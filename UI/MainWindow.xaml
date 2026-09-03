@@ -1,0 +1,136 @@
+<Window x:Class="MgaSonicAnvil.UI.MainWindow"
+        x:ClassModifier="public"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:MgaSonicAnvil.UI"
+        xmlns:domain="clr-namespace:MgaSonicAnvil.Domain"
+        Title="{x:Static domain:AppVersion.ProductName}"
+        MinWidth="720"
+        MinHeight="420"
+        Width="1100"
+        Height="640"
+        AllowDrop="True"
+        Background="{DynamicResource SurfaceBackBrush}">
+  <DockPanel LastChildFill="True">
+    <ui:LevelMeterView x:Name="LevelMeter"
+                       DockPanel.Dock="Right"
+                       Margin="4,0,0,0" />
+    <Border DockPanel.Dock="Bottom"
+            Height="{x:Static ui:DesignMetrics.StatusBarHeight}"
+            Background="{DynamicResource StatusBarBackBrush}"
+            Padding="8,0">
+      <TextBlock x:Name="StatusMeta"
+                 VerticalAlignment="Center"
+                 FontFamily="Consolas"
+                 FontSize="11"
+                 Foreground="{DynamicResource StatusBarDetailForeBrush}"
+                 Text="{x:Static domain:UiStrings.StatusEmpty}" />
+    </Border>
+
+    <Border x:Name="ActionBar"
+            DockPanel.Dock="Bottom"
+            Height="{x:Static ui:DesignMetrics.ActionBarHeight}"
+            Padding="10,6,8,6"
+            Background="{DynamicResource ActionBarBackBrush}">
+      <Grid>
+        <StackPanel Orientation="Horizontal"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Center">
+          <TextBlock FontSize="10"
+                     Foreground="{DynamicResource ActionCopyrightForeBrush}"
+                     Text="{x:Static domain:UiStrings.CopyrightText}" />
+          <TextBlock FontSize="10"
+                     Cursor="Hand"
+                     Foreground="{DynamicResource ActionLinkForeBrush}"
+                     Text="{x:Static domain:UiStrings.CopyrightGitHub}"
+                     ToolTip="{x:Static domain:UiStrings.TipGitHub}"
+                     MouseLeftButtonUp="GitHubLink_MouseLeftButtonUp" />
+        </StackPanel>
+        <ui:ProjectSpectrumView x:Name="Spectrum"
+                                Height="{x:Static ui:DesignMetrics.ToolbarButtonSide}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource ActionBarBackBrush}"
+                                ToolTip="{x:Static domain:UiStrings.TipSpectrum}" />
+        <StackPanel Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center">
+          <CheckBox x:Name="AlwaysOnTopCheck"
+                    Style="{StaticResource DarkCheckBoxStyle}"
+                    Content="{x:Static domain:UiStrings.LabelAlwaysOnTop}"
+                    VerticalAlignment="Center"
+                    Margin="0,0,16,0"
+                    FontSize="11"
+                    Foreground="{DynamicResource MutedForeBrush}"
+                    ToolTip="{x:Static domain:UiStrings.TipAlwaysOnTop}"
+                    Checked="AlwaysOnTopCheck_Changed"
+                    Unchecked="AlwaysOnTopCheck_Changed" />
+          <TextBlock Text="{x:Static domain:UiStrings.LabelAudioApi}"
+                     VerticalAlignment="Center"
+                     Margin="0,0,6,0"
+                     Foreground="{DynamicResource MutedForeBrush}"
+                     ToolTip="{x:Static domain:UiStrings.TipAudioApi}" />
+          <ComboBox x:Name="ApiCombo"
+                    Width="110"
+                    Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                    Margin="0,0,12,0"
+                    VerticalContentAlignment="Center"
+                    ToolTip="{x:Static domain:UiStrings.TipAudioApi}"
+                    SelectionChanged="ApiCombo_SelectionChanged" />
+          <TextBlock Text="{x:Static domain:UiStrings.LabelAudioDevice}"
+                     VerticalAlignment="Center"
+                     Margin="0,0,6,0"
+                     Foreground="{DynamicResource MutedForeBrush}"
+                     ToolTip="{x:Static domain:UiStrings.TipAudioDevice}" />
+          <ComboBox x:Name="DeviceCombo"
+                    Width="220"
+                    Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                    VerticalContentAlignment="Center"
+                    ToolTip="{x:Static domain:UiStrings.TipAudioDevice}"
+                    SelectionChanged="DeviceCombo_SelectionChanged" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <ui:TransportBar x:Name="Transport" DockPanel.Dock="Bottom" />
+
+    <Border DockPanel.Dock="Top"
+            Height="{x:Static ui:DesignMetrics.ProjectBarHeight}"
+            Padding="8,4"
+            Background="{DynamicResource ProjectBarBackBrush}">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBlock x:Name="FileNameText"
+                   VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis"
+                   FontSize="11"
+                   Foreground="{DynamicResource PrimaryForeBrush}"
+                   ToolTip="{x:Static domain:UiStrings.TipOpen}"
+                   Text="{x:Static domain:UiStrings.DropHint}" />
+        <ui:OverviewView x:Name="Overview"
+                         Grid.Row="1"
+                         Margin="0,3,0,0"
+                         ToolTip="{x:Static domain:UiStrings.TipOverview}" />
+      </Grid>
+    </Border>
+
+    <Border Background="{DynamicResource WaveformScrollTrackBrush}"
+            MinHeight="{x:Static ui:DesignMetrics.WaveformHostMinHeight}"
+            AllowDrop="True">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*" />
+          <RowDefinition Height="{x:Static ui:DesignMetrics.WaveformScrollBarHeightGrid}" />
+        </Grid.RowDefinitions>
+        <ui:WaveformView x:Name="Waveform" Grid.Row="0" />
+        <ui:TimeScrollBar x:Name="TimeScroll"
+                          Grid.Row="1"
+                          Style="{StaticResource DarkScrollBarStyle}"
+                          Background="{DynamicResource WaveformScrollTrackBrush}" />
+      </Grid>
+    </Border>
+  </DockPanel>
+</Window>

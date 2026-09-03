@@ -1,0 +1,50 @@
+<Window x:Class="MgaSonicAnvil.UI.AudioSettingsWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:MgaSonicAnvil.UI"
+        xmlns:domain="clr-namespace:MgaSonicAnvil.Domain"
+        WindowStyle="SingleBorderWindow"
+        SizeToContent="WidthAndHeight"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBackBrush}"
+        Foreground="{DynamicResource PrimaryForeBrush}"
+        Title="{x:Static domain:UiStrings.DialogSettingsTitle}">
+  <Border Padding="{x:Static ui:DesignMetrics.AudioPad}">
+    <StackPanel Width="280">
+      <TextBlock Text="{x:Static domain:UiStrings.LabelAudioApi}" Margin="0,0,0,3" />
+      <ComboBox x:Name="ApiCombo"
+                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                Padding="6,1"
+                FontSize="11.333"
+                VerticalContentAlignment="Center"
+                Margin="0,0,0,12"
+                SelectionChanged="ApiCombo_SelectionChanged" />
+
+      <TextBlock Text="{x:Static domain:UiStrings.LabelAudioDevice}" Margin="0,0,0,3" />
+      <ComboBox x:Name="DeviceCombo"
+                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                Padding="6,1"
+                FontSize="11.333"
+                VerticalContentAlignment="Center"
+                Margin="0,0,0,16" />
+
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <ui:RoundedButton x:Name="OkButton"
+                          Content="{x:Static domain:UiStrings.ButtonOk}"
+                          Width="{x:Static ui:DesignMetrics.AudioDialogButtonWidth}"
+                          Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
+                          Margin="0,0,12,0"
+                          Click="OkButton_Click" />
+        <ui:RoundedButton x:Name="CancelButton"
+                          Content="{x:Static domain:UiStrings.ButtonCancel}"
+                          Width="{x:Static ui:DesignMetrics.AudioDialogButtonWidth}"
+                          Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
+                          IsCancel="True"
+                          Click="CancelButton_Click" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</Window>
