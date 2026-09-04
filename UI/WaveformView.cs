@@ -13,15 +13,17 @@ namespace MgaSonicAnvil.UI;
 
 internal sealed class WaveformView : Grid
 {
-    public const double TimeZoomStep = 1.09050773267;
+    // 旧 2^(1/8) の 3 段階分 = 2^(3/8)。キー／ボタンの時間・振幅ズーム共通。
+    public const double TimeZoomStep = 1.2968395546510096;
     public const double TimeZoomMax = 81920d;
     public const double TimeZoomStepMax = 32d;
     public const double AmpZoomMax = 128d;
-    public const double WheelTimeStep = 1.189207115;
+    // 旧 2^(1/4) の 3 段階分 = 2^(3/4)。ホイール時間ズーム。
+    public const double WheelTimeStep = 1.681792830507429;
     private const int PolylineMaxSamplesPerPixel = 1;
     private const int RawColumnMaxSamplesPerPixel = 96;
     private const int RawColumnMaxFrames = 1 << 18;
-    public const double SamplePointMinZoom = 10000d;
+    private const int SamplePointMaxVisibleFrames = 500;
     private const double SamplePointRadius = 8d / 3d;
     private static readonly double[] DbRequiredMarks = [-3, -6, -12];
     private static readonly double[] DbOptionalMarks = [-9, -18, -24, -36, -48, -60];
@@ -305,9 +307,8 @@ internal sealed class WaveformView : Grid
 
     public bool SamplePointsVisible =>
         _document is not null
-        && _timeZoom >= SamplePointMinZoom
         && ContentWidth > 0
-        && ViewSpanFrames <= ContentWidth;
+        && ViewSpanFrames <= Math.Min(SamplePointMaxVisibleFrames, ContentWidth);
 
     public long NudgeStepFrames
     {
@@ -2016,8 +2017,7 @@ internal sealed class WaveformView : Grid
 
     private bool ShouldDrawSamplePoints(int count, double width) =>
         count > 0
-        && count <= width
-        && _timeZoom >= SamplePointMinZoom;
+        && count <= Math.Min(SamplePointMaxVisibleFrames, width);
 
     private static bool IsPolylineZoom(long rangeFrames, int width) =>
         rangeFrames > 0 && width > 0 && rangeFrames <= (long)width * PolylineMaxSamplesPerPixel;
