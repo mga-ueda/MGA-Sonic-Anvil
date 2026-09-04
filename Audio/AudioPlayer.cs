@@ -201,7 +201,93 @@ internal sealed class AudioPlayer : IDisposable
         }
 
         _disposed = true;
-        DisposeOutputOnly();
+        try
+        {
+            FlushOutputWithSilence();
+        }
+        finally
+        {
+            DisposeOutputOnly();
+        }
+    }
+
+    /// <summary>
+    /// 停止だけではドライバ先読みが残ることがあるため、無音を流してから破棄する。
+    /// 洗い流し時間は出力レイテンシ／バッファ長に合わせる（短い固定値だと足りない）。
+    /// </summary>
+    private void FlushOutputWithSilence()
+    {
+        if (_output is null)
+        {
+            return;
+        }
+
+        _suppressPlaybackEnded = true;
+        try
+        {
+            _scrubbing = false;
+            _provider.BeginSilenceFlush();
+            try
+            {
+                _output.Play();
+                _playing = true;
+            }
+            catch
+            {
+                // 既に止まっている等は無視して破棄へ進む。
+            }
+
+            Thread.Sleep(EstimateFlushMilliseconds(_output));
+            try
+            {
+                _output.Stop();
+            }
+            catch
+            {
+            }
+
+            _playing = false;
+        }
+        catch
+        {
+            // 終了処理は失敗しても破棄を優先する。
+        }
+    }
+
+    private int EstimateFlushMilliseconds(IWavePlayer output)
+    {
+        // 再生中バッファ＋キュー分を見込む。上限は終了待ちの体感用。
+        const int minMs = 200;
+        const int maxMs = 1500;
+        var sampleRate = Math.Max(1, _provider.WaveFormat.SampleRate);
+        var ms = output switch
+        {
+            WaveOutEvent wave =>
+                Math.Max(1, wave.DesiredLatency) * Math.Max(1, wave.NumberOfBuffers),
+            WasapiOut =>
+                AudioOutputFactory.WasapiLatencyMs * 3,
+            AsioOut asio =>
+                EstimateAsioFlushMilliseconds(asio, sampleRate),
+            _ => 400,
+        };
+
+        // 実効遅延より少し長めに洗い流す。
+        ms = (int)Math.Ceiling(ms * 1.25);
+        return Math.Clamp(ms, minMs, maxMs);
+    }
+
+    private static int EstimateAsioFlushMilliseconds(AsioOut asio, int sampleRate)
+    {
+        try
+        {
+            var frames = Math.Max(1, asio.FramesPerBuffer);
+            // ASIO は典型的にダブルバッファ。
+            return (int)Math.Ceiling(frames * 2.0 * 1000.0 / Math.Max(1, sampleRate));
+        }
+        catch
+        {
+            return 400;
+        }
     }
 
     private void EnsureBound(AudioDocument document, long frame)

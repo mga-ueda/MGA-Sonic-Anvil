@@ -18,7 +18,6 @@ internal static class FadeCurveIcons
     public static ImageSource Create(
         FadeShape shape,
         bool isFadeIn,
-        bool selected,
         int pixelSize = IconSize)
     {
         var inner = Math.Max(8, pixelSize);
@@ -70,13 +69,6 @@ internal static class FadeCurveIcons
 
             geo.Freeze();
             dc.DrawGeometry(null, pen, geo);
-
-            if (selected)
-            {
-                var selectPen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("AccentCyanBrush")), 1);
-                selectPen.Freeze();
-                dc.DrawRectangle(null, selectPen, new Rect(1, 1, inner, inner));
-            }
         }
 
         var bmp = new RenderTargetBitmap(canvas, canvas, 96, 96, PixelFormats.Pbgra32);
@@ -103,21 +95,31 @@ internal static class FadeCurveIcons
     {
         var order = FadeCurves.MenuOrder(isFadeIn);
         var canvas = CanvasSize(iconSize);
+        var cyan = WpfControlHelpers.FrozenBrush(Theme.Get("AccentCyanBrush"));
         foreach (var shape in order)
         {
             var captured = shape;
+            var selected = shape == current;
             var item = new MenuItem
             {
                 Header = UiStrings.LabelFadeCurve((int)shape),
                 Tag = captured,
                 ToolTip = UiStrings.TipFadeShape((int)shape),
-                Icon = new Image
+                Icon = new Border
                 {
-                    Source = Create(shape, isFadeIn, selected: shape == current, iconSize),
                     Width = canvas,
                     Height = canvas,
-                    Stretch = Stretch.None,
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = selected ? cyan : Brushes.Transparent,
                     SnapsToDevicePixels = true,
+                    Child = new Image
+                    {
+                        Source = Create(shape, isFadeIn, iconSize),
+                        Width = canvas,
+                        Height = canvas,
+                        Stretch = Stretch.None,
+                        SnapsToDevicePixels = true,
+                    },
                 },
             };
             item.Click += (_, _) => onSelected(captured);
@@ -125,23 +127,17 @@ internal static class FadeCurveIcons
         }
     }
 
-    public static void SyncSelectedIcons(
-        ItemCollection items,
-        FadeShape selected,
-        bool isFadeIn,
-        int iconSize = IconSize)
+    public static void SyncSelectedBorder(ItemCollection items, FadeShape selected)
     {
-        var canvas = CanvasSize(iconSize);
+        var cyan = WpfControlHelpers.FrozenBrush(Theme.Get("AccentCyanBrush"));
         foreach (var item in items.OfType<MenuItem>())
         {
-            if (item.Tag is not FadeShape shape || item.Icon is not Image image)
+            if (item.Tag is not FadeShape shape || item.Icon is not Border border)
             {
                 continue;
             }
 
-            image.Source = Create(shape, isFadeIn, selected: shape == selected, iconSize);
-            image.Width = canvas;
-            image.Height = canvas;
+            border.BorderBrush = shape == selected ? cyan : Brushes.Transparent;
         }
     }
 }

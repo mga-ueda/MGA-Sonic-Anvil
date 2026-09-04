@@ -164,6 +164,7 @@ public partial class MainWindow
 
         var frame = _player.CursorFrame;
         _fadePreviewing = false;
+        Waveform.SetPreviewGain(null);
         PausePlaybackSoft();
         SeekFrame(frame);
         return true;
@@ -367,6 +368,7 @@ public partial class MainWindow
         if (_fadePreviewing)
         {
             _fadePreviewing = false;
+            Waveform.SetPreviewGain(null);
         }
 
         _playTimer.Stop();
@@ -439,6 +441,7 @@ public partial class MainWindow
         if (_fadePreviewing)
         {
             _fadePreviewing = false;
+            Waveform.SetPreviewGain(null);
             PausePlaybackSoft();
             if (_document is not null)
             {

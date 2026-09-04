@@ -28,6 +28,11 @@ public partial class MainWindow
             _fadeMenu.IsOpen = false;
         }
 
+        if (_player.IsPlaying)
+        {
+            PausePlaybackSoft();
+        }
+
         _fadePromptIsIn = fadeIn;
         _fadePreviewResumeFrame = _document.CursorFrame;
         var target = placementTarget ?? Waveform;
@@ -37,11 +42,13 @@ public partial class MainWindow
             placement,
             fadeIn,
             shape => ApplyFade(fadeIn, shape),
-            shape => PreviewFade(fadeIn, shape));
+            shape => PreviewFade(fadeIn, shape),
+            shape => ApplyFadeCurveVisualPreview(fadeIn, shape));
         _fadeMenu = menu;
         menu.Closed += (_, _) =>
         {
             StopFadePreview(restoreCursor: true);
+            ClearFadeCurveVisualPreview();
             if (ReferenceEquals(_fadeMenu, menu))
             {
                 _fadeMenu = null;
@@ -59,6 +66,29 @@ public partial class MainWindow
         _fadeMenu.IsOpen = false;
         return true;
     }
+
+    private void ApplyFadeCurveVisualPreview(bool fadeIn, FadeShape shape)
+    {
+        if (_document is null)
+        {
+            ClearFadeCurveVisualPreview();
+            return;
+        }
+
+        var range = FadeCurves.InclusiveSampleRange(ActiveRange(), _document.FrameCount);
+        if (range.IsEmpty)
+        {
+            ClearFadeCurveVisualPreview();
+            return;
+        }
+
+        Waveform.SetPreviewGain(frame =>
+            frame < range.StartFrame || frame >= range.EndFrame
+                ? 1f
+                : FadeCurves.GainAtFrame(shape, fadeIn, frame, range.StartFrame, range.Length));
+    }
+
+    private void ClearFadeCurveVisualPreview() => Waveform.SetPreviewGain(null);
 
     private void PreviewFade(bool fadeIn, FadeShape shape)
     {
@@ -80,6 +110,7 @@ public partial class MainWindow
             if (_fadePreviewing && _player.IsPlaying)
             {
                 StopFadePreview(restoreCursor: true);
+                ApplyFadeCurveVisualPreview(fadeIn, shape);
                 return;
             }
 
@@ -108,15 +139,16 @@ public partial class MainWindow
         {
             PausePlaybackSoft();
             _meter.Reset();
+            var previewRange = FadeCurves.InclusiveSampleRange(range, _document.FrameCount);
             var gain = (long frame) =>
-                FadeCurves.GainAtFrame(shape, fadeIn, frame, range.StartFrame, range.Length);
+                FadeCurves.GainAtFrame(shape, fadeIn, frame, previewRange.StartFrame, previewRange.Length);
             if (_player.HasOutputDevice)
             {
-                _player.Rebind(_document, range.StartFrame, range, loop: false, gain);
+                _player.Rebind(_document, previewRange.StartFrame, previewRange, loop: false, gain);
             }
             else
             {
-                _player.Prepare(_document, range.StartFrame, range, loop: false, gain);
+                _player.Prepare(_document, previewRange.StartFrame, previewRange, loop: false, gain);
             }
 
             _player.Play();
@@ -126,11 +158,13 @@ public partial class MainWindow
             StartMeterRendering();
             Waveform.SetTrailRecording(true);
             Transport.SetPlaying(true);
-            Waveform.PlayheadFrame = range.StartFrame;
+            Waveform.PlayheadFrame = previewRange.StartFrame;
+            ApplyFadeCurveVisualPreview(fadeIn, shape);
         }
         catch (Exception ex)
         {
             _fadePreviewing = false;
+            ClearFadeCurveVisualPreview();
             PausePlaybackSoft();
             OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
@@ -182,6 +216,7 @@ public partial class MainWindow
         }
 
         _fadePreviewing = false;
+        ClearFadeCurveVisualPreview();
         PausePlaybackSoft();
         var command = fadeIn
             ? ProcessEdits.FadeIn(_document, range, shape)

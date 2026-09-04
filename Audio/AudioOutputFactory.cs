@@ -7,7 +7,7 @@ namespace MgaSonicAnvil.Audio;
 
 internal static class AudioOutputFactory
 {
-    private const int WasapiLatencyMs = 100;
+    internal const int WasapiLatencyMs = 100;
 
     public static IReadOnlyList<AudioOutputDeviceInfo> EnumerateDevices(AudioOutputApi api) =>
         api switch

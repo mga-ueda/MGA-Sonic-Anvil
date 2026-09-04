@@ -66,6 +66,32 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void FadeOut_IncludesSampleAtExclusiveEndBoundary()
+    {
+        var document = MakeConstant(frames: 20, value: 1f);
+        var history = new EditHistory();
+        // 選択 [0,10) の終端線は frame 10。ここも無音にする。
+        history.Do(document, ProcessEdits.FadeOut(document, new WaveSelection(0, 10), FadeShape.Linear));
+
+        Assert.Equal(1f, document.Interleaved[0], 5);
+        Assert.Equal(0f, document.Interleaved[10 * 2], 5);
+        Assert.Equal(0f, document.Interleaved[10 * 2 + 1], 5);
+        Assert.Equal(1f, document.Interleaved[11 * 2], 5);
+    }
+
+    [Fact]
+    public void FadeIn_StartsSilentAtSelectionStart()
+    {
+        var document = MakeConstant(frames: 20, value: 1f);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.FadeIn(document, new WaveSelection(5, 15), FadeShape.Linear));
+
+        Assert.Equal(1f, document.Interleaved[4 * 2], 5);
+        Assert.Equal(0f, document.Interleaved[5 * 2], 5);
+        Assert.Equal(0f, document.Interleaved[5 * 2 + 1], 5);
+    }
+
+    [Fact]
     public void FadeOut_UsesComplementOfRisingCurve()
     {
         var document = MakeConstant(frames: 5, value: 1f);

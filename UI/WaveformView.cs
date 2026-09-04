@@ -61,6 +61,7 @@ internal sealed class WaveformView : Grid
     private bool _endingCommentEdit;
     private readonly List<(long Frame, long TickMs)> _trailSamples = [];
     private bool _trailActive;
+    private Func<long, float>? _previewGainAtFrame;
 
     private AudioDocument? _document;
     private WriteableBitmap? _waveBitmap;
@@ -171,11 +172,21 @@ internal sealed class WaveformView : Grid
             EndMarkerCommentEdit(commit: false);
             ResetMarkerDragState();
             _scrubbing = false;
+            _previewGainAtFrame = null;
             _selectedMarkerFrames.Clear();
             _keyboardSelectAnchor = null;
             InvalidateWaveform();
             RaiseViewChanged();
         }
+    }
+
+    /// <summary>
+    /// お試しフェード中など、描画だけにゲインを掛ける（ドキュメントは変更しない）。
+    /// </summary>
+    public void SetPreviewGain(Func<long, float>? gainAtFrame)
+    {
+        _previewGainAtFrame = gainAtFrame;
+        InvalidateWaveform();
     }
 
     public long PlayheadFrame
@@ -1290,6 +1301,11 @@ internal sealed class WaveformView : Grid
                 return;
             }
 
+            if (!useRawColumns && _previewGainAtFrame is not null)
+            {
+                ApplyPreviewGainToColumns(startFrame, endFrame, count, channels);
+            }
+
             for (var ch = 0; ch < channels; ch++)
             {
                 var top = ch * (laneHeight + laneGap);
@@ -1487,9 +1503,10 @@ internal sealed class WaveformView : Grid
             for (var frame = f0; frame < f1; frame++)
             {
                 var src = (int)frame * channels;
+                var gain = PreviewGain(frame);
                 for (var ch = 0; ch < channels; ch++)
                 {
-                    var sample = samples[src + ch];
+                    var sample = samples[src + ch] * gain;
                     if (sample < _columnMins[dest + ch])
                     {
                         _columnMins[dest + ch] = sample;
@@ -1513,6 +1530,42 @@ internal sealed class WaveformView : Grid
         }
 
         return buckets;
+    }
+
+    private float PreviewGain(long frame) =>
+        _previewGainAtFrame is { } gain ? gain(frame) : 1f;
+
+    private void ApplyPreviewGainToColumns(long startFrame, long endFrame, int count, int channels)
+    {
+        if (_previewGainAtFrame is null || count <= 0)
+        {
+            return;
+        }
+
+        var rangeFrames = endFrame - startFrame;
+        if (rangeFrames <= 0)
+        {
+            return;
+        }
+
+        for (var i = 0; i < count; i++)
+        {
+            var f0 = startFrame + i * rangeFrames / count;
+            var f1 = startFrame + (i + 1) * rangeFrames / count;
+            var mid = f0 + Math.Max(0L, (f1 - f0) / 2);
+            var gain = PreviewGain(mid);
+            if (Math.Abs(gain - 1f) < 1e-6f)
+            {
+                continue;
+            }
+
+            var dest = i * channels;
+            for (var ch = 0; ch < channels; ch++)
+            {
+                _columnMins[dest + ch] *= gain;
+                _columnMaxs[dest + ch] *= gain;
+            }
+        }
     }
 
     private unsafe void RasterSamplePolyline(
@@ -1547,7 +1600,11 @@ internal sealed class WaveformView : Grid
             return Math.Clamp(y, clipTop, clipBottom - 1);
         }
 
-        float SampleAt(int index) => samples[(first + index) * channels + channel];
+        float SampleAt(int index)
+        {
+            var frame = first + index;
+            return samples[(int)frame * channels + channel] * PreviewGain(frame);
+        }
         var collectDots = ShouldDrawSamplePoints(count, width / scaleX);
         var dotRadius = Math.Max(1, (int)Math.Round(SamplePointRadius * scaleX));
 
@@ -2539,6 +2596,7 @@ internal sealed class WaveformView : Grid
                 MarkerCommentCommitted?.Invoke(this, (frame, text.Trim()));
             }
 
+            ClearMarkerSelection();
             Focus();
             InvalidatePlayheadLayer();
         }

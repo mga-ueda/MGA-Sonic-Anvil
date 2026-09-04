@@ -7,13 +7,13 @@ namespace MgaSonicAnvil.UI;
 
 /// <summary>
 /// Wwise IM Importer と同じ小型スペクトラムアナライザ。
-/// バー幅・間隔はデバイス px 固定（2px）、ホスト幅もそれに合わせる。
+/// バー幅・間隔はデバイス px 固定（4px）、ホスト幅もそれに合わせる。
 /// </summary>
 internal sealed class ProjectSpectrumView : FrameworkElement
 {
     private const int FftSize = 2048;
-    private const int BarWidthDevicePx = 2;
-    private const int BarGapDevicePx = 2;
+    private const int BarWidthDevicePx = 4;
+    private const int BarGapDevicePx = 4;
     private const float FloorDb = -60f;
     private const float CeilingDb = 0f;
     private const double RiseSeconds = 0.001d;
@@ -85,7 +85,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
 
     public AudioPlayer? Player { get; set; }
 
-    /// <summary>デバイス px 換算の必要幅（バー 2px + 隙間 2px × バンド数）。</summary>
+    /// <summary>デバイス px 換算の必要幅（バー 4px + 隙間 4px × バンド数）。</summary>
     public static int RequiredWidthDevicePx =>
         BandCenters.Length * BarWidthDevicePx
         + (BandCenters.Length - 1) * BarGapDevicePx;

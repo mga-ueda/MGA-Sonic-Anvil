@@ -39,6 +39,7 @@ public partial class MainWindow : Window
     private long _fadePreviewResumeFrame;
     private long _fadeSpaceTick;
     private bool _resumeAfterScrub;
+    private bool _startupRevealPending = true;
 
     public MainWindow()
     {
@@ -107,12 +108,42 @@ public partial class MainWindow : Window
             _playTimer.Stop();
             StopMarkerNudge();
             ResetMarkerDigitEntry();
+            // Closing で既に破棄済みでも安全（冪等）。
             _player.Dispose();
         };
 
         ApplyWaveformHeightScale();
         SetDocument(null);
-        Loaded += (_, _) => TryRestoreLastDocument();
+        Loaded += OnStartupLoaded;
+        ContentRendered += OnStartupContentRendered;
+    }
+
+    private void OnStartupLoaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= OnStartupLoaded;
+        TryRestoreLastDocument();
+        UpdateLayout();
+        Waveform.Refresh();
+        Overview.InvalidateVisual();
+        // Loaded 直後の描画・コンボ反映が終わるまで待ってから表示する。
+        Dispatcher.BeginInvoke(RevealStartupWindow, DispatcherPriority.ApplicationIdle);
+    }
+
+    private void OnStartupContentRendered(object? sender, EventArgs e)
+    {
+        ContentRendered -= OnStartupContentRendered;
+        Dispatcher.BeginInvoke(RevealStartupWindow, DispatcherPriority.ApplicationIdle);
+    }
+
+    private void RevealStartupWindow()
+    {
+        if (!_startupRevealPending)
+        {
+            return;
+        }
+
+        _startupRevealPending = false;
+        Opacity = 1;
     }
 
     private void SetDocument(AudioDocument? document)
@@ -241,6 +272,12 @@ public partial class MainWindow : Window
         AppStorage.Settings.ApplyAudioOutput(_outputSettings);
         AppStorage.Settings.WaveformHeightScale = _waveformHeightScale;
         AppStorage.Save();
+
+        // メッセージポンプが生きているうちに無音フラッシュ＋デバイス破棄する。
+        StopMeterRendering();
+        _playTimer.Stop();
+        StopMarkerNudge();
+        _player.Dispose();
     }
 
     private void MainWindow_DragOver(object sender, DragEventArgs e)

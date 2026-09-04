@@ -13,7 +13,7 @@ internal static class DesignMetrics
 
     public static double ProjectBarHeight => From96(48);
 
-    public static double ActionBarHeight => From96(44);
+    public static double ActionBarHeight => From96(60);
 
     public static double StatusBarHeight => From96(20);
 
@@ -42,6 +42,9 @@ internal static class DesignMetrics
     public static double TransportPositionWidth => Dip(220);
 
     public static double ToolbarButtonSide => From96(24);
+
+    /// <summary>アクションバー中央のスペアナ高さ（従来ツールバーボタンの 2 倍）。</summary>
+    public static double SpectrumHeight => ToolbarButtonSide * 2;
 
     public static double ActionButtonWidth => From96(108);
 

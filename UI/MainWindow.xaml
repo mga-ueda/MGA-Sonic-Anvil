@@ -9,6 +9,7 @@
         MinHeight="420"
         Width="1100"
         Height="640"
+        Opacity="0"
         AllowDrop="True"
         Background="{DynamicResource SurfaceBackBrush}">
   <DockPanel LastChildFill="True">
@@ -47,7 +48,7 @@
                      MouseLeftButtonUp="GitHubLink_MouseLeftButtonUp" />
         </StackPanel>
         <ui:ProjectSpectrumView x:Name="Spectrum"
-                                Height="{x:Static ui:DesignMetrics.ToolbarButtonSide}"
+                                Height="{x:Static ui:DesignMetrics.SpectrumHeight}"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Background="{DynamicResource ActionBarBackBrush}"

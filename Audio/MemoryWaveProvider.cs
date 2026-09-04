@@ -67,6 +67,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private double _intervalSumSqL;
     private double _intervalSumSqR;
     private int _intervalFrames;
+    private bool _silenceOnly;
 
     public WaveFormat WaveFormat { get; private set; } =
         WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
@@ -107,6 +108,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(document.SampleRate, _outputChannels);
             _cursor = checked((int)Math.Clamp(startFrame, 0, document.FrameCount) * _channels);
             _frameGain = frameGain;
+            _silenceOnly = false;
             if (playRange is { IsEmpty: false } range)
             {
                 _loop = loop;
@@ -120,6 +122,32 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 _playEnd = _samples.Length;
             }
 
+            Ended = false;
+            Array.Clear(_meterL);
+            Array.Clear(_meterR);
+            _meterWrite = 0;
+            _meterCount = 0;
+            lock (_monitorGate)
+            {
+                Array.Clear(_monitorRing);
+                _monitorWriteCount = 0;
+                ResetMeterIntervalNoLock();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 以降の Read は無音のみ。終了時にドライバ先読みを洗い流す用途。
+    /// </summary>
+    public void BeginSilenceFlush()
+    {
+        lock (_gate)
+        {
+            _silenceOnly = true;
+            _scrubbing = false;
+            _scrub.Stop();
+            _samples = [];
+            _frameGain = null;
             Ended = false;
             Array.Clear(_meterL);
             Array.Clear(_meterR);
@@ -291,6 +319,12 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
     private int ReadCore(float[] buffer, int offset, int count)
     {
+        if (_silenceOnly)
+        {
+            Array.Clear(buffer, offset, count);
+            return count;
+        }
+
         if (_scrubbing)
         {
             return ReadScrub(buffer, offset, count);

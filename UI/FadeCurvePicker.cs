@@ -18,18 +18,27 @@ internal static class FadeCurvePicker
     private static readonly DependencyPropertyDescriptor? IsHighlightedDescriptor =
         DependencyPropertyDescriptor.FromProperty(MenuItem.IsHighlightedProperty, typeof(MenuItem));
 
+    private static bool _updatingSelectionChrome;
+
+    private sealed class MenuState
+    {
+        public required bool FadeIn { get; init; }
+        public Action<FadeShape>? OnHighlight { get; init; }
+    }
+
     public static ContextMenu Show(
         FrameworkElement placementTarget,
         PlacementMode placement,
         bool fadeIn,
         Action<FadeShape> onCommit,
-        Action<FadeShape> onPreview)
+        Action<FadeShape> onPreview,
+        Action<FadeShape>? onHighlight = null)
     {
         var menu = new ContextMenu
         {
             PlacementTarget = placementTarget,
             Placement = placement,
-            Tag = fadeIn,
+            Tag = new MenuState { FadeIn = fadeIn, OnHighlight = onHighlight },
         };
 
         FadeCurveIcons.AddCurveChoices(menu.Items, FadeCurves.Default, fadeIn, onCommit);
@@ -117,20 +126,32 @@ internal static class FadeCurvePicker
 
     private static void OnItemIsHighlightedChanged(object? sender, EventArgs e)
     {
-        if (sender is not MenuItem { IsHighlighted: true, Tag: FadeShape shape } item)
+        if (_updatingSelectionChrome
+            || sender is not MenuItem { IsHighlighted: true, Tag: FadeShape shape } item)
         {
             return;
         }
 
         var menu = ItemsControl.ItemsControlFromItemContainer(item) as ContextMenu
             ?? item.Parent as ContextMenu;
-        if (menu is null || menu.Tag is not bool fadeIn)
+        if (menu is null)
         {
             return;
         }
 
-        FadeCurveIcons.SyncSelectedIcons(menu.Items, shape, fadeIn);
-        CurrentSelectionProperty?.SetValue(menu, item);
+        _updatingSelectionChrome = true;
+        try
+        {
+            FadeCurveIcons.SyncSelectedBorder(menu.Items, shape);
+            if (menu.Tag is MenuState { OnHighlight: { } onHighlight })
+            {
+                onHighlight(shape);
+            }
+        }
+        finally
+        {
+            _updatingSelectionChrome = false;
+        }
     }
 
     private static void HighlightDefault(ContextMenu menu)
@@ -150,12 +171,21 @@ internal static class FadeCurvePicker
             return;
         }
 
-        target.Focus();
-        Keyboard.Focus(target);
-        CurrentSelectionProperty?.SetValue(menu, target);
-        if (menu.Tag is bool fadeIn)
+        _updatingSelectionChrome = true;
+        try
         {
-            FadeCurveIcons.SyncSelectedIcons(menu.Items, FadeCurves.Default, fadeIn);
+            target.Focus();
+            Keyboard.Focus(target);
+            CurrentSelectionProperty?.SetValue(menu, target);
+            FadeCurveIcons.SyncSelectedBorder(menu.Items, FadeCurves.Default);
+            if (menu.Tag is MenuState { OnHighlight: { } onHighlight })
+            {
+                onHighlight(FadeCurves.Default);
+            }
+        }
+        finally
+        {
+            _updatingSelectionChrome = false;
         }
     }
 }

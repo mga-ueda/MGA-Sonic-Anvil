@@ -463,16 +463,15 @@ internal static class ProcessEdits
         string name,
         FadeShape shape)
     {
+        var selectionAfter = range;
+        range = FadeCurves.InclusiveSampleRange(range, document.FrameCount);
         var before = document.CopyRange(range.StartFrame, range.Length);
         var after = (float[])before.Clone();
         var channels = document.Channels;
         var frames = (int)range.Length;
         if (frames <= 1)
         {
-            if (fadeIn)
-            {
-                Array.Clear(after);
-            }
+            Array.Clear(after);
         }
         else
         {
@@ -494,9 +493,9 @@ internal static class ProcessEdits
             before,
             after,
             document.Selection,
-            range,
+            selectionAfter,
             document.CursorFrame,
-            range.StartFrame);
+            selectionAfter.StartFrame);
     }
 
     private static void ApplyFadeGains(

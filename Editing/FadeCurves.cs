@@ -1,3 +1,5 @@
+using MgaSonicAnvil.Audio;
+
 namespace MgaSonicAnvil.Editing;
 
 /// <summary>
@@ -88,11 +90,33 @@ internal static class FadeCurves
     {
         if (length <= 1)
         {
-            return fadeIn ? 0f : 1f;
+            // 1 サンプルでも端点の意味を持たせる（イン=無音、アウト=無音）。
+            return 0f;
         }
 
         var t = (frame - startFrame) / (double)(length - 1);
         return Gain(shape, fadeIn, t);
+    }
+
+    /// <summary>
+    /// 選択は [start, end) だが、終端線上のサンプルもフェード対象にする。
+    /// （終端がマーカーのとき、そのサンプルが残って崖になるのを防ぐ）
+    /// </summary>
+    public static WaveSelection InclusiveSampleRange(WaveSelection selection, long frameCount)
+    {
+        if (selection.IsEmpty || frameCount <= 0)
+        {
+            return WaveSelection.Empty;
+        }
+
+        var start = selection.StartFrame;
+        var end = selection.EndFrame;
+        if (end < frameCount)
+        {
+            end += 1;
+        }
+
+        return new WaveSelection(start, end).Clamp(frameCount);
     }
 
     private static float SCurve(double t)
