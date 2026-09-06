@@ -9,10 +9,22 @@ static class Program
     static void Main()
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        AppStorage.Initialize();
+        if (!SingleInstance.TryAcquire())
+        {
+            SingleInstance.RequestActivate();
+            return;
+        }
 
-        var app = new App();
-        app.InitializeComponent();
-        app.Run();
+        try
+        {
+            AppStorage.Initialize();
+            var app = new App();
+            app.InitializeComponent();
+            app.Run();
+        }
+        finally
+        {
+            SingleInstance.Release();
+        }
     }
 }

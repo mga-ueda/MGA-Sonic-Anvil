@@ -3,6 +3,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="clr-namespace:MgaSonicAnvil.UI"
+             xmlns:domain="clr-namespace:MgaSonicAnvil.Domain"
              Height="{x:Static ui:DesignMetrics.TransportBarHeight}"
              Focusable="False"
              Background="{DynamicResource TransportBackBrush}">
@@ -11,15 +12,32 @@
       <ColumnDefinition Width="Auto" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
-    <TextBlock x:Name="PositionText"
-               Width="{x:Static ui:DesignMetrics.TransportPositionWidth}"
-               VerticalAlignment="Center"
-               FontFamily="Consolas"
-               FontWeight="Bold"
-               FontSize="16"
-               Foreground="{DynamicResource PrimaryForeBrush}"
-               ToolTip="再生ヘッド位置"
-               Text="00:00.000" />
+    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+      <TextBox x:Name="CurrentTimeBox"
+               Style="{StaticResource TransportTimecodeStyle}"
+               Text="00:00.000"
+               ToolTip="{x:Static domain:UiStrings.TipTimecode}"
+               PreviewKeyDown="CurrentTimeBox_PreviewKeyDown"
+               PreviewMouseLeftButtonDown="CurrentTimeBox_PreviewMouseLeftButtonDown"
+               GotKeyboardFocus="CurrentTimeBox_GotKeyboardFocus"
+               LostKeyboardFocus="CurrentTimeBox_LostKeyboardFocus"
+               ContextMenuOpening="CurrentTimeBox_ContextMenuOpening">
+        <TextBox.ContextMenu>
+          <ContextMenu>
+            <MenuItem Header="{x:Static domain:UiStrings.MenuCopy}" Click="CopyPosition_Click" />
+            <MenuItem x:Name="PasteMenuItem" Header="{x:Static domain:UiStrings.MenuPaste}" Click="PastePosition_Click" />
+          </ContextMenu>
+        </TextBox.ContextMenu>
+      </TextBox>
+      <TextBlock x:Name="TotalTimeText"
+                 Margin="8,0,0,0"
+                 VerticalAlignment="Center"
+                 FontFamily="Consolas"
+                 FontWeight="Bold"
+                 FontSize="16"
+                 Foreground="{DynamicResource MutedForeBrush}"
+                 Text="/ 00:00.000" />
+    </StackPanel>
     <StackPanel x:Name="ButtonsHost"
                 Grid.Column="1"
                 Orientation="Horizontal"

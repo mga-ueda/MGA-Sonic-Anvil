@@ -299,6 +299,86 @@ public sealed class ProcessEditsTests
         Assert.All(buffer, value => Assert.Equal(0, value));
     }
 
+    [Fact]
+    public void CopyPaste_InsertsAtCursorAndUndoRestores()
+    {
+        var document = MakeConstant(frames: 10, value: 0.5f);
+        document.Selection = new WaveSelection(0, 3);
+        var clip = ProcessEdits.Copy(document, document.Selection);
+        Assert.NotNull(clip);
+        document.Selection = WaveSelection.Empty;
+        document.CursorFrame = 10;
+        var history = new EditHistory();
+        var command = ProcessEdits.Paste(document, clip, 10);
+        Assert.NotNull(command);
+        history.Do(document, command);
+
+        Assert.Equal(13, document.FrameCount);
+        Assert.Equal(new WaveSelection(10, 13), document.Selection);
+        Assert.Equal(0.5f, document.Interleaved[20]);
+        Assert.True(history.Undo(document));
+        Assert.Equal(10, document.FrameCount);
+        Assert.True(document.Selection.IsEmpty);
+    }
+
+    [Fact]
+    public void Paste_ReplacesSelection()
+    {
+        var document = MakeConstant(frames: 8, value: 0.2f);
+        document.ReplaceRange(0, [0.9f, 0.9f, 0.9f, 0.9f]);
+        document.Selection = new WaveSelection(0, 2);
+        var clip = ProcessEdits.Copy(document, document.Selection);
+        Assert.NotNull(clip);
+        document.Selection = new WaveSelection(4, 6);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.Paste(document, clip, 0)!);
+
+        Assert.Equal(8, document.FrameCount);
+        Assert.Equal(0.9f, document.Interleaved[8]);
+        Assert.Equal(0.9f, document.Interleaved[10]);
+        Assert.Equal(0.2f, document.Interleaved[12]);
+        Assert.Equal(new WaveSelection(4, 6), document.Selection);
+    }
+
+    [Fact]
+    public void CopyPaste_IncludesMarkersAndComments()
+    {
+        var document = MakeConstant(frames: 20, value: 0.4f);
+        document.TryAddMarker(2);
+        document.TrySetMarkerComment(2, "-L");
+        document.TryAddMarker(5);
+        document.TryAddMarker(12);
+        document.Selection = new WaveSelection(0, 10);
+        var clip = ProcessEdits.Copy(document, document.Selection);
+        Assert.NotNull(clip);
+        Assert.Equal(2, clip.Markers.Count);
+
+        document.Selection = WaveSelection.Empty;
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.Paste(document, clip, 20)!);
+
+        Assert.Equal(30, document.FrameCount);
+        Assert.Equal(new long[] { 2, 5, 12, 22, 25 }, document.Markers.Select(m => m.Frame).ToArray());
+        Assert.Equal("-L", document.MarkerCommentAt(22));
+        Assert.True(history.Undo(document));
+        Assert.Equal(new long[] { 2, 5, 12 }, document.Markers.Select(m => m.Frame).ToArray());
+    }
+
+    [Fact]
+    public void Paste_AdaptsMonoClipToStereo()
+    {
+        var document = MakeConstant(frames: 4, value: 0.1f);
+        var clip = new AudioClip([0.8f, 0.8f], channels: 1, sampleRate: 48000);
+        document.Selection = WaveSelection.Empty;
+        document.CursorFrame = 2;
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.Paste(document, clip, 2)!);
+
+        Assert.Equal(6, document.FrameCount);
+        Assert.Equal(0.8f, document.Interleaved[4]);
+        Assert.Equal(0.8f, document.Interleaved[5]);
+    }
+
     private static AudioDocument MakeConstant(int frames, float value)
     {
         var samples = new float[frames * 2];

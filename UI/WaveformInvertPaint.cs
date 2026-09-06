@@ -33,11 +33,13 @@ internal static class WaveformInvertPaint
             return;
         }
 
+        var regionFill = ToBgra(Theme.Get("RegionWaveFillBrush"));
         var sampleLoop = ToBgra(Theme.Get("SampleLoopWaveFillBrush"));
         var anacrusis = ToBgra(Theme.Get("RegionWaveFillAnacrusisBrush"));
         var loop = ToBgra(Theme.Get("RegionWaveFillLoopBrush"));
         var exit = ToBgra(Theme.Get("RegionWaveFillExitBrush"));
         var remove = ToBgra(Theme.Get("RegionWaveFillExcludedBrush"));
+        var regions = document.Regions;
         var sample = document.SampleLoop;
         var hasSampleLoop = !sample.IsEmpty;
         var markers = document.Markers;
@@ -47,6 +49,15 @@ internal static class WaveformInvertPaint
         {
             var frame = FrameAtColumn(x, width, viewStart, viewSpan, frameCount);
             var columnBack = waveformBack;
+            foreach (var region in regions)
+            {
+                if (region.ContainsFrame(frame))
+                {
+                    columnBack = BlendOver(columnBack, regionFill);
+                    break;
+                }
+            }
+
             if (hasSampleLoop && frame >= sample.StartFrame && frame < sample.EndFrame)
             {
                 columnBack = BlendOver(columnBack, sampleLoop);

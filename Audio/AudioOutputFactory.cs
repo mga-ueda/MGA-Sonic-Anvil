@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using NAudio.Wave.Asio;
@@ -16,6 +17,36 @@ internal static class AudioOutputFactory
             AudioOutputApi.Asio => EnumerateAsioDevices(),
             _ => EnumerateWaveOutDevices(),
         };
+
+    public static int QueryCurrentSampleRate(AudioOutputSettings settings)
+    {
+        try
+        {
+            return settings.Api switch
+            {
+                AudioOutputApi.Asio => QueryAsioSampleRate(settings.DeviceId),
+                AudioOutputApi.Wasapi => QueryWasapiMixRate(settings.DeviceId),
+                _ => QueryWasapiMixRate(deviceId: null),
+            };
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Init 前の ASIO ドライバが報告している現在クロック。NAudio 2.2 の AsioOut に公開プロパティはない。
+    /// </summary>
+    public static int ReadLiveSampleRate(IWavePlayer output)
+    {
+        if (output is AsioOut asio)
+        {
+            return ReadAsioDriverRate(asio);
+        }
+
+        return 0;
+    }
 
     public static IWavePlayer Create(AudioOutputSettings settings, out string? fallbackMessage)
     {
@@ -41,6 +72,66 @@ internal static class AudioOutputFactory
             AudioOutputApi.Asio => CreateAsio(settings.DeviceId),
             _ => CreateWaveOut(ParseWaveOutDeviceNumber(settings.DeviceId)),
         };
+
+    private static int QueryWasapiMixRate(string? deviceId)
+    {
+        using var enumerator = new MMDeviceEnumerator();
+        using var device = string.IsNullOrWhiteSpace(deviceId)
+            ? enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia)
+            : enumerator.GetDevice(deviceId);
+        var rate = device.AudioClient.MixFormat.SampleRate;
+        return rate >= 1000 ? rate : 0;
+    }
+
+    private static int QueryAsioSampleRate(string? driverName)
+    {
+        // ASIO は排他オープンなので、再生用 AsioOut の外からドライバを開いて聞かない。
+        _ = driverName;
+        return 0;
+    }
+
+    private static int ReadAsioDriverRate(AsioOut asio)
+    {
+        try
+        {
+            if (GetAsioDriverExt(asio) is not { } ext)
+            {
+                return 0;
+            }
+
+            var live = NormalizeSampleRate(ext.Driver.GetSampleRate());
+            if (live >= 1000)
+            {
+                return live;
+            }
+
+            return NormalizeSampleRate(ext.Capabilities.SampleRate);
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private static AsioDriverExt? GetAsioDriverExt(AsioOut asio)
+    {
+        var field = typeof(AsioOut).GetField("driver", BindingFlags.Instance | BindingFlags.NonPublic);
+        if (field?.GetValue(asio) is AsioDriverExt named)
+        {
+            return named;
+        }
+
+        return typeof(AsioOut)
+            .GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+            .FirstOrDefault(candidate => typeof(AsioDriverExt).IsAssignableFrom(candidate.FieldType))
+            ?.GetValue(asio) as AsioDriverExt;
+    }
+
+    private static int NormalizeSampleRate(double sampleRate)
+    {
+        var rate = (int)Math.Round(sampleRate);
+        return rate >= 1000 ? rate : 0;
+    }
 
     private static IWavePlayer CreateWaveOut(int deviceNumber) =>
         new WaveOutEvent { DeviceNumber = deviceNumber };

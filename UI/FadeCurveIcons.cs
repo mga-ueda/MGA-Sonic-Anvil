@@ -96,13 +96,16 @@ internal static class FadeCurveIcons
         var order = FadeCurves.MenuOrder(isFadeIn);
         var canvas = CanvasSize(iconSize);
         var cyan = WpfControlHelpers.FrozenBrush(Theme.Get("AccentCyanBrush"));
+        var index = 0;
         foreach (var shape in order)
         {
             var captured = shape;
             var selected = shape == current;
+            index++;
             var item = new MenuItem
             {
-                Header = UiStrings.LabelFadeCurve((int)shape),
+                Header = $"{index}  {UiStrings.LabelFadeCurve((int)shape)}",
+                InputGestureText = index.ToString(),
                 Tag = captured,
                 ToolTip = UiStrings.TipFadeShape((int)shape),
                 Icon = new Border

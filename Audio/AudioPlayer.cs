@@ -8,6 +8,10 @@ internal sealed class AudioPlayer : IDisposable
     private readonly PlaybackSampleProvider _provider = new();
     private IWavePlayer? _output;
     private AudioOutputSettings _settings = AudioOutputSettings.Default;
+    private int _deviceRate;
+    private int _deviceChannels;
+    private int _lockedDeviceRate;
+    private string? _clockLockKey;
     private bool _disposed;
     private bool _playing;
     private bool _scrubbing;
@@ -43,6 +47,12 @@ internal sealed class AudioPlayer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _settings = settings;
+        _clockLockKey = null;
+        _lockedDeviceRate = 0;
+        if (settings.Api != AudioOutputApi.Asio)
+        {
+            CaptureDeviceClock(output: null);
+        }
         if (_output is null)
         {
             return;
@@ -65,9 +75,8 @@ internal sealed class AudioPlayer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         var wasPlaying = _playing;
-        RecreateOutput();
         _provider.Bind(document, startFrame, playRange, loop, frameGain);
-        InitOutputDevice();
+        EnsureDeviceMatchesProvider();
         if (wasPlaying)
         {
             Play();
@@ -298,15 +307,21 @@ internal sealed class AudioPlayer : IDisposable
             return;
         }
 
-        if (_output is null)
+        _provider.Bind(document, frame, null, loop: false);
+        EnsureDeviceMatchesProvider();
+    }
+
+    private void EnsureDeviceMatchesProvider()
+    {
+        var rate = _provider.WaveFormat.SampleRate;
+        var channels = _provider.WaveFormat.Channels;
+        if (_output is not null && _deviceRate == rate && _deviceChannels == channels)
         {
-            RecreateOutput();
-            _provider.Bind(document, frame, null, loop: false);
-            InitOutputDevice();
             return;
         }
 
-        _provider.Bind(document, frame, null, loop: false);
+        RecreateOutput();
+        InitOutputDevice();
     }
 
     private void RecreateOutput()
@@ -331,6 +346,8 @@ internal sealed class AudioPlayer : IDisposable
                 Diagnostic?.Invoke(this, fallback);
             }
 
+            CaptureDeviceClock(_output);
+            EnsureClockLockedForInit(_output);
             InitWaveProvider(_output);
         }
         catch (Exception ex)
@@ -340,6 +357,8 @@ internal sealed class AudioPlayer : IDisposable
             try
             {
                 _output = AudioOutputFactory.Create(AudioOutputSettings.Default, out _);
+                CaptureDeviceClock(_output);
+                EnsureClockLockedForInit(_output);
                 InitWaveProvider(_output);
             }
             catch (Exception fallbackEx)
@@ -350,6 +369,67 @@ internal sealed class AudioPlayer : IDisposable
         }
 
         _output.PlaybackStopped += OnPlaybackStopped;
+        _deviceRate = _provider.WaveFormat.SampleRate;
+        _deviceChannels = _provider.WaveFormat.Channels;
+    }
+
+    /// <summary>
+    /// 起動時（または出力デバイス変更時）のカードクロックを固定する。
+    /// 以降の再生はこのレートへリアルタイム変換し、ドライバの SetSampleRate は呼ばない。
+    /// </summary>
+    private void CaptureDeviceClock(IWavePlayer? output)
+    {
+        var settings = ClockSettingsFor(output);
+        var key = settings.Api + "\u001f" + (settings.DeviceId ?? string.Empty);
+        if (_clockLockKey == key && _lockedDeviceRate >= 1000)
+        {
+            _provider.SetDeviceSampleRate(_lockedDeviceRate);
+            return;
+        }
+
+        var live = output is null ? 0 : AudioOutputFactory.ReadLiveSampleRate(output);
+        var queried = live >= 1000 ? 0 : AudioOutputFactory.QueryCurrentSampleRate(settings);
+        var rate = live >= 1000 ? live : queried;
+        if (rate < 1000)
+        {
+            if (_lockedDeviceRate >= 1000)
+            {
+                _provider.SetDeviceSampleRate(_lockedDeviceRate);
+            }
+
+            return;
+        }
+
+        _clockLockKey = key;
+        _lockedDeviceRate = rate;
+        _provider.SetDeviceSampleRate(rate);
+    }
+
+    private AudioOutputSettings ClockSettingsFor(IWavePlayer? output) =>
+        output switch
+        {
+            AsioOut => _settings.Api == AudioOutputApi.Asio
+                ? _settings
+                : new AudioOutputSettings(AudioOutputApi.Asio, string.Empty),
+            WasapiOut => _settings.Api == AudioOutputApi.Wasapi
+                ? _settings
+                : new AudioOutputSettings(AudioOutputApi.Wasapi, string.Empty),
+            WaveOutEvent => _settings.Api == AudioOutputApi.WaveOut
+                ? _settings
+                : AudioOutputSettings.Default,
+            _ => _settings,
+        };
+
+    private void EnsureClockLockedForInit(IWavePlayer output)
+    {
+        if (_lockedDeviceRate >= 1000 || output is not AsioOut)
+        {
+            return;
+        }
+
+        // Init 前に現在レートへ合わせないと NAudio が SetSampleRate する。
+        throw new InvalidOperationException(
+            "Could not read the ASIO driver sample rate before Init.");
     }
 
     private void InitWaveProvider(IWavePlayer output)
@@ -414,6 +494,8 @@ internal sealed class AudioPlayer : IDisposable
         finally
         {
             _output = null;
+            _deviceRate = 0;
+            _deviceChannels = 0;
             _suppressPlaybackEnded = false;
         }
     }

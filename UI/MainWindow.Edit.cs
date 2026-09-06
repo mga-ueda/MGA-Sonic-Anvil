@@ -23,6 +23,7 @@ public partial class MainWindow
             return;
         }
 
+        CloseFormatConvertPicker();
         if (_fadeMenu is { IsOpen: true })
         {
             _fadeMenu.IsOpen = false;
@@ -35,11 +36,9 @@ public partial class MainWindow
 
         _fadePromptIsIn = fadeIn;
         _fadePreviewResumeFrame = _document.CursorFrame;
-        var target = placementTarget ?? Waveform;
-        var placement = placementTarget is null ? PlacementMode.MousePoint : PlacementMode.Top;
         var menu = FadeCurvePicker.Show(
-            target,
-            placement,
+            this,
+            PlacementMode.Center,
             fadeIn,
             shape => ApplyFade(fadeIn, shape),
             shape => PreviewFade(fadeIn, shape),
@@ -90,6 +89,16 @@ public partial class MainWindow
 
     private void ClearFadeCurveVisualPreview() => Waveform.SetPreviewGain(null);
 
+    private void RestoreFadeVisualIfMenuOpen()
+    {
+        if (_document is null || _fadeMenu is not { IsOpen: true })
+        {
+            return;
+        }
+
+        ApplyFadeCurveVisualPreview(_fadePromptIsIn, FadeCurvePicker.HighlightedShape(_fadeMenu));
+    }
+
     private void PreviewFade(bool fadeIn, FadeShape shape)
     {
         if (_document is null || _fadePreviewToggling)
@@ -110,7 +119,7 @@ public partial class MainWindow
             if (_fadePreviewing && _player.IsPlaying)
             {
                 StopFadePreview(restoreCursor: true);
-                ApplyFadeCurveVisualPreview(fadeIn, shape);
+                RestoreFadeVisualIfMenuOpen();
                 return;
             }
 
@@ -151,15 +160,16 @@ public partial class MainWindow
                 _player.Prepare(_document, previewRange.StartFrame, previewRange, loop: false, gain);
             }
 
-            _player.Play();
+            ApplyFadeCurveVisualPreview(fadeIn, shape);
             _fadePreviewing = true;
+            _fadePreviewStartedAt = Environment.TickCount64;
+            _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
             StartMeterRendering();
             Waveform.SetTrailRecording(true);
             Transport.SetPlaying(true);
             Waveform.PlayheadFrame = previewRange.StartFrame;
-            ApplyFadeCurveVisualPreview(fadeIn, shape);
         }
         catch (Exception ex)
         {
@@ -184,6 +194,8 @@ public partial class MainWindow
         {
             SeekFrame(resume);
         }
+
+        RestoreFadeVisualIfMenuOpen();
     }
 
     private void PausePlaybackSoft()
@@ -325,6 +337,79 @@ public partial class MainWindow
         ApplyDeleteSelectedMarkers();
     }
 
+    private void ApplyCopy()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var clip = ProcessEdits.Copy(_document, _document.Selection);
+        if (clip is null)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        _clipboard = clip;
+    }
+
+    private void ApplyCut()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var range = _document.Selection.Clamp(_document.FrameCount);
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (range.StartFrame <= 0 && range.EndFrame >= _document.FrameCount)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorEmptyAfterDelete, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var clip = ProcessEdits.Copy(_document, range);
+        if (clip is null)
+        {
+            return;
+        }
+
+        _clipboard = clip;
+        StopPlaybackForEdit();
+        _history.Do(_document, ProcessEdits.Delete(_document, range));
+        AfterEdit();
+    }
+
+    private void ApplyPaste()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        if (_clipboard is null || _clipboard.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorClipboardEmpty, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var command = ProcessEdits.Paste(_document, _clipboard, Waveform.PlayheadFrame);
+        if (command is null)
+        {
+            return;
+        }
+
+        StopPlaybackForEdit();
+        _history.Do(_document, command);
+        AfterEdit();
+    }
+
     private void ApplyDelete()
     {
         if (_document is null)
@@ -332,9 +417,10 @@ public partial class MainWindow
             return;
         }
 
-        if (Waveform.HasSelectedMarkers)
+        if (Waveform.HasSelectedMarkers || Waveform.HasSelectedRegions)
         {
             ApplyDeleteSelectedMarkers();
+            ApplyDeleteSelectedRegions();
             return;
         }
 
@@ -374,14 +460,53 @@ public partial class MainWindow
         AfterMarkerEdit();
     }
 
-    private void CommitMarkerLayout(MarkerSnapshot[] before, MarkerSnapshot[] after)
+    private void ApplyDeleteSelectedRegions()
+    {
+        if (_document is null || !Waveform.HasSelectedRegions)
+        {
+            return;
+        }
+
+        var command = ProcessEdits.RemoveRegions(_document, Waveform.SelectedRegions);
+        if (command is null)
+        {
+            return;
+        }
+
+        _history.Do(_document, command);
+        Waveform.ClearMarkerSelection();
+        AfterMarkerEdit();
+    }
+
+    private void ClearMarkers(IReadOnlyList<long> frames)
+    {
+        if (_document is null || frames is null || frames.Count == 0)
+        {
+            return;
+        }
+
+        var command = ProcessEdits.RemoveMarkers(_document, frames);
+        if (command is null)
+        {
+            return;
+        }
+
+        _history.Do(_document, command);
+        Waveform.ClearMarkerSelection();
+        AfterMarkerEdit();
+    }
+
+    private void CommitTimelineLayout(
+        MarkerSnapshot[] markersBefore,
+        WaveSelection[] regionsBefore,
+        WaveSelection loopBefore)
     {
         if (_document is null)
         {
             return;
         }
 
-        var command = ProcessEdits.ReplaceMarkers(before, after, before.Length == after.Length ? "Move Markers" : "Delete Markers");
+        var command = ProcessEdits.MoveTimelineItems(_document, markersBefore, regionsBefore, loopBefore);
         if (command is null)
         {
             return;
@@ -479,6 +604,48 @@ public partial class MainWindow
         Waveform.SeekKeepingSelection(playhead + applied);
         AfterMarkerEdit();
         return true;
+    }
+
+    private bool NudgePlayheadOrSelection(int direction)
+    {
+        if (direction == 0)
+        {
+            return false;
+        }
+
+        if (Waveform.HasSelectedTimelineItems)
+        {
+            NudgeSelectedTimeline(direction);
+            return true;
+        }
+
+        Waveform.NudgePlayhead(direction);
+        return true;
+    }
+
+    private void NudgeSelectedTimeline(int direction)
+    {
+        if (_document is null || direction == 0)
+        {
+            return;
+        }
+
+        var markersBefore = _document.SnapshotMarkers();
+        var regionsBefore = _document.SnapshotRegions();
+        var loopBefore = _document.SampleLoop;
+        if (!Waveform.TryNudgeSelectedTimeline(Waveform.NudgeStepFrames * direction, out _))
+        {
+            return;
+        }
+
+        var command = ProcessEdits.MoveTimelineItems(_document, markersBefore, regionsBefore, loopBefore);
+        if (command is null)
+        {
+            return;
+        }
+
+        _history.Do(_document, command);
+        AfterMarkerEdit();
     }
 
     private void AfterMarkerEdit()

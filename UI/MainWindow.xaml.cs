@@ -15,7 +15,9 @@ namespace MgaSonicAnvil.UI;
 public partial class MainWindow : Window
 {
     private readonly AudioPlayer _player = new();
-    private readonly EditHistory _history = new();
+    private readonly List<DocumentSession> _sessions = [];
+    private DocumentSession? _activeSession;
+    private EditHistory _history = new();
     private readonly LevelMeterEngine _meter = new();
     private readonly Stopwatch _meterClock = Stopwatch.StartNew();
     private bool _meterRendering;
@@ -25,6 +27,7 @@ public partial class MainWindow : Window
     private int _markerNudgeDirection;
     private int _markerNumber;
     private AudioDocument? _document;
+    private AudioClip? _clipboard;
     private AudioOutputSettings _outputSettings;
     private long _lastPlaybackStart;
     private bool _syncingScroll;
@@ -33,10 +36,18 @@ public partial class MainWindow : Window
     private int _playbackGeneration;
     private bool _didRestoreLastDocument;
     private System.Windows.Controls.ContextMenu? _fadeMenu;
+    private System.Windows.Controls.ContextMenu? _formatMenu;
+    private FormatConvertKind _formatKind;
+    private bool _formatPreviewing;
+    private bool _formatPreviewToggling;
+    private long _formatPreviewResumeFrame;
+    private long _formatPreviewStartedAt;
+    private long _formatSpaceTick;
     private bool _fadePreviewing;
     private bool _fadePreviewToggling;
     private bool _fadePromptIsIn;
     private long _fadePreviewResumeFrame;
+    private long _fadePreviewStartedAt;
     private long _fadeSpaceTick;
     private bool _resumeAfterScrub;
     private bool _startupRevealPending = true;
@@ -51,17 +62,23 @@ public partial class MainWindow : Window
         Topmost = AppStorage.Settings.AlwaysOnTop;
 
         Transport.CommandInvoked += (_, command) => ExecuteTransport(command);
+        Transport.PositionSeeked += (_, seconds) => SeekToSeconds(seconds);
+        Transport.RequestWaveformFocus += (_, _) => Waveform.Focus();
         Waveform.CursorCommitted += (_, frame) => OnCursorCommitted(frame);
         Waveform.ScrubStarted += (_, frame) => OnScrubStarted(frame);
         Waveform.ScrubPreviewed += (_, frame) => OnScrubPreviewed(frame);
         Waveform.ScrubEnded += (_, e) => OnScrubEnded(e.Frame, e.Commit);
         Waveform.MarkerCommentCommitted += (_, e) => CommitMarkerComment(e.Frame, e.Comment);
-        Waveform.MarkerLayoutCommitted += (_, e) => CommitMarkerLayout(e.Before, e.After);
+        Waveform.TimelineLayoutCommitted += (_, e) =>
+            CommitTimelineLayout(e.MarkersBefore, e.RegionsBefore, e.LoopBefore);
         Waveform.MarkersChanged += (_, _) =>
         {
             Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
             Overview.Refresh();
         };
+        Waveform.SampleLoopClearRequested += (_, _) => ClearSampleLoop();
+        Waveform.RegionClearRequested += (_, region) => ClearRegion(region);
+        Waveform.MarkerClearRequested += (_, frames) => ClearMarkers(frames);
         Waveform.SelectionChanged += (_, _) => OnWaveformSelectionChanged();
         Waveform.ViewChanged += (_, _) =>
         {
@@ -113,9 +130,34 @@ public partial class MainWindow : Window
         };
 
         ApplyWaveformHeightScale();
-        SetDocument(null);
+        BindWorkspace(null);
         Loaded += OnStartupLoaded;
         ContentRendered += OnStartupContentRendered;
+        MgaSonicAnvil.SingleInstance.StartWatch(() => Dispatcher.BeginInvoke(ActivateFromOtherInstance));
+    }
+
+    private void ActivateFromOtherInstance()
+    {
+        if (!IsVisible)
+        {
+            Show();
+        }
+
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        if (Opacity < 1)
+        {
+            _startupRevealPending = false;
+            Opacity = 1;
+        }
+
+        Activate();
+        var keepTop = AlwaysOnTopCheck.IsChecked == true;
+        Topmost = true;
+        Topmost = keepTop;
     }
 
     private void OnStartupLoaded(object sender, RoutedEventArgs e)
@@ -146,25 +188,44 @@ public partial class MainWindow : Window
         Opacity = 1;
     }
 
-    private void SetDocument(AudioDocument? document)
+    private void BindWorkspace(DocumentSession? session)
     {
         _player.Stop();
         _playTimer.Stop();
         CloseFadeCurvePicker();
+        CloseFormatConvertPicker();
+        CloseEditHistory(commit: true);
         _resumeAfterScrub = false;
         StopMarkerNudge();
         ResetMarkerDigitEntry();
         StopMeterRendering();
-        Overview.SetSelectedMarkerFrames(null);
         Waveform.UnlockCenter();
-        _document = document;
-        _history.Clear();
-        Waveform.Document = document;
-        Overview.Document = document;
-        Waveform.LoopEnabled = true;
+        _activeSession = session;
+        _document = session?.Document;
+        _history = session?.History ?? new EditHistory();
+        Waveform.Document = _document;
+        Overview.Document = _document;
+        if (session is not null)
+        {
+            Waveform.ApplyPersistedView(
+                session.TimeZoom,
+                session.AmpZoom,
+                session.ViewStart,
+                session.PlayheadFrame);
+            Waveform.RestoreSelectedMarkers(session.SelectedMarkerFrames);
+            Waveform.LoopEnabled = session.LoopEnabled;
+            Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
+        }
+        else
+        {
+            Overview.SetSelectedMarkerFrames(null);
+            Waveform.LoopEnabled = true;
+        }
+
         Transport.SetPlaying(false);
-        Transport.SetCommandsEnabled(document is not null);
+        Transport.SetCommandsEnabled(_document is not null);
         ExtinguishMeter();
+        RebuildTabBar();
         RefreshTitle();
         SyncViewChrome();
         RefreshStatus();
@@ -172,16 +233,8 @@ public partial class MainWindow : Window
 
     private void RefreshTitle()
     {
-        var name = _document?.SourcePath is { } path
-            ? System.IO.Path.GetFileName(path)
-            : UiStrings.DropHint;
-        if (_document?.IsDirty == true)
-        {
-            name = "* " + name;
-        }
-
-        FileNameText.Text = name;
         Title = AppVersion.FormTitle;
+        RefreshTabHeaders();
     }
 
     private void SyncViewChrome()
@@ -191,15 +244,16 @@ public partial class MainWindow : Window
         TimeScroll.Sync(Waveform.ViewStart, Waveform.ViewSpanFrames, frames);
         _syncingScroll = false;
         Overview.SetView(Waveform.ViewStart, Waveform.ViewSpanFrames);
-        Transport.SetPosition(FrameToSeconds(Waveform.PlayheadFrame));
+        SyncTransportPosition();
     }
 
     private void RefreshStatus()
     {
         if (_document is null)
         {
-            StatusMeta.Text = UiStrings.StatusEmpty;
-            Transport.SetPosition(0);
+            StatusMeta.Text = string.Empty;
+            SyncTransportPosition(0);
+            RefreshTitle();
             return;
         }
 
@@ -212,7 +266,7 @@ public partial class MainWindow : Window
         var selection = _document.Selection;
         var text = string.Create(
             CultureInfo.InvariantCulture,
-            $"{_document.SampleRate} Hz   {_document.BitsPerSample} bit   {_document.Channels} ch   {kind}   {UiStrings.FormatFileBytes(_document.FileBytes)}   {UiStrings.FormatDuration(_document.DurationSeconds)}   Time {FormatZoom(Waveform.TimeZoom)}   Amp {FormatZoom(Waveform.AmpZoom)}");
+            $"{_document.SampleRate} Hz   {_document.BitsPerSample} bit   {_document.Channels} ch   {kind}   {UiStrings.FormatFileBytes(_document.FileBytes)}");
         if (!selection.IsEmpty)
         {
             text += string.Create(
@@ -221,19 +275,26 @@ public partial class MainWindow : Window
         }
 
         StatusMeta.Text = text;
-        Transport.SetPosition(FrameToSeconds(Waveform.PlayheadFrame));
+        SyncTransportPosition();
         RefreshTitle();
     }
 
-    private static string FormatZoom(double zoom)
+    private void SyncTransportPosition(long? frame = null)
     {
-        var clamped = Math.Max(1d, zoom);
-        if (clamped >= 100 || Math.Abs(clamped - Math.Round(clamped)) < 0.05)
+        var current = FrameToSeconds(frame ?? Waveform.PlayheadFrame);
+        Transport.SetPosition(current, _document?.DurationSeconds ?? 0);
+    }
+
+    private void SeekToSeconds(double seconds)
+    {
+        if (_document is null)
         {
-            return string.Create(CultureInfo.InvariantCulture, $"{clamped:0}×");
+            return;
         }
 
-        return string.Create(CultureInfo.InvariantCulture, $"{clamped:0.0}×");
+        var frame = (long)Math.Round(seconds * _document.SampleRate);
+        SeekFrame(frame);
+        Waveform.CenterViewOnPlayhead();
     }
 
     private double FrameToSeconds(long frame) =>
@@ -253,6 +314,12 @@ public partial class MainWindow : Window
 
     private void ConfirmAndExit()
     {
+        if (_sessions.Any(session => session.Document.IsDirty))
+        {
+            Close();
+            return;
+        }
+
         var confirm = OwnerCenteredMessageBox.Show(
             this,
             UiStrings.DialogExitBody,
@@ -268,6 +335,12 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        if (!OfferSaveAllDirty())
+        {
+            e.Cancel = true;
+            return;
+        }
+
         RememberDocumentState();
         AppStorage.Settings.ApplyAudioOutput(_outputSettings);
         AppStorage.Settings.WaveformHeightScale = _waveformHeightScale;
@@ -288,15 +361,15 @@ public partial class MainWindow : Window
 
     private void MainWindow_Drop(object sender, DragEventArgs e)
     {
-        if (TryGetDroppedAudio(e, out var path))
+        if (TryGetDroppedAudio(e, out var paths))
         {
-            OpenPath(path);
+            OpenPaths(paths);
         }
     }
 
-    private static bool TryGetDroppedAudio(DragEventArgs e, out string path)
+    private static bool TryGetDroppedAudio(DragEventArgs e, out string[] paths)
     {
-        path = string.Empty;
+        paths = [];
         if (!e.Data.GetDataPresent(DataFormats.FileDrop)
             || e.Data.GetData(DataFormats.FileDrop) is not string[] files
             || files.Length == 0)
@@ -304,8 +377,8 @@ public partial class MainWindow : Window
             return false;
         }
 
-        path = files[0];
-        return AudioCodec.IsOpenable(path);
+        paths = files.Where(AudioCodec.IsOpenable).ToArray();
+        return paths.Length > 0;
     }
 
     private void AlwaysOnTopCheck_Changed(object sender, RoutedEventArgs e)

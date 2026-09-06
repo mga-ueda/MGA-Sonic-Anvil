@@ -69,6 +69,14 @@ internal sealed class OverviewView : FrameworkElement
         InvalidateVisual();
     }
 
+    public void RefreshAppearance()
+    {
+        _waveBgra = 0;
+        _zeroBgra = 0;
+        _waveDirty = true;
+        InvalidateVisual();
+    }
+
     public void SetSelectedMarkerFrames(IReadOnlyCollection<long>? frames)
     {
         if (frames is null || frames.Count == 0)
@@ -108,6 +116,7 @@ internal sealed class OverviewView : FrameworkElement
             return;
         }
 
+        MarkerRolePaint.DrawRegion(dc, _document, bounds, 0, _document.FrameCount, "RegionWaveFillBrush");
         MarkerRolePaint.DrawSampleLoop(dc, _document, bounds, 0, _document.FrameCount, "SampleLoopWaveFillBrush");
         MarkerRolePaint.DrawBackgrounds(dc, _document, bounds, 0, _document.FrameCount);
         EnsureWaveform(bounds);

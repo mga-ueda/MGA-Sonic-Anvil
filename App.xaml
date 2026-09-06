@@ -9,6 +9,7 @@
         <ResourceDictionary Source="Themes/Controls.xaml"/>
       </ResourceDictionary.MergedDictionaries>
       <FontFamily x:Key="AppFontFamily">Yu Gothic UI</FontFamily>
+      <Style x:Key="{x:Static SystemParameters.FocusVisualStyleKey}"/>
       <Style TargetType="Window">
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
         <Setter Property="FontSize" Value="12"/>
@@ -28,6 +29,7 @@
       <Style TargetType="Control">
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
         <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
         <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
       </Style>

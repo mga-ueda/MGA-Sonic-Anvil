@@ -15,6 +15,11 @@ internal static class FadeCurvePicker
     private static readonly PropertyInfo? CurrentSelectionProperty =
         typeof(MenuBase).GetProperty("CurrentSelection", BindingFlags.Instance | BindingFlags.NonPublic);
 
+    private static readonly DependencyPropertyKey? IsHighlightedKey =
+        typeof(MenuItem)
+            .GetField("IsHighlightedPropertyKey", BindingFlags.NonPublic | BindingFlags.Static)
+            ?.GetValue(null) as DependencyPropertyKey;
+
     private static readonly DependencyPropertyDescriptor? IsHighlightedDescriptor =
         DependencyPropertyDescriptor.FromProperty(MenuItem.IsHighlightedProperty, typeof(MenuItem));
 
@@ -46,19 +51,29 @@ internal static class FadeCurvePicker
 
         menu.PreviewKeyDown += (_, e) =>
         {
-            if (e.Key != Key.Space || Keyboard.Modifiers != ModifierKeys.None)
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (Keyboard.Modifiers != ModifierKeys.None)
             {
                 return;
             }
 
-            e.Handled = true;
-            onPreview(HighlightedShape(menu));
+            if (key == Key.Space)
+            {
+                e.Handled = true;
+                onPreview(HighlightedShape(menu));
+                return;
+            }
+
+            if (TryDigitIndex(key, out var index) && HighlightByIndex(menu, index))
+            {
+                e.Handled = true;
+            }
         };
 
         menu.Opened += (_, _) =>
         {
             menu.Dispatcher.BeginInvoke(
-                () => HighlightDefault(menu),
+                () => HighlightShape(menu, FadeCurves.Default),
                 DispatcherPriority.Input);
         };
 
@@ -88,6 +103,41 @@ internal static class FadeCurvePicker
         }
 
         return FadeCurves.Default;
+    }
+
+    public static bool HighlightByIndex(ContextMenu menu, int index)
+    {
+        if (menu.Tag is not MenuState state)
+        {
+            return false;
+        }
+
+        var order = FadeCurves.MenuOrder(state.FadeIn);
+        if ((uint)index >= (uint)order.Count)
+        {
+            return false;
+        }
+
+        HighlightShape(menu, order[index]);
+        return true;
+    }
+
+    private static bool TryDigitIndex(Key key, out int index)
+    {
+        index = key switch
+        {
+            Key.D1 or Key.NumPad1 => 0,
+            Key.D2 or Key.NumPad2 => 1,
+            Key.D3 or Key.NumPad3 => 2,
+            Key.D4 or Key.NumPad4 => 3,
+            Key.D5 or Key.NumPad5 => 4,
+            Key.D6 or Key.NumPad6 => 5,
+            Key.D7 or Key.NumPad7 => 6,
+            Key.D8 or Key.NumPad8 => 7,
+            Key.D9 or Key.NumPad9 => 8,
+            _ => -1,
+        };
+        return index >= 0;
     }
 
     private static void WireHighlightTracking(ContextMenu menu)
@@ -154,12 +204,12 @@ internal static class FadeCurvePicker
         }
     }
 
-    private static void HighlightDefault(ContextMenu menu)
+    private static void HighlightShape(ContextMenu menu, FadeShape shape)
     {
         MenuItem? target = null;
         foreach (var item in menu.Items.OfType<MenuItem>())
         {
-            if (item.Tag is FadeShape shape && shape == FadeCurves.Default)
+            if (item.Tag is FadeShape tagged && tagged == shape)
             {
                 target = item;
                 break;
@@ -174,18 +224,33 @@ internal static class FadeCurvePicker
         _updatingSelectionChrome = true;
         try
         {
+            foreach (var item in menu.Items.OfType<MenuItem>())
+            {
+                SetHighlighted(item, ReferenceEquals(item, target));
+            }
+
             target.Focus();
             Keyboard.Focus(target);
             CurrentSelectionProperty?.SetValue(menu, target);
-            FadeCurveIcons.SyncSelectedBorder(menu.Items, FadeCurves.Default);
+            FadeCurveIcons.SyncSelectedBorder(menu.Items, shape);
             if (menu.Tag is MenuState { OnHighlight: { } onHighlight })
             {
-                onHighlight(FadeCurves.Default);
+                onHighlight(shape);
             }
         }
         finally
         {
             _updatingSelectionChrome = false;
         }
+    }
+
+    private static void SetHighlighted(MenuItem item, bool highlighted)
+    {
+        if (IsHighlightedKey is null)
+        {
+            return;
+        }
+
+        item.SetValue(IsHighlightedKey, highlighted);
     }
 }

@@ -95,6 +95,16 @@ public partial class MainWindow
 
     private bool TryProcessShortcut(Key key, ModifierKeys modifiers)
     {
+        if (Transport.IsPositionFocused)
+        {
+            return false;
+        }
+
+        if (TryProcessHistoryShortcut(key, modifiers))
+        {
+            return true;
+        }
+
         if (key == Key.Escape)
         {
             StopMarkerNudge();
@@ -104,12 +114,25 @@ public partial class MainWindow
                 return false;
             }
 
+            if (Transport.IsEditingPosition)
+            {
+                Transport.CancelPositionEdit();
+                Waveform.Focus();
+                return true;
+            }
+
+            if (Transport.IsPositionFocused)
+            {
+                Waveform.Focus();
+                return true;
+            }
+
             if (Waveform.CancelMarkerCommentEdit())
             {
                 return true;
             }
 
-            if (CloseFadeCurvePicker())
+            if (CloseFadeCurvePicker() || CloseFormatConvertPicker())
             {
                 return true;
             }
@@ -133,9 +156,14 @@ public partial class MainWindow
             return true;
         }
 
-        if (Waveform.IsEditingMarkerComment)
+        if (Waveform.IsEditingMarkerComment || Transport.IsPositionFocused)
         {
             return false;
+        }
+
+        if (TryHandleFormatMenuShortcut(key, modifiers))
+        {
+            return true;
         }
 
         if (_fadeMenu is { IsOpen: true })
@@ -165,12 +193,47 @@ public partial class MainWindow
                 return true;
             }
 
+            if (modifiers == ModifierKeys.None
+                && TryDigitPercent(key, out var fadeDigit)
+                && fadeDigit > 0)
+            {
+                var index = (int)Math.Round(fadeDigit * 10d) - 1;
+                if (FadeCurvePicker.HighlightByIndex(_fadeMenu, index))
+                {
+                    return true;
+                }
+            }
+
             return false;
         }
 
         if (key == Key.W && modifiers == ModifierKeys.Control)
         {
             CloseDocument();
+            return true;
+        }
+
+        if (key == Key.Tab && modifiers == ModifierKeys.Control)
+        {
+            ActivateAdjacentTab(1);
+            return true;
+        }
+
+        if (key == Key.Tab && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            ActivateAdjacentTab(-1);
+            return true;
+        }
+
+        if (key == Key.PageDown && modifiers == ModifierKeys.Control)
+        {
+            ActivateAdjacentTab(1);
+            return true;
+        }
+
+        if (key == Key.PageUp && modifiers == ModifierKeys.Control)
+        {
+            ActivateAdjacentTab(-1);
             return true;
         }
 
@@ -216,6 +279,32 @@ public partial class MainWindow
             return true;
         }
 
+#if DEBUG
+        if (key == Key.C && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            ShowColorDevPanel();
+            return true;
+        }
+#endif
+
+        if (key == Key.C && modifiers == ModifierKeys.Control)
+        {
+            ApplyCopy();
+            return true;
+        }
+
+        if (key == Key.X && modifiers == ModifierKeys.Control)
+        {
+            ApplyCut();
+            return true;
+        }
+
+        if (key == Key.V && modifiers == ModifierKeys.Control)
+        {
+            ApplyPaste();
+            return true;
+        }
+
         if (key == Key.Space && modifiers == ModifierKeys.Control)
         {
             StartPrerollPlayback();
@@ -239,7 +328,7 @@ public partial class MainWindow
             return true;
         }
 
-        if ((key is Key.C or Key.OemPeriod or Key.Decimal) && modifiers == ModifierKeys.None)
+        if ((key is Key.Z or Key.OemPeriod or Key.Decimal) && modifiers == ModifierKeys.None)
         {
             if (_player.IsPlaying)
             {
@@ -266,6 +355,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.R && modifiers == ModifierKeys.Shift)
+        {
+            SetRegionFromSelection();
+            return true;
+        }
+
         if (key == Key.L && modifiers == ModifierKeys.None)
         {
             JumpToLoopPrerollAndPlay();
@@ -284,9 +379,32 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.Z && modifiers == ModifierKeys.None)
+        if (key == Key.U && modifiers == ModifierKeys.None)
         {
-            CycleWaveformHeight();
+            OpenEditHistory();
+            return true;
+        }
+
+        if (key == Key.T && modifiers == ModifierKeys.None)
+        {
+            return Transport.FocusCurrentTime();
+        }
+
+        if (key == Key.S && modifiers == ModifierKeys.None)
+        {
+            PromptFormatConvert(FormatConvertKind.SampleRate);
+            return true;
+        }
+
+        if (key == Key.B && modifiers == ModifierKeys.None)
+        {
+            PromptFormatConvert(FormatConvertKind.BitDepth);
+            return true;
+        }
+
+        if (key == Key.C && modifiers == ModifierKeys.None)
+        {
+            PromptFormatConvert(FormatConvertKind.Channels);
             return true;
         }
 
@@ -478,14 +596,12 @@ public partial class MainWindow
 
         if (key == Key.Left && modifiers == ModifierKeys.None)
         {
-            Waveform.NudgePlayhead(-1);
-            return true;
+            return NudgePlayheadOrSelection(-1);
         }
 
         if (key == Key.Right && modifiers == ModifierKeys.None)
         {
-            Waveform.NudgePlayhead(1);
-            return true;
+            return NudgePlayheadOrSelection(1);
         }
 
         if (key == Key.Up && modifiers == ModifierKeys.Shift)

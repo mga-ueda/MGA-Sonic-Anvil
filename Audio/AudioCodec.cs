@@ -1,7 +1,7 @@
 using System.IO;
+using System.Text;
 using NAudio.MediaFoundation;
 using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
 
 namespace MgaSonicAnvil.Audio;
 
@@ -52,7 +52,7 @@ internal static class AudioCodec
         }
 
         var interleaved = new float[checked((int)frames * channels)];
-        var provider = stream.ToSampleProvider();
+        var provider = AsPcmProvider(stream).ToSampleProvider();
         if (provider.WaveFormat.Channels != channels)
         {
             throw new InvalidDataException(
@@ -130,13 +130,119 @@ internal static class AudioCodec
         }
     }
 
+    private static readonly byte[] PcmSubFormat =
+        new Guid(0x00000001, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71).ToByteArray();
+
     public static void SaveWave(AudioDocument document, string path)
     {
-        var format = document.BitsPerSample <= 16
-            ? new WaveFormat(document.SampleRate, 16, document.Channels)
-            : new WaveFormat(document.SampleRate, 24, document.Channels);
-        using var writer = new WaveFileWriter(path, format);
-        WritePcm(document, writer, format.BitsPerSample);
+        var bits = document.BitsPerSample switch
+        {
+            8 => 8,
+            24 => 24,
+            _ => 16,
+        };
+        var channels = Math.Max(1, document.Channels);
+        var sampleRate = Math.Max(1, document.SampleRate);
+        var blockAlign = channels * (bits / 8);
+        var byteRate = sampleRate * blockAlign;
+        var frames = document.FrameCount;
+
+        using (var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read))
+        using (var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: false))
+        {
+            writer.Write(Encoding.ASCII.GetBytes("RIFF"));
+            var riffSizePos = stream.Position;
+            writer.Write(0);
+            writer.Write(Encoding.ASCII.GetBytes("WAVE"));
+            WriteFmtChunk(writer, sampleRate, channels, bits, byteRate, blockAlign);
+            if (bits > 16)
+            {
+                writer.Write(Encoding.ASCII.GetBytes("fact"));
+                writer.Write(4);
+                writer.Write((int)Math.Clamp(frames, 0, int.MaxValue));
+            }
+
+            writer.Write(Encoding.ASCII.GetBytes("data"));
+            var dataSizePos = stream.Position;
+            writer.Write(0);
+            WritePcm(document, writer, bits);
+            var dataSize = (int)(stream.Position - dataSizePos - 4);
+            if ((dataSize & 1) != 0)
+            {
+                writer.Write((byte)0);
+            }
+
+            var end = stream.Position;
+            stream.Position = dataSizePos;
+            writer.Write(dataSize);
+            stream.Position = riffSizePos;
+            writer.Write((int)(end - 8));
+        }
+
+        WavEmbeddedMeta.Write(path, document);
+        DeleteSoundForgeSidecars(path);
+    }
+
+    private static void WriteFmtChunk(
+        BinaryWriter writer,
+        int sampleRate,
+        int channels,
+        int bits,
+        int byteRate,
+        int blockAlign)
+    {
+        writer.Write(Encoding.ASCII.GetBytes("fmt "));
+        if (bits <= 16)
+        {
+            writer.Write(16);
+            writer.Write((ushort)1);
+            writer.Write((ushort)channels);
+            writer.Write(sampleRate);
+            writer.Write(byteRate);
+            writer.Write((ushort)blockAlign);
+            writer.Write((ushort)bits);
+            return;
+        }
+
+        // 24-bit を 16 バイト PCM で書くと Sound Forge が raw 32 kHz として開く。
+        writer.Write(40);
+        writer.Write((ushort)0xFFFE);
+        writer.Write((ushort)channels);
+        writer.Write(sampleRate);
+        writer.Write(byteRate);
+        writer.Write((ushort)blockAlign);
+        writer.Write((ushort)bits);
+        writer.Write((ushort)22);
+        writer.Write((ushort)bits);
+        writer.Write(ExtensibleChannelMask(channels));
+        writer.Write(PcmSubFormat);
+    }
+
+    private static int ExtensibleChannelMask(int channels) => channels switch
+    {
+        1 => 0x4,
+        2 => 0x3,
+        6 => 0x3F,
+        _ => channels >= 31 ? -1 : (1 << channels) - 1,
+    };
+
+    private static void DeleteSoundForgeSidecars(string path)
+    {
+        foreach (var ext in new[] { ".sfk", ".sfl" })
+        {
+            var sidecar = Path.ChangeExtension(path, ext);
+            try
+            {
+                if (File.Exists(sidecar))
+                {
+                    File.Delete(sidecar);
+                }
+            }
+            catch
+            {
+                // ロック中でも WAV 本体は書けている。
+            }
+        }
     }
 
     public static void SaveMp3(AudioDocument document, string path, int bitRateKbps)
@@ -163,9 +269,21 @@ internal static class AudioCodec
         SaveWave(document, path);
     }
 
-    private static void WritePcm(AudioDocument document, WaveFileWriter writer, int bits)
+    private static void WritePcm(AudioDocument document, BinaryWriter writer, int bits)
     {
         var samples = document.Interleaved;
+        if (bits <= 8)
+        {
+            var buffer = new byte[samples.Length];
+            for (var i = 0; i < samples.Length; i++)
+            {
+                buffer[i] = (byte)Math.Clamp((int)Math.Round(samples[i] * 127f + 128f), 0, 255);
+            }
+
+            writer.Write(buffer);
+            return;
+        }
+
         if (bits <= 16)
         {
             var buffer = new byte[samples.Length * 2];
@@ -176,7 +294,7 @@ internal static class AudioCodec
                 buffer[i * 2 + 1] = (byte)(value >> 8);
             }
 
-            writer.Write(buffer, 0, buffer.Length);
+            writer.Write(buffer);
             return;
         }
 
@@ -190,7 +308,7 @@ internal static class AudioCodec
             packed[offset + 2] = (byte)(value >> 16);
         }
 
-        writer.Write(packed, 0, packed.Length);
+        writer.Write(packed);
     }
 
     private static int PeekBitDepth(string path)
@@ -218,6 +336,22 @@ internal static class AudioCodec
         return 16;
     }
 
+    private static IWaveProvider AsPcmProvider(WaveStream stream)
+    {
+        var format = stream.WaveFormat;
+        if (format.Encoding is WaveFormatEncoding.Pcm or WaveFormatEncoding.Extensible
+            && format.BitsPerSample is 8 or 16 or 24 or 32)
+        {
+            var pcm = new WaveFormat(format.SampleRate, format.BitsPerSample, format.Channels);
+            if (format.Encoding != WaveFormatEncoding.Pcm || format.ExtraSize != 0)
+            {
+                return new RelabeledWaveProvider(stream, pcm);
+            }
+        }
+
+        return stream;
+    }
+
     private static void EnsureMediaFoundation()
     {
         if (_mediaFoundationStarted)
@@ -227,5 +361,21 @@ internal static class AudioCodec
 
         MediaFoundationApi.Startup();
         _mediaFoundationStarted = true;
+    }
+
+    private sealed class RelabeledWaveProvider : IWaveProvider
+    {
+        private readonly IWaveProvider _source;
+
+        public RelabeledWaveProvider(IWaveProvider source, WaveFormat format)
+        {
+            _source = source;
+            WaveFormat = format;
+        }
+
+        public WaveFormat WaveFormat { get; }
+
+        public int Read(byte[] buffer, int offset, int count) =>
+            _source.Read(buffer, offset, count);
     }
 }

@@ -41,11 +41,11 @@ internal sealed class AudioDocument
 
     public float[] Interleaved { get; private set; }
 
-    public int SampleRate { get; }
+    public int SampleRate { get; private set; }
 
-    public int Channels { get; }
+    public int Channels { get; private set; }
 
-    public int BitsPerSample { get; }
+    public int BitsPerSample { get; private set; }
 
     public AudioFileKind SourceKind { get; private set; }
 
@@ -65,6 +65,14 @@ internal sealed class AudioDocument
 
     /// <summary>マーカーを使わないサンプルループ範囲。未設定は Empty。</summary>
     public WaveSelection SampleLoop { get; set; }
+
+    private readonly List<WaveSelection> _regions = [];
+
+    /// <summary>マーカーを使わないリージョン範囲。複数可。サンプルループと重複可。</summary>
+    public IReadOnlyList<WaveSelection> Regions => _regions;
+
+    /// <summary>先頭のリージョン。未設定は Empty。</summary>
+    public WaveSelection Region => _regions.Count == 0 ? WaveSelection.Empty : _regions[0];
 
     public long CursorFrame { get; set; }
 
@@ -87,6 +95,8 @@ internal sealed class AudioDocument
         SourcePath = sourcePath;
         IsDirty = true;
     }
+
+    public void SetDirty(bool dirty) => IsDirty = dirty;
 
     public void ReplaceRange(long startFrame, float[] samples)
     {
@@ -134,11 +144,42 @@ internal sealed class AudioDocument
         IsDirty = true;
     }
 
+    public void ReplaceAudio(
+        float[] interleaved,
+        int sampleRate,
+        int channels,
+        int bitsPerSample)
+    {
+        if (channels < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(channels));
+        }
+
+        if (sampleRate < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(sampleRate));
+        }
+
+        if (bitsPerSample < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(bitsPerSample));
+        }
+
+        Interleaved = interleaved;
+        SampleRate = sampleRate;
+        Channels = channels;
+        BitsPerSample = bitsPerSample;
+        RebuildPeaks();
+        RefreshFileBytes();
+        IsDirty = true;
+    }
+
     public void ClampCursor()
     {
         CursorFrame = Math.Clamp(CursorFrame, 0, Math.Max(0, FrameCount));
         Selection = Selection.Clamp(FrameCount);
         SampleLoop = SampleLoop.Clamp(FrameCount);
+        SetRegions(_regions, markDirty: false);
         ClampMarkers();
     }
 
@@ -237,6 +278,11 @@ internal sealed class AudioDocument
             return loop;
         }
 
+        if (TryGetRegionAt(frame, out var region))
+        {
+            return region;
+        }
+
         var cues = CueFrames();
         if (cues.Count == 0)
         {
@@ -268,6 +314,11 @@ internal sealed class AudioDocument
             return loop;
         }
 
+        if (TryGetRegionContaining(range, out var enclosing))
+        {
+            return enclosing;
+        }
+
         return range;
     }
 
@@ -276,9 +327,19 @@ internal sealed class AudioDocument
         return AdjacentInSorted(CueFrames(), from, direction);
     }
 
-    public void SetSampleLoop(WaveSelection range)
+    public void SetSampleLoop(WaveSelection range, bool markDirty = true)
     {
-        SampleLoop = range.IsEmpty ? WaveSelection.Empty : range.Clamp(FrameCount);
+        var next = range.IsEmpty ? WaveSelection.Empty : range.Clamp(FrameCount);
+        if (next == SampleLoop)
+        {
+            return;
+        }
+
+        SampleLoop = next;
+        if (markDirty)
+        {
+            IsDirty = true;
+        }
     }
 
     public void ApplyDeleteToSampleLoop(long startFrame, long frameCount)
@@ -294,26 +355,227 @@ internal sealed class AudioDocument
         SampleLoop = new WaveSelection(start, end).Clamp(FrameCount);
     }
 
+    public void ApplyInsertToSampleLoop(long startFrame, long frameCount)
+    {
+        if (SampleLoop.IsEmpty || frameCount <= 0)
+        {
+            return;
+        }
+
+        var start = SampleLoop.StartFrame >= startFrame
+            ? SampleLoop.StartFrame + frameCount
+            : SampleLoop.StartFrame;
+        var end = SampleLoop.EndFrame > startFrame
+            ? SampleLoop.EndFrame + frameCount
+            : SampleLoop.EndFrame;
+        SampleLoop = new WaveSelection(start, end).Clamp(FrameCount);
+    }
+
+    public WaveSelection[] SnapshotRegions() => _regions.Count == 0 ? [] : [.. _regions];
+
+    /// <summary>開始時刻順。マーカー番号の続きから振る。無い範囲は 0。</summary>
+    public int RegionNumber(WaveSelection range)
+    {
+        for (var i = 0; i < _regions.Count; i++)
+        {
+            if (_regions[i] == range)
+            {
+                return _markers.Length + i + 1;
+            }
+        }
+
+        return 0;
+    }
+
+    public void SetRegion(WaveSelection range, bool markDirty = true) =>
+        SetRegions(range.IsEmpty ? [] : [range], markDirty);
+
+    public void SetRegions(IReadOnlyList<WaveSelection> ranges, bool markDirty = true)
+    {
+        var next = NormalizeRegions(ranges);
+        if (SameRegions(_regions, next))
+        {
+            return;
+        }
+
+        _regions.Clear();
+        _regions.AddRange(next);
+        if (markDirty)
+        {
+            IsDirty = true;
+        }
+    }
+
+    public bool TryGetRegionAt(long frame, out WaveSelection region)
+    {
+        region = WaveSelection.Empty;
+        var found = false;
+        foreach (var item in _regions)
+        {
+            if (!item.ContainsFrame(frame))
+            {
+                continue;
+            }
+
+            if (!found || item.Length < region.Length)
+            {
+                region = item;
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+    public bool TryGetRegionContaining(WaveSelection range, out WaveSelection region)
+    {
+        region = WaveSelection.Empty;
+        if (range.IsEmpty)
+        {
+            return false;
+        }
+
+        var found = false;
+        foreach (var item in _regions)
+        {
+            if (range.StartFrame < item.StartFrame || range.EndFrame > item.EndFrame)
+            {
+                continue;
+            }
+
+            if (!found || item.Length < region.Length)
+            {
+                region = item;
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+    public void ApplyDeleteToRegion(long startFrame, long frameCount)
+    {
+        if (_regions.Count == 0 || frameCount <= 0)
+        {
+            return;
+        }
+
+        var delEnd = startFrame + frameCount;
+        var next = new List<WaveSelection>(_regions.Count);
+        foreach (var item in _regions)
+        {
+            var start = ShiftFrameThroughDelete(item.StartFrame, startFrame, delEnd, frameCount, inclusiveEnd: false);
+            var end = ShiftFrameThroughDelete(item.EndFrame, startFrame, delEnd, frameCount, inclusiveEnd: true);
+            var shifted = new WaveSelection(start, end).Clamp(FrameCount);
+            if (!shifted.IsEmpty)
+            {
+                next.Add(shifted);
+            }
+        }
+
+        SetRegions(next, markDirty: false);
+    }
+
+    public void ApplyInsertToRegion(long startFrame, long frameCount)
+    {
+        if (_regions.Count == 0 || frameCount <= 0)
+        {
+            return;
+        }
+
+        var next = new List<WaveSelection>(_regions.Count);
+        foreach (var item in _regions)
+        {
+            var start = item.StartFrame >= startFrame
+                ? item.StartFrame + frameCount
+                : item.StartFrame;
+            var end = item.EndFrame > startFrame
+                ? item.EndFrame + frameCount
+                : item.EndFrame;
+            var shifted = new WaveSelection(start, end).Clamp(FrameCount);
+            if (!shifted.IsEmpty)
+            {
+                next.Add(shifted);
+            }
+        }
+
+        SetRegions(next, markDirty: false);
+    }
+
+    private List<WaveSelection> NormalizeRegions(IEnumerable<WaveSelection> ranges)
+    {
+        var list = new List<WaveSelection>();
+        foreach (var range in ranges)
+        {
+            var next = range.IsEmpty ? WaveSelection.Empty : range.Clamp(FrameCount);
+            if (next.IsEmpty)
+            {
+                continue;
+            }
+
+            var exists = false;
+            foreach (var item in list)
+            {
+                if (item == next)
+                {
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (!exists)
+            {
+                list.Add(next);
+            }
+        }
+
+        list.Sort(static (a, b) =>
+        {
+            var byStart = a.StartFrame.CompareTo(b.StartFrame);
+            return byStart != 0 ? byStart : a.EndFrame.CompareTo(b.EndFrame);
+        });
+        return list;
+    }
+
+    private static bool SameRegions(IReadOnlyList<WaveSelection> left, IReadOnlyList<WaveSelection> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Count; i++)
+        {
+            if (left[i] != right[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private List<long> CueFrames()
     {
-        var loop = SampleLoop;
-        if (loop.IsEmpty)
+        var extras = new List<long>(4);
+        AddRangeBounds(extras, SampleLoop);
+        foreach (var region in _regions)
+        {
+            AddRangeBounds(extras, region);
+        }
+        if (extras.Count == 0)
         {
             return _markerFrames;
         }
 
-        var points = new List<long>(_markerFrames.Count + 2);
+        var points = new List<long>(_markerFrames.Count + extras.Count);
         points.AddRange(_markerFrames);
-        var start = ClampMarkerFrame(loop.StartFrame);
-        var end = ClampMarkerFrame(loop.EndFrame);
-        if (_markerFrames.BinarySearch(start) < 0)
+        foreach (var frame in extras)
         {
-            points.Add(start);
-        }
-
-        if (end != start && _markerFrames.BinarySearch(end) < 0)
-        {
-            points.Add(end);
+            if (_markerFrames.BinarySearch(frame) < 0 && !points.Contains(frame))
+            {
+                points.Add(frame);
+            }
         }
 
         if (points.Count != _markerFrames.Count)
@@ -322,6 +584,21 @@ internal sealed class AudioDocument
         }
 
         return points;
+    }
+
+    private void AddRangeBounds(List<long> frames, WaveSelection range)
+    {
+        if (range.IsEmpty)
+        {
+            return;
+        }
+
+        frames.Add(ClampMarkerFrame(range.StartFrame));
+        var end = ClampMarkerFrame(range.EndFrame);
+        if (end != frames[^1])
+        {
+            frames.Add(end);
+        }
     }
 
     private long AdjacentInSorted(List<long> frames, long from, int direction)
@@ -496,6 +773,102 @@ internal sealed class AudioDocument
         return true;
     }
 
+    public bool TryMoveRegions(IReadOnlyList<WaveSelection> origins, long delta, out long appliedDelta, bool markDirty = true)
+    {
+        appliedDelta = 0;
+        if (origins is null || origins.Count == 0)
+        {
+            return false;
+        }
+
+        var moves = new List<RangeEdgeMove>(origins.Count);
+        foreach (var origin in origins)
+        {
+            if (!origin.IsEmpty)
+            {
+                moves.Add(RangeEdgeMove.Translate(origin));
+            }
+        }
+
+        return TryMoveRegionEdges(moves, delta, out appliedDelta, markDirty);
+    }
+
+    public bool TryMoveRegionEdges(IReadOnlyList<RangeEdgeMove> moves, long delta, out long appliedDelta, bool markDirty = true)
+    {
+        appliedDelta = 0;
+        if (moves is null || moves.Count == 0 || delta == 0)
+        {
+            return false;
+        }
+
+        var byRange = new Dictionary<WaveSelection, RangeEdgeMove>();
+        foreach (var move in moves)
+        {
+            if (move.IsEmpty || !_regions.Contains(move.Range))
+            {
+                continue;
+            }
+
+            if (byRange.TryGetValue(move.Range, out var existing))
+            {
+                byRange[move.Range] = existing with
+                {
+                    Start = existing.Start || move.Start,
+                    End = existing.End || move.End,
+                };
+            }
+            else
+            {
+                byRange[move.Range] = move;
+            }
+        }
+
+        if (byRange.Count == 0)
+        {
+            return false;
+        }
+
+        var valid = byRange.Values.ToList();
+        appliedDelta = TimelineMoves.ClampEdgeMoves(valid, delta, FrameCount);
+        if (appliedDelta == 0)
+        {
+            return false;
+        }
+
+        var next = new List<WaveSelection>(_regions.Count);
+        foreach (var region in _regions)
+        {
+            next.Add(byRange.TryGetValue(region, out var move)
+                ? TimelineMoves.ShiftEdges(region, move.Start, move.End, appliedDelta)
+                : region);
+        }
+
+        SetRegions(next, markDirty);
+        return true;
+    }
+
+    public bool TryMoveSampleLoop(long delta, out long appliedDelta, bool markDirty = true) =>
+        TryMoveSampleLoopEdges(start: true, end: true, delta, out appliedDelta, markDirty);
+
+    public bool TryMoveSampleLoopEdges(bool start, bool end, long delta, out long appliedDelta, bool markDirty = true)
+    {
+        appliedDelta = 0;
+        if (SampleLoop.IsEmpty || delta == 0 || (!start && !end))
+        {
+            return false;
+        }
+
+        var move = new RangeEdgeMove(SampleLoop, start, end);
+        appliedDelta = TimelineMoves.ClampEdgeMoves([move], delta, FrameCount);
+        if (appliedDelta == 0)
+        {
+            return false;
+        }
+
+        SetSampleLoop(TimelineMoves.ShiftEdges(SampleLoop, start, end, appliedDelta), markDirty);
+        return true;
+    }
+
     public string MarkerCommentAt(long frame) =>
         _markerComments.TryGetValue(frame, out var comment) ? comment : string.Empty;
 
@@ -538,6 +911,62 @@ internal sealed class AudioDocument
         }
 
         return snapshot;
+    }
+
+    public MarkerSnapshot[] SnapshotMarkersInRange(WaveSelection range)
+    {
+        range = range.Clamp(FrameCount);
+        if (range.IsEmpty || _markerFrames.Count == 0)
+        {
+            return [];
+        }
+
+        var copied = new List<MarkerSnapshot>();
+        foreach (var frame in _markerFrames)
+        {
+            if (frame < range.StartFrame || frame >= range.EndFrame)
+            {
+                continue;
+            }
+
+            copied.Add(new MarkerSnapshot(frame - range.StartFrame, MarkerCommentAt(frame)));
+        }
+
+        return copied.ToArray();
+    }
+
+    public void ApplyPastedMarkers(long insertFrame, IReadOnlyList<MarkerSnapshot> relative)
+    {
+        if (relative is null || relative.Count == 0)
+        {
+            return;
+        }
+
+        var added = false;
+        foreach (var marker in relative)
+        {
+            var dest = ClampMarkerFrame(insertFrame + marker.Frame);
+            if (HasMarkerAt(dest))
+            {
+                continue;
+            }
+
+            _markerFrames.Add(dest);
+            if (!string.IsNullOrWhiteSpace(marker.Comment))
+            {
+                _markerComments[dest] = MarkerRoles.Normalize(marker.Comment);
+            }
+
+            added = true;
+        }
+
+        if (!added)
+        {
+            return;
+        }
+
+        CommitMarkers();
+        IsDirty = true;
     }
 
     public void ReplaceMarkerFrames(IReadOnlyList<long> frames, bool markDirty = true)
@@ -593,6 +1022,36 @@ internal sealed class AudioDocument
             }
 
             var dest = frame >= end ? frame - frameCount : frame;
+            nextFrames.Add(dest);
+            if (_markerComments.TryGetValue(frame, out var comment))
+            {
+                nextComments[dest] = comment;
+            }
+        }
+
+        _markerFrames.Clear();
+        _markerFrames.AddRange(nextFrames);
+        _markerComments.Clear();
+        foreach (var pair in nextComments)
+        {
+            _markerComments[pair.Key] = pair.Value;
+        }
+
+        CommitMarkers();
+    }
+
+    public void ApplyInsertToMarkers(long startFrame, long frameCount)
+    {
+        if (frameCount <= 0)
+        {
+            return;
+        }
+
+        var nextFrames = new List<long>(_markerFrames.Count);
+        var nextComments = new Dictionary<long, string>();
+        foreach (var frame in _markerFrames)
+        {
+            var dest = frame >= startFrame ? frame + frameCount : frame;
             nextFrames.Add(dest);
             if (_markerComments.TryGetValue(frame, out var comment))
             {
@@ -732,6 +1191,8 @@ internal readonly record struct WaveSelection(long StartFrame, long EndFrame)
     public static WaveSelection Empty { get; } = new(0, 0);
 
     public bool IsEmpty => EndFrame <= StartFrame;
+
+    public bool ContainsFrame(long frame) => !IsEmpty && frame >= StartFrame && frame < EndFrame;
 
     public long Length => Math.Max(0, EndFrame - StartFrame);
 

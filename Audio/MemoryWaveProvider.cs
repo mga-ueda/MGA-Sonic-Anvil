@@ -47,6 +47,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private float[] _samples = [];
     private int _channels = 2;
     private int _outputChannels = 2;
+    private int _deviceRate = 48000;
+    private int _sourceRate = 48000;
+    private double _sourceFrame;
     private int _cursor;
     private int _loopStart;
     private int _playEnd;
@@ -72,7 +75,27 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     public WaveFormat WaveFormat { get; private set; } =
         WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
 
+    public int DeviceSampleRate
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _deviceRate;
+            }
+        }
+    }
+
     public bool Ended { get; private set; }
+
+    public void SetDeviceSampleRate(int sampleRate)
+    {
+        lock (_gate)
+        {
+            _deviceRate = Math.Clamp(sampleRate, 1000, 384000);
+            WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(_deviceRate, Math.Max(1, _outputChannels));
+        }
+    }
 
     public bool IsBoundTo(AudioDocument document)
     {
@@ -88,7 +111,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         {
             lock (_gate)
             {
-                return _channels <= 0 ? 0 : _cursor / _channels;
+                return _channels <= 0 ? 0 : (long)Math.Floor(_sourceFrame);
             }
         }
     }
@@ -105,8 +128,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _samples = document.Interleaved;
             _channels = Math.Max(1, document.Channels);
             _outputChannels = Math.Min(2, _channels);
-            WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(document.SampleRate, _outputChannels);
-            _cursor = checked((int)Math.Clamp(startFrame, 0, document.FrameCount) * _channels);
+            _sourceRate = Math.Max(1, document.SampleRate);
+            WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(_deviceRate, _outputChannels);
+            var start = Math.Clamp(startFrame, 0, document.FrameCount);
+            _sourceFrame = start;
+            _cursor = checked((int)start * _channels);
             _frameGain = frameGain;
             _silenceOnly = false;
             if (playRange is { IsEmpty: false } range)
@@ -259,7 +285,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         lock (_gate)
         {
             var max = _channels <= 0 ? 0 : _samples.Length / _channels;
-            _cursor = checked((int)Math.Clamp(frame, 0, max) * _channels);
+            var next = Math.Clamp(frame, 0, max);
+            _sourceFrame = next;
+            _cursor = checked((int)next * _channels);
             Ended = false;
         }
     }
@@ -338,7 +366,16 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var srcCh = Math.Max(1, _channels);
         var outCh = Math.Max(1, _outputChannels);
         var framesWanted = count / outCh;
+        var writtenFrames = _sourceRate == _deviceRate
+            ? ReadCoreNative(buffer, offset, framesWanted, srcCh, outCh)
+            : ReadCoreResampled(buffer, offset, framesWanted, srcCh, outCh);
+        return writtenFrames * outCh;
+    }
+
+    private int ReadCoreNative(float[] buffer, int offset, int framesWanted, int srcCh, int outCh)
+    {
         var writtenFrames = 0;
+        _cursor = checked((int)_sourceFrame * srcCh);
         while (writtenFrames < framesWanted)
         {
             if (_cursor >= _playEnd)
@@ -346,6 +383,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 if (_loop && _playEnd > _loopStart)
                 {
                     _cursor = _loopStart;
+                    _sourceFrame = _loopStart / (double)srcCh;
                     continue;
                 }
 
@@ -370,39 +408,108 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                     right *= gain;
                 }
 
-                var dest = offset + writtenFrames * outCh;
-                buffer[dest] = left;
-                if (outCh > 1)
-                {
-                    buffer[dest + 1] = right;
-                }
-
+                WriteFrame(buffer, offset, writtenFrames, outCh, left, right);
                 _cursor += srcCh;
                 writtenFrames++;
             }
         }
 
-        return writtenFrames * outCh;
+        _sourceFrame = srcCh <= 0 ? 0 : _cursor / (double)srcCh;
+        return writtenFrames;
+    }
+
+    private int ReadCoreResampled(float[] buffer, int offset, int framesWanted, int srcCh, int outCh)
+    {
+        var playEndFrame = srcCh <= 0 ? 0 : _playEnd / (double)srcCh;
+        var loopStartFrame = srcCh <= 0 ? 0 : _loopStart / (double)srcCh;
+        var frameCount = srcCh <= 0 ? 0 : _samples.Length / srcCh;
+        var step = _sourceRate / (double)_deviceRate;
+        var writtenFrames = 0;
+        while (writtenFrames < framesWanted)
+        {
+            if (_sourceFrame >= playEndFrame)
+            {
+                if (_loop && playEndFrame > loopStartFrame)
+                {
+                    _sourceFrame = loopStartFrame;
+                    continue;
+                }
+
+                Ended = true;
+                break;
+            }
+
+            FormatConvert.DownmixBandlimited(
+                _samples,
+                srcCh,
+                _sourceFrame,
+                frameCount,
+                _sourceRate,
+                _deviceRate,
+                out var left,
+                out var right);
+            if (_frameGain is { } gainAt)
+            {
+                var gain = gainAt((long)Math.Floor(_sourceFrame));
+                left *= gain;
+                right *= gain;
+            }
+
+            WriteFrame(buffer, offset, writtenFrames, outCh, left, right);
+            _sourceFrame += step;
+            writtenFrames++;
+        }
+
+        _cursor = checked((int)Math.Clamp(_sourceFrame, 0, frameCount) * srcCh);
+        return writtenFrames;
+    }
+
+    private static void WriteFrame(float[] buffer, int offset, int frame, int outCh, float left, float right)
+    {
+        var dest = offset + frame * outCh;
+        buffer[dest] = left;
+        if (outCh > 1)
+        {
+            buffer[dest + 1] = right;
+        }
     }
 
     private int ReadScrub(float[] buffer, int offset, int count)
     {
         var outCh = Math.Max(1, _outputChannels);
         var framesWanted = Math.Max(0, count / outCh);
-        var needed = framesWanted * 2;
+        var sourceFrames = _sourceRate == _deviceRate
+            ? framesWanted
+            : Math.Max(1, (int)Math.Round(framesWanted * (_sourceRate / (double)_deviceRate)));
+        var needed = Math.Max(framesWanted, sourceFrames) * 2;
         if (_scrubScratch.Length < needed)
         {
             _scrubScratch = new float[needed];
         }
 
-        _scrub.Read(_scrubScratch, 0, framesWanted, 1f);
-        for (var i = 0; i < framesWanted; i++)
+        _scrub.Read(_scrubScratch, 0, sourceFrames, 1f);
+        if (_sourceRate == _deviceRate)
         {
-            var dest = offset + i * outCh;
-            buffer[dest] = _scrubScratch[i * 2];
-            if (outCh > 1)
+            for (var i = 0; i < framesWanted; i++)
             {
-                buffer[dest + 1] = _scrubScratch[i * 2 + 1];
+                WriteFrame(buffer, offset, i, outCh, _scrubScratch[i * 2], _scrubScratch[i * 2 + 1]);
+            }
+        }
+        else
+        {
+            var step = sourceFrames / (double)Math.Max(1, framesWanted);
+            for (var i = 0; i < framesWanted; i++)
+            {
+                FormatConvert.DownmixBandlimited(
+                    _scrubScratch,
+                    2,
+                    i * step,
+                    sourceFrames,
+                    _sourceRate,
+                    _deviceRate,
+                    out var left,
+                    out var right);
+                WriteFrame(buffer, offset, i, outCh, left, right);
             }
         }
 

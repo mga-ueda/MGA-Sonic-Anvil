@@ -1,6 +1,7 @@
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
+using MgaSonicAnvil.UI;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
@@ -90,6 +91,18 @@ public sealed class MarkerTests
         AssertIdsMatchOrder(document);
         Assert.Equal(new long[] { 10, 30, 50 }, Frames(document));
         Assert.Equal(new[] { 1, 2, 3 }, document.Markers.Select(m => m.Id).ToArray());
+    }
+
+    [Fact]
+    public void ApplyInsert_ShiftsMarkersAtOrAfterInsert()
+    {
+        var document = MakeDocument(frames: 100);
+        document.TryAddMarker(10);
+        document.TryAddMarker(30);
+        document.ApplyInsertToMarkers(30, 8);
+
+        Assert.Equal(new long[] { 10, 38 }, Frames(document));
+        AssertIdsMatchOrder(document);
     }
 
     [Fact]
@@ -327,6 +340,38 @@ public sealed class MarkerTests
         Assert.True(history.Undo(document));
         AssertIdsMatchOrder(document);
         Assert.Equal(new long[] { 10, 30, 50 }, Frames(document));
+    }
+
+    [Fact]
+    public void TryPickNearestSnap_PicksClosestWithinThreshold()
+    {
+        long[] frames = [100, 400, 800];
+        Assert.True(WaveformView.TryPickNearestSnap(
+            frames,
+            mouseX: 103,
+            maxDistPx: 8,
+            viewStart: 0,
+            viewEnd: 1000,
+            frame => frame,
+            out var x,
+            out var frame));
+        Assert.Equal(100, frame);
+        Assert.Equal(100, x);
+    }
+
+    [Fact]
+    public void TryPickNearestSnap_IgnoresOutsideViewAndBeyondThreshold()
+    {
+        long[] frames = [10, 500];
+        Assert.False(WaveformView.TryPickNearestSnap(
+            frames,
+            mouseX: 20,
+            maxDistPx: 8,
+            viewStart: 100,
+            viewEnd: 900,
+            frame => frame,
+            out _,
+            out _));
     }
 
     private static void AssertIdsMatchOrder(AudioDocument document)

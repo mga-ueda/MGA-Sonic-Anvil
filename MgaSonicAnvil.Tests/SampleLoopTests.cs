@@ -1,5 +1,6 @@
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Editing;
+using MgaSonicAnvil.UI;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
@@ -14,6 +15,24 @@ public sealed class SampleLoopTests
 
         Assert.Equal(new WaveSelection(20, 80), document.SampleLoop);
         Assert.Empty(document.Markers);
+    }
+
+    [Fact]
+    public void SetSampleLoop_MarksDocumentDirty()
+    {
+        var document = MakeDocument(frames: 100);
+        Assert.False(document.IsDirty);
+
+        document.SetSampleLoop(new WaveSelection(20, 80));
+        Assert.True(document.IsDirty);
+
+        document.MarkSaved("loop.wav", AudioFileKind.Wave);
+        document.SetSampleLoop(new WaveSelection(20, 80));
+        Assert.False(document.IsDirty);
+
+        document.SetSampleLoop(WaveSelection.Empty, markDirty: false);
+        Assert.False(document.IsDirty);
+        Assert.True(document.SampleLoop.IsEmpty);
     }
 
     [Fact]
@@ -69,6 +88,16 @@ public sealed class SampleLoopTests
     }
 
     [Fact]
+    public void ApplyInsert_ShiftsSampleLoop()
+    {
+        var document = MakeDocument(frames: 100);
+        document.SetSampleLoop(new WaveSelection(20, 60));
+        document.ApplyInsertToSampleLoop(20, 10);
+
+        Assert.Equal(new WaveSelection(30, 70), document.SampleLoop);
+    }
+
+    [Fact]
     public void ApplyDelete_ClearsSampleLoopWhenFullyRemoved()
     {
         var document = MakeDocument(frames: 100);
@@ -115,11 +144,15 @@ public sealed class SampleLoopTests
     }
 
     [Fact]
-    public void SetSampleLoop_SameRangeIsNoOp()
+    public void SetSampleLoop_SameRangeClears()
     {
         var document = MakeDocument(frames: 100);
         document.SetSampleLoop(new WaveSelection(10, 40));
-        Assert.Null(ProcessEdits.SetSampleLoop(document, new WaveSelection(10, 40)));
+        var command = ProcessEdits.SetSampleLoop(document, new WaveSelection(10, 40));
+        Assert.NotNull(command);
+        new EditHistory().Do(document, command);
+        Assert.True(document.SampleLoop.IsEmpty);
+        Assert.Null(ProcessEdits.SetSampleLoop(document, WaveSelection.Empty));
     }
 
     [Fact]
@@ -157,6 +190,26 @@ public sealed class SampleLoopTests
         Assert.Equal(new WaveSelection(20, 80), document.DoubleClickSpanAt(40));
         Assert.Equal(new WaveSelection(0, 20), document.DoubleClickSpanAt(10));
         Assert.Equal(new WaveSelection(80, 100), document.DoubleClickSpanAt(90));
+    }
+
+    [Fact]
+    public void SampleLoopBar_HitTestUsesVisibleRect()
+    {
+        var lane = new System.Windows.Rect(40, 10, 200, 16);
+        Assert.True(MarkerRolePaint.TryGetVisibleRangeRect(
+            new WaveSelection(20, 80),
+            lane,
+            viewStart: 0,
+            viewSpan: 100,
+            out var bar));
+        Assert.True(bar.Contains(new System.Windows.Point(bar.X + 2, lane.Y + 4)));
+        Assert.False(bar.Contains(new System.Windows.Point(lane.X + 2, lane.Y + 4)));
+        Assert.False(MarkerRolePaint.TryGetVisibleRangeRect(
+            WaveSelection.Empty,
+            lane,
+            viewStart: 0,
+            viewSpan: 100,
+            out _));
     }
 
     private static AudioDocument MakeDocument(int frames)

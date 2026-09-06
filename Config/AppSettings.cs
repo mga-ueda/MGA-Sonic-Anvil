@@ -37,9 +37,20 @@ internal sealed class AppSettings
 
     public long LastSampleLoopEnd { get; set; }
 
+    public long LastRegionStart { get; set; }
+
+    public long LastRegionEnd { get; set; }
+
+    public long[] LastRegionStarts { get; set; } = [];
+
+    public long[] LastRegionEnds { get; set; } = [];
+
     public long[] LastMarkerFrames { get; set; } = [];
 
     public string[] LastMarkerComments { get; set; } = [];
+
+    /// <summary>色調整パネルで保存したアプリ既定色。#RRGGBB。未設定なら XAML 既定。</summary>
+    public Dictionary<string, string>? Colors { get; set; }
 
     public AudioOutputSettings ToAudioOutputSettings() =>
         new(AudioOutputSettings.ParseApi(AudioApi), AudioDeviceId ?? string.Empty);

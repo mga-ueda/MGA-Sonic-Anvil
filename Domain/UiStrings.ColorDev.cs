@@ -1,0 +1,80 @@
+namespace MgaSonicAnvil.Domain;
+
+internal static partial class UiStrings
+{
+    public const string ColorDevTitle = "色調整（開発者）";
+    public const string ColorDevClose = "閉じる";
+    public const string ColorDevResetToDefaults = "既定に戻す";
+
+    public static string ColorLabel(string key)
+    {
+        var token = key.EndsWith("Brush", StringComparison.Ordinal) ? key[..^5] : key;
+        return token switch
+        {
+            "PrimaryFore" => "共通・標準文字",
+            "MutedFore" => "共通・弱い文字",
+            "AccentCyan" => "共通・シアンアクセント",
+            "DirtyAccent" => "共通・未保存アクセント",
+            "SurfaceBack" => "共通・基本背景",
+            "WindowBack" => "ダイアログ・背景",
+            "ChromeBack" => "共通・クローム背景",
+            "ChromeBorder" => "共通・クローム境界",
+            "ChromeMid" => "共通・中間グレー",
+            "ChromeDim" => "共通・無効／薄いグレー",
+            "ControlHoverBorder" => "コントロール・ホバー境界",
+            "DialogInputBack" => "入力欄・背景",
+            "MenuSeparator" => "メニュー・区切り",
+            "WaveformBack" => "波形エリア背景",
+            "WaveFill" => "波形",
+            "WaveZeroLine" => "波形 0dB 線",
+            "WaveformScrollTrack" => "波形スクロール・トラック",
+            "TimelineWellBack" => "タイムライン井戸・背景",
+            "Playhead" => "再生ヘッド",
+            "MouseGuide" => "マウスガイド",
+            "MouseGuideOnSelection" => "マウスガイド（選択上）",
+            "LoopRangeFill" => "選択範囲・塗り",
+            "SampleLoopTimeline" => "サンプルループ・タイムライン",
+            "SampleLoopWaveFill" => "サンプルループ・波形塗り",
+            "SampleLoopTimeLabelFore" => "サンプルループ・時刻文字",
+            "RegionTimeline" => "リージョン・タイムライン",
+            "RegionWaveFill" => "リージョン・波形塗り",
+            "RegionTimeLabelFore" => "リージョン・時刻文字",
+            "Marker" => "マーカー",
+            "MarkerSelected" => "マーカー・選択",
+            "MarkerSelectedBorder" => "マーカー・選択枠",
+            "MarkerLabelFore" => "マーカー番号文字",
+            "RegionWaveFillAnacrusis" => "波形リージョン（-A）",
+            "RegionWaveFillLoop" => "波形リージョン（-L）",
+            "RegionWaveFillExit" => "波形リージョン（-E）",
+            "RegionWaveFillExcluded" => "波形リージョン（-R）",
+            "SpectrumBar" => "スペアナ・バー",
+            "ProjectBarBack" => "全体波形バー・背景",
+            "TransportBack" => "トランスポート・背景",
+            "TransportFore" => "トランスポート・文字",
+            "TransportDisabledFore" => "トランスポート・無効文字",
+            "TransportHoverBack" => "トランスポート・ホバー",
+            "TransportPressedBack" => "トランスポート・押下",
+            "ActionBarBack" => "アクションバー・背景",
+            "ActionCopyrightFore" => "アクションバー・著作権文字",
+            "ActionLinkFore" => "アクションバー・リンク",
+            "StatusBarBack" => "ステータスバー・背景",
+            "StatusBarDetailFore" => "ステータスバー・詳細文字",
+            "ColorPanelBack" => "色パネル・背景",
+            "ColorPanelListBack" => "色パネル・リスト背景",
+            "ColorPanelInputBack" => "色パネル・入力背景",
+            "ExportButtonFill" => "ダイアログ・OK塗り",
+            "ExportButtonHoverFill" => "ダイアログ・OKホバー塗り",
+            "ExportButtonBack" => "ダイアログ・OK枠",
+            "ExportButtonHoverBack" => "ダイアログ・OKホバー枠",
+            "ExportButtonPressedBack" => "ダイアログ・OK押下枠",
+            "ExportButtonFore" => "ダイアログ・OK文字",
+            "ClearButtonFill" => "ダイアログ・キャンセル塗り",
+            "ClearButtonHoverFill" => "ダイアログ・キャンセルホバー塗り",
+            "ClearButtonBack" => "ダイアログ・キャンセル枠",
+            "ClearButtonHoverBack" => "ダイアログ・キャンセルホバー枠",
+            "ClearButtonPressedBack" => "ダイアログ・キャンセル押下枠",
+            "ClearButtonFore" => "ダイアログ・キャンセル文字",
+            _ => token,
+        };
+    }
+}

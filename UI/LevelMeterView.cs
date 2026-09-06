@@ -8,21 +8,18 @@ namespace MgaSonicAnvil.UI;
 internal sealed class LevelMeterView : FrameworkElement
 {
     private const double ScaleColWidth = 22;
-    private const double BarWidth = 28;
+    private const double BarWidth = 14;
     private const double LampHeight = 8;
-    private const double ReadoutHeight = 16;
-    private const double LabelHeight = 12;
-    private const double ChromePad = 6;
+    private const double ReadoutLineHeight = 12;
+    private const double ReadoutHeight = ReadoutLineHeight * 2;
+    private const double HoldLineHeight = 3;
 
-    private static readonly Color SectionBack = Color.FromRgb(0x24, 0x26, 0x29);
-    private static readonly Color SectionBorder = Color.FromRgb(0x4A, 0x4D, 0x52);
     private static readonly Color TrackBack = Color.FromRgb(0x24, 0x26, 0x29);
     private static readonly Color TrackBorder = Color.FromRgb(0x1A, 0x22, 0x1A);
     private static readonly Color Tick = Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF);
     private static readonly Color ClipOff = Color.FromRgb(0x28, 0x08, 0x08);
     private static readonly Color ClipOffBorder = Color.FromRgb(0x3A, 0x15, 0x15);
     private static readonly Color ClipOn = Color.FromRgb(0xFF, 0x00, 0x00);
-    private static readonly Color LabelFore = Colors.White;
 
     private LevelMeterSnapshot _snapshot = LevelMeterSnapshot.Idle;
     private LinearGradientBrush? _barGradient;
@@ -57,30 +54,22 @@ internal sealed class LevelMeterView : FrameworkElement
             return;
         }
 
-        dc.DrawRoundedRectangle(
-            WpfControlHelpers.FrozenBrush(SectionBack),
-            new Pen(WpfControlHelpers.FrozenBrush(SectionBorder), 1),
-            bounds,
-            4,
-            4);
-
-        var inner = new Rect(
-            bounds.X + ChromePad,
-            bounds.Y + ChromePad,
-            Math.Max(1, bounds.Width - ChromePad * 2),
-            Math.Max(1, bounds.Height - ChromePad * 2));
+        var inner = bounds;
         var trackTop = inner.Y + LampHeight;
-        var trackBottom = inner.Bottom - ReadoutHeight - LabelHeight;
+        var trackBottom = inner.Bottom - ReadoutHeight;
         var trackHeight = Math.Max(24, trackBottom - trackTop);
-        var track = new Rect(inner.X + ScaleColWidth, trackTop, BarWidth * 4, trackHeight);
+        var barsWidth = BarWidth * 4;
+        var barsLeft = inner.X + Math.Max(0, (inner.Width - barsWidth) * 0.5);
+        var track = new Rect(barsLeft, trackTop, barsWidth, trackHeight);
         EnsureGradient(trackHeight);
 
-        DrawScale(dc, new Rect(inner.X, trackTop, ScaleColWidth, trackHeight), rightAlign: true);
-        DrawUnit(dc, new Rect(track.X, inner.Y, BarWidth, inner.Height), trackHeight, isPeak: false, _snapshot.Left, clip: false, "RMS");
-        DrawUnit(dc, new Rect(track.X + BarWidth, inner.Y, BarWidth, inner.Height), trackHeight, isPeak: true, _snapshot.Left, _snapshot.ClipLeft, "L");
-        DrawUnit(dc, new Rect(track.X + BarWidth * 2, inner.Y, BarWidth, inner.Height), trackHeight, isPeak: true, _snapshot.Right, _snapshot.ClipRight, "R");
-        DrawUnit(dc, new Rect(track.X + BarWidth * 3, inner.Y, BarWidth, inner.Height), trackHeight, isPeak: false, _snapshot.Right, clip: false, "RMS");
+        DrawScale(dc, new Rect(track.X - ScaleColWidth, trackTop, ScaleColWidth, trackHeight), rightAlign: true);
+        DrawUnit(dc, new Rect(track.X, inner.Y, BarWidth, inner.Height), trackHeight, isPeak: false, _snapshot.Left, clip: false);
+        DrawUnit(dc, new Rect(track.X + BarWidth, inner.Y, BarWidth, inner.Height), trackHeight, isPeak: true, _snapshot.Left, _snapshot.ClipLeft);
+        DrawUnit(dc, new Rect(track.X + BarWidth * 2, inner.Y, BarWidth, inner.Height), trackHeight, isPeak: true, _snapshot.Right, _snapshot.ClipRight);
+        DrawUnit(dc, new Rect(track.X + BarWidth * 3, inner.Y, BarWidth, inner.Height), trackHeight, isPeak: false, _snapshot.Right, clip: false);
         DrawScale(dc, new Rect(track.Right, trackTop, ScaleColWidth, trackHeight), rightAlign: false);
+        DrawReadouts(dc, new Rect(inner.X, track.Bottom + 1, inner.Width, ReadoutHeight));
     }
 
     private void DrawUnit(
@@ -89,8 +78,7 @@ internal sealed class LevelMeterView : FrameworkElement
         double trackHeight,
         bool isPeak,
         ChannelMeter meter,
-        bool clip,
-        string label)
+        bool clip)
     {
         var lamp = new Rect(unit.X + 1, unit.Y, unit.Width - 2, LampHeight - 1);
         if (isPeak)
@@ -129,7 +117,7 @@ internal sealed class LevelMeterView : FrameworkElement
         {
             var holdPct = isPeak ? meter.PeakHoldPct : meter.RmsHoldPct;
             var holdDb = isPeak ? meter.PeakHeldDb : meter.RmsHoldLineDb;
-            var holdH = Math.Max(1, track.Height / Math.Abs(LevelMeterEngine.DbMax - LevelMeterEngine.DbMin));
+            var holdH = HoldLineHeight;
             var holdBottom = track.Height * Math.Clamp(holdPct, 0, 100) / 100d;
             var y = track.Bottom - holdBottom - holdH;
             var color = LevelMeterEngine.LevelColor(holdDb);
@@ -139,30 +127,74 @@ internal sealed class LevelMeterView : FrameworkElement
                 new Pen(Brushes.Black, 1),
                 holdRect);
         }
-
-        var readoutDb = isPeak ? meter.PeakHeldDb : meter.RmsHeldDb;
-        var readout = LevelMeterEngine.FormatReadout(readoutDb);
-        var pixels = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-        var dbText = new FormattedText(
-            readout,
-            CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight,
-            WpfControlHelpers.MonoTypeface,
-            8,
-            WpfControlHelpers.FrozenBrush(LabelFore),
-            pixels);
-        dc.DrawText(dbText, new Point(unit.X + (unit.Width - dbText.Width) * 0.5, track.Bottom + 1));
-
-        var labelText = new FormattedText(
-            label,
-            CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight,
-            WpfControlHelpers.MonoTypeface,
-            8,
-            WpfControlHelpers.FrozenBrush(LabelFore),
-            pixels);
-        dc.DrawText(labelText, new Point(unit.X + (unit.Width - labelText.Width) * 0.5, track.Bottom + ReadoutHeight));
     }
+
+    private void DrawReadouts(DrawingContext dc, Rect area)
+    {
+        var pixels = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var brush = LabelBrush();
+        var labelWidth = Math.Max(MeasureReadout("Peak", pixels).Width, MeasureReadout("RMS", pixels).Width);
+        var intSlot = MeasureReadout("-50", pixels).Width;
+        var fracSlot = MeasureReadout(".0", pixels).Width;
+        var numWidth = intSlot + fracSlot;
+        const double gap = 3;
+        var rowWidth = labelWidth + gap + numWidth + gap + numWidth;
+        var left = area.X + Math.Max(0, (area.Width - rowWidth) * 0.5);
+        var leftDotX = left + labelWidth + gap + intSlot;
+        var rightDotX = leftDotX + fracSlot + gap + intSlot;
+
+        DrawReadoutLabel(dc, "Peak", left, area.Y, pixels, brush);
+        DrawReadoutAligned(dc, LevelMeterEngine.FormatReadout(_snapshot.Left.PeakHeldDb), leftDotX, area.Y, pixels, brush);
+        DrawReadoutAligned(dc, LevelMeterEngine.FormatReadout(_snapshot.Right.PeakHeldDb), rightDotX, area.Y, pixels, brush);
+
+        var y2 = area.Y + ReadoutLineHeight;
+        DrawReadoutLabel(dc, "RMS", left, y2, pixels, brush);
+        DrawReadoutAligned(dc, LevelMeterEngine.FormatReadout(_snapshot.Left.RmsHeldDb), leftDotX, y2, pixels, brush);
+        DrawReadoutAligned(dc, LevelMeterEngine.FormatReadout(_snapshot.Right.RmsHeldDb), rightDotX, y2, pixels, brush);
+    }
+
+    private static void DrawReadoutLabel(
+        DrawingContext dc,
+        string text,
+        double x,
+        double y,
+        double pixels,
+        Brush brush)
+    {
+        dc.DrawText(MeasureReadout(text, pixels, brush), new Point(x, y));
+    }
+
+    private static void DrawReadoutAligned(
+        DrawingContext dc,
+        string text,
+        double dotX,
+        double y,
+        double pixels,
+        Brush brush)
+    {
+        var dot = text.IndexOf('.');
+        if (dot < 0)
+        {
+            var whole = MeasureReadout(text, pixels, brush);
+            dc.DrawText(whole, new Point(dotX - whole.Width, y));
+            return;
+        }
+
+        var integer = MeasureReadout(text[..dot], pixels, brush);
+        var fraction = MeasureReadout(text[dot..], pixels, brush);
+        dc.DrawText(integer, new Point(dotX - integer.Width, y));
+        dc.DrawText(fraction, new Point(dotX, y));
+    }
+
+    private static FormattedText MeasureReadout(string text, double pixels, Brush? brush = null) =>
+        new(
+            text,
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            WpfControlHelpers.MonoTypeface,
+            8,
+            brush ?? LabelBrush(),
+            pixels);
 
     private void DrawScale(DrawingContext dc, Rect col, bool rightAlign)
     {
@@ -177,7 +209,7 @@ internal sealed class LevelMeterView : FrameworkElement
                 FlowDirection.LeftToRight,
                 WpfControlHelpers.MonoTypeface,
                 8,
-                WpfControlHelpers.FrozenBrush(LabelFore),
+                LabelBrush(),
                 pixels);
             var x = rightAlign ? col.Right - formatted.Width - 1 : col.X + 1;
             var ty = db <= LevelMeterEngine.DbMin
@@ -188,6 +220,9 @@ internal sealed class LevelMeterView : FrameworkElement
             dc.DrawText(formatted, new Point(x, ty));
         }
     }
+
+    private static Brush LabelBrush() =>
+        WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
 
     private static void DrawTicks(DrawingContext dc, Rect track)
     {

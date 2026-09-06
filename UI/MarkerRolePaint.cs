@@ -89,6 +89,20 @@ internal static class MarkerRolePaint
         DrawRange(dc, document.SampleLoop, lane, viewStart, viewSpan, brushKey);
     }
 
+    public static void DrawRegion(
+        DrawingContext dc,
+        AudioDocument document,
+        Rect lane,
+        double viewStart,
+        double viewSpan,
+        string brushKey)
+    {
+        foreach (var region in document.Regions)
+        {
+            DrawRange(dc, region, lane, viewStart, viewSpan, brushKey);
+        }
+    }
+
     public static void DrawRange(
         DrawingContext dc,
         WaveSelection range,
@@ -97,24 +111,43 @@ internal static class MarkerRolePaint
         double viewSpan,
         string brushKey)
     {
-        if (range.IsEmpty || lane.Width <= 1 || lane.Height <= 1 || viewSpan <= 0)
+        if (!TryGetVisibleRangeRect(range, lane, viewStart, viewSpan, out var bar))
         {
             return;
+        }
+
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get(brushKey)), null, bar);
+    }
+
+    public static bool TryGetVisibleRangeRect(
+        WaveSelection range,
+        Rect lane,
+        double viewStart,
+        double viewSpan,
+        out Rect bar)
+    {
+        bar = default;
+        if (range.IsEmpty || lane.Width <= 1 || lane.Height <= 1 || viewSpan <= 0)
+        {
+            return false;
         }
 
         var x0 = lane.X + ((range.StartFrame - viewStart) / viewSpan) * lane.Width;
         var x1 = lane.X + ((range.EndFrame - viewStart) / viewSpan) * lane.Width;
+        if (x1 < x0)
+        {
+            (x0, x1) = (x1, x0);
+        }
+
         if (x1 < lane.X || x0 > lane.Right)
         {
-            return;
+            return false;
         }
 
         x0 = Math.Clamp(x0, lane.X, lane.Right);
         x1 = Math.Clamp(x1, lane.X, lane.Right);
-        dc.DrawRectangle(
-            WpfControlHelpers.FrozenBrush(Theme.Get(brushKey)),
-            null,
-            new Rect(x0, lane.Y, Math.Max(1, x1 - x0), lane.Height));
+        bar = new Rect(x0, lane.Y, Math.Max(1, x1 - x0), lane.Height);
+        return true;
     }
 
     private static Brush BrushOf(MarkerRole role) =>

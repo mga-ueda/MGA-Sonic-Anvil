@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -30,6 +31,8 @@ internal sealed class WaveformView : Grid
     private const double DbOptionalMinGapPx = 11;
     private static double DbScaleLaneWidth => DesignMetrics.DbScaleWidth;
     private const int DragThresholdPx = 3;
+    private const double LoopHandleMinPx = 10;
+    private const double MarkerSnapPx = 8d;
     private const float TrailTargetLengthPx = 360f;
     private const int TrailSampleRetainMs = 10400;
     private const float TrailPeakAlpha = 0.15f;
@@ -49,7 +52,12 @@ internal sealed class WaveformView : Grid
     private readonly Line _mouseGuideLine = new();
     private readonly TranslateTransform _mouseGuideTransform = new();
     private readonly List<(WaveMarker Marker, Rect Flag)> _markerFlags = [];
+    private readonly List<(WaveSelection Range, long Frame, Rect Flag)> _regionFlags = [];
     private readonly HashSet<long> _selectedMarkerFrames = [];
+    private readonly HashSet<RegionEdge> _selectedRegionEdges = [];
+    private bool _loopStartSelected;
+    private bool _loopEndSelected;
+    private long? _markerSelectAnchor;
     private bool _markerDragging;
     private bool _markerDragMoved;
     private long _markerDragPrimaryOrigin;
@@ -57,6 +65,11 @@ internal sealed class WaveformView : Grid
     private long _markerDragLastDelta = long.MinValue;
     private long[] _markerDragOrigins = [];
     private MarkerSnapshot[] _markerDragBefore = [];
+    private RegionEdge[] _regionDragOrigins = [];
+    private WaveSelection[] _regionsDragBefore = [];
+    private bool _loopDragStart;
+    private bool _loopDragEnd;
+    private WaveSelection _loopDragBefore;
     private bool _pendingSelectionPrerollJump;
     private TextBox? _commentEditor;
     private long _commentEditFrame = -1;
@@ -75,7 +88,7 @@ internal sealed class WaveformView : Grid
     private bool _waveDirty = true;
     private bool _staticRebuildQueued;
     private bool _viewChangedQueued;
-    private readonly Dictionary<(string Text, bool OnSampleLoop), FormattedText> _timeLabelCache = new();
+    private readonly Dictionary<(string Text, TimeLabelAccent Accent), FormattedText> _timeLabelCache = new();
     private readonly Dictionary<string, FormattedText> _dbLabelCache = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FormattedText> _markerLabelCache = new(StringComparer.Ordinal);
     private readonly Dictionary<(string Text, bool Selected), FormattedText> _markerCommentLabelCache = new();
@@ -113,8 +126,14 @@ internal sealed class WaveformView : Grid
     public event EventHandler? SelectionChanged;
     public event EventHandler? ViewChanged;
     public event EventHandler<(long Frame, string Comment)>? MarkerCommentCommitted;
-    public event EventHandler<(MarkerSnapshot[] Before, MarkerSnapshot[] After)>? MarkerLayoutCommitted;
+    public event EventHandler<(
+        MarkerSnapshot[] MarkersBefore,
+        WaveSelection[] RegionsBefore,
+        WaveSelection LoopBefore)>? TimelineLayoutCommitted;
     public event EventHandler? MarkersChanged;
+    public event EventHandler? SampleLoopClearRequested;
+    public event EventHandler<WaveSelection>? RegionClearRequested;
+    public event EventHandler<IReadOnlyList<long>>? MarkerClearRequested;
 
     public bool IsEditingMarkerComment =>
         _commentEditor is { Visibility: Visibility.Visible };
@@ -123,6 +142,7 @@ internal sealed class WaveformView : Grid
     {
         ClipToBounds = true;
         Focusable = true;
+        FocusVisualStyle = null;
         SnapsToDevicePixels = false;
         UseLayoutRounding = false;
         Cursor = Cursors.IBeam;
@@ -175,7 +195,8 @@ internal sealed class WaveformView : Grid
             ResetMarkerDragState();
             _scrubbing = false;
             _previewGainAtFrame = null;
-            _selectedMarkerFrames.Clear();
+            ClearTimelineSelection(refresh: false);
+            _markerSelectAnchor = null;
             _keyboardSelectAnchor = null;
             InvalidateWaveform();
             RaiseViewChanged();
@@ -206,6 +227,7 @@ internal sealed class WaveformView : Grid
                 return;
             }
 
+            ResetTrailIfRewound(value);
             _playheadFrame = value;
             if (_trailActive)
             {
@@ -241,7 +263,87 @@ internal sealed class WaveformView : Grid
 
     public IReadOnlyCollection<long> SelectedMarkerFrames => _selectedMarkerFrames;
 
+    public void RestoreSelectedMarkers(IEnumerable<long> frames)
+    {
+        _selectedMarkerFrames.Clear();
+        if (_document is not null)
+        {
+            foreach (var frame in frames)
+            {
+                if (_document.HasMarkerAt(frame))
+                {
+                    _selectedMarkerFrames.Add(frame);
+                }
+            }
+        }
+
+        InvalidateStaticLayer();
+    }
+
     public bool HasSelectedMarkers => _selectedMarkerFrames.Count > 0;
+
+    public bool HasSelectedRegions => _selectedRegionEdges.Count > 0;
+
+    public IReadOnlyList<WaveSelection> SelectedRegions
+    {
+        get
+        {
+            if (_selectedRegionEdges.Count == 0)
+            {
+                return [];
+            }
+
+            var list = new List<WaveSelection>();
+            foreach (var edge in _selectedRegionEdges)
+            {
+                if (!list.Contains(edge.Range))
+                {
+                    list.Add(edge.Range);
+                }
+            }
+
+            return list;
+        }
+    }
+
+    public bool HasSelectedTimelineItems => HasTimelineDragSelection();
+
+    public bool TryNudgeSelectedTimeline(long desiredDelta, out long applied)
+    {
+        applied = 0;
+        if (_document is null || !HasTimelineDragSelection() || desiredDelta == 0)
+        {
+            return false;
+        }
+
+        var markerOrigins = _selectedMarkerFrames.OrderBy(frame => frame).ToArray();
+        var regionOrigins = _selectedRegionEdges.ToArray();
+        var loopStart = _loopStartSelected;
+        var loopEnd = _loopEndSelected;
+        var loopOrigin = _document.SampleLoop;
+        var follow = IsSelectedTimelineFrame(_playheadFrame);
+        applied = ApplyTimelineDelta(markerOrigins, regionOrigins, loopStart, loopEnd, loopOrigin, desiredDelta);
+        if (applied == 0)
+        {
+            return false;
+        }
+
+        RemapSelectedMarkerFrames(markerOrigins, applied);
+        RemapSelectedRegionEdges(regionOrigins, applied);
+        _loopStartSelected = loopStart;
+        _loopEndSelected = loopEnd;
+        if (follow)
+        {
+            var next = _playheadFrame + applied;
+            _playheadFrame = next;
+            _document.CursorFrame = next;
+        }
+
+        InvalidateStaticLayer();
+        InvalidatePlayheadLayer();
+        MarkersChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
 
     public double TimeZoom => _timeZoom;
 
@@ -263,6 +365,17 @@ internal sealed class WaveformView : Grid
     }
 
     public void Refresh() => InvalidateWaveform();
+
+    public void RefreshAppearance()
+    {
+        _mouseGuideBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MouseGuideBrush"));
+        _mouseGuideOnSelectionBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MouseGuideOnSelectionBrush"));
+        _waveBgra = 0;
+        _zeroBgra = 0;
+        _playheadCore = null;
+        InvalidateWaveform();
+        ApplyMouseGuideOverlay();
+    }
 
     public void RefreshOverlay() => InvalidatePlayheadLayer();
 
@@ -710,6 +823,22 @@ internal sealed class WaveformView : Grid
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    private void SelectRegion(WaveSelection range)
+    {
+        if (_document is null || range.IsEmpty)
+        {
+            return;
+        }
+
+        _keyboardSelectAnchor = range.StartFrame;
+        _document.Selection = range;
+        _document.CursorFrame = range.StartFrame;
+        _playheadFrame = range.StartFrame;
+        EnsureFrameVisible(range.StartFrame);
+        InvalidatePlayheadLayer();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public bool CancelScrub()
     {
         if (!_scrubbing)
@@ -761,17 +890,22 @@ internal sealed class WaveformView : Grid
         return ClearMarkerSelection();
     }
 
-    public bool ClearMarkerSelection()
+    public bool ClearMarkerSelection() => ClearTimelineSelection(refresh: true);
+
+    private bool ClearTimelineSelection(bool refresh)
     {
-        if (_selectedMarkerFrames.Count == 0)
+        var changed = HasTimelineDragSelection();
+        _selectedMarkerFrames.Clear();
+        _selectedRegionEdges.Clear();
+        _loopStartSelected = false;
+        _loopEndSelected = false;
+        if (changed && refresh)
         {
-            return false;
+            InvalidateStaticLayer();
+            MarkersChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        _selectedMarkerFrames.Clear();
-        InvalidateStaticLayer();
-        MarkersChanged?.Invoke(this, EventArgs.Empty);
-        return true;
+        return changed;
     }
 
     public void SelectMarkerFrames(IEnumerable<long> frames, bool additive = false)
@@ -779,6 +913,9 @@ internal sealed class WaveformView : Grid
         if (!additive)
         {
             _selectedMarkerFrames.Clear();
+            _selectedRegionEdges.Clear();
+            _loopStartSelected = false;
+            _loopEndSelected = false;
         }
 
         if (_document is not null)
@@ -788,6 +925,10 @@ internal sealed class WaveformView : Grid
                 if (_document.HasMarkerAt(frame))
                 {
                     _selectedMarkerFrames.Add(frame);
+                    if (!additive)
+                    {
+                        _markerSelectAnchor = frame;
+                    }
                 }
             }
         }
@@ -800,17 +941,30 @@ internal sealed class WaveformView : Grid
     {
         if (_document is null)
         {
-            if (_selectedMarkerFrames.Count == 0)
+            if (ClearTimelineSelection(refresh: false))
             {
-                return;
+                MarkersChanged?.Invoke(this, EventArgs.Empty);
             }
 
-            _selectedMarkerFrames.Clear();
-            MarkersChanged?.Invoke(this, EventArgs.Empty);
             return;
         }
 
-        if (_selectedMarkerFrames.RemoveWhere(frame => !_document.HasMarkerAt(frame)) > 0)
+        var changed = _selectedMarkerFrames.RemoveWhere(frame => !_document.HasMarkerAt(frame)) > 0;
+        if (_markerSelectAnchor is long anchor && !_document.HasMarkerAt(anchor)
+            && !IsSelectedRegionOrLoopFrame(anchor))
+        {
+            _markerSelectAnchor = null;
+        }
+
+        changed |= _selectedRegionEdges.RemoveWhere(edge => !_document.Regions.Contains(edge.Range)) > 0;
+        if ((_loopStartSelected || _loopEndSelected) && _document.SampleLoop.IsEmpty)
+        {
+            _loopStartSelected = false;
+            _loopEndSelected = false;
+            changed = true;
+        }
+
+        if (changed)
         {
             InvalidateStaticLayer();
             MarkersChanged?.Invoke(this, EventArgs.Empty);
@@ -858,13 +1012,12 @@ internal sealed class WaveformView : Grid
         return previous;
     }
 
-    public long FrameAt(double x) => ClampFrame(XToFrame(x));
+    public long FrameAt(double x) => PointerFrame(x);
 
     protected override void OnMouseEnter(MouseEventArgs e)
     {
         base.OnMouseEnter(e);
-        var x = e.GetPosition(this).X;
-        _mouseGuideX = x < ContentLeft ? null : x;
+        SetMouseGuideFromX(e.GetPosition(this).X);
         ApplyMouseGuideOverlay();
     }
 
@@ -889,6 +1042,12 @@ internal sealed class WaveformView : Grid
                 SelectMarkerFrames([marker.Frame]);
                 BeginMarkerCommentEdit(marker);
             }
+            else if (TryHitRegionFlag(pos, out var region, out var regionFrame))
+            {
+                SelectMarkerFrames([]);
+                _selectedRegionEdges.Add(ToRegionEdge(region, regionFrame));
+                SelectRegion(region);
+            }
             else
             {
                 ClearMarkerSelection();
@@ -909,6 +1068,20 @@ internal sealed class WaveformView : Grid
         if (TryHitMarkerFlag(start, out var hit))
         {
             BeginMarkerFlagInteraction(hit, start);
+            e.Handled = true;
+            return;
+        }
+
+        if (TryHitRegionFlag(start, out var regionHit, out var hitFrame))
+        {
+            BeginRegionFlagInteraction(regionHit, hitFrame, start);
+            e.Handled = true;
+            return;
+        }
+
+        if (TryHitSampleLoopBar(start))
+        {
+            BeginLoopBarInteraction(start);
             e.Handled = true;
             return;
         }
@@ -956,7 +1129,7 @@ internal sealed class WaveformView : Grid
     protected override void OnMouseMove(MouseEventArgs e)
     {
         var pos = e.GetPosition(this);
-        _mouseGuideX = pos.X < ContentLeft ? null : pos.X;
+        SetMouseGuideFromX(pos.X);
         ApplyMouseGuideOverlay();
 
         if (_scrubbing && _document is not null)
@@ -982,7 +1155,7 @@ internal sealed class WaveformView : Grid
 
             if (_markerDragMoved)
             {
-                ApplyMarkerDrag(FrameAt(pos.X) - _markerDragPrimaryOrigin);
+                ApplyMarkerDrag(DesiredTimelineDragDelta(pos.X));
             }
 
             return;
@@ -990,9 +1163,20 @@ internal sealed class WaveformView : Grid
 
         if (!_dragging)
         {
-            Cursor = pos.X < ContentLeft || TryHitMarkerFlag(pos, out _)
-                ? Cursors.Arrow
-                : Cursors.IBeam;
+            if (pos.X < ContentLeft
+                || TryHitMarkerFlag(pos, out _)
+                || TryHitRegionFlag(pos, out _, out _))
+            {
+                Cursor = Cursors.Arrow;
+            }
+            else if (TryHitLoopBar(pos, out var loopPart))
+            {
+                Cursor = loopPart == LoopBarPart.Body ? Cursors.SizeAll : Cursors.SizeWE;
+            }
+            else
+            {
+                Cursor = Cursors.IBeam;
+            }
         }
 
         if (_dragging && _document is not null)
@@ -1078,9 +1262,57 @@ internal sealed class WaveformView : Grid
     {
         if (!_dragging)
         {
-            _mouseGuideX = null;
+            ClearMouseGuide();
             ApplyMouseGuideOverlay();
         }
+    }
+
+    protected override void OnMouseRightButtonDown(MouseButtonEventArgs e)
+    {
+        var pos = e.GetPosition(this);
+        var hitMarker = TryHitMarkerFlag(pos, out var marker);
+        var hitRegion = TryHitRegionFlag(pos, out var region);
+        var hitLoop = TryHitSampleLoopBar(pos);
+        if (!hitMarker && !hitRegion && !hitLoop)
+        {
+            return;
+        }
+
+        Focus();
+        e.Handled = true;
+        var menu = new ContextMenu
+        {
+            Placement = PlacementMode.MousePoint,
+            PlacementTarget = this,
+        };
+        if (hitMarker)
+        {
+            var frames = _selectedMarkerFrames.Contains(marker.Frame) && _selectedMarkerFrames.Count > 1
+                ? _selectedMarkerFrames.ToArray()
+                : new[] { marker.Frame };
+            var item = new MenuItem
+            {
+                Header = frames.Length > 1 ? UiStrings.MenuClearMarkers : UiStrings.MenuClearMarker,
+            };
+            item.Click += (_, _) => MarkerClearRequested?.Invoke(this, frames);
+            menu.Items.Add(item);
+        }
+
+        if (hitRegion)
+        {
+            var item = new MenuItem { Header = UiStrings.MenuClearRegion };
+            item.Click += (_, _) => RegionClearRequested?.Invoke(this, region);
+            menu.Items.Add(item);
+        }
+
+        if (hitLoop)
+        {
+            var item = new MenuItem { Header = UiStrings.MenuClearSampleLoop };
+            item.Click += (_, _) => SampleLoopClearRequested?.Invoke(this, EventArgs.Empty);
+            menu.Items.Add(item);
+        }
+
+        menu.IsOpen = true;
     }
 
     internal void PaintStatic(DrawingContext dc)
@@ -1098,6 +1330,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        MarkerRolePaint.DrawRegion(dc, _document, wave, start, span, "RegionWaveFillBrush");
         MarkerRolePaint.DrawSampleLoop(dc, _document, wave, start, span, "SampleLoopWaveFillBrush");
         MarkerRolePaint.DrawBackgrounds(dc, _document, wave, start, span);
         EnsureWaveformBitmap(wave);
@@ -1135,6 +1368,7 @@ internal sealed class WaveformView : Grid
             DrawRange(dc, bounds, start, span, _document.Selection, Theme.Get("LoopRangeFillBrush"));
         }
 
+        DrawRegionFlags(dc, bounds, start, span);
         DrawMarkers(dc, bounds, start, span);
         DrawPlayhead(dc, bounds, start, span);
     }
@@ -2052,6 +2286,82 @@ internal sealed class WaveformView : Grid
     private bool IsInDbScaleLane(Point point) =>
         point.X < ContentLeft && point.Y >= ChromeTopHeight;
 
+    private enum LoopBarPart
+    {
+        None,
+        Start,
+        End,
+        Body,
+    }
+
+    private bool TryHitSampleLoopBar(Point pos) =>
+        TryHitLoopBar(pos, out _);
+
+    private bool TryHitLoopBar(Point pos, out LoopBarPart part)
+    {
+        part = LoopBarPart.None;
+        if (!TryGetLoopBarRects(out var bar, out var startHandle, out var endHandle))
+        {
+            return false;
+        }
+
+        if (startHandle.Contains(pos))
+        {
+            part = LoopBarPart.Start;
+            return true;
+        }
+
+        if (endHandle.Contains(pos))
+        {
+            part = LoopBarPart.End;
+            return true;
+        }
+
+        if (bar.Contains(pos))
+        {
+            part = LoopBarPart.Body;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryGetLoopBarRects(out Rect bar, out Rect startHandle, out Rect endHandle)
+    {
+        bar = default;
+        startHandle = default;
+        endHandle = default;
+        if (_document is null || _document.SampleLoop.IsEmpty || ViewSpanFrames <= 0)
+        {
+            return false;
+        }
+
+        var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
+        var lane = TimeLaneBounds(bounds);
+        if (!MarkerRolePaint.TryGetVisibleRangeRect(_document.SampleLoop, lane, _viewStart, ViewSpanFrames, out bar))
+        {
+            return false;
+        }
+
+        var handle = Math.Min(Math.Max(LoopHandleMinPx, lane.Height * 0.75), Math.Max(4, bar.Width * 0.4));
+        startHandle = new Rect(bar.X, bar.Y, handle, bar.Height);
+        endHandle = new Rect(bar.Right - handle, bar.Y, handle, bar.Height);
+        return true;
+    }
+
+    private bool TryHitRangeBar(WaveSelection range, Point pos)
+    {
+        if (_document is null || range.IsEmpty || ViewSpanFrames <= 0)
+        {
+            return false;
+        }
+
+        var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
+        var lane = TimeLaneBounds(bounds);
+        return MarkerRolePaint.TryGetVisibleRangeRect(range, lane, _viewStart, ViewSpanFrames, out var bar)
+            && bar.Contains(pos);
+    }
+
     private static double ScaleLeft(Rect bounds) =>
         Math.Min(DbScaleLaneWidth, Math.Max(0, bounds.Width));
 
@@ -2106,7 +2416,7 @@ internal sealed class WaveformView : Grid
         dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TimelineWellBackBrush")), null, lane);
         if (_document is not null)
         {
-            MarkerRolePaint.DrawSampleLoop(dc, _document, lane, start, span, "SampleLoopTimelineBrush");
+            DrawSampleLoopBar(dc, lane, start, span);
         }
 
         var edge = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush")), 1);
@@ -2137,6 +2447,8 @@ internal sealed class WaveformView : Grid
         tick.Freeze();
         var lastRight = double.NegativeInfinity;
         const double minGap = 72;
+        var loopX0 = hasLoop ? FrameToViewX(loop.StartFrame, start, span, bounds) : 0;
+        var loopX1 = hasLoop ? FrameToViewX(loop.EndFrame, start, span, bounds) : 0;
         for (var t = first; t <= startSec + seconds + step; t += step)
         {
             if (t < -1e-9)
@@ -2150,14 +2462,171 @@ internal sealed class WaveformView : Grid
                 continue;
             }
 
-            var frame = (long)Math.Round(t * _document.SampleRate);
-            var onLoop = hasLoop && frame >= loop.StartFrame && frame < loop.EndFrame;
-            var text = GetTimeLabel(UiStrings.FormatDuration(Math.Max(0, t)), pixelsPerDip, onLoop);
-            var textY = lane.Y + Math.Max(1, (lane.Height - text.Height) * 0.5);
+            var label = UiStrings.FormatDuration(Math.Max(0, t));
+            var muted = GetTimeLabel(label, pixelsPerDip, accent: TimeLabelAccent.None);
+            var origin = new Point(x + 3, lane.Y + Math.Max(1, (lane.Height - muted.Height) * 0.5));
             dc.DrawLine(tick, new Point(x, lane.Bottom - 5), new Point(x, lane.Bottom - 1));
-            dc.DrawText(text, new Point(x + 3, textY));
-            lastRight = x + 3 + text.Width;
+            if (hasLoop)
+            {
+                DrawTimeLabelAcrossBands(
+                    dc,
+                    muted,
+                    GetTimeLabel(label, pixelsPerDip, accent: TimeLabelAccent.Loop),
+                    GetTimeLabel(label, pixelsPerDip, accent: TimeLabelAccent.Region),
+                    origin,
+                    hasLoop ? (loopX0, loopX1) : null,
+                    []);
+            }
+            else
+            {
+                dc.DrawText(muted, origin);
+            }
+
+            lastRight = origin.X + muted.Width;
         }
+    }
+
+    private static void DrawTimeLabelAcrossBands(
+        DrawingContext dc,
+        FormattedText muted,
+        FormattedText onLoop,
+        FormattedText onRegion,
+        Point origin,
+        (double X0, double X1)? loop,
+        IReadOnlyList<(double X0, double X1)> regions)
+    {
+        var text = new Rect(origin.X, origin.Y, muted.Width, muted.Height);
+        if (text.Width <= 0 || text.Height <= 0)
+        {
+            return;
+        }
+
+        dc.DrawText(muted, origin);
+        foreach (var regionBand in regions)
+        {
+            DrawClippedText(
+                dc,
+                onRegion,
+                origin,
+                Rect.Intersect(text, BandRect(regionBand.X0, regionBand.X1, text)));
+        }
+
+        if (loop is { } loopBand)
+        {
+            DrawClippedText(
+                dc,
+                onLoop,
+                origin,
+                Rect.Intersect(text, BandRect(loopBand.X0, loopBand.X1, text)));
+        }
+    }
+
+    private static Rect BandRect(double x0, double x1, Rect text)
+    {
+        var left = Math.Min(x0, x1);
+        var right = Math.Max(x0, x1);
+        return new Rect(left, text.Y, Math.Max(0, right - left), text.Height);
+    }
+
+    private static void DrawClippedText(DrawingContext dc, FormattedText text, Point origin, Rect clip)
+    {
+        if (clip.IsEmpty || clip.Width <= 0 || clip.Height <= 0)
+        {
+            return;
+        }
+
+        dc.PushClip(new RectangleGeometry(clip));
+        dc.DrawText(text, origin);
+        dc.Pop();
+    }
+
+    private void DrawRegionFlags(DrawingContext dc, Rect bounds, double start, double span)
+    {
+        _regionFlags.Clear();
+        if (_document is null || _document.Regions.Count == 0)
+        {
+            return;
+        }
+
+        var color = Theme.Get("RegionTimelineBrush");
+        var line = new Pen(WpfControlHelpers.FrozenBrush(color), 1);
+        line.Freeze();
+        var selectedLine = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("MarkerSelectedBorderBrush")), 1.5);
+        selectedLine.Freeze();
+        var fill = WpfControlHelpers.FrozenBrush(color);
+        var selectedPen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("MarkerSelectedBorderBrush")), 1);
+        selectedPen.Freeze();
+        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var lane = MarkerLaneBounds(bounds);
+        for (var i = 0; i < _document.Regions.Count; i++)
+        {
+            var region = _document.Regions[i];
+            var id = _document.RegionNumber(region);
+            DrawRegionFlag(dc, bounds, lane, start, span, region, region.StartFrame, id, _selectedRegionEdges.Contains(new RegionEdge(region, true)), line, selectedLine, fill, selectedPen, pixelsPerDip);
+            DrawRegionFlag(dc, bounds, lane, start, span, region, region.EndFrame, id, _selectedRegionEdges.Contains(new RegionEdge(region, false)), line, selectedLine, fill, selectedPen, pixelsPerDip);
+        }
+    }
+
+    private void DrawRegionFlag(
+        DrawingContext dc,
+        Rect bounds,
+        Rect lane,
+        double start,
+        double span,
+        WaveSelection region,
+        long frame,
+        int id,
+        bool selected,
+        Pen line,
+        Pen selectedLine,
+        Brush fill,
+        Pen selectedPen,
+        double pixelsPerDip)
+    {
+        var x = FrameToViewX(frame, start, span, bounds);
+        if (x < ScaleLeft(bounds) || x > bounds.Width + 24)
+        {
+            return;
+        }
+
+        dc.DrawLine(selected ? selectedLine : line, new Point(x, 0), new Point(x, bounds.Height));
+        if (lane.Height <= 2)
+        {
+            return;
+        }
+
+        var idText = GetMarkerLabel(id.ToString(CultureInfo.InvariantCulture), pixelsPerDip);
+        const double padX = 3;
+        const double maxFlagWidth = 48;
+        var boxH = Math.Min(Math.Max(idText.Height + 2, lane.Height - 2), lane.Height - 1);
+        var boxW = Math.Min(maxFlagWidth, idText.Width + padX * 2);
+        var box = new Rect(x, 1, boxW, boxH);
+        _regionFlags.Add((region, frame, box));
+        dc.DrawRectangle(fill, selected ? selectedPen : null, box);
+        dc.DrawText(
+            idText,
+            new Point(x + padX, box.Y + Math.Max(0, (box.Height - idText.Height) * 0.5)));
+    }
+
+    private bool TryHitRegionFlag(Point point, out WaveSelection region) =>
+        TryHitRegionFlag(point, out region, out _);
+
+    private bool TryHitRegionFlag(Point point, out WaveSelection region, out long frame)
+    {
+        for (var i = _regionFlags.Count - 1; i >= 0; i--)
+        {
+            var hit = _regionFlags[i];
+            if (hit.Flag.Contains(point))
+            {
+                region = hit.Range;
+                frame = hit.Frame;
+                return true;
+            }
+        }
+
+        region = WaveSelection.Empty;
+        frame = 0;
+        return false;
     }
 
     private void DrawMarkers(DrawingContext dc, Rect bounds, double start, double span)
@@ -2347,17 +2816,33 @@ internal sealed class WaveformView : Grid
         ScrubEnded?.Invoke(this, (frame, commit));
     }
 
+    private readonly record struct RegionEdge(WaveSelection Range, bool IsStart)
+    {
+        public long Frame => IsStart ? Range.StartFrame : Range.EndFrame;
+    }
+
+    private static RegionEdge ToRegionEdge(WaveSelection region, long frame) =>
+        new(region, frame == region.StartFrame);
+
     private void BeginMarkerFlagInteraction(WaveMarker marker, Point start)
     {
         EndMarkerCommentEdit(commit: true);
-        var additive = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
-        if (additive)
+        var control = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+        var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+        if (shift)
+        {
+            SelectTimelineRangeTo(marker.Frame, additive: control);
+            return;
+        }
+
+        if (control)
         {
             if (!_selectedMarkerFrames.Add(marker.Frame))
             {
                 _selectedMarkerFrames.Remove(marker.Frame);
             }
 
+            _markerSelectAnchor = marker.Frame;
             InvalidateStaticLayer();
             MarkersChanged?.Invoke(this, EventArgs.Empty);
             return;
@@ -2365,13 +2850,277 @@ internal sealed class WaveformView : Grid
 
         if (!_selectedMarkerFrames.Contains(marker.Frame))
         {
-            _selectedMarkerFrames.Clear();
+            ClearTimelineSelection(refresh: false);
             _selectedMarkerFrames.Add(marker.Frame);
             InvalidateStaticLayer();
             MarkersChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        if (_document is null || _selectedMarkerFrames.Count == 0)
+        _markerSelectAnchor = marker.Frame;
+        if (_document is null || !HasTimelineDragSelection())
+        {
+            return;
+        }
+
+        BeginTimelineDrag(start, marker.Frame);
+    }
+
+    private void SelectTimelineRangeTo(long endFrame, bool additive)
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var startFrame = ResolveTimelineSelectAnchor(endFrame);
+        if (!additive)
+        {
+            ClearTimelineSelection(refresh: false);
+        }
+
+        var lo = Math.Min(startFrame, endFrame);
+        var hi = Math.Max(startFrame, endFrame);
+        foreach (var item in _document.Markers)
+        {
+            if (item.Frame >= lo && item.Frame <= hi)
+            {
+                _selectedMarkerFrames.Add(item.Frame);
+            }
+        }
+
+        foreach (var region in _document.Regions)
+        {
+            if (region.StartFrame >= lo && region.StartFrame <= hi)
+            {
+                _selectedRegionEdges.Add(new RegionEdge(region, true));
+            }
+
+            if (region.EndFrame >= lo && region.EndFrame <= hi)
+            {
+                _selectedRegionEdges.Add(new RegionEdge(region, false));
+            }
+        }
+
+        var loop = _document.SampleLoop;
+        if (!loop.IsEmpty)
+        {
+            if (loop.StartFrame >= lo && loop.StartFrame <= hi)
+            {
+                _loopStartSelected = true;
+            }
+
+            if (loop.EndFrame >= lo && loop.EndFrame <= hi)
+            {
+                _loopEndSelected = true;
+            }
+        }
+
+        InvalidateStaticLayer();
+        MarkersChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private long ResolveTimelineSelectAnchor(long fallback)
+    {
+        if (_markerSelectAnchor is long stored)
+        {
+            return stored;
+        }
+
+        var first = long.MaxValue;
+        void Consider(long frame)
+        {
+            if (frame < first)
+            {
+                first = frame;
+            }
+        }
+
+        foreach (var frame in _selectedMarkerFrames)
+        {
+            Consider(frame);
+        }
+
+        foreach (var edge in _selectedRegionEdges)
+        {
+            Consider(edge.Frame);
+        }
+
+        if (_document is not null && !_document.SampleLoop.IsEmpty)
+        {
+            if (_loopStartSelected)
+            {
+                Consider(_document.SampleLoop.StartFrame);
+            }
+
+            if (_loopEndSelected)
+            {
+                Consider(_document.SampleLoop.EndFrame);
+            }
+        }
+
+        return first == long.MaxValue ? fallback : first;
+    }
+
+    private void BeginRegionFlagInteraction(WaveSelection region, long frame, Point start)
+    {
+        EndMarkerCommentEdit(commit: true);
+        var edge = ToRegionEdge(region, frame);
+        var control = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+        var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+        if (shift)
+        {
+            SelectTimelineRangeTo(frame, additive: control);
+            return;
+        }
+
+        if (control)
+        {
+            if (!_selectedRegionEdges.Add(edge))
+            {
+                _selectedRegionEdges.Remove(edge);
+            }
+
+            _markerSelectAnchor = frame;
+            InvalidateStaticLayer();
+            MarkersChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        if (!_selectedRegionEdges.Contains(edge))
+        {
+            ClearTimelineSelection(refresh: false);
+            _selectedRegionEdges.Add(edge);
+            InvalidateStaticLayer();
+            MarkersChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        _markerSelectAnchor = frame;
+        if (_document is null || !HasTimelineDragSelection())
+        {
+            return;
+        }
+
+        BeginTimelineDrag(start, frame);
+    }
+
+    private void DrawSampleLoopBar(DrawingContext dc, Rect lane, double start, double span)
+    {
+        if (_document is null
+            || !MarkerRolePaint.TryGetVisibleRangeRect(_document.SampleLoop, lane, start, span, out var bar))
+        {
+            return;
+        }
+
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("SampleLoopTimelineBrush")), null, bar);
+        if (!TryGetLoopBarRects(out _, out var startHandle, out var endHandle))
+        {
+            return;
+        }
+
+        var grip = WpfControlHelpers.FrozenBrush(Color.FromRgb(0x8E, 0xC4, 0xDC));
+        var selected = WpfControlHelpers.FrozenBrush(Theme.Get("MarkerSelectedBorderBrush"));
+        dc.DrawRectangle(_loopStartSelected ? selected : grip, null, startHandle);
+        dc.DrawRectangle(_loopEndSelected ? selected : grip, null, endHandle);
+    }
+
+    private void BeginLoopBarInteraction(Point start)
+    {
+        EndMarkerCommentEdit(commit: true);
+        if (_document is null || _document.SampleLoop.IsEmpty || !TryHitLoopBar(start, out var part))
+        {
+            return;
+        }
+
+        var loop = _document.SampleLoop;
+        var isBody = part == LoopBarPart.Body;
+        var isStart = part == LoopBarPart.Start;
+        var frame = isBody
+            ? RawFrameAt(start.X)
+            : isStart ? loop.StartFrame : loop.EndFrame;
+        var control = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+        var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+        if (shift)
+        {
+            SelectTimelineRangeTo(frame, additive: control);
+            return;
+        }
+
+        if (control)
+        {
+            if (isBody)
+            {
+                var both = _loopStartSelected && _loopEndSelected;
+                _loopStartSelected = !both;
+                _loopEndSelected = !both;
+            }
+            else if (isStart)
+            {
+                _loopStartSelected = !_loopStartSelected;
+            }
+            else
+            {
+                _loopEndSelected = !_loopEndSelected;
+            }
+
+            _markerSelectAnchor = frame;
+            InvalidateStaticLayer();
+            MarkersChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        var already = isBody
+            ? _loopStartSelected && _loopEndSelected
+            : isStart ? _loopStartSelected : _loopEndSelected;
+        if (!already)
+        {
+            ClearTimelineSelection(refresh: false);
+            _loopStartSelected = isBody || isStart;
+            _loopEndSelected = isBody || !isStart;
+            InvalidateStaticLayer();
+            MarkersChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        _markerSelectAnchor = frame;
+        if (!HasTimelineDragSelection())
+        {
+            return;
+        }
+
+        BeginTimelineDrag(start, frame);
+    }
+
+    private bool HasTimelineDragSelection() =>
+        _selectedMarkerFrames.Count > 0
+        || _selectedRegionEdges.Count > 0
+        || _loopStartSelected
+        || _loopEndSelected;
+
+    private bool IsSelectedRegionOrLoopFrame(long frame)
+    {
+        if (_loopStartSelected && _document?.SampleLoop.StartFrame == frame)
+        {
+            return true;
+        }
+
+        if (_loopEndSelected && _document?.SampleLoop.EndFrame == frame)
+        {
+            return true;
+        }
+
+        foreach (var edge in _selectedRegionEdges)
+        {
+            if (edge.Frame == frame)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void BeginTimelineDrag(Point start, long primaryFrame)
+    {
+        if (_document is null)
         {
             return;
         }
@@ -2380,14 +3129,79 @@ internal sealed class WaveformView : Grid
         _markerDragging = true;
         _markerDragMoved = false;
         _markerDragLastDelta = long.MinValue;
-        _markerDragPrimaryOrigin = marker.Frame;
+        _markerDragPrimaryOrigin = primaryFrame;
         _markerDragOrigins = _selectedMarkerFrames.OrderBy(frame => frame).ToArray();
         _markerDragBefore = _document.SnapshotMarkers();
-        _markerDragFollowOrigin = _document.HasMarkerAt(_playheadFrame) && _selectedMarkerFrames.Contains(_playheadFrame)
-            ? _playheadFrame
-            : null;
+        _regionDragOrigins = [.. _selectedRegionEdges];
+        _regionsDragBefore = _document.SnapshotRegions();
+        _loopDragStart = _loopStartSelected && !_document.SampleLoop.IsEmpty;
+        _loopDragEnd = _loopEndSelected && !_document.SampleLoop.IsEmpty;
+        _loopDragBefore = _document.SampleLoop;
+        _markerDragFollowOrigin = IsSelectedTimelineFrame(_playheadFrame) ? _playheadFrame : null;
         CaptureMouse();
-        Cursor = Cursors.Arrow;
+        Cursor = Cursors.SizeWE;
+    }
+
+    private bool IsSelectedTimelineFrame(long frame)
+    {
+        if (_selectedMarkerFrames.Contains(frame))
+        {
+            return true;
+        }
+
+        return IsSelectedRegionOrLoopFrame(frame);
+    }
+
+    private long DesiredTimelineDragDelta(double x)
+    {
+        var exclude = TimelineDragSnapExclude();
+        return TrySnapXToMarker(x, exclude, out _, out var snapped)
+            ? snapped - _markerDragPrimaryOrigin
+            : RawFrameAt(x) - _markerDragPrimaryOrigin;
+    }
+
+    private HashSet<long>? TimelineDragSnapExclude()
+    {
+        var exclude = new HashSet<long>();
+        void AddRangeEnds(WaveSelection range)
+        {
+            if (!range.IsEmpty)
+            {
+                exclude.Add(range.StartFrame);
+                exclude.Add(range.EndFrame);
+            }
+        }
+
+        foreach (var frame in _markerDragOrigins)
+        {
+            exclude.Add(frame);
+        }
+
+        foreach (var frame in _selectedMarkerFrames)
+        {
+            exclude.Add(frame);
+        }
+
+        foreach (var edge in _regionDragOrigins)
+        {
+            AddRangeEnds(edge.Range);
+        }
+
+        foreach (var edge in _selectedRegionEdges)
+        {
+            AddRangeEnds(edge.Range);
+        }
+
+        if (_loopDragStart || _loopDragEnd)
+        {
+            AddRangeEnds(_loopDragBefore);
+            if (_document is not null)
+            {
+                AddRangeEnds(_document.SampleLoop);
+            }
+        }
+
+        return exclude.Count == 0 ? null : exclude;
     }
 
     private void ApplyMarkerDrag(long desiredDelta)
@@ -2397,15 +3211,19 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        _document.ReplaceMarkers(_markerDragBefore, markDirty: false);
-        if (!_document.TryMoveMarkers(_markerDragOrigins, desiredDelta, out var applied, markDirty: false)
-            && desiredDelta != 0)
-        {
-            applied = 0;
-        }
-
+        RestoreTimelineDragOrigins();
+        var applied = ApplyTimelineDelta(
+            _markerDragOrigins,
+            _regionDragOrigins,
+            _loopDragStart,
+            _loopDragEnd,
+            _loopDragBefore,
+            desiredDelta);
         _markerDragLastDelta = desiredDelta;
         RemapSelectedMarkerFrames(_markerDragOrigins, applied);
+        RemapSelectedRegionEdges(_regionDragOrigins, applied);
+        _loopStartSelected = _loopDragStart;
+        _loopEndSelected = _loopDragEnd;
         if (_markerDragFollowOrigin is long follow)
         {
             var next = follow + applied;
@@ -2418,6 +3236,94 @@ internal sealed class WaveformView : Grid
         MarkersChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    private long ApplyTimelineDelta(
+        IReadOnlyList<long> markerOrigins,
+        IReadOnlyList<RegionEdge> regionOrigins,
+        bool loopStart,
+        bool loopEnd,
+        WaveSelection loopOrigin,
+        long desiredDelta)
+    {
+        if (_document is null)
+        {
+            return 0;
+        }
+
+        var moves = ToRegionMoves(regionOrigins);
+        if ((loopStart || loopEnd) && !loopOrigin.IsEmpty)
+        {
+            moves.Add(new RangeEdgeMove(loopOrigin, loopStart, loopEnd));
+        }
+
+        var sorted = markerOrigins as long[] ?? [.. markerOrigins.OrderBy(frame => frame)];
+        var occupied = new HashSet<long>();
+        foreach (var marker in _document.Markers)
+        {
+            if (Array.BinarySearch(sorted, marker.Frame) < 0)
+            {
+                occupied.Add(marker.Frame);
+            }
+        }
+
+        var applied = TimelineMoves.Resolve(sorted, occupied, moves, desiredDelta, _document.FrameCount);
+        if (applied == 0)
+        {
+            return 0;
+        }
+
+        if (sorted.Length > 0)
+        {
+            _document.TryMoveMarkers(sorted, applied, out _, markDirty: false);
+        }
+
+        var regionMoves = ToRegionMoves(regionOrigins);
+        if (regionMoves.Count > 0)
+        {
+            _document.TryMoveRegionEdges(regionMoves, applied, out _, markDirty: false);
+        }
+
+        if (loopStart || loopEnd)
+        {
+            _document.TryMoveSampleLoopEdges(loopStart, loopEnd, applied, out _, markDirty: false);
+        }
+
+        return applied;
+    }
+
+    private static List<RangeEdgeMove> ToRegionMoves(IReadOnlyList<RegionEdge> edges)
+    {
+        var map = new Dictionary<WaveSelection, RangeEdgeMove>();
+        foreach (var edge in edges)
+        {
+            if (map.TryGetValue(edge.Range, out var existing))
+            {
+                map[edge.Range] = existing with
+                {
+                    Start = existing.Start || edge.IsStart,
+                    End = existing.End || !edge.IsStart,
+                };
+            }
+            else
+            {
+                map[edge.Range] = new RangeEdgeMove(edge.Range, edge.IsStart, !edge.IsStart);
+            }
+        }
+
+        return [.. map.Values];
+    }
+
+    private void RestoreTimelineDragOrigins()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        _document.ReplaceMarkers(_markerDragBefore, markDirty: false);
+        _document.SetRegions(_regionsDragBefore, markDirty: false);
+        _document.SetSampleLoop(_loopDragBefore, markDirty: false);
+    }
+
     private void FinishMarkerDrag(bool commit)
     {
         if (!_markerDragging)
@@ -2425,7 +3331,9 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var before = _markerDragBefore;
+        var markersBefore = _markerDragBefore;
+        var regionsBefore = _regionsDragBefore;
+        var loopBefore = _loopDragBefore;
         var moved = _markerDragMoved;
         var follow = _markerDragFollowOrigin;
         _markerDragging = false;
@@ -2443,13 +3351,11 @@ internal sealed class WaveformView : Grid
 
         if (!commit || !moved)
         {
-            _document.ReplaceMarkers(before, markDirty: false);
-            _selectedMarkerFrames.Clear();
-            foreach (var frame in _markerDragOrigins)
-            {
-                _selectedMarkerFrames.Add(frame);
-            }
-
+            RestoreTimelineDragOrigins();
+            RemapSelectedMarkerFrames(_markerDragOrigins, 0);
+            RemapSelectedRegionEdges(_regionDragOrigins, 0);
+            _loopStartSelected = _loopDragStart;
+            _loopEndSelected = _loopDragEnd;
             if (follow is long origin)
             {
                 _playheadFrame = origin;
@@ -2463,14 +3369,16 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var after = _document.SnapshotMarkers();
+        var changed = !markersBefore.AsSpan().SequenceEqual(_document.SnapshotMarkers())
+            || !regionsBefore.AsSpan().SequenceEqual(_document.SnapshotRegions())
+            || loopBefore != _document.SampleLoop;
         ResetMarkerDragState();
         InvalidateStaticLayer();
         InvalidatePlayheadLayer();
         MarkersChanged?.Invoke(this, EventArgs.Empty);
-        if (!before.AsSpan().SequenceEqual(after))
+        if (changed)
         {
-            MarkerLayoutCommitted?.Invoke(this, (before, after));
+            TimelineLayoutCommitted?.Invoke(this, (markersBefore, regionsBefore, loopBefore));
             if (follow is not null)
             {
                 CursorCommitted?.Invoke(this, _playheadFrame);
@@ -2480,10 +3388,59 @@ internal sealed class WaveformView : Grid
 
     private void RemapSelectedMarkerFrames(IReadOnlyList<long> origins, long appliedDelta)
     {
+        if (_markerSelectAnchor is long anchor)
+        {
+            foreach (var frame in origins)
+            {
+                if (frame == anchor)
+                {
+                    _markerSelectAnchor = anchor + appliedDelta;
+                    break;
+                }
+            }
+        }
+
         _selectedMarkerFrames.Clear();
         foreach (var frame in origins)
         {
             _selectedMarkerFrames.Add(frame + appliedDelta);
+        }
+    }
+
+    private void RemapSelectedRegionEdges(IReadOnlyList<RegionEdge> origins, long appliedDelta)
+    {
+        var byRange = new Dictionary<WaveSelection, (bool Start, bool End)>();
+        foreach (var edge in origins)
+        {
+            byRange.TryGetValue(edge.Range, out var flags);
+            byRange[edge.Range] = (flags.Start || edge.IsStart, flags.End || !edge.IsStart);
+        }
+
+        _selectedRegionEdges.Clear();
+        foreach (var pair in byRange)
+        {
+            var next = TimelineMoves.ShiftEdges(pair.Key, pair.Value.Start, pair.Value.End, appliedDelta);
+            if (pair.Value.Start)
+            {
+                _selectedRegionEdges.Add(new RegionEdge(next, true));
+            }
+
+            if (pair.Value.End)
+            {
+                _selectedRegionEdges.Add(new RegionEdge(next, false));
+            }
+
+            if (_markerSelectAnchor is long anchor)
+            {
+                if (pair.Value.Start && pair.Key.StartFrame == anchor)
+                {
+                    _markerSelectAnchor = pair.Key.StartFrame + appliedDelta;
+                }
+                else if (pair.Value.End && pair.Key.EndFrame == anchor)
+                {
+                    _markerSelectAnchor = pair.Key.EndFrame + appliedDelta;
+                }
+            }
         }
     }
 
@@ -2496,6 +3453,11 @@ internal sealed class WaveformView : Grid
         _markerDragLastDelta = long.MinValue;
         _markerDragOrigins = [];
         _markerDragBefore = [];
+        _regionDragOrigins = [];
+        _regionsDragBefore = [];
+        _loopDragStart = false;
+        _loopDragEnd = false;
+        _loopDragBefore = WaveSelection.Empty;
     }
 
     private void BeginMarkerCommentEdit(WaveMarker marker)
@@ -2645,21 +3607,34 @@ internal sealed class WaveformView : Grid
         return formatted;
     }
 
-    private FormattedText GetTimeLabel(string text, double pixelsPerDip, bool onSampleLoop = false)
+    private enum TimeLabelAccent
     {
-        var key = (text, onSampleLoop);
+        None,
+        Loop,
+        Region,
+    }
+
+    private FormattedText GetTimeLabel(string text, double pixelsPerDip, TimeLabelAccent accent)
+    {
+        var key = (text, accent);
         if (_timeLabelCache.TryGetValue(key, out var cached))
         {
             return cached;
         }
 
+        var brushKey = accent switch
+        {
+            TimeLabelAccent.Loop => "SampleLoopTimeLabelForeBrush",
+            TimeLabelAccent.Region => "RegionTimeLabelForeBrush",
+            _ => "MutedForeBrush",
+        };
         var formatted = new FormattedText(
             text,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
             WpfControlHelpers.MonoTypeface,
             10,
-            WpfControlHelpers.FrozenBrush(Theme.Get(onSampleLoop ? "SampleLoopTimeLabelForeBrush" : "MutedForeBrush")),
+            WpfControlHelpers.FrozenBrush(Theme.Get(brushKey)),
             pixelsPerDip);
         _timeLabelCache[key] = formatted;
         return formatted;
@@ -2797,6 +3772,155 @@ internal sealed class WaveformView : Grid
         return (long)Math.Round(_viewStart + (local / ContentWidth) * ViewSpanFrames);
     }
 
+    private long RawFrameAt(double x) => ClampFrame(XToFrame(x));
+
+    private long PointerFrame(double x) =>
+        CanSnapPointerToMarkers && TrySnapXToMarker(x, null, out _, out var frame)
+            ? frame
+            : RawFrameAt(x);
+
+    private bool CanSnapPointerToMarkers =>
+        !_markerDragging
+        && _document is not null
+        && (_document.Markers.Count > 0 || !_document.SampleLoop.IsEmpty || _document.Regions.Count > 0);
+
+    private void SetMouseGuideFromX(double x)
+    {
+        if (x < ContentLeft)
+        {
+            ClearMouseGuide();
+            return;
+        }
+
+        if (_markerDragging)
+        {
+            _mouseGuideX = TrySnapXToMarker(x, TimelineDragSnapExclude(), out var dragSnapX, out _)
+                ? dragSnapX
+                : x;
+            return;
+        }
+
+        _mouseGuideX = CanSnapPointerToMarkers && TrySnapXToMarker(x, null, out var snappedX, out _)
+            ? snappedX
+            : x;
+    }
+
+    private void ClearMouseGuide() => _mouseGuideX = null;
+
+    private bool TrySnapXToMarker(double mouseX, HashSet<long>? exclude, out double snappedX, out long frame)
+    {
+        snappedX = 0;
+        frame = 0;
+        if (_document is null || ContentWidth <= 0)
+        {
+            return false;
+        }
+
+        var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
+        var start = _viewStart;
+        var span = ViewSpanFrames;
+        var viewEnd = start + span;
+        var bestDist = MarkerSnapPx;
+        long? best = null;
+        var bestX = 0d;
+
+        void Consider(long markerFrame)
+        {
+            if (exclude is not null && exclude.Contains(markerFrame))
+            {
+                return;
+            }
+
+            if (markerFrame < start - 1e-9 || markerFrame > viewEnd + 1e-9)
+            {
+                return;
+            }
+
+            var x = FrameToViewX(markerFrame, start, span, bounds);
+            var dist = Math.Abs(x - mouseX);
+            if (dist > bestDist)
+            {
+                return;
+            }
+
+            bestDist = dist;
+            best = markerFrame;
+            bestX = x;
+        }
+
+        foreach (var marker in _document.Markers)
+        {
+            Consider(marker.Frame);
+        }
+
+        var loop = _document.SampleLoop;
+        if (!loop.IsEmpty)
+        {
+            Consider(loop.StartFrame);
+            Consider(loop.EndFrame);
+        }
+
+        foreach (var region in _document.Regions)
+        {
+            Consider(region.StartFrame);
+            Consider(region.EndFrame);
+        }
+
+        if (best is not { } found)
+        {
+            return false;
+        }
+
+        snappedX = bestX;
+        frame = found;
+        return true;
+    }
+
+    internal static bool TryPickNearestSnap(
+        IReadOnlyList<long> frames,
+        double mouseX,
+        double maxDistPx,
+        double viewStart,
+        double viewEnd,
+        Func<long, double> frameToX,
+        out double snappedX,
+        out long frame)
+    {
+        snappedX = 0;
+        frame = 0;
+        var bestDist = maxDistPx;
+        long? best = null;
+        var bestX = 0d;
+        for (var i = 0; i < frames.Count; i++)
+        {
+            var markerFrame = frames[i];
+            if (markerFrame < viewStart - 1e-9 || markerFrame > viewEnd + 1e-9)
+            {
+                continue;
+            }
+
+            var x = frameToX(markerFrame);
+            var dist = Math.Abs(x - mouseX);
+            if (dist > bestDist)
+            {
+                continue;
+            }
+
+            bestDist = dist;
+            best = markerFrame;
+            bestX = x;
+        }
+
+        if (best is not { } found)
+        {
+            return false;
+        }
+
+        snappedX = bestX;
+        frame = found;
+        return true;
+    }
+
     private static double FrameToX(double frame, double start, double span, double width) =>
         span <= 0 ? 0 : (frame - start) / span * width;
 
@@ -2822,6 +3946,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        ResetTrailIfRewound(frame);
         _document.CursorFrame = frame;
         _playheadFrame = frame;
         InvalidatePlayheadLayer();
@@ -2996,6 +4121,19 @@ internal sealed class WaveformView : Grid
         dc.DrawRectangle(brush, null, new Rect(drawLeft, wave.Y, drawW, wave.Height));
     }
 
+    private void ResetTrailIfRewound(long frame)
+    {
+        if (!_trailActive || _trailSamples.Count == 0)
+        {
+            return;
+        }
+
+        if (frame < _trailSamples[^1].Frame)
+        {
+            _trailSamples.Clear();
+        }
+    }
+
     private void RecordTrailSample(long frame)
     {
         if (!_trailActive)
@@ -3003,13 +4141,13 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        ResetTrailIfRewound(frame);
         var now = Environment.TickCount64;
         var durationSec = DurationSeconds();
         if (_trailSamples.Count > 0)
         {
             var last = _trailSamples[^1];
-            var secDelta = FramesToSec(Math.Abs(frame - last.Frame));
-            if (secDelta >= DiscontinuitySec(durationSec))
+            if (FramesToSec(Math.Abs(frame - last.Frame)) >= DiscontinuitySec(durationSec))
             {
                 _trailSamples.Clear();
             }

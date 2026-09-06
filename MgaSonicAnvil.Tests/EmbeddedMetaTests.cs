@@ -30,7 +30,37 @@ public sealed class EmbeddedMetaTests
             Assert.Equal(60, document.Markers[1].Frame);
             Assert.Equal("-L", document.Markers[1].Comment);
             Assert.True(document.SampleLoop.IsEmpty);
+            Assert.Equal([new WaveSelection(40, 56)], document.Regions);
             Assert.False(document.IsDirty);
+        }
+        finally
+        {
+            TryDelete(path);
+        }
+    }
+
+    [Fact]
+    public void Load_ReadsMultipleLtxtRegions()
+    {
+        var path = TempPath("regions");
+        try
+        {
+            WriteWave(
+                path,
+                frames: 100,
+                cues:
+                [
+                    new Cue(1, 8, "A", 10),
+                    new Cue(2, 40, "B", 16),
+                    new Cue(3, 70, "Hit", 0),
+                ]);
+
+            var document = AudioCodec.Load(path);
+            Assert.Single(document.Markers);
+            Assert.Equal(70, document.Markers[0].Frame);
+            Assert.Equal(
+                [new WaveSelection(8, 18), new WaveSelection(40, 56)],
+                document.Regions);
         }
         finally
         {
@@ -74,6 +104,69 @@ public sealed class EmbeddedMetaTests
             Assert.Equal(8, document.Markers[0].Frame);
             Assert.Equal("Hit", document.Markers[0].Comment);
             Assert.Equal(new WaveSelection(20, 50), document.SampleLoop);
+        }
+        finally
+        {
+            TryDelete(path);
+        }
+    }
+
+    [Fact]
+    public void SaveWave_WritesCueMarkersAndSampleLoop()
+    {
+        var path = TempPath("save-meta");
+        try
+        {
+            var document = new AudioDocument(new float[160], 48000, 2, 16, AudioFileKind.Wave, null);
+            document.TryAddMarker(10);
+            document.TrySetMarkerComment(10, "Intro");
+            document.TryAddMarker(60);
+            document.TrySetMarkerComment(60, "-L");
+            document.SetSampleLoop(new WaveSelection(20, 50));
+            document.SetRegions([new WaveSelection(8, 18), new WaveSelection(55, 75)]);
+
+            AudioCodec.SaveWave(document, path);
+            var loaded = AudioCodec.Load(path);
+
+            Assert.Equal(2, loaded.Markers.Count);
+            Assert.Equal(10, loaded.Markers[0].Frame);
+            Assert.Equal("Intro", loaded.Markers[0].Comment);
+            Assert.Equal(60, loaded.Markers[1].Frame);
+            Assert.Equal("-L", loaded.Markers[1].Comment);
+            Assert.Equal(new WaveSelection(20, 50), loaded.SampleLoop);
+            Assert.Equal(
+                [new WaveSelection(8, 18), new WaveSelection(55, 75)],
+                loaded.Regions);
+            Assert.False(loaded.IsDirty);
+        }
+        finally
+        {
+            TryDelete(path);
+        }
+    }
+
+    [Fact]
+    public void SaveWave_OverwriteDropsRemovedMarkers()
+    {
+        var path = TempPath("save-overwrite");
+        try
+        {
+            WriteWave(
+                path,
+                frames: 80,
+                cues: [new Cue(1, 10, "Old", 0)],
+                smpl: (12, 31));
+
+            var document = AudioCodec.Load(path);
+            document.ReplaceMarkers([], markDirty: true);
+            document.SetSampleLoop(WaveSelection.Empty);
+            document.SetRegion(WaveSelection.Empty);
+            AudioCodec.SaveWave(document, path);
+
+            var loaded = AudioCodec.Load(path);
+            Assert.Empty(loaded.Markers);
+            Assert.True(loaded.SampleLoop.IsEmpty);
+            Assert.Empty(loaded.Regions);
         }
         finally
         {

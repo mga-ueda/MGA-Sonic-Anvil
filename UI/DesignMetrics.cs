@@ -11,11 +11,13 @@ internal static class DesignMetrics
 
     public static double From96(double value96) => value96;
 
-    public static double ProjectBarHeight => From96(48);
+    public static double ProjectBarHeight => From96(30);
 
-    public static double ActionBarHeight => From96(60);
+    public static double ActionBarHeight => From96(44);
 
     public static double StatusBarHeight => From96(20);
+
+    public static double DocumentTabBarHeight => From96(22);
 
     public static double RulerHeight => From96(24);
 
@@ -39,12 +41,12 @@ internal static class DesignMetrics
 
     public static double TransportPadX => Dip(12);
 
-    public static double TransportPositionWidth => Dip(220);
+    public static double TransportCurrentTimeWidth => Dip(168);
 
     public static double ToolbarButtonSide => From96(24);
 
-    /// <summary>アクションバー中央のスペアナ高さ（従来ツールバーボタンの 2 倍）。</summary>
-    public static double SpectrumHeight => ToolbarButtonSide * 2;
+    /// <summary>トランスポート右端のスペアナ高さ（トランスポートバーと同じ）。</summary>
+    public static double SpectrumHeight => TransportBarHeight;
 
     public static double ActionButtonWidth => From96(108);
 
@@ -60,6 +62,6 @@ internal static class DesignMetrics
 
     public static Thickness AudioPad => new(Dip(18));
 
-    /// <summary>LMC マスターメーター: 目盛 22×2 + バー 28×4 + 余白。</summary>
-    public static double LevelMeterWidth => From96(168);
+    /// <summary>目盛 22×2 + バー 14×4。枠なしの最小幅。</summary>
+    public static double LevelMeterWidth => From96(100);
 }

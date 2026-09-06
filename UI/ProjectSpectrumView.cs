@@ -12,8 +12,8 @@ namespace MgaSonicAnvil.UI;
 internal sealed class ProjectSpectrumView : FrameworkElement
 {
     private const int FftSize = 2048;
-    private const int BarWidthDevicePx = 4;
-    private const int BarGapDevicePx = 4;
+    private const int BarWidthDevicePx = 3;
+    private const int BarGapDevicePx = 2;
     private const float FloorDb = -60f;
     private const float CeilingDb = 0f;
     private const double RiseSeconds = 0.001d;
@@ -55,19 +55,11 @@ internal sealed class ProjectSpectrumView : FrameworkElement
 
     public ProjectSpectrumView()
     {
+        Height = DesignMetrics.TransportBarHeight;
         Focusable = false;
         SnapsToDevicePixels = true;
         UseLayoutRounding = true;
-        ApplyDevicePixelLayout();
-        Loaded += (_, _) => ApplyDevicePixelLayout();
-        LayoutUpdated += (_, _) =>
-        {
-            var next = RequiredWidthDevicePx / PixelsPerDip;
-            if (Math.Abs(Width - next) > 0.01)
-            {
-                Width = next;
-            }
-        };
+        ApplyDevicePixelWidth();
 
         var windowSum = 0f;
         for (var i = 0; i < FftSize; i++)
@@ -85,10 +77,22 @@ internal sealed class ProjectSpectrumView : FrameworkElement
 
     public AudioPlayer? Player { get; set; }
 
-    /// <summary>デバイス px 換算の必要幅（バー 4px + 隙間 4px × バンド数）。</summary>
     public static int RequiredWidthDevicePx =>
         BandCenters.Length * BarWidthDevicePx
         + (BandCenters.Length - 1) * BarGapDevicePx;
+
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        ApplyDevicePixelWidth();
+    }
+
+    private void ApplyDevicePixelWidth()
+    {
+        var dip = RequiredWidthDevicePx / PixelsPerDip;
+        Width = dip;
+        MinWidth = dip;
+    }
 
     private double PixelsPerDip
     {
@@ -99,18 +103,15 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         }
     }
 
-    private void ApplyDevicePixelLayout()
-    {
-        Width = RequiredWidthDevicePx / PixelsPerDip;
-        InvalidateVisual();
-    }
-
     protected override void OnRender(DrawingContext dc)
     {
-        var back = Background ?? WpfControlHelpers.FrozenBrush(Theme.Get("ActionBarBackBrush"));
-        dc.DrawRectangle(back, null, new Rect(0, 0, ActualWidth, ActualHeight));
+        var bounds = new Rect(RenderSize);
+        if (bounds.Width <= 1 || bounds.Height <= 1)
+        {
+            return;
+        }
 
-        var inner = new Rect(0, 0, ActualWidth, ActualHeight);
+        var inner = bounds;
         if (inner.Width <= 0 || inner.Height <= 0)
         {
             return;

@@ -74,4 +74,47 @@ public sealed class ChannelLayoutTests
         Assert.True(buffer[0] > 0.3f);
         Assert.True(buffer[1] < -0.1f);
     }
+
+    [Fact]
+    public void Playback_KeepsDeviceRateWhenDocumentDiffers()
+    {
+        var document = new AudioDocument(new float[8820], 44100, 2, 16, AudioFileKind.Wave, null);
+        for (var i = 0; i < document.Interleaved.Length; i++)
+        {
+            document.Interleaved[i] = 0.25f;
+        }
+
+        var provider = new PlaybackSampleProvider();
+        provider.SetDeviceSampleRate(48000);
+        provider.Bind(document, 0, null, loop: false);
+        Assert.Equal(48000, provider.WaveFormat.SampleRate);
+        Assert.Equal(48000, provider.DeviceSampleRate);
+
+        var buffer = new float[960];
+        var read = provider.Read(buffer, 0, buffer.Length);
+        Assert.Equal(960, read);
+        Assert.True(buffer.Take(16).All(sample => sample > 0.2f));
+        Assert.True(provider.CursorFrame > 0);
+        Assert.True(provider.CursorFrame < 44100);
+    }
+
+    [Fact]
+    public void Playback_UsesCapturedDeviceRateNotHardcoded48k()
+    {
+        var document = new AudioDocument(new float[9600], 48000, 2, 16, AudioFileKind.Wave, null);
+        for (var i = 0; i < document.Interleaved.Length; i++)
+        {
+            document.Interleaved[i] = 0.2f;
+        }
+
+        var provider = new PlaybackSampleProvider();
+        provider.SetDeviceSampleRate(96000);
+        provider.Bind(document, 0, null, loop: false);
+        Assert.Equal(96000, provider.WaveFormat.SampleRate);
+
+        var buffer = new float[192];
+        Assert.Equal(192, provider.Read(buffer, 0, buffer.Length));
+        Assert.True(provider.CursorFrame > 0);
+        Assert.True(provider.CursorFrame < 200);
+    }
 }

@@ -52,6 +52,6 @@ internal static class AppVersion
                 $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}");
         }
 
-        return "0.1.0";
+        return "0.0.1-beta";
     }
 }

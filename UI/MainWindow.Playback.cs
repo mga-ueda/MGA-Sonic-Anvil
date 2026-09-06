@@ -164,9 +164,9 @@ public partial class MainWindow
 
         var frame = _player.CursorFrame;
         _fadePreviewing = false;
-        Waveform.SetPreviewGain(null);
         PausePlaybackSoft();
         SeekFrame(frame);
+        RestoreFadeVisualIfMenuOpen();
         return true;
     }
 
@@ -308,13 +308,18 @@ public partial class MainWindow
             return;
         }
 
+        if (_formatPreviewing)
+        {
+            return;
+        }
+
         var frame = _player.CursorFrame;
         _document.CursorFrame = frame;
         if (!Waveform.IsInteracting)
         {
             Waveform.PlayheadFrame = frame;
             Waveform.FollowPlayhead();
-            Transport.SetPosition(FrameToSeconds(frame));
+            SyncTransportPosition(frame);
         }
     }
 
@@ -371,6 +376,11 @@ public partial class MainWindow
             Waveform.SetPreviewGain(null);
         }
 
+        if (_formatPreviewing)
+        {
+            StopFormatPreview();
+        }
+
         _playTimer.Stop();
         Waveform.SetTrailRecording(false);
         try
@@ -379,7 +389,7 @@ public partial class MainWindow
             _playbackGeneration = _player.Generation;
             StartMeterRendering();
             Transport.SetPlaying(true);
-            Transport.SetPosition(FrameToSeconds(frame));
+            SyncTransportPosition(frame);
         }
         catch (Exception ex)
         {
@@ -398,7 +408,7 @@ public partial class MainWindow
 
         _document.CursorFrame = frame;
         _player.CaptureScrub(_document, frame);
-        Transport.SetPosition(FrameToSeconds(frame));
+        SyncTransportPosition(frame);
         RefreshStatus();
     }
 
@@ -440,14 +450,30 @@ public partial class MainWindow
 
         if (_fadePreviewing)
         {
+            if (Environment.TickCount64 - _fadePreviewStartedAt < 250)
+            {
+                return;
+            }
+
             _fadePreviewing = false;
-            Waveform.SetPreviewGain(null);
             PausePlaybackSoft();
             if (_document is not null)
             {
                 SeekFrame(_fadePreviewResumeFrame);
             }
 
+            RestoreFadeVisualIfMenuOpen();
+            return;
+        }
+
+        if (_formatPreviewing)
+        {
+            if (Environment.TickCount64 - _formatPreviewStartedAt < 250)
+            {
+                return;
+            }
+
+            StopFormatPreview();
             return;
         }
 
@@ -509,8 +535,65 @@ public partial class MainWindow
         }
 
         _history.Do(_document, command);
-        Waveform.Refresh();
-        Overview.Refresh();
+        AfterMarkerEdit();
+    }
+
+    private void ClearSampleLoop()
+    {
+        if (_document is null || _document.SampleLoop.IsEmpty)
+        {
+            return;
+        }
+
+        var command = ProcessEdits.SetSampleLoop(_document, WaveSelection.Empty);
+        if (command is null)
+        {
+            return;
+        }
+
+        _history.Do(_document, command);
+        AfterMarkerEdit();
+    }
+
+    private void SetRegionFromSelection()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var range = _document.Selection;
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var command = ProcessEdits.SetRegion(_document, range);
+        if (command is null)
+        {
+            return;
+        }
+
+        _history.Do(_document, command);
+        AfterMarkerEdit();
+    }
+
+    private void ClearRegion(WaveSelection range)
+    {
+        if (_document is null || range.IsEmpty)
+        {
+            return;
+        }
+
+        var command = ProcessEdits.SetRegion(_document, range);
+        if (command is null)
+        {
+            return;
+        }
+
+        _history.Do(_document, command);
+        AfterMarkerEdit();
     }
 
     private void ApplyWaveformHeightScale()
@@ -520,11 +603,5 @@ public partial class MainWindow
         {
             border.MinHeight = DesignMetrics.WaveformHostMinHeight * _waveformHeightScale;
         }
-    }
-
-    private void CycleWaveformHeight()
-    {
-        _waveformHeightScale = _waveformHeightScale >= 3 ? 1 : _waveformHeightScale + 1;
-        ApplyWaveformHeightScale();
     }
 }

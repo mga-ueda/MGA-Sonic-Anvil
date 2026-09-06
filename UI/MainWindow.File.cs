@@ -16,6 +16,7 @@ public partial class MainWindow
         {
             Filter = "Audio|*.wav;*.wave;*.aif;*.aiff;*.mp3|Wave|*.wav;*.wave|AIFF|*.aif;*.aiff|MP3|*.mp3|All|*.*",
             Title = UiStrings.MenuOpen,
+            Multiselect = true,
         };
         var lastDir = Path.GetDirectoryName(AppStorage.Settings.LastDocumentPath);
         if (!string.IsNullOrWhiteSpace(lastDir) && Directory.Exists(lastDir))
@@ -24,38 +25,78 @@ public partial class MainWindow
         }
         if (dialog.ShowDialog(this) == true)
         {
-            OpenPath(dialog.FileName);
+            OpenPaths(dialog.FileNames);
         }
     }
 
-    private void OpenPath(string path)
+    private void OpenPath(string path) => OpenPaths([path]);
+
+    private void OpenPaths(IReadOnlyList<string> paths)
     {
-        if (!OfferSaveIfDirty())
+        DocumentSession? first = null;
+        List<string>? errors = null;
+        foreach (var path in paths)
         {
-            return;
+            if (!AudioCodec.IsOpenable(path))
+            {
+                continue;
+            }
+
+            var existing = FindSessionByPath(path);
+            if (existing is not null)
+            {
+                first ??= existing;
+                continue;
+            }
+
+            try
+            {
+                var document = AudioCodec.Load(path);
+                var session = new DocumentSession(document);
+                _sessions.Add(session);
+                first ??= session;
+            }
+            catch (Exception ex)
+            {
+                errors ??= [];
+                errors.Add($"{Path.GetFileName(path)}: {ex.Message}");
+            }
         }
 
-        try
+        if (first is not null)
         {
-            var document = AudioCodec.Load(path);
-            SetDocument(document);
-            RememberOpenedPath(path, dirty: false, resetMarkers: false);
+            ActivateSession(first);
+            if (first.Document.SourcePath is { } opened)
+            {
+                RememberOpenedPath(opened, dirty: false, resetMarkers: false);
+            }
         }
-        catch (Exception ex)
+        else
         {
-            OwnerCenteredMessageBox.Show(this, $"{UiStrings.ErrorOpenFailed}\n{ex.Message}", UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Error);
+            RebuildTabBar();
+        }
+
+        if (errors is { Count: > 0 })
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                $"{UiStrings.ErrorOpenFailed}\n{string.Join("\n", errors)}",
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 
-    private bool Save(bool saveAs)
+    private bool Save(bool saveAs, AudioDocument? target = null)
     {
-        if (_document is null)
+        var document = target ?? _document;
+        if (document is null)
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
             return false;
         }
 
-        var path = _document.SourcePath;
+        var path = document.SourcePath;
         var kind = path is null ? AudioFileKind.Wave : AudioCodec.DetectKind(path);
         if (saveAs
             || string.IsNullOrEmpty(path)
@@ -86,9 +127,17 @@ public partial class MainWindow
 
         try
         {
-            AudioCodec.Save(_document, path, AppStorage.Settings.Mp3BitRate);
-            _document.MarkSaved(path, AudioCodec.DetectKind(path));
-            RememberOpenedPath(path, dirty: false, resetMarkers: false);
+            AudioCodec.Save(document, path, AppStorage.Settings.Mp3BitRate);
+            document.MarkSaved(path, AudioCodec.DetectKind(path));
+            var history = _sessions.FirstOrDefault(item => ReferenceEquals(item.Document, document))?.History
+                ?? (ReferenceEquals(document, _document) ? _history : null);
+            history?.MarkClean();
+            if (ReferenceEquals(document, _document))
+            {
+                RememberOpenedPath(path, dirty: false, resetMarkers: false);
+            }
+
+            RefreshTitle();
             return true;
         }
         catch (NotSupportedException)
@@ -105,30 +154,26 @@ public partial class MainWindow
 
     private void CloseDocument()
     {
-        if (_document is null)
+        if (_activeSession is null)
         {
             return;
         }
 
-        if (!OfferSaveIfDirty())
-        {
-            return;
-        }
-
-        SetDocument(null);
-        ForgetClosedDocument();
+        CloseSession(_activeSession);
     }
 
-    private bool OfferSaveIfDirty()
+    private bool OfferSaveIfDirty() => OfferSaveIfDirty(_activeSession);
+
+    private bool OfferSaveIfDirty(DocumentSession? session)
     {
-        if (_document is not { IsDirty: true })
+        if (session?.Document is not { IsDirty: true } document)
         {
             return true;
         }
 
         var result = OwnerCenteredMessageBox.Show(
             this,
-            UiStrings.ConfirmSave,
+            UiStrings.ConfirmSaveFor(session.DisplayName),
             UiStrings.AppName,
             MessageBoxButton.YesNoCancel,
             MessageBoxImage.Question);
@@ -142,7 +187,7 @@ public partial class MainWindow
             return true;
         }
 
-        return Save(saveAs: false);
+        return Save(saveAs: false, document);
     }
 
     private void ForgetClosedDocument()
@@ -155,6 +200,7 @@ public partial class MainWindow
         settings.LastSelectionEnd = 0;
         settings.LastSampleLoopStart = 0;
         settings.LastSampleLoopEnd = 0;
+        StoreSessionRegions(settings, []);
         StoreSessionMarkers([]);
         AppStorage.ClearSessionDocument();
         AppStorage.Save();
@@ -263,12 +309,14 @@ public partial class MainWindow
             StoreSessionMarkers([]);
             settings.LastSampleLoopStart = 0;
             settings.LastSampleLoopEnd = 0;
+            StoreSessionRegions(settings, []);
         }
         else
         {
             StoreSessionMarkers(_document?.SnapshotMarkers());
             settings.LastSampleLoopStart = _document?.SampleLoop.StartFrame ?? 0;
             settings.LastSampleLoopEnd = _document?.SampleLoop.EndFrame ?? 0;
+            StoreSessionRegions(settings, _document?.Regions);
         }
 
         if (!dirty)
@@ -281,6 +329,7 @@ public partial class MainWindow
 
     private void RememberDocumentState()
     {
+        CaptureActiveSessionView();
         var settings = AppStorage.Settings;
         if (_document is null)
         {
@@ -295,26 +344,24 @@ public partial class MainWindow
         settings.LastAmpZoom = Waveform.AmpZoom;
         settings.LastViewStart = Waveform.ViewStart;
         settings.LastLoop = true;
-        settings.LastSampleLoopStart = _document.SampleLoop.StartFrame;
-        settings.LastSampleLoopEnd = _document.SampleLoop.EndFrame;
-        StoreSessionMarkers(_document.SnapshotMarkers());
         if (_document.IsDirty)
         {
-            try
-            {
-                AudioCodec.SaveWave(_document, AppStorage.SessionDocumentPath);
-                settings.LastDocumentDirty = true;
-            }
-            catch
-            {
-                settings.LastDocumentDirty = false;
-            }
+            // 保存せず終了した変更は捨て、次回はファイル側の埋め込みを使う。
+            settings.LastSampleLoopStart = 0;
+            settings.LastSampleLoopEnd = 0;
+            StoreSessionRegions(settings, []);
+            StoreSessionMarkers([]);
         }
         else
         {
-            settings.LastDocumentDirty = false;
-            AppStorage.ClearSessionDocument();
+            settings.LastSampleLoopStart = _document.SampleLoop.StartFrame;
+            settings.LastSampleLoopEnd = _document.SampleLoop.EndFrame;
+            StoreSessionRegions(settings, _document.Regions);
+            StoreSessionMarkers(_document.SnapshotMarkers());
         }
+
+        settings.LastDocumentDirty = false;
+        AppStorage.ClearSessionDocument();
     }
 
     private void TryRestoreLastDocument()
@@ -346,27 +393,85 @@ public partial class MainWindow
                 return;
             }
 
-            SetDocument(document);
-            document.ReplaceMarkers(LoadSessionMarkers(settings), markDirty: false);
-            document.SetSampleLoop(
-                new WaveSelection(settings.LastSampleLoopStart, settings.LastSampleLoopEnd));
+            var sessionMarkers = LoadSessionMarkers(settings);
+            if (sessionMarkers.Length > 0)
+            {
+                document.ReplaceMarkers(sessionMarkers, markDirty: false);
+            }
+
+            var sessionLoop = new WaveSelection(settings.LastSampleLoopStart, settings.LastSampleLoopEnd);
+            if (!sessionLoop.IsEmpty || settings.LastDocumentDirty)
+            {
+                document.SetSampleLoop(sessionLoop, markDirty: false);
+            }
+
+            var sessionRegions = LoadSessionRegions(settings);
+            if (sessionRegions.Length > 0 || settings.LastDocumentDirty)
+            {
+                document.SetRegions(sessionRegions, markDirty: false);
+            }
             document.Selection = new WaveSelection(settings.LastSelectionStart, settings.LastSelectionEnd)
                 .Clamp(document.FrameCount);
-            Waveform.ApplyPersistedView(
-                settings.LastTimeZoom,
-                settings.LastAmpZoom,
-                settings.LastViewStart,
-                settings.LastCursorFrame);
-            Waveform.LoopEnabled = true;
+            var session = new DocumentSession(document)
+            {
+                TimeZoom = settings.LastTimeZoom,
+                AmpZoom = settings.LastAmpZoom,
+                ViewStart = settings.LastViewStart,
+                PlayheadFrame = settings.LastCursorFrame,
+            };
+            _sessions.Add(session);
+            BindWorkspace(session);
             Waveform.Refresh();
             Overview.InvalidateVisual();
-            RefreshStatus();
-            SyncViewChrome();
         }
         catch
         {
             // 前回ファイルが無い・壊れているときは空のまま起動する。
         }
+    }
+
+    private static void StoreSessionRegions(AppSettings settings, IReadOnlyList<WaveSelection>? regions)
+    {
+        if (regions is null || regions.Count == 0)
+        {
+            settings.LastRegionStart = 0;
+            settings.LastRegionEnd = 0;
+            settings.LastRegionStarts = [];
+            settings.LastRegionEnds = [];
+            return;
+        }
+
+        var starts = new long[regions.Count];
+        var ends = new long[regions.Count];
+        for (var i = 0; i < regions.Count; i++)
+        {
+            starts[i] = regions[i].StartFrame;
+            ends[i] = regions[i].EndFrame;
+        }
+
+        settings.LastRegionStarts = starts;
+        settings.LastRegionEnds = ends;
+        settings.LastRegionStart = starts[0];
+        settings.LastRegionEnd = ends[0];
+    }
+
+    private static WaveSelection[] LoadSessionRegions(AppSettings settings)
+    {
+        var starts = settings.LastRegionStarts ?? [];
+        var ends = settings.LastRegionEnds ?? [];
+        if (starts.Length > 0 && starts.Length == ends.Length)
+        {
+            var regions = new WaveSelection[starts.Length];
+            for (var i = 0; i < starts.Length; i++)
+            {
+                regions[i] = new WaveSelection(starts[i], ends[i]);
+            }
+
+            return regions;
+        }
+
+        var legacy = new WaveSelection(settings.LastRegionStart, settings.LastRegionEnd);
+        return legacy.IsEmpty ? [] : [legacy];
     }
 
     private static void StoreSessionMarkers(IReadOnlyList<MarkerSnapshot>? markers)

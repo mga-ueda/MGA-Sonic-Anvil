@@ -302,47 +302,6 @@ internal static class ActionButtonLooks
             Theme.Get("ExportButtonPressedBackBrush"),
             Theme.Get("ExportButtonForeBrush"));
 
-    public static void ApplyReload(RoundedButton button) =>
-        Apply(
-            button,
-            Theme.Get("ReloadButtonFillBrush"),
-            Theme.Get("ReloadButtonHoverFillBrush"),
-            Theme.Get("ReloadButtonBackBrush"),
-            Theme.Get("ReloadButtonHoverBackBrush"),
-            Theme.Get("ReloadButtonPressedBackBrush"),
-            Theme.Get("ReloadButtonForeBrush"));
-
-    public static void ApplyRender(RoundedButton button) =>
-        Apply(
-            button,
-            Theme.Get("RenderButtonFillBrush"),
-            Theme.Get("RenderButtonHoverFillBrush"),
-            Theme.Get("RenderButtonBackBrush"),
-            Theme.Get("RenderButtonHoverBackBrush"),
-            Theme.Get("RenderButtonPressedBackBrush"),
-            Theme.Get("RenderButtonForeBrush"));
-
-    public static void ApplyProxy(RoundedButton button) =>
-        Apply(
-            button,
-            Theme.Get("ProxyButtonFillBrush"),
-            Theme.Get("ProxyButtonHoverFillBrush"),
-            Theme.Get("ProxyButtonBackBrush"),
-            Theme.Get("ProxyButtonHoverBackBrush"),
-            Theme.Get("ProxyButtonPressedBackBrush"),
-            Theme.Get("ProxyButtonForeBrush"));
-
-    public static void ApplyChrome(RoundedButton button) =>
-        Apply(
-            button,
-            Theme.Get("ChromeBackBrush"),
-            Theme.Get("TransportHoverBackBrush"),
-            Theme.Get("ChromeBorderBrush"),
-            Theme.Get("ChromeMidBrush"),
-            Theme.Get("TransportPressedBackBrush"),
-            Theme.Get("PrimaryForeBrush"),
-            borderSize: 1);
-
     private static void Apply(
         RoundedButton button,
         Color fill,
