@@ -52,6 +52,59 @@ public sealed class EditHistoryTests
     }
 
     [Fact]
+    public void MoveTimelineItems_SummaryIncludesMarkerLoopAndRegionShifts()
+    {
+        var document = MakeConstant(48000, 1f);
+        document.TryAddMarker(0);
+        document.TrySetMarkerComment(0, "-L");
+        document.SetRegions([new WaveSelection(4800, 9600)]);
+        document.SetSampleLoop(new WaveSelection(24000, 36000));
+        var markersBefore = document.SnapshotMarkers();
+        var regionsBefore = document.SnapshotRegions();
+        var loopBefore = document.SampleLoop;
+
+        Assert.True(document.TryMoveMarkers([0], 4800, out _));
+        Assert.True(document.TryMoveRegionEdges([RangeEdgeMove.FromStart(regionsBefore[0].Range)], 2400, out _));
+        Assert.True(document.TryMoveSampleLoopEdges(start: false, end: true, 4800, out _));
+
+        var command = ProcessEdits.MoveTimelineItems(document, markersBefore, regionsBefore, loopBefore);
+        Assert.NotNull(command);
+        Assert.Equal(
+            "マーカー移動  00:00.000→00:00.100  -L  ループ終了  00:00.750→00:00.850  リージョン開始  00:00.100→00:00.150",
+            command.Summary);
+    }
+
+    [Fact]
+    public void MoveTimelineItems_SummaryDescribesSingleLoopStart()
+    {
+        var document = MakeConstant(48000, 1f);
+        document.SetSampleLoop(new WaveSelection(4800, 24000));
+        var markersBefore = document.SnapshotMarkers();
+        var regionsBefore = document.SnapshotRegions();
+        var loopBefore = document.SampleLoop;
+        Assert.True(document.TryMoveSampleLoopEdges(start: true, end: false, 4800, out _));
+
+        var command = ProcessEdits.MoveTimelineItems(document, markersBefore, regionsBefore, loopBefore);
+        Assert.NotNull(command);
+        Assert.Equal("ループ開始  00:00.100→00:00.200", command.Summary);
+    }
+
+    [Fact]
+    public void MoveTimelineItems_SummaryDescribesWholeLoopMove()
+    {
+        var document = MakeConstant(48000, 1f);
+        document.SetSampleLoop(new WaveSelection(4800, 14400));
+        var markersBefore = document.SnapshotMarkers();
+        var regionsBefore = document.SnapshotRegions();
+        var loopBefore = document.SampleLoop;
+        Assert.True(document.TryMoveSampleLoop(4800, out _));
+
+        var command = ProcessEdits.MoveTimelineItems(document, markersBefore, regionsBefore, loopBefore);
+        Assert.NotNull(command);
+        Assert.Equal("ループ移動  00:00.100–00:00.300→00:00.200–00:00.400", command.Summary);
+    }
+
+    [Fact]
     public void Snapshot_TitleIncludesActionAndTimeRange()
     {
         var document = MakeConstant(48000, 1f);

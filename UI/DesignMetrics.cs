@@ -21,7 +21,9 @@ internal static class DesignMetrics
 
     public static double RulerHeight => From96(24);
 
-    public static double MarkerLaneHeight => From96(20);
+    public static double MarkerLaneRowHeight => From96(16);
+
+    public static double MarkerLaneHeight => MarkerLaneRowHeight * 2;
 
     public static double DbScaleWidth => From96(40);
 

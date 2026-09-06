@@ -25,6 +25,12 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _markerDigitTimer;
     private readonly DispatcherTimer _markerNudgeTimer;
     private int _markerNudgeDirection;
+    private bool _nudgeAtPlayhead;
+    private bool _nudgeRepeatStarted;
+    private bool _timelineNudgeOpen;
+    private MarkerSnapshot[] _timelineNudgeMarkersBefore = [];
+    private WaveRegion[] _timelineNudgeRegionsBefore = [];
+    private WaveSelection _timelineNudgeLoopBefore;
     private int _markerNumber;
     private AudioDocument? _document;
     private AudioClip? _clipboard;
@@ -69,6 +75,8 @@ public partial class MainWindow : Window
         Waveform.ScrubPreviewed += (_, frame) => OnScrubPreviewed(frame);
         Waveform.ScrubEnded += (_, e) => OnScrubEnded(e.Frame, e.Commit);
         Waveform.MarkerCommentCommitted += (_, e) => CommitMarkerComment(e.Frame, e.Comment);
+        Waveform.RegionNameCommitted += (_, e) => CommitRegionName(e.Region, e.Name);
+        Waveform.TimelineDragStarting += (_, _) => CommitTimelineNudgeSession();
         Waveform.TimelineLayoutCommitted += (_, e) =>
             CommitTimelineLayout(e.MarkersBefore, e.RegionsBefore, e.LoopBefore);
         Waveform.MarkersChanged += (_, _) =>
@@ -110,9 +118,10 @@ public partial class MainWindow : Window
         _playTimer.Tick += (_, _) => OnPlayTick();
         _markerDigitTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(750) };
         _markerDigitTimer.Tick += (_, _) => ResetMarkerDigitEntry();
-        _markerNudgeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        _markerNudgeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs) };
         _markerNudgeTimer.Tick += (_, _) => OnMarkerNudgeTick();
 
+        Deactivated += (_, _) => StopMarkerNudge();
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         PreviewKeyUp += MainWindow_PreviewKeyUp;
         PreviewMouseWheel += MainWindow_PreviewMouseWheel;

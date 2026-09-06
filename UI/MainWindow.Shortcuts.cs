@@ -17,14 +17,26 @@ public partial class MainWindow
     private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key is Key.Left or Key.Right)
+        {
+            if (_markerNudgeDirection != 0
+                && (key == Key.Left && _markerNudgeDirection < 0
+                    || key == Key.Right && _markerNudgeDirection > 0
+                    || (Keyboard.Modifiers & ModifierKeys.Alt) == 0))
+            {
+                StopMarkerNudge();
+            }
+
+            CommitTimelineNudgeSession();
+            return;
+        }
+
         if (_markerNudgeDirection == 0)
         {
             return;
         }
 
-        if (key is Key.LeftAlt or Key.RightAlt
-            || (key == Key.Left && _markerNudgeDirection < 0)
-            || (key == Key.Right && _markerNudgeDirection > 0))
+        if (key is Key.LeftAlt or Key.RightAlt)
         {
             StopMarkerNudge();
         }
@@ -98,6 +110,11 @@ public partial class MainWindow
         if (Transport.IsPositionFocused)
         {
             return false;
+        }
+
+        if (key is not (Key.Left or Key.Right))
+        {
+            CommitTimelineNudgeSession();
         }
 
         if (TryProcessHistoryShortcut(key, modifiers))
@@ -545,8 +562,17 @@ public partial class MainWindow
         if (_markerNudgeDirection != 0
             && key is Key.LeftShift or Key.RightShift or Key.LeftCtrl or Key.RightCtrl)
         {
-            ApplyHeldMarkerNudge();
-            return true;
+            if (_nudgeAtPlayhead)
+            {
+                ApplyHeldMarkerNudge();
+                return true;
+            }
+
+            if (key is Key.LeftShift or Key.RightShift)
+            {
+                ApplyNudgeStep(_markerNudgeDirection);
+                return true;
+            }
         }
 
         if (key is Key.Left or Key.Right && (modifiers & ModifierKeys.Alt) != 0)
@@ -584,12 +610,22 @@ public partial class MainWindow
 
         if (key == Key.Left && modifiers == ModifierKeys.Shift)
         {
+            if (Waveform.HasSelectedTimelineItems)
+            {
+                return NudgePlayheadOrSelection(-1);
+            }
+
             Waveform.NudgeSelection(-1);
             return true;
         }
 
         if (key == Key.Right && modifiers == ModifierKeys.Shift)
         {
+            if (Waveform.HasSelectedTimelineItems)
+            {
+                return NudgePlayheadOrSelection(1);
+            }
+
             Waveform.NudgeSelection(1);
             return true;
         }

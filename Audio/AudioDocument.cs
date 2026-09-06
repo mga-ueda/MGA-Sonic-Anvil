@@ -66,13 +66,30 @@ internal sealed class AudioDocument
     /// <summary>マーカーを使わないサンプルループ範囲。未設定は Empty。</summary>
     public WaveSelection SampleLoop { get; set; }
 
-    private readonly List<WaveSelection> _regions = [];
+    private readonly List<WaveRegion> _regions = [];
 
     /// <summary>マーカーを使わないリージョン範囲。複数可。サンプルループと重複可。</summary>
-    public IReadOnlyList<WaveSelection> Regions => _regions;
+    public IReadOnlyList<WaveSelection> Regions
+    {
+        get
+        {
+            if (_regions.Count == 0)
+            {
+                return [];
+            }
+
+            var ranges = new WaveSelection[_regions.Count];
+            for (var i = 0; i < _regions.Count; i++)
+            {
+                ranges[i] = _regions[i].Range;
+            }
+
+            return ranges;
+        }
+    }
 
     /// <summary>先頭のリージョン。未設定は Empty。</summary>
-    public WaveSelection Region => _regions.Count == 0 ? WaveSelection.Empty : _regions[0];
+    public WaveSelection Region => _regions.Count == 0 ? WaveSelection.Empty : _regions[0].Range;
 
     public long CursorFrame { get; set; }
 
@@ -371,14 +388,50 @@ internal sealed class AudioDocument
         SampleLoop = new WaveSelection(start, end).Clamp(FrameCount);
     }
 
-    public WaveSelection[] SnapshotRegions() => _regions.Count == 0 ? [] : [.. _regions];
+    public WaveRegion[] SnapshotRegions() => _regions.Count == 0 ? [] : [.. _regions];
+
+    public string RegionName(WaveSelection range)
+    {
+        foreach (var region in _regions)
+        {
+            if (region.Range == range)
+            {
+                return region.Name;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    public bool TrySetRegionName(WaveSelection range, string? name)
+    {
+        for (var i = 0; i < _regions.Count; i++)
+        {
+            if (_regions[i].Range != range)
+            {
+                continue;
+            }
+
+            var next = MarkerRoles.Normalize(name);
+            if (_regions[i].Name == next)
+            {
+                return false;
+            }
+
+            _regions[i] = _regions[i] with { Name = next };
+            IsDirty = true;
+            return true;
+        }
+
+        return false;
+    }
 
     /// <summary>開始時刻順。マーカー番号の続きから振る。無い範囲は 0。</summary>
     public int RegionNumber(WaveSelection range)
     {
         for (var i = 0; i < _regions.Count; i++)
         {
-            if (_regions[i] == range)
+            if (_regions[i].Range == range)
             {
                 return _markers.Length + i + 1;
             }
@@ -392,7 +445,24 @@ internal sealed class AudioDocument
 
     public void SetRegions(IReadOnlyList<WaveSelection> ranges, bool markDirty = true)
     {
-        var next = NormalizeRegions(ranges);
+        if (ranges is null)
+        {
+            SetRegions(Array.Empty<WaveRegion>(), markDirty);
+            return;
+        }
+
+        var named = new WaveRegion[ranges.Count];
+        for (var i = 0; i < ranges.Count; i++)
+        {
+            named[i] = new WaveRegion(ranges[i], RegionName(ranges[i]));
+        }
+
+        SetRegions(named, markDirty);
+    }
+
+    public void SetRegions(IReadOnlyList<WaveRegion> regions, bool markDirty = true)
+    {
+        var next = NormalizeRegions(regions);
         if (SameRegions(_regions, next))
         {
             return;
@@ -412,14 +482,14 @@ internal sealed class AudioDocument
         var found = false;
         foreach (var item in _regions)
         {
-            if (!item.ContainsFrame(frame))
+            if (!item.Range.ContainsFrame(frame))
             {
                 continue;
             }
 
-            if (!found || item.Length < region.Length)
+            if (!found || item.Range.Length < region.Length)
             {
-                region = item;
+                region = item.Range;
                 found = true;
             }
         }
@@ -443,9 +513,9 @@ internal sealed class AudioDocument
                 continue;
             }
 
-            if (!found || item.Length < region.Length)
+            if (!found || item.Range.Length < region.Length)
             {
-                region = item;
+                region = item.Range;
                 found = true;
             }
         }
@@ -461,7 +531,7 @@ internal sealed class AudioDocument
         }
 
         var delEnd = startFrame + frameCount;
-        var next = new List<WaveSelection>(_regions.Count);
+        var next = new List<WaveRegion>(_regions.Count);
         foreach (var item in _regions)
         {
             var start = ShiftFrameThroughDelete(item.StartFrame, startFrame, delEnd, frameCount, inclusiveEnd: false);
@@ -469,7 +539,7 @@ internal sealed class AudioDocument
             var shifted = new WaveSelection(start, end).Clamp(FrameCount);
             if (!shifted.IsEmpty)
             {
-                next.Add(shifted);
+                next.Add(new WaveRegion(shifted, item.Name));
             }
         }
 
@@ -483,7 +553,7 @@ internal sealed class AudioDocument
             return;
         }
 
-        var next = new List<WaveSelection>(_regions.Count);
+        var next = new List<WaveRegion>(_regions.Count);
         foreach (var item in _regions)
         {
             var start = item.StartFrame >= startFrame
@@ -495,19 +565,19 @@ internal sealed class AudioDocument
             var shifted = new WaveSelection(start, end).Clamp(FrameCount);
             if (!shifted.IsEmpty)
             {
-                next.Add(shifted);
+                next.Add(new WaveRegion(shifted, item.Name));
             }
         }
 
         SetRegions(next, markDirty: false);
     }
 
-    private List<WaveSelection> NormalizeRegions(IEnumerable<WaveSelection> ranges)
+    private List<WaveRegion> NormalizeRegions(IEnumerable<WaveRegion> regions)
     {
-        var list = new List<WaveSelection>();
-        foreach (var range in ranges)
+        var list = new List<WaveRegion>();
+        foreach (var region in regions)
         {
-            var next = range.IsEmpty ? WaveSelection.Empty : range.Clamp(FrameCount);
+            var next = region.Clamp(FrameCount);
             if (next.IsEmpty)
             {
                 continue;
@@ -516,7 +586,7 @@ internal sealed class AudioDocument
             var exists = false;
             foreach (var item in list)
             {
-                if (item == next)
+                if (item.Range == next.Range)
                 {
                     exists = true;
                     break;
@@ -537,7 +607,7 @@ internal sealed class AudioDocument
         return list;
     }
 
-    private static bool SameRegions(IReadOnlyList<WaveSelection> left, IReadOnlyList<WaveSelection> right)
+    private static bool SameRegions(IReadOnlyList<WaveRegion> left, IReadOnlyList<WaveRegion> right)
     {
         if (left.Count != right.Count)
         {
@@ -561,7 +631,7 @@ internal sealed class AudioDocument
         AddRangeBounds(extras, SampleLoop);
         foreach (var region in _regions)
         {
-            AddRangeBounds(extras, region);
+            AddRangeBounds(extras, region.Range);
         }
         if (extras.Count == 0)
         {
@@ -804,7 +874,7 @@ internal sealed class AudioDocument
         var byRange = new Dictionary<WaveSelection, RangeEdgeMove>();
         foreach (var move in moves)
         {
-            if (move.IsEmpty || !_regions.Contains(move.Range))
+            if (move.IsEmpty || !HasRegionRange(move.Range))
             {
                 continue;
             }
@@ -835,16 +905,29 @@ internal sealed class AudioDocument
             return false;
         }
 
-        var next = new List<WaveSelection>(_regions.Count);
+        var next = new List<WaveRegion>(_regions.Count);
         foreach (var region in _regions)
         {
-            next.Add(byRange.TryGetValue(region, out var move)
-                ? TimelineMoves.ShiftEdges(region, move.Start, move.End, appliedDelta)
+            next.Add(byRange.TryGetValue(region.Range, out var move)
+                ? region.WithRange(TimelineMoves.ShiftEdges(region.Range, move.Start, move.End, appliedDelta))
                 : region);
         }
 
         SetRegions(next, markDirty);
         return true;
+    }
+
+    private bool HasRegionRange(WaveSelection range)
+    {
+        foreach (var region in _regions)
+        {
+            if (region.Range == range)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public bool TryMoveSampleLoop(long delta, out long appliedDelta, bool markDirty = true) =>
@@ -933,6 +1016,56 @@ internal sealed class AudioDocument
         }
 
         return copied.ToArray();
+    }
+
+    public WaveRegion[] SnapshotExactRegions(WaveSelection range)
+    {
+        range = range.Clamp(FrameCount);
+        if (range.IsEmpty)
+        {
+            return [];
+        }
+
+        foreach (var region in _regions)
+        {
+            if (region.Range == range)
+            {
+                return [new WaveRegion(new WaveSelection(0, range.Length), region.Name)];
+            }
+        }
+
+        return [];
+    }
+
+    public void ApplyPastedRegions(long insertFrame, IReadOnlyList<WaveRegion> relative)
+    {
+        if (relative is null || relative.Count == 0)
+        {
+            return;
+        }
+
+        var next = new List<WaveRegion>(_regions);
+        var added = false;
+        foreach (var region in relative)
+        {
+            var dest = new WaveSelection(
+                insertFrame + region.StartFrame,
+                insertFrame + region.EndFrame).Clamp(FrameCount);
+            if (dest.IsEmpty || HasRegionRange(dest))
+            {
+                continue;
+            }
+
+            next.Add(new WaveRegion(dest, region.Name));
+            added = true;
+        }
+
+        if (!added)
+        {
+            return;
+        }
+
+        SetRegions(next, markDirty: true);
     }
 
     public void ApplyPastedMarkers(long insertFrame, IReadOnlyList<MarkerSnapshot> relative)
@@ -1185,6 +1318,29 @@ internal readonly record struct WaveMarker(int Id, long Frame, string Comment)
 }
 
 internal readonly record struct MarkerSnapshot(long Frame, string Comment);
+
+internal readonly record struct WaveRegion(long StartFrame, long EndFrame, string Name)
+{
+    public WaveRegion(WaveSelection range, string? name = null)
+        : this(range.StartFrame, range.EndFrame, name ?? string.Empty)
+    {
+    }
+
+    public static WaveRegion Empty { get; } = new(0, 0, string.Empty);
+
+    public WaveSelection Range => new(StartFrame, EndFrame);
+
+    public bool IsEmpty => EndFrame <= StartFrame;
+
+    public WaveRegion Clamp(long frameCount)
+    {
+        var range = Range.Clamp(frameCount);
+        return range.IsEmpty ? Empty : new WaveRegion(range, Name);
+    }
+
+    public WaveRegion WithRange(WaveSelection range) =>
+        range.IsEmpty ? Empty : new WaveRegion(range, Name);
+}
 
 internal readonly record struct WaveSelection(long StartFrame, long EndFrame)
 {

@@ -1,6 +1,7 @@
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
+using MgaSonicAnvil.UI;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
@@ -267,6 +268,170 @@ public sealed class RegionTests
         Assert.Equal(10, TimelineMoves.Resolve([], occupied, [new WaveSelection(80, 90)], 40, 100));
         Assert.Equal(15, TimelineMoves.Resolve(markers, [], Array.Empty<WaveSelection>(), 15, 100));
         Assert.Equal(0, TimelineMoves.Resolve(markers, [], [new WaveSelection(90, 100)], 20, 100));
+    }
+
+    [Fact]
+    public void TrySetRegionName_StoresAndPreservesAcrossMove()
+    {
+        var document = MakeDocument(frames: 100);
+        document.SetRegions([new WaveSelection(10, 40)]);
+        Assert.True(document.TrySetRegionName(new WaveSelection(10, 40), "verse"));
+        Assert.Equal("verse", document.RegionName(new WaveSelection(10, 40)));
+
+        Assert.True(document.TryMoveRegions([new WaveSelection(10, 40)], 5, out _));
+        Assert.Equal("verse", document.RegionName(new WaveSelection(15, 45)));
+        Assert.Equal(string.Empty, document.RegionName(new WaveSelection(10, 40)));
+    }
+
+    [Fact]
+    public void SetRegionName_UndoRestoresPrevious()
+    {
+        var document = MakeDocument(frames: 100);
+        document.SetRegions([new WaveSelection(10, 40)]);
+        var history = new EditHistory();
+        var command = ProcessEdits.SetRegionName(document, new WaveSelection(10, 40), "chorus");
+        Assert.NotNull(command);
+        history.Do(document, command);
+        Assert.Equal("chorus", document.RegionName(new WaveSelection(10, 40)));
+
+        Assert.True(history.Undo(document));
+        Assert.Equal(string.Empty, document.RegionName(new WaveSelection(10, 40)));
+    }
+
+    [Fact]
+    public void FlagsOverlapX_DetectsHorizontalOverlap()
+    {
+        Assert.True(WaveformView.FlagsOverlapX(10, 20, 20, 10));
+        Assert.True(WaveformView.FlagsOverlapX(10, 20, 10, 20));
+        Assert.False(WaveformView.FlagsOverlapX(10, 20, 30, 10));
+        Assert.False(WaveformView.FlagsOverlapX(40, 10, 10, 20));
+        Assert.True(WaveformView.FlagsOverlapX(10, 20, 30, 10, pad: 1));
+        Assert.True(WaveformView.FlagsOverlapX(10, 20, 32, 8, pad: WaveformView.FlagProximityPad));
+    }
+
+    [Fact]
+    public void PackFlagRow_ShortRegionKeepsBothStemsVisible()
+    {
+        var packed = WaveformView.PackFlagRow(
+        [
+            new WaveformView.PackedTimelineFlag(10, 20, GrowLeft: false),
+            new WaveformView.PackedTimelineFlag(18, 20, GrowLeft: true),
+        ]);
+        Assert.Equal(2, packed.Length);
+        Assert.True(packed[0].Right <= packed[1].Left + 0.001);
+        Assert.True(packed[0].Width >= 1);
+        Assert.True(packed[1].Width >= 1);
+        Assert.Equal(10, packed[0].StemX);
+        Assert.Equal(18, packed[1].StemX);
+    }
+
+    [Fact]
+    public void PackFlagRow_CloseRightGrowingFlagsDoNotCoverNextStem()
+    {
+        var packed = WaveformView.PackFlagRow(
+        [
+            new WaveformView.PackedTimelineFlag(10, 20, GrowLeft: false),
+            new WaveformView.PackedTimelineFlag(16, 20, GrowLeft: false),
+        ]);
+        Assert.True(packed[0].Right <= packed[1].StemX);
+        Assert.Equal(20, packed[1].Width);
+    }
+
+    [Fact]
+    public void ChainFlagRow_CloseMarkersKeepFullWidthAndLineUp()
+    {
+        var packed = WaveformView.ChainFlagRow(
+        [
+            new WaveformView.PackedTimelineFlag(10, 20, GrowLeft: false),
+            new WaveformView.PackedTimelineFlag(16, 20, GrowLeft: false),
+            new WaveformView.PackedTimelineFlag(16, 18, GrowLeft: false),
+        ]);
+        Assert.Equal(20, packed[0].Width);
+        Assert.Equal(20, packed[1].Width);
+        Assert.Equal(18, packed[2].Width);
+        Assert.Equal(10, packed[0].Left);
+        Assert.Equal(packed[0].Right, packed[1].Left);
+        Assert.Equal(packed[1].Right, packed[2].Left);
+        Assert.Equal(10, packed[0].StemX);
+        Assert.Equal(16, packed[1].StemX);
+        Assert.Equal(16, packed[2].StemX);
+    }
+
+    [Fact]
+    public void ChainFlagRow_FarMarkersStayOnStem()
+    {
+        var packed = WaveformView.ChainFlagRow(
+        [
+            new WaveformView.PackedTimelineFlag(10, 20, GrowLeft: false),
+            new WaveformView.PackedTimelineFlag(80, 16, GrowLeft: false),
+        ]);
+        Assert.Equal(0, packed[0].Offset);
+        Assert.Equal(0, packed[1].Offset);
+        Assert.Equal(10, packed[0].Left);
+        Assert.Equal(80, packed[1].Left);
+    }
+
+    [Fact]
+    public void PackFlagRow_AdjacentEndAndStartGrowAway()
+    {
+        var packed = WaveformView.PackFlagRow(
+        [
+            new WaveformView.PackedTimelineFlag(50, 20, GrowLeft: true),
+            new WaveformView.PackedTimelineFlag(50, 20, GrowLeft: false),
+        ]);
+        Assert.True(packed[0].Right <= packed[1].Left);
+        Assert.Equal(20, packed[0].Width);
+        Assert.Equal(20, packed[1].Width);
+    }
+
+    [Fact]
+    public void SplitFlagRect_PutsRegionAboveMarker()
+    {
+        var region = WaveformView.SplitFlagRect(8, 16, laneHeight: 32, top: true);
+        var marker = WaveformView.SplitFlagRect(8, 16, laneHeight: 32, top: false);
+        Assert.True(region.Bottom <= marker.Top);
+        Assert.True(region.Y < marker.Y);
+        Assert.Equal(8, region.X);
+        Assert.Equal(8, marker.X);
+    }
+
+    [Theory]
+    [InlineData(false, false, 0)]
+    [InlineData(true, false, 1)]
+    [InlineData(false, true, 1)]
+    [InlineData(true, true, 2)]
+    public void CountFlagLaneRows_MatchesContent(bool hasMarkers, bool hasRegions, int rows)
+    {
+        Assert.Equal(rows, WaveformView.CountFlagLaneRows(hasMarkers, hasRegions));
+    }
+
+    [Fact]
+    public void MarkerLaneHeightForRows_SingleLaneIsHalfOfTwo()
+    {
+        Assert.Equal(0, WaveformView.MarkerLaneHeightForRows(0));
+        Assert.Equal(DesignMetrics.MarkerLaneRowHeight, WaveformView.MarkerLaneHeightForRows(1));
+        Assert.Equal(DesignMetrics.MarkerLaneHeight, WaveformView.MarkerLaneHeightForRows(2));
+        Assert.Equal(DesignMetrics.MarkerLaneHeight, WaveformView.MarkerLaneHeightForRows(1) * 2);
+    }
+
+    [Fact]
+    public void LaneFlagRect_UsesFullLaneWhenNotSplit()
+    {
+        var full = WaveformView.LaneFlagRect(8, 16, laneHeight: 32, split: false, top: true);
+        var marker = WaveformView.LaneFlagRect(8, 16, laneHeight: 32, split: false, top: false);
+        Assert.Equal(full, marker);
+        Assert.True(full.Height > 20);
+        Assert.Equal(1, full.Y);
+    }
+
+    [Fact]
+    public void LaneFlagRect_SplitsWhenBothKindsPresent()
+    {
+        var region = WaveformView.LaneFlagRect(8, 16, laneHeight: 32, split: true, top: true);
+        var marker = WaveformView.LaneFlagRect(8, 16, laneHeight: 32, split: true, top: false);
+        Assert.True(region.Bottom <= marker.Top);
+        Assert.True(region.Height < 20);
+        Assert.True(marker.Height < 20);
     }
 
     [Fact]

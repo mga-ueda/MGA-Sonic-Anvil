@@ -294,6 +294,25 @@ public partial class MainWindow
         RefreshStatus();
     }
 
+    private void CommitRegionName(WaveSelection region, string name)
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var command = ProcessEdits.SetRegionName(_document, region, name);
+        if (command is null)
+        {
+            return;
+        }
+
+        _history.Do(_document, command);
+        Waveform.Refresh();
+        Overview.Refresh();
+        RefreshStatus();
+    }
+
     private void AddMarkerAtPlayhead()
     {
         if (_document is null)
@@ -308,7 +327,6 @@ public partial class MainWindow
         }
 
         _history.Do(_document, ProcessEdits.AddMarker(_document, frame));
-        Waveform.SelectMarkerFrames([frame]);
         AfterMarkerEdit();
     }
 
@@ -496,14 +514,48 @@ public partial class MainWindow
         AfterMarkerEdit();
     }
 
+    private void BeginTimelineNudgeSession()
+    {
+        if (_timelineNudgeOpen || _document is null)
+        {
+            return;
+        }
+
+        _timelineNudgeOpen = true;
+        _timelineNudgeMarkersBefore = _document.SnapshotMarkers();
+        _timelineNudgeRegionsBefore = _document.SnapshotRegions();
+        _timelineNudgeLoopBefore = _document.SampleLoop;
+    }
+
+    private void CommitTimelineNudgeSession()
+    {
+        if (!_timelineNudgeOpen)
+        {
+            return;
+        }
+
+        _timelineNudgeOpen = false;
+        if (_document is null)
+        {
+            return;
+        }
+
+        CommitTimelineLayout(_timelineNudgeMarkersBefore, _timelineNudgeRegionsBefore, _timelineNudgeLoopBefore);
+    }
+
     private void CommitTimelineLayout(
         MarkerSnapshot[] markersBefore,
-        WaveSelection[] regionsBefore,
+        WaveRegion[] regionsBefore,
         WaveSelection loopBefore)
     {
         if (_document is null)
         {
             return;
+        }
+
+        if (_timelineNudgeOpen)
+        {
+            CommitTimelineNudgeSession();
         }
 
         var command = ProcessEdits.MoveTimelineItems(_document, markersBefore, regionsBefore, loopBefore);
@@ -516,37 +568,67 @@ public partial class MainWindow
         AfterMarkerEdit();
     }
 
-    private bool BeginOrContinueMarkerNudge(int direction)
+    private const int TimelineNudgeRepeatDelayMs = 400;
+    private const int TimelineNudgeRepeatIntervalMs = 50;
+
+    private bool BeginOrContinueMarkerNudge(int direction) =>
+        BeginOrContinueTimelineNudge(direction, atPlayhead: true);
+
+    private bool BeginOrContinueTimelineNudge(int direction, bool atPlayhead)
     {
         if (direction == 0)
         {
             return false;
         }
 
-        if (_markerNudgeDirection == direction && _markerNudgeTimer.IsEnabled)
+        if (_markerNudgeDirection == direction && _markerNudgeTimer.IsEnabled && _nudgeAtPlayhead == atPlayhead)
         {
             return true;
         }
 
-        if (!ApplyHeldMarkerNudge(direction))
+        _nudgeAtPlayhead = atPlayhead;
+        if (!ApplyNudgeStep(direction))
         {
             return true;
         }
 
         _markerNudgeDirection = direction;
+        _nudgeRepeatStarted = false;
+        _markerNudgeTimer.Stop();
+        _markerNudgeTimer.Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs);
         _markerNudgeTimer.Start();
         return true;
     }
 
     private void OnMarkerNudgeTick()
     {
-        if (_markerNudgeDirection == 0 || !IsMarkerNudgeHeld(_markerNudgeDirection))
+        if (_markerNudgeDirection == 0 || !IsNudgeHeld(_markerNudgeDirection))
         {
             StopMarkerNudge();
             return;
         }
 
-        ApplyHeldMarkerNudge();
+        ApplyNudgeStep(_markerNudgeDirection);
+        if (_nudgeRepeatStarted)
+        {
+            return;
+        }
+
+        _nudgeRepeatStarted = true;
+        _markerNudgeTimer.Stop();
+        _markerNudgeTimer.Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatIntervalMs);
+        _markerNudgeTimer.Start();
+    }
+
+    private bool ApplyNudgeStep(int direction)
+    {
+        if (_nudgeAtPlayhead)
+        {
+            return ApplyHeldMarkerNudge(direction);
+        }
+
+        NudgeSelectedTimeline(direction);
+        return true;
     }
 
     private bool ApplyHeldMarkerNudge(int? direction = null)
@@ -562,20 +644,25 @@ public partial class MainWindow
         return NudgeMarkersAtPlayhead(step, includePrevious, fast);
     }
 
-    private static bool IsMarkerNudgeHeld(int direction)
+    private bool IsNudgeHeld(int direction)
     {
-        if ((Keyboard.Modifiers & ModifierKeys.Alt) == 0)
+        var keyDown = direction < 0 ? Keyboard.IsKeyDown(Key.Left) : Keyboard.IsKeyDown(Key.Right);
+        if (!keyDown)
         {
             return false;
         }
 
-        return direction < 0 ? Keyboard.IsKeyDown(Key.Left) : Keyboard.IsKeyDown(Key.Right);
+        var alt = (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
+        return _nudgeAtPlayhead ? alt : !alt;
     }
 
     private void StopMarkerNudge()
     {
         _markerNudgeDirection = 0;
+        _nudgeRepeatStarted = false;
         _markerNudgeTimer.Stop();
+        _markerNudgeTimer.Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs);
+        CommitTimelineNudgeSession();
     }
 
     private bool NudgeMarkersAtPlayhead(int direction, bool includePrevious, bool fast)
@@ -585,23 +672,19 @@ public partial class MainWindow
             return false;
         }
 
-        var origins = Waveform.MarkerNudgeFrames(includePrevious);
-        if (origins.Count == 0)
+        if (!Waveform.TrySelectTimelineAtPlayhead(includePrevious))
         {
             return false;
         }
 
         var delta = Waveform.NudgeStepFrames * (fast ? 3 : 1) * direction;
-        var command = ProcessEdits.MoveMarkers(_document, origins, delta, out var applied);
-        if (command is null)
+        BeginTimelineNudgeSession();
+        if (!Waveform.TryNudgeSelectedTimeline(delta, out _))
         {
             return false;
         }
 
-        var playhead = Waveform.PlayheadFrame;
-        _history.Do(_document, command);
-        Waveform.SelectMarkerFrames(origins.Select(frame => frame + applied));
-        Waveform.SeekKeepingSelection(playhead + applied);
+        Waveform.SeekKeepingSelection(Waveform.PlayheadFrame);
         AfterMarkerEdit();
         return true;
     }
@@ -615,8 +698,7 @@ public partial class MainWindow
 
         if (Waveform.HasSelectedTimelineItems)
         {
-            NudgeSelectedTimeline(direction);
-            return true;
+            return BeginOrContinueTimelineNudge(direction, atPlayhead: false);
         }
 
         Waveform.NudgePlayhead(direction);
@@ -630,21 +712,13 @@ public partial class MainWindow
             return;
         }
 
-        var markersBefore = _document.SnapshotMarkers();
-        var regionsBefore = _document.SnapshotRegions();
-        var loopBefore = _document.SampleLoop;
-        if (!Waveform.TryNudgeSelectedTimeline(Waveform.NudgeStepFrames * direction, out _))
+        var fast = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+        BeginTimelineNudgeSession();
+        if (!Waveform.TryNudgeSelectedTimeline(Waveform.NudgeStepFrames * (fast ? 3 : 1) * direction, out _))
         {
             return;
         }
 
-        var command = ProcessEdits.MoveTimelineItems(_document, markersBefore, regionsBefore, loopBefore);
-        if (command is null)
-        {
-            return;
-        }
-
-        _history.Do(_document, command);
         AfterMarkerEdit();
     }
 
@@ -665,6 +739,7 @@ public partial class MainWindow
 
     private void UndoEdit()
     {
+        CommitTimelineNudgeSession();
         if (_document is null || !_history.CanUndo)
         {
             return;
@@ -677,6 +752,7 @@ public partial class MainWindow
 
     private void RedoEdit()
     {
+        CommitTimelineNudgeSession();
         if (_document is null || !_history.CanRedo)
         {
             return;

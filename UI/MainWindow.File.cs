@@ -200,7 +200,7 @@ public partial class MainWindow
         settings.LastSelectionEnd = 0;
         settings.LastSampleLoopStart = 0;
         settings.LastSampleLoopEnd = 0;
-        StoreSessionRegions(settings, []);
+        StoreSessionRegions(settings, null);
         StoreSessionMarkers([]);
         AppStorage.ClearSessionDocument();
         AppStorage.Save();
@@ -309,14 +309,14 @@ public partial class MainWindow
             StoreSessionMarkers([]);
             settings.LastSampleLoopStart = 0;
             settings.LastSampleLoopEnd = 0;
-            StoreSessionRegions(settings, []);
+            StoreSessionRegions(settings, null);
         }
         else
         {
             StoreSessionMarkers(_document?.SnapshotMarkers());
             settings.LastSampleLoopStart = _document?.SampleLoop.StartFrame ?? 0;
             settings.LastSampleLoopEnd = _document?.SampleLoop.EndFrame ?? 0;
-            StoreSessionRegions(settings, _document?.Regions);
+            StoreSessionRegions(settings, _document);
         }
 
         if (!dirty)
@@ -349,14 +349,14 @@ public partial class MainWindow
             // 保存せず終了した変更は捨て、次回はファイル側の埋め込みを使う。
             settings.LastSampleLoopStart = 0;
             settings.LastSampleLoopEnd = 0;
-            StoreSessionRegions(settings, []);
+            StoreSessionRegions(settings, null);
             StoreSessionMarkers([]);
         }
         else
         {
             settings.LastSampleLoopStart = _document.SampleLoop.StartFrame;
             settings.LastSampleLoopEnd = _document.SampleLoop.EndFrame;
-            StoreSessionRegions(settings, _document.Regions);
+            StoreSessionRegions(settings, _document);
             StoreSessionMarkers(_document.SnapshotMarkers());
         }
 
@@ -430,48 +430,55 @@ public partial class MainWindow
         }
     }
 
-    private static void StoreSessionRegions(AppSettings settings, IReadOnlyList<WaveSelection>? regions)
+    private static void StoreSessionRegions(AppSettings settings, AudioDocument? document)
     {
-        if (regions is null || regions.Count == 0)
+        var regions = document?.SnapshotRegions();
+        if (regions is null || regions.Length == 0)
         {
             settings.LastRegionStart = 0;
             settings.LastRegionEnd = 0;
             settings.LastRegionStarts = [];
             settings.LastRegionEnds = [];
+            settings.LastRegionNames = [];
             return;
         }
 
-        var starts = new long[regions.Count];
-        var ends = new long[regions.Count];
-        for (var i = 0; i < regions.Count; i++)
+        var starts = new long[regions.Length];
+        var ends = new long[regions.Length];
+        var names = new string[regions.Length];
+        for (var i = 0; i < regions.Length; i++)
         {
             starts[i] = regions[i].StartFrame;
             ends[i] = regions[i].EndFrame;
+            names[i] = regions[i].Name;
         }
 
         settings.LastRegionStarts = starts;
         settings.LastRegionEnds = ends;
+        settings.LastRegionNames = names;
         settings.LastRegionStart = starts[0];
         settings.LastRegionEnd = ends[0];
     }
 
-    private static WaveSelection[] LoadSessionRegions(AppSettings settings)
+    private static WaveRegion[] LoadSessionRegions(AppSettings settings)
     {
         var starts = settings.LastRegionStarts ?? [];
         var ends = settings.LastRegionEnds ?? [];
+        var names = settings.LastRegionNames ?? [];
         if (starts.Length > 0 && starts.Length == ends.Length)
         {
-            var regions = new WaveSelection[starts.Length];
+            var regions = new WaveRegion[starts.Length];
             for (var i = 0; i < starts.Length; i++)
             {
-                regions[i] = new WaveSelection(starts[i], ends[i]);
+                var name = i < names.Length ? names[i] : string.Empty;
+                regions[i] = new WaveRegion(new WaveSelection(starts[i], ends[i]), name);
             }
 
             return regions;
         }
 
         var legacy = new WaveSelection(settings.LastRegionStart, settings.LastRegionEnd);
-        return legacy.IsEmpty ? [] : [legacy];
+        return legacy.IsEmpty ? [] : [new WaveRegion(legacy, string.Empty)];
     }
 
     private static void StoreSessionMarkers(IReadOnlyList<MarkerSnapshot>? markers)

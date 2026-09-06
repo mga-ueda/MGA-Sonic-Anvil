@@ -1,10 +1,18 @@
+using MgaSonicAnvil.Domain;
+
 namespace MgaSonicAnvil.Audio;
 
 internal readonly record struct EmbeddedCueMarker(long Frame, string Comment);
 
 internal readonly record struct EmbeddedSampleLoop(long StartFrame, long EndFrame);
 
-internal readonly record struct EmbeddedRegion(long StartFrame, long EndFrame);
+internal readonly record struct EmbeddedRegion(long StartFrame, long EndFrame, string Name)
+{
+    public EmbeddedRegion(long startFrame, long endFrame)
+        : this(startFrame, endFrame, string.Empty)
+    {
+    }
+}
 
 internal sealed class EmbeddedAudioMeta
 {
@@ -48,10 +56,12 @@ internal sealed class EmbeddedAudioMeta
 
         if (Regions.Count > 0)
         {
-            var ranges = new WaveSelection[Regions.Count];
+            var ranges = new WaveRegion[Regions.Count];
             for (var i = 0; i < Regions.Count; i++)
             {
-                ranges[i] = new WaveSelection(Regions[i].StartFrame, Regions[i].EndFrame);
+                ranges[i] = new WaveRegion(
+                    new WaveSelection(Regions[i].StartFrame, Regions[i].EndFrame),
+                    MarkerRoles.Normalize(Regions[i].Name));
             }
 
             document.SetRegions(ranges, markDirty: false);

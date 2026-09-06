@@ -63,7 +63,7 @@ internal static class WavEmbeddedMeta
             meta = new EmbeddedAudioMeta(
                 BuildMarkers(cuePositions, labels, notes, regionIds),
                 ChooseSampleLoop(smplLoops),
-                CollectRegions(cuePositions, regionLengths));
+                CollectRegions(cuePositions, regionLengths, labels, notes));
             return !meta.IsEmpty;
         }
         catch
@@ -129,7 +129,9 @@ internal static class WavEmbeddedMeta
 
     private static IReadOnlyList<EmbeddedRegion> CollectRegions(
         Dictionary<uint, long> cuePositions,
-        Dictionary<uint, uint> regionLengths)
+        Dictionary<uint, uint> regionLengths,
+        Dictionary<uint, string> labels,
+        Dictionary<uint, string> notes)
     {
         var regions = new List<EmbeddedRegion>();
         foreach (var (cueId, length) in regionLengths)
@@ -145,7 +147,10 @@ internal static class WavEmbeddedMeta
                 continue;
             }
 
-            var region = new EmbeddedRegion(start, end);
+            notes.TryGetValue(cueId, out var note);
+            labels.TryGetValue(cueId, out var label);
+            var name = !string.IsNullOrWhiteSpace(note) ? note.Trim() : (label ?? string.Empty).Trim();
+            var region = new EmbeddedRegion(start, end, name);
             var exists = false;
             foreach (var item in regions)
             {
@@ -355,7 +360,7 @@ internal static class WavEmbeddedMeta
 
             var id = NextCueId(points);
             regionSpans.Add((id, region.InclusiveEnd - region.Start + 1));
-            points.Add((id, region.Start, string.Empty));
+            points.Add((id, region.Start, document.RegionName(range)));
         }
 
         if (points.Count == 0 && loop is null)

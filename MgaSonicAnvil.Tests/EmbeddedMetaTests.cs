@@ -124,6 +124,8 @@ public sealed class EmbeddedMetaTests
             document.TrySetMarkerComment(60, "-L");
             document.SetSampleLoop(new WaveSelection(20, 50));
             document.SetRegions([new WaveSelection(8, 18), new WaveSelection(55, 75)]);
+            Assert.True(document.TrySetRegionName(new WaveSelection(8, 18), "Intro"));
+            Assert.True(document.TrySetRegionName(new WaveSelection(55, 75), "-L"));
 
             AudioCodec.SaveWave(document, path);
             var loaded = AudioCodec.Load(path);
@@ -137,6 +139,8 @@ public sealed class EmbeddedMetaTests
             Assert.Equal(
                 [new WaveSelection(8, 18), new WaveSelection(55, 75)],
                 loaded.Regions);
+            Assert.Equal("Intro", loaded.RegionName(new WaveSelection(8, 18)));
+            Assert.Equal("-L", loaded.RegionName(new WaveSelection(55, 75)));
             Assert.False(loaded.IsDirty);
         }
         finally

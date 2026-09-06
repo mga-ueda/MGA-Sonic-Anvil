@@ -17,6 +17,7 @@ public partial class MainWindow
             return;
         }
 
+        CommitTimelineNudgeSession();
         StopPlaybackForEdit();
         _historyAnchorIndex = _history.CurrentIndex;
         _historySelectedIndex = _historyAnchorIndex;

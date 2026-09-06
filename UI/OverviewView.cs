@@ -130,6 +130,7 @@ internal sealed class OverviewView : FrameworkElement
         DrawInvertedSelection(dc, bounds);
         DrawVisibleWindow(dc, bounds);
         DrawMarkerLines(dc, bounds);
+        DrawRegionLines(dc, bounds);
     }
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
@@ -266,6 +267,34 @@ internal sealed class OverviewView : FrameworkElement
             var selected = _selectedMarkerFrames is not null && _selectedMarkerFrames.Contains(marker.Frame);
             dc.DrawLine(selected ? selectedPen : pen, new Point(x, 0), new Point(x, bounds.Height));
         }
+    }
+
+    private void DrawRegionLines(DrawingContext dc, Rect bounds)
+    {
+        if (_document is null || _document.Regions.Count == 0 || _document.FrameCount <= 0)
+        {
+            return;
+        }
+
+        var frames = (double)_document.FrameCount;
+        var pen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("RegionTimelineBrush")), 1);
+        pen.Freeze();
+        foreach (var region in _document.Regions)
+        {
+            DrawRegionLine(dc, bounds, frames, pen, region.StartFrame);
+            DrawRegionLine(dc, bounds, frames, pen, region.EndFrame);
+        }
+    }
+
+    private static void DrawRegionLine(DrawingContext dc, Rect bounds, double frames, Pen pen, long frame)
+    {
+        var x = frame / frames * bounds.Width;
+        if (x < -1 || x > bounds.Width + 1)
+        {
+            return;
+        }
+
+        dc.DrawLine(pen, new Point(x, 0), new Point(x, bounds.Height));
     }
 
     private void DrawVisibleWindow(DrawingContext dc, Rect bounds)

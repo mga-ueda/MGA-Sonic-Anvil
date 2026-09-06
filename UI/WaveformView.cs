@@ -31,7 +31,7 @@ internal sealed class WaveformView : Grid
     private const double DbOptionalMinGapPx = 11;
     private static double DbScaleLaneWidth => DesignMetrics.DbScaleWidth;
     private const int DragThresholdPx = 3;
-    private const double LoopHandleMinPx = 10;
+    private const double LoopHandleMinPx = 5;
     private const double MarkerSnapPx = 8d;
     private const float TrailTargetLengthPx = 360f;
     private const int TrailSampleRetainMs = 10400;
@@ -43,9 +43,31 @@ internal sealed class WaveformView : Grid
     private const double TrailDiscontinuitySec = 1.25;
 
     private const double MouseGuideMoveEpsilonPx = 0.5;
-    private static double MarkerLaneHeight => DesignMetrics.MarkerLaneHeight;
     private static double TimeLaneHeight => DesignMetrics.RulerHeight;
-    private static double ChromeTopHeight => MarkerLaneHeight + TimeLaneHeight;
+
+    internal static int CountFlagLaneRows(bool hasMarkers, bool hasRegions)
+    {
+        if (!hasMarkers && !hasRegions)
+        {
+            return 0;
+        }
+
+        return hasMarkers && hasRegions ? 2 : 1;
+    }
+
+    private int FlagLaneCount =>
+        _document is null
+            ? 0
+            : CountFlagLaneRows(_document.Markers.Count > 0, _document.Regions.Count > 0);
+
+    private bool SplitFlagLanes => FlagLaneCount > 1;
+
+    internal static double MarkerLaneHeightForRows(int rows) =>
+        Math.Max(0, rows) * DesignMetrics.MarkerLaneRowHeight;
+
+    private double MarkerLaneHeight => MarkerLaneHeightForRows(FlagLaneCount);
+
+    private double ChromeTopHeight => MarkerLaneHeight + TimeLaneHeight;
 
     private readonly DrawingHost _staticHost;
     private readonly DrawingHost _overlayHost;
@@ -63,16 +85,18 @@ internal sealed class WaveformView : Grid
     private long _markerDragPrimaryOrigin;
     private long? _markerDragFollowOrigin;
     private long _markerDragLastDelta = long.MinValue;
+    private long? _markerDragSnapHold;
     private long[] _markerDragOrigins = [];
     private MarkerSnapshot[] _markerDragBefore = [];
     private RegionEdge[] _regionDragOrigins = [];
-    private WaveSelection[] _regionsDragBefore = [];
+    private WaveRegion[] _regionsDragBefore = [];
     private bool _loopDragStart;
     private bool _loopDragEnd;
     private WaveSelection _loopDragBefore;
     private bool _pendingSelectionPrerollJump;
     private TextBox? _commentEditor;
     private long _commentEditFrame = -1;
+    private WaveSelection _commentEditRegion;
     private bool _endingCommentEdit;
     private readonly List<(long Frame, long TickMs)> _trailSamples = [];
     private bool _trailActive;
@@ -86,11 +110,14 @@ internal sealed class WaveformView : Grid
     private double _waveDpiX;
     private double _waveDpiY;
     private bool _waveDirty = true;
+    private double _appliedMarkerLaneHeight = -1;
     private bool _staticRebuildQueued;
     private bool _viewChangedQueued;
     private readonly Dictionary<(string Text, TimeLabelAccent Accent), FormattedText> _timeLabelCache = new();
     private readonly Dictionary<string, FormattedText> _dbLabelCache = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FormattedText> _markerLabelCache = new(StringComparer.Ordinal);
+    private readonly Dictionary<(WaveSelection Range, long Frame), Rect> _regionFlagLayout = [];
+    private readonly Dictionary<long, Rect> _markerFlagLayout = [];
     private readonly Dictionary<(string Text, bool Selected), FormattedText> _markerCommentLabelCache = new();
     private double _timeLabelPixelsPerDip;
     private float[] _columnMins = [];
@@ -126,9 +153,11 @@ internal sealed class WaveformView : Grid
     public event EventHandler? SelectionChanged;
     public event EventHandler? ViewChanged;
     public event EventHandler<(long Frame, string Comment)>? MarkerCommentCommitted;
+    public event EventHandler<(WaveSelection Region, string Name)>? RegionNameCommitted;
+    public event EventHandler? TimelineDragStarting;
     public event EventHandler<(
         MarkerSnapshot[] MarkersBefore,
-        WaveSelection[] RegionsBefore,
+        WaveRegion[] RegionsBefore,
         WaveSelection LoopBefore)>? TimelineLayoutCommitted;
     public event EventHandler? MarkersChanged;
     public event EventHandler? SampleLoopClearRequested;
@@ -991,6 +1020,70 @@ internal sealed class WaveformView : Grid
         return frames;
     }
 
+    public bool TrySelectTimelineAtPlayhead(bool includePair)
+    {
+        if (_document is null)
+        {
+            return false;
+        }
+
+        var playhead = _playheadFrame;
+        var markers = MarkerNudgeFrames(includePair);
+        var loop = _document.SampleLoop;
+        var loopStart = !loop.IsEmpty && loop.StartFrame == playhead;
+        var loopEnd = !loop.IsEmpty && loop.EndFrame == playhead;
+        if (includePair && (loopStart || loopEnd))
+        {
+            loopStart = true;
+            loopEnd = true;
+        }
+
+        var regionEdges = new List<RegionEdge>();
+        foreach (var region in _document.Regions)
+        {
+            var onStart = region.StartFrame == playhead;
+            var onEnd = region.EndFrame == playhead;
+            if (!onStart && !onEnd)
+            {
+                continue;
+            }
+
+            if (includePair || onStart)
+            {
+                regionEdges.Add(new RegionEdge(region, true));
+            }
+
+            if (includePair || onEnd)
+            {
+                regionEdges.Add(new RegionEdge(region, false));
+            }
+        }
+
+        if (markers.Count == 0 && !loopStart && !loopEnd && regionEdges.Count == 0)
+        {
+            return false;
+        }
+
+        _selectedMarkerFrames.Clear();
+        foreach (var frame in markers)
+        {
+            _selectedMarkerFrames.Add(frame);
+        }
+
+        _selectedRegionEdges.Clear();
+        foreach (var edge in regionEdges)
+        {
+            _selectedRegionEdges.Add(edge);
+        }
+
+        _loopStartSelected = loopStart;
+        _loopEndSelected = loopEnd;
+        _markerSelectAnchor = playhead;
+        InvalidateStaticLayer();
+        MarkersChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
     private long? PreviousMarkerFrame(long frame)
     {
         if (_document is null)
@@ -1037,16 +1130,16 @@ internal sealed class WaveformView : Grid
                 e.Handled = true;
                 return;
             }
-            if (TryHitMarkerFlag(pos, out var marker))
-            {
-                SelectMarkerFrames([marker.Frame]);
-                BeginMarkerCommentEdit(marker);
-            }
-            else if (TryHitRegionFlag(pos, out var region, out var regionFrame))
+            if (TryHitRegionFlag(pos, out var region, out var regionFrame))
             {
                 SelectMarkerFrames([]);
                 _selectedRegionEdges.Add(ToRegionEdge(region, regionFrame));
-                SelectRegion(region);
+                BeginRegionNameEdit(region);
+            }
+            else if (TryHitMarkerFlag(pos, out var marker))
+            {
+                SelectMarkerFrames([marker.Frame]);
+                BeginMarkerCommentEdit(marker);
             }
             else
             {
@@ -1065,16 +1158,16 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        if (TryHitMarkerFlag(start, out var hit))
+        if (TryHitRegionFlag(start, out var regionHit, out var hitFrame))
         {
-            BeginMarkerFlagInteraction(hit, start);
+            BeginRegionFlagInteraction(regionHit, hitFrame, start);
             e.Handled = true;
             return;
         }
 
-        if (TryHitRegionFlag(start, out var regionHit, out var hitFrame))
+        if (TryHitMarkerFlag(start, out var hit))
         {
-            BeginRegionFlagInteraction(regionHit, hitFrame, start);
+            BeginMarkerFlagInteraction(hit, start);
             e.Handled = true;
             return;
         }
@@ -1319,6 +1412,13 @@ internal sealed class WaveformView : Grid
     {
         var bounds = new Rect(_staticHost.RenderSize);
         dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("WaveformBackBrush")), null, bounds);
+        if (Math.Abs(_appliedMarkerLaneHeight - MarkerLaneHeight) > 0.01)
+        {
+            _appliedMarkerLaneHeight = MarkerLaneHeight;
+            _waveDirty = true;
+        }
+
+        SyncMouseGuideHeight();
         var wave = WaveformBounds(bounds);
         var span = _document is null ? 0 : ViewSpanFrames;
         var start = _viewStart;
@@ -1368,6 +1468,7 @@ internal sealed class WaveformView : Grid
             DrawRange(dc, bounds, start, span, _document.Selection, Theme.Get("LoopRangeFillBrush"));
         }
 
+        RefreshFlagStacks(bounds, start, span);
         DrawRegionFlags(dc, bounds, start, span);
         DrawMarkers(dc, bounds, start, span);
         DrawPlayhead(dc, bounds, start, span);
@@ -2343,7 +2444,7 @@ internal sealed class WaveformView : Grid
             return false;
         }
 
-        var handle = Math.Min(Math.Max(LoopHandleMinPx, lane.Height * 0.75), Math.Max(4, bar.Width * 0.4));
+        var handle = Math.Min(Math.Max(LoopHandleMinPx, lane.Height * 0.375), Math.Max(2, bar.Width * 0.2));
         startHandle = new Rect(bar.X, bar.Y, handle, bar.Height);
         endHandle = new Rect(bar.Right - handle, bar.Y, handle, bar.Height);
         return true;
@@ -2371,17 +2472,155 @@ internal sealed class WaveformView : Grid
     private static Rect DbScaleBounds(Rect bounds) =>
         new(0, 0, ScaleLeft(bounds), bounds.Height);
 
-    private static Rect WaveformBounds(Rect bounds)
+    private Rect WaveformBounds(Rect bounds)
     {
         var top = Math.Min(ChromeTopHeight, Math.Max(0, bounds.Height));
         var left = ScaleLeft(bounds);
         return new Rect(left, top, ScaleContentWidth(bounds), Math.Max(0, bounds.Height - top));
     }
 
-    private static Rect MarkerLaneBounds(Rect bounds) =>
+    private Rect MarkerLaneBounds(Rect bounds) =>
         new(ScaleLeft(bounds), 0, ScaleContentWidth(bounds), Math.Min(MarkerLaneHeight, bounds.Height));
 
-    private static Rect TimeLaneBounds(Rect bounds)
+    internal const double FlagProximityPad = 8;
+
+    internal readonly record struct PackedTimelineFlag(double StemX, double Width, bool GrowLeft, double Offset = 0)
+    {
+        public double Left => (GrowLeft ? StemX - Width : StemX) + Offset;
+        public double Right => Left + Width;
+    }
+
+    internal static bool FlagsOverlapX(double x0, double width0, double x1, double width1, double pad = 0) =>
+        width0 > 0 && width1 > 0 && x0 - pad < x1 + width1 && x1 - pad < x0 + width0;
+
+    internal static PackedTimelineFlag[] PackFlagRow(IReadOnlyList<PackedTimelineFlag> flags)
+    {
+        if (flags.Count == 0)
+        {
+            return [];
+        }
+
+        if (flags.Count == 1)
+        {
+            return [flags[0]];
+        }
+
+        var packed = new PackedTimelineFlag[flags.Count];
+        var order = new int[flags.Count];
+        for (var i = 0; i < flags.Count; i++)
+        {
+            packed[i] = flags[i];
+            order[i] = i;
+        }
+
+        Array.Sort(order, (left, right) =>
+        {
+            var cmp = packed[left].StemX.CompareTo(packed[right].StemX);
+            return cmp != 0 ? cmp : packed[left].GrowLeft.CompareTo(packed[right].GrowLeft);
+        });
+
+        for (var n = 0; n < order.Length - 1; n++)
+        {
+            var i = order[n];
+            var j = order[n + 1];
+            var a = packed[i];
+            var b = packed[j];
+            if (a.Right <= b.Left)
+            {
+                continue;
+            }
+
+            if (!a.GrowLeft && b.GrowLeft)
+            {
+                var gap = b.StemX - a.StemX;
+                if (gap <= 0)
+                {
+                    continue;
+                }
+
+                var mid = a.StemX + gap * 0.5;
+                packed[i] = a with { Width = Math.Min(a.Width, Math.Max(1, mid - a.StemX)) };
+                packed[j] = b with { Width = Math.Min(b.Width, Math.Max(1, b.StemX - mid)) };
+                continue;
+            }
+
+            if (!a.GrowLeft && !b.GrowLeft)
+            {
+                packed[i] = a with { Width = Math.Min(a.Width, Math.Max(1, b.StemX - a.StemX)) };
+                continue;
+            }
+
+            if (a.GrowLeft && b.GrowLeft)
+            {
+                packed[j] = b with { Width = Math.Min(b.Width, Math.Max(1, b.StemX - a.StemX)) };
+            }
+        }
+
+        return packed;
+    }
+
+    internal static PackedTimelineFlag[] ChainFlagRow(IReadOnlyList<PackedTimelineFlag> flags)
+    {
+        if (flags.Count == 0)
+        {
+            return [];
+        }
+
+        if (flags.Count == 1)
+        {
+            return [flags[0] with { Offset = 0 }];
+        }
+
+        var packed = new PackedTimelineFlag[flags.Count];
+        var order = new int[flags.Count];
+        for (var i = 0; i < flags.Count; i++)
+        {
+            packed[i] = flags[i] with { Offset = 0 };
+            order[i] = i;
+        }
+
+        Array.Sort(order, (left, right) =>
+        {
+            var cmp = packed[left].StemX.CompareTo(packed[right].StemX);
+            return cmp != 0 ? cmp : left.CompareTo(right);
+        });
+
+        var chainRight = double.NegativeInfinity;
+        foreach (var i in order)
+        {
+            var flag = packed[i];
+            var left = Math.Max(flag.StemX, chainRight);
+            packed[i] = flag with { Offset = left - flag.StemX };
+            chainRight = left + flag.Width;
+        }
+
+        return packed;
+    }
+
+    internal static Rect FullFlagRect(double x, double width, double laneHeight) =>
+        new(x, 1, width, Math.Max(2, laneHeight - 2));
+
+    internal static Rect SplitFlagRect(double x, double width, double laneHeight, bool top)
+    {
+        var y = 1d;
+        var inner = Math.Max(4, laneHeight - 2);
+        var half = Math.Floor((inner - 1) * 0.5);
+        if (top)
+        {
+            return new Rect(x, y, width, half);
+        }
+
+        var bottomY = y + half + 1;
+        return new Rect(x, bottomY, width, Math.Max(2, laneHeight - 1 - bottomY));
+    }
+
+    internal static Rect LaneFlagRect(double x, double width, double laneHeight, bool split, bool top) =>
+        split ? SplitFlagRect(x, width, laneHeight, top) : FullFlagRect(x, width, laneHeight);
+
+    private static Rect TimelineFlagRect(double x, double width, double laneHeight, bool top) =>
+        SplitFlagRect(x, width, laneHeight, top);
+
+    private Rect TimeLaneBounds(Rect bounds)
     {
         var top = Math.Min(MarkerLaneHeight, bounds.Height);
         var height = Math.Min(TimeLaneHeight, Math.Max(0, bounds.Height - top));
@@ -2540,6 +2779,126 @@ internal sealed class WaveformView : Grid
         dc.Pop();
     }
 
+    private void RefreshFlagStacks(Rect bounds, double start, double span)
+    {
+        _regionFlagLayout.Clear();
+        _markerFlagLayout.Clear();
+        if (_document is null)
+        {
+            return;
+        }
+
+        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var laneHeight = MarkerLaneBounds(bounds).Height;
+        var split = SplitFlagLanes;
+        var regions = new List<(WaveSelection Range, long Frame, double StemX, double Width, bool GrowLeft)>();
+        foreach (var region in _document.Regions)
+        {
+            var id = _document.RegionNumber(region);
+            TryCollectFlag(regions, bounds, start, span, region, region.StartFrame, id, growLeft: false, pixelsPerDip);
+            TryCollectFlag(regions, bounds, start, span, region, region.EndFrame, id, growLeft: true, pixelsPerDip);
+        }
+
+        var markers = new List<(long Frame, double StemX, double Width)>();
+        foreach (var marker in _document.Markers)
+        {
+            var x = FrameToViewX(marker.Frame, start, span, bounds);
+            if (x < ScaleLeft(bounds) || x > bounds.Width + 24)
+            {
+                continue;
+            }
+
+            markers.Add((marker.Frame, x, MeasureFlagWidth(marker.Id.ToString(CultureInfo.InvariantCulture), pixelsPerDip)));
+        }
+
+        var top = new List<(bool Region, WaveSelection Range, long Frame, PackedTimelineFlag Flag)>(regions.Count + markers.Count);
+        var bottom = new List<(long Frame, PackedTimelineFlag Flag)>(markers.Count);
+        foreach (var region in regions)
+        {
+            top.Add((true, region.Range, region.Frame, new PackedTimelineFlag(region.StemX, region.Width, region.GrowLeft)));
+        }
+
+        foreach (var marker in markers)
+        {
+            var flag = new PackedTimelineFlag(marker.StemX, marker.Width, GrowLeft: false);
+            if (split)
+            {
+                bottom.Add((marker.Frame, flag));
+            }
+            else
+            {
+                top.Add((false, default, marker.Frame, flag));
+            }
+        }
+
+        ApplyPackedRow(top, laneHeight, split, topRow: true, chain: top.TrueForAll(item => !item.Region));
+        if (bottom.Count > 0)
+        {
+            var packed = ChainFlagRow(bottom.ConvertAll(item => item.Flag));
+            for (var i = 0; i < bottom.Count; i++)
+            {
+                _markerFlagLayout[bottom[i].Frame] = LaneFlagRect(packed[i].Left, packed[i].Width, laneHeight, split: true, top: false);
+            }
+        }
+    }
+
+    private void ApplyPackedRow(
+        List<(bool Region, WaveSelection Range, long Frame, PackedTimelineFlag Flag)> row,
+        double laneHeight,
+        bool split,
+        bool topRow,
+        bool chain)
+    {
+        if (row.Count == 0)
+        {
+            return;
+        }
+
+        var packed = chain
+            ? ChainFlagRow(row.ConvertAll(item => item.Flag))
+            : PackFlagRow(row.ConvertAll(item => item.Flag));
+        for (var i = 0; i < row.Count; i++)
+        {
+            var item = row[i];
+            var box = LaneFlagRect(packed[i].Left, packed[i].Width, laneHeight, split, topRow);
+            if (item.Region)
+            {
+                _regionFlagLayout[(item.Range, item.Frame)] = box;
+            }
+            else
+            {
+                _markerFlagLayout[item.Frame] = box;
+            }
+        }
+    }
+
+    private void TryCollectFlag(
+        List<(WaveSelection Range, long Frame, double StemX, double Width, bool GrowLeft)> dest,
+        Rect bounds,
+        double start,
+        double span,
+        WaveSelection region,
+        long frame,
+        int id,
+        bool growLeft,
+        double pixelsPerDip)
+    {
+        var x = FrameToViewX(frame, start, span, bounds);
+        if (x < ScaleLeft(bounds) || x > bounds.Width + 24)
+        {
+            return;
+        }
+
+        dest.Add((region, frame, x, MeasureFlagWidth(id.ToString(CultureInfo.InvariantCulture), pixelsPerDip), growLeft));
+    }
+
+    private double MeasureFlagWidth(string id, double pixelsPerDip)
+    {
+        const double padX = 3;
+        const double maxFlagWidth = 48;
+        return Math.Min(maxFlagWidth, GetMarkerLabel(id, pixelsPerDip).Width + padX * 2);
+    }
+
     private void DrawRegionFlags(DrawingContext dc, Rect bounds, double start, double span)
     {
         _regionFlags.Clear();
@@ -2597,15 +2956,41 @@ internal sealed class WaveformView : Grid
 
         var idText = GetMarkerLabel(id.ToString(CultureInfo.InvariantCulture), pixelsPerDip);
         const double padX = 3;
-        const double maxFlagWidth = 48;
-        var boxH = Math.Min(Math.Max(idText.Height + 2, lane.Height - 2), lane.Height - 1);
-        var boxW = Math.Min(maxFlagWidth, idText.Width + padX * 2);
-        var box = new Rect(x, 1, boxW, boxH);
+        if (!_regionFlagLayout.TryGetValue((region, frame), out var box))
+        {
+            var growLeft = frame != region.StartFrame;
+            var boxW = MeasureFlagWidth(id.ToString(CultureInfo.InvariantCulture), pixelsPerDip);
+            box = LaneFlagRect(growLeft ? x - boxW : x, boxW, lane.Height, SplitFlagLanes, top: true);
+        }
+
         _regionFlags.Add((region, frame, box));
         dc.DrawRectangle(fill, selected ? selectedPen : null, box);
+        dc.PushClip(new RectangleGeometry(box));
         dc.DrawText(
             idText,
-            new Point(x + padX, box.Y + Math.Max(0, (box.Height - idText.Height) * 0.5)));
+            new Point(box.X + padX, box.Y + Math.Max(0, (box.Height - idText.Height) * 0.5)));
+        dc.Pop();
+
+        if (frame != region.StartFrame || _document is null || _commentEditRegion == region)
+        {
+            return;
+        }
+
+        var name = _document.RegionName(region);
+        if (string.IsNullOrEmpty(name))
+        {
+            return;
+        }
+
+        var nameText = GetMarkerCommentLabel(TruncateMarkerComment(name), pixelsPerDip, selected);
+        const double nameGap = 2;
+        var nameX = box.Right + nameGap;
+        var nameY = box.Y + Math.Max(0, (box.Height - nameText.Height) * 0.5);
+        if (nameX + nameText.Width <= bounds.Width
+            && !TextOverlapsOtherFlag(nameX, nameText.Width, nameY, nameText.Height, box))
+        {
+            dc.DrawText(nameText, new Point(nameX, nameY));
+        }
     }
 
     private bool TryHitRegionFlag(Point point, out WaveSelection region) =>
@@ -2673,10 +3058,12 @@ internal sealed class WaveformView : Grid
 
             var idText = GetMarkerLabel(marker.Id.ToString(CultureInfo.InvariantCulture), pixelsPerDip);
             const double padX = 3;
-            const double maxFlagWidth = 48;
-            var boxH = Math.Min(Math.Max(idText.Height + 2, lane.Height - 2), lane.Height - 1);
-            var boxW = Math.Min(maxFlagWidth, idText.Width + padX * 2);
-            var box = new Rect(x, 1, boxW, boxH);
+            if (!_markerFlagLayout.TryGetValue(marker.Frame, out var box))
+            {
+                var boxW = MeasureFlagWidth(marker.Id.ToString(CultureInfo.InvariantCulture), pixelsPerDip);
+                box = LaneFlagRect(x, boxW, lane.Height, SplitFlagLanes, top: !SplitFlagLanes);
+            }
+
             _markerFlags.Add((marker, box));
             if (editing && marker.Frame == _commentEditFrame)
             {
@@ -2684,25 +3071,47 @@ internal sealed class WaveformView : Grid
             }
 
             dc.DrawRectangle(selected ? selectedFill : fill, selected ? selectedPen : null, box);
+            dc.PushClip(new RectangleGeometry(box));
             dc.DrawText(
                 idText,
-                new Point(x + padX, box.Y + Math.Max(0, (box.Height - idText.Height) * 0.5)));
+                new Point(box.X + padX, box.Y + Math.Max(0, (box.Height - idText.Height) * 0.5)));
+            dc.Pop();
 
             if (!string.IsNullOrEmpty(marker.Comment))
             {
                 var commentText = GetMarkerCommentLabel(TruncateMarkerComment(marker.Comment), pixelsPerDip, selected);
                 const double commentGap = 2;
                 var commentX = box.Right + commentGap;
-                if (commentX + commentText.Width <= bounds.Width)
+                var commentY = box.Y + Math.Max(0, (box.Height - commentText.Height) * 0.5);
+                if (commentX + commentText.Width <= bounds.Width
+                    && !TextOverlapsOtherFlag(commentX, commentText.Width, commentY, commentText.Height, box))
                 {
-                    dc.DrawText(
-                        commentText,
-                        new Point(
-                            commentX,
-                            box.Y + Math.Max(0, (box.Height - commentText.Height) * 0.5)));
+                    dc.DrawText(commentText, new Point(commentX, commentY));
                 }
             }
         }
+    }
+
+    private bool TextOverlapsOtherFlag(double x, double width, double y, double height, Rect except)
+    {
+        var text = new Rect(x, y, width, height);
+        foreach (var box in _regionFlagLayout.Values)
+        {
+            if (box != except && box.IntersectsWith(text))
+            {
+                return true;
+            }
+        }
+
+        foreach (var box in _markerFlagLayout.Values)
+        {
+            if (box != except && box.IntersectsWith(text))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string TruncateMarkerComment(string comment) =>
@@ -2740,24 +3149,66 @@ internal sealed class WaveformView : Grid
             }
         }
 
-        if (frame is not long target)
+        if (frame is long target)
+        {
+            foreach (var marker in _document.Markers)
+            {
+                if (marker.Frame != target)
+                {
+                    continue;
+                }
+
+                SelectMarkerFrames([marker.Frame]);
+                BeginMarkerCommentEdit(marker);
+                return true;
+            }
+        }
+
+        return TryBeginRenameRegion();
+    }
+
+    private bool TryBeginRenameRegion()
+    {
+        if (_document is null)
         {
             return false;
         }
 
-        foreach (var marker in _document.Markers)
+        var region = WaveSelection.Empty;
+        foreach (var edge in _selectedRegionEdges)
         {
-            if (marker.Frame != target)
-            {
-                continue;
-            }
-
-            SelectMarkerFrames([marker.Frame]);
-            BeginMarkerCommentEdit(marker);
-            return true;
+            region = edge.Range;
+            break;
         }
 
-        return false;
+        if (region.IsEmpty)
+        {
+            foreach (var item in _document.Regions)
+            {
+                if (item.StartFrame == _playheadFrame || item.EndFrame == _playheadFrame)
+                {
+                    region = item;
+                    break;
+                }
+            }
+
+            if (region.IsEmpty)
+            {
+                _document.TryGetRegionAt(_playheadFrame, out region);
+            }
+        }
+
+        if (region.IsEmpty)
+        {
+            return false;
+        }
+
+        SelectMarkerFrames([]);
+        _selectedRegionEdges.Clear();
+        _selectedRegionEdges.Add(new RegionEdge(region, true));
+        _selectedRegionEdges.Add(new RegionEdge(region, false));
+        BeginRegionNameEdit(region);
+        return true;
     }
 
     private bool TryHitMarkerFlag(Point point, out WaveMarker marker)
@@ -3125,10 +3576,12 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        TimelineDragStarting?.Invoke(this, EventArgs.Empty);
         _dragStart = start;
         _markerDragging = true;
         _markerDragMoved = false;
         _markerDragLastDelta = long.MinValue;
+        _markerDragSnapHold = null;
         _markerDragPrimaryOrigin = primaryFrame;
         _markerDragOrigins = _selectedMarkerFrames.OrderBy(frame => frame).ToArray();
         _markerDragBefore = _document.SnapshotMarkers();
@@ -3155,23 +3608,39 @@ internal sealed class WaveformView : Grid
     private long DesiredTimelineDragDelta(double x)
     {
         var exclude = TimelineDragSnapExclude();
-        return TrySnapXToMarker(x, exclude, out _, out var snapped)
-            ? snapped - _markerDragPrimaryOrigin
-            : RawFrameAt(x) - _markerDragPrimaryOrigin;
+        if (TrySnapXToMarker(x, exclude, out _, out var snapped))
+        {
+            _markerDragSnapHold = snapped;
+            return snapped - _markerDragPrimaryOrigin;
+        }
+
+        if (_markerDragSnapHold is long held
+            && TryGetSnapHoldDistance(x, held, out var holdDist)
+            && holdDist <= MarkerSnapPx * 1.5)
+        {
+            return held - _markerDragPrimaryOrigin;
+        }
+
+        _markerDragSnapHold = null;
+        return RawFrameAt(x) - _markerDragPrimaryOrigin;
+    }
+
+    private bool TryGetSnapHoldDistance(double mouseX, long frame, out double dist)
+    {
+        dist = 0;
+        if (ContentWidth <= 0)
+        {
+            return false;
+        }
+
+        var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
+        dist = Math.Abs(FrameToViewX(frame, _viewStart, ViewSpanFrames, bounds) - mouseX);
+        return true;
     }
 
     private HashSet<long>? TimelineDragSnapExclude()
     {
         var exclude = new HashSet<long>();
-        void AddRangeEnds(WaveSelection range)
-        {
-            if (!range.IsEmpty)
-            {
-                exclude.Add(range.StartFrame);
-                exclude.Add(range.EndFrame);
-            }
-        }
-
         foreach (var frame in _markerDragOrigins)
         {
             exclude.Add(frame);
@@ -3182,26 +3651,25 @@ internal sealed class WaveformView : Grid
             exclude.Add(frame);
         }
 
-        foreach (var edge in _regionDragOrigins)
+        return exclude.Count == 0 ? null : exclude;
+    }
+
+    private bool IsDraggingRegionEdge(WaveSelection range, bool isStart)
+    {
+        if (!_markerDragging)
         {
-            AddRangeEnds(edge.Range);
+            return false;
         }
 
         foreach (var edge in _selectedRegionEdges)
         {
-            AddRangeEnds(edge.Range);
-        }
-
-        if (_loopDragStart || _loopDragEnd)
-        {
-            AddRangeEnds(_loopDragBefore);
-            if (_document is not null)
+            if (edge.IsStart == isStart && edge.Range == range)
             {
-                AddRangeEnds(_document.SampleLoop);
+                return true;
             }
         }
 
-        return exclude.Count == 0 ? null : exclude;
+        return false;
     }
 
     private void ApplyMarkerDrag(long desiredDelta)
@@ -3451,6 +3919,7 @@ internal sealed class WaveformView : Grid
         _markerDragPrimaryOrigin = 0;
         _markerDragFollowOrigin = null;
         _markerDragLastDelta = long.MinValue;
+        _markerDragSnapHold = null;
         _markerDragOrigins = [];
         _markerDragBefore = [];
         _regionDragOrigins = [];
@@ -3460,10 +3929,59 @@ internal sealed class WaveformView : Grid
         _loopDragBefore = WaveSelection.Empty;
     }
 
+    private void BeginRegionNameEdit(WaveSelection region)
+    {
+        if (_document is null || region.IsEmpty)
+        {
+            return;
+        }
+
+        _commentEditor ??= CreateMarkerCommentEditor();
+        _commentEditFrame = -1;
+        _commentEditRegion = region;
+        _commentEditor.Text = _document.RegionName(region);
+        PlaceRegionNameEditor(region);
+        _commentEditor.Visibility = Visibility.Visible;
+        _commentEditor.Focus();
+        _commentEditor.SelectAll();
+        InvalidatePlayheadLayer();
+    }
+
+    private void PlaceRegionNameEditor(WaveSelection region)
+    {
+        if (_commentEditor is null)
+        {
+            return;
+        }
+
+        Rect flag = default;
+        foreach (var item in _regionFlags)
+        {
+            if (item.Range == region && item.Frame == region.StartFrame)
+            {
+                flag = item.Flag;
+                break;
+            }
+        }
+
+        if (flag.Width < 8)
+        {
+            var x = FrameToViewX(region.StartFrame, _viewStart, ViewSpanFrames, new Rect(0, 0, ActualWidth, ActualHeight));
+            flag = LaneFlagRect(x, 24, MarkerLaneHeight, SplitFlagLanes, top: true);
+        }
+
+        const double commentGap = 2;
+        var editorX = flag.Right + commentGap;
+        _commentEditor.Width = Math.Clamp(160, 80, Math.Max(80, ActualWidth - editorX));
+        _commentEditor.Height = Math.Max(12, flag.Height);
+        _commentEditor.Margin = new Thickness(editorX, flag.Y, 0, 0);
+    }
+
     private void BeginMarkerCommentEdit(WaveMarker marker)
     {
         _commentEditor ??= CreateMarkerCommentEditor();
         _commentEditFrame = marker.Frame;
+        _commentEditRegion = WaveSelection.Empty;
         _commentEditor.Text = marker.Comment ?? string.Empty;
         PlaceMarkerCommentEditor(marker);
         _commentEditor.Visibility = Visibility.Visible;
@@ -3492,13 +4010,13 @@ internal sealed class WaveformView : Grid
         if (flag.Width < 8)
         {
             var x = FrameToViewX(marker.Frame, _viewStart, ViewSpanFrames, new Rect(0, 0, ActualWidth, ActualHeight));
-            flag = new Rect(x, 1, 24, Math.Max(16, MarkerLaneHeight - 2));
+            flag = LaneFlagRect(x, 24, MarkerLaneHeight, SplitFlagLanes, top: !SplitFlagLanes);
         }
 
         const double commentGap = 2;
         var editorX = flag.Right + commentGap;
         _commentEditor.Width = Math.Clamp(160, 80, Math.Max(80, ActualWidth - editorX));
-        _commentEditor.Height = Math.Max(flag.Height, MarkerLaneHeight - 2);
+        _commentEditor.Height = Math.Max(12, flag.Height);
         _commentEditor.Margin = new Thickness(editorX, flag.Y, 0, 0);
     }
 
@@ -3550,12 +4068,21 @@ internal sealed class WaveformView : Grid
         try
         {
             var frame = _commentEditFrame;
+            var region = _commentEditRegion;
             var text = _commentEditor.Text;
             _commentEditor.Visibility = Visibility.Collapsed;
             _commentEditFrame = -1;
-            if (commit && frame >= 0)
+            _commentEditRegion = WaveSelection.Empty;
+            if (commit)
             {
-                MarkerCommentCommitted?.Invoke(this, (frame, text.Trim()));
+                if (!region.IsEmpty)
+                {
+                    RegionNameCommitted?.Invoke(this, (region, text.Trim()));
+                }
+                else if (frame >= 0)
+                {
+                    MarkerCommentCommitted?.Invoke(this, (frame, text.Trim()));
+                }
             }
 
             ClearMarkerSelection();
@@ -3640,7 +4167,7 @@ internal sealed class WaveformView : Grid
         return formatted;
     }
 
-    private static void DrawRange(
+    private void DrawRange(
         DrawingContext dc,
         Rect bounds,
         double start,
@@ -3794,9 +4321,21 @@ internal sealed class WaveformView : Grid
 
         if (_markerDragging)
         {
-            _mouseGuideX = TrySnapXToMarker(x, TimelineDragSnapExclude(), out var dragSnapX, out _)
-                ? dragSnapX
-                : x;
+            if (TrySnapXToMarker(x, TimelineDragSnapExclude(), out var dragSnapX, out _))
+            {
+                _mouseGuideX = dragSnapX;
+            }
+            else if (_markerDragSnapHold is long held
+                && TryGetSnapHoldDistance(x, held, out var holdDist)
+                && holdDist <= MarkerSnapPx * 1.5)
+            {
+                _mouseGuideX = FrameToViewX(held, _viewStart, ViewSpanFrames, new Rect(0, 0, ActualWidth, ActualHeight));
+            }
+            else
+            {
+                _mouseGuideX = x;
+            }
+
             return;
         }
 
@@ -3856,14 +4395,29 @@ internal sealed class WaveformView : Grid
         var loop = _document.SampleLoop;
         if (!loop.IsEmpty)
         {
-            Consider(loop.StartFrame);
-            Consider(loop.EndFrame);
+            // 動かしている端そのものは除外する。同じフレームの他マーカーは残す（吸着後の震え防止）。
+            if (!_markerDragging || !_loopDragStart)
+            {
+                Consider(loop.StartFrame);
+            }
+
+            if (!_markerDragging || !_loopDragEnd)
+            {
+                Consider(loop.EndFrame);
+            }
         }
 
         foreach (var region in _document.Regions)
         {
-            Consider(region.StartFrame);
-            Consider(region.EndFrame);
+            if (!IsDraggingRegionEdge(region, isStart: true))
+            {
+                Consider(region.StartFrame);
+            }
+
+            if (!IsDraggingRegionEdge(region, isStart: false))
+            {
+                Consider(region.EndFrame);
+            }
         }
 
         if (best is not { } found)

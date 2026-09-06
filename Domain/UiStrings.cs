@@ -115,8 +115,8 @@ internal static partial class UiStrings
     public const string TipWaveform =
         "ドラッグで選択　Ctrl+ドラッグでスクラブ　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A で全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着\n"
         + "ホイール=時間ズーム　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"
-        + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル）　Ctrl+←→ 前後のマーカー / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（同じ範囲でもう一度で解除）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M マーカー　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動 / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
-        + "マーカー上で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む）　T で現在時間　U で編集履歴";
+        + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル、Shift で3倍）　Ctrl+←→ 前後のマーカー / リージョン端 / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（同じ範囲でもう一度で解除）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M マーカー　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動（Shift で3倍） / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント / リージョン名（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
+        + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　T で現在時間　U で編集履歴";
     public const string TipAlwaysOnTop = "ウィンドウを常に最前面へ表示します。";
     public const string TipGitHub = "GitHub リポジトリを開きます。";
     public const string TipTimecode = "再生位置 (T)。クリックまたは T で入力、Enter で移動。コピー／貼り付け可";
@@ -143,6 +143,7 @@ internal static partial class UiStrings
         "Paste" => "ペースト",
         "Add Marker" => "マーカー追加",
         "Marker Comment" => "マーカーコメント",
+        "Region Name" => "リージョン名",
         "Delete Markers" => "マーカー削除",
         "Move Marker" => "マーカー移動",
         "Move Markers" => "マーカー移動",
@@ -216,9 +217,28 @@ internal static partial class UiStrings
             return FormatMarkerTimes(verb, removed, sampleRate);
         }
 
-        if (removed.Length == 1 && added.Length == 1)
+        if (removed.Length == added.Length && removed.Length > 0)
         {
-            return $"{verb}  {FormatTimecode(removed[0].Frame, sampleRate)}→{FormatTimecode(added[0].Frame, sampleRate)}";
+            Array.Sort(removed, static (left, right) => left.Frame.CompareTo(right.Frame));
+            Array.Sort(added, static (left, right) => left.Frame.CompareTo(right.Frame));
+            if (removed.Length <= 3)
+            {
+                var pairs = new string[removed.Length];
+                for (var i = 0; i < removed.Length; i++)
+                {
+                    pairs[i] = FormatShift(removed[i].Frame, added[i].Frame, sampleRate);
+                }
+
+                var text = $"{verb}  {string.Join(", ", pairs)}";
+                if (removed.Length == 1 && removed[0].Comment.Length > 0)
+                {
+                    return $"{text}  {EditHistoryQuote(removed[0].Comment)}";
+                }
+
+                return text;
+            }
+
+            return $"{verb}  {removed.Length}個";
         }
 
         if (removed.Length > 0)
@@ -228,6 +248,140 @@ internal static partial class UiStrings
 
         return verb;
     }
+
+    public static string EditHistoryTimelineMove(
+        IReadOnlyList<MarkerSnapshot> markersBefore,
+        IReadOnlyList<MarkerSnapshot> markersAfter,
+        IReadOnlyList<WaveRegion> regionsBefore,
+        IReadOnlyList<WaveRegion> regionsAfter,
+        WaveSelection loopBefore,
+        WaveSelection loopAfter,
+        int sampleRate)
+    {
+        var parts = new List<string>(3);
+        if (!markersBefore.Select(marker => marker.Frame).SequenceEqual(markersAfter.Select(marker => marker.Frame)))
+        {
+            var name = markersBefore.Count == 1 && markersAfter.Count == 1 ? "Move Marker" : "Move Markers";
+            parts.Add(EditHistoryMarkers(name, markersBefore, markersAfter, sampleRate));
+        }
+
+        if (TryFormatLoopMove(loopBefore, loopAfter, sampleRate, out var loop))
+        {
+            parts.Add(loop);
+        }
+
+        if (TryFormatRegionMoves(
+            regionsBefore.Select(region => region.Range).ToArray(),
+            regionsAfter.Select(region => region.Range).ToArray(),
+            sampleRate,
+            out var regions))
+        {
+            parts.Add(regions);
+        }
+
+        return parts.Count == 0 ? EditHistoryName("Move Timeline") : string.Join("  ", parts);
+    }
+
+    private static bool TryFormatLoopMove(
+        WaveSelection before,
+        WaveSelection after,
+        int sampleRate,
+        out string text)
+    {
+        text = string.Empty;
+        if (before == after)
+        {
+            return false;
+        }
+
+        if (before.IsEmpty || after.IsEmpty)
+        {
+            text = after.IsEmpty
+                ? EditHistoryName("Set Sample Loop") + "  解除"
+                : EditHistoryRange(EditHistoryName("Set Sample Loop"), sampleRate, after.StartFrame, after.EndFrame);
+            return true;
+        }
+
+        var startChanged = before.StartFrame != after.StartFrame;
+        var endChanged = before.EndFrame != after.EndFrame;
+        if (startChanged && endChanged)
+        {
+            text = $"ループ移動  {FormatRange(before, sampleRate)}→{FormatRange(after, sampleRate)}";
+            return true;
+        }
+
+        text = startChanged
+            ? $"ループ開始  {FormatShift(before.StartFrame, after.StartFrame, sampleRate)}"
+            : $"ループ終了  {FormatShift(before.EndFrame, after.EndFrame, sampleRate)}";
+        return true;
+    }
+
+    private static bool TryFormatRegionMoves(
+        IReadOnlyList<WaveSelection> before,
+        IReadOnlyList<WaveSelection> after,
+        int sampleRate,
+        out string text)
+    {
+        text = string.Empty;
+        var gone = before.Where(range => !after.Contains(range)).ToArray();
+        var come = after.Where(range => !before.Contains(range)).ToArray();
+        if (gone.Length == 0 && come.Length == 0)
+        {
+            return false;
+        }
+
+        if (gone.Length == 1 && come.Length == 1)
+        {
+            text = FormatOneRegionMove(gone[0], come[0], sampleRate);
+            return true;
+        }
+
+        if (gone.Length == come.Length && gone.Length is > 0 and <= 2)
+        {
+            Array.Sort(gone, CompareRanges);
+            Array.Sort(come, CompareRanges);
+            var pairs = new string[gone.Length];
+            for (var i = 0; i < gone.Length; i++)
+            {
+                pairs[i] = $"{FormatRange(gone[i], sampleRate)}→{FormatRange(come[i], sampleRate)}";
+            }
+
+            text = $"リージョン移動  {string.Join(", ", pairs)}";
+            return true;
+        }
+
+        text = $"リージョン移動  {Math.Max(gone.Length, come.Length)}個";
+        return true;
+    }
+
+    private static string FormatOneRegionMove(WaveSelection before, WaveSelection after, int sampleRate)
+    {
+        var startChanged = before.StartFrame != after.StartFrame;
+        var endChanged = before.EndFrame != after.EndFrame;
+        if (startChanged && !endChanged)
+        {
+            return $"リージョン開始  {FormatShift(before.StartFrame, after.StartFrame, sampleRate)}";
+        }
+
+        if (endChanged && !startChanged)
+        {
+            return $"リージョン終了  {FormatShift(before.EndFrame, after.EndFrame, sampleRate)}";
+        }
+
+        return $"リージョン移動  {FormatRange(before, sampleRate)}→{FormatRange(after, sampleRate)}";
+    }
+
+    private static int CompareRanges(WaveSelection left, WaveSelection right)
+    {
+        var byStart = left.StartFrame.CompareTo(right.StartFrame);
+        return byStart != 0 ? byStart : left.EndFrame.CompareTo(right.EndFrame);
+    }
+
+    private static string FormatRange(WaveSelection range, int sampleRate) =>
+        $"{FormatTimecode(range.StartFrame, sampleRate)}–{FormatTimecode(range.EndFrame, sampleRate)}";
+
+    private static string FormatShift(long fromFrame, long toFrame, int sampleRate) =>
+        $"{FormatTimecode(fromFrame, sampleRate)}→{FormatTimecode(toFrame, sampleRate)}";
 
     private static string FormatMarkerTimes(string verb, IReadOnlyList<MarkerSnapshot> markers, int sampleRate)
     {

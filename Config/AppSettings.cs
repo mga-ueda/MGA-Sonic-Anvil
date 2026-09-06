@@ -45,6 +45,8 @@ internal sealed class AppSettings
 
     public long[] LastRegionEnds { get; set; } = [];
 
+    public string[] LastRegionNames { get; set; } = [];
+
     public long[] LastMarkerFrames { get; set; } = [];
 
     public string[] LastMarkerComments { get; set; } = [];

@@ -202,7 +202,7 @@ internal sealed class DeleteRangeCommand : IEditCommand
     private readonly long _cursorBefore;
     private readonly MarkerSnapshot[] _markersBefore;
     private readonly WaveSelection _sampleLoopBefore;
-    private readonly WaveSelection[] _regionsBefore;
+    private readonly WaveRegion[] _regionsBefore;
 
     public DeleteRangeCommand(
         long startFrame,
@@ -211,7 +211,7 @@ internal sealed class DeleteRangeCommand : IEditCommand
         long cursorBefore,
         MarkerSnapshot[] markersBefore,
         WaveSelection sampleLoopBefore,
-        WaveSelection[] regionsBefore,
+        WaveRegion[] regionsBefore,
         string summary)
     {
         _startFrame = startFrame;
@@ -259,8 +259,9 @@ internal sealed class PasteCommand : IEditCommand
     private readonly long _cursorBefore;
     private readonly MarkerSnapshot[] _markersBefore;
     private readonly MarkerSnapshot[] _pastedMarkers;
+    private readonly WaveRegion[] _pastedRegions;
     private readonly WaveSelection _sampleLoopBefore;
-    private readonly WaveSelection[] _regionsBefore;
+    private readonly WaveRegion[] _regionsBefore;
 
     public PasteCommand(
         long insertFrame,
@@ -270,8 +271,9 @@ internal sealed class PasteCommand : IEditCommand
         long cursorBefore,
         MarkerSnapshot[] markersBefore,
         MarkerSnapshot[] pastedMarkers,
+        WaveRegion[] pastedRegions,
         WaveSelection sampleLoopBefore,
-        WaveSelection[] regionsBefore,
+        WaveRegion[] regionsBefore,
         string summary)
     {
         _insertFrame = insertFrame;
@@ -281,6 +283,7 @@ internal sealed class PasteCommand : IEditCommand
         _cursorBefore = cursorBefore;
         _markersBefore = markersBefore;
         _pastedMarkers = pastedMarkers;
+        _pastedRegions = pastedRegions;
         _sampleLoopBefore = sampleLoopBefore;
         _regionsBefore = regionsBefore;
         Summary = summary;
@@ -307,6 +310,7 @@ internal sealed class PasteCommand : IEditCommand
         document.ApplyInsertToSampleLoop(_insertFrame, insertedFrames);
         document.ApplyInsertToRegion(_insertFrame, insertedFrames);
         document.ApplyPastedMarkers(_insertFrame, _pastedMarkers);
+        document.ApplyPastedRegions(_insertFrame, _pastedRegions);
         document.Selection = new WaveSelection(_insertFrame, _insertFrame + insertedFrames);
         document.CursorFrame = _insertFrame + insertedFrames;
     }
@@ -347,6 +351,29 @@ internal sealed class AddMarkerCommand : IEditCommand
     public void Apply(AudioDocument document) => document.TryAddMarker(_frame);
 
     public void Revert(AudioDocument document) => document.ReplaceMarkers(_markersBefore);
+}
+
+internal sealed class SetRegionNameCommand : IEditCommand
+{
+    private readonly WaveSelection _range;
+    private readonly string _before;
+    private readonly string _after;
+
+    public SetRegionNameCommand(WaveSelection range, string before, string after, string summary)
+    {
+        _range = range;
+        _before = before;
+        _after = after;
+        Summary = summary;
+    }
+
+    public string Name => "Region Name";
+
+    public string Summary { get; }
+
+    public void Apply(AudioDocument document) => document.TrySetRegionName(_range, _after);
+
+    public void Revert(AudioDocument document) => document.TrySetRegionName(_range, _before);
 }
 
 internal sealed class SetMarkerCommentCommand : IEditCommand
@@ -417,10 +444,10 @@ internal sealed class SetSampleLoopCommand : IEditCommand
 
 internal sealed class SetRegionCommand : IEditCommand
 {
-    private readonly WaveSelection[] _before;
-    private readonly WaveSelection[] _after;
+    private readonly WaveRegion[] _before;
+    private readonly WaveRegion[] _after;
 
-    public SetRegionCommand(WaveSelection[] before, WaveSelection[] after, string summary)
+    public SetRegionCommand(WaveRegion[] before, WaveRegion[] after, string summary)
     {
         _before = before;
         _after = after;
@@ -440,16 +467,16 @@ internal sealed class MoveTimelineItemsCommand : IEditCommand
 {
     private readonly MarkerSnapshot[] _markersBefore;
     private readonly MarkerSnapshot[] _markersAfter;
-    private readonly WaveSelection[] _regionsBefore;
-    private readonly WaveSelection[] _regionsAfter;
+    private readonly WaveRegion[] _regionsBefore;
+    private readonly WaveRegion[] _regionsAfter;
     private readonly WaveSelection _loopBefore;
     private readonly WaveSelection _loopAfter;
 
     public MoveTimelineItemsCommand(
         MarkerSnapshot[] markersBefore,
         MarkerSnapshot[] markersAfter,
-        WaveSelection[] regionsBefore,
-        WaveSelection[] regionsAfter,
+        WaveRegion[] regionsBefore,
+        WaveRegion[] regionsAfter,
         WaveSelection loopBefore,
         WaveSelection loopAfter,
         string summary)
@@ -511,7 +538,7 @@ internal readonly record struct FormatSnapshot(
     int BitsPerSample,
     WaveSelection Selection,
     WaveSelection SampleLoop,
-    WaveSelection[] Regions,
+    WaveRegion[] Regions,
     long Cursor,
     MarkerSnapshot[] Markers)
 {
@@ -676,7 +703,8 @@ internal static class ProcessEdits
             document.CopyRange(range.StartFrame, range.Length),
             document.Channels,
             document.SampleRate,
-            document.SnapshotMarkersInRange(range));
+            document.SnapshotMarkersInRange(range),
+            document.SnapshotExactRegions(range));
     }
 
     public static IEditCommand? Paste(AudioDocument document, AudioClip clip, long insertFrame)
@@ -716,6 +744,7 @@ internal static class ProcessEdits
             document.CursorFrame,
             document.SnapshotMarkers(),
             clip.Markers.ToArray(),
+            clip.Regions.ToArray(),
             document.SampleLoop,
             document.SnapshotRegions(),
             UiStrings.EditHistoryRange(
@@ -752,7 +781,7 @@ internal static class ProcessEdits
     public static IEditCommand? SetRegion(AudioDocument document, WaveSelection range)
     {
         var before = document.SnapshotRegions();
-        var afterList = new List<WaveSelection>(before);
+        var afterList = new List<WaveRegion>(before);
         if (range.IsEmpty)
         {
             if (afterList.Count == 0)
@@ -770,14 +799,14 @@ internal static class ProcessEdits
                 return null;
             }
 
-            var index = afterList.FindIndex(item => item == next);
+            var index = afterList.FindIndex(item => item.Range == next);
             if (index >= 0)
             {
                 afterList.RemoveAt(index);
             }
             else
             {
-                afterList.Add(next);
+                afterList.Add(new WaveRegion(next, string.Empty));
             }
         }
 
@@ -809,7 +838,7 @@ internal static class ProcessEdits
             }
         }
 
-        var after = before.Where(region => !remove.Contains(region)).ToArray();
+        var after = before.Where(region => !remove.Contains(region.Range)).ToArray();
         if (after.Length == before.Length)
         {
             return null;
@@ -846,6 +875,27 @@ internal static class ProcessEdits
                 UiStrings.EditHistoryName("Marker Comment"),
                 document.SampleRate,
                 frame,
+                UiStrings.EditHistoryQuote(after)));
+    }
+
+    public static IEditCommand? SetRegionName(AudioDocument document, WaveSelection range, string name)
+    {
+        var before = document.RegionName(range);
+        var after = MarkerRoles.Normalize(name);
+        if (before == after || document.RegionNumber(range) <= 0)
+        {
+            return null;
+        }
+
+        return new SetRegionNameCommand(
+            range,
+            before,
+            after,
+            UiStrings.EditHistoryRange(
+                UiStrings.EditHistoryName("Region Name"),
+                document.SampleRate,
+                range.StartFrame,
+                range.EndFrame,
                 UiStrings.EditHistoryQuote(after)));
     }
 
@@ -926,7 +976,7 @@ internal static class ProcessEdits
     public static IEditCommand? MoveTimelineItems(
         AudioDocument document,
         MarkerSnapshot[] markersBefore,
-        WaveSelection[] regionsBefore,
+        WaveRegion[] regionsBefore,
         WaveSelection loopBefore)
     {
         var markersAfter = document.SnapshotMarkers();
@@ -946,10 +996,17 @@ internal static class ProcessEdits
             regionsAfter,
             loopBefore,
             loopAfter,
-            UiStrings.EditHistoryName("Move Timeline"));
+            UiStrings.EditHistoryTimelineMove(
+                markersBefore,
+                markersAfter,
+                regionsBefore,
+                regionsAfter,
+                loopBefore,
+                loopAfter,
+                document.SampleRate));
     }
 
-    private static bool RegionsEqual(WaveSelection[] left, WaveSelection[] right)
+    private static bool RegionsEqual(WaveRegion[] left, WaveRegion[] right)
     {
         if (left.Length != right.Length)
         {
@@ -1016,7 +1073,7 @@ internal static class ProcessEdits
             after);
     }
 
-    private static WaveSelection[] ScaleRegions(AudioDocument document, int destRate, long destFrames)
+    private static WaveRegion[] ScaleRegions(AudioDocument document, int destRate, long destFrames)
     {
         var source = document.SnapshotRegions();
         if (source.Length == 0)
@@ -1024,10 +1081,12 @@ internal static class ProcessEdits
             return source;
         }
 
-        var scaled = new WaveSelection[source.Length];
+        var scaled = new WaveRegion[source.Length];
         for (var i = 0; i < source.Length; i++)
         {
-            scaled[i] = FormatConvert.ScaleSelection(source[i], document.SampleRate, destRate, destFrames);
+            scaled[i] = new WaveRegion(
+                FormatConvert.ScaleSelection(source[i].Range, document.SampleRate, destRate, destFrames),
+                source[i].Name);
         }
 
         return scaled;

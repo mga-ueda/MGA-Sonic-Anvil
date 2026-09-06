@@ -365,6 +365,40 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void CopyPaste_IncludesExactRegionAndName()
+    {
+        var document = MakeConstant(frames: 20, value: 0.3f);
+        document.SetRegions([new WaveSelection(4, 10), new WaveSelection(12, 18)]);
+        Assert.True(document.TrySetRegionName(new WaveSelection(4, 10), "verse"));
+        document.Selection = new WaveSelection(4, 10);
+        var clip = ProcessEdits.Copy(document, document.Selection);
+        Assert.NotNull(clip);
+        var copied = Assert.Single(clip.Regions);
+        Assert.Equal(new WaveSelection(0, 6), copied.Range);
+        Assert.Equal("verse", copied.Name);
+
+        document.Selection = new WaveSelection(5, 12);
+        var wider = ProcessEdits.Copy(document, document.Selection);
+        Assert.NotNull(wider);
+        Assert.Empty(wider.Regions);
+
+        document.Selection = WaveSelection.Empty;
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.Paste(document, clip, 20)!);
+
+        Assert.Equal(26, document.FrameCount);
+        Assert.Equal(
+            [new WaveSelection(4, 10), new WaveSelection(12, 18), new WaveSelection(20, 26)],
+            document.Regions);
+        Assert.Equal("verse", document.RegionName(new WaveSelection(20, 26)));
+        Assert.True(history.Undo(document));
+        Assert.Equal(
+            [new WaveSelection(4, 10), new WaveSelection(12, 18)],
+            document.Regions);
+        Assert.Equal("verse", document.RegionName(new WaveSelection(4, 10)));
+    }
+
+    [Fact]
     public void Paste_AdaptsMonoClipToStereo()
     {
         var document = MakeConstant(frames: 4, value: 0.1f);

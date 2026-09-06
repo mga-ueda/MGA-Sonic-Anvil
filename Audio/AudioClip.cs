@@ -6,12 +6,14 @@ internal sealed class AudioClip
         float[] interleaved,
         int channels,
         int sampleRate,
-        IReadOnlyList<MarkerSnapshot>? markers = null)
+        IReadOnlyList<MarkerSnapshot>? markers = null,
+        IReadOnlyList<WaveRegion>? regions = null)
     {
         Interleaved = interleaved;
         Channels = Math.Max(1, channels);
         SampleRate = Math.Max(1, sampleRate);
         Markers = markers is { Count: > 0 } ? [.. markers] : [];
+        Regions = regions is { Count: > 0 } ? [.. regions] : [];
     }
 
     public float[] Interleaved { get; }
@@ -21,6 +23,8 @@ internal sealed class AudioClip
     public int SampleRate { get; }
 
     public IReadOnlyList<MarkerSnapshot> Markers { get; }
+
+    public IReadOnlyList<WaveRegion> Regions { get; }
 
     public int FrameCount => Interleaved.Length / Channels;
 
