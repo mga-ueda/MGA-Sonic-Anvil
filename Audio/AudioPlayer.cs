@@ -16,6 +16,7 @@ internal sealed class AudioPlayer : IDisposable
     private bool _playing;
     private bool _scrubbing;
     private bool _suppressPlaybackEnded;
+    private bool _playExitLayer;
     private int _generation;
 
     public event EventHandler<int>? PlaybackEnded;
@@ -116,6 +117,31 @@ internal sealed class AudioPlayer : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         _provider.SetPlayWindow(playRange, loop);
     }
+
+    /// <summary>
+    /// Play -E：ループ折り返しで -E 区間を二重再生するか。
+    /// false にすると進行中の Exit も直ちに止める。
+    /// </summary>
+    public bool PlayExitLayer
+    {
+        get => _playExitLayer;
+        set
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _playExitLayer = value;
+            _provider.SetPlayExitLayer(value);
+        }
+    }
+
+    /// <summary>再生ウィンドウ終端に続く -E 区間（ソースフレーム）を登録する。null で解除。</summary>
+    public void SetExitSpan(WaveSelection? span)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _provider.SetExitSpan(span);
+    }
+
+    /// <summary>Exit レイヤー再生中の現在フレーム。停止中は -1。</summary>
+    public long ExitCursorFrame => _provider.ExitCursorFrame;
 
     public void BeginScrub(AudioDocument document, long frame)
     {

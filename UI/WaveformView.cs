@@ -99,6 +99,7 @@ internal sealed class WaveformView : Grid
     private WaveSelection _commentEditRegion;
     private bool _endingCommentEdit;
     private readonly List<(long Frame, long TickMs)> _trailSamples = [];
+    private readonly List<(long Frame, long TickMs)> _exitTrailSamples = [];
     private bool _trailActive;
     private Func<long, float>? _previewGainAtFrame;
 
@@ -146,6 +147,11 @@ internal sealed class WaveformView : Grid
     private Pen? _playheadGlowInner;
     private Pen? _playheadCore;
     private Color _playheadPenColor;
+    private long _exitPlayheadFrame = -1;
+    private Pen? _exitPlayheadGlowOuter;
+    private Pen? _exitPlayheadGlowInner;
+    private Pen? _exitPlayheadCore;
+    private Color _exitPlayheadPenColor;
 
     public event EventHandler<long>? CursorCommitted;
     public event EventHandler<long>? ScrubStarted;
@@ -257,11 +263,11 @@ internal sealed class WaveformView : Grid
                 return;
             }
 
-            ResetTrailIfRewound(value);
+            ResetTrailIfRewound(value, _trailSamples);
             _playheadFrame = value;
             if (_trailActive)
             {
-                RecordTrailSample(value);
+                RecordTrailSample(value, _trailSamples);
             }
 
             InvalidatePlayheadLayer();
@@ -281,14 +287,52 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        ResetTrailIfRewound(frame);
+        ResetTrailIfRewound(frame, _trailSamples);
         _playheadFrame = frame;
         if (_trailActive)
         {
-            RecordTrailSample(frame);
+            RecordTrailSample(frame, _trailSamples);
         }
 
         InvalidatePlayheadLayer();
+    }
+
+    /// <summary>
+    /// -E 二重再生（Exit レイヤー）ヘッドのフレーム。負値で非表示。
+    /// Play -E 有効時、ループ折り返し中はシークバーが 2 本になる（IM Importer と同じ）。
+    /// </summary>
+    public long ExitPlayheadFrame
+    {
+        get => _exitPlayheadFrame;
+        set
+        {
+            if (value < 0)
+            {
+                if (_exitPlayheadFrame < 0 && _exitTrailSamples.Count == 0)
+                {
+                    return;
+                }
+
+                _exitPlayheadFrame = -1;
+                _exitTrailSamples.Clear();
+                InvalidatePlayheadLayer();
+                return;
+            }
+
+            if (_exitPlayheadFrame == value)
+            {
+                return;
+            }
+
+            ResetTrailIfRewound(value, _exitTrailSamples);
+            _exitPlayheadFrame = value;
+            if (_trailActive)
+            {
+                RecordTrailSample(value, _exitTrailSamples);
+            }
+
+            InvalidatePlayheadLayer();
+        }
     }
 
     public void SetTrailRecording(bool active)
@@ -297,12 +341,18 @@ internal sealed class WaveformView : Grid
         if (!active)
         {
             _trailSamples.Clear();
+            _exitTrailSamples.Clear();
             InvalidatePlayheadLayer();
             ApplyMouseGuideOverlay();
             return;
         }
 
-        RecordTrailSample(_playheadFrame);
+        RecordTrailSample(_playheadFrame, _trailSamples);
+        if (_exitPlayheadFrame >= 0)
+        {
+            RecordTrailSample(_exitPlayheadFrame, _exitTrailSamples);
+        }
+
         ApplyMouseGuideOverlay();
     }
 
@@ -426,6 +476,7 @@ internal sealed class WaveformView : Grid
         _waveBgra = 0;
         _zeroBgra = 0;
         _playheadCore = null;
+        _exitPlayheadCore = null;
         InvalidateWaveform();
         ApplyMouseGuideOverlay();
     }
@@ -4592,7 +4643,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        ResetTrailIfRewound(frame);
+        ResetTrailIfRewound(frame, _trailSamples);
         _document.CursorFrame = frame;
         _playheadFrame = frame;
         InvalidatePlayheadLayer();
@@ -4663,7 +4714,13 @@ internal sealed class WaveformView : Grid
     private void DrawPlayhead(DrawingContext dc, Rect bounds, double start, double span)
     {
         var playX = FrameToViewX(_playheadFrame, start, span, bounds);
-        DrawSeekPlaybackTrail(dc, bounds, playX, start, span);
+        if (_exitPlayheadFrame >= 0)
+        {
+            var exitX = FrameToViewX(_exitPlayheadFrame, start, span, bounds);
+            DrawSeekPlaybackTrail(dc, bounds, exitX, start, span, _exitTrailSamples, Theme.Get("SeekExitBrush"));
+        }
+
+        DrawSeekPlaybackTrail(dc, bounds, playX, start, span, _trailSamples, Theme.Get("PlayheadBrush"));
         EnsurePlayheadPens();
         var wave = WaveformBounds(bounds);
         if (wave.Height <= 1)
@@ -4673,9 +4730,36 @@ internal sealed class WaveformView : Grid
 
         var y0 = wave.Y;
         var y1 = wave.Y + wave.Height;
+        if (_exitPlayheadFrame >= 0)
+        {
+            // -E 二重再生ヘッド（赤）。メインヘッドより下層に描く。
+            EnsureExitPlayheadPens();
+            var exitX = FrameToViewX(_exitPlayheadFrame, start, span, bounds);
+            dc.DrawLine(_exitPlayheadGlowOuter, new Point(exitX, y0), new Point(exitX, y1));
+            dc.DrawLine(_exitPlayheadGlowInner, new Point(exitX, y0), new Point(exitX, y1));
+            dc.DrawLine(_exitPlayheadCore, new Point(exitX, y0), new Point(exitX, y1));
+        }
+
         dc.DrawLine(_playheadGlowOuter, new Point(playX, y0), new Point(playX, y1));
         dc.DrawLine(_playheadGlowInner, new Point(playX, y0), new Point(playX, y1));
         dc.DrawLine(_playheadCore, new Point(playX, y0), new Point(playX, y1));
+    }
+
+    private void EnsureExitPlayheadPens()
+    {
+        var color = Theme.Get("SeekExitBrush");
+        if (_exitPlayheadCore is not null && _exitPlayheadPenColor == color)
+        {
+            return;
+        }
+
+        _exitPlayheadPenColor = color;
+        _exitPlayheadGlowOuter = new Pen(WpfControlHelpers.FrozenBrush(Color.FromArgb(40, color.R, color.G, color.B)), 3);
+        _exitPlayheadGlowInner = new Pen(WpfControlHelpers.FrozenBrush(Color.FromArgb(90, color.R, color.G, color.B)), 1.5);
+        _exitPlayheadCore = new Pen(WpfControlHelpers.FrozenBrush(color), 1);
+        _exitPlayheadGlowOuter.Freeze();
+        _exitPlayheadGlowInner.Freeze();
+        _exitPlayheadCore.Freeze();
     }
 
     private void EnsurePlayheadPens()
@@ -4695,11 +4779,18 @@ internal sealed class WaveformView : Grid
         _playheadCore.Freeze();
     }
 
-    private void DrawSeekPlaybackTrail(DrawingContext dc, Rect bounds, double playheadX, double start, double span)
+    private void DrawSeekPlaybackTrail(
+        DrawingContext dc,
+        Rect bounds,
+        double playheadX,
+        double start,
+        double span,
+        List<(long Frame, long TickMs)> samples,
+        Color color)
     {
         var now = Environment.TickCount64;
-        PruneTrailSamplesByAge(now);
-        if (_trailSamples.Count < 2 || bounds.Width <= 0)
+        PruneTrailSamplesByAge(now, samples);
+        if (samples.Count < 2 || bounds.Width <= 0)
         {
             return;
         }
@@ -4714,7 +4805,7 @@ internal sealed class WaveformView : Grid
 
         var fadeMs = TrailFadeMsForView(ScaleContentWidth(bounds));
         double? coveredLeft = null;
-        foreach (var sample in _trailSamples)
+        foreach (var sample in samples)
         {
             if (now - sample.TickMs >= fadeMs)
             {
@@ -4743,7 +4834,6 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var color = Theme.Get("PlayheadBrush");
         var peak = Color.FromArgb(ToByteAlpha(TrailPeakAlpha), color.R, color.G, color.B);
         var mid = Color.FromArgb(ToByteAlpha(TrailPeakAlpha * 0.25f), color.R, color.G, color.B);
         var soft = Color.FromArgb(ToByteAlpha(TrailPeakAlpha * 0.06f), color.R, color.G, color.B);
@@ -4767,41 +4857,41 @@ internal sealed class WaveformView : Grid
         dc.DrawRectangle(brush, null, new Rect(drawLeft, wave.Y, drawW, wave.Height));
     }
 
-    private void ResetTrailIfRewound(long frame)
+    private void ResetTrailIfRewound(long frame, List<(long Frame, long TickMs)> samples)
     {
-        if (!_trailActive || _trailSamples.Count == 0)
+        if (!_trailActive || samples.Count == 0)
         {
             return;
         }
 
-        if (frame < _trailSamples[^1].Frame)
+        if (frame < samples[^1].Frame)
         {
-            _trailSamples.Clear();
+            samples.Clear();
         }
     }
 
-    private void RecordTrailSample(long frame)
+    private void RecordTrailSample(long frame, List<(long Frame, long TickMs)> samples)
     {
         if (!_trailActive)
         {
             return;
         }
 
-        ResetTrailIfRewound(frame);
+        ResetTrailIfRewound(frame, samples);
         var now = Environment.TickCount64;
         var durationSec = DurationSeconds();
-        if (_trailSamples.Count > 0)
+        if (samples.Count > 0)
         {
-            var last = _trailSamples[^1];
+            var last = samples[^1];
             if (FramesToSec(Math.Abs(frame - last.Frame)) >= DiscontinuitySec(durationSec))
             {
-                _trailSamples.Clear();
+                samples.Clear();
             }
         }
 
-        if (_trailSamples.Count > 0)
+        if (samples.Count > 0)
         {
-            var last = _trailSamples[^1];
+            var last = samples[^1];
             var secDelta = FramesToSec(Math.Abs(frame - last.Frame));
             if (now - last.TickMs < TrailSampleMinIntervalMs && secDelta < TrailMinSecDelta)
             {
@@ -4809,27 +4899,27 @@ internal sealed class WaveformView : Grid
             }
         }
 
-        _trailSamples.Add((frame, now));
-        PruneTrailSamplesByAge(now);
-        if (_trailSamples.Count > TrailMaxSamples)
+        samples.Add((frame, now));
+        PruneTrailSamplesByAge(now, samples);
+        if (samples.Count > TrailMaxSamples)
         {
-            _trailSamples.RemoveRange(0, _trailSamples.Count - TrailMaxSamples);
-            PruneTrailSamplesByAge(now);
+            samples.RemoveRange(0, samples.Count - TrailMaxSamples);
+            PruneTrailSamplesByAge(now, samples);
         }
     }
 
-    private void PruneTrailSamplesByAge(long now)
+    private void PruneTrailSamplesByAge(long now, List<(long Frame, long TickMs)> samples)
     {
         var retainMs = Math.Max(TrailSampleRetainMs, TrailFadeMsForView(ContentWidth));
         var remove = 0;
-        while (remove < _trailSamples.Count && now - _trailSamples[remove].TickMs >= retainMs)
+        while (remove < samples.Count && now - samples[remove].TickMs >= retainMs)
         {
             remove++;
         }
 
         if (remove > 0)
         {
-            _trailSamples.RemoveRange(0, remove);
+            samples.RemoveRange(0, remove);
         }
     }
 

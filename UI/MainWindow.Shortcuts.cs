@@ -261,6 +261,16 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.E && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            if (WaapiBar.ExportEnabled)
+            {
+                _ = ExportToWwiseAsync();
+            }
+
+            return true;
+        }
+
         if (key == Key.S && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
             Save(saveAs: true);
@@ -389,6 +399,12 @@ public partial class MainWindow
         if (key == Key.M && modifiers == ModifierKeys.None)
         {
             AddMarkerAtPlayhead();
+            return true;
+        }
+
+        if (key == Key.E && modifiers == ModifierKeys.None)
+        {
+            TogglePlayPostExit();
             return true;
         }
 

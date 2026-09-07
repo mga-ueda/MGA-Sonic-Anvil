@@ -3,6 +3,7 @@ using System.Windows.Media;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
+using MgaSonicAnvil.Wwise;
 
 namespace MgaSonicAnvil.UI;
 
@@ -73,6 +74,9 @@ public partial class MainWindow
                 break;
             case TransportCommand.Save:
                 Save(saveAs: false);
+                break;
+            case TransportCommand.ToggleWaapi:
+                ToggleWaapiPanel();
                 break;
         }
     }
@@ -158,6 +162,7 @@ public partial class MainWindow
         {
             _meter.Reset();
             _player.Prepare(_document, startFrame, playRange, loop: playRange is not null);
+            _player.SetExitSpan(ComputeExitLayerSpan(playRange));
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
@@ -246,10 +251,53 @@ public partial class MainWindow
         if (_document.Selection.IsEmpty)
         {
             _player.SetPlayWindow(null, loop: false);
+            _player.SetExitSpan(null);
             return;
         }
 
         _player.SetPlayWindow(_document.Selection, loop: true);
+        _player.SetExitSpan(ComputeExitLayerSpan(_document.Selection));
+    }
+
+    /// <summary>
+    /// 再生ウィンドウ終端に接する -E（Exit）区間。Play -E のループ折り返し二重再生対象。
+    /// 連続する Exit リージョンは 1 区間へつなげる。該当がなければ null。
+    /// </summary>
+    private WaveSelection? ComputeExitLayerSpan(WaveSelection? window)
+    {
+        if (_document is null || window is not { IsEmpty: false } range)
+        {
+            return null;
+        }
+
+        long start = -1;
+        long end = -1;
+        foreach (var region in WaveOnlyPlanBuilder.BuildRegions(_document))
+        {
+            if (region.Kind != WaveOnlyRegionKind.Exit || region.FrameCount <= 0)
+            {
+                continue;
+            }
+
+            if (start < 0)
+            {
+                if (region.StartFrame == range.EndFrame)
+                {
+                    start = region.StartFrame;
+                    end = region.EndFrame;
+                }
+            }
+            else if (region.StartFrame == end)
+            {
+                end = region.EndFrame;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        return start >= 0 ? new WaveSelection(start, end) : null;
     }
 
     private void OnWaveformSelectionChanged()
@@ -353,6 +401,7 @@ public partial class MainWindow
         if (!Waveform.IsInteracting)
         {
             Waveform.PlayheadFrame = frame;
+            Waveform.ExitPlayheadFrame = _player.ExitCursorFrame;
             Waveform.FollowPlayhead();
             SyncTransportPosition(frame);
         }

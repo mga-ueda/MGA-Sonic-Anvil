@@ -26,6 +26,8 @@
                  Foreground="{DynamicResource StatusBarDetailForeBrush}" />
     </Border>
 
+    <ui:WaapiStatusBar x:Name="WaapiBar" DockPanel.Dock="Bottom" />
+
     <Border x:Name="ActionBar"
             DockPanel.Dock="Bottom"
             Height="{x:Static ui:DesignMetrics.ActionBarHeight}"

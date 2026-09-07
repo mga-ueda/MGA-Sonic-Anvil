@@ -1,7 +1,9 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
@@ -20,11 +22,15 @@ internal enum TransportIcon
     AmpZoomMax,
     AmpZoomReset,
     Open,
+    Folder,
     FadeIn,
     FadeOut,
     Normalize,
     Delete,
     Save,
+    Lock,
+    Unlock,
+    Waapi,
 }
 
 internal enum TransportCommand
@@ -47,6 +53,7 @@ internal enum TransportCommand
     Normalize,
     Delete,
     Save,
+    ToggleWaapi,
 }
 
 internal sealed class TransportIconButton : Button
@@ -89,6 +96,10 @@ internal sealed class TransportIconButton : Button
         set => SetValue(IsLatchedProperty, value);
     }
 
+    public bool QuietChrome { get; set; }
+
+    public Color? IconForeOverride { get; set; }
+
     public TransportIconButton()
     {
         Width = DesignMetrics.TransportButtonSide;
@@ -116,7 +127,15 @@ internal sealed class TransportIconButton : Button
             return;
         }
 
-        var backColor = Theme.Get("TransportBackBrush");
+        if (Icon == TransportIcon.Waapi)
+        {
+            DrawWaapiToggle(dc, bounds);
+            return;
+        }
+
+        var backColor = QuietChrome
+            ? Theme.Get("WaapiBarBackBrush")
+            : Theme.Get("TransportBackBrush");
         dc.DrawRectangle(WpfControlHelpers.FrozenBrush(backColor), null, bounds);
         if (IsEnabled && (IsMouseOver || IsPressed || IsLatched))
         {
@@ -126,14 +145,45 @@ internal sealed class TransportIconButton : Button
             dc.DrawRectangle(WpfControlHelpers.FrozenBrush(hover), null, new Rect(3, 3, bounds.Width - 6, bounds.Height - 6));
         }
 
-        var fore = !IsEnabled
-            ? Theme.Get("TransportDisabledForeBrush")
-            : Icon == TransportIcon.PlayPause && IsPlaying
-                ? Theme.Get("AccentCyanBrush")
-                : IsLatched
+        var fore = IconForeOverride
+            ?? (!IsEnabled
+                ? Theme.Get("TransportDisabledForeBrush")
+                : Icon == TransportIcon.PlayPause && IsPlaying
                     ? Theme.Get("AccentCyanBrush")
-                    : Theme.Get("TransportForeBrush");
+                    : IsLatched
+                        ? Theme.Get("AccentCyanBrush")
+                        : Theme.Get("TransportForeBrush"));
         TransportIconDrawing.Draw(dc, Icon, bounds, fore, IsPlaying);
+    }
+
+    private void DrawWaapiToggle(DrawingContext dc, Rect bounds)
+    {
+        var on = IsLatched;
+        var hover = IsEnabled && IsMouseOver && !IsPressed;
+        var back = on
+            ? Theme.Get(hover ? "WaapiToggleOnHoverBackBrush" : "WaapiToggleOnBackBrush")
+            : Theme.Get(hover ? "WaapiToggleOffHoverBackBrush" : "WaapiToggleOffBackBrush");
+        var fore = on
+            ? Theme.Get("WaapiToggleOnForeBrush")
+            : Theme.Get("WaapiToggleOffForeBrush");
+
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
+        var chip = new Rect(2, 6, Math.Max(1, bounds.Width - 4), Math.Max(1, bounds.Height - 12));
+        dc.DrawRoundedRectangle(WpfControlHelpers.FrozenBrush(back), null, chip, 3, 3);
+
+        var formatted = new FormattedText(
+            UiStrings.WaapiTitle,
+            CultureInfo.CurrentUICulture,
+            FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+            10,
+            WpfControlHelpers.FrozenBrush(fore),
+            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        dc.DrawText(
+            formatted,
+            new Point(
+                (bounds.Width - formatted.Width) * 0.5,
+                (bounds.Height - formatted.Height) * 0.5));
     }
 }
 
@@ -213,6 +263,7 @@ internal static class TransportIconDrawing
                 DrawZoomModifier(dc, pen, brush, icon, cx, cy);
                 break;
             case TransportIcon.Open:
+            case TransportIcon.Folder:
                 dc.DrawLine(pen, new Point(9, 12), new Point(9, 10));
                 dc.DrawLine(pen, new Point(9, 10), new Point(15, 10));
                 dc.DrawLine(pen, new Point(15, 10), new Point(17, 12));
@@ -255,10 +306,50 @@ internal static class TransportIconDrawing
                 dc.DrawLine(pen, new Point(22, 16), new Point(17, 21));
                 dc.DrawLine(pen, new Point(9, 26), new Point(25, 26));
                 break;
+            case TransportIcon.Lock:
+                DrawPadlockBody(dc, pen, brush);
+                DrawPadlockShackle(dc, pen, open: false);
+                break;
+            case TransportIcon.Unlock:
+                DrawPadlockBody(dc, pen, brush);
+                DrawPadlockShackle(dc, pen, open: true);
+                break;
         }
 
         dc.Pop();
         dc.Pop();
+    }
+
+    private static void DrawPadlockBody(DrawingContext dc, Pen pen, Brush brush)
+    {
+        dc.DrawRectangle(null, pen, new Rect(10, 16, 14, 11));
+        dc.DrawEllipse(brush, null, new Point(17, 20), 1.4, 1.4);
+        dc.DrawLine(pen, new Point(17, 21.4), new Point(17, 24.2));
+    }
+
+    private static void DrawPadlockShackle(DrawingContext dc, Pen pen, bool open)
+    {
+        var geo = new StreamGeometry();
+        using (var ctx = geo.Open())
+        {
+            if (open)
+            {
+                ctx.BeginFigure(new Point(12.5, 16), false, false);
+                ctx.LineTo(new Point(12.5, 11.5), true, false);
+                ctx.ArcTo(new Point(22, 11.5), new Size(4.75, 4.75), 0, false, SweepDirection.Clockwise, true, false);
+                ctx.LineTo(new Point(22, 13.5), true, false);
+            }
+            else
+            {
+                ctx.BeginFigure(new Point(12.5, 16), false, false);
+                ctx.LineTo(new Point(12.5, 12.5), true, false);
+                ctx.ArcTo(new Point(21.5, 12.5), new Size(4.5, 4.5), 0, false, SweepDirection.Clockwise, true, false);
+                ctx.LineTo(new Point(21.5, 16), true, false);
+            }
+        }
+
+        geo.Freeze();
+        dc.DrawGeometry(null, pen, geo);
     }
 
     private static void DrawChevron(DrawingContext dc, Pen pen, double centerX, double centerY, bool left)

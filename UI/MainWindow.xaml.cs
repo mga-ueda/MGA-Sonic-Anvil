@@ -138,6 +138,7 @@ public partial class MainWindow : Window
         {
             StopMeterRendering();
             _playTimer.Stop();
+            _waapiPollTimer.Stop();
             StopMarkerNudge();
             ResetMarkerDigitEntry();
             // Closing で既に破棄済みでも安全（冪等）。
@@ -146,6 +147,7 @@ public partial class MainWindow : Window
 
         ApplyWaveformHeightScale();
         BindWorkspace(null);
+        InitializeWaapi();
         Loaded += OnStartupLoaded;
         ContentRendered += OnStartupContentRendered;
         MgaSonicAnvil.SingleInstance.StartWatch(() => Dispatcher.BeginInvoke(ActivateFromOtherInstance));
@@ -199,6 +201,7 @@ public partial class MainWindow : Window
         Opacity = 1;
         // 表示を先に出し、前回ドキュメントの読み込みは次のアイドルへ回す。
         Dispatcher.BeginInvoke(RestoreLastDocumentAfterReveal, DispatcherPriority.ApplicationIdle);
+        Dispatcher.BeginInvoke(() => _ = StartWaapiAsync(), DispatcherPriority.ApplicationIdle);
     }
 
     private void RestoreLastDocumentAfterReveal()
@@ -295,6 +298,7 @@ public partial class MainWindow : Window
         if (_document is null)
         {
             StatusMeta.Text = string.Empty;
+            RefreshExportEnabled();
             SyncTransportPosition(0);
             RefreshTitle();
             return;
@@ -318,6 +322,7 @@ public partial class MainWindow : Window
         }
 
         StatusMeta.Text = text;
+        RefreshExportEnabled();
         SyncTransportPosition();
         RefreshTitle();
     }
@@ -417,6 +422,7 @@ public partial class MainWindow : Window
         RememberDocumentState();
         AppStorage.Settings.ApplyAudioOutput(_outputSettings);
         AppStorage.Settings.WaveformHeightScale = _waveformHeightScale;
+        PersistWaapiSettings();
         AppStorage.Save();
 
         // メッセージポンプが生きているうちに無音フラッシュ＋デバイス破棄する。

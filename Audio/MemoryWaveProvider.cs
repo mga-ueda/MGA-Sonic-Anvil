@@ -55,6 +55,14 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private int _playEnd;
     private bool _loop;
     private Func<long, float>? _frameGain;
+    /// <summary>Play -E：ループ折り返しで -E 区間を二重再生するか。</summary>
+    private bool _playExitLayer;
+    /// <summary>再生ウィンドウ終端に続く -E 区間（ソースフレーム）。負値で未設定。</summary>
+    private long _exitSpanStartFrame = -1;
+    private long _exitSpanEndFrame = -1;
+    private bool _exitPlaying;
+    /// <summary>Exit レイヤーの読み出し位置（ソースフレーム）。</summary>
+    private double _exitFrame;
     private readonly float[] _meterL = new float[LevelMeterEngine.WindowFrames];
     private readonly float[] _meterR = new float[LevelMeterEngine.WindowFrames];
     private int _meterWrite;
@@ -135,6 +143,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _cursor = checked((int)start * _channels);
             _frameGain = frameGain;
             _silenceOnly = false;
+            _exitPlaying = false;
+            _exitSpanStartFrame = -1;
+            _exitSpanEndFrame = -1;
             if (playRange is { IsEmpty: false } range)
             {
                 _loop = loop;
@@ -174,6 +185,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _scrub.Stop();
             _samples = [];
             _frameGain = null;
+            _exitPlaying = false;
             Ended = false;
             Array.Clear(_meterL);
             Array.Clear(_meterR);
@@ -288,6 +300,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             var next = Math.Clamp(frame, 0, max);
             _sourceFrame = next;
             _cursor = checked((int)next * _channels);
+            // シークでジャンプしたら進行中の Exit 二重再生は直ちに止める（IM Importer と同じ）。
+            _exitPlaying = false;
             Ended = false;
         }
     }
@@ -325,7 +339,58 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 _playEnd = _samples.Length;
             }
 
+            // 再生ウィンドウが変わったら進行中の Exit は止める（-E 区間は呼び出し側が再設定する）。
+            _exitPlaying = false;
             Ended = false;
+        }
+    }
+
+    /// <summary>
+    /// ループ折り返し時に -E 区間を二重再生するか（Play -E）。
+    /// false にすると進行中の Exit も直ちに止める。
+    /// </summary>
+    public void SetPlayExitLayer(bool enabled)
+    {
+        lock (_gate)
+        {
+            _playExitLayer = enabled;
+            if (!enabled)
+            {
+                _exitPlaying = false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 再生ウィンドウ終端に続く -E 区間（ソースフレーム）を登録する。null で解除。
+    /// </summary>
+    public void SetExitSpan(WaveSelection? span)
+    {
+        lock (_gate)
+        {
+            if (span is { IsEmpty: false } range)
+            {
+                _exitSpanStartFrame = range.StartFrame;
+                _exitSpanEndFrame = range.EndFrame;
+            }
+            else
+            {
+                _exitSpanStartFrame = -1;
+                _exitSpanEndFrame = -1;
+                _exitPlaying = false;
+            }
+        }
+    }
+
+    /// <summary>Exit レイヤー再生中の現在フレーム。停止中は -1。</summary>
+    public long ExitCursorFrame
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _exitPlaying ? (long)Math.Floor(_exitFrame) : -1;
+            }
         }
     }
 
@@ -375,6 +440,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private int ReadCoreNative(float[] buffer, int offset, int framesWanted, int srcCh, int outCh)
     {
         var writtenFrames = 0;
+        var exitMixedFrames = 0;
         _cursor = checked((int)_sourceFrame * srcCh);
         while (writtenFrames < framesWanted)
         {
@@ -382,8 +448,12 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             {
                 if (_loop && _playEnd > _loopStart)
                 {
+                    // 折り返し前までの Exit を先に乗せてから、Exit を -E 先頭から（再）開始する。
+                    MixExitLayer(buffer, offset, exitMixedFrames, writtenFrames, srcCh, outCh, resampled: false);
+                    exitMixedFrames = writtenFrames;
                     _cursor = _loopStart;
                     _sourceFrame = _loopStart / (double)srcCh;
+                    BeginExitOnLoopWrapNoLock();
                     continue;
                 }
 
@@ -415,6 +485,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
 
         _sourceFrame = srcCh <= 0 ? 0 : _cursor / (double)srcCh;
+        MixExitLayer(buffer, offset, exitMixedFrames, writtenFrames, srcCh, outCh, resampled: false);
         return writtenFrames;
     }
 
@@ -425,13 +496,18 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var frameCount = srcCh <= 0 ? 0 : _samples.Length / srcCh;
         var step = _sourceRate / (double)_deviceRate;
         var writtenFrames = 0;
+        var exitMixedFrames = 0;
         while (writtenFrames < framesWanted)
         {
             if (_sourceFrame >= playEndFrame)
             {
                 if (_loop && playEndFrame > loopStartFrame)
                 {
+                    // 折り返し前までの Exit を先に乗せてから、Exit を -E 先頭から（再）開始する。
+                    MixExitLayer(buffer, offset, exitMixedFrames, writtenFrames, srcCh, outCh, resampled: true);
+                    exitMixedFrames = writtenFrames;
                     _sourceFrame = loopStartFrame;
+                    BeginExitOnLoopWrapNoLock();
                     continue;
                 }
 
@@ -461,7 +537,82 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
 
         _cursor = checked((int)Math.Clamp(_sourceFrame, 0, frameCount) * srcCh);
+        MixExitLayer(buffer, offset, exitMixedFrames, writtenFrames, srcCh, outCh, resampled: true);
         return writtenFrames;
+    }
+
+    /// <summary>
+    /// ループ末端→頭の折り返しと同時に Exit 二重再生を開始／頭から再開する（Wwise 相当）。
+    /// </summary>
+    private void BeginExitOnLoopWrapNoLock()
+    {
+        if (!_playExitLayer || _exitSpanStartFrame < 0 || _exitSpanEndFrame <= _exitSpanStartFrame)
+        {
+            return;
+        }
+
+        _exitFrame = _exitSpanStartFrame;
+        _exitPlaying = true;
+    }
+
+    /// <summary>
+    /// buffer の [fromFrame, toFrame) へ Exit レイヤーを加算ミックスする。
+    /// -E 終端へ達したら Exit を止める。
+    /// </summary>
+    private void MixExitLayer(
+        float[] buffer,
+        int offset,
+        int fromFrame,
+        int toFrame,
+        int srcCh,
+        int outCh,
+        bool resampled)
+    {
+        if (!_exitPlaying || toFrame <= fromFrame)
+        {
+            return;
+        }
+
+        var frameCount = srcCh <= 0 ? 0 : _samples.Length / srcCh;
+        var endFrame = Math.Min(_exitSpanEndFrame, frameCount);
+        var step = resampled ? _sourceRate / (double)_deviceRate : 1d;
+        for (var i = fromFrame; i < toFrame; i++)
+        {
+            if (_exitFrame >= endFrame)
+            {
+                _exitPlaying = false;
+                return;
+            }
+
+            float left;
+            float right;
+            if (resampled)
+            {
+                FormatConvert.DownmixBandlimited(
+                    _samples,
+                    srcCh,
+                    _exitFrame,
+                    frameCount,
+                    _sourceRate,
+                    _deviceRate,
+                    out left,
+                    out right);
+            }
+            else
+            {
+                ChannelMix.Downmix(_samples, checked((int)_exitFrame * srcCh), srcCh, out left, out right);
+            }
+
+            if (_frameGain is { } gainAt)
+            {
+                var gain = gainAt((long)Math.Floor(_exitFrame));
+                left *= gain;
+                right *= gain;
+            }
+
+            AddFrame(buffer, offset, i, outCh, left, right);
+            _exitFrame += step;
+        }
     }
 
     private static void WriteFrame(float[] buffer, int offset, int frame, int outCh, float left, float right)
@@ -471,6 +622,16 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         if (outCh > 1)
         {
             buffer[dest + 1] = right;
+        }
+    }
+
+    private static void AddFrame(float[] buffer, int offset, int frame, int outCh, float left, float right)
+    {
+        var dest = offset + frame * outCh;
+        buffer[dest] += left;
+        if (outCh > 1)
+        {
+            buffer[dest + 1] += right;
         }
     }
 

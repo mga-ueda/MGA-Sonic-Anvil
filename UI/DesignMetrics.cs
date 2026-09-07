@@ -17,6 +17,14 @@ internal static class DesignMetrics
 
     public static double StatusBarHeight => From96(20);
 
+    public static double WaapiBarHeight => From96(32);
+
+    public static double StatusExportButtonWidth => From96(80);
+
+    public static double StatusExportButtonHeight => From96(24);
+
+    public static double StatusOutputPathHeight => From96(22);
+
     public static double DocumentTabBarHeight => From96(22);
 
     public static double DocumentTabScrollButtonWidth => From96(20);
@@ -38,6 +46,8 @@ internal static class DesignMetrics
     public static double TransportBarHeight => Dip(54);
 
     public static double TransportButtonSide => Dip(45);
+
+    public static double TransportWaapiButtonWidth => From96(56);
 
     public static double TransportButtonGap => Dip(2);
 

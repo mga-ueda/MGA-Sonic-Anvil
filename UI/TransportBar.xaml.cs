@@ -8,6 +8,7 @@ namespace MgaSonicAnvil.UI;
 internal partial class TransportBar : UserControl
 {
     private readonly TransportIconButton _play;
+    private readonly TransportIconButton _waapiToggle;
     private readonly Dictionary<TransportCommand, TransportIconButton> _buttons = new();
     private double _currentSeconds;
     private double _totalSeconds;
@@ -48,6 +49,24 @@ internal partial class TransportBar : UserControl
         Add(TransportCommand.Normalize, TransportIcon.Normalize, UiStrings.TipNormalize);
         Add(TransportCommand.Delete, TransportIcon.Delete, UiStrings.TipDelete);
         Add(TransportCommand.Save, TransportIcon.Save, UiStrings.TipSave);
+        AddGap();
+        // WAAPI トグルはドキュメント非依存のため _buttons（SetCommandsEnabled 対象）へ入れない。
+        _waapiToggle = new TransportIconButton
+        {
+            CommandKind = TransportCommand.ToggleWaapi,
+            Icon = TransportIcon.Waapi,
+            Width = DesignMetrics.TransportWaapiButtonWidth,
+            ToolTip = UiStrings.TipWaapiToggle,
+            Margin = new Thickness(DesignMetrics.TransportButtonGap, 0, DesignMetrics.TransportButtonGap, 0),
+        };
+        _waapiToggle.Click += (_, _) => CommandInvoked?.Invoke(this, TransportCommand.ToggleWaapi);
+        ButtonsHost.Children.Add(_waapiToggle);
+    }
+
+    public void SetWaapiLatched(bool latched)
+    {
+        _waapiToggle.IsLatched = latched;
+        _waapiToggle.InvalidateVisual();
     }
 
     public void SetPlaying(bool playing)
@@ -94,6 +113,8 @@ internal partial class TransportBar : UserControl
         {
             button.InvalidateVisual();
         }
+
+        _waapiToggle.InvalidateVisual();
     }
 
     public void SetCommandsEnabled(bool enabled)

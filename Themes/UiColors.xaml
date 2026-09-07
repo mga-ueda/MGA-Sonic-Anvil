@@ -21,6 +21,7 @@
     <SolidColorBrush x:Key="WaveformScrollTrackBrush" Color="#FF121212" />
     <SolidColorBrush x:Key="TimelineWellBackBrush" Color="#FF17171A" />
     <SolidColorBrush x:Key="PlayheadBrush" Color="#FF00F5FF" />
+    <SolidColorBrush x:Key="SeekExitBrush" Color="#FFDC2D2D" />
     <SolidColorBrush x:Key="MouseGuideBrush" Color="#DCFFFFFF" />
     <SolidColorBrush x:Key="MouseGuideOnSelectionBrush" Color="#DC000000" />
     <SolidColorBrush x:Key="LoopRangeFillBrush" Color="#1A1A3E5E" />
@@ -46,11 +47,32 @@
     <SolidColorBrush x:Key="TransportDisabledForeBrush" Color="#FF5B5B5B" />
     <SolidColorBrush x:Key="TransportHoverBackBrush" Color="#FF37373A" />
     <SolidColorBrush x:Key="TransportPressedBackBrush" Color="#FF484848" />
+    <SolidColorBrush x:Key="WaapiToggleOffBackBrush" Color="#FF2A2A2E" />
+    <SolidColorBrush x:Key="WaapiToggleOffHoverBackBrush" Color="#FF3A3A40" />
+    <SolidColorBrush x:Key="WaapiToggleOffForeBrush" Color="#FF9A9A9A" />
+    <SolidColorBrush x:Key="WaapiToggleOnBackBrush" Color="#FF006BD7" />
+    <SolidColorBrush x:Key="WaapiToggleOnHoverBackBrush" Color="#FF1A82EA" />
+    <SolidColorBrush x:Key="WaapiToggleOnForeBrush" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="ActionBarBackBrush" Color="#FF1A1B26" />
     <SolidColorBrush x:Key="ActionCopyrightForeBrush" Color="#FF969696" />
     <SolidColorBrush x:Key="ActionLinkForeBrush" Color="#FF6EB4FF" />
     <SolidColorBrush x:Key="StatusBarBackBrush" Color="#FF161618" />
+    <SolidColorBrush x:Key="WaapiBarBackBrush" Color="#FF1D1D22" />
+    <SolidColorBrush x:Key="StatusBarTitleForeBrush" Color="#FF969696" />
     <SolidColorBrush x:Key="StatusBarDetailForeBrush" Color="#FFEBEBEB" />
+    <SolidColorBrush x:Key="StatusBarErrorDetailForeBrush" Color="#FFFF6E6E" />
+    <SolidColorBrush x:Key="StatusBarConnectedBadgeBackBrush" Color="#FF006BD7" />
+    <SolidColorBrush x:Key="StatusBarDisconnectedBadgeBackBrush" Color="#FFBE3232" />
+    <SolidColorBrush x:Key="KeepTargetLockForeBrush" Color="#FFFFDC30" />
+    <SolidColorBrush x:Key="KeepTargetLockHoverForeBrush" Color="#FFFFF08C" />
+    <SolidColorBrush x:Key="KeepTargetUnlockForeBrush" Color="#FFEBEBEB" />
+    <SolidColorBrush x:Key="KeepTargetUnlockHoverForeBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="StatusExportButtonFillBrush" Color="#FF2F1414" />
+    <SolidColorBrush x:Key="StatusExportButtonHoverFillBrush" Color="#FF522323" />
+    <SolidColorBrush x:Key="StatusExportButtonBackBrush" Color="#FFBE3232" />
+    <SolidColorBrush x:Key="StatusExportButtonHoverBackBrush" Color="#FFDC4646" />
+    <SolidColorBrush x:Key="StatusExportButtonPressedBackBrush" Color="#FF962828" />
+    <SolidColorBrush x:Key="StatusExportButtonForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="ColorPanelBackBrush" Color="#FF28282A" />
     <SolidColorBrush x:Key="ColorPanelListBackBrush" Color="#FF202022" />
     <SolidColorBrush x:Key="ColorPanelInputBackBrush" Color="#FF1C1C1E" />

@@ -245,6 +245,7 @@ public partial class MainWindow
 
         _playTimer.Stop();
         StopMeterRendering();
+        Waveform.ExitPlayheadFrame = -1;
         Waveform.SetTrailRecording(false);
         Transport.SetPlaying(false);
         ExtinguishMeter();

@@ -302,6 +302,16 @@ internal static class ActionButtonLooks
             Theme.Get("ExportButtonPressedBackBrush"),
             Theme.Get("ExportButtonForeBrush"));
 
+    public static void ApplyStatusExport(RoundedButton button) =>
+        Apply(
+            button,
+            Theme.Get("StatusExportButtonFillBrush"),
+            Theme.Get("StatusExportButtonHoverFillBrush"),
+            Theme.Get("StatusExportButtonBackBrush"),
+            Theme.Get("StatusExportButtonHoverBackBrush"),
+            Theme.Get("StatusExportButtonPressedBackBrush"),
+            Theme.Get("StatusExportButtonForeBrush"));
+
     private static void Apply(
         RoundedButton button,
         Color fill,

@@ -1,0 +1,95 @@
+<UserControl x:Class="MgaSonicAnvil.UI.WaapiStatusBar"
+             x:ClassModifier="internal"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:MgaSonicAnvil.UI"
+             xmlns:domain="clr-namespace:MgaSonicAnvil.Domain"
+             Height="{x:Static ui:DesignMetrics.WaapiBarHeight}"
+             Focusable="False"
+             Background="{DynamicResource WaapiBarBackBrush}">
+  <Grid Margin="8,0">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" ClipToBounds="True">
+      <TextBlock x:Name="TitleLabel"
+                 FontWeight="Bold"
+                 FontSize="11"
+                 VerticalAlignment="Center"
+                 Margin="0,0,6,0"
+                 Foreground="{DynamicResource StatusBarTitleForeBrush}"
+                 Text="{x:Static domain:UiStrings.WaapiTitle}" />
+      <Canvas x:Name="BadgeCanvas" Width="72" Height="18" Margin="0,0,8,0" />
+      <TextBlock x:Name="VersionLabel" FontSize="11" VerticalAlignment="Center"
+                 Foreground="{DynamicResource StatusBarDetailForeBrush}" />
+      <TextBlock x:Name="SepAfterVersion" Text=" - " FontSize="11" VerticalAlignment="Center"
+                 Foreground="{DynamicResource StatusBarDetailForeBrush}" />
+      <TextBlock x:Name="ProjectNameLabel" FontSize="11" VerticalAlignment="Center"
+                 Foreground="{DynamicResource StatusBarDetailForeBrush}"
+                 Cursor="Arrow"
+                 MouseLeftButtonUp="ProjectNameLabel_Click"
+                 MouseEnter="ProjectNameLabel_MouseEnter"
+                 MouseLeave="ProjectNameLabel_MouseLeave" />
+      <TextBlock x:Name="SepAfterProject" Text=" - " FontSize="11" VerticalAlignment="Center"
+                 Foreground="{DynamicResource StatusBarDetailForeBrush}" />
+      <TextBlock x:Name="PathLabel" FontSize="11" VerticalAlignment="Center"
+                 TextTrimming="CharacterEllipsis" MaxWidth="420"
+                 Foreground="{DynamicResource StatusBarDetailForeBrush}" />
+      <StackPanel x:Name="KeepLockPanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+        <ContentControl x:Name="KeepLockButtonHost" VerticalAlignment="Center" />
+        <TextBlock x:Name="KeepStateLabel" FontSize="11" VerticalAlignment="Center" Margin="2,0,8,0"
+                   Foreground="{DynamicResource StatusBarTitleForeBrush}" />
+      </StackPanel>
+    </StackPanel>
+
+    <ContentControl x:Name="OutputFolderButtonHost"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Margin="8,0,4,0" />
+    <TextBox x:Name="OutputPathBox"
+             Grid.Column="2"
+             MinWidth="0"
+             Height="{x:Static ui:DesignMetrics.StatusOutputPathHeight}"
+             HorizontalAlignment="Stretch"
+             Style="{StaticResource DarkTextBoxStyle}"
+             FontSize="11"
+             Padding="4,1"
+             IsReadOnly="True"
+             VerticalContentAlignment="Center"
+             ToolTip="{x:Static domain:UiStrings.TipOutputPath}"
+             PreviewMouseLeftButtonUp="OutputPathBox_Click" />
+
+    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+      <CheckBox x:Name="PlayMinusECheckBox"
+                Style="{StaticResource DarkCheckBoxStyle}"
+                Content="{x:Static domain:UiStrings.LabelPlayMinusE}"
+                VerticalAlignment="Center"
+                FontSize="11"
+                Margin="12,0,0,0"
+                Foreground="{DynamicResource StatusBarTitleForeBrush}"
+                ToolTip="{x:Static domain:UiStrings.TipPlayMinusE}"
+                Checked="PlayMinusECheckBox_Changed"
+                Unchecked="PlayMinusECheckBox_Changed" />
+      <CheckBox x:Name="AutoActiveCheckBox"
+                Style="{StaticResource DarkCheckBoxStyle}"
+                Content="{x:Static domain:UiStrings.LabelAutoActive}"
+                VerticalAlignment="Center"
+                FontSize="11"
+                Margin="12,0,12,0"
+                Foreground="{DynamicResource StatusBarTitleForeBrush}"
+                ToolTip="{x:Static domain:UiStrings.TipAutoActive}"
+                Checked="AutoActiveCheckBox_Changed"
+                Unchecked="AutoActiveCheckBox_Changed" />
+      <ui:RoundedButton x:Name="ExportButton"
+                        Width="{x:Static ui:DesignMetrics.StatusExportButtonWidth}"
+                        Height="{x:Static ui:DesignMetrics.StatusExportButtonHeight}"
+                        Content="{x:Static domain:UiStrings.ButtonExport}"
+                        ToolTip="{x:Static domain:UiStrings.TipExport}"
+                        Click="ExportButton_Click" />
+    </StackPanel>
+  </Grid>
+</UserControl>
