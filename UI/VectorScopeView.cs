@@ -28,6 +28,7 @@ internal sealed class VectorScopeView : FrameworkElement
     private float _displayGain = 1f;
     private float _paintFade = 1f;
     private bool _idle = true;
+    private long _lastTickAt;
 
     public static readonly DependencyProperty BackgroundProperty =
         System.Windows.Controls.Control.BackgroundProperty.AddOwner(
@@ -59,12 +60,30 @@ internal sealed class VectorScopeView : FrameworkElement
             _trails[i] = new Point[MaxPoints];
         }
 
+        // 停止後の減衰用。再生中は Background 優先度がマウス入力に飢餓するため、
+        // MainWindow の CompositionTarget.Rendering から Tick() で駆動される。
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
-        _timer.Tick += (_, _) => UpdateScope();
+        _timer.Tick += (_, _) => Tick();
         _timer.Start();
     }
 
     public AudioPlayer? Player { get; set; }
+
+    /// <summary>
+    /// 更新を 1 回試みる。33ms 未満の連続呼び出しは無視するので、
+    /// フレーム駆動とタイマーの両方から呼んでも二重更新しない。
+    /// </summary>
+    public void Tick()
+    {
+        var now = Environment.TickCount64;
+        if (now - _lastTickAt < 33)
+        {
+            return;
+        }
+
+        _lastTickAt = now;
+        UpdateScope();
+    }
 
     protected override void OnRender(DrawingContext dc)
     {

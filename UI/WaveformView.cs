@@ -75,7 +75,8 @@ internal sealed class WaveformView : Grid
 
     private readonly DrawingHost _staticHost;
     private readonly DrawingHost _overlayHost;
-    private readonly Line _mouseGuideLine = new();
+    private readonly DrawingHost _playheadHost;
+    private readonly Rectangle _mouseGuideBar = new();
     private readonly TranslateTransform _mouseGuideTransform = new();
     private readonly List<(WaveMarker Marker, Rect Flag)> _markerFlags = [];
     private readonly List<(WaveSelection Range, long Frame, Rect Flag)> _regionFlags = [];
@@ -122,6 +123,7 @@ internal sealed class WaveformView : Grid
     private SpectrogramViewMode _spectrogramMode;
     private readonly SpectrogramRenderer _spectrogram = new();
     private double _appliedMarkerLaneHeight = -1;
+    private double _staticPaintMs;
     private bool _staticRebuildQueued;
     private bool _viewChangedQueued;
     private readonly Dictionary<(string Text, TimeLabelAccent Accent), FormattedText> _timeLabelCache = new();
@@ -138,13 +140,18 @@ internal sealed class WaveformView : Grid
     private int _waveBgra;
     private int _zeroBgra;
     private double _viewStart;
-    private long _followRebuildAt;
+    private double _followRebuildAtMs;
     private double _timeZoom = 1d;
     private double _ampZoom = 1d;
     private long _playheadFrame;
+    private double? _pointerX;
     private double? _mouseGuideX;
     private double _appliedGuideX = double.NaN;
     private bool _guideOverSelection;
+    private bool _mouseGuideQueued;
+    private bool _snapCacheDirty = true;
+    private readonly List<(double X, long Frame)> _snapPoints = [];
+    private long _hoverCursorAt;
     private Brush? _mouseGuideBrush;
     private Brush? _mouseGuideOnSelectionBrush;
     private bool _dragging;
@@ -194,29 +201,31 @@ internal sealed class WaveformView : Grid
         Cursor = Cursors.IBeam;
         Background = Brushes.Transparent;
 
-        _staticHost = new DrawingHost(overlay: false) { Owner = this };
-        _overlayHost = new DrawingHost(overlay: true) { Owner = this };
+        _staticHost = new DrawingHost(LayerKind.Static) { Owner = this };
+        _overlayHost = new DrawingHost(LayerKind.Overlay) { Owner = this };
+        _playheadHost = new DrawingHost(LayerKind.Playhead) { Owner = this };
         Children.Add(_staticHost);
         Children.Add(_overlayHost);
+        Children.Add(_playheadHost);
 
         _mouseGuideBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MouseGuideBrush"));
         _mouseGuideOnSelectionBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MouseGuideOnSelectionBrush"));
-        _mouseGuideLine.IsHitTestVisible = false;
-        _mouseGuideLine.Stroke = _mouseGuideBrush;
-        _mouseGuideLine.StrokeThickness = 1;
-        _mouseGuideLine.SnapsToDevicePixels = false;
-        _mouseGuideLine.UseLayoutRounding = false;
-        _mouseGuideLine.Visibility = Visibility.Collapsed;
-        _mouseGuideLine.X1 = 0;
-        _mouseGuideLine.X2 = 0;
-        _mouseGuideLine.Y1 = ChromeTopHeight;
-        _mouseGuideLine.Y2 = ChromeTopHeight + 1;
-        _mouseGuideLine.RenderTransform = _mouseGuideTransform;
-        RenderOptions.SetEdgeMode(_mouseGuideLine, EdgeMode.Aliased);
-        RenderOptions.SetBitmapScalingMode(_mouseGuideLine, BitmapScalingMode.NearestNeighbor);
+        _mouseGuideBar.Width = 1;
+        _mouseGuideBar.HorizontalAlignment = HorizontalAlignment.Left;
+        _mouseGuideBar.VerticalAlignment = VerticalAlignment.Stretch;
+        _mouseGuideBar.IsHitTestVisible = false;
+        _mouseGuideBar.Fill = _mouseGuideBrush;
+        _mouseGuideBar.StrokeThickness = 0;
+        _mouseGuideBar.SnapsToDevicePixels = true;
+        _mouseGuideBar.UseLayoutRounding = true;
+        _mouseGuideBar.Visibility = Visibility.Collapsed;
+        _mouseGuideBar.RenderTransform = _mouseGuideTransform;
+        RenderOptions.SetEdgeMode(_mouseGuideBar, EdgeMode.Aliased);
+        RenderOptions.SetBitmapScalingMode(_mouseGuideBar, BitmapScalingMode.NearestNeighbor);
         Panel.SetZIndex(_overlayHost, 2);
-        Panel.SetZIndex(_mouseGuideLine, 3);
-        Children.Add(_mouseGuideLine);
+        Panel.SetZIndex(_playheadHost, 3);
+        Panel.SetZIndex(_mouseGuideBar, 4);
+        Children.Add(_mouseGuideBar);
         SizeChanged += (_, _) =>
         {
             EndMarkerCommentEdit(commit: true);
@@ -283,7 +292,7 @@ internal sealed class WaveformView : Grid
                 RecordTrailSample(value, _trailSamples);
             }
 
-            InvalidatePlayheadLayer();
+            InvalidatePlayheadOnly();
         }
     }
 
@@ -307,7 +316,7 @@ internal sealed class WaveformView : Grid
             RecordTrailSample(frame, _trailSamples);
         }
 
-        InvalidatePlayheadLayer();
+        InvalidatePlayheadOnly();
     }
 
     /// <summary>
@@ -328,7 +337,7 @@ internal sealed class WaveformView : Grid
 
                 _exitPlayheadFrame = -1;
                 _exitTrailSamples.Clear();
-                InvalidatePlayheadLayer();
+                InvalidatePlayheadOnly();
                 return;
             }
 
@@ -344,7 +353,7 @@ internal sealed class WaveformView : Grid
                 RecordTrailSample(value, _exitTrailSamples);
             }
 
-            InvalidatePlayheadLayer();
+            InvalidatePlayheadOnly();
         }
     }
 
@@ -355,8 +364,7 @@ internal sealed class WaveformView : Grid
         {
             _trailSamples.Clear();
             _exitTrailSamples.Clear();
-            InvalidatePlayheadLayer();
-            ApplyMouseGuideOverlay();
+            InvalidatePlayheadOnly();
             return;
         }
 
@@ -365,8 +373,6 @@ internal sealed class WaveformView : Grid
         {
             RecordTrailSample(_exitPlayheadFrame, _exitTrailSamples);
         }
-
-        ApplyMouseGuideOverlay();
     }
 
     public bool LoopEnabled { get; set; }
@@ -896,13 +902,13 @@ internal sealed class WaveformView : Grid
         var frame = (double)_playheadFrame;
         if (frame > _viewStart + span - margin)
         {
-            SetViewStart(frame - span + margin);
+            SetViewStart(frame - span + margin, playbackFollow: true);
             return;
         }
 
         if (frame < _viewStart)
         {
-            SetViewStart(frame - margin);
+            SetViewStart(frame - margin, playbackFollow: true);
         }
     }
 
@@ -1390,7 +1396,7 @@ internal sealed class WaveformView : Grid
     {
         var pos = e.GetPosition(this);
         SetMouseGuideFromX(pos.X);
-        ApplyMouseGuideOverlay();
+        QueueMouseGuideOverlay();
 
         if (_scrubbing && _document is not null)
         {
@@ -1423,20 +1429,7 @@ internal sealed class WaveformView : Grid
 
         if (!_dragging)
         {
-            if (pos.X < ContentLeft
-                || TryHitMarkerFlag(pos, out _)
-                || TryHitRegionFlag(pos, out _, out _))
-            {
-                Cursor = Cursors.Arrow;
-            }
-            else if (TryHitLoopBar(pos, out var loopPart))
-            {
-                Cursor = loopPart == LoopBarPart.Body ? Cursors.SizeAll : Cursors.SizeWE;
-            }
-            else
-            {
-                Cursor = Cursors.IBeam;
-            }
+            UpdateHoverCursor(pos);
         }
 
         if (_dragging && _document is not null)
@@ -1453,6 +1446,7 @@ internal sealed class WaveformView : Grid
                 if (next != _document.Selection)
                 {
                     _document.Selection = next;
+                    InvalidatePlayheadLayer();
                     SelectionChanged?.Invoke(this, EventArgs.Empty);
                 }
             }
@@ -1577,6 +1571,18 @@ internal sealed class WaveformView : Grid
 
     internal void PaintStatic(DrawingContext dc)
     {
+        // TickCount64 は分解能が約 15ms で軽い描画を過大測定し追従がカクつくため、
+        // 高分解能の Stopwatch タイムスタンプで測る。
+        var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        PaintStaticCore(dc);
+        var elapsedMs = (System.Diagnostics.Stopwatch.GetTimestamp() - startedAt)
+            * 1000d / System.Diagnostics.Stopwatch.Frequency;
+        // 追従スクロールの再描画間引きに使う実測コスト（EMA）。
+        _staticPaintMs = _staticPaintMs * 0.7 + elapsedMs * 0.3;
+    }
+
+    private void PaintStaticCore(DrawingContext dc)
+    {
         var bounds = new Rect(_staticHost.RenderSize);
         dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("WaveformBackBrush")), null, bounds);
         if (Math.Abs(_appliedMarkerLaneHeight - MarkerLaneHeight) > 0.01)
@@ -1585,11 +1591,10 @@ internal sealed class WaveformView : Grid
             _waveDirty = true;
         }
 
-        SyncMouseGuideHeight();
         var wave = WaveformBounds(bounds);
         var span = _document is null ? 0 : ViewSpanFrames;
         var start = _viewStart;
-        DrawDbScaleWell(dc, bounds, wave);
+        DrawDbScaleWell(dc, bounds);
         DrawMarkerLane(dc, bounds, start, span);
         DrawTimeLane(dc, bounds, start, span);
         if (_document is null || _document.FrameCount <= 0 || wave.Width <= 1 || wave.Height <= 1)
@@ -1672,7 +1677,17 @@ internal sealed class WaveformView : Grid
         RefreshFlagStacks(bounds, start, span);
         DrawRegionFlags(dc, bounds, start, span);
         DrawMarkers(dc, bounds, start, span);
-        DrawPlayhead(dc, bounds, start, span);
+    }
+
+    internal void PaintPlayhead(DrawingContext dc)
+    {
+        var bounds = new Rect(_playheadHost.RenderSize);
+        if (_document is null || _document.FrameCount <= 0 || bounds.Width <= 1 || bounds.Height <= 1)
+        {
+            return;
+        }
+
+        DrawPlayhead(dc, bounds, _viewStart, ViewSpanFrames);
     }
 
     private void EnsureWaveformBitmap(Rect bounds)
@@ -2512,7 +2527,7 @@ internal sealed class WaveformView : Grid
         }
     }
 
-    private void DrawDbScaleWell(DrawingContext dc, Rect bounds, Rect wave)
+    private void DrawDbScaleWell(DrawingContext dc, Rect bounds)
     {
         var well = DbScaleBounds(bounds);
         if (well.Width <= 1)
@@ -2524,16 +2539,6 @@ internal sealed class WaveformView : Grid
         var edge = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush")), 1);
         edge.Freeze();
         dc.DrawLine(edge, new Point(well.Right - 0.5, 0), new Point(well.Right - 0.5, bounds.Height));
-
-        if (wave.Y > 8 && well.Width > 12)
-        {
-            var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-            var muted = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
-            var header = GetDbLabel("dB", pixelsPerDip, muted);
-            var hx = well.X + Math.Max(2, (well.Width - header.Width) * 0.5);
-            var hy = Math.Max(2, (wave.Y - header.Height) * 0.5);
-            dc.DrawText(header, new Point(hx, hy));
-        }
     }
 
     private void DrawDbScaleTicks(
@@ -4617,19 +4622,22 @@ internal sealed class WaveformView : Grid
         }
 
         _viewStart = next;
-        ApplyMouseGuideOverlay();
+        _snapCacheDirty = true;
+        QueueMouseGuideOverlay();
         if (playbackFollow)
         {
-            // センターロック追従。シークバー層は毎回、重い静的層は約 30fps に間引く。
-            InvalidatePlayheadLayer();
-            var now = Environment.TickCount64;
-            var followMs = _spectrogramMode == SpectrogramViewMode.Overlay
-                && ViewSpanFrames <= OverlayPolylineMaxSamplesPerPixel * 2048
-                    ? 8
-                    : 33;
-            if (now - _followRebuildAt >= followMs)
+            // 追従スクロール。シークバー層は毎回更新。静的層（波形本体）は
+            // 実測描画コストに応じて間引く：軽ければ毎フレーム（≒60fps）で
+            // 滑らかに流し、深い拡大のスペクトログラム等で重い場合は間隔を
+            // 広げてディスパッチャに入力処理の余地を残す（操作不能防止）。
+            InvalidatePlayheadOnly();
+            // TickCount64 は分解能約 15ms で毎フレーム判定に使えないため Stopwatch。
+            var nowMs = System.Diagnostics.Stopwatch.GetTimestamp()
+                * 1000d / System.Diagnostics.Stopwatch.Frequency;
+            var followMs = Math.Clamp(_staticPaintMs * 2.5, 8d, 500d);
+            if (nowMs - _followRebuildAtMs >= followMs)
             {
-                _followRebuildAt = now;
+                _followRebuildAtMs = nowMs;
                 InvalidateStaticLayer();
                 RaiseViewChanged();
             }
@@ -4686,11 +4694,19 @@ internal sealed class WaveformView : Grid
         && _document is not null
         && (_document.Markers.Count > 0 || !_document.SampleLoop.IsEmpty || _document.Regions.Count > 0);
 
-    private void SetMouseGuideFromX(double x)
+    private void SetMouseGuideFromX(double x) => _pointerX = x;
+
+    private void ClearMouseGuide()
     {
-        if (x < ContentLeft)
+        _pointerX = null;
+        _mouseGuideX = null;
+    }
+
+    private void ResolveMouseGuideX()
+    {
+        if (_pointerX is not double x || x < ContentLeft)
         {
-            ClearMouseGuide();
+            _mouseGuideX = null;
             return;
         }
 
@@ -4719,7 +4735,22 @@ internal sealed class WaveformView : Grid
             : x;
     }
 
-    private void ClearMouseGuide() => _mouseGuideX = null;
+    private void QueueMouseGuideOverlay()
+    {
+        if (_mouseGuideQueued)
+        {
+            return;
+        }
+
+        _mouseGuideQueued = true;
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, FlushMouseGuideOverlay);
+    }
+
+    private void FlushMouseGuideOverlay()
+    {
+        _mouseGuideQueued = false;
+        ApplyMouseGuideOverlay();
+    }
 
     private bool TrySnapXToMarker(double mouseX, HashSet<long>? exclude, out double snappedX, out long frame)
     {
@@ -4730,13 +4761,48 @@ internal sealed class WaveformView : Grid
             return false;
         }
 
+        if (!_markerDragging)
+        {
+            EnsureSnapCache();
+            var bestDist = MarkerSnapPx;
+            long? best = null;
+            var bestX = 0d;
+            for (var i = 0; i < _snapPoints.Count; i++)
+            {
+                var point = _snapPoints[i];
+                if (exclude is not null && exclude.Contains(point.Frame))
+                {
+                    continue;
+                }
+
+                var dist = Math.Abs(point.X - mouseX);
+                if (dist > bestDist)
+                {
+                    continue;
+                }
+
+                bestDist = dist;
+                best = point.Frame;
+                bestX = point.X;
+            }
+
+            if (best is not { } cached)
+            {
+                return false;
+            }
+
+            snappedX = bestX;
+            frame = cached;
+            return true;
+        }
+
         var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
         var start = _viewStart;
         var span = ViewSpanFrames;
         var viewEnd = start + span;
-        var bestDist = MarkerSnapPx;
-        long? best = null;
-        var bestX = 0d;
+        var dragBestDist = MarkerSnapPx;
+        long? dragBest = null;
+        var dragBestX = 0d;
 
         void Consider(long markerFrame)
         {
@@ -4752,14 +4818,14 @@ internal sealed class WaveformView : Grid
 
             var x = FrameToViewX(markerFrame, start, span, bounds);
             var dist = Math.Abs(x - mouseX);
-            if (dist > bestDist)
+            if (dist > dragBestDist)
             {
                 return;
             }
 
-            bestDist = dist;
-            best = markerFrame;
-            bestX = x;
+            dragBestDist = dist;
+            dragBest = markerFrame;
+            dragBestX = x;
         }
 
         foreach (var marker in _document.Markers)
@@ -4771,12 +4837,12 @@ internal sealed class WaveformView : Grid
         if (!loop.IsEmpty)
         {
             // 動かしている端そのものは除外する。同じフレームの他マーカーは残す（吸着後の震え防止）。
-            if (!_markerDragging || !_loopDragStart)
+            if (!_loopDragStart)
             {
                 Consider(loop.StartFrame);
             }
 
-            if (!_markerDragging || !_loopDragEnd)
+            if (!_loopDragEnd)
             {
                 Consider(loop.EndFrame);
             }
@@ -4795,14 +4861,62 @@ internal sealed class WaveformView : Grid
             }
         }
 
-        if (best is not { } found)
+        if (dragBest is not { } found)
         {
             return false;
         }
 
-        snappedX = bestX;
+        snappedX = dragBestX;
         frame = found;
         return true;
+    }
+
+    private void EnsureSnapCache()
+    {
+        if (!_snapCacheDirty)
+        {
+            return;
+        }
+
+        _snapCacheDirty = false;
+        _snapPoints.Clear();
+        if (_document is null || ContentWidth <= 0)
+        {
+            return;
+        }
+
+        var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
+        var start = _viewStart;
+        var span = ViewSpanFrames;
+        var viewEnd = start + span;
+
+        void Add(long markerFrame)
+        {
+            if (markerFrame < start - 1e-9 || markerFrame > viewEnd + 1e-9)
+            {
+                return;
+            }
+
+            _snapPoints.Add((FrameToViewX(markerFrame, start, span, bounds), markerFrame));
+        }
+
+        foreach (var marker in _document.Markers)
+        {
+            Add(marker.Frame);
+        }
+
+        var loop = _document.SampleLoop;
+        if (!loop.IsEmpty)
+        {
+            Add(loop.StartFrame);
+            Add(loop.EndFrame);
+        }
+
+        foreach (var region in _document.Regions)
+        {
+            Add(region.StartFrame);
+            Add(region.EndFrame);
+        }
     }
 
     internal static bool TryPickNearestSnap(
@@ -4878,7 +4992,7 @@ internal sealed class WaveformView : Grid
         ResetTrailIfRewound(frame, _trailSamples);
         _document.CursorFrame = frame;
         _playheadFrame = frame;
-        InvalidatePlayheadLayer();
+        InvalidatePlayheadOnly();
     }
 
     private void CommitCursor(long frame, bool ensureVisible = true)
@@ -4921,6 +5035,7 @@ internal sealed class WaveformView : Grid
     private void InvalidateStaticLayer()
     {
         _waveDirty = true;
+        _snapCacheDirty = true;
         if (_staticRebuildQueued)
         {
             return;
@@ -4933,15 +5048,19 @@ internal sealed class WaveformView : Grid
     private void FlushStaticRebuild()
     {
         _staticRebuildQueued = false;
+        SyncMouseGuideHeight();
         _staticHost.InvalidateVisual();
         _overlayHost.InvalidateVisual();
+        _playheadHost.InvalidateVisual();
     }
 
     private void InvalidatePlayheadLayer()
     {
         _overlayHost.InvalidateVisual();
-        ApplyMouseGuideOverlay();
+        _playheadHost.InvalidateVisual();
     }
+
+    private void InvalidatePlayheadOnly() => _playheadHost.InvalidateVisual();
 
     private void DrawPlayhead(DrawingContext dc, Rect bounds, double start, double span)
     {
@@ -5200,48 +5319,44 @@ internal sealed class WaveformView : Grid
     private void SyncMouseGuideHeight()
     {
         var top = Math.Min(ChromeTopHeight, Math.Max(0, ActualHeight));
-        if (Math.Abs(_mouseGuideLine.Y1 - top) > 0.01)
+        var margin = new Thickness(0, top, 0, 0);
+        if (_mouseGuideBar.Margin != margin)
         {
-            _mouseGuideLine.Y1 = top;
-        }
-
-        if (Math.Abs(_mouseGuideLine.Y2 - ActualHeight) > 0.01)
-        {
-            _mouseGuideLine.Y2 = ActualHeight;
+            _mouseGuideBar.Margin = margin;
         }
     }
 
     private void ApplyMouseGuideOverlay()
     {
+        ResolveMouseGuideX();
         if (_mouseGuideX is not double mx || _document is null)
         {
-            if (_mouseGuideLine.Visibility != Visibility.Collapsed)
+            if (_mouseGuideBar.Visibility != Visibility.Collapsed)
             {
-                _mouseGuideLine.Visibility = Visibility.Collapsed;
+                _mouseGuideBar.Visibility = Visibility.Collapsed;
             }
 
             _appliedGuideX = double.NaN;
             _guideOverSelection = false;
-            _mouseGuideLine.Stroke = _mouseGuideBrush;
+            _mouseGuideBar.Fill = _mouseGuideBrush;
             return;
         }
 
-        SyncMouseGuideHeight();
         var over = IsGuideOverSelection(mx, _viewStart, ViewSpanFrames, new Rect(0, 0, ActualWidth, ActualHeight));
         var moved = double.IsNaN(_appliedGuideX) || Math.Abs(_appliedGuideX - mx) >= MouseGuideMoveEpsilonPx;
         if (!moved
             && over == _guideOverSelection
-            && _mouseGuideLine.Visibility == Visibility.Visible)
+            && _mouseGuideBar.Visibility == Visibility.Visible)
         {
             return;
         }
 
         _appliedGuideX = mx;
         _mouseGuideTransform.X = mx;
-        _mouseGuideLine.Visibility = Visibility.Visible;
+        _mouseGuideBar.Visibility = Visibility.Visible;
         if (over != _guideOverSelection)
         {
-            _mouseGuideLine.Stroke = over
+            _mouseGuideBar.Fill = over
                 ? (_mouseGuideOnSelectionBrush ?? _mouseGuideBrush)
                 : _mouseGuideBrush;
         }
@@ -5249,18 +5364,61 @@ internal sealed class WaveformView : Grid
         _guideOverSelection = over;
     }
 
+    private void UpdateHoverCursor(Point pos)
+    {
+        if (_trailActive)
+        {
+            var now = Environment.TickCount64;
+            if (now - _hoverCursorAt < 32)
+            {
+                return;
+            }
+
+            _hoverCursorAt = now;
+        }
+
+        Cursor next;
+        if (pos.X < ContentLeft
+            || TryHitMarkerFlag(pos, out _)
+            || TryHitRegionFlag(pos, out _, out _))
+        {
+            next = Cursors.Arrow;
+        }
+        else if (TryHitLoopBar(pos, out var loopPart))
+        {
+            next = loopPart == LoopBarPart.Body ? Cursors.SizeAll : Cursors.SizeWE;
+        }
+        else
+        {
+            next = Cursors.IBeam;
+        }
+
+        if (!ReferenceEquals(Cursor, next))
+        {
+            Cursor = next;
+        }
+    }
+
+    private enum LayerKind
+    {
+        Static,
+        Overlay,
+        Playhead,
+    }
+
     private sealed class DrawingHost : FrameworkElement
     {
-        private readonly bool _overlay;
+        private readonly LayerKind _kind;
 
         public WaveformView? Owner { get; set; }
 
-        public DrawingHost(bool overlay)
+        public DrawingHost(LayerKind kind)
         {
-            _overlay = overlay;
+            _kind = kind;
             HorizontalAlignment = HorizontalAlignment.Stretch;
             VerticalAlignment = VerticalAlignment.Stretch;
             IsHitTestVisible = false;
+            var overlay = kind != LayerKind.Static;
             SnapsToDevicePixels = !overlay;
             UseLayoutRounding = !overlay;
             if (overlay)
@@ -5276,13 +5434,17 @@ internal sealed class WaveformView : Grid
 
         protected override void OnRender(DrawingContext dc)
         {
-            if (_overlay)
+            switch (_kind)
             {
-                Owner?.PaintOverlay(dc);
-            }
-            else
-            {
-                Owner?.PaintStatic(dc);
+                case LayerKind.Overlay:
+                    Owner?.PaintOverlay(dc);
+                    break;
+                case LayerKind.Playhead:
+                    Owner?.PaintPlayhead(dc);
+                    break;
+                default:
+                    Owner?.PaintStatic(dc);
+                    break;
             }
         }
     }

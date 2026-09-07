@@ -41,6 +41,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
     private readonly float[] _levels = new float[BandCenters.Length];
     private readonly float _windowSum;
     private bool _idle = true;
+    private long _lastTickAt;
 
     public static readonly DependencyProperty BackgroundProperty =
         System.Windows.Controls.Control.BackgroundProperty.AddOwner(
@@ -70,9 +71,28 @@ internal sealed class ProjectSpectrumView : FrameworkElement
 
         _windowSum = windowSum;
         Array.Fill(_envelopeDb, FloorDb);
+        // 停止後の減衰用。再生中は Background 優先度がマウス入力に飢餓するため、
+        // MainWindow の CompositionTarget.Rendering から Tick() で駆動される。
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
-        _timer.Tick += (_, _) => UpdateLevels();
+        _timer.Tick += (_, _) => Tick();
         _timer.Start();
+    }
+
+    /// <summary>
+    /// 更新を 1 回試みる。33ms 未満の連続呼び出しは無視するので、
+    /// フレーム駆動とタイマーの両方から呼んでも二重更新しない。
+    /// </summary>
+    public void Tick()
+    {
+        var now = Environment.TickCount64;
+        var elapsed = now - _lastTickAt;
+        if (elapsed < 33)
+        {
+            return;
+        }
+
+        _lastTickAt = now;
+        UpdateLevels(Math.Min(200d, elapsed));
     }
 
     public AudioPlayer? Player { get; set; }
@@ -140,7 +160,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         }
     }
 
-    private void UpdateLevels()
+    private void UpdateLevels(double dtMs)
     {
         if (!IsVisible)
         {
@@ -152,13 +172,13 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         if (active)
         {
             _ = player!.ReadRecentOutputSamples(_samples);
-            ComputeBandTargets(player.OutputSampleRate);
+            ComputeBandTargets(player.OutputSampleRate, dtMs);
             _idle = false;
         }
         else
         {
             var anyVisible = false;
-            var fall = 1d - Math.Exp(-_timer.Interval.TotalMilliseconds / 1000d / FallSeconds);
+            var fall = 1d - Math.Exp(-dtMs / 1000d / FallSeconds);
             for (var i = 0; i < _levels.Length; i++)
             {
                 _envelopeDb[i] += (FloorDb - _envelopeDb[i]) * (float)fall;
@@ -187,7 +207,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         InvalidateVisual();
     }
 
-    private void ComputeBandTargets(int sampleRate)
+    private void ComputeBandTargets(int sampleRate, double dtMs)
     {
         if (sampleRate <= 0)
         {
@@ -226,7 +246,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
 
         BlurBandPower();
 
-        var dt = _timer.Interval.TotalMilliseconds / 1000d;
+        var dt = dtMs / 1000d;
         var rise = 1d - Math.Exp(-dt / RiseSeconds);
         var fall = 1d - Math.Exp(-dt / FallSeconds);
         for (var band = 0; band < BandCenters.Length; band++)

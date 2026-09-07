@@ -18,6 +18,9 @@ internal sealed class AudioPlayer : IDisposable
     private bool _suppressPlaybackEnded;
     private bool _playExitLayer;
     private int _generation;
+    private long _smoothRawFrame = -1;
+    private long _smoothShownFrame = -1;
+    private long _smoothStampTicks;
 
     public event EventHandler<int>? PlaybackEnded;
 
@@ -30,6 +33,55 @@ internal sealed class AudioPlayer : IDisposable
     public bool HasOutputDevice => _output is not null;
 
     public long CursorFrame => _provider.CursorFrame;
+
+    /// <summary>
+    /// 描画専用の補間付き再生位置。CursorFrame はオーディオバッファ単位
+    /// （ASIO で 10〜20ms 刻み）でしか進まず、60fps 描画と干渉してジャダーに
+    /// 見えるため、最後の更新からの経過時間で外挿して滑らかにする。
+    /// ロジック判定には CursorFrame を使うこと。
+    /// </summary>
+    public long SmoothCursorFrame
+    {
+        get
+        {
+            var raw = _provider.CursorFrame;
+            var now = System.Diagnostics.Stopwatch.GetTimestamp();
+            if (!_playing || _scrubbing)
+            {
+                _smoothRawFrame = raw;
+                _smoothShownFrame = raw;
+                _smoothStampTicks = now;
+                return raw;
+            }
+
+            if (raw != _smoothRawFrame)
+            {
+                var jumpedBack = raw < _smoothRawFrame;
+                _smoothRawFrame = raw;
+                _smoothStampTicks = now;
+                if (jumpedBack)
+                {
+                    // ループ折り返し・巻き戻しシークは追いかけず即座に反映する。
+                    _smoothShownFrame = raw;
+                    return raw;
+                }
+            }
+
+            // 外挿は 1 バッファ相当（80ms）まで。出力停止時の暴走を防ぐ。
+            var elapsedSec = Math.Min(
+                0.08,
+                (now - _smoothStampTicks) / (double)System.Diagnostics.Stopwatch.Frequency);
+            var value = _smoothRawFrame + (long)(elapsedSec * _provider.SourceSampleRate);
+            // 生カーソル更新の直後に外挿分だけ戻って見えないよう単調性を保つ。
+            if (_smoothShownFrame >= 0 && value < _smoothShownFrame)
+            {
+                value = _smoothShownFrame;
+            }
+
+            _smoothShownFrame = value;
+            return value;
+        }
+    }
 
     public bool ProviderEnded =>
         _provider.Ended || _output is AsioOut { HasReachedEnd: true };

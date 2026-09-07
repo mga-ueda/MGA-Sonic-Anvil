@@ -68,51 +68,72 @@ internal sealed class SpectrogramRenderer
             if (imageOpacity < 0.999)
             {
                 dc.PushOpacity(Math.Clamp(imageOpacity, 0, 1));
-                DrawSpectrogramImage(dc, wave);
+                DrawSpectrogramImage(dc, wave, viewStart, viewSpan);
                 dc.Pop();
             }
             else
             {
-                DrawSpectrogramImage(dc, wave);
+                DrawSpectrogramImage(dc, wave, viewStart, viewSpan);
             }
         }
 
         DrawFrequencyScale(dc, wave, host);
     }
 
-    private void DrawSpectrogramImage(DrawingContext dc, Rect wave)
+    private void DrawSpectrogramImage(DrawingContext dc, Rect wave, double viewStart, double viewSpan)
     {
+        // ビットマップは 1px 格子に量子化した位置（_viewStart）で作られている。
+        // 端数はここでサブピクセルオフセットとして吸収し、滑らかにスクロールさせる。
+        var visibleWidth = Math.Max(1, _pixelWidth - 1);
+        var offsetDip = viewSpan <= 0
+            ? 0d
+            : (viewStart - _viewStart) / viewSpan * wave.Width;
+        var dest = new Rect(
+            wave.X - offsetDip,
+            wave.Y,
+            wave.Width * _pixelWidth / visibleWidth,
+            wave.Height);
         var group = new DrawingGroup();
         RenderOptions.SetBitmapScalingMode(group, BitmapScalingMode.Fant);
         var context = group.Open();
-        context.DrawImage(_bitmap, wave);
+        context.DrawImage(_bitmap, dest);
         context.Close();
+        dc.PushClip(new RectangleGeometry(wave));
         dc.DrawDrawing(group);
+        dc.Pop();
     }
 
     private void EnsureBitmap(Rect wave, AudioDocument document, double viewStart, double viewSpan, DpiScale dpi)
     {
+        var width = Math.Clamp((int)Math.Round(wave.Width * Math.Max(1e-6, dpi.DpiScaleX)), 1, MaxPixelWidth);
+        var height = Math.Clamp((int)Math.Round(wave.Height * Math.Max(1e-6, dpi.DpiScaleY)), 1, MaxPixelHeight);
+        // ビュー開始位置を 1 デバイス px = framesPerPx の格子に量子化する。
+        // スクロールが常に整数 px 差になるため、列シフト＋差分 FFT が毎回効く。
+        // 右端の欠けを防ぐため 1 列余分に持つ。
+        var framesPerPx = viewSpan / width;
+        var quantStart = Math.Floor(viewStart / framesPerPx) * framesPerPx;
+        var bmpWidth = width + 1;
+        var bmpSpan = bmpWidth * framesPerPx;
         if (ReferenceEquals(_samples, document.Interleaved)
             && _bitmap is not null
-            && _dipSize == wave.Size
+            && _bitmap.PixelWidth == bmpWidth
+            && _bitmap.PixelHeight == height
             && Math.Abs(_dpiX - dpi.DpiScaleX) < 0.001
             && Math.Abs(_dpiY - dpi.DpiScaleY) < 0.001
-            && Math.Abs(_viewStart - viewStart) < 0.01
-            && Math.Abs(_viewSpan - viewSpan) < 0.01
+            && Math.Abs(_viewStart - quantStart) < framesPerPx * 0.01
+            && Math.Abs(_viewSpan - bmpSpan) < framesPerPx * 0.01
             && _sampleRate == document.SampleRate
             && _drewFromCache == _cache.IsReady)
         {
             return;
         }
 
-        var width = Math.Clamp((int)Math.Round(wave.Width * Math.Max(1e-6, dpi.DpiScaleX)), 1, MaxPixelWidth);
-        var height = Math.Clamp((int)Math.Round(wave.Height * Math.Max(1e-6, dpi.DpiScaleY)), 1, MaxPixelHeight);
         if (_bitmap is null
-            || _bitmap.PixelWidth != width
+            || _bitmap.PixelWidth != bmpWidth
             || _bitmap.PixelHeight != height)
         {
             _bitmap = new WriteableBitmap(
-                width,
+                bmpWidth,
                 height,
                 dpi.PixelsPerInchX,
                 dpi.PixelsPerInchY,
@@ -120,33 +141,50 @@ internal sealed class SpectrogramRenderer
                 null);
         }
 
-        var needed = width * height;
+        var needed = bmpWidth * height;
         if (_pixels.Length < needed)
         {
             _pixels = new int[needed];
         }
 
         EnsureRowHertz(height);
-        if (_cache.IsReady)
+        var fromCache = _cache.IsReady;
+        if (!TryShiftColumns(document, quantStart, bmpSpan, bmpWidth, height, fromCache))
         {
-            RasterizeFromCache(viewStart, viewSpan, width, height, document.SampleRate);
-        }
-        else if (!TryShiftColumns(document, viewStart, viewSpan, width, height))
-        {
-            RasterizeColumns(document, viewStart, viewSpan, width, height, 0, width);
+            RasterizeSpan(document, quantStart, bmpSpan, bmpWidth, height, 0, bmpWidth, fromCache);
         }
 
-        _bitmap.WritePixels(new Int32Rect(0, 0, width, height), _pixels, width * 4, 0);
+        _bitmap.WritePixels(new Int32Rect(0, 0, bmpWidth, height), _pixels, bmpWidth * 4, 0);
         _samples = document.Interleaved;
         _dipSize = wave.Size;
         _dpiX = dpi.DpiScaleX;
         _dpiY = dpi.DpiScaleY;
-        _viewStart = viewStart;
-        _viewSpan = viewSpan;
+        _viewStart = quantStart;
+        _viewSpan = bmpSpan;
         _sampleRate = document.SampleRate;
-        _pixelWidth = width;
+        _pixelWidth = bmpWidth;
         _pixelHeight = height;
-        _drewFromCache = _cache.IsReady;
+        _drewFromCache = fromCache;
+    }
+
+    private void RasterizeSpan(
+        AudioDocument document,
+        double viewStart,
+        double viewSpan,
+        int width,
+        int height,
+        int x0,
+        int x1,
+        bool fromCache)
+    {
+        if (fromCache)
+        {
+            RasterizeFromCache(viewStart, viewSpan, width, height, x0, x1, document.SampleRate);
+        }
+        else
+        {
+            RasterizeColumns(document, viewStart, viewSpan, width, height, x0, x1);
+        }
     }
 
     private bool TryShiftColumns(
@@ -154,12 +192,14 @@ internal sealed class SpectrogramRenderer
         double viewStart,
         double viewSpan,
         int width,
-        int height)
+        int height,
+        bool fromCache)
     {
         if (!ReferenceEquals(_samples, document.Interleaved)
             || _pixelWidth != width
             || _pixelHeight != height
             || _sampleRate != document.SampleRate
+            || _drewFromCache != fromCache
             || Math.Abs(_viewSpan - viewSpan) > 0.01
             || viewSpan <= 1)
         {
@@ -176,11 +216,11 @@ internal sealed class SpectrogramRenderer
         ShiftPixels(width, height, shiftPx);
         if (shiftPx > 0)
         {
-            RasterizeColumns(document, viewStart, viewSpan, width, height, width - shiftPx, width);
+            RasterizeSpan(document, viewStart, viewSpan, width, height, width - shiftPx, width, fromCache);
         }
         else
         {
-            RasterizeColumns(document, viewStart, viewSpan, width, height, 0, -shiftPx);
+            RasterizeSpan(document, viewStart, viewSpan, width, height, 0, -shiftPx, fromCache);
         }
 
         return true;
@@ -231,12 +271,19 @@ internal sealed class SpectrogramRenderer
         _rowHeight = height;
     }
 
-    private void RasterizeFromCache(double viewStart, double viewSpan, int width, int height, int sampleRate)
+    private void RasterizeFromCache(
+        double viewStart,
+        double viewSpan,
+        int width,
+        int height,
+        int x0,
+        int x1,
+        int sampleRate)
     {
         var binHz = Math.Max(1, sampleRate) / (double)SpectrogramEngine.FftSize;
         var nyquist = SpectrogramEngine.ContentNyquist(sampleRate);
         var floor = SpectrogramEngine.ColorBgra(SpectrogramEngine.FloorDb);
-        for (var x = 0; x < width; x++)
+        for (var x = x0; x < x1; x++)
         {
             var center = (long)Math.Round(viewStart + (x + 0.5) / width * viewSpan);
             var row = 0;

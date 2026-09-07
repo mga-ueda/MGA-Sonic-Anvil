@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private readonly LevelMeterEngine _meter = new();
     private readonly Stopwatch _meterClock = Stopwatch.StartNew();
     private bool _meterRendering;
+    private TimeSpan _lastRenderingTime;
     private readonly DispatcherTimer _playTimer;
     private readonly DispatcherTimer _markerDigitTimer;
     private readonly DispatcherTimer _markerNudgeTimer;
@@ -116,9 +117,11 @@ public partial class MainWindow : Window
         VectorScope.Player = _player;
         PopulateOutputCombos();
 
-        // Render 優先度だと追従描画が入力 (Input=5 < Render=7) を飢餓させ、
-        // センターロック中に停止操作が届かなくなる。Background で入力を先に通す。
-        _playTimer = new DispatcherTimer(DispatcherPriority.Background)
+        // 優先度は Input が唯一安全：Render だと追従描画が入力を飢餓させ操作不能になり
+        // （深い拡大のスペクトログラム追従で実際に発生）、Background だと逆に
+        // マウス移動がタイマーを飢餓させ再生ヘッドがカクつく。
+        // Input はマウス入力と同列 FIFO で処理されるため、どちらの飢餓も起きない。
+        _playTimer = new DispatcherTimer(DispatcherPriority.Input)
         {
             Interval = TimeSpan.FromMilliseconds(16),
         };

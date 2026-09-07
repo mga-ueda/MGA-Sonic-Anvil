@@ -404,7 +404,21 @@ public partial class MainWindow
             return;
         }
 
-        var frame = _player.CursorFrame;
+        // 通常はフレーム駆動（OnMeterRendering）が描画を同期する。ここは代行のみ。
+        if (!_meterRendering)
+        {
+            SyncPlaybackVisuals();
+        }
+    }
+
+    private void SyncPlaybackVisuals()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var frame = _player.SmoothCursorFrame;
         _document.CursorFrame = frame;
         if (!Waveform.IsInteracting)
         {
@@ -445,11 +459,34 @@ public partial class MainWindow
             return;
         }
 
+        // 同一フレームで複数回発火することがあるため RenderingTime で間引く。
+        if (e is RenderingEventArgs rendering)
+        {
+            if (rendering.RenderingTime == _lastRenderingTime)
+            {
+                return;
+            }
+
+            _lastRenderingTime = rendering.RenderingTime;
+        }
+
         var hasSamples = _player.TakeMeterInterval(out var peakL, out var rmsL, out var peakR, out var rmsR);
         LevelMeter.Apply(_meter.Update(peakL, rmsL, peakR, rmsR, _meterClock.Elapsed.TotalSeconds, hasSamples));
+        // スペアナ・ゴニオも Background タイマー飢餓を避けてフレーム駆動で更新する。
+        Spectrum.Tick();
+        VectorScope.Tick();
         if (_fadePreviewing || _formatPreviewing)
         {
             SyncPreviewPlayhead();
+            return;
+        }
+
+        // 再生ヘッド・追従スクロールは vsync 同期でサンプリングしないとジッターが
+        // 見えるため、ここ（毎フレーム）で行う。重い静的再描画は WaveformView 側の
+        // 適応間引き（実測コスト×2.5）が抑えるので入力飢餓にはならない。
+        if (_playTimer.IsEnabled && !_player.IsScrubbing)
+        {
+            SyncPlaybackVisuals();
         }
     }
 
@@ -460,7 +497,7 @@ public partial class MainWindow
             return;
         }
 
-        var frame = _player.CursorFrame;
+        var frame = _player.SmoothCursorFrame;
         _document.CursorFrame = frame;
         Waveform.SetPlayheadFromPlayback(frame);
         SyncOverviewPlayhead();

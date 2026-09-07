@@ -126,6 +126,17 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
+    public int SourceSampleRate
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _sourceRate;
+            }
+        }
+    }
+
     public void Bind(
         AudioDocument document,
         long startFrame,

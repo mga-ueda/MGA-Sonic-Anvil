@@ -81,10 +81,19 @@ internal partial class TransportBar : UserControl
         _totalSeconds = totalSeconds;
         if (!IsEditingPosition)
         {
-            CurrentTimeBox.Text = UiStrings.FormatDuration(seconds);
+            // TextBox.Text 代入はレイアウト・イベントを伴い重いので同値ならスキップ。
+            var current = UiStrings.FormatDuration(seconds);
+            if (CurrentTimeBox.Text != current)
+            {
+                CurrentTimeBox.Text = current;
+            }
         }
 
-        TotalTimeText.Text = "/ " + UiStrings.FormatDuration(totalSeconds);
+        var total = "/ " + UiStrings.FormatDuration(totalSeconds);
+        if (TotalTimeText.Text != total)
+        {
+            TotalTimeText.Text = total;
+        }
     }
 
     public void CancelPositionEdit()
