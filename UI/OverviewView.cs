@@ -22,6 +22,15 @@ internal sealed class OverviewView : FrameworkElement
     private int _waveBgra;
     private int _zeroBgra;
     private HashSet<long>? _selectedMarkerFrames;
+    private long _exitPlayheadFrame = -1;
+    private Pen? _playheadGlowOuter;
+    private Pen? _playheadGlowInner;
+    private Pen? _playheadCore;
+    private Color _playheadPenColor;
+    private Pen? _exitPlayheadGlowOuter;
+    private Pen? _exitPlayheadGlowInner;
+    private Pen? _exitPlayheadCore;
+    private Color _exitPlayheadPenColor;
 
     public event EventHandler<double>? ViewStartChanged;
 
@@ -52,6 +61,7 @@ internal sealed class OverviewView : FrameworkElement
             _viewStart = 0;
             _viewSpan = value?.FrameCount ?? 1;
             _selectedMarkerFrames = null;
+            _exitPlayheadFrame = -1;
             _waveDirty = true;
             InvalidateVisual();
         }
@@ -77,7 +87,19 @@ internal sealed class OverviewView : FrameworkElement
     {
         _waveBgra = 0;
         _zeroBgra = 0;
+        _playheadCore = null;
+        _exitPlayheadCore = null;
         _waveDirty = true;
+        InvalidateVisual();
+    }
+
+    public void SyncPlayhead(long exitFrame = -1)
+    {
+        if (_exitPlayheadFrame != exitFrame)
+        {
+            _exitPlayheadFrame = exitFrame;
+        }
+
         InvalidateVisual();
     }
 
@@ -135,6 +157,7 @@ internal sealed class OverviewView : FrameworkElement
         DrawVisibleWindow(dc, bounds);
         DrawMarkerLines(dc, bounds);
         DrawRegionLines(dc, bounds);
+        DrawPlayhead(dc, bounds);
     }
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
@@ -329,6 +352,81 @@ internal sealed class OverviewView : FrameworkElement
         }
 
         dc.DrawLine(pen, new Point(x, 0), new Point(x, bounds.Height));
+    }
+
+    private void DrawPlayhead(DrawingContext dc, Rect bounds)
+    {
+        if (_document is null || _document.FrameCount <= 0)
+        {
+            return;
+        }
+
+        var frames = (double)_document.FrameCount;
+        if (_exitPlayheadFrame >= 0)
+        {
+            EnsureExitPlayheadPens();
+            DrawPlayheadLine(dc, bounds, frames, _exitPlayheadFrame, _exitPlayheadGlowOuter!, _exitPlayheadGlowInner!, _exitPlayheadCore!);
+        }
+
+        EnsurePlayheadPens();
+        DrawPlayheadLine(dc, bounds, frames, _document.CursorFrame, _playheadGlowOuter!, _playheadGlowInner!, _playheadCore!);
+    }
+
+    private static void DrawPlayheadLine(
+        DrawingContext dc,
+        Rect bounds,
+        double frames,
+        long frame,
+        Pen glowOuter,
+        Pen glowInner,
+        Pen core)
+    {
+        var x = frame / frames * bounds.Width;
+        if (x < -2 || x > bounds.Width + 2)
+        {
+            return;
+        }
+
+        var y0 = bounds.Y;
+        var y1 = bounds.Y + bounds.Height;
+        dc.DrawLine(glowOuter, new Point(x, y0), new Point(x, y1));
+        dc.DrawLine(glowInner, new Point(x, y0), new Point(x, y1));
+        dc.DrawLine(core, new Point(x, y0), new Point(x, y1));
+    }
+
+    private void EnsurePlayheadPens()
+    {
+        var color = Theme.Get("PlayheadBrush");
+        if (_playheadCore is not null && _playheadPenColor == color)
+        {
+            return;
+        }
+
+        _playheadPenColor = color;
+        _playheadGlowOuter = FreezePen(Color.FromArgb(40, color.R, color.G, color.B), 3);
+        _playheadGlowInner = FreezePen(Color.FromArgb(90, color.R, color.G, color.B), 1.5);
+        _playheadCore = FreezePen(color, 1);
+    }
+
+    private void EnsureExitPlayheadPens()
+    {
+        var color = Theme.Get("SeekExitBrush");
+        if (_exitPlayheadCore is not null && _exitPlayheadPenColor == color)
+        {
+            return;
+        }
+
+        _exitPlayheadPenColor = color;
+        _exitPlayheadGlowOuter = FreezePen(Color.FromArgb(40, color.R, color.G, color.B), 3);
+        _exitPlayheadGlowInner = FreezePen(Color.FromArgb(90, color.R, color.G, color.B), 1.5);
+        _exitPlayheadCore = FreezePen(color, 1);
+    }
+
+    private static Pen FreezePen(Color color, double thickness)
+    {
+        var pen = new Pen(WpfControlHelpers.FrozenBrush(color), thickness);
+        pen.Freeze();
+        return pen;
     }
 
     private void DrawVisibleWindow(DrawingContext dc, Rect bounds)

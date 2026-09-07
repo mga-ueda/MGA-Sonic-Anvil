@@ -49,6 +49,7 @@ public partial class MainWindow
         Waveform.RefreshAppearance();
         Overview.RefreshAppearance();
         Spectrum.InvalidateVisual();
+        VectorScope.InvalidateVisual();
         LevelMeter.InvalidateVisual();
         Transport.RefreshAppearance();
         RebuildTabBar();

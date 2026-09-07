@@ -57,6 +57,8 @@ internal sealed class AudioDocument
 
     public long FileBytes { get; private set; }
 
+    public DateTime? FileLastWriteTime { get; private set; }
+
     public long FrameCount => Interleaved.Length / Channels;
 
     public double DurationSeconds => SampleRate <= 0 ? 0 : FrameCount / (double)SampleRate;
@@ -1293,6 +1295,7 @@ internal sealed class AudioDocument
                 if (info.Exists)
                 {
                     FileBytes = info.Length;
+                    FileLastWriteTime = info.LastWriteTime;
                     return;
                 }
             }
@@ -1306,6 +1309,7 @@ internal sealed class AudioDocument
 
         var bytesPerSample = Math.Max(1, (BitsPerSample + 7) / 8);
         FileBytes = FrameCount * (long)Channels * bytesPerSample;
+        FileLastWriteTime = null;
     }
 }
 

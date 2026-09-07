@@ -6,17 +6,19 @@ namespace MgaSonicAnvil;
 static class Program
 {
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        var files = LaunchFiles.Collect(args);
         if (!SingleInstance.TryAcquire())
         {
-            SingleInstance.RequestActivate();
+            SingleInstance.RequestActivate(files);
             return;
         }
 
         try
         {
+            LaunchFiles.SetStartup(files);
             AppStorage.Initialize();
             var app = new App();
             app.InitializeComponent();

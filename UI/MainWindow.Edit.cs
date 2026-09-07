@@ -816,6 +816,7 @@ public partial class MainWindow
 
         Waveform.PlayheadFrame = _document.CursorFrame;
         Waveform.PruneMarkerSelection();
+        Waveform.InvalidateSpectrogramCache();
         Waveform.Refresh();
         Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
         Overview.Refresh();

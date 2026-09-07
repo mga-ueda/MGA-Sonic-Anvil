@@ -17,6 +17,22 @@ public sealed class FormatConvertTests
     }
 
     [Fact]
+    public void Resample_ReportsProgressFromZeroToOne()
+    {
+        var reports = new List<double>();
+        var source = MakeSine(frames: 480, sampleRate: 48000);
+        FormatConvert.Resample(
+            source,
+            channels: 2,
+            sourceRate: 48000,
+            destRate: 44100,
+            new CollectProgress(reports));
+        Assert.Contains(0d, reports);
+        Assert.Contains(1d, reports);
+        Assert.True(reports[0] <= reports[^1]);
+    }
+
+    [Fact]
     public void Resample_DownsampleRemovesContentAboveNewNyquist()
     {
         var source = MakeSine(frames: 48000, sampleRate: 48000, frequency: 6000);
@@ -383,5 +399,10 @@ public sealed class FormatConvertTests
         }
 
         return Math.Sqrt(sum / Math.Max(1, samples.Length));
+    }
+
+    private sealed class CollectProgress(List<double> values) : IProgress<double>
+    {
+        public void Report(double value) => values.Add(value);
     }
 }

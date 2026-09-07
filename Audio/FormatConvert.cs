@@ -31,7 +31,12 @@ internal static class FormatConvert
     /// 新しいナイキストで帯域制限してから間引く／補間する。
     /// ホールドだと階段波の高調波が出て、8 kHz がキンキンする。
     /// </summary>
-    public static float[] Resample(float[] interleaved, int channels, int sourceRate, int destRate)
+    public static float[] Resample(
+        float[] interleaved,
+        int channels,
+        int sourceRate,
+        int destRate,
+        IProgress<double>? progress = null)
     {
         channels = Math.Max(1, channels);
         if (sourceRate < 1 || destRate < 1)
@@ -41,6 +46,7 @@ internal static class FormatConvert
 
         if (sourceRate == destRate || interleaved.Length < channels)
         {
+            progress?.Report(1);
             return interleaved;
         }
 
@@ -49,6 +55,8 @@ internal static class FormatConvert
         var dest = new float[destFrames * channels];
         var step = sourceRate / (double)destRate;
         var cutoff = LowpassCutoff(sourceRate, destRate);
+        var reportEvery = Math.Max(1, destFrames / 100);
+        progress?.Report(0);
         for (var i = 0; i < destFrames; i++)
         {
             var srcFrame = i * step;
@@ -56,6 +64,11 @@ internal static class FormatConvert
             for (var ch = 0; ch < channels; ch++)
             {
                 dest[destOffset + ch] = SampleSinc(interleaved, channels, ch, srcFrame, srcFrames, cutoff);
+            }
+
+            if (progress is not null && ((i + 1) % reportEvery == 0 || i + 1 == destFrames))
+            {
+                progress.Report((i + 1) / (double)destFrames);
             }
         }
 

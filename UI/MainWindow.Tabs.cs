@@ -134,7 +134,7 @@ public partial class MainWindow
     private void RebuildTabBar()
     {
         DocumentTabs.Children.Clear();
-        DocumentTabHost.Visibility = _sessions.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        DocumentTabHost.Visibility = _sessions.Count <= 1 ? Visibility.Collapsed : Visibility.Visible;
         foreach (var session in _sessions)
         {
             DocumentTabs.Children.Add(CreateTabItem(session));

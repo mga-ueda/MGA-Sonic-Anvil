@@ -8,8 +8,16 @@ namespace MgaSonicAnvil.UI;
 
 public partial class MainWindow
 {
+    private readonly BusyGlassOverlay _busyGlass = new();
+    private bool _formatConvertBusy;
+
     private void PromptFormatConvert(FormatConvertKind kind)
     {
+        if (_formatConvertBusy)
+        {
+            return;
+        }
+
         if (_document is null)
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
@@ -304,32 +312,127 @@ public partial class MainWindow
 
     private void ApplyFormatConvert(FormatConvertKind kind, int value)
     {
-        if (_document is null)
+        if (_document is null || _formatConvertBusy)
         {
             return;
         }
 
+        CloseFormatConvertPicker();
         StopFormatPreview();
-        var sourceRate = _document.SampleRate;
+        if (kind == FormatConvertKind.SampleRate)
+        {
+            _ = ApplySampleRateConvertAsync(value);
+            return;
+        }
+
         var command = kind switch
         {
             FormatConvertKind.BitDepth => ProcessEdits.ConvertBitDepth(_document, value),
             FormatConvertKind.Channels => ProcessEdits.ConvertChannels(_document, value),
-            _ => ProcessEdits.ConvertSampleRate(_document, value),
+            _ => null,
         };
-        CloseFormatConvertPicker();
         if (command is null)
         {
             return;
         }
 
         _history.Do(_document, command);
-        if (kind == FormatConvertKind.SampleRate && sourceRate > 0)
+        AfterEdit();
+    }
+
+    private async Task ApplySampleRateConvertAsync(int destRate)
+    {
+        if (_document is null || _formatConvertBusy)
         {
-            var factor = _document.SampleRate / (double)sourceRate;
-            Waveform.SetViewStartExternal(Waveform.ViewStart * factor);
+            return;
         }
 
-        AfterEdit();
+        if (!FormatConvert.IsValidSampleRate(destRate) || destRate == _document.SampleRate)
+        {
+            return;
+        }
+
+        var document = _document;
+        var sourceRate = document.SampleRate;
+        _formatConvertBusy = true;
+        Exception? error = null;
+        IEditCommand? command = null;
+        try
+        {
+            ShowSampleRateBusyGlass();
+            var progress = new Progress<double>(p => _busyGlass.SetProgress(p));
+            command = await Task.Run(() => ProcessEdits.ConvertSampleRate(document, destRate, progress))
+                .ConfigureAwait(true);
+            if (!IsLoaded || !ReferenceEquals(_document, document) || command is null)
+            {
+                return;
+            }
+
+            _history.Do(document, command);
+            if (sourceRate > 0)
+            {
+                var factor = document.SampleRate / (double)sourceRate;
+                Waveform.SetViewStartExternal(Waveform.ViewStart * factor);
+            }
+
+            AfterEdit();
+        }
+        catch (Exception ex)
+        {
+            error = ex;
+        }
+        finally
+        {
+            _formatConvertBusy = false;
+            if (error is not null)
+            {
+                _busyGlass.HideOverlay();
+            }
+            else
+            {
+                _busyGlass.BeginFadeOut();
+            }
+        }
+
+        if (error is not null && IsLoaded)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                error.Message,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void ShowSampleRateBusyGlass()
+    {
+        RootChrome.UpdateLayout();
+        RootDock.UpdateLayout();
+        _busyGlass.ShowOverlay(
+            RootChrome,
+            RootDock,
+            GetBusyGlassCoverBounds(),
+            UiStrings.OverlaySampleRateConvert);
+    }
+
+    private Rect GetBusyGlassCoverBounds()
+    {
+        var host = RootChrome;
+        return new Rect(
+            0,
+            0,
+            Math.Max(0, host.ActualWidth),
+            Math.Max(0, host.ActualHeight));
+    }
+
+    private void SyncBusyGlassOverlayBounds()
+    {
+        if (!_busyGlass.IsShowingBusy)
+        {
+            return;
+        }
+
+        _busyGlass.SyncBounds(GetBusyGlassCoverBounds());
     }
 }

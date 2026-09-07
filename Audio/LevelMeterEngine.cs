@@ -5,9 +5,11 @@ internal sealed class LevelMeterEngine
 {
     public const int WindowFrames = 1024;
     public const double DbMax = 0;
-    public const double DbMin = -50;
+    public const double DbMin = -60;
     public const double KneeDb = -20;
-    public const double LoSegmentFrac = 0.4;
+    /// <summary>-20 dB の高さ比（下端 = 0）。0〜-20 は均等、それより下は徐々に圧縮。</summary>
+    public const double KneeNorm = 0.48;
+    public const double BelowKneeGamma = 1.55;
     public const double BarInstTrack = 0.48;
     public const double BarAttackSec = 0.018;
     public const double BarReleaseSec = 0.10;
@@ -89,12 +91,13 @@ internal sealed class LevelMeterEngine
         }
 
         var c = Math.Clamp(db, DbMin, DbMax);
-        if (c <= KneeDb)
+        if (c >= KneeDb)
         {
-            return ((c - DbMin) / (KneeDb - DbMin)) * LoSegmentFrac;
+            return KneeNorm + (c - KneeDb) / (DbMax - KneeDb) * (1 - KneeNorm);
         }
 
-        return LoSegmentFrac + ((c - KneeDb) / (DbMax - KneeDb)) * (1 - LoSegmentFrac);
+        var u = (c - DbMin) / (KneeDb - DbMin);
+        return KneeNorm * Math.Pow(Math.Max(0, u), BelowKneeGamma);
     }
 
     public static double DbToHeightPct(double db) => DbToNorm(db) * 100d;
@@ -103,14 +106,14 @@ internal sealed class LevelMeterEngine
     {
         if (!double.IsFinite(db) || db <= DbMin)
         {
-            return "-50.0";
+            return "-60.0";
         }
 
         return Math.Min(DbMax, db).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
     }
 
     public static IReadOnlyList<double> ScaleLabels { get; } =
-        [0, -5, -10, -15, -20, -30, -40, -50];
+        [0, -5, -10, -15, -20, -25, -30, -35, -40, -45, -50, -60];
 
     public static ColorRgb LevelColor(double db)
     {

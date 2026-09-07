@@ -58,6 +58,7 @@ internal static partial class UiStrings
     public const string ErrorNoSelection = "選択範囲がありません。";
     public const string ErrorClipboardEmpty = "クリップボードが空です。";
     public const string ErrorEmptyAfterDelete = "ファイル全体は削除できません。";
+    public const string OverlaySampleRateConvert = "サンプリングレート変換";
 
     public const string TipPlay = "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止\nCtrl+ドラッグでスクラブ\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し";
     public const string TipStop = "停止（開始位置へ戻る）";
@@ -112,13 +113,14 @@ internal static partial class UiStrings
     public const string TipTabScrollRight = "右のタブを表示";
     public const string TipOverview = "波形全体。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）　ホイールで拡縮（シークバー基準）";
     public const string TipSpectrum = "再生出力の簡易スペクトラム表示です。";
+    public const string TipVectorScope = "再生出力の位相相関とベクターオーディオスコープです。上の数値は L/R の相関（+1 同相 / 0 無相関 / -1 逆相）。下は縦が Mid、横が Side です。";
     public const string TipAudioApi = "再生 API（WaveOut / WASAPI / ASIO）";
     public const string TipAudioDevice = "再生デバイス";
     public const string TipWaveform =
         "ドラッグで選択　Ctrl+ドラッグでスクラブ　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A で全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着\n"
         + "ホイール=時間ズーム（シークバー基準）　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"
         + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル、Shift で3倍）　Ctrl+←→ 前後のマーカー / リージョン端 / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（同じ範囲でもう一度で解除）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M マーカー　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動（Shift で3倍） / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント / リージョン名（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
-        + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　T で現在時間　U で編集履歴　Ctrl+Shift+E で Wwise EXPORT（Wave 単体）";
+        + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　T で現在時間　U で編集履歴　G で波形 / スペクトログラム / 重ね表示　Ctrl+Shift+E で Wwise EXPORT（Wave 単体）";
     public const string TipAlwaysOnTop = "ウィンドウを常に最前面へ表示します。";
     public const string TipGitHub = "GitHub リポジトリを開きます。";
     public const string TipTimecode = "再生位置 (T)。クリックまたは T で入力、Enter で移動。コピー／貼り付け可";
@@ -401,6 +403,19 @@ internal static partial class UiStrings
         return $"{verb}  {markers.Count}個";
     }
 
+    public static string FormatSampleRate(int hertz)
+    {
+        var kilo = hertz / 1000d;
+        var rounded = Math.Round(kilo, 3);
+        return Math.Abs(rounded - Math.Round(rounded)) < 1e-6
+            ? $"{(int)Math.Round(rounded)}kHz"
+            : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{rounded:0.###}kHz");
+    }
+
+    public static string FormatBitDepth(int bits) => $"{Math.Max(0, bits)}bit";
+
+    public static string FormatChannels(int channels) => $"{Math.Max(0, channels)}ch";
+
     public static string FormatFileBytes(long bytes)
     {
         if (bytes < 0)
@@ -411,6 +426,9 @@ internal static partial class UiStrings
         var mega = bytes / (1024d * 1024d);
         return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{mega:0.00} MB");
     }
+
+    public static string FormatFileTimestamp(DateTime timestamp) =>
+        timestamp.ToLocalTime().ToString("yyyy/MM/dd HH:mm", System.Globalization.CultureInfo.InvariantCulture);
 
     public static string FormatDuration(double seconds)
     {

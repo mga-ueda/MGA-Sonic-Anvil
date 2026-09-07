@@ -279,7 +279,11 @@ internal sealed class AudioPlayer : IDisposable
             _provider.BeginSilenceFlush();
             try
             {
-                _output.Play();
+                if (_output.PlaybackState != PlaybackState.Playing)
+                {
+                    _output.Play();
+                }
+
                 _playing = true;
             }
             catch
@@ -287,7 +291,13 @@ internal sealed class AudioPlayer : IDisposable
                 // 既に止まっている等は無視して破棄へ進む。
             }
 
-            Thread.Sleep(EstimateFlushMilliseconds(_output));
+            // 先読みに残った音が無音に置き換わるまで待つ（秒数は AudioOutputFlush）。
+            var until = Environment.TickCount64 + EstimateFlushMilliseconds(_output);
+            while (Environment.TickCount64 < until)
+            {
+                Thread.Sleep(15);
+            }
+
             try
             {
                 _output.Stop();
@@ -302,41 +312,53 @@ internal sealed class AudioPlayer : IDisposable
         {
             // 終了処理は失敗しても破棄を優先する。
         }
+        finally
+        {
+            _suppressPlaybackEnded = false;
+        }
     }
 
     private int EstimateFlushMilliseconds(IWavePlayer output)
     {
-        // 再生中バッファ＋キュー分を見込む。上限は終了待ちの体感用。
-        const int minMs = 200;
-        const int maxMs = 1500;
         var sampleRate = Math.Max(1, _provider.WaveFormat.SampleRate);
-        var ms = output switch
+        return output switch
         {
-            WaveOutEvent wave =>
-                Math.Max(1, wave.DesiredLatency) * Math.Max(1, wave.NumberOfBuffers),
-            WasapiOut =>
-                AudioOutputFactory.WasapiLatencyMs * 3,
-            AsioOut asio =>
-                EstimateAsioFlushMilliseconds(asio, sampleRate),
-            _ => 400,
+            WaveOutEvent wave => AudioOutputFlush.EstimateMilliseconds(
+                AudioOutputApi.WaveOut,
+                sampleRate,
+                waveDesiredLatencyMs: wave.DesiredLatency,
+                waveBufferCount: wave.NumberOfBuffers),
+            WasapiOut => AudioOutputFlush.EstimateMilliseconds(AudioOutputApi.Wasapi, sampleRate),
+            AsioOut asio => AudioOutputFlush.EstimateMilliseconds(
+                AudioOutputApi.Asio,
+                sampleRate,
+                framesPerBuffer: TryAsioFramesPerBuffer(asio),
+                playbackLatencySamples: TryAsioPlaybackLatency(asio)),
+            _ => AudioOutputFlush.EstimateMilliseconds(AudioOutputApi.Wasapi, sampleRate),
         };
-
-        // 実効遅延より少し長めに洗い流す。
-        ms = (int)Math.Ceiling(ms * 1.25);
-        return Math.Clamp(ms, minMs, maxMs);
     }
 
-    private static int EstimateAsioFlushMilliseconds(AsioOut asio, int sampleRate)
+    private static int TryAsioFramesPerBuffer(AsioOut asio)
     {
         try
         {
-            var frames = Math.Max(1, asio.FramesPerBuffer);
-            // ASIO は典型的にダブルバッファ。
-            return (int)Math.Ceiling(frames * 2.0 * 1000.0 / Math.Max(1, sampleRate));
+            return Math.Max(1, asio.FramesPerBuffer);
         }
         catch
         {
-            return 400;
+            return 0;
+        }
+    }
+
+    private static int TryAsioPlaybackLatency(AsioOut asio)
+    {
+        try
+        {
+            return Math.Max(0, asio.PlaybackLatency);
+        }
+        catch
+        {
+            return 0;
         }
     }
 

@@ -134,7 +134,7 @@ internal sealed class LevelMeterView : FrameworkElement
         var pixels = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         var brush = LabelBrush();
         var labelWidth = Math.Max(MeasureReadout("Peak", pixels).Width, MeasureReadout("RMS", pixels).Width);
-        var intSlot = MeasureReadout("-50", pixels).Width;
+        var intSlot = MeasureReadout("-60", pixels).Width;
         var fracSlot = MeasureReadout(".0", pixels).Width;
         var numWidth = intSlot + fracSlot;
         const double gap = 3;
@@ -199,6 +199,7 @@ internal sealed class LevelMeterView : FrameworkElement
     private void DrawScale(DrawingContext dc, Rect col, bool rightAlign)
     {
         var pixels = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var lastBottom = double.NegativeInfinity;
         foreach (var db in LevelMeterEngine.ScaleLabels)
         {
             var y = col.Y + (1 - LevelMeterEngine.DbToNorm(db)) * col.Height;
@@ -217,7 +218,13 @@ internal sealed class LevelMeterView : FrameworkElement
                 : db >= LevelMeterEngine.DbMax
                     ? col.Y
                     : y - formatted.Height * 0.5 + 1;
+            if (db is not (0 or -60) && ty < lastBottom + formatted.Height * 0.15)
+            {
+                continue;
+            }
+
             dc.DrawText(formatted, new Point(x, ty));
+            lastBottom = ty + formatted.Height;
         }
     }
 

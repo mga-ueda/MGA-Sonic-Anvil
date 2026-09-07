@@ -15,7 +15,7 @@ internal static class DesignMetrics
 
     public static double ActionBarHeight => From96(44);
 
-    public static double StatusBarHeight => From96(20);
+    public static double StatusBarHeight => From96(28);
 
     public static double WaapiBarHeight => From96(32);
 
@@ -36,6 +36,11 @@ internal static class DesignMetrics
     public static double MarkerLaneHeight => MarkerLaneRowHeight * 2;
 
     public static double DbScaleWidth => From96(40);
+
+    public static GridLength DbScaleWidthGrid => new(DbScaleWidth);
+
+    /// <summary>全体表示の波形左端を、本波形（dB 目盛の右）に揃える。</summary>
+    public static Thickness OverviewPad => new(0, 3, 0, 3);
 
     public static double WaveformHostMinHeight => From96(180);
 
@@ -59,8 +64,19 @@ internal static class DesignMetrics
 
     public static double ToolbarButtonSide => From96(24);
 
-    /// <summary>トランスポート右端のスペアナ高さ（トランスポートバーと同じ）。</summary>
+    /// <summary>スペアナの最小高さ（操作バーと同じ。右列では余白まで伸ばす）。</summary>
     public static double SpectrumHeight => TransportBarHeight;
+
+    /// <summary>スペアナの横幅倍率。</summary>
+    public static double SpectrumWidthScale => 2;
+
+    /// <summary>レベルメーター列直下の位相バー高さ。</summary>
+    public static double VectorScopeCorrelationHeight => From96(22);
+
+    /// <summary>位相バー + 正方形ゴニオ。</summary>
+    public static double VectorScopeHeight => VectorScopeCorrelationHeight + LevelMeterWidth;
+
+    public static GridLength VectorScopeHeightGrid => new(VectorScopeHeight);
 
     public static double ActionButtonWidth => From96(108);
 
@@ -78,4 +94,7 @@ internal static class DesignMetrics
 
     /// <summary>目盛 22×2 + バー 14×4。枠なしの最小幅。</summary>
     public static double LevelMeterWidth => From96(100);
+
+    /// <summary>正方形ゴニオと同じ高さ。トランスポート行をこれに揃える。</summary>
+    public static GridLength LevelMeterWidthGrid => new(LevelMeterWidth);
 }

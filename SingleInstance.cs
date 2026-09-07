@@ -1,4 +1,7 @@
+using System.IO;
+using System.Text;
 using System.Threading;
+using MgaSonicAnvil.Config;
 
 namespace MgaSonicAnvil;
 
@@ -7,10 +10,14 @@ internal static class SingleInstance
 {
     private const string MutexName = @"Local\MGA.SonicAnvil.SingleInstance";
     private const string ActivateEventName = @"Local\MGA.SonicAnvil.Activate";
+    private const string QueueMutexName = @"Local\MGA.SonicAnvil.OpenQueue";
+    private const string QueueFileName = "open-queue.txt";
 
     private static Mutex? _mutex;
     private static EventWaitHandle? _activate;
     private static EventWaitHandle? _stop;
+
+    private static string QueuePath => Path.Combine(AppStorage.RootDirectory, QueueFileName);
 
     public static bool TryAcquire()
     {
@@ -32,8 +39,13 @@ internal static class SingleInstance
         return true;
     }
 
-    public static void RequestActivate()
+    public static void RequestActivate(IReadOnlyList<string>? paths = null)
     {
+        if (paths is { Count: > 0 })
+        {
+            EnqueuePaths(paths);
+        }
+
         try
         {
             using var ev = EventWaitHandle.OpenExisting(ActivateEventName);
@@ -42,6 +54,68 @@ internal static class SingleInstance
         catch (WaitHandleCannotBeOpenedException)
         {
             // 既存プロセスの待ち受け前なら、その起動中の窓が出る。
+        }
+    }
+
+    public static string[] TakePendingPaths()
+    {
+        string[] lines = [];
+        WithQueue(() =>
+        {
+            if (!File.Exists(QueuePath))
+            {
+                return;
+            }
+
+            try
+            {
+                lines = File.ReadAllLines(QueuePath, Encoding.UTF8);
+                File.Delete(QueuePath);
+            }
+            catch
+            {
+                lines = [];
+            }
+        });
+
+        return LaunchFiles.Collect(lines);
+    }
+
+    private static void EnqueuePaths(IReadOnlyList<string> paths)
+    {
+        WithQueue(() =>
+        {
+            Directory.CreateDirectory(AppStorage.RootDirectory);
+            File.AppendAllLines(QueuePath, paths, Encoding.UTF8);
+        });
+    }
+
+    private static void WithQueue(Action action)
+    {
+        using var mutex = new Mutex(initiallyOwned: false, QueueMutexName);
+        try
+        {
+            mutex.WaitOne();
+        }
+        catch (AbandonedMutexException)
+        {
+            // 前回が異常終了してもキュー操作は続ける。
+        }
+
+        try
+        {
+            action();
+        }
+        finally
+        {
+            try
+            {
+                mutex.ReleaseMutex();
+            }
+            catch (ApplicationException)
+            {
+                // 所有していない場合は無視。
+            }
         }
     }
 

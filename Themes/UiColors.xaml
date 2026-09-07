@@ -41,6 +41,10 @@
     <SolidColorBrush x:Key="RegionWaveFillExcludedBrush" Color="#66C8C8C8" />
 
     <SolidColorBrush x:Key="SpectrumBarBrush" Color="#FF1A799D" />
+    <SolidColorBrush x:Key="VectorScopeBackBrush" Color="#FF242629" />
+    <SolidColorBrush x:Key="VectorScopeTraceBrush" Color="#FF00F5FF" />
+    <SolidColorBrush x:Key="VectorScopeGridBrush" Color="#FF3A3A3E" />
+    <SolidColorBrush x:Key="VectorScopeCorrelationBrush" Color="#FF00F5FF" />
     <SolidColorBrush x:Key="ProjectBarBackBrush" Color="#FF1A1B26" />
     <SolidColorBrush x:Key="TransportBackBrush" Color="#FF1A1B26" />
     <SolidColorBrush x:Key="TransportForeBrush" Color="#FFEBEBEB" />

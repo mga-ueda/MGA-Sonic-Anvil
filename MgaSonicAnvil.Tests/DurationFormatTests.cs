@@ -34,4 +34,13 @@ public sealed class DurationFormatTests
         Assert.True(UiStrings.TryParseDuration(UiStrings.FormatDuration(125.5), out var seconds));
         Assert.Equal(125.5, seconds, 3);
     }
+
+    [Fact]
+    public void FormatSampleRate_UsesKiloHertz()
+    {
+        Assert.Equal("48kHz", UiStrings.FormatSampleRate(48000));
+        Assert.Equal("44.1kHz", UiStrings.FormatSampleRate(44100));
+        Assert.Equal("24bit", UiStrings.FormatBitDepth(24));
+        Assert.Equal("2ch", UiStrings.FormatChannels(2));
+    }
 }

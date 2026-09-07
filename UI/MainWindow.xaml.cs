@@ -113,6 +113,7 @@ public partial class MainWindow : Window
             OwnerCenteredMessageBox.Show(this, message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning));
         _player.ApplyOutputSettings(_outputSettings);
         Spectrum.Player = _player;
+        VectorScope.Player = _player;
         PopulateOutputCombos();
 
         // Render 優先度だと追従描画が入力 (Input=5 < Render=7) を飢餓させ、
@@ -134,6 +135,7 @@ public partial class MainWindow : Window
         Drop += MainWindow_Drop;
         DragOver += MainWindow_DragOver;
         Closing += MainWindow_Closing;
+        SizeChanged += (_, _) => SyncBusyGlassOverlayBounds();
         Closed += (_, _) =>
         {
             StopMeterRendering();
@@ -142,6 +144,7 @@ public partial class MainWindow : Window
             StopMarkerNudge();
             ResetMarkerDigitEntry();
             // Closing で既に破棄済みでも安全（冪等）。
+            Waveform.DisposeSpectrogram();
             _player.Dispose();
         };
 
@@ -174,6 +177,7 @@ public partial class MainWindow : Window
         var keepTop = AlwaysOnTopCheck.IsChecked == true;
         Topmost = true;
         Topmost = keepTop;
+        OpenLaunchPaths(SingleInstance.TakePendingPaths());
     }
 
     private void OnStartupLoaded(object sender, RoutedEventArgs e)
@@ -206,6 +210,14 @@ public partial class MainWindow : Window
 
     private void RestoreLastDocumentAfterReveal()
     {
+        var launch = MergeLaunchPaths(LaunchFiles.TakeStartup(), SingleInstance.TakePendingPaths());
+        if (launch.Length > 0)
+        {
+            _didRestoreLastDocument = true;
+            OpenLaunchPaths(launch);
+            return;
+        }
+
         TryRestoreLastDocument();
         UpdateLayout();
         Waveform.Refresh();
@@ -245,11 +257,13 @@ public partial class MainWindow : Window
             Waveform.RestoreSelectedMarkers(session.SelectedMarkerFrames);
             Waveform.LoopEnabled = session.LoopEnabled;
             Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
+            SyncOverviewPlayhead();
         }
         else
         {
             Overview.SetSelectedMarkerFrames(null);
             Waveform.LoopEnabled = true;
+            SyncOverviewPlayhead();
         }
 
         Transport.SetPlaying(false);
@@ -310,15 +324,20 @@ public partial class MainWindow : Window
             AudioFileKind.Aiff => "AIFF",
             _ => "WAVE",
         };
+        var name = _activeSession?.DisplayName ?? UiStrings.UntitledDocument;
         var selection = _document.Selection;
         var text = string.Create(
             CultureInfo.InvariantCulture,
-            $"{_document.SampleRate} Hz   {_document.BitsPerSample} bit   {_document.Channels} ch   {kind}   {UiStrings.FormatFileBytes(_document.FileBytes)}");
+            $"{name} {UiStrings.FormatSampleRate(_document.SampleRate)} {UiStrings.FormatBitDepth(_document.BitsPerSample)} {UiStrings.FormatChannels(_document.Channels)} {kind} {UiStrings.FormatFileBytes(_document.FileBytes)}");
+        if (_document.FileLastWriteTime is { } stamped)
+        {
+            text += $" {UiStrings.FormatFileTimestamp(stamped)}";
+        }
         if (!selection.IsEmpty)
         {
             text += string.Create(
                 CultureInfo.InvariantCulture,
-                $"   Sel {UiStrings.FormatDuration(selection.Length / (double)_document.SampleRate)}");
+                $" Sel {UiStrings.FormatDuration(selection.Length / (double)_document.SampleRate)}");
         }
 
         StatusMeta.Text = text;
@@ -413,6 +432,12 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        if (_formatConvertBusy)
+        {
+            e.Cancel = true;
+            return;
+        }
+
         if (!OfferSaveAllDirty())
         {
             e.Cancel = true;
@@ -434,12 +459,25 @@ public partial class MainWindow : Window
 
     private void MainWindow_DragOver(object sender, DragEventArgs e)
     {
+        if (_formatConvertBusy)
+        {
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
         e.Effects = TryGetDroppedAudio(e, out _) ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
     }
 
     private void MainWindow_Drop(object sender, DragEventArgs e)
     {
+        if (_formatConvertBusy)
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (TryGetDroppedAudio(e, out var paths))
         {
             OpenPaths(paths);

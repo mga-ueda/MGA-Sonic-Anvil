@@ -32,6 +32,34 @@ public partial class MainWindow
 
     private void OpenPath(string path) => OpenPaths([path]);
 
+    private void OpenLaunchPaths(IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0)
+        {
+            return;
+        }
+
+        OpenPaths(paths);
+    }
+
+    private static string[] MergeLaunchPaths(params IReadOnlyList<string>[] groups)
+    {
+        var merged = new List<string>();
+        foreach (var group in groups)
+        {
+            foreach (var path in group)
+            {
+                if (!string.IsNullOrWhiteSpace(path)
+                    && !merged.Contains(path, StringComparer.OrdinalIgnoreCase))
+                {
+                    merged.Add(path);
+                }
+            }
+        }
+
+        return merged.ToArray();
+    }
+
     private void PumpUiAfterOpen()
     {
         UpdateLayout();

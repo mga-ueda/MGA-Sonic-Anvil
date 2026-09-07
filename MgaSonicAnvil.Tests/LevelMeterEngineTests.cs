@@ -15,18 +15,29 @@ public sealed class LevelMeterEngineTests
     }
 
     [Fact]
-    public void DbToNorm_UsesKneeAtMinus20()
+    public void DbToNorm_IsEvenAboveKneeThenCompresses()
     {
-        Assert.Equal(0, LevelMeterEngine.DbToNorm(-50), 9);
-        Assert.Equal(0.4, LevelMeterEngine.DbToNorm(-20), 9);
+        Assert.Equal(0, LevelMeterEngine.DbToNorm(-60), 9);
+        Assert.Equal(LevelMeterEngine.KneeNorm, LevelMeterEngine.DbToNorm(-20), 9);
         Assert.Equal(1, LevelMeterEngine.DbToNorm(0), 9);
-        Assert.Equal(0.2, LevelMeterEngine.DbToNorm(-35), 9);
+
+        var topStep = LevelMeterEngine.DbToNorm(0) - LevelMeterEngine.DbToNorm(-5);
+        Assert.Equal(topStep, LevelMeterEngine.DbToNorm(-5) - LevelMeterEngine.DbToNorm(-10), 9);
+        Assert.Equal(topStep, LevelMeterEngine.DbToNorm(-15) - LevelMeterEngine.DbToNorm(-20), 9);
+
+        var justBelow = LevelMeterEngine.DbToNorm(-20) - LevelMeterEngine.DbToNorm(-25);
+        var midQuiet = LevelMeterEngine.DbToNorm(-35) - LevelMeterEngine.DbToNorm(-40);
+        var deep = LevelMeterEngine.DbToNorm(-50) - LevelMeterEngine.DbToNorm(-55);
+        Assert.True(justBelow < topStep);
+        Assert.True(midQuiet < justBelow);
+        Assert.True(deep < midQuiet);
     }
 
     [Fact]
-    public void FormatReadout_FloorsAtMinus50()
+    public void FormatReadout_FloorsAtMinus60()
     {
-        Assert.Equal("-50.0", LevelMeterEngine.FormatReadout(-80));
+        Assert.Equal("-60.0", LevelMeterEngine.FormatReadout(-80));
+        Assert.Equal("-60.0", LevelMeterEngine.FormatReadout(-60));
         Assert.Equal("-50.0", LevelMeterEngine.FormatReadout(-50));
         Assert.Equal("0.0", LevelMeterEngine.FormatReadout(0));
         Assert.Equal("-6.0", LevelMeterEngine.FormatReadout(-6.02));

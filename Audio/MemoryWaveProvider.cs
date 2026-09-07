@@ -79,6 +79,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private double _intervalSumSqR;
     private int _intervalFrames;
     private bool _silenceOnly;
+    private int _flushFadeRemaining;
+    private int _flushFadeTotal;
 
     public WaveFormat WaveFormat { get; private set; } =
         WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
@@ -143,6 +145,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _cursor = checked((int)start * _channels);
             _frameGain = frameGain;
             _silenceOnly = false;
+            _flushFadeRemaining = 0;
+            _flushFadeTotal = 0;
             _exitPlaying = false;
             _exitSpanStartFrame = -1;
             _exitSpanEndFrame = -1;
@@ -174,19 +178,21 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     }
 
     /// <summary>
-    /// 以降の Read は無音のみ。終了時にドライバ先読みを洗い流す用途。
+    /// 終了時にドライバ先読みを洗い流す。先に短くフェードしてから無音のみを返す。
     /// </summary>
     public void BeginSilenceFlush()
     {
         lock (_gate)
         {
-            _silenceOnly = true;
             _scrubbing = false;
             _scrub.Stop();
-            _samples = [];
-            _frameGain = null;
             _exitPlaying = false;
+            _frameGain = null;
             Ended = false;
+            // クリック避けの短いフェード。先読み全体の待ちは AudioOutputFlush 側。
+            _flushFadeTotal = AudioOutputFlush.FadeFrames(_deviceRate);
+            _flushFadeRemaining = _flushFadeTotal;
+            _silenceOnly = _samples.Length == 0;
             Array.Clear(_meterL);
             Array.Clear(_meterR);
             _meterWrite = 0;
@@ -400,6 +406,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         lock (_gate)
         {
             written = ReadCore(buffer, offset, count);
+            ApplyFlushFade(buffer, offset, written);
         }
 
         if (written > 0)
@@ -425,6 +432,12 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
         if (_samples.Length == 0 || Ended)
         {
+            if (_flushFadeTotal > 0)
+            {
+                Array.Clear(buffer, offset, count);
+                return count;
+            }
+
             return 0;
         }
 
@@ -434,7 +447,49 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var writtenFrames = _sourceRate == _deviceRate
             ? ReadCoreNative(buffer, offset, framesWanted, srcCh, outCh)
             : ReadCoreResampled(buffer, offset, framesWanted, srcCh, outCh);
-        return writtenFrames * outCh;
+        var written = writtenFrames * outCh;
+        if (_flushFadeTotal > 0 && written < count)
+        {
+            Array.Clear(buffer, offset + written, count - written);
+            return count;
+        }
+
+        return written;
+    }
+
+    private void ApplyFlushFade(float[] buffer, int offset, int count)
+    {
+        if (_flushFadeTotal <= 0 || count <= 0)
+        {
+            return;
+        }
+
+        var outCh = Math.Max(1, _outputChannels);
+        var frames = count / outCh;
+        for (var i = 0; i < frames; i++)
+        {
+            if (_flushFadeRemaining <= 0)
+            {
+                Array.Clear(buffer, offset + i * outCh, count - i * outCh);
+                _silenceOnly = true;
+                return;
+            }
+
+            var gain = _flushFadeRemaining / (float)_flushFadeTotal;
+            var at = offset + i * outCh;
+            buffer[at] *= gain;
+            if (outCh > 1)
+            {
+                buffer[at + 1] *= gain;
+            }
+
+            _flushFadeRemaining--;
+        }
+
+        if (_flushFadeRemaining <= 0)
+        {
+            _silenceOnly = true;
+        }
     }
 
     private int ReadCoreNative(float[] buffer, int offset, int framesWanted, int srcCh, int outCh)

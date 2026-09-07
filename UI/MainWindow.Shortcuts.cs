@@ -44,6 +44,12 @@ public partial class MainWindow
 
     private void MainWindow_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
+        if (_formatConvertBusy)
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (e.OriginalSource is not System.Windows.DependencyObject origin)
         {
             return;
@@ -106,6 +112,11 @@ public partial class MainWindow
 
     private bool TryProcessShortcut(Key key, ModifierKeys modifiers)
     {
+        if (_formatConvertBusy)
+        {
+            return true;
+        }
+
         if (Transport.IsPositionFocused)
         {
             return false;
@@ -408,6 +419,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.W && modifiers == ModifierKeys.None)
+        {
+            ToggleWaapiPanel();
+            return true;
+        }
+
         if (key == Key.R && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
             RenameMarkerAtPosition();
@@ -417,6 +434,12 @@ public partial class MainWindow
         if (key == Key.U && modifiers == ModifierKeys.None)
         {
             OpenEditHistory();
+            return true;
+        }
+
+        if (key == Key.G && modifiers == ModifierKeys.None)
+        {
+            Waveform.ToggleSpectrogram();
             return true;
         }
 

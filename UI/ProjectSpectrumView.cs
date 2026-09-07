@@ -55,7 +55,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
 
     public ProjectSpectrumView()
     {
-        Height = DesignMetrics.TransportBarHeight;
+        MinHeight = DesignMetrics.SpectrumHeight;
         Focusable = false;
         SnapsToDevicePixels = true;
         UseLayoutRounding = true;
@@ -89,7 +89,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
 
     private void ApplyDevicePixelWidth()
     {
-        var dip = RequiredWidthDevicePx / PixelsPerDip;
+        var dip = RequiredWidthDevicePx / PixelsPerDip * DesignMetrics.SpectrumWidthScale;
         Width = dip;
         MinWidth = dip;
     }
@@ -118,8 +118,8 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         }
 
         var px = 1d / PixelsPerDip;
-        var barWidth = BarWidthDevicePx * px;
-        var barGap = BarGapDevicePx * px;
+        var barWidth = BarWidthDevicePx * px * DesignMetrics.SpectrumWidthScale;
+        var barGap = BarGapDevicePx * px * DesignMetrics.SpectrumWidthScale;
         var barBrush = WpfControlHelpers.FrozenBrush(Theme.Get("SpectrumBarBrush"));
         var bandCount = Math.Min(
             _levels.Length,

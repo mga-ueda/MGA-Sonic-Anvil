@@ -4,15 +4,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="clr-namespace:MgaSonicAnvil.UI"
              xmlns:domain="clr-namespace:MgaSonicAnvil.Domain"
-             Height="{x:Static ui:DesignMetrics.TransportBarHeight}"
              Focusable="False"
              Background="{DynamicResource TransportBackBrush}">
-  <Grid Margin="12,0">
-    <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="Auto" />
-      <ColumnDefinition Width="*" />
-    </Grid.ColumnDefinitions>
-    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+  <Grid Margin="12,4,12,0">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <StackPanel Orientation="Horizontal"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center">
       <TextBox x:Name="CurrentTimeBox"
                Style="{StaticResource TransportTimecodeStyle}"
                Text="00:00.000"
@@ -39,9 +40,10 @@
                  Text="/ 00:00.000" />
     </StackPanel>
     <StackPanel x:Name="ButtonsHost"
-                Grid.Column="1"
+                Grid.Row="1"
                 Orientation="Horizontal"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center" />
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                Margin="0,4,0,0" />
   </Grid>
 </UserControl>

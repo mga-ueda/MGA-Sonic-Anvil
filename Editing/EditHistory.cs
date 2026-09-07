@@ -1042,7 +1042,10 @@ internal static class ProcessEdits
             UiStrings.EditHistoryMarkers(name, before, after, sampleRate));
     }
 
-    public static IEditCommand? ConvertSampleRate(AudioDocument document, int destRate)
+    public static IEditCommand? ConvertSampleRate(
+        AudioDocument document,
+        int destRate,
+        IProgress<double>? progress = null)
     {
         if (!FormatConvert.IsValidSampleRate(destRate) || destRate == document.SampleRate)
         {
@@ -1054,7 +1057,8 @@ internal static class ProcessEdits
             document.Interleaved,
             document.Channels,
             document.SampleRate,
-            destRate);
+            destRate,
+            progress);
         var destFrames = samples.Length / document.Channels;
         var after = new FormatSnapshot(
             samples,

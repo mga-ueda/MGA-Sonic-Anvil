@@ -170,6 +170,7 @@ public partial class MainWindow
             Waveform.SetTrailRecording(true);
             Transport.SetPlaying(true);
             Waveform.PlayheadFrame = startFrame;
+            SyncOverviewPlayhead();
         }
         catch (Exception ex)
         {
@@ -220,7 +221,13 @@ public partial class MainWindow
         }
 
         _player.Seek(frame);
+        SyncOverviewPlayhead();
         RefreshStatus();
+    }
+
+    private void SyncOverviewPlayhead()
+    {
+        Overview.SyncPlayhead(_document is null ? -1 : Waveform.ExitPlayheadFrame);
     }
 
     private void OnCursorCommitted(long frame)
@@ -238,6 +245,7 @@ public partial class MainWindow
             _player.Seek(frame);
         }
 
+        SyncOverviewPlayhead();
         RefreshStatus();
     }
 
@@ -403,6 +411,7 @@ public partial class MainWindow
             Waveform.PlayheadFrame = frame;
             Waveform.ExitPlayheadFrame = _player.ExitCursorFrame;
             Waveform.FollowPlayhead();
+            SyncOverviewPlayhead();
             SyncTransportPosition(frame);
         }
     }
@@ -454,6 +463,7 @@ public partial class MainWindow
         var frame = _player.CursorFrame;
         _document.CursorFrame = frame;
         Waveform.SetPlayheadFromPlayback(frame);
+        SyncOverviewPlayhead();
         SyncTransportPosition(frame);
     }
 
@@ -509,6 +519,7 @@ public partial class MainWindow
 
         _document.CursorFrame = frame;
         _player.CaptureScrub(_document, frame);
+        SyncOverviewPlayhead();
         SyncTransportPosition(frame);
         RefreshStatus();
     }

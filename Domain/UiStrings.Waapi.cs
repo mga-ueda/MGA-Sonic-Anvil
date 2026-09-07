@@ -28,7 +28,7 @@ internal static partial class UiStrings
         + "アプリ内プレビューではループ折り返し時に -E を二重再生し、シークバーが 2 本になります。\n"
         + "EXPORT 時は Music Playlist Container の既定トランジションルール（Any to Any）へ反映します。";
     public const string TipWaapiToggle =
-        "WAAPI の接続とエリア表示を切り替えます。オフのときは Wwise へ接続しません。";
+        "WAAPI の接続とエリア表示を切り替えます (W)。オフのときは Wwise へ接続しません。";
     public const string PreflightWaapiOff =
         "WAAPI がオフです。トランスポートの WAAPI をオンにすると接続します。";
     public const string TipExport =
