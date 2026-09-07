@@ -3042,10 +3042,28 @@ internal sealed class WaveformView : Grid
         var hasLoop = !loop.IsEmpty;
         var tick = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush")), 1);
         tick.Freeze();
-        var lastRight = double.NegativeInfinity;
         const double minGap = 72;
         var loopX0 = hasLoop ? FrameToViewX(loop.StartFrame, start, span, bounds) : 0;
         var loopX1 = hasLoop ? FrameToViewX(loop.EndFrame, start, span, bounds) : 0;
+
+        // ラベルが混み合う場合の間引きは「前のラベルとの距離」ではなく
+        // 絶対時刻に固定した N 目盛りごとに行う。相対判定だとスクロールで
+        // 先頭目盛りが変わるたびに描かれる組がずれ、ラベルが跳んで見える。
+        var spacingPx = seconds <= 0 ? 0 : step / seconds * ScaleContentWidth(bounds);
+        if (spacingPx > 0)
+        {
+            var sampleLabel = GetTimeLabel(
+                UiStrings.FormatDuration(Math.Max(0, startSec + seconds)),
+                pixelsPerDip,
+                accent: TimeLabelAccent.None);
+            var required = sampleLabel.Width + 3 + minGap;
+            if (spacingPx < required)
+            {
+                step *= NiceMultiplier((int)Math.Ceiling(required / spacingPx));
+                first = Math.Floor(startSec / step) * step;
+            }
+        }
+
         for (var t = first; t <= startSec + seconds + step; t += step)
         {
             if (t < -1e-9)
@@ -3054,11 +3072,6 @@ internal sealed class WaveformView : Grid
             }
 
             var x = FrameToViewX(t * _document.SampleRate, start, span, bounds);
-            if (x - lastRight < minGap)
-            {
-                continue;
-            }
-
             var label = UiStrings.FormatDuration(Math.Max(0, t));
             var muted = GetTimeLabel(label, pixelsPerDip, accent: TimeLabelAccent.None);
             var origin = new Point(x + 3, lane.Y + Math.Max(1, (lane.Height - muted.Height) * 0.5));
@@ -3078,8 +3091,30 @@ internal sealed class WaveformView : Grid
             {
                 dc.DrawText(muted, origin);
             }
+        }
+    }
 
-            lastRight = origin.X + muted.Width;
+    /// <summary>k 以上で最小の「きれいな」倍率（1,2,5,10,20,50,…）を返す。</summary>
+    internal static int NiceMultiplier(int k)
+    {
+        if (k <= 1)
+        {
+            return 1;
+        }
+
+        var scale = 1;
+        while (true)
+        {
+            foreach (var nice in (ReadOnlySpan<int>)[1, 2, 5])
+            {
+                var candidate = nice * scale;
+                if (candidate >= k)
+                {
+                    return candidate;
+                }
+            }
+
+            scale *= 10;
         }
     }
 
