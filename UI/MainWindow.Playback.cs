@@ -327,14 +327,24 @@ public partial class MainWindow
             Waveform.AbandonScrub();
         }
 
-        if (_player.ProviderEnded)
+        if (_fadePreviewing || _formatPreviewing)
         {
-            OnPlaybackEnded(_playbackGeneration);
+            SyncPreviewPlayhead();
+            if (_player.ProviderEnded)
+            {
+                var started = _fadePreviewing ? _fadePreviewStartedAt : _formatPreviewStartedAt;
+                if (Environment.TickCount64 - started >= 250)
+                {
+                    OnPlaybackEnded(_playbackGeneration);
+                }
+            }
+
             return;
         }
 
-        if (_formatPreviewing)
+        if (_player.ProviderEnded)
         {
+            OnPlaybackEnded(_playbackGeneration);
             return;
         }
 
@@ -379,6 +389,23 @@ public partial class MainWindow
 
         var hasSamples = _player.TakeMeterInterval(out var peakL, out var rmsL, out var peakR, out var rmsR);
         LevelMeter.Apply(_meter.Update(peakL, rmsL, peakR, rmsR, _meterClock.Elapsed.TotalSeconds, hasSamples));
+        if (_fadePreviewing || _formatPreviewing)
+        {
+            SyncPreviewPlayhead();
+        }
+    }
+
+    private void SyncPreviewPlayhead()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var frame = _player.CursorFrame;
+        _document.CursorFrame = frame;
+        Waveform.SetPlayheadFromPlayback(frame);
+        SyncTransportPosition(frame);
     }
 
     private void ExtinguishMeter()

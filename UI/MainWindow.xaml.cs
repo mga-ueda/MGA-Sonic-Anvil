@@ -56,6 +56,7 @@ public partial class MainWindow : Window
     private long _fadePreviewResumeFrame;
     private long _fadePreviewStartedAt;
     private long _fadeSpaceTick;
+    private bool _fadeReplayOnHighlight;
     private bool _resumeAfterScrub;
     private bool _startupRevealPending = true;
 

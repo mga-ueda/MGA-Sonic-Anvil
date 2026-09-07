@@ -178,7 +178,12 @@ internal sealed class AudioPlayer : IDisposable
             EndScrub();
         }
 
-        _output?.Pause();
+        // 停止済みの出力に Pause すると、続く Play が無音のまま終わることがある。
+        if (_playing)
+        {
+            _output?.Pause();
+        }
+
         _playing = false;
     }
 

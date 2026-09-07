@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
@@ -36,16 +37,18 @@ public partial class MainWindow
 
         _fadePromptIsIn = fadeIn;
         _fadePreviewResumeFrame = _document.CursorFrame;
+        _fadeReplayOnHighlight = false;
         var menu = FadeCurvePicker.Show(
             this,
             PlacementMode.Center,
             fadeIn,
             shape => ApplyFade(fadeIn, shape),
             shape => PreviewFade(fadeIn, shape),
-            shape => ApplyFadeCurveVisualPreview(fadeIn, shape));
+            shape => OnFadeCurveHighlighted(fadeIn, shape));
         _fadeMenu = menu;
         menu.Closed += (_, _) =>
         {
+            _fadeReplayOnHighlight = false;
             StopFadePreview(restoreCursor: true);
             ClearFadeCurveVisualPreview();
             if (ReferenceEquals(_fadeMenu, menu))
@@ -53,6 +56,7 @@ public partial class MainWindow
                 _fadeMenu = null;
             }
         };
+        Dispatcher.BeginInvoke(() => _fadeReplayOnHighlight = true, DispatcherPriority.ApplicationIdle);
     }
 
     private bool CloseFadeCurvePicker()
@@ -64,6 +68,23 @@ public partial class MainWindow
 
         _fadeMenu.IsOpen = false;
         return true;
+    }
+
+    private void OnFadeCurveHighlighted(bool fadeIn, FadeShape shape)
+    {
+        ApplyFadeCurveVisualPreview(fadeIn, shape);
+        if (!_fadeReplayOnHighlight || _document is null || _fadePreviewToggling)
+        {
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            return;
+        }
+
+        StartFadePreviewPlayback(range, fadeIn, shape);
     }
 
     private void ApplyFadeCurveVisualPreview(bool fadeIn, FadeShape shape)
@@ -146,7 +167,12 @@ public partial class MainWindow
 
         try
         {
-            PausePlaybackSoft();
+            if (_player.IsPlaying)
+            {
+                _player.Pause();
+            }
+
+            _playTimer.Stop();
             _meter.Reset();
             var previewRange = FadeCurves.InclusiveSampleRange(range, _document.FrameCount);
             var gain = (long frame) =>
@@ -169,7 +195,8 @@ public partial class MainWindow
             StartMeterRendering();
             Waveform.SetTrailRecording(true);
             Transport.SetPlaying(true);
-            Waveform.PlayheadFrame = previewRange.StartFrame;
+            Waveform.UnlockCenter();
+            Waveform.SetPlayheadFromPlayback(previewRange.StartFrame);
         }
         catch (Exception ex)
         {
@@ -201,7 +228,7 @@ public partial class MainWindow
     private void ReleaseStuckScrub()
     {
         Overview.CancelDrag();
-        Mouse.Capture(null);
+        // グローバル Capture 解除はフェード / 変換メニューを閉じ、Closed で試聴まで止める。
         Waveform.AbandonScrub();
         if (_player.IsScrubbing)
         {

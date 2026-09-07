@@ -43,10 +43,23 @@ internal static class FadeCurvePicker
         {
             PlacementTarget = placementTarget,
             Placement = placement,
+            StaysOpen = true,
             Tag = new MenuState { FadeIn = fadeIn, OnHighlight = onHighlight },
         };
 
         FadeCurveIcons.AddCurveChoices(menu.Items, FadeCurves.Default, fadeIn, onCommit);
+        foreach (var item in menu.Items.OfType<MenuItem>())
+        {
+            item.PreviewKeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Space && Keyboard.Modifiers == ModifierKeys.None)
+                {
+                    e.Handled = true;
+                    onPreview(HighlightedShape(menu));
+                }
+            };
+        }
+
         WireHighlightTracking(menu);
 
         menu.PreviewKeyDown += (_, e) =>

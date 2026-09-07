@@ -14,13 +14,13 @@ namespace MgaSonicAnvil.UI;
 
 internal sealed class WaveformView : Grid
 {
-    // 旧 2^(1/8) の 3 段階分 = 2^(3/8)。キー／ボタンの時間・振幅ズーム共通。
-    public const double TimeZoomStep = 1.2968395546510096;
+    // 旧 2^(1/8) の 5 段階分 = 2^(5/8)。キー／ボタンの時間・振幅ズーム共通。
+    public const double TimeZoomStep = 1.5422108254079407;
     public const double TimeZoomMax = 81920d;
     public const double TimeZoomStepMax = 32d;
     public const double AmpZoomMax = 128d;
-    // 旧 2^(1/4) の 3 段階分 = 2^(3/4)。ホイール時間ズーム。
-    public const double WheelTimeStep = 1.681792830507429;
+    // 旧 2^(1/4) の 5 段階分 = 2^(5/4)。ホイール時間ズーム。
+    public const double WheelTimeStep = 2.378414230005442;
     private const int PolylineMaxSamplesPerPixel = 1;
     private const int RawColumnMaxSamplesPerPixel = 96;
     private const int RawColumnMaxFrames = 1 << 18;
@@ -266,6 +266,29 @@ internal sealed class WaveformView : Grid
 
             InvalidatePlayheadLayer();
         }
+    }
+
+    public void SetPlayheadFromPlayback(long frame)
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        frame = ClampFrame(frame);
+        if (_playheadFrame == frame)
+        {
+            return;
+        }
+
+        ResetTrailIfRewound(frame);
+        _playheadFrame = frame;
+        if (_trailActive)
+        {
+            RecordTrailSample(frame);
+        }
+
+        InvalidatePlayheadLayer();
     }
 
     public void SetTrailRecording(bool active)
