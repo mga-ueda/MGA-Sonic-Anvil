@@ -27,6 +27,7 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+    <PublishDir>$(MSBuildThisFileDirectory)publish\</PublishDir>
     <NoWarn>$(NoWarn);SYSLIB1054</NoWarn>
     <DefaultItemExcludes>$(DefaultItemExcludes);MgaSonicAnvil.Tests\**;tools\**</DefaultItemExcludes>
   </PropertyGroup>

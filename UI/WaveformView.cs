@@ -1375,6 +1375,7 @@ internal sealed class WaveformView : Grid
             _keyboardSelectAnchor = _anchorFrame;
             _document.Selection = WaveSelection.FromPoints(_anchorFrame, frame);
             _selecting = true;
+            InvalidatePlayheadLayer();
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
         else
@@ -1384,6 +1385,7 @@ internal sealed class WaveformView : Grid
             if (!_document.Selection.IsEmpty)
             {
                 _document.Selection = WaveSelection.Empty;
+                InvalidatePlayheadLayer();
                 SelectionChanged?.Invoke(this, EventArgs.Empty);
             }
         }
