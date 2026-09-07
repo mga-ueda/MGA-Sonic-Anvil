@@ -53,7 +53,7 @@ public partial class MainWindow
         {
             if (Keyboard.Modifiers == ModifierKeys.None)
             {
-                Waveform.WheelTimeZoomAtFrame(e.Delta, Overview.FrameAt(e.GetPosition(Overview).X));
+                Waveform.WheelTimeZoomAtPlayhead(e.Delta);
                 e.Handled = true;
             }
 
@@ -82,8 +82,7 @@ public partial class MainWindow
 
         if (modifiers == ModifierKeys.None)
         {
-            var x = e.GetPosition(Waveform).X;
-            Waveform.WheelTimeZoom(e.Delta, x);
+            Waveform.WheelTimeZoomAtPlayhead(e.Delta);
             e.Handled = true;
         }
     }
@@ -154,8 +153,10 @@ public partial class MainWindow
                 return true;
             }
 
-            if (Waveform.CancelScrub())
+            if (Waveform.IsScrubbing)
             {
+                Overview.CancelDrag();
+                Waveform.CancelScrub();
                 return true;
             }
 
@@ -347,8 +348,9 @@ public partial class MainWindow
 
         if ((key is Key.Z or Key.OemPeriod or Key.Decimal) && modifiers == ModifierKeys.None)
         {
-            if (_player.IsPlaying)
+            if (IsPlaybackActive())
             {
+                DetachOverviewScrubKeepPlayback();
                 if (Waveform.CenterLocked)
                 {
                     Waveform.UnlockCenter();

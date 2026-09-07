@@ -198,12 +198,23 @@ public partial class MainWindow
         RestoreFadeVisualIfMenuOpen();
     }
 
+    private void ReleaseStuckScrub()
+    {
+        Overview.CancelDrag();
+        Mouse.Capture(null);
+        Waveform.AbandonScrub();
+        if (_player.IsScrubbing)
+        {
+            _player.EndScrub();
+        }
+
+        _resumeAfterScrub = false;
+    }
+
     private void PausePlaybackSoft()
     {
-        if (_player.IsPlaying)
-        {
-            _player.Pause();
-        }
+        ReleaseStuckScrub();
+        _player.Pause();
 
         _playTimer.Stop();
         StopMeterRendering();

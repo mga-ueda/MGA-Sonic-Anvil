@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -147,6 +148,67 @@ public partial class MainWindow
                 break;
             }
         }
+
+        Dispatcher.BeginInvoke(SyncTabOverflow, DispatcherPriority.Loaded);
+    }
+
+    private void DocumentTabHost_SizeChanged(object sender, SizeChangedEventArgs e) =>
+        SyncTabOverflow();
+
+    private void DocumentTabScroll_ScrollChanged(object sender, ScrollChangedEventArgs e) =>
+        SyncTabOverflow();
+
+    private void DocumentTabScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (DocumentTabScroll.ExtentWidth <= DocumentTabScroll.ViewportWidth)
+        {
+            return;
+        }
+
+        ScrollTabs(e.Delta > 0 ? -1 : 1, step: 80);
+        e.Handled = true;
+    }
+
+    private void TabScrollLeft_Click(object sender, RoutedEventArgs e)
+    {
+        ScrollTabs(-1);
+        e.Handled = true;
+    }
+
+    private void TabScrollRight_Click(object sender, RoutedEventArgs e)
+    {
+        ScrollTabs(1);
+        e.Handled = true;
+    }
+
+    private void ScrollTabs(int direction, double? step = null)
+    {
+        var amount = step ?? Math.Max(80, DocumentTabScroll.ViewportWidth * 0.6);
+        var max = Math.Max(0, DocumentTabScroll.ExtentWidth - DocumentTabScroll.ViewportWidth);
+        DocumentTabScroll.ScrollToHorizontalOffset(
+            Math.Clamp(DocumentTabScroll.HorizontalOffset + direction * amount, 0, max));
+    }
+
+    private void SyncTabOverflow()
+    {
+        if (DocumentTabHost.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        var overflow = DocumentTabScroll.ExtentWidth > DocumentTabScroll.ViewportWidth + 1;
+        var show = overflow ? Visibility.Visible : Visibility.Collapsed;
+        if (TabScrollLeft.Visibility != show)
+        {
+            TabScrollLeft.Visibility = show;
+            TabScrollRight.Visibility = show;
+        }
+
+        var canLeft = DocumentTabScroll.HorizontalOffset > 1;
+        var canRight = DocumentTabScroll.HorizontalOffset + DocumentTabScroll.ViewportWidth
+            < DocumentTabScroll.ExtentWidth - 1;
+        TabScrollLeft.IsEnabled = canLeft;
+        TabScrollRight.IsEnabled = canRight;
     }
 
     private void RefreshTabHeaders()

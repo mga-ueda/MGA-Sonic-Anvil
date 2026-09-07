@@ -74,6 +74,11 @@ internal sealed class AudioPlayer : IDisposable
         Func<long, float>? frameGain = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_scrubbing)
+        {
+            EndScrub();
+        }
+
         var wasPlaying = _playing;
         _provider.Bind(document, startFrame, playRange, loop, frameGain);
         EnsureDeviceMatchesProvider();
@@ -149,6 +154,11 @@ internal sealed class AudioPlayer : IDisposable
     public void Play()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_scrubbing)
+        {
+            EndScrub();
+        }
+
         EnsureOutputDevice();
         if (_output is null)
         {

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
@@ -31,6 +32,14 @@ public partial class MainWindow
 
     private void OpenPath(string path) => OpenPaths([path]);
 
+    private void PumpUiAfterOpen()
+    {
+        UpdateLayout();
+        Waveform.Refresh();
+        Overview.InvalidateVisual();
+        Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+    }
+
     private void OpenPaths(IReadOnlyList<string> paths)
     {
         DocumentSession? first = null;
@@ -45,7 +54,13 @@ public partial class MainWindow
             var existing = FindSessionByPath(path);
             if (existing is not null)
             {
-                first ??= existing;
+                if (first is null)
+                {
+                    first = existing;
+                    ActivateSession(existing);
+                    PumpUiAfterOpen();
+                }
+
                 continue;
             }
 
@@ -54,7 +69,17 @@ public partial class MainWindow
                 var document = AudioCodec.Load(path);
                 var session = new DocumentSession(document);
                 _sessions.Add(session);
-                first ??= session;
+                if (first is null)
+                {
+                    first = session;
+                    ActivateSession(session);
+                }
+                else
+                {
+                    RebuildTabBar();
+                }
+
+                PumpUiAfterOpen();
             }
             catch (Exception ex)
             {
@@ -65,7 +90,6 @@ public partial class MainWindow
 
         if (first is not null)
         {
-            ActivateSession(first);
             if (first.Document.SourcePath is { } opened)
             {
                 RememberOpenedPath(opened, dirty: false, resetMarkers: false);

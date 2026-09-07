@@ -84,13 +84,36 @@ public partial class MainWindow
             return;
         }
 
-        if (_player.IsPlaying)
+        if (IsPlaybackActive())
         {
             HaltPlaybackToStart();
             return;
         }
 
         StartPlayback(_document.CursorFrame, prerollSeconds: 0);
+    }
+
+    private bool IsPlaybackActive() =>
+        _player.IsPlaying || _player.IsScrubbing || _playTimer.IsEnabled;
+
+    private void DetachOverviewScrubKeepPlayback()
+    {
+        Overview.CancelDrag();
+        if (Waveform.IsScrubbing)
+        {
+            Waveform.AbandonScrub();
+        }
+
+        if (_player.IsScrubbing)
+        {
+            _player.EndScrub();
+        }
+
+        _resumeAfterScrub = false;
+        if (_player.IsPlaying)
+        {
+            _playTimer.Start();
+        }
     }
 
     private void StartPrerollPlayback()
@@ -130,6 +153,7 @@ public partial class MainWindow
         _lastPlaybackStart = startFrame;
 
         _ = prerollSeconds;
+        ReleaseStuckScrub();
         try
         {
             _meter.Reset();
@@ -144,11 +168,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _playTimer.Stop();
-            StopMeterRendering();
-            Waveform.SetTrailRecording(false);
-            Transport.SetPlaying(false);
-            ExtinguishMeter();
+            PausePlaybackSoft();
             OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -157,7 +177,7 @@ public partial class MainWindow
 
     private bool PausePlaybackHere()
     {
-        if (_document is null || !_player.IsPlaying)
+        if (_document is null || !IsPlaybackActive())
         {
             return false;
         }
@@ -297,9 +317,14 @@ public partial class MainWindow
             return;
         }
 
-        if (_player.IsScrubbing || Waveform.IsScrubbing)
+        if (_player.IsScrubbing)
         {
             return;
+        }
+
+        if (Waveform.IsScrubbing && !Overview.IsDragging)
+        {
+            Waveform.AbandonScrub();
         }
 
         if (_player.ProviderEnded)
@@ -443,9 +468,14 @@ public partial class MainWindow
             return;
         }
 
-        if (_player.IsScrubbing || Waveform.IsScrubbing)
+        if (_player.IsScrubbing)
         {
             return;
+        }
+
+        if (Waveform.IsScrubbing)
+        {
+            Waveform.AbandonScrub();
         }
 
         if (_fadePreviewing)

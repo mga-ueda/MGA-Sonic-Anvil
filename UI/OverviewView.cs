@@ -25,6 +25,10 @@ internal sealed class OverviewView : FrameworkElement
 
     public event EventHandler<double>? ViewStartChanged;
 
+    public event EventHandler? DragEnded;
+
+    public bool IsDragging => _dragging;
+
     public OverviewView()
     {
         ClipToBounds = true;
@@ -140,7 +144,11 @@ internal sealed class OverviewView : FrameworkElement
             return;
         }
 
-        CaptureMouse();
+        if (!CaptureMouse())
+        {
+            return;
+        }
+
         _dragging = true;
         var x = e.GetPosition(this).X;
         var window = VisibleWindow(ActualWidth);
@@ -159,7 +167,7 @@ internal sealed class OverviewView : FrameworkElement
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
-        if (!_dragging)
+        if (!_dragging || !IsMouseCaptured)
         {
             return;
         }
@@ -174,9 +182,35 @@ internal sealed class OverviewView : FrameworkElement
             return;
         }
 
-        ReleaseMouseCapture();
-        _dragging = false;
+        EndDrag(notify: true);
         e.Handled = true;
+    }
+
+    protected override void OnLostMouseCapture(MouseEventArgs e)
+    {
+        EndDrag(notify: true);
+        base.OnLostMouseCapture(e);
+    }
+
+    public void CancelDrag() => EndDrag(notify: false);
+
+    private void EndDrag(bool notify)
+    {
+        if (!_dragging)
+        {
+            return;
+        }
+
+        _dragging = false;
+        if (IsMouseCaptured)
+        {
+            ReleaseMouseCapture();
+        }
+
+        if (notify)
+        {
+            DragEnded?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     private void ApplyViewFromWindowLeft(double windowLeft)

@@ -127,6 +127,7 @@ internal sealed class WaveformView : Grid
     private int _waveBgra;
     private int _zeroBgra;
     private double _viewStart;
+    private long _followRebuildAt;
     private double _timeZoom = 1d;
     private double _ampZoom = 1d;
     private long _playheadFrame;
@@ -432,6 +433,9 @@ internal sealed class WaveformView : Grid
 
     public void WheelTimeZoom(int delta, double anchorX) =>
         WheelTimeZoomAtFrame(delta, XToFrame(anchorX));
+
+    public void WheelTimeZoomAtPlayhead(int delta) =>
+        WheelTimeZoomAtFrame(delta, _playheadFrame);
 
     public void WheelTimeZoomAtFrame(int delta, double anchorFrame)
     {
@@ -768,7 +772,7 @@ internal sealed class WaveformView : Grid
 
         if (CenterLocked)
         {
-            CenterViewOnPlayhead();
+            SetViewStart(_playheadFrame - span * 0.5, playbackFollow: true);
             return;
         }
 
@@ -866,6 +870,53 @@ internal sealed class WaveformView : Grid
         EnsureFrameVisible(range.StartFrame);
         InvalidatePlayheadLayer();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void BeginScrubAtFrame(long frame)
+    {
+        if (_document is null || _scrubbing)
+        {
+            return;
+        }
+
+        EndMarkerCommentEdit(commit: true);
+        _scrubbing = true;
+        _selecting = false;
+        frame = ClampFrame(frame);
+        PreviewInteraction(frame, force: true);
+        ScrubStarted?.Invoke(this, frame);
+    }
+
+    public void PreviewScrubAtFrame(long frame)
+    {
+        if (!_scrubbing || _document is null)
+        {
+            return;
+        }
+
+        frame = ClampFrame(frame);
+        if (frame == _playheadFrame)
+        {
+            return;
+        }
+
+        PreviewInteraction(frame);
+        ScrubPreviewed?.Invoke(this, frame);
+    }
+
+    public void EndScrubAtFrame(long frame, bool commit) => FinishScrub(commit, frame);
+
+    public void AbandonScrub()
+    {
+        _scrubbing = false;
+        _dragging = false;
+        _selecting = false;
+        if (IsMouseCaptured)
+        {
+            ReleaseMouseCapture();
+        }
+
+        Cursor = Cursors.IBeam;
     }
 
     public bool CancelScrub()
@@ -3257,13 +3308,12 @@ internal sealed class WaveformView : Grid
         }
 
         Cursor = Cursors.IBeam;
-        if (_document is null)
+        frame = ClampFrame(frame);
+        if (_document is not null)
         {
-            return;
+            PreviewInteraction(frame, force: true);
         }
 
-        frame = ClampFrame(frame);
-        PreviewInteraction(frame, force: true);
         ScrubEnded?.Invoke(this, (frame, commit));
     }
 
@@ -4237,7 +4287,7 @@ internal sealed class WaveformView : Grid
         RaiseViewChanged();
     }
 
-    private void SetViewStart(double start)
+    private void SetViewStart(double start, bool playbackFollow = false)
     {
         if (_document is null)
         {
@@ -4259,10 +4309,29 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        EndMarkerCommentEdit(commit: true);
+        if (!playbackFollow)
+        {
+            EndMarkerCommentEdit(commit: true);
+        }
+
         _viewStart = next;
-        InvalidateStaticLayer();
         ApplyMouseGuideOverlay();
+        if (playbackFollow)
+        {
+            // センターロック追従。シークバー層は毎回、重い静的層は約 30fps に間引く。
+            InvalidatePlayheadLayer();
+            var now = Environment.TickCount64;
+            if (now - _followRebuildAt >= 33)
+            {
+                _followRebuildAt = now;
+                InvalidateStaticLayer();
+                RaiseViewChanged();
+            }
+
+            return;
+        }
+
+        InvalidateStaticLayer();
         RaiseViewChanged();
     }
 

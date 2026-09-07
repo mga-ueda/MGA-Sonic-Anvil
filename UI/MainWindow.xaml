@@ -106,13 +106,31 @@
             DockPanel.Dock="Bottom"
             Height="{x:Static ui:DesignMetrics.DocumentTabBarHeight}"
             Background="{DynamicResource TransportBackBrush}"
-            Visibility="Collapsed">
-      <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                    VerticalScrollBarVisibility="Disabled"
-                    Focusable="False">
-        <StackPanel x:Name="DocumentTabs"
-                    Orientation="Horizontal" />
-      </ScrollViewer>
+            Visibility="Collapsed"
+            SizeChanged="DocumentTabHost_SizeChanged">
+      <DockPanel>
+        <ui:TabScrollButton x:Name="TabScrollLeft"
+                            DockPanel.Dock="Left"
+                            PointLeft="True"
+                            Visibility="Collapsed"
+                            ToolTip="{x:Static domain:UiStrings.TipTabScrollLeft}"
+                            Click="TabScrollLeft_Click" />
+        <ui:TabScrollButton x:Name="TabScrollRight"
+                            DockPanel.Dock="Right"
+                            Visibility="Collapsed"
+                            ToolTip="{x:Static domain:UiStrings.TipTabScrollRight}"
+                            Click="TabScrollRight_Click" />
+        <ScrollViewer x:Name="DocumentTabScroll"
+                      HorizontalScrollBarVisibility="Hidden"
+                      VerticalScrollBarVisibility="Disabled"
+                      Focusable="False"
+                      PanningMode="HorizontalOnly"
+                      ScrollChanged="DocumentTabScroll_ScrollChanged"
+                      PreviewMouseWheel="DocumentTabScroll_PreviewMouseWheel">
+          <StackPanel x:Name="DocumentTabs"
+                      Orientation="Horizontal" />
+        </ScrollViewer>
+      </DockPanel>
     </Border>
 
     <ui:LevelMeterView x:Name="LevelMeter"

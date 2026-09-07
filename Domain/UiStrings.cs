@@ -108,13 +108,15 @@ internal static partial class UiStrings
     public const string TipSave = "保存 (Ctrl+S)\nCtrl+Shift+S で別名保存";
     public const string TipOpen = "開く (Ctrl+O)\n複数ファイル可。追加で開く。\nWave / AIFF / MP3\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Tab で次のタブ";
     public const string TipCloseTab = "タブを閉じる (Ctrl+W)";
-    public const string TipOverview = "波形全体。明るい部分が表示中の範囲。ドラッグで移動　ホイールで拡縮";
+    public const string TipTabScrollLeft = "左のタブを表示";
+    public const string TipTabScrollRight = "右のタブを表示";
+    public const string TipOverview = "波形全体。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）　ホイールで拡縮（シークバー基準）";
     public const string TipSpectrum = "再生出力の簡易スペクトラム表示です。";
     public const string TipAudioApi = "再生 API（WaveOut / WASAPI / ASIO）";
     public const string TipAudioDevice = "再生デバイス";
     public const string TipWaveform =
         "ドラッグで選択　Ctrl+ドラッグでスクラブ　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A で全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着\n"
-        + "ホイール=時間ズーム　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"
+        + "ホイール=時間ズーム（シークバー基準）　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"
         + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル、Shift で3倍）　Ctrl+←→ 前後のマーカー / リージョン端 / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（同じ範囲でもう一度で解除）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M マーカー　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動（Shift で3倍） / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント / リージョン名（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
         + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　T で現在時間　U で編集履歴";
     public const string TipAlwaysOnTop = "ウィンドウを常に最前面へ表示します。";

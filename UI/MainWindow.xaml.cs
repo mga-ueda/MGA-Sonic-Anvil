@@ -37,6 +37,7 @@ public partial class MainWindow : Window
     private AudioOutputSettings _outputSettings;
     private long _lastPlaybackStart;
     private bool _syncingScroll;
+    private bool _syncingChrome;
     private bool _syncingOutputCombos;
     private int _waveformHeightScale;
     private int _playbackGeneration;
@@ -88,15 +89,17 @@ public partial class MainWindow : Window
         Waveform.RegionClearRequested += (_, region) => ClearRegion(region);
         Waveform.MarkerClearRequested += (_, frames) => ClearMarkers(frames);
         Waveform.SelectionChanged += (_, _) => OnWaveformSelectionChanged();
-        Waveform.ViewChanged += (_, _) =>
+        Waveform.ViewChanged += (_, _) => SyncViewChrome();
+        Overview.ViewStartChanged += (_, start) =>
         {
-            SyncViewChrome();
-            RefreshStatus();
+            Waveform.UnlockCenter();
+            Waveform.SetViewStartExternal(start);
+            ScrubVisibleCenter();
         };
-        Overview.ViewStartChanged += (_, start) => Waveform.SetViewStartExternal(start);
+        Overview.DragEnded += (_, _) => EndOverviewScrub();
         TimeScroll.ValueChanged += (_, _) =>
         {
-            if (_syncingScroll)
+            if (_syncingScroll || Waveform.CenterLocked)
             {
                 return;
             }
@@ -111,7 +114,9 @@ public partial class MainWindow : Window
         Spectrum.Player = _player;
         PopulateOutputCombos();
 
-        _playTimer = new DispatcherTimer(DispatcherPriority.Render)
+        // Render 優先度だと追従描画が入力 (Input=5 < Render=7) を飢餓させ、
+        // センターロック中に停止操作が届かなくなる。Background で入力を先に通す。
+        _playTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
             Interval = TimeSpan.FromMilliseconds(16),
         };
@@ -159,8 +164,7 @@ public partial class MainWindow : Window
 
         if (Opacity < 1)
         {
-            _startupRevealPending = false;
-            Opacity = 1;
+            RevealStartupWindow();
         }
 
         Activate();
@@ -172,18 +176,15 @@ public partial class MainWindow : Window
     private void OnStartupLoaded(object sender, RoutedEventArgs e)
     {
         Loaded -= OnStartupLoaded;
-        TryRestoreLastDocument();
         UpdateLayout();
-        Waveform.Refresh();
-        Overview.InvalidateVisual();
-        // Loaded 直後の描画・コンボ反映が終わるまで待ってから表示する。
-        Dispatcher.BeginInvoke(RevealStartupWindow, DispatcherPriority.ApplicationIdle);
+        // 波形復元はせず、空のクロムが描ける状態にしてから表示する。
+        Dispatcher.BeginInvoke(RevealStartupWindow, DispatcherPriority.Loaded);
     }
 
     private void OnStartupContentRendered(object? sender, EventArgs e)
     {
         ContentRendered -= OnStartupContentRendered;
-        Dispatcher.BeginInvoke(RevealStartupWindow, DispatcherPriority.ApplicationIdle);
+        RevealStartupWindow();
     }
 
     private void RevealStartupWindow()
@@ -195,10 +196,26 @@ public partial class MainWindow : Window
 
         _startupRevealPending = false;
         Opacity = 1;
+        // 表示を先に出し、前回ドキュメントの読み込みは次のアイドルへ回す。
+        Dispatcher.BeginInvoke(RestoreLastDocumentAfterReveal, DispatcherPriority.ApplicationIdle);
+    }
+
+    private void RestoreLastDocumentAfterReveal()
+    {
+        TryRestoreLastDocument();
+        UpdateLayout();
+        Waveform.Refresh();
+        Overview.InvalidateVisual();
     }
 
     private void BindWorkspace(DocumentSession? session)
     {
+        Overview.CancelDrag();
+        if (Waveform.IsScrubbing)
+        {
+            Waveform.CancelScrub();
+        }
+
         _player.Stop();
         _playTimer.Stop();
         CloseFadeCurvePicker();
@@ -248,12 +265,28 @@ public partial class MainWindow : Window
 
     private void SyncViewChrome()
     {
-        var frames = _document?.FrameCount ?? 0;
-        _syncingScroll = true;
-        TimeScroll.Sync(Waveform.ViewStart, Waveform.ViewSpanFrames, frames);
-        _syncingScroll = false;
-        Overview.SetView(Waveform.ViewStart, Waveform.ViewSpanFrames);
-        SyncTransportPosition();
+        if (_syncingChrome)
+        {
+            return;
+        }
+
+        _syncingChrome = true;
+        try
+        {
+            var frames = _document?.FrameCount ?? 0;
+            _syncingScroll = true;
+            TimeScroll.Sync(Waveform.ViewStart, Waveform.ViewSpanFrames, frames);
+            _syncingScroll = false;
+            Overview.SetView(Waveform.ViewStart, Waveform.ViewSpanFrames);
+            if (!_playTimer.IsEnabled)
+            {
+                SyncTransportPosition();
+            }
+        }
+        finally
+        {
+            _syncingChrome = false;
+        }
     }
 
     private void RefreshStatus()
@@ -292,6 +325,36 @@ public partial class MainWindow : Window
     {
         var current = FrameToSeconds(frame ?? Waveform.PlayheadFrame);
         Transport.SetPosition(current, _document?.DurationSeconds ?? 0);
+    }
+
+    private long VisibleCenterFrame() =>
+        (long)Math.Round(Waveform.ViewStart + Waveform.ViewSpanFrames * 0.5);
+
+    private void ScrubVisibleCenter()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var frame = VisibleCenterFrame();
+        if (Waveform.IsScrubbing)
+        {
+            Waveform.PreviewScrubAtFrame(frame);
+            return;
+        }
+
+        Waveform.BeginScrubAtFrame(frame);
+    }
+
+    private void EndOverviewScrub()
+    {
+        if (!Waveform.IsScrubbing)
+        {
+            return;
+        }
+
+        Waveform.EndScrubAtFrame(VisibleCenterFrame(), commit: true);
     }
 
     private void SeekToSeconds(double seconds)

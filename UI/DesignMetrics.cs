@@ -19,6 +19,8 @@ internal static class DesignMetrics
 
     public static double DocumentTabBarHeight => From96(22);
 
+    public static double DocumentTabScrollButtonWidth => From96(20);
+
     public static double RulerHeight => From96(24);
 
     public static double MarkerLaneRowHeight => From96(16);
