@@ -5,10 +5,10 @@
         xmlns:ui="clr-namespace:MgaSonicAnvil.UI"
         xmlns:domain="clr-namespace:MgaSonicAnvil.Domain"
         Title="{x:Static domain:AppVersion.ProductName}"
-        MinWidth="720"
-        MinHeight="420"
-        Width="1100"
-        Height="640"
+        MinWidth="{x:Static ui:DesignMetrics.WindowMinWidth}"
+        MinHeight="{x:Static ui:DesignMetrics.WindowMinHeight}"
+        Width="{x:Static ui:DesignMetrics.WindowDefaultWidth}"
+        Height="{x:Static ui:DesignMetrics.WindowDefaultHeight}"
         Opacity="0"
         AllowDrop="True"
         ToolTipService.IsEnabled="False"
@@ -23,54 +23,29 @@
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
         <TextBlock x:Name="StatusMeta"
                    VerticalAlignment="Center"
                    HorizontalAlignment="Left"
+                   Margin="0,0,8,0"
                    FontFamily="Consolas"
                    FontSize="11"
                    TextTrimming="CharacterEllipsis"
                    Foreground="{DynamicResource StatusBarDetailForeBrush}" />
-        <StackPanel Grid.Column="1"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Center">
-          <TextBlock x:Name="CopyrightText"
-                     FontSize="10"
-                     VerticalAlignment="Center"
-                     Foreground="{DynamicResource ActionCopyrightForeBrush}"
-                     Text="{x:Static domain:UiStrings.CopyrightText}" />
-          <TextBlock x:Name="GitHubLink"
-                     FontSize="10"
-                     VerticalAlignment="Center"
-                     Cursor="Hand"
-                     Foreground="{DynamicResource ActionLinkForeBrush}"
-                     Text="{x:Static domain:UiStrings.CopyrightGitHub}"
-                     MouseLeftButtonUp="GitHubLink_MouseLeftButtonUp" />
-          <TextBlock x:Name="AudioApiLabel"
-                     Text="{x:Static domain:UiStrings.LabelAudioApi}"
-                     VerticalAlignment="Center"
-                     Margin="12,0,6,0"
-                     FontSize="11"
-                     Foreground="{DynamicResource StatusBarTitleForeBrush}" />
-          <ComboBox x:Name="ApiCombo"
-                    Width="110"
-                    Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                    Margin="0,0,12,0"
-                    VerticalContentAlignment="Center"
-                    SelectionChanged="ApiCombo_SelectionChanged" />
-          <TextBlock x:Name="AudioDeviceLabel"
-                     Text="{x:Static domain:UiStrings.LabelAudioDevice}"
-                     VerticalAlignment="Center"
-                     Margin="0,0,6,0"
-                     FontSize="11"
-                     Foreground="{DynamicResource StatusBarTitleForeBrush}" />
-          <ComboBox x:Name="DeviceCombo"
-                    Width="220"
-                    Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                    VerticalContentAlignment="Center"
-                    SelectionChanged="DeviceCombo_SelectionChanged" />
-        </StackPanel>
+        <ui:StatusTimeStrip x:Name="StatusTimes"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Margin="0,0,12,0" />
+        <CheckBox x:Name="AlwaysOnTopCheck"
+                  Grid.Column="2"
+                  Style="{StaticResource DarkCheckBoxStyle}"
+                  Content="{x:Static domain:UiStrings.LabelAlwaysOnTop}"
+                  VerticalAlignment="Center"
+                  FontSize="11"
+                  Foreground="{DynamicResource StatusBarTitleForeBrush}"
+                  Checked="AlwaysOnTopCheck_Changed"
+                  Unchecked="AlwaysOnTopCheck_Changed" />
       </Grid>
     </Border>
 
@@ -129,7 +104,12 @@
             <ColumnDefinition Width="{x:Static ui:DesignMetrics.DbScaleWidthGrid}" />
             <ColumnDefinition Width="*" />
           </Grid.ColumnDefinitions>
-          <Border Background="{DynamicResource TimelineWellBackBrush}" />
+          <Border Background="{DynamicResource TransportBackBrush}">
+            <ui:SettingsGearButton x:Name="SettingsGear"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Click="SettingsGearButton_Click" />
+          </Border>
           <Border Grid.Column="1"
                   Padding="{x:Static ui:DesignMetrics.OverviewPad}"
                   Background="{DynamicResource ProjectBarBackBrush}">
@@ -148,92 +128,101 @@
             <ui:TimeScrollBar x:Name="TimeScroll"
                               Grid.Row="1"
                               Style="{StaticResource DarkScrollBarStyle}"
-                              Background="{DynamicResource WaveformScrollTrackBrush}" />
+                              Background="{DynamicResource TimelineWellBackBrush}" />
           </Grid>
         </Border>
       </DockPanel>
 
-      <Grid Grid.Row="0" Grid.Column="1" Grid.RowSpan="2">
+      <Grid Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
+            Width="{x:Static ui:DesignMetrics.LevelMeterWidth}"
+            Background="{DynamicResource TransportBackBrush}">
         <Grid.RowDefinitions>
+          <RowDefinition Height="{x:Static ui:DesignMetrics.ProjectBarHeightGrid}" />
           <RowDefinition Height="*" />
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
+        <Border x:Name="MeterTopSlot"
+                Grid.Row="0"
+                Background="{DynamicResource TransportBackBrush}" />
         <ui:LevelMeterView x:Name="LevelMeter"
-                           Grid.Row="0"
-                           Margin="2,0,2,0"
+                           Grid.Row="1"
                            VerticalAlignment="Stretch" />
         <ui:VectorScopeView x:Name="VectorScope"
-                            Grid.Row="1"
-                            Margin="2,0,2,0"
+                            Grid.Row="2"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Bottom"
                             />
       </Grid>
 
-      <Grid Grid.Row="1" Grid.Column="0">
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <Border x:Name="DocumentTabHost"
-                Grid.Row="0"
-                Height="{x:Static ui:DesignMetrics.DocumentTabBarHeight}"
-                Background="{DynamicResource TransportBackBrush}"
-                Visibility="Collapsed"
-                SizeChanged="DocumentTabHost_SizeChanged">
-          <DockPanel>
-            <ui:TabScrollButton x:Name="TabScrollLeft"
-                                DockPanel.Dock="Left"
-                                PointLeft="True"
-                                Visibility="Collapsed"
-                                Click="TabScrollLeft_Click" />
-            <ui:TabScrollButton x:Name="TabScrollRight"
-                                DockPanel.Dock="Right"
-                                Visibility="Collapsed"
-                                Click="TabScrollRight_Click" />
-            <ScrollViewer x:Name="DocumentTabScroll"
-                          HorizontalScrollBarVisibility="Hidden"
-                          VerticalScrollBarVisibility="Disabled"
-                          Focusable="False"
-                          PanningMode="HorizontalOnly"
-                          ScrollChanged="DocumentTabScroll_ScrollChanged"
-                          PreviewMouseWheel="DocumentTabScroll_PreviewMouseWheel">
-              <StackPanel x:Name="DocumentTabs"
-                          Orientation="Horizontal" />
-            </ScrollViewer>
-          </DockPanel>
-        </Border>
-
-        <Grid Grid.Row="1"
+      <Grid Grid.Row="1" Grid.Column="0"
+            Background="{DynamicResource TransportBackBrush}">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Grid Grid.Column="0"
               MinHeight="{x:Static ui:DesignMetrics.TransportBarHeight}"
               Background="{DynamicResource TransportBackBrush}">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-          </Grid.ColumnDefinitions>
-          <StackPanel Grid.Column="0"
-                      HorizontalAlignment="Left"
-                      VerticalAlignment="Top">
-            <ui:TransportBar x:Name="Transport" />
-            <CheckBox x:Name="AlwaysOnTopCheck"
-                      Style="{StaticResource DarkCheckBoxStyle}"
-                      Content="{x:Static domain:UiStrings.LabelAlwaysOnTop}"
-                      HorizontalAlignment="Left"
-                      VerticalAlignment="Center"
-                      Margin="12,4,0,0"
-                      FontSize="11"
-                      Foreground="{DynamicResource MutedForeBrush}"
-                      Checked="AlwaysOnTopCheck_Changed"
-                      Unchecked="AlwaysOnTopCheck_Changed" />
-          </StackPanel>
-          <ui:ProjectSpectrumView x:Name="Spectrum"
-                                  Grid.Column="1"
-                                  Height="{x:Static ui:DesignMetrics.SpectrumHeight}"
-                                  Margin="4,0,0,0"
-                                  HorizontalAlignment="Right"
-                                  VerticalAlignment="Top" />
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <Border x:Name="DocumentTabHost"
+                  Grid.Row="0"
+                  Height="{x:Static ui:DesignMetrics.DocumentTabBarHeight}"
+                  Background="{DynamicResource TransportBackBrush}"
+                  SizeChanged="DocumentTabHost_SizeChanged">
+            <DockPanel>
+              <ui:TabScrollButton x:Name="TabScrollLeft"
+                                  DockPanel.Dock="Left"
+                                  PointLeft="True"
+                                  Visibility="Collapsed"
+                                  Click="TabScrollLeft_Click" />
+              <ui:TabScrollButton x:Name="TabScrollRight"
+                                  DockPanel.Dock="Right"
+                                  Visibility="Collapsed"
+                                  Click="TabScrollRight_Click" />
+              <ScrollViewer x:Name="DocumentTabScroll"
+                            HorizontalScrollBarVisibility="Hidden"
+                            VerticalScrollBarVisibility="Disabled"
+                            Focusable="False"
+                            PanningMode="HorizontalOnly"
+                            ScrollChanged="DocumentTabScroll_ScrollChanged"
+                            PreviewMouseWheel="DocumentTabScroll_PreviewMouseWheel">
+                <StackPanel x:Name="DocumentTabs"
+                            Orientation="Horizontal" />
+              </ScrollViewer>
+            </DockPanel>
+          </Border>
+          <Grid Grid.Row="1">
+            <ui:TransportBar x:Name="Transport"
+                             HorizontalAlignment="Left"
+                             VerticalAlignment="Top" />
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Bottom"
+                        Margin="12,0,0,6">
+              <TextBlock x:Name="CopyrightText"
+                         FontSize="10"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ActionCopyrightForeBrush}"
+                         Text="{x:Static domain:UiStrings.CopyrightText}" />
+              <TextBlock x:Name="GitHubLink"
+                         FontSize="10"
+                         VerticalAlignment="Center"
+                         Cursor="Hand"
+                         Foreground="{DynamicResource ActionLinkForeBrush}"
+                         Text="{x:Static domain:UiStrings.CopyrightGitHub}"
+                         MouseLeftButtonUp="GitHubLink_MouseLeftButtonUp" />
+            </StackPanel>
+          </Grid>
         </Grid>
+        <ui:ProjectSpectrumView x:Name="Spectrum"
+                                Grid.Column="1"
+                                Height="{x:Static ui:DesignMetrics.SpectrumHeight}"
+                                Margin="0,0,1,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top" />
       </Grid>
     </Grid>
   </DockPanel>

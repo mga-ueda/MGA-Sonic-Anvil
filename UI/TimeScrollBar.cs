@@ -16,7 +16,7 @@ internal sealed class TimeScrollBar : ScrollBar
         Focusable = false;
         // 派生型には App.xaml の ScrollBar 暗黙スタイルが当たらない。
         SetResourceReference(StyleProperty, "DarkScrollBarStyle");
-        SetResourceReference(BackgroundProperty, "WaveformScrollTrackBrush");
+        SetResourceReference(BackgroundProperty, "TimelineWellBackBrush");
     }
 
     public void Sync(double viewStart, double viewSpan, long totalFrames)

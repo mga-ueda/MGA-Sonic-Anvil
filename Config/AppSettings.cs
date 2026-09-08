@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Editing;
 
 namespace MgaSonicAnvil.Config;
 
@@ -9,16 +10,34 @@ internal sealed class AppSettings
 
     public string AudioDeviceId { get; set; } = string.Empty;
 
+    public string DefaultFadeInCurve { get; set; } = nameof(FadeShape.SCurve);
+
+    public string DefaultFadeOutCurve { get; set; } = nameof(FadeShape.SCurve);
+
     public int WaveformHeightScale { get; set; } = 1;
 
     public int Mp3BitRate { get; set; } = 192;
 
     public bool AlwaysOnTop { get; set; }
 
-    public string UiLanguage { get; set; } = "ja";
+    public int WindowX { get; set; }
+
+    public int WindowY { get; set; }
+
+    public int WindowWidth { get; set; }
+
+    public int WindowHeight { get; set; }
+
+    /// <summary>Normal / Maximized。空または不明なら通常表示。</summary>
+    public string WindowState { get; set; } = string.Empty;
+
+    public string UiLanguage { get; set; } = "auto";
 
     /// <summary>Tips 枠の表示。既定オン。</summary>
     public bool ShowTips { get; set; } = true;
+
+    /// <summary>ステータスバーの時間をサンプル数で表示。</summary>
+    public bool StatusShowSamples { get; set; }
 
     /// <summary>「今は開かない」にしたリモート版。同じ版では再通知しない。</summary>
     public string SkippedUpdateVersion { get; set; } = string.Empty;
@@ -26,6 +45,11 @@ internal sealed class AppSettings
     public string LastDocumentPath { get; set; } = string.Empty;
 
     public bool LastDocumentDirty { get; set; }
+
+    /// <summary>終了時に開いていたタブ。無ければ LastDocument* から 1 本だけ戻す。</summary>
+    public OpenDocumentSnapshot[] OpenDocuments { get; set; } = [];
+
+    public int ActiveDocumentIndex { get; set; }
 
     public long LastCursorFrame { get; set; }
 
@@ -90,8 +114,20 @@ internal sealed class AppSettings
         AudioApi = AudioOutputSettings.ToStoredValue(settings.Api);
         AudioDeviceId = settings.DeviceId ?? string.Empty;
     }
+
+    public FadeShape ResolvedFadeInCurve() => FadeCurves.ParseStored(DefaultFadeInCurve);
+
+    public FadeShape ResolvedFadeOutCurve() => FadeCurves.ParseStored(DefaultFadeOutCurve);
+
+    public void ApplyDefaultFades(FadeShape fadeIn, FadeShape fadeOut)
+    {
+        DefaultFadeInCurve = fadeIn.ToString();
+        DefaultFadeOutCurve = fadeOut.ToString();
+    }
 }
 
 [JsonSerializable(typeof(AppSettings))]
+[JsonSerializable(typeof(OpenDocumentSnapshot))]
+[JsonSerializable(typeof(OpenDocumentSnapshot[]))]
 [JsonSourceGenerationOptions(WriteIndented = true)]
 internal partial class AppSettingsJsonContext : JsonSerializerContext;

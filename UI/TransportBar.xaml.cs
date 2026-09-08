@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -8,32 +7,15 @@ namespace MgaSonicAnvil.UI;
 internal partial class TransportBar : UserControl
 {
     private readonly TransportIconButton _play;
-    private readonly TransportIconButton _waapiToggle;
-    private readonly TransportLanguageButton _language;
     private readonly TransportTipsToggleButton _tips;
     private readonly TransportManualButton _manual;
     private readonly Dictionary<TransportCommand, TransportIconButton> _buttons = new();
-    private double _currentSeconds;
-    private double _totalSeconds;
-    private bool _editing;
-    private bool _committing;
-    private bool _selectAllOnFocus;
 
     public event EventHandler<TransportCommand>? CommandInvoked;
-
-    public event EventHandler<double>? PositionSeeked;
-
-    public event EventHandler? RequestWaveformFocus;
-
-    public event EventHandler? LanguageToggleRequested;
 
     public event EventHandler? TipsToggleRequested;
 
     public event EventHandler? ManualHelpRequested;
-
-    public bool IsPositionFocused => CurrentTimeBox.IsKeyboardFocusWithin;
-
-    public bool IsEditingPosition => _editing || CurrentTimeBox.IsKeyboardFocusWithin;
 
     public TransportBar()
     {
@@ -52,42 +34,24 @@ internal partial class TransportBar : UserControl
         Add(TransportCommand.AmpZoomOut, TransportIcon.AmpZoomOut, UiStrings.TipAmpZoomOut);
         Add(TransportCommand.AmpZoomMax, TransportIcon.AmpZoomMax, UiStrings.TipAmpZoomMax);
         Add(TransportCommand.AmpZoomReset, TransportIcon.AmpZoomReset, UiStrings.TipAmpZoomReset);
-        AddGap();
-        Add(TransportCommand.FadeIn, TransportIcon.FadeIn, UiStrings.TipFadeIn);
-        Add(TransportCommand.FadeOut, TransportIcon.FadeOut, UiStrings.TipFadeOut);
-        Add(TransportCommand.Normalize, TransportIcon.Normalize, UiStrings.TipNormalize);
-        Add(TransportCommand.Delete, TransportIcon.Delete, UiStrings.TipDelete);
-        Add(TransportCommand.Save, TransportIcon.Save, UiStrings.TipSave);
-        AddGap();
-        // WAAPI トグルはドキュメント非依存のため _buttons（SetCommandsEnabled 対象）へ入れない。
-        _waapiToggle = new TransportIconButton
-        {
-            CommandKind = TransportCommand.ToggleWaapi,
-            Icon = TransportIcon.Waapi,
-            Width = DesignMetrics.TransportWaapiButtonWidth,
-            Margin = new Thickness(DesignMetrics.TransportButtonGap, 0, DesignMetrics.TransportButtonGap, 0),
-        };
-        _waapiToggle.Click += (_, _) => CommandInvoked?.Invoke(this, TransportCommand.ToggleWaapi);
-        ButtonsHost.Children.Add(_waapiToggle);
-        AddGap();
-        _language = new TransportLanguageButton
-        {
-            Margin = new Thickness(DesignMetrics.TransportButtonGap, 0, DesignMetrics.TransportButtonGap, 0),
-        };
-        _language.Click += (_, _) => LanguageToggleRequested?.Invoke(this, EventArgs.Empty);
-        ButtonsHost.Children.Add(_language);
+        Add(EditButtonsHost, TransportCommand.FadeIn, TransportIcon.FadeIn, UiStrings.TipFadeIn);
+        Add(EditButtonsHost, TransportCommand.FadeOut, TransportIcon.FadeOut, UiStrings.TipFadeOut);
+        Add(EditButtonsHost, TransportCommand.Normalize, TransportIcon.Normalize, UiStrings.TipNormalize);
+        Add(EditButtonsHost, TransportCommand.Delete, TransportIcon.Delete, UiStrings.TipDelete);
+        Add(EditButtonsHost, TransportCommand.Save, TransportIcon.Save, UiStrings.TipSave);
+        AddGap(EditButtonsHost);
         _tips = new TransportTipsToggleButton
         {
             Margin = new Thickness(DesignMetrics.TransportButtonGap, 0, DesignMetrics.TransportButtonGap, 0),
         };
         _tips.Click += (_, _) => TipsToggleRequested?.Invoke(this, EventArgs.Empty);
-        ButtonsHost.Children.Add(_tips);
+        EditButtonsHost.Children.Add(_tips);
         _manual = new TransportManualButton
         {
             Margin = new Thickness(DesignMetrics.TransportButtonGap, 0, DesignMetrics.TransportButtonGap, 0),
         };
         _manual.Click += (_, _) => ManualHelpRequested?.Invoke(this, EventArgs.Empty);
-        ButtonsHost.Children.Add(_manual);
+        EditButtonsHost.Children.Add(_manual);
         ApplyLocalizedTips();
     }
 
@@ -110,16 +74,10 @@ internal partial class TransportBar : UserControl
         SetTip(TransportCommand.Normalize, UiStrings.TipNormalize);
         SetTip(TransportCommand.Delete, UiStrings.TipDelete);
         SetTip(TransportCommand.Save, UiStrings.TipSave);
-        TipService.Set(_waapiToggle, UiStrings.TipWaapiToggle);
-        TipService.Set(_language, TransportLanguageButton.LanguageTip());
         TipService.Set(_tips, UiStrings.TipTipsToggle, respectsEnabled: false);
         TipService.Set(_manual, UiStrings.TipManualHelp);
-        TipService.Set(CurrentTimeBox, UiStrings.TipTimecode);
-        _language.RefreshAppearance();
         _tips.RefreshAppearance();
         _manual.RefreshAppearance();
-        CopyMenuItem.Header = UiStrings.MenuCopy;
-        PasteMenuItem.Header = UiStrings.MenuPaste;
     }
 
     public void SetTipsEnabled(bool enabled)
@@ -135,53 +93,10 @@ internal partial class TransportBar : UserControl
         }
     }
 
-    public void SetWaapiLatched(bool latched)
-    {
-        _waapiToggle.IsLatched = latched;
-        _waapiToggle.InvalidateVisual();
-    }
-
     public void SetPlaying(bool playing)
     {
         _play.IsPlaying = playing;
         _play.InvalidateVisual();
-    }
-
-    public void SetPosition(double seconds, double totalSeconds)
-    {
-        _currentSeconds = seconds;
-        _totalSeconds = totalSeconds;
-        if (!IsEditingPosition)
-        {
-            // TextBox.Text 代入はレイアウト・イベントを伴い重いので同値ならスキップ。
-            var current = UiStrings.FormatDuration(seconds);
-            if (CurrentTimeBox.Text != current)
-            {
-                CurrentTimeBox.Text = current;
-            }
-        }
-
-        var total = "/ " + UiStrings.FormatDuration(totalSeconds);
-        if (TotalTimeText.Text != total)
-        {
-            TotalTimeText.Text = total;
-        }
-    }
-
-    public void CancelPositionEdit()
-    {
-        EndEdit(commit: false);
-    }
-
-    public bool FocusCurrentTime()
-    {
-        if (!CurrentTimeBox.IsEnabled)
-        {
-            return false;
-        }
-
-        _selectAllOnFocus = true;
-        return CurrentTimeBox.Focus();
     }
 
     public FrameworkElement? ButtonFor(TransportCommand command) =>
@@ -195,8 +110,6 @@ internal partial class TransportBar : UserControl
             button.InvalidateVisual();
         }
 
-        _waapiToggle.InvalidateVisual();
-        _language.InvalidateVisual();
         _tips.InvalidateVisual();
         _manual.InvalidateVisual();
     }
@@ -207,156 +120,12 @@ internal partial class TransportBar : UserControl
         {
             button.IsEnabled = enabled;
         }
-
-        CurrentTimeBox.IsEnabled = enabled;
-        if (!enabled)
-        {
-            CancelPositionEdit();
-        }
     }
 
-    private void CurrentTimeBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (!CurrentTimeBox.IsEnabled)
-        {
-            return;
-        }
+    private TransportIconButton Add(TransportCommand command, TransportIcon icon, string tip) =>
+        Add(ButtonsHost, command, icon, tip);
 
-        if (!CurrentTimeBox.IsKeyboardFocusWithin)
-        {
-            _selectAllOnFocus = true;
-            CurrentTimeBox.Focus();
-            e.Handled = true;
-        }
-    }
-
-    private void CurrentTimeBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-    {
-        _editing = true;
-        if (_selectAllOnFocus)
-        {
-            _selectAllOnFocus = false;
-            CurrentTimeBox.Dispatcher.BeginInvoke(CurrentTimeBox.SelectAll);
-        }
-    }
-
-    private void CurrentTimeBox_PreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-        {
-            EndEdit(commit: true);
-            RequestWaveformFocus?.Invoke(this, EventArgs.Empty);
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key == Key.Escape)
-        {
-            EndEdit(commit: false);
-            e.Handled = true;
-            return;
-        }
-
-        var ctrl = (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
-            && (Keyboard.Modifiers & ModifierKeys.Alt) == ModifierKeys.None;
-        if (ctrl && e.Key == Key.C)
-        {
-            CopyPosition();
-            e.Handled = true;
-            return;
-        }
-
-        if (ctrl && e.Key == Key.V)
-        {
-            PastePosition();
-            e.Handled = true;
-        }
-    }
-
-    private void CurrentTimeBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-    {
-        if (_editing && !_committing)
-        {
-            EndEdit(commit: true);
-        }
-    }
-
-    private void CurrentTimeBox_ContextMenuOpening(object sender, ContextMenuEventArgs e)
-    {
-        PasteMenuItem.IsEnabled = CurrentTimeBox.IsEnabled && Clipboard.ContainsText();
-    }
-
-    private void CopyPosition_Click(object sender, RoutedEventArgs e) => CopyPosition();
-
-    private void PastePosition_Click(object sender, RoutedEventArgs e) => PastePosition();
-
-    private void EndEdit(bool commit)
-    {
-        if (!_editing)
-        {
-            CurrentTimeBox.Text = UiStrings.FormatDuration(_currentSeconds);
-            return;
-        }
-
-        _committing = true;
-        try
-        {
-            _editing = false;
-            if (commit && UiStrings.TryParseDuration(CurrentTimeBox.Text, out var seconds))
-            {
-                seconds = Math.Clamp(seconds, 0, Math.Max(0, _totalSeconds));
-                PositionSeeked?.Invoke(this, seconds);
-            }
-            else
-            {
-                CurrentTimeBox.Text = UiStrings.FormatDuration(_currentSeconds);
-            }
-
-            if (CurrentTimeBox.IsKeyboardFocusWithin && !commit)
-            {
-                Keyboard.ClearFocus();
-            }
-        }
-        finally
-        {
-            _committing = false;
-        }
-    }
-
-    private void CopyPosition()
-    {
-        var text = CurrentTimeBox.SelectionLength > 0
-            ? CurrentTimeBox.SelectedText
-            : UiStrings.FormatDuration(_currentSeconds);
-        if (text.Length == 0)
-        {
-            return;
-        }
-
-        Clipboard.SetText(text);
-    }
-
-    private void PastePosition()
-    {
-        if (!CurrentTimeBox.IsEnabled || !Clipboard.ContainsText())
-        {
-            return;
-        }
-
-        var text = Clipboard.GetText();
-        if (UiStrings.TryParseDuration(text, out var seconds) && !CurrentTimeBox.IsKeyboardFocusWithin)
-        {
-            seconds = Math.Clamp(seconds, 0, Math.Max(0, _totalSeconds));
-            PositionSeeked?.Invoke(this, seconds);
-            return;
-        }
-
-        _editing = true;
-        CurrentTimeBox.Focus();
-        CurrentTimeBox.SelectedText = text;
-    }
-
-    private TransportIconButton Add(TransportCommand command, TransportIcon icon, string tip)
+    private TransportIconButton Add(Panel host, TransportCommand command, TransportIcon icon, string tip)
     {
         var button = new TransportIconButton
         {
@@ -367,12 +136,14 @@ internal partial class TransportBar : UserControl
         TipService.Set(button, tip);
         button.Click += (_, _) => CommandInvoked?.Invoke(this, command);
         _buttons[command] = button;
-        ButtonsHost.Children.Add(button);
+        host.Children.Add(button);
         return button;
     }
 
-    private void AddGap()
+    private void AddGap() => AddGap(ButtonsHost);
+
+    private void AddGap(Panel host)
     {
-        ButtonsHost.Children.Add(new Border { Width = DesignMetrics.TransportGroupGap });
+        host.Children.Add(new Border { Width = DesignMetrics.TransportGroupGap });
     }
 }

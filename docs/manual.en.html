@@ -91,23 +91,25 @@
         <li>Drop a Wave / AIFF / MP3, or press <kbd>Ctrl</kbd>+<kbd>O</kbd> (multiple files open as tabs).</li>
         <li>Listen, cut, fade, and place markers or a loop on the waveform.</li>
         <li>Save with <kbd>Ctrl</kbd>+<kbd>S</kbd> as Wave or MP3 (AIFF export is not supported).</li>
-        <li>To send it to Wwise, turn on <span class="ui">WAAPI</span> in the transport, pick a destination, and press <span class="ui">EXPORT</span>.</li>
+        <li>To send it to Wwise, turn on <span class="ui">WAAPI</span> above the level meter, pick a destination, and press <span class="ui">EXPORT</span>.</li>
       </ol>
       <div class="note">
-        <p>Settings live in <code>%LocalAppData%\MGA\MGA Sonic Anvil\</code>. Nothing is written next to the exe.</p>
+        <p>Settings live in <code>%LocalAppData%\MGA\MGA Sonic Anvil\</code>. Nothing is written next to the exe. Closing the app also stores open tabs and unsaved edits there.</p>
       </div>
 
       <h2 id="layout">3. Layout</h2>
       <ul>
+        <li><strong>Settings</strong> — gear at the top left. UI language (Auto / Japanese / English; Auto is Japanese if the OS is Japanese, otherwise English), audio output (WaveOut / WASAPI / ASIO), and default fade curves. <kbd>Esc</kbd> closes it.</li>
         <li><strong>Overview</strong> — top strip. The bright area is the current view. Drag to move (scrubs the center); wheel zooms around the playhead.</li>
         <li><strong>Waveform</strong> — the edit surface: time ruler, marker / region flags, playhead, mouse guide.</li>
-        <li><strong>Tabs</strong> — multiple files. Close with <kbd>Ctrl</kbd>+<kbd>W</kbd>. Right-click for “Close Other Tabs (O)”, “Close This and Tabs to the Right (R)”, “Close This and Tabs to the Left (L)”, “Close All Tabs (W)”, and “Select All Tabs (A)”. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> also closes all tabs. Select tabs with <kbd>Ctrl</kbd>+click (toggle), <kbd>Shift</kbd>+click (range), or <kbd>Ctrl</kbd>+<kbd>A</kbd> while the pointer is over the tab bar (all); selected tabs are highlighted and <kbd>Esc</kbd> deselects. With a selection, the right-click menu becomes “Close Selected/All Tabs” / “Paste Copied Edits to Selected/All Tabs”, and <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to every selected tab at once.</li>
-        <li><strong>Transport</strong> — playback, zoom, fade / normalize / delete / save, <span class="ui">WAAPI</span>, language <span class="ui">JP / EN</span>, <span class="ui">Tips</span> on/off, manual <span class="ui">?</span>.</li>
-        <li><strong>Always on Top</strong> — keeps the window in front.</li>
-        <li><strong>Spectrum / meters / vector scope</strong> — a view of the playback output. The spectrum is the same LED-band display as Layer Music Checker, fitted into the narrow slot right of the transport.</li>
+        <li><strong>Time scrollbar</strong> — under the waveform. Pan the current view.</li>
+        <li><strong>Tabs</strong> — shown even for a single file. Close with <kbd>Ctrl</kbd>+<kbd>W</kbd>. Right-click for “Close Other Tabs (O)”, “Close This and Tabs to the Right (R)”, “Close This and Tabs to the Left (L)”, “Close All Tabs (W)”, and “Select All Tabs (A)”. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> also closes all tabs. Select tabs with <kbd>Ctrl</kbd>+click (toggle), <kbd>Shift</kbd>+click (range), or <kbd>Ctrl</kbd>+<kbd>A</kbd> while the pointer is over the tab bar (all); selected tabs are highlighted and <kbd>Esc</kbd> deselects. With a selection, the right-click menu becomes “Close Selected/All Tabs” / “Paste Copied Edits to Selected/All Tabs”, and <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to every selected tab at once.</li>
+        <li><strong>Transport</strong> — top row is playback and zoom; second row is fade / normalize / delete / save, <span class="ui">Tips</span> on/off, and manual <span class="ui">?</span>. License / GitHub sit on the bottom of that row.</li>
+        <li><strong>Always on Top</strong> — right end of the status bar. Keeps the window in front.</li>
+        <li><strong>Spectrum / meters / vector scope</strong> — a view of the playback output. The spectrum is the same LED-band display as Layer Music Checker, fitted into the narrow slot right of the transport. <span class="ui">WAAPI</span> above the level meter toggles the bar.</li>
         <li><strong>Tips</strong> — above the WAAPI bar, fixed height. Hover a control to see its description; overflow scrolls. The first tip appears immediately; moving to another control or away waits 300 ms before replacing or clearing. Click the heading or body to lock (cyan frame, <span class="ui">Tips (Locked)</span>); click again to unlock. The text does not change while locked or while the pointer is on the panel. Floating tooltips are not used.</li>
         <li><strong>WAAPI bar</strong> — connection, destination, <span class="ui">Play -E</span>, <span class="ui">Auto Active</span>, <span class="ui">EXPORT</span>.</li>
-        <li><strong>Status bar</strong> — file info, Audio API / Device, GitHub link.</li>
+        <li><strong>Status bar</strong> — format info (name is on the tab; sample rate / bit depth / channels turn red after conversion until you save; size is MB (MiB / B), and turns red as an estimate after conversion or a range delete that changes length); current / selection start / selection length / selection end / total (all but total are editable; wheel / ↑↓ nudge — time by 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min, samples by 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000; right-click switches time and samples); Always on Top on the right.</li>
       </ul>
 
       <h2 id="playback">4. Playback</h2>
@@ -117,13 +119,13 @@
         <li><kbd>Ctrl</kbd>+<kbd>Space</kbd> — from 3 seconds earlier.</li>
         <li><kbd>Alt</kbd>+<kbd>Enter</kbd> — restart from the playback start.</li>
         <li><kbd>Ctrl</kbd>+drag — scrub.</li>
-        <li><kbd>T</kbd> — type the playhead time. Enter jumps. Copy / paste allowed.</li>
+        <li><kbd>T</kbd> — type the current time in the status bar. Enter jumps. Copy / paste allowed. Right-click switches time / samples.</li>
         <li><kbd>Z</kbd> or <kbd>.</kbd> — center. Toggles center-lock while playing; clears it when stopped.</li>
         <li><kbd>L</kbd> — loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</li>
       </ul>
 
       <h2 id="edit">5. Selection and editing</h2>
-      <p>Drag to select. <kbd>Esc</kbd> or a move without Shift clears it. Fade / normalize with nothing selected uses the whole file.</p>
+      <p>Drag to select. <kbd>Esc</kbd> or a move without Shift clears it. Fade / normalize with nothing selected uses the whole file. You can also type the selection start / length / end in the status bar.</p>
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd> / <span class="ui">FADE OUT</span> <kbd>O</kbd> — pick a curve, Space to preview, Enter to apply. 1–9 select a curve.</li>
         <li><kbd>X</kbd> — linear fade around the playhead in the view (before = out / after = in).</li>
@@ -150,7 +152,7 @@
       </div>
 
       <h2 id="spectrogram">7. Spectrogram</h2>
-      <p><kbd>G</kbd> cycles waveform / spectrogram / overlay. Deep time zooms shift columns and compute only what is missing.</p>
+      <p><kbd>G</kbd> cycles waveform / spectrogram / overlay. Overlay draws the waveform shape on top of the spectrogram (no translucent wash). At amplitude zoom 1 it uses the middle half; amplifying fills the full height. Deep time zooms shift columns and compute only what is missing.</p>
 
       <h2 id="format">8. Format conversion</h2>
       <ul>
@@ -158,12 +160,12 @@
         <li><kbd>B</kbd> — bit depth</li>
         <li><kbd>C</kbd> — channel count (Mono / Stereo)</li>
       </ul>
-      <p>Pick a preset or a custom Hz. The UI is locked while converting.</p>
+      <p>Pick a preset or a custom Hz. Custom Hz nudges with ↑↓ / wheel by 1 Hz (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). The menu sits just off the cursor. Highlighting a value updates the status size to the estimate. The UI is locked while converting. Confirmed fields stay red until you save.</p>
 
       <h2 id="export">9. WAAPI EXPORT (Wave-only)</h2>
       <ol>
         <li>Start Wwise Authoring.</li>
-        <li>Turn on <span class="ui">WAAPI</span> in the transport (<kbd>W</kbd>).</li>
+        <li>Turn on <span class="ui">WAAPI</span> above the level meter (<kbd>W</kbd>).</li>
         <li>Select a destination object in Wwise. <span class="ui">Keep Target</span> can pin the path.</li>
         <li>The export folder must be under Originals of the connected project.</li>
         <li><span class="ui">EXPORT</span> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>.</li>
@@ -200,10 +202,11 @@
 
       <h2 id="settings">11. Settings and language</h2>
       <ul>
-        <li>Playback API is Audio API / Device on the status bar (WaveOut / WASAPI / ASIO).</li>
-        <li>UI language is <span class="ui">JP / EN</span> on the transport. The Japanese locale keeps the current wording, including English labels.</li>
+        <li>Playback device and default fade curves are on the gear at the top left (WaveOut / WASAPI / ASIO).</li>
+        <li>UI language is also on the gear. The default is <span class="ui">Auto</span> (Japanese if the OS is Japanese, otherwise English). The Japanese locale keeps the current wording, including English labels.</li>
         <li>The manual is <span class="ui">?</span>, or GitHub Pages in the browser. It follows the UI language.</li>
         <li>Settings file: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>
+        <li>Closing the app remembers every open tab, the window position and size (including maximized), and unsaved edits (kept as a working copy), and restores them on the next launch. Closing a tab still asks to save.</li>
       </ul>
 
       <h2 id="disclaimer">12. Scope</h2>

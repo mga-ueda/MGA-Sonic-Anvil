@@ -83,17 +83,36 @@ internal sealed partial class WaapiStatusBar : UserControl
 
     private void ApplyTips()
     {
+        TipService.Set(TitleLabel, UiStrings.TipWaapiConnection);
+        TipService.Set(BadgeCanvas, UiStrings.TipWaapiConnection);
+        TipService.Set(VersionLabel, UiStrings.TipWwiseVersion);
         TipService.Set(PlayMinusECheckBox, UiStrings.TipPlayMinusE);
         TipService.Set(AutoActiveCheckBox, UiStrings.TipAutoActive);
         TipService.Set(ExportButton, UiStrings.TipExport);
         TipService.Set(OutputPathBox, UiStrings.TipOutputPath);
         TipService.Set(_outputFolderButton, UiStrings.TipOutputFolder);
+        ApplyProjectNameTip();
+        ApplyPathTip();
+        ApplyKeepTargetTips();
+    }
+
+    private void ApplyProjectNameTip() =>
         TipService.Set(
             ProjectNameLabel,
-            _projectNameClickable ? UiStrings.TipWwiseProjectNameOpen : null);
+            _projectNameClickable ? UiStrings.TipWwiseProjectNameOpen : UiStrings.TipWwiseProjectName);
+
+    private void ApplyPathTip() =>
         TipService.Set(
-            _keepLockButton,
-            _keepTargetChecked ? UiStrings.TipKeepTargetLock : UiStrings.TipKeepTargetUnlock);
+            PathLabel,
+            VersionLabel.Visibility == Visibility.Visible
+                ? UiStrings.TipWaapiTargetPath
+                : UiStrings.TipWaapiConnection);
+
+    private void ApplyKeepTargetTips()
+    {
+        var tip = _keepTargetChecked ? UiStrings.TipKeepTargetLock : UiStrings.TipKeepTargetUnlock;
+        TipService.Set(_keepLockButton, tip);
+        TipService.Set(KeepStateLabel, tip);
     }
 
     public event EventHandler? KeepTargetChanged;
@@ -291,6 +310,7 @@ internal sealed partial class WaapiStatusBar : UserControl
         PathLabel.Visibility = Visibility.Visible;
         PathLabel.Foreground = WpfControlHelpers.FrozenBrush(foreColor);
         UpdateKeepLockVisibility();
+        ApplyPathTip();
         DrawBadge();
     }
 
@@ -314,6 +334,7 @@ internal sealed partial class WaapiStatusBar : UserControl
         PathLabel.Visibility = Visibility.Visible;
         SetProjectNameClickable(projectNameClickable && hasProject);
         UpdateKeepLockVisibility();
+        ApplyPathTip();
         DrawBadge();
     }
 
@@ -326,7 +347,7 @@ internal sealed partial class WaapiStatusBar : UserControl
         }
 
         ApplyProjectNameColors();
-        TipService.Set(ProjectNameLabel, clickable ? UiStrings.TipWwiseProjectNameOpen : null);
+        ApplyProjectNameTip();
     }
 
     private void UpdateKeepLockVisibility()
@@ -345,9 +366,7 @@ internal sealed partial class WaapiStatusBar : UserControl
             ? UiStrings.KeepTargetOnLabel
             : UiStrings.KeepTargetOffLabel;
         ApplyKeepLockColors();
-        TipService.Set(
-            _keepLockButton,
-            _keepTargetChecked ? UiStrings.TipKeepTargetLock : UiStrings.TipKeepTargetUnlock);
+        ApplyKeepTargetTips();
     }
 
     private void ApplyKeepLockColors()

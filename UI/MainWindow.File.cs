@@ -244,96 +244,37 @@ public partial class MainWindow
 
     private void ForgetClosedDocument()
     {
-        var settings = AppStorage.Settings;
-        settings.LastDocumentPath = string.Empty;
-        settings.LastDocumentDirty = false;
-        settings.LastCursorFrame = 0;
-        settings.LastSelectionStart = 0;
-        settings.LastSelectionEnd = 0;
-        settings.LastSampleLoopStart = 0;
-        settings.LastSampleLoopEnd = 0;
-        StoreSessionRegions(settings, null);
-        StoreSessionMarkers([]);
-        AppStorage.ClearSessionDocument();
+        DocumentSessionStore.ClearOpenDocuments(AppStorage.Settings);
+        AppStorage.ClearAllSessionAudio();
         AppStorage.Save();
     }
 
-    private void PopulateOutputCombos()
+    private void SettingsGearButton_Click(object sender, RoutedEventArgs e)
     {
-        _syncingOutputCombos = true;
-        ApiCombo.Items.Clear();
-        ApiCombo.Items.Add(new ApiItem(AudioOutputApi.WaveOut, UiStrings.LabelAudioApiWaveOut));
-        ApiCombo.Items.Add(new ApiItem(AudioOutputApi.Wasapi, UiStrings.LabelAudioApiWasapi));
-        ApiCombo.Items.Add(new ApiItem(AudioOutputApi.Asio, UiStrings.LabelAudioApiAsio));
-        foreach (ApiItem item in ApiCombo.Items)
+        var settings = AppStorage.Settings;
+        var dialog = new AudioSettingsWindow(
+            _outputSettings,
+            settings.ResolvedFadeInCurve(),
+            settings.ResolvedFadeOutCurve(),
+            UiStrings.ParseLanguageChoice(settings.UiLanguage))
         {
-            if (item.Api == _outputSettings.Api)
-            {
-                ApiCombo.SelectedItem = item;
-                break;
-            }
-        }
+            Owner = this,
+        };
 
-        if (ApiCombo.SelectedItem is null)
-        {
-            ApiCombo.SelectedIndex = 0;
-        }
-
-        ReloadDevices(_outputSettings.DeviceId);
-        _syncingOutputCombos = false;
-    }
-
-    private void ReloadDevices(string? preferredDeviceId)
-    {
-        var api = ApiCombo.SelectedItem is ApiItem item ? item.Api : AudioOutputApi.WaveOut;
-        DeviceCombo.Items.Clear();
-        DeviceItem? selected = null;
-        foreach (var device in AudioOutputFactory.EnumerateDevices(api))
-        {
-            var entry = new DeviceItem(device.Id, device.DisplayName);
-            DeviceCombo.Items.Add(entry);
-            if (preferredDeviceId is not null
-                && string.Equals(device.Id, preferredDeviceId, StringComparison.OrdinalIgnoreCase))
-            {
-                selected = entry;
-            }
-        }
-
-        DeviceCombo.SelectedItem = selected ?? (DeviceCombo.Items.Count > 0 ? DeviceCombo.Items[0] : null);
-    }
-
-    private void ApiCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_syncingOutputCombos || !IsLoaded)
+        if (dialog.ShowDialog() != true)
         {
             return;
         }
 
-        _syncingOutputCombos = true;
-        ReloadDevices(preferredDeviceId: null);
-        _syncingOutputCombos = false;
-        ApplyOutputFromCombos();
+        settings.UiLanguage = UiStrings.ToStoredValue(dialog.SelectedLanguage);
+        UiStrings.SetLanguage(UiStrings.ResolveLanguage(dialog.SelectedLanguage));
+        settings.ApplyDefaultFades(dialog.FadeInCurve, dialog.FadeOutCurve);
+        ApplyOutputSettings(dialog.SelectedSettings);
     }
 
-    private void DeviceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void ApplyOutputSettings(AudioOutputSettings settings)
     {
-        if (_syncingOutputCombos || !IsLoaded)
-        {
-            return;
-        }
-
-        ApplyOutputFromCombos();
-    }
-
-    private void ApplyOutputFromCombos()
-    {
-        if (ApiCombo.SelectedItem is not ApiItem api)
-        {
-            return;
-        }
-
-        var deviceId = DeviceCombo.SelectedItem is DeviceItem device ? device.Id : string.Empty;
-        _outputSettings = new AudioOutputSettings(api.Api, deviceId);
+        _outputSettings = settings;
         AppStorage.Settings.ApplyAudioOutput(_outputSettings);
         AppStorage.Save();
         if (_player.IsPlaying)
@@ -381,39 +322,60 @@ public partial class MainWindow
 
     private void RememberDocumentState()
     {
-        CaptureActiveSessionView();
-        var settings = AppStorage.Settings;
-        if (_document is null)
+        try
         {
-            return;
-        }
+            CaptureActiveSessionView();
+            var settings = AppStorage.Settings;
+            if (_sessions.Count == 0)
+            {
+                DocumentSessionStore.ClearOpenDocuments(settings);
+                AppStorage.ClearAllSessionAudio();
+                return;
+            }
 
-        settings.LastDocumentPath = _document.SourcePath ?? settings.LastDocumentPath;
-        settings.LastCursorFrame = Waveform.PlayheadFrame;
-        settings.LastSelectionStart = _document.Selection.StartFrame;
-        settings.LastSelectionEnd = _document.Selection.EndFrame;
-        settings.LastTimeZoom = Waveform.TimeZoom;
-        settings.LastAmpZoom = Waveform.AmpZoom;
-        settings.LastViewStart = Waveform.ViewStart;
-        settings.LastLoop = true;
-        if (_document.IsDirty)
-        {
-            // 保存せず終了した変更は捨て、次回はファイル側の埋め込みを使う。
-            settings.LastSampleLoopStart = 0;
-            settings.LastSampleLoopEnd = 0;
-            StoreSessionRegions(settings, null);
-            StoreSessionMarkers([]);
-        }
-        else
-        {
-            settings.LastSampleLoopStart = _document.SampleLoop.StartFrame;
-            settings.LastSampleLoopEnd = _document.SampleLoop.EndFrame;
-            StoreSessionRegions(settings, _document);
-            StoreSessionMarkers(_document.SnapshotMarkers());
-        }
+            var snapshots = new OpenDocumentSnapshot[_sessions.Count];
+            var keep = new List<string>();
+            Directory.CreateDirectory(AppStorage.SessionDirectory);
+            for (var i = 0; i < _sessions.Count; i++)
+            {
+                var session = _sessions[i];
+                var view = new SessionViewState(
+                    session.PlayheadFrame,
+                    session.TimeZoom,
+                    session.AmpZoom,
+                    session.ViewStart,
+                    session.LoopEnabled,
+                    session.SelectedMarkerFrames);
+                var snap = DocumentSessionStore.Capture(session.Document, view, i);
+                if (DocumentSessionStore.NeedsSessionAudio(snap.Dirty, snap.SourcePath))
+                {
+                    try
+                    {
+                        var name = DocumentSessionStore.SanitizeSessionFileName(snap.SessionFileName)
+                            ?? DocumentSessionStore.FileNameForIndex(i);
+                        snap.SessionFileName = name;
+                        AudioCodec.SaveWave(session.Document, AppStorage.SessionFilePath(name));
+                        keep.Add(name);
+                    }
+                    catch
+                    {
+                        snap.SessionFileName = string.Empty;
+                    }
+                }
 
-        settings.LastDocumentDirty = false;
-        AppStorage.ClearSessionDocument();
+                snapshots[i] = snap;
+            }
+
+            AppStorage.ReplaceSessionFiles(keep);
+            settings.OpenDocuments = snapshots;
+            var activeIndex = _activeSession is null ? 0 : _sessions.IndexOf(_activeSession);
+            settings.ActiveDocumentIndex = Math.Clamp(activeIndex, 0, snapshots.Length - 1);
+            DocumentSessionStore.MirrorActiveToLegacy(settings, snapshots[settings.ActiveDocumentIndex]);
+        }
+        catch
+        {
+            // セッション保存失敗でも終了は止めない。
+        }
     }
 
     private void TryRestoreLastDocument()
@@ -425,60 +387,78 @@ public partial class MainWindow
 
         _didRestoreLastDocument = true;
         var settings = AppStorage.Settings;
+        var docs = DocumentSessionStore.ResolveOpenDocuments(settings);
+        if (docs.Length == 0)
+        {
+            return;
+        }
+
+        DocumentSession? active = null;
+        var activeIndex = Math.Clamp(settings.ActiveDocumentIndex, 0, docs.Length - 1);
+        for (var i = 0; i < docs.Length; i++)
+        {
+            if (!TryRestoreSession(docs[i], out var session))
+            {
+                continue;
+            }
+
+            _sessions.Add(session);
+            if (i == activeIndex)
+            {
+                active = session;
+            }
+        }
+
+        if (_sessions.Count == 0)
+        {
+            return;
+        }
+
+        BindWorkspace(active ?? _sessions[0]);
+        Waveform.Refresh();
+        Overview.InvalidateVisual();
+    }
+
+    private static bool TryRestoreSession(OpenDocumentSnapshot snap, out DocumentSession session)
+    {
+        session = null!;
         try
         {
-            AudioDocument? document = null;
-            if (settings.LastDocumentDirty && File.Exists(AppStorage.SessionDocumentPath))
+            if (!DocumentSessionStore.TryResolveLoadPath(
+                    AppStorage.RootDirectory,
+                    snap,
+                    out var path,
+                    out var fromSession))
             {
-                document = AudioCodec.Load(AppStorage.SessionDocumentPath);
-                document.MarkUnsaved(
-                    string.IsNullOrWhiteSpace(settings.LastDocumentPath) ? null : settings.LastDocumentPath);
-            }
-            else if (!string.IsNullOrWhiteSpace(settings.LastDocumentPath)
-                && File.Exists(settings.LastDocumentPath))
-            {
-                document = AudioCodec.Load(settings.LastDocumentPath);
+                return false;
             }
 
-            if (document is null)
+            var document = AudioCodec.Load(path);
+            if (fromSession)
             {
-                return;
+                document.MarkUnsaved(string.IsNullOrWhiteSpace(snap.SourcePath) ? null : snap.SourcePath);
             }
 
-            var sessionMarkers = LoadSessionMarkers(settings);
-            if (sessionMarkers.Length > 0)
+            DocumentSessionStore.ApplyMeta(document, snap);
+            session = new DocumentSession(document)
             {
-                document.ReplaceMarkers(sessionMarkers, markDirty: false);
-            }
-
-            var sessionLoop = new WaveSelection(settings.LastSampleLoopStart, settings.LastSampleLoopEnd);
-            if (!sessionLoop.IsEmpty || settings.LastDocumentDirty)
-            {
-                document.SetSampleLoop(sessionLoop, markDirty: false);
-            }
-
-            var sessionRegions = LoadSessionRegions(settings);
-            if (sessionRegions.Length > 0 || settings.LastDocumentDirty)
-            {
-                document.SetRegions(sessionRegions, markDirty: false);
-            }
-            document.Selection = new WaveSelection(settings.LastSelectionStart, settings.LastSelectionEnd)
-                .Clamp(document.FrameCount);
-            var session = new DocumentSession(document)
-            {
-                TimeZoom = settings.LastTimeZoom,
-                AmpZoom = settings.LastAmpZoom,
-                ViewStart = settings.LastViewStart,
-                PlayheadFrame = settings.LastCursorFrame,
+                TimeZoom = snap.TimeZoom <= 0 ? 1 : snap.TimeZoom,
+                AmpZoom = snap.AmpZoom <= 0 ? 1 : snap.AmpZoom,
+                ViewStart = snap.ViewStart,
+                PlayheadFrame = snap.CursorFrame,
+                LoopEnabled = snap.LoopEnabled,
             };
-            _sessions.Add(session);
-            BindWorkspace(session);
-            Waveform.Refresh();
-            Overview.InvalidateVisual();
+            if (snap.SelectedMarkerFrames is { Length: > 0 } selected)
+            {
+                session.SelectedMarkerFrames.AddRange(selected);
+            }
+
+            return true;
         }
         catch
         {
-            // 前回ファイルが無い・壊れているときは空のまま起動する。
+            session = null!;
+            return false;
         }
     }
 
@@ -512,27 +492,6 @@ public partial class MainWindow
         settings.LastRegionEnd = ends[0];
     }
 
-    private static WaveRegion[] LoadSessionRegions(AppSettings settings)
-    {
-        var starts = settings.LastRegionStarts ?? [];
-        var ends = settings.LastRegionEnds ?? [];
-        var names = settings.LastRegionNames ?? [];
-        if (starts.Length > 0 && starts.Length == ends.Length)
-        {
-            var regions = new WaveRegion[starts.Length];
-            for (var i = 0; i < starts.Length; i++)
-            {
-                var name = i < names.Length ? names[i] : string.Empty;
-                regions[i] = new WaveRegion(new WaveSelection(starts[i], ends[i]), name);
-            }
-
-            return regions;
-        }
-
-        var legacy = new WaveSelection(settings.LastRegionStart, settings.LastRegionEnd);
-        return legacy.IsEmpty ? [] : [new WaveRegion(legacy, string.Empty)];
-    }
-
     private static void StoreSessionMarkers(IReadOnlyList<MarkerSnapshot>? markers)
     {
         if (markers is null || markers.Count == 0)
@@ -554,26 +513,4 @@ public partial class MainWindow
         AppStorage.Settings.LastMarkerComments = comments;
     }
 
-    private static MarkerSnapshot[] LoadSessionMarkers(AppSettings settings)
-    {
-        var frames = settings.LastMarkerFrames ?? [];
-        var comments = settings.LastMarkerComments ?? [];
-        var markers = new MarkerSnapshot[frames.Length];
-        for (var i = 0; i < frames.Length; i++)
-        {
-            markers[i] = new MarkerSnapshot(frames[i], i < comments.Length ? comments[i] : string.Empty);
-        }
-
-        return markers;
-    }
-
-    private sealed record ApiItem(AudioOutputApi Api, string Label)
-    {
-        public override string ToString() => Label;
-    }
-
-    private sealed record DeviceItem(string Id, string Label)
-    {
-        public override string ToString() => Label;
-    }
 }

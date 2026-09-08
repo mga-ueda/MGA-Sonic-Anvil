@@ -1,0 +1,65 @@
+<UserControl x:Class="MgaSonicAnvil.UI.StatusTimeStrip"
+             x:ClassModifier="internal"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:MgaSonicAnvil.UI"
+             Focusable="False">
+  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+    <TextBlock x:Name="CurrentLabel"
+               Style="{StaticResource StatusTimecodeLabelStyle}"
+               PreviewMouseWheel="Label_PreviewMouseWheel" />
+    <TextBox x:Name="CurrentBox"
+             Style="{StaticResource StatusTimecodeStyle}"
+             Text="00:00.000"
+             PreviewKeyDown="Field_PreviewKeyDown"
+             PreviewMouseWheel="Field_PreviewMouseWheel"
+             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"
+             GotKeyboardFocus="Field_GotKeyboardFocus"
+             LostKeyboardFocus="Field_LostKeyboardFocus" />
+    <TextBlock x:Name="SelStartLabel"
+               Style="{StaticResource StatusTimecodeLabelStyle}"
+               PreviewMouseWheel="Label_PreviewMouseWheel" />
+    <TextBox x:Name="SelStartBox"
+             Style="{StaticResource StatusTimecodeStyle}"
+             PreviewKeyDown="Field_PreviewKeyDown"
+             PreviewMouseWheel="Field_PreviewMouseWheel"
+             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"
+             GotKeyboardFocus="Field_GotKeyboardFocus"
+             LostKeyboardFocus="Field_LostKeyboardFocus" />
+    <TextBlock x:Name="SelLengthLabel"
+               Style="{StaticResource StatusTimecodeLabelStyle}"
+               PreviewMouseWheel="Label_PreviewMouseWheel" />
+    <TextBox x:Name="SelLengthBox"
+             Style="{StaticResource StatusTimecodeStyle}"
+             PreviewKeyDown="Field_PreviewKeyDown"
+             PreviewMouseWheel="Field_PreviewMouseWheel"
+             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"
+             GotKeyboardFocus="Field_GotKeyboardFocus"
+             LostKeyboardFocus="Field_LostKeyboardFocus" />
+    <TextBlock x:Name="SelEndLabel"
+               Style="{StaticResource StatusTimecodeLabelStyle}"
+               PreviewMouseWheel="Label_PreviewMouseWheel" />
+    <TextBox x:Name="SelEndBox"
+             Style="{StaticResource StatusTimecodeStyle}"
+             PreviewKeyDown="Field_PreviewKeyDown"
+             PreviewMouseWheel="Field_PreviewMouseWheel"
+             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"
+             GotKeyboardFocus="Field_GotKeyboardFocus"
+             LostKeyboardFocus="Field_LostKeyboardFocus" />
+    <TextBlock x:Name="TotalLabel" Style="{StaticResource StatusTimecodeLabelStyle}" />
+    <Border MinWidth="{x:Static ui:DesignMetrics.StatusTimecodeWidth}"
+            Width="{x:Static ui:DesignMetrics.StatusTimecodeWidth}"
+            Height="20"
+            VerticalAlignment="Center"
+            Background="{DynamicResource WaveformBackBrush}">
+      <TextBlock x:Name="TotalText"
+                 VerticalAlignment="Center"
+                 TextAlignment="Center"
+                 FontFamily="Consolas"
+                 FontWeight="Bold"
+                 FontSize="11"
+                 Foreground="{DynamicResource StatusBarTitleForeBrush}"
+                 Text="00:00.000" />
+    </Border>
+  </StackPanel>
+</UserControl>

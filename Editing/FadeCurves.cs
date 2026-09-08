@@ -26,6 +26,17 @@ internal static class FadeCurves
 {
     public const FadeShape Default = FadeShape.SCurve;
 
+    public static FadeShape ParseStored(string? text, FadeShape fallback = Default)
+    {
+        if (!Enum.TryParse<FadeShape>(text, ignoreCase: true, out var shape)
+            || shape == FadeShape.Constant)
+        {
+            return fallback;
+        }
+
+        return MenuOrderFadeIn.Contains(shape) ? shape : fallback;
+    }
+
     /// <summary>TimeCaster フェードイン右クリックと同じ順。Constant は除く。</summary>
     public static IReadOnlyList<FadeShape> MenuOrderFadeIn { get; } =
     [

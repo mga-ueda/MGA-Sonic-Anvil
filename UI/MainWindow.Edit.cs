@@ -3,6 +3,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
 
@@ -38,13 +39,17 @@ public partial class MainWindow
         _fadePromptIsIn = fadeIn;
         _fadePreviewResumeFrame = _document.CursorFrame;
         _fadeReplayOnHighlight = false;
+        var initial = fadeIn
+            ? AppStorage.Settings.ResolvedFadeInCurve()
+            : AppStorage.Settings.ResolvedFadeOutCurve();
         var menu = FadeCurvePicker.Show(
             this,
             PlacementMode.Center,
             fadeIn,
             shape => ApplyFade(fadeIn, shape),
             shape => PreviewFade(fadeIn, shape),
-            shape => OnFadeCurveHighlighted(fadeIn, shape));
+            shape => OnFadeCurveHighlighted(fadeIn, shape),
+            initial);
         _fadeMenu = menu;
         menu.Closed += (_, _) =>
         {

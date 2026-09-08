@@ -8,6 +8,8 @@ namespace MgaSonicAnvil.UI;
 
 public partial class MainWindow
 {
+    private readonly record struct FormatSizePreview(FormatConvertKind Kind, int Value);
+
     private readonly BusyGlassOverlay _busyGlass = new();
     private bool _formatConvertBusy;
 
@@ -50,10 +52,12 @@ public partial class MainWindow
             value => ApplyFormatConvert(kind, value),
             kind is FormatConvertKind.SampleRate or FormatConvertKind.BitDepth
                 ? value => PreviewFormatConvert(kind, value)
-                : null);
+                : null,
+            value => PreviewFormatConvertSize(kind, value));
         _formatMenu = menu;
         menu.Closed += (_, _) =>
         {
+            ClearFormatSizePreview();
             StopFormatPreview();
             if (ReferenceEquals(_formatMenu, menu))
             {
@@ -98,6 +102,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key is Key.Up or Key.Down
+            && FormatConvertPicker.TryNudgeCustomRate(_formatMenu, key == Key.Up ? 1 : -1))
+        {
+            return true;
+        }
+
         if (FormatConvertPicker.IsCustomBoxFocused(_formatMenu))
         {
             return false;
@@ -132,6 +142,29 @@ public partial class MainWindow
         }
 
         return false;
+    }
+
+    private void PreviewFormatConvertSize(FormatConvertKind kind, int value)
+    {
+        var preview = new FormatSizePreview(kind, value);
+        if (_formatSizePreview == preview)
+        {
+            return;
+        }
+
+        _formatSizePreview = preview;
+        RefreshStatus();
+    }
+
+    private void ClearFormatSizePreview()
+    {
+        if (_formatSizePreview is null)
+        {
+            return;
+        }
+
+        _formatSizePreview = null;
+        RefreshStatus();
     }
 
     private void PreviewFormatConvert(FormatConvertKind kind, int value)
@@ -306,10 +339,7 @@ public partial class MainWindow
         try
         {
             _player.Prepare(_document, _document.CursorFrame, null, loop: false);
-            if (_player.IsPlaying)
-            {
-                _player.Pause();
-            }
+            _player.Pause();
         }
         catch
         {
@@ -326,6 +356,7 @@ public partial class MainWindow
 
         CloseFormatConvertPicker();
         StopFormatPreview();
+        PausePlaybackSoft();
         if (kind == FormatConvertKind.SampleRate)
         {
             _ = ApplySampleRateConvertAsync(value);
@@ -376,6 +407,7 @@ public partial class MainWindow
             }
 
             _history.Do(document, command);
+            PausePlaybackSoft();
             if (sourceRate > 0)
             {
                 var factor = document.SampleRate / (double)sourceRate;
@@ -383,6 +415,7 @@ public partial class MainWindow
             }
 
             AfterEdit();
+            PausePlaybackSoft();
         }
         catch (Exception ex)
         {

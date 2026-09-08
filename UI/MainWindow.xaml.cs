@@ -1,7 +1,7 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -39,13 +39,14 @@ public partial class MainWindow : Window
     private long _lastPlaybackStart;
     private bool _syncingScroll;
     private bool _syncingChrome;
-    private bool _syncingOutputCombos;
     private int _waveformHeightScale;
     private int _playbackGeneration;
     private bool _didRestoreLastDocument;
+    private TransportIconButton? _waapiToggle;
     private System.Windows.Controls.ContextMenu? _fadeMenu;
     private System.Windows.Controls.ContextMenu? _formatMenu;
     private FormatConvertKind _formatKind;
+    private FormatSizePreview? _formatSizePreview;
     private bool _formatPreviewing;
     private bool _formatPreviewToggling;
     private long _formatPreviewResumeFrame;
@@ -66,6 +67,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        if (!WindowPlacement.TryApply(this, AppStorage.Settings))
+        {
+            WindowPlacement.ApplyFirstLaunch(this);
+        }
         TipService.Enabled = AppStorage.Settings.ShowTips;
         TipService.BindDisplay(TipsLabel, TipsPanel, TipsScroll);
         TipService.PinChanged += (_, _) => RefreshTipsHeader();
@@ -78,9 +83,13 @@ public partial class MainWindow : Window
         Topmost = AppStorage.Settings.AlwaysOnTop;
 
         Transport.CommandInvoked += (_, command) => ExecuteTransport(command);
-        Transport.PositionSeeked += (_, seconds) => SeekToSeconds(seconds);
-        Transport.RequestWaveformFocus += (_, _) => Waveform.Focus();
-        Transport.LanguageToggleRequested += (_, _) => ToggleUiLanguage();
+        StatusTimes.CurrentCommitted += (_, frame) =>
+        {
+            SeekFrame(frame);
+            Waveform.CenterViewOnPlayhead();
+        };
+        StatusTimes.SelectionCommitted += (_, range) => Waveform.SetSelection(range);
+        StatusTimes.RequestWaveformFocus += (_, _) => Waveform.Focus();
         Transport.TipsToggleRequested += (_, _) => ToggleTips();
         Transport.ManualHelpRequested += (_, _) => ManualViewer.Open(this);
         UiStrings.LanguageChanged += (_, _) => Dispatcher.BeginInvoke(RefreshLocalizedText);
@@ -126,7 +135,6 @@ public partial class MainWindow : Window
         _player.ApplyOutputSettings(_outputSettings);
         Spectrum.Player = _player;
         VectorScope.Player = _player;
-        PopulateOutputCombos();
 
         // 優先度は Input が唯一安全：Render だと追従描画が入力を飢餓させ操作不能になり
         // （深い拡大のスペクトログラム追従で実際に発生）、Background だと逆に
@@ -164,6 +172,7 @@ public partial class MainWindow : Window
 
         ApplyWaveformHeightScale();
         BindWorkspace(null);
+        PlaceWaapiToggle();
         InitializeWaapi();
         RefreshLocalizedText();
         Loaded += OnStartupLoaded;
@@ -291,15 +300,6 @@ public partial class MainWindow : Window
         RefreshStatus();
     }
 
-    private void ToggleUiLanguage()
-    {
-        var next = UiStrings.IsJapanese ? UiLanguage.English : UiLanguage.Japanese;
-        UiStrings.SetLanguage(next);
-        AppStorage.Settings.UiLanguage = UiStrings.ToStoredValue(next);
-        AppStorage.Save();
-        Waveform.Focus();
-    }
-
     private void ToggleTips()
     {
         var enabled = !AppStorage.Settings.ShowTips;
@@ -327,20 +327,34 @@ public partial class MainWindow : Window
         GitHubLink.Text = UiStrings.CopyrightGitHub;
         RefreshTipsHeader();
         TipService.Set(GitHubLink, UiStrings.TipGitHub);
-        AudioApiLabel.Text = UiStrings.LabelAudioApi;
-        TipService.Set(AudioApiLabel, UiStrings.TipAudioApi);
-        TipService.Set(ApiCombo, UiStrings.TipAudioApi);
-        AudioDeviceLabel.Text = UiStrings.LabelAudioDevice;
-        TipService.Set(AudioDeviceLabel, UiStrings.TipAudioDevice);
-        TipService.Set(DeviceCombo, UiStrings.TipAudioDevice);
+        TipService.Set(CopyrightText, UiStrings.TipCopyright);
+        TipService.Set(SettingsGear, UiStrings.TipAudioSettings);
+        SettingsGear.SetValue(System.Windows.Automation.AutomationProperties.NameProperty, UiStrings.AccessibleAudioSettingsButton);
         AlwaysOnTopCheck.Content = UiStrings.LabelAlwaysOnTop;
         TipService.Set(AlwaysOnTopCheck, UiStrings.TipAlwaysOnTop);
+        StatusTimes.ApplyLocalizedText();
+        TipService.Set(StatusMeta, UiStrings.TipStatusFormat);
         TipService.Set(Overview, UiStrings.TipOverview);
         TipService.Set(VectorScope, UiStrings.TipVectorScope);
         TipService.Set(Spectrum, UiStrings.TipSpectrum);
+        TipService.Set(LevelMeter, UiStrings.TipLevelMeter);
+        TipService.Set(TimeScroll, UiStrings.TipTimeScroll);
+        TipService.Set(DocumentTabHost, UiStrings.TipOpen);
+        TipService.Set(DocumentTabScroll, UiStrings.TipOpen);
+        TipService.Set(DocumentTabs, UiStrings.TipOpen);
+        TipService.Set(TipsHeader, UiStrings.TipTips, respectsEnabled: false);
+        TipService.Set(TipsScroll, UiStrings.TipTips, respectsEnabled: false);
+        TipService.Set(TipsLabel, UiStrings.TipTips, respectsEnabled: false);
+        TipService.Set(HistoryOverlay, UiStrings.TipEditHistory);
         TipService.Set(TabScrollLeft, UiStrings.TipTabScrollLeft);
         TipService.Set(TabScrollRight, UiStrings.TipTabScrollRight);
         Transport.ApplyLocalizedTips();
+        if (_waapiToggle is not null)
+        {
+            TipService.Set(_waapiToggle, UiStrings.TipWaapiToggle);
+            _waapiToggle.InvalidateVisual();
+        }
+
         Waveform.RefreshLocalizedTips();
         WaapiBar.ApplyLocalizedText();
         RefreshWaapiStatusDisplay();
@@ -392,9 +406,9 @@ public partial class MainWindow : Window
 
     private void RefreshStatus()
     {
+        StatusMeta.Inlines.Clear();
         if (_document is null)
         {
-            StatusMeta.Text = string.Empty;
             RefreshExportEnabled();
             SyncTransportPosition(0);
             RefreshTitle();
@@ -407,32 +421,66 @@ public partial class MainWindow : Window
             AudioFileKind.Aiff => "AIFF",
             _ => "WAVE",
         };
-        var name = _activeSession?.DisplayName ?? UiStrings.UntitledDocument;
-        var selection = _document.Selection;
-        var text = string.Create(
-            CultureInfo.InvariantCulture,
-            $"{name} {UiStrings.FormatSampleRate(_document.SampleRate)} {UiStrings.FormatBitDepth(_document.BitsPerSample)} {UiStrings.FormatChannels(_document.Channels)} {kind} {UiStrings.FormatFileBytes(_document.FileBytes)}");
-        if (_document.FileLastWriteTime is { } stamped)
+        var normal = WpfControlHelpers.FrozenBrush(Theme.Get("StatusBarDetailForeBrush"));
+        var edited = WpfControlHelpers.FrozenBrush(Theme.Get("StatusBarErrorDetailForeBrush"));
+        var rate = _document.SampleRate;
+        var bits = _document.BitsPerSample;
+        var channels = _document.Channels;
+        if (_formatSizePreview is { } preview)
         {
-            text += $" {UiStrings.FormatFileTimestamp(stamped)}";
-        }
-        if (!selection.IsEmpty)
-        {
-            text += string.Create(
-                CultureInfo.InvariantCulture,
-                $" {UiStrings.StatusSelectionPrefix} {UiStrings.FormatDuration(selection.Length / (double)_document.SampleRate)}");
+            switch (preview.Kind)
+            {
+                case FormatConvertKind.SampleRate when FormatConvert.IsValidSampleRate(preview.Value):
+                    rate = preview.Value;
+                    break;
+                case FormatConvertKind.BitDepth when FormatConvert.IsValidBitDepth(preview.Value):
+                    bits = preview.Value;
+                    break;
+                case FormatConvertKind.Channels when preview.Value is 1 or 2:
+                    channels = preview.Value;
+                    break;
+            }
         }
 
-        StatusMeta.Text = text;
+        var estimatedBytes = _document.EstimateFileBytesFor(rate, bits, channels);
+        var sizeEdited = estimatedBytes != _document.CommittedFileBytes;
+
+        AppendStatusRun(UiStrings.FormatSampleRate(rate), rate != _document.CommittedSampleRate, normal, edited);
+        AppendStatusRun(UiStrings.FormatBitDepth(bits), bits != _document.CommittedBitsPerSample, normal, edited);
+        AppendStatusRun(UiStrings.FormatChannels(channels), channels != _document.CommittedChannels, normal, edited);
+        AppendStatusRun(kind, edited: false, normal, edited);
+        AppendStatusRun(
+            UiStrings.FormatFileBytes(sizeEdited ? estimatedBytes : _document.FileBytes),
+            sizeEdited,
+            normal,
+            edited);
+
         RefreshExportEnabled();
         SyncTransportPosition();
         RefreshTitle();
     }
 
+    private void AppendStatusRun(string text, bool edited, Brush normal, Brush highlight)
+    {
+        if (StatusMeta.Inlines.Count > 0)
+        {
+            StatusMeta.Inlines.Add(new Run(" "));
+        }
+
+        StatusMeta.Inlines.Add(new Run(text)
+        {
+            Foreground = edited ? highlight : normal,
+        });
+    }
+
     private void SyncTransportPosition(long? frame = null)
     {
-        var current = FrameToSeconds(frame ?? Waveform.PlayheadFrame);
-        Transport.SetPosition(current, _document?.DurationSeconds ?? 0);
+        StatusTimes.SetState(
+            frame ?? Waveform.PlayheadFrame,
+            _document?.Selection ?? WaveSelection.Empty,
+            _document?.FrameCount ?? 0,
+            _document?.SampleRate ?? 0,
+            _document is not null);
     }
 
     private long VisibleCenterFrame() =>
@@ -465,21 +513,6 @@ public partial class MainWindow : Window
         Waveform.EndScrubAtFrame(VisibleCenterFrame(), commit: true);
     }
 
-    private void SeekToSeconds(double seconds)
-    {
-        if (_document is null)
-        {
-            return;
-        }
-
-        var frame = (long)Math.Round(seconds * _document.SampleRate);
-        SeekFrame(frame);
-        Waveform.CenterViewOnPlayhead();
-    }
-
-    private double FrameToSeconds(long frame) =>
-        _document is null || _document.SampleRate <= 0 ? 0 : frame / (double)_document.SampleRate;
-
     private WaveSelection ActiveRange()
     {
         if (_document is null)
@@ -494,12 +527,6 @@ public partial class MainWindow : Window
 
     private void ConfirmAndExit()
     {
-        if (_sessions.Any(session => session.Document.IsDirty))
-        {
-            Close();
-            return;
-        }
-
         var confirm = OwnerCenteredMessageBox.Show(
             this,
             UiStrings.DialogExitBody,
@@ -521,12 +548,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!OfferSaveAllDirty())
-        {
-            e.Cancel = true;
-            return;
-        }
-
         if (_exitAfterFlush)
         {
             return;
@@ -534,6 +555,7 @@ public partial class MainWindow : Window
 
         e.Cancel = true;
         _closing = true;
+        WindowPlacement.Capture(this, AppStorage.Settings);
         RememberDocumentState();
         AppStorage.Settings.ApplyAudioOutput(_outputSettings);
         AppStorage.Settings.WaveformHeightScale = _waveformHeightScale;

@@ -109,27 +109,44 @@
         </Setter>
     </Style>
 
-    <Style x:Key="TransportTimecodeStyle" TargetType="TextBox" BasedOn="{StaticResource DarkTextBoxStyle}">
+    <Style x:Key="StatusTimecodeLabelStyle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="Consolas" />
         <Setter Property="FontWeight" Value="Bold" />
-        <Setter Property="FontSize" Value="16" />
-        <Setter Property="Padding" Value="6,1" />
-        <Setter Property="MinWidth" Value="{x:Static ui:DesignMetrics.TransportCurrentTimeWidth}" />
-        <Setter Property="MinHeight" Value="26" />
+        <Setter Property="FontSize" Value="8" />
+        <Setter Property="LineHeight" Value="10" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="TextAlignment" Value="Center" />
+        <Setter Property="Width" Value="{x:Static ui:DesignMetrics.StatusTimecodeLabelWidth}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource StatusBarTitleForeBrush}" />
+        <Setter Property="Margin" Value="0,0,3,0" />
+    </Style>
+
+    <Style x:Key="StatusTimecodeStyle" TargetType="TextBox" BasedOn="{StaticResource DarkTextBoxStyle}">
+        <Setter Property="FontFamily" Value="Consolas" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Padding" Value="4,0" />
+        <Setter Property="MinWidth" Value="{x:Static ui:DesignMetrics.StatusTimecodeWidth}" />
+        <Setter Property="Width" Value="{x:Static ui:DesignMetrics.StatusTimecodeWidth}" />
+        <Setter Property="MinHeight" Value="20" />
+        <Setter Property="MaxHeight" Value="22" />
+        <Setter Property="TextAlignment" Value="Center" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="Background" Value="{DynamicResource TransportBackBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource ChromeBorderBrush}" />
-        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{DynamicResource StatusBarTitleForeBrush}" />
+        <Setter Property="Background" Value="{DynamicResource WaveformBackBrush}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Margin" Value="0,0,4,0" />
         <Setter Property="CaretBrush" Value="{DynamicResource AccentCyanBrush}" />
         <Setter Property="SelectionBrush" Value="{DynamicResource AccentCyanBrush}" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{DynamicResource TransportHoverBackBrush}" />
-                <Setter Property="BorderBrush" Value="{DynamicResource AccentCyanBrush}" />
             </Trigger>
             <Trigger Property="IsKeyboardFocused" Value="True">
                 <Setter Property="Background" Value="{DynamicResource DialogInputBackBrush}" />
-                <Setter Property="BorderBrush" Value="{DynamicResource AccentCyanBrush}" />
             </Trigger>
         </Style.Triggers>
     </Style>

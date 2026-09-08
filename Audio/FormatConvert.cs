@@ -17,6 +17,31 @@ internal static class FormatConvert
     public static bool IsValidSampleRate(int rate) =>
         rate >= MinSampleRate && rate <= MaxSampleRate;
 
+    public static int SampleRateNudgeStep(bool shift, bool control) =>
+        control && shift ? 1000 : control ? 100 : shift ? 10 : 1;
+
+    public static int ApplySampleRateNudge(int current, int direction, int step)
+    {
+        var clamped = Math.Clamp(current, MinSampleRate, MaxSampleRate);
+        if (direction == 0 || step <= 0)
+        {
+            return clamped;
+        }
+
+        var next = current + (long)step * Math.Sign(direction);
+        if (next > MaxSampleRate)
+        {
+            return MaxSampleRate;
+        }
+
+        if (next < MinSampleRate)
+        {
+            return MinSampleRate;
+        }
+
+        return (int)next;
+    }
+
     public static bool IsValidBitDepth(int bits) =>
         Array.IndexOf(BitDepths, bits) >= 0;
 

@@ -31,6 +31,7 @@ internal sealed class TabScrollButton : Button
         OverridesDefaultStyle = true;
         Template = new ControlTemplate(typeof(Button));
         SnapsToDevicePixels = true;
+        TransportHover.Attach(this);
         IsEnabledChanged += (_, _) => Cursor = IsEnabled ? Cursors.Hand : Cursors.Arrow;
     }
 
@@ -47,8 +48,8 @@ internal sealed class TabScrollButton : Button
             return;
         }
 
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
-        DrawChevron(dc, bounds, PointLeft, Theme.Get("TransportDisabledForeBrush"));
+        TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed);
+        DrawChevron(dc, bounds, PointLeft, TransportChrome.Fore(IsEnabled));
     }
 
     private static void DrawChevron(DrawingContext dc, Rect bounds, bool left, Color fore)

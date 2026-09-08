@@ -31,6 +31,15 @@ internal static class AppStorage
 
     public static string SessionDocumentPath => Path.Combine(RootDirectory, SessionDocumentFileName);
 
+    public static string SessionDirectory => Path.Combine(RootDirectory, DocumentSessionStore.SessionDirectoryName);
+
+    public static string SessionFilePath(string fileName)
+    {
+        var name = DocumentSessionStore.SanitizeSessionFileName(fileName)
+            ?? throw new ArgumentException("Invalid session file name.", nameof(fileName));
+        return Path.Combine(SessionDirectory, name);
+    }
+
     public static void ClearSessionDocument()
     {
         try
@@ -44,6 +53,19 @@ internal static class AppStorage
         {
             // 作業コピーの削除失敗は致命的ではない。
         }
+    }
+
+    public static void ReplaceSessionFiles(IReadOnlyCollection<string> keepFileNames)
+    {
+        Directory.CreateDirectory(SessionDirectory);
+        DocumentSessionStore.RemoveOrphanSessionFiles(SessionDirectory, keepFileNames);
+        ClearSessionDocument();
+    }
+
+    public static void ClearAllSessionAudio()
+    {
+        ClearSessionDocument();
+        DocumentSessionStore.RemoveOrphanSessionFiles(SessionDirectory, []);
     }
 
     public static void Load()

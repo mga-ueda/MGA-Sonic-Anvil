@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using MgaSonicAnvil.Domain;
@@ -12,6 +13,8 @@ internal static class FadeCurveIcons
 {
     public const int IconSize = 18;
     public const int CanvasPad = 1;
+
+    public static int WidthFor(int pixelSize) => Math.Max(8, pixelSize);
 
     public static int CanvasSize(int pixelSize) => Math.Max(8, pixelSize) + CanvasPad * 2;
 
@@ -142,5 +145,29 @@ internal static class FadeCurveIcons
 
             border.BorderBrush = shape == selected ? cyan : Brushes.Transparent;
         }
+    }
+
+    public static ContextMenu ShowPicker(
+        FrameworkElement owner,
+        Point clientLocation,
+        FadeShape current,
+        bool isFadeIn,
+        Action<FadeShape> onSelected,
+        ref ContextMenu? menuSlot)
+    {
+        if (menuSlot is not null)
+        {
+            menuSlot.IsOpen = false;
+        }
+
+        var menu = new ContextMenu();
+        menuSlot = menu;
+        AddCurveChoices(menu.Items, current, isFadeIn, onSelected);
+        menu.PlacementTarget = owner;
+        menu.Placement = PlacementMode.RelativePoint;
+        menu.HorizontalOffset = clientLocation.X;
+        menu.VerticalOffset = clientLocation.Y;
+        menu.IsOpen = true;
+        return menu;
     }
 }

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows.Threading;
 using MgaSonicAnvil.Config;
+using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Wwise;
 
 namespace MgaSonicAnvil.UI;
@@ -27,6 +28,24 @@ public partial class MainWindow
     private string _keptTargetProjectFilePath = string.Empty;
     private string _lastKnownWwiseProjectFilePath = string.Empty;
     private string _lastKnownWwiseProjectName = string.Empty;
+
+    private void PlaceWaapiToggle()
+    {
+        var button = new TransportIconButton
+        {
+            CommandKind = TransportCommand.ToggleWaapi,
+            Icon = TransportIcon.Waapi,
+            QuietChrome = true,
+            Width = DesignMetrics.TransportWaapiButtonWidth,
+            Height = DesignMetrics.ProjectBarHeight,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+        };
+        TipService.Set(button, UiStrings.TipWaapiToggle);
+        button.Click += (_, _) => ToggleWaapiPanel();
+        MeterTopSlot.Child = button;
+        _waapiToggle = button;
+    }
 
     private void InitializeWaapi()
     {
@@ -86,7 +105,12 @@ public partial class MainWindow
         WaapiBar.Visibility = _waapiPanelVisible
             ? System.Windows.Visibility.Visible
             : System.Windows.Visibility.Collapsed;
-        Transport.SetWaapiLatched(_waapiPanelVisible);
+        if (_waapiToggle is not null)
+        {
+            _waapiToggle.IsLatched = _waapiPanelVisible;
+            _waapiToggle.InvalidateVisual();
+        }
+
         if (!_waapiPanelVisible)
         {
             DisconnectWaapi();

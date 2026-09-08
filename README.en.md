@@ -10,15 +10,15 @@ Hear, cut, mark, and loop game audio — then hand a Wave-only structure to Wwis
 
 Fade, normalize, ripple-delete, copy / paste, markers / regions / sample loop, and a spectrogram — decide by ear and commit. You can prep game one-shots and loops here without bouncing between a DAW and a dedicated editor.
 
-**EXPORT talks to Wwise in Wave-only mode.** Turn on WAAPI in the transport, pick a destination, and EXPORT writes the source wave into Originals and imports it as a Music Playlist Container (markers / sample loop; no Custom Cues). Play -E previews the loop wrap and writes Play post-exit on EXPORT.
+**EXPORT talks to Wwise in Wave-only mode.** Turn on WAAPI above the level meter, pick a destination, and EXPORT writes the source wave into Originals and imports it as a Music Playlist Container (markers / sample loop; no Custom Cues). Play -E previews the loop wrap and writes Play post-exit on EXPORT.
 
-**The UI is Japanese / English.** The Japanese locale keeps the current wording, including English labels as they are. The English locale translates the Japanese. Switch with **JP / EN** on the transport.
+**The UI is Japanese / English.** The Japanese locale keeps the current wording, including English labels as they are. The English locale translates the Japanese. Switch it in Settings (the gear). The default is **Auto** (Japanese if the OS is Japanese, otherwise English).
 
 ## Manual & download
 
 - Manual: [Japanese](https://mga-ueda.github.io/MGA-Sonic-Anvil/manual.ja.html) · [English](https://mga-ueda.github.io/MGA-Sonic-Anvil/manual.en.html) · [Hub](https://mga-ueda.github.io/MGA-Sonic-Anvil/)
 - New here? Start with the [quick start](https://mga-ueda.github.io/MGA-Sonic-Anvil/manual.en.html#quickstart)
-- In-app: transport **Manual (`?`)** (right of JP / EN; follows the UI language)
+- In-app: transport **Manual (`?`)** (follows the UI language)
 - Builds: [Releases](https://github.com/mga-ueda/MGA-Sonic-Anvil/releases)
 - Settings: `%LocalAppData%\MGA\MGA Sonic Anvil\` (`settings.json`; not written next to the exe)
 - License: [MIT](LICENSE)

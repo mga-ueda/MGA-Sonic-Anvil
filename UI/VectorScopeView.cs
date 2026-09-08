@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 
@@ -13,10 +14,12 @@ internal sealed class VectorScopeView : FrameworkElement
 {
     private const int HistoryLayers = 6;
     private const int MaxPoints = 360;
-    private const double LayoutPad = 1;
+    private const double LayoutPad = 3;
+    private const double CorrelationSidePad = 4;
     private const float SilentPeak = 0.0025f;
     private const double CorrelationAttack = 0.38;
     private const double CorrelationRelease = 0.16;
+    private const float PersistFade = 0.78f;
 
     private readonly DispatcherTimer _timer;
     private readonly float[] _left = new float[LevelMeterEngine.WindowFrames];
@@ -29,6 +32,10 @@ internal sealed class VectorScopeView : FrameworkElement
     private float _paintFade = 1f;
     private bool _idle = true;
     private long _lastTickAt;
+    private WriteableBitmap? _persist;
+    private int[] _persistPixels = [];
+    private int _persistW;
+    private int _persistH;
 
     public static readonly DependencyProperty BackgroundProperty =
         System.Windows.Controls.Control.BackgroundProperty.AddOwner(
@@ -93,6 +100,7 @@ internal sealed class VectorScopeView : FrameworkElement
             return;
         }
 
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
         var layout = MeasureLayout(bounds);
         DrawScope(dc, layout.Scope);
         DrawCorrelation(dc, layout.Correlation);
@@ -130,49 +138,60 @@ internal sealed class VectorScopeView : FrameworkElement
 
         var clip = new RectangleGeometry(scope, 3, 3);
         dc.PushClip(clip);
-        var trace = Theme.Get("VectorScopeTraceBrush");
-        for (var layer = 0; layer < HistoryLayers; layer++)
+        if (_persist is not null)
         {
-            var index = (_trailWrite + layer) % HistoryLayers;
-            var count = _trailCounts[index];
-            if (count < 2)
-            {
-                continue;
-            }
-
-            var age = layer / (double)Math.Max(1, HistoryLayers - 1);
-            var alpha = (byte)Math.Round(255 * _paintFade * (0.16 + 0.84 * age));
-            if (alpha < 8)
-            {
-                continue;
-            }
-
-            var pen = new Pen(
-                WpfControlHelpers.FrozenBrush(Color.FromArgb(alpha, trace.R, trace.G, trace.B)),
-                layer == HistoryLayers - 1 ? 0.7 : 0.5);
-            pen.Freeze();
-            var geometry = new StreamGeometry();
-            using (var ctx = geometry.Open())
-            {
-                ctx.BeginFigure(_trails[index][0], false, false);
-                for (var i = 1; i < count; i++)
-                {
-                    ctx.LineTo(_trails[index][i], true, true);
-                }
-            }
-
-            geometry.Freeze();
-            dc.DrawGeometry(null, pen, geometry);
+            dc.DrawImage(_persist, scope);
         }
 
+        DrawTrail(dc, LatestTrailIndex(), _paintFade);
         dc.Pop();
+    }
+
+    private int LatestTrailIndex() =>
+        (_trailWrite + HistoryLayers - 1) % HistoryLayers;
+
+    private void DrawTrail(DrawingContext dc, int index, float fade)
+    {
+        var count = _trailCounts[index];
+        if (count < 2 || fade < 0.04f)
+        {
+            return;
+        }
+
+        var trace = Theme.Get("VectorScopeTraceBrush");
+        var geometry = new StreamGeometry();
+        using (var ctx = geometry.Open())
+        {
+            ctx.BeginFigure(_trails[index][0], false, false);
+            for (var i = 1; i < count; i++)
+            {
+                ctx.LineTo(_trails[index][i], true, true);
+            }
+        }
+
+        geometry.Freeze();
+        var alpha = (byte)Math.Round(255 * fade);
+        if (alpha < 8)
+        {
+            return;
+        }
+
+        var pen = new Pen(
+            WpfControlHelpers.FrozenBrush(Color.FromArgb(alpha, trace.R, trace.G, trace.B)),
+            0.7);
+        pen.Freeze();
+        dc.DrawGeometry(null, pen, geometry);
     }
 
     private void DrawCorrelation(DrawingContext dc, Rect area)
     {
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("SurfaceBackBrush")), null, area);
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, area);
         var trackHeight = 5d;
-        var track = new Rect(area.X, area.Y + 1, area.Width, trackHeight);
+        var track = new Rect(
+            area.X + CorrelationSidePad,
+            area.Y + LayoutPad,
+            Math.Max(8d, area.Width - CorrelationSidePad * 2),
+            trackHeight);
         var muted = Theme.Get("MutedForeBrush");
         dc.DrawRoundedRectangle(
             WpfControlHelpers.FrozenBrush(Color.FromArgb(70, muted.R, muted.G, muted.B)),
@@ -200,9 +219,9 @@ internal sealed class VectorScopeView : FrameworkElement
         var right = Measure("+1", 8, dim, dpi);
         var value = Measure(VectorScopeEngine.FormatCorrelation(_correlation), 8, dim, dpi);
         var labelY = track.Bottom + 1;
-        dc.DrawText(left, new Point(area.X, labelY));
-        dc.DrawText(right, new Point(area.Right - right.Width, labelY));
-        dc.DrawText(value, new Point(area.X + (area.Width - value.Width) * 0.5, labelY));
+        dc.DrawText(left, new Point(track.X, labelY));
+        dc.DrawText(right, new Point(track.Right - right.Width, labelY));
+        dc.DrawText(value, new Point(track.X + (track.Width - value.Width) * 0.5, labelY));
     }
 
     private void UpdateScope()
@@ -234,6 +253,7 @@ internal sealed class VectorScopeView : FrameworkElement
                 Array.Clear(_trailCounts);
                 _correlation = 0;
                 _paintFade = 0;
+                ClearPersist();
                 if (_idle)
                 {
                     return;
@@ -243,7 +263,136 @@ internal sealed class VectorScopeView : FrameworkElement
             }
         }
 
+        AdvancePersist();
         InvalidateVisual();
+    }
+
+    private void AdvancePersist()
+    {
+        var layout = MeasureLayout(new Rect(RenderSize));
+        if (!EnsurePersist(layout.Scope))
+        {
+            return;
+        }
+
+        FadePersist();
+        var latest = LatestTrailIndex();
+        if (_trailCounts[latest] >= 2 && _paintFade > 0.04f)
+        {
+            StampTrail(layout.Scope, _trails[latest], _trailCounts[latest], _paintFade);
+        }
+
+        _persist!.WritePixels(new Int32Rect(0, 0, _persistW, _persistH), _persistPixels, _persistW * 4, 0);
+    }
+
+    private bool EnsurePersist(Rect scope)
+    {
+        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var w = Math.Max(8, (int)Math.Round(scope.Width * dpi));
+        var h = Math.Max(8, (int)Math.Round(scope.Height * dpi));
+        if (_persist is not null && _persistW == w && _persistH == h)
+        {
+            return true;
+        }
+
+        _persistW = w;
+        _persistH = h;
+        _persistPixels = new int[w * h];
+        _persist = new WriteableBitmap(w, h, 96 * dpi, 96 * dpi, PixelFormats.Bgra32, null);
+        return true;
+    }
+
+    private void FadePersist()
+    {
+        for (var i = 0; i < _persistPixels.Length; i++)
+        {
+            var p = _persistPixels[i];
+            if (p == 0)
+            {
+                continue;
+            }
+
+            var a = (int)(((p >> 24) & 0xFF) * PersistFade);
+            if (a < 6)
+            {
+                _persistPixels[i] = 0;
+                continue;
+            }
+
+            var r = (int)(((p >> 16) & 0xFF) * PersistFade);
+            var g = (int)(((p >> 8) & 0xFF) * PersistFade);
+            var b = (int)((p & 0xFF) * PersistFade);
+            _persistPixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
+        }
+    }
+
+    private void ClearPersist()
+    {
+        if (_persistPixels.Length == 0)
+        {
+            return;
+        }
+
+        Array.Clear(_persistPixels);
+        _persist?.WritePixels(new Int32Rect(0, 0, _persistW, _persistH), _persistPixels, _persistW * 4, 0);
+    }
+
+    private void StampTrail(Rect scope, Point[] points, int count, float fade)
+    {
+        var color = Theme.Get("VectorScopeTraceBrush");
+        var alpha = (byte)Math.Clamp((int)Math.Round(210 * fade), 0, 255);
+        if (alpha < 8)
+        {
+            return;
+        }
+
+        var sx = _persistW / Math.Max(1e-6, scope.Width);
+        var sy = _persistH / Math.Max(1e-6, scope.Height);
+        for (var i = 1; i < count; i++)
+        {
+            var x0 = (points[i - 1].X - scope.X) * sx;
+            var y0 = (points[i - 1].Y - scope.Y) * sy;
+            var x1 = (points[i].X - scope.X) * sx;
+            var y1 = (points[i].Y - scope.Y) * sy;
+            StampSegment(x0, y0, x1, y1, color, alpha);
+        }
+    }
+
+    private void StampSegment(double x0, double y0, double x1, double y1, Color color, byte alpha)
+    {
+        var dx = x1 - x0;
+        var dy = y1 - y0;
+        var steps = Math.Max(1, (int)Math.Ceiling(Math.Max(Math.Abs(dx), Math.Abs(dy))));
+        var inv = 1d / steps;
+        for (var i = 0; i <= steps; i++)
+        {
+            var t = i * inv;
+            var x = x0 + dx * t;
+            var y = y0 + dy * t;
+            StampDot(x, y, color, alpha);
+        }
+    }
+
+    private void StampDot(double x, double y, Color color, byte alpha)
+    {
+        var ix = (int)Math.Round(x);
+        var iy = (int)Math.Round(y);
+        if ((uint)ix >= (uint)_persistW || (uint)iy >= (uint)_persistH || alpha < 4)
+        {
+            return;
+        }
+
+        var i = iy * _persistW + ix;
+        var p = _persistPixels[i];
+        var a0 = (p >> 24) & 0xFF;
+        var r0 = (p >> 16) & 0xFF;
+        var g0 = (p >> 8) & 0xFF;
+        var b0 = p & 0xFF;
+        var a1 = Math.Max(a0, alpha);
+        var r1 = Math.Max(r0, (color.R * alpha) / 255);
+        var g1 = Math.Max(g0, (color.G * alpha) / 255);
+        var b1 = Math.Max(b0, (color.B * alpha) / 255);
+        _persistPixels[i] = (a1 << 24) | (r1 << 16) | (g1 << 8) | b1;
     }
 
     private void CaptureTrail()

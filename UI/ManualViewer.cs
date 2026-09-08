@@ -6,7 +6,7 @@ namespace MgaSonicAnvil.UI;
 
 /// <summary>
 /// GitHub Pages 上のユーザーマニュアルを既定ブラウザで開く。
-/// アプリの表示言語（JP／EN）に合わせて URL を切り替える。
+/// アプリの表示言語に合わせて URL を切り替える。
 /// </summary>
 internal static class ManualViewer
 {

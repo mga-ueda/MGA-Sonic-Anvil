@@ -28,6 +28,7 @@ internal partial class ColorDevPanelWindow : Window
         SourceInitialized += (_, _) => DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
         BuildRows();
         RefreshRows();
+        ApplyTips();
     }
 
     public void ApplyLocalizedText()
@@ -40,6 +41,31 @@ internal partial class ColorDevPanelWindow : Window
             if (_nameLabels.TryGetValue(entry.Key, out var label))
             {
                 label.Text = entry.Label;
+            }
+        }
+
+        ApplyTips();
+    }
+
+    private void ApplyTips()
+    {
+        TipService.Set(ResetButton, UiStrings.ColorDevResetToDefaults);
+        TipService.Set(CloseButton, UiStrings.ColorDevClose);
+        foreach (var entry in UiColors.Entries)
+        {
+            if (_nameLabels.TryGetValue(entry.Key, out var label))
+            {
+                TipService.Set(label, entry.Label);
+            }
+
+            if (_swatches.TryGetValue(entry.Key, out var swatch))
+            {
+                TipService.Set(swatch, entry.Label);
+            }
+
+            if (_hexInputs.TryGetValue(entry.Key, out var hex))
+            {
+                TipService.Set(hex, entry.Label);
             }
         }
     }

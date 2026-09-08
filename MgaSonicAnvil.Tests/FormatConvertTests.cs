@@ -68,9 +68,17 @@ public sealed class FormatConvertTests
         Assert.Equal(new WaveSelection(60, 180), document.SampleLoop);
         Assert.Equal(new WaveSelection(40, 100), document.Region);
         Assert.True(document.IsDirty);
+        Assert.True(document.SampleRateEdited);
+        Assert.True(document.FormatEdited);
+        Assert.False(document.BitDepthEdited);
+        Assert.False(document.ChannelsEdited);
+        Assert.Equal(
+            AudioDocument.EstimateFileBytes(document.CommittedFileBytes, 480, 2, 16, 240, 2, 16),
+            document.EstimatedFileBytes);
 
         Assert.True(history.Undo(document));
         Assert.Equal(48000, document.SampleRate);
+        Assert.False(document.SampleRateEdited);
         Assert.Equal(480, document.FrameCount);
         Assert.Equal(240, document.Markers[0].Frame);
     }
@@ -214,6 +222,10 @@ public sealed class FormatConvertTests
         Assert.Equal(16, document.BitsPerSample);
         Assert.Equal(FormatConvert.Quantize([0.1234567f], 16)[0], document.Interleaved[0]);
         Assert.True(document.IsDirty);
+        Assert.True(document.BitDepthEdited);
+        Assert.False(document.SampleRateEdited);
+        document.MarkSaved("b.wav", AudioFileKind.Wave);
+        Assert.False(document.BitDepthEdited);
     }
 
     [Fact]
@@ -309,6 +321,29 @@ public sealed class FormatConvertTests
         Assert.Equal(1, document.Channels);
         Assert.Equal(4, document.FrameCount);
         Assert.Equal(0f, document.Interleaved[0], 5);
+        Assert.True(document.ChannelsEdited);
+        Assert.False(document.SampleRateEdited);
+        Assert.False(document.BitDepthEdited);
+    }
+
+    [Fact]
+    public void EstimateFileBytesFor_ScalesWithHighlightedRate()
+    {
+        var document = MakeDocument(frames: 48000, sampleRate: 48000);
+        var half = document.EstimateFileBytesFor(24000, document.BitsPerSample, document.Channels);
+        Assert.Equal(document.CommittedFileBytes / 2, half);
+        Assert.Equal(document.CommittedFileBytes, document.EstimateFileBytesFor(48000, 16, 2));
+    }
+
+    [Fact]
+    public void EstimateFileBytes_KeepsHeaderAndScalesPayload()
+    {
+        var committedPcm = AudioDocument.EstimatePcmPayloadBytes(48000, 2, 16);
+        var destPcm = AudioDocument.EstimatePcmPayloadBytes(24000, 1, 24);
+        var header = 128;
+        Assert.Equal(
+            destPcm + header,
+            AudioDocument.EstimateFileBytes(committedPcm + header, 48000, 2, 16, 24000, 1, 24));
     }
 
     [Fact]
@@ -318,6 +353,25 @@ public sealed class FormatConvertTests
         Assert.True(FormatConvert.IsValidSampleRate(12345));
         Assert.False(FormatConvert.IsValidSampleRate(999));
         Assert.False(FormatConvert.IsValidSampleRate(400000));
+    }
+
+    [Theory]
+    [InlineData(false, false, 1)]
+    [InlineData(true, false, 10)]
+    [InlineData(false, true, 100)]
+    [InlineData(true, true, 1000)]
+    public void SampleRateNudgeStep_UsesModifiers(bool shift, bool control, int expected)
+    {
+        Assert.Equal(expected, FormatConvert.SampleRateNudgeStep(shift, control));
+    }
+
+    [Fact]
+    public void ApplySampleRateNudge_ClampsToValidRange()
+    {
+        Assert.Equal(48001, FormatConvert.ApplySampleRateNudge(48000, 1, 1));
+        Assert.Equal(47990, FormatConvert.ApplySampleRateNudge(48000, -1, 10));
+        Assert.Equal(FormatConvert.MinSampleRate, FormatConvert.ApplySampleRateNudge(1005, -1, 10));
+        Assert.Equal(FormatConvert.MaxSampleRate, FormatConvert.ApplySampleRateNudge(383500, 1, 1000));
     }
 
     private static (int ChunkSize, ushort FormatTag, ushort Channels, int SampleRate, int ByteRate, ushort BlockAlign, ushort BitsPerSample) ReadFmt(string path)

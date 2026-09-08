@@ -117,7 +117,7 @@ public partial class MainWindow
             return true;
         }
 
-        if (Transport.IsPositionFocused)
+        if (StatusTimes.IsTimeFocused)
         {
             return false;
         }
@@ -135,20 +135,14 @@ public partial class MainWindow
         if (key == Key.Escape)
         {
             StopMarkerNudge();
-            if (ApiCombo.IsDropDownOpen || DeviceCombo.IsDropDownOpen
-                || ApiCombo.IsKeyboardFocusWithin || DeviceCombo.IsKeyboardFocusWithin)
+            if (StatusTimes.IsEditing)
             {
-                return false;
-            }
-
-            if (Transport.IsEditingPosition)
-            {
-                Transport.CancelPositionEdit();
+                StatusTimes.CancelEdit();
                 Waveform.Focus();
                 return true;
             }
 
-            if (Transport.IsPositionFocused)
+            if (StatusTimes.IsTimeFocused)
             {
                 Waveform.Focus();
                 return true;
@@ -190,7 +184,7 @@ public partial class MainWindow
             return true;
         }
 
-        if (Waveform.IsEditingMarkerComment || Transport.IsPositionFocused)
+        if (Waveform.IsEditingMarkerComment || StatusTimes.IsTimeFocused)
         {
             return false;
         }
@@ -463,7 +457,7 @@ public partial class MainWindow
 
         if (key == Key.T && modifiers == ModifierKeys.None)
         {
-            return Transport.FocusCurrentTime();
+            return StatusTimes.FocusCurrentTime();
         }
 
         if (key == Key.S && modifiers == ModifierKeys.None)

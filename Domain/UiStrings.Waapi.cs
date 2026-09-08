@@ -37,11 +37,14 @@ internal static partial class UiStrings
         "WAAPI の接続とエリア表示を切り替えます (W)。オフのときは Wwise へ接続しません。",
         "Toggle WAAPI connection and the WAAPI area (W). Off means no connection to Wwise.");
     public static string PreflightWaapiOff => Get(
-        "WAAPI がオフです。トランスポートの WAAPI をオンにすると接続します。",
-        "WAAPI is off. Turn on WAAPI in the transport to connect.");
+        "WAAPI がオフです。レベルメーター上の WAAPI をオンにすると接続します。",
+        "WAAPI is off. Turn on WAAPI above the level meter to connect.");
     public static string TipExport => Get(
         "現在の波形を Wwise Originals へ書き、Music Playlist Container としてインポートします (Ctrl+Shift+E)。\nWave 単体モード（マーカー / サンプルループ。Custom Cue は出しません）。",
         "Write the current wave into Wwise Originals and import it as a Music Playlist Container (Ctrl+Shift+E).\nWave-only mode (markers / sample loop. No Custom Cues).");
+    public static string TipWwiseProjectName => Get(
+        "接続中の Wwise プロジェクトです。",
+        "The connected Wwise project.");
     public static string TipWwiseProjectNameOpen => Get(
         "この Wwise プロジェクトを開きます（既に開いていれば前面）。",
         "Open this Wwise project (or bring it to the front if it is already open).");
@@ -51,6 +54,15 @@ internal static partial class UiStrings
     public static string TipOutputPath => Get(
         "元 WAV のコピー先フォルダです。横のフォルダボタンで変更できます。",
         "Folder where the source WAV is copied. Change it with the folder button.");
+    public static string TipWaapiConnection => Get(
+        "Wwise Authoring との接続状態です。CONNECT なら接続中、DISCONNECT なら未接続。",
+        "Connection to Wwise Authoring. CONNECT is linked, DISCONNECT is not.");
+    public static string TipWwiseVersion => Get(
+        "接続中の Wwise のバージョンです。",
+        "Version of the connected Wwise.");
+    public static string TipWaapiTargetPath => Get(
+        "Wwise の作成先オブジェクトです。Wwise で選択すると更新されます。Keep Target で固定できます。",
+        "Wwise destination object. Updates when you select in Wwise. Keep Target can pin it.");
     public static string SelectOutputFolderTitle => Get("書き出し先フォルダを選択", "Select export folder");
     public static string ErrSelectFolderFailed(string message) => Format(
         "フォルダを選べませんでした: {0}",

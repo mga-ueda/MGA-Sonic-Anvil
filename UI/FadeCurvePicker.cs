@@ -28,6 +28,7 @@ internal static class FadeCurvePicker
     private sealed class MenuState
     {
         public required bool FadeIn { get; init; }
+        public required FadeShape Initial { get; init; }
         public Action<FadeShape>? OnHighlight { get; init; }
     }
 
@@ -37,17 +38,19 @@ internal static class FadeCurvePicker
         bool fadeIn,
         Action<FadeShape> onCommit,
         Action<FadeShape> onPreview,
-        Action<FadeShape>? onHighlight = null)
+        Action<FadeShape>? onHighlight = null,
+        FadeShape? initial = null)
     {
+        var start = initial ?? FadeCurves.Default;
         var menu = new ContextMenu
         {
             PlacementTarget = placementTarget,
             Placement = placement,
             StaysOpen = true,
-            Tag = new MenuState { FadeIn = fadeIn, OnHighlight = onHighlight },
+            Tag = new MenuState { FadeIn = fadeIn, Initial = start, OnHighlight = onHighlight },
         };
 
-        FadeCurveIcons.AddCurveChoices(menu.Items, FadeCurves.Default, fadeIn, onCommit);
+        FadeCurveIcons.AddCurveChoices(menu.Items, start, fadeIn, onCommit);
         foreach (var item in menu.Items.OfType<MenuItem>())
         {
             item.PreviewKeyDown += (_, e) =>
@@ -86,7 +89,7 @@ internal static class FadeCurvePicker
         menu.Opened += (_, _) =>
         {
             menu.Dispatcher.BeginInvoke(
-                () => HighlightShape(menu, FadeCurves.Default),
+                () => HighlightShape(menu, start),
                 DispatcherPriority.Input);
         };
 
@@ -115,7 +118,7 @@ internal static class FadeCurvePicker
             return fromFocus;
         }
 
-        return FadeCurves.Default;
+        return menu.Tag is MenuState state ? state.Initial : FadeCurves.Default;
     }
 
     public static bool HighlightByIndex(ContextMenu menu, int index)

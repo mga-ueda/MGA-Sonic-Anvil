@@ -2,17 +2,6 @@ namespace MgaSonicAnvil.Domain;
 
 internal static partial class UiStrings
 {
-    public static string LanguageBadgeJapanese => Get("JP", "JP");
-    public static string LanguageBadgeEnglish => Get("EN", "EN");
-
-    public static string TipLanguageJapanese => Get(
-        "現在: 日本語。クリックで英語に切り替えます。",
-        "Current: Japanese. Click to switch to English.");
-
-    public static string TipLanguageEnglish => Get(
-        "現在: 英語。クリックで日本語に切り替えます。",
-        "Current: English. Click to switch to Japanese.");
-
     public static string LabelTips => Get(
         "Tips (click to lock/unlock)",
         "Tips (click to lock/unlock)");

@@ -57,9 +57,6 @@ public partial class MainWindow
             case TransportCommand.AmpZoomReset:
                 Waveform.ResetAmpZoom();
                 break;
-            case TransportCommand.Open:
-                OpenFromDialog();
-                break;
             case TransportCommand.FadeIn:
                 PromptFade(fadeIn: true, Transport.ButtonFor(TransportCommand.FadeIn));
                 break;

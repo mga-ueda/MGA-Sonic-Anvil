@@ -195,11 +195,17 @@ public sealed class ProcessEditsTests
         var original = (float[])document.Interleaved.Clone();
         var history = new EditHistory();
         document.Selection = new WaveSelection(10, 20);
+        var committedBytes = document.CommittedFileBytes;
         history.Do(document, ProcessEdits.Delete(document, document.Selection));
 
         Assert.Equal(40, document.FrameCount);
+        Assert.True(document.FileSizeEdited);
+        Assert.Equal(
+            AudioDocument.EstimateFileBytes(committedBytes, 50, document.Channels, document.BitsPerSample, 40, document.Channels, document.BitsPerSample),
+            document.EstimatedFileBytes);
         Assert.True(history.Undo(document));
         Assert.Equal(50, document.FrameCount);
+        Assert.False(document.FileSizeEdited);
         Assert.Equal(original, document.Interleaved);
     }
 

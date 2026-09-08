@@ -52,6 +52,8 @@ public partial class MainWindow
         VectorScope.InvalidateVisual();
         LevelMeter.InvalidateVisual();
         Transport.RefreshAppearance();
+        SettingsGear.RefreshAppearance();
+        _waapiToggle?.InvalidateVisual();
         RebuildTabBar();
     }
 #endif

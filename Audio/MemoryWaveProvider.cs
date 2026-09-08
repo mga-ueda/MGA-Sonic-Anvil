@@ -157,7 +157,6 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _cursor = checked((int)start * _channels);
             _frameGain = frameGain;
             _silenceOnly = false;
-            _paused = false;
             _flushFadeRemaining = 0;
             _flushFadeTotal = 0;
             _exitPlaying = false;

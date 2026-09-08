@@ -42,6 +42,16 @@ public sealed class FadeCurvesTests
     }
 
     [Fact]
+    public void ParseStored_AcceptsMenuCurvesAndRejectsConstant()
+    {
+        Assert.Equal(FadeShape.SCurve, FadeCurves.ParseStored("SCurve"));
+        Assert.Equal(FadeShape.Linear, FadeCurves.ParseStored("linear"));
+        Assert.Equal(FadeShape.SCurve, FadeCurves.ParseStored("Constant"));
+        Assert.Equal(FadeShape.SCurve, FadeCurves.ParseStored(""));
+        Assert.Equal(FadeShape.SCurve, FadeCurves.ParseStored(null));
+    }
+
+    [Fact]
     public void Default_IsSCurve()
     {
         Assert.Equal(FadeShape.SCurve, FadeCurves.Default);

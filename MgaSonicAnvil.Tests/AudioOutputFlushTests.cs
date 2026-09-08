@@ -77,6 +77,23 @@ public sealed class AudioOutputFlushTests
     }
 
     [Fact]
+    public void Bind_KeepsPausedSoAsioDoesNotResume()
+    {
+        var samples = new float[4800];
+        Array.Fill(samples, 0.5f);
+        var document = new AudioDocument(samples, 48000, 2, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.Bind(document, 0, null, loop: false);
+        provider.SetPaused(true);
+        provider.Bind(document, 0, null, loop: false);
+
+        var buffer = new float[96];
+        Assert.Equal(96, provider.Read(buffer, 0, buffer.Length));
+        Assert.All(buffer, sample => Assert.Equal(0f, sample));
+        Assert.Equal(0, provider.CursorFrame);
+    }
+
+    [Fact]
     public void BeginSilenceFlush_ReturnsSilenceWithoutAdvancingCursor()
     {
         var samples = new float[4800];

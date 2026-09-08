@@ -275,6 +275,7 @@ public partial class MainWindow
         }
 
         item.Click += (_, _) => action();
+        TipService.Set(item, gesture is null ? header : $"{header}\n{gesture}");
         return item;
     }
 
@@ -319,7 +320,6 @@ public partial class MainWindow
     private void RebuildTabBar()
     {
         DocumentTabs.Children.Clear();
-        DocumentTabHost.Visibility = _sessions.Count <= 1 ? Visibility.Collapsed : Visibility.Visible;
         foreach (var session in _sessions)
         {
             DocumentTabs.Children.Add(CreateTabItem(session));
@@ -415,7 +415,7 @@ public partial class MainWindow
         var border = new Border
         {
             Tag = session,
-            Background = BrushOrTransparent(active ? "ChromeMidBrush" : null),
+            Background = BrushOrTransparent(active ? "ChromeMidBrush" : "WaveformBackBrush"),
             BorderBrush = (Brush)FindResource("ChromeBorderBrush"),
             BorderThickness = new Thickness(0, 0, 1, 0),
             Cursor = Cursors.Hand,
@@ -540,6 +540,11 @@ public partial class MainWindow
             ? accent
             : (Brush)FindResource(active ? "PrimaryForeBrush" : "MutedForeBrush");
 
+        if (dock.Parent is Border host)
+        {
+            host.Background = BrushOrTransparent(active ? "ChromeMidBrush" : "WaveformBackBrush");
+        }
+
         foreach (var child in dock.Children)
         {
             if (child is Border underline && underline.Height == 2)
@@ -554,18 +559,5 @@ public partial class MainWindow
                 title.Foreground = titleBrush;
             }
         }
-    }
-
-    private bool OfferSaveAllDirty()
-    {
-        foreach (var session in _sessions.ToArray())
-        {
-            if (!OfferSaveIfDirty(session))
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 }

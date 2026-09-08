@@ -121,7 +121,27 @@ public sealed class SpectrumAnalyzerTests
         }
 
         Assert.True(analyzer.HasVisibleLevel);
-        for (var i = 0; i < 300; i++)
+        for (var i = 0; i < 20; i++)
+        {
+            analyzer.Process(samples, rate, 1 / 60d, active: false);
+        }
+
+        var peakBand = 0;
+        for (var i = 1; i < analyzer.PeakHoldDb.Length; i++)
+        {
+            if (analyzer.PeakHoldDb[i] > analyzer.PeakHoldDb[peakBand])
+            {
+                peakBand = i;
+            }
+        }
+
+        Assert.True(analyzer.PeakHoldDb[peakBand] > analyzer.EnvelopeDb[peakBand] + 5f);
+
+        var idleSec = SpectrumAnalyzer.PeakHoldCenterSec
+            + (SpectrumAnalyzer.CeilingDb - SpectrumAnalyzer.FloorDb) / SpectrumAnalyzer.PeakReleaseDbPerSec
+            + 2;
+        var idleFrames = (int)Math.Ceiling(idleSec * 60);
+        for (var i = 0; i < idleFrames; i++)
         {
             analyzer.Process(samples, rate, 1 / 60d, active: false);
         }

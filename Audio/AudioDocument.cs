@@ -37,6 +37,7 @@ internal sealed class AudioDocument
         SourcePath = sourcePath;
         Peaks = PeakPyramid.Build(interleaved, channels);
         RefreshFileBytes();
+        CommitFormat();
     }
 
     public float[] Interleaved { get; private set; }
@@ -46,6 +47,34 @@ internal sealed class AudioDocument
     public int Channels { get; private set; }
 
     public int BitsPerSample { get; private set; }
+
+    public bool SampleRateEdited => SampleRate != _committedSampleRate;
+
+    public bool BitDepthEdited => BitsPerSample != _committedBitsPerSample;
+
+    public bool ChannelsEdited => Channels != _committedChannels;
+
+    public bool FormatEdited => SampleRateEdited || BitDepthEdited || ChannelsEdited;
+
+    public bool FileSizeEdited => EstimatedFileBytes != CommittedFileBytes;
+
+    public int CommittedSampleRate => _committedSampleRate;
+
+    public int CommittedBitsPerSample => _committedBitsPerSample;
+
+    public int CommittedChannels => _committedChannels;
+
+    public long CommittedFileBytes => _committedFileBytes;
+
+    public long EstimatedFileBytes =>
+        EstimateFileBytes(
+            _committedFileBytes,
+            _committedFrameCount,
+            _committedChannels,
+            _committedBitsPerSample,
+            FrameCount,
+            Channels,
+            BitsPerSample);
 
     public AudioFileKind SourceKind { get; private set; }
 
@@ -67,6 +96,12 @@ internal sealed class AudioDocument
 
     /// <summary>マーカーを使わないサンプルループ範囲。未設定は Empty。</summary>
     public WaveSelection SampleLoop { get; set; }
+
+    private int _committedSampleRate;
+    private int _committedBitsPerSample;
+    private int _committedChannels;
+    private long _committedFrameCount;
+    private long _committedFileBytes;
 
     private readonly List<WaveRegion> _regions = [];
 
@@ -107,7 +142,62 @@ internal sealed class AudioDocument
         SourceKind = kind;
         IsDirty = false;
         RefreshFileBytes();
+        CommitFormat();
     }
+
+    public void CommitFormat()
+    {
+        _committedSampleRate = SampleRate;
+        _committedBitsPerSample = BitsPerSample;
+        _committedChannels = Channels;
+        _committedFrameCount = FrameCount;
+        _committedFileBytes = FileBytes;
+    }
+
+    public static long EstimatePcmPayloadBytes(long frames, int channels, int bitsPerSample)
+    {
+        var bytesPerSample = Math.Max(1, (bitsPerSample + 7) / 8);
+        return Math.Max(0, frames) * (long)Math.Max(0, channels) * bytesPerSample;
+    }
+
+    public static long EstimateFileBytes(
+        long committedFileBytes,
+        long committedFrames,
+        int committedChannels,
+        int committedBitsPerSample,
+        long frames,
+        int channels,
+        int bitsPerSample)
+    {
+        var committedPcm = EstimatePcmPayloadBytes(committedFrames, committedChannels, committedBitsPerSample);
+        var currentPcm = EstimatePcmPayloadBytes(frames, channels, bitsPerSample);
+        if (committedPcm <= 0)
+        {
+            return currentPcm;
+        }
+
+        return currentPcm + Math.Max(0, committedFileBytes - committedPcm);
+    }
+
+    public long EstimateFrameCountForRate(int destRate)
+    {
+        if (destRate == SampleRate || destRate < 1 || SampleRate < 1)
+        {
+            return FrameCount;
+        }
+
+        return Math.Max(0, (long)Math.Round(FrameCount * (double)destRate / SampleRate));
+    }
+
+    public long EstimateFileBytesFor(int sampleRate, int bitsPerSample, int channels) =>
+        EstimateFileBytes(
+            _committedFileBytes,
+            _committedFrameCount,
+            _committedChannels,
+            _committedBitsPerSample,
+            EstimateFrameCountForRate(sampleRate),
+            channels,
+            bitsPerSample);
 
     public void MarkUnsaved(string? sourcePath)
     {

@@ -309,10 +309,9 @@ internal sealed class OverviewView : FrameworkElement
         }
 
         var frames = (double)_document.FrameCount;
-        var pen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("MarkerBrush")), 1);
-        pen.Freeze();
-        var selectedPen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("MarkerSelectedBorderBrush")), 1.5);
-        selectedPen.Freeze();
+        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pen = WpfControlHelpers.FrozenHairline(Theme.Get("MarkerBrush"), pixelsPerDip);
+        var selectedPen = WpfControlHelpers.FrozenHairline(Theme.Get("MarkerSelectedBorderBrush"), pixelsPerDip);
         foreach (var marker in _document.Markers)
         {
             var x = marker.Frame / frames * bounds.Width;
@@ -322,7 +321,8 @@ internal sealed class OverviewView : FrameworkElement
             }
 
             var selected = _selectedMarkerFrames is not null && _selectedMarkerFrames.Contains(marker.Frame);
-            dc.DrawLine(selected ? selectedPen : pen, new Point(x, 0), new Point(x, bounds.Height));
+            var xs = WpfControlHelpers.SnapDeviceCenter(x, pixelsPerDip);
+            dc.DrawLine(selected ? selectedPen : pen, new Point(xs, 0), new Point(xs, bounds.Height));
         }
     }
 
@@ -334,16 +334,22 @@ internal sealed class OverviewView : FrameworkElement
         }
 
         var frames = (double)_document.FrameCount;
-        var pen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("RegionTimelineBrush")), 1);
-        pen.Freeze();
+        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pen = WpfControlHelpers.FrozenHairline(Theme.Get("RegionTimelineBrush"), pixelsPerDip);
         foreach (var region in _document.Regions)
         {
-            DrawRegionLine(dc, bounds, frames, pen, region.StartFrame);
-            DrawRegionLine(dc, bounds, frames, pen, region.EndFrame);
+            DrawRegionLine(dc, bounds, frames, pen, region.StartFrame, pixelsPerDip);
+            DrawRegionLine(dc, bounds, frames, pen, region.EndFrame, pixelsPerDip);
         }
     }
 
-    private static void DrawRegionLine(DrawingContext dc, Rect bounds, double frames, Pen pen, long frame)
+    private static void DrawRegionLine(
+        DrawingContext dc,
+        Rect bounds,
+        double frames,
+        Pen pen,
+        long frame,
+        double pixelsPerDip)
     {
         var x = frame / frames * bounds.Width;
         if (x < -1 || x > bounds.Width + 1)
@@ -351,7 +357,8 @@ internal sealed class OverviewView : FrameworkElement
             return;
         }
 
-        dc.DrawLine(pen, new Point(x, 0), new Point(x, bounds.Height));
+        var xs = WpfControlHelpers.SnapDeviceCenter(x, pixelsPerDip);
+        dc.DrawLine(pen, new Point(xs, 0), new Point(xs, bounds.Height));
     }
 
     private void DrawPlayhead(DrawingContext dc, Rect bounds)

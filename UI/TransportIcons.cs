@@ -21,7 +21,6 @@ internal enum TransportIcon
     AmpZoomOut,
     AmpZoomMax,
     AmpZoomReset,
-    Open,
     Folder,
     FadeIn,
     FadeOut,
@@ -47,7 +46,6 @@ internal enum TransportCommand
     AmpZoomOut,
     AmpZoomMax,
     AmpZoomReset,
-    Open,
     FadeIn,
     FadeOut,
     Normalize,
@@ -112,6 +110,7 @@ internal sealed class TransportIconButton : Button
         OverridesDefaultStyle = true;
         Template = new ControlTemplate(typeof(Button));
         SnapsToDevicePixels = true;
+        TransportHover.Attach(this);
     }
 
     protected override HitTestResult? HitTestCore(PointHitTestParameters hitTestParameters) =>
@@ -133,26 +132,9 @@ internal sealed class TransportIconButton : Button
             return;
         }
 
-        var backColor = QuietChrome
-            ? Theme.Get("WaapiBarBackBrush")
-            : Theme.Get("TransportBackBrush");
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(backColor), null, bounds);
-        if (IsEnabled && (IsMouseOver || IsPressed || IsLatched))
-        {
-            var hover = IsPressed
-                ? Theme.Get("TransportPressedBackBrush")
-                : Theme.Get("TransportHoverBackBrush");
-            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(hover), null, new Rect(3, 3, bounds.Width - 6, bounds.Height - 6));
-        }
-
-        var fore = IconForeOverride
-            ?? (!IsEnabled
-                ? Theme.Get("TransportDisabledForeBrush")
-                : Icon == TransportIcon.PlayPause && IsPlaying
-                    ? Theme.Get("AccentCyanBrush")
-                    : IsLatched
-                        ? Theme.Get("AccentCyanBrush")
-                        : Theme.Get("TransportForeBrush"));
+        var backKey = QuietChrome ? "ProjectBarBackBrush" : "TransportBackBrush";
+        TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed, backKey);
+        var fore = IconForeOverride ?? TransportChrome.Fore(IsEnabled);
         TransportIconDrawing.Draw(dc, Icon, bounds, fore, IsPlaying);
     }
 
@@ -167,7 +149,8 @@ internal sealed class TransportIconButton : Button
             ? Theme.Get("WaapiToggleOnForeBrush")
             : Theme.Get("WaapiToggleOffForeBrush");
 
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
+        var slotKey = QuietChrome ? "ProjectBarBackBrush" : "TransportBackBrush";
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get(slotKey)), null, bounds);
         var chip = new Rect(2, 6, Math.Max(1, bounds.Width - 4), Math.Max(1, bounds.Height - 12));
         dc.DrawRoundedRectangle(WpfControlHelpers.FrozenBrush(back), null, chip, 3, 3);
 
@@ -262,7 +245,6 @@ internal static class TransportIconDrawing
                 DrawVerticalZoom(dc, pen);
                 DrawZoomModifier(dc, pen, brush, icon, cx, cy);
                 break;
-            case TransportIcon.Open:
             case TransportIcon.Folder:
                 dc.DrawLine(pen, new Point(9, 12), new Point(9, 10));
                 dc.DrawLine(pen, new Point(9, 10), new Point(15, 10));
@@ -409,62 +391,6 @@ internal static class TransportIconDrawing
     }
 }
 
-/// <summary>表示言語切替。JP／EN を描画するトランスポートサイズのボタン。</summary>
-internal sealed class TransportLanguageButton : Button
-{
-    public TransportLanguageButton()
-    {
-        Width = DesignMetrics.TransportButtonSide;
-        Height = DesignMetrics.TransportButtonSide;
-        Focusable = false;
-        FocusVisualStyle = null;
-        Cursor = Cursors.Hand;
-        Background = Brushes.Transparent;
-        BorderThickness = new Thickness(0);
-        OverridesDefaultStyle = true;
-        Template = new ControlTemplate(typeof(Button));
-        SnapsToDevicePixels = true;
-    }
-
-    public void RefreshAppearance()
-    {
-        InvalidateVisual();
-    }
-
-    public static string LanguageTip() =>
-        UiStrings.IsJapanese ? UiStrings.TipLanguageJapanese : UiStrings.TipLanguageEnglish;
-
-    protected override HitTestResult? HitTestCore(PointHitTestParameters hitTestParameters) =>
-        new Rect(RenderSize).Contains(hitTestParameters.HitPoint)
-            ? new PointHitTestResult(this, hitTestParameters.HitPoint)
-            : null;
-
-    protected override void OnRender(DrawingContext dc)
-    {
-        var bounds = new Rect(RenderSize);
-        if (bounds.Width <= 0 || bounds.Height <= 0)
-        {
-            return;
-        }
-
-        TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed);
-        var label = UiStrings.IsJapanese
-            ? UiStrings.LanguageBadgeJapanese
-            : UiStrings.LanguageBadgeEnglish;
-        var formatted = new FormattedText(
-            label,
-            CultureInfo.CurrentUICulture,
-            FlowDirection.LeftToRight,
-            new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
-            10,
-            WpfControlHelpers.FrozenBrush(TransportChrome.Fore(IsEnabled)),
-            VisualTreeHelper.GetDpi(this).PixelsPerDip);
-        dc.DrawText(
-            formatted,
-            new Point((bounds.Width - formatted.Width) * 0.5, (bounds.Height - formatted.Height) * 0.5));
-    }
-}
-
 /// <summary>ユーザーマニュアルを開く。「?」を描画する。</summary>
 internal sealed class TransportManualButton : Button
 {
@@ -480,6 +406,7 @@ internal sealed class TransportManualButton : Button
         OverridesDefaultStyle = true;
         Template = new ControlTemplate(typeof(Button));
         SnapsToDevicePixels = true;
+        TransportHover.Attach(this);
     }
 
     public void RefreshAppearance()
@@ -532,6 +459,7 @@ internal sealed class TransportTipsToggleButton : Button
         OverridesDefaultStyle = true;
         Template = new ControlTemplate(typeof(Button));
         SnapsToDevicePixels = true;
+        TransportHover.Attach(this);
     }
 
     public bool Checked
@@ -566,10 +494,7 @@ internal sealed class TransportTipsToggleButton : Button
 
         TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed);
         var fill = ResolveFillColor();
-        var iconColor = _checked
-            ? TransportChrome.Fore(IsEnabled)
-            : Color.FromArgb(128, TransportChrome.Fore(IsEnabled).R, TransportChrome.Fore(IsEnabled).G, TransportChrome.Fore(IsEnabled).B);
-        DrawBalloon(dc, iconColor, fill, Math.Min(bounds.Width, bounds.Height));
+        DrawBalloon(dc, TransportChrome.Fore(IsEnabled), fill, Math.Min(bounds.Width, bounds.Height));
     }
 
     private Color ResolveFillColor()
@@ -621,11 +546,30 @@ internal sealed class TransportTipsToggleButton : Button
     }
 }
 
+internal static class TransportHover
+{
+    public static void Attach(Button button)
+    {
+        button.MouseEnter += (_, _) => button.InvalidateVisual();
+        button.MouseLeave += (_, _) => button.InvalidateVisual();
+        button.PreviewMouseLeftButtonDown += (_, _) => button.InvalidateVisual();
+        button.PreviewMouseLeftButtonUp += (_, _) => button.InvalidateVisual();
+        button.LostMouseCapture += (_, _) => button.InvalidateVisual();
+        button.IsEnabledChanged += (_, _) => button.InvalidateVisual();
+    }
+}
+
 internal static class TransportChrome
 {
-    public static void Paint(DrawingContext dc, Rect bounds, bool enabled, bool hover, bool pressed)
+    public static void Paint(
+        DrawingContext dc,
+        Rect bounds,
+        bool enabled,
+        bool hover,
+        bool pressed,
+        string backKey = "TransportBackBrush")
     {
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get(backKey)), null, bounds);
         if (enabled && (hover || pressed))
         {
             var fill = pressed

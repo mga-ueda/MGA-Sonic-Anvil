@@ -344,8 +344,7 @@ internal sealed class SpectrogramRenderer
         var maxHertz = SpectrogramEngine.DisplayMaxHertz;
         var dpi = VisualTreeHelper.GetDpi(host).PixelsPerDip;
         var fore = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
-        var grid = new Pen(WpfControlHelpers.FrozenBrush(Color.FromArgb(40, 255, 255, 255)), 1);
-        grid.Freeze();
+        var grid = WpfControlHelpers.FrozenHairline(Color.FromArgb(26, 255, 255, 255), dpi);
         foreach (var mark in SpectrogramEngine.FrequencyMarks)
         {
             if (mark < SpectrogramEngine.MinHertz || mark > maxHertz * 1.001)
@@ -354,7 +353,7 @@ internal sealed class SpectrogramRenderer
             }
 
             var unit = SpectrogramEngine.HertzToUnit(mark, SpectrogramEngine.MinHertz, maxHertz);
-            var y = wave.Y + (1 - unit) * wave.Height;
+            var y = WpfControlHelpers.SnapDeviceCenter(wave.Y + (1 - unit) * wave.Height, dpi);
             dc.DrawLine(grid, new Point(wave.X, y), new Point(wave.Right, y));
             var text = new FormattedText(
                 SpectrogramEngine.FormatHertz(mark),

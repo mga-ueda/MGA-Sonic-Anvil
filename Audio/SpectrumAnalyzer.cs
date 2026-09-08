@@ -362,7 +362,7 @@ internal sealed class SpectrumAnalyzer
         t = Math.Clamp(t, 0f, 1f);
         ReadOnlySpan<(float P, byte R, byte G, byte B)> stops =
         [
-            (0f, 2, 24, 32),
+            (0f, 10, 48, 68),
             (0.26f, 13, 74, 98),
             (0.55f, 58, 184, 232),
             (0.82f, 200, 239, 255),
@@ -653,22 +653,21 @@ internal sealed class SpectrumAnalyzer
         }
 
         UpdateEnvelope(dtSec);
-        // 停止中はホールドせず、バーに合わせて床まで落とす。
+        UpdatePeakHold(dtSec);
+        for (var b = 0; b < _envelopeDb.Length; b++)
+        {
+            if (_envelopeDb[b] <= FloorDb + 0.25f)
+            {
+                _envelopeDb[b] = FloorDb;
+            }
+        }
+
         for (var b = 0; b < _peakHoldDb.Length; b++)
         {
-            _peakHoldUntil[b] = -1e9;
-            var env = b < _envelopeDb.Length ? _envelopeDb[b] : FloorDb;
-            if (env <= FloorDb + 0.25f)
+            if (_peakHoldDb[b] <= FloorDb + 0.25f)
             {
-                env = FloorDb;
-                if (b < _envelopeDb.Length)
-                {
-                    _envelopeDb[b] = FloorDb;
-                }
+                _peakHoldDb[b] = FloorDb;
             }
-
-            var held = Math.Min(_peakHoldDb[b], env);
-            _peakHoldDb[b] = held <= FloorDb + 0.25f ? FloorDb : held;
         }
 
         _binsPrimed = false;

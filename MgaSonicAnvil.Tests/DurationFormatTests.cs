@@ -35,6 +35,46 @@ public sealed class DurationFormatTests
         Assert.Equal(125.5, seconds, 3);
     }
 
+    [Theory]
+    [InlineData("0", 0)]
+    [InlineData("48000", 48000)]
+    [InlineData("1,000", 1000)]
+    [InlineData("1_024", 1024)]
+    public void TryParseSampleCount_AcceptsIntegers(string text, long expected)
+    {
+        Assert.True(UiStrings.TryParseSampleCount(text, out var samples));
+        Assert.Equal(expected, samples);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("abc")]
+    [InlineData("1.5")]
+    [InlineData("1,5")]
+    [InlineData("-3")]
+    public void TryParseSampleCount_RejectsInvalid(string text)
+    {
+        Assert.False(UiStrings.TryParseSampleCount(text, out _));
+    }
+
+    [Fact]
+    public void TryParseStatusTime_PrefersSamplesThenDuration()
+    {
+        Assert.True(UiStrings.TryParseStatusTime("48000", 48000, preferSamples: true, out var samples));
+        Assert.Equal(48000, samples);
+        Assert.True(UiStrings.TryParseStatusTime("00:01.000", 48000, preferSamples: true, out var fromTime));
+        Assert.Equal(48000, fromTime);
+        Assert.True(UiStrings.TryParseStatusTime("48000", 48000, preferSamples: false, out var secondsAsTime));
+        Assert.Equal(48000L * 48000, secondsAsTime);
+    }
+
+    [Fact]
+    public void FormatStatusTime_SwitchesSamplesAndDuration()
+    {
+        Assert.Equal("48000", UiStrings.FormatStatusTime(48000, 48000, asSamples: true));
+        Assert.Equal("00:01.000", UiStrings.FormatStatusTime(48000, 48000, asSamples: false));
+    }
+
     [Fact]
     public void FormatSampleRate_UsesKiloHertz()
     {
@@ -43,4 +83,12 @@ public sealed class DurationFormatTests
         Assert.Equal("24bit", UiStrings.FormatBitDepth(24));
         Assert.Equal("2ch", UiStrings.FormatChannels(2));
     }
+
+    [Fact]
+    public void FormatFileBytes_ShowsMegaMebiAndBytes()
+    {
+        Assert.Equal("1.00 MB (0.95 MiB / 1,000,000 B)", UiStrings.FormatFileBytes(1_000_000));
+        Assert.Equal("1.05 MB (1.00 MiB / 1,048,576 B)", UiStrings.FormatFileBytes(1024 * 1024));
+    }
+
 }

@@ -25,26 +25,67 @@ internal static partial class UiStrings
         LanguageChanged?.Invoke(null, EventArgs.Empty);
     }
 
-    public static UiLanguage ParseLanguage(string? value)
+    public static UiLanguageChoice ParseLanguageChoice(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            return UiLanguage.Japanese;
+            return UiLanguageChoice.Auto;
         }
 
         var trimmed = value.Trim();
+        if (trimmed.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("os", StringComparison.OrdinalIgnoreCase))
+        {
+            return UiLanguageChoice.Auto;
+        }
+
         if (trimmed.Equals("en", StringComparison.OrdinalIgnoreCase)
             || trimmed.Equals("english", StringComparison.OrdinalIgnoreCase)
             || trimmed.Equals(nameof(UiLanguage.English), StringComparison.OrdinalIgnoreCase))
         {
+            return UiLanguageChoice.English;
+        }
+
+        if (trimmed.Equals("ja", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("jp", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("japanese", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals(nameof(UiLanguage.Japanese), StringComparison.OrdinalIgnoreCase))
+        {
+            return UiLanguageChoice.Japanese;
+        }
+
+        return UiLanguageChoice.Auto;
+    }
+
+    public static UiLanguage ParseLanguage(string? value) =>
+        ResolveLanguage(ParseLanguageChoice(value));
+
+    public static UiLanguage ResolveLanguage(UiLanguageChoice choice, string? osTwoLetterIso = null)
+    {
+        if (choice == UiLanguageChoice.English)
+        {
             return UiLanguage.English;
         }
 
-        return UiLanguage.Japanese;
+        if (choice == UiLanguageChoice.Japanese)
+        {
+            return UiLanguage.Japanese;
+        }
+
+        var os = osTwoLetterIso
+            ?? System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+        return os.Equals("ja", StringComparison.OrdinalIgnoreCase)
+            ? UiLanguage.Japanese
+            : UiLanguage.English;
     }
 
-    public static string ToStoredValue(UiLanguage language) =>
-        language == UiLanguage.English ? "en" : "ja";
+    public static string ToStoredValue(UiLanguageChoice choice) =>
+        choice switch
+        {
+            UiLanguageChoice.English => "en",
+            UiLanguageChoice.Japanese => "ja",
+            _ => "auto",
+        };
 
     public static string Get(string japanese, string english) =>
         IsJapanese ? japanese : english;
@@ -77,14 +118,24 @@ internal static partial class UiStrings
     public static string LabelAudioApiAsio => Get("ASIO", "ASIO");
     public static string ButtonOk => Get("OK", "OK");
     public static string ButtonCancel => Get("Cancel", "Cancel");
-    public static string DialogSettingsTitle => Get("Audio Settings", "Audio Settings");
+    public static string DialogSettingsTitle => Get("設定", "Settings");
+    public static string LabelUiLanguage => Get("言語", "Language");
+    public static string LabelLanguageAuto => Get("Auto", "Auto");
+    public static string LabelLanguageJapanese => Get("Japanese", "Japanese");
+    public static string LabelLanguageEnglish => Get("English", "English");
+    public static string LabelFadeCurveDefaults => Get("フェードカーブ既定", "Default Fade Curves");
+    public static string LabelDefaultFadeIn => Get("波形フェードイン", "Waveform Fade In");
+    public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
+    public static string AccessibleAudioSettingsButton => Get("設定", "Settings");
+    public static string TipAudioSettings => Get(
+        "表示言語、音声出力、フェードカーブ既定を設定します。",
+        "Configure UI language, audio output, and default fade curves.");
 
     public static string ButtonFadeIn => Get("FADE IN", "FADE IN");
     public static string ButtonFadeOut => Get("FADE OUT", "FADE OUT");
     public static string ButtonNormalize => Get("NORMALIZE", "NORMALIZE");
     public static string ButtonDelete => Get("DELETE", "DELETE");
     public static string ButtonSave => Get("SAVE", "SAVE");
-    public static string ButtonOpen => Get("OPEN", "OPEN");
     public static string LabelMono => Get("Mono", "Mono");
     public static string LabelStereo => Get("Stereo", "Stereo");
     public static string LabelHertz => Get("Hz", "Hz");
@@ -96,7 +147,7 @@ internal static partial class UiStrings
     public static string MenuOpen => Get("開く", "Open");
     public static string MenuSave => Get("上書き保存", "Save");
     public static string MenuSaveAs => Get("名前を付けて保存", "Save As");
-    public static string MenuSettings => Get("音声設定", "Audio Settings");
+    public static string MenuSettings => Get("設定", "Settings");
 
     public static string DialogExitTitle => Get("終了確認", "Quit");
     public static string DialogExitBody => Get(
@@ -173,11 +224,11 @@ internal static partial class UiStrings
     public static string TipGoToStart => Get("先頭 (Ctrl+Home)", "Go to start (Ctrl+Home)");
     public static string TipGoToEnd => Get("末尾 (Ctrl+End)", "Go to end (Ctrl+End)");
     public static string TipTimeZoomIn => Get("時間拡大 (↑)\nホイールでも拡大", "Zoom in time (↑)\nMouse wheel also zooms");
-    public static string TipTimeZoomOut => Get("時間縮小 (↓)", "Zoom out time (↓)");
+    public static string TipTimeZoomOut => Get("時間縮小 (↓)\nホイールでも縮小", "Zoom out time (↓)\nMouse wheel also zooms");
     public static string TipTimeZoomMax => Get("時間 32倍 / 最大 (Ctrl+↑)", "Time zoom 32× / max (Ctrl+↑)");
     public static string TipTimeZoomReset => Get("全体表示 (Ctrl+↓)", "Fit all (Ctrl+↓)");
     public static string TipAmpZoomIn => Get("振幅拡大 (Shift+↑)\nCtrl+ホイールでも拡大", "Zoom in amplitude (Shift+↑)\nCtrl+wheel also zooms");
-    public static string TipAmpZoomOut => Get("振幅縮小 (Shift+↓)", "Zoom out amplitude (Shift+↓)");
+    public static string TipAmpZoomOut => Get("振幅縮小 (Shift+↓)\nCtrl+ホイールでも縮小", "Zoom out amplitude (Shift+↓)\nCtrl+wheel also zooms");
     public static string TipAmpZoomMax => Get("振幅最大 (Ctrl+Shift+↑)", "Amplitude zoom max (Ctrl+Shift+↑)");
     public static string TipAmpZoomReset => Get("振幅リセット (Ctrl+Shift+↓)", "Reset amplitude zoom (Ctrl+Shift+↓)");
     public static string TipFadeIn => Get(
@@ -227,13 +278,13 @@ internal static partial class UiStrings
         "保存 (Ctrl+S)\nCtrl+Shift+S で別名保存",
         "Save (Ctrl+S)\nCtrl+Shift+S to save as");
     public static string TipOpen => Get(
-        "開く (Ctrl+O)\n複数ファイル可。追加で開く。\nWave / AIFF / MP3\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Tab で次のタブ",
-        "Open (Ctrl+O)\nMultiple files allowed; opens as extra tabs.\nWave / AIFF / MP3\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Tab goes to the next tab");
+        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Tab で次のタブ",
+        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Tab goes to the next tab");
     public static string TipCloseTab => Get("タブを閉じる (Ctrl+W)", "Close tab (Ctrl+W)");
     public static string TipTabScrollLeft => Get("左のタブを表示", "Show tabs to the left");
     public static string TipTabScrollRight => Get("右のタブを表示", "Show tabs to the right");
     public static string TipOverview => Get(
-        "波形全体。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）　ホイールで拡縮（シークバー基準）",
+        "波形全体。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）　ホイールで拡縮（再生ヘッド基準）",
         "Whole file. The bright area is the current view. Drag to move (scrubs the center). Wheel zooms around the playhead");
     public static string TipSpectrum => Get(
         "再生出力の LED スペクトラムです。1/3oct 相当の帯域とピークホールド。Layer Music Checker と同じ検波です。",
@@ -245,9 +296,48 @@ internal static partial class UiStrings
         "再生 API（WaveOut / WASAPI / ASIO）",
         "Playback API (WaveOut / WASAPI / ASIO)");
     public static string TipAudioDevice => Get("再生デバイス", "Playback device");
+    public static string TipUiLanguage => Get(
+        "表示言語。Auto は OS が日本語なら Japanese、それ以外は English。",
+        "UI language. Auto is Japanese if the OS is Japanese, otherwise English.");
+    public static string TipFadeCurveDefaults => Get(
+        "I / O で開くフェードカーブの初期選択です。",
+        "Initial curve shown when you open fade in / fade out (I / O).");
+    public static string TipSettingsOk => Get(
+        "設定を保存して閉じます。",
+        "Save settings and close.");
+    public static string TipSettingsCancel => Get(
+        "変更を破棄して閉じます。",
+        "Discard changes and close.");
+    public static string TipStatusFormat => Get(
+        "サンプリングレート / ビット深度 / チャンネル / 形式 / 容量。S / B / C で変換。変換や範囲削除で長さが変わると容量は推測サイズになり赤。確定項目は保存まで赤。",
+        "Sample rate / bit depth / channels / format / size. S / B / C convert. Size turns red as an estimate after conversion or a range delete that changes length. Confirmed fields stay red until you save.");
+    public static string TipLevelMeter => Get(
+        "再生出力の Peak / RMS。内側 2 本が Peak（上の赤ランプがクリップ）、外側 2 本が RMS。下の数値は Peak 行／RMS 行。",
+        "Playback Peak / RMS. Inner two bars are Peak (red lamps clip), outer two are RMS. Numbers below are Peak then RMS.");
+    public static string TipTimeScroll => Get(
+        "表示範囲を左右に動かします。つまみをドラッグ、またはトラックをクリック。",
+        "Pan the view. Drag the thumb, or click the track.");
+    public static string TipCopyright => Get(
+        "© MIYABI GAME AUDIO INC. MIT License。",
+        "© MIYABI GAME AUDIO INC. MIT License.");
+    public static string TipEditHistory => Get(
+        "編集履歴 (U)。↑↓ で移動、Enter で確定、Esc でキャンセル。Ctrl+クリック／Shift+↑↓ で選択、Ctrl+C でコピー、別ファイルで Ctrl+V。",
+        "Edit history (U). ↑↓ move, Enter apply, Esc cancel. Ctrl+click / Shift+↑↓ select, Ctrl+C copy, Ctrl+V in another file.");
+    public static string TipFormatSampleRate => Get(
+        "サンプリングレートを変換します (S)。Space で試聴、Enter で確定。1–9 で項目。",
+        "Convert sample rate (S). Space previews, Enter applies. 1–9 pick a row.");
+    public static string TipFormatBitDepth => Get(
+        "ビット深度を変換します (B)。Space で試聴、Enter で確定。1–9 で項目。",
+        "Convert bit depth (B). Space previews, Enter applies. 1–9 pick a row.");
+    public static string TipFormatChannels => Get(
+        "チャンネル数を変換します (C)。Enter で確定。1–2 で項目。",
+        "Convert channel count (C). Enter applies. 1–2 pick a row.");
+    public static string TipFormatCustomRate => Get(
+        "任意 Hz。↑↓／ホイールで 1（Shift 10／Ctrl 100／Ctrl+Shift 1000）。Enter で確定。範囲 1000–384000。",
+        "Custom Hz. ↑↓ / wheel by 1 (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Range 1000–384000.");
     public static string TipWaveform => Get(
         "ドラッグで選択　Ctrl+ドラッグでスクラブ　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A で全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着\n"
-        + "ホイール=時間ズーム（シークバー基準）　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"
+        + "ホイール=時間ズーム（再生ヘッド基準）　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"
         + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル、Shift で3倍）　Ctrl+←→ 前後のマーカー / リージョン端 / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（同じ範囲でもう一度で解除）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M マーカー　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動（Shift で3倍） / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント / リージョン名（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
         + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　T で現在時間　U で編集履歴　G で波形 / スペクトログラム / 重ね表示　Ctrl+Shift+E で Wwise EXPORT（Wave 単体）",
         "Drag to select. Ctrl+drag to scrub. Esc or a move without Shift clears the selection. Shift+move extends. Shift+←/→ grows it (1 sample when dots are shown). Home/End jump to the view edge. Shift+PgUp/PgDn by 5%. Ctrl+Shift+Home/End selects all before/after. Ctrl+A selects all. Double-click selects a span (between markers). The guide snaps to markers / loop edges.\n"
@@ -261,8 +351,27 @@ internal static partial class UiStrings
         "GitHub リポジトリを開きます。",
         "Open the GitHub repository.");
     public static string TipTimecode => Get(
-        "再生位置 (T)。クリックまたは T で入力、Enter で移動。コピー／貼り付け可",
-        "Playhead (T). Click or press T to type, Enter to jump. Copy / paste allowed");
+        "現在時間 (T)。入力、ホイール／↑↓で調整（時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分、サンプルは1／Shift10／Ctrl100／Ctrl+Shift1000）。Enter で移動。右クリックで時間／サンプル数",
+        "Current time (T). Type, or wheel / ↑↓ (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter jumps. Right-click switches time / samples");
+    public static string TipSelectionStartTime => Get(
+        "選択開始。入力、ホイール／↑↓で調整（時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分、サンプルは1／Shift10／Ctrl100／Ctrl+Shift1000）。Enter で反映。右クリックで時間／サンプル数",
+        "Selection start. Type, or wheel / ↑↓ (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Right-click switches time / samples");
+    public static string TipSelectionLengthTime => Get(
+        "選択範囲の長さ。入力、ホイール／↑↓で調整（時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分、サンプルは1／Shift10／Ctrl100／Ctrl+Shift1000）。Enter で反映。右クリックで時間／サンプル数",
+        "Selection length. Type, or wheel / ↑↓ (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Right-click switches time / samples");
+    public static string TipSelectionEndTime => Get(
+        "選択終了。入力、ホイール／↑↓で調整（時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分、サンプルは1／Shift10／Ctrl100／Ctrl+Shift1000）。Enter で反映。右クリックで時間／サンプル数",
+        "Selection end. Type, or wheel / ↑↓ (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Right-click switches time / samples");
+    public static string TipTotalTime => Get(
+        "トータル時間。右クリックで時間／サンプル数を切り替えます。",
+        "Total time. Right-click to switch time / samples.");
+    public static string LabelStatusNowPos => "NOW\nPOS";
+    public static string LabelStatusSelStart => "SEL\nST";
+    public static string LabelStatusSelWidth => "SEL\nWID";
+    public static string LabelStatusSelEnd => "SEL\nEND";
+    public static string LabelStatusEndPos => "END\nPOS";
+    public static string MenuShowTime => Get("時間", "Time");
+    public static string MenuShowSamples => Get("サンプル数", "Samples");
     public static string MenuCopy => Get("コピー", "Copy");
     public static string MenuPaste => Get("貼り付け", "Paste");
     public static string MenuClearSampleLoop => Get("ループを削除", "Clear loop");
@@ -604,12 +713,12 @@ internal static partial class UiStrings
             bytes = 0;
         }
 
-        var mega = bytes / (1024d * 1024d);
-        return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{mega:0.00} MB");
+        var mega = bytes / 1_000_000d;
+        var mebi = bytes / (1024d * 1024d);
+        return string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"{mega:0.00} MB ({mebi:0.00} MiB / {bytes:N0} B)");
     }
-
-    public static string FormatFileTimestamp(DateTime timestamp) =>
-        timestamp.ToLocalTime().ToString("yyyy/MM/dd HH:mm", System.Globalization.CultureInfo.InvariantCulture);
 
     public static string FormatDuration(double seconds)
     {
@@ -621,6 +730,83 @@ internal static partial class UiStrings
         var minutes = (int)(seconds / 60d);
         var rest = seconds - minutes * 60d;
         return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{minutes:00}:{rest:00.000}");
+    }
+
+    public static string FormatStatusTime(long frame, int sampleRate, bool asSamples)
+    {
+        frame = Math.Max(0, frame);
+        if (asSamples)
+        {
+            return frame.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        return FormatTimecode(frame, sampleRate);
+    }
+
+    public static bool TryParseSampleCount(string? text, out long samples)
+    {
+        samples = 0;
+        var compact = (text ?? string.Empty).Trim().Replace("_", string.Empty, StringComparison.Ordinal)
+            .Replace(" ", string.Empty, StringComparison.Ordinal);
+        if (compact.Length == 0)
+        {
+            return false;
+        }
+
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        if (long.TryParse(compact, System.Globalization.NumberStyles.Integer, culture, out samples)
+            && samples >= 0)
+        {
+            return true;
+        }
+
+        var parts = compact.Split(',');
+        if (parts.Length < 2
+            || parts[0].Length is < 1 or > 3
+            || !parts[0].All(char.IsDigit))
+        {
+            return false;
+        }
+
+        for (var i = 1; i < parts.Length; i++)
+        {
+            if (parts[i].Length != 3 || !parts[i].All(char.IsDigit))
+            {
+                return false;
+            }
+        }
+
+        return long.TryParse(string.Concat(parts), System.Globalization.NumberStyles.Integer, culture, out samples)
+            && samples >= 0;
+    }
+
+    public static bool TryParseStatusTime(string? text, int sampleRate, bool preferSamples, out long frame)
+    {
+        frame = 0;
+        var rate = Math.Max(1, sampleRate);
+        if (preferSamples)
+        {
+            if (TryParseSampleCount(text, out frame))
+            {
+                return true;
+            }
+
+            if (TryParseDuration(text, out var sampleSeconds))
+            {
+                frame = (long)Math.Round(sampleSeconds * rate);
+                return frame >= 0;
+            }
+
+            return false;
+        }
+
+        if (TryParseDuration(text, out var seconds))
+        {
+            frame = (long)Math.Round(seconds * rate);
+            return frame >= 0;
+        }
+
+        return TryParseSampleCount(text, out frame);
     }
 
     public static bool TryParseDuration(string? text, out double seconds)

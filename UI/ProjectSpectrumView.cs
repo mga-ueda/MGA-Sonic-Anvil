@@ -92,7 +92,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         var g = ComputePlot(wPx, hPx);
         var px = 1d / dpi;
 
-        var chrome = WpfControlHelpers.FrozenBrush(Theme.Get("SurfaceBackBrush"));
+        var chrome = WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush"));
         var plotBack = WpfControlHelpers.FrozenBrush(Theme.Get("VectorScopeBackBrush"));
         dc.DrawRectangle(chrome, null, bounds);
         var plot = new Rect(g.PlotX * px, g.PlotY * px, g.PlotW * px, g.PlotH * px);
@@ -203,7 +203,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
     private int MeasureDbPadDevicePx()
     {
         var ft = ChromeText("-50", ChromeFontSize, WpfControlHelpers.FrozenBrush(LabelColor()));
-        return Math.Max(1, (int)Math.Ceiling(ft.Width * PixelsPerDip) + 2);
+        return Math.Max(1, (int)Math.Ceiling((ft.Width + 3) * PixelsPerDip));
     }
 
     private static Color LabelColor()
@@ -221,9 +221,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
     private PlotGeometry ComputePlot(int wPx, int hPx)
     {
         var s = hPx / (double)SpectrumAnalyzer.OriginalOuterHeightPx;
-        var textPad = MeasureDbPadDevicePx();
-        var padL = Math.Max(textPad, (int)Math.Round(SpectrumAnalyzer.OrigPadLeftPx * s))
-            + (int)Math.Round(DesignMetrics.SpectrumPadLeftExtra * PixelsPerDip);
+        var padL = MeasureDbPadDevicePx();
         var padR = 0;
         var padT = 0;
         var minLabelH = Math.Max(
@@ -286,8 +284,8 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         var maxF = bands.Count == 0 ? 0 : bands.Centers[^1] * 1.001;
         var row1y = (g.PlotY + g.PlotH + 1) * px;
         var row2y = row1y + ChromeText("0", font, brush).Height + 2;
-        DrawFreqRow(dc, SpectrumAnalyzer.LabelTopRow, bands, rects, maxF, row1y, font, brush, px);
-        DrawFreqRow(dc, SpectrumAnalyzer.LabelBotRow, bands, rects, maxF, row2y, font, brush, px);
+        DrawFreqRow(dc, SpectrumAnalyzer.LabelTopRow, bands, rects, maxF, row1y, font, brush, px, g);
+        DrawFreqRow(dc, SpectrumAnalyzer.LabelBotRow, bands, rects, maxF, row2y, font, brush, px, g);
     }
 
     private void DrawFreqRow(
@@ -299,7 +297,8 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         double y,
         double font,
         Brush brush,
-        double px)
+        double px,
+        PlotGeometry g)
     {
         foreach (var (hz, text) in row)
         {
@@ -315,7 +314,9 @@ internal sealed class ProjectSpectrumView : FrameworkElement
             }
 
             var ft = ChromeText(text, font, brush);
-            dc.DrawText(ft, new Point(cx.Value * px - ft.Width * 0.5, y));
+            var x = cx.Value * px - ft.Width * 0.5;
+            var maxX = Math.Max(0, g.WidthPx * px - ft.Width);
+            dc.DrawText(ft, new Point(Math.Clamp(x, 0, maxX), y));
         }
     }
 

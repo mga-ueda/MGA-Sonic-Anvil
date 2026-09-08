@@ -55,6 +55,7 @@ internal sealed class LevelMeterView : FrameworkElement
             return;
         }
 
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
         var inner = bounds;
         var trackTop = inner.Y + LampHeight;
         var trackBottom = inner.Bottom - ReadoutHeight;
@@ -258,7 +259,7 @@ internal sealed class LevelMeterView : FrameworkElement
             MappingMode = BrushMappingMode.RelativeToBoundingBox,
             GradientStops =
             [
-                new GradientStop(Color.FromRgb(0x02, 0x18, 0x20), 0),
+                new GradientStop(Color.FromRgb(0x0A, 0x30, 0x44), 0),
                 new GradientStop(Color.FromRgb(0x0D, 0x4A, 0x62), 0.26),
                 new GradientStop(Color.FromRgb(0x3A, 0xB8, 0xE8), 0.55),
                 new GradientStop(Color.FromRgb(0xC8, 0xEF, 0xFF), 0.82),

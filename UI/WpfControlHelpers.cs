@@ -16,6 +16,26 @@ internal static class WpfControlHelpers
     public static Typeface MonoTypeface { get; } =
         new(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
 
+    public static double DeviceHairline(double pixelsPerDip) =>
+        pixelsPerDip > 0 ? 1.0 / pixelsPerDip : 1.0;
+
+    public static double SnapDeviceCenter(double x, double pixelsPerDip)
+    {
+        if (pixelsPerDip <= 0)
+        {
+            return x;
+        }
+
+        return (Math.Round(x * pixelsPerDip) + 0.5) / pixelsPerDip;
+    }
+
+    public static Pen FrozenHairline(Color color, double pixelsPerDip)
+    {
+        var pen = new Pen(FrozenBrush(color), DeviceHairline(pixelsPerDip));
+        pen.Freeze();
+        return pen;
+    }
+
     public static SolidColorBrush FrozenBrush(Color color)
     {
         var brush = new SolidColorBrush(color);

@@ -122,7 +122,7 @@ internal sealed class LevelMeterEngine
         var t = Math.Clamp(DbToNorm(db), 0, 1);
         ReadOnlySpan<(double P, byte R, byte G, byte B)> stops =
         [
-            (0, 2, 24, 32),
+            (0, 10, 48, 68),
             (0.26, 13, 74, 98),
             (0.55, 58, 184, 232),
             (0.82, 200, 239, 255),

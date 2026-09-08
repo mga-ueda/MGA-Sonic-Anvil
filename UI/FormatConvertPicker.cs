@@ -40,8 +40,10 @@ internal static class FormatConvertPicker
         public required bool AllowPreview { get; init; }
         public required bool AllowCustom { get; init; }
         public TextBox? CustomBox { get; set; }
+        public int FallbackRate { get; init; }
         public Action<int>? OnCommit { get; init; }
         public Action<int>? OnPreview { get; init; }
+        public Action<int>? OnHighlight { get; init; }
     }
 
     public static ContextMenu Show(
@@ -49,21 +51,29 @@ internal static class FormatConvertPicker
         FormatConvertKind kind,
         int currentValue,
         Action<int> onCommit,
-        Action<int>? onPreview)
+        Action<int>? onPreview,
+        Action<int>? onHighlight = null)
     {
         var allowCustom = kind == FormatConvertKind.SampleRate;
         var allowPreview = kind is FormatConvertKind.SampleRate or FormatConvertKind.BitDepth;
         var menu = new ContextMenu
         {
             PlacementTarget = placementTarget,
-            Placement = PlacementMode.Center,
+            Placement = PlacementMode.Custom,
+            CustomPopupPlacementCallback = (popupSize, targetSize, _) =>
+                PopupCursorAvoidance.Callback(
+                    popupSize,
+                    targetSize,
+                    Mouse.GetPosition(placementTarget)),
             Tag = new MenuState
             {
                 Kind = kind,
                 AllowPreview = allowPreview,
                 AllowCustom = allowCustom,
+                FallbackRate = currentValue,
                 OnCommit = onCommit,
                 OnPreview = onPreview,
+                OnHighlight = onHighlight,
             },
         };
 
@@ -81,6 +91,7 @@ internal static class FormatConvertPicker
                 Icon = AccentMark(value == currentValue, cyan),
             };
             item.Click += (_, _) => onCommit(value);
+            TipService.Set(item, KindTip(kind));
             menu.Items.Add(item);
         }
 
@@ -106,9 +117,33 @@ internal static class FormatConvertPicker
                 box.Focus();
                 box.SelectAll();
             };
+            box.TextChanged += (_, _) => NotifyHighlight(menu);
+            box.PreviewMouseWheel += (_, e) =>
+            {
+                if (NudgeCustomBox(box, currentValue, Math.Sign(e.Delta)))
+                {
+                    e.Handled = true;
+                }
+            };
+            custom.PreviewMouseWheel += (_, e) =>
+            {
+                if (NudgeCustomBox(box, currentValue, Math.Sign(e.Delta)))
+                {
+                    e.Handled = true;
+                }
+            };
+            TipService.Set(custom, UiStrings.TipFormatCustomRate);
+            TipService.Set(box, UiStrings.TipFormatCustomRate);
             box.PreviewKeyDown += (_, e) =>
             {
                 var key = e.Key == Key.System ? e.SystemKey : e.Key;
+                if (key is Key.Up or Key.Down)
+                {
+                    e.Handled = true;
+                    NudgeCustomBox(box, currentValue, key == Key.Up ? 1 : -1);
+                    return;
+                }
+
                 if (key == Key.Enter)
                 {
                     e.Handled = true;
@@ -132,15 +167,22 @@ internal static class FormatConvertPicker
             menu.Items.Add(custom);
         }
 
+        TipService.Set(menu, KindTip(kind));
         WireHighlightTracking(menu);
         menu.PreviewKeyDown += (_, e) =>
         {
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (key is Key.Up or Key.Down && TryNudgeCustomRate(menu, key == Key.Up ? 1 : -1))
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (Keyboard.Modifiers != ModifierKeys.None)
             {
                 return;
             }
 
-            var key = e.Key == Key.System ? e.SystemKey : e.Key;
             if (IsCustomBoxFocused(menu))
             {
                 return;
@@ -231,11 +273,80 @@ internal static class FormatConvertPicker
     public static bool IsCustomBoxFocused(ContextMenu menu) =>
         menu.Tag is MenuState { CustomBox: { } box } && box.IsKeyboardFocusWithin;
 
+    public static bool TryNudgeCustomRate(ContextMenu menu, int direction)
+    {
+        if (menu.Tag is not MenuState { CustomBox: { } box } state || !IsCustomActive(menu))
+        {
+            return false;
+        }
+
+        return NudgeCustomBox(box, state.FallbackRate, direction);
+    }
+
+    private static bool IsCustomActive(ContextMenu menu)
+    {
+        if (IsCustomBoxFocused(menu))
+        {
+            return true;
+        }
+
+        var item = HighlightedItem(menu);
+        return item is not null && Equals(item.Tag, "custom");
+    }
+
+    private static bool NudgeCustomBox(TextBox box, int fallbackRate, int direction)
+    {
+        if (direction == 0)
+        {
+            return false;
+        }
+
+        if (!TryReadRaw(box, out var current))
+        {
+            current = Math.Clamp(fallbackRate, FormatConvert.MinSampleRate, FormatConvert.MaxSampleRate);
+        }
+
+        var next = FormatConvert.ApplySampleRateNudge(
+            current,
+            direction,
+            NudgeStep(Keyboard.Modifiers));
+        var text = next.ToString(CultureInfo.InvariantCulture);
+        if (!string.Equals(box.Text, text, StringComparison.Ordinal))
+        {
+            box.Text = text;
+            box.CaretIndex = text.Length;
+        }
+
+        return true;
+    }
+
+    private static int NudgeStep(ModifierKeys modifiers)
+    {
+        var shift = (modifiers & ModifierKeys.Shift) == ModifierKeys.Shift;
+        var control = (modifiers & ModifierKeys.Control) == ModifierKeys.Control
+            && (modifiers & ModifierKeys.Alt) == ModifierKeys.None;
+        return FormatConvert.SampleRateNudgeStep(shift, control);
+    }
+
+    private static bool TryReadRaw(TextBox box, out int value)
+    {
+        value = 0;
+        var text = box.Text.Trim().Replace(",", "", StringComparison.Ordinal);
+        return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+    }
+
     private static int[] Presets(FormatConvertKind kind) => kind switch
     {
         FormatConvertKind.BitDepth => FormatConvert.BitDepths,
         FormatConvertKind.Channels => FormatConvert.ChannelCounts,
         _ => FormatConvert.SampleRates,
+    };
+
+    private static string KindTip(FormatConvertKind kind) => kind switch
+    {
+        FormatConvertKind.BitDepth => UiStrings.TipFormatBitDepth,
+        FormatConvertKind.Channels => UiStrings.TipFormatChannels,
+        _ => UiStrings.TipFormatSampleRate,
     };
 
     private static string FormatLabel(FormatConvertKind kind, int value) => kind switch
@@ -374,6 +485,16 @@ internal static class FormatConvertPicker
         }
 
         SyncMarks(menu, item);
+        NotifyHighlight(menu);
+    }
+
+    private static void NotifyHighlight(ContextMenu menu)
+    {
+        if (menu.Tag is MenuState { OnHighlight: { } onHighlight }
+            && TryHighlightedValue(menu, out var value))
+        {
+            onHighlight(value);
+        }
     }
 
     private static void HighlightItem(ContextMenu menu, MenuItem target)
@@ -399,6 +520,8 @@ internal static class FormatConvertPicker
         {
             _updatingSelectionChrome = false;
         }
+
+        NotifyHighlight(menu);
     }
 
     private static void SyncMarks(ContextMenu menu, MenuItem selected)

@@ -10,15 +10,15 @@
 
 フェード・ノーマライズ・部分削除・コピー／ペースト、マーカー／リージョン／サンプルループ、スペクトログラムまで、聴きながら決めて焼き込めます。DAW や専用エディタを往復しなくても、ゲーム用ワンショットとループの下ごしらえがこのウィンドウで完結します。
 
-**Wwise へは Wave 単体モードで渡せます。** トランスポートの WAAPI をオンにし、作成先を選んで EXPORT すると、元波形を Originals へ書き、Music Playlist Container（マーカー／サンプルループ。Custom Cue は出しません）として取り込みます。Play -E はループ折り返しのプレビューと、EXPORT 時の Play post-exit に使います。
+**Wwise へは Wave 単体モードで渡せます。** レベルメーター上の WAAPI をオンにし、作成先を選んで EXPORT すると、元波形を Originals へ書き、Music Playlist Container（マーカー／サンプルループ。Custom Cue は出しません）として取り込みます。Play -E はループ折り返しのプレビューと、EXPORT 時の Play post-exit に使います。
 
-**表示言語は日本語／英語です。** 日本語版の画面文言は、英語のままのラベルも含め現状どおりです。英語版では日本語だけを訳します。切替はトランスポート右の **JP／EN**。
+**表示言語は日本語／英語です。** 日本語版の画面文言は、英語のままのラベルも含め現状どおりです。英語版では日本語だけを訳します。切替は左上の歯車（設定）。既定は **Auto**（OS が日本語なら Japanese、それ以外は English）。
 
 ## マニュアル・ダウンロード
 
 - マニュアル: [日本語](https://mga-ueda.github.io/MGA-Sonic-Anvil/manual.ja.html) · [English](https://mga-ueda.github.io/MGA-Sonic-Anvil/manual.en.html) · [一覧](https://mga-ueda.github.io/MGA-Sonic-Anvil/)
 - 初めての方: [クイックスタート](https://mga-ueda.github.io/MGA-Sonic-Anvil/manual.ja.html#quickstart)
-- アプリ内: トランスポートの **マニュアル（`?`）**（JP／EN の右。表示言語に追従）
+- アプリ内: トランスポートの **マニュアル（`?`）**（表示言語に追従）
 - 配布: [Releases](https://github.com/mga-ueda/MGA-Sonic-Anvil/releases)
 - 設定データ: `%LocalAppData%\MGA\MGA Sonic Anvil\`（`settings.json`。exe 横には書きません）
 - ライセンス: [MIT](LICENSE)

@@ -11,7 +11,17 @@ internal static class DesignMetrics
 
     public static double From96(double value96) => value96;
 
+    public static double WindowMinWidth => From96(1019);
+
+    public static double WindowMinHeight => From96(420);
+
+    public static double WindowDefaultWidth => From96(1019);
+
+    public static double WindowDefaultHeight => From96(573);
+
     public static double ProjectBarHeight => From96(30);
+
+    public static GridLength ProjectBarHeightGrid => new(ProjectBarHeight);
 
     public static double ActionBarHeight => From96(44);
 
@@ -68,7 +78,9 @@ internal static class DesignMetrics
 
     public static double TransportPadX => Dip(12);
 
-    public static double TransportCurrentTimeWidth => Dip(168);
+    public static double StatusTimecodeWidth => From96(86);
+
+    public static double StatusTimecodeLabelWidth => From96(22);
 
     public static double ToolbarButtonSide => From96(24);
 
@@ -76,10 +88,7 @@ internal static class DesignMetrics
     public static double SpectrumHeight => VectorScopeHeight;
 
     /// <summary>周波数数値の重なりを避けるため、右揃えのまま左へ足す幅。</summary>
-    public static double SpectrumExtraWidth => From96(80);
-
-    /// <summary>dB 数値がバーに被らないよう、左目盛へ足す幅。</summary>
-    public static double SpectrumPadLeftExtra => From96(8);
+    public static double SpectrumExtraWidth => From96(72);
 
     /// <summary>正方形ゴニオ直下の位相バー高さ。</summary>
     public static double VectorScopeCorrelationHeight => From96(18);
@@ -102,6 +111,8 @@ internal static class DesignMetrics
     public static double AudioDialogButtonHeight => Dip(48);
 
     public static Thickness AudioPad => new(Dip(18));
+
+    public static double FadeOptionRowHeight => AudioInputHeight;
 
     /// <summary>目盛 22×2 + バー 14×4。枠なしの最小幅。</summary>
     public static double LevelMeterWidth => From96(100);

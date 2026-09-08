@@ -23,6 +23,7 @@ internal sealed class WaveformView : Grid
     public const double WheelTimeStep = 2.378414230005442;
     private const int PolylineMaxSamplesPerPixel = 1;
     private const int OverlayPolylineMaxSamplesPerPixel = 32;
+    private const double OverlayWaveHeightFraction = 0.5;
     private const int RawColumnMaxSamplesPerPixel = 96;
     private const int RawColumnMaxFrames = 1 << 18;
     private const int SamplePointMaxVisibleFrames = 500;
@@ -42,9 +43,6 @@ internal sealed class WaveformView : Grid
     private const int TrailSampleMinIntervalMs = 24;
     private const int TrailMaxSamples = 900;
     private const double TrailDiscontinuitySec = 1.25;
-    private const double SpectrogramOverlayOpacity = 0.28;
-    private const double WaveformOverlayOpacity = 0.72;
-    private const double OverlayWaveHeightFraction = 0.5;
 
     private const double MouseGuideMoveEpsilonPx = 0.5;
     private static double TimeLaneHeight => DesignMetrics.RulerHeight;
@@ -112,6 +110,9 @@ internal sealed class WaveformView : Grid
     private WriteableBitmap? _waveBitmap;
     private WriteableBitmap? _invertBitmap;
     private int[] _invertPixels = [];
+    private int[] _wavePixels = [];
+    private int _wavePixelWidth;
+    private int _wavePixelHeight;
     private Size _waveDipSize;
     private double _waveDpiX;
     private double _waveDpiY;
@@ -124,6 +125,7 @@ internal sealed class WaveformView : Grid
     private readonly SpectrogramRenderer _spectrogram = new();
     private double _appliedMarkerLaneHeight = -1;
     private double _staticPaintMs;
+    private double _followRebuildAtMs;
     private bool _staticRebuildQueued;
     private bool _viewChangedQueued;
     private readonly Dictionary<(string Text, TimeLabelAccent Accent), FormattedText> _timeLabelCache = new();
@@ -141,7 +143,6 @@ internal sealed class WaveformView : Grid
     private int _waveOverlayBgra;
     private int _zeroBgra;
     private double _viewStart;
-    private double _followRebuildAtMs;
     private double _timeZoom = 1d;
     private double _ampZoom = 1d;
     private long _playheadFrame;
@@ -557,9 +558,6 @@ internal sealed class WaveformView : Grid
     public void ZoomAmpToMax() => SetAmpZoom(AmpZoomMax);
 
     public void ResetAmpZoom() => SetAmpZoom(1d);
-
-    public void WheelTimeZoom(int delta, double anchorX) =>
-        WheelTimeZoomAtFrame(delta, XToFrame(anchorX));
 
     public void WheelTimeZoomAtPlayhead(int delta) =>
         WheelTimeZoomAtFrame(delta, _playheadFrame);
@@ -1556,6 +1554,7 @@ internal sealed class WaveformView : Grid
                 Header = frames.Length > 1 ? UiStrings.MenuClearMarkers : UiStrings.MenuClearMarker,
             };
             item.Click += (_, _) => MarkerClearRequested?.Invoke(this, frames);
+            TipService.Set(item, item.Header as string);
             menu.Items.Add(item);
         }
 
@@ -1563,6 +1562,7 @@ internal sealed class WaveformView : Grid
         {
             var item = new MenuItem { Header = UiStrings.MenuClearRegion };
             item.Click += (_, _) => RegionClearRequested?.Invoke(this, region);
+            TipService.Set(item, UiStrings.MenuClearRegion);
             menu.Items.Add(item);
         }
 
@@ -1570,6 +1570,7 @@ internal sealed class WaveformView : Grid
         {
             var item = new MenuItem { Header = UiStrings.MenuClearSampleLoop };
             item.Click += (_, _) => SampleLoopClearRequested?.Invoke(this, EventArgs.Empty);
+            TipService.Set(item, UiStrings.MenuClearSampleLoop);
             menu.Items.Add(item);
         }
 
@@ -1610,37 +1611,18 @@ internal sealed class WaveformView : Grid
         }
 
         var overlay = _spectrogramMode == SpectrogramViewMode.Overlay;
+        if (SpectrogramVisible)
+        {
+            _spectrogram.Draw(dc, wave, _document, start, span, this);
+        }
+
         if (!SpectrogramVisible || overlay)
         {
             MarkerRolePaint.DrawRegion(dc, _document, wave, start, span, "RegionWaveFillBrush");
             MarkerRolePaint.DrawSampleLoop(dc, _document, wave, start, span, "SampleLoopWaveFillBrush");
             MarkerRolePaint.DrawBackgrounds(dc, _document, wave, start, span);
             EnsureWaveformBitmap(wave);
-            if (_waveBitmap is not null)
-            {
-                if (overlay)
-                {
-                    dc.PushOpacity(WaveformOverlayOpacity);
-                    dc.DrawImage(_waveBitmap, wave);
-                    dc.Pop();
-                }
-                else
-                {
-                    dc.DrawImage(_waveBitmap, wave);
-                }
-            }
-        }
-
-        if (SpectrogramVisible)
-        {
-            _spectrogram.Draw(
-                dc,
-                wave,
-                _document,
-                start,
-                span,
-                this,
-                overlay ? SpectrogramOverlayOpacity : 1);
+            DrawWaveformImage(dc, wave);
         }
 
         MarkerRolePaint.DrawRemoveOverlays(dc, _document, wave, start, span);
@@ -1655,9 +1637,9 @@ internal sealed class WaveformView : Grid
         }
         else if (overlay)
         {
-            var laneHeight = wave.Height * OverlayWaveHeightFraction;
-            var overlayWave = new Rect(wave.X, wave.Y + (wave.Height - laneHeight) * 0.5, wave.Width, laneHeight);
-            DrawDbScaleTicks(dc, bounds, overlayWave, channels: 1, laneGap: 0, laneHeight);
+            ResolveWaveLane(overlay: true, wave.Height, 1, 0, _ampZoom, out var laneHeight, out var origin, out var ampHeight);
+            var overlayWave = new Rect(wave.X, wave.Y + origin, wave.Width, laneHeight);
+            DrawDbScaleTicks(dc, bounds, overlayWave, channels: 1, laneGap: 0, laneHeight, ampHeight);
         }
     }
 
@@ -1701,60 +1683,151 @@ internal sealed class WaveformView : Grid
     {
         var dpi = VisualTreeHelper.GetDpi(this);
         var span = ViewSpanFrames;
+        var scaleX = Math.Max(1e-6, dpi.DpiScaleX);
+        var scaleY = Math.Max(1e-6, dpi.DpiScaleY);
+        var width = Math.Max(1, (int)Math.Round(bounds.Width * scaleX));
+        var height = Math.Max(1, (int)Math.Round(bounds.Height * scaleY));
+        WaveScroll.Quantize(_viewStart, span, width, out var quantStart, out var bmpSpan, out var bmpWidth);
         if (!_waveDirty
             && _waveBitmap is not null
+            && _wavePixelWidth == bmpWidth
+            && _wavePixelHeight == height
             && _waveDipSize == bounds.Size
             && Math.Abs(_waveDpiX - dpi.DpiScaleX) < 0.001
             && Math.Abs(_waveDpiY - dpi.DpiScaleY) < 0.001
-            && Math.Abs(_waveViewStart - _viewStart) < 0.01
-            && Math.Abs(_waveViewSpan - span) < 0.01
+            && Math.Abs(_waveViewStart - quantStart) < bmpSpan / bmpWidth * 0.01
+            && Math.Abs(_waveViewSpan - bmpSpan) < bmpSpan / bmpWidth * 0.01
             && Math.Abs(_waveAmpZoom - _ampZoom) < 1e-6
             && _waveMode == _spectrogramMode)
         {
             return;
         }
 
-        RebuildWaveformBitmap(bounds, dpi);
+        EnsureWaveBitmap(bmpWidth, height, dpi);
+        EnsureWavePens();
+        EnsureWavePixels(bmpWidth, height);
+
+        var shifted = !_waveDirty
+            && _wavePixelWidth == bmpWidth
+            && _wavePixelHeight == height
+            && Math.Abs(_waveViewSpan - bmpSpan) < 0.01
+            && Math.Abs(_waveAmpZoom - _ampZoom) < 1e-6
+            && _waveMode == _spectrogramMode
+            && TryShiftWaveform(quantStart, bmpSpan, bmpWidth, height, scaleX, scaleY);
+        if (!shifted)
+        {
+            Array.Clear(_wavePixels, 0, bmpWidth * height);
+            RasterizeWaveformPixels(0, bmpWidth, bmpWidth, height, scaleX, scaleY, quantStart, bmpSpan);
+        }
+
+        _waveBitmap!.WritePixels(new Int32Rect(0, 0, bmpWidth, height), _wavePixels, bmpWidth * 4, 0);
+        if (!SpectrogramVisible)
+        {
+            RebuildInvertBitmap(bmpWidth, height, dpi);
+        }
+
         _waveDipSize = bounds.Size;
         _waveDpiX = dpi.DpiScaleX;
         _waveDpiY = dpi.DpiScaleY;
-        _waveViewStart = _viewStart;
-        _waveViewSpan = span;
+        _waveViewStart = quantStart;
+        _waveViewSpan = bmpSpan;
         _waveAmpZoom = _ampZoom;
         _waveMode = _spectrogramMode;
+        _wavePixelWidth = bmpWidth;
+        _wavePixelHeight = height;
         _waveDirty = false;
     }
 
-    private void RebuildWaveformBitmap(Rect bounds, DpiScale dpi)
+    private bool TryShiftWaveform(
+        double quantStart,
+        double bmpSpan,
+        int width,
+        int height,
+        double scaleX,
+        double scaleY)
     {
-        var document = _document!;
-        var scaleX = Math.Max(1e-6, dpi.DpiScaleX);
-        var scaleY = Math.Max(1e-6, dpi.DpiScaleY);
-        var width = Math.Max(1, (int)Math.Round(bounds.Width * scaleX));
-        var height = Math.Max(1, (int)Math.Round(bounds.Height * scaleY));
-        EnsureWaveBitmap(width, height, dpi);
-        EnsureWavePens();
-
-        var bitmap = _waveBitmap!;
-        bitmap.Lock();
-        try
+        if (!WaveScroll.TryPixelShift(_waveViewStart, quantStart, bmpSpan, width, out var shiftPx))
         {
-            unsafe
+            return false;
+        }
+
+        var rangeFrames = (long)Math.Ceiling(quantStart + bmpSpan) - (long)Math.Floor(quantStart);
+        if (IsPolylineZoom(rangeFrames, width, _spectrogramMode == SpectrogramViewMode.Overlay))
+        {
+            return false;
+        }
+
+        WaveScroll.ShiftPacked(_wavePixels, width, height, shiftPx);
+        if (shiftPx > 0)
+        {
+            RasterizeWaveformPixels(width - shiftPx, width, width, height, scaleX, scaleY, quantStart, bmpSpan);
+        }
+        else
+        {
+            RasterizeWaveformPixels(0, -shiftPx, width, height, scaleX, scaleY, quantStart, bmpSpan);
+        }
+
+        return true;
+    }
+
+    private void DrawWaveformImage(DrawingContext dc, Rect wave)
+    {
+        if (_waveBitmap is null || _wavePixelWidth <= 1)
+        {
+            return;
+        }
+
+        var dest = WaveBitmapDest(wave);
+        var group = new DrawingGroup();
+        RenderOptions.SetBitmapScalingMode(group, BitmapScalingMode.Fant);
+        var context = group.Open();
+        context.DrawImage(_waveBitmap, dest);
+        context.Close();
+        dc.PushClip(new RectangleGeometry(wave));
+        dc.DrawDrawing(group);
+        dc.Pop();
+    }
+
+    private Rect WaveBitmapDest(Rect wave)
+    {
+        var span = ViewSpanFrames;
+        var offsetDip = span <= 0 || _wavePixelWidth <= 1
+            ? 0d
+            : (_viewStart - _waveViewStart) / span * wave.Width;
+        var visibleWidth = Math.Max(1, _wavePixelWidth - 1);
+        return new Rect(
+            wave.X - offsetDip,
+            wave.Y,
+            wave.Width * _wavePixelWidth / visibleWidth,
+            wave.Height);
+    }
+
+    private void RasterizeWaveformPixels(
+        int x0,
+        int x1,
+        int width,
+        int height,
+        double scaleX,
+        double scaleY,
+        double start,
+        double span)
+    {
+        unsafe
+        {
+            fixed (int* buffer = _wavePixels)
             {
-                var buffer = (int*)bitmap.BackBuffer;
-                var stride = bitmap.BackBufferStride / 4;
-                new Span<int>(buffer, stride * height).Clear();
-                RasterizeWaveform(buffer, stride, width, height, scaleX, scaleY, document);
+                RasterizeWaveform(buffer, width, width, height, scaleX, scaleY, _document!, x0, x1, start, span);
             }
-
-            bitmap.AddDirtyRect(new Int32Rect(0, 0, width, height));
         }
-        finally
+    }
+
+    private void EnsureWavePixels(int width, int height)
+    {
+        var needed = width * height;
+        if (_wavePixels.Length < needed)
         {
-            bitmap.Unlock();
+            _wavePixels = new int[needed];
         }
-
-        RebuildInvertBitmap(width, height, dpi);
     }
 
     private void EnsureWaveBitmap(int width, int height, DpiScale dpi)
@@ -1846,7 +1919,7 @@ internal sealed class WaveformView : Grid
         x1 = Math.Clamp(x1, wave.X, wave.Right);
         var width = Math.Max(1, x1 - x0);
         dc.PushClip(new RectangleGeometry(new Rect(x0, wave.Y, width, wave.Height)));
-        dc.DrawImage(_invertBitmap, wave);
+        dc.DrawImage(_invertBitmap, WaveBitmapDest(wave));
         dc.Pop();
     }
 
@@ -1857,22 +1930,23 @@ internal sealed class WaveformView : Grid
         int height,
         double scaleX,
         double scaleY,
-        AudioDocument document)
+        AudioDocument document,
+        int x0,
+        int x1,
+        double start,
+        double span)
     {
         var sourceChannels = Math.Max(1, document.Channels);
         var overlay = _spectrogramMode == SpectrogramViewMode.Overlay;
         var drawChannels = overlay ? 1 : sourceChannels;
         var laneGap = !overlay && drawChannels > 1 ? 4d * scaleY : 0d;
-        var laneHeight = overlay
-            ? height * OverlayWaveHeightFraction
-            : (height - laneGap * (drawChannels - 1)) / drawChannels;
-        var laneOrigin = overlay ? (height - laneHeight) * 0.5 : 0d;
-        var start = _viewStart;
-        var span = ViewSpanFrames;
+        ResolveWaveLane(overlay, height, drawChannels, laneGap, _ampZoom, out var laneHeight, out var laneOrigin, out var ampHeight);
+        x0 = Math.Clamp(x0, 0, width);
+        x1 = Math.Clamp(x1, x0, width);
         var startFrame = Math.Clamp((long)Math.Floor(start), 0, document.FrameCount);
         var endFrame = Math.Clamp((long)Math.Ceiling(start + span), startFrame, document.FrameCount);
         var rangeFrames = endFrame - startFrame;
-        if (rangeFrames <= 0 || laneHeight < 1)
+        if (rangeFrames <= 0 || laneHeight < 1 || x1 <= x0)
         {
             return;
         }
@@ -1881,12 +1955,20 @@ internal sealed class WaveformView : Grid
         var useRawColumns = !usePolyline && rangeFrames <= RawColumnBudget(width);
         if (!usePolyline)
         {
-            EnsureColumnBuffers(width * sourceChannels);
+            var f0 = startFrame + (long)x0 * rangeFrames / width;
+            var f1 = startFrame + (long)x1 * rangeFrames / width;
+            if (f1 <= f0)
+            {
+                f1 = f0 + 1;
+            }
+
+            var colCount = x1 - x0;
+            EnsureColumnBuffers(colCount * sourceChannels);
             var count = useRawColumns
                 ? overlay
-                    ? FillRawColumnPeaksMono(document, startFrame, endFrame, width, sourceChannels)
-                    : FillRawColumnPeaks(document, startFrame, endFrame, width, sourceChannels)
-                : document.Peaks.ReadRangePacked(startFrame, endFrame, width, _columnMins, _columnMaxs);
+                    ? FillRawColumnPeaksMono(document, f0, f1, colCount, sourceChannels)
+                    : FillRawColumnPeaks(document, f0, f1, colCount, sourceChannels)
+                : document.Peaks.ReadRangePacked(f0, f1, colCount, _columnMins, _columnMaxs);
             if (count <= 0)
             {
                 return;
@@ -1894,7 +1976,7 @@ internal sealed class WaveformView : Grid
 
             if (!useRawColumns && _previewGainAtFrame is not null)
             {
-                ApplyPreviewGainToColumns(startFrame, endFrame, count, sourceChannels);
+                ApplyPreviewGainToColumns(f0, f1, count, sourceChannels);
             }
 
             var packedChannels = sourceChannels;
@@ -1913,7 +1995,11 @@ internal sealed class WaveformView : Grid
                     continue;
                 }
 
-                DrawLaneGuides(buffer, stride, width, height, top, mid, drawLaneTop: !overlay);
+                if (!overlay)
+                {
+                    DrawLaneGuides(buffer, stride, width, height, top, mid, drawLaneTop: true, x0, x1);
+                }
+
                 RasterPeakEnvelope(
                     buffer,
                     stride,
@@ -1923,8 +2009,10 @@ internal sealed class WaveformView : Grid
                     ch,
                     packedChannels,
                     count,
+                    x0,
                     top,
                     laneHeight,
+                    ampHeight,
                     mid,
                     connectNeighbors: rangeFrames <= (long)width * 8);
             }
@@ -1941,7 +2029,11 @@ internal sealed class WaveformView : Grid
                 continue;
             }
 
-            DrawLaneGuides(buffer, stride, width, height, top, mid, drawLaneTop: !overlay);
+            if (!overlay)
+            {
+                DrawLaneGuides(buffer, stride, width, height, top, mid, drawLaneTop: true, 0, width);
+            }
+
             RasterSamplePolyline(
                 buffer,
                 stride,
@@ -1953,10 +2045,33 @@ internal sealed class WaveformView : Grid
                 start,
                 span,
                 top,
-                laneHeight,
+                ampHeight,
                 mid,
                 scaleX);
         }
+    }
+
+    private static void ResolveWaveLane(
+        bool overlay,
+        double height,
+        int drawChannels,
+        double laneGap,
+        double ampZoom,
+        out double laneHeight,
+        out double laneOrigin,
+        out double ampHeight)
+    {
+        if (!overlay)
+        {
+            laneHeight = (height - laneGap * (drawChannels - 1)) / drawChannels;
+            laneOrigin = 0d;
+            ampHeight = laneHeight;
+            return;
+        }
+
+        ampHeight = height * OverlayWaveHeightFraction;
+        laneHeight = Math.Min(height, ampHeight * ampZoom);
+        laneOrigin = (height - laneHeight) * 0.5;
     }
 
     private static bool TryLaneClip(
@@ -1991,12 +2106,14 @@ internal sealed class WaveformView : Grid
         int height,
         double top,
         double mid,
-        bool drawLaneTop)
+        bool drawLaneTop,
+        int x0,
+        int x1)
     {
         var yMid = (int)Math.Round(mid);
         if ((uint)yMid < (uint)height)
         {
-            FillHLine(buffer, stride, width, yMid, _zeroBgra);
+            FillHLine(buffer, stride, width, x0, x1, yMid, _zeroBgra);
         }
 
         if (!drawLaneTop)
@@ -2007,7 +2124,7 @@ internal sealed class WaveformView : Grid
         var yTop = (int)Math.Round(top);
         if (yTop > 0 && (uint)yTop < (uint)height)
         {
-            FillHLine(buffer, stride, width, yTop, _zeroBgra);
+            FillHLine(buffer, stride, width, x0, x1, yTop, _zeroBgra);
         }
     }
 
@@ -2020,21 +2137,27 @@ internal sealed class WaveformView : Grid
         int channel,
         int channels,
         int count,
+        int px0,
         double top,
         double laneHeight,
+        double ampHeight,
         double mid,
         bool connectNeighbors)
     {
         EnsureColumnEdges(width);
-        var amp = laneHeight * 0.5 * _ampZoom;
+        var amp = ampHeight * 0.5 * _ampZoom;
         var bottom = top + laneHeight;
         var color = WavePaintBgra;
-        for (var px = 0; px < width; px++)
+        var px1 = Math.Min(width, px0 + count);
+        for (var i = 0; i < count; i++)
         {
-            var bucket = count == width
-                ? px
-                : (int)Math.Clamp((long)px * count / width, 0, count - 1);
-            var index = bucket * channels + channel;
+            var px = px0 + i;
+            if ((uint)px >= (uint)width)
+            {
+                break;
+            }
+
+            var index = i * channels + channel;
             var y1 = Math.Clamp(mid - _columnMaxs[index] * amp, top, bottom);
             var y2 = Math.Clamp(mid - _columnMins[index] * amp, top, bottom);
             if (y2 < y1)
@@ -2051,11 +2174,11 @@ internal sealed class WaveformView : Grid
             _columnYLo[px] = (int)Math.Ceiling(y2);
         }
 
-        for (var px = 0; px < width; px++)
+        for (var px = px0; px < px1; px++)
         {
             var hi = _columnYHi[px];
             var lo = _columnYLo[px];
-            if (connectNeighbors && px + 1 < width)
+            if (connectNeighbors && px + 1 < px1)
             {
                 hi = Math.Min(hi, _columnYHi[px + 1]);
                 lo = Math.Max(lo, _columnYLo[px + 1]);
@@ -2273,7 +2396,7 @@ internal sealed class WaveformView : Grid
         double start,
         double span,
         double top,
-        double laneHeight,
+        double ampHeight,
         double mid,
         double scaleX)
     {
@@ -2287,7 +2410,7 @@ internal sealed class WaveformView : Grid
 
         var count = (int)(last - first + 1);
         var samples = document.Interleaved;
-        var amp = laneHeight * 0.5 * _ampZoom;
+        var amp = ampHeight * 0.5 * _ampZoom;
         int SampleY(float sample)
         {
             var y = (int)Math.Round(mid - sample * amp);
@@ -2419,10 +2542,12 @@ internal sealed class WaveformView : Grid
         }
     }
 
-    private static unsafe void FillHLine(int* buffer, int stride, int width, int y, int color)
+    private static unsafe void FillHLine(int* buffer, int stride, int width, int x0, int x1, int y, int color)
     {
         var p = buffer + y * stride;
-        for (var x = 0; x < width; x++)
+        var left = Math.Clamp(x0, 0, width);
+        var right = Math.Clamp(x1, left, width);
+        for (var x = left; x < right; x++)
         {
             p[x] = color;
         }
@@ -2542,10 +2667,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TimelineWellBackBrush")), null, well);
-        var edge = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush")), 1);
-        edge.Freeze();
-        dc.DrawLine(edge, new Point(well.Right - 0.5, 0), new Point(well.Right - 0.5, bounds.Height));
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, well);
     }
 
     private void DrawDbScaleTicks(
@@ -2554,7 +2676,8 @@ internal sealed class WaveformView : Grid
         Rect wave,
         int channels,
         double laneGap,
-        double laneHeight)
+        double laneHeight,
+        double? ampHeight = null)
     {
         var well = DbScaleBounds(bounds);
         if (well.Width <= 8 || laneHeight < 8)
@@ -2567,7 +2690,7 @@ internal sealed class WaveformView : Grid
         var tick = new Pen(muted, 1);
         tick.Freeze();
         var half = laneHeight * 0.5;
-        var amp = half * _ampZoom;
+        var amp = (ampHeight ?? laneHeight) * 0.5 * _ampZoom;
 
         for (var ch = 0; ch < channels; ch++)
         {
@@ -3008,9 +3131,6 @@ internal sealed class WaveformView : Grid
         }
 
         dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TimelineWellBackBrush")), null, lane);
-        var edge = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush")), 1);
-        edge.Freeze();
-        dc.DrawLine(edge, new Point(lane.X, lane.Bottom - 0.5), new Point(lane.Right, lane.Bottom - 0.5));
     }
 
     private void DrawTimeLane(DrawingContext dc, Rect bounds, double start, double span)
@@ -3027,9 +3147,6 @@ internal sealed class WaveformView : Grid
             DrawSampleLoopBar(dc, lane, start, span);
         }
 
-        var edge = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush")), 1);
-        edge.Freeze();
-        dc.DrawLine(edge, new Point(lane.X, lane.Bottom - 0.5), new Point(lane.Right, lane.Bottom - 0.5));
         if (_document is null || _document.FrameCount <= 0 || span <= 0)
         {
             return;
@@ -3075,33 +3192,50 @@ internal sealed class WaveformView : Grid
             }
         }
 
-        for (var t = first; t <= startSec + seconds + step; t += step)
+        dc.PushClip(new RectangleGeometry(lane));
+        try
         {
-            if (t < -1e-9)
+            for (var t = first; t <= startSec + seconds + step; t += step)
             {
-                continue;
-            }
+                if (t < -1e-9)
+                {
+                    continue;
+                }
 
-            var x = FrameToViewX(t * _document.SampleRate, start, span, bounds);
-            var label = UiStrings.FormatDuration(Math.Max(0, t));
-            var muted = GetTimeLabel(label, pixelsPerDip, accent: TimeLabelAccent.None);
-            var origin = new Point(x + 3, lane.Y + Math.Max(1, (lane.Height - muted.Height) * 0.5));
-            dc.DrawLine(tick, new Point(x, lane.Bottom - 5), new Point(x, lane.Bottom - 1));
-            if (hasLoop)
-            {
-                DrawTimeLabelAcrossBands(
-                    dc,
-                    muted,
-                    GetTimeLabel(label, pixelsPerDip, accent: TimeLabelAccent.Loop),
-                    GetTimeLabel(label, pixelsPerDip, accent: TimeLabelAccent.Region),
-                    origin,
-                    hasLoop ? (loopX0, loopX1) : null,
-                    []);
+                var x = FrameToViewX(t * _document.SampleRate, start, span, bounds);
+                var label = UiStrings.FormatDuration(Math.Max(0, t));
+                var muted = GetTimeLabel(label, pixelsPerDip, accent: TimeLabelAccent.None);
+                var origin = new Point(x + 3, lane.Y + Math.Max(1, (lane.Height - muted.Height) * 0.5));
+                if (origin.X >= lane.Right || origin.X + muted.Width <= lane.X)
+                {
+                    continue;
+                }
+
+                if (x >= lane.X && x <= lane.Right)
+                {
+                    dc.DrawLine(tick, new Point(x, lane.Bottom - 5), new Point(x, lane.Bottom - 1));
+                }
+
+                if (hasLoop)
+                {
+                    DrawTimeLabelAcrossBands(
+                        dc,
+                        muted,
+                        GetTimeLabel(label, pixelsPerDip, accent: TimeLabelAccent.Loop),
+                        GetTimeLabel(label, pixelsPerDip, accent: TimeLabelAccent.Region),
+                        origin,
+                        hasLoop ? (loopX0, loopX1) : null,
+                        []);
+                }
+                else
+                {
+                    dc.DrawText(muted, origin);
+                }
             }
-            else
-            {
-                dc.DrawText(muted, origin);
-            }
+        }
+        finally
+        {
+            dc.Pop();
         }
     }
 
@@ -3311,15 +3445,13 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         var color = Theme.Get("RegionTimelineBrush");
-        var line = new Pen(WpfControlHelpers.FrozenBrush(color), 1);
-        line.Freeze();
-        var selectedLine = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("MarkerSelectedBorderBrush")), 1.5);
-        selectedLine.Freeze();
+        var line = WpfControlHelpers.FrozenHairline(color, pixelsPerDip);
+        var selectedLine = WpfControlHelpers.FrozenHairline(Theme.Get("MarkerSelectedBorderBrush"), pixelsPerDip);
         var fill = WpfControlHelpers.FrozenBrush(color);
         var selectedPen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("MarkerSelectedBorderBrush")), 1);
         selectedPen.Freeze();
-        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         var lane = MarkerLaneBounds(bounds);
         for (var i = 0; i < _document.Regions.Count; i++)
         {
@@ -3352,7 +3484,8 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        dc.DrawLine(selected ? selectedLine : line, new Point(x, 0), new Point(x, bounds.Height));
+        var xs = WpfControlHelpers.SnapDeviceCenter(x, pixelsPerDip);
+        dc.DrawLine(selected ? selectedLine : line, new Point(xs, 0), new Point(xs, bounds.Height));
         if (lane.Height <= 2)
         {
             return;
@@ -3425,18 +3558,16 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         var color = Theme.Get("MarkerBrush");
         var selectedColor = Theme.Get("MarkerSelectedBrush");
         var selectedBorder = Theme.Get("MarkerSelectedBorderBrush");
-        var line = new Pen(WpfControlHelpers.FrozenBrush(color), 1);
-        line.Freeze();
-        var selectedLine = new Pen(WpfControlHelpers.FrozenBrush(selectedBorder), 1.5);
-        selectedLine.Freeze();
+        var line = WpfControlHelpers.FrozenHairline(color, pixelsPerDip);
+        var selectedLine = WpfControlHelpers.FrozenHairline(selectedBorder, pixelsPerDip);
         var fill = WpfControlHelpers.FrozenBrush(color);
         var selectedFill = WpfControlHelpers.FrozenBrush(selectedColor);
         var selectedPen = new Pen(WpfControlHelpers.FrozenBrush(selectedBorder), 1);
         selectedPen.Freeze();
-        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         var lane = MarkerLaneBounds(bounds);
         _markerFlags.Clear();
         var editing = IsEditingMarkerComment;
@@ -3454,12 +3585,6 @@ internal sealed class WaveformView : Grid
             }
 
             var selected = _selectedMarkerFrames.Contains(marker.Frame);
-            dc.DrawLine(selected ? selectedLine : line, new Point(x, 0), new Point(x, bounds.Height));
-            if (lane.Height <= 2)
-            {
-                continue;
-            }
-
             var idText = GetMarkerLabel(marker.Id.ToString(CultureInfo.InvariantCulture), pixelsPerDip);
             const double padX = 3;
             if (!_markerFlagLayout.TryGetValue(marker.Frame, out var box))
@@ -3469,6 +3594,13 @@ internal sealed class WaveformView : Grid
             }
 
             _markerFlags.Add((marker, box));
+            var lineTop = lane.Height > 2 ? box.Bottom : 0;
+            var xs = WpfControlHelpers.SnapDeviceCenter(x, pixelsPerDip);
+            dc.DrawLine(selected ? selectedLine : line, new Point(xs, lineTop), new Point(xs, bounds.Height));
+            if (lane.Height <= 2)
+            {
+                continue;
+            }
             if (editing && marker.Frame == _commentEditFrame)
             {
                 continue;
@@ -4672,10 +4804,11 @@ internal sealed class WaveformView : Grid
         QueueMouseGuideOverlay();
         if (playbackFollow)
         {
-            // 追従スクロール。シークバー層は毎回更新。静的層（波形本体）は
-            // 実測描画コストに応じて間引く：軽ければ毎フレーム（≒60fps）で
-            // 滑らかに流し、深い拡大のスペクトログラム等で重い場合は間隔を
-            // 広げてディスパッチャに入力処理の余地を残す（操作不能防止）。
+            // 追従スクロール。シークバー層は毎回更新。静的層（波形＋スペクトログラム）は
+            // 実測描画コストに応じて間引く：軽ければ毎フレーム（≒60fps）で滑らかに流し、
+            // 深い拡大で重い場合は間隔を広げ、ディスパッチャに入力処理の余地を残す
+            // （Render 優先度の連続再描画がマウス／キー入力を飢餓させて操作不能になるのを防ぐ）。
+            // 波形ビットマップはスクロール位置へオフセット描画するため、間引いても流れは止まらない。
             InvalidatePlayheadOnly();
             // TickCount64 は分解能約 15ms で毎フレーム判定に使えないため Stopwatch。
             var nowMs = System.Diagnostics.Stopwatch.GetTimestamp()
@@ -5059,7 +5192,11 @@ internal sealed class WaveformView : Grid
         CursorCommitted?.Invoke(this, frame);
     }
 
-    private void InvalidateWaveform() => InvalidateStaticLayer();
+    private void InvalidateWaveform()
+    {
+        _waveDirty = true;
+        InvalidateStaticLayer();
+    }
 
     private void RaiseViewChanged()
     {
@@ -5080,7 +5217,6 @@ internal sealed class WaveformView : Grid
 
     private void InvalidateStaticLayer()
     {
-        _waveDirty = true;
         _snapCacheDirty = true;
         if (_staticRebuildQueued)
         {

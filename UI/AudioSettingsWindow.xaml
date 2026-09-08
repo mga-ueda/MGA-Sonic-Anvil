@@ -11,10 +11,23 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource WindowBackBrush}"
         Foreground="{DynamicResource PrimaryForeBrush}"
-        Title="{x:Static domain:UiStrings.DialogSettingsTitle}">
+        Title="{x:Static domain:UiStrings.DialogSettingsTitle}"
+        KeyDown="Window_KeyDown">
   <Border Padding="{x:Static ui:DesignMetrics.AudioPad}">
-    <StackPanel Width="280">
-      <TextBlock Text="{x:Static domain:UiStrings.LabelAudioApi}" Margin="0,0,0,3" />
+    <StackPanel x:Name="ContentRoot" Width="280">
+      <TextBlock x:Name="LanguageLabel"
+                 Text="{x:Static domain:UiStrings.LabelUiLanguage}"
+                 Margin="0,0,0,3" />
+      <ComboBox x:Name="LanguageCombo"
+                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                Padding="6,1"
+                FontSize="11.333"
+                VerticalContentAlignment="Center"
+                Margin="0,0,0,12" />
+
+      <TextBlock x:Name="ApiLabel"
+                 Text="{x:Static domain:UiStrings.LabelAudioApi}"
+                 Margin="0,0,0,3" />
       <ComboBox x:Name="ApiCombo"
                 Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
                 Padding="6,1"
@@ -23,13 +36,24 @@
                 Margin="0,0,0,12"
                 SelectionChanged="ApiCombo_SelectionChanged" />
 
-      <TextBlock Text="{x:Static domain:UiStrings.LabelAudioDevice}" Margin="0,0,0,3" />
+      <TextBlock x:Name="DeviceLabel"
+                 Text="{x:Static domain:UiStrings.LabelAudioDevice}"
+                 Margin="0,0,0,3" />
       <ComboBox x:Name="DeviceCombo"
                 Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
                 Padding="6,1"
                 FontSize="11.333"
                 VerticalContentAlignment="Center"
-                Margin="0,0,0,16" />
+                Margin="0,0,0,12" />
+
+      <TextBlock x:Name="FadeDefaultsHeader"
+                 Text="{x:Static domain:UiStrings.LabelFadeCurveDefaults}"
+                 FontWeight="Bold"
+                 FontSize="11.333"
+                 Margin="0,4,0,6" />
+
+      <StackPanel x:Name="FadeRowsHost"
+                  Margin="0,0,0,16" />
 
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
         <ui:RoundedButton x:Name="OkButton"
@@ -37,6 +61,7 @@
                           Width="{x:Static ui:DesignMetrics.AudioDialogButtonWidth}"
                           Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
                           Margin="0,0,12,0"
+                          IsDefault="True"
                           Click="OkButton_Click" />
         <ui:RoundedButton x:Name="CancelButton"
                           Content="{x:Static domain:UiStrings.ButtonCancel}"
