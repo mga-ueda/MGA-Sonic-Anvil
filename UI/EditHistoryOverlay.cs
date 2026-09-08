@@ -11,6 +11,8 @@ internal sealed class EditHistoryOverlay : Border
 {
     private readonly StackPanel _items = new();
     private readonly ScrollViewer _scroll;
+    private readonly TextBlock _title;
+    private readonly TextBlock _hint;
 
     public event EventHandler<int>? ItemChosen;
 
@@ -25,14 +27,14 @@ internal sealed class EditHistoryOverlay : Border
         SnapsToDevicePixels = true;
         Focusable = false;
 
-        var title = new TextBlock
+        _title = new TextBlock
         {
             Text = UiStrings.EditHistoryTitle,
             Margin = new Thickness(10, 8, 10, 2),
             FontSize = 11,
             Foreground = (Brush)Application.Current.FindResource("MutedForeBrush"),
         };
-        var hint = new TextBlock
+        _hint = new TextBlock
         {
             Text = UiStrings.EditHistoryHint,
             Margin = new Thickness(10, 0, 10, 6),
@@ -48,12 +50,18 @@ internal sealed class EditHistoryOverlay : Border
         };
 
         var root = new DockPanel();
-        DockPanel.SetDock(title, Dock.Top);
-        DockPanel.SetDock(hint, Dock.Top);
-        root.Children.Add(title);
-        root.Children.Add(hint);
+        DockPanel.SetDock(_title, Dock.Top);
+        DockPanel.SetDock(_hint, Dock.Top);
+        root.Children.Add(_title);
+        root.Children.Add(_hint);
         root.Children.Add(_scroll);
         Child = root;
+    }
+
+    public void ApplyLocalizedText()
+    {
+        _title.Text = UiStrings.EditHistoryTitle;
+        _hint.Text = UiStrings.EditHistoryHint;
     }
 
     public void SetItems(IReadOnlyList<EditHistoryEntry> items, int selectedIndex)

@@ -70,6 +70,26 @@ internal sealed partial class WaapiStatusBar : UserControl
         BadgeCanvas.Loaded += (_, _) => DrawBadge();
     }
 
+    public void ApplyLocalizedText()
+    {
+        TitleLabel.Text = UiStrings.WaapiTitle;
+        PlayMinusECheckBox.Content = UiStrings.LabelPlayMinusE;
+        PlayMinusECheckBox.ToolTip = UiStrings.TipPlayMinusE;
+        AutoActiveCheckBox.Content = UiStrings.LabelAutoActive;
+        AutoActiveCheckBox.ToolTip = UiStrings.TipAutoActive;
+        ExportButton.Content = UiStrings.ButtonExport;
+        ExportButton.ToolTip = UiStrings.TipExport;
+        OutputPathBox.ToolTip = UiStrings.TipOutputPath;
+        _outputFolderButton.ToolTip = UiStrings.TipOutputFolder;
+        UpdateKeepLockAppearance();
+        if (_projectNameClickable)
+        {
+            ProjectNameLabel.ToolTip = UiStrings.TipWwiseProjectNameOpen;
+        }
+
+        DrawBadge();
+    }
+
     public event EventHandler? KeepTargetChanged;
     public event EventHandler? AutoActiveChanged;
     public event EventHandler? PlayPostExitChanged;

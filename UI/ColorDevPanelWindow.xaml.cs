@@ -16,6 +16,7 @@ internal partial class ColorDevPanelWindow : Window
 {
     private readonly Dictionary<string, Border> _swatches = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, TextBox> _hexInputs = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, TextBlock> _nameLabels = new(StringComparer.OrdinalIgnoreCase);
     private bool _suppressHexEvents;
 
     public event EventHandler? ColorsChanged;
@@ -29,11 +30,26 @@ internal partial class ColorDevPanelWindow : Window
         RefreshRows();
     }
 
+    public void ApplyLocalizedText()
+    {
+        Title = UiStrings.ColorDevTitle;
+        ResetButton.Content = UiStrings.ColorDevResetToDefaults;
+        CloseButton.Content = UiStrings.ColorDevClose;
+        foreach (var entry in UiColors.Entries)
+        {
+            if (_nameLabels.TryGetValue(entry.Key, out var label))
+            {
+                label.Text = entry.Label;
+            }
+        }
+    }
+
     private void BuildRows()
     {
         ListPanel.Children.Clear();
         _swatches.Clear();
         _hexInputs.Clear();
+        _nameLabels.Clear();
 
         var hexWidth = MeasureHexEditorWidth(12);
 
@@ -63,6 +79,7 @@ internal partial class ColorDevPanelWindow : Window
                 VerticalAlignment = VerticalAlignment.Center,
                 Foreground = (Brush)FindResource("PrimaryForeBrush"),
             };
+            _nameLabels[entry.Key] = nameLabel;
 
             var swatch = new Border
             {

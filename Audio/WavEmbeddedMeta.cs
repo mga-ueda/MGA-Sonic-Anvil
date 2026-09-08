@@ -1,4 +1,5 @@
 using System.Text;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.Audio;
 
@@ -371,20 +372,20 @@ internal static class WavEmbeddedMeta
         using var stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
         if (stream.Length < 12)
         {
-            throw new InvalidDataException("Wave file is too short to append metadata.");
+            throw new InvalidDataException(UiStrings.ErrWaveTooShortToAppendMeta);
         }
 
         using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: true);
         stream.Position = 0;
         if (ReadFourCc(reader) != "RIFF")
         {
-            throw new InvalidDataException("Not a RIFF wave file.");
+            throw new InvalidDataException(UiStrings.ErrNotRiffWave);
         }
 
         stream.Position = 8;
         if (ReadFourCc(reader) != "WAVE")
         {
-            throw new InvalidDataException("Not a WAVE file.");
+            throw new InvalidDataException(UiStrings.ErrNotWaveFile);
         }
 
         using var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: true);
@@ -408,7 +409,7 @@ internal static class WavEmbeddedMeta
         var riffSize = stream.Length - 8;
         if (riffSize > uint.MaxValue)
         {
-            throw new InvalidDataException("Wave file exceeds RIFF size limit.");
+            throw new InvalidDataException(UiStrings.ErrWaveExceedsRiffLimit);
         }
 
         stream.Position = 4;

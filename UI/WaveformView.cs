@@ -196,6 +196,7 @@ internal sealed class WaveformView : Grid
         ClipToBounds = true;
         Focusable = true;
         FocusVisualStyle = null;
+        RefreshLocalizedTips();
         SnapsToDevicePixels = false;
         UseLayoutRounding = false;
         Cursor = Cursors.IBeam;
@@ -236,6 +237,8 @@ internal sealed class WaveformView : Grid
         _spectrogram.InvalidateRequested += () =>
             Dispatcher.BeginInvoke(InvalidateStaticLayer);
     }
+
+    public void RefreshLocalizedTips() => ToolTip = UiStrings.TipWaveform;
 
     public AudioDocument? Document
     {

@@ -15,7 +15,7 @@ public partial class MainWindow
     {
         var dialog = new OpenFileDialog
         {
-            Filter = "Audio|*.wav;*.wave;*.aif;*.aiff;*.mp3|Wave|*.wav;*.wave|AIFF|*.aif;*.aiff|MP3|*.mp3|All|*.*",
+            Filter = UiStrings.FilterOpenAudio,
             Title = UiStrings.MenuOpen,
             Multiselect = true,
         };
@@ -158,7 +158,7 @@ public partial class MainWindow
         {
             var dialog = new SaveFileDialog
             {
-                Filter = "Wave|*.wav|MP3|*.mp3",
+                Filter = UiStrings.FilterSaveAudio,
                 Title = UiStrings.MenuSaveAs,
                 FileName = string.IsNullOrEmpty(path)
                     ? "untitled.wav"

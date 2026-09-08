@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
@@ -129,7 +130,7 @@ internal static class Theme
             return brush.Color;
         }
 
-        throw new InvalidOperationException($"未定義の色キー: {key}");
+        throw new InvalidOperationException(UiStrings.ErrUndefinedColorKey(key));
     }
 }
 

@@ -259,7 +259,7 @@ internal static class FormatConvertPicker
         DockPanel.SetDock(label, Dock.Left);
         var unit = new TextBlock
         {
-            Text = "Hz",
+            Text = UiStrings.LabelHertz,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(8, 0, 0, 0),
         };

@@ -20,6 +20,7 @@ static class Program
         {
             LaunchFiles.SetStartup(files);
             AppStorage.Initialize();
+            Domain.UiStrings.SetLanguage(Domain.UiStrings.ParseLanguage(AppStorage.Settings.UiLanguage));
             var app = new App();
             app.InitializeComponent();
             app.Run();

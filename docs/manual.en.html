@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MGA Sonic Anvil Manual</title>
+  <style>
+    :root {
+      --bg: #1a1c1e; --panel: #22262a; --text: #e8eaed; --muted: #9aa3ad;
+      --accent: #6cb6ff; --border: #3a424a; --code: #c9d1d9; --code-bg: #121416; --toc-w: 15.5rem;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font-family: "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif; background: var(--bg); color: var(--text); line-height: 1.65; font-size: 15px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .layout { display: grid; grid-template-columns: var(--toc-w) minmax(0, 1fr); min-height: 100vh; }
+    nav.toc { position: sticky; top: 0; align-self: start; height: 100vh; overflow: auto; padding: 1.25rem 1rem 2rem; background: var(--panel); border-right: 1px solid var(--border); }
+    nav.toc h1 { font-size: 0.95rem; margin: 0 0 0.75rem; font-weight: 600; }
+    nav.toc ol { margin: 0; padding-left: 1.1rem; font-size: 0.86rem; }
+    nav.toc li { margin: 0.35rem 0; }
+    nav.toc ol ol { margin: 0.2rem 0 0.35rem; padding-left: 1rem; font-size: 0.82rem; }
+    nav.toc ol ol li { margin: 0.2rem 0; }
+    nav.toc a { color: var(--muted); }
+    nav.toc a:hover { color: var(--accent); }
+    nav.toc a.active { color: var(--accent); font-weight: 600; }
+    main { max-width: 52rem; padding: 1.75rem 2rem 4rem; }
+    main > header h1 { margin: 0 0 0.35rem; font-size: 1.75rem; font-weight: 650; }
+    .lead { color: var(--muted); margin: 0 0 1rem; font-size: 1.02rem; }
+    .hero { background: linear-gradient(145deg, #243041 0%, #1e262e 100%); border: 1px solid #3d5678; border-radius: 10px; padding: 1.1rem 1.2rem; margin: 0 0 1.75rem; }
+    .hero p { margin: 0.45rem 0; }
+    .hero strong { color: #b3d4ff; }
+    h2 { margin: 2.25rem 0 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border); font-size: 1.35rem; }
+    h2:first-of-type { border-top: none; padding-top: 0; }
+    h3 { margin: 1.4rem 0 0.5rem; font-size: 1.08rem; color: #d7dde3; }
+    p { margin: 0.55rem 0; }
+    ul, ol { margin: 0.4rem 0 0.8rem; padding-left: 1.35rem; }
+    li { margin: 0.25rem 0; }
+    code, kbd { font-family: Consolas, "Cascadia Mono", "Courier New", monospace; font-size: 0.9em; background: var(--code-bg); color: var(--code); border-radius: 4px; padding: 0.08em 0.35em; }
+    kbd { border: 1px solid var(--border); padding: 0.05em 0.4em; }
+    table { width: 100%; border-collapse: collapse; margin: 0.75rem 0 1.1rem; font-size: 0.92rem; }
+    th, td { border: 1px solid var(--border); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+    th { background: #2a3036; color: #dce3ea; font-weight: 600; }
+    tr:nth-child(even) td { background: #1e2226; }
+    .ui { font-weight: 600; color: #f0f3f6; }
+    .note { background: #20282f; border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: 0.6rem 0.9rem; margin: 0.75rem 0; }
+    .note p { margin: 0.3rem 0; }
+    footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; text-align: center; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      nav.toc { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+      main { padding: 1.25rem 1rem 3rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav class="toc" aria-label="Contents">
+      <h1>Contents</h1>
+      <ol>
+        <li><a href="#about">What this app does</a></li>
+        <li><a href="#quickstart">Quick start</a></li>
+        <li><a href="#layout">Layout</a></li>
+        <li><a href="#playback">Playback</a></li>
+        <li><a href="#edit">Selection and editing</a></li>
+        <li><a href="#markers">Markers / regions / loops</a></li>
+        <li><a href="#spectrogram">Spectrogram</a></li>
+        <li><a href="#format">Format conversion</a></li>
+        <li><a href="#export">WAAPI EXPORT (Wave-only)</a></li>
+        <li><a href="#shortcuts">Shortcuts</a></li>
+        <li><a href="#settings">Settings and language</a></li>
+        <li><a href="#disclaimer">Scope</a></li>
+        <li><a href="#trademarks">Trademarks and license</a></li>
+      </ol>
+    </nav>
+    <main>
+      <header>
+        <h1>MGA Sonic Anvil Manual</h1>
+        <p class="lead">Hear, cut, mark, and loop game audio — then hand a Wave-only structure to Wwise.</p>
+      </header>
+
+      <h2 id="about">1. What this app does</h2>
+      <div class="hero">
+        <p><strong>A waveform editor and Wave-only EXPORT into Wwise Interactive Music, in one window.</strong></p>
+        <p>Fade, normalize, ripple-delete, copy / paste, markers / regions / sample loop, and a spectrogram — decide by ear and commit.</p>
+        <p><strong>EXPORT talks to Wwise in Wave-only mode.</strong> It writes the source wave into Originals and imports it as a Music Playlist Container (markers / sample loop; no Custom Cues).</p>
+      </div>
+
+      <h2 id="quickstart">2. Quick start</h2>
+      <ol>
+        <li>Drop a Wave / AIFF / MP3, or press <kbd>Ctrl</kbd>+<kbd>O</kbd> (multiple files open as tabs).</li>
+        <li>Listen, cut, fade, and place markers or a loop on the waveform.</li>
+        <li>Save with <kbd>Ctrl</kbd>+<kbd>S</kbd> as Wave or MP3 (AIFF export is not supported).</li>
+        <li>To send it to Wwise, turn on <span class="ui">WAAPI</span> in the transport, pick a destination, and press <span class="ui">EXPORT</span>.</li>
+      </ol>
+      <div class="note">
+        <p>Settings live in <code>%LocalAppData%\MGA\MGA Sonic Anvil\</code>. Nothing is written next to the exe.</p>
+      </div>
+
+      <h2 id="layout">3. Layout</h2>
+      <ul>
+        <li><strong>Overview</strong> — top strip. The bright area is the current view. Drag to move (scrubs the center); wheel zooms around the playhead.</li>
+        <li><strong>Waveform</strong> — the edit surface: time ruler, marker / region flags, playhead, mouse guide.</li>
+        <li><strong>Tabs</strong> — multiple files. Close with <kbd>Ctrl</kbd>+<kbd>W</kbd>.</li>
+        <li><strong>Transport</strong> — playback, zoom, fade / normalize / delete / save, <span class="ui">WAAPI</span>, language <span class="ui">JP / EN</span>, manual <span class="ui">?</span>.</li>
+        <li><strong>Always on Top</strong> — keeps the window in front.</li>
+        <li><strong>Spectrum / meters / vector scope</strong> — a simple view of the playback output.</li>
+        <li><strong>WAAPI bar</strong> — connection, destination, <span class="ui">Play -E</span>, <span class="ui">Auto Active</span>, <span class="ui">EXPORT</span>.</li>
+        <li><strong>Status bar</strong> — file info, Audio API / Device, GitHub link.</li>
+      </ul>
+
+      <h2 id="playback">4. Playback</h2>
+      <ul>
+        <li><kbd>Space</kbd> — play / stop. Stop returns to the start position.</li>
+        <li><kbd>Enter</kbd> — pause in place.</li>
+        <li><kbd>Ctrl</kbd>+<kbd>Space</kbd> — from 3 seconds earlier.</li>
+        <li><kbd>Alt</kbd>+<kbd>Enter</kbd> — restart from the playback start.</li>
+        <li><kbd>Ctrl</kbd>+drag — scrub.</li>
+        <li><kbd>T</kbd> — type the playhead time. Enter jumps. Copy / paste allowed.</li>
+        <li><kbd>Z</kbd> or <kbd>.</kbd> — center. Toggles center-lock while playing; clears it when stopped.</li>
+        <li><kbd>L</kbd> — loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</li>
+      </ul>
+
+      <h2 id="edit">5. Selection and editing</h2>
+      <p>Drag to select. <kbd>Esc</kbd> or a move without Shift clears it. Fade / normalize with nothing selected uses the whole file.</p>
+      <ul>
+        <li><span class="ui">FADE IN</span> <kbd>I</kbd> / <span class="ui">FADE OUT</span> <kbd>O</kbd> — pick a curve, Space to preview, Enter to apply. 1–9 select a curve.</li>
+        <li><kbd>X</kbd> — linear fade around the playhead in the view (before = out / after = in).</li>
+        <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> — fit the peak to -0.1 dB.</li>
+        <li><span class="ui">DELETE</span> — ripple-delete the selection. Selected markers / regions go with it.</li>
+        <li><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd> — cut / copy / paste (markers in range included; a matching region is included too).</li>
+        <li><kbd>U</kbd> — edit history. ↑↓ move, Enter apply, Esc cancel.</li>
+        <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> — undo / redo.</li>
+      </ul>
+
+      <h2 id="markers">6. Markers / regions / loops</h2>
+      <ul>
+        <li><kbd>M</kbd> — marker at the playhead.</li>
+        <li><kbd>Shift</kbd>+<kbd>L</kbd> — set the selection as the sample loop (same range again clears it).</li>
+        <li><kbd>Shift</kbd>+<kbd>R</kbd> — set the selection as a region (same range again clears it).</li>
+        <li>Click a flag to select an edge. Shift+click for a range, Ctrl+click to add. Drag or ←/→ to move (Shift ×3).</li>
+        <li>Double-click a comment / region name. <code>-A</code> lime, <code>-L</code> blue, <code>-E</code> red, <code>-R</code> gray.</li>
+        <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> — rename.</li>
+        <li>Right-click, or <kbd>Ctrl</kbd>+<kbd>Del</kbd>, deletes markers.</li>
+      </ul>
+      <div class="note">
+        <p>WAV cue / adtl (markers and regions) and smpl (sample loop) are read and written on save.</p>
+      </div>
+
+      <h2 id="spectrogram">7. Spectrogram</h2>
+      <p><kbd>G</kbd> cycles waveform / spectrogram / overlay. Deep time zooms shift columns and compute only what is missing.</p>
+
+      <h2 id="format">8. Format conversion</h2>
+      <ul>
+        <li><kbd>S</kbd> — sample rate</li>
+        <li><kbd>B</kbd> — bit depth</li>
+        <li><kbd>C</kbd> — channel count (Mono / Stereo)</li>
+      </ul>
+      <p>Pick a preset or a custom Hz. The UI is locked while converting.</p>
+
+      <h2 id="export">9. WAAPI EXPORT (Wave-only)</h2>
+      <ol>
+        <li>Start Wwise Authoring.</li>
+        <li>Turn on <span class="ui">WAAPI</span> in the transport (<kbd>W</kbd>).</li>
+        <li>Select a destination object in Wwise. <span class="ui">Keep Target</span> can pin the path.</li>
+        <li>The export folder must be under Originals of the connected project.</li>
+        <li><span class="ui">EXPORT</span> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>.</li>
+      </ol>
+      <ul>
+        <li><span class="ui">Play -E</span> (<kbd>E</kbd>) — play after the Exit Cue. In-app preview double-plays -E on a loop wrap so two playheads appear. EXPORT writes this to the Music Playlist Container default transition rule (Any to Any).</li>
+        <li><span class="ui">Auto Active</span> — bring Wwise to the front after EXPORT.</li>
+      </ul>
+      <div class="note">
+        <p>No Custom Cues are written. Always verify the result in Wwise.</p>
+      </div>
+
+      <h2 id="shortcuts">10. Shortcuts</h2>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Space</kbd></td><td>Play / stop (return to start)</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Pause in place</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Play from 3 seconds earlier</td></tr>
+          <tr><td>↑↓ / <kbd>Ctrl</kbd>+↑↓</td><td>Time zoom / 32× · fit all</td></tr>
+          <tr><td><kbd>Shift</kbd>+↑↓ / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↑↓</td><td>Amplitude zoom / max · reset</td></tr>
+          <tr><td>Wheel / <kbd>Shift</kbd> / <kbd>Ctrl</kbd>+wheel</td><td>Time zoom / pan / amplitude</td></tr>
+          <tr><td>←→ / <kbd>Ctrl</kbd>+←→</td><td>Seek / previous or next marker · edge</td></tr>
+          <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>View edge</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select all</td></tr>
+          <tr><td><kbd>I</kbd> / <kbd>O</kbd> / <kbd>N</kbd> / <kbd>Delete</kbd></td><td>Fade in / out / normalize / delete</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd> / <kbd>S</kbd> / <kbd>Shift</kbd>+<kbd>S</kbd></td><td>Open / save / save as</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd> / <kbd>Ctrl</kbd>+<kbd>Tab</kbd></td><td>Close tab / next tab</td></tr>
+          <tr><td><kbd>W</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Toggle WAAPI / EXPORT</td></tr>
+          <tr><td><kbd>G</kbd> / <kbd>U</kbd> / <kbd>T</kbd></td><td>Spectrogram / history / time</td></tr>
+        </tbody>
+      </table>
+      <p>Hover the waveform for a fuller list of operations.</p>
+
+      <h2 id="settings">11. Settings and language</h2>
+      <ul>
+        <li>Playback API is Audio API / Device on the status bar (WaveOut / WASAPI / ASIO).</li>
+        <li>UI language is <span class="ui">JP / EN</span> on the transport. The Japanese locale keeps the current wording, including English labels.</li>
+        <li>The manual is <span class="ui">?</span>, or GitHub Pages in the browser. It follows the UI language.</li>
+        <li>Settings file: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>
+      </ul>
+
+      <h2 id="disclaimer">12. Scope</h2>
+      <ul>
+        <li>This does not cover everything Interactive Music can do. EXPORT is Wave-only (markers / sample loop).</li>
+        <li>In-app preview is an approximation. Dual playheads for Play -E may not match Wwise exactly. Always verify after EXPORT.</li>
+        <li>AIFF export is not supported. Choose Wave or MP3.</li>
+        <li>EXPORT changes the Wwise project. Back up or use version control first.</li>
+      </ul>
+
+      <h2 id="trademarks">13. Trademarks and license</h2>
+      <ul>
+        <li><strong>Wwise®</strong> / <strong>Audiokinetic®</strong> are trademarks of Audiokinetic Inc. This tool is unofficial. WAAPI requires a valid Wwise license.</li>
+        <li>This app is released under the <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/LICENSE">MIT License</a>.</li>
+      </ul>
+      <footer>© MIYABI GAME AUDIO INC. — MGA Sonic Anvil User Manual (en)</footer>
+    </main>
+  </div>
+  <script>
+    (function () {
+      var links = Array.prototype.slice.call(
+        document.querySelectorAll("nav.toc a[href^='#']"));
+      var linkByTargetId = {};
+      links.forEach(function (link) {
+        linkByTargetId[decodeURIComponent(link.hash.slice(1))] = link;
+      });
+      var headings = Array.prototype.slice.call(
+        document.querySelectorAll("main [id]")).filter(function (el) {
+          return linkByTargetId[el.id];
+        });
+      var activeLink = null;
+
+      function update() {
+        var offset = window.innerHeight * 0.25;
+        var current = null;
+        for (var i = 0; i < headings.length; i++) {
+          if (headings[i].getBoundingClientRect().top <= offset) {
+            current = headings[i];
+          } else {
+            break;
+          }
+        }
+        if (window.innerHeight + window.scrollY
+            >= document.documentElement.scrollHeight - 2) {
+          current = headings[headings.length - 1] || current;
+        }
+        var link = current ? linkByTargetId[current.id] : null;
+        if (link === activeLink) {
+          return;
+        }
+        if (activeLink) {
+          activeLink.classList.remove("active");
+        }
+        activeLink = link;
+        if (activeLink) {
+          activeLink.classList.add("active");
+          activeLink.scrollIntoView({ block: "nearest" });
+        }
+      }
+
+      var queued = false;
+      function onScroll() {
+        if (queued) {
+          return;
+        }
+        queued = true;
+        requestAnimationFrame(function () {
+          queued = false;
+          update();
+        });
+      }
+
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onScroll);
+      update();
+    })();
+  </script>
+</body>
+</html>

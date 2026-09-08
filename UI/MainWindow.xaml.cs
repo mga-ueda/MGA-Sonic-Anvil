@@ -60,6 +60,7 @@ public partial class MainWindow : Window
     private bool _fadeReplayOnHighlight;
     private bool _resumeAfterScrub;
     private bool _startupRevealPending = true;
+    private bool _closing;
 
     public MainWindow()
     {
@@ -73,6 +74,9 @@ public partial class MainWindow : Window
         Transport.CommandInvoked += (_, command) => ExecuteTransport(command);
         Transport.PositionSeeked += (_, seconds) => SeekToSeconds(seconds);
         Transport.RequestWaveformFocus += (_, _) => Waveform.Focus();
+        Transport.LanguageToggleRequested += (_, _) => ToggleUiLanguage();
+        Transport.ManualHelpRequested += (_, _) => ManualViewer.Open(this);
+        UiStrings.LanguageChanged += (_, _) => Dispatcher.BeginInvoke(RefreshLocalizedText);
         Waveform.CursorCommitted += (_, frame) => OnCursorCommitted(frame);
         Waveform.ScrubStarted += (_, frame) => OnScrubStarted(frame);
         Waveform.ScrubPreviewed += (_, frame) => OnScrubPreviewed(frame);
@@ -154,6 +158,7 @@ public partial class MainWindow : Window
         ApplyWaveformHeightScale();
         BindWorkspace(null);
         InitializeWaapi();
+        RefreshLocalizedText();
         Loaded += OnStartupLoaded;
         ContentRendered += OnStartupContentRendered;
         MgaSonicAnvil.SingleInstance.StartWatch(() => Dispatcher.BeginInvoke(ActivateFromOtherInstance));
@@ -209,6 +214,7 @@ public partial class MainWindow : Window
         // 表示を先に出し、前回ドキュメントの読み込みは次のアイドルへ回す。
         Dispatcher.BeginInvoke(RestoreLastDocumentAfterReveal, DispatcherPriority.ApplicationIdle);
         Dispatcher.BeginInvoke(() => _ = StartWaapiAsync(), DispatcherPriority.ApplicationIdle);
+        _ = CheckForAppUpdateAsync();
     }
 
     private void RestoreLastDocumentAfterReveal()
@@ -278,6 +284,51 @@ public partial class MainWindow : Window
         RefreshStatus();
     }
 
+    private void ToggleUiLanguage()
+    {
+        var next = UiStrings.IsJapanese ? UiLanguage.English : UiLanguage.Japanese;
+        UiStrings.SetLanguage(next);
+        AppStorage.Settings.UiLanguage = UiStrings.ToStoredValue(next);
+        AppStorage.Save();
+        Waveform.Focus();
+    }
+
+    private void RefreshLocalizedText()
+    {
+        CopyrightText.Text = UiStrings.CopyrightText;
+        GitHubLink.Text = UiStrings.CopyrightGitHub;
+        GitHubLink.ToolTip = UiStrings.TipGitHub;
+        AudioApiLabel.Text = UiStrings.LabelAudioApi;
+        AudioApiLabel.ToolTip = UiStrings.TipAudioApi;
+        ApiCombo.ToolTip = UiStrings.TipAudioApi;
+        AudioDeviceLabel.Text = UiStrings.LabelAudioDevice;
+        AudioDeviceLabel.ToolTip = UiStrings.TipAudioDevice;
+        DeviceCombo.ToolTip = UiStrings.TipAudioDevice;
+        AlwaysOnTopCheck.Content = UiStrings.LabelAlwaysOnTop;
+        AlwaysOnTopCheck.ToolTip = UiStrings.TipAlwaysOnTop;
+        Overview.ToolTip = UiStrings.TipOverview;
+        VectorScope.ToolTip = UiStrings.TipVectorScope;
+        Spectrum.ToolTip = UiStrings.TipSpectrum;
+        TabScrollLeft.ToolTip = UiStrings.TipTabScrollLeft;
+        TabScrollRight.ToolTip = UiStrings.TipTabScrollRight;
+        Transport.ApplyLocalizedTips();
+        Waveform.RefreshLocalizedTips();
+        WaapiBar.ApplyLocalizedText();
+        RefreshWaapiStatusDisplay();
+        HistoryOverlay.ApplyLocalizedText();
+        if (HistoryOpen)
+        {
+            RefreshHistoryOverlay();
+        }
+
+        RefreshTabLocalizedTips();
+        RefreshStatus();
+        LevelMeter.InvalidateVisual();
+#if DEBUG
+        _colorDevPanel?.ApplyLocalizedText();
+#endif
+    }
+
     private void RefreshTitle()
     {
         Title = AppVersion.FormTitle;
@@ -340,7 +391,7 @@ public partial class MainWindow : Window
         {
             text += string.Create(
                 CultureInfo.InvariantCulture,
-                $" Sel {UiStrings.FormatDuration(selection.Length / (double)_document.SampleRate)}");
+                $" {UiStrings.StatusSelectionPrefix} {UiStrings.FormatDuration(selection.Length / (double)_document.SampleRate)}");
         }
 
         StatusMeta.Text = text;
@@ -447,6 +498,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        _closing = true;
         RememberDocumentState();
         AppStorage.Settings.ApplyAudioOutput(_outputSettings);
         AppStorage.Settings.WaveformHeightScale = _waveformHeightScale;
@@ -518,6 +570,67 @@ public partial class MainWindow : Window
     {
         TryOpenUrl(AppVersion.RepositoryUrl);
         e.Handled = true;
+    }
+
+    private async Task CheckForAppUpdateAsync()
+    {
+        try
+        {
+            var update = await GitHubUpdateChecker.TryGetNewerReleaseAsync().ConfigureAwait(true);
+            if (_closing || update is null)
+            {
+                return;
+            }
+
+            var remoteSemVer = update.Value.RemoteSemVer;
+            var skipped = AppVersion.NormalizeTag(AppStorage.Settings.SkippedUpdateVersion);
+            if (skipped.Length > 0
+                && string.Equals(skipped, remoteSemVer, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var answer = OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.DialogUpdateAvailableBody(
+                    AppVersion.Current,
+                    remoteSemVer,
+                    update.Value.IsPrerelease),
+                UiStrings.DialogUpdateAvailableTitle,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information,
+                MessageBoxResult.Yes);
+
+            if (answer == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    Process.Start(
+                        new ProcessStartInfo(update.Value.ReleaseUrl)
+                        {
+                            UseShellExecute = true,
+                        });
+                }
+                catch (Exception ex)
+                {
+                    OwnerCenteredMessageBox.Show(
+                        this,
+                        ex.Message,
+                        UiStrings.DialogOpenGithubFailed,
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
+            }
+            else
+            {
+                AppStorage.Settings.SkippedUpdateVersion = remoteSemVer;
+                AppStorage.Save();
+            }
+        }
+        catch
+        {
+            // オフライン・API 制限などは起動を妨げない。
+        }
     }
 
     private static void TryOpenUrl(string url)

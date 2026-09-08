@@ -2,177 +2,318 @@ using MgaSonicAnvil.Audio;
 
 namespace MgaSonicAnvil.Domain;
 
+/// <summary>
+/// ユーザーに見えるすべての表示テキストを一箇所に集約する。
+/// 日本語版は現状の文言（英語のままの UI も含む）を維持し、英語版だけ日本語を訳す。
+/// </summary>
 internal static partial class UiStrings
 {
+    public static UiLanguage Language { get; private set; } = UiLanguage.Japanese;
+
+    public static event EventHandler? LanguageChanged;
+
+    public static bool IsJapanese => Language == UiLanguage.Japanese;
+
+    public static void SetLanguage(UiLanguage language)
+    {
+        if (Language == language)
+        {
+            return;
+        }
+
+        Language = language;
+        LanguageChanged?.Invoke(null, EventArgs.Empty);
+    }
+
+    public static UiLanguage ParseLanguage(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return UiLanguage.Japanese;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.Equals("en", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("english", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals(nameof(UiLanguage.English), StringComparison.OrdinalIgnoreCase))
+        {
+            return UiLanguage.English;
+        }
+
+        return UiLanguage.Japanese;
+    }
+
+    public static string ToStoredValue(UiLanguage language) =>
+        language == UiLanguage.English ? "en" : "ja";
+
+    public static string Get(string japanese, string english) =>
+        IsJapanese ? japanese : english;
+
+    public static string Format(string japaneseFormat, string englishFormat, params object[] args) =>
+        string.Format(
+            System.Globalization.CultureInfo.CurrentCulture,
+            Get(japaneseFormat, englishFormat),
+            args);
+
     public const string AppName = AppVersion.ProductName;
 
-    public const string CopyrightText = "© 2026 " + AppVersion.CompanyName + "  ";
+    public static string CopyrightText => Get(
+        "© 2026 " + AppVersion.CompanyName + "  ",
+        "© 2026 " + AppVersion.CompanyName + "  ");
 
-    public const string CopyrightGitHub = "GitHub";
+    public static string CopyrightGitHub => Get("GitHub", "GitHub");
 
-    public const string DropHint = "Wave / AIFF / MP3 をドロップ、または Ctrl+O";
+    public static string DropHint => Get(
+        "Wave / AIFF / MP3 をドロップ、または Ctrl+O",
+        "Drop Wave / AIFF / MP3, or press Ctrl+O");
 
-    public const string UntitledDocument = "untitled";
+    public static string UntitledDocument => Get("untitled", "untitled");
 
-    public const string LabelAlwaysOnTop = "Always on Top";
-    public const string LabelAudioApi = "Audio API";
-    public const string LabelAudioDevice = "Device";
-    public const string LabelAudioApiWaveOut = "WaveOut";
-    public const string LabelAudioApiWasapi = "WASAPI";
-    public const string LabelAudioApiAsio = "ASIO";
-    public const string ButtonOk = "OK";
-    public const string ButtonCancel = "Cancel";
-    public const string DialogSettingsTitle = "Audio Settings";
+    public static string LabelAlwaysOnTop => Get("Always on Top", "Always on Top");
+    public static string LabelAudioApi => Get("Audio API", "Audio API");
+    public static string LabelAudioDevice => Get("Device", "Device");
+    public static string LabelAudioApiWaveOut => Get("WaveOut", "WaveOut");
+    public static string LabelAudioApiWasapi => Get("WASAPI", "WASAPI");
+    public static string LabelAudioApiAsio => Get("ASIO", "ASIO");
+    public static string ButtonOk => Get("OK", "OK");
+    public static string ButtonCancel => Get("Cancel", "Cancel");
+    public static string DialogSettingsTitle => Get("Audio Settings", "Audio Settings");
 
-    public const string ButtonFadeIn = "FADE IN";
-    public const string ButtonFadeOut = "FADE OUT";
-    public const string ButtonNormalize = "NORMALIZE";
-    public const string ButtonDelete = "DELETE";
-    public const string ButtonSave = "SAVE";
-    public const string ButtonOpen = "OPEN";
-    public const string LabelMono = "Mono";
-    public const string LabelStereo = "Stereo";
-    public const string LabelConvertCustomRate = "任意";
+    public static string ButtonFadeIn => Get("FADE IN", "FADE IN");
+    public static string ButtonFadeOut => Get("FADE OUT", "FADE OUT");
+    public static string ButtonNormalize => Get("NORMALIZE", "NORMALIZE");
+    public static string ButtonDelete => Get("DELETE", "DELETE");
+    public static string ButtonSave => Get("SAVE", "SAVE");
+    public static string ButtonOpen => Get("OPEN", "OPEN");
+    public static string LabelMono => Get("Mono", "Mono");
+    public static string LabelStereo => Get("Stereo", "Stereo");
+    public static string LabelHertz => Get("Hz", "Hz");
+    public static string LabelConvertCustomRate => Get("任意", "Custom");
+    public static string LabelPeak => Get("Peak", "Peak");
+    public static string LabelRms => Get("RMS", "RMS");
+    public static string StatusSelectionPrefix => Get("Sel", "Sel");
 
-    public const string MenuOpen = "開く";
-    public const string MenuSave = "上書き保存";
-    public const string MenuSaveAs = "名前を付けて保存";
-    public const string MenuSettings = "音声設定";
+    public static string MenuOpen => Get("開く", "Open");
+    public static string MenuSave => Get("上書き保存", "Save");
+    public static string MenuSaveAs => Get("名前を付けて保存", "Save As");
+    public static string MenuSettings => Get("音声設定", "Audio Settings");
 
-    public const string DialogExitTitle = "終了確認";
-    public const string DialogExitBody = "アプリケーションを終了しますか？";
+    public static string DialogExitTitle => Get("終了確認", "Quit");
+    public static string DialogExitBody => Get(
+        "アプリケーションを終了しますか？",
+        "Quit the application?");
 
-    public const string ConfirmSave =
-        "未保存の変更があります。保存しますか？";
+    public static string DialogUpdateAvailableTitle => Get(
+        "アップデートのお知らせ",
+        "Update available");
 
-    public static string ConfirmSaveFor(string name) =>
-        $"{name} に未保存の変更があります。保存しますか？";
+    public static string DialogUpdateAvailableBody(
+        string localVersion,
+        string remoteVersion,
+        bool isPrerelease) => Format(
+        "新しいバージョンがあります。{0}{0}"
+        + "現在: {1}{0}"
+        + "最新: {2}{3}{0}{0}"
+        + "GitHub のリリースページを開きますか？{0}"
+        + "（自動ダウンロードは行いません）",
+        "A newer version is available.{0}{0}"
+        + "Current: {1}{0}"
+        + "Latest: {2}{3}{0}{0}"
+        + "Open the GitHub release page?{0}"
+        + "(This app does not download updates automatically.)",
+        Environment.NewLine,
+        localVersion,
+        remoteVersion,
+        isPrerelease
+            ? Get("（プレリリース）", " (pre-release)")
+            : string.Empty);
 
-    public const string ConfirmOverwrite =
-        "既存ファイルを上書きしますか？";
+    public static string DialogOpenGithubFailed => Get(
+        "GitHub を開けませんでした。",
+        "Unable to open GitHub.");
 
-    public const string ErrorOpenFailed = "読み込みに失敗しました。";
-    public const string ErrorSaveFailed = "書き出しに失敗しました。";
-    public const string ErrorAiffExport = "AIFF の書き出しには対応していません。Wave または MP3 を選んでください。";
-    public const string ErrorNoDocument = "ファイルが開かれていません。";
-    public const string ErrorNoSelection = "選択範囲がありません。";
-    public const string ErrorClipboardEmpty = "クリップボードが空です。";
-    public const string ErrorEmptyAfterDelete = "ファイル全体は削除できません。";
-    public const string OverlaySampleRateConvert = "サンプリングレート変換";
+    public static string ConfirmSave => Get(
+        "未保存の変更があります。保存しますか？",
+        "There are unsaved changes. Save them?");
 
-    public const string TipPlay = "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止\nCtrl+ドラッグでスクラブ\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し";
-    public const string TipStop = "停止（開始位置へ戻る）";
-    public const string TipGoToStart = "先頭 (Ctrl+Home)";
-    public const string TipGoToEnd = "末尾 (Ctrl+End)";
-    public const string TipTimeZoomIn = "時間拡大 (↑)\nホイールでも拡大";
-    public const string TipTimeZoomOut = "時間縮小 (↓)";
-    public const string TipTimeZoomMax = "時間 32倍 / 最大 (Ctrl+↑)";
-    public const string TipTimeZoomReset = "全体表示 (Ctrl+↓)";
-    public const string TipAmpZoomIn = "振幅拡大 (Shift+↑)\nCtrl+ホイールでも拡大";
-    public const string TipAmpZoomOut = "振幅縮小 (Shift+↓)";
-    public const string TipAmpZoomMax = "振幅最大 (Ctrl+Shift+↑)";
-    public const string TipAmpZoomReset = "振幅リセット (Ctrl+Shift+↓)";
-    public const string TipFadeIn = "フェードイン (I)\nカーブを選び Space で試聴、Enter で実行。1–9 でカーブを選択。未選択なら全体";
-    public const string TipFadeOut = "フェードアウト (O)\nカーブを選び Space で試聴、Enter で実行。1–9 でカーブを選択。未選択なら全体";
+    public static string ConfirmSaveFor(string name) => Format(
+        "{0} に未保存の変更があります。保存しますか？",
+        "{0} has unsaved changes. Save them?",
+        name);
+
+    public static string ConfirmOverwrite => Get(
+        "既存ファイルを上書きしますか？",
+        "Overwrite the existing file?");
+
+    public static string ErrorOpenFailed => Get("読み込みに失敗しました。", "Failed to open the file.");
+    public static string ErrorSaveFailed => Get("書き出しに失敗しました。", "Failed to save the file.");
+    public static string ErrorAiffExport => Get(
+        "AIFF の書き出しには対応していません。Wave または MP3 を選んでください。",
+        "AIFF export is not supported. Choose Wave or MP3.");
+    public static string ErrorNoDocument => Get("ファイルが開かれていません。", "No file is open.");
+    public static string ErrorNoSelection => Get("選択範囲がありません。", "Nothing is selected.");
+    public static string ErrorClipboardEmpty => Get("クリップボードが空です。", "The clipboard is empty.");
+    public static string ErrorEmptyAfterDelete => Get(
+        "ファイル全体は削除できません。",
+        "The entire file cannot be deleted.");
+    public static string OverlaySampleRateConvert => Get("サンプリングレート変換", "Sample rate conversion");
+
+    public static string FilterOpenAudio => Get(
+        "Audio|*.wav;*.wave;*.aif;*.aiff;*.mp3|Wave|*.wav;*.wave|AIFF|*.aif;*.aiff|MP3|*.mp3|All|*.*",
+        "Audio|*.wav;*.wave;*.aif;*.aiff;*.mp3|Wave|*.wav;*.wave|AIFF|*.aif;*.aiff|MP3|*.mp3|All|*.*");
+
+    public static string FilterSaveAudio => Get(
+        "Wave|*.wav|MP3|*.mp3",
+        "Wave|*.wav|MP3|*.mp3");
+
+    public static string TipPlay => Get(
+        "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止\nCtrl+ドラッグでスクラブ\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し",
+        "Play / stop (Space)\nStop returns to the start position\nEnter pauses in place\nCtrl+drag to scrub\nCtrl+Space from 3 seconds earlier\nAlt+Enter restarts from the playback start");
+    public static string TipStop => Get("停止（開始位置へ戻る）", "Stop (return to start)");
+    public static string TipGoToStart => Get("先頭 (Ctrl+Home)", "Go to start (Ctrl+Home)");
+    public static string TipGoToEnd => Get("末尾 (Ctrl+End)", "Go to end (Ctrl+End)");
+    public static string TipTimeZoomIn => Get("時間拡大 (↑)\nホイールでも拡大", "Zoom in time (↑)\nMouse wheel also zooms");
+    public static string TipTimeZoomOut => Get("時間縮小 (↓)", "Zoom out time (↓)");
+    public static string TipTimeZoomMax => Get("時間 32倍 / 最大 (Ctrl+↑)", "Time zoom 32× / max (Ctrl+↑)");
+    public static string TipTimeZoomReset => Get("全体表示 (Ctrl+↓)", "Fit all (Ctrl+↓)");
+    public static string TipAmpZoomIn => Get("振幅拡大 (Shift+↑)\nCtrl+ホイールでも拡大", "Zoom in amplitude (Shift+↑)\nCtrl+wheel also zooms");
+    public static string TipAmpZoomOut => Get("振幅縮小 (Shift+↓)", "Zoom out amplitude (Shift+↓)");
+    public static string TipAmpZoomMax => Get("振幅最大 (Ctrl+Shift+↑)", "Amplitude zoom max (Ctrl+Shift+↑)");
+    public static string TipAmpZoomReset => Get("振幅リセット (Ctrl+Shift+↓)", "Reset amplitude zoom (Ctrl+Shift+↓)");
+    public static string TipFadeIn => Get(
+        "フェードイン (I)\nカーブを選び Space で試聴、Enter で実行。1–9 でカーブを選択。未選択なら全体",
+        "Fade in (I)\nPick a curve, Space to preview, Enter to apply. 1–9 select a curve. Uses the whole file if nothing is selected");
+    public static string TipFadeOut => Get(
+        "フェードアウト (O)\nカーブを選び Space で試聴、Enter で実行。1–9 でカーブを選択。未選択なら全体",
+        "Fade out (O)\nPick a curve, Space to preview, Enter to apply. 1–9 select a curve. Uses the whole file if nothing is selected");
 
     public static string LabelFadeCurve(int shapeId) => shapeId switch
     {
-        0 => "Logarithmic (Base 3)",
-        1 => "Sine (Constant Power Fade In)",
-        2 => "Logarithmic (Base 1.41)",
-        3 => "Inverted S-Curve",
-        4 => "Linear",
-        5 => "Constant",
-        6 => "S-Curve",
-        7 => "Exponential (Base 1.41)",
-        8 => "Sine (Constant Power Fade Out)",
-        9 => "Exponential (Base 3)",
-        _ => "S-Curve",
+        0 => Get("Logarithmic (Base 3)", "Logarithmic (Base 3)"),
+        1 => Get("Sine (Constant Power Fade In)", "Sine (Constant Power Fade In)"),
+        2 => Get("Logarithmic (Base 1.41)", "Logarithmic (Base 1.41)"),
+        3 => Get("Inverted S-Curve", "Inverted S-Curve"),
+        4 => Get("Linear", "Linear"),
+        5 => Get("Constant", "Constant"),
+        6 => Get("S-Curve", "S-Curve"),
+        7 => Get("Exponential (Base 1.41)", "Exponential (Base 1.41)"),
+        8 => Get("Sine (Constant Power Fade Out)", "Sine (Constant Power Fade Out)"),
+        9 => Get("Exponential (Base 3)", "Exponential (Base 3)"),
+        _ => Get("S-Curve", "S-Curve"),
     };
 
     public static string TipFadeShape(int shapeId) => shapeId switch
     {
-        0 => "対数（Base 3）。立ち上がりが早く、終わりがなだらかです。",
-        1 => "定電力フェードイン（Sine）。",
-        2 => "対数（Base 1.41）。",
-        3 => "逆 S 字。",
-        4 => "直線。",
-        5 => "一定（終端まで値を保ち、最後で切り替わります）。",
-        6 => "S 字。",
-        7 => "指数（Base 1.41）。立ち上がりが遅く、終わりが急です。",
-        8 => "定電力フェードアウト（Sine）。",
-        9 => "指数（Base 3）。立ち上がりが遅く、終わりが急です。",
-        _ => "S 字。",
+        0 => Get("対数（Base 3）。立ち上がりが早く、終わりがなだらかです。", "Logarithmic (Base 3). Rises quickly and eases out."),
+        1 => Get("定電力フェードイン（Sine）。", "Constant-power fade in (Sine)."),
+        2 => Get("対数（Base 1.41）。", "Logarithmic (Base 1.41)."),
+        3 => Get("逆 S 字。", "Inverted S-curve."),
+        4 => Get("直線。", "Linear."),
+        5 => Get("一定（終端まで値を保ち、最後で切り替わります）。", "Constant (holds the value, then switches at the end)."),
+        6 => Get("S 字。", "S-curve."),
+        7 => Get("指数（Base 1.41）。立ち上がりが遅く、終わりが急です。", "Exponential (Base 1.41). Rises slowly and finishes steeply."),
+        8 => Get("定電力フェードアウト（Sine）。", "Constant-power fade out (Sine)."),
+        9 => Get("指数（Base 3）。立ち上がりが遅く、終わりが急です。", "Exponential (Base 3). Rises slowly and finishes steeply."),
+        _ => Get("S 字。", "S-curve."),
     };
-    public const string TipNormalize = "ノーマライズ (N)\nピークを -0.1 dB に合わせる";
-    public const string TipDelete = "部分削除 (Delete)\n選択範囲を詰めて削除\n選択中のマーカー / リージョンはまとめて削除\nCtrl+Del でマーカー削除";
-    public const string TipSave = "保存 (Ctrl+S)\nCtrl+Shift+S で別名保存";
-    public const string TipOpen = "開く (Ctrl+O)\n複数ファイル可。追加で開く。\nWave / AIFF / MP3\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Tab で次のタブ";
-    public const string TipCloseTab = "タブを閉じる (Ctrl+W)";
-    public const string TipTabScrollLeft = "左のタブを表示";
-    public const string TipTabScrollRight = "右のタブを表示";
-    public const string TipOverview = "波形全体。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）　ホイールで拡縮（シークバー基準）";
-    public const string TipSpectrum = "再生出力の簡易スペクトラム表示です。";
-    public const string TipVectorScope = "再生出力の位相相関とベクターオーディオスコープです。上の数値は L/R の相関（+1 同相 / 0 無相関 / -1 逆相）。下は縦が Mid、横が Side です。";
-    public const string TipAudioApi = "再生 API（WaveOut / WASAPI / ASIO）";
-    public const string TipAudioDevice = "再生デバイス";
-    public const string TipWaveform =
+
+    public static string TipNormalize => Get(
+        "ノーマライズ (N)\nピークを -0.1 dB に合わせる",
+        "Normalize (N)\nFit the peak to -0.1 dB");
+    public static string TipDelete => Get(
+        "部分削除 (Delete)\n選択範囲を詰めて削除\n選択中のマーカー / リージョンはまとめて削除\nCtrl+Del でマーカー削除",
+        "Ripple delete (Delete)\nRemove the selection and close the gap\nSelected markers / regions are deleted together\nCtrl+Del deletes markers");
+    public static string TipSave => Get(
+        "保存 (Ctrl+S)\nCtrl+Shift+S で別名保存",
+        "Save (Ctrl+S)\nCtrl+Shift+S to save as");
+    public static string TipOpen => Get(
+        "開く (Ctrl+O)\n複数ファイル可。追加で開く。\nWave / AIFF / MP3\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Tab で次のタブ",
+        "Open (Ctrl+O)\nMultiple files allowed; opens as extra tabs.\nWave / AIFF / MP3\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Tab goes to the next tab");
+    public static string TipCloseTab => Get("タブを閉じる (Ctrl+W)", "Close tab (Ctrl+W)");
+    public static string TipTabScrollLeft => Get("左のタブを表示", "Show tabs to the left");
+    public static string TipTabScrollRight => Get("右のタブを表示", "Show tabs to the right");
+    public static string TipOverview => Get(
+        "波形全体。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）　ホイールで拡縮（シークバー基準）",
+        "Whole file. The bright area is the current view. Drag to move (scrubs the center). Wheel zooms around the playhead");
+    public static string TipSpectrum => Get(
+        "再生出力の簡易スペクトラム表示です。",
+        "A simple spectrum of the playback output.");
+    public static string TipVectorScope => Get(
+        "再生出力の位相相関とベクターオーディオスコープです。上の数値は L/R の相関（+1 同相 / 0 無相関 / -1 逆相）。下は縦が Mid、横が Side です。",
+        "Phase correlation and a vector audio scope of the playback output. The number is L/R correlation (+1 in phase / 0 uncorrelated / -1 inverted). Vertical is Mid, horizontal is Side.");
+    public static string TipAudioApi => Get(
+        "再生 API（WaveOut / WASAPI / ASIO）",
+        "Playback API (WaveOut / WASAPI / ASIO)");
+    public static string TipAudioDevice => Get("再生デバイス", "Playback device");
+    public static string TipWaveform => Get(
         "ドラッグで選択　Ctrl+ドラッグでスクラブ　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A で全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着\n"
         + "ホイール=時間ズーム（シークバー基準）　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"
         + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル、Shift で3倍）　Ctrl+←→ 前後のマーカー / リージョン端 / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（同じ範囲でもう一度で解除）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M マーカー　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動（Shift で3倍） / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント / リージョン名（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
-        + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　T で現在時間　U で編集履歴　G で波形 / スペクトログラム / 重ね表示　Ctrl+Shift+E で Wwise EXPORT（Wave 単体）";
-    public const string TipAlwaysOnTop = "ウィンドウを常に最前面へ表示します。";
-    public const string TipGitHub = "GitHub リポジトリを開きます。";
-    public const string TipTimecode = "再生位置 (T)。クリックまたは T で入力、Enter で移動。コピー／貼り付け可";
-    public const string MenuCopy = "コピー";
-    public const string MenuPaste = "貼り付け";
-    public const string MenuClearSampleLoop = "ループを削除";
-    public const string MenuClearRegion = "リージョンを削除";
-    public const string MenuClearMarker = "マーカーを削除";
-    public const string MenuClearMarkers = "選択したマーカーを削除";
-    public const string StatusEmpty = "ファイルなし";
+        + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　T で現在時間　U で編集履歴　G で波形 / スペクトログラム / 重ね表示　Ctrl+Shift+E で Wwise EXPORT（Wave 単体）",
+        "Drag to select. Ctrl+drag to scrub. Esc or a move without Shift clears the selection. Shift+move extends. Shift+←/→ grows it (1 sample when dots are shown). Home/End jump to the view edge. Shift+PgUp/PgDn by 5%. Ctrl+Shift+Home/End selects all before/after. Ctrl+A selects all. Double-click selects a span (between markers). The guide snaps to markers / loop edges.\n"
+        + "Wheel = time zoom (around the playhead). Shift+wheel = pan. Ctrl+wheel = amplitude.\n"
+        + "←/→ seek (moves a selected marker / region edge / loop edge; 1 sample when dots are shown, Shift ×3). Ctrl+←/→ previous/next marker / region edge / sample-loop edge. Numpad jumps to a number (or a view position). Z / . centers (toggles center-lock while playing, clears it when stopped). 0–9 jump in the view. L loops from 3 seconds before the end of the selection (or the sample loop / -L). Shift+L sets the selection as the sample loop (same range again clears it). Shift+R sets the selection as a region (same range again clears it). Right-click a marker / region flag / loop bar to delete. S sample rate, B bit depth, C channels, M marker. Click a flag to select an edge / Shift+click for a range / Ctrl+click to add / drag or ←/→ to move (Shift ×3) / Delete or Ctrl+Del to delete. Ctrl+Shift+R to rename. Double-click a comment / region name (-A lime / -L blue / -E red / -R gray).\n"
+        + "On a marker / region edge / loop edge, Alt+←/→ is 1 px (1 sample when dots are shown), Shift ×3, Ctrl pairs with the previous marker (both edges for a region / loop). X applies a linear fade around the playhead in the view (before = out / after = in). Ctrl+X / C / V cut / copy / paste (markers in range included; a matching region is included too). T edits the current time. U opens edit history. G cycles waveform / spectrogram / overlay. Ctrl+Shift+E exports Wave-only to Wwise.");
+    public static string TipAlwaysOnTop => Get(
+        "ウィンドウを常に最前面へ表示します。",
+        "Keep the window always on top.");
+    public static string TipGitHub => Get(
+        "GitHub リポジトリを開きます。",
+        "Open the GitHub repository.");
+    public static string TipTimecode => Get(
+        "再生位置 (T)。クリックまたは T で入力、Enter で移動。コピー／貼り付け可",
+        "Playhead (T). Click or press T to type, Enter to jump. Copy / paste allowed");
+    public static string MenuCopy => Get("コピー", "Copy");
+    public static string MenuPaste => Get("貼り付け", "Paste");
+    public static string MenuClearSampleLoop => Get("ループを削除", "Clear loop");
+    public static string MenuClearRegion => Get("リージョンを削除", "Clear region");
+    public static string MenuClearMarker => Get("マーカーを削除", "Clear marker");
+    public static string MenuClearMarkers => Get("選択したマーカーを削除", "Clear selected markers");
+    public static string StatusEmpty => Get("ファイルなし", "No file");
 
-    public const string EditHistoryTitle = "編集履歴";
-    public const string EditHistoryOrigin = "初期状態";
-    public const string EditHistoryHint = "↑↓ 移動　Enter 確定　Esc キャンセル";
+    public static string EditHistoryTitle => Get("編集履歴", "Edit history");
+    public static string EditHistoryOrigin => Get("初期状態", "Original");
+    public static string EditHistoryHint => Get(
+        "↑↓ 移動　Enter 確定　Esc キャンセル",
+        "↑↓ move   Enter apply   Esc cancel");
 
     public static string EditHistoryName(string name) => name switch
     {
-        EditHistoryOrigin => EditHistoryOrigin,
-        "Fade In" => "フェードイン",
-        "Fade Out" => "フェードアウト",
-        "Fade Around Playhead" => "再生ヘッド前後フェード",
-        "Normalize" => "ノーマライズ",
-        "Delete" => "削除",
-        "Paste" => "ペースト",
-        "Add Marker" => "マーカー追加",
-        "Marker Comment" => "マーカーコメント",
-        "Region Name" => "リージョン名",
-        "Delete Markers" => "マーカー削除",
-        "Move Marker" => "マーカー移動",
-        "Move Markers" => "マーカー移動",
-        "Set Sample Loop" => "サンプルループ",
-        "Set Region" => "リージョン",
-        "Move Timeline" => "移動",
-        "Convert Sample Rate" => "サンプリングレート",
-        "Convert Bit Depth" => "ビット深度",
-        "Convert Channels" => "チャンネル数",
+        _ when name == EditHistoryOrigin || name == "初期状態" || name == "Original" => EditHistoryOrigin,
+        "Fade In" => Get("フェードイン", "Fade In"),
+        "Fade Out" => Get("フェードアウト", "Fade Out"),
+        "Fade Around Playhead" => Get("再生ヘッド前後フェード", "Fade Around Playhead"),
+        "Normalize" => Get("ノーマライズ", "Normalize"),
+        "Delete" => Get("削除", "Delete"),
+        "Paste" => Get("ペースト", "Paste"),
+        "Add Marker" => Get("マーカー追加", "Add Marker"),
+        "Marker Comment" => Get("マーカーコメント", "Marker Comment"),
+        "Region Name" => Get("リージョン名", "Region Name"),
+        "Delete Markers" => Get("マーカー削除", "Delete Markers"),
+        "Move Marker" => Get("マーカー移動", "Move Marker"),
+        "Move Markers" => Get("マーカー移動", "Move Markers"),
+        "Set Sample Loop" => Get("サンプルループ", "Set Sample Loop"),
+        "Set Region" => Get("リージョン", "Set Region"),
+        "Move Timeline" => Get("移動", "Move Timeline"),
+        "Convert Sample Rate" => Get("サンプリングレート", "Convert Sample Rate"),
+        "Convert Bit Depth" => Get("ビット深度", "Convert Bit Depth"),
+        "Convert Channels" => Get("チャンネル数", "Convert Channels"),
         _ => name,
     };
 
     public static string LabelFadeCurveShort(int shapeId) => shapeId switch
     {
-        0 => "対数3",
-        1 => "Sine",
-        2 => "対数1.41",
-        3 => "逆S字",
-        4 => "直線",
-        5 => "一定",
-        6 => "S字",
-        7 => "指数1.41",
-        8 => "Sine",
-        9 => "指数3",
-        _ => "S字",
+        0 => Get("対数3", "Log 3"),
+        1 => Get("Sine", "Sine"),
+        2 => Get("対数1.41", "Log 1.41"),
+        3 => Get("逆S字", "Inv S"),
+        4 => Get("直線", "Linear"),
+        5 => Get("一定", "Constant"),
+        6 => Get("S字", "S-curve"),
+        7 => Get("指数1.41", "Exp 1.41"),
+        8 => Get("Sine", "Sine"),
+        9 => Get("指数3", "Exp 3"),
+        _ => Get("S字", "S-curve"),
     };
 
     public static string FormatTimecode(long frame, int sampleRate)
@@ -198,7 +339,7 @@ internal static partial class UiStrings
         text = (text ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ').Trim();
         if (text.Length == 0)
         {
-            return "（空）";
+            return Get("（空）", "(empty)");
         }
 
         const int max = 18;
@@ -242,12 +383,12 @@ internal static partial class UiStrings
                 return text;
             }
 
-            return $"{verb}  {removed.Length}個";
+            return $"{verb}  {CountLabel(removed.Length)}";
         }
 
         if (removed.Length > 0)
         {
-            return $"{verb}  {removed.Length}個";
+            return $"{verb}  {CountLabel(removed.Length)}";
         }
 
         return verb;
@@ -301,7 +442,7 @@ internal static partial class UiStrings
         if (before.IsEmpty || after.IsEmpty)
         {
             text = after.IsEmpty
-                ? EditHistoryName("Set Sample Loop") + "  解除"
+                ? EditHistoryName("Set Sample Loop") + Get("  解除", "  cleared")
                 : EditHistoryRange(EditHistoryName("Set Sample Loop"), sampleRate, after.StartFrame, after.EndFrame);
             return true;
         }
@@ -310,13 +451,13 @@ internal static partial class UiStrings
         var endChanged = before.EndFrame != after.EndFrame;
         if (startChanged && endChanged)
         {
-            text = $"ループ移動  {FormatRange(before, sampleRate)}→{FormatRange(after, sampleRate)}";
+            text = Get("ループ移動  ", "Loop move  ") + $"{FormatRange(before, sampleRate)}→{FormatRange(after, sampleRate)}";
             return true;
         }
 
         text = startChanged
-            ? $"ループ開始  {FormatShift(before.StartFrame, after.StartFrame, sampleRate)}"
-            : $"ループ終了  {FormatShift(before.EndFrame, after.EndFrame, sampleRate)}";
+            ? Get("ループ開始  ", "Loop start  ") + FormatShift(before.StartFrame, after.StartFrame, sampleRate)
+            : Get("ループ終了  ", "Loop end  ") + FormatShift(before.EndFrame, after.EndFrame, sampleRate);
         return true;
     }
 
@@ -350,11 +491,11 @@ internal static partial class UiStrings
                 pairs[i] = $"{FormatRange(gone[i], sampleRate)}→{FormatRange(come[i], sampleRate)}";
             }
 
-            text = $"リージョン移動  {string.Join(", ", pairs)}";
+            text = Get("リージョン移動  ", "Region move  ") + string.Join(", ", pairs);
             return true;
         }
 
-        text = $"リージョン移動  {Math.Max(gone.Length, come.Length)}個";
+        text = Get("リージョン移動  ", "Region move  ") + CountLabel(Math.Max(gone.Length, come.Length));
         return true;
     }
 
@@ -364,15 +505,15 @@ internal static partial class UiStrings
         var endChanged = before.EndFrame != after.EndFrame;
         if (startChanged && !endChanged)
         {
-            return $"リージョン開始  {FormatShift(before.StartFrame, after.StartFrame, sampleRate)}";
+            return Get("リージョン開始  ", "Region start  ") + FormatShift(before.StartFrame, after.StartFrame, sampleRate);
         }
 
         if (endChanged && !startChanged)
         {
-            return $"リージョン終了  {FormatShift(before.EndFrame, after.EndFrame, sampleRate)}";
+            return Get("リージョン終了  ", "Region end  ") + FormatShift(before.EndFrame, after.EndFrame, sampleRate);
         }
 
-        return $"リージョン移動  {FormatRange(before, sampleRate)}→{FormatRange(after, sampleRate)}";
+        return Get("リージョン移動  ", "Region move  ") + $"{FormatRange(before, sampleRate)}→{FormatRange(after, sampleRate)}";
     }
 
     private static int CompareRanges(WaveSelection left, WaveSelection right)
@@ -400,8 +541,10 @@ internal static partial class UiStrings
             return $"{verb}  {times}";
         }
 
-        return $"{verb}  {markers.Count}個";
+        return $"{verb}  {CountLabel(markers.Count)}";
     }
+
+    private static string CountLabel(int count) => Format("{0}個", "{0}", count);
 
     public static string FormatSampleRate(int hertz)
     {

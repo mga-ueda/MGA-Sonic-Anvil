@@ -408,3 +408,134 @@ internal static class TransportIconDrawing
         }
     }
 }
+
+/// <summary>表示言語切替。JP／EN を描画するトランスポートサイズのボタン。</summary>
+internal sealed class TransportLanguageButton : Button
+{
+    public TransportLanguageButton()
+    {
+        Width = DesignMetrics.TransportButtonSide;
+        Height = DesignMetrics.TransportButtonSide;
+        Focusable = false;
+        FocusVisualStyle = null;
+        Cursor = Cursors.Hand;
+        Background = Brushes.Transparent;
+        BorderThickness = new Thickness(0);
+        OverridesDefaultStyle = true;
+        Template = new ControlTemplate(typeof(Button));
+        SnapsToDevicePixels = true;
+        ToolTip = LanguageTip();
+    }
+
+    public void RefreshAppearance()
+    {
+        ToolTip = LanguageTip();
+        InvalidateVisual();
+    }
+
+    private static string LanguageTip() =>
+        UiStrings.IsJapanese ? UiStrings.TipLanguageJapanese : UiStrings.TipLanguageEnglish;
+
+    protected override HitTestResult? HitTestCore(PointHitTestParameters hitTestParameters) =>
+        new Rect(RenderSize).Contains(hitTestParameters.HitPoint)
+            ? new PointHitTestResult(this, hitTestParameters.HitPoint)
+            : null;
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        var bounds = new Rect(RenderSize);
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            return;
+        }
+
+        TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed);
+        var label = UiStrings.IsJapanese
+            ? UiStrings.LanguageBadgeJapanese
+            : UiStrings.LanguageBadgeEnglish;
+        var formatted = new FormattedText(
+            label,
+            CultureInfo.CurrentUICulture,
+            FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+            10,
+            WpfControlHelpers.FrozenBrush(TransportChrome.Fore(IsEnabled)),
+            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        dc.DrawText(
+            formatted,
+            new Point((bounds.Width - formatted.Width) * 0.5, (bounds.Height - formatted.Height) * 0.5));
+    }
+}
+
+/// <summary>ユーザーマニュアルを開く。「?」を描画する。</summary>
+internal sealed class TransportManualButton : Button
+{
+    public TransportManualButton()
+    {
+        Width = DesignMetrics.TransportButtonSide;
+        Height = DesignMetrics.TransportButtonSide;
+        Focusable = false;
+        FocusVisualStyle = null;
+        Cursor = Cursors.Hand;
+        Background = Brushes.Transparent;
+        BorderThickness = new Thickness(0);
+        OverridesDefaultStyle = true;
+        Template = new ControlTemplate(typeof(Button));
+        SnapsToDevicePixels = true;
+        ToolTip = UiStrings.TipManualHelp;
+    }
+
+    public void RefreshAppearance()
+    {
+        ToolTip = UiStrings.TipManualHelp;
+        InvalidateVisual();
+    }
+
+    protected override HitTestResult? HitTestCore(PointHitTestParameters hitTestParameters) =>
+        new Rect(RenderSize).Contains(hitTestParameters.HitPoint)
+            ? new PointHitTestResult(this, hitTestParameters.HitPoint)
+            : null;
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        var bounds = new Rect(RenderSize);
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            return;
+        }
+
+        TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed);
+        var formatted = new FormattedText(
+            "?",
+            CultureInfo.CurrentUICulture,
+            FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI Semibold"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+            Math.Max(12d, Math.Min(bounds.Width, bounds.Height) * 0.42),
+            WpfControlHelpers.FrozenBrush(TransportChrome.Fore(IsEnabled)),
+            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        dc.DrawText(
+            formatted,
+            new Point((bounds.Width - formatted.Width) * 0.5, (bounds.Height - formatted.Height) * 0.5));
+    }
+}
+
+internal static class TransportChrome
+{
+    public static void Paint(DrawingContext dc, Rect bounds, bool enabled, bool hover, bool pressed)
+    {
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
+        if (enabled && (hover || pressed))
+        {
+            var fill = pressed
+                ? Theme.Get("TransportPressedBackBrush")
+                : Theme.Get("TransportHoverBackBrush");
+            dc.DrawRectangle(
+                WpfControlHelpers.FrozenBrush(fill),
+                null,
+                new Rect(3, 3, bounds.Width - 6, bounds.Height - 6));
+        }
+    }
+
+    public static Color Fore(bool enabled) =>
+        enabled ? Theme.Get("TransportForeBrush") : Theme.Get("TransportDisabledForeBrush");
+}

@@ -17,6 +17,7 @@
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/mga-ueda/MGA-Sonic-Anvil</RepositoryUrl>
     <PackageProjectUrl>https://github.com/mga-ueda/MGA-Sonic-Anvil</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <ApplicationIcon>Assets\Branding\MgaSonicAnvil.ico</ApplicationIcon>
     <Version>0.0.1-beta</Version>
     <AssemblyVersion>0.0.1.0</AssemblyVersion>

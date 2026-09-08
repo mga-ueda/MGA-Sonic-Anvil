@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MGA Sonic Anvil マニュアル</title>
+  <style>
+    :root {
+      --bg: #1a1c1e; --panel: #22262a; --text: #e8eaed; --muted: #9aa3ad;
+      --accent: #6cb6ff; --border: #3a424a; --code: #c9d1d9; --code-bg: #121416; --toc-w: 15.5rem;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font-family: "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif; background: var(--bg); color: var(--text); line-height: 1.65; font-size: 15px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .layout { display: grid; grid-template-columns: var(--toc-w) minmax(0, 1fr); min-height: 100vh; }
+    nav.toc { position: sticky; top: 0; align-self: start; height: 100vh; overflow: auto; padding: 1.25rem 1rem 2rem; background: var(--panel); border-right: 1px solid var(--border); }
+    nav.toc h1 { font-size: 0.95rem; margin: 0 0 0.75rem; font-weight: 600; }
+    nav.toc ol { margin: 0; padding-left: 1.1rem; font-size: 0.86rem; }
+    nav.toc li { margin: 0.35rem 0; }
+    nav.toc ol ol { margin: 0.2rem 0 0.35rem; padding-left: 1rem; font-size: 0.82rem; }
+    nav.toc ol ol li { margin: 0.2rem 0; }
+    nav.toc a { color: var(--muted); }
+    nav.toc a:hover { color: var(--accent); }
+    nav.toc a.active { color: var(--accent); font-weight: 600; }
+    main { max-width: 52rem; padding: 1.75rem 2rem 4rem; }
+    main > header h1 { margin: 0 0 0.35rem; font-size: 1.75rem; font-weight: 650; }
+    .lead { color: var(--muted); margin: 0 0 1rem; font-size: 1.02rem; }
+    .hero { background: linear-gradient(145deg, #243041 0%, #1e262e 100%); border: 1px solid #3d5678; border-radius: 10px; padding: 1.1rem 1.2rem; margin: 0 0 1.75rem; }
+    .hero p { margin: 0.45rem 0; }
+    .hero strong { color: #b3d4ff; }
+    h2 { margin: 2.25rem 0 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border); font-size: 1.35rem; }
+    h2:first-of-type { border-top: none; padding-top: 0; }
+    h3 { margin: 1.4rem 0 0.5rem; font-size: 1.08rem; color: #d7dde3; }
+    p { margin: 0.55rem 0; }
+    ul, ol { margin: 0.4rem 0 0.8rem; padding-left: 1.35rem; }
+    li { margin: 0.25rem 0; }
+    code, kbd { font-family: Consolas, "Cascadia Mono", "Courier New", monospace; font-size: 0.9em; background: var(--code-bg); color: var(--code); border-radius: 4px; padding: 0.08em 0.35em; }
+    kbd { border: 1px solid var(--border); padding: 0.05em 0.4em; }
+    table { width: 100%; border-collapse: collapse; margin: 0.75rem 0 1.1rem; font-size: 0.92rem; }
+    th, td { border: 1px solid var(--border); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+    th { background: #2a3036; color: #dce3ea; font-weight: 600; }
+    tr:nth-child(even) td { background: #1e2226; }
+    .ui { font-weight: 600; color: #f0f3f6; }
+    .note { background: #20282f; border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: 0.6rem 0.9rem; margin: 0.75rem 0; }
+    .note p { margin: 0.3rem 0; }
+    footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; text-align: center; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      nav.toc { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+      main { padding: 1.25rem 1rem 3rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav class="toc" aria-label="目次">
+      <h1>目次</h1>
+      <ol>
+        <li><a href="#about">このアプリでできること</a></li>
+        <li><a href="#quickstart">クイックスタート</a></li>
+        <li><a href="#layout">画面の見方</a></li>
+        <li><a href="#playback">再生</a></li>
+        <li><a href="#edit">選択と編集</a></li>
+        <li><a href="#markers">マーカー／リージョン／ループ</a></li>
+        <li><a href="#spectrogram">スペクトログラム</a></li>
+        <li><a href="#format">フォーマット変換</a></li>
+        <li><a href="#export">WAAPI EXPORT（Wave 単体）</a></li>
+        <li><a href="#shortcuts">ショートカット</a></li>
+        <li><a href="#settings">設定と言語</a></li>
+        <li><a href="#disclaimer">対応範囲と位置づけ</a></li>
+        <li><a href="#trademarks">商標とライセンス</a></li>
+      </ol>
+    </nav>
+    <main>
+      <header>
+        <h1>MGA Sonic Anvil マニュアル</h1>
+        <p class="lead">ゲーム向け波形を、聴いて切って、マーカーとループを置いて、Wwise へ Wave 単体で渡す。</p>
+      </header>
+
+      <h2 id="about">1. このアプリでできること</h2>
+      <div class="hero">
+        <p><strong>波形エディタと、Wwise Interactive Music への Wave 単体 EXPORT をひとつにしたもの</strong>です。</p>
+        <p>フェード・ノーマライズ・部分削除・コピー／ペースト、マーカー／リージョン／サンプルループ、スペクトログラムまで、聴きながら決めて焼き込めます。</p>
+        <p><strong>Wwise へは Wave 単体モードで渡せます。</strong> 元波形を Originals へ書き、Music Playlist Container（マーカー／サンプルループ。Custom Cue は出しません）として取り込みます。</p>
+      </div>
+
+      <h2 id="quickstart">2. クイックスタート</h2>
+      <ol>
+        <li>Wave / AIFF / MP3 をドロップするか、<kbd>Ctrl</kbd>+<kbd>O</kbd> で開きます（複数可。タブで並びます）。</li>
+        <li>波形上で聴きながら切る・フェードする・マーカーやループを置きます。</li>
+        <li>必要なら <kbd>Ctrl</kbd>+<kbd>S</kbd> で Wave または MP3 に保存します（AIFF 書き出しは非対応）。</li>
+        <li>Wwise へ渡すときは、トランスポートの <span class="ui">WAAPI</span> をオンにし、作成先を選んで <span class="ui">EXPORT</span> します。</li>
+      </ol>
+      <div class="note">
+        <p>設定は <code>%LocalAppData%\MGA\MGA Sonic Anvil\</code> に保存されます。exe 横には書きません。</p>
+      </div>
+
+      <h2 id="layout">3. 画面の見方</h2>
+      <ul>
+        <li><strong>全体波形</strong> …… 上段。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）、ホイールで拡縮（シークバー基準）。</li>
+        <li><strong>波形エリア</strong> …… 本編集面。時間ルーラー、マーカー／リージョンフラッグ、再生ヘッド、マウスガイド。</li>
+        <li><strong>タブ</strong> …… 複数ファイル。閉じるは <kbd>Ctrl</kbd>+<kbd>W</kbd>。</li>
+        <li><strong>トランスポート</strong> …… 再生、ズーム、フェード／ノーマライズ／削除／保存、<span class="ui">WAAPI</span>、言語 <span class="ui">JP／EN</span>、マニュアル <span class="ui">?</span>。</li>
+        <li><strong>Always on Top</strong> …… ウィンドウを最前面に固定します。</li>
+        <li><strong>スペクトラム／レベルメーター／ベクタースコープ</strong> …… 再生出力の簡易表示。</li>
+        <li><strong>WAAPI バー</strong> …… 接続状態、作成先、<span class="ui">Play -E</span>、<span class="ui">Auto Active</span>、<span class="ui">EXPORT</span>。</li>
+        <li><strong>ステータスバー</strong> …… ファイル情報、Audio API／Device、GitHub リンク。</li>
+      </ul>
+
+      <h2 id="playback">4. 再生</h2>
+      <ul>
+        <li><kbd>Space</kbd> …… 再生／停止。停止すると開始位置へ戻ります。</li>
+        <li><kbd>Enter</kbd> …… その場停止。</li>
+        <li><kbd>Ctrl</kbd>+<kbd>Space</kbd> …… 3 秒前から。</li>
+        <li><kbd>Alt</kbd>+<kbd>Enter</kbd> …… 再生開始位置からやり直し。</li>
+        <li><kbd>Ctrl</kbd>+ドラッグ …… スクラブ。</li>
+        <li><kbd>T</kbd> …… 再生位置の入力。Enter で移動。コピー／貼り付け可。</li>
+        <li><kbd>Z</kbd> または <kbd>.</kbd> …… 中央寄せ。再生中はセンターロックの切替、停止で解除。</li>
+        <li><kbd>L</kbd> …… 選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生。</li>
+      </ul>
+
+      <h2 id="edit">5. 選択と編集</h2>
+      <p>ドラッグで選択。<kbd>Esc</kbd> または Shift なし移動で解除。未選択のフェード／ノーマライズは全体が対象です。</p>
+      <ul>
+        <li><span class="ui">FADE IN</span> <kbd>I</kbd>／<span class="ui">FADE OUT</span> <kbd>O</kbd> …… カーブを選び Space で試聴、Enter で実行。1–9 でカーブ。</li>
+        <li><kbd>X</kbd> …… 表示範囲をシーク前後にリニアフェード（前＝アウト／後＝イン）。</li>
+        <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> …… ピークを -0.1 dB に合わせる。</li>
+        <li><span class="ui">DELETE</span> …… 選択を詰めて削除。選択中のマーカー／リージョンもまとめて削除。</li>
+        <li><kbd>Ctrl</kbd>+<kbd>X</kbd>／<kbd>C</kbd>／<kbd>V</kbd> …… カット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）。</li>
+        <li><kbd>U</kbd> …… 編集履歴。↑↓ で移動、Enter 確定、Esc キャンセル。</li>
+        <li><kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Ctrl</kbd>+<kbd>Y</kbd> …… 元に戻す／やり直す。</li>
+      </ul>
+
+      <h2 id="markers">6. マーカー／リージョン／ループ</h2>
+      <ul>
+        <li><kbd>M</kbd> …… 再生位置にマーカー。</li>
+        <li><kbd>Shift</kbd>+<kbd>L</kbd> …… 選択をサンプルループに（同じ範囲でもう一度で解除）。</li>
+        <li><kbd>Shift</kbd>+<kbd>R</kbd> …… 選択をリージョンに（同じ範囲でもう一度で解除）。</li>
+        <li>フラッグをクリックで端を選択。Shift+クリックで範囲、Ctrl+クリックで追加。ドラッグまたは ←→ で移動（Shift で 3 倍）。</li>
+        <li>ダブルクリックでコメント／リージョン名。<code>-A</code> ライム、<code>-L</code> ブルー、<code>-E</code> 赤、<code>-R</code> グレー。</li>
+        <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> …… リネーム。</li>
+        <li>右クリック、または <kbd>Ctrl</kbd>+<kbd>Del</kbd> でマーカー削除。</li>
+      </ul>
+      <div class="note">
+        <p>WAV の cue / adtl（マーカー・リージョン）と smpl（サンプルループ）を読み書きします。保存時に埋め込みます。</p>
+      </div>
+
+      <h2 id="spectrogram">7. スペクトログラム</h2>
+      <p><kbd>G</kbd> で波形／スペクトログラム／重ね表示を切り替えます。時間ズームが深いときは列をずらして足りない分だけ計算します。</p>
+
+      <h2 id="format">8. フォーマット変換</h2>
+      <ul>
+        <li><kbd>S</kbd> …… サンプリングレート</li>
+        <li><kbd>B</kbd> …… ビット深度</li>
+        <li><kbd>C</kbd> …… チャンネル数（Mono／Stereo）</li>
+      </ul>
+      <p>プリセットか任意 Hz を選びます。変換中は操作を受け付けません。</p>
+
+      <h2 id="export">9. WAAPI EXPORT（Wave 単体）</h2>
+      <ol>
+        <li>Wwise Authoring を起動します。</li>
+        <li>トランスポートの <span class="ui">WAAPI</span> をオンにします（<kbd>W</kbd>）。</li>
+        <li>Wwise で作成先オブジェクトを選びます。<span class="ui">Keep Target</span> でパスを固定できます。</li>
+        <li>書き出し先は接続中プロジェクトの Originals 配下である必要があります。</li>
+        <li><span class="ui">EXPORT</span> または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>。</li>
+      </ol>
+      <ul>
+        <li><span class="ui">Play -E</span>（<kbd>E</kbd>）…… Exit Cue 以降を再生。アプリ内ではループ折り返し時に -E を二重再生し、シークバーが 2 本になります。EXPORT 時は Music Playlist Container の既定トランジションルール（Any to Any）へ反映します。</li>
+        <li><span class="ui">Auto Active</span> …… EXPORT 後に Wwise を前面へ出します。</li>
+      </ul>
+      <div class="note">
+        <p>Custom Cue は出しません。最終確認は必ず Wwise 上で行ってください。</p>
+      </div>
+
+      <h2 id="shortcuts">10. ショートカット</h2>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Space</kbd></td><td>再生／停止（開始位置へ戻る）</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>その場停止</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>3 秒前から再生</td></tr>
+          <tr><td>↑↓／<kbd>Ctrl</kbd>+↑↓</td><td>時間ズーム／32 倍・全体</td></tr>
+          <tr><td><kbd>Shift</kbd>+↑↓／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↑↓</td><td>振幅ズーム／最大・リセット</td></tr>
+          <tr><td>ホイール／<kbd>Shift</kbd>／<kbd>Ctrl</kbd>+ホイール</td><td>時間ズーム／パン／振幅</td></tr>
+          <tr><td>←→／<kbd>Ctrl</kbd>+←→</td><td>シーク／前後のマーカー・端</td></tr>
+          <tr><td><kbd>Home</kbd>／<kbd>End</kbd></td><td>画面端</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>全選択</td></tr>
+          <tr><td><kbd>I</kbd>／<kbd>O</kbd>／<kbd>N</kbd>／<kbd>Delete</kbd></td><td>フェードイン／アウト／ノーマライズ／削除</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd>／<kbd>S</kbd>／<kbd>Shift</kbd>+<kbd>S</kbd></td><td>開く／保存／別名保存</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd>／<kbd>Ctrl</kbd>+<kbd>Tab</kbd></td><td>タブを閉じる／次のタブ</td></tr>
+          <tr><td><kbd>W</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>WAAPI 切替／EXPORT</td></tr>
+          <tr><td><kbd>G</kbd>／<kbd>U</kbd>／<kbd>T</kbd></td><td>スペクトログラム／履歴／時刻</td></tr>
+        </tbody>
+      </table>
+      <p>波形上にマウスを置くと、より詳しい操作が一覧されます。</p>
+
+      <h2 id="settings">11. 設定と言語</h2>
+      <ul>
+        <li>再生 API はステータスバーの Audio API／Device（WaveOut／WASAPI／ASIO）。</li>
+        <li>表示言語はトランスポートの <span class="ui">JP／EN</span>。日本語版は現状の文言（英語ラベル含む）のままです。</li>
+        <li>マニュアルは <span class="ui">?</span>、またはブラウザの GitHub Pages。表示言語に合わせて日本語／英語を開きます。</li>
+        <li>設定ファイル: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>
+      </ul>
+
+      <h2 id="disclaimer">12. 対応範囲と位置づけ</h2>
+      <ul>
+        <li>Wwise の Interactive Music でできることをすべてカバーするものではありません。EXPORT は Wave 単体（マーカー／サンプルループ）に限っています。</li>
+        <li>アプリ内プレビューは近似です。Play -E の二重再生も Wwise 実機と完全一致するとは限りません。最終確認は EXPORT 後に Wwise 上で行ってください。</li>
+        <li>AIFF の書き出しには対応していません。Wave または MP3 を選んでください。</li>
+        <li>EXPORT は Wwise プロジェクトを変更します。実行前のバックアップやバージョン管理をおすすめします。</li>
+      </ul>
+
+      <h2 id="trademarks">13. 商標とライセンス</h2>
+      <ul>
+        <li><strong>Wwise®</strong>／<strong>Audiokinetic®</strong> は Audiokinetic Inc. の商標です。本ツールは非公式です。WAAPI には有効な Wwise ライセンスが必要です。</li>
+        <li>本アプリは <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/LICENSE">MIT License</a> で公開しています。</li>
+      </ul>
+      <footer>© MIYABI GAME AUDIO INC. — MGA Sonic Anvil User Manual (ja)</footer>
+    </main>
+  </div>
+  <script>
+    (function () {
+      var links = Array.prototype.slice.call(
+        document.querySelectorAll("nav.toc a[href^='#']"));
+      var linkByTargetId = {};
+      links.forEach(function (link) {
+        linkByTargetId[decodeURIComponent(link.hash.slice(1))] = link;
+      });
+      var headings = Array.prototype.slice.call(
+        document.querySelectorAll("main [id]")).filter(function (el) {
+          return linkByTargetId[el.id];
+        });
+      var activeLink = null;
+
+      function update() {
+        var offset = window.innerHeight * 0.25;
+        var current = null;
+        for (var i = 0; i < headings.length; i++) {
+          if (headings[i].getBoundingClientRect().top <= offset) {
+            current = headings[i];
+          } else {
+            break;
+          }
+        }
+        if (window.innerHeight + window.scrollY
+            >= document.documentElement.scrollHeight - 2) {
+          current = headings[headings.length - 1] || current;
+        }
+        var link = current ? linkByTargetId[current.id] : null;
+        if (link === activeLink) {
+          return;
+        }
+        if (activeLink) {
+          activeLink.classList.remove("active");
+        }
+        activeLink = link;
+        if (activeLink) {
+          activeLink.classList.add("active");
+          activeLink.scrollIntoView({ block: "nearest" });
+        }
+      }
+
+      var queued = false;
+      function onScroll() {
+        if (queued) {
+          return;
+        }
+        queued = true;
+        requestAnimationFrame(function () {
+          queued = false;
+          update();
+        });
+      }
+
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onScroll);
+      update();
+    })();
+  </script>
+</body>
+</html>

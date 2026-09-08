@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Reflection;
+using MgaSonicAnvil.Domain;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using NAudio.Wave.Asio;
@@ -150,13 +151,13 @@ internal static class AudioOutputFactory
         var names = AsioDriver.GetAsioDriverNames();
         if (names.Length == 0)
         {
-            throw new InvalidOperationException("No ASIO drivers are installed.");
+            throw new InvalidOperationException(UiStrings.ErrAsioNoDrivers);
         }
 
         var selected = string.IsNullOrWhiteSpace(driverName)
             ? names[0]
             : names.FirstOrDefault(n => n.Equals(driverName, StringComparison.OrdinalIgnoreCase))
-                ?? throw new InvalidOperationException($"ASIO driver '{driverName}' was not found.");
+                ?? throw new InvalidOperationException(UiStrings.ErrAsioDriverNotFound(driverName));
 
         return new AsioOut(selected)
         {

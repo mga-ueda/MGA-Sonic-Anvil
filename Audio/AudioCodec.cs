@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using MgaSonicAnvil.Domain;
 using NAudio.MediaFoundation;
 using NAudio.Wave;
 
@@ -48,7 +49,7 @@ internal static class AudioCodec
         var frames = stream.Length / Math.Max(1, format.BlockAlign);
         if (frames <= 0)
         {
-            throw new InvalidDataException("Empty audio file.");
+            throw new InvalidDataException(UiStrings.ErrEmptyAudioFile);
         }
 
         var interleaved = new float[checked((int)frames * channels)];
@@ -56,7 +57,7 @@ internal static class AudioCodec
         if (provider.WaveFormat.Channels != channels)
         {
             throw new InvalidDataException(
-                $"Channel count changed while reading ({channels} → {provider.WaveFormat.Channels}).");
+                UiStrings.ErrChannelCountChanged(channels, provider.WaveFormat.Channels));
         }
 
         var read = 0;
@@ -78,7 +79,7 @@ internal static class AudioCodec
 
         if (interleaved.Length < channels)
         {
-            throw new InvalidDataException("Empty audio file.");
+            throw new InvalidDataException(UiStrings.ErrEmptyAudioFile);
         }
 
         var document = new AudioDocument(
@@ -277,7 +278,7 @@ internal static class AudioCodec
         var kind = DetectKind(path);
         if (kind == AudioFileKind.Aiff)
         {
-            throw new NotSupportedException("AIFF export is not supported.");
+            throw new NotSupportedException(UiStrings.ErrAiffExportNotSupported);
         }
 
         if (kind == AudioFileKind.Mp3)

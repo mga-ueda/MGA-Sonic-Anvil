@@ -9,6 +9,8 @@ internal partial class TransportBar : UserControl
 {
     private readonly TransportIconButton _play;
     private readonly TransportIconButton _waapiToggle;
+    private readonly TransportLanguageButton _language;
+    private readonly TransportManualButton _manual;
     private readonly Dictionary<TransportCommand, TransportIconButton> _buttons = new();
     private double _currentSeconds;
     private double _totalSeconds;
@@ -21,6 +23,10 @@ internal partial class TransportBar : UserControl
     public event EventHandler<double>? PositionSeeked;
 
     public event EventHandler? RequestWaveformFocus;
+
+    public event EventHandler? LanguageToggleRequested;
+
+    public event EventHandler? ManualHelpRequested;
 
     public bool IsPositionFocused => CurrentTimeBox.IsKeyboardFocusWithin;
 
@@ -61,6 +67,54 @@ internal partial class TransportBar : UserControl
         };
         _waapiToggle.Click += (_, _) => CommandInvoked?.Invoke(this, TransportCommand.ToggleWaapi);
         ButtonsHost.Children.Add(_waapiToggle);
+        AddGap();
+        _language = new TransportLanguageButton
+        {
+            Margin = new Thickness(DesignMetrics.TransportButtonGap, 0, DesignMetrics.TransportButtonGap, 0),
+        };
+        _language.Click += (_, _) => LanguageToggleRequested?.Invoke(this, EventArgs.Empty);
+        ButtonsHost.Children.Add(_language);
+        _manual = new TransportManualButton
+        {
+            Margin = new Thickness(DesignMetrics.TransportButtonGap, 0, DesignMetrics.TransportButtonGap, 0),
+        };
+        _manual.Click += (_, _) => ManualHelpRequested?.Invoke(this, EventArgs.Empty);
+        ButtonsHost.Children.Add(_manual);
+    }
+
+    public void ApplyLocalizedTips()
+    {
+        SetTip(TransportCommand.TogglePlayback, UiStrings.TipPlay);
+        SetTip(TransportCommand.Stop, UiStrings.TipStop);
+        SetTip(TransportCommand.GoToStart, UiStrings.TipGoToStart);
+        SetTip(TransportCommand.GoToEnd, UiStrings.TipGoToEnd);
+        SetTip(TransportCommand.TimeZoomIn, UiStrings.TipTimeZoomIn);
+        SetTip(TransportCommand.TimeZoomOut, UiStrings.TipTimeZoomOut);
+        SetTip(TransportCommand.TimeZoomMax, UiStrings.TipTimeZoomMax);
+        SetTip(TransportCommand.TimeZoomReset, UiStrings.TipTimeZoomReset);
+        SetTip(TransportCommand.AmpZoomIn, UiStrings.TipAmpZoomIn);
+        SetTip(TransportCommand.AmpZoomOut, UiStrings.TipAmpZoomOut);
+        SetTip(TransportCommand.AmpZoomMax, UiStrings.TipAmpZoomMax);
+        SetTip(TransportCommand.AmpZoomReset, UiStrings.TipAmpZoomReset);
+        SetTip(TransportCommand.FadeIn, UiStrings.TipFadeIn);
+        SetTip(TransportCommand.FadeOut, UiStrings.TipFadeOut);
+        SetTip(TransportCommand.Normalize, UiStrings.TipNormalize);
+        SetTip(TransportCommand.Delete, UiStrings.TipDelete);
+        SetTip(TransportCommand.Save, UiStrings.TipSave);
+        _waapiToggle.ToolTip = UiStrings.TipWaapiToggle;
+        _language.RefreshAppearance();
+        _manual.RefreshAppearance();
+        CurrentTimeBox.ToolTip = UiStrings.TipTimecode;
+        CopyMenuItem.Header = UiStrings.MenuCopy;
+        PasteMenuItem.Header = UiStrings.MenuPaste;
+    }
+
+    private void SetTip(TransportCommand command, string tip)
+    {
+        if (_buttons.TryGetValue(command, out var button))
+        {
+            button.ToolTip = tip;
+        }
     }
 
     public void SetWaapiLatched(bool latched)
@@ -124,6 +178,8 @@ internal partial class TransportBar : UserControl
         }
 
         _waapiToggle.InvalidateVisual();
+        _language.InvalidateVisual();
+        _manual.InvalidateVisual();
     }
 
     public void SetCommandsEnabled(bool enabled)

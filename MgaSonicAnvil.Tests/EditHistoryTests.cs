@@ -7,6 +7,11 @@ namespace MgaSonicAnvil.Tests;
 
 public sealed class EditHistoryTests
 {
+    public EditHistoryTests()
+    {
+        UiStrings.SetLanguage(UiLanguage.Japanese);
+    }
+
     [Fact]
     public void Snapshot_StartsWithOriginAndFollowsUndoRedo()
     {

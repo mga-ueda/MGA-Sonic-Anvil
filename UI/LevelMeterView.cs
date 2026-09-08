@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
@@ -133,7 +134,7 @@ internal sealed class LevelMeterView : FrameworkElement
     {
         var pixels = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         var brush = LabelBrush();
-        var labelWidth = Math.Max(MeasureReadout("Peak", pixels).Width, MeasureReadout("RMS", pixels).Width);
+        var labelWidth = Math.Max(MeasureReadout(UiStrings.LabelPeak, pixels).Width, MeasureReadout(UiStrings.LabelRms, pixels).Width);
         var intSlot = MeasureReadout("-60", pixels).Width;
         var fracSlot = MeasureReadout(".0", pixels).Width;
         var numWidth = intSlot + fracSlot;
@@ -143,12 +144,12 @@ internal sealed class LevelMeterView : FrameworkElement
         var leftDotX = left + labelWidth + gap + intSlot;
         var rightDotX = leftDotX + fracSlot + gap + intSlot;
 
-        DrawReadoutLabel(dc, "Peak", left, area.Y, pixels, brush);
+        DrawReadoutLabel(dc, UiStrings.LabelPeak, left, area.Y, pixels, brush);
         DrawReadoutAligned(dc, LevelMeterEngine.FormatReadout(_snapshot.Left.PeakHeldDb), leftDotX, area.Y, pixels, brush);
         DrawReadoutAligned(dc, LevelMeterEngine.FormatReadout(_snapshot.Right.PeakHeldDb), rightDotX, area.Y, pixels, brush);
 
         var y2 = area.Y + ReadoutLineHeight;
-        DrawReadoutLabel(dc, "RMS", left, y2, pixels, brush);
+        DrawReadoutLabel(dc, UiStrings.LabelRms, left, y2, pixels, brush);
         DrawReadoutAligned(dc, LevelMeterEngine.FormatReadout(_snapshot.Left.RmsHeldDb), leftDotX, y2, pixels, brush);
         DrawReadoutAligned(dc, LevelMeterEngine.FormatReadout(_snapshot.Right.RmsHeldDb), rightDotX, y2, pixels, brush);
     }

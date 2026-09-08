@@ -15,6 +15,11 @@ internal sealed class AppSettings
 
     public bool AlwaysOnTop { get; set; }
 
+    public string UiLanguage { get; set; } = "ja";
+
+    /// <summary>「今は開かない」にしたリモート版。同じ版では再通知しない。</summary>
+    public string SkippedUpdateVersion { get; set; } = string.Empty;
+
     public string LastDocumentPath { get; set; } = string.Empty;
 
     public bool LastDocumentDirty { get; set; }

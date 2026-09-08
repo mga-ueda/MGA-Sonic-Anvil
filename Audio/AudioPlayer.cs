@@ -1,3 +1,4 @@
+using MgaSonicAnvil.Domain;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 
@@ -203,7 +204,7 @@ internal sealed class AudioPlayer : IDisposable
         EnsureOutputDevice();
         if (_output is null)
         {
-            throw new InvalidOperationException("Audio output device is not available.");
+            throw new InvalidOperationException(UiStrings.ErrAudioOutputUnavailable);
         }
 
         if (!_playing)
@@ -240,7 +241,7 @@ internal sealed class AudioPlayer : IDisposable
         EnsureOutputDevice();
         if (_output is null)
         {
-            throw new InvalidOperationException("Audio output device is not available.");
+            throw new InvalidOperationException(UiStrings.ErrAudioOutputUnavailable);
         }
 
         _generation++;
@@ -543,8 +544,7 @@ internal sealed class AudioPlayer : IDisposable
         }
 
         // Init 前に現在レートへ合わせないと NAudio が SetSampleRate する。
-        throw new InvalidOperationException(
-            "Could not read the ASIO driver sample rate before Init.");
+        throw new InvalidOperationException(UiStrings.ErrAsioSampleRateBeforeInit);
     }
 
     private void InitWaveProvider(IWavePlayer output)
@@ -562,14 +562,14 @@ internal sealed class AudioPlayer : IDisposable
     {
         if (asio.DriverOutputChannelCount < 1)
         {
-            throw new InvalidOperationException("ASIO driver has no output channels.");
+            throw new InvalidOperationException(UiStrings.ErrAsioNoOutputChannels);
         }
 
         var rate = _provider.WaveFormat.SampleRate;
         if (!asio.IsSampleRateSupported(rate))
         {
             throw new InvalidOperationException(
-                $"ASIO '{asio.DriverName}' does not support {rate} Hz.");
+                UiStrings.ErrAsioSampleRateUnsupported(asio.DriverName, rate));
         }
 
         var channels = Math.Min(2, asio.DriverOutputChannelCount);

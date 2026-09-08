@@ -25,7 +25,7 @@
                ContextMenuOpening="CurrentTimeBox_ContextMenuOpening">
         <TextBox.ContextMenu>
           <ContextMenu>
-            <MenuItem Header="{x:Static domain:UiStrings.MenuCopy}" Click="CopyPosition_Click" />
+            <MenuItem x:Name="CopyMenuItem" Header="{x:Static domain:UiStrings.MenuCopy}" Click="CopyPosition_Click" />
             <MenuItem x:Name="PasteMenuItem" Header="{x:Static domain:UiStrings.MenuPaste}" Click="PastePosition_Click" />
           </ContextMenu>
         </TextBox.ContextMenu>

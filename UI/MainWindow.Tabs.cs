@@ -299,6 +299,30 @@ public partial class MainWindow
         return border;
     }
 
+    private void RefreshTabLocalizedTips()
+    {
+        foreach (var border in DocumentTabs.Children.OfType<Border>())
+        {
+            if (border.Child is not DockPanel dock)
+            {
+                continue;
+            }
+
+            var session = border.Tag as DocumentSession;
+            foreach (var block in dock.Children.OfType<Grid>().SelectMany(grid => grid.Children.OfType<TextBlock>()))
+            {
+                if (block.Text == "×")
+                {
+                    block.ToolTip = UiStrings.TipCloseTab;
+                }
+                else if (session is not null)
+                {
+                    block.ToolTip = session.Document.SourcePath ?? UiStrings.UntitledDocument;
+                }
+            }
+        }
+    }
+
     private Brush BrushOrTransparent(string? key) =>
         key is null ? Brushes.Transparent : (Brush)FindResource(key);
 
