@@ -9,13 +9,18 @@ internal static class AudioOutputFlush
     public const int FadeMilliseconds = 20;
 
     /// <summary>
-    /// 旧下限 400ms では仮想ミキサ hop が残ることがあった。
-    /// 測れる先読みの 3 周＋デバイス尾で足りるので、床は 0.5 秒に留める。
+    /// VoiceMeeter 等の仮想 ASIO は PlaybackLatency に最終出力 hop を含めない。
+    /// 0.5 秒では終了後に先読みが残る。測れない後段を見て下限は 2 秒。
     /// </summary>
-    public const int MinMilliseconds = 500;
+    public const int MinMilliseconds = 2000;
 
     /// <summary>巨大バッファでも終了待ちを伸ばしすぎない。</summary>
-    public const int MaxMilliseconds = 2000;
+    public const int MaxMilliseconds = 5000;
+
+    /// <summary>
+    /// WaveOut / WASAPI はセッション音量を 0 にしたあと、適用を待つだけ。
+    /// </summary>
+    public const int MutedSettleMilliseconds = 80;
 
     /// <summary>WASAPI / 最終出力 1 ホップ程度。</summary>
     public const int DeviceTailMilliseconds = 150;

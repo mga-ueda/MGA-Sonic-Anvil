@@ -107,7 +107,7 @@ internal sealed class LevelMeterView : FrameworkElement
         {
             var bar = new Rect(track.X + 1, track.Bottom - barH, Math.Max(1, track.Width - 2), barH);
             dc.PushClip(new RectangleGeometry(bar));
-            dc.PushOpacity(0.68);
+            dc.PushOpacity(LevelMeterEngine.BarFillOpacity);
             dc.DrawRectangle(_barGradient, null, track);
             dc.Pop();
             dc.Pop();

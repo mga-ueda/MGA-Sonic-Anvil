@@ -107,7 +107,6 @@ internal static class FadeCurveIcons
                 Header = $"{index}  {UiStrings.LabelFadeCurve((int)shape)}",
                 InputGestureText = index.ToString(),
                 Tag = captured,
-                ToolTip = UiStrings.TipFadeShape((int)shape),
                 Icon = new Border
                 {
                     Width = canvas,
@@ -125,6 +124,7 @@ internal static class FadeCurveIcons
                     },
                 },
             };
+            TipService.Set(item, UiStrings.TipFadeShape((int)shape));
             item.Click += (_, _) => onSelected(captured);
             items.Add(item);
         }

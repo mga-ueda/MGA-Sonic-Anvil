@@ -9,6 +9,8 @@ internal sealed class LevelMeterEngine
     public const double KneeDb = -20;
     /// <summary>-20 dB の高さ比（下端 = 0）。0〜-20 は均等、それより下は徐々に圧縮。</summary>
     public const double KneeNorm = 0.48;
+    /// <summary>バー塗り（レベルメーター / スペアナ）の不透明度。</summary>
+    public const double BarFillOpacity = 0.68;
     public const double BelowKneeGamma = 1.55;
     public const double BarInstTrack = 0.48;
     public const double BarAttackSec = 0.018;

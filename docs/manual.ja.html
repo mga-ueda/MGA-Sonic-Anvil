@@ -101,10 +101,11 @@
       <ul>
         <li><strong>全体波形</strong> …… 上段。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）、ホイールで拡縮（シークバー基準）。</li>
         <li><strong>波形エリア</strong> …… 本編集面。時間ルーラー、マーカー／リージョンフラッグ、再生ヘッド、マウスガイド。</li>
-        <li><strong>タブ</strong> …… 複数ファイル。閉じるは <kbd>Ctrl</kbd>+<kbd>W</kbd>。</li>
-        <li><strong>トランスポート</strong> …… 再生、ズーム、フェード／ノーマライズ／削除／保存、<span class="ui">WAAPI</span>、言語 <span class="ui">JP／EN</span>、マニュアル <span class="ui">?</span>。</li>
+        <li><strong>タブ</strong> …… 複数ファイル。閉じるは <kbd>Ctrl</kbd>+<kbd>W</kbd>。右クリックで「このタブ以外を閉じる(O)」「このタブを含め右側を全部閉じる(R)」「このタブを含め左側を全部閉じる(L)」「すべてのタブを閉じる(W)」「全部のタブを選択する(A)」。<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> でもすべてのタブを閉じられます。タブは <kbd>Ctrl</kbd>+クリックで個別追加、<kbd>Shift</kbd>+クリックで範囲選択、タブバー上の <kbd>Ctrl</kbd>+<kbd>A</kbd> で全選択でき、選択中のタブはハイライトされます（<kbd>Esc</kbd> で解除）。選択中の右クリックは「選択した（すべての）タブを閉じる」「選択した（すべての）タブにペーストする」になり、<kbd>Ctrl</kbd>+<kbd>V</kbd> でコピーした編集履歴を選択タブへ一括適用できます。</li>
+        <li><strong>トランスポート</strong> …… 再生、ズーム、フェード／ノーマライズ／削除／保存、<span class="ui">WAAPI</span>、言語 <span class="ui">JP／EN</span>、<span class="ui">Tips</span> 枠のオン／オフ、マニュアル <span class="ui">?</span>。</li>
         <li><strong>Always on Top</strong> …… ウィンドウを最前面に固定します。</li>
-        <li><strong>スペクトラム／レベルメーター／ベクタースコープ</strong> …… 再生出力の簡易表示。</li>
+        <li><strong>スペクトラム／レベルメーター／ベクタースコープ</strong> …… 再生出力の表示。スペクトラムは Layer Music Checker と同じ LED 帯域表示を、トランスポート右の狭い枠に収めています。</li>
+        <li><strong>Tips</strong> …… WAAPI バーの上。高さ固定。コントロールにマウスを置くと説明を表示し、はみ出したらスクロールします。初回はすぐ出ます。別の項目へ移る／外すときは 300ms 待ってから差し替え／消去します。見出しまたは本文をクリックでロック（枠がシアン、<span class="ui">Tips (Locked)</span>）。もう一度クリックで解除。ロック中とパネル上では内容が変わりません。ホバー用のツールチップは使いません。</li>
         <li><strong>WAAPI バー</strong> …… 接続状態、作成先、<span class="ui">Play -E</span>、<span class="ui">Auto Active</span>、<span class="ui">EXPORT</span>。</li>
         <li><strong>ステータスバー</strong> …… ファイル情報、Audio API／Device、GitHub リンク。</li>
       </ul>
@@ -130,6 +131,7 @@
         <li><span class="ui">DELETE</span> …… 選択を詰めて削除。選択中のマーカー／リージョンもまとめて削除。</li>
         <li><kbd>Ctrl</kbd>+<kbd>X</kbd>／<kbd>C</kbd>／<kbd>V</kbd> …… カット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）。</li>
         <li><kbd>U</kbd> …… 編集履歴。↑↓ で移動、Enter 確定、Esc キャンセル。</li>
+        <li>履歴のコピー＆ペースト …… 履歴内で <kbd>Ctrl</kbd>+クリック（<kbd>Shift</kbd>+クリックや <kbd>Shift</kbd>+<kbd>↑↓</kbd> で範囲、<kbd>Ctrl</kbd>+<kbd>A</kbd> で全選択）して <kbd>Ctrl</kbd>+<kbd>C</kbd>。別ファイルで <kbd>Ctrl</kbd>+<kbd>V</kbd> すると同じ処理を再適用します（履歴を開いていなくても可）。コピーは次に何かをコピーするまで残るので、タブを切り替えて <kbd>Ctrl</kbd>+<kbd>V</kbd> を繰り返せば複数ファイルへ反映できます。選択なしの <kbd>Ctrl</kbd>+<kbd>C</kbd> は現在位置までの全操作。範囲はサンプルレートが違っても時間基準で写像され、ノーマライズ等は適用先で再計算されます。</li>
         <li><kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Ctrl</kbd>+<kbd>Y</kbd> …… 元に戻す／やり直す。</li>
       </ul>
 
@@ -189,7 +191,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>全選択</td></tr>
           <tr><td><kbd>I</kbd>／<kbd>O</kbd>／<kbd>N</kbd>／<kbd>Delete</kbd></td><td>フェードイン／アウト／ノーマライズ／削除</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd>／<kbd>S</kbd>／<kbd>Shift</kbd>+<kbd>S</kbd></td><td>開く／保存／別名保存</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd>／<kbd>Ctrl</kbd>+<kbd>Tab</kbd></td><td>タブを閉じる／次のタブ</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>／<kbd>Ctrl</kbd>+<kbd>Tab</kbd></td><td>タブを閉じる／すべて閉じる／次のタブ</td></tr>
           <tr><td><kbd>W</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>WAAPI 切替／EXPORT</td></tr>
           <tr><td><kbd>G</kbd>／<kbd>U</kbd>／<kbd>T</kbd></td><td>スペクトログラム／履歴／時刻</td></tr>
         </tbody>

@@ -17,6 +17,9 @@ internal sealed class AppSettings
 
     public string UiLanguage { get; set; } = "ja";
 
+    /// <summary>Tips 枠の表示。既定オン。</summary>
+    public bool ShowTips { get; set; } = true;
+
     /// <summary>「今は開かない」にしたリモート版。同じ版では再通知しない。</summary>
     public string SkippedUpdateVersion { get; set; } = string.Empty;
 

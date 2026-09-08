@@ -101,17 +101,17 @@ internal sealed class VectorScopeView : FrameworkElement
     private static (Rect Scope, Rect Correlation) MeasureLayout(Rect bounds)
     {
         var corrHeight = DesignMetrics.VectorScopeCorrelationHeight;
-        var correlation = new Rect(
-            bounds.Left,
-            bounds.Top,
-            Math.Max(8d, bounds.Width),
-            corrHeight);
         var side = Math.Max(8d, Math.Min(bounds.Width, bounds.Height - corrHeight));
         var scope = new Rect(
             bounds.Left + (bounds.Width - side) * 0.5,
-            correlation.Bottom,
+            bounds.Top,
             side,
             side);
+        var correlation = new Rect(
+            bounds.Left,
+            scope.Bottom,
+            Math.Max(8d, bounds.Width),
+            corrHeight);
         return (scope, correlation);
     }
 
@@ -170,8 +170,9 @@ internal sealed class VectorScopeView : FrameworkElement
 
     private void DrawCorrelation(DrawingContext dc, Rect area)
     {
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("SurfaceBackBrush")), null, area);
         var trackHeight = 5d;
-        var track = new Rect(area.X, area.Y + 2, area.Width, trackHeight);
+        var track = new Rect(area.X, area.Y + 1, area.Width, trackHeight);
         var muted = Theme.Get("MutedForeBrush");
         dc.DrawRoundedRectangle(
             WpfControlHelpers.FrozenBrush(Color.FromArgb(70, muted.R, muted.G, muted.B)),

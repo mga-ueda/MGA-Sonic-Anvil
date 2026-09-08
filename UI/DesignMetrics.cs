@@ -19,6 +19,14 @@ internal static class DesignMetrics
 
     public static double WaapiBarHeight => From96(32);
 
+    public static double TipsHeaderHeight => From96(20);
+
+    /// <summary>本文約 5 行。はみ出しはスクロール。</summary>
+    public static double TipsBodyHeight => From96(88);
+
+    /// <summary>Tips 枠の固定高さ（見出し + 本文）。</summary>
+    public static double TipsPanelHeight => TipsHeaderHeight + TipsBodyHeight;
+
     public static double StatusExportButtonWidth => From96(80);
 
     public static double StatusExportButtonHeight => From96(24);
@@ -29,7 +37,7 @@ internal static class DesignMetrics
 
     public static double DocumentTabScrollButtonWidth => From96(20);
 
-    public static double RulerHeight => From96(24);
+    public static double RulerHeight => From96(16);
 
     public static double MarkerLaneRowHeight => From96(16);
 
@@ -64,17 +72,20 @@ internal static class DesignMetrics
 
     public static double ToolbarButtonSide => From96(24);
 
-    /// <summary>スペアナの最小高さ（操作バーと同じ。右列では余白まで伸ばす）。</summary>
-    public static double SpectrumHeight => TransportBarHeight;
+    /// <summary>スペアナ全体（LED メーター + 下の周波数数値）。ゴニオ＋位相バーと同じ高さ。</summary>
+    public static double SpectrumHeight => VectorScopeHeight;
 
-    /// <summary>スペアナの横幅倍率。</summary>
-    public static double SpectrumWidthScale => 2;
+    /// <summary>周波数数値の重なりを避けるため、右揃えのまま左へ足す幅。</summary>
+    public static double SpectrumExtraWidth => From96(80);
 
-    /// <summary>レベルメーター列直下の位相バー高さ。</summary>
-    public static double VectorScopeCorrelationHeight => From96(22);
+    /// <summary>dB 数値がバーに被らないよう、左目盛へ足す幅。</summary>
+    public static double SpectrumPadLeftExtra => From96(8);
 
-    /// <summary>位相バー + 正方形ゴニオ。</summary>
-    public static double VectorScopeHeight => VectorScopeCorrelationHeight + LevelMeterWidth;
+    /// <summary>正方形ゴニオ直下の位相バー高さ。</summary>
+    public static double VectorScopeCorrelationHeight => From96(18);
+
+    /// <summary>正方形ゴニオ + 下の位相バー。トランスポート行をこれに揃える。</summary>
+    public static double VectorScopeHeight => LevelMeterWidth + VectorScopeCorrelationHeight;
 
     public static GridLength VectorScopeHeightGrid => new(VectorScopeHeight);
 
@@ -95,6 +106,5 @@ internal static class DesignMetrics
     /// <summary>目盛 22×2 + バー 14×4。枠なしの最小幅。</summary>
     public static double LevelMeterWidth => From96(100);
 
-    /// <summary>正方形ゴニオと同じ高さ。トランスポート行をこれに揃える。</summary>
     public static GridLength LevelMeterWidthGrid => new(LevelMeterWidth);
 }

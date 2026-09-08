@@ -190,6 +190,9 @@ public partial class MainWindow
         var rate = source.SampleRate;
         var channels = source.Channels;
         var bits = source.BitsPerSample;
+        var sourceRange = source.Selection.IsEmpty
+            ? PreviewWindow(source)
+            : source.Selection;
         if (kind == FormatConvertKind.SampleRate)
         {
             if (!FormatConvert.IsValidSampleRate(value) || value == rate)
@@ -197,7 +200,14 @@ public partial class MainWindow
                 return false;
             }
 
+            var pad = FormatConvert.ResampleEdgePad;
+            var extractStart = Math.Max(0, sourceRange.StartFrame - pad);
+            var extractEnd = Math.Min(source.FrameCount, sourceRange.EndFrame + pad);
+            samples = FormatConvert.CopyFrameRange(source.Interleaved, channels, extractStart, extractEnd);
             samples = FormatConvert.Resample(samples, channels, rate, value);
+            sourceRange = new WaveSelection(
+                sourceRange.StartFrame - extractStart,
+                sourceRange.EndFrame - extractStart);
             rate = value;
         }
         else if (kind == FormatConvertKind.BitDepth)
@@ -221,9 +231,6 @@ public partial class MainWindow
 
         preview = new AudioDocument(samples, rate, channels, bits, AudioFileKind.Wave, null);
         var destFrames = preview.FrameCount;
-        var sourceRange = source.Selection.IsEmpty
-            ? PreviewWindow(source)
-            : source.Selection;
         playRange = FormatConvert.ScaleSelection(sourceRange, source.SampleRate, rate, destFrames);
         if (playRange.IsEmpty)
         {

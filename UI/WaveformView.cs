@@ -138,6 +138,7 @@ internal sealed class WaveformView : Grid
     private int[] _columnYHi = [];
     private int[] _columnYLo = [];
     private int _waveBgra;
+    private int _waveOverlayBgra;
     private int _zeroBgra;
     private double _viewStart;
     private double _followRebuildAtMs;
@@ -238,7 +239,7 @@ internal sealed class WaveformView : Grid
             Dispatcher.BeginInvoke(InvalidateStaticLayer);
     }
 
-    public void RefreshLocalizedTips() => ToolTip = UiStrings.TipWaveform;
+    public void RefreshLocalizedTips() => TipService.Set(this, UiStrings.TipWaveform);
 
     public AudioDocument? Document
     {
@@ -496,6 +497,7 @@ internal sealed class WaveformView : Grid
         _mouseGuideBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MouseGuideBrush"));
         _mouseGuideOnSelectionBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MouseGuideOnSelectionBrush"));
         _waveBgra = 0;
+        _waveOverlayBgra = 0;
         _zeroBgra = 0;
         _playheadCore = null;
         _exitPlayheadCore = null;
@@ -2026,7 +2028,7 @@ internal sealed class WaveformView : Grid
         EnsureColumnEdges(width);
         var amp = laneHeight * 0.5 * _ampZoom;
         var bottom = top + laneHeight;
-        var color = _waveBgra;
+        var color = WavePaintBgra;
         for (var px = 0; px < width; px++)
         {
             var bucket = count == width
@@ -2311,10 +2313,10 @@ internal sealed class WaveformView : Grid
         {
             var x = (int)Math.Round(FrameToX(first, start, span, width));
             var y = SampleY(SampleAt(0));
-            FillVLine(buffer, stride, width, clipTop, clipBottom, x, y - 3, y + 3, _waveBgra);
+            FillVLine(buffer, stride, width, clipTop, clipBottom, x, y - 3, y + 3, WavePaintBgra);
             if (collectDots)
             {
-                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, _waveBgra);
+                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, WavePaintBgra);
             }
 
             return;
@@ -2329,7 +2331,7 @@ internal sealed class WaveformView : Grid
             var y = SampleY(SampleAt(i));
             if (havePrev)
             {
-                DrawThickLine(buffer, stride, width, clipTop, clipBottom, prevX, prevY, x, y, _waveBgra);
+                DrawThickLine(buffer, stride, width, clipTop, clipBottom, prevX, prevY, x, y, WavePaintBgra);
             }
 
             prevX = x;
@@ -2337,7 +2339,7 @@ internal sealed class WaveformView : Grid
             havePrev = true;
             if (collectDots)
             {
-                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, _waveBgra);
+                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, WavePaintBgra);
             }
         }
     }
@@ -2724,14 +2726,18 @@ internal sealed class WaveformView : Grid
 
     private void EnsureWavePens()
     {
-        if (_waveBgra != 0)
+        if (_waveBgra != 0 && _waveOverlayBgra != 0)
         {
             return;
         }
 
         _waveBgra = ToBgra(Theme.Get("WaveFillBrush"));
+        _waveOverlayBgra = ToBgra(Theme.Get("WaveFillOverlayBrush"));
         _zeroBgra = ToBgra(Theme.Get("WaveZeroLineBrush"));
     }
+
+    private int WavePaintBgra =>
+        _spectrogramMode == SpectrogramViewMode.Overlay ? _waveOverlayBgra : _waveBgra;
 
     private static int ToBgra(Color color) =>
         color.B | (color.G << 8) | (color.R << 16) | (color.A << 24);

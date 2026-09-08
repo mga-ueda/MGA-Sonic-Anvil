@@ -9,9 +9,49 @@ internal interface IEditCommand
 
     string Summary { get; }
 
+    /// <summary>
+    /// 同じ操作を別ドキュメントへ再実行するファクトリ（履歴のコピー＆ペースト用）。
+    /// パラメータ（範囲・カーブ等）から作り直すので、ノーマライズ等は適用先で再計算される。
+    /// null は再適用不可（ドラッグ由来のタイムライン一括移動など）。
+    /// 適用できない場合（範囲が空になる等）はファクトリが null を返す。
+    /// </summary>
+    Func<AudioDocument, IEditCommand?>? Replay { get; set; }
+
     void Apply(AudioDocument document);
 
     void Revert(AudioDocument document);
+}
+
+/// <summary>
+/// 履歴レシピを別ドキュメントへ写像する座標変換。レートが違えば時間基準で
+/// スケールし、長さはクランプする。
+/// </summary>
+internal static class EditReplay
+{
+    public static long MapFrame(long frame, int sourceRate, AudioDocument target)
+    {
+        var mapped = sourceRate > 0 && sourceRate != target.SampleRate
+            ? (long)Math.Round(frame * (double)target.SampleRate / sourceRate)
+            : frame;
+        return Math.Clamp(mapped, 0, Math.Max(0, target.FrameCount));
+    }
+
+    public static WaveSelection MapRange(WaveSelection range, int sourceRate, AudioDocument target)
+    {
+        if (range.IsEmpty)
+        {
+            return WaveSelection.Empty;
+        }
+
+        return new WaveSelection(
+            MapFrame(range.StartFrame, sourceRate, target),
+            MapFrame(range.EndFrame, sourceRate, target));
+    }
+
+    public static long ScaleDelta(long delta, int sourceRate, int targetRate) =>
+        sourceRate > 0 && targetRate > 0 && sourceRate != targetRate
+            ? (long)Math.Round(delta * (double)targetRate / sourceRate)
+            : delta;
 }
 
 internal sealed class EditHistory
@@ -55,15 +95,43 @@ internal sealed class EditHistory
         var index = 1;
         foreach (var command in _undo.Reverse())
         {
-            items.Add(new(index++, command.Name, command.Summary));
+            items.Add(new(index++, command.Name, command.Summary, command.Replay is not null));
         }
 
         foreach (var command in _redo)
         {
-            items.Add(new(index++, command.Name, command.Summary));
+            items.Add(new(index++, command.Name, command.Summary, command.Replay is not null));
         }
 
         return items;
+    }
+
+    /// <summary>Snapshot と同じ並び（1 始まり）で再実行レシピを返す。無ければ null。</summary>
+    public Func<AudioDocument, IEditCommand?>? ReplayAt(int index)
+    {
+        if (index < 1 || index > TotalCount)
+        {
+            return null;
+        }
+
+        var i = 1;
+        foreach (var command in _undo.Reverse())
+        {
+            if (i++ == index)
+            {
+                return command.Replay;
+            }
+        }
+
+        foreach (var command in _redo)
+        {
+            if (i++ == index)
+            {
+                return command.Replay;
+            }
+        }
+
+        return null;
     }
 
     public bool JumpTo(AudioDocument document, int index)
@@ -141,7 +209,7 @@ internal sealed class EditHistory
     }
 }
 
-internal readonly record struct EditHistoryEntry(int Index, string Name, string Title);
+internal readonly record struct EditHistoryEntry(int Index, string Name, string Title, bool CanReplay = false);
 
 internal sealed class ReplaceRangeCommand : IEditCommand
 {
@@ -178,6 +246,8 @@ internal sealed class ReplaceRangeCommand : IEditCommand
     public string Name { get; }
 
     public string Summary { get; }
+
+    public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
 
     public void Apply(AudioDocument document)
     {
@@ -227,6 +297,8 @@ internal sealed class DeleteRangeCommand : IEditCommand
     public string Name => "Delete";
 
     public string Summary { get; }
+
+    public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
 
     public void Apply(AudioDocument document)
     {
@@ -293,6 +365,8 @@ internal sealed class PasteCommand : IEditCommand
 
     public string Summary { get; }
 
+    public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
+
     public void Apply(AudioDocument document)
     {
         if (_replaced is { Length: > 0 })
@@ -348,6 +422,8 @@ internal sealed class AddMarkerCommand : IEditCommand
 
     public string Summary { get; }
 
+    public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
+
     public void Apply(AudioDocument document) => document.TryAddMarker(_frame);
 
     public void Revert(AudioDocument document) => document.ReplaceMarkers(_markersBefore);
@@ -370,6 +446,8 @@ internal sealed class SetRegionNameCommand : IEditCommand
     public string Name => "Region Name";
 
     public string Summary { get; }
+
+    public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
 
     public void Apply(AudioDocument document) => document.TrySetRegionName(_range, _after);
 
@@ -394,6 +472,8 @@ internal sealed class SetMarkerCommentCommand : IEditCommand
 
     public string Summary { get; }
 
+    public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
+
     public void Apply(AudioDocument document) => document.TrySetMarkerComment(_frame, _after);
 
     public void Revert(AudioDocument document) => document.TrySetMarkerComment(_frame, _before);
@@ -416,6 +496,8 @@ internal sealed class ReplaceMarkersCommand : IEditCommand
 
     public string Summary { get; }
 
+    public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
+
     public void Apply(AudioDocument document) => document.ReplaceMarkers(_after);
 
     public void Revert(AudioDocument document) => document.ReplaceMarkers(_before);
@@ -437,6 +519,8 @@ internal sealed class SetSampleLoopCommand : IEditCommand
 
     public string Summary { get; }
 
+    public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
+
     public void Apply(AudioDocument document) => document.SetSampleLoop(_after);
 
     public void Revert(AudioDocument document) => document.SetSampleLoop(_before);
@@ -457,6 +541,8 @@ internal sealed class SetRegionCommand : IEditCommand
     public string Name => "Set Region";
 
     public string Summary { get; }
+
+    public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
 
     public void Apply(AudioDocument document) => document.SetRegions(_after);
 
@@ -494,6 +580,8 @@ internal sealed class MoveTimelineItemsCommand : IEditCommand
 
     public string Summary { get; }
 
+    public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
+
     public void Apply(AudioDocument document)
     {
         document.ReplaceMarkers(_markersAfter);
@@ -525,6 +613,8 @@ internal sealed class ConvertFormatCommand : IEditCommand
     public string Name { get; }
 
     public string Summary { get; }
+
+    public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
 
     public void Apply(AudioDocument document) => _after.Restore(document);
 
@@ -573,11 +663,33 @@ internal static class ProcessEdits
     public static IEditCommand FadeOut(AudioDocument document, WaveSelection range) =>
         FadeOut(document, range, FadeCurves.Default);
 
-    public static IEditCommand FadeIn(AudioDocument document, WaveSelection range, FadeShape shape) =>
-        Fade(document, range, fadeIn: true, "Fade In", shape);
+    public static IEditCommand FadeIn(AudioDocument document, WaveSelection range, FadeShape shape)
+    {
+        var command = Fade(document, range, fadeIn: true, "Fade In", shape);
+        AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => FadeIn(target, mapped, shape));
+        return command;
+    }
 
-    public static IEditCommand FadeOut(AudioDocument document, WaveSelection range, FadeShape shape) =>
-        Fade(document, range, fadeIn: false, "Fade Out", shape);
+    public static IEditCommand FadeOut(AudioDocument document, WaveSelection range, FadeShape shape)
+    {
+        var command = Fade(document, range, fadeIn: false, "Fade Out", shape);
+        AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => FadeOut(target, mapped, shape));
+        return command;
+    }
+
+    /// <summary>範囲を写像して同じ操作を作り直すレシピを付ける。写像後に空なら適用しない。</summary>
+    private static void AttachRangeReplay(
+        IEditCommand command,
+        int sourceRate,
+        WaveSelection range,
+        Func<AudioDocument, WaveSelection, IEditCommand?> factory)
+    {
+        command.Replay = target =>
+        {
+            var mapped = EditReplay.MapRange(range, sourceRate, target);
+            return mapped.IsEmpty ? null : factory(target, mapped);
+        };
+    }
 
     public static IEditCommand? FadeAroundPlayhead(
         AudioDocument document,
@@ -603,7 +715,7 @@ internal static class ProcessEdits
         ApplyFadeGains(after, document.Channels, union.StartFrame, fadeOut, fadeIn: false);
         ApplyFadeGains(after, document.Channels, union.StartFrame, fadeIn, fadeIn: true);
         var cursor = Math.Clamp(playhead, 0, Math.Max(0, document.FrameCount));
-        return new ReplaceRangeCommand(
+        var command = new ReplaceRangeCommand(
             "Fade Around Playhead",
             union.StartFrame,
             before,
@@ -617,6 +729,17 @@ internal static class ProcessEdits
                 document.SampleRate,
                 union.StartFrame,
                 union.EndFrame));
+        var sourceRate = document.SampleRate;
+        var sourceVisible = visible;
+        var sourcePlayhead = playhead;
+        command.Replay = target =>
+        {
+            var mappedVisible = EditReplay.MapRange(sourceVisible, sourceRate, target);
+            return mappedVisible.IsEmpty
+                ? null
+                : FadeAroundPlayhead(target, mappedVisible, EditReplay.MapFrame(sourcePlayhead, sourceRate, target));
+        };
+        return command;
     }
 
     public static void SplitVisibleAroundPlayhead(
@@ -657,7 +780,7 @@ internal static class ProcessEdits
             }
         }
 
-        return new ReplaceRangeCommand(
+        var command = new ReplaceRangeCommand(
             "Normalize",
             range.StartFrame,
             before,
@@ -671,12 +794,15 @@ internal static class ProcessEdits
                 document.SampleRate,
                 range.StartFrame,
                 range.EndFrame));
+        // 再適用時はゲインを適用先のピークから再計算する。
+        AttachRangeReplay(command, document.SampleRate, range, Normalize);
+        return command;
     }
 
     public static IEditCommand Delete(AudioDocument document, WaveSelection range)
     {
         var removed = document.CopyRange(range.StartFrame, range.Length);
-        return new DeleteRangeCommand(
+        var command = new DeleteRangeCommand(
             range.StartFrame,
             removed,
             document.Selection,
@@ -689,6 +815,8 @@ internal static class ProcessEdits
                 document.SampleRate,
                 range.StartFrame,
                 range.EndFrame));
+        AttachRangeReplay(command, document.SampleRate, range, Delete);
+        return command;
     }
 
     public static AudioClip? Copy(AudioDocument document, WaveSelection range)
@@ -736,7 +864,7 @@ internal static class ProcessEdits
         var pasteVerb = replaced is { Length: > 0 }
             ? UiStrings.EditHistoryName("Paste") + "（置換）"
             : UiStrings.EditHistoryName("Paste");
-        return new PasteCommand(
+        var command = new PasteCommand(
             insertFrame,
             samples,
             replaced,
@@ -752,6 +880,10 @@ internal static class ProcessEdits
                 document.SampleRate,
                 insertFrame,
                 insertFrame + insertedFrames));
+        var sourceRate = document.SampleRate;
+        var resolvedFrame = insertFrame;
+        command.Replay = target => Paste(target, clip, EditReplay.MapFrame(resolvedFrame, sourceRate, target));
+        return command;
     }
 
     public static IEditCommand? SetSampleLoop(AudioDocument document, WaveSelection range)
@@ -768,15 +900,36 @@ internal static class ProcessEdits
             after = WaveSelection.Empty;
         }
 
-        var loopSummary = after.IsEmpty
+        var command = new SetSampleLoopCommand(before, after, SampleLoopSummary(document.SampleRate, after));
+        var sourceRate = document.SampleRate;
+        var sourceAfter = after;
+        // 再適用は「after の状態にする」。トグルではないので同じ範囲でも解除にならない。
+        command.Replay = target =>
+        {
+            var mapped = sourceAfter.IsEmpty
+                ? WaveSelection.Empty
+                : EditReplay.MapRange(sourceAfter, sourceRate, target);
+            if (target.SampleLoop == mapped)
+            {
+                return null;
+            }
+
+            return new SetSampleLoopCommand(
+                target.SampleLoop,
+                mapped,
+                SampleLoopSummary(target.SampleRate, mapped));
+        };
+        return command;
+    }
+
+    private static string SampleLoopSummary(int sampleRate, WaveSelection after) =>
+        after.IsEmpty
             ? UiStrings.EditHistoryName("Set Sample Loop") + "  解除"
             : UiStrings.EditHistoryRange(
                 UiStrings.EditHistoryName("Set Sample Loop"),
-                document.SampleRate,
+                sampleRate,
                 after.StartFrame,
                 after.EndFrame);
-        return new SetSampleLoopCommand(before, after, loopSummary);
-    }
 
     public static IEditCommand? SetRegion(AudioDocument document, WaveSelection range)
     {
@@ -818,7 +971,36 @@ internal static class ProcessEdits
                 document.SampleRate,
                 range.StartFrame,
                 range.EndFrame);
-        return new SetRegionCommand(before, after, summary);
+        var command = new SetRegionCommand(before, after, summary);
+        var sourceRate = document.SampleRate;
+        var sourceRange = range;
+        var wasRemoval = after.Length < before.Length;
+        command.Replay = target =>
+        {
+            // 全解除は適用先も全解除。個別は追加／解除の向きを保つ（トグルの反転を防ぐ）。
+            if (sourceRange.IsEmpty)
+            {
+                var targetBefore = target.SnapshotRegions();
+                return targetBefore.Length == 0
+                    ? null
+                    : new SetRegionCommand(targetBefore, [], UiStrings.EditHistoryName("Set Region") + "  解除");
+            }
+
+            var mapped = EditReplay.MapRange(sourceRange, sourceRate, target);
+            if (mapped.IsEmpty)
+            {
+                return null;
+            }
+
+            var exists = target.RegionNumber(mapped) > 0;
+            if (wasRemoval)
+            {
+                return exists ? RemoveRegions(target, [mapped]) : null;
+            }
+
+            return exists ? null : SetRegion(target, mapped);
+        };
+        return command;
     }
 
     public static IEditCommand? RemoveRegions(AudioDocument document, IReadOnlyList<WaveSelection> ranges)
@@ -844,18 +1026,34 @@ internal static class ProcessEdits
             return null;
         }
 
-        return new SetRegionCommand(
+        var command = new SetRegionCommand(
             before,
             after,
             UiStrings.EditHistoryName("Set Region") + "  解除");
+        var sourceRate = document.SampleRate;
+        var removedRanges = remove.ToArray();
+        command.Replay = target => RemoveRegions(
+            target,
+            removedRanges
+                .Select(item => EditReplay.MapRange(item, sourceRate, target))
+                .Where(item => !item.IsEmpty)
+                .ToArray());
+        return command;
     }
 
     public static IEditCommand AddMarker(AudioDocument document, long frame)
     {
-        return new AddMarkerCommand(
+        var command = new AddMarkerCommand(
             frame,
             document.SnapshotMarkers(),
             UiStrings.EditHistoryPoint(UiStrings.EditHistoryName("Add Marker"), document.SampleRate, frame));
+        var sourceRate = document.SampleRate;
+        command.Replay = target =>
+        {
+            var mapped = EditReplay.MapFrame(frame, sourceRate, target);
+            return target.HasMarkerAt(mapped) ? null : AddMarker(target, mapped);
+        };
+        return command;
     }
 
     public static IEditCommand? SetMarkerComment(AudioDocument document, long frame, string comment)
@@ -867,7 +1065,7 @@ internal static class ProcessEdits
             return null;
         }
 
-        return new SetMarkerCommentCommand(
+        var command = new SetMarkerCommentCommand(
             frame,
             before,
             after,
@@ -876,6 +1074,10 @@ internal static class ProcessEdits
                 document.SampleRate,
                 frame,
                 UiStrings.EditHistoryQuote(after)));
+        var sourceRate = document.SampleRate;
+        command.Replay = target =>
+            SetMarkerComment(target, EditReplay.MapFrame(frame, sourceRate, target), after);
+        return command;
     }
 
     public static IEditCommand? SetRegionName(AudioDocument document, WaveSelection range, string name)
@@ -887,7 +1089,7 @@ internal static class ProcessEdits
             return null;
         }
 
-        return new SetRegionNameCommand(
+        var command = new SetRegionNameCommand(
             range,
             before,
             after,
@@ -897,6 +1099,10 @@ internal static class ProcessEdits
                 range.StartFrame,
                 range.EndFrame,
                 UiStrings.EditHistoryQuote(after)));
+        var sourceRate = document.SampleRate;
+        command.Replay = target =>
+            SetRegionName(target, EditReplay.MapRange(range, sourceRate, target), after);
+        return command;
     }
 
     public static IEditCommand? RemoveMarkers(AudioDocument document, IReadOnlyList<long> frames)
@@ -909,11 +1115,17 @@ internal static class ProcessEdits
             return null;
         }
 
-        return new ReplaceMarkersCommand(
+        var command = new ReplaceMarkersCommand(
             "Delete Markers",
             before,
             after,
             UiStrings.EditHistoryMarkers("Delete Markers", before, after, document.SampleRate));
+        var sourceRate = document.SampleRate;
+        var removedFrames = remove.ToArray();
+        command.Replay = target => RemoveMarkers(
+            target,
+            removedFrames.Select(item => EditReplay.MapFrame(item, sourceRate, target)).ToArray());
+        return command;
     }
 
     public static IEditCommand? MoveMarkers(
@@ -966,11 +1178,20 @@ internal static class ProcessEdits
 
         Array.Sort(after, (left, right) => left.Frame.CompareTo(right.Frame));
         var name = moving.Count == 1 ? "Move Marker" : "Move Markers";
-        return new ReplaceMarkersCommand(
+        var command = new ReplaceMarkersCommand(
             name,
             before,
             after,
             UiStrings.EditHistoryMarkers(name, before, after, document.SampleRate));
+        var sourceRate = document.SampleRate;
+        var movingFrames = moving.ToArray();
+        var deltaApplied = appliedDelta;
+        command.Replay = target => MoveMarkers(
+            target,
+            movingFrames.Select(item => EditReplay.MapFrame(item, sourceRate, target)).ToArray(),
+            EditReplay.ScaleDelta(deltaApplied, sourceRate, target.SampleRate),
+            out _);
+        return command;
     }
 
     public static IEditCommand? MoveTimelineItems(
@@ -1070,11 +1291,13 @@ internal static class ProcessEdits
             ScaleRegions(document, destRate, destFrames),
             FormatConvert.ScaleFrame(document.CursorFrame, document.SampleRate, destRate, destFrames),
             FormatConvert.ScaleMarkers(document.SnapshotMarkers(), document.SampleRate, destRate, destFrames));
-        return new ConvertFormatCommand(
+        var command = new ConvertFormatCommand(
             "Convert Sample Rate",
             $"{UiStrings.EditHistoryName("Convert Sample Rate")}  {document.SampleRate}→{destRate} Hz",
             before,
             after);
+        command.Replay = target => ConvertSampleRate(target, destRate);
+        return command;
     }
 
     private static WaveRegion[] ScaleRegions(AudioDocument document, int destRate, long destFrames)
@@ -1108,11 +1331,13 @@ internal static class ProcessEdits
             ? FormatConvert.Quantize(document.Interleaved, bits)
             : document.Interleaved;
         var after = before with { Samples = samples, BitsPerSample = bits };
-        return new ConvertFormatCommand(
+        var command = new ConvertFormatCommand(
             "Convert Bit Depth",
             $"{UiStrings.EditHistoryName("Convert Bit Depth")}  {document.BitsPerSample}→{bits} bit",
             before,
             after);
+        command.Replay = target => ConvertBitDepth(target, bits);
+        return command;
     }
 
     public static IEditCommand? ConvertChannels(AudioDocument document, int destChannels)
@@ -1125,11 +1350,13 @@ internal static class ProcessEdits
         var before = FormatSnapshot.Capture(document);
         var samples = FormatConvert.Remix(document.Interleaved, document.Channels, destChannels);
         var after = before with { Samples = samples, Channels = destChannels };
-        return new ConvertFormatCommand(
+        var command = new ConvertFormatCommand(
             "Convert Channels",
             $"{UiStrings.EditHistoryName("Convert Channels")}  {document.Channels}→{destChannels} ch",
             before,
             after);
+        command.Replay = target => ConvertChannels(target, destChannels);
+        return command;
     }
 
     private static IEditCommand Fade(

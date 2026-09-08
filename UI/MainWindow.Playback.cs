@@ -631,12 +631,6 @@ public partial class MainWindow
             return;
         }
 
-        if (_document is { Selection.IsEmpty: false })
-        {
-            PausePlaybackSoft();
-            return;
-        }
-
         HaltPlaybackToStart();
     }
 

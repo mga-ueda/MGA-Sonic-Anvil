@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -10,6 +11,19 @@ namespace MgaSonicAnvil.UI;
 
 public partial class MainWindow
 {
+    /// <summary>
+    /// 複数選択されたタブ。Ctrl+クリックで個別追加、Shift+クリックで範囲、
+    /// タブ上の Ctrl+A で全選択。Esc で解除。選択中の Ctrl+V は選択タブへの
+    /// 履歴レシピ適用になる。タブのアクティブ化で解除。
+    /// </summary>
+    private readonly HashSet<DocumentSession> _selectedTabs = [];
+
+    /// <summary>Shift+クリックの範囲選択の起点。</summary>
+    private DocumentSession? _tabSelectionAnchor;
+
+    private bool HasTabSelection => _selectedTabs.Count > 0;
+
+    private bool AllTabsSelected => _sessions.Count > 0 && _selectedTabs.Count == _sessions.Count;
     private void CaptureActiveSessionView()
     {
         if (_activeSession is null)
@@ -28,6 +42,8 @@ public partial class MainWindow
 
     private void ActivateSession(DocumentSession session)
     {
+        _selectedTabs.Clear();
+        _tabSelectionAnchor = session;
         if (ReferenceEquals(_activeSession, session) && ReferenceEquals(_document, session.Document))
         {
             RebuildTabBar();
@@ -60,17 +76,24 @@ public partial class MainWindow
         ActivateSession(_sessions[next]);
     }
 
-    private void CloseSession(DocumentSession session)
+    /// <summary>閉じたら true。保存確認でキャンセルされたら false（連続クローズを中断する）。</summary>
+    private bool CloseSession(DocumentSession session)
     {
         if (!OfferSaveIfDirty(session))
         {
-            return;
+            return false;
         }
 
         var index = _sessions.IndexOf(session);
         if (index < 0)
         {
-            return;
+            return true;
+        }
+
+        _selectedTabs.Remove(session);
+        if (ReferenceEquals(_tabSelectionAnchor, session))
+        {
+            _tabSelectionAnchor = null;
         }
 
         var closingActive = ReferenceEquals(session, _activeSession);
@@ -79,7 +102,7 @@ public partial class MainWindow
         {
             BindWorkspace(null);
             ForgetClosedDocument();
-            return;
+            return true;
         }
 
         if (closingActive)
@@ -91,6 +114,168 @@ public partial class MainWindow
             RebuildTabBar();
             RefreshTabHeaders();
         }
+
+        return true;
+    }
+
+    private void CloseOtherTabs(DocumentSession keep)
+    {
+        foreach (var session in _sessions.ToArray())
+        {
+            if (!ReferenceEquals(session, keep) && !CloseSession(session))
+            {
+                return;
+            }
+        }
+    }
+
+    /// <summary>このタブを含め、右側（または左側）を全部閉じる。</summary>
+    private void CloseTabsFrom(DocumentSession session, bool rightSide)
+    {
+        var index = _sessions.IndexOf(session);
+        if (index < 0)
+        {
+            return;
+        }
+
+        var targets = rightSide
+            ? _sessions.Skip(index).ToArray()
+            : _sessions.Take(index + 1).ToArray();
+        foreach (var target in targets)
+        {
+            if (!CloseSession(target))
+            {
+                return;
+            }
+        }
+    }
+
+    private void CloseAllTabs() => CloseTabs(_sessions.ToArray());
+
+    private void SelectAllTabs()
+    {
+        if (_sessions.Count == 0)
+        {
+            return;
+        }
+
+        _selectedTabs.Clear();
+        foreach (var session in _sessions)
+        {
+            _selectedTabs.Add(session);
+        }
+
+        RebuildTabBar();
+    }
+
+    /// <summary>Ctrl+クリック。選択に個別追加／解除する（アクティブ化はしない）。</summary>
+    private void ToggleTabSelection(DocumentSession session)
+    {
+        if (!_selectedTabs.Add(session))
+        {
+            _selectedTabs.Remove(session);
+        }
+
+        _tabSelectionAnchor = session;
+        RebuildTabBar();
+    }
+
+    /// <summary>Shift+クリック。起点（前回操作したタブ、無ければアクティブ）から範囲選択。</summary>
+    private void SelectTabRange(DocumentSession session)
+    {
+        var anchor = _tabSelectionAnchor ?? _activeSession;
+        var from = anchor is null ? -1 : _sessions.IndexOf(anchor);
+        var to = _sessions.IndexOf(session);
+        if (to < 0)
+        {
+            return;
+        }
+
+        if (from < 0)
+        {
+            from = to;
+        }
+
+        var start = Math.Min(from, to);
+        var end = Math.Max(from, to);
+        for (var i = start; i <= end; i++)
+        {
+            _selectedTabs.Add(_sessions[i]);
+        }
+
+        RebuildTabBar();
+    }
+
+    /// <summary>Esc から呼ぶ。解除したら true。</summary>
+    private bool ClearTabSelection()
+    {
+        if (!HasTabSelection)
+        {
+            return false;
+        }
+
+        _selectedTabs.Clear();
+        RebuildTabBar();
+        return true;
+    }
+
+    /// <summary>選択タブをタブバーの並び順で返す。</summary>
+    private DocumentSession[] SelectedTabsInOrder() =>
+        _sessions.Where(_selectedTabs.Contains).ToArray();
+
+    private void CloseTabs(IReadOnlyList<DocumentSession> targets)
+    {
+        foreach (var session in targets)
+        {
+            if (!CloseSession(session))
+            {
+                return;
+            }
+        }
+    }
+
+    private void OpenTabContextMenu(FrameworkElement anchor, DocumentSession session)
+    {
+        var menu = new ContextMenu
+        {
+            PlacementTarget = anchor,
+            Placement = PlacementMode.MousePoint,
+        };
+
+        if (HasTabSelection)
+        {
+            var targets = SelectedTabsInOrder();
+            menu.Items.Add(AllTabsSelected
+                ? CreateTabMenuItem(UiStrings.TabMenuCloseAll, CloseAllTabs, "Ctrl+Shift+W")
+                : CreateTabMenuItem(UiStrings.TabMenuCloseSelected, () => CloseTabs(targets)));
+            menu.Items.Add(CreateTabMenuItem(
+                AllTabsSelected ? UiStrings.TabMenuPasteToAll : UiStrings.TabMenuPasteToSelected,
+                () => PasteHistoryRecipesToTabs(targets),
+                "Ctrl+V"));
+        }
+        else
+        {
+            menu.Items.Add(CreateTabMenuItem(UiStrings.TabMenuCloseOthers, () => CloseOtherTabs(session)));
+            menu.Items.Add(CreateTabMenuItem(UiStrings.TabMenuCloseRight, () => CloseTabsFrom(session, rightSide: true)));
+            menu.Items.Add(CreateTabMenuItem(UiStrings.TabMenuCloseLeft, () => CloseTabsFrom(session, rightSide: false)));
+            menu.Items.Add(CreateTabMenuItem(UiStrings.TabMenuCloseAllNormal, CloseAllTabs, "Ctrl+Shift+W"));
+            menu.Items.Add(new Separator());
+            menu.Items.Add(CreateTabMenuItem(UiStrings.TabMenuSelectAll, SelectAllTabs));
+        }
+
+        menu.IsOpen = true;
+    }
+
+    private static MenuItem CreateTabMenuItem(string header, Action action, string? gesture = null)
+    {
+        var item = new MenuItem { Header = header };
+        if (gesture is not null)
+        {
+            item.InputGestureText = gesture;
+        }
+
+        item.Click += (_, _) => action();
+        return item;
     }
 
     private DocumentSession? FindSessionByPath(string path)
@@ -226,7 +411,7 @@ public partial class MainWindow
 
     private FrameworkElement CreateTabItem(DocumentSession session)
     {
-        var active = ReferenceEquals(session, _activeSession);
+        var active = ReferenceEquals(session, _activeSession) || _selectedTabs.Contains(session);
         var border = new Border
         {
             Tag = session,
@@ -246,8 +431,8 @@ public partial class MainWindow
             FontFamily = new FontFamily("Consolas"),
             TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(0, 0, 6, 0),
-            ToolTip = session.Document.SourcePath ?? UiStrings.UntitledDocument,
         };
+        TipService.Set(title, session.Document.SourcePath ?? UiStrings.UntitledDocument);
 
         var close = new TextBlock
         {
@@ -258,8 +443,8 @@ public partial class MainWindow
             HorizontalAlignment = HorizontalAlignment.Center,
             Foreground = (Brush)FindResource("MutedForeBrush"),
             Cursor = Cursors.Hand,
-            ToolTip = UiStrings.TipCloseTab,
         };
+        TipService.Set(close, UiStrings.TipCloseTab);
         close.MouseLeftButtonUp += (_, e) =>
         {
             e.Handled = true;
@@ -283,7 +468,22 @@ public partial class MainWindow
         border.Child = body;
         border.MouseLeftButtonUp += (_, e) =>
         {
-            if (!e.Handled)
+            if (e.Handled)
+            {
+                return;
+            }
+
+            if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
+            {
+                e.Handled = true;
+                ToggleTabSelection(session);
+            }
+            else if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+            {
+                e.Handled = true;
+                SelectTabRange(session);
+            }
+            else
             {
                 ActivateSession(session);
             }
@@ -295,6 +495,11 @@ public partial class MainWindow
                 e.Handled = true;
                 CloseSession(session);
             }
+        };
+        border.MouseRightButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            OpenTabContextMenu(border, session);
         };
         return border;
     }
@@ -313,11 +518,11 @@ public partial class MainWindow
             {
                 if (block.Text == "×")
                 {
-                    block.ToolTip = UiStrings.TipCloseTab;
+                    TipService.Set(block, UiStrings.TipCloseTab);
                 }
                 else if (session is not null)
                 {
-                    block.ToolTip = session.Document.SourcePath ?? UiStrings.UntitledDocument;
+                    TipService.Set(block, session.Document.SourcePath ?? UiStrings.UntitledDocument);
                 }
             }
         }
@@ -329,7 +534,7 @@ public partial class MainWindow
     private void ApplyTabChrome(DocumentSession session, DockPanel dock)
     {
         var dirty = session.Document.IsDirty;
-        var active = ReferenceEquals(session, _activeSession);
+        var active = ReferenceEquals(session, _activeSession) || _selectedTabs.Contains(session);
         var accent = (Brush)FindResource(dirty ? "DirtyAccentBrush" : "AccentCyanBrush");
         var titleBrush = dirty
             ? accent

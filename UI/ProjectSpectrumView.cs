@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -6,40 +7,22 @@ using MgaSonicAnvil.Audio;
 namespace MgaSonicAnvil.UI;
 
 /// <summary>
-/// Wwise IM Importer と同じ小型スペクトラムアナライザ。
-/// バー幅・間隔はデバイス px 固定（4px）、ホスト幅もそれに合わせる。
+/// Layer Music Checker の LED スペアナを、トランスポート横の狭い枠に収めたもの。
 /// </summary>
 internal sealed class ProjectSpectrumView : FrameworkElement
 {
-    private const int FftSize = 2048;
-    private const int BarWidthDevicePx = 3;
-    private const int BarGapDevicePx = 2;
-    private const float FloorDb = -60f;
-    private const float CeilingDb = 0f;
-    private const double RiseSeconds = 0.001d;
-    private const double FallSeconds = 0.7d;
-    private const double BlurSigma = 0.45d;
-    private const float PeakSoftKneeDb = -6f;
-    private const double PeakSoftGamma = 1.24d;
+    /// <summary>Courier で読める下限。メーター目盛の 8 より一段小さい。</summary>
+    private const double ChromeFontSize = 7;
+    private static readonly Typeface ChromeTypeface = new(
+        new FontFamily("Courier New"),
+        FontStyles.Normal,
+        FontWeights.Normal,
+        FontStretches.Normal);
 
-    private static readonly double[] BandCenters =
-    [
-        20d, 25d, 31.5d, 40d, 50d, 63d, 80d, 100d,
-        125d, 160d, 200d, 250d, 315d, 400d, 500d, 630d,
-        800d, 1000d, 1250d, 1600d, 2000d, 2500d, 3150d,
-        4000d, 5000d, 6300d, 8000d, 10000d, 12500d, 16000d, 20000d,
-    ];
-
+    private readonly SpectrumAnalyzer _analyzer = new();
     private readonly DispatcherTimer _timer;
-    private readonly float[] _samples = new float[FftSize];
-    private readonly float[] _window = new float[FftSize];
-    private readonly double[] _re = new double[FftSize];
-    private readonly double[] _im = new double[FftSize];
-    private readonly double[] _bandPower = new double[BandCenters.Length];
-    private readonly double[] _blurredPower = new double[BandCenters.Length];
-    private readonly float[] _envelopeDb = new float[BandCenters.Length];
-    private readonly float[] _levels = new float[BandCenters.Length];
-    private readonly float _windowSum;
+    private readonly float[] _samples = new float[SpectrumAnalyzer.FftSize];
+    private LinearGradientBrush? _barGradient;
     private bool _idle = true;
     private long _lastTickAt;
 
@@ -60,28 +43,28 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         Focusable = false;
         SnapsToDevicePixels = true;
         UseLayoutRounding = true;
-        ApplyDevicePixelWidth();
-
-        var windowSum = 0f;
-        for (var i = 0; i < FftSize; i++)
-        {
-            _window[i] = 0.5f - 0.5f * (float)Math.Cos(2d * Math.PI * i / (FftSize - 1));
-            windowSum += _window[i];
-        }
-
-        _windowSum = windowSum;
-        Array.Fill(_envelopeDb, FloorDb);
-        // 停止後の減衰用。再生中は Background 優先度がマウス入力に飢餓するため、
-        // MainWindow の CompositionTarget.Rendering から Tick() で駆動される。
+        ClipToBounds = true;
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
         _timer.Tick += (_, _) => Tick();
         _timer.Start();
     }
 
-    /// <summary>
-    /// 更新を 1 回試みる。33ms 未満の連続呼び出しは無視するので、
-    /// フレーム駆動とタイマーの両方から呼んでも二重更新しない。
-    /// </summary>
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        var height = DesignMetrics.SpectrumHeight;
+        var width = DesignMetrics.LevelMeterWidth * SpectrumAnalyzer.OriginalAspect
+            + DesignMetrics.SpectrumExtraWidth;
+        return new Size(width, height);
+    }
+
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        InvalidateMeasure();
+    }
+
+    public AudioPlayer? Player { get; set; }
+
     public void Tick()
     {
         var now = Environment.TickCount64;
@@ -95,69 +78,94 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         UpdateLevels(Math.Min(200d, elapsed));
     }
 
-    public AudioPlayer? Player { get; set; }
-
-    public static int RequiredWidthDevicePx =>
-        BandCenters.Length * BarWidthDevicePx
-        + (BandCenters.Length - 1) * BarGapDevicePx;
-
-    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
-    {
-        base.OnDpiChanged(oldDpi, newDpi);
-        ApplyDevicePixelWidth();
-    }
-
-    private void ApplyDevicePixelWidth()
-    {
-        var dip = RequiredWidthDevicePx / PixelsPerDip * DesignMetrics.SpectrumWidthScale;
-        Width = dip;
-        MinWidth = dip;
-    }
-
-    private double PixelsPerDip
-    {
-        get
-        {
-            var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-            return dpi > 0 ? dpi : 1d;
-        }
-    }
-
     protected override void OnRender(DrawingContext dc)
     {
         var bounds = new Rect(RenderSize);
-        if (bounds.Width <= 1 || bounds.Height <= 1)
+        if (bounds.Width <= 2 || bounds.Height <= 2)
         {
             return;
         }
 
-        var inner = bounds;
-        if (inner.Width <= 0 || inner.Height <= 0)
+        var dpi = PixelsPerDip;
+        var wPx = Math.Max(1, (int)Math.Floor(bounds.Width * dpi));
+        var hPx = Math.Max(1, (int)Math.Floor(bounds.Height * dpi));
+        var g = ComputePlot(wPx, hPx);
+        var px = 1d / dpi;
+
+        var chrome = WpfControlHelpers.FrozenBrush(Theme.Get("SurfaceBackBrush"));
+        var plotBack = WpfControlHelpers.FrozenBrush(Theme.Get("VectorScopeBackBrush"));
+        dc.DrawRectangle(chrome, null, bounds);
+        var plot = new Rect(g.PlotX * px, g.PlotY * px, g.PlotW * px, g.PlotH * px);
+        if (plot.Width <= 0 || plot.Height <= 0)
         {
             return;
         }
 
-        var px = 1d / PixelsPerDip;
-        var barWidth = BarWidthDevicePx * px * DesignMetrics.SpectrumWidthScale;
-        var barGap = BarGapDevicePx * px * DesignMetrics.SpectrumWidthScale;
-        var barBrush = WpfControlHelpers.FrozenBrush(Theme.Get("SpectrumBarBrush"));
-        var bandCount = Math.Min(
-            _levels.Length,
-            (int)((inner.Width + barGap) / (barWidth + barGap)));
-        var graphWidth = bandCount * barWidth + Math.Max(0, bandCount - 1) * barGap;
-        var graphLeft = inner.Left + Math.Max(0, (inner.Width - graphWidth) / 2);
-        for (var band = 0; band < bandCount; band++)
+        dc.DrawRectangle(plotBack, null, plot);
+        DrawDbGrid(dc, g, px);
+        EnsureGradient();
+
+        var bands = _analyzer.CurrentBands;
+        var n = bands.Count;
+        var rects = SpectrumAnalyzer.CreateBarRects(
+            g.PlotX,
+            g.PlotW,
+            n,
+            SpectrumAnalyzer.BarGutterDevicePx);
+        var cells = SpectrumAnalyzer.CreateLedCells(g.PlotY, g.PlotH, SpectrumAnalyzer.FloorDb);
+        var env = _analyzer.EnvelopeDb;
+        var hold = _analyzer.PeakHoldDb;
+
+        for (var b = 0; b < n && b < rects.Length; b++)
         {
-            var x = graphLeft + band * (barWidth + barGap);
-            var barHeight = Math.Round(_levels[band] * inner.Height);
-            if (barHeight > 0)
+            var barDb = b < env.Length ? env[b] : SpectrumAnalyzer.FloorDb;
+            var lastLit = LastLitRow(cells, barDb);
+            if (lastLit < 0 || _barGradient is null)
             {
-                dc.DrawRectangle(
-                    barBrush,
-                    null,
-                    new Rect(x, inner.Bottom - barHeight, barWidth, barHeight));
+                continue;
+            }
+
+            var lit = DipRect(
+                rects[b].X1,
+                cells.Top[lastLit],
+                rects[b].BarW,
+                cells.Bot[0] - cells.Top[lastLit],
+                px);
+            if (lit.Height > 0)
+            {
+                dc.PushClip(new RectangleGeometry(lit));
+                dc.PushOpacity(LevelMeterEngine.BarFillOpacity);
+                dc.DrawRectangle(_barGradient, null, plot);
+                dc.Pop();
+                dc.Pop();
             }
         }
+
+        for (var b = 0; b < n && b < rects.Length && b < hold.Length; b++)
+        {
+            var pkDb = hold[b];
+            if (pkDb <= SpectrumAnalyzer.FloorDb + 1e-4f)
+            {
+                continue;
+            }
+
+            var iPk = Math.Clamp((int)Math.Floor(pkDb) - cells.LoInt, 0, cells.Count - 1);
+            var color = LevelMeterEngine.LevelColor(pkDb);
+            var peak = DipRect(
+                rects[b].X1,
+                cells.Top[iPk],
+                rects[b].BarW,
+                cells.Bot[iPk] - cells.Top[iPk],
+                px);
+            if (peak.Height > 0)
+            {
+                dc.PushOpacity(LevelMeterEngine.BarFillOpacity);
+                dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Color.FromRgb(color.R, color.G, color.B)), null, peak);
+                dc.Pop();
+            }
+        }
+
+        DrawChromeLabels(dc, g, bands, rects, px);
     }
 
     private void UpdateLevels(double dtMs)
@@ -172,28 +180,13 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         if (active)
         {
             _ = player!.ReadRecentOutputSamples(_samples);
-            ComputeBandTargets(player.OutputSampleRate, dtMs);
+            _analyzer.Process(_samples, player.OutputSampleRate, dtMs / 1000d, active: true);
             _idle = false;
         }
         else
         {
-            var anyVisible = false;
-            var fall = 1d - Math.Exp(-dtMs / 1000d / FallSeconds);
-            for (var i = 0; i < _levels.Length; i++)
-            {
-                _envelopeDb[i] += (FloorDb - _envelopeDb[i]) * (float)fall;
-                _levels[i] = DbToLevel(_envelopeDb[i]);
-                if (_levels[i] > 0.004f)
-                {
-                    anyVisible = true;
-                }
-                else
-                {
-                    _levels[i] = 0f;
-                }
-            }
-
-            if (!anyVisible)
+            _analyzer.Process(_samples, player?.OutputSampleRate ?? 48000, dtMs / 1000d, active: false);
+            if (!_analyzer.HasVisibleLevel)
             {
                 if (_idle)
                 {
@@ -207,153 +200,214 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         InvalidateVisual();
     }
 
-    private void ComputeBandTargets(int sampleRate, double dtMs)
+    private int MeasureDbPadDevicePx()
     {
-        if (sampleRate <= 0)
+        var ft = ChromeText("-50", ChromeFontSize, WpfControlHelpers.FrozenBrush(LabelColor()));
+        return Math.Max(1, (int)Math.Ceiling(ft.Width * PixelsPerDip) + 2);
+    }
+
+    private static Color LabelColor()
+    {
+        try
         {
-            sampleRate = 48000;
+            return Theme.Get("MutedForeBrush");
         }
-
-        for (var i = 0; i < FftSize; i++)
+        catch (InvalidOperationException)
         {
-            _re[i] = _samples[i] * _window[i];
-            _im[i] = 0d;
-        }
-
-        Fft(_re, _im);
-        Array.Clear(_bandPower);
-        var binHz = sampleRate / (double)FftSize;
-        var nyquist = sampleRate / 2d;
-
-        for (var bin = 1; bin < FftSize / 2; bin++)
-        {
-            var binLow = bin * binHz;
-            var binHigh = Math.Min(nyquist, (bin + 1) * binHz);
-            var magnitude = 2d
-                * Math.Sqrt(_re[bin] * _re[bin] + _im[bin] * _im[bin])
-                / _windowSum;
-            var power = magnitude * magnitude;
-            for (var band = 0; band < BandCenters.Length; band++)
-            {
-                GetBandEdges(band, nyquist, out var bandLow, out var bandHigh);
-                var overlap = Math.Min(binHigh, bandHigh) - Math.Max(binLow, bandLow);
-                if (overlap > 0d)
-                {
-                    _bandPower[band] += power * overlap / binHz;
-                }
-            }
-        }
-
-        BlurBandPower();
-
-        var dt = dtMs / 1000d;
-        var rise = 1d - Math.Exp(-dt / RiseSeconds);
-        var fall = 1d - Math.Exp(-dt / FallSeconds);
-        for (var band = 0; band < BandCenters.Length; band++)
-        {
-            var rawDb = _blurredPower[band] > 1e-18
-                ? (float)(10d * Math.Log10(_blurredPower[band]))
-                : FloorDb;
-            var targetDb = SoftenDisplayPeak(Math.Clamp(rawDb, FloorDb, CeilingDb));
-            var coefficient = targetDb >= _envelopeDb[band] ? rise : fall;
-            _envelopeDb[band] += (targetDb - _envelopeDb[band]) * (float)coefficient;
-            _levels[band] = DbToLevel(_envelopeDb[band]);
+            return Color.FromRgb(0x96, 0x96, 0x96);
         }
     }
 
-    private static void GetBandEdges(int band, double nyquist, out double low, out double high)
+    private PlotGeometry ComputePlot(int wPx, int hPx)
     {
-        low = band == 0
-            ? BandCenters[0]
-            : Math.Sqrt(BandCenters[band - 1] * BandCenters[band]);
-        high = band == BandCenters.Length - 1
-            ? Math.Min(nyquist * 0.995d, BandCenters[^1] * Math.Pow(2d, 1d / 6d))
-            : Math.Sqrt(BandCenters[band] * BandCenters[band + 1]);
-        high = Math.Min(high, nyquist * 0.995d);
+        var s = hPx / (double)SpectrumAnalyzer.OriginalOuterHeightPx;
+        var textPad = MeasureDbPadDevicePx();
+        var padL = Math.Max(textPad, (int)Math.Round(SpectrumAnalyzer.OrigPadLeftPx * s))
+            + (int)Math.Round(DesignMetrics.SpectrumPadLeftExtra * PixelsPerDip);
+        var padR = 0;
+        var padT = 0;
+        var minLabelH = Math.Max(
+            (int)Math.Ceiling(ChromeFontSize * 2 + 2),
+            (int)Math.Round(SpectrumAnalyzer.OrigFreqLabelPx * s));
+        var insetL = Math.Max(1, (int)Math.Round(SpectrumAnalyzer.OrigInsetLeftPx * s));
+        var insetR = 0;
+        var plotX = padL + insetL;
+        var plotY = padT;
+        var meterH = Math.Max(1, (int)Math.Round(DesignMetrics.LevelMeterWidth * PixelsPerDip));
+        var plotH = Math.Max(1, Math.Min(hPx - minLabelH, meterH));
+        var plotW = Math.Max(1, wPx - padL - padR - insetL - insetR);
+        return new PlotGeometry(plotX, plotY, plotW, plotH, padL, padR, ShowDb: true, ShowHz: true, wPx, hPx);
     }
 
-    private void BlurBandPower()
+    private static void DrawDbGrid(DrawingContext dc, PlotGeometry g, double px)
     {
-        var radius = (int)Math.Ceiling(BlurSigma * 4d);
-        for (var band = 0; band < BandCenters.Length; band++)
+        var pen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("VectorScopeGridBrush")), 0.6);
+        pen.Freeze();
+        var x0 = g.PlotX * px;
+        var x1 = (g.PlotX + g.PlotW) * px;
+        for (var db = -10; db >= (int)SpectrumAnalyzer.FloorDb; db -= 10)
         {
-            var weighted = 0d;
-            var weightSum = 0d;
-            for (var offset = -radius; offset <= radius; offset++)
-            {
-                var source = band + offset;
-                if (source < 0 || source >= BandCenters.Length)
-                {
-                    continue;
-                }
-
-                var weight = Math.Exp(-(offset * offset) / (2d * BlurSigma * BlurSigma));
-                weighted += _bandPower[source] * weight;
-                weightSum += weight;
-            }
-
-            _blurredPower[band] = weightSum > 0d ? weighted / weightSum : 0d;
+            var y = (g.PlotY + g.PlotH * (1 - SpectrumAnalyzer.DbNorm(db))) * px;
+            dc.DrawLine(pen, new Point(x0, y), new Point(x1, y));
         }
     }
 
-    private static float SoftenDisplayPeak(float db)
+    private void DrawChromeLabels(
+        DrawingContext dc,
+        PlotGeometry g,
+        SpectrumAnalyzer.Bands bands,
+        SpectrumAnalyzer.BarRect[] rects,
+        double px)
     {
-        if (db <= PeakSoftKneeDb)
+        var brush = WpfControlHelpers.FrozenBrush(LabelColor());
+        var font = ChromeFontSize;
+        if (g.ShowDb)
         {
-            return db;
+            var labels = new SortedSet<int> { (int)SpectrumAnalyzer.FloorDb };
+            for (var db = -10; db >= (int)SpectrumAnalyzer.FloorDb; db -= 10)
+            {
+                labels.Add(db);
+            }
+
+            foreach (var db in labels)
+            {
+                var t = SpectrumAnalyzer.DbNorm(db);
+                var y = (g.PlotY + g.PlotH * (1 - t)) * px;
+                var ft = ChromeText(db.ToString(CultureInfo.InvariantCulture), font, brush);
+                dc.DrawText(ft, new Point(g.PlotX * px - 3 - ft.Width, y - ft.Height * 0.5));
+            }
         }
 
-        var span = CeilingDb - PeakSoftKneeDb;
-        var normalized = (db - PeakSoftKneeDb) / span;
-        return PeakSoftKneeDb + span * (float)Math.Pow(normalized, PeakSoftGamma);
+        if (!g.ShowHz)
+        {
+            return;
+        }
+
+        var maxF = bands.Count == 0 ? 0 : bands.Centers[^1] * 1.001;
+        var row1y = (g.PlotY + g.PlotH + 1) * px;
+        var row2y = row1y + ChromeText("0", font, brush).Height + 2;
+        DrawFreqRow(dc, SpectrumAnalyzer.LabelTopRow, bands, rects, maxF, row1y, font, brush, px);
+        DrawFreqRow(dc, SpectrumAnalyzer.LabelBotRow, bands, rects, maxF, row2y, font, brush, px);
     }
 
-    private static float DbToLevel(float db) =>
-        Math.Clamp((db - FloorDb) / (CeilingDb - FloorDb), 0f, 1f);
-
-    private static void Fft(double[] re, double[] im)
+    private void DrawFreqRow(
+        DrawingContext dc,
+        (double Hz, string Text)[] row,
+        SpectrumAnalyzer.Bands bands,
+        SpectrumAnalyzer.BarRect[] rects,
+        double maxF,
+        double y,
+        double font,
+        Brush brush,
+        double px)
     {
-        var n = re.Length;
-        for (int i = 1, j = 0; i < n; i++)
+        foreach (var (hz, text) in row)
         {
-            var bit = n >> 1;
-            for (; (j & bit) != 0; bit >>= 1)
+            if (hz > maxF)
             {
-                j &= ~bit;
+                continue;
             }
 
-            j |= bit;
-            if (i < j)
+            var cx = BarCenterX(bands, rects, hz);
+            if (cx is null)
             {
-                (re[i], re[j]) = (re[j], re[i]);
-                (im[i], im[j]) = (im[j], im[i]);
+                continue;
             }
-        }
 
-        for (var length = 2; length <= n; length <<= 1)
-        {
-            var angle = -2d * Math.PI / length;
-            var wRe = Math.Cos(angle);
-            var wIm = Math.Sin(angle);
-            for (var start = 0; start < n; start += length)
-            {
-                var curRe = 1d;
-                var curIm = 0d;
-                for (var k = 0; k < length / 2; k++)
-                {
-                    var evenIndex = start + k;
-                    var oddIndex = start + k + length / 2;
-                    var oddRe = re[oddIndex] * curRe - im[oddIndex] * curIm;
-                    var oddIm = re[oddIndex] * curIm + im[oddIndex] * curRe;
-                    re[oddIndex] = re[evenIndex] - oddRe;
-                    im[oddIndex] = im[evenIndex] - oddIm;
-                    re[evenIndex] += oddRe;
-                    im[evenIndex] += oddIm;
-                    var nextRe = curRe * wRe - curIm * wIm;
-                    curIm = curRe * wIm + curIm * wRe;
-                    curRe = nextRe;
-                }
-            }
+            var ft = ChromeText(text, font, brush);
+            dc.DrawText(ft, new Point(cx.Value * px - ft.Width * 0.5, y));
         }
     }
+
+    private static double? BarCenterX(
+        SpectrumAnalyzer.Bands bands,
+        SpectrumAnalyzer.BarRect[] rects,
+        double hz)
+    {
+        var tol = Math.Max(5e-4, Math.Abs(hz) * 1e-12);
+        for (var b = 0; b < bands.Count && b < rects.Length; b++)
+        {
+            if (Math.Abs(bands.Centers[b] - hz) <= tol)
+            {
+                return rects[b].X1 + rects[b].BarW * 0.5;
+            }
+        }
+
+        return null;
+    }
+
+    private static int LastLitRow(SpectrumAnalyzer.LedCells cells, float barDb)
+    {
+        var last = -1;
+        for (var i = 0; i < cells.Count; i++)
+        {
+            var segLo = cells.LoInt + i;
+            var segHi = segLo + 1;
+            if (segLo < barDb && segHi > SpectrumAnalyzer.FloorDb)
+            {
+                last = i;
+            }
+        }
+
+        return last;
+    }
+
+    private static Rect DipRect(double x, double y, double w, double h, double px) =>
+        new(x * px, y * px, Math.Max(0, w) * px, Math.Max(0, h) * px);
+
+    private FormattedText ChromeText(string text, double fontSize, Brush brush) =>
+        new(
+            text,
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            ChromeTypeface,
+            fontSize,
+            brush,
+            PixelsPerDip);
+
+    private void EnsureGradient()
+    {
+        if (_barGradient is not null)
+        {
+            return;
+        }
+
+        // プロットは dB 直線。色はレベルメーターと同じ DbToNorm（-20 dB ニー）で取る。
+        var stops = new GradientStopCollection();
+        for (var db = SpectrumAnalyzer.FloorDb; db <= SpectrumAnalyzer.CeilingDb + 1e-4f; db += 5f)
+        {
+            var c = LevelMeterEngine.LevelColor(db);
+            stops.Add(new GradientStop(Color.FromRgb(c.R, c.G, c.B), SpectrumAnalyzer.DbNorm(db)));
+        }
+
+        _barGradient = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 1),
+            EndPoint = new Point(0, 0),
+            MappingMode = BrushMappingMode.RelativeToBoundingBox,
+            GradientStops = stops,
+        };
+        _barGradient.Freeze();
+    }
+
+    private double PixelsPerDip
+    {
+        get
+        {
+            var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+            return dpi > 0 ? dpi : 1d;
+        }
+    }
+
+    private readonly record struct PlotGeometry(
+        int PlotX,
+        int PlotY,
+        int PlotW,
+        int PlotH,
+        int PadL,
+        int PadR,
+        bool ShowDb,
+        bool ShowHz,
+        int WidthPx,
+        int HeightPx);
 }

@@ -10,6 +10,7 @@ internal partial class TransportBar : UserControl
     private readonly TransportIconButton _play;
     private readonly TransportIconButton _waapiToggle;
     private readonly TransportLanguageButton _language;
+    private readonly TransportTipsToggleButton _tips;
     private readonly TransportManualButton _manual;
     private readonly Dictionary<TransportCommand, TransportIconButton> _buttons = new();
     private double _currentSeconds;
@@ -25,6 +26,8 @@ internal partial class TransportBar : UserControl
     public event EventHandler? RequestWaveformFocus;
 
     public event EventHandler? LanguageToggleRequested;
+
+    public event EventHandler? TipsToggleRequested;
 
     public event EventHandler? ManualHelpRequested;
 
@@ -62,7 +65,6 @@ internal partial class TransportBar : UserControl
             CommandKind = TransportCommand.ToggleWaapi,
             Icon = TransportIcon.Waapi,
             Width = DesignMetrics.TransportWaapiButtonWidth,
-            ToolTip = UiStrings.TipWaapiToggle,
             Margin = new Thickness(DesignMetrics.TransportButtonGap, 0, DesignMetrics.TransportButtonGap, 0),
         };
         _waapiToggle.Click += (_, _) => CommandInvoked?.Invoke(this, TransportCommand.ToggleWaapi);
@@ -74,12 +76,19 @@ internal partial class TransportBar : UserControl
         };
         _language.Click += (_, _) => LanguageToggleRequested?.Invoke(this, EventArgs.Empty);
         ButtonsHost.Children.Add(_language);
+        _tips = new TransportTipsToggleButton
+        {
+            Margin = new Thickness(DesignMetrics.TransportButtonGap, 0, DesignMetrics.TransportButtonGap, 0),
+        };
+        _tips.Click += (_, _) => TipsToggleRequested?.Invoke(this, EventArgs.Empty);
+        ButtonsHost.Children.Add(_tips);
         _manual = new TransportManualButton
         {
             Margin = new Thickness(DesignMetrics.TransportButtonGap, 0, DesignMetrics.TransportButtonGap, 0),
         };
         _manual.Click += (_, _) => ManualHelpRequested?.Invoke(this, EventArgs.Empty);
         ButtonsHost.Children.Add(_manual);
+        ApplyLocalizedTips();
     }
 
     public void ApplyLocalizedTips()
@@ -101,19 +110,28 @@ internal partial class TransportBar : UserControl
         SetTip(TransportCommand.Normalize, UiStrings.TipNormalize);
         SetTip(TransportCommand.Delete, UiStrings.TipDelete);
         SetTip(TransportCommand.Save, UiStrings.TipSave);
-        _waapiToggle.ToolTip = UiStrings.TipWaapiToggle;
+        TipService.Set(_waapiToggle, UiStrings.TipWaapiToggle);
+        TipService.Set(_language, TransportLanguageButton.LanguageTip());
+        TipService.Set(_tips, UiStrings.TipTipsToggle, respectsEnabled: false);
+        TipService.Set(_manual, UiStrings.TipManualHelp);
+        TipService.Set(CurrentTimeBox, UiStrings.TipTimecode);
         _language.RefreshAppearance();
+        _tips.RefreshAppearance();
         _manual.RefreshAppearance();
-        CurrentTimeBox.ToolTip = UiStrings.TipTimecode;
         CopyMenuItem.Header = UiStrings.MenuCopy;
         PasteMenuItem.Header = UiStrings.MenuPaste;
+    }
+
+    public void SetTipsEnabled(bool enabled)
+    {
+        _tips.Checked = enabled;
     }
 
     private void SetTip(TransportCommand command, string tip)
     {
         if (_buttons.TryGetValue(command, out var button))
         {
-            button.ToolTip = tip;
+            TipService.Set(button, tip);
         }
     }
 
@@ -179,6 +197,7 @@ internal partial class TransportBar : UserControl
 
         _waapiToggle.InvalidateVisual();
         _language.InvalidateVisual();
+        _tips.InvalidateVisual();
         _manual.InvalidateVisual();
     }
 
@@ -343,9 +362,9 @@ internal partial class TransportBar : UserControl
         {
             CommandKind = command,
             Icon = icon,
-            ToolTip = tip,
             Margin = new Thickness(DesignMetrics.TransportButtonGap, 0, DesignMetrics.TransportButtonGap, 0),
         };
+        TipService.Set(button, tip);
         button.Click += (_, _) => CommandInvoked?.Invoke(this, command);
         _buttons[command] = button;
         ButtonsHost.Children.Add(button);

@@ -26,6 +26,7 @@ internal static partial class UiStrings
             "MenuSeparator" => Get("メニュー・区切り", "Menu · separator"),
             "WaveformBack" => Get("波形エリア背景", "Waveform area background"),
             "WaveFill" => Get("波形", "Waveform"),
+            "WaveFillOverlay" => Get("波形（スペクトログラム重ね）", "Waveform (spectrogram overlay)"),
             "WaveZeroLine" => Get("波形 0dB 線", "Waveform 0 dB line"),
             "WaveformScrollTrack" => Get("波形スクロール・トラック", "Waveform scroll · track"),
             "TimelineWellBack" => Get("タイムライン井戸・背景", "Timeline well · background"),

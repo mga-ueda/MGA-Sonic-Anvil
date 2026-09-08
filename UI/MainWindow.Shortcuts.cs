@@ -176,6 +176,11 @@ public partial class MainWindow
                 return true;
             }
 
+            if (ClearTabSelection())
+            {
+                return true;
+            }
+
             if (Waveform.ClearSelection())
             {
                 return true;
@@ -239,6 +244,12 @@ public partial class MainWindow
         if (key == Key.W && modifiers == ModifierKeys.Control)
         {
             CloseDocument();
+            return true;
+        }
+
+        if (key == Key.W && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            CloseAllTabs();
             return true;
         }
 
@@ -314,6 +325,13 @@ public partial class MainWindow
 
         if (key == Key.A && modifiers == ModifierKeys.Control)
         {
+            // タブバー上にポインタがあるときはタブの全選択。
+            if (DocumentTabHost.Visibility == System.Windows.Visibility.Visible && DocumentTabHost.IsMouseOver)
+            {
+                SelectAllTabs();
+                return true;
+            }
+
             Waveform.SelectAll();
             return true;
         }

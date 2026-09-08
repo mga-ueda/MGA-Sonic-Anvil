@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+
 namespace MgaSonicAnvil.Audio;
 
 internal static class FormatConvert
@@ -19,7 +21,13 @@ internal static class FormatConvert
         Array.IndexOf(BitDepths, bits) >= 0;
 
     private const int SincHalfWidth = 24;
+    private const int SincTapCount = SincHalfWidth * 2 + 1;
+    private const int SincFracBins = 1024;
+    private const int ParallelFrameThreshold = 4096;
     private const double SincTransition = 0.91;
+
+    /// <summary>Resample の端でカーネルが参照する余白（プレビュー切り出し用）。</summary>
+    public static int ResampleEdgePad => SincHalfWidth;
 
     public static bool ShouldResampleForDevice(int sourceRate, int deviceRate) =>
         sourceRate > 0 && deviceRate > 0 && sourceRate != deviceRate;
@@ -54,24 +62,62 @@ internal static class FormatConvert
         var destFrames = Math.Max(1, (int)Math.Round(srcFrames * (double)destRate / sourceRate));
         var dest = new float[destFrames * channels];
         var step = sourceRate / (double)destRate;
-        var cutoff = LowpassCutoff(sourceRate, destRate);
+        var table = BuildSincKernelTable(LowpassCutoff(sourceRate, destRate));
         var reportEvery = Math.Max(1, destFrames / 100);
         progress?.Report(0);
-        for (var i = 0; i < destFrames; i++)
+
+        if (destFrames < ParallelFrameThreshold)
         {
-            var srcFrame = i * step;
-            var destOffset = i * channels;
-            for (var ch = 0; ch < channels; ch++)
+            for (var i = 0; i < destFrames; i++)
             {
-                dest[destOffset + ch] = SampleSinc(interleaved, channels, ch, srcFrame, srcFrames, cutoff);
+                WriteResampledFrame(dest, interleaved, channels, srcFrames, i, step, table);
+                if (progress is not null && ((i + 1) % reportEvery == 0 || i + 1 == destFrames))
+                {
+                    progress.Report((i + 1) / (double)destFrames);
+                }
             }
 
-            if (progress is not null && ((i + 1) % reportEvery == 0 || i + 1 == destFrames))
-            {
-                progress.Report((i + 1) / (double)destFrames);
-            }
+            return dest;
         }
 
+        var done = 0;
+        Parallel.For(0, destFrames, i =>
+        {
+            WriteResampledFrame(dest, interleaved, channels, srcFrames, i, step, table);
+            if (progress is null)
+            {
+                return;
+            }
+
+            var n = Interlocked.Increment(ref done);
+            if (n % reportEvery == 0 || n == destFrames)
+            {
+                progress.Report(n / (double)destFrames);
+            }
+        });
+        progress?.Report(1);
+        return dest;
+    }
+
+    public static float[] CopyFrameRange(float[] interleaved, int channels, long startFrame, long endFrame)
+    {
+        channels = Math.Max(1, channels);
+        var frames = interleaved.Length / channels;
+        var start = (int)Math.Clamp(startFrame, 0, frames);
+        var end = (int)Math.Clamp(endFrame, start, frames);
+        if (start == 0 && end == frames)
+        {
+            return interleaved;
+        }
+
+        var count = end - start;
+        if (count <= 0)
+        {
+            return [];
+        }
+
+        var dest = new float[count * channels];
+        Array.Copy(interleaved, start * channels, dest, 0, dest.Length);
         return dest;
     }
 
@@ -270,13 +316,47 @@ internal static class FormatConvert
     private static double LowpassCutoff(int sourceRate, int destRate) =>
         0.5 * Math.Min(1d, destRate / (double)Math.Max(1, sourceRate)) * SincTransition;
 
-    private static float SampleSinc(
+    private static void WriteResampledFrame(
+        float[] dest,
+        float[] src,
+        int channels,
+        int srcFrames,
+        int destFrame,
+        double step,
+        double[] table)
+    {
+        var srcFrame = destFrame * step;
+        var destOffset = destFrame * channels;
+        for (var ch = 0; ch < channels; ch++)
+        {
+            dest[destOffset + ch] = SampleSincTable(src, channels, ch, srcFrame, srcFrames, table);
+        }
+    }
+
+    private static double[] BuildSincKernelTable(double cutoff)
+    {
+        var table = new double[(SincFracBins + 1) * SincTapCount];
+        for (var bin = 0; bin <= SincFracBins; bin++)
+        {
+            var frac = bin / (double)SincFracBins;
+            var row = bin * SincTapCount;
+            for (var t = 0; t < SincTapCount; t++)
+            {
+                var tap = t - SincHalfWidth;
+                table[row + t] = SincKernel(tap - frac, cutoff, tap);
+            }
+        }
+
+        return table;
+    }
+
+    private static float SampleSincTable(
         float[] src,
         int channels,
         int channel,
         double frame,
         int frameCount,
-        double cutoff)
+        double[] table)
     {
         if (frameCount <= 1)
         {
@@ -284,13 +364,40 @@ internal static class FormatConvert
         }
 
         var center = (int)Math.Floor(frame);
+        var frac = frame - center;
+        var scaled = frac * SincFracBins;
+        var bin = (int)scaled;
+        if (bin >= SincFracBins)
+        {
+            bin = SincFracBins - 1;
+            scaled = SincFracBins;
+        }
+
+        var blend = scaled - bin;
+        var row0 = bin * SincTapCount;
+        var row1 = row0 + SincTapCount;
+        var left = center - SincHalfWidth;
         var sum = 0d;
         var wsum = 0d;
-        for (var tap = -SincHalfWidth; tap <= SincHalfWidth; tap++)
+        if (unchecked((uint)left) <= (uint)(frameCount - SincTapCount))
         {
-            var kernel = SincKernel(center + tap - frame, cutoff, tap);
-            sum += src[ClampIndex(center + tap, frameCount) * channels + channel] * kernel;
-            wsum += kernel;
+            var index = left * channels + channel;
+            for (var t = 0; t < SincTapCount; t++)
+            {
+                var kernel = table[row0 + t] + (table[row1 + t] - table[row0 + t]) * blend;
+                sum += src[index] * kernel;
+                wsum += kernel;
+                index += channels;
+            }
+        }
+        else
+        {
+            for (var t = 0; t < SincTapCount; t++)
+            {
+                var kernel = table[row0 + t] + (table[row1 + t] - table[row0 + t]) * blend;
+                sum += src[ClampIndex(left + t, frameCount) * channels + channel] * kernel;
+                wsum += kernel;
+            }
         }
 
         return (float)(Math.Abs(wsum) > 1e-8 ? sum / wsum : sum);

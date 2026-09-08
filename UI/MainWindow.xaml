@@ -11,6 +11,7 @@
         Height="640"
         Opacity="0"
         AllowDrop="True"
+        ToolTipService.IsEnabled="False"
         Background="{DynamicResource SurfaceBackBrush}">
   <Grid x:Name="RootChrome">
   <DockPanel x:Name="RootDock" LastChildFill="True">
@@ -45,40 +46,71 @@
                      Cursor="Hand"
                      Foreground="{DynamicResource ActionLinkForeBrush}"
                      Text="{x:Static domain:UiStrings.CopyrightGitHub}"
-                     ToolTip="{x:Static domain:UiStrings.TipGitHub}"
                      MouseLeftButtonUp="GitHubLink_MouseLeftButtonUp" />
           <TextBlock x:Name="AudioApiLabel"
                      Text="{x:Static domain:UiStrings.LabelAudioApi}"
                      VerticalAlignment="Center"
                      Margin="12,0,6,0"
                      FontSize="11"
-                     Foreground="{DynamicResource StatusBarTitleForeBrush}"
-                     ToolTip="{x:Static domain:UiStrings.TipAudioApi}" />
+                     Foreground="{DynamicResource StatusBarTitleForeBrush}" />
           <ComboBox x:Name="ApiCombo"
                     Width="110"
                     Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
                     Margin="0,0,12,0"
                     VerticalContentAlignment="Center"
-                    ToolTip="{x:Static domain:UiStrings.TipAudioApi}"
                     SelectionChanged="ApiCombo_SelectionChanged" />
           <TextBlock x:Name="AudioDeviceLabel"
                      Text="{x:Static domain:UiStrings.LabelAudioDevice}"
                      VerticalAlignment="Center"
                      Margin="0,0,6,0"
                      FontSize="11"
-                     Foreground="{DynamicResource StatusBarTitleForeBrush}"
-                     ToolTip="{x:Static domain:UiStrings.TipAudioDevice}" />
+                     Foreground="{DynamicResource StatusBarTitleForeBrush}" />
           <ComboBox x:Name="DeviceCombo"
                     Width="220"
                     Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
                     VerticalContentAlignment="Center"
-                    ToolTip="{x:Static domain:UiStrings.TipAudioDevice}"
                     SelectionChanged="DeviceCombo_SelectionChanged" />
         </StackPanel>
       </Grid>
     </Border>
 
     <ui:WaapiStatusBar x:Name="WaapiBar" DockPanel.Dock="Bottom" />
+
+    <Border x:Name="TipsPanel"
+            DockPanel.Dock="Bottom"
+            Height="{x:Static ui:DesignMetrics.TipsPanelHeight}"
+            Visibility="Collapsed"
+            Background="{DynamicResource WaapiBarBackBrush}"
+            BorderBrush="{DynamicResource ChromeBorderBrush}"
+            BorderThickness="1">
+      <DockPanel LastChildFill="True">
+        <TextBlock x:Name="TipsHeader"
+                   DockPanel.Dock="Top"
+                   Height="{x:Static ui:DesignMetrics.TipsHeaderHeight}"
+                   Padding="8,0"
+                   VerticalAlignment="Center"
+                   FontWeight="Bold"
+                   FontSize="11"
+                   Cursor="Hand"
+                   Foreground="{DynamicResource StatusBarTitleForeBrush}"
+                   Text="{x:Static domain:UiStrings.LabelTips}"
+                   MouseLeftButtonDown="TipsPin_MouseLeftButtonDown" />
+        <ScrollViewer x:Name="TipsScroll"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Focusable="False"
+                      PanningMode="VerticalOnly">
+          <TextBlock x:Name="TipsLabel"
+                     Padding="8,4,8,5"
+                     FontSize="11"
+                     TextWrapping="Wrap"
+                     TextTrimming="None"
+                     Cursor="Hand"
+                     Foreground="{DynamicResource StatusBarDetailForeBrush}"
+                     MouseLeftButtonDown="TipsPin_MouseLeftButtonDown" />
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
 
     <Grid>
       <Grid.ColumnDefinitions>
@@ -87,7 +119,7 @@
       </Grid.ColumnDefinitions>
       <Grid.RowDefinitions>
         <RowDefinition Height="*" />
-        <RowDefinition Height="{x:Static ui:DesignMetrics.LevelMeterWidthGrid}" />
+        <RowDefinition Height="{x:Static ui:DesignMetrics.VectorScopeHeightGrid}" />
       </Grid.RowDefinitions>
 
       <DockPanel Grid.Row="0" Grid.Column="0">
@@ -101,8 +133,7 @@
           <Border Grid.Column="1"
                   Padding="{x:Static ui:DesignMetrics.OverviewPad}"
                   Background="{DynamicResource ProjectBarBackBrush}">
-            <ui:OverviewView x:Name="Overview"
-                             ToolTip="{x:Static domain:UiStrings.TipOverview}" />
+            <ui:OverviewView x:Name="Overview" />
           </Border>
         </Grid>
         <Border Background="{DynamicResource WaveformScrollTrackBrush}"
@@ -136,7 +167,7 @@
                             Margin="2,0,2,0"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Bottom"
-                            ToolTip="{x:Static domain:UiStrings.TipVectorScope}" />
+                            />
       </Grid>
 
       <Grid Grid.Row="1" Grid.Column="0">
@@ -156,12 +187,10 @@
                                 DockPanel.Dock="Left"
                                 PointLeft="True"
                                 Visibility="Collapsed"
-                                ToolTip="{x:Static domain:UiStrings.TipTabScrollLeft}"
                                 Click="TabScrollLeft_Click" />
             <ui:TabScrollButton x:Name="TabScrollRight"
                                 DockPanel.Dock="Right"
                                 Visibility="Collapsed"
-                                ToolTip="{x:Static domain:UiStrings.TipTabScrollRight}"
                                 Click="TabScrollRight_Click" />
             <ScrollViewer x:Name="DocumentTabScroll"
                           HorizontalScrollBarVisibility="Hidden"
@@ -195,16 +224,15 @@
                       Margin="12,4,0,0"
                       FontSize="11"
                       Foreground="{DynamicResource MutedForeBrush}"
-                      ToolTip="{x:Static domain:UiStrings.TipAlwaysOnTop}"
                       Checked="AlwaysOnTopCheck_Changed"
                       Unchecked="AlwaysOnTopCheck_Changed" />
           </StackPanel>
           <ui:ProjectSpectrumView x:Name="Spectrum"
                                   Grid.Column="1"
-                                  Margin="8,4,8,4"
-                                  HorizontalAlignment="Center"
-                                  VerticalAlignment="Stretch"
-                                  ToolTip="{x:Static domain:UiStrings.TipSpectrum}" />
+                                  Height="{x:Static ui:DesignMetrics.SpectrumHeight}"
+                                  Margin="4,0,0,0"
+                                  HorizontalAlignment="Right"
+                                  VerticalAlignment="Top" />
         </Grid>
       </Grid>
     </Grid>
@@ -213,6 +241,6 @@
                            Visibility="Collapsed"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
-                           ItemChosen="HistoryOverlay_ItemChosen" />
+                           ItemClicked="HistoryOverlay_ItemClicked" />
   </Grid>
 </Window>

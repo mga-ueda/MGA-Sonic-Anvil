@@ -311,6 +311,7 @@ public partial class MainWindow
 
         StopPlaybackForEdit();
         _history.Do(_document, ProcessEdits.Normalize(_document, range));
+        Waveform.ClearSelection();
         AfterEdit();
     }
 
@@ -409,6 +410,7 @@ public partial class MainWindow
         }
 
         _clipboard = clip;
+        _historyClipboardIsLatest = false;
     }
 
     private void ApplyCut()
@@ -438,6 +440,7 @@ public partial class MainWindow
         }
 
         _clipboard = clip;
+        _historyClipboardIsLatest = false;
         StopPlaybackForEdit();
         _history.Do(_document, ProcessEdits.Delete(_document, range));
         AfterEdit();
@@ -446,6 +449,20 @@ public partial class MainWindow
     private void ApplyPaste()
     {
         if (_document is null)
+        {
+            return;
+        }
+
+        // タブ選択中の Ctrl+V は選択タブへの履歴レシピ適用。
+        if (HasTabSelection)
+        {
+            PasteHistoryRecipesToTabs(SelectedTabsInOrder());
+            return;
+        }
+
+        // 直近のコピーが履歴レシピなら、履歴ウィンドウを開かなくても
+        // Ctrl+V で同じ処理を適用する（複数ファイルへの反映用）。
+        if (TryPasteHistoryRecipesDirect())
         {
             return;
         }

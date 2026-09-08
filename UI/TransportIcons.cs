@@ -424,16 +424,14 @@ internal sealed class TransportLanguageButton : Button
         OverridesDefaultStyle = true;
         Template = new ControlTemplate(typeof(Button));
         SnapsToDevicePixels = true;
-        ToolTip = LanguageTip();
     }
 
     public void RefreshAppearance()
     {
-        ToolTip = LanguageTip();
         InvalidateVisual();
     }
 
-    private static string LanguageTip() =>
+    public static string LanguageTip() =>
         UiStrings.IsJapanese ? UiStrings.TipLanguageJapanese : UiStrings.TipLanguageEnglish;
 
     protected override HitTestResult? HitTestCore(PointHitTestParameters hitTestParameters) =>
@@ -482,12 +480,10 @@ internal sealed class TransportManualButton : Button
         OverridesDefaultStyle = true;
         Template = new ControlTemplate(typeof(Button));
         SnapsToDevicePixels = true;
-        ToolTip = UiStrings.TipManualHelp;
     }
 
     public void RefreshAppearance()
     {
-        ToolTip = UiStrings.TipManualHelp;
         InvalidateVisual();
     }
 
@@ -516,6 +512,112 @@ internal sealed class TransportManualButton : Button
         dc.DrawText(
             formatted,
             new Point((bounds.Width - formatted.Width) * 0.5, (bounds.Height - formatted.Height) * 0.5));
+    }
+}
+
+/// <summary>Tips 枠のオン／オフ。IM Importer と同じ吹き出しアイコン。オフ時はグレーアウト。</summary>
+internal sealed class TransportTipsToggleButton : Button
+{
+    private bool _checked = true;
+
+    public TransportTipsToggleButton()
+    {
+        Width = DesignMetrics.TransportButtonSide;
+        Height = DesignMetrics.TransportButtonSide;
+        Focusable = false;
+        FocusVisualStyle = null;
+        Cursor = Cursors.Hand;
+        Background = Brushes.Transparent;
+        BorderThickness = new Thickness(0);
+        OverridesDefaultStyle = true;
+        Template = new ControlTemplate(typeof(Button));
+        SnapsToDevicePixels = true;
+    }
+
+    public bool Checked
+    {
+        get => _checked;
+        set
+        {
+            if (_checked == value)
+            {
+                return;
+            }
+
+            _checked = value;
+            InvalidateVisual();
+        }
+    }
+
+    public void RefreshAppearance() => InvalidateVisual();
+
+    protected override HitTestResult? HitTestCore(PointHitTestParameters hitTestParameters) =>
+        new Rect(RenderSize).Contains(hitTestParameters.HitPoint)
+            ? new PointHitTestResult(this, hitTestParameters.HitPoint)
+            : null;
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        var bounds = new Rect(RenderSize);
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            return;
+        }
+
+        TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed);
+        var fill = ResolveFillColor();
+        var iconColor = _checked
+            ? TransportChrome.Fore(IsEnabled)
+            : Color.FromArgb(128, TransportChrome.Fore(IsEnabled).R, TransportChrome.Fore(IsEnabled).G, TransportChrome.Fore(IsEnabled).B);
+        DrawBalloon(dc, iconColor, fill, Math.Min(bounds.Width, bounds.Height));
+    }
+
+    private Color ResolveFillColor()
+    {
+        if (IsEnabled && (IsMouseOver || IsPressed))
+        {
+            return IsPressed
+                ? Theme.Get("TransportPressedBackBrush")
+                : Theme.Get("TransportHoverBackBrush");
+        }
+
+        return Theme.Get("TransportBackBrush");
+    }
+
+    /// <summary>MGA Wwise IM Importer の TipsToggleButton.DrawBalloon と同じ吹き出し＋3点。</summary>
+    private static void DrawBalloon(DrawingContext dc, Color color, Color holeColor, double side)
+    {
+        var w = side * 0.62;
+        var h = side * 0.42;
+        var x = (side - w) / 2d;
+        var y = side * 0.24;
+        var radius = h * 0.36;
+        var geometry = new StreamGeometry();
+        using (var ctx = geometry.Open())
+        {
+            WpfControlHelpers.AddRoundedRect(ctx, new Rect(x, y, w, h), radius);
+            var tailTopX = x + w * 0.28;
+            ctx.BeginFigure(new Point(tailTopX, y + h - 1), isFilled: true, isClosed: true);
+            ctx.LineTo(new Point(tailTopX + w * 0.18, y + h - 1), true, false);
+            ctx.LineTo(new Point(tailTopX, y + h + side * 0.14), true, false);
+        }
+
+        geometry.FillRule = FillRule.Nonzero;
+        geometry.Freeze();
+        dc.DrawGeometry(WpfControlHelpers.FrozenBrush(color), null, geometry);
+
+        var dot = Math.Max(1.5, side * 0.06);
+        var dotY = y + h / 2d - dot / 2d;
+        for (var i = 0; i < 3; i++)
+        {
+            var dotX = x + w * (0.26 + 0.24 * i) - dot / 2d;
+            dc.DrawEllipse(
+                WpfControlHelpers.FrozenBrush(holeColor),
+                null,
+                new Point(dotX + dot / 2d, dotY + dot / 2d),
+                dot / 2d,
+                dot / 2d);
+        }
     }
 }
 

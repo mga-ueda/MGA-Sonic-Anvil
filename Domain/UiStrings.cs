@@ -236,11 +236,11 @@ internal static partial class UiStrings
         "波形全体。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）　ホイールで拡縮（シークバー基準）",
         "Whole file. The bright area is the current view. Drag to move (scrubs the center). Wheel zooms around the playhead");
     public static string TipSpectrum => Get(
-        "再生出力の簡易スペクトラム表示です。",
-        "A simple spectrum of the playback output.");
+        "再生出力の LED スペクトラムです。1/3oct 相当の帯域とピークホールド。Layer Music Checker と同じ検波です。",
+        "LED spectrum of the playback output. Third-octave-style bands and peak hold, same detection as Layer Music Checker.");
     public static string TipVectorScope => Get(
-        "再生出力の位相相関とベクターオーディオスコープです。上の数値は L/R の相関（+1 同相 / 0 無相関 / -1 逆相）。下は縦が Mid、横が Side です。",
-        "Phase correlation and a vector audio scope of the playback output. The number is L/R correlation (+1 in phase / 0 uncorrelated / -1 inverted). Vertical is Mid, horizontal is Side.");
+        "再生出力の位相相関とベクターオーディオスコープです。正方形は縦が Mid、横が Side。下の数値は L/R の相関（+1 同相 / 0 無相関 / -1 逆相）です。",
+        "Phase correlation and a vector audio scope of the playback output. The square is Mid (vertical) and Side (horizontal). The number below is L/R correlation (+1 in phase / 0 uncorrelated / -1 inverted).");
     public static string TipAudioApi => Get(
         "再生 API（WaveOut / WASAPI / ASIO）",
         "Playback API (WaveOut / WASAPI / ASIO)");
@@ -271,11 +271,49 @@ internal static partial class UiStrings
     public static string MenuClearMarkers => Get("選択したマーカーを削除", "Clear selected markers");
     public static string StatusEmpty => Get("ファイルなし", "No file");
 
+    public static string TabMenuCloseOthers => Get("このタブ以外を閉じる(_O)", "Close _Other Tabs");
+    public static string TabMenuCloseRight => Get("このタブを含め右側を全部閉じる(_R)", "Close This and Tabs to the _Right");
+    public static string TabMenuCloseLeft => Get("このタブを含め左側を全部閉じる(_L)", "Close This and Tabs to the _Left");
+    public static string TabMenuSelectAll => Get("全部のタブを選択する(_A)", "Select _All Tabs");
+    public static string TabMenuCloseAll => Get("すべてのタブを閉じる(_A)", "Close _All Tabs");
+
+    /// <summary>通常メニュー用。「全部のタブを選択する(_A)」とアクセスキーが重ならないよう W。</summary>
+    public static string TabMenuCloseAllNormal => Get("すべてのタブを閉じる(_W)", "Close All Tabs (_W)");
+    public static string TabMenuPasteToAll => Get("編集データを全てにペーストする(_V)", "Paste Copied Edits to All Tabs (_V)");
+    public static string TabMenuCloseSelected => Get("選択したタブを閉じる(_A)", "Close Selected Tabs (_A)");
+    public static string TabMenuPasteToSelected => Get("選択したタブにペーストする(_V)", "Paste Copied Edits to Selected Tabs (_V)");
+
     public static string EditHistoryTitle => Get("編集履歴", "Edit history");
     public static string EditHistoryOrigin => Get("初期状態", "Original");
     public static string EditHistoryHint => Get(
-        "↑↓ 移動　Enter 確定　Esc キャンセル",
-        "↑↓ move   Enter apply   Esc cancel");
+        "↑↓ 移動　Enter 確定　Esc キャンセル\nCtrl+クリック／Shift+↑↓ 選択　Ctrl+C コピー　Ctrl+V 別ファイルへ適用",
+        "↑↓ move   Enter apply   Esc cancel\nCtrl+click / Shift+↑↓ select   Ctrl+C copy   Ctrl+V apply to file");
+
+    public static string EditHistoryNotCopyable => Get(
+        "この操作は別ファイルへ適用できません",
+        "This step cannot be applied to another file");
+
+    public static string EditHistoryCopyEmpty => Get(
+        "コピーできる操作がありません",
+        "Nothing to copy");
+
+    public static string EditHistoryPasteEmpty => Get(
+        "コピーされた履歴がありません",
+        "No copied history");
+
+    public static string EditHistoryCopied(int count) => Get(
+        $"{count} 件コピーしました（別ファイルで Ctrl+V。履歴を開かなくても可）",
+        $"Copied {count} step(s). Press Ctrl+V in another file (no need to open its history)");
+
+    public static string EditHistoryPasteSkippedAll => Get(
+        "コピーした履歴はこのファイルに適用できませんでした",
+        "None of the copied history steps could be applied to this file");
+
+    public static string EditHistoryPasted(int applied, int total) => applied == total
+        ? Get($"{applied} 件適用しました", $"Applied {applied} step(s)")
+        : Get(
+            $"{applied} / {total} 件適用しました（適用できないものはスキップ）",
+            $"Applied {applied} of {total} step(s); inapplicable ones skipped");
 
     public static string EditHistoryName(string name) => name switch
     {

@@ -61,10 +61,16 @@ public partial class MainWindow : Window
     private bool _resumeAfterScrub;
     private bool _startupRevealPending = true;
     private bool _closing;
+    private bool _exitAfterFlush;
 
     public MainWindow()
     {
         InitializeComponent();
+        TipService.Enabled = AppStorage.Settings.ShowTips;
+        TipService.BindDisplay(TipsLabel, TipsPanel, TipsScroll);
+        TipService.PinChanged += (_, _) => RefreshTipsHeader();
+        RefreshTipsHeader();
+        Transport.SetTipsEnabled(AppStorage.Settings.ShowTips);
         _outputSettings = AppStorage.Settings.ToAudioOutputSettings();
         _waveformHeightScale = Math.Clamp(AppStorage.Settings.WaveformHeightScale, 1, 3);
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
@@ -75,6 +81,7 @@ public partial class MainWindow : Window
         Transport.PositionSeeked += (_, seconds) => SeekToSeconds(seconds);
         Transport.RequestWaveformFocus += (_, _) => Waveform.Focus();
         Transport.LanguageToggleRequested += (_, _) => ToggleUiLanguage();
+        Transport.TipsToggleRequested += (_, _) => ToggleTips();
         Transport.ManualHelpRequested += (_, _) => ManualViewer.Open(this);
         UiStrings.LanguageChanged += (_, _) => Dispatcher.BeginInvoke(RefreshLocalizedText);
         Waveform.CursorCommitted += (_, frame) => OnCursorCommitted(frame);
@@ -293,24 +300,46 @@ public partial class MainWindow : Window
         Waveform.Focus();
     }
 
+    private void ToggleTips()
+    {
+        var enabled = !AppStorage.Settings.ShowTips;
+        AppStorage.Settings.ShowTips = enabled;
+        AppStorage.Save();
+        TipService.Enabled = enabled;
+        Transport.SetTipsEnabled(enabled);
+        Waveform.Focus();
+    }
+
+    private void TipsPin_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        TipService.TogglePinned();
+    }
+
+    private void RefreshTipsHeader()
+    {
+        TipsHeader.Text = TipService.Pinned ? UiStrings.LabelTipsPinned : UiStrings.LabelTips;
+    }
+
     private void RefreshLocalizedText()
     {
         CopyrightText.Text = UiStrings.CopyrightText;
         GitHubLink.Text = UiStrings.CopyrightGitHub;
-        GitHubLink.ToolTip = UiStrings.TipGitHub;
+        RefreshTipsHeader();
+        TipService.Set(GitHubLink, UiStrings.TipGitHub);
         AudioApiLabel.Text = UiStrings.LabelAudioApi;
-        AudioApiLabel.ToolTip = UiStrings.TipAudioApi;
-        ApiCombo.ToolTip = UiStrings.TipAudioApi;
+        TipService.Set(AudioApiLabel, UiStrings.TipAudioApi);
+        TipService.Set(ApiCombo, UiStrings.TipAudioApi);
         AudioDeviceLabel.Text = UiStrings.LabelAudioDevice;
-        AudioDeviceLabel.ToolTip = UiStrings.TipAudioDevice;
-        DeviceCombo.ToolTip = UiStrings.TipAudioDevice;
+        TipService.Set(AudioDeviceLabel, UiStrings.TipAudioDevice);
+        TipService.Set(DeviceCombo, UiStrings.TipAudioDevice);
         AlwaysOnTopCheck.Content = UiStrings.LabelAlwaysOnTop;
-        AlwaysOnTopCheck.ToolTip = UiStrings.TipAlwaysOnTop;
-        Overview.ToolTip = UiStrings.TipOverview;
-        VectorScope.ToolTip = UiStrings.TipVectorScope;
-        Spectrum.ToolTip = UiStrings.TipSpectrum;
-        TabScrollLeft.ToolTip = UiStrings.TipTabScrollLeft;
-        TabScrollRight.ToolTip = UiStrings.TipTabScrollRight;
+        TipService.Set(AlwaysOnTopCheck, UiStrings.TipAlwaysOnTop);
+        TipService.Set(Overview, UiStrings.TipOverview);
+        TipService.Set(VectorScope, UiStrings.TipVectorScope);
+        TipService.Set(Spectrum, UiStrings.TipSpectrum);
+        TipService.Set(TabScrollLeft, UiStrings.TipTabScrollLeft);
+        TipService.Set(TabScrollRight, UiStrings.TipTabScrollRight);
         Transport.ApplyLocalizedTips();
         Waveform.RefreshLocalizedTips();
         WaapiBar.ApplyLocalizedText();
@@ -498,6 +527,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (_exitAfterFlush)
+        {
+            return;
+        }
+
+        e.Cancel = true;
         _closing = true;
         RememberDocumentState();
         AppStorage.Settings.ApplyAudioOutput(_outputSettings);
@@ -505,11 +540,34 @@ public partial class MainWindow : Window
         PersistWaapiSettings();
         AppStorage.Save();
 
-        // メッセージポンプが生きているうちに無音フラッシュ＋デバイス破棄する。
+        HideFromTaskAndFocus();
         StopMeterRendering();
         _playTimer.Stop();
         StopMarkerNudge();
-        _player.Dispose();
+        _ = FinishExitAfterFlushAsync();
+    }
+
+    private void HideFromTaskAndFocus()
+    {
+        Topmost = false;
+        ShowInTaskbar = false;
+        Hide();
+    }
+
+    private async Task FinishExitAfterFlushAsync()
+    {
+        try
+        {
+            await _player.DisposeAsync().ConfigureAwait(true);
+        }
+        catch
+        {
+            // 破棄失敗でもプロセスは終える。
+        }
+
+        Waveform.DisposeSpectrogram();
+        _exitAfterFlush = true;
+        Close();
     }
 
     private void MainWindow_DragOver(object sender, DragEventArgs e)

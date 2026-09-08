@@ -79,6 +79,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private double _intervalSumSqR;
     private int _intervalFrames;
     private bool _silenceOnly;
+    private bool _paused;
     private int _flushFadeRemaining;
     private int _flushFadeTotal;
 
@@ -156,6 +157,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _cursor = checked((int)start * _channels);
             _frameGain = frameGain;
             _silenceOnly = false;
+            _paused = false;
             _flushFadeRemaining = 0;
             _flushFadeTotal = 0;
             _exitPlaying = false;
@@ -189,7 +191,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     }
 
     /// <summary>
-    /// 終了時にドライバ先読みを洗い流す。先に短くフェードしてから無音のみを返す。
+    /// 終了時にドライバ先読みを洗い流す。実音は足さず、無音だけを返す。
     /// </summary>
     public void BeginSilenceFlush()
     {
@@ -200,10 +202,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _exitPlaying = false;
             _frameGain = null;
             Ended = false;
-            // クリック避けの短いフェード。先読み全体の待ちは AudioOutputFlush 側。
-            _flushFadeTotal = AudioOutputFlush.FadeFrames(_deviceRate);
-            _flushFadeRemaining = _flushFadeTotal;
-            _silenceOnly = _samples.Length == 0;
+            // フェードで実音を足すと、終了時に先読みへまた音が入る。
+            _flushFadeTotal = 0;
+            _flushFadeRemaining = 0;
+            _silenceOnly = true;
+            _paused = false;
             Array.Clear(_meterL);
             Array.Clear(_meterR);
             _meterWrite = 0;
@@ -333,6 +336,18 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
+    /// <summary>
+    /// 一時停止ゲート。true の間は Read が無音を返し、カーソルは進まない。
+    /// 出力デバイスは動かしたままにして先読みを無音で置き換える。
+    /// </summary>
+    public void SetPaused(bool paused)
+    {
+        lock (_gate)
+        {
+            _paused = paused;
+        }
+    }
+
     public void CaptureScrub(AudioDocument document, long frame)
     {
         _scrub.Bind(document);
@@ -431,6 +446,15 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private int ReadCore(float[] buffer, int offset, int count)
     {
         if (_silenceOnly)
+        {
+            Array.Clear(buffer, offset, count);
+            return count;
+        }
+
+        // 一時停止中はカーソルを進めず無音を返す。デバイスを止めないことで、
+        // ドライバ／仮想ミキサの先読みが常に無音で上書きされ、次の再生で
+        // 古い音が出ない（停止時に洗い流す方式）。
+        if (_paused)
         {
             Array.Clear(buffer, offset, count);
             return count;

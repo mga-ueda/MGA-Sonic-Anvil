@@ -1,4 +1,5 @@
 using MgaSonicAnvil.Domain;
+using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 
@@ -17,6 +18,8 @@ internal sealed class AudioPlayer : IDisposable
     private bool _playing;
     private bool _scrubbing;
     private bool _suppressPlaybackEnded;
+    private bool _discardQueuedOutput;
+    private bool _asioEndArmed;
     private bool _playExitLayer;
     private int _generation;
     private long _smoothRawFrame = -1;
@@ -84,8 +87,35 @@ internal sealed class AudioPlayer : IDisposable
         }
     }
 
-    public bool ProviderEnded =>
-        _provider.Ended || _output is AsioOut { HasReachedEnd: true };
+    public bool ProviderEnded
+    {
+        get
+        {
+            if (!_playing || _scrubbing)
+            {
+                return false;
+            }
+
+            if (_provider.Ended)
+            {
+                return true;
+            }
+
+            // ASIO は Stop 後も HasReachedEnd が残る。再生が一度動いてからだけ見る。
+            if (_output is not AsioOut asio)
+            {
+                return false;
+            }
+
+            if (!asio.HasReachedEnd)
+            {
+                _asioEndArmed = true;
+                return false;
+            }
+
+            return _asioEndArmed;
+        }
+    }
 
     public int Generation => _generation;
 
@@ -133,13 +163,8 @@ internal sealed class AudioPlayer : IDisposable
             EndScrub();
         }
 
-        var wasPlaying = _playing;
         _provider.Bind(document, startFrame, playRange, loop, frameGain);
         EnsureDeviceMatchesProvider();
-        if (wasPlaying)
-        {
-            Play();
-        }
     }
 
     /// <summary>デバイスを捨てずに中身だけ差し替える。再生中の ASIO Stop を避ける。</summary>
@@ -163,6 +188,10 @@ internal sealed class AudioPlayer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _provider.SeekFrame(frame);
+        if (!_playing)
+        {
+            _discardQueuedOutput = true;
+        }
     }
 
     public void SetPlayWindow(WaveSelection? playRange, bool loop)
@@ -209,9 +238,7 @@ internal sealed class AudioPlayer : IDisposable
 
         if (!_playing)
         {
-            _generation++;
-            _output.Play();
-            _playing = true;
+            StartOutput();
         }
 
         _scrubbing = true;
@@ -244,9 +271,56 @@ internal sealed class AudioPlayer : IDisposable
             throw new InvalidOperationException(UiStrings.ErrAudioOutputUnavailable);
         }
 
+        StartOutput();
+    }
+
+    /// <summary>
+    /// Pause 後の Play は先読みキューを再開し、古い位置の音が先に出る。
+    /// ASIO はデバイスを止めず、プロバイダの無音ゲートで先読みを洗い流して
+    /// あるので、ゲートを開けるだけ（Stop すると HasReachedEnd が残り
+    /// シークバーが即終了扱いになる）。
+    /// WaveOut / WASAPI は Stop 後に先読みが残ることがあるので作り直す
+    /// （IM Importer と同じ）。
+    /// </summary>
+    private void StartOutput()
+    {
+        if (_output is not AsioOut
+            && (_discardQueuedOutput || _output!.PlaybackState != PlaybackState.Stopped))
+        {
+            RecreateOutputKeepingCursor();
+        }
+
+        _discardQueuedOutput = false;
         _generation++;
-        _output.Play();
+        _asioEndArmed = false;
+        ResetSmoothCursor();
+        _provider.SetPaused(false);
+        if (_output is null)
+        {
+            InitOutputDevice();
+        }
+
+        if (_output!.PlaybackState != PlaybackState.Playing)
+        {
+            _output.Play();
+        }
+
         _playing = true;
+    }
+
+    private void RecreateOutputKeepingCursor()
+    {
+        var frame = _provider.CursorFrame;
+        RecreateOutput();
+        InitOutputDevice();
+        _provider.SeekFrame(frame);
+    }
+
+    private void ResetSmoothCursor()
+    {
+        _smoothRawFrame = -1;
+        _smoothShownFrame = -1;
+        _smoothStampTicks = 0;
     }
 
     public void Pause()
@@ -257,10 +331,34 @@ internal sealed class AudioPlayer : IDisposable
             EndScrub();
         }
 
-        // 停止済みの出力に Pause すると、続く Play が無音のまま終わることがある。
         if (_playing)
         {
-            _output?.Pause();
+            if (_output is AsioOut)
+            {
+                // デバイスは動かしたまま無音を流し、ドライバ／仮想ミキサの
+                // 先読みを無音で置き換える（停止時に洗い流す）。
+                _provider.SetPaused(true);
+            }
+            else
+            {
+                // WaveOut / WASAPI は即止める。残った先読みは次の Play で
+                // デバイスごと作り直して捨てる。
+                _suppressPlaybackEnded = true;
+                try
+                {
+                    _output?.Stop();
+                }
+                catch
+                {
+                    // 次の Play で作り直す。
+                }
+                finally
+                {
+                    _suppressPlaybackEnded = false;
+                }
+
+                _discardQueuedOutput = true;
+            }
         }
 
         _playing = false;
@@ -270,6 +368,15 @@ internal sealed class AudioPlayer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _playing = false;
+
+        // ASIO はデバイスを止めず無音ゲートで洗い流す（Pause と同じ）。
+        // driver.Stop → Start は旧バッファの再生や HasReachedEnd の残留を招く。
+        if (_output is AsioOut)
+        {
+            _provider.SetPaused(true);
+            return;
+        }
+
         _suppressPlaybackEnded = true;
         try
         {
@@ -277,12 +384,14 @@ internal sealed class AudioPlayer : IDisposable
         }
         catch
         {
-            // ASIO Stop 失敗は破棄で回収する。
+            // 次の Play でデバイスを作り直す。
         }
         finally
         {
             _suppressPlaybackEnded = false;
         }
+
+        _discardQueuedOutput = true;
     }
 
     public void EnsureOutputDevice()
@@ -298,15 +407,57 @@ internal sealed class AudioPlayer : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
+        if (BeginDispose())
         {
             return;
         }
 
-        _disposed = true;
         try
         {
             FlushOutputWithSilence();
+        }
+        finally
+        {
+            EndDispose();
+        }
+    }
+
+    /// <summary>
+    /// 洗い流し待ちを UI に載せない。Stop / Dispose は呼び出し側の同期コンテキスト（UI）へ戻す。
+    /// </summary>
+    public async Task DisposeAsync()
+    {
+        if (BeginDispose())
+        {
+            return;
+        }
+
+        try
+        {
+            await FlushOutputWithSilenceAsync().ConfigureAwait(true);
+        }
+        finally
+        {
+            EndDispose();
+        }
+    }
+
+    private bool BeginDispose()
+    {
+        if (_disposed)
+        {
+            return true;
+        }
+
+        _disposed = true;
+        return false;
+    }
+
+    private void EndDispose()
+    {
+        try
+        {
+            FlushStopOutput();
         }
         finally
         {
@@ -316,59 +467,182 @@ internal sealed class AudioPlayer : IDisposable
 
     /// <summary>
     /// 停止だけではドライバ先読みが残ることがあるため、無音を流してから破棄する。
-    /// 洗い流し時間は出力レイテンシ／バッファ長に合わせる（短い固定値だと足りない）。
+    /// WaveOut / WASAPI は停止後の Play が旧キューを再再生するので回さない。
     /// </summary>
     private void FlushOutputWithSilence()
     {
+        var waitMs = BeginSilenceFlushWait();
+        if (waitMs > 0)
+        {
+            WaitFlush(waitMs);
+        }
+    }
+
+    private async Task FlushOutputWithSilenceAsync()
+    {
+        var waitMs = BeginSilenceFlushWait();
+        if (waitMs > 0)
+        {
+            await Task.Delay(waitMs).ConfigureAwait(true);
+        }
+    }
+
+    /// <returns>先読みを無音で置き換える待ちミリ秒。0 なら待たない。</returns>
+    private int BeginSilenceFlushWait()
+    {
         if (_output is null)
         {
-            return;
+            return 0;
         }
 
         _suppressPlaybackEnded = true;
         try
         {
             _scrubbing = false;
+            var muted = TryMuteOutput(_output);
             _provider.BeginSilenceFlush();
+
+            var playing = false;
             try
             {
-                if (_output.PlaybackState != PlaybackState.Playing)
-                {
-                    _output.Play();
-                }
-
-                _playing = true;
+                playing = _output.PlaybackState == PlaybackState.Playing;
             }
             catch
             {
-                // 既に止まっている等は無視して破棄へ進む。
+                return 0;
             }
 
-            // 先読みに残った音が無音に置き換わるまで待つ（秒数は AudioOutputFlush）。
-            var until = Environment.TickCount64 + EstimateFlushMilliseconds(_output);
-            while (Environment.TickCount64 < until)
+            if (!playing)
             {
-                Thread.Sleep(15);
+                return 0;
             }
 
-            try
-            {
-                _output.Stop();
-            }
-            catch
-            {
-            }
-
-            _playing = false;
+            _playing = true;
+            // ミュートできた WaveOut / WASAPI は適用待ちだけ。
+            // ASIO とミュート失敗時は、後段 hop が無音に置き換わるまで待つ。
+            return !muted || _output is AsioOut
+                ? EstimateFlushMilliseconds(_output)
+                : AudioOutputFlush.MutedSettleMilliseconds;
         }
         catch
         {
-            // 終了処理は失敗しても破棄を優先する。
+            return 0;
         }
-        finally
+    }
+
+    private void FlushStopOutput()
+    {
+        try
         {
-            _suppressPlaybackEnded = false;
+            _output?.Stop();
         }
+        catch
+        {
+        }
+
+        _playing = false;
+        _suppressPlaybackEnded = false;
+    }
+
+    private static void WaitFlush(int milliseconds)
+    {
+        var until = Environment.TickCount64 + Math.Max(0, milliseconds);
+        while (Environment.TickCount64 < until)
+        {
+            Thread.Sleep(15);
+        }
+    }
+
+    /// <summary>
+    /// 既にキューへ乗った音を直ちに消す。WasapiOut.Volume は端末マスターなので使わない。
+    /// ASIO はセッション音量が効かないので false。
+    /// </summary>
+    private static bool TryMuteOutput(IWavePlayer output)
+    {
+        if (output is AsioOut)
+        {
+            TryMuteProcessSessions();
+            return false;
+        }
+
+        var muted = false;
+        try
+        {
+            if (output is WaveOutEvent wave)
+            {
+                wave.Volume = 0;
+                muted = true;
+            }
+            else if (output is WasapiOut wasapi)
+            {
+                var stream = wasapi.AudioStreamVolume;
+                stream.SetAllVolumes(new float[stream.ChannelCount]);
+                muted = true;
+            }
+        }
+        catch
+        {
+            // セッション側のミュートに任せる。
+        }
+
+        return TryMuteProcessSessions() || muted;
+    }
+
+    private static bool TryMuteProcessSessions()
+    {
+        var muted = false;
+        try
+        {
+            using var enumerator = new MMDeviceEnumerator();
+            foreach (var device in enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active))
+            {
+                using (device)
+                {
+                    muted |= TryMuteDeviceSessions(device);
+                }
+            }
+        }
+        catch
+        {
+            // 終了時のミュート失敗は洗い流し待ちで回収する。
+        }
+
+        return muted;
+    }
+
+    private static bool TryMuteDeviceSessions(MMDevice device)
+    {
+        var muted = false;
+        try
+        {
+            var sessions = device.AudioSessionManager.Sessions;
+            var pid = (uint)Environment.ProcessId;
+            for (var i = 0; i < sessions.Count; i++)
+            {
+                var session = sessions[i];
+                try
+                {
+                    if (session.GetProcessID != pid)
+                    {
+                        continue;
+                    }
+
+                    session.SimpleAudioVolume.Mute = true;
+                    session.SimpleAudioVolume.Volume = 0f;
+                    muted = true;
+                }
+                catch
+                {
+                    // 切れたセッションは飛ばす。
+                }
+            }
+        }
+        catch
+        {
+            // デバイスによってはセッション列挙が失敗する。
+        }
+
+        return muted;
     }
 
     private int EstimateFlushMilliseconds(IWavePlayer output)
@@ -617,7 +891,9 @@ internal sealed class AudioPlayer : IDisposable
 
     private void OnPlaybackStopped(object? sender, StoppedEventArgs e)
     {
-        if (_suppressPlaybackEnded)
+        // 一時停止の Stop（WaveOutEvent は Stop 後に非同期で届く）は
+        // 終了イベントにしない。真の EOF は _playing 中にしか来ない。
+        if (_suppressPlaybackEnded || !_playing)
         {
             return;
         }

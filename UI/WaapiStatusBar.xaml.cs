@@ -59,7 +59,6 @@ internal sealed partial class WaapiStatusBar : UserControl
             Height = keepLockSide,
             Margin = new Thickness(0),
             QuietChrome = true,
-            ToolTip = UiStrings.TipOutputFolder,
         };
         _outputFolderButton.Click += (_, _) => OutputFolderBrowse?.Invoke(this, EventArgs.Empty);
         OutputFolderButtonHost.Content = _outputFolderButton;
@@ -67,6 +66,7 @@ internal sealed partial class WaapiStatusBar : UserControl
         AutoActiveCheckBox.IsChecked = true;
         ActionButtonLooks.ApplyStatusExport(ExportButton);
         SetPending();
+        ApplyTips();
         BadgeCanvas.Loaded += (_, _) => DrawBadge();
     }
 
@@ -74,20 +74,26 @@ internal sealed partial class WaapiStatusBar : UserControl
     {
         TitleLabel.Text = UiStrings.WaapiTitle;
         PlayMinusECheckBox.Content = UiStrings.LabelPlayMinusE;
-        PlayMinusECheckBox.ToolTip = UiStrings.TipPlayMinusE;
         AutoActiveCheckBox.Content = UiStrings.LabelAutoActive;
-        AutoActiveCheckBox.ToolTip = UiStrings.TipAutoActive;
         ExportButton.Content = UiStrings.ButtonExport;
-        ExportButton.ToolTip = UiStrings.TipExport;
-        OutputPathBox.ToolTip = UiStrings.TipOutputPath;
-        _outputFolderButton.ToolTip = UiStrings.TipOutputFolder;
+        ApplyTips();
         UpdateKeepLockAppearance();
-        if (_projectNameClickable)
-        {
-            ProjectNameLabel.ToolTip = UiStrings.TipWwiseProjectNameOpen;
-        }
-
         DrawBadge();
+    }
+
+    private void ApplyTips()
+    {
+        TipService.Set(PlayMinusECheckBox, UiStrings.TipPlayMinusE);
+        TipService.Set(AutoActiveCheckBox, UiStrings.TipAutoActive);
+        TipService.Set(ExportButton, UiStrings.TipExport);
+        TipService.Set(OutputPathBox, UiStrings.TipOutputPath);
+        TipService.Set(_outputFolderButton, UiStrings.TipOutputFolder);
+        TipService.Set(
+            ProjectNameLabel,
+            _projectNameClickable ? UiStrings.TipWwiseProjectNameOpen : null);
+        TipService.Set(
+            _keepLockButton,
+            _keepTargetChecked ? UiStrings.TipKeepTargetLock : UiStrings.TipKeepTargetUnlock);
     }
 
     public event EventHandler? KeepTargetChanged;
@@ -320,7 +326,7 @@ internal sealed partial class WaapiStatusBar : UserControl
         }
 
         ApplyProjectNameColors();
-        ProjectNameLabel.ToolTip = clickable ? UiStrings.TipWwiseProjectNameOpen : null;
+        TipService.Set(ProjectNameLabel, clickable ? UiStrings.TipWwiseProjectNameOpen : null);
     }
 
     private void UpdateKeepLockVisibility()
@@ -339,9 +345,9 @@ internal sealed partial class WaapiStatusBar : UserControl
             ? UiStrings.KeepTargetOnLabel
             : UiStrings.KeepTargetOffLabel;
         ApplyKeepLockColors();
-        _keepLockButton.ToolTip = _keepTargetChecked
-            ? UiStrings.TipKeepTargetLock
-            : UiStrings.TipKeepTargetUnlock;
+        TipService.Set(
+            _keepLockButton,
+            _keepTargetChecked ? UiStrings.TipKeepTargetLock : UiStrings.TipKeepTargetUnlock);
     }
 
     private void ApplyKeepLockColors()

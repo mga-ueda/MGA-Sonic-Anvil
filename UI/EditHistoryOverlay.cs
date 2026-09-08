@@ -2,10 +2,14 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
 
 namespace MgaSonicAnvil.UI;
+
+/// <summary>履歴オーバーレイの行クリック（修飾キー付き）。</summary>
+internal readonly record struct HistoryItemClick(int Index, ModifierKeys Modifiers);
 
 internal sealed class EditHistoryOverlay : Border
 {
@@ -13,8 +17,9 @@ internal sealed class EditHistoryOverlay : Border
     private readonly ScrollViewer _scroll;
     private readonly TextBlock _title;
     private readonly TextBlock _hint;
+    private readonly DispatcherTimer _statusTimer;
 
-    public event EventHandler<int>? ItemChosen;
+    public event EventHandler<HistoryItemClick>? ItemClicked;
 
     public EditHistoryOverlay()
     {
@@ -39,6 +44,7 @@ internal sealed class EditHistoryOverlay : Border
             Text = UiStrings.EditHistoryHint,
             Margin = new Thickness(10, 0, 10, 6),
             FontSize = 10,
+            TextWrapping = TextWrapping.Wrap,
             Foreground = (Brush)Application.Current.FindResource("MutedForeBrush"),
         };
         _scroll = new ScrollViewer
@@ -47,6 +53,14 @@ internal sealed class EditHistoryOverlay : Border
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             MaxHeight = 300,
             Content = _items,
+        };
+
+        _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+        _statusTimer.Tick += (_, _) =>
+        {
+            _statusTimer.Stop();
+            _hint.Text = UiStrings.EditHistoryHint;
+            _hint.Foreground = (Brush)Application.Current.FindResource("MutedForeBrush");
         };
 
         var root = new DockPanel();
@@ -60,27 +74,45 @@ internal sealed class EditHistoryOverlay : Border
 
     public void ApplyLocalizedText()
     {
+        _statusTimer.Stop();
         _title.Text = UiStrings.EditHistoryTitle;
         _hint.Text = UiStrings.EditHistoryHint;
+        _hint.Foreground = (Brush)Application.Current.FindResource("MutedForeBrush");
     }
 
-    public void SetItems(IReadOnlyList<EditHistoryEntry> items, int selectedIndex)
+    /// <summary>ヒント行に一時メッセージ（コピー／適用件数など）を表示する。</summary>
+    public void FlashStatus(string text)
+    {
+        _hint.Text = text;
+        _hint.Foreground = (Brush)Application.Current.FindResource("AccentCyanBrush");
+        _statusTimer.Stop();
+        _statusTimer.Start();
+    }
+
+    public void SetItems(
+        IReadOnlyList<EditHistoryEntry> items,
+        int selectedIndex,
+        IReadOnlySet<int>? copySelected = null)
     {
         _items.Children.Clear();
         var selectedBack = (Brush)Application.Current.FindResource("PrimaryForeBrush");
         var selectedFore = (Brush)Application.Current.FindResource("SurfaceBackBrush");
         var idleFore = (Brush)Application.Current.FindResource("PrimaryForeBrush");
         var futureFore = (Brush)Application.Current.FindResource("MutedForeBrush");
+        var copyMark = (Brush)Application.Current.FindResource("AccentCyanBrush");
         FrameworkElement? selectedRow = null;
         foreach (var item in items)
         {
             var selected = item.Index == selectedIndex;
             var future = item.Index > selectedIndex;
+            var copying = copySelected is not null && copySelected.Contains(item.Index);
             var row = new Border
             {
                 Tag = item.Index,
-                Padding = new Thickness(10, 4, 10, 4),
+                Padding = new Thickness(8, 4, 10, 4),
                 Background = selected ? selectedBack : Brushes.Transparent,
+                BorderThickness = new Thickness(2, 0, 0, 0),
+                BorderBrush = copying ? copyMark : Brushes.Transparent,
                 Cursor = Cursors.Hand,
             };
             var label = new TextBlock
@@ -89,7 +121,9 @@ internal sealed class EditHistoryOverlay : Border
                 FontSize = 12,
                 FontFamily = new FontFamily("Consolas"),
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                Foreground = selected ? selectedFore : future ? futureFore : idleFore,
+                Foreground = copying && !selected
+                    ? copyMark
+                    : selected ? selectedFore : future ? futureFore : idleFore,
             };
             row.Child = label;
             row.MouseLeftButtonUp += (_, e) =>
@@ -97,7 +131,7 @@ internal sealed class EditHistoryOverlay : Border
                 e.Handled = true;
                 if (row.Tag is int index)
                 {
-                    ItemChosen?.Invoke(this, index);
+                    ItemClicked?.Invoke(this, new HistoryItemClick(index, Keyboard.Modifiers));
                 }
             };
             _items.Children.Add(row);

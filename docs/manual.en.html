@@ -101,10 +101,11 @@
       <ul>
         <li><strong>Overview</strong> — top strip. The bright area is the current view. Drag to move (scrubs the center); wheel zooms around the playhead.</li>
         <li><strong>Waveform</strong> — the edit surface: time ruler, marker / region flags, playhead, mouse guide.</li>
-        <li><strong>Tabs</strong> — multiple files. Close with <kbd>Ctrl</kbd>+<kbd>W</kbd>.</li>
-        <li><strong>Transport</strong> — playback, zoom, fade / normalize / delete / save, <span class="ui">WAAPI</span>, language <span class="ui">JP / EN</span>, manual <span class="ui">?</span>.</li>
+        <li><strong>Tabs</strong> — multiple files. Close with <kbd>Ctrl</kbd>+<kbd>W</kbd>. Right-click for “Close Other Tabs (O)”, “Close This and Tabs to the Right (R)”, “Close This and Tabs to the Left (L)”, “Close All Tabs (W)”, and “Select All Tabs (A)”. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> also closes all tabs. Select tabs with <kbd>Ctrl</kbd>+click (toggle), <kbd>Shift</kbd>+click (range), or <kbd>Ctrl</kbd>+<kbd>A</kbd> while the pointer is over the tab bar (all); selected tabs are highlighted and <kbd>Esc</kbd> deselects. With a selection, the right-click menu becomes “Close Selected/All Tabs” / “Paste Copied Edits to Selected/All Tabs”, and <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to every selected tab at once.</li>
+        <li><strong>Transport</strong> — playback, zoom, fade / normalize / delete / save, <span class="ui">WAAPI</span>, language <span class="ui">JP / EN</span>, <span class="ui">Tips</span> on/off, manual <span class="ui">?</span>.</li>
         <li><strong>Always on Top</strong> — keeps the window in front.</li>
-        <li><strong>Spectrum / meters / vector scope</strong> — a simple view of the playback output.</li>
+        <li><strong>Spectrum / meters / vector scope</strong> — a view of the playback output. The spectrum is the same LED-band display as Layer Music Checker, fitted into the narrow slot right of the transport.</li>
+        <li><strong>Tips</strong> — above the WAAPI bar, fixed height. Hover a control to see its description; overflow scrolls. The first tip appears immediately; moving to another control or away waits 300 ms before replacing or clearing. Click the heading or body to lock (cyan frame, <span class="ui">Tips (Locked)</span>); click again to unlock. The text does not change while locked or while the pointer is on the panel. Floating tooltips are not used.</li>
         <li><strong>WAAPI bar</strong> — connection, destination, <span class="ui">Play -E</span>, <span class="ui">Auto Active</span>, <span class="ui">EXPORT</span>.</li>
         <li><strong>Status bar</strong> — file info, Audio API / Device, GitHub link.</li>
       </ul>
@@ -130,6 +131,7 @@
         <li><span class="ui">DELETE</span> — ripple-delete the selection. Selected markers / regions go with it.</li>
         <li><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd> — cut / copy / paste (markers in range included; a matching region is included too).</li>
         <li><kbd>U</kbd> — edit history. ↑↓ move, Enter apply, Esc cancel.</li>
+        <li>History copy &amp; paste — inside the history, <kbd>Ctrl</kbd>+click to select steps (Shift+click or <kbd>Shift</kbd>+<kbd>↑↓</kbd> for a range, <kbd>Ctrl</kbd>+<kbd>A</kbd> for all), then <kbd>Ctrl</kbd>+<kbd>C</kbd>. Press <kbd>Ctrl</kbd>+<kbd>V</kbd> in another file to re-apply the same processing (its history window does not need to be open). The copy persists until you copy something else, so you can switch tabs and press <kbd>Ctrl</kbd>+<kbd>V</kbd> repeatedly to apply it to multiple files. <kbd>Ctrl</kbd>+<kbd>C</kbd> with no selection copies every step up to the current position. Ranges are mapped by time across sample rates, and gain-type edits such as normalize are recomputed on the target.</li>
         <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> — undo / redo.</li>
       </ul>
 
@@ -189,7 +191,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select all</td></tr>
           <tr><td><kbd>I</kbd> / <kbd>O</kbd> / <kbd>N</kbd> / <kbd>Delete</kbd></td><td>Fade in / out / normalize / delete</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd> / <kbd>S</kbd> / <kbd>Shift</kbd>+<kbd>S</kbd></td><td>Open / save / save as</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd> / <kbd>Ctrl</kbd>+<kbd>Tab</kbd></td><td>Close tab / next tab</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> / <kbd>Ctrl</kbd>+<kbd>Tab</kbd></td><td>Close tab / close all / next tab</td></tr>
           <tr><td><kbd>W</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Toggle WAAPI / EXPORT</td></tr>
           <tr><td><kbd>G</kbd> / <kbd>U</kbd> / <kbd>T</kbd></td><td>Spectrogram / history / time</td></tr>
         </tbody>
