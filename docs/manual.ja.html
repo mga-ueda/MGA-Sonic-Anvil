@@ -184,7 +184,7 @@
       <p>プリセットは 8 / 11.025 / 16 / 22.05 / 32 / 44.1 / 48 / 96 kHz、ビットは 4 / 8 / 16 / 24、チャンネルは Mono / Stereo です。任意 Hz は 1000–384000 で、↑↓／ホイールで 1Hz（Shift 10／Ctrl 100／Ctrl+Shift 1000）。メニューはカーソルの直下を避けます。項目を選んだ時点でステータスの容量が推測サイズに更新されます。変換中はすりガラスで操作を止めます。確定した項目は保存まで赤のままです。サンプリングレートとビット深度は、読み込み時（またはフェード等の中身の編集後）の元 PCM から毎回変換します。48 kHz→24 kHz のあと 11 kHz にしても、24 kHz 経由ではなく 48 kHz から作り直します。<kbd>Space</kbd> で試聴できるのはレートとビットです（チャンネルは <kbd>Enter</kbd> のみ。1–2）。4 bit は量子化の試聴用です。Wave に書くビットは 8 / 16 / 24 だけなので、4 bit のままでは出さず 16 bit で書きます。</p>
 
       <h2 id="export">9. WAAPI EXPORT（Wave 単体）</h2>
-      <p><strong>Wwise IM Importer の Wave 単体モードと同じ組み立て</strong>です。ワンショットとループをあらかじめ別ファイルに分けず、1 本のマスター波形上で構造を決めます。EXPORT は元波形を 1 ファイルのまま Originals へ書き、区間は MusicClip のトリムで合わせます。Music Playlist Container 1 つを作ります。Custom Cue は出しません。小節・テンポ管理、複数波形の Switch、XML マーカートラックはありません。</p>
+      <p><strong><a href="https://github.com/mga-ueda/MGA-Wwise-IM-Importer">Wwise IM Importer</a> の Wave 単体モードと同じ組み立て</strong>です。ワンショットとループをあらかじめ別ファイルに分けず、1 本のマスター波形上で構造を決めます。EXPORT は元波形を 1 ファイルのまま Originals へ書き、区間は MusicClip のトリムで合わせます。Music Playlist Container 1 つを作ります。Custom Cue は出しません。小節・テンポ管理、複数波形の Switch、XML マーカートラックはありません。</p>
       <p>このアプリは波形エディタでもあるので、フェードや削除などの編集はソースへ焼き込んだうえで渡します。マーカーとサンプルループは保存時に WAV へ埋め込みます。</p>
 
       <h3 id="export-how">9-1. 手順</h3>
@@ -218,7 +218,7 @@
           <tr><td><code>-E</code></td><td>Exit Cue 以降（余韻）。直前の <code>-L</code> と同じ Music Segment に束ね、遷移時に次と重なって鳴らせます。</td></tr>
           <tr><td><code>-A</code></td><td>Entry Cue 前（アウフタクト）。次の区間と同じ Music Segment に束ねます。</td></tr>
           <tr><td>名前に <code>Loop</code></td><td><code>-L</code> と同等。2 個で挟むとその間がループ、余り 1 個は単独の <code>-L</code>。</td></tr>
-          <tr><td><code>-R</code></td><td>色だけ IM Importer と同じグレーです。このアプリでは除外しません。通常マーカーと同じ分割点です。</td></tr>
+          <tr><td><code>-R</code></td><td>色だけ <a href="https://github.com/mga-ueda/MGA-Wwise-IM-Importer">IM Importer</a> と同じグレーです。このアプリでは除外しません。通常マーカーと同じ分割点です。</td></tr>
         </tbody>
       </table>
       <p>マーカーはプレビューと区間分割にだけ使い、<strong>Wwise の Custom Cue にはしません</strong>。</p>

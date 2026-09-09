@@ -184,7 +184,7 @@
       <p>Presets are 8 / 11.025 / 16 / 22.05 / 32 / 44.1 / 48 / 96 kHz, bit depths 4 / 8 / 16 / 24, and channels Mono / Stereo. Custom Hz is 1000–384000, nudged with ↑↓ / wheel by 1 Hz (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). The menu sits just off the cursor. Highlighting a value updates the status size to the estimate. A frosted-glass overlay blocks the UI while converting. Confirmed fields stay red until you save. Sample rate and bit depth always convert from the PCM captured at load (or after a content edit such as fade). 48 kHz → 24 kHz then 11 kHz is rebuilt from 48 kHz, not cascaded through 24 kHz. <kbd>Space</kbd> previews rate and bit depth only (channels apply with <kbd>Enter</kbd>; 1–2 pick a row). 4-bit is for quantized audition. Wave writes only 8 / 16 / 24, so a 4-bit document is written as 16-bit.</p>
 
       <h2 id="export">9. WAAPI EXPORT (Wave-only)</h2>
-      <p><strong>The same assembly as Wwise IM Importer’s Wave-only mode.</strong> Keep one-shot and loop material on a single master waveform instead of pre-separating files. EXPORT writes that wave as one file into Originals and maps ranges with MusicClip trim. It creates one Music Playlist Container. No Custom Cues. There is no bar / tempo overlay, no multi-wave Switch, and no XML marker-track mode.</p>
+      <p><strong>The same assembly as <a href="https://github.com/mga-ueda/MGA-Wwise-IM-Importer">Wwise IM Importer</a>’s Wave-only mode.</strong> Keep one-shot and loop material on a single master waveform instead of pre-separating files. EXPORT writes that wave as one file into Originals and maps ranges with MusicClip trim. It creates one Music Playlist Container. No Custom Cues. There is no bar / tempo overlay, no multi-wave Switch, and no XML marker-track mode.</p>
       <p>This app is also a waveform editor, so fades and other edits are baked into the source before it is handed over. Markers and the sample loop are written into the WAV on save.</p>
 
       <h3 id="export-how">9-1. Steps</h3>
@@ -218,7 +218,7 @@
           <tr><td><code>-E</code></td><td>After the Exit Cue (the tail). Bundled into the same Music Segment as the preceding <code>-L</code> so it can overlap the next piece on a transition.</td></tr>
           <tr><td><code>-A</code></td><td>Before the Entry Cue (pickup). Bundled into the same Music Segment as the next range.</td></tr>
           <tr><td>Name containing <code>Loop</code></td><td>Same as <code>-L</code>. Two of them bracket a loop; an unpaired odd one is a lone <code>-L</code>.</td></tr>
-          <tr><td><code>-R</code></td><td>Painted gray like IM Importer. This app does not exclude it. It is just another split point.</td></tr>
+          <tr><td><code>-R</code></td><td>Painted gray like <a href="https://github.com/mga-ueda/MGA-Wwise-IM-Importer">IM Importer</a>. This app does not exclude it. It is just another split point.</td></tr>
         </tbody>
       </table>
       <p>Markers are used for preview and splitting only. They are <strong>not</strong> written as Wwise Custom Cues.</p>
