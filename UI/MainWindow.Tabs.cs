@@ -21,6 +21,8 @@ public partial class MainWindow
     /// <summary>Shift+クリックの範囲選択の起点。</summary>
     private DocumentSession? _tabSelectionAnchor;
 
+    private bool _tabLayoutBusy;
+
     private bool HasTabSelection => _selectedTabs.Count > 0;
 
     private bool AllTabsSelected => _sessions.Count > 0 && _selectedTabs.Count == _sessions.Count;
@@ -325,15 +327,6 @@ public partial class MainWindow
             DocumentTabs.Children.Add(CreateTabItem(session));
         }
 
-        foreach (var child in DocumentTabs.Children.OfType<FrameworkElement>())
-        {
-            if (child.Tag is DocumentSession session && ReferenceEquals(session, _activeSession))
-            {
-                child.BringIntoView();
-                break;
-            }
-        }
-
         Dispatcher.BeginInvoke(SyncTabOverflow, DispatcherPriority.Loaded);
     }
 
@@ -376,24 +369,99 @@ public partial class MainWindow
 
     private void SyncTabOverflow()
     {
-        if (DocumentTabHost.Visibility != Visibility.Visible)
+        if (_tabLayoutBusy || DocumentTabHost.Visibility != Visibility.Visible)
         {
             return;
         }
 
-        var overflow = DocumentTabScroll.ExtentWidth > DocumentTabScroll.ViewportWidth + 1;
-        var show = overflow ? Visibility.Visible : Visibility.Collapsed;
-        if (TabScrollLeft.Visibility != show)
+        var hostWidth = DocumentTabHost.ActualWidth;
+        if (hostWidth <= 1)
         {
-            TabScrollLeft.Visibility = show;
-            TabScrollRight.Visibility = show;
+            return;
         }
 
+        var tabs = DocumentTabs.Children.OfType<Border>().ToArray();
+        if (tabs.Length == 0)
+        {
+            SetTabScrollButtons(show: false);
+            return;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var slots = new DocumentTabSlot[tabs.Length];
+        for (var i = 0; i < tabs.Length; i++)
+        {
+            var title = tabs[i].Tag is DocumentSession session ? session.TabTitle : "";
+            var preferred = DocumentTabLayout.PreferredWidth(title, dpi);
+            var min = Math.Min(preferred, DocumentTabLayout.MinWidth(title, dpi));
+            var keepWide = tabs[i].Tag is DocumentSession tab
+                && ReferenceEquals(tab, _activeSession);
+            slots[i] = new DocumentTabSlot(preferred, min, keepWide);
+        }
+
+        var showArrows = !DocumentTabLayout.FitsWithoutArrows(slots, hostWidth);
+        var widths = new double[tabs.Length];
+        DocumentTabLayout.Allocate(slots, hostWidth, widths);
+
+        _tabLayoutBusy = true;
+        try
+        {
+            SetTabScrollButtons(showArrows);
+            for (var i = 0; i < tabs.Length; i++)
+            {
+                var border = tabs[i];
+                var width = widths[i];
+                border.MinWidth = 0;
+                border.MaxWidth = DocumentTabLayout.MaxTabWidth;
+                if (double.IsNaN(border.Width) || Math.Abs(border.Width - width) > 0.5)
+                {
+                    border.Width = width;
+                }
+            }
+
+            if (!showArrows && DocumentTabScroll.HorizontalOffset > 0)
+            {
+                DocumentTabScroll.ScrollToHorizontalOffset(0);
+            }
+
+            BringActiveTabIntoView(tabs);
+            RefreshTabScrollEnabled();
+        }
+        finally
+        {
+            _tabLayoutBusy = false;
+        }
+    }
+
+    private void SetTabScrollButtons(bool show)
+    {
+        var visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (TabScrollLeft.Visibility != visibility)
+        {
+            TabScrollLeft.Visibility = visibility;
+            TabScrollRight.Visibility = visibility;
+        }
+    }
+
+    private void RefreshTabScrollEnabled()
+    {
         var canLeft = DocumentTabScroll.HorizontalOffset > 1;
         var canRight = DocumentTabScroll.HorizontalOffset + DocumentTabScroll.ViewportWidth
             < DocumentTabScroll.ExtentWidth - 1;
         TabScrollLeft.IsEnabled = canLeft;
         TabScrollRight.IsEnabled = canRight;
+    }
+
+    private void BringActiveTabIntoView(IReadOnlyList<Border> tabs)
+    {
+        foreach (var border in tabs)
+        {
+            if (border.Tag is DocumentSession session && ReferenceEquals(session, _activeSession))
+            {
+                border.BringIntoView();
+                return;
+            }
+        }
     }
 
     private void RefreshTabHeaders()
@@ -407,6 +475,8 @@ public partial class MainWindow
 
             ApplyTabChrome(session, dock);
         }
+
+        SyncTabOverflow();
     }
 
     private FrameworkElement CreateTabItem(DocumentSession session)
@@ -419,8 +489,8 @@ public partial class MainWindow
             BorderBrush = (Brush)FindResource("ChromeBorderBrush"),
             BorderThickness = new Thickness(0, 0, 1, 0),
             Cursor = Cursors.Hand,
-            MinWidth = 80,
-            MaxWidth = 220,
+            MinWidth = 0,
+            MaxWidth = DocumentTabLayout.MaxTabWidth,
         };
 
         var title = new TextBlock
