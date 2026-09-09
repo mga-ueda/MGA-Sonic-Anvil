@@ -1,7 +1,9 @@
 using System.IO;
+using System.IO.MemoryMappedFiles;
 using System.Text;
 using System.Threading;
 using MgaSonicAnvil.Config;
+using MgaSonicAnvil.UI;
 
 namespace MgaSonicAnvil;
 
@@ -10,12 +12,18 @@ internal static class SingleInstance
 {
     private const string MutexName = @"Local\MGA.SonicAnvil.SingleInstance";
     private const string ActivateEventName = @"Local\MGA.SonicAnvil.Activate";
+    private const string ActivateAckEventName = @"Local\MGA.SonicAnvil.ActivateAck";
+    private const string OwnerPidMapName = @"Local\MGA.SonicAnvil.OwnerPid";
     private const string QueueMutexName = @"Local\MGA.SonicAnvil.OpenQueue";
     private const string QueueFileName = "open-queue.txt";
+    private static readonly TimeSpan ActivateAckTimeout = TimeSpan.FromMilliseconds(1500);
 
     private static Mutex? _mutex;
     private static EventWaitHandle? _activate;
+    private static EventWaitHandle? _activateAck;
     private static EventWaitHandle? _stop;
+    private static MemoryMappedFile? _ownerPid;
+    private static bool _watching;
 
     private static string QueuePath => Path.Combine(AppStorage.RootDirectory, QueueFileName);
 
@@ -36,6 +44,8 @@ internal static class SingleInstance
         }
 
         _mutex = mutex;
+        _ownerPid = SharedProcessId.Publish(OwnerPidMapName, Environment.ProcessId);
+        EnsureActivateEvents();
         return true;
     }
 
@@ -46,14 +56,44 @@ internal static class SingleInstance
             EnqueuePaths(paths);
         }
 
+        GrantForegroundToOwner();
+
+        var signaled = false;
         try
         {
             using var ev = EventWaitHandle.OpenExisting(ActivateEventName);
             ev.Set();
+            signaled = true;
         }
         catch (WaitHandleCannotBeOpenedException)
         {
             // 既存プロセスの待ち受け前なら、その起動中の窓が出る。
+        }
+
+        if (!signaled)
+        {
+            return;
+        }
+
+        // 権限譲渡中に既存プロセスが SetForegroundWindow できるよう、ACK まで残る。
+        try
+        {
+            using var ack = EventWaitHandle.OpenExisting(ActivateAckEventName);
+            ack.WaitOne(ActivateAckTimeout);
+        }
+        catch (WaitHandleCannotBeOpenedException)
+        {
+        }
+    }
+
+    public static void NotifyActivated()
+    {
+        try
+        {
+            _activateAck?.Set();
+        }
+        catch (ObjectDisposedException)
+        {
         }
     }
 
@@ -121,14 +161,14 @@ internal static class SingleInstance
 
     public static void StartWatch(Action onActivate)
     {
-        if (_activate is not null)
+        if (_watching)
         {
             return;
         }
 
-        _activate = new EventWaitHandle(false, EventResetMode.AutoReset, ActivateEventName);
+        EnsureActivateEvents();
         _stop = new EventWaitHandle(false, EventResetMode.ManualReset);
-        var activate = _activate;
+        var activate = _activate!;
         var stop = _stop;
         var thread = new Thread(() =>
         {
@@ -142,6 +182,7 @@ internal static class SingleInstance
             IsBackground = true,
             Name = "SingleInstanceActivate",
         };
+        _watching = true;
         thread.Start();
     }
 
@@ -151,9 +192,14 @@ internal static class SingleInstance
         {
             _stop?.Set();
             _activate?.Dispose();
+            _activateAck?.Dispose();
             _stop?.Dispose();
+            _ownerPid?.Dispose();
             _activate = null;
+            _activateAck = null;
             _stop = null;
+            _ownerPid = null;
+            _watching = false;
             _mutex?.ReleaseMutex();
             _mutex?.Dispose();
             _mutex = null;
@@ -162,6 +208,61 @@ internal static class SingleInstance
         {
             _mutex?.Dispose();
             _mutex = null;
+        }
+    }
+
+    private static void EnsureActivateEvents()
+    {
+        _activate ??= new EventWaitHandle(false, EventResetMode.AutoReset, ActivateEventName);
+        _activateAck ??= new EventWaitHandle(false, EventResetMode.AutoReset, ActivateAckEventName);
+    }
+
+    private static void GrantForegroundToOwner()
+    {
+        if (SharedProcessId.TryRead(OwnerPidMapName, out var pid) && ForegroundActivation.TryAllowProcess(pid))
+        {
+            return;
+        }
+
+        ForegroundActivation.TryAllowAny();
+    }
+}
+
+/// <summary>既存プロセスの PID を名前付きメモリで共有する。</summary>
+internal static class SharedProcessId
+{
+    public static MemoryMappedFile? Publish(string mapName, int processId)
+    {
+        try
+        {
+            var map = MemoryMappedFile.CreateOrOpen(mapName, sizeof(int));
+            using var view = map.CreateViewAccessor(0, sizeof(int));
+            view.Write(0, processId);
+            return map;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public static bool TryRead(string mapName, out int processId)
+    {
+        processId = 0;
+        try
+        {
+            using var map = MemoryMappedFile.OpenExisting(mapName);
+            using var view = map.CreateViewAccessor(0, sizeof(int));
+            processId = view.ReadInt32(0);
+            return processId > 0;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
         }
     }
 }

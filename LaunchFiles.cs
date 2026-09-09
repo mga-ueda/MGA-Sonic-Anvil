@@ -11,6 +11,8 @@ internal static class LaunchFiles
     public static void SetStartup(IReadOnlyList<string> paths) =>
         _startup = paths.Count == 0 ? [] : paths.ToArray();
 
+    public static bool HasStartup => _startup.Length > 0;
+
     public static string[] TakeStartup()
     {
         var taken = _startup;

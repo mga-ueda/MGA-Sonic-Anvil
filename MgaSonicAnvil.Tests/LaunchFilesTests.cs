@@ -33,4 +33,21 @@ public sealed class LaunchFilesTests
         Assert.True(Path.IsPathRooted(collected[0]));
         Assert.EndsWith($"{Path.DirectorySeparatorChar}nested{Path.DirectorySeparatorChar}sample.aiff", collected[0]);
     }
+
+    [Fact]
+    public void HasStartup_FollowsSetAndTake()
+    {
+        try
+        {
+            var wav = Path.GetFullPath("startup-has.wav");
+            LaunchFiles.SetStartup([wav]);
+            Assert.True(LaunchFiles.HasStartup);
+            Assert.Equal([wav], LaunchFiles.TakeStartup());
+            Assert.False(LaunchFiles.HasStartup);
+        }
+        finally
+        {
+            LaunchFiles.SetStartup([]);
+        }
+    }
 }

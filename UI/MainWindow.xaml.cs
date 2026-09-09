@@ -179,31 +179,27 @@ public partial class MainWindow : Window
         RefreshLocalizedText();
         Loaded += OnStartupLoaded;
         ContentRendered += OnStartupContentRendered;
-        MgaSonicAnvil.SingleInstance.StartWatch(() => Dispatcher.BeginInvoke(ActivateFromOtherInstance));
+        MgaSonicAnvil.SingleInstance.StartWatch(() =>
+            Dispatcher.BeginInvoke(ActivateFromOtherInstance, DispatcherPriority.Send));
     }
 
     private void ActivateFromOtherInstance()
     {
-        if (!IsVisible)
-        {
-            Show();
-        }
-
-        if (WindowState == WindowState.Minimized)
-        {
-            WindowState = WindowState.Normal;
-        }
-
         if (Opacity < 1)
         {
             RevealStartupWindow();
         }
 
-        Activate();
-        var keepTop = AlwaysOnTopCheck.IsChecked == true;
-        Topmost = true;
-        Topmost = keepTop;
-        OpenLaunchPaths(SingleInstance.TakePendingPaths());
+        ForegroundActivation.BringToFront(this);
+        SingleInstance.NotifyActivated();
+        var pending = SingleInstance.TakePendingPaths();
+        if (pending.Length == 0)
+        {
+            return;
+        }
+
+        _didRestoreLastDocument = true;
+        OpenLaunchPaths(pending);
     }
 
     private void OnStartupLoaded(object sender, RoutedEventArgs e)
@@ -229,6 +225,11 @@ public partial class MainWindow : Window
 
         _startupRevealPending = false;
         Opacity = 1;
+        if (LaunchFiles.HasStartup)
+        {
+            ForegroundActivation.BringToFront(this);
+        }
+
         // 表示を先に出し、前回ドキュメントの読み込みは次のアイドルへ回す。
         Dispatcher.BeginInvoke(RestoreLastDocumentAfterReveal, DispatcherPriority.ApplicationIdle);
         Dispatcher.BeginInvoke(() => _ = StartWaapiAsync(), DispatcherPriority.ApplicationIdle);
