@@ -67,7 +67,20 @@
         <li><a href="#spectrogram">Spectrogram</a></li>
         <li><a href="#format">Format conversion</a></li>
         <li><a href="#export">WAAPI EXPORT (Wave-only)</a></li>
-        <li><a href="#shortcuts">Shortcuts</a></li>
+        <li><a href="#shortcuts">Shortcuts</a>
+          <ol>
+            <li><a href="#shortcuts-file">File / tabs</a></li>
+            <li><a href="#shortcuts-play">Playback</a></li>
+            <li><a href="#shortcuts-view">View / zoom</a></li>
+            <li><a href="#shortcuts-seek">Seek / selection</a></li>
+            <li><a href="#shortcuts-edit">Edit</a></li>
+            <li><a href="#shortcuts-mark">Markers / regions / loops</a></li>
+            <li><a href="#shortcuts-format">Format</a></li>
+            <li><a href="#shortcuts-waapi">WAAPI</a></li>
+            <li><a href="#shortcuts-mouse">Mouse / pointer</a></li>
+            <li><a href="#shortcuts-context">Contextual</a></li>
+          </ol>
+        </li>
         <li><a href="#settings">Settings and language</a></li>
         <li><a href="#disclaimer">Scope</a></li>
         <li><a href="#trademarks">Trademarks and license</a></li>
@@ -179,26 +192,199 @@
       </div>
 
       <h2 id="shortcuts">10. Shortcuts</h2>
+      <p>This section lists every implemented shortcut, including ones already described earlier. Contextual keys apply only while that UI is open. The waveform Tips panel shows the same operations.</p>
+
+      <h3 id="shortcuts-file">File / tabs</h3>
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td><kbd>Space</kbd></td><td>Play / stop (return to start)</td></tr>
-          <tr><td><kbd>Enter</kbd></td><td>Pause in place</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Play from 3 seconds earlier</td></tr>
-          <tr><td>↑↓ / <kbd>Ctrl</kbd>+↑↓</td><td>Time zoom / 32× · fit all</td></tr>
-          <tr><td><kbd>Shift</kbd>+↑↓ / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↑↓</td><td>Amplitude zoom / max · reset</td></tr>
-          <tr><td>Wheel / <kbd>Shift</kbd> / <kbd>Ctrl</kbd>+wheel</td><td>Time zoom / pan / amplitude</td></tr>
-          <tr><td>←→ / <kbd>Ctrl</kbd>+←→</td><td>Seek / previous or next marker · edge</td></tr>
-          <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>View edge</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select all</td></tr>
-          <tr><td><kbd>I</kbd> / <kbd>O</kbd> / <kbd>N</kbd> / <kbd>Delete</kbd></td><td>Fade in / out / normalize / delete</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd> / <kbd>S</kbd> / <kbd>Shift</kbd>+<kbd>S</kbd></td><td>Open / save / save as</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> / <kbd>Ctrl</kbd>+<kbd>Tab</kbd></td><td>Close tab / close all / next tab</td></tr>
-          <tr><td><kbd>W</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Toggle WAAPI / EXPORT</td></tr>
-          <tr><td><kbd>G</kbd> / <kbd>U</kbd> / <kbd>T</kbd></td><td>Spectrogram / history / time</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>Open (drop also works; multiple files become tabs)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save (Wave or MP3)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Save as</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close tab (asks to save if dirty)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Close all tabs</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageDown</kbd></td><td>Next tab</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageUp</kbd></td><td>Previous tab</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select all. Over the tab bar, selects every tab</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Cancel edit, menu, scrub, tab selection, then the waveform selection, in that order. If nothing remains, confirm quit</td></tr>
         </tbody>
       </table>
-      <p>Hover the waveform for a fuller list of operations.</p>
+
+      <h3 id="shortcuts-play">Playback</h3>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Space</kbd></td><td>Play / stop (stop returns to the start position)</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Pause in place</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Play from 3 seconds earlier</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from the playback start</td></tr>
+          <tr><td><kbd>L</kbd></td><td>Loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>)</td></tr>
+          <tr><td><kbd>Z</kbd> / <kbd>.</kbd></td><td>Center. Toggles center-lock while playing; clears it when stopped</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Home</kbd></td><td>Go to the start of the file</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>End</kbd></td><td>Go to the end of the file</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-view">View / zoom</h3>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>↑ / ↓</td><td>Time zoom (around the playhead)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+↑</td><td>Time zoom 32× / max</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+↓</td><td>Fit all</td></tr>
+          <tr><td><kbd>Shift</kbd>+↑ / ↓</td><td>Amplitude zoom</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↑</td><td>Amplitude zoom max</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↓</td><td>Reset amplitude zoom</td></tr>
+          <tr><td>Wheel</td><td>Time zoom (around the playhead; same on the overview)</td></tr>
+          <tr><td><kbd>Shift</kbd>+wheel</td><td>Pan (on the waveform)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+wheel</td><td>Amplitude zoom (on the waveform)</td></tr>
+          <tr><td><kbd>G</kbd></td><td>Cycle waveform / spectrogram / overlay</td></tr>
+          <tr><td><kbd>T</kbd></td><td>Edit the current time in the status bar</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-seek">Seek / selection</h3>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>← / →</td><td>Seek. Moves a selected marker / region edge / loop edge (1 sample when dots are shown)</td></tr>
+          <tr><td><kbd>Shift</kbd>+← / →</td><td>Extend the selection. Moves a selected edge ×3 (1 sample when dots are shown)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+← / →</td><td>Previous / next marker / region edge / sample-loop edge</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+← / →</td><td>Extend the selection to the previous / next marker or edge</td></tr>
+          <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>View edge</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>Home</kbd> / <kbd>End</kbd></td><td>Extend the selection to the view edge</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Home</kbd> / <kbd>End</kbd></td><td>Select everything before / after</td></tr>
+          <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Seek by 5% of the view</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Extend the selection by 5% of the view</td></tr>
+          <tr><td><kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to 0%–90% of the view</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>0</kbd>–<kbd>9</kbd></td><td>Extend the selection to 0%–90% of the view</td></tr>
+          <tr><td>Numpad <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to a marker number (digits can be chained). Falls back to a view position</td></tr>
+          <tr><td><kbd>Shift</kbd>+numpad</td><td>Extend the selection to that marker / view position</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-edit">Edit</h3>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>I</kbd></td><td>Fade in</td></tr>
+          <tr><td><kbd>O</kbd></td><td>Fade out</td></tr>
+          <tr><td><kbd>X</kbd></td><td>Linear fade around the playhead in the view (before = out / after = in)</td></tr>
+          <tr><td><kbd>N</kbd></td><td>Normalize (peak −0.1 dB)</td></tr>
+          <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Ripple-delete the selection. Selected markers / regions go with it</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd></td><td>Cut / copy / paste (markers in range included; a matching region is included too). With tabs selected, <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to those tabs</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Y</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Redo</td></tr>
+          <tr><td><kbd>U</kbd></td><td>Edit history</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-mark">Markers / regions / loops</h3>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>M</kbd></td><td>Marker at the playhead</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>L</kbd></td><td>Set the selection as the sample loop (same range again clears it)</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>R</kbd></td><td>Set the selection as a region (same range again clears it)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></td><td>Rename</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Delete</kbd></td><td>Delete selected markers</td></tr>
+          <tr><td><kbd>Alt</kbd>+← / →</td><td>Nudge the marker / edge at the playhead by 1 px (1 sample when dots are shown)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+← / →</td><td>Same, ×3</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Ctrl</kbd>+← / →</td><td>Move it paired with the previous marker (both edges for a region / loop)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-format">Format</h3>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>S</kbd></td><td>Sample rate</td></tr>
+          <tr><td><kbd>B</kbd></td><td>Bit depth</td></tr>
+          <tr><td><kbd>C</kbd></td><td>Channel count (Mono / Stereo)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-waapi">WAAPI</h3>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>W</kbd></td><td>Toggle the WAAPI bar</td></tr>
+          <tr><td><kbd>E</kbd></td><td>Toggle Play -E</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Wwise EXPORT (Wave-only)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-mouse">Mouse / pointer</h3>
+      <table>
+        <thead><tr><th>Action</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>Drag</td><td>Select</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+drag</td><td>Scrub</td></tr>
+          <tr><td><kbd>Shift</kbd>+drag / move</td><td>Extend the selection</td></tr>
+          <tr><td>Double-click (waveform)</td><td>Select a span (between markers)</td></tr>
+          <tr><td>Click a flag</td><td>Select an edge</td></tr>
+          <tr><td><kbd>Shift</kbd>+click a flag</td><td>Range-select</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+click a flag</td><td>Add to the selection</td></tr>
+          <tr><td>Drag a flag / loop bar</td><td>Move (the guide snaps to markers / loop edges)</td></tr>
+          <tr><td>Double-click a comment / region name</td><td>Edit (<code>-A</code> lime / <code>-L</code> blue / <code>-E</code> red / <code>-R</code> gray)</td></tr>
+          <tr><td>Right-click a flag / loop bar</td><td>Delete</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+click a tab</td><td>Toggle that tab in the selection</td></tr>
+          <tr><td><kbd>Shift</kbd>+click a tab</td><td>Range-select tabs</td></tr>
+          <tr><td>Right-click a tab</td><td>Close / select all. With a selection: close or paste history to those tabs. Menu letters: <kbd>O</kbd> / <kbd>R</kbd> / <kbd>L</kbd> / <kbd>W</kbd> / <kbd>A</kbd> / <kbd>V</kbd></td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-context">Contextual</h3>
+      <p>While edit history is open</p>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>↑ / ↓</td><td>Move through history (preview)</td></tr>
+          <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Move by 8 steps</td></tr>
+          <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>First / last</td></tr>
+          <tr><td><kbd>Enter</kbd> / <kbd>U</kbd></td><td>Apply and close</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Cancel and close</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+click / <kbd>Shift</kbd>+↑↓</td><td>Select steps to copy</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select every replayable step</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Copy the selected steps (or every step up to the current position if none are selected)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Apply the copied history to this file (its history window does not need to be open)</td></tr>
+        </tbody>
+      </table>
+      <p>While picking a fade curve</p>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>Select a curve</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Preview the highlighted curve</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Apply</td></tr>
+          <tr><td><kbd>I</kbd> / <kbd>O</kbd></td><td>Switch fade in / out</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close</td></tr>
+        </tbody>
+      </table>
+      <p>While the format-conversion menu is open</p>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>Select a preset</td></tr>
+          <tr><td>↑ / ↓ / wheel</td><td>Nudge custom Hz by 1 (<kbd>Shift</kbd> 10 / <kbd>Ctrl</kbd> 100 / <kbd>Ctrl</kbd>+<kbd>Shift</kbd> 1000)</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Preview the highlighted value</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Apply</td></tr>
+          <tr><td><kbd>S</kbd> / <kbd>B</kbd> / <kbd>C</kbd></td><td>Switch sample rate / bit depth / channels</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close</td></tr>
+        </tbody>
+      </table>
+      <p>While editing a status-bar time field</p>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>Type / <kbd>Enter</kbd></td><td>Jump to the current time, or apply selection start / length / end</td></tr>
+          <tr><td>↑↓ / wheel</td><td>Time: 1 s (<kbd>Shift</kbd> 10 s / <kbd>Ctrl</kbd> 1 min / <kbd>Ctrl</kbd>+<kbd>Shift</kbd> 10 min). Samples: 1 / 10 / 100 / 1000</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd></td><td>Copy / paste that field</td></tr>
+          <tr><td>Right-click</td><td>Switch time and samples</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Cancel the edit</td></tr>
+        </tbody>
+      </table>
+      <p>In Settings, <kbd>Esc</kbd> closes the window. The UI ignores input while a format conversion is running.</p>
 
       <h2 id="settings">11. Settings and language</h2>
       <ul>

@@ -67,7 +67,20 @@
         <li><a href="#spectrogram">スペクトログラム</a></li>
         <li><a href="#format">フォーマット変換</a></li>
         <li><a href="#export">WAAPI EXPORT（Wave 単体）</a></li>
-        <li><a href="#shortcuts">ショートカット</a></li>
+        <li><a href="#shortcuts">ショートカット</a>
+          <ol>
+            <li><a href="#shortcuts-file">ファイル／タブ</a></li>
+            <li><a href="#shortcuts-play">再生</a></li>
+            <li><a href="#shortcuts-view">表示／ズーム</a></li>
+            <li><a href="#shortcuts-seek">シーク／選択</a></li>
+            <li><a href="#shortcuts-edit">編集</a></li>
+            <li><a href="#shortcuts-mark">マーカー／リージョン／ループ</a></li>
+            <li><a href="#shortcuts-format">フォーマット</a></li>
+            <li><a href="#shortcuts-waapi">WAAPI</a></li>
+            <li><a href="#shortcuts-mouse">マウス／ポインタ</a></li>
+            <li><a href="#shortcuts-context">状況別</a></li>
+          </ol>
+        </li>
         <li><a href="#settings">設定と言語</a></li>
         <li><a href="#disclaimer">対応範囲と位置づけ</a></li>
         <li><a href="#trademarks">商標とライセンス</a></li>
@@ -179,26 +192,199 @@
       </div>
 
       <h2 id="shortcuts">10. ショートカット</h2>
+      <p>他の節で解説したものも含め、実装されている操作をすべて載せています。状況別のキーは、その画面が開いているときだけ効きます。波形の Tips でも同じ操作を確認できます。</p>
+
+      <h3 id="shortcuts-file">ファイル／タブ</h3>
       <table>
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
-          <tr><td><kbd>Space</kbd></td><td>再生／停止（開始位置へ戻る）</td></tr>
-          <tr><td><kbd>Enter</kbd></td><td>その場停止</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>3 秒前から再生</td></tr>
-          <tr><td>↑↓／<kbd>Ctrl</kbd>+↑↓</td><td>時間ズーム／32 倍・全体</td></tr>
-          <tr><td><kbd>Shift</kbd>+↑↓／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↑↓</td><td>振幅ズーム／最大・リセット</td></tr>
-          <tr><td>ホイール／<kbd>Shift</kbd>／<kbd>Ctrl</kbd>+ホイール</td><td>時間ズーム／パン／振幅</td></tr>
-          <tr><td>←→／<kbd>Ctrl</kbd>+←→</td><td>シーク／前後のマーカー・端</td></tr>
-          <tr><td><kbd>Home</kbd>／<kbd>End</kbd></td><td>画面端</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>全選択</td></tr>
-          <tr><td><kbd>I</kbd>／<kbd>O</kbd>／<kbd>N</kbd>／<kbd>Delete</kbd></td><td>フェードイン／アウト／ノーマライズ／削除</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd>／<kbd>S</kbd>／<kbd>Shift</kbd>+<kbd>S</kbd></td><td>開く／保存／別名保存</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>／<kbd>Ctrl</kbd>+<kbd>Tab</kbd></td><td>タブを閉じる／すべて閉じる／次のタブ</td></tr>
-          <tr><td><kbd>W</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>WAAPI 切替／EXPORT</td></tr>
-          <tr><td><kbd>G</kbd>／<kbd>U</kbd>／<kbd>T</kbd></td><td>スペクトログラム／履歴／時刻</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>開く（ドロップでも可。複数はタブで追加）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>保存（Wave または MP3）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>別名保存</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>タブを閉じる（未保存なら保存確認）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>すべてのタブを閉じる</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Tab</kbd>／<kbd>Ctrl</kbd>+<kbd>PageDown</kbd></td><td>次のタブ</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd>／<kbd>Ctrl</kbd>+<kbd>PageUp</kbd></td><td>前のタブ</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>全選択。タブバー上ではタブの全選択</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>入力・メニュー・スクラブ・タブ選択・範囲選択を順に解除。何も残っていなければ終了確認</td></tr>
         </tbody>
       </table>
-      <p>波形上にマウスを置くと、より詳しい操作が一覧されます。</p>
+
+      <h3 id="shortcuts-play">再生</h3>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Space</kbd></td><td>再生／停止（停止で開始位置へ戻る）</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>その場停止</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>3 秒前から再生</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>再生開始位置からやり直し</td></tr>
+          <tr><td><kbd>L</kbd></td><td>選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生</td></tr>
+          <tr><td><kbd>Z</kbd>／<kbd>.</kbd></td><td>中央寄せ。再生中はセンターロックの切替、停止で解除</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Home</kbd></td><td>ファイル先頭へ</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>End</kbd></td><td>ファイル末尾へ</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-view">表示／ズーム</h3>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td>↑／↓</td><td>時間ズーム（再生ヘッド基準）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+↑</td><td>時間 32 倍／最大</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+↓</td><td>全体表示</td></tr>
+          <tr><td><kbd>Shift</kbd>+↑／↓</td><td>振幅ズーム</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↑</td><td>振幅最大</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↓</td><td>振幅リセット</td></tr>
+          <tr><td>ホイール</td><td>時間ズーム（再生ヘッド基準。全体波形上も同じ）</td></tr>
+          <tr><td><kbd>Shift</kbd>+ホイール</td><td>パン（波形上）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+ホイール</td><td>振幅ズーム（波形上）</td></tr>
+          <tr><td><kbd>G</kbd></td><td>波形／スペクトログラム／重ね表示</td></tr>
+          <tr><td><kbd>T</kbd></td><td>ステータスバーの現在時間を入力</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-seek">シーク／選択</h3>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td>←／→</td><td>シーク。選択中のマーカー／リージョン端／ループ端は移動（点表示時は 1 サンプル）</td></tr>
+          <tr><td><kbd>Shift</kbd>+←／→</td><td>選択を伸長。選択中の端は 3 倍で移動（点表示時は 1 サンプル）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+←／→</td><td>前後のマーカー／リージョン端／サンプルループ端へ</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+←／→</td><td>前後のマーカー／端まで選択を伸長</td></tr>
+          <tr><td><kbd>Home</kbd>／<kbd>End</kbd></td><td>画面端へ</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>Home</kbd>／<kbd>End</kbd></td><td>画面端まで選択を伸長</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Home</kbd>／<kbd>End</kbd></td><td>ファイルの前後すべてを選択</td></tr>
+          <tr><td><kbd>PageUp</kbd>／<kbd>PageDown</kbd></td><td>表示幅の 5% シーク</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>PageUp</kbd>／<kbd>PageDown</kbd></td><td>表示幅の 5% だけ選択を伸長</td></tr>
+          <tr><td><kbd>0</kbd>–<kbd>9</kbd></td><td>表示範囲の 0%〜90% へジャンプ</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>0</kbd>–<kbd>9</kbd></td><td>表示範囲の 0%〜90% まで選択を伸長</td></tr>
+          <tr><td>テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>マーカー番号へ（連続入力可）。該当が無ければ表示位置</td></tr>
+          <tr><td><kbd>Shift</kbd>+テンキー</td><td>そのマーカー／表示位置まで選択を伸長</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-edit">編集</h3>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>I</kbd></td><td>フェードイン</td></tr>
+          <tr><td><kbd>O</kbd></td><td>フェードアウト</td></tr>
+          <tr><td><kbd>X</kbd></td><td>表示範囲をシーク前後にリニアフェード（前＝アウト／後＝イン）</td></tr>
+          <tr><td><kbd>N</kbd></td><td>ノーマライズ（ピーク -0.1 dB）</td></tr>
+          <tr><td><kbd>Delete</kbd>／<kbd>Backspace</kbd></td><td>選択を詰めて削除。選択中のマーカー／リージョンもまとめて削除</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd>／<kbd>C</kbd>／<kbd>V</kbd></td><td>カット／コピー／ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）。タブ選択中の <kbd>Ctrl</kbd>+<kbd>V</kbd> はコピーした編集履歴を選択タブへ適用</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>元に戻す</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Y</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>やり直す</td></tr>
+          <tr><td><kbd>U</kbd></td><td>編集履歴</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-mark">マーカー／リージョン／ループ</h3>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>M</kbd></td><td>再生位置にマーカー</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>L</kbd></td><td>選択をサンプルループに（同じ範囲でもう一度で解除）</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>R</kbd></td><td>選択をリージョンに（同じ範囲でもう一度で解除）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></td><td>リネーム</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Delete</kbd></td><td>選択中のマーカーを削除</td></tr>
+          <tr><td><kbd>Alt</kbd>+←／→</td><td>再生位置のマーカー／端を 1 px（点表示時は 1 サンプル）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+←／→</td><td>同上を 3 倍</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Ctrl</kbd>+←／→</td><td>手前のマーカーとセットで移動（リージョン／ループは両端）</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-format">フォーマット</h3>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>S</kbd></td><td>サンプリングレート</td></tr>
+          <tr><td><kbd>B</kbd></td><td>ビット深度</td></tr>
+          <tr><td><kbd>C</kbd></td><td>チャンネル数（Mono／Stereo）</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-waapi">WAAPI</h3>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>W</kbd></td><td>WAAPI バーの表示切替</td></tr>
+          <tr><td><kbd>E</kbd></td><td>Play -E の切替</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Wwise EXPORT（Wave 単体）</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-mouse">マウス／ポインタ</h3>
+      <table>
+        <thead><tr><th>操作</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td>ドラッグ</td><td>選択</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+ドラッグ</td><td>スクラブ</td></tr>
+          <tr><td><kbd>Shift</kbd>+ドラッグ／移動</td><td>選択を伸長</td></tr>
+          <tr><td>ダブルクリック（波形）</td><td>区間選択（マーカー間）</td></tr>
+          <tr><td>フラッグをクリック</td><td>端を選択</td></tr>
+          <tr><td><kbd>Shift</kbd>+クリック（フラッグ）</td><td>範囲選択</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+クリック（フラッグ）</td><td>追加選択</td></tr>
+          <tr><td>フラッグ／ループバーをドラッグ</td><td>移動（ガイドはマーカー／ループ端に吸着）</td></tr>
+          <tr><td>ダブルクリック（コメント／リージョン名）</td><td>編集（<code>-A</code> ライム／<code>-L</code> ブルー／<code>-E</code> 赤／<code>-R</code> グレー）</td></tr>
+          <tr><td>右クリック（フラッグ／ループバー）</td><td>削除</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+クリック（タブ）</td><td>タブを個別追加／解除</td></tr>
+          <tr><td><kbd>Shift</kbd>+クリック（タブ）</td><td>タブを範囲選択</td></tr>
+          <tr><td>右クリック（タブ）</td><td>閉じる／全選択。選択中は選択タブの閉じる／履歴ペースト。メニュー上は <kbd>O</kbd>／<kbd>R</kbd>／<kbd>L</kbd>／<kbd>W</kbd>／<kbd>A</kbd>／<kbd>V</kbd></td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-context">状況別</h3>
+      <p>編集履歴が開いているとき</p>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td>↑／↓</td><td>履歴を移動（プレビュー）</td></tr>
+          <tr><td><kbd>PageUp</kbd>／<kbd>PageDown</kbd></td><td>8 件ずつ移動</td></tr>
+          <tr><td><kbd>Home</kbd>／<kbd>End</kbd></td><td>先頭／末尾へ</td></tr>
+          <tr><td><kbd>Enter</kbd>／<kbd>U</kbd></td><td>確定して閉じる</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>キャンセルして閉じる</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+クリック／<kbd>Shift</kbd>+↑↓</td><td>コピー対象を選択</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>再適用できる履歴を全選択</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>選択した履歴をコピー（選択なしは現在位置まで）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>コピーした履歴をこのファイルへ適用（履歴を開いていなくても可）</td></tr>
+        </tbody>
+      </table>
+      <p>フェードカーブを選んでいるとき</p>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>カーブを選択</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>ハイライト中のカーブを試聴</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>実行</td></tr>
+          <tr><td><kbd>I</kbd>／<kbd>O</kbd></td><td>フェードイン／アウトへ切替</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>閉じる</td></tr>
+        </tbody>
+      </table>
+      <p>フォーマット変換メニューが開いているとき</p>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>プリセットを選択</td></tr>
+          <tr><td>↑／↓／ホイール</td><td>任意 Hz を 1（<kbd>Shift</kbd> 10／<kbd>Ctrl</kbd> 100／<kbd>Ctrl</kbd>+<kbd>Shift</kbd> 1000）</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>ハイライト中の値を試聴</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>確定</td></tr>
+          <tr><td><kbd>S</kbd>／<kbd>B</kbd>／<kbd>C</kbd></td><td>レート／ビット／チャンネルへ切替</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>閉じる</td></tr>
+        </tbody>
+      </table>
+      <p>ステータスバーの時刻を編集しているとき</p>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td>入力／<kbd>Enter</kbd></td><td>現在時間へ移動、または選択開始／範囲／終了を反映</td></tr>
+          <tr><td>↑↓／ホイール</td><td>時間は 1 秒（<kbd>Shift</kbd> 10 秒／<kbd>Ctrl</kbd> 1 分／<kbd>Ctrl</kbd>+<kbd>Shift</kbd> 10 分）。サンプル数は 1／10／100／1000</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd>／<kbd>V</kbd></td><td>その欄をコピー／貼り付け</td></tr>
+          <tr><td>右クリック</td><td>時間とサンプル数を切替</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>編集をキャンセル</td></tr>
+        </tbody>
+      </table>
+      <p>設定ウィンドウでは <kbd>Esc</kbd> で閉じます。変換中は操作を受け付けません。</p>
 
       <h2 id="settings">11. 設定と言語</h2>
       <ul>
