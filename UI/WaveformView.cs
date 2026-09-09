@@ -27,6 +27,7 @@ internal sealed class WaveformView : Grid
     private const int RawColumnMaxSamplesPerPixel = 96;
     private const int RawColumnMaxFrames = 1 << 18;
     private const int SamplePointMaxVisibleFrames = 500;
+    private const int TimeLabelCacheMax = 512;
     private const double SamplePointRadius = 8d / 3d;
     private static readonly double[] DbRequiredMarks = [-3, -6, -12];
     private static readonly double[] DbOptionalMarks = [-9, -18, -24, -36, -48, -60];
@@ -125,6 +126,8 @@ internal sealed class WaveformView : Grid
     private readonly SpectrogramRenderer _spectrogram = new();
     private double _appliedMarkerLaneHeight = -1;
     private double _staticPaintMs;
+    private double _staticPaintLastMs;
+    private double _staticPaintEndMs;
     private double _followRebuildAtMs;
     private bool _staticRebuildQueued;
     private bool _viewChangedQueued;
@@ -1583,10 +1586,13 @@ internal sealed class WaveformView : Grid
         // 高分解能の Stopwatch タイムスタンプで測る。
         var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         PaintStaticCore(dc);
-        var elapsedMs = (System.Diagnostics.Stopwatch.GetTimestamp() - startedAt)
-            * 1000d / System.Diagnostics.Stopwatch.Frequency;
-        // 追従スクロールの再描画間引きに使う実測コスト（EMA）。
+        var endedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        var elapsedMs = (endedAt - startedAt) * 1000d / System.Diagnostics.Stopwatch.Frequency;
+        // 追従スクロールの再描画間引きに使う実測コスト（EMA）。急に重くなった直後にも
+        // 即応できるよう、直近 1 回の実測と終了時刻も別に持つ（SetViewStart の追従分岐参照）。
         _staticPaintMs = _staticPaintMs * 0.7 + elapsedMs * 0.3;
+        _staticPaintLastMs = elapsedMs;
+        _staticPaintEndMs = endedAt * 1000d / System.Diagnostics.Stopwatch.Frequency;
     }
 
     private void PaintStaticCore(DrawingContext dc)
@@ -4698,6 +4704,13 @@ internal sealed class WaveformView : Grid
             10,
             WpfControlHelpers.FrozenBrush(Theme.Get(brushKey)),
             pixelsPerDip);
+        if (_timeLabelCache.Count >= TimeLabelCacheMax)
+        {
+            // 深い拡大の追従スクロール中は目盛りラベル（ms 単位）が毎回新しく
+            // 際限なく増えるため、上限で丸ごと捨てる（表示中の数十個は次回再生成）。
+            _timeLabelCache.Clear();
+        }
+
         _timeLabelCache[key] = formatted;
         return formatted;
     }
@@ -4808,13 +4821,18 @@ internal sealed class WaveformView : Grid
             // 実測描画コストに応じて間引く：軽ければ毎フレーム（≒60fps）で滑らかに流し、
             // 深い拡大で重い場合は間隔を広げ、ディスパッチャに入力処理の余地を残す
             // （Render 優先度の連続再描画がマウス／キー入力を飢餓させて操作不能になるのを防ぐ）。
-            // 波形ビットマップはスクロール位置へオフセット描画するため、間引いても流れは止まらない。
             InvalidatePlayheadOnly();
             // TickCount64 は分解能約 15ms で毎フレーム判定に使えないため Stopwatch。
             var nowMs = System.Diagnostics.Stopwatch.GetTimestamp()
                 * 1000d / System.Diagnostics.Stopwatch.Frequency;
-            var followMs = Math.Clamp(_staticPaintMs * 2.5, 8d, 500d);
-            if (nowMs - _followRebuildAtMs >= followMs)
+            // 「前回ペイントの終了時刻」を起点に、ペイント実測コストに比例した休止を必ず挟む。
+            // 起点を要求時刻にすると重いペイント自体が休止を食い潰して隙間が消える。
+            // また休止に上限を設けると、ペイントが上限より重い深い拡大で隙間ゼロ＝入力飢餓
+            // （操作不能・終了不能）に戻るため、上限は設けない。急変に即応するため
+            // EMA と直近実測の大きい方を使う。
+            var idleMs = Math.Max(Math.Max(_staticPaintMs, _staticPaintLastMs) * 1.5, 8d);
+            var lastMs = Math.Max(_followRebuildAtMs, _staticPaintEndMs);
+            if (nowMs - lastMs >= idleMs)
             {
                 _followRebuildAtMs = nowMs;
                 InvalidateStaticLayer();

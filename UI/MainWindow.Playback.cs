@@ -480,7 +480,7 @@ public partial class MainWindow
 
         // 再生ヘッド・追従スクロールは vsync 同期でサンプリングしないとジッターが
         // 見えるため、ここ（毎フレーム）で行う。重い静的再描画は WaveformView 側の
-        // 適応間引き（実測コスト×2.5）が抑えるので入力飢餓にはならない。
+        // 適応間引き（ペイント終了からコスト比例の休止を必ず挟む）が抑えるので入力飢餓にはならない。
         if (_playTimer.IsEnabled && !_player.IsScrubbing)
         {
             SyncPlaybackVisuals();
