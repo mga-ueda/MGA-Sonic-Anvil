@@ -14,6 +14,91 @@ internal static class ChannelMix
         return 0.5f * (left + right);
     }
 
+    /// <summary>
+    /// 1 フレームのチャンネル包絡。重ね波形と全体波形が使う。
+    /// Mid は逆相で消えるので、表示の有無判定には使わない。
+    /// </summary>
+    public static void FrameEnvelope(
+        float[] interleaved,
+        int channels,
+        long frame,
+        long frameCount,
+        out float min,
+        out float max)
+    {
+        if (!TryFrameOffset(interleaved, channels, frame, frameCount, out var offset))
+        {
+            min = 0;
+            max = 0;
+            return;
+        }
+
+        Envelope(interleaved.AsSpan(offset, channels), out min, out max);
+    }
+
+    public static void Envelope(ReadOnlySpan<float> frame, out float min, out float max)
+    {
+        if (frame.Length == 0)
+        {
+            min = 0;
+            max = 0;
+            return;
+        }
+
+        min = max = frame[0];
+        for (var i = 1; i < frame.Length; i++)
+        {
+            var sample = frame[i];
+            if (sample < min)
+            {
+                min = sample;
+            }
+
+            if (sample > max)
+            {
+                max = sample;
+            }
+        }
+    }
+
+    /// <summary>
+    /// packed ピーク列 [column * channels + ch] を、各列のチャンネル和集合へ畳む。
+    /// 書き込みは先頭 count 要素。
+    /// </summary>
+    public static void FoldPackedPeaksToUnion(float[] mins, float[] maxs, int count, int channels)
+    {
+        if (channels <= 1 || count <= 0)
+        {
+            return;
+        }
+
+        for (var i = 0; i < count; i++)
+        {
+            var src = i * channels;
+            Envelope(mins.AsSpan(src, channels), out var min, out _);
+            Envelope(maxs.AsSpan(src, channels), out _, out var max);
+            mins[i] = min;
+            maxs[i] = max;
+        }
+    }
+
+    internal static bool TryFrameOffset(
+        float[] interleaved,
+        int channels,
+        long frame,
+        long frameCount,
+        out int offset)
+    {
+        if (frame < 0 || frame >= frameCount || interleaved.Length < channels)
+        {
+            offset = 0;
+            return false;
+        }
+
+        offset = (int)Math.Clamp(frame * (long)channels, 0, interleaved.Length - channels);
+        return true;
+    }
+
     public static void Downmix(ReadOnlySpan<float> frame, out float left, out float right)
     {
         var channels = frame.Length;

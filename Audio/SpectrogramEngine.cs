@@ -205,13 +205,12 @@ internal static class SpectrogramEngine
         long frameCount,
         out float sample)
     {
-        if (frame < 0 || frame >= frameCount || interleaved.Length < channels)
+        if (!ChannelMix.TryFrameOffset(interleaved, channels, frame, frameCount, out var offset))
         {
             sample = 0;
             return;
         }
 
-        var offset = (int)Math.Clamp(frame * channels, 0, interleaved.Length - channels);
         ChannelMix.Downmix(interleaved, offset, channels, out var left, out var right);
         sample = 0.5f * (left + right);
     }

@@ -1971,9 +1971,7 @@ internal sealed class WaveformView : Grid
             var colCount = x1 - x0;
             EnsureColumnBuffers(colCount * sourceChannels);
             var count = useRawColumns
-                ? overlay
-                    ? FillRawColumnPeaksMono(document, f0, f1, colCount, sourceChannels)
-                    : FillRawColumnPeaks(document, f0, f1, colCount, sourceChannels)
+                ? FillRawColumnPeaks(document, f0, f1, colCount, sourceChannels)
                 : document.Peaks.ReadRangePacked(f0, f1, colCount, _columnMins, _columnMaxs);
             if (count <= 0)
             {
@@ -1986,9 +1984,9 @@ internal sealed class WaveformView : Grid
             }
 
             var packedChannels = sourceChannels;
-            if (overlay && !useRawColumns)
+            if (overlay)
             {
-                FoldPackedPeaksToMono(count, sourceChannels);
+                ChannelMix.FoldPackedPeaksToUnion(_columnMins, _columnMaxs, count, sourceChannels);
                 packedChannels = 1;
             }
 
@@ -2271,90 +2269,6 @@ internal sealed class WaveformView : Grid
         return buckets;
     }
 
-    private int FillRawColumnPeaksMono(
-        AudioDocument document,
-        long startFrame,
-        long endFrame,
-        int width,
-        int channels)
-    {
-        var rangeFrames = endFrame - startFrame;
-        var buckets = (int)Math.Min(width, rangeFrames);
-        if (buckets <= 0)
-        {
-            return 0;
-        }
-
-        var samples = document.Interleaved;
-        var frameCount = document.FrameCount;
-        for (var i = 0; i < buckets; i++)
-        {
-            _columnMins[i] = float.MaxValue;
-            _columnMaxs[i] = float.MinValue;
-        }
-
-        for (var i = 0; i < buckets; i++)
-        {
-            var f0 = startFrame + i * rangeFrames / buckets;
-            var f1 = startFrame + (i + 1) * rangeFrames / buckets;
-            if (f1 <= f0)
-            {
-                f1 = f0 + 1;
-            }
-
-            f0 = Math.Clamp(f0, 0, frameCount);
-            f1 = Math.Clamp(f1, f0, frameCount);
-            for (var frame = f0; frame < f1; frame++)
-            {
-                SpectrogramEngine.MixFrame(samples, channels, frame, frameCount, out var mixed);
-                var sample = mixed * PreviewGain(frame);
-                if (sample < _columnMins[i])
-                {
-                    _columnMins[i] = sample;
-                }
-
-                if (sample > _columnMaxs[i])
-                {
-                    _columnMaxs[i] = sample;
-                }
-            }
-        }
-
-        for (var i = 0; i < buckets; i++)
-        {
-            if (_columnMins[i] > _columnMaxs[i])
-            {
-                _columnMins[i] = 0;
-                _columnMaxs[i] = 0;
-            }
-        }
-
-        return buckets;
-    }
-
-    private void FoldPackedPeaksToMono(int count, int channels)
-    {
-        if (channels <= 1 || count <= 0)
-        {
-            return;
-        }
-
-        Span<float> mins = stackalloc float[channels];
-        Span<float> maxs = stackalloc float[channels];
-        for (var i = 0; i < count; i++)
-        {
-            var src = i * channels;
-            for (var ch = 0; ch < channels; ch++)
-            {
-                mins[ch] = _columnMins[src + ch];
-                maxs[ch] = _columnMaxs[src + ch];
-            }
-
-            _columnMins[i] = ChannelMix.Mid(mins);
-            _columnMaxs[i] = ChannelMix.Mid(maxs);
-        }
-    }
-
     private float PreviewGain(long frame) =>
         _previewGainAtFrame is { } gain ? gain(frame) : 1f;
 
@@ -2423,55 +2337,109 @@ internal sealed class WaveformView : Grid
             return Math.Clamp(y, clipTop, clipBottom - 1);
         }
 
-        float SampleAt(int index)
+        void SampleRange(int index, out float lo, out float hi)
         {
             var frame = first + index;
             var gain = PreviewGain(frame);
             if (channel < 0)
             {
-                SpectrogramEngine.MixFrame(samples, channels, frame, document.FrameCount, out var mixed);
-                return mixed * gain;
+                ChannelMix.FrameEnvelope(samples, channels, frame, document.FrameCount, out lo, out hi);
+                lo *= gain;
+                hi *= gain;
+                return;
             }
 
-            return samples[(int)frame * channels + channel] * gain;
+            lo = hi = samples[(int)frame * channels + channel] * gain;
         }
+
         var collectDots = ShouldDrawSamplePoints(count, width / scaleX);
         var dotRadius = Math.Max(1, (int)Math.Round(SamplePointRadius * scaleX));
+        var overlay = channel < 0;
 
         if (count == 1)
         {
             var x = (int)Math.Round(FrameToX(first, start, span, width));
-            var y = SampleY(SampleAt(0));
-            FillVLine(buffer, stride, width, clipTop, clipBottom, x, y - 3, y + 3, WavePaintBgra);
+            SampleRange(0, out var lo, out var hi);
+            var y1 = SampleY(hi);
+            var y2 = SampleY(lo);
+            if (y2 < y1)
+            {
+                (y1, y2) = (y2, y1);
+            }
+
+            if (overlay)
+            {
+                if (y2 - y1 < 1)
+                {
+                    y2 = y1 + 1;
+                }
+
+                FillVLine(buffer, stride, width, clipTop, clipBottom, x, y1, y2, WavePaintBgra);
+            }
+            else
+            {
+                FillVLine(buffer, stride, width, clipTop, clipBottom, x, y1 - 3, y1 + 3, WavePaintBgra);
+            }
+
             if (collectDots)
             {
-                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, WavePaintBgra);
+                FillDot(buffer, stride, width, clipTop, clipBottom, x, SampleY(PeakSample(lo, hi)), dotRadius, WavePaintBgra);
             }
 
             return;
         }
 
         var prevX = 0;
-        var prevY = 0;
+        var prevY1 = 0;
+        var prevY2 = 0;
         var havePrev = false;
         for (var i = 0; i < count; i++)
         {
             var x = (int)Math.Round(FrameToX(first + i, start, span, width));
-            var y = SampleY(SampleAt(i));
+            SampleRange(i, out var lo, out var hi);
+            var y1 = SampleY(hi);
+            var y2 = SampleY(lo);
+            if (y2 < y1)
+            {
+                (y1, y2) = (y2, y1);
+            }
+
+            if (overlay && y2 - y1 < 1)
+            {
+                y2 = y1 + 1;
+            }
+
+            if (overlay)
+            {
+                FillVLine(buffer, stride, width, clipTop, clipBottom, x, y1, y2, WavePaintBgra);
+            }
+
             if (havePrev)
             {
-                DrawThickLine(buffer, stride, width, clipTop, clipBottom, prevX, prevY, x, y, WavePaintBgra);
+                if (overlay)
+                {
+                    DrawThickLine(buffer, stride, width, clipTop, clipBottom, prevX, prevY1, x, y1, WavePaintBgra);
+                    DrawThickLine(buffer, stride, width, clipTop, clipBottom, prevX, prevY2, x, y2, WavePaintBgra);
+                }
+                else
+                {
+                    DrawThickLine(buffer, stride, width, clipTop, clipBottom, prevX, prevY1, x, y1, WavePaintBgra);
+                }
             }
 
             prevX = x;
-            prevY = y;
+            prevY1 = y1;
+            prevY2 = y2;
             havePrev = true;
             if (collectDots)
             {
-                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, WavePaintBgra);
+                FillDot(buffer, stride, width, clipTop, clipBottom, x, SampleY(PeakSample(lo, hi)), dotRadius, WavePaintBgra);
             }
         }
     }
+
+    private static float PeakSample(float lo, float hi) =>
+        Math.Abs(hi) >= Math.Abs(lo) ? hi : lo;
 
     private static unsafe void FillVLine(
         int* buffer,
