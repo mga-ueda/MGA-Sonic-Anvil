@@ -32,6 +32,9 @@ internal sealed class SpectrogramRenderer
     private int _pixelHeight;
     private object? _samples;
     private bool _drewFromCache;
+    private bool _drewSharp;
+    private float[]? _gainSamples;
+    private float _gainDb;
 
     public SpectrogramRenderer()
     {
@@ -43,7 +46,14 @@ internal sealed class SpectrogramRenderer
     public void RequestCache(AudioDocument document, Action onUpdated) =>
         _cache.Ensure(document, onUpdated);
 
-    public void InvalidateCache() => _cache.Invalidate();
+    public void InvalidateCache()
+    {
+        _cache.Invalidate();
+        // 編集はサンプル配列を同じ参照のまま書き換えるので、参照比較の早期リターンに
+        // 頼らず、次回の描画で必ず再ラスタライズさせる。表示用ゲインも測り直す。
+        _samples = null;
+        _gainSamples = null;
+    }
 
     public void Dispose() => _cache.Dispose();
 
@@ -94,7 +104,11 @@ internal sealed class SpectrogramRenderer
             wave.Width * _pixelWidth / visibleWidth,
             wave.Height);
         var group = new DrawingGroup();
-        RenderOptions.SetBitmapScalingMode(group, BitmapScalingMode.Fant);
+        // ズーム中は幅 1920px のビットマップを引き伸ばすので従来どおり Fant で滑らかに。
+        // フィット表示のライブ FFT は 1:1 なので補間せずシャープに描く。
+        RenderOptions.SetBitmapScalingMode(
+            group,
+            _drewSharp ? BitmapScalingMode.NearestNeighbor : BitmapScalingMode.Fant);
         var context = group.Open();
         context.DrawImage(_bitmap, dest);
         context.Close();
@@ -105,8 +119,13 @@ internal sealed class SpectrogramRenderer
 
     private void EnsureBitmap(Rect wave, AudioDocument document, double viewStart, double viewSpan, DpiScale dpi)
     {
-        var width = Math.Clamp((int)Math.Round(wave.Width * Math.Max(1e-6, dpi.DpiScaleX)), 1, MaxPixelWidth);
+        var widthFull = Math.Max(1, (int)Math.Round(wave.Width * Math.Max(1e-6, dpi.DpiScaleX)));
         var height = Math.Clamp((int)Math.Round(wave.Height * Math.Max(1e-6, dpi.DpiScaleY)), 1, MaxPixelHeight);
+        // フィット表示（シャープに描く）だけ等倍。ズーム中は従来どおり幅を 1920px に抑え、
+        // 追従スクロールの列生成と転送を軽く保つ（Fant で引き伸ばすので見た目は滑らかなまま）。
+        var sharp = SpectrogramEngine.PreferLiveFft(
+            viewSpan / widthFull, viewSpan, document.FrameCount);
+        var width = sharp ? widthFull : Math.Min(widthFull, MaxPixelWidth);
         // ビュー開始位置を 1 デバイス px = framesPerPx の格子に量子化する。
         // スクロールが常に整数 px 差になるため、列シフト＋差分 FFT が毎回効く。
         // 右端の欠けを防ぐため 1 列余分に持つ。
@@ -114,6 +133,7 @@ internal sealed class SpectrogramRenderer
         var quantStart = Math.Floor(viewStart / framesPerPx) * framesPerPx;
         var bmpWidth = width + 1;
         var bmpSpan = bmpWidth * framesPerPx;
+        var fromCache = _cache.IsReady && !sharp;
         if (ReferenceEquals(_samples, document.Interleaved)
             && _bitmap is not null
             && _bitmap.PixelWidth == bmpWidth
@@ -123,7 +143,8 @@ internal sealed class SpectrogramRenderer
             && Math.Abs(_viewStart - quantStart) < framesPerPx * 0.01
             && Math.Abs(_viewSpan - bmpSpan) < framesPerPx * 0.01
             && _sampleRate == document.SampleRate
-            && _drewFromCache == _cache.IsReady)
+            && _drewFromCache == fromCache
+            && _drewSharp == sharp)
         {
             return;
         }
@@ -148,7 +169,13 @@ internal sealed class SpectrogramRenderer
         }
 
         EnsureRowHertz(height);
-        var fromCache = _cache.IsReady;
+        if (!ReferenceEquals(_gainSamples, document.Interleaved))
+        {
+            // 表示用ノーマライズ。読み込み・編集の後に一度だけピークを測る（描画ごとには追従しない）。
+            _gainDb = SpectrogramEngine.NormalizeGainDb(document.Interleaved);
+            _gainSamples = document.Interleaved;
+        }
+
         if (!TryShiftColumns(document, quantStart, bmpSpan, bmpWidth, height, fromCache))
         {
             RasterizeSpan(document, quantStart, bmpSpan, bmpWidth, height, 0, bmpWidth, fromCache);
@@ -165,6 +192,7 @@ internal sealed class SpectrogramRenderer
         _pixelWidth = bmpWidth;
         _pixelHeight = height;
         _drewFromCache = fromCache;
+        _drewSharp = sharp;
     }
 
     private void RasterizeSpan(
@@ -333,7 +361,7 @@ internal sealed class SpectrogramRenderer
                 var hz = _rowHertz[y];
                 _pixels[row + x] = hz > nyquist
                     ? floor
-                    : SpectrogramEngine.ColorBgra(SpectrogramEngine.BinDb(_re.AsSpan(0, bins), hz / binHz));
+                    : SpectrogramEngine.ColorBgra(SpectrogramEngine.BinDb(_re.AsSpan(0, bins), hz / binHz) + _gainDb);
                 row += width;
             }
         }

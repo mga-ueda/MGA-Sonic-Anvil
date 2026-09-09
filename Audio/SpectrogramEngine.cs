@@ -53,8 +53,41 @@ internal static class SpectrogramEngine
     public static int ColumnCount(long frameCount) =>
         Math.Max(1, (int)((Math.Max(0, frameCount) + Hop - 1) / Hop));
 
+    /// <summary>
+    /// 画面列ごとにライブ FFT するか。
+    /// ファイル全体が画面に収まっていて（＝スクロールが起きない）、かつ
+    /// キャッシュ列（Hop 間隔）が画面より粗いときだけライブにする（短い SE のフィット表示）。
+    /// 少しでもズームしていれば従来どおりキャッシュから読み、拡大時の追従スクロールを軽く保つ。
+    /// </summary>
+    public static bool PreferLiveFft(double framesPerPixel, double viewSpanFrames, long frameCount) =>
+        framesPerPixel < Hop && viewSpanFrames >= frameCount;
+
     public static int ColumnIndex(long frame, int columnCount) =>
         (int)Math.Clamp(frame / Hop, 0, Math.Max(0, columnCount - 1));
+
+    /// <summary>
+    /// 表示用ノーマライズのゲイン（dB）。ファイル内のピークが 0 dBFS になる持ち上げ量。
+    /// 読み込み・編集の解析タイミングで一度だけ計算し、描画ごとには追従しない。
+    /// </summary>
+    public static float NormalizeGainDb(float[] samples)
+    {
+        var peak = 0f;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var abs = Math.Abs(samples[i]);
+            if (abs > peak)
+            {
+                peak = abs;
+            }
+        }
+
+        if (peak <= 0f)
+        {
+            return 0f;
+        }
+
+        return Math.Clamp((float)(-20d * Math.Log10(peak)), -24f, 96f);
+    }
 
     public static byte DbToLutByte(float db)
     {
@@ -66,7 +99,7 @@ internal static class SpectrogramEngine
 
     public static int ColorBgra(float db) => ColorFromLutByte(DbToLutByte(db));
 
-    public static void WriteColumnLut(ReadOnlySpan<double> magnitude, Span<byte> dest)
+    public static void WriteColumnLut(ReadOnlySpan<double> magnitude, Span<byte> dest, float gainDb = 0f)
     {
         var bins = Math.Min(dest.Length, magnitude.Length);
         for (var i = 0; i < bins; i++)
@@ -74,7 +107,7 @@ internal static class SpectrogramEngine
             var mag = magnitude[i];
             dest[i] = mag <= 1e-12
                 ? (byte)0
-                : DbToLutByte((float)(20d * Math.Log10(mag)));
+                : DbToLutByte((float)(20d * Math.Log10(mag)) + gainDb);
         }
     }
 

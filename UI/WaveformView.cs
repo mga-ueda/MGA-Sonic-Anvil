@@ -240,7 +240,19 @@ internal sealed class WaveformView : Grid
             InvalidateStaticLayer();
         };
         _spectrogram.InvalidateRequested += () =>
-            Dispatcher.BeginInvoke(InvalidateStaticLayer);
+            Dispatcher.BeginInvoke(InvalidateStaticLayerForSpectrogram);
+    }
+
+    /// <summary>
+    /// スペクトログラムのキャッシュ進捗による再描画。裏で生成が続いていても、
+    /// 波形のみ表示のときは静的レイヤーを無駄に描き直さない。
+    /// </summary>
+    private void InvalidateStaticLayerForSpectrogram()
+    {
+        if (SpectrogramVisible)
+        {
+            InvalidateStaticLayer();
+        }
     }
 
     public void RefreshLocalizedTips() => TipService.Set(this, UiStrings.TipWaveform);
@@ -523,7 +535,7 @@ internal sealed class WaveformView : Grid
         };
         if (SpectrogramVisible && _document is not null)
         {
-            _spectrogram.RequestCache(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayer));
+            _spectrogram.RequestCache(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayerForSpectrogram));
         }
 
         InvalidateStaticLayer();
@@ -534,7 +546,7 @@ internal sealed class WaveformView : Grid
         _spectrogram.InvalidateCache();
         if (SpectrogramVisible && _document is not null)
         {
-            _spectrogram.RequestCache(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayer));
+            _spectrogram.RequestCache(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayerForSpectrogram));
         }
     }
 
@@ -1624,14 +1636,20 @@ internal sealed class WaveformView : Grid
 
         if (!SpectrogramVisible || overlay)
         {
-            MarkerRolePaint.DrawRegion(dc, _document, wave, start, span, "RegionWaveFillBrush");
-            MarkerRolePaint.DrawSampleLoop(dc, _document, wave, start, span, "SampleLoopWaveFillBrush");
-            MarkerRolePaint.DrawBackgrounds(dc, _document, wave, start, span);
+            if (!overlay)
+            {
+                MarkerRolePaint.DrawRegion(dc, _document, wave, start, span, "RegionWaveFillBrush");
+                MarkerRolePaint.DrawSampleLoop(dc, _document, wave, start, span, "SampleLoopWaveFillBrush");
+                MarkerRolePaint.DrawBackgrounds(dc, _document, wave, start, span);
+            }
+
             EnsureWaveformBitmap(wave);
             DrawWaveformImage(dc, wave);
+            if (!overlay)
+            {
+                MarkerRolePaint.DrawRemoveOverlays(dc, _document, wave, start, span);
+            }
         }
-
-        MarkerRolePaint.DrawRemoveOverlays(dc, _document, wave, start, span);
 
         if (!SpectrogramVisible)
         {
@@ -1785,7 +1803,7 @@ internal sealed class WaveformView : Grid
 
         var dest = WaveBitmapDest(wave);
         var group = new DrawingGroup();
-        RenderOptions.SetBitmapScalingMode(group, BitmapScalingMode.Fant);
+        RenderOptions.SetBitmapScalingMode(group, BitmapScalingMode.NearestNeighbor);
         var context = group.Open();
         context.DrawImage(_waveBitmap, dest);
         context.Close();

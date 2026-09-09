@@ -147,13 +147,15 @@ internal sealed class SpectrogramCache : IDisposable
             var column = new byte[bins];
             var lastNotify = -1;
             var notifyEvery = Math.Max(1, session.ColumnCount / 10);
+            // 表示用ノーマライズ。ビルド開始時に一度だけピークを測り、LUT に焼き込む。
+            var gainDb = SpectrogramEngine.NormalizeGainDb(session.Samples);
             for (var col = 0; col < session.ColumnCount; col++)
             {
                 token.ThrowIfCancellationRequested();
                 var origin = (long)col * SpectrogramEngine.Hop - SpectrogramEngine.FftSize / 2;
                 SpectrogramEngine.FillMonoMix(session.Samples, session.Channels, origin, session.FrameCount, mix);
                 SpectrogramEngine.AnalyzeWindow(mix, _window, _windowSum, re, im);
-                SpectrogramEngine.WriteColumnLut(re.AsSpan(0, bins), column);
+                SpectrogramEngine.WriteColumnLut(re.AsSpan(0, bins), column, gainDb);
                 session.WriteColumn(col, column);
                 session.ReadyColumns = col + 1;
                 if (col - lastNotify >= notifyEvery || col + 1 == session.ColumnCount)

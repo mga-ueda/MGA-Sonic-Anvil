@@ -40,6 +40,56 @@ public sealed class SpectrogramEngineTests
     }
 
     [Fact]
+    public void PreferLiveFft_ZoomedOutUsesCacheAsLod()
+    {
+        Assert.False(SpectrogramEngine.PreferLiveFft(SpectrogramEngine.Hop, 10_000_000, 10_000_000));
+        Assert.False(SpectrogramEngine.PreferLiveFft(SpectrogramEngine.Hop * 4, 10_000_000, 10_000_000));
+    }
+
+    [Fact]
+    public void PreferLiveFft_ShortFileFitStaysLive()
+    {
+        // 6 秒 @ 48 kHz を 1500px に載せると 1px あたり約 192 フレーム。全体が見えているのでライブ。
+        Assert.True(SpectrogramEngine.PreferLiveFft(287088d / 1500d, 287088, 287088));
+        // 0.5 秒の SE でもフィット表示ならライブ（スクロールしないので重くならない）。
+        Assert.True(SpectrogramEngine.PreferLiveFft(24000d / 1500d, 24000, 24000));
+    }
+
+    [Fact]
+    public void NormalizeGainDb_LiftsQuietContentToFullScale()
+    {
+        // ピーク 0.5 は約 +6 dB、ピーク 0.1 は +20 dB 持ち上げる。
+        Assert.Equal(6.02, SpectrogramEngine.NormalizeGainDb([0.5f, -0.25f]), 2);
+        Assert.Equal(20.0, SpectrogramEngine.NormalizeGainDb([0.1f]), 2);
+        // フルスケールは変化なし。無音も変化なし（持ち上げない）。
+        Assert.Equal(0.0, SpectrogramEngine.NormalizeGainDb([1f, -1f]), 5);
+        Assert.Equal(0.0, SpectrogramEngine.NormalizeGainDb([0f, 0f]), 5);
+        // 極端に小さいピークは +96 dB で頭打ち。
+        Assert.Equal(96.0, SpectrogramEngine.NormalizeGainDb([1e-7f]), 2);
+    }
+
+    [Fact]
+    public void WriteColumnLut_AppliesDisplayGain()
+    {
+        Span<byte> plain = stackalloc byte[1];
+        Span<byte> lifted = stackalloc byte[1];
+        ReadOnlySpan<double> magnitude = [0.01]; // -40 dB
+        SpectrogramEngine.WriteColumnLut(magnitude, plain);
+        SpectrogramEngine.WriteColumnLut(magnitude, lifted, 40f);
+        Assert.True(lifted[0] > plain[0]);
+        Assert.Equal(SpectrogramEngine.DbToLutByte(0f), lifted[0]);
+    }
+
+    [Fact]
+    public void PreferLiveFft_AnyZoomedViewUsesCacheColumns()
+    {
+        // 一部だけ表示しているとき（＝スクロールが起こりうる）は、深さによらずキャッシュ列で軽く描く。
+        Assert.False(SpectrogramEngine.PreferLiveFft(8, 8 * 1500d, 10_000_000));
+        Assert.False(SpectrogramEngine.PreferLiveFft(100, 100 * 1500d, 10_000_000));
+        Assert.False(SpectrogramEngine.PreferLiveFft(SpectrogramEngine.Hop - 1, 700_000, 10_000_000));
+    }
+
+    [Fact]
     public void DbToLutByte_MapsFloorAndCeiling()
     {
         Assert.Equal(0, SpectrogramEngine.DbToLutByte(SpectrogramEngine.FloorDb));
