@@ -347,6 +347,7 @@ public partial class MainWindow
                     session.LoopEnabled,
                     session.SelectedMarkerFrames);
                 var snap = DocumentSessionStore.Capture(session.Document, view, i);
+                snap.IsActive = ReferenceEquals(session, _activeSession);
                 if (DocumentSessionStore.NeedsSessionAudio(snap.Dirty, snap.SourcePath))
                 {
                     try
@@ -393,8 +394,8 @@ public partial class MainWindow
             return;
         }
 
-        DocumentSession? active = null;
-        var activeIndex = Math.Clamp(settings.ActiveDocumentIndex, 0, docs.Length - 1);
+        var restored = new List<(int SourceIndex, DocumentSession Session)>();
+        var activeIndex = DocumentSessionStore.ResolveActiveIndex(docs, settings.ActiveDocumentIndex);
         for (var i = 0; i < docs.Length; i++)
         {
             if (!TryRestoreSession(docs[i], out var session))
@@ -403,10 +404,7 @@ public partial class MainWindow
             }
 
             _sessions.Add(session);
-            if (i == activeIndex)
-            {
-                active = session;
-            }
+            restored.Add((i, session));
         }
 
         if (_sessions.Count == 0)
@@ -414,7 +412,7 @@ public partial class MainWindow
             return;
         }
 
-        BindWorkspace(active ?? _sessions[0]);
+        BindWorkspace(DocumentSessionStore.PickRestoredActive(restored, activeIndex) ?? _sessions[0]);
         Waveform.Refresh();
         Overview.InvalidateVisual();
     }
@@ -442,16 +440,8 @@ public partial class MainWindow
             DocumentSessionStore.ApplyMeta(document, snap);
             session = new DocumentSession(document)
             {
-                TimeZoom = snap.TimeZoom <= 0 ? 1 : snap.TimeZoom,
-                AmpZoom = snap.AmpZoom <= 0 ? 1 : snap.AmpZoom,
-                ViewStart = snap.ViewStart,
-                PlayheadFrame = snap.CursorFrame,
                 LoopEnabled = snap.LoopEnabled,
             };
-            if (snap.SelectedMarkerFrames is { Length: > 0 } selected)
-            {
-                session.SelectedMarkerFrames.AddRange(selected);
-            }
 
             return true;
         }

@@ -49,6 +49,9 @@ internal sealed class OpenDocumentSnapshot
     public string[] MarkerComments { get; set; } = [];
 
     public long[] SelectedMarkerFrames { get; set; } = [];
+
+    /// <summary>終了時に前面だったタブ。起動復元で ActiveDocumentIndex より優先する。</summary>
+    public bool IsActive { get; set; }
 }
 
 internal static class DocumentSessionStore
@@ -156,8 +159,43 @@ internal static class DocumentSessionStore
         document.ReplaceMarkers(LoadMarkers(snap), markDirty: false);
         document.SetSampleLoop(new WaveSelection(snap.SampleLoopStart, snap.SampleLoopEnd), markDirty: false);
         document.SetRegions(LoadRegions(snap), markDirty: false);
-        document.Selection = new WaveSelection(snap.SelectionStart, snap.SelectionEnd).Clamp(document.FrameCount);
-        document.CursorFrame = Math.Clamp(snap.CursorFrame, 0, Math.Max(0, document.FrameCount));
+        // 起動復元ではズーム・選択・再生ヘッドは初期化する（タブ切り替え中の表示はセッション側で持つ）。
+        document.Selection = WaveSelection.Empty;
+        document.CursorFrame = 0;
+    }
+
+    public static int ResolveActiveIndex(IReadOnlyList<OpenDocumentSnapshot> docs, int savedIndex)
+    {
+        if (docs.Count == 0)
+        {
+            return 0;
+        }
+
+        for (var i = 0; i < docs.Count; i++)
+        {
+            if (docs[i].IsActive)
+            {
+                return i;
+            }
+        }
+
+        return Math.Clamp(savedIndex, 0, docs.Count - 1);
+    }
+
+    public static T? PickRestoredActive<T>(
+        IReadOnlyList<(int SourceIndex, T Item)> restored,
+        int activeSourceIndex)
+        where T : class
+    {
+        foreach (var (sourceIndex, item) in restored)
+        {
+            if (sourceIndex == activeSourceIndex)
+            {
+                return item;
+            }
+        }
+
+        return restored.Count > 0 ? restored[0].Item : null;
     }
 
     public static OpenDocumentSnapshot[] ResolveOpenDocuments(AppSettings settings)
@@ -192,6 +230,7 @@ internal static class DocumentSessionStore
         RegionNames = settings.LastRegionNames ?? [],
         MarkerFrames = settings.LastMarkerFrames ?? [],
         MarkerComments = settings.LastMarkerComments ?? [],
+        IsActive = true,
     };
 
     public static void MirrorActiveToLegacy(AppSettings settings, OpenDocumentSnapshot? active)

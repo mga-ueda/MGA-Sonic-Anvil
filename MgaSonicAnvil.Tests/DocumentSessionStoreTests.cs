@@ -9,7 +9,7 @@ namespace MgaSonicAnvil.Tests;
 public sealed class DocumentSessionStoreTests
 {
     [Fact]
-    public void CaptureAndApply_RestoresMarkersLoopRegionsAndSelection()
+    public void CaptureAndApply_RestoresMarkersLoopRegions_ButClearsView()
     {
         var source = MakeDocument();
         source.ReplaceMarkers([new MarkerSnapshot(10, "A"), new MarkerSnapshot(40, "B")], markDirty: false);
@@ -39,9 +39,8 @@ public sealed class DocumentSessionStoreTests
         Assert.Equal(20, target.SampleLoop.EndFrame);
         Assert.Single(target.SnapshotRegions());
         Assert.Equal("intro", target.SnapshotRegions()[0].Name);
-        Assert.Equal(2, target.Selection.StartFrame);
-        Assert.Equal(8, target.Selection.EndFrame);
-        Assert.Equal(30, target.CursorFrame);
+        Assert.True(target.Selection.IsEmpty);
+        Assert.Equal(0, target.CursorFrame);
         Assert.False(target.IsDirty);
     }
 
@@ -151,6 +150,46 @@ public sealed class DocumentSessionStoreTests
     }
 
     [Fact]
+    public void ResolveActiveIndex_PrefersIsActiveOverSavedIndex()
+    {
+        OpenDocumentSnapshot[] docs =
+        [
+            new() { SourcePath = @"C:\a.wav" },
+            new() { SourcePath = @"C:\b.wav", IsActive = true },
+            new() { SourcePath = @"C:\c.wav" },
+        ];
+
+        Assert.Equal(1, DocumentSessionStore.ResolveActiveIndex(docs, savedIndex: 0));
+    }
+
+    [Fact]
+    public void ResolveActiveIndex_FallsBackToSavedIndex()
+    {
+        OpenDocumentSnapshot[] docs =
+        [
+            new() { SourcePath = @"C:\a.wav" },
+            new() { SourcePath = @"C:\b.wav" },
+        ];
+
+        Assert.Equal(1, DocumentSessionStore.ResolveActiveIndex(docs, savedIndex: 1));
+        Assert.Equal(1, DocumentSessionStore.ResolveActiveIndex(docs, savedIndex: 9));
+    }
+
+    [Fact]
+    public void PickRestoredActive_SkipsMissingSource()
+    {
+        var kept = new object();
+        var restored = new List<(int SourceIndex, object Item)>
+        {
+            (0, new object()),
+            (2, kept),
+        };
+
+        Assert.Same(kept, DocumentSessionStore.PickRestoredActive(restored, activeSourceIndex: 2));
+        Assert.Same(restored[0].Item, DocumentSessionStore.PickRestoredActive(restored, activeSourceIndex: 1));
+    }
+
+    [Fact]
     public void SettingsJson_RoundTripsOpenDocuments()
     {
         var settings = new AppSettings
@@ -165,6 +204,7 @@ public sealed class DocumentSessionStoreTests
                     SessionFileName = "doc-0.wav",
                     TimeZoom = 2,
                     SelectedMarkerFrames = [8, 16],
+                    IsActive = true,
                 },
                 new OpenDocumentSnapshot
                 {
@@ -184,6 +224,7 @@ public sealed class DocumentSessionStoreTests
         Assert.True(back.OpenDocuments[0].Dirty);
         Assert.Equal("doc-0.wav", back.OpenDocuments[0].SessionFileName);
         Assert.Equal([8, 16], back.OpenDocuments[0].SelectedMarkerFrames);
+        Assert.True(back.OpenDocuments[0].IsActive);
         Assert.Equal("hit", back.OpenDocuments[1].MarkerComments[0]);
     }
 
@@ -238,7 +279,7 @@ public sealed class DocumentSessionStoreTests
             Assert.True(restored.IsDirty);
             Assert.Equal(sourcePath, restored.SourcePath);
             Assert.Equal(0.9f, restored.Interleaved[0], 3);
-            Assert.Equal(3, restored.CursorFrame);
+            Assert.Equal(0, restored.CursorFrame);
         }
         finally
         {

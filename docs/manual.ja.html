@@ -192,7 +192,7 @@
         <li>レベルメーター上の <span class="ui">WAAPI</span> をオンにします（<kbd>W</kbd>）。</li>
         <li>Wwise で作成先オブジェクトを選びます。<span class="ui">Keep Target</span> でパスを固定できます。</li>
         <li>書き出し先は接続中プロジェクトの Originals 配下である必要があります。</li>
-        <li><span class="ui">EXPORT</span> または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>。</li>
+        <li><span class="ui">EXPORT</span> または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>。WAAPI 接続中だけ有効です。</li>
       </ol>
       <ul>
         <li><span class="ui">Play -E</span>（<kbd>E</kbd>）…… Exit Cue 以降を再生。アプリ内ではループ折り返し時に -E を二重再生し、シークバーが 2 本になります。EXPORT 時は Music Playlist Container の既定トランジションルール（Any to Any）の Play post-exit へ反映します。</li>
@@ -436,7 +436,7 @@
         <li>表示言語も歯車の設定。既定は <span class="ui">Auto</span>（OS が日本語なら Japanese、それ以外は English）。日本語版は現状の文言（英語ラベル含む）のままです。</li>
         <li>マニュアルは <span class="ui">?</span>、またはブラウザの GitHub Pages。表示言語に合わせて日本語／英語を開きます。</li>
         <li>設定ファイル: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>
-        <li>アプリを閉じると、開いていたタブとウィンドウ位置・サイズ（最大化含む）を覚えます。未保存の編集も作業コピーとして残し、次回起動時に戻します。タブを閉じるときは従来どおり保存確認します。</li>
+        <li>アプリを閉じると、開いていたタブ（どれが前面だったか含む）とウィンドウ位置・サイズ（最大化含む）を覚えます。未保存の編集も作業コピーとして残し、次回起動時に戻します。時間／振幅ズーム、波形の選択、再生ヘッドは初期状態に戻します。タブを閉じるときは従来どおり保存確認します。</li>
       </ul>
 
       <h2 id="disclaimer">12. 対応範囲と位置づけ</h2>
