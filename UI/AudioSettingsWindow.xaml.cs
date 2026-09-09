@@ -1,8 +1,10 @@
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Microsoft.Win32;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
@@ -25,16 +27,32 @@ internal partial class AudioSettingsWindow : Window
 
     public double SelectedLoudnessTargetLufs { get; private set; }
 
+    public int SelectedMp3BitRate { get; private set; }
+
+    public string SelectedLameExePath { get; private set; } = string.Empty;
+
+    public string SelectedLameOptions { get; private set; } = Mp3Encode.DefaultLameOptions;
+
+    public int SelectedExportParallelism { get; private set; }
+
     public AudioSettingsWindow(
         AudioOutputSettings current,
         FadeShape fadeIn,
         FadeShape fadeOut,
         UiLanguageChoice language,
-        double loudnessTargetLufs)
+        double loudnessTargetLufs,
+        int mp3BitRate,
+        string lameExePath,
+        string lameOptions,
+        int exportParallelism)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
         SelectedLoudnessTargetLufs = LoudnessMeterEngine.ClampTargetLufs(loudnessTargetLufs);
+        SelectedMp3BitRate = Mp3Encode.ClampWindowsBitRate(mp3BitRate);
+        SelectedLameExePath = lameExePath ?? string.Empty;
+        SelectedLameOptions = lameOptions ?? string.Empty;
+        SelectedExportParallelism = exportParallelism;
         InitializeComponent();
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
         Title = UiStrings.DialogSettingsTitle;
@@ -50,6 +68,7 @@ internal partial class AudioSettingsWindow : Window
 
         ActionButtonLooks.ApplyAccent(OkButton);
         ActionButtonLooks.ApplyClear(CancelButton);
+        ActionButtonLooks.ApplyClear(LameBrowseButton);
 
         _fadeInRow = CreateFadeRow(UiStrings.LabelDefaultFadeIn, fadeIn, isFadeIn: true);
         _fadeOutRow = CreateFadeRow(UiStrings.LabelDefaultFadeOut, fadeOut, isFadeIn: false);
@@ -59,6 +78,10 @@ internal partial class AudioSettingsWindow : Window
         SelectApi(current.Api);
         ReloadDevices(current.DeviceId);
         LoudnessTargetBox.Text = SelectedLoudnessTargetLufs.ToString("0.#", CultureInfo.InvariantCulture);
+        FillWindowsBitRates(SelectedMp3BitRate);
+        LamePathBox.Text = SelectedLameExePath;
+        LameOptionsBox.Text = Mp3Encode.ResolveLameOptions(SelectedLameOptions);
+        FillExportParallelism(SelectedExportParallelism);
         ApplyTips();
         Loaded += (_, _) =>
         {
@@ -81,6 +104,16 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(LoudnessTargetBox, UiStrings.TipLoudnessTarget);
         TipService.Set(LoudnessTargetUnit, UiStrings.TipLoudnessTarget);
         TipService.Set(FadeDefaultsHeader, UiStrings.TipFadeCurveDefaults);
+        TipService.Set(Mp3Header, UiStrings.TipMp3Encode);
+        TipService.Set(WindowsBitRateLabel, UiStrings.TipWindowsMp3BitRate);
+        TipService.Set(WindowsBitRateCombo, UiStrings.TipWindowsMp3BitRate);
+        TipService.Set(LamePathLabel, UiStrings.TipLamePath);
+        TipService.Set(LamePathBox, UiStrings.TipLamePath);
+        TipService.Set(LameBrowseButton, UiStrings.TipLameBrowse);
+        TipService.Set(LameOptionsLabel, UiStrings.TipLameOptions);
+        TipService.Set(LameOptionsBox, UiStrings.TipLameOptions);
+        TipService.Set(ExportParallelLabel, UiStrings.TipExportParallel);
+        TipService.Set(ExportParallelCombo, UiStrings.TipExportParallel);
         TipService.Set(OkButton, UiStrings.TipSettingsOk);
         TipService.Set(CancelButton, UiStrings.TipSettingsCancel);
     }
@@ -124,7 +157,93 @@ internal partial class AudioSettingsWindow : Window
         }
 
         SelectedLoudnessTargetLufs = target;
+        SelectedMp3BitRate = WindowsBitRateCombo.SelectedItem is BitRateItem bitRate
+            ? bitRate.Kbps
+            : Mp3Encode.DefaultWindowsBitRateKbps;
+        SelectedLameExePath = LamePathBox.Text.Trim();
+        SelectedLameOptions = Mp3Encode.ResolveLameOptions(LameOptionsBox.Text);
+        SelectedExportParallelism = ExportParallelCombo.SelectedItem is ParallelismItem parallel
+            ? parallel.Value
+            : AudioExport.AutoParallelism;
         DialogResult = true;
+    }
+
+    private void LameBrowseButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = UiStrings.FilterLameExe,
+            Title = UiStrings.LabelLamePath,
+            CheckFileExists = true,
+        };
+        var current = LamePathBox.Text.Trim().Trim('"');
+        var dir = Path.GetDirectoryName(current);
+        if (!string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir))
+        {
+            dialog.InitialDirectory = dir;
+        }
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            LamePathBox.Text = dialog.FileName;
+        }
+    }
+
+    private void FillWindowsBitRates(int currentKbps)
+    {
+        WindowsBitRateCombo.Items.Clear();
+        BitRateItem? selected = null;
+        var seen = new HashSet<int>();
+        foreach (var kbps in Mp3Encode.WindowsBitRates)
+        {
+            var item = new BitRateItem(kbps);
+            WindowsBitRateCombo.Items.Add(item);
+            seen.Add(kbps);
+            if (kbps == currentKbps)
+            {
+                selected = item;
+            }
+        }
+
+        if (!seen.Contains(currentKbps))
+        {
+            var extra = new BitRateItem(currentKbps);
+            WindowsBitRateCombo.Items.Add(extra);
+            selected = extra;
+        }
+
+        WindowsBitRateCombo.SelectedItem = selected ?? WindowsBitRateCombo.Items[0];
+    }
+
+    private void FillExportParallelism(int current)
+    {
+        var cores = Environment.ProcessorCount;
+        var max = AudioExport.MaxWorkers(cores);
+        var stored = current <= AudioExport.AutoParallelism
+            ? AudioExport.AutoParallelism
+            : Math.Clamp(current, 1, max);
+        ExportParallelCombo.Items.Clear();
+        ParallelismItem? selected = null;
+        var auto = new ParallelismItem(
+            AudioExport.AutoParallelism,
+            UiStrings.LabelExportParallelAuto(AudioExport.AutoWorkers(cores)));
+        ExportParallelCombo.Items.Add(auto);
+        if (stored == AudioExport.AutoParallelism)
+        {
+            selected = auto;
+        }
+
+        for (var n = 1; n <= max; n++)
+        {
+            var item = new ParallelismItem(n, n.ToString(CultureInfo.InvariantCulture));
+            ExportParallelCombo.Items.Add(item);
+            if (n == stored)
+            {
+                selected = item;
+            }
+        }
+
+        ExportParallelCombo.SelectedItem = selected ?? auto;
     }
 
     private void CancelButton_Click(object sender, RoutedEventArgs e) => DialogResult = false;
@@ -307,6 +426,16 @@ internal partial class AudioSettingsWindow : Window
     }
 
     private sealed record DeviceItem(string Id, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    private sealed record BitRateItem(int Kbps)
+    {
+        public override string ToString() => $"{Kbps} {UiStrings.LabelKbps}";
+    }
+
+    private sealed record ParallelismItem(int Value, string Label)
     {
         public override string ToString() => Label;
     }

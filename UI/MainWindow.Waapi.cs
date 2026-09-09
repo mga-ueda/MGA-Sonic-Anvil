@@ -138,6 +138,7 @@ public partial class MainWindow
         WaapiBar.ExportEnabled =
             _waapiPanelVisible
             && !_exportBusy
+            && !IsUiBusy
             && _document is not null
             && _waapiLastResult is { Ok: true };
     }

@@ -72,6 +72,9 @@ public partial class MainWindow
             case TransportCommand.Save:
                 Save(saveAs: false);
                 break;
+            case TransportCommand.SaveMp3:
+                SaveAsMp3();
+                break;
             case TransportCommand.ToggleWaapi:
                 ToggleWaapiPanel();
                 break;
@@ -178,6 +181,16 @@ public partial class MainWindow
     }
 
     private void StopPlayback() => HaltPlaybackToStart();
+
+    private void StopPlaybackForExport()
+    {
+        if (!IsPlaybackActive())
+        {
+            return;
+        }
+
+        PausePlaybackSoft();
+    }
 
     private bool PausePlaybackHere()
     {

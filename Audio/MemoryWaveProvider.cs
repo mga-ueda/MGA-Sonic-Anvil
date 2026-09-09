@@ -5,11 +5,14 @@ namespace MgaSonicAnvil.Audio;
 internal sealed class Pcm16WaveProvider : IWaveProvider, IDisposable
 {
     private readonly float[] _samples;
+    private readonly IProgress<double>? _progress;
     private int _index;
+    private int _lastBucket = -1;
 
-    public Pcm16WaveProvider(AudioDocument document)
+    public Pcm16WaveProvider(AudioDocument document, IProgress<double>? progress = null)
     {
         _samples = document.Interleaved;
+        _progress = progress;
         WaveFormat = new WaveFormat(document.SampleRate, 16, document.Channels);
     }
 
@@ -33,6 +36,16 @@ internal sealed class Pcm16WaveProvider : IWaveProvider, IDisposable
         }
 
         _index += n;
+        if (_progress is not null && _samples.Length > 0)
+        {
+            var bucket = _index * 50 / _samples.Length;
+            if (bucket != _lastBucket || _index >= _samples.Length)
+            {
+                _lastBucket = bucket;
+                _progress.Report(Math.Clamp(_index / (double)_samples.Length, 0, 1));
+            }
+        }
+
         return n * 2;
     }
 

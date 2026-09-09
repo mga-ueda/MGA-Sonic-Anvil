@@ -5,6 +5,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -304,6 +305,16 @@ public partial class MainWindow
                 AllTabsSelected ? UiStrings.TabMenuPasteToAll : UiStrings.TabMenuPasteToSelected,
                 () => PasteHistoryRecipesToTabs(targets),
                 "Ctrl+V"));
+            menu.Items.Add(new Separator());
+            menu.Items.Add(CreateTabMenuItem(
+                AllTabsSelected ? UiStrings.TabMenuExportWaveAll : UiStrings.TabMenuExportWaveSelected,
+                () => ExportTabs(targets, AudioFileKind.Wave),
+                enabled: !IsUiBusy));
+            menu.Items.Add(CreateTabMenuItem(
+                AllTabsSelected ? UiStrings.TabMenuExportMp3All : UiStrings.TabMenuExportMp3Selected,
+                () => ExportTabs(targets, AudioFileKind.Mp3),
+                AllTabsSelected ? "Ctrl+Shift+Alt+M" : null,
+                enabled: !IsUiBusy));
         }
         else
         {
@@ -313,14 +324,27 @@ public partial class MainWindow
             menu.Items.Add(CreateTabMenuItem(UiStrings.TabMenuCloseAllNormal, CloseAllTabs, "Ctrl+Shift+W"));
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(UiStrings.TabMenuSelectAll, SelectAllTabs));
+            menu.Items.Add(new Separator());
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.TabMenuExportWave,
+                () => ExportTabs([session], AudioFileKind.Wave),
+                enabled: !IsUiBusy));
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.TabMenuExportMp3,
+                () => ExportTabs([session], AudioFileKind.Mp3),
+                enabled: !IsUiBusy));
         }
 
         menu.IsOpen = true;
     }
 
-    private static MenuItem CreateTabMenuItem(string header, Action action, string? gesture = null)
+    private static MenuItem CreateTabMenuItem(
+        string header,
+        Action action,
+        string? gesture = null,
+        bool enabled = true)
     {
-        var item = new MenuItem { Header = header };
+        var item = new MenuItem { Header = header, IsEnabled = enabled };
         if (gesture is not null)
         {
             item.InputGestureText = gesture;

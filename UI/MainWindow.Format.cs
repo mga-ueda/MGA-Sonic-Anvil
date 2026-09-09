@@ -12,10 +12,14 @@ public partial class MainWindow
 
     private readonly BusyGlassOverlay _busyGlass = new();
     private bool _formatConvertBusy;
+    private bool _tabExportBusy;
+    private bool _openBusy;
+
+    private bool IsUiBusy => _formatConvertBusy || _tabExportBusy || _openBusy;
 
     private void PromptFormatConvert(FormatConvertKind kind)
     {
-        if (_formatConvertBusy)
+        if (IsUiBusy)
         {
             return;
         }
@@ -390,7 +394,7 @@ public partial class MainWindow
 
     private void ApplyFormatConvert(FormatConvertKind kind, int value)
     {
-        if (_document is null || _formatConvertBusy)
+        if (_document is null || IsUiBusy)
         {
             return;
         }
@@ -421,7 +425,7 @@ public partial class MainWindow
 
     private async Task ApplySampleRateConvertAsync(int destRate)
     {
-        if (_document is null || _formatConvertBusy)
+        if (_document is null || IsUiBusy)
         {
             return;
         }

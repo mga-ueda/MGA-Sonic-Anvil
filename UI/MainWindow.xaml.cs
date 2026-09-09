@@ -412,6 +412,21 @@ public partial class MainWindow : Window
     private void RefreshStatus()
     {
         StatusMeta.Inlines.Clear();
+        if (_openStatusText is not null)
+        {
+            StatusMeta.Inlines.Add(new Run(_openStatusText)
+            {
+                Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("StatusBarDetailForeBrush")),
+            });
+            StatusOpenProgress.Visibility = Visibility.Visible;
+            StatusOpenProgress.Value = _openStatusRatio;
+            RefreshExportEnabled();
+            RefreshTitle();
+            return;
+        }
+
+        StatusOpenProgress.Visibility = Visibility.Collapsed;
+        StatusOpenProgress.Value = 0;
         if (_document is null)
         {
             RefreshExportEnabled();
@@ -547,7 +562,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (_formatConvertBusy)
+        if (IsUiBusy)
         {
             e.Cancel = true;
             return;
@@ -599,7 +614,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_DragOver(object sender, DragEventArgs e)
     {
-        if (_formatConvertBusy)
+        if (IsUiBusy)
         {
             e.Effects = DragDropEffects.None;
             e.Handled = true;
@@ -612,7 +627,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_Drop(object sender, DragEventArgs e)
     {
-        if (_formatConvertBusy)
+        if (IsUiBusy)
         {
             e.Handled = true;
             return;

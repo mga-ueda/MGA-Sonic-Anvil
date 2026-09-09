@@ -104,10 +104,6 @@ internal static partial class UiStrings
 
     public static string CopyrightGitHub => Get("GitHub", "GitHub");
 
-    public static string DropHint => Get(
-        "Wave / AIFF / MP3 をドロップ、または Ctrl+O",
-        "Drop Wave / AIFF / MP3, or press Ctrl+O");
-
     public static string UntitledDocument => Get("untitled", "untitled");
 
     public static string LabelAlwaysOnTop => Get("Always on Top", "Always on Top");
@@ -128,26 +124,102 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string AccessibleAudioSettingsButton => Get("設定", "Settings");
     public static string TipAudioSettings => Get(
-        "表示言語、音声出力、ラウドネスターゲット、フェードカーブ既定を設定します。",
-        "Configure UI language, audio output, loudness target, and default fade curves.");
+        "設定 (Ctrl+Shift+O)\n表示言語、音声出力、ラウドネスターゲット、フェードカーブ既定、MP3（Windows / LAME）、同時書き出しを設定します。",
+        "Settings (Ctrl+Shift+O)\nConfigure UI language, audio output, loudness target, default fade curves, MP3 (Windows / LAME), and parallel exports.");
+    public static string LabelMp3Encode => Get("MP3", "MP3");
+    public static string TipMp3Encode => Get(
+        "MP3 保存の経路です。LAME のパスが有効なら lame.exe、空欄または無効なら Windows です。",
+        "MP3 save path. A valid LAME path uses lame.exe; empty or invalid uses Windows.");
+    public static string LabelWindowsMp3BitRate => Get("Windows ビットレート", "Windows Bit Rate");
+    public static string LabelKbps => Get("kbps", "kbps");
+    public static string LabelLamePath => Get("LAME のパス", "LAME Path");
+    public static string LabelLameOptions => Get("LAME オプション", "LAME Options");
+    public static string LabelExportParallel => Get("同時書き出し", "Parallel exports");
+    public static string LabelExportParallelAuto(int workers) => Format(
+        "Auto（{0}）",
+        "Auto ({0})",
+        workers);
+    public static string ButtonBrowse => Get("参照", "Browse");
+    public static string FilterLameExe => Get(
+        "LAME|lame.exe|実行ファイル|*.exe|すべて|*.*",
+        "LAME|lame.exe|Executable|*.exe|All|*.*");
+    public static string FilterSaveMp3 => Get("MP3|*.mp3", "MP3|*.mp3");
+    public static string MenuSaveMp3 => Get("MP3 として保存", "Save as MP3");
+    public static string ErrorLameFailed => Get(
+        "LAME での MP3 変換に失敗しました。",
+        "LAME failed to encode the MP3.");
+    public static string ErrorWindowsMp3Failed => Get(
+        "Windows での MP3 変換に失敗しました。",
+        "Windows failed to encode the MP3.");
+    public static string LabelMp3EncoderLame => Get("LAME", "LAME");
+    public static string LabelMp3EncoderWindows => Get("Windows", "Windows");
+    public static string InfoMp3Wrote(Mp3EncoderKind encoder) => encoder == Mp3EncoderKind.Lame
+        ? Get("LAME で MP3 を書き出しました。", "Wrote the MP3 with LAME.")
+        : Get("Windows で MP3 を書き出しました。", "Wrote the MP3 with Windows.");
+    public static string FilterSaveWave => Get("Wave|*.wav", "Wave|*.wav");
+    public static string MenuExportWave => Get("Wave で書き出す", "Export Wave");
+    public static string MenuExportMp3 => Get("MP3 で書き出す", "Export MP3");
+    public static string ExportFolderTitle => Get("書き出し先フォルダ", "Export folder");
+    public static string ConfirmOverwriteFiles(int count, string list) => Format(
+        "既にあるファイルが {0} 件あります。上書きしますか？{1}{1}{2}{1}{1}はい＝上書き、いいえ＝それらをスキップ、キャンセル＝中止",
+        "{0} existing file(s). Overwrite them?{1}{1}{2}{1}{1}Yes = overwrite, No = skip them, Cancel = stop",
+        count,
+        Environment.NewLine,
+        list);
+    public static string OverwriteMoreFiles(int hidden, int total) => Format(
+        "ほか {0} 件（合計 {1} 件）",
+        "and {0} more ({1} total)",
+        hidden,
+        total);
+    public static string ExportNone => Get(
+        "書き出すファイルがありません。",
+        "There is nothing to export.");
+    public static string ExportWaveDone(int count) => Format(
+        "Wave を {0} 件書き出しました。",
+        "Exported {0} Wave file(s).",
+        count);
+    public static string ExportMp3Done(int count, Mp3EncoderKind encoder) => Format(
+        "{1} で MP3 を {0} 件書き出しました。",
+        "Exported {0} MP3 file(s) with {1}.",
+        count,
+        encoder == Mp3EncoderKind.Lame ? LabelMp3EncoderLame : LabelMp3EncoderWindows);
+    public static string ExportPartial(
+        int ok,
+        int skipped,
+        int failed,
+        string? encoder,
+        string errors) => Format(
+        "成功 {0} 件{1}{2}スキップ {3} 件{2}失敗 {4} 件{5}",
+        "Succeeded: {0}{1}{2}Skipped: {3}{2}Failed: {4}{5}",
+        ok,
+        string.IsNullOrEmpty(encoder) ? string.Empty : Format("（{0}）", " ({0})", encoder),
+        Environment.NewLine,
+        skipped,
+        failed,
+        string.IsNullOrWhiteSpace(errors) ? string.Empty : Environment.NewLine + errors);
+    public static string TipWindowsMp3BitRate => Get(
+        "LAME のパスが空欄、または無効なときの Windows（Media Foundation）出力ビットレート。既定 192 kbps。CBR。",
+        "Windows (Media Foundation) CBR bit rate when the LAME path is empty or invalid. Default 192 kbps.");
+    public static string TipLamePath => Get(
+        "lame.exe の場所。空欄または無効なら Windows で出力します。アプリには同梱しません。",
+        "Path to lame.exe. Empty or invalid uses Windows output. Not bundled with the app.");
+    public static string TipLameBrowse => Get("lame.exe を選びます。", "Choose lame.exe.");
+    public static string TipLameOptions => Get(
+        "lame に渡すオプション。入出力ファイルは自動で末尾に付けます。空欄は既定の -V2 --noreplaygain です。",
+        "Flags passed to lame. Input and output files are appended automatically. Empty falls back to -V2 --noreplaygain.");
+    public static string TipExportParallel => Get(
+        "全タブの Wave / MP3 を同時に書く本数。Auto は CPU コア数の 1/4（最低 1）。プルダウンの上限はコア数の 1/2。Windows の MP3 は常に 1 本。",
+        "How many Wave / MP3 tab exports run at once. Auto is a quarter of the CPU cores (at least 1). The dropdown max is half the cores. Windows MP3 is always one at a time.");
 
-    public static string ButtonFadeIn => Get("FADE IN", "FADE IN");
-    public static string ButtonFadeOut => Get("FADE OUT", "FADE OUT");
-    public static string ButtonNormalize => Get("NORMALIZE", "NORMALIZE");
-    public static string ButtonDelete => Get("DELETE", "DELETE");
-    public static string ButtonSave => Get("SAVE", "SAVE");
     public static string LabelMono => Get("Mono", "Mono");
     public static string LabelStereo => Get("Stereo", "Stereo");
     public static string LabelHertz => Get("Hz", "Hz");
     public static string LabelConvertCustomRate => Get("任意", "Custom");
     public static string LabelPeak => Get("Peak", "Peak");
     public static string LabelRms => Get("RMS", "RMS");
-    public static string StatusSelectionPrefix => Get("Sel", "Sel");
 
     public static string MenuOpen => Get("開く", "Open");
-    public static string MenuSave => Get("上書き保存", "Save");
     public static string MenuSaveAs => Get("名前を付けて保存", "Save As");
-    public static string MenuSettings => Get("設定", "Settings");
 
     public static string DialogExitTitle => Get("終了確認", "Quit");
     public static string DialogExitBody => Get(
@@ -183,20 +255,18 @@ internal static partial class UiStrings
         "GitHub を開けませんでした。",
         "Unable to open GitHub.");
 
-    public static string ConfirmSave => Get(
-        "未保存の変更があります。保存しますか？",
-        "There are unsaved changes. Save them?");
-
     public static string ConfirmSaveFor(string name) => Format(
         "{0} に未保存の変更があります。保存しますか？",
         "{0} has unsaved changes. Save them?",
         name);
 
-    public static string ConfirmOverwrite => Get(
-        "既存ファイルを上書きしますか？",
-        "Overwrite the existing file?");
-
     public static string ErrorOpenFailed => Get("読み込みに失敗しました。", "Failed to open the file.");
+    public static string StatusOpeningFiles(int current, int total, string name) => Format(
+        "開いています {0} / {1}  {2}",
+        "Opening {0} / {1}  {2}",
+        current,
+        total,
+        name);
     public static string ErrorSaveFailed => Get("書き出しに失敗しました。", "Failed to save the file.");
     public static string ErrorAiffExport => Get(
         "AIFF の書き出しには対応していません。Wave または MP3 を選んでください。",
@@ -225,6 +295,13 @@ internal static partial class UiStrings
         "ラウドネスターゲットは -70 から 0 の LKFS で入力してください。",
         "Enter a loudness target between -70 and 0 LKFS.");
     public static string OverlaySampleRateConvert => Get("サンプリングレート変換", "Sample rate conversion");
+    public static string OverlayExportWave => Get("Wave を書き出しています", "Exporting Wave");
+    public static string OverlayExportMp3 => Get("MP3 を書き出しています", "Exporting MP3");
+    public static string OverlayExportCount(int finished, int total) => Format(
+        "{0} / {1}",
+        "{0} / {1}",
+        finished,
+        total);
 
     public static string FilterOpenAudio => Get(
         "Audio|*.wav;*.wave;*.aif;*.aiff;*.mp3|Wave|*.wav;*.wave|AIFF|*.aif;*.aiff|MP3|*.mp3|All|*.*",
@@ -233,6 +310,27 @@ internal static partial class UiStrings
     public static string FilterSaveAudio => Get(
         "Wave|*.wav|MP3|*.mp3",
         "Wave|*.wav|MP3|*.mp3");
+
+    public static string TooltipPlay => Get("再生 / 停止 (Space)", "Play / stop (Space)");
+    public static string TooltipStop => Get("停止 (Space)", "Stop (Space)");
+    public static string TooltipGoToStart => Get("先頭 (Ctrl+Home)", "Go to start (Ctrl+Home)");
+    public static string TooltipGoToEnd => Get("末尾 (Ctrl+End)", "Go to end (Ctrl+End)");
+    public static string TooltipTimeZoomIn => Get("時間拡大 (↑)", "Zoom in time (↑)");
+    public static string TooltipTimeZoomOut => Get("時間縮小 (↓)", "Zoom out time (↓)");
+    public static string TooltipTimeZoomMax => Get("時間最大 (Ctrl+↑)", "Time zoom max (Ctrl+↑)");
+    public static string TooltipTimeZoomReset => Get("全体表示 (Ctrl+↓)", "Fit all (Ctrl+↓)");
+    public static string TooltipAmpZoomIn => Get("振幅拡大 (Shift+↑)", "Zoom in amplitude (Shift+↑)");
+    public static string TooltipAmpZoomOut => Get("振幅縮小 (Shift+↓)", "Zoom out amplitude (Shift+↓)");
+    public static string TooltipAmpZoomMax => Get("振幅最大 (Ctrl+Shift+↑)", "Amplitude zoom max (Ctrl+Shift+↑)");
+    public static string TooltipAmpZoomReset => Get("振幅リセット (Ctrl+Shift+↓)", "Reset amplitude zoom (Ctrl+Shift+↓)");
+    public static string TooltipFadeIn => Get("フェードイン (I)", "Fade in (I)");
+    public static string TooltipFadeOut => Get("フェードアウト (O)", "Fade out (O)");
+    public static string TooltipNormalize => Get("ノーマライズ (N)", "Normalize (N)");
+    public static string TooltipDelete => Get("部分削除 (Delete)", "Ripple delete (Delete)");
+    public static string TooltipSave => Get("保存 (Ctrl+S)", "Save (Ctrl+S)");
+    public static string TooltipSaveMp3 => Get("MP3 として保存 (Ctrl+Shift+M)", "Save as MP3 (Ctrl+Shift+M)");
+    public static string TooltipTipsToggle => Get("Tips の表示", "Show Tips");
+    public static string TooltipManualHelp => Get("マニュアル", "Manual");
 
     public static string TipPlay => Get(
         "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止\nCtrl+ドラッグでスクラブ\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し",
@@ -292,8 +390,11 @@ internal static partial class UiStrings
         "部分削除 (Delete)\n選択範囲を詰めて削除\n選択中のマーカー / リージョンはまとめて削除\nCtrl+Del でマーカー削除",
         "Ripple delete (Delete)\nRemove the selection and close the gap\nSelected markers / regions are deleted together\nCtrl+Del deletes markers");
     public static string TipSave => Get(
-        "保存 (Ctrl+S)\nCtrl+Shift+S で別名保存\nMP3 は PCM 16bit にしてから再エンコード（既定 192 kbps）。マーカー／リージョン／ループは MP3 に書きません",
-        "Save (Ctrl+S)\nCtrl+Shift+S to save as\nMP3 is re-encoded from 16-bit PCM (default 192 kbps). Markers / regions / loops are not written to MP3");
+        "保存 (Ctrl+S)\nCtrl+Shift+S で別名保存\nCtrl+Shift+M で MP3 保存（今のタブは開いたまま。書き出した MP3 は読み込まない）\nCtrl+Shift+Alt+M で全タブを MP3 書き出し\nMP3 は PCM 16bit から再エンコード。LAME のパスが有効ならそれを使い、空欄または無効なら Windows（既定 192 kbps）。成功時に LAME / Windows を表示。失敗はダイアログ。マーカー／リージョン／ループは MP3 に書きません",
+        "Save (Ctrl+S)\nCtrl+Shift+S to save as\nCtrl+Shift+M to save as MP3 (keeps the current tab; does not open the written MP3)\nCtrl+Shift+Alt+M exports every tab as MP3\nMP3 is re-encoded from 16-bit PCM. A valid LAME path is used; empty or invalid falls back to Windows (default 192 kbps). Success shows LAME / Windows. Failures open a dialog. Markers / regions / loops are not written to MP3");
+    public static string TipSaveMp3 => Get(
+        "MP3 として保存 (Ctrl+Shift+M)\n別名保存と同じく書き出すだけ。今のタブは開いたまま、書き出した MP3 は読み込まない。Ctrl+Shift+Alt+M で全タブを MP3 書き出し。設定の LAME があればそれを使い、空欄または無効なら Windows（既定 192 kbps）。成功時にどちらで書いたかを表示。失敗はダイアログ。マーカー／リージョン／ループは書きません",
+        "Save as MP3 (Ctrl+Shift+M)\nWrites a file like Save As; keeps the current tab and does not open the written MP3. Ctrl+Shift+Alt+M exports every tab as MP3. Uses LAME when the path is valid; otherwise Windows (default 192 kbps). Success shows which encoder ran. Failures open a dialog. Markers / regions / loops are not written");
     public static string TipOpen => Get(
         "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Shift+T で閉じたタブを開き直す（何度でも）\nCtrl+Tab で次のタブ\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
         "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Shift+T reopens closed tabs (more than one)\nCtrl+Tab goes to the next tab\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
@@ -364,11 +465,11 @@ internal static partial class UiStrings
         "ドラッグで選択　Ctrl+ドラッグでスクラブ　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A で全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着\n"
         + "ホイール=時間ズーム（再生ヘッド基準）　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"
         + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル、Shift で3倍）　Ctrl+←→ 前後のマーカー / リージョン端 / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L（G でも可）で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（同じ範囲でもう一度で解除）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M マーカー　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動（Shift で3倍） / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント / リージョン名（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
-        + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　T で現在時間　U で編集履歴　A で波形 / スペクトログラム / 重ね表示 / ラウドネス解析（Short Term LKFS。白い幅は ±1 LU、半透明。波形は上半分のピーク dBFS を線で同じ目盛へ。曲線は原色のシアン／橙／赤。LKFS は左目盛。スペクトログラム・重ね・ラウドネスでは -A/-L/-E/-R とループ／リージョンの下塗りなし）　Ctrl+Shift+E で Wwise EXPORT（Wave 単体）　MP3 ではリージョン／ループ不可。マーカーは置けるが MP3 保存では残らない",
+        + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　T で現在時間　U で編集履歴　A で波形 / スペクトログラム / 重ね表示 / ラウドネス解析（Short Term LKFS。白い幅は ±1 LU、半透明。波形は上半分のピーク dBFS を線で同じ目盛へ。曲線は原色のシアン／橙／赤。LKFS は左目盛。スペクトログラム・重ね・ラウドネスでは -A/-L/-E/-R とループ／リージョンの下塗りなし）　Ctrl+Shift+E で Wwise EXPORT（Wave 単体）　Ctrl+Shift+M で MP3 保存　Ctrl+Shift+Alt+M で全タブを MP3 書き出し　MP3 ではリージョン／ループ不可。マーカーは置けるが MP3 保存では残らない",
         "Drag to select. Ctrl+drag to scrub. Esc or a move without Shift clears the selection. Shift+move extends. Shift+←/→ grows it (1 sample when dots are shown). Home/End jump to the view edge. Shift+PgUp/PgDn by 5%. Ctrl+Shift+Home/End selects all before/after. Ctrl+A selects all. Double-click selects a span (between markers). The guide snaps to markers / loop edges.\n"
         + "Wheel = time zoom (around the playhead). Shift+wheel = pan. Ctrl+wheel = amplitude.\n"
         + "←/→ seek (moves a selected marker / region edge / loop edge; 1 sample when dots are shown, Shift ×3). Ctrl+←/→ previous/next marker / region edge / sample-loop edge. Numpad jumps to a number (or a view position). Z / . centers (toggles center-lock while playing, clears it when stopped). 0–9 jump in the view. L (or G) loops from 3 seconds before the end of the selection (or the sample loop / -L). Shift+L sets the selection as the sample loop (same range again clears it). Shift+R sets the selection as a region (same range again clears it). Right-click a marker / region flag / loop bar to delete. S sample rate, B bit depth, C channels, M marker. Click a flag to select an edge / Shift+click for a range / Ctrl+click to add / drag or ←/→ to move (Shift ×3) / Delete or Ctrl+Del to delete. Ctrl+Shift+R to rename. Double-click a comment / region name (-A lime / -L blue / -E red / -R gray).\n"
-        + "On a marker / region edge / loop edge, Alt+←/→ is 1 px (1 sample when dots are shown), Shift ×3, Ctrl pairs with the previous marker (both edges for a region / loop). X applies a linear fade around the playhead in the view (before = out / after = in). Ctrl+X / C / V cut / copy / paste (markers in range included; a matching region is included too). T edits the current time. U opens edit history. A cycles waveform / spectrogram / overlay / loudness analysis (Short Term LKFS; the white width is a translucent ±1 LU band; the waveform is an upper-half peak dBFS line on the same scale; the curve is primary cyan / orange / red; LKFS numbers sit on the left scale). Spectrogram, overlay, and loudness skip -A/-L/-E/-R, loop, and region fills. Ctrl+Shift+E exports Wave-only to Wwise. MP3 cannot take regions / loops; markers are allowed but not saved to MP3.");
+        + "On a marker / region edge / loop edge, Alt+←/→ is 1 px (1 sample when dots are shown), Shift ×3, Ctrl pairs with the previous marker (both edges for a region / loop). X applies a linear fade around the playhead in the view (before = out / after = in). Ctrl+X / C / V cut / copy / paste (markers in range included; a matching region is included too). T edits the current time. U opens edit history. A cycles waveform / spectrogram / overlay / loudness analysis (Short Term LKFS; the white width is a translucent ±1 LU band; the waveform is an upper-half peak dBFS line on the same scale; the curve is primary cyan / orange / red; LKFS numbers sit on the left scale). Spectrogram, overlay, and loudness skip -A/-L/-E/-R, loop, and region fills. Ctrl+Shift+E exports Wave-only to Wwise. Ctrl+Shift+M saves as MP3. Ctrl+Shift+Alt+M exports every tab as MP3. MP3 cannot take regions / loops; markers are allowed but not saved to MP3.");
     public static string TipAlwaysOnTop => Get(
         "ウィンドウを常に最前面へ表示します。",
         "Keep the window always on top.");
@@ -403,7 +504,6 @@ internal static partial class UiStrings
     public static string MenuClearRegion => Get("リージョンを削除", "Clear region");
     public static string MenuClearMarker => Get("マーカーを削除", "Clear marker");
     public static string MenuClearMarkers => Get("選択したマーカーを削除", "Clear selected markers");
-    public static string StatusEmpty => Get("ファイルなし", "No file");
 
     public static string TabMenuCloseOthers => Get("このタブ以外を閉じる(_O)", "Close _Other Tabs");
     public static string TabMenuCloseRight => Get("このタブを含め右側を全部閉じる(_R)", "Close This and Tabs to the _Right");
@@ -416,6 +516,12 @@ internal static partial class UiStrings
     public static string TabMenuPasteToAll => Get("編集データを全てにペーストする(_V)", "Paste Copied Edits to All Tabs (_V)");
     public static string TabMenuCloseSelected => Get("選択したタブを閉じる(_A)", "Close Selected Tabs (_A)");
     public static string TabMenuPasteToSelected => Get("選択したタブにペーストする(_V)", "Paste Copied Edits to Selected Tabs (_V)");
+    public static string TabMenuExportWave => Get("Wave で書き出す(_E)", "Export _Wave");
+    public static string TabMenuExportMp3 => Get("MP3 で書き出す(_M)", "Export _MP3");
+    public static string TabMenuExportWaveSelected => Get("選択したタブを Wave で書き出す(_E)", "Export Selected Tabs as _Wave");
+    public static string TabMenuExportMp3Selected => Get("選択したタブを MP3 で書き出す(_M)", "Export Selected Tabs as _MP3");
+    public static string TabMenuExportWaveAll => Get("すべてのタブを Wave で書き出す(_E)", "Export All Tabs as _Wave");
+    public static string TabMenuExportMp3All => Get("すべてのタブを MP3 で書き出す(_M)", "Export All Tabs as _MP3");
 
     public static string EditHistoryTitle => Get("編集履歴", "Edit history");
     public static string EditHistoryOrigin => Get("初期状態", "Original");

@@ -16,7 +16,19 @@ internal sealed class AppSettings
 
     public int WaveformHeightScale { get; set; } = 1;
 
-    public int Mp3BitRate { get; set; } = 192;
+    public int Mp3BitRate { get; set; } = Mp3Encode.DefaultWindowsBitRateKbps;
+
+    /// <summary>ユーザー用意の lame.exe。空または無効なら Windows で MP3 出力。</summary>
+    public string LameExePath { get; set; } = string.Empty;
+
+    /// <summary>lame に渡すオプション。入出力パスは含めない。空欄は既定（-V2）。</summary>
+    public string LameOptions { get; set; } = Mp3Encode.DefaultLameOptions;
+
+    /// <summary>全タブ同時書き出し数。0 は Auto（コア数の 1/4）。上限はコア数の 1/2。</summary>
+    public int ExportParallelism { get; set; }
+
+    /// <summary>タブ書き出しで最後に選んだフォルダ。</summary>
+    public string LastExportFolder { get; set; } = string.Empty;
 
     /// <summary>ラウドネスメーターのターゲット（LKFS）。既定 -24。</summary>
     public double LoudnessTargetLufs { get; set; } = LoudnessMeterEngine.DefaultTargetLufs;
@@ -130,6 +142,9 @@ internal sealed class AppSettings
         DefaultFadeInCurve = fadeIn.ToString();
         DefaultFadeOutCurve = fadeOut.ToString();
     }
+
+    public Mp3EncodeOptions ToMp3EncodeOptions() =>
+        new(Mp3BitRate, LameExePath ?? string.Empty, Mp3Encode.ResolveLameOptions(LameOptions));
 }
 
 [JsonSerializable(typeof(AppSettings))]

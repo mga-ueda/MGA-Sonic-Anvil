@@ -97,8 +97,18 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="10,6" />
         <Setter Property="FontSize" Value="12" />
-        <Setter Property="MaxWidth" Value="360" />
+        <Setter Property="MaxWidth" Value="420" />
         <Setter Property="HasDropShadow" Value="False" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="ContentTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}"
+                               TextWrapping="Wrap"
+                               TextTrimming="None" />
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="DarkComboBoxToggleButtonStyle" TargetType="ToggleButton">
@@ -490,6 +500,26 @@
                     <Border Height="{TemplateBinding Height}"
                             Background="{TemplateBinding Background}"
                             HorizontalAlignment="Stretch"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="StatusOpenProgressStyle" TargetType="ProgressBar">
+        <Setter Property="Height" Value="2" />
+        <Setter Property="MinHeight" Value="2" />
+        <Setter Property="Background" Value="{DynamicResource TimelineWellBackBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentCyanBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Border Background="{TemplateBinding Background}">
+                        <Decorator x:Name="PART_Indicator" HorizontalAlignment="Left">
+                            <Border Background="{TemplateBinding Foreground}" />
+                        </Decorator>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

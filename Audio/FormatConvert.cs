@@ -57,9 +57,6 @@ internal static class FormatConvert
     public static bool ShouldResampleForDevice(int sourceRate, int deviceRate) =>
         sourceRate > 0 && deviceRate > 0 && sourceRate != deviceRate;
 
-    public static bool ShouldHoldForDevice(int sourceRate, int deviceRate) =>
-        ShouldResampleForDevice(sourceRate, deviceRate);
-
     /// <summary>
     /// 新しいナイキストで帯域制限してから間引く／補間する。
     /// ホールドだと階段波の高調波が出て、8 kHz がキンキンする。

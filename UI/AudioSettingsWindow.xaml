@@ -14,11 +14,13 @@
         Title="{x:Static domain:UiStrings.DialogSettingsTitle}"
         KeyDown="Window_KeyDown">
   <Border Padding="{x:Static ui:DesignMetrics.AudioPad}">
-    <StackPanel x:Name="ContentRoot" Width="280">
+    <StackPanel x:Name="ContentRoot" Width="420">
       <TextBlock x:Name="LanguageLabel"
                  Text="{x:Static domain:UiStrings.LabelUiLanguage}"
                  Margin="0,0,0,3" />
       <ComboBox x:Name="LanguageCombo"
+                Width="{x:Static ui:DesignMetrics.SettingsShortComboWidth}"
+                HorizontalAlignment="Left"
                 Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
                 Padding="6,1"
                 FontSize="11.333"
@@ -29,6 +31,8 @@
                  Text="{x:Static domain:UiStrings.LabelAudioApi}"
                  Margin="0,0,0,3" />
       <ComboBox x:Name="ApiCombo"
+                Width="{x:Static ui:DesignMetrics.SettingsShortComboWidth}"
+                HorizontalAlignment="Left"
                 Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
                 Padding="6,1"
                 FontSize="11.333"
@@ -49,12 +53,13 @@
       <TextBlock x:Name="LoudnessTargetLabel"
                  Text="{x:Static domain:UiStrings.LabelLoudnessTarget}"
                  Margin="0,0,0,3" />
-      <Grid Margin="0,0,0,12">
+      <Grid HorizontalAlignment="Left" Margin="0,0,0,12">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
         <TextBox x:Name="LoudnessTargetBox"
+                 Width="{x:Static ui:DesignMetrics.SettingsLoudnessBoxWidth}"
                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
                  Style="{StaticResource DarkTextBoxStyle}"
                  Padding="6,1"
@@ -74,7 +79,71 @@
                  Margin="0,4,0,6" />
 
       <StackPanel x:Name="FadeRowsHost"
-                  Margin="0,0,0,16" />
+                  Margin="0,0,0,12" />
+
+      <TextBlock x:Name="Mp3Header"
+                 Text="{x:Static domain:UiStrings.LabelMp3Encode}"
+                 FontWeight="Bold"
+                 FontSize="11.333"
+                 Margin="0,4,0,6" />
+
+      <TextBlock x:Name="WindowsBitRateLabel"
+                 Text="{x:Static domain:UiStrings.LabelWindowsMp3BitRate}"
+                 Margin="0,0,0,3" />
+      <ComboBox x:Name="WindowsBitRateCombo"
+                Width="{x:Static ui:DesignMetrics.SettingsBitRateComboWidth}"
+                HorizontalAlignment="Left"
+                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                Padding="6,1"
+                FontSize="11.333"
+                VerticalContentAlignment="Center"
+                Margin="0,0,0,12" />
+
+      <TextBlock x:Name="LamePathLabel"
+                 Text="{x:Static domain:UiStrings.LabelLamePath}"
+                 Margin="0,0,0,3" />
+      <Grid Margin="0,0,0,12">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBox x:Name="LamePathBox"
+                 Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                 Style="{StaticResource DarkTextBoxStyle}"
+                 Padding="6,1"
+                 FontSize="11.333"
+                 VerticalContentAlignment="Center" />
+        <ui:RoundedButton x:Name="LameBrowseButton"
+                          Grid.Column="1"
+                          Content="{x:Static domain:UiStrings.ButtonBrowse}"
+                          Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                          MinWidth="64"
+                          Margin="8,0,0,0"
+                          Click="LameBrowseButton_Click" />
+      </Grid>
+
+      <TextBlock x:Name="LameOptionsLabel"
+                 Text="{x:Static domain:UiStrings.LabelLameOptions}"
+                 Margin="0,0,0,3" />
+      <TextBox x:Name="LameOptionsBox"
+               Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+               Style="{StaticResource DarkTextBoxStyle}"
+               Padding="6,1"
+               FontSize="11.333"
+               VerticalContentAlignment="Center"
+               Margin="0,0,0,12" />
+
+      <TextBlock x:Name="ExportParallelLabel"
+                 Text="{x:Static domain:UiStrings.LabelExportParallel}"
+                 Margin="0,0,0,3" />
+      <ComboBox x:Name="ExportParallelCombo"
+                Width="{x:Static ui:DesignMetrics.SettingsShortComboWidth}"
+                HorizontalAlignment="Left"
+                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                Padding="6,1"
+                FontSize="11.333"
+                VerticalContentAlignment="Center"
+                Margin="0,0,0,16" />
 
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
         <ui:RoundedButton x:Name="OkButton"

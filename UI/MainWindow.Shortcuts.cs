@@ -44,7 +44,7 @@ public partial class MainWindow
 
     private void MainWindow_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (_formatConvertBusy)
+        if (IsUiBusy)
         {
             e.Handled = true;
             return;
@@ -112,7 +112,7 @@ public partial class MainWindow
 
     private bool TryProcessShortcut(Key key, ModifierKeys modifiers)
     {
-        if (_formatConvertBusy)
+        if (IsUiBusy)
         {
             return true;
         }
@@ -283,6 +283,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.O && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            OpenSettings();
+            return true;
+        }
+
         if (key == Key.E && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
             if (WaapiBar.ExportEnabled)
@@ -296,6 +302,18 @@ public partial class MainWindow
         if (key == Key.S && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
             Save(saveAs: true);
+            return true;
+        }
+
+        if (key == Key.M && modifiers == (ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Alt))
+        {
+            ExportAllTabsMp3();
+            return true;
+        }
+
+        if (key == Key.M && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            SaveAsMp3();
             return true;
         }
 

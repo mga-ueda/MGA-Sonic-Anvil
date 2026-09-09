@@ -380,6 +380,51 @@ public sealed class FormatConvertTests
     }
 
     [Fact]
+    public void EstimateFileBytes_KeepsCompressedSizeWhenUnchanged()
+    {
+        var pcm = AudioDocument.EstimatePcmPayloadBytes(48000, 2, 16);
+        var compressed = Math.Max(1, pcm / 10);
+        Assert.Equal(
+            compressed,
+            AudioDocument.EstimateFileBytes(compressed, 48000, 2, 16, 48000, 2, 16));
+    }
+
+    [Fact]
+    public void EstimateFileBytes_ScalesCompressedSizeWithPayload()
+    {
+        var pcm = AudioDocument.EstimatePcmPayloadBytes(48000, 2, 16);
+        var compressed = Math.Max(1, pcm / 10);
+        Assert.Equal(
+            compressed / 2,
+            AudioDocument.EstimateFileBytes(compressed, 48000, 2, 16, 24000, 2, 16));
+    }
+
+    [Fact]
+    public void Mp3Load_DoesNotMarkFileSizeEdited()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"mga-mp3-size-{Guid.NewGuid():N}.bin");
+        try
+        {
+            File.WriteAllBytes(path, new byte[1234]);
+            var document = new AudioDocument(new float[48000 * 2], 48000, 2, 16, AudioFileKind.Mp3, path);
+            Assert.Equal(1234, document.CommittedFileBytes);
+            Assert.Equal(1234, document.EstimatedFileBytes);
+            Assert.Equal(1234, document.EstimateFileBytesFor(48000, 16, 2));
+            Assert.False(document.FileSizeEdited);
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(path);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    [Fact]
     public void CustomRate_Bounds()
     {
         Assert.True(FormatConvert.IsValidSampleRate(44100));

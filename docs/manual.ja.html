@@ -104,13 +104,14 @@
         <p><strong>波形エディタと、Wwise Interactive Music への Wave 単体 EXPORT をひとつにしたもの</strong>です。</p>
         <p>フェード・ノーマライズ・部分削除・コピー／ペースト、マーカー／リージョン／サンプルループ、スペクトログラムまで、聴きながら決めて焼き込めます。</p>
         <p><strong>Wwise へは Wave 単体モードで渡せます。</strong> 元波形を Originals へ書き、Music Playlist Container（マーカー／サンプルループ。Custom Cue は出しません）として取り込みます。</p>
+        <p>開いた波形は Wave / MP3 に保存できます。タブの右クリックで、今の編集内容を Wave / MP3 として書き出せます。</p>
       </div>
 
       <h2 id="quickstart">2. クイックスタート</h2>
       <ol>
-        <li>Wave / AIFF / MP3 をドロップするか、<kbd>Ctrl</kbd>+<kbd>O</kbd> で開きます（複数可。タブで並びます）。</li>
+        <li>Wave / AIFF / MP3 をドロップするか、<kbd>Ctrl</kbd>+<kbd>O</kbd> で開きます（複数可。タブで並びます。複数のときはステータスバーに進捗が出ます）。</li>
         <li>波形上で聴きながら切る・フェードする・マーカーやループを置きます。</li>
-        <li>必要なら <kbd>Ctrl</kbd>+<kbd>S</kbd> で Wave または MP3 に保存します（AIFF 書き出しは非対応）。MP3 は 16bit PCM から再エンコード（既定 192 kbps）で、マーカー等は書きません。</li>
+        <li>必要なら <kbd>Ctrl</kbd>+<kbd>S</kbd> で Wave または MP3 に保存します（AIFF 書き出しは非対応）。<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> は MP3 専用です。MP3 への書き出しは別名保存のようにファイルを出すだけで、今のタブは開いたままです（書き出した MP3 は読み込みません）。MP3 は 16bit PCM から再エンコードします。設定で LAME のパスが有効ならそれを使い、空欄または無効なら Windows（既定 192 kbps）。マーカー等は書きません。</li>
         <li>Wwise へ渡すときは、レベルメーター上の <span class="ui">WAAPI</span> をオンにし、作成先を選んで <span class="ui">EXPORT</span> します。</li>
       </ol>
       <div class="note">
@@ -119,15 +120,15 @@
 
       <h2 id="layout">3. 画面の見方</h2>
       <ul>
-        <li><strong>設定</strong> …… 左上の歯車。表示言語（Auto／Japanese／English。Auto は OS が日本語なら Japanese、それ以外は English）、音声出力（WaveOut／WASAPI／ASIO）、ラウドネスターゲット（LKFS）、フェードカーブ既定。<kbd>Esc</kbd> で閉じます。</li>
+        <li><strong>設定</strong> …… 左上の歯車、<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>。表示言語（Auto／Japanese／English。Auto は OS が日本語なら Japanese、それ以外は English）、音声出力（WaveOut／WASAPI／ASIO）、ラウドネスターゲット（LKFS）、フェードカーブ既定、MP3（Windows ビットレート／LAME パス／LAME オプション）、同時書き出し（既定 Auto＝CPU コア数の 1/4。上限はコア数の 1/2）。<kbd>Esc</kbd> で閉じます。</li>
         <li><strong>全体波形</strong> …… 上段。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）、ホイールで拡縮（再生ヘッド基準）。</li>
         <li><strong>波形エリア</strong> …… 本編集面。時間ルーラー、マーカー／リージョンフラッグ、再生ヘッド、マウスガイド。</li>
         <li><strong>時間スクロールバー</strong> …… 波形の下。表示範囲を左右に動かします。</li>
-        <li><strong>タブ</strong> …… 1 ファイルでも表示。閉じるは <kbd>Ctrl</kbd>+<kbd>W</kbd>。誤って閉じたタブは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> で開き直せる（複数可）。右クリックで「このタブ以外を閉じる(O)」「このタブを含め右側を全部閉じる(R)」「このタブを含め左側を全部閉じる(L)」「すべてのタブを閉じる(W)」「全部のタブを選択する(A)」。<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> でもすべてのタブを閉じられます。タブは <kbd>Ctrl</kbd>+クリックで個別追加、<kbd>Shift</kbd>+クリックで範囲選択、タブバー上の <kbd>Ctrl</kbd>+<kbd>A</kbd> で全選択でき、選択中のタブはハイライトされます（<kbd>Esc</kbd> で解除）。選択中の右クリックは「選択した（すべての）タブを閉じる」「選択した（すべての）タブにペーストする」になり、<kbd>Ctrl</kbd>+<kbd>V</kbd> でコピーした編集履歴を選択タブへ一括適用できます。タブが増えてバーに収まらないときは、先にアクティブ以外を縮めます。タイトルが 6 文字を切るまで縮めても足りなければ、左右の ＜＞ で送ります。</li>
-        <li><strong>トランスポート</strong> …… 上段は再生・ズーム。下段はフェード／ノーマライズ／削除／保存、<span class="ui">Tips</span> 枠のオン／オフ、マニュアル <span class="ui">?</span>。ライセンス／GitHub は行の下端。</li>
+        <li><strong>タブ</strong> …… 1 ファイルでも表示。閉じるは <kbd>Ctrl</kbd>+<kbd>W</kbd>。誤って閉じたタブは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> で開き直せる（複数可）。右クリックで「このタブ以外を閉じる(O)」「このタブを含め右側を全部閉じる(R)」「このタブを含め左側を全部閉じる(L)」「すべてのタブを閉じる(W)」「全部のタブを選択する(A)」「Wave で書き出す(E)」「MP3 で書き出す(M)」。書き出しは今の編集内容を別ファイルへ出します（未保存のままで可。1 件は保存ダイアログ、複数はフォルダを選ぶ。既存ファイルは上書き確認：はい＝上書き、いいえ＝それらをスキップ、キャンセル＝中止。多いときは件数と先頭だけ出します）。複数書き出しの名前は元ファイル名（未保存はタブ名）で、同じ名前が重なれば <code> 2</code> から番号を付けます。前回選んだフォルダを覚えます。実行中はすりガラスで操作を止め、全体と並列中の曲すべてのプログレスバーを出します（多いときは 2 列）。<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> でもすべてのタブを閉じられます。<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> で全タブを MP3 書き出し（今のタブは開いたまま。Wave の一括書き出しにキーはありません）。タブは <kbd>Ctrl</kbd>+クリックで個別追加、<kbd>Shift</kbd>+クリックで範囲選択、タブバー上の <kbd>Ctrl</kbd>+<kbd>A</kbd> で全選択でき、選択中のタブはハイライトされます（<kbd>Esc</kbd> で解除）。選択中の右クリックは「選択した（すべての）タブを閉じる」「選択した（すべての）タブにペーストする」「Wave / MP3 で書き出す」になり、<kbd>Ctrl</kbd>+<kbd>V</kbd> でコピーした編集履歴を選択タブへ一括適用できます。タブが増えてバーに収まらないときは、先にアクティブ以外を縮めます。タイトルが 6 文字を切るまで縮めても足りなければ、左右の ＜＞ で送ります。</li>
+        <li><strong>トランスポート</strong> …… 上段は再生・ズーム。下段はフェード／ノーマライズ／削除／保存／MP3 出力、<span class="ui">Tips</span> 枠のオン／オフ、マニュアル <span class="ui">?</span>。ライセンス／GitHub は行の下端。</li>
         <li><strong>Always on Top</strong> …… ステータスバー右端。ウィンドウを最前面に固定します。</li>
         <li><strong>スペクトラム／ラウドネス／レベルメーター／ベクタースコープ</strong> …… 再生出力の表示。スペクトラムの左にラウドネス（Short Term / Integrated / Momentary Max、Loudness Range、True Peak。ターゲット LKFS は設定。数値は青＝余裕、橙＝接近、赤＝超過。停止後も最後の値を残し、再生し直すと測り直します）。スペクトラムは Layer Music Checker と同じ LED 帯域表示です。ベクタースコープは停止後、点が中心へゆっくり戻ります。レベルメーター上の <span class="ui">WAAPI</span> でバーの表示を切り替えます。</li>
-        <li><strong>Tips</strong> …… WAAPI バーの上。高さ固定。コントロールにマウスを置くと説明を表示し、はみ出したらスクロールします。初回はすぐ出ます。別の項目へ移る／外すときは 300ms 待ってから差し替え／消去します。見出しまたは本文をクリックでロック（枠がシアン、<span class="ui">Tips (Locked)</span>）。もう一度クリックで解除。ロック中とパネル上では内容が変わりません。ホバー用のツールチップは使いません。</li>
+        <li><strong>Tips</strong> …… WAAPI バーの上。高さ固定。コントロールにマウスを置くと説明を表示し、はみ出したらスクロールします。初回はすぐ出ます。別の項目へ移る／外すときは 300ms 待ってから差し替え／消去します。見出しまたは本文をクリックでロック（枠がシアン、<span class="ui">Tips (Locked)</span>）。もう一度クリックで解除。ロック中とパネル上では内容が変わりません。トランスポートのボタンだけ、短いツールチップ（ショートカット付き。折り返し、切り詰めなし）も出ます。他のコントロールにホバー用ツールチップはありません。</li>
         <li><strong>WAAPI バー</strong> …… 接続状態、作成先、<span class="ui">Play -E</span>、<span class="ui">Auto Active</span>、<span class="ui">EXPORT</span>。</li>
         <li><strong>ステータスバー</strong> …… サンプリングレート等のファイル情報（名前はタブ側。レート／ビット深度／チャンネルを変換すると該当項目が保存まで赤。容量は MB（MiB / B）。変換や範囲削除で変わると推測サイズが赤）、現在時間／選択開始／選択範囲／選択終了／トータル（トータル以外は入力・ホイール／↑↓で調整。時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分、サンプルは1／Shift10／Ctrl100／Ctrl+Shift1000。右クリックで時間とサンプル数を切替）、右端に Always on Top。</li>
       </ul>
@@ -140,7 +141,7 @@
         <li><kbd>Alt</kbd>+<kbd>Enter</kbd> …… 再生開始位置からやり直し。</li>
         <li><kbd>Ctrl</kbd>+ドラッグ …… スクラブ。</li>
         <li><kbd>T</kbd> …… ステータスバーの現在時間を入力。Enter で移動。コピー／貼り付け可。右クリックで時間／サンプル数。</li>
-        <li><kbd>Z</kbd> または <kbd>.</kbd> …… 中央寄せ。再生中はセンターロックの切替、停止で解除。</li>
+        <li><kbd>Z</kbd> または <kbd>.</kbd>（テンキーの <kbd>.</kbd> も同じ）…… 中央寄せ。再生中はセンターロックの切替、停止で解除。</li>
         <li><kbd>L</kbd>（<kbd>G</kbd> でも可）…… 選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生。</li>
       </ul>
 
@@ -154,7 +155,7 @@
         <li><kbd>Ctrl</kbd>+<kbd>X</kbd>／<kbd>C</kbd>／<kbd>V</kbd> …… カット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）。</li>
         <li><kbd>U</kbd> …… 編集履歴。↑↓ で移動、Enter 確定、Esc キャンセル。</li>
         <li>履歴のコピー＆ペースト …… 履歴内で <kbd>Ctrl</kbd>+クリック（<kbd>Shift</kbd>+クリックや <kbd>Shift</kbd>+<kbd>↑↓</kbd> で範囲、<kbd>Ctrl</kbd>+<kbd>A</kbd> で全選択）して <kbd>Ctrl</kbd>+<kbd>C</kbd>。別ファイルで <kbd>Ctrl</kbd>+<kbd>V</kbd> すると同じ処理を再適用します（履歴を開いていなくても可）。コピーは次に何かをコピーするまで残るので、タブを切り替えて <kbd>Ctrl</kbd>+<kbd>V</kbd> を繰り返せば複数ファイルへ反映できます。選択なしの <kbd>Ctrl</kbd>+<kbd>C</kbd> は現在位置までの全操作。範囲はサンプルレートが違っても時間基準で写像され、ノーマライズ等は適用先で再計算されます。</li>
-        <li><kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Ctrl</kbd>+<kbd>Y</kbd> …… 元に戻す／やり直す。</li>
+        <li><kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Ctrl</kbd>+<kbd>Y</kbd>（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> でもやり直し）…… 元に戻す／やり直す。</li>
       </ul>
 
       <h2 id="markers">6. マーカー／リージョン／ループ</h2>
@@ -180,7 +181,7 @@
         <li><kbd>B</kbd> …… ビット深度</li>
         <li><kbd>C</kbd> …… チャンネル数（Mono／Stereo）</li>
       </ul>
-      <p>プリセットか任意 Hz を選びます。任意 Hz は ↑↓／ホイールで 1Hz（Shift 10／Ctrl 100／Ctrl+Shift 1000）。メニューはカーソルの直下を避けます。項目を選んだ時点でステータスの容量が推測サイズに更新されます。変換中は操作を受け付けません。確定した項目は保存まで赤のままです。サンプリングレートとビット深度は、読み込み時（またはフェード等の中身の編集後）の元 PCM から毎回変換します。48 kHz→24 kHz のあと 11 kHz にしても、24 kHz 経由ではなく 48 kHz から作り直します。</p>
+      <p>プリセットは 8 / 11.025 / 16 / 22.05 / 32 / 44.1 / 48 / 96 kHz、ビットは 4 / 8 / 16 / 24、チャンネルは Mono / Stereo です。任意 Hz は 1000–384000 で、↑↓／ホイールで 1Hz（Shift 10／Ctrl 100／Ctrl+Shift 1000）。メニューはカーソルの直下を避けます。項目を選んだ時点でステータスの容量が推測サイズに更新されます。変換中はすりガラスで操作を止めます。確定した項目は保存まで赤のままです。サンプリングレートとビット深度は、読み込み時（またはフェード等の中身の編集後）の元 PCM から毎回変換します。48 kHz→24 kHz のあと 11 kHz にしても、24 kHz 経由ではなく 48 kHz から作り直します。<kbd>Space</kbd> で試聴できるのはレートとビットです（チャンネルは <kbd>Enter</kbd> のみ。1–2）。4 bit は量子化の試聴用です。Wave に書くビットは 8 / 16 / 24 だけなので、4 bit のままでは出さず 16 bit で書きます。</p>
 
       <h2 id="export">9. WAAPI EXPORT（Wave 単体）</h2>
       <p><strong>Wwise IM Importer の Wave 単体モードと同じ組み立て</strong>です。ワンショットとループをあらかじめ別ファイルに分けず、1 本のマスター波形上で構造を決めます。EXPORT は元波形を 1 ファイルのまま Originals へ書き、区間は MusicClip のトリムで合わせます。Music Playlist Container 1 つを作ります。Custom Cue は出しません。小節・テンポ管理、複数波形の Switch、XML マーカートラックはありません。</p>
@@ -243,8 +244,11 @@
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
           <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>開く（ドロップでも可。複数はタブで追加）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd></td><td>設定</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>保存（Wave または MP3）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>別名保存</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>MP3 として保存（今のタブは開いたまま）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd></td><td>すべてのタブを MP3 で書き出す</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>タブを閉じる（未保存なら保存確認）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>閉じたタブを開き直す（新しいものから。複数可）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>すべてのタブを閉じる</td></tr>
@@ -264,7 +268,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>3 秒前から再生</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>再生開始位置からやり直し</td></tr>
           <tr><td><kbd>L</kbd>／<kbd>G</kbd></td><td>選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生</td></tr>
-          <tr><td><kbd>Z</kbd>／<kbd>.</kbd></td><td>中央寄せ。再生中はセンターロックの切替、停止で解除</td></tr>
+          <tr><td><kbd>Z</kbd>／<kbd>.</kbd>／テンキー <kbd>.</kbd></td><td>中央寄せ。再生中はセンターロックの切替、停止で解除</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Home</kbd></td><td>ファイル先頭へ</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>End</kbd></td><td>ファイル末尾へ</td></tr>
         </tbody>
@@ -345,7 +349,7 @@
         <tbody>
           <tr><td><kbd>S</kbd></td><td>サンプリングレート</td></tr>
           <tr><td><kbd>B</kbd></td><td>ビット深度</td></tr>
-          <tr><td><kbd>C</kbd></td><td>チャンネル数（Mono／Stereo）</td></tr>
+          <tr><td><kbd>C</kbd></td><td>チャンネル数（Mono／Stereo。試聴なし）</td></tr>
         </tbody>
       </table>
 
@@ -375,12 +379,12 @@
           <tr><td>右クリック（フラッグ／ループバー）</td><td>削除</td></tr>
           <tr><td><kbd>Ctrl</kbd>+クリック（タブ）</td><td>タブを個別追加／解除</td></tr>
           <tr><td><kbd>Shift</kbd>+クリック（タブ）</td><td>タブを範囲選択</td></tr>
-          <tr><td>右クリック（タブ）</td><td>閉じる／全選択。選択中は選択タブの閉じる／履歴ペースト。メニュー上は <kbd>O</kbd>／<kbd>R</kbd>／<kbd>L</kbd>／<kbd>W</kbd>／<kbd>A</kbd>／<kbd>V</kbd></td></tr>
+          <tr><td>右クリック（タブ）</td><td>閉じる／全選択／Wave・MP3 書き出し。選択中は選択タブの閉じる／履歴ペースト／書き出し。メニュー上は <kbd>O</kbd>／<kbd>R</kbd>／<kbd>L</kbd>／<kbd>W</kbd>／<kbd>A</kbd>／<kbd>V</kbd>／<kbd>E</kbd>／<kbd>M</kbd></td></tr>
         </tbody>
       </table>
 
       <h3 id="shortcuts-context">状況別</h3>
-      <p>編集履歴が開いているとき</p>
+      <p>編集履歴が開いているとき（このあいだは他のショートカットは効きません）</p>
       <table>
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
@@ -389,7 +393,7 @@
           <tr><td><kbd>Home</kbd>／<kbd>End</kbd></td><td>先頭／末尾へ</td></tr>
           <tr><td><kbd>Enter</kbd>／<kbd>U</kbd></td><td>確定して閉じる</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>キャンセルして閉じる</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+クリック／<kbd>Shift</kbd>+↑↓</td><td>コピー対象を選択</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+クリック／<kbd>Shift</kbd>+クリック／<kbd>Shift</kbd>+↑↓</td><td>コピー対象を選択</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>再適用できる履歴を全選択</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>選択した履歴をコピー（選択なしは現在位置まで）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>コピーした履歴をこのファイルへ適用（履歴を開いていなくても可）</td></tr>
@@ -410,9 +414,9 @@
       <table>
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
-          <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>プリセットを選択</td></tr>
+          <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>プリセットを選択（チャンネルは <kbd>1</kbd>–<kbd>2</kbd>）</td></tr>
           <tr><td>↑／↓／ホイール</td><td>任意 Hz を 1（<kbd>Shift</kbd> 10／<kbd>Ctrl</kbd> 100／<kbd>Ctrl</kbd>+<kbd>Shift</kbd> 1000）</td></tr>
-          <tr><td><kbd>Space</kbd></td><td>ハイライト中の値を試聴</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>ハイライト中の値を試聴（レート／ビット。チャンネルはなし）</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>確定</td></tr>
           <tr><td><kbd>S</kbd>／<kbd>B</kbd>／<kbd>C</kbd></td><td>レート／ビット／チャンネルへ切替</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>閉じる</td></tr>
@@ -429,22 +433,25 @@
           <tr><td><kbd>Esc</kbd></td><td>編集をキャンセル</td></tr>
         </tbody>
       </table>
-      <p>設定ウィンドウでは <kbd>Esc</kbd> で閉じます。変換中は操作を受け付けません。</p>
+      <p>設定ウィンドウでは <kbd>Esc</kbd> で閉じます。変換・タブ書き出し・複数ファイルを開いているあいだは操作を受け付けません。</p>
 
       <h2 id="settings">11. 設定と言語</h2>
       <ul>
-        <li>再生デバイス、ラウドネスターゲット（LKFS）、フェードカーブ既定は左上の歯車（WaveOut／WASAPI／ASIO）。</li>
+        <li>再生デバイス、ラウドネスターゲット（既定 -24 LKFS。-70 から 0。色分けの基準で、音声は変えません）、フェードカーブ既定、MP3、同時書き出しは左上の歯車、または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>（WaveOut／WASAPI／ASIO）。</li>
+        <li>MP3 は設定の LAME パスが有効ならユーザー用意の <code>lame.exe</code> を呼び、オプション欄の内容を渡します（入出力ファイルは自動で付けます。既定は <code>-V2 --noreplaygain</code>。空欄もこの既定）。パスが空欄または無効なら Windows Media Foundation で出力し、ビットレートは 128 / 160 / 192 / 224 / 256 / 320 kbps（既定 192。CBR）です。書き出し後に LAME / Windows のどちらで変換したかを知らせ、失敗はダイアログです。書き出した MP3 は今のタブへ読み込みません（開いているのがその MP3 のときの上書き保存だけ、今のファイルのままです）。全タブ書き出しの同時数は同時書き出し（既定 Auto＝CPU コア数の 1/4。上限はコア数の 1/2。Windows の MP3 は常に 1 本）。前回選んだ書き出しフォルダを覚えます。LAME は同梱しません。</li>
         <li>表示言語も歯車の設定。既定は <span class="ui">Auto</span>（OS が日本語なら Japanese、それ以外は English）。日本語版は現状の文言（英語ラベル含む）のままです。</li>
         <li>マニュアルは <span class="ui">?</span>、またはブラウザの GitHub Pages。表示言語に合わせて日本語／英語を開きます。</li>
         <li>設定ファイル: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>
-        <li>アプリを閉じると、開いていたタブ（どれが前面だったか含む）とウィンドウ位置・サイズ（最大化含む）を覚えます。未保存の編集も作業コピーとして残し、次回起動時に戻します。編集履歴も、レシピとして残せる操作は戻します（初期状態へ Undo できます）。時間／振幅ズーム、波形の選択、再生ヘッドは初期状態に戻します。タブを閉じるときは従来どおり保存確認します。</li>
+        <li>アプリを閉じると、開いていたタブ（どれが前面だったか含む）とウィンドウ位置・サイズ（最大化含む）を覚えます。未保存の編集も作業コピーとして残し、次回起動時に戻します（複数タブなら、開くときと同じくステータスバーに進捗が出ます）。編集履歴も、レシピとして残せる操作は戻します（初期状態へ Undo できます）。時間／振幅ズーム、波形の選択、再生ヘッドは初期状態に戻します。タブを閉じるときは従来どおり保存確認します。</li>
+        <li>起動はひとつだけです。2 回目は既存ウィンドウを前面にし、渡した Wave / AIFF / MP3 をタブで開きます。</li>
+        <li>起動時に GitHub Releases を見て、新しい版があれば知らせます。はい＝リリースページを開く（自動ダウンロードはしません）。いいえ＝その版では再通知しません。オフラインでは黙って続けます。</li>
       </ul>
 
       <h2 id="disclaimer">12. 対応範囲と位置づけ</h2>
       <ul>
         <li>Wwise の Interactive Music でできることをすべてカバーするものではありません。EXPORT は Wave 単体（マーカー／サンプルループ）に限っています。</li>
         <li>アプリ内プレビューは近似です。Play -E の二重再生も Wwise 実機と完全一致するとは限りません。最終確認は EXPORT 後に Wwise 上で行ってください。</li>
-        <li>AIFF の書き出しには対応していません。Wave または MP3 を選んでください。</li>
+        <li>AIFF の書き出しには対応していません。Wave または MP3 を選んでください。Wave に書くビットは 8 / 16 / 24 です（4 bit は量子化の試聴用で、保存時は 16 bit）。</li>
         <li>EXPORT は Wwise プロジェクトを変更します。実行前のバックアップやバージョン管理をおすすめします。</li>
       </ul>
 
@@ -452,6 +459,7 @@
       <ul>
         <li><strong>Wwise®</strong>／<strong>Audiokinetic®</strong> は Audiokinetic Inc. の商標です。本ツールは非公式です。WAAPI には有効な Wwise ライセンスが必要です。</li>
         <li>本アプリは <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/LICENSE">MIT License</a> で公開しています。</li>
+        <li><strong>LAME</strong> は LAME project の名称で、ライセンスは LGPL です。本アプリは同梱・改変・リンク・再配布せず、ユーザーが用意した <code>lame.exe</code> をプロセスとして呼び出すだけです。入手とライセンス遵守は利用者側です。LAME プロジェクトの非公式です。</li>
       </ul>
       <footer>© MIYABI GAME AUDIO INC. — MGA Sonic Anvil User Manual (ja)</footer>
     </main>

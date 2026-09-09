@@ -23,8 +23,6 @@ internal static class DesignMetrics
 
     public static GridLength ProjectBarHeightGrid => new(ProjectBarHeight);
 
-    public static double ActionBarHeight => From96(44);
-
     public static double StatusBarHeight => From96(28);
 
     public static double WaapiBarHeight => From96(32);
@@ -76,8 +74,6 @@ internal static class DesignMetrics
 
     public static double TransportGroupGap => Dip(6);
 
-    public static double TransportPadX => Dip(12);
-
     public static double StatusTimecodeWidth => From96(86);
 
     public static double StatusTimecodeLabelWidth => From96(22);
@@ -101,11 +97,16 @@ internal static class DesignMetrics
 
     public static GridLength VectorScopeHeightGrid => new(VectorScopeHeight);
 
-    public static double ActionButtonWidth => From96(108);
-
-    public static double ActionButtonHeight => From96(32);
-
     public static double AudioInputHeight => Dip(30);
+
+    /// <summary>設定の短いコンボ（Auto / Japanese / WaveOut など）。</summary>
+    public static double SettingsShortComboWidth => From96(128);
+
+    /// <summary>設定のビットレート（320 kbps）。</summary>
+    public static double SettingsBitRateComboWidth => From96(108);
+
+    /// <summary>設定のラウドネス値（-70.0）。</summary>
+    public static double SettingsLoudnessBoxWidth => From96(72);
 
     public static double AudioDialogButtonWidth => Dip(162);
 

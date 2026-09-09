@@ -27,6 +27,7 @@ internal enum TransportIcon
     Normalize,
     Delete,
     Save,
+    SaveMp3,
     Lock,
     Unlock,
     Waapi,
@@ -51,6 +52,7 @@ internal enum TransportCommand
     Normalize,
     Delete,
     Save,
+    SaveMp3,
     ToggleWaapi,
 }
 
@@ -287,6 +289,14 @@ internal static class TransportIconDrawing
                 dc.DrawLine(pen, new Point(12, 16), new Point(17, 21));
                 dc.DrawLine(pen, new Point(22, 16), new Point(17, 21));
                 dc.DrawLine(pen, new Point(9, 26), new Point(25, 26));
+                break;
+            case TransportIcon.SaveMp3:
+                dc.DrawLine(pen, new Point(9, 16), new Point(9, 26));
+                dc.DrawLine(pen, new Point(9, 26), new Point(25, 26));
+                dc.DrawLine(pen, new Point(25, 26), new Point(25, 16));
+                dc.DrawLine(pen, new Point(17, 24), new Point(17, 8));
+                dc.DrawLine(pen, new Point(12, 13), new Point(17, 8));
+                dc.DrawLine(pen, new Point(22, 13), new Point(17, 8));
                 break;
             case TransportIcon.Lock:
                 DrawPadlockBody(dc, pen, brush);

@@ -8,6 +8,7 @@ namespace MgaSonicAnvil.Audio;
 
 internal static class AudioCodec
 {
+    private static readonly object MediaFoundationGate = new();
     private static bool _mediaFoundationStarted;
 
     public static IReadOnlyList<string> OpenExtensions { get; } =
@@ -154,14 +155,26 @@ internal static class AudioCodec
         SaveWave(slice, path);
     }
 
-    public static void SaveWave(AudioDocument document, string path)
+    public static void SaveWave(AudioDocument document, string path, IProgress<double>? progress = null) =>
+        WriteWave(document, path, ResolveWaveBits(document.BitsPerSample), embedMeta: true, progress);
+
+    internal static void SavePcm16Wave(AudioDocument document, string path, IProgress<double>? progress = null) =>
+        WriteWave(document, path, bits: 16, embedMeta: false, progress);
+
+    private static int ResolveWaveBits(int bits) => bits switch
     {
-        var bits = document.BitsPerSample switch
-        {
-            8 => 8,
-            24 => 24,
-            _ => 16,
-        };
+        8 => 8,
+        24 => 24,
+        _ => 16,
+    };
+
+    private static void WriteWave(
+        AudioDocument document,
+        string path,
+        int bits,
+        bool embedMeta,
+        IProgress<double>? progress = null)
+    {
         var channels = Math.Max(1, document.Channels);
         var sampleRate = Math.Max(1, document.SampleRate);
         var blockAlign = channels * (bits / 8);
@@ -186,7 +199,7 @@ internal static class AudioCodec
             writer.Write(Encoding.ASCII.GetBytes("data"));
             var dataSizePos = stream.Position;
             writer.Write(0);
-            WritePcm(document, writer, bits);
+            WritePcm(document, writer, bits, progress, embedMeta ? 0.92 : 1);
             var dataSize = (int)(stream.Position - dataSizePos - 4);
             if ((dataSize & 1) != 0)
             {
@@ -200,8 +213,15 @@ internal static class AudioCodec
             writer.Write((int)(end - 8));
         }
 
+        if (!embedMeta)
+        {
+            progress?.Report(1);
+            return;
+        }
+
         WavEmbeddedMeta.Write(path, document);
         DeleteSoundForgeSidecars(path);
+        progress?.Report(1);
     }
 
     private static void WriteFmtChunk(
@@ -266,14 +286,40 @@ internal static class AudioCodec
         }
     }
 
-    public static void SaveMp3(AudioDocument document, string path, int bitRateKbps)
+    public static Mp3EncoderKind SaveMp3(
+        AudioDocument document,
+        string path,
+        Mp3EncodeOptions options,
+        IProgress<double>? progress = null)
     {
-        EnsureMediaFoundation();
-        using var provider = new Pcm16WaveProvider(document);
-        MediaFoundationEncoder.EncodeToMp3(provider, path, bitRateKbps * 1000);
+        if (Mp3Encode.TryResolveLameExe(options.LameExePath, out var lameExe))
+        {
+            LameEncoder.Encode(document, path, lameExe, options.LameOptions, progress);
+            return Mp3EncoderKind.Lame;
+        }
+
+        try
+        {
+            lock (MediaFoundationGate)
+            {
+                EnsureMediaFoundation();
+                using var provider = new Pcm16WaveProvider(document, progress);
+                MediaFoundationEncoder.EncodeToMp3(
+                    provider,
+                    path,
+                    Mp3Encode.ClampWindowsBitRate(options.WindowsBitRateKbps) * 1000);
+            }
+
+            progress?.Report(1);
+            return Mp3EncoderKind.Windows;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"{UiStrings.ErrorWindowsMp3Failed}\n{ex.Message}", ex);
+        }
     }
 
-    public static void Save(AudioDocument document, string path, int mp3BitRateKbps)
+    public static Mp3EncoderKind? Save(AudioDocument document, string path, Mp3EncodeOptions options)
     {
         var kind = DetectKind(path);
         if (kind == AudioFileKind.Aiff)
@@ -283,22 +329,34 @@ internal static class AudioCodec
 
         if (kind == AudioFileKind.Mp3)
         {
-            SaveMp3(document, path, mp3BitRateKbps);
-            return;
+            return SaveMp3(document, path, options);
         }
 
         SaveWave(document, path);
+        return null;
     }
 
-    private static void WritePcm(AudioDocument document, BinaryWriter writer, int bits)
+    private static void WritePcm(
+        AudioDocument document,
+        BinaryWriter writer,
+        int bits,
+        IProgress<double>? progress,
+        double progressScale)
     {
         var samples = document.Interleaved;
+        var lastBucket = -1;
+        void Step(int index)
+        {
+            ReportWriteProgress(progress, index, samples.Length, progressScale, ref lastBucket);
+        }
+
         if (bits <= 8)
         {
             var buffer = new byte[samples.Length];
             for (var i = 0; i < samples.Length; i++)
             {
                 buffer[i] = (byte)Math.Clamp((int)Math.Round(samples[i] * 127f + 128f), 0, 255);
+                Step(i + 1);
             }
 
             writer.Write(buffer);
@@ -313,6 +371,7 @@ internal static class AudioCodec
                 var value = (short)Math.Clamp((int)Math.Round(samples[i] * 32767f), short.MinValue, short.MaxValue);
                 buffer[i * 2] = (byte)value;
                 buffer[i * 2 + 1] = (byte)(value >> 8);
+                Step(i + 1);
             }
 
             writer.Write(buffer);
@@ -327,9 +386,32 @@ internal static class AudioCodec
             packed[offset] = (byte)value;
             packed[offset + 1] = (byte)(value >> 8);
             packed[offset + 2] = (byte)(value >> 16);
+            Step(i + 1);
         }
 
         writer.Write(packed);
+    }
+
+    private static void ReportWriteProgress(
+        IProgress<double>? progress,
+        int index,
+        int total,
+        double scale,
+        ref int lastBucket)
+    {
+        if (progress is null || total <= 0)
+        {
+            return;
+        }
+
+        var bucket = index * 50 / total;
+        if (bucket == lastBucket && index < total)
+        {
+            return;
+        }
+
+        lastBucket = bucket;
+        progress.Report(Math.Clamp(index / (double)total * scale, 0, 1));
     }
 
     private static int PeekBitDepth(string path)
@@ -380,8 +462,16 @@ internal static class AudioCodec
             return;
         }
 
-        MediaFoundationApi.Startup();
-        _mediaFoundationStarted = true;
+        lock (MediaFoundationGate)
+        {
+            if (_mediaFoundationStarted)
+            {
+                return;
+            }
+
+            MediaFoundationApi.Startup();
+            _mediaFoundationStarted = true;
+        }
     }
 
     private sealed class RelabeledWaveProvider : IWaveProvider

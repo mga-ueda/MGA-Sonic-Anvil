@@ -17,18 +17,25 @@
   <DockPanel x:Name="RootDock" LastChildFill="True">
     <Border DockPanel.Dock="Bottom"
             Height="{x:Static ui:DesignMetrics.StatusBarHeight}"
-            Background="{DynamicResource StatusBarBackBrush}"
-            Padding="8,0">
+            Background="{DynamicResource StatusBarBackBrush}">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
+        <ProgressBar x:Name="StatusOpenProgress"
+                     Grid.ColumnSpan="3"
+                     Style="{StaticResource StatusOpenProgressStyle}"
+                     VerticalAlignment="Bottom"
+                     Minimum="0"
+                     Maximum="1"
+                     Value="0"
+                     Visibility="Collapsed" />
         <TextBlock x:Name="StatusMeta"
+                   Margin="8,0,8,0"
                    VerticalAlignment="Center"
                    HorizontalAlignment="Left"
-                   Margin="0,0,8,0"
                    FontFamily="Consolas"
                    FontSize="11"
                    TextTrimming="CharacterEllipsis"
@@ -43,6 +50,7 @@
                   Content="{x:Static domain:UiStrings.LabelAlwaysOnTop}"
                   VerticalAlignment="Center"
                   FontSize="11"
+                  Margin="0,0,8,0"
                   Foreground="{DynamicResource StatusBarTitleForeBrush}"
                   Checked="AlwaysOnTopCheck_Changed"
                   Unchecked="AlwaysOnTopCheck_Changed" />

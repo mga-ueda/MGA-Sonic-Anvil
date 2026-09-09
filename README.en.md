@@ -12,6 +12,8 @@ Fade, normalize, ripple-delete, copy / paste, markers / regions / sample loop, a
 
 **EXPORT talks to Wwise in Wave-only mode.** Turn on WAAPI above the level meter, pick a destination, and EXPORT writes the source wave into Originals and imports it as a Music Playlist Container (markers / sample loop; no Custom Cues). Play -E previews the loop wrap and writes Play post-exit on EXPORT.
 
+**You can also write MP3.** A valid LAME path in Settings uses your `lame.exe`; empty or invalid uses Windows (default 192 kbps). Right-click a tab to export the current edits as Wave or MP3 (several tabs ask for a folder; dirty tabs stay dirty).
+
 **The UI is Japanese / English.** The Japanese locale keeps the current wording, including English labels as they are. The English locale translates the Japanese. Switch it in Settings (the gear). The default is **Auto** (Japanese if the OS is Japanese, otherwise English).
 
 ## Manual & download
@@ -21,6 +23,10 @@ Fade, normalize, ripple-delete, copy / paste, markers / regions / sample loop, a
 - In-app: transport **Manual (`?`)** (follows the UI language)
 - Builds: [Releases](https://github.com/mga-ueda/MGA-Sonic-Anvil/releases)
 - Settings: `%LocalAppData%\MGA\MGA Sonic Anvil\` (`settings.json`; not written next to the exe)
+- Launch: a second start brings the existing window forward and opens the files you passed
+- On startup the app checks GitHub Releases and tells you if a newer build exists (it does not download updates)
 - License: [MIT](LICENSE)
 
 Wwise® / Audiokinetic® are trademarks of their respective owners. This tool is unofficial.
+
+LAME is the name of the LAME project and is licensed under the LGPL. This app does not bundle, modify, link, or redistribute it; it only runs a user-supplied `lame.exe` as a process. Obtaining LAME and complying with its license is the user’s responsibility. This tool is unofficial.

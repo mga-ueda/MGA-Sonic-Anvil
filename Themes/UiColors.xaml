@@ -77,8 +77,6 @@
     <SolidColorBrush x:Key="StatusExportButtonPressedBackBrush" Color="#FF962828" />
     <SolidColorBrush x:Key="StatusExportButtonForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="ColorPanelBackBrush" Color="#FF28282A" />
-    <SolidColorBrush x:Key="ColorPanelListBackBrush" Color="#FF202022" />
-    <SolidColorBrush x:Key="ColorPanelInputBackBrush" Color="#FF1C1C1E" />
 
     <SolidColorBrush x:Key="ExportButtonFillBrush" Color="#FF0F1B2D" />
     <SolidColorBrush x:Key="ExportButtonHoverFillBrush" Color="#FF122843" />

@@ -20,25 +20,26 @@ internal partial class TransportBar : UserControl
     public TransportBar()
     {
         InitializeComponent();
-        _play = Add(TransportCommand.TogglePlayback, TransportIcon.PlayPause, UiStrings.TipPlay);
-        Add(TransportCommand.Stop, TransportIcon.Stop, UiStrings.TipStop);
-        Add(TransportCommand.GoToStart, TransportIcon.GoToStart, UiStrings.TipGoToStart);
-        Add(TransportCommand.GoToEnd, TransportIcon.GoToEnd, UiStrings.TipGoToEnd);
+        _play = Add(TransportCommand.TogglePlayback, TransportIcon.PlayPause, UiStrings.TipPlay, UiStrings.TooltipPlay);
+        Add(TransportCommand.Stop, TransportIcon.Stop, UiStrings.TipStop, UiStrings.TooltipStop);
+        Add(TransportCommand.GoToStart, TransportIcon.GoToStart, UiStrings.TipGoToStart, UiStrings.TooltipGoToStart);
+        Add(TransportCommand.GoToEnd, TransportIcon.GoToEnd, UiStrings.TipGoToEnd, UiStrings.TooltipGoToEnd);
         AddGap();
-        Add(TransportCommand.TimeZoomIn, TransportIcon.TimeZoomIn, UiStrings.TipTimeZoomIn);
-        Add(TransportCommand.TimeZoomOut, TransportIcon.TimeZoomOut, UiStrings.TipTimeZoomOut);
-        Add(TransportCommand.TimeZoomMax, TransportIcon.TimeZoomMax, UiStrings.TipTimeZoomMax);
-        Add(TransportCommand.TimeZoomReset, TransportIcon.TimeZoomReset, UiStrings.TipTimeZoomReset);
+        Add(TransportCommand.TimeZoomIn, TransportIcon.TimeZoomIn, UiStrings.TipTimeZoomIn, UiStrings.TooltipTimeZoomIn);
+        Add(TransportCommand.TimeZoomOut, TransportIcon.TimeZoomOut, UiStrings.TipTimeZoomOut, UiStrings.TooltipTimeZoomOut);
+        Add(TransportCommand.TimeZoomMax, TransportIcon.TimeZoomMax, UiStrings.TipTimeZoomMax, UiStrings.TooltipTimeZoomMax);
+        Add(TransportCommand.TimeZoomReset, TransportIcon.TimeZoomReset, UiStrings.TipTimeZoomReset, UiStrings.TooltipTimeZoomReset);
         AddGap();
-        Add(TransportCommand.AmpZoomIn, TransportIcon.AmpZoomIn, UiStrings.TipAmpZoomIn);
-        Add(TransportCommand.AmpZoomOut, TransportIcon.AmpZoomOut, UiStrings.TipAmpZoomOut);
-        Add(TransportCommand.AmpZoomMax, TransportIcon.AmpZoomMax, UiStrings.TipAmpZoomMax);
-        Add(TransportCommand.AmpZoomReset, TransportIcon.AmpZoomReset, UiStrings.TipAmpZoomReset);
-        Add(EditButtonsHost, TransportCommand.FadeIn, TransportIcon.FadeIn, UiStrings.TipFadeIn);
-        Add(EditButtonsHost, TransportCommand.FadeOut, TransportIcon.FadeOut, UiStrings.TipFadeOut);
-        Add(EditButtonsHost, TransportCommand.Normalize, TransportIcon.Normalize, UiStrings.TipNormalize);
-        Add(EditButtonsHost, TransportCommand.Delete, TransportIcon.Delete, UiStrings.TipDelete);
-        Add(EditButtonsHost, TransportCommand.Save, TransportIcon.Save, UiStrings.TipSave);
+        Add(TransportCommand.AmpZoomIn, TransportIcon.AmpZoomIn, UiStrings.TipAmpZoomIn, UiStrings.TooltipAmpZoomIn);
+        Add(TransportCommand.AmpZoomOut, TransportIcon.AmpZoomOut, UiStrings.TipAmpZoomOut, UiStrings.TooltipAmpZoomOut);
+        Add(TransportCommand.AmpZoomMax, TransportIcon.AmpZoomMax, UiStrings.TipAmpZoomMax, UiStrings.TooltipAmpZoomMax);
+        Add(TransportCommand.AmpZoomReset, TransportIcon.AmpZoomReset, UiStrings.TipAmpZoomReset, UiStrings.TooltipAmpZoomReset);
+        Add(EditButtonsHost, TransportCommand.FadeIn, TransportIcon.FadeIn, UiStrings.TipFadeIn, UiStrings.TooltipFadeIn);
+        Add(EditButtonsHost, TransportCommand.FadeOut, TransportIcon.FadeOut, UiStrings.TipFadeOut, UiStrings.TooltipFadeOut);
+        Add(EditButtonsHost, TransportCommand.Normalize, TransportIcon.Normalize, UiStrings.TipNormalize, UiStrings.TooltipNormalize);
+        Add(EditButtonsHost, TransportCommand.Delete, TransportIcon.Delete, UiStrings.TipDelete, UiStrings.TooltipDelete);
+        Add(EditButtonsHost, TransportCommand.Save, TransportIcon.Save, UiStrings.TipSave, UiStrings.TooltipSave);
+        Add(EditButtonsHost, TransportCommand.SaveMp3, TransportIcon.SaveMp3, UiStrings.TipSaveMp3, UiStrings.TooltipSaveMp3);
         AddGap(EditButtonsHost);
         _tips = new TransportTipsToggleButton
         {
@@ -57,25 +58,28 @@ internal partial class TransportBar : UserControl
 
     public void ApplyLocalizedTips()
     {
-        SetTip(TransportCommand.TogglePlayback, UiStrings.TipPlay);
-        SetTip(TransportCommand.Stop, UiStrings.TipStop);
-        SetTip(TransportCommand.GoToStart, UiStrings.TipGoToStart);
-        SetTip(TransportCommand.GoToEnd, UiStrings.TipGoToEnd);
-        SetTip(TransportCommand.TimeZoomIn, UiStrings.TipTimeZoomIn);
-        SetTip(TransportCommand.TimeZoomOut, UiStrings.TipTimeZoomOut);
-        SetTip(TransportCommand.TimeZoomMax, UiStrings.TipTimeZoomMax);
-        SetTip(TransportCommand.TimeZoomReset, UiStrings.TipTimeZoomReset);
-        SetTip(TransportCommand.AmpZoomIn, UiStrings.TipAmpZoomIn);
-        SetTip(TransportCommand.AmpZoomOut, UiStrings.TipAmpZoomOut);
-        SetTip(TransportCommand.AmpZoomMax, UiStrings.TipAmpZoomMax);
-        SetTip(TransportCommand.AmpZoomReset, UiStrings.TipAmpZoomReset);
-        SetTip(TransportCommand.FadeIn, UiStrings.TipFadeIn);
-        SetTip(TransportCommand.FadeOut, UiStrings.TipFadeOut);
-        SetTip(TransportCommand.Normalize, UiStrings.TipNormalize);
-        SetTip(TransportCommand.Delete, UiStrings.TipDelete);
-        SetTip(TransportCommand.Save, UiStrings.TipSave);
+        SetTip(TransportCommand.TogglePlayback, UiStrings.TipPlay, UiStrings.TooltipPlay);
+        SetTip(TransportCommand.Stop, UiStrings.TipStop, UiStrings.TooltipStop);
+        SetTip(TransportCommand.GoToStart, UiStrings.TipGoToStart, UiStrings.TooltipGoToStart);
+        SetTip(TransportCommand.GoToEnd, UiStrings.TipGoToEnd, UiStrings.TooltipGoToEnd);
+        SetTip(TransportCommand.TimeZoomIn, UiStrings.TipTimeZoomIn, UiStrings.TooltipTimeZoomIn);
+        SetTip(TransportCommand.TimeZoomOut, UiStrings.TipTimeZoomOut, UiStrings.TooltipTimeZoomOut);
+        SetTip(TransportCommand.TimeZoomMax, UiStrings.TipTimeZoomMax, UiStrings.TooltipTimeZoomMax);
+        SetTip(TransportCommand.TimeZoomReset, UiStrings.TipTimeZoomReset, UiStrings.TooltipTimeZoomReset);
+        SetTip(TransportCommand.AmpZoomIn, UiStrings.TipAmpZoomIn, UiStrings.TooltipAmpZoomIn);
+        SetTip(TransportCommand.AmpZoomOut, UiStrings.TipAmpZoomOut, UiStrings.TooltipAmpZoomOut);
+        SetTip(TransportCommand.AmpZoomMax, UiStrings.TipAmpZoomMax, UiStrings.TooltipAmpZoomMax);
+        SetTip(TransportCommand.AmpZoomReset, UiStrings.TipAmpZoomReset, UiStrings.TooltipAmpZoomReset);
+        SetTip(TransportCommand.FadeIn, UiStrings.TipFadeIn, UiStrings.TooltipFadeIn);
+        SetTip(TransportCommand.FadeOut, UiStrings.TipFadeOut, UiStrings.TooltipFadeOut);
+        SetTip(TransportCommand.Normalize, UiStrings.TipNormalize, UiStrings.TooltipNormalize);
+        SetTip(TransportCommand.Delete, UiStrings.TipDelete, UiStrings.TooltipDelete);
+        SetTip(TransportCommand.Save, UiStrings.TipSave, UiStrings.TooltipSave);
+        SetTip(TransportCommand.SaveMp3, UiStrings.TipSaveMp3, UiStrings.TooltipSaveMp3);
         TipService.Set(_tips, UiStrings.TipTipsToggle, respectsEnabled: false);
+        TransportToolTip.Attach(_tips, UiStrings.TooltipTipsToggle);
         TipService.Set(_manual, UiStrings.TipManualHelp);
+        TransportToolTip.Attach(_manual, UiStrings.TooltipManualHelp);
         _tips.RefreshAppearance();
         _manual.RefreshAppearance();
     }
@@ -85,11 +89,12 @@ internal partial class TransportBar : UserControl
         _tips.Checked = enabled;
     }
 
-    private void SetTip(TransportCommand command, string tip)
+    private void SetTip(TransportCommand command, string tip, string tooltip)
     {
         if (_buttons.TryGetValue(command, out var button))
         {
             TipService.Set(button, tip);
+            TransportToolTip.Attach(button, tooltip);
         }
     }
 
@@ -122,10 +127,10 @@ internal partial class TransportBar : UserControl
         }
     }
 
-    private TransportIconButton Add(TransportCommand command, TransportIcon icon, string tip) =>
-        Add(ButtonsHost, command, icon, tip);
+    private TransportIconButton Add(TransportCommand command, TransportIcon icon, string tip, string tooltip) =>
+        Add(ButtonsHost, command, icon, tip, tooltip);
 
-    private TransportIconButton Add(Panel host, TransportCommand command, TransportIcon icon, string tip)
+    private TransportIconButton Add(Panel host, TransportCommand command, TransportIcon icon, string tip, string tooltip)
     {
         var button = new TransportIconButton
         {
@@ -134,6 +139,7 @@ internal partial class TransportBar : UserControl
             Margin = new Thickness(DesignMetrics.TransportButtonGap, 0, DesignMetrics.TransportButtonGap, 0),
         };
         TipService.Set(button, tip);
+        TransportToolTip.Attach(button, tooltip);
         button.Click += (_, _) => CommandInvoked?.Invoke(this, command);
         _buttons[command] = button;
         host.Children.Add(button);

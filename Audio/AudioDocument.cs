@@ -184,7 +184,19 @@ internal sealed class AudioDocument
             return currentPcm;
         }
 
-        return currentPcm + Math.Max(0, committedFileBytes - committedPcm);
+        var leftover = committedFileBytes - committedPcm;
+        if (leftover >= 0)
+        {
+            return currentPcm + leftover;
+        }
+
+        // MP3 など、実ファイルが PCM より小さいとき。未変更なら実サイズのまま。
+        if (currentPcm == committedPcm)
+        {
+            return committedFileBytes;
+        }
+
+        return Math.Max(0, (long)Math.Round(committedFileBytes * (currentPcm / (double)committedPcm)));
     }
 
     public long EstimateFrameCountForRate(int destRate)
@@ -1272,17 +1284,6 @@ internal sealed class AudioDocument
 
         CommitMarkers();
         IsDirty = true;
-    }
-
-    public void ReplaceMarkerFrames(IReadOnlyList<long> frames, bool markDirty = true)
-    {
-        var snapshots = new MarkerSnapshot[frames?.Count ?? 0];
-        for (var i = 0; i < snapshots.Length; i++)
-        {
-            snapshots[i] = new MarkerSnapshot(frames![i], string.Empty);
-        }
-
-        ReplaceMarkers(snapshots, markDirty);
     }
 
     public void ReplaceMarkers(IReadOnlyList<MarkerSnapshot> markers, bool markDirty = true)

@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using MgaSonicAnvil.Audio;
 
 namespace MgaSonicAnvil.UI;
 
@@ -14,13 +15,19 @@ internal sealed class BusyGlassOverlay : FrameworkElement
 {
     private const int MaxDots = 3;
     private const int FadeOutDurationMs = 300;
-    private const double ProgressBarWidth = 220;
+    private const double ProgressBarWidth = 280;
     private const double ProgressBarHeight = 4;
+    private const double JobNameWidth = 168;
+    private const double JobBarWidth = 100;
+    private const double JobPctWidth = 40;
+    private const double JobRowWidth = JobNameWidth + 8 + JobBarWidth + 8 + JobPctWidth;
 
     private readonly DispatcherTimer _dotsTimer;
     private readonly DispatcherTimer _fadeTimer;
     private ImageBrush? _frostedBrush;
     private string _baseText = string.Empty;
+    private string _statusText = string.Empty;
+    private ExportJobProgress[] _jobs = [];
     private int _dotCount = 1;
     private int _percent = -1;
     private bool _fading;
@@ -54,6 +61,8 @@ internal sealed class BusyGlassOverlay : FrameworkElement
 
         _frostedBrush = CaptureFrostedBrush(captureSource, coverBounds);
         _baseText = NormalizeMessage(baseText);
+        _statusText = string.Empty;
+        _jobs = [];
         _dotCount = 1;
         _percent = 0;
         _paintOpacity = 1f;
@@ -91,6 +100,21 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         }
 
         _percent = percent;
+        InvalidateVisual();
+    }
+
+    public void SetExportView(double overall, string status, IReadOnlyList<ExportJobProgress> running)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => SetExportView(overall, status, running));
+            return;
+        }
+
+        _percent = (int)Math.Round(Math.Clamp(overall, 0d, 1d) * 100);
+        _statusText = status ?? string.Empty;
+        _jobs = running.Count == 0 ? [] : running.ToArray();
+
         InvalidateVisual();
     }
 
@@ -222,6 +246,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
     private void DrawMessage(DrawingContext dc, float opacity)
     {
         var typeface = WpfControlHelpers.UiBoldTypeface;
+        var regular = WpfControlHelpers.UiTypeface;
         var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         var fore = WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush"));
         var culture = CultureInfo.CurrentUICulture;
@@ -251,7 +276,10 @@ internal sealed class BusyGlassOverlay : FrameworkElement
             fore,
             dpi);
 
-        var percentText = _percent >= 0 ? $"{_percent}%" : string.Empty;
+        var statusText = _statusText;
+        var percentText = _percent >= 0
+            ? (string.IsNullOrEmpty(statusText) ? $"{_percent}%" : $"{statusText}  {_percent}%")
+            : statusText;
         var percentFormatted = new FormattedText(
             percentText,
             culture,
@@ -261,9 +289,20 @@ internal sealed class BusyGlassOverlay : FrameworkElement
             fore,
             dpi);
 
-        var blockHeight = baseFormatted.Height
+        var headerHeight = baseFormatted.Height
             + (percentText.Length > 0 ? 8 + percentFormatted.Height : 0)
             + 16 + ProgressBarHeight;
+        var jobsGap = _jobs.Length > 0 ? 14d : 0d;
+        var availableJobsHeight = Math.Max(
+            BusyGlassJobLayout.MinRowHeight,
+            ActualHeight - headerHeight - jobsGap - 24);
+        var layout = BusyGlassJobLayout.Arrange(
+            _jobs.Length,
+            Math.Max(0, ActualWidth - 32),
+            availableJobsHeight,
+            JobRowWidth);
+        var jobsHeight = layout.Rows * layout.RowHeight;
+        var blockHeight = headerHeight + jobsGap + jobsHeight;
         var x = (ActualWidth - (baseFormatted.Width + dotsReserve.Width)) / 2;
         var y = (ActualHeight - blockHeight) / 2;
 
@@ -271,37 +310,123 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         DrawTextWithOutline(dc, baseFormatted, new Point(x, y), opacity, _baseText, typeface, 15);
         DrawTextWithOutline(dc, dotsFormatted, new Point(x + baseFormatted.Width, y), opacity, dotsText, typeface, 15);
 
+        var barY = y + baseFormatted.Height;
         if (percentText.Length > 0)
         {
             var percentX = (ActualWidth - percentFormatted.Width) / 2;
             var percentY = y + baseFormatted.Height + 8;
             DrawTextWithOutline(dc, percentFormatted, new Point(percentX, percentY), opacity, percentText, typeface, 13);
+            barY = percentY + percentFormatted.Height + 12;
+        }
+        else
+        {
+            barY += 16;
+        }
 
-            var barX = (ActualWidth - ProgressBarWidth) / 2;
-            var barY = percentY + percentFormatted.Height + 12;
-            var track = new Rect(barX, barY, ProgressBarWidth, ProgressBarHeight);
-            var muted = Theme.Get("MutedForeBrush");
-            dc.DrawRoundedRectangle(
-                WpfControlHelpers.FrozenBrush(Color.FromArgb((byte)Math.Round(90 * opacity), muted.R, muted.G, muted.B)),
-                null,
-                track,
-                2,
-                2);
-            var fillWidth = ProgressBarWidth * Math.Clamp(_percent, 0, 100) / 100d;
-            if (fillWidth > 0)
+        DrawBar(dc, (ActualWidth - ProgressBarWidth) / 2, barY, ProgressBarWidth, Math.Clamp(_percent, 0, 100) / 100d, opacity);
+
+        if (_jobs.Length > 0)
+        {
+            var gridWidth = layout.Columns * JobRowWidth
+                + Math.Max(0, layout.Columns - 1) * BusyGlassJobLayout.ColumnGap;
+            var gridX = (ActualWidth - gridWidth) / 2;
+            var rowY = barY + ProgressBarHeight + 14;
+            for (var i = 0; i < _jobs.Length; i++)
             {
-                var accent = Theme.Get("AccentCyanBrush");
-                dc.DrawRoundedRectangle(
-                    WpfControlHelpers.FrozenBrush(
-                        Color.FromArgb((byte)Math.Round(255 * opacity), accent.R, accent.G, accent.B)),
-                    null,
-                    new Rect(barX, barY, fillWidth, ProgressBarHeight),
-                    2,
-                    2);
+                var col = i / layout.Rows;
+                var row = i % layout.Rows;
+                DrawJobRow(
+                    dc,
+                    _jobs[i],
+                    gridX + col * (JobRowWidth + BusyGlassJobLayout.ColumnGap),
+                    rowY + row * layout.RowHeight,
+                    opacity,
+                    regular,
+                    culture,
+                    dpi);
             }
         }
 
         dc.Pop();
+    }
+
+    private void DrawJobRow(
+        DrawingContext dc,
+        ExportJobProgress job,
+        double x,
+        double y,
+        float opacity,
+        Typeface typeface,
+        CultureInfo culture,
+        double dpi)
+    {
+        var name = FitText(job.Name, JobNameWidth, typeface, 12, culture, dpi);
+        var nameText = new FormattedText(name, culture, FlowDirection.LeftToRight, typeface, 12,
+            WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush")), dpi);
+        DrawTextWithOutline(dc, nameText, new Point(x, y), opacity, name, typeface, 12);
+
+        var barY = y + Math.Max(0, (nameText.Height - ProgressBarHeight) / 2);
+        DrawBar(dc, x + JobNameWidth + 8, barY, JobBarWidth, Math.Clamp(job.Progress, 0, 1), opacity);
+
+        var pct = $"{(int)Math.Round(Math.Clamp(job.Progress, 0, 1) * 100)}%";
+        var pctText = new FormattedText(pct, culture, FlowDirection.LeftToRight, typeface, 12,
+            WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush")), dpi);
+        DrawTextWithOutline(dc, pctText, new Point(x + JobNameWidth + 8 + JobBarWidth + 8, y), opacity, pct, typeface, 12);
+    }
+
+    private void DrawBar(DrawingContext dc, double x, double y, double width, double fill, float opacity)
+    {
+        var muted = Theme.Get("MutedForeBrush");
+        dc.DrawRoundedRectangle(
+            WpfControlHelpers.FrozenBrush(Color.FromArgb((byte)Math.Round(90 * opacity), muted.R, muted.G, muted.B)),
+            null,
+            new Rect(x, y, width, ProgressBarHeight),
+            2,
+            2);
+        var fillWidth = width * Math.Clamp(fill, 0, 1);
+        if (fillWidth > 0)
+        {
+            var accent = Theme.Get("AccentCyanBrush");
+            dc.DrawRoundedRectangle(
+                WpfControlHelpers.FrozenBrush(
+                    Color.FromArgb((byte)Math.Round(255 * opacity), accent.R, accent.G, accent.B)),
+                null,
+                new Rect(x, y, fillWidth, ProgressBarHeight),
+                2,
+                2);
+        }
+    }
+
+    private static string FitText(
+        string text,
+        double maxWidth,
+        Typeface typeface,
+        double fontSize,
+        CultureInfo culture,
+        double dpi)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
+
+        var full = new FormattedText(text, culture, FlowDirection.LeftToRight, typeface, fontSize, Brushes.White, dpi);
+        if (full.Width <= maxWidth)
+        {
+            return text;
+        }
+
+        for (var n = text.Length - 1; n > 1; n--)
+        {
+            var cut = text[..n] + "…";
+            var trial = new FormattedText(cut, culture, FlowDirection.LeftToRight, typeface, fontSize, Brushes.White, dpi);
+            if (trial.Width <= maxWidth)
+            {
+                return cut;
+            }
+        }
+
+        return "…";
     }
 
     private void DrawTextWithOutline(
@@ -396,5 +521,50 @@ internal sealed class BusyGlassOverlay : FrameworkElement
                 height / (double)source.PixelHeight));
         scaled.Freeze();
         return scaled;
+    }
+}
+
+/// <summary>すりガラス上の並列ジョブ行。高さに収まらなければ列を増やす。</summary>
+internal static class BusyGlassJobLayout
+{
+    public const double DefaultRowHeight = 20;
+    public const double MinRowHeight = 16;
+    public const double ColumnGap = 16;
+    public const int MaxColumns = 3;
+
+    public static (int Columns, int Rows, double RowHeight) Arrange(
+        int jobCount,
+        double availableWidth,
+        double availableHeight,
+        double rowWidth,
+        double preferredRowHeight = DefaultRowHeight)
+    {
+        if (jobCount <= 0)
+        {
+            return (1, 0, preferredRowHeight);
+        }
+
+        var maxByWidth = 1;
+        if (rowWidth > 0 && availableWidth > 0)
+        {
+            maxByWidth = Math.Max(1, (int)((availableWidth + ColumnGap) / (rowWidth + ColumnGap)));
+            maxByWidth = Math.Min(MaxColumns, maxByWidth);
+        }
+
+        var columns = 1;
+        var rows = jobCount;
+        var rowHeight = preferredRowHeight;
+        while (columns < maxByWidth && rows * rowHeight > availableHeight)
+        {
+            columns++;
+            rows = (int)Math.Ceiling(jobCount / (double)columns);
+        }
+
+        if (rows > 0 && rows * rowHeight > availableHeight)
+        {
+            rowHeight = Math.Max(MinRowHeight, availableHeight / rows);
+        }
+
+        return (columns, rows, rowHeight);
     }
 }

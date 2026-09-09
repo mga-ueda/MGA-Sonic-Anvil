@@ -13,7 +13,7 @@ public partial class MainWindow
 
     private async Task ExportToWwiseAsync()
     {
-        if (_exportBusy)
+        if (_exportBusy || IsUiBusy)
         {
             return;
         }
@@ -51,6 +51,7 @@ public partial class MainWindow
             return;
         }
 
+        StopPlaybackForExport();
         _exportBusy = true;
         WaapiBar.ExportEnabled = false;
         try

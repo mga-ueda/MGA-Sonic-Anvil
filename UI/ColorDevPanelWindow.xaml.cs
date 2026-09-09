@@ -131,7 +131,7 @@ internal partial class ColorDevPanelWindow : Window
                 VerticalContentAlignment = VerticalAlignment.Center,
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 12,
-                Background = (Brush)FindResource("ColorPanelInputBackBrush"),
+                Background = (Brush)FindResource("DialogInputBackBrush"),
                 Foreground = (Brush)FindResource("PrimaryForeBrush"),
                 BorderBrush = (Brush)FindResource("ChromeBorderBrush"),
                 BorderThickness = new Thickness(1),

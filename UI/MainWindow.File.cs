@@ -69,64 +69,86 @@ public partial class MainWindow
         Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
     }
 
+    private string? _openStatusText;
+    private double _openStatusRatio;
+
     private void OpenPaths(IReadOnlyList<string> paths)
     {
-        DocumentSession? first = null;
-        List<string>? errors = null;
+        var targets = new List<string>();
         foreach (var path in paths)
         {
-            if (!AudioCodec.IsOpenable(path))
+            if (AudioCodec.IsOpenable(path))
             {
-                continue;
+                targets.Add(path);
             }
+        }
 
-            var existing = FindSessionByPath(path);
-            if (existing is not null)
+        var showProgress = targets.Count > 1;
+        DocumentSession? first = null;
+        List<string>? errors = null;
+        BeginOpenWork(targets.Count);
+        try
+        {
+            for (var i = 0; i < targets.Count; i++)
             {
-                if (first is null)
+                var path = targets[i];
+                if (showProgress)
                 {
-                    first = existing;
-                    ActivateSession(existing);
+                    SetOpenStatus(i + 1, targets.Count, Path.GetFileName(path));
+                }
+
+                var existing = FindSessionByPath(path);
+                if (existing is not null)
+                {
+                    if (first is null)
+                    {
+                        first = existing;
+                        ActivateSession(existing);
+                        PumpUiAfterOpen();
+                    }
+
+                    continue;
+                }
+
+                try
+                {
+                    var document = AudioCodec.Load(path);
+                    var session = new DocumentSession(document);
+                    _sessions.Add(session);
+                    if (first is null)
+                    {
+                        first = session;
+                        ActivateSession(session);
+                    }
+                    else
+                    {
+                        RebuildTabBar();
+                    }
+
                     PumpUiAfterOpen();
                 }
-
-                continue;
+                catch (Exception ex)
+                {
+                    errors ??= [];
+                    errors.Add($"{Path.GetFileName(path)}: {ex.Message}");
+                }
             }
 
-            try
+            if (first is not null)
             {
-                var document = AudioCodec.Load(path);
-                var session = new DocumentSession(document);
-                _sessions.Add(session);
-                if (first is null)
+                if (first.Document.SourcePath is { } opened)
                 {
-                    first = session;
-                    ActivateSession(session);
+                    RememberOpenedPath(opened, dirty: false, resetMarkers: false);
                 }
-                else
-                {
-                    RebuildTabBar();
-                }
-
-                PumpUiAfterOpen();
             }
-            catch (Exception ex)
+            else
             {
-                errors ??= [];
-                errors.Add($"{Path.GetFileName(path)}: {ex.Message}");
+                RebuildTabBar();
             }
         }
-
-        if (first is not null)
+        finally
         {
-            if (first.Document.SourcePath is { } opened)
-            {
-                RememberOpenedPath(opened, dirty: false, resetMarkers: false);
-            }
-        }
-        else
-        {
-            RebuildTabBar();
+            EndOpenWork(showProgress);
         }
 
         if (errors is { Count: > 0 })
@@ -138,6 +160,40 @@ public partial class MainWindow
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+    }
+
+    private void BeginOpenWork(int targetCount)
+    {
+        _openBusy = targetCount > 0;
+        RefreshExportEnabled();
+    }
+
+    private void EndOpenWork(bool showProgress)
+    {
+        _openBusy = false;
+        if (showProgress)
+        {
+            ClearOpenStatus();
+        }
+        else
+        {
+            RefreshExportEnabled();
+        }
+    }
+
+    private void SetOpenStatus(int current, int total, string name)
+    {
+        _openStatusText = UiStrings.StatusOpeningFiles(current, total, name);
+        _openStatusRatio = total <= 0 ? 0 : current / (double)total;
+        RefreshStatus();
+        Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
+    }
+
+    private void ClearOpenStatus()
+    {
+        _openStatusText = null;
+        _openStatusRatio = 0;
+        RefreshStatus();
     }
 
     private bool Save(bool saveAs, AudioDocument? target = null)
@@ -180,7 +236,13 @@ public partial class MainWindow
 
         try
         {
-            AudioCodec.Save(document, path, AppStorage.Settings.Mp3BitRate);
+            if (AudioCodec.DetectKind(path) == AudioFileKind.Mp3
+                && !SameDocumentPath(document.SourcePath, path))
+            {
+                return ExportMp3WithoutReloading(document, path);
+            }
+
+            var encoder = AudioCodec.Save(document, path, AppStorage.Settings.ToMp3EncodeOptions());
             document.MarkSaved(path, AudioCodec.DetectKind(path));
             var history = _sessions.FirstOrDefault(item => ReferenceEquals(item.Document, document))?.History
                 ?? (ReferenceEquals(document, _document) ? _history : null);
@@ -191,6 +253,12 @@ public partial class MainWindow
             }
 
             RefreshTitle();
+            RefreshStatus();
+            if (encoder is { } used)
+            {
+                ShowMp3EncoderResult(used);
+            }
+
             return true;
         }
         catch (NotSupportedException)
@@ -203,6 +271,127 @@ public partial class MainWindow
         }
 
         return false;
+    }
+
+    private bool SaveAsMp3(AudioDocument? target = null)
+    {
+        _ = SaveAsMp3Async(target);
+        return true;
+    }
+
+    private async Task SaveAsMp3Async(AudioDocument? target)
+    {
+        var document = target ?? _document;
+        if (document is null)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (IsUiBusy)
+        {
+            return;
+        }
+
+        var path = document.SourcePath;
+        var dialog = new SaveFileDialog
+        {
+            Filter = UiStrings.FilterSaveMp3,
+            Title = UiStrings.MenuSaveMp3,
+            FileName = string.IsNullOrEmpty(path)
+                ? "untitled.mp3"
+                : Path.GetFileNameWithoutExtension(path) + ".mp3",
+        };
+        var lastDir = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(lastDir) && Directory.Exists(lastDir))
+        {
+            dialog.InitialDirectory = lastDir;
+        }
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        await ExportSingleMp3WithGlassAsync(document, dialog.FileName);
+    }
+
+    private async Task ExportSingleMp3WithGlassAsync(AudioDocument document, string path)
+    {
+        if (IsUiBusy)
+        {
+            return;
+        }
+
+        StopPlaybackForExport();
+        var options = AppStorage.Settings.ToMp3EncodeOptions();
+        var name = Path.GetFileName(path);
+        var tracker = new ExportProgressTracker(
+            [name],
+            [document.FrameCount],
+            new Progress<ExportProgressSnapshot>(ApplyExportProgress));
+
+        _tabExportBusy = true;
+        try
+        {
+            ShowExportBusyGlass(AudioFileKind.Mp3);
+            ApplyExportProgress(tracker.Capture());
+            var encoder = await Task.Run(() =>
+            {
+                tracker.Report(0, 0, ExportJobState.Running);
+                try
+                {
+                    var used = AudioCodec.SaveMp3(
+                        document,
+                        path,
+                        options,
+                        new Progress<double>(p => tracker.Report(0, p, ExportJobState.Running)));
+                    tracker.Report(0, 1, ExportJobState.Done);
+                    return used;
+                }
+                catch
+                {
+                    tracker.Report(0, 1, ExportJobState.Failed);
+                    throw;
+                }
+            }).ConfigureAwait(true);
+
+            _busyGlass.HideOverlay();
+            ShowMp3EncoderResult(encoder);
+        }
+        catch (Exception ex)
+        {
+            _busyGlass.HideOverlay();
+            OwnerCenteredMessageBox.Show(this, $"{UiStrings.ErrorSaveFailed}\n{ex.Message}", UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            _tabExportBusy = false;
+        }
+    }
+
+    private bool ExportMp3WithoutReloading(AudioDocument document, string path)
+    {
+        var encoder = AudioCodec.SaveMp3(document, path, AppStorage.Settings.ToMp3EncodeOptions());
+        ShowMp3EncoderResult(encoder);
+        return true;
+    }
+
+    private static bool SameDocumentPath(string? left, string? right)
+    {
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+        {
+            return false;
+        }
+
+        try
+        {
+            return string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void CloseDocument()
@@ -250,7 +439,9 @@ public partial class MainWindow
         AppStorage.Save();
     }
 
-    private void SettingsGearButton_Click(object sender, RoutedEventArgs e)
+    private void SettingsGearButton_Click(object sender, RoutedEventArgs e) => OpenSettings();
+
+    private void OpenSettings()
     {
         var settings = AppStorage.Settings;
         var dialog = new AudioSettingsWindow(
@@ -258,7 +449,11 @@ public partial class MainWindow
             settings.ResolvedFadeInCurve(),
             settings.ResolvedFadeOutCurve(),
             UiStrings.ParseLanguageChoice(settings.UiLanguage),
-            settings.ResolvedLoudnessTargetLufs())
+            settings.ResolvedLoudnessTargetLufs(),
+            settings.Mp3BitRate,
+            settings.LameExePath,
+            settings.LameOptions,
+            settings.ExportParallelism)
         {
             Owner = this,
         };
@@ -272,6 +467,10 @@ public partial class MainWindow
         UiStrings.SetLanguage(UiStrings.ResolveLanguage(dialog.SelectedLanguage));
         settings.ApplyDefaultFades(dialog.FadeInCurve, dialog.FadeOutCurve);
         settings.LoudnessTargetLufs = dialog.SelectedLoudnessTargetLufs;
+        settings.Mp3BitRate = dialog.SelectedMp3BitRate;
+        settings.LameExePath = dialog.SelectedLameExePath;
+        settings.LameOptions = dialog.SelectedLameOptions;
+        settings.ExportParallelism = dialog.SelectedExportParallelism;
         LoudnessMeter.ApplyTargetFromSettings();
         Waveform.LoudnessTargetLufs = settings.ResolvedLoudnessTargetLufs();
         ApplyOutputSettings(dialog.SelectedSettings);
@@ -402,25 +601,53 @@ public partial class MainWindow
 
         var restored = new List<(int SourceIndex, DocumentSession Session)>();
         var activeIndex = DocumentSessionStore.ResolveActiveIndex(docs, settings.ActiveDocumentIndex);
-        for (var i = 0; i < docs.Length; i++)
+        var showProgress = docs.Length > 1;
+        BeginOpenWork(docs.Length);
+        try
         {
-            if (!TryRestoreSession(docs[i], out var session))
+            for (var i = 0; i < docs.Length; i++)
             {
-                continue;
+                if (showProgress)
+                {
+                    SetOpenStatus(i + 1, docs.Length, SnapshotDisplayName(docs[i]));
+                }
+
+                if (!TryRestoreSession(docs[i], out var session))
+                {
+                    continue;
+                }
+
+                _sessions.Add(session);
+                restored.Add((i, session));
+                if (showProgress)
+                {
+                    PumpUiAfterOpen();
+                }
             }
 
-            _sessions.Add(session);
-            restored.Add((i, session));
-        }
+            if (_sessions.Count == 0)
+            {
+                return;
+            }
 
-        if (_sessions.Count == 0)
+            BindWorkspace(DocumentSessionStore.PickRestoredActive(restored, activeIndex) ?? _sessions[0]);
+            Waveform.Refresh();
+            Overview.InvalidateVisual();
+        }
+        finally
         {
-            return;
+            EndOpenWork(showProgress);
+        }
+    }
+
+    private static string SnapshotDisplayName(OpenDocumentSnapshot snap)
+    {
+        if (!string.IsNullOrWhiteSpace(snap.SourcePath))
+        {
+            return Path.GetFileName(snap.SourcePath);
         }
 
-        BindWorkspace(DocumentSessionStore.PickRestoredActive(restored, activeIndex) ?? _sessions[0]);
-        Waveform.Refresh();
-        Overview.InvalidateVisual();
+        return UiStrings.UntitledDocument;
     }
 
     private static bool TryRestoreSession(OpenDocumentSnapshot snap, out DocumentSession session)

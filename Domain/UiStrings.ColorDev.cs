@@ -85,8 +85,6 @@ internal static partial class UiStrings
             "StatusExportButtonPressedBack" => Get("ステータスバー・EXPORT押下枠", "Status bar · EXPORT pressed border"),
             "StatusExportButtonFore" => Get("ステータスバー・EXPORT文字", "Status bar · EXPORT text"),
             "ColorPanelBack" => Get("色パネル・背景", "Color panel · background"),
-            "ColorPanelListBack" => Get("色パネル・リスト背景", "Color panel · list background"),
-            "ColorPanelInputBack" => Get("色パネル・入力背景", "Color panel · input background"),
             "ExportButtonFill" => Get("ダイアログ・OK塗り", "Dialog · OK fill"),
             "ExportButtonHoverFill" => Get("ダイアログ・OKホバー塗り", "Dialog · OK hover fill"),
             "ExportButtonBack" => Get("ダイアログ・OK枠", "Dialog · OK border"),
