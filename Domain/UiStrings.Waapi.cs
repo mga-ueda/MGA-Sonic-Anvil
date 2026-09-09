@@ -40,8 +40,8 @@ internal static partial class UiStrings
         "WAAPI がオフです。レベルメーター上の WAAPI をオンにすると接続します。",
         "WAAPI is off. Turn on WAAPI above the level meter to connect.");
     public static string TipExport => Get(
-        "現在の波形を Wwise Originals へ書き、Music Playlist Container としてインポートします (Ctrl+Shift+E)。\nWave 単体モード（マーカー / サンプルループ。Custom Cue は出しません）。",
-        "Write the current wave into Wwise Originals and import it as a Music Playlist Container (Ctrl+Shift+E).\nWave-only mode (markers / sample loop. No Custom Cues).");
+        "現在の波形を Wwise Originals へ書き、Music Playlist Container としてインポートします (Ctrl+Shift+E)。\nWAAPI 接続中だけ有効。Wave 単体モード（マーカー / サンプルループ。Custom Cue は出しません）。",
+        "Write the current wave into Wwise Originals and import it as a Music Playlist Container (Ctrl+Shift+E).\nEnabled only while WAAPI is connected. Wave-only mode (markers / sample loop. No Custom Cues).");
     public static string TipWwiseProjectName => Get(
         "接続中の Wwise プロジェクトです。",
         "The connected Wwise project.");

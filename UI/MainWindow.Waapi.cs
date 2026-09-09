@@ -135,7 +135,11 @@ public partial class MainWindow
 
     private void RefreshExportEnabled()
     {
-        WaapiBar.ExportEnabled = _waapiPanelVisible && !_exportBusy && _document is not null;
+        WaapiBar.ExportEnabled =
+            _waapiPanelVisible
+            && !_exportBusy
+            && _document is not null
+            && _waapiLastResult is { Ok: true };
     }
 
     private async Task StartWaapiAsync()
@@ -146,6 +150,8 @@ public partial class MainWindow
         }
 
         WaapiBar.SetPending();
+        _waapiLastResult = null;
+        RefreshExportEnabled();
         _waapiLastResult = await WaapiStartupProbe.RunAsync(_waapiSettings).ConfigureAwait(true);
         ApplyWaapiProbeResult(_waapiLastResult);
         if (_keepTarget)
@@ -180,6 +186,7 @@ public partial class MainWindow
         }
 
         RefreshWaapiStatusDisplay();
+        RefreshExportEnabled();
     }
 
     private void RememberLiveWwiseProject(WaapiProbeResult result)

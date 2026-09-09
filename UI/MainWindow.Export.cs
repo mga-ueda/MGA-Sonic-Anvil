@@ -29,6 +29,17 @@ public partial class MainWindow
             return;
         }
 
+        if (_waapiLastResult is not { Ok: true })
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.PreflightWaapiDisconnected,
+                UiStrings.DialogExportTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
         if (_document is null)
         {
             OwnerCenteredMessageBox.Show(
