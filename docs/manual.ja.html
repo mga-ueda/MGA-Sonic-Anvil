@@ -66,7 +66,14 @@
         <li><a href="#markers">マーカー／リージョン／ループ</a></li>
         <li><a href="#spectrogram">スペクトログラム</a></li>
         <li><a href="#format">フォーマット変換</a></li>
-        <li><a href="#export">WAAPI EXPORT（Wave 単体）</a></li>
+        <li><a href="#export">WAAPI EXPORT（Wave 単体）</a>
+          <ol>
+            <li><a href="#export-how">手順</a></li>
+            <li><a href="#export-plan">リージョンの組み立て</a></li>
+            <li><a href="#export-suffix">接尾辞</a></li>
+            <li><a href="#export-wwise">Wwise に作られるもの</a></li>
+          </ol>
+        </li>
         <li><a href="#shortcuts">ショートカット</a>
           <ol>
             <li><a href="#shortcuts-file">ファイル／タブ</a></li>
@@ -156,7 +163,7 @@
         <li><kbd>Shift</kbd>+<kbd>L</kbd> …… 選択をサンプルループに（同じ範囲でもう一度で解除）。</li>
         <li><kbd>Shift</kbd>+<kbd>R</kbd> …… 選択をリージョンに（同じ範囲でもう一度で解除）。</li>
         <li>フラッグをクリックで端を選択。Shift+クリックで範囲、Ctrl+クリックで追加。ドラッグまたは ←→ で移動（Shift で 3 倍）。</li>
-        <li>ダブルクリックでコメント／リージョン名。<code>-A</code> ライム、<code>-L</code> ブルー、<code>-E</code> 赤、<code>-R</code> グレー。</li>
+        <li>ダブルクリックでコメント／リージョン名。<code>-A</code> ライム、<code>-L</code> ブルー、<code>-E</code> 赤、<code>-R</code> グレー。EXPORT での意味は <a href="#export-suffix">9-3</a>。</li>
         <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> …… リネーム。</li>
         <li>右クリック、または <kbd>Ctrl</kbd>+<kbd>Del</kbd> でマーカー削除。</li>
       </ul>
@@ -176,6 +183,10 @@
       <p>プリセットか任意 Hz を選びます。任意 Hz は ↑↓／ホイールで 1Hz（Shift 10／Ctrl 100／Ctrl+Shift 1000）。メニューはカーソルの直下を避けます。項目を選んだ時点でステータスの容量が推測サイズに更新されます。変換中は操作を受け付けません。確定した項目は保存まで赤のままです。</p>
 
       <h2 id="export">9. WAAPI EXPORT（Wave 単体）</h2>
+      <p><strong>Wwise IM Importer の Wave 単体モードと同じ組み立て</strong>です。ワンショットとループをあらかじめ別ファイルに分けず、1 本のマスター波形上で構造を決めます。EXPORT は元波形を 1 ファイルのまま Originals へ書き、区間は MusicClip のトリムで合わせます。Music Playlist Container 1 つを作ります。Custom Cue は出しません。小節・テンポ管理、複数波形の Switch、XML マーカートラックはありません。</p>
+      <p>このアプリは波形エディタでもあるので、フェードや削除などの編集はソースへ焼き込んだうえで渡します。マーカーとサンプルループは保存時に WAV へ埋め込みます。</p>
+
+      <h3 id="export-how">9-1. 手順</h3>
       <ol>
         <li>Wwise Authoring を起動します。</li>
         <li>レベルメーター上の <span class="ui">WAAPI</span> をオンにします（<kbd>W</kbd>）。</li>
@@ -184,11 +195,44 @@
         <li><span class="ui">EXPORT</span> または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>。</li>
       </ol>
       <ul>
-        <li><span class="ui">Play -E</span>（<kbd>E</kbd>）…… Exit Cue 以降を再生。アプリ内ではループ折り返し時に -E を二重再生し、シークバーが 2 本になります。EXPORT 時は Music Playlist Container の既定トランジションルール（Any to Any）へ反映します。</li>
+        <li><span class="ui">Play -E</span>（<kbd>E</kbd>）…… Exit Cue 以降を再生。アプリ内ではループ折り返し時に -E を二重再生し、シークバーが 2 本になります。EXPORT 時は Music Playlist Container の既定トランジションルール（Any to Any）の Play post-exit へ反映します。</li>
         <li><span class="ui">Auto Active</span> …… EXPORT 後に Wwise を前面へ出します。</li>
       </ul>
+
+      <h3 id="export-plan">9-2. リージョンの組み立て</h3>
+      <p>上にあるものほど優先します。</p>
+      <ol>
+        <li><strong>サンプルループ</strong>（WAV の smpl、または <kbd>Shift</kbd>+<kbd>L</kbd>）…… ループ前が Intro、ループが <code>-L</code>、ループ後が <code>-E</code>。マーカーより優先します。</li>
+        <li><strong>接尾辞付きマーカー</strong>（<code>-A</code>／<code>-L</code>／<code>-E</code>、または名前に <code>Loop</code>）…… その位置から次の分割点までがリージョンになります。<code>-L</code> の直後に接尾辞が無い区間があれば <code>-E</code> を自動で付けます。</li>
+        <li><strong>接尾辞の無いマーカーがちょうど 2 点</strong>…… その間を暗黙のループにします。</li>
+        <li><strong>リージョン</strong>（<kbd>Shift</kbd>+<kbd>R</kbd>）…… 特殊マーカーもサンプルループも無いとき、名前付き区間をそのまま通します。</li>
+        <li>どれも無ければ、ファイル全体を 1 区間として渡します。</li>
+      </ol>
+
+      <h3 id="export-suffix">9-3. 接尾辞</h3>
+      <table>
+        <thead><tr><th>接尾辞</th><th>意味</th></tr></thead>
+        <tbody>
+          <tr><td><code>-L</code></td><td>ループ。プレビューでループし、Wwise では無限ループの Music Segment になります。</td></tr>
+          <tr><td><code>-E</code></td><td>Exit Cue 以降（余韻）。直前の <code>-L</code> と同じ Music Segment に束ね、遷移時に次と重なって鳴らせます。</td></tr>
+          <tr><td><code>-A</code></td><td>Entry Cue 前（アウフタクト）。次の区間と同じ Music Segment に束ねます。</td></tr>
+          <tr><td>名前に <code>Loop</code></td><td><code>-L</code> と同等。2 個で挟むとその間がループ、余り 1 個は単独の <code>-L</code>。</td></tr>
+          <tr><td><code>-R</code></td><td>色だけ IM Importer と同じグレーです。このアプリでは除外しません。通常マーカーと同じ分割点です。</td></tr>
+        </tbody>
+      </table>
+      <p>マーカーはプレビューと区間分割にだけ使い、<strong>Wwise の Custom Cue にはしません</strong>。</p>
+
+      <h3 id="export-wwise">9-4. Wwise に作られるもの</h3>
+      <ul>
+        <li>Music Playlist Container 1 つ（名前はファイル名）。中は Sequential、各区間が Playlist Item。</li>
+        <li>Music Segment。1 区間ならファイル名のまま、複数なら <code>_a</code>／<code>_b</code>…。ループ区間は Loop Count 0（無限）。<code>-A</code> と <code>-E</code> は隣の区間と同一 Segment に入り、Entry／Exit Cue だけがずれます。</li>
+        <li>元波形は分割せず 1 本の WAV。各クリップは同じファイルを参照し、Begin／End Trim で区間を合わせます。</li>
+        <li>先頭 Segment は Zero Latency、Look-ahead 50 ms、Prefetch 500 ms。以降は Look-ahead 500 ms。</li>
+        <li>Tempo 120／4/4 を Override します（小節管理はしません）。</li>
+        <li><span class="ui">Play -E</span> オン時、Playlist 既定ルール（Any to Any）の Play post-exit を立てます。</li>
+      </ul>
       <div class="note">
-        <p>Custom Cue は出しません。最終確認は必ず Wwise 上で行ってください。</p>
+        <p>同名の Container があれば中身を置き換えます。Originals に同名 WAV があれば確認なしで上書きします。最終確認は必ず Wwise 上で行ってください。</p>
       </div>
 
       <h2 id="shortcuts">10. ショートカット</h2>

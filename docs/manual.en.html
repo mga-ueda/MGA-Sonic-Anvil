@@ -66,7 +66,14 @@
         <li><a href="#markers">Markers / regions / loops</a></li>
         <li><a href="#spectrogram">Spectrogram</a></li>
         <li><a href="#format">Format conversion</a></li>
-        <li><a href="#export">WAAPI EXPORT (Wave-only)</a></li>
+        <li><a href="#export">WAAPI EXPORT (Wave-only)</a>
+          <ol>
+            <li><a href="#export-how">Steps</a></li>
+            <li><a href="#export-plan">How ranges are built</a></li>
+            <li><a href="#export-suffix">Suffixes</a></li>
+            <li><a href="#export-wwise">What Wwise gets</a></li>
+          </ol>
+        </li>
         <li><a href="#shortcuts">Shortcuts</a>
           <ol>
             <li><a href="#shortcuts-file">File / tabs</a></li>
@@ -156,7 +163,7 @@
         <li><kbd>Shift</kbd>+<kbd>L</kbd> — set the selection as the sample loop (same range again clears it).</li>
         <li><kbd>Shift</kbd>+<kbd>R</kbd> — set the selection as a region (same range again clears it).</li>
         <li>Click a flag to select an edge. Shift+click for a range, Ctrl+click to add. Drag or ←/→ to move (Shift ×3).</li>
-        <li>Double-click a comment / region name. <code>-A</code> lime, <code>-L</code> blue, <code>-E</code> red, <code>-R</code> gray.</li>
+        <li>Double-click a comment / region name. <code>-A</code> lime, <code>-L</code> blue, <code>-E</code> red, <code>-R</code> gray. See <a href="#export-suffix">9-3</a> for what EXPORT does with them.</li>
         <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> — rename.</li>
         <li>Right-click, or <kbd>Ctrl</kbd>+<kbd>Del</kbd>, deletes markers.</li>
       </ul>
@@ -176,6 +183,10 @@
       <p>Pick a preset or a custom Hz. Custom Hz nudges with ↑↓ / wheel by 1 Hz (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). The menu sits just off the cursor. Highlighting a value updates the status size to the estimate. The UI is locked while converting. Confirmed fields stay red until you save.</p>
 
       <h2 id="export">9. WAAPI EXPORT (Wave-only)</h2>
+      <p><strong>The same assembly as Wwise IM Importer’s Wave-only mode.</strong> Keep one-shot and loop material on a single master waveform instead of pre-separating files. EXPORT writes that wave as one file into Originals and maps ranges with MusicClip trim. It creates one Music Playlist Container. No Custom Cues. There is no bar / tempo overlay, no multi-wave Switch, and no XML marker-track mode.</p>
+      <p>This app is also a waveform editor, so fades and other edits are baked into the source before it is handed over. Markers and the sample loop are written into the WAV on save.</p>
+
+      <h3 id="export-how">9-1. Steps</h3>
       <ol>
         <li>Start Wwise Authoring.</li>
         <li>Turn on <span class="ui">WAAPI</span> above the level meter (<kbd>W</kbd>).</li>
@@ -184,11 +195,44 @@
         <li><span class="ui">EXPORT</span> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>.</li>
       </ol>
       <ul>
-        <li><span class="ui">Play -E</span> (<kbd>E</kbd>) — play after the Exit Cue. In-app preview double-plays -E on a loop wrap so two playheads appear. EXPORT writes this to the Music Playlist Container default transition rule (Any to Any).</li>
+        <li><span class="ui">Play -E</span> (<kbd>E</kbd>) — play after the Exit Cue. In-app preview double-plays -E on a loop wrap so two playheads appear. EXPORT writes Play post-exit on the Music Playlist Container default transition rule (Any to Any).</li>
         <li><span class="ui">Auto Active</span> — bring Wwise to the front after EXPORT.</li>
       </ul>
+
+      <h3 id="export-plan">9-2. How ranges are built</h3>
+      <p>Earlier items win.</p>
+      <ol>
+        <li><strong>Sample loop</strong> (the WAV smpl chunk, or <kbd>Shift</kbd>+<kbd>L</kbd>) — before the loop is Intro, the loop is <code>-L</code>, after it is <code>-E</code>. This beats markers.</li>
+        <li><strong>Suffixed markers</strong> (<code>-A</code> / <code>-L</code> / <code>-E</code>, or a name containing <code>Loop</code>) — each starts a region that runs to the next split. A bare span right after <code>-L</code> is given <code>-E</code> automatically.</li>
+        <li><strong>Exactly two unsuffixed markers</strong> — the span between them becomes an implicit loop.</li>
+        <li><strong>Regions</strong> (<kbd>Shift</kbd>+<kbd>R</kbd>) — used as-is when there is no sample loop and no special markers.</li>
+        <li>If none of the above apply, the whole file is one range.</li>
+      </ol>
+
+      <h3 id="export-suffix">9-3. Suffixes</h3>
+      <table>
+        <thead><tr><th>Suffix</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>-L</code></td><td>Loop. Loops in preview and becomes an infinitely looping Music Segment in Wwise.</td></tr>
+          <tr><td><code>-E</code></td><td>After the Exit Cue (the tail). Bundled into the same Music Segment as the preceding <code>-L</code> so it can overlap the next piece on a transition.</td></tr>
+          <tr><td><code>-A</code></td><td>Before the Entry Cue (pickup). Bundled into the same Music Segment as the next range.</td></tr>
+          <tr><td>Name containing <code>Loop</code></td><td>Same as <code>-L</code>. Two of them bracket a loop; an unpaired odd one is a lone <code>-L</code>.</td></tr>
+          <tr><td><code>-R</code></td><td>Painted gray like IM Importer. This app does not exclude it. It is just another split point.</td></tr>
+        </tbody>
+      </table>
+      <p>Markers are used for preview and splitting only. They are <strong>not</strong> written as Wwise Custom Cues.</p>
+
+      <h3 id="export-wwise">9-4. What Wwise gets</h3>
+      <ul>
+        <li>One Music Playlist Container (named after the file). Sequential play; each range is a Playlist Item.</li>
+        <li>Music Segments. One range keeps the file name; several become <code>_a</code> / <code>_b</code>…. Loop ranges use Loop Count 0 (infinite). <code>-A</code> and <code>-E</code> share a Segment with their neighbor; only the Entry / Exit Cues move.</li>
+        <li>The source wave is not split. Every clip references the same WAV and uses Begin / End Trim for the range.</li>
+        <li>The first Segment is Zero Latency, 50 ms look-ahead, 500 ms prefetch. Later Segments use 500 ms look-ahead.</li>
+        <li>Tempo 120 / 4/4 is overridden (there is no bar management).</li>
+        <li>With <span class="ui">Play -E</span> on, Play post-exit is set on the playlist default rule (Any to Any).</li>
+      </ul>
       <div class="note">
-        <p>No Custom Cues are written. Always verify the result in Wwise.</p>
+        <p>An existing container of the same name is replaced. A WAV of the same name under Originals is overwritten without asking. Always verify the result in Wwise.</p>
       </div>
 
       <h2 id="shortcuts">10. Shortcuts</h2>
