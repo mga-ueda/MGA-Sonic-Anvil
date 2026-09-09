@@ -114,7 +114,7 @@
         <li>To send it to Wwise, turn on <span class="ui">WAAPI</span> above the level meter, pick a destination, and press <span class="ui">EXPORT</span>.</li>
       </ol>
       <div class="note">
-        <p>Settings live in <code>%LocalAppData%\MGA\MGA Sonic Anvil\</code>. Nothing is written next to the exe. Closing the app also stores open tabs and unsaved edits there.</p>
+        <p>Settings live in <code>%LocalAppData%\MGA\MGA Sonic Anvil\</code>. Nothing is written next to the exe. Closing the app also stores open tabs, unsaved edits, and edit history (when the operations can be replayed) there.</p>
       </div>
 
       <h2 id="layout">3. Layout</h2>
@@ -123,7 +123,7 @@
         <li><strong>Overview</strong> — top strip. The bright area is the current view. Drag to move (scrubs the center); wheel zooms around the playhead.</li>
         <li><strong>Waveform</strong> — the edit surface: time ruler, marker / region flags, playhead, mouse guide.</li>
         <li><strong>Time scrollbar</strong> — under the waveform. Pan the current view.</li>
-        <li><strong>Tabs</strong> — shown even for a single file. Close with <kbd>Ctrl</kbd>+<kbd>W</kbd>. Right-click for “Close Other Tabs (O)”, “Close This and Tabs to the Right (R)”, “Close This and Tabs to the Left (L)”, “Close All Tabs (W)”, and “Select All Tabs (A)”. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> also closes all tabs. Select tabs with <kbd>Ctrl</kbd>+click (toggle), <kbd>Shift</kbd>+click (range), or <kbd>Ctrl</kbd>+<kbd>A</kbd> while the pointer is over the tab bar (all); selected tabs are highlighted and <kbd>Esc</kbd> deselects. With a selection, the right-click menu becomes “Close Selected/All Tabs” / “Paste Copied Edits to Selected/All Tabs”, and <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to every selected tab at once.</li>
+        <li><strong>Tabs</strong> — shown even for a single file. Close with <kbd>Ctrl</kbd>+<kbd>W</kbd>. Right-click for “Close Other Tabs (O)”, “Close This and Tabs to the Right (R)”, “Close This and Tabs to the Left (L)”, “Close All Tabs (W)”, and “Select All Tabs (A)”. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> also closes all tabs. Select tabs with <kbd>Ctrl</kbd>+click (toggle), <kbd>Shift</kbd>+click (range), or <kbd>Ctrl</kbd>+<kbd>A</kbd> while the pointer is over the tab bar (all); selected tabs are highlighted and <kbd>Esc</kbd> deselects. With a selection, the right-click menu becomes “Close Selected/All Tabs” / “Paste Copied Edits to Selected/All Tabs”, and <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to every selected tab at once. When tabs no longer fit, inactive tabs shrink first. Scroll arrows appear only if a title would fall below 6 characters.</li>
         <li><strong>Transport</strong> — top row is playback and zoom; second row is fade / normalize / delete / save, <span class="ui">Tips</span> on/off, and manual <span class="ui">?</span>. License / GitHub sit on the bottom of that row.</li>
         <li><strong>Always on Top</strong> — right end of the status bar. Keeps the window in front.</li>
         <li><strong>Spectrum / meters / vector scope</strong> — a view of the playback output. The spectrum is the same LED-band display as Layer Music Checker, fitted into the narrow slot right of the transport. <span class="ui">WAAPI</span> above the level meter toggles the bar.</li>
@@ -172,7 +172,7 @@
       </div>
 
       <h2 id="spectrogram">7. Spectrogram</h2>
-      <p><kbd>G</kbd> cycles waveform / spectrogram / overlay. Overlay draws the waveform shape on top of the spectrogram (no translucent wash). The overlay waveform uses the same per-channel min/max envelope as the overview, not a Mid mix. At amplitude zoom 1 it uses the middle half; amplifying fills the full height. Deep time zooms shift columns and compute only what is missing.</p>
+      <p><kbd>G</kbd> cycles waveform / spectrogram / overlay. Overlay draws the waveform shape on top of the spectrogram (no translucent wash). It does not paint <code>-A</code> / <code>-L</code> / <code>-E</code> / <code>-R</code>, sample-loop, or region fills (flags and lines stay; spectrogram-only also skips those fills). The overlay waveform uses the same per-channel min/max envelope as the overview, not a Mid mix. At amplitude zoom 1 it uses the middle half; amplifying fills the full height. Colors are display-normalized so the file's peak reads as 0 dBFS (the audio itself is untouched); the gain is measured once at load / edit analysis time, never in real time. When the whole file fits on screen — such as a short SE at fit — each screen column runs its own FFT and draws sharp, without interpolation. Any zoomed view draws smoothly interpolated columns from the full-file cache, keeping zooming and follow-scroll light. Scrolling shifts columns and computes only what is missing.</p>
 
       <h2 id="format">8. Format conversion</h2>
       <ul>
@@ -436,7 +436,7 @@
         <li>UI language is also on the gear. The default is <span class="ui">Auto</span> (Japanese if the OS is Japanese, otherwise English). The Japanese locale keeps the current wording, including English labels.</li>
         <li>The manual is <span class="ui">?</span>, or GitHub Pages in the browser. It follows the UI language.</li>
         <li>Settings file: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>
-        <li>Closing the app remembers every open tab (including which one was in front), the window position and size (including maximized), and unsaved edits (kept as a working copy), and restores them on the next launch. Time / amplitude zoom, waveform selection, and the playhead reset to their defaults. Closing a tab still asks to save.</li>
+        <li>Closing the app remembers every open tab (including which one was in front), the window position and size (including maximized), and unsaved edits (kept as a working copy), and restores them on the next launch. Edit history is restored too when the operations can be replayed (Undo back to the original still works). Time / amplitude zoom, waveform selection, and the playhead reset to their defaults. Closing a tab still asks to save.</li>
       </ul>
 
       <h2 id="disclaimer">12. Scope</h2>
