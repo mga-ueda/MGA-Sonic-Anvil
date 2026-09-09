@@ -22,6 +22,8 @@ internal sealed class HistoryRecipe
 
     public int Value { get; set; }
 
+    public double Amount { get; set; }
+
     public string Text { get; set; } = "";
 
     public bool Flag { get; set; }
@@ -75,6 +77,7 @@ internal static class HistoryRecipes
     public const string FadeOut = "FadeOut";
     public const string FadeAround = "FadeAround";
     public const string Normalize = "Normalize";
+    public const string Gain = "Gain";
     public const string Delete = "Delete";
     public const string Paste = "Paste";
     public const string SetSampleLoop = "SetSampleLoop";
@@ -100,6 +103,16 @@ internal static class HistoryRecipes
             Value = value,
         };
 
+    public static HistoryRecipe FromGain(int sourceRate, WaveSelection range, double gainDb) =>
+        new()
+        {
+            Kind = Gain,
+            SourceRate = sourceRate,
+            Start = range.StartFrame,
+            End = range.EndFrame,
+            Amount = gainDb,
+        };
+
     public static IEditCommand? TryCreate(AudioDocument document, HistoryRecipe recipe)
     {
         return recipe.Kind switch
@@ -108,6 +121,7 @@ internal static class HistoryRecipes
             FadeOut => ProcessEdits.FadeOut(document, RangeOf(recipe), ShapeOf(recipe)),
             FadeAround => ProcessEdits.FadeAroundPlayhead(document, RangeOf(recipe), recipe.Playhead),
             Normalize => ProcessEdits.Normalize(document, RangeOf(recipe)),
+            Gain => ProcessEdits.Gain(document, RangeOf(recipe), recipe.Amount),
             Delete => ProcessEdits.Delete(document, RangeOf(recipe)),
             Paste => TryPaste(document, recipe),
             SetSampleLoop => TrySetSampleLoop(document, recipe),

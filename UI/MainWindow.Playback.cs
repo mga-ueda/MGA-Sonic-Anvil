@@ -201,9 +201,11 @@ public partial class MainWindow
 
         var frame = _player.CursorFrame;
         _fadePreviewing = false;
+        _volumePreviewing = false;
         PausePlaybackSoft();
         SeekFrame(frame);
         RestoreFadeVisualIfMenuOpen();
+        RestoreVolumeVisualIfMenuOpen();
         return true;
     }
 
@@ -394,12 +396,16 @@ public partial class MainWindow
             Waveform.AbandonScrub();
         }
 
-        if (_fadePreviewing || _formatPreviewing)
+        if (_fadePreviewing || _formatPreviewing || _volumePreviewing)
         {
             SyncPreviewPlayhead();
             if (_player.ProviderEnded)
             {
-                var started = _fadePreviewing ? _fadePreviewStartedAt : _formatPreviewStartedAt;
+                var started = _fadePreviewing
+                    ? _fadePreviewStartedAt
+                    : _formatPreviewing
+                        ? _formatPreviewStartedAt
+                        : _volumePreviewStartedAt;
                 if (Environment.TickCount64 - started >= 250)
                 {
                     OnPlaybackEnded(_playbackGeneration);
@@ -487,7 +493,7 @@ public partial class MainWindow
         Spectrum.Tick();
         LoudnessMeter.Tick();
         VectorScope.Tick();
-        if (_fadePreviewing || _formatPreviewing)
+        if (_fadePreviewing || _formatPreviewing || _volumePreviewing)
         {
             SyncPreviewPlayhead();
             return;
@@ -533,6 +539,12 @@ public partial class MainWindow
         if (_fadePreviewing)
         {
             _fadePreviewing = false;
+            Waveform.SetPreviewGain(null);
+        }
+
+        if (_volumePreviewing)
+        {
+            _volumePreviewing = false;
             Waveform.SetPreviewGain(null);
         }
 
@@ -629,6 +641,24 @@ public partial class MainWindow
             }
 
             RestoreFadeVisualIfMenuOpen();
+            return;
+        }
+
+        if (_volumePreviewing)
+        {
+            if (Environment.TickCount64 - _volumePreviewStartedAt < 250)
+            {
+                return;
+            }
+
+            _volumePreviewing = false;
+            PausePlaybackSoft();
+            if (_document is not null)
+            {
+                SeekFrame(_volumePreviewResumeFrame);
+            }
+
+            RestoreVolumeVisualIfMenuOpen();
             return;
         }
 

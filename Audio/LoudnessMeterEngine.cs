@@ -254,9 +254,12 @@ internal sealed class LoudnessMeterEngine
     private float ShortTermLufs() =>
         MeanSquareToLufs(_shortCount == 0 ? 0 : _shortSum / _shortCount);
 
-    private float IntegratedLufs()
+    private float IntegratedLufs() => IntegratedFromMeanSquares(_integratedBlocks);
+
+    /// <summary>0.1 秒ブロックの mean-square から Integrated LKFS（絶対／相対ゲート）。</summary>
+    internal static float IntegratedFromMeanSquares(IReadOnlyList<double> blocks)
     {
-        if (_integratedBlocks.Count == 0)
+        if (blocks.Count == 0)
         {
             return float.NegativeInfinity;
         }
@@ -264,7 +267,7 @@ internal sealed class LoudnessMeterEngine
         var absMs = LufsToMeanSquare(AbsoluteGateLufs);
         var passed = 0;
         var sum = 0d;
-        foreach (var block in _integratedBlocks)
+        foreach (var block in blocks)
         {
             if (block < absMs)
             {
@@ -284,7 +287,7 @@ internal sealed class LoudnessMeterEngine
         var relMs = LufsToMeanSquare(relative);
         sum = 0;
         passed = 0;
-        foreach (var block in _integratedBlocks)
+        foreach (var block in blocks)
         {
             if (block < relMs)
             {
@@ -437,6 +440,27 @@ internal sealed class LoudnessMeterEngine
     public static double LufsToMeanSquare(double lufs) =>
         Math.Pow(10d, (lufs + 0.691) / 10d);
 
+    /// <summary>一定線形ゲインを掛けたあとの LKFS。無音は無音のまま。</summary>
+    public static float ApplyLinearGainToLufs(float lufs, float linearGain)
+    {
+        if (!float.IsFinite(lufs))
+        {
+            return lufs;
+        }
+
+        if (linearGain <= 1e-12f)
+        {
+            return float.NegativeInfinity;
+        }
+
+        if (Math.Abs(linearGain - 1f) < 1e-6f)
+        {
+            return lufs;
+        }
+
+        return lufs + (float)(20d * Math.Log10(linearGain));
+    }
+
     private static float Hermite(float p0, float p1, float p2, float p3, float t)
     {
         var c0 = p1;
@@ -446,7 +470,7 @@ internal sealed class LoudnessMeterEngine
         return ((c3 * t + c2) * t + c1) * t + c0;
     }
 
-    private static void DesignKWeighting(int sampleRate, Biquad pre, Biquad rlb)
+    internal static void DesignKWeighting(int sampleRate, Biquad pre, Biquad rlb)
     {
         var fs = (double)sampleRate;
         var db = 3.999843853973347;
@@ -470,7 +494,7 @@ internal sealed class LoudnessMeterEngine
         rlb.Set(1d / a0, -2d / a0, 1d / a0, 2d * (k * k - 1d) / a0, (1d - k / q + k * k) / a0);
     }
 
-    private sealed class Biquad
+    internal sealed class Biquad
     {
         private double _b0 = 1, _b1, _b2, _a1, _a2, _z1, _z2;
 

@@ -50,6 +50,13 @@ public partial class MainWindow
             return;
         }
 
+        if (_volumeMenu is { IsOpen: true })
+        {
+            VolumeGainPicker.TryNudge(_volumeMenu, Math.Sign(e.Delta));
+            e.Handled = true;
+            return;
+        }
+
         if (e.OriginalSource is not System.Windows.DependencyObject origin)
         {
             return;
@@ -153,7 +160,7 @@ public partial class MainWindow
                 return true;
             }
 
-            if (CloseFadeCurvePicker() || CloseFormatConvertPicker())
+            if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker())
             {
                 return true;
             }
@@ -233,6 +240,11 @@ public partial class MainWindow
             }
 
             return false;
+        }
+
+        if (TryHandleVolumeMenuShortcut(key, modifiers))
+        {
+            return true;
         }
 
         if (key == Key.W && modifiers == ModifierKeys.Control)
@@ -532,6 +544,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.V && modifiers == ModifierKeys.None)
+        {
+            PromptVolume();
+            return true;
+        }
+
         if (key == Key.Delete && modifiers == ModifierKeys.Control)
         {
             ApplyDeleteMarkers();
@@ -758,6 +776,39 @@ public partial class MainWindow
             && (modifiers == ModifierKeys.None || modifiers == ModifierKeys.Shift))
         {
             JumpByVisiblePercent(percent, extendSelection: modifiers == ModifierKeys.Shift);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryHandleVolumeMenuShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (_volumeMenu is not { IsOpen: true })
+        {
+            return false;
+        }
+
+        if (key is Key.Up or Key.Down)
+        {
+            VolumeGainPicker.TryNudge(_volumeMenu, key == Key.Up ? 1 : -1);
+            return true;
+        }
+
+        if (key == Key.Space && modifiers == ModifierKeys.None)
+        {
+            PreviewVolume(VolumeGainPicker.ReadGain(_volumeMenu));
+            return true;
+        }
+
+        if (key == Key.Enter && modifiers == ModifierKeys.None)
+        {
+            ApplyVolume(VolumeGainPicker.ReadGain(_volumeMenu));
+            return true;
+        }
+
+        if (key == Key.V && modifiers == ModifierKeys.None)
+        {
             return true;
         }
 

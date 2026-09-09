@@ -146,10 +146,11 @@
       </ul>
 
       <h2 id="edit">5. 選択と編集</h2>
-      <p>ドラッグで選択。<kbd>Esc</kbd> または Shift なし移動で解除。未選択のフェード／ノーマライズは全体が対象です。ステータスバーの選択開始／範囲／終了に値を入れることでも選択できます。</p>
+      <p>ドラッグで選択。<kbd>Esc</kbd> または Shift なし移動で解除。未選択のフェード／音量／ノーマライズは全体が対象です。ステータスバーの選択開始／範囲／終了に値を入れることでも選択できます。</p>
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd>／<span class="ui">FADE OUT</span> <kbd>O</kbd> …… カーブを選び Space で試聴、Enter で実行。1–9 でカーブ。</li>
         <li><kbd>X</kbd> …… 表示範囲をシーク前後にリニアフェード（前＝アウト／後＝イン）。</li>
+        <li><kbd>V</kbd> …… 音量。↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。Space で試聴、Enter で実行。メニューに波形全体の Integrated LKFS／RMS／Peak の変化を先に出します。ラウドネス表示中は Short Term 曲線も同じ dB で追従します。</li>
         <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> …… ピークを -0.1 dB に合わせる。</li>
         <li><span class="ui">DELETE</span> …… 選択を詰めて削除。選択中のマーカー／リージョンもまとめて削除。</li>
         <li><kbd>Ctrl</kbd>+<kbd>X</kbd>／<kbd>C</kbd>／<kbd>V</kbd> …… カット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）。</li>
@@ -319,6 +320,7 @@
           <tr><td><kbd>I</kbd></td><td>フェードイン</td></tr>
           <tr><td><kbd>O</kbd></td><td>フェードアウト</td></tr>
           <tr><td><kbd>X</kbd></td><td>表示範囲をシーク前後にリニアフェード（前＝アウト／後＝イン）</td></tr>
+          <tr><td><kbd>V</kbd></td><td>音量（dB。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS／RMS／Peak を先に表示）</td></tr>
           <tr><td><kbd>N</kbd></td><td>ノーマライズ（ピーク -0.1 dB）</td></tr>
           <tr><td><kbd>Delete</kbd>／<kbd>Backspace</kbd></td><td>選択を詰めて削除。選択中のマーカー／リージョンもまとめて削除</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd>／<kbd>C</kbd>／<kbd>V</kbd></td><td>カット／コピー／ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）。タブ選択中の <kbd>Ctrl</kbd>+<kbd>V</kbd> はコピーした編集履歴を選択タブへ適用</td></tr>
@@ -407,6 +409,16 @@
           <tr><td><kbd>Space</kbd></td><td>ハイライト中のカーブを試聴</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>実行</td></tr>
           <tr><td><kbd>I</kbd>／<kbd>O</kbd></td><td>フェードイン／アウトへ切替</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>閉じる</td></tr>
+        </tbody>
+      </table>
+      <p>音量メニューが開いているとき</p>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td>↑／↓／ホイール</td><td>0.1 dB（<kbd>Shift</kbd> 1／<kbd>Ctrl</kbd> 3／<kbd>Ctrl</kbd>+<kbd>Shift</kbd> 6）</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>試聴</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>実行</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>閉じる</td></tr>
         </tbody>
       </table>

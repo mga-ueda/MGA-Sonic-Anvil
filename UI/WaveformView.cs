@@ -1741,7 +1741,8 @@ internal sealed class WaveformView : Grid
                     profile,
                     _loudnessTargetLufs,
                     start,
-                    span);
+                    span,
+                    _previewGainAtFrame);
             }
         }
 

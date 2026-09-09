@@ -189,6 +189,33 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void Gain_ScalesSelectionByDbAndUndoRestores()
+    {
+        var document = MakeConstant(frames: 8, value: 0.25f);
+        var original = (float[])document.Interleaved.Clone();
+        var history = new EditHistory();
+        var command = ProcessEdits.Gain(document, new WaveSelection(2, 6), 6);
+        Assert.NotNull(command);
+        history.Do(document, command!);
+
+        var expected = 0.25f * (float)Math.Pow(10d, 6d / 20d);
+        Assert.Equal(0.25f, document.Interleaved[0], 5);
+        Assert.Equal(expected, document.Interleaved[4], 5);
+        Assert.Equal(0.25f, document.Interleaved[12], 5);
+        Assert.Equal("Volume", command!.Name);
+        Assert.True(history.Undo(document));
+        Assert.Equal(original, document.Interleaved);
+    }
+
+    [Fact]
+    public void Gain_ReturnsNullWhenZeroDb()
+    {
+        var document = MakeConstant(frames: 4, value: 0.5f);
+        Assert.Null(ProcessEdits.Gain(document, new WaveSelection(0, 4), 0));
+        Assert.Null(ProcessEdits.Gain(document, WaveSelection.Empty, 3));
+    }
+
+    [Fact]
     public void Delete_RemovesRangeAndUndoRestores()
     {
         var document = MakeSine(frames: 50);

@@ -913,6 +913,45 @@ internal static class ProcessEdits
         return command;
     }
 
+    public static IEditCommand? Gain(AudioDocument document, WaveSelection range, double gainDb)
+    {
+        range = range.Clamp(document.FrameCount);
+        gainDb = WaveformGainAnalyzer.SnapGainDb(gainDb);
+        if (range.IsEmpty || WaveformGainAnalyzer.IsNoOp(gainDb))
+        {
+            return null;
+        }
+
+        var linear = (float)WaveformGainAnalyzer.LinearFromDb(gainDb);
+        var before = document.CopyRange(range.StartFrame, range.Length);
+        var after = (float[])before.Clone();
+        for (var i = 0; i < after.Length; i++)
+        {
+            after[i] *= linear;
+        }
+
+        var extra = UiStrings.FormatSignedDb(gainDb);
+        var command = new ReplaceRangeCommand(
+            "Volume",
+            range.StartFrame,
+            before,
+            after,
+            document.Selection,
+            document.Selection,
+            document.CursorFrame,
+            document.CursorFrame,
+            UiStrings.EditHistoryRange(
+                UiStrings.EditHistoryName("Volume"),
+                document.SampleRate,
+                range.StartFrame,
+                range.EndFrame,
+                extra));
+        var snapped = gainDb;
+        AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => Gain(target, mapped, snapped));
+        command.Persist = HistoryRecipes.FromGain(document.SampleRate, range, snapped);
+        return command;
+    }
+
     public static IEditCommand Delete(AudioDocument document, WaveSelection range)
     {
         var removed = document.CopyRange(range.StartFrame, range.Length);

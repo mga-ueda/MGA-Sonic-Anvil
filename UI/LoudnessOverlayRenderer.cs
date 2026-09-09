@@ -109,7 +109,8 @@ internal sealed class LoudnessOverlayRenderer
         LoudnessProfile profile,
         double target,
         double viewStart,
-        double viewSpan)
+        double viewSpan,
+        Func<long, float>? previewGain = null)
     {
         if (wave.Width <= 1 || wave.Height <= 1 || viewSpan <= 0)
         {
@@ -118,10 +119,10 @@ internal sealed class LoudnessOverlayRenderer
 
         target = LoudnessMeterEngine.ClampTargetLufs(target);
         dc.PushClip(new RectangleGeometry(wave));
-        DrawLuWidth(dc, wave, profile, target, viewStart, viewSpan);
-        DrawCurve(dc, wave, profile, target, viewStart, viewSpan, danger: false);
+        DrawLuWidth(dc, wave, profile, target, viewStart, viewSpan, previewGain);
+        DrawCurve(dc, wave, profile, target, viewStart, viewSpan, previewGain, danger: false);
         DrawTarget(dc, wave, target);
-        DrawCurve(dc, wave, profile, target, viewStart, viewSpan, danger: true);
+        DrawCurve(dc, wave, profile, target, viewStart, viewSpan, previewGain, danger: true);
         dc.Pop();
     }
 
@@ -209,7 +210,8 @@ internal sealed class LoudnessOverlayRenderer
         LoudnessProfile profile,
         double target,
         double viewStart,
-        double viewSpan)
+        double viewSpan,
+        Func<long, float>? previewGain)
     {
         var width = Math.Max(1, (int)Math.Ceiling(wave.Width));
         var lu = LoudnessTrafficLight.LufsApproachLu;
@@ -250,7 +252,7 @@ internal sealed class LoudnessOverlayRenderer
         for (var i = 0; i <= width; i++)
         {
             var frame = viewStart + viewSpan * (i / (double)width);
-            var lufs = profile.AtFrame(frame);
+            var lufs = profile.AtFrame(frame, previewGain);
             if (float.IsInfinity(lufs) || float.IsNaN(lufs))
             {
                 Flush();
@@ -272,6 +274,7 @@ internal sealed class LoudnessOverlayRenderer
         double target,
         double viewStart,
         double viewSpan,
+        Func<long, float>? previewGain,
         Func<LoudnessTraffic, LoudnessTraffic, Pen?> penAt)
     {
         var width = Math.Max(1, (int)Math.Ceiling(wave.Width));
@@ -280,7 +283,7 @@ internal sealed class LoudnessOverlayRenderer
         for (var i = 0; i <= width; i++)
         {
             var frame = viewStart + viewSpan * (i / (double)width);
-            var lufs = profile.AtFrame(frame);
+            var lufs = profile.AtFrame(frame, previewGain);
             if (float.IsInfinity(lufs) || float.IsNaN(lufs))
             {
                 prev = null;
@@ -306,6 +309,7 @@ internal sealed class LoudnessOverlayRenderer
         double target,
         double viewStart,
         double viewSpan,
+        Func<long, float>? previewGain,
         bool danger)
     {
         DrawProfilePath(
@@ -315,6 +319,7 @@ internal sealed class LoudnessOverlayRenderer
             target,
             viewStart,
             viewSpan,
+            previewGain,
             (traffic, prev) =>
             {
                 var tone = traffic == LoudnessTraffic.Idle ? prev : traffic;

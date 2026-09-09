@@ -26,6 +26,7 @@ public partial class MainWindow
         }
 
         CloseFormatConvertPicker();
+        CloseVolumeGainPicker();
         if (_fadeMenu is { IsOpen: true })
         {
             _fadeMenu.IsOpen = false;
@@ -73,6 +74,228 @@ public partial class MainWindow
 
         _fadeMenu.IsOpen = false;
         return true;
+    }
+
+    private void PromptVolume()
+    {
+        if (_document is null)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (_volumeMenu is { IsOpen: true })
+        {
+            return;
+        }
+
+        CloseFadeCurvePicker();
+        CloseFormatConvertPicker();
+        if (_player.IsPlaying)
+        {
+            PausePlaybackSoft();
+        }
+
+        _volumePreviewResumeFrame = _document.CursorFrame;
+        var analyzer = WaveformGainAnalyzer.Build(
+            _document.Interleaved,
+            _document.Channels,
+            _document.SampleRate,
+            range);
+        var menu = VolumeGainPicker.Show(
+            this,
+            analyzer,
+            AppStorage.Settings.ResolvedLoudnessTargetLufs(),
+            ApplyVolume,
+            PreviewVolume,
+            OnVolumeGainChanged);
+        _volumeMenu = menu;
+        menu.Closed += (_, _) =>
+        {
+            StopVolumePreview(restoreCursor: true);
+            ClearVolumeVisualPreview();
+            if (ReferenceEquals(_volumeMenu, menu))
+            {
+                _volumeMenu = null;
+            }
+        };
+    }
+
+    private bool CloseVolumeGainPicker()
+    {
+        if (_volumeMenu is not { IsOpen: true })
+        {
+            return false;
+        }
+
+        _volumeMenu.IsOpen = false;
+        return true;
+    }
+
+    private void OnVolumeGainChanged(double gainDb)
+    {
+        ApplyVolumeVisualPreview(gainDb);
+        if (!_volumePreviewing || _document is null || _volumePreviewToggling)
+        {
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            return;
+        }
+
+        StartVolumePreviewPlayback(range, gainDb);
+    }
+
+    private void ApplyVolumeVisualPreview(double gainDb)
+    {
+        if (_document is null)
+        {
+            ClearVolumeVisualPreview();
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            ClearVolumeVisualPreview();
+            return;
+        }
+
+        var linear = (float)WaveformGainAnalyzer.LinearFromDb(gainDb);
+        Waveform.SetPreviewGain(frame =>
+            frame < range.StartFrame || frame >= range.EndFrame
+                ? 1f
+                : linear);
+    }
+
+    private void ClearVolumeVisualPreview() => Waveform.SetPreviewGain(null);
+
+    private void RestoreVolumeVisualIfMenuOpen()
+    {
+        if (_document is null || _volumeMenu is not { IsOpen: true })
+        {
+            return;
+        }
+
+        ApplyVolumeVisualPreview(VolumeGainPicker.ReadGain(_volumeMenu));
+    }
+
+    private void PreviewVolume(double gainDb)
+    {
+        if (_document is null || _volumePreviewToggling)
+        {
+            return;
+        }
+
+        var now = Environment.TickCount64;
+        if (now - _volumeSpaceTick < 120)
+        {
+            return;
+        }
+
+        _volumeSpaceTick = now;
+        _volumePreviewToggling = true;
+        try
+        {
+            if (_volumePreviewing && _player.IsPlaying)
+            {
+                StopVolumePreview(restoreCursor: true);
+                RestoreVolumeVisualIfMenuOpen();
+                return;
+            }
+
+            var range = ActiveRange();
+            if (range.IsEmpty)
+            {
+                return;
+            }
+
+            StartVolumePreviewPlayback(range, gainDb);
+        }
+        finally
+        {
+            _volumePreviewToggling = false;
+        }
+    }
+
+    private void StartVolumePreviewPlayback(WaveSelection range, double gainDb)
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_player.IsPlaying)
+            {
+                _player.Pause();
+            }
+
+            _playTimer.Stop();
+            _meter.Reset();
+            LoudnessMeter.Reset();
+            var linear = (float)WaveformGainAnalyzer.LinearFromDb(gainDb);
+            float GainAt(long frame) =>
+                frame < range.StartFrame || frame >= range.EndFrame
+                    ? 1f
+                    : linear;
+            if (_player.HasOutputDevice)
+            {
+                _player.Rebind(_document, range.StartFrame, range, loop: false, GainAt);
+            }
+            else
+            {
+                _player.Prepare(_document, range.StartFrame, range, loop: false, GainAt);
+            }
+
+            ApplyVolumeVisualPreview(gainDb);
+            _volumePreviewing = true;
+            _volumePreviewStartedAt = Environment.TickCount64;
+            _player.Play();
+            _playbackGeneration = _player.Generation;
+            _playTimer.Start();
+            StartMeterRendering();
+            Waveform.SetTrailRecording(true);
+            Transport.SetPlaying(true);
+            Waveform.UnlockCenter();
+            Waveform.SetPlayheadFromPlayback(range.StartFrame);
+        }
+        catch (Exception ex)
+        {
+            _volumePreviewing = false;
+            ClearVolumeVisualPreview();
+            PausePlaybackSoft();
+            OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void StopVolumePreview(bool restoreCursor)
+    {
+        if (!_volumePreviewing)
+        {
+            return;
+        }
+
+        var resume = _volumePreviewResumeFrame;
+        _volumePreviewing = false;
+        PausePlaybackSoft();
+        if (restoreCursor && _document is not null)
+        {
+            SeekFrame(resume);
+        }
+
+        RestoreVolumeVisualIfMenuOpen();
     }
 
     private void OnFadeCurveHighlighted(bool fadeIn, FadeShape shape)
@@ -318,6 +541,39 @@ public partial class MainWindow
         StopPlaybackForEdit();
         _history.Do(_document, ProcessEdits.Normalize(_document, range));
         Waveform.ClearSelection();
+        AfterEdit();
+    }
+
+    private void ApplyVolume(double gainDb)
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        _volumePreviewing = false;
+        ClearVolumeVisualPreview();
+        CloseVolumeGainPicker();
+        if (WaveformGainAnalyzer.IsNoOp(WaveformGainAnalyzer.SnapGainDb(gainDb)))
+        {
+            return;
+        }
+
+        PausePlaybackSoft();
+        var command = ProcessEdits.Gain(_document, range, gainDb);
+        if (command is null)
+        {
+            return;
+        }
+
+        _history.Do(_document, command);
         AfterEdit();
     }
 

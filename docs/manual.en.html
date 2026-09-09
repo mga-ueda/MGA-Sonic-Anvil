@@ -146,10 +146,11 @@
       </ul>
 
       <h2 id="edit">5. Selection and editing</h2>
-      <p>Drag to select. <kbd>Esc</kbd> or a move without Shift clears it. Fade / normalize with nothing selected uses the whole file. You can also type the selection start / length / end in the status bar.</p>
+      <p>Drag to select. <kbd>Esc</kbd> or a move without Shift clears it. Fade / volume / normalize with nothing selected uses the whole file. You can also type the selection start / length / end in the status bar.</p>
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd> / <span class="ui">FADE OUT</span> <kbd>O</kbd> — pick a curve, Space to preview, Enter to apply. 1–9 select a curve.</li>
         <li><kbd>X</kbd> — linear fade around the playhead in the view (before = out / after = in).</li>
+        <li><kbd>V</kbd> — volume. ↑↓ / wheel by 0.1 dB (Shift 1 / Ctrl 3 / Ctrl+Shift 6). Space previews, Enter applies. The menu shows how whole-file Integrated LKFS / RMS / Peak will change. In loudness view the Short Term curve follows the same dB.</li>
         <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> — fit the peak to -0.1 dB.</li>
         <li><span class="ui">DELETE</span> — ripple-delete the selection. Selected markers / regions go with it.</li>
         <li><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd> — cut / copy / paste (markers in range included; a matching region is included too).</li>
@@ -319,6 +320,7 @@
           <tr><td><kbd>I</kbd></td><td>Fade in</td></tr>
           <tr><td><kbd>O</kbd></td><td>Fade out</td></tr>
           <tr><td><kbd>X</kbd></td><td>Linear fade around the playhead in the view (before = out / after = in)</td></tr>
+          <tr><td><kbd>V</kbd></td><td>Volume (dB; ↑↓ / wheel, Space preview, Enter apply; shows whole-file LKFS / RMS / Peak first)</td></tr>
           <tr><td><kbd>N</kbd></td><td>Normalize (peak −0.1 dB)</td></tr>
           <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Ripple-delete the selection. Selected markers / regions go with it</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd></td><td>Cut / copy / paste (markers in range included; a matching region is included too). With tabs selected, <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to those tabs</td></tr>
@@ -407,6 +409,16 @@
           <tr><td><kbd>Space</kbd></td><td>Preview the highlighted curve</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>Apply</td></tr>
           <tr><td><kbd>I</kbd> / <kbd>O</kbd></td><td>Switch fade in / out</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close</td></tr>
+        </tbody>
+      </table>
+      <p>While the volume menu is open</p>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>↑ / ↓ / wheel</td><td>0.1 dB (<kbd>Shift</kbd> 1 / <kbd>Ctrl</kbd> 3 / <kbd>Ctrl</kbd>+<kbd>Shift</kbd> 6)</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Preview</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Apply</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Close</td></tr>
         </tbody>
       </table>

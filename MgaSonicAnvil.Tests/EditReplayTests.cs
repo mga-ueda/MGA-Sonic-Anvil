@@ -43,6 +43,23 @@ public sealed class EditReplayTests
     }
 
     [Fact]
+    public void Gain_Replay_AppliesSameDbToTarget()
+    {
+        var source = MakeConstant(frames: 50, value: 0.5f, rate: 48000);
+        var command = ProcessEdits.Gain(source, new WaveSelection(0, 50), -6);
+        Assert.NotNull(command);
+        Assert.NotNull(command!.Replay);
+
+        var target = MakeConstant(frames: 50, value: 0.8f, rate: 48000);
+        var replayed = command.Replay!(target);
+        Assert.NotNull(replayed);
+        new EditHistory().Do(target, replayed!);
+
+        var expected = 0.8f * (float)Math.Pow(10d, -6d / 20d);
+        Assert.Equal(expected, target.Interleaved[0], 4);
+    }
+
+    [Fact]
     public void Delete_Replay_ClampsRangeToTargetLength()
     {
         var source = MakeConstant(frames: 100, value: 1f, rate: 48000);

@@ -67,6 +67,24 @@ public sealed class HistorySessionTests
     }
 
     [Fact]
+    public void TryExportImport_RestoresVolumeGainAmount()
+    {
+        var document = MakeConstant(16, 0.5f);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.Gain(document, new WaveSelection(0, 16), -3.5)!);
+        var gained = document.Interleaved[0];
+
+        var exported = history.TryExport();
+        Assert.NotNull(exported);
+        Assert.Equal(HistoryRecipes.Gain, exported!.Recipes[0].Kind);
+        Assert.Equal(-3.5, exported.Recipes[0].Amount);
+
+        var restored = MakeConstant(16, 0.5f);
+        Assert.True(EditHistory.TryImport(restored, exported, out _));
+        Assert.Equal(gained, restored.Interleaved[0], 5);
+    }
+
+    [Fact]
     public void HistoryJson_RoundTripsRecipes()
     {
         var document = MakeConstant(8, 1f);

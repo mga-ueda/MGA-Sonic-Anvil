@@ -37,6 +37,9 @@ public partial class MainWindow
             return;
         }
 
+        CloseFadeCurvePicker();
+        CloseFormatConvertPicker();
+        CloseVolumeGainPicker();
         CommitTimelineNudgeSession();
         StopPlaybackForEdit();
         _historyAnchorIndex = _history.CurrentIndex;

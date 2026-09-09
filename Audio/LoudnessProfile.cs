@@ -51,4 +51,15 @@ internal sealed class LoudnessProfile
 
         return a + (b - a) * (float)(x - i);
     }
+
+    public float AtFrame(double frame, Func<long, float>? previewGain)
+    {
+        var lufs = AtFrame(frame);
+        if (previewGain is null)
+        {
+            return lufs;
+        }
+
+        return LoudnessMeterEngine.ApplyLinearGainToLufs(lufs, previewGain((long)Math.Floor(frame)));
+    }
 }

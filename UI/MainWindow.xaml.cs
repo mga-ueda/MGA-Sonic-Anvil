@@ -45,6 +45,7 @@ public partial class MainWindow : Window
     private TransportIconButton? _waapiToggle;
     private System.Windows.Controls.ContextMenu? _fadeMenu;
     private System.Windows.Controls.ContextMenu? _formatMenu;
+    private System.Windows.Controls.ContextMenu? _volumeMenu;
     private FormatConvertKind _formatKind;
     private FormatSizePreview? _formatSizePreview;
     private bool _formatPreviewing;
@@ -59,6 +60,11 @@ public partial class MainWindow : Window
     private long _fadePreviewStartedAt;
     private long _fadeSpaceTick;
     private bool _fadeReplayOnHighlight;
+    private bool _volumePreviewing;
+    private bool _volumePreviewToggling;
+    private long _volumePreviewResumeFrame;
+    private long _volumePreviewStartedAt;
+    private long _volumeSpaceTick;
     private bool _resumeAfterScrub;
     private bool _startupRevealPending = true;
     private bool _closing;
@@ -264,6 +270,7 @@ public partial class MainWindow : Window
         _playTimer.Stop();
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
+        CloseVolumeGainPicker();
         CloseEditHistory(commit: true);
         _resumeAfterScrub = false;
         StopMarkerNudge();

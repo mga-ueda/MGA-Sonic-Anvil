@@ -85,6 +85,26 @@ public sealed class LoudnessMeterEngineTests
     }
 
     [Fact]
+    public void ApplyLinearGainToLufs_AddsTwentyLog()
+    {
+        Assert.InRange(LoudnessMeterEngine.ApplyLinearGainToLufs(-24f, 2f), -18.05f, -17.95f);
+        Assert.Equal(-24f, LoudnessMeterEngine.ApplyLinearGainToLufs(-24f, 1f), 5);
+        Assert.True(float.IsNegativeInfinity(LoudnessMeterEngine.ApplyLinearGainToLufs(-24f, 0f)));
+        Assert.True(float.IsNegativeInfinity(
+            LoudnessMeterEngine.ApplyLinearGainToLufs(float.NegativeInfinity, 2f)));
+    }
+
+    [Fact]
+    public void Profile_AtFrame_AppliesPreviewGain()
+    {
+        var values = new float[] { -20f, -18f };
+        var profile = new LoudnessProfile(48000, 4800, values);
+        Assert.Equal(-20f, profile.AtFrame(0), 4);
+        Assert.InRange(profile.AtFrame(0, _ => 2f), -14.05f, -13.95f);
+        Assert.Equal(-20f, profile.AtFrame(0, _ => 1f), 4);
+    }
+
+    [Fact]
     public void Traffic_Lra_WarnsWhenWide()
     {
         Assert.Equal(LoudnessTraffic.Safe, LoudnessTrafficLight.ForLra(12f));

@@ -31,6 +31,7 @@ public partial class MainWindow
         }
 
         CloseFadeCurvePicker();
+        CloseVolumeGainPicker();
         if (_formatMenu is { IsOpen: true })
         {
             _formatMenu.IsOpen = false;
