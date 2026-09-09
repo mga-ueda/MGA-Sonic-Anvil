@@ -179,6 +179,7 @@ public partial class MainWindow
 
             _playTimer.Stop();
             _meter.Reset();
+            LoudnessMeter.Reset();
             var previewRange = FadeCurves.InclusiveSampleRange(range, _document.FrameCount);
             var gain = (long frame) =>
                 FadeCurves.GainAtFrame(shape, fadeIn, frame, previewRange.StartFrame, previewRange.Length);

@@ -21,6 +21,18 @@ public sealed class ChannelMixTests
     }
 
     [Fact]
+    public void FoldPackedPeaksToMid_AveragesChannelPeaks()
+    {
+        var mins = new[] { 0.20f, 0.40f };
+        var maxs = new[] { 0.60f, 0.80f };
+
+        ChannelMix.FoldPackedPeaksToMid(mins, maxs, count: 1, channels: 2);
+
+        Assert.Equal(0.30f, mins[0], 5);
+        Assert.Equal(0.70f, maxs[0], 5);
+    }
+
+    [Fact]
     public void FoldPackedPeaksToUnion_OppositeChannelsStayVisible()
     {
         var mins = new[] { 0.55f, -0.91f, 0.40f, -0.88f };

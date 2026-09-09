@@ -64,7 +64,7 @@
         <li><a href="#playback">再生</a></li>
         <li><a href="#edit">選択と編集</a></li>
         <li><a href="#markers">マーカー／リージョン／ループ</a></li>
-        <li><a href="#spectrogram">スペクトログラム</a></li>
+        <li><a href="#spectrogram">スペクトログラム／ラウドネス</a></li>
         <li><a href="#format">フォーマット変換</a></li>
         <li><a href="#export">WAAPI EXPORT（Wave 単体）</a>
           <ol>
@@ -110,7 +110,7 @@
       <ol>
         <li>Wave / AIFF / MP3 をドロップするか、<kbd>Ctrl</kbd>+<kbd>O</kbd> で開きます（複数可。タブで並びます）。</li>
         <li>波形上で聴きながら切る・フェードする・マーカーやループを置きます。</li>
-        <li>必要なら <kbd>Ctrl</kbd>+<kbd>S</kbd> で Wave または MP3 に保存します（AIFF 書き出しは非対応）。</li>
+        <li>必要なら <kbd>Ctrl</kbd>+<kbd>S</kbd> で Wave または MP3 に保存します（AIFF 書き出しは非対応）。MP3 は 16bit PCM から再エンコード（既定 192 kbps）で、マーカー等は書きません。</li>
         <li>Wwise へ渡すときは、レベルメーター上の <span class="ui">WAAPI</span> をオンにし、作成先を選んで <span class="ui">EXPORT</span> します。</li>
       </ol>
       <div class="note">
@@ -119,14 +119,14 @@
 
       <h2 id="layout">3. 画面の見方</h2>
       <ul>
-        <li><strong>設定</strong> …… 左上の歯車。表示言語（Auto／Japanese／English。Auto は OS が日本語なら Japanese、それ以外は English）、音声出力（WaveOut／WASAPI／ASIO）、フェードカーブ既定。<kbd>Esc</kbd> で閉じます。</li>
+        <li><strong>設定</strong> …… 左上の歯車。表示言語（Auto／Japanese／English。Auto は OS が日本語なら Japanese、それ以外は English）、音声出力（WaveOut／WASAPI／ASIO）、ラウドネスターゲット（LKFS）、フェードカーブ既定。<kbd>Esc</kbd> で閉じます。</li>
         <li><strong>全体波形</strong> …… 上段。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）、ホイールで拡縮（再生ヘッド基準）。</li>
         <li><strong>波形エリア</strong> …… 本編集面。時間ルーラー、マーカー／リージョンフラッグ、再生ヘッド、マウスガイド。</li>
         <li><strong>時間スクロールバー</strong> …… 波形の下。表示範囲を左右に動かします。</li>
-        <li><strong>タブ</strong> …… 1 ファイルでも表示。閉じるは <kbd>Ctrl</kbd>+<kbd>W</kbd>。右クリックで「このタブ以外を閉じる(O)」「このタブを含め右側を全部閉じる(R)」「このタブを含め左側を全部閉じる(L)」「すべてのタブを閉じる(W)」「全部のタブを選択する(A)」。<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> でもすべてのタブを閉じられます。タブは <kbd>Ctrl</kbd>+クリックで個別追加、<kbd>Shift</kbd>+クリックで範囲選択、タブバー上の <kbd>Ctrl</kbd>+<kbd>A</kbd> で全選択でき、選択中のタブはハイライトされます（<kbd>Esc</kbd> で解除）。選択中の右クリックは「選択した（すべての）タブを閉じる」「選択した（すべての）タブにペーストする」になり、<kbd>Ctrl</kbd>+<kbd>V</kbd> でコピーした編集履歴を選択タブへ一括適用できます。タブが増えてバーに収まらないときは、先にアクティブ以外を縮めます。タイトルが 6 文字を切るまで縮めても足りなければ、左右の ＜＞ で送ります。</li>
+        <li><strong>タブ</strong> …… 1 ファイルでも表示。閉じるは <kbd>Ctrl</kbd>+<kbd>W</kbd>。誤って閉じたタブは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> で開き直せる（複数可）。右クリックで「このタブ以外を閉じる(O)」「このタブを含め右側を全部閉じる(R)」「このタブを含め左側を全部閉じる(L)」「すべてのタブを閉じる(W)」「全部のタブを選択する(A)」。<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> でもすべてのタブを閉じられます。タブは <kbd>Ctrl</kbd>+クリックで個別追加、<kbd>Shift</kbd>+クリックで範囲選択、タブバー上の <kbd>Ctrl</kbd>+<kbd>A</kbd> で全選択でき、選択中のタブはハイライトされます（<kbd>Esc</kbd> で解除）。選択中の右クリックは「選択した（すべての）タブを閉じる」「選択した（すべての）タブにペーストする」になり、<kbd>Ctrl</kbd>+<kbd>V</kbd> でコピーした編集履歴を選択タブへ一括適用できます。タブが増えてバーに収まらないときは、先にアクティブ以外を縮めます。タイトルが 6 文字を切るまで縮めても足りなければ、左右の ＜＞ で送ります。</li>
         <li><strong>トランスポート</strong> …… 上段は再生・ズーム。下段はフェード／ノーマライズ／削除／保存、<span class="ui">Tips</span> 枠のオン／オフ、マニュアル <span class="ui">?</span>。ライセンス／GitHub は行の下端。</li>
         <li><strong>Always on Top</strong> …… ステータスバー右端。ウィンドウを最前面に固定します。</li>
-        <li><strong>スペクトラム／レベルメーター／ベクタースコープ</strong> …… 再生出力の表示。スペクトラムは Layer Music Checker と同じ LED 帯域表示を、トランスポート右の狭い枠に収めています。レベルメーター上の <span class="ui">WAAPI</span> でバーの表示を切り替えます。</li>
+        <li><strong>スペクトラム／ラウドネス／レベルメーター／ベクタースコープ</strong> …… 再生出力の表示。スペクトラムの左にラウドネス（Short Term / Integrated / Momentary Max、Loudness Range、True Peak。ターゲット LKFS は設定。数値は青＝余裕、橙＝接近、赤＝超過。停止後も最後の値を残し、再生し直すと測り直します）。スペクトラムは Layer Music Checker と同じ LED 帯域表示です。ベクタースコープは停止後、点が中心へゆっくり戻ります。レベルメーター上の <span class="ui">WAAPI</span> でバーの表示を切り替えます。</li>
         <li><strong>Tips</strong> …… WAAPI バーの上。高さ固定。コントロールにマウスを置くと説明を表示し、はみ出したらスクロールします。初回はすぐ出ます。別の項目へ移る／外すときは 300ms 待ってから差し替え／消去します。見出しまたは本文をクリックでロック（枠がシアン、<span class="ui">Tips (Locked)</span>）。もう一度クリックで解除。ロック中とパネル上では内容が変わりません。ホバー用のツールチップは使いません。</li>
         <li><strong>WAAPI バー</strong> …… 接続状態、作成先、<span class="ui">Play -E</span>、<span class="ui">Auto Active</span>、<span class="ui">EXPORT</span>。</li>
         <li><strong>ステータスバー</strong> …… サンプリングレート等のファイル情報（名前はタブ側。レート／ビット深度／チャンネルを変換すると該当項目が保存まで赤。容量は MB（MiB / B）。変換や範囲削除で変わると推測サイズが赤）、現在時間／選択開始／選択範囲／選択終了／トータル（トータル以外は入力・ホイール／↑↓で調整。時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分、サンプルは1／Shift10／Ctrl100／Ctrl+Shift1000。右クリックで時間とサンプル数を切替）、右端に Always on Top。</li>
@@ -141,7 +141,7 @@
         <li><kbd>Ctrl</kbd>+ドラッグ …… スクラブ。</li>
         <li><kbd>T</kbd> …… ステータスバーの現在時間を入力。Enter で移動。コピー／貼り付け可。右クリックで時間／サンプル数。</li>
         <li><kbd>Z</kbd> または <kbd>.</kbd> …… 中央寄せ。再生中はセンターロックの切替、停止で解除。</li>
-        <li><kbd>L</kbd> …… 選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生。</li>
+        <li><kbd>L</kbd>（<kbd>G</kbd> でも可）…… 選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生。</li>
       </ul>
 
       <h2 id="edit">5. 選択と編集</h2>
@@ -168,11 +168,11 @@
         <li>右クリック、または <kbd>Ctrl</kbd>+<kbd>Del</kbd> でマーカー削除。</li>
       </ul>
       <div class="note">
-        <p>WAV の cue / adtl（マーカー・リージョン）と smpl（サンプルループ）を読み書きします。保存時に埋め込みます。</p>
+        <p>WAV の cue / adtl（マーカー・リージョン）と smpl（サンプルループ）を読み書きします。保存時に埋め込みます。MP3 にはリージョンとサンプルループを付けられません。マーカーは置けますが、MP3 へ保存しても書き出しません（再エンコード時にメタは付きません）。</p>
       </div>
 
-      <h2 id="spectrogram">7. スペクトログラム</h2>
-      <p><kbd>G</kbd> で波形／スペクトログラム／重ね表示を切り替えます。重ね表示はスペクトログラムの上に波形の形だけを載せます（半透明のベールはかけません）。<code>-A</code>／<code>-L</code>／<code>-E</code>／<code>-R</code> とループ／リージョンの下塗りは重ねません（フラッグとラインはそのまま。スペクトログラム単体でも下塗りは出しません）。重ね波形は全体波形と同じく各チャンネルの包絡（最小／最大）で描き、Mid 合成は使いません。振幅ズームが 1 のときは中央半分、拡大すると縦いっぱいに伸びます。色はファイル内のピークを 0 dBFS とみなす表示用ノーマライズで着色します（音声データは変更しません）。ゲインは読み込み・編集の解析時に一度だけ計算し、リアルタイムには追従しません。ファイル全体が画面に収まっているとき（短い SE のフィット表示など）は画面列ごとに FFT し、補間せずシャープに描きます。ズームしているときは全体キャッシュから補間して滑らかに描き、ズーム操作や追従スクロールを軽く保ちます。スクロールは列をずらして足りない分だけ計算します。</p>
+      <h2 id="spectrogram">7. スペクトログラム／ラウドネス解析</h2>
+      <p><kbd>A</kbd> で波形／スペクトログラム／重ね表示／ラウドネス解析を切り替えます。一周すると通常の波形に戻ります。<kbd>L</kbd> は選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生です。ラウドネス解析は Short Term LKFS の曲線です。白い幅は曲線の上下 ±1 LU（1 LU ＝ 1 LKFS の差。メーターの「接近」と同じ）で、半透明です。波形は Mid 合成のピーク dBFS を線でつなぎ、LKFS と同じ縦軸に載せます（0 dBFS ＝ 目盛の 0）。拡大してサンプルが見えるときは、通常の波形と同じく各サンプルを線でつなぎます。dBFS と LKFS は別物ですが、ピークとラウドネスを同じ高さで比べられます。背景の帯はメーターと同じ青／橙／赤（0〜ターゲットが赤、その下 6 LU が橙、さらに下が青）です。曲線は原色のシアン／橙／赤で、赤だけ少し太くします。左目盛は LKFS です（通常の波形では dB）。白い線は設定のターゲットです。重ね表示はスペクトログラムの上に波形の形だけを載せます（半透明のベールはかけません）。<code>-A</code>／<code>-L</code>／<code>-E</code>／<code>-R</code> とループ／リージョンの下塗りは重ねません（フラッグとラインはそのまま。スペクトログラム単体とラウドネス解析でも下塗りは出しません）。重ね波形も Mid 合成の 1 本です。拡大してサンプルが見えるときは、通常の波形と同じく点と線でつなぎます。振幅ズームが 1 のときは中央半分、拡大すると縦いっぱいに伸びます。色はファイル内のピークを 0 dBFS とみなす表示用ノーマライズで着色します（音声データは変更しません）。ゲインは読み込み・編集の解析時に一度だけ計算し、リアルタイムには追従しません。ファイル全体が画面に収まっているとき（短い SE のフィット表示など）は画面列ごとに FFT し、補間せずシャープに描きます。ズームしているときは全体キャッシュから補間して滑らかに描き、ズーム操作や追従スクロールを軽く保ちます。スクロールは列をずらして足りない分だけ計算します。</p>
 
       <h2 id="format">8. フォーマット変換</h2>
       <ul>
@@ -180,7 +180,7 @@
         <li><kbd>B</kbd> …… ビット深度</li>
         <li><kbd>C</kbd> …… チャンネル数（Mono／Stereo）</li>
       </ul>
-      <p>プリセットか任意 Hz を選びます。任意 Hz は ↑↓／ホイールで 1Hz（Shift 10／Ctrl 100／Ctrl+Shift 1000）。メニューはカーソルの直下を避けます。項目を選んだ時点でステータスの容量が推測サイズに更新されます。変換中は操作を受け付けません。確定した項目は保存まで赤のままです。</p>
+      <p>プリセットか任意 Hz を選びます。任意 Hz は ↑↓／ホイールで 1Hz（Shift 10／Ctrl 100／Ctrl+Shift 1000）。メニューはカーソルの直下を避けます。項目を選んだ時点でステータスの容量が推測サイズに更新されます。変換中は操作を受け付けません。確定した項目は保存まで赤のままです。サンプリングレートとビット深度は、読み込み時（またはフェード等の中身の編集後）の元 PCM から毎回変換します。48 kHz→24 kHz のあと 11 kHz にしても、24 kHz 経由ではなく 48 kHz から作り直します。</p>
 
       <h2 id="export">9. WAAPI EXPORT（Wave 単体）</h2>
       <p><strong>Wwise IM Importer の Wave 単体モードと同じ組み立て</strong>です。ワンショットとループをあらかじめ別ファイルに分けず、1 本のマスター波形上で構造を決めます。EXPORT は元波形を 1 ファイルのまま Originals へ書き、区間は MusicClip のトリムで合わせます。Music Playlist Container 1 つを作ります。Custom Cue は出しません。小節・テンポ管理、複数波形の Switch、XML マーカートラックはありません。</p>
@@ -246,6 +246,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>保存（Wave または MP3）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>別名保存</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>タブを閉じる（未保存なら保存確認）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>閉じたタブを開き直す（新しいものから。複数可）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>すべてのタブを閉じる</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Tab</kbd>／<kbd>Ctrl</kbd>+<kbd>PageDown</kbd></td><td>次のタブ</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd>／<kbd>Ctrl</kbd>+<kbd>PageUp</kbd></td><td>前のタブ</td></tr>
@@ -262,7 +263,7 @@
           <tr><td><kbd>Enter</kbd></td><td>その場停止</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>3 秒前から再生</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>再生開始位置からやり直し</td></tr>
-          <tr><td><kbd>L</kbd></td><td>選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生</td></tr>
+          <tr><td><kbd>L</kbd>／<kbd>G</kbd></td><td>選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生</td></tr>
           <tr><td><kbd>Z</kbd>／<kbd>.</kbd></td><td>中央寄せ。再生中はセンターロックの切替、停止で解除</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Home</kbd></td><td>ファイル先頭へ</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>End</kbd></td><td>ファイル末尾へ</td></tr>
@@ -282,7 +283,7 @@
           <tr><td>ホイール</td><td>時間ズーム（再生ヘッド基準。全体波形上も同じ）</td></tr>
           <tr><td><kbd>Shift</kbd>+ホイール</td><td>パン（波形上）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+ホイール</td><td>振幅ズーム（波形上）</td></tr>
-          <tr><td><kbd>G</kbd></td><td>波形／スペクトログラム／重ね表示</td></tr>
+          <tr><td><kbd>A</kbd></td><td>波形／スペクトログラム／重ね表示／ラウドネス解析</td></tr>
           <tr><td><kbd>T</kbd></td><td>ステータスバーの現在時間を入力</td></tr>
         </tbody>
       </table>
@@ -432,7 +433,7 @@
 
       <h2 id="settings">11. 設定と言語</h2>
       <ul>
-        <li>再生デバイスとフェードカーブ既定は左上の歯車（WaveOut／WASAPI／ASIO）。</li>
+        <li>再生デバイス、ラウドネスターゲット（LKFS）、フェードカーブ既定は左上の歯車（WaveOut／WASAPI／ASIO）。</li>
         <li>表示言語も歯車の設定。既定は <span class="ui">Auto</span>（OS が日本語なら Japanese、それ以外は English）。日本語版は現状の文言（英語ラベル含む）のままです。</li>
         <li>マニュアルは <span class="ui">?</span>、またはブラウザの GitHub Pages。表示言語に合わせて日本語／英語を開きます。</li>
         <li>設定ファイル: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>

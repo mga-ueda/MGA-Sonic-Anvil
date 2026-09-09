@@ -128,8 +128,8 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string AccessibleAudioSettingsButton => Get("設定", "Settings");
     public static string TipAudioSettings => Get(
-        "表示言語、音声出力、フェードカーブ既定を設定します。",
-        "Configure UI language, audio output, and default fade curves.");
+        "表示言語、音声出力、ラウドネスターゲット、フェードカーブ既定を設定します。",
+        "Configure UI language, audio output, loudness target, and default fade curves.");
 
     public static string ButtonFadeIn => Get("FADE IN", "FADE IN");
     public static string ButtonFadeOut => Get("FADE OUT", "FADE OUT");
@@ -207,6 +207,23 @@ internal static partial class UiStrings
     public static string ErrorEmptyAfterDelete => Get(
         "ファイル全体は削除できません。",
         "The entire file cannot be deleted.");
+    public static string ErrorMp3NoRegionLoop => Get(
+        "MP3 にはリージョンとサンプルループを付けられません。マーカーは置けますが、MP3 保存では書き出しません。",
+        "MP3 cannot take regions or a sample loop. Markers are allowed, but they are not written when you save as MP3.");
+    public static string LabelLoudness => Get("Loudness", "Loudness");
+    public static string LabelLoudnessShortTerm => Get("Short Term", "Short Term");
+    public static string LabelLoudnessIntegrated => Get("Integrated", "Integrated");
+    public static string LabelLoudnessMomentary => Get("Momentary", "Momentary");
+    public static string LabelMaxLufs => Get("LKFS Max", "LKFS Max");
+    public static string LabelLufs => Get("LKFS", "LKFS");
+    public static string LabelLra => Get("Loudness Range", "Loudness Range");
+    public static string LabelLu => Get("LU", "LU");
+    public static string LabelTruePeak => Get("True Peak", "True Peak");
+    public static string LabelDb => Get("dB", "dB");
+    public static string LabelLoudnessTarget => Get("ラウドネスターゲット", "Loudness Target");
+    public static string ErrorLoudnessTargetRange => Get(
+        "ラウドネスターゲットは -70 から 0 の LKFS で入力してください。",
+        "Enter a loudness target between -70 and 0 LKFS.");
     public static string OverlaySampleRateConvert => Get("サンプリングレート変換", "Sample rate conversion");
 
     public static string FilterOpenAudio => Get(
@@ -275,12 +292,14 @@ internal static partial class UiStrings
         "部分削除 (Delete)\n選択範囲を詰めて削除\n選択中のマーカー / リージョンはまとめて削除\nCtrl+Del でマーカー削除",
         "Ripple delete (Delete)\nRemove the selection and close the gap\nSelected markers / regions are deleted together\nCtrl+Del deletes markers");
     public static string TipSave => Get(
-        "保存 (Ctrl+S)\nCtrl+Shift+S で別名保存",
-        "Save (Ctrl+S)\nCtrl+Shift+S to save as");
+        "保存 (Ctrl+S)\nCtrl+Shift+S で別名保存\nMP3 は PCM 16bit にしてから再エンコード（既定 192 kbps）。マーカー／リージョン／ループは MP3 に書きません",
+        "Save (Ctrl+S)\nCtrl+Shift+S to save as\nMP3 is re-encoded from 16-bit PCM (default 192 kbps). Markers / regions / loops are not written to MP3");
     public static string TipOpen => Get(
-        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Tab で次のタブ\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
-        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Tab goes to the next tab\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
-    public static string TipCloseTab => Get("タブを閉じる (Ctrl+W)", "Close tab (Ctrl+W)");
+        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Shift+T で閉じたタブを開き直す（何度でも）\nCtrl+Tab で次のタブ\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
+        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Shift+T reopens closed tabs (more than one)\nCtrl+Tab goes to the next tab\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
+    public static string TipCloseTab => Get(
+        "タブを閉じる (Ctrl+W)。Ctrl+Shift+T で開き直せる",
+        "Close tab (Ctrl+W). Ctrl+Shift+T reopens it");
     public static string TipTabScrollLeft => Get("左のタブを表示", "Show tabs to the left");
     public static string TipTabScrollRight => Get("右のタブを表示", "Show tabs to the right");
     public static string TipOverview => Get(
@@ -289,9 +308,12 @@ internal static partial class UiStrings
     public static string TipSpectrum => Get(
         "再生出力の LED スペクトラムです。1/3oct 相当の帯域とピークホールド。Layer Music Checker と同じ検波です。",
         "LED spectrum of the playback output. Third-octave-style bands and peak hold, same detection as Layer Music Checker.");
+    public static string TipLoudness => Get(
+        "再生出力のラウドネス（ITU-R BS.1770 / EBU R128）。Short Term・Integrated・Momentary Max、Loudness Range、True Peak。ターゲット LKFS は設定で変更。数値は青＝余裕、橙＝接近、赤＝超過（LKFS はターゲット、True Peak は 0 dBTP、Loudness Range は 20/25 LU）。停止後も最後の値を残し、再生し直すと測り直します。音声は変えません。",
+        "Playback loudness (ITU-R BS.1770 / EBU R128): Short Term, Integrated, Momentary Max, Loudness Range, True Peak. Target LKFS is in Settings. Values: blue = headroom, orange = approaching, red = over (LKFS vs target, True Peak vs 0 dBTP, Loudness Range vs 20/25 LU). Holds the last reading after stop; a new play measures again. Does not change the audio.");
     public static string TipVectorScope => Get(
-        "再生出力の位相相関とベクターオーディオスコープです。正方形は縦が Mid、横が Side。下の数値は L/R の相関（+1 同相 / 0 無相関 / -1 逆相）です。",
-        "Phase correlation and a vector audio scope of the playback output. The square is Mid (vertical) and Side (horizontal). The number below is L/R correlation (+1 in phase / 0 uncorrelated / -1 inverted).");
+        "再生出力の位相相関とベクターオーディオスコープです。正方形は縦が Mid、横が Side。下の数値は L/R の相関（+1 同相 / 0 無相関 / -1 逆相）です。停止後は点が中心へゆっくり戻ります。",
+        "Phase correlation and a vector audio scope of the playback output. The square is Mid (vertical) and Side (horizontal). The number below is L/R correlation (+1 in phase / 0 uncorrelated / -1 inverted). After stop, the point slowly returns to the center.");
     public static string TipAudioApi => Get(
         "再生 API（WaveOut / WASAPI / ASIO）",
         "Playback API (WaveOut / WASAPI / ASIO)");
@@ -299,6 +321,9 @@ internal static partial class UiStrings
     public static string TipUiLanguage => Get(
         "表示言語。Auto は OS が日本語なら Japanese、それ以外は English。",
         "UI language. Auto is Japanese if the OS is Japanese, otherwise English.");
+    public static string TipLoudnessTarget => Get(
+        "ラウドネスメーターのターゲット（LKFS）。-70 から 0。色分けの基準です。音声は変えません。",
+        "Loudness meter target (LKFS), from -70 to 0. Used for the color scale. Does not change the audio.");
     public static string TipFadeCurveDefaults => Get(
         "I / O で開くフェードカーブの初期選択です。",
         "Initial curve shown when you open fade in / fade out (I / O).");
@@ -338,12 +363,12 @@ internal static partial class UiStrings
     public static string TipWaveform => Get(
         "ドラッグで選択　Ctrl+ドラッグでスクラブ　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A で全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着\n"
         + "ホイール=時間ズーム（再生ヘッド基準）　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"
-        + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル、Shift で3倍）　Ctrl+←→ 前後のマーカー / リージョン端 / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（同じ範囲でもう一度で解除）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M マーカー　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動（Shift で3倍） / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント / リージョン名（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
-        + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　T で現在時間　U で編集履歴　G で波形 / スペクトログラム / 重ね表示（重ねとスペクトログラム単体では -A/-L/-E/-R とループ／リージョンの下塗りなし）　Ctrl+Shift+E で Wwise EXPORT（Wave 単体）",
+        + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル、Shift で3倍）　Ctrl+←→ 前後のマーカー / リージョン端 / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L（G でも可）で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（同じ範囲でもう一度で解除）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M マーカー　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動（Shift で3倍） / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント / リージョン名（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
+        + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　T で現在時間　U で編集履歴　A で波形 / スペクトログラム / 重ね表示 / ラウドネス解析（Short Term LKFS。白い幅は ±1 LU、半透明。波形は上半分のピーク dBFS を線で同じ目盛へ。曲線は原色のシアン／橙／赤。LKFS は左目盛。スペクトログラム・重ね・ラウドネスでは -A/-L/-E/-R とループ／リージョンの下塗りなし）　Ctrl+Shift+E で Wwise EXPORT（Wave 単体）　MP3 ではリージョン／ループ不可。マーカーは置けるが MP3 保存では残らない",
         "Drag to select. Ctrl+drag to scrub. Esc or a move without Shift clears the selection. Shift+move extends. Shift+←/→ grows it (1 sample when dots are shown). Home/End jump to the view edge. Shift+PgUp/PgDn by 5%. Ctrl+Shift+Home/End selects all before/after. Ctrl+A selects all. Double-click selects a span (between markers). The guide snaps to markers / loop edges.\n"
         + "Wheel = time zoom (around the playhead). Shift+wheel = pan. Ctrl+wheel = amplitude.\n"
-        + "←/→ seek (moves a selected marker / region edge / loop edge; 1 sample when dots are shown, Shift ×3). Ctrl+←/→ previous/next marker / region edge / sample-loop edge. Numpad jumps to a number (or a view position). Z / . centers (toggles center-lock while playing, clears it when stopped). 0–9 jump in the view. L loops from 3 seconds before the end of the selection (or the sample loop / -L). Shift+L sets the selection as the sample loop (same range again clears it). Shift+R sets the selection as a region (same range again clears it). Right-click a marker / region flag / loop bar to delete. S sample rate, B bit depth, C channels, M marker. Click a flag to select an edge / Shift+click for a range / Ctrl+click to add / drag or ←/→ to move (Shift ×3) / Delete or Ctrl+Del to delete. Ctrl+Shift+R to rename. Double-click a comment / region name (-A lime / -L blue / -E red / -R gray).\n"
-        + "On a marker / region edge / loop edge, Alt+←/→ is 1 px (1 sample when dots are shown), Shift ×3, Ctrl pairs with the previous marker (both edges for a region / loop). X applies a linear fade around the playhead in the view (before = out / after = in). Ctrl+X / C / V cut / copy / paste (markers in range included; a matching region is included too). T edits the current time. U opens edit history. G cycles waveform / spectrogram / overlay (overlay and spectrogram-only skip -A/-L/-E/-R, loop, and region fills). Ctrl+Shift+E exports Wave-only to Wwise.");
+        + "←/→ seek (moves a selected marker / region edge / loop edge; 1 sample when dots are shown, Shift ×3). Ctrl+←/→ previous/next marker / region edge / sample-loop edge. Numpad jumps to a number (or a view position). Z / . centers (toggles center-lock while playing, clears it when stopped). 0–9 jump in the view. L (or G) loops from 3 seconds before the end of the selection (or the sample loop / -L). Shift+L sets the selection as the sample loop (same range again clears it). Shift+R sets the selection as a region (same range again clears it). Right-click a marker / region flag / loop bar to delete. S sample rate, B bit depth, C channels, M marker. Click a flag to select an edge / Shift+click for a range / Ctrl+click to add / drag or ←/→ to move (Shift ×3) / Delete or Ctrl+Del to delete. Ctrl+Shift+R to rename. Double-click a comment / region name (-A lime / -L blue / -E red / -R gray).\n"
+        + "On a marker / region edge / loop edge, Alt+←/→ is 1 px (1 sample when dots are shown), Shift ×3, Ctrl pairs with the previous marker (both edges for a region / loop). X applies a linear fade around the playhead in the view (before = out / after = in). Ctrl+X / C / V cut / copy / paste (markers in range included; a matching region is included too). T edits the current time. U opens edit history. A cycles waveform / spectrogram / overlay / loudness analysis (Short Term LKFS; the white width is a translucent ±1 LU band; the waveform is an upper-half peak dBFS line on the same scale; the curve is primary cyan / orange / red; LKFS numbers sit on the left scale). Spectrogram, overlay, and loudness skip -A/-L/-E/-R, loop, and region fills. Ctrl+Shift+E exports Wave-only to Wwise. MP3 cannot take regions / loops; markers are allowed but not saved to MP3.");
     public static string TipAlwaysOnTop => Get(
         "ウィンドウを常に最前面へ表示します。",
         "Keep the window always on top.");

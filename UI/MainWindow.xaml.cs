@@ -134,6 +134,8 @@ public partial class MainWindow : Window
             OwnerCenteredMessageBox.Show(this, message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning));
         _player.ApplyOutputSettings(_outputSettings);
         Spectrum.Player = _player;
+        LoudnessMeter.Player = _player;
+        Waveform.LoudnessTargetLufs = AppStorage.Settings.ResolvedLoudnessTargetLufs();
         VectorScope.Player = _player;
 
         // 優先度は Input が唯一安全：Render だと追従描画が入力を飢餓させ操作不能になり
@@ -294,6 +296,7 @@ public partial class MainWindow : Window
         Transport.SetPlaying(false);
         Transport.SetCommandsEnabled(_document is not null);
         ExtinguishMeter();
+        LoudnessMeter.Reset();
         RebuildTabBar();
         RefreshTitle();
         SyncViewChrome();
@@ -337,6 +340,7 @@ public partial class MainWindow : Window
         TipService.Set(Overview, UiStrings.TipOverview);
         TipService.Set(VectorScope, UiStrings.TipVectorScope);
         TipService.Set(Spectrum, UiStrings.TipSpectrum);
+        TipService.Set(LoudnessMeter, UiStrings.TipLoudness);
         TipService.Set(LevelMeter, UiStrings.TipLevelMeter);
         TipService.Set(TimeScroll, UiStrings.TipTimeScroll);
         TipService.Set(DocumentTabHost, UiStrings.TipOpen);
@@ -367,6 +371,7 @@ public partial class MainWindow : Window
         RefreshTabLocalizedTips();
         RefreshStatus();
         LevelMeter.InvalidateVisual();
+        LoudnessMeter.ApplyLocalizedText();
 #if DEBUG
         _colorDevPanel?.ApplyLocalizedText();
 #endif

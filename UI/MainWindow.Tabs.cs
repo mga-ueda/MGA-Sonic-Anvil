@@ -11,6 +11,8 @@ namespace MgaSonicAnvil.UI;
 
 public partial class MainWindow
 {
+    private readonly record struct ClosedTab(DocumentSession Session, int Index);
+
     /// <summary>
     /// 複数選択されたタブ。Ctrl+クリックで個別追加、Shift+クリックで範囲、
     /// タブ上の Ctrl+A で全選択。Esc で解除。選択中の Ctrl+V は選択タブへの
@@ -18,8 +20,13 @@ public partial class MainWindow
     /// </summary>
     private readonly HashSet<DocumentSession> _selectedTabs = [];
 
+    /// <summary>閉じたタブ。末尾が一番新しく、Ctrl+Shift+T でそこから戻す。</summary>
+    private readonly List<ClosedTab> _closedTabs = [];
+
     /// <summary>Shift+クリックの範囲選択の起点。</summary>
     private DocumentSession? _tabSelectionAnchor;
+
+    private const int ClosedTabLimit = 32;
 
     private bool _tabLayoutBusy;
 
@@ -99,6 +106,12 @@ public partial class MainWindow
         }
 
         var closingActive = ReferenceEquals(session, _activeSession);
+        if (closingActive)
+        {
+            CaptureActiveSessionView();
+        }
+
+        RememberClosedTab(session, index);
         _sessions.RemoveAt(index);
         if (_sessions.Count == 0)
         {
@@ -118,6 +131,43 @@ public partial class MainWindow
         }
 
         return true;
+    }
+
+    private void RememberClosedTab(DocumentSession session, int index)
+    {
+        _closedTabs.Add(new ClosedTab(session, index));
+        if (_closedTabs.Count > ClosedTabLimit)
+        {
+            _closedTabs.RemoveAt(0);
+        }
+    }
+
+    private void ReopenLastClosedTab()
+    {
+        if (_closedTabs.Count == 0)
+        {
+            return;
+        }
+
+        var closed = _closedTabs[^1];
+        _closedTabs.RemoveAt(_closedTabs.Count - 1);
+        var session = closed.Session;
+        if (_sessions.Contains(session))
+        {
+            ActivateSession(session);
+            return;
+        }
+
+        if (session.Document.SourcePath is { } path
+            && FindSessionByPath(path) is { } existing)
+        {
+            ActivateSession(existing);
+            return;
+        }
+
+        var index = Math.Clamp(closed.Index, 0, _sessions.Count);
+        _sessions.Insert(index, session);
+        ActivateSession(session);
     }
 
     private void CloseOtherTabs(DocumentSession keep)

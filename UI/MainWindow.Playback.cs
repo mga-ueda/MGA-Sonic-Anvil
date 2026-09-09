@@ -158,6 +158,7 @@ public partial class MainWindow
         try
         {
             _meter.Reset();
+            LoudnessMeter.Reset();
             _player.Prepare(_document, startFrame, playRange, loop: playRange is not null);
             _player.SetExitSpan(ComputeExitLayerSpan(playRange));
             _player.Play();
@@ -471,6 +472,7 @@ public partial class MainWindow
         LevelMeter.Apply(_meter.Update(peakL, rmsL, peakR, rmsR, _meterClock.Elapsed.TotalSeconds, hasSamples));
         // スペアナ・ゴニオも Background タイマー飢餓を避けてフレーム駆動で更新する。
         Spectrum.Tick();
+        LoudnessMeter.Tick();
         VectorScope.Tick();
         if (_fadePreviewing || _formatPreviewing)
         {
@@ -666,6 +668,17 @@ public partial class MainWindow
             return;
         }
 
+        if (!_document.AllowsRegionsAndLoops)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorMp3NoRegionLoop,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
         var range = _document.Selection;
         if (range.IsEmpty)
         {
@@ -704,6 +717,17 @@ public partial class MainWindow
     {
         if (_document is null)
         {
+            return;
+        }
+
+        if (!_document.AllowsRegionsAndLoops)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorMp3NoRegionLoop,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 

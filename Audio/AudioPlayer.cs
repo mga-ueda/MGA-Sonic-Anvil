@@ -150,6 +150,9 @@ internal sealed class AudioPlayer : IDisposable
     public bool TakeMeterInterval(out float peakLeft, out float rmsLeft, out float peakRight, out float rmsRight) =>
         _provider.TakeMeterInterval(out peakLeft, out rmsLeft, out peakRight, out rmsRight);
 
+    public int TakeLoudnessFrames(float[] left, float[] right) =>
+        _provider.TakeLoudnessFrames(left, right);
+
     public void Prepare(
         AudioDocument document,
         long startFrame,

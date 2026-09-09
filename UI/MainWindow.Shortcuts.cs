@@ -247,6 +247,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.T && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            ReopenLastClosedTab();
+            return true;
+        }
+
         if (key == Key.Tab && modifiers == ModifierKeys.Control)
         {
             ActivateAdjacentTab(1);
@@ -419,6 +425,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.A && modifiers == ModifierKeys.None)
+        {
+            Waveform.ToggleAnalysisView();
+            return true;
+        }
+
         if (key == Key.M && modifiers == ModifierKeys.None)
         {
             AddMarkerAtPlayhead();
@@ -451,7 +463,7 @@ public partial class MainWindow
 
         if (key == Key.G && modifiers == ModifierKeys.None)
         {
-            Waveform.ToggleSpectrogram();
+            JumpToLoopPrerollAndPlay();
             return true;
         }
 

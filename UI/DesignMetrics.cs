@@ -11,11 +11,11 @@ internal static class DesignMetrics
 
     public static double From96(double value96) => value96;
 
-    public static double WindowMinWidth => From96(1019);
+    public static double WindowMinWidth => From96(1240);
 
     public static double WindowMinHeight => From96(420);
 
-    public static double WindowDefaultWidth => From96(1019);
+    public static double WindowDefaultWidth => From96(1240);
 
     public static double WindowDefaultHeight => From96(573);
 
@@ -90,6 +90,9 @@ internal static class DesignMetrics
     /// <summary>周波数数値の重なりを避けるため、右揃えのまま左へ足す幅。</summary>
     public static double SpectrumExtraWidth => From96(72);
 
+    /// <summary>スペアナ左のラウドネスメーター幅。縦積み1列。</summary>
+    public static double LoudnessMeterWidth => From96(232);
+
     /// <summary>正方形ゴニオ直下の位相バー高さ。</summary>
     public static double VectorScopeCorrelationHeight => From96(18);
 
@@ -103,8 +106,6 @@ internal static class DesignMetrics
     public static double ActionButtonHeight => From96(32);
 
     public static double AudioInputHeight => Dip(30);
-
-    public static GridLength AudioInputHeightGrid => new(AudioInputHeight);
 
     public static double AudioDialogButtonWidth => Dip(162);
 

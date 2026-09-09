@@ -22,7 +22,6 @@ internal sealed class WaveformView : Grid
     // 旧 2^(1/4) の 5 段階分 = 2^(5/4)。ホイール時間ズーム。
     public const double WheelTimeStep = 2.378414230005442;
     private const int PolylineMaxSamplesPerPixel = 1;
-    private const int OverlayPolylineMaxSamplesPerPixel = 32;
     private const double OverlayWaveHeightFraction = 0.5;
     private const int RawColumnMaxSamplesPerPixel = 96;
     private const int RawColumnMaxFrames = 1 << 18;
@@ -124,6 +123,8 @@ internal sealed class WaveformView : Grid
     private bool _waveDirty = true;
     private SpectrogramViewMode _spectrogramMode;
     private readonly SpectrogramRenderer _spectrogram = new();
+    private readonly LoudnessOverlayRenderer _loudness = new();
+    private double _loudnessTargetLufs = LoudnessMeterEngine.DefaultTargetLufs;
     private double _appliedMarkerLaneHeight = -1;
     private double _staticPaintMs;
     private double _staticPaintLastMs;
@@ -144,6 +145,7 @@ internal sealed class WaveformView : Grid
     private int[] _columnYLo = [];
     private int _waveBgra;
     private int _waveOverlayBgra;
+    private int _loudnessWaveBgra;
     private int _zeroBgra;
     private double _viewStart;
     private double _timeZoom = 1d;
@@ -255,6 +257,15 @@ internal sealed class WaveformView : Grid
         }
     }
 
+    private void InvalidateStaticLayerForLoudness()
+    {
+        if (LoudnessVisible)
+        {
+            _waveDirty = true;
+            InvalidateStaticLayer();
+        }
+    }
+
     public void RefreshLocalizedTips() => TipService.Set(this, UiStrings.TipWaveform);
 
     public AudioDocument? Document
@@ -276,6 +287,7 @@ internal sealed class WaveformView : Grid
             _markerSelectAnchor = null;
             _keyboardSelectAnchor = null;
             _spectrogram.InvalidateCache();
+            _loudness.Invalidate();
             InvalidateWaveform();
             RaiseViewChanged();
         }
@@ -514,6 +526,7 @@ internal sealed class WaveformView : Grid
         _mouseGuideOnSelectionBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MouseGuideOnSelectionBrush"));
         _waveBgra = 0;
         _waveOverlayBgra = 0;
+        _loudnessWaveBgra = 0;
         _zeroBgra = 0;
         _playheadCore = null;
         _exitPlayheadCore = null;
@@ -523,19 +536,53 @@ internal sealed class WaveformView : Grid
 
     public void RefreshOverlay() => InvalidatePlayheadLayer();
 
-    public bool SpectrogramVisible => _spectrogramMode != SpectrogramViewMode.Off;
+    public bool SpectrogramVisible =>
+        _spectrogramMode is SpectrogramViewMode.Spectrogram or SpectrogramViewMode.Overlay;
 
-    public void ToggleSpectrogram()
+    public bool LoudnessVisible => _spectrogramMode == SpectrogramViewMode.Loudness;
+
+    public double LoudnessTargetLufs
+    {
+        get => _loudnessTargetLufs;
+        set
+        {
+            var next = LoudnessMeterEngine.ClampTargetLufs(value);
+            if (Math.Abs(_loudnessTargetLufs - next) < 1e-6)
+            {
+                return;
+            }
+
+            _loudnessTargetLufs = next;
+            if (LoudnessVisible)
+            {
+                _waveDirty = true;
+                InvalidateStaticLayer();
+            }
+        }
+    }
+
+    public void ToggleAnalysisView()
     {
         _spectrogramMode = _spectrogramMode switch
         {
             SpectrogramViewMode.Off => SpectrogramViewMode.Spectrogram,
             SpectrogramViewMode.Spectrogram => SpectrogramViewMode.Overlay,
+            SpectrogramViewMode.Overlay => SpectrogramViewMode.Loudness,
             _ => SpectrogramViewMode.Off,
         };
+        ApplyAnalysisView();
+    }
+
+    private void ApplyAnalysisView()
+    {
         if (SpectrogramVisible && _document is not null)
         {
             _spectrogram.RequestCache(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayerForSpectrogram));
+        }
+
+        if (LoudnessVisible && _document is not null)
+        {
+            _loudness.Ensure(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayerForLoudness));
         }
 
         InvalidateStaticLayer();
@@ -544,13 +591,23 @@ internal sealed class WaveformView : Grid
     public void InvalidateSpectrogramCache()
     {
         _spectrogram.InvalidateCache();
+        _loudness.Invalidate();
         if (SpectrogramVisible && _document is not null)
         {
             _spectrogram.RequestCache(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayerForSpectrogram));
         }
+
+        if (LoudnessVisible && _document is not null)
+        {
+            _loudness.Ensure(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayerForLoudness));
+        }
     }
 
-    public void DisposeSpectrogram() => _spectrogram.Dispose();
+    public void DisposeSpectrogram()
+    {
+        _spectrogram.Dispose();
+        _loudness.Dispose();
+    }
 
     public void ZoomTimeIn(bool anchorPlayhead = true) =>
         SetTimeZoom(_timeZoom * TimeZoomStep, AnchorFrame(anchorPlayhead));
@@ -1629,14 +1686,21 @@ internal sealed class WaveformView : Grid
         }
 
         var overlay = _spectrogramMode == SpectrogramViewMode.Overlay;
+        var loudness = LoudnessVisible;
         if (SpectrogramVisible)
         {
             _spectrogram.Draw(dc, wave, _document, start, span, this);
         }
 
-        if (!SpectrogramVisible || overlay)
+        if (loudness)
         {
-            if (!overlay)
+            _loudness.Ensure(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayerForLoudness));
+            _loudness.DrawUnderlay(dc, wave, _loudnessTargetLufs);
+        }
+
+        if (!SpectrogramVisible || overlay || loudness)
+        {
+            if (!overlay && !loudness)
             {
                 MarkerRolePaint.DrawRegion(dc, _document, wave, start, span, "RegionWaveFillBrush");
                 MarkerRolePaint.DrawSampleLoop(dc, _document, wave, start, span, "SampleLoopWaveFillBrush");
@@ -1644,14 +1708,44 @@ internal sealed class WaveformView : Grid
             }
 
             EnsureWaveformBitmap(wave);
-            DrawWaveformImage(dc, wave);
-            if (!overlay)
+            if (loudness)
+            {
+                dc.PushOpacity(0.75);
+                DrawWaveformImage(dc, wave);
+                dc.Pop();
+            }
+            else
+            {
+                DrawWaveformImage(dc, wave);
+            }
+
+            if (!overlay && !loudness)
             {
                 MarkerRolePaint.DrawRemoveOverlays(dc, _document, wave, start, span);
             }
         }
 
-        if (!SpectrogramVisible)
+        if (loudness)
+        {
+            _loudness.DrawScale(
+                dc,
+                DbScaleBounds(bounds),
+                wave,
+                _loudnessTargetLufs,
+                VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            if (_loudness.Current is { } profile)
+            {
+                _loudness.DrawOverlay(
+                    dc,
+                    wave,
+                    profile,
+                    _loudnessTargetLufs,
+                    start,
+                    span);
+            }
+        }
+
+        if (!SpectrogramVisible && !loudness)
         {
             var channels = Math.Max(1, _document.Channels);
             var laneGap = channels > 1 ? 4d : 0d;
@@ -1745,7 +1839,7 @@ internal sealed class WaveformView : Grid
         }
 
         _waveBitmap!.WritePixels(new Int32Rect(0, 0, bmpWidth, height), _wavePixels, bmpWidth * 4, 0);
-        if (!SpectrogramVisible)
+        if (!SpectrogramVisible && !LoudnessVisible)
         {
             RebuildInvertBitmap(bmpWidth, height, dpi);
         }
@@ -1776,7 +1870,7 @@ internal sealed class WaveformView : Grid
         }
 
         var rangeFrames = (long)Math.Ceiling(quantStart + bmpSpan) - (long)Math.Floor(quantStart);
-        if (IsPolylineZoom(rangeFrames, width, _spectrogramMode == SpectrogramViewMode.Overlay))
+        if (IsPolylineZoom(rangeFrames, width))
         {
             return false;
         }
@@ -1910,9 +2004,9 @@ internal sealed class WaveformView : Grid
         double span,
         WaveSelection selection)
     {
-        if (SpectrogramVisible || _invertBitmap is null)
+        if (SpectrogramVisible || LoudnessVisible || _invertBitmap is null)
         {
-            if (SpectrogramVisible)
+            if (SpectrogramVisible || LoudnessVisible)
             {
                 var specWave = WaveformBounds(bounds);
                 var sx0 = FrameToViewX(selection.StartFrame, start, span, bounds);
@@ -1962,8 +2056,10 @@ internal sealed class WaveformView : Grid
     {
         var sourceChannels = Math.Max(1, document.Channels);
         var overlay = _spectrogramMode == SpectrogramViewMode.Overlay;
-        var drawChannels = overlay ? 1 : sourceChannels;
-        var laneGap = !overlay && drawChannels > 1 ? 4d * scaleY : 0d;
+        var loudness = LoudnessVisible;
+        var monoWave = overlay || loudness;
+        var drawChannels = monoWave ? 1 : sourceChannels;
+        var laneGap = !monoWave && drawChannels > 1 ? 4d * scaleY : 0d;
         ResolveWaveLane(overlay, height, drawChannels, laneGap, _ampZoom, out var laneHeight, out var laneOrigin, out var ampHeight);
         x0 = Math.Clamp(x0, 0, width);
         x1 = Math.Clamp(x1, x0, width);
@@ -1975,8 +2071,28 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var usePolyline = IsPolylineZoom(rangeFrames, width, overlay);
+        var usePolyline = IsPolylineZoom(rangeFrames, width);
         var useRawColumns = !usePolyline && rangeFrames <= RawColumnBudget(width);
+        if (loudness)
+        {
+            RasterLoudnessDbWaveform(
+                buffer,
+                stride,
+                width,
+                height,
+                document,
+                x0,
+                x1,
+                start,
+                span,
+                startFrame,
+                rangeFrames,
+                sourceChannels,
+                usePolyline,
+                useRawColumns);
+            return;
+        }
+
         if (!usePolyline)
         {
             var f0 = startFrame + (long)x0 * rangeFrames / width;
@@ -2002,9 +2118,9 @@ internal sealed class WaveformView : Grid
             }
 
             var packedChannels = sourceChannels;
-            if (overlay)
+            if (monoWave)
             {
-                ChannelMix.FoldPackedPeaksToUnion(_columnMins, _columnMaxs, count, sourceChannels);
+                ChannelMix.FoldPackedPeaksToMid(_columnMins, _columnMaxs, count, sourceChannels);
                 packedChannels = 1;
             }
 
@@ -2017,7 +2133,7 @@ internal sealed class WaveformView : Grid
                     continue;
                 }
 
-                if (!overlay)
+                if (!monoWave)
                 {
                     DrawLaneGuides(buffer, stride, width, height, top, mid, drawLaneTop: true, x0, x1);
                 }
@@ -2051,7 +2167,7 @@ internal sealed class WaveformView : Grid
                 continue;
             }
 
-            if (!overlay)
+            if (!monoWave)
             {
                 DrawLaneGuides(buffer, stride, width, height, top, mid, drawLaneTop: true, 0, width);
             }
@@ -2063,7 +2179,7 @@ internal sealed class WaveformView : Grid
                 clipTop,
                 clipBottom,
                 document,
-                overlay ? -1 : ch,
+                monoWave ? -1 : ch,
                 start,
                 span,
                 top,
@@ -2071,6 +2187,171 @@ internal sealed class WaveformView : Grid
                 mid,
                 scaleX);
         }
+    }
+
+    private unsafe void RasterLoudnessDbWaveform(
+        int* buffer,
+        int stride,
+        int width,
+        int height,
+        AudioDocument document,
+        int x0,
+        int x1,
+        double start,
+        double span,
+        long startFrame,
+        long rangeFrames,
+        int sourceChannels,
+        bool usePolyline,
+        bool useRawColumns)
+    {
+        if (usePolyline)
+        {
+            RasterLoudnessDbPolyline(buffer, stride, width, height, document, start, span);
+            return;
+        }
+
+        var f0 = startFrame + (long)x0 * rangeFrames / width;
+        var f1 = startFrame + (long)x1 * rangeFrames / width;
+        if (f1 <= f0)
+        {
+            f1 = f0 + 1;
+        }
+
+        var colCount = x1 - x0;
+        EnsureColumnBuffers(colCount * sourceChannels);
+        var count = useRawColumns
+            ? FillRawColumnPeaks(document, f0, f1, colCount, sourceChannels)
+            : document.Peaks.ReadRangePacked(f0, f1, colCount, _columnMins, _columnMaxs);
+        if (count <= 0)
+        {
+            return;
+        }
+
+        if (!useRawColumns && _previewGainAtFrame is not null)
+        {
+            ApplyPreviewGainToColumns(f0, f1, count, sourceChannels);
+        }
+
+        ChannelMix.FoldPackedPeaksToMid(_columnMins, _columnMaxs, count, sourceChannels);
+        EnsureColumnEdges(width);
+        var px1 = Math.Min(width, x0 + count);
+        for (var i = 0; i < count; i++)
+        {
+            var px = x0 + i;
+            if ((uint)px >= (uint)width)
+            {
+                break;
+            }
+
+            _columnYHi[px] = LoudnessPeakToY(AbsPeak(_columnMins[i], _columnMaxs[i]), height);
+        }
+
+        DrawLoudnessConnected(buffer, stride, width, height, x0, px1);
+    }
+
+    private unsafe void RasterLoudnessDbPolyline(
+        int* buffer,
+        int stride,
+        int width,
+        int height,
+        AudioDocument document,
+        double start,
+        double span)
+    {
+        var first = (long)Math.Floor(start);
+        var last = Math.Min(document.FrameCount - 1, (long)Math.Ceiling(start + span));
+        if (last < first)
+        {
+            return;
+        }
+
+        var count = (int)(last - first + 1);
+        var samples = document.Interleaved;
+        var channels = document.Channels;
+        float AbsAt(int index)
+        {
+            var frame = first + index;
+            SpectrogramEngine.MixFrame(samples, channels, frame, document.FrameCount, out var mixed);
+            return Math.Abs(mixed * PreviewGain(frame));
+        }
+
+        var color = _loudnessWaveBgra;
+        if (count == 1)
+        {
+            var x = (int)Math.Round(FrameToX(first, start, span, width));
+            var y = LoudnessPeakToY(AbsAt(0), height);
+            DrawLine(buffer, stride, width, 0, height, x, y, x + 1, y, color);
+            return;
+        }
+
+        var prevX = 0;
+        var prevY = 0;
+        var havePrev = false;
+        for (var i = 0; i < count; i++)
+        {
+            var x = (int)Math.Round(FrameToX(first + i, start, span, width));
+            var y = LoudnessPeakToY(AbsAt(i), height);
+            if (havePrev)
+            {
+                DrawLine(buffer, stride, width, 0, height, prevX, prevY, x, y, color);
+            }
+
+            prevX = x;
+            prevY = y;
+            havePrev = true;
+        }
+    }
+
+    private unsafe void DrawLoudnessConnected(
+        int* buffer,
+        int stride,
+        int width,
+        int height,
+        int x0,
+        int px1)
+    {
+        var color = _loudnessWaveBgra;
+        if (px1 - x0 < 2)
+        {
+            if (px1 > x0 && (uint)x0 < (uint)width)
+            {
+                var y = _columnYHi[x0];
+                DrawLine(buffer, stride, width, 0, height, x0, y, Math.Min(width - 1, x0 + 1), y, color);
+            }
+
+            return;
+        }
+
+        for (var px = x0; px + 1 < px1; px++)
+        {
+            DrawLine(
+                buffer,
+                stride,
+                width,
+                0,
+                height,
+                px,
+                _columnYHi[px],
+                px + 1,
+                _columnYHi[px + 1],
+                color);
+        }
+    }
+
+    private int LoudnessPeakToY(float peak, double height) =>
+        Math.Clamp((int)Math.Round(LoudnessDbToY(AmplitudeToDb(peak), height)), 0, (int)height - 1);
+
+    private double LoudnessDbToY(double db, double height) =>
+        LoudnessOverlayRenderer.LufsToY(db, new Rect(0, 0, 1, height), _loudnessTargetLufs);
+
+    private static float AbsPeak(float min, float max) =>
+        Math.Max(Math.Abs(min), Math.Abs(max));
+
+    private static double AmplitudeToDb(float amplitude)
+    {
+        var a = Math.Abs(amplitude);
+        return a < 1e-7f ? -200d : 20d * Math.Log10(a);
     }
 
     private static void ResolveWaveLane(
@@ -2355,109 +2636,56 @@ internal sealed class WaveformView : Grid
             return Math.Clamp(y, clipTop, clipBottom - 1);
         }
 
-        void SampleRange(int index, out float lo, out float hi)
+        float SampleAt(int index)
         {
             var frame = first + index;
             var gain = PreviewGain(frame);
             if (channel < 0)
             {
-                ChannelMix.FrameEnvelope(samples, channels, frame, document.FrameCount, out lo, out hi);
-                lo *= gain;
-                hi *= gain;
-                return;
+                SpectrogramEngine.MixFrame(samples, channels, frame, document.FrameCount, out var mixed);
+                return mixed * gain;
             }
 
-            lo = hi = samples[(int)frame * channels + channel] * gain;
+            return samples[(int)frame * channels + channel] * gain;
         }
 
         var collectDots = ShouldDrawSamplePoints(count, width / scaleX);
         var dotRadius = Math.Max(1, (int)Math.Round(SamplePointRadius * scaleX));
-        var overlay = channel < 0;
 
         if (count == 1)
         {
             var x = (int)Math.Round(FrameToX(first, start, span, width));
-            SampleRange(0, out var lo, out var hi);
-            var y1 = SampleY(hi);
-            var y2 = SampleY(lo);
-            if (y2 < y1)
-            {
-                (y1, y2) = (y2, y1);
-            }
-
-            if (overlay)
-            {
-                if (y2 - y1 < 1)
-                {
-                    y2 = y1 + 1;
-                }
-
-                FillVLine(buffer, stride, width, clipTop, clipBottom, x, y1, y2, WavePaintBgra);
-            }
-            else
-            {
-                FillVLine(buffer, stride, width, clipTop, clipBottom, x, y1 - 3, y1 + 3, WavePaintBgra);
-            }
-
+            var y = SampleY(SampleAt(0));
+            FillVLine(buffer, stride, width, clipTop, clipBottom, x, y - 3, y + 3, WavePaintBgra);
             if (collectDots)
             {
-                FillDot(buffer, stride, width, clipTop, clipBottom, x, SampleY(PeakSample(lo, hi)), dotRadius, WavePaintBgra);
+                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, WavePaintBgra);
             }
 
             return;
         }
 
         var prevX = 0;
-        var prevY1 = 0;
-        var prevY2 = 0;
+        var prevY = 0;
         var havePrev = false;
         for (var i = 0; i < count; i++)
         {
             var x = (int)Math.Round(FrameToX(first + i, start, span, width));
-            SampleRange(i, out var lo, out var hi);
-            var y1 = SampleY(hi);
-            var y2 = SampleY(lo);
-            if (y2 < y1)
-            {
-                (y1, y2) = (y2, y1);
-            }
-
-            if (overlay && y2 - y1 < 1)
-            {
-                y2 = y1 + 1;
-            }
-
-            if (overlay)
-            {
-                FillVLine(buffer, stride, width, clipTop, clipBottom, x, y1, y2, WavePaintBgra);
-            }
-
+            var y = SampleY(SampleAt(i));
             if (havePrev)
             {
-                if (overlay)
-                {
-                    DrawThickLine(buffer, stride, width, clipTop, clipBottom, prevX, prevY1, x, y1, WavePaintBgra);
-                    DrawThickLine(buffer, stride, width, clipTop, clipBottom, prevX, prevY2, x, y2, WavePaintBgra);
-                }
-                else
-                {
-                    DrawThickLine(buffer, stride, width, clipTop, clipBottom, prevX, prevY1, x, y1, WavePaintBgra);
-                }
+                DrawThickLine(buffer, stride, width, clipTop, clipBottom, prevX, prevY, x, y, WavePaintBgra);
             }
 
             prevX = x;
-            prevY1 = y1;
-            prevY2 = y2;
+            prevY = y;
             havePrev = true;
             if (collectDots)
             {
-                FillDot(buffer, stride, width, clipTop, clipBottom, x, SampleY(PeakSample(lo, hi)), dotRadius, WavePaintBgra);
+                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, WavePaintBgra);
             }
         }
     }
-
-    private static float PeakSample(float lo, float hi) =>
-        Math.Abs(hi) >= Math.Abs(lo) ? hi : lo;
 
     private static unsafe void FillVLine(
         int* buffer,
@@ -2824,11 +3052,8 @@ internal sealed class WaveformView : Grid
         count > 0
         && count <= Math.Min(SamplePointMaxVisibleFrames, width);
 
-    private static bool IsPolylineZoom(long rangeFrames, int width, bool overlay = false)
-    {
-        var maxSpp = overlay ? OverlayPolylineMaxSamplesPerPixel : PolylineMaxSamplesPerPixel;
-        return rangeFrames > 0 && width > 0 && rangeFrames <= (long)width * maxSpp;
-    }
+    private static bool IsPolylineZoom(long rangeFrames, int width) =>
+        rangeFrames > 0 && width > 0 && rangeFrames <= (long)width * PolylineMaxSamplesPerPixel;
 
     private void EnsureColumnBuffers(int width)
     {
@@ -2841,18 +3066,22 @@ internal sealed class WaveformView : Grid
 
     private void EnsureWavePens()
     {
-        if (_waveBgra != 0 && _waveOverlayBgra != 0)
+        if (_waveBgra != 0 && _waveOverlayBgra != 0 && _loudnessWaveBgra != 0)
         {
             return;
         }
 
         _waveBgra = ToBgra(Theme.Get("WaveFillBrush"));
         _waveOverlayBgra = ToBgra(Theme.Get("WaveFillOverlayBrush"));
+        _loudnessWaveBgra = ToBgra(Colors.White);
         _zeroBgra = ToBgra(Theme.Get("WaveZeroLineBrush"));
     }
 
-    private int WavePaintBgra =>
-        _spectrogramMode == SpectrogramViewMode.Overlay ? _waveOverlayBgra : _waveBgra;
+    private int WavePaintBgra => LoudnessVisible
+        ? _loudnessWaveBgra
+        : _spectrogramMode == SpectrogramViewMode.Overlay
+            ? _waveOverlayBgra
+            : _waveBgra;
 
     private static int ToBgra(Color color) =>
         color.B | (color.G << 8) | (color.R << 16) | (color.A << 24);
@@ -2869,6 +3098,7 @@ internal sealed class WaveformView : Grid
         Off,
         Spectrogram,
         Overlay,
+        Loudness,
     }
 
     private enum LoopBarPart
@@ -3111,7 +3341,7 @@ internal sealed class WaveformView : Grid
         return new Rect(ScaleLeft(bounds), top, ScaleContentWidth(bounds), height);
     }
 
-    private static double FrameToViewX(double frame, double start, double span, Rect bounds) =>
+    private double FrameToViewX(double frame, double start, double span, Rect bounds) =>
         ScaleLeft(bounds) + FrameToX(frame, start, span, ScaleContentWidth(bounds));
 
     private void DrawMarkerLane(DrawingContext dc, Rect bounds, double start, double span)

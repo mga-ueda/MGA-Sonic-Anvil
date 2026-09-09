@@ -41,7 +41,6 @@
     <SolidColorBrush x:Key="RegionWaveFillExitBrush" Color="#FF441E1E" />
     <SolidColorBrush x:Key="RegionWaveFillExcludedBrush" Color="#66C8C8C8" />
 
-    <SolidColorBrush x:Key="SpectrumBarBrush" Color="#FF1A799D" />
     <SolidColorBrush x:Key="VectorScopeBackBrush" Color="#FF242629" />
     <SolidColorBrush x:Key="VectorScopeTraceBrush" Color="#FF3AB8E8" />
     <SolidColorBrush x:Key="VectorScopeGridBrush" Color="#FF3A3A3E" />
@@ -58,7 +57,6 @@
     <SolidColorBrush x:Key="WaapiToggleOnBackBrush" Color="#FF006BD7" />
     <SolidColorBrush x:Key="WaapiToggleOnHoverBackBrush" Color="#FF1A82EA" />
     <SolidColorBrush x:Key="WaapiToggleOnForeBrush" Color="#FFFFFFFF" />
-    <SolidColorBrush x:Key="ActionBarBackBrush" Color="#FF1A1B26" />
     <SolidColorBrush x:Key="ActionCopyrightForeBrush" Color="#FF969696" />
     <SolidColorBrush x:Key="ActionLinkForeBrush" Color="#FF6EB4FF" />
     <SolidColorBrush x:Key="StatusBarBackBrush" Color="#FF161618" />

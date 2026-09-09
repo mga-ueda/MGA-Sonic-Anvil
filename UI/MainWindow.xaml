@@ -159,69 +159,77 @@
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <Grid Grid.Column="0"
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Border x:Name="DocumentTabHost"
+                Grid.Row="0"
+                Grid.Column="0"
+                Height="{x:Static ui:DesignMetrics.DocumentTabBarHeight}"
+                Background="{DynamicResource TransportBackBrush}"
+                SizeChanged="DocumentTabHost_SizeChanged">
+          <DockPanel>
+            <ui:TabScrollButton x:Name="TabScrollLeft"
+                                DockPanel.Dock="Left"
+                                PointLeft="True"
+                                Visibility="Collapsed"
+                                Click="TabScrollLeft_Click" />
+            <ui:TabScrollButton x:Name="TabScrollRight"
+                                DockPanel.Dock="Right"
+                                Visibility="Collapsed"
+                                Click="TabScrollRight_Click" />
+            <ScrollViewer x:Name="DocumentTabScroll"
+                          HorizontalScrollBarVisibility="Hidden"
+                          VerticalScrollBarVisibility="Disabled"
+                          Focusable="False"
+                          PanningMode="HorizontalOnly"
+                          ScrollChanged="DocumentTabScroll_ScrollChanged"
+                          PreviewMouseWheel="DocumentTabScroll_PreviewMouseWheel">
+              <StackPanel x:Name="DocumentTabs"
+                          Orientation="Horizontal" />
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+        <Grid Grid.Row="1"
+              Grid.Column="0"
               MinHeight="{x:Static ui:DesignMetrics.TransportBarHeight}"
               Background="{DynamicResource TransportBackBrush}">
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-          </Grid.RowDefinitions>
-          <Border x:Name="DocumentTabHost"
-                  Grid.Row="0"
-                  Height="{x:Static ui:DesignMetrics.DocumentTabBarHeight}"
-                  Background="{DynamicResource TransportBackBrush}"
-                  SizeChanged="DocumentTabHost_SizeChanged">
-            <DockPanel>
-              <ui:TabScrollButton x:Name="TabScrollLeft"
-                                  DockPanel.Dock="Left"
-                                  PointLeft="True"
-                                  Visibility="Collapsed"
-                                  Click="TabScrollLeft_Click" />
-              <ui:TabScrollButton x:Name="TabScrollRight"
-                                  DockPanel.Dock="Right"
-                                  Visibility="Collapsed"
-                                  Click="TabScrollRight_Click" />
-              <ScrollViewer x:Name="DocumentTabScroll"
-                            HorizontalScrollBarVisibility="Hidden"
-                            VerticalScrollBarVisibility="Disabled"
-                            Focusable="False"
-                            PanningMode="HorizontalOnly"
-                            ScrollChanged="DocumentTabScroll_ScrollChanged"
-                            PreviewMouseWheel="DocumentTabScroll_PreviewMouseWheel">
-                <StackPanel x:Name="DocumentTabs"
-                            Orientation="Horizontal" />
-              </ScrollViewer>
-            </DockPanel>
-          </Border>
-          <Grid Grid.Row="1">
-            <ui:TransportBar x:Name="Transport"
-                             HorizontalAlignment="Left"
-                             VerticalAlignment="Top" />
-            <StackPanel Orientation="Horizontal"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Bottom"
-                        Margin="12,0,0,6">
-              <TextBlock x:Name="CopyrightText"
-                         FontSize="10"
-                         VerticalAlignment="Center"
-                         Foreground="{DynamicResource ActionCopyrightForeBrush}"
-                         Text="{x:Static domain:UiStrings.CopyrightText}" />
-              <TextBlock x:Name="GitHubLink"
-                         FontSize="10"
-                         VerticalAlignment="Center"
-                         Cursor="Hand"
-                         Foreground="{DynamicResource ActionLinkForeBrush}"
-                         Text="{x:Static domain:UiStrings.CopyrightGitHub}"
-                         MouseLeftButtonUp="GitHubLink_MouseLeftButtonUp" />
-            </StackPanel>
-          </Grid>
+          <ui:TransportBar x:Name="Transport"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Top" />
+          <StackPanel Orientation="Horizontal"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Bottom"
+                      Margin="12,0,0,6">
+            <TextBlock x:Name="CopyrightText"
+                       FontSize="10"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource ActionCopyrightForeBrush}"
+                       Text="{x:Static domain:UiStrings.CopyrightText}" />
+            <TextBlock x:Name="GitHubLink"
+                       FontSize="10"
+                       VerticalAlignment="Center"
+                       Cursor="Hand"
+                       Foreground="{DynamicResource ActionLinkForeBrush}"
+                       Text="{x:Static domain:UiStrings.CopyrightGitHub}"
+                       MouseLeftButtonUp="GitHubLink_MouseLeftButtonUp" />
+          </StackPanel>
         </Grid>
+        <ui:LoudnessMeterView x:Name="LoudnessMeter"
+                              Grid.Row="0"
+                              Grid.RowSpan="2"
+                              Grid.Column="1"
+                              Margin="0,0,6,0"
+                              VerticalAlignment="Stretch" />
         <ui:ProjectSpectrumView x:Name="Spectrum"
-                                Grid.Column="1"
+                                Grid.Row="0"
+                                Grid.RowSpan="2"
+                                Grid.Column="2"
                                 Height="{x:Static ui:DesignMetrics.SpectrumHeight}"
                                 Margin="0,0,1,0"
-                                HorizontalAlignment="Right"
                                 VerticalAlignment="Top" />
       </Grid>
     </Grid>

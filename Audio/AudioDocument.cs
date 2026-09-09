@@ -38,6 +38,7 @@ internal sealed class AudioDocument
         Peaks = PeakPyramid.Build(interleaved, channels);
         RefreshFileBytes();
         CommitFormat();
+        CaptureFormatOrigin();
     }
 
     public float[] Interleaved { get; private set; }
@@ -76,6 +77,9 @@ internal sealed class AudioDocument
             Channels,
             BitsPerSample);
 
+    /// <summary>MP3 は cue/smpl を持てないのでリージョンとサンプルループは置けない。</summary>
+    public bool AllowsRegionsAndLoops => SourceKind != AudioFileKind.Mp3;
+
     public AudioFileKind SourceKind { get; private set; }
 
     public string? SourcePath { get; set; }
@@ -102,6 +106,10 @@ internal sealed class AudioDocument
     private int _committedChannels;
     private long _committedFrameCount;
     private long _committedFileBytes;
+    private float[] _formatOriginSamples = [];
+    private int _formatOriginSampleRate;
+    private int _formatOriginChannels;
+    private int _formatOriginBits;
 
     private readonly List<WaveRegion> _regions = [];
 
@@ -218,6 +226,7 @@ internal sealed class AudioDocument
         Array.Copy(samples, 0, Interleaved, start, samples.Length);
         RebuildPeaks();
         IsDirty = true;
+        CaptureFormatOrigin();
     }
 
     public float[] CopyRange(long startFrame, long frameCount)
@@ -239,6 +248,7 @@ internal sealed class AudioDocument
         Interleaved = next;
         RebuildPeaks();
         IsDirty = true;
+        CaptureFormatOrigin();
     }
 
     public void InsertRange(long startFrame, float[] samples)
@@ -251,6 +261,7 @@ internal sealed class AudioDocument
         Interleaved = next;
         RebuildPeaks();
         IsDirty = true;
+        CaptureFormatOrigin();
     }
 
     public void ReplaceAudio(
@@ -281,6 +292,65 @@ internal sealed class AudioDocument
         RebuildPeaks();
         RefreshFileBytes();
         IsDirty = true;
+    }
+
+    public float[] FormatOriginSamples => _formatOriginSamples;
+
+    public int FormatOriginSampleRate => _formatOriginSampleRate;
+
+    public int FormatOriginChannels => _formatOriginChannels;
+
+    public int FormatOriginBitsPerSample => _formatOriginBits;
+
+    public long FormatOriginFrameCount =>
+        _formatOriginChannels <= 0 ? 0 : _formatOriginSamples.Length / _formatOriginChannels;
+
+    /// <summary>フェード等の中身の編集後。以降のレート／ビット変換の起点になる。</summary>
+    public void CaptureFormatOrigin()
+    {
+        _formatOriginSamples = Interleaved;
+        _formatOriginSampleRate = SampleRate;
+        _formatOriginChannels = Channels;
+        _formatOriginBits = BitsPerSample;
+    }
+
+    public void SetFormatOrigin(float[] samples, int sampleRate, int channels, int bitsPerSample)
+    {
+        _formatOriginSamples = samples;
+        _formatOriginSampleRate = sampleRate;
+        _formatOriginChannels = channels;
+        _formatOriginBits = bitsPerSample;
+    }
+
+    /// <summary>直近の中身編集（または読み込み）時点の PCM から、指定フォーマットを作る。</summary>
+    public float[] MaterializeFormat(
+        int destRate,
+        int destBits,
+        int destChannels,
+        IProgress<double>? progress = null)
+    {
+        var samples = _formatOriginSamples;
+        var rate = Math.Max(1, _formatOriginSampleRate);
+        var channels = Math.Max(1, _formatOriginChannels);
+        destChannels = Math.Max(1, destChannels);
+        destRate = Math.Max(1, destRate);
+        if (channels != destChannels)
+        {
+            samples = FormatConvert.Remix(samples, channels, destChannels);
+            channels = destChannels;
+        }
+
+        if (rate != destRate)
+        {
+            samples = FormatConvert.Resample(samples, channels, rate, destRate, progress);
+        }
+
+        if (destBits < _formatOriginBits)
+        {
+            samples = FormatConvert.Quantize(samples, destBits);
+        }
+
+        return samples;
     }
 
     public void ClampCursor()
@@ -439,6 +509,11 @@ internal sealed class AudioDocument
     public void SetSampleLoop(WaveSelection range, bool markDirty = true)
     {
         var next = range.IsEmpty ? WaveSelection.Empty : range.Clamp(FrameCount);
+        if (!AllowsRegionsAndLoops && !next.IsEmpty)
+        {
+            return;
+        }
+
         if (next == SampleLoop)
         {
             return;
@@ -555,6 +630,11 @@ internal sealed class AudioDocument
     public void SetRegions(IReadOnlyList<WaveRegion> regions, bool markDirty = true)
     {
         var next = NormalizeRegions(regions);
+        if (!AllowsRegionsAndLoops && next.Count > 0)
+        {
+            return;
+        }
+
         if (SameRegions(_regions, next))
         {
             return;

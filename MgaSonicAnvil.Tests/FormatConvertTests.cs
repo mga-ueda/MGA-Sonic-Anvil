@@ -205,6 +205,39 @@ public sealed class FormatConvertTests
     }
 
     [Fact]
+    public void ConvertSampleRate_SecondConvertUsesOriginalRate()
+    {
+        var source = MakeSine(frames: 4800, sampleRate: 48000, frequency: 400);
+        var document = new AudioDocument((float[])source.Clone(), 48000, 2, 16, AudioFileKind.Wave, null);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.ConvertSampleRate(document, 24000)!);
+        history.Do(document, ProcessEdits.ConvertSampleRate(document, 12000)!);
+
+        var direct = FormatConvert.Resample(source, 2, 48000, 12000);
+        Assert.Equal(direct.Length, document.Interleaved.Length);
+        var err = 0d;
+        for (var i = 0; i < direct.Length; i++)
+        {
+            var d = document.Interleaved[i] - direct[i];
+            err += d * d;
+        }
+
+        Assert.True(Math.Sqrt(err / direct.Length) < 1e-6);
+    }
+
+    [Fact]
+    public void ConvertBitDepth_SecondLoweringUsesOriginalPrecision()
+    {
+        var document = MakeDocument(frames: 8, sampleRate: 48000, bits: 24);
+        document.Interleaved[0] = 0.1234567f;
+        document.CaptureFormatOrigin();
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.ConvertBitDepth(document, 16)!);
+        history.Do(document, ProcessEdits.ConvertBitDepth(document, 8)!);
+        Assert.Equal(FormatConvert.Quantize([0.1234567f], 8)[0], document.Interleaved[0]);
+    }
+
+    [Fact]
     public void ConvertSampleRate_SameRateIsNoOp()
     {
         var document = MakeDocument(frames: 100, sampleRate: 48000);

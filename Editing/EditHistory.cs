@@ -720,6 +720,10 @@ internal readonly record struct FormatSnapshot(
     int SampleRate,
     int Channels,
     int BitsPerSample,
+    float[] OriginSamples,
+    int OriginSampleRate,
+    int OriginChannels,
+    int OriginBitsPerSample,
     WaveSelection Selection,
     WaveSelection SampleLoop,
     WaveRegion[] Regions,
@@ -732,6 +736,10 @@ internal readonly record struct FormatSnapshot(
             document.SampleRate,
             document.Channels,
             document.BitsPerSample,
+            document.FormatOriginSamples,
+            document.FormatOriginSampleRate,
+            document.FormatOriginChannels,
+            document.FormatOriginBitsPerSample,
             document.Selection,
             document.SampleLoop,
             document.SnapshotRegions(),
@@ -741,6 +749,7 @@ internal readonly record struct FormatSnapshot(
     public void Restore(AudioDocument document)
     {
         document.ReplaceAudio(Samples, SampleRate, Channels, BitsPerSample);
+        document.SetFormatOrigin(OriginSamples, OriginSampleRate, OriginChannels, OriginBitsPerSample);
         document.ReplaceMarkers(Markers, markDirty: false);
         document.Selection = Selection;
         document.SetSampleLoop(SampleLoop, markDirty: false);
@@ -995,6 +1004,11 @@ internal static class ProcessEdits
 
     public static IEditCommand? SetSampleLoop(AudioDocument document, WaveSelection range)
     {
+        if (!document.AllowsRegionsAndLoops && !range.IsEmpty)
+        {
+            return null;
+        }
+
         var before = document.SampleLoop;
         var after = range.IsEmpty ? WaveSelection.Empty : range.Clamp(document.FrameCount);
         if (before == after)
@@ -1041,6 +1055,11 @@ internal static class ProcessEdits
 
     public static IEditCommand? SetRegion(AudioDocument document, WaveSelection range)
     {
+        if (!document.AllowsRegionsAndLoops && !range.IsEmpty)
+        {
+            return null;
+        }
+
         var before = document.SnapshotRegions();
         var afterList = new List<WaveRegion>(before);
         if (range.IsEmpty)
@@ -1424,18 +1443,17 @@ internal static class ProcessEdits
         }
 
         var before = FormatSnapshot.Capture(document);
-        var samples = FormatConvert.Resample(
-            document.Interleaved,
-            document.Channels,
-            document.SampleRate,
-            destRate,
-            progress);
+        var samples = document.MaterializeFormat(destRate, document.BitsPerSample, document.Channels, progress);
         var destFrames = samples.Length / document.Channels;
         var after = new FormatSnapshot(
             samples,
             destRate,
             document.Channels,
             document.BitsPerSample,
+            before.OriginSamples,
+            before.OriginSampleRate,
+            before.OriginChannels,
+            before.OriginBitsPerSample,
             FormatConvert.ScaleSelection(document.Selection, document.SampleRate, destRate, destFrames),
             FormatConvert.ScaleSelection(document.SampleLoop, document.SampleRate, destRate, destFrames),
             ScaleRegions(document, destRate, destFrames),
@@ -1483,9 +1501,7 @@ internal static class ProcessEdits
         }
 
         var before = FormatSnapshot.Capture(document);
-        var samples = bits < document.BitsPerSample
-            ? FormatConvert.Quantize(document.Interleaved, bits)
-            : document.Interleaved;
+        var samples = document.MaterializeFormat(document.SampleRate, bits, document.Channels);
         var after = before with { Samples = samples, BitsPerSample = bits };
         var command = new ConvertFormatCommand(
             "Convert Bit Depth",
@@ -1510,7 +1526,7 @@ internal static class ProcessEdits
         }
 
         var before = FormatSnapshot.Capture(document);
-        var samples = FormatConvert.Remix(document.Interleaved, document.Channels, destChannels);
+        var samples = document.MaterializeFormat(document.SampleRate, document.BitsPerSample, destChannels);
         var after = before with { Samples = samples, Channels = destChannels };
         var command = new ConvertFormatCommand(
             "Convert Channels",

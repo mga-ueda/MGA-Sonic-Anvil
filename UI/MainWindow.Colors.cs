@@ -51,6 +51,7 @@ public partial class MainWindow
         Spectrum.InvalidateVisual();
         VectorScope.InvalidateVisual();
         LevelMeter.InvalidateVisual();
+        LoudnessMeter.ApplyValueColors();
         Transport.RefreshAppearance();
         SettingsGear.RefreshAppearance();
         _waapiToggle?.InvalidateVisual();

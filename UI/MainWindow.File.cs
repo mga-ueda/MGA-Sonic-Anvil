@@ -257,7 +257,8 @@ public partial class MainWindow
             _outputSettings,
             settings.ResolvedFadeInCurve(),
             settings.ResolvedFadeOutCurve(),
-            UiStrings.ParseLanguageChoice(settings.UiLanguage))
+            UiStrings.ParseLanguageChoice(settings.UiLanguage),
+            settings.ResolvedLoudnessTargetLufs())
         {
             Owner = this,
         };
@@ -270,6 +271,9 @@ public partial class MainWindow
         settings.UiLanguage = UiStrings.ToStoredValue(dialog.SelectedLanguage);
         UiStrings.SetLanguage(UiStrings.ResolveLanguage(dialog.SelectedLanguage));
         settings.ApplyDefaultFades(dialog.FadeInCurve, dialog.FadeOutCurve);
+        settings.LoudnessTargetLufs = dialog.SelectedLoudnessTargetLufs;
+        LoudnessMeter.ApplyTargetFromSettings();
+        Waveform.LoudnessTargetLufs = settings.ResolvedLoudnessTargetLufs();
         ApplyOutputSettings(dialog.SelectedSettings);
     }
 

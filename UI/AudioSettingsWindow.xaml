@@ -46,6 +46,27 @@
                 VerticalContentAlignment="Center"
                 Margin="0,0,0,12" />
 
+      <TextBlock x:Name="LoudnessTargetLabel"
+                 Text="{x:Static domain:UiStrings.LabelLoudnessTarget}"
+                 Margin="0,0,0,3" />
+      <Grid Margin="0,0,0,12">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBox x:Name="LoudnessTargetBox"
+                 Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                 Style="{StaticResource DarkTextBoxStyle}"
+                 Padding="6,1"
+                 FontSize="11.333"
+                 VerticalContentAlignment="Center" />
+        <TextBlock x:Name="LoudnessTargetUnit"
+                   Grid.Column="1"
+                   Text="{x:Static domain:UiStrings.LabelLufs}"
+                   VerticalAlignment="Center"
+                   Margin="8,0,0,0" />
+      </Grid>
+
       <TextBlock x:Name="FadeDefaultsHeader"
                  Text="{x:Static domain:UiStrings.LabelFadeCurveDefaults}"
                  FontWeight="Bold"

@@ -78,6 +78,10 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private double _intervalSumSqL;
     private double _intervalSumSqR;
     private int _intervalFrames;
+    private readonly float[] _loudL = new float[8192];
+    private readonly float[] _loudR = new float[8192];
+    private int _loudWrite;
+    private int _loudCount;
     private bool _silenceOnly;
     private bool _paused;
     private int _flushFadeRemaining;
@@ -185,6 +189,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 Array.Clear(_monitorRing);
                 _monitorWriteCount = 0;
                 ResetMeterIntervalNoLock();
+                ResetLoudnessNoLock();
             }
         }
     }
@@ -215,6 +220,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 Array.Clear(_monitorRing);
                 _monitorWriteCount = 0;
                 ResetMeterIntervalNoLock();
+                ResetLoudnessNoLock();
             }
         }
     }
@@ -809,7 +815,59 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 {
                     _meterCount++;
                 }
+
+                _loudL[_loudWrite] = left;
+                _loudR[_loudWrite] = right;
+                _loudWrite++;
+                if (_loudWrite >= _loudL.Length)
+                {
+                    _loudWrite = 0;
+                }
+
+                if (_loudCount < _loudL.Length)
+                {
+                    _loudCount++;
+                }
             }
         }
+    }
+
+    /// <summary>前回取得以降のステレオ出力。新規がなければ 0。</summary>
+    public int TakeLoudnessFrames(float[] left, float[] right)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+        lock (_monitorGate)
+        {
+            var n = Math.Min(_loudCount, Math.Min(left.Length, right.Length));
+            if (n <= 0)
+            {
+                return 0;
+            }
+
+            var start = _loudWrite - _loudCount;
+            if (start < 0)
+            {
+                start += _loudL.Length;
+            }
+
+            for (var i = 0; i < n; i++)
+            {
+                var src = (start + i) % _loudL.Length;
+                left[i] = _loudL[src];
+                right[i] = _loudR[src];
+            }
+
+            _loudCount -= n;
+            return n;
+        }
+    }
+
+    private void ResetLoudnessNoLock()
+    {
+        Array.Clear(_loudL);
+        Array.Clear(_loudR);
+        _loudWrite = 0;
+        _loudCount = 0;
     }
 }

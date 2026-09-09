@@ -15,7 +15,7 @@ internal static class ChannelMix
     }
 
     /// <summary>
-    /// 1 フレームのチャンネル包絡。重ね波形と全体波形が使う。
+    /// 1 フレームのチャンネル包絡。全体波形が使う。
     /// Mid は逆相で消えるので、表示の有無判定には使わない。
     /// </summary>
     public static void FrameEnvelope(
@@ -58,6 +58,33 @@ internal static class ChannelMix
             {
                 max = sample;
             }
+        }
+    }
+
+    /// <summary>
+    /// packed ピーク列 [column * channels + ch] を、各列の Mid（L/R 平均）へ畳む。
+    /// 重ね波形が使う。書き込みは先頭 count 要素。
+    /// </summary>
+    public static void FoldPackedPeaksToMid(float[] mins, float[] maxs, int count, int channels)
+    {
+        if (channels <= 1 || count <= 0)
+        {
+            return;
+        }
+
+        Span<float> lo = stackalloc float[channels];
+        Span<float> hi = stackalloc float[channels];
+        for (var i = 0; i < count; i++)
+        {
+            var src = i * channels;
+            for (var ch = 0; ch < channels; ch++)
+            {
+                lo[ch] = mins[src + ch];
+                hi[ch] = maxs[src + ch];
+            }
+
+            mins[i] = Mid(lo);
+            maxs[i] = Mid(hi);
         }
     }
 

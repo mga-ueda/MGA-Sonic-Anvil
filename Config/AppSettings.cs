@@ -18,6 +18,9 @@ internal sealed class AppSettings
 
     public int Mp3BitRate { get; set; } = 192;
 
+    /// <summary>ラウドネスメーターのターゲット（LKFS）。既定 -24。</summary>
+    public double LoudnessTargetLufs { get; set; } = LoudnessMeterEngine.DefaultTargetLufs;
+
     public bool AlwaysOnTop { get; set; }
 
     public int WindowX { get; set; }
@@ -114,6 +117,9 @@ internal sealed class AppSettings
         AudioApi = AudioOutputSettings.ToStoredValue(settings.Api);
         AudioDeviceId = settings.DeviceId ?? string.Empty;
     }
+
+    public double ResolvedLoudnessTargetLufs() =>
+        LoudnessMeterEngine.ClampTargetLufs(LoudnessTargetLufs);
 
     public FadeShape ResolvedFadeInCurve() => FadeCurves.ParseStored(DefaultFadeInCurve);
 

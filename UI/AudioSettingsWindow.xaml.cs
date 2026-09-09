@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -22,14 +23,18 @@ internal partial class AudioSettingsWindow : Window
 
     public UiLanguageChoice SelectedLanguage { get; private set; }
 
+    public double SelectedLoudnessTargetLufs { get; private set; }
+
     public AudioSettingsWindow(
         AudioOutputSettings current,
         FadeShape fadeIn,
         FadeShape fadeOut,
-        UiLanguageChoice language)
+        UiLanguageChoice language,
+        double loudnessTargetLufs)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
+        SelectedLoudnessTargetLufs = LoudnessMeterEngine.ClampTargetLufs(loudnessTargetLufs);
         InitializeComponent();
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
         Title = UiStrings.DialogSettingsTitle;
@@ -53,6 +58,7 @@ internal partial class AudioSettingsWindow : Window
 
         SelectApi(current.Api);
         ReloadDevices(current.DeviceId);
+        LoudnessTargetBox.Text = SelectedLoudnessTargetLufs.ToString("0.#", CultureInfo.InvariantCulture);
         ApplyTips();
         Loaded += (_, _) =>
         {
@@ -71,6 +77,9 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(ApiCombo, UiStrings.TipAudioApi);
         TipService.Set(DeviceLabel, UiStrings.TipAudioDevice);
         TipService.Set(DeviceCombo, UiStrings.TipAudioDevice);
+        TipService.Set(LoudnessTargetLabel, UiStrings.TipLoudnessTarget);
+        TipService.Set(LoudnessTargetBox, UiStrings.TipLoudnessTarget);
+        TipService.Set(LoudnessTargetUnit, UiStrings.TipLoudnessTarget);
         TipService.Set(FadeDefaultsHeader, UiStrings.TipFadeCurveDefaults);
         TipService.Set(OkButton, UiStrings.TipSettingsOk);
         TipService.Set(CancelButton, UiStrings.TipSettingsCancel);
@@ -101,6 +110,20 @@ internal partial class AudioSettingsWindow : Window
         SelectedLanguage = LanguageCombo.SelectedItem is LanguageItem item
             ? item.Choice
             : UiLanguageChoice.Auto;
+        if (!LoudnessMeterEngine.TryParseTargetLufs(LoudnessTargetBox.Text, out var target))
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorLoudnessTargetRange,
+                UiStrings.DialogSettingsTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            LoudnessTargetBox.Focus();
+            LoudnessTargetBox.SelectAll();
+            return;
+        }
+
+        SelectedLoudnessTargetLufs = target;
         DialogResult = true;
     }
 
