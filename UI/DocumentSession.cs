@@ -14,7 +14,7 @@ internal sealed class DocumentSession
 
     public AudioDocument Document { get; }
 
-    public EditHistory History { get; } = new();
+    public EditHistory History { get; set; } = new();
 
     public double TimeZoom { get; set; } = 1;
 

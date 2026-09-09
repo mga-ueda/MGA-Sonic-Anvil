@@ -17,6 +17,9 @@ internal interface IEditCommand
     /// </summary>
     Func<AudioDocument, IEditCommand?>? Replay { get; set; }
 
+    /// <summary>起動復元用。無い操作はセッションに残さない。</summary>
+    HistoryRecipe? Persist { get; set; }
+
     void Apply(AudioDocument document);
 
     void Revert(AudioDocument document);
@@ -161,6 +164,75 @@ internal sealed class EditHistory
         _cleanValid = true;
     }
 
+    public void RestoreClean(int cleanIndex, bool valid)
+    {
+        _cleanIndex = Math.Clamp(cleanIndex, 0, TotalCount);
+        _cleanValid = valid;
+    }
+
+    public HistorySessionSnapshot? TryExport()
+    {
+        if (TotalCount <= 0)
+        {
+            return null;
+        }
+
+        var recipes = new List<HistoryRecipe>(TotalCount);
+        foreach (var command in _undo.Reverse())
+        {
+            if (command.Persist is null)
+            {
+                return null;
+            }
+
+            recipes.Add(command.Persist);
+        }
+
+        foreach (var command in _redo)
+        {
+            if (command.Persist is null)
+            {
+                return null;
+            }
+
+            recipes.Add(command.Persist);
+        }
+
+        return new HistorySessionSnapshot
+        {
+            CurrentIndex = CurrentIndex,
+            CleanIndex = _cleanIndex,
+            CleanValid = _cleanValid,
+            Recipes = [.. recipes],
+        };
+    }
+
+    public static bool TryImport(AudioDocument document, HistorySessionSnapshot snapshot, out EditHistory history)
+    {
+        history = new EditHistory();
+        if (snapshot.Recipes is not { Length: > 0 } recipes)
+        {
+            return false;
+        }
+
+        foreach (var recipe in recipes)
+        {
+            var command = HistoryRecipes.TryCreate(document, recipe);
+            if (command is null)
+            {
+                history = new EditHistory();
+                return false;
+            }
+
+            history.Do(document, command);
+        }
+
+        history.JumpTo(document, snapshot.CurrentIndex);
+        history.RestoreClean(snapshot.CleanIndex, snapshot.CleanValid);
+        document.SetDirty(!history.IsClean);
+        return true;
+    }
+
     public void Do(AudioDocument document, IEditCommand command)
     {
         command.Apply(document);
@@ -249,6 +321,8 @@ internal sealed class ReplaceRangeCommand : IEditCommand
 
     public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
 
+    public HistoryRecipe? Persist { get; set; }
+
     public void Apply(AudioDocument document)
     {
         document.ReplaceRange(_startFrame, _after);
@@ -299,6 +373,8 @@ internal sealed class DeleteRangeCommand : IEditCommand
     public string Summary { get; }
 
     public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
+
+    public HistoryRecipe? Persist { get; set; }
 
     public void Apply(AudioDocument document)
     {
@@ -367,6 +443,8 @@ internal sealed class PasteCommand : IEditCommand
 
     public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
 
+    public HistoryRecipe? Persist { get; set; }
+
     public void Apply(AudioDocument document)
     {
         if (_replaced is { Length: > 0 })
@@ -424,6 +502,8 @@ internal sealed class AddMarkerCommand : IEditCommand
 
     public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
 
+    public HistoryRecipe? Persist { get; set; }
+
     public void Apply(AudioDocument document) => document.TryAddMarker(_frame);
 
     public void Revert(AudioDocument document) => document.ReplaceMarkers(_markersBefore);
@@ -448,6 +528,8 @@ internal sealed class SetRegionNameCommand : IEditCommand
     public string Summary { get; }
 
     public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
+
+    public HistoryRecipe? Persist { get; set; }
 
     public void Apply(AudioDocument document) => document.TrySetRegionName(_range, _after);
 
@@ -474,6 +556,8 @@ internal sealed class SetMarkerCommentCommand : IEditCommand
 
     public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
 
+    public HistoryRecipe? Persist { get; set; }
+
     public void Apply(AudioDocument document) => document.TrySetMarkerComment(_frame, _after);
 
     public void Revert(AudioDocument document) => document.TrySetMarkerComment(_frame, _before);
@@ -498,6 +582,8 @@ internal sealed class ReplaceMarkersCommand : IEditCommand
 
     public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
 
+    public HistoryRecipe? Persist { get; set; }
+
     public void Apply(AudioDocument document) => document.ReplaceMarkers(_after);
 
     public void Revert(AudioDocument document) => document.ReplaceMarkers(_before);
@@ -521,6 +607,8 @@ internal sealed class SetSampleLoopCommand : IEditCommand
 
     public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
 
+    public HistoryRecipe? Persist { get; set; }
+
     public void Apply(AudioDocument document) => document.SetSampleLoop(_after);
 
     public void Revert(AudioDocument document) => document.SetSampleLoop(_before);
@@ -543,6 +631,8 @@ internal sealed class SetRegionCommand : IEditCommand
     public string Summary { get; }
 
     public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
+
+    public HistoryRecipe? Persist { get; set; }
 
     public void Apply(AudioDocument document) => document.SetRegions(_after);
 
@@ -582,6 +672,8 @@ internal sealed class MoveTimelineItemsCommand : IEditCommand
 
     public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
 
+    public HistoryRecipe? Persist { get; set; }
+
     public void Apply(AudioDocument document)
     {
         document.ReplaceMarkers(_markersAfter);
@@ -615,6 +707,8 @@ internal sealed class ConvertFormatCommand : IEditCommand
     public string Summary { get; }
 
     public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
+
+    public HistoryRecipe? Persist { get; set; }
 
     public void Apply(AudioDocument document) => _after.Restore(document);
 
@@ -667,6 +761,7 @@ internal static class ProcessEdits
     {
         var command = Fade(document, range, fadeIn: true, "Fade In", shape);
         AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => FadeIn(target, mapped, shape));
+        command.Persist = HistoryRecipes.Range(HistoryRecipes.FadeIn, document.SampleRate, range, (int)shape);
         return command;
     }
 
@@ -674,6 +769,7 @@ internal static class ProcessEdits
     {
         var command = Fade(document, range, fadeIn: false, "Fade Out", shape);
         AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => FadeOut(target, mapped, shape));
+        command.Persist = HistoryRecipes.Range(HistoryRecipes.FadeOut, document.SampleRate, range, (int)shape);
         return command;
     }
 
@@ -739,6 +835,14 @@ internal static class ProcessEdits
                 ? null
                 : FadeAroundPlayhead(target, mappedVisible, EditReplay.MapFrame(sourcePlayhead, sourceRate, target));
         };
+        command.Persist = new HistoryRecipe
+        {
+            Kind = HistoryRecipes.FadeAround,
+            SourceRate = sourceRate,
+            Start = sourceVisible.StartFrame,
+            End = sourceVisible.EndFrame,
+            Playhead = sourcePlayhead,
+        };
         return command;
     }
 
@@ -796,6 +900,7 @@ internal static class ProcessEdits
                 range.EndFrame));
         // 再適用時はゲインを適用先のピークから再計算する。
         AttachRangeReplay(command, document.SampleRate, range, Normalize);
+        command.Persist = HistoryRecipes.Range(HistoryRecipes.Normalize, document.SampleRate, range);
         return command;
     }
 
@@ -816,6 +921,7 @@ internal static class ProcessEdits
                 range.StartFrame,
                 range.EndFrame));
         AttachRangeReplay(command, document.SampleRate, range, Delete);
+        command.Persist = HistoryRecipes.Range(HistoryRecipes.Delete, document.SampleRate, range);
         return command;
     }
 
@@ -883,6 +989,7 @@ internal static class ProcessEdits
         var sourceRate = document.SampleRate;
         var resolvedFrame = insertFrame;
         command.Replay = target => Paste(target, clip, EditReplay.MapFrame(resolvedFrame, sourceRate, target));
+        command.Persist = HistoryRecipes.FromPaste(sourceRate, resolvedFrame, clip);
         return command;
     }
 
@@ -919,6 +1026,7 @@ internal static class ProcessEdits
                 mapped,
                 SampleLoopSummary(target.SampleRate, mapped));
         };
+        command.Persist = HistoryRecipes.Range(HistoryRecipes.SetSampleLoop, sourceRate, sourceAfter);
         return command;
     }
 
@@ -1000,6 +1108,14 @@ internal static class ProcessEdits
 
             return exists ? null : SetRegion(target, mapped);
         };
+        command.Persist = new HistoryRecipe
+        {
+            Kind = HistoryRecipes.SetRegion,
+            SourceRate = sourceRate,
+            Start = sourceRange.StartFrame,
+            End = sourceRange.EndFrame,
+            Flag = wasRemoval,
+        };
         return command;
     }
 
@@ -1038,6 +1154,7 @@ internal static class ProcessEdits
                 .Select(item => EditReplay.MapRange(item, sourceRate, target))
                 .Where(item => !item.IsEmpty)
                 .ToArray());
+        command.Persist = HistoryRecipes.FromRanges(HistoryRecipes.RemoveRegions, sourceRate, removedRanges);
         return command;
     }
 
@@ -1052,6 +1169,12 @@ internal static class ProcessEdits
         {
             var mapped = EditReplay.MapFrame(frame, sourceRate, target);
             return target.HasMarkerAt(mapped) ? null : AddMarker(target, mapped);
+        };
+        command.Persist = new HistoryRecipe
+        {
+            Kind = HistoryRecipes.AddMarker,
+            SourceRate = sourceRate,
+            Frame = frame,
         };
         return command;
     }
@@ -1077,6 +1200,13 @@ internal static class ProcessEdits
         var sourceRate = document.SampleRate;
         command.Replay = target =>
             SetMarkerComment(target, EditReplay.MapFrame(frame, sourceRate, target), after);
+        command.Persist = new HistoryRecipe
+        {
+            Kind = HistoryRecipes.MarkerComment,
+            SourceRate = sourceRate,
+            Frame = frame,
+            Text = after,
+        };
         return command;
     }
 
@@ -1102,6 +1232,14 @@ internal static class ProcessEdits
         var sourceRate = document.SampleRate;
         command.Replay = target =>
             SetRegionName(target, EditReplay.MapRange(range, sourceRate, target), after);
+        command.Persist = new HistoryRecipe
+        {
+            Kind = HistoryRecipes.RegionName,
+            SourceRate = sourceRate,
+            Start = range.StartFrame,
+            End = range.EndFrame,
+            Text = after,
+        };
         return command;
     }
 
@@ -1125,6 +1263,7 @@ internal static class ProcessEdits
         command.Replay = target => RemoveMarkers(
             target,
             removedFrames.Select(item => EditReplay.MapFrame(item, sourceRate, target)).ToArray());
+        command.Persist = HistoryRecipes.FromMarkers(HistoryRecipes.RemoveMarkers, sourceRate, removedFrames);
         return command;
     }
 
@@ -1191,6 +1330,11 @@ internal static class ProcessEdits
             movingFrames.Select(item => EditReplay.MapFrame(item, sourceRate, target)).ToArray(),
             EditReplay.ScaleDelta(deltaApplied, sourceRate, target.SampleRate),
             out _);
+        command.Persist = HistoryRecipes.FromMarkers(
+            HistoryRecipes.MoveMarkers,
+            sourceRate,
+            movingFrames,
+            deltaApplied);
         return command;
     }
 
@@ -1210,7 +1354,7 @@ internal static class ProcessEdits
             return null;
         }
 
-        return new MoveTimelineItemsCommand(
+        var command = new MoveTimelineItemsCommand(
             markersBefore,
             markersAfter,
             regionsBefore,
@@ -1225,6 +1369,12 @@ internal static class ProcessEdits
                 loopBefore,
                 loopAfter,
                 document.SampleRate));
+        command.Persist = HistoryRecipes.FromTimeline(
+            document.SampleRate,
+            markersAfter,
+            regionsAfter,
+            loopAfter);
+        return command;
     }
 
     private static bool RegionsEqual(WaveRegion[] left, WaveRegion[] right)
@@ -1297,6 +1447,12 @@ internal static class ProcessEdits
             before,
             after);
         command.Replay = target => ConvertSampleRate(target, destRate);
+        command.Persist = new HistoryRecipe
+        {
+            Kind = HistoryRecipes.ConvertRate,
+            SourceRate = document.SampleRate,
+            Value = destRate,
+        };
         return command;
     }
 
@@ -1337,6 +1493,12 @@ internal static class ProcessEdits
             before,
             after);
         command.Replay = target => ConvertBitDepth(target, bits);
+        command.Persist = new HistoryRecipe
+        {
+            Kind = HistoryRecipes.ConvertBits,
+            SourceRate = document.SampleRate,
+            Value = bits,
+        };
         return command;
     }
 
@@ -1356,6 +1518,12 @@ internal static class ProcessEdits
             before,
             after);
         command.Replay = target => ConvertChannels(target, destChannels);
+        command.Persist = new HistoryRecipe
+        {
+            Kind = HistoryRecipes.ConvertChannels,
+            SourceRate = document.SampleRate,
+            Value = destChannels,
+        };
         return command;
     }
 

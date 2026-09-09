@@ -6,6 +6,7 @@ using Microsoft.Win32;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
+using MgaSonicAnvil.Editing;
 
 namespace MgaSonicAnvil.UI;
 
@@ -348,6 +349,7 @@ public partial class MainWindow
                     session.SelectedMarkerFrames);
                 var snap = DocumentSessionStore.Capture(session.Document, view, i);
                 snap.IsActive = ReferenceEquals(session, _activeSession);
+                TrySaveSessionHistory(session, snap, i, keep);
                 if (DocumentSessionStore.NeedsSessionAudio(snap.Dirty, snap.SourcePath))
                 {
                     try
@@ -419,6 +421,11 @@ public partial class MainWindow
 
     private static bool TryRestoreSession(OpenDocumentSnapshot snap, out DocumentSession session)
     {
+        if (TryRestoreSessionHistory(snap, out session))
+        {
+            return true;
+        }
+
         session = null!;
         try
         {
@@ -443,6 +450,90 @@ public partial class MainWindow
                 LoopEnabled = snap.LoopEnabled,
             };
 
+            return true;
+        }
+        catch
+        {
+            session = null!;
+            return false;
+        }
+    }
+
+    private static void TrySaveSessionHistory(
+        DocumentSession session,
+        OpenDocumentSnapshot snap,
+        int index,
+        List<string> keep)
+    {
+        var exported = session.History.TryExport();
+        if (exported is null)
+        {
+            return;
+        }
+
+        var originName = DocumentSessionStore.OriginFileNameForIndex(index);
+        var historyName = DocumentSessionStore.HistoryFileNameForIndex(index);
+        var currentIndex = session.History.CurrentIndex;
+        try
+        {
+            session.History.JumpTo(session.Document, 0);
+            AudioCodec.SaveWave(session.Document, AppStorage.SessionSidecarPath(originName));
+            session.History.JumpTo(session.Document, currentIndex);
+            if (!DocumentSessionStore.TryWriteHistory(AppStorage.SessionSidecarPath(historyName), exported))
+            {
+                return;
+            }
+
+            snap.OriginFileName = originName;
+            snap.HistoryFileName = historyName;
+            keep.Add(originName);
+            keep.Add(historyName);
+        }
+        catch
+        {
+            // 履歴が残らなくても作業コピーは残す。
+        }
+        finally
+        {
+            session.History.JumpTo(session.Document, currentIndex);
+        }
+    }
+
+    private static bool TryRestoreSessionHistory(OpenDocumentSnapshot snap, out DocumentSession session)
+    {
+        session = null!;
+        var originName = DocumentSessionStore.SanitizeSidecarName(snap.OriginFileName);
+        var historyName = DocumentSessionStore.SanitizeSidecarName(snap.HistoryFileName);
+        if (originName is null || historyName is null)
+        {
+            return false;
+        }
+
+        var originPath = Path.Combine(AppStorage.SessionDirectory, originName);
+        var historyPath = Path.Combine(AppStorage.SessionDirectory, historyName);
+        if (!DocumentSessionStore.TryReadHistory(historyPath, out var historySnap)
+            || !File.Exists(originPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var document = AudioCodec.Load(originPath);
+            if (!EditHistory.TryImport(document, historySnap, out var history))
+            {
+                return false;
+            }
+
+            document.MarkUnsaved(string.IsNullOrWhiteSpace(snap.SourcePath) ? null : snap.SourcePath);
+            document.SetDirty(!history.IsClean);
+            DocumentSessionStore.ApplyMeta(document, snap);
+            document.SetDirty(!history.IsClean);
+            session = new DocumentSession(document)
+            {
+                History = history,
+                LoopEnabled = snap.LoopEnabled,
+            };
             return true;
         }
         catch

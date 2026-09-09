@@ -1,5 +1,7 @@
 using System.IO;
+using System.Text.Json;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Editing;
 
 namespace MgaSonicAnvil.Config;
 
@@ -52,6 +54,10 @@ internal sealed class OpenDocumentSnapshot
 
     /// <summary>終了時に前面だったタブ。起動復元で ActiveDocumentIndex より優先する。</summary>
     public bool IsActive { get; set; }
+
+    public string OriginFileName { get; set; } = string.Empty;
+
+    public string HistoryFileName { get; set; } = string.Empty;
 }
 
 internal static class DocumentSessionStore
@@ -61,8 +67,81 @@ internal static class DocumentSessionStore
 
     public static string FileNameForIndex(int index) => $"doc-{Math.Max(0, index)}.wav";
 
+    public static string OriginFileNameForIndex(int index) => $"doc-{Math.Max(0, index)}-origin.wav";
+
+    public static string HistoryFileNameForIndex(int index) => $"doc-{Math.Max(0, index)}-history.json";
+
+    public static string? SanitizeSidecarName(string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return null;
+        }
+
+        var name = Path.GetFileName(fileName.Trim());
+        if (string.IsNullOrWhiteSpace(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            return null;
+        }
+
+        if (name.EndsWith("-origin.wav", StringComparison.OrdinalIgnoreCase)
+            && name.StartsWith("doc-", StringComparison.OrdinalIgnoreCase))
+        {
+            return name;
+        }
+
+        if (name.EndsWith("-history.json", StringComparison.OrdinalIgnoreCase)
+            && name.StartsWith("doc-", StringComparison.OrdinalIgnoreCase))
+        {
+            return name;
+        }
+
+        return null;
+    }
+
     public static bool NeedsSessionAudio(bool dirty, string? sourcePath) =>
         dirty || string.IsNullOrWhiteSpace(sourcePath);
+
+    public static bool TryWriteHistory(string path, HistorySessionSnapshot snapshot)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(snapshot, HistorySessionJsonContext.Default.HistorySessionSnapshot);
+            File.WriteAllText(path, json);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static bool TryReadHistory(string path, out HistorySessionSnapshot snapshot)
+    {
+        snapshot = null!;
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return false;
+            }
+
+            var loaded = JsonSerializer.Deserialize(
+                File.ReadAllText(path),
+                HistorySessionJsonContext.Default.HistorySessionSnapshot);
+            if (loaded?.Recipes is not { Length: > 0 })
+            {
+                return false;
+            }
+
+            snapshot = loaded;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     public static string? SanitizeSessionFileName(string? fileName)
     {

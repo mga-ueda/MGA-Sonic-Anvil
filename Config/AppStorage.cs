@@ -40,6 +40,13 @@ internal static class AppStorage
         return Path.Combine(SessionDirectory, name);
     }
 
+    public static string SessionSidecarPath(string fileName)
+    {
+        var name = DocumentSessionStore.SanitizeSidecarName(fileName)
+            ?? throw new ArgumentException("Invalid session sidecar name.", nameof(fileName));
+        return Path.Combine(SessionDirectory, name);
+    }
+
     public static void ClearSessionDocument()
     {
         try
