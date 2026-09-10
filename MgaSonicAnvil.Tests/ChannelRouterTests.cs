@@ -46,6 +46,28 @@ public sealed class ChannelRouterTests
     }
 
     [Fact]
+    public void ShouldMirrorMono_WhenMonoHasTwoOrMorePorts()
+    {
+        Assert.True(ChannelRouter.ShouldMirrorMono(1, 2));
+        Assert.True(ChannelRouter.ShouldMirrorMono(1, 8));
+        Assert.False(ChannelRouter.ShouldMirrorMono(2, 2));
+        Assert.False(ChannelRouter.ShouldMirrorMono(1, 1));
+    }
+
+    [Fact]
+    public void MonoPorts_UsesMappedStereoPortsWhenAvailable()
+    {
+        Assert.Equal((0, 1), ChannelRouter.MonoPorts(8, null));
+        Assert.Equal((0, 1), ChannelRouter.MonoPorts(8, []));
+        // 保存済みステレオマップ（例: ASIO の再生ポート 0/1）はそのままミラー先になる。
+        Assert.Equal((0, 1), ChannelRouter.MonoPorts(18, [0, 1]));
+        Assert.Equal((2, 3), ChannelRouter.MonoPorts(8, [2, 3]));
+        // マップが 1 要素しか無ければ隣のポートへ。
+        Assert.Equal((4, 5), ChannelRouter.MonoPorts(8, [4]));
+        Assert.Equal((0, 1), ChannelRouter.MonoPorts(2, [0, 5]));
+    }
+
+    [Fact]
     public void MapInterleaved_GatherBuildsDestFrames()
     {
         var source = new float[] { 1f, 2f, 3f, 4f };

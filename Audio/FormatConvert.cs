@@ -58,6 +58,12 @@ internal static class FormatConvert
         sourceRate > 0 && deviceRate > 0 && sourceRate != deviceRate;
 
     /// <summary>
+    /// 再生はソースのサンプルをホールドする。補間すると変換後の劣化が消える。
+    /// </summary>
+    public static bool ShouldHoldForDevice(int sourceRate, int deviceRate) =>
+        sourceRate > 0 && deviceRate > 0 && sourceRate != deviceRate;
+
+    /// <summary>
     /// 新しいナイキストで帯域制限してから間引く／補間する。
     /// ホールドだと階段波の高調波が出て、8 kHz がキンキンする。
     /// </summary>

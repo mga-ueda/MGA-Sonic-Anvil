@@ -320,9 +320,11 @@ public sealed class FormatConvertTests
     }
 
     [Fact]
-    public void Playback_ReconstructsInsteadOfHoldingStairs()
+    public void Playback_HoldsSourceSamplesOnDeviceClock()
     {
+        Assert.True(FormatConvert.ShouldHoldForDevice(8000, 48000));
         Assert.True(FormatConvert.ShouldResampleForDevice(8000, 48000));
+        Assert.False(FormatConvert.ShouldHoldForDevice(48000, 48000));
         Assert.False(FormatConvert.ShouldResampleForDevice(48000, 48000));
 
         var samples = new float[8];
@@ -338,8 +340,29 @@ public sealed class FormatConvertTests
         var buffer = new float[24];
         Assert.Equal(24, provider.Read(buffer, 0, buffer.Length));
         var left = Enumerable.Range(0, 12).Select(i => buffer[i * 2]).ToArray();
-        Assert.True(left.Distinct().Count() > 2);
-        Assert.True(left.Take(6).Distinct().Count() > 1);
+        Assert.All(left, sample => Assert.True(sample is 1f or -1f));
+        Assert.Equal(1f, left[0]);
+        Assert.Equal(-1f, left[^1]);
+        Assert.Equal(2, left.Distinct().Count());
+    }
+
+    [Fact]
+    public void Playback_ConvertedMonoPlaysOnBothChannels()
+    {
+        var document = MakeDocument(frames: 4, sampleRate: 48000);
+        document.Interleaved[0] = 0.8f;
+        document.Interleaved[1] = -0.2f;
+        new EditHistory().Do(document, ProcessEdits.ConvertChannels(document, 1)!);
+
+        var provider = new PlaybackSampleProvider();
+        provider.Bind(document, 0, null, loop: false);
+        Assert.Equal(2, provider.WaveFormat.Channels);
+
+        var buffer = new float[8];
+        Assert.Equal(8, provider.Read(buffer, 0, buffer.Length));
+        var expected = 0.5f * (0.8f + -0.2f);
+        Assert.Equal(expected, buffer[0], 5);
+        Assert.Equal(expected, buffer[1], 5);
     }
 
     [Fact]

@@ -40,6 +40,26 @@ internal static class ChannelRouter
     public static bool ShouldDownmix(int sourceChannels, int destPorts, int[]? map) =>
         destPorts <= 2 && sourceChannels > 2 && IsEmpty(map);
 
+    /// <summary>モノラルはポートが 2 つ以上あれば L/R 相当の 2 ポートへ同じ音を出す。</summary>
+    public static bool ShouldMirrorMono(int sourceChannels, int destPorts) =>
+        sourceChannels == 1 && destPorts > 1;
+
+    /// <summary>モノラルミラー先の 2 ポート。マップ有りは map[0]/map[1]、無しは 0/1。</summary>
+    public static (int Left, int Right) MonoPorts(int destPorts, int[]? map)
+    {
+        var last = Math.Max(0, destPorts - 1);
+        if (IsEmpty(map))
+        {
+            return (0, Math.Min(1, last));
+        }
+
+        var left = Math.Clamp(map![0], 0, last);
+        var right = map.Length > 1 && map[1] >= 0
+            ? Math.Clamp(map[1], 0, last)
+            : Math.Min(left + 1, last);
+        return (left, right);
+    }
+
     /// <summary>入力ポート → 論理チャンネル。dest[i] = source[map[i]]。</summary>
     public static void Gather(ReadOnlySpan<float> source, Span<float> dest, ReadOnlySpan<int> map)
     {

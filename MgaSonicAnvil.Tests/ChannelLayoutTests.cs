@@ -76,6 +76,108 @@ public sealed class ChannelLayoutTests
     }
 
     [Fact]
+    public void Playback_MonoPlaysOnBothStereoChannels()
+    {
+        var samples = new float[] { 0.4f, 0.4f, 0.4f, 0.4f };
+        var document = new AudioDocument(samples, 48000, 1, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.Bind(document, 0, null, loop: false);
+        Assert.Equal(2, provider.WaveFormat.Channels);
+
+        var buffer = new float[8];
+        Assert.Equal(8, provider.Read(buffer, 0, buffer.Length));
+        for (var i = 0; i < 4; i++)
+        {
+            Assert.Equal(0.4f, buffer[i * 2], 3);
+            Assert.Equal(0.4f, buffer[i * 2 + 1], 3);
+        }
+    }
+
+    [Fact]
+    public void Playback_MonoMirrorsToLeftAndRightOnManyPorts()
+    {
+        var samples = new float[] { 0.5f, 0.5f };
+        var document = new AudioDocument(samples, 48000, 1, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(8, null);
+        provider.Bind(document, 0, null, loop: false);
+        Assert.Equal(8, provider.WaveFormat.Channels);
+
+        var buffer = new float[16];
+        Assert.Equal(16, provider.Read(buffer, 0, buffer.Length));
+        Assert.Equal(0.5f, buffer[0], 3);
+        Assert.Equal(0.5f, buffer[1], 3);
+        Assert.Equal(0f, buffer[2], 3);
+        Assert.Equal(0f, buffer[7], 3);
+    }
+
+    [Fact]
+    public void Playback_MonoMirrorsToMappedStereoPorts()
+    {
+        // ASIO Fireface + 保存済み再生ポート [0,1] の構成。マップ有りでもモノラルは両ポートへ。
+        var samples = new float[] { 0.5f, 0.5f };
+        var document = new AudioDocument(samples, 48000, 1, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(18, [0, 1]);
+        provider.Bind(document, 0, null, loop: false);
+        Assert.Equal(18, provider.WaveFormat.Channels);
+
+        var buffer = new float[36];
+        Assert.Equal(36, provider.Read(buffer, 0, buffer.Length));
+        Assert.Equal(0.5f, buffer[0], 3);
+        Assert.Equal(0.5f, buffer[1], 3);
+        for (var port = 2; port < 18; port++)
+        {
+            Assert.Equal(0f, buffer[port], 3);
+        }
+    }
+
+    [Fact]
+    public void Playback_MonoFollowsMapToNonDefaultPorts()
+    {
+        var samples = new float[] { 0.5f, 0.5f };
+        var document = new AudioDocument(samples, 48000, 1, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(8, [2, 3]);
+        provider.Bind(document, 0, null, loop: false);
+
+        var buffer = new float[16];
+        Assert.Equal(16, provider.Read(buffer, 0, buffer.Length));
+        Assert.Equal(0f, buffer[0], 3);
+        Assert.Equal(0f, buffer[1], 3);
+        Assert.Equal(0.5f, buffer[2], 3);
+        Assert.Equal(0.5f, buffer[3], 3);
+    }
+
+    [Fact]
+    public void Playback_HoldsSamplesOnMappedDirectRoute()
+    {
+        // 8kHz ソースを 48kHz デバイスへ。直接ルート（マップ有り）でも補間せずホールドする。
+        var frames = 64;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            var value = i % 2 == 0 ? 1f : -1f;
+            samples[i * 2] = value;
+            samples[i * 2 + 1] = value;
+        }
+
+        var document = new AudioDocument(samples, 8000, 2, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.SetDeviceSampleRate(48000);
+        provider.ConfigureOutput(18, [0, 1]);
+        provider.Bind(document, 0, null, loop: false);
+
+        var buffer = new float[18 * 96];
+        Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+        for (var frame = 0; frame < 96; frame++)
+        {
+            var sample = buffer[frame * 18];
+            Assert.True(sample is 1f or -1f, $"frame {frame}: {sample} は補間されている");
+        }
+    }
+
+    [Fact]
     public void Playback_RoutesSurroundWhenDeviceHasManyPorts()
     {
         var frames = 8;

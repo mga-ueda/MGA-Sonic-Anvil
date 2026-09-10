@@ -63,6 +63,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private int _deviceOutputChannels = 2;
     private int[] _outputMap = [];
     private int[] _routeMap = [];
+    private int _monoLeftPort;
+    private int _monoRightPort = 1;
     private bool _directRoute;
     private int _deviceRate = 48000;
     private int _sourceRate = 48000;
@@ -154,10 +156,12 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         else
         {
             _directRoute = dest > 2 || !ChannelRouter.IsEmpty(_outputMap);
-            _outputChannels = _directRoute ? dest : Math.Min(2, Math.Max(1, _channels));
+            // ダウンミックス経路は常に L/R。1ch の WaveFormat だと左だけ鳴る。
+            _outputChannels = _directRoute ? dest : dest <= 1 ? 1 : 2;
         }
 
         _routeMap = ChannelRouter.Normalize(_outputMap, _channels, _outputChannels);
+        (_monoLeftPort, _monoRightPort) = ChannelRouter.MonoPorts(_outputChannels, _outputMap);
         WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(_deviceRate, Math.Max(1, _outputChannels));
     }
 
@@ -743,13 +747,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             else
             {
                 PushNearestSourceFrame(srcCh);
-                FormatConvert.DownmixBandlimited(
+                FormatConvert.DownmixHeld(
                     _samples,
                     srcCh,
                     _sourceFrame,
                     frameCount,
-                    _sourceRate,
-                    _deviceRate,
                     out var left,
                     out var right);
                 if (_frameGain is { } gainAt)
@@ -818,13 +820,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             float right;
             if (resampled)
             {
-                FormatConvert.DownmixBandlimited(
+                FormatConvert.DownmixHeld(
                     _samples,
                     srcCh,
                     _exitFrame,
                     frameCount,
-                    _sourceRate,
-                    _deviceRate,
                     out left,
                     out right);
             }
@@ -860,6 +860,15 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         if (_directRoute)
         {
             var dest = buffer.AsSpan(offset + writtenFrames * outCh, outCh);
+            if (ChannelRouter.ShouldMirrorMono(srcCh, outCh))
+            {
+                dest.Clear();
+                var sample = source[0] * gain;
+                dest[_monoLeftPort] = sample;
+                dest[_monoRightPort] = sample;
+                return;
+            }
+
             ChannelRouter.Scatter(source, dest, _routeMap);
             if (gain != 1f)
             {
@@ -928,13 +937,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             var step = sourceFrames / (double)Math.Max(1, framesWanted);
             for (var i = 0; i < framesWanted; i++)
             {
-                FormatConvert.DownmixBandlimited(
+                FormatConvert.DownmixHeld(
                     _scrubScratch,
                     2,
                     i * step,
                     sourceFrames,
-                    _sourceRate,
-                    _deviceRate,
                     out var left,
                     out var right);
                 WriteFrame(buffer, offset, i, outCh, left, right);
