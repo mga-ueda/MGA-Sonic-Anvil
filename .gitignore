@@ -10,3 +10,4 @@ obj/
 *.cache
 *.log
 publish/
+artifacts/
