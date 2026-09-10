@@ -28,6 +28,7 @@ public partial class MainWindow
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
         ClosePitchShiftPicker();
+        CloseTimeStretchPicker();
         if (_fadeMenu is { IsOpen: true })
         {
             _fadeMenu.IsOpen = false;
@@ -100,6 +101,7 @@ public partial class MainWindow
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
         ClosePitchShiftPicker();
+        CloseTimeStretchPicker();
         if (_player.IsPlaying)
         {
             PausePlaybackSoft();
@@ -169,6 +171,7 @@ public partial class MainWindow
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
+        CloseTimeStretchPicker();
         if (_player.IsPlaying)
         {
             PausePlaybackSoft();
@@ -381,6 +384,281 @@ public partial class MainWindow
         finally
         {
             _pitchShiftBusy = false;
+            if (error is not null)
+            {
+                _busyGlass.HideOverlay();
+            }
+            else
+            {
+                _busyGlass.BeginFadeOut();
+            }
+        }
+
+        if (error is not null && IsLoaded)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                error.Message,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void PromptTimeStretch()
+    {
+        if (IsUiBusy)
+        {
+            return;
+        }
+
+        if (_document is null)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (_timeStretchMenu is { IsOpen: true })
+        {
+            return;
+        }
+
+        CloseFadeCurvePicker();
+        CloseFormatConvertPicker();
+        CloseVolumeGainPicker();
+        ClosePitchShiftPicker();
+        if (_player.IsPlaying)
+        {
+            PausePlaybackSoft();
+        }
+
+        _timeStretchPreviewResumeFrame = _document.CursorFrame;
+        var menu = TimeStretchPicker.Show(
+            this,
+            (int)Math.Min(int.MaxValue, range.Length),
+            _document.SampleRate,
+            ApplyTimeStretch,
+            PreviewTimeStretch,
+            OnTimeStretchChanged);
+        _timeStretchMenu = menu;
+        menu.Closed += (_, _) =>
+        {
+            StopTimeStretchPreview(restoreCursor: true);
+            if (ReferenceEquals(_timeStretchMenu, menu))
+            {
+                _timeStretchMenu = null;
+            }
+        };
+    }
+
+    private bool CloseTimeStretchPicker()
+    {
+        if (_timeStretchMenu is not { IsOpen: true })
+        {
+            return false;
+        }
+
+        _timeStretchMenu.IsOpen = false;
+        return true;
+    }
+
+    private void OnTimeStretchChanged(int destFrames)
+    {
+        if (!_timeStretchPreviewing || _document is null || _timeStretchPreviewToggling)
+        {
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            return;
+        }
+
+        StartTimeStretchPreviewPlayback(range, destFrames);
+    }
+
+    private void PreviewTimeStretch(int destFrames)
+    {
+        if (_document is null || _timeStretchPreviewToggling)
+        {
+            return;
+        }
+
+        var now = Environment.TickCount64;
+        if (now - _timeStretchSpaceTick < 120)
+        {
+            return;
+        }
+
+        _timeStretchSpaceTick = now;
+        _timeStretchPreviewToggling = true;
+        try
+        {
+            if (_timeStretchPreviewing && _player.IsPlaying)
+            {
+                StopTimeStretchPreview(restoreCursor: true);
+                return;
+            }
+
+            var range = ActiveRange();
+            if (range.IsEmpty)
+            {
+                return;
+            }
+
+            StartTimeStretchPreviewPlayback(range, destFrames);
+        }
+        finally
+        {
+            _timeStretchPreviewToggling = false;
+        }
+    }
+
+    private void StartTimeStretchPreviewPlayback(WaveSelection range, int destFrames)
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_player.IsPlaying)
+            {
+                _player.Pause();
+            }
+
+            _playTimer.Stop();
+            _meter.Reset();
+            LoudnessMeter.Reset();
+            var source = _document.CopyRange(range.StartFrame, range.Length);
+            var stretched = Audio.TimeStretch.IsNoOp((int)range.Length, destFrames)
+                ? source
+                : Audio.TimeStretch.Apply(
+                    source,
+                    _document.Channels,
+                    _document.SampleRate,
+                    destFrames);
+            var preview = new AudioDocument(
+                stretched,
+                _document.SampleRate,
+                _document.Channels,
+                _document.BitsPerSample,
+                _document.SourceKind,
+                null);
+            var previewRange = new WaveSelection(0, preview.FrameCount);
+            if (_player.HasOutputDevice)
+            {
+                _player.Rebind(preview, 0, previewRange, loop: false);
+            }
+            else
+            {
+                _player.Prepare(preview, 0, previewRange, loop: false);
+            }
+
+            _timeStretchPreviewOrigin = range.StartFrame;
+            _timeStretchPreviewing = true;
+            _timeStretchPreviewStartedAt = Environment.TickCount64;
+            _player.Play();
+            _playbackGeneration = _player.Generation;
+            _playTimer.Start();
+            StartMeterRendering();
+            Waveform.SetTrailRecording(true);
+            Transport.SetPlaying(true);
+            Waveform.UnlockCenter();
+            Waveform.SetPlayheadFromPlayback(range.StartFrame);
+        }
+        catch (Exception ex)
+        {
+            _timeStretchPreviewing = false;
+            PausePlaybackSoft();
+            OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void StopTimeStretchPreview(bool restoreCursor)
+    {
+        if (!_timeStretchPreviewing)
+        {
+            return;
+        }
+
+        var resume = _timeStretchPreviewResumeFrame;
+        _timeStretchPreviewing = false;
+        PausePlaybackSoft();
+        if (restoreCursor && _document is not null)
+        {
+            SeekFrame(resume);
+        }
+    }
+
+    private void ApplyTimeStretch(int destFrames) =>
+        _ = ApplyTimeStretchAsync(destFrames);
+
+    private async Task ApplyTimeStretchAsync(int destFrames)
+    {
+        if (_document is null || IsUiBusy)
+        {
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        _timeStretchPreviewing = false;
+        CloseTimeStretchPicker();
+        destFrames = Audio.TimeStretch.ClampDestFrames((int)range.Length, destFrames);
+        if (Audio.TimeStretch.IsNoOp((int)range.Length, destFrames))
+        {
+            return;
+        }
+
+        PausePlaybackSoft();
+        var document = _document;
+        var viewStart = Waveform.ViewStart;
+        _timeStretchBusy = true;
+        Exception? error = null;
+        IEditCommand? command = null;
+        try
+        {
+            ShowTimeStretchBusyGlass();
+            var progress = new Progress<double>(p => _busyGlass.SetProgress(p));
+            command = await Task.Run(() => ProcessEdits.TimeStretch(document, range, destFrames, progress))
+                .ConfigureAwait(true);
+            if (!IsLoaded || !ReferenceEquals(_document, document) || command is null)
+            {
+                return;
+            }
+
+            _history.Do(document, command);
+            Waveform.SetViewStartExternal(
+                AudioDocument.MapFrameThroughRangeStretch(
+                    (long)Math.Round(viewStart),
+                    range.StartFrame,
+                    range.Length,
+                    destFrames));
+            AfterTransform();
+            PausePlaybackSoft();
+        }
+        catch (Exception ex)
+        {
+            error = ex;
+        }
+        finally
+        {
+            _timeStretchBusy = false;
             if (error is not null)
             {
                 _busyGlass.HideOverlay();
@@ -803,6 +1081,31 @@ public partial class MainWindow
 
         StopPlaybackForEdit();
         _history.Do(_document, ProcessEdits.Normalize(_document, range));
+        AfterTransform();
+    }
+
+    private void ApplyReverse()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var command = ProcessEdits.Reverse(_document, range);
+        if (command is null)
+        {
+            return;
+        }
+
+        StopPlaybackForEdit();
+        _history.Do(_document, command);
         AfterTransform();
     }
 

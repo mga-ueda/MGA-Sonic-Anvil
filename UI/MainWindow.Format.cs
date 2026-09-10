@@ -13,10 +13,11 @@ public partial class MainWindow
     private readonly BusyGlassOverlay _busyGlass = new();
     private bool _formatConvertBusy;
     private bool _pitchShiftBusy;
+    private bool _timeStretchBusy;
     private bool _tabExportBusy;
     private bool _openBusy;
 
-    private bool IsUiBusy => _formatConvertBusy || _pitchShiftBusy || _tabExportBusy || _openBusy;
+    private bool IsUiBusy => _formatConvertBusy || _pitchShiftBusy || _timeStretchBusy || _tabExportBusy || _openBusy;
 
     private void PromptFormatConvert(FormatConvertKind kind)
     {
@@ -34,6 +35,7 @@ public partial class MainWindow
         CloseFadeCurvePicker();
         CloseVolumeGainPicker();
         ClosePitchShiftPicker();
+        CloseTimeStretchPicker();
         if (_formatMenu is { IsOpen: true })
         {
             _formatMenu.IsOpen = false;
@@ -513,6 +515,17 @@ public partial class MainWindow
             RootDock,
             GetBusyGlassCoverBounds(),
             UiStrings.OverlayPitchShift);
+    }
+
+    private void ShowTimeStretchBusyGlass()
+    {
+        RootChrome.UpdateLayout();
+        RootDock.UpdateLayout();
+        _busyGlass.ShowOverlay(
+            RootChrome,
+            RootDock,
+            GetBusyGlassCoverBounds(),
+            UiStrings.OverlayTimeStretch);
     }
 
     private Rect GetBusyGlassCoverBounds()

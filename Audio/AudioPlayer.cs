@@ -10,6 +10,7 @@ internal sealed class AudioPlayer : IDisposable
     private readonly PlaybackSampleProvider _provider = new();
     private IWavePlayer? _output;
     private AudioOutputSettings _settings = AudioOutputSettings.Default;
+    private int[] _outputMap = [];
     private int _deviceRate;
     private int _deviceChannels;
     private int _lockedDeviceRate;
@@ -127,6 +128,14 @@ internal sealed class AudioPlayer : IDisposable
     public int ReadRecentOutputSamples(float[] destination) =>
         _provider.CopyRecentOutputSamples(destination);
 
+    public void SetOutputMap(int[]? map) => _outputMap = map ?? [];
+
+    public void ReleaseOutput()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        RecreateOutput();
+    }
+
     public void ApplyOutputSettings(AudioOutputSettings settings)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -167,6 +176,7 @@ internal sealed class AudioPlayer : IDisposable
         }
 
         _provider.Bind(document, startFrame, playRange, loop, frameGain);
+        ApplyPlaybackRouting();
         EnsureDeviceMatchesProvider();
     }
 
@@ -701,7 +711,19 @@ internal sealed class AudioPlayer : IDisposable
         }
 
         _provider.Bind(document, frame, null, loop: false);
+        ApplyPlaybackRouting();
         EnsureDeviceMatchesProvider();
+    }
+
+    private void ApplyPlaybackRouting()
+    {
+        if (_settings.Api == AudioOutputApi.Asio)
+        {
+            return;
+        }
+
+        var dest = AudioCaptureFactory.QueryOutputChannelCount(_settings);
+        _provider.ConfigureOutput(dest < 1 ? 2 : dest, _outputMap);
     }
 
     private void EnsureDeviceMatchesProvider()
@@ -849,7 +871,9 @@ internal sealed class AudioPlayer : IDisposable
                 UiStrings.ErrAsioSampleRateUnsupported(asio.DriverName, rate));
         }
 
-        var channels = Math.Min(2, asio.DriverOutputChannelCount);
+        var driverCh = Math.Max(1, asio.DriverOutputChannelCount);
+        _provider.ConfigureOutput(driverCh, _outputMap);
+        var channels = Math.Clamp(_provider.WaveFormat.Channels, 1, driverCh);
         asio.Init(new AsioOutputAdapter(_provider, channels));
     }
 

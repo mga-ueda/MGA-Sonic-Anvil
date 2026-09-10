@@ -41,6 +41,7 @@ public partial class MainWindow
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
         ClosePitchShiftPicker();
+        CloseTimeStretchPicker();
         CommitTimelineNudgeSession();
         StopPlaceRepeat();
         StopPlaybackForEdit();

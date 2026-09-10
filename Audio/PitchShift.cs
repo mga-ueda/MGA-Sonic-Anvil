@@ -55,21 +55,22 @@ internal static class PitchShift
         var frames = interleaved.Length / channels;
         if (timeStretch)
         {
-            return ApplySignalsmith(interleaved, frames, frames, channels, sampleRate, semitones, progress);
+            return StretchExact(interleaved, frames, frames, channels, sampleRate, semitones, progress);
         }
 
         var destFrames = DestFrameCount(frames, semitones, timeStretch: false);
         return FormatConvert.ResampleToFrameCount(interleaved, channels, sampleRate, destFrames, progress);
     }
 
-    private static float[] ApplySignalsmith(
+    internal static float[] StretchExact(
         float[] interleaved,
         int inputFrames,
         int outputFrames,
         int channels,
         int sampleRate,
-        int semitones,
-        IProgress<double>? progress)
+        float semitones,
+        IProgress<double>? progress,
+        string? failedMessage = null)
     {
         var dest = new float[outputFrames * channels];
         SignalsmithStretchNative.ProgressCallback? callback = progress is null
@@ -88,7 +89,7 @@ internal static class PitchShift
         GC.KeepAlive(callback);
         if (ok == 0)
         {
-            throw new InvalidOperationException(UiStrings.ErrorPitchShiftFailed);
+            throw new InvalidOperationException(failedMessage ?? UiStrings.ErrorPitchShiftFailed);
         }
 
         return dest;

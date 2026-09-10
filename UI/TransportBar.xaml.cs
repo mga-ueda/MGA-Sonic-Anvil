@@ -22,6 +22,7 @@ internal partial class TransportBar : UserControl
         InitializeComponent();
         _play = Add(TransportCommand.TogglePlayback, TransportIcon.PlayPause, UiStrings.TipPlay, UiStrings.TooltipPlay);
         Add(TransportCommand.Stop, TransportIcon.Stop, UiStrings.TipStop, UiStrings.TooltipStop);
+        Add(TransportCommand.Record, TransportIcon.Record, UiStrings.TipRecord, UiStrings.TooltipRecord);
         Add(TransportCommand.GoToStart, TransportIcon.GoToStart, UiStrings.TipGoToStart, UiStrings.TooltipGoToStart);
         Add(TransportCommand.GoToEnd, TransportIcon.GoToEnd, UiStrings.TipGoToEnd, UiStrings.TooltipGoToEnd);
         AddGap();
@@ -60,6 +61,7 @@ internal partial class TransportBar : UserControl
     {
         SetTip(TransportCommand.TogglePlayback, UiStrings.TipPlay, UiStrings.TooltipPlay);
         SetTip(TransportCommand.Stop, UiStrings.TipStop, UiStrings.TooltipStop);
+        SetTip(TransportCommand.Record, UiStrings.TipRecord, UiStrings.TooltipRecord);
         SetTip(TransportCommand.GoToStart, UiStrings.TipGoToStart, UiStrings.TooltipGoToStart);
         SetTip(TransportCommand.GoToEnd, UiStrings.TipGoToEnd, UiStrings.TooltipGoToEnd);
         SetTip(TransportCommand.TimeZoomIn, UiStrings.TipTimeZoomIn, UiStrings.TooltipTimeZoomIn);
@@ -102,6 +104,15 @@ internal partial class TransportBar : UserControl
     {
         _play.IsPlaying = playing;
         _play.InvalidateVisual();
+    }
+
+    public void SetRecording(bool recording)
+    {
+        if (_buttons.TryGetValue(TransportCommand.Record, out var button))
+        {
+            button.IsLatched = recording;
+            button.InvalidateVisual();
+        }
     }
 
     public FrameworkElement? ButtonFor(TransportCommand command) =>

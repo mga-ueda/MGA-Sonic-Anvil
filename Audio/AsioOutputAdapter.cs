@@ -15,7 +15,7 @@ internal sealed class AsioOutputAdapter : IWaveProvider
     {
         ArgumentNullException.ThrowIfNull(source);
         _source = source;
-        var channels = Math.Clamp(outputChannels, 1, 2);
+        var channels = Math.Clamp(outputChannels, 1, ChannelLayout.MaxChannels);
         WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(
             Math.Max(1, source.WaveFormat.SampleRate),
             channels);
@@ -44,16 +44,14 @@ internal sealed class AsioOutputAdapter : IWaveProvider
         var gotFrames = Math.Max(0, got / sourceChannels);
         var dest = buffer.AsSpan(offset, frames * frameBytes);
         dest.Clear();
+        var copy = Math.Min(sourceChannels, outChannels);
         for (var frame = 0; frame < gotFrames; frame++)
         {
             var src = frame * sourceChannels;
-            var left = _scratch[src];
-            var right = sourceChannels > 1 ? _scratch[src + 1] : left;
             var at = frame * frameBytes;
-            BitConverter.TryWriteBytes(dest.Slice(at, 4), left);
-            if (outChannels > 1)
+            for (var channel = 0; channel < copy; channel++)
             {
-                BitConverter.TryWriteBytes(dest.Slice(at + 4, 4), right);
+                BitConverter.TryWriteBytes(dest.Slice(at + channel * 4, 4), _scratch[src + channel]);
             }
         }
 

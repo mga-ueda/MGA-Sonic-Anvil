@@ -19,6 +19,15 @@ internal static partial class UiStrings
         "AIFF export is not supported.",
         "AIFF export is not supported.");
 
+    public static string ErrorNoCaptureDevice => Get(
+        "録音できるデバイスがありません。",
+        "No capture device is available.");
+    public static string ErrorRecordFailed => Get(
+        "録音を開始できませんでした。",
+        "Could not start recording.");
+    public static string ErrorToneFailed => Get(
+        "テスト音を再生できませんでした。",
+        "Could not play the test tone.");
     public static string ErrAudioOutputUnavailable => Get(
         "Audio output device is not available.",
         "Audio output device is not available.");

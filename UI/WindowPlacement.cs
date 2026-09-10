@@ -47,6 +47,58 @@ internal static class WindowPlacement
         return true;
     }
 
+    public static void CaptureSettings(Window window, AppSettings settings)
+    {
+        var bounds = window.WindowState == WindowState.Normal
+            ? new Rect(window.Left, window.Top, window.Width, window.Height)
+            : window.RestoreBounds;
+        settings.SettingsWindowX = (int)Math.Round(bounds.X);
+        settings.SettingsWindowY = (int)Math.Round(bounds.Y);
+        settings.SettingsWindowWidth = (int)Math.Round(bounds.Width);
+        settings.SettingsWindowHeight = (int)Math.Round(bounds.Height);
+        settings.SettingsWindowHasPosition = true;
+    }
+
+    public static bool TryApplySettings(Window window, AppSettings settings)
+    {
+        if (!TryReadSettings(settings, out var bounds, out var hasSize))
+        {
+            return false;
+        }
+
+        var height = hasSize ? Math.Max(bounds.Height, window.MinHeight) : window.Height;
+        var placed = new Rect(bounds.X, bounds.Y, window.Width, height);
+        if (!IsVisibleOnAnyScreen(placed))
+        {
+            return false;
+        }
+
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = placed.X;
+        window.Top = placed.Y;
+        if (hasSize)
+        {
+            window.Height = placed.Height;
+        }
+
+        return true;
+    }
+
+    public static bool TryReadSettings(AppSettings settings, out Rect bounds, out bool hasSize)
+    {
+        bounds = default;
+        hasSize = settings.SettingsWindowHeight > 0;
+        if (!settings.SettingsWindowHasPosition)
+        {
+            return false;
+        }
+
+        var width = settings.SettingsWindowWidth > 0 ? settings.SettingsWindowWidth : 1;
+        var height = hasSize ? settings.SettingsWindowHeight : 1;
+        bounds = new Rect(settings.SettingsWindowX, settings.SettingsWindowY, width, height);
+        return true;
+    }
+
     public static void ApplyFirstLaunch(Window window)
     {
         var width = DesignMetrics.WindowDefaultWidth;

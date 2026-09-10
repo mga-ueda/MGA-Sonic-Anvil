@@ -11,6 +11,7 @@ internal enum TransportIcon
 {
     PlayPause,
     Stop,
+    Record,
     GoToStart,
     GoToEnd,
     TimeZoomIn,
@@ -37,6 +38,7 @@ internal enum TransportCommand
 {
     TogglePlayback,
     Stop,
+    Record,
     GoToStart,
     GoToEnd,
     TimeZoomIn,
@@ -137,6 +139,11 @@ internal sealed class TransportIconButton : Button
         var backKey = QuietChrome ? "ProjectBarBackBrush" : "TransportBackBrush";
         TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed, backKey);
         var fore = IconForeOverride ?? TransportChrome.Fore(IsEnabled);
+        if (Icon == TransportIcon.Record && IsLatched)
+        {
+            fore = Color.FromRgb(0xE2, 0x4B, 0x4A);
+        }
+
         TransportIconDrawing.Draw(dc, Icon, bounds, fore, IsPlaying);
     }
 
@@ -225,6 +232,9 @@ internal static class TransportIconDrawing
                 break;
             case TransportIcon.Stop:
                 dc.DrawRectangle(brush, null, new Rect(12, 12, 10, 12));
+                break;
+            case TransportIcon.Record:
+                dc.DrawEllipse(brush, null, new Point(cx, cy), 6.2, 6.2);
                 break;
             case TransportIcon.GoToStart:
             case TransportIcon.GoToEnd:

@@ -17,7 +17,16 @@ public partial class MainWindow
                 TogglePlayback();
                 break;
             case TransportCommand.Stop:
+                if (IsRecording)
+                {
+                    StopRecording();
+                    break;
+                }
+
                 StopPlayback();
+                break;
+            case TransportCommand.Record:
+                ToggleRecording();
                 break;
             case TransportCommand.GoToStart:
                 Waveform.ClearSelection();
@@ -83,6 +92,12 @@ public partial class MainWindow
 
     private void TogglePlayback()
     {
+        if (IsRecording)
+        {
+            StopRecording();
+            return;
+        }
+
         if (_document is null)
         {
             return;
@@ -205,9 +220,15 @@ public partial class MainWindow
             frame += _pitchPreviewOrigin;
         }
 
+        if (_timeStretchPreviewing)
+        {
+            frame += _timeStretchPreviewOrigin;
+        }
+
         _fadePreviewing = false;
         _volumePreviewing = false;
         _pitchPreviewing = false;
+        _timeStretchPreviewing = false;
         PausePlaybackSoft();
         SeekFrame(frame);
         RestoreFadeVisualIfMenuOpen();
@@ -402,7 +423,7 @@ public partial class MainWindow
             Waveform.AbandonScrub();
         }
 
-        if (_fadePreviewing || _formatPreviewing || _volumePreviewing || _pitchPreviewing)
+        if (_fadePreviewing || _formatPreviewing || _volumePreviewing || _pitchPreviewing || _timeStretchPreviewing)
         {
             SyncPreviewPlayhead();
             if (_player.ProviderEnded)
@@ -413,7 +434,9 @@ public partial class MainWindow
                         ? _formatPreviewStartedAt
                         : _pitchPreviewing
                             ? _pitchPreviewStartedAt
-                            : _volumePreviewStartedAt;
+                            : _timeStretchPreviewing
+                                ? _timeStretchPreviewStartedAt
+                                : _volumePreviewStartedAt;
                 if (Environment.TickCount64 - started >= 250)
                 {
                     OnPlaybackEnded(_playbackGeneration);
@@ -501,7 +524,7 @@ public partial class MainWindow
         Spectrum.Tick();
         LoudnessMeter.Tick();
         VectorScope.Tick();
-        if (_fadePreviewing || _formatPreviewing || _volumePreviewing || _pitchPreviewing)
+        if (_fadePreviewing || _formatPreviewing || _volumePreviewing || _pitchPreviewing || _timeStretchPreviewing)
         {
             SyncPreviewPlayhead();
             return;
@@ -527,6 +550,11 @@ public partial class MainWindow
         if (_pitchPreviewing)
         {
             frame += _pitchPreviewOrigin;
+        }
+
+        if (_timeStretchPreviewing)
+        {
+            frame += _timeStretchPreviewOrigin;
         }
 
         _document.CursorFrame = frame;
@@ -564,6 +592,11 @@ public partial class MainWindow
         if (_pitchPreviewing)
         {
             _pitchPreviewing = false;
+        }
+
+        if (_timeStretchPreviewing)
+        {
+            _timeStretchPreviewing = false;
         }
 
         if (_formatPreviewing)
@@ -692,6 +725,23 @@ public partial class MainWindow
             if (_document is not null)
             {
                 SeekFrame(_pitchPreviewResumeFrame);
+            }
+
+            return;
+        }
+
+        if (_timeStretchPreviewing)
+        {
+            if (Environment.TickCount64 - _timeStretchPreviewStartedAt < 250)
+            {
+                return;
+            }
+
+            _timeStretchPreviewing = false;
+            PausePlaybackSoft();
+            if (_document is not null)
+            {
+                SeekFrame(_timeStretchPreviewResumeFrame);
             }
 
             return;

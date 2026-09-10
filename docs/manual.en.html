@@ -120,7 +120,7 @@
 
       <h2 id="layout">3. Layout</h2>
       <ul>
-        <li><strong>Settings</strong> — gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. UI language (Auto / Japanese / English; Auto is Japanese if the OS is Japanese, otherwise English), audio output (WaveOut / WASAPI / ASIO), loudness target (LKFS), default fade curves, MP3 (Windows bit rate / LAME path / LAME options), and parallel exports (default Auto = a quarter of the CPU cores; the dropdown max is half the cores). <kbd>Esc</kbd> closes it.</li>
+        <li><strong>Settings</strong> — gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. Tabs are General / Audio / Editing / Export. General is UI language (Auto / Japanese / English; Auto is Japanese if the OS is Japanese, otherwise English). Audio is the API (WaveOut / WASAPI / ASIO) and the audio device. Recording is record channel count (mono through Atmos 9.1.6), record ports (names come from the device), and level meters. Playback is playback channel count, playback ports (names come from the device), and a Sine −20 dB (1 kHz) test. Editing is the loudness target (LKFS) and default fade curves. Export is MP3 (Windows bit rate when not using LAME / LAME path / LAME options) and Parallel export count (default Auto = a quarter of the CPU cores; the dropdown max is half the cores). Width follows the Audio tab. <kbd>Ctrl</kbd>+<kbd>Tab</kbd> goes to the next tab, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> to the previous. <kbd>Esc</kbd> closes it.</li>
         <li><strong>Overview</strong> — top strip. The bright area is the current view. Drag to move (scrubs the center); wheel zooms around the playhead.</li>
         <li><strong>Waveform</strong> — the edit surface: time ruler, marker / region flags, playhead, mouse guide.</li>
         <li><strong>Time scrollbar</strong> — under the waveform. Pan the current view.</li>
@@ -143,16 +143,19 @@
         <li><kbd>G</kbd> — type NOW POS in the status bar. Enter jumps. Copy / paste allowed. Right-click switches time / samples.</li>
         <li><kbd>Z</kbd> or <kbd>.</kbd> (the numpad <kbd>.</kbd> is the same) — center. Toggles center-lock while playing; clears it when stopped.</li>
         <li><kbd>L</kbd> — loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</li>
+        <li><kbd>Ctrl</kbd>+<kbd>R</kbd> — record into a new tab using the channel layout in Settings. Press again, or Space / Enter / Esc, to stop. Record ports are assigned in Settings; surround playback ports are there too.</li>
       </ul>
 
       <h2 id="edit">5. Selection and editing</h2>
-      <p>Drag to select. <kbd>Esc</kbd> or a move without Shift clears it. Fade / volume / pitch / normalize with nothing selected uses the whole file. You can also type the selection start / length / end in the status bar.</p>
+      <p>Drag to select. <kbd>Esc</kbd> or a move without Shift clears it. Fade / volume / pitch / normalize / reverse with nothing selected uses the whole file. You can also type the selection start / length / end in the status bar.</p>
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd> / <span class="ui">FADE OUT</span> <kbd>O</kbd> — pick a curve, Space to preview, Enter to apply. 1–9 select a curve.</li>
         <li><kbd>X</kbd> — linear fade around the playhead in the view (before = out / after = in).</li>
         <li><kbd>V</kbd> — volume. ↑↓ / wheel by 0.1 dB (Shift 1 / Ctrl 3 / Ctrl+Shift 6). Space previews, Enter applies. The menu shows how whole-file Integrated LKFS / RMS / Peak will change. In loudness view the Short Term curve follows the same dB.</li>
-        <li><kbd>P</kbd> — pitch. ↑↓ / wheel by a semitone (Shift or Ctrl for an octave). Space previews, Enter applies. Range is ±2 octaves. Time stretch is on by default (length stays the same). <kbd>Tab</kbd> moves to the checkbox. <kbd>T</kbd> or the checkbox turns it off so length changes with pitch, like playback speed. A frosted-glass overlay shows progress while it runs.</li>
+        <li><kbd>P</kbd> — pitch. ↑↓ / wheel by a semitone (Shift or Ctrl for an octave). Space previews, Enter applies. Range is ±2 octaves. Keep length is on by default (<kbd>Tab</kbd> moves to the checkbox). Off also changes length, like playback speed. A frosted-glass overlay shows progress while it runs.</li>
+        <li><kbd>T</kbd> — time stretch (pitch stays). Uses the selection, or the whole file. Destination time and ratio (%) stay linked. ↑↓ / wheel (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; ratio: 0.1 / Shift 1 / Ctrl 10 / Ctrl+Shift 25%). <kbd>Tab</kbd> switches fields. Space previews, Enter applies. Range is 10–1000%. A frosted-glass overlay shows progress while it runs.</li>
         <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> — fit the peak to -0.1 dB.</li>
+        <li><kbd>R</kbd> — reverse. Uses the selection, or the whole file. Audio only; markers / regions / loops stay put.</li>
         <li><span class="ui">DELETE</span> — ripple-delete the selection. Selected markers / regions go with it.</li>
         <li><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd> — cut / copy / paste (markers in range included; a matching region is included too).</li>
         <li><kbd>U</kbd> — edit history. ↑↓ move, Enter apply, Esc cancel.</li>
@@ -271,6 +274,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Play from 3 seconds earlier</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from the playback start</td></tr>
           <tr><td><kbd>L</kbd></td><td>Loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Record (new tab; press again / Space / Enter / Esc to stop)</td></tr>
           <tr><td><kbd>Z</kbd> / <kbd>.</kbd> / numpad <kbd>.</kbd></td><td>Center. Toggles center-lock while playing; clears it when stopped</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Home</kbd></td><td>Go to the start of the file</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>End</kbd></td><td>Go to the end of the file</td></tr>
@@ -323,8 +327,10 @@
           <tr><td><kbd>O</kbd></td><td>Fade out</td></tr>
           <tr><td><kbd>X</kbd></td><td>Linear fade around the playhead in the view (before = out / after = in)</td></tr>
           <tr><td><kbd>V</kbd></td><td>Volume (dB; ↑↓ / wheel, Space preview, Enter apply; shows whole-file LKFS / RMS / Peak first)</td></tr>
-          <tr><td><kbd>P</kbd></td><td>Pitch (semitones; ↑↓ / wheel, Shift for an octave; Space preview, Enter apply; ±2 octaves; time stretch on by default, <kbd>Tab</kbd> to the checkbox, <kbd>T</kbd> toggles; frosted-glass progress while running)</td></tr>
+          <tr><td><kbd>P</kbd></td><td>Pitch (semitones; ↑↓ / wheel, Shift for an octave; Space preview, Enter apply; ±2 octaves; keep length on by default; frosted-glass progress while running)</td></tr>
+          <tr><td><kbd>T</kbd></td><td>Time stretch (time and ratio stay linked; Space preview, Enter apply; frosted glass while running)</td></tr>
           <tr><td><kbd>N</kbd></td><td>Normalize (peak −0.1 dB)</td></tr>
+          <tr><td><kbd>R</kbd></td><td>Reverse (selection, or the whole file; audio only; markers / regions / loops stay put)</td></tr>
           <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Ripple-delete the selection. Selected markers / regions go with it</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd></td><td>Cut / copy / paste (markers in range included; a matching region is included too). With tabs selected, <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to those tabs</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo</td></tr>
@@ -452,8 +458,8 @@
 
       <h2 id="settings">11. Settings and language</h2>
       <ul>
-        <li>Playback device, loudness target (default −24 LKFS, from −70 to 0; color scale only, does not change the audio), default fade curves, MP3, and parallel exports are on the gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd> (WaveOut / WASAPI / ASIO).</li>
-        <li>MP3 uses the user-supplied <code>lame.exe</code> when the LAME path is valid, and passes the options field (input and output files are appended; the default is <code>-V2 --noreplaygain</code>, also used if the field is empty). Empty or invalid path falls back to Windows Media Foundation at 128 / 160 / 192 / 224 / 256 / 320 kbps (default 192, CBR). After writing, the app reports whether LAME or Windows ran; failures open a dialog. The written MP3 is not opened in the current tab (only overwriting the MP3 already open keeps that file). Parallel tab exports use the Parallel exports setting (default Auto = a quarter of the CPU cores; the dropdown max is half the cores; Windows MP3 is always one at a time). The last export folder is remembered. LAME is not bundled.</li>
+        <li>Settings are on the gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>, split into General / Audio / Editing / Export (WaveOut / WASAPI / ASIO). Audio recording has record channel count and a level meter (to confirm a signal). Playback has playback channel count and Sine −20 dB (1 kHz) through the port map. Loudness target (default −24 LKFS, from −70 to 0; color scale only, does not change the audio) and default fade curves are on Editing; MP3 and Parallel export count are on Export. The settings window remembers its position and height when closed. Width is set automatically from the Audio tab. <kbd>Ctrl</kbd>+<kbd>Tab</kbd> switches tabs.</li>
+        <li>MP3 uses the user-supplied <code>lame.exe</code> when the LAME path is valid, and passes the options field (input and output files are appended; the default is <code>-V2 --noreplaygain</code>, also used if the field is empty). Empty or invalid path falls back to Windows Media Foundation at 128 / 160 / 192 / 224 / 256 / 320 kbps (default 192, CBR). After writing, the app reports whether LAME or Windows ran; failures open a dialog. The written MP3 is not opened in the current tab (only overwriting the MP3 already open keeps that file). Parallel tab exports use the Parallel export count setting (default Auto = a quarter of the CPU cores; the dropdown max is half the cores; Windows MP3 is always one at a time). The last export folder is remembered. LAME is not bundled.</li>
         <li>UI language is also on the gear. The default is <span class="ui">Auto</span> (Japanese if the OS is Japanese, otherwise English). The Japanese locale keeps the current wording, including English labels.</li>
         <li>The manual is <span class="ui">?</span>, or GitHub Pages in the browser. It follows the UI language.</li>
         <li>Settings file: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>

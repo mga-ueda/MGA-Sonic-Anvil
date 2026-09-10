@@ -120,7 +120,7 @@
 
       <h2 id="layout">3. 画面の見方</h2>
       <ul>
-        <li><strong>設定</strong> …… 左上の歯車、<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>。表示言語（Auto／Japanese／English。Auto は OS が日本語なら Japanese、それ以外は English）、音声出力（WaveOut／WASAPI／ASIO）、ラウドネスターゲット（LKFS）、フェードカーブ既定、MP3（Windows ビットレート／LAME パス／LAME オプション）、同時書き出し（既定 Auto＝CPU コア数の 1/4。上限はコア数の 1/2）。<kbd>Esc</kbd> で閉じます。</li>
+        <li><strong>設定</strong> …… 左上の歯車、<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>。タブは一般／オーディオ／編集／書き出し。一般は表示言語（Auto／Japanese／English。Auto は OS が日本語なら Japanese、それ以外は English）。オーディオは API（WaveOut／WASAPI／ASIO）とオーディオデバイス。録音は録音チャンネル数（モノラル〜 Atmos 9.1.6）・録音ポート（名前はデバイスから）とレベルメーター。再生は再生チャンネル数・再生ポート（名前はデバイスから）と Sine −20 dB（1 kHz）。編集はラウドネスターゲット（LKFS）とフェードカーブ既定。書き出しは MP3（Windows ビットレート〈LAME を使わないとき〉／LAME パス／LAME オプション）と同時書き出し本数（既定 Auto＝CPU コア数の 1/4。上限はコア数の 1/2）。幅はオーディオタブの内容に合わせます。<kbd>Ctrl</kbd>+<kbd>Tab</kbd> で次のタブ、<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> で前のタブ。<kbd>Esc</kbd> で閉じます。</li>
         <li><strong>全体波形</strong> …… 上段。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）、ホイールで拡縮（再生ヘッド基準）。</li>
         <li><strong>波形エリア</strong> …… 本編集面。時間ルーラー、マーカー／リージョンフラッグ、再生ヘッド、マウスガイド。</li>
         <li><strong>時間スクロールバー</strong> …… 波形の下。表示範囲を左右に動かします。</li>
@@ -143,16 +143,19 @@
         <li><kbd>G</kbd> …… ステータスバーの NOW POS を入力。Enter で移動。コピー／貼り付け可。右クリックで時間／サンプル数。</li>
         <li><kbd>Z</kbd> または <kbd>.</kbd>（テンキーの <kbd>.</kbd> も同じ）…… 中央寄せ。再生中はセンターロックの切替、停止で解除。</li>
         <li><kbd>L</kbd> …… 選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生。</li>
+        <li><kbd>Ctrl</kbd>+<kbd>R</kbd> …… 録音。設定のチャンネル構成で新規タブに録る。もう一度、または Space / Enter / Esc で停止。録音ポートは設定で割り当て。サラウンド再生の再生ポートも同じ設定。</li>
       </ul>
 
       <h2 id="edit">5. 選択と編集</h2>
-      <p>ドラッグで選択。<kbd>Esc</kbd> または Shift なし移動で解除。未選択のフェード／音量／ピッチ／ノーマライズは全体が対象です。ステータスバーの選択開始／範囲／終了に値を入れることでも選択できます。</p>
+      <p>ドラッグで選択。<kbd>Esc</kbd> または Shift なし移動で解除。未選択のフェード／音量／ピッチ／ノーマライズ／リバースは全体が対象です。ステータスバーの選択開始／範囲／終了に値を入れることでも選択できます。</p>
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd>／<span class="ui">FADE OUT</span> <kbd>O</kbd> …… カーブを選び Space で試聴、Enter で実行。1–9 でカーブ。</li>
         <li><kbd>X</kbd> …… 表示範囲をシーク前後にリニアフェード（前＝アウト／後＝イン）。</li>
         <li><kbd>V</kbd> …… 音量。↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。Space で試聴、Enter で実行。メニューに波形全体の Integrated LKFS／RMS／Peak の変化を先に出します。ラウドネス表示中は Short Term 曲線も同じ dB で追従します。</li>
-        <li><kbd>P</kbd> …… ピッチ。↑↓／ホイールで半音（Shift または Ctrl で 1 オクターブ）。Space で試聴、Enter で実行。±2 オクターブ。タイムストレッチは既定オン（長さ据え置き）。<kbd>Tab</kbd> でチェックへ移動。<kbd>T</kbd> またはチェックでオフにすると、再生速度と同じく長さも変わります。実行中はすりガラスで進捗を出します。</li>
+        <li><kbd>P</kbd> …… ピッチ。↑↓／ホイールで半音（Shift または Ctrl で 1 オクターブ）。Space で試聴、Enter で実行。±2 オクターブ。長さを保つのは既定オン（<kbd>Tab</kbd> でチェックへ）。オフは再生速度と同じく長さも変わります。実行中はすりガラスで進捗を出します。</li>
+        <li><kbd>T</kbd> …… タイムストレッチ（ピッチ据え置き）。選択があればその時間、無ければ全体。伸ばした時間と割合（％）が連動。↑↓／ホイール（時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分。割合は 0.1／Shift 1／Ctrl 10／Ctrl+Shift 25％）。<kbd>Tab</kbd> で時間と割合。Space で試聴、Enter で実行。10–1000％。実行中はすりガラス。</li>
         <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> …… ピークを -0.1 dB に合わせる。</li>
+        <li><kbd>R</kbd> …… リバース。選択があればその範囲、無ければ全体の波形だけを時間方向に反転。マーカー／リージョン／ループは動かさない。</li>
         <li><span class="ui">DELETE</span> …… 選択を詰めて削除。選択中のマーカー／リージョンもまとめて削除。</li>
         <li><kbd>Ctrl</kbd>+<kbd>X</kbd>／<kbd>C</kbd>／<kbd>V</kbd> …… カット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）。</li>
         <li><kbd>U</kbd> …… 編集履歴。↑↓ で移動、Enter 確定、Esc キャンセル。</li>
@@ -271,6 +274,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>3 秒前から再生</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>再生開始位置からやり直し</td></tr>
           <tr><td><kbd>L</kbd></td><td>選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>録音（新規タブ。再押し／Space／Enter／Esc で停止）</td></tr>
           <tr><td><kbd>Z</kbd>／<kbd>.</kbd>／テンキー <kbd>.</kbd></td><td>中央寄せ。再生中はセンターロックの切替、停止で解除</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Home</kbd></td><td>ファイル先頭へ</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>End</kbd></td><td>ファイル末尾へ</td></tr>
@@ -323,8 +327,10 @@
           <tr><td><kbd>O</kbd></td><td>フェードアウト</td></tr>
           <tr><td><kbd>X</kbd></td><td>表示範囲をシーク前後にリニアフェード（前＝アウト／後＝イン）</td></tr>
           <tr><td><kbd>V</kbd></td><td>音量（dB。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS／RMS／Peak を先に表示）</td></tr>
-          <tr><td><kbd>P</kbd></td><td>ピッチ（半音。↑↓／ホイール、Shift で 1 オクターブ。Space 試聴、Enter 実行。±2 オクターブ。タイムストレッチ既定オン、<kbd>Tab</kbd> でチェックへ、<kbd>T</kbd> で切替。実行中はすりガラス）</td></tr>
+          <tr><td><kbd>P</kbd></td><td>ピッチ（半音。↑↓／ホイール、Shift で 1 オクターブ。Space 試聴、Enter 実行。±2 オクターブ。長さを保つ既定オン。実行中はすりガラス）</td></tr>
+          <tr><td><kbd>T</kbd></td><td>タイムストレッチ（時間と割合を連動。Space 試聴、Enter 実行。実行中はすりガラス）</td></tr>
           <tr><td><kbd>N</kbd></td><td>ノーマライズ（ピーク -0.1 dB）</td></tr>
+          <tr><td><kbd>R</kbd></td><td>リバース（選択、無ければ全体。波形のみ。マーカー等は動かさない）</td></tr>
           <tr><td><kbd>Delete</kbd>／<kbd>Backspace</kbd></td><td>選択を詰めて削除。選択中のマーカー／リージョンもまとめて削除</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd>／<kbd>C</kbd>／<kbd>V</kbd></td><td>カット／コピー／ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）。タブ選択中の <kbd>Ctrl</kbd>+<kbd>V</kbd> はコピーした編集履歴を選択タブへ適用</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>元に戻す</td></tr>
@@ -452,8 +458,8 @@
 
       <h2 id="settings">11. 設定と言語</h2>
       <ul>
-        <li>再生デバイス、ラウドネスターゲット（既定 -24 LKFS。-70 から 0。色分けの基準で、音声は変えません）、フェードカーブ既定、MP3、同時書き出しは左上の歯車、または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>（WaveOut／WASAPI／ASIO）。</li>
-        <li>MP3 は設定の LAME パスが有効ならユーザー用意の <code>lame.exe</code> を呼び、オプション欄の内容を渡します（入出力ファイルは自動で付けます。既定は <code>-V2 --noreplaygain</code>。空欄もこの既定）。パスが空欄または無効なら Windows Media Foundation で出力し、ビットレートは 128 / 160 / 192 / 224 / 256 / 320 kbps（既定 192。CBR）です。書き出し後に LAME / Windows のどちらで変換したかを知らせ、失敗はダイアログです。書き出した MP3 は今のタブへ読み込みません（開いているのがその MP3 のときの上書き保存だけ、今のファイルのままです）。全タブ書き出しの同時数は同時書き出し（既定 Auto＝CPU コア数の 1/4。上限はコア数の 1/2。Windows の MP3 は常に 1 本）。前回選んだ書き出しフォルダを覚えます。LAME は同梱しません。</li>
+        <li>設定は左上の歯車、または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>。内容は一般／オーディオ／編集／書き出しのタブに分かれます（WaveOut／WASAPI／ASIO）。オーディオの録音は録音チャンネル数とレベルメーター（信号が入っているか確認）。再生は再生チャンネル数と Sine −20 dB（1 kHz）で割り当てどおりに鳴らせます。ラウドネスターゲット（既定 -24 LKFS。-70 から 0。色分けの基準で、音声は変えません）とフェードカーブ既定は編集タブ、MP3 と同時書き出し本数は書き出しタブです。設定ウィンドウの位置と高さは閉じたときに覚えます。幅はオーディオタブの内容から自動です。<kbd>Ctrl</kbd>+<kbd>Tab</kbd> でタブを切り替えます。</li>
+        <li>MP3 は設定の LAME パスが有効ならユーザー用意の <code>lame.exe</code> を呼び、オプション欄の内容を渡します（入出力ファイルは自動で付けます。既定は <code>-V2 --noreplaygain</code>。空欄もこの既定）。パスが空欄または無効なら Windows Media Foundation で出力し、ビットレートは 128 / 160 / 192 / 224 / 256 / 320 kbps（既定 192。CBR）です。書き出し後に LAME / Windows のどちらで変換したかを知らせ、失敗はダイアログです。書き出した MP3 は今のタブへ読み込みません（開いているのがその MP3 のときの上書き保存だけ、今のファイルのままです）。全タブ書き出しの同時数は同時書き出し本数（既定 Auto＝CPU コア数の 1/4。上限はコア数の 1/2。Windows の MP3 は常に 1 本）。前回選んだ書き出しフォルダを覚えます。LAME は同梱しません。</li>
         <li>表示言語も歯車の設定。既定は <span class="ui">Auto</span>（OS が日本語なら Japanese、それ以外は English）。日本語版は現状の文言（英語ラベル含む）のままです。</li>
         <li>マニュアルは <span class="ui">?</span>、またはブラウザの GitHub Pages。表示言語に合わせて日本語／英語を開きます。</li>
         <li>設定ファイル: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>

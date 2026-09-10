@@ -1118,6 +1118,96 @@ internal static class ProcessEdits
         return splice;
     }
 
+    public static IEditCommand? TimeStretch(
+        AudioDocument document,
+        WaveSelection range,
+        int destFrames,
+        IProgress<double>? progress = null)
+    {
+        range = range.Clamp(document.FrameCount);
+        destFrames = Audio.TimeStretch.ClampDestFrames((int)range.Length, destFrames);
+        if (range.IsEmpty || Audio.TimeStretch.IsNoOp((int)range.Length, destFrames))
+        {
+            return null;
+        }
+
+        progress?.Report(0);
+        var before = document.CopyRange(range.StartFrame, range.Length);
+        var after = Audio.TimeStretch.Apply(
+            before,
+            document.Channels,
+            document.SampleRate,
+            destFrames,
+            progress);
+        progress?.Report(1);
+        var extra = UiStrings.FormatTimeStretchExtra(document.SampleRate, (int)range.Length, destFrames);
+        var oldFrames = range.Length;
+        var ratio = destFrames / (double)oldFrames;
+        var newFrames = after.Length / Math.Max(1, document.Channels);
+        var markersAfter = MapMarkersThroughRange(document.SnapshotMarkers(), range.StartFrame, oldFrames, newFrames);
+        var regionsAfter = MapRegionsThroughRange(document.SnapshotRegions(), range.StartFrame, oldFrames, newFrames);
+        var loopAfter = MapSelectionThroughRange(document.SampleLoop, range.StartFrame, oldFrames, newFrames);
+        var cursorAfter = AudioDocument.MapFrameThroughRangeStretch(
+            document.CursorFrame,
+            range.StartFrame,
+            oldFrames,
+            newFrames);
+        var splice = new SpliceRangeCommand(
+            "Time Stretch",
+            range.StartFrame,
+            before,
+            after,
+            document.Selection,
+            WaveSelection.Empty,
+            document.CursorFrame,
+            cursorAfter,
+            document.SnapshotMarkers(),
+            markersAfter,
+            document.SampleLoop,
+            loopAfter,
+            document.SnapshotRegions(),
+            regionsAfter,
+            UiStrings.EditHistoryRange(
+                UiStrings.EditHistoryName("Time Stretch"),
+                document.SampleRate,
+                range.StartFrame,
+                range.EndFrame,
+                extra));
+        AttachRangeReplay(splice, document.SampleRate, range, (target, mapped) =>
+            TimeStretch(target, mapped, Audio.TimeStretch.DestFrameCountFromRatio((int)mapped.Length, ratio)));
+        splice.Persist = HistoryRecipes.FromTimeStretch(document.SampleRate, range, ratio);
+        return splice;
+    }
+
+    public static IEditCommand? Reverse(AudioDocument document, WaveSelection range)
+    {
+        range = range.Clamp(document.FrameCount);
+        if (range.Length < 2)
+        {
+            return null;
+        }
+
+        var before = document.CopyRange(range.StartFrame, range.Length);
+        var after = Audio.Reverse.Apply(before, document.Channels);
+        var command = new ReplaceRangeCommand(
+            "Reverse",
+            range.StartFrame,
+            before,
+            after,
+            document.Selection,
+            WaveSelection.Empty,
+            document.CursorFrame,
+            range.StartFrame,
+            UiStrings.EditHistoryRange(
+                UiStrings.EditHistoryName("Reverse"),
+                document.SampleRate,
+                range.StartFrame,
+                range.EndFrame));
+        AttachRangeReplay(command, document.SampleRate, range, Reverse);
+        command.Persist = HistoryRecipes.Range(HistoryRecipes.Reverse, document.SampleRate, range);
+        return command;
+    }
+
     private static MarkerSnapshot[] MapMarkersThroughRange(
         MarkerSnapshot[] markers,
         long rangeStart,

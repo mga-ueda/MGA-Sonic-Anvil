@@ -64,6 +64,13 @@ public partial class MainWindow
             return;
         }
 
+        if (_timeStretchMenu is { IsOpen: true })
+        {
+            TimeStretchPicker.TryNudge(_timeStretchMenu, Math.Sign(e.Delta));
+            e.Handled = true;
+            return;
+        }
+
         if (e.OriginalSource is not System.Windows.DependencyObject origin)
         {
             return;
@@ -131,6 +138,29 @@ public partial class MainWindow
             return true;
         }
 
+        if (_recording)
+        {
+            if (key == Key.R && modifiers == ModifierKeys.Control)
+            {
+                StopRecording();
+                return true;
+            }
+
+            if (key is Key.Space or Key.Enter or Key.Escape && modifiers == ModifierKeys.None)
+            {
+                StopRecording();
+                return true;
+            }
+
+            if (key == Key.Q && modifiers == ModifierKeys.Control)
+            {
+                Close();
+                return true;
+            }
+
+            return true;
+        }
+
         if (StatusTimes.IsTimeFocused)
         {
             return false;
@@ -153,6 +183,12 @@ public partial class MainWindow
 
         if (key == Key.Escape)
         {
+            if (_recording)
+            {
+                StopRecording();
+                return true;
+            }
+
             StopMarkerNudge();
             StopPlaceRepeat();
             if (StatusTimes.IsEditing)
@@ -173,7 +209,7 @@ public partial class MainWindow
                 return true;
             }
 
-            if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker() || ClosePitchShiftPicker())
+            if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker() || ClosePitchShiftPicker() || CloseTimeStretchPicker())
             {
                 return true;
             }
@@ -264,9 +300,20 @@ public partial class MainWindow
             return true;
         }
 
+        if (TryHandleTimeStretchMenuShortcut(key, modifiers))
+        {
+            return true;
+        }
+
         if (key == Key.Q && modifiers == ModifierKeys.Control)
         {
             Close();
+            return true;
+        }
+
+        if (key == Key.R && modifiers == ModifierKeys.Control)
+        {
+            ToggleRecording();
             return true;
         }
 
@@ -559,6 +606,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.R && modifiers == ModifierKeys.None)
+        {
+            ApplyReverse();
+            return true;
+        }
+
         if (key == Key.V && modifiers == ModifierKeys.None)
         {
             PromptVolume();
@@ -568,6 +621,12 @@ public partial class MainWindow
         if (key == Key.P && modifiers == ModifierKeys.None)
         {
             PromptPitch();
+            return true;
+        }
+
+        if (key == Key.T && modifiers == ModifierKeys.None)
+        {
+            PromptTimeStretch();
             return true;
         }
 
@@ -875,13 +934,48 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.T && modifiers == ModifierKeys.None)
+        if (key == Key.P && modifiers == ModifierKeys.None)
         {
-            PitchShiftPicker.TryToggleTimeStretch(_pitchMenu);
             return true;
         }
 
-        if (key == Key.P && modifiers == ModifierKeys.None)
+        return false;
+    }
+
+    private bool TryHandleTimeStretchMenuShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (_timeStretchMenu is not { IsOpen: true })
+        {
+            return false;
+        }
+
+        if (key is Key.Up or Key.Down)
+        {
+            TimeStretchPicker.TryNudge(_timeStretchMenu, key == Key.Up ? 1 : -1);
+            return true;
+        }
+
+        if (key == Key.Tab)
+        {
+            TimeStretchPicker.TryMoveFocus(
+                _timeStretchMenu,
+                reverse: (modifiers & ModifierKeys.Shift) == ModifierKeys.Shift);
+            return true;
+        }
+
+        if (key == Key.Space && modifiers == ModifierKeys.None)
+        {
+            PreviewTimeStretch(TimeStretchPicker.ReadDestFrames(_timeStretchMenu));
+            return true;
+        }
+
+        if (key == Key.Enter && modifiers == ModifierKeys.None)
+        {
+            ApplyTimeStretch(TimeStretchPicker.ReadDestFrames(_timeStretchMenu));
+            return true;
+        }
+
+        if (key == Key.T && modifiers == ModifierKeys.None)
         {
             return true;
         }

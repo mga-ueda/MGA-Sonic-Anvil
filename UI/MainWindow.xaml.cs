@@ -55,6 +55,7 @@ public partial class MainWindow : Window
     private System.Windows.Controls.ContextMenu? _formatMenu;
     private System.Windows.Controls.ContextMenu? _volumeMenu;
     private System.Windows.Controls.ContextMenu? _pitchMenu;
+    private System.Windows.Controls.ContextMenu? _timeStretchMenu;
     private FormatConvertKind _formatKind;
     private FormatSizePreview? _formatSizePreview;
     private bool _formatPreviewing;
@@ -80,6 +81,12 @@ public partial class MainWindow : Window
     private long _pitchPreviewStartedAt;
     private long _pitchPreviewOrigin;
     private long _pitchSpaceTick;
+    private bool _timeStretchPreviewing;
+    private bool _timeStretchPreviewToggling;
+    private long _timeStretchPreviewResumeFrame;
+    private long _timeStretchPreviewStartedAt;
+    private long _timeStretchPreviewOrigin;
+    private long _timeStretchSpaceTick;
     private bool _resumeAfterScrub;
     private bool _startupRevealPending = true;
     private bool _closing;
@@ -167,6 +174,12 @@ public partial class MainWindow : Window
         // （深い拡大のスペクトログラム追従で実際に発生）、Background だと逆に
         // マウス移動がタイマーを飢餓させ再生ヘッドがカクつく。
         // Input はマウス入力と同列 FIFO で処理されるため、どちらの飢餓も起きない。
+        _player.SetOutputMap(AppStorage.Settings.PlaybackOutputMap);
+        _recordTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(250),
+        };
+        _recordTimer.Tick += (_, _) => OnRecordTimerTick();
         _playTimer = new DispatcherTimer(DispatcherPriority.Input)
         {
             Interval = TimeSpan.FromMilliseconds(16),
@@ -195,6 +208,8 @@ public partial class MainWindow : Window
         {
             StopMeterRendering();
             _playTimer.Stop();
+            _recordTimer.Stop();
+            _recorder.Dispose();
             _waapiPollTimer.Stop();
             StopMarkerNudge();
             StopPlaceRepeat();
@@ -298,6 +313,7 @@ public partial class MainWindow : Window
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
         ClosePitchShiftPicker();
+        CloseTimeStretchPicker();
         CloseEditHistory(commit: true);
         _resumeAfterScrub = false;
         StopMarkerNudge();
@@ -582,6 +598,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        StopRecording();
         if (IsUiBusy)
         {
             e.Cancel = true;

@@ -269,6 +269,7 @@ internal static class AudioCodec
         1 => 0x4,
         2 => 0x3,
         6 => 0x3F,
+        8 => 0x63F,
         _ => channels >= 31 ? -1 : (1 << channels) - 1,
     };
 

@@ -76,6 +76,42 @@ public sealed class EditReplayTests
     }
 
     [Fact]
+    public void Reverse_Replay_FlipsMappedRangeOnTarget()
+    {
+        var source = MakeRamp(frames: 8, rate: 48000);
+        var command = ProcessEdits.Reverse(source, new WaveSelection(2, 6));
+        Assert.NotNull(command);
+        Assert.NotNull(command!.Replay);
+
+        var target = MakeRamp(frames: 8, rate: 48000);
+        var replayed = command.Replay!(target);
+        Assert.NotNull(replayed);
+        new EditHistory().Do(target, replayed!);
+
+        Assert.Equal(0f, target.Interleaved[0]);
+        Assert.Equal(5f, target.Interleaved[4]);
+        Assert.Equal(4f, target.Interleaved[6]);
+        Assert.Equal(3f, target.Interleaved[8]);
+        Assert.Equal(2f, target.Interleaved[10]);
+        Assert.Equal(6f, target.Interleaved[12]);
+    }
+
+    [Fact]
+    public void TimeStretch_Replay_AppliesSameRatioToTarget()
+    {
+        var source = MakeSine(frames: 48000, rate: 48000);
+        var command = ProcessEdits.TimeStretch(source, new WaveSelection(0, 48000), 24000);
+        Assert.NotNull(command);
+        Assert.NotNull(command!.Replay);
+
+        var target = MakeSine(frames: 48000, rate: 48000);
+        var replayed = command.Replay!(target);
+        Assert.NotNull(replayed);
+        new EditHistory().Do(target, replayed!);
+        Assert.Equal(24000, target.FrameCount);
+    }
+
+    [Fact]
     public void Delete_Replay_ClampsRangeToTargetLength()
     {
         var source = MakeConstant(frames: 100, value: 1f, rate: 48000);
@@ -145,6 +181,18 @@ public sealed class EditReplayTests
             var value = (float)Math.Sin(2 * Math.PI * 440 * i / rate) * 0.5f;
             samples[i * 2] = value;
             samples[i * 2 + 1] = value;
+        }
+
+        return new AudioDocument(samples, rate, 2, 24, AudioFileKind.Wave, null);
+    }
+
+    private static AudioDocument MakeRamp(int frames, int rate)
+    {
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 2] = i;
+            samples[i * 2 + 1] = i;
         }
 
         return new AudioDocument(samples, rate, 2, 24, AudioFileKind.Wave, null);

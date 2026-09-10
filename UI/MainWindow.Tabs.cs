@@ -52,6 +52,11 @@ public partial class MainWindow
 
     private void ActivateSession(DocumentSession session)
     {
+        if (_recording && _recordSession is not null && !ReferenceEquals(session, _recordSession))
+        {
+            StopRecording();
+        }
+
         _selectedTabs.Clear();
         _tabSelectionAnchor = session;
         if (ReferenceEquals(_activeSession, session) && ReferenceEquals(_document, session.Document))
@@ -89,6 +94,11 @@ public partial class MainWindow
     /// <summary>閉じたら true。保存確認でキャンセルされたら false（連続クローズを中断する）。</summary>
     private bool CloseSession(DocumentSession session)
     {
+        if (_recordSession is not null && ReferenceEquals(session, _recordSession))
+        {
+            StopRecording();
+        }
+
         if (!OfferSaveIfDirty(session))
         {
             return false;

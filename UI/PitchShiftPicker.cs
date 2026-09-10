@@ -106,13 +106,6 @@ internal static class PitchShiftPicker
 
                 e.Handled = true;
                 onPreview(ReadSemitones(menu), ReadTimeStretch(menu));
-                return;
-            }
-
-            if (key == Key.T && Keyboard.Modifiers == ModifierKeys.None)
-            {
-                e.Handled = true;
-                TryToggleTimeStretch(menu);
             }
         };
 

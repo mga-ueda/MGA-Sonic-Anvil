@@ -79,6 +79,8 @@ internal static class HistoryRecipes
     public const string Normalize = "Normalize";
     public const string Gain = "Gain";
     public const string PitchShift = "PitchShift";
+    public const string TimeStretch = "TimeStretch";
+    public const string Reverse = "Reverse";
     public const string Delete = "Delete";
     public const string Paste = "Paste";
     public const string SetSampleLoop = "SetSampleLoop";
@@ -131,6 +133,16 @@ internal static class HistoryRecipes
             Flag = !timeStretch,
         };
 
+    public static HistoryRecipe FromTimeStretch(int sourceRate, WaveSelection range, double ratio) =>
+        new()
+        {
+            Kind = TimeStretch,
+            SourceRate = sourceRate,
+            Start = range.StartFrame,
+            End = range.EndFrame,
+            Amount = ratio,
+        };
+
     public static IEditCommand? TryCreate(AudioDocument document, HistoryRecipe recipe)
     {
         return recipe.Kind switch
@@ -141,6 +153,11 @@ internal static class HistoryRecipes
             Normalize => ProcessEdits.Normalize(document, RangeOf(recipe)),
             Gain => ProcessEdits.Gain(document, RangeOf(recipe), recipe.Amount),
             PitchShift => ProcessEdits.PitchShift(document, RangeOf(recipe), recipe.Value, timeStretch: !recipe.Flag),
+            TimeStretch => ProcessEdits.TimeStretch(
+                document,
+                RangeOf(recipe),
+                Audio.TimeStretch.DestFrameCountFromRatio((int)RangeOf(recipe).Length, recipe.Amount)),
+            Reverse => ProcessEdits.Reverse(document, RangeOf(recipe)),
             Delete => ProcessEdits.Delete(document, RangeOf(recipe)),
             Paste => TryPaste(document, recipe),
             SetSampleLoop => TrySetSampleLoop(document, recipe),

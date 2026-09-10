@@ -32,6 +32,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("Delete", UiStrings.TooltipDelete);
         Assert.Contains("Ctrl+S", UiStrings.TooltipSave);
         Assert.Contains("Ctrl+Shift+M", UiStrings.TooltipSaveMp3);
+        Assert.Contains("Ctrl+R", UiStrings.TooltipRecord);
     }
 
     [Fact]

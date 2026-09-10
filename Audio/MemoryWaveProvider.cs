@@ -60,6 +60,10 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private float[] _samples = [];
     private int _channels = 2;
     private int _outputChannels = 2;
+    private int _deviceOutputChannels = 2;
+    private int[] _outputMap = [];
+    private int[] _routeMap = [];
+    private bool _directRoute;
     private int _deviceRate = 48000;
     private int _sourceRate = 48000;
     private double _sourceFrame;
@@ -125,6 +129,34 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
+    public void ConfigureOutput(int deviceChannels, int[]? map)
+    {
+        lock (_gate)
+        {
+            _deviceOutputChannels = Math.Max(1, deviceChannels);
+            _outputMap = map ?? [];
+            ApplyOutputConfig();
+        }
+    }
+
+    private void ApplyOutputConfig()
+    {
+        var dest = Math.Max(1, _deviceOutputChannels);
+        if (ChannelRouter.ShouldDownmix(_channels, dest, _outputMap))
+        {
+            _directRoute = false;
+            _outputChannels = 2;
+        }
+        else
+        {
+            _directRoute = dest > 2 || !ChannelRouter.IsEmpty(_outputMap);
+            _outputChannels = _directRoute ? dest : Math.Min(2, Math.Max(1, _channels));
+        }
+
+        _routeMap = ChannelRouter.Normalize(_outputMap, _channels, _outputChannels);
+        WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(_deviceRate, Math.Max(1, _outputChannels));
+    }
+
     public bool IsBoundTo(AudioDocument document)
     {
         lock (_gate)
@@ -166,9 +198,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         {
             _samples = document.Interleaved;
             _channels = Math.Max(1, document.Channels);
-            _outputChannels = Math.Min(2, _channels);
             _sourceRate = Math.Max(1, document.SampleRate);
-            WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(_deviceRate, _outputChannels);
+            ApplyOutputConfig();
             var start = Math.Clamp(startFrame, 0, document.FrameCount);
             _sourceFrame = start;
             _cursor = checked((int)start * _channels);
@@ -530,10 +561,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
             var gain = _flushFadeRemaining / (float)_flushFadeTotal;
             var at = offset + i * outCh;
-            buffer[at] *= gain;
-            if (outCh > 1)
+            for (var channel = 0; channel < outCh; channel++)
             {
-                buffer[at + 1] *= gain;
+                buffer[at + channel] *= gain;
             }
 
             _flushFadeRemaining--;
@@ -578,15 +608,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
             for (var i = 0; i < frames; i++)
             {
-                ChannelMix.Downmix(_samples, _cursor, srcCh, out var left, out var right);
-                if (_frameGain is { } gainAt)
-                {
-                    var gain = gainAt(_cursor / srcCh);
-                    left *= gain;
-                    right *= gain;
-                }
-
-                WriteFrame(buffer, offset, writtenFrames, outCh, left, right);
+                EmitSourceFrame(buffer, offset, writtenFrames, srcCh, outCh, _cursor, _cursor / srcCh);
                 _cursor += srcCh;
                 writtenFrames++;
             }
@@ -623,23 +645,32 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 break;
             }
 
-            FormatConvert.DownmixBandlimited(
-                _samples,
-                srcCh,
-                _sourceFrame,
-                frameCount,
-                _sourceRate,
-                _deviceRate,
-                out var left,
-                out var right);
-            if (_frameGain is { } gainAt)
+            if (_directRoute)
             {
-                var gain = gainAt((long)Math.Floor(_sourceFrame));
-                left *= gain;
-                right *= gain;
+                var srcFrame = (int)Math.Clamp(Math.Floor(_sourceFrame), 0, Math.Max(0, frameCount - 1));
+                EmitSourceFrame(buffer, offset, writtenFrames, srcCh, outCh, srcFrame * srcCh, srcFrame);
+            }
+            else
+            {
+                FormatConvert.DownmixBandlimited(
+                    _samples,
+                    srcCh,
+                    _sourceFrame,
+                    frameCount,
+                    _sourceRate,
+                    _deviceRate,
+                    out var left,
+                    out var right);
+                if (_frameGain is { } gainAt)
+                {
+                    var gain = gainAt((long)Math.Floor(_sourceFrame));
+                    left *= gain;
+                    right *= gain;
+                }
+
+                WriteFrame(buffer, offset, writtenFrames, outCh, left, right);
             }
 
-            WriteFrame(buffer, offset, writtenFrames, outCh, left, right);
             _sourceFrame += step;
             writtenFrames++;
         }
@@ -721,6 +752,42 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             AddFrame(buffer, offset, i, outCh, left, right);
             _exitFrame += step;
         }
+    }
+
+    private void EmitSourceFrame(
+        float[] buffer,
+        int offset,
+        int writtenFrames,
+        int srcCh,
+        int outCh,
+        int sourceIndex,
+        long sourceFrame)
+    {
+        if (_directRoute)
+        {
+            var dest = buffer.AsSpan(offset + writtenFrames * outCh, outCh);
+            ChannelRouter.Scatter(_samples.AsSpan(sourceIndex, srcCh), dest, _routeMap);
+            if (_frameGain is { } gainAt)
+            {
+                var gain = gainAt(sourceFrame);
+                for (var i = 0; i < dest.Length; i++)
+                {
+                    dest[i] *= gain;
+                }
+            }
+
+            return;
+        }
+
+        ChannelMix.Downmix(_samples, sourceIndex, srcCh, out var left, out var right);
+        if (_frameGain is { } gainFn)
+        {
+            var gain = gainFn(sourceFrame);
+            left *= gain;
+            right *= gain;
+        }
+
+        WriteFrame(buffer, offset, writtenFrames, outCh, left, right);
     }
 
     private static void WriteFrame(float[] buffer, int offset, int frame, int outCh, float left, float right)

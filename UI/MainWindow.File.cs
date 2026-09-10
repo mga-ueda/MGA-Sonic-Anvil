@@ -516,6 +516,13 @@ public partial class MainWindow
     private void OpenSettings()
     {
         var settings = AppStorage.Settings;
+        StopRecording();
+        if (IsPlaybackActive())
+        {
+            StopPlayback();
+        }
+
+        _player.ReleaseOutput();
         var dialog = new AudioSettingsWindow(
             _outputSettings,
             settings.ResolvedFadeInCurve(),
@@ -525,13 +532,26 @@ public partial class MainWindow
             settings.Mp3BitRate,
             settings.LameExePath,
             settings.LameOptions,
-            settings.ExportParallelism)
+            settings.ExportParallelism,
+            ChannelLayout.Parse(settings.RecordLayout),
+            settings.ResolvedPlaybackLayout(),
+            settings.RecordInputMap ?? [],
+            settings.PlaybackOutputMap ?? [])
         {
             Owner = this,
         };
 
         if (dialog.ShowDialog() != true)
         {
+            try
+            {
+                _player.ApplyOutputSettings(_outputSettings);
+            }
+            catch
+            {
+                // 次の再生で開き直す。
+            }
+
             return;
         }
 
@@ -543,6 +563,12 @@ public partial class MainWindow
         settings.LameExePath = dialog.SelectedLameExePath;
         settings.LameOptions = dialog.SelectedLameOptions;
         settings.ExportParallelism = dialog.SelectedExportParallelism;
+        settings.RecordLayout = dialog.SelectedRecordLayout.Id;
+        settings.PlaybackLayout = dialog.SelectedPlaybackLayout.Id;
+        settings.RecordDeviceId = dialog.SelectedRecordDeviceId;
+        settings.RecordInputMap = dialog.SelectedRecordInputMap;
+        settings.PlaybackOutputMap = dialog.SelectedPlaybackOutputMap;
+        _player.SetOutputMap(settings.PlaybackOutputMap);
         LoudnessMeter.ApplyTargetFromSettings();
         Waveform.LoudnessTargetLufs = settings.ResolvedLoudnessTargetLufs();
         ApplyOutputSettings(dialog.SelectedSettings);

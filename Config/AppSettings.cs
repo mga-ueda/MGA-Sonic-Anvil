@@ -10,6 +10,17 @@ internal sealed class AppSettings
 
     public string AudioDeviceId { get; set; } = string.Empty;
 
+    public string RecordLayout { get; set; } = "Stereo";
+
+    /// <summary>空なら RecordLayout を使う（以前は入出力で兼用していた）。</summary>
+    public string PlaybackLayout { get; set; } = string.Empty;
+
+    public string RecordDeviceId { get; set; } = string.Empty;
+
+    public int[] RecordInputMap { get; set; } = [];
+
+    public int[] PlaybackOutputMap { get; set; } = [];
+
     public string DefaultFadeInCurve { get; set; } = nameof(FadeShape.SCurve);
 
     public string DefaultFadeOutCurve { get; set; } = nameof(FadeShape.SCurve);
@@ -45,6 +56,19 @@ internal sealed class AppSettings
 
     /// <summary>Normal / Maximized。空または不明なら通常表示。</summary>
     public string WindowState { get; set; } = string.Empty;
+
+    /// <summary>設定ウィンドウの位置。未保存なら false。</summary>
+    public bool SettingsWindowHasPosition { get; set; }
+
+    public int SettingsWindowX { get; set; }
+
+    public int SettingsWindowY { get; set; }
+
+    /// <summary>閉じたときの幅。開くときは使わず、内容から自動で決める。</summary>
+    public int SettingsWindowWidth { get; set; }
+
+    /// <summary>閉じたときの高さ。次回復元する。</summary>
+    public int SettingsWindowHeight { get; set; }
 
     public string UiLanguage { get; set; } = "auto";
 
@@ -132,6 +156,12 @@ internal sealed class AppSettings
 
     public double ResolvedLoudnessTargetLufs() =>
         LoudnessMeterEngine.ClampTargetLufs(LoudnessTargetLufs);
+
+    public ChannelLayout ResolvedPlaybackLayout() =>
+        ChannelLayout.Parse(string.IsNullOrWhiteSpace(PlaybackLayout) ? RecordLayout : PlaybackLayout);
+
+    public string ResolvedRecordDeviceId() =>
+        AudioCaptureFactory.ResolveRecordDeviceId(ToAudioOutputSettings().Api, AudioDeviceId);
 
     public FadeShape ResolvedFadeInCurve() => FadeCurves.ParseStored(DefaultFadeInCurve);
 

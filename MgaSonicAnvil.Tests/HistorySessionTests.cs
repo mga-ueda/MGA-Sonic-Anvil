@@ -104,6 +104,41 @@ public sealed class HistorySessionTests
     }
 
     [Fact]
+    public void TryExportImport_RestoresReverse()
+    {
+        var original = new float[] { 0.1f, 0.1f, 0.2f, 0.2f, 0.3f, 0.3f, 0.4f, 0.4f };
+        var document = new AudioDocument((float[])original.Clone(), 48000, 2, 24, AudioFileKind.Wave, null);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.Reverse(document, new WaveSelection(0, 4))!);
+        var reversed = (float[])document.Interleaved.Clone();
+
+        var exported = history.TryExport();
+        Assert.NotNull(exported);
+        Assert.Equal(HistoryRecipes.Reverse, exported!.Recipes[0].Kind);
+
+        var restored = new AudioDocument((float[])original.Clone(), 48000, 2, 24, AudioFileKind.Wave, null);
+        Assert.True(EditHistory.TryImport(restored, exported, out _));
+        Assert.Equal(reversed, restored.Interleaved);
+    }
+
+    [Fact]
+    public void TryExportImport_RestoresTimeStretchRatio()
+    {
+        var document = MakeSine(48000);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.TimeStretch(document, new WaveSelection(0, 48000), 24000)!);
+        Assert.Equal(24000, document.FrameCount);
+        var exported = history.TryExport();
+        Assert.NotNull(exported);
+        Assert.Equal(HistoryRecipes.TimeStretch, exported!.Recipes[0].Kind);
+        Assert.Equal(0.5, exported.Recipes[0].Amount, 5);
+
+        var restored = MakeSine(48000);
+        Assert.True(EditHistory.TryImport(restored, exported, out _));
+        Assert.Equal(24000, restored.FrameCount);
+    }
+
+    [Fact]
     public void HistoryJson_RoundTripsRecipes()
     {
         var document = MakeConstant(8, 1f);

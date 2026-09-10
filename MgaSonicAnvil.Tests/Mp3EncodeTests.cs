@@ -18,6 +18,15 @@ public sealed class Mp3EncodeTests
         Assert.Equal(Mp3Encode.DefaultLameOptions, settings.LameOptions);
         Assert.Equal(192, settings.Mp3BitRate);
         Assert.Equal(0, settings.ExportParallelism);
+        Assert.Equal("Stereo", settings.RecordLayout);
+        Assert.Equal(string.Empty, settings.PlaybackLayout);
+        Assert.Equal("Stereo", settings.ResolvedPlaybackLayout().Id);
+        settings.RecordLayout = "5.1";
+        Assert.Equal("5.1", settings.ResolvedPlaybackLayout().Id);
+        settings.PlaybackLayout = "7.1";
+        Assert.Equal("7.1", settings.ResolvedPlaybackLayout().Id);
+        Assert.Empty(settings.RecordInputMap);
+        Assert.Empty(settings.PlaybackOutputMap);
         var options = settings.ToMp3EncodeOptions();
         Assert.Equal(192, options.WindowsBitRateKbps);
         Assert.Equal(string.Empty, options.LameExePath);

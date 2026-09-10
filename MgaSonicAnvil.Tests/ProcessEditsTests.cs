@@ -248,6 +248,85 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void TimeStretch_ChangesLengthAndUndoRestores()
+    {
+        var document = MakeSine(frames: 48000);
+        var original = (float[])document.Interleaved.Clone();
+        var history = new EditHistory();
+        document.Selection = new WaveSelection(0, 48000);
+        var command = ProcessEdits.TimeStretch(document, document.Selection, 24000);
+        Assert.NotNull(command);
+        history.Do(document, command!);
+        Assert.Equal("Time Stretch", command!.Name);
+        Assert.Equal(24000, document.FrameCount);
+        Assert.True(document.Selection.IsEmpty);
+        Assert.True(history.Undo(document));
+        Assert.Equal(original, document.Interleaved);
+        Assert.Equal(48000, document.FrameCount);
+    }
+
+    [Fact]
+    public void TimeStretch_ReturnsNullWhenLengthUnchanged()
+    {
+        var document = MakeSine(frames: 64);
+        Assert.Null(ProcessEdits.TimeStretch(document, new WaveSelection(0, 64), 64));
+        Assert.Null(ProcessEdits.TimeStretch(document, WaveSelection.Empty, 32));
+    }
+
+    [Fact]
+    public void Reverse_FlipsRangeAndUndoRestores()
+    {
+        var samples = new float[] { 0.1f, -0.1f, 0.2f, -0.2f, 0.3f, -0.3f, 0.4f, -0.4f };
+        var document = new AudioDocument(samples, 48000, 2, 24, AudioFileKind.Wave, null);
+        var original = (float[])document.Interleaved.Clone();
+        var history = new EditHistory();
+        document.Selection = new WaveSelection(1, 4);
+        var command = ProcessEdits.Reverse(document, document.Selection);
+        Assert.NotNull(command);
+        history.Do(document, command!);
+
+        Assert.Equal("Reverse", command!.Name);
+        Assert.Equal(0.1f, document.Interleaved[0]);
+        Assert.Equal(-0.1f, document.Interleaved[1]);
+        Assert.Equal(0.4f, document.Interleaved[2]);
+        Assert.Equal(-0.4f, document.Interleaved[3]);
+        Assert.Equal(0.3f, document.Interleaved[4]);
+        Assert.Equal(-0.3f, document.Interleaved[5]);
+        Assert.Equal(0.2f, document.Interleaved[6]);
+        Assert.Equal(-0.2f, document.Interleaved[7]);
+        Assert.True(document.Selection.IsEmpty);
+        Assert.True(history.Undo(document));
+        Assert.Equal(original, document.Interleaved);
+    }
+
+    [Fact]
+    public void Reverse_LeavesMarkersRegionsAndLoopInPlace()
+    {
+        var document = MakeConstant(frames: 20, value: 0.4f);
+        document.TryAddMarker(2);
+        document.TryAddMarker(5);
+        document.TryAddMarker(15);
+        document.SetRegions([new WaveSelection(0, 5), new WaveSelection(3, 7), new WaveSelection(12, 18)]);
+        document.SetSampleLoop(new WaveSelection(4, 7));
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.Reverse(document, new WaveSelection(2, 10))!);
+
+        Assert.Equal(new long[] { 2, 5, 15 }, document.Markers.Select(item => item.Frame).ToArray());
+        Assert.Equal(
+            [new WaveSelection(0, 5), new WaveSelection(3, 7), new WaveSelection(12, 18)],
+            document.Regions);
+        Assert.Equal(new WaveSelection(4, 7), document.SampleLoop);
+    }
+
+    [Fact]
+    public void Reverse_ReturnsNullWhenTooShort()
+    {
+        var document = MakeConstant(frames: 4, value: 0.5f);
+        Assert.Null(ProcessEdits.Reverse(document, new WaveSelection(0, 1)));
+        Assert.Null(ProcessEdits.Reverse(document, WaveSelection.Empty));
+    }
+
+    [Fact]
     public void RangeTransforms_ClearSelection()
     {
         var document = MakeSine(frames: 64);
@@ -266,6 +345,16 @@ public sealed class ProcessEditsTests
         document = MakeSine(frames: 4096);
         document.Selection = new WaveSelection(0, 4096);
         new EditHistory().Do(document, ProcessEdits.PitchShift(document, document.Selection, 1)!);
+        Assert.True(document.Selection.IsEmpty);
+
+        document = MakeSine(frames: 4096);
+        document.Selection = new WaveSelection(0, 4096);
+        new EditHistory().Do(document, ProcessEdits.TimeStretch(document, document.Selection, 2048)!);
+        Assert.True(document.Selection.IsEmpty);
+
+        document = MakeSine(frames: 64);
+        document.Selection = new WaveSelection(8, 24);
+        new EditHistory().Do(document, ProcessEdits.Reverse(document, document.Selection)!);
         Assert.True(document.Selection.IsEmpty);
     }
 

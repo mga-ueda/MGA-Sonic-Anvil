@@ -24,7 +24,6 @@ internal sealed class LevelMeterView : FrameworkElement
 
     private LevelMeterSnapshot _snapshot = LevelMeterSnapshot.Idle;
     private LinearGradientBrush? _barGradient;
-    private double _gradientTrackHeight;
 
     public LevelMeterView()
     {
@@ -63,7 +62,7 @@ internal sealed class LevelMeterView : FrameworkElement
         var barsWidth = BarWidth * 4;
         var barsLeft = inner.X + Math.Max(0, (inner.Width - barsWidth) * 0.5);
         var track = new Rect(barsLeft, trackTop, barsWidth, trackHeight);
-        EnsureGradient(trackHeight);
+        EnsureGradient();
 
         DrawScale(dc, new Rect(track.X - ScaleColWidth, trackTop, ScaleColWidth, trackHeight), rightAlign: true);
         DrawUnit(dc, new Rect(track.X, inner.Y, BarWidth, inner.Height), trackHeight, isPeak: false, _snapshot.Left, clip: false);
@@ -244,28 +243,6 @@ internal sealed class LevelMeterView : FrameworkElement
         }
     }
 
-    private void EnsureGradient(double trackHeight)
-    {
-        if (_barGradient is not null && Math.Abs(_gradientTrackHeight - trackHeight) < 0.5)
-        {
-            return;
-        }
-
-        _gradientTrackHeight = trackHeight;
-        _barGradient = new LinearGradientBrush
-        {
-            StartPoint = new Point(0, 1),
-            EndPoint = new Point(0, 0),
-            MappingMode = BrushMappingMode.RelativeToBoundingBox,
-            GradientStops =
-            [
-                new GradientStop(Color.FromRgb(0x0A, 0x30, 0x44), 0),
-                new GradientStop(Color.FromRgb(0x0D, 0x4A, 0x62), 0.26),
-                new GradientStop(Color.FromRgb(0x3A, 0xB8, 0xE8), 0.55),
-                new GradientStop(Color.FromRgb(0xC8, 0xEF, 0xFF), 0.82),
-                new GradientStop(Color.FromRgb(0xF8, 0xFE, 0xFF), 1),
-            ],
-        };
-        _barGradient.Freeze();
-    }
+    private void EnsureGradient() =>
+        _barGradient ??= LevelMeterBarPaint.Create(vertical: true);
 }

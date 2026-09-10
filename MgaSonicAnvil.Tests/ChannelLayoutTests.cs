@@ -76,6 +76,31 @@ public sealed class ChannelLayoutTests
     }
 
     [Fact]
+    public void Playback_RoutesSurroundWhenDeviceHasManyPorts()
+    {
+        var frames = 8;
+        var samples = new float[frames * 6];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 6] = 0.4f;
+            samples[i * 6 + 5] = -0.3f;
+        }
+
+        var document = new AudioDocument(samples, 48000, 6, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(8, null);
+        provider.Bind(document, 0, null, loop: false);
+        Assert.Equal(8, provider.WaveFormat.Channels);
+
+        var buffer = new float[16];
+        Assert.Equal(16, provider.Read(buffer, 0, buffer.Length));
+        Assert.Equal(0.4f, buffer[0], 3);
+        Assert.Equal(0f, buffer[1], 3);
+        Assert.Equal(-0.3f, buffer[5], 3);
+        Assert.Equal(0f, buffer[6], 3);
+    }
+
+    [Fact]
     public void Playback_KeepsDeviceRateWhenDocumentDiffers()
     {
         var document = new AudioDocument(new float[8820], 44100, 2, 16, AudioFileKind.Wave, null);

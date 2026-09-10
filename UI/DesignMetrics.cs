@@ -99,6 +99,50 @@ internal static class DesignMetrics
 
     public static double AudioInputHeight => Dip(30);
 
+    /// <summary>1 列タブ（一般／編集／書き出し）の本文幅。</summary>
+    public static double SettingsPanelWidth => From96(560);
+
+    /// <summary>設定ウィンドウの下限幅（タブ見出しが切れない程度）。</summary>
+    public static double SettingsWindowMinWidth => From96(480);
+
+    /// <summary>設定ウィンドウ幅の旧固定値。内容幅の計算がまだのときの予備。</summary>
+    public static double SettingsWindowWidth => From96(1024);
+
+    /// <summary>オーディオタブ内容の外側に足す余白。</summary>
+    public static double SettingsWindowContentMargin => From96(16);
+
+    /// <summary>設定ウィンドウの初期高さ。チャンネル数で中はスクロール。</summary>
+    public static double SettingsWindowHeight => From96(600);
+
+    public static double SettingsWindowMinHeight => From96(420);
+
+    public static double SettingsWindowMaxHeight => From96(780);
+
+    /// <summary>設定のラベルとコンボのあいだ。</summary>
+    public static double SettingsLabelComboGap => From96(8);
+
+    /// <summary>設定列の縦スクロールバー。スタイルと幅計算で共用。</summary>
+    public static double SettingsScrollBarWidth => From96(10);
+
+    public static GridLength SettingsScrollBarWidthGrid => new(SettingsScrollBarWidth);
+
+    /// <summary>列のコンボ／メーターとスクロールバーのあいだ。</summary>
+    public static double SettingsScrollBarGap => From96(8);
+
+    /// <summary>オーディオタブの入力／出力列のすき間。</summary>
+    public static double SettingsColumnGap => From96(20);
+
+    public static GridLength SettingsColumnGapGrid => new(SettingsColumnGap);
+
+    /// <summary>録音／再生ポート行のチャンネル名列。</summary>
+    public static double SettingsChannelLabelWidth => From96(72);
+
+    /// <summary>入力ルーティング行の横レベルバー。</summary>
+    public static double SettingsLevelBarWidth => From96(88);
+
+    /// <summary>Sine −20 dB ボタン。</summary>
+    public static double SettingsSineButtonWidth => From96(128);
+
     /// <summary>設定の短いコンボ（Auto / Japanese / WaveOut など）。</summary>
     public static double SettingsShortComboWidth => From96(128);
 
