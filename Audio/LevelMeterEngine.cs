@@ -22,25 +22,50 @@ internal sealed class LevelMeterEngine
     public const double HoldLineEpsilonDb = 0.05;
     public const double ClipHoldSec = 2.0;
 
-    private readonly ChannelState _left = new();
-    private readonly ChannelState _right = new();
-    private DateTime _clipLeftUntil;
-    private DateTime _clipRightUntil;
+    private ChannelState[] _states = [new(), new()];
+    private DateTime[] _clipUntil = new DateTime[2];
 
     public LevelMeterSnapshot Snapshot { get; private set; } = LevelMeterSnapshot.Idle;
 
     public void Reset()
     {
-        _left.Reset();
-        _right.Reset();
-        _clipLeftUntil = default;
-        _clipRightUntil = default;
-        Snapshot = LevelMeterSnapshot.Idle;
+        foreach (var state in _states)
+        {
+            state.Reset();
+        }
+
+        Array.Clear(_clipUntil);
+        Snapshot = LevelMeterSnapshot.IdleFor(_states.Length);
     }
 
     public void Extinguish()
     {
-        Reset();
+        var n = Math.Max(1, _states.Length);
+        foreach (var state in _states)
+        {
+            state.Reset();
+        }
+
+        Array.Clear(_clipUntil);
+        Snapshot = LevelMeterSnapshot.IdleFor(n);
+    }
+
+    public void EnsureLayout(int channels)
+    {
+        var n = Math.Clamp(Math.Max(1, channels), 1, ChannelLayout.MaxChannels);
+        if (_states.Length == n && Snapshot.Channels.Length == n)
+        {
+            return;
+        }
+
+        EnsureStates(n);
+        foreach (var state in _states)
+        {
+            state.Reset();
+        }
+
+        Array.Clear(_clipUntil);
+        Snapshot = LevelMeterSnapshot.IdleFor(n);
     }
 
     public LevelMeterSnapshot Update(ReadOnlySpan<float> left, ReadOnlySpan<float> right, double nowSeconds)
@@ -58,28 +83,60 @@ internal sealed class LevelMeterEngine
         double nowSeconds,
         bool hasSamples)
     {
-        if (!hasSamples)
+        Span<float> peaks = [peakLeft, peakRight];
+        Span<float> rms = [rmsLeft, rmsRight];
+        return Update(peaks, rms, nowSeconds, hasSamples);
+    }
+
+    public LevelMeterSnapshot Update(
+        ReadOnlySpan<float> peaks,
+        ReadOnlySpan<float> rms,
+        double nowSeconds,
+        bool hasSamples)
+    {
+        var n = Math.Clamp(Math.Max(peaks.Length, 1), 1, ChannelLayout.MaxChannels);
+        EnsureStates(n);
+        var meters = new ChannelMeter[n];
+        var clips = new bool[n];
+        var now = DateTime.UtcNow;
+        for (var i = 0; i < n; i++)
         {
-            peakLeft = _left.LastPeak;
-            rmsLeft = _left.LastRms;
-            peakRight = _right.LastPeak;
-            rmsRight = _right.LastRms;
+            var peak = hasSamples && i < peaks.Length ? peaks[i] : _states[i].LastPeak;
+            var rmsVal = hasSamples && i < rms.Length ? rms[i] : _states[i].LastRms;
+            var meter = Measure(_states[i], peak, rmsVal, nowSeconds);
+            if (meter.InstPeakDb >= 0)
+            {
+                _clipUntil[i] = now.AddSeconds(ClipHoldSec);
+            }
+
+            meters[i] = meter;
+            clips[i] = now < _clipUntil[i];
         }
 
-        var l = Measure(_left, peakLeft, rmsLeft, nowSeconds);
-        var r = Measure(_right, peakRight, rmsRight, nowSeconds);
-        if (l.InstPeakDb >= 0)
-        {
-            _clipLeftUntil = DateTime.UtcNow.AddSeconds(ClipHoldSec);
-        }
-
-        if (r.InstPeakDb >= 0)
-        {
-            _clipRightUntil = DateTime.UtcNow.AddSeconds(ClipHoldSec);
-        }
-
-        Snapshot = new LevelMeterSnapshot(l, r, DateTime.UtcNow < _clipLeftUntil, DateTime.UtcNow < _clipRightUntil);
+        Snapshot = new LevelMeterSnapshot(meters, clips, ShowRms: n <= 2);
         return Snapshot;
+    }
+
+    private void EnsureStates(int channels)
+    {
+        if (_states.Length == channels)
+        {
+            return;
+        }
+
+        var next = new ChannelState[channels];
+        var clips = new DateTime[channels];
+        for (var i = 0; i < channels; i++)
+        {
+            next[i] = i < _states.Length ? _states[i] : new ChannelState();
+            if (i < _clipUntil.Length)
+            {
+                clips[i] = _clipUntil[i];
+            }
+        }
+
+        _states = next;
+        _clipUntil = clips;
     }
 
     public static double ToDb(double linear) =>
@@ -283,16 +340,28 @@ internal readonly record struct ChannelMeter(
     bool ShowRmsHold);
 
 internal readonly record struct LevelMeterSnapshot(
-    ChannelMeter Left,
-    ChannelMeter Right,
-    bool ClipLeft,
-    bool ClipRight)
+    ChannelMeter[] Channels,
+    bool[] Clips,
+    bool ShowRms)
 {
-    public static LevelMeterSnapshot Idle { get; } = new(
-        new ChannelMeter(0, 0, 0, 0, LevelMeterEngine.DbMin, LevelMeterEngine.DbMin,
-            LevelMeterEngine.DbMin, LevelMeterEngine.DbMin, LevelMeterEngine.DbMin, false, false),
-        new ChannelMeter(0, 0, 0, 0, LevelMeterEngine.DbMin, LevelMeterEngine.DbMin,
-            LevelMeterEngine.DbMin, LevelMeterEngine.DbMin, LevelMeterEngine.DbMin, false, false),
-        false,
-        false);
+    public ChannelMeter Left => Channels.Length > 0 ? Channels[0] : default;
+    public ChannelMeter Right => Channels.Length > 1 ? Channels[1] : Left;
+    public bool ClipLeft => Clips.Length > 0 && Clips[0];
+    public bool ClipRight => Clips.Length > 1 && Clips[1];
+
+    public static LevelMeterSnapshot Idle { get; } = IdleFor(2);
+
+    public static LevelMeterSnapshot IdleFor(int channels)
+    {
+        var n = Math.Clamp(channels, 1, ChannelLayout.MaxChannels);
+        var meters = new ChannelMeter[n];
+        var clips = new bool[n];
+        var idle = new ChannelMeter(
+            0, 0, 0, 0,
+            LevelMeterEngine.DbMin, LevelMeterEngine.DbMin,
+            LevelMeterEngine.DbMin, LevelMeterEngine.DbMin, LevelMeterEngine.DbMin,
+            false, false);
+        Array.Fill(meters, idle);
+        return new LevelMeterSnapshot(meters, clips, ShowRms: n <= 2);
+    }
 }

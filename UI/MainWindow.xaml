@@ -141,7 +141,8 @@
         </Border>
       </DockPanel>
 
-      <Grid Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
+      <Grid x:Name="MeterColumn"
+            Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
             Width="{x:Static ui:DesignMetrics.LevelMeterWidth}"
             Background="{DynamicResource TransportBackBrush}">
         <Grid.RowDefinitions>

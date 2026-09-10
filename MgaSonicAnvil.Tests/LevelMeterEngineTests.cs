@@ -145,4 +145,49 @@ public sealed class LevelMeterEngineTests
             Assert.Equal(0.1f, dest[i], 5);
         }
     }
+
+    [Fact]
+    public void Update_SurroundHidesRmsAndKeepsAllPeaks()
+    {
+        var peaks = new float[] { 0.5f, 0.25f, 1f, 0.1f, 0.2f, 0.3f };
+        var rms = new float[] { 0.2f, 0.1f, 0.4f, 0.05f, 0.1f, 0.15f };
+        var engine = new LevelMeterEngine();
+        var snap = engine.Update(peaks, rms, nowSeconds: 1, hasSamples: true);
+
+        Assert.False(snap.ShowRms);
+        Assert.Equal(6, snap.Channels.Length);
+        Assert.Equal(LevelMeterEngine.ToDb(1), snap.Channels[2].InstPeakDb, 6);
+        Assert.True(snap.Clips[2]);
+    }
+
+    [Fact]
+    public void PlaybackProvider_DirectRoute_MetersAllSourceChannels()
+    {
+        var frames = 8;
+        var samples = new float[frames * 6];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 6 + 2] = 0.8f;
+        }
+
+        var document = new AudioDocument(samples, 48000, 6, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(8, null);
+        provider.Bind(document, 0, null, loop: false);
+        var buffer = new float[frames * 8];
+        Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+
+        var dest = new float[frames];
+        Assert.Equal(frames, provider.CopyRecentOutputSamples(dest));
+        var expected = ChannelMix.Mid([0f, 0f, 0.8f, 0f, 0f, 0f]);
+        Assert.All(dest, sample => Assert.Equal(expected, sample, 5));
+
+        var peaks = new float[ChannelLayout.MaxChannels];
+        var rms = new float[ChannelLayout.MaxChannels];
+        Assert.True(provider.TakeMeterInterval(peaks, rms, out var channels));
+        Assert.Equal(6, channels);
+        Assert.Equal(0f, peaks[0], 5);
+        Assert.Equal(0f, peaks[1], 5);
+        Assert.Equal(0.8f, peaks[2], 5);
+    }
 }

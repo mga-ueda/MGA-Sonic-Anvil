@@ -1848,6 +1848,7 @@ public partial class MainWindow
         Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
         Overview.Refresh();
         SyncViewChrome();
+        SyncMonitorLayout();
         RefreshStatus();
         RefreshHistoryStrip();
     }

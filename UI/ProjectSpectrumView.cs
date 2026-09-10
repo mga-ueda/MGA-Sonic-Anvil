@@ -49,6 +49,8 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         _timer.Start();
     }
 
+    public void StopTicks() => _timer.Stop();
+
     protected override Size MeasureOverride(Size availableSize)
     {
         var height = DesignMetrics.SpectrumHeight;

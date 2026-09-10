@@ -55,6 +55,13 @@ internal sealed class LevelMeterView : FrameworkElement
         }
 
         dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
+        EnsureGradient();
+        if (!_snapshot.ShowRms && _snapshot.Channels.Length > 2)
+        {
+            DrawSurround(dc, bounds);
+            return;
+        }
+
         var inner = bounds;
         var trackTop = inner.Y + LampHeight;
         var trackBottom = inner.Bottom - ReadoutHeight;
@@ -62,7 +69,6 @@ internal sealed class LevelMeterView : FrameworkElement
         var barsWidth = BarWidth * 4;
         var barsLeft = inner.X + Math.Max(0, (inner.Width - barsWidth) * 0.5);
         var track = new Rect(barsLeft, trackTop, barsWidth, trackHeight);
-        EnsureGradient();
 
         DrawScale(dc, new Rect(track.X - ScaleColWidth, trackTop, ScaleColWidth, trackHeight), rightAlign: true);
         DrawUnit(dc, new Rect(track.X, inner.Y, BarWidth, inner.Height), trackHeight, isPeak: false, _snapshot.Left, clip: false);
@@ -73,15 +79,106 @@ internal sealed class LevelMeterView : FrameworkElement
         DrawReadouts(dc, new Rect(inner.X, track.Bottom + 1, inner.Width, ReadoutHeight));
     }
 
+    private void DrawSurround(DrawingContext dc, Rect bounds)
+    {
+        var channels = Math.Max(1, _snapshot.Channels.Length);
+        var layout = ChannelLayout.Guess(channels);
+        var names = new string[channels];
+        for (var i = 0; i < channels; i++)
+        {
+            names[i] = layout.LabelAt(i);
+        }
+
+        var barW = LevelMeterSurroundLayout.BarWidth(channels);
+        var barsLeft = LevelMeterSurroundLayout.BarsLeft(bounds.X, bounds.Width, barW, channels);
+        var barsRight = barsLeft + (barW * channels);
+
+        var pixels = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var brush = LabelBrush();
+        var labels = LevelMeterSurroundLayout.SolveLabels(
+            bounds.Right,
+            barsLeft,
+            barW,
+            channels,
+            font => MeasureNameExtents(names, pixels, brush, font),
+            leftEdge: bounds.X + 1);
+        var lineHeight = labels.HasLabels
+            ? Math.Ceiling(MeasureReadout("Rg", pixels, brush, labels.FontSize).Height)
+            : 0;
+        var labelHeight = lineHeight * labels.Rows;
+        var trackTop = bounds.Y + LampHeight;
+        var trackBottom = bounds.Bottom - labelHeight;
+        var trackHeight = Math.Max(24, trackBottom - trackTop);
+        DrawScale(dc, new Rect(barsLeft - ScaleColWidth, trackTop, ScaleColWidth, trackHeight), rightAlign: true);
+        DrawScale(dc, new Rect(barsRight, trackTop, ScaleColWidth, trackHeight), rightAlign: false);
+        for (var i = 0; i < channels; i++)
+        {
+            var clip = i < _snapshot.Clips.Length && _snapshot.Clips[i];
+            DrawUnit(
+                dc,
+                new Rect(barsLeft + i * barW, bounds.Y, barW, LampHeight + trackHeight),
+                trackHeight,
+                isPeak: true,
+                _snapshot.Channels[i],
+                clip,
+                insetStroke: true);
+        }
+
+        DrawChannelNames(dc, bounds.Bottom, names, labels, lineHeight, pixels, brush);
+    }
+
+    /// <summary>セルで切らずに、解いた座標へそのまま置く。</summary>
+    private static void DrawChannelNames(
+        DrawingContext dc,
+        double areaBottom,
+        string[] names,
+        in SurroundLabelLayout labels,
+        double lineHeight,
+        double pixels,
+        Brush brush)
+    {
+        if (!labels.HasLabels)
+        {
+            return;
+        }
+
+        for (var i = 0; i < names.Length; i++)
+        {
+            var text = MeasureReadout(names[i], pixels, brush, labels.FontSize);
+            var rowBottom = areaBottom - (labels.Row[i] * lineHeight);
+            dc.DrawText(text, new Point(labels.X[i] + LeadPad(text), rowBottom - text.Height));
+        }
+    }
+
+    private static double[] MeasureNameExtents(string[] names, double pixels, Brush brush, double font)
+    {
+        var widths = new double[names.Length];
+        for (var i = 0; i < names.Length; i++)
+        {
+            widths[i] = TextExtent(MeasureReadout(names[i], pixels, brush, font));
+        }
+
+        return widths;
+    }
+
+    /// <summary>左へはみ出すインクぶん。描画原点をここだけ右へずらす。</summary>
+    private static double LeadPad(FormattedText text) => Math.Max(0, -text.OverhangLeading);
+
+    private static double TextExtent(FormattedText text) =>
+        text.Width + LeadPad(text) + Math.Max(0, -text.OverhangTrailing);
+
     private void DrawUnit(
         DrawingContext dc,
         Rect unit,
         double trackHeight,
         bool isPeak,
         ChannelMeter meter,
-        bool clip)
+        bool clip,
+        bool insetStroke = false)
     {
-        var lamp = new Rect(unit.X + 1, unit.Y, unit.Width - 2, LampHeight - 1);
+        var pad = insetStroke ? 0.5 : 0;
+        unit = new Rect(unit.X + pad, unit.Y, Math.Max(1, unit.Width - pad * 2), unit.Height);
+        var lamp = new Rect(unit.X + 1, unit.Y, Math.Max(1, unit.Width - 2), LampHeight - 1);
         if (isPeak)
         {
             var fill = clip ? ClipOn : ClipOff;
@@ -187,13 +284,13 @@ internal sealed class LevelMeterView : FrameworkElement
         dc.DrawText(fraction, new Point(dotX, y));
     }
 
-    private static FormattedText MeasureReadout(string text, double pixels, Brush? brush = null) =>
+    private static FormattedText MeasureReadout(string text, double pixels, Brush? brush = null, double font = 8) =>
         new(
             text,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
             WpfControlHelpers.MonoTypeface,
-            8,
+            font,
             brush ?? LabelBrush(),
             pixels);
 

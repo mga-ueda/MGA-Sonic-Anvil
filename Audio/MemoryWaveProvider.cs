@@ -82,18 +82,22 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private double _exitFrame;
     private readonly float[] _meterL = new float[LevelMeterEngine.WindowFrames];
     private readonly float[] _meterR = new float[LevelMeterEngine.WindowFrames];
+    private readonly float[] _meterPlanar = new float[LevelMeterEngine.WindowFrames * ChannelLayout.MaxChannels];
+    private readonly float[] _intervalPeak = new float[ChannelLayout.MaxChannels];
+    private readonly double[] _intervalSumSq = new double[ChannelLayout.MaxChannels];
     private int _meterWrite;
     private int _meterCount;
+    private int _meterSourceChannels = 2;
+    private int _sourceMeterThisRead;
+    private float[] _sourceMeterScratch = [];
+    private int _sourceMeterScratchFrames;
+    private int _sourceMeterScratchChannels = 1;
     private readonly float[] _monitorRing = new float[8192];
     private long _monitorWriteCount;
     private readonly object _monitorGate = new();
     private readonly MemoryScrubVoice _scrub = new();
     private bool _scrubbing;
     private float[] _scrubScratch = [];
-    private float _intervalPeakL;
-    private float _intervalPeakR;
-    private double _intervalSumSqL;
-    private double _intervalSumSqR;
     private int _intervalFrames;
     private readonly float[] _loudL = new float[8192];
     private readonly float[] _loudR = new float[8192];
@@ -187,6 +191,28 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
+    public int SourceChannels
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return Math.Max(1, _channels);
+            }
+        }
+    }
+
+    public int MeterChannels
+    {
+        get
+        {
+            lock (_monitorGate)
+            {
+                return Math.Max(1, _meterSourceChannels);
+            }
+        }
+    }
+
     public void Bind(
         AudioDocument document,
         long startFrame,
@@ -224,12 +250,10 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             }
 
             Ended = false;
-            Array.Clear(_meterL);
-            Array.Clear(_meterR);
-            _meterWrite = 0;
-            _meterCount = 0;
+            ResetMeterBuffers();
             lock (_monitorGate)
             {
+                _meterSourceChannels = Math.Max(1, _channels);
                 Array.Clear(_monitorRing);
                 _monitorWriteCount = 0;
                 ResetMeterIntervalNoLock();
@@ -255,10 +279,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _flushFadeRemaining = 0;
             _silenceOnly = true;
             _paused = false;
-            Array.Clear(_meterL);
-            Array.Clear(_meterR);
-            _meterWrite = 0;
-            _meterCount = 0;
+            ResetMeterBuffers();
             lock (_monitorGate)
             {
                 Array.Clear(_monitorRing);
@@ -307,32 +328,89 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     /// <summary>前回取得以降に出力した区間の Peak / RMS。新規サンプルがなければ false。</summary>
     public bool TakeMeterInterval(out float peakLeft, out float rmsLeft, out float peakRight, out float rmsRight)
     {
+        Span<float> peaks = stackalloc float[ChannelLayout.MaxChannels];
+        Span<float> rms = stackalloc float[ChannelLayout.MaxChannels];
+        var ok = TakeMeterInterval(peaks, rms, out _);
+        peakLeft = peaks[0];
+        rmsLeft = rms[0];
+        peakRight = peaks[1];
+        rmsRight = rms[1];
+        return ok;
+    }
+
+    public bool TakeMeterInterval(Span<float> peaks, Span<float> rms, out int channels)
+    {
         lock (_monitorGate)
         {
+            channels = Math.Max(1, _meterSourceChannels);
+            var n = Math.Min(Math.Min(peaks.Length, rms.Length), channels);
             if (_intervalFrames <= 0)
             {
-                peakLeft = 0;
-                rmsLeft = 0;
-                peakRight = 0;
-                rmsRight = 0;
+                peaks[..n].Clear();
+                rms[..n].Clear();
                 return false;
             }
 
-            peakLeft = _intervalPeakL;
-            peakRight = _intervalPeakR;
-            rmsLeft = (float)Math.Sqrt(_intervalSumSqL / _intervalFrames);
-            rmsRight = (float)Math.Sqrt(_intervalSumSqR / _intervalFrames);
+            for (var ch = 0; ch < n; ch++)
+            {
+                peaks[ch] = _intervalPeak[ch];
+                rms[ch] = (float)Math.Sqrt(_intervalSumSq[ch] / _intervalFrames);
+            }
+
             ResetMeterIntervalNoLock();
             return true;
         }
     }
 
+    public void CopyMeterPeaks(Span<float> peaks)
+    {
+        lock (_monitorGate)
+        {
+            var n = Math.Min(peaks.Length, Math.Max(1, _meterSourceChannels));
+            var count = _meterCount;
+            var window = LevelMeterEngine.WindowFrames;
+            var start = _meterWrite - count;
+            if (start < 0)
+            {
+                start += window;
+            }
+
+            for (var ch = 0; ch < n; ch++)
+            {
+                var peak = 0f;
+                for (var i = 0; i < count; i++)
+                {
+                    var src = (start + i) % window;
+                    var sample = Math.Abs(_meterPlanar[src * ChannelLayout.MaxChannels + ch]);
+                    if (sample > peak)
+                    {
+                        peak = sample;
+                    }
+                }
+
+                peaks[ch] = peak;
+            }
+
+            if (peaks.Length > n)
+            {
+                peaks[n..].Clear();
+            }
+        }
+    }
+
+    private void ResetMeterBuffers()
+    {
+        Array.Clear(_meterL);
+        Array.Clear(_meterR);
+        Array.Clear(_meterPlanar);
+        _meterWrite = 0;
+        _meterCount = 0;
+    }
+
     private void ResetMeterIntervalNoLock()
     {
-        _intervalPeakL = 0;
-        _intervalPeakR = 0;
-        _intervalSumSqL = 0;
-        _intervalSumSqR = 0;
+        Array.Clear(_intervalPeak);
+        Array.Clear(_intervalSumSq);
         _intervalFrames = 0;
     }
 
@@ -478,15 +556,27 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     public int Read(float[] buffer, int offset, int count)
     {
         int written;
+        var pushedSource = false;
         lock (_gate)
         {
+            _sourceMeterThisRead = 0;
+            _sourceMeterScratchFrames = 0;
             written = ReadCore(buffer, offset, count);
             ApplyFlushFade(buffer, offset, written);
+            pushedSource = _sourceMeterThisRead > 0;
+            if (pushedSource)
+            {
+                FlushSourceMeterScratchNoLock();
+            }
         }
 
         if (written > 0)
         {
-            PushMeter(buffer, offset, written);
+            PushOutputLoudness(buffer, offset, written);
+            if (!pushedSource)
+            {
+                PushMeterFromOutput(buffer, offset, written);
+            }
         }
 
         return written;
@@ -652,6 +742,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             }
             else
             {
+                PushNearestSourceFrame(srcCh);
                 FormatConvert.DownmixBandlimited(
                     _samples,
                     srcCh,
@@ -763,13 +854,15 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         int sourceIndex,
         long sourceFrame)
     {
+        var source = _samples.AsSpan(sourceIndex, srcCh);
+        var gain = _frameGain is { } gainAt ? gainAt(sourceFrame) : 1f;
+        PushSourceFrame(source, gain);
         if (_directRoute)
         {
             var dest = buffer.AsSpan(offset + writtenFrames * outCh, outCh);
-            ChannelRouter.Scatter(_samples.AsSpan(sourceIndex, srcCh), dest, _routeMap);
-            if (_frameGain is { } gainAt)
+            ChannelRouter.Scatter(source, dest, _routeMap);
+            if (gain != 1f)
             {
-                var gain = gainAt(sourceFrame);
                 for (var i = 0; i < dest.Length; i++)
                 {
                     dest[i] *= gain;
@@ -779,10 +872,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return;
         }
 
-        ChannelMix.Downmix(_samples, sourceIndex, srcCh, out var left, out var right);
-        if (_frameGain is { } gainFn)
+        ChannelMix.Downmix(source, out var left, out var right);
+        if (gain != 1f)
         {
-            var gain = gainFn(sourceFrame);
             left *= gain;
             right *= gain;
         }
@@ -854,7 +946,119 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         return framesWanted * outCh;
     }
 
-    private void PushMeter(float[] source, int offset, int count)
+    private void PushNearestSourceFrame(int srcCh)
+    {
+        var channels = Math.Max(1, srcCh);
+        var frameCount = channels <= 0 ? 0 : _samples.Length / channels;
+        if (frameCount <= 0)
+        {
+            return;
+        }
+
+        var frame = (int)Math.Clamp(Math.Floor(_sourceFrame), 0, frameCount - 1);
+        var gain = _frameGain is { } gainAt ? gainAt(frame) : 1f;
+        PushSourceFrame(_samples.AsSpan(frame * channels, channels), gain);
+    }
+
+    private void PushSourceFrame(ReadOnlySpan<float> frame, float gain)
+    {
+        var n = Math.Min(Math.Max(1, frame.Length), ChannelLayout.MaxChannels);
+        if (_sourceMeterScratchFrames == 0)
+        {
+            _sourceMeterScratchChannels = n;
+        }
+
+        var channels = _sourceMeterScratchChannels;
+        var dest = _sourceMeterScratchFrames * channels;
+        var need = dest + channels;
+        if (_sourceMeterScratch.Length < need)
+        {
+            Array.Resize(ref _sourceMeterScratch, Math.Max(need, _sourceMeterScratch.Length * 2 + 64));
+        }
+
+        var copy = Math.Min(n, channels);
+        for (var ch = 0; ch < copy; ch++)
+        {
+            _sourceMeterScratch[dest + ch] = frame[ch] * gain;
+        }
+
+        for (var ch = copy; ch < channels; ch++)
+        {
+            _sourceMeterScratch[dest + ch] = 0;
+        }
+
+        _sourceMeterScratchFrames++;
+        _sourceMeterThisRead++;
+    }
+
+    private void FlushSourceMeterScratchNoLock()
+    {
+        if (_sourceMeterScratchFrames <= 0)
+        {
+            return;
+        }
+
+        var n = Math.Max(1, _sourceMeterScratchChannels);
+        lock (_monitorGate)
+        {
+            for (var i = 0; i < _sourceMeterScratchFrames; i++)
+            {
+                WriteSourceMeterNoLock(_sourceMeterScratch.AsSpan(i * n, n));
+            }
+        }
+
+        _sourceMeterScratchFrames = 0;
+    }
+
+    private void WriteSourceMeterNoLock(ReadOnlySpan<float> frame)
+    {
+        var n = Math.Min(Math.Max(1, frame.Length), ChannelLayout.MaxChannels);
+        _meterSourceChannels = Math.Max(_meterSourceChannels, n);
+        var dest = _meterWrite * ChannelLayout.MaxChannels;
+        for (var ch = 0; ch < n; ch++)
+        {
+            var sample = frame[ch];
+            var abs = Math.Abs(sample);
+            if (abs > _intervalPeak[ch])
+            {
+                _intervalPeak[ch] = abs;
+            }
+
+            _intervalSumSq[ch] += abs * (double)abs;
+            _meterPlanar[dest + ch] = sample;
+        }
+
+        for (var ch = n; ch < ChannelLayout.MaxChannels; ch++)
+        {
+            _meterPlanar[dest + ch] = 0;
+        }
+
+        _intervalFrames++;
+        _meterL[_meterWrite] = frame[0];
+        _meterR[_meterWrite] = n > 1 ? frame[1] : frame[0];
+        _monitorRing[(int)(_monitorWriteCount % _monitorRing.Length)] = ChannelMix.Mid(frame);
+        _monitorWriteCount++;
+        AdvanceMeterWriteNoLock();
+    }
+
+    private void PushMeterFromOutput(float[] source, int offset, int count)
+    {
+        var channels = Math.Max(1, _outputChannels);
+        var frames = count / channels;
+        Span<float> frame = stackalloc float[2];
+        lock (_monitorGate)
+        {
+            for (var i = 0; i < frames; i++)
+            {
+                var src = offset + i * channels;
+                frame[0] = source[src];
+                frame[1] = channels > 1 ? source[src + 1] : frame[0];
+                WriteSourceMeterNoLock(channels > 1 ? frame : frame[..1]);
+            }
+        }
+    }
+
+    private void PushOutputLoudness(float[] source, int offset, int count)
     {
         var channels = Math.Max(1, _outputChannels);
         var frames = count / channels;
@@ -865,37 +1069,6 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 var src = offset + i * channels;
                 var left = source[src];
                 var right = channels > 1 ? source[src + 1] : left;
-                var absL = Math.Abs(left);
-                var absR = Math.Abs(right);
-                if (absL > _intervalPeakL)
-                {
-                    _intervalPeakL = absL;
-                }
-
-                if (absR > _intervalPeakR)
-                {
-                    _intervalPeakR = absR;
-                }
-
-                _intervalSumSqL += absL * (double)absL;
-                _intervalSumSqR += absR * (double)absR;
-                _intervalFrames++;
-                _meterL[_meterWrite] = left;
-                _meterR[_meterWrite] = right;
-                _monitorRing[(int)(_monitorWriteCount % _monitorRing.Length)] =
-                    (left + right) * 0.5f;
-                _monitorWriteCount++;
-                _meterWrite++;
-                if (_meterWrite >= LevelMeterEngine.WindowFrames)
-                {
-                    _meterWrite = 0;
-                }
-
-                if (_meterCount < LevelMeterEngine.WindowFrames)
-                {
-                    _meterCount++;
-                }
-
                 _loudL[_loudWrite] = left;
                 _loudR[_loudWrite] = right;
                 _loudWrite++;
@@ -909,6 +1082,20 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                     _loudCount++;
                 }
             }
+        }
+    }
+
+    private void AdvanceMeterWriteNoLock()
+    {
+        _meterWrite++;
+        if (_meterWrite >= LevelMeterEngine.WindowFrames)
+        {
+            _meterWrite = 0;
+        }
+
+        if (_meterCount < LevelMeterEngine.WindowFrames)
+        {
+            _meterCount++;
         }
     }
 

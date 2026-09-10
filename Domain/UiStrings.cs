@@ -551,14 +551,14 @@ internal static partial class UiStrings
         "波形全体。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）　ホイールで拡縮（再生ヘッド基準）",
         "Whole file. The bright area is the current view. Drag to move (scrubs the center). Wheel zooms around the playhead");
     public static string TipSpectrum => Get(
-        "再生出力の LED スペクトラムです。1/3oct 相当の帯域とピークホールド。Layer Music Checker と同じ検波です。",
-        "LED spectrum of the playback output. Third-octave-style bands and peak hold, same detection as Layer Music Checker.");
+        "再生中の全チャンネルを畳んだ LED スペクトラムです。1/3oct 相当の帯域とピークホールド。Layer Music Checker と同じ検波です。",
+        "LED spectrum of every playback channel mixed together. Third-octave-style bands and peak hold, same detection as Layer Music Checker.");
     public static string TipLoudness => Get(
         "再生出力のラウドネス（ITU-R BS.1770 / EBU R128）。Short Term・Integrated・Momentary Max、Loudness Range、True Peak。ターゲット LKFS は設定で変更。数値は青＝余裕、橙＝接近、赤＝超過（LKFS はターゲット、True Peak は 0 dBTP、Loudness Range は 20/25 LU）。停止後も最後の値を残し、再生し直すと測り直します。音声は変えません。",
         "Playback loudness (ITU-R BS.1770 / EBU R128): Short Term, Integrated, Momentary Max, Loudness Range, True Peak. Target LKFS is in Settings. Values: blue = headroom, orange = approaching, red = over (LKFS vs target, True Peak vs 0 dBTP, Loudness Range vs 20/25 LU). Holds the last reading after stop; a new play measures again. Does not change the audio.");
     public static string TipVectorScope => Get(
-        "再生出力の位相相関とベクターオーディオスコープです。正方形は縦が Mid、横が Side。下の数値は L/R の相関（+1 同相 / 0 無相関 / -1 逆相）です。停止後は点が中心へゆっくり戻ります。",
-        "Phase correlation and a vector audio scope of the playback output. The square is Mid (vertical) and Side (horizontal). The number below is L/R correlation (+1 in phase / 0 uncorrelated / -1 inverted). After stop, the point slowly returns to the center.");
+        "再生出力の位相相関とベクターオーディオスコープです。正方形は縦が Mid、横が Side。下の数値は L/R の相関（+1 同相 / 0 無相関 / -1 逆相）です。3ch 以上ではサラウンドビュー（上が正面。中央の円は LFE）に切り替わります。停止後は表示がゆっくり消えます。",
+        "Phase correlation and a vector audio scope of the playback output. The square is Mid (vertical) and Side (horizontal). The number below is L/R correlation (+1 in phase / 0 uncorrelated / -1 inverted). Three or more channels switch to a surround view (front is up; the center circle is LFE). After stop, the display slowly fades.");
     public static string TipAudioApi => Get(
         "再生／録音 API（WaveOut / WASAPI / ASIO）",
         "Playback / record API (WaveOut / WASAPI / ASIO)");
@@ -587,8 +587,8 @@ internal static partial class UiStrings
         "サンプリングレート / ビット深度 / チャンネル / 形式 / 容量。S / B / C で変換。変換や範囲削除で長さが変わると容量は推測サイズになり赤。確定項目は保存まで赤。",
         "Sample rate / bit depth / channels / format / size. S / B / C convert. Size turns red as an estimate after conversion or a range delete that changes length. Confirmed fields stay red until you save.");
     public static string TipLevelMeter => Get(
-        "再生出力の Peak / RMS。内側 2 本が Peak（上の赤ランプがクリップ）、外側 2 本が RMS。下の数値は Peak 行／RMS 行。",
-        "Playback Peak / RMS. Inner two bars are Peak (red lamps clip), outer two are RMS. Numbers below are Peak then RMS.");
+        "再生出力の Peak / RMS。内側 2 本が Peak（上の赤ランプがクリップ）、外側 2 本が RMS。下の数値は Peak 行／RMS 行。3ch 以上はチャンネルごとの Peak のみです。",
+        "Playback Peak / RMS. Inner two bars are Peak (red lamps clip), outer two are RMS. Numbers below are Peak then RMS. Three or more channels show Peak only, one bar per channel.");
     public static string TipTimeScroll => Get(
         "表示範囲を左右に動かします。つまみをドラッグ、またはトラックをクリック。",
         "Pan the view. Drag the thumb, or click the track.");

@@ -347,6 +347,7 @@ public partial class MainWindow : Window
         Transport.SetPlaying(false);
         Transport.SetCommandsEnabled(_document is not null);
         ExtinguishMeter();
+        SyncMonitorLayout();
         LoudnessMeter.Reset();
         RebuildTabBar();
         RefreshTitle();
@@ -619,14 +620,10 @@ public partial class MainWindow : Window
         e.Cancel = true;
         _closing = true;
         WindowPlacement.Capture(this, AppStorage.Settings);
-        RememberDocumentState();
-        AppStorage.Settings.ApplyAudioOutput(_outputSettings);
-        AppStorage.Settings.WaveformHeightScale = _waveformHeightScale;
-        PersistWaapiSettings();
-        AppStorage.Save();
-
         HideFromTaskAndFocus();
         StopMeterRendering();
+        VectorScope.StopTicks();
+        Spectrum.StopTicks();
         _playTimer.Stop();
         StopMarkerNudge();
         _ = FinishExitAfterFlushAsync();
@@ -643,6 +640,13 @@ public partial class MainWindow : Window
     {
         try
         {
+            // Hide を描画してからセッション保存・デバイス洗い流しに入る。
+            await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Render);
+            RememberDocumentState();
+            AppStorage.Settings.ApplyAudioOutput(_outputSettings);
+            AppStorage.Settings.WaveformHeightScale = _waveformHeightScale;
+            PersistWaapiSettings();
+            AppStorage.Save();
             await _player.DisposeAsync().ConfigureAwait(true);
         }
         catch

@@ -518,8 +518,14 @@ public partial class MainWindow
             _lastRenderingTime = rendering.RenderingTime;
         }
 
-        var hasSamples = _player.TakeMeterInterval(out var peakL, out var rmsL, out var peakR, out var rmsR);
-        LevelMeter.Apply(_meter.Update(peakL, rmsL, peakR, rmsR, _meterClock.Elapsed.TotalSeconds, hasSamples));
+        Span<float> peaks = stackalloc float[ChannelLayout.MaxChannels];
+        Span<float> rms = stackalloc float[ChannelLayout.MaxChannels];
+        var hasSamples = _player.TakeMeterInterval(peaks, rms, out var meterChannels);
+        LevelMeter.Apply(_meter.Update(
+            peaks[..Math.Max(1, meterChannels)],
+            rms[..Math.Max(1, meterChannels)],
+            _meterClock.Elapsed.TotalSeconds,
+            hasSamples));
         // スペアナ・ゴニオも Background タイマー飢餓を避けてフレーム駆動で更新する。
         Spectrum.Tick();
         LoudnessMeter.Tick();
@@ -566,7 +572,16 @@ public partial class MainWindow
     private void ExtinguishMeter()
     {
         _meter.Extinguish();
-        LevelMeter.Extinguish();
+        LevelMeter.Apply(_meter.Snapshot);
+    }
+
+    private void SyncMonitorLayout()
+    {
+        var channels = _document?.Channels ?? 2;
+        VectorScope.ApplyLayout(channels);
+        _meter.EnsureLayout(channels);
+        LevelMeter.Apply(_meter.Snapshot);
+        VectorScope.InvalidateVisual();
     }
 
     private void OnScrubStarted(long frame)

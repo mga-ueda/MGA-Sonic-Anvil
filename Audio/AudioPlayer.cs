@@ -122,8 +122,13 @@ internal sealed class AudioPlayer : IDisposable
 
     public int OutputSampleRate => _provider.WaveFormat.SampleRate;
 
+    public int SourceChannels => _provider.SourceChannels;
+
     public void CopyMeterWindow(float[] left, float[] right) =>
         _provider.CopyMeterWindow(left, right);
+
+    public void CopyMeterPeaks(Span<float> peaks) =>
+        _provider.CopyMeterPeaks(peaks);
 
     public int ReadRecentOutputSamples(float[] destination) =>
         _provider.CopyRecentOutputSamples(destination);
@@ -158,6 +163,9 @@ internal sealed class AudioPlayer : IDisposable
 
     public bool TakeMeterInterval(out float peakLeft, out float rmsLeft, out float peakRight, out float rmsRight) =>
         _provider.TakeMeterInterval(out peakLeft, out rmsLeft, out peakRight, out rmsRight);
+
+    public bool TakeMeterInterval(Span<float> peaks, Span<float> rms, out int channels) =>
+        _provider.TakeMeterInterval(peaks, rms, out channels);
 
     public int TakeLoudnessFrames(float[] left, float[] right) =>
         _provider.TakeLoudnessFrames(left, right);
