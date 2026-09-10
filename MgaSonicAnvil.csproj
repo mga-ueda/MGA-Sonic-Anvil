@@ -19,9 +19,9 @@
     <PackageProjectUrl>https://github.com/mga-ueda/MGA-Sonic-Anvil</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <ApplicationIcon>Assets\Branding\MgaSonicAnvil.ico</ApplicationIcon>
-    <Version>0.0.5-beta</Version>
-    <AssemblyVersion>0.0.5.0</AssemblyVersion>
-    <FileVersion>0.0.5.0</FileVersion>
+    <Version>0.0.6-beta</Version>
+    <AssemblyVersion>0.0.6.0</AssemblyVersion>
+    <FileVersion>0.0.6.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <Utf8Output>true</Utf8Output>
     <PublishSingleFile>true</PublishSingleFile>
