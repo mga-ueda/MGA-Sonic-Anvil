@@ -31,14 +31,14 @@ public partial class MainWindow
             return;
         }
 
-        if (_markerNudgeDirection == 0)
-        {
-            return;
-        }
-
-        if (key is Key.LeftAlt or Key.RightAlt)
+        if (_markerNudgeDirection != 0 && key is Key.LeftAlt or Key.RightAlt)
         {
             StopMarkerNudge();
+        }
+
+        if (_placeRepeatKind != PlaceRepeatKind.None && !IsPlaceHeld(_placeRepeatKind))
+        {
+            StopPlaceRepeat();
         }
     }
 
@@ -134,6 +134,11 @@ public partial class MainWindow
             CommitTimelineNudgeSession();
         }
 
+        if (_placeRepeatKind != PlaceRepeatKind.None && !IsContinuingPlaceKey(key, modifiers))
+        {
+            StopPlaceRepeat();
+        }
+
         if (TryProcessHistoryShortcut(key, modifiers))
         {
             return true;
@@ -142,6 +147,7 @@ public partial class MainWindow
         if (key == Key.Escape)
         {
             StopMarkerNudge();
+            StopPlaceRepeat();
             if (StatusTimes.IsEditing)
             {
                 StatusTimes.CancelEdit();
@@ -445,8 +451,7 @@ public partial class MainWindow
 
         if (key == Key.R && modifiers == ModifierKeys.Shift)
         {
-            SetRegionFromSelection();
-            return true;
+            return BeginOrContinuePlaceRepeat(PlaceRepeatKind.Region);
         }
 
         if (key == Key.L && modifiers == ModifierKeys.None)
@@ -461,10 +466,9 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.M && modifiers == ModifierKeys.None)
+        if (key is Key.M or Key.Insert && modifiers == ModifierKeys.None)
         {
-            AddMarkerAtPlayhead();
-            return true;
+            return BeginOrContinuePlaceRepeat(PlaceRepeatKind.Marker);
         }
 
         if (key == Key.E && modifiers == ModifierKeys.None)

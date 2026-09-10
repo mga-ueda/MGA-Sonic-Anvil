@@ -84,6 +84,8 @@ internal static class HistoryRecipes
     public const string SetRegion = "SetRegion";
     public const string RemoveRegions = "RemoveRegions";
     public const string AddMarker = "AddMarker";
+    public const string ReplaceMarkers = "ReplaceMarkers";
+    public const string ReplaceRegions = "ReplaceRegions";
     public const string MarkerComment = "MarkerComment";
     public const string RegionName = "RegionName";
     public const string RemoveMarkers = "RemoveMarkers";
@@ -128,6 +130,8 @@ internal static class HistoryRecipes
             SetRegion => TrySetRegion(document, recipe),
             RemoveRegions => ProcessEdits.RemoveRegions(document, RangesOf(recipe)),
             AddMarker => TryAddMarker(document, recipe),
+            ReplaceMarkers => ProcessEdits.ApplyMarkers(document, MarkersOf(recipe.Frames, recipe.Comments)),
+            ReplaceRegions => ProcessEdits.ApplyRegions(document, RegionsOf(recipe.Starts, recipe.Ends, recipe.Names)),
             MarkerComment => ProcessEdits.SetMarkerComment(document, recipe.Frame, recipe.Text ?? ""),
             RegionName => ProcessEdits.SetRegionName(document, RangeOf(recipe), recipe.Text ?? ""),
             RemoveMarkers => ProcessEdits.RemoveMarkers(document, recipe.Frames ?? []),
@@ -333,6 +337,31 @@ internal static class HistoryRecipes
             SourceRate = sourceRate,
             Frames = [.. frames],
             Delta = delta,
+        };
+
+    public static HistoryRecipe FromMarkerSnapshots(
+        string kind,
+        int sourceRate,
+        IReadOnlyList<MarkerSnapshot> markers) =>
+        new()
+        {
+            Kind = kind,
+            SourceRate = sourceRate,
+            Frames = markers.Select(item => item.Frame).ToArray(),
+            Comments = markers.Select(item => item.Comment ?? "").ToArray(),
+        };
+
+    public static HistoryRecipe FromRegionSnapshots(
+        string kind,
+        int sourceRate,
+        IReadOnlyList<WaveRegion> regions) =>
+        new()
+        {
+            Kind = kind,
+            SourceRate = sourceRate,
+            Starts = regions.Select(item => item.StartFrame).ToArray(),
+            Ends = regions.Select(item => item.EndFrame).ToArray(),
+            Names = regions.Select(item => item.Name ?? "").ToArray(),
         };
 
     public static HistoryRecipe FromRanges(string kind, int sourceRate, IReadOnlyList<WaveSelection> ranges) =>

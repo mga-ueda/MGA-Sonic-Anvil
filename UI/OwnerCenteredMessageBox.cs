@@ -27,7 +27,7 @@ internal static class OwnerCenteredMessageBox
         MessageBoxImage icon = MessageBoxImage.None,
         MessageBoxResult defaultResult = MessageBoxResult.None)
     {
-        PlaySystemSound(icon);
+        PlayFor(icon);
 
         if (owner is null)
         {
@@ -41,6 +41,8 @@ internal static class OwnerCenteredMessageBox
     /// <see cref="MessageBoxImage"/> に対応する Windows システムイベント音を再生する。
     /// （Error/Hand、Warning/Exclamation、Information/Asterisk は同一値）。
     /// </summary>
+    public static void PlayFor(MessageBoxImage icon) => PlaySystemSound(icon);
+
     private static void PlaySystemSound(MessageBoxImage icon)
     {
         // Control Panel「サウンド」に登録されているシステムイベント別名。

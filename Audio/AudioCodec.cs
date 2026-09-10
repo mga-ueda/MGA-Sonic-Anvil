@@ -135,7 +135,12 @@ internal static class AudioCodec
     private static readonly byte[] PcmSubFormat =
         new Guid(0x00000001, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71).ToByteArray();
 
-    public static void SaveWaveRange(AudioDocument document, long startFrame, long frameCount, string path)
+    public static void SaveWaveRange(
+        AudioDocument document,
+        long startFrame,
+        long frameCount,
+        string path,
+        IProgress<double>? progress = null)
     {
         var start = Math.Clamp(startFrame, 0, document.FrameCount);
         var length = Math.Clamp(frameCount, 0, document.FrameCount - start);
@@ -152,7 +157,7 @@ internal static class AudioCodec
             document.BitsPerSample,
             AudioFileKind.Wave,
             path);
-        SaveWave(slice, path);
+        SaveWave(slice, path, progress);
     }
 
     public static void SaveWave(AudioDocument document, string path, IProgress<double>? progress = null) =>

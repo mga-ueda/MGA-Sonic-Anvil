@@ -17,7 +17,13 @@ public partial class MainWindow
     private void ExportTabs(IReadOnlyList<DocumentSession> sessions, AudioFileKind kind) =>
         _ = ExportTabsAsync(sessions, kind);
 
-    private async Task ExportTabsAsync(IReadOnlyList<DocumentSession> sessions, AudioFileKind kind)
+    private void ExportTabsSeparated(IReadOnlyList<DocumentSession> sessions, TabExportSplit split) =>
+        _ = ExportTabsAsync(sessions, AudioFileKind.Wave, split);
+
+    private async Task ExportTabsAsync(
+        IReadOnlyList<DocumentSession> sessions,
+        AudioFileKind kind,
+        TabExportSplit split = TabExportSplit.None)
     {
         if (IsUiBusy)
         {
@@ -31,7 +37,7 @@ public partial class MainWindow
         }
 
         var extension = kind == AudioFileKind.Mp3 ? ".mp3" : ".wav";
-        if (!TryPlanExportJobs(sessions, extension, out var jobs))
+        if (!TryPlanExportJobs(sessions, extension, split, out var jobs))
         {
             return;
         }
@@ -67,7 +73,7 @@ public partial class MainWindow
             : AudioExport.WorkerCount(jobs.Count, AppStorage.Settings.ExportParallelism);
         var tracker = new ExportProgressTracker(
             jobs.Select(job => job.Name).ToArray(),
-            jobs.Select(job => job.Document.FrameCount).ToArray(),
+            jobs.Select(job => job.ExportFrameCount).ToArray(),
             new Progress<ExportProgressSnapshot>(ApplyExportProgress));
 
         _tabExportBusy = true;
@@ -129,6 +135,11 @@ public partial class MainWindow
                 {
                     outcomes[i] = new ExportOutcome(AudioCodec.SaveMp3(job.Document, job.Path, options, jobProgress), null);
                 }
+                else if (job.FrameCount > 0)
+                {
+                    AudioCodec.SaveWaveRange(job.Document, job.StartFrame, job.FrameCount, job.Path, jobProgress);
+                    outcomes[i] = new ExportOutcome(null, null);
+                }
                 else
                 {
                     AudioCodec.SaveWave(job.Document, job.Path, jobProgress);
@@ -165,12 +176,18 @@ public partial class MainWindow
     private bool TryPlanExportJobs(
         IReadOnlyList<DocumentSession> sessions,
         string extension,
+        TabExportSplit split,
         out List<ExportJob> jobs)
     {
         jobs = [];
         if (sessions.Count == 0)
         {
             return true;
+        }
+
+        if (split != TabExportSplit.None)
+        {
+            return TryPlanSeparatedExportJobs(sessions, extension, split, jobs);
         }
 
         if (sessions.Count == 1)
@@ -195,6 +212,61 @@ public partial class MainWindow
         }
 
         return true;
+    }
+
+    private bool TryPlanSeparatedExportJobs(
+        IReadOnlyList<DocumentSession> sessions,
+        string extension,
+        TabExportSplit split,
+        List<ExportJob> jobs)
+    {
+        if (!TryPickExportFolder(sessions, out var folder))
+        {
+            return false;
+        }
+
+        var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var session in sessions)
+        {
+            if (!TryGetExportSegments(session.Document, split, out var segments))
+            {
+                continue;
+            }
+
+            var baseName = AudioExport.SuggestBaseName(session.Document.SourcePath, session.DisplayName);
+            for (var i = 0; i < segments.Length; i++)
+            {
+                var name = WaveSeparate.IndexedBaseName(baseName, i + 1, segments.Length);
+                var dest = AudioExport.UniqueInDirectory(folder, name, extension, reserved);
+                jobs.Add(new ExportJob(
+                    name,
+                    dest,
+                    session.Document,
+                    segments[i].StartFrame,
+                    segments[i].Length));
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryGetExportSegments(
+        AudioDocument document,
+        TabExportSplit split,
+        out WaveSelection[] segments)
+    {
+        return split switch
+        {
+            TabExportSplit.Markers => WaveSeparate.TrySegmentsByMarkers(document, out segments),
+            TabExportSplit.Regions => WaveSeparate.TrySegmentsByRegions(document, out segments),
+            _ => EmptySegments(out segments),
+        };
+    }
+
+    private static bool EmptySegments(out WaveSelection[] segments)
+    {
+        segments = [];
+        return false;
     }
 
     private bool TryPlanSingleExportJob(DocumentSession session, string extension, List<ExportJob> jobs)
@@ -328,7 +400,22 @@ public partial class MainWindow
             MessageBoxImage.Information);
     }
 
-    private readonly record struct ExportJob(string Name, string Path, AudioDocument Document);
+    private readonly record struct ExportJob(
+        string Name,
+        string Path,
+        AudioDocument Document,
+        long StartFrame = 0,
+        long FrameCount = 0)
+    {
+        public long ExportFrameCount => FrameCount > 0 ? FrameCount : Document.FrameCount;
+    }
 
     private readonly record struct ExportOutcome(Mp3EncoderKind? Encoder, Exception? Error);
+}
+
+internal enum TabExportSplit
+{
+    None,
+    Markers,
+    Regions,
 }

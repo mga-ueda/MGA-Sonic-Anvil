@@ -25,6 +25,12 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _playTimer;
     private readonly DispatcherTimer _markerDigitTimer;
     private readonly DispatcherTimer _markerNudgeTimer;
+    private readonly DispatcherTimer _placeRepeatTimer;
+    private PlaceRepeatKind _placeRepeatKind;
+    private bool _placeRepeatStarted;
+    private bool _placeSessionOpen;
+    private MarkerSnapshot[] _placeMarkersBefore = [];
+    private WaveRegion[] _placeRegionsBefore = [];
     private int _markerNudgeDirection;
     private bool _nudgeAtPlayhead;
     private bool _nudgeRepeatStarted;
@@ -34,6 +40,8 @@ public partial class MainWindow : Window
     private WaveSelection _timelineNudgeLoopBefore;
     private int _markerNumber;
     private AudioDocument? _document;
+    private RangeDivideState? _markerDivide;
+    private RangeDivideState? _regionDivide;
     private AudioClip? _clipboard;
     private AudioOutputSettings _outputSettings;
     private long _lastPlaybackStart;
@@ -105,7 +113,11 @@ public partial class MainWindow : Window
         Waveform.ScrubEnded += (_, e) => OnScrubEnded(e.Frame, e.Commit);
         Waveform.MarkerCommentCommitted += (_, e) => CommitMarkerComment(e.Frame, e.Comment);
         Waveform.RegionNameCommitted += (_, e) => CommitRegionName(e.Region, e.Name);
-        Waveform.TimelineDragStarting += (_, _) => CommitTimelineNudgeSession();
+        Waveform.TimelineDragStarting += (_, _) =>
+        {
+            CommitTimelineNudgeSession();
+            StopPlaceRepeat();
+        };
         Waveform.TimelineLayoutCommitted += (_, e) =>
             CommitTimelineLayout(e.MarkersBefore, e.RegionsBefore, e.LoopBefore);
         Waveform.MarkersChanged += (_, _) =>
@@ -157,8 +169,14 @@ public partial class MainWindow : Window
         _markerDigitTimer.Tick += (_, _) => ResetMarkerDigitEntry();
         _markerNudgeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs) };
         _markerNudgeTimer.Tick += (_, _) => OnMarkerNudgeTick();
+        _placeRepeatTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs) };
+        _placeRepeatTimer.Tick += (_, _) => OnPlaceRepeatTick();
 
-        Deactivated += (_, _) => StopMarkerNudge();
+        Deactivated += (_, _) =>
+        {
+            StopMarkerNudge();
+            StopPlaceRepeat();
+        };
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         PreviewKeyUp += MainWindow_PreviewKeyUp;
         PreviewMouseWheel += MainWindow_PreviewMouseWheel;
@@ -172,6 +190,7 @@ public partial class MainWindow : Window
             _playTimer.Stop();
             _waapiPollTimer.Stop();
             StopMarkerNudge();
+            StopPlaceRepeat();
             ResetMarkerDigitEntry();
             // Closing で既に破棄済みでも安全（冪等）。
             Waveform.DisposeSpectrogram();

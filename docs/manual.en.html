@@ -124,7 +124,7 @@
         <li><strong>Overview</strong> — top strip. The bright area is the current view. Drag to move (scrubs the center); wheel zooms around the playhead.</li>
         <li><strong>Waveform</strong> — the edit surface: time ruler, marker / region flags, playhead, mouse guide.</li>
         <li><strong>Time scrollbar</strong> — under the waveform. Pan the current view.</li>
-        <li><strong>Tabs</strong> — shown even for a single file. Close with <kbd>Ctrl</kbd>+<kbd>W</kbd>. Reopen a closed tab with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> (more than one). Right-click for “Close Other Tabs (O)”, “Close This and Tabs to the Right (R)”, “Close This and Tabs to the Left (L)”, “Close All Tabs (W)”, “Select All Tabs (A)”, “Export Wave (E)”, and “Export MP3 (M)”. Export writes the current edits to another file (dirty tabs stay dirty). One tab opens a Save dialog; several tabs ask for a folder. Overwrite is confirmed when the destination already exists: Yes = overwrite, No = skip those files, Cancel = stop (a long list shows the count and the first names only). Batch names use the source file name (or the tab title if unsaved); a clash gets <code> 2</code> and up. The last folder is remembered. While it runs, a frosted-glass overlay blocks the UI and shows an overall bar plus a bar for every song encoding in parallel (two columns when they would not fit). <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> also closes all tabs. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> exports every tab as MP3 (keeps the current tabs; there is no key for batch Wave). Select tabs with <kbd>Ctrl</kbd>+click (toggle), <kbd>Shift</kbd>+click (range), or <kbd>Ctrl</kbd>+<kbd>A</kbd> while the pointer is over the tab bar (all); selected tabs are highlighted and <kbd>Esc</kbd> deselects. With a selection, the right-click menu becomes “Close Selected/All Tabs” / “Paste Copied Edits to Selected/All Tabs” / Wave or MP3 export, and <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to every selected tab at once. When tabs no longer fit, inactive tabs shrink first. Scroll arrows appear only if a title would fall below 6 characters.</li>
+        <li><strong>Tabs</strong> — shown even for a single file. Close with <kbd>Ctrl</kbd>+<kbd>W</kbd>. Reopen a closed tab with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> (more than one). Right-click for “Close Other Tabs (O)”, “Close This and Tabs to the Right (R)”, “Close This and Tabs to the Left (L)”, “Close All Tabs (W)”, “Select All Tabs (A)”, “Export Wave (E)”, “Export MP3 (M)”, “Export Wave Separated by Markers (K)”, and “Export Wave Separated by Regions (G)”. Export writes the current edits to another file (dirty tabs stay dirty). One tab opens a Save dialog; several tabs ask for a folder. Overwrite is confirmed when the destination already exists: Yes = overwrite, No = skip those files, Cancel = stop (a long list shows the count and the first names only). Separate export always asks for a folder. Markers need two or more spans; regions need at least one (tabs that do not qualify are skipped). Names append <code>_1</code> (or <code>_01</code> and so on so the digits match the count). Batch names use the source file name (or the tab title if unsaved); a clash gets <code> 2</code> and up. The last folder is remembered. While it runs, a frosted-glass overlay blocks the UI and shows an overall bar plus a bar for every song encoding in parallel (two columns when they would not fit). <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> also closes all tabs. Closing several tabs with two or more dirty ones also offers “Save all and quit” and “Quit without saving any”. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> exports every tab as MP3 (keeps the current tabs; there is no key for batch Wave). Select tabs with <kbd>Ctrl</kbd>+click (toggle), <kbd>Shift</kbd>+click (range), or <kbd>Ctrl</kbd>+<kbd>A</kbd> while the pointer is over the tab bar (all); selected tabs are highlighted and <kbd>Esc</kbd> deselects. With a selection, the right-click menu becomes “Close Selected/All Tabs” / “Paste Copied Edits to Selected/All Tabs” / Wave or MP3 export / separate by markers or regions, and <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to every selected tab at once. When tabs no longer fit, inactive tabs shrink first. Scroll arrows appear only if a title would fall below 6 characters.</li>
         <li><strong>Transport</strong> — top row is playback and zoom; second row is fade / normalize / delete / save / MP3 output, <span class="ui">Tips</span> on/off, and manual <span class="ui">?</span>. License / GitHub sit on the bottom of that row.</li>
         <li><strong>Always on Top</strong> — right end of the status bar. Keeps the window in front.</li>
         <li><strong>Spectrum / loudness / meters / vector scope</strong> — a view of the playback output. Loudness sits left of the spectrum (Short Term / Integrated / Momentary Max, Loudness Range, True Peak; target LKFS is in Settings; values are blue = headroom, orange = approaching, red = over; holds the last reading after stop and measures again on a new play). The spectrum is the same LED-band display as Layer Music Checker. After stop, the vector-scope point slowly returns to the center. <span class="ui">WAAPI</span> above the level meter toggles the bar.</li>
@@ -161,9 +161,9 @@
 
       <h2 id="markers">6. Markers / regions / loops</h2>
       <ul>
-        <li><kbd>M</kbd> — marker at the playhead.</li>
+        <li><kbd>M</kbd> / <kbd>Ins</kbd> — marker at the playhead when there is no selection. The same frame cannot take another. With a selection, the first press places start and end; further presses replace them with the midpoint, then thirds, then fourths, and so on (hold uses the same repeat timing as marker nudge; one history entry until you release).</li>
         <li><kbd>Shift</kbd>+<kbd>L</kbd> — set the selection as the sample loop (same range again clears it).</li>
-        <li><kbd>Shift</kbd>+<kbd>R</kbd> — set the selection as a region (same range again clears it).</li>
+        <li><kbd>Shift</kbd>+<kbd>R</kbd> — set the selection as a region. The same range again divides it in two, then three, and so on (clear with right-click / <kbd>Delete</kbd>; hold uses the same repeat timing, one history entry until you release).</li>
         <li>Click a flag to select an edge. Shift+click for a range, Ctrl+click to add. Drag or ←/→ to move (Shift ×3).</li>
         <li>Double-click a comment / region name. <code>-A</code> lime, <code>-L</code> blue, <code>-E</code> red, <code>-R</code> gray. See <a href="#export-suffix">9-3</a> for what EXPORT does with them.</li>
         <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> — rename.</li>
@@ -250,7 +250,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Save as</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Save as MP3 (keeps the current tab)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd></td><td>Export all tabs as MP3</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close tab (asks to save if dirty)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close tab (asks to save if dirty; several dirty tabs can be finished together)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Reopen a closed tab (newest first; more than one)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Close all tabs</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageDown</kbd></td><td>Next tab</td></tr>
@@ -334,9 +334,9 @@
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td><kbd>M</kbd></td><td>Marker at the playhead</td></tr>
+          <tr><td><kbd>M</kbd> / <kbd>Ins</kbd></td><td>Marker at the playhead, or divide the selection (a hold is one history entry)</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>L</kbd></td><td>Set the selection as the sample loop (same range again clears it)</td></tr>
-          <tr><td><kbd>Shift</kbd>+<kbd>R</kbd></td><td>Set the selection as a region (same range again clears it)</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>R</kbd></td><td>Set the selection as a region; same range again divides it (clear with right-click / Delete)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></td><td>Rename</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Delete</kbd></td><td>Delete selected markers</td></tr>
           <tr><td><kbd>Alt</kbd>+← / →</td><td>Nudge the marker / edge at the playhead by 1 px (1 sample when dots are shown)</td></tr>
@@ -381,7 +381,7 @@
           <tr><td>Right-click a flag / loop bar</td><td>Delete</td></tr>
           <tr><td><kbd>Ctrl</kbd>+click a tab</td><td>Toggle that tab in the selection</td></tr>
           <tr><td><kbd>Shift</kbd>+click a tab</td><td>Range-select tabs</td></tr>
-          <tr><td>Right-click a tab</td><td>Close / select all / export Wave or MP3. With a selection: close, paste history, or export those tabs. Menu letters: <kbd>O</kbd> / <kbd>R</kbd> / <kbd>L</kbd> / <kbd>W</kbd> / <kbd>A</kbd> / <kbd>V</kbd> / <kbd>E</kbd> / <kbd>M</kbd></td></tr>
+          <tr><td>Right-click a tab</td><td>Close / select all / export Wave or MP3 / separate by markers or regions. With a selection: close, paste history, or export those tabs. Menu letters: <kbd>O</kbd> / <kbd>R</kbd> / <kbd>L</kbd> / <kbd>W</kbd> / <kbd>A</kbd> / <kbd>V</kbd> / <kbd>E</kbd> / <kbd>M</kbd> / <kbd>K</kbd> / <kbd>G</kbd></td></tr>
         </tbody>
       </table>
 
@@ -454,7 +454,7 @@
         <li>UI language is also on the gear. The default is <span class="ui">Auto</span> (Japanese if the OS is Japanese, otherwise English). The Japanese locale keeps the current wording, including English labels.</li>
         <li>The manual is <span class="ui">?</span>, or GitHub Pages in the browser. It follows the UI language.</li>
         <li>Settings file: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>
-        <li>Closing the app remembers every open tab (including which one was in front), the window position and size (including maximized), and unsaved edits (kept as a working copy), and restores them on the next launch (multiple tabs show the same status-bar progress as opening). Edit history is restored too when the operations can be replayed (Undo back to the original still works). Time / amplitude zoom, waveform selection, and the playhead reset to their defaults. Closing a tab still asks to save.</li>
+        <li>Closing the app remembers every open tab (including which one was in front), the window position and size (including maximized), and unsaved edits (kept as a working copy), and restores them on the next launch (multiple tabs show the same status-bar progress as opening). Edit history is restored too when the operations can be replayed (Undo back to the original still works). Time / amplitude zoom, waveform selection, and the playhead reset to their defaults. Closing a tab still asks to save. Two or more dirty tabs also offer “Save all and quit” and “Quit without saving any”.</li>
         <li>Only one instance runs. A second start brings the existing window forward and opens the Wave / AIFF / MP3 files you passed as extra tabs.</li>
         <li>On startup the app checks GitHub Releases and tells you if a newer build exists. Yes opens the release page (nothing is downloaded). No skips that version until a newer one appears. Offline, it continues quietly.</li>
       </ul>

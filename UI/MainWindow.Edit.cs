@@ -615,21 +615,40 @@ public partial class MainWindow
         RefreshStatus();
     }
 
-    private void AddMarkerAtPlayhead()
+    private bool TryAddMarkerAtPlayhead()
     {
         if (_document is null)
         {
-            return;
+            return false;
+        }
+
+        var range = _document.Selection;
+        if (!range.IsEmpty)
+        {
+            var previous = _markerDivide is { } state && state.Matches(_document, range)
+                ? state.Parts
+                : 0;
+            var next = RangeDivide.NextParts(previous);
+            var command = ProcessEdits.DivideMarkers(_document, range, previous, next);
+            if (command is not null)
+            {
+                ApplyPlaceLive(command);
+            }
+
+            _markerDivide = new RangeDivideState(_document, range.StartFrame, range.EndFrame, next);
+            AfterMarkerEdit();
+            return true;
         }
 
         var frame = Waveform.PlayheadFrame;
         if (_document.HasMarkerAt(frame))
         {
-            return;
+            return true;
         }
 
-        _history.Do(_document, ProcessEdits.AddMarker(_document, frame));
+        ApplyPlaceLive(ProcessEdits.AddMarker(_document, frame));
         AfterMarkerEdit();
+        return true;
     }
 
     private void RenameMarkerAtPosition()
@@ -983,6 +1002,159 @@ public partial class MainWindow
         CommitTimelineNudgeSession();
     }
 
+    private enum PlaceRepeatKind
+    {
+        None,
+        Marker,
+        Region,
+    }
+
+    private bool BeginOrContinuePlaceRepeat(PlaceRepeatKind kind)
+    {
+        if (kind == PlaceRepeatKind.None)
+        {
+            return false;
+        }
+
+        if (_placeRepeatKind == kind && _placeRepeatTimer.IsEnabled)
+        {
+            return true;
+        }
+
+        BeginPlaceSession();
+        if (!ApplyPlace(kind, quiet: false))
+        {
+            StopPlaceRepeat();
+            return true;
+        }
+
+        _placeRepeatKind = kind;
+        _placeRepeatStarted = false;
+        _placeRepeatTimer.Stop();
+        _placeRepeatTimer.Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs);
+        _placeRepeatTimer.Start();
+        return true;
+    }
+
+    private void OnPlaceRepeatTick()
+    {
+        if (_placeRepeatKind == PlaceRepeatKind.None || !IsPlaceHeld(_placeRepeatKind))
+        {
+            StopPlaceRepeat();
+            return;
+        }
+
+        ApplyPlace(_placeRepeatKind, quiet: true);
+        if (_placeRepeatStarted)
+        {
+            return;
+        }
+
+        _placeRepeatStarted = true;
+        _placeRepeatTimer.Stop();
+        _placeRepeatTimer.Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatIntervalMs);
+        _placeRepeatTimer.Start();
+    }
+
+    private bool ApplyPlace(PlaceRepeatKind kind, bool quiet) =>
+        kind switch
+        {
+            PlaceRepeatKind.Marker => TryAddMarkerAtPlayhead(),
+            PlaceRepeatKind.Region => TrySetRegionFromSelection(quiet),
+            _ => false,
+        };
+
+    private bool IsPlaceHeld(PlaceRepeatKind kind) =>
+        kind switch
+        {
+            PlaceRepeatKind.Marker =>
+                (Keyboard.IsKeyDown(Key.M) || Keyboard.IsKeyDown(Key.Insert))
+                && Keyboard.Modifiers == ModifierKeys.None,
+            PlaceRepeatKind.Region =>
+                Keyboard.IsKeyDown(Key.R) && Keyboard.Modifiers == ModifierKeys.Shift,
+            _ => false,
+        };
+
+    private void StopPlaceRepeat()
+    {
+        CommitPlaceSession();
+        _placeRepeatKind = PlaceRepeatKind.None;
+        _placeRepeatStarted = false;
+        _placeRepeatTimer.Stop();
+        _placeRepeatTimer.Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs);
+    }
+
+    private void BeginPlaceSession()
+    {
+        if (_placeSessionOpen || _document is null)
+        {
+            return;
+        }
+
+        _placeSessionOpen = true;
+        _placeMarkersBefore = _document.SnapshotMarkers();
+        _placeRegionsBefore = _document.SnapshotRegions();
+    }
+
+    private void ApplyPlaceLive(IEditCommand command)
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        if (_placeSessionOpen)
+        {
+            command.Apply(_document);
+            return;
+        }
+
+        _history.Do(_document, command);
+    }
+
+    private void CommitPlaceSession()
+    {
+        if (!_placeSessionOpen)
+        {
+            return;
+        }
+
+        _placeSessionOpen = false;
+        if (_document is null)
+        {
+            return;
+        }
+
+        var command = _placeRepeatKind switch
+        {
+            PlaceRepeatKind.Marker => ProcessEdits.ApplyMarkers(
+                _document,
+                _placeMarkersBefore,
+                _document.SnapshotMarkers()),
+            PlaceRepeatKind.Region => ProcessEdits.ApplyRegions(
+                _document,
+                _placeRegionsBefore,
+                _document.SnapshotRegions(),
+                _document.Selection),
+            _ => null,
+        };
+        if (command is null)
+        {
+            return;
+        }
+
+        _history.Do(_document, command);
+        AfterMarkerEdit();
+    }
+
+    private bool IsContinuingPlaceKey(Key key, ModifierKeys modifiers) =>
+        _placeRepeatKind switch
+        {
+            PlaceRepeatKind.Marker => key is Key.M or Key.Insert && modifiers == ModifierKeys.None,
+            PlaceRepeatKind.Region => key == Key.R && modifiers == ModifierKeys.Shift,
+            _ => false,
+        };
+
     private bool NudgeMarkersAtPlayhead(int direction, bool includePrevious, bool fast)
     {
         if (_document is null || direction == 0)
@@ -1058,6 +1230,7 @@ public partial class MainWindow
     private void UndoEdit()
     {
         CommitTimelineNudgeSession();
+        StopPlaceRepeat();
         if (_document is null || !_history.CanUndo)
         {
             return;
@@ -1071,6 +1244,7 @@ public partial class MainWindow
     private void RedoEdit()
     {
         CommitTimelineNudgeSession();
+        StopPlaceRepeat();
         if (_document is null || !_history.CanRedo)
         {
             return;
@@ -1088,6 +1262,8 @@ public partial class MainWindow
 
     private void AfterEdit()
     {
+        _markerDivide = null;
+        _regionDivide = null;
         if (_document is null)
         {
             return;

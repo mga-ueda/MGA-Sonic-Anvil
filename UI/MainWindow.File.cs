@@ -404,6 +404,16 @@ public partial class MainWindow
         CloseSession(_activeSession);
     }
 
+    private enum DirtyClosePolicy
+    {
+        Ask,
+        SaveAll,
+        DiscardAll,
+    }
+
+    private DirtyClosePolicy _dirtyClosePolicy;
+    private IReadOnlyList<DocumentSession>? _closingBatch;
+
     private bool OfferSaveIfDirty() => OfferSaveIfDirty(_activeSession);
 
     private bool OfferSaveIfDirty(DocumentSession? session)
@@ -413,23 +423,85 @@ public partial class MainWindow
             return true;
         }
 
-        var result = OwnerCenteredMessageBox.Show(
-            this,
-            UiStrings.ConfirmSaveFor(session.DisplayName),
-            UiStrings.AppName,
-            MessageBoxButton.YesNoCancel,
-            MessageBoxImage.Question);
-        if (result == MessageBoxResult.Cancel)
-        {
-            return false;
-        }
-
-        if (result == MessageBoxResult.No)
+        if (_dirtyClosePolicy == DirtyClosePolicy.DiscardAll)
         {
             return true;
         }
 
-        return Save(saveAs: false, document);
+        if (_dirtyClosePolicy == DirtyClosePolicy.SaveAll)
+        {
+            return Save(saveAs: false, document);
+        }
+
+        var remaining = CountRemainingDirtyInCloseBatch();
+        var choice = remaining >= 2
+            ? ConfirmSaveWindow.Show(this, session.DisplayName, remaining)
+            : MapSaveMessageBox(session.DisplayName);
+        switch (choice)
+        {
+            case ConfirmSaveChoice.Cancel:
+                return false;
+            case ConfirmSaveChoice.Discard:
+                return true;
+            case ConfirmSaveChoice.DiscardAll:
+                _dirtyClosePolicy = DirtyClosePolicy.DiscardAll;
+                return true;
+            case ConfirmSaveChoice.SaveAll:
+                _dirtyClosePolicy = DirtyClosePolicy.SaveAll;
+                return Save(saveAs: false, document);
+            default:
+                return Save(saveAs: false, document);
+        }
+    }
+
+    private ConfirmSaveChoice MapSaveMessageBox(string displayName)
+    {
+        var result = OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.ConfirmSaveFor(displayName),
+            UiStrings.AppName,
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+        return result switch
+        {
+            MessageBoxResult.Yes => ConfirmSaveChoice.Save,
+            MessageBoxResult.No => ConfirmSaveChoice.Discard,
+            _ => ConfirmSaveChoice.Cancel,
+        };
+    }
+
+    private int CountRemainingDirtyInCloseBatch()
+    {
+        if (_closingBatch is null)
+        {
+            return 1;
+        }
+
+        var n = 0;
+        foreach (var session in _closingBatch)
+        {
+            if (_sessions.Contains(session) && session.Document.IsDirty)
+            {
+                n++;
+            }
+        }
+
+        return n;
+    }
+
+    private void RunCloseBatch(IReadOnlyList<DocumentSession> targets, Action body)
+    {
+        _closingBatch = targets;
+        _dirtyClosePolicy = DirtyClosePolicy.Ask;
+        try
+        {
+            body();
+        }
+        finally
+        {
+            _closingBatch = null;
+            _dirtyClosePolicy = DirtyClosePolicy.Ask;
+        }
     }
 
     private void ForgetClosedDocument()

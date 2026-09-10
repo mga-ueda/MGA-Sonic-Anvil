@@ -114,6 +114,10 @@ internal static partial class UiStrings
     public static string LabelAudioApiAsio => Get("ASIO", "ASIO");
     public static string ButtonOk => Get("OK", "OK");
     public static string ButtonCancel => Get("Cancel", "Cancel");
+    public static string ButtonYes => Get("はい", "Yes");
+    public static string ButtonNo => Get("いいえ", "No");
+    public static string ButtonSaveAllAndExit => Get("すべて保存して終了", "Save all and quit");
+    public static string ButtonDiscardAllAndExit => Get("すべて保存せずに終了", "Quit without saving any");
     public static string DialogSettingsTitle => Get("設定", "Settings");
     public static string LabelUiLanguage => Get("言語", "Language");
     public static string LabelLanguageAuto => Get("Auto", "Auto");
@@ -268,6 +272,10 @@ internal static partial class UiStrings
         "{0} に未保存の変更があります。保存しますか？",
         "{0} has unsaved changes. Save them?",
         name);
+    public static string ConfirmSaveBatchHint(int remaining) => Format(
+        "未保存のタブが {0} 件あります。まとめて終了することもできます。",
+        "{0} tab(s) have unsaved changes. You can finish them all at once.",
+        remaining);
 
     public static string ErrorOpenFailed => Get("読み込みに失敗しました。", "Failed to open the file.");
     public static string StatusOpeningFiles(int current, int total, string name) => Format(
@@ -476,11 +484,11 @@ internal static partial class UiStrings
     public static string TipWaveform => Get(
         "ドラッグで選択　Ctrl+ドラッグでスクラブ　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A で全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着\n"
         + "ホイール=時間ズーム（再生ヘッド基準）　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"
-        + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル、Shift で3倍）　Ctrl+←→ 前後のマーカー / リージョン端 / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L（G でも可）で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（同じ範囲でもう一度で解除）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M マーカー　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動（Shift で3倍） / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント / リージョン名（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
+        + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル、Shift で3倍）　Ctrl+←→ 前後のマーカー / リージョン端 / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L（G でも可）で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（同じ範囲で繰り返すと2等分、3等分…と打ち直し。解除は右クリック／Delete）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M / Ins マーカー（選択中は両端。続けて打つと中央→3等分…と打ち直し。同じ位置には重ならない）　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動（Shift で3倍） / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント / リージョン名（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
         + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　V で音量（dB。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS / RMS / Peak を先に表示）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　T で現在時間　U で編集履歴　A で波形 / スペクトログラム / 重ね表示 / ラウドネス解析（Short Term LKFS。白い幅は ±1 LU、半透明。波形は上半分のピーク dBFS を線で同じ目盛へ。曲線は原色のシアン／橙／赤。LKFS は左目盛。スペクトログラム・重ね・ラウドネスでは -A/-L/-E/-R とループ／リージョンの下塗りなし）　Ctrl+Shift+E で Wwise EXPORT（Wave 単体）　Ctrl+Shift+M で MP3 保存　Ctrl+Shift+Alt+M で全タブを MP3 書き出し　MP3 ではリージョン／ループ不可。マーカーは置けるが MP3 保存では残らない",
         "Drag to select. Ctrl+drag to scrub. Esc or a move without Shift clears the selection. Shift+move extends. Shift+←/→ grows it (1 sample when dots are shown). Home/End jump to the view edge. Shift+PgUp/PgDn by 5%. Ctrl+Shift+Home/End selects all before/after. Ctrl+A selects all. Double-click selects a span (between markers). The guide snaps to markers / loop edges.\n"
         + "Wheel = time zoom (around the playhead). Shift+wheel = pan. Ctrl+wheel = amplitude.\n"
-        + "←/→ seek (moves a selected marker / region edge / loop edge; 1 sample when dots are shown, Shift ×3). Ctrl+←/→ previous/next marker / region edge / sample-loop edge. Numpad jumps to a number (or a view position). Z / . centers (toggles center-lock while playing, clears it when stopped). 0–9 jump in the view. L (or G) loops from 3 seconds before the end of the selection (or the sample loop / -L). Shift+L sets the selection as the sample loop (same range again clears it). Shift+R sets the selection as a region (same range again clears it). Right-click a marker / region flag / loop bar to delete. S sample rate, B bit depth, C channels, M marker. Click a flag to select an edge / Shift+click for a range / Ctrl+click to add / drag or ←/→ to move (Shift ×3) / Delete or Ctrl+Del to delete. Ctrl+Shift+R to rename. Double-click a comment / region name (-A lime / -L blue / -E red / -R gray).\n"
+        + "←/→ seek (moves a selected marker / region edge / loop edge; 1 sample when dots are shown, Shift ×3). Ctrl+←/→ previous/next marker / region edge / sample-loop edge. Numpad jumps to a number (or a view position). Z / . centers (toggles center-lock while playing, clears it when stopped). 0–9 jump in the view. L (or G) loops from 3 seconds before the end of the selection (or the sample loop / -L). Shift+L sets the selection as the sample loop (same range again clears it). Shift+R sets the selection as a region (repeat on the same range to split 2, 3, … ways; right-click / Delete clears). Right-click a marker / region flag / loop bar to delete. S sample rate, B bit depth, C channels, M / Ins marker (selection places both ends; repeat for center then 3, 4, … equal parts; same frame is rejected). Click a flag to select an edge / Shift+click for a range / Ctrl+click to add / drag or ←/→ to move (Shift ×3) / Delete or Ctrl+Del to delete. Ctrl+Shift+R to rename. Double-click a comment / region name (-A lime / -L blue / -E red / -R gray).\n"
         + "On a marker / region edge / loop edge, Alt+←/→ is 1 px (1 sample when dots are shown), Shift ×3, Ctrl pairs with the previous marker (both edges for a region / loop). X applies a linear fade around the playhead in the view (before = out / after = in). V opens volume (dB; ↑↓ / wheel, Space preview, Enter apply; shows whole-file LKFS / RMS / Peak first). Ctrl+X / C / V cut / copy / paste (markers in range included; a matching region is included too). T edits the current time. U opens edit history. A cycles waveform / spectrogram / overlay / loudness analysis (Short Term LKFS; the white width is a translucent ±1 LU band; the waveform is an upper-half peak dBFS line on the same scale; the curve is primary cyan / orange / red; LKFS numbers sit on the left scale). Spectrogram, overlay, and loudness skip -A/-L/-E/-R, loop, and region fills. Ctrl+Shift+E exports Wave-only to Wwise. Ctrl+Shift+M saves as MP3. Ctrl+Shift+Alt+M exports every tab as MP3. MP3 cannot take regions / loops; markers are allowed but not saved to MP3.");
     public static string TipAlwaysOnTop => Get(
         "ウィンドウを常に最前面へ表示します。",
@@ -534,6 +542,24 @@ internal static partial class UiStrings
     public static string TabMenuExportMp3Selected => Get("選択したタブを MP3 で書き出す(_M)", "Export Selected Tabs as _MP3");
     public static string TabMenuExportWaveAll => Get("すべてのタブを Wave で書き出す(_E)", "Export All Tabs as _Wave");
     public static string TabMenuExportMp3All => Get("すべてのタブを MP3 で書き出す(_M)", "Export All Tabs as _MP3");
+    public static string TabMenuExportWaveByMarkers => Get(
+        "マーカーでセパレートして書き出す(_K)",
+        "Export Wave Separated by Mar_kers");
+    public static string TabMenuExportWaveByMarkersSelected => Get(
+        "選択したタブをマーカーでセパレートして書き出す(_K)",
+        "Export Selected Tabs Separated by Mar_kers");
+    public static string TabMenuExportWaveByMarkersAll => Get(
+        "すべてのタブをマーカーでセパレートして書き出す(_K)",
+        "Export All Tabs Separated by Mar_kers");
+    public static string TabMenuExportWaveByRegions => Get(
+        "リージョンでセパレートして書き出す(_G)",
+        "Export Wave Separated by Re_gions");
+    public static string TabMenuExportWaveByRegionsSelected => Get(
+        "選択したタブをリージョンでセパレートして書き出す(_G)",
+        "Export Selected Tabs Separated by Re_gions");
+    public static string TabMenuExportWaveByRegionsAll => Get(
+        "すべてのタブをリージョンでセパレートして書き出す(_G)",
+        "Export All Tabs Separated by Re_gions");
 
     public static string EditHistoryTitle => Get("編集履歴", "Edit history");
     public static string EditHistoryOrigin => Get("初期状態", "Original");

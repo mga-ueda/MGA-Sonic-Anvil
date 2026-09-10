@@ -110,6 +110,10 @@ internal static class DesignMetrics
 
     public static double AudioDialogButtonWidth => Dip(162);
 
+    public static double ConfirmSaveButtonWidth => From96(88);
+
+    public static double SaveBatchButtonWidth => From96(200);
+
     public static double AudioDialogButtonHeight => Dip(48);
 
     public static Thickness AudioPad => new(Dip(18));

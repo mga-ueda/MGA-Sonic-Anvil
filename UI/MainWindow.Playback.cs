@@ -756,39 +756,52 @@ public partial class MainWindow
         AfterMarkerEdit();
     }
 
-    private void SetRegionFromSelection()
+    private bool TrySetRegionFromSelection(bool quiet = false)
     {
         if (_document is null)
         {
-            return;
+            return false;
         }
 
         if (!_document.AllowsRegionsAndLoops)
         {
-            OwnerCenteredMessageBox.Show(
-                this,
-                UiStrings.ErrorMp3NoRegionLoop,
-                UiStrings.AppName,
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            return;
+            if (!quiet)
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    UiStrings.ErrorMp3NoRegionLoop,
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
+            return false;
         }
 
         var range = _document.Selection;
         if (range.IsEmpty)
         {
-            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
+            if (!quiet)
+            {
+                OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+
+            return false;
         }
 
-        var command = ProcessEdits.SetRegion(_document, range);
-        if (command is null)
+        var previous = _regionDivide is { } state && state.Matches(_document, range)
+            ? state.Parts
+            : 0;
+        var next = RangeDivide.NextParts(previous);
+        var command = ProcessEdits.DivideRegions(_document, range, previous, next);
+        if (command is not null)
         {
-            return;
+            ApplyPlaceLive(command);
         }
 
-        _history.Do(_document, command);
+        _regionDivide = new RangeDivideState(_document, range.StartFrame, range.EndFrame, next);
         AfterMarkerEdit();
+        return true;
     }
 
     private void ClearRegion(WaveSelection range)

@@ -307,15 +307,15 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         var y = (ActualHeight - blockHeight) / 2;
 
         dc.PushOpacity(opacity);
-        DrawTextWithOutline(dc, baseFormatted, new Point(x, y), opacity, _baseText, typeface, 15);
-        DrawTextWithOutline(dc, dotsFormatted, new Point(x + baseFormatted.Width, y), opacity, dotsText, typeface, 15);
+        dc.DrawText(baseFormatted, new Point(x, y));
+        dc.DrawText(dotsFormatted, new Point(x + baseFormatted.Width, y));
 
         var barY = y + baseFormatted.Height;
         if (percentText.Length > 0)
         {
             var percentX = (ActualWidth - percentFormatted.Width) / 2;
             var percentY = y + baseFormatted.Height + 8;
-            DrawTextWithOutline(dc, percentFormatted, new Point(percentX, percentY), opacity, percentText, typeface, 13);
+            dc.DrawText(percentFormatted, new Point(percentX, percentY));
             barY = percentY + percentFormatted.Height + 12;
         }
         else
@@ -363,7 +363,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         var name = FitText(job.Name, JobNameWidth, typeface, 12, culture, dpi);
         var nameText = new FormattedText(name, culture, FlowDirection.LeftToRight, typeface, 12,
             WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush")), dpi);
-        DrawTextWithOutline(dc, nameText, new Point(x, y), opacity, name, typeface, 12);
+        dc.DrawText(nameText, new Point(x, y));
 
         var barY = y + Math.Max(0, (nameText.Height - ProgressBarHeight) / 2);
         DrawBar(dc, x + JobNameWidth + 8, barY, JobBarWidth, Math.Clamp(job.Progress, 0, 1), opacity);
@@ -371,7 +371,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         var pct = $"{(int)Math.Round(Math.Clamp(job.Progress, 0, 1) * 100)}%";
         var pctText = new FormattedText(pct, culture, FlowDirection.LeftToRight, typeface, 12,
             WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush")), dpi);
-        DrawTextWithOutline(dc, pctText, new Point(x + JobNameWidth + 8 + JobBarWidth + 8, y), opacity, pct, typeface, 12);
+        dc.DrawText(pctText, new Point(x + JobNameWidth + 8 + JobBarWidth + 8, y));
     }
 
     private void DrawBar(DrawingContext dc, double x, double y, double width, double fill, float opacity)
@@ -428,40 +428,6 @@ internal sealed class BusyGlassOverlay : FrameworkElement
 
         return "…";
     }
-
-    private void DrawTextWithOutline(
-        DrawingContext dc,
-        FormattedText text,
-        Point location,
-        float opacity,
-        string rawText,
-        Typeface typeface,
-        double fontSize)
-    {
-        var outlineBrush = WpfControlHelpers.FrozenBrush(
-            Color.FromArgb((byte)Math.Round(255 * opacity), 0, 0, 0));
-        foreach (var (dx, dy) in OutlineOffsets)
-        {
-            var outline = new FormattedText(
-                rawText,
-                CultureInfo.CurrentUICulture,
-                FlowDirection.LeftToRight,
-                typeface,
-                fontSize,
-                outlineBrush,
-                VisualTreeHelper.GetDpi(this).PixelsPerDip);
-            dc.DrawText(outline, new Point(location.X + dx, location.Y + dy));
-        }
-
-        dc.DrawText(text, location);
-    }
-
-    private static readonly (int Dx, int Dy)[] OutlineOffsets =
-    [
-        (-1, -1), (0, -1), (1, -1),
-        (-1, 0), (1, 0),
-        (-1, 1), (0, 1), (1, 1),
-    ];
 
     private static ImageBrush? CaptureFrostedBrush(FrameworkElement captureSource, Rect coverBounds)
     {

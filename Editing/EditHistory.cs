@@ -1237,6 +1237,125 @@ internal static class ProcessEdits
         return command;
     }
 
+    public static IEditCommand? DivideMarkers(
+        AudioDocument document,
+        WaveSelection range,
+        int previousParts,
+        int nextParts)
+    {
+        if (range.IsEmpty)
+        {
+            return null;
+        }
+
+        var after = RangeDivide.ApplyMarkers(document.SnapshotMarkers(), range, previousParts, nextParts);
+        return ApplyMarkers(document, after);
+    }
+
+    public static IEditCommand? ApplyMarkers(AudioDocument document, MarkerSnapshot[] after) =>
+        ApplyMarkers(document, document.SnapshotMarkers(), after);
+
+    public static IEditCommand? ApplyMarkers(
+        AudioDocument document,
+        MarkerSnapshot[] before,
+        MarkerSnapshot[] after)
+    {
+        var command = ReplaceMarkers(before, after, "Add Marker", document.SampleRate);
+        if (command is null)
+        {
+            return null;
+        }
+
+        var sourceRate = document.SampleRate;
+        command.Replay = target => ApplyMarkers(target, MapMarkers(after, sourceRate, target));
+        command.Persist = HistoryRecipes.FromMarkerSnapshots(HistoryRecipes.ReplaceMarkers, sourceRate, after);
+        return command;
+    }
+
+    public static IEditCommand? DivideRegions(
+        AudioDocument document,
+        WaveSelection range,
+        int previousParts,
+        int nextParts)
+    {
+        if (range.IsEmpty || !document.AllowsRegionsAndLoops)
+        {
+            return null;
+        }
+
+        var after = RangeDivide.ApplyRegions(document.SnapshotRegions(), range, previousParts, nextParts);
+        return ApplyRegions(document, after, range);
+    }
+
+    public static IEditCommand? ApplyRegions(
+        AudioDocument document,
+        WaveRegion[] after,
+        WaveSelection? span = null) =>
+        ApplyRegions(document, document.SnapshotRegions(), after, span);
+
+    public static IEditCommand? ApplyRegions(
+        AudioDocument document,
+        WaveRegion[] before,
+        WaveRegion[] after,
+        WaveSelection? span = null)
+    {
+        if (!document.AllowsRegionsAndLoops && after.Length > 0)
+        {
+            return null;
+        }
+
+        if (RegionsEqual(before, after))
+        {
+            return null;
+        }
+
+        var summary = span is { IsEmpty: false } range
+            ? UiStrings.EditHistoryRange(
+                UiStrings.EditHistoryName("Set Region"),
+                document.SampleRate,
+                range.StartFrame,
+                range.EndFrame)
+            : UiStrings.EditHistoryName("Set Region");
+        var command = new SetRegionCommand(before, after, summary);
+        var sourceRate = document.SampleRate;
+        command.Replay = target => ApplyRegions(target, MapRegions(after, sourceRate, target));
+        command.Persist = HistoryRecipes.FromRegionSnapshots(HistoryRecipes.ReplaceRegions, sourceRate, after);
+        return command;
+    }
+
+    private static MarkerSnapshot[] MapMarkers(
+        IReadOnlyList<MarkerSnapshot> source,
+        int sourceRate,
+        AudioDocument target)
+    {
+        var mapped = new MarkerSnapshot[source.Count];
+        for (var i = 0; i < source.Count; i++)
+        {
+            mapped[i] = new MarkerSnapshot(
+                EditReplay.MapFrame(source[i].Frame, sourceRate, target),
+                source[i].Comment);
+        }
+
+        return mapped;
+    }
+
+    private static WaveRegion[] MapRegions(
+        IReadOnlyList<WaveRegion> source,
+        int sourceRate,
+        AudioDocument target)
+    {
+        var mapped = new WaveRegion[source.Count];
+        for (var i = 0; i < source.Count; i++)
+        {
+            var range = EditReplay.MapRange(source[i].Range, sourceRate, target);
+            mapped[i] = range.IsEmpty
+                ? WaveRegion.Empty
+                : new WaveRegion(range, source[i].Name);
+        }
+
+        return mapped;
+    }
+
     public static IEditCommand? SetMarkerComment(AudioDocument document, long frame, string comment)
     {
         var before = document.MarkerCommentAt(frame);

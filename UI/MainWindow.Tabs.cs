@@ -173,13 +173,17 @@ public partial class MainWindow
 
     private void CloseOtherTabs(DocumentSession keep)
     {
-        foreach (var session in _sessions.ToArray())
+        var targets = _sessions.Where(session => !ReferenceEquals(session, keep)).ToArray();
+        RunCloseBatch(targets, () =>
         {
-            if (!ReferenceEquals(session, keep) && !CloseSession(session))
+            foreach (var session in targets)
             {
-                return;
+                if (!CloseSession(session))
+                {
+                    return;
+                }
             }
-        }
+        });
     }
 
     /// <summary>このタブを含め、右側（または左側）を全部閉じる。</summary>
@@ -194,13 +198,16 @@ public partial class MainWindow
         var targets = rightSide
             ? _sessions.Skip(index).ToArray()
             : _sessions.Take(index + 1).ToArray();
-        foreach (var target in targets)
+        RunCloseBatch(targets, () =>
         {
-            if (!CloseSession(target))
+            foreach (var target in targets)
             {
-                return;
+                if (!CloseSession(target))
+                {
+                    return;
+                }
             }
-        }
+        });
     }
 
     private void CloseAllTabs() => CloseTabs(_sessions.ToArray());
@@ -278,13 +285,16 @@ public partial class MainWindow
 
     private void CloseTabs(IReadOnlyList<DocumentSession> targets)
     {
-        foreach (var session in targets)
+        RunCloseBatch(targets, () =>
         {
-            if (!CloseSession(session))
+            foreach (var session in targets)
             {
-                return;
+                if (!CloseSession(session))
+                {
+                    return;
+                }
             }
-        }
+        });
     }
 
     private void OpenTabContextMenu(FrameworkElement anchor, DocumentSession session)
@@ -315,6 +325,14 @@ public partial class MainWindow
                 () => ExportTabs(targets, AudioFileKind.Mp3),
                 AllTabsSelected ? "Ctrl+Shift+Alt+M" : null,
                 enabled: !IsUiBusy));
+            menu.Items.Add(CreateTabMenuItem(
+                AllTabsSelected ? UiStrings.TabMenuExportWaveByMarkersAll : UiStrings.TabMenuExportWaveByMarkersSelected,
+                () => ExportTabsSeparated(targets, TabExportSplit.Markers),
+                enabled: !IsUiBusy));
+            menu.Items.Add(CreateTabMenuItem(
+                AllTabsSelected ? UiStrings.TabMenuExportWaveByRegionsAll : UiStrings.TabMenuExportWaveByRegionsSelected,
+                () => ExportTabsSeparated(targets, TabExportSplit.Regions),
+                enabled: !IsUiBusy));
         }
         else
         {
@@ -332,6 +350,14 @@ public partial class MainWindow
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.TabMenuExportMp3,
                 () => ExportTabs([session], AudioFileKind.Mp3),
+                enabled: !IsUiBusy));
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.TabMenuExportWaveByMarkers,
+                () => ExportTabsSeparated([session], TabExportSplit.Markers),
+                enabled: !IsUiBusy));
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.TabMenuExportWaveByRegions,
+                () => ExportTabsSeparated([session], TabExportSplit.Regions),
                 enabled: !IsUiBusy));
         }
 

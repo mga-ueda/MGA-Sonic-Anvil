@@ -41,6 +41,7 @@ public partial class MainWindow
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
         CommitTimelineNudgeSession();
+        StopPlaceRepeat();
         StopPlaybackForEdit();
         _historyAnchorIndex = _history.CurrentIndex;
         _historySelectedIndex = _historyAnchorIndex;
