@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security;
+using System.Text;
 using Microsoft.Win32;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
@@ -22,6 +23,9 @@ internal static class FileAssociations
     private const string RegisteredApplications = @"Software\RegisteredApplications";
     private const int ShcneAssocChanged = 0x08000000;
     private const uint ShcnfIdlist = 0x0000;
+    private const int AssocStrCommand = 1;
+    private const int AssocStrExecutable = 2;
+    private const int ErrorInsufficientBuffer = unchecked((int)0x8007007A);
 
     public static IReadOnlyList<string> Extensions => AudioCodec.OpenExtensions;
 
@@ -87,24 +91,57 @@ internal static class FileAssociations
         return exePath.Length > 0;
     }
 
-    public static bool CommandTargets(string? command, string exePath)
+    public static bool CommandTargets(string? command, string exePath) =>
+        TryGetCommandExePath(command, out var fromCommand) && SameAppPath(fromCommand, exePath, namesOnly: false);
+
+    public static bool TargetsThisApp(string? commandOrPath, string exePath)
     {
-        if (string.IsNullOrWhiteSpace(exePath) || !TryGetCommandExePath(command, out var fromCommand))
+        if (string.IsNullOrWhiteSpace(commandOrPath) || string.IsNullOrWhiteSpace(exePath))
         {
             return false;
         }
 
-        try
+        if (TryGetCommandExePath(commandOrPath, out var fromCommand)
+            && SameAppPath(fromCommand, exePath, namesOnly: true))
         {
-            return string.Equals(
-                Path.GetFullPath(fromCommand),
-                Path.GetFullPath(exePath),
-                StringComparison.OrdinalIgnoreCase);
+            return true;
         }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+
+        var trimmed = commandOrPath.Trim().Trim('"');
+        return trimmed.Length > 0 && SameAppPath(trimmed, exePath, namesOnly: true);
+    }
+
+    public static bool IsApplicationsProgId(string? progId, string exePath) =>
+        IsApplicationsProgIdName(progId, Path.GetFileName(exePath));
+
+    public static bool IsApplicationsProgIdName(string? progId, string exeFileName)
+    {
+        const string prefix = @"Applications\";
+        if (string.IsNullOrWhiteSpace(progId)
+            || string.IsNullOrWhiteSpace(exeFileName)
+            || !progId.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
         {
-            return string.Equals(fromCommand, exePath, StringComparison.OrdinalIgnoreCase);
+            return false;
         }
+
+        return string.Equals(progId[prefix.Length..], exeFileName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static string CurrentExeFileName()
+    {
+        var exe = ResolveExePath();
+        if (exe is not null)
+        {
+            var name = Path.GetFileName(exe);
+            if (!name.Equals("dotnet.exe", StringComparison.OrdinalIgnoreCase)
+                && !name.Equals("testhost.exe", StringComparison.OrdinalIgnoreCase)
+                && !name.Equals("testhost.dll", StringComparison.OrdinalIgnoreCase))
+            {
+                return name;
+            }
+        }
+
+        return "MGA Sonic Anvil.exe";
     }
 
     public static bool IsOurProgId(string? progId, string? extension = null)
@@ -146,14 +183,22 @@ internal static class FileAssociations
     public static bool IsAssociated(string extension)
     {
         var ext = NormalizeExtension(extension);
+        var exeName = CurrentExeFileName();
+        var exe = ResolveExePath();
         var progId = ReadEffectiveProgId(ext);
-        if (!IsOurProgId(progId, ext))
+        if (IsOurProgId(progId, ext) || IsApplicationsProgIdName(progId, exeName))
         {
-            return false;
+            return true;
         }
 
-        var exe = ResolveExePath();
-        return exe is not null && CommandTargets(ReadOpenCommand(progId), exe);
+        if (TargetsThisApp(QueryAssoc(ext, AssocStrExecutable), exe ?? exeName)
+            || TargetsThisApp(QueryAssoc(ext, AssocStrCommand), exe ?? exeName))
+        {
+            return true;
+        }
+
+        return FileNameEquals(QueryAssoc(ext, AssocStrExecutable), exeName)
+            || FileNameEquals(ReadOpenCommand(progId), exeName);
     }
 
     public static void SetAssociated(string extension, bool associated)
@@ -174,7 +219,7 @@ internal static class FileAssociations
             ?? throw new InvalidOperationException(UiStrings.ErrFileAssociationNoExe);
         var progId = ProgIdFor(ext);
         var current = ReadEffectiveProgId(ext);
-        if (!IsOurProgId(current, ext))
+        if (!IsOurProgId(current, ext) && !IsApplicationsProgId(current, exe))
         {
             WritePreviousProgId(ext, current);
         }
@@ -210,7 +255,8 @@ internal static class FileAssociations
         }
 
         WriteCapabilities(ext, progId, add: false);
-        if (IsOurProgId(ReadUserChoiceProgId(ext), ext))
+        var userChoice = ReadUserChoiceProgId(ext);
+        if (IsOurProgId(userChoice, ext) || IsApplicationsProgIdName(userChoice, CurrentExeFileName()))
         {
             TryDeleteUserChoice(ext);
         }
@@ -233,20 +279,20 @@ internal static class FileAssociations
     private static string? ReadUserChoiceProgId(string ext)
     {
         using var key = Registry.CurrentUser.OpenSubKey($@"{FileExtsRoot}\{ext}\UserChoice");
-        return TrimValue(key?.GetValue("ProgId") as string);
+        return TrimValue(key?.GetValue("ProgId")?.ToString());
     }
 
     private static string? ReadClassesProgId(string ext, bool userOnly)
     {
         using var user = Registry.CurrentUser.OpenSubKey($@"{ClassesRoot}\{ext}");
-        var value = TrimValue(user?.GetValue(null) as string);
+        var value = ReadDefault(user);
         if (!string.IsNullOrWhiteSpace(value) || userOnly)
         {
             return value;
         }
 
         using var merged = Registry.ClassesRoot.OpenSubKey(ext);
-        return TrimValue(merged?.GetValue(null) as string);
+        return ReadDefault(merged);
     }
 
     private static string? ReadOpenCommand(string? progId)
@@ -256,8 +302,46 @@ internal static class FileAssociations
             return null;
         }
 
-        using var key = Registry.CurrentUser.OpenSubKey($@"{ClassesRoot}\{progId}\shell\open\command");
-        return key?.GetValue(null) as string;
+        using var user = Registry.CurrentUser.OpenSubKey($@"{ClassesRoot}\{progId}\shell\open\command");
+        var value = ReadDefault(user);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        using var merged = Registry.ClassesRoot.OpenSubKey($@"{progId}\shell\open\command");
+        return ReadDefault(merged);
+    }
+
+    private static string? QueryAssoc(string ext, int assocStr)
+    {
+        foreach (var extra in new[] { "open", null })
+        {
+            uint length = 0;
+            var hr = AssocQueryStringW(0, assocStr, ext, extra, null, ref length);
+            if (length == 0)
+            {
+                continue;
+            }
+
+            if (hr < 0 && hr != ErrorInsufficientBuffer)
+            {
+                continue;
+            }
+
+            var buffer = new StringBuilder((int)length);
+            hr = AssocQueryStringW(0, assocStr, ext, extra, buffer, ref length);
+            if (hr is 0 or 1)
+            {
+                var text = TrimValue(buffer.ToString());
+                if (text is not null)
+                {
+                    return text;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static void WriteProgId(string progId, string exe)
@@ -408,6 +492,32 @@ internal static class FileAssociations
     private static void NotifyShell() =>
         SHChangeNotify(ShcneAssocChanged, ShcnfIdlist, IntPtr.Zero, IntPtr.Zero);
 
+    private static bool SameAppPath(string left, string right, bool namesOnly)
+    {
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+        {
+            return false;
+        }
+
+        try
+        {
+            if (string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            if (string.Equals(left, right, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return namesOnly
+            && string.Equals(Path.GetFileName(left), Path.GetFileName(right), StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool TryExistingFullPath(string? path, out string fullPath)
     {
         fullPath = string.Empty;
@@ -420,6 +530,34 @@ internal static class FileAssociations
         return true;
     }
 
+    private static bool FileNameEquals(string? commandOrPath, string exeFileName)
+    {
+        if (string.IsNullOrWhiteSpace(commandOrPath) || string.IsNullOrWhiteSpace(exeFileName))
+        {
+            return false;
+        }
+
+        if (TryGetCommandExePath(commandOrPath, out var fromCommand)
+            && string.Equals(Path.GetFileName(fromCommand), exeFileName, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var trimmed = commandOrPath.Trim().Trim('"');
+        return string.Equals(Path.GetFileName(trimmed), exeFileName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? ReadDefault(RegistryKey? key)
+    {
+        if (key is null)
+        {
+            return null;
+        }
+
+        var raw = key.GetValue(null);
+        return TrimValue(raw as string ?? raw?.ToString());
+    }
+
     private static string? TrimValue(string? value)
     {
         var text = value?.Trim();
@@ -428,4 +566,13 @@ internal static class FileAssociations
 
     [DllImport("shell32.dll")]
     private static extern void SHChangeNotify(int wEventId, uint uFlags, IntPtr dwItem1, IntPtr dwItem2);
+
+    [DllImport("shlwapi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern int AssocQueryStringW(
+        int flags,
+        int str,
+        string pszAssoc,
+        string? pszExtra,
+        StringBuilder? pszOut,
+        ref uint pcchOut);
 }

@@ -64,7 +64,37 @@ public sealed class FileAssociationTests
         Assert.True(FileAssociations.IsOurProgId("mgaSonicAnvil.WAV", ".wav"));
         Assert.False(FileAssociations.IsOurProgId("MgaSonicAnvil.wav", ".mp3"));
         Assert.False(FileAssociations.IsOurProgId("WMP11.AssocFile.WAV"));
+        Assert.False(FileAssociations.IsOurProgId("Applications\\MGA Sonic Anvil.exe"));
         Assert.False(FileAssociations.IsOurProgId(null));
+    }
+
+    [Fact]
+    public void IsApplicationsProgId_MatchesThisExeName()
+    {
+        var exe = @"C:\Apps\MGA Sonic Anvil.exe";
+        Assert.True(FileAssociations.IsApplicationsProgId(@"Applications\MGA Sonic Anvil.exe", exe));
+        Assert.True(FileAssociations.IsApplicationsProgId(@"applications\mga sonic anvil.exe", exe));
+        Assert.True(FileAssociations.IsApplicationsProgIdName(
+            @"Applications\MGA Sonic Anvil.exe",
+            "MGA Sonic Anvil.exe"));
+        Assert.False(FileAssociations.IsApplicationsProgId(@"Applications\Other.exe", exe));
+        Assert.False(FileAssociations.IsApplicationsProgId("MgaSonicAnvil.wav", exe));
+        Assert.False(FileAssociations.IsApplicationsProgId(null, exe));
+    }
+
+    [Fact]
+    public void TargetsThisApp_AcceptsSameFileName()
+    {
+        var running = @"C:\dev\bin\MGA Sonic Anvil.exe";
+        Assert.True(FileAssociations.TargetsThisApp(
+            "\"V:\\Program Files\\MGA Sonic Anvil\\MGA Sonic Anvil.exe\" \"%1\"",
+            running));
+        Assert.True(FileAssociations.TargetsThisApp(
+            @"V:\Program Files\MGA Sonic Anvil\MGA Sonic Anvil.exe",
+            running));
+        Assert.False(FileAssociations.TargetsThisApp(
+            "\"C:\\Program Files\\Windows Media Player\\wmplayer.exe\" \"%1\"",
+            running));
     }
 
     [Fact]

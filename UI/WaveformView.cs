@@ -1767,8 +1767,8 @@ internal sealed class WaveformView : Grid
             var channels = Math.Max(1, _document.Channels);
             var laneGap = channels > 1 ? 4d : 0d;
             var laneHeight = (wave.Height - laneGap * (channels - 1)) / channels;
-            DrawChannelLabels(dc, wave, channels, laneGap, laneHeight);
             DrawDbScaleTicks(dc, bounds, wave, channels, laneGap, laneHeight);
+            DrawChannelLabels(dc, bounds, wave, channels, laneGap, laneHeight);
         }
         else if (overlay)
         {
@@ -2854,6 +2854,7 @@ internal sealed class WaveformView : Grid
     private void DrawChannelLabels(
         DrawingContext dc,
         Rect bounds,
+        Rect wave,
         int channels,
         double laneGap,
         double laneHeight)
@@ -2863,35 +2864,45 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        var well = DbScaleBounds(bounds);
+        if (well.Width <= 8)
+        {
+            return;
+        }
+
         var fore = WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush"));
-        var backColor = Theme.Get("WaveformBackBrush");
-        var back = WpfControlHelpers.FrozenBrush(Color.FromArgb(180, backColor.R, backColor.G, backColor.B));
         var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-        const double padX = 4;
-        const double left = 6;
+        var reserve = 7 + GetDbLabel("-12", pixelsPerDip, fore).Width;
+        var maxName = Math.Max(8, well.Width - reserve - 2);
         for (var ch = 0; ch < channels; ch++)
         {
-            var top = bounds.Y + ch * (laneHeight + laneGap);
+            var top = wave.Y + ch * (laneHeight + laneGap);
+            var name = ChannelLabels.Name(ch, channels);
+            var em = name.Length <= 2 ? 11d : 8d;
             var text = new FormattedText(
-                ChannelLabels.Name(ch, channels),
+                name,
                 CultureInfo.InvariantCulture,
                 FlowDirection.LeftToRight,
                 WpfControlHelpers.MonoTypeface,
-                11,
+                em,
                 fore,
                 pixelsPerDip);
-            var boxH = text.Height + 2;
-            var y = top + Math.Max(0, (laneHeight - boxH) * 0.5);
-            var box = new Rect(left, y, text.Width + padX * 2, boxH);
-            if (box.Bottom > top + laneHeight)
+            if (text.Width > maxName && em > 8)
             {
-                box.Y = top + Math.Max(0, (laneHeight - boxH) * 0.5);
-                y = box.Y;
+                text = new FormattedText(
+                    name,
+                    CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight,
+                    WpfControlHelpers.MonoTypeface,
+                    8,
+                    fore,
+                    pixelsPerDip);
             }
 
-            dc.PushClip(new RectangleGeometry(new Rect(0, top, bounds.Width, laneHeight)));
-            dc.DrawRoundedRectangle(back, null, box, 2, 2);
-            dc.DrawText(text, new Point(left + padX, y + Math.Max(0, (box.Height - text.Height) * 0.5)));
+            var x = well.X + Math.Max(0, (maxName - text.Width) * 0.5);
+            var y = top + Math.Max(0, (laneHeight - text.Height) * 0.5);
+            dc.PushClip(new RectangleGeometry(new Rect(well.X, top, maxName + 1, laneHeight)));
+            dc.DrawText(text, new Point(x, y));
             dc.Pop();
         }
     }

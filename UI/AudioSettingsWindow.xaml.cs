@@ -238,7 +238,7 @@ internal partial class AudioSettingsWindow : Window
             {
                 var box = new CheckBox
                 {
-                    Content = FileAssociations.FormatLabel(ext),
+                    Content = new TextBlock { Text = FileAssociations.FormatLabel(ext) },
                     IsChecked = FileAssociations.IsAssociated(ext),
                     Margin = new Thickness(0, 0, 0, 6),
                     Tag = ext,
