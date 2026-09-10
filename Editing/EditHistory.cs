@@ -463,7 +463,7 @@ internal sealed class PasteCommand : IEditCommand
         document.ApplyInsertToRegion(_insertFrame, insertedFrames);
         document.ApplyPastedMarkers(_insertFrame, _pastedMarkers);
         document.ApplyPastedRegions(_insertFrame, _pastedRegions);
-        document.Selection = new WaveSelection(_insertFrame, _insertFrame + insertedFrames);
+        document.Selection = WaveSelection.Empty;
         document.CursorFrame = _insertFrame + insertedFrames;
     }
 

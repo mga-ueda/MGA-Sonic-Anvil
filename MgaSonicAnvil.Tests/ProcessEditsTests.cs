@@ -347,7 +347,7 @@ public sealed class ProcessEditsTests
         history.Do(document, command);
 
         Assert.Equal(13, document.FrameCount);
-        Assert.Equal(new WaveSelection(10, 13), document.Selection);
+        Assert.True(document.Selection.IsEmpty);
         Assert.Equal(0.5f, document.Interleaved[20]);
         Assert.True(history.Undo(document));
         Assert.Equal(10, document.FrameCount);
@@ -370,7 +370,7 @@ public sealed class ProcessEditsTests
         Assert.Equal(0.9f, document.Interleaved[8]);
         Assert.Equal(0.9f, document.Interleaved[10]);
         Assert.Equal(0.2f, document.Interleaved[12]);
-        Assert.Equal(new WaveSelection(4, 6), document.Selection);
+        Assert.True(document.Selection.IsEmpty);
     }
 
     [Fact]
