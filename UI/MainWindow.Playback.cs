@@ -789,9 +789,7 @@ public partial class MainWindow
             return false;
         }
 
-        var previous = _regionDivide is { } state && state.Matches(_document, range)
-            ? state.Parts
-            : 0;
+        var previous = RangeDivide.ResolvePreviousParts(_regionDivide, _document, range, regions: true);
         var next = RangeDivide.NextParts(previous);
         var command = ProcessEdits.DivideRegions(_document, range, previous, next);
         if (command is not null)

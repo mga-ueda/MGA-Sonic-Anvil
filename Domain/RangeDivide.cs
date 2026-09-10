@@ -2,7 +2,7 @@ using MgaSonicAnvil.Audio;
 
 namespace MgaSonicAnvil.Domain;
 
-/// <summary>選択範囲を等分してマーカー／リージョンを打つ。1回目は両端、以降は 2、3…と打ち直す。回数の上限は無い。</summary>
+/// <summary>選択範囲を等分してマーカー／リージョンを打つ。1回目は両端（同じ種類が既にあればすぐ等分）、以降は 2、3…と打ち直す。回数の上限は無い。</summary>
 internal static class RangeDivide
 {
     public static int NextParts(int current)
@@ -157,6 +157,60 @@ internal static class RangeDivide
             return byStart != 0 ? byStart : a.EndFrame.CompareTo(b.EndFrame);
         });
         return [.. next];
+    }
+
+    /// <summary>連続操作中は state。無ければ同じ種類の両端が既にあれば 1 回目済みとみなす。</summary>
+    public static int ResolvePreviousParts(
+        RangeDivideState? state,
+        AudioDocument document,
+        WaveSelection range,
+        bool regions)
+    {
+        if (state is { } current && current.Matches(document, range))
+        {
+            return current.Parts;
+        }
+
+        return (regions ? HasRegionsAtEnds(document, range) : HasMarkersAtEnds(document, range))
+            ? 1
+            : 0;
+    }
+
+    /// <summary>選択の両端にマーカーがあれば、マーカーの両端打ちは済んでいる。</summary>
+    public static bool HasMarkersAtEnds(AudioDocument document, WaveSelection range) =>
+        !range.IsEmpty
+        && document.HasMarkerAt(range.StartFrame)
+        && document.HasMarkerAt(range.EndFrame);
+
+    /// <summary>選択の両端にリージョン端があれば、リージョン 1 本は済んでいる。</summary>
+    public static bool HasRegionsAtEnds(AudioDocument document, WaveSelection range)
+    {
+        if (range.IsEmpty)
+        {
+            return false;
+        }
+
+        var start = false;
+        var end = false;
+        foreach (var region in document.Regions)
+        {
+            if (region.StartFrame == range.StartFrame)
+            {
+                start = true;
+            }
+
+            if (region.EndFrame == range.EndFrame)
+            {
+                end = true;
+            }
+
+            if (start && end)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 

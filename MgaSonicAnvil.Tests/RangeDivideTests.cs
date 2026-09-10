@@ -226,6 +226,100 @@ public sealed class RangeDivideTests
         Assert.Null(ProcessEdits.DivideMarkers(document, new WaveSelection(0, 80), 0, 1));
     }
 
+    [Fact]
+    public void HasMarkersAtEnds_IgnoresRegions()
+    {
+        var document = MakeDocument(100);
+        var range = new WaveSelection(10, 90);
+        Assert.False(RangeDivide.HasMarkersAtEnds(document, range));
+
+        document.TryAddMarker(10);
+        Assert.False(RangeDivide.HasMarkersAtEnds(document, range));
+
+        document.TryAddMarker(90);
+        Assert.True(RangeDivide.HasMarkersAtEnds(document, range));
+        Assert.False(RangeDivide.HasMarkersAtEnds(document, WaveSelection.Empty));
+
+        document.SetRegion(new WaveSelection(0, 80));
+        Assert.False(RangeDivide.HasMarkersAtEnds(document, new WaveSelection(0, 80)));
+    }
+
+    [Fact]
+    public void HasRegionsAtEnds_IgnoresMarkers()
+    {
+        var document = MakeDocument(100);
+        document.TryAddMarker(0);
+        document.TryAddMarker(80);
+        Assert.False(RangeDivide.HasRegionsAtEnds(document, new WaveSelection(0, 80)));
+
+        document.SetRegion(new WaveSelection(0, 80));
+        Assert.True(RangeDivide.HasRegionsAtEnds(document, new WaveSelection(0, 80)));
+        Assert.False(RangeDivide.HasRegionsAtEnds(document, new WaveSelection(0, 40)));
+        Assert.False(RangeDivide.HasRegionsAtEnds(document, WaveSelection.Empty));
+    }
+
+    [Fact]
+    public void ResolvePreviousParts_SeedsBySameKindOnly()
+    {
+        var document = MakeDocument(100);
+        var range = new WaveSelection(0, 80);
+        Assert.Equal(0, RangeDivide.ResolvePreviousParts(null, document, range, regions: false));
+        Assert.Equal(0, RangeDivide.ResolvePreviousParts(null, document, range, regions: true));
+
+        document.TryAddMarker(0);
+        document.TryAddMarker(80);
+        Assert.Equal(1, RangeDivide.ResolvePreviousParts(null, document, range, regions: false));
+        Assert.Equal(0, RangeDivide.ResolvePreviousParts(null, document, range, regions: true));
+
+        var state = new RangeDivideState(document, range.StartFrame, range.EndFrame, 3);
+        Assert.Equal(3, RangeDivide.ResolvePreviousParts(state, document, range, regions: true));
+        Assert.Equal(0, RangeDivide.ResolvePreviousParts(state, document, new WaveSelection(10, 90), regions: false));
+
+        document.SetRegion(new WaveSelection(10, 90));
+        Assert.Equal(1, RangeDivide.ResolvePreviousParts(state, document, new WaveSelection(10, 90), regions: true));
+        Assert.Equal(0, RangeDivide.ResolvePreviousParts(state, document, new WaveSelection(10, 90), regions: false));
+    }
+
+    [Fact]
+    public void DivideMarkers_SkipsBothEndsWhenTheyAlreadyExist()
+    {
+        var document = MakeDocument(100);
+        document.TryAddMarker(0);
+        document.TryAddMarker(80);
+        var range = new WaveSelection(0, 80);
+        var previous = RangeDivide.ResolvePreviousParts(null, document, range, regions: false);
+        var next = RangeDivide.NextParts(previous);
+        ProcessEdits.DivideMarkers(document, range, previous, next)!.Apply(document);
+        Assert.Equal(new long[] { 0, 40, 80 }, document.Markers.Select(item => item.Frame).ToArray());
+    }
+
+    [Fact]
+    public void DivideRegions_PlacesSpanWhenOnlyMarkersBoundTheRange()
+    {
+        var document = MakeDocument(100);
+        document.TryAddMarker(10);
+        document.TryAddMarker(90);
+        var range = new WaveSelection(10, 90);
+        var previous = RangeDivide.ResolvePreviousParts(null, document, range, regions: true);
+        var next = RangeDivide.NextParts(previous);
+        ProcessEdits.DivideRegions(document, range, previous, next)!.Apply(document);
+        Assert.Equal([new WaveSelection(10, 90)], document.Regions);
+    }
+
+    [Fact]
+    public void DivideRegions_SkipsWholeSpanWhenRegionEndsAlreadyExist()
+    {
+        var document = MakeDocument(100);
+        document.SetRegion(new WaveSelection(10, 90));
+        var range = new WaveSelection(10, 90);
+        var previous = RangeDivide.ResolvePreviousParts(null, document, range, regions: true);
+        var next = RangeDivide.NextParts(previous);
+        ProcessEdits.DivideRegions(document, range, previous, next)!.Apply(document);
+        Assert.Equal(
+            [new WaveSelection(10, 50), new WaveSelection(50, 90)],
+            document.Regions);
+    }
+
     private static AudioDocument MakeDocument(int frames) =>
         new(new float[frames * 2], 48000, 2, 24, AudioFileKind.Wave, null);
 }

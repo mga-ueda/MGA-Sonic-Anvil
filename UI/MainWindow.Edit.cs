@@ -625,9 +625,7 @@ public partial class MainWindow
         var range = _document.Selection;
         if (!range.IsEmpty)
         {
-            var previous = _markerDivide is { } state && state.Matches(_document, range)
-                ? state.Parts
-                : 0;
+            var previous = RangeDivide.ResolvePreviousParts(_markerDivide, _document, range, regions: false);
             var next = RangeDivide.NextParts(previous);
             var command = ProcessEdits.DivideMarkers(_document, range, previous, next);
             if (command is not null)

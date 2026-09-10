@@ -161,9 +161,9 @@
 
       <h2 id="markers">6. Markers / regions / loops</h2>
       <ul>
-        <li><kbd>M</kbd> / <kbd>Ins</kbd> — marker at the playhead when there is no selection. The same frame cannot take another. With a selection, the first press places start and end; further presses replace them with the midpoint, then thirds, then fourths, and so on (hold uses the same repeat timing as marker nudge; one history entry until you release).</li>
+        <li><kbd>M</kbd> / <kbd>Ins</kbd> — marker at the playhead when there is no selection. The same frame cannot take another. With a selection, the first press places start and end (or the midpoint if both ends already have markers); further presses replace them with thirds, then fourths, and so on (hold uses the same repeat timing as marker nudge; one history entry until you release).</li>
         <li><kbd>Shift</kbd>+<kbd>L</kbd> — set the selection as the sample loop (same range again clears it).</li>
-        <li><kbd>Shift</kbd>+<kbd>R</kbd> — set the selection as a region. The same range again divides it in two, then three, and so on (clear with right-click / <kbd>Delete</kbd>; hold uses the same repeat timing, one history entry until you release).</li>
+        <li><kbd>Shift</kbd>+<kbd>R</kbd> — set the selection as a region. If both ends already have a region, the first press divides it in two; the same range again divides it in three, and so on (clear with right-click / <kbd>Delete</kbd>; hold uses the same repeat timing, one history entry until you release).</li>
         <li>Click a flag to select an edge. Shift+click for a range, Ctrl+click to add. Drag or ←/→ to move (Shift ×3).</li>
         <li>Double-click a comment / region name. <code>-A</code> lime, <code>-L</code> blue, <code>-E</code> red, <code>-R</code> gray. See <a href="#export-suffix">9-3</a> for what EXPORT does with them.</li>
         <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> — rename.</li>
