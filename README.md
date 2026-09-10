@@ -30,3 +30,5 @@
 Wwise®／Audiokinetic® は各権利者の商標です。本ツールは非公式です。
 
 LAME は LAME project の名称で、ライセンスは LGPL です。同梱・改変・リンク・再配布せず、ユーザーが用意した `lame.exe` をプロセスとして呼び出すだけです。入手とライセンス遵守は利用者側です。LAME プロジェクトの非公式です。
+
+Signalsmith Stretch（Signalsmith Audio、MIT）をピッチシフトに同梱しています。

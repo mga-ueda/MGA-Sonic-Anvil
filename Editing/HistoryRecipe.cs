@@ -78,6 +78,7 @@ internal static class HistoryRecipes
     public const string FadeAround = "FadeAround";
     public const string Normalize = "Normalize";
     public const string Gain = "Gain";
+    public const string PitchShift = "PitchShift";
     public const string Delete = "Delete";
     public const string Paste = "Paste";
     public const string SetSampleLoop = "SetSampleLoop";
@@ -115,6 +116,21 @@ internal static class HistoryRecipes
             Amount = gainDb,
         };
 
+    public static HistoryRecipe FromPitchShift(
+        int sourceRate,
+        WaveSelection range,
+        int semitones,
+        bool timeStretch = true) =>
+        new()
+        {
+            Kind = PitchShift,
+            SourceRate = sourceRate,
+            Start = range.StartFrame,
+            End = range.EndFrame,
+            Value = Audio.PitchShift.Snap(semitones),
+            Flag = !timeStretch,
+        };
+
     public static IEditCommand? TryCreate(AudioDocument document, HistoryRecipe recipe)
     {
         return recipe.Kind switch
@@ -124,6 +140,7 @@ internal static class HistoryRecipes
             FadeAround => ProcessEdits.FadeAroundPlayhead(document, RangeOf(recipe), recipe.Playhead),
             Normalize => ProcessEdits.Normalize(document, RangeOf(recipe)),
             Gain => ProcessEdits.Gain(document, RangeOf(recipe), recipe.Amount),
+            PitchShift => ProcessEdits.PitchShift(document, RangeOf(recipe), recipe.Value, timeStretch: !recipe.Flag),
             Delete => ProcessEdits.Delete(document, RangeOf(recipe)),
             Paste => TryPaste(document, recipe),
             SetSampleLoop => TrySetSampleLoop(document, recipe),

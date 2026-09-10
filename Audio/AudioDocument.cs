@@ -241,6 +241,55 @@ internal sealed class AudioDocument
         CaptureFormatOrigin();
     }
 
+    public void SpliceRange(long startFrame, long oldFrameCount, float[] samples)
+    {
+        var start = checked((int)startFrame * Channels);
+        var oldLength = checked((int)oldFrameCount * Channels);
+        if (start < 0 || oldLength < 0 || start + oldLength > Interleaved.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(startFrame));
+        }
+
+        var next = new float[Interleaved.Length - oldLength + samples.Length];
+        Array.Copy(Interleaved, 0, next, 0, start);
+        Array.Copy(samples, 0, next, start, samples.Length);
+        Array.Copy(
+            Interleaved,
+            start + oldLength,
+            next,
+            start + samples.Length,
+            Interleaved.Length - start - oldLength);
+        Interleaved = next;
+        RebuildPeaks();
+        IsDirty = true;
+        CaptureFormatOrigin();
+    }
+
+    public static long MapFrameThroughRangeStretch(
+        long frame,
+        long rangeStart,
+        long oldLength,
+        long newLength)
+    {
+        var rangeEnd = rangeStart + Math.Max(0, oldLength);
+        if (frame < rangeStart)
+        {
+            return frame;
+        }
+
+        if (frame >= rangeEnd)
+        {
+            return frame + (newLength - oldLength);
+        }
+
+        if (oldLength <= 0)
+        {
+            return rangeStart;
+        }
+
+        return rangeStart + (long)Math.Round((frame - rangeStart) * (double)newLength / oldLength);
+    }
+
     public float[] CopyRange(long startFrame, long frameCount)
     {
         var start = checked((int)startFrame * Channels);

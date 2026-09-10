@@ -338,6 +338,87 @@ internal sealed class ReplaceRangeCommand : IEditCommand
     }
 }
 
+internal sealed class SpliceRangeCommand : IEditCommand
+{
+    private readonly long _startFrame;
+    private readonly float[] _before;
+    private readonly float[] _after;
+    private readonly WaveSelection _selectionBefore;
+    private readonly WaveSelection _selectionAfter;
+    private readonly long _cursorBefore;
+    private readonly long _cursorAfter;
+    private readonly MarkerSnapshot[] _markersBefore;
+    private readonly MarkerSnapshot[] _markersAfter;
+    private readonly WaveSelection _sampleLoopBefore;
+    private readonly WaveSelection _sampleLoopAfter;
+    private readonly WaveRegion[] _regionsBefore;
+    private readonly WaveRegion[] _regionsAfter;
+
+    public SpliceRangeCommand(
+        string name,
+        long startFrame,
+        float[] before,
+        float[] after,
+        WaveSelection selectionBefore,
+        WaveSelection selectionAfter,
+        long cursorBefore,
+        long cursorAfter,
+        MarkerSnapshot[] markersBefore,
+        MarkerSnapshot[] markersAfter,
+        WaveSelection sampleLoopBefore,
+        WaveSelection sampleLoopAfter,
+        WaveRegion[] regionsBefore,
+        WaveRegion[] regionsAfter,
+        string? summary = null)
+    {
+        Name = name;
+        Summary = string.IsNullOrWhiteSpace(summary) ? UiStrings.EditHistoryName(name) : summary;
+        _startFrame = startFrame;
+        _before = before;
+        _after = after;
+        _selectionBefore = selectionBefore;
+        _selectionAfter = selectionAfter;
+        _cursorBefore = cursorBefore;
+        _cursorAfter = cursorAfter;
+        _markersBefore = markersBefore;
+        _markersAfter = markersAfter;
+        _sampleLoopBefore = sampleLoopBefore;
+        _sampleLoopAfter = sampleLoopAfter;
+        _regionsBefore = regionsBefore;
+        _regionsAfter = regionsAfter;
+    }
+
+    public string Name { get; }
+
+    public string Summary { get; }
+
+    public Func<AudioDocument, IEditCommand?>? Replay { get; set; }
+
+    public HistoryRecipe? Persist { get; set; }
+
+    public void Apply(AudioDocument document)
+    {
+        var oldFrames = _before.Length / Math.Max(1, document.Channels);
+        document.SpliceRange(_startFrame, oldFrames, _after);
+        document.ReplaceMarkers(_markersAfter, markDirty: false);
+        document.SetSampleLoop(_sampleLoopAfter, markDirty: false);
+        document.SetRegions(_regionsAfter, markDirty: false);
+        document.Selection = _selectionAfter;
+        document.CursorFrame = _cursorAfter;
+    }
+
+    public void Revert(AudioDocument document)
+    {
+        var newFrames = _after.Length / Math.Max(1, document.Channels);
+        document.SpliceRange(_startFrame, newFrames, _before);
+        document.ReplaceMarkers(_markersBefore, markDirty: false);
+        document.SetSampleLoop(_sampleLoopBefore, markDirty: false);
+        document.SetRegions(_regionsBefore, markDirty: false);
+        document.Selection = _selectionBefore;
+        document.CursorFrame = _cursorBefore;
+    }
+}
+
 internal sealed class DeleteRangeCommand : IEditCommand
 {
     private readonly long _startFrame;
@@ -899,7 +980,7 @@ internal static class ProcessEdits
             before,
             after,
             document.Selection,
-            range,
+            WaveSelection.Empty,
             document.CursorFrame,
             range.StartFrame,
             UiStrings.EditHistoryRange(
@@ -937,7 +1018,7 @@ internal static class ProcessEdits
             before,
             after,
             document.Selection,
-            document.Selection,
+            WaveSelection.Empty,
             document.CursorFrame,
             document.CursorFrame,
             UiStrings.EditHistoryRange(
@@ -950,6 +1031,164 @@ internal static class ProcessEdits
         AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => Gain(target, mapped, snapped));
         command.Persist = HistoryRecipes.FromGain(document.SampleRate, range, snapped);
         return command;
+    }
+
+    public static IEditCommand? PitchShift(
+        AudioDocument document,
+        WaveSelection range,
+        int semitones,
+        bool timeStretch = true,
+        IProgress<double>? progress = null)
+    {
+        range = range.Clamp(document.FrameCount);
+        semitones = Audio.PitchShift.Snap(semitones);
+        if (range.IsEmpty || Audio.PitchShift.IsNoOp(semitones))
+        {
+            return null;
+        }
+
+        progress?.Report(0);
+        var before = document.CopyRange(range.StartFrame, range.Length);
+        var after = Audio.PitchShift.Apply(
+            before,
+            document.Channels,
+            document.SampleRate,
+            semitones,
+            timeStretch,
+            progress);
+        progress?.Report(1);
+        var extra = UiStrings.FormatPitchShiftExtra(semitones, timeStretch);
+        var snapped = semitones;
+        var stretch = timeStretch;
+        if (timeStretch && after.Length == before.Length)
+        {
+            var command = new ReplaceRangeCommand(
+                "Pitch Shift",
+                range.StartFrame,
+                before,
+                after,
+                document.Selection,
+                WaveSelection.Empty,
+                document.CursorFrame,
+                document.CursorFrame,
+                UiStrings.EditHistoryRange(
+                    UiStrings.EditHistoryName("Pitch Shift"),
+                    document.SampleRate,
+                    range.StartFrame,
+                    range.EndFrame,
+                    extra));
+            AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => PitchShift(target, mapped, snapped, stretch));
+            command.Persist = HistoryRecipes.FromPitchShift(document.SampleRate, range, snapped, stretch);
+            return command;
+        }
+
+        var oldFrames = range.Length;
+        var newFrames = after.Length / Math.Max(1, document.Channels);
+        var markersAfter = MapMarkersThroughRange(document.SnapshotMarkers(), range.StartFrame, oldFrames, newFrames);
+        var regionsAfter = MapRegionsThroughRange(document.SnapshotRegions(), range.StartFrame, oldFrames, newFrames);
+        var loopAfter = MapSelectionThroughRange(document.SampleLoop, range.StartFrame, oldFrames, newFrames);
+        var cursorAfter = AudioDocument.MapFrameThroughRangeStretch(
+            document.CursorFrame,
+            range.StartFrame,
+            oldFrames,
+            newFrames);
+        var splice = new SpliceRangeCommand(
+            "Pitch Shift",
+            range.StartFrame,
+            before,
+            after,
+            document.Selection,
+            WaveSelection.Empty,
+            document.CursorFrame,
+            cursorAfter,
+            document.SnapshotMarkers(),
+            markersAfter,
+            document.SampleLoop,
+            loopAfter,
+            document.SnapshotRegions(),
+            regionsAfter,
+            UiStrings.EditHistoryRange(
+                UiStrings.EditHistoryName("Pitch Shift"),
+                document.SampleRate,
+                range.StartFrame,
+                range.EndFrame,
+                extra));
+        AttachRangeReplay(splice, document.SampleRate, range, (target, mapped) => PitchShift(target, mapped, snapped, stretch));
+        splice.Persist = HistoryRecipes.FromPitchShift(document.SampleRate, range, snapped, stretch);
+        return splice;
+    }
+
+    private static MarkerSnapshot[] MapMarkersThroughRange(
+        MarkerSnapshot[] markers,
+        long rangeStart,
+        long oldLength,
+        long newLength)
+    {
+        if (markers.Length == 0)
+        {
+            return markers;
+        }
+
+        var mapped = new MarkerSnapshot[markers.Length];
+        for (var i = 0; i < markers.Length; i++)
+        {
+            mapped[i] = markers[i] with
+            {
+                Frame = AudioDocument.MapFrameThroughRangeStretch(
+                    markers[i].Frame,
+                    rangeStart,
+                    oldLength,
+                    newLength),
+            };
+        }
+
+        return mapped;
+    }
+
+    private static WaveRegion[] MapRegionsThroughRange(
+        WaveRegion[] regions,
+        long rangeStart,
+        long oldLength,
+        long newLength)
+    {
+        if (regions.Length == 0)
+        {
+            return regions;
+        }
+
+        var mapped = new WaveRegion[regions.Length];
+        for (var i = 0; i < regions.Length; i++)
+        {
+            var start = AudioDocument.MapFrameThroughRangeStretch(
+                regions[i].StartFrame,
+                rangeStart,
+                oldLength,
+                newLength);
+            var end = AudioDocument.MapFrameThroughRangeStretch(
+                regions[i].EndFrame,
+                rangeStart,
+                oldLength,
+                newLength);
+            mapped[i] = new WaveRegion(start, end, regions[i].Name);
+        }
+
+        return mapped;
+    }
+
+    private static WaveSelection MapSelectionThroughRange(
+        WaveSelection range,
+        long rangeStart,
+        long oldLength,
+        long newLength)
+    {
+        if (range.IsEmpty)
+        {
+            return range;
+        }
+
+        var start = AudioDocument.MapFrameThroughRangeStretch(range.StartFrame, rangeStart, oldLength, newLength);
+        var end = AudioDocument.MapFrameThroughRangeStretch(range.EndFrame, rangeStart, oldLength, newLength);
+        return new WaveSelection(start, end);
     }
 
     public static IEditCommand Delete(AudioDocument document, WaveSelection range)
@@ -1612,7 +1851,7 @@ internal static class ProcessEdits
             before.OriginSampleRate,
             before.OriginChannels,
             before.OriginBitsPerSample,
-            FormatConvert.ScaleSelection(document.Selection, document.SampleRate, destRate, destFrames),
+            WaveSelection.Empty,
             FormatConvert.ScaleSelection(document.SampleLoop, document.SampleRate, destRate, destFrames),
             ScaleRegions(document, destRate, destFrames),
             FormatConvert.ScaleFrame(document.CursorFrame, document.SampleRate, destRate, destFrames),
@@ -1660,7 +1899,7 @@ internal static class ProcessEdits
 
         var before = FormatSnapshot.Capture(document);
         var samples = document.MaterializeFormat(document.SampleRate, bits, document.Channels);
-        var after = before with { Samples = samples, BitsPerSample = bits };
+        var after = before with { Samples = samples, BitsPerSample = bits, Selection = WaveSelection.Empty };
         var command = new ConvertFormatCommand(
             "Convert Bit Depth",
             $"{UiStrings.EditHistoryName("Convert Bit Depth")}  {document.BitsPerSample}→{bits} bit",
@@ -1685,7 +1924,7 @@ internal static class ProcessEdits
 
         var before = FormatSnapshot.Capture(document);
         var samples = document.MaterializeFormat(document.SampleRate, document.BitsPerSample, destChannels);
-        var after = before with { Samples = samples, Channels = destChannels };
+        var after = before with { Samples = samples, Channels = destChannels, Selection = WaveSelection.Empty };
         var command = new ConvertFormatCommand(
             "Convert Channels",
             $"{UiStrings.EditHistoryName("Convert Channels")}  {document.Channels}→{destChannels} ch",
@@ -1708,7 +1947,7 @@ internal static class ProcessEdits
         string name,
         FadeShape shape)
     {
-        var selectionAfter = range;
+        var span = range;
         range = FadeCurves.InclusiveSampleRange(range, document.FrameCount);
         var before = document.CopyRange(range.StartFrame, range.Length);
         var after = (float[])before.Clone();
@@ -1738,14 +1977,14 @@ internal static class ProcessEdits
             before,
             after,
             document.Selection,
-            selectionAfter,
+            WaveSelection.Empty,
             document.CursorFrame,
-            selectionAfter.StartFrame,
+            document.CursorFrame,
             UiStrings.EditHistoryRange(
                 UiStrings.EditHistoryName(name),
                 document.SampleRate,
-                selectionAfter.StartFrame,
-                selectionAfter.EndFrame,
+                span.StartFrame,
+                span.EndFrame,
                 UiStrings.LabelFadeCurveShort((int)shape)));
     }
 

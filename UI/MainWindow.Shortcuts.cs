@@ -57,6 +57,13 @@ public partial class MainWindow
             return;
         }
 
+        if (_pitchMenu is { IsOpen: true })
+        {
+            PitchShiftPicker.TryNudge(_pitchMenu, Math.Sign(e.Delta));
+            e.Handled = true;
+            return;
+        }
+
         if (e.OriginalSource is not System.Windows.DependencyObject origin)
         {
             return;
@@ -166,7 +173,7 @@ public partial class MainWindow
                 return true;
             }
 
-            if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker())
+            if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker() || ClosePitchShiftPicker())
             {
                 return true;
             }
@@ -193,7 +200,6 @@ public partial class MainWindow
                 return true;
             }
 
-            ConfirmAndExit();
             return true;
         }
 
@@ -250,6 +256,17 @@ public partial class MainWindow
 
         if (TryHandleVolumeMenuShortcut(key, modifiers))
         {
+            return true;
+        }
+
+        if (TryHandlePitchMenuShortcut(key, modifiers))
+        {
+            return true;
+        }
+
+        if (key == Key.Q && modifiers == ModifierKeys.Control)
+        {
+            Close();
             return true;
         }
 
@@ -497,12 +514,6 @@ public partial class MainWindow
 
         if (key == Key.G && modifiers == ModifierKeys.None)
         {
-            JumpToLoopPrerollAndPlay();
-            return true;
-        }
-
-        if (key == Key.T && modifiers == ModifierKeys.None)
-        {
             return StatusTimes.FocusCurrentTime();
         }
 
@@ -551,6 +562,12 @@ public partial class MainWindow
         if (key == Key.V && modifiers == ModifierKeys.None)
         {
             PromptVolume();
+            return true;
+        }
+
+        if (key == Key.P && modifiers == ModifierKeys.None)
+        {
+            PromptPitch();
             return true;
         }
 
@@ -812,6 +829,59 @@ public partial class MainWindow
         }
 
         if (key == Key.V && modifiers == ModifierKeys.None)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryHandlePitchMenuShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (_pitchMenu is not { IsOpen: true })
+        {
+            return false;
+        }
+
+        if (key is Key.Up or Key.Down)
+        {
+            PitchShiftPicker.TryNudge(_pitchMenu, key == Key.Up ? 1 : -1);
+            return true;
+        }
+
+        if (key == Key.Tab)
+        {
+            PitchShiftPicker.TryMoveFocus(
+                _pitchMenu,
+                reverse: (modifiers & ModifierKeys.Shift) == ModifierKeys.Shift);
+            return true;
+        }
+
+        if (key == Key.Space && modifiers == ModifierKeys.None)
+        {
+            if (PitchShiftPicker.IsTimeStretchFocused(_pitchMenu))
+            {
+                PitchShiftPicker.TryToggleTimeStretch(_pitchMenu);
+                return true;
+            }
+
+            PreviewPitch(PitchShiftPicker.ReadSemitones(_pitchMenu), PitchShiftPicker.ReadTimeStretch(_pitchMenu));
+            return true;
+        }
+
+        if (key == Key.Enter && modifiers == ModifierKeys.None)
+        {
+            ApplyPitch(PitchShiftPicker.ReadSemitones(_pitchMenu), PitchShiftPicker.ReadTimeStretch(_pitchMenu));
+            return true;
+        }
+
+        if (key == Key.T && modifiers == ModifierKeys.None)
+        {
+            PitchShiftPicker.TryToggleTimeStretch(_pitchMenu);
+            return true;
+        }
+
+        if (key == Key.P && modifiers == ModifierKeys.None)
         {
             return true;
         }

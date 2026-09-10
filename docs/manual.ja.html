@@ -124,7 +124,7 @@
         <li><strong>全体波形</strong> …… 上段。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）、ホイールで拡縮（再生ヘッド基準）。</li>
         <li><strong>波形エリア</strong> …… 本編集面。時間ルーラー、マーカー／リージョンフラッグ、再生ヘッド、マウスガイド。</li>
         <li><strong>時間スクロールバー</strong> …… 波形の下。表示範囲を左右に動かします。</li>
-        <li><strong>タブ</strong> …… 1 ファイルでも表示。閉じるは <kbd>Ctrl</kbd>+<kbd>W</kbd>。誤って閉じたタブは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> で開き直せる（複数可）。右クリックで「このタブ以外を閉じる(O)」「このタブを含め右側を全部閉じる(R)」「このタブを含め左側を全部閉じる(L)」「すべてのタブを閉じる(W)」「全部のタブを選択する(A)」「Wave で書き出す(E)」「MP3 で書き出す(M)」「マーカーでセパレートして書き出す(K)」「リージョンでセパレートして書き出す(G)」。書き出しは今の編集内容を別ファイルへ出します（未保存のままで可。1 件は保存ダイアログ、複数はフォルダを選ぶ。既存ファイルは上書き確認：はい＝上書き、いいえ＝それらをスキップ、キャンセル＝中止。多いときは件数と先頭だけ出します）。セパレートはフォルダを選び、マーカーは区間が 2 つ以上、リージョンは 1 本以上あるタブだけ出します（足りないタブは飛ばす）。名前は元名に <code>_1</code>（10 個以上なら <code>_01</code> のように桁を合わせる）。複数書き出しの名前は元ファイル名（未保存はタブ名）で、同じ名前が重なれば <code> 2</code> から番号を付けます。前回選んだフォルダを覚えます。実行中はすりガラスで操作を止め、全体と並列中の曲すべてのプログレスバーを出します（多いときは 2 列）。<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> でもすべてのタブを閉じられます。複数タブを閉じるとき、未保存が 2 件以上なら「すべて保存して終了」「すべて保存せずに終了」も選べます。<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> で全タブを MP3 書き出し（今のタブは開いたまま。Wave の一括書き出しにキーはありません）。タブは <kbd>Ctrl</kbd>+クリックで個別追加、<kbd>Shift</kbd>+クリックで範囲選択、タブバー上の <kbd>Ctrl</kbd>+<kbd>A</kbd> で全選択でき、選択中のタブはハイライトされます（<kbd>Esc</kbd> で解除）。選択中の右クリックは「選択した（すべての）タブを閉じる」「選択した（すべての）タブにペーストする」「Wave / MP3 で書き出す」「マーカー／リージョンでセパレートして書き出す」になり、<kbd>Ctrl</kbd>+<kbd>V</kbd> でコピーした編集履歴を選択タブへ一括適用できます。タブが増えてバーに収まらないときは、先にアクティブ以外を縮めます。タイトルが 6 文字を切るまで縮めても足りなければ、左右の ＜＞ で送ります。</li>
+        <li><strong>タブ</strong> …… 1 ファイルでも表示。閉じるは <kbd>Ctrl</kbd>+<kbd>W</kbd>。アプリ終了は <kbd>Ctrl</kbd>+<kbd>Q</kbd>。誤って閉じたタブは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> で開き直せる（複数可）。右クリックで「このタブ以外を閉じる(O)」「このタブを含め右側を全部閉じる(R)」「このタブを含め左側を全部閉じる(L)」「すべてのタブを閉じる(W)」「全部のタブを選択する(A)」「Wave で書き出す(E)」「MP3 で書き出す(M)」「マーカーでセパレートして書き出す(K)」「リージョンでセパレートして書き出す(G)」。書き出しは今の編集内容を別ファイルへ出します（未保存のままで可。1 件は保存ダイアログ、複数はフォルダを選ぶ。既存ファイルは上書き確認：はい＝上書き、いいえ＝それらをスキップ、キャンセル＝中止。多いときは件数と先頭だけ出します）。セパレートはフォルダを選び、マーカーは区間が 2 つ以上、リージョンは 1 本以上あるタブだけ出します（足りないタブは飛ばす）。名前は元名に <code>_1</code>（10 個以上なら <code>_01</code> のように桁を合わせる）。複数書き出しの名前は元ファイル名（未保存はタブ名）で、同じ名前が重なれば <code> 2</code> から番号を付けます。前回選んだフォルダを覚えます。実行中はすりガラスで操作を止め、全体と並列中の曲すべてのプログレスバーを出します（多いときは 2 列）。<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> でもすべてのタブを閉じられます。複数タブを閉じるとき、未保存が 2 件以上なら「すべて保存して終了」「すべて保存せずに終了」も選べます。<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> で全タブを MP3 書き出し（今のタブは開いたまま。Wave の一括書き出しにキーはありません）。タブは <kbd>Ctrl</kbd>+クリックで個別追加、<kbd>Shift</kbd>+クリックで範囲選択、タブバー上の <kbd>Ctrl</kbd>+<kbd>A</kbd> で全選択でき、選択中のタブはハイライトされます（<kbd>Esc</kbd> で解除）。選択中の右クリックは「選択した（すべての）タブを閉じる」「選択した（すべての）タブにペーストする」「Wave / MP3 で書き出す」「マーカー／リージョンでセパレートして書き出す」になり、<kbd>Ctrl</kbd>+<kbd>V</kbd> でコピーした編集履歴を選択タブへ一括適用できます。タブが増えてバーに収まらないときは、先にアクティブ以外を縮めます。タイトルが 6 文字を切るまで縮めても足りなければ、左右の ＜＞ で送ります。</li>
         <li><strong>トランスポート</strong> …… 上段は再生・ズーム。下段はフェード／ノーマライズ／削除／保存／MP3 出力、<span class="ui">Tips</span> 枠のオン／オフ、マニュアル <span class="ui">?</span>。ライセンス／GitHub は行の下端。</li>
         <li><strong>Always on Top</strong> …… ステータスバー右端。ウィンドウを最前面に固定します。</li>
         <li><strong>スペクトラム／ラウドネス／レベルメーター／ベクタースコープ</strong> …… 再生出力の表示。スペクトラムの左にラウドネス（Short Term / Integrated / Momentary Max、Loudness Range、True Peak。ターゲット LKFS は設定。数値は青＝余裕、橙＝接近、赤＝超過。停止後も最後の値を残し、再生し直すと測り直します）。スペクトラムは Layer Music Checker と同じ LED 帯域表示です。ベクタースコープは停止後、点が中心へゆっくり戻ります。レベルメーター上の <span class="ui">WAAPI</span> でバーの表示を切り替えます。</li>
@@ -140,17 +140,18 @@
         <li><kbd>Ctrl</kbd>+<kbd>Space</kbd> …… 3 秒前から。</li>
         <li><kbd>Alt</kbd>+<kbd>Enter</kbd> …… 再生開始位置からやり直し。</li>
         <li><kbd>Ctrl</kbd>+ドラッグ …… スクラブ。</li>
-        <li><kbd>T</kbd> …… ステータスバーの現在時間を入力。Enter で移動。コピー／貼り付け可。右クリックで時間／サンプル数。</li>
+        <li><kbd>G</kbd> …… ステータスバーの NOW POS を入力。Enter で移動。コピー／貼り付け可。右クリックで時間／サンプル数。</li>
         <li><kbd>Z</kbd> または <kbd>.</kbd>（テンキーの <kbd>.</kbd> も同じ）…… 中央寄せ。再生中はセンターロックの切替、停止で解除。</li>
-        <li><kbd>L</kbd>（<kbd>G</kbd> でも可）…… 選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生。</li>
+        <li><kbd>L</kbd> …… 選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生。</li>
       </ul>
 
       <h2 id="edit">5. 選択と編集</h2>
-      <p>ドラッグで選択。<kbd>Esc</kbd> または Shift なし移動で解除。未選択のフェード／音量／ノーマライズは全体が対象です。ステータスバーの選択開始／範囲／終了に値を入れることでも選択できます。</p>
+      <p>ドラッグで選択。<kbd>Esc</kbd> または Shift なし移動で解除。未選択のフェード／音量／ピッチ／ノーマライズは全体が対象です。ステータスバーの選択開始／範囲／終了に値を入れることでも選択できます。</p>
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd>／<span class="ui">FADE OUT</span> <kbd>O</kbd> …… カーブを選び Space で試聴、Enter で実行。1–9 でカーブ。</li>
         <li><kbd>X</kbd> …… 表示範囲をシーク前後にリニアフェード（前＝アウト／後＝イン）。</li>
         <li><kbd>V</kbd> …… 音量。↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。Space で試聴、Enter で実行。メニューに波形全体の Integrated LKFS／RMS／Peak の変化を先に出します。ラウドネス表示中は Short Term 曲線も同じ dB で追従します。</li>
+        <li><kbd>P</kbd> …… ピッチ。↑↓／ホイールで半音（Shift または Ctrl で 1 オクターブ）。Space で試聴、Enter で実行。±2 オクターブ。タイムストレッチは既定オン（長さ据え置き）。<kbd>Tab</kbd> でチェックへ移動。<kbd>T</kbd> またはチェックでオフにすると、再生速度と同じく長さも変わります。実行中はすりガラスで進捗を出します。</li>
         <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> …… ピークを -0.1 dB に合わせる。</li>
         <li><span class="ui">DELETE</span> …… 選択を詰めて削除。選択中のマーカー／リージョンもまとめて削除。</li>
         <li><kbd>Ctrl</kbd>+<kbd>X</kbd>／<kbd>C</kbd>／<kbd>V</kbd> …… カット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）。</li>
@@ -250,13 +251,14 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>別名保存</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>MP3 として保存（今のタブは開いたまま）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd></td><td>すべてのタブを MP3 で書き出す</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>アプリを終了（タブと未保存の作業コピーは次回起動時に戻す）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>タブを閉じる（未保存なら保存確認。複数なら一括も可）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>閉じたタブを開き直す（新しいものから。複数可）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>すべてのタブを閉じる</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Tab</kbd>／<kbd>Ctrl</kbd>+<kbd>PageDown</kbd></td><td>次のタブ</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd>／<kbd>Ctrl</kbd>+<kbd>PageUp</kbd></td><td>前のタブ</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>全選択。タブバー上ではタブの全選択</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>入力・メニュー・スクラブ・タブ選択・範囲選択を順に解除。何も残っていなければ終了確認</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>入力・メニュー・スクラブ・タブ選択・範囲選択を順に解除</td></tr>
         </tbody>
       </table>
 
@@ -268,7 +270,7 @@
           <tr><td><kbd>Enter</kbd></td><td>その場停止</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>3 秒前から再生</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>再生開始位置からやり直し</td></tr>
-          <tr><td><kbd>L</kbd>／<kbd>G</kbd></td><td>選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生</td></tr>
+          <tr><td><kbd>L</kbd></td><td>選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生</td></tr>
           <tr><td><kbd>Z</kbd>／<kbd>.</kbd>／テンキー <kbd>.</kbd></td><td>中央寄せ。再生中はセンターロックの切替、停止で解除</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Home</kbd></td><td>ファイル先頭へ</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>End</kbd></td><td>ファイル末尾へ</td></tr>
@@ -289,7 +291,7 @@
           <tr><td><kbd>Shift</kbd>+ホイール</td><td>パン（波形上）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+ホイール</td><td>振幅ズーム（波形上）</td></tr>
           <tr><td><kbd>A</kbd></td><td>波形／スペクトログラム／重ね表示／ラウドネス解析</td></tr>
-          <tr><td><kbd>T</kbd></td><td>ステータスバーの現在時間を入力</td></tr>
+          <tr><td><kbd>G</kbd></td><td>ステータスバーの NOW POS を入力</td></tr>
         </tbody>
       </table>
 
@@ -321,6 +323,7 @@
           <tr><td><kbd>O</kbd></td><td>フェードアウト</td></tr>
           <tr><td><kbd>X</kbd></td><td>表示範囲をシーク前後にリニアフェード（前＝アウト／後＝イン）</td></tr>
           <tr><td><kbd>V</kbd></td><td>音量（dB。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS／RMS／Peak を先に表示）</td></tr>
+          <tr><td><kbd>P</kbd></td><td>ピッチ（半音。↑↓／ホイール、Shift で 1 オクターブ。Space 試聴、Enter 実行。±2 オクターブ。タイムストレッチ既定オン、<kbd>Tab</kbd> でチェックへ、<kbd>T</kbd> で切替。実行中はすりガラス）</td></tr>
           <tr><td><kbd>N</kbd></td><td>ノーマライズ（ピーク -0.1 dB）</td></tr>
           <tr><td><kbd>Delete</kbd>／<kbd>Backspace</kbd></td><td>選択を詰めて削除。選択中のマーカー／リージョンもまとめて削除</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd>／<kbd>C</kbd>／<kbd>V</kbd></td><td>カット／コピー／ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）。タブ選択中の <kbd>Ctrl</kbd>+<kbd>V</kbd> はコピーした編集履歴を選択タブへ適用</td></tr>
@@ -454,7 +457,7 @@
         <li>表示言語も歯車の設定。既定は <span class="ui">Auto</span>（OS が日本語なら Japanese、それ以外は English）。日本語版は現状の文言（英語ラベル含む）のままです。</li>
         <li>マニュアルは <span class="ui">?</span>、またはブラウザの GitHub Pages。表示言語に合わせて日本語／英語を開きます。</li>
         <li>設定ファイル: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>
-        <li>アプリを閉じると、開いていたタブ（どれが前面だったか含む）とウィンドウ位置・サイズ（最大化含む）を覚えます。未保存の編集も作業コピーとして残し、次回起動時に戻します（複数タブなら、開くときと同じくステータスバーに進捗が出ます）。編集履歴も、レシピとして残せる操作は戻します（初期状態へ Undo できます）。時間／振幅ズーム、波形の選択、再生ヘッドは初期状態に戻します。タブを閉じるときは保存確認します。未保存が 2 件以上なら、はい／いいえ／キャンセルに加え「すべて保存して終了」「すべて保存せずに終了」も選べます。</li>
+        <li>アプリを閉じる（<kbd>Ctrl</kbd>+<kbd>Q</kbd>、またはウィンドウを閉じる）と、開いていたタブ（どれが前面だったか含む）とウィンドウ位置・サイズ（最大化含む）を覚えます。未保存の編集も作業コピーとして残し、次回起動時に戻します（複数タブなら、開くときと同じくステータスバーに進捗が出ます）。編集履歴も、レシピとして残せる操作は戻します（初期状態へ Undo できます）。時間／振幅ズーム、波形の選択、再生ヘッドは初期状態に戻します。タブを閉じるときは保存確認します。未保存が 2 件以上なら、はい／いいえ／キャンセルに加え「すべて保存して終了」「すべて保存せずに終了」も選べます。</li>
         <li>起動はひとつだけです。2 回目は既存ウィンドウを前面にし、渡した Wave / AIFF / MP3 をタブで開きます。</li>
         <li>起動時に GitHub Releases を見て、新しい版があれば知らせます。はい＝リリースページを開く（自動ダウンロードはしません）。いいえ＝その版では再通知しません。オフラインでは黙って続けます。</li>
       </ul>
@@ -472,6 +475,7 @@
         <li><strong>Wwise®</strong>／<strong>Audiokinetic®</strong> は Audiokinetic Inc. の商標です。本ツールは非公式です。WAAPI には有効な Wwise ライセンスが必要です。</li>
         <li>本アプリは <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/LICENSE">MIT License</a> で公開しています。</li>
         <li><strong>LAME</strong> は LAME project の名称で、ライセンスは LGPL です。本アプリは同梱・改変・リンク・再配布せず、ユーザーが用意した <code>lame.exe</code> をプロセスとして呼び出すだけです。入手とライセンス遵守は利用者側です。LAME プロジェクトの非公式です。</li>
+        <li><strong>Signalsmith Stretch</strong> は Signalsmith Audio のピッチ／タイムライブラリ（MIT）です。ピッチシフトに同梱しています。</li>
       </ul>
       <footer>© MIYABI GAME AUDIO INC. — MGA Sonic Anvil User Manual (ja)</footer>
     </main>

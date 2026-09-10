@@ -1,0 +1,9 @@
+**/.git/
+signalsmith-stretch/web/
+signalsmith-stretch/cmd/
+signalsmith-linear/tests/
+SignalsmithStretch/bin/
+*.obj
+*.exp
+*.lib
+*.pdb

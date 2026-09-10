@@ -208,6 +208,68 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void PitchShift_RaisesSineAndUndoRestores()
+    {
+        var document = MakeSine(frames: 48000);
+        var original = (float[])document.Interleaved.Clone();
+        var history = new EditHistory();
+        var command = ProcessEdits.PitchShift(document, new WaveSelection(0, 48000), 12);
+        Assert.NotNull(command);
+        history.Do(document, command!);
+        Assert.Equal("Pitch Shift", command!.Name);
+        Assert.NotEqual(original[8000], document.Interleaved[8000]);
+        Assert.True(history.Undo(document));
+        Assert.Equal(original, document.Interleaved);
+    }
+
+    [Fact]
+    public void PitchShift_WithoutStretchChangesLengthAndUndoRestores()
+    {
+        var document = MakeSine(frames: 48000);
+        var original = (float[])document.Interleaved.Clone();
+        var history = new EditHistory();
+        document.Selection = new WaveSelection(0, 48000);
+        var command = ProcessEdits.PitchShift(document, document.Selection, 12, timeStretch: false);
+        Assert.NotNull(command);
+        history.Do(document, command!);
+        Assert.Equal(24000, document.FrameCount);
+        Assert.True(document.Selection.IsEmpty);
+        Assert.True(history.Undo(document));
+        Assert.Equal(original, document.Interleaved);
+        Assert.Equal(48000, document.FrameCount);
+    }
+
+    [Fact]
+    public void PitchShift_ReturnsNullWhenZeroSemitones()
+    {
+        var document = MakeSine(frames: 64);
+        Assert.Null(ProcessEdits.PitchShift(document, new WaveSelection(0, 64), 0));
+        Assert.Null(ProcessEdits.PitchShift(document, WaveSelection.Empty, 3));
+    }
+
+    [Fact]
+    public void RangeTransforms_ClearSelection()
+    {
+        var document = MakeSine(frames: 64);
+        document.Selection = new WaveSelection(0, 32);
+        new EditHistory().Do(document, ProcessEdits.FadeIn(document, document.Selection));
+        Assert.True(document.Selection.IsEmpty);
+
+        document.Selection = new WaveSelection(8, 24);
+        new EditHistory().Do(document, ProcessEdits.Normalize(document, document.Selection));
+        Assert.True(document.Selection.IsEmpty);
+
+        document.Selection = new WaveSelection(0, 16);
+        new EditHistory().Do(document, ProcessEdits.Gain(document, document.Selection, -3)!);
+        Assert.True(document.Selection.IsEmpty);
+
+        document = MakeSine(frames: 4096);
+        document.Selection = new WaveSelection(0, 4096);
+        new EditHistory().Do(document, ProcessEdits.PitchShift(document, document.Selection, 1)!);
+        Assert.True(document.Selection.IsEmpty);
+    }
+
+    [Fact]
     public void Gain_ReturnsNullWhenZeroDb()
     {
         var document = MakeConstant(frames: 4, value: 0.5f);

@@ -19,4 +19,10 @@
     <ProjectReference Include="..\MgaSonicAnvil.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\native\SignalsmithStretch\win-x64\SignalsmithStretch.dll" Condition="Exists('..\native\SignalsmithStretch\win-x64\SignalsmithStretch.dll')" Link="SignalsmithStretch.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

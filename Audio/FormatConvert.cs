@@ -121,6 +121,68 @@ internal static class FormatConvert
         return dest;
     }
 
+    public static float[] ResampleToFrameCount(
+        float[] interleaved,
+        int channels,
+        int sampleRate,
+        int destFrames,
+        IProgress<double>? progress = null)
+    {
+        channels = Math.Max(1, channels);
+        sampleRate = Math.Max(1, sampleRate);
+        var srcFrames = interleaved.Length / channels;
+        destFrames = Math.Max(1, destFrames);
+        if (srcFrames <= 0 || interleaved.Length < channels)
+        {
+            progress?.Report(1);
+            return (float[])interleaved.Clone();
+        }
+
+        if (srcFrames == destFrames)
+        {
+            progress?.Report(1);
+            return (float[])interleaved.Clone();
+        }
+
+        var destRate = Math.Max(1, (int)Math.Round(sampleRate * (double)destFrames / srcFrames));
+        var dest = new float[destFrames * channels];
+        var step = srcFrames / (double)destFrames;
+        var table = BuildSincKernelTable(LowpassCutoff(sampleRate, destRate));
+        var reportEvery = Math.Max(1, destFrames / 100);
+        progress?.Report(0);
+        if (destFrames < ParallelFrameThreshold)
+        {
+            for (var i = 0; i < destFrames; i++)
+            {
+                WriteResampledFrame(dest, interleaved, channels, srcFrames, i, step, table);
+                if (progress is not null && ((i + 1) % reportEvery == 0 || i + 1 == destFrames))
+                {
+                    progress.Report((i + 1) / (double)destFrames);
+                }
+            }
+
+            return dest;
+        }
+
+        var done = 0;
+        Parallel.For(0, destFrames, i =>
+        {
+            WriteResampledFrame(dest, interleaved, channels, srcFrames, i, step, table);
+            if (progress is null)
+            {
+                return;
+            }
+
+            var n = Interlocked.Increment(ref done);
+            if (n % reportEvery == 0 || n == destFrames)
+            {
+                progress.Report(n / (double)destFrames);
+            }
+        });
+        progress?.Report(1);
+        return dest;
+    }
+
     public static float[] CopyFrameRange(float[] interleaved, int channels, long startFrame, long endFrame)
     {
         channels = Math.Max(1, channels);

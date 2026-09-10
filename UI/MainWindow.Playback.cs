@@ -200,8 +200,14 @@ public partial class MainWindow
         }
 
         var frame = _player.CursorFrame;
+        if (_pitchPreviewing)
+        {
+            frame += _pitchPreviewOrigin;
+        }
+
         _fadePreviewing = false;
         _volumePreviewing = false;
+        _pitchPreviewing = false;
         PausePlaybackSoft();
         SeekFrame(frame);
         RestoreFadeVisualIfMenuOpen();
@@ -396,7 +402,7 @@ public partial class MainWindow
             Waveform.AbandonScrub();
         }
 
-        if (_fadePreviewing || _formatPreviewing || _volumePreviewing)
+        if (_fadePreviewing || _formatPreviewing || _volumePreviewing || _pitchPreviewing)
         {
             SyncPreviewPlayhead();
             if (_player.ProviderEnded)
@@ -405,7 +411,9 @@ public partial class MainWindow
                     ? _fadePreviewStartedAt
                     : _formatPreviewing
                         ? _formatPreviewStartedAt
-                        : _volumePreviewStartedAt;
+                        : _pitchPreviewing
+                            ? _pitchPreviewStartedAt
+                            : _volumePreviewStartedAt;
                 if (Environment.TickCount64 - started >= 250)
                 {
                     OnPlaybackEnded(_playbackGeneration);
@@ -493,7 +501,7 @@ public partial class MainWindow
         Spectrum.Tick();
         LoudnessMeter.Tick();
         VectorScope.Tick();
-        if (_fadePreviewing || _formatPreviewing || _volumePreviewing)
+        if (_fadePreviewing || _formatPreviewing || _volumePreviewing || _pitchPreviewing)
         {
             SyncPreviewPlayhead();
             return;
@@ -516,6 +524,11 @@ public partial class MainWindow
         }
 
         var frame = _player.SmoothCursorFrame;
+        if (_pitchPreviewing)
+        {
+            frame += _pitchPreviewOrigin;
+        }
+
         _document.CursorFrame = frame;
         Waveform.SetPlayheadFromPlayback(frame);
         SyncOverviewPlayhead();
@@ -546,6 +559,11 @@ public partial class MainWindow
         {
             _volumePreviewing = false;
             Waveform.SetPreviewGain(null);
+        }
+
+        if (_pitchPreviewing)
+        {
+            _pitchPreviewing = false;
         }
 
         if (_formatPreviewing)
@@ -659,6 +677,23 @@ public partial class MainWindow
             }
 
             RestoreVolumeVisualIfMenuOpen();
+            return;
+        }
+
+        if (_pitchPreviewing)
+        {
+            if (Environment.TickCount64 - _pitchPreviewStartedAt < 250)
+            {
+                return;
+            }
+
+            _pitchPreviewing = false;
+            PausePlaybackSoft();
+            if (_document is not null)
+            {
+                SeekFrame(_pitchPreviewResumeFrame);
+            }
+
             return;
         }
 

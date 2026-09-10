@@ -54,6 +54,7 @@ public partial class MainWindow : Window
     private System.Windows.Controls.ContextMenu? _fadeMenu;
     private System.Windows.Controls.ContextMenu? _formatMenu;
     private System.Windows.Controls.ContextMenu? _volumeMenu;
+    private System.Windows.Controls.ContextMenu? _pitchMenu;
     private FormatConvertKind _formatKind;
     private FormatSizePreview? _formatSizePreview;
     private bool _formatPreviewing;
@@ -73,6 +74,12 @@ public partial class MainWindow : Window
     private long _volumePreviewResumeFrame;
     private long _volumePreviewStartedAt;
     private long _volumeSpaceTick;
+    private bool _pitchPreviewing;
+    private bool _pitchPreviewToggling;
+    private long _pitchPreviewResumeFrame;
+    private long _pitchPreviewStartedAt;
+    private long _pitchPreviewOrigin;
+    private long _pitchSpaceTick;
     private bool _resumeAfterScrub;
     private bool _startupRevealPending = true;
     private bool _closing;
@@ -290,6 +297,7 @@ public partial class MainWindow : Window
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
+        ClosePitchShiftPicker();
         CloseEditHistory(commit: true);
         _resumeAfterScrub = false;
         StopMarkerNudge();
@@ -570,21 +578,6 @@ public partial class MainWindow : Window
         return _document.Selection.IsEmpty
             ? new WaveSelection(0, _document.FrameCount)
             : _document.Selection;
-    }
-
-    private void ConfirmAndExit()
-    {
-        var confirm = OwnerCenteredMessageBox.Show(
-            this,
-            UiStrings.DialogExitBody,
-            UiStrings.DialogExitTitle,
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question,
-            MessageBoxResult.Yes);
-        if (confirm == MessageBoxResult.Yes)
-        {
-            Close();
-        }
     }
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)

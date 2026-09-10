@@ -85,6 +85,25 @@ public sealed class HistorySessionTests
     }
 
     [Fact]
+    public void TryExportImport_RestoresPitchShiftSemitones()
+    {
+        var document = MakeSine(4096);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.PitchShift(document, new WaveSelection(0, 4096), -12)!);
+        var shifted = document.Interleaved[2048];
+
+        var exported = history.TryExport();
+        Assert.NotNull(exported);
+        Assert.Equal(HistoryRecipes.PitchShift, exported!.Recipes[0].Kind);
+        Assert.Equal(-12, exported.Recipes[0].Value);
+        Assert.False(exported.Recipes[0].Flag);
+
+        var restored = MakeSine(4096);
+        Assert.True(EditHistory.TryImport(restored, exported, out _));
+        Assert.Equal(shifted, restored.Interleaved[2048], 5);
+    }
+
+    [Fact]
     public void HistoryJson_RoundTripsRecipes()
     {
         var document = MakeConstant(8, 1f);
@@ -123,6 +142,19 @@ public sealed class HistorySessionTests
     {
         var samples = new float[frames * 2];
         Array.Fill(samples, value);
+        return new AudioDocument(samples, 48000, 2, 24, AudioFileKind.Wave, null);
+    }
+
+    private static AudioDocument MakeSine(int frames)
+    {
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            var value = (float)Math.Sin(2 * Math.PI * 440 * i / 48000d) * 0.5f;
+            samples[i * 2] = value;
+            samples[i * 2 + 1] = value;
+        }
+
         return new AudioDocument(samples, 48000, 2, 24, AudioFileKind.Wave, null);
     }
 }

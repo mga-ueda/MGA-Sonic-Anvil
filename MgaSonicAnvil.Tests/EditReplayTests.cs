@@ -60,6 +60,22 @@ public sealed class EditReplayTests
     }
 
     [Fact]
+    public void PitchShift_Replay_AppliesSameSemitonesToTarget()
+    {
+        var source = MakeSine(frames: 2048, rate: 48000);
+        var command = ProcessEdits.PitchShift(source, new WaveSelection(0, 2048), 12);
+        Assert.NotNull(command);
+        Assert.NotNull(command!.Replay);
+
+        var target = MakeSine(frames: 2048, rate: 48000);
+        var before = (float[])target.Interleaved.Clone();
+        var replayed = command.Replay!(target);
+        Assert.NotNull(replayed);
+        new EditHistory().Do(target, replayed!);
+        Assert.NotEqual(before, target.Interleaved);
+    }
+
+    [Fact]
     public void Delete_Replay_ClampsRangeToTargetLength()
     {
         var source = MakeConstant(frames: 100, value: 1f, rate: 48000);
@@ -118,6 +134,19 @@ public sealed class EditReplayTests
     {
         var samples = new float[frames * 2];
         Array.Fill(samples, value);
+        return new AudioDocument(samples, rate, 2, 24, AudioFileKind.Wave, null);
+    }
+
+    private static AudioDocument MakeSine(int frames, int rate)
+    {
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            var value = (float)Math.Sin(2 * Math.PI * 440 * i / rate) * 0.5f;
+            samples[i * 2] = value;
+            samples[i * 2 + 1] = value;
+        }
+
         return new AudioDocument(samples, rate, 2, 24, AudioFileKind.Wave, null);
     }
 }

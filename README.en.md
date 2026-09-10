@@ -30,3 +30,5 @@ Fade, normalize, ripple-delete, copy / paste, markers / regions / sample loop, a
 Wwise® / Audiokinetic® are trademarks of their respective owners. This tool is unofficial.
 
 LAME is the name of the LAME project and is licensed under the LGPL. This app does not bundle, modify, link, or redistribute it; it only runs a user-supplied `lame.exe` as a process. Obtaining LAME and complying with its license is the user’s responsibility. This tool is unofficial.
+
+Pitch shift bundles Signalsmith Stretch (Signalsmith Audio, MIT).

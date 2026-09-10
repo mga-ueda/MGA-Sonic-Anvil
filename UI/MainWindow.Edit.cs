@@ -27,6 +27,7 @@ public partial class MainWindow
 
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
+        ClosePitchShiftPicker();
         if (_fadeMenu is { IsOpen: true })
         {
             _fadeMenu.IsOpen = false;
@@ -98,6 +99,7 @@ public partial class MainWindow
 
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
+        ClosePitchShiftPicker();
         if (_player.IsPlaying)
         {
             PausePlaybackSoft();
@@ -137,6 +139,267 @@ public partial class MainWindow
 
         _volumeMenu.IsOpen = false;
         return true;
+    }
+
+    private void PromptPitch()
+    {
+        if (IsUiBusy)
+        {
+            return;
+        }
+
+        if (_document is null)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (_pitchMenu is { IsOpen: true })
+        {
+            return;
+        }
+
+        CloseFadeCurvePicker();
+        CloseFormatConvertPicker();
+        CloseVolumeGainPicker();
+        if (_player.IsPlaying)
+        {
+            PausePlaybackSoft();
+        }
+
+        _pitchPreviewResumeFrame = _document.CursorFrame;
+        var menu = PitchShiftPicker.Show(this, ApplyPitch, PreviewPitch, OnPitchChanged);
+        _pitchMenu = menu;
+        menu.Closed += (_, _) =>
+        {
+            StopPitchPreview(restoreCursor: true);
+            if (ReferenceEquals(_pitchMenu, menu))
+            {
+                _pitchMenu = null;
+            }
+        };
+    }
+
+    private bool ClosePitchShiftPicker()
+    {
+        if (_pitchMenu is not { IsOpen: true })
+        {
+            return false;
+        }
+
+        _pitchMenu.IsOpen = false;
+        return true;
+    }
+
+    private void OnPitchChanged(int semitones, bool timeStretch)
+    {
+        if (!_pitchPreviewing || _document is null || _pitchPreviewToggling)
+        {
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            return;
+        }
+
+        StartPitchPreviewPlayback(range, semitones, timeStretch);
+    }
+
+    private void PreviewPitch(int semitones, bool timeStretch)
+    {
+        if (_document is null || _pitchPreviewToggling)
+        {
+            return;
+        }
+
+        var now = Environment.TickCount64;
+        if (now - _pitchSpaceTick < 120)
+        {
+            return;
+        }
+
+        _pitchSpaceTick = now;
+        _pitchPreviewToggling = true;
+        try
+        {
+            if (_pitchPreviewing && _player.IsPlaying)
+            {
+                StopPitchPreview(restoreCursor: true);
+                return;
+            }
+
+            var range = ActiveRange();
+            if (range.IsEmpty)
+            {
+                return;
+            }
+
+            StartPitchPreviewPlayback(range, semitones, timeStretch);
+        }
+        finally
+        {
+            _pitchPreviewToggling = false;
+        }
+    }
+
+    private void StartPitchPreviewPlayback(WaveSelection range, int semitones, bool timeStretch)
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_player.IsPlaying)
+            {
+                _player.Pause();
+            }
+
+            _playTimer.Stop();
+            _meter.Reset();
+            LoudnessMeter.Reset();
+            var source = _document.CopyRange(range.StartFrame, range.Length);
+            var pitched = Audio.PitchShift.IsNoOp(semitones)
+                ? source
+                : Audio.PitchShift.Apply(
+                    source,
+                    _document.Channels,
+                    _document.SampleRate,
+                    semitones,
+                    timeStretch);
+            var preview = new AudioDocument(
+                pitched,
+                _document.SampleRate,
+                _document.Channels,
+                _document.BitsPerSample,
+                _document.SourceKind,
+                null);
+            var previewRange = new WaveSelection(0, preview.FrameCount);
+            if (_player.HasOutputDevice)
+            {
+                _player.Rebind(preview, 0, previewRange, loop: false);
+            }
+            else
+            {
+                _player.Prepare(preview, 0, previewRange, loop: false);
+            }
+
+            _pitchPreviewOrigin = range.StartFrame;
+            _pitchPreviewing = true;
+            _pitchPreviewStartedAt = Environment.TickCount64;
+            _player.Play();
+            _playbackGeneration = _player.Generation;
+            _playTimer.Start();
+            StartMeterRendering();
+            Waveform.SetTrailRecording(true);
+            Transport.SetPlaying(true);
+            Waveform.UnlockCenter();
+            Waveform.SetPlayheadFromPlayback(range.StartFrame);
+        }
+        catch (Exception ex)
+        {
+            _pitchPreviewing = false;
+            PausePlaybackSoft();
+            OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void StopPitchPreview(bool restoreCursor)
+    {
+        if (!_pitchPreviewing)
+        {
+            return;
+        }
+
+        var resume = _pitchPreviewResumeFrame;
+        _pitchPreviewing = false;
+        PausePlaybackSoft();
+        if (restoreCursor && _document is not null)
+        {
+            SeekFrame(resume);
+        }
+    }
+
+    private void ApplyPitch(int semitones, bool timeStretch) =>
+        _ = ApplyPitchAsync(semitones, timeStretch);
+
+    private async Task ApplyPitchAsync(int semitones, bool timeStretch)
+    {
+        if (_document is null || IsUiBusy)
+        {
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        _pitchPreviewing = false;
+        ClosePitchShiftPicker();
+        if (Audio.PitchShift.IsNoOp(semitones))
+        {
+            return;
+        }
+
+        PausePlaybackSoft();
+        var document = _document;
+        _pitchShiftBusy = true;
+        Exception? error = null;
+        IEditCommand? command = null;
+        try
+        {
+            ShowPitchShiftBusyGlass();
+            var progress = new Progress<double>(p => _busyGlass.SetProgress(p));
+            command = await Task.Run(() => ProcessEdits.PitchShift(document, range, semitones, timeStretch, progress))
+                .ConfigureAwait(true);
+            if (!IsLoaded || !ReferenceEquals(_document, document) || command is null)
+            {
+                return;
+            }
+
+            _history.Do(document, command);
+            AfterTransform();
+            PausePlaybackSoft();
+        }
+        catch (Exception ex)
+        {
+            error = ex;
+        }
+        finally
+        {
+            _pitchShiftBusy = false;
+            if (error is not null)
+            {
+                _busyGlass.HideOverlay();
+            }
+            else
+            {
+                _busyGlass.BeginFadeOut();
+            }
+        }
+
+        if (error is not null && IsLoaded)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                error.Message,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void OnVolumeGainChanged(double gainDb)
@@ -502,7 +765,7 @@ public partial class MainWindow
             ? ProcessEdits.FadeIn(_document, range, shape)
             : ProcessEdits.FadeOut(_document, range, shape);
         _history.Do(_document, command);
-        AfterEdit();
+        AfterTransform();
     }
 
     private void ApplyFadeAroundPlayhead()
@@ -540,8 +803,7 @@ public partial class MainWindow
 
         StopPlaybackForEdit();
         _history.Do(_document, ProcessEdits.Normalize(_document, range));
-        Waveform.ClearSelection();
-        AfterEdit();
+        AfterTransform();
     }
 
     private void ApplyVolume(double gainDb)
@@ -574,7 +836,7 @@ public partial class MainWindow
         }
 
         _history.Do(_document, command);
-        AfterEdit();
+        AfterTransform();
     }
 
     private void CommitMarkerComment(long frame, string comment)
@@ -1256,6 +1518,12 @@ public partial class MainWindow
     private void StopPlaybackForEdit()
     {
         PausePlaybackSoft();
+    }
+
+    private void AfterTransform()
+    {
+        Waveform.ClearSelection();
+        AfterEdit();
     }
 
     private void AfterEdit()

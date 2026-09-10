@@ -40,6 +40,7 @@ public partial class MainWindow
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
+        ClosePitchShiftPicker();
         CommitTimelineNudgeSession();
         StopPlaceRepeat();
         StopPlaybackForEdit();
@@ -87,6 +88,8 @@ public partial class MainWindow
                 case Key.V:
                     PasteHistoryRecipes();
                     return true;
+                case Key.Q:
+                    return false;
             }
         }
 

@@ -124,7 +124,7 @@
         <li><strong>Overview</strong> — top strip. The bright area is the current view. Drag to move (scrubs the center); wheel zooms around the playhead.</li>
         <li><strong>Waveform</strong> — the edit surface: time ruler, marker / region flags, playhead, mouse guide.</li>
         <li><strong>Time scrollbar</strong> — under the waveform. Pan the current view.</li>
-        <li><strong>Tabs</strong> — shown even for a single file. Close with <kbd>Ctrl</kbd>+<kbd>W</kbd>. Reopen a closed tab with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> (more than one). Right-click for “Close Other Tabs (O)”, “Close This and Tabs to the Right (R)”, “Close This and Tabs to the Left (L)”, “Close All Tabs (W)”, “Select All Tabs (A)”, “Export Wave (E)”, “Export MP3 (M)”, “Export Wave Separated by Markers (K)”, and “Export Wave Separated by Regions (G)”. Export writes the current edits to another file (dirty tabs stay dirty). One tab opens a Save dialog; several tabs ask for a folder. Overwrite is confirmed when the destination already exists: Yes = overwrite, No = skip those files, Cancel = stop (a long list shows the count and the first names only). Separate export always asks for a folder. Markers need two or more spans; regions need at least one (tabs that do not qualify are skipped). Names append <code>_1</code> (or <code>_01</code> and so on so the digits match the count). Batch names use the source file name (or the tab title if unsaved); a clash gets <code> 2</code> and up. The last folder is remembered. While it runs, a frosted-glass overlay blocks the UI and shows an overall bar plus a bar for every song encoding in parallel (two columns when they would not fit). <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> also closes all tabs. Closing several tabs with two or more dirty ones also offers “Save all and quit” and “Quit without saving any”. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> exports every tab as MP3 (keeps the current tabs; there is no key for batch Wave). Select tabs with <kbd>Ctrl</kbd>+click (toggle), <kbd>Shift</kbd>+click (range), or <kbd>Ctrl</kbd>+<kbd>A</kbd> while the pointer is over the tab bar (all); selected tabs are highlighted and <kbd>Esc</kbd> deselects. With a selection, the right-click menu becomes “Close Selected/All Tabs” / “Paste Copied Edits to Selected/All Tabs” / Wave or MP3 export / separate by markers or regions, and <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to every selected tab at once. When tabs no longer fit, inactive tabs shrink first. Scroll arrows appear only if a title would fall below 6 characters.</li>
+        <li><strong>Tabs</strong> — shown even for a single file. Close with <kbd>Ctrl</kbd>+<kbd>W</kbd>. Quit with <kbd>Ctrl</kbd>+<kbd>Q</kbd>. Reopen a closed tab with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> (more than one). Right-click for “Close Other Tabs (O)”, “Close This and Tabs to the Right (R)”, “Close This and Tabs to the Left (L)”, “Close All Tabs (W)”, “Select All Tabs (A)”, “Export Wave (E)”, “Export MP3 (M)”, “Export Wave Separated by Markers (K)”, and “Export Wave Separated by Regions (G)”. Export writes the current edits to another file (dirty tabs stay dirty). One tab opens a Save dialog; several tabs ask for a folder. Overwrite is confirmed when the destination already exists: Yes = overwrite, No = skip those files, Cancel = stop (a long list shows the count and the first names only). Separate export always asks for a folder. Markers need two or more spans; regions need at least one (tabs that do not qualify are skipped). Names append <code>_1</code> (or <code>_01</code> and so on so the digits match the count). Batch names use the source file name (or the tab title if unsaved); a clash gets <code> 2</code> and up. The last folder is remembered. While it runs, a frosted-glass overlay blocks the UI and shows an overall bar plus a bar for every song encoding in parallel (two columns when they would not fit). <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> also closes all tabs. Closing several tabs with two or more dirty ones also offers “Save all and quit” and “Quit without saving any”. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> exports every tab as MP3 (keeps the current tabs; there is no key for batch Wave). Select tabs with <kbd>Ctrl</kbd>+click (toggle), <kbd>Shift</kbd>+click (range), or <kbd>Ctrl</kbd>+<kbd>A</kbd> while the pointer is over the tab bar (all); selected tabs are highlighted and <kbd>Esc</kbd> deselects. With a selection, the right-click menu becomes “Close Selected/All Tabs” / “Paste Copied Edits to Selected/All Tabs” / Wave or MP3 export / separate by markers or regions, and <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to every selected tab at once. When tabs no longer fit, inactive tabs shrink first. Scroll arrows appear only if a title would fall below 6 characters.</li>
         <li><strong>Transport</strong> — top row is playback and zoom; second row is fade / normalize / delete / save / MP3 output, <span class="ui">Tips</span> on/off, and manual <span class="ui">?</span>. License / GitHub sit on the bottom of that row.</li>
         <li><strong>Always on Top</strong> — right end of the status bar. Keeps the window in front.</li>
         <li><strong>Spectrum / loudness / meters / vector scope</strong> — a view of the playback output. Loudness sits left of the spectrum (Short Term / Integrated / Momentary Max, Loudness Range, True Peak; target LKFS is in Settings; values are blue = headroom, orange = approaching, red = over; holds the last reading after stop and measures again on a new play). The spectrum is the same LED-band display as Layer Music Checker. After stop, the vector-scope point slowly returns to the center. <span class="ui">WAAPI</span> above the level meter toggles the bar.</li>
@@ -140,17 +140,18 @@
         <li><kbd>Ctrl</kbd>+<kbd>Space</kbd> — from 3 seconds earlier.</li>
         <li><kbd>Alt</kbd>+<kbd>Enter</kbd> — restart from the playback start.</li>
         <li><kbd>Ctrl</kbd>+drag — scrub.</li>
-        <li><kbd>T</kbd> — type the current time in the status bar. Enter jumps. Copy / paste allowed. Right-click switches time / samples.</li>
+        <li><kbd>G</kbd> — type NOW POS in the status bar. Enter jumps. Copy / paste allowed. Right-click switches time / samples.</li>
         <li><kbd>Z</kbd> or <kbd>.</kbd> (the numpad <kbd>.</kbd> is the same) — center. Toggles center-lock while playing; clears it when stopped.</li>
-        <li><kbd>L</kbd> (or <kbd>G</kbd>) — loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</li>
+        <li><kbd>L</kbd> — loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</li>
       </ul>
 
       <h2 id="edit">5. Selection and editing</h2>
-      <p>Drag to select. <kbd>Esc</kbd> or a move without Shift clears it. Fade / volume / normalize with nothing selected uses the whole file. You can also type the selection start / length / end in the status bar.</p>
+      <p>Drag to select. <kbd>Esc</kbd> or a move without Shift clears it. Fade / volume / pitch / normalize with nothing selected uses the whole file. You can also type the selection start / length / end in the status bar.</p>
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd> / <span class="ui">FADE OUT</span> <kbd>O</kbd> — pick a curve, Space to preview, Enter to apply. 1–9 select a curve.</li>
         <li><kbd>X</kbd> — linear fade around the playhead in the view (before = out / after = in).</li>
         <li><kbd>V</kbd> — volume. ↑↓ / wheel by 0.1 dB (Shift 1 / Ctrl 3 / Ctrl+Shift 6). Space previews, Enter applies. The menu shows how whole-file Integrated LKFS / RMS / Peak will change. In loudness view the Short Term curve follows the same dB.</li>
+        <li><kbd>P</kbd> — pitch. ↑↓ / wheel by a semitone (Shift or Ctrl for an octave). Space previews, Enter applies. Range is ±2 octaves. Time stretch is on by default (length stays the same). <kbd>Tab</kbd> moves to the checkbox. <kbd>T</kbd> or the checkbox turns it off so length changes with pitch, like playback speed. A frosted-glass overlay shows progress while it runs.</li>
         <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> — fit the peak to -0.1 dB.</li>
         <li><span class="ui">DELETE</span> — ripple-delete the selection. Selected markers / regions go with it.</li>
         <li><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd> — cut / copy / paste (markers in range included; a matching region is included too).</li>
@@ -250,13 +251,14 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Save as</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Save as MP3 (keeps the current tab)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd></td><td>Export all tabs as MP3</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>Quit (open tabs and unsaved working copies come back on the next launch)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close tab (asks to save if dirty; several dirty tabs can be finished together)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Reopen a closed tab (newest first; more than one)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Close all tabs</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageDown</kbd></td><td>Next tab</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageUp</kbd></td><td>Previous tab</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select all. Over the tab bar, selects every tab</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>Cancel edit, menu, scrub, tab selection, then the waveform selection, in that order. If nothing remains, confirm quit</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Cancel edit, menu, scrub, tab selection, then the waveform selection, in that order</td></tr>
         </tbody>
       </table>
 
@@ -268,7 +270,7 @@
           <tr><td><kbd>Enter</kbd></td><td>Pause in place</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Play from 3 seconds earlier</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from the playback start</td></tr>
-          <tr><td><kbd>L</kbd> / <kbd>G</kbd></td><td>Loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>)</td></tr>
+          <tr><td><kbd>L</kbd></td><td>Loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>)</td></tr>
           <tr><td><kbd>Z</kbd> / <kbd>.</kbd> / numpad <kbd>.</kbd></td><td>Center. Toggles center-lock while playing; clears it when stopped</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Home</kbd></td><td>Go to the start of the file</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>End</kbd></td><td>Go to the end of the file</td></tr>
@@ -289,7 +291,7 @@
           <tr><td><kbd>Shift</kbd>+wheel</td><td>Pan (on the waveform)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+wheel</td><td>Amplitude zoom (on the waveform)</td></tr>
           <tr><td><kbd>A</kbd></td><td>Cycle waveform / spectrogram / overlay / loudness analysis</td></tr>
-          <tr><td><kbd>T</kbd></td><td>Edit the current time in the status bar</td></tr>
+          <tr><td><kbd>G</kbd></td><td>Edit NOW POS in the status bar</td></tr>
         </tbody>
       </table>
 
@@ -321,6 +323,7 @@
           <tr><td><kbd>O</kbd></td><td>Fade out</td></tr>
           <tr><td><kbd>X</kbd></td><td>Linear fade around the playhead in the view (before = out / after = in)</td></tr>
           <tr><td><kbd>V</kbd></td><td>Volume (dB; ↑↓ / wheel, Space preview, Enter apply; shows whole-file LKFS / RMS / Peak first)</td></tr>
+          <tr><td><kbd>P</kbd></td><td>Pitch (semitones; ↑↓ / wheel, Shift for an octave; Space preview, Enter apply; ±2 octaves; time stretch on by default, <kbd>Tab</kbd> to the checkbox, <kbd>T</kbd> toggles; frosted-glass progress while running)</td></tr>
           <tr><td><kbd>N</kbd></td><td>Normalize (peak −0.1 dB)</td></tr>
           <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Ripple-delete the selection. Selected markers / regions go with it</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd></td><td>Cut / copy / paste (markers in range included; a matching region is included too). With tabs selected, <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to those tabs</td></tr>
@@ -454,7 +457,7 @@
         <li>UI language is also on the gear. The default is <span class="ui">Auto</span> (Japanese if the OS is Japanese, otherwise English). The Japanese locale keeps the current wording, including English labels.</li>
         <li>The manual is <span class="ui">?</span>, or GitHub Pages in the browser. It follows the UI language.</li>
         <li>Settings file: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>
-        <li>Closing the app remembers every open tab (including which one was in front), the window position and size (including maximized), and unsaved edits (kept as a working copy), and restores them on the next launch (multiple tabs show the same status-bar progress as opening). Edit history is restored too when the operations can be replayed (Undo back to the original still works). Time / amplitude zoom, waveform selection, and the playhead reset to their defaults. Closing a tab still asks to save. Two or more dirty tabs also offer “Save all and quit” and “Quit without saving any”.</li>
+        <li>Closing the app (<kbd>Ctrl</kbd>+<kbd>Q</kbd>, or the window close button) remembers every open tab (including which one was in front), the window position and size (including maximized), and unsaved edits (kept as a working copy), and restores them on the next launch (multiple tabs show the same status-bar progress as opening). Edit history is restored too when the operations can be replayed (Undo back to the original still works). Time / amplitude zoom, waveform selection, and the playhead reset to their defaults. Closing a tab still asks to save. Two or more dirty tabs also offer “Save all and quit” and “Quit without saving any”.</li>
         <li>Only one instance runs. A second start brings the existing window forward and opens the Wave / AIFF / MP3 files you passed as extra tabs.</li>
         <li>On startup the app checks GitHub Releases and tells you if a newer build exists. Yes opens the release page (nothing is downloaded). No skips that version until a newer one appears. Offline, it continues quietly.</li>
       </ul>
@@ -472,6 +475,7 @@
         <li><strong>Wwise®</strong> / <strong>Audiokinetic®</strong> are trademarks of Audiokinetic Inc. This tool is unofficial. WAAPI requires a valid Wwise license.</li>
         <li>This app is released under the <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/LICENSE">MIT License</a>.</li>
         <li><strong>LAME</strong> is the name of the LAME project and is licensed under the LGPL. This app does not bundle, modify, link, or redistribute it; it only runs a user-supplied <code>lame.exe</code> as a process. Obtaining LAME and complying with its license is the user’s responsibility. This tool is unofficial.</li>
+        <li><strong>Signalsmith Stretch</strong> is Signalsmith Audio’s pitch/time library (MIT). It is bundled for pitch shift.</li>
       </ul>
       <footer>© MIYABI GAME AUDIO INC. — MGA Sonic Anvil User Manual (en)</footer>
     </main>

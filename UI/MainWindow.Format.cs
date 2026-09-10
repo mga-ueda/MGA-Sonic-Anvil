@@ -12,10 +12,11 @@ public partial class MainWindow
 
     private readonly BusyGlassOverlay _busyGlass = new();
     private bool _formatConvertBusy;
+    private bool _pitchShiftBusy;
     private bool _tabExportBusy;
     private bool _openBusy;
 
-    private bool IsUiBusy => _formatConvertBusy || _tabExportBusy || _openBusy;
+    private bool IsUiBusy => _formatConvertBusy || _pitchShiftBusy || _tabExportBusy || _openBusy;
 
     private void PromptFormatConvert(FormatConvertKind kind)
     {
@@ -32,6 +33,7 @@ public partial class MainWindow
 
         CloseFadeCurvePicker();
         CloseVolumeGainPicker();
+        ClosePitchShiftPicker();
         if (_formatMenu is { IsOpen: true })
         {
             _formatMenu.IsOpen = false;
@@ -421,7 +423,7 @@ public partial class MainWindow
         }
 
         _history.Do(_document, command);
-        AfterEdit();
+        AfterTransform();
     }
 
     private async Task ApplySampleRateConvertAsync(int destRate)
@@ -460,7 +462,7 @@ public partial class MainWindow
                 Waveform.SetViewStartExternal(Waveform.ViewStart * factor);
             }
 
-            AfterEdit();
+            AfterTransform();
             PausePlaybackSoft();
         }
         catch (Exception ex)
@@ -500,6 +502,17 @@ public partial class MainWindow
             RootDock,
             GetBusyGlassCoverBounds(),
             UiStrings.OverlaySampleRateConvert);
+    }
+
+    private void ShowPitchShiftBusyGlass()
+    {
+        RootChrome.UpdateLayout();
+        RootDock.UpdateLayout();
+        _busyGlass.ShowOverlay(
+            RootChrome,
+            RootDock,
+            GetBusyGlassCoverBounds(),
+            UiStrings.OverlayPitchShift);
     }
 
     private Rect GetBusyGlassCoverBounds()

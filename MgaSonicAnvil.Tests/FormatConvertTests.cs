@@ -360,6 +360,23 @@ public sealed class FormatConvertTests
     }
 
     [Fact]
+    public void ConvertFormat_ClearsSelection()
+    {
+        var document = MakeDocument(frames: 480, sampleRate: 48000);
+        document.Selection = new WaveSelection(10, 80);
+        new EditHistory().Do(document, ProcessEdits.ConvertSampleRate(document, 24000)!);
+        Assert.True(document.Selection.IsEmpty);
+
+        document.Selection = new WaveSelection(0, 40);
+        new EditHistory().Do(document, ProcessEdits.ConvertBitDepth(document, 24)!);
+        Assert.True(document.Selection.IsEmpty);
+
+        document.Selection = new WaveSelection(0, 20);
+        new EditHistory().Do(document, ProcessEdits.ConvertChannels(document, 1)!);
+        Assert.True(document.Selection.IsEmpty);
+    }
+
+    [Fact]
     public void EstimateFileBytesFor_ScalesWithHighlightedRate()
     {
         var document = MakeDocument(frames: 48000, sampleRate: 48000);

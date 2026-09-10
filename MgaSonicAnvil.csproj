@@ -30,7 +30,7 @@
     <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
     <PublishDir>$(MSBuildThisFileDirectory)publish\</PublishDir>
     <NoWarn>$(NoWarn);SYSLIB1054</NoWarn>
-    <DefaultItemExcludes>$(DefaultItemExcludes);MgaSonicAnvil.Tests\**;tools\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);MgaSonicAnvil.Tests\**;tools\**;native\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -62,6 +62,14 @@
 
   <ItemGroup>
     <Resource Include="Assets\Branding\MgaSonicAnvil.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="native\SignalsmithStretch\win-x64\SignalsmithStretch.dll" Condition="Exists('native\SignalsmithStretch\win-x64\SignalsmithStretch.dll')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>SignalsmithStretch.dll</Link>
+      <Visible>false</Visible>
+    </None>
   </ItemGroup>
 
 </Project>
