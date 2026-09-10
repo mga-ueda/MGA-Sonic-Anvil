@@ -51,6 +51,7 @@ internal partial class AudioSettingsWindow : Window
     private readonly ChannelRoutingEditor _outputEditor;
     private readonly SettingsIoProbe _probe = new();
     private readonly DispatcherTimer _meterTimer;
+    private bool _syncingAssociations;
     private int[] _recordInputMap;
     private int[] _playbackOutputMap;
     private string[] _inputPortNames = [];
@@ -127,6 +128,7 @@ internal partial class AudioSettingsWindow : Window
         LamePathBox.Text = SelectedLameExePath;
         LameOptionsBox.Text = Mp3Encode.ResolveLameOptions(SelectedLameOptions);
         FillExportParallelism(SelectedExportParallelism);
+        FillAssociations();
         ApplyTips();
         ReflowSettingsWindow();
         WindowPlacement.TryApplySettings(this, AppStorage.Settings);
@@ -149,6 +151,7 @@ internal partial class AudioSettingsWindow : Window
     {
         TipService.Set(LanguageLabel, UiStrings.TipUiLanguage);
         TipService.Set(LanguageCombo, UiStrings.TipUiLanguage);
+        TipService.Set(AssociationHeader, UiStrings.TipFileAssociations);
         TipService.Set(ApiLabel, UiStrings.TipAudioApi);
         TipService.Set(ApiCombo, UiStrings.TipAudioApi);
         TipService.Set(DeviceLabel, UiStrings.TipAudioDevice);
@@ -222,6 +225,82 @@ internal partial class AudioSettingsWindow : Window
         }
 
         RefreshRouting(releaseDevice: false);
+    }
+
+    private void FillAssociations()
+    {
+        AssociationHost.Children.Clear();
+        var style = TryFindResource("DarkCheckBoxStyle") as Style;
+        _syncingAssociations = true;
+        try
+        {
+            foreach (var ext in FileAssociations.Extensions)
+            {
+                var box = new CheckBox
+                {
+                    Content = FileAssociations.FormatLabel(ext),
+                    IsChecked = FileAssociations.IsAssociated(ext),
+                    Margin = new Thickness(0, 0, 0, 6),
+                    Tag = ext,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                };
+                if (style is not null)
+                {
+                    box.Style = style;
+                }
+
+                box.Checked += Association_Changed;
+                box.Unchecked += Association_Changed;
+                TipService.Set(box, UiStrings.TipFileAssociations);
+                AssociationHost.Children.Add(box);
+            }
+        }
+        finally
+        {
+            _syncingAssociations = false;
+        }
+    }
+
+    private void Association_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_syncingAssociations || sender is not CheckBox box || box.Tag is not string ext)
+        {
+            return;
+        }
+
+        var want = box.IsChecked == true;
+        try
+        {
+            FileAssociations.SetAssociated(ext, want);
+        }
+        catch (Exception ex)
+        {
+            var text = ex is InvalidOperationException
+                ? ex.Message
+                : UiStrings.ErrFileAssociationFailed(ex.Message);
+            OwnerCenteredMessageBox.Show(
+                this,
+                text,
+                UiStrings.DialogSettingsTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
+        var actual = FileAssociations.IsAssociated(ext);
+        if (box.IsChecked == actual)
+        {
+            return;
+        }
+
+        _syncingAssociations = true;
+        try
+        {
+            box.IsChecked = actual;
+        }
+        finally
+        {
+            _syncingAssociations = false;
+        }
     }
 
     private void OkButton_Click(object sender, RoutedEventArgs e)

@@ -51,6 +51,8 @@
     <SolidColorBrush x:Key="TransportDisabledForeBrush" Color="#FF5B5B5B" />
     <SolidColorBrush x:Key="TransportHoverBackBrush" Color="#FF37373A" />
     <SolidColorBrush x:Key="TransportPressedBackBrush" Color="#FF484848" />
+    <SolidColorBrush x:Key="HistoryStripBackBrush" Color="#FF21222B" />
+    <SolidColorBrush x:Key="HistoryStripHoverBackBrush" Color="#FF2A2B34" />
     <SolidColorBrush x:Key="WaapiToggleOffBackBrush" Color="#FF2A2A2E" />
     <SolidColorBrush x:Key="WaapiToggleOffHoverBackBrush" Color="#FF3A3A40" />
     <SolidColorBrush x:Key="WaapiToggleOffForeBrush" Color="#FF9A9A9A" />

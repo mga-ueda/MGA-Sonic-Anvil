@@ -58,6 +58,7 @@ internal static class FormatConvertPicker
         var allowPreview = kind is FormatConvertKind.SampleRate or FormatConvertKind.BitDepth;
         var menu = new ContextMenu
         {
+            MinWidth = 0,
             PlacementTarget = placementTarget,
             Placement = PlacementMode.Custom,
             CustomPopupPlacementCallback = (popupSize, targetSize, _) =>
@@ -85,7 +86,7 @@ internal static class FormatConvertPicker
             var value = presets[i];
             var item = new MenuItem
             {
-                Header = $"{i + 1}  {FormatLabel(kind, value)}",
+                Header = PickerChrome.Numbered(i + 1, FormatLabel(kind, value)),
                 InputGestureText = (i + 1).ToString(CultureInfo.InvariantCulture),
                 Tag = value,
                 Icon = AccentMark(value == currentValue, cyan),
@@ -97,12 +98,8 @@ internal static class FormatConvertPicker
 
         if (allowCustom)
         {
-            var box = new TextBox
-            {
-                Width = 88,
-                Text = currentValue.ToString(CultureInfo.InvariantCulture),
-                VerticalContentAlignment = VerticalAlignment.Center,
-            };
+            var box = PickerChrome.ValueBoxChars(PickerChrome.CustomRateChars);
+            box.Text = currentValue.ToString(CultureInfo.InvariantCulture);
             ((MenuState)menu.Tag).CustomBox = box;
             var custom = new MenuItem
             {
@@ -226,6 +223,7 @@ internal static class FormatConvertPicker
                 DispatcherPriority.Input);
         };
 
+        PickerChrome.FitListMenu(menu);
         menu.IsOpen = true;
         return menu;
     }
@@ -363,17 +361,12 @@ internal static class FormatConvertPicker
         var row = new DockPanel();
         var label = new TextBlock
         {
-            Text = $"{index}  {UiStrings.LabelConvertCustomRate}",
+            Text = PickerChrome.Numbered(index, string.Empty),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 8, 0),
         };
         DockPanel.SetDock(label, Dock.Left);
-        var unit = new TextBlock
-        {
-            Text = UiStrings.LabelHertz,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(8, 0, 0, 0),
-        };
+        var unit = PickerChrome.Unit(UiStrings.LabelHertz);
         DockPanel.SetDock(unit, Dock.Right);
         row.Children.Add(label);
         row.Children.Add(unit);

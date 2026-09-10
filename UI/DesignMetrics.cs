@@ -86,6 +86,12 @@ internal static class DesignMetrics
     /// <summary>周波数数値の重なりを避けるため、右揃えのまま左へ足す幅。</summary>
     public static double SpectrumExtraWidth => From96(72);
 
+    /// <summary>ラウドネス左の履歴プレビュー幅。長い題は切る。</summary>
+    public static double HistoryStripWidth => From96(176);
+
+    /// <summary>履歴プレビュー1行。</summary>
+    public static double HistoryStripRowHeight => From96(14);
+
     /// <summary>スペアナ左のラウドネスメーター幅。縦積み1列。</summary>
     public static double LoudnessMeterWidth => From96(232);
 

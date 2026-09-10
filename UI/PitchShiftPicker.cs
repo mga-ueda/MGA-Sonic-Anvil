@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
@@ -42,6 +41,7 @@ internal static class PitchShiftPicker
         };
         var menu = new ContextMenu
         {
+            MinWidth = 0,
             PlacementTarget = placementTarget,
             Placement = PlacementMode.Custom,
             CustomPopupPlacementCallback = (popupSize, targetSize, _) =>
@@ -53,23 +53,18 @@ internal static class PitchShiftPicker
             Tag = state,
         };
 
-        var item = new MenuItem
-        {
-            Header = BuildPanel(state),
-            StaysOpenOnClick = true,
-            Focusable = false,
-        };
-        item.PreviewMouseWheel += (_, e) =>
-        {
-            if (TryNudge(menu, Math.Sign(e.Delta)))
-            {
-                e.Handled = true;
-            }
-        };
+        BuildEditors(state);
+        var root = PickerChrome.Panel();
+        KeyboardNavigation.SetTabNavigation(root, KeyboardNavigationMode.Cycle);
+        root.Children.Add(
+            PickerChrome.FieldRow(UiStrings.LabelPitch, state.SemitoneBox, UiStrings.LabelSemitone));
+        root.Children.Add(state.TimeStretchBox);
+        var item = PickerChrome.FormHost(root);
         menu.Items.Add(item);
         TipService.Set(menu, UiStrings.TipPitch);
         TipService.Set(item, UiStrings.TipPitch);
         TipService.Set(state.SemitoneBox, UiStrings.TipPitch);
+        TipService.Set(state.TimeStretchBox, UiStrings.TipPitchTimeStretch);
 
         menu.PreviewKeyDown += (_, e) =>
         {
@@ -129,6 +124,7 @@ internal static class PitchShiftPicker
                 DispatcherPriority.Input);
         };
 
+        PickerChrome.FitFormMenu(menu);
         menu.IsOpen = true;
         return menu;
     }
@@ -185,18 +181,12 @@ internal static class PitchShiftPicker
         return true;
     }
 
-    private static object BuildPanel(MenuState state)
+    private static void BuildEditors(MenuState state)
     {
-        var box = new TextBox
-        {
-            Width = 56,
-            Text = FormatBox(0),
-            TextAlignment = TextAlignment.Right,
-            VerticalContentAlignment = VerticalAlignment.Center,
-            FontFamily = new FontFamily("Consolas"),
-            IsTabStop = true,
-        };
+        var box = PickerChrome.ValueBoxChars(4);
+        box.Text = FormatBox(0);
         state.SemitoneBox = box;
+        KeyboardNavigation.SetTabIndex(box, 0);
         box.PreviewMouseWheel += (_, e) =>
         {
             var menu = box.FindAncestor<ContextMenu>();
@@ -231,45 +221,12 @@ internal static class PitchShiftPicker
             }
         };
 
-        var root = new StackPanel { Width = 220 };
-        KeyboardNavigation.SetTabNavigation(root, KeyboardNavigationMode.Cycle);
-        KeyboardNavigation.SetDirectionalNavigation(root, KeyboardNavigationMode.Cycle);
-        var title = new DockPanel();
-        var unit = new TextBlock
-        {
-            Text = UiStrings.LabelSemitone,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(8, 0, 0, 0),
-        };
-        DockPanel.SetDock(unit, Dock.Right);
-        var caption = new TextBlock
-        {
-            Text = UiStrings.LabelPitch,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 8, 0),
-        };
-        DockPanel.SetDock(caption, Dock.Left);
-        title.Children.Add(unit);
-        title.Children.Add(caption);
-        title.Children.Add(box);
-        root.Children.Add(title);
-
-        KeyboardNavigation.SetTabIndex(box, 0);
-        var stretch = new CheckBox
-        {
-            Content = UiStrings.LabelPitchTimeStretch,
-            IsChecked = state.TimeStretch,
-            Margin = new Thickness(0, 8, 0, 0),
-            Focusable = true,
-            IsTabStop = true,
-        };
+        var stretch = PickerChrome.Option(UiStrings.LabelPitchTimeStretch);
+        stretch.IsChecked = state.TimeStretch;
         KeyboardNavigation.SetTabIndex(stretch, 1);
         state.TimeStretchBox = stretch;
         stretch.Checked += (_, _) => SetTimeStretch(state, true);
         stretch.Unchecked += (_, _) => SetTimeStretch(state, false);
-        TipService.Set(stretch, UiStrings.TipPitchTimeStretch);
-        root.Children.Add(stretch);
-        return root;
     }
 
     private static void SetSemitones(MenuState state, int semitones) =>

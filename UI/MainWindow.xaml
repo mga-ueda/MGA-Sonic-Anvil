@@ -168,6 +168,7 @@
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
@@ -226,16 +227,23 @@
                        MouseLeftButtonUp="GitHubLink_MouseLeftButtonUp" />
           </StackPanel>
         </Grid>
+        <ui:HistoryStripView x:Name="HistoryStrip"
+                             Grid.Row="0"
+                             Grid.RowSpan="2"
+                             Grid.Column="1"
+                             Margin="0,0,6,0"
+                             VerticalAlignment="Stretch"
+                             OpenRequested="HistoryStrip_OpenRequested" />
         <ui:LoudnessMeterView x:Name="LoudnessMeter"
                               Grid.Row="0"
                               Grid.RowSpan="2"
-                              Grid.Column="1"
+                              Grid.Column="2"
                               Margin="0,0,6,0"
                               VerticalAlignment="Stretch" />
         <ui:ProjectSpectrumView x:Name="Spectrum"
                                 Grid.Row="0"
                                 Grid.RowSpan="2"
-                                Grid.Column="2"
+                                Grid.Column="3"
                                 Height="{x:Static ui:DesignMetrics.SpectrumHeight}"
                                 Margin="0,0,1,0"
                                 VerticalAlignment="Top" />

@@ -179,7 +179,24 @@ public partial class MainWindow
     {
         _historyEntries = _history.Snapshot();
         HistoryOverlay.SetItems(_historyEntries, _historySelectedIndex, _historyCopySelection);
+        RefreshHistoryStrip();
     }
+
+    private void RefreshHistoryStrip()
+    {
+        if (_document is null)
+        {
+            HistoryStrip.SetItems([], 0);
+            return;
+        }
+
+        var items = HistoryOpen ? _historyEntries : _history.Snapshot();
+        var current = HistoryOpen ? _historySelectedIndex : _history.CurrentIndex;
+        HistoryStrip.SetItems(items, current);
+    }
+
+    private void HistoryStrip_OpenRequested(object sender, EventArgs e) =>
+        OpenEditHistory();
 
     private void HistoryOverlay_ItemClicked(object sender, HistoryItemClick e)
     {

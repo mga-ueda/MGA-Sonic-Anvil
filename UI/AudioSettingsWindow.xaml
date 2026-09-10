@@ -48,6 +48,13 @@
                         FontSize="11.333"
                         VerticalContentAlignment="Center" />
             </Grid>
+
+            <TextBlock x:Name="AssociationHeader"
+                       Text="{x:Static domain:UiStrings.LabelFileAssociations}"
+                       FontWeight="Bold"
+                       FontSize="11.333"
+                       Margin="0,16,0,6" />
+            <StackPanel x:Name="AssociationHost" />
           </StackPanel>
         </TabItem>
 

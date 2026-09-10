@@ -49,6 +49,7 @@ internal static class VolumeGainPicker
         };
         var menu = new ContextMenu
         {
+            MinWidth = 0,
             PlacementTarget = placementTarget,
             Placement = PlacementMode.Custom,
             CustomPopupPlacementCallback = (popupSize, targetSize, _) =>
@@ -60,19 +61,22 @@ internal static class VolumeGainPicker
             Tag = state,
         };
 
-        var item = new MenuItem
-        {
-            Header = BuildPanel(state),
-            StaysOpenOnClick = true,
-            Focusable = false,
-        };
-        item.PreviewMouseWheel += (_, e) =>
-        {
-            if (TryNudge(menu, Math.Sign(e.Delta)))
-            {
-                e.Handled = true;
-            }
-        };
+        BuildEditors(state);
+        var labelWidth = PickerChrome.LabelColumnWidth(
+            UiStrings.LabelVolume,
+            UiStrings.LabelLufs,
+            UiStrings.LabelRms,
+            UiStrings.LabelPeak);
+        var root = PickerChrome.Panel();
+        root.Children.Add(
+            PickerChrome.FieldRow(UiStrings.LabelVolume, state.GainBox, UiStrings.LabelDb, labelWidth));
+        root.Children.Add(
+            PickerChrome.MetricRow(UiStrings.LabelLufs, state.LkfsBefore, state.LkfsAfter, labelWidth));
+        root.Children.Add(
+            PickerChrome.MetricRow(UiStrings.LabelRms, state.RmsBefore, state.RmsAfter, labelWidth));
+        root.Children.Add(
+            PickerChrome.MetricRow(UiStrings.LabelPeak, state.PeakBefore, state.PeakAfter, labelWidth));
+        var item = PickerChrome.FormHost(root);
         menu.Items.Add(item);
         TipService.Set(menu, UiStrings.TipVolume);
         TipService.Set(item, UiStrings.TipVolume);
@@ -123,6 +127,7 @@ internal static class VolumeGainPicker
                 DispatcherPriority.Input);
         };
 
+        PickerChrome.FitFormMenu(menu);
         menu.IsOpen = true;
         return menu;
     }
@@ -160,16 +165,10 @@ internal static class VolumeGainPicker
         return shift ? 1 : 0.1;
     }
 
-    private static object BuildPanel(MenuState state)
+    private static void BuildEditors(MenuState state)
     {
-        var box = new TextBox
-        {
-            Width = 64,
-            Text = FormatGainBox(0),
-            TextAlignment = TextAlignment.Right,
-            VerticalContentAlignment = VerticalAlignment.Center,
-            FontFamily = new FontFamily("Consolas"),
-        };
+        var box = PickerChrome.ValueBoxChars(5);
+        box.Text = FormatGainBox(0);
         state.GainBox = box;
         box.PreviewMouseWheel += (_, e) =>
         {
@@ -205,80 +204,22 @@ internal static class VolumeGainPicker
             }
         };
 
-        state.LkfsBefore = MetricValue();
-        state.LkfsAfter = MetricValue();
-        state.RmsBefore = MetricValue();
-        state.RmsAfter = MetricValue();
-        state.PeakBefore = MetricValue();
-        state.PeakAfter = MetricValue();
-
-        var root = new StackPanel { Width = 248 };
-        var title = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
-        var unit = new TextBlock
-        {
-            Text = UiStrings.LabelDb,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(8, 0, 0, 0),
-        };
-        DockPanel.SetDock(unit, Dock.Right);
-        var caption = new TextBlock
-        {
-            Text = UiStrings.LabelVolume,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 8, 0),
-        };
-        DockPanel.SetDock(caption, Dock.Left);
-        title.Children.Add(unit);
-        title.Children.Add(caption);
-        title.Children.Add(box);
-
-        root.Children.Add(title);
-        root.Children.Add(MetricRow(UiStrings.LabelLufs, state.LkfsBefore, state.LkfsAfter));
-        root.Children.Add(MetricRow(UiStrings.LabelRms, state.RmsBefore, state.RmsAfter));
-        root.Children.Add(MetricRow(UiStrings.LabelPeak, state.PeakBefore, state.PeakAfter));
-        return root;
+        var readingWidth = PickerChrome.CharBoxWidth(5);
+        state.LkfsBefore = ReadingValue(readingWidth);
+        state.LkfsAfter = ReadingValue(readingWidth);
+        state.RmsBefore = ReadingValue(readingWidth);
+        state.RmsAfter = ReadingValue(readingWidth);
+        state.PeakBefore = ReadingValue(readingWidth);
+        state.PeakAfter = ReadingValue(readingWidth);
     }
 
-    private static Grid MetricRow(string caption, TextBlock before, TextBlock after)
+    private static TextBlock ReadingValue(double width)
     {
-        var row = new Grid { Margin = new Thickness(0, 1, 0, 1) };
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(52) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var label = new TextBlock
-        {
-            Text = caption,
-            VerticalAlignment = VerticalAlignment.Center,
-            Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush")),
-        };
-        var arrow = new TextBlock
-        {
-            Text = "→",
-            Margin = new Thickness(6, 0, 6, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-            Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush")),
-        };
-        Grid.SetColumn(label, 0);
-        Grid.SetColumn(before, 1);
-        Grid.SetColumn(arrow, 2);
-        Grid.SetColumn(after, 3);
-        row.Children.Add(label);
-        row.Children.Add(before);
-        row.Children.Add(arrow);
-        row.Children.Add(after);
-        return row;
+        var block = PickerChrome.MonoValue(emphasize: true);
+        block.Width = width;
+        block.MinWidth = width;
+        return block;
     }
-
-    private static TextBlock MetricValue() =>
-        new()
-        {
-            FontFamily = new FontFamily("Consolas"),
-            FontWeight = FontWeights.SemiBold,
-            TextAlignment = TextAlignment.Right,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
 
     private static void SetGain(MenuState state, double gainDb) =>
         ApplyGain(state, WaveformGainAnalyzer.SnapGainDb(gainDb), rewrite: true);

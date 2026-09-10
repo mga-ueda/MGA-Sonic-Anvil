@@ -352,6 +352,7 @@ public partial class MainWindow : Window
         RefreshTitle();
         SyncViewChrome();
         RefreshStatus();
+        RefreshHistoryStrip();
     }
 
     private void ToggleTips()
@@ -391,6 +392,7 @@ public partial class MainWindow : Window
         TipService.Set(Overview, UiStrings.TipOverview);
         TipService.Set(VectorScope, UiStrings.TipVectorScope);
         TipService.Set(Spectrum, UiStrings.TipSpectrum);
+        TipService.Set(HistoryStrip, UiStrings.TipHistoryStrip);
         TipService.Set(LoudnessMeter, UiStrings.TipLoudness);
         TipService.Set(LevelMeter, UiStrings.TipLevelMeter);
         TipService.Set(TimeScroll, UiStrings.TipTimeScroll);
@@ -417,6 +419,10 @@ public partial class MainWindow : Window
         if (HistoryOpen)
         {
             RefreshHistoryOverlay();
+        }
+        else
+        {
+            RefreshHistoryStrip();
         }
 
         RefreshTabLocalizedTips();

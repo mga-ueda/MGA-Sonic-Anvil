@@ -64,4 +64,17 @@ internal static partial class UiStrings
     public static string ErrWaveExceedsRiffLimit => Get(
         "Wave file exceeds RIFF size limit.",
         "Wave file exceeds RIFF size limit.");
+
+    public static string ErrFileAssociationNoExe => Get(
+        "実行ファイルの場所が分かりません。",
+        "Could not find this executable.");
+
+    public static string ErrFileAssociationNotDefault => Get(
+        "Windows が既定のアプリを保護しているため、このアプリを既定にできませんでした。「プログラムから開く」には登録済みです。",
+        "Windows is protecting the default app, so this app could not be made the default. It is registered under Open with.");
+
+    public static string ErrFileAssociationFailed(string detail) => Format(
+        "関連付けを変更できませんでした。{0}",
+        "Could not change the file association. {0}",
+        detail);
 }

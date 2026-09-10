@@ -1159,6 +1159,7 @@ public partial class MainWindow
         Waveform.Refresh();
         Overview.Refresh();
         RefreshStatus();
+        RefreshHistoryStrip();
     }
 
     private void CommitRegionName(WaveSelection region, string name)
@@ -1178,6 +1179,7 @@ public partial class MainWindow
         Waveform.Refresh();
         Overview.Refresh();
         RefreshStatus();
+        RefreshHistoryStrip();
     }
 
     private bool TryAddMarkerAtPlayhead()
@@ -1788,6 +1790,7 @@ public partial class MainWindow
         Overview.Refresh();
         SyncViewChrome();
         RefreshStatus();
+        RefreshHistoryStrip();
     }
 
     private void UndoEdit()
@@ -1846,5 +1849,6 @@ public partial class MainWindow
         Overview.Refresh();
         SyncViewChrome();
         RefreshStatus();
+        RefreshHistoryStrip();
     }
 }

@@ -59,6 +59,8 @@ internal static partial class UiStrings
             "TransportDisabledFore" => Get("トランスポート・無効文字", "Transport · disabled text"),
             "TransportHoverBack" => Get("トランスポート・ホバー", "Transport · hover"),
             "TransportPressedBack" => Get("トランスポート・押下", "Transport · pressed"),
+            "HistoryStripBack" => Get("履歴ストリップ・背景", "History strip · background"),
+            "HistoryStripHoverBack" => Get("履歴ストリップ・ホバー", "History strip · hover"),
             "WaapiToggleOffBack" => Get("WAAPI トグル・オフ背景", "WAAPI toggle · off background"),
             "WaapiToggleOffHoverBack" => Get("WAAPI トグル・オフホバー", "WAAPI toggle · off hover"),
             "WaapiToggleOffFore" => Get("WAAPI トグル・オフ文字", "WAAPI toggle · off text"),

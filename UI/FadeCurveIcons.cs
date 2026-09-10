@@ -107,7 +107,7 @@ internal static class FadeCurveIcons
             index++;
             var item = new MenuItem
             {
-                Header = $"{index}  {UiStrings.LabelFadeCurve((int)shape)}",
+                Header = PickerChrome.Numbered(index, UiStrings.LabelFadeCurve((int)shape)),
                 InputGestureText = index.ToString(),
                 Tag = captured,
                 Icon = new Border

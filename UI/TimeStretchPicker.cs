@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
@@ -50,6 +49,7 @@ internal static class TimeStretchPicker
         };
         var menu = new ContextMenu
         {
+            MinWidth = 0,
             PlacementTarget = placementTarget,
             Placement = PlacementMode.Custom,
             CustomPopupPlacementCallback = (popupSize, targetSize, _) =>
@@ -61,19 +61,24 @@ internal static class TimeStretchPicker
             Tag = state,
         };
 
-        var item = new MenuItem
-        {
-            Header = BuildPanel(state),
-            StaysOpenOnClick = true,
-            Focusable = false,
-        };
-        item.PreviewMouseWheel += (_, e) =>
-        {
-            if (TryNudge(menu, Math.Sign(e.Delta)))
-            {
-                e.Handled = true;
-            }
-        };
+        BuildEditors(state);
+        var labelWidth = PickerChrome.LabelColumnWidth(
+            UiStrings.LabelTimeStretchSource,
+            UiStrings.LabelTimeStretchDest,
+            UiStrings.LabelTimeStretchPercent);
+        var root = PickerChrome.Panel();
+        root.Children.Add(PickerChrome.Title(UiStrings.LabelTimeStretch));
+        root.Children.Add(
+            PickerChrome.FieldRow(UiStrings.LabelTimeStretchSource, state.SourceText, null, labelWidth));
+        root.Children.Add(
+            PickerChrome.FieldRow(UiStrings.LabelTimeStretchDest, state.TimeBox, null, labelWidth));
+        root.Children.Add(
+            PickerChrome.FieldRow(
+                UiStrings.LabelTimeStretchPercent,
+                state.PercentBox,
+                UiStrings.LabelPercent,
+                labelWidth));
+        var item = PickerChrome.FormHost(root);
         menu.Items.Add(item);
         TipService.Set(menu, UiStrings.TipTimeStretch);
         TipService.Set(item, UiStrings.TipTimeStretch);
@@ -131,6 +136,7 @@ internal static class TimeStretchPicker
                 DispatcherPriority.Input);
         };
 
+        PickerChrome.FitFormMenu(menu);
         menu.IsOpen = true;
         return menu;
     }
@@ -185,85 +191,24 @@ internal static class TimeStretchPicker
         return true;
     }
 
-    private static object BuildPanel(MenuState state)
+    private static void BuildEditors(MenuState state)
     {
-        var root = new StackPanel { Width = 248 };
-        KeyboardNavigation.SetTabNavigation(root, KeyboardNavigationMode.Cycle);
-        root.Children.Add(new TextBlock
-        {
-            Text = UiStrings.LabelTimeStretch,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 8),
-        });
-
-        state.SourceText = new TextBlock
-        {
-            FontFamily = new FontFamily("Consolas"),
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        root.Children.Add(LabeledRow(UiStrings.LabelTimeStretchSource, state.SourceText, tabIndex: -1));
-
-        var timeBox = CreateBox();
+        var fieldWidth = PickerChrome.CharBoxWidth(state.ShowSamples
+            ? Math.Max(10, state.SourceFrames.ToString(CultureInfo.InvariantCulture).Length)
+            : 10);
+        state.SourceText = PickerChrome.MonoValue();
+        state.SourceText.Width = fieldWidth;
+        state.SourceText.MinWidth = fieldWidth;
+        var timeBox = PickerChrome.ValueBox(fieldWidth);
         state.TimeBox = timeBox;
         KeyboardNavigation.SetTabIndex(timeBox, 0);
         BindBox(timeBox, state, percent: false);
-        root.Children.Add(LabeledRow(UiStrings.LabelTimeStretchDest, timeBox, tabIndex: 0));
-
-        var percentBox = CreateBox();
+        var percentBox = PickerChrome.ValueBox(fieldWidth);
         state.PercentBox = percentBox;
         KeyboardNavigation.SetTabIndex(percentBox, 1);
         BindBox(percentBox, state, percent: true);
-        root.Children.Add(LabeledRow(UiStrings.LabelTimeStretchPercent, percentBox, tabIndex: 1, UiStrings.LabelPercent));
-
         WriteBoxes(state, rewriteTime: true, rewritePercent: true);
-        return root;
     }
-
-    private static Grid LabeledRow(string caption, FrameworkElement field, int tabIndex, string? unit = null)
-    {
-        var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(72) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        if (unit is not null)
-        {
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        }
-
-        var label = new TextBlock
-        {
-            Text = caption,
-            VerticalAlignment = VerticalAlignment.Center,
-            Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush")),
-        };
-        Grid.SetColumn(label, 0);
-        Grid.SetColumn(field, 1);
-        row.Children.Add(label);
-        row.Children.Add(field);
-        if (unit is not null)
-        {
-            var unitText = new TextBlock
-            {
-                Text = unit,
-                Margin = new Thickness(8, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-            };
-            Grid.SetColumn(unitText, 2);
-            row.Children.Add(unitText);
-        }
-
-        _ = tabIndex;
-        return row;
-    }
-
-    private static TextBox CreateBox() =>
-        new()
-        {
-            MinWidth = 96,
-            TextAlignment = TextAlignment.Right,
-            VerticalContentAlignment = VerticalAlignment.Center,
-            FontFamily = new FontFamily("Consolas"),
-            IsTabStop = true,
-        };
 
     private static void BindBox(TextBox box, MenuState state, bool percent)
     {

@@ -150,6 +150,7 @@ internal static partial class UiStrings
     public static string ButtonDiscardAllAndExit => Get("すべて保存せずに終了", "Quit without saving any");
     public static string DialogSettingsTitle => Get("設定", "Settings");
     public static string LabelUiLanguage => Get("言語", "Language");
+    public static string LabelFileAssociations => Get("関連付け", "File associations");
     public static string LabelLanguageAuto => Get("Auto", "Auto");
     public static string LabelLanguageJapanese => Get("Japanese", "Japanese");
     public static string LabelLanguageEnglish => Get("English", "English");
@@ -158,8 +159,8 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string AccessibleAudioSettingsButton => Get("設定", "Settings");
     public static string TipAudioSettings => Get(
-        "設定 (Ctrl+Shift+O)\n一般／オーディオ／編集／書き出しのタブ。表示言語、録音／再生と確認用メーター／Sine、ラウドネス、フェード、MP3、同時書き出し本数。",
-        "Settings (Ctrl+Shift+O)\nGeneral / Audio / Editing / Export tabs. Language, record / playback with meters and a sine test, loudness, fades, MP3, and parallel export count.");
+        "設定 (Ctrl+Shift+O)\n一般／オーディオ／編集／書き出しのタブ。表示言語、関連付け、録音／再生と確認用メーター／Sine、ラウドネス、フェード、MP3、同時書き出し本数。",
+        "Settings (Ctrl+Shift+O)\nGeneral / Audio / Editing / Export tabs. Language, file associations, record / playback with meters and a sine test, loudness, fades, MP3, and parallel export count.");
     public static string LabelMp3Encode => Get("MP3", "MP3");
     public static string TipMp3Encode => Get(
         "MP3 保存の経路です。LAME のパスが有効なら lame.exe、空欄または無効なら Windows です。",
@@ -267,7 +268,7 @@ internal static partial class UiStrings
     public static string LabelTimeStretchSource => Get("元の時間", "Original");
     public static string LabelTimeStretchDest => Get("時間", "Time");
     public static string LabelTimeStretchPercent => Get("割合", "Ratio");
-    public static string LabelPercent => "%";
+    public static string LabelPercent => "％";
     public static string ErrorTimeStretchFailed => Get(
         "タイムストレッチに失敗しました。",
         "Time stretch failed.");
@@ -567,6 +568,9 @@ internal static partial class UiStrings
     public static string TipUiLanguage => Get(
         "表示言語。Auto は OS が日本語なら Japanese、それ以外は English。",
         "UI language. Auto is Japanese if the OS is Japanese, otherwise English.");
+    public static string TipFileAssociations => Get(
+        "チェックすると、その拡張子をこのアプリで開く（既定）。外すと関連付けを外す。すでにこのアプリが既定ならチェック済み。OK を待たず、今の exe へすぐ書き込みます。",
+        "Check to make this app the default for that extension. Uncheck to remove the association. Types already using this app are checked. Writes to this exe immediately, without waiting for OK.");
     public static string TipLoudnessTarget => Get(
         "ラウドネスメーターのターゲット（LKFS）。-70 から 0。色分けの基準です。音声は変えません。",
         "Loudness meter target (LKFS), from -70 to 0. Used for the color scale. Does not change the audio.");
@@ -594,6 +598,9 @@ internal static partial class UiStrings
     public static string TipEditHistory => Get(
         "編集履歴 (U)。↑↓ で移動、Enter で確定、Esc でキャンセル。Ctrl+クリック／Shift+↑↓ で選択、Ctrl+C でコピー、別ファイルで Ctrl+V。セーブせず終了しても、戻せる操作は次回起動時に履歴へ戻す。",
         "Edit history (U). ↑↓ move, Enter apply, Esc cancel. Ctrl+click / Shift+↑↓ select, Ctrl+C copy, Ctrl+V in another file. Replayable edits also come back after a restart without saving.");
+    public static string TipHistoryStrip => Get(
+        "編集履歴の一覧（収まる分だけ。古いものは切れる）。クリックで編集履歴 (U)。ここからは選べません。",
+        "Edit-history list (as many as fit; older rows clip). Click to open edit history (U). This strip is display-only.");
     public static string TipFormatSampleRate => Get(
         "サンプリングレートを変換します (S)。Space で試聴、Enter で確定。1–9 で項目。",
         "Convert sample rate (S). Space previews, Enter applies. 1–9 pick a row.");
@@ -607,11 +614,11 @@ internal static partial class UiStrings
         "任意 Hz。↑↓／ホイールで 1（Shift 10／Ctrl 100／Ctrl+Shift 1000）。Enter で確定。範囲 1000–384000。",
         "Custom Hz. ↑↓ / wheel by 1 (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Range 1000–384000.");
     public static string TipWaveform => Get(
-        "ドラッグで選択　Ctrl+ドラッグでスクラブ　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A で全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着\n"
+        "ドラッグで選択　Ctrl+ドラッグでスクラブ　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A またはトリプルクリックで全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着\n"
         + "ホイール=時間ズーム（再生ヘッド基準）　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"
         + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル、Shift で3倍）　Ctrl+←→ 前後のマーカー / リージョン端 / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（両端にリージョンがあればすぐ2等分。同じ範囲で繰り返すと3等分…と打ち直し。解除は右クリック／Delete）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M / Ins マーカー（選択中は両端。両端にあればすぐ中央→3等分…と打ち直し。同じ位置には重ならない）　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動（Shift で3倍） / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント / リージョン名（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
         + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　V で音量（dB。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS / RMS / Peak を先に表示）　P でピッチ（半音。↑↓／ホイール、Shift で1オクターブ。Space 試聴、Enter 実行。±2オクターブ。長さを保つ既定オン）　T でタイムストレッチ（時間と割合を連動。実行中はすりガラス）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　G で NOW POS　U で編集履歴　A で波形 / スペクトログラム / 重ね表示 / ラウドネス解析（Short Term LKFS。白い幅は ±1 LU、半透明。波形は上半分のピーク dBFS を線で同じ目盛へ。曲線は原色のシアン／橙／赤。LKFS は左目盛。スペクトログラム・重ね・ラウドネスでは -A/-L/-E/-R とループ／リージョンの下塗りなし）　Ctrl+Shift+E で Wwise EXPORT（Wave 単体）　Ctrl+Shift+M で MP3 保存　Ctrl+Shift+Alt+M で全タブを MP3 書き出し　MP3 ではリージョン／ループ不可。マーカーは置けるが MP3 保存では残らない",
-        "Drag to select. Ctrl+drag to scrub. Esc or a move without Shift clears the selection. Shift+move extends. Shift+←/→ grows it (1 sample when dots are shown). Home/End jump to the view edge. Shift+PgUp/PgDn by 5%. Ctrl+Shift+Home/End selects all before/after. Ctrl+A selects all. Double-click selects a span (between markers). The guide snaps to markers / loop edges.\n"
+        "Drag to select. Ctrl+drag to scrub. Esc or a move without Shift clears the selection. Shift+move extends. Shift+←/→ grows it (1 sample when dots are shown). Home/End jump to the view edge. Shift+PgUp/PgDn by 5%. Ctrl+Shift+Home/End selects all before/after. Ctrl+A or a triple-click selects all. Double-click selects a span (between markers). The guide snaps to markers / loop edges.\n"
         + "Wheel = time zoom (around the playhead). Shift+wheel = pan. Ctrl+wheel = amplitude.\n"
         + "←/→ seek (moves a selected marker / region edge / loop edge; 1 sample when dots are shown, Shift ×3). Ctrl+←/→ previous/next marker / region edge / sample-loop edge. Numpad jumps to a number (or a view position). Z / . centers (toggles center-lock while playing, clears it when stopped). 0–9 jump in the view. L loops from 3 seconds before the end of the selection (or the sample loop / -L). Shift+L sets the selection as the sample loop (same range again clears it). Shift+R sets the selection as a region (if both ends already have a region, split immediately; repeat on the same range to split 3, … ways; right-click / Delete clears). Right-click a marker / region flag / loop bar to delete. S sample rate, B bit depth, C channels, M / Ins marker (selection places both ends, or the center if both ends are already marked; repeat for 3, 4, … equal parts; same frame is rejected). Click a flag to select an edge / Shift+click for a range / Ctrl+click to add / drag or ←/→ to move (Shift ×3) / Delete or Ctrl+Del to delete. Ctrl+Shift+R to rename. Double-click a comment / region name (-A lime / -L blue / -E red / -R gray).\n"
         + "On a marker / region edge / loop edge, Alt+←/→ is 1 px (1 sample when dots are shown), Shift ×3, Ctrl pairs with the previous marker (both edges for a region / loop). X applies a linear fade around the playhead in the view (before = out / after = in). V opens volume (dB; ↑↓ / wheel, Space preview, Enter apply; shows whole-file LKFS / RMS / Peak first). P opens pitch (semitones; ↑↓ / wheel, Shift for an octave, Space preview, Enter apply; ±2 octaves; keep length on by default). T stretches time (time and ratio stay linked; frosted glass while running). Ctrl+X / C / V cut / copy / paste (markers in range included; a matching region is included too). G focuses NOW POS. U opens edit history. A cycles waveform / spectrogram / overlay / loudness analysis (Short Term LKFS; the white width is a translucent ±1 LU band; the waveform is an upper-half peak dBFS line on the same scale; the curve is primary cyan / orange / red; LKFS numbers sit on the left scale). Spectrogram, overlay, and loudness skip -A/-L/-E/-R, loop, and region fills. Ctrl+Shift+E exports Wave-only to Wwise. Ctrl+Shift+M saves as MP3. Ctrl+Shift+Alt+M exports every tab as MP3. MP3 cannot take regions / loops; markers are allowed but not saved to MP3.");

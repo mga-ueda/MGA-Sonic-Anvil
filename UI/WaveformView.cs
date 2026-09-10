@@ -1370,6 +1370,22 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        if (e.ClickCount >= 3)
+        {
+            var pos = e.GetPosition(this);
+            if (IsInDbScaleLane(pos))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            EndMarkerCommentEdit(commit: false);
+            ClearMarkerSelection();
+            SelectAll();
+            e.Handled = true;
+            return;
+        }
+
         if (e.ClickCount >= 2)
         {
             var pos = e.GetPosition(this);
