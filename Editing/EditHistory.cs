@@ -61,8 +61,27 @@ internal sealed class EditHistory
 {
     private readonly Stack<IEditCommand> _undo = new();
     private readonly Stack<IEditCommand> _redo = new();
+    private readonly Stack<OriginSnapshot> _undoOrigins = new();
+    private readonly Stack<OriginSnapshot> _redoOrigins = new();
     private int _cleanIndex;
     private bool _cleanValid = true;
+
+    /// <summary>
+    /// コマンド実行前のフォーマット変換起点。内容編集の Revert は起点を「今のレートのデータ」で
+    /// 取り直してしまうため、Undo 後もレート／ビット変換がオリジナルから再変換できるように戻す。
+    /// </summary>
+    private readonly record struct OriginSnapshot(float[] Samples, int SampleRate, int Channels, int Bits)
+    {
+        public static OriginSnapshot Capture(AudioDocument document) =>
+            new(
+                document.FormatOriginSamples,
+                document.FormatOriginSampleRate,
+                document.FormatOriginChannels,
+                document.FormatOriginBitsPerSample);
+
+        public void Restore(AudioDocument document) =>
+            document.SetFormatOrigin(Samples, SampleRate, Channels, Bits);
+    }
 
     public bool CanUndo => _undo.Count > 0;
 
@@ -160,6 +179,8 @@ internal sealed class EditHistory
     {
         _undo.Clear();
         _redo.Clear();
+        _undoOrigins.Clear();
+        _redoOrigins.Clear();
         _cleanIndex = 0;
         _cleanValid = true;
     }
@@ -235,6 +256,7 @@ internal sealed class EditHistory
 
     public void Do(AudioDocument document, IEditCommand command)
     {
+        var origin = OriginSnapshot.Capture(document);
         command.Apply(document);
         if (_redo.Count > 0 && _cleanValid && _cleanIndex > _undo.Count)
         {
@@ -242,7 +264,9 @@ internal sealed class EditHistory
         }
 
         _undo.Push(command);
+        _undoOrigins.Push(origin);
         _redo.Clear();
+        _redoOrigins.Clear();
         Finish(document);
     }
 
@@ -254,8 +278,11 @@ internal sealed class EditHistory
         }
 
         var command = _undo.Pop();
+        var origin = _undoOrigins.Pop();
         command.Revert(document);
+        origin.Restore(document);
         _redo.Push(command);
+        _redoOrigins.Push(origin);
         Finish(document);
         return true;
     }
@@ -268,8 +295,10 @@ internal sealed class EditHistory
         }
 
         var command = _redo.Pop();
+        var origin = _redoOrigins.Pop();
         command.Apply(document);
         _undo.Push(command);
+        _undoOrigins.Push(origin);
         Finish(document);
         return true;
     }

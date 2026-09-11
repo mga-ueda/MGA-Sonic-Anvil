@@ -611,8 +611,8 @@ internal static partial class UiStrings
         "チャンネル数を変換します (C)。Enter で確定。1–2 で項目。",
         "Convert channel count (C). Enter applies. 1–2 pick a row.");
     public static string TipFormatCustomRate => Get(
-        "任意 Hz。↑↓／ホイールで 1（Shift 10／Ctrl 100／Ctrl+Shift 1000）。Enter で確定。範囲 1000–384000。",
-        "Custom Hz. ↑↓ / wheel by 1 (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Range 1000–384000.");
+        "任意 Hz。↑↓／ホイールで 1（Shift 10／Ctrl 100／Ctrl+Shift 1000）。Enter で確定。Tab で抜けて 1–9 で項目。範囲 1000–384000。",
+        "Custom Hz. ↑↓ / wheel by 1 (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Tab leaves the box so 1–9 pick a row. Range 1000–384000.");
     public static string TipWaveform => Get(
         "ドラッグで選択　Ctrl+ドラッグでスクラブ　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A またはトリプルクリックで全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着\n"
         + "ホイール=時間ズーム（再生ヘッド基準）　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"

@@ -134,6 +134,19 @@ internal static class FormatConvertPicker
             box.PreviewKeyDown += (_, e) =>
             {
                 var key = e.Key == Key.System ? e.SystemKey : e.Key;
+                if (key == Key.Tab)
+                {
+                    // 数字キーで他の選択肢を選べるように、フォーカスをエディタの外へ出す。
+                    e.Handled = true;
+                    if (box.FindAncestor<MenuItem>() is { } owner)
+                    {
+                        owner.Focus();
+                        Keyboard.Focus(owner);
+                    }
+
+                    return;
+                }
+
                 if (key is Key.Up or Key.Down)
                 {
                     e.Handled = true;

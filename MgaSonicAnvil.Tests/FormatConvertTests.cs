@@ -226,6 +226,24 @@ public sealed class FormatConvertTests
     }
 
     [Fact]
+    public void ConvertSampleRate_AfterUndoneEditStillUsesOriginal()
+    {
+        // S 8000 → フェード（内容編集）→ Undo → S 48000。
+        // Undo でドキュメントは変換直後に戻るので、S はオリジナル 48k から再変換されること。
+        var source = MakeSine(frames: 4800, sampleRate: 48000, frequency: 400);
+        var document = new AudioDocument((float[])source.Clone(), 48000, 2, 16, AudioFileKind.Wave, null);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.ConvertSampleRate(document, 8000)!);
+        history.Do(document, ProcessEdits.FadeIn(document, new WaveSelection(0, 100)));
+        history.Undo(document);
+        history.Do(document, ProcessEdits.ConvertSampleRate(document, 48000)!);
+
+        Assert.Equal(48000, document.SampleRate);
+        Assert.Equal(source.Length, document.Interleaved.Length);
+        Assert.Equal(source, document.Interleaved);
+    }
+
+    [Fact]
     public void ConvertBitDepth_SecondLoweringUsesOriginalPrecision()
     {
         var document = MakeDocument(frames: 8, sampleRate: 48000, bits: 24);
