@@ -150,14 +150,15 @@ public sealed class ChannelLayoutTests
     }
 
     [Fact]
-    public void Playback_HoldsSamplesOnMappedDirectRoute()
+    public void Playback_ReconstructsOnMappedDirectRoute()
     {
-        // 8kHz ソースを 48kHz デバイスへ。直接ルート（マップ有り）でも補間せずホールドする。
-        var frames = 64;
+        // ASIO 多ポート + マップ有り（直接ルート）でも、8kHz→48kHz は帯域制限補間で再構成する。
+        // ホールドだと折り返しイメージが乗り、1 kHz まで下げてもスペアナが 22 kHz まで振れてしまう。
+        var frames = 400;
         var samples = new float[frames * 2];
         for (var i = 0; i < frames; i++)
         {
-            var value = i % 2 == 0 ? 1f : -1f;
+            var value = (float)Math.Sin(2 * Math.PI * i / 8);
             samples[i * 2] = value;
             samples[i * 2 + 1] = value;
         }
@@ -168,13 +169,19 @@ public sealed class ChannelLayoutTests
         provider.ConfigureOutput(18, [0, 1]);
         provider.Bind(document, 0, null, loop: false);
 
-        var buffer = new float[18 * 96];
+        var buffer = new float[18 * 960];
         Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
-        for (var frame = 0; frame < 96; frame++)
+        var port0 = Enumerable.Range(0, 960).Select(i => buffer[i * 18]).ToArray();
+        Assert.True(port0.Max(Math.Abs) > 0.5f, "信号が出ていない");
+        for (var i = 9; i < port0.Length; i++)
         {
-            var sample = buffer[frame * 18];
-            Assert.True(sample is 1f or -1f, $"frame {frame}: {sample} は補間されている");
+            var jump = Math.Abs(port0[i] - port0[i - 1]);
+            Assert.True(jump < 0.25f, $"frame {i}: 隣接差 {jump} が大きい（階段＝折り返しイメージ）");
         }
+
+        // マップ外のポートは無音のまま。
+        Assert.Equal(0f, buffer[2], 3);
+        Assert.Equal(0f, buffer[17], 3);
     }
 
     [Fact]

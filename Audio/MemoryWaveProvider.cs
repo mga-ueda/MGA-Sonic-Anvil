@@ -721,6 +721,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var step = _sourceRate / (double)_deviceRate;
         var writtenFrames = 0;
         var exitMixedFrames = 0;
+        Span<float> frame = stackalloc float[ChannelLayout.MaxChannels];
+        var source = frame[..Math.Min(srcCh, ChannelLayout.MaxChannels)];
         while (writtenFrames < framesWanted)
         {
             if (_sourceFrame >= playEndFrame)
@@ -739,30 +741,17 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 break;
             }
 
-            if (_directRoute)
-            {
-                var srcFrame = (int)Math.Clamp(Math.Floor(_sourceFrame), 0, Math.Max(0, frameCount - 1));
-                EmitSourceFrame(buffer, offset, writtenFrames, srcCh, outCh, srcFrame * srcCh, srcFrame);
-            }
-            else
-            {
-                PushNearestSourceFrame(srcCh);
-                FormatConvert.DownmixHeld(
-                    _samples,
-                    srcCh,
-                    _sourceFrame,
-                    frameCount,
-                    out var left,
-                    out var right);
-                if (_frameGain is { } gainAt)
-                {
-                    var gain = gainAt((long)Math.Floor(_sourceFrame));
-                    left *= gain;
-                    right *= gain;
-                }
-
-                WriteFrame(buffer, offset, writtenFrames, outCh, left, right);
-            }
+            // ホールドだと折り返しイメージ（ジャリつく偽の高域）が乗る。帯域制限補間で再構成する。
+            FormatConvert.ResampleFrameBandlimited(
+                _samples,
+                srcCh,
+                _sourceFrame,
+                frameCount,
+                _sourceRate,
+                _deviceRate,
+                source);
+            var gain = _frameGain is { } gainAt ? gainAt((long)Math.Floor(_sourceFrame)) : 1f;
+            EmitFrame(buffer, offset, writtenFrames, outCh, source, gain);
 
             _sourceFrame += step;
             writtenFrames++;
@@ -820,11 +809,13 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             float right;
             if (resampled)
             {
-                FormatConvert.DownmixHeld(
+                FormatConvert.DownmixBandlimited(
                     _samples,
                     srcCh,
                     _exitFrame,
                     frameCount,
+                    _sourceRate,
+                    _deviceRate,
                     out left,
                     out right);
             }
@@ -856,11 +847,23 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         var source = _samples.AsSpan(sourceIndex, srcCh);
         var gain = _frameGain is { } gainAt ? gainAt(sourceFrame) : 1f;
+        EmitFrame(buffer, offset, writtenFrames, outCh, source, gain);
+    }
+
+    /// <summary>1 フレーム分のソース信号をメーターへ流し、ルーティングして出力へ書く。</summary>
+    private void EmitFrame(
+        float[] buffer,
+        int offset,
+        int writtenFrames,
+        int outCh,
+        ReadOnlySpan<float> source,
+        float gain)
+    {
         PushSourceFrame(source, gain);
         if (_directRoute)
         {
             var dest = buffer.AsSpan(offset + writtenFrames * outCh, outCh);
-            if (ChannelRouter.ShouldMirrorMono(srcCh, outCh))
+            if (ChannelRouter.ShouldMirrorMono(source.Length, outCh))
             {
                 dest.Clear();
                 var sample = source[0] * gain;
@@ -937,11 +940,13 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             var step = sourceFrames / (double)Math.Max(1, framesWanted);
             for (var i = 0; i < framesWanted; i++)
             {
-                FormatConvert.DownmixHeld(
+                FormatConvert.DownmixBandlimited(
                     _scrubScratch,
                     2,
                     i * step,
                     sourceFrames,
+                    _sourceRate,
+                    _deviceRate,
                     out var left,
                     out var right);
                 WriteFrame(buffer, offset, i, outCh, left, right);
@@ -951,20 +956,6 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         MemoryScrubVoice.SoftClip(buffer, offset, framesWanted * outCh);
         Ended = false;
         return framesWanted * outCh;
-    }
-
-    private void PushNearestSourceFrame(int srcCh)
-    {
-        var channels = Math.Max(1, srcCh);
-        var frameCount = channels <= 0 ? 0 : _samples.Length / channels;
-        if (frameCount <= 0)
-        {
-            return;
-        }
-
-        var frame = (int)Math.Clamp(Math.Floor(_sourceFrame), 0, frameCount - 1);
-        var gain = _frameGain is { } gainAt ? gainAt(frame) : 1f;
-        PushSourceFrame(_samples.AsSpan(frame * channels, channels), gain);
     }
 
     private void PushSourceFrame(ReadOnlySpan<float> frame, float gain)

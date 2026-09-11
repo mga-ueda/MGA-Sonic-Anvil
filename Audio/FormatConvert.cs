@@ -58,12 +58,6 @@ internal static class FormatConvert
         sourceRate > 0 && deviceRate > 0 && sourceRate != deviceRate;
 
     /// <summary>
-    /// 再生はソースのサンプルをホールドする。補間すると変換後の劣化が消える。
-    /// </summary>
-    public static bool ShouldHoldForDevice(int sourceRate, int deviceRate) =>
-        sourceRate > 0 && deviceRate > 0 && sourceRate != deviceRate;
-
-    /// <summary>
     /// 新しいナイキストで帯域制限してから間引く／補間する。
     /// ホールドだと階段波の高調波が出て、8 kHz がキンキンする。
     /// </summary>
@@ -351,56 +345,50 @@ internal static class FormatConvert
         right = (float)sumR;
     }
 
-    public static void DownmixHeld(
+    /// <summary>
+    /// ソースの全チャンネルを帯域制限補間で 1 フレーム分求める（再生のレート合わせ用）。
+    /// ホールドだと折り返しイメージが乗り、1 kHz のファイルでも 22 kHz まで鳴ってしまう。
+    /// </summary>
+    public static void ResampleFrameBandlimited(
         float[] interleaved,
         int channels,
         double frame,
         int frameCount,
-        out float left,
-        out float right)
+        int sourceRate,
+        int destRate,
+        Span<float> dest)
     {
-        if (frameCount <= 0 || interleaved.Length < channels)
+        channels = Math.Max(1, channels);
+        var n = Math.Min(channels, dest.Length);
+        if (frameCount <= 0 || interleaved.Length < channels || n <= 0)
         {
-            left = right = 0;
+            dest.Clear();
             return;
         }
 
-        ChannelMix.Downmix(
-            interleaved,
-            ClampIndex((int)Math.Floor(frame), frameCount) * channels,
-            channels,
-            out left,
-            out right);
-    }
-
-    public static void DownmixInterpolated(
-        float[] interleaved,
-        int channels,
-        double frame,
-        int frameCount,
-        out float left,
-        out float right)
-    {
-        if (frameCount <= 0 || interleaved.Length < channels)
+        var cutoff = LowpassCutoff(sourceRate, destRate);
+        var center = (int)Math.Floor(frame);
+        Span<double> sums = stackalloc double[ChannelLayout.MaxChannels];
+        sums = sums[..n];
+        sums.Clear();
+        var wsum = 0d;
+        for (var tap = -SincHalfWidth; tap <= SincHalfWidth; tap++)
         {
-            left = right = 0;
-            return;
+            var kernel = SincKernel(center + tap - frame, cutoff, tap);
+            var index = ClampIndex(center + tap, frameCount) * channels;
+            for (var ch = 0; ch < n; ch++)
+            {
+                sums[ch] += interleaved[index + ch] * kernel;
+            }
+
+            wsum += kernel;
         }
 
-        var i = (int)Math.Floor(frame);
-        var t = (float)(frame - i);
-        if (t <= 1e-8f || frameCount == 1)
+        var scale = Math.Abs(wsum) > 1e-8 ? 1d / wsum : 1d;
+        for (var ch = 0; ch < n; ch++)
         {
-            ChannelMix.Downmix(interleaved, ClampIndex(i, frameCount) * channels, channels, out left, out right);
-            return;
+            dest[ch] = (float)(sums[ch] * scale);
         }
-
-        ChannelMix.Downmix(interleaved, ClampIndex(i - 1, frameCount) * channels, channels, out var p0l, out var p0r);
-        ChannelMix.Downmix(interleaved, ClampIndex(i, frameCount) * channels, channels, out var p1l, out var p1r);
-        ChannelMix.Downmix(interleaved, ClampIndex(i + 1, frameCount) * channels, channels, out var p2l, out var p2r);
-        ChannelMix.Downmix(interleaved, ClampIndex(i + 2, frameCount) * channels, channels, out var p3l, out var p3r);
-        left = Hermite(p0l, p1l, p2l, p3l, t);
-        right = Hermite(p0r, p1r, p2r, p3r, t);
     }
 
     private static double LowpassCutoff(int sourceRate, int destRate) =>
@@ -508,27 +496,6 @@ internal static class FormatConvert
 
         var pix = Math.PI * x;
         return Math.Sin(pix) / pix;
-    }
-
-    private static float SampleHeld(float[] src, int channels, int channel, double frame, int frameCount)
-    {
-        if (frameCount <= 1)
-        {
-            return src[channel];
-        }
-
-        return src[ClampIndex((int)Math.Floor(frame), frameCount) * channels + channel];
-    }
-
-    private static float Hermite(float p0, float p1, float p2, float p3, float t)
-    {
-        var t2 = t * t;
-        var t3 = t2 * t;
-        return 0.5f * (
-            2f * p1
-            + (-p0 + p2) * t
-            + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2
-            + (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
     }
 
     private static int ClampIndex(int index, int frameCount) =>

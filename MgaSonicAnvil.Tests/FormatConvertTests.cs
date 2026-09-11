@@ -320,30 +320,34 @@ public sealed class FormatConvertTests
     }
 
     [Fact]
-    public void Playback_HoldsSourceSamplesOnDeviceClock()
+    public void Playback_ReconstructsWithoutAliasImagesOnDeviceClock()
     {
-        Assert.True(FormatConvert.ShouldHoldForDevice(8000, 48000));
         Assert.True(FormatConvert.ShouldResampleForDevice(8000, 48000));
-        Assert.False(FormatConvert.ShouldHoldForDevice(48000, 48000));
         Assert.False(FormatConvert.ShouldResampleForDevice(48000, 48000));
 
-        var samples = new float[8];
-        samples[0] = 1f;
-        samples[1] = 1f;
-        samples[2] = -1f;
-        samples[3] = -1f;
-        var document = new AudioDocument(samples, 8000, 2, 16, AudioFileKind.Wave, null);
+        // 8 kHz の 1 kHz サイン。ホールドすると階段状になり折り返しイメージ（偽の高域）が鳴る。
+        var frames = 400;
+        var samples = new float[frames];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i] = (float)Math.Sin(2 * Math.PI * i / 8);
+        }
+
+        var document = new AudioDocument(samples, 8000, 1, 16, AudioFileKind.Wave, null);
         var provider = new PlaybackSampleProvider();
         provider.SetDeviceSampleRate(48000);
         provider.Bind(document, 0, null, loop: false);
 
-        var buffer = new float[24];
-        Assert.Equal(24, provider.Read(buffer, 0, buffer.Length));
-        var left = Enumerable.Range(0, 12).Select(i => buffer[i * 2]).ToArray();
-        Assert.All(left, sample => Assert.True(sample is 1f or -1f));
-        Assert.Equal(1f, left[0]);
-        Assert.Equal(-1f, left[^1]);
-        Assert.Equal(2, left.Distinct().Count());
+        var buffer = new float[1920];
+        Assert.Equal(1920, provider.Read(buffer, 0, buffer.Length));
+        var left = Enumerable.Range(0, 960).Select(i => buffer[i * 2]).ToArray();
+        Assert.True(left.Max(Math.Abs) > 0.5f, "信号が出ていない");
+        for (var i = 9; i < left.Length; i++)
+        {
+            var jump = Math.Abs(left[i] - left[i - 1]);
+            // 48 kHz 上の 1 kHz サインなら隣接差は ~0.13。ホールドの階段は ~0.7 跳ぶ。
+            Assert.True(jump < 0.25f, $"frame {i}: 隣接差 {jump} が大きい（階段＝折り返しイメージ）");
+        }
     }
 
     [Fact]
