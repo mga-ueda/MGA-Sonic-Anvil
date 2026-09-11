@@ -361,7 +361,9 @@ internal sealed class SpectrogramRenderer
                 var hz = _rowHertz[y];
                 _pixels[row + x] = hz > nyquist
                     ? floor
-                    : SpectrogramEngine.ColorBgra(SpectrogramEngine.BinDb(_re.AsSpan(0, bins), hz / binHz) + _gainDb);
+                    : SpectrogramEngine.ColorBgraFromMagnitude(
+                        SpectrogramEngine.BinMagnitude(_re.AsSpan(0, bins), hz / binHz),
+                        _gainDb);
                 row += width;
             }
         }

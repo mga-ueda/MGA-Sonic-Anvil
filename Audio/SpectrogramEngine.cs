@@ -1,6 +1,6 @@
 namespace MgaSonicAnvil.Audio;
 
-/// <summary>表示用 STFT。フロアは -60 dB。周波数は対数。</summary>
+/// <summary>表示用 STFT。フロアは -60 dB。周波数は対数＋低域圧縮。暗部は持ち上げて見せる。</summary>
 internal static class SpectrogramEngine
 {
     public const int FftSize = 1024;
@@ -8,16 +8,17 @@ internal static class SpectrogramEngine
     public const int BinCount = FftSize / 2 + 1;
     public const float FloorDb = -60f;
     public const float CeilingDb = 0f;
-    public const double MinHertz = 20d;
-    public const double MaxHertz = 20000d;
+    public const double MinHertz = 80d;
+    public const double MaxHertz = 24000d;
+    /// <summary>1 より大きいと低域の縦幅を圧縮する。対数軸の上にかける。</summary>
+    public const double FrequencyWarp = 1.35;
     public const byte OverlayAlpha = 255;
     private const int ColorLutSize = 256;
     private static readonly int[] ColorLut = CreateColorLut();
 
     public static readonly double[] FrequencyMarks =
     [
-        20, 30, 50, 70, 100, 200, 300, 500, 700,
-        1000, 2000, 3000, 5000, 7000, 10000, 20000,
+        100, 200, 500, 1000, 2000, 5000, 10000, 20000,
     ];
 
     public static string FormatHertz(double hertz)
@@ -38,13 +39,17 @@ internal static class SpectrogramEngine
     {
         var lo = Math.Log(Math.Max(1e-6, minHertz));
         var hi = Math.Log(Math.Max(minHertz * 1.0001, maxHertz));
-        return Math.Clamp((Math.Log(Math.Clamp(hertz, minHertz, maxHertz)) - lo) / (hi - lo), 0, 1);
+        var logUnit = Math.Clamp((Math.Log(Math.Clamp(hertz, minHertz, maxHertz)) - lo) / (hi - lo), 0, 1);
+        return Math.Pow(logUnit, FrequencyWarp);
     }
 
-    public static double UnitToHertz(double unit, double minHertz, double maxHertz) =>
-        minHertz * Math.Pow(maxHertz / minHertz, Math.Clamp(unit, 0, 1));
+    public static double UnitToHertz(double unit, double minHertz, double maxHertz)
+    {
+        var logUnit = Math.Pow(Math.Clamp(unit, 0, 1), 1d / FrequencyWarp);
+        return minHertz * Math.Pow(maxHertz / minHertz, logUnit);
+    }
 
-    /// <summary>表示スケールは常に 20 kHz。実データのナイキストはこれと別。</summary>
+    /// <summary>表示スケールは常に 24 kHz。実データのナイキストはこれと別。</summary>
     public static double DisplayMaxHertz => MaxHertz;
 
     public static double ContentNyquist(int sampleRate) =>
@@ -89,25 +94,45 @@ internal static class SpectrogramEngine
         return Math.Clamp((float)(-20d * Math.Log10(peak)), -24f, 96f);
     }
 
+    /// <summary>
+    /// 正規化レベル（0=フロア、1=天井）の暗部を持ち上げる。
+    /// ハイライトはほぼ線形のまま残し、ピークの色は潰さない。
+    /// </summary>
+    public static float LiftDisplayUnit(float t)
+    {
+        t = Math.Clamp(t, 0f, 1f);
+        var root = MathF.Sqrt(t);
+        return root + (t - root) * t;
+    }
+
     public static byte DbToLutByte(float db)
     {
         var t = Math.Clamp((db - FloorDb) / (CeilingDb - FloorDb), 0f, 1f);
-        return (byte)Math.Round(t * (ColorLutSize - 1));
+        return (byte)Math.Round(LiftDisplayUnit(t) * (ColorLutSize - 1));
     }
 
     public static int ColorFromLutByte(byte value) => ColorLut[value];
 
     public static int ColorBgra(float db) => ColorFromLutByte(DbToLutByte(db));
 
+    /// <summary>
+    /// 振幅を色にする。無音は表示ゲインを足さない（フロアのまま）。
+    /// フィットのライブ FFT とキャッシュ列で同じ式を使う。
+    /// </summary>
+    public static byte LutByteFromMagnitude(double mag, float gainDb = 0f) =>
+        mag <= 1e-12
+            ? (byte)0
+            : DbToLutByte((float)(20d * Math.Log10(mag)) + gainDb);
+
+    public static int ColorBgraFromMagnitude(double mag, float gainDb = 0f) =>
+        ColorFromLutByte(LutByteFromMagnitude(mag, gainDb));
+
     public static void WriteColumnLut(ReadOnlySpan<double> magnitude, Span<byte> dest, float gainDb = 0f)
     {
         var bins = Math.Min(dest.Length, magnitude.Length);
         for (var i = 0; i < bins; i++)
         {
-            var mag = magnitude[i];
-            dest[i] = mag <= 1e-12
-                ? (byte)0
-                : DbToLutByte((float)(20d * Math.Log10(mag)) + gainDb);
+            dest[i] = LutByteFromMagnitude(magnitude[i], gainDb);
         }
     }
 
@@ -118,12 +143,17 @@ internal static class SpectrogramEngine
         long frames,
         float[] dest)
     {
+        if (frames <= 0)
+        {
+            Array.Clear(dest);
+            return;
+        }
+
         if (channels <= 1)
         {
             for (var i = 0; i < dest.Length; i++)
             {
-                var frame = origin + i;
-                dest[i] = frame >= 0 && frame < frames ? interleaved[frame] : 0;
+                dest[i] = interleaved[ReflectFrame(origin + i, frames)];
             }
 
             return;
@@ -131,8 +161,27 @@ internal static class SpectrogramEngine
 
         for (var i = 0; i < dest.Length; i++)
         {
-            MixFrame(interleaved, channels, origin + i, frames, out dest[i]);
+            MixFrame(interleaved, channels, ReflectFrame(origin + i, frames), frames, out dest[i]);
         }
+    }
+
+    /// <summary>ファイル端の外側を鏡で折り返す。ゼロ埋めの段差で全帯域に漏れないようにする。</summary>
+    public static long ReflectFrame(long frame, long frames)
+    {
+        if (frames <= 1)
+        {
+            return 0;
+        }
+
+        var last = frames - 1;
+        var period = last * 2;
+        var x = frame % period;
+        if (x < 0)
+        {
+            x += period;
+        }
+
+        return x <= last ? x : period - x;
     }
 
     private static int[] CreateColorLut()
@@ -148,7 +197,7 @@ internal static class SpectrogramEngine
 
     private static int SampleGradient(float t)
     {
-        t = MathF.Pow(Math.Clamp(t, 0f, 1f), 0.78f);
+        t = Math.Clamp(t, 0f, 1f);
         ReadOnlySpan<(float P, byte R, byte G, byte B)> stops =
         [
             (0.00f, 4, 0, 20),
@@ -215,19 +264,24 @@ internal static class SpectrogramEngine
         }
     }
 
-    public static float BinDb(ReadOnlySpan<double> magnitude, double bin)
+    public static double BinMagnitude(ReadOnlySpan<double> magnitude, double bin)
     {
         var last = magnitude.Length - 1;
         if (last <= 0)
         {
-            return FloorDb;
+            return 0;
         }
 
         var i = Math.Clamp(bin, 0, last);
         var lo = (int)Math.Floor(i);
         var hi = Math.Min(last, lo + 1);
         var t = i - lo;
-        var mag = magnitude[lo] * (1 - t) + magnitude[hi] * t;
+        return magnitude[lo] * (1 - t) + magnitude[hi] * t;
+    }
+
+    public static float BinDb(ReadOnlySpan<double> magnitude, double bin)
+    {
+        var mag = BinMagnitude(magnitude, bin);
         return mag <= 1e-12 ? FloorDb : (float)(20d * Math.Log10(mag));
     }
 

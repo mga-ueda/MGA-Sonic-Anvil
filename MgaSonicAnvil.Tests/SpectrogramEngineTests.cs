@@ -8,16 +8,33 @@ public sealed class SpectrogramEngineTests
     [Fact]
     public void HertzToUnit_InvertsWithUnitToHertz()
     {
-        var hz = SpectrogramEngine.UnitToHertz(0.4, 20, 20000);
-        Assert.Equal(0.4, SpectrogramEngine.HertzToUnit(hz, 20, 20000), 8);
+        var hz = SpectrogramEngine.UnitToHertz(0.4, SpectrogramEngine.MinHertz, SpectrogramEngine.MaxHertz);
+        Assert.Equal(0.4, SpectrogramEngine.HertzToUnit(hz, SpectrogramEngine.MinHertz, SpectrogramEngine.MaxHertz), 8);
     }
 
     [Fact]
-    public void DisplayMaxHertz_StaysAtTwentyKiloRegardlessOfSampleRate()
+    public void DisplayMaxHertz_StaysAtTwentyFourKiloRegardlessOfSampleRate()
     {
-        Assert.Equal(20000, SpectrogramEngine.DisplayMaxHertz);
+        Assert.Equal(24000, SpectrogramEngine.DisplayMaxHertz);
         Assert.True(SpectrogramEngine.ContentNyquist(8000) < 5000);
         Assert.True(SpectrogramEngine.ContentNyquist(44100) > 20000);
+        Assert.True(SpectrogramEngine.ContentNyquist(48000) > 22000);
+    }
+
+    [Fact]
+    public void HertzToUnit_CompressesBassAndLeavesRoomAboveTwentyKilo()
+    {
+        var min = SpectrogramEngine.MinHertz;
+        var max = SpectrogramEngine.MaxHertz;
+        var at100 = SpectrogramEngine.HertzToUnit(100, min, max);
+        var at200 = SpectrogramEngine.HertzToUnit(200, min, max);
+        var at10k = SpectrogramEngine.HertzToUnit(10000, min, max);
+        var at20k = SpectrogramEngine.HertzToUnit(20000, min, max);
+        // 100 Hz 以下はほぼ底。低域の 1oct は高域の 1oct より狭い。
+        Assert.True(at100 < 0.04);
+        Assert.True(at200 - at100 < at20k - at10k);
+        Assert.True(at20k < 0.98);
+        Assert.Equal(1, SpectrogramEngine.HertzToUnit(max, min, max), 5);
     }
 
     [Fact]
@@ -27,6 +44,52 @@ public sealed class SpectrogramEngineTests
         Assert.Equal("700", SpectrogramEngine.FormatHertz(700));
         Assert.Equal("1k", SpectrogramEngine.FormatHertz(1000));
         Assert.Equal("20k", SpectrogramEngine.FormatHertz(20000));
+        Assert.Equal("24k", SpectrogramEngine.FormatHertz(24000));
+    }
+
+    [Fact]
+    public void FillMonoMix_ReflectsOutsideFileInsteadOfZero()
+    {
+        float[] samples = [1, 2, 3, 4, 5];
+        var dest = new float[5];
+        SpectrogramEngine.FillMonoMix(samples, 1, origin: -2, frames: 5, dest);
+        Assert.Equal([3f, 2f, 1f, 2f, 3f], dest);
+        SpectrogramEngine.FillMonoMix(samples, 1, origin: 3, frames: 5, dest);
+        Assert.Equal([4f, 5f, 4f, 3f, 2f], dest);
+    }
+
+    [Fact]
+    public void AnalyzeWindow_FileStartDoesNotSprayBroadband()
+    {
+        const int rate = 48000;
+        var samples = new float[rate];
+        for (var i = 0; i < samples.Length; i++)
+        {
+            samples[i] = (float)Math.Sin(2 * Math.PI * 440 * i / rate);
+        }
+
+        var window = new float[SpectrogramEngine.FftSize];
+        SpectrogramEngine.FillHann(window, out var sum);
+        var mix = new float[SpectrogramEngine.FftSize];
+        var re = new double[SpectrogramEngine.FftSize];
+        var im = new double[SpectrogramEngine.FftSize];
+
+        float HighBinDb(long center)
+        {
+            SpectrogramEngine.FillMonoMix(samples, 1, center - SpectrogramEngine.FftSize / 2, samples.Length, mix);
+            SpectrogramEngine.AnalyzeWindow(mix, window, sum, re, im);
+            var bin = 8000d * SpectrogramEngine.FftSize / rate;
+            return SpectrogramEngine.BinDb(re.AsSpan(0, SpectrogramEngine.BinCount), bin);
+        }
+
+        // ゼロ埋めだと先頭だけ全帯域に漏れ、フロアより上に出て赤い帯になる。
+        // 折り返しなら 8 kHz はフロア以下のまま（中盤の数値ノイズよりは高い）。
+        var start = HighBinDb(0);
+        var mid = HighBinDb(rate / 2);
+        Assert.True(start <= SpectrogramEngine.FloorDb, $"start {start} dB");
+        Assert.True(mid <= SpectrogramEngine.FloorDb, $"mid {mid} dB");
+        Assert.Equal(0, SpectrogramEngine.DbToLutByte(start));
+        Assert.Equal(0, SpectrogramEngine.DbToLutByte(mid));
     }
 
     [Fact]
@@ -69,6 +132,19 @@ public sealed class SpectrogramEngineTests
     }
 
     [Fact]
+    public void ColorBgraFromMagnitude_SilenceStaysFloorEvenWithDisplayGain()
+    {
+        // ピークが小さいファイルは +20 dB など乗る。無音に足すとフロアが赤帯になる。
+        var silent = SpectrogramEngine.ColorBgraFromMagnitude(0, 20f);
+        var floor = SpectrogramEngine.ColorBgra(SpectrogramEngine.FloorDb);
+        var liftedFloor = SpectrogramEngine.ColorBgra(SpectrogramEngine.FloorDb + 20f);
+        Assert.Equal(floor, silent);
+        Assert.NotEqual(floor, liftedFloor);
+        Assert.Equal(0, SpectrogramEngine.LutByteFromMagnitude(0, 20f));
+        Assert.Equal(SpectrogramEngine.DbToLutByte(-20f), SpectrogramEngine.LutByteFromMagnitude(0.1, 0f));
+    }
+
+    [Fact]
     public void WriteColumnLut_AppliesDisplayGain()
     {
         Span<byte> plain = stackalloc byte[1];
@@ -90,10 +166,29 @@ public sealed class SpectrogramEngineTests
     }
 
     [Fact]
+    public void LiftDisplayUnit_RaisesShadowsAndKeepsEnds()
+    {
+        Assert.Equal(0, SpectrogramEngine.LiftDisplayUnit(0), 5);
+        Assert.Equal(1, SpectrogramEngine.LiftDisplayUnit(1), 5);
+        // 暗部ほど線形より上。ハイライト側の持ち上げはそれより小さい。
+        Assert.True(SpectrogramEngine.LiftDisplayUnit(0.2f) > 0.2f);
+        Assert.True(SpectrogramEngine.LiftDisplayUnit(0.2f) - 0.2f
+            > SpectrogramEngine.LiftDisplayUnit(0.8f) - 0.8f);
+    }
+
+    [Fact]
     public void DbToLutByte_MapsFloorAndCeiling()
     {
         Assert.Equal(0, SpectrogramEngine.DbToLutByte(SpectrogramEngine.FloorDb));
         Assert.Equal(255, SpectrogramEngine.DbToLutByte(SpectrogramEngine.CeilingDb));
+    }
+
+    [Fact]
+    public void DbToLutByte_LiftsShadowsAboveLinear()
+    {
+        // -45 dB はフロアからの 25%。暗部持ち上げで線形より高い LUT に載る。
+        var linear = (byte)Math.Round(0.25f * 255);
+        Assert.True(SpectrogramEngine.DbToLutByte(-45f) > linear);
     }
 
     [Fact]
