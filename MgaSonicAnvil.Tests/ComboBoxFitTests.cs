@@ -36,6 +36,58 @@ public sealed class ComboBoxFitTests
         Assert.Equal(0, AudioSettingsWindow.WrapTabIndex(0, 1, 1));
     }
 
+    [Theory]
+    [InlineData(false, "Stereo", "5.1", false)]
+    [InlineData(true, "Stereo", "Stereo", false)]
+    [InlineData(true, "Stereo", "5.1", true)]
+    [InlineData(true, null, "5.1", true)]
+    public void ShouldConfirmSpeakerSave_OnlyWhenDirtyAndSwitching(
+        bool dirty,
+        string? currentId,
+        string nextId,
+        bool expected)
+    {
+        Assert.Equal(expected, AudioSettingsWindow.ShouldConfirmSpeakerSave(dirty, currentId, nextId));
+    }
+
+    [Theory]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    public void ShouldCaptureEditorMaps_SkipsWhenLoadingOrSyncing(
+        bool loadingSpeaker,
+        bool syncingSpeaker,
+        bool expected)
+    {
+        Assert.Equal(expected, AudioSettingsWindow.ShouldCaptureEditorMaps(loadingSpeaker, syncingSpeaker));
+    }
+
+    [Theory]
+    [InlineData(48000, 1000, true, 48000, 1000, true, false)]
+    [InlineData(48000, 1000, true, 44100, 1000, true, true)]
+    [InlineData(48000, 1000, true, 48000, 2000, true, true)]
+    [InlineData(48000, 1000, true, 48000, 1000, false, true)]
+    public void ShouldAbandonTimeEdit_WhenDocumentIdentityChanges(
+        int previousRate,
+        long previousTotal,
+        bool previousHasDocument,
+        int sampleRate,
+        long totalFrames,
+        bool hasDocument,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            StatusTimeStrip.ShouldAbandonTimeEdit(
+                previousRate,
+                previousTotal,
+                previousHasDocument,
+                sampleRate,
+                totalFrames,
+                hasDocument));
+    }
+
     private sealed record Named(string Label)
     {
         public override string ToString() => Label;

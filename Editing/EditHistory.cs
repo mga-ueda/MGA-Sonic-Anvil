@@ -876,21 +876,36 @@ internal static class ProcessEdits
     public static IEditCommand FadeOut(AudioDocument document, WaveSelection range) =>
         FadeOut(document, range, FadeCurves.Default);
 
-    public static IEditCommand FadeIn(AudioDocument document, WaveSelection range, FadeShape shape)
+    public static IEditCommand FadeIn(
+        AudioDocument document,
+        WaveSelection range,
+        FadeShape shape,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
     {
-        var command = Fade(document, range, fadeIn: true, "Fade In", shape);
-        AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => FadeIn(target, mapped, shape));
-        command.Persist = HistoryRecipes.Range(HistoryRecipes.FadeIn, document.SampleRate, range, (int)shape);
+        var mask = EditMask(document, channel, channelMask);
+        var command = Fade(document, range, fadeIn: true, "Fade In", shape, mask);
+        AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => FadeIn(target, mapped, shape, channelMask: mask));
+        command.Persist = HistoryRecipes.Range(HistoryRecipes.FadeIn, document.SampleRate, range, (int)shape, channelMask: mask);
         return command;
     }
 
-    public static IEditCommand FadeOut(AudioDocument document, WaveSelection range, FadeShape shape)
+    public static IEditCommand FadeOut(
+        AudioDocument document,
+        WaveSelection range,
+        FadeShape shape,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
     {
-        var command = Fade(document, range, fadeIn: false, "Fade Out", shape);
-        AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => FadeOut(target, mapped, shape));
-        command.Persist = HistoryRecipes.Range(HistoryRecipes.FadeOut, document.SampleRate, range, (int)shape);
+        var mask = EditMask(document, channel, channelMask);
+        var command = Fade(document, range, fadeIn: false, "Fade Out", shape, mask);
+        AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => FadeOut(target, mapped, shape, channelMask: mask));
+        command.Persist = HistoryRecipes.Range(HistoryRecipes.FadeOut, document.SampleRate, range, (int)shape, channelMask: mask);
         return command;
     }
+
+    private static int EditMask(AudioDocument document, int channel, int channelMask) =>
+        ChannelSolo.ResolveMask(channel, channelMask, document.Channels);
 
     /// <summary>範囲を写像して同じ操作を作り直すレシピを付ける。写像後に空なら適用しない。</summary>
     private static void AttachRangeReplay(
@@ -909,8 +924,11 @@ internal static class ProcessEdits
     public static IEditCommand? FadeAroundPlayhead(
         AudioDocument document,
         WaveSelection visible,
-        long playhead)
+        long playhead,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
     {
+        var mask = EditMask(document, channel, channelMask);
         SplitVisibleAroundPlayhead(visible, playhead, document.FrameCount, out var fadeOut, out var fadeIn);
         if (fadeOut.IsEmpty && fadeIn.IsEmpty)
         {
@@ -927,8 +945,8 @@ internal static class ProcessEdits
 
         var before = document.CopyRange(union.StartFrame, union.Length);
         var after = (float[])before.Clone();
-        ApplyFadeGains(after, document.Channels, union.StartFrame, fadeOut, fadeIn: false);
-        ApplyFadeGains(after, document.Channels, union.StartFrame, fadeIn, fadeIn: true);
+        ApplyFadeGains(after, document.Channels, union.StartFrame, fadeOut, fadeIn: false, mask);
+        ApplyFadeGains(after, document.Channels, union.StartFrame, fadeIn, fadeIn: true, mask);
         var cursor = Math.Clamp(playhead, 0, Math.Max(0, document.FrameCount));
         var command = new ReplaceRangeCommand(
             "Fade Around Playhead",
@@ -952,7 +970,11 @@ internal static class ProcessEdits
             var mappedVisible = EditReplay.MapRange(sourceVisible, sourceRate, target);
             return mappedVisible.IsEmpty
                 ? null
-                : FadeAroundPlayhead(target, mappedVisible, EditReplay.MapFrame(sourcePlayhead, sourceRate, target));
+                : FadeAroundPlayhead(
+                    target,
+                    mappedVisible,
+                    EditReplay.MapFrame(sourcePlayhead, sourceRate, target),
+                    channelMask: mask);
         };
         command.Persist = new HistoryRecipe
         {
@@ -961,6 +983,7 @@ internal static class ProcessEdits
             Start = sourceVisible.StartFrame,
             End = sourceVisible.EndFrame,
             Playhead = sourcePlayhead,
+            ChannelMask = mask,
         };
         return command;
     }
@@ -978,29 +1001,22 @@ internal static class ProcessEdits
         fadeIn = new WaveSelection(Math.Max(playhead, visible.StartFrame), visible.EndFrame).Clamp(frameCount);
     }
 
-    public static IEditCommand Normalize(AudioDocument document, WaveSelection range)
+    public static IEditCommand Normalize(
+        AudioDocument document,
+        WaveSelection range,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
     {
+        var mask = EditMask(document, channel, channelMask);
         var before = document.CopyRange(range.StartFrame, range.Length);
         var after = (float[])before.Clone();
-        var peak = 0f;
-        foreach (var sample in after)
-        {
-            var abs = Math.Abs(sample);
-            if (abs > peak)
-            {
-                peak = abs;
-            }
-        }
+        var peak = ChannelSamples.Peak(after, document.Channels, mask);
 
         if (peak > 1e-8f)
         {
             // Sound Forge 既定に合わせ -0.1 dB ヘッドルーム。
             var target = (float)Math.Pow(10d, -0.1d / 20d);
-            var gain = target / peak;
-            for (var i = 0; i < after.Length; i++)
-            {
-                after[i] *= gain;
-            }
+            ChannelSamples.ApplyGain(after, document.Channels, mask, target / peak);
         }
 
         var command = new ReplaceRangeCommand(
@@ -1018,14 +1034,20 @@ internal static class ProcessEdits
                 range.StartFrame,
                 range.EndFrame));
         // 再適用時はゲインを適用先のピークから再計算する。
-        AttachRangeReplay(command, document.SampleRate, range, Normalize);
-        command.Persist = HistoryRecipes.Range(HistoryRecipes.Normalize, document.SampleRate, range);
+        AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => Normalize(target, mapped, channelMask: mask));
+        command.Persist = HistoryRecipes.Range(HistoryRecipes.Normalize, document.SampleRate, range, channelMask: mask);
         return command;
     }
 
-    public static IEditCommand? Gain(AudioDocument document, WaveSelection range, double gainDb)
+    public static IEditCommand? Gain(
+        AudioDocument document,
+        WaveSelection range,
+        double gainDb,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
     {
         range = range.Clamp(document.FrameCount);
+        var mask = EditMask(document, channel, channelMask);
         gainDb = WaveformGainAnalyzer.SnapGainDb(gainDb);
         if (range.IsEmpty || WaveformGainAnalyzer.IsNoOp(gainDb))
         {
@@ -1035,10 +1057,7 @@ internal static class ProcessEdits
         var linear = (float)WaveformGainAnalyzer.LinearFromDb(gainDb);
         var before = document.CopyRange(range.StartFrame, range.Length);
         var after = (float[])before.Clone();
-        for (var i = 0; i < after.Length; i++)
-        {
-            after[i] *= linear;
-        }
+        ChannelSamples.ApplyGain(after, document.Channels, mask, linear);
 
         var extra = UiStrings.FormatSignedDb(gainDb);
         var command = new ReplaceRangeCommand(
@@ -1057,8 +1076,8 @@ internal static class ProcessEdits
                 range.EndFrame,
                 extra));
         var snapped = gainDb;
-        AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => Gain(target, mapped, snapped));
-        command.Persist = HistoryRecipes.FromGain(document.SampleRate, range, snapped);
+        AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => Gain(target, mapped, snapped, channelMask: mask));
+        command.Persist = HistoryRecipes.FromGain(document.SampleRate, range, snapped, channelMask: mask);
         return command;
     }
 
@@ -1067,9 +1086,12 @@ internal static class ProcessEdits
         WaveSelection range,
         int semitones,
         bool timeStretch = true,
-        IProgress<double>? progress = null)
+        IProgress<double>? progress = null,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
     {
         range = range.Clamp(document.FrameCount);
+        var mask = EditMask(document, channel, channelMask);
         semitones = Audio.PitchShift.Snap(semitones);
         if (range.IsEmpty || Audio.PitchShift.IsNoOp(semitones))
         {
@@ -1078,18 +1100,36 @@ internal static class ProcessEdits
 
         progress?.Report(0);
         var before = document.CopyRange(range.StartFrame, range.Length);
-        var after = Audio.PitchShift.Apply(
-            before,
-            document.Channels,
-            document.SampleRate,
-            semitones,
-            timeStretch,
-            progress);
+        float[] after;
+        if (ChannelSamples.IsScoped(mask, document.Channels))
+        {
+            var extracted = ChannelSamples.ExtractScope(before, document.Channels, mask);
+            var processed = Audio.PitchShift.Apply(
+                extracted.Samples,
+                extracted.Channels,
+                document.SampleRate,
+                semitones,
+                timeStretch,
+                progress);
+            after = (float[])before.Clone();
+            ChannelSamples.WriteFitted(after, document.Channels, mask, processed, extracted.Channels);
+        }
+        else
+        {
+            after = Audio.PitchShift.Apply(
+                before,
+                document.Channels,
+                document.SampleRate,
+                semitones,
+                timeStretch,
+                progress);
+        }
+
         progress?.Report(1);
         var extra = UiStrings.FormatPitchShiftExtra(semitones, timeStretch);
         var snapped = semitones;
         var stretch = timeStretch;
-        if (timeStretch && after.Length == before.Length)
+        if (after.Length == before.Length)
         {
             var command = new ReplaceRangeCommand(
                 "Pitch Shift",
@@ -1106,8 +1146,12 @@ internal static class ProcessEdits
                     range.StartFrame,
                     range.EndFrame,
                     extra));
-            AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => PitchShift(target, mapped, snapped, stretch));
-            command.Persist = HistoryRecipes.FromPitchShift(document.SampleRate, range, snapped, stretch);
+            AttachRangeReplay(
+                command,
+                document.SampleRate,
+                range,
+                (target, mapped) => PitchShift(target, mapped, snapped, stretch, channelMask: mask));
+            command.Persist = HistoryRecipes.FromPitchShift(document.SampleRate, range, snapped, stretch, channelMask: mask);
             return command;
         }
 
@@ -1142,8 +1186,12 @@ internal static class ProcessEdits
                 range.StartFrame,
                 range.EndFrame,
                 extra));
-        AttachRangeReplay(splice, document.SampleRate, range, (target, mapped) => PitchShift(target, mapped, snapped, stretch));
-        splice.Persist = HistoryRecipes.FromPitchShift(document.SampleRate, range, snapped, stretch);
+        AttachRangeReplay(
+            splice,
+            document.SampleRate,
+            range,
+            (target, mapped) => PitchShift(target, mapped, snapped, stretch, channelMask: mask));
+        splice.Persist = HistoryRecipes.FromPitchShift(document.SampleRate, range, snapped, stretch, channelMask: mask);
         return splice;
     }
 
@@ -1151,9 +1199,12 @@ internal static class ProcessEdits
         AudioDocument document,
         WaveSelection range,
         int destFrames,
-        IProgress<double>? progress = null)
+        IProgress<double>? progress = null,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
     {
         range = range.Clamp(document.FrameCount);
+        var mask = EditMask(document, channel, channelMask);
         destFrames = Audio.TimeStretch.ClampDestFrames((int)range.Length, destFrames);
         if (range.IsEmpty || Audio.TimeStretch.IsNoOp((int)range.Length, destFrames))
         {
@@ -1162,16 +1213,60 @@ internal static class ProcessEdits
 
         progress?.Report(0);
         var before = document.CopyRange(range.StartFrame, range.Length);
-        var after = Audio.TimeStretch.Apply(
-            before,
-            document.Channels,
-            document.SampleRate,
-            destFrames,
-            progress);
+        float[] after;
+        if (ChannelSamples.IsScoped(mask, document.Channels))
+        {
+            var extracted = ChannelSamples.ExtractScope(before, document.Channels, mask);
+            var processed = Audio.TimeStretch.Apply(
+                extracted.Samples,
+                extracted.Channels,
+                document.SampleRate,
+                destFrames,
+                progress);
+            after = (float[])before.Clone();
+            ChannelSamples.WriteFitted(after, document.Channels, mask, processed, extracted.Channels);
+        }
+        else
+        {
+            after = Audio.TimeStretch.Apply(
+                before,
+                document.Channels,
+                document.SampleRate,
+                destFrames,
+                progress);
+        }
+
         progress?.Report(1);
         var extra = UiStrings.FormatTimeStretchExtra(document.SampleRate, (int)range.Length, destFrames);
         var oldFrames = range.Length;
         var ratio = destFrames / (double)oldFrames;
+        if (after.Length == before.Length)
+        {
+            var replace = new ReplaceRangeCommand(
+                "Time Stretch",
+                range.StartFrame,
+                before,
+                after,
+                document.Selection,
+                WaveSelection.Empty,
+                document.CursorFrame,
+                document.CursorFrame,
+                UiStrings.EditHistoryRange(
+                    UiStrings.EditHistoryName("Time Stretch"),
+                    document.SampleRate,
+                    range.StartFrame,
+                    range.EndFrame,
+                    extra));
+            AttachRangeReplay(replace, document.SampleRate, range, (target, mapped) =>
+                TimeStretch(
+                    target,
+                    mapped,
+                    Audio.TimeStretch.DestFrameCountFromRatio((int)mapped.Length, ratio),
+                    channelMask: mask));
+            replace.Persist = HistoryRecipes.FromTimeStretch(document.SampleRate, range, ratio, channelMask: mask);
+            return replace;
+        }
+
         var newFrames = after.Length / Math.Max(1, document.Channels);
         var markersAfter = MapMarkersThroughRange(document.SnapshotMarkers(), range.StartFrame, oldFrames, newFrames);
         var regionsAfter = MapRegionsThroughRange(document.SnapshotRegions(), range.StartFrame, oldFrames, newFrames);
@@ -1203,14 +1298,23 @@ internal static class ProcessEdits
                 range.EndFrame,
                 extra));
         AttachRangeReplay(splice, document.SampleRate, range, (target, mapped) =>
-            TimeStretch(target, mapped, Audio.TimeStretch.DestFrameCountFromRatio((int)mapped.Length, ratio)));
-        splice.Persist = HistoryRecipes.FromTimeStretch(document.SampleRate, range, ratio);
+            TimeStretch(
+                target,
+                mapped,
+                Audio.TimeStretch.DestFrameCountFromRatio((int)mapped.Length, ratio),
+                channelMask: mask));
+        splice.Persist = HistoryRecipes.FromTimeStretch(document.SampleRate, range, ratio, channelMask: mask);
         return splice;
     }
 
-    public static IEditCommand? Reverse(AudioDocument document, WaveSelection range)
+    public static IEditCommand? Reverse(
+        AudioDocument document,
+        WaveSelection range,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
     {
         range = range.Clamp(document.FrameCount);
+        var mask = EditMask(document, channel, channelMask);
         if (range.Length < 2)
         {
             return null;
@@ -1218,6 +1322,7 @@ internal static class ProcessEdits
 
         var before = document.CopyRange(range.StartFrame, range.Length);
         var after = Audio.Reverse.Apply(before, document.Channels);
+        ChannelSamples.RestoreOthers(before, after, document.Channels, mask);
         var command = new ReplaceRangeCommand(
             "Reverse",
             range.StartFrame,
@@ -1232,8 +1337,8 @@ internal static class ProcessEdits
                 document.SampleRate,
                 range.StartFrame,
                 range.EndFrame));
-        AttachRangeReplay(command, document.SampleRate, range, Reverse);
-        command.Persist = HistoryRecipes.Range(HistoryRecipes.Reverse, document.SampleRate, range);
+        AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => Reverse(target, mapped, channelMask: mask));
+        command.Persist = HistoryRecipes.Range(HistoryRecipes.Reverse, document.SampleRate, range, channelMask: mask);
         return command;
     }
 
@@ -1310,8 +1415,37 @@ internal static class ProcessEdits
         return new WaveSelection(start, end);
     }
 
-    public static IEditCommand Delete(AudioDocument document, WaveSelection range)
+    public static IEditCommand Delete(
+        AudioDocument document,
+        WaveSelection range,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
     {
+        var mask = EditMask(document, channel, channelMask);
+        if (ChannelSamples.IsScoped(mask, document.Channels))
+        {
+            var before = document.CopyRange(range.StartFrame, range.Length);
+            var after = (float[])before.Clone();
+            ChannelSamples.Silence(after, document.Channels, mask);
+            var silence = new ReplaceRangeCommand(
+                "Delete",
+                range.StartFrame,
+                before,
+                after,
+                document.Selection,
+                document.Selection,
+                document.CursorFrame,
+                document.CursorFrame,
+                UiStrings.EditHistoryRange(
+                    UiStrings.EditHistoryName("Delete"),
+                    document.SampleRate,
+                    range.StartFrame,
+                    range.EndFrame));
+            AttachRangeReplay(silence, document.SampleRate, range, (target, mapped) => Delete(target, mapped, channelMask: mask));
+            silence.Persist = HistoryRecipes.Range(HistoryRecipes.Delete, document.SampleRate, range, channelMask: mask);
+            return silence;
+        }
+
         var removed = document.CopyRange(range.StartFrame, range.Length);
         var command = new DeleteRangeCommand(
             range.StartFrame,
@@ -1326,32 +1460,60 @@ internal static class ProcessEdits
                 document.SampleRate,
                 range.StartFrame,
                 range.EndFrame));
-        AttachRangeReplay(command, document.SampleRate, range, Delete);
-        command.Persist = HistoryRecipes.Range(HistoryRecipes.Delete, document.SampleRate, range);
+        AttachRangeReplay(command, document.SampleRate, range, (target, mapped) => Delete(target, mapped, channelMask: mask));
+        command.Persist = HistoryRecipes.Range(HistoryRecipes.Delete, document.SampleRate, range, channelMask: mask);
         return command;
     }
 
-    public static AudioClip? Copy(AudioDocument document, WaveSelection range)
+    public static AudioClip? Copy(
+        AudioDocument document,
+        WaveSelection range,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
     {
         range = range.Clamp(document.FrameCount);
+        var mask = EditMask(document, channel, channelMask);
         if (range.IsEmpty)
         {
             return null;
         }
 
+        var interleaved = document.CopyRange(range.StartFrame, range.Length);
+        if (ChannelSamples.IsScoped(mask, document.Channels))
+        {
+            var extracted = ChannelSamples.ExtractScope(interleaved, document.Channels, mask);
+            return new AudioClip(
+                extracted.Samples,
+                extracted.Channels,
+                document.SampleRate,
+                document.SnapshotMarkersInRange(range),
+                document.SnapshotExactRegions(range));
+        }
+
         return new AudioClip(
-            document.CopyRange(range.StartFrame, range.Length),
+            interleaved,
             document.Channels,
             document.SampleRate,
             document.SnapshotMarkersInRange(range),
             document.SnapshotExactRegions(range));
     }
 
-    public static IEditCommand? Paste(AudioDocument document, AudioClip clip, long insertFrame)
+    public static IEditCommand? Paste(
+        AudioDocument document,
+        AudioClip clip,
+        long insertFrame,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
     {
         if (clip.IsEmpty)
         {
             return null;
+        }
+
+        var mask = EditMask(document, channel, channelMask);
+        if (ChannelSamples.IsScoped(mask, document.Channels))
+        {
+            return PasteChannel(document, clip, insertFrame, mask);
         }
 
         var samples = clip.AdaptTo(document.Channels);
@@ -1394,8 +1556,57 @@ internal static class ProcessEdits
                 insertFrame + insertedFrames));
         var sourceRate = document.SampleRate;
         var resolvedFrame = insertFrame;
-        command.Replay = target => Paste(target, clip, EditReplay.MapFrame(resolvedFrame, sourceRate, target));
-        command.Persist = HistoryRecipes.FromPaste(sourceRate, resolvedFrame, clip);
+        command.Replay = target => Paste(target, clip, EditReplay.MapFrame(resolvedFrame, sourceRate, target), channelMask: mask);
+        command.Persist = HistoryRecipes.FromPaste(sourceRate, resolvedFrame, clip, channelMask: mask);
+        return command;
+    }
+
+    private static IEditCommand? PasteChannel(
+        AudioDocument document,
+        AudioClip clip,
+        long insertFrame,
+        int mask)
+    {
+        var replace = document.Selection.Clamp(document.FrameCount);
+        long destStart;
+        long destFrames;
+        if (!replace.IsEmpty)
+        {
+            destStart = replace.StartFrame;
+            destFrames = replace.Length;
+        }
+        else
+        {
+            destStart = Math.Clamp(insertFrame, 0, document.FrameCount);
+            destFrames = clip.FrameCount;
+        }
+
+        destFrames = Math.Min(destFrames, document.FrameCount - destStart);
+        if (destFrames <= 0)
+        {
+            return null;
+        }
+
+        var before = document.CopyRange(destStart, destFrames);
+        var after = (float[])before.Clone();
+        ChannelSamples.WriteFitted(after, document.Channels, mask, clip.Interleaved, clip.Channels);
+        var command = new ReplaceRangeCommand(
+            "Paste",
+            destStart,
+            before,
+            after,
+            document.Selection,
+            document.Selection,
+            document.CursorFrame,
+            document.CursorFrame,
+            UiStrings.EditHistoryRange(
+                UiStrings.EditHistoryName("Paste"),
+                document.SampleRate,
+                destStart,
+                destStart + destFrames));
+        var sourceRate = document.SampleRate;
+        command.Replay = target => Paste(target, clip, EditReplay.MapFrame(destStart, sourceRate, target), channelMask: mask);
+        command.Persist = HistoryRecipes.FromPaste(sourceRate, destStart, clip, channelMask: mask);
         return command;
     }
 
@@ -2064,7 +2275,8 @@ internal static class ProcessEdits
         WaveSelection range,
         bool fadeIn,
         string name,
-        FadeShape shape)
+        FadeShape shape,
+        int mask)
     {
         var span = range;
         range = FadeCurves.InclusiveSampleRange(range, document.FrameCount);
@@ -2074,7 +2286,7 @@ internal static class ProcessEdits
         var frames = (int)range.Length;
         if (frames <= 1)
         {
-            Array.Clear(after);
+            ChannelSamples.Silence(after, channels, mask);
         }
         else
         {
@@ -2085,7 +2297,10 @@ internal static class ProcessEdits
                 var offset = frame * channels;
                 for (var ch = 0; ch < channels; ch++)
                 {
-                    after[offset + ch] *= gain;
+                    if (ChannelSolo.Contains(mask, ch))
+                    {
+                        after[offset + ch] *= gain;
+                    }
                 }
             }
         }
@@ -2112,7 +2327,8 @@ internal static class ProcessEdits
         int channels,
         long bufferStart,
         WaveSelection range,
-        bool fadeIn)
+        bool fadeIn,
+        int mask)
     {
         if (range.IsEmpty || samples.Length == 0 || channels < 1)
         {
@@ -2126,7 +2342,14 @@ internal static class ProcessEdits
             var index = offsetFrames * channels;
             if ((uint)index < (uint)samples.Length)
             {
-                Array.Clear(samples, index, Math.Min(channels, samples.Length - index));
+                var count = Math.Min(channels, samples.Length - index);
+                for (var ch = 0; ch < count; ch++)
+                {
+                    if (ChannelSolo.Contains(mask, ch))
+                    {
+                        samples[index + ch] = 0;
+                    }
+                }
             }
 
             return;
@@ -2145,7 +2368,10 @@ internal static class ProcessEdits
             var count = Math.Min(channels, samples.Length - offset);
             for (var ch = 0; ch < count; ch++)
             {
-                samples[offset + ch] *= gain;
+                if (ChannelSolo.Contains(mask, ch))
+                {
+                    samples[offset + ch] *= gain;
+                }
             }
         }
     }

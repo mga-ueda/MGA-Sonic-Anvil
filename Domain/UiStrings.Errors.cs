@@ -28,6 +28,9 @@ internal static partial class UiStrings
     public static string ErrorToneFailed => Get(
         "テスト音を再生できませんでした。",
         "Could not play the test tone.");
+    public static string ErrorChannelVoiceFailed => Get(
+        "チャンネル名を読み上げられませんでした。Windows の英語音声合成を確認してください。",
+        "Could not speak the channel name. Check Windows English speech synthesis.");
     public static string ErrAudioOutputUnavailable => Get(
         "Audio output device is not available.",
         "Audio output device is not available.");

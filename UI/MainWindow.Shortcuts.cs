@@ -347,6 +347,18 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.Tab && modifiers == ModifierKeys.None)
+        {
+            CycleChannelSolo(1);
+            return true;
+        }
+
+        if (key == Key.Tab && modifiers == ModifierKeys.Shift)
+        {
+            CycleChannelSolo(-1);
+            return true;
+        }
+
         if (key == Key.PageDown && modifiers == ModifierKeys.Control)
         {
             ActivateAdjacentTab(1);

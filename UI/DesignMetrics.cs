@@ -1,4 +1,5 @@
 using System.Windows;
+using MgaSonicAnvil.Audio;
 
 namespace MgaSonicAnvil.UI;
 
@@ -74,6 +75,8 @@ internal static class DesignMetrics
 
     public static double TransportGroupGap => Dip(6);
 
+    public static double TransportSpeakerComboWidth => From96(168);
+
     public static double StatusTimecodeWidth => From96(86);
 
     public static double StatusTimecodeLabelWidth => From96(22);
@@ -111,9 +114,6 @@ internal static class DesignMetrics
     /// <summary>設定ウィンドウの下限幅（タブ見出しが切れない程度）。</summary>
     public static double SettingsWindowMinWidth => From96(480);
 
-    /// <summary>設定ウィンドウ幅の旧固定値。内容幅の計算がまだのときの予備。</summary>
-    public static double SettingsWindowWidth => From96(1024);
-
     /// <summary>オーディオタブ内容の外側に足す余白。</summary>
     public static double SettingsWindowContentMargin => From96(16);
 
@@ -140,20 +140,20 @@ internal static class DesignMetrics
 
     public static GridLength SettingsColumnGapGrid => new(SettingsColumnGap);
 
-    /// <summary>録音／再生ポート行のチャンネル名列。</summary>
-    public static double SettingsChannelLabelWidth => From96(72);
-
     /// <summary>入力ルーティング行の横レベルバー。</summary>
     public static double SettingsLevelBarWidth => From96(88);
 
-    /// <summary>Sine −20 dB ボタン。</summary>
-    public static double SettingsSineButtonWidth => From96(128);
+    /// <summary>再生ポート行の Sine −20 dB ボタン。</summary>
+    public static double SettingsSineButtonWidth => From96(108);
 
-    /// <summary>設定の短いコンボ（Auto / Japanese / WaveOut など）。</summary>
-    public static double SettingsShortComboWidth => From96(128);
+    /// <summary>再生ポート行の Voice ボタン。</summary>
+    public static double SettingsVoiceButtonWidth => From96(56);
 
-    /// <summary>設定のビットレート（320 kbps）。</summary>
-    public static double SettingsBitRateComboWidth => From96(108);
+    /// <summary>ポートコンボとテストボタンのあいだ。</summary>
+    public static double SettingsTestButtonGap => From96(6);
+
+    /// <summary>ファイル Ch コンボの下限幅（「Ch16」）。</summary>
+    public static double SettingsFileLaneComboMinWidth => From96(72);
 
     /// <summary>設定のラウドネス値（-70.0）。</summary>
     public static double SettingsLoudnessBoxWidth => From96(72);
@@ -170,8 +170,28 @@ internal static class DesignMetrics
 
     public static double FadeOptionRowHeight => AudioInputHeight;
 
-    /// <summary>目盛 22×2 + バー 14×4。枠なしの最小幅。</summary>
+    /// <summary>目盛 22×2 + バー 14×4。枠なしの既定かつ最小幅。</summary>
     public static double LevelMeterWidth => From96(100);
 
     public static GridLength LevelMeterWidthGrid => new(LevelMeterWidth);
+
+    /// <summary>バーが最大太さになる列幅（16ch）。チャンネル数が少ないとこれより狭い。</summary>
+    public static double LevelMeterWidthMax =>
+        LevelMeterSurroundLayout.FilledColumnWidth(ChannelLayout.MaxChannels);
+
+    /// <summary>メーター列左端のドラッグ幅。</summary>
+    public static double MeterColumnSplitterWidth => From96(4);
+
+    public static double ClampMeterColumnWidth(double width) =>
+        ClampMeterColumnWidth(width, ChannelLayout.MaxChannels);
+
+    public static double ClampMeterColumnWidth(double width, int channels)
+    {
+        if (width <= 0)
+        {
+            return LevelMeterWidth;
+        }
+
+        return Math.Clamp(width, LevelMeterWidth, LevelMeterSurroundLayout.FilledColumnWidth(channels));
+    }
 }

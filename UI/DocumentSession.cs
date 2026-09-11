@@ -28,6 +28,9 @@ internal sealed class DocumentSession
 
     public bool LoopEnabled { get; set; } = true;
 
+    /// <summary>波形レーンのソロ。0 は解除。bit i がそのレーン。</summary>
+    public int SoloMask { get; set; }
+
     public string DisplayName =>
         Document.SourcePath is { } path
             ? System.IO.Path.GetFileName(path)

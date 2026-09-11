@@ -597,6 +597,103 @@ public sealed class ProcessEditsTests
         Assert.Equal(0.8f, document.Interleaved[5]);
     }
 
+    [Fact]
+    public void FadeIn_OnlyTouchesSoloChannel()
+    {
+        var document = MakeConstant(frames: 5, value: 1f);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.FadeIn(document, new WaveSelection(0, 5), FadeShape.Linear, channel: 0));
+
+        Assert.Equal(0f, document.Interleaved[0], 5);
+        Assert.Equal(1f, document.Interleaved[1], 5);
+        Assert.Equal(1f, document.Interleaved[8], 5);
+        Assert.Equal(1f, document.Interleaved[9], 5);
+    }
+
+    [Fact]
+    public void Normalize_UsesSoloChannelPeak()
+    {
+        var samples = new float[] { 0.5f, 1f, 0.5f, 1f };
+        var document = new AudioDocument(samples, 48000, 2, 24, AudioFileKind.Wave, null);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.Normalize(document, new WaveSelection(0, 2), channel: 0));
+
+        var target = (float)Math.Pow(10d, -0.1d / 20d);
+        Assert.Equal(target, document.Interleaved[0], 4);
+        Assert.Equal(1f, document.Interleaved[1], 5);
+    }
+
+    [Fact]
+    public void Delete_SilencesSoloChannel()
+    {
+        var document = MakeConstant(frames: 4, value: 0.4f);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.Delete(document, new WaveSelection(1, 3), channel: 1));
+
+        Assert.Equal(4, document.FrameCount);
+        Assert.Equal(0.4f, document.Interleaved[0], 5);
+        Assert.Equal(0.4f, document.Interleaved[1], 5);
+        Assert.Equal(0.4f, document.Interleaved[2], 5);
+        Assert.Equal(0f, document.Interleaved[3], 5);
+        Assert.Equal(0.4f, document.Interleaved[4], 5);
+        Assert.Equal(0f, document.Interleaved[5], 5);
+    }
+
+    [Fact]
+    public void Reverse_OnlySoloChannel()
+    {
+        var samples = new float[] { 1f, 10f, 2f, 20f, 3f, 30f, 4f, 40f };
+        var document = new AudioDocument(samples, 48000, 2, 24, AudioFileKind.Wave, null);
+        new EditHistory().Do(document, ProcessEdits.Reverse(document, new WaveSelection(0, 4), channel: 0)!);
+
+        Assert.Equal(4f, document.Interleaved[0], 5);
+        Assert.Equal(10f, document.Interleaved[1], 5);
+        Assert.Equal(3f, document.Interleaved[2], 5);
+        Assert.Equal(20f, document.Interleaved[3], 5);
+    }
+
+    [Fact]
+    public void Copy_ExtractsSoloChannel()
+    {
+        var samples = new float[] { 0.1f, 0.9f, 0.2f, 0.8f };
+        var document = new AudioDocument(samples, 48000, 2, 24, AudioFileKind.Wave, null);
+        var clip = ProcessEdits.Copy(document, new WaveSelection(0, 2), channel: 1);
+        Assert.NotNull(clip);
+        Assert.Equal(1, clip.Channels);
+        Assert.Equal(new[] { 0.9f, 0.8f }, clip.Interleaved);
+    }
+
+    [Fact]
+    public void Paste_WritesSoloChannelWithoutChangingLength()
+    {
+        var document = MakeConstant(frames: 4, value: 0.1f);
+        var clip = new AudioClip([0.8f, 0.8f], channels: 1, sampleRate: 48000);
+        document.Selection = new WaveSelection(1, 3);
+        new EditHistory().Do(document, ProcessEdits.Paste(document, clip, 1, channel: 0)!);
+
+        Assert.Equal(4, document.FrameCount);
+        Assert.Equal(0.1f, document.Interleaved[0], 5);
+        Assert.Equal(0.8f, document.Interleaved[2], 5);
+        Assert.Equal(0.1f, document.Interleaved[3], 5);
+    }
+
+    [Fact]
+    public void FadeIn_TouchesSelectedMaskOnly()
+    {
+        var samples = new float[5 * 3];
+        Array.Fill(samples, 1f);
+        var document = new AudioDocument(samples, 48000, 3, 24, AudioFileKind.Wave, null);
+        new EditHistory().Do(
+            document,
+            ProcessEdits.FadeIn(document, new WaveSelection(0, 5), FadeShape.Linear, channelMask: 1 | 2));
+
+        Assert.Equal(0f, document.Interleaved[0], 5);
+        Assert.Equal(0f, document.Interleaved[1], 5);
+        Assert.Equal(1f, document.Interleaved[2], 5);
+        Assert.Equal(1f, document.Interleaved[12], 5);
+        Assert.Equal(1f, document.Interleaved[14], 5);
+    }
+
     private static AudioDocument MakeConstant(int frames, float value)
     {
         var samples = new float[frames * 2];

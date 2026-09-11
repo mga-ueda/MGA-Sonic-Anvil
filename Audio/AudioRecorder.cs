@@ -14,7 +14,9 @@ internal sealed class AudioRecorder : IDisposable
     private float[] _samples = [];
     private int _count;
     private int[] _map = [];
+    private int[] _fileMap = [];
     private int _sourceChannels = 1;
+    private int _speakerChannels = 2;
     private int _destChannels = 2;
     private int _sampleRate = 48000;
     private bool _recording;
@@ -69,10 +71,13 @@ internal sealed class AudioRecorder : IDisposable
         AudioOutputSettings output,
         string? recordDeviceId,
         ChannelLayout layout,
-        int[]? inputMap)
+        int[]? inputMap,
+        int[]? fileChannelMap = null)
     {
         Stop();
-        _destChannels = Math.Clamp(layout.Channels, 1, ChannelLayout.MaxChannels);
+        _speakerChannels = Math.Clamp(layout.Channels, 1, ChannelLayout.MaxChannels);
+        _destChannels = ChannelRouter.DestLaneCount(_speakerChannels, fileChannelMap);
+        _fileMap = ChannelRouter.Normalize(fileChannelMap, _speakerChannels, _destChannels);
         lock (_gate)
         {
             _samples = new float[_destChannels * _sampleRate];
@@ -85,13 +90,13 @@ internal sealed class AudioRecorder : IDisposable
             switch (output.Api)
             {
                 case AudioOutputApi.Wasapi:
-                    StartWasapi(recordDeviceId, layout, inputMap);
+                    StartWasapi(recordDeviceId, layout, inputMap, fileChannelMap);
                     break;
                 case AudioOutputApi.Asio:
-                    StartAsio(output.DeviceId, layout, inputMap);
+                    StartAsio(output.DeviceId, layout, inputMap, fileChannelMap);
                     break;
                 default:
-                    StartWaveIn(recordDeviceId, layout, inputMap);
+                    StartWaveIn(recordDeviceId, layout, inputMap, fileChannelMap);
                     break;
             }
         }
@@ -140,7 +145,7 @@ internal sealed class AudioRecorder : IDisposable
 
     public void Dispose() => Stop();
 
-    private void StartWaveIn(string? deviceId, ChannelLayout layout, int[]? inputMap)
+    private void StartWaveIn(string? deviceId, ChannelLayout layout, int[]? inputMap, int[]? fileChannelMap)
     {
         var index = AudioCaptureFactory.ParseIndex(deviceId);
         if (WaveIn.DeviceCount < 1)
@@ -162,26 +167,26 @@ internal sealed class AudioRecorder : IDisposable
             WaveFormat = new WaveFormat(rate, 16, channels),
             BufferMilliseconds = 50,
         };
-        PrepareRoute(waveIn.WaveFormat.SampleRate, channels, layout, inputMap);
+        PrepareRoute(waveIn.WaveFormat.SampleRate, channels, layout, inputMap, fileChannelMap);
         waveIn.DataAvailable += (_, e) => AppendPcm(e.Buffer, e.BytesRecorded, waveIn.WaveFormat);
         waveIn.StartRecording();
         _capture = waveIn;
     }
 
-    private void StartWasapi(string? deviceId, ChannelLayout layout, int[]? inputMap)
+    private void StartWasapi(string? deviceId, ChannelLayout layout, int[]? inputMap, int[]? fileChannelMap)
     {
         using var enumerator = new MMDeviceEnumerator();
         var device = string.IsNullOrWhiteSpace(deviceId)
             ? enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia)
             : enumerator.GetDevice(deviceId);
         var capture = new WasapiCapture(device);
-        PrepareRoute(capture.WaveFormat.SampleRate, capture.WaveFormat.Channels, layout, inputMap);
+        PrepareRoute(capture.WaveFormat.SampleRate, capture.WaveFormat.Channels, layout, inputMap, fileChannelMap);
         capture.DataAvailable += (_, e) => AppendPcm(e.Buffer, e.BytesRecorded, capture.WaveFormat);
         capture.StartRecording();
         _capture = new CaptureLease(capture, device);
     }
 
-    private void StartAsio(string? driverName, ChannelLayout layout, int[]? inputMap)
+    private void StartAsio(string? driverName, ChannelLayout layout, int[]? inputMap, int[]? fileChannelMap)
     {
         var names = AsioDriver.GetAsioDriverNames();
         if (names.Length == 0)
@@ -210,7 +215,7 @@ internal sealed class AudioRecorder : IDisposable
             // ドライバ既定のまま。
         }
 
-        PrepareRoute(rate, inputCount, layout, inputMap);
+        PrepareRoute(rate, inputCount, layout, inputMap, fileChannelMap);
         var silence = new SilenceSampleProvider(WaveFormat.CreateIeeeFloatWaveFormat(rate, Math.Min(2, Math.Max(1, asio.DriverOutputChannelCount))));
         asio.InitRecordAndPlayback(new SampleToWaveProvider(silence), inputCount, 0);
         asio.AudioAvailable += OnAsioAudio;
@@ -230,12 +235,19 @@ internal sealed class AudioRecorder : IDisposable
         AppendRouted(_routeScratch.AsSpan(0, needed));
     }
 
-    private void PrepareRoute(int sampleRate, int sourceChannels, ChannelLayout layout, int[]? inputMap)
+    private void PrepareRoute(
+        int sampleRate,
+        int sourceChannels,
+        ChannelLayout layout,
+        int[]? inputMap,
+        int[]? fileChannelMap)
     {
         _sampleRate = Math.Clamp(sampleRate, 1000, 384000);
         _sourceChannels = Math.Max(1, sourceChannels);
-        _destChannels = Math.Clamp(layout.Channels, 1, ChannelLayout.MaxChannels);
-        _map = ChannelRouter.Normalize(inputMap, _destChannels, _sourceChannels);
+        _speakerChannels = Math.Clamp(layout.Channels, 1, ChannelLayout.MaxChannels);
+        _destChannels = ChannelRouter.DestLaneCount(_speakerChannels, fileChannelMap);
+        _map = ChannelRouter.Normalize(inputMap, _speakerChannels, _sourceChannels);
+        _fileMap = ChannelRouter.Normalize(fileChannelMap, _speakerChannels, _destChannels);
         lock (_gate)
         {
             _samples = new float[Math.Max(_destChannels * _sampleRate, _destChannels)];
@@ -271,6 +283,7 @@ internal sealed class AudioRecorder : IDisposable
             return;
         }
 
+        Span<float> speakers = stackalloc float[_speakerChannels];
         Span<float> dest = stackalloc float[destCh];
         lock (_gate)
         {
@@ -282,7 +295,8 @@ internal sealed class AudioRecorder : IDisposable
             EnsureCapacity(frames * destCh);
             for (var frame = 0; frame < frames; frame++)
             {
-                ChannelRouter.Gather(interleaved.Slice(frame * srcCh, srcCh), dest, _map);
+                ChannelRouter.Gather(interleaved.Slice(frame * srcCh, srcCh), speakers, _map);
+                ChannelRouter.Scatter(speakers, dest, _fileMap);
                 dest.CopyTo(_samples.AsSpan(_count, destCh));
                 _count += destCh;
             }

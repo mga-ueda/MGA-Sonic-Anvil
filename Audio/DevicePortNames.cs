@@ -1,4 +1,6 @@
+using System.IO;
 using System.Reflection;
+using System.Text;
 using NAudio.Wave;
 
 namespace MgaSonicAnvil.Audio;
@@ -97,6 +99,56 @@ internal static class DevicePortNames
 
         return ChannelMaskField.GetValue(extensible) is int mask ? mask : 0;
     }
+
+    /// <summary>ファイルの fmt から dwChannelMask を読む。無ければ 0。推測しない。</summary>
+    public static int ReadWaveFileChannelMask(string path)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: false);
+            if (ReadFourCc(reader) != "RIFF")
+            {
+                return 0;
+            }
+
+            _ = reader.ReadUInt32();
+            if (ReadFourCc(reader) != "WAVE")
+            {
+                return 0;
+            }
+
+            while (stream.Position + 8 <= stream.Length)
+            {
+                var id = ReadFourCc(reader);
+                var size = reader.ReadInt32();
+                var start = stream.Position;
+                if (id == "fmt " && size >= 40)
+                {
+                    _ = reader.ReadUInt16();
+                    _ = reader.ReadUInt16();
+                    _ = reader.ReadInt32();
+                    _ = reader.ReadInt32();
+                    _ = reader.ReadUInt16();
+                    _ = reader.ReadUInt16();
+                    _ = reader.ReadUInt16();
+                    _ = reader.ReadUInt16();
+                    return reader.ReadInt32();
+                }
+
+                stream.Position = start + size + (size & 1);
+            }
+        }
+        catch
+        {
+            return 0;
+        }
+
+        return 0;
+    }
+
+    private static string ReadFourCc(BinaryReader reader) =>
+        Encoding.ASCII.GetString(reader.ReadBytes(4));
 
     public static string[] FromWaveFormat(WaveFormat format)
     {

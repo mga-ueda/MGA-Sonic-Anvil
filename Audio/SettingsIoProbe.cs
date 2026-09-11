@@ -6,7 +6,7 @@ using NAudio.Wave.SampleProviders;
 
 namespace MgaSonicAnvil.Audio;
 
-/// <summary>設定画面用。入力ピーク監視と −20 dB 正弦波の試聴。</summary>
+/// <summary>設定画面用。入力ピーク監視と、再生ポートごとの Sine / Voice 試聴。</summary>
 internal sealed class SettingsIoProbe : IDisposable
 {
     private readonly object _gate = new();
@@ -22,6 +22,9 @@ internal sealed class SettingsIoProbe : IDisposable
     private int _destChannels = 2;
     private float[] _scratch = [];
     private bool _toneWanted;
+    private SettingsProbeKind _toneKind;
+    private int _toneChannel = ChannelRouter.Off;
+    private float[] _voiceLoop = [];
 
     public bool TonePlaying
     {
@@ -30,6 +33,28 @@ internal sealed class SettingsIoProbe : IDisposable
             lock (_gate)
             {
                 return _toneWanted && _tone is { Enabled: true };
+            }
+        }
+    }
+
+    public SettingsProbeKind ToneKind
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _toneKind;
+            }
+        }
+    }
+
+    public int ToneChannel
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _toneWanted ? _toneChannel : ChannelRouter.Off;
             }
         }
     }
@@ -118,7 +143,15 @@ internal sealed class SettingsIoProbe : IDisposable
 
         if (keepTone)
         {
-            return SetTone(true, output, playLayout, _outputMap);
+            SettingsProbeKind kind;
+            var channel = ChannelRouter.Off;
+            lock (_gate)
+            {
+                kind = _toneKind;
+                channel = _toneChannel;
+            }
+
+            return SetTone(true, kind, channel, output, playLayout, _outputMap);
         }
 
         return null;
@@ -126,9 +159,12 @@ internal sealed class SettingsIoProbe : IDisposable
 
     public string? SetTone(
         bool on,
+        SettingsProbeKind kind,
+        int logicalChannel,
         AudioOutputSettings output,
         ChannelLayout playLayout,
-        int[]? outputMap)
+        int[]? outputMap,
+        Func<int, float[]>? voiceFactory = null)
     {
         _playLayout = playLayout;
         if (outputMap is not null)
@@ -136,53 +172,71 @@ internal sealed class SettingsIoProbe : IDisposable
             _outputMap = outputMap;
         }
 
+        if (on && kind == SettingsProbeKind.Voice && SettingsTone.IsLfe(playLayout.LabelAt(logicalChannel)))
+        {
+            on = false;
+        }
+
         lock (_gate)
         {
             _toneWanted = on;
-        }
-
-        if (output.Api == AudioOutputApi.Asio)
-        {
-            if (_tone is null)
+            if (on)
             {
-                if (!on)
-                {
-                    return null;
-                }
-
-                Stop();
-                try
-                {
-                    StartAsio(output.DeviceId, _recordLayout, playLayout, inputMap: _inputMap, outputMap);
-                    _tone!.Enabled = true;
-                    return null;
-                }
-                catch (Exception ex)
-                {
-                    Stop();
-                    return string.IsNullOrWhiteSpace(ex.Message) ? UiStrings.ErrorToneFailed : ex.Message;
-                }
+                _toneKind = kind;
+                _toneChannel = logicalChannel;
             }
-
-            _tone.Enabled = on;
-            _tone.SetMap(_outputMap);
-            return null;
-        }
-
-        if (!on)
-        {
-            StopOutputOnly();
-            return null;
         }
 
         try
         {
-            StartOutput(output, playLayout, outputMap);
+            if (output.Api == AudioOutputApi.Asio)
+            {
+                if (_tone is null)
+                {
+                    if (!on)
+                    {
+                        return null;
+                    }
+
+                    StopDevices(clearToneWanted: false);
+                    StartAsio(output.DeviceId, _recordLayout, playLayout, inputMap: _inputMap, outputMap);
+                }
+                else
+                {
+                    _tone.SetMap(_outputMap);
+                }
+
+                ApplyVoice(voiceFactory);
+                ApplyToneState();
+                return null;
+            }
+
+            if (!on)
+            {
+                StopOutputOnly();
+                return null;
+            }
+
+            if (_tone is null || _output is null)
+            {
+                StartOutput(output, playLayout, outputMap);
+            }
+            else
+            {
+                _tone.SetMap(_outputMap);
+            }
+
+            ApplyVoice(voiceFactory);
+            ApplyToneState();
             return null;
         }
         catch (Exception ex)
         {
-            StopOutputOnly();
+            if (output.Api != AudioOutputApi.Asio)
+            {
+                StopOutputOnly();
+            }
+
             lock (_gate)
             {
                 _toneWanted = false;
@@ -302,17 +356,13 @@ internal sealed class SettingsIoProbe : IDisposable
 
         PrepareRoute(inputCount, recordLayout, inputMap);
         var tone = new SettingsToneProvider(rate, playLayout.Channels, outputCount, outputMap);
-        lock (_gate)
-        {
-            tone.Enabled = _toneWanted;
-        }
-
         asio.InitRecordAndPlayback(new SampleToWaveProvider(tone), inputCount, 0);
         asio.AudioAvailable += OnAsioAudio;
         asio.Play();
         _tone = tone;
         _capture = asio;
         _output = asio;
+        ApplyToneState();
     }
 
     private void StartOutput(AudioOutputSettings output, ChannelLayout layout, int[]? outputMap)
@@ -325,15 +375,53 @@ internal sealed class SettingsIoProbe : IDisposable
             rate = 48000;
         }
 
-        var tone = new SettingsToneProvider(rate, layout.Channels, ports, outputMap)
-        {
-            Enabled = true,
-        };
+        var tone = new SettingsToneProvider(rate, layout.Channels, ports, outputMap);
         var player = AudioOutputFactory.Create(output, out _);
         player.Init(new SampleToWaveProvider(tone));
         player.Play();
         _tone = tone;
         _output = player;
+        ApplyToneState();
+    }
+
+    private void ApplyVoice(Func<int, float[]>? voiceFactory)
+    {
+        if (_tone is null || voiceFactory is null)
+        {
+            return;
+        }
+
+        var loop = voiceFactory(_tone.WaveFormat.SampleRate) ?? [];
+        lock (_gate)
+        {
+            _voiceLoop = loop;
+        }
+
+        _tone.SetVoiceLoop(loop);
+    }
+
+    private void ApplyToneState()
+    {
+        if (_tone is null)
+        {
+            return;
+        }
+
+        bool on;
+        var channel = ChannelRouter.Off;
+        var kind = SettingsProbeKind.Sine;
+        float[] voice;
+        lock (_gate)
+        {
+            on = _toneWanted;
+            channel = _toneChannel;
+            kind = _toneKind;
+            voice = _voiceLoop;
+        }
+
+        var label = on ? _playLayout.LabelAt(channel) : string.Empty;
+        _tone.SetVoiceLoop(voice);
+        _tone.SetSignal(on, channel, SettingsTone.HertzFor(label), kind);
     }
 
     private void OnAsioAudio(object? sender, AsioAudioAvailableEventArgs e)
@@ -403,11 +491,7 @@ internal sealed class SettingsIoProbe : IDisposable
     {
         if (_output is AsioOut)
         {
-            if (_tone is not null)
-            {
-                _tone.Enabled = false;
-            }
-
+            _tone?.SetSignal(false, ChannelRouter.Off);
             return;
         }
 

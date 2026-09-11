@@ -172,12 +172,19 @@ internal static class AudioOutputFactory
             new("-1", "Wave Mapper (Default)"),
         };
 
-        for (var i = 0; i < WaveOut.DeviceCount; i++)
+        var products = new string[WaveOut.DeviceCount];
+        for (var i = 0; i < products.Length; i++)
         {
             var caps = WaveOut.GetCapabilities(i);
-            list.Add(new(
-                i.ToString(CultureInfo.InvariantCulture),
-                string.IsNullOrWhiteSpace(caps.ProductName) ? $"Device {i}" : caps.ProductName));
+            products[i] = string.IsNullOrWhiteSpace(caps.ProductName) ? $"Device {i}" : caps.ProductName;
+        }
+
+        var names = WaveDeviceNames.ResolveAll(
+            products,
+            WaveDeviceNames.QueryWasapiFriendlyNames(DataFlow.Render));
+        for (var i = 0; i < names.Length; i++)
+        {
+            list.Add(new(i.ToString(CultureInfo.InvariantCulture), names[i]));
         }
 
         return list;

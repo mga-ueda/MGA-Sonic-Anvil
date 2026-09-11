@@ -12,6 +12,14 @@ public sealed class ChannelMixTests
     }
 
     [Fact]
+    public void Mid_IncludesEverySurroundChannel()
+    {
+        Assert.True(Math.Abs(ChannelMix.Mid([0f, 0f, 0.8f, 0f, 0f, 0f])) > 0.1f);
+        Assert.True(Math.Abs(ChannelMix.Mid([0f, 0f, 0f, 0f, 0f, 0.8f])) > 0.1f);
+        Assert.True(Math.Abs(ChannelMix.Mid([0f, 0f, 0f, 0.8f, 0f, 0f, 0f, 0f])) > 0.1f);
+    }
+
+    [Fact]
     public void FrameEnvelope_KeepsInvertedStereo()
     {
         var samples = new float[] { 0.82f, -0.74f };

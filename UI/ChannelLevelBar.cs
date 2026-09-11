@@ -7,8 +7,9 @@ namespace MgaSonicAnvil.UI;
 /// <summary>設定の録音ポート行用。メインのレベルメーターと同じグラデ。</summary>
 internal sealed class ChannelLevelBar : FrameworkElement
 {
-    private readonly LinearGradientBrush _gradient = LevelMeterBarPaint.Create(vertical: false);
     private float _display;
+
+    public int Channel { get; set; }
 
     public ChannelLevelBar()
     {
@@ -58,7 +59,7 @@ internal sealed class ChannelLevelBar : FrameworkElement
         var bar = new Rect(track.X, track.Y, fillWidth, track.Height);
         dc.PushClip(new RectangleGeometry(bar));
         dc.PushOpacity(LevelMeterEngine.BarFillOpacity);
-        dc.DrawRectangle(_gradient, null, track);
+        dc.DrawRectangle(LevelMeterBarPaint.Create(vertical: false, Channel), null, track);
         dc.Pop();
         dc.Pop();
     }

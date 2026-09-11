@@ -366,7 +366,7 @@ public partial class MainWindow
         {
             ShowPitchShiftBusyGlass();
             var progress = new Progress<double>(p => _busyGlass.SetProgress(p));
-            command = await Task.Run(() => ProcessEdits.PitchShift(document, range, semitones, timeStretch, progress))
+            command = await Task.Run(() => ProcessEdits.PitchShift(document, range, semitones, timeStretch, progress, channelMask: EditMask()))
                 .ConfigureAwait(true);
             if (!IsLoaded || !ReferenceEquals(_document, document) || command is null)
             {
@@ -635,7 +635,7 @@ public partial class MainWindow
         {
             ShowTimeStretchBusyGlass();
             var progress = new Progress<double>(p => _busyGlass.SetProgress(p));
-            command = await Task.Run(() => ProcessEdits.TimeStretch(document, range, destFrames, progress))
+            command = await Task.Run(() => ProcessEdits.TimeStretch(document, range, destFrames, progress, channelMask: EditMask()))
                 .ConfigureAwait(true);
             if (!IsLoaded || !ReferenceEquals(_document, document) || command is null)
             {
@@ -643,12 +643,15 @@ public partial class MainWindow
             }
 
             _history.Do(document, command);
+            var mappedDest = ChannelSamples.IsScoped(EditMask(), document.Channels)
+                ? range.Length
+                : destFrames;
             Waveform.SetViewStartExternal(
                 AudioDocument.MapFrameThroughRangeStretch(
                     (long)Math.Round(viewStart),
                     range.StartFrame,
                     range.Length,
-                    destFrames));
+                    mappedDest));
             AfterTransform();
             PausePlaybackSoft();
         }
@@ -1040,8 +1043,8 @@ public partial class MainWindow
         ClearFadeCurveVisualPreview();
         PausePlaybackSoft();
         var command = fadeIn
-            ? ProcessEdits.FadeIn(_document, range, shape)
-            : ProcessEdits.FadeOut(_document, range, shape);
+            ? ProcessEdits.FadeIn(_document, range, shape, channelMask: EditMask())
+            : ProcessEdits.FadeOut(_document, range, shape, channelMask: EditMask());
         _history.Do(_document, command);
         AfterTransform();
     }
@@ -1054,7 +1057,7 @@ public partial class MainWindow
         }
 
         var visible = new WaveSelection(Waveform.ViewLeftFrame, Waveform.ViewRightFrame);
-        var command = ProcessEdits.FadeAroundPlayhead(_document, visible, Waveform.PlayheadFrame);
+        var command = ProcessEdits.FadeAroundPlayhead(_document, visible, Waveform.PlayheadFrame, channelMask: EditMask());
         if (command is null)
         {
             return;
@@ -1080,7 +1083,7 @@ public partial class MainWindow
         }
 
         StopPlaybackForEdit();
-        _history.Do(_document, ProcessEdits.Normalize(_document, range));
+        _history.Do(_document, ProcessEdits.Normalize(_document, range, channelMask: EditMask()));
         AfterTransform();
     }
 
@@ -1098,7 +1101,7 @@ public partial class MainWindow
             return;
         }
 
-        var command = ProcessEdits.Reverse(_document, range);
+        var command = ProcessEdits.Reverse(_document, range, channelMask: EditMask());
         if (command is null)
         {
             return;
@@ -1132,7 +1135,7 @@ public partial class MainWindow
         }
 
         PausePlaybackSoft();
-        var command = ProcessEdits.Gain(_document, range, gainDb);
+        var command = ProcessEdits.Gain(_document, range, gainDb, channelMask: EditMask());
         if (command is null)
         {
             return;
@@ -1248,7 +1251,7 @@ public partial class MainWindow
             return;
         }
 
-        var clip = ProcessEdits.Copy(_document, _document.Selection);
+        var clip = ProcessEdits.Copy(_document, _document.Selection, channelMask: EditMask());
         if (clip is null)
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1273,13 +1276,13 @@ public partial class MainWindow
             return;
         }
 
-        if (range.StartFrame <= 0 && range.EndFrame >= _document.FrameCount)
+        if (DeletesWholeFile(range))
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorEmptyAfterDelete, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        var clip = ProcessEdits.Copy(_document, range);
+        var clip = ProcessEdits.Copy(_document, range, channelMask: EditMask());
         if (clip is null)
         {
             return;
@@ -1288,7 +1291,7 @@ public partial class MainWindow
         _clipboard = clip;
         _historyClipboardIsLatest = false;
         StopPlaybackForEdit();
-        _history.Do(_document, ProcessEdits.Delete(_document, range));
+        _history.Do(_document, ProcessEdits.Delete(_document, range, channelMask: EditMask()));
         AfterEdit();
     }
 
@@ -1319,7 +1322,7 @@ public partial class MainWindow
             return;
         }
 
-        var command = ProcessEdits.Paste(_document, _clipboard, Waveform.PlayheadFrame);
+        var command = ProcessEdits.Paste(_document, _clipboard, Waveform.PlayheadFrame, channelMask: EditMask());
         if (command is null)
         {
             return;
@@ -1351,14 +1354,14 @@ public partial class MainWindow
             return;
         }
 
-        if (range.StartFrame <= 0 && range.EndFrame >= _document.FrameCount)
+        if (DeletesWholeFile(range))
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorEmptyAfterDelete, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
         StopPlaybackForEdit();
-        _history.Do(_document, ProcessEdits.Delete(_document, range));
+        _history.Do(_document, ProcessEdits.Delete(_document, range, channelMask: EditMask()));
         AfterEdit();
     }
 
@@ -1849,6 +1852,7 @@ public partial class MainWindow
         Overview.Refresh();
         SyncViewChrome();
         SyncMonitorLayout();
+        ApplyChannelSolo();
         RefreshStatus();
         RefreshHistoryStrip();
     }

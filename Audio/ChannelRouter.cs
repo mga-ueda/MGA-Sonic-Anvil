@@ -24,16 +24,25 @@ internal static class ChannelRouter
         return result;
     }
 
-    public static int[] Identity(int logicalCount)
+    /// <summary>録音ファイルのレーン数。配置本数と、割り当てた波形番号の大きい方。</summary>
+    public static int DestLaneCount(int speakerChannels, int[]? fileMap)
     {
-        logicalCount = Math.Clamp(logicalCount, 0, ChannelLayout.MaxChannels);
-        var map = new int[logicalCount];
-        for (var i = 0; i < logicalCount; i++)
+        var count = Math.Clamp(speakerChannels < 1 ? 1 : speakerChannels, 1, ChannelLayout.MaxChannels);
+        if (fileMap is null)
         {
-            map[i] = i;
+            return count;
         }
 
-        return map;
+        for (var i = 0; i < fileMap.Length; i++)
+        {
+            var lane = fileMap[i];
+            if (lane >= 0)
+            {
+                count = Math.Max(count, Math.Min(lane + 1, ChannelLayout.MaxChannels));
+            }
+        }
+
+        return count;
     }
 
     /// <summary>2ch 以下の出力で、明示マップが無い多ch は従来どおりダウンミックスする。</summary>

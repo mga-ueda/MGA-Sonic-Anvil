@@ -37,23 +37,28 @@ internal partial class AudioSettingsWindow : Window
 
     public int SelectedExportParallelism { get; private set; }
 
-    public ChannelLayout SelectedRecordLayout { get; private set; } = ChannelLayout.Stereo;
+    public SpeakerPreset[] SelectedPresets { get; private set; } = [];
 
-    public ChannelLayout SelectedPlaybackLayout { get; private set; } = ChannelLayout.Stereo;
+    public string[] SelectedVisibleSpeakerIds { get; private set; } = SpeakerPreset.DefaultVisibleIds;
+
+    public string SelectedActiveSpeakerId { get; private set; } = string.Empty;
 
     public string SelectedRecordDeviceId { get; private set; } = string.Empty;
 
-    public int[] SelectedRecordInputMap { get; private set; } = [];
-
-    public int[] SelectedPlaybackOutputMap { get; private set; } = [];
-
+    private readonly List<SpeakerPreset> _presets;
+    private readonly HashSet<string> _visibleIds;
+    private SpeakerPreset? _editingSpeaker;
     private readonly ChannelRoutingEditor _inputEditor;
     private readonly ChannelRoutingEditor _outputEditor;
     private readonly SettingsIoProbe _probe = new();
     private readonly DispatcherTimer _meterTimer;
     private bool _syncingAssociations;
+    private bool _syncingSpeaker;
+    private bool _syncingVisibility;
+    private bool _speakerDirty;
     private int[] _recordInputMap;
     private int[] _playbackOutputMap;
+    private int[] _fileChannelMap;
     private string[] _inputPortNames = [];
     private string[] _outputPortNames = [];
     private float[] _meterPeaks = [];
@@ -68,10 +73,9 @@ internal partial class AudioSettingsWindow : Window
         string lameExePath,
         string lameOptions,
         int exportParallelism,
-        ChannelLayout recordLayout,
-        ChannelLayout playbackLayout,
-        int[] recordInputMap,
-        int[] playbackOutputMap)
+        IEnumerable<SpeakerPreset> presets,
+        string activeSpeakerId,
+        IEnumerable<string>? visibleSpeakerIds = null)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
@@ -80,11 +84,22 @@ internal partial class AudioSettingsWindow : Window
         SelectedLameExePath = lameExePath ?? string.Empty;
         SelectedLameOptions = lameOptions ?? string.Empty;
         SelectedExportParallelism = exportParallelism;
-        SelectedRecordLayout = recordLayout;
-        SelectedPlaybackLayout = playbackLayout;
-        SelectedRecordDeviceId = AudioCaptureFactory.ResolveRecordDeviceId(current.Api, current.DeviceId);
-        _recordInputMap = recordInputMap ?? [];
-        _playbackOutputMap = playbackOutputMap ?? [];
+        _presets = [.. SpeakerPreset.CloneAll(presets)];
+        var visible = SpeakerPreset.NormalizeVisibleIds(visibleSpeakerIds);
+        _visibleIds = new HashSet<string>(visible, StringComparer.OrdinalIgnoreCase);
+        SelectedVisibleSpeakerIds = visible;
+        SelectedActiveSpeakerId = string.IsNullOrWhiteSpace(activeSpeakerId)
+            ? _presets[0].Id
+            : activeSpeakerId;
+        var speaker = FindPreset(SelectedActiveSpeakerId) ?? _presets[0];
+        SelectedActiveSpeakerId = speaker.Id;
+        SelectedSettings = speaker.ToAudioOutputSettings();
+        SelectedRecordDeviceId = AudioCaptureFactory.ResolveRecordDeviceId(
+            SelectedSettings.Api,
+            SelectedSettings.DeviceId);
+        _recordInputMap = [.. speaker.RecordInputMap ?? []];
+        _playbackOutputMap = [.. speaker.PlaybackOutputMap ?? []];
+        _fileChannelMap = [.. speaker.FileChannelMap ?? []];
         InitializeComponent();
         _meterTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -92,9 +107,10 @@ internal partial class AudioSettingsWindow : Window
         };
         _meterTimer.Tick += (_, _) => RefreshInputMeters();
         _inputEditor = new ChannelRoutingEditor(RecordInputHost, showMeters: true);
-        _outputEditor = new ChannelRoutingEditor(PlaybackOutputHost);
+        _outputEditor = new ChannelRoutingEditor(PlaybackOutputHost, showTestButtons: true);
         _inputEditor.MapChanged += OnInputMapChanged;
         _outputEditor.MapChanged += OnOutputMapChanged;
+        _outputEditor.TestClicked += OnOutputTest;
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
         VerticalResizeOnly.LockWidth(this);
         Title = UiStrings.DialogSettingsTitle;
@@ -111,17 +127,15 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyAccent(OkButton);
         ActionButtonLooks.ApplyClear(CancelButton);
         ActionButtonLooks.ApplyClear(LameBrowseButton);
-        ActionButtonLooks.ApplyClear(SineButton);
 
         _fadeInRow = CreateFadeRow(UiStrings.LabelDefaultFadeIn, fadeIn, isFadeIn: true);
         _fadeOutRow = CreateFadeRow(UiStrings.LabelDefaultFadeOut, fadeOut, isFadeIn: false);
         FadeRowsHost.Children.Add(_fadeInRow.Host);
         FadeRowsHost.Children.Add(_fadeOutRow.Host);
 
-        FillLayouts(RecordLayoutCombo, recordLayout);
-        FillLayouts(PlaybackLayoutCombo, playbackLayout);
-        SelectApi(current.Api);
-        ReloadDevices(current.DeviceId);
+        FillSpeakers(SelectedActiveSpeakerId);
+        FillSpeakerVisibility();
+        LoadSpeakerEditors(FindPreset(SelectedActiveSpeakerId) ?? _presets[0], releaseDevice: false);
         RebuildRouting();
         LoudnessTargetBox.Text = SelectedLoudnessTargetLufs.ToString("0.#", CultureInfo.InvariantCulture);
         FillWindowsBitRates(SelectedMp3BitRate);
@@ -152,22 +166,19 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(LanguageLabel, UiStrings.TipUiLanguage);
         TipService.Set(LanguageCombo, UiStrings.TipUiLanguage);
         TipService.Set(AssociationHeader, UiStrings.TipFileAssociations);
+        TipService.Set(SpeakerLabel, UiStrings.TipSpeakerPreset);
+        TipService.Set(SpeakerCombo, UiStrings.TipSpeakerPreset);
+        TipService.Set(SpeakerVisibilityHeader, UiStrings.TipSpeakerVisibility);
+        TipService.Set(SpeakerVisibilityHost, UiStrings.TipSpeakerVisibility);
         TipService.Set(ApiLabel, UiStrings.TipAudioApi);
         TipService.Set(ApiCombo, UiStrings.TipAudioApi);
         TipService.Set(DeviceLabel, UiStrings.TipAudioDevice);
         TipService.Set(DeviceCombo, UiStrings.TipAudioDevice);
         TipService.Set(InputHeader, UiStrings.TipSettingsInput);
         TipService.Set(OutputHeader, UiStrings.TipSettingsOutput);
-        TipService.Set(RecordLayoutLabel, UiStrings.TipRecordLayout);
-        TipService.Set(RecordLayoutCombo, UiStrings.TipRecordLayout);
-        TipService.Set(PlaybackLayoutLabel, UiStrings.TipPlaybackLayout);
-        TipService.Set(PlaybackLayoutCombo, UiStrings.TipPlaybackLayout);
-        TipService.Set(RecordInputMapLabel, UiStrings.TipRecordInputMap);
         TipService.Set(RecordInputHost, UiStrings.TipRecordInputMap);
         TipService.Set(InputStatus, UiStrings.TipInputLevel);
-        TipService.Set(PlaybackOutputMapLabel, UiStrings.TipPlaybackOutputMap);
         TipService.Set(PlaybackOutputHost, UiStrings.TipPlaybackOutputMap);
-        TipService.Set(SineButton, UiStrings.TipSineMinusTwenty);
         TipService.Set(LoudnessTargetLabel, UiStrings.TipLoudnessTarget);
         TipService.Set(LoudnessTargetBox, UiStrings.TipLoudnessTarget);
         TipService.Set(LoudnessTargetUnit, UiStrings.TipLoudnessTarget);
@@ -188,43 +199,60 @@ internal partial class AudioSettingsWindow : Window
 
     private void ApiCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!IsLoaded)
+        if (!IsLoaded || _syncingSpeaker)
         {
             return;
         }
 
+        MarkSpeakerDirty();
         ReloadDevices(preferredDeviceId: null);
         RefreshRouting(releaseDevice: true);
     }
 
     private void DeviceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!IsLoaded)
+        if (!IsLoaded || _syncingSpeaker)
         {
             return;
         }
 
+        MarkSpeakerDirty();
         RefreshRouting(releaseDevice: true);
     }
 
-    private void RecordLayoutCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void SpeakerCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!IsLoaded)
+        if (!IsLoaded || _syncingSpeaker || SpeakerCombo.SelectedItem is not SpeakerItem next)
         {
             return;
         }
 
-        RefreshRouting(releaseDevice: false);
-    }
-
-    private void PlaybackLayoutCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (!IsLoaded)
+        var currentId = _editingSpeaker?.Id;
+        if (!ShouldConfirmSpeakerSave(_speakerDirty, currentId, next.Preset.Id))
         {
+            LoadSpeakerEditors(next.Preset, releaseDevice: true);
             return;
         }
 
-        RefreshRouting(releaseDevice: false);
+        var answer = OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.ConfirmSpeakerSettingsSave(_editingSpeaker!.DisplayName()),
+            UiStrings.DialogSettingsTitle,
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question,
+            MessageBoxResult.Yes);
+        if (answer == MessageBoxResult.Cancel)
+        {
+            RestoreSpeakerCombo(currentId);
+            return;
+        }
+
+        if (answer == MessageBoxResult.Yes)
+        {
+            FlushCurrentSpeaker();
+        }
+
+        LoadSpeakerEditors(next.Preset, releaseDevice: true);
     }
 
     private void FillAssociations()
@@ -340,15 +368,12 @@ internal partial class AudioSettingsWindow : Window
         SelectedExportParallelism = ExportParallelCombo.SelectedItem is ParallelismItem parallel
             ? parallel.Value
             : AudioExport.AutoParallelism;
-        SelectedRecordLayout = RecordLayoutCombo.SelectedItem is LayoutItem layout
-            ? layout.Layout
-            : ChannelLayout.Stereo;
-        SelectedPlaybackLayout = PlaybackLayoutCombo.SelectedItem is LayoutItem playLayout
-            ? playLayout.Layout
-            : ChannelLayout.Stereo;
+        FlushCurrentSpeaker();
+        SelectedSettings = ReadOutputSettings();
+        SelectedPresets = SpeakerPreset.CloneAll(_presets);
+        SelectedVisibleSpeakerIds = SpeakerPreset.NormalizeVisibleIds(_visibleIds);
+        SelectedActiveSpeakerId = CurrentSpeaker()?.Id ?? _presets[0].Id;
         SelectedRecordDeviceId = ReadRecordDeviceId();
-        SelectedRecordInputMap = _inputEditor.ReadMap();
-        SelectedPlaybackOutputMap = _outputEditor.ReadMap();
         StopProbeUi();
         DialogResult = true;
     }
@@ -462,16 +487,50 @@ internal partial class AudioSettingsWindow : Window
         StopProbeUi();
     }
 
-    private void SineButton_Click(object sender, RoutedEventArgs e)
+    private void OnOutputTest(int channel, SettingsProbeKind kind)
     {
-        if (_probe.TonePlaying)
+        var labels = _outputEditor.ChannelNames;
+        var label = (uint)channel < (uint)labels.Length ? labels[channel] : string.Empty;
+        if (kind == SettingsProbeKind.Voice && SettingsTone.IsLfe(label))
         {
-            _probe.SetTone(false, ReadOutputSettings(), ReadPlaybackLayout(), _outputEditor.ReadMap());
-            RefreshSineButton();
             return;
         }
 
-        var error = _probe.SetTone(true, ReadOutputSettings(), ReadPlaybackLayout(), _outputEditor.ReadMap());
+        if (_probe.TonePlaying && _probe.ToneKind == kind && _probe.ToneChannel == channel)
+        {
+            _probe.SetTone(
+                false,
+                kind,
+                channel,
+                ReadOutputSettings(),
+                ReadPlaybackLayout(),
+                _outputEditor.ReadMap());
+            RefreshTestButtons();
+            return;
+        }
+
+        Func<int, float[]>? voiceFactory = null;
+        if (kind == SettingsProbeKind.Voice)
+        {
+            voiceFactory = rate =>
+            {
+                if (!SettingsChannelVoice.TryRender(label, rate, out var samples, out var voiceError))
+                {
+                    throw new InvalidOperationException(voiceError ?? UiStrings.ErrorChannelVoiceFailed);
+                }
+
+                return samples;
+            };
+        }
+
+        var error = _probe.SetTone(
+            true,
+            kind,
+            channel,
+            ReadOutputSettings(),
+            ReadPlaybackLayout(),
+            _outputEditor.ReadMap(),
+            voiceFactory);
         if (error is not null)
         {
             OwnerCenteredMessageBox.Show(
@@ -482,19 +541,41 @@ internal partial class AudioSettingsWindow : Window
                 MessageBoxImage.Warning);
         }
 
-        RefreshSineButton();
+        RefreshTestButtons();
     }
 
     private void OnInputMapChanged()
     {
+        MarkSpeakerDirty();
         _recordInputMap = _inputEditor.ReadMap();
+        SyncFileChannelMap(_inputEditor.ReadFileMap(), fromInput: true);
         _probe.SetInputMap(_recordInputMap);
     }
 
     private void OnOutputMapChanged()
     {
+        MarkSpeakerDirty();
         _playbackOutputMap = _outputEditor.ReadMap();
+        SyncFileChannelMap(_outputEditor.ReadFileMap(), fromInput: false);
         _probe.SetOutputMap(_playbackOutputMap);
+    }
+
+    private void SyncFileChannelMap(int[] map, bool fromInput)
+    {
+        if (_fileChannelMap.AsSpan().SequenceEqual(map))
+        {
+            return;
+        }
+
+        _fileChannelMap = map;
+        if (fromInput)
+        {
+            _outputEditor.SetFileMap(map);
+        }
+        else
+        {
+            _inputEditor.SetFileMap(map);
+        }
     }
 
     private void RestartProbeIfVisible()
@@ -519,7 +600,7 @@ internal partial class AudioSettingsWindow : Window
             ReadPlaybackLayout(),
             _recordInputMap);
         SetInputStatus(error);
-        RefreshSineButton();
+        RefreshTestButtons();
         if (!_meterTimer.IsEnabled)
         {
             _meterTimer.Start();
@@ -529,16 +610,24 @@ internal partial class AudioSettingsWindow : Window
         ReflowSettingsWindow();
     }
 
-    private void RefreshRouting(bool releaseDevice)
-    {
-        if (_inputEditor.ChannelNames.Length > 0)
-        {
-            _recordInputMap = _inputEditor.ReadMap();
-        }
+    internal static bool ShouldCaptureEditorMaps(bool loadingSpeaker, bool syncingSpeaker = false) =>
+        !loadingSpeaker && !syncingSpeaker;
 
-        if (_outputEditor.ChannelNames.Length > 0)
+    private void RefreshRouting(bool releaseDevice, bool loadingSpeaker = false)
+    {
+        if (ShouldCaptureEditorMaps(loadingSpeaker, _syncingSpeaker))
         {
-            _playbackOutputMap = _outputEditor.ReadMap();
+            if (_inputEditor.ChannelNames.Length > 0)
+            {
+                _recordInputMap = _inputEditor.ReadMap();
+                _fileChannelMap = _inputEditor.ReadFileMap();
+            }
+
+            if (_outputEditor.ChannelNames.Length > 0)
+            {
+                _playbackOutputMap = _outputEditor.ReadMap();
+                _fileChannelMap = _outputEditor.ReadFileMap();
+            }
         }
 
         if (releaseDevice)
@@ -581,7 +670,7 @@ internal partial class AudioSettingsWindow : Window
         _meterTimer.Stop();
         _probe.Stop();
         SetInputStatus(null);
-        RefreshSineButton();
+        RefreshTestButtons();
         _inputEditor.ApplyPeaks([]);
     }
 
@@ -597,15 +686,15 @@ internal partial class AudioSettingsWindow : Window
         _inputEditor.ApplyPeaks(_meterPeaks);
     }
 
-    private void RefreshSineButton()
+    private void RefreshTestButtons()
     {
         if (_probe.TonePlaying)
         {
-            ActionButtonLooks.ApplyAccent(SineButton);
+            _outputEditor.SetTestState(_probe.ToneChannel, _probe.ToneKind);
             return;
         }
 
-        ActionButtonLooks.ApplyClear(SineButton);
+        _outputEditor.SetTestState(ChannelRouter.Off, kind: null);
     }
 
     private void SetInputStatus(string? message)
@@ -669,10 +758,10 @@ internal partial class AudioSettingsWindow : Window
     }
 
     private ChannelLayout ReadRecordLayout() =>
-        RecordLayoutCombo.SelectedItem is LayoutItem item ? item.Layout : ChannelLayout.Stereo;
+        ChannelLayout.Parse((_editingSpeaker ?? CurrentSpeaker())?.Id);
 
     private ChannelLayout ReadPlaybackLayout() =>
-        PlaybackLayoutCombo.SelectedItem is LayoutItem item ? item.Layout : ChannelLayout.Stereo;
+        ReadRecordLayout();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -710,6 +799,47 @@ internal partial class AudioSettingsWindow : Window
         }
 
         return (index + delta % count + count) % count;
+    }
+
+    internal static bool ShouldConfirmSpeakerSave(bool dirty, string? currentId, string? nextId)
+    {
+        if (!dirty || string.IsNullOrWhiteSpace(nextId))
+        {
+            return false;
+        }
+
+        return currentId is null
+            || !currentId.Equals(nextId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void MarkSpeakerDirty()
+    {
+        if (!IsLoaded || _syncingSpeaker)
+        {
+            return;
+        }
+
+        _speakerDirty = true;
+    }
+
+    private void RestoreSpeakerCombo(string? id)
+    {
+        _syncingSpeaker = true;
+        try
+        {
+            foreach (SpeakerItem item in SpeakerCombo.Items)
+            {
+                if (item.Preset.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
+                {
+                    SpeakerCombo.SelectedItem = item;
+                    return;
+                }
+            }
+        }
+        finally
+        {
+            _syncingSpeaker = false;
+        }
     }
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -783,10 +913,9 @@ internal partial class AudioSettingsWindow : Window
     {
         var deviceMax = Math.Max(80, SystemParameters.WorkArea.Width - 200);
         ComboBoxFit.Apply(LanguageCombo);
+        ComboBoxFit.Apply(SpeakerCombo);
         ComboBoxFit.Apply(ApiCombo);
         ComboBoxFit.Apply(DeviceCombo, deviceMax);
-        ComboBoxFit.Apply(RecordLayoutCombo);
-        ComboBoxFit.Apply(PlaybackLayoutCombo);
         ComboBoxFit.Apply(WindowsBitRateCombo);
         ComboBoxFit.ApplySelected(ExportParallelCombo);
     }
@@ -816,21 +945,18 @@ internal partial class AudioSettingsWindow : Window
 
     private double AudioTabContentWidth()
     {
-        var top = LabeledComboWidth(ApiLabel, ApiCombo)
+        var speaker = LabeledComboWidth(SpeakerLabel, SpeakerCombo);
+        var device = LabeledComboWidth(ApiLabel, ApiCombo)
             + 16
             + LabeledComboWidth(DeviceLabel, DeviceCombo);
+        var top = Math.Max(speaker, device);
         var gutter = DesignMetrics.SettingsScrollBarGap + DesignMetrics.SettingsScrollBarWidth;
         var record = Max(
             LabelWidth(InputHeader),
-            LabeledComboWidth(RecordLayoutLabel, RecordLayoutCombo),
-            LabelWidth(RecordInputMapLabel),
             _inputEditor.FittedRowWidth) + gutter;
         var play = Max(
             LabelWidth(OutputHeader),
-            LabeledComboWidth(PlaybackLayoutLabel, PlaybackLayoutCombo),
-            LabelWidth(PlaybackOutputMapLabel),
-            _outputEditor.FittedRowWidth,
-            DesignMetrics.SettingsSineButtonWidth) + gutter;
+            _outputEditor.FittedRowWidth) + gutter;
         var columns = record + DesignMetrics.SettingsColumnGap + play;
         return Math.Max(top, columns);
     }
@@ -840,6 +966,7 @@ internal partial class AudioSettingsWindow : Window
         var headers = new[]
         {
             UiStrings.LabelSettingsTabGeneral,
+            UiStrings.LabelSettingsTabLayouts,
             UiStrings.LabelSettingsTabAudio,
             UiStrings.LabelSettingsTabEditing,
             UiStrings.LabelSettingsTabExport,
@@ -887,39 +1014,203 @@ internal partial class AudioSettingsWindow : Window
         return SystemParameters.ResizeFrameVerticalBorderWidth * 2 + 2;
     }
 
-    private static void FillLayouts(ComboBox combo, ChannelLayout current)
+    private void FillSpeakers(string selectedId)
     {
-        combo.Items.Clear();
-        LayoutItem? selected = null;
-        foreach (var layout in ChannelLayout.All)
+        _syncingSpeaker = true;
+        try
         {
-            var item = new LayoutItem(layout);
-            combo.Items.Add(item);
-            if (layout.Id == current.Id)
+            SpeakerCombo.Items.Clear();
+            SpeakerItem? selected = null;
+            foreach (var preset in SpeakerPreset.FilterMenu(_presets, _visibleIds, selectedId))
             {
-                selected = item;
+                var item = new SpeakerItem(preset);
+                SpeakerCombo.Items.Add(item);
+                if (preset.Id.Equals(selectedId, StringComparison.OrdinalIgnoreCase))
+                {
+                    selected = item;
+                }
+            }
+
+            SpeakerCombo.SelectedItem = selected ?? (SpeakerCombo.Items.Count > 0 ? SpeakerCombo.Items[0] : null);
+        }
+        finally
+        {
+            _syncingSpeaker = false;
+        }
+    }
+
+    private void FillSpeakerVisibility()
+    {
+        SpeakerVisibilityHost.Children.Clear();
+        var style = TryFindResource("DarkCheckBoxStyle") as Style;
+        _syncingVisibility = true;
+        try
+        {
+            foreach (var preset in _presets)
+            {
+                var box = new CheckBox
+                {
+                    Content = new TextBlock { Text = preset.DisplayName() },
+                    IsChecked = _visibleIds.Contains(preset.Id),
+                    Margin = new Thickness(0, 0, 0, 6),
+                    Tag = preset.Id,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                };
+                if (style is not null)
+                {
+                    box.Style = style;
+                }
+
+                box.Checked += SpeakerVisibility_Changed;
+                box.Unchecked += SpeakerVisibility_Changed;
+                TipService.Set(box, UiStrings.TipSpeakerVisibility);
+                SpeakerVisibilityHost.Children.Add(box);
+            }
+        }
+        finally
+        {
+            _syncingVisibility = false;
+        }
+    }
+
+    private void SpeakerVisibility_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_syncingVisibility || sender is not CheckBox box || box.Tag is not string id)
+        {
+            return;
+        }
+
+        if (box.IsChecked == true)
+        {
+            _visibleIds.Add(id);
+        }
+        else if (CheckedVisibilityCount() == 0)
+        {
+            _syncingVisibility = true;
+            try
+            {
+                box.IsChecked = true;
+            }
+            finally
+            {
+                _syncingVisibility = false;
+            }
+
+            return;
+        }
+        else
+        {
+            _visibleIds.Remove(id);
+        }
+
+        FillSpeakers(SelectedActiveSpeakerId);
+        ComboBoxFit.Apply(SpeakerCombo);
+    }
+
+    private int CheckedVisibilityCount()
+    {
+        var n = 0;
+        foreach (var child in SpeakerVisibilityHost.Children)
+        {
+            if (child is CheckBox box && box.IsChecked == true)
+            {
+                n++;
             }
         }
 
-        combo.SelectedItem = selected ?? combo.Items[0];
+        return n;
     }
+
+    private void LoadSpeakerEditors(SpeakerPreset speaker, bool releaseDevice)
+    {
+        _syncingSpeaker = true;
+        try
+        {
+            SelectedActiveSpeakerId = speaker.Id;
+            SelectApi(AudioOutputSettings.ParseApi(speaker.AudioApi));
+            ReloadDevices(speaker.AudioDeviceId);
+            _recordInputMap = [.. speaker.RecordInputMap ?? []];
+            _playbackOutputMap = [.. speaker.PlaybackOutputMap ?? []];
+            _fileChannelMap = [.. speaker.FileChannelMap ?? []];
+            _editingSpeaker = speaker;
+        }
+        finally
+        {
+            _syncingSpeaker = false;
+        }
+
+        RefreshRouting(releaseDevice, loadingSpeaker: true);
+        _speakerDirty = false;
+    }
+
+    private void FlushCurrentSpeaker()
+    {
+        if ((_editingSpeaker ?? CurrentSpeaker()) is not { } speaker)
+        {
+            return;
+        }
+
+        if (_inputEditor.ChannelNames.Length > 0)
+        {
+            _recordInputMap = _inputEditor.ReadMap();
+            _fileChannelMap = _inputEditor.ReadFileMap();
+        }
+
+        if (_outputEditor.ChannelNames.Length > 0)
+        {
+            _playbackOutputMap = _outputEditor.ReadMap();
+            _fileChannelMap = _outputEditor.ReadFileMap();
+        }
+
+        speaker.ApplyAudioOutput(ReadOutputSettings());
+        speaker.RecordInputMap = SpeakerPreset.SnapshotMap(_recordInputMap, speaker.Channels);
+        speaker.PlaybackOutputMap = SpeakerPreset.SnapshotMap(_playbackOutputMap, speaker.Channels);
+        speaker.FileChannelMap = SpeakerPreset.SnapshotMap(_fileChannelMap, speaker.Channels);
+        speaker.Normalized();
+    }
+
+    private SpeakerPreset? CurrentSpeaker() =>
+        SpeakerCombo.SelectedItem is SpeakerItem item ? item.Preset : FindPreset(SelectedActiveSpeakerId);
+
+    private SpeakerPreset? FindPreset(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return null;
+        }
+
+        foreach (var preset in _presets)
+        {
+            if (preset.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
+            {
+                return preset;
+            }
+        }
+
+        return null;
+    }
+
+    private int ReadSpeakerChannels() => ReadRecordLayout().Channels;
 
     private void RebuildRouting()
     {
-        var recordLayout = ReadRecordLayout();
-        var playLayout = ReadPlaybackLayout();
+        var layout = ReadRecordLayout();
         var inputPorts = ResolvePortNames(input: true);
         var outputPorts = ResolvePortNames(input: false);
         _inputPortNames = inputPorts;
         _outputPortNames = outputPorts;
+        var fileMap = ChannelRouter.Normalize(_fileChannelMap, layout.Channels, ChannelLayout.MaxChannels);
         _inputEditor.Rebuild(
-            recordLayout.Labels,
+            layout.Labels,
             inputPorts,
-            ChannelRouter.Normalize(_recordInputMap, recordLayout.Channels, inputPorts.Length));
+            ChannelRouter.Normalize(_recordInputMap, layout.Channels, inputPorts.Length),
+            fileMap);
         _outputEditor.Rebuild(
-            playLayout.Labels,
+            layout.Labels,
             outputPorts,
-            ChannelRouter.Normalize(_playbackOutputMap, playLayout.Channels, outputPorts.Length));
+            ChannelRouter.Normalize(_playbackOutputMap, layout.Channels, outputPorts.Length),
+            fileMap);
+        RefreshTestButtons();
     }
 
     private FadeCurveRow CreateFadeRow(string labelText, FadeShape curve, bool isFadeIn)
@@ -1037,9 +1328,9 @@ internal partial class AudioSettingsWindow : Window
         public override string ToString() => Label;
     }
 
-    private sealed record LayoutItem(ChannelLayout Layout)
+    private sealed record SpeakerItem(SpeakerPreset Preset)
     {
-        public override string ToString() => Layout.DisplayName;
+        public override string ToString() => Preset.DisplayName();
     }
 
     private sealed record DeviceItem(string Id, string Label)

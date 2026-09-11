@@ -71,8 +71,41 @@ public partial class MainWindow
 
     private string? _openStatusText;
     private double _openStatusRatio;
+    private readonly List<string> _queuedOpenPaths = [];
+    private DispatcherTimer? _waveformLoadingHint;
+    private const int WaveformLoadingHintMs = 300;
 
     private void OpenPaths(IReadOnlyList<string> paths)
+    {
+        if (_openBusy)
+        {
+            QueueOpenPaths(paths);
+            return;
+        }
+
+        if (IsUiBusy)
+        {
+            return;
+        }
+
+        _ = OpenPathsAsync(paths);
+    }
+
+    private void QueueOpenPaths(IReadOnlyList<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            if (!AudioCodec.IsOpenable(path)
+                || _queuedOpenPaths.Contains(path, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            _queuedOpenPaths.Add(path);
+        }
+    }
+
+    private async Task OpenPathsAsync(IReadOnlyList<string> paths)
     {
         var targets = new List<string>();
         foreach (var path in paths)
@@ -81,6 +114,11 @@ public partial class MainWindow
             {
                 targets.Add(path);
             }
+        }
+
+        if (targets.Count == 0)
+        {
+            return;
         }
 
         var showProgress = targets.Count > 1;
@@ -112,7 +150,7 @@ public partial class MainWindow
 
                 try
                 {
-                    var document = AudioCodec.Load(path);
+                    var document = await Task.Run(() => AudioCodec.Load(path)).ConfigureAwait(true);
                     var session = new DocumentSession(document);
                     _sessions.Add(session);
                     if (first is null)
@@ -160,17 +198,58 @@ public partial class MainWindow
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+
+        if (_queuedOpenPaths.Count > 0)
+        {
+            var queued = _queuedOpenPaths.ToArray();
+            _queuedOpenPaths.Clear();
+            await OpenPathsAsync(queued).ConfigureAwait(true);
+        }
     }
 
     private void BeginOpenWork(int targetCount)
     {
         _openBusy = targetCount > 0;
         RefreshExportEnabled();
+        StopWaveformLoadingHint(hide: false);
+        if (targetCount <= 0)
+        {
+            return;
+        }
+
+        _waveformLoadingHint = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(WaveformLoadingHintMs),
+        };
+        _waveformLoadingHint.Tick += OnWaveformLoadingHint;
+        _waveformLoadingHint.Start();
+    }
+
+    private void OnWaveformLoadingHint(object? sender, EventArgs e)
+    {
+        StopWaveformLoadingHint(hide: false);
+        Waveform.SetLoadingVisible(true);
+    }
+
+    private void StopWaveformLoadingHint(bool hide)
+    {
+        if (_waveformLoadingHint is not null)
+        {
+            _waveformLoadingHint.Stop();
+            _waveformLoadingHint.Tick -= OnWaveformLoadingHint;
+            _waveformLoadingHint = null;
+        }
+
+        if (hide)
+        {
+            Waveform.SetLoadingVisible(false);
+        }
     }
 
     private void EndOpenWork(bool showProgress)
     {
         _openBusy = false;
+        StopWaveformLoadingHint(hide: true);
         if (showProgress)
         {
             ClearOpenStatus();
@@ -533,10 +612,9 @@ public partial class MainWindow
             settings.LameExePath,
             settings.LameOptions,
             settings.ExportParallelism,
-            ChannelLayout.Parse(settings.RecordLayout),
-            settings.ResolvedPlaybackLayout(),
-            settings.RecordInputMap ?? [],
-            settings.PlaybackOutputMap ?? [])
+            settings.SpeakerPresets,
+            settings.ActiveSpeakerPresetId,
+            settings.VisibleSpeakerPresetIds)
         {
             Owner = this,
         };
@@ -563,15 +641,97 @@ public partial class MainWindow
         settings.LameExePath = dialog.SelectedLameExePath;
         settings.LameOptions = dialog.SelectedLameOptions;
         settings.ExportParallelism = dialog.SelectedExportParallelism;
-        settings.RecordLayout = dialog.SelectedRecordLayout.Id;
-        settings.PlaybackLayout = dialog.SelectedPlaybackLayout.Id;
+        settings.ReplaceSpeakerPresets(dialog.SelectedPresets, dialog.SelectedActiveSpeakerId);
+        settings.ApplyVisibleSpeakerIds(dialog.SelectedVisibleSpeakerIds);
         settings.RecordDeviceId = dialog.SelectedRecordDeviceId;
-        settings.RecordInputMap = dialog.SelectedRecordInputMap;
-        settings.PlaybackOutputMap = dialog.SelectedPlaybackOutputMap;
-        _player.SetOutputMap(settings.PlaybackOutputMap);
+        ApplyPlayerRoute();
         LoudnessMeter.ApplyTargetFromSettings();
         Waveform.LoudnessTargetLufs = settings.ResolvedLoudnessTargetLufs();
+        RefreshSpeakerMenu();
+        SyncMonitorLayout();
         ApplyOutputSettings(dialog.SelectedSettings);
+    }
+
+    private void ApplySpeakerPreset(string id, bool persist)
+    {
+        var settings = AppStorage.Settings;
+        if (settings.FindSpeaker(id) is null)
+        {
+            return;
+        }
+
+        if (string.Equals(settings.ActiveSpeakerPresetId, id, StringComparison.OrdinalIgnoreCase)
+            && persist)
+        {
+            RefreshSpeakerMenu();
+            return;
+        }
+
+        StopRecording();
+        if (IsPlaybackActive())
+        {
+            StopPlayback();
+        }
+
+        settings.ActiveSpeakerPresetId = id;
+        settings.EnsureSpeakerPresets();
+        var speaker = settings.ResolvedSpeaker();
+        ApplyPlayerRoute();
+        ApplyOutputSettings(speaker.ToAudioOutputSettings());
+        RefreshSpeakerMenu();
+        SyncMonitorLayout();
+        if (persist)
+        {
+            AppStorage.Save();
+        }
+    }
+
+    private void RefreshSpeakerMenu()
+    {
+        var settings = AppStorage.Settings;
+        SetSpeakerMenu(settings.MenuSpeakers(), settings.ActiveSpeakerPresetId);
+    }
+
+    private void SetSpeakerMenu(IReadOnlyList<SpeakerPreset> presets, string activeId)
+    {
+        _syncingSpeakers = true;
+        try
+        {
+            SpeakerMenu.Items.Clear();
+            SpeakerChoice? selected = null;
+            foreach (var preset in presets)
+            {
+                var item = new SpeakerChoice(preset.Id, preset.DisplayName());
+                SpeakerMenu.Items.Add(item);
+                if (preset.Id.Equals(activeId, StringComparison.OrdinalIgnoreCase))
+                {
+                    selected = item;
+                }
+            }
+
+            SpeakerMenu.SelectedItem = selected
+                ?? (SpeakerMenu.Items.Count > 0 ? SpeakerMenu.Items[0] : null);
+            ComboBoxFit.Apply(SpeakerMenu);
+        }
+        finally
+        {
+            _syncingSpeakers = false;
+        }
+    }
+
+    private void SpeakerMenu_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_syncingSpeakers || SpeakerMenu.SelectedItem is not SpeakerChoice item)
+        {
+            return;
+        }
+
+        ApplySpeakerPreset(item.Id, persist: true);
+    }
+
+    private sealed record SpeakerChoice(string Id, string Label)
+    {
+        public override string ToString() => Label;
     }
 
     private void ApplyOutputSettings(AudioOutputSettings settings)
@@ -682,7 +842,7 @@ public partial class MainWindow
         }
     }
 
-    private void TryRestoreLastDocument()
+    private async Task TryRestoreLastDocumentAsync()
     {
         if (_didRestoreLastDocument)
         {
@@ -710,7 +870,8 @@ public partial class MainWindow
                     SetOpenStatus(i + 1, docs.Length, SnapshotDisplayName(docs[i]));
                 }
 
-                if (!TryRestoreSession(docs[i], out var session))
+                var session = await TryRestoreSessionAsync(docs[i]).ConfigureAwait(true);
+                if (session is null)
                 {
                     continue;
                 }
@@ -736,6 +897,13 @@ public partial class MainWindow
         {
             EndOpenWork(showProgress);
         }
+
+        if (_queuedOpenPaths.Count > 0)
+        {
+            var queued = _queuedOpenPaths.ToArray();
+            _queuedOpenPaths.Clear();
+            await OpenPathsAsync(queued).ConfigureAwait(true);
+        }
     }
 
     private static string SnapshotDisplayName(OpenDocumentSnapshot snap)
@@ -748,14 +916,14 @@ public partial class MainWindow
         return UiStrings.UntitledDocument;
     }
 
-    private static bool TryRestoreSession(OpenDocumentSnapshot snap, out DocumentSession session)
+    private async Task<DocumentSession?> TryRestoreSessionAsync(OpenDocumentSnapshot snap)
     {
-        if (TryRestoreSessionHistory(snap, out session))
+        var fromHistory = await TryRestoreSessionHistoryAsync(snap).ConfigureAwait(true);
+        if (fromHistory is not null)
         {
-            return true;
+            return fromHistory;
         }
 
-        session = null!;
         try
         {
             if (!DocumentSessionStore.TryResolveLoadPath(
@@ -764,27 +932,24 @@ public partial class MainWindow
                     out var path,
                     out var fromSession))
             {
-                return false;
+                return null;
             }
 
-            var document = AudioCodec.Load(path);
+            var document = await Task.Run(() => AudioCodec.Load(path)).ConfigureAwait(true);
             if (fromSession)
             {
                 document.MarkUnsaved(string.IsNullOrWhiteSpace(snap.SourcePath) ? null : snap.SourcePath);
             }
 
             DocumentSessionStore.ApplyMeta(document, snap);
-            session = new DocumentSession(document)
+            return new DocumentSession(document)
             {
                 LoopEnabled = snap.LoopEnabled,
             };
-
-            return true;
         }
         catch
         {
-            session = null!;
-            return false;
+            return null;
         }
     }
 
@@ -828,14 +993,13 @@ public partial class MainWindow
         }
     }
 
-    private static bool TryRestoreSessionHistory(OpenDocumentSnapshot snap, out DocumentSession session)
+    private async Task<DocumentSession?> TryRestoreSessionHistoryAsync(OpenDocumentSnapshot snap)
     {
-        session = null!;
         var originName = DocumentSessionStore.SanitizeSidecarName(snap.OriginFileName);
         var historyName = DocumentSessionStore.SanitizeSidecarName(snap.HistoryFileName);
         if (originName is null || historyName is null)
         {
-            return false;
+            return null;
         }
 
         var originPath = Path.Combine(AppStorage.SessionDirectory, originName);
@@ -843,32 +1007,30 @@ public partial class MainWindow
         if (!DocumentSessionStore.TryReadHistory(historyPath, out var historySnap)
             || !File.Exists(originPath))
         {
-            return false;
+            return null;
         }
 
         try
         {
-            var document = AudioCodec.Load(originPath);
+            var document = await Task.Run(() => AudioCodec.Load(originPath)).ConfigureAwait(true);
             if (!EditHistory.TryImport(document, historySnap, out var history))
             {
-                return false;
+                return null;
             }
 
             document.MarkUnsaved(string.IsNullOrWhiteSpace(snap.SourcePath) ? null : snap.SourcePath);
             document.SetDirty(!history.IsClean);
             DocumentSessionStore.ApplyMeta(document, snap);
             document.SetDirty(!history.IsClean);
-            session = new DocumentSession(document)
+            return new DocumentSession(document)
             {
                 History = history,
                 LoopEnabled = snap.LoopEnabled,
             };
-            return true;
         }
         catch
         {
-            session = null!;
-            return false;
+            return null;
         }
     }
 

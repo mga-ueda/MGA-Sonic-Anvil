@@ -23,9 +23,10 @@
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
         <ProgressBar x:Name="StatusOpenProgress"
-                     Grid.ColumnSpan="3"
+                     Grid.ColumnSpan="4"
                      Style="{StaticResource StatusOpenProgressStyle}"
                      VerticalAlignment="Bottom"
                      Minimum="0"
@@ -40,12 +41,30 @@
                    FontSize="11"
                    TextTrimming="CharacterEllipsis"
                    Foreground="{DynamicResource StatusBarDetailForeBrush}" />
+        <StackPanel Grid.Column="1"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Center"
+                    Margin="0,0,8,0">
+          <TextBlock x:Name="SpeakerMenuLabel"
+                     Style="{StaticResource StatusTimecodeLabelStyle}"
+                     Width="Auto"
+                     Text="{x:Static domain:UiStrings.LabelStatusSpeaker}" />
+          <ComboBox x:Name="SpeakerMenu"
+                    Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                    MinWidth="{x:Static ui:DesignMetrics.TransportSpeakerComboWidth}"
+                    MaxHeight="22"
+                    Padding="6,1,6,1"
+                    FontSize="11"
+                    VerticalAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    SelectionChanged="SpeakerMenu_SelectionChanged" />
+        </StackPanel>
         <ui:StatusTimeStrip x:Name="StatusTimes"
-                            Grid.Column="1"
+                            Grid.Column="2"
                             VerticalAlignment="Center"
                             Margin="0,0,12,0" />
         <CheckBox x:Name="AlwaysOnTopCheck"
-                  Grid.Column="2"
+                  Grid.Column="3"
                   Style="{StaticResource DarkCheckBoxStyle}"
                   Content="{x:Static domain:UiStrings.LabelAlwaysOnTop}"
                   VerticalAlignment="Center"
@@ -98,7 +117,10 @@
     <Grid>
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition x:Name="MeterColumnDef"
+                          Width="{x:Static ui:DesignMetrics.LevelMeterWidthGrid}"
+                          MinWidth="{x:Static ui:DesignMetrics.LevelMeterWidth}"
+                          MaxWidth="{x:Static ui:DesignMetrics.LevelMeterWidthMax}" />
       </Grid.ColumnDefinitions>
       <Grid.RowDefinitions>
         <RowDefinition Height="*" />
@@ -141,9 +163,21 @@
         </Border>
       </DockPanel>
 
+      <GridSplitter x:Name="MeterColumnSplitter"
+                    Grid.Row="0"
+                    Grid.Column="1"
+                    Grid.RowSpan="2"
+                    Width="{x:Static ui:DesignMetrics.MeterColumnSplitterWidth}"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Stretch"
+                    ResizeBehavior="PreviousAndCurrent"
+                    ResizeDirection="Columns"
+                    Background="Transparent"
+                    Cursor="SizeWE"
+                    Panel.ZIndex="8"
+                    DragCompleted="MeterColumnSplitter_DragCompleted" />
       <Grid x:Name="MeterColumn"
             Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
-            Width="{x:Static ui:DesignMetrics.LevelMeterWidth}"
             Background="{DynamicResource TransportBackBrush}">
         <Grid.RowDefinitions>
           <RowDefinition Height="{x:Static ui:DesignMetrics.ProjectBarHeightGrid}" />

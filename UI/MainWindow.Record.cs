@@ -40,10 +40,16 @@ public partial class MainWindow
         }
 
         var settings = AppStorage.Settings;
-        var layout = ChannelLayout.Parse(settings.RecordLayout);
+        var speaker = settings.ResolvedSpeaker();
+        var layout = settings.ResolvedRecordLayout();
         try
         {
-            _recorder.Start(_outputSettings, settings.ResolvedRecordDeviceId(), layout, settings.RecordInputMap);
+            _recorder.Start(
+                _outputSettings,
+                settings.ResolvedRecordDeviceId(),
+                layout,
+                speaker.RecordInputMap,
+                speaker.FileChannelMap);
         }
         catch (Exception ex)
         {
@@ -56,10 +62,11 @@ public partial class MainWindow
             return;
         }
 
+        var channels = Math.Max(1, _recorder.Channels);
         var document = new AudioDocument(
-            new float[layout.Channels],
+            new float[channels],
             _recorder.SampleRate,
-            layout.Channels,
+            channels,
             24,
             AudioFileKind.Wave,
             null);

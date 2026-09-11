@@ -147,6 +147,57 @@ public sealed class LevelMeterEngineTests
     }
 
     [Fact]
+    public void Update_RmsHoldLineRisesSlowerThanHeldValue()
+    {
+        var engine = new LevelMeterEngine();
+        var first = engine.Update([0.5f, 0.5f], [0.4f, 0.4f], nowSeconds: 1, hasSamples: true);
+        var held = first.Left.RmsHeldDb;
+        Assert.Equal(LevelMeterEngine.ToDb(0.4), held, 4);
+        Assert.True(first.Left.RmsHoldLineDb < held - 20);
+
+        var now = 1 + (1d / 60d);
+        LevelMeterSnapshot snap = first;
+        for (var i = 0; i < 12; i++)
+        {
+            snap = engine.Update([0.5f, 0.5f], [0.4f, 0.4f], now, hasSamples: true);
+            now += 1d / 60d;
+        }
+
+        Assert.True(snap.Left.RmsHoldLineDb < held - 5);
+        Assert.True(snap.Left.RmsHoldLineDb > LevelMeterEngine.DbMin + 1);
+    }
+
+    [Fact]
+    public void Update_RmsHoldLineFallsSlowerThanHeldValue()
+    {
+        var engine = new LevelMeterEngine();
+        var now = 1d;
+        LevelMeterSnapshot snap = engine.Snapshot;
+        for (var i = 0; i < 70; i++)
+        {
+            snap = engine.Update([0.5f, 0.5f], [0.4f, 0.4f], now, hasSamples: true);
+            now += 0.12;
+        }
+
+        var held = snap.Left.RmsHeldDb;
+        Assert.Equal(LevelMeterEngine.ToDb(0.4), held, 4);
+        Assert.True(snap.Left.RmsHoldLineDb > held - 1);
+        Assert.True(snap.Left.RmsHoldLineDb <= held);
+
+        now += 1.05;
+        for (var i = 0; i < 24; i++)
+        {
+            snap = engine.Update([0.02f, 0.02f], [0.01f, 0.01f], now, hasSamples: true);
+            now += 1d / 60d;
+        }
+
+        Assert.True(snap.Left.ShowRmsHold);
+        Assert.True(snap.Left.RmsHoldLineDb > snap.Left.RmsHeldDb + 0.4);
+        Assert.True(snap.Left.RmsHoldLineDb < held);
+        Assert.True(snap.Left.RmsHoldPct > snap.Left.RmsPct + 1);
+    }
+
+    [Fact]
     public void Update_SurroundHidesRmsAndKeepsAllPeaks()
     {
         var peaks = new float[] { 0.5f, 0.25f, 1f, 0.1f, 0.2f, 0.3f };
@@ -189,5 +240,35 @@ public sealed class LevelMeterEngineTests
         Assert.Equal(0f, peaks[0], 5);
         Assert.Equal(0f, peaks[1], 5);
         Assert.Equal(0.8f, peaks[2], 5);
+
+        var planar = new float[LevelMeterEngine.WindowFrames * ChannelLayout.MaxChannels];
+        provider.CopyMeterPlanar(planar);
+        var last = (LevelMeterEngine.WindowFrames - 1) * ChannelLayout.MaxChannels;
+        Assert.Equal(0f, planar[last], 5);
+        Assert.Equal(0.8f, planar[last + 2], 5);
+    }
+
+    [Fact]
+    public void PlaybackProvider_SpectrumTap_IncludesLastSurroundChannel()
+    {
+        var frames = 8;
+        var samples = new float[frames * 6];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 6 + 5] = 0.7f;
+        }
+
+        var document = new AudioDocument(samples, 48000, 6, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(8, null);
+        provider.Bind(document, 0, null, loop: false);
+        var buffer = new float[frames * 8];
+        Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+
+        var dest = new float[frames];
+        Assert.Equal(frames, provider.CopyRecentOutputSamples(dest));
+        var expected = ChannelMix.Mid([0f, 0f, 0f, 0f, 0f, 0.7f]);
+        Assert.All(dest, sample => Assert.Equal(expected, sample, 5));
+        Assert.True(Math.Abs(expected) > 0.1f);
     }
 }

@@ -17,8 +17,9 @@ internal sealed class LevelMeterEngine
     public const double BarReleaseSec = 0.10;
     public const double PeakHoldSec = 1.0;
     public const double PeakReleaseDbPerSec = 10;
-    public const double RmsHoldMarkUpSmooth = 0.010;
-    public const double RmsHoldMarkDnSmooth = 0.034;
+    /// <summary>RMS ホールド線の時定数。ステレオバーと同じ上昇／下降。</summary>
+    public const double RmsHoldLineAttackSec = 1.66;
+    public const double RmsHoldLineReleaseSec = 0.48;
     public const double HoldLineEpsilonDb = 0.05;
     public const double ClipHoldSec = 2.0;
 
@@ -179,8 +180,8 @@ internal sealed class LevelMeterEngine
         var t = Math.Clamp(DbToNorm(db), 0, 1);
         ReadOnlySpan<(double P, byte R, byte G, byte B)> stops =
         [
-            (0, 10, 48, 68),
-            (0.26, 13, 74, 98),
+            (0, 16, 62, 86),
+            (0.26, 20, 90, 118),
             (0.55, 58, 184, 232),
             (0.82, 200, 239, 255),
             (1, 248, 254, 255),
@@ -262,16 +263,7 @@ internal sealed class LevelMeterEngine
 
         rmsHeldDb = Math.Clamp(rmsHeldDb, DbMin, DbMax);
         st.RmsHeldDb = rmsHeldDb;
-
-        var lineDb = st.RmsHoldLineDb;
-        if (!double.IsFinite(lineDb))
-        {
-            lineDb = rmsHeldDb;
-        }
-
-        var lineTau = rmsHeldDb > lineDb + 1e-6 ? 1.66 : 0.48;
-        lineDb += (rmsHeldDb - lineDb) * (1d - Math.Exp(-dt / lineTau));
-        st.RmsHoldLineDb = Math.Clamp(lineDb, DbMin, DbMax);
+        TrackRmsHoldLine(ref st.RmsHoldLineDb, rmsHeldDb, dt);
 
         return new ChannelMeter(
             DbToHeightPct(st.VisPeakDb),
@@ -284,7 +276,7 @@ internal sealed class LevelMeterEngine
             rmsHeldDb,
             st.RmsHoldLineDb,
             peakHeldDb > instPeakDb + HoldLineEpsilonDb,
-            rmsHeldDb > instRmsDb + HoldLineEpsilonDb);
+            st.RmsHoldLineDb > DbMin + HoldLineEpsilonDb);
     }
 
     private static void TrackBar(ref double visDb, double instDb, double dt)
@@ -293,6 +285,21 @@ internal sealed class LevelMeterEngine
         var coeff = 1d - Math.Exp(-dt / Math.Max(1e-4, tau));
         visDb += (instDb - visDb) * coeff;
         visDb = Math.Clamp(visDb, DbMin, DbMax);
+    }
+
+    /// <summary>RMS ホールド線。ホールド値へ跳ねず、ステレオと同じ時定数で追従する。</summary>
+    private static void TrackRmsHoldLine(ref double lineDb, double heldDb, double dt)
+    {
+        if (!double.IsFinite(lineDb))
+        {
+            lineDb = heldDb;
+            return;
+        }
+
+        var tau = heldDb >= lineDb ? RmsHoldLineAttackSec : RmsHoldLineReleaseSec;
+        var coeff = 1d - Math.Exp(-dt / Math.Max(1e-4, tau));
+        lineDb += (heldDb - lineDb) * coeff;
+        lineDb = Math.Clamp(lineDb, DbMin, DbMax);
     }
 
     private sealed class ChannelState

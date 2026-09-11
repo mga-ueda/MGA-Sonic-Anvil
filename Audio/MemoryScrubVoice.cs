@@ -36,8 +36,18 @@ internal sealed class MemoryScrubVoice
     private double _grainSeconds = double.NaN;
     private double _lastCaptureSeconds = double.NaN;
     private bool _opened;
+    private int _soloMask;
+    private float[] _soloScratch = [];
 
     public int SampleRate => Math.Max(1, _sampleRate);
+
+    public void SetSoloMask(int mask)
+    {
+        lock (_gate)
+        {
+            _soloMask = mask;
+        }
+    }
 
     public void Bind(AudioDocument document)
     {
@@ -232,10 +242,44 @@ internal sealed class MemoryScrubVoice
                 continue;
             }
 
+            if (_soloMask != 0)
+            {
+                ChannelMix.Downmix(
+                    ApplySolo(src.AsSpan(offset, channels)),
+                    out dest[i * 2],
+                    out dest[i * 2 + 1]);
+                continue;
+            }
+
             ChannelMix.Downmix(src, offset, channels, out var left, out var right);
             dest[i * 2] = left;
             dest[i * 2 + 1] = right;
         }
+    }
+
+    private ReadOnlySpan<float> ApplySolo(ReadOnlySpan<float> source)
+    {
+        if (_soloMask == 0)
+        {
+            return source;
+        }
+
+        if (_soloScratch.Length < source.Length)
+        {
+            _soloScratch = new float[source.Length];
+        }
+
+        var dest = _soloScratch.AsSpan(0, source.Length);
+        dest.Clear();
+        for (var i = 0; i < source.Length; i++)
+        {
+            if (ChannelSolo.Contains(_soloMask, i))
+            {
+                dest[i] = source[i];
+            }
+        }
+
+        return dest;
     }
 
     private static void ReadOne(float[] grain, ref int index, int taperFrames, out float left, out float right)

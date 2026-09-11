@@ -82,16 +82,19 @@ internal static class AppStorage
             if (!File.Exists(SettingsPath))
             {
                 Settings = new AppSettings();
+                Settings.EnsureSpeakerPresets();
                 return;
             }
 
             var json = File.ReadAllText(SettingsPath);
             Settings = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings)
                 ?? new AppSettings();
+            Settings.EnsureSpeakerPresets();
         }
         catch
         {
             Settings = new AppSettings();
+            Settings.EnsureSpeakerPresets();
         }
     }
 

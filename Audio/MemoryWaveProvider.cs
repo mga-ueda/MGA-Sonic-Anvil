@@ -62,7 +62,12 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private int _outputChannels = 2;
     private int _deviceOutputChannels = 2;
     private int[] _outputMap = [];
+    private int[] _fileChannelMap = [];
+    private int[] _fileMap = [];
     private int[] _routeMap = [];
+    private int _speakerChannels;
+    private int _soloMask;
+    private float[] _soloScratch = [];
     private int _monoLeftPort;
     private int _monoRightPort = 1;
     private bool _directRoute;
@@ -92,6 +97,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private int _meterSourceChannels = 2;
     private int _sourceMeterThisRead;
     private float[] _sourceMeterScratch = [];
+    private float[] _speakerScratch = [];
     private int _sourceMeterScratchFrames;
     private int _sourceMeterScratchChannels = 1;
     private readonly float[] _monitorRing = new float[8192];
@@ -135,12 +141,30 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
-    public void ConfigureOutput(int deviceChannels, int[]? map)
+    public void SetSoloChannel(int channel) =>
+        SetSoloMask(ChannelSolo.MaskOf(channel));
+
+    public void SetSoloMask(int mask)
+    {
+        lock (_gate)
+        {
+            _soloMask = mask;
+            _scrub.SetSoloMask(mask);
+            if (_scrubbing)
+            {
+                _scrub.Capture((long)Math.Floor(_sourceFrame));
+            }
+        }
+    }
+
+    public void ConfigureOutput(int deviceChannels, int[]? map, int[]? fileChannelMap = null, int speakerChannels = 0)
     {
         lock (_gate)
         {
             _deviceOutputChannels = Math.Max(1, deviceChannels);
             _outputMap = map ?? [];
+            _fileChannelMap = fileChannelMap ?? [];
+            _speakerChannels = speakerChannels < 1 ? 0 : speakerChannels;
             ApplyOutputConfig();
         }
     }
@@ -148,7 +172,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private void ApplyOutputConfig()
     {
         var dest = Math.Max(1, _deviceOutputChannels);
-        if (ChannelRouter.ShouldDownmix(_channels, dest, _outputMap))
+        var logical = _speakerChannels > 0 ? _speakerChannels : _channels;
+        _fileMap = _speakerChannels > 0
+            ? ChannelRouter.Normalize(_fileChannelMap, logical, _channels)
+            : [];
+        if (ChannelRouter.ShouldDownmix(logical, dest, _outputMap))
         {
             _directRoute = false;
             _outputChannels = 2;
@@ -160,7 +188,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _outputChannels = _directRoute ? dest : dest <= 1 ? 1 : 2;
         }
 
-        _routeMap = ChannelRouter.Normalize(_outputMap, _channels, _outputChannels);
+        _routeMap = ChannelRouter.Normalize(_outputMap, logical, _outputChannels);
         (_monoLeftPort, _monoRightPort) = ChannelRouter.MonoPorts(_outputChannels, _outputMap);
         WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(_deviceRate, Math.Max(1, _outputChannels));
     }
@@ -363,6 +391,40 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
             ResetMeterIntervalNoLock();
             return true;
+        }
+    }
+
+    public void CopyMeterPlanar(float[] dest)
+    {
+        ArgumentNullException.ThrowIfNull(dest);
+        var frames = LevelMeterEngine.WindowFrames;
+        var stride = ChannelLayout.MaxChannels;
+        if (dest.Length < frames * stride)
+        {
+            throw new ArgumentException("Planar meter buffer must hold 1024 frames.");
+        }
+
+        lock (_monitorGate)
+        {
+            var count = _meterCount;
+            var start = _meterWrite - count;
+            if (start < 0)
+            {
+                start += frames;
+            }
+
+            for (var i = 0; i < frames; i++)
+            {
+                var destAt = i * stride;
+                if (i < frames - count)
+                {
+                    dest.AsSpan(destAt, stride).Clear();
+                    continue;
+                }
+
+                var src = (start + i - (frames - count)) % frames;
+                _meterPlanar.AsSpan(src * stride, stride).CopyTo(dest.AsSpan(destAt, stride));
+            }
         }
     }
 
@@ -807,7 +869,14 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
             float left;
             float right;
-            if (resampled)
+            if (_soloMask != 0)
+            {
+                ChannelMix.Downmix(
+                    ApplySolo(_samples.AsSpan(checked((int)_exitFrame * srcCh), srcCh)),
+                    out left,
+                    out right);
+            }
+            else if (resampled)
             {
                 FormatConvert.DownmixBandlimited(
                     _samples,
@@ -859,6 +928,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         ReadOnlySpan<float> source,
         float gain)
     {
+        source = ApplySolo(source);
         PushSourceFrame(source, gain);
         if (_directRoute)
         {
@@ -872,7 +942,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 return;
             }
 
-            ChannelRouter.Scatter(source, dest, _routeMap);
+            var logical = ToSpeakerFrame(source);
+            ChannelRouter.Scatter(logical, dest, _routeMap);
             if (gain != 1f)
             {
                 for (var i = 0; i < dest.Length; i++)
@@ -884,7 +955,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return;
         }
 
-        ChannelMix.Downmix(source, out var left, out var right);
+        ChannelMix.Downmix(ToSpeakerFrame(source), out var left, out var right);
         if (gain != 1f)
         {
             left *= gain;
@@ -892,6 +963,48 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
 
         WriteFrame(buffer, offset, writtenFrames, outCh, left, right);
+    }
+
+    private ReadOnlySpan<float> ApplySolo(ReadOnlySpan<float> source)
+    {
+        if (_soloMask == 0)
+        {
+            return source;
+        }
+
+        if (_soloScratch.Length < source.Length)
+        {
+            _soloScratch = new float[source.Length];
+        }
+
+        var dest = _soloScratch.AsSpan(0, source.Length);
+        dest.Clear();
+        for (var i = 0; i < source.Length; i++)
+        {
+            if (ChannelSolo.Contains(_soloMask, i))
+            {
+                dest[i] = source[i];
+            }
+        }
+
+        return dest;
+    }
+
+    private ReadOnlySpan<float> ToSpeakerFrame(ReadOnlySpan<float> source)
+    {
+        if (_fileMap.Length == 0)
+        {
+            return source;
+        }
+
+        if (_speakerScratch.Length < _fileMap.Length)
+        {
+            _speakerScratch = new float[_fileMap.Length];
+        }
+
+        var dest = _speakerScratch.AsSpan(0, _fileMap.Length);
+        ChannelRouter.Gather(source, dest, _fileMap);
+        return dest;
     }
 
     private static void WriteFrame(float[] buffer, int offset, int frame, int outCh, float left, float right)

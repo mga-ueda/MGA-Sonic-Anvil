@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -47,7 +48,9 @@ public partial class MainWindow : Window
     private long _lastPlaybackStart;
     private bool _syncingScroll;
     private bool _syncingChrome;
+    private bool _syncingSpeakers;
     private int _waveformHeightScale;
+    private double _meterColumnPreferred;
     private int _playbackGeneration;
     private bool _didRestoreLastDocument;
     private TransportIconButton? _waapiToggle;
@@ -91,6 +94,7 @@ public partial class MainWindow : Window
     private bool _startupRevealPending = true;
     private bool _closing;
     private bool _exitAfterFlush;
+    private bool _bindingWorkspace;
 
     public MainWindow()
     {
@@ -106,6 +110,7 @@ public partial class MainWindow : Window
         Transport.SetTipsEnabled(AppStorage.Settings.ShowTips);
         _outputSettings = AppStorage.Settings.ToAudioOutputSettings();
         _waveformHeightScale = Math.Clamp(AppStorage.Settings.WaveformHeightScale, 1, 3);
+        ApplyMeterColumnWidth(AppStorage.Settings.MeterColumnWidth);
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
         AlwaysOnTopCheck.IsChecked = AppStorage.Settings.AlwaysOnTop;
         Topmost = AppStorage.Settings.AlwaysOnTop;
@@ -113,10 +118,23 @@ public partial class MainWindow : Window
         Transport.CommandInvoked += (_, command) => ExecuteTransport(command);
         StatusTimes.CurrentCommitted += (_, frame) =>
         {
+            if (_bindingWorkspace)
+            {
+                return;
+            }
+
             SeekFrame(frame);
             Waveform.CenterViewOnPlayhead();
         };
-        StatusTimes.SelectionCommitted += (_, range) => Waveform.SetSelection(range);
+        StatusTimes.SelectionCommitted += (_, range) =>
+        {
+            if (_bindingWorkspace)
+            {
+                return;
+            }
+
+            Waveform.SetSelection(range);
+        };
         StatusTimes.RequestWaveformFocus += (_, _) => Waveform.Focus();
         Transport.TipsToggleRequested += (_, _) => ToggleTips();
         Transport.ManualHelpRequested += (_, _) => ManualViewer.Open(this);
@@ -143,6 +161,7 @@ public partial class MainWindow : Window
         Waveform.RegionClearRequested += (_, region) => ClearRegion(region);
         Waveform.MarkerClearRequested += (_, frames) => ClearMarkers(frames);
         Waveform.SelectionChanged += (_, _) => OnWaveformSelectionChanged();
+        Waveform.ChannelLabelClicked += (_, e) => ToggleChannelSolo(e.Channel, e.Add, e.Mute);
         Waveform.ViewChanged += (_, _) => SyncViewChrome();
         Overview.ViewStartChanged += (_, start) =>
         {
@@ -164,6 +183,8 @@ public partial class MainWindow : Window
         _player.PlaybackEnded += (_, generation) => Dispatcher.BeginInvoke(() => OnPlaybackEnded(generation));
         _player.Diagnostic += (_, message) => Dispatcher.BeginInvoke(() =>
             OwnerCenteredMessageBox.Show(this, message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning));
+        AppStorage.Settings.EnsureSpeakerPresets();
+        _outputSettings = AppStorage.Settings.ToAudioOutputSettings();
         _player.ApplyOutputSettings(_outputSettings);
         Spectrum.Player = _player;
         LoudnessMeter.Player = _player;
@@ -174,7 +195,8 @@ public partial class MainWindow : Window
         // （深い拡大のスペクトログラム追従で実際に発生）、Background だと逆に
         // マウス移動がタイマーを飢餓させ再生ヘッドがカクつく。
         // Input はマウス入力と同列 FIFO で処理されるため、どちらの飢餓も起きない。
-        _player.SetOutputMap(AppStorage.Settings.PlaybackOutputMap);
+        ApplyPlayerRoute();
+        RefreshSpeakerMenu();
         _recordTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
             Interval = TimeSpan.FromMilliseconds(250),
@@ -283,17 +305,17 @@ public partial class MainWindow : Window
         _ = CheckForAppUpdateAsync();
     }
 
-    private void RestoreLastDocumentAfterReveal()
+    private async void RestoreLastDocumentAfterReveal()
     {
         var launch = MergeLaunchPaths(LaunchFiles.TakeStartup(), SingleInstance.TakePendingPaths());
         if (launch.Length > 0)
         {
             _didRestoreLastDocument = true;
-            OpenLaunchPaths(launch);
+            await OpenPathsAsync(launch).ConfigureAwait(true);
             return;
         }
 
-        TryRestoreLastDocument();
+        await TryRestoreLastDocumentAsync().ConfigureAwait(true);
         UpdateLayout();
         Waveform.Refresh();
         Overview.InvalidateVisual();
@@ -301,59 +323,69 @@ public partial class MainWindow : Window
 
     private void BindWorkspace(DocumentSession? session)
     {
-        Overview.CancelDrag();
-        if (Waveform.IsScrubbing)
+        _bindingWorkspace = true;
+        try
         {
-            Waveform.CancelScrub();
-        }
+            StatusTimes.CancelEdit();
+            Overview.CancelDrag();
+            if (Waveform.IsScrubbing)
+            {
+                Waveform.CancelScrub();
+            }
 
-        _player.Stop();
-        _playTimer.Stop();
-        CloseFadeCurvePicker();
-        CloseFormatConvertPicker();
-        CloseVolumeGainPicker();
-        ClosePitchShiftPicker();
-        CloseTimeStretchPicker();
-        CloseEditHistory(commit: true);
-        _resumeAfterScrub = false;
-        StopMarkerNudge();
-        ResetMarkerDigitEntry();
-        StopMeterRendering();
-        Waveform.UnlockCenter();
-        _activeSession = session;
-        _document = session?.Document;
-        _history = session?.History ?? new EditHistory();
-        Waveform.Document = _document;
-        Overview.Document = _document;
-        if (session is not null)
-        {
-            Waveform.ApplyPersistedView(
-                session.TimeZoom,
-                session.AmpZoom,
-                session.ViewStart,
-                session.PlayheadFrame);
-            Waveform.RestoreSelectedMarkers(session.SelectedMarkerFrames);
-            Waveform.LoopEnabled = session.LoopEnabled;
-            Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
-            SyncOverviewPlayhead();
-        }
-        else
-        {
-            Overview.SetSelectedMarkerFrames(null);
-            Waveform.LoopEnabled = true;
-            SyncOverviewPlayhead();
-        }
+            _player.Stop();
+            _playTimer.Stop();
+            CloseFadeCurvePicker();
+            CloseFormatConvertPicker();
+            CloseVolumeGainPicker();
+            ClosePitchShiftPicker();
+            CloseTimeStretchPicker();
+            CloseEditHistory(commit: true);
+            _resumeAfterScrub = false;
+            StopMarkerNudge();
+            ResetMarkerDigitEntry();
+            StopMeterRendering();
+            Waveform.UnlockCenter();
+            _activeSession = session;
+            _document = session?.Document;
+            _history = session?.History ?? new EditHistory();
+            Waveform.Document = _document;
+            Overview.Document = _document;
+            ApplyChannelSolo();
+            if (session is not null)
+            {
+                Waveform.ApplyPersistedView(
+                    session.TimeZoom,
+                    session.AmpZoom,
+                    session.ViewStart,
+                    session.PlayheadFrame);
+                Waveform.RestoreSelectedMarkers(session.SelectedMarkerFrames);
+                Waveform.LoopEnabled = session.LoopEnabled;
+                Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
+                SyncOverviewPlayhead();
+            }
+            else
+            {
+                Overview.SetSelectedMarkerFrames(null);
+                Waveform.LoopEnabled = true;
+                SyncOverviewPlayhead();
+            }
 
-        Transport.SetPlaying(false);
-        Transport.SetCommandsEnabled(_document is not null);
-        ExtinguishMeter();
-        SyncMonitorLayout();
-        LoudnessMeter.Reset();
-        RebuildTabBar();
-        RefreshTitle();
-        SyncViewChrome();
-        RefreshStatus();
-        RefreshHistoryStrip();
+            Transport.SetPlaying(false);
+            Transport.SetCommandsEnabled(_document is not null);
+            ExtinguishMeter();
+            SyncMonitorLayout();
+            LoudnessMeter.Reset();
+            RebuildTabBar();
+            RefreshTitle();
+            SyncViewChrome();
+            RefreshStatus();
+            RefreshHistoryStrip();
+        }
+        finally
+        {
+            _bindingWorkspace = false;
+        }
     }
 
     private void ToggleTips()
@@ -407,6 +439,10 @@ public partial class MainWindow : Window
         TipService.Set(TabScrollLeft, UiStrings.TipTabScrollLeft);
         TipService.Set(TabScrollRight, UiStrings.TipTabScrollRight);
         Transport.ApplyLocalizedTips();
+        SpeakerMenuLabel.Text = UiStrings.LabelStatusSpeaker;
+        TipService.Set(SpeakerMenuLabel, UiStrings.TipSpeakerSwitch, respectsEnabled: false);
+        TipService.Set(SpeakerMenu, UiStrings.TipSpeakerSwitch);
+        RefreshSpeakerMenu();
         if (_waapiToggle is not null)
         {
             TipService.Set(_waapiToggle, UiStrings.TipWaapiToggle);
@@ -603,6 +639,12 @@ public partial class MainWindow : Window
             : _document.Selection;
     }
 
+    private bool DeletesWholeFile(WaveSelection range) =>
+        _document is not null
+        && range.StartFrame <= 0
+        && range.EndFrame >= _document.FrameCount
+        && !ChannelSamples.IsScoped(EditMask(), _document.Channels);
+
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         StopRecording();
@@ -645,6 +687,7 @@ public partial class MainWindow : Window
             RememberDocumentState();
             AppStorage.Settings.ApplyAudioOutput(_outputSettings);
             AppStorage.Settings.WaveformHeightScale = _waveformHeightScale;
+            AppStorage.Settings.MeterColumnWidth = _meterColumnPreferred;
             PersistWaapiSettings();
             AppStorage.Save();
             await _player.DisposeAsync().ConfigureAwait(true);
@@ -698,6 +741,40 @@ public partial class MainWindow : Window
 
         paths = files.Where(AudioCodec.IsOpenable).ToArray();
         return paths.Length > 0;
+    }
+
+    private void MeterColumnSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        PersistMeterColumnWidth();
+    }
+
+    private void ApplyMeterColumnWidth(double preferred)
+    {
+        _meterColumnPreferred = DesignMetrics.ClampMeterColumnWidth(preferred);
+        var channels = _document?.Channels ?? 2;
+        var max = LevelMeterSurroundLayout.FilledColumnWidth(channels);
+        var width = Math.Min(_meterColumnPreferred, max);
+        MeterColumnDef.MinWidth = DesignMetrics.LevelMeterWidth;
+        MeterColumnDef.MaxWidth = max;
+        MeterColumnDef.Width = new GridLength(width);
+        var canResize = max > DesignMetrics.LevelMeterWidth + 0.5;
+        MeterColumnSplitter.IsEnabled = canResize;
+        MeterColumnSplitter.Cursor = canResize ? Cursors.SizeWE : Cursors.Arrow;
+    }
+
+    private double ReadMeterColumnWidth()
+    {
+        var raw = MeterColumnDef.ActualWidth > 0
+            ? MeterColumnDef.ActualWidth
+            : MeterColumnDef.Width.Value;
+        return DesignMetrics.ClampMeterColumnWidth(raw, _document?.Channels ?? 2);
+    }
+
+    private void PersistMeterColumnWidth()
+    {
+        ApplyMeterColumnWidth(ReadMeterColumnWidth());
+        AppStorage.Settings.MeterColumnWidth = _meterColumnPreferred;
+        AppStorage.Save();
     }
 
     private void AlwaysOnTopCheck_Changed(object sender, RoutedEventArgs e)

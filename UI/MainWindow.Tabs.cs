@@ -665,6 +665,7 @@ public partial class MainWindow
             }
             else
             {
+                e.Handled = true;
                 ActivateSession(session);
             }
         };

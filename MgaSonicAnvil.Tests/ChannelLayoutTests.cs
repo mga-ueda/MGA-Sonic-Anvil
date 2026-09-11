@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using MgaSonicAnvil.Audio;
 using Xunit;
 
@@ -7,17 +8,105 @@ namespace MgaSonicAnvil.Tests;
 public sealed class ChannelLayoutTests
 {
     [Theory]
-    [InlineData(1, 0, "M")]
-    [InlineData(2, 0, "L")]
-    [InlineData(2, 1, "R")]
-    [InlineData(6, 2, "C")]
-    [InlineData(6, 3, "LFE")]
-    [InlineData(6, 4, "Ls")]
-    [InlineData(6, 5, "Rs")]
-    [InlineData(10, 8, "Ch9")]
-    public void Name_UsesStandardOrder(int channels, int index, string expected)
+    [InlineData(1, 0, "1")]
+    [InlineData(2, 0, "1")]
+    [InlineData(2, 1, "2")]
+    [InlineData(6, 2, "3")]
+    [InlineData(6, 3, "4")]
+    [InlineData(6, 4, "5")]
+    [InlineData(6, 5, "6")]
+    [InlineData(10, 8, "9")]
+    public void Name_UsesOrdinalNumbers(int channels, int index, string expected)
     {
         Assert.Equal(expected, ChannelLabels.Name(index, channels));
+    }
+
+    [Fact]
+    public void Parse_FiveOne_KeepsSpeakerNames()
+    {
+        var layout = ChannelLayout.Parse("5.1");
+        Assert.Equal(["L", "R", "C", "LFE", "Ls", "Rs"], layout.Labels);
+        Assert.Equal(["1", "2", "3", "4", "5", "6"], ChannelLayout.Guess(6).Labels);
+    }
+
+    [Fact]
+    public void ForFile_UsesIdentityMapAsStartingNames()
+    {
+        var named = ChannelLayout.ForFile(6, ChannelLayout.Parse("5.1"));
+        Assert.Equal(["L", "R", "C", "LFE", "Ls", "Rs"], named.Labels);
+        Assert.Equal("C", named.LabelAt(2));
+        Assert.Equal(
+            ["L", "R", "C", "LFE", "Ls", "Rs", "7", "8"],
+            ChannelLayout.ForFile(8, ChannelLayout.Parse("5.1")).Labels);
+        Assert.Equal(["L", "R"], ChannelLayout.ForFile(2, ChannelLayout.Parse("5.1")).Labels);
+    }
+
+    [Fact]
+    public void ForFile_NamesOnlyMappedLanes()
+    {
+        var swapped = ChannelLayout.ForFile(6, ChannelLayout.Parse("5.1"), [2, 0, 1, 3, 4, 5]);
+        Assert.Equal(["R", "C", "L", "LFE", "Ls", "Rs"], swapped.Labels);
+        var wide = ChannelLayout.ForFile(8, ChannelLayout.Parse("5.1"), [2, ChannelRouter.Off, 0, 3, 4, 5]);
+        Assert.Equal(["C", "2", "L", "LFE", "Ls", "Rs", "7", "8"], wide.Labels);
+        var unused = ChannelLayout.ForFile(
+            6,
+            ChannelLayout.Parse("5.1"),
+            [ChannelRouter.Off, ChannelRouter.Off, ChannelRouter.Off, ChannelRouter.Off, ChannelRouter.Off, ChannelRouter.Off]);
+        Assert.Equal(["1", "2", "3", "4", "5", "6"], unused.Labels);
+    }
+
+    [Fact]
+    public void MenuLabel_IsEnglishWithChannelCount()
+    {
+        Assert.Equal("Mono", ChannelLayout.Mono.MenuLabel);
+        Assert.Equal("Stereo", ChannelLayout.Stereo.MenuLabel);
+        Assert.Equal("5.1 ch", ChannelLayout.Parse("5.1").MenuLabel);
+        Assert.Equal("Quad Back 4ch", ChannelLayout.Parse("Quad-Back").MenuLabel);
+        Assert.Equal("5.1.2 Side ch", ChannelLayout.Parse("5.1.2-Side").MenuLabel);
+        Assert.Equal("9.1.6 ch", ChannelLayout.Parse("9.1.6").MenuLabel);
+    }
+
+    [Fact]
+    public void SaveWave_TwentyFourBitWritesUnspecifiedMask()
+    {
+        var document = new AudioDocument(new float[48], 48000, 6, 24, AudioFileKind.Wave, null);
+        var path = Path.Combine(Path.GetTempPath(), $"sonic-anvil-mask0-{Guid.NewGuid():N}.wav");
+        try
+        {
+            AudioCodec.SaveWave(document, path);
+            Assert.Equal(0, ReadChannelMask(path));
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
+    public void SaveWave_PreservesExistingChannelMask()
+    {
+        var document = new AudioDocument(new float[48], 48000, 6, 24, AudioFileKind.Wave, null);
+        document.SetChannelMask(0x3F);
+        Assert.Equal(24, document.BitsPerSample);
+        Assert.Equal(0x3F, document.ChannelMask);
+        var path = Path.Combine(Path.GetTempPath(), $"sonic-anvil-mask-keep-{Guid.NewGuid():N}.wav");
+        try
+        {
+            AudioCodec.SaveWave(document, path);
+            Assert.Equal(0x3F, ReadChannelMask(path));
+            var loaded = AudioCodec.Load(path);
+            Assert.Equal(0x3F, loaded.ChannelMask);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
     }
 
     [Fact]
@@ -210,6 +299,30 @@ public sealed class ChannelLayoutTests
     }
 
     [Fact]
+    public void Playback_ReadsFileLanesAssignedToSpeakers()
+    {
+        var frames = 4;
+        var samples = new float[frames * 6];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 6] = 0.4f;
+            samples[i * 6 + 2] = -0.3f;
+        }
+
+        var document = new AudioDocument(samples, 48000, 6, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(8, [0, 1, 2, 3, 4, 5], [2, 1, 0, 3, 4, 5], speakerChannels: 6);
+        provider.Bind(document, 0, null, loop: false);
+
+        var buffer = new float[16];
+        Assert.Equal(16, provider.Read(buffer, 0, buffer.Length));
+        Assert.Equal(-0.3f, buffer[0], 3);
+        Assert.Equal(0f, buffer[1], 3);
+        Assert.Equal(0.4f, buffer[2], 3);
+        Assert.Equal(0f, buffer[6], 3);
+    }
+
+    [Fact]
     public void Playback_KeepsDeviceRateWhenDocumentDiffers()
     {
         var document = new AudioDocument(new float[8820], 44100, 2, 16, AudioFileKind.Wave, null);
@@ -250,5 +363,36 @@ public sealed class ChannelLayoutTests
         Assert.Equal(192, provider.Read(buffer, 0, buffer.Length));
         Assert.True(provider.CursorFrame > 0);
         Assert.True(provider.CursorFrame < 200);
+    }
+
+    private static int ReadChannelMask(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: false);
+        Assert.Equal("RIFF", Encoding.ASCII.GetString(reader.ReadBytes(4)));
+        _ = reader.ReadUInt32();
+        Assert.Equal("WAVE", Encoding.ASCII.GetString(reader.ReadBytes(4)));
+        while (stream.Position + 8 <= stream.Length)
+        {
+            var id = Encoding.ASCII.GetString(reader.ReadBytes(4));
+            var size = reader.ReadInt32();
+            if (id == "fmt ")
+            {
+                Assert.True(size >= 40, $"fmt size {size}");
+                _ = reader.ReadUInt16();
+                _ = reader.ReadUInt16();
+                _ = reader.ReadInt32();
+                _ = reader.ReadInt32();
+                _ = reader.ReadUInt16();
+                _ = reader.ReadUInt16();
+                _ = reader.ReadUInt16();
+                _ = reader.ReadUInt16();
+                return reader.ReadInt32();
+            }
+
+            stream.Position += size + (size & 1);
+        }
+
+        throw new InvalidDataException("fmt chunk missing");
     }
 }

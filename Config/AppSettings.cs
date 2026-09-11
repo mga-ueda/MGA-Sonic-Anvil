@@ -10,9 +10,10 @@ internal sealed class AppSettings
 
     public string AudioDeviceId { get; set; } = string.Empty;
 
+    /// <summary>旧設定。読み込み時に SpeakerPresets へ移す。</summary>
     public string RecordLayout { get; set; } = "Stereo";
 
-    /// <summary>空なら RecordLayout を使う（以前は入出力で兼用していた）。</summary>
+    /// <summary>旧設定。空なら RecordLayout を使っていた。</summary>
     public string PlaybackLayout { get; set; } = string.Empty;
 
     public string RecordDeviceId { get; set; } = string.Empty;
@@ -21,11 +22,23 @@ internal sealed class AppSettings
 
     public int[] PlaybackOutputMap { get; set; } = [];
 
+    public int[] FileChannelMap { get; set; } = [];
+
+    public SpeakerPreset[] SpeakerPresets { get; set; } = [];
+
+    public string ActiveSpeakerPresetId { get; set; } = string.Empty;
+
+    /// <summary>有効にするスピーカー定義。空は Stereo のみ。</summary>
+    public string[] VisibleSpeakerPresetIds { get; set; } = [];
+
     public string DefaultFadeInCurve { get; set; } = nameof(FadeShape.SCurve);
 
     public string DefaultFadeOutCurve { get; set; } = nameof(FadeShape.SCurve);
 
     public int WaveformHeightScale { get; set; } = 1;
+
+    /// <summary>レベルメーター／ゴニオ列の幅。0 以下は既定（最小幅）。</summary>
+    public double MeterColumnWidth { get; set; }
 
     public int Mp3BitRate { get; set; } = Mp3Encode.DefaultWindowsBitRateKbps;
 
@@ -146,22 +159,158 @@ internal sealed class AppSettings
     public Dictionary<string, string>? Colors { get; set; }
 
     public AudioOutputSettings ToAudioOutputSettings() =>
-        new(AudioOutputSettings.ParseApi(AudioApi), AudioDeviceId ?? string.Empty);
+        ResolvedSpeaker().ToAudioOutputSettings();
 
     public void ApplyAudioOutput(AudioOutputSettings settings)
     {
-        AudioApi = AudioOutputSettings.ToStoredValue(settings.Api);
-        AudioDeviceId = settings.DeviceId ?? string.Empty;
+        var speaker = ResolvedSpeaker();
+        speaker.ApplyAudioOutput(settings);
+        MirrorActiveSpeaker();
     }
 
     public double ResolvedLoudnessTargetLufs() =>
         LoudnessMeterEngine.ClampTargetLufs(LoudnessTargetLufs);
 
-    public ChannelLayout ResolvedPlaybackLayout() =>
-        ChannelLayout.Parse(string.IsNullOrWhiteSpace(PlaybackLayout) ? RecordLayout : PlaybackLayout);
+    public SpeakerPreset ResolvedSpeaker()
+    {
+        EnsureSpeakerPresets();
+        return FindSpeaker(ActiveSpeakerPresetId) ?? SpeakerPresets[0];
+    }
 
-    public string ResolvedRecordDeviceId() =>
-        AudioCaptureFactory.ResolveRecordDeviceId(ToAudioOutputSettings().Api, AudioDeviceId);
+    public string[] ResolvedVisibleSpeakerIds() =>
+        SpeakerPreset.NormalizeVisibleIds(VisibleSpeakerPresetIds);
+
+    public void ApplyVisibleSpeakerIds(IEnumerable<string> ids) =>
+        VisibleSpeakerPresetIds = SpeakerPreset.NormalizeVisibleIds(ids);
+
+    public SpeakerPreset[] MenuSpeakers()
+    {
+        EnsureSpeakerPresets();
+        return SpeakerPreset.FilterMenu(SpeakerPresets, ResolvedVisibleSpeakerIds(), ActiveSpeakerPresetId);
+    }
+
+    public ChannelLayout ResolvedRecordLayout() =>
+        ChannelLayout.Parse(ResolvedSpeaker().Id);
+
+    public ChannelLayout ResolvedPlaybackLayout() =>
+        ChannelLayout.Parse(ResolvedSpeaker().Id);
+
+    public int[] ResolvedRecordInputMap() => ResolvedSpeaker().RecordInputMap ?? [];
+
+    public int[] ResolvedPlaybackOutputMap() => ResolvedSpeaker().PlaybackOutputMap ?? [];
+
+    public int[] ResolvedFileChannelMap() => ResolvedSpeaker().FileChannelMap ?? [];
+
+    public string ResolvedRecordDeviceId()
+    {
+        var output = ToAudioOutputSettings();
+        return AudioCaptureFactory.ResolveRecordDeviceId(output.Api, output.DeviceId);
+    }
+
+    public SpeakerPreset? FindSpeaker(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id) || SpeakerPresets is not { Length: > 0 })
+        {
+            return null;
+        }
+
+        foreach (var preset in SpeakerPresets)
+        {
+            if (preset.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
+            {
+                return preset;
+            }
+        }
+
+        return null;
+    }
+
+    public void ReplaceSpeakerPresets(IEnumerable<SpeakerPreset> presets, string? activeId)
+    {
+        var saved = presets as SpeakerPreset[] ?? presets.ToArray();
+        ActiveSpeakerPresetId = activeId ?? string.Empty;
+        SpeakerPresets = SpeakerPreset.MergeCatalog(saved);
+        ActiveSpeakerPresetId = SpeakerPreset.ResolveActiveId(SpeakerPresets, ActiveSpeakerPresetId, saved);
+        MirrorActiveSpeaker();
+    }
+
+    /// <summary>カタログを正本にし、保存済みのデバイスとマップを載せる。</summary>
+    public void EnsureSpeakerPresets()
+    {
+        var saved = SpeakerPresets;
+        if (saved is not { Length: > 0 })
+        {
+            saved = SeedFromLegacyFields();
+        }
+
+        SpeakerPresets = SpeakerPreset.MergeCatalog(saved);
+        if (FindSpeaker(ActiveSpeakerPresetId) is null)
+        {
+            if (ChannelLayout.TryGet(RecordLayout, out var fromRecord))
+            {
+                ActiveSpeakerPresetId = fromRecord.Id;
+            }
+            else
+            {
+                ActiveSpeakerPresetId = SpeakerPreset.ResolveActiveId(
+                    SpeakerPresets,
+                    ActiveSpeakerPresetId,
+                    saved);
+            }
+        }
+
+        if (FindSpeaker(ActiveSpeakerPresetId) is null)
+        {
+            ActiveSpeakerPresetId = SpeakerPreset.DefaultId;
+        }
+
+        MirrorActiveSpeaker();
+    }
+
+    private SpeakerPreset[] SeedFromLegacyFields()
+    {
+        var output = new AudioOutputSettings(AudioOutputSettings.ParseApi(AudioApi), AudioDeviceId ?? string.Empty);
+        var recordChannels = ChannelLayout.Parse(RecordLayout).Channels;
+        var playChannels = ChannelLayout.Parse(
+            string.IsNullOrWhiteSpace(PlaybackLayout) ? RecordLayout : PlaybackLayout).Channels;
+        var channels = Math.Clamp(Math.Max(recordChannels, playChannels), 1, ChannelLayout.MaxChannels);
+        var target = ChannelLayout.TryGet(RecordLayout, out var named)
+            ? named
+            : ChannelLayout.PreferredForChannels(channels);
+        var catalog = SpeakerPreset.CreateCatalog();
+        foreach (var item in catalog)
+        {
+            item.ApplyAudioOutput(output);
+            if (!item.Id.Equals(target.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            item.RecordInputMap = [.. RecordInputMap ?? []];
+            item.PlaybackOutputMap = [.. PlaybackOutputMap ?? []];
+            item.FileChannelMap = [.. FileChannelMap ?? []];
+        }
+
+        ActiveSpeakerPresetId = target.Id;
+        return catalog;
+    }
+
+    private void MirrorActiveSpeaker()
+    {
+        var speaker = FindSpeaker(ActiveSpeakerPresetId) ?? (SpeakerPresets is { Length: > 0 } ? SpeakerPresets[0] : null);
+        if (speaker is null)
+        {
+            return;
+        }
+
+        AudioApi = speaker.AudioApi ?? "WaveOut";
+        AudioDeviceId = speaker.AudioDeviceId ?? string.Empty;
+        RecordInputMap = [.. speaker.RecordInputMap ?? []];
+        PlaybackOutputMap = [.. speaker.PlaybackOutputMap ?? []];
+        FileChannelMap = [.. speaker.FileChannelMap ?? []];
+        RecordLayout = speaker.Id;
+        PlaybackLayout = speaker.Id;
+    }
 
     public FadeShape ResolvedFadeInCurve() => FadeCurves.ParseStored(DefaultFadeInCurve);
 
@@ -178,6 +327,8 @@ internal sealed class AppSettings
 }
 
 [JsonSerializable(typeof(AppSettings))]
+[JsonSerializable(typeof(SpeakerPreset))]
+[JsonSerializable(typeof(SpeakerPreset[]))]
 [JsonSerializable(typeof(OpenDocumentSnapshot))]
 [JsonSerializable(typeof(OpenDocumentSnapshot[]))]
 [JsonSourceGenerationOptions(WriteIndented = true)]

@@ -22,6 +22,12 @@ internal sealed class HistoryRecipe
 
     public int Value { get; set; }
 
+    /// <summary>1 始まり。0 は全チャンネル（旧レシピ）。</summary>
+    public int Channel { get; set; }
+
+    /// <summary>複数ソロ。0 は <see cref="Channel"/> を使う。</summary>
+    public int ChannelMask { get; set; }
+
     public double Amount { get; set; }
 
     public string Text { get; set; } = "";
@@ -98,67 +104,107 @@ internal static class HistoryRecipes
     public const string ConvertBits = "ConvertBits";
     public const string ConvertChannels = "ConvertChannels";
 
-    public static HistoryRecipe Range(string kind, int sourceRate, WaveSelection range, int value = 0) =>
-        new()
-        {
-            Kind = kind,
-            SourceRate = sourceRate,
-            Start = range.StartFrame,
-            End = range.EndFrame,
-            Value = value,
-        };
+    public static HistoryRecipe Range(
+        string kind,
+        int sourceRate,
+        WaveSelection range,
+        int value = 0,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0) =>
+        WithChannel(
+            new HistoryRecipe
+            {
+                Kind = kind,
+                SourceRate = sourceRate,
+                Start = range.StartFrame,
+                End = range.EndFrame,
+                Value = value,
+            },
+            channel,
+            channelMask);
 
-    public static HistoryRecipe FromGain(int sourceRate, WaveSelection range, double gainDb) =>
-        new()
-        {
-            Kind = Gain,
-            SourceRate = sourceRate,
-            Start = range.StartFrame,
-            End = range.EndFrame,
-            Amount = gainDb,
-        };
+    public static HistoryRecipe FromGain(
+        int sourceRate,
+        WaveSelection range,
+        double gainDb,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0) =>
+        WithChannel(
+            new HistoryRecipe
+            {
+                Kind = Gain,
+                SourceRate = sourceRate,
+                Start = range.StartFrame,
+                End = range.EndFrame,
+                Amount = gainDb,
+            },
+            channel,
+            channelMask);
 
     public static HistoryRecipe FromPitchShift(
         int sourceRate,
         WaveSelection range,
         int semitones,
-        bool timeStretch = true) =>
-        new()
-        {
-            Kind = PitchShift,
-            SourceRate = sourceRate,
-            Start = range.StartFrame,
-            End = range.EndFrame,
-            Value = Audio.PitchShift.Snap(semitones),
-            Flag = !timeStretch,
-        };
+        bool timeStretch = true,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0) =>
+        WithChannel(
+            new HistoryRecipe
+            {
+                Kind = PitchShift,
+                SourceRate = sourceRate,
+                Start = range.StartFrame,
+                End = range.EndFrame,
+                Value = Audio.PitchShift.Snap(semitones),
+                Flag = !timeStretch,
+            },
+            channel,
+            channelMask);
 
-    public static HistoryRecipe FromTimeStretch(int sourceRate, WaveSelection range, double ratio) =>
-        new()
-        {
-            Kind = TimeStretch,
-            SourceRate = sourceRate,
-            Start = range.StartFrame,
-            End = range.EndFrame,
-            Amount = ratio,
-        };
+    public static HistoryRecipe FromTimeStretch(
+        int sourceRate,
+        WaveSelection range,
+        double ratio,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0) =>
+        WithChannel(
+            new HistoryRecipe
+            {
+                Kind = TimeStretch,
+                SourceRate = sourceRate,
+                Start = range.StartFrame,
+                End = range.EndFrame,
+                Amount = ratio,
+            },
+            channel,
+            channelMask);
 
     public static IEditCommand? TryCreate(AudioDocument document, HistoryRecipe recipe)
     {
         return recipe.Kind switch
         {
-            FadeIn => ProcessEdits.FadeIn(document, RangeOf(recipe), ShapeOf(recipe)),
-            FadeOut => ProcessEdits.FadeOut(document, RangeOf(recipe), ShapeOf(recipe)),
-            FadeAround => ProcessEdits.FadeAroundPlayhead(document, RangeOf(recipe), recipe.Playhead),
-            Normalize => ProcessEdits.Normalize(document, RangeOf(recipe)),
-            Gain => ProcessEdits.Gain(document, RangeOf(recipe), recipe.Amount),
-            PitchShift => ProcessEdits.PitchShift(document, RangeOf(recipe), recipe.Value, timeStretch: !recipe.Flag),
+            FadeIn => ProcessEdits.FadeIn(document, RangeOf(recipe), ShapeOf(recipe), channelMask: MaskOf(recipe)),
+            FadeOut => ProcessEdits.FadeOut(document, RangeOf(recipe), ShapeOf(recipe), channelMask: MaskOf(recipe)),
+            FadeAround => ProcessEdits.FadeAroundPlayhead(
+                document,
+                RangeOf(recipe),
+                recipe.Playhead,
+                channelMask: MaskOf(recipe)),
+            Normalize => ProcessEdits.Normalize(document, RangeOf(recipe), channelMask: MaskOf(recipe)),
+            Gain => ProcessEdits.Gain(document, RangeOf(recipe), recipe.Amount, channelMask: MaskOf(recipe)),
+            PitchShift => ProcessEdits.PitchShift(
+                document,
+                RangeOf(recipe),
+                recipe.Value,
+                timeStretch: !recipe.Flag,
+                channelMask: MaskOf(recipe)),
             TimeStretch => ProcessEdits.TimeStretch(
                 document,
                 RangeOf(recipe),
-                Audio.TimeStretch.DestFrameCountFromRatio((int)RangeOf(recipe).Length, recipe.Amount)),
-            Reverse => ProcessEdits.Reverse(document, RangeOf(recipe)),
-            Delete => ProcessEdits.Delete(document, RangeOf(recipe)),
+                Audio.TimeStretch.DestFrameCountFromRatio((int)RangeOf(recipe).Length, recipe.Amount),
+                channelMask: MaskOf(recipe)),
+            Reverse => ProcessEdits.Reverse(document, RangeOf(recipe), channelMask: MaskOf(recipe)),
+            Delete => ProcessEdits.Delete(document, RangeOf(recipe), channelMask: MaskOf(recipe)),
             Paste => TryPaste(document, recipe),
             SetSampleLoop => TrySetSampleLoop(document, recipe),
             SetRegion => TrySetRegion(document, recipe),
@@ -214,7 +260,7 @@ internal static class HistoryRecipes
             recipe.ClipRate,
             MarkersOf(recipe.ClipMarkerFrames, recipe.ClipMarkerComments),
             RegionsOf(recipe.ClipRegionStarts, recipe.ClipRegionEnds, recipe.ClipRegionNames));
-        return ProcessEdits.Paste(document, clip, recipe.Frame);
+        return ProcessEdits.Paste(document, clip, recipe.Frame, channelMask: MaskOf(recipe));
     }
 
     private static IEditCommand? TrySetSampleLoop(AudioDocument document, HistoryRecipe recipe)
@@ -348,21 +394,59 @@ internal static class HistoryRecipes
         return regions;
     }
 
-    public static HistoryRecipe FromPaste(int sourceRate, long insertFrame, AudioClip clip) =>
-        new()
+    public static HistoryRecipe FromPaste(
+        int sourceRate,
+        long insertFrame,
+        AudioClip clip,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0) =>
+        WithChannel(
+            new HistoryRecipe
+            {
+                Kind = Paste,
+                SourceRate = sourceRate,
+                Frame = insertFrame,
+                ClipSamples = clip.Interleaved,
+                ClipChannels = clip.Channels,
+                ClipRate = clip.SampleRate,
+                ClipMarkerFrames = clip.Markers.Select(item => item.Frame).ToArray(),
+                ClipMarkerComments = clip.Markers.Select(item => item.Comment ?? "").ToArray(),
+                ClipRegionStarts = clip.Regions.Select(item => item.StartFrame).ToArray(),
+                ClipRegionEnds = clip.Regions.Select(item => item.EndFrame).ToArray(),
+                ClipRegionNames = clip.Regions.Select(item => item.Name).ToArray(),
+            },
+            channel,
+            channelMask);
+
+    private static HistoryRecipe WithChannel(HistoryRecipe recipe, int channel, int channelMask = 0)
+    {
+        if (channelMask != 0 && ChannelSolo.Count(channelMask) > 1)
         {
-            Kind = Paste,
-            SourceRate = sourceRate,
-            Frame = insertFrame,
-            ClipSamples = clip.Interleaved,
-            ClipChannels = clip.Channels,
-            ClipRate = clip.SampleRate,
-            ClipMarkerFrames = clip.Markers.Select(item => item.Frame).ToArray(),
-            ClipMarkerComments = clip.Markers.Select(item => item.Comment ?? "").ToArray(),
-            ClipRegionStarts = clip.Regions.Select(item => item.StartFrame).ToArray(),
-            ClipRegionEnds = clip.Regions.Select(item => item.EndFrame).ToArray(),
-            ClipRegionNames = clip.Regions.Select(item => item.Name).ToArray(),
-        };
+            recipe.Channel = 0;
+            recipe.ChannelMask = channelMask;
+            return recipe;
+        }
+
+        recipe.Channel = channel < 0 ? 0 : channel + 1;
+        if (recipe.Channel == 0 && channelMask != 0)
+        {
+            var primary = ChannelSolo.Primary(channelMask);
+            recipe.Channel = primary < 0 ? 0 : primary + 1;
+        }
+
+        recipe.ChannelMask = 0;
+        return recipe;
+    }
+
+    internal static int MaskOf(HistoryRecipe recipe)
+    {
+        if (recipe.ChannelMask != 0)
+        {
+            return recipe.ChannelMask;
+        }
+
+        return recipe.Channel <= 0 ? 0 : 1 << (recipe.Channel - 1);
+    }
 
     public static HistoryRecipe FromMarkers(string kind, int sourceRate, IReadOnlyList<long> frames, long delta = 0) =>
         new()

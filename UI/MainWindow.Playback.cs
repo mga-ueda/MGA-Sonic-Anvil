@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
 using MgaSonicAnvil.Wwise;
@@ -575,12 +576,66 @@ public partial class MainWindow
         LevelMeter.Apply(_meter.Snapshot);
     }
 
+    private void ApplyPlayerRoute()
+    {
+        var speaker = AppStorage.Settings.ResolvedSpeaker();
+        _player.SetOutputMap(speaker.PlaybackOutputMap);
+        _player.SetFileChannelMap(speaker.FileChannelMap, speaker.Channels);
+        ApplyChannelSolo();
+    }
+
+    private void CycleChannelSolo(int direction = 1)
+    {
+        if (_document is null || _activeSession is null)
+        {
+            return;
+        }
+
+        _activeSession.SoloMask = ChannelSolo.StepMask(
+            _activeSession.SoloMask,
+            _document.Channels,
+            direction < 0 ? -1 : 1);
+        ApplyChannelSolo();
+    }
+
+    private void ToggleChannelSolo(int channel, bool add, bool mute = false)
+    {
+        if (_document is null || _activeSession is null)
+        {
+            return;
+        }
+
+        _activeSession.SoloMask = mute
+            ? ChannelSolo.Mute(_activeSession.SoloMask, channel, _document.Channels)
+            : ChannelSolo.Toggle(_activeSession.SoloMask, channel, _document.Channels, add);
+        ApplyChannelSolo();
+    }
+
+    private int EditMask() =>
+        ChannelSolo.ClampMask(_activeSession?.SoloMask ?? 0, _document?.Channels ?? 1);
+
+    private void ApplyChannelSolo()
+    {
+        var mask = ChannelSolo.ClampMask(_activeSession?.SoloMask ?? 0, _document?.Channels ?? 1);
+        if (_activeSession is not null)
+        {
+            _activeSession.SoloMask = mask;
+        }
+
+        Waveform.SetSoloMask(mask);
+        _player.SetSoloMask(mask);
+    }
+
     private void SyncMonitorLayout()
     {
         var channels = _document?.Channels ?? 2;
-        VectorScope.ApplyLayout(channels);
+        var speaker = AppStorage.Settings.ResolvedPlaybackLayout();
+        var fileMap = AppStorage.Settings.ResolvedFileChannelMap();
+        Waveform.ApplySpeakerLayout(speaker, fileMap);
+        VectorScope.ApplyLayout(channels, speaker, fileMap);
         _meter.EnsureLayout(channels);
         LevelMeter.Apply(_meter.Snapshot);
+        ApplyMeterColumnWidth(_meterColumnPreferred);
         VectorScope.InvalidateVisual();
     }
 

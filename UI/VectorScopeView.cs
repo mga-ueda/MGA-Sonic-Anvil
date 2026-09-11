@@ -19,20 +19,30 @@ internal sealed class VectorScopeView : FrameworkElement
     private const double CorrelationAttack = 0.38;
     private const double CorrelationRelease = 0.16;
     private const float PersistFade = 0.78f;
+    private const float SurroundPersistFade = 0.90f;
+    private static readonly bool SurroundPersistEnabled = false;
     private const float BeamGhostFade = 0.88f;
     private const int BeamGhostHoldFrames = 36;
     private const float BeamHome = 0.07f;
     private const double BeamRadius = 1.4;
     private const double ScopeInset = 4;
+    private const float StereoMaxGain = 3.5f;
+    private const float SurroundMaxGain = 1.7f;
+    private static readonly Color SurroundHullStroke = Color.FromRgb(0x5A, 0x5A, 0x5F);
 
     private readonly DispatcherTimer _timer;
     private readonly float[] _left = new float[LevelMeterEngine.WindowFrames];
     private readonly float[] _right = new float[LevelMeterEngine.WindowFrames];
     private readonly float[] _surroundPeaks = new float[ChannelLayout.MaxChannels];
+    private readonly float[] _surroundPlanar = new float[LevelMeterEngine.WindowFrames * ChannelLayout.MaxChannels];
     private readonly float[] _surroundVis = new float[ChannelLayout.MaxChannels];
     private readonly float[] _surroundEnvelope = new float[SurroundScopeEngine.EnvelopeSteps];
+    private readonly float[] _surroundHull = new float[SurroundScopeEngine.EnvelopeSteps];
+    private readonly float[] _surroundHullNow = new float[SurroundScopeEngine.EnvelopeSteps];
+    private readonly int[] _surroundHullHold = new int[SurroundScopeEngine.EnvelopeSteps];
     private readonly Point[] _trail = new Point[MaxPoints];
     private bool _surroundMode;
+    private ChannelLayout _scopeLayout = ChannelLayout.Stereo;
     private int _surroundChannels = 2;
     private float _surroundLfe;
     private float _surroundPaint;
@@ -54,6 +64,7 @@ internal sealed class VectorScopeView : FrameworkElement
     private WriteableBitmap? _persist;
     private WriteableBitmap? _beamGhost;
     private int[] _persistPixels = [];
+    private int[] _surroundFramePixels = [];
     private int[] _beamGhostPixels = [];
     private int _persistW;
     private int _persistH;
@@ -87,15 +98,22 @@ internal sealed class VectorScopeView : FrameworkElement
     /// <summary>開いている文書のチャンネル数。未再生でもサラウンド表示へ切替える。</summary>
     public int DocumentChannels { get; private set; } = 2;
 
-    public void ApplyLayout(int channels)
+    public void ApplyLayout(int channels, ChannelLayout? speaker = null, int[]? fileChannelMap = null)
     {
         DocumentChannels = Math.Max(1, channels);
         _surroundChannels = DocumentChannels;
+        _scopeLayout = ChannelLayout.ForFile(
+            DocumentChannels,
+            speaker ?? ChannelLayout.FromChannels(DocumentChannels),
+            fileChannelMap);
         _surroundMode = SurroundScopeEngine.IsSurround(DocumentChannels);
         if (_surroundMode)
         {
             Array.Clear(_surroundVis);
             Array.Clear(_surroundEnvelope);
+            Array.Clear(_surroundHull);
+            Array.Clear(_surroundHullNow);
+            Array.Clear(_surroundHullHold);
             _surroundLfe = 0;
             _surroundPaint = 0;
             _displayGain = 1f;
@@ -310,6 +328,10 @@ internal sealed class VectorScopeView : FrameworkElement
             _surroundMode = surround;
             _surroundChannels = DocumentChannels > 0 ? DocumentChannels : player?.SourceChannels ?? 2;
             Array.Clear(_surroundVis);
+            Array.Clear(_surroundEnvelope);
+            Array.Clear(_surroundHull);
+            Array.Clear(_surroundHullNow);
+            Array.Clear(_surroundHullHold);
             _surroundLfe = 0;
             _surroundPaint = 0;
             _displayGain = 1f;
@@ -646,7 +668,7 @@ internal sealed class VectorScopeView : FrameworkElement
             return;
         }
 
-        var targetGain = Math.Clamp(0.88f / peak, 1f, 6f);
+        var targetGain = Math.Clamp(0.88f / peak, 1f, StereoMaxGain);
         var follow = targetGain > _displayGain ? 0.28f : 0.06f;
         _displayGain += (targetGain - _displayGain) * follow;
 
@@ -686,12 +708,13 @@ internal sealed class VectorScopeView : FrameworkElement
         if (active && player is not null)
         {
             player.CopyMeterPeaks(_surroundPeaks);
+            player.CopyMeterPlanar(_surroundPlanar);
             var loudest = 0f;
             for (var i = 0; i < channels; i++)
             {
                 var target = SurroundScopeEngine.RadiusFromLinear(_surroundPeaks[i]);
                 var vis = _surroundVis[i];
-                var mix = target >= vis ? 0.18f : 0.10f;
+                var mix = target >= vis ? 0.42f : 0.16f;
                 _surroundVis[i] = vis + (target - vis) * mix;
                 if (_surroundVis[i] > loudest)
                 {
@@ -701,10 +724,10 @@ internal sealed class VectorScopeView : FrameworkElement
 
             for (var i = channels; i < _surroundVis.Length; i++)
             {
-                _surroundVis[i] *= 0.78f;
+                _surroundVis[i] *= 0.72f;
             }
 
-            var targetGain = loudest < 0.08f ? 1f : Math.Clamp(0.88f / loudest, 1f, 2.4f);
+            var targetGain = loudest < 0.08f ? 1f : Math.Clamp(0.88f / loudest, 1f, SurroundMaxGain);
             var gainMix = targetGain > _displayGain ? 0.10f : 0.06f;
             _displayGain += (targetGain - _displayGain) * gainMix;
             _surroundPaint = 1f;
@@ -714,7 +737,7 @@ internal sealed class VectorScopeView : FrameworkElement
         {
             for (var i = 0; i < _surroundVis.Length; i++)
             {
-                _surroundVis[i] *= 0.88f;
+                _surroundVis[i] *= 0.86f;
                 if (_surroundVis[i] < 0.002f)
                 {
                     _surroundVis[i] = 0;
@@ -722,44 +745,166 @@ internal sealed class VectorScopeView : FrameworkElement
             }
 
             _displayGain += (1f - _displayGain) * 0.08f;
-            _surroundPaint *= 0.88f;
+            _surroundPaint *= 0.86f;
+        }
+
+        if (_surroundPaint >= 0.04f)
+        {
+            Span<float> radii = stackalloc float[channels];
+            var gain = Math.Clamp(_displayGain, 1f, SurroundMaxGain);
+            for (var i = 0; i < channels; i++)
+            {
+                radii[i] = Math.Clamp(_surroundVis[i] * gain, 0, 1);
+            }
+
+            var layout = ScopeLayout(channels);
+            _surroundLfe += (SurroundScopeEngine.LfeLevel(radii, layout) - _surroundLfe) * (active ? 0.35f : 0.18f);
+            SurroundScopeEngine.FillCombinedWrap(
+                radii,
+                layout,
+                _surroundHullNow,
+                _surroundPlanar,
+                ChannelLayout.MaxChannels);
+            SurroundScopeEngine.HoldWrap(_surroundHull, _surroundHullNow, _surroundHullHold);
+        }
+        else
+        {
+            Array.Clear(_surroundVis);
+            Array.Clear(_surroundEnvelope);
+            Array.Clear(_surroundHull);
+            Array.Clear(_surroundHullNow);
+            Array.Clear(_surroundHullHold);
+            _surroundLfe = 0;
+            _surroundPaint = 0;
+        }
+
+        if (SurroundPersistEnabled)
+        {
+            AdvanceSurroundPersist(SurroundScopeRect(new Rect(RenderSize)));
+            if (_surroundPaint < 0.04f && !PersistHasInk())
+            {
+                _idle = true;
+                ClearPersist();
+            }
+        }
+        else
+        {
+            ClearPersist();
             if (_surroundPaint < 0.04f)
             {
-                Array.Clear(_surroundVis);
-                Array.Clear(_surroundEnvelope);
-                _surroundLfe = 0;
-                _surroundPaint = 0;
                 _idle = true;
-                InvalidateVisual();
-                return;
             }
         }
 
-        Span<float> radii = stackalloc float[channels];
-        var gain = Math.Clamp(_displayGain, 1f, 2.4f);
-        for (var i = 0; i < channels; i++)
-        {
-            radii[i] = Math.Clamp(_surroundVis[i] * gain, 0, 1);
-        }
-
-        var layout = SurroundScopeEngine.LayoutOf(channels);
-        _surroundLfe += (SurroundScopeEngine.LfeLevel(radii, layout) - _surroundLfe) * (active ? 0.22f : 0.14f);
-        SurroundScopeEngine.FillEnvelope(radii, layout, _surroundEnvelope);
         InvalidateVisual();
     }
 
-    private void DrawSurround(DrawingContext dc, Rect bounds)
+    private void AdvanceSurroundPersist(Rect scope)
+    {
+        if (scope.Width < 8 || scope.Height < 8 || !EnsurePersist(scope))
+        {
+            return;
+        }
+
+        FadePixels(_persistPixels, SurroundPersistFade, fadeColor: true, cutoff: 4);
+        var fade = Math.Clamp(_surroundPaint, 0, 1);
+        if (fade >= 0.04f)
+        {
+            StampSurroundEnergy(scope, fade);
+        }
+
+        _persist!.WritePixels(new Int32Rect(0, 0, _persistW, _persistH), _persistPixels, _persistW * 4, 0);
+    }
+
+    private void StampSurroundEnergy(Rect scope, double fade)
+    {
+        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            ScopeGeometry(new Rect(0, 0, scope.Width, scope.Height), out var cx, out var cy, out var radius);
+            DrawSurroundLobes(dc, cx, cy, radius, fade, persist: true);
+            DrawSurroundLfe(dc, cx, cy, radius, fade, persist: true);
+            DrawSurroundHull(dc, cx, cy, radius, fade, persist: true);
+        }
+
+        var rtb = new RenderTargetBitmap(_persistW, _persistH, 96 * dpi, 96 * dpi, PixelFormats.Pbgra32);
+        rtb.Render(visual);
+        if (_surroundFramePixels.Length != _persistPixels.Length)
+        {
+            _surroundFramePixels = new int[_persistPixels.Length];
+        }
+
+        rtb.CopyPixels(_surroundFramePixels, _persistW * 4, 0);
+        BlendFrame(_persistPixels, _surroundFramePixels);
+    }
+
+    private static void BlendFrame(int[] dest, int[] src)
+    {
+        for (var i = 0; i < dest.Length; i++)
+        {
+            var s = src[i];
+            var a1 = (s >> 24) & 0xFF;
+            if (a1 < 4)
+            {
+                continue;
+            }
+
+            var r1 = (s >> 16) & 0xFF;
+            var g1 = (s >> 8) & 0xFF;
+            var b1 = s & 0xFF;
+            if (a1 < 255)
+            {
+                r1 = r1 * 255 / a1;
+                g1 = g1 * 255 / a1;
+                b1 = b1 * 255 / a1;
+            }
+
+            var d = dest[i];
+            var a0 = (d >> 24) & 0xFF;
+            var r0 = (d >> 16) & 0xFF;
+            var g0 = (d >> 8) & 0xFF;
+            var b0 = d & 0xFF;
+            dest[i] = (Math.Max(a0, a1) << 24)
+                | (Math.Max(r0, r1) << 16)
+                | (Math.Max(g0, g1) << 8)
+                | Math.Max(b0, b1);
+        }
+    }
+
+    private bool PersistHasInk()
+    {
+        for (var i = 0; i < _persistPixels.Length; i++)
+        {
+            if (_persistPixels[i] != 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static Rect SurroundScopeRect(Rect bounds)
     {
         var side = Math.Max(8d, Math.Min(bounds.Width, bounds.Height));
-        var scope = new Rect(
+        return new Rect(
             bounds.Left + (bounds.Width - side) * 0.5,
             bounds.Top + (bounds.Height - side) * 0.5,
             side,
             side);
+    }
+
+    private void DrawSurround(DrawingContext dc, Rect bounds)
+    {
+        var scope = SurroundScopeRect(bounds);
         dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("VectorScopeBackBrush")), null, scope);
         ScopeGeometry(scope, out var cx, out var cy, out var radius);
         DrawSurroundGrid(dc, cx, cy, radius);
-        DrawSurroundSpeakerMarks(dc, cx, cy, radius);
+        if (SurroundPersistEnabled && _persist is not null)
+        {
+            dc.DrawImage(_persist, scope);
+        }
 
         var fade = Math.Clamp(_surroundPaint, 0, 1);
         if (fade < 0.04f)
@@ -767,43 +912,9 @@ internal sealed class VectorScopeView : FrameworkElement
             return;
         }
 
-        var trace = Theme.Get("VectorScopeTraceBrush");
-        var fillAlpha = (byte)Math.Clamp((int)Math.Round(70 * fade), 0, 255);
-        var lineAlpha = (byte)Math.Clamp((int)Math.Round(230 * fade), 0, 255);
-        var geometry = new StreamGeometry();
-        using (var ctx = geometry.Open())
-        {
-            var first = true;
-            for (var i = 0; i < _surroundEnvelope.Length; i++)
-            {
-                SurroundScopeEngine.PolarToXy(
-                    SurroundScopeEngine.StepAzimuth(i, _surroundEnvelope.Length),
-                    _surroundEnvelope[i],
-                    cx,
-                    cy,
-                    radius,
-                    out var x,
-                    out var y);
-                if (first)
-                {
-                    ctx.BeginFigure(new Point(x, y), isFilled: true, isClosed: true);
-                    first = false;
-                }
-                else
-                {
-                    ctx.LineTo(new Point(x, y), isStroked: true, isSmoothJoin: true);
-                }
-            }
-        }
-
-        geometry.Freeze();
-        dc.DrawGeometry(
-            WpfControlHelpers.FrozenBrush(Color.FromArgb(fillAlpha, trace.R, trace.G, trace.B)),
-            new Pen(WpfControlHelpers.FrozenBrush(Color.FromArgb(lineAlpha, trace.R, trace.G, trace.B)), 1.1),
-            geometry);
-
-        DrawSurroundLfe(dc, cx, cy, radius, fade);
-        DrawSurroundSpeakers(dc, cx, cy, radius, fade, trace);
+        DrawSurroundLobes(dc, cx, cy, radius, fade, persist: false);
+        DrawSurroundLfe(dc, cx, cy, radius, fade, persist: false);
+        DrawSurroundHull(dc, cx, cy, radius, fade, persist: false);
     }
 
     private static void DrawSurroundGrid(DrawingContext dc, double cx, double cy, double radius)
@@ -823,63 +934,21 @@ internal sealed class VectorScopeView : FrameworkElement
         dc.DrawLine(pen, new Point(cx - diag, cy + diag), new Point(cx + diag, cy - diag));
     }
 
-    private void DrawSurroundLfe(DrawingContext dc, double cx, double cy, double radius, double fade)
+    private void DrawSurroundLobes(DrawingContext dc, double cx, double cy, double radius, double fade, bool persist)
     {
-        var level = Math.Clamp(_surroundLfe, 0, 1);
-        if (level < 0.01f || fade < 0.04f)
-        {
-            return;
-        }
-
-        var accent = Theme.Get("DirtyAccentBrush");
-        var r = radius * SurroundScopeEngine.LfeRadius * level;
-        var fill = (byte)Math.Clamp((int)Math.Round(90 * fade), 0, 255);
-        var line = (byte)Math.Clamp((int)Math.Round(230 * fade), 0, 255);
-        dc.DrawEllipse(
-            WpfControlHelpers.FrozenBrush(Color.FromArgb(fill, accent.R, accent.G, accent.B)),
-            new Pen(WpfControlHelpers.FrozenBrush(Color.FromArgb(line, accent.R, accent.G, accent.B)), 1.1),
-            new Point(cx, cy),
-            r,
-            r);
-    }
-
-    private void DrawSurroundSpeakerMarks(DrawingContext dc, double cx, double cy, double radius)
-    {
-        var layout = SurroundScopeEngine.LayoutOf(
-            DocumentChannels > 0 ? DocumentChannels : _surroundChannels);
-        var grid = Theme.Get("VectorScopeGridBrush");
-        var brush = WpfControlHelpers.FrozenBrush(Color.FromArgb(200, grid.R, grid.G, grid.B));
-        for (var i = 0; i < layout.Channels; i++)
-        {
-            var label = layout.LabelAt(i);
-            if (SurroundScopeEngine.IsLfeLabel(label) ||
-                !SurroundScopeEngine.TryAzimuthDegrees(label, out var azimuth))
-            {
-                continue;
-            }
-
-            SurroundScopeEngine.PolarToXy(azimuth, 0.92, cx, cy, radius, out var x, out var y);
-            dc.DrawEllipse(brush, null, new Point(x, y), 2.0, 2.0);
-        }
-    }
-
-    private void DrawSurroundSpeakers(DrawingContext dc, double cx, double cy, double radius, double fade, Color trace)
-    {
-        var layout = SurroundScopeEngine.LayoutOf(_surroundChannels);
+        var layout = ScopeLayout(_surroundChannels);
         var n = Math.Min(_surroundChannels, layout.Channels);
-        var alpha = (byte)Math.Clamp((int)Math.Round(240 * fade), 0, 255);
-        if (alpha < 8)
+        var fillScale = persist ? 1.15 : 1;
+        var fillAlpha = (byte)Math.Clamp((int)Math.Round(140 * fade * fillScale), 0, 255);
+        if (fillAlpha < 4)
         {
             return;
         }
 
-        var brush = WpfControlHelpers.FrozenBrush(Color.FromArgb(alpha, trace.R, trace.G, trace.B));
-        var gain = Math.Clamp(_displayGain, 1f, 2.4f);
+        var gain = Math.Clamp(_displayGain, 1f, SurroundMaxGain);
         for (var i = 0; i < n; i++)
         {
-            var label = layout.LabelAt(i);
-            if (SurroundScopeEngine.IsLfeLabel(label) ||
-                !SurroundScopeEngine.TryAzimuthDegrees(label, out var azimuth))
+            if (!TrySpeakerAzimuth(layout, i, out var azimuth))
             {
                 continue;
             }
@@ -890,9 +959,190 @@ internal sealed class VectorScopeView : FrameworkElement
                 continue;
             }
 
-            SurroundScopeEngine.PolarToXy(azimuth, level, cx, cy, radius, out var x, out var y);
-            dc.DrawEllipse(brush, null, new Point(x, y), 2.2, 2.2);
+            SurroundScopeEngine.FillLobe(
+                _surroundEnvelope,
+                azimuth,
+                level,
+                _surroundPlanar,
+                ChannelLayout.MaxChannels,
+                i);
+            DrawEnvelope(dc, _surroundEnvelope, cx, cy, radius, ChannelSwatch.Of(i), fillAlpha);
         }
+    }
+
+    private void DrawSurroundHull(DrawingContext dc, double cx, double cy, double radius, double fade, bool persist)
+    {
+        var alpha = (byte)Math.Clamp((int)Math.Round((persist ? 230 : 255) * fade), 0, 255);
+        if (alpha < 8)
+        {
+            return;
+        }
+
+        DrawEnvelopeStroke(
+            dc,
+            _surroundHull,
+            cx,
+            cy,
+            radius,
+            Color.FromArgb(alpha, SurroundHullStroke.R, SurroundHullStroke.G, SurroundHullStroke.B),
+            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+    }
+
+    private static void DrawEnvelope(
+        DrawingContext dc,
+        float[] envelope,
+        double cx,
+        double cy,
+        double radius,
+        Color color,
+        byte fillAlpha)
+    {
+        var geometry = new StreamGeometry();
+        using (var ctx = geometry.Open())
+        {
+            var first = true;
+            for (var i = 0; i < envelope.Length; i++)
+            {
+                SurroundScopeEngine.PolarToXy(
+                    SurroundScopeEngine.StepAzimuth(i, envelope.Length),
+                    envelope[i],
+                    cx,
+                    cy,
+                    radius,
+                    out var x,
+                    out var y);
+                if (first)
+                {
+                    ctx.BeginFigure(new Point(x, y), isFilled: true, isClosed: true);
+                    first = false;
+                }
+                else
+                {
+                    ctx.LineTo(new Point(x, y), isStroked: false, isSmoothJoin: true);
+                }
+            }
+        }
+
+        geometry.Freeze();
+        dc.DrawGeometry(
+            WpfControlHelpers.FrozenBrush(Color.FromArgb(fillAlpha, color.R, color.G, color.B)),
+            null,
+            geometry);
+    }
+
+    private static void DrawEnvelopeStroke(
+        DrawingContext dc,
+        float[] envelope,
+        double cx,
+        double cy,
+        double radius,
+        Color color,
+        double pixelsPerDip)
+    {
+        var peak = 0f;
+        for (var i = 0; i < envelope.Length; i++)
+        {
+            if (envelope[i] > peak)
+            {
+                peak = envelope[i];
+            }
+        }
+
+        if (peak < 0.02f)
+        {
+            return;
+        }
+
+        var geometry = new StreamGeometry();
+        using (var ctx = geometry.Open())
+        {
+            var first = true;
+            for (var i = 0; i < envelope.Length; i++)
+            {
+                if (envelope[i] < 0.04f)
+                {
+                    continue;
+                }
+
+                SurroundScopeEngine.PolarToXy(
+                    SurroundScopeEngine.StepAzimuth(i, envelope.Length),
+                    envelope[i],
+                    cx,
+                    cy,
+                    radius,
+                    out var x,
+                    out var y);
+                if (first)
+                {
+                    ctx.BeginFigure(new Point(x, y), isFilled: false, isClosed: true);
+                    first = false;
+                }
+                else
+                {
+                    ctx.LineTo(new Point(x, y), isStroked: true, isSmoothJoin: true);
+                }
+            }
+        }
+
+        geometry.Freeze();
+        var pen = new Pen(WpfControlHelpers.FrozenBrush(color), WpfControlHelpers.DeviceHairline(pixelsPerDip));
+        pen.LineJoin = PenLineJoin.Round;
+        pen.Freeze();
+        dc.DrawGeometry(null, pen, geometry);
+    }
+
+    private void DrawSurroundLfe(DrawingContext dc, double cx, double cy, double radius, double fade, bool persist)
+    {
+        var level = Math.Clamp(_surroundLfe, 0, 1);
+        if (level < 0.01f || fade < 0.04f)
+        {
+            return;
+        }
+
+        var color = ChannelSwatch.Of(LfeChannelIndex(ScopeLayout(_surroundChannels)));
+        var r = radius * SurroundScopeEngine.LfeRadius * level;
+        var fillScale = persist ? 1.15 : 1;
+        var fill = (byte)Math.Clamp((int)Math.Round(150 * fade * fillScale), 0, 255);
+        dc.DrawEllipse(
+            WpfControlHelpers.FrozenBrush(Color.FromArgb(fill, color.R, color.G, color.B)),
+            null,
+            new Point(cx, cy),
+            r,
+            r);
+    }
+
+    private static int LfeChannelIndex(ChannelLayout layout)
+    {
+        for (var i = 0; i < layout.Channels; i++)
+        {
+            if (SurroundScopeEngine.IsLfeLabel(layout.LabelAt(i)))
+            {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    private ChannelLayout ScopeLayout(int channels) =>
+        _scopeLayout.Channels == channels ? _scopeLayout : ChannelLayout.FromChannels(channels);
+
+    private static bool TrySpeakerAzimuth(ChannelLayout layout, int index, out double azimuth)
+    {
+        var label = layout.LabelAt(index);
+        if (SurroundScopeEngine.IsLfeLabel(label))
+        {
+            azimuth = 0;
+            return false;
+        }
+
+        if (SurroundScopeEngine.TryAzimuthDegrees(label, out azimuth))
+        {
+            return true;
+        }
+
+        azimuth = SurroundScopeEngine.AzimuthDegrees(index, layout.Channels);
+        return true;
     }
 
     private static FormattedText Measure(string text, double size, Brush brush, double dpi) =>

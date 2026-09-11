@@ -11,7 +11,7 @@ public sealed class ChannelRouterTests
         Assert.Equal("Stereo", ChannelLayout.Parse(null).Id);
         Assert.Equal("9.1.6", ChannelLayout.Parse("9.1.6").Id);
         Assert.Equal(16, ChannelLayout.Parse("9.1.6").Channels);
-        Assert.Equal(12, ChannelLayout.All.Length);
+        Assert.Equal(29, ChannelLayout.All.Length);
     }
 
     [Fact]
@@ -68,10 +68,32 @@ public sealed class ChannelRouterTests
     }
 
     [Fact]
+    public void DestLaneCount_UsesAssignedWaveformNumbers()
+    {
+        Assert.Equal(6, ChannelRouter.DestLaneCount(6, null));
+        Assert.Equal(6, ChannelRouter.DestLaneCount(6, []));
+        Assert.Equal(6, ChannelRouter.DestLaneCount(6, [0, 1, 2, 3, 4, 5]));
+        Assert.Equal(8, ChannelRouter.DestLaneCount(6, [7, 1, 2, 3, 4, 5]));
+        Assert.Equal(6, ChannelRouter.DestLaneCount(6, [ChannelRouter.Off, ChannelRouter.Off]));
+        Assert.Equal(16, ChannelRouter.DestLaneCount(2, [100]));
+    }
+
+    [Fact]
     public void MapInterleaved_GatherBuildsDestFrames()
     {
         var source = new float[] { 1f, 2f, 3f, 4f };
         var mapped = ChannelRouter.MapInterleaved(source, 2, 4, [1, 0, ChannelRouter.Off, 1], gather: true);
         Assert.Equal([2f, 1f, 0f, 2f, 4f, 3f, 0f, 4f], mapped);
+    }
+
+    [Fact]
+    public void Record_WritesSpeakersOntoAssignedFileLanes()
+    {
+        var ports = new float[] { 0.1f, 0.2f, 0.3f };
+        var speakers = new float[2];
+        var file = new float[4];
+        ChannelRouter.Gather(ports, speakers, [2, 0]);
+        ChannelRouter.Scatter(speakers, file, [3, 1]);
+        Assert.Equal([0f, 0.1f, 0f, 0.3f], file);
     }
 }

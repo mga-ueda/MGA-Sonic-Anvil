@@ -72,6 +72,11 @@ internal partial class StatusTimeStrip : UserControl
 
     public void SetState(long currentFrame, WaveSelection selection, long totalFrames, int sampleRate, bool hasDocument)
     {
+        if (ShouldAbandonTimeEdit(_sampleRate, _totalFrames, _hasDocument, sampleRate, totalFrames, hasDocument))
+        {
+            CancelEdit();
+        }
+
         _currentFrame = Math.Max(0, currentFrame);
         _selection = selection;
         _totalFrames = Math.Max(0, totalFrames);
@@ -88,6 +93,17 @@ internal partial class StatusTimeStrip : UserControl
 
         RefreshTexts();
     }
+
+    internal static bool ShouldAbandonTimeEdit(
+        int previousRate,
+        long previousTotal,
+        bool previousHasDocument,
+        int sampleRate,
+        long totalFrames,
+        bool hasDocument) =>
+        previousHasDocument != hasDocument
+        || previousRate != sampleRate
+        || previousTotal != totalFrames;
 
     public void CancelEdit()
     {

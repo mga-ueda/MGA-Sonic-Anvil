@@ -11,6 +11,8 @@ internal sealed class AudioPlayer : IDisposable
     private IWavePlayer? _output;
     private AudioOutputSettings _settings = AudioOutputSettings.Default;
     private int[] _outputMap = [];
+    private int[] _fileChannelMap = [];
+    private int _speakerChannels;
     private int _deviceRate;
     private int _deviceChannels;
     private int _lockedDeviceRate;
@@ -130,10 +132,21 @@ internal sealed class AudioPlayer : IDisposable
     public void CopyMeterPeaks(Span<float> peaks) =>
         _provider.CopyMeterPeaks(peaks);
 
+    public void CopyMeterPlanar(float[] dest) =>
+        _provider.CopyMeterPlanar(dest);
+
     public int ReadRecentOutputSamples(float[] destination) =>
         _provider.CopyRecentOutputSamples(destination);
 
     public void SetOutputMap(int[]? map) => _outputMap = map ?? [];
+
+    public void SetFileChannelMap(int[]? map, int speakerChannels)
+    {
+        _fileChannelMap = map ?? [];
+        _speakerChannels = speakerChannels < 1 ? 0 : speakerChannels;
+    }
+
+    public void SetSoloMask(int mask) => _provider.SetSoloMask(mask);
 
     public void ReleaseOutput()
     {
@@ -731,8 +744,11 @@ internal sealed class AudioPlayer : IDisposable
         }
 
         var dest = AudioCaptureFactory.QueryOutputChannelCount(_settings);
-        _provider.ConfigureOutput(dest < 1 ? 2 : dest, _outputMap);
+        ConfigureProviderOutput(dest < 1 ? 2 : dest);
     }
+
+    private void ConfigureProviderOutput(int deviceChannels) =>
+        _provider.ConfigureOutput(deviceChannels, _outputMap, _fileChannelMap, _speakerChannels);
 
     private void EnsureDeviceMatchesProvider()
     {
@@ -880,7 +896,7 @@ internal sealed class AudioPlayer : IDisposable
         }
 
         var driverCh = Math.Max(1, asio.DriverOutputChannelCount);
-        _provider.ConfigureOutput(driverCh, _outputMap);
+        ConfigureProviderOutput(driverCh);
         var channels = Math.Clamp(_provider.WaveFormat.Channels, 1, driverCh);
         asio.Init(new AsioOutputAdapter(_provider, channels));
     }

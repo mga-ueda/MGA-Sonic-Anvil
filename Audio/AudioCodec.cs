@@ -90,6 +90,7 @@ internal static class AudioCodec
             bits <= 0 ? 16 : bits,
             DetectKind(path),
             path);
+        document.SetChannelMask(DevicePortNames.ReadWaveFileChannelMask(path));
         ApplyEmbeddedMeta(document, path);
         return document;
     }
@@ -157,6 +158,7 @@ internal static class AudioCodec
             document.BitsPerSample,
             AudioFileKind.Wave,
             path);
+        slice.SetChannelMask(document.ChannelMask);
         SaveWave(slice, path, progress);
     }
 
@@ -193,7 +195,7 @@ internal static class AudioCodec
             var riffSizePos = stream.Position;
             writer.Write(0);
             writer.Write(Encoding.ASCII.GetBytes("WAVE"));
-            WriteFmtChunk(writer, sampleRate, channels, bits, byteRate, blockAlign);
+            WriteFmtChunk(writer, sampleRate, channels, bits, byteRate, blockAlign, document.ChannelMask);
             if (bits > 16)
             {
                 writer.Write(Encoding.ASCII.GetBytes("fact"));
@@ -235,7 +237,8 @@ internal static class AudioCodec
         int channels,
         int bits,
         int byteRate,
-        int blockAlign)
+        int blockAlign,
+        int channelMask)
     {
         writer.Write(Encoding.ASCII.GetBytes("fmt "));
         if (bits <= 16)
@@ -251,6 +254,7 @@ internal static class AudioCodec
         }
 
         // 24-bit を 16 バイト PCM で書くと Sound Forge が raw 32 kHz として開く。
+        // スピーカーマスクは元ファイルの値だけ残す。無ければ 0（未指定）。推測して埋めない。
         writer.Write(40);
         writer.Write((ushort)0xFFFE);
         writer.Write((ushort)channels);
@@ -260,18 +264,9 @@ internal static class AudioCodec
         writer.Write((ushort)bits);
         writer.Write((ushort)22);
         writer.Write((ushort)bits);
-        writer.Write(ExtensibleChannelMask(channels));
+        writer.Write(channelMask);
         writer.Write(PcmSubFormat);
     }
-
-    private static int ExtensibleChannelMask(int channels) => channels switch
-    {
-        1 => 0x4,
-        2 => 0x3,
-        6 => 0x3F,
-        8 => 0x63F,
-        _ => channels >= 31 ? -1 : (1 << channels) - 1,
-    };
 
     private static void DeleteSoundForgeSidecars(string path)
     {

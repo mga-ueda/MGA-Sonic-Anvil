@@ -33,6 +33,7 @@ internal sealed class AudioDocument
         SampleRate = sampleRate;
         Channels = channels;
         BitsPerSample = bitsPerSample;
+        ChannelMask = 0;
         SourceKind = sourceKind;
         SourcePath = sourcePath;
         Peaks = PeakPyramid.Build(interleaved, channels);
@@ -48,6 +49,9 @@ internal sealed class AudioDocument
     public int Channels { get; private set; }
 
     public int BitsPerSample { get; private set; }
+
+    /// <summary>元ファイルの dwChannelMask。0 は未指定。推測して埋めない。</summary>
+    public int ChannelMask { get; private set; }
 
     public bool SampleRateEdited => SampleRate != _committedSampleRate;
 
@@ -346,14 +350,22 @@ internal sealed class AudioDocument
             throw new ArgumentOutOfRangeException(nameof(bitsPerSample));
         }
 
+        var channelsChanged = channels != Channels;
         Interleaved = interleaved;
         SampleRate = sampleRate;
         Channels = channels;
         BitsPerSample = bitsPerSample;
+        if (channelsChanged)
+        {
+            ChannelMask = 0;
+        }
+
         RebuildPeaks();
         RefreshFileBytes();
         IsDirty = true;
     }
+
+    public void SetChannelMask(int mask) => ChannelMask = mask;
 
     public float[] FormatOriginSamples => _formatOriginSamples;
 

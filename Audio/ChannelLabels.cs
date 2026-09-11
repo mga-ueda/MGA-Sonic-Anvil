@@ -1,25 +1,25 @@
+using System.Globalization;
+
 namespace MgaSonicAnvil.Audio;
 
-/// <summary>
-/// WAVEFORMATEXTENSIBLE の一般的な並び（L, R, C, LFE, Ls, Rs …）に沿った表示名。
-/// </summary>
+/// <summary>ファイル上のチャンネル番号。表示名は割り当て経由の ChannelLayout.ForFile。</summary>
 internal static class ChannelLabels
 {
-    private static readonly string[] Named =
-        ["L", "R", "C", "LFE", "Ls", "Rs", "Lsr", "Rsr"];
-
     public static string Name(int index, int channelCount)
     {
-        if (channelCount <= 1)
+        _ = channelCount;
+        return (index + 1).ToString(CultureInfo.InvariantCulture);
+    }
+
+    public static string[] Numbered(int channels)
+    {
+        channels = Math.Clamp(channels, 1, ChannelLayout.MaxChannels);
+        var names = new string[channels];
+        for (var i = 0; i < channels; i++)
         {
-            return "M";
+            names[i] = (i + 1).ToString(CultureInfo.InvariantCulture);
         }
 
-        if ((uint)index >= (uint)channelCount)
-        {
-            return $"Ch{index + 1}";
-        }
-
-        return index < Named.Length ? Named[index] : $"Ch{index + 1}";
+        return names;
     }
 }

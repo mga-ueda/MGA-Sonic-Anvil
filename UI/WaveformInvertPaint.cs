@@ -13,7 +13,9 @@ internal static class WaveformInvertPaint
         int height,
         AudioDocument? document,
         double viewStart,
-        double viewSpan)
+        double viewSpan,
+        IReadOnlyList<int>? laneWaveColors = null,
+        double laneGapPx = 0)
     {
         if (width <= 0 || height <= 0 || pixels.Length < width * height)
         {
@@ -21,13 +23,15 @@ internal static class WaveformInvertPaint
         }
 
         var waveformBack = ToBgra(Theme.Get("WaveformBackBrush"));
-        var waveColor = ToBgra(Theme.Get("WaveFillBrush"));
+        var fallbackWave = ToBgra(Theme.Get("WaveFillBrush"));
         var count = width * height;
         if (document is null || document.FrameCount <= 0 || viewSpan <= 0)
         {
             for (var i = 0; i < count; i++)
             {
-                pixels[i] = IsWavePixel(pixels[i]) ? waveformBack : waveColor;
+                pixels[i] = IsWavePixel(pixels[i])
+                    ? waveformBack
+                    : WaveColorAt(i / width, height, laneWaveColors, laneGapPx, fallbackWave);
             }
 
             return;
@@ -74,9 +78,31 @@ internal static class WaveformInvertPaint
             for (var y = 0; y < height; y++)
             {
                 var index = y * width + x;
-                pixels[index] = IsWavePixel(pixels[index]) ? swappedBack : waveColor;
+                pixels[index] = IsWavePixel(pixels[index])
+                    ? swappedBack
+                    : WaveColorAt(y, height, laneWaveColors, laneGapPx, fallbackWave);
             }
         }
+    }
+
+    private static int WaveColorAt(
+        int y,
+        int height,
+        IReadOnlyList<int>? laneWaveColors,
+        double laneGapPx,
+        int fallback)
+    {
+        if (laneWaveColors is null || laneWaveColors.Count == 0)
+        {
+            return fallback;
+        }
+
+        if (laneWaveColors.Count == 1)
+        {
+            return laneWaveColors[0];
+        }
+
+        return laneWaveColors[ChannelWavePaint.LaneAt(y, height, laneWaveColors.Count, laneGapPx)];
     }
 
     private static bool IsWavePixel(int pixel) => ((pixel >> 24) & 0xFF) > 0;

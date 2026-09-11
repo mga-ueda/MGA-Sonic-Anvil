@@ -145,12 +145,19 @@ internal static class AudioCaptureFactory
     private static List<AudioOutputDeviceInfo> EnumerateWaveIn()
     {
         var list = new List<AudioOutputDeviceInfo>();
-        for (var i = 0; i < WaveIn.DeviceCount; i++)
+        var products = new string[WaveIn.DeviceCount];
+        for (var i = 0; i < products.Length; i++)
         {
             var caps = WaveIn.GetCapabilities(i);
-            list.Add(new(
-                i.ToString(CultureInfo.InvariantCulture),
-                string.IsNullOrWhiteSpace(caps.ProductName) ? $"Input {i}" : caps.ProductName));
+            products[i] = string.IsNullOrWhiteSpace(caps.ProductName) ? $"Input {i}" : caps.ProductName;
+        }
+
+        var names = WaveDeviceNames.ResolveAll(
+            products,
+            WaveDeviceNames.QueryWasapiFriendlyNames(DataFlow.Capture));
+        for (var i = 0; i < names.Length; i++)
+        {
+            list.Add(new(i.ToString(CultureInfo.InvariantCulture), names[i]));
         }
 
         return list;

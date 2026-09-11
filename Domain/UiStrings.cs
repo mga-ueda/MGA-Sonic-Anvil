@@ -111,34 +111,16 @@ internal static partial class UiStrings
     public static string LabelAudioDevice => Get("オーディオデバイス", "Audio device");
     public static string LabelSettingsTabGeneral => Get("一般", "General");
     public static string LabelSettingsTabAudio => Get("オーディオ", "Audio");
+    public static string LabelSettingsTabLayouts => Get("表示項目", "Shown");
     public static string LabelSettingsTabEditing => Get("編集", "Editing");
     public static string LabelSettingsTabExport => Get("書き出し", "Export");
     public static string LabelSettingsInput => Get("録音", "Recording");
     public static string LabelSettingsOutput => Get("再生", "Playback");
+    public static string LabelSpeaker => Get("スピーカー", "Speakers");
+    public static string LabelSpeakerVisibility => Get("有効にするスピーカー定義", "Speaker definitions to enable");
     public static string ButtonSineMinusTwenty => Get("Sine −20 dB", "Sine −20 dB");
-    public static string LabelRecordHeader => Get("録音", "Recording");
-    public static string LabelRecordLayout => Get("録音チャンネル数", "Record channel count");
-    public static string LabelPlaybackLayout => Get("再生チャンネル数", "Playback channel count");
-    public static string LabelRecordDevice => Get("録音デバイス", "Record device");
-    public static string LabelRecordInputMap => Get("録音ポート", "Record ports");
-    public static string LabelPlaybackOutputMap => Get("再生ポート", "Playback ports");
+    public static string ButtonChannelVoice => Get("Voice", "Voice");
     public static string LabelPortOff => Get("なし", "Off");
-    public static string LabelChannelLayout(string id) => id switch
-    {
-        "Mono" => Get("モノラル", "Mono"),
-        "Stereo" => Get("ステレオ", "Stereo"),
-        "Quad" => Get("4.0", "4.0"),
-        "5.0" => Get("5.0", "5.0"),
-        "5.1" => Get("5.1", "5.1"),
-        "5.1.2" => Get("5.1.2", "5.1.2"),
-        "7.1" => Get("7.1", "7.1"),
-        "5.1.4" => Get("5.1.4", "5.1.4"),
-        "7.1.2" => Get("7.1.2", "7.1.2"),
-        "7.1.4" => Get("7.1.4", "7.1.4"),
-        "9.1.4" => Get("9.1.4", "9.1.4"),
-        "9.1.6" => Get("9.1.6", "9.1.6"),
-        _ => id,
-    };
     public static string LabelAudioApiWaveOut => Get("WaveOut", "WaveOut");
     public static string LabelAudioApiWasapi => Get("WASAPI", "WASAPI");
     public static string LabelAudioApiAsio => Get("ASIO", "ASIO");
@@ -159,8 +141,8 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string AccessibleAudioSettingsButton => Get("設定", "Settings");
     public static string TipAudioSettings => Get(
-        "設定 (Ctrl+Shift+O)\n一般／オーディオ／編集／書き出しのタブ。表示言語、関連付け、録音／再生と確認用メーター／Sine、ラウドネス、フェード、MP3、同時書き出し本数。",
-        "Settings (Ctrl+Shift+O)\nGeneral / Audio / Editing / Export tabs. Language, file associations, record / playback with meters and a sine test, loudness, fades, MP3, and parallel export count.");
+        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出しのタブ。表示言語、関連付け、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、フェード、MP3、同時書き出し本数。",
+        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export tabs. Language, file associations, speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, fades, MP3, and parallel export count.");
     public static string LabelMp3Encode => Get("MP3", "MP3");
     public static string TipMp3Encode => Get(
         "MP3 保存の経路です。LAME のパスが有効なら lame.exe、空欄または無効なら Windows です。",
@@ -251,7 +233,6 @@ internal static partial class UiStrings
     public static string LabelMono => Get("Mono", "Mono");
     public static string LabelStereo => Get("Stereo", "Stereo");
     public static string LabelHertz => Get("Hz", "Hz");
-    public static string LabelConvertCustomRate => Get("任意", "Custom");
     public static string LabelPeak => Get("Peak", "Peak");
     public static string LabelRms => Get("RMS", "RMS");
     public static string LabelVolume => Get("音量", "Volume");
@@ -351,6 +332,11 @@ internal static partial class UiStrings
         "GitHub を開けませんでした。",
         "Unable to open GitHub.");
 
+    public static string ConfirmSpeakerSettingsSave(string name) => Format(
+        "{0} の設定を保存しますか？",
+        "Save settings for {0}?",
+        name);
+
     public static string ConfirmSaveFor(string name) => Format(
         "{0} に未保存の変更があります。保存しますか？",
         "{0} has unsaved changes. Save them?",
@@ -360,6 +346,7 @@ internal static partial class UiStrings
         "{0} tab(s) have unsaved changes. You can finish them all at once.",
         remaining);
 
+    public static string LabelWaveformLoading => Get("Now Loading ...", "Now Loading ...");
     public static string ErrorOpenFailed => Get("読み込みに失敗しました。", "Failed to open the file.");
     public static string StatusOpeningFiles(int current, int total, string name) => Format(
         "開いています {0} / {1}  {2}",
@@ -434,42 +421,50 @@ internal static partial class UiStrings
     public static string TooltipTipsToggle => Get("Tips の表示", "Show Tips");
     public static string TooltipManualHelp => Get("マニュアル", "Manual");
 
+    public static string LabelWaveformLane(int number) =>
+        Get($"Ch{number}", $"Ch{number}");
     public static string TipSettingsInput => Get(
-        "録音チャンネル数と録音ポート。右のバーで信号が入っているか確認できます。",
-        "Record channel count and record ports. The bars show whether a signal is arriving.");
+        "各スピーカーの録音ポートと、書き込む Ch。右のバーで信号が入っているか確認できます。",
+        "Record port and file channel (Ch) for each speaker. The bars show whether a signal is arriving.");
     public static string TipSettingsOutput => Get(
-        "再生チャンネル数と再生ポート。Sine −20 dB で再生を確認できます。",
-        "Playback channel count and playback ports. Sine −20 dB checks playback.");
+        "各スピーカーの再生ポートと、読む Ch。行の Sine −20 dB と Voice で確認できます。LFE に Voice はありません。",
+        "Playback port and file channel (Ch) for each speaker. Sine −20 dB and Voice on each row check the route. LFE has no Voice.");
+    public static string TipSpeakerPreset => Get(
+        "アプリ用意のスピーカー配置。先にこれを選び、その中でデバイスとポート割り当てを決めます。一覧は表示項目タブのチェックで絞れます。変更したあと OK せずに別の配置へ切り替えると、保存するか聞きます。",
+        "Built-in speaker layout. Pick this first, then set the device and port assignments inside it. The list is filtered by the Shown tab. Switching layouts without OK asks whether to save the current one.");
+    public static string TipSpeakerVisibility => Get(
+        "チェックしたスピーカー定義だけ、設定とステータスバー（NOW POS の左）の一覧に出します。既定は Stereo だけです。今使っている定義は、外しても切り替えるまで残ります。全部外すことはできません。",
+        "Only enabled speaker definitions appear in Settings and the status-bar menu (left of NOW POS). Stereo is on by default. The definition in use stays listed until you switch away. At least one must stay enabled.");
+    public static string TipSpeakerSwitch => Get(
+        "使うスピーカー配置を切り替えます。デバイスとポート割り当てが一緒に変わります。一覧は設定の表示項目タブで絞れます。",
+        "Switch speaker layout. The device and port assignments change with it. The list is filtered in Settings → Shown.");
     public static string TipRecord => Get(
-        "録音 (Ctrl+R)\n新規タブに録音。もう一度で停止。設定のチャンネル構成と録音ポートを使う。Space / Enter / Esc でも停止。",
-        "Record (Ctrl+R)\nRecords into a new tab. Press again to stop. Uses the channel layout and record ports in Settings. Space / Enter / Esc also stop.");
-    public static string TipRecordLayout => Get(
-        "録音するチャンネル構成。モノラルから Atmos ベッド 9.1.6 まで。",
-        "Channel layout for recording, from mono to an Atmos 9.1.6 bed.");
-    public static string TipPlaybackLayout => Get(
-        "再生のチャンネル構成。再生ポート割り当てと Sine のチャンネル数に使います。",
-        "Channel layout for playback. Used for the playback port map and the sine test.");
-    public static string TipRecordDevice => Get(
-        "録音に使うデバイス。ASIO は再生と同じドライバを使います。",
-        "Device for recording. ASIO uses the same driver as playback.");
+        "録音 (Ctrl+R)\n新規タブに録音。もう一度で停止。スピーカー配置・録音ポート・Ch の割り当てを使う。Space / Enter / Esc でも停止。",
+        "Record (Ctrl+R)\nRecords into a new tab. Press again to stop. Uses the speaker layout, record ports, and Ch map. Space / Enter / Esc also stop.");
     public static string TipRecordInputMap => Get(
-        "各録音チャンネルがどのポートから入るか。なしは無音。右のバーは今のレベルです。",
-        "Which port feeds each record channel. Off is silence. The bar on the right is the live level.");
+        "各スピーカーがどのポートから入り、どの Ch へ書くか。なしは無音。右のバーは今のレベルです。Ch は再生と共通です。",
+        "Which port feeds each speaker, and which file channel (Ch) it writes. Off is silence. The bar is the live level. Ch is shared with playback.");
+    public static string TipFileChannelMap => Get(
+        "このスピーカーがファイルのどの Ch か。録音と再生で同じ割り当てです。なしはそのスピーカーを使いません。初期値は 1 から順です。",
+        "Which file channel (Ch) this speaker uses. Shared by record and playback. Off leaves the speaker unused. The default is 1, 2, 3…");
     public static string TipInputLevel => Get(
         "割り当てた録音ポートのピーク。信号が入っているか確認できます。",
         "Peak of the assigned record port. Use it to confirm a signal is arriving.");
     public static string TipSineMinusTwenty => Get(
-        "1 kHz の正弦波を −20 dBFS で、再生ポート割り当てどおりに鳴らします。もう一度押すと停止。",
-        "Plays a 1 kHz sine at −20 dBFS through the playback port map. Press again to stop.");
+        "このスピーカーだけに −20 dBFS の正弦波を出します。通常は 1 kHz、LFE は 80 Hz。もう一度押すと停止。",
+        "Plays a −20 dBFS sine on this speaker only. 1 kHz normally, 80 Hz for LFE. Press again to stop.");
+    public static string TipChannelVoice => Get(
+        "このスピーカーのチャンネル名を英語で読み上げ、同じポートへ繰り返し出します。LFE にはありません。もう一度押すと停止。",
+        "Speaks this speaker's channel name in English and loops it on the same port. Not used for LFE. Press again to stop.");
     public static string StatusInputMonitorFailed => Get(
         "録音を開けません。デバイスと API を確認してください。",
         "Could not open recording. Check the device and API.");
     public static string TipPlaybackOutputMap => Get(
-        "サラウンド再生で、各再生チャンネルをどのポートへ出すか。2ch 再生で未設定なら従来どおりダウンミックス。",
-        "For surround playback, which port each playback channel uses. Stereo playback with no map still downmixes.");
+        "各スピーカーをどのポートへ出し、どの Ch から読むか。Ch は録音と共通。2ch 再生でポート未設定なら、スピーカー分をダウンミックス。",
+        "Which port each speaker uses, and which file channel (Ch) it reads. Ch is shared with record. Stereo playback with no port map still downmixes the speakers.");
     public static string TipPlay => Get(
-        "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止\nCtrl+ドラッグでスクラブ\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し",
-        "Play / stop (Space)\nStop returns to the start position\nEnter pauses in place\nCtrl+drag to scrub\nCtrl+Space from 3 seconds earlier\nAlt+Enter restarts from the playback start");
+        "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止\nCtrl+ドラッグでスクラブ（全chを L/R に畳む。メーターも L/R だけ）\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し",
+        "Play / stop (Space)\nStop returns to the start position\nEnter pauses in place\nCtrl+drag to scrub (every channel downmixed to L/R; the meter moves on L/R only)\nCtrl+Space from 3 seconds earlier\nAlt+Enter restarts from the playback start");
     public static string TipStop => Get("停止（開始位置へ戻る）", "Stop (return to start)");
     public static string TipGoToStart => Get("先頭 (Ctrl+Home)", "Go to start (Ctrl+Home)");
     public static string TipGoToEnd => Get("末尾 (Ctrl+End)", "Go to end (Ctrl+End)");
@@ -521,9 +516,6 @@ internal static partial class UiStrings
     public static string TipNormalize => Get(
         "ノーマライズ (N)\nピークを -0.1 dB に合わせる",
         "Normalize (N)\nFit the peak to -0.1 dB");
-    public static string TipReverse => Get(
-        "リバース (R)\n選択範囲の波形だけを時間方向に反転。未選択なら全体。マーカー／リージョン／ループは動かさない。",
-        "Reverse (R)\nReverse only the audio in the selection. Uses the whole file if nothing is selected. Markers / regions / loops stay put.");
     public static string TipVolume => Get(
         "音量 (V)\n↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。Space で試聴、Enter で実行。未選択なら全体。波形全体の Integrated LKFS / RMS / Peak の変化を先に表示。ラウドネス表示中は曲線も同じ dB で追従。",
         "Volume (V)\n↑↓ / wheel by 0.1 dB (Shift 1 / Ctrl 3 / Ctrl+Shift 6). Space previews, Enter applies. Uses the whole file if nothing is selected. Shows how whole-file Integrated LKFS / RMS / Peak will change. In loudness view the curve follows the same dB.");
@@ -557,8 +549,8 @@ internal static partial class UiStrings
         "再生出力のラウドネス（ITU-R BS.1770 / EBU R128）。Short Term・Integrated・Momentary Max、Loudness Range、True Peak。ターゲット LKFS は設定で変更。数値は青＝余裕、橙＝接近、赤＝超過（LKFS はターゲット、True Peak は 0 dBTP、Loudness Range は 20/25 LU）。停止後も最後の値を残し、再生し直すと測り直します。音声は変えません。",
         "Playback loudness (ITU-R BS.1770 / EBU R128): Short Term, Integrated, Momentary Max, Loudness Range, True Peak. Target LKFS is in Settings. Values: blue = headroom, orange = approaching, red = over (LKFS vs target, True Peak vs 0 dBTP, Loudness Range vs 20/25 LU). Holds the last reading after stop; a new play measures again. Does not change the audio.");
     public static string TipVectorScope => Get(
-        "再生出力の位相相関とベクターオーディオスコープです。正方形は縦が Mid、横が Side。下の数値は L/R の相関（+1 同相 / 0 無相関 / -1 逆相）です。3ch 以上ではサラウンドビュー（上が正面。中央の円は LFE）に切り替わります。停止後は表示がゆっくり消えます。",
-        "Phase correlation and a vector audio scope of the playback output. The square is Mid (vertical) and Side (horizontal). The number below is L/R correlation (+1 in phase / 0 uncorrelated / -1 inverted). Three or more channels switch to a surround view (front is up; the center circle is LFE). After stop, the display slowly fades.");
+        "再生出力の位相相関とベクターオーディオスコープです。正方形は縦が Mid、横が Side。下の数値は 1/2 の相関（+1 同相 / 0 無相関 / -1 逆相）です。3ch 以上ではサラウンドビューに切り替わり、今のスピーカー配置の位置を使います（ファイルのチャンネル名は当てません）。エネルギーは波形と同じチャンネル色で、大きさはチャンネルのレベル、輪郭の凹凸はそのチャンネルの直近の波形です（先端が今、裾が少し前）。全体の広がりをひとつのダークグレーの細線で囲みます。枠はピークを少し持ってからゆっくり戻ります。停止後は表示がゆっくり消えます。",
+        "Phase correlation and a vector audio scope of the playback output. The square is Mid (vertical) and Side (horizontal). The number below is channel 1/2 correlation (+1 in phase / 0 uncorrelated / -1 inverted). Three or more channels switch to a surround view using the active speaker layout (file channel names are not inferred). Energy uses the same channel colors as the waveform. Size is channel level; the outline texture is that channel's recent waveform (the tip is now, the flanks are a few milliseconds earlier). One thin dark-gray outline wraps the overall spread. The outline holds peaks briefly, then falls slowly. After stop, the display slowly fades.");
     public static string TipAudioApi => Get(
         "再生／録音 API（WaveOut / WASAPI / ASIO）",
         "Playback / record API (WaveOut / WASAPI / ASIO)");
@@ -587,8 +579,8 @@ internal static partial class UiStrings
         "サンプリングレート / ビット深度 / チャンネル / 形式 / 容量。S / B / C で変換。変換や範囲削除で長さが変わると容量は推測サイズになり赤。確定項目は保存まで赤。",
         "Sample rate / bit depth / channels / format / size. S / B / C convert. Size turns red as an estimate after conversion or a range delete that changes length. Confirmed fields stay red until you save.");
     public static string TipLevelMeter => Get(
-        "再生出力の Peak / RMS。内側 2 本が Peak（上の赤ランプがクリップ）、外側 2 本が RMS。下の数値は Peak 行／RMS 行。3ch 以上はチャンネルごとの Peak のみです。",
-        "Playback Peak / RMS. Inner two bars are Peak (red lamps clip), outer two are RMS. Numbers below are Peak then RMS. Three or more channels show Peak only, one bar per channel.");
+        "再生出力の Peak / RMS。内側 2 本が Peak（上の赤ランプがクリップ）、外側 2 本が RMS。どちらもホールド線が付きます。下の数値は Peak 行／RMS 行。3ch 以上はチャンネルごとの Peak バーに、Peak ホールドと緩やかな RMS ホールドを載せます。バーの色は波形左端のチャンネル名の四角と同じ登場順（Atmos 9.1.6 の 16 色）。2ch 以下はシアングラデです。メーターにチャンネル名は出しません。左端をドラッグすると列を広げられます（既定が最小。バーが最大の太さになるところで止まります。次の起動まで覚えます）。",
+        "Playback Peak / RMS. Inner two bars are Peak (red lamps clip), outer two are RMS. Both have hold lines. Numbers below are Peak then RMS. Three or more channels show one Peak bar per channel, with Peak hold and a slower RMS hold. Bar colors match the colored squares on the waveform channel names (16 colors for Atmos 9.1.6). Stereo and mono use the cyan gradient. The meter does not show channel names. Drag the left edge to widen the column (the default is the minimum; it stops when the bars reach full thickness; the width is remembered).");
     public static string TipTimeScroll => Get(
         "表示範囲を左右に動かします。つまみをドラッグ、またはトラックをクリック。",
         "Pan the view. Drag the thumb, or click the track.");
@@ -614,11 +606,11 @@ internal static partial class UiStrings
         "任意 Hz。↑↓／ホイールで 1（Shift 10／Ctrl 100／Ctrl+Shift 1000）。Enter で確定。Tab で抜けて 1–9 で項目。範囲 1000–384000。",
         "Custom Hz. ↑↓ / wheel by 1 (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Tab leaves the box so 1–9 pick a row. Range 1000–384000.");
     public static string TipWaveform => Get(
-        "ドラッグで選択　Ctrl+ドラッグでスクラブ　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A またはトリプルクリックで全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着\n"
+        "ドラッグで選択　Ctrl+ドラッグでスクラブ（全chを L/R に畳む。メーターも L/R だけ）　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A またはトリプルクリックで全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着　左端のチャンネル名をクリックでソロ（同じ名前をもう一度で解除。Ctrl＋クリックで追加。Shift＋クリックでミュート／解除）　Tab でチャンネルをソロ（繰り返すと次へ。Shift+Tab で逆順。最後の次で解除。波形の時間選択は変えない。波形操作はそのチャンネルだけ。ミュートはグレー。再生中でも可）\n"
         + "ホイール=時間ズーム（再生ヘッド基準）　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"
         + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル、Shift で3倍）　Ctrl+←→ 前後のマーカー / リージョン端 / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（両端にリージョンがあればすぐ2等分。同じ範囲で繰り返すと3等分…と打ち直し。解除は右クリック／Delete）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M / Ins マーカー（選択中は両端。両端にあればすぐ中央→3等分…と打ち直し。同じ位置には重ならない）　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動（Shift で3倍） / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント / リージョン名（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
         + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　V で音量（dB。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS / RMS / Peak を先に表示）　P でピッチ（半音。↑↓／ホイール、Shift で1オクターブ。Space 試聴、Enter 実行。±2オクターブ。長さを保つ既定オン）　T でタイムストレッチ（時間と割合を連動。実行中はすりガラス）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　G で NOW POS　U で編集履歴　A で波形 / スペクトログラム / 重ね表示 / ラウドネス解析（Short Term LKFS。白い幅は ±1 LU、半透明。波形は上半分のピーク dBFS を線で同じ目盛へ。曲線は原色のシアン／橙／赤。LKFS は左目盛。スペクトログラム・重ね・ラウドネスでは -A/-L/-E/-R とループ／リージョンの下塗りなし）　Ctrl+Shift+E で Wwise EXPORT（Wave 単体）　Ctrl+Shift+M で MP3 保存　Ctrl+Shift+Alt+M で全タブを MP3 書き出し　MP3 ではリージョン／ループ不可。マーカーは置けるが MP3 保存では残らない",
-        "Drag to select. Ctrl+drag to scrub. Esc or a move without Shift clears the selection. Shift+move extends. Shift+←/→ grows it (1 sample when dots are shown). Home/End jump to the view edge. Shift+PgUp/PgDn by 5%. Ctrl+Shift+Home/End selects all before/after. Ctrl+A or a triple-click selects all. Double-click selects a span (between markers). The guide snaps to markers / loop edges.\n"
+        "Drag to select. Ctrl+drag to scrub (every channel downmixed to L/R; the meter moves on L/R only). Esc or a move without Shift clears the selection. Shift+move extends. Shift+←/→ grows it (1 sample when dots are shown). Home/End jump to the view edge. Shift+PgUp/PgDn by 5%. Ctrl+Shift+Home/End selects all before/after. Ctrl+A or a triple-click selects all. Double-click selects a span (between markers). The guide snaps to markers / loop edges. Click a channel name on the left to solo (click the same name again to clear; Ctrl+click adds; Shift+click mutes / unmutes). Tab solos a channel (again for the next; Shift+Tab goes backward; past the last clears it; the time selection does not change; waveform edits apply only to that channel; muted lanes go gray; works while playing).\n"
         + "Wheel = time zoom (around the playhead). Shift+wheel = pan. Ctrl+wheel = amplitude.\n"
         + "←/→ seek (moves a selected marker / region edge / loop edge; 1 sample when dots are shown, Shift ×3). Ctrl+←/→ previous/next marker / region edge / sample-loop edge. Numpad jumps to a number (or a view position). Z / . centers (toggles center-lock while playing, clears it when stopped). 0–9 jump in the view. L loops from 3 seconds before the end of the selection (or the sample loop / -L). Shift+L sets the selection as the sample loop (same range again clears it). Shift+R sets the selection as a region (if both ends already have a region, split immediately; repeat on the same range to split 3, … ways; right-click / Delete clears). Right-click a marker / region flag / loop bar to delete. S sample rate, B bit depth, C channels, M / Ins marker (selection places both ends, or the center if both ends are already marked; repeat for 3, 4, … equal parts; same frame is rejected). Click a flag to select an edge / Shift+click for a range / Ctrl+click to add / drag or ←/→ to move (Shift ×3) / Delete or Ctrl+Del to delete. Ctrl+Shift+R to rename. Double-click a comment / region name (-A lime / -L blue / -E red / -R gray).\n"
         + "On a marker / region edge / loop edge, Alt+←/→ is 1 px (1 sample when dots are shown), Shift ×3, Ctrl pairs with the previous marker (both edges for a region / loop). X applies a linear fade around the playhead in the view (before = out / after = in). V opens volume (dB; ↑↓ / wheel, Space preview, Enter apply; shows whole-file LKFS / RMS / Peak first). P opens pitch (semitones; ↑↓ / wheel, Shift for an octave, Space preview, Enter apply; ±2 octaves; keep length on by default). T stretches time (time and ratio stay linked; frosted glass while running). Ctrl+X / C / V cut / copy / paste (markers in range included; a matching region is included too). G focuses NOW POS. U opens edit history. A cycles waveform / spectrogram / overlay / loudness analysis (Short Term LKFS; the white width is a translucent ±1 LU band; the waveform is an upper-half peak dBFS line on the same scale; the curve is primary cyan / orange / red; LKFS numbers sit on the left scale). Spectrogram, overlay, and loudness skip -A/-L/-E/-R, loop, and region fills. Ctrl+Shift+E exports Wave-only to Wwise. Ctrl+Shift+M saves as MP3. Ctrl+Shift+Alt+M exports every tab as MP3. MP3 cannot take regions / loops; markers are allowed but not saved to MP3.");
@@ -643,6 +635,7 @@ internal static partial class UiStrings
     public static string TipTotalTime => Get(
         "トータル時間。右クリックで時間／サンプル数を切り替えます。",
         "Total time. Right-click to switch time / samples.");
+    public static string LabelStatusSpeaker => "SPEAKER";
     public static string LabelStatusNowPos => "NOW\nPOS";
     public static string LabelStatusSelStart => "SEL\nST";
     public static string LabelStatusSelWidth => "SEL\nWID";

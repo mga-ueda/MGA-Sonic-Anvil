@@ -16,8 +16,8 @@ public sealed class DevicePortNamesTests
     [Fact]
     public void FromChannelMask_EmptyFallsBackToChannelLabels()
     {
-        Assert.Equal(["L", "R"], DevicePortNames.FromChannelMask(0, 2));
-        Assert.Equal(["M"], DevicePortNames.FromChannelMask(0, 1));
+        Assert.Equal(["1", "2"], DevicePortNames.FromChannelMask(0, 2));
+        Assert.Equal(["1"], DevicePortNames.FromChannelMask(0, 1));
     }
 
     [Fact]
@@ -30,6 +30,6 @@ public sealed class DevicePortNamesTests
     [Fact]
     public void FromChannelCount_MatchesChannelLabels()
     {
-        Assert.Equal(["L", "R", "C", "LFE", "Ls", "Rs"], DevicePortNames.FromChannelCount(6));
+        Assert.Equal(["1", "2", "3", "4", "5", "6"], DevicePortNames.FromChannelCount(6));
     }
 }
