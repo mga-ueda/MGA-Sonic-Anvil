@@ -17,7 +17,7 @@ internal static class ChannelWavePaint
 
     public static int Tint(int baseColor, int tint)
     {
-        const int amount = 84;
+        const int amount = 120;
         const int rest = 255 - amount;
         var b = (((tint & 0xFF) * amount) + ((baseColor & 0xFF) * rest)) / 255;
         var g = ((((tint >> 8) & 0xFF) * amount) + (((baseColor >> 8) & 0xFF) * rest)) / 255;

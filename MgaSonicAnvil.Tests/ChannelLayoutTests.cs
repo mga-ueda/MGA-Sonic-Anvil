@@ -7,6 +7,13 @@ namespace MgaSonicAnvil.Tests;
 
 public sealed class ChannelLayoutTests
 {
+    [Fact]
+    public void Labels_FitThreeCharacterSlot()
+    {
+        Assert.Equal(3, ChannelLabels.MaxChars);
+        Assert.Equal(ChannelLabels.MaxChars, ChannelLabels.LongestCharCount());
+    }
+
     [Theory]
     [InlineData(1, 0, "1")]
     [InlineData(2, 0, "1")]
