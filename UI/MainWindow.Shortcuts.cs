@@ -183,9 +183,28 @@ public partial class MainWindow
             return TryProcessFadeMenuShortcut(fadeMenu, key, modifiers);
         }
 
+        if (key == Key.A && modifiers == ModifierKeys.Shift)
+        {
+            Waveform.ExitSpectrogramView();
+            return true;
+        }
+
+        if (key == Key.V && modifiers == ModifierKeys.Shift)
+        {
+            CloseVolumeGainPicker();
+            Waveform.ExitLoudnessView();
+            return true;
+        }
+
         if (TryHandleVolumeMenuShortcut(key, modifiers))
         {
             return true;
+        }
+
+        // 数字・小数点・Delete などをゲイン欄へ渡す。
+        if (_volumeMenu is { IsOpen: true })
+        {
+            return false;
         }
 
         if (TryHandlePitchMenuShortcut(key, modifiers))
@@ -324,7 +343,13 @@ public partial class MainWindow
 
         if (key == Key.A && modifiers == ModifierKeys.None)
         {
-            Waveform.ToggleAnalysisView();
+            Waveform.ToggleSpectrogramView();
+            return true;
+        }
+
+        if (key == Key.H && modifiers == ModifierKeys.None)
+        {
+            CycleWaveformHeight();
             return true;
         }
 

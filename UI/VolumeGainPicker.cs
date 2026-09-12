@@ -33,7 +33,6 @@ internal static class VolumeGainPicker
 
     public static ContextMenu Show(
         FrameworkElement placementTarget,
-        WaveformGainAnalyzer analyzer,
         double targetLufs,
         Action<double> onCommit,
         Action<double> onPreview,
@@ -45,7 +44,6 @@ internal static class VolumeGainPicker
             OnPreview = onPreview,
             OnChange = onChange,
             TargetLufs = targetLufs,
-            Analyzer = analyzer,
         };
         var menu = new ContextMenu
         {
@@ -76,6 +74,7 @@ internal static class VolumeGainPicker
             PickerChrome.MetricRow(UiStrings.LabelRms, state.RmsBefore, state.RmsAfter, labelWidth));
         root.Children.Add(
             PickerChrome.MetricRow(UiStrings.LabelPeak, state.PeakBefore, state.PeakAfter, labelWidth));
+        PickerChrome.PrependClose(root, menu);
         var item = PickerChrome.FormHost(root);
         menu.Items.Add(item);
         TipService.Set(menu, UiStrings.TipVolume);
@@ -122,7 +121,10 @@ internal static class VolumeGainPicker
                 {
                     state.GainBox.Focus();
                     state.GainBox.SelectAll();
-                    onChange(state.GainDb);
+                    if (!WaveformGainAnalyzer.IsNoOp(state.GainDb))
+                    {
+                        onChange(state.GainDb);
+                    }
                 },
                 DispatcherPriority.Input);
         };
@@ -130,6 +132,17 @@ internal static class VolumeGainPicker
         PickerChrome.FitFormMenu(menu);
         menu.IsOpen = true;
         return menu;
+    }
+
+    public static void SetAnalyzer(ContextMenu menu, WaveformGainAnalyzer analyzer)
+    {
+        if (menu.Tag is not MenuState state)
+        {
+            return;
+        }
+
+        state.Analyzer = analyzer;
+        PaintReadings(state);
     }
 
     public static bool TryNudge(ContextMenu menu, int direction)
@@ -167,7 +180,7 @@ internal static class VolumeGainPicker
 
     private static void BuildEditors(MenuState state)
     {
-        var box = PickerChrome.ValueBoxChars(5);
+        var box = PickerChrome.ValueBoxChars(7);
         box.Text = FormatGainBox(0);
         state.GainBox = box;
         box.PreviewMouseWheel += (_, e) =>

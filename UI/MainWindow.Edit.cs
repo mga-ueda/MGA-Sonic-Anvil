@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -98,6 +99,11 @@ public partial class MainWindow
             return;
         }
 
+        if (Waveform.AnalysisView != WaveformAnalysisView.Loudness)
+        {
+            Waveform.SetAnalysisView(WaveformAnalysisView.Loudness);
+        }
+
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
         ClosePitchShiftPicker();
@@ -108,14 +114,8 @@ public partial class MainWindow
         }
 
         _volumePreview.ResumeFrame = _document.CursorFrame;
-        var analyzer = WaveformGainAnalyzer.Build(
-            _document.Interleaved,
-            _document.Channels,
-            _document.SampleRate,
-            range);
         var menu = VolumeGainPicker.Show(
             this,
-            analyzer,
             AppStorage.Settings.ResolvedLoudnessTargetLufs(),
             ApplyVolume,
             PreviewVolume,
@@ -130,6 +130,30 @@ public partial class MainWindow
                 _volumeMenu = null;
             }
         };
+
+        var interleaved = _document.Interleaved;
+        var channels = _document.Channels;
+        var sampleRate = _document.SampleRate;
+        _ = Task.Run(() => WaveformGainAnalyzer.Build(interleaved, channels, sampleRate, range))
+            .ContinueWith(
+                task =>
+                {
+                    if (!task.IsCompletedSuccessfully)
+                    {
+                        return;
+                    }
+
+                    menu.Dispatcher.BeginInvoke(() =>
+                    {
+                        if (!ReferenceEquals(_volumeMenu, menu) || menu is not { IsOpen: true })
+                        {
+                            return;
+                        }
+
+                        VolumeGainPicker.SetAnalyzer(menu, task.Result);
+                    });
+                },
+                TaskScheduler.Default);
     }
 
     private bool CloseVolumeGainPicker()
