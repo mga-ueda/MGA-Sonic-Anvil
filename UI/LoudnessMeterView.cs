@@ -48,7 +48,6 @@ internal sealed class LoudnessMeterView : Grid
         SnapsToDevicePixels = true;
         UseLayoutRounding = true;
         ClipToBounds = false;
-        Background = Brushes.Transparent;
 
         _shortValue = MetricValue();
         _integratedValue = MetricValue();
@@ -66,8 +65,12 @@ internal sealed class LoudnessMeterView : Grid
         _lraUnit = Chrome();
         _truePeakUnit = Chrome();
 
-        var metrics = new Grid { Margin = new Thickness(6, 2, 6, 2) };
-        metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var metrics = new Grid
+        {
+            Margin = new Thickness(4, 2, 6, 2),
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         for (var i = 0; i < 5; i++)

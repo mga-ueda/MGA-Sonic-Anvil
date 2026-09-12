@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
@@ -178,16 +179,22 @@ internal sealed class LoudnessOverlayRenderer
     private static Brush BandBrush(LoudnessTraffic traffic)
     {
         LoudnessTrafficLight.Rgb(traffic, out var r, out var g, out var b);
-        const double shade = 0.28;
-        return WpfControlHelpers.FrozenBrush(Color.FromRgb(
-            (byte)Math.Round(r * shade),
-            (byte)Math.Round(g * shade),
-            (byte)Math.Round(b * shade)));
+        var shade = IsLight ? 0.55 : 0.28;
+        return IsLight
+            ? WpfControlHelpers.FrozenBrush(Color.FromArgb(
+                0xA0,
+                (byte)Math.Round(r * shade),
+                (byte)Math.Round(g * shade),
+                (byte)Math.Round(b * shade)))
+            : WpfControlHelpers.FrozenBrush(Color.FromRgb(
+                (byte)Math.Round(r * shade),
+                (byte)Math.Round(g * shade),
+                (byte)Math.Round(b * shade)));
     }
 
     private static void DrawGrid(DrawingContext dc, Rect wave, double target)
     {
-        var pen = new Pen(WpfControlHelpers.FrozenBrush(Color.FromArgb(36, 255, 255, 255)), 1);
+        var pen = new Pen(WpfControlHelpers.FrozenBrush(HairlineInk(36, 40)), 1);
         pen.Freeze();
         foreach (var lufs in ScaleMarks(target))
         {
@@ -199,7 +206,7 @@ internal sealed class LoudnessOverlayRenderer
     private static void DrawTarget(DrawingContext dc, Rect wave, double target)
     {
         var y = LufsToY(target, wave, target);
-        var pen = new Pen(WpfControlHelpers.FrozenBrush(Color.FromArgb(200, 255, 255, 255)), 1.2);
+        var pen = new Pen(WpfControlHelpers.FrozenBrush(HairlineInk(200, 48)), 1.2);
         pen.Freeze();
         dc.DrawLine(pen, new Point(wave.X, y), new Point(wave.Right, y));
     }
@@ -344,6 +351,15 @@ internal sealed class LoudnessOverlayRenderer
         return pen;
     }
 
+    private static bool IsLight => UiThemeService.Current == UiTheme.Light;
+
+    private static Color HairlineInk(byte darkAlpha, byte lightGray)
+    {
+        return IsLight
+            ? Color.FromArgb(darkAlpha, lightGray, lightGray, (byte)(lightGray + 4))
+            : Color.FromArgb(darkAlpha, 255, 255, 255);
+    }
+
     private static void DrawScaleLabels(
         DrawingContext dc,
         Rect well,
@@ -352,8 +368,6 @@ internal sealed class LoudnessOverlayRenderer
         double pixelsPerDip)
     {
         var fore = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
-        var tick = new Pen(fore, 1);
-        tick.Freeze();
         foreach (var lufs in ScaleMarks(target))
         {
             var y = LufsToY(lufs, wave, target);
@@ -373,8 +387,7 @@ internal sealed class LoudnessOverlayRenderer
                 fore,
                 pixelsPerDip);
             var ty = Math.Clamp(y - text.Height * 0.5, wave.Y, wave.Bottom - text.Height);
-            var tx = well.Right - 7 - text.Width;
-            dc.DrawLine(tick, new Point(well.Right - 5, y), new Point(well.Right - 1, y));
+            var tx = well.Right - 2 - text.Width;
             dc.DrawText(text, new Point(Math.Max(well.X + 2, tx), ty));
         }
     }

@@ -66,9 +66,9 @@ internal sealed class HistoryStripView : FrameworkElement
         dc.DrawRectangle(
             ThemeBrush(
                 _hover ? "HistoryStripHoverBackBrush" : "HistoryStripBackBrush",
-                _hover ? (byte)0x2A : (byte)0x21,
-                _hover ? (byte)0x2B : (byte)0x22,
-                _hover ? (byte)0x34 : (byte)0x2B),
+                _hover ? (byte)0x22 : (byte)0x1C,
+                _hover ? (byte)0x23 : (byte)0x1D,
+                _hover ? (byte)0x2E : (byte)0x28),
             null,
             bounds);
 
@@ -82,9 +82,9 @@ internal sealed class HistoryStripView : FrameworkElement
         var start = HistoryStripLayout.VisibleStart(_items.Count, _currentIndex, visible);
         var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         var textWidth = Math.Max(0, ActualWidth - (PadX * 2));
-        var current = ThemeBrush("TransportForeBrush", 0xEB, 0xEB, 0xEB);
-        var past = ThemeBrush("MutedForeBrush", 0x96, 0x96, 0x96);
-        var future = ThemeBrush("ChromeDimBrush", 0x5B, 0x5B, 0x5B);
+        var current = ThemeBrush("HistoryStripCurrentForeBrush", 0x96, 0x96, 0x96);
+        var past = ThemeBrush("HistoryStripPastForeBrush", 0x5B, 0x5B, 0x5B);
+        var future = ThemeBrush("HistoryStripFutureForeBrush", 0x48, 0x48, 0x48);
         var y = PadY;
         for (var i = 0; i < visible && start + i < _items.Count; i++)
         {

@@ -11,6 +11,10 @@
     <SolidColorBrush x:Key="ChromeBorderBrush" Color="#FF37373A" />
     <SolidColorBrush x:Key="ChromeMidBrush" Color="#FF484848" />
     <SolidColorBrush x:Key="ChromeDimBrush" Color="#FF5B5B5B" />
+    <SolidColorBrush x:Key="ScrollThumbBackBrush" Color="#FF484848" />
+    <SolidColorBrush x:Key="ScrollThumbHoverBackBrush" Color="#FF5B5B5B" />
+    <SolidColorBrush x:Key="ScrollThumbPressedBackBrush" Color="#FFEBEBEB" />
+    <SolidColorBrush x:Key="ScrollThumbGripBrush" Color="#FF969696" />
     <SolidColorBrush x:Key="ControlHoverBorderBrush" Color="#FF505050" />
     <SolidColorBrush x:Key="DialogInputBackBrush" Color="#FF1C1C1E" />
     <SolidColorBrush x:Key="MenuSeparatorBrush" Color="#FF3A3A3E" />
@@ -41,18 +45,32 @@
     <SolidColorBrush x:Key="RegionWaveFillExitBrush" Color="#FF441E1E" />
     <SolidColorBrush x:Key="RegionWaveFillExcludedBrush" Color="#66C8C8C8" />
 
+    <SolidColorBrush x:Key="LevelMeterTrackBackBrush" Color="#FF242629" />
+    <SolidColorBrush x:Key="LevelMeterTrackBorderBrush" Color="#FF1A221A" />
+    <SolidColorBrush x:Key="LevelMeterHoldBorderBrush" Color="#FF1A221A" />
+    <SolidColorBrush x:Key="LevelMeterTickBrush" Color="#38FFFFFF" />
+    <SolidColorBrush x:Key="DbScaleForeBrush" Color="#FF969696" />
+    <SolidColorBrush x:Key="SpectrogramScaleForeBrush" Color="#FFEBEBEB" />
+    <SolidColorBrush x:Key="SurroundHullStrokeBrush" Color="#FF5A5A5F" />
+    <SolidColorBrush x:Key="LevelMeterClipOffBrush" Color="#FF280808" />
+    <SolidColorBrush x:Key="LevelMeterClipOffBorderBrush" Color="#FF3A1515" />
+
     <SolidColorBrush x:Key="VectorScopeBackBrush" Color="#FF242629" />
     <SolidColorBrush x:Key="VectorScopeTraceBrush" Color="#FF3AB8E8" />
     <SolidColorBrush x:Key="VectorScopeGridBrush" Color="#FF3A3A3E" />
     <SolidColorBrush x:Key="VectorScopeCorrelationBrush" Color="#FF3AB8E8" />
     <SolidColorBrush x:Key="ProjectBarBackBrush" Color="#FF1A1B26" />
+    <SolidColorBrush x:Key="OverviewOutsideFillBrush" Color="#96000000" />
     <SolidColorBrush x:Key="TransportBackBrush" Color="#FF1A1B26" />
     <SolidColorBrush x:Key="TransportForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="TransportDisabledForeBrush" Color="#FF5B5B5B" />
     <SolidColorBrush x:Key="TransportHoverBackBrush" Color="#FF37373A" />
     <SolidColorBrush x:Key="TransportPressedBackBrush" Color="#FF484848" />
-    <SolidColorBrush x:Key="HistoryStripBackBrush" Color="#FF21222B" />
-    <SolidColorBrush x:Key="HistoryStripHoverBackBrush" Color="#FF2A2B34" />
+    <SolidColorBrush x:Key="HistoryStripBackBrush" Color="#FF1C1D28" />
+    <SolidColorBrush x:Key="HistoryStripHoverBackBrush" Color="#FF22232E" />
+    <SolidColorBrush x:Key="HistoryStripCurrentForeBrush" Color="#FF969696" />
+    <SolidColorBrush x:Key="HistoryStripPastForeBrush" Color="#FF5B5B5B" />
+    <SolidColorBrush x:Key="HistoryStripFutureForeBrush" Color="#FF484848" />
     <SolidColorBrush x:Key="WaapiToggleOffBackBrush" Color="#FF2A2A2E" />
     <SolidColorBrush x:Key="WaapiToggleOffHoverBackBrush" Color="#FF3A3A40" />
     <SolidColorBrush x:Key="WaapiToggleOffForeBrush" Color="#FF9A9A9A" />

@@ -27,6 +27,8 @@ internal partial class AudioSettingsWindow : Window
 
     public UiLanguageChoice SelectedLanguage { get; private set; }
 
+    public UiThemeChoice SelectedTheme { get; private set; }
+
     public double SelectedLoudnessTargetLufs { get; private set; }
 
     public int SelectedMp3BitRate { get; private set; }
@@ -68,6 +70,7 @@ internal partial class AudioSettingsWindow : Window
         FadeShape fadeIn,
         FadeShape fadeOut,
         UiLanguageChoice language,
+        UiThemeChoice theme,
         double loudnessTargetLufs,
         int mp3BitRate,
         string lameExePath,
@@ -79,6 +82,7 @@ internal partial class AudioSettingsWindow : Window
     {
         SelectedSettings = current;
         SelectedLanguage = language;
+        SelectedTheme = theme;
         SelectedLoudnessTargetLufs = LoudnessMeterEngine.ClampTargetLufs(loudnessTargetLufs);
         SelectedMp3BitRate = Mp3Encode.ClampWindowsBitRate(mp3BitRate);
         SelectedLameExePath = lameExePath ?? string.Empty;
@@ -120,6 +124,11 @@ internal partial class AudioSettingsWindow : Window
         LanguageCombo.Items.Add(new LanguageItem(UiLanguageChoice.English, UiStrings.LabelLanguageEnglish));
         SelectLanguage(language);
 
+        ThemeCombo.Items.Add(new ThemeItem(UiThemeChoice.Auto, UiStrings.LabelThemeAuto));
+        ThemeCombo.Items.Add(new ThemeItem(UiThemeChoice.Dark, UiStrings.LabelThemeDark));
+        ThemeCombo.Items.Add(new ThemeItem(UiThemeChoice.Light, UiStrings.LabelThemeLight));
+        SelectTheme(theme);
+
         ApiCombo.Items.Add(new ApiItem(AudioOutputApi.WaveOut, UiStrings.LabelAudioApiWaveOut));
         ApiCombo.Items.Add(new ApiItem(AudioOutputApi.Wasapi, UiStrings.LabelAudioApiWasapi));
         ApiCombo.Items.Add(new ApiItem(AudioOutputApi.Asio, UiStrings.LabelAudioApiAsio));
@@ -132,6 +141,8 @@ internal partial class AudioSettingsWindow : Window
         _fadeOutRow = CreateFadeRow(UiStrings.LabelDefaultFadeOut, fadeOut, isFadeIn: false);
         FadeRowsHost.Children.Add(_fadeInRow.Host);
         FadeRowsHost.Children.Add(_fadeOutRow.Host);
+        UiThemeService.Changed += OnUiThemeChanged;
+        Closed += (_, _) => UiThemeService.Changed -= OnUiThemeChanged;
 
         FillSpeakers(SelectedActiveSpeakerId);
         FillSpeakerVisibility();
@@ -165,6 +176,8 @@ internal partial class AudioSettingsWindow : Window
     {
         TipService.Set(LanguageLabel, UiStrings.TipUiLanguage);
         TipService.Set(LanguageCombo, UiStrings.TipUiLanguage);
+        TipService.Set(ThemeLabel, UiStrings.TipUiTheme);
+        TipService.Set(ThemeCombo, UiStrings.TipUiTheme);
         TipService.Set(AssociationHeader, UiStrings.TipFileAssociations);
         TipService.Set(SpeakerLabel, UiStrings.TipSpeakerPreset);
         TipService.Set(SpeakerCombo, UiStrings.TipSpeakerPreset);
@@ -346,6 +359,9 @@ internal partial class AudioSettingsWindow : Window
         SelectedLanguage = LanguageCombo.SelectedItem is LanguageItem item
             ? item.Choice
             : UiLanguageChoice.Auto;
+        SelectedTheme = ThemeCombo.SelectedItem is ThemeItem themeItem
+            ? themeItem.Choice
+            : UiThemeChoice.Auto;
         if (!LoudnessMeterEngine.TryParseTargetLufs(LoudnessTargetBox.Text, out var target))
         {
             OwnerCenteredMessageBox.Show(
@@ -876,6 +892,20 @@ internal partial class AudioSettingsWindow : Window
         LanguageCombo.SelectedIndex = 0;
     }
 
+    private void SelectTheme(UiThemeChoice theme)
+    {
+        foreach (ThemeItem item in ThemeCombo.Items)
+        {
+            if (item.Choice == theme)
+            {
+                ThemeCombo.SelectedItem = item;
+                return;
+            }
+        }
+
+        ThemeCombo.SelectedIndex = 0;
+    }
+
     private void SelectApi(AudioOutputApi api)
     {
         foreach (ApiItem item in ApiCombo.Items)
@@ -913,6 +943,7 @@ internal partial class AudioSettingsWindow : Window
     {
         var deviceMax = Math.Max(80, SystemParameters.WorkArea.Width - 200);
         ComboBoxFit.Apply(LanguageCombo);
+        ComboBoxFit.Apply(ThemeCombo);
         ComboBoxFit.Apply(SpeakerCombo);
         ComboBoxFit.Apply(ApiCombo);
         ComboBoxFit.Apply(DeviceCombo, deviceMax);
@@ -1213,6 +1244,26 @@ internal partial class AudioSettingsWindow : Window
         RefreshTestButtons();
     }
 
+    private void OnUiThemeChanged(object? sender, EventArgs e)
+    {
+        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        RefreshFadeRowChrome(_fadeInRow);
+        RefreshFadeRowIcon(_fadeInRow);
+        RefreshFadeRowChrome(_fadeOutRow);
+        RefreshFadeRowIcon(_fadeOutRow);
+        ActionButtonLooks.ApplyAccent(OkButton);
+        ActionButtonLooks.ApplyClear(CancelButton);
+        ActionButtonLooks.ApplyClear(LameBrowseButton);
+        RefreshTestButtons();
+    }
+
+    private static void RefreshFadeRowChrome(FadeCurveRow row)
+    {
+        row.Label.Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush"));
+        row.IconHost.Background = WpfControlHelpers.FrozenBrush(Theme.Get("DialogInputBackBrush"));
+        row.IconHost.BorderBrush = WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush"));
+    }
+
     private FadeCurveRow CreateFadeRow(string labelText, FadeShape curve, bool isFadeIn)
     {
         var rowHeight = DesignMetrics.FadeOptionRowHeight;
@@ -1319,6 +1370,11 @@ internal partial class AudioSettingsWindow : Window
     }
 
     private sealed record LanguageItem(UiLanguageChoice Choice, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    private sealed record ThemeItem(UiThemeChoice Choice, string Label)
     {
         public override string ToString() => Label;
     }

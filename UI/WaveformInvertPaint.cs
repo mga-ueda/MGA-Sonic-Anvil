@@ -80,9 +80,26 @@ internal static class WaveformInvertPaint
                 var index = y * width + x;
                 pixels[index] = IsWavePixel(pixels[index])
                     ? swappedBack
-                    : WaveColorAt(y, height, laneWaveColors, laneGapPx, fallbackWave);
+                    : SoftenSelectionFill(
+                        WaveColorAt(y, height, laneWaveColors, laneGapPx, fallbackWave),
+                        waveformBack);
             }
         }
+    }
+
+    internal const byte LightFillAlpha = 176;
+
+    internal static int SoftenSelectionFill(int fill, int back) =>
+        SoftenSelectionFill(fill, back, UiThemeService.Current == UiTheme.Light);
+
+    internal static int SoftenSelectionFill(int fill, int back, bool light)
+    {
+        if (!light)
+        {
+            return fill;
+        }
+
+        return BlendOver(back, (fill & 0x00FFFFFF) | (LightFillAlpha << 24));
     }
 
     private static int WaveColorAt(

@@ -549,7 +549,7 @@ public partial class MainWindow
         var border = new Border
         {
             Tag = session,
-            Background = BrushOrTransparent(active ? "ChromeMidBrush" : "WaveformBackBrush"),
+            Background = BrushOrTransparent(active ? "DialogInputBackBrush" : "TimelineWellBackBrush"),
             BorderBrush = (Brush)FindResource("ChromeBorderBrush"),
             BorderThickness = new Thickness(0, 0, 1, 0),
             Cursor = Cursors.Hand,
@@ -677,7 +677,8 @@ public partial class MainWindow
 
         if (dock.Parent is Border host)
         {
-            host.Background = BrushOrTransparent(active ? "ChromeMidBrush" : "WaveformBackBrush");
+            host.Background = BrushOrTransparent(active ? "DialogInputBackBrush" : "TimelineWellBackBrush");
+            host.BorderBrush = (Brush)FindResource("ChromeBorderBrush");
         }
 
         foreach (var child in dock.Children)
@@ -687,11 +688,19 @@ public partial class MainWindow
                 underline.Background = active ? accent : Brushes.Transparent;
                 underline.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
             }
-            else if (child is Grid grid
-                && grid.Children.OfType<TextBlock>().FirstOrDefault() is { } title)
+            else if (child is Grid grid)
             {
-                title.Text = session.TabTitle;
-                title.Foreground = titleBrush;
+                foreach (var block in grid.Children.OfType<TextBlock>())
+                {
+                    if (block.Text == "×")
+                    {
+                        block.Foreground = (Brush)FindResource("MutedForeBrush");
+                        continue;
+                    }
+
+                    block.Text = session.TabTitle;
+                    block.Foreground = titleBrush;
+                }
             }
         }
     }

@@ -76,9 +76,61 @@ internal sealed partial class WaapiStatusBar : UserControl
         PlayMinusECheckBox.Content = UiStrings.LabelPlayMinusE;
         AutoActiveCheckBox.Content = UiStrings.LabelAutoActive;
         ExportButton.Content = UiStrings.ButtonExport;
+        ActionButtonLooks.ApplyStatusExport(ExportButton);
         ApplyTips();
         UpdateKeepLockAppearance();
+        _outputFolderButton.InvalidateVisual();
         DrawBadge();
+    }
+
+    /// <summary>配色だけ更新する。接続状態・ポーリング・文言は触らない。</summary>
+    public void RefreshAppearance()
+    {
+        RefreshBadgeColors();
+        RefreshDetailColors();
+        ApplyKeepLockColors();
+        ActionButtonLooks.ApplyStatusExport(ExportButton);
+        _outputFolderButton.InvalidateVisual();
+        DrawBadge();
+    }
+
+    private void RefreshBadgeColors()
+    {
+        if (_badgeText == UiStrings.WaapiBadgeConnect)
+        {
+            SetBadgeConnected();
+            return;
+        }
+
+        if (_badgeText == UiStrings.WaapiBadgeDisconnect)
+        {
+            SetBadgeDisconnected();
+            return;
+        }
+
+        SetBadgeNeutral();
+    }
+
+    private void RefreshDetailColors()
+    {
+        if (_badgeText == UiStrings.WaapiBadgeConnect)
+        {
+            ApplyPathForeColor(connected: true);
+            return;
+        }
+
+        if (VersionLabel.Visibility == Visibility.Visible || _showKeepLock)
+        {
+            PathLabel.Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("StatusBarDetailForeBrush"));
+            SepAfterVersion.Foreground = PathLabel.Foreground;
+            SepAfterProject.Foreground = PathLabel.Foreground;
+            VersionLabel.Foreground = PathLabel.Foreground;
+            ApplyProjectNameColors();
+            return;
+        }
+
+        PathLabel.Foreground = WpfControlHelpers.FrozenBrush(Theme.Get(
+            _badgeFilled ? "StatusBarErrorDetailForeBrush" : "StatusBarTitleForeBrush"));
     }
 
     private void ApplyTips()
@@ -427,10 +479,22 @@ internal sealed partial class WaapiStatusBar : UserControl
         _badgeFilled = false;
     }
 
+    internal string BadgeText => _badgeText;
+
+    internal static bool TryClearBadgeCanvas(Panel canvas)
+    {
+        if (canvas.ActualHeight <= 0)
+        {
+            return false;
+        }
+
+        canvas.Children.Clear();
+        return true;
+    }
+
     private void DrawBadge()
     {
-        BadgeCanvas.Children.Clear();
-        if (BadgeCanvas.ActualHeight <= 0)
+        if (!TryClearBadgeCanvas(BadgeCanvas))
         {
             return;
         }

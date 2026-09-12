@@ -17,10 +17,6 @@ internal static class DarkWindowChrome
     public static void ApplyImmersiveDarkTitleBar(Window window)
     {
         WindowIconHelper.Apply(window);
-        if (window is MainWindow)
-        {
-            window.Title = AppVersion.FormTitle;
-        }
 
         void Apply()
         {
@@ -30,7 +26,7 @@ internal static class DarkWindowChrome
                 return;
             }
 
-            var useDarkMode = 1;
+            var useDarkMode = UiThemeService.Current == UiTheme.Dark ? 1 : 0;
             if (DwmSetWindowAttribute(hwnd, DwmwaUseImmersiveDarkMode, ref useDarkMode, sizeof(int)) != 0)
             {
                 _ = DwmSetWindowAttribute(

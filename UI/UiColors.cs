@@ -55,7 +55,12 @@ internal static class UiColors
         {
             Set(key, color);
         }
+
+        UiThemePalette.Apply(UiThemeService.Current);
     }
+
+    public static Color Default(string key) =>
+        Defaults.TryGetValue(key, out var color) ? color : Get(key);
 
     public static Color Get(string key) => Theme.Get(key);
 
@@ -67,13 +72,54 @@ internal static class UiColors
             return;
         }
 
-        var brush = new SolidColorBrush(color);
-        if (brush.CanFreeze)
+        if (TryWrite(app.Resources, key, color))
         {
-            brush.Freeze();
+            return;
         }
 
-        app.Resources[key] = brush;
+        app.Resources[key] = new SolidColorBrush(color);
+    }
+
+    /// <summary>
+    /// 既存の <see cref="SolidColorBrush"/> を同じインスタンスのまま塗り替える。
+    /// DynamicResource と FindResource 済みの参照が、差し替えなしで追従する。
+    /// </summary>
+    internal static bool TryWrite(ResourceDictionary dictionary, string key, Color color)
+    {
+        if (dictionary.Contains(key) && dictionary[key] is SolidColorBrush brush)
+        {
+            if (!brush.IsFrozen)
+            {
+                if (brush.Color != color)
+                {
+                    brush.Color = color;
+                }
+
+                return true;
+            }
+
+            var copy = brush.Clone();
+            copy.Color = color;
+            try
+            {
+                dictionary[key] = copy;
+                return true;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+        }
+
+        foreach (var merged in dictionary.MergedDictionaries)
+        {
+            if (TryWrite(merged, key, color))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static byte GetDefaultAlpha(string key) =>

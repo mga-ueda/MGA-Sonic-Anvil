@@ -1,0 +1,216 @@
+using System.Windows.Media;
+using MgaSonicAnvil.Domain;
+
+namespace MgaSonicAnvil.UI;
+
+/// <summary>配色で入れ替える背景／文字。意味のあるアクセントは含めない。</summary>
+internal static class UiThemePalette
+{
+    private static readonly HashSet<string> Themeable = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "PrimaryForeBrush",
+        "MutedForeBrush",
+        "AccentCyanBrush",
+        "SurfaceBackBrush",
+        "WindowBackBrush",
+        "ChromeBackBrush",
+        "ChromeBorderBrush",
+        "ChromeMidBrush",
+        "ChromeDimBrush",
+        "ScrollThumbBackBrush",
+        "ScrollThumbHoverBackBrush",
+        "ScrollThumbPressedBackBrush",
+        "ScrollThumbGripBrush",
+        "ControlHoverBorderBrush",
+        "DialogInputBackBrush",
+        "MenuSeparatorBrush",
+        "WaveformBackBrush",
+        "WaveFillBrush",
+        "WaveZeroLineBrush",
+        "WaveformScrollTrackBrush",
+        "TimelineWellBackBrush",
+        "MouseGuideBrush",
+        "MouseGuideOnSelectionBrush",
+        "LoopRangeFillBrush",
+        "LevelMeterTrackBackBrush",
+        "LevelMeterTrackBorderBrush",
+        "LevelMeterHoldBorderBrush",
+        "LevelMeterTickBrush",
+        "DbScaleForeBrush",
+        "SpectrogramScaleForeBrush",
+        "SurroundHullStrokeBrush",
+        "LevelMeterClipOffBrush",
+        "LevelMeterClipOffBorderBrush",
+        "VectorScopeBackBrush",
+        "VectorScopeGridBrush",
+        "ProjectBarBackBrush",
+        "OverviewOutsideFillBrush",
+        "TransportBackBrush",
+        "TransportForeBrush",
+        "TransportDisabledForeBrush",
+        "TransportHoverBackBrush",
+        "TransportPressedBackBrush",
+        "HistoryStripBackBrush",
+        "HistoryStripHoverBackBrush",
+        "HistoryStripCurrentForeBrush",
+        "HistoryStripPastForeBrush",
+        "HistoryStripFutureForeBrush",
+        "WaapiToggleOffBackBrush",
+        "WaapiToggleOffHoverBackBrush",
+        "WaapiToggleOffForeBrush",
+        "ActionCopyrightForeBrush",
+        "ActionLinkForeBrush",
+        "StatusBarBackBrush",
+        "WaapiBarBackBrush",
+        "StatusBarTitleForeBrush",
+        "StatusBarDetailForeBrush",
+        "KeepTargetLockForeBrush",
+        "KeepTargetLockHoverForeBrush",
+        "KeepTargetUnlockForeBrush",
+        "KeepTargetUnlockHoverForeBrush",
+        "ColorPanelBackBrush",
+        "ExportButtonFillBrush",
+        "ExportButtonHoverFillBrush",
+        "ExportButtonBackBrush",
+        "ExportButtonHoverBackBrush",
+        "ExportButtonPressedBackBrush",
+        "ExportButtonForeBrush",
+        "ClearButtonFillBrush",
+        "ClearButtonHoverFillBrush",
+        "ClearButtonBackBrush",
+        "ClearButtonHoverBackBrush",
+        "ClearButtonPressedBackBrush",
+        "ClearButtonForeBrush",
+        "StatusExportButtonFillBrush",
+        "StatusExportButtonHoverFillBrush",
+        "StatusExportButtonBackBrush",
+        "StatusExportButtonHoverBackBrush",
+        "StatusExportButtonPressedBackBrush",
+        "StatusExportButtonForeBrush",
+        "WaapiToggleOnBackBrush",
+        "WaapiToggleOnHoverBackBrush",
+        "StatusBarConnectedBadgeBackBrush",
+        "StatusBarDisconnectedBadgeBackBrush",
+        "StatusBarErrorDetailForeBrush",
+        "RegionWaveFillAnacrusisBrush",
+        "RegionWaveFillLoopBrush",
+        "RegionWaveFillExitBrush",
+    };
+
+    private static readonly Dictionary<string, Color> Light = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["PrimaryForeBrush"] = Rgb(0x1A, 0x1A, 0x1A),
+        ["MutedForeBrush"] = Rgb(0x3F, 0x3F, 0x42),
+        ["AccentCyanBrush"] = Rgb(0x1A, 0x90, 0xA8),
+        ["SurfaceBackBrush"] = Rgb(0xF4, 0xF4, 0xF5),
+        ["WindowBackBrush"] = Rgb(0xF4, 0xF4, 0xF5),
+        ["ChromeBackBrush"] = Rgb(0xE8, 0xE9, 0xF0),
+        ["ChromeBorderBrush"] = Rgb(0x9A, 0x9A, 0xA0),
+        ["ChromeMidBrush"] = Rgb(0x4A, 0x4A, 0x4E),
+        ["ChromeDimBrush"] = Rgb(0x5E, 0x5E, 0x62),
+        ["ScrollThumbBackBrush"] = Rgb(0xC8, 0xC8, 0xCC),
+        ["ScrollThumbHoverBackBrush"] = Rgb(0xD8, 0xD8, 0xDC),
+        ["ScrollThumbPressedBackBrush"] = Rgb(0xE4, 0xE4, 0xE8),
+        ["ScrollThumbGripBrush"] = Rgb(0x9A, 0x9A, 0xA0),
+        ["ControlHoverBorderBrush"] = Rgb(0x6E, 0x6E, 0x74),
+        ["DialogInputBackBrush"] = Rgb(0xFF, 0xFF, 0xFF),
+        ["MenuSeparatorBrush"] = Rgb(0xC0, 0xC0, 0xC6),
+        ["WaveformBackBrush"] = Rgb(0xFA, 0xFA, 0xFA),
+        ["WaveFillBrush"] = Rgb(0x62, 0x62, 0x62),
+        ["WaveZeroLineBrush"] = Argb(0x99, 0x2A, 0x2A, 0x2A),
+        ["WaveformScrollTrackBrush"] = Rgb(0xE2, 0xE2, 0xE4),
+        ["TimelineWellBackBrush"] = Rgb(0xEE, 0xEF, 0xF2),
+        ["MouseGuideBrush"] = Argb(0x8C, 0x5E, 0x5E, 0x62),
+        ["MouseGuideOnSelectionBrush"] = Argb(0xDC, 0xFF, 0xFF, 0xFF),
+        ["LoopRangeFillBrush"] = Argb(0x10, 0x40, 0x40, 0x48),
+        ["LevelMeterTrackBackBrush"] = Rgb(0xF0, 0xF1, 0xF3),
+        ["LevelMeterTrackBorderBrush"] = Rgb(0xC8, 0xC8, 0xCC),
+        ["LevelMeterHoldBorderBrush"] = Rgb(0xFF, 0xFF, 0xFF),
+        ["LevelMeterTickBrush"] = Rgb(0xC8, 0xC8, 0xCC),
+        ["DbScaleForeBrush"] = Rgb(0x3F, 0x3F, 0x42),
+        ["SpectrogramScaleForeBrush"] = Rgb(0xEB, 0xEB, 0xEB),
+        ["SurroundHullStrokeBrush"] = Rgb(0x9A, 0x9A, 0xA0),
+        ["LevelMeterClipOffBrush"] = Rgb(0xF7, 0xEC, 0xEC),
+        ["LevelMeterClipOffBorderBrush"] = Rgb(0xD8, 0xC4, 0xC4),
+        ["VectorScopeBackBrush"] = Rgb(0xF0, 0xF1, 0xF3),
+        ["VectorScopeGridBrush"] = Rgb(0xC8, 0xC8, 0xCC),
+        ["ProjectBarBackBrush"] = Rgb(0xE8, 0xE9, 0xF0),
+        ["OverviewOutsideFillBrush"] = Argb(0x48, 0x3A, 0x3A, 0x3E),
+        ["TransportBackBrush"] = Rgb(0xE8, 0xE9, 0xF0),
+        ["TransportForeBrush"] = Rgb(0x50, 0x50, 0x50),
+        ["TransportDisabledForeBrush"] = Rgb(0x2C, 0x2C, 0x30),
+        ["TransportHoverBackBrush"] = Rgb(0xF4, 0xF5, 0xF8),
+        ["TransportPressedBackBrush"] = Rgb(0xFF, 0xFF, 0xFF),
+        ["HistoryStripBackBrush"] = Rgb(0xE4, 0xE5, 0xEC),
+        ["HistoryStripHoverBackBrush"] = Rgb(0xF0, 0xF1, 0xF6),
+        ["HistoryStripCurrentForeBrush"] = Rgb(0x3F, 0x3F, 0x42),
+        ["HistoryStripPastForeBrush"] = Rgb(0x5E, 0x5E, 0x62),
+        ["HistoryStripFutureForeBrush"] = Rgb(0x8A, 0x8A, 0x90),
+        ["WaapiToggleOffBackBrush"] = Rgb(0xD4, 0xD4, 0xD8),
+        ["WaapiToggleOffHoverBackBrush"] = Rgb(0xE8, 0xE8, 0xEC),
+        ["WaapiToggleOffForeBrush"] = Rgb(0x3A, 0x3A, 0x3A),
+        ["ActionCopyrightForeBrush"] = Rgb(0x3F, 0x3F, 0x42),
+        ["ActionLinkForeBrush"] = Rgb(0x1A, 0x90, 0xA8),
+        ["StatusBarBackBrush"] = Rgb(0xE6, 0xE6, 0xE8),
+        ["WaapiBarBackBrush"] = Rgb(0xE6, 0xE6, 0xEA),
+        ["StatusBarTitleForeBrush"] = Rgb(0x3F, 0x3F, 0x42),
+        ["StatusBarDetailForeBrush"] = Rgb(0x2C, 0x2C, 0x30),
+        ["KeepTargetLockForeBrush"] = Rgb(0xE0, 0x70, 0x00),
+        ["KeepTargetLockHoverForeBrush"] = Rgb(0xF0, 0x88, 0x20),
+        ["KeepTargetUnlockForeBrush"] = Rgb(0x2C, 0x2C, 0x30),
+        ["KeepTargetUnlockHoverForeBrush"] = Rgb(0x3A, 0x3A, 0x3A),
+        ["ColorPanelBackBrush"] = Rgb(0xEC, 0xEC, 0xEE),
+        ["ExportButtonFillBrush"] = Rgb(0xE8, 0xF1, 0xFC),
+        ["ExportButtonHoverFillBrush"] = Rgb(0xF4, 0xF8, 0xFE),
+        ["ExportButtonForeBrush"] = Rgb(0x2C, 0x2C, 0x30),
+        ["ClearButtonFillBrush"] = Rgb(0xFC, 0xEC, 0xEC),
+        ["ClearButtonHoverFillBrush"] = Rgb(0xFF, 0xF6, 0xF6),
+        ["ClearButtonForeBrush"] = Rgb(0x2C, 0x2C, 0x30),
+        ["StatusExportButtonFillBrush"] = Rgb(0xFC, 0xEC, 0xEC),
+        ["StatusExportButtonHoverFillBrush"] = Rgb(0xFF, 0xF6, 0xF6),
+        ["StatusExportButtonBackBrush"] = Rgb(0xE8, 0x5A, 0x5A),
+        ["StatusExportButtonHoverBackBrush"] = Rgb(0xF0, 0x78, 0x78),
+        ["StatusExportButtonPressedBackBrush"] = Rgb(0xD4, 0x48, 0x48),
+        ["StatusExportButtonForeBrush"] = Rgb(0x2C, 0x2C, 0x30),
+        ["ExportButtonBackBrush"] = Rgb(0x4A, 0x9A, 0xE8),
+        ["ExportButtonHoverBackBrush"] = Rgb(0x6B, 0xB0, 0xF2),
+        ["ExportButtonPressedBackBrush"] = Rgb(0x3A, 0x88, 0xD8),
+        ["ClearButtonBackBrush"] = Rgb(0xE8, 0x5A, 0x5A),
+        ["ClearButtonHoverBackBrush"] = Rgb(0xF0, 0x78, 0x78),
+        ["ClearButtonPressedBackBrush"] = Rgb(0xD4, 0x48, 0x48),
+        ["WaapiToggleOnBackBrush"] = Rgb(0x3D, 0x8E, 0xE8),
+        ["WaapiToggleOnHoverBackBrush"] = Rgb(0x5A, 0xA4, 0xF2),
+        ["StatusBarConnectedBadgeBackBrush"] = Rgb(0x3D, 0x8E, 0xE8),
+        ["StatusBarDisconnectedBadgeBackBrush"] = Rgb(0xE8, 0x5A, 0x5A),
+        ["StatusBarErrorDetailForeBrush"] = Rgb(0xFF, 0x6A, 0x6A),
+        ["RegionWaveFillAnacrusisBrush"] = Argb(0x99, 0xE8, 0xB4, 0x4A),
+        ["RegionWaveFillLoopBrush"] = Argb(0x99, 0x4A, 0x9A, 0xE8),
+        ["RegionWaveFillExitBrush"] = Argb(0x99, 0xE8, 0x58, 0x58),
+    };
+
+    public static IReadOnlyCollection<string> ThemeableKeys => Themeable;
+
+    public static bool IsThemeable(string key) => Themeable.Contains(key);
+
+    public static void Apply(UiTheme theme)
+    {
+        foreach (var key in Themeable)
+        {
+            UiColors.Set(key, ColorFor(theme, key));
+        }
+    }
+
+    public static Color ColorFor(UiTheme theme, string key)
+    {
+        if (theme == UiTheme.Light && Light.TryGetValue(key, out var light))
+        {
+            return light;
+        }
+
+        return UiColors.Default(key);
+    }
+
+    private static Color Rgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);
+
+    private static Color Argb(byte a, byte r, byte g, byte b) => Color.FromArgb(a, r, g, b);
+}

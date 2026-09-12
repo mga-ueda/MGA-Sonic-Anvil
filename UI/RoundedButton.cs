@@ -325,9 +325,12 @@ internal static class ActionButtonLooks
         button.Background = WpfControlHelpers.FrozenBrush(fill);
         button.HoverBackColor = hoverFill;
         button.PressedBackColor = fill;
+        button.DisabledBackColor = Theme.Get("ChromeBackBrush");
+        button.DisabledForeColor = Theme.Get("TransportDisabledForeBrush");
         button.BorderColor = border;
         button.HoverBorderColor = hoverBorder;
         button.PressedBorderColor = pressedBorder;
+        button.DisabledBorderColor = Theme.Get("ChromeBorderBrush");
         button.BorderSize = borderSize;
         button.Foreground = WpfControlHelpers.FrozenBrush(fore);
         button.InvalidateVisual();

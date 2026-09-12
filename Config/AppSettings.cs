@@ -85,6 +85,9 @@ internal sealed class AppSettings
 
     public string UiLanguage { get; set; } = "auto";
 
+    /// <summary>配色。auto / dark / light。既定は OS に従う。</summary>
+    public string UiTheme { get; set; } = "auto";
+
     /// <summary>Tips 枠の表示。既定オン。</summary>
     public bool ShowTips { get; set; } = true;
 
