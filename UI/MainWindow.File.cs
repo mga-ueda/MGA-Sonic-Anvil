@@ -591,8 +591,6 @@ public partial class MainWindow
         AppStorage.Save();
     }
 
-    private void SettingsGearButton_Click(object sender, RoutedEventArgs e) => OpenSettings();
-
     private void OpenSettings()
     {
         var settings = AppStorage.Settings;
@@ -608,6 +606,7 @@ public partial class MainWindow
             settings.ResolvedFadeInCurve(),
             settings.ResolvedFadeOutCurve(),
             UiStrings.ParseLanguageChoice(settings.UiLanguage),
+            UiThemes.ParseChoice(settings.UiTheme),
             settings.ResolvedLoudnessTargetLufs(),
             settings.Mp3BitRate,
             settings.LameExePath,
@@ -636,6 +635,8 @@ public partial class MainWindow
 
         settings.UiLanguage = UiStrings.ToStoredValue(dialog.SelectedLanguage);
         UiStrings.SetLanguage(UiStrings.ResolveLanguage(dialog.SelectedLanguage));
+        settings.UiTheme = UiThemes.ToStoredValue(dialog.SelectedTheme);
+        UiThemeService.ApplyFromSettings(force: true);
         settings.ApplyDefaultFades(dialog.FadeInCurve, dialog.FadeOutCurve);
         settings.LoudnessTargetLufs = dialog.SelectedLoudnessTargetLufs;
         settings.Mp3BitRate = dialog.SelectedMp3BitRate;

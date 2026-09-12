@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -35,10 +36,7 @@ internal sealed class WaveformView : Grid
     private const int DragThresholdPx = 3;
     private const double LoopHandleMinPx = 5;
     private const double MarkerSnapPx = 8d;
-    private const float TrailTargetLengthPx = 360f;
-    private const int TrailSampleRetainMs = 10400;
-    private const float TrailPeakAlpha = 0.15f;
-    private const float TrailPlayheadGapPx = 2f;
+    private const int TrailSampleRetainMs = SeekPlaybackTrailPaint.SampleRetainMs;
     private const double TrailMinSecDelta = 0.02;
     private const int TrailSampleMinIntervalMs = 24;
     private const int TrailMaxSamples = 900;
@@ -66,6 +64,12 @@ internal sealed class WaveformView : Grid
 
     internal static double MarkerLaneHeightForRows(int rows) =>
         Math.Max(0, rows) * DesignMetrics.MarkerLaneRowHeight;
+
+    /// <summary>名前欄の左端。幅は <see cref="ChannelLabels.MaxChars"/> 文字分で固定。</summary>
+    internal static double ChannelLabelBadgeX(double wellX) => wellX;
+
+    internal static double ChannelLabelTextX(double badgeX, double badgeW, double textW) =>
+        badgeX + Math.Max(0, (badgeW - textW) * 0.5);
 
     private double MarkerLaneHeight => MarkerLaneHeightForRows(FlagLaneCount);
 
@@ -130,6 +134,7 @@ internal sealed class WaveformView : Grid
     private bool _waveDirty = true;
     private SpectrogramViewMode _spectrogramMode;
     private readonly SpectrogramRenderer _spectrogram = new();
+    private readonly SpectrogramBoostBar _boostBar = new();
     private readonly LoudnessOverlayRenderer _loudness = new();
     private double _loudnessTargetLufs = LoudnessMeterEngine.DefaultTargetLufs;
     private double _appliedMarkerLaneHeight = -1;
@@ -200,9 +205,7 @@ internal sealed class WaveformView : Grid
         WaveRegion[] RegionsBefore,
         WaveSelection LoopBefore)>? TimelineLayoutCommitted;
     public event EventHandler? MarkersChanged;
-    public event EventHandler? SampleLoopClearRequested;
-    public event EventHandler<WaveSelection>? RegionClearRequested;
-    public event EventHandler<IReadOnlyList<long>>? MarkerClearRequested;
+    public event EventHandler<WaveformContextHit>? ContextMenuRequested;
     public event EventHandler<(int Channel, bool Add, bool Mute)>? ChannelLabelClicked;
 
     public bool IsEditingMarkerComment =>
@@ -211,6 +214,7 @@ internal sealed class WaveformView : Grid
     public WaveformView()
     {
         ClipToBounds = true;
+        Clip = new RectangleGeometry(new Rect(RenderSize));
         Focusable = true;
         FocusVisualStyle = null;
         RefreshLocalizedTips();
@@ -254,11 +258,17 @@ internal sealed class WaveformView : Grid
         _loadingLabel.SetResourceReference(TextBlock.ForegroundProperty, "MutedForeBrush");
         Panel.SetZIndex(_loadingLabel, 6);
         Children.Add(_loadingLabel);
+        _boostBar.Visibility = Visibility.Collapsed;
+        _boostBar.ValueChanged += OnSpectrogramBoostChanged;
+        Panel.SetZIndex(_boostBar, 5);
+        Children.Add(_boostBar);
         SizeChanged += (_, _) =>
         {
             EndMarkerCommentEdit(commit: true);
             _waveDirty = true;
+            Clip = new RectangleGeometry(new Rect(RenderSize));
             SyncMouseGuideHeight();
+            SyncSpectrogramBoostBar();
             InvalidateStaticLayer();
         };
         _spectrogram.InvalidateRequested += () =>
@@ -289,6 +299,8 @@ internal sealed class WaveformView : Grid
     public void RefreshLocalizedTips()
     {
         TipService.Set(this, UiStrings.TipWaveform);
+        TipService.Set(_boostBar, UiStrings.TipSpectrogramBoost);
+        _boostBar.SetValue(AutomationProperties.NameProperty, UiStrings.TipSpectrogramBoost);
         _loadingLabel.Text = UiStrings.LabelWaveformLoading;
     }
 
@@ -319,6 +331,7 @@ internal sealed class WaveformView : Grid
             _spectrogram.InvalidateCache();
             _loudness.Invalidate();
             InvalidateWaveform();
+            SyncSpectrogramBoostBar();
             RaiseViewChanged();
         }
     }
@@ -418,6 +431,10 @@ internal sealed class WaveformView : Grid
             InvalidatePlayheadOnly();
         }
     }
+
+    internal IReadOnlyList<(long Frame, long TickMs)> SeekTrailSamples => _trailSamples;
+
+    internal IReadOnlyList<(long Frame, long TickMs)> ExitSeekTrailSamples => _exitTrailSamples;
 
     public void SetTrailRecording(bool active)
     {
@@ -575,6 +592,8 @@ internal sealed class WaveformView : Grid
     {
         _mouseGuideBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MouseGuideBrush"));
         _mouseGuideOnSelectionBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MouseGuideOnSelectionBrush"));
+        _timeLabelCache.Clear();
+        _dbLabelCache.Clear();
         _waveBgra = 0;
         _waveOverlayBgra = 0;
         _loudnessWaveBgra = 0;
@@ -591,6 +610,72 @@ internal sealed class WaveformView : Grid
         _spectrogramMode is SpectrogramViewMode.Spectrogram or SpectrogramViewMode.Overlay;
 
     public bool LoudnessVisible => _spectrogramMode == SpectrogramViewMode.Loudness;
+
+    public WaveformAnalysisView AnalysisView => _spectrogramMode switch
+    {
+        SpectrogramViewMode.Spectrogram => WaveformAnalysisView.Spectrogram,
+        SpectrogramViewMode.Overlay => WaveformAnalysisView.Overlay,
+        SpectrogramViewMode.Loudness => WaveformAnalysisView.Loudness,
+        _ => WaveformAnalysisView.Waveform,
+    };
+
+    public event EventHandler? AnalysisViewChanged;
+
+    public void SetAnalysisView(WaveformAnalysisView view)
+    {
+        var next = view switch
+        {
+            WaveformAnalysisView.Spectrogram => SpectrogramViewMode.Spectrogram,
+            WaveformAnalysisView.Overlay => SpectrogramViewMode.Overlay,
+            WaveformAnalysisView.Loudness => SpectrogramViewMode.Loudness,
+            _ => SpectrogramViewMode.Off,
+        };
+        if (_spectrogramMode == next)
+        {
+            return;
+        }
+
+        _spectrogramMode = next;
+        ApplyAnalysisView();
+    }
+
+    public void ToggleSpectrogramView() =>
+        SetAnalysisView(_spectrogramMode switch
+        {
+            SpectrogramViewMode.Spectrogram => WaveformAnalysisView.Overlay,
+            SpectrogramViewMode.Overlay => WaveformAnalysisView.Spectrogram,
+            _ => WaveformAnalysisView.Spectrogram,
+        });
+
+    public void CycleSpectrogramView() =>
+        SetAnalysisView(_spectrogramMode switch
+        {
+            SpectrogramViewMode.Spectrogram => WaveformAnalysisView.Overlay,
+            SpectrogramViewMode.Overlay => WaveformAnalysisView.Waveform,
+            _ => WaveformAnalysisView.Spectrogram,
+        });
+
+    public void ExitSpectrogramView()
+    {
+        if (SpectrogramVisible)
+        {
+            SetAnalysisView(WaveformAnalysisView.Waveform);
+        }
+    }
+
+    public void ToggleLoudnessView() =>
+        SetAnalysisView(
+            _spectrogramMode == SpectrogramViewMode.Loudness
+                ? WaveformAnalysisView.Waveform
+                : WaveformAnalysisView.Loudness);
+
+    public void ExitLoudnessView()
+    {
+        if (LoudnessVisible)
+        {
+            SetAnalysisView(WaveformAnalysisView.Waveform);
+        }
+    }
 
     public double LoudnessTargetLufs
     {
@@ -636,7 +721,39 @@ internal sealed class WaveformView : Grid
             _loudness.Ensure(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayerForLoudness));
         }
 
+        SyncSpectrogramBoostBar();
         InvalidateStaticLayer();
+        AnalysisViewChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnSpectrogramBoostChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        _spectrogram.DisplayBoostDb = SpectrogramEngine.DisplayBoostDbFromUnit(_boostBar.BoostUnit);
+        if (SpectrogramVisible)
+        {
+            InvalidateStaticLayer();
+        }
+    }
+
+    private void SyncSpectrogramBoostBar()
+    {
+        var show = SpectrogramVisible;
+        _boostBar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        _boostBar.IsEnabled = show && _document is not null;
+        if (!show || ActualHeight <= 1)
+        {
+            return;
+        }
+
+        var wave = WaveformBounds(new Rect(RenderSize));
+        var pad = DesignMetrics.SpectrogramBoostBarPad;
+        double? labelW = _spectrogramMode == SpectrogramViewMode.Overlay
+            ? WpfControlHelpers.MonoText("-12", 9, Brushes.Transparent, VisualTreeHelper.GetDpi(this).PixelsPerDip).Width
+            : null;
+        var left = DesignMetrics.SpectrogramBoostBarLeft(labelW);
+        _boostBar.Width = DesignMetrics.SpectrogramBoostThumbSize;
+        _boostBar.Height = Math.Max(0, wave.Height - pad * 2);
+        _boostBar.Margin = new Thickness(left, wave.Y + pad, 0, pad);
     }
 
     public void InvalidateSpectrogramCache()
@@ -1688,53 +1805,32 @@ internal sealed class WaveformView : Grid
 
     protected override void OnMouseRightButtonDown(MouseButtonEventArgs e)
     {
-        var pos = e.GetPosition(this);
-        var hitMarker = TryHitMarkerFlag(pos, out var marker);
-        var hitRegion = TryHitRegionFlag(pos, out var region);
-        var hitLoop = TryHitSampleLoopBar(pos);
-        if (!hitMarker && !hitRegion && !hitLoop)
+        if (IsEditingMarkerComment || _dragging || _markerDragging || _scrubbing)
         {
             return;
         }
 
-        Focus();
-        e.Handled = true;
-        var menu = new ContextMenu
-        {
-            Placement = PlacementMode.MousePoint,
-            PlacementTarget = this,
-        };
+        var pos = e.GetPosition(this);
+        var hitMarker = TryHitMarkerFlag(pos, out var marker);
+        var hitRegion = TryHitRegionFlag(pos, out var region);
+        var hitLoop = TryHitSampleLoopBar(pos);
+        IReadOnlyList<long> frames = [];
         if (hitMarker)
         {
-            var frames = _selectedMarkerFrames.Contains(marker.Frame) && _selectedMarkerFrames.Count > 1
+            frames = _selectedMarkerFrames.Contains(marker.Frame) && _selectedMarkerFrames.Count > 1
                 ? _selectedMarkerFrames.ToArray()
-                : new[] { marker.Frame };
-            var item = new MenuItem
-            {
-                Header = frames.Length > 1 ? UiStrings.MenuClearMarkers : UiStrings.MenuClearMarker,
-            };
-            item.Click += (_, _) => MarkerClearRequested?.Invoke(this, frames);
-            TipService.Set(item, item.Header as string);
-            menu.Items.Add(item);
+                : [marker.Frame];
         }
 
-        if (hitRegion)
+        Focus();
+        e.Handled = true;
+        ContextMenuRequested?.Invoke(this, new WaveformContextHit
         {
-            var item = new MenuItem { Header = UiStrings.MenuClearRegion };
-            item.Click += (_, _) => RegionClearRequested?.Invoke(this, region);
-            TipService.Set(item, UiStrings.MenuClearRegion);
-            menu.Items.Add(item);
-        }
-
-        if (hitLoop)
-        {
-            var item = new MenuItem { Header = UiStrings.MenuClearSampleLoop };
-            item.Click += (_, _) => SampleLoopClearRequested?.Invoke(this, EventArgs.Empty);
-            TipService.Set(item, UiStrings.MenuClearSampleLoop);
-            menu.Items.Add(item);
-        }
-
-        menu.IsOpen = true;
+            Frame = PointerFrame(pos.X),
+            MarkerFrames = frames,
+            Region = hitRegion ? region : WaveSelection.Empty,
+            HitLoop = hitLoop,
+        });
     }
 
     internal void PaintStatic(DrawingContext dc)
@@ -1766,6 +1862,7 @@ internal sealed class WaveformView : Grid
         var span = _document is null ? 0 : ViewSpanFrames;
         var start = _viewStart;
         DrawDbScaleWell(dc, bounds);
+        SyncSpectrogramBoostBar();
         DrawMarkerLane(dc, bounds, start, span);
         DrawTimeLane(dc, bounds, start, span);
         if (_document is null || _document.FrameCount <= 0 || wave.Width <= 1 || wave.Height <= 1)
@@ -2126,7 +2223,10 @@ internal sealed class WaveformView : Grid
                 if (sx1 > sx0)
                 {
                     dc.DrawRectangle(
-                        WpfControlHelpers.FrozenBrush(Color.FromArgb(56, 255, 255, 255)),
+                        WpfControlHelpers.FrozenBrush(
+                            UiThemeService.Current == UiTheme.Light
+                                ? Theme.Get("LoopRangeFillBrush")
+                                : Color.FromArgb(56, 255, 255, 255)),
                         null,
                         new Rect(sx0, specWave.Y, sx1 - sx0, specWave.Height));
                 }
@@ -3033,6 +3133,23 @@ internal sealed class WaveformView : Grid
         var maxName = Math.Max(8, well.Width - reserve - 2);
         var layout = ChannelLayout.ForFile(channels, _speakerLayout, _fileChannelMap);
         var tint = ChannelColors.UsesLaneTint(channels);
+        const double padX = 3;
+        const double padY = 1;
+        const double smallEm = 8;
+        const double largeEm = 11;
+        FormattedText MeasureName(string text, double em, Brush brush) => new(
+            text,
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            WpfControlHelpers.MonoTypeface,
+            em,
+            brush,
+            pixelsPerDip);
+        var slot = Math.Max(
+            MeasureName(new string('M', ChannelLabels.MaxChars), smallEm, fore).Width,
+            MeasureName("WW", largeEm, fore).Width);
+        var badgeW = Math.Min(maxName, slot + padX * 2);
+        var badgeX = ChannelLabelBadgeX(well.X);
         for (var ch = 0; ch < channels; ch++)
         {
             var muted = IsLaneMuted(ch);
@@ -3041,34 +3158,16 @@ internal sealed class WaveformView : Grid
                 : WpfControlHelpers.FrozenBrush(Theme.Get(muted ? "MutedForeBrush" : "PrimaryForeBrush"));
             var top = wave.Y + ch * (laneHeight + laneGap);
             var name = layout.LabelAt(ch);
-            var em = name.Length <= 2 ? 11d : 8d;
-            var text = new FormattedText(
-                name,
-                CultureInfo.InvariantCulture,
-                FlowDirection.LeftToRight,
-                WpfControlHelpers.MonoTypeface,
-                em,
-                nameFore,
-                pixelsPerDip);
-            if (text.Width > maxName && em > 8)
+            var em = name.Length <= 2 ? largeEm : smallEm;
+            var text = MeasureName(name, em, nameFore);
+            if (text.Width > badgeW - padX * 2 && em > smallEm)
             {
-                text = new FormattedText(
-                    name,
-                    CultureInfo.InvariantCulture,
-                    FlowDirection.LeftToRight,
-                    WpfControlHelpers.MonoTypeface,
-                    8,
-                    nameFore,
-                    pixelsPerDip);
+                text = MeasureName(name, smallEm, nameFore);
             }
 
-            const double padX = 3;
-            const double padY = 1;
-            var badgeW = Math.Min(maxName, text.Width + padX * 2);
             var badgeH = Math.Min(laneHeight, text.Height + padY * 2);
-            var badgeX = well.X + Math.Max(0, (maxName - badgeW) * 0.5);
             var badgeY = top + Math.Max(0, (laneHeight - badgeH) * 0.5);
-            var x = badgeX + Math.Max(0, (badgeW - text.Width) * 0.5);
+            var x = ChannelLabelTextX(badgeX, badgeW, text.Width);
             var y = badgeY + Math.Max(0, (badgeH - text.Height) * 0.5);
             dc.PushClip(new RectangleGeometry(new Rect(well.X, top, maxName + 1, laneHeight)));
             if (tint)
@@ -3111,9 +3210,7 @@ internal sealed class WaveformView : Grid
         }
 
         var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-        var muted = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
-        var tick = new Pen(muted, 1);
-        tick.Freeze();
+        var scale = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
         var half = laneHeight * 0.5;
         var amp = (ampHeight ?? laneHeight) * 0.5 * _ampZoom;
 
@@ -3123,13 +3220,13 @@ internal sealed class WaveformView : Grid
             var mid = top + half;
             var bottom = top + laneHeight;
             dc.PushClip(new RectangleGeometry(new Rect(well.X, top, well.Width, laneHeight)));
-            DrawDbTick(dc, well, mid, "∞", pixelsPerDip, muted, tick);
+            DrawDbTick(dc, well, mid, "∞", pixelsPerDip, scale);
 
             var drawn = new List<double> { mid };
             var values = 1;
             foreach (var db in DbRequiredMarks)
             {
-                if (TryDrawDbValue(dc, well, db, mid, amp, top, bottom, pixelsPerDip, muted, tick, drawn, minGap: 0))
+                if (TryDrawDbValue(dc, well, db, mid, amp, top, bottom, pixelsPerDip, scale, drawn, minGap: 0))
                 {
                     values++;
                 }
@@ -3137,7 +3234,7 @@ internal sealed class WaveformView : Grid
 
             foreach (var db in DbOptionalMarks)
             {
-                if (TryDrawDbValue(dc, well, db, mid, amp, top, bottom, pixelsPerDip, muted, tick, drawn, DbOptionalMinGapPx))
+                if (TryDrawDbValue(dc, well, db, mid, amp, top, bottom, pixelsPerDip, scale, drawn, DbOptionalMinGapPx))
                 {
                     values++;
                 }
@@ -3147,7 +3244,7 @@ internal sealed class WaveformView : Grid
             {
                 foreach (var db in DbOptionalMarks)
                 {
-                    if (TryDrawDbValue(dc, well, db, mid, amp, top, bottom, pixelsPerDip, muted, tick, drawn, minGap: 0)
+                    if (TryDrawDbValue(dc, well, db, mid, amp, top, bottom, pixelsPerDip, scale, drawn, minGap: 0)
                         && ++values >= 4)
                     {
                         break;
@@ -3169,7 +3266,6 @@ internal sealed class WaveformView : Grid
         double bottom,
         double pixelsPerDip,
         Brush fore,
-        Pen tick,
         List<double> drawn,
         double minGap)
     {
@@ -3180,8 +3276,8 @@ internal sealed class WaveformView : Grid
         }
 
         var label = db.ToString("0", CultureInfo.InvariantCulture);
-        var up = TryDrawDbTickAt(dc, well, mid - dy, label, top, bottom, pixelsPerDip, fore, tick, drawn, minGap);
-        var down = TryDrawDbTickAt(dc, well, mid + dy, label, top, bottom, pixelsPerDip, fore, tick, drawn, minGap);
+        var up = TryDrawDbTickAt(dc, well, mid - dy, label, top, bottom, pixelsPerDip, fore, drawn, minGap);
+        var down = TryDrawDbTickAt(dc, well, mid + dy, label, top, bottom, pixelsPerDip, fore, drawn, minGap);
         return up || down;
     }
 
@@ -3194,7 +3290,6 @@ internal sealed class WaveformView : Grid
         double bottom,
         double pixelsPerDip,
         Brush fore,
-        Pen tick,
         List<double> drawn,
         double minGap)
     {
@@ -3213,7 +3308,7 @@ internal sealed class WaveformView : Grid
             }
         }
 
-        DrawDbTick(dc, well, y, label, pixelsPerDip, fore, tick);
+        DrawDbTick(dc, well, y, label, pixelsPerDip, fore);
         drawn.Add(y);
         return true;
     }
@@ -3224,13 +3319,11 @@ internal sealed class WaveformView : Grid
         double y,
         string label,
         double pixelsPerDip,
-        Brush fore,
-        Pen tick)
+        Brush fore)
     {
         var text = GetDbLabel(label, pixelsPerDip, fore);
         var ty = y - text.Height * 0.5;
-        var tx = well.Right - 7 - text.Width;
-        dc.DrawLine(tick, new Point(well.Right - 5, y), new Point(well.Right - 1, y));
+        var tx = well.Right - 2 - text.Width;
         dc.DrawText(text, new Point(Math.Max(well.X + 2, tx), ty));
     }
 
@@ -3672,7 +3765,7 @@ internal sealed class WaveformView : Grid
 
         var loop = _document.SampleLoop;
         var hasLoop = !loop.IsEmpty;
-        var tick = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush")), 1);
+        var tick = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("DbScaleForeBrush")), 1);
         tick.Freeze();
         const double minGap = 72;
         var loopX0 = hasLoop ? FrameToViewX(loop.StartFrame, start, span, bounds) : 0;
@@ -5274,6 +5367,31 @@ internal sealed class WaveformView : Grid
         RaiseViewChanged();
     }
 
+    public void SetVisibleRange(double viewStart, double viewSpan)
+    {
+        if (_document is null || _document.FrameCount <= 0)
+        {
+            return;
+        }
+
+        var total = (double)_document.FrameCount;
+        var minSpan = Math.Max(1d, total / TimeZoomMax);
+        var span = Math.Clamp(viewSpan, minSpan, total);
+        var nextZoom = Math.Clamp(total / span, 1d, TimeZoomMax);
+        var actualSpan = Math.Max(1d, total / Math.Max(1d, nextZoom));
+        var nextStart = Math.Clamp(viewStart, 0d, Math.Max(0d, total - actualSpan));
+        if (Math.Abs(nextZoom - _timeZoom) < 1e-12 && Math.Abs(nextStart - _viewStart) < 0.0001)
+        {
+            return;
+        }
+
+        EndMarkerCommentEdit(commit: true);
+        _timeZoom = nextZoom;
+        _viewStart = nextStart;
+        InvalidateStaticLayer();
+        RaiseViewChanged();
+    }
+
     private void SetAmpZoom(double zoom)
     {
         var next = Math.Clamp(zoom, 1d, AmpZoomMax);
@@ -5814,37 +5932,58 @@ internal sealed class WaveformView : Grid
 
     private void DrawPlayhead(DrawingContext dc, Rect bounds, double start, double span)
     {
-        var playX = FrameToViewX(_playheadFrame, start, span, bounds);
-        if (_exitPlayheadFrame >= 0)
-        {
-            var exitX = FrameToViewX(_exitPlayheadFrame, start, span, bounds);
-            DrawSeekPlaybackTrail(dc, bounds, exitX, start, span, _exitTrailSamples, Theme.Get("SeekExitBrush"));
-        }
-
-        DrawSeekPlaybackTrail(dc, bounds, playX, start, span, _trailSamples, Theme.Get("PlayheadBrush"));
-        EnsurePlayheadPens();
         var wave = WaveformBounds(bounds);
-        if (wave.Height <= 1)
+        if (wave.Width <= 1 || wave.Height <= 1)
         {
             return;
         }
 
-        var y0 = wave.Y;
-        var y1 = wave.Y + wave.Height;
-        if (_exitPlayheadFrame >= 0)
+        // dB 列とスクロール行には出さない。左端拡縮で再生位置が画面外になると、
+        // クリップなしでは ＋－ の上にヘッドが描かれる。
+        dc.PushClip(new RectangleGeometry(new Rect(wave.X, 0, wave.Width, wave.Y + wave.Height)));
+        try
         {
-            // -E 二重再生ヘッド（赤）。メインヘッドより下層に描く。
-            EnsureExitPlayheadPens();
-            var exitX = FrameToViewX(_exitPlayheadFrame, start, span, bounds);
-            dc.DrawLine(_exitPlayheadGlowOuter, new Point(exitX, y0), new Point(exitX, y1));
-            dc.DrawLine(_exitPlayheadGlowInner, new Point(exitX, y0), new Point(exitX, y1));
-            dc.DrawLine(_exitPlayheadCore, new Point(exitX, y0), new Point(exitX, y1));
-        }
+            var playX = FrameToViewX(_playheadFrame, start, span, bounds);
+            if (_exitPlayheadFrame >= 0)
+            {
+                var exitX = FrameToViewX(_exitPlayheadFrame, start, span, bounds);
+                DrawSeekPlaybackTrail(dc, bounds, exitX, start, span, _exitTrailSamples, Theme.Get("SeekExitBrush"));
+            }
 
-        dc.DrawLine(_playheadGlowOuter, new Point(playX, y0), new Point(playX, y1));
-        dc.DrawLine(_playheadGlowInner, new Point(playX, y0), new Point(playX, y1));
-        dc.DrawLine(_playheadCore, new Point(playX, y0), new Point(playX, y1));
+            DrawSeekPlaybackTrail(dc, bounds, playX, start, span, _trailSamples, Theme.Get("PlayheadBrush"));
+            EnsurePlayheadPens();
+            var y0 = wave.Y;
+            var y1 = wave.Y + wave.Height;
+            if (_exitPlayheadFrame >= 0)
+            {
+                // -E 二重再生ヘッド（赤）。メインヘッドより下層に描く。
+                EnsureExitPlayheadPens();
+                var exitX = FrameToViewX(_exitPlayheadFrame, start, span, bounds);
+                if (IsPlayheadXVisible(exitX, wave))
+                {
+                    dc.DrawLine(_exitPlayheadGlowOuter, new Point(exitX, y0), new Point(exitX, y1));
+                    dc.DrawLine(_exitPlayheadGlowInner, new Point(exitX, y0), new Point(exitX, y1));
+                    dc.DrawLine(_exitPlayheadCore, new Point(exitX, y0), new Point(exitX, y1));
+                }
+            }
+
+            if (!IsPlayheadXVisible(playX, wave))
+            {
+                return;
+            }
+
+            dc.DrawLine(_playheadGlowOuter, new Point(playX, y0), new Point(playX, y1));
+            dc.DrawLine(_playheadGlowInner, new Point(playX, y0), new Point(playX, y1));
+            dc.DrawLine(_playheadCore, new Point(playX, y0), new Point(playX, y1));
+        }
+        finally
+        {
+            dc.Pop();
+        }
     }
+
+    private static bool IsPlayheadXVisible(double x, Rect wave) =>
+        x >= wave.X - 1 && x <= wave.X + wave.Width + 1;
 
     private void EnsureExitPlayheadPens()
     {
@@ -5889,73 +6028,17 @@ internal sealed class WaveformView : Grid
         List<(long Frame, long TickMs)> samples,
         Color color)
     {
-        var now = Environment.TickCount64;
-        PruneTrailSamplesByAge(now, samples);
-        if (samples.Count < 2 || bounds.Width <= 0)
-        {
-            return;
-        }
-
-        var contentLeft = ScaleLeft(bounds);
-        var trailRightX = playheadX - TrailPlayheadGapPx;
-        var trailLeftLimit = playheadX - TrailTargetLengthPx;
-        if (trailRightX <= contentLeft || trailRightX <= trailLeftLimit)
-        {
-            return;
-        }
-
-        var fadeMs = TrailFadeMsForView(ScaleContentWidth(bounds));
-        double? coveredLeft = null;
-        foreach (var sample in samples)
-        {
-            if (now - sample.TickMs >= fadeMs)
-            {
-                continue;
-            }
-
-            var x = FrameToViewX(sample.Frame, start, span, bounds);
-            if (x > trailRightX)
-            {
-                continue;
-            }
-
-            coveredLeft = coveredLeft is double left ? Math.Min(left, x) : x;
-        }
-
-        if (coveredLeft is null)
-        {
-            return;
-        }
-
-        var drawLeft = Math.Max(contentLeft, Math.Max(trailLeftLimit, coveredLeft.Value));
-        var drawRight = Math.Min(bounds.Width, trailRightX);
-        var drawW = drawRight - drawLeft;
-        if (drawW < 1)
-        {
-            return;
-        }
-
-        var peak = Color.FromArgb(ToByteAlpha(TrailPeakAlpha), color.R, color.G, color.B);
-        var mid = Color.FromArgb(ToByteAlpha(TrailPeakAlpha * 0.25f), color.R, color.G, color.B);
-        var soft = Color.FromArgb(ToByteAlpha(TrailPeakAlpha * 0.06f), color.R, color.G, color.B);
-        var clear = Color.FromArgb(0, color.R, color.G, color.B);
-        var brush = new LinearGradientBrush
-        {
-            MappingMode = BrushMappingMode.Absolute,
-            StartPoint = new Point(playheadX - TrailTargetLengthPx, 0),
-            EndPoint = new Point(playheadX, 0),
-            GradientStops =
-            [
-                new GradientStop(clear, 0),
-                new GradientStop(clear, 0.14),
-                new GradientStop(soft, 0.42),
-                new GradientStop(mid, 0.72),
-                new GradientStop(peak, 1),
-            ],
-        };
-        brush.Freeze();
+        PruneTrailSamplesByAge(Environment.TickCount64, samples);
         var wave = WaveformBounds(bounds);
-        dc.DrawRectangle(brush, null, new Rect(drawLeft, wave.Y, drawW, wave.Height));
+        SeekPlaybackTrailPaint.Draw(
+            dc,
+            wave,
+            playheadX,
+            ScaleLeft(bounds),
+            samples,
+            frame => FrameToViewX(frame, start, span, bounds),
+            TrailFadeMsForView(ScaleContentWidth(bounds)),
+            color);
     }
 
     private void ResetTrailIfRewound(long frame, List<(long Frame, long TickMs)> samples)
@@ -6027,15 +6110,8 @@ internal sealed class WaveformView : Grid
     private double TrailFadeMsForView(double contentWidth)
     {
         var durationSec = DurationSeconds();
-        if (durationSec <= 0 || contentWidth <= 1)
-        {
-            return TrailSampleRetainMs;
-        }
-
         var viewDurationSec = durationSec * (ViewSpanFrames / Math.Max(1d, _document?.FrameCount ?? 1));
-        var fadeSec = TrailTargetLengthPx / contentWidth * viewDurationSec;
-        fadeSec = Math.Clamp(fadeSec, 0.2, 60.0);
-        return fadeSec * 1000.0;
+        return SeekPlaybackTrailPaint.FadeMs(contentWidth, viewDurationSec);
     }
 
     private double DurationSeconds() =>
@@ -6050,9 +6126,6 @@ internal sealed class WaveformView : Grid
 
     private static double DiscontinuitySec(double durationSec) =>
         durationSec <= 0 ? TrailDiscontinuitySec : Math.Max(TrailDiscontinuitySec, durationSec * 0.025);
-
-    private static byte ToByteAlpha(float a) =>
-        (byte)Math.Clamp((int)MathF.Round(a * 255f), 0, 255);
 
     private bool IsGuideOverSelection(double x, double start, double span, Rect bounds)
     {
@@ -6175,6 +6248,7 @@ internal sealed class WaveformView : Grid
             var overlay = kind != LayerKind.Static;
             SnapsToDevicePixels = !overlay;
             UseLayoutRounding = !overlay;
+            ClipToBounds = true;
             if (overlay)
             {
                 RenderOptions.SetEdgeMode(this, EdgeMode.Aliased);

@@ -134,31 +134,24 @@
             <ColumnDefinition Width="{x:Static ui:DesignMetrics.DbScaleWidthGrid}" />
             <ColumnDefinition Width="*" />
           </Grid.ColumnDefinitions>
-          <Border Background="{DynamicResource TransportBackBrush}">
-            <ui:SettingsGearButton x:Name="SettingsGear"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Click="SettingsGearButton_Click" />
-          </Border>
+          <Border Background="{DynamicResource TransportBackBrush}" />
           <Border Grid.Column="1"
                   Padding="{x:Static ui:DesignMetrics.OverviewPad}"
                   Background="{DynamicResource ProjectBarBackBrush}">
-            <ui:OverviewView x:Name="Overview" />
+            <ui:OverviewView x:Name="Overview"
+                             MouseRightButtonDown="Overview_MouseRightButtonDown" />
           </Border>
         </Grid>
         <Border Background="{DynamicResource WaveformScrollTrackBrush}"
                 MinHeight="{x:Static ui:DesignMetrics.WaveformHostMinHeight}"
                 AllowDrop="True">
           <Grid>
-            <Grid.RowDefinitions>
-              <RowDefinition Height="*" />
-              <RowDefinition Height="{x:Static ui:DesignMetrics.WaveformScrollBarHeightGrid}" />
-            </Grid.RowDefinitions>
-            <ui:WaveformView x:Name="Waveform" Grid.Row="0" />
-            <ui:TimeScrollBar x:Name="TimeScroll"
-                              Grid.Row="1"
-                              Style="{StaticResource DarkScrollBarStyle}"
-                              Background="{DynamicResource TimelineWellBackBrush}" />
+            <DockPanel ClipToBounds="True">
+              <ui:WaveformScrollStrip x:Name="TimeScrollStrip"
+                                      DockPanel.Dock="Bottom"
+                                      Panel.ZIndex="1" />
+              <ui:WaveformView x:Name="Waveform" ClipToBounds="True" />
+            </DockPanel>
           </Grid>
         </Border>
       </DockPanel>
@@ -266,7 +259,7 @@
                              Grid.Row="0"
                              Grid.RowSpan="2"
                              Grid.Column="1"
-                             Margin="0,0,6,0"
+                             Margin="0,0,2,0"
                              VerticalAlignment="Stretch"
                              OpenRequested="HistoryStrip_OpenRequested" />
         <ui:LoudnessMeterView x:Name="LoudnessMeter"
@@ -274,7 +267,8 @@
                               Grid.RowSpan="2"
                               Grid.Column="2"
                               Margin="0,0,6,0"
-                              VerticalAlignment="Stretch" />
+                              VerticalAlignment="Stretch"
+                              Background="{DynamicResource TransportBackBrush}" />
         <ui:ProjectSpectrumView x:Name="Spectrum"
                                 Grid.Row="0"
                                 Grid.RowSpan="2"
@@ -289,6 +283,7 @@
                            Visibility="Collapsed"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
+                           CloseRequested="HistoryOverlay_CloseRequested"
                            ItemClicked="HistoryOverlay_ItemClicked" />
   </Grid>
 </Window>

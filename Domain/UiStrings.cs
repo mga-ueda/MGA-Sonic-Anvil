@@ -130,6 +130,10 @@ internal static partial class UiStrings
     public static string ButtonDiscardAllAndExit => Get("すべて保存せずに終了", "Quit without saving any");
     public static string DialogSettingsTitle => Get("設定", "Settings");
     public static string LabelUiLanguage => Get("言語", "Language");
+    public static string LabelUiTheme => Get("配色", "Theme");
+    public static string LabelThemeAuto => Get("Auto", "Auto");
+    public static string LabelThemeDark => Get("Dark", "Dark");
+    public static string LabelThemeLight => Get("Light", "Light");
     public static string LabelFileAssociations => Get("関連付け", "File associations");
     public static string LabelLanguageAuto => Get("Auto", "Auto");
     public static string LabelLanguageJapanese => Get("Japanese", "Japanese");
@@ -139,8 +143,8 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string AccessibleAudioSettingsButton => Get("設定", "Settings");
     public static string TipAudioSettings => Get(
-        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出しのタブ。表示言語、関連付け、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、フェード、MP3、同時書き出し本数。",
-        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export tabs. Language, file associations, speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, fades, MP3, and parallel export count.");
+        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出しのタブ。表示言語、配色（ダーク／ライト／Auto）、関連付け、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、フェード、MP3、同時書き出し本数。",
+        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export tabs. Language, theme (Dark / Light / Auto), file associations, speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, fades, MP3, and parallel export count.");
     public static string LabelMp3Encode => Get("MP3", "MP3");
     public static string TipMp3Encode => Get(
         "MP3 保存の経路です。LAME のパスが有効なら lame.exe、空欄または無効なら Windows です。",
@@ -413,6 +417,17 @@ internal static partial class UiStrings
         "Wave|*.wav|MP3|*.mp3",
         "Wave|*.wav|MP3|*.mp3");
 
+    public static string LabelTransportGroup => Get("TRANS", "TRANS");
+    public static string LabelNavigationGroup => Get("NAV", "NAV");
+    public static string LabelTimeZoomGroup => Get("TIME", "TIME");
+    public static string LabelAmpZoomGroup => Get("AMP", "AMP");
+    public static string LabelWaveformHeightGroup => Get("SIZE", "SIZE");
+    public static string LabelEditGroup => Get("EDIT", "EDIT");
+    public static string LabelMarkerGroup => Get("MARK", "MARK");
+    public static string LabelFileGroup => Get("FILE", "FILE");
+    public static string LabelViewGroup => Get("VIEW", "VIEW");
+    public static string LabelHelpGroup => Get("HELP", "HELP");
+
     public static string TooltipRecord => Get("録音 (Ctrl+R)", "Record (Ctrl+R)");
     public static string TooltipPlay => Get("再生 / 停止 (Space)", "Play / stop (Space)");
     public static string TooltipStop => Get("停止 (Space)", "Stop (Space)");
@@ -433,7 +448,66 @@ internal static partial class UiStrings
     public static string TooltipSave => Get("保存 (Ctrl+S)", "Save (Ctrl+S)");
     public static string TooltipSaveMp3 => Get("MP3 として保存 (Ctrl+Shift+M)", "Save as MP3 (Ctrl+Shift+M)");
     public static string TooltipTipsToggle => Get("Tips の表示", "Show Tips");
+    public static string TooltipSettings => Get("設定 (Ctrl+Shift+O)", "Settings (Ctrl+Shift+O)");
     public static string TooltipManualHelp => Get("マニュアル", "Manual");
+    public static string TooltipJumpToTime => Get("時間へ移動 (G)", "Focus time (G)");
+    public static string TooltipPreviousPage => Get("表示の約 5% 戻る (PageUp)", "Back about 5% of the view (PageUp)");
+    public static string TooltipNextPage => Get("表示の約 5% 進む (PageDown)", "Forward about 5% of the view (PageDown)");
+    public static string TooltipPreviousMarker => Get("前のマーカー (Ctrl+←)", "Previous marker (Ctrl+←)");
+    public static string TooltipNextMarker => Get("次のマーカー (Ctrl+→)", "Next marker (Ctrl+→)");
+    public static string TooltipWaveformHeight => Get("波形の高さ 1×／2×／3× (H)", "Waveform height 1× / 2× / 3× (H)");
+    public static string TooltipUndo => Get("元に戻す (Ctrl+Z)", "Undo (Ctrl+Z)");
+    public static string TooltipRedo => Get("やり直し (Ctrl+Y)", "Redo (Ctrl+Y)");
+    public static string TooltipFadeAround => Get("再生位置でフェード (X)", "Fade around playhead (X)");
+    public static string TooltipVolume => Get("音量 (V)", "Volume (V)");
+    public static string TooltipPitch => Get("ピッチ (P)", "Pitch (P)");
+    public static string TooltipTimeStretch => Get("タイムストレッチ (T)", "Time stretch (T)");
+    public static string TooltipReverse => Get("リバース (R)", "Reverse (R)");
+    public static string TooltipAddMarker => Get("マーカーを追加 (M)", "Add marker (M)");
+    public static string TooltipSetLoop => Get("選択をループに (Shift+L)", "Set selection as loop (Shift+L)");
+    public static string TooltipSetRegion => Get("選択をリージョンに (Shift+R)", "Set selection as region (Shift+R)");
+    public static string TooltipOpen => Get("開く (Ctrl+O)", "Open (Ctrl+O)");
+    public static string TooltipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)", "Save As (Ctrl+Shift+S)");
+    public static string TooltipAnalysisView => Get("スペクトログラム / 重ね (A)  解除 (Shift+A)", "Spectrogram / overlay (A)  leave (Shift+A)");
+    public static string TooltipSpectrogramView => Get("スペクトログラム / 重ね (A)  解除 (Shift+A)", "Spectrogram / overlay (A)  leave (Shift+A)");
+    public static string TooltipLoudnessView => Get("ラウドネス (V)  解除 (Shift+V)", "Loudness (V)  leave (Shift+V)");
+    public static string TooltipCenterPlayhead => Get("中央寄せ / センターロック (Z)", "Center / center-lock (Z)");
+    public static string TooltipHistory => Get("編集履歴 (U)", "Edit history (U)");
+    public static string TooltipUiThemeToggle => Get("ダーク / ライト", "Dark / Light");
+
+    public static string TipJumpToTime => Get("時間へ移動 (G)", "Focus time (G)");
+    public static string TipPreviousPage => Get("表示の約 5% 戻る (PageUp)", "Back about 5% of the view (PageUp)");
+    public static string TipNextPage => Get("表示の約 5% 進む (PageDown)", "Forward about 5% of the view (PageDown)");
+    public static string TipPreviousMarker => Get("前のマーカー (Ctrl+←)", "Previous marker (Ctrl+←)");
+    public static string TipNextMarker => Get("次のマーカー (Ctrl+→)", "Next marker (Ctrl+→)");
+    public static string TipWaveformHeight => Get(
+        "波形の高さ (H)\n1× → 2× → 3× と循環",
+        "Waveform height (H)\nCycles 1× → 2× → 3×");
+    public static string TipUndo => Get("元に戻す (Ctrl+Z)", "Undo (Ctrl+Z)");
+    public static string TipRedo => Get("やり直し (Ctrl+Y)", "Redo (Ctrl+Y)");
+    public static string TipFadeAround => Get(
+        "再生位置でフェード (X)\n表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）",
+        "Fade around playhead (X)\nLinear fade in the view around the playhead (before = out / after = in)");
+    public static string TipReverse => Get("リバース (R)\n選択範囲を時間方向に反転。未選択なら全体", "Reverse (R)\nReverse the selection in time. Uses the whole file if nothing is selected");
+    public static string TipAddMarker => Get("マーカーを追加 (M / Ins)\n選択中は両端。同じ範囲で繰り返すと分割", "Add marker (M / Ins)\nPlaces both ends of a selection; repeat to split");
+    public static string TipSetLoop => Get("選択をサンプルループに (Shift+L)\n同じ範囲でもう一度で解除", "Set selection as sample loop (Shift+L)\nSame range again clears it");
+    public static string TipSetRegion => Get("選択をリージョンに (Shift+R)\n同じ範囲で繰り返すと分割", "Set selection as region (Shift+R)\nRepeat on the same range to split");
+    public static string TipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)", "Save As (Ctrl+Shift+S)");
+    public static string TipAnalysisView => Get(
+        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Shift+A。ボタンは 3 回で波形に戻る",
+        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Shift+A returns to the waveform. The button returns to the waveform on the third click");
+    public static string TipSpectrogramView => Get(
+        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Shift+A。ボタンは 3 回で波形に戻る",
+        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Shift+A returns to the waveform. The button returns to the waveform on the third click");
+    public static string TipLoudnessView => Get(
+        "ラウドネス表示 (V)\nV で曲線と音量入力を開く。抜けるのは Shift+V。ボタンは表示のオン／オフ",
+        "Loudness view (V)\nV shows the curve and opens volume input. Shift+V returns to the waveform. The button toggles the view only");
+    public static string TipCenterPlayhead => Get(
+        "中央寄せ (Z / .)\n再生中はセンターロックの切替",
+        "Center (Z / .)\nToggles center-lock while playing");
+    public static string TipUiThemeToggle => Get(
+        "ダークとライトを切り替えます。設定の配色は明示的な Dark / Light になります（Auto は外れます）。",
+        "Switch Dark and Light. Settings theme becomes an explicit Dark / Light (Auto is cleared).");
 
     public static string LabelWaveformLane(int number) =>
         Get($"Ch{number}", $"Ch{number}");
@@ -477,8 +551,8 @@ internal static partial class UiStrings
         "各スピーカーをどのポートへ出し、どの Ch から読むか。Ch は録音と共通。2ch 再生でポート未設定なら、スピーカー分をダウンミックス。",
         "Which port each speaker uses, and which file channel (Ch) it reads. Ch is shared with record. Stereo playback with no port map still downmixes the speakers.");
     public static string TipPlay => Get(
-        "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止\nCtrl+ドラッグでスクラブ（全chを L/R に畳む。メーターも L/R だけ）\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し",
-        "Play / stop (Space)\nStop returns to the start position\nEnter pauses in place\nCtrl+drag to scrub (every channel downmixed to L/R; the meter moves on L/R only)\nCtrl+Space from 3 seconds earlier\nAlt+Enter restarts from the playback start");
+        "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し",
+        "Play / stop (Space)\nStop returns to the start position\nEnter pauses in place\nCtrl+Space from 3 seconds earlier\nAlt+Enter restarts from the playback start");
     public static string TipStop => Get("停止（開始位置へ戻る）", "Stop (return to start)");
     public static string TipGoToStart => Get("先頭 (Ctrl+Home)", "Go to start (Ctrl+Home)");
     public static string TipGoToEnd => Get("末尾 (Ctrl+End)", "Go to end (Ctrl+End)");
@@ -531,8 +605,8 @@ internal static partial class UiStrings
         "ノーマライズ (N)\nピークを -0.1 dB に合わせる",
         "Normalize (N)\nFit the peak to -0.1 dB");
     public static string TipVolume => Get(
-        "音量 (V)\n↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。Space で試聴、Enter で実行。未選択なら全体。波形全体の Integrated LKFS / RMS / Peak の変化を先に表示。ラウドネス表示中は曲線も同じ dB で追従。",
-        "Volume (V)\n↑↓ / wheel by 0.1 dB (Shift 1 / Ctrl 3 / Ctrl+Shift 6). Space previews, Enter applies. Uses the whole file if nothing is selected. Shows how whole-file Integrated LKFS / RMS / Peak will change. In loudness view the curve follows the same dB.");
+        "音量 (V)\nラウドネス曲線を表示して dB を入力。↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。数字キーで直接入力。Space で試聴、Enter で実行。未選択なら全体。波形全体の Integrated LKFS / RMS / Peak の変化を先に表示。曲線も同じ dB で追従。Shift+V で曲線を閉じる。",
+        "Volume (V)\nShows the loudness curve and accepts a dB value. ↑↓ / wheel by 0.1 dB (Shift 1 / Ctrl 3 / Ctrl+Shift 6). Type digits to enter a value. Space previews, Enter applies. Uses the whole file if nothing is selected. Shows how whole-file Integrated LKFS / RMS / Peak will change. The curve follows the same dB. Shift+V closes the curve.");
     public static string TipPitch => Get(
         "ピッチ (P)\n↑↓／ホイールで半音（Shift または Ctrl で1オクターブ）。Space で試聴、Enter で実行。未選択なら全体。±2オクターブ。長さを保つ（既定オン。Tab でチェックへ）。オフは長さも変わる。長さだけなら T。",
         "Pitch (P)\n↑↓ / wheel by a semitone (Shift or Ctrl for an octave). Space previews, Enter applies. Uses the whole file if nothing is selected. Range is ±2 octaves. Keep length (on by default. Tab moves to the checkbox). Off also changes length. T stretches time only.");
@@ -574,6 +648,9 @@ internal static partial class UiStrings
     public static string TipUiLanguage => Get(
         "表示言語。Auto は OS が日本語なら Japanese、それ以外は English。",
         "UI language. Auto is Japanese if the OS is Japanese, otherwise English.");
+    public static string TipUiTheme => Get(
+        "配色。Auto は OS のアプリ配色に従います。背景と文字だけ変わり、再生ヘッドやマーカーなどのアクセント色は維持します。",
+        "Theme. Auto follows the OS app theme. Only backgrounds and text change; accent colors such as the playhead and markers stay the same.");
     public static string TipFileAssociations => Get(
         "チェックすると、その拡張子をこのアプリで開く（既定）。外すと関連付けを外す。すでにこのアプリが既定ならチェック済み。OK を待たず、今の exe へすぐ書き込みます。",
         "Check to make this app the default for that extension. Uncheck to remove the association. Types already using this app are checked. Writes to this exe immediately, without waiting for OK.");
@@ -595,18 +672,39 @@ internal static partial class UiStrings
     public static string TipLevelMeter => Get(
         "再生出力の Peak / RMS。内側 2 本が Peak（上の赤ランプがクリップ）、外側 2 本が RMS。どちらもホールド線が付きます。下の数値は Peak 行／RMS 行。3ch 以上はチャンネルごとの Peak バーに、Peak ホールドと緩やかな RMS ホールドを載せます。バーの色は波形左端のチャンネル名の四角と同じ登場順（Atmos 9.1.6 の 16 色）。2ch 以下はシアングラデです。メーターにチャンネル名は出しません。左端をドラッグすると列を広げられます（既定が最小。バーが最大の太さになるところで止まります。次の起動まで覚えます）。",
         "Playback Peak / RMS. Inner two bars are Peak (red lamps clip), outer two are RMS. Both have hold lines. Numbers below are Peak then RMS. Three or more channels show one Peak bar per channel, with Peak hold and a slower RMS hold. Bar colors match the colored squares on the waveform channel names (16 colors for Atmos 9.1.6). Stereo and mono use the cyan gradient. The meter does not show channel names. Drag the left edge to widen the column (the default is the minimum; it stops when the bars reach full thickness; the width is remembered).");
+    public static string TipSpectrogramBoost => Get(
+        "小さい音を目立たせます。つまみを上へ動かすほど暗い成分が明るくなります（既定は下端でオフ）。",
+        "Lift quiet energy. Drag the thumb up to brighten darker bins (default is off at the bottom).");
     public static string TipTimeScroll => Get(
-        "表示範囲を左右に動かします。つまみをドラッグ、またはトラックをクリック。",
-        "Pan the view. Drag the thumb, or click the track.");
+        "表示範囲を左右に動かします。つまみ中央をドラッグ、またはトラックをクリック。両端をドラッグすると時間拡縮。",
+        "Pan the view. Drag the thumb, or click the track. Drag either end to zoom time.");
+    public static string TipTimeScrollLeft => Get(
+        "表示を左へ動かします。",
+        "Pan the view left.");
+    public static string TipTimeScrollRight => Get(
+        "表示を右へ動かします。",
+        "Pan the view right.");
+    public static string TipTimeScrollAmpZoomIn => Get(
+        "振幅拡大 (Shift+↑)",
+        "Zoom in amplitude (Shift+↑)");
+    public static string TipTimeScrollAmpZoomOut => Get(
+        "振幅縮小 (Shift+↓)",
+        "Zoom out amplitude (Shift+↓)");
+    public static string TipTimeScrollTimeZoomIn => Get(
+        "時間拡大 (↑)",
+        "Zoom in time (↑)");
+    public static string TipTimeScrollTimeZoomOut => Get(
+        "時間縮小 (↓)",
+        "Zoom out time (↓)");
     public static string TipCopyright => Get(
         "© MIYABI GAME AUDIO INC. MIT License。",
         "© MIYABI GAME AUDIO INC. MIT License.");
     public static string TipEditHistory => Get(
-        "編集履歴 (U)。↑↓ で移動、Enter で確定、Esc でキャンセル。Ctrl+クリック／Shift+↑↓ で選択、Ctrl+C でコピー、別ファイルで Ctrl+V。セーブせず終了しても、戻せる操作は次回起動時に履歴へ戻す。",
-        "Edit history (U). ↑↓ move, Enter apply, Esc cancel. Ctrl+click / Shift+↑↓ select, Ctrl+C copy, Ctrl+V in another file. Replayable edits also come back after a restart without saving.");
+        "編集履歴 (U)。↑↓ で移動、Enter／X／外側クリックで確定、Esc でキャンセル。履歴エリアのクリックでも閉じる。Ctrl+クリック／Shift+↑↓ で選択、Ctrl+C でコピー、別ファイルで Ctrl+V。セーブせず終了しても、戻せる操作は次回起動時に履歴へ戻す。",
+        "Edit history (U). ↑↓ move, Enter / X / click outside apply, Esc cancel. Click the history strip to close. Ctrl+click / Shift+↑↓ select, Ctrl+C copy, Ctrl+V in another file. Replayable edits also come back after a restart without saving.");
     public static string TipHistoryStrip => Get(
-        "編集履歴の一覧（収まる分だけ。古いものは切れる）。クリックで編集履歴 (U)。ここからは選べません。",
-        "Edit-history list (as many as fit; older rows clip). Click to open edit history (U). This strip is display-only.");
+        "編集履歴の一覧（収まる分だけ。古いものは切れる）。クリックで開く／閉じる。ここからは選べません。",
+        "Edit-history list (as many as fit; older rows clip). Click to open or close. This strip is display-only.");
     public static string TipFormatSampleRate => Get(
         "サンプリングレートを変換します (S)。Space で試聴、Enter で確定。1–9 で項目。",
         "Convert sample rate (S). Space previews, Enter applies. 1–9 pick a row.");
@@ -620,14 +718,16 @@ internal static partial class UiStrings
         "任意 Hz。↑↓／ホイールで 1（Shift 10／Ctrl 100／Ctrl+Shift 1000）。Enter で確定。Tab で抜けて 1–9 で項目。範囲 1000–384000。",
         "Custom Hz. ↑↓ / wheel by 1 (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Tab leaves the box so 1–9 pick a row. Range 1000–384000.");
     public static string TipWaveform => Get(
-        "ドラッグで選択　Ctrl+ドラッグでスクラブ（全chを L/R に畳む。メーターも L/R だけ）　Esc または Shiftなし移動で解除　Shift＋移動は選択　Shift+←→ で伸長（点表示時は1サンプル）　Home/End で画面端　Shift+PgUp/PgDn で5%　Ctrl+Shift+Home/End で前後すべて　Ctrl+A またはトリプルクリックで全選択　ダブルクリックで区間（マーカー間）　ガイドはマーカー / ループ端に吸着　左端のチャンネル名をクリックでソロ（同じ名前をもう一度で解除。Ctrl＋クリックで追加。Shift＋クリックでミュート／解除）　Tab でチャンネルをソロ（繰り返すと次へ。Shift+Tab で逆順。最後の次で解除。波形の時間選択は変えない。波形操作はそのチャンネルだけ。ミュートはグレー。再生中でも可）\n"
-        + "ホイール=時間ズーム（再生ヘッド基準）　Shift+ホイール=パン　Ctrl+ホイール=振幅\n"
-        + "←→ シーク（選択中のマーカー / リージョン端 / ループ端は移動。点表示時は1サンプル、Shift で3倍）　Ctrl+←→ 前後のマーカー / リージョン端 / サンプルループ端　テンキーで番号（無ければ表示位置）　Z / . 中央寄せ（再生中はセンターロックの切替、停止で解除）　0-9 表示位置　L で選択（無ければサンプルループ / -L）の末尾3秒前からループ再生　Shift+L で選択をサンプルループに設定（同じ範囲でもう一度で解除）　Shift+R で選択をリージョンに設定（両端にリージョンがあればすぐ2等分。同じ範囲で繰り返すと3等分…と打ち直し。解除は右クリック／Delete）　マーカー / リージョンフラッグ / ループバーを右クリックで削除　S サンプリングレート　B ビット深度　C チャンネル数　M / Ins マーカー（選択中は両端。両端にあればすぐ中央→3等分…と打ち直し。同じ位置には重ならない）　フラッグをクリックで端を選択 / Shift+クリックで範囲 / Ctrl+クリックで追加 / ドラッグまたは ←→ で移動（Shift で3倍） / Delete または Ctrl+Del で削除　Ctrl+Shift+R でリネーム　ダブルクリックでコメント / リージョン名（-A ライム / -L ブルー / -E 赤 / -R グレー）\n"
-        + "マーカー / リージョン端 / ループ端で Alt+←→ は1px（点表示時は1サンプル）、Shift で3倍、Ctrl で手前のマーカーとセット（リージョン / ループは両端）　X で表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）　V で音量（dB。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS / RMS / Peak を先に表示）　P でピッチ（半音。↑↓／ホイール、Shift で1オクターブ。Space 試聴、Enter 実行。±2オクターブ。長さを保つ既定オン）　T でタイムストレッチ（時間と割合を連動。実行中はすりガラス）　Ctrl+X / C / V でカット・コピー・ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）　G で NOW POS　U で編集履歴　A で波形 / スペクトログラム / 重ね表示 / ラウドネス解析（Short Term LKFS。白い幅は ±1 LU、半透明。波形は上半分のピーク dBFS を線で同じ目盛へ。曲線は原色のシアン／橙／赤。LKFS は左目盛。スペクトログラム・重ね・ラウドネスでは -A/-L/-E/-R とループ／リージョンの下塗りなし）　Ctrl+Shift+E で Wwise EXPORT（Wave 単体）　Ctrl+Shift+M で MP3 保存　Ctrl+Shift+Alt+M で全タブを MP3 書き出し　MP3 ではリージョン／ループ不可。マーカーは置けるが MP3 保存では残らない",
-        "Drag to select. Ctrl+drag to scrub (every channel downmixed to L/R; the meter moves on L/R only). Esc or a move without Shift clears the selection. Shift+move extends. Shift+←/→ grows it (1 sample when dots are shown). Home/End jump to the view edge. Shift+PgUp/PgDn by 5%. Ctrl+Shift+Home/End selects all before/after. Ctrl+A or a triple-click selects all. Double-click selects a span (between markers). The guide snaps to markers / loop edges. Click a channel name on the left to solo (click the same name again to clear; Ctrl+click adds; Shift+click mutes / unmutes). Tab solos a channel (again for the next; Shift+Tab goes backward; past the last clears it; the time selection does not change; waveform edits apply only to that channel; muted lanes go gray; works while playing).\n"
+        "クリックで再生位置。ドラッグで選択。Ctrl+ドラッグでスクラブ（全chを L/R に畳む）。\n"
+        + "Esc または Shift なし移動で解除。Shift＋ドラッグ／←→ で伸長。ダブルクリックで区間（マーカー間）。トリプルクリックで全選択。ガイドはマーカー／ループ端に吸着。\n"
+        + "左端のチャンネル名：クリックでソロ（再クリックで解除。Ctrl で追加。Shift でミュート）。Tab／Shift+Tab で順にソロ。\n"
+        + "ホイール＝時間ズーム（再生ヘッド基準）。Shift+ホイール＝パン。Ctrl+ホイール＝振幅。\n"
+        + "フラッグ／ループ端：クリックで選択、ドラッグまたは ←→ で移動。Alt+←→ は微調整。ダブルクリックで名前。右クリックでメニュー。",
+        "Click to set the playhead. Drag to select. Ctrl+drag scrubs (every channel downmixed to L/R).\n"
+        + "Esc or a move without Shift clears the selection. Shift+drag / ←→ extends it. Double-click a span (between markers). Triple-click selects all. The guide snaps to markers / loop edges.\n"
+        + "Channel names on the left: click to solo (again to clear; Ctrl adds; Shift mutes). Tab / Shift+Tab cycle solo.\n"
         + "Wheel = time zoom (around the playhead). Shift+wheel = pan. Ctrl+wheel = amplitude.\n"
-        + "←/→ seek (moves a selected marker / region edge / loop edge; 1 sample when dots are shown, Shift ×3). Ctrl+←/→ previous/next marker / region edge / sample-loop edge. Numpad jumps to a number (or a view position). Z / . centers (toggles center-lock while playing, clears it when stopped). 0–9 jump in the view. L loops from 3 seconds before the end of the selection (or the sample loop / -L). Shift+L sets the selection as the sample loop (same range again clears it). Shift+R sets the selection as a region (if both ends already have a region, split immediately; repeat on the same range to split 3, … ways; right-click / Delete clears). Right-click a marker / region flag / loop bar to delete. S sample rate, B bit depth, C channels, M / Ins marker (selection places both ends, or the center if both ends are already marked; repeat for 3, 4, … equal parts; same frame is rejected). Click a flag to select an edge / Shift+click for a range / Ctrl+click to add / drag or ←/→ to move (Shift ×3) / Delete or Ctrl+Del to delete. Ctrl+Shift+R to rename. Double-click a comment / region name (-A lime / -L blue / -E red / -R gray).\n"
-        + "On a marker / region edge / loop edge, Alt+←/→ is 1 px (1 sample when dots are shown), Shift ×3, Ctrl pairs with the previous marker (both edges for a region / loop). X applies a linear fade around the playhead in the view (before = out / after = in). V opens volume (dB; ↑↓ / wheel, Space preview, Enter apply; shows whole-file LKFS / RMS / Peak first). P opens pitch (semitones; ↑↓ / wheel, Shift for an octave, Space preview, Enter apply; ±2 octaves; keep length on by default). T stretches time (time and ratio stay linked; frosted glass while running). Ctrl+X / C / V cut / copy / paste (markers in range included; a matching region is included too). G focuses NOW POS. U opens edit history. A cycles waveform / spectrogram / overlay / loudness analysis (Short Term LKFS; the white width is a translucent ±1 LU band; the waveform is an upper-half peak dBFS line on the same scale; the curve is primary cyan / orange / red; LKFS numbers sit on the left scale). Spectrogram, overlay, and loudness skip -A/-L/-E/-R, loop, and region fills. Ctrl+Shift+E exports Wave-only to Wwise. Ctrl+Shift+M saves as MP3. Ctrl+Shift+Alt+M exports every tab as MP3. MP3 cannot take regions / loops; markers are allowed but not saved to MP3.");
+        + "Flags / loop edges: click to select, drag or ←→ to move. Alt+←→ nudges. Double-click to name. Right-click for the menu.");
     public static string TipAlwaysOnTop => Get(
         "ウィンドウを常に最前面へ表示します。",
         "Keep the window always on top.");
@@ -655,10 +755,10 @@ internal static partial class UiStrings
     public static string LabelStatusSelWidth => "SEL\nWID";
     public static string LabelStatusSelEnd => "SEL\nEND";
     public static string LabelStatusEndPos => "END\nPOS";
-    public static string MenuShowTime => Get("時間", "Time");
-    public static string MenuShowSamples => Get("サンプル数", "Samples");
-    public static string MenuCopy => Get("コピー", "Copy");
-    public static string MenuPaste => Get("貼り付け", "Paste");
+    public static string MenuShowTime => Get("時間(_T)", "_Time");
+    public static string MenuShowSamples => Get("サンプル数(_S)", "_Samples");
+    public static string MenuCopy => Get("コピー(_C)", "_Copy");
+    public static string MenuPaste => Get("貼り付け(_P)", "_Paste");
     public static string MenuClearSampleLoop => Get("ループを削除", "Clear loop");
     public static string MenuClearRegion => Get("リージョンを削除", "Clear region");
     public static string MenuClearMarker => Get("マーカーを削除", "Clear marker");
@@ -702,9 +802,10 @@ internal static partial class UiStrings
 
     public static string EditHistoryTitle => Get("編集履歴", "Edit history");
     public static string EditHistoryOrigin => Get("初期状態", "Original");
+    public static string OverlayClose => Get("閉じる", "Close");
     public static string EditHistoryHint => Get(
-        "↑↓ 移動　Enter 確定　Esc キャンセル\nCtrl+クリック／Shift+↑↓ 選択　Ctrl+C コピー　Ctrl+V 別ファイルへ適用",
-        "↑↓ move   Enter apply   Esc cancel\nCtrl+click / Shift+↑↓ select   Ctrl+C copy   Ctrl+V apply to file");
+        "↑↓ 移動　Enter／X／外側クリック 確定　Esc キャンセル\nCtrl+クリック／Shift+↑↓ 選択　Ctrl+C コピー　Ctrl+V 別ファイルへ適用",
+        "↑↓ move   Enter / X / click outside apply   Esc cancel\nCtrl+click / Shift+↑↓ select   Ctrl+C copy   Ctrl+V apply to file");
 
     public static string EditHistoryNotCopyable => Get(
         "この操作は別ファイルへ適用できません",

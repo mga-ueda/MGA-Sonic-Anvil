@@ -79,6 +79,7 @@ public partial class MainWindow : Window
     private bool _closing;
     private bool _exitAfterFlush;
     private bool _bindingWorkspace;
+    private TimeScrollBar TimeScroll => TimeScrollStrip.Bar;
 
     public MainWindow()
     {
@@ -91,11 +92,12 @@ public partial class MainWindow : Window
         TipService.BindDisplay(TipsLabel, TipsPanel, TipsScroll);
         TipService.PinChanged += (_, _) => RefreshTipsHeader();
         RefreshTipsHeader();
-        Transport.SetTipsEnabled(AppStorage.Settings.ShowTips);
+        Transport.SetTipsVisible(AppStorage.Settings.ShowTips);
         _outputSettings = AppStorage.Settings.ToAudioOutputSettings();
         _waveformHeightScale = Math.Clamp(AppStorage.Settings.WaveformHeightScale, 1, 3);
         ApplyMeterColumnWidth(AppStorage.Settings.MeterColumnWidth);
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        UiThemeService.Changed += (_, _) => Dispatcher.BeginInvoke(ApplyUiColors);
         AlwaysOnTopCheck.IsChecked = AppStorage.Settings.AlwaysOnTop;
         Topmost = AppStorage.Settings.AlwaysOnTop;
 
@@ -120,9 +122,9 @@ public partial class MainWindow : Window
             Waveform.SetSelection(range);
         };
         StatusTimes.RequestWaveformFocus += (_, _) => Keyboard.Focus(Waveform);
-        Transport.TipsToggleRequested += (_, _) => ToggleTips();
-        Transport.ManualHelpRequested += (_, _) => ManualViewer.Open(this);
         UiStrings.LanguageChanged += (_, _) => Dispatcher.BeginInvoke(RefreshLocalizedText);
+        Waveform.AnalysisViewChanged += (_, _) => Transport.SetAnalysisView(Waveform.AnalysisView);
+        Transport.SetAnalysisView(Waveform.AnalysisView);
         Waveform.CursorCommitted += (_, frame) => OnCursorCommitted(frame);
         Waveform.ScrubStarted += (_, frame) => OnScrubStarted(frame);
         Waveform.ScrubPreviewed += (_, frame) => OnScrubPreviewed(frame);
@@ -141,9 +143,7 @@ public partial class MainWindow : Window
             Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
             Overview.Refresh();
         };
-        Waveform.SampleLoopClearRequested += (_, _) => ClearSampleLoop();
-        Waveform.RegionClearRequested += (_, region) => ClearRegion(region);
-        Waveform.MarkerClearRequested += (_, frames) => ClearMarkers(frames);
+        Waveform.ContextMenuRequested += (_, hit) => OpenWaveformContextMenu(hit);
         Waveform.SelectionChanged += (_, _) => OnWaveformSelectionChanged();
         Waveform.ChannelLabelClicked += (_, e) => ToggleChannelSolo(e.Channel, e.Add, e.Mute);
         Waveform.ViewChanged += (_, _) => SyncViewChrome();
@@ -156,12 +156,39 @@ public partial class MainWindow : Window
         Overview.DragEnded += (_, _) => EndOverviewScrub();
         TimeScroll.ValueChanged += (_, _) =>
         {
-            if (_syncingScroll || Waveform.CenterLocked)
+            if (_syncingScroll || TimeScroll.IsRangeResizing || Waveform.CenterLocked)
             {
                 return;
             }
 
             Waveform.SetViewStartExternal(TimeScroll.Value);
+        };
+        TimeScroll.RangeChanged += (_, range) =>
+        {
+            Waveform.UnlockCenter();
+            Waveform.SetVisibleRange(range.ViewStart, range.ViewSpan);
+        };
+        TimeScrollStrip.AmpZoomIn += (_, _) => Waveform.ZoomAmpIn();
+        TimeScrollStrip.AmpZoomOut += (_, _) => Waveform.ZoomAmpOut();
+        TimeScrollStrip.TimeZoomIn += (_, _) =>
+        {
+            Waveform.UnlockCenter();
+            Waveform.ZoomTimeIn(anchorPlayhead: false);
+        };
+        TimeScrollStrip.TimeZoomOut += (_, _) =>
+        {
+            Waveform.UnlockCenter();
+            Waveform.ZoomTimeOut(anchorPlayhead: false);
+        };
+        TimeScrollStrip.ScrollLeft += (_, _) =>
+        {
+            Waveform.UnlockCenter();
+            Waveform.PanByVisibleFraction(-TimeScrollRange.ScrollStepFraction);
+        };
+        TimeScrollStrip.ScrollRight += (_, _) =>
+        {
+            Waveform.UnlockCenter();
+            Waveform.PanByVisibleFraction(TimeScrollRange.ScrollStepFraction);
         };
 
         _player.PlaybackEnded += (_, generation) => Dispatcher.BeginInvoke(() => OnPlaybackEnded(generation));
@@ -173,6 +200,7 @@ public partial class MainWindow : Window
         Spectrum.Player = _player;
         LoudnessMeter.Player = _player;
         Waveform.LoudnessTargetLufs = AppStorage.Settings.ResolvedLoudnessTargetLufs();
+        Overview.SeekTrailSource = Waveform;
         VectorScope.Player = _player;
 
         // 優先度は Input が唯一安全：Render だと追従描画が入力を飢餓させ操作不能になり
@@ -202,9 +230,11 @@ public partial class MainWindow : Window
         {
             StopMarkerNudge();
             StopPlaceRepeat();
+            CloseEditHistory(commit: true);
         };
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         PreviewKeyUp += MainWindow_PreviewKeyUp;
+        PreviewMouseDown += MainWindow_PreviewMouseDown;
         PreviewMouseWheel += MainWindow_PreviewMouseWheel;
         Drop += MainWindow_Drop;
         DragOver += MainWindow_DragOver;
@@ -379,7 +409,7 @@ public partial class MainWindow : Window
         AppStorage.Settings.ShowTips = enabled;
         AppStorage.Save();
         TipService.Enabled = enabled;
-        Transport.SetTipsEnabled(enabled);
+        Transport.SetTipsVisible(enabled);
         Waveform.Focus();
     }
 
@@ -401,8 +431,6 @@ public partial class MainWindow : Window
         RefreshTipsHeader();
         TipService.Set(GitHubLink, UiStrings.TipGitHub);
         TipService.Set(CopyrightText, UiStrings.TipCopyright);
-        TipService.Set(SettingsGear, UiStrings.TipAudioSettings);
-        SettingsGear.SetValue(System.Windows.Automation.AutomationProperties.NameProperty, UiStrings.AccessibleAudioSettingsButton);
         AlwaysOnTopCheck.Content = UiStrings.LabelAlwaysOnTop;
         TipService.Set(AlwaysOnTopCheck, UiStrings.TipAlwaysOnTop);
         StatusTimes.ApplyLocalizedText();
@@ -413,7 +441,7 @@ public partial class MainWindow : Window
         TipService.Set(HistoryStrip, UiStrings.TipHistoryStrip);
         TipService.Set(LoudnessMeter, UiStrings.TipLoudness);
         TipService.Set(LevelMeter, UiStrings.TipLevelMeter);
-        TipService.Set(TimeScroll, UiStrings.TipTimeScroll);
+        TimeScrollStrip.ApplyLocalizedTips();
         TipService.Set(DocumentTabHost, UiStrings.TipOpen);
         TipService.Set(DocumentTabScroll, UiStrings.TipOpen);
         TipService.Set(DocumentTabs, UiStrings.TipOpen);
@@ -458,7 +486,7 @@ public partial class MainWindow : Window
 
     private void RefreshTitle()
     {
-        Title = AppVersion.FormTitle;
+        Title = AppVersion.FormTitleWithFile(_document?.SourcePath);
         RefreshTabHeaders();
     }
 
@@ -473,9 +501,12 @@ public partial class MainWindow : Window
         try
         {
             var frames = _document?.FrameCount ?? 0;
-            _syncingScroll = true;
-            TimeScroll.Sync(Waveform.ViewStart, Waveform.ViewSpanFrames, frames);
-            _syncingScroll = false;
+            if (!TimeScroll.IsRangeResizing)
+            {
+                _syncingScroll = true;
+                TimeScroll.Sync(Waveform.ViewStart, Waveform.ViewSpanFrames, frames);
+                _syncingScroll = false;
+            }
             Overview.SetView(Waveform.ViewStart, Waveform.ViewSpanFrames);
             if (!_playTimer.IsEnabled)
             {
