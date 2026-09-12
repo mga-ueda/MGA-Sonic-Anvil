@@ -209,6 +209,11 @@ public sealed class LevelMeterEngineTests
         Assert.Equal(6, snap.Channels.Length);
         Assert.Equal(LevelMeterEngine.ToDb(1), snap.Channels[2].InstPeakDb, 6);
         Assert.True(snap.Clips[2]);
+        Assert.Equal(snap.Channels[2].PeakHeldDb, snap.LoudestPeakHeldDb, 6);
+        Assert.Equal(
+            snap.Channels.Max(channel => channel.RmsHeldDb),
+            snap.LoudestRmsHeldDb,
+            6);
     }
 
     [Fact]

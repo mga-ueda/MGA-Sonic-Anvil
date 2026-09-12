@@ -51,6 +51,12 @@ internal sealed class ProjectSpectrumView : FrameworkElement
 
     public void StopTicks() => _timer.Stop();
 
+    public void RefreshAppearance()
+    {
+        _barGradient = null;
+        InvalidateVisual();
+    }
+
     protected override Size MeasureOverride(Size availableSize)
     {
         var height = DesignMetrics.SpectrumHeight;
@@ -152,7 +158,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
             }
 
             var iPk = Math.Clamp((int)Math.Floor(pkDb) - cells.LoInt, 0, cells.Count - 1);
-            var color = LevelMeterEngine.LevelColor(pkDb);
+            var color = LevelColorTheme.PeakHold(pkDb);
             var peak = DipRect(
                 rects[b].X1,
                 cells.Top[iPk],
@@ -375,11 +381,11 @@ internal sealed class ProjectSpectrumView : FrameworkElement
             return;
         }
 
-        // プロットは dB 直線。色はレベルメーターと同じ DbToNorm（-20 dB ニー）で取る。
+        // プロットは dB 直線。色も同じ軸で一本につなぐ。
         var stops = new GradientStopCollection();
-        for (var db = SpectrumAnalyzer.FloorDb; db <= SpectrumAnalyzer.CeilingDb + 1e-4f; db += 5f)
+        for (var db = SpectrumAnalyzer.FloorDb; db <= SpectrumAnalyzer.CeilingDb + 1e-4f; db += LevelColorTheme.GradientStepDb)
         {
-            var c = LevelMeterEngine.LevelColor(db);
+            var c = LevelColorTheme.Of(db);
             stops.Add(new GradientStop(Color.FromRgb(c.R, c.G, c.B), SpectrumAnalyzer.DbNorm(db)));
         }
 

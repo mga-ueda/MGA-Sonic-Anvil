@@ -19,6 +19,14 @@ public sealed class LevelMeterRenderTests
     private static readonly Color TransportBack = Color.FromRgb(0x1B, 0x1D, 0x24);
 
     [Fact]
+    public void SurroundTrack_LeavesStereoReadoutGap()
+    {
+        var bounds = new Rect(0, 0, DesignMetrics.LevelMeterWidth, 400);
+        Assert.Equal(24, LevelMeterView.TrackBottomGap);
+        Assert.Equal(bounds.Height - 4 - LevelMeterView.TrackBottomGap, LevelMeterView.TrackHeight(bounds));
+    }
+
+    [Fact]
     public void SurroundMeter_KeepsInkInsideRightEdge()
     {
         RunSta(() =>
@@ -82,6 +90,13 @@ public sealed class LevelMeterRenderTests
         // LevelMeterView が参照するキーだけを用意する（テーマ全体は読まない）。
         Application.Current!.Resources["TransportBackBrush"] = new SolidColorBrush(TransportBack);
         Application.Current.Resources["MutedForeBrush"] = new SolidColorBrush(Color.FromRgb(0x9A, 0xA3, 0xAD));
+        Application.Current.Resources["DbScaleForeBrush"] = new SolidColorBrush(Color.FromRgb(0x96, 0x96, 0x96));
+        Application.Current.Resources["LevelMeterTrackBackBrush"] = new SolidColorBrush(Color.FromRgb(0x24, 0x26, 0x29));
+        Application.Current.Resources["LevelMeterTrackBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x1A, 0x22, 0x1A));
+        Application.Current.Resources["LevelMeterHoldBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x1A, 0x22, 0x1A));
+        Application.Current.Resources["LevelMeterTickBrush"] = new SolidColorBrush(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF));
+        Application.Current.Resources["LevelMeterClipOffBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x08, 0x08));
+        Application.Current.Resources["LevelMeterClipOffBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x3A, 0x15, 0x15));
     }
 
     private static void SavePng(BitmapSource bitmap, string fileName)

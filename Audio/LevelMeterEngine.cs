@@ -143,20 +143,23 @@ internal sealed class LevelMeterEngine
     public static double ToDb(double linear) =>
         20d * Math.Log10(Math.Max(linear, 1e-8));
 
-    public static double DbToNorm(double db)
+    public static double DbToNorm(double db) => DbToNorm(db, KneeDb);
+
+    public static double DbToNorm(double db, double kneeDb)
     {
         if (!double.IsFinite(db))
         {
             return 0;
         }
 
+        var knee = Math.Clamp(kneeDb, DbMin + 1e-9, DbMax - 1e-9);
         var c = Math.Clamp(db, DbMin, DbMax);
-        if (c >= KneeDb)
+        if (c >= knee)
         {
-            return KneeNorm + (c - KneeDb) / (DbMax - KneeDb) * (1 - KneeNorm);
+            return KneeNorm + (c - knee) / (DbMax - knee) * (1 - KneeNorm);
         }
 
-        var u = (c - DbMin) / (KneeDb - DbMin);
+        var u = (c - DbMin) / (knee - DbMin);
         return KneeNorm * Math.Pow(Math.Max(0, u), BelowKneeGamma);
     }
 
@@ -175,9 +178,11 @@ internal sealed class LevelMeterEngine
     public static IReadOnlyList<double> ScaleLabels { get; } =
         [0, -5, -10, -15, -20, -25, -30, -35, -40, -45, -50, -60];
 
-    public static ColorRgb LevelColor(double db)
+    public static ColorRgb LevelColor(double db) => LevelColorFromNorm(DbToNorm(db));
+
+    public static ColorRgb LevelColorFromNorm(double t)
     {
-        var t = Math.Clamp(DbToNorm(db), 0, 1);
+        t = Math.Clamp(t, 0, 1);
         ReadOnlySpan<(double P, byte R, byte G, byte B)> stops =
         [
             (0, 16, 62, 86),
@@ -355,6 +360,25 @@ internal readonly record struct LevelMeterSnapshot(
     public ChannelMeter Right => Channels.Length > 1 ? Channels[1] : Left;
     public bool ClipLeft => Clips.Length > 0 && Clips[0];
     public bool ClipRight => Clips.Length > 1 && Clips[1];
+
+    public double LoudestPeakHeldDb => LoudestHeld(peak: true);
+
+    public double LoudestRmsHeldDb => LoudestHeld(peak: false);
+
+    private double LoudestHeld(bool peak)
+    {
+        var max = LevelMeterEngine.DbMin;
+        foreach (var channel in Channels)
+        {
+            var db = peak ? channel.PeakHeldDb : channel.RmsHeldDb;
+            if (db > max)
+            {
+                max = db;
+            }
+        }
+
+        return max;
+    }
 
     public static LevelMeterSnapshot Idle { get; } = IdleFor(2);
 
