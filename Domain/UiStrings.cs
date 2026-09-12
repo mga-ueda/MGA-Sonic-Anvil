@@ -494,11 +494,11 @@ internal static partial class UiStrings
     public static string TipSetRegion => Get("選択をリージョンに (Shift+R)\n同じ範囲で繰り返すと分割", "Set selection as region (Shift+R)\nRepeat on the same range to split");
     public static string TipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)", "Save As (Ctrl+Shift+S)");
     public static string TipAnalysisView => Get(
-        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Shift+A。ボタンは 3 回で波形に戻る",
-        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Shift+A returns to the waveform. The button returns to the waveform on the third click");
+        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Shift+A。ボタンは 3 回で波形に戻る。暗部持ち上げは左端のバーまたは Alt+↑／↓",
+        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Shift+A returns to the waveform. The button returns to the waveform on the third click. Lift dark energy with the left bar or Alt+↑ / ↓");
     public static string TipSpectrogramView => Get(
-        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Shift+A。ボタンは 3 回で波形に戻る",
-        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Shift+A returns to the waveform. The button returns to the waveform on the third click");
+        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Shift+A。ボタンは 3 回で波形に戻る。暗部持ち上げは左端のバーまたは Alt+↑／↓",
+        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Shift+A returns to the waveform. The button returns to the waveform on the third click. Lift dark energy with the left bar or Alt+↑ / ↓");
     public static string TipLoudnessView => Get(
         "ラウドネス表示 (V)\nV で曲線と音量入力を開く。抜けるのは Shift+V。ボタンは表示のオン／オフ",
         "Loudness view (V)\nV shows the curve and opens volume input. Shift+V returns to the waveform. The button toggles the view only");
@@ -673,8 +673,8 @@ internal static partial class UiStrings
         "再生出力の Peak / RMS。内側 2 本が Peak（上の赤ランプがクリップ）、外側 2 本が RMS。どちらもホールド線が付きます。下の数値は Peak 行／RMS 行。3ch 以上はチャンネルごとの Peak バーに、Peak ホールドと緩やかな RMS ホールドを載せます。バーの色は波形左端のチャンネル名の四角と同じ登場順（Atmos 9.1.6 の 16 色）。2ch 以下はシアングラデです。メーターにチャンネル名は出しません。左端をドラッグすると列を広げられます（既定が最小。バーが最大の太さになるところで止まります。次の起動まで覚えます）。",
         "Playback Peak / RMS. Inner two bars are Peak (red lamps clip), outer two are RMS. Both have hold lines. Numbers below are Peak then RMS. Three or more channels show one Peak bar per channel, with Peak hold and a slower RMS hold. Bar colors match the colored squares on the waveform channel names (16 colors for Atmos 9.1.6). Stereo and mono use the cyan gradient. The meter does not show channel names. Drag the left edge to widen the column (the default is the minimum; it stops when the bars reach full thickness; the width is remembered).");
     public static string TipSpectrogramBoost => Get(
-        "小さい音を目立たせます。つまみを上へ動かすほど暗い成分が明るくなります（既定は下端でオフ）。",
-        "Lift quiet energy. Drag the thumb up to brighten darker bins (default is off at the bottom).");
+        "小さい音を目立たせます。つまみを上へ動かすほど暗い成分が明るくなります（既定は下端でオフ）。スペクトログラム／重ねでは Alt+↑／↓（押しっぱなしで連続）。",
+        "Lift quiet energy. Drag the thumb up to brighten darker bins (default is off at the bottom). In spectrogram / overlay, Alt+↑ / ↓ (hold to repeat).");
     public static string TipTimeScroll => Get(
         "表示範囲を左右に動かします。つまみ中央をドラッグ、またはトラックをクリック。両端をドラッグすると時間拡縮。",
         "Pan the view. Drag the thumb, or click the track. Drag either end to zoom time.");

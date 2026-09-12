@@ -726,6 +726,17 @@ internal sealed class WaveformView : Grid
         AnalysisViewChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public bool NudgeSpectrogramBoost(int direction)
+    {
+        if (!SpectrogramVisible || direction == 0)
+        {
+            return false;
+        }
+
+        _boostBar.Nudge(direction);
+        return true;
+    }
+
     private void OnSpectrogramBoostChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         _spectrogram.DisplayBoostDb = SpectrogramEngine.DisplayBoostDbFromUnit(_boostBar.BoostUnit);

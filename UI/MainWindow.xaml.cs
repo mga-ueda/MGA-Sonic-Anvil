@@ -33,8 +33,11 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _markerDigitTimer;
     private readonly DispatcherTimer _markerNudgeTimer;
     private readonly DispatcherTimer _placeRepeatTimer;
+    private readonly DispatcherTimer _boostNudgeTimer;
     private PlaceRepeatKind _placeRepeatKind;
     private bool _placeRepeatStarted;
+    private int _boostNudgeDirection;
+    private bool _boostRepeatStarted;
     private bool _placeSessionOpen;
     private MarkerSnapshot[] _placeMarkersBefore = [];
     private WaveRegion[] _placeRegionsBefore = [];
@@ -225,11 +228,14 @@ public partial class MainWindow : Window
         _markerNudgeTimer.Tick += (_, _) => OnMarkerNudgeTick();
         _placeRepeatTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs) };
         _placeRepeatTimer.Tick += (_, _) => OnPlaceRepeatTick();
+        _boostNudgeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs) };
+        _boostNudgeTimer.Tick += (_, _) => OnSpectrogramBoostNudgeTick();
 
         Deactivated += (_, _) =>
         {
             StopMarkerNudge();
             StopPlaceRepeat();
+            StopSpectrogramBoostNudge();
             CloseEditHistory(commit: true);
         };
         PreviewKeyDown += MainWindow_PreviewKeyDown;
@@ -249,6 +255,7 @@ public partial class MainWindow : Window
             _waapiPollTimer.Stop();
             StopMarkerNudge();
             StopPlaceRepeat();
+            StopSpectrogramBoostNudge();
             ResetMarkerDigitEntry();
             // Closing で既に破棄済みでも安全（冪等）。
             Waveform.DisposeSpectrogram();
@@ -360,6 +367,7 @@ public partial class MainWindow : Window
             CloseEditHistory(commit: true);
             _resumeAfterScrub = false;
             StopMarkerNudge();
+            StopSpectrogramBoostNudge();
             ResetMarkerDigitEntry();
             StopMeterRendering();
             Waveform.UnlockCenter();
@@ -693,6 +701,7 @@ public partial class MainWindow : Window
         Spectrum.StopTicks();
         _playTimer.Stop();
         StopMarkerNudge();
+        StopSpectrogramBoostNudge();
         _ = FinishExitAfterFlushAsync();
     }
 

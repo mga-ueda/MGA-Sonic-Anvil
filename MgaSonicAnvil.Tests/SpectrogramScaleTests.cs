@@ -31,4 +31,16 @@ public sealed class SpectrogramScaleTests
         Assert.Equal(Color.FromRgb(0x9C, 0x2E, 0x00), SpectrogramBoostBar.TrackOrange);
         Assert.Equal(Colors.White, SpectrogramBoostBar.TrackWhite);
     }
+
+    [Fact]
+    public void BoostBar_NudgeUnit_StepsAndClamps()
+    {
+        Assert.Equal(0.05, SpectrogramBoostBar.UnitStep);
+        Assert.Equal(0.05, SpectrogramBoostBar.NudgeUnit(0, 1), 5);
+        Assert.Equal(0, SpectrogramBoostBar.NudgeUnit(0, -1), 5);
+        Assert.Equal(1, SpectrogramBoostBar.NudgeUnit(1, 1), 5);
+        Assert.Equal(0.95, SpectrogramBoostBar.NudgeUnit(1, -1), 5);
+        Assert.Equal(0.5, SpectrogramBoostBar.NudgeUnit(0.5, 0), 5);
+        Assert.Equal(SpectrogramBoostBar.NudgeUnit(0, 1), SpectrogramBoostBar.NudgeUnit(0, 2), 5);
+    }
 }

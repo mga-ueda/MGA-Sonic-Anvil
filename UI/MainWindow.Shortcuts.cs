@@ -31,9 +31,30 @@ public partial class MainWindow
             return;
         }
 
-        if (_markerNudgeDirection != 0 && key is Key.LeftAlt or Key.RightAlt)
+        if (key is Key.Up or Key.Down)
         {
-            StopMarkerNudge();
+            if (_boostNudgeDirection != 0
+                && (key == Key.Up && _boostNudgeDirection > 0
+                    || key == Key.Down && _boostNudgeDirection < 0
+                    || (Keyboard.Modifiers & ModifierKeys.Alt) == 0))
+            {
+                StopSpectrogramBoostNudge();
+            }
+
+            return;
+        }
+
+        if (key is Key.LeftAlt or Key.RightAlt)
+        {
+            if (_markerNudgeDirection != 0)
+            {
+                StopMarkerNudge();
+            }
+
+            if (_boostNudgeDirection != 0)
+            {
+                StopSpectrogramBoostNudge();
+            }
         }
 
         if (_placeRepeatKind != PlaceRepeatKind.None && !IsPlaceHeld(_placeRepeatKind))
@@ -644,6 +665,11 @@ public partial class MainWindow
             return NudgePlayheadOrSelection(1);
         }
 
+        if (key is Key.Up or Key.Down && modifiers == ModifierKeys.Alt)
+        {
+            return BeginOrContinueSpectrogramBoostNudge(key == Key.Up ? 1 : -1);
+        }
+
         if (key == Key.Up && modifiers == ModifierKeys.Shift)
         {
             Waveform.ZoomAmpIn();
@@ -728,6 +754,7 @@ public partial class MainWindow
 
         StopMarkerNudge();
         StopPlaceRepeat();
+        StopSpectrogramBoostNudge();
         if (StatusTimes.IsEditing)
         {
             StatusTimes.CancelEdit();

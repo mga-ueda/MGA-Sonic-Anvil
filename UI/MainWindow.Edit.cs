@@ -1677,6 +1677,70 @@ public partial class MainWindow
         _placeRepeatTimer.Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs);
     }
 
+    private bool BeginOrContinueSpectrogramBoostNudge(int direction)
+    {
+        if (!Waveform.SpectrogramVisible || direction == 0)
+        {
+            return false;
+        }
+
+        if (_boostNudgeDirection == direction && _boostNudgeTimer.IsEnabled)
+        {
+            return true;
+        }
+
+        if (!Waveform.NudgeSpectrogramBoost(direction))
+        {
+            return false;
+        }
+
+        _boostNudgeDirection = direction;
+        _boostRepeatStarted = false;
+        _boostNudgeTimer.Stop();
+        _boostNudgeTimer.Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs);
+        _boostNudgeTimer.Start();
+        return true;
+    }
+
+    private void OnSpectrogramBoostNudgeTick()
+    {
+        if (_boostNudgeDirection == 0 || !IsSpectrogramBoostHeld(_boostNudgeDirection))
+        {
+            StopSpectrogramBoostNudge();
+            return;
+        }
+
+        Waveform.NudgeSpectrogramBoost(_boostNudgeDirection);
+        if (_boostRepeatStarted)
+        {
+            return;
+        }
+
+        _boostRepeatStarted = true;
+        _boostNudgeTimer.Stop();
+        _boostNudgeTimer.Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatIntervalMs);
+        _boostNudgeTimer.Start();
+    }
+
+    private bool IsSpectrogramBoostHeld(int direction)
+    {
+        if (IsUiBusy || !Waveform.SpectrogramVisible)
+        {
+            return false;
+        }
+
+        var keyDown = direction > 0 ? Keyboard.IsKeyDown(Key.Up) : Keyboard.IsKeyDown(Key.Down);
+        return keyDown && Keyboard.Modifiers == ModifierKeys.Alt;
+    }
+
+    private void StopSpectrogramBoostNudge()
+    {
+        _boostNudgeDirection = 0;
+        _boostRepeatStarted = false;
+        _boostNudgeTimer.Stop();
+        _boostNudgeTimer.Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs);
+    }
+
     private void BeginPlaceSession()
     {
         if (_placeSessionOpen || _document is null)
