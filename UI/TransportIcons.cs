@@ -211,7 +211,17 @@ internal sealed class TransportIconButton : Button
         }
 
         var backKey = QuietChrome ? "ProjectBarBackBrush" : "TransportBackBrush";
-        TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed, backKey);
+        TransportChrome.Paint(
+            dc,
+            bounds,
+            IsEnabled,
+            IsMouseOver,
+            IsPressed,
+            backKey,
+            fillSlot: !QuietChrome,
+            hoverBounds: QuietChrome && Icon == TransportIcon.Folder
+                ? TransportIconDrawing.FolderHoverBounds(bounds)
+                : null);
         var fore = IconForeOverride ?? TransportChrome.Fore(IsEnabled);
         if (Icon == TransportIcon.WaveformHeight)
         {
@@ -359,8 +369,8 @@ internal static class TransportIconDrawing
         _ = theme;
         Brush? fill = null;
         var stroke = pen;
-        const double cx = 17d;
-        const double cy = 18d;
+        var cx = designW * 0.5;
+        var cy = designH * 0.5;
 
         switch (icon)
         {
@@ -431,7 +441,7 @@ internal static class TransportIconDrawing
                 DrawZoomModifier(dc, pen, brush, icon, cx, cy);
                 break;
             case TransportIcon.Folder:
-                DrawFolder(dc, pen);
+                DrawFolder(dc, pen, cx, cy);
                 break;
             case TransportIcon.Settings:
                 DrawGear(dc, pen, cx, cy);
@@ -605,9 +615,31 @@ internal static class TransportIconDrawing
         dc.DrawGeometry(null, pen, geo);
     }
 
-    private static void DrawFolder(DrawingContext dc, Pen pen)
+    private static readonly Rect FolderDesign = new(6, 9, 22, 18);
+
+    internal static Rect FolderHoverBounds(Rect bounds)
+    {
+        const double chromePad = 3d;
+        const double strokePad = 1d;
+        var innerW = Math.Max(1, bounds.Width - chromePad * 2);
+        var innerH = Math.Max(1, bounds.Height - chromePad * 2);
+        var scale = Math.Min(innerW / FolderDesign.Width, innerH / FolderDesign.Height);
+        var w = FolderDesign.Width * scale + strokePad * 2;
+        var h = FolderDesign.Height * scale + strokePad * 2;
+        return new Rect(
+            bounds.X + (bounds.Width - w) * 0.5,
+            bounds.Y + (bounds.Height - h) * 0.5,
+            w,
+            h);
+    }
+
+    private static void DrawFolder(DrawingContext dc, Pen pen, double cx, double cy)
     {
         var stroke = OutlinePen(pen, 1.25);
+        var bounds = FolderDesign;
+        dc.PushTransform(new TranslateTransform(
+            cx - (bounds.X + bounds.Width * 0.5),
+            cy - (bounds.Y + bounds.Height * 0.5)));
         dc.DrawLine(stroke, new Point(6, 12), new Point(6, 9));
         dc.DrawLine(stroke, new Point(6, 9), new Point(14, 9));
         dc.DrawLine(stroke, new Point(14, 9), new Point(16, 12));
@@ -616,6 +648,7 @@ internal static class TransportIconDrawing
         dc.DrawLine(stroke, new Point(28, 27), new Point(6, 27));
         dc.DrawLine(stroke, new Point(6, 27), new Point(6, 12));
         dc.DrawLine(stroke, new Point(6, 15), new Point(28, 15));
+        dc.Pop();
     }
 
     private static void DrawThemeSun(DrawingContext dc, Pen pen, double cx, double cy)
@@ -1061,18 +1094,24 @@ internal static class TransportChrome
         bool enabled,
         bool hover,
         bool pressed,
-        string backKey = "TransportBackBrush")
+        string backKey = "TransportBackBrush",
+        bool fillSlot = true,
+        Rect? hoverBounds = null)
     {
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get(backKey)), null, bounds);
+        if (fillSlot)
+        {
+            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get(backKey)), null, bounds);
+        }
+
         if (enabled && (hover || pressed))
         {
             var fill = pressed
                 ? Theme.Get("TransportPressedBackBrush")
                 : Theme.Get("TransportHoverBackBrush");
-            dc.DrawRectangle(
-                WpfControlHelpers.FrozenBrush(fill),
-                null,
-                new Rect(3, 3, bounds.Width - 6, bounds.Height - 6));
+            const double pad = 3d;
+            var rect = hoverBounds
+                ?? new Rect(pad, pad, Math.Max(1, bounds.Width - pad * 2), Math.Max(1, bounds.Height - pad * 2));
+            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(fill), null, rect);
         }
     }
 

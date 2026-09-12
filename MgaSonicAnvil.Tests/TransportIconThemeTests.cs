@@ -37,8 +37,32 @@ public sealed class TransportIconThemeTests
         RunSta(() =>
         {
             var pixels = Render(TransportIcon.Folder, UiTheme.Dark, 22, 22);
-            Assert.False(IsInk(pixels, 22, 13, 15), "22px Wwise folder body should be hollow");
+            Assert.False(IsInk(pixels, 22, 11, 12), "22px Wwise folder body should be hollow");
             Assert.True(CountInk(pixels, 22, 22) >= 20, "22px Wwise folder should still draw a stroke");
+        });
+    }
+
+    [Fact]
+    public void FolderHoverBounds_MatchesGlyphOnWaapiButton()
+    {
+        var hover = TransportIconDrawing.FolderHoverBounds(new Rect(0, 0, 22, 22));
+        Assert.True(hover.Width > hover.Height);
+        Assert.InRange(hover.Width, 16, 20);
+        Assert.InRange(hover.Height, 13, 17);
+        Assert.InRange(hover.X + hover.Width * 0.5, 10.5, 11.5);
+        Assert.InRange(hover.Y + hover.Height * 0.5, 10.5, 11.5);
+    }
+
+    [Fact]
+    public void Folder_IsBboxCenteredInBothThemes()
+    {
+        RunSta(() =>
+        {
+            foreach (var theme in new[] { UiTheme.Light, UiTheme.Dark })
+            {
+                AssertIconCentered(TransportIcon.Folder, theme, 22, 22);
+                AssertIconCentered(TransportIcon.Folder, theme, 34, 36);
+            }
         });
     }
 
@@ -83,14 +107,14 @@ public sealed class TransportIconThemeTests
             {
                 foreach (var icon in new[] { TransportIcon.Lock, TransportIcon.Unlock })
                 {
-                    AssertLockCentered(icon, theme, 22, 22);
-                    AssertLockCentered(icon, theme, 34, 36);
+                    AssertIconCentered(icon, theme, 22, 22);
+                    AssertIconCentered(icon, theme, 34, 36);
                 }
             }
         });
     }
 
-    private static void AssertLockCentered(TransportIcon icon, UiTheme theme, int width, int height)
+    private static void AssertIconCentered(TransportIcon icon, UiTheme theme, int width, int height)
     {
         var pixels = Render(icon, theme, width, height);
         InkBounds(pixels, width, height, out var left, out var top, out var right, out var bottom);
@@ -133,7 +157,7 @@ public sealed class TransportIconThemeTests
             }
         }
 
-        Assert.True(right >= left && bottom >= top, "lock has no ink");
+        Assert.True(right >= left && bottom >= top, "icon has no ink");
     }
 
     private static byte[] Render(TransportIcon icon, UiTheme theme, int width, int height)
