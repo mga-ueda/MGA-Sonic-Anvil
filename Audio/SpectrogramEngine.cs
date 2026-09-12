@@ -8,6 +8,9 @@ internal static class SpectrogramEngine
     public const int BinCount = FftSize / 2 + 1;
     public const float FloorDb = -60f;
     public const float CeilingDb = 0f;
+    /// <summary>左の縦バー最上段。小さい成分を天井近くまで持ち上げる。</summary>
+    public const float DisplayBoostMaxDb = 32f * 2f / 3f;
+    private static readonly float[] LinearFromLut = CreateLinearFromLut();
     public const double MinHertz = 80d;
     public const double MaxHertz = 24000d;
     /// <summary>1 より大きいと低域の縦幅を圧縮する。対数軸の上にかける。</summary>
@@ -111,7 +114,130 @@ internal static class SpectrogramEngine
         return (byte)Math.Round(LiftDisplayUnit(t) * (ColorLutSize - 1));
     }
 
+    public static float InvertLiftDisplayUnit(float lifted)
+    {
+        lifted = Math.Clamp(lifted, 0f, 1f);
+        if (lifted <= 0f)
+        {
+            return 0f;
+        }
+
+        if (lifted >= 1f)
+        {
+            return 1f;
+        }
+
+        var lo = 0f;
+        var hi = 1f;
+        for (var i = 0; i < 24; i++)
+        {
+            var mid = (lo + hi) * 0.5f;
+            if (LiftDisplayUnit(mid) < lifted)
+            {
+                lo = mid;
+            }
+            else
+            {
+                hi = mid;
+            }
+        }
+
+        return (lo + hi) * 0.5f;
+    }
+
+    public static float ClampDisplayBoostDb(float boostDb) =>
+        Math.Clamp(boostDb, 0f, DisplayBoostMaxDb);
+
+    public static float DisplayBoostDbFromUnit(double unit) =>
+        ClampDisplayBoostDb((float)(Math.Clamp(unit, 0d, 1d) * DisplayBoostMaxDb));
+
+    public static double DisplayBoostUnitFromDb(float boostDb) =>
+        Math.Clamp(ClampDisplayBoostDb(boostDb) / DisplayBoostMaxDb, 0d, 1d);
+
+    /// <summary>
+    /// キャッシュ済み LUT に表示ブーストを足す。0 は無音のまま（フロアを黄にしない）。
+    /// </summary>
+    public static byte ApplyDisplayBoostToLut(byte lut, float boostDb)
+    {
+        if (lut == 0 || boostDb <= 0.0001f)
+        {
+            return lut;
+        }
+
+        var db = FloorDb + LinearFromLut[lut] * (CeilingDb - FloorDb);
+        return DbToLutByte(db + boostDb);
+    }
+
     public static int ColorFromLutByte(byte value) => ColorLut[value];
+
+    /// <summary>表示ブースト用の 256 色パレット。ビットマップの LUT 番号だけ差し替える。</summary>
+    public static void FillBoostColorMap(Span<int> map, float boostDb)
+    {
+        var n = Math.Min(map.Length, ColorLutSize);
+        for (var i = 0; i < n; i++)
+        {
+            map[i] = ColorFromLutByte(ApplyDisplayBoostToLut((byte)i, boostDb));
+        }
+    }
+
+    public const int LinearUnitScale = 65535;
+
+    public static float LinearUnitFromDb(float db) =>
+        Math.Clamp((db - FloorDb) / (CeilingDb - FloorDb), 0f, 1f);
+
+    public static ushort PackLinearUnit(float t) =>
+        (ushort)Math.Round(Math.Clamp(t, 0f, 1f) * LinearUnitScale);
+
+    public static float UnpackLinearUnit(ushort packed) =>
+        packed / (float)LinearUnitScale;
+
+    /// <summary>持ち上げ済み LUT（0–255、小数のまま）を線形ユニットへ。0 は無音。</summary>
+    public static ushort LinearUnitFromLifted(float liftedByte)
+    {
+        if (liftedByte <= 0.5f)
+        {
+            return 0;
+        }
+
+        return PackLinearUnit(InvertLiftDisplayUnit(liftedByte / (ColorLutSize - 1)));
+    }
+
+    public static ushort LinearUnitFromMagnitude(double mag, float gainDb = 0f)
+    {
+        if (mag <= 1e-12)
+        {
+            return 0;
+        }
+
+        return PackLinearUnit(LinearUnitFromDb((float)(20d * Math.Log10(mag)) + gainDb));
+    }
+
+    public static int ColorFromLinearUnit(ushort packed, float boostDb = 0f)
+    {
+        if (packed == 0)
+        {
+            return ColorFromLutByte(0);
+        }
+
+        var db = FloorDb + UnpackLinearUnit(packed) * (CeilingDb - FloorDb);
+        return ColorBgra(db + boostDb);
+    }
+
+    /// <summary>16 bit 線形ユニット用パレット。暗部ブーストでも段が目立たない。</summary>
+    public static void FillBoostLinearMap(Span<int> map, float boostDb)
+    {
+        var n = Math.Min(map.Length, LinearUnitScale + 1);
+        if (n <= 0)
+        {
+            return;
+        }
+
+        map[0] = ColorFromLutByte(0);
+        for (var i = 1; i < n; i++)
+        {
+            map[i] = ColorFromLinearUnit((ushort)i, boostDb);
+        }
+    }
 
     public static int ColorBgra(float db) => ColorFromLutByte(DbToLutByte(db));
 
@@ -182,6 +308,19 @@ internal static class SpectrogramEngine
         }
 
         return x <= last ? x : period - x;
+    }
+
+    private static float[] CreateLinearFromLut()
+    {
+        var table = new float[ColorLutSize];
+        table[0] = 0f;
+        table[ColorLutSize - 1] = 1f;
+        for (var i = 1; i < ColorLutSize - 1; i++)
+        {
+            table[i] = InvertLiftDisplayUnit(i / (float)(ColorLutSize - 1));
+        }
+
+        return table;
     }
 
     private static int[] CreateColorLut()

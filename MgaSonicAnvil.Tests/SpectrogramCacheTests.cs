@@ -30,5 +30,9 @@ public sealed class SpectrogramCacheTests
         Assert.NotEqual(0, color);
         Assert.True(cache.TryColor(SpectrogramEngine.Hop / 2, 10, out var mid));
         Assert.NotEqual(0, mid);
+        Assert.True(cache.TryColor(0, 10, 24f, out var boosted));
+        static int Luma(int bgra) =>
+            (bgra & 0xFF) + ((bgra >> 8) & 0xFF) + ((bgra >> 16) & 0xFF);
+        Assert.True(Luma(boosted) >= Luma(color));
     }
 }

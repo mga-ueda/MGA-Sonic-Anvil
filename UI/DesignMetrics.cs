@@ -12,11 +12,16 @@ internal static class DesignMetrics
 
     public static double From96(double value96) => value96;
 
-    public static double WindowMinWidth => From96(1240);
+    /// <summary>
+    /// 固定2行（上段 TRANS/EDIT/FILE、下段 MARK/VIEW/HELP）と右の履歴・ラウドネス・スペアナ・メーターが
+    /// 折り返さず並ぶ下限。枠のぶんを足す。
+    /// </summary>
+    public static double WindowMinWidth =>
+        Math.Ceiling(TransportFixedRowWidth + TransportSideChromeWidth + WindowFramePad);
 
     public static double WindowMinHeight => From96(420);
 
-    public static double WindowDefaultWidth => From96(1240);
+    public static double WindowDefaultWidth => WindowMinWidth;
 
     public static double WindowDefaultHeight => From96(573);
 
@@ -61,11 +66,83 @@ internal static class DesignMetrics
 
     public static double WaveformHostMinHeight => From96(180);
 
-    public static double WaveformScrollBarHeight => From96(12);
+    /// <summary>波形下の時間スクロール行（＋－／矢印と同じ高さ）。</summary>
+    public static double WaveformScrollBarHeight => From96(16);
 
     public static GridLength WaveformScrollBarHeightGrid => new(WaveformScrollBarHeight);
 
-    public static double TransportBarHeight => Dip(54);
+    public static double WaveformScrollButtonWidth => From96(16);
+
+    public static GridLength WaveformScrollButtonWidthGrid => new(WaveformScrollButtonWidth);
+
+    /// <summary>つまみ両端の拡縮ヒット幅。</summary>
+    public static double WaveformScrollHandleWidth => From96(8);
+
+    /// <summary>スペクトログラム左の表示ブーストバー。時間スクロールの半分。</summary>
+    public static double SpectrogramBoostBarWidth => WaveformScrollBarHeight * 0.5;
+
+    /// <summary>ブーストつまみ。バーより大きいが、バーの 2 倍にはしない。</summary>
+    public static double SpectrogramBoostThumbSize => From96(12);
+
+    /// <summary>ブーストバーの上下余白。</summary>
+    public static double SpectrogramBoostBarPad => From96(8);
+
+    /// <summary>右寄せ dB 目盛の幅（数字＋隙間）。重ね表示のとき、バーはこの左側で中央。</summary>
+    public static double SpectrogramBoostLabelReserve(double labelWidth) =>
+        7 + Math.Max(0, labelWidth);
+
+    public static double SpectrogramBoostBarLeft(double? labelWidth = null) =>
+        labelWidth is { } width
+            ? Math.Max(0, (DbScaleWidth - SpectrogramBoostLabelReserve(width) - SpectrogramBoostThumbSize) * 0.5)
+            : Math.Max(0, (DbScaleWidth - SpectrogramBoostThumbSize) * 0.5);
+
+    /// <summary>上段＋下段 MARK。ホスト上余白 2 + 各行ボタン。行間は 0。</summary>
+    public static double TransportBarHeight =>
+        From96(2) + TransportButtonSide * 2 + TransportRowGap;
+
+    /// <summary>上段と下段（MARK / VIEW / HELP）のあいだ。</summary>
+    public static double TransportRowGap => 0;
+
+    public static Thickness TransportBottomRowMargin => new(0, TransportRowGap, 0, 0);
+
+    /// <summary>TransportBar 左右マージン（8+8）。</summary>
+    public static double TransportHostPaddingX => From96(16);
+
+    /// <summary>グループ見出し（9pt Bold）の余裕込み。いちばん長い TRANS でも足りる。</summary>
+    public static double TransportGroupLabelReserve => From96(40);
+
+    public static double TransportGroupWidth(int buttonCount) =>
+        TransportGroupLabelReserve
+        + TransportGroupLabelGap
+        + buttonCount * (TransportButtonSide + TransportButtonGap)
+        + TransportGroupGap;
+
+    /// <summary>上段: TRANS(2) EDIT(9) FILE(4)。VIEW は下段へ折り返す。</summary>
+    public static double TransportTopRowWidth =>
+        TransportHostPaddingX
+        + TransportGroupWidth(2)
+        + TransportGroupWidth(9)
+        + TransportGroupWidth(4);
+
+    /// <summary>下段: MARK(3) VIEW(5) HELP(3)。</summary>
+    public static double TransportBottomRowWidth =>
+        TransportHostPaddingX
+        + TransportGroupWidth(3)
+        + TransportGroupWidth(5)
+        + TransportGroupWidth(3);
+
+    public static double TransportFixedRowWidth =>
+        Math.Max(TransportTopRowWidth, TransportBottomRowWidth);
+
+    /// <summary>トランスポート右の履歴・ラウドネス・スペアナと、右端メーター列。</summary>
+    public static double TransportSideChromeWidth =>
+        HistoryStripWidth + From96(2)
+        + LoudnessMeterWidth + From96(6)
+        + SpectrumWidth + From96(1)
+        + LevelMeterWidth;
+
+    /// <summary>ウィンドウ枠（リサイズ辺）。</summary>
+    public static double WindowFramePad => From96(24);
 
     public static double TransportButtonSide => Dip(45);
 
@@ -73,7 +150,11 @@ internal static class DesignMetrics
 
     public static double TransportButtonGap => Dip(2);
 
-    public static double TransportGroupGap => Dip(6);
+    public static double TransportGroupGap => Dip(10);
+
+    public static double TransportGroupLabelFontSize => From96(9);
+
+    public static double TransportGroupLabelGap => Dip(3);
 
     public static double TransportSpeakerComboWidth => From96(168);
 
@@ -89,14 +170,17 @@ internal static class DesignMetrics
     /// <summary>周波数数値の重なりを避けるため、右揃えのまま左へ足す幅。</summary>
     public static double SpectrumExtraWidth => From96(72);
 
+    public static double SpectrumWidth =>
+        LevelMeterWidth * SpectrumAnalyzer.OriginalAspect + SpectrumExtraWidth;
+
     /// <summary>ラウドネス左の履歴プレビュー幅。長い題は切る。</summary>
     public static double HistoryStripWidth => From96(176);
 
     /// <summary>履歴プレビュー1行。</summary>
     public static double HistoryStripRowHeight => From96(14);
 
-    /// <summary>スペアナ左のラウドネスメーター幅。縦積み1列。</summary>
-    public static double LoudnessMeterWidth => From96(232);
+    /// <summary>スペアナ左のラウドネスメーター幅。縦積み1列。履歴枠との間だけ詰める。</summary>
+    public static double LoudnessMeterWidth => From96(200);
 
     /// <summary>正方形ゴニオ直下の位相バー高さ。</summary>
     public static double VectorScopeCorrelationHeight => From96(18);

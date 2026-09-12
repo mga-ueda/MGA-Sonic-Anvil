@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -20,6 +19,10 @@ internal sealed class SpectrogramRenderer
     private readonly SpectrogramCache _cache = new();
     private WriteableBitmap? _bitmap;
     private int[] _pixels = [];
+    private ushort[] _units = [];
+    private readonly int[] _boostMap = new int[SpectrogramEngine.LinearUnitScale + 1];
+    private float _mapBoostDb = float.NaN;
+    private bool _hasUnits;
     private double[] _rowHertz = [];
     private int _rowHeight;
     private Size _dipSize;
@@ -35,10 +38,27 @@ internal sealed class SpectrogramRenderer
     private bool _drewSharp;
     private float[]? _gainSamples;
     private float _gainDb;
+    private float _displayBoostDb;
+    private float _appliedBoostDb;
 
     public SpectrogramRenderer()
     {
         SpectrogramEngine.FillHann(_window, out _windowSum);
+    }
+
+    public float DisplayBoostDb
+    {
+        get => _displayBoostDb;
+        set
+        {
+            var next = SpectrogramEngine.ClampDisplayBoostDb(value);
+            if (Math.Abs(next - _displayBoostDb) < 0.01f)
+            {
+                return;
+            }
+
+            _displayBoostDb = next;
+        }
     }
 
     public event Action? InvalidateRequested;
@@ -53,6 +73,8 @@ internal sealed class SpectrogramRenderer
         // 頼らず、次回の描画で必ず再ラスタライズさせる。表示用ゲインも測り直す。
         _samples = null;
         _gainSamples = null;
+        _hasUnits = false;
+        _mapBoostDb = float.NaN;
     }
 
     public void Dispose() => _cache.Dispose();
@@ -138,7 +160,8 @@ internal sealed class SpectrogramRenderer
         var bmpWidth = width + 1;
         var bmpSpan = bmpWidth * framesPerPx;
         var fromCache = _cache.IsReady && !sharp;
-        if (ReferenceEquals(_samples, document.Interleaved)
+        var sameView = ReferenceEquals(_samples, document.Interleaved)
+            && _hasUnits
             && _bitmap is not null
             && _bitmap.PixelWidth == bmpWidth
             && _bitmap.PixelHeight == height
@@ -148,7 +171,8 @@ internal sealed class SpectrogramRenderer
             && Math.Abs(_viewSpan - bmpSpan) < framesPerPx * 0.01
             && _sampleRate == document.SampleRate
             && _drewFromCache == fromCache
-            && _drewSharp == sharp)
+            && _drewSharp == sharp;
+        if (sameView && Math.Abs(_appliedBoostDb - _displayBoostDb) < 0.01f)
         {
             return;
         }
@@ -172,6 +196,11 @@ internal sealed class SpectrogramRenderer
             _pixels = new int[needed];
         }
 
+        if (_units.Length < needed)
+        {
+            _units = new ushort[needed];
+        }
+
         EnsureRowHertz(height);
         if (!ReferenceEquals(_gainSamples, document.Interleaved))
         {
@@ -180,11 +209,17 @@ internal sealed class SpectrogramRenderer
             _gainSamples = document.Interleaved;
         }
 
-        if (!TryShiftColumns(document, quantStart, bmpSpan, bmpWidth, height, fromCache))
+        if (!sameView)
         {
-            RasterizeSpan(document, quantStart, bmpSpan, bmpWidth, height, 0, bmpWidth, fromCache);
+            if (!TryShiftColumns(document, quantStart, bmpSpan, bmpWidth, height, fromCache))
+            {
+                RasterizeSpan(document, quantStart, bmpSpan, bmpWidth, height, 0, bmpWidth, fromCache);
+            }
+
+            _hasUnits = true;
         }
 
+        ApplyBoostToPixels(needed);
         _bitmap.WritePixels(new Int32Rect(0, 0, bmpWidth, height), _pixels, bmpWidth * 4, 0);
         _samples = document.Interleaved;
         _dipSize = wave.Size;
@@ -197,6 +232,7 @@ internal sealed class SpectrogramRenderer
         _pixelHeight = height;
         _drewFromCache = fromCache;
         _drewSharp = sharp;
+        _appliedBoostDb = _displayBoostDb;
     }
 
     private void RasterizeSpan(
@@ -245,7 +281,7 @@ internal sealed class SpectrogramRenderer
             return false;
         }
 
-        ShiftPixels(width, height, shiftPx);
+        ShiftUnits(width, height, shiftPx);
         if (shiftPx > 0)
         {
             RasterizeSpan(document, viewStart, viewSpan, width, height, width - shiftPx, width, fromCache);
@@ -258,14 +294,14 @@ internal sealed class SpectrogramRenderer
         return true;
     }
 
-    private void ShiftPixels(int width, int height, int shiftPx)
+    private void ShiftUnits(int width, int height, int shiftPx)
     {
         if (shiftPx > 0)
         {
             for (var y = 0; y < height; y++)
             {
                 var row = y * width;
-                Array.Copy(_pixels, row + shiftPx, _pixels, row, width - shiftPx);
+                Array.Copy(_units, row + shiftPx, _units, row, width - shiftPx);
             }
 
             return;
@@ -275,7 +311,21 @@ internal sealed class SpectrogramRenderer
         for (var y = 0; y < height; y++)
         {
             var row = y * width;
-            Array.Copy(_pixels, row, _pixels, row + left, width - left);
+            Array.Copy(_units, row, _units, row + left, width - left);
+        }
+    }
+
+    private void ApplyBoostToPixels(int count)
+    {
+        if (float.IsNaN(_mapBoostDb) || Math.Abs(_mapBoostDb - _displayBoostDb) >= 0.01f)
+        {
+            SpectrogramEngine.FillBoostLinearMap(_boostMap, _displayBoostDb);
+            _mapBoostDb = _displayBoostDb;
+        }
+
+        for (var i = 0; i < count; i++)
+        {
+            _pixels[i] = _boostMap[_units[i]];
         }
     }
 
@@ -314,7 +364,6 @@ internal sealed class SpectrogramRenderer
     {
         var binHz = Math.Max(1, sampleRate) / (double)SpectrogramEngine.FftSize;
         var nyquist = SpectrogramEngine.ContentNyquist(sampleRate);
-        var floor = SpectrogramEngine.ColorBgra(SpectrogramEngine.FloorDb);
         for (var x = x0; x < x1; x++)
         {
             var center = (long)Math.Round(viewStart + (x + 0.5) / width * viewSpan);
@@ -322,13 +371,13 @@ internal sealed class SpectrogramRenderer
             for (var y = 0; y < height; y++)
             {
                 var hz = _rowHertz[y];
-                if (hz > nyquist)
+                if (hz > nyquist || !_cache.TryLinearUnit(center, hz / binHz, out var unit))
                 {
-                    _pixels[row + x] = floor;
+                    _units[row + x] = 0;
                 }
-                else if (_cache.TryColor(center, hz / binHz, out var bgra))
+                else
                 {
-                    _pixels[row + x] = bgra;
+                    _units[row + x] = unit;
                 }
 
                 row += width;
@@ -352,7 +401,6 @@ internal sealed class SpectrogramRenderer
         var bins = half + 1;
         var binHz = Math.Max(1, document.SampleRate) / (double)SpectrogramEngine.FftSize;
         var nyquist = SpectrogramEngine.ContentNyquist(document.SampleRate);
-        var floor = SpectrogramEngine.ColorBgra(SpectrogramEngine.FloorDb);
 
         for (var x = x0; x < x1; x++)
         {
@@ -363,9 +411,9 @@ internal sealed class SpectrogramRenderer
             for (var y = 0; y < height; y++)
             {
                 var hz = _rowHertz[y];
-                _pixels[row + x] = hz > nyquist
-                    ? floor
-                    : SpectrogramEngine.ColorBgraFromMagnitude(
+                _units[row + x] = hz > nyquist
+                    ? (ushort)0
+                    : SpectrogramEngine.LinearUnitFromMagnitude(
                         SpectrogramEngine.BinMagnitude(_re.AsSpan(0, bins), hz / binHz),
                         _gainDb);
                 row += width;
@@ -377,7 +425,8 @@ internal sealed class SpectrogramRenderer
     {
         var maxHertz = SpectrogramEngine.DisplayMaxHertz;
         var dpi = VisualTreeHelper.GetDpi(host).PixelsPerDip;
-        var fore = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
+        var fill = WpfControlHelpers.FrozenBrush(Theme.Get("SpectrogramScaleForeBrush"));
+        var edge = WpfControlHelpers.FrozenBrush(FrequencyLabelEdge);
         var grid = WpfControlHelpers.FrozenHairline(Color.FromArgb(26, 255, 255, 255), dpi);
         foreach (var mark in SpectrogramEngine.FrequencyMarks)
         {
@@ -389,17 +438,38 @@ internal sealed class SpectrogramRenderer
             var unit = SpectrogramEngine.HertzToUnit(mark, SpectrogramEngine.MinHertz, maxHertz);
             var y = WpfControlHelpers.SnapDeviceCenter(wave.Y + (1 - unit) * wave.Height, dpi);
             dc.DrawLine(grid, new Point(wave.X, y), new Point(wave.Right, y));
-            var text = new FormattedText(
-                SpectrogramEngine.FormatHertz(mark),
-                CultureInfo.InvariantCulture,
-                FlowDirection.LeftToRight,
-                WpfControlHelpers.MonoTypeface,
-                8,
-                fore,
-                dpi);
+            var label = SpectrogramEngine.FormatHertz(mark);
+            var text = WpfControlHelpers.MonoText(label, 8, fill, dpi);
             var x = wave.Right - text.Width - 4;
             var ty = Math.Clamp(y - text.Height * 0.5, wave.Y, wave.Bottom - text.Height);
-            dc.DrawText(text, new Point(x, ty));
+            DrawHaloLabel(dc, label, fill, edge, dpi, new Point(x, ty));
         }
+    }
+
+    internal static Color FrequencyLabelFill => Color.FromRgb(0xEB, 0xEB, 0xEB);
+
+    internal static Color FrequencyLabelEdge => Colors.Black;
+
+    internal static readonly (double X, double Y)[] FrequencyLabelHalo =
+    [
+        (-1, 0), (1, 0), (0, -1), (0, 1),
+        (-1, -1), (1, -1), (-1, 1), (1, 1),
+    ];
+
+    private static void DrawHaloLabel(
+        DrawingContext dc,
+        string label,
+        Brush fill,
+        Brush edge,
+        double dpi,
+        Point origin)
+    {
+        var outline = WpfControlHelpers.MonoText(label, 8, edge, dpi);
+        foreach (var (dx, dy) in FrequencyLabelHalo)
+        {
+            dc.DrawText(outline, new Point(origin.X + dx, origin.Y + dy));
+        }
+
+        dc.DrawText(WpfControlHelpers.MonoText(label, 8, fill, dpi), origin);
     }
 }

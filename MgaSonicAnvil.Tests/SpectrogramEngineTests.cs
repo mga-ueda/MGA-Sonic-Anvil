@@ -212,4 +212,92 @@ public sealed class SpectrogramEngineTests
         var peak = Unpack(SpectrogramEngine.ColorBgra(SpectrogramEngine.CeilingDb));
         Assert.True(peak.R > 250 && peak.G > 250 && peak.B > 250);
     }
+
+    [Fact]
+    public void DisplayBoost_DefaultIsOffAndTopIsMax()
+    {
+        Assert.Equal(32f * 2f / 3f, SpectrogramEngine.DisplayBoostMaxDb);
+        Assert.Equal(0, SpectrogramEngine.DisplayBoostDbFromUnit(0), 5);
+        Assert.Equal(SpectrogramEngine.DisplayBoostMaxDb, SpectrogramEngine.DisplayBoostDbFromUnit(1), 5);
+        Assert.Equal(0, SpectrogramEngine.DisplayBoostUnitFromDb(0), 5);
+        Assert.Equal(1, SpectrogramEngine.DisplayBoostUnitFromDb(SpectrogramEngine.DisplayBoostMaxDb), 5);
+        Assert.Equal(0, SpectrogramEngine.ClampDisplayBoostDb(-4), 5);
+        Assert.Equal(SpectrogramEngine.DisplayBoostMaxDb, SpectrogramEngine.ClampDisplayBoostDb(99), 5);
+    }
+
+    [Fact]
+    public void InvertLiftDisplayUnit_RoundTripsMidTones()
+    {
+        Assert.Equal(0, SpectrogramEngine.InvertLiftDisplayUnit(0), 5);
+        Assert.Equal(1, SpectrogramEngine.InvertLiftDisplayUnit(1), 5);
+        Assert.Equal(0.2, SpectrogramEngine.InvertLiftDisplayUnit(SpectrogramEngine.LiftDisplayUnit(0.2f)), 4);
+        Assert.Equal(0.8, SpectrogramEngine.InvertLiftDisplayUnit(SpectrogramEngine.LiftDisplayUnit(0.8f)), 4);
+    }
+
+    [Fact]
+    public void ApplyDisplayBoostToLut_ZeroKeepsIdentityAndSilenceStaysFloor()
+    {
+        Assert.Equal(80, SpectrogramEngine.ApplyDisplayBoostToLut(80, 0));
+        Assert.Equal(0, SpectrogramEngine.ApplyDisplayBoostToLut(0, SpectrogramEngine.DisplayBoostMaxDb));
+        Assert.Equal(
+            SpectrogramEngine.ColorBgra(SpectrogramEngine.FloorDb),
+            SpectrogramEngine.ColorFromLutByte(
+                SpectrogramEngine.ApplyDisplayBoostToLut(0, 36f)));
+    }
+
+    [Fact]
+    public void ApplyDisplayBoostToLut_RaisesQuietEnergyTowardYellowWhite()
+    {
+        var quiet = SpectrogramEngine.LutByteFromMagnitude(0.01); // -40 dB
+        var boosted = SpectrogramEngine.ApplyDisplayBoostToLut(quiet, 24f);
+        var direct = SpectrogramEngine.LutByteFromMagnitude(0.01, 24f);
+        Assert.True(boosted > quiet);
+        Assert.InRange(boosted, direct - 2, direct + 2);
+
+        static int Luma(int bgra) =>
+            (bgra & 0xFF) + ((bgra >> 8) & 0xFF) + ((bgra >> 16) & 0xFF);
+
+        Assert.True(
+            Luma(SpectrogramEngine.ColorFromLutByte(boosted))
+            > Luma(SpectrogramEngine.ColorFromLutByte(quiet)));
+    }
+
+    [Fact]
+    public void FillBoostColorMap_RemapsLutWithoutTouchingSilence()
+    {
+        var map = new int[256];
+        SpectrogramEngine.FillBoostColorMap(map, 0);
+        Assert.Equal(SpectrogramEngine.ColorFromLutByte(80), map[80]);
+        SpectrogramEngine.FillBoostColorMap(map, 20f);
+        Assert.Equal(
+            SpectrogramEngine.ColorFromLutByte(SpectrogramEngine.ApplyDisplayBoostToLut(80, 20f)),
+            map[80]);
+        Assert.Equal(SpectrogramEngine.ColorFromLutByte(0), map[0]);
+    }
+
+    [Fact]
+    public void ColorFromLinearUnit_BoostMatchesMagnitudePath()
+    {
+        var packed = SpectrogramEngine.LinearUnitFromMagnitude(0.01);
+        Assert.True(packed > 0);
+        Assert.Equal(0, SpectrogramEngine.LinearUnitFromMagnitude(0));
+        Assert.Equal(
+            SpectrogramEngine.ColorBgraFromMagnitude(0.01, 0f),
+            SpectrogramEngine.ColorFromLinearUnit(packed));
+        Assert.Equal(
+            SpectrogramEngine.ColorBgraFromMagnitude(0.01, 24f),
+            SpectrogramEngine.ColorFromLinearUnit(packed, 24f));
+        Assert.Equal(
+            SpectrogramEngine.ColorBgra(SpectrogramEngine.FloorDb),
+            SpectrogramEngine.ColorFromLinearUnit(0, 24f));
+    }
+
+    [Fact]
+    public void LinearUnitFromLifted_KeepsSubByteSteps()
+    {
+        var a = SpectrogramEngine.LinearUnitFromLifted(3f);
+        var b = SpectrogramEngine.LinearUnitFromLifted(3.6f);
+        Assert.True(b > a);
+        Assert.True(a > 0);
+    }
 }

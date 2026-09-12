@@ -67,7 +67,10 @@ internal sealed class SpectrogramCache : IDisposable
         }
     }
 
-    public bool TryColor(long frame, double bin, out int bgra)
+    public bool TryColor(long frame, double bin, out int bgra) =>
+        TryColor(frame, bin, 0f, out bgra);
+
+    public bool TryColor(long frame, double bin, float boostDb, out int bgra)
     {
         Session? session;
         lock (_gate)
@@ -85,7 +88,49 @@ internal sealed class SpectrogramCache : IDisposable
             return false;
         }
 
-        return session.TryColor(frame, bin, out bgra);
+        return session.TryColor(frame, bin, boostDb, out bgra);
+    }
+
+    public bool TryLut(long frame, double bin, out byte lut)
+    {
+        Session? session;
+        lock (_gate)
+        {
+            session = _published;
+            if (session is null || !session.IsComplete)
+            {
+                session = _building;
+            }
+        }
+
+        if (session is null)
+        {
+            lut = 0;
+            return false;
+        }
+
+        return session.TryLut(frame, bin, out lut);
+    }
+
+    public bool TryLinearUnit(long frame, double bin, out ushort unit)
+    {
+        Session? session;
+        lock (_gate)
+        {
+            session = _published;
+            if (session is null || !session.IsComplete)
+            {
+                session = _building;
+            }
+        }
+
+        if (session is null)
+        {
+            unit = 0;
+            return false;
+        }
+
+        return session.TryLinearUnit(frame, bin, out unit);
     }
 
     public void Dispose()
@@ -321,19 +366,56 @@ internal sealed class SpectrogramCache : IDisposable
             _view.WriteArray(offset, values, 0, values.Length);
         }
 
-        public bool TryColor(long frame, double bin, out int bgra)
+        public bool TryColor(long frame, double bin, float boostDb, out int bgra)
+        {
+            if (!TryLut(frame, bin, out var lut))
+            {
+                bgra = 0;
+                return false;
+            }
+
+            bgra = SpectrogramEngine.ColorFromLutByte(
+                SpectrogramEngine.ApplyDisplayBoostToLut(lut, boostDb));
+            return true;
+        }
+
+        public bool TryLut(long frame, double bin, out byte lut)
+        {
+            if (!TryLifted(frame, bin, out var lifted))
+            {
+                lut = 0;
+                return false;
+            }
+
+            lut = (byte)Math.Clamp(Math.Round(lifted), 0, 255);
+            return true;
+        }
+
+        public bool TryLinearUnit(long frame, double bin, out ushort unit)
+        {
+            if (!TryLifted(frame, bin, out var lifted))
+            {
+                unit = 0;
+                return false;
+            }
+
+            unit = SpectrogramEngine.LinearUnitFromLifted((float)lifted);
+            return true;
+        }
+
+        private bool TryLifted(long frame, double bin, out double lifted)
         {
             var ready = ReadyColumns;
             if (ready <= 0 || _disposed)
             {
-                bgra = 0;
+                lifted = 0;
                 return false;
             }
 
             var lastCol = Math.Min(ColumnCount, ready) - 1;
             if (lastCol < 0)
             {
-                bgra = 0;
+                lifted = 0;
                 return false;
             }
 
@@ -354,8 +436,7 @@ internal sealed class SpectrogramCache : IDisposable
             var v11 = ReadLut(c1, b1);
             var v0 = v00 + (v01 - v00) * ty;
             var v1 = v10 + (v11 - v10) * ty;
-            var mixed = (byte)Math.Clamp(Math.Round(v0 + (v1 - v0) * tx), 0, 255);
-            bgra = SpectrogramEngine.ColorFromLutByte(mixed);
+            lifted = v0 + (v1 - v0) * tx;
             return true;
         }
 

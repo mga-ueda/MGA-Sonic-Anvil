@@ -284,15 +284,15 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
                     <Border x:Name="ThumbBorder"
-                            Background="{DynamicResource ChromeMidBrush}"
+                            Background="{DynamicResource ScrollThumbBackBrush}"
                             CornerRadius="2"
                             Margin="1" />
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource ChromeDimBrush}" />
+                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource ScrollThumbHoverBackBrush}" />
                         </Trigger>
                         <Trigger Property="IsDragging" Value="True">
-                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource PrimaryForeBrush}" />
+                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource ScrollThumbPressedBackBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -341,6 +341,149 @@
                 </Setter>
             </Trigger>
         </Style.Triggers>
+    </Style>
+
+    <Style x:Key="TimeScrollBarThumbStyle" TargetType="Thumb">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border x:Name="ThumbBorder"
+                            Background="{DynamicResource ScrollThumbBackBrush}"
+                            CornerRadius="2"
+                            Margin="1">
+                        <Grid>
+                            <Rectangle Width="2"
+                                       HorizontalAlignment="Left"
+                                       Margin="3,3,0,3"
+                                       Fill="{DynamicResource ScrollThumbGripBrush}"
+                                       RadiusX="0.5"
+                                       RadiusY="0.5" />
+                            <Rectangle Width="2"
+                                       HorizontalAlignment="Right"
+                                       Margin="0,3,3,3"
+                                       Fill="{DynamicResource ScrollThumbGripBrush}"
+                                       RadiusX="0.5"
+                                       RadiusY="0.5" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource ScrollThumbHoverBackBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource ScrollThumbPressedBackBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SpectrogramBoostBarThumbStyle" TargetType="Thumb">
+        <Setter Property="Width" Value="{x:Static ui:DesignMetrics.SpectrogramBoostThumbSize}" />
+        <Setter Property="Height" Value="{x:Static ui:DesignMetrics.SpectrogramBoostThumbSize}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Grid Width="{x:Static ui:DesignMetrics.SpectrogramBoostThumbSize}"
+                          Height="{x:Static ui:DesignMetrics.SpectrogramBoostThumbSize}">
+                        <Ellipse x:Name="Dot"
+                                 Margin="0.6"
+                                 Fill="#F4F4F4"
+                                 Stroke="#2A2A2A"
+                                 StrokeThickness="1.2" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Dot" Property="Fill" Value="#FFFFFF" />
+                            <Setter TargetName="Dot" Property="Stroke" Value="#111111" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="Dot" Property="Fill" Value="#FFFFFF" />
+                            <Setter TargetName="Dot" Property="Stroke" Value="#111111" />
+                            <Setter TargetName="Dot" Property="StrokeThickness" Value="1.8" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SpectrogramBoostBarStyle" TargetType="Slider">
+        <Setter Property="Orientation" Value="Vertical" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="IsMoveToPointEnabled" Value="True" />
+        <Setter Property="IsDirectionReversed" Value="False" />
+        <Setter Property="Width" Value="{x:Static ui:DesignMetrics.SpectrogramBoostThumbSize}" />
+        <Setter Property="MinWidth" Value="{x:Static ui:DesignMetrics.SpectrogramBoostThumbSize}" />
+        <Setter Property="MaxWidth" Value="{x:Static ui:DesignMetrics.SpectrogramBoostThumbSize}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid>
+                        <Border x:Name="TrackBack"
+                                Width="{x:Static ui:DesignMetrics.SpectrogramBoostBarWidth}"
+                                HorizontalAlignment="Center"
+                                CornerRadius="4"
+                                SnapsToDevicePixels="True">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0.5,1" EndPoint="0.5,0">
+                                    <GradientStop Color="#9C2E00" Offset="0" />
+                                    <GradientStop Color="#FF9A20" Offset="0.5" />
+                                    <GradientStop Color="#FFFFFF" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
+                        <!-- 下が 0（オフ）、上が最大。 -->
+                        <Track x:Name="PART_Track">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="{x:Static Slider.DecreaseLarge}"
+                                              Opacity="0"
+                                              IsHitTestVisible="False"
+                                              Focusable="False" />
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="{x:Static Slider.IncreaseLarge}"
+                                              Opacity="0"
+                                              IsHitTestVisible="False"
+                                              Focusable="False" />
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource SpectrogramBoostBarThumbStyle}" />
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="TrackBack" Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TimeScrollBarStyle" TargetType="ScrollBar">
+        <Setter Property="Background" Value="{DynamicResource TimelineWellBackBrush}" />
+        <Setter Property="Orientation" Value="Horizontal" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Width" Value="Auto" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Height" Value="{x:Static ui:DesignMetrics.WaveformScrollBarHeight}" />
+        <Setter Property="MinHeight" Value="{x:Static ui:DesignMetrics.WaveformScrollBarHeight}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Grid Background="{TemplateBinding Background}">
+                        <Track x:Name="PART_Track" IsDirectionReversed="False">
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource TimeScrollBarThumbStyle}" />
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="SettingsColumnScrollViewerStyle" TargetType="ScrollViewer">
@@ -474,43 +617,115 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
-                    <Border x:Name="Bd"
-                            Background="{TemplateBinding Background}"
-                            Padding="{TemplateBinding Padding}"
-                            Margin="0"
-                            SnapsToDevicePixels="True"
-                            ClipToBounds="False">
-                        <DockPanel LastChildFill="True">
-                            <ContentPresenter x:Name="IconPresenter"
-                                              DockPanel.Dock="Left"
-                                              ContentSource="Icon"
-                                              Width="22"
-                                              Height="22"
-                                              Margin="0,0,8,0"
-                                              VerticalAlignment="Center"
-                                              HorizontalAlignment="Center"
-                                              ClipToBounds="False"/>
-                            <ContentPresenter ContentSource="Header"
-                                              RecognizesAccessKey="True"
-                                              VerticalAlignment="Center"
-                                              HorizontalAlignment="Left">
-                                <ContentPresenter.Resources>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="VerticalAlignment" Value="Center" />
-                                        <Setter Property="TextWrapping" Value="NoWrap" />
-                                        <Setter Property="TextTrimming" Value="None" />
-                                    </Style>
-                                </ContentPresenter.Resources>
-                            </ContentPresenter>
-                        </DockPanel>
-                    </Border>
+                    <Grid SnapsToDevicePixels="True" ClipToBounds="False">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                Margin="0"
+                                SnapsToDevicePixels="True"
+                                ClipToBounds="False">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MenuCheck"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MenuGesture"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="CheckMark"
+                                           Grid.Column="0"
+                                           Width="16"
+                                           Text=""
+                                           Visibility="Collapsed"
+                                           TextAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                                <ContentPresenter x:Name="IconPresenter"
+                                                  Grid.Column="1"
+                                                  ContentSource="Icon"
+                                                  Width="22"
+                                                  Height="22"
+                                                  Margin="0,0,8,0"
+                                                  VerticalAlignment="Center"
+                                                  HorizontalAlignment="Center"
+                                                  ClipToBounds="False"/>
+                                <ContentPresenter Grid.Column="2"
+                                                  ContentSource="Header"
+                                                  RecognizesAccessKey="True"
+                                                  VerticalAlignment="Center"
+                                                  HorizontalAlignment="Stretch">
+                                    <ContentPresenter.Resources>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center" />
+                                            <Setter Property="TextWrapping" Value="NoWrap" />
+                                            <Setter Property="TextTrimming" Value="None" />
+                                        </Style>
+                                    </ContentPresenter.Resources>
+                                </ContentPresenter>
+                                <TextBlock x:Name="Gesture"
+                                           Grid.Column="3"
+                                           Margin="16,0,4,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource MutedForeBrush}"
+                                           Text="{TemplateBinding InputGestureText}"/>
+                                <Path x:Name="Arrow"
+                                      Grid.Column="4"
+                                      Margin="8,0,0,0"
+                                      VerticalAlignment="Center"
+                                      Visibility="Collapsed"
+                                      Data="M 0,0 L 4,3.5 L 0,7 Z"
+                                      Fill="{TemplateBinding Foreground}"/>
+                            </Grid>
+                        </Border>
+                        <Popup x:Name="PART_Popup"
+                               AllowsTransparency="True"
+                               Focusable="False"
+                               Placement="Right"
+                               HorizontalOffset="-1"
+                               VerticalOffset="-2"
+                               IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                            <Border Background="{DynamicResource SurfaceBackBrush}"
+                                    BorderBrush="{DynamicResource ChromeBorderBrush}"
+                                    BorderThickness="1"
+                                    Padding="0,2"
+                                    MinWidth="200"
+                                    SnapsToDevicePixels="True"
+                                    Grid.IsSharedSizeScope="True">
+                                <ScrollViewer CanContentScroll="True">
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"
+                                                    Margin="0"
+                                                    SnapsToDevicePixels="True"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="Icon" Value="{x:Null}">
                             <Setter TargetName="IconPresenter" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="IconPresenter" Property="Width" Value="0"/>
                             <Setter TargetName="IconPresenter" Property="Margin" Value="0"/>
                         </Trigger>
+                        <Trigger Property="InputGestureText" Value="{x:Null}">
+                            <Setter TargetName="Gesture" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="Gesture" Property="Margin" Value="0"/>
+                        </Trigger>
+                        <Trigger Property="InputGestureText" Value="">
+                            <Setter TargetName="Gesture" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="Gesture" Property="Margin" Value="0"/>
+                        </Trigger>
+                        <Trigger Property="IsCheckable" Value="True">
+                            <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="CheckMark" Property="Text" Value="●"/>
+                        </Trigger>
+                        <Trigger Property="Role" Value="SubmenuHeader">
+                            <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
+                        </Trigger>
                         <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TransportHoverBackBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsSubmenuOpen" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TransportHoverBackBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
