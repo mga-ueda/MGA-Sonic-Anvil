@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Threading;
 
 namespace MgaSonicAnvil.UI;
 
@@ -6,6 +7,7 @@ public partial class MainWindow
 {
 #if DEBUG
     private ColorDevPanelWindow? _colorDevPanel;
+    private bool _appColorRefreshQueued;
 
     private void ShowColorDevPanel()
     {
@@ -16,14 +18,29 @@ public partial class MainWindow
                 Owner = this,
                 Topmost = Topmost,
             };
-            _colorDevPanel.ColorsChanged += (_, _) => ApplyUiColors();
+            _colorDevPanel.ColorsChanged += (_, _) => QueueAppColorRefresh();
             _colorDevPanel.Closed += (_, _) => _colorDevPanel = null;
             PositionColorDevPanel(_colorDevPanel);
         }
 
-        _colorDevPanel.RefreshRows();
+        _colorDevPanel.RefreshAppearance();
         _colorDevPanel.Show();
         _colorDevPanel.Activate();
+    }
+
+    private void QueueAppColorRefresh()
+    {
+        if (_appColorRefreshQueued)
+        {
+            return;
+        }
+
+        _appColorRefreshQueued = true;
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
+        {
+            _appColorRefreshQueued = false;
+            ApplyUiColors(includeColorPanel: false);
+        });
     }
 
     private void PositionColorDevPanel(ColorDevPanelWindow panel)
@@ -42,21 +59,34 @@ public partial class MainWindow
         panel.Left = Math.Max(work.Left, x);
         panel.Top = y;
     }
+#endif
 
-    private void ApplyUiColors()
+    internal void ApplyUiColors() => ApplyUiColors(includeColorPanel: true);
+
+    internal void ApplyUiColors(bool includeColorPanel)
     {
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
         Waveform.RefreshAppearance();
         Overview.RefreshAppearance();
-        Spectrum.InvalidateVisual();
+        Spectrum.RefreshAppearance();
         VectorScope.InvalidateVisual();
         LevelMeter.InvalidateVisual();
         HistoryStrip.InvalidateVisual();
+        HistoryOverlay.InvalidateVisual();
         LoudnessMeter.ApplyValueColors();
         Transport.RefreshAppearance();
-        SettingsGear.RefreshAppearance();
+        TimeScrollStrip.RefreshAppearance();
+        TabScrollLeft.InvalidateVisual();
+        TabScrollRight.InvalidateVisual();
         _waapiToggle?.InvalidateVisual();
-        RebuildTabBar();
-    }
+        WaapiBar.RefreshAppearance();
+        RefreshTabHeaders();
+        RefreshStatus();
+#if DEBUG
+        if (includeColorPanel)
+        {
+            _colorDevPanel?.RefreshAppearance();
+        }
 #endif
+    }
 }

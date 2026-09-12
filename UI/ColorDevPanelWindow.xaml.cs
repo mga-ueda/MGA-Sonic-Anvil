@@ -1,8 +1,8 @@
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MgaSonicAnvil.Domain;
 using MediaColor = System.Windows.Media.Color;
 
@@ -14,10 +14,11 @@ namespace MgaSonicAnvil.UI;
 /// </summary>
 internal partial class ColorDevPanelWindow : Window
 {
-    private readonly Dictionary<string, Border> _swatches = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, TextBox> _hexInputs = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, TextBlock> _nameLabels = new(StringComparer.OrdinalIgnoreCase);
-    private bool _suppressHexEvents;
+    private readonly Dictionary<string, ColorRow> _rows = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<ColorGroup> _groups = [];
+    private readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
+    private bool _applyingOwnChange;
+    private string? _selectedKey;
 
     public event EventHandler? ColorsChanged;
 
@@ -26,150 +27,405 @@ internal partial class ColorDevPanelWindow : Window
         InitializeComponent();
         Title = UiStrings.ColorDevTitle;
         SourceInitialized += (_, _) => DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        Closed += (_, _) => FlushSave();
+        _saveTimer.Tick += (_, _) => FlushSave();
+        Picker.ColorChanged += (_, _) => ApplyLive(Picker.Color);
+        Picker.ColorCommitted += (_, _) => FlushSave();
         BuildRows();
         RefreshRows();
+        ApplyFilter();
+        SelectFirstVisible();
+        ApplyButtonLooks();
         ApplyTips();
+        UpdateSearchHint();
     }
 
     public void ApplyLocalizedText()
     {
         Title = UiStrings.ColorDevTitle;
+        SearchHint.Text = UiStrings.ColorDevSearch;
+        EmptyHint.Text = UiStrings.ColorDevNoMatches;
+        PickerHint.Text = UiStrings.ColorDevPickHint;
+        ResetThisButton.Content = UiStrings.ColorDevResetThis;
         ResetButton.Content = UiStrings.ColorDevResetToDefaults;
         CloseButton.Content = UiStrings.ColorDevClose;
-        foreach (var entry in UiColors.Entries)
-        {
-            if (_nameLabels.TryGetValue(entry.Key, out var label))
-            {
-                label.Text = entry.Label;
-            }
-        }
-
+        Picker.ApplyLocalizedText();
+        var selected = _selectedKey;
+        BuildRows();
+        RefreshRows();
+        ApplyButtonLooks();
         ApplyTips();
+        ApplyFilter();
+        if (selected is not null && _rows.ContainsKey(selected))
+        {
+            SelectKey(selected, scrollIntoView: false);
+        }
+    }
+
+    public void RefreshAppearance()
+    {
+        RefreshRows();
+        ApplyButtonLooks();
+        Picker.RefreshChrome();
+        if (!_applyingOwnChange)
+        {
+            SyncPickerFromSelection();
+        }
+    }
+
+    public void RefreshRows()
+    {
+        var offset = Scroll.VerticalOffset;
+        RefreshRowsCore();
+        Scroll.ScrollToVerticalOffset(offset);
+    }
+
+    private void ApplyButtonLooks()
+    {
+        ActionButtonLooks.ApplyClear(ResetThisButton);
+        ActionButtonLooks.ApplyClear(ResetButton);
+        ActionButtonLooks.ApplyAccent(CloseButton);
     }
 
     private void ApplyTips()
     {
+        TipService.Set(ResetThisButton, UiStrings.ColorDevResetThis);
         TipService.Set(ResetButton, UiStrings.ColorDevResetToDefaults);
         TipService.Set(CloseButton, UiStrings.ColorDevClose);
-        foreach (var entry in UiColors.Entries)
+        foreach (var row in _rows.Values)
         {
-            if (_nameLabels.TryGetValue(entry.Key, out var label))
-            {
-                TipService.Set(label, entry.Label);
-            }
-
-            if (_swatches.TryGetValue(entry.Key, out var swatch))
-            {
-                TipService.Set(swatch, entry.Label);
-            }
-
-            if (_hexInputs.TryGetValue(entry.Key, out var hex))
-            {
-                TipService.Set(hex, entry.Label);
-            }
+            TipService.Set(row.Host, row.Label);
+            TipService.Set(row.Name, row.Label);
+            TipService.Set(row.Swatch, row.Label);
         }
     }
 
     private void BuildRows()
     {
         ListPanel.Children.Clear();
-        _swatches.Clear();
-        _hexInputs.Clear();
-        _nameLabels.Clear();
+        _rows.Clear();
+        _groups.Clear();
 
-        var hexWidth = MeasureHexEditorWidth(12);
+        var items = UiColors.Entries
+            .Select(entry => (Entry: entry, Group: ColorDevCatalog.GroupOf(entry.Label)))
+            .OrderBy(item => item.Group, StringComparer.CurrentCulture)
+            .ThenBy(item => item.Entry.Label, StringComparer.CurrentCulture);
 
-        foreach (var entry in UiColors.Entries)
+        ColorGroup? current = null;
+        foreach (var (entry, groupTitle) in items)
         {
-            var row = new Grid { Height = 34, Margin = new Thickness(0, 0, 0, 2) };
-            row.ColumnDefinitions.Add(new ColumnDefinition
+            if (current is null || !string.Equals(current.Title, groupTitle, StringComparison.CurrentCulture))
             {
-                Width = GridLength.Auto,
-                SharedSizeGroup = "ColorDevName",
-            });
-            row.ColumnDefinitions.Add(new ColumnDefinition
-            {
-                Width = GridLength.Auto,
-                SharedSizeGroup = "ColorDevSwatch",
-            });
-            row.ColumnDefinitions.Add(new ColumnDefinition
-            {
-                Width = GridLength.Auto,
-                SharedSizeGroup = "ColorDevHex",
-            });
+                var header = new TextBlock
+                {
+                    Text = groupTitle,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = (Brush)FindResource("MutedForeBrush"),
+                    Margin = new Thickness(4, current is null ? 2 : 12, 4, 4),
+                };
+                current = new ColorGroup(groupTitle, header);
+                _groups.Add(current);
+                ListPanel.Children.Add(header);
+            }
 
-            var nameLabel = new TextBlock
-            {
-                Text = entry.Label,
-                Margin = new Thickness(0, 0, 12, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = (Brush)FindResource("PrimaryForeBrush"),
-            };
-            _nameLabels[entry.Key] = nameLabel;
-
-            var swatch = new Border
-            {
-                Width = 40,
-                Height = 22,
-                Margin = new Thickness(0, 4, 4, 4),
-                VerticalAlignment = VerticalAlignment.Center,
-                BorderBrush = (Brush)FindResource("ChromeBorderBrush"),
-                BorderThickness = new Thickness(1),
-                Cursor = Cursors.Hand,
-                Tag = entry.Key,
-            };
-            swatch.MouseLeftButtonUp += (_, _) => PickColor(entry.Key);
-
-            var hex = new TextBox
-            {
-                Width = hexWidth,
-                MinWidth = hexWidth,
-                MaxLength = 7,
-                Margin = new Thickness(0, 2, 0, 2),
-                Padding = new Thickness(6, 1, 6, 1),
-                VerticalAlignment = VerticalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center,
-                FontFamily = new FontFamily("Consolas"),
-                FontSize = 12,
-                Background = (Brush)FindResource("DialogInputBackBrush"),
-                Foreground = (Brush)FindResource("PrimaryForeBrush"),
-                BorderBrush = (Brush)FindResource("ChromeBorderBrush"),
-                BorderThickness = new Thickness(1),
-                Tag = entry.Key,
-            };
-            hex.LostFocus += Hex_LostFocus;
-            hex.KeyDown += Hex_KeyDown;
-
-            row.Children.Add(nameLabel);
-            row.Children.Add(swatch);
-            row.Children.Add(hex);
-            Grid.SetColumn(swatch, 1);
-            Grid.SetColumn(hex, 2);
-
-            _swatches[entry.Key] = swatch;
-            _hexInputs[entry.Key] = hex;
-            ListPanel.Children.Add(row);
+            var row = CreateRow(entry);
+            current.Rows.Add(row);
+            _rows[entry.Key] = row;
+            ListPanel.Children.Add(row.Host);
         }
     }
 
-    private double MeasureHexEditorWidth(double fontSize)
+    private ColorRow CreateRow(UiColorEntry entry)
     {
-        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-        if (dpi < 0.01)
+        var host = new Border
         {
-            dpi = 1d;
+            Padding = new Thickness(4, 3, 6, 3),
+            Margin = new Thickness(0, 0, 0, 1),
+            CornerRadius = new CornerRadius(6),
+            Cursor = Cursors.Hand,
+            Background = Brushes.Transparent,
+        };
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var accent = new Border
+        {
+            Width = 3,
+            Height = 22,
+            CornerRadius = new CornerRadius(1.5),
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Hidden,
+        };
+        var swatch = new Border
+        {
+            Width = 22,
+            Height = 22,
+            CornerRadius = new CornerRadius(5),
+            BorderThickness = new Thickness(1),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var name = new TextBlock
+        {
+            Text = entry.Label,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        };
+        var hex = new TextBlock
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            FontFamily = new FontFamily("Consolas"),
+            FontSize = 11,
+            Margin = new Thickness(8, 0, 0, 0),
+        };
+        grid.Children.Add(accent);
+        grid.Children.Add(swatch);
+        grid.Children.Add(name);
+        grid.Children.Add(hex);
+        Grid.SetColumn(swatch, 2);
+        Grid.SetColumn(name, 4);
+        Grid.SetColumn(hex, 5);
+        host.Child = grid;
+
+        var row = new ColorRow(entry.Key, host, accent, swatch, name, hex);
+        host.MouseLeftButtonUp += (_, _) => SelectKey(entry.Key, scrollIntoView: false);
+        host.MouseEnter += (_, _) => PaintRow(row, hover: true);
+        host.MouseLeave += (_, _) => PaintRow(row, hover: false);
+        return row;
+    }
+
+    private void RefreshRowsCore()
+    {
+        foreach (var entry in UiColors.Entries)
+        {
+            if (_rows.TryGetValue(entry.Key, out var row))
+            {
+                PaintColor(row, entry.Get());
+            }
         }
 
-        var formatted = new FormattedText(
-            "#RRGGBB",
-            CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight,
-            WpfControlHelpers.MonoTypeface,
-            fontSize,
-            Brushes.Black,
-            dpi);
-        var textWidth = Math.Max(formatted.WidthIncludingTrailingWhitespace, fontSize * 0.7 * 7);
-        return Math.Ceiling(textWidth) + 6 + 6 + 2 + 10;
+        PaintSelection();
+    }
+
+    private static void PaintColor(ColorRow row, MediaColor color)
+    {
+        var rgb = MediaColor.FromRgb(color.R, color.G, color.B);
+        row.Swatch.Background = UiColors.Brush(rgb);
+        row.Swatch.BorderBrush = WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush"));
+        row.Hex.Text = UiColors.FormatColor(color);
+        row.Hex.Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
+        row.Name.Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush"));
+    }
+
+    private void PaintRow(ColorRow row, bool hover)
+    {
+        var selected = string.Equals(row.Key, _selectedKey, StringComparison.OrdinalIgnoreCase);
+        row.Host.Background = selected
+            ? WpfControlHelpers.FrozenBrush(Theme.Get("TransportHoverBackBrush"))
+            : hover
+                ? WpfControlHelpers.FrozenBrush(Theme.Get("TransportHoverBackBrush"))
+                : Brushes.Transparent;
+        row.Accent.Background = WpfControlHelpers.FrozenBrush(Theme.Get("AccentCyanBrush"));
+        row.Accent.Visibility = selected ? Visibility.Visible : Visibility.Hidden;
+    }
+
+    private void PaintSelection()
+    {
+        foreach (var row in _rows.Values)
+        {
+            PaintRow(row, hover: false);
+        }
+    }
+
+    private void SelectKey(string key, bool scrollIntoView)
+    {
+        if (!_rows.TryGetValue(key, out var row))
+        {
+            return;
+        }
+
+        _selectedKey = key;
+        SelectedName.Text = row.Label;
+        SelectedName.Visibility = Visibility.Visible;
+        Picker.Visibility = Visibility.Visible;
+        PickerHint.Visibility = Visibility.Collapsed;
+        ResetThisButton.IsEnabled = true;
+        PaintSelection();
+        SyncPickerFromSelection();
+        if (scrollIntoView)
+        {
+            row.Host.BringIntoView();
+        }
+
+        Scroll.Focus();
+    }
+
+    private void SelectFirstVisible()
+    {
+        var first = VisibleRows().FirstOrDefault();
+        if (first is null)
+        {
+            _selectedKey = null;
+            SelectedName.Visibility = Visibility.Collapsed;
+            Picker.Visibility = Visibility.Collapsed;
+            PickerHint.Visibility = Visibility.Visible;
+            ResetThisButton.IsEnabled = false;
+            PaintSelection();
+            return;
+        }
+
+        SelectKey(first.Key, scrollIntoView: false);
+    }
+
+    private void SyncPickerFromSelection()
+    {
+        if (_selectedKey is null)
+        {
+            return;
+        }
+
+        var entry = FindEntry(_selectedKey);
+        if (entry is null)
+        {
+            return;
+        }
+
+        var color = entry.Get();
+        Picker.SetColor(MediaColor.FromRgb(color.R, color.G, color.B));
+    }
+
+    private void ApplyLive(MediaColor rgb)
+    {
+        if (_selectedKey is null)
+        {
+            return;
+        }
+
+        var entry = FindEntry(_selectedKey);
+        if (entry is null)
+        {
+            return;
+        }
+
+        var alpha = UiColors.GetDefaultAlpha(_selectedKey);
+        _applyingOwnChange = true;
+        try
+        {
+            entry.Set(MediaColor.FromArgb(alpha, rgb.R, rgb.G, rgb.B));
+            if (_rows.TryGetValue(_selectedKey, out var row))
+            {
+                PaintColor(row, entry.Get());
+            }
+
+            ColorsChanged?.Invoke(this, EventArgs.Empty);
+        }
+        finally
+        {
+            _applyingOwnChange = false;
+        }
+
+        _saveTimer.Stop();
+        _saveTimer.Start();
+    }
+
+    private void FlushSave()
+    {
+        _saveTimer.Stop();
+        UiColors.Save();
+    }
+
+    private void ApplyFilter()
+    {
+        var query = SearchBox.Text;
+        var any = false;
+        foreach (var group in _groups)
+        {
+            var visibleInGroup = false;
+            foreach (var row in group.Rows)
+            {
+                var hex = row.Hex.Text;
+                var show = ColorDevCatalog.Matches(row.Label, row.Key, hex, query);
+                row.Host.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+                visibleInGroup |= show;
+                any |= show;
+            }
+
+            group.Header.Visibility = visibleInGroup ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        EmptyHint.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
+        Scroll.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
+        if (_selectedKey is null || !_rows.TryGetValue(_selectedKey, out var selected)
+            || selected.Host.Visibility != Visibility.Visible)
+        {
+            SelectFirstVisible();
+        }
+    }
+
+    private IEnumerable<ColorRow> VisibleRows() =>
+        _groups.SelectMany(group => group.Rows)
+            .Where(row => row.Host.Visibility == Visibility.Visible);
+
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdateSearchHint();
+        if (Picker is null || ListPanel is null)
+        {
+            return;
+        }
+
+        ApplyFilter();
+    }
+
+    private void SearchBox_FocusChanged(object sender, KeyboardFocusChangedEventArgs e) =>
+        UpdateSearchHint();
+
+    private void UpdateSearchHint()
+    {
+        if (SearchHint is null)
+        {
+            return;
+        }
+
+        SearchHint.Visibility = string.IsNullOrEmpty(SearchBox.Text) && !SearchBox.IsKeyboardFocused
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void Scroll_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key is not (Key.Up or Key.Down) || SearchBox.IsKeyboardFocusWithin)
+        {
+            return;
+        }
+
+        var visible = VisibleRows().ToList();
+        if (visible.Count == 0)
+        {
+            return;
+        }
+
+        var index = visible.FindIndex(row =>
+            string.Equals(row.Key, _selectedKey, StringComparison.OrdinalIgnoreCase));
+        if (index < 0)
+        {
+            index = 0;
+        }
+        else if (e.Key == Key.Down)
+        {
+            index = Math.Min(visible.Count - 1, index + 1);
+        }
+        else
+        {
+            index = Math.Max(0, index - 1);
+        }
+
+        SelectKey(visible[index].Key, scrollIntoView: true);
+        e.Handled = true;
     }
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -186,256 +442,76 @@ internal partial class ColorDevPanelWindow : Window
     private void ResetButton_Click(object sender, RoutedEventArgs e)
     {
         UiColors.ResetToDefaults();
-        ApplyColorChange();
-    }
-
-    public void RefreshRows()
-    {
-        var offset = Scroll.VerticalOffset;
-        RefreshRowsCore();
-        Scroll.ScrollToVerticalOffset(offset);
-    }
-
-    private void Hex_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter || sender is not TextBox hex || hex.Tag is not string key)
-        {
-            return;
-        }
-
-        e.Handled = true;
-        ApplyHexText(key, hex.Text);
-    }
-
-    private void Hex_LostFocus(object sender, RoutedEventArgs e)
-    {
-        if (_suppressHexEvents || sender is not TextBox hex || hex.Tag is not string key)
-        {
-            return;
-        }
-
-        ApplyHexText(key, hex.Text);
-    }
-
-    private void ApplyHexText(string key, string text)
-    {
-        var entry = FindEntry(key);
-        if (entry is null)
-        {
-            return;
-        }
-
-        var current = entry.Get();
-        var expected = UiColors.FormatColor(current);
-        if (string.Equals(text.Trim(), expected, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        if (!UiColors.TryParseColor(text, out var parsed))
-        {
-            _suppressHexEvents = true;
-            try
-            {
-                if (_hexInputs.TryGetValue(key, out var hex))
-                {
-                    hex.Text = expected;
-                }
-            }
-            finally
-            {
-                _suppressHexEvents = false;
-            }
-
-            return;
-        }
-
-        var alpha = UiColors.GetDefaultAlpha(key);
-        entry.Set(MediaColor.FromArgb(alpha, parsed.R, parsed.G, parsed.B));
-        ApplyColorChange();
-    }
-
-    private void PickColor(string key)
-    {
-        var entry = FindEntry(key);
-        if (entry is null)
-        {
-            return;
-        }
-
-        var current = entry.Get();
-        var picker = new WpfRgbColorPickerWindow(Owner, MediaColor.FromRgb(current.R, current.G, current.B));
-        if (picker.ShowDialog() != true)
-        {
-            return;
-        }
-
-        var alpha = UiColors.GetDefaultAlpha(key);
-        entry.Set(MediaColor.FromArgb(alpha, picker.SelectedColor.R, picker.SelectedColor.G, picker.SelectedColor.B));
-        ApplyColorChange();
-    }
-
-    private void ApplyColorChange()
-    {
-        var offset = Scroll.VerticalOffset;
-        RefreshRowsCore();
-        UiColors.Save();
+        RefreshRows();
+        SyncPickerFromSelection();
+        FlushSave();
         ColorsChanged?.Invoke(this, EventArgs.Empty);
-        Dispatcher.BeginInvoke(
-            () => Scroll.ScrollToVerticalOffset(offset),
-            System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void ResetThisButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedKey is null)
+        {
+            return;
+        }
+
+        var color = UiColors.Default(_selectedKey);
+        var alpha = UiColors.GetDefaultAlpha(_selectedKey);
+        FindEntry(_selectedKey)?.Set(MediaColor.FromArgb(alpha, color.R, color.G, color.B));
+        RefreshRows();
+        SyncPickerFromSelection();
+        FlushSave();
+        ColorsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private static UiColorEntry? FindEntry(string key) =>
         UiColors.Entries.FirstOrDefault(entry => string.Equals(entry.Key, key, StringComparison.OrdinalIgnoreCase));
 
-    private void RefreshRowsCore()
+    private sealed class ColorGroup
     {
-        _suppressHexEvents = true;
-        try
+        public ColorGroup(string title, TextBlock header)
         {
-            foreach (var entry in UiColors.Entries)
-            {
-                var color = entry.Get();
-                if (_swatches.TryGetValue(entry.Key, out var swatch))
-                {
-                    swatch.Background = UiColors.Brush(MediaColor.FromRgb(color.R, color.G, color.B));
-                }
+            Title = title;
+            Header = header;
+        }
 
-                if (_hexInputs.TryGetValue(entry.Key, out var hex))
-                {
-                    hex.Text = UiColors.FormatColor(color);
-                }
-            }
-        }
-        finally
-        {
-            _suppressHexEvents = false;
-        }
+        public string Title { get; }
+
+        public TextBlock Header { get; }
+
+        public List<ColorRow> Rows { get; } = [];
     }
 
-    private sealed class WpfRgbColorPickerWindow : Window
+    private sealed class ColorRow
     {
-        private readonly TextBox _rBox;
-        private readonly TextBox _gBox;
-        private readonly TextBox _bBox;
-        private readonly Border _preview;
-
-        public MediaColor SelectedColor { get; private set; }
-
-        public WpfRgbColorPickerWindow(Window? owner, MediaColor initial)
+        public ColorRow(
+            string key,
+            Border host,
+            Border accent,
+            Border swatch,
+            TextBlock name,
+            TextBlock hex)
         {
-            Owner = owner;
-            WindowStartupLocation = owner is null
-                ? WindowStartupLocation.CenterScreen
-                : WindowStartupLocation.CenterOwner;
-            Title = UiStrings.ColorDevTitle;
-            SizeToContent = SizeToContent.WidthAndHeight;
-            ResizeMode = ResizeMode.NoResize;
-            ShowInTaskbar = false;
-            WindowStyle = WindowStyle.ToolWindow;
-            Background = (Brush)Application.Current.FindResource("ColorPanelBackBrush");
-            Foreground = (Brush)Application.Current.FindResource("PrimaryForeBrush");
-            SourceInitialized += (_, _) => DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
-            SelectedColor = initial;
-
-            var root = new StackPanel { Margin = new Thickness(16), MinWidth = 240 };
-            _preview = new Border
-            {
-                Height = 36,
-                Margin = new Thickness(0, 0, 0, 12),
-                BorderBrush = (Brush)Application.Current.FindResource("ChromeBorderBrush"),
-                BorderThickness = new Thickness(1),
-                Background = UiColors.Brush(initial),
-            };
-
-            _rBox = CreateChannelBox(initial.R);
-            _gBox = CreateChannelBox(initial.G);
-            _bBox = CreateChannelBox(initial.B);
-            root.Children.Add(_preview);
-            root.Children.Add(CreateChannelRow("R", _rBox));
-            root.Children.Add(CreateChannelRow("G", _gBox));
-            root.Children.Add(CreateChannelRow("B", _bBox));
-
-            var buttons = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(0, 12, 0, 0),
-            };
-            var ok = new Button { Content = UiStrings.ButtonOk, Width = 72, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
-            var cancel = new Button { Content = UiStrings.ButtonCancel, Width = 72, IsCancel = true };
-            ok.Click += (_, _) =>
-            {
-                if (TryReadColor(out var color))
-                {
-                    SelectedColor = color;
-                    DialogResult = true;
-                    Close();
-                }
-            };
-            cancel.Click += (_, _) =>
-            {
-                DialogResult = false;
-                Close();
-            };
-            buttons.Children.Add(ok);
-            buttons.Children.Add(cancel);
-            root.Children.Add(buttons);
-            Content = root;
-
-            _rBox.TextChanged += (_, _) => UpdatePreviewFromFields();
-            _gBox.TextChanged += (_, _) => UpdatePreviewFromFields();
-            _bBox.TextChanged += (_, _) => UpdatePreviewFromFields();
+            Key = key;
+            Host = host;
+            Accent = accent;
+            Swatch = swatch;
+            Name = name;
+            Hex = hex;
         }
 
-        private static TextBox CreateChannelBox(byte value) => new()
-        {
-            Width = 56,
-            Height = 28,
-            MaxLength = 3,
-            Padding = new Thickness(4, 1, 4, 1),
-            VerticalContentAlignment = VerticalAlignment.Center,
-            HorizontalContentAlignment = HorizontalAlignment.Center,
-            FontFamily = new FontFamily("Consolas"),
-            FontSize = 12,
-            Text = value.ToString(CultureInfo.InvariantCulture),
-        };
+        public string Key { get; }
 
-        private static StackPanel CreateChannelRow(string label, TextBox box)
-        {
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
-            row.Children.Add(new TextBlock
-            {
-                Text = label,
-                Width = 16,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-            });
-            row.Children.Add(box);
-            return row;
-        }
+        public Border Host { get; }
 
-        private void UpdatePreviewFromFields()
-        {
-            if (TryReadColor(out var color))
-            {
-                _preview.Background = UiColors.Brush(color);
-            }
-        }
+        public Border Accent { get; }
 
-        private bool TryReadColor(out MediaColor color)
-        {
-            color = default;
-            if (!byte.TryParse(_rBox.Text, out var r)
-                || !byte.TryParse(_gBox.Text, out var g)
-                || !byte.TryParse(_bBox.Text, out var b))
-            {
-                return false;
-            }
+        public Border Swatch { get; }
 
-            color = MediaColor.FromRgb(r, g, b);
-            return true;
-        }
+        public TextBlock Name { get; }
+
+        public TextBlock Hex { get; }
+
+        public string Label => Name.Text;
     }
 }

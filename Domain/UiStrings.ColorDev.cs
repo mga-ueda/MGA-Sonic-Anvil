@@ -5,6 +5,13 @@ internal static partial class UiStrings
     public static string ColorDevTitle => Get("色調整（開発者）", "Color tuning (developer)");
     public static string ColorDevClose => Get("閉じる", "Close");
     public static string ColorDevResetToDefaults => Get("既定に戻す", "Reset to defaults");
+    public static string ColorDevResetThis => Get("この色を既定に戻す", "Reset this color");
+    public static string ColorDevSearch => Get("検索", "Search");
+    public static string ColorDevHex => Get("Hex", "Hex");
+    public static string ColorDevPickHint => Get(
+        "左の一覧から色を選ぶと、ここで調整できます。",
+        "Select a color on the left to edit it here.");
+    public static string ColorDevNoMatches => Get("一致する色がありません。", "No matching colors.");
 
     public static string ColorLabel(string key)
     {
@@ -21,6 +28,10 @@ internal static partial class UiStrings
             "ChromeBorder" => Get("共通・クローム境界", "Shared · chrome border"),
             "ChromeMid" => Get("共通・中間グレー", "Shared · mid gray"),
             "ChromeDim" => Get("共通・無効／薄いグレー", "Shared · disabled / dim gray"),
+            "ScrollThumbBack" => Get("スクロールつまみ・塗り", "Scroll thumb · fill"),
+            "ScrollThumbHoverBack" => Get("スクロールつまみ・ホバー", "Scroll thumb · hover"),
+            "ScrollThumbPressedBack" => Get("スクロールつまみ・ドラッグ", "Scroll thumb · drag"),
+            "ScrollThumbGrip" => Get("スクロールつまみ・端の線", "Scroll thumb · end grips"),
             "ControlHoverBorder" => Get("コントロール・ホバー境界", "Control · hover border"),
             "DialogInputBack" => Get("入力欄・背景", "Input · background"),
             "MenuSeparator" => Get("メニュー・区切り", "Menu · separator"),
@@ -29,7 +40,7 @@ internal static partial class UiStrings
             "WaveFillOverlay" => Get("波形（スペクトログラム重ね）", "Waveform (spectrogram overlay)"),
             "WaveZeroLine" => Get("波形 0dB 線", "Waveform 0 dB line"),
             "WaveformScrollTrack" => Get("波形スクロール・トラック", "Waveform scroll · track"),
-            "TimelineWellBack" => Get("タイムライン井戸・背景", "Timeline well · background"),
+            "TimelineWellBack" => Get("タイムライン・背景", "Timeline · background"),
             "Playhead" => Get("再生ヘッド", "Playhead"),
             "SeekExit" => Get("Exit 二重再生ヘッド", "Exit dual playhead"),
             "MouseGuide" => Get("マウスガイド", "Mouse guide"),
@@ -49,11 +60,21 @@ internal static partial class UiStrings
             "RegionWaveFillLoop" => Get("波形リージョン（-L）", "Wave region (-L)"),
             "RegionWaveFillExit" => Get("波形リージョン（-E）", "Wave region (-E)"),
             "RegionWaveFillExcluded" => Get("波形リージョン（-R）", "Wave region (-R)"),
+            "LevelMeterTrackBack" => Get("レベルメーター・トラック", "Level meter · track"),
+            "LevelMeterTrackBorder" => Get("レベルメーター・トラック枠", "Level meter · track border"),
+            "LevelMeterHoldBorder" => Get("レベルメーター・ホールド枠", "Level meter · hold border"),
+            "LevelMeterTick" => Get("レベルメーター・目盛", "Level meter · ticks"),
+            "DbScaleFore" => Get("音量目盛・文字", "Volume scale · text"),
+            "SpectrogramScaleFore" => Get("スペクトログラム・周波数文字", "Spectrogram · frequency text"),
+            "SurroundHullStroke" => Get("サラウンド・RMS枠", "Surround · RMS hull"),
+            "LevelMeterClipOff" => Get("レベルメーター・クリップ消灯", "Level meter · clip off"),
+            "LevelMeterClipOffBorder" => Get("レベルメーター・クリップ消灯枠", "Level meter · clip off border"),
             "VectorScopeBack" => Get("ベクタースコープ・背景", "Vector scope · background"),
             "VectorScopeTrace" => Get("ベクタースコープ・軌跡", "Vector scope · trace"),
             "VectorScopeGrid" => Get("ベクタースコープ・十字", "Vector scope · cross"),
             "VectorScopeCorrelation" => Get("ベクタースコープ・相関針", "Vector scope · correlation"),
             "ProjectBarBack" => Get("全体波形バー・背景", "Overview bar · background"),
+            "OverviewOutsideFill" => Get("全体波形・範囲外", "Overview · outside view"),
             "TransportBack" => Get("トランスポート・背景", "Transport · background"),
             "TransportFore" => Get("トランスポート・文字", "Transport · text"),
             "TransportDisabledFore" => Get("トランスポート・無効文字", "Transport · disabled text"),
@@ -61,6 +82,9 @@ internal static partial class UiStrings
             "TransportPressedBack" => Get("トランスポート・押下", "Transport · pressed"),
             "HistoryStripBack" => Get("履歴ストリップ・背景", "History strip · background"),
             "HistoryStripHoverBack" => Get("履歴ストリップ・ホバー", "History strip · hover"),
+            "HistoryStripCurrentFore" => Get("履歴ストリップ・現在", "History strip · current"),
+            "HistoryStripPastFore" => Get("履歴ストリップ・過去", "History strip · past"),
+            "HistoryStripFutureFore" => Get("履歴ストリップ・未来", "History strip · undone"),
             "WaapiToggleOffBack" => Get("WAAPI トグル・オフ背景", "WAAPI toggle · off background"),
             "WaapiToggleOffHoverBack" => Get("WAAPI トグル・オフホバー", "WAAPI toggle · off hover"),
             "WaapiToggleOffFore" => Get("WAAPI トグル・オフ文字", "WAAPI toggle · off text"),
