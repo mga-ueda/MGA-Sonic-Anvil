@@ -2,16 +2,19 @@
              x:ClassModifier="internal"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:MgaSonicAnvil.UI"
              Focusable="False"
              ToolTipService.IsEnabled="True"
+             MinWidth="{x:Static ui:DesignMetrics.TransportFixedRowWidth}"
+             MinHeight="{x:Static ui:DesignMetrics.TransportBarHeight}"
              Background="{DynamicResource TransportBackBrush}">
   <StackPanel HorizontalAlignment="Left"
               VerticalAlignment="Top"
-              Margin="12,4,12,0">
-    <StackPanel x:Name="ButtonsHost"
+              Margin="8,2,8,0">
+    <StackPanel x:Name="TopRow"
                 Orientation="Horizontal" />
-    <StackPanel x:Name="EditButtonsHost"
+    <StackPanel x:Name="BottomRow"
                 Orientation="Horizontal"
-                Margin="0,2,0,0" />
+                Margin="{x:Static ui:DesignMetrics.TransportBottomRowMargin}" />
   </StackPanel>
 </UserControl>

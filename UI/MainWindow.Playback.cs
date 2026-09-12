@@ -29,10 +29,25 @@ public partial class MainWindow
             case TransportCommand.Record:
                 ToggleRecording();
                 break;
+            case TransportCommand.JumpToTime:
+                StatusTimes.FocusCurrentTime();
+                break;
             case TransportCommand.GoToStart:
                 Waveform.ClearSelection();
                 SeekFrame(0);
                 Waveform.PanTimeToStart();
+                break;
+            case TransportCommand.PreviousPage:
+                Waveform.SeekByVisibleFraction(-0.05);
+                break;
+            case TransportCommand.NextPage:
+                Waveform.SeekByVisibleFraction(0.05);
+                break;
+            case TransportCommand.PreviousMarker:
+                Waveform.SeekToMarker(-1);
+                break;
+            case TransportCommand.NextMarker:
+                Waveform.SeekToMarker(1);
                 break;
             case TransportCommand.GoToEnd:
                 if (_document is not null)
@@ -67,23 +82,87 @@ public partial class MainWindow
             case TransportCommand.AmpZoomReset:
                 Waveform.ResetAmpZoom();
                 break;
+            case TransportCommand.CycleWaveformHeight:
+                CycleWaveformHeight();
+                break;
             case TransportCommand.FadeIn:
                 PromptFade(fadeIn: true, Transport.ButtonFor(TransportCommand.FadeIn));
                 break;
             case TransportCommand.FadeOut:
                 PromptFade(fadeIn: false, Transport.ButtonFor(TransportCommand.FadeOut));
                 break;
+            case TransportCommand.FadeAround:
+                ApplyFadeAroundPlayhead();
+                break;
             case TransportCommand.Normalize:
                 ApplyNormalize();
+                break;
+            case TransportCommand.Volume:
+                PromptVolume();
+                break;
+            case TransportCommand.Pitch:
+                PromptPitch();
+                break;
+            case TransportCommand.TimeStretch:
+                PromptTimeStretch();
+                break;
+            case TransportCommand.Reverse:
+                ApplyReverse();
                 break;
             case TransportCommand.Delete:
                 ApplyDelete();
                 break;
+            case TransportCommand.Undo:
+                UndoEdit();
+                break;
+            case TransportCommand.Redo:
+                RedoEdit();
+                break;
+            case TransportCommand.AddMarker:
+                TryAddMarkerAtPlayhead();
+                break;
+            case TransportCommand.SetLoop:
+                SetSampleLoopFromSelection();
+                break;
+            case TransportCommand.SetRegion:
+                TrySetRegionFromSelection();
+                break;
+            case TransportCommand.Open:
+                OpenFromDialog();
+                break;
             case TransportCommand.Save:
                 Save(saveAs: false);
                 break;
+            case TransportCommand.SaveAs:
+                Save(saveAs: true);
+                break;
             case TransportCommand.SaveMp3:
                 SaveAsMp3();
+                break;
+            case TransportCommand.ToggleAnalysis:
+            case TransportCommand.ToggleSpectrogram:
+                Waveform.CycleSpectrogramView();
+                break;
+            case TransportCommand.ToggleLoudnessView:
+                Waveform.ToggleLoudnessView();
+                break;
+            case TransportCommand.CenterPlayhead:
+                CenterPlayheadOrToggleLock();
+                break;
+            case TransportCommand.History:
+                OpenEditHistory();
+                break;
+            case TransportCommand.ToggleUiTheme:
+                UiThemeService.ToggleDarkLight();
+                break;
+            case TransportCommand.ToggleTips:
+                ToggleTips();
+                break;
+            case TransportCommand.OpenSettings:
+                OpenSettings();
+                break;
+            case TransportCommand.OpenManual:
+                ManualViewer.Open(this);
                 break;
             case TransportCommand.ToggleWaapi:
                 ToggleWaapiPanel();
@@ -943,6 +1022,35 @@ public partial class MainWindow
         AfterMarkerEdit();
     }
 
+    private void CycleWaveformHeight()
+    {
+        _waveformHeightScale = _waveformHeightScale >= 3 ? 1 : _waveformHeightScale + 1;
+        ApplyWaveformHeightScale();
+        Transport.SetWaveformHeightScale(_waveformHeightScale);
+        AppStorage.Settings.WaveformHeightScale = _waveformHeightScale;
+        AppStorage.Save();
+    }
+
+    private void CenterPlayheadOrToggleLock()
+    {
+        if (IsPlaybackActive())
+        {
+            DetachOverviewScrubKeepPlayback();
+            if (Waveform.CenterLocked)
+            {
+                Waveform.UnlockCenter();
+            }
+            else
+            {
+                Waveform.LockCenterToPlayhead();
+            }
+
+            return;
+        }
+
+        Waveform.CenterViewOnPlayhead();
+    }
+
     private void ApplyWaveformHeightScale()
     {
         var host = Waveform.Parent as System.Windows.FrameworkElement;
@@ -950,5 +1058,7 @@ public partial class MainWindow
         {
             border.MinHeight = DesignMetrics.WaveformHostMinHeight * _waveformHeightScale;
         }
+
+        Transport.SetWaveformHeightScale(_waveformHeightScale);
     }
 }
