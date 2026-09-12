@@ -34,7 +34,7 @@ public sealed class WindowPlacementTests
         {
             WindowX = 80,
             WindowY = 40,
-            WindowWidth = 1300,
+            WindowWidth = 1920,
             WindowHeight = 640,
             WindowState = "Normal",
         };
@@ -42,7 +42,7 @@ public sealed class WindowPlacementTests
         Assert.False(maximized);
         Assert.Equal(80, bounds.X);
         Assert.Equal(40, bounds.Y);
-        Assert.Equal(1300, bounds.Width);
+        Assert.Equal(1920, bounds.Width);
         Assert.Equal(640, bounds.Height);
     }
 
@@ -53,7 +53,7 @@ public sealed class WindowPlacementTests
         {
             WindowX = 0,
             WindowY = 0,
-            WindowWidth = 1280,
+            WindowWidth = 1920,
             WindowHeight = 720,
             WindowState = "Maximized",
         };
