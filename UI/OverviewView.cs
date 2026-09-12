@@ -9,6 +9,7 @@ namespace MgaSonicAnvil.UI;
 internal sealed class OverviewView : FrameworkElement
 {
     private AudioDocument? _document;
+    private WaveformView? _seekTrailSource;
     private WriteableBitmap? _bitmap;
     private WriteableBitmap? _invertBitmap;
     private int[] _invertPixels = [];
@@ -67,6 +68,12 @@ internal sealed class OverviewView : FrameworkElement
             _waveDirty = true;
             InvalidateVisual();
         }
+    }
+
+    public WaveformView? SeekTrailSource
+    {
+        get => _seekTrailSource;
+        set => _seekTrailSource = value;
     }
 
     public double FrameAt(double x)
@@ -371,6 +378,15 @@ internal sealed class OverviewView : FrameworkElement
         }
 
         var frames = (double)_document.FrameCount;
+        var playFrame = _seekTrailSource?.PlayheadFrame ?? _document.CursorFrame;
+        var playX = playFrame / frames * bounds.Width;
+        if (_exitPlayheadFrame >= 0)
+        {
+            var exitX = _exitPlayheadFrame / frames * bounds.Width;
+            DrawSeekTrail(dc, bounds, exitX, _seekTrailSource?.ExitSeekTrailSamples, Theme.Get("SeekExitBrush"));
+        }
+
+        DrawSeekTrail(dc, bounds, playX, _seekTrailSource?.SeekTrailSamples, Theme.Get("PlayheadBrush"));
         if (_exitPlayheadFrame >= 0)
         {
             EnsureExitPlayheadPens();
@@ -378,7 +394,34 @@ internal sealed class OverviewView : FrameworkElement
         }
 
         EnsurePlayheadPens();
-        DrawPlayheadLine(dc, bounds, frames, _document.CursorFrame, _playheadGlowOuter!, _playheadGlowInner!, _playheadCore!);
+        DrawPlayheadLine(dc, bounds, frames, playFrame, _playheadGlowOuter!, _playheadGlowInner!, _playheadCore!);
+    }
+
+    private void DrawSeekTrail(
+        DrawingContext dc,
+        Rect bounds,
+        double playheadX,
+        IReadOnlyList<(long Frame, long TickMs)>? samples,
+        Color color)
+    {
+        if (_document is null || samples is null || samples.Count < 2)
+        {
+            return;
+        }
+
+        var frames = (double)_document.FrameCount;
+        var durationSec = _document.SampleRate <= 0
+            ? 0
+            : _document.FrameCount / (double)_document.SampleRate;
+        SeekPlaybackTrailPaint.Draw(
+            dc,
+            bounds,
+            playheadX,
+            contentLeft: 0,
+            samples,
+            frame => frame / frames * bounds.Width,
+            SeekPlaybackTrailPaint.FadeMs(bounds.Width, durationSec),
+            color);
     }
 
     private static void DrawPlayheadLine(
@@ -446,7 +489,7 @@ internal sealed class OverviewView : FrameworkElement
             return;
         }
 
-        var dim = WpfControlHelpers.FrozenBrush(Color.FromArgb(150, 0, 0, 0));
+        var dim = WpfControlHelpers.FrozenBrush(Theme.Get("OverviewOutsideFillBrush"));
         if (window.X > 0.5)
         {
             dc.DrawRectangle(dim, null, new Rect(0, 0, window.X, bounds.Height));
