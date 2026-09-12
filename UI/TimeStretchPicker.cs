@@ -67,7 +67,7 @@ internal static class TimeStretchPicker
             UiStrings.LabelTimeStretchDest,
             UiStrings.LabelTimeStretchPercent);
         var root = PickerChrome.Panel();
-        root.Children.Add(PickerChrome.Title(UiStrings.LabelTimeStretch));
+        root.Children.Add(PickerChrome.TitleBar(UiStrings.LabelTimeStretch, menu));
         root.Children.Add(
             PickerChrome.FieldRow(UiStrings.LabelTimeStretchSource, state.SourceText, null, labelWidth));
         root.Children.Add(

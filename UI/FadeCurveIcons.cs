@@ -18,6 +18,18 @@ internal static class FadeCurveIcons
 
     public static int CanvasSize(int pixelSize) => Math.Max(8, pixelSize) + CanvasPad * 2;
 
+    private static Color CurveColor()
+    {
+        try
+        {
+            return Theme.Get("PrimaryForeBrush");
+        }
+        catch (InvalidOperationException)
+        {
+            return Color.FromArgb(220, 220, 220, 220);
+        }
+    }
+
     public static ImageSource Create(
         FadeShape shape,
         bool isFadeIn,
@@ -30,7 +42,7 @@ internal static class FadeCurveIcons
         {
             dc.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, canvas, canvas));
 
-            var pen = new Pen(new SolidColorBrush(Color.FromArgb(220, 220, 220, 220)), 1.4)
+            var pen = new Pen(WpfControlHelpers.FrozenBrush(CurveColor()), 1.4)
             {
                 StartLineCap = PenLineCap.Round,
                 EndLineCap = PenLineCap.Round,
@@ -40,44 +52,61 @@ internal static class FadeCurveIcons
 
             var inset = CanvasPad + 1.5;
             var span = canvas - inset * 2;
-            var geo = new StreamGeometry();
-            using (var ctx = geo.Open())
-            {
-                if (shape == FadeShape.Constant)
-                {
-                    var y = canvas * 0.5;
-                    ctx.BeginFigure(new Point(inset, y), false, false);
-                    ctx.LineTo(new Point(inset + span, y), true, true);
-                }
-                else
-                {
-                    const int samples = 16;
-                    for (var i = 0; i <= samples; i++)
-                    {
-                        var t = i / (double)samples;
-                        var rising = IconRising(shape, t);
-                        var yGain = isFadeIn ? rising : 1d - rising;
-                        var p = new Point(inset + t * span, canvas - inset - yGain * span);
-                        if (i == 0)
-                        {
-                            ctx.BeginFigure(p, false, false);
-                        }
-                        else
-                        {
-                            ctx.LineTo(p, true, true);
-                        }
-                    }
-                }
-            }
-
-            geo.Freeze();
-            dc.DrawGeometry(null, pen, geo);
+            DrawCurve(dc, shape, isFadeIn, new Rect(inset, inset, span, span), pen);
         }
 
         var bmp = new RenderTargetBitmap(canvas, canvas, 96, 96, PixelFormats.Pbgra32);
         bmp.Render(visual);
         bmp.Freeze();
         return bmp;
+    }
+
+    public static void DrawCurve(
+        DrawingContext dc,
+        FadeShape shape,
+        bool isFadeIn,
+        Rect bounds,
+        Pen pen)
+    {
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            return;
+        }
+
+        var geo = new StreamGeometry();
+        using (var ctx = geo.Open())
+        {
+            if (shape == FadeShape.Constant)
+            {
+                var y = bounds.Y + bounds.Height * 0.5;
+                ctx.BeginFigure(new Point(bounds.X, y), false, false);
+                ctx.LineTo(new Point(bounds.X + bounds.Width, y), true, true);
+            }
+            else
+            {
+                const int samples = 16;
+                for (var i = 0; i <= samples; i++)
+                {
+                    var t = i / (double)samples;
+                    var rising = IconRising(shape, t);
+                    var yGain = isFadeIn ? rising : 1d - rising;
+                    var p = new Point(
+                        bounds.X + t * bounds.Width,
+                        bounds.Y + (1d - yGain) * bounds.Height);
+                    if (i == 0)
+                    {
+                        ctx.BeginFigure(p, false, false);
+                    }
+                    else
+                    {
+                        ctx.LineTo(p, true, true);
+                    }
+                }
+            }
+        }
+
+        geo.Freeze();
+        dc.DrawGeometry(null, pen, geo);
     }
 
     /// <summary>TimeCaster と同様、S / InvS だけ二度がけして 18px でも形が分かる。</summary>
@@ -108,7 +137,6 @@ internal static class FadeCurveIcons
             var item = new MenuItem
             {
                 Header = PickerChrome.Numbered(index, UiStrings.LabelFadeCurve((int)shape)),
-                InputGestureText = index.ToString(),
                 Tag = captured,
                 Icon = new Border
                 {
@@ -167,6 +195,7 @@ internal static class FadeCurveIcons
         menu.Placement = PlacementMode.RelativePoint;
         menu.HorizontalOffset = clientLocation.X;
         menu.VerticalOffset = clientLocation.Y;
+        PickerChrome.FitListMenu(menu);
         menu.IsOpen = true;
         return menu;
     }

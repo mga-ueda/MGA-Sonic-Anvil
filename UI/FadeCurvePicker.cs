@@ -93,6 +93,7 @@ internal static class FadeCurvePicker
                 DispatcherPriority.Input);
         };
 
+        PickerChrome.FitListMenu(menu);
         menu.IsOpen = true;
         return menu;
     }

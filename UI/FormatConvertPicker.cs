@@ -87,7 +87,6 @@ internal static class FormatConvertPicker
             var item = new MenuItem
             {
                 Header = PickerChrome.Numbered(i + 1, FormatLabel(kind, value)),
-                InputGestureText = (i + 1).ToString(CultureInfo.InvariantCulture),
                 Tag = value,
                 Icon = AccentMark(value == currentValue, cyan),
             };

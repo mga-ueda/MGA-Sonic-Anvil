@@ -46,6 +46,37 @@ internal static class PickerChrome
             Margin = new Thickness(0, 0, 0, 4),
         };
 
+    public static readonly Thickness FormItemPadding = new(12, 8, 12, 8);
+
+    public static DockPanel TitleBar(string title, ContextMenu menu)
+    {
+        var bar = CloseBar(menu, new Thickness(0, -FormItemPadding.Top, -FormItemPadding.Right, 4), fill: true);
+        bar.Children.Add(Title(title));
+        return bar;
+    }
+
+    public static void PrependClose(Panel root, ContextMenu menu)
+    {
+        root.Children.Insert(
+            0,
+            CloseBar(menu, new Thickness(0, -FormItemPadding.Top, -FormItemPadding.Right, 2), fill: false));
+    }
+
+    private static DockPanel CloseBar(ContextMenu menu, Thickness margin, bool fill)
+    {
+        var bar = new DockPanel
+        {
+            LastChildFill = fill,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = margin,
+        };
+        var close = OverlayCaption.CloseButton(() => menu.IsOpen = false);
+        OverlayCaption.PinCorner(close);
+        DockPanel.SetDock(close, Dock.Right);
+        bar.Children.Add(close);
+        return bar;
+    }
+
     public static TextBlock Caption(string text) =>
         new()
         {
@@ -252,7 +283,7 @@ internal static class PickerChrome
 
     public static MenuItem FormHost(FrameworkElement header)
     {
-        header.HorizontalAlignment = HorizontalAlignment.Left;
+        header.HorizontalAlignment = HorizontalAlignment.Stretch;
         var item = new MenuItem
         {
             Header = header,
@@ -273,12 +304,12 @@ internal static class PickerChrome
         foreach (var item in menu.Items.OfType<MenuItem>())
         {
             item.Icon = null;
-            item.Padding = new Thickness(12, 8, 12, 8);
+            item.Padding = FormItemPadding;
             item.MinHeight = 0;
-            item.HorizontalAlignment = HorizontalAlignment.Left;
+            item.HorizontalAlignment = HorizontalAlignment.Stretch;
             if (item.Header is FrameworkElement header)
             {
-                header.HorizontalAlignment = HorizontalAlignment.Left;
+                header.HorizontalAlignment = HorizontalAlignment.Stretch;
             }
 
             widest = Math.Max(widest, MeasureFormRow(item));
@@ -314,7 +345,7 @@ internal static class PickerChrome
             widest = Math.Max(widest, MeasureMenuRow(item));
         }
 
-        var width = Math.Ceiling(widest) + 4;
+        var width = Math.Ceiling(widest) + 8;
         menu.Width = width;
         menu.MinWidth = width;
         menu.MaxWidth = width;
@@ -323,7 +354,10 @@ internal static class PickerChrome
     public static double MeasureMenuRow(MenuItem item)
     {
         var icon = item.Icon is null ? 0 : 22 + 8;
-        return item.Padding.Left + item.Padding.Right + icon + MeasureHeader(item.Header) + 2;
+        var gesture = string.IsNullOrEmpty(item.InputGestureText)
+            ? 0
+            : 16 + 4 + MeasureUiText(item.InputGestureText);
+        return item.Padding.Left + item.Padding.Right + icon + MeasureHeader(item.Header) + gesture + 2;
     }
 
     public static double MeasureUiText(string text)

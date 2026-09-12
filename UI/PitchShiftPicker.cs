@@ -59,6 +59,7 @@ internal static class PitchShiftPicker
         root.Children.Add(
             PickerChrome.FieldRow(UiStrings.LabelPitch, state.SemitoneBox, UiStrings.LabelSemitone));
         root.Children.Add(state.TimeStretchBox);
+        PickerChrome.PrependClose(root, menu);
         var item = PickerChrome.FormHost(root);
         menu.Items.Add(item);
         TipService.Set(menu, UiStrings.TipPitch);
