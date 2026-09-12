@@ -138,26 +138,8 @@ public partial class MainWindow
             return true;
         }
 
-        if (_recording)
+        if (TryConsumeRecordingShortcut(key, modifiers))
         {
-            if (key == Key.R && modifiers == ModifierKeys.Control)
-            {
-                StopRecording();
-                return true;
-            }
-
-            if (key is Key.Space or Key.Enter or Key.Escape && modifiers == ModifierKeys.None)
-            {
-                StopRecording();
-                return true;
-            }
-
-            if (key == Key.Q && modifiers == ModifierKeys.Control)
-            {
-                Close();
-                return true;
-            }
-
             return true;
         }
 
@@ -181,61 +163,8 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.Escape)
+        if (TryProcessEscapeShortcut(key, modifiers))
         {
-            if (_recording)
-            {
-                StopRecording();
-                return true;
-            }
-
-            StopMarkerNudge();
-            StopPlaceRepeat();
-            if (StatusTimes.IsEditing)
-            {
-                StatusTimes.CancelEdit();
-                Waveform.Focus();
-                return true;
-            }
-
-            if (StatusTimes.IsTimeFocused)
-            {
-                Waveform.Focus();
-                return true;
-            }
-
-            if (Waveform.CancelMarkerCommentEdit())
-            {
-                return true;
-            }
-
-            if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker() || ClosePitchShiftPicker() || CloseTimeStretchPicker())
-            {
-                return true;
-            }
-
-            if (Waveform.IsScrubbing)
-            {
-                Overview.CancelDrag();
-                Waveform.CancelScrub();
-                return true;
-            }
-
-            if (Waveform.CancelMarkerInteraction())
-            {
-                return true;
-            }
-
-            if (ClearTabSelection())
-            {
-                return true;
-            }
-
-            if (Waveform.ClearSelection())
-            {
-                return true;
-            }
-
             return true;
         }
 
@@ -249,45 +178,9 @@ public partial class MainWindow
             return true;
         }
 
-        if (_fadeMenu is { IsOpen: true })
+        if (_fadeMenu is { IsOpen: true } fadeMenu)
         {
-            if (key == Key.I && modifiers == ModifierKeys.None)
-            {
-                PromptFade(fadeIn: true);
-                return true;
-            }
-
-            if (key == Key.O && modifiers == ModifierKeys.None)
-            {
-                PromptFade(fadeIn: false);
-                return true;
-            }
-
-            if (key == Key.Space && modifiers == ModifierKeys.None)
-            {
-                PreviewFade(_fadePromptIsIn, FadeCurvePicker.HighlightedShape(_fadeMenu));
-                return true;
-            }
-
-            if (key == Key.Enter && modifiers == ModifierKeys.None)
-            {
-                ApplyFade(_fadePromptIsIn, FadeCurvePicker.HighlightedShape(_fadeMenu));
-                CloseFadeCurvePicker();
-                return true;
-            }
-
-            if (modifiers == ModifierKeys.None
-                && TryDigitPercent(key, out var fadeDigit)
-                && fadeDigit > 0)
-            {
-                var index = (int)Math.Round(fadeDigit * 10d) - 1;
-                if (FadeCurvePicker.HighlightByIndex(_fadeMenu, index))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return TryProcessFadeMenuShortcut(fadeMenu, key, modifiers);
         }
 
         if (TryHandleVolumeMenuShortcut(key, modifiers))
@@ -305,115 +198,8 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.Q && modifiers == ModifierKeys.Control)
+        if (TryProcessDocumentShortcut(key, modifiers))
         {
-            Close();
-            return true;
-        }
-
-        if (key == Key.R && modifiers == ModifierKeys.Control)
-        {
-            ToggleRecording();
-            return true;
-        }
-
-        if (key == Key.W && modifiers == ModifierKeys.Control)
-        {
-            CloseDocument();
-            return true;
-        }
-
-        if (key == Key.W && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
-        {
-            CloseAllTabs();
-            return true;
-        }
-
-        if (key == Key.T && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
-        {
-            ReopenLastClosedTab();
-            return true;
-        }
-
-        if (key == Key.Tab && modifiers == ModifierKeys.Control)
-        {
-            ActivateAdjacentTab(1);
-            return true;
-        }
-
-        if (key == Key.Tab && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
-        {
-            ActivateAdjacentTab(-1);
-            return true;
-        }
-
-        if (key == Key.Tab && modifiers == ModifierKeys.None)
-        {
-            CycleChannelSolo(1);
-            return true;
-        }
-
-        if (key == Key.Tab && modifiers == ModifierKeys.Shift)
-        {
-            CycleChannelSolo(-1);
-            return true;
-        }
-
-        if (key == Key.PageDown && modifiers == ModifierKeys.Control)
-        {
-            ActivateAdjacentTab(1);
-            return true;
-        }
-
-        if (key == Key.PageUp && modifiers == ModifierKeys.Control)
-        {
-            ActivateAdjacentTab(-1);
-            return true;
-        }
-
-        if (key == Key.O && modifiers == ModifierKeys.Control)
-        {
-            OpenFromDialog();
-            return true;
-        }
-
-        if (key == Key.O && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
-        {
-            OpenSettings();
-            return true;
-        }
-
-        if (key == Key.E && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
-        {
-            if (WaapiBar.ExportEnabled)
-            {
-                _ = ExportToWwiseAsync();
-            }
-
-            return true;
-        }
-
-        if (key == Key.S && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
-        {
-            Save(saveAs: true);
-            return true;
-        }
-
-        if (key == Key.M && modifiers == (ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Alt))
-        {
-            ExportAllTabsMp3();
-            return true;
-        }
-
-        if (key == Key.M && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
-        {
-            SaveAsMp3();
-            return true;
-        }
-
-        if (key == Key.S && modifiers == ModifierKeys.Control)
-        {
-            Save(saveAs: false);
             return true;
         }
 
@@ -868,6 +654,258 @@ public partial class MainWindow
             && (modifiers == ModifierKeys.None || modifiers == ModifierKeys.Shift))
         {
             JumpByVisiblePercent(percent, extendSelection: modifiers == ModifierKeys.Shift);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryConsumeRecordingShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (!_recording)
+        {
+            return false;
+        }
+
+        if (key == Key.R && modifiers == ModifierKeys.Control)
+        {
+            StopRecording();
+            return true;
+        }
+
+        if (key is Key.Space or Key.Enter or Key.Escape && modifiers == ModifierKeys.None)
+        {
+            StopRecording();
+            return true;
+        }
+
+        if (key == Key.Q && modifiers == ModifierKeys.Control)
+        {
+            Close();
+            return true;
+        }
+
+        return true;
+    }
+
+    private bool TryProcessEscapeShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (key != Key.Escape)
+        {
+            return false;
+        }
+
+        if (_recording)
+        {
+            StopRecording();
+            return true;
+        }
+
+        StopMarkerNudge();
+        StopPlaceRepeat();
+        if (StatusTimes.IsEditing)
+        {
+            StatusTimes.CancelEdit();
+            Waveform.Focus();
+            return true;
+        }
+
+        if (StatusTimes.IsTimeFocused)
+        {
+            Waveform.Focus();
+            return true;
+        }
+
+        if (Waveform.CancelMarkerCommentEdit())
+        {
+            return true;
+        }
+
+        if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker() || ClosePitchShiftPicker() || CloseTimeStretchPicker())
+        {
+            return true;
+        }
+
+        if (Waveform.IsScrubbing)
+        {
+            Overview.CancelDrag();
+            Waveform.CancelScrub();
+            return true;
+        }
+
+        if (Waveform.CancelMarkerInteraction())
+        {
+            return true;
+        }
+
+        if (ClearTabSelection())
+        {
+            return true;
+        }
+
+        if (Waveform.ClearSelection())
+        {
+            return true;
+        }
+
+        return true;
+    }
+
+    private bool TryProcessFadeMenuShortcut(
+        System.Windows.Controls.ContextMenu fadeMenu,
+        Key key,
+        ModifierKeys modifiers)
+    {
+        if (key == Key.I && modifiers == ModifierKeys.None)
+        {
+            PromptFade(fadeIn: true);
+            return true;
+        }
+
+        if (key == Key.O && modifiers == ModifierKeys.None)
+        {
+            PromptFade(fadeIn: false);
+            return true;
+        }
+
+        if (key == Key.Space && modifiers == ModifierKeys.None)
+        {
+            PreviewFade(_fadePromptIsIn, FadeCurvePicker.HighlightedShape(fadeMenu));
+            return true;
+        }
+
+        if (key == Key.Enter && modifiers == ModifierKeys.None)
+        {
+            ApplyFade(_fadePromptIsIn, FadeCurvePicker.HighlightedShape(fadeMenu));
+            CloseFadeCurvePicker();
+            return true;
+        }
+
+        if (modifiers == ModifierKeys.None
+            && TryDigitPercent(key, out var fadeDigit)
+            && fadeDigit > 0)
+        {
+            var index = (int)Math.Round(fadeDigit * 10d) - 1;
+            if (FadeCurvePicker.HighlightByIndex(fadeMenu, index))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryProcessDocumentShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (key == Key.Q && modifiers == ModifierKeys.Control)
+        {
+            Close();
+            return true;
+        }
+
+        if (key == Key.R && modifiers == ModifierKeys.Control)
+        {
+            ToggleRecording();
+            return true;
+        }
+
+        if (key == Key.W && modifiers == ModifierKeys.Control)
+        {
+            CloseDocument();
+            return true;
+        }
+
+        if (key == Key.W && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            CloseAllTabs();
+            return true;
+        }
+
+        if (key == Key.T && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            ReopenLastClosedTab();
+            return true;
+        }
+
+        if (key == Key.Tab && modifiers == ModifierKeys.Control)
+        {
+            ActivateAdjacentTab(1);
+            return true;
+        }
+
+        if (key == Key.Tab && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            ActivateAdjacentTab(-1);
+            return true;
+        }
+
+        if (key == Key.Tab && modifiers == ModifierKeys.None)
+        {
+            CycleChannelSolo(1);
+            return true;
+        }
+
+        if (key == Key.Tab && modifiers == ModifierKeys.Shift)
+        {
+            CycleChannelSolo(-1);
+            return true;
+        }
+
+        if (key == Key.PageDown && modifiers == ModifierKeys.Control)
+        {
+            ActivateAdjacentTab(1);
+            return true;
+        }
+
+        if (key == Key.PageUp && modifiers == ModifierKeys.Control)
+        {
+            ActivateAdjacentTab(-1);
+            return true;
+        }
+
+        if (key == Key.O && modifiers == ModifierKeys.Control)
+        {
+            OpenFromDialog();
+            return true;
+        }
+
+        if (key == Key.O && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            OpenSettings();
+            return true;
+        }
+
+        if (key == Key.E && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            if (WaapiBar.ExportEnabled)
+            {
+                _ = ExportToWwiseAsync();
+            }
+
+            return true;
+        }
+
+        if (key == Key.S && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            Save(saveAs: true);
+            return true;
+        }
+
+        if (key == Key.M && modifiers == (ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Alt))
+        {
+            ExportAllTabsMp3();
+            return true;
+        }
+
+        if (key == Key.M && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            SaveAsMp3();
+            return true;
+        }
+
+        if (key == Key.S && modifiers == ModifierKeys.Control)
+        {
+            Save(saveAs: false);
             return true;
         }
 

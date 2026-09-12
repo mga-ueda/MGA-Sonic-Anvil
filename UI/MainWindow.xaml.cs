@@ -16,9 +16,15 @@ namespace MgaSonicAnvil.UI;
 public partial class MainWindow : Window
 {
     private readonly AudioPlayer _player = new();
-    private readonly List<DocumentSession> _sessions = [];
-    private DocumentSession? _activeSession;
-    private EditHistory _history = new();
+    private readonly DocumentWorkspace _workspace = new();
+    private readonly EditHistory _idleHistory = new();
+    private List<DocumentSession> _sessions => _workspace.Sessions;
+    private DocumentSession? _activeSession
+    {
+        get => _workspace.Active;
+        set => _workspace.Active = value;
+    }
+    private EditHistory _history => _activeSession?.History ?? _idleHistory;
     private readonly LevelMeterEngine _meter = new();
     private readonly Stopwatch _meterClock = Stopwatch.StartNew();
     private bool _meterRendering;
@@ -40,7 +46,7 @@ public partial class MainWindow : Window
     private WaveRegion[] _timelineNudgeRegionsBefore = [];
     private WaveSelection _timelineNudgeLoopBefore;
     private int _markerNumber;
-    private AudioDocument? _document;
+    private AudioDocument? _document => _activeSession?.Document;
     private RangeDivideState? _markerDivide;
     private RangeDivideState? _regionDivide;
     private AudioClip? _clipboard;
@@ -61,35 +67,13 @@ public partial class MainWindow : Window
     private System.Windows.Controls.ContextMenu? _timeStretchMenu;
     private FormatConvertKind _formatKind;
     private FormatSizePreview? _formatSizePreview;
-    private bool _formatPreviewing;
-    private bool _formatPreviewToggling;
-    private long _formatPreviewResumeFrame;
-    private long _formatPreviewStartedAt;
-    private long _formatSpaceTick;
-    private bool _fadePreviewing;
-    private bool _fadePreviewToggling;
+    private readonly EffectPreviewState _formatPreview = new();
+    private readonly EffectPreviewState _fadePreview = new();
     private bool _fadePromptIsIn;
-    private long _fadePreviewResumeFrame;
-    private long _fadePreviewStartedAt;
-    private long _fadeSpaceTick;
     private bool _fadeReplayOnHighlight;
-    private bool _volumePreviewing;
-    private bool _volumePreviewToggling;
-    private long _volumePreviewResumeFrame;
-    private long _volumePreviewStartedAt;
-    private long _volumeSpaceTick;
-    private bool _pitchPreviewing;
-    private bool _pitchPreviewToggling;
-    private long _pitchPreviewResumeFrame;
-    private long _pitchPreviewStartedAt;
-    private long _pitchPreviewOrigin;
-    private long _pitchSpaceTick;
-    private bool _timeStretchPreviewing;
-    private bool _timeStretchPreviewToggling;
-    private long _timeStretchPreviewResumeFrame;
-    private long _timeStretchPreviewStartedAt;
-    private long _timeStretchPreviewOrigin;
-    private long _timeStretchSpaceTick;
+    private readonly EffectPreviewState _volumePreview = new();
+    private readonly EffectPreviewState _pitchPreview = new();
+    private readonly EffectPreviewState _timeStretchPreview = new();
     private bool _resumeAfterScrub;
     private bool _startupRevealPending = true;
     private bool _closing;
@@ -135,7 +119,7 @@ public partial class MainWindow : Window
 
             Waveform.SetSelection(range);
         };
-        StatusTimes.RequestWaveformFocus += (_, _) => Waveform.Focus();
+        StatusTimes.RequestWaveformFocus += (_, _) => Keyboard.Focus(Waveform);
         Transport.TipsToggleRequested += (_, _) => ToggleTips();
         Transport.ManualHelpRequested += (_, _) => ManualViewer.Open(this);
         UiStrings.LanguageChanged += (_, _) => Dispatcher.BeginInvoke(RefreshLocalizedText);
@@ -347,8 +331,6 @@ public partial class MainWindow : Window
             StopMeterRendering();
             Waveform.UnlockCenter();
             _activeSession = session;
-            _document = session?.Document;
-            _history = session?.History ?? new EditHistory();
             Waveform.Document = _document;
             Overview.Document = _document;
             ApplyChannelSolo();

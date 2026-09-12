@@ -17,7 +17,13 @@ public partial class MainWindow
     private bool _tabExportBusy;
     private bool _openBusy;
 
-    private bool IsUiBusy => _formatConvertBusy || _pitchShiftBusy || _timeStretchBusy || _tabExportBusy || _openBusy;
+    private bool IsUiBusy =>
+        _formatConvertBusy
+        || _pitchShiftBusy
+        || _timeStretchBusy
+        || _tabExportBusy
+        || _openBusy
+        || _exportBusy;
 
     private void PromptFormatConvert(FormatConvertKind kind)
     {
@@ -47,7 +53,7 @@ public partial class MainWindow
         }
 
         _formatKind = kind;
-        _formatPreviewResumeFrame = _document.CursorFrame;
+        _formatPreview.ResumeFrame = _document.CursorFrame;
         var current = kind switch
         {
             FormatConvertKind.BitDepth => _document.BitsPerSample,
@@ -178,22 +184,22 @@ public partial class MainWindow
 
     private void PreviewFormatConvert(FormatConvertKind kind, int value)
     {
-        if (_document is null || _formatPreviewToggling)
+        if (_document is null || _formatPreview.Toggling)
         {
             return;
         }
 
         var now = Environment.TickCount64;
-        if (now - _formatSpaceTick < 120)
+        if (now - _formatPreview.SpaceTick < 120)
         {
             return;
         }
 
-        _formatSpaceTick = now;
-        _formatPreviewToggling = true;
+        _formatPreview.SpaceTick = now;
+        _formatPreview.Toggling = true;
         try
         {
-            if (_formatPreviewing && _player.IsPlaying)
+            if (_formatPreview.Previewing && _player.IsPlaying)
             {
                 StopFormatPreview();
                 return;
@@ -208,7 +214,7 @@ public partial class MainWindow
         }
         finally
         {
-            _formatPreviewToggling = false;
+            _formatPreview.Toggling = false;
         }
     }
 
@@ -345,8 +351,8 @@ public partial class MainWindow
             LoudnessMeter.Reset();
             _player.Prepare(preview, startFrame, range, loop: false);
 
-            _formatPreviewing = true;
-            _formatPreviewStartedAt = Environment.TickCount64;
+            _formatPreview.Previewing = true;
+            _formatPreview.StartedAt = Environment.TickCount64;
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
@@ -355,7 +361,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _formatPreviewing = false;
+            _formatPreview.Previewing = false;
             PausePlaybackSoft();
             RebindOriginalDocument();
             OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -364,18 +370,18 @@ public partial class MainWindow
 
     private void StopFormatPreview()
     {
-        if (!_formatPreviewing)
+        if (!_formatPreview.Previewing)
         {
             RebindOriginalDocument();
             return;
         }
 
-        _formatPreviewing = false;
+        _formatPreview.Previewing = false;
         PausePlaybackSoft();
         RebindOriginalDocument();
         if (_document is not null)
         {
-            SeekFrame(_formatPreviewResumeFrame);
+            SeekFrame(_formatPreview.ResumeFrame);
         }
     }
 
@@ -495,29 +501,16 @@ public partial class MainWindow
         }
     }
 
-    private void ShowSampleRateBusyGlass()
-    {
-        RootChrome.UpdateLayout();
-        RootDock.UpdateLayout();
-        _busyGlass.ShowOverlay(
-            RootChrome,
-            RootDock,
-            GetBusyGlassCoverBounds(),
-            UiStrings.OverlaySampleRateConvert);
-    }
+    private void ShowSampleRateBusyGlass() =>
+        ShowBusyGlass(UiStrings.OverlaySampleRateConvert);
 
-    private void ShowPitchShiftBusyGlass()
-    {
-        RootChrome.UpdateLayout();
-        RootDock.UpdateLayout();
-        _busyGlass.ShowOverlay(
-            RootChrome,
-            RootDock,
-            GetBusyGlassCoverBounds(),
-            UiStrings.OverlayPitchShift);
-    }
+    private void ShowPitchShiftBusyGlass() =>
+        ShowBusyGlass(UiStrings.OverlayPitchShift);
 
-    private void ShowTimeStretchBusyGlass()
+    private void ShowTimeStretchBusyGlass() =>
+        ShowBusyGlass(UiStrings.OverlayTimeStretch);
+
+    private void ShowBusyGlass(string message)
     {
         RootChrome.UpdateLayout();
         RootDock.UpdateLayout();
@@ -525,7 +518,7 @@ public partial class MainWindow
             RootChrome,
             RootDock,
             GetBusyGlassCoverBounds(),
-            UiStrings.OverlayTimeStretch);
+            message);
     }
 
     private Rect GetBusyGlassCoverBounds()

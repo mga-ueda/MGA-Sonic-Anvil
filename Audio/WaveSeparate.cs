@@ -1,3 +1,5 @@
+using MgaSonicAnvil.Domain;
+
 namespace MgaSonicAnvil.Audio;
 
 /// <summary>マーカーまたはリージョンで波形を分割して書き出す区間。</summary>

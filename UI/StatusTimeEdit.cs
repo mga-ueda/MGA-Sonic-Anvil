@@ -1,5 +1,6 @@
 using System.Windows.Input;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 

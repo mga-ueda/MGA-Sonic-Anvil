@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
 
 namespace MgaSonicAnvil.Config;

@@ -216,20 +216,20 @@ public partial class MainWindow
         }
 
         var frame = _player.CursorFrame;
-        if (_pitchPreviewing)
+        if (_pitchPreview.Previewing)
         {
-            frame += _pitchPreviewOrigin;
+            frame += _pitchPreview.Origin;
         }
 
-        if (_timeStretchPreviewing)
+        if (_timeStretchPreview.Previewing)
         {
-            frame += _timeStretchPreviewOrigin;
+            frame += _timeStretchPreview.Origin;
         }
 
-        _fadePreviewing = false;
-        _volumePreviewing = false;
-        _pitchPreviewing = false;
-        _timeStretchPreviewing = false;
+        _fadePreview.Previewing = false;
+        _volumePreview.Previewing = false;
+        _pitchPreview.Previewing = false;
+        _timeStretchPreview.Previewing = false;
         PausePlaybackSoft();
         SeekFrame(frame);
         RestoreFadeVisualIfMenuOpen();
@@ -424,24 +424,12 @@ public partial class MainWindow
             Waveform.AbandonScrub();
         }
 
-        if (_fadePreviewing || _formatPreviewing || _volumePreviewing || _pitchPreviewing || _timeStretchPreviewing)
+        if (AnyEffectPreviewing)
         {
             SyncPreviewPlayhead();
-            if (_player.ProviderEnded)
+            if (_player.ProviderEnded && Environment.TickCount64 - ActivePreviewStartedAt >= 250)
             {
-                var started = _fadePreviewing
-                    ? _fadePreviewStartedAt
-                    : _formatPreviewing
-                        ? _formatPreviewStartedAt
-                        : _pitchPreviewing
-                            ? _pitchPreviewStartedAt
-                            : _timeStretchPreviewing
-                                ? _timeStretchPreviewStartedAt
-                                : _volumePreviewStartedAt;
-                if (Environment.TickCount64 - started >= 250)
-                {
-                    OnPlaybackEnded(_playbackGeneration);
-                }
+                OnPlaybackEnded(_playbackGeneration);
             }
 
             return;
@@ -531,7 +519,7 @@ public partial class MainWindow
         Spectrum.Tick();
         LoudnessMeter.Tick();
         VectorScope.Tick();
-        if (_fadePreviewing || _formatPreviewing || _volumePreviewing || _pitchPreviewing || _timeStretchPreviewing)
+        if (AnyEffectPreviewing)
         {
             SyncPreviewPlayhead();
             return;
@@ -554,14 +542,14 @@ public partial class MainWindow
         }
 
         var frame = _player.SmoothCursorFrame;
-        if (_pitchPreviewing)
+        if (_pitchPreview.Previewing)
         {
-            frame += _pitchPreviewOrigin;
+            frame += _pitchPreview.Origin;
         }
 
-        if (_timeStretchPreviewing)
+        if (_timeStretchPreview.Previewing)
         {
-            frame += _timeStretchPreviewOrigin;
+            frame += _timeStretchPreview.Origin;
         }
 
         _document.CursorFrame = frame;
@@ -647,29 +635,29 @@ public partial class MainWindow
         }
 
         _resumeAfterScrub = _player.IsPlaying && !_player.IsScrubbing;
-        if (_fadePreviewing)
+        if (_fadePreview.Previewing)
         {
-            _fadePreviewing = false;
+            _fadePreview.Previewing = false;
             Waveform.SetPreviewGain(null);
         }
 
-        if (_volumePreviewing)
+        if (_volumePreview.Previewing)
         {
-            _volumePreviewing = false;
+            _volumePreview.Previewing = false;
             Waveform.SetPreviewGain(null);
         }
 
-        if (_pitchPreviewing)
+        if (_pitchPreview.Previewing)
         {
-            _pitchPreviewing = false;
+            _pitchPreview.Previewing = false;
         }
 
-        if (_timeStretchPreviewing)
+        if (_timeStretchPreview.Previewing)
         {
-            _timeStretchPreviewing = false;
+            _timeStretchPreview.Previewing = false;
         }
 
-        if (_formatPreviewing)
+        if (_formatPreview.Previewing)
         {
             StopFormatPreview();
         }
@@ -747,88 +735,68 @@ public partial class MainWindow
             Waveform.AbandonScrub();
         }
 
-        if (_fadePreviewing)
+        if (TryHandleEffectPreviewEnded(_fadePreview, () =>
+            {
+                StopPreviewToResume(_fadePreview);
+                RestoreFadeVisualIfMenuOpen();
+            })
+            || TryHandleEffectPreviewEnded(_volumePreview, () =>
+            {
+                StopPreviewToResume(_volumePreview);
+                RestoreVolumeVisualIfMenuOpen();
+            })
+            || TryHandleEffectPreviewEnded(_pitchPreview, () => StopPreviewToResume(_pitchPreview))
+            || TryHandleEffectPreviewEnded(_timeStretchPreview, () => StopPreviewToResume(_timeStretchPreview))
+            || TryHandleEffectPreviewEnded(_formatPreview, StopFormatPreview))
         {
-            if (Environment.TickCount64 - _fadePreviewStartedAt < 250)
-            {
-                return;
-            }
-
-            _fadePreviewing = false;
-            PausePlaybackSoft();
-            if (_document is not null)
-            {
-                SeekFrame(_fadePreviewResumeFrame);
-            }
-
-            RestoreFadeVisualIfMenuOpen();
-            return;
-        }
-
-        if (_volumePreviewing)
-        {
-            if (Environment.TickCount64 - _volumePreviewStartedAt < 250)
-            {
-                return;
-            }
-
-            _volumePreviewing = false;
-            PausePlaybackSoft();
-            if (_document is not null)
-            {
-                SeekFrame(_volumePreviewResumeFrame);
-            }
-
-            RestoreVolumeVisualIfMenuOpen();
-            return;
-        }
-
-        if (_pitchPreviewing)
-        {
-            if (Environment.TickCount64 - _pitchPreviewStartedAt < 250)
-            {
-                return;
-            }
-
-            _pitchPreviewing = false;
-            PausePlaybackSoft();
-            if (_document is not null)
-            {
-                SeekFrame(_pitchPreviewResumeFrame);
-            }
-
-            return;
-        }
-
-        if (_timeStretchPreviewing)
-        {
-            if (Environment.TickCount64 - _timeStretchPreviewStartedAt < 250)
-            {
-                return;
-            }
-
-            _timeStretchPreviewing = false;
-            PausePlaybackSoft();
-            if (_document is not null)
-            {
-                SeekFrame(_timeStretchPreviewResumeFrame);
-            }
-
-            return;
-        }
-
-        if (_formatPreviewing)
-        {
-            if (Environment.TickCount64 - _formatPreviewStartedAt < 250)
-            {
-                return;
-            }
-
-            StopFormatPreview();
             return;
         }
 
         HaltPlaybackToStart();
+    }
+
+    private bool AnyEffectPreviewing =>
+        _fadePreview.Previewing
+        || _formatPreview.Previewing
+        || _volumePreview.Previewing
+        || _pitchPreview.Previewing
+        || _timeStretchPreview.Previewing;
+
+    private long ActivePreviewStartedAt =>
+        _fadePreview.Previewing
+            ? _fadePreview.StartedAt
+            : _formatPreview.Previewing
+                ? _formatPreview.StartedAt
+                : _pitchPreview.Previewing
+                    ? _pitchPreview.StartedAt
+                    : _timeStretchPreview.Previewing
+                        ? _timeStretchPreview.StartedAt
+                        : _volumePreview.StartedAt;
+
+    private bool TryHandleEffectPreviewEnded(EffectPreviewState preview, Action finish)
+    {
+        if (!preview.Previewing)
+        {
+            return false;
+        }
+
+        if (preview.IsTooSoon)
+        {
+            return true;
+        }
+
+        finish();
+        return true;
+    }
+
+    private void StopPreviewToResume(EffectPreviewState preview)
+    {
+        preview.Previewing = false;
+        PausePlaybackSoft();
+        if (_document is not null)
+        {
+            SeekFrame(preview.ResumeFrame);
+        }
     }
 
     private void JumpToLoopPrerollAndPlay()
@@ -944,7 +912,7 @@ public partial class MainWindow
             return false;
         }
 
-        var previous = RangeDivide.ResolvePreviousParts(_regionDivide, _document, range, regions: true);
+        var previous = DocumentRangeDivide.ResolvePreviousParts(_regionDivide, _document, range, regions: true);
         var next = RangeDivide.NextParts(previous);
         var command = ProcessEdits.DivideRegions(_document, range, previous, next);
         if (command is not null)

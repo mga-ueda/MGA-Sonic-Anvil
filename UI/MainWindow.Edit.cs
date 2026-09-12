@@ -40,7 +40,7 @@ public partial class MainWindow
         }
 
         _fadePromptIsIn = fadeIn;
-        _fadePreviewResumeFrame = _document.CursorFrame;
+        _fadePreview.ResumeFrame = _document.CursorFrame;
         _fadeReplayOnHighlight = false;
         var initial = fadeIn
             ? AppStorage.Settings.ResolvedFadeInCurve()
@@ -107,7 +107,7 @@ public partial class MainWindow
             PausePlaybackSoft();
         }
 
-        _volumePreviewResumeFrame = _document.CursorFrame;
+        _volumePreview.ResumeFrame = _document.CursorFrame;
         var analyzer = WaveformGainAnalyzer.Build(
             _document.Interleaved,
             _document.Channels,
@@ -177,7 +177,7 @@ public partial class MainWindow
             PausePlaybackSoft();
         }
 
-        _pitchPreviewResumeFrame = _document.CursorFrame;
+        _pitchPreview.ResumeFrame = _document.CursorFrame;
         var menu = PitchShiftPicker.Show(this, ApplyPitch, PreviewPitch, OnPitchChanged);
         _pitchMenu = menu;
         menu.Closed += (_, _) =>
@@ -203,7 +203,7 @@ public partial class MainWindow
 
     private void OnPitchChanged(int semitones, bool timeStretch)
     {
-        if (!_pitchPreviewing || _document is null || _pitchPreviewToggling)
+        if (!_pitchPreview.Previewing || _document is null || _pitchPreview.Toggling)
         {
             return;
         }
@@ -219,22 +219,22 @@ public partial class MainWindow
 
     private void PreviewPitch(int semitones, bool timeStretch)
     {
-        if (_document is null || _pitchPreviewToggling)
+        if (_document is null || _pitchPreview.Toggling)
         {
             return;
         }
 
         var now = Environment.TickCount64;
-        if (now - _pitchSpaceTick < 120)
+        if (now - _pitchPreview.SpaceTick < 120)
         {
             return;
         }
 
-        _pitchSpaceTick = now;
-        _pitchPreviewToggling = true;
+        _pitchPreview.SpaceTick = now;
+        _pitchPreview.Toggling = true;
         try
         {
-            if (_pitchPreviewing && _player.IsPlaying)
+            if (_pitchPreview.Previewing && _player.IsPlaying)
             {
                 StopPitchPreview(restoreCursor: true);
                 return;
@@ -250,7 +250,7 @@ public partial class MainWindow
         }
         finally
         {
-            _pitchPreviewToggling = false;
+            _pitchPreview.Toggling = false;
         }
     }
 
@@ -297,9 +297,9 @@ public partial class MainWindow
                 _player.Prepare(preview, 0, previewRange, loop: false);
             }
 
-            _pitchPreviewOrigin = range.StartFrame;
-            _pitchPreviewing = true;
-            _pitchPreviewStartedAt = Environment.TickCount64;
+            _pitchPreview.Origin = range.StartFrame;
+            _pitchPreview.Previewing = true;
+            _pitchPreview.StartedAt = Environment.TickCount64;
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
@@ -311,7 +311,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _pitchPreviewing = false;
+            _pitchPreview.Previewing = false;
             PausePlaybackSoft();
             OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
@@ -319,13 +319,13 @@ public partial class MainWindow
 
     private void StopPitchPreview(bool restoreCursor)
     {
-        if (!_pitchPreviewing)
+        if (!_pitchPreview.Previewing)
         {
             return;
         }
 
-        var resume = _pitchPreviewResumeFrame;
-        _pitchPreviewing = false;
+        var resume = _pitchPreview.ResumeFrame;
+        _pitchPreview.Previewing = false;
         PausePlaybackSoft();
         if (restoreCursor && _document is not null)
         {
@@ -350,7 +350,7 @@ public partial class MainWindow
             return;
         }
 
-        _pitchPreviewing = false;
+        _pitchPreview.Previewing = false;
         ClosePitchShiftPicker();
         if (Audio.PitchShift.IsNoOp(semitones))
         {
@@ -439,7 +439,7 @@ public partial class MainWindow
             PausePlaybackSoft();
         }
 
-        _timeStretchPreviewResumeFrame = _document.CursorFrame;
+        _timeStretchPreview.ResumeFrame = _document.CursorFrame;
         var menu = TimeStretchPicker.Show(
             this,
             (int)Math.Min(int.MaxValue, range.Length),
@@ -471,7 +471,7 @@ public partial class MainWindow
 
     private void OnTimeStretchChanged(int destFrames)
     {
-        if (!_timeStretchPreviewing || _document is null || _timeStretchPreviewToggling)
+        if (!_timeStretchPreview.Previewing || _document is null || _timeStretchPreview.Toggling)
         {
             return;
         }
@@ -487,22 +487,22 @@ public partial class MainWindow
 
     private void PreviewTimeStretch(int destFrames)
     {
-        if (_document is null || _timeStretchPreviewToggling)
+        if (_document is null || _timeStretchPreview.Toggling)
         {
             return;
         }
 
         var now = Environment.TickCount64;
-        if (now - _timeStretchSpaceTick < 120)
+        if (now - _timeStretchPreview.SpaceTick < 120)
         {
             return;
         }
 
-        _timeStretchSpaceTick = now;
-        _timeStretchPreviewToggling = true;
+        _timeStretchPreview.SpaceTick = now;
+        _timeStretchPreview.Toggling = true;
         try
         {
-            if (_timeStretchPreviewing && _player.IsPlaying)
+            if (_timeStretchPreview.Previewing && _player.IsPlaying)
             {
                 StopTimeStretchPreview(restoreCursor: true);
                 return;
@@ -518,7 +518,7 @@ public partial class MainWindow
         }
         finally
         {
-            _timeStretchPreviewToggling = false;
+            _timeStretchPreview.Toggling = false;
         }
     }
 
@@ -564,9 +564,9 @@ public partial class MainWindow
                 _player.Prepare(preview, 0, previewRange, loop: false);
             }
 
-            _timeStretchPreviewOrigin = range.StartFrame;
-            _timeStretchPreviewing = true;
-            _timeStretchPreviewStartedAt = Environment.TickCount64;
+            _timeStretchPreview.Origin = range.StartFrame;
+            _timeStretchPreview.Previewing = true;
+            _timeStretchPreview.StartedAt = Environment.TickCount64;
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
@@ -578,7 +578,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _timeStretchPreviewing = false;
+            _timeStretchPreview.Previewing = false;
             PausePlaybackSoft();
             OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
@@ -586,13 +586,13 @@ public partial class MainWindow
 
     private void StopTimeStretchPreview(bool restoreCursor)
     {
-        if (!_timeStretchPreviewing)
+        if (!_timeStretchPreview.Previewing)
         {
             return;
         }
 
-        var resume = _timeStretchPreviewResumeFrame;
-        _timeStretchPreviewing = false;
+        var resume = _timeStretchPreview.ResumeFrame;
+        _timeStretchPreview.Previewing = false;
         PausePlaybackSoft();
         if (restoreCursor && _document is not null)
         {
@@ -617,7 +617,7 @@ public partial class MainWindow
             return;
         }
 
-        _timeStretchPreviewing = false;
+        _timeStretchPreview.Previewing = false;
         CloseTimeStretchPicker();
         destFrames = Audio.TimeStretch.ClampDestFrames((int)range.Length, destFrames);
         if (Audio.TimeStretch.IsNoOp((int)range.Length, destFrames))
@@ -686,7 +686,7 @@ public partial class MainWindow
     private void OnVolumeGainChanged(double gainDb)
     {
         ApplyVolumeVisualPreview(gainDb);
-        if (!_volumePreviewing || _document is null || _volumePreviewToggling)
+        if (!_volumePreview.Previewing || _document is null || _volumePreview.Toggling)
         {
             return;
         }
@@ -736,22 +736,22 @@ public partial class MainWindow
 
     private void PreviewVolume(double gainDb)
     {
-        if (_document is null || _volumePreviewToggling)
+        if (_document is null || _volumePreview.Toggling)
         {
             return;
         }
 
         var now = Environment.TickCount64;
-        if (now - _volumeSpaceTick < 120)
+        if (now - _volumePreview.SpaceTick < 120)
         {
             return;
         }
 
-        _volumeSpaceTick = now;
-        _volumePreviewToggling = true;
+        _volumePreview.SpaceTick = now;
+        _volumePreview.Toggling = true;
         try
         {
-            if (_volumePreviewing && _player.IsPlaying)
+            if (_volumePreview.Previewing && _player.IsPlaying)
             {
                 StopVolumePreview(restoreCursor: true);
                 RestoreVolumeVisualIfMenuOpen();
@@ -768,7 +768,7 @@ public partial class MainWindow
         }
         finally
         {
-            _volumePreviewToggling = false;
+            _volumePreview.Toggling = false;
         }
     }
 
@@ -804,8 +804,8 @@ public partial class MainWindow
             }
 
             ApplyVolumeVisualPreview(gainDb);
-            _volumePreviewing = true;
-            _volumePreviewStartedAt = Environment.TickCount64;
+            _volumePreview.Previewing = true;
+            _volumePreview.StartedAt = Environment.TickCount64;
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
@@ -817,7 +817,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _volumePreviewing = false;
+            _volumePreview.Previewing = false;
             ClearVolumeVisualPreview();
             PausePlaybackSoft();
             OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -826,13 +826,13 @@ public partial class MainWindow
 
     private void StopVolumePreview(bool restoreCursor)
     {
-        if (!_volumePreviewing)
+        if (!_volumePreview.Previewing)
         {
             return;
         }
 
-        var resume = _volumePreviewResumeFrame;
-        _volumePreviewing = false;
+        var resume = _volumePreview.ResumeFrame;
+        _volumePreview.Previewing = false;
         PausePlaybackSoft();
         if (restoreCursor && _document is not null)
         {
@@ -845,7 +845,7 @@ public partial class MainWindow
     private void OnFadeCurveHighlighted(bool fadeIn, FadeShape shape)
     {
         ApplyFadeCurveVisualPreview(fadeIn, shape);
-        if (!_fadeReplayOnHighlight || _document is null || _fadePreviewToggling)
+        if (!_fadeReplayOnHighlight || _document is null || _fadePreview.Toggling)
         {
             return;
         }
@@ -894,22 +894,22 @@ public partial class MainWindow
 
     private void PreviewFade(bool fadeIn, FadeShape shape)
     {
-        if (_document is null || _fadePreviewToggling)
+        if (_document is null || _fadePreview.Toggling)
         {
             return;
         }
 
         var now = Environment.TickCount64;
-        if (now - _fadeSpaceTick < 120)
+        if (now - _fadePreview.SpaceTick < 120)
         {
             return;
         }
 
-        _fadeSpaceTick = now;
-        _fadePreviewToggling = true;
+        _fadePreview.SpaceTick = now;
+        _fadePreview.Toggling = true;
         try
         {
-            if (_fadePreviewing && _player.IsPlaying)
+            if (_fadePreview.Previewing && _player.IsPlaying)
             {
                 StopFadePreview(restoreCursor: true);
                 RestoreFadeVisualIfMenuOpen();
@@ -926,7 +926,7 @@ public partial class MainWindow
         }
         finally
         {
-            _fadePreviewToggling = false;
+            _fadePreview.Toggling = false;
         }
     }
 
@@ -960,8 +960,8 @@ public partial class MainWindow
             }
 
             ApplyFadeCurveVisualPreview(fadeIn, shape);
-            _fadePreviewing = true;
-            _fadePreviewStartedAt = Environment.TickCount64;
+            _fadePreview.Previewing = true;
+            _fadePreview.StartedAt = Environment.TickCount64;
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
@@ -973,7 +973,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _fadePreviewing = false;
+            _fadePreview.Previewing = false;
             ClearFadeCurveVisualPreview();
             PausePlaybackSoft();
             OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -982,13 +982,13 @@ public partial class MainWindow
 
     private void StopFadePreview(bool restoreCursor)
     {
-        if (!_fadePreviewing)
+        if (!_fadePreview.Previewing)
         {
             return;
         }
 
-        var resume = _fadePreviewResumeFrame;
-        _fadePreviewing = false;
+        var resume = _fadePreview.ResumeFrame;
+        _fadePreview.Previewing = false;
         PausePlaybackSoft();
         if (restoreCursor && _document is not null)
         {
@@ -1039,7 +1039,7 @@ public partial class MainWindow
             return;
         }
 
-        _fadePreviewing = false;
+        _fadePreview.Previewing = false;
         ClearFadeCurveVisualPreview();
         PausePlaybackSoft();
         var command = fadeIn
@@ -1126,7 +1126,7 @@ public partial class MainWindow
             return;
         }
 
-        _volumePreviewing = false;
+        _volumePreview.Previewing = false;
         ClearVolumeVisualPreview();
         CloseVolumeGainPicker();
         if (WaveformGainAnalyzer.IsNoOp(WaveformGainAnalyzer.SnapGainDb(gainDb)))
@@ -1195,7 +1195,7 @@ public partial class MainWindow
         var range = _document.Selection;
         if (!range.IsEmpty)
         {
-            var previous = RangeDivide.ResolvePreviousParts(_markerDivide, _document, range, regions: false);
+            var previous = DocumentRangeDivide.ResolvePreviousParts(_markerDivide, _document, range, regions: false);
             var next = RangeDivide.NextParts(previous);
             var command = ProcessEdits.DivideMarkers(_document, range, previous, next);
             if (command is not null)

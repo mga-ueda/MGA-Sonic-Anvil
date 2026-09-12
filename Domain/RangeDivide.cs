@@ -1,5 +1,3 @@
-using MgaSonicAnvil.Audio;
-
 namespace MgaSonicAnvil.Domain;
 
 /// <summary>選択範囲を等分してマーカー／リージョンを打つ。1回目は両端（同じ種類が既にあればすぐ等分）、以降は 2、3…と打ち直す。回数の上限は無い。</summary>
@@ -159,31 +157,14 @@ internal static class RangeDivide
         return [.. next];
     }
 
-    /// <summary>連続操作中は state。無ければ同じ種類の両端が既にあれば 1 回目済みとみなす。</summary>
-    public static int ResolvePreviousParts(
-        RangeDivideState? state,
-        AudioDocument document,
-        WaveSelection range,
-        bool regions)
-    {
-        if (state is { } current && current.Matches(document, range))
-        {
-            return current.Parts;
-        }
-
-        return (regions ? HasRegionsAtEnds(document, range) : HasMarkersAtEnds(document, range))
-            ? 1
-            : 0;
-    }
-
     /// <summary>選択の両端にマーカーがあれば、マーカーの両端打ちは済んでいる。</summary>
-    public static bool HasMarkersAtEnds(AudioDocument document, WaveSelection range) =>
+    public static bool HasMarkersAtEnds(WaveSelection range, Func<long, bool> hasMarkerAt) =>
         !range.IsEmpty
-        && document.HasMarkerAt(range.StartFrame)
-        && document.HasMarkerAt(range.EndFrame);
+        && hasMarkerAt(range.StartFrame)
+        && hasMarkerAt(range.EndFrame);
 
     /// <summary>選択の両端にリージョン端があれば、リージョン 1 本は済んでいる。</summary>
-    public static bool HasRegionsAtEnds(AudioDocument document, WaveSelection range)
+    public static bool HasRegionsAtEnds(WaveSelection range, IReadOnlyList<WaveSelection> regions)
     {
         if (range.IsEmpty)
         {
@@ -192,7 +173,7 @@ internal static class RangeDivide
 
         var start = false;
         var end = false;
-        foreach (var region in document.Regions)
+        foreach (var region in regions)
         {
             if (region.StartFrame == range.StartFrame)
             {
@@ -212,17 +193,4 @@ internal static class RangeDivide
 
         return false;
     }
-}
-
-internal readonly record struct RangeDivideState(
-    AudioDocument Document,
-    long StartFrame,
-    long EndFrame,
-    int Parts)
-{
-    public bool Matches(AudioDocument document, WaveSelection range) =>
-        ReferenceEquals(Document, document)
-        && StartFrame == range.StartFrame
-        && EndFrame == range.EndFrame
-        && Parts > 0;
 }

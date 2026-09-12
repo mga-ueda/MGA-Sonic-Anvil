@@ -1,4 +1,4 @@
-using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.Editing;
 

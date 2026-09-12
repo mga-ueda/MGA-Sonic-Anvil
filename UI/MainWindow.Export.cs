@@ -13,7 +13,7 @@ public partial class MainWindow
 
     private async Task ExportToWwiseAsync()
     {
-        if (_exportBusy || IsUiBusy)
+        if (IsUiBusy)
         {
             return;
         }

@@ -1,4 +1,5 @@
 using System.IO;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.Audio;
 
@@ -6,12 +7,6 @@ internal readonly record struct Mp3EncodeOptions(
     int WindowsBitRateKbps,
     string LameExePath,
     string LameOptions);
-
-internal enum Mp3EncoderKind
-{
-    Windows,
-    Lame,
-}
 
 /// <summary>MP3 出力の経路判定と LAME 引数。exe は同梱せず、ユーザー指定時だけ呼ぶ。</summary>
 internal static class Mp3Encode

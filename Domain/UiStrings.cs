@@ -1,5 +1,3 @@
-using MgaSonicAnvil.Audio;
-
 namespace MgaSonicAnvil.Domain;
 
 /// <summary>
@@ -266,7 +264,7 @@ internal static partial class UiStrings
 
     public static string FormatTimeStretchExtra(int sampleRate, int sourceFrames, int destFrames)
     {
-        var percent = TimeStretch.PercentOf(sourceFrames, destFrames)
+        var percent = TimeStretchPercentOf(sourceFrames, destFrames)
             .ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
         return FormatStatusTime(sourceFrames, sampleRate, asSamples: false)
             + "→"
@@ -274,6 +272,22 @@ internal static partial class UiStrings
             + "  "
             + percent
             + "%";
+    }
+
+    /// <summary>タイムストレッチ割合の表示。Audio.TimeStretch.PercentOf と同じ計算。</summary>
+    private static double TimeStretchPercentOf(int sourceFrames, int destFrames)
+    {
+        sourceFrames = Math.Max(0, sourceFrames);
+        destFrames = Math.Max(0, destFrames);
+        if (sourceFrames == 0)
+        {
+            return 100;
+        }
+
+        return Math.Clamp(
+            Math.Round(destFrames * 100d / sourceFrames, 1, MidpointRounding.AwayFromZero),
+            10,
+            1000);
     }
 
     public static string FormatSignedDb(double gainDb)
@@ -286,7 +300,7 @@ internal static partial class UiStrings
 
     public static string FormatSignedSemitones(int semitones)
     {
-        var value = PitchShift.Snap(semitones);
+        var value = Math.Clamp(semitones, -24, 24);
         return value.ToString("+0;-0;0", System.Globalization.CultureInfo.InvariantCulture)
             + " "
             + LabelSemitone;

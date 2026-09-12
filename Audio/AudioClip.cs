@@ -1,3 +1,5 @@
+using MgaSonicAnvil.Domain;
+
 namespace MgaSonicAnvil.Audio;
 
 internal sealed class AudioClip

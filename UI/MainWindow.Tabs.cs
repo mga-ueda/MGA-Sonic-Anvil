@@ -12,22 +12,19 @@ namespace MgaSonicAnvil.UI;
 
 public partial class MainWindow
 {
-    private readonly record struct ClosedTab(DocumentSession Session, int Index);
-
     /// <summary>
     /// 複数選択されたタブ。Ctrl+クリックで個別追加、Shift+クリックで範囲、
     /// タブ上の Ctrl+A で全選択。Esc で解除。選択中の Ctrl+V は選択タブへの
     /// 履歴レシピ適用になる。タブのアクティブ化で解除。
     /// </summary>
-    private readonly HashSet<DocumentSession> _selectedTabs = [];
-
-    /// <summary>閉じたタブ。末尾が一番新しく、Ctrl+Shift+T でそこから戻す。</summary>
-    private readonly List<ClosedTab> _closedTabs = [];
+    private HashSet<DocumentSession> _selectedTabs => _workspace.SelectedTabs;
 
     /// <summary>Shift+クリックの範囲選択の起点。</summary>
-    private DocumentSession? _tabSelectionAnchor;
-
-    private const int ClosedTabLimit = 32;
+    private DocumentSession? _tabSelectionAnchor
+    {
+        get => _workspace.SelectionAnchor;
+        set => _workspace.SelectionAnchor = value;
+    }
 
     private bool _tabLayoutBusy;
 
@@ -144,24 +141,16 @@ public partial class MainWindow
         return true;
     }
 
-    private void RememberClosedTab(DocumentSession session, int index)
-    {
-        _closedTabs.Add(new ClosedTab(session, index));
-        if (_closedTabs.Count > ClosedTabLimit)
-        {
-            _closedTabs.RemoveAt(0);
-        }
-    }
+    private void RememberClosedTab(DocumentSession session, int index) =>
+        _workspace.RememberClosed(session, index);
 
     private void ReopenLastClosedTab()
     {
-        if (_closedTabs.Count == 0)
+        if (!_workspace.TryTakeLastClosed(out var closed))
         {
             return;
         }
 
-        var closed = _closedTabs[^1];
-        _closedTabs.RemoveAt(_closedTabs.Count - 1);
         var session = closed.Session;
         if (_sessions.Contains(session))
         {
@@ -391,43 +380,8 @@ public partial class MainWindow
         return item;
     }
 
-    private DocumentSession? FindSessionByPath(string path)
-    {
-        if (!TryNormalizePath(path, out var full))
-        {
-            return null;
-        }
-
-        foreach (var session in _sessions)
-        {
-            if (session.Document.SourcePath is not { } existing
-                || !TryNormalizePath(existing, out var existingFull))
-            {
-                continue;
-            }
-
-            if (string.Equals(existingFull, full, StringComparison.OrdinalIgnoreCase))
-            {
-                return session;
-            }
-        }
-
-        return null;
-    }
-
-    private static bool TryNormalizePath(string path, out string full)
-    {
-        try
-        {
-            full = Path.GetFullPath(path);
-            return true;
-        }
-        catch
-        {
-            full = path;
-            return !string.IsNullOrWhiteSpace(path);
-        }
-    }
+    private DocumentSession? FindSessionByPath(string path) =>
+        _workspace.FindByPath(path);
 
     private void RebuildTabBar()
     {

@@ -26,6 +26,7 @@ internal partial class StatusTimeStrip : UserControl
     private bool _hasDocument;
     private bool _showSamples;
     private bool _committing;
+    private IInputElement? _focusReturn;
 
     public event EventHandler<long>? CurrentCommitted;
 
@@ -107,6 +108,7 @@ internal partial class StatusTimeStrip : UserControl
 
     public void CancelEdit()
     {
+        _focusReturn = null;
         foreach (var state in _fields.Values)
         {
             EndEdit(state, commit: false);
@@ -120,8 +122,52 @@ internal partial class StatusTimeStrip : UserControl
             return false;
         }
 
-        _fields[CurrentBox].SelectAllOnFocus = true;
-        return CurrentBox.Focus();
+        RememberFocusReturn();
+        return ActivateField(CurrentBox);
+    }
+
+    private void RememberFocusReturn()
+    {
+        if (IsTimeFocused)
+        {
+            return;
+        }
+
+        var current = Keyboard.FocusedElement;
+        _focusReturn = current is null or Window || ReferenceEquals(current, CurrentBox)
+            ? null
+            : current;
+    }
+
+    private bool ActivateField(TextBox box)
+    {
+        var state = _fields[box];
+        state.SelectAllOnFocus = true;
+        if (box.IsKeyboardFocusWithin)
+        {
+            state.SelectAllOnFocus = false;
+            box.SelectAll();
+            return true;
+        }
+
+        // UIElement.Focus() は論理フォーカスが残っているとキーボードフォーカスを付け直せない。
+        return Keyboard.Focus(box) == box;
+    }
+
+    private void RestoreFocusReturn()
+    {
+        var target = _focusReturn;
+        _focusReturn = null;
+        if (target is UIElement element
+            && element.IsVisible
+            && element.IsEnabled
+            && element.Focusable
+            && Keyboard.Focus(element) == element)
+        {
+            return;
+        }
+
+        RequestWaveformFocus?.Invoke(this, EventArgs.Empty);
     }
 
     private void Bind(TextBox box, StatusTimeField field)
@@ -359,6 +405,7 @@ internal partial class StatusTimeStrip : UserControl
         if (e.Key == Key.Escape)
         {
             EndEdit(state, commit: false);
+            RestoreFocusReturn();
             e.Handled = true;
             return;
         }
