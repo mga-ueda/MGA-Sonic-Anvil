@@ -20,6 +20,10 @@ internal static class LaunchFiles
         return taken;
     }
 
+    /// <summary>引数で新規に開いたタブを優先し、既に復旧済みならそのタブ。</summary>
+    public static T? PreferOpened<T>(T? opened, T? existing) where T : class =>
+        opened ?? existing;
+
     public static string[] Collect(IEnumerable<string> args)
     {
         var result = new List<string>();

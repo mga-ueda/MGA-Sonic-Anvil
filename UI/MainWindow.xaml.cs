@@ -251,7 +251,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        _didRestoreLastDocument = true;
+        if (!_didRestoreLastDocument)
+        {
+            LaunchFiles.SetStartup(MergeLaunchPaths(LaunchFiles.TakeStartup(), pending));
+            return;
+        }
+
         OpenLaunchPaths(pending);
     }
 
@@ -292,14 +297,12 @@ public partial class MainWindow : Window
     private async void RestoreLastDocumentAfterReveal()
     {
         var launch = MergeLaunchPaths(LaunchFiles.TakeStartup(), SingleInstance.TakePendingPaths());
+        await TryRestoreLastDocumentAsync().ConfigureAwait(true);
         if (launch.Length > 0)
         {
-            _didRestoreLastDocument = true;
             await OpenPathsAsync(launch).ConfigureAwait(true);
-            return;
         }
 
-        await TryRestoreLastDocumentAsync().ConfigureAwait(true);
         UpdateLayout();
         Waveform.Refresh();
         Overview.InvalidateVisual();

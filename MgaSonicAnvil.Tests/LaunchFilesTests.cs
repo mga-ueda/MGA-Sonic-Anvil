@@ -35,6 +35,16 @@ public sealed class LaunchFilesTests
     }
 
     [Fact]
+    public void PreferOpened_PrefersNewlyOpenedOverExisting()
+    {
+        var opened = new object();
+        var existing = new object();
+        Assert.Same(opened, LaunchFiles.PreferOpened(opened, existing));
+        Assert.Same(existing, LaunchFiles.PreferOpened<object>(opened: null, existing));
+        Assert.Null(LaunchFiles.PreferOpened<object>(opened: null, existing: null));
+    }
+
+    [Fact]
     public void HasStartup_FollowsSetAndTake()
     {
         try

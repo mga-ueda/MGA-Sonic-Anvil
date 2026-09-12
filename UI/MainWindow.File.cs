@@ -122,7 +122,8 @@ public partial class MainWindow
         }
 
         var showProgress = targets.Count > 1;
-        DocumentSession? first = null;
+        DocumentSession? opened = null;
+        DocumentSession? existingFirst = null;
         List<string>? errors = null;
         BeginOpenWork(targets.Count);
         try
@@ -138,13 +139,7 @@ public partial class MainWindow
                 var existing = FindSessionByPath(path);
                 if (existing is not null)
                 {
-                    if (first is null)
-                    {
-                        first = existing;
-                        ActivateSession(existing);
-                        PumpUiAfterOpen();
-                    }
-
+                    existingFirst ??= existing;
                     continue;
                 }
 
@@ -153,9 +148,9 @@ public partial class MainWindow
                     var document = await Task.Run(() => AudioCodec.Load(path)).ConfigureAwait(true);
                     var session = new DocumentSession(document);
                     _sessions.Add(session);
-                    if (first is null)
+                    if (opened is null)
                     {
-                        first = session;
+                        opened = session;
                         ActivateSession(session);
                     }
                     else
@@ -172,11 +167,17 @@ public partial class MainWindow
                 }
             }
 
-            if (first is not null)
+            var active = LaunchFiles.PreferOpened(opened, existingFirst);
+            if (active is not null)
             {
-                if (first.Document.SourcePath is { } opened)
+                if (!ReferenceEquals(_activeSession, active))
                 {
-                    RememberOpenedPath(opened, dirty: false, resetMarkers: false);
+                    ActivateSession(active);
+                }
+
+                if (active.Document.SourcePath is { } openedPath)
+                {
+                    RememberOpenedPath(openedPath, dirty: false, resetMarkers: false);
                 }
             }
             else
