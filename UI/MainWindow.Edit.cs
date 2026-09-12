@@ -1001,6 +1001,7 @@ public partial class MainWindow
     private void ReleaseStuckScrub()
     {
         Overview.CancelDrag();
+        ApplyOverviewViewToWaveform();
         // グローバル Capture 解除はフェード / 変換メニューを閉じ、Closed で試聴まで止める。
         Waveform.AbandonScrub();
         if (_player.IsScrubbing)

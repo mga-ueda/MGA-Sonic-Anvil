@@ -150,8 +150,8 @@ public partial class MainWindow : Window
         Overview.ViewStartChanged += (_, start) =>
         {
             Waveform.UnlockCenter();
-            Waveform.SetViewStartExternal(start);
-            ScrubVisibleCenter();
+            ScrubVisibleCenterAt(start);
+            Waveform.PanViewStart(start);
         };
         Overview.DragEnded += (_, _) => EndOverviewScrub();
         TimeScroll.ValueChanged += (_, _) =>
@@ -579,17 +579,19 @@ public partial class MainWindow : Window
             _document is not null);
     }
 
-    private long VisibleCenterFrame() =>
-        (long)Math.Round(Waveform.ViewStart + Waveform.ViewSpanFrames * 0.5);
+    private long VisibleCenterFrame() => VisibleCenterFrameAt(Overview.ViewStart);
 
-    private void ScrubVisibleCenter()
+    private long VisibleCenterFrameAt(double viewStart) =>
+        (long)Math.Round(viewStart + Waveform.ViewSpanFrames * 0.5);
+
+    private void ScrubVisibleCenterAt(double viewStart)
     {
         if (_document is null)
         {
             return;
         }
 
-        var frame = VisibleCenterFrame();
+        var frame = VisibleCenterFrameAt(viewStart);
         if (Waveform.IsScrubbing)
         {
             Waveform.PreviewScrubAtFrame(frame);
@@ -599,14 +601,21 @@ public partial class MainWindow : Window
         Waveform.BeginScrubAtFrame(frame);
     }
 
+    private void ApplyOverviewViewToWaveform()
+    {
+        Waveform.SetViewStartExternal(Overview.ViewStart);
+        Waveform.CommitPannedView();
+    }
+
     private void EndOverviewScrub()
     {
+        ApplyOverviewViewToWaveform();
         if (!Waveform.IsScrubbing)
         {
             return;
         }
 
-        Waveform.EndScrubAtFrame(VisibleCenterFrame(), commit: true);
+        Waveform.EndScrubAtFrame(VisibleCenterFrameAt(Overview.ViewStart), commit: true);
     }
 
     private WaveSelection ActiveRange()

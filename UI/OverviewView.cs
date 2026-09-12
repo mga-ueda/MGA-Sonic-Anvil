@@ -38,6 +38,8 @@ internal sealed class OverviewView : FrameworkElement
 
     public bool IsDragging => _dragging;
 
+    public double ViewStart => _viewStart;
+
     public OverviewView()
     {
         ClipToBounds = true;

@@ -67,6 +67,42 @@ public sealed class MemoryScrubVoiceTests
     }
 
     [Fact]
+    public void SwitchingToScrub_StopsAdvancingPlaybackCursor()
+    {
+        var document = MakeSine(frames: 8000, rate: 48000);
+        var provider = new PlaybackSampleProvider();
+        provider.Bind(document, 0, null, loop: false);
+        var buffer = new float[512];
+        Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+        var afterPlay = provider.CursorFrame;
+        Assert.True(afterPlay > 0);
+
+        provider.SetScrubbing(true);
+        provider.CaptureScrub(document, 100);
+        Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+        Assert.Equal(afterPlay, provider.CursorFrame);
+        Assert.False(provider.Ended);
+    }
+
+    [Fact]
+    public void SetScrubbingAgain_KeepsActiveGrain()
+    {
+        var document = MakeSine(frames: 8000, rate: 48000);
+        var provider = new PlaybackSampleProvider();
+        provider.Bind(document, 0, null, loop: false);
+        provider.SetScrubbing(true);
+        provider.CaptureScrub(document, 0);
+        var first = new float[512];
+        Assert.Equal(first.Length, provider.Read(first, 0, first.Length));
+        Assert.Contains(first, sample => Math.Abs(sample) > 0.01f);
+
+        provider.SetScrubbing(true);
+        var second = new float[512];
+        Assert.Equal(second.Length, provider.Read(second, 0, second.Length));
+        Assert.Contains(second, sample => Math.Abs(sample) > 0.01f);
+    }
+
+    [Fact]
     public void PlaybackProvider_ScrubFillsBufferWithoutEnding()
     {
         var document = MakeSine(frames: 8000, rate: 48000);
@@ -79,6 +115,15 @@ public sealed class MemoryScrubVoiceTests
         Assert.Equal(buffer.Length, written);
         Assert.False(provider.Ended);
         Assert.Contains(buffer, sample => Math.Abs(sample) > 0.01f);
+    }
+
+    [Fact]
+    public void PlaybackStoppedDuringScrub_IsIgnored()
+    {
+        Assert.True(AudioPlayer.ShouldIgnorePlaybackStopped(suppress: false, playing: true, scrubbing: true));
+        Assert.True(AudioPlayer.ShouldIgnorePlaybackStopped(suppress: true, playing: true, scrubbing: false));
+        Assert.True(AudioPlayer.ShouldIgnorePlaybackStopped(suppress: false, playing: false, scrubbing: false));
+        Assert.False(AudioPlayer.ShouldIgnorePlaybackStopped(suppress: false, playing: true, scrubbing: false));
     }
 
     private static AudioDocument MakeSine(int frames, int rate)

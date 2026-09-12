@@ -138,6 +138,8 @@ internal sealed class WaveformView : Grid
     private double _staticPaintEndMs;
     private double _followRebuildAtMs;
     private bool _staticRebuildQueued;
+    private bool _deferWaveReload;
+    private bool _deferredStaticQueued;
     private bool _viewChangedQueued;
     private readonly Dictionary<(string Text, TimeLabelAccent Accent), FormattedText> _timeLabelCache = new();
     private readonly Dictionary<string, FormattedText> _dbLabelCache = new(StringComparer.Ordinal);
@@ -1141,12 +1143,12 @@ internal sealed class WaveformView : Grid
         }
 
         frame = ClampFrame(frame);
-        if (frame == _playheadFrame)
+        if (frame != _playheadFrame)
         {
-            return;
+            PreviewInteraction(frame);
         }
 
-        PreviewInteraction(frame);
+        // 位置が同じでも Capture を回し、ホールド切れの無音を防ぐ。
         ScrubPreviewed?.Invoke(this, frame);
     }
 
@@ -1555,7 +1557,7 @@ internal sealed class WaveformView : Grid
         SetMouseGuideFromX(pos.X);
         QueueMouseGuideOverlay();
 
-        if (_scrubbing && _document is not null)
+        if (_dragging && _scrubbing && _document is not null)
         {
             Cursor = Cursors.ScrollWE;
             var scrubFrame = FrameAt(pos.X);
@@ -1621,7 +1623,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        if (_scrubbing)
+        if (_dragging && _scrubbing)
         {
             FinishScrub(commit: true, FrameAt(e.GetPosition(this).X));
             e.Handled = true;
@@ -1663,7 +1665,7 @@ internal sealed class WaveformView : Grid
             FinishMarkerDrag(commit: true);
         }
 
-        if (_scrubbing)
+        if (_dragging && _scrubbing)
         {
             FinishScrub(commit: true, FrameAt(e.GetPosition(this).X));
         }
@@ -1775,7 +1777,7 @@ internal sealed class WaveformView : Grid
         var loudness = LoudnessVisible;
         if (SpectrogramVisible)
         {
-            _spectrogram.Draw(dc, wave, _document, start, span, this);
+            _spectrogram.Draw(dc, wave, _document, start, span, this, reuseBitmap: _deferWaveReload);
         }
 
         if (loudness)
@@ -1893,6 +1895,11 @@ internal sealed class WaveformView : Grid
         var width = Math.Max(1, (int)Math.Round(bounds.Width * scaleX));
         var height = Math.Max(1, (int)Math.Round(bounds.Height * scaleY));
         WaveScroll.Quantize(_viewStart, span, width, out var quantStart, out var bmpSpan, out var bmpWidth);
+        if (_deferWaveReload && _waveBitmap is not null && !_waveDirty)
+        {
+            return;
+        }
+
         if (!_waveDirty
             && _waveBitmap is not null
             && _wavePixelWidth == bmpWidth
@@ -5280,7 +5287,7 @@ internal sealed class WaveformView : Grid
         RaiseViewChanged();
     }
 
-    private void SetViewStart(double start, bool playbackFollow = false)
+    private void SetViewStart(double start, bool playbackFollow = false, bool deferReload = false)
     {
         if (_document is null)
         {
@@ -5290,6 +5297,7 @@ internal sealed class WaveformView : Grid
             }
 
             _viewStart = 0;
+            _deferWaveReload = false;
             InvalidateStaticLayer();
             RaiseViewChanged();
             return;
@@ -5302,7 +5310,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        if (!playbackFollow)
+        if (!playbackFollow && !deferReload)
         {
             EndMarkerCommentEdit(commit: true);
         }
@@ -5310,6 +5318,18 @@ internal sealed class WaveformView : Grid
         _viewStart = next;
         _snapCacheDirty = true;
         QueueMouseGuideOverlay();
+        if (deferReload)
+        {
+            // キャッシュした波形／スペクトログラムをずらして先にスクロールする。
+            // 足りない端の読み直しは入力が空いてから（ContextIdle）。
+            _deferWaveReload = true;
+            InvalidateStaticLayer();
+            RaiseViewChanged();
+            QueueDeferredStaticRebuild();
+            return;
+        }
+
+        _deferWaveReload = false;
         if (playbackFollow)
         {
             // 追従スクロール。シークバー層は毎回更新。静的層（波形＋スペクトログラム）は
@@ -5341,7 +5361,24 @@ internal sealed class WaveformView : Grid
         RaiseViewChanged();
     }
 
-    public void SetViewStartExternal(double start) => SetViewStart(start);
+    public void SetViewStartExternal(double start, bool playbackFollow = false) =>
+        SetViewStart(start, playbackFollow);
+
+    /// <summary>
+    /// 概要ドラッグ用。表示位置はすぐ動かし、ピーク／スペクトログラムの読み直しは遅らせる。
+    /// </summary>
+    public void PanViewStart(double start) => SetViewStart(start, deferReload: true);
+
+    public void CommitPannedView()
+    {
+        if (!_deferWaveReload && !_deferredStaticQueued)
+        {
+            return;
+        }
+
+        _deferWaveReload = false;
+        InvalidateStaticLayer();
+    }
 
     public void ApplyPersistedView(double timeZoom, double ampZoom, double viewStart, long playhead)
     {
@@ -5708,6 +5745,24 @@ internal sealed class WaveformView : Grid
     private void InvalidateWaveform()
     {
         _waveDirty = true;
+        InvalidateStaticLayer();
+    }
+
+    private void QueueDeferredStaticRebuild()
+    {
+        if (_deferredStaticQueued)
+        {
+            return;
+        }
+
+        _deferredStaticQueued = true;
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, FlushDeferredStaticRebuild);
+    }
+
+    private void FlushDeferredStaticRebuild()
+    {
+        _deferredStaticQueued = false;
+        _deferWaveReload = false;
         InvalidateStaticLayer();
     }
 

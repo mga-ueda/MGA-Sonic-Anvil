@@ -524,8 +524,18 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         lock (_gate)
         {
+            if (_scrubbing == scrubbing)
+            {
+                return;
+            }
+
             _scrubbing = scrubbing;
             _scrub.Stop();
+            if (scrubbing)
+            {
+                _exitPlaying = false;
+            }
+
             Ended = false;
         }
     }

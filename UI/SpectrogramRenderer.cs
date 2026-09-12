@@ -64,7 +64,8 @@ internal sealed class SpectrogramRenderer
         double viewStart,
         double viewSpan,
         Visual host,
-        double imageOpacity = 1)
+        double imageOpacity = 1,
+        bool reuseBitmap = false)
     {
         if (wave.Width <= 1 || wave.Height <= 1 || document.FrameCount <= 0)
         {
@@ -72,7 +73,10 @@ internal sealed class SpectrogramRenderer
         }
 
         _cache.Ensure(document, () => host.Dispatcher.BeginInvoke(() => InvalidateRequested?.Invoke()));
-        EnsureBitmap(wave, document, viewStart, viewSpan, VisualTreeHelper.GetDpi(host));
+        if (!reuseBitmap || _bitmap is null)
+        {
+            EnsureBitmap(wave, document, viewStart, viewSpan, VisualTreeHelper.GetDpi(host));
+        }
         if (_bitmap is not null)
         {
             if (imageOpacity < 0.999)

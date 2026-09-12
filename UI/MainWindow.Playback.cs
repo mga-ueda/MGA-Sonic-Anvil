@@ -119,6 +119,7 @@ public partial class MainWindow
     private void DetachOverviewScrubKeepPlayback()
     {
         Overview.CancelDrag();
+        ApplyOverviewViewToWaveform();
         if (Waveform.IsScrubbing)
         {
             Waveform.AbandonScrub();

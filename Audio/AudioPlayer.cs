@@ -37,6 +37,13 @@ internal sealed class AudioPlayer : IDisposable
 
     public bool IsScrubbing => _scrubbing;
 
+    /// <summary>
+    /// 再生中スクラブの Stop→Play や一時停止の Stop は、遅延した
+    /// PlaybackStopped を EOF にしない。
+    /// </summary>
+    internal static bool ShouldIgnorePlaybackStopped(bool suppress, bool playing, bool scrubbing) =>
+        suppress || !playing || scrubbing;
+
     public bool HasOutputDevice => _output is not null;
 
     public long CursorFrame => _provider.CursorFrame;
@@ -262,20 +269,52 @@ internal sealed class AudioPlayer : IDisposable
     public void BeginScrub(AudioDocument document, long frame)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        var refillQueued = _playing && !_scrubbing && _output is not AsioOut;
         EnsureBound(document, frame);
         _provider.SetScrubbing(true);
+        _provider.CaptureScrub(document, frame);
         EnsureOutputDevice();
         if (_output is null)
         {
             throw new InvalidOperationException(UiStrings.ErrAudioOutputUnavailable);
         }
 
-        if (!_playing)
+        // PlaybackStopped が遅れて来ても EOF 扱いにしない。
+        _scrubbing = true;
+        if (refillQueued)
+        {
+            RefillOutputForScrub();
+        }
+        else if (!_playing)
         {
             StartOutput();
         }
+    }
 
-        _scrubbing = true;
+    /// <summary>
+    /// 再生中スクラブは、先読みに残った実音を捨ててからグレインを埋める。
+    /// デバイスを作り直すと概要ドラッグが途切れ、止めないとトーンが残る。
+    /// WaveOut は waveOutReset、WASAPI は AudioClient.Reset でキューを空にする。
+    /// ASIO は Stop すると HasReachedEnd が残るので、短い残留は許容する。
+    /// </summary>
+    private void RefillOutputForScrub()
+    {
+        if (_output is null or AsioOut)
+        {
+            return;
+        }
+
+        _suppressPlaybackEnded = true;
+        try
+        {
+            _output.Stop();
+            _output.Play();
+            _playing = true;
+        }
+        finally
+        {
+            _suppressPlaybackEnded = false;
+        }
     }
 
     public void CaptureScrub(AudioDocument document, long frame)
@@ -944,7 +983,8 @@ internal sealed class AudioPlayer : IDisposable
     {
         // 一時停止の Stop（WaveOutEvent は Stop 後に非同期で届く）は
         // 終了イベントにしない。真の EOF は _playing 中にしか来ない。
-        if (_suppressPlaybackEnded || !_playing)
+        // 再生中スクラブの refill（Stop→Play）も同様。
+        if (ShouldIgnorePlaybackStopped(_suppressPlaybackEnded, _playing, _scrubbing))
         {
             return;
         }
