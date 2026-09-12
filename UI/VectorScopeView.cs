@@ -28,7 +28,7 @@ internal sealed class VectorScopeView : FrameworkElement
     private const double ScopeInset = 4;
     private const float StereoMaxGain = 3.5f;
     private const float SurroundMaxGain = 1.7f;
-    private static readonly Color SurroundHullStroke = Color.FromRgb(0x5A, 0x5A, 0x5F);
+    private static Color SurroundHullStroke => Theme.Get("SurroundHullStrokeBrush");
 
     private readonly DispatcherTimer _timer;
     private readonly float[] _left = new float[LevelMeterEngine.WindowFrames];
@@ -152,18 +152,20 @@ internal sealed class VectorScopeView : FrameworkElement
         }
 
         dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
+        var layout = MeasureLayout(bounds);
         if (ShowSurround)
         {
-            DrawSurround(dc, bounds);
-            return;
+            DrawSurround(dc, layout.Scope);
+        }
+        else
+        {
+            DrawScope(dc, layout.Scope);
         }
 
-        var layout = MeasureLayout(bounds);
-        DrawScope(dc, layout.Scope);
         DrawCorrelation(dc, layout.Correlation);
     }
 
-    private static (Rect Scope, Rect Correlation) MeasureLayout(Rect bounds)
+    internal static (Rect Scope, Rect Correlation) MeasureLayout(Rect bounds)
     {
         var corrHeight = DesignMetrics.VectorScopeCorrelationHeight;
         var side = Math.Max(8d, Math.Min(bounds.Width, bounds.Height - corrHeight));
@@ -314,6 +316,24 @@ internal sealed class VectorScopeView : FrameworkElement
         dc.DrawText(value, new Point(track.X + (track.Width - value.Width) * 0.5, labelY));
     }
 
+    private void UpdateCorrelation(AudioPlayer? player, bool active, bool resetWhenIdle)
+    {
+        if (active && player is not null)
+        {
+            player.CopyMeterWindow(_left, _right);
+            var raw = VectorScopeEngine.Correlation(_left, _right);
+            var mix = raw >= _correlation ? CorrelationAttack : CorrelationRelease;
+            _correlation += (raw - _correlation) * mix;
+            return;
+        }
+
+        _correlation *= 0.88;
+        if (resetWhenIdle)
+        {
+            _correlation = 0;
+        }
+    }
+
     private void UpdateScope()
     {
         if (!IsVisible || ActualWidth < 8 || ActualHeight < 8)
@@ -339,20 +359,18 @@ internal sealed class VectorScopeView : FrameworkElement
             ClearBeamGhost();
         }
 
+        var active = player is { IsPlaying: true } or { IsScrubbing: true };
         if (_surroundMode || surround)
         {
-            UpdateSurround(player, active: player is { IsPlaying: true } or { IsScrubbing: true });
+            UpdateSurround(player, active);
+            UpdateCorrelation(player, active, resetWhenIdle: _surroundPaint < 0.04f);
             return;
         }
 
-        var active = player is { IsPlaying: true } or { IsScrubbing: true };
         if (active)
         {
-            player!.CopyMeterWindow(_left, _right);
+            UpdateCorrelation(player, active: true, resetWhenIdle: false);
             CaptureTrail();
-            var raw = VectorScopeEngine.Correlation(_left, _right);
-            var mix = raw >= _correlation ? CorrelationAttack : CorrelationRelease;
-            _correlation += (raw - _correlation) * mix;
             _paintFade = 1f;
             _idle = false;
             _beamSettled = false;
@@ -366,7 +384,7 @@ internal sealed class VectorScopeView : FrameworkElement
         }
         else
         {
-            _correlation *= 0.88;
+            UpdateCorrelation(player, active: false, resetWhenIdle: false);
             _displayGain += (1f - _displayGain) * 0.12f;
             _paintFade *= 0.86f;
             _beamFade += (1f - _beamFade) * BeamHome;
@@ -885,19 +903,10 @@ internal sealed class VectorScopeView : FrameworkElement
         return false;
     }
 
-    private static Rect SurroundScopeRect(Rect bounds)
-    {
-        var side = Math.Max(8d, Math.Min(bounds.Width, bounds.Height));
-        return new Rect(
-            bounds.Left + (bounds.Width - side) * 0.5,
-            bounds.Top + (bounds.Height - side) * 0.5,
-            side,
-            side);
-    }
+    internal static Rect SurroundScopeRect(Rect bounds) => MeasureLayout(bounds).Scope;
 
-    private void DrawSurround(DrawingContext dc, Rect bounds)
+    private void DrawSurround(DrawingContext dc, Rect scope)
     {
-        var scope = SurroundScopeRect(bounds);
         dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("VectorScopeBackBrush")), null, scope);
         ScopeGeometry(scope, out var cx, out var cy, out var radius);
         DrawSurroundGrid(dc, cx, cy, radius);
