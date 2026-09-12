@@ -69,6 +69,39 @@ public partial class MainWindow
         HistoryOverlay.Visibility = Visibility.Collapsed;
     }
 
+    private void MainWindow_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (HistoryOpen)
+        {
+            if (HistoryOverlay.IsMouseOver)
+            {
+                return;
+            }
+
+            // 履歴ストリップは MouseUp でトグルする。ここでは閉じない。
+            if (HistoryStrip.IsMouseOver)
+            {
+                return;
+            }
+
+            CloseEditHistory(commit: true);
+            e.Handled = true;
+            return;
+        }
+
+        if (CloseFadeCurvePicker()
+            || CloseFormatConvertPicker()
+            || CloseVolumeGainPicker()
+            || ClosePitchShiftPicker()
+            || CloseTimeStretchPicker())
+        {
+            e.Handled = true;
+        }
+    }
+
+    private void HistoryOverlay_CloseRequested(object sender, EventArgs e) =>
+        CloseEditHistory(commit: true);
+
     private bool TryProcessHistoryShortcut(Key key, ModifierKeys modifiers)
     {
         if (!HistoryOpen)
@@ -195,8 +228,16 @@ public partial class MainWindow
         HistoryStrip.SetItems(items, current);
     }
 
-    private void HistoryStrip_OpenRequested(object sender, EventArgs e) =>
+    private void HistoryStrip_OpenRequested(object sender, EventArgs e)
+    {
+        if (HistoryOpen)
+        {
+            CloseEditHistory(commit: true);
+            return;
+        }
+
         OpenEditHistory();
+    }
 
     private void HistoryOverlay_ItemClicked(object sender, HistoryItemClick e)
     {

@@ -21,6 +21,8 @@ internal sealed class EditHistoryOverlay : Border
 
     public event EventHandler<HistoryItemClick>? ItemClicked;
 
+    public event EventHandler? CloseRequested;
+
     public EditHistoryOverlay()
     {
         Width = 340;
@@ -35,10 +37,17 @@ internal sealed class EditHistoryOverlay : Border
         _title = new TextBlock
         {
             Text = UiStrings.EditHistoryTitle,
-            Margin = new Thickness(10, 8, 10, 2),
+            Margin = new Thickness(10, 8, 4, 2),
             FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center,
             Foreground = (Brush)Application.Current.FindResource("MutedForeBrush"),
         };
+        var caption = new DockPanel();
+        var close = OverlayCaption.CloseButton(() => CloseRequested?.Invoke(this, EventArgs.Empty));
+        OverlayCaption.PinCorner(close);
+        DockPanel.SetDock(close, Dock.Right);
+        caption.Children.Add(close);
+        caption.Children.Add(_title);
         _hint = new TextBlock
         {
             Text = UiStrings.EditHistoryHint,
@@ -64,9 +73,9 @@ internal sealed class EditHistoryOverlay : Border
         };
 
         var root = new DockPanel();
-        DockPanel.SetDock(_title, Dock.Top);
+        DockPanel.SetDock(caption, Dock.Top);
         DockPanel.SetDock(_hint, Dock.Top);
-        root.Children.Add(_title);
+        root.Children.Add(caption);
         root.Children.Add(_hint);
         root.Children.Add(_scroll);
         Child = root;
