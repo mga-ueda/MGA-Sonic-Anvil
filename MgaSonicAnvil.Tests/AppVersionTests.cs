@@ -1,3 +1,4 @@
+using System.IO;
 using MgaSonicAnvil.Domain;
 using Xunit;
 
@@ -19,4 +20,20 @@ public sealed class AppVersionTests
     [Fact]
     public void CompareSemVer_HigherPatchIsNewer() =>
         Assert.True(AppVersion.CompareSemVer("0.0.2-beta", "0.0.1-beta") > 0);
+
+    [Fact]
+    public void FormTitleWithFile_OmitsBracketsWhenEmpty()
+    {
+        Assert.Equal(AppVersion.FormTitle, AppVersion.FormTitleWithFile(null));
+        Assert.Equal(AppVersion.FormTitle, AppVersion.FormTitleWithFile("  "));
+    }
+
+    [Fact]
+    public void FormTitleWithFile_WrapsFullPathInBrackets()
+    {
+        var path = @"D:\Audio\take.wav";
+        var title = AppVersion.FormTitleWithFile(path);
+        Assert.StartsWith(AppVersion.FormTitle, title);
+        Assert.EndsWith(" [ " + Path.GetFullPath(path) + " ]", title);
+    }
 }

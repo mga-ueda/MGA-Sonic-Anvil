@@ -31,6 +31,32 @@ internal static partial class AppVersion
 
     public static string FormTitle => ProductName + " - Version " + Current;
 
+    /// <summary>アクティブファイルがあるとき、タイトル末尾に <c>[ フルパス ]</c> を付ける。</summary>
+    public static string FormTitleWithFile(string? sourcePath)
+    {
+        var path = (sourcePath ?? string.Empty).Trim();
+        if (path.Length == 0)
+        {
+            return FormTitle;
+        }
+
+        try
+        {
+            path = Path.GetFullPath(path);
+        }
+        catch (ArgumentException)
+        {
+        }
+        catch (NotSupportedException)
+        {
+        }
+        catch (PathTooLongException)
+        {
+        }
+
+        return FormTitle + " [ " + path + " ]";
+    }
+
     /// <summary>
     /// <paramref name="remoteSemVer"/> がローカルより新しいとき true。
     /// パース不能なときは比較せず false。
