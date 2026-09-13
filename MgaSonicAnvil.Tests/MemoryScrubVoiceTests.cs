@@ -118,6 +118,49 @@ public sealed class MemoryScrubVoiceTests
     }
 
     [Fact]
+    public void SurroundScrub_ClearsResidualChannelsInReusedBuffer()
+    {
+        // サラウンド直出し(6ch ソース → 8 ポート)で再生中にスクラブへ切り替えたとき、
+        // 再利用バッファの ch2 以降に残った直前の再生音が鳴り続けない(ビー音対策)。
+        var frames = 48000;
+        var samples = new float[frames * 6];
+        for (var i = 0; i < frames; i++)
+        {
+            var s = MathF.Sin(2 * MathF.PI * 440f * i / 48000f);
+            for (var ch = 0; ch < 6; ch++)
+            {
+                samples[i * 6 + ch] = s;
+            }
+        }
+
+        var document = new AudioDocument(samples, 48000, 6, 24, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(8, null);
+        provider.Bind(document, 0, null, loop: false);
+        Assert.Equal(8, provider.WaveFormat.Channels);
+
+        provider.SetScrubbing(true);
+        provider.CaptureScrub(document, 0);
+
+        // NAudio / ASIO アダプタのバッファ再利用を模して、直前の再生音の残骸で埋めておく。
+        var buffer = new float[8 * 256];
+        Array.Fill(buffer, 0.7f);
+        Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+
+        var heard = false;
+        for (var frame = 0; frame < 256; frame++)
+        {
+            heard |= Math.Abs(buffer[frame * 8]) > 0.01f || Math.Abs(buffer[frame * 8 + 1]) > 0.01f;
+            for (var ch = 2; ch < 8; ch++)
+            {
+                Assert.Equal(0f, buffer[frame * 8 + ch]);
+            }
+        }
+
+        Assert.True(heard, "スクラブ音が L/R に出ていない");
+    }
+
+    [Fact]
     public void PlaybackStoppedDuringScrub_IsIgnored()
     {
         Assert.True(AudioPlayer.ShouldIgnorePlaybackStopped(suppress: false, playing: true, scrubbing: true));

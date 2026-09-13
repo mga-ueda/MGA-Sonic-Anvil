@@ -1351,6 +1351,14 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _scrubScratch = new float[needed];
         }
 
+        // スクラブは L/R しか書かないため、サラウンド出力では ch2 以降に
+        // 再利用バッファへ残った直前の再生音がそのまま鳴り続けてしまう。
+        // 通常再生の EmitFrame と同じく、先にクリアしてから書く。
+        if (outCh > 2)
+        {
+            Array.Clear(buffer, offset, framesWanted * outCh);
+        }
+
         _scrub.Read(_scrubScratch, 0, sourceFrames, 1f);
         if (_sourceRate == _deviceRate)
         {
