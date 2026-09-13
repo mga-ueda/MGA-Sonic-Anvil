@@ -1,3 +1,4 @@
+using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 using Xunit;
 
@@ -43,5 +44,14 @@ public sealed class WaveformInvertPaintTests
         var back = unchecked((int)0xFFFAFAFA);
         Assert.Equal(back, WaveformInvertPaint.InvertPixel(wave, back, wave));
         Assert.Equal(wave, WaveformInvertPaint.InvertPixel(0, back, wave));
+    }
+
+    [Fact]
+    public void SpectrogramSelectionFill_LightIsBrightWash()
+    {
+        var fill = WaveformView.SpectrogramSelectionFill();
+        var old = UiThemePalette.ColorFor(UiTheme.Light, "LoopRangeFillBrush");
+        Assert.True(fill.R + fill.G + fill.B > old.R + old.G + old.B);
+        Assert.Equal(255, fill.R);
     }
 }

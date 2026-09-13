@@ -2203,6 +2203,8 @@ internal sealed class WaveformView : Grid
         _invertChannels = _document?.Channels ?? 0;
     }
 
+    internal static Color SpectrogramSelectionFill() => Color.FromArgb(56, 255, 255, 255);
+
     private void DrawInvertedSelection(
         DrawingContext dc,
         Rect bounds,
@@ -2226,10 +2228,7 @@ internal sealed class WaveformView : Grid
                 if (sx1 > sx0)
                 {
                     dc.DrawRectangle(
-                        WpfControlHelpers.FrozenBrush(
-                            UiThemeService.Current == UiTheme.Light
-                                ? Theme.Get("LoopRangeFillBrush")
-                                : Color.FromArgb(56, 255, 255, 255)),
+                        WpfControlHelpers.FrozenBrush(SpectrogramSelectionFill()),
                         null,
                         new Rect(sx0, specWave.Y, sx1 - sx0, specWave.Height));
                 }
