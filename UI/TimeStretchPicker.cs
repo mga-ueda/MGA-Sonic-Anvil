@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -193,9 +194,7 @@ internal static class TimeStretchPicker
 
     private static void BuildEditors(MenuState state)
     {
-        var fieldWidth = PickerChrome.CharBoxWidth(state.ShowSamples
-            ? Math.Max(10, state.SourceFrames.ToString(CultureInfo.InvariantCulture).Length)
-            : 10);
+        var fieldWidth = TimeFieldWidth(state);
         state.SourceText = PickerChrome.MonoValue();
         state.SourceText.Width = fieldWidth;
         state.SourceText.MinWidth = fieldWidth;
@@ -301,6 +300,20 @@ internal static class TimeStretchPicker
         {
             state.UpdatingText = false;
         }
+    }
+
+    private static double TimeFieldWidth(MenuState state) =>
+        PickerChrome.CharBoxWidth(TimeFieldChars(state.SourceFrames, state.SampleRate, state.ShowSamples));
+
+    internal static int TimeFieldChars(int sourceFrames, int sampleRate, bool showSamples)
+    {
+        var longest = new[]
+        {
+            FormatTime(sourceFrames, sampleRate, showSamples),
+            FormatTime(TimeStretch.DestFrameCount(sourceFrames, TimeStretch.MinPercent), sampleRate, showSamples),
+            FormatTime(TimeStretch.MaxDestFrames(sourceFrames), sampleRate, showSamples),
+        }.Max(text => text.Length);
+        return Math.Max(11, longest);
     }
 
     private static string FormatTime(int frames, int sampleRate, bool showSamples) =>

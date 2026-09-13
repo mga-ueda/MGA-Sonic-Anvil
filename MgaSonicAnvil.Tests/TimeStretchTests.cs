@@ -1,4 +1,6 @@
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
+using MgaSonicAnvil.UI;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
@@ -18,6 +20,18 @@ public sealed class TimeStretchTests
     {
         Assert.Equal(4800, TimeStretch.DestFrameCount(48000, 1));
         Assert.Equal(480000, TimeStretch.DestFrameCount(48000, 5000));
+    }
+
+    [Fact]
+    public void TimeFieldChars_FitsMaxStretchDuration()
+    {
+        const int sampleRate = 44100;
+        const int sourceFrames = 1_110_000;
+        var maxText = UiStrings.FormatStatusTime(
+            TimeStretch.MaxDestFrames(sourceFrames),
+            sampleRate,
+            asSamples: false);
+        Assert.True(TimeStretchPicker.TimeFieldChars(sourceFrames, sampleRate, showSamples: false) >= maxText.Length);
     }
 
     [Fact]

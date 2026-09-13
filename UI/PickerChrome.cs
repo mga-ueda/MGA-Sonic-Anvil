@@ -122,10 +122,12 @@ internal static class PickerChrome
             TextAlignment = TextAlignment.Right,
             VerticalContentAlignment = VerticalAlignment.Center,
             FontFamily = new FontFamily("Consolas"),
+            FontSize = 12,
             MinHeight = 22,
             IsTabStop = true,
         };
         TryStyle(box, "DarkTextBoxStyle");
+        ScrollViewer.SetHorizontalScrollBarVisibility(box, ScrollBarVisibility.Disabled);
         return box;
     }
 
@@ -142,7 +144,11 @@ internal static class PickerChrome
             12,
             Brushes.Black,
             1.0);
-        return Math.Ceiling(formatted.WidthIncludingTrailingWhitespace) + 6 + 6 + 1 + 1 + 4;
+        return Math.Ceiling(
+            formatted.WidthIncludingTrailingWhitespace
+            + Math.Max(0, -formatted.OverhangLeading)
+            + Math.Max(0, formatted.OverhangAfter)
+            + 6 + 6 + 1 + 1 + 12);
     }
 
     public static TextBlock MonoValue(bool emphasize = false) =>
