@@ -44,6 +44,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("(X)", UiStrings.TooltipFadeAround);
         Assert.Contains("(V)", UiStrings.TooltipVolume);
         Assert.Contains("(V)", UiStrings.TooltipLoudnessView);
+        Assert.Contains("Esc", UiStrings.TooltipLoudnessView);
         Assert.Contains("Shift+A", UiStrings.TooltipLoudnessView);
         Assert.Contains("Shift+V", UiStrings.TooltipLoudnessView);
         Assert.Contains("(P)", UiStrings.TooltipPitch);
@@ -56,6 +57,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("Ctrl+Shift+O", UiStrings.TooltipSettings);
         Assert.Contains("Ctrl+Shift+S", UiStrings.TooltipSaveAs);
         Assert.Contains("(A)", UiStrings.TooltipSpectrogramView);
+        Assert.Contains("Esc", UiStrings.TooltipSpectrogramView);
         Assert.Contains("Shift+A", UiStrings.TooltipSpectrogramView);
         Assert.Contains("Shift+V", UiStrings.TooltipSpectrogramView);
         Assert.Contains("(Z)", UiStrings.TooltipCenterPlayhead);

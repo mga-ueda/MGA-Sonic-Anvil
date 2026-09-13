@@ -478,9 +478,9 @@ internal static partial class UiStrings
     public static string TooltipSetRegion => Get("選択をリージョンに (Shift+R)", "Set selection as region (Shift+R)");
     public static string TooltipOpen => Get("開く (Ctrl+O)", "Open (Ctrl+O)");
     public static string TooltipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)", "Save As (Ctrl+Shift+S)");
-    public static string TooltipAnalysisView => Get("スペクトログラム / 重ね (A)  解除 (Shift+A / Shift+V)", "Spectrogram / overlay (A)  leave (Shift+A / Shift+V)");
-    public static string TooltipSpectrogramView => Get("スペクトログラム / 重ね (A)  解除 (Shift+A / Shift+V)", "Spectrogram / overlay (A)  leave (Shift+A / Shift+V)");
-    public static string TooltipLoudnessView => Get("ラウドネス (V)  解除 (Shift+A / Shift+V)", "Loudness (V)  leave (Shift+A / Shift+V)");
+    public static string TooltipAnalysisView => Get("スペクトログラム / 重ね (A)  解除 (Esc / Shift+A / Shift+V)", "Spectrogram / overlay (A)  leave (Esc / Shift+A / Shift+V)");
+    public static string TooltipSpectrogramView => Get("スペクトログラム / 重ね (A)  解除 (Esc / Shift+A / Shift+V)", "Spectrogram / overlay (A)  leave (Esc / Shift+A / Shift+V)");
+    public static string TooltipLoudnessView => Get("ラウドネス (V)  解除 (Esc / Shift+A / Shift+V)", "Loudness (V)  leave (Esc / Shift+A / Shift+V)");
     public static string TooltipCenterPlayhead => Get("中央寄せ / センターロック (Z)", "Center / center-lock (Z)");
     public static string TooltipHistory => Get("編集履歴 (U)", "Edit history (U)");
     public static string TooltipUiThemeToggle => Get("ダーク / ライト", "Dark / Light");
@@ -505,14 +505,14 @@ internal static partial class UiStrings
     public static string TipSetRegion => Get("選択をリージョンに (Shift+R)\n同じ範囲で繰り返すと分割", "Set selection as region (Shift+R)\nRepeat on the same range to split");
     public static string TipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)", "Save As (Ctrl+Shift+S)");
     public static string TipAnalysisView => Get(
-        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Shift+A または Shift+V（今の表示にかかわらず波形へ）。ボタンは 3 回で波形に戻る。暗部持ち上げは左端のバーまたは Alt+↑／↓",
-        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Shift+A or Shift+V returns to the waveform from any view. The button returns to the waveform on the third click. Lift dark energy with the left bar or Alt+↑ / ↓");
+        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Esc、Shift+A、Shift+V（今の表示にかかわらず波形へ）。ボタンは 3 回で波形に戻る。暗部持ち上げは左端のバーまたは Alt+↑／↓",
+        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Esc, Shift+A, or Shift+V returns to the waveform from any view. The button returns to the waveform on the third click. Lift dark energy with the left bar or Alt+↑ / ↓");
     public static string TipSpectrogramView => Get(
-        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Shift+A または Shift+V（今の表示にかかわらず波形へ）。ボタンは 3 回で波形に戻る。暗部持ち上げは左端のバーまたは Alt+↑／↓",
-        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Shift+A or Shift+V returns to the waveform from any view. The button returns to the waveform on the third click. Lift dark energy with the left bar or Alt+↑ / ↓");
+        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Esc、Shift+A、Shift+V（今の表示にかかわらず波形へ）。ボタンは 3 回で波形に戻る。暗部持ち上げは左端のバーまたは Alt+↑／↓",
+        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Esc, Shift+A, or Shift+V returns to the waveform from any view. The button returns to the waveform on the third click. Lift dark energy with the left bar or Alt+↑ / ↓");
     public static string TipLoudnessView => Get(
-        "ラウドネス表示 (V)\nV で曲線と音量入力を開く。抜けるのは Shift+A または Shift+V（今の表示にかかわらず波形へ）。ボタンは表示のオン／オフ",
-        "Loudness view (V)\nV shows the curve and opens volume input. Shift+A or Shift+V returns to the waveform from any view. The button toggles the view only");
+        "ラウドネス表示 (V)\nV で曲線と音量入力を開く。抜けるのは Esc、Shift+A、Shift+V（今の表示にかかわらず波形へ）。ボタンは表示のオン／オフ",
+        "Loudness view (V)\nV shows the curve and opens volume input. Esc, Shift+A, or Shift+V returns to the waveform from any view. The button toggles the view only");
     public static string TipCenterPlayhead => Get(
         "中央寄せ (Z / .)\n再生中はセンターロックの切替",
         "Center (Z / .)\nToggles center-lock while playing");

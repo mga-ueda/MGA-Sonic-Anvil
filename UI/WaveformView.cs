@@ -669,6 +669,17 @@ internal sealed class WaveformView : Grid
 
     public void ExitAnalysisView() => SetAnalysisView(WaveformAnalysisView.Waveform);
 
+    public bool TryExitAnalysisView()
+    {
+        if (AnalysisView == WaveformAnalysisView.Waveform)
+        {
+            return false;
+        }
+
+        ExitAnalysisView();
+        return true;
+    }
+
     public double LoudnessTargetLufs
     {
         get => _loudnessTargetLufs;

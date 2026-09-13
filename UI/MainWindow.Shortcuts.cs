@@ -792,6 +792,11 @@ public partial class MainWindow
             return true;
         }
 
+        if (Waveform.TryExitAnalysisView())
+        {
+            return true;
+        }
+
         return true;
     }
 
