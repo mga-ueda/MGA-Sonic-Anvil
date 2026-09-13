@@ -55,6 +55,23 @@ public sealed class LevelColorThemeTests
         }
     }
 
+    [Fact]
+    public void Light_LevelMeterPeakHold_MatchesSpectrumPeakHold()
+    {
+        foreach (var db in new[] { -28d, -10d, 0d })
+        {
+            Assert.Equal(
+                LevelColorTheme.PeakHold(db, UiTheme.Light),
+                LevelMeterView.HoldFillColor(db, isPeakHold: true, UiTheme.Light));
+            Assert.Equal(
+                LevelMeterEngine.LevelColor(db),
+                LevelMeterView.HoldFillColor(db, isPeakHold: true, UiTheme.Dark));
+            Assert.Equal(
+                LevelMeterEngine.LevelColor(db),
+                LevelMeterView.HoldFillColor(db, isPeakHold: false, UiTheme.Light));
+        }
+    }
+
     private static double Luma(ColorRgb color)
     {
         static double Lin(byte channel)

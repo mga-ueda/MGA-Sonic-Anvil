@@ -163,12 +163,12 @@ internal sealed class LevelMeterView : FrameworkElement
 
         if (isPeak && meter.ShowPeakHold)
         {
-            DrawHoldLine(dc, track, meter.PeakHoldPct, meter.PeakHeldDb, channel);
+            DrawHoldLine(dc, track, meter.PeakHoldPct, meter.PeakHeldDb, channel, isPeakHold: true);
         }
 
         if ((!isPeak || includeRmsHold) && meter.ShowRmsHold)
         {
-            DrawHoldLine(dc, track, meter.RmsHoldPct, meter.RmsHoldLineDb, channel);
+            DrawHoldLine(dc, track, meter.RmsHoldPct, meter.RmsHoldLineDb, channel, isPeakHold: false);
         }
     }
 
@@ -184,7 +184,24 @@ internal sealed class LevelMeterView : FrameworkElement
         }
     }
 
-    private void DrawHoldLine(DrawingContext dc, Rect track, double holdPct, double holdDb, int channel)
+    /// <summary>ライトのピークホールドだけスペアナと同じ <see cref="LevelColorTheme.PeakHold"/>。</summary>
+    internal static ColorRgb HoldFillColor(double holdDb, bool isPeakHold, UiTheme theme)
+    {
+        if (isPeakHold && theme == UiTheme.Light)
+        {
+            return LevelColorTheme.PeakHold(holdDb, theme);
+        }
+
+        return LevelMeterEngine.LevelColor(holdDb);
+    }
+
+    private void DrawHoldLine(
+        DrawingContext dc,
+        Rect track,
+        double holdPct,
+        double holdDb,
+        int channel,
+        bool isPeakHold)
     {
         var holdBottom = track.Height * Math.Clamp(holdPct, 0, 100) / 100d;
         var y = track.Bottom - holdBottom - HoldLineHeight;
@@ -195,7 +212,7 @@ internal sealed class LevelMeterView : FrameworkElement
         }
         else
         {
-            var rgb = LevelMeterEngine.LevelColor(holdDb);
+            var rgb = HoldFillColor(holdDb, isPeakHold, UiThemeService.Current);
             fill = WpfControlHelpers.FrozenBrush(Color.FromRgb(rgb.R, rgb.G, rgb.B));
         }
 
