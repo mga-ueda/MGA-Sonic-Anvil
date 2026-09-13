@@ -69,6 +69,8 @@ public sealed class UiThemeTests
         Assert.True(UiThemePalette.IsThemeable("SampleLoopTimeLabelForeBrush"));
         Assert.True(UiThemePalette.IsThemeable("RegionTimeLabelForeBrush"));
         Assert.True(UiThemePalette.IsThemeable("MarkerLabelForeBrush"));
+        Assert.True(UiThemePalette.IsThemeable("MenuHighlightBackBrush"));
+        Assert.True(UiThemePalette.IsThemeable("MenuDisabledForeBrush"));
 
         foreach (var key in UiThemePalette.ThemeableKeys)
         {
@@ -144,6 +146,10 @@ public sealed class UiThemeTests
             > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "TransportDisabledForeBrush")));
         Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "TransportHoverBackBrush"))
             > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "TransportBackBrush")));
+        var surface = UiThemePalette.ColorFor(UiTheme.Light, "SurfaceBackBrush");
+        var menuHighlight = UiThemePalette.ColorFor(UiTheme.Light, "MenuHighlightBackBrush");
+        Assert.True(RelativeLuma(surface) - RelativeLuma(menuHighlight) >= 0.08);
+        Assert.True(Contrast(UiThemePalette.ColorFor(UiTheme.Light, "PrimaryForeBrush"), menuHighlight) >= 7);
         Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "TransportPressedBackBrush"))
             >= RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "TransportHoverBackBrush")));
         Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "HistoryStripHoverBackBrush"))

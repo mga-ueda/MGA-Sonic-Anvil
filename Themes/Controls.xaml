@@ -160,7 +160,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">
-                            <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource TransportHoverBackBrush}" />
+                            <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource MenuHighlightBackBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{DynamicResource ChromeDimBrush}" />
@@ -658,6 +658,10 @@
                                             <Setter Property="VerticalAlignment" Value="Center" />
                                             <Setter Property="TextWrapping" Value="NoWrap" />
                                             <Setter Property="TextTrimming" Value="None" />
+                                            <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=MenuItem}}" />
+                                        </Style>
+                                        <Style TargetType="AccessText">
+                                            <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=MenuItem}}" />
                                         </Style>
                                     </ContentPresenter.Resources>
                                 </ContentPresenter>
@@ -722,14 +726,25 @@
                         <Trigger Property="Role" Value="SubmenuHeader">
                             <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
                         </Trigger>
-                        <Trigger Property="IsHighlighted" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TransportHoverBackBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsSubmenuOpen" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TransportHoverBackBrush}" />
-                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsHighlighted" Value="True" />
+                                <Condition Property="IsEnabled" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MenuHighlightBackBrush}" />
+                        </MultiTrigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsSubmenuOpen" Value="True" />
+                                <Condition Property="IsEnabled" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MenuHighlightBackBrush}" />
+                        </MultiTrigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Foreground" Value="{DynamicResource MutedForeBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource MenuDisabledForeBrush}" />
+                            <Setter TargetName="Gesture" Property="Foreground" Value="{DynamicResource MenuDisabledForeBrush}" />
+                            <Setter TargetName="CheckMark" Property="Foreground" Value="{DynamicResource MenuDisabledForeBrush}" />
+                            <Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource MenuDisabledForeBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

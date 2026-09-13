@@ -18,6 +18,8 @@
     <SolidColorBrush x:Key="ControlHoverBorderBrush" Color="#FF505050" />
     <SolidColorBrush x:Key="DialogInputBackBrush" Color="#FF1C1C1E" />
     <SolidColorBrush x:Key="MenuSeparatorBrush" Color="#FF3A3A3E" />
+    <SolidColorBrush x:Key="MenuHighlightBackBrush" Color="#FF37373A" />
+    <SolidColorBrush x:Key="MenuDisabledForeBrush" Color="#FF8C8C90" />
 
     <SolidColorBrush x:Key="WaveformBackBrush" Color="#FF262626" />
     <SolidColorBrush x:Key="WaveFillBrush" Color="#FFB6B6B6" />
