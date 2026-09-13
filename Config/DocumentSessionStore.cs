@@ -59,6 +59,22 @@ internal sealed class OpenDocumentSnapshot
     public string OriginFileName { get; set; } = string.Empty;
 
     public string HistoryFileName { get; set; } = string.Empty;
+
+    /// <summary>未保存の録音。保存すると false。</summary>
+    public bool CanContinueRecording { get; set; }
+
+    /// <summary>Wave / Aiff / Mp3。空なら復元時に変えない。</summary>
+    public string SourceKind { get; set; } = string.Empty;
+
+    /// <summary>閉じたタブを再開するときの挿入位置。</summary>
+    public int ClosedIndex { get; set; }
+}
+
+internal enum SessionAudioWriteKind
+{
+    Skip,
+    Reuse,
+    Rewrite,
 }
 
 internal static class DocumentSessionStore
@@ -67,9 +83,15 @@ internal static class DocumentSessionStore
 
     public static string FileNameForIndex(int index) => $"doc-{Math.Max(0, index)}.wav";
 
+    public static string FileNameForClosedIndex(int index) => $"closed-{Math.Max(0, index)}.wav";
+
     public static string OriginFileNameForIndex(int index) => $"doc-{Math.Max(0, index)}-origin.wav";
 
+    public static string OriginFileNameForClosedIndex(int index) => $"closed-{Math.Max(0, index)}-origin.wav";
+
     public static string HistoryFileNameForIndex(int index) => $"doc-{Math.Max(0, index)}-history.json";
+
+    public static string HistoryFileNameForClosedIndex(int index) => $"closed-{Math.Max(0, index)}-history.json";
 
     public static string? SanitizeSidecarName(string? fileName)
     {
@@ -85,13 +107,13 @@ internal static class DocumentSessionStore
         }
 
         if (name.EndsWith("-origin.wav", StringComparison.OrdinalIgnoreCase)
-            && name.StartsWith("doc-", StringComparison.OrdinalIgnoreCase))
+            && IsManagedSessionStem(name))
         {
             return name;
         }
 
         if (name.EndsWith("-history.json", StringComparison.OrdinalIgnoreCase)
-            && name.StartsWith("doc-", StringComparison.OrdinalIgnoreCase))
+            && IsManagedSessionStem(name))
         {
             return name;
         }
@@ -99,8 +121,93 @@ internal static class DocumentSessionStore
         return null;
     }
 
-    public static bool NeedsSessionAudio(bool dirty, string? sourcePath) =>
-        dirty || string.IsNullOrWhiteSpace(sourcePath);
+    public static bool NeedsSessionAudio(bool dirty, string? sourcePath, bool canContinueRecording = false) =>
+        canContinueRecording || dirty || string.IsNullOrWhiteSpace(sourcePath);
+
+    public static bool HasWorkingAudio(AudioDocument document) => document.FrameCount > 0;
+
+    /// <summary>
+    /// 作業コピー WAV を書くか。サンプルが前回と同じなら、既にあるコピーか元ファイルを使う。
+    /// </summary>
+    public static SessionAudioWriteKind DecideSessionAudioWrite(
+        bool needsSessionAudio,
+        bool hasWorkingAudio,
+        bool hasSourcePath,
+        int sampleRevision,
+        int persistedSampleRevision,
+        bool reusableFileExists)
+    {
+        if (!needsSessionAudio || !hasWorkingAudio)
+        {
+            return SessionAudioWriteKind.Skip;
+        }
+
+        if (sampleRevision == persistedSampleRevision)
+        {
+            if (reusableFileExists)
+            {
+                return SessionAudioWriteKind.Reuse;
+            }
+
+            if (hasSourcePath)
+            {
+                return SessionAudioWriteKind.Skip;
+            }
+        }
+
+        return SessionAudioWriteKind.Rewrite;
+    }
+
+    public static bool HasUsableSessionAudio(string directory, string? fileName) =>
+        SanitizeSessionFileName(fileName) is { } name && HasUsableFile(directory, name);
+
+    public static bool HasUsableSidecar(string directory, string? fileName) =>
+        SanitizeSidecarName(fileName) is { } name && HasUsableFile(directory, name);
+
+    public static bool HistoryMatchesFile(string path, HistorySessionSnapshot snapshot)
+    {
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return false;
+            }
+
+            var expected = JsonSerializer.Serialize(snapshot, HistorySessionJsonContext.Default.HistorySessionSnapshot);
+            return string.Equals(File.ReadAllText(path), expected, StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool HasUsableFile(string directory, string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            return false;
+        }
+
+        try
+        {
+            var path = Path.Combine(directory, fileName);
+            return File.Exists(path) && new FileInfo(path).Length > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>終了時に作業コピーを残す未保存の録音（閉じたタブ含む）。</summary>
+    public static bool ShouldPersistClosedTab(AudioDocument document) =>
+        HasWorkingAudio(document)
+        && (document.CanContinueRecording || string.IsNullOrWhiteSpace(document.SourcePath));
+
+    private static bool IsManagedSessionStem(string name) =>
+        name.StartsWith("doc-", StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("closed-", StringComparison.OrdinalIgnoreCase);
 
     public static bool TryWriteHistory(string path, HistorySessionSnapshot snapshot)
     {
@@ -207,7 +314,8 @@ internal static class DocumentSessionStore
 
     public static OpenDocumentSnapshot Capture(AudioDocument document, in SessionViewState view, int index)
     {
-        var needsAudio = NeedsSessionAudio(document.IsDirty, document.SourcePath);
+        var needsAudio = NeedsSessionAudio(document.IsDirty, document.SourcePath, document.CanContinueRecording)
+            && HasWorkingAudio(document);
         var snap = new OpenDocumentSnapshot
         {
             SourcePath = document.SourcePath ?? string.Empty,
@@ -225,20 +333,55 @@ internal static class DocumentSessionStore
             SelectedMarkerFrames = view.SelectedMarkerFrames.Count == 0
                 ? []
                 : [.. view.SelectedMarkerFrames],
+            CanContinueRecording = document.CanContinueRecording,
+            SourceKind = document.SourceKind == AudioFileKind.Wave
+                ? string.Empty
+                : document.SourceKind.ToString(),
         };
         StoreMarkers(snap, document.SnapshotMarkers());
         StoreRegions(snap, document.SnapshotRegions());
         return snap;
     }
 
+    public static bool TryParseSourceKind(string? text, out AudioFileKind kind)
+    {
+        if (string.Equals(text, nameof(AudioFileKind.Mp3), StringComparison.OrdinalIgnoreCase))
+        {
+            kind = AudioFileKind.Mp3;
+            return true;
+        }
+
+        if (string.Equals(text, nameof(AudioFileKind.Aiff), StringComparison.OrdinalIgnoreCase))
+        {
+            kind = AudioFileKind.Aiff;
+            return true;
+        }
+
+        if (string.Equals(text, nameof(AudioFileKind.Wave), StringComparison.OrdinalIgnoreCase))
+        {
+            kind = AudioFileKind.Wave;
+            return true;
+        }
+
+        kind = AudioFileKind.Wave;
+        return false;
+    }
+
     public static void ApplyMeta(AudioDocument document, OpenDocumentSnapshot snap)
     {
+        if (TryParseSourceKind(snap.SourceKind, out var kind))
+        {
+            document.RestoreSourceKind(kind);
+        }
+
         document.ReplaceMarkers(LoadMarkers(snap), markDirty: false);
         document.SetSampleLoop(new WaveSelection(snap.SampleLoopStart, snap.SampleLoopEnd), markDirty: false);
         document.SetRegions(LoadRegions(snap), markDirty: false);
         // 起動復元ではズーム・選択・再生ヘッドは初期化する（タブ切り替え中の表示はセッション側で持つ）。
         document.Selection = WaveSelection.Empty;
         document.CursorFrame = 0;
+        document.CanContinueRecording = snap.CanContinueRecording
+            || (snap.Dirty && string.IsNullOrWhiteSpace(snap.SourcePath));
     }
 
     public static int ResolveActiveIndex(IReadOnlyList<OpenDocumentSnapshot> docs, int savedIndex)
@@ -278,9 +421,13 @@ internal static class DocumentSessionStore
     public static OpenDocumentSnapshot[] ResolveOpenDocuments(AppSettings settings) =>
         settings.OpenDocuments ?? [];
 
+    public static OpenDocumentSnapshot[] ResolveClosedDocuments(AppSettings settings) =>
+        settings.ClosedDocuments ?? [];
+
     public static void ClearOpenDocuments(AppSettings settings)
     {
         settings.OpenDocuments = [];
+        settings.ClosedDocuments = [];
         settings.ActiveDocumentIndex = 0;
     }
 

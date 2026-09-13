@@ -6,6 +6,7 @@ namespace MgaSonicAnvil.Audio;
 internal sealed class Pcm16WaveProvider : IWaveProvider, IDisposable
 {
     private readonly float[] _samples;
+    private readonly int _count;
     private readonly IProgress<double>? _progress;
     private int _index;
     private int _lastBucket = -1;
@@ -13,6 +14,7 @@ internal sealed class Pcm16WaveProvider : IWaveProvider, IDisposable
     public Pcm16WaveProvider(AudioDocument document, IProgress<double>? progress = null)
     {
         _samples = document.Interleaved;
+        _count = Math.Clamp(document.SampleCount, 0, _samples.Length);
         _progress = progress;
         WaveFormat = new WaveFormat(document.SampleRate, 16, document.Channels);
     }
@@ -22,7 +24,7 @@ internal sealed class Pcm16WaveProvider : IWaveProvider, IDisposable
     public int Read(byte[] buffer, int offset, int count)
     {
         var frames = count / 2;
-        var n = Math.Min(frames, _samples.Length - _index);
+        var n = Math.Min(frames, _count - _index);
         if (n <= 0)
         {
             return 0;
@@ -37,13 +39,13 @@ internal sealed class Pcm16WaveProvider : IWaveProvider, IDisposable
         }
 
         _index += n;
-        if (_progress is not null && _samples.Length > 0)
+        if (_progress is not null && _count > 0)
         {
-            var bucket = _index * 50 / _samples.Length;
-            if (bucket != _lastBucket || _index >= _samples.Length)
+            var bucket = _index * 50 / _count;
+            if (bucket != _lastBucket || _index >= _count)
             {
                 _lastBucket = bucket;
-                _progress.Report(Math.Clamp(_index / (double)_samples.Length, 0, 1));
+                _progress.Report(Math.Clamp(_index / (double)_count, 0, 1));
             }
         }
 
@@ -59,6 +61,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 {
     private readonly object _gate = new();
     private float[] _samples = [];
+    private int _usedSamples;
     private int _channels = 2;
     private int _outputChannels = 2;
     private int _deviceOutputChannels = 2;
@@ -125,7 +128,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private int _flushFadeRemaining;
     private int _flushFadeTotal;
 
-    /// <summary>再生中 Shift でシークバーを進める倍率（ピッチ据え置き）。</summary>
+    /// <summary>ピッチ据え置きの早送り／巻き戻し倍率。</summary>
     internal const double FastSpeed = 3;
     private const double ShuttleGrainSeconds = 0.03;
     private const double ShuttleTaperSeconds = 0.004;
@@ -269,6 +272,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         lock (_gate)
         {
             _samples = document.Interleaved;
+            _usedSamples = Math.Clamp(document.SampleCount, 0, _samples.Length);
             _channels = Math.Max(1, document.Channels);
             _sourceRate = Math.Max(1, document.SampleRate);
             ApplyOutputConfig();
@@ -283,18 +287,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _shuttlePrimed = false;
             _exitSpanStartFrame = -1;
             _exitSpanEndFrame = -1;
-            if (playRange is { IsEmpty: false } range)
-            {
-                _loop = loop;
-                _loopStart = checked((int)range.StartFrame * _channels);
-                _playEnd = checked((int)range.EndFrame * _channels);
-            }
-            else
-            {
-                _loop = false;
-                _loopStart = 0;
-                _playEnd = _samples.Length;
-            }
+            ApplyPlayWindowNoLock(playRange, loop);
 
             Ended = false;
             ResetMeterBuffers();
@@ -524,7 +517,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         lock (_gate)
         {
-            var max = _channels <= 0 ? 0 : _samples.Length / _channels;
+            var max = UsedFrameCountNoLock(_channels);
             var next = Math.Clamp(frame, 0, max);
             _sourceFrame = next;
             _cursor = checked((int)next * _channels);
@@ -616,19 +609,6 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
-    /// <summary>
-    /// 左右 Shift の状態から再生速度を決める。両方で巻き戻し、片方で早送り。
-    /// </summary>
-    internal static double SpeedFromShiftKeys(bool leftShift, bool rightShift, bool otherModifiers)
-    {
-        if (otherModifiers || !(leftShift || rightShift))
-        {
-            return 1;
-        }
-
-        return leftShift && rightShift ? -FastSpeed : FastSpeed;
-    }
-
     public void CaptureScrub(AudioDocument document, long frame)
     {
         _scrub.Bind(document);
@@ -639,22 +619,33 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         lock (_gate)
         {
-            if (playRange is { IsEmpty: false } range)
-            {
-                _loop = loop;
-                _loopStart = checked((int)range.StartFrame * _channels);
-                _playEnd = checked((int)range.EndFrame * _channels);
-            }
-            else
-            {
-                _loop = false;
-                _loopStart = 0;
-                _playEnd = _samples.Length;
-            }
+            ApplyPlayWindowNoLock(playRange, loop);
 
             // 再生ウィンドウが変わったら進行中の Exit は止める（-E 区間は呼び出し側が再設定する）。
             _exitPlaying = false;
             Ended = false;
+        }
+    }
+
+    private int UsedSampleCountNoLock() => Math.Clamp(_usedSamples, 0, _samples.Length);
+
+    private int UsedFrameCountNoLock(int srcCh) =>
+        srcCh <= 0 ? 0 : UsedSampleCountNoLock() / srcCh;
+
+    private void ApplyPlayWindowNoLock(WaveSelection? playRange, bool loop)
+    {
+        var used = UsedSampleCountNoLock();
+        if (playRange is { IsEmpty: false } range)
+        {
+            _loop = loop;
+            _playEnd = Math.Min(checked((int)range.EndFrame * _channels), used);
+            _loopStart = Math.Clamp(checked((int)range.StartFrame * _channels), 0, Math.Max(0, _playEnd));
+        }
+        else
+        {
+            _loop = false;
+            _loopStart = 0;
+            _playEnd = used;
         }
     }
 
@@ -758,7 +749,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return ReadScrub(buffer, offset, count);
         }
 
-        if (_samples.Length == 0 || Ended)
+        if (_usedSamples <= 0 || Ended)
         {
             if (_flushFadeTotal > 0)
             {
@@ -895,7 +886,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         var playEndFrame = srcCh <= 0 ? 0 : _playEnd / (double)srcCh;
         var loopStartFrame = srcCh <= 0 ? 0 : _loopStart / (double)srcCh;
-        var frameCount = srcCh <= 0 ? 0 : _samples.Length / srcCh;
+        var frameCount = UsedFrameCountNoLock(srcCh);
         var step = PlaybackStep(resampled: true);
         var writtenFrames = 0;
         var exitMixedFrames = 0;
@@ -952,7 +943,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         var playEndFrame = srcCh <= 0 ? 0 : _playEnd / (double)srcCh;
         var loopStartFrame = srcCh <= 0 ? 0 : _loopStart / (double)srcCh;
-        var frameCount = srcCh <= 0 ? 0 : _samples.Length / srcCh;
+        var frameCount = UsedFrameCountNoLock(srcCh);
         var step = PlaybackStep(resampled: true);
         var grainStep = _sourceRate / (double)Math.Max(1, _deviceRate);
         var grainFrames = Math.Max(64, (int)Math.Round(ShuttleGrainSeconds * _sourceRate));
@@ -1028,7 +1019,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
     private void ReadShuttleSource(double sourceFrame, int srcCh, int frameCount, Span<float> dest)
     {
-        if (sourceFrame < 0 || sourceFrame >= frameCount || _samples.Length < srcCh)
+        var used = UsedSampleCountNoLock();
+        if (sourceFrame < 0 || sourceFrame >= frameCount || used < srcCh)
         {
             dest.Clear();
             return;
@@ -1037,7 +1029,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         if (_sourceRate == _deviceRate && Math.Abs(sourceFrame - Math.Round(sourceFrame)) < 1e-6)
         {
             var at = checked((int)Math.Round(sourceFrame) * srcCh);
-            if ((uint)at > (uint)(_samples.Length - srcCh))
+            if ((uint)at > (uint)(used - srcCh))
             {
                 dest.Clear();
                 return;
@@ -1075,7 +1067,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     /// <returns>カーソルを動かした（続きの判定が必要）。</returns>
     private bool TrySkipSilenceNoLock(int srcCh, long start)
     {
-        if (!_silentSkip || _samples.Length == 0)
+        if (!_silentSkip || _usedSamples <= 0 || UsesShuttleRead())
         {
             return false;
         }
@@ -1171,7 +1163,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return;
         }
 
-        var frameCount = srcCh <= 0 ? 0 : _samples.Length / srcCh;
+        var frameCount = UsedFrameCountNoLock(srcCh);
         var endFrame = Math.Min(_exitSpanEndFrame, frameCount);
         var step = PlaybackStep(resampled);
         for (var i = fromFrame; i < toFrame; i++)

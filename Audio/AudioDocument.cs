@@ -86,17 +86,28 @@ internal sealed partial class AudioDocument
 
     public AudioFileKind SourceKind { get; private set; }
 
+    /// <summary>作業コピー復元などで種類だけ戻す。保存済みパスは変えない。</summary>
+    public void RestoreSourceKind(AudioFileKind kind) => SourceKind = kind;
+
     public string? SourcePath { get; set; }
 
     public PeakPyramid Peaks { get; private set; }
 
     public bool IsDirty { get; private set; }
 
+    /// <summary>サンプル内容が変わった回数。マーカー等のメタだけでは増えない。</summary>
+    public int SampleRevision { get; private set; }
+
+    /// <summary>未保存の録音タブ。保存すると続きは録れない。</summary>
+    public bool CanContinueRecording { get; set; }
+
     public long FileBytes { get; private set; }
 
     public DateTime? FileLastWriteTime { get; private set; }
 
-    public long FrameCount => Interleaved.Length / Channels;
+    public long FrameCount => Channels <= 0 ? 0 : SampleCount / Channels;
+
+    internal int SampleCount => _liveSampleCount >= 0 ? _liveSampleCount : Interleaved.Length;
 
     public double DurationSeconds => SampleRate <= 0 ? 0 : FrameCount / (double)SampleRate;
 
@@ -114,6 +125,8 @@ internal sealed partial class AudioDocument
     private int _formatOriginSampleRate;
     private int _formatOriginChannels;
     private int _formatOriginBits;
+
+    private int _liveSampleCount = -1;
 
     private readonly List<WaveRegion> _regions = [];
 
@@ -156,6 +169,7 @@ internal sealed partial class AudioDocument
         SourcePath = path;
         SourceKind = kind;
         IsDirty = false;
+        CanContinueRecording = false;
         RefreshFileBytes();
         CommitFormat();
     }
@@ -170,6 +184,7 @@ internal sealed partial class AudioDocument
 
     public void ReplaceRange(long startFrame, float[] samples)
     {
+        DiscardLiveCapacity();
         var start = checked((int)startFrame * Channels);
         if (start < 0 || start + samples.Length > Interleaved.Length)
         {
@@ -178,12 +193,13 @@ internal sealed partial class AudioDocument
 
         Array.Copy(samples, 0, Interleaved, start, samples.Length);
         RebuildPeaks();
-        IsDirty = true;
+        NoteSamplesChanged();
         CaptureFormatOrigin();
     }
 
     public void SpliceRange(long startFrame, long oldFrameCount, float[] samples)
     {
+        DiscardLiveCapacity();
         var start = checked((int)startFrame * Channels);
         var oldLength = checked((int)oldFrameCount * Channels);
         if (start < 0 || oldLength < 0 || start + oldLength > Interleaved.Length)
@@ -202,7 +218,7 @@ internal sealed partial class AudioDocument
             Interleaved.Length - start - oldLength);
         Interleaved = next;
         RebuildPeaks();
-        IsDirty = true;
+        NoteSamplesChanged();
         CaptureFormatOrigin();
     }
 
@@ -235,6 +251,11 @@ internal sealed partial class AudioDocument
     {
         var start = checked((int)startFrame * Channels);
         var length = checked((int)frameCount * Channels);
+        if (start < 0 || length < 0 || start + length > SampleCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(startFrame));
+        }
+
         var copy = new float[length];
         Array.Copy(Interleaved, start, copy, 0, length);
         return copy;
@@ -242,6 +263,7 @@ internal sealed partial class AudioDocument
 
     public void DeleteRange(long startFrame, long frameCount)
     {
+        DiscardLiveCapacity();
         var start = checked((int)startFrame * Channels);
         var length = checked((int)frameCount * Channels);
         var next = new float[Interleaved.Length - length];
@@ -249,12 +271,13 @@ internal sealed partial class AudioDocument
         Array.Copy(Interleaved, start + length, next, start, Interleaved.Length - start - length);
         Interleaved = next;
         RebuildPeaks();
-        IsDirty = true;
+        NoteSamplesChanged();
         CaptureFormatOrigin();
     }
 
     public void InsertRange(long startFrame, float[] samples)
     {
+        DiscardLiveCapacity();
         var start = checked((int)startFrame * Channels);
         var next = new float[Interleaved.Length + samples.Length];
         Array.Copy(Interleaved, 0, next, 0, start);
@@ -262,7 +285,7 @@ internal sealed partial class AudioDocument
         Array.Copy(Interleaved, start, next, start + samples.Length, Interleaved.Length - start);
         Interleaved = next;
         RebuildPeaks();
-        IsDirty = true;
+        NoteSamplesChanged();
         CaptureFormatOrigin();
     }
 
@@ -270,7 +293,8 @@ internal sealed partial class AudioDocument
         float[] interleaved,
         int sampleRate,
         int channels,
-        int bitsPerSample)
+        int bitsPerSample,
+        bool rebuildPeaks = true)
     {
         if (channels < 1)
         {
@@ -288,6 +312,7 @@ internal sealed partial class AudioDocument
         }
 
         var channelsChanged = channels != Channels;
+        _liveSampleCount = -1;
         Interleaved = interleaved;
         SampleRate = sampleRate;
         Channels = channels;
@@ -297,9 +322,40 @@ internal sealed partial class AudioDocument
             ChannelMask = 0;
         }
 
-        RebuildPeaks();
+        if (rebuildPeaks)
+        {
+            RebuildPeaks();
+        }
+
         RefreshFileBytes();
-        IsDirty = true;
+        NoteSamplesChanged();
+    }
+
+    public void AppendLiveSamples(ReadOnlySpan<float> extra)
+    {
+        if (extra.IsEmpty)
+        {
+            return;
+        }
+
+        var used = SampleCount;
+        var needed = checked(used + extra.Length);
+        EnsureLiveCapacity(needed, used);
+        extra.CopyTo(Interleaved.AsSpan(used, extra.Length));
+        _liveSampleCount = needed;
+        NoteSamplesChanged();
+        RefreshFileBytes();
+    }
+
+    public void RefreshPeaks() => RebuildPeaks();
+
+    public void CommitLiveSamples(bool rebuildPeaks)
+    {
+        DiscardLiveCapacity();
+        if (rebuildPeaks)
+        {
+            RebuildPeaks();
+        }
     }
 
     public void SetChannelMask(int mask) => ChannelMask = mask;
@@ -313,7 +369,80 @@ internal sealed partial class AudioDocument
         ClampMarkers();
     }
 
-    private void RebuildPeaks() => Peaks = PeakPyramid.Build(Interleaved, Channels);
+    private void NoteSamplesChanged()
+    {
+        unchecked
+        {
+            SampleRevision++;
+        }
+
+        IsDirty = true;
+    }
+
+    private void RebuildPeaks() => Peaks = PeakPyramid.Build(Interleaved, Channels, SampleCount);
+
+    private void EnsureLiveCapacity(int needed, int keep)
+    {
+        if (Interleaved.Length >= needed)
+        {
+            if (_liveSampleCount < 0)
+            {
+                _liveSampleCount = keep;
+            }
+
+            return;
+        }
+
+        var cap = Math.Max(Interleaved.Length, 1);
+        if (cap < 8192)
+        {
+            cap = 8192;
+        }
+
+        while (cap < needed)
+        {
+            if (cap > int.MaxValue / 2)
+            {
+                cap = needed;
+                break;
+            }
+
+            cap *= 2;
+        }
+
+        var next = new float[cap];
+        if (keep > 0)
+        {
+            Array.Copy(Interleaved, next, keep);
+        }
+
+        Interleaved = next;
+        if (_liveSampleCount < 0)
+        {
+            _liveSampleCount = keep;
+        }
+    }
+
+    private void DiscardLiveCapacity()
+    {
+        if (_liveSampleCount < 0)
+        {
+            return;
+        }
+
+        if (_liveSampleCount != Interleaved.Length)
+        {
+            var exact = new float[_liveSampleCount];
+            if (_liveSampleCount > 0)
+            {
+                Array.Copy(Interleaved, exact, _liveSampleCount);
+            }
+
+            Interleaved = exact;
+        }
+
+        _liveSampleCount = -1;
+    }
 
     public void RefreshFileBytes()
     {

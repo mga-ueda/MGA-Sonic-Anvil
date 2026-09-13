@@ -22,6 +22,7 @@
     <SolidColorBrush x:Key="MenuDisabledForeBrush" Color="#FF8C8C90" />
 
     <SolidColorBrush x:Key="WaveformBackBrush" Color="#FF262626" />
+    <SolidColorBrush x:Key="WaveformRecordBackBrush" Color="#FF3A1C1C" />
     <SolidColorBrush x:Key="WaveFillBrush" Color="#FFB6B6B6" />
     <SolidColorBrush x:Key="WaveFillOverlayBrush" Color="#FF3AB8E8" />
     <SolidColorBrush x:Key="WaveZeroLineBrush" Color="#5ACCCCCC" />

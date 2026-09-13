@@ -28,22 +28,6 @@ public sealed class PlaybackSpeedTests
         Assert.Equal(1, provider.PlaybackSpeed);
     }
 
-    [Theory]
-    [InlineData(false, false, false, 1)]
-    [InlineData(true, false, false, 3)]
-    [InlineData(false, true, false, 3)]
-    [InlineData(true, true, false, -3)]
-    [InlineData(true, true, true, 1)]
-    [InlineData(true, false, true, 1)]
-    public void SpeedFromShiftKeys_MapsBothShiftsToRewind(
-        bool left,
-        bool right,
-        bool other,
-        double expected)
-    {
-        Assert.Equal(expected, PlaybackSampleProvider.SpeedFromShiftKeys(left, right, other));
-    }
-
     [Fact]
     public void FastSpeed_AdvancesCursorThreefold()
     {

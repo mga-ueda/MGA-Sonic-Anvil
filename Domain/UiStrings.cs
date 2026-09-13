@@ -119,6 +119,21 @@ internal static partial class UiStrings
     public static string ErrorSilentSkipThresholdRange => Get(
         "無音しきい値は -120 から 0 の dB で入力してください。",
         "Enter a silence threshold between -120 and 0 dB.");
+    public static string LabelSilentSkipRecordPad => Get(
+        "無音の上限（録音）",
+        "Max silence (record)");
+    public static string LabelConfirmRecordSilentSkip => Get(
+        "Silent Skip をオンにする",
+        "Turn on Silent Skip");
+    public static string LabelSilentSkipRecordAddRegion => Get(
+        "録音部分と無音部分にリージョンを付加",
+        "Add regions to recorded and silent parts");
+    public static string RegionNameRecordAudio => Get("録音", "Rec");
+    public static string RegionNameRecordSilence => Get("無音", "Silence");
+    public static string LabelMs => Get("ms", "ms");
+    public static string ErrorSilentSkipRecordPadRange => Get(
+        "録音の無音は 0 から 10000 の ms で入力してください。",
+        "Enter a record silence pad between 0 and 10000 ms.");
     public static string LabelAudioApi => Get("Audio API", "Audio API");
     public static string LabelAudioDevice => Get("オーディオデバイス", "Audio device");
     public static string LabelSettingsTabGeneral => Get("一般", "General");
@@ -142,6 +157,12 @@ internal static partial class UiStrings
     public static string ButtonNo => Get("いいえ", "No");
     public static string ButtonSaveAllAndExit => Get("すべて保存して終了", "Save all and quit");
     public static string ButtonDiscardAllAndExit => Get("すべて保存せずに終了", "Quit without saving any");
+    public static string ConfirmRecord => Get("録音を開始します。", "Start recording.");
+    public static string ConfirmRecordSilentSkip(double thresholdDb, int padMs) => Format(
+        "Silent Skip をオンにすると、ピークが {0} dB を超えたときだけ録音します。しきい値を下回るとすぐ無音を挟み、{1} ms で止めます。しきい値と無音の尺は設定から変えられます。",
+        "When Silent Skip is on, recording writes only audio above {0} dB. When the level falls, silence is inserted immediately and stops at {1} ms. The threshold and silence length can be changed in Settings.",
+        thresholdDb.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture),
+        padMs);
     public static string DialogSettingsTitle => Get("設定", "Settings");
     public static string LabelUiLanguage => Get("言語", "Language");
     public static string LabelUiTheme => Get("配色", "Theme");
@@ -408,6 +429,7 @@ internal static partial class UiStrings
     public static string LabelLu => Get("LU", "LU");
     public static string LabelTruePeak => Get("True Peak", "True Peak");
     public static string LabelDb => Get("dB", "dB");
+    public static string LabelSilentSkipFloorNote => Get("（谷の平均）", "(avg. floor)");
     public static string LabelLoudnessTarget => Get("ラウドネスターゲット", "Loudness Target");
     public static string ErrorLoudnessTargetRange => Get(
         "ラウドネスターゲットは -70 から 0 の LKFS で入力してください。",
@@ -512,14 +534,14 @@ internal static partial class UiStrings
         "使うスピーカー配置を切り替えます。デバイスとポート割り当てが一緒に変わります。一覧は設定の表示項目タブで絞れます。",
         "Switch speaker layout. The device and port assignments change with it. The list is filtered in Settings → Shown.");
     public static string TipRecord => Get(
-        "録音 (Ctrl+R)\n新規タブに録音。もう一度で停止。スピーカー配置・録音ポート・Ch の割り当てを使う。Space / Enter / Esc でも停止。",
-        "Record (Ctrl+R)\nRecords into a new tab. Press again to stop. Uses the speaker layout, record ports, and Ch map. Space / Enter / Esc also stop.");
+        "録音 (Ctrl+R)\n開始前に毎回、Silent Skip をオンにするか確認する。未保存の録音があれば末尾から続きを録る。なければ新規タブ。保存した録音には続けて録れない。終了しても作業コピーが残り、再起動や閉じたタブの再開で戻る。波形はすぐ出して、あとから整える。Silent Skip がオンならしきい値を超えたときだけ録り、下回った時点から無音を挟んで上限で止める。もう一度で停止。スピーカー配置・録音ポート・Ch の割り当てを使う。Space / Enter / Esc でも停止。",
+        "Record (Ctrl+R)\nAsks every time whether to turn Silent Skip on. Continues an unsaved recording from the end, or opens a new tab if there is none. A saved recording cannot be continued. An unsaved take is kept as a working copy and comes back on restart or Reopen Closed Tab. The waveform appears immediately and is refined after. With Silent Skip on, only audio above the threshold is recorded, and silence is inserted when the level falls (up to the Settings limit). Press again to stop. Uses the speaker layout, record ports, and Ch map. Space / Enter / Esc also stop.");
     public static string TipRecordInputMap => Get(
         "各スピーカーがどのポートから入り、どの Ch へ書くか。なしは無音。右のバーは今のレベルです。Ch は再生と共通です。",
         "Which port feeds each speaker, and which file channel (Ch) it writes. Off is silence. The bar is the live level. Ch is shared with playback.");
     public static string TipFileChannelMap => Get(
-        "このスピーカーがファイルのどの Ch か。録音と再生で同じ割り当てです。なしはそのスピーカーを使いません。初期値は 1 から順です。",
-        "Which file channel (Ch) this speaker uses. Shared by record and playback. Off leaves the speaker unused. The default is 1, 2, 3…");
+        "このスピーカーがファイルのどの Ch か。録音と再生で同じ割り当てです。なしはそのスピーカーを使いません。一覧は今のスピーカー配置の本数まで。初期値は 1 から順です。",
+        "Which file channel (Ch) this speaker uses. Shared by record and playback. Off leaves the speaker unused. The list matches the current speaker count. The default is 1, 2, 3…");
     public static string TipInputLevel => Get(
         "割り当てた録音ポートのピーク。信号が入っているか確認できます。",
         "Peak of the assigned record port. Use it to confirm a signal is arriving.");
@@ -536,8 +558,8 @@ internal static partial class UiStrings
         "各スピーカーをどのポートへ出し、どの Ch から読むか。Ch は録音と共通。2ch 再生でポート未設定なら、スピーカー分をダウンミックス。",
         "Which port each speaker uses, and which file channel (Ch) it reads. Ch is shared with record. Stereo playback with no port map still downmixes the speakers.");
     public static string TipPlay => Get(
-        "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し\n再生中 Shift で 3 倍速（ピッチ据え置き）\n左右 Shift 同時で 3 倍巻き戻し",
-        "Play / stop (Space)\nStop returns to the start position\nEnter pauses in place\nCtrl+Space from 3 seconds earlier\nAlt+Enter restarts from the playback start\nHold Shift while playing for 3× (pitch unchanged)\nBoth Shifts: 3× rewind");
+        "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し",
+        "Play / stop (Space)\nStop returns to the start position\nEnter pauses in place\nCtrl+Space from 3 seconds earlier\nAlt+Enter restarts from the playback start");
     public static string TipFadeIn => Get(
         "フェードイン (I)\nカーブを選び Space で試聴、Enter で実行。1–9 でカーブを選択。未選択なら全体",
         "Fade in (I)\nPick a curve, Space to preview, Enter to apply. 1–9 select a curve. Uses the whole file if nothing is selected");
@@ -695,12 +717,12 @@ internal static partial class UiStrings
         "任意 Hz。↑↓／ホイールで 1（Shift 10／Ctrl 100／Ctrl+Shift 1000）。Enter で確定。Tab で抜けて 1–9 で項目。範囲 1000–384000。",
         "Custom Hz. ↑↓ / wheel by 1 (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Tab leaves the box so 1–9 pick a row. Range 1000–384000.");
     public static string TipWaveform => Get(
-        "クリックで再生位置。ドラッグで選択。Ctrl+ドラッグでスクラブ（全chを L/R に畳む）。\n"
+        "クリックで再生位置。←→ でシーク（再生中は押しっぱなしで 3 倍早送り／巻き戻し）。ドラッグで選択。Ctrl+ドラッグでスクラブ（全chを L/R に畳む）。\n"
         + "Esc または Shift なし移動で解除。Shift＋ドラッグ／←→ で伸長。ダブルクリックで区間（マーカー間）。トリプルクリックで全選択。ガイドはマーカー／ループ端に吸着。\n"
         + "左端のチャンネル名：クリックでソロ（再クリックで解除。Ctrl で追加。Shift でミュート）。Tab／Shift+Tab で順にソロ。\n"
         + "ホイール＝時間ズーム（再生ヘッド基準）。Shift+ホイール＝パン。Ctrl+ホイール＝振幅。\n"
         + "フラッグ／ループ端：クリックで選択、ドラッグまたは ←→ で移動。Alt+←→ は微調整。ダブルクリックで名前。右クリックでメニュー。",
-        "Click to set the playhead. Drag to select. Ctrl+drag scrubs (every channel downmixed to L/R).\n"
+        "Click to set the playhead. ←→ seek (hold during playback for 3× shuttle). Drag to select. Ctrl+drag scrubs (every channel downmixed to L/R).\n"
         + "Esc or a move without Shift clears the selection. Shift+drag / ←→ extends it. Double-click a span (between markers). Triple-click selects all. The guide snaps to markers / loop edges.\n"
         + "Channel names on the left: click to solo (again to clear; Ctrl adds; Shift mutes). Tab / Shift+Tab cycle solo.\n"
         + "Wheel = time zoom (around the playhead). Shift+wheel = pan. Ctrl+wheel = amplitude.\n"
@@ -709,11 +731,23 @@ internal static partial class UiStrings
         "ウィンドウを常に最前面へ表示します。",
         "Keep the window always on top.");
     public static string TipSilentSkip => Get(
-        "無音区間を飛ばして再生します (Alt+S)。しきい値は設定の編集タブ（既定 -60 dB）。",
-        "Skip silent stretches during playback (Alt+S). Set the threshold on the Editing tab in Settings (default −60 dB).");
+        "無音区間を飛ばして再生し、録音中はしきい値を超えたときだけ書き込みます (Alt+S)。再生中の ←→ 早送り／巻き戻し中は飛ばしません。録音開始時にオンにするか毎回確認する。しきい値と、録音で残す無音の上限は設定の編集タブ。リージョン付加は録音開始時に指定。",
+        "Skip silent stretches during playback, and while recording write only audio above the threshold (Alt+S). Hold ←→ during playback to shuttle without skipping. Recording always asks whether to turn it on. Threshold and the record-only max silence are on the Editing tab in Settings. Adding regions is chosen when you start recording.");
     public static string TipSilentSkipThreshold => Get(
-        "Silent Skip で無音とみなすピーク（dBFS）。-120 から 0。既定 -60。再生位置がこの値未満なら次の音まで飛ばします。",
-        "Peak level treated as silence for Silent Skip (dBFS), from −120 to 0. Default −60. Playback jumps from below this level to the next sound.");
+        "Silent Skip で無音とみなすピーク（dBFS）。-120 から 0。既定 -60。再生ではこの値未満なら次の音まで飛ばし、録音では書き込みません。右のバーは割り当てた録音をモノラル化したピーク。赤線と数字は短区間ピークの最小の平均です。",
+        "Peak level treated as silence for Silent Skip (dBFS), from −120 to 0. Default −60. Playback jumps from below this level to the next sound. Recording does not write those frames. The bar is the assigned record ports mixed to mono. The red line and number are the average of short-block peak minima.");
+    public static string TipSilentSkipThresholdMeter => Get(
+        "バーはピーク。赤線と右の数値はピークではなく、短い区間のピークのうち小さい方をならした値（谷の平均）。しきい値の目安にします。",
+        "The bar is peak. The red line and number are not peak; they average the quieter short-block peaks (avg. floor). Use them as a guide for the threshold.");
+    public static string TipSilentSkipRecordPad => Get(
+        "録音専用。しきい値を下回った時点から無音を書き、この長さまで書いたら止めます。音が戻ったときにまとめて挟みません。先頭の無音と、末尾の長い無音は残しません。0 なら無音は全部捨てます。0 から 10000。既定 500。",
+        "Recording only. Silence is written as soon as the level falls, then stops at this length. It is not dumped when sound returns. Leading silence and a long tail are discarded. 0 drops every silent frame. From 0 to 10000. Default 500.");
+    public static string TipConfirmRecordSilentSkip => Get(
+        "この録音で Silent Skip を使うか。オンならしきい値を超えたときだけ録り、下回った時点から無音を挟んで上限で止めます。オフならすべて書きます。OK するとステータスバーにも反映します。",
+        "Whether to use Silent Skip for this recording. When on, only audio above the threshold is recorded, and silence is inserted when the level falls (up to the Settings limit). When off, everything is written. OK also updates the status-bar switch.");
+    public static string TipSilentSkipRecordAddRegion => Get(
+        "Silent Skip 録音のときだけ。無音を pad まで挟んだとき、その無音と前後の録音それぞれにリージョンを付けます。波形の短い谷では分けません。続きの録音は新しい区間だけ。録音のたびに指定。前回の指定を初期値にする。",
+        "Only when recording with Silent Skip. A region is added when silence is inserted up to the pad, plus the recorded stretches it separates. Brief dips in the waveform are not split. A continued take gets regions for the new audio only. Chosen each time you record. The last choice is the default.");
     public static string TipTimecode => Get(
         "現在時間 (G)。入力、ホイール／↑↓で調整（時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分、サンプルは1／Shift10／Ctrl100／Ctrl+Shift1000）。Enter で移動。右クリックで時間／サンプル数",
         "Current time (G). Type, or wheel / ↑↓ (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter jumps. Right-click switches time / samples");

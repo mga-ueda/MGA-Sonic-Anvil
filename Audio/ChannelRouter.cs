@@ -69,6 +69,25 @@ internal static class ChannelRouter
         return (left, right);
     }
 
+    /// <summary>割り当て済み論理チャンネルを平均してモノラル化する。Off は除く。</summary>
+    public static float MixMono(ReadOnlySpan<float> channels, ReadOnlySpan<int> map)
+    {
+        var sum = 0f;
+        var n = 0;
+        for (var i = 0; i < channels.Length; i++)
+        {
+            if ((uint)i < (uint)map.Length && map[i] < 0)
+            {
+                continue;
+            }
+
+            sum += channels[i];
+            n++;
+        }
+
+        return n == 0 ? 0 : sum / n;
+    }
+
     /// <summary>入力ポート → 論理チャンネル。dest[i] = source[map[i]]。</summary>
     public static void Gather(ReadOnlySpan<float> source, Span<float> dest, ReadOnlySpan<int> map)
     {

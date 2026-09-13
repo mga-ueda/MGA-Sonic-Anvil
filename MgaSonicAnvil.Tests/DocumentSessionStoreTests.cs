@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
+using MgaSonicAnvil.Editing;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
@@ -44,6 +45,89 @@ public sealed class DocumentSessionStoreTests
         Assert.False(target.IsDirty);
     }
 
+    [Theory]
+    [InlineData(false, true, false, 1, 0, false, 0)]
+    [InlineData(true, true, true, 0, 0, false, 0)]
+    [InlineData(true, true, false, 0, 0, true, 1)]
+    [InlineData(true, true, false, 3, 0, true, 2)]
+    [InlineData(true, true, false, 2, 0, false, 2)]
+    [InlineData(true, false, false, 0, 0, false, 0)]
+    public void DecideSessionAudioWrite_SkipsWhenSamplesUnchanged(
+        bool needs,
+        bool hasWorking,
+        bool hasSource,
+        int revision,
+        int persisted,
+        bool reusable,
+        int expected)
+    {
+        Assert.Equal(
+            expected,
+            (int)DocumentSessionStore.DecideSessionAudioWrite(
+                needs,
+                hasWorking,
+                hasSource,
+                revision,
+                persisted,
+                reusable));
+    }
+
+    [Fact]
+    public void HasUsableSessionAudio_RequiresNonEmptyWave()
+    {
+        var dir = NewTempDir("usable");
+        try
+        {
+            File.WriteAllBytes(Path.Combine(dir, "doc-0.wav"), [1, 2, 3]);
+            File.WriteAllBytes(Path.Combine(dir, "empty.wav"), []);
+            Assert.True(DocumentSessionStore.HasUsableSessionAudio(dir, "doc-0.wav"));
+            Assert.False(DocumentSessionStore.HasUsableSessionAudio(dir, "empty.wav"));
+            Assert.False(DocumentSessionStore.HasUsableSessionAudio(dir, "missing.wav"));
+        }
+        finally
+        {
+            TryDeleteDir(dir);
+        }
+    }
+
+    [Fact]
+    public void SampleRevision_IgnoresMarkerOnlyEdits()
+    {
+        var document = MakeDocument();
+        Assert.Equal(0, document.SampleRevision);
+        document.SetSampleLoop(new WaveSelection(5, 20), markDirty: true);
+        document.ReplaceMarkers([new MarkerSnapshot(10, "A")], markDirty: true);
+        Assert.Equal(0, document.SampleRevision);
+        Assert.True(document.IsDirty);
+
+        document.ReplaceRange(0, [0.1f, 0.2f]);
+        Assert.Equal(1, document.SampleRevision);
+    }
+
+    [Fact]
+    public void HistoryMatchesFile_DetectsUnchangedRecipes()
+    {
+        var dir = NewTempDir("history-match");
+        var path = Path.Combine(dir, "doc-0-history.json");
+        try
+        {
+            var snap = new HistorySessionSnapshot
+            {
+                CurrentIndex = 1,
+                CleanIndex = 0,
+                Recipes = [new HistoryRecipe { Kind = HistoryRecipes.AddMarker, Frame = 8 }],
+            };
+            Assert.True(DocumentSessionStore.TryWriteHistory(path, snap));
+            Assert.True(DocumentSessionStore.HistoryMatchesFile(path, snap));
+            snap.CurrentIndex = 0;
+            Assert.False(DocumentSessionStore.HistoryMatchesFile(path, snap));
+        }
+        finally
+        {
+            TryDeleteDir(dir);
+        }
+    }
+
     [Fact]
     public void Capture_CleanNamedDocument_DoesNotNeedSessionFile()
     {
@@ -54,6 +138,40 @@ public sealed class DocumentSessionStoreTests
         Assert.False(snap.Dirty);
         Assert.Equal(string.Empty, snap.SessionFileName);
         Assert.False(DocumentSessionStore.NeedsSessionAudio(snap.Dirty, snap.SourcePath));
+        Assert.False(DocumentSessionStore.ShouldPersistClosedTab(document));
+    }
+
+    [Fact]
+    public void ShouldPersistClosedTab_UnsavedRecordingOnly()
+    {
+        var recording = MakeDocument();
+        recording.CanContinueRecording = true;
+        recording.MarkUnsaved(null);
+        Assert.True(DocumentSessionStore.ShouldPersistClosedTab(recording));
+
+        var empty = new AudioDocument([], 48000, 2, 24, AudioFileKind.Wave, null)
+        {
+            CanContinueRecording = true,
+        };
+        Assert.False(DocumentSessionStore.ShouldPersistClosedTab(empty));
+
+        var saved = MakeDocument();
+        saved.MarkSaved(@"C:\rec.wav", AudioFileKind.Wave);
+        Assert.False(DocumentSessionStore.ShouldPersistClosedTab(saved));
+    }
+
+    [Fact]
+    public void ClosedSessionFileNames_AreManagedSidecars()
+    {
+        Assert.Equal("closed-2.wav", DocumentSessionStore.FileNameForClosedIndex(2));
+        Assert.Equal("closed-2-origin.wav", DocumentSessionStore.OriginFileNameForClosedIndex(2));
+        Assert.Equal("closed-2-history.json", DocumentSessionStore.HistoryFileNameForClosedIndex(2));
+        Assert.Equal(
+            "closed-2-origin.wav",
+            DocumentSessionStore.SanitizeSidecarName(@"..\session\closed-2-origin.wav"));
+        Assert.Equal(
+            "closed-1-history.json",
+            DocumentSessionStore.SanitizeSidecarName("closed-1-history.json"));
     }
 
     [Fact]
@@ -187,12 +305,22 @@ public sealed class DocumentSessionStoreTests
                     TimeZoom = 2,
                     SelectedMarkerFrames = [8, 16],
                     IsActive = true,
+                    CanContinueRecording = true,
                 },
                 new OpenDocumentSnapshot
                 {
                     SourcePath = @"C:\b.wav",
                     MarkerFrames = [4],
                     MarkerComments = ["hit"],
+                },
+            ],
+            ClosedDocuments =
+            [
+                new OpenDocumentSnapshot
+                {
+                    SessionFileName = "closed-0.wav",
+                    CanContinueRecording = true,
+                    ClosedIndex = 1,
                 },
             ],
         };
@@ -207,7 +335,12 @@ public sealed class DocumentSessionStoreTests
         Assert.Equal("doc-0.wav", back.OpenDocuments[0].SessionFileName);
         Assert.Equal([8, 16], back.OpenDocuments[0].SelectedMarkerFrames);
         Assert.True(back.OpenDocuments[0].IsActive);
+        Assert.True(back.OpenDocuments[0].CanContinueRecording);
         Assert.Equal("hit", back.OpenDocuments[1].MarkerComments[0]);
+        Assert.Single(back.ClosedDocuments);
+        Assert.Equal("closed-0.wav", back.ClosedDocuments[0].SessionFileName);
+        Assert.True(back.ClosedDocuments[0].CanContinueRecording);
+        Assert.Equal(1, back.ClosedDocuments[0].ClosedIndex);
     }
 
     [Fact]

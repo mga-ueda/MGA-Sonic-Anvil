@@ -24,6 +24,9 @@ internal sealed class AudioPlayer : IDisposable
     private bool _discardQueuedOutput;
     private bool _asioEndArmed;
     private bool _playExitLayer;
+    private bool _shutdownFlushStarted;
+    private int _shutdownFlushMs;
+    private long _shutdownFlushStartedTicks;
     private int _generation;
     private long _smoothRawFrame = -1;
     private long _smoothShownFrame = -1;
@@ -523,6 +526,45 @@ internal sealed class AudioPlayer : IDisposable
         InitOutputDevice();
     }
 
+    /// <summary>
+    /// 終了シーケンスの最初に実音を止める。セッション WAV 書き出しより先に呼ぶ。
+    /// ASIO は無音で先読みを洗い流し、WaveOut / WASAPI はデバイスごと捨てる。
+    /// </summary>
+    public void BeginShutdownFlush()
+    {
+        if (_disposed || _shutdownFlushStarted)
+        {
+            return;
+        }
+
+        _shutdownFlushStarted = true;
+        _playing = false;
+        _scrubbing = false;
+        if (_output is AsioOut)
+        {
+            _shutdownFlushMs = BeginSilenceFlushWait();
+            _shutdownFlushStartedTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+            return;
+        }
+
+        if (_output is null)
+        {
+            return;
+        }
+
+        _suppressPlaybackEnded = true;
+        try
+        {
+            TryMuteOutput(_output);
+            _provider.BeginSilenceFlush();
+            FlushStopOutput();
+        }
+        finally
+        {
+            DisposeOutputOnly();
+        }
+    }
+
     public void Dispose()
     {
         if (BeginDispose())
@@ -589,7 +631,7 @@ internal sealed class AudioPlayer : IDisposable
     /// </summary>
     private void FlushOutputWithSilence()
     {
-        var waitMs = BeginSilenceFlushWait();
+        var waitMs = RemainingOrStartFlushWait();
         if (waitMs > 0)
         {
             WaitFlush(waitMs);
@@ -598,11 +640,24 @@ internal sealed class AudioPlayer : IDisposable
 
     private async Task FlushOutputWithSilenceAsync()
     {
-        var waitMs = BeginSilenceFlushWait();
+        var waitMs = RemainingOrStartFlushWait();
         if (waitMs > 0)
         {
             await Task.Delay(waitMs).ConfigureAwait(true);
         }
+    }
+
+    private int RemainingOrStartFlushWait()
+    {
+        if (_shutdownFlushStarted)
+        {
+            return AudioOutputFlush.RemainingMilliseconds(
+                _shutdownFlushMs,
+                _shutdownFlushStartedTicks,
+                System.Diagnostics.Stopwatch.GetTimestamp());
+        }
+
+        return BeginSilenceFlushWait();
     }
 
     /// <returns>先読みを無音で置き換える待ちミリ秒。0 なら待たない。</returns>

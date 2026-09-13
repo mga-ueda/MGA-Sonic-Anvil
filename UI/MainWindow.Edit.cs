@@ -1038,6 +1038,7 @@ public partial class MainWindow
 
     private void PausePlaybackSoft()
     {
+        StopPlaybackShuttle();
         ReleaseStuckScrub();
         _player.Pause();
 
@@ -1417,6 +1418,48 @@ public partial class MainWindow
         }
 
         var command = ProcessEdits.RemoveRegions(_document, Waveform.SelectedRegions);
+        if (command is null)
+        {
+            return;
+        }
+
+        _history.Do(_document, command);
+        Waveform.ClearMarkerSelection();
+        AfterMarkerEdit();
+    }
+
+    private void ApplyDeleteAllMarkers()
+    {
+        if (_document is null || _document.Markers.Count == 0)
+        {
+            return;
+        }
+
+        var frames = new long[_document.Markers.Count];
+        for (var i = 0; i < frames.Length; i++)
+        {
+            frames[i] = _document.Markers[i].Frame;
+        }
+
+        var command = ProcessEdits.RemoveMarkers(_document, frames);
+        if (command is null)
+        {
+            return;
+        }
+
+        _history.Do(_document, command);
+        Waveform.ClearMarkerSelection();
+        AfterMarkerEdit();
+    }
+
+    private void ApplyDeleteAllRegions()
+    {
+        if (_document is null || !_document.AllowsRegionsAndLoops || _document.Regions.Count == 0)
+        {
+            return;
+        }
+
+        var command = ProcessEdits.RemoveRegions(_document, _document.Regions);
         if (command is null)
         {
             return;
@@ -1846,7 +1889,13 @@ public partial class MainWindow
 
         if (Waveform.HasSelectedTimelineItems)
         {
+            StopPlaybackShuttle();
             return BeginOrContinueTimelineNudge(direction, atPlayhead: false);
+        }
+
+        if (CanPlaybackShuttle())
+        {
+            return BeginOrContinuePlaybackShuttle(direction);
         }
 
         Waveform.NudgePlayhead(direction);

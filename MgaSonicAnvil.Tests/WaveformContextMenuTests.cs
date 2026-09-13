@@ -63,6 +63,8 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.Undo, commands);
             Assert.Contains(WaveMenuCommand.FadeIn, commands);
             Assert.Contains(WaveMenuCommand.AddMarker, commands);
+            Assert.Contains(WaveMenuCommand.DeleteAllMarkers, commands);
+            Assert.Contains(WaveMenuCommand.DeleteAllRegions, commands);
             Assert.Contains(WaveMenuCommand.TogglePlayback, commands);
             Assert.Contains(WaveMenuCommand.ViewSpectrogram, commands);
             Assert.Contains(WaveMenuCommand.ViewLoudness, commands);
@@ -119,6 +121,8 @@ public sealed class WaveformContextMenuTests
         Assert.False(Find(ready, WaveMenuCommand.Undo)?.Enabled);
         Assert.False(Find(ready, WaveMenuCommand.Cut)?.Enabled);
         Assert.False(Find(ready, WaveMenuCommand.LoopPlay)?.Enabled);
+        Assert.False(Find(ready, WaveMenuCommand.DeleteAllMarkers)?.Enabled);
+        Assert.False(Find(ready, WaveMenuCommand.DeleteAllRegions)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.FadeIn)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.AddMarkerHere)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.Save)?.Enabled);

@@ -94,6 +94,16 @@ public sealed class AudioOutputFlushTests
     }
 
     [Fact]
+    public void RemainingMilliseconds_SubtractsElapsedFlushWait()
+    {
+        var start = System.Diagnostics.Stopwatch.GetTimestamp();
+        var later = start + (long)(System.Diagnostics.Stopwatch.Frequency * 1.5);
+        Assert.Equal(0, AudioOutputFlush.RemainingMilliseconds(0, start, later));
+        Assert.Equal(500, AudioOutputFlush.RemainingMilliseconds(2000, start, later));
+        Assert.Equal(0, AudioOutputFlush.RemainingMilliseconds(1000, start, later));
+    }
+
+    [Fact]
     public void BeginSilenceFlush_ReturnsSilenceWithoutAdvancingCursor()
     {
         var samples = new float[4800];

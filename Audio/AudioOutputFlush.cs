@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace MgaSonicAnvil.Audio;
 
 /// <summary>
@@ -52,6 +54,20 @@ internal static class AudioOutputFlush
 
     public static int FadeFrames(int sampleRate) =>
         Math.Max(32, Math.Max(1, sampleRate) * FadeMilliseconds / 1000);
+
+    /// <summary>
+    /// 終了洗い流しのうち、すでに経過した分を差し引いた残り待ち。
+    /// </summary>
+    public static int RemainingMilliseconds(int waitMs, long startedTicks, long nowTicks)
+    {
+        if (waitMs <= 0)
+        {
+            return 0;
+        }
+
+        var elapsedMs = (nowTicks - startedTicks) * 1000.0 / Stopwatch.Frequency;
+        return Math.Max(0, waitMs - (int)Math.Round(elapsedMs));
+    }
 
     private static int EstimateAsioPipelineMilliseconds(
         int sampleRate,

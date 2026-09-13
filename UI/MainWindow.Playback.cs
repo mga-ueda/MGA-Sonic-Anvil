@@ -199,6 +199,41 @@ public partial class MainWindow
     private bool IsPlaybackActive() =>
         _player.IsPlaying || _player.IsScrubbing || _playTimer.IsEnabled;
 
+    private static bool IsPlaybackShuttleKey(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None && key is Key.Left or Key.Right;
+
+    private bool CanPlaybackShuttle() =>
+        _player.IsPlaying && !_player.IsScrubbing && !AnyEffectPreviewing;
+
+    private bool BeginOrContinuePlaybackShuttle(int direction)
+    {
+        if (direction == 0)
+        {
+            return false;
+        }
+
+        if (_playbackShuttleDirection == direction)
+        {
+            return true;
+        }
+
+        _playbackShuttleDirection = direction;
+        _player.SetPlaybackSpeed(
+            direction < 0 ? -PlaybackSampleProvider.FastSpeed : PlaybackSampleProvider.FastSpeed);
+        return true;
+    }
+
+    private void StopPlaybackShuttle()
+    {
+        if (_playbackShuttleDirection == 0)
+        {
+            return;
+        }
+
+        _playbackShuttleDirection = 0;
+        _player.SetPlaybackSpeed(1);
+    }
+
     private void DetachOverviewScrubKeepPlayback()
     {
         Overview.CancelDrag();
@@ -265,7 +300,6 @@ public partial class MainWindow
             _player.Prepare(_document, startFrame, playRange, loop: playRange is not null);
             _player.SetExitSpan(ComputeExitLayerSpan(playRange));
             _player.Play();
-            SyncPlaybackSpeedFromKeyboard();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
             StartMeterRendering();
@@ -533,24 +567,6 @@ public partial class MainWindow
         }
     }
 
-    private void SyncPlaybackSpeedFromKeyboard()
-    {
-        if (!_player.IsPlaying
-            || _player.IsScrubbing
-            || StatusTimes.IsTimeFocused
-            || Waveform.IsEditingMarkerComment)
-        {
-            _player.SetPlaybackSpeed(1);
-            return;
-        }
-
-        var other = (Keyboard.Modifiers & ~ModifierKeys.Shift) != 0;
-        _player.SetPlaybackSpeed(PlaybackSampleProvider.SpeedFromShiftKeys(
-            Keyboard.IsKeyDown(Key.LeftShift),
-            Keyboard.IsKeyDown(Key.RightShift),
-            other));
-    }
-
     private void SyncPlaybackVisuals()
     {
         if (_document is null)
@@ -558,7 +574,6 @@ public partial class MainWindow
             return;
         }
 
-        SyncPlaybackSpeedFromKeyboard();
         var frame = _player.SmoothCursorFrame;
         _document.CursorFrame = frame;
         if (!Waveform.IsInteracting)
@@ -623,7 +638,6 @@ public partial class MainWindow
         Spectrum.Tick();
         LoudnessMeter.Tick();
         VectorScope.Tick();
-        SyncPlaybackSpeedFromKeyboard();
         if (AnyEffectPreviewing)
         {
             SyncPreviewPlayhead();
@@ -739,6 +753,7 @@ public partial class MainWindow
             return;
         }
 
+        StopPlaybackShuttle();
         _resumeAfterScrub = _player.IsPlaying && !_player.IsScrubbing;
         if (_fadePreview.Previewing)
         {

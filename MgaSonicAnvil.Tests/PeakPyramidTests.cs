@@ -91,6 +91,28 @@ public sealed class PeakPyramidTests
     }
 
     [Fact]
+    public void Build_SampleCount_IgnoresSpareCapacity()
+    {
+        var samples = new float[8];
+        samples[0] = 0.1f;
+        samples[1] = 0.1f;
+        samples[2] = 0.1f;
+        samples[3] = 0.1f;
+        samples[4] = 1f;
+        samples[5] = 1f;
+        samples[6] = 1f;
+        samples[7] = 1f;
+
+        var peaks = PeakPyramid.Build(samples, 1, 4);
+        Assert.Equal(4, peaks.FrameCount);
+
+        var mins = new float[1];
+        var maxs = new float[1];
+        Assert.Equal(1, peaks.ReadRange(0, 4, 1, 0, mins, maxs));
+        Assert.InRange(maxs[0], 0.09f, 0.11f);
+    }
+
+    [Fact]
     public void ReadRange_ZoomedWindow_MatchesRawMinMax()
     {
         var frames = 8000;

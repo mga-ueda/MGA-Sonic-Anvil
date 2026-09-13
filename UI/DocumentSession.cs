@@ -31,6 +31,15 @@ internal sealed class DocumentSession
     /// <summary>波形レーンのソロ。0 は解除。bit i がそのレーン。</summary>
     public int SoloMask { get; set; }
 
+    /// <summary>前回書いた／読み込んだ作業コピー。サンプルが同じなら書き直さない。</summary>
+    public string? PersistedSessionAudioName { get; set; }
+
+    public int PersistedSampleRevision { get; set; }
+
+    public string? PersistedOriginName { get; set; }
+
+    public string? PersistedHistoryName { get; set; }
+
     public string DisplayName =>
         Document.SourcePath is { } path
             ? System.IO.Path.GetFileName(path)

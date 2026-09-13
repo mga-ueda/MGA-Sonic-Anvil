@@ -8,11 +8,6 @@ public partial class MainWindow
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var modifiers = Keyboard.Modifiers;
-        if (key is Key.LeftShift or Key.RightShift)
-        {
-            SyncPlaybackSpeedFromKeyboard();
-        }
-
         if (TryProcessShortcut(key, modifiers))
         {
             e.Handled = true;
@@ -22,13 +17,15 @@ public partial class MainWindow
     private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (key is Key.LeftShift or Key.RightShift)
-        {
-            SyncPlaybackSpeedFromKeyboard();
-        }
-
         if (key is Key.Left or Key.Right)
         {
+            if (_playbackShuttleDirection != 0
+                && (key == Key.Left && _playbackShuttleDirection < 0
+                    || key == Key.Right && _playbackShuttleDirection > 0))
+            {
+                StopPlaybackShuttle();
+            }
+
             if (_markerNudgeDirection != 0
                 && (key == Key.Left && _markerNudgeDirection < 0
                     || key == Key.Right && _markerNudgeDirection > 0
@@ -166,17 +163,25 @@ public partial class MainWindow
     {
         if (IsUiBusy)
         {
+            StopPlaybackShuttle();
             return true;
         }
 
         if (TryConsumeRecordingShortcut(key, modifiers))
         {
+            StopPlaybackShuttle();
             return true;
         }
 
         if (StatusTimes.IsTimeFocused)
         {
+            StopPlaybackShuttle();
             return false;
+        }
+
+        if (!IsPlaybackShuttleKey(key, modifiers))
+        {
+            StopPlaybackShuttle();
         }
 
         if (key is not (Key.Left or Key.Right))

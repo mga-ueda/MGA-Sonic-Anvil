@@ -71,6 +71,12 @@ internal sealed class AppSettings
     /// <summary>Silent Skip の無音しきい値（dBFS）。既定 -60。</summary>
     public double SilentSkipThresholdDb { get; set; } = global::MgaSonicAnvil.Audio.SilentSkip.DefaultThresholdDb;
 
+    /// <summary>録音 Silent Skip で、しきい値を下回った時点から書く無音の上限（ms）。再生には使わない。既定 500。</summary>
+    public int SilentSkipRecordPadMs { get; set; } = global::MgaSonicAnvil.Audio.SilentSkip.DefaultRecordPadMs;
+
+    /// <summary>Silent Skip 録音の停止時、pad を挟んだ可聴／無音にリージョンを付ける。既定オフ。</summary>
+    public bool SilentSkipRecordAddRegion { get; set; }
+
     public int WindowX { get; set; }
 
     public int WindowY { get; set; }
@@ -126,6 +132,9 @@ internal sealed class AppSettings
     /// <summary>終了時に開いていたタブ。</summary>
     public OpenDocumentSnapshot[] OpenDocuments { get; set; } = [];
 
+    /// <summary>閉じた未保存録音。起動後に Ctrl+Shift+T で戻す。</summary>
+    public OpenDocumentSnapshot[] ClosedDocuments { get; set; } = [];
+
     public int ActiveDocumentIndex { get; set; }
 
     public bool WaapiKeepTarget { get; set; }
@@ -166,6 +175,9 @@ internal sealed class AppSettings
 
     public double ResolvedSilentSkipThresholdDb() =>
         global::MgaSonicAnvil.Audio.SilentSkip.ClampThresholdDb(SilentSkipThresholdDb);
+
+    public int ResolvedSilentSkipRecordPadMs() =>
+        global::MgaSonicAnvil.Audio.SilentSkip.ClampRecordPadMs(SilentSkipRecordPadMs);
 
     public SpeakerPreset ResolvedSpeaker()
     {

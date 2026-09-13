@@ -33,6 +33,8 @@ internal partial class AudioSettingsWindow : Window
 
     public double SelectedSilentSkipThresholdDb { get; private set; }
 
+    public int SelectedSilentSkipRecordPadMs { get; private set; }
+
     public int SelectedMp3BitRate { get; private set; }
 
     public string SelectedLameExePath { get; private set; } = string.Empty;
@@ -75,6 +77,7 @@ internal partial class AudioSettingsWindow : Window
         UiThemeChoice theme,
         double loudnessTargetLufs,
         double silentSkipThresholdDb,
+        int silentSkipRecordPadMs,
         int mp3BitRate,
         string lameExePath,
         string lameOptions,
@@ -88,6 +91,7 @@ internal partial class AudioSettingsWindow : Window
         SelectedTheme = theme;
         SelectedLoudnessTargetLufs = LoudnessMeterEngine.ClampTargetLufs(loudnessTargetLufs);
         SelectedSilentSkipThresholdDb = SilentSkip.ClampThresholdDb(silentSkipThresholdDb);
+        SelectedSilentSkipRecordPadMs = SilentSkip.ClampRecordPadMs(silentSkipRecordPadMs);
         SelectedMp3BitRate = Mp3Encode.ClampWindowsBitRate(mp3BitRate);
         SelectedLameExePath = lameExePath ?? string.Empty;
         SelectedLameOptions = lameOptions ?? string.Empty;
@@ -154,6 +158,7 @@ internal partial class AudioSettingsWindow : Window
         RebuildRouting();
         LoudnessTargetBox.Text = SelectedLoudnessTargetLufs.ToString("0.#", CultureInfo.InvariantCulture);
         SilentSkipThresholdBox.Text = SelectedSilentSkipThresholdDb.ToString("0.#", CultureInfo.InvariantCulture);
+        SilentSkipRecordPadBox.Text = SelectedSilentSkipRecordPadMs.ToString(CultureInfo.InvariantCulture);
         FillWindowsBitRates(SelectedMp3BitRate);
         LamePathBox.Text = SelectedLameExePath;
         LameOptionsBox.Text = Mp3Encode.ResolveLameOptions(SelectedLameOptions);
@@ -170,7 +175,7 @@ internal partial class AudioSettingsWindow : Window
             }
 
             ReflowSettingsWindow();
-            if (IsAudioTabSelected())
+            if (IsProbeTabSelected())
             {
                 StartProbe();
             }
@@ -203,6 +208,13 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(SilentSkipThresholdLabel, UiStrings.TipSilentSkipThreshold);
         TipService.Set(SilentSkipThresholdBox, UiStrings.TipSilentSkipThreshold);
         TipService.Set(SilentSkipThresholdUnit, UiStrings.TipSilentSkipThreshold);
+        TipService.Set(SilentSkipThresholdMeter, UiStrings.TipSilentSkipThresholdMeter);
+        TipService.Set(SilentSkipThresholdPeakText, UiStrings.TipSilentSkipThresholdMeter);
+        TipService.Set(SilentSkipThresholdFloorNote, UiStrings.TipSilentSkipThresholdMeter);
+        RefreshSilentSkipThresholdPeakText();
+        TipService.Set(SilentSkipRecordPadLabel, UiStrings.TipSilentSkipRecordPad);
+        TipService.Set(SilentSkipRecordPadBox, UiStrings.TipSilentSkipRecordPad);
+        TipService.Set(SilentSkipRecordPadUnit, UiStrings.TipSilentSkipRecordPad);
         TipService.Set(FadeDefaultsHeader, UiStrings.TipFadeCurveDefaults);
         TipService.Set(Mp3Header, UiStrings.TipMp3Encode);
         TipService.Set(WindowsBitRateLabel, UiStrings.TipWindowsMp3BitRate);
@@ -398,6 +410,20 @@ internal partial class AudioSettingsWindow : Window
         }
 
         SelectedSilentSkipThresholdDb = silenceDb;
+        if (!SilentSkip.TryParseRecordPadMs(SilentSkipRecordPadBox.Text, out var recordPadMs))
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorSilentSkipRecordPadRange,
+                UiStrings.DialogSettingsTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            SilentSkipRecordPadBox.Focus();
+            SilentSkipRecordPadBox.SelectAll();
+            return;
+        }
+
+        SelectedSilentSkipRecordPadMs = recordPadMs;
         SelectedMp3BitRate = WindowsBitRateCombo.SelectedItem is BitRateItem bitRate
             ? bitRate.Kbps
             : Mp3Encode.DefaultWindowsBitRateKbps;
@@ -516,7 +542,7 @@ internal partial class AudioSettingsWindow : Window
             return;
         }
 
-        if (IsAudioTabSelected())
+        if (IsProbeTabSelected())
         {
             StartProbe();
             return;
@@ -618,7 +644,7 @@ internal partial class AudioSettingsWindow : Window
 
     private void RestartProbeIfVisible()
     {
-        if (!IsLoaded || !IsAudioTabSelected())
+        if (!IsLoaded || !IsProbeTabSelected())
         {
             return;
         }
@@ -710,6 +736,8 @@ internal partial class AudioSettingsWindow : Window
         SetInputStatus(null);
         RefreshTestButtons();
         _inputEditor.ApplyPeaks([]);
+        SilentSkipThresholdMeter.Reset();
+        RefreshSilentSkipThresholdPeakText();
     }
 
     private void RefreshInputMeters()
@@ -722,6 +750,15 @@ internal partial class AudioSettingsWindow : Window
 
         _probe.CopyPeaks(_meterPeaks);
         _inputEditor.ApplyPeaks(_meterPeaks);
+        SilentSkipThresholdMeter.ApplyLinearPeak(_probe.TakeMonoPeak());
+        SilentSkipThresholdMeter.ApplyFloor(_probe.TakeMonoFloor());
+        RefreshSilentSkipThresholdPeakText();
+    }
+
+    private void RefreshSilentSkipThresholdPeakText()
+    {
+        SilentSkipThresholdPeakText.Text =
+            SilentSkip.FormatPeakDb(SilentSkipThresholdMeter.DisplayFloorDb) + " " + UiStrings.LabelDb;
     }
 
     private void RefreshTestButtons()
@@ -760,6 +797,9 @@ internal partial class AudioSettingsWindow : Window
 
     private bool IsAudioTabSelected() =>
         ReferenceEquals(SettingsTabs.SelectedItem, AudioTab);
+
+    private bool IsProbeTabSelected() =>
+        IsAudioTabSelected() || ReferenceEquals(SettingsTabs.SelectedItem, EditingTab);
 
     private AudioOutputSettings ReadOutputSettings()
     {
@@ -1252,7 +1292,7 @@ internal partial class AudioSettingsWindow : Window
         var outputPorts = ResolvePortNames(input: false);
         _inputPortNames = inputPorts;
         _outputPortNames = outputPorts;
-        var fileMap = ChannelRouter.Normalize(_fileChannelMap, layout.Channels, ChannelLayout.MaxChannels);
+        var fileMap = ChannelRouter.Normalize(_fileChannelMap, layout.Channels, layout.Channels);
         _inputEditor.Rebuild(
             layout.Labels,
             inputPorts,

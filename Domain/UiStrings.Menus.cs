@@ -51,9 +51,11 @@ internal static partial class UiStrings
     public static string WaveMenuAddMarker => Get("マーカーを追加(_M)", "Add _Marker");
     public static string WaveMenuRenameMarker => Get("マーカー名を編集(_N)", "Re_name Marker");
     public static string WaveMenuDeleteMarkers => Get("マーカーを削除(_D)", "_Delete Markers");
+    public static string WaveMenuDeleteAllMarkers => Get("すべてのマーカーを削除(_A)", "Delete _All Markers");
     public static string WaveMenuSetRegion => Get("選択範囲をリージョンに(_G)", "Set Re_gion from Selection");
     public static string WaveMenuRenameRegion => Get("リージョン名を編集(_E)", "R_ename Region");
     public static string WaveMenuDeleteRegions => Get("選択したリージョンを削除(_L)", "Delete Selected Regions (_L)");
+    public static string WaveMenuDeleteAllRegions => Get("すべてのリージョンを削除(_R)", "Delete All _Regions");
     public static string WaveMenuSetLoop => Get("選択範囲をループに(_O)", "Set Sample L_oop from Selection");
     public static string WaveMenuClearLoopItem => Get("ループを削除(_C)", "_Clear Loop");
     public static string WaveMenuPrevMarker => Get("前のマーカーへ(_P)", "_Previous Marker");

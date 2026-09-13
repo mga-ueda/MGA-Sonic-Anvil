@@ -198,7 +198,7 @@
           </Grid>
         </TabItem>
 
-        <TabItem Header="{x:Static domain:UiStrings.LabelSettingsTabEditing}">
+        <TabItem x:Name="EditingTab" Header="{x:Static domain:UiStrings.LabelSettingsTabEditing}">
           <StackPanel MaxWidth="{x:Static ui:DesignMetrics.SettingsPanelWidth}"
                       HorizontalAlignment="Left">
             <TextBlock x:Name="LoudnessTargetLabel"
@@ -230,6 +230,8 @@
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <TextBox x:Name="SilentSkipThresholdBox"
                        Width="{x:Static ui:DesignMetrics.SettingsLoudnessBoxWidth}"
@@ -241,6 +243,47 @@
               <TextBlock x:Name="SilentSkipThresholdUnit"
                          Grid.Column="1"
                          Text="{x:Static domain:UiStrings.LabelDb}"
+                         VerticalAlignment="Center"
+                         Margin="8,0,0,0" />
+              <ui:ChannelLevelBar x:Name="SilentSkipThresholdMeter"
+                                  Grid.Column="2"
+                                  Channel="0"
+                                  Channels="1"
+                                  Margin="8,0,0,0"
+                                  VerticalAlignment="Center" />
+              <StackPanel Grid.Column="3"
+                          Orientation="Horizontal"
+                          VerticalAlignment="Center"
+                          Margin="8,0,0,0">
+                <TextBlock x:Name="SilentSkipThresholdPeakText"
+                           FontFamily="Consolas"
+                           FontSize="11.333" />
+                <TextBlock x:Name="SilentSkipThresholdFloorNote"
+                           Text="{x:Static domain:UiStrings.LabelSilentSkipFloorNote}"
+                           Foreground="{DynamicResource MutedForeBrush}"
+                           FontSize="11.333"
+                           Margin="4,0,0,0" />
+              </StackPanel>
+            </Grid>
+
+            <TextBlock x:Name="SilentSkipRecordPadLabel"
+                       Text="{x:Static domain:UiStrings.LabelSilentSkipRecordPad}"
+                       Margin="0,0,0,3" />
+            <Grid HorizontalAlignment="Left" Margin="0,0,0,16">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="SilentSkipRecordPadBox"
+                       Width="{x:Static ui:DesignMetrics.SettingsLoudnessBoxWidth}"
+                       Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                       Style="{StaticResource DarkTextBoxStyle}"
+                       Padding="6,1"
+                       FontSize="11.333"
+                       VerticalContentAlignment="Center" />
+              <TextBlock x:Name="SilentSkipRecordPadUnit"
+                         Grid.Column="1"
+                         Text="{x:Static domain:UiStrings.LabelMs}"
                          VerticalAlignment="Center"
                          Margin="8,0,0,0" />
             </Grid>

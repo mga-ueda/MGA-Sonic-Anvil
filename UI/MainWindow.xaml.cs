@@ -43,6 +43,7 @@ public partial class MainWindow : Window
     private MarkerSnapshot[] _placeMarkersBefore = [];
     private WaveRegion[] _placeRegionsBefore = [];
     private int _markerNudgeDirection;
+    private int _playbackShuttleDirection;
     private bool _nudgeAtPlayhead;
     private bool _nudgeRepeatStarted;
     private bool _timelineNudgeOpen;
@@ -227,9 +228,9 @@ public partial class MainWindow : Window
         // Input はマウス入力と同列 FIFO で処理されるため、どちらの飢餓も起きない。
         ApplyPlayerRoute();
         RefreshSpeakerMenu();
-        _recordTimer = new DispatcherTimer(DispatcherPriority.Background)
+        _recordTimer = new DispatcherTimer(DispatcherPriority.Input)
         {
-            Interval = TimeSpan.FromMilliseconds(250),
+            Interval = TimeSpan.FromMilliseconds(50),
         };
         _recordTimer.Tick += (_, _) => OnRecordTimerTick();
         _playTimer = new DispatcherTimer(DispatcherPriority.Input)
@@ -251,6 +252,7 @@ public partial class MainWindow : Window
             StopMarkerNudge();
             StopPlaceRepeat();
             StopSpectrogramBoostNudge();
+            StopPlaybackShuttle();
             CloseEditHistory(commit: true);
         };
         PreviewKeyDown += MainWindow_PreviewKeyDown;
@@ -271,6 +273,7 @@ public partial class MainWindow : Window
             StopMarkerNudge();
             StopPlaceRepeat();
             StopSpectrogramBoostNudge();
+            StopPlaybackShuttle();
             ResetMarkerDigitEntry();
             // Closing で既に破棄済みでも安全（冪等）。
             Waveform.DisposeSpectrogram();
@@ -404,12 +407,17 @@ public partial class MainWindow : Window
             _resumeAfterScrub = false;
             StopMarkerNudge();
             StopSpectrogramBoostNudge();
+            StopPlaybackShuttle();
             ResetMarkerDigitEntry();
             StopMeterRendering();
             Waveform.UnlockCenter();
             _activeSession = session;
             Waveform.Document = _document;
             Overview.Document = _document;
+            if (_recording && _recordSession is not null && ReferenceEquals(session, _recordSession))
+            {
+                Waveform.SetLiveRecording(true);
+            }
             ApplyChannelSolo();
             if (session is not null)
             {
@@ -731,6 +739,8 @@ public partial class MainWindow : Window
 
         e.Cancel = true;
         _closing = true;
+        // 未保存の録音 WAV 書き出しより先に実音を止める。保存を先にすると長く鳴り続ける。
+        _player.BeginShutdownFlush();
         WindowPlacement.Capture(this, AppStorage.Settings);
         HideFromTaskAndFocus();
         StopMeterRendering();
@@ -739,6 +749,7 @@ public partial class MainWindow : Window
         _playTimer.Stop();
         StopMarkerNudge();
         StopSpectrogramBoostNudge();
+        StopPlaybackShuttle();
         _ = FinishExitAfterFlushAsync();
     }
 
@@ -753,7 +764,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            // Hide を描画してからセッション保存・デバイス洗い流しに入る。
+            // Hide を描画してからセッション保存。洗い流しは Closing で開始済み。
             await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Render);
             RememberDocumentState();
             AppStorage.Settings.ApplyAudioOutput(_outputSettings);
@@ -875,9 +886,13 @@ public partial class MainWindow : Window
 
     private void ApplySilentSkipFromSettings()
     {
-        _player.SetSilentSkip(
-            SilentSkipCheck.IsChecked == true,
-            AppStorage.Settings.ResolvedSilentSkipThresholdDb());
+        var enabled = SilentSkipCheck.IsChecked == true;
+        var thresholdDb = AppStorage.Settings.ResolvedSilentSkipThresholdDb();
+        _player.SetSilentSkip(enabled, thresholdDb);
+        _recorder.SetSilentSkip(
+            enabled,
+            thresholdDb,
+            AppStorage.Settings.ResolvedSilentSkipRecordPadMs());
     }
 
     private void BrandLicenseHost_LinkClick(object sender, BrandLicenseLinkClickEventArgs e)

@@ -68,6 +68,14 @@ public sealed class ChannelRouterTests
     }
 
     [Fact]
+    public void Normalize_FileLanesMatchSpeakerCount()
+    {
+        Assert.Equal([0, 1], ChannelRouter.Normalize([0, 1, 4], 2, 2));
+        Assert.Equal([ChannelRouter.Off, 1], ChannelRouter.Normalize([5, 1], 2, 2));
+        Assert.Equal([0, 1, 2, 3, 4, 5], ChannelRouter.Normalize(null, 6, 6));
+    }
+
+    [Fact]
     public void DestLaneCount_UsesAssignedWaveformNumbers()
     {
         Assert.Equal(6, ChannelRouter.DestLaneCount(6, null));
@@ -76,6 +84,15 @@ public sealed class ChannelRouterTests
         Assert.Equal(8, ChannelRouter.DestLaneCount(6, [7, 1, 2, 3, 4, 5]));
         Assert.Equal(6, ChannelRouter.DestLaneCount(6, [ChannelRouter.Off, ChannelRouter.Off]));
         Assert.Equal(16, ChannelRouter.DestLaneCount(2, [100]));
+    }
+
+    [Fact]
+    public void MixMono_AveragesAssignedChannels()
+    {
+        Assert.Equal(0.3f, ChannelRouter.MixMono([0.2f, 0.4f], [0, 1]), 5);
+        Assert.Equal(0.4f, ChannelRouter.MixMono([0.4f, 0.8f], [0, ChannelRouter.Off]), 5);
+        Assert.Equal(0f, ChannelRouter.MixMono([0.5f, 0.5f], [ChannelRouter.Off, ChannelRouter.Off]), 5);
+        Assert.Equal(0.2f, ChannelRouter.MixMono([0.1f, 0.2f, 0.3f], [0, 1, 2]), 5);
     }
 
     [Fact]

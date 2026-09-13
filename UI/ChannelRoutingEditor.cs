@@ -45,7 +45,8 @@ internal sealed class ChannelRoutingEditor
             _meters.Clear();
             _sineButtons.Clear();
             _voiceButtons.Clear();
-            var lanes = ChannelRouter.Normalize(fileMap, channelNames.Length, ChannelLayout.MaxChannels);
+            var fileLanes = Math.Clamp(channelNames.Length, 1, ChannelLayout.MaxChannels);
+            var lanes = ChannelRouter.Normalize(fileMap, channelNames.Length, fileLanes);
             for (var i = 0; i < channelNames.Length; i++)
             {
                 var row = new Grid { Height = DesignMetrics.AudioInputHeight, Margin = new Thickness(0, 0, 0, 4) };
@@ -84,7 +85,12 @@ internal sealed class ChannelRoutingEditor
                 var next = 2;
                 if (_showMeters)
                 {
-                    var meter = new ChannelLevelBar { Margin = new Thickness(8, 0, 0, 0), Channel = i };
+                    var meter = new ChannelLevelBar
+                    {
+                        Margin = new Thickness(8, 0, 0, 0),
+                        Channel = i,
+                        Channels = channelNames.Length,
+                    };
                     TipService.Set(meter, UiStrings.TipInputLevel);
                     row.Children.Add(meter);
                     Grid.SetColumn(meter, next);
@@ -95,7 +101,7 @@ internal sealed class ChannelRoutingEditor
                 var fileBox = CreateIndexCombo();
                 fileBox.Margin = new Thickness(DesignMetrics.SettingsLabelComboGap, 0, 0, 0);
                 fileBox.Items.Add(new PortItem(ChannelRouter.Off, UiStrings.LabelPortOff));
-                for (var lane = 0; lane < ChannelLayout.MaxChannels; lane++)
+                for (var lane = 0; lane < fileLanes; lane++)
                 {
                     fileBox.Items.Add(new PortItem(lane, UiStrings.LabelWaveformLane(lane + 1)));
                 }
@@ -357,7 +363,7 @@ internal sealed class ChannelRoutingEditor
     {
         var max = Math.Max(
             DesignMetrics.SettingsFileLaneComboMinWidth,
-            ComboBoxFit.MeasureText(_host, UiStrings.LabelWaveformLane(ChannelLayout.MaxChannels), 11.333) + 36);
+            ComboBoxFit.MeasureText(_host, UiStrings.LabelWaveformLane(Math.Max(1, _channelNames.Length)), 11.333) + 36);
         max = Math.Max(max, ComboBoxFit.MeasureText(_host, UiStrings.LabelPortOff, 11.333) + 36);
         foreach (var box in _fileBoxes)
         {

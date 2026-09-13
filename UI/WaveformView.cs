@@ -132,6 +132,10 @@ internal sealed class WaveformView : Grid
     private double _waveAmpZoom;
     private SpectrogramViewMode _waveMode;
     private bool _waveDirty = true;
+    private bool _liveRecording;
+    private bool _waveLiveRecording;
+    private long _waveLiveFrames;
+    private long _waveLivePeakFrames;
     private SpectrogramViewMode _spectrogramMode;
     private readonly SpectrogramRenderer _spectrogram = new();
     private readonly SpectrogramBoostBar _boostBar = new();
@@ -312,11 +316,17 @@ internal sealed class WaveformView : Grid
         get => _document;
         set
         {
+            if (ReferenceEquals(_document, value))
+            {
+                return;
+            }
+
             _document = value;
             _timeZoom = 1d;
             _ampZoom = 1d;
             _viewStart = 0;
             CenterLocked = false;
+            _liveRecording = false;
             SetTrailRecording(false);
             EndMarkerCommentEdit(commit: false);
             ResetMarkerDragState();
@@ -566,6 +576,41 @@ internal sealed class WaveformView : Grid
     }
 
     public void Refresh() => InvalidateWaveform();
+
+    /// <summary>
+    /// 録音中の追従。キャッシュを捨てず、新しい列だけ足す／スクロール差分だけずらす。
+    /// ピークを作り直したときだけ settled 側を描き直す。
+    /// </summary>
+    public void RefreshLive(bool rebuildSettled)
+    {
+        if (rebuildSettled)
+        {
+            _waveDirty = true;
+        }
+
+        InvalidateStaticLayer();
+    }
+
+    public void SetLiveRecording(bool active)
+    {
+        if (_liveRecording == active)
+        {
+            return;
+        }
+
+        _liveRecording = active;
+        InvalidateWaveform();
+    }
+
+    public void RevealFrame(long frame)
+    {
+        if (_document is null || _document.FrameCount <= 0)
+        {
+            return;
+        }
+
+        EnsureFrameVisible(ClampFrame(frame));
+    }
 
     public void ApplySpeakerLayout(ChannelLayout speaker, int[]? fileChannelMap = null)
     {
@@ -1865,7 +1910,10 @@ internal sealed class WaveformView : Grid
     private void PaintStaticCore(DrawingContext dc)
     {
         var bounds = new Rect(_staticHost.RenderSize);
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("WaveformBackBrush")), null, bounds);
+        dc.DrawRectangle(
+            WpfControlHelpers.FrozenBrush(Theme.Get(_liveRecording ? "WaveformRecordBackBrush" : "WaveformBackBrush")),
+            null,
+            bounds);
         if (Math.Abs(_appliedMarkerLaneHeight - MarkerLaneHeight) > 0.01)
         {
             _appliedMarkerLaneHeight = MarkerLaneHeight;
@@ -1888,12 +1936,23 @@ internal sealed class WaveformView : Grid
         var loudness = LoudnessVisible;
         if (SpectrogramVisible)
         {
-            _spectrogram.Draw(dc, wave, _document, start, span, this, reuseBitmap: _deferWaveReload);
+            _spectrogram.Draw(
+                dc,
+                wave,
+                _document,
+                start,
+                span,
+                this,
+                reuseBitmap: _deferWaveReload || _liveRecording);
         }
 
         if (loudness)
         {
-            _loudness.Ensure(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayerForLoudness));
+            if (!_liveRecording)
+            {
+                _loudness.Ensure(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayerForLoudness));
+            }
+
             _loudness.DrawUnderlay(dc, wave, _loudnessTargetLufs);
         }
 
@@ -2022,7 +2081,10 @@ internal sealed class WaveformView : Grid
             && Math.Abs(_waveViewSpan - bmpSpan) < bmpSpan / bmpWidth * 0.01
             && Math.Abs(_waveAmpZoom - _ampZoom) < 1e-6
             && _waveMode == _spectrogramMode
-            && _waveChannels == (_document?.Channels ?? 0))
+            && _waveChannels == (_document?.Channels ?? 0)
+            && _waveLiveRecording == _liveRecording
+            && _waveLiveFrames == (_document?.FrameCount ?? 0)
+            && _waveLivePeakFrames == (_document?.Peaks.FrameCount ?? 0))
         {
             return;
         }
@@ -2031,21 +2093,22 @@ internal sealed class WaveformView : Grid
         EnsureWavePens();
         EnsureWavePixels(bmpWidth, height);
 
-        var shifted = !_waveDirty
+        var reused = !_waveDirty
             && _wavePixelWidth == bmpWidth
             && _wavePixelHeight == height
             && Math.Abs(_waveViewSpan - bmpSpan) < 0.01
             && Math.Abs(_waveAmpZoom - _ampZoom) < 1e-6
             && _waveMode == _spectrogramMode
-            && TryShiftWaveform(quantStart, bmpSpan, bmpWidth, height, scaleX, scaleY);
-        if (!shifted)
+            && (TryShiftWaveform(quantStart, bmpSpan, bmpWidth, height, scaleX, scaleY)
+                || TryPaintLiveTail(quantStart, bmpSpan, bmpWidth, height, scaleX, scaleY));
+        if (!reused)
         {
             Array.Clear(_wavePixels, 0, bmpWidth * height);
             RasterizeWaveformPixels(0, bmpWidth, bmpWidth, height, scaleX, scaleY, quantStart, bmpSpan);
         }
 
         _waveBitmap!.WritePixels(new Int32Rect(0, 0, bmpWidth, height), _wavePixels, bmpWidth * 4, 0);
-        if (!SpectrogramVisible && !LoudnessVisible)
+        if (!SpectrogramVisible && !LoudnessVisible && !_liveRecording)
         {
             RebuildInvertBitmap(bmpWidth, height, dpi);
         }
@@ -2060,6 +2123,9 @@ internal sealed class WaveformView : Grid
         _wavePixelWidth = bmpWidth;
         _wavePixelHeight = height;
         _waveChannels = _document?.Channels ?? 0;
+        _waveLiveRecording = _liveRecording;
+        _waveLiveFrames = _document?.FrameCount ?? 0;
+        _waveLivePeakFrames = _document?.Peaks.FrameCount ?? 0;
         _waveDirty = false;
     }
 
@@ -2092,6 +2158,48 @@ internal sealed class WaveformView : Grid
             RasterizeWaveformPixels(0, -shiftPx, width, height, scaleX, scaleY, quantStart, bmpSpan);
         }
 
+        return true;
+    }
+
+    private bool TryPaintLiveTail(
+        double quantStart,
+        double bmpSpan,
+        int width,
+        int height,
+        double scaleX,
+        double scaleY)
+    {
+        if (!_liveRecording || _document is null || _waveLiveFrames <= 0)
+        {
+            return false;
+        }
+
+        var nextFrames = _document.FrameCount;
+        if (nextFrames <= _waveLiveFrames
+            || _waveChannels != _document.Channels
+            || Math.Abs(_waveViewStart - quantStart) >= bmpSpan / Math.Max(1, width) * 0.01)
+        {
+            return false;
+        }
+
+        var rangeFrames = (long)Math.Ceiling(quantStart + bmpSpan) - (long)Math.Floor(quantStart);
+        if (IsPolylineZoom(rangeFrames, width))
+        {
+            return false;
+        }
+
+        var from = Math.Max(_waveLiveFrames - 1, (long)Math.Floor(quantStart));
+        var to = Math.Min(nextFrames, (long)Math.Ceiling(quantStart + bmpSpan));
+        if (to <= from)
+        {
+            return true;
+        }
+
+        var x0 = (int)Math.Floor((from - quantStart) / bmpSpan * width);
+        var x1 = (int)Math.Ceiling((to - quantStart) / bmpSpan * width) + 1;
+        x0 = Math.Clamp(x0, 0, width);
+        x1 = Math.Clamp(Math.Max(x0 + 1, x1), x0, width);
+        RasterizeWaveformPixels(x0, x1, width, height, scaleX, scaleY, quantStart, bmpSpan);
         return true;
     }
 
@@ -2322,6 +2430,8 @@ internal sealed class WaveformView : Grid
         return lanes.Count == 0 ? [wave] : lanes;
     }
 
+    private long DrawableFrameCount(AudioDocument document) => document.FrameCount;
+
     private unsafe void RasterizeWaveform(
         int* buffer,
         int stride,
@@ -2335,6 +2445,12 @@ internal sealed class WaveformView : Grid
         double start,
         double span)
     {
+        var drawable = DrawableFrameCount(document);
+        if (drawable <= 0)
+        {
+            return;
+        }
+
         var sourceChannels = Math.Max(1, document.Channels);
         var overlay = _spectrogramMode == SpectrogramViewMode.Overlay;
         var loudness = LoudnessVisible;
@@ -2344,8 +2460,8 @@ internal sealed class WaveformView : Grid
         ResolveWaveLane(overlay, height, drawChannels, laneGap, _ampZoom, out var laneHeight, out var laneOrigin, out var ampHeight);
         x0 = Math.Clamp(x0, 0, width);
         x1 = Math.Clamp(x1, x0, width);
-        var startFrame = Math.Clamp((long)Math.Floor(start), 0, document.FrameCount);
-        var endFrame = Math.Clamp((long)Math.Ceiling(start + span), startFrame, document.FrameCount);
+        var startFrame = Math.Clamp((long)Math.Floor(start), 0, drawable);
+        var endFrame = Math.Clamp((long)Math.Ceiling(start + span), startFrame, drawable);
         var rangeFrames = endFrame - startFrame;
         if (rangeFrames <= 0 || laneHeight < 1 || x1 <= x0)
         {
@@ -2385,17 +2501,16 @@ internal sealed class WaveformView : Grid
 
             var colCount = x1 - x0;
             EnsureColumnBuffers(colCount * sourceChannels);
-            var count = useRawColumns
-                ? FillRawColumnPeaks(document, f0, f1, colCount, sourceChannels)
-                : document.Peaks.ReadRangePacked(f0, f1, colCount, _columnMins, _columnMaxs);
+            var count = FillWaveColumnPeaks(
+                document,
+                f0,
+                f1,
+                colCount,
+                sourceChannels,
+                useRawColumns);
             if (count <= 0)
             {
                 return;
-            }
-
-            if (!useRawColumns && _previewGainAtFrame is not null)
-            {
-                ApplyPreviewGainToColumns(f0, f1, count, sourceChannels);
             }
 
             var packedChannels = sourceChannels;
@@ -2501,17 +2616,16 @@ internal sealed class WaveformView : Grid
 
         var colCount = x1 - x0;
         EnsureColumnBuffers(colCount * sourceChannels);
-        var count = useRawColumns
-            ? FillRawColumnPeaks(document, f0, f1, colCount, sourceChannels)
-            : document.Peaks.ReadRangePacked(f0, f1, colCount, _columnMins, _columnMaxs);
+        var count = FillWaveColumnPeaks(
+            document,
+            f0,
+            f1,
+            colCount,
+            sourceChannels,
+            useRawColumns);
         if (count <= 0)
         {
             return;
-        }
-
-        if (!useRawColumns && _previewGainAtFrame is not null)
-        {
-            ApplyPreviewGainToColumns(f0, f1, count, sourceChannels);
         }
 
         ChannelMix.FoldPackedPeaksToMid(_columnMins, _columnMaxs, count, sourceChannels);
@@ -2783,12 +2897,91 @@ internal sealed class WaveformView : Grid
         _columnYLo = new int[width];
     }
 
-    private int FillRawColumnPeaks(
+    private int FillWaveColumnPeaks(
+        AudioDocument document,
+        long startFrame,
+        long endFrame,
+        int width,
+        int channels,
+        bool useRawColumns)
+    {
+        if (_liveRecording)
+        {
+            return FillLiveColumnPeaks(document, startFrame, endFrame, width, channels);
+        }
+
+        var count = useRawColumns
+            ? FillRawColumnPeaks(document, startFrame, endFrame, width, channels)
+            : document.Peaks.ReadRangePacked(startFrame, endFrame, width, _columnMins, _columnMaxs);
+        if (count > 0 && !useRawColumns && _previewGainAtFrame is not null)
+        {
+            ApplyPreviewGainToColumns(startFrame, endFrame, count, channels);
+        }
+
+        return count;
+    }
+
+    private int FillLiveColumnPeaks(
         AudioDocument document,
         long startFrame,
         long endFrame,
         int width,
         int channels)
+    {
+        var rangeFrames = endFrame - startFrame;
+        if (rangeFrames <= 0 || width <= 0)
+        {
+            return 0;
+        }
+
+        if (document.Peaks.IsEmpty || document.Peaks.Channels != channels)
+        {
+            return FillRawColumnPeaks(document, startFrame, endFrame, width, channels);
+        }
+
+        var settledCols = RecordContinue.CountPrefixColumns(
+            startFrame,
+            rangeFrames,
+            width,
+            Math.Min(document.Peaks.FrameCount, document.FrameCount));
+        var peakCols = 0;
+        if (settledCols > 0)
+        {
+            var settledEnd = startFrame + settledCols * rangeFrames / width;
+            peakCols = document.Peaks.ReadRangePacked(
+                startFrame,
+                settledEnd,
+                settledCols,
+                _columnMins,
+                _columnMaxs);
+            if (peakCols > 0 && _previewGainAtFrame is not null)
+            {
+                ApplyPreviewGainToColumns(startFrame, settledEnd, peakCols, channels);
+            }
+        }
+
+        if (peakCols >= width)
+        {
+            return peakCols;
+        }
+
+        var rawStart = startFrame + peakCols * rangeFrames / width;
+        return peakCols + FillRawColumnPeaks(
+            document,
+            rawStart,
+            endFrame,
+            width - peakCols,
+            channels,
+            peakCols);
+    }
+
+    private int FillRawColumnPeaks(
+        AudioDocument document,
+        long startFrame,
+        long endFrame,
+        int width,
+        int channels,
+        int destColumn = 0)
     {
         var rangeFrames = endFrame - startFrame;
         var buckets = (int)Math.Min(width, rangeFrames);
@@ -2799,7 +2992,9 @@ internal sealed class WaveformView : Grid
 
         var samples = document.Interleaved;
         var frameCount = document.FrameCount;
-        for (var i = 0; i < buckets * channels; i++)
+        var destBase = destColumn * channels;
+        var destEnd = destBase + buckets * channels;
+        for (var i = destBase; i < destEnd; i++)
         {
             _columnMins[i] = float.MaxValue;
             _columnMaxs[i] = float.MinValue;
@@ -2816,7 +3011,7 @@ internal sealed class WaveformView : Grid
 
             f0 = Math.Clamp(f0, 0, frameCount);
             f1 = Math.Clamp(f1, f0, frameCount);
-            var dest = i * channels;
+            var dest = destBase + i * channels;
             for (var frame = f0; frame < f1; frame++)
             {
                 var src = (int)frame * channels;
@@ -2837,7 +3032,7 @@ internal sealed class WaveformView : Grid
             }
         }
 
-        for (var i = 0; i < buckets * channels; i++)
+        for (var i = destBase; i < destEnd; i++)
         {
             if (_columnMins[i] > _columnMaxs[i])
             {
@@ -2906,8 +3101,9 @@ internal sealed class WaveformView : Grid
         double scaleX)
     {
         var channels = document.Channels;
+        var drawable = DrawableFrameCount(document);
         var first = (long)Math.Floor(start);
-        var last = Math.Min(document.FrameCount - 1, (long)Math.Ceiling(start + span));
+        var last = Math.Min(drawable - 1, (long)Math.Ceiling(start + span));
         if (last < first)
         {
             return;
@@ -2928,7 +3124,7 @@ internal sealed class WaveformView : Grid
             var gain = channel >= 0 && IsLaneMuted(channel) ? 1f : PreviewGain(frame);
             if (channel < 0)
             {
-                SpectrogramEngine.MixFrame(samples, channels, frame, document.FrameCount, out var mixed);
+                SpectrogramEngine.MixFrame(samples, channels, frame, drawable, out var mixed);
                 return mixed * gain;
             }
 

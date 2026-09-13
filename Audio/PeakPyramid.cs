@@ -37,15 +37,19 @@ internal sealed class PeakPyramid
 
     public static PeakPyramid Empty { get; } = new([[]], [[]], 1, 0, 1);
 
-    public static PeakPyramid Build(float[] interleaved, int channels)
+    public static PeakPyramid Build(float[] interleaved, int channels) =>
+        Build(interleaved, channels, interleaved.Length);
+
+    public static PeakPyramid Build(float[] interleaved, int channels, int sampleCount)
     {
         channels = Math.Max(1, channels);
-        if (interleaved.Length < channels)
+        sampleCount = Math.Clamp(sampleCount, 0, interleaved.Length);
+        if (sampleCount < channels)
         {
             return new PeakPyramid([[]], [[]], channels, 0, 1);
         }
 
-        var frames = interleaved.Length / channels;
+        var frames = sampleCount / channels;
         var baseBucket = (int)Math.Max(1L, (frames + TargetBaseBuckets - 1) / TargetBaseBuckets);
         var baseCount = (int)((frames + baseBucket - 1) / baseBucket);
         var mins = new float[baseCount * channels];

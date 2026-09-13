@@ -692,6 +692,7 @@ public partial class MainWindow
             UiThemes.ParseChoice(settings.UiTheme),
             settings.ResolvedLoudnessTargetLufs(),
             settings.ResolvedSilentSkipThresholdDb(),
+            settings.ResolvedSilentSkipRecordPadMs(),
             settings.Mp3BitRate,
             settings.LameExePath,
             settings.LameOptions,
@@ -724,6 +725,7 @@ public partial class MainWindow
         settings.ApplyDefaultFades(dialog.FadeInCurve, dialog.FadeOutCurve);
         settings.LoudnessTargetLufs = dialog.SelectedLoudnessTargetLufs;
         settings.SilentSkipThresholdDb = dialog.SelectedSilentSkipThresholdDb;
+        settings.SilentSkipRecordPadMs = dialog.SelectedSilentSkipRecordPadMs;
         settings.Mp3BitRate = dialog.SelectedMp3BitRate;
         settings.LameExePath = dialog.SelectedLameExePath;
         settings.LameOptions = dialog.SelectedLameOptions;
@@ -855,7 +857,10 @@ public partial class MainWindow
         {
             CaptureActiveSessionView();
             var settings = AppStorage.Settings;
-            if (_sessions.Count == 0)
+            var closed = _workspace.ClosedTabs
+                .Where(tab => DocumentSessionStore.ShouldPersistClosedTab(tab.Session.Document))
+                .ToArray();
+            if (_sessions.Count == 0 && closed.Length == 0)
             {
                 DocumentSessionStore.ClearOpenDocuments(settings);
                 AppStorage.ClearAllSessionAudio();
@@ -867,38 +872,38 @@ public partial class MainWindow
             Directory.CreateDirectory(AppStorage.SessionDirectory);
             for (var i = 0; i < _sessions.Count; i++)
             {
-                var session = _sessions[i];
-                var view = new SessionViewState(
-                    session.PlayheadFrame,
-                    session.TimeZoom,
-                    session.AmpZoom,
-                    session.ViewStart,
-                    session.LoopEnabled,
-                    session.SelectedMarkerFrames);
-                var snap = DocumentSessionStore.Capture(session.Document, view, i);
-                snap.IsActive = ReferenceEquals(session, _activeSession);
-                TrySaveSessionHistory(session, snap, i, keep);
-                if (DocumentSessionStore.NeedsSessionAudio(snap.Dirty, snap.SourcePath))
-                {
-                    try
-                    {
-                        var name = DocumentSessionStore.SanitizeSessionFileName(snap.SessionFileName)
-                            ?? DocumentSessionStore.FileNameForIndex(i);
-                        snap.SessionFileName = name;
-                        AudioCodec.SaveWave(session.Document, AppStorage.SessionFilePath(name));
-                        keep.Add(name);
-                    }
-                    catch
-                    {
-                        snap.SessionFileName = string.Empty;
-                    }
-                }
+                snapshots[i] = CaptureSessionSnapshot(
+                    _sessions[i],
+                    i,
+                    DocumentSessionStore.FileNameForIndex(i),
+                    DocumentSessionStore.OriginFileNameForIndex(i),
+                    DocumentSessionStore.HistoryFileNameForIndex(i),
+                    keep);
+                snapshots[i].IsActive = ReferenceEquals(_sessions[i], _activeSession);
+            }
 
-                snapshots[i] = snap;
+            var closedSnaps = new OpenDocumentSnapshot[closed.Length];
+            for (var i = 0; i < closed.Length; i++)
+            {
+                closedSnaps[i] = CaptureSessionSnapshot(
+                    closed[i].Session,
+                    i,
+                    DocumentSessionStore.FileNameForClosedIndex(i),
+                    DocumentSessionStore.OriginFileNameForClosedIndex(i),
+                    DocumentSessionStore.HistoryFileNameForClosedIndex(i),
+                    keep);
+                closedSnaps[i].ClosedIndex = closed[i].Index;
             }
 
             AppStorage.ReplaceSessionFiles(keep);
             settings.OpenDocuments = snapshots;
+            settings.ClosedDocuments = closedSnaps;
+            if (snapshots.Length == 0)
+            {
+                settings.ActiveDocumentIndex = 0;
+                return;
+            }
+
             var activeIndex = _activeSession is null ? 0 : _sessions.IndexOf(_activeSession);
             settings.ActiveDocumentIndex = Math.Clamp(activeIndex, 0, snapshots.Length - 1);
             var activePath = snapshots[settings.ActiveDocumentIndex].SourcePath;
@@ -923,7 +928,8 @@ public partial class MainWindow
         _didRestoreLastDocument = true;
         var settings = AppStorage.Settings;
         var docs = DocumentSessionStore.ResolveOpenDocuments(settings);
-        if (docs.Length == 0)
+        var closedDocs = DocumentSessionStore.ResolveClosedDocuments(settings);
+        if (docs.Length == 0 && closedDocs.Length == 0)
         {
             return;
         }
@@ -962,6 +968,17 @@ public partial class MainWindow
                 }
             }
 
+            foreach (var snap in closedDocs)
+            {
+                var session = await TryRestoreSessionAsync(snap).ConfigureAwait(true);
+                if (session is null)
+                {
+                    continue;
+                }
+
+                _workspace.RememberClosed(session, snap.ClosedIndex);
+            }
+
             if (_sessions.Count == 0)
             {
                 return;
@@ -997,7 +1014,7 @@ public partial class MainWindow
     private async Task<DocumentSession?> TryRestoreSessionAsync(OpenDocumentSnapshot snap)
     {
         var fromHistory = await TryRestoreSessionHistoryAsync(snap).ConfigureAwait(true);
-        if (fromHistory is not null)
+        if (fromHistory is not null && fromHistory.Document.FrameCount > 0)
         {
             return fromHistory;
         }
@@ -1020,10 +1037,12 @@ public partial class MainWindow
             }
 
             DocumentSessionStore.ApplyMeta(document, snap);
-            return new DocumentSession(document)
+            var session = new DocumentSession(document)
             {
                 LoopEnabled = snap.LoopEnabled,
             };
+            RememberPersistedSessionFiles(session, snap, fromSession);
+            return session;
         }
         catch
         {
@@ -1031,10 +1050,110 @@ public partial class MainWindow
         }
     }
 
+    private static void RememberPersistedSessionFiles(
+        DocumentSession session,
+        OpenDocumentSnapshot snap,
+        bool fromSessionAudio)
+    {
+        if (fromSessionAudio
+            || DocumentSessionStore.HasUsableSessionAudio(AppStorage.SessionDirectory, snap.SessionFileName))
+        {
+            session.PersistedSessionAudioName = DocumentSessionStore.SanitizeSessionFileName(snap.SessionFileName);
+            session.PersistedSampleRevision = session.Document.SampleRevision;
+        }
+
+        if (DocumentSessionStore.HasUsableSidecar(AppStorage.SessionDirectory, snap.OriginFileName)
+            && DocumentSessionStore.HasUsableSidecar(AppStorage.SessionDirectory, snap.HistoryFileName))
+        {
+            session.PersistedOriginName = DocumentSessionStore.SanitizeSidecarName(snap.OriginFileName);
+            session.PersistedHistoryName = DocumentSessionStore.SanitizeSidecarName(snap.HistoryFileName);
+        }
+    }
+
+    private OpenDocumentSnapshot CaptureSessionSnapshot(
+        DocumentSession session,
+        int index,
+        string audioName,
+        string originName,
+        string historyName,
+        List<string> keep)
+    {
+        var view = new SessionViewState(
+            session.PlayheadFrame,
+            session.TimeZoom,
+            session.AmpZoom,
+            session.ViewStart,
+            session.LoopEnabled,
+            session.SelectedMarkerFrames);
+        var snap = DocumentSessionStore.Capture(session.Document, view, index);
+        TrySaveSessionHistory(session, snap, originName, historyName, keep);
+        var write = DocumentSessionStore.DecideSessionAudioWrite(
+            DocumentSessionStore.NeedsSessionAudio(snap.Dirty, snap.SourcePath, snap.CanContinueRecording),
+            DocumentSessionStore.HasWorkingAudio(session.Document),
+            !string.IsNullOrWhiteSpace(session.Document.SourcePath),
+            session.Document.SampleRevision,
+            session.PersistedSampleRevision,
+            DocumentSessionStore.HasUsableSessionAudio(
+                AppStorage.SessionDirectory,
+                session.PersistedSessionAudioName));
+        if (write == SessionAudioWriteKind.Skip)
+        {
+            snap.SessionFileName = string.Empty;
+            return snap;
+        }
+
+        if (write == SessionAudioWriteKind.Reuse)
+        {
+            var reused = DocumentSessionStore.SanitizeSessionFileName(session.PersistedSessionAudioName);
+            if (reused is not null)
+            {
+                snap.SessionFileName = reused;
+                keep.Add(reused);
+                return snap;
+            }
+        }
+
+        try
+        {
+            var name = DocumentSessionStore.SanitizeSessionFileName(audioName)
+                ?? DocumentSessionStore.FileNameForIndex(index);
+            snap.SessionFileName = name;
+            AudioCodec.SaveWave(session.Document, AppStorage.SessionFilePath(name));
+            keep.Add(name);
+            session.PersistedSessionAudioName = name;
+            session.PersistedSampleRevision = session.Document.SampleRevision;
+        }
+        catch
+        {
+            var written = DocumentSessionStore.SanitizeSessionFileName(snap.SessionFileName);
+            if (written is not null)
+            {
+                try
+                {
+                    var path = AppStorage.SessionFilePath(written);
+                    if (File.Exists(path) && new FileInfo(path).Length > 0)
+                    {
+                        keep.Add(written);
+                        return snap;
+                    }
+                }
+                catch
+                {
+                    // 作業コピーが残っていなければ捨てる。
+                }
+            }
+
+            snap.SessionFileName = string.Empty;
+        }
+
+        return snap;
+    }
+
     private static void TrySaveSessionHistory(
         DocumentSession session,
         OpenDocumentSnapshot snap,
-        int index,
+        string originName,
+        string historyName,
         List<string> keep)
     {
         var exported = session.History.TryExport();
@@ -1043,23 +1162,57 @@ public partial class MainWindow
             return;
         }
 
-        var originName = DocumentSessionStore.OriginFileNameForIndex(index);
-        var historyName = DocumentSessionStore.HistoryFileNameForIndex(index);
-        var currentIndex = session.History.CurrentIndex;
-        try
+        var persistedOrigin = DocumentSessionStore.SanitizeSidecarName(session.PersistedOriginName);
+        var persistedHistory = DocumentSessionStore.SanitizeSidecarName(session.PersistedHistoryName);
+        if (persistedOrigin is not null
+            && DocumentSessionStore.HasUsableSidecar(AppStorage.SessionDirectory, persistedOrigin))
         {
-            session.History.JumpTo(session.Document, 0);
-            AudioCodec.SaveWave(session.Document, AppStorage.SessionSidecarPath(originName));
-            session.History.JumpTo(session.Document, currentIndex);
-            if (!DocumentSessionStore.TryWriteHistory(AppStorage.SessionSidecarPath(historyName), exported))
+            snap.OriginFileName = persistedOrigin;
+            keep.Add(persistedOrigin);
+        }
+
+        if (persistedHistory is not null
+            && DocumentSessionStore.HistoryMatchesFile(
+                AppStorage.SessionSidecarPath(persistedHistory),
+                exported))
+        {
+            snap.HistoryFileName = persistedHistory;
+            keep.Add(persistedHistory);
+            if (!string.IsNullOrEmpty(snap.OriginFileName))
             {
                 return;
             }
+        }
 
-            snap.OriginFileName = originName;
-            snap.HistoryFileName = historyName;
-            keep.Add(originName);
-            keep.Add(historyName);
+        if (!string.IsNullOrEmpty(snap.OriginFileName) && !string.IsNullOrEmpty(snap.HistoryFileName))
+        {
+            return;
+        }
+
+        var currentIndex = session.History.CurrentIndex;
+        try
+        {
+            if (string.IsNullOrEmpty(snap.OriginFileName))
+            {
+                session.History.JumpTo(session.Document, 0);
+                AudioCodec.SaveWave(session.Document, AppStorage.SessionSidecarPath(originName));
+                session.History.JumpTo(session.Document, currentIndex);
+                snap.OriginFileName = originName;
+                keep.Add(originName);
+                session.PersistedOriginName = originName;
+            }
+
+            if (string.IsNullOrEmpty(snap.HistoryFileName))
+            {
+                if (!DocumentSessionStore.TryWriteHistory(AppStorage.SessionSidecarPath(historyName), exported))
+                {
+                    return;
+                }
+
+                snap.HistoryFileName = historyName;
+                keep.Add(historyName);
+                session.PersistedHistoryName = historyName;
+            }
         }
         catch
         {
@@ -1100,11 +1253,13 @@ public partial class MainWindow
             document.SetDirty(!history.IsClean);
             DocumentSessionStore.ApplyMeta(document, snap);
             document.SetDirty(!history.IsClean);
-            return new DocumentSession(document)
+            var session = new DocumentSession(document)
             {
                 History = history,
                 LoopEnabled = snap.LoopEnabled,
             };
+            RememberPersistedSessionFiles(session, snap, fromSessionAudio: false);
+            return session;
         }
         catch
         {

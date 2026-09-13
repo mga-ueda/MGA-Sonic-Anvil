@@ -204,11 +204,17 @@ public partial class MainWindow
             case WaveMenuCommand.DeleteMarkers:
                 ApplyDeleteMarkers();
                 break;
+            case WaveMenuCommand.DeleteAllMarkers:
+                ApplyDeleteAllMarkers();
+                break;
             case WaveMenuCommand.SetRegion:
                 TrySetRegionFromSelection();
                 break;
             case WaveMenuCommand.DeleteRegions:
                 ApplyDeleteSelectedRegions();
+                break;
+            case WaveMenuCommand.DeleteAllRegions:
+                ApplyDeleteAllRegions();
                 break;
             case WaveMenuCommand.SetLoop:
                 SetSampleLoopFromSelection();

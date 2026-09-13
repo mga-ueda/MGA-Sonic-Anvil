@@ -57,6 +57,7 @@ internal static partial class UiStrings
             "ProjectBarBack" => Get("背景", "Background"),
             "OverviewOutsideFill" => Get("範囲外", "Outside view"),
             "WaveformBack" => Get("エリア背景", "Area background"),
+            "WaveformRecordBack" => Get("録音中の背景", "Recording background"),
             "WaveFill" => Get("波形", "Waveform"),
             "WaveFillOverlay" => Get("スペクトログラム重ね", "Spectrogram overlay"),
             "WaveZeroLine" => Get("0 dB 線", "0 dB line"),

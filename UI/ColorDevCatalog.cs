@@ -54,6 +54,7 @@ internal static class ColorDevCatalog
             ("OverviewOutsideFillBrush", ColorDevGroup.Overview),
 
             ("WaveformBackBrush", ColorDevGroup.Waveform),
+            ("WaveformRecordBackBrush", ColorDevGroup.Waveform),
             ("WaveFillBrush", ColorDevGroup.Waveform),
             ("WaveFillOverlayBrush", ColorDevGroup.Waveform),
             ("WaveZeroLineBrush", ColorDevGroup.Waveform),

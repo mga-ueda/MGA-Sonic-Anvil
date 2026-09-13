@@ -20,6 +20,10 @@ internal sealed class AudioRecorder : IDisposable
     private int _destChannels = 2;
     private int _sampleRate = 48000;
     private bool _recording;
+    private bool _silentSkip;
+    private float _silentSkipLinear = SilentSkip.LinearFromDb(SilentSkip.DefaultThresholdDb);
+    private int _silentSkipRecordPadMs = SilentSkip.DefaultRecordPadMs;
+    private readonly SilentSkipRecordGate _recordGate = new();
     private float[] _routeScratch = [];
 
     public bool IsRecording
@@ -67,6 +71,26 @@ internal sealed class AudioRecorder : IDisposable
         }
     }
 
+    public void SetSilentSkip(bool enabled, double thresholdDb, int recordPadMs = SilentSkip.DefaultRecordPadMs)
+    {
+        lock (_gate)
+        {
+            _silentSkip = enabled;
+            _silentSkipLinear = SilentSkip.LinearFromDb(thresholdDb);
+            _silentSkipRecordPadMs = SilentSkip.ClampRecordPadMs(recordPadMs);
+            ConfigureRecordGate();
+        }
+    }
+
+    public void MarkTakeHasAudio()
+    {
+        lock (_gate)
+        {
+            _recordGate.Reset(hasWritten: true);
+            ConfigureRecordGate();
+        }
+    }
+
     public void Start(
         AudioOutputSettings output,
         string? recordDeviceId,
@@ -82,6 +106,8 @@ internal sealed class AudioRecorder : IDisposable
         {
             _samples = new float[_destChannels * _sampleRate];
             _count = 0;
+            _recordGate.Reset(hasWritten: false);
+            ConfigureRecordGate();
             _recording = true;
         }
 
@@ -116,20 +142,38 @@ internal sealed class AudioRecorder : IDisposable
     {
         lock (_gate)
         {
-            var copy = new float[_count];
-            Array.Copy(_samples, copy, _count);
-            return copy;
+            return CopyUsedNoLock(0);
+        }
+    }
+
+    public float[] SnapshotFrom(int startSample)
+    {
+        lock (_gate)
+        {
+            return CopyUsedNoLock(startSample);
+        }
+    }
+
+    public RecordedSpan[] TakeWrittenSpans()
+    {
+        lock (_gate)
+        {
+            return _recordGate.SnapshotWrittenSpans();
         }
     }
 
     public float[] StopAndTake()
     {
-        Stop();
         lock (_gate)
         {
-            var copy = new float[_count];
-            Array.Copy(_samples, copy, _count);
-            return copy;
+            FlushTrailingNoLock();
+            _recording = false;
+        }
+
+        DisposeCapture();
+        lock (_gate)
+        {
+            return CopyUsedNoLock(0);
         }
     }
 
@@ -252,6 +296,8 @@ internal sealed class AudioRecorder : IDisposable
         {
             _samples = new float[Math.Max(_destChannels * _sampleRate, _destChannels)];
             _count = 0;
+            _recordGate.Reset(hasWritten: false);
+            ConfigureRecordGate();
         }
     }
 
@@ -292,15 +338,46 @@ internal sealed class AudioRecorder : IDisposable
                 return;
             }
 
-            EnsureCapacity(frames * destCh);
+            ConfigureRecordGate();
+            EnsureCapacity((frames + 1) * destCh);
             for (var frame = 0; frame < frames; frame++)
             {
                 ChannelRouter.Gather(interleaved.Slice(frame * srcCh, srcCh), speakers, _map);
                 ChannelRouter.Scatter(speakers, dest, _fileMap);
-                dest.CopyTo(_samples.AsSpan(_count, destCh));
-                _count += destCh;
+                EnsureCapacity(destCh);
+                _count += _recordGate.ProcessFrame(dest, _samples.AsSpan(_count));
             }
         }
+    }
+
+    private void ConfigureRecordGate()
+    {
+        var destCh = Math.Max(1, _destChannels);
+        _recordGate.Configure(
+            _silentSkip,
+            _silentSkipLinear,
+            SilentSkip.RecordPadFrames(_sampleRate, _silentSkipRecordPadMs),
+            destCh);
+    }
+
+    private float[] CopyUsedNoLock(int startSample)
+    {
+        startSample = Math.Clamp(startSample, 0, _count);
+        var length = _count - startSample;
+        if (length <= 0)
+        {
+            return [];
+        }
+
+        var copy = new float[length];
+        Array.Copy(_samples, startSample, copy, 0, length);
+        return copy;
+    }
+
+    private void FlushTrailingNoLock()
+    {
+        ConfigureRecordGate();
+        _count = Math.Max(0, _count - _recordGate.CloseTake());
     }
 
     private void EnsureCapacity(int add)

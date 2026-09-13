@@ -45,7 +45,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("(U)", UiStrings.TooltipHistory);
         Assert.Contains("Ctrl+Shift+C", UiStrings.TooltipColorPanel);
         Assert.Contains("Alt+S", UiStrings.TipSilentSkip);
-        Assert.Contains("Shift", UiStrings.TipPlay);
+        Assert.Contains("Ctrl+Space", UiStrings.TipPlay);
     }
 
     [Fact]

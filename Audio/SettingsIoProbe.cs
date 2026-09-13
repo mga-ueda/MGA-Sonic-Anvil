@@ -14,6 +14,11 @@ internal sealed class SettingsIoProbe : IDisposable
     private IWavePlayer? _output;
     private SettingsToneProvider? _tone;
     private float[] _peaks = [];
+    private float _monoPeak;
+    private float _floorBlockPeak;
+    private int _floorBlockFrames;
+    private float _floorIntervalMin;
+    private bool _floorHasMin;
     private int[] _inputMap = [];
     private int[] _outputMap = [];
     private ChannelLayout _recordLayout = ChannelLayout.Stereo;
@@ -100,6 +105,28 @@ internal sealed class SettingsIoProbe : IDisposable
             {
                 dest[n..].Clear();
             }
+        }
+    }
+
+    public float TakeMonoPeak()
+    {
+        lock (_gate)
+        {
+            var peak = _monoPeak;
+            _monoPeak = 0;
+            return peak;
+        }
+    }
+
+    public float TakeMonoFloor()
+    {
+        lock (_gate)
+        {
+            return SilentSkip.TakeFloor(
+                ref _floorBlockPeak,
+                ref _floorBlockFrames,
+                ref _floorIntervalMin,
+                ref _floorHasMin);
         }
     }
 
@@ -263,6 +290,7 @@ internal sealed class SettingsIoProbe : IDisposable
         lock (_gate)
         {
             _peaks = [];
+            ResetMonoMeters();
         }
     }
 
@@ -276,7 +304,17 @@ internal sealed class SettingsIoProbe : IDisposable
         {
             _inputMap = ChannelRouter.Normalize(inputMap, _destChannels, _sourceChannels);
             _peaks = new float[_destChannels];
+            ResetMonoMeters();
         }
+    }
+
+    private void ResetMonoMeters()
+    {
+        _monoPeak = 0;
+        _floorBlockPeak = 0;
+        _floorBlockFrames = 0;
+        _floorIntervalMin = 0;
+        _floorHasMin = false;
     }
 
     private void StartWaveIn(string? deviceId, ChannelLayout layout, int[]? inputMap)
@@ -483,6 +521,19 @@ internal sealed class SettingsIoProbe : IDisposable
                         _peaks[channel] = abs;
                     }
                 }
+
+                var mix = Math.Abs(ChannelRouter.MixMono(dest, _inputMap));
+                if (mix > _monoPeak)
+                {
+                    _monoPeak = mix;
+                }
+
+                SilentSkip.NoteFloorAbs(
+                    mix,
+                    ref _floorBlockPeak,
+                    ref _floorBlockFrames,
+                    ref _floorIntervalMin,
+                    ref _floorHasMin);
             }
         }
     }

@@ -27,6 +27,21 @@ public sealed class LevelMeterRenderTests
     }
 
     [Fact]
+    public void BarPaint_StereoUsesCyan_SurroundUsesChannelTint()
+    {
+        RunSta(() =>
+        {
+            var stereoL = LevelMeterBarPaint.Create(vertical: false, 0, 2);
+            var stereoR = LevelMeterBarPaint.Create(vertical: false, 1, 2);
+            var surroundL = LevelMeterBarPaint.Create(vertical: false, 0, 6);
+            var surroundR = LevelMeterBarPaint.Create(vertical: false, 1, 6);
+            Assert.Same(stereoL, stereoR);
+            Assert.NotSame(surroundL, surroundR);
+            Assert.NotSame(stereoL, surroundL);
+        });
+    }
+
+    [Fact]
     public void SurroundMeter_KeepsInkInsideRightEdge()
     {
         RunSta(() =>
