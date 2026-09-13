@@ -260,7 +260,7 @@ public partial class MainWindow
         try
         {
             _meter.Reset();
-            LoudnessMeter.Reset();
+            LoudnessMeter.ResetLive();
             _player.Prepare(_document, startFrame, playRange, loop: playRange is not null);
             _player.SetExitSpan(ComputeExitLayerSpan(playRange));
             _player.Play();

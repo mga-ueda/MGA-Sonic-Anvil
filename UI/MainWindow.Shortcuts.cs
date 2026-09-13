@@ -304,6 +304,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.S && modifiers == ModifierKeys.Alt)
+        {
+            SilentSkipCheck.IsChecked = SilentSkipCheck.IsChecked != true;
+            return true;
+        }
+
         if (key == Key.Enter && modifiers == ModifierKeys.None)
         {
             return PausePlaybackHere();

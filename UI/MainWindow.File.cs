@@ -691,6 +691,7 @@ public partial class MainWindow
             UiStrings.ParseLanguageChoice(settings.UiLanguage),
             UiThemes.ParseChoice(settings.UiTheme),
             settings.ResolvedLoudnessTargetLufs(),
+            settings.ResolvedSilentSkipThresholdDb(),
             settings.Mp3BitRate,
             settings.LameExePath,
             settings.LameOptions,
@@ -722,6 +723,7 @@ public partial class MainWindow
         UiThemeService.ApplyFromSettings(force: true);
         settings.ApplyDefaultFades(dialog.FadeInCurve, dialog.FadeOutCurve);
         settings.LoudnessTargetLufs = dialog.SelectedLoudnessTargetLufs;
+        settings.SilentSkipThresholdDb = dialog.SelectedSilentSkipThresholdDb;
         settings.Mp3BitRate = dialog.SelectedMp3BitRate;
         settings.LameExePath = dialog.SelectedLameExePath;
         settings.LameOptions = dialog.SelectedLameOptions;
@@ -732,6 +734,7 @@ public partial class MainWindow
         ApplyPlayerRoute();
         LoudnessMeter.ApplyTargetFromSettings();
         Waveform.LoudnessTargetLufs = settings.ResolvedLoudnessTargetLufs();
+        ApplySilentSkipFromSettings();
         RefreshSpeakerMenu();
         SyncMonitorLayout();
         ApplyOutputSettings(dialog.SelectedSettings);

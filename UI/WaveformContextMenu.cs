@@ -84,6 +84,7 @@ internal enum WaveMenuCommand
     SoloPrev,
     SoloClear,
     FocusTime,
+    SilentSkip,
     AlwaysOnTop,
     Open,
     Save,
@@ -142,6 +143,7 @@ internal sealed class WaveformContextMenuModel
     public bool CanRenameRegion { get; init; }
     public bool HasSolo { get; init; }
     public bool CenterLocked { get; init; }
+    public bool SilentSkip { get; init; }
     public bool AlwaysOnTop { get; init; }
     public bool TipsVisible { get; init; }
     public bool WaapiVisible { get; init; }
@@ -149,6 +151,8 @@ internal sealed class WaveformContextMenuModel
     public bool WaapiExportEnabled { get; init; }
     public bool CanReopenTab { get; init; }
     public bool HasMultipleTabs { get; init; }
+    public bool CanLoopPlay { get; init; }
+    public bool CanAddMarkerHere { get; init; }
     public WaveformAnalysisView AnalysisView { get; init; }
     public WaveformContextHit Hit { get; init; } = new();
 
@@ -174,6 +178,7 @@ internal sealed class WaveformContextMenuModel
         CanRenameRegion = true,
         HasSolo = true,
         CenterLocked = true,
+        SilentSkip = true,
         AlwaysOnTop = true,
         TipsVisible = true,
         WaapiVisible = true,
@@ -181,6 +186,8 @@ internal sealed class WaveformContextMenuModel
         WaapiExportEnabled = true,
         CanReopenTab = true,
         HasMultipleTabs = true,
+        CanLoopPlay = true,
+        CanAddMarkerHere = true,
         AnalysisView = WaveformAnalysisView.Waveform,
         Hit = new WaveformContextHit
         {
@@ -345,7 +352,7 @@ internal static class WaveformContextMenuBuilder
 
         items.Add(Cmd(UiStrings.WaveMenuPlayFromHere, WaveMenuCommand.PlayFromHere, enabled: m.CanNavigate));
         items.Add(Cmd(UiStrings.WaveMenuSeekHere, WaveMenuCommand.SeekHere, enabled: m.CanNavigate));
-        items.Add(Cmd(UiStrings.WaveMenuAddMarkerHere, WaveMenuCommand.AddMarkerHere, enabled: m.CanEdit));
+        items.Add(Cmd(UiStrings.WaveMenuAddMarkerHere, WaveMenuCommand.AddMarkerHere, enabled: m.CanAddMarkerHere));
         items.Add(Cmd(UiStrings.WaveMenuSelectSpanHere, WaveMenuCommand.SelectSpanHere, enabled: m.CanNavigate));
     }
 
@@ -410,7 +417,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuPauseHere, WaveMenuCommand.PauseHere, "Enter", m.IsPlaying && !m.IsBusy),
         Cmd(UiStrings.WaveMenuPreroll, WaveMenuCommand.Preroll, "Ctrl+Space", m.CanNavigate),
         Cmd(UiStrings.WaveMenuRestart, WaveMenuCommand.Restart, "Alt+Enter", m.CanNavigate),
-        Cmd(UiStrings.WaveMenuLoopPlay, WaveMenuCommand.LoopPlay, "L", m.CanNavigate),
+        Cmd(UiStrings.WaveMenuLoopPlay, WaveMenuCommand.LoopPlay, "L", m.CanLoopPlay),
         Check(UiStrings.WaveMenuPlayExit, WaveMenuCommand.PlayExit, "E", m.PlayExit, m.HasDocument && !m.IsBusy),
         WaveMenuSeparatorEntry.Instance,
         Check(UiStrings.WaveMenuRecord, WaveMenuCommand.Record, "Ctrl+R", m.IsRecording, !m.IsBusy),
@@ -446,6 +453,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuSoloClear, WaveMenuCommand.SoloClear, enabled: m.CanNavigate && m.HasSolo),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuFocusTime, WaveMenuCommand.FocusTime, "G", m.HasDocument && !m.IsBusy),
+        Check(UiStrings.WaveMenuSilentSkip, WaveMenuCommand.SilentSkip, "Alt+S", m.SilentSkip, enabled: true),
         Check(UiStrings.WaveMenuAlwaysOnTop, WaveMenuCommand.AlwaysOnTop, checkedState: m.AlwaysOnTop, enabled: true),
     ];
 

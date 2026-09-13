@@ -66,6 +66,9 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.TogglePlayback, commands);
             Assert.Contains(WaveMenuCommand.ViewSpectrogram, commands);
             Assert.Contains(WaveMenuCommand.ViewLoudness, commands);
+            Assert.Contains(WaveMenuCommand.SilentSkip, commands);
+            var silentSkip = Find(tree, WaveMenuCommand.SilentSkip);
+            Assert.Equal("Alt+S", silentSkip?.Gesture);
             Assert.Contains(WaveMenuCommand.Volume, commands);
             var volume = Find(tree, WaveMenuCommand.Volume);
             var loudness = Find(tree, WaveMenuCommand.ViewLoudness);
@@ -91,6 +94,36 @@ public sealed class WaveformContextMenuTests
         Assert.Contains(WaveMenuCommand.Manual, commands);
         Assert.DoesNotContain(WaveMenuCommand.PlayFromHere, commands);
         Assert.DoesNotContain(WaveMenuCommand.ClearMarkers, commands);
+    }
+
+    [Fact]
+    public void Build_DisablesCommandsThatCannotRun()
+    {
+        var idle = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel());
+        Assert.False(Find(idle, WaveMenuCommand.Undo)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.Cut)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.FadeIn)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.Save)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.LoopPlay)?.Enabled);
+        Assert.True(Find(idle, WaveMenuCommand.Open)?.Enabled);
+        Assert.True(Find(idle, WaveMenuCommand.Quit)?.Enabled);
+        Assert.True(Find(idle, WaveMenuCommand.Manual)?.Enabled);
+
+        var ready = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasDocument = true,
+            CanEdit = true,
+            CanNavigate = true,
+            CanAddMarkerHere = true,
+        });
+        Assert.False(Find(ready, WaveMenuCommand.Undo)?.Enabled);
+        Assert.False(Find(ready, WaveMenuCommand.Cut)?.Enabled);
+        Assert.False(Find(ready, WaveMenuCommand.LoopPlay)?.Enabled);
+        Assert.True(Find(ready, WaveMenuCommand.FadeIn)?.Enabled);
+        Assert.True(Find(ready, WaveMenuCommand.AddMarkerHere)?.Enabled);
+        Assert.True(Find(ready, WaveMenuCommand.Save)?.Enabled);
+        Assert.True(Find(ready, WaveMenuCommand.PlayExit)?.Enabled);
+        Assert.Equal("E", Find(ready, WaveMenuCommand.PlayExit)?.Gesture);
     }
 
     [Fact]

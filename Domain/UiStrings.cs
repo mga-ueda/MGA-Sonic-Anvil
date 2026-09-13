@@ -114,6 +114,11 @@ internal static partial class UiStrings
     public static string UntitledDocument => Get("untitled", "untitled");
 
     public static string LabelAlwaysOnTop => Get("Always on Top", "Always on Top");
+    public static string LabelSilentSkip => Get("Silent Skip", "Silent Skip");
+    public static string LabelSilentSkipThreshold => Get("無音しきい値（Silent Skip）", "Silence threshold (Silent Skip)");
+    public static string ErrorSilentSkipThresholdRange => Get(
+        "無音しきい値は -120 から 0 の dB で入力してください。",
+        "Enter a silence threshold between -120 and 0 dB.");
     public static string LabelAudioApi => Get("Audio API", "Audio API");
     public static string LabelAudioDevice => Get("オーディオデバイス", "Audio device");
     public static string LabelSettingsTabGeneral => Get("一般", "General");
@@ -648,8 +653,8 @@ internal static partial class UiStrings
         "再生中の全チャンネルを畳んだ LED スペクトラムです。1/3oct 相当の帯域とピークホールド。Layer Music Checker と同じ検波です。",
         "LED spectrum of every playback channel mixed together. Third-octave-style bands and peak hold, same detection as Layer Music Checker.");
     public static string TipLoudness => Get(
-        "再生出力のラウドネス（ITU-R BS.1770 / EBU R128）。Short Term・Integrated・Momentary Max、Loudness Range、True Peak。ターゲット LKFS は設定で変更。数値は青＝余裕、橙＝接近、赤＝超過（LKFS はターゲット、True Peak は 0 dBTP、Loudness Range は 20/25 LU）。停止後も最後の値を残し、再生し直すと測り直します。音声は変えません。",
-        "Playback loudness (ITU-R BS.1770 / EBU R128): Short Term, Integrated, Momentary Max, Loudness Range, True Peak. Target LKFS is in Settings. Values: blue = headroom, orange = approaching, red = over (LKFS vs target, True Peak vs 0 dBTP, Loudness Range vs 20/25 LU). Holds the last reading after stop; a new play measures again. Does not change the audio.");
+        "ラウドネス（ITU-R BS.1770 / EBU R128）。Short Term・Integrated・Momentary Max、Loudness Range、True Peak。ターゲット LKFS は設定で変更。青＝余裕、橙＝接近、赤＝超過（LKFS はターゲット、True Peak は 0 dBTP、Loudness Range は 20/25 LU）。再生中は出力のリアルタイム計測（数値が色）。停止中は波形全体のオフライン解析（Short Term はファイル内の最大。色が塗り、文字は通常色）。音声は変えません。",
+        "Loudness (ITU-R BS.1770 / EBU R128): Short Term, Integrated, Momentary Max, Loudness Range, True Peak. Target LKFS is in Settings. Blue = headroom, orange = approaching, red = over (LKFS vs target, True Peak vs 0 dBTP, Loudness Range vs 20/25 LU). While playing, values are live from the output (colored text). While stopped, they are an offline read of the whole file (max Short Term; the color fills the value, text uses the default color). Does not change the audio.");
     public static string TipVectorScope => Get(
         "再生出力の位相相関とベクターオーディオスコープです。正方形は縦が Mid、横が Side。下の数値は 1/2 の相関（+1 同相 / 0 無相関 / -1 逆相）です。3ch 以上ではサラウンドビューに切り替わり、今のスピーカー配置の位置を使います（ファイルのチャンネル名は当てません）。エネルギーは波形と同じチャンネル色で、大きさはチャンネルのレベル、輪郭の凹凸はそのチャンネルの直近の波形です（先端が今、裾が少し前）。全体の広がりをひとつのダークグレーの細線で囲みます。枠はピークを少し持ってからゆっくり戻ります。停止後は表示がゆっくり消えます。",
         "Phase correlation and a vector audio scope of the playback output. The square is Mid (vertical) and Side (horizontal). The number below is channel 1/2 correlation (+1 in phase / 0 uncorrelated / -1 inverted). Three or more channels switch to a surround view using the active speaker layout (file channel names are not inferred). Energy uses the same channel colors as the waveform. Size is channel level; the outline texture is that channel's recent waveform (the tip is now, the flanks are a few milliseconds earlier). One thin dark-gray outline wraps the overall spread. The outline holds peaks briefly, then falls slowly. After stop, the display slowly fades.");
@@ -748,6 +753,12 @@ internal static partial class UiStrings
     public static string TipAlwaysOnTop => Get(
         "ウィンドウを常に最前面へ表示します。",
         "Keep the window always on top.");
+    public static string TipSilentSkip => Get(
+        "無音区間を飛ばして再生します (Alt+S)。しきい値は設定の編集タブ（既定 -60 dB）。",
+        "Skip silent stretches during playback (Alt+S). Set the threshold on the Editing tab in Settings (default −60 dB).");
+    public static string TipSilentSkipThreshold => Get(
+        "Silent Skip で無音とみなすピーク（dBFS）。-120 から 0。既定 -60。再生位置がこの値未満なら次の音まで飛ばします。",
+        "Peak level treated as silence for Silent Skip (dBFS), from −120 to 0. Default −60. Playback jumps from below this level to the next sound.");
     public static string TipGitHub => Get(
         "GitHub リポジトリを開きます。",
         "Open the GitHub repository.");

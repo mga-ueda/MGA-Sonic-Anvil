@@ -223,6 +223,28 @@
                          Margin="8,0,0,0" />
             </Grid>
 
+            <TextBlock x:Name="SilentSkipThresholdLabel"
+                       Text="{x:Static domain:UiStrings.LabelSilentSkipThreshold}"
+                       Margin="0,0,0,3" />
+            <Grid HorizontalAlignment="Left" Margin="0,0,0,16">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="SilentSkipThresholdBox"
+                       Width="{x:Static ui:DesignMetrics.SettingsLoudnessBoxWidth}"
+                       Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                       Style="{StaticResource DarkTextBoxStyle}"
+                       Padding="6,1"
+                       FontSize="11.333"
+                       VerticalContentAlignment="Center" />
+              <TextBlock x:Name="SilentSkipThresholdUnit"
+                         Grid.Column="1"
+                         Text="{x:Static domain:UiStrings.LabelDb}"
+                         VerticalAlignment="Center"
+                         Margin="8,0,0,0" />
+            </Grid>
+
             <TextBlock x:Name="FadeDefaultsHeader"
                        Text="{x:Static domain:UiStrings.LabelFadeCurveDefaults}"
                        FontWeight="Bold"

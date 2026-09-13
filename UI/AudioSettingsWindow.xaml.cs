@@ -31,6 +31,8 @@ internal partial class AudioSettingsWindow : Window
 
     public double SelectedLoudnessTargetLufs { get; private set; }
 
+    public double SelectedSilentSkipThresholdDb { get; private set; }
+
     public int SelectedMp3BitRate { get; private set; }
 
     public string SelectedLameExePath { get; private set; } = string.Empty;
@@ -72,6 +74,7 @@ internal partial class AudioSettingsWindow : Window
         UiLanguageChoice language,
         UiThemeChoice theme,
         double loudnessTargetLufs,
+        double silentSkipThresholdDb,
         int mp3BitRate,
         string lameExePath,
         string lameOptions,
@@ -84,6 +87,7 @@ internal partial class AudioSettingsWindow : Window
         SelectedLanguage = language;
         SelectedTheme = theme;
         SelectedLoudnessTargetLufs = LoudnessMeterEngine.ClampTargetLufs(loudnessTargetLufs);
+        SelectedSilentSkipThresholdDb = SilentSkip.ClampThresholdDb(silentSkipThresholdDb);
         SelectedMp3BitRate = Mp3Encode.ClampWindowsBitRate(mp3BitRate);
         SelectedLameExePath = lameExePath ?? string.Empty;
         SelectedLameOptions = lameOptions ?? string.Empty;
@@ -149,6 +153,7 @@ internal partial class AudioSettingsWindow : Window
         LoadSpeakerEditors(FindPreset(SelectedActiveSpeakerId) ?? _presets[0], releaseDevice: false);
         RebuildRouting();
         LoudnessTargetBox.Text = SelectedLoudnessTargetLufs.ToString("0.#", CultureInfo.InvariantCulture);
+        SilentSkipThresholdBox.Text = SelectedSilentSkipThresholdDb.ToString("0.#", CultureInfo.InvariantCulture);
         FillWindowsBitRates(SelectedMp3BitRate);
         LamePathBox.Text = SelectedLameExePath;
         LameOptionsBox.Text = Mp3Encode.ResolveLameOptions(SelectedLameOptions);
@@ -195,6 +200,9 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(LoudnessTargetLabel, UiStrings.TipLoudnessTarget);
         TipService.Set(LoudnessTargetBox, UiStrings.TipLoudnessTarget);
         TipService.Set(LoudnessTargetUnit, UiStrings.TipLoudnessTarget);
+        TipService.Set(SilentSkipThresholdLabel, UiStrings.TipSilentSkipThreshold);
+        TipService.Set(SilentSkipThresholdBox, UiStrings.TipSilentSkipThreshold);
+        TipService.Set(SilentSkipThresholdUnit, UiStrings.TipSilentSkipThreshold);
         TipService.Set(FadeDefaultsHeader, UiStrings.TipFadeCurveDefaults);
         TipService.Set(Mp3Header, UiStrings.TipMp3Encode);
         TipService.Set(WindowsBitRateLabel, UiStrings.TipWindowsMp3BitRate);
@@ -376,6 +384,20 @@ internal partial class AudioSettingsWindow : Window
         }
 
         SelectedLoudnessTargetLufs = target;
+        if (!SilentSkip.TryParseThresholdDb(SilentSkipThresholdBox.Text, out var silenceDb))
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorSilentSkipThresholdRange,
+                UiStrings.DialogSettingsTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            SilentSkipThresholdBox.Focus();
+            SilentSkipThresholdBox.SelectAll();
+            return;
+        }
+
+        SelectedSilentSkipThresholdDb = silenceDb;
         SelectedMp3BitRate = WindowsBitRateCombo.SelectedItem is BitRateItem bitRate
             ? bitRate.Kbps
             : Mp3Encode.DefaultWindowsBitRateKbps;

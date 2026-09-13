@@ -114,6 +114,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private int _loudCount;
     private bool _silenceOnly;
     private bool _paused;
+    private bool _silentSkip;
+    private float _silentSkipLinear = SilentSkip.LinearFromDb(SilentSkip.DefaultThresholdDb);
     private int _flushFadeRemaining;
     private int _flushFadeTotal;
 
@@ -552,6 +554,15 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
+    public void SetSilentSkip(bool enabled, double thresholdDb)
+    {
+        lock (_gate)
+        {
+            _silentSkip = enabled;
+            _silentSkipLinear = SilentSkip.LinearFromDb(thresholdDb);
+        }
+    }
+
     public void CaptureScrub(AudioDocument document, long frame)
     {
         _scrub.Bind(document);
@@ -766,6 +777,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 break;
             }
 
+            if (TrySkipSilenceNoLock(srcCh, _cursor / srcCh))
+            {
+                continue;
+            }
+
             var frames = Math.Min(framesWanted - writtenFrames, (_playEnd - _cursor) / srcCh);
             if (frames <= 0)
             {
@@ -775,6 +791,18 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
             for (var i = 0; i < frames; i++)
             {
+                if (i > 0
+                    && _silentSkip
+                    && SilentSkip.IsFrameSilent(
+                        _samples,
+                        srcCh,
+                        _cursor / srcCh,
+                        _silentSkipLinear,
+                        _soloMask))
+                {
+                    break;
+                }
+
                 EmitSourceFrame(buffer, offset, writtenFrames, srcCh, outCh, _cursor, _cursor / srcCh);
                 _cursor += srcCh;
                 writtenFrames++;
@@ -814,6 +842,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 break;
             }
 
+            if (TrySkipSilenceNoLock(srcCh, (long)Math.Floor(_sourceFrame)))
+            {
+                continue;
+            }
+
             // ホールドだと折り返しイメージ（ジャリつく偽の高域）が乗る。帯域制限補間で再構成する。
             FormatConvert.ResampleFrameBandlimited(
                 _samples,
@@ -833,6 +866,73 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _cursor = checked((int)Math.Clamp(_sourceFrame, 0, frameCount) * srcCh);
         MixExitLayer(buffer, offset, exitMixedFrames, writtenFrames, srcCh, outCh, resampled: true);
         return writtenFrames;
+    }
+
+    /// <returns>カーソルを動かした（続きの判定が必要）。</returns>
+    private bool TrySkipSilenceNoLock(int srcCh, long start)
+    {
+        if (!_silentSkip || _samples.Length == 0)
+        {
+            return false;
+        }
+
+        var end = srcCh <= 0 ? 0 : _playEnd / srcCh;
+        if (start < 0 || start >= end)
+        {
+            return false;
+        }
+
+        if (!SilentSkip.IsFrameSilent(_samples, srcCh, start, _silentSkipLinear, _soloMask))
+        {
+            return false;
+        }
+
+        var next = SilentSkip.FindNextAudible(
+            _samples,
+            srcCh,
+            start,
+            end,
+            _silentSkipLinear,
+            _soloMask);
+        if (next < end)
+        {
+            ApplySilentSkipJump(next, srcCh, wrapped: false);
+            return true;
+        }
+
+        if (_loop && _playEnd > _loopStart)
+        {
+            var loopStart = _loopStart / (double)srcCh;
+            var wrap = SilentSkip.FindNextAudible(
+                _samples,
+                srcCh,
+                (long)loopStart,
+                end,
+                _silentSkipLinear,
+                _soloMask);
+            if (wrap < end)
+            {
+                ApplySilentSkipJump(wrap, srcCh, wrapped: true);
+                return true;
+            }
+
+            return false;
+        }
+
+        ApplySilentSkipJump(end, srcCh, wrapped: false);
+        Ended = true;
+        return true;
+    }
+
+    private void ApplySilentSkipJump(long frame, int srcCh, bool wrapped)
+    {
+        _sourceFrame = frame;
+        _cursor = checked((int)frame * srcCh);
+        _exitPlaying = false;
+        if (wrapped)
+        {
+            BeginExitOnLoopWrapNoLock();
+        }
     }
 
     /// <summary>

@@ -59,6 +59,12 @@ internal sealed class AppSettings
 
     public bool AlwaysOnTop { get; set; }
 
+    /// <summary>再生で無音区間を飛ばす。既定オフ。</summary>
+    public bool SilentSkip { get; set; }
+
+    /// <summary>Silent Skip の無音しきい値（dBFS）。既定 -60。</summary>
+    public double SilentSkipThresholdDb { get; set; } = global::MgaSonicAnvil.Audio.SilentSkip.DefaultThresholdDb;
+
     public int WindowX { get; set; }
 
     public int WindowY { get; set; }
@@ -184,6 +190,9 @@ internal sealed class AppSettings
 
     public double ResolvedLoudnessTargetLufs() =>
         LoudnessMeterEngine.ClampTargetLufs(LoudnessTargetLufs);
+
+    public double ResolvedSilentSkipThresholdDb() =>
+        global::MgaSonicAnvil.Audio.SilentSkip.ClampThresholdDb(SilentSkipThresholdDb);
 
     public SpeakerPreset ResolvedSpeaker()
     {

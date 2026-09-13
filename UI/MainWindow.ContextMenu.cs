@@ -77,6 +77,7 @@ public partial class MainWindow
                 && (Waveform.HasSelectedRegions || document.Regions.Count > 0),
             HasSolo = (_activeSession?.SoloMask ?? 0) != 0,
             CenterLocked = Waveform.CenterLocked,
+            SilentSkip = SilentSkipCheck.IsChecked == true,
             AlwaysOnTop = AlwaysOnTopCheck.IsChecked == true,
             TipsVisible = AppStorage.Settings.ShowTips,
             WaapiVisible = _waapiPanelVisible,
@@ -84,6 +85,11 @@ public partial class MainWindow
             WaapiExportEnabled = WaapiBar.ExportEnabled,
             CanReopenTab = _workspace.ClosedTabs.Count > 0,
             HasMultipleTabs = _sessions.Count > 1,
+            CanLoopPlay = canNavigate
+                && (hasSelection
+                    || !document!.SampleLoop.IsEmpty
+                    || document.TryGetRoleSpan(MarkerRole.Loop, Waveform.PlayheadFrame, out _)),
+            CanAddMarkerHere = canEdit && !document!.HasMarkerAt(hit.Frame),
             AnalysisView = Waveform.AnalysisView,
             Hit = hit,
         };
@@ -310,6 +316,9 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.FocusTime:
                 StatusTimes.FocusCurrentTime();
+                break;
+            case WaveMenuCommand.SilentSkip:
+                SilentSkipCheck.IsChecked = SilentSkipCheck.IsChecked != true;
                 break;
             case WaveMenuCommand.AlwaysOnTop:
                 AlwaysOnTopCheck.IsChecked = AlwaysOnTopCheck.IsChecked != true;

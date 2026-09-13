@@ -155,6 +155,9 @@ internal sealed class AudioPlayer : IDisposable
 
     public void SetSoloMask(int mask) => _provider.SetSoloMask(mask);
 
+    public void SetSilentSkip(bool enabled, double thresholdDb) =>
+        _provider.SetSilentSkip(enabled, thresholdDb);
+
     public void ReleaseOutput()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

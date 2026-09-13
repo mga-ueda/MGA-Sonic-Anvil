@@ -116,6 +116,8 @@ public partial class MainWindow : Window
         UiThemeService.Changed += (_, _) => Dispatcher.BeginInvoke(ApplyUiColors);
         AlwaysOnTopCheck.IsChecked = AppStorage.Settings.AlwaysOnTop;
         Topmost = AppStorage.Settings.AlwaysOnTop;
+        SilentSkipCheck.IsChecked = AppStorage.Settings.SilentSkip;
+        ApplySilentSkipFromSettings();
 
         Transport.CommandInvoked += (_, command) => ExecuteTransport(command);
         StatusTimes.CurrentCommitted += (_, frame) =>
@@ -411,6 +413,7 @@ public partial class MainWindow : Window
             Transport.SetCommandsEnabled(_document is not null);
             ExtinguishMeter();
             SyncMonitorLayout();
+            LoudnessMeter.Document = _document;
             LoudnessMeter.Reset();
             RebuildTabBar();
             RefreshTitle();
@@ -454,6 +457,8 @@ public partial class MainWindow : Window
         TipService.Set(BrandLogo, UiStrings.TipBrandLogo, respectsEnabled: false);
         AlwaysOnTopCheck.Content = UiStrings.LabelAlwaysOnTop;
         TipService.Set(AlwaysOnTopCheck, UiStrings.TipAlwaysOnTop);
+        SilentSkipCheck.Content = UiStrings.LabelSilentSkip;
+        TipService.Set(SilentSkipCheck, UiStrings.TipSilentSkip);
         StatusTimes.ApplyLocalizedText();
         TipService.Set(StatusMeta, UiStrings.TipStatusFormat);
         TipService.Set(Overview, UiStrings.TipOverview);
@@ -833,6 +838,25 @@ public partial class MainWindow : Window
 
         AppStorage.Settings.AlwaysOnTop = enabled;
         AppStorage.Save();
+    }
+
+    private void SilentSkipCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        ApplySilentSkipFromSettings();
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        AppStorage.Settings.SilentSkip = SilentSkipCheck.IsChecked == true;
+        AppStorage.Save();
+    }
+
+    private void ApplySilentSkipFromSettings()
+    {
+        _player.SetSilentSkip(
+            SilentSkipCheck.IsChecked == true,
+            AppStorage.Settings.ResolvedSilentSkipThresholdDb());
     }
 
     private void BrandLicenseHost_LinkClick(object sender, BrandLicenseLinkClickEventArgs e)
