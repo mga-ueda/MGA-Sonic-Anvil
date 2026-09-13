@@ -72,6 +72,8 @@ public partial class MainWindow
     private string? _openStatusText;
     private double _openStatusRatio;
     private readonly List<string> _queuedOpenPaths = [];
+    private string[] _openJobNames = [];
+    private double[] _openJobProgress = [];
     private DispatcherTimer? _waveformLoadingHint;
     private const int WaveformLoadingHintMs = 300;
 
@@ -125,7 +127,7 @@ public partial class MainWindow
         DocumentSession? opened = null;
         DocumentSession? existingFirst = null;
         List<string>? errors = null;
-        BeginOpenWork(targets.Count);
+        BeginOpenWork(targets.Select(path => Path.GetFileName(path) ?? path).ToArray());
         try
         {
             for (var i = 0; i < targets.Count; i++)
@@ -134,12 +136,18 @@ public partial class MainWindow
                 if (showProgress)
                 {
                     SetOpenStatus(i + 1, targets.Count, Path.GetFileName(path));
+                    SetOpenJobRunning(i);
                 }
 
                 var existing = FindSessionByPath(path);
                 if (existing is not null)
                 {
                     existingFirst ??= existing;
+                    if (showProgress)
+                    {
+                        SetOpenJobDone(i);
+                    }
+
                     continue;
                 }
 
@@ -164,6 +172,11 @@ public partial class MainWindow
                 {
                     errors ??= [];
                     errors.Add($"{Path.GetFileName(path)}: {ex.Message}");
+                }
+
+                if (showProgress)
+                {
+                    SetOpenJobDone(i);
                 }
             }
 
@@ -208,13 +221,23 @@ public partial class MainWindow
         }
     }
 
-    private void BeginOpenWork(int targetCount)
+    private void BeginOpenWork(IReadOnlyList<string> displayNames)
     {
+        var targetCount = displayNames.Count;
         _openBusy = targetCount > 0;
+        _openJobNames = displayNames.ToArray();
+        _openJobProgress = new double[targetCount];
         RefreshExportEnabled();
         StopWaveformLoadingHint(hide: false);
         if (targetCount <= 0)
         {
+            return;
+        }
+
+        if (targetCount > 1)
+        {
+            ShowOpenBusyGlass();
+            ApplyOpenBusyGlass();
             return;
         }
 
@@ -251,14 +274,74 @@ public partial class MainWindow
     {
         _openBusy = false;
         StopWaveformLoadingHint(hide: true);
+        _openJobNames = [];
+        _openJobProgress = [];
         if (showProgress)
         {
             ClearOpenStatus();
+            _busyGlass.BeginFadeOut();
         }
         else
         {
             RefreshExportEnabled();
         }
+    }
+
+    private void SetOpenJobRunning(int index)
+    {
+        if ((uint)index >= (uint)_openJobProgress.Length)
+        {
+            return;
+        }
+
+        for (var i = 0; i < index; i++)
+        {
+            _openJobProgress[i] = 1;
+        }
+
+        _openJobProgress[index] = Math.Max(_openJobProgress[index], 0.08);
+        ApplyOpenBusyGlass();
+    }
+
+    private void SetOpenJobDone(int index)
+    {
+        if ((uint)index >= (uint)_openJobProgress.Length)
+        {
+            return;
+        }
+
+        _openJobProgress[index] = 1;
+        ApplyOpenBusyGlass();
+    }
+
+    private void ApplyOpenBusyGlass()
+    {
+        if (!_busyGlass.IsShowingBusy || _openJobNames.Length == 0)
+        {
+            return;
+        }
+
+        var finished = 0;
+        var jobs = new ExportJobProgress[_openJobNames.Length];
+        for (var i = 0; i < _openJobNames.Length; i++)
+        {
+            var progress = i < _openJobProgress.Length ? _openJobProgress[i] : 0;
+            if (progress >= 1)
+            {
+                finished++;
+            }
+
+            jobs[i] = new ExportJobProgress(_openJobNames[i], progress);
+        }
+
+        var overall = jobs.Length == 0
+            ? 0
+            : jobs.Sum(job => job.Progress) / jobs.Length;
+        _busyGlass.SetExportView(
+            overall,
+            UiStrings.OverlayExportCount(finished, jobs.Length),
+            jobs);
+        Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
     }
 
     private void SetOpenStatus(int current, int total, string name)
@@ -862,7 +945,7 @@ public partial class MainWindow
         var restored = new List<(int SourceIndex, DocumentSession Session)>();
         var activeIndex = DocumentSessionStore.ResolveActiveIndex(docs, settings.ActiveDocumentIndex);
         var showProgress = docs.Length > 1;
-        BeginOpenWork(docs.Length);
+        BeginOpenWork(docs.Select(SnapshotDisplayName).ToArray());
         try
         {
             for (var i = 0; i < docs.Length; i++)
@@ -870,11 +953,17 @@ public partial class MainWindow
                 if (showProgress)
                 {
                     SetOpenStatus(i + 1, docs.Length, SnapshotDisplayName(docs[i]));
+                    SetOpenJobRunning(i);
                 }
 
                 var session = await TryRestoreSessionAsync(docs[i]).ConfigureAwait(true);
                 if (session is null)
                 {
+                    if (showProgress)
+                    {
+                        SetOpenJobDone(i);
+                    }
+
                     continue;
                 }
 
@@ -883,6 +972,7 @@ public partial class MainWindow
                 if (showProgress)
                 {
                     PumpUiAfterOpen();
+                    SetOpenJobDone(i);
                 }
             }
 

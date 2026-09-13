@@ -96,11 +96,20 @@ internal static partial class UiStrings
 
     public const string AppName = AppVersion.ProductName;
 
-    public static string CopyrightText => Get(
-        "© 2026 " + AppVersion.CompanyName + "  ",
-        "© 2026 " + AppVersion.CompanyName + "  ");
+    /// <summary>フッタ権利表記。リンク文言と Wwise 商標行は IM Importer と同様に常に英語。</summary>
+    public static string CopyrightText =>
+        "© 2026 " + AppVersion.CompanyName + "  " + CopyrightGitHub
+        + " / " + CopyrightMitLink + " / " + CopyrightLameLink
+        + "\n" + CopyrightWwiseLine;
 
-    public static string CopyrightGitHub => Get("GitHub", "GitHub");
+    public const string CopyrightGitHub = "GitHub";
+
+    public const string CopyrightWwiseLine =
+        "Wwise® and Audiokinetic® are trademarks of Audiokinetic Inc.";
+
+    public const string CopyrightMitLink = "MIT License";
+
+    public const string CopyrightLameLink = "LAME";
 
     public static string UntitledDocument => Get("untitled", "untitled");
 
@@ -401,6 +410,7 @@ internal static partial class UiStrings
         "Enter a loudness target between -70 and 0 LKFS.");
     public static string OverlaySampleRateConvert => Get("サンプリングレート変換", "Sample rate conversion");
     public static string OverlayPitchShift => Get("ピッチシフト", "Pitch shift");
+    public static string OverlayOpening => Get("読み込んでいます", "Opening");
     public static string OverlayExportWave => Get("Wave を書き出しています", "Exporting Wave");
     public static string OverlayExportMp3 => Get("MP3 を書き出しています", "Exporting MP3");
     public static string OverlayExportCount(int finished, int total) => Format(
@@ -468,12 +478,13 @@ internal static partial class UiStrings
     public static string TooltipSetRegion => Get("選択をリージョンに (Shift+R)", "Set selection as region (Shift+R)");
     public static string TooltipOpen => Get("開く (Ctrl+O)", "Open (Ctrl+O)");
     public static string TooltipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)", "Save As (Ctrl+Shift+S)");
-    public static string TooltipAnalysisView => Get("スペクトログラム / 重ね (A)  解除 (Shift+A)", "Spectrogram / overlay (A)  leave (Shift+A)");
-    public static string TooltipSpectrogramView => Get("スペクトログラム / 重ね (A)  解除 (Shift+A)", "Spectrogram / overlay (A)  leave (Shift+A)");
-    public static string TooltipLoudnessView => Get("ラウドネス (V)  解除 (Shift+V)", "Loudness (V)  leave (Shift+V)");
+    public static string TooltipAnalysisView => Get("スペクトログラム / 重ね (A)  解除 (Shift+A / Shift+V)", "Spectrogram / overlay (A)  leave (Shift+A / Shift+V)");
+    public static string TooltipSpectrogramView => Get("スペクトログラム / 重ね (A)  解除 (Shift+A / Shift+V)", "Spectrogram / overlay (A)  leave (Shift+A / Shift+V)");
+    public static string TooltipLoudnessView => Get("ラウドネス (V)  解除 (Shift+A / Shift+V)", "Loudness (V)  leave (Shift+A / Shift+V)");
     public static string TooltipCenterPlayhead => Get("中央寄せ / センターロック (Z)", "Center / center-lock (Z)");
     public static string TooltipHistory => Get("編集履歴 (U)", "Edit history (U)");
     public static string TooltipUiThemeToggle => Get("ダーク / ライト", "Dark / Light");
+    public static string TooltipColorPanel => Get("色設定 (Ctrl+Shift+C)", "Color settings (Ctrl+Shift+C)");
 
     public static string TipJumpToTime => Get("時間へ移動 (G)", "Focus time (G)");
     public static string TipPreviousPage => Get("表示の約 5% 戻る (PageUp)", "Back about 5% of the view (PageUp)");
@@ -494,20 +505,23 @@ internal static partial class UiStrings
     public static string TipSetRegion => Get("選択をリージョンに (Shift+R)\n同じ範囲で繰り返すと分割", "Set selection as region (Shift+R)\nRepeat on the same range to split");
     public static string TipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)", "Save As (Ctrl+Shift+S)");
     public static string TipAnalysisView => Get(
-        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Shift+A。ボタンは 3 回で波形に戻る。暗部持ち上げは左端のバーまたは Alt+↑／↓",
-        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Shift+A returns to the waveform. The button returns to the waveform on the third click. Lift dark energy with the left bar or Alt+↑ / ↓");
+        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Shift+A または Shift+V（今の表示にかかわらず波形へ）。ボタンは 3 回で波形に戻る。暗部持ち上げは左端のバーまたは Alt+↑／↓",
+        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Shift+A or Shift+V returns to the waveform from any view. The button returns to the waveform on the third click. Lift dark energy with the left bar or Alt+↑ / ↓");
     public static string TipSpectrogramView => Get(
-        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Shift+A。ボタンは 3 回で波形に戻る。暗部持ち上げは左端のバーまたは Alt+↑／↓",
-        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Shift+A returns to the waveform. The button returns to the waveform on the third click. Lift dark energy with the left bar or Alt+↑ / ↓");
+        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Shift+A または Shift+V（今の表示にかかわらず波形へ）。ボタンは 3 回で波形に戻る。暗部持ち上げは左端のバーまたは Alt+↑／↓",
+        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Shift+A or Shift+V returns to the waveform from any view. The button returns to the waveform on the third click. Lift dark energy with the left bar or Alt+↑ / ↓");
     public static string TipLoudnessView => Get(
-        "ラウドネス表示 (V)\nV で曲線と音量入力を開く。抜けるのは Shift+V。ボタンは表示のオン／オフ",
-        "Loudness view (V)\nV shows the curve and opens volume input. Shift+V returns to the waveform. The button toggles the view only");
+        "ラウドネス表示 (V)\nV で曲線と音量入力を開く。抜けるのは Shift+A または Shift+V（今の表示にかかわらず波形へ）。ボタンは表示のオン／オフ",
+        "Loudness view (V)\nV shows the curve and opens volume input. Shift+A or Shift+V returns to the waveform from any view. The button toggles the view only");
     public static string TipCenterPlayhead => Get(
         "中央寄せ (Z / .)\n再生中はセンターロックの切替",
         "Center (Z / .)\nToggles center-lock while playing");
     public static string TipUiThemeToggle => Get(
         "ダークとライトを切り替えます。設定の配色は明示的な Dark / Light になります（Auto は外れます）。",
         "Switch Dark and Light. Settings theme becomes an explicit Dark / Light (Auto is cleared).");
+    public static string TipColorPanel => Get(
+        "色設定 (Ctrl+Shift+C)\n今のモードの色を調整します。タイトルにダークモード／ライトモードを出します。",
+        "Color settings (Ctrl+Shift+C)\nTune colors for the current mode. The title shows Dark mode or Light mode.");
 
     public static string LabelWaveformLane(int number) =>
         Get($"Ch{number}", $"Ch{number}");
@@ -697,8 +711,11 @@ internal static partial class UiStrings
         "時間縮小 (↓)",
         "Zoom out time (↓)");
     public static string TipCopyright => Get(
-        "© MIYABI GAME AUDIO INC. MIT License。",
-        "© MIYABI GAME AUDIO INC. MIT License.");
+        "© MIYABI GAME AUDIO INC. MIT License で公開。GitHub はリポジトリ、MIT License は全文、LAME は公式サイト。LAME は同梱せず、設定の lame.exe だけを呼びます（LGPL。入手と遵守は利用者側）。Wwise®／Audiokinetic® は Audiokinetic Inc. の商標。非公式。WAAPI には有効な Wwise ライセンスが必要です。",
+        "© MIYABI GAME AUDIO INC. Released under the MIT License. GitHub opens the repository, MIT License the full text, LAME the project site. LAME is not bundled; only a user-supplied lame.exe is run (LGPL; obtaining it and complying is the user’s responsibility). Wwise® / Audiokinetic® are trademarks of Audiokinetic Inc. This tool is unofficial. WAAPI requires a valid Wwise license.");
+    public static string TipBrandLogo => Get(
+        "MIYABI GAME AUDIO のウェブサイトを開きます。",
+        "Open the MIYABI GAME AUDIO website.");
     public static string TipEditHistory => Get(
         "編集履歴 (U)。↑↓ で移動、Enter／X／外側クリックで確定、Esc でキャンセル。履歴エリアのクリックでも閉じる。Ctrl+クリック／Shift+↑↓ で選択、Ctrl+C でコピー、別ファイルで Ctrl+V。セーブせず終了しても、戻せる操作は次回起動時に履歴へ戻す。",
         "Edit history (U). ↑↓ move, Enter / X / click outside apply, Esc cancel. Click the history strip to close. Ctrl+click / Shift+↑↓ select, Ctrl+C copy, Ctrl+V in another file. Replayable edits also come back after a restart without saving.");

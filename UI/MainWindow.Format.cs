@@ -501,6 +501,9 @@ public partial class MainWindow
         }
     }
 
+    private void ShowOpenBusyGlass() =>
+        ShowBusyGlass(UiStrings.OverlayOpening);
+
     private void ShowSampleRateBusyGlass() =>
         ShowBusyGlass(UiStrings.OverlaySampleRateConvert);
 
