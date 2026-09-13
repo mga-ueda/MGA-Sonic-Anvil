@@ -68,14 +68,22 @@ internal sealed class AudioPlayer : IDisposable
                 return raw;
             }
 
+            var speed = _provider.PlaybackSpeed;
             if (raw != _smoothRawFrame)
             {
-                var jumpedBack = raw < _smoothRawFrame;
+                var delta = raw - _smoothRawFrame;
+                var discontinuity = speed < 0 ? delta > 0 : delta < 0;
+                var maxStep = (long)(_provider.SourceSampleRate * 0.25 * Math.Max(1, Math.Abs(speed)));
+                if (Math.Abs(delta) > maxStep)
+                {
+                    discontinuity = true;
+                }
+
                 _smoothRawFrame = raw;
                 _smoothStampTicks = now;
-                if (jumpedBack)
+                if (discontinuity)
                 {
-                    // ループ折り返し・巻き戻しシークは追いかけず即座に反映する。
+                    // ループ折り返し・大きなシークは追いかけず即座に反映する。
                     _smoothShownFrame = raw;
                     return raw;
                 }
@@ -85,11 +93,27 @@ internal sealed class AudioPlayer : IDisposable
             var elapsedSec = Math.Min(
                 0.08,
                 (now - _smoothStampTicks) / (double)System.Diagnostics.Stopwatch.Frequency);
-            var value = _smoothRawFrame + (long)(elapsedSec * _provider.SourceSampleRate);
-            // 生カーソル更新の直後に外挿分だけ戻って見えないよう単調性を保つ。
-            if (_smoothShownFrame >= 0 && value < _smoothShownFrame)
+            var value = _smoothRawFrame
+                + (long)(elapsedSec * _provider.SourceSampleRate * speed);
+            // 生カーソル更新の直後に外挿分だけ戻って見えないよう、進行方向の単調性を保つ。
+            if (_smoothShownFrame >= 0)
             {
-                value = _smoothShownFrame;
+                if (speed < 0)
+                {
+                    if (value > _smoothShownFrame)
+                    {
+                        value = _smoothShownFrame;
+                    }
+                }
+                else if (value < _smoothShownFrame)
+                {
+                    value = _smoothShownFrame;
+                }
+            }
+
+            if (value < 0)
+            {
+                value = 0;
             }
 
             _smoothShownFrame = value;
@@ -157,6 +181,22 @@ internal sealed class AudioPlayer : IDisposable
 
     public void SetSilentSkip(bool enabled, double thresholdDb) =>
         _provider.SetSilentSkip(enabled, thresholdDb);
+
+    public double PlaybackSpeed => _provider.PlaybackSpeed;
+
+    /// <summary>
+    /// 再生速度。出力を止めずに切り替える。速度が変わったときだけ外挿の起点を更新する。
+    /// </summary>
+    public void SetPlaybackSpeed(double speed)
+    {
+        if (!_provider.SetPlaybackSpeed(speed))
+        {
+            return;
+        }
+
+        _smoothRawFrame = _provider.CursorFrame;
+        _smoothStampTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+    }
 
     public void ReleaseOutput()
     {
@@ -437,6 +477,7 @@ internal sealed class AudioPlayer : IDisposable
             }
         }
 
+        _provider.SetPlaybackSpeed(1);
         _playing = false;
     }
 
@@ -444,6 +485,7 @@ internal sealed class AudioPlayer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _playing = false;
+        _provider.SetPlaybackSpeed(1);
 
         // ASIO はデバイスを止めず無音ゲートで洗い流す（Pause と同じ）。
         // driver.Stop → Start は旧バッファの再生や HasReachedEnd の残留を招く。

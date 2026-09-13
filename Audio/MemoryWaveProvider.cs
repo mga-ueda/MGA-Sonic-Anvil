@@ -116,8 +116,19 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private bool _paused;
     private bool _silentSkip;
     private float _silentSkipLinear = SilentSkip.LinearFromDb(SilentSkip.DefaultThresholdDb);
+    /// <summary>再生ヘッドの進行倍率。1 / <see cref="FastSpeed"/> / -<see cref="FastSpeed"/>。</summary>
+    private double _playbackSpeed = 1;
+    private bool _shuttlePrimed;
+    private bool _shuttleFadeIn;
+    private double _shuttleOrigin;
+    private double _shuttleRead;
     private int _flushFadeRemaining;
     private int _flushFadeTotal;
+
+    /// <summary>再生中 Shift でシークバーを進める倍率（ピッチ据え置き）。</summary>
+    internal const double FastSpeed = 3;
+    private const double ShuttleGrainSeconds = 0.03;
+    private const double ShuttleTaperSeconds = 0.004;
 
     public WaveFormat WaveFormat { get; private set; } =
         WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
@@ -269,6 +280,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _flushFadeRemaining = 0;
             _flushFadeTotal = 0;
             _exitPlaying = false;
+            _shuttlePrimed = false;
             _exitSpanStartFrame = -1;
             _exitSpanEndFrame = -1;
             if (playRange is { IsEmpty: false } range)
@@ -518,6 +530,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _cursor = checked((int)next * _channels);
             // シークでジャンプしたら進行中の Exit 二重再生は直ちに止める（IM Importer と同じ）。
             _exitPlaying = false;
+            _shuttlePrimed = false;
             Ended = false;
         }
     }
@@ -561,6 +574,59 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _silentSkip = enabled;
             _silentSkipLinear = SilentSkip.LinearFromDb(thresholdDb);
         }
+    }
+
+    public double PlaybackSpeed
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _playbackSpeed;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 再生速度。出力を止めずに切り替える。1 / <see cref="FastSpeed"/> / -<see cref="FastSpeed"/>。
+    /// </summary>
+    /// <returns>値が変わったとき true。</returns>
+    public bool SetPlaybackSpeed(double speed)
+    {
+        var next = 1d;
+        if (speed <= -1.5)
+        {
+            next = -FastSpeed;
+        }
+        else if (speed > 1.5)
+        {
+            next = FastSpeed;
+        }
+
+        lock (_gate)
+        {
+            if (Math.Abs(_playbackSpeed - next) < 1e-12)
+            {
+                return false;
+            }
+
+            _playbackSpeed = next;
+            _shuttlePrimed = false;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// 左右 Shift の状態から再生速度を決める。両方で巻き戻し、片方で早送り。
+    /// </summary>
+    internal static double SpeedFromShiftKeys(bool leftShift, bool rightShift, bool otherModifiers)
+    {
+        if (otherModifiers || !(leftShift || rightShift))
+        {
+            return 1;
+        }
+
+        return leftShift && rightShift ? -FastSpeed : FastSpeed;
     }
 
     public void CaptureScrub(AudioDocument document, long frame)
@@ -706,9 +772,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var srcCh = Math.Max(1, _channels);
         var outCh = Math.Max(1, _outputChannels);
         var framesWanted = count / outCh;
-        var writtenFrames = _sourceRate == _deviceRate
+        var writtenFrames = UsesNativeRead()
             ? ReadCoreNative(buffer, offset, framesWanted, srcCh, outCh)
-            : ReadCoreResampled(buffer, offset, framesWanted, srcCh, outCh);
+            : UsesShuttleRead()
+                ? ReadCoreShuttle(buffer, offset, framesWanted, srcCh, outCh)
+                : ReadCoreResampled(buffer, offset, framesWanted, srcCh, outCh);
         var written = writtenFrames * outCh;
         if (_flushFadeTotal > 0 && written < count)
         {
@@ -718,6 +786,15 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
         return written;
     }
+
+    private bool UsesNativeRead() =>
+        _sourceRate == _deviceRate && Math.Abs(_playbackSpeed - 1d) < 1e-9;
+
+    private bool UsesShuttleRead() =>
+        Math.Abs(_playbackSpeed - 1d) > 1e-9;
+
+    private double PlaybackStep(bool resampled) =>
+        (resampled ? _sourceRate / (double)_deviceRate : 1d) * _playbackSpeed;
 
     private void ApplyFlushFade(float[] buffer, int offset, int count)
     {
@@ -819,7 +896,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var playEndFrame = srcCh <= 0 ? 0 : _playEnd / (double)srcCh;
         var loopStartFrame = srcCh <= 0 ? 0 : _loopStart / (double)srcCh;
         var frameCount = srcCh <= 0 ? 0 : _samples.Length / srcCh;
-        var step = _sourceRate / (double)_deviceRate;
+        var step = PlaybackStep(resampled: true);
         var writtenFrames = 0;
         var exitMixedFrames = 0;
         Span<float> frame = stackalloc float[ChannelLayout.MaxChannels];
@@ -866,6 +943,133 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _cursor = checked((int)Math.Clamp(_sourceFrame, 0, frameCount) * srcCh);
         MixExitLayer(buffer, offset, exitMixedFrames, writtenFrames, srcCh, outCh, resampled: true);
         return writtenFrames;
+    }
+
+    /// <summary>
+    /// ピッチ据え置きの早送り／巻き戻し。グレインを原速で出し、ヘッドだけ倍速で動かす。
+    /// </summary>
+    private int ReadCoreShuttle(float[] buffer, int offset, int framesWanted, int srcCh, int outCh)
+    {
+        var playEndFrame = srcCh <= 0 ? 0 : _playEnd / (double)srcCh;
+        var loopStartFrame = srcCh <= 0 ? 0 : _loopStart / (double)srcCh;
+        var frameCount = srcCh <= 0 ? 0 : _samples.Length / srcCh;
+        var step = PlaybackStep(resampled: true);
+        var grainStep = _sourceRate / (double)Math.Max(1, _deviceRate);
+        var grainFrames = Math.Max(64, (int)Math.Round(ShuttleGrainSeconds * _sourceRate));
+        var taper = Math.Clamp((int)Math.Round(ShuttleTaperSeconds * _sourceRate), 1, grainFrames / 4);
+        var rewind = _playbackSpeed < 0;
+        var dir = rewind ? -1 : 1;
+        var writtenFrames = 0;
+        Span<float> frame = stackalloc float[ChannelLayout.MaxChannels];
+        var source = frame[..Math.Min(srcCh, ChannelLayout.MaxChannels)];
+        while (writtenFrames < framesWanted)
+        {
+            if (rewind)
+            {
+                var canLoop = _loop && playEndFrame > loopStartFrame;
+                if (_sourceFrame < loopStartFrame && canLoop)
+                {
+                    _sourceFrame = playEndFrame - (loopStartFrame - _sourceFrame);
+                    if (_sourceFrame >= playEndFrame)
+                    {
+                        _sourceFrame = Math.Max(loopStartFrame, playEndFrame - grainStep);
+                    }
+
+                    _shuttlePrimed = false;
+                    continue;
+                }
+
+                if (_sourceFrame <= loopStartFrame && !canLoop)
+                {
+                    _sourceFrame = loopStartFrame;
+                    source.Clear();
+                    EmitFrame(buffer, offset, writtenFrames, outCh, source, 0f);
+                    writtenFrames++;
+                    continue;
+                }
+            }
+            else if (_sourceFrame >= playEndFrame)
+            {
+                if (_loop && playEndFrame > loopStartFrame)
+                {
+                    _sourceFrame = loopStartFrame + (_sourceFrame - playEndFrame);
+                    _shuttlePrimed = false;
+                    BeginExitOnLoopWrapNoLock();
+                    continue;
+                }
+
+                Ended = true;
+                break;
+            }
+
+            if (!_shuttlePrimed || _shuttleRead >= grainFrames)
+            {
+                _shuttleFadeIn = _shuttlePrimed;
+                _shuttleOrigin = _sourceFrame;
+                _shuttleRead = 0;
+                _shuttlePrimed = true;
+            }
+
+            var audioFrame = _shuttleOrigin + dir * _shuttleRead;
+            ReadShuttleSource(audioFrame, srcCh, frameCount, source);
+            var window = ShuttleWindow(_shuttleRead, grainFrames, taper, _shuttleFadeIn);
+            var gain = _frameGain is { } gainAt
+                ? gainAt((long)Math.Floor(Math.Clamp(audioFrame, 0, Math.Max(0, frameCount - 1)))) * window
+                : window;
+            EmitFrame(buffer, offset, writtenFrames, outCh, source, gain);
+            _shuttleRead += grainStep;
+            _sourceFrame += step;
+            writtenFrames++;
+        }
+
+        _cursor = checked((int)Math.Clamp(_sourceFrame, 0, frameCount) * srcCh);
+        return writtenFrames;
+    }
+
+    private void ReadShuttleSource(double sourceFrame, int srcCh, int frameCount, Span<float> dest)
+    {
+        if (sourceFrame < 0 || sourceFrame >= frameCount || _samples.Length < srcCh)
+        {
+            dest.Clear();
+            return;
+        }
+
+        if (_sourceRate == _deviceRate && Math.Abs(sourceFrame - Math.Round(sourceFrame)) < 1e-6)
+        {
+            var at = checked((int)Math.Round(sourceFrame) * srcCh);
+            if ((uint)at > (uint)(_samples.Length - srcCh))
+            {
+                dest.Clear();
+                return;
+            }
+
+            _samples.AsSpan(at, srcCh).CopyTo(dest);
+            return;
+        }
+
+        FormatConvert.ResampleFrameBandlimited(
+            _samples,
+            srcCh,
+            sourceFrame,
+            frameCount,
+            _sourceRate,
+            _deviceRate,
+            dest);
+    }
+
+    private static float ShuttleWindow(double read, int grainFrames, int taper, bool fadeIn)
+    {
+        if (fadeIn && read < taper)
+        {
+            return 0.5f * (1f - MathF.Cos((float)(Math.PI * read / taper)));
+        }
+
+        if (read > grainFrames - taper)
+        {
+            return 0.5f * (1f - MathF.Cos((float)(Math.PI * (grainFrames - read) / taper)));
+        }
+
+        return 1f;
     }
 
     /// <returns>カーソルを動かした（続きの判定が必要）。</returns>
@@ -969,7 +1173,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
         var frameCount = srcCh <= 0 ? 0 : _samples.Length / srcCh;
         var endFrame = Math.Min(_exitSpanEndFrame, frameCount);
-        var step = resampled ? _sourceRate / (double)_deviceRate : 1d;
+        var step = PlaybackStep(resampled);
         for (var i = fromFrame; i < toFrame; i++)
         {
             if (_exitFrame >= endFrame)

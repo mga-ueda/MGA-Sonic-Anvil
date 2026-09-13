@@ -570,8 +570,8 @@ internal static partial class UiStrings
         "各スピーカーをどのポートへ出し、どの Ch から読むか。Ch は録音と共通。2ch 再生でポート未設定なら、スピーカー分をダウンミックス。",
         "Which port each speaker uses, and which file channel (Ch) it reads. Ch is shared with record. Stereo playback with no port map still downmixes the speakers.");
     public static string TipPlay => Get(
-        "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し",
-        "Play / stop (Space)\nStop returns to the start position\nEnter pauses in place\nCtrl+Space from 3 seconds earlier\nAlt+Enter restarts from the playback start");
+        "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し\n再生中 Shift で 3 倍速（ピッチ据え置き）\n左右 Shift 同時で 3 倍巻き戻し",
+        "Play / stop (Space)\nStop returns to the start position\nEnter pauses in place\nCtrl+Space from 3 seconds earlier\nAlt+Enter restarts from the playback start\nHold Shift while playing for 3× (pitch unchanged)\nBoth Shifts: 3× rewind");
     public static string TipStop => Get("停止（開始位置へ戻る）", "Stop (return to start)");
     public static string TipGoToStart => Get("先頭 (Ctrl+Home)", "Go to start (Ctrl+Home)");
     public static string TipGoToEnd => Get("末尾 (Ctrl+End)", "Go to end (Ctrl+End)");

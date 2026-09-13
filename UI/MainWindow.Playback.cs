@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
@@ -264,6 +265,7 @@ public partial class MainWindow
             _player.Prepare(_document, startFrame, playRange, loop: playRange is not null);
             _player.SetExitSpan(ComputeExitLayerSpan(playRange));
             _player.Play();
+            SyncPlaybackSpeedFromKeyboard();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
             StartMeterRendering();
@@ -531,6 +533,24 @@ public partial class MainWindow
         }
     }
 
+    private void SyncPlaybackSpeedFromKeyboard()
+    {
+        if (!_player.IsPlaying
+            || _player.IsScrubbing
+            || StatusTimes.IsTimeFocused
+            || Waveform.IsEditingMarkerComment)
+        {
+            _player.SetPlaybackSpeed(1);
+            return;
+        }
+
+        var other = (Keyboard.Modifiers & ~ModifierKeys.Shift) != 0;
+        _player.SetPlaybackSpeed(PlaybackSampleProvider.SpeedFromShiftKeys(
+            Keyboard.IsKeyDown(Key.LeftShift),
+            Keyboard.IsKeyDown(Key.RightShift),
+            other));
+    }
+
     private void SyncPlaybackVisuals()
     {
         if (_document is null)
@@ -538,6 +558,7 @@ public partial class MainWindow
             return;
         }
 
+        SyncPlaybackSpeedFromKeyboard();
         var frame = _player.SmoothCursorFrame;
         _document.CursorFrame = frame;
         if (!Waveform.IsInteracting)
@@ -602,6 +623,7 @@ public partial class MainWindow
         Spectrum.Tick();
         LoudnessMeter.Tick();
         VectorScope.Tick();
+        SyncPlaybackSpeedFromKeyboard();
         if (AnyEffectPreviewing)
         {
             SyncPreviewPlayhead();
