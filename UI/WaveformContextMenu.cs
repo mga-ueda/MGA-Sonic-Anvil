@@ -436,7 +436,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuCenterPlayhead, WaveMenuCommand.CenterPlayhead, "Z", m.CanNavigate),
         Check(UiStrings.WaveMenuCenterLock, WaveMenuCommand.CenterLock, "Z", m.CenterLocked, m.IsPlaying && !m.IsBusy),
         WaveMenuSeparatorEntry.Instance,
-        Check(UiStrings.WaveMenuViewWaveform, WaveMenuCommand.ViewWaveform, "Shift+A", m.AnalysisView == WaveformAnalysisView.Waveform, m.HasDocument && !m.IsBusy),
+        Check(UiStrings.WaveMenuViewWaveform, WaveMenuCommand.ViewWaveform, "Shift+A / Shift+V", m.AnalysisView == WaveformAnalysisView.Waveform, m.HasDocument && !m.IsBusy),
         Check(UiStrings.WaveMenuViewSpectrogram, WaveMenuCommand.ViewSpectrogram, "A", m.AnalysisView == WaveformAnalysisView.Spectrogram, m.HasDocument && !m.IsBusy),
         Check(UiStrings.WaveMenuViewOverlay, WaveMenuCommand.ViewOverlay, "A", m.AnalysisView == WaveformAnalysisView.Overlay, m.HasDocument && !m.IsBusy),
         Check(UiStrings.WaveMenuViewLoudness, WaveMenuCommand.ViewLoudness, "V", m.AnalysisView == WaveformAnalysisView.Loudness, m.HasDocument && !m.IsBusy),

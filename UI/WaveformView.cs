@@ -594,6 +594,8 @@ internal sealed class WaveformView : Grid
         _mouseGuideOnSelectionBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MouseGuideOnSelectionBrush"));
         _timeLabelCache.Clear();
         _dbLabelCache.Clear();
+        _markerLabelCache.Clear();
+        _markerCommentLabelCache.Clear();
         _waveBgra = 0;
         _waveOverlayBgra = 0;
         _loudnessWaveBgra = 0;
@@ -655,13 +657,7 @@ internal sealed class WaveformView : Grid
             _ => WaveformAnalysisView.Spectrogram,
         });
 
-    public void ExitSpectrogramView()
-    {
-        if (SpectrogramVisible)
-        {
-            SetAnalysisView(WaveformAnalysisView.Waveform);
-        }
-    }
+    public void ExitSpectrogramView() => ExitAnalysisView();
 
     public void ToggleLoudnessView() =>
         SetAnalysisView(
@@ -669,13 +665,9 @@ internal sealed class WaveformView : Grid
                 ? WaveformAnalysisView.Waveform
                 : WaveformAnalysisView.Loudness);
 
-    public void ExitLoudnessView()
-    {
-        if (LoudnessVisible)
-        {
-            SetAnalysisView(WaveformAnalysisView.Waveform);
-        }
-    }
+    public void ExitLoudnessView() => ExitAnalysisView();
+
+    public void ExitAnalysisView() => SetAnalysisView(WaveformAnalysisView.Waveform);
 
     public double LoudnessTargetLufs
     {

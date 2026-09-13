@@ -204,16 +204,10 @@ public partial class MainWindow
             return TryProcessFadeMenuShortcut(fadeMenu, key, modifiers);
         }
 
-        if (key == Key.A && modifiers == ModifierKeys.Shift)
-        {
-            Waveform.ExitSpectrogramView();
-            return true;
-        }
-
-        if (key == Key.V && modifiers == ModifierKeys.Shift)
+        if (modifiers == ModifierKeys.Shift && key is Key.A or Key.V)
         {
             CloseVolumeGainPicker();
-            Waveform.ExitLoudnessView();
+            Waveform.ExitAnalysisView();
             return true;
         }
 
@@ -274,13 +268,11 @@ public partial class MainWindow
             return true;
         }
 
-#if DEBUG
         if (key == Key.C && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
             ShowColorDevPanel();
             return true;
         }
-#endif
 
         if (key == Key.C && modifiers == ModifierKeys.Control)
         {
