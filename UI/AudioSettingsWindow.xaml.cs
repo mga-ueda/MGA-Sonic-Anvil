@@ -209,9 +209,9 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(SilentSkipThresholdBox, UiStrings.TipSilentSkipThreshold);
         TipService.Set(SilentSkipThresholdUnit, UiStrings.TipSilentSkipThreshold);
         TipService.Set(SilentSkipThresholdMeter, UiStrings.TipSilentSkipThresholdMeter);
-        TipService.Set(SilentSkipThresholdPeakText, UiStrings.TipSilentSkipThresholdMeter);
+        TipService.Set(SilentSkipThresholdFloorText, UiStrings.TipSilentSkipThresholdMeter);
         TipService.Set(SilentSkipThresholdFloorNote, UiStrings.TipSilentSkipThresholdMeter);
-        RefreshSilentSkipThresholdPeakText();
+        RefreshSilentSkipThresholdFloorText();
         TipService.Set(SilentSkipRecordPadLabel, UiStrings.TipSilentSkipRecordPad);
         TipService.Set(SilentSkipRecordPadBox, UiStrings.TipSilentSkipRecordPad);
         TipService.Set(SilentSkipRecordPadUnit, UiStrings.TipSilentSkipRecordPad);
@@ -737,7 +737,7 @@ internal partial class AudioSettingsWindow : Window
         RefreshTestButtons();
         _inputEditor.ApplyPeaks([]);
         SilentSkipThresholdMeter.Reset();
-        RefreshSilentSkipThresholdPeakText();
+        RefreshSilentSkipThresholdFloorText();
     }
 
     private void RefreshInputMeters()
@@ -752,12 +752,12 @@ internal partial class AudioSettingsWindow : Window
         _inputEditor.ApplyPeaks(_meterPeaks);
         SilentSkipThresholdMeter.ApplyLinearPeak(_probe.TakeMonoPeak());
         SilentSkipThresholdMeter.ApplyFloor(_probe.TakeMonoFloor());
-        RefreshSilentSkipThresholdPeakText();
+        RefreshSilentSkipThresholdFloorText();
     }
 
-    private void RefreshSilentSkipThresholdPeakText()
+    private void RefreshSilentSkipThresholdFloorText()
     {
-        SilentSkipThresholdPeakText.Text =
+        SilentSkipThresholdFloorText.Text =
             SilentSkip.FormatPeakDb(SilentSkipThresholdMeter.DisplayFloorDb) + " " + UiStrings.LabelDb;
     }
 

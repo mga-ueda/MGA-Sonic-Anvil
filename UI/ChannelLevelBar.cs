@@ -20,8 +20,6 @@ internal sealed class ChannelLevelBar : FrameworkElement
     /// <summary>スピーカー本数。2 以下はシアングラデ、3 以上はチャンネル色。</summary>
     public int Channels { get; set; } = 2;
 
-    public double DisplayDb => LevelMeterEngine.ToDb(_display);
-
     public double DisplayFloorDb => LevelMeterEngine.ToDb(_floor);
 
     public ChannelLevelBar()

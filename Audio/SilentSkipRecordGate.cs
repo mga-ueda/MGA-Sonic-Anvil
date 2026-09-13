@@ -27,8 +27,6 @@ internal sealed class SilentSkipRecordGate
 
     public bool HasWritten => _hasWritten;
 
-    public int PadFrames => _padFrames;
-
     public void Reset(bool hasWritten)
     {
         _hasWritten = hasWritten;

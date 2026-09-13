@@ -59,18 +59,6 @@ internal sealed class AudioRecorder : IDisposable
         }
     }
 
-    public int FrameCount
-    {
-        get
-        {
-            lock (_gate)
-            {
-                var channels = Math.Max(1, _destChannels);
-                return _count / channels;
-            }
-        }
-    }
-
     public void SetSilentSkip(bool enabled, double thresholdDb, int recordPadMs = SilentSkip.DefaultRecordPadMs)
     {
         lock (_gate)

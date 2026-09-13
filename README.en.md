@@ -12,7 +12,7 @@ Fade, normalize, ripple-delete, copy / paste, markers / regions / sample loop, a
 
 **EXPORT talks to Wwise in Wave-only mode.** Turn on WAAPI above the level meter, pick a destination, and EXPORT writes the source wave into Originals and imports it as a Music Playlist Container (markers / sample loop; no Custom Cues). Play -E previews the loop wrap and writes Play post-exit on EXPORT.
 
-**You can also write MP3.** A valid LAME path in Settings uses your `lame.exe`; empty or invalid uses Windows (default 192 kbps). Right-click a tab to export the current edits as Wave or MP3 (several tabs ask for a folder; dirty tabs stay dirty).
+**You can also write MP3.** Recording itself stays PCM. A valid LAME path in Settings uses your `lame.exe`; empty or invalid uses Windows (default 192 kbps). Right-click a tab to export the current edits as Wave or MP3 (several tabs ask for a folder; dirty tabs stay dirty).
 
 **The UI is Japanese / English.** The Japanese locale keeps the current wording, including English labels as they are. The English locale translates the Japanese. Switch it in Settings (the gear). The default is **Auto** (Japanese if the OS is Japanese, otherwise English).
 
