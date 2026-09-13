@@ -66,7 +66,7 @@ public partial class MainWindow
         UpdateLayout();
         Waveform.Refresh();
         Overview.InvalidateVisual();
-        Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+        Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
     }
 
     private string? _openStatusText;
@@ -858,7 +858,10 @@ public partial class MainWindow
             CaptureActiveSessionView();
             var settings = AppStorage.Settings;
             var closed = _workspace.ClosedTabs
-                .Where(tab => DocumentSessionStore.ShouldPersistClosedTab(tab.Session.Document))
+                .Where(tab => tab.Session is { } session
+                    ? DocumentSessionStore.ShouldPersistClosedTab(session.Document)
+                    : tab.Pending is { } pending
+                        && DocumentSessionStore.ShouldRestoreClosedTab(pending))
                 .ToArray();
             if (_sessions.Count == 0 && closed.Length == 0)
             {
@@ -885,13 +888,28 @@ public partial class MainWindow
             var closedSnaps = new OpenDocumentSnapshot[closed.Length];
             for (var i = 0; i < closed.Length; i++)
             {
-                closedSnaps[i] = CaptureSessionSnapshot(
-                    closed[i].Session,
-                    i,
-                    DocumentSessionStore.FileNameForClosedIndex(i),
-                    DocumentSessionStore.OriginFileNameForClosedIndex(i),
-                    DocumentSessionStore.HistoryFileNameForClosedIndex(i),
-                    keep);
+                if (closed[i].Session is { } session)
+                {
+                    closedSnaps[i] = CaptureSessionSnapshot(
+                        session,
+                        i,
+                        DocumentSessionStore.FileNameForClosedIndex(i),
+                        DocumentSessionStore.OriginFileNameForClosedIndex(i),
+                        DocumentSessionStore.HistoryFileNameForClosedIndex(i),
+                        keep);
+                }
+                else
+                {
+                    closedSnaps[i] = closed[i].Pending ?? new OpenDocumentSnapshot();
+                    DocumentSessionStore.CollectReferencedSessionFiles(
+                        AppStorage.RootDirectory,
+                        closedSnaps[i],
+                        keep);
+                    DocumentSessionStore.DropUnreferencedSidecarNames(
+                        AppStorage.RootDirectory,
+                        closedSnaps[i]);
+                }
+
                 closedSnaps[i].ClosedIndex = closed[i].Index;
             }
 
@@ -927,6 +945,7 @@ public partial class MainWindow
 
         _didRestoreLastDocument = true;
         var settings = AppStorage.Settings;
+        var root = AppStorage.RootDirectory;
         var docs = DocumentSessionStore.ResolveOpenDocuments(settings);
         var closedDocs = DocumentSessionStore.ResolveClosedDocuments(settings);
         if (docs.Length == 0 && closedDocs.Length == 0)
@@ -936,47 +955,98 @@ public partial class MainWindow
 
         var restored = new List<(int SourceIndex, DocumentSession Session)>();
         var activeIndex = DocumentSessionStore.ResolveActiveIndex(docs, settings.ActiveDocumentIndex);
-        var showProgress = docs.Length > 1;
-        BeginOpenWork(docs.Select(SnapshotDisplayName).ToArray());
+        var restorable = new List<(int SourceIndex, OpenDocumentSnapshot Snap)>(docs.Length);
+        for (var i = 0; i < docs.Length; i++)
+        {
+            if (DocumentSessionStore.CanRestoreDocument(root, docs[i]))
+            {
+                restorable.Add((i, docs[i]));
+            }
+        }
+
+        var showProgress = restorable.Count > 1;
+        BeginOpenWork(restorable.Select(item => SnapshotDisplayName(item.Snap)).ToArray());
         try
         {
-            for (var i = 0; i < docs.Length; i++)
+            int JobIndex(int sourceIndex)
             {
-                if (showProgress)
+                for (var i = 0; i < restorable.Count; i++)
                 {
-                    SetOpenStatus(i + 1, docs.Length, SnapshotDisplayName(docs[i]));
-                    SetOpenJobRunning(i);
+                    if (restorable[i].SourceIndex == sourceIndex)
+                    {
+                        return i;
+                    }
                 }
 
-                var session = await TryRestoreSessionAsync(docs[i]).ConfigureAwait(true);
-                if (session is null)
+                return 0;
+            }
+
+            async Task<DocumentSession?> RestoreIndexedAsync(int sourceIndex, OpenDocumentSnapshot snap)
+            {
+                var job = JobIndex(sourceIndex);
+                if (showProgress)
                 {
+                    SetOpenStatus(job + 1, restorable.Count, SnapshotDisplayName(snap));
+                    SetOpenJobRunning(job);
+                }
+
+                var session = await TryRestoreSessionAsync(snap).ConfigureAwait(true);
+                if (showProgress)
+                {
+                    SetOpenJobDone(job);
+                }
+
+                return session;
+            }
+
+            var activeSnap = (uint)activeIndex < (uint)docs.Length ? docs[activeIndex] : null;
+            if (activeSnap is not null && DocumentSessionStore.CanRestoreDocument(root, activeSnap))
+            {
+                var session = await RestoreIndexedAsync(activeIndex, activeSnap).ConfigureAwait(true);
+                if (session is not null)
+                {
+                    _sessions.Add(session);
+                    restored.Add((activeIndex, session));
+                    BindWorkspace(session);
+                    Waveform.Refresh();
+                    Overview.InvalidateVisual();
                     if (showProgress)
                     {
-                        SetOpenJobDone(i);
+                        PumpUiAfterOpen();
                     }
+                }
+            }
 
+            foreach (var (sourceIndex, snap) in restorable)
+            {
+                if (sourceIndex == activeIndex)
+                {
+                    continue;
+                }
+
+                var session = await RestoreIndexedAsync(sourceIndex, snap).ConfigureAwait(true);
+                if (session is null)
+                {
                     continue;
                 }
 
                 _sessions.Add(session);
-                restored.Add((i, session));
+                restored.Add((sourceIndex, session));
                 if (showProgress)
                 {
                     PumpUiAfterOpen();
-                    SetOpenJobDone(i);
                 }
             }
 
             foreach (var snap in closedDocs)
             {
-                var session = await TryRestoreSessionAsync(snap).ConfigureAwait(true);
-                if (session is null)
+                if (!DocumentSessionStore.ShouldRestoreClosedTab(snap)
+                    || !DocumentSessionStore.CanRestoreDocument(root, snap))
                 {
                     continue;
                 }
 
-                _workspace.RememberClosed(session, snap.ClosedIndex);
+                _workspace.RememberClosedPending(snap, snap.ClosedIndex);
             }
 
             if (_sessions.Count == 0)
@@ -984,7 +1054,11 @@ public partial class MainWindow
                 return;
             }
 
-            BindWorkspace(DocumentSessionStore.PickRestoredActive(restored, activeIndex) ?? _sessions[0]);
+            if (_activeSession is null)
+            {
+                BindWorkspace(DocumentSessionStore.PickRestoredActive(restored, activeIndex) ?? _sessions[0]);
+            }
+
             Waveform.Refresh();
             Overview.InvalidateVisual();
         }
@@ -1013,10 +1087,13 @@ public partial class MainWindow
 
     private async Task<DocumentSession?> TryRestoreSessionAsync(OpenDocumentSnapshot snap)
     {
-        var fromHistory = await TryRestoreSessionHistoryAsync(snap).ConfigureAwait(true);
-        if (fromHistory is not null && fromHistory.Document.FrameCount > 0)
+        if (DocumentSessionStore.NeedsHistoryReplay(AppStorage.RootDirectory, snap))
         {
-            return fromHistory;
+            var fromHistory = await TryRestoreSessionHistoryAsync(snap).ConfigureAwait(true);
+            if (fromHistory is not null && fromHistory.Document.FrameCount > 0)
+            {
+                return fromHistory;
+            }
         }
 
         try
@@ -1086,7 +1163,6 @@ public partial class MainWindow
             session.LoopEnabled,
             session.SelectedMarkerFrames);
         var snap = DocumentSessionStore.Capture(session.Document, view, index);
-        TrySaveSessionHistory(session, snap, originName, historyName, keep);
         var write = DocumentSessionStore.DecideSessionAudioWrite(
             DocumentSessionStore.NeedsSessionAudio(snap.Dirty, snap.SourcePath, snap.CanContinueRecording),
             DocumentSessionStore.HasWorkingAudio(session.Document),
@@ -1096,56 +1172,70 @@ public partial class MainWindow
             DocumentSessionStore.HasUsableSessionAudio(
                 AppStorage.SessionDirectory,
                 session.PersistedSessionAudioName));
+        var hasSessionAudio = false;
         if (write == SessionAudioWriteKind.Skip)
         {
             snap.SessionFileName = string.Empty;
-            return snap;
         }
-
-        if (write == SessionAudioWriteKind.Reuse)
+        else if (write == SessionAudioWriteKind.Reuse)
         {
             var reused = DocumentSessionStore.SanitizeSessionFileName(session.PersistedSessionAudioName);
             if (reused is not null)
             {
                 snap.SessionFileName = reused;
                 keep.Add(reused);
-                return snap;
+                hasSessionAudio = true;
             }
         }
 
-        try
+        if (write == SessionAudioWriteKind.Rewrite || (write == SessionAudioWriteKind.Reuse && !hasSessionAudio))
         {
-            var name = DocumentSessionStore.SanitizeSessionFileName(audioName)
-                ?? DocumentSessionStore.FileNameForIndex(index);
-            snap.SessionFileName = name;
-            AudioCodec.SaveWave(session.Document, AppStorage.SessionFilePath(name));
-            keep.Add(name);
-            session.PersistedSessionAudioName = name;
-            session.PersistedSampleRevision = session.Document.SampleRevision;
-        }
-        catch
-        {
-            var written = DocumentSessionStore.SanitizeSessionFileName(snap.SessionFileName);
-            if (written is not null)
+            try
             {
-                try
+                var name = DocumentSessionStore.SanitizeSessionFileName(audioName)
+                    ?? DocumentSessionStore.FileNameForIndex(index);
+                snap.SessionFileName = name;
+                AudioCodec.SaveWave(session.Document, AppStorage.SessionFilePath(name));
+                keep.Add(name);
+                session.PersistedSessionAudioName = name;
+                session.PersistedSampleRevision = session.Document.SampleRevision;
+                hasSessionAudio = true;
+            }
+            catch
+            {
+                var written = DocumentSessionStore.SanitizeSessionFileName(snap.SessionFileName);
+                if (written is not null)
                 {
-                    var path = AppStorage.SessionFilePath(written);
-                    if (File.Exists(path) && new FileInfo(path).Length > 0)
+                    try
                     {
-                        keep.Add(written);
-                        return snap;
+                        var path = AppStorage.SessionFilePath(written);
+                        if (File.Exists(path) && new FileInfo(path).Length > 0)
+                        {
+                            keep.Add(written);
+                            hasSessionAudio = true;
+                        }
+                    }
+                    catch
+                    {
+                        // 作業コピーが残っていなければ捨てる。
                     }
                 }
-                catch
+
+                if (!hasSessionAudio)
                 {
-                    // 作業コピーが残っていなければ捨てる。
+                    snap.SessionFileName = string.Empty;
                 }
             }
-
-            snap.SessionFileName = string.Empty;
         }
 
+        if (!DocumentSessionStore.ShouldPersistHistorySidecars(hasSessionAudio, snap.Dirty, snap.SourcePath))
+        {
+            snap.OriginFileName = string.Empty;
+            snap.HistoryFileName = string.Empty;
+            return snap;
+        }
+
+        TrySaveSessionHistory(session, snap, originName, historyName, keep);
         return snap;
     }
 
@@ -1236,6 +1326,7 @@ public partial class MainWindow
         var originPath = Path.Combine(AppStorage.SessionDirectory, originName);
         var historyPath = Path.Combine(AppStorage.SessionDirectory, historyName);
         if (!DocumentSessionStore.TryReadHistory(historyPath, out var historySnap)
+            || !HistoryRecipes.CanImport(historySnap)
             || !File.Exists(originPath))
         {
             return null;
@@ -1243,12 +1334,20 @@ public partial class MainWindow
 
         try
         {
-            var document = await Task.Run(() => AudioCodec.Load(originPath)).ConfigureAwait(true);
-            if (!EditHistory.TryImport(document, historySnap, out var history))
+            var imported = await Task.Run(() =>
+            {
+                var document = AudioCodec.Load(originPath);
+                return EditHistory.TryImport(document, historySnap, out var history)
+                    ? (document, history)
+                    : default((AudioDocument Document, EditHistory History)?);
+            }).ConfigureAwait(true);
+            if (imported is not { } pair || pair.Document.FrameCount <= 0)
             {
                 return null;
             }
 
+            var document = pair.Document;
+            var history = pair.History;
             document.MarkUnsaved(string.IsNullOrWhiteSpace(snap.SourcePath) ? null : snap.SourcePath);
             document.SetDirty(!history.IsClean);
             DocumentSessionStore.ApplyMeta(document, snap);

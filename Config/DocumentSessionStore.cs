@@ -205,6 +205,253 @@ internal static class DocumentSessionStore
         HasWorkingAudio(document)
         && (document.CanContinueRecording || string.IsNullOrWhiteSpace(document.SourcePath));
 
+    /// <summary>閉じたタブとして再開できるのは未保存の録音だけ。保存済みや空は対象外。</summary>
+    public static bool ShouldRestoreClosedTab(OpenDocumentSnapshot snap) =>
+        snap.CanContinueRecording
+        || (snap.Dirty && string.IsNullOrWhiteSpace(snap.SourcePath));
+
+    /// <summary>
+    /// 作業コピーか保存済み元ファイルで現状の PCM が戻せる。
+    /// このときは履歴の再実行は波形にも Undo 復元にも使わない。
+    /// </summary>
+    public static bool HasCurrentAudio(string rootDirectory, OpenDocumentSnapshot snap)
+    {
+        var sessionDir = Path.Combine(rootDirectory, SessionDirectoryName);
+        if (HasUsableSessionAudio(sessionDir, snap.SessionFileName))
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(snap.SourcePath) || !File.Exists(snap.SourcePath))
+        {
+            return false;
+        }
+
+        if (!snap.Dirty)
+        {
+            return true;
+        }
+
+        if (!TryGetRestorableHistory(sessionDir, snap, out var history))
+        {
+            return true;
+        }
+
+        return !HistoryRecipes.AffectsSamples(history);
+    }
+
+    public static bool TryGetRestorableHistory(
+        string sessionDirectory,
+        OpenDocumentSnapshot snap,
+        out HistorySessionSnapshot history)
+    {
+        history = null!;
+        var originName = SanitizeSidecarName(snap.OriginFileName);
+        var historyName = SanitizeSidecarName(snap.HistoryFileName);
+        if (originName is null || historyName is null)
+        {
+            return false;
+        }
+
+        if (!HasUsableSidecar(sessionDirectory, originName)
+            || !TryReadHistory(Path.Combine(sessionDirectory, historyName), out var loaded)
+            || !HistoryRecipes.CanImport(loaded))
+        {
+            return false;
+        }
+
+        history = loaded;
+        return true;
+    }
+
+    public static bool HasRestorableHistory(string sessionDirectory, OpenDocumentSnapshot snap) =>
+        TryGetRestorableHistory(sessionDirectory, snap, out _);
+
+    /// <summary>現状の PCM が無いときだけ、原点 WAV から履歴を再実行する。</summary>
+    public static bool NeedsHistoryReplay(string rootDirectory, OpenDocumentSnapshot snap) =>
+        !HasCurrentAudio(rootDirectory, snap)
+        && HasRestorableHistory(Path.Combine(rootDirectory, SessionDirectoryName), snap);
+
+    public static bool CanRestoreDocument(string rootDirectory, OpenDocumentSnapshot snap) =>
+        HasCurrentAudio(rootDirectory, snap)
+        || HasRestorableHistory(Path.Combine(rootDirectory, SessionDirectoryName), snap)
+        || TryResolveLoadPath(rootDirectory, snap, out _, out _);
+
+    /// <summary>次起動で現状の PCM を読めるなら origin / history は残さない（再実行しない）。</summary>
+    public static bool ShouldPersistHistorySidecars(
+        bool hasSessionAudio,
+        bool dirty,
+        string? sourcePath) =>
+        !hasSessionAudio && (dirty || string.IsNullOrWhiteSpace(sourcePath));
+
+    /// <summary>次に実際に開くファイルだけ残す。履歴再実行しない origin / history は捨てる。</summary>
+    public static void CollectReferencedSessionFiles(
+        string rootDirectory,
+        OpenDocumentSnapshot snap,
+        ICollection<string> keep)
+    {
+        if (NeedsHistoryReplay(rootDirectory, snap))
+        {
+            if (SanitizeSidecarName(snap.OriginFileName) is { } origin)
+            {
+                keep.Add(origin);
+            }
+
+            if (SanitizeSidecarName(snap.HistoryFileName) is { } history)
+            {
+                keep.Add(history);
+            }
+
+            return;
+        }
+
+        if (TryResolveLoadPath(rootDirectory, snap, out _, out var fromSession)
+            && fromSession
+            && SanitizeSessionFileName(snap.SessionFileName) is { } audio)
+        {
+            keep.Add(audio);
+        }
+    }
+
+    public static void CollectReferencedSessionFiles(
+        string rootDirectory,
+        IEnumerable<OpenDocumentSnapshot> open,
+        IEnumerable<OpenDocumentSnapshot> closed,
+        ICollection<string> keep)
+    {
+        foreach (var snap in open)
+        {
+            if (CanRestoreDocument(rootDirectory, snap))
+            {
+                CollectReferencedSessionFiles(rootDirectory, snap, keep);
+            }
+        }
+
+        foreach (var snap in closed)
+        {
+            if (ShouldRestoreClosedTab(snap) && CanRestoreDocument(rootDirectory, snap))
+            {
+                CollectReferencedSessionFiles(rootDirectory, snap, keep);
+            }
+        }
+    }
+
+    /// <summary>次起動で読まないサイドカー名をスナップから外す。消したら true。</summary>
+    public static bool DropUnreferencedSidecarNames(string rootDirectory, OpenDocumentSnapshot snap)
+    {
+        var changed = false;
+        if (NeedsHistoryReplay(rootDirectory, snap))
+        {
+            if (snap.SessionFileName.Length > 0)
+            {
+                snap.SessionFileName = string.Empty;
+                changed = true;
+            }
+
+            return changed;
+        }
+
+        if (snap.OriginFileName.Length > 0 || snap.HistoryFileName.Length > 0)
+        {
+            snap.OriginFileName = string.Empty;
+            snap.HistoryFileName = string.Empty;
+            changed = true;
+        }
+
+        var keepSession = TryResolveLoadPath(rootDirectory, snap, out _, out var fromSession) && fromSession;
+        if (!keepSession && snap.SessionFileName.Length > 0)
+        {
+            snap.SessionFileName = string.Empty;
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    /// <summary>
+    /// 設定が指していても、復元にも再開にも使わないセッションファイルを消す。
+    /// 閉じた保存済みタブなど、再開対象外のスナップも設定から外す。
+    /// </summary>
+    public static bool PruneUnreferencedSessionState(
+        string rootDirectory,
+        AppSettings settings,
+        string? leftoverSessionDocumentPath = null)
+    {
+        var open = settings.OpenDocuments ?? [];
+        var closed = settings.ClosedDocuments ?? [];
+        var keep = new List<string>();
+        CollectReferencedSessionFiles(rootDirectory, open, closed, keep);
+
+        var sessionDir = Path.Combine(rootDirectory, SessionDirectoryName);
+        RemoveOrphanSessionFiles(sessionDir, keep);
+        TryDeleteEmptyDirectory(sessionDir);
+        TryDeleteFile(leftoverSessionDocumentPath);
+
+        var changed = false;
+        foreach (var snap in open)
+        {
+            if (DropUnreferencedSidecarNames(rootDirectory, snap))
+            {
+                changed = true;
+            }
+        }
+
+        var keptClosed = new List<OpenDocumentSnapshot>(closed.Length);
+        foreach (var snap in closed)
+        {
+            if (!ShouldRestoreClosedTab(snap) || !CanRestoreDocument(rootDirectory, snap))
+            {
+                changed = true;
+                continue;
+            }
+
+            if (DropUnreferencedSidecarNames(rootDirectory, snap))
+            {
+                changed = true;
+            }
+
+            keptClosed.Add(snap);
+        }
+
+        if (keptClosed.Count != closed.Length)
+        {
+            settings.ClosedDocuments = [.. keptClosed];
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    public static void TryDeleteEmptyDirectory(string directory)
+    {
+        try
+        {
+            if (Directory.Exists(directory) && Directory.GetFileSystemEntries(directory).Length == 0)
+            {
+                Directory.Delete(directory);
+            }
+        }
+        catch
+        {
+            // 空フォルダの削除失敗は残ファイルより軽い。
+        }
+    }
+
+    public static void TryDeleteFile(string? path)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+            // 参照されない作業コピーの削除失敗は致命的ではない。
+        }
+    }
+
     private static bool IsManagedSessionStem(string name) =>
         name.StartsWith("doc-", StringComparison.OrdinalIgnoreCase)
         || name.StartsWith("closed-", StringComparison.OrdinalIgnoreCase);
@@ -455,6 +702,8 @@ internal static class DocumentSessionStore
                 // 作業コピーの削除失敗は致命的ではない。
             }
         }
+
+        TryDeleteEmptyDirectory(sessionDirectory);
     }
 
     private static void StoreMarkers(OpenDocumentSnapshot snap, IReadOnlyList<MarkerSnapshot> markers)

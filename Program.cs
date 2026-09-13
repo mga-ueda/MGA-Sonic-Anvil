@@ -1,4 +1,5 @@
 using System.Text;
+using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
 
 namespace MgaSonicAnvil;
@@ -20,6 +21,8 @@ static class Program
         {
             LaunchFiles.SetStartup(files);
             AppStorage.Initialize();
+            SpectrogramCache.DeleteLeftoverTempFiles();
+            LameEncoder.DeleteLeftoverTemps();
             Domain.UiStrings.SetLanguage(Domain.UiStrings.ParseLanguage(AppStorage.Settings.UiLanguage));
             var app = new App();
             app.InitializeComponent();

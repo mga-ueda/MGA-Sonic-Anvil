@@ -260,6 +260,47 @@ internal static class LameEncoder
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern int GetShortPathName(string lpszLongPath, StringBuilder lpszShortPath, int cchBuffer);
 
+    public static void DeleteLeftoverTemps()
+    {
+        foreach (var dir in DistinctTempDirs())
+        {
+            TryDeletePattern(dir, "mga-anvil-*.wav");
+            TryDeletePattern(dir, "mga-anvil-*.mp3");
+        }
+    }
+
+    private static IEnumerable<string> DistinctTempDirs()
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var dir in new[] { Path.GetTempPath(), PreferAsciiDirectory(Path.GetTempPath()) })
+        {
+            if (seen.Add(dir))
+            {
+                yield return dir;
+            }
+        }
+    }
+
+    private static void TryDeletePattern(string directory, string pattern)
+    {
+        try
+        {
+            if (!Directory.Exists(directory))
+            {
+                return;
+            }
+
+            foreach (var path in Directory.EnumerateFiles(directory, pattern))
+            {
+                TryDelete(path);
+            }
+        }
+        catch
+        {
+            // 変換中のファイルは残してよい。
+        }
+    }
+
     private static void TryDelete(string path)
     {
         try

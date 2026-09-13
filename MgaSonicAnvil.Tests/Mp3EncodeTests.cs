@@ -74,6 +74,33 @@ public sealed class Mp3EncodeTests
     }
 
     [Fact]
+    public void DeleteLeftoverTemps_RemovesOrphanEncodeFiles()
+    {
+        var wav = Path.Combine(Path.GetTempPath(), $"mga-anvil-{Guid.NewGuid():N}.wav");
+        var mp3 = Path.Combine(Path.GetTempPath(), $"mga-anvil-{Guid.NewGuid():N}.mp3");
+        File.WriteAllText(wav, "x");
+        File.WriteAllText(mp3, "y");
+        try
+        {
+            LameEncoder.DeleteLeftoverTemps();
+            Assert.False(File.Exists(wav));
+            Assert.False(File.Exists(mp3));
+        }
+        finally
+        {
+            if (File.Exists(wav))
+            {
+                File.Delete(wav);
+            }
+
+            if (File.Exists(mp3))
+            {
+                File.Delete(mp3);
+            }
+        }
+    }
+
+    [Fact]
     public void TryResolveLameExe_ExistingFile_UsesLame()
     {
         var path = Path.GetTempFileName();

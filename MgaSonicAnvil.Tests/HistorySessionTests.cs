@@ -165,6 +165,40 @@ public sealed class HistorySessionTests
     }
 
     [Fact]
+    public void CanImport_RejectsEmptyAndUnknownKinds()
+    {
+        Assert.False(HistoryRecipes.CanImport(null));
+        Assert.False(HistoryRecipes.CanImport(new HistorySessionSnapshot { Recipes = [] }));
+        Assert.False(HistoryRecipes.CanImport(new HistorySessionSnapshot
+        {
+            Recipes = [new HistoryRecipe { Kind = "NotARealEdit" }],
+        }));
+        Assert.True(HistoryRecipes.CanImport(new HistorySessionSnapshot
+        {
+            Recipes = [new HistoryRecipe { Kind = HistoryRecipes.AddMarker, Frame = 4 }],
+        }));
+    }
+
+    [Fact]
+    public void AffectsSamples_IgnoresMarkerOnlyRecipes()
+    {
+        Assert.False(HistoryRecipes.AffectsSamples(new HistoryRecipe { Kind = HistoryRecipes.AddMarker }));
+        Assert.True(HistoryRecipes.AffectsSamples(new HistoryRecipe { Kind = HistoryRecipes.FadeIn }));
+        Assert.False(HistoryRecipes.AffectsSamples(new HistorySessionSnapshot
+        {
+            Recipes = [new HistoryRecipe { Kind = HistoryRecipes.AddMarker }],
+        }));
+        Assert.True(HistoryRecipes.AffectsSamples(new HistorySessionSnapshot
+        {
+            Recipes =
+            [
+                new HistoryRecipe { Kind = HistoryRecipes.AddMarker },
+                new HistoryRecipe { Kind = HistoryRecipes.Gain },
+            ],
+        }));
+    }
+
+    [Fact]
     public void SanitizeSidecarName_AllowsOriginAndHistory()
     {
         Assert.Equal("doc-2-origin.wav", DocumentSessionStore.SanitizeSidecarName(@"..\session\doc-2-origin.wav"));

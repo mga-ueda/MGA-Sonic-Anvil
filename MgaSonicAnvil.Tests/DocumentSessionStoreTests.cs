@@ -161,6 +161,145 @@ public sealed class DocumentSessionStoreTests
     }
 
     [Fact]
+    public void ShouldRestoreClosedTab_MatchesPersistableRecordingsOnly()
+    {
+        Assert.True(DocumentSessionStore.ShouldRestoreClosedTab(new OpenDocumentSnapshot
+        {
+            CanContinueRecording = true,
+        }));
+        Assert.True(DocumentSessionStore.ShouldRestoreClosedTab(new OpenDocumentSnapshot
+        {
+            Dirty = true,
+        }));
+        Assert.False(DocumentSessionStore.ShouldRestoreClosedTab(new OpenDocumentSnapshot
+        {
+            SourcePath = @"C:\saved.wav",
+            Dirty = false,
+        }));
+        Assert.False(DocumentSessionStore.ShouldRestoreClosedTab(new OpenDocumentSnapshot
+        {
+            SourcePath = @"C:\edited.wav",
+            Dirty = true,
+        }));
+    }
+
+    [Fact]
+    public void ShouldPersistHistorySidecars_OnlyWhenCurrentAudioIsMissing()
+    {
+        Assert.False(DocumentSessionStore.ShouldPersistHistorySidecars(hasSessionAudio: true, dirty: true, @"C:\a.wav"));
+        Assert.False(DocumentSessionStore.ShouldPersistHistorySidecars(hasSessionAudio: false, dirty: false, @"C:\a.wav"));
+        Assert.True(DocumentSessionStore.ShouldPersistHistorySidecars(hasSessionAudio: false, dirty: true, @"C:\a.wav"));
+        Assert.True(DocumentSessionStore.ShouldPersistHistorySidecars(hasSessionAudio: false, dirty: true, null));
+    }
+
+    [Fact]
+    public void RestorePredicates_SkipUnrestorableAndHistoryWhenCurrentAudioExists()
+    {
+        var root = NewTempDir("restore-pred");
+        try
+        {
+            var sessionDir = Path.Combine(root, DocumentSessionStore.SessionDirectoryName);
+            Directory.CreateDirectory(sessionDir);
+            var sourcePath = Path.Combine(root, "source.wav");
+            File.WriteAllText(sourcePath, "src");
+            File.WriteAllBytes(Path.Combine(sessionDir, "doc-0.wav"), [1, 2, 3]);
+            File.WriteAllBytes(Path.Combine(sessionDir, "doc-0-origin.wav"), [1, 2, 3]);
+            var history = new HistorySessionSnapshot
+            {
+                CurrentIndex = 1,
+                Recipes = [new HistoryRecipe { Kind = HistoryRecipes.FadeIn, Start = 0, End = 8 }],
+            };
+            Assert.True(DocumentSessionStore.TryWriteHistory(
+                Path.Combine(sessionDir, "doc-0-history.json"),
+                history));
+
+            var dirtyWithSession = new OpenDocumentSnapshot
+            {
+                SourcePath = sourcePath,
+                Dirty = true,
+                SessionFileName = "doc-0.wav",
+                OriginFileName = "doc-0-origin.wav",
+                HistoryFileName = "doc-0-history.json",
+            };
+            Assert.True(DocumentSessionStore.HasCurrentAudio(root, dirtyWithSession));
+            Assert.False(DocumentSessionStore.NeedsHistoryReplay(root, dirtyWithSession));
+            Assert.True(DocumentSessionStore.CanRestoreDocument(root, dirtyWithSession));
+
+            var cleanNamed = new OpenDocumentSnapshot
+            {
+                SourcePath = sourcePath,
+                Dirty = false,
+                OriginFileName = "doc-0-origin.wav",
+                HistoryFileName = "doc-0-history.json",
+            };
+            Assert.True(DocumentSessionStore.HasCurrentAudio(root, cleanNamed));
+            Assert.False(DocumentSessionStore.NeedsHistoryReplay(root, cleanNamed));
+
+            var dirtyNoSession = new OpenDocumentSnapshot
+            {
+                SourcePath = sourcePath,
+                Dirty = true,
+                OriginFileName = "doc-0-origin.wav",
+                HistoryFileName = "doc-0-history.json",
+            };
+            Assert.False(DocumentSessionStore.HasCurrentAudio(root, dirtyNoSession));
+            Assert.True(DocumentSessionStore.NeedsHistoryReplay(root, dirtyNoSession));
+
+            var markerOnlyDirty = new OpenDocumentSnapshot
+            {
+                SourcePath = sourcePath,
+                Dirty = true,
+                OriginFileName = "doc-0-origin.wav",
+                HistoryFileName = "marker-history.json",
+            };
+            Assert.True(DocumentSessionStore.TryWriteHistory(
+                Path.Combine(sessionDir, "marker-history.json"),
+                new HistorySessionSnapshot
+                {
+                    CurrentIndex = 1,
+                    Recipes = [new HistoryRecipe { Kind = HistoryRecipes.AddMarker, Frame = 4 }],
+                }));
+            File.WriteAllBytes(Path.Combine(sessionDir, "doc-0-origin.wav"), [1, 2, 3]);
+            Assert.True(DocumentSessionStore.HasCurrentAudio(root, markerOnlyDirty));
+            Assert.False(DocumentSessionStore.NeedsHistoryReplay(root, markerOnlyDirty));
+
+            var unknownHistory = new OpenDocumentSnapshot
+            {
+                Dirty = true,
+                OriginFileName = "doc-0-origin.wav",
+                HistoryFileName = "bad-history.json",
+            };
+            Assert.True(DocumentSessionStore.TryWriteHistory(
+                Path.Combine(sessionDir, "bad-history.json"),
+                new HistorySessionSnapshot
+                {
+                    CurrentIndex = 1,
+                    Recipes = [new HistoryRecipe { Kind = "NotARealEdit" }],
+                }));
+            Assert.False(DocumentSessionStore.HasRestorableHistory(sessionDir, unknownHistory));
+            Assert.False(DocumentSessionStore.CanRestoreDocument(root, unknownHistory));
+
+            var missing = new OpenDocumentSnapshot
+            {
+                SourcePath = Path.Combine(root, "gone.wav"),
+                Dirty = true,
+            };
+            Assert.False(DocumentSessionStore.CanRestoreDocument(root, missing));
+
+            var closedSaved = new OpenDocumentSnapshot
+            {
+                SourcePath = sourcePath,
+                Dirty = false,
+            };
+            Assert.False(DocumentSessionStore.ShouldRestoreClosedTab(closedSaved));
+        }
+        finally
+        {
+            TryDeleteDir(root);
+        }
+    }
+
+    [Fact]
     public void ClosedSessionFileNames_AreManagedSidecars()
     {
         Assert.Equal("closed-2.wav", DocumentSessionStore.FileNameForClosedIndex(2));
@@ -172,6 +311,126 @@ public sealed class DocumentSessionStoreTests
         Assert.Equal(
             "closed-1-history.json",
             DocumentSessionStore.SanitizeSidecarName("closed-1-history.json"));
+    }
+
+    [Fact]
+    public void CollectReferencedSessionFiles_KeepsOnlyFilesThatWillBeRead()
+    {
+        var root = NewTempDir("ref-files");
+        try
+        {
+            var sessionDir = Path.Combine(root, DocumentSessionStore.SessionDirectoryName);
+            Directory.CreateDirectory(sessionDir);
+            var sourcePath = Path.Combine(root, "source.wav");
+            File.WriteAllText(sourcePath, "src");
+            File.WriteAllBytes(Path.Combine(sessionDir, "doc-0.wav"), [1, 2, 3]);
+            File.WriteAllBytes(Path.Combine(sessionDir, "doc-0-origin.wav"), [1, 2, 3]);
+            Assert.True(DocumentSessionStore.TryWriteHistory(
+                Path.Combine(sessionDir, "doc-0-history.json"),
+                new HistorySessionSnapshot
+                {
+                    CurrentIndex = 1,
+                    Recipes = [new HistoryRecipe { Kind = HistoryRecipes.FadeIn, Start = 0, End = 8 }],
+                }));
+
+            var dirtyWithSession = new OpenDocumentSnapshot
+            {
+                SourcePath = sourcePath,
+                Dirty = true,
+                SessionFileName = "doc-0.wav",
+                OriginFileName = "doc-0-origin.wav",
+                HistoryFileName = "doc-0-history.json",
+            };
+            var keep = new List<string>();
+            DocumentSessionStore.CollectReferencedSessionFiles(root, dirtyWithSession, keep);
+            Assert.Equal(["doc-0.wav"], keep);
+
+            var cleanNamed = new OpenDocumentSnapshot
+            {
+                SourcePath = sourcePath,
+                Dirty = false,
+                SessionFileName = "doc-0.wav",
+                OriginFileName = "doc-0-origin.wav",
+                HistoryFileName = "doc-0-history.json",
+            };
+            keep.Clear();
+            DocumentSessionStore.CollectReferencedSessionFiles(root, cleanNamed, keep);
+            Assert.Empty(keep);
+
+            var historyOnly = new OpenDocumentSnapshot
+            {
+                Dirty = true,
+                OriginFileName = "doc-0-origin.wav",
+                HistoryFileName = "doc-0-history.json",
+            };
+            keep.Clear();
+            DocumentSessionStore.CollectReferencedSessionFiles(root, historyOnly, keep);
+            Assert.Contains("doc-0-origin.wav", keep);
+            Assert.Contains("doc-0-history.json", keep);
+            Assert.DoesNotContain("doc-0.wav", keep);
+        }
+        finally
+        {
+            TryDeleteDir(root);
+        }
+    }
+
+    [Fact]
+    public void PruneUnreferencedSessionState_DeletesUnusedSidecarsAndClosedSavedTabs()
+    {
+        var root = NewTempDir("prune");
+        try
+        {
+            var sessionDir = Path.Combine(root, DocumentSessionStore.SessionDirectoryName);
+            Directory.CreateDirectory(sessionDir);
+            var sourcePath = Path.Combine(root, "source.wav");
+            var leftover = Path.Combine(root, "last-document.wav");
+            File.WriteAllText(sourcePath, "src");
+            File.WriteAllText(leftover, "old");
+            File.WriteAllBytes(Path.Combine(sessionDir, "doc-0.wav"), [1]);
+            File.WriteAllBytes(Path.Combine(sessionDir, "doc-0-origin.wav"), [2]);
+            File.WriteAllText(Path.Combine(sessionDir, "doc-0-history.json"), "{}");
+            File.WriteAllBytes(Path.Combine(sessionDir, "closed-0.wav"), [3]);
+
+            var settings = new AppSettings
+            {
+                OpenDocuments =
+                [
+                    new OpenDocumentSnapshot
+                    {
+                        SourcePath = sourcePath,
+                        Dirty = false,
+                        SessionFileName = "doc-0.wav",
+                        OriginFileName = "doc-0-origin.wav",
+                        HistoryFileName = "doc-0-history.json",
+                    },
+                ],
+                ClosedDocuments =
+                [
+                    new OpenDocumentSnapshot
+                    {
+                        SourcePath = sourcePath,
+                        Dirty = false,
+                        SessionFileName = "closed-0.wav",
+                    },
+                ],
+            };
+
+            Assert.True(DocumentSessionStore.PruneUnreferencedSessionState(root, settings, leftover));
+            Assert.False(File.Exists(leftover));
+            Assert.False(File.Exists(Path.Combine(sessionDir, "doc-0.wav")));
+            Assert.False(File.Exists(Path.Combine(sessionDir, "doc-0-origin.wav")));
+            Assert.False(File.Exists(Path.Combine(sessionDir, "doc-0-history.json")));
+            Assert.False(File.Exists(Path.Combine(sessionDir, "closed-0.wav")));
+            Assert.False(Directory.Exists(sessionDir));
+            Assert.Equal(string.Empty, settings.OpenDocuments[0].SessionFileName);
+            Assert.Equal(string.Empty, settings.OpenDocuments[0].OriginFileName);
+            Assert.Empty(settings.ClosedDocuments);
+        }
+        finally
+        {
+            TryDeleteDir(root);
+        }
     }
 
     [Fact]

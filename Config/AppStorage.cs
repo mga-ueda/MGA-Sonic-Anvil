@@ -22,6 +22,17 @@ internal static class AppStorage
     {
         Directory.CreateDirectory(RootDirectory);
         Load();
+        if (DocumentSessionStore.PruneUnreferencedSessionState(
+                RootDirectory,
+                Settings,
+                SessionDocumentPath))
+        {
+            Save();
+        }
+        else
+        {
+            ClearSessionDocument();
+        }
     }
 
     public static void AcknowledgeSettingsReset() => SettingsReset = SettingsFileReset.None;
@@ -70,6 +81,7 @@ internal static class AppStorage
     {
         Directory.CreateDirectory(SessionDirectory);
         DocumentSessionStore.RemoveOrphanSessionFiles(SessionDirectory, keepFileNames);
+        DocumentSessionStore.TryDeleteEmptyDirectory(SessionDirectory);
         ClearSessionDocument();
     }
 

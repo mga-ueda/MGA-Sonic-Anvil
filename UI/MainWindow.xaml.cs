@@ -443,7 +443,7 @@ public partial class MainWindow : Window
             ExtinguishMeter();
             SyncMonitorLayout();
             LoudnessMeter.Document = _document;
-            LoudnessMeter.Reset();
+            LoudnessMeter.ResetLive();
             RebuildTabBar();
             RefreshTitle();
             SyncViewChrome();

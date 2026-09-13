@@ -24,7 +24,44 @@ internal sealed class SpectrogramCache : IDisposable
     public SpectrogramCache()
     {
         SpectrogramEngine.FillHann(_window, out _windowSum);
-        TryDeleteStaleTempFiles();
+        DeleteLeftoverTempFiles();
+    }
+
+    public static void DeleteLeftoverTempFiles()
+    {
+        try
+        {
+            var dir = Path.Combine(Path.GetTempPath(), TempFolderName);
+            if (!Directory.Exists(dir))
+            {
+                return;
+            }
+
+            foreach (var path in Directory.EnumerateFiles(dir, FilePrefix + "*.bin"))
+            {
+                try
+                {
+                    File.Delete(path);
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+            }
+
+            if (Directory.GetFileSystemEntries(dir).Length == 0)
+            {
+                Directory.Delete(dir);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     public bool IsReady
@@ -242,33 +279,6 @@ internal sealed class SpectrogramCache : IDisposable
                     _building = null;
                 }
             }
-        }
-    }
-
-    private static void TryDeleteStaleTempFiles()
-    {
-        try
-        {
-            var dir = Path.Combine(Path.GetTempPath(), TempFolderName);
-            if (!Directory.Exists(dir))
-            {
-                return;
-            }
-
-            var cutoff = DateTime.UtcNow.AddDays(-1);
-            foreach (var path in Directory.EnumerateFiles(dir, FilePrefix + "*.bin"))
-            {
-                if (File.GetLastWriteTimeUtc(path) < cutoff)
-                {
-                    File.Delete(path);
-                }
-            }
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
         }
     }
 

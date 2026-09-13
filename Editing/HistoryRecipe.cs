@@ -104,6 +104,64 @@ internal static class HistoryRecipes
     public const string ConvertBits = "ConvertBits";
     public const string ConvertChannels = "ConvertChannels";
 
+    private static readonly HashSet<string> KnownKinds = new(StringComparer.Ordinal)
+    {
+        FadeIn,
+        FadeOut,
+        FadeAround,
+        Normalize,
+        Gain,
+        PitchShift,
+        TimeStretch,
+        Reverse,
+        Delete,
+        Paste,
+        SetSampleLoop,
+        SetRegion,
+        RemoveRegions,
+        AddMarker,
+        ReplaceMarkers,
+        ReplaceRegions,
+        MarkerComment,
+        RegionName,
+        RemoveMarkers,
+        MoveMarkers,
+        MoveTimeline,
+        ConvertRate,
+        ConvertBits,
+        ConvertChannels,
+    };
+
+    private static readonly HashSet<string> SampleKinds = new(StringComparer.Ordinal)
+    {
+        FadeIn,
+        FadeOut,
+        FadeAround,
+        Normalize,
+        Gain,
+        PitchShift,
+        TimeStretch,
+        Reverse,
+        Delete,
+        Paste,
+        ConvertRate,
+        ConvertBits,
+        ConvertChannels,
+    };
+
+    public static bool IsKnownKind(string? kind) =>
+        kind is { Length: > 0 } && KnownKinds.Contains(kind);
+
+    public static bool CanImport(HistorySessionSnapshot? snapshot) =>
+        snapshot?.Recipes is { Length: > 0 } recipes
+        && recipes.All(recipe => IsKnownKind(recipe.Kind));
+
+    public static bool AffectsSamples(HistoryRecipe recipe) =>
+        recipe.Kind is { Length: > 0 } && SampleKinds.Contains(recipe.Kind);
+
+    public static bool AffectsSamples(HistorySessionSnapshot snapshot) =>
+        snapshot.Recipes is { Length: > 0 } recipes && recipes.Any(AffectsSamples);
+
     public static HistoryRecipe Range(
         string kind,
         int sourceRate,

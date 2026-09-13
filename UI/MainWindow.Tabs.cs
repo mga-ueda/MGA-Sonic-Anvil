@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -151,7 +152,24 @@ public partial class MainWindow
             return;
         }
 
+        if (closed.Pending is { } pending)
+        {
+            if (IsUiBusy)
+            {
+                _workspace.RememberClosedPending(pending, closed.Index);
+                return;
+            }
+
+            _ = ReopenPendingClosedAsync(pending, closed.Index);
+            return;
+        }
+
         var session = closed.Session;
+        if (session is null)
+        {
+            return;
+        }
+
         if (_sessions.Contains(session))
         {
             ActivateSession(session);
@@ -168,6 +186,34 @@ public partial class MainWindow
         var index = Math.Clamp(closed.Index, 0, _sessions.Count);
         _sessions.Insert(index, session);
         ActivateSession(session);
+    }
+
+    private async Task ReopenPendingClosedAsync(OpenDocumentSnapshot snap, int insertIndex)
+    {
+        BeginOpenWork([SnapshotDisplayName(snap)]);
+        try
+        {
+            var session = await TryRestoreSessionAsync(snap).ConfigureAwait(true);
+            if (session is null)
+            {
+                return;
+            }
+
+            if (session.Document.SourcePath is { } path
+                && FindSessionByPath(path) is { } existing)
+            {
+                ActivateSession(existing);
+                return;
+            }
+
+            var index = Math.Clamp(insertIndex, 0, _sessions.Count);
+            _sessions.Insert(index, session);
+            ActivateSession(session);
+        }
+        finally
+        {
+            EndOpenWork(showProgress: false);
+        }
     }
 
     private void CloseOtherTabs(DocumentSession keep)
