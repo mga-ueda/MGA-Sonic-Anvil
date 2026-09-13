@@ -191,6 +191,12 @@ internal static class SpectrogramEngine
     public static float UnpackLinearUnit(ushort packed) =>
         packed / (float)LinearUnitScale;
 
+    /// <summary>
+    /// LUT バイト→線形ユニット（0–1）の事前計算表。ホットループでは
+    /// <see cref="LinearUnitFromLifted"/> の二分探索を画素ごとに回さず、この表を補間する。
+    /// </summary>
+    internal static float[] LinearUnitFromLutTable => LinearFromLut;
+
     /// <summary>持ち上げ済み LUT（0–255、小数のまま）を線形ユニットへ。0 は無音。</summary>
     public static ushort LinearUnitFromLifted(float liftedByte)
     {

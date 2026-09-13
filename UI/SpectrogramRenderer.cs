@@ -25,6 +25,14 @@ internal sealed class SpectrogramRenderer
     private bool _hasUnits;
     private double[] _rowHertz = [];
     private int _rowHeight;
+    private int[] _rowBin0 = [];
+    private int[] _rowBin1 = [];
+    private float[] _rowBinT = [];
+    private bool[] _rowSilent = [];
+    private int _rowBinsHeight;
+    private int _rowBinsRate;
+    private readonly byte[] _cacheCol0 = new byte[SpectrogramEngine.BinCount];
+    private readonly byte[] _cacheCol1 = new byte[SpectrogramEngine.BinCount];
     private Size _dipSize;
     private double _dpiX;
     private double _dpiY;
@@ -209,9 +217,28 @@ internal sealed class SpectrogramRenderer
             _gainSamples = document.Interleaved;
         }
 
+        var mapDirty = float.IsNaN(_mapBoostDb) || Math.Abs(_mapBoostDb - _displayBoostDb) >= 0.01f;
+        if (mapDirty)
+        {
+            SpectrogramEngine.FillBoostLinearMap(_boostMap, _displayBoostDb);
+            _mapBoostDb = _displayBoostDb;
+        }
+
+        // シフト再利用できた列はピクセルも一緒にずらしてあるので、ブースト（LUT 適用）は
+        // 差分列だけでよい。ブースト値が変わったときだけ全列を塗り直す。
+        var dirtyX0 = 0;
+        var dirtyX1 = bmpWidth;
         if (!sameView)
         {
-            if (!TryShiftColumns(document, quantStart, bmpSpan, bmpWidth, height, fromCache))
+            if (TryShiftColumns(document, quantStart, bmpSpan, bmpWidth, height, fromCache, out var freshX0, out var freshX1))
+            {
+                if (!mapDirty && Math.Abs(_appliedBoostDb - _displayBoostDb) < 0.01f)
+                {
+                    dirtyX0 = freshX0;
+                    dirtyX1 = freshX1;
+                }
+            }
+            else
             {
                 RasterizeSpan(document, quantStart, bmpSpan, bmpWidth, height, 0, bmpWidth, fromCache);
             }
@@ -219,7 +246,7 @@ internal sealed class SpectrogramRenderer
             _hasUnits = true;
         }
 
-        ApplyBoostToPixels(needed);
+        ApplyBoostToPixels(dirtyX0, dirtyX1, bmpWidth, height);
         _bitmap.WritePixels(new Int32Rect(0, 0, bmpWidth, height), _pixels, bmpWidth * 4, 0);
         _samples = document.Interleaved;
         _dipSize = wave.Size;
@@ -261,8 +288,12 @@ internal sealed class SpectrogramRenderer
         double viewSpan,
         int width,
         int height,
-        bool fromCache)
+        bool fromCache,
+        out int freshX0,
+        out int freshX1)
     {
+        freshX0 = 0;
+        freshX1 = width;
         if (!ReferenceEquals(_samples, document.Interleaved)
             || _pixelWidth != width
             || _pixelHeight != height
@@ -281,20 +312,23 @@ internal sealed class SpectrogramRenderer
             return false;
         }
 
-        ShiftUnits(width, height, shiftPx);
+        ShiftColumns(width, height, shiftPx);
         if (shiftPx > 0)
         {
-            RasterizeSpan(document, viewStart, viewSpan, width, height, width - shiftPx, width, fromCache);
+            freshX0 = width - shiftPx;
+            freshX1 = width;
         }
         else
         {
-            RasterizeSpan(document, viewStart, viewSpan, width, height, 0, -shiftPx, fromCache);
+            freshX0 = 0;
+            freshX1 = -shiftPx;
         }
 
+        RasterizeSpan(document, viewStart, viewSpan, width, height, freshX0, freshX1, fromCache);
         return true;
     }
 
-    private void ShiftUnits(int width, int height, int shiftPx)
+    private void ShiftColumns(int width, int height, int shiftPx)
     {
         if (shiftPx > 0)
         {
@@ -302,6 +336,7 @@ internal sealed class SpectrogramRenderer
             {
                 var row = y * width;
                 Array.Copy(_units, row + shiftPx, _units, row, width - shiftPx);
+                Array.Copy(_pixels, row + shiftPx, _pixels, row, width - shiftPx);
             }
 
             return;
@@ -312,20 +347,26 @@ internal sealed class SpectrogramRenderer
         {
             var row = y * width;
             Array.Copy(_units, row, _units, row + left, width - left);
+            Array.Copy(_pixels, row, _pixels, row + left, width - left);
         }
     }
 
-    private void ApplyBoostToPixels(int count)
+    private void ApplyBoostToPixels(int x0, int x1, int width, int height)
     {
-        if (float.IsNaN(_mapBoostDb) || Math.Abs(_mapBoostDb - _displayBoostDb) >= 0.01f)
+        x0 = Math.Clamp(x0, 0, width);
+        x1 = Math.Clamp(x1, x0, width);
+        if (x1 <= x0)
         {
-            SpectrogramEngine.FillBoostLinearMap(_boostMap, _displayBoostDb);
-            _mapBoostDb = _displayBoostDb;
+            return;
         }
 
-        for (var i = 0; i < count; i++)
+        for (var y = 0; y < height; y++)
         {
-            _pixels[i] = _boostMap[_units[i]];
+            var row = y * width;
+            for (var x = x0; x < x1; x++)
+            {
+                _pixels[row + x] = _boostMap[_units[row + x]];
+            }
         }
     }
 
@@ -362,27 +403,93 @@ internal sealed class SpectrogramRenderer
         int x1,
         int sampleRate)
     {
-        var binHz = Math.Max(1, sampleRate) / (double)SpectrogramEngine.FftSize;
-        var nyquist = SpectrogramEngine.ContentNyquist(sampleRate);
+        // 画素ごとの TryLinearUnit（ロック＋メモリマップ読み×4＋二分探索）は
+        // 深いズームの追従スクロールで支配的なコストになる。列ごとに LUT 列を
+        // 一括で読み、行のビン補間係数は事前計算表で済ませる。
+        EnsureRowBins(height, sampleRate);
+        var unitLut = SpectrogramEngine.LinearUnitFromLutTable;
         for (var x = x0; x < x1; x++)
         {
             var center = (long)Math.Round(viewStart + (x + 0.5) / width * viewSpan);
+            if (!_cache.TryReadColumnPair(center, _cacheCol0, _cacheCol1, out var txd))
+            {
+                for (var y = 0; y < height; y++)
+                {
+                    _units[y * width + x] = 0;
+                }
+
+                continue;
+            }
+
+            var tx = (float)txd;
             var row = 0;
             for (var y = 0; y < height; y++)
             {
-                var hz = _rowHertz[y];
-                if (hz > nyquist || !_cache.TryLinearUnit(center, hz / binHz, out var unit))
+                if (_rowSilent[y])
                 {
                     _units[row + x] = 0;
-                }
-                else
-                {
-                    _units[row + x] = unit;
+                    row += width;
+                    continue;
                 }
 
+                var b0 = _rowBin0[y];
+                var b1 = _rowBin1[y];
+                var ty = _rowBinT[y];
+                var u00 = unitLut[_cacheCol0[b0]];
+                var u01 = unitLut[_cacheCol0[b1]];
+                var u10 = unitLut[_cacheCol1[b0]];
+                var u11 = unitLut[_cacheCol1[b1]];
+                var u0 = u00 + (u01 - u00) * ty;
+                var u1 = u10 + (u11 - u10) * ty;
+                var unit = u0 + (u1 - u0) * tx;
+                _units[row + x] = (ushort)(unit * SpectrogramEngine.LinearUnitScale + 0.5f);
                 row += width;
             }
         }
+    }
+
+    /// <summary>行→FFT ビンの補間係数。高さとサンプルレートが変わったときだけ作り直す。</summary>
+    private void EnsureRowBins(int height, int sampleRate)
+    {
+        EnsureRowHertz(height);
+        if (_rowBinsHeight == height && _rowBinsRate == sampleRate)
+        {
+            return;
+        }
+
+        if (_rowBin0.Length < height)
+        {
+            _rowBin0 = new int[height];
+            _rowBin1 = new int[height];
+            _rowBinT = new float[height];
+            _rowSilent = new bool[height];
+        }
+
+        var binHz = Math.Max(1, sampleRate) / (double)SpectrogramEngine.FftSize;
+        var nyquist = SpectrogramEngine.ContentNyquist(sampleRate);
+        var lastBin = SpectrogramEngine.BinCount - 1;
+        for (var y = 0; y < height; y++)
+        {
+            var hz = _rowHertz[y];
+            if (hz > nyquist)
+            {
+                _rowSilent[y] = true;
+                _rowBin0[y] = 0;
+                _rowBin1[y] = 0;
+                _rowBinT[y] = 0;
+                continue;
+            }
+
+            _rowSilent[y] = false;
+            var binF = Math.Clamp(hz / binHz, 0, lastBin);
+            var b0 = (int)Math.Floor(binF);
+            _rowBin0[y] = b0;
+            _rowBin1[y] = Math.Min(lastBin, b0 + 1);
+            _rowBinT[y] = (float)(binF - b0);
+        }
+
+        _rowBinsHeight = height;
+        _rowBinsRate = sampleRate;
     }
 
     private void RasterizeColumns(
@@ -421,11 +528,26 @@ internal sealed class SpectrogramRenderer
         }
     }
 
-    private static void DrawFrequencyScale(DrawingContext dc, Rect wave, Visual host)
+    private readonly Dictionary<string, (FormattedText Fill, FormattedText Outline)> _scaleLabels =
+        new(StringComparer.Ordinal);
+
+    private double _scaleLabelDpi;
+    private Color _scaleLabelColor;
+
+    private void DrawFrequencyScale(DrawingContext dc, Rect wave, Visual host)
     {
         var maxHertz = SpectrogramEngine.DisplayMaxHertz;
         var dpi = VisualTreeHelper.GetDpi(host).PixelsPerDip;
-        var fill = WpfControlHelpers.FrozenBrush(Theme.Get("SpectrogramScaleForeBrush"));
+        var fillColor = Theme.Get("SpectrogramScaleForeBrush");
+        // FormattedText の生成（文字整形）は毎ペイントだと高くつく。ラベルは固定なのでキャッシュする。
+        if (Math.Abs(dpi - _scaleLabelDpi) > 0.001 || fillColor != _scaleLabelColor)
+        {
+            _scaleLabels.Clear();
+            _scaleLabelDpi = dpi;
+            _scaleLabelColor = fillColor;
+        }
+
+        var fill = WpfControlHelpers.FrozenBrush(fillColor);
         var edge = WpfControlHelpers.FrozenBrush(FrequencyLabelEdge);
         var grid = WpfControlHelpers.FrozenHairline(Color.FromArgb(26, 255, 255, 255), dpi);
         foreach (var mark in SpectrogramEngine.FrequencyMarks)
@@ -439,10 +561,17 @@ internal sealed class SpectrogramRenderer
             var y = WpfControlHelpers.SnapDeviceCenter(wave.Y + (1 - unit) * wave.Height, dpi);
             dc.DrawLine(grid, new Point(wave.X, y), new Point(wave.Right, y));
             var label = SpectrogramEngine.FormatHertz(mark);
-            var text = WpfControlHelpers.MonoText(label, 8, fill, dpi);
-            var x = wave.Right - text.Width - 4;
-            var ty = Math.Clamp(y - text.Height * 0.5, wave.Y, wave.Bottom - text.Height);
-            DrawHaloLabel(dc, label, fill, edge, dpi, new Point(x, ty));
+            if (!_scaleLabels.TryGetValue(label, out var texts))
+            {
+                texts = (
+                    WpfControlHelpers.MonoText(label, 8, fill, dpi),
+                    WpfControlHelpers.MonoText(label, 8, edge, dpi));
+                _scaleLabels[label] = texts;
+            }
+
+            var x = wave.Right - texts.Fill.Width - 4;
+            var ty = Math.Clamp(y - texts.Fill.Height * 0.5, wave.Y, wave.Bottom - texts.Fill.Height);
+            DrawHaloLabel(dc, texts.Outline, texts.Fill, new Point(x, ty));
         }
     }
 
@@ -458,18 +587,15 @@ internal sealed class SpectrogramRenderer
 
     private static void DrawHaloLabel(
         DrawingContext dc,
-        string label,
-        Brush fill,
-        Brush edge,
-        double dpi,
+        FormattedText outline,
+        FormattedText fill,
         Point origin)
     {
-        var outline = WpfControlHelpers.MonoText(label, 8, edge, dpi);
         foreach (var (dx, dy) in FrequencyLabelHalo)
         {
             dc.DrawText(outline, new Point(origin.X + dx, origin.Y + dy));
         }
 
-        dc.DrawText(WpfControlHelpers.MonoText(label, 8, fill, dpi), origin);
+        dc.DrawText(fill, origin);
     }
 }

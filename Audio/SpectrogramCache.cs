@@ -170,6 +170,31 @@ internal sealed class SpectrogramCache : IDisposable
         return session.TryLinearUnit(frame, bin, out unit);
     }
 
+    /// <summary>
+    /// 画面 1 列ぶんの LUT 列（左右 2 本）を一括で読む。画素ごとにロックと
+    /// メモリマップ読みを繰り返さないためのホットループ用の口。tx は列間の補間係数。
+    /// </summary>
+    public bool TryReadColumnPair(long frame, byte[] col0, byte[] col1, out double tx)
+    {
+        Session? session;
+        lock (_gate)
+        {
+            session = _published;
+            if (session is null || !session.IsComplete)
+            {
+                session = _building;
+            }
+        }
+
+        if (session is null)
+        {
+            tx = 0;
+            return false;
+        }
+
+        return session.TryReadColumnPair(frame, col0, col1, out tx);
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -411,6 +436,45 @@ internal sealed class SpectrogramCache : IDisposable
 
             unit = SpectrogramEngine.LinearUnitFromLifted((float)lifted);
             return true;
+        }
+
+        public bool TryReadColumnPair(long frame, byte[] col0, byte[] col1, out double tx)
+        {
+            var ready = ReadyColumns;
+            if (ready <= 0 || _disposed)
+            {
+                tx = 0;
+                return false;
+            }
+
+            var lastCol = Math.Min(ColumnCount, ready) - 1;
+            if (lastCol < 0)
+            {
+                tx = 0;
+                return false;
+            }
+
+            var colF = Math.Clamp(frame / (double)SpectrogramEngine.Hop, 0, lastCol);
+            var c0 = (int)Math.Floor(colF);
+            var c1 = Math.Min(lastCol, c0 + 1);
+            tx = colF - c0;
+            ReadColumn(c0, col0);
+            if (c1 == c0)
+            {
+                Array.Copy(col0, col1, SpectrogramEngine.BinCount);
+            }
+            else
+            {
+                ReadColumn(c1, col1);
+            }
+
+            return true;
+        }
+
+        private void ReadColumn(int column, byte[] dest)
+        {
+            var offset = HeaderSize + (long)column * SpectrogramEngine.BinCount;
+            _view.ReadArray(offset, dest, 0, SpectrogramEngine.BinCount);
         }
 
         private bool TryLifted(long frame, double bin, out double lifted)
