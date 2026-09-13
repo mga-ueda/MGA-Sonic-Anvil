@@ -304,16 +304,18 @@ public partial class MainWindow
             Placement = PlacementMode.MousePoint,
         };
 
+        var canMutate = !IsUiBusy && !IsRecording;
         if (HasTabSelection)
         {
             var targets = SelectedTabsInOrder();
             menu.Items.Add(AllTabsSelected
-                ? CreateTabMenuItem(UiStrings.TabMenuCloseAll, CloseAllTabs, "Ctrl+Shift+W")
-                : CreateTabMenuItem(UiStrings.TabMenuCloseSelected, () => CloseTabs(targets)));
+                ? CreateTabMenuItem(UiStrings.TabMenuCloseAll, CloseAllTabs, "Ctrl+Shift+W", canMutate)
+                : CreateTabMenuItem(UiStrings.TabMenuCloseSelected, () => CloseTabs(targets), enabled: canMutate));
             menu.Items.Add(CreateTabMenuItem(
                 AllTabsSelected ? UiStrings.TabMenuPasteToAll : UiStrings.TabMenuPasteToSelected,
                 () => PasteHistoryRecipesToTabs(targets),
-                "Ctrl+V"));
+                "Ctrl+V",
+                enabled: canMutate && _historyRecipeClipboard.Count > 0));
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 AllTabsSelected ? UiStrings.TabMenuExportWaveAll : UiStrings.TabMenuExportWaveSelected,
@@ -327,20 +329,37 @@ public partial class MainWindow
             menu.Items.Add(CreateTabMenuItem(
                 AllTabsSelected ? UiStrings.TabMenuExportWaveByMarkersAll : UiStrings.TabMenuExportWaveByMarkersSelected,
                 () => ExportTabsSeparated(targets, TabExportSplit.Markers),
-                enabled: !IsUiBusy));
+                enabled: !IsUiBusy && AnyTabHasMarkers(targets)));
             menu.Items.Add(CreateTabMenuItem(
                 AllTabsSelected ? UiStrings.TabMenuExportWaveByRegionsAll : UiStrings.TabMenuExportWaveByRegionsSelected,
                 () => ExportTabsSeparated(targets, TabExportSplit.Regions),
-                enabled: !IsUiBusy));
+                enabled: !IsUiBusy && AnyTabHasRegions(targets)));
         }
         else
         {
-            menu.Items.Add(CreateTabMenuItem(UiStrings.TabMenuCloseOthers, () => CloseOtherTabs(session)));
-            menu.Items.Add(CreateTabMenuItem(UiStrings.TabMenuCloseRight, () => CloseTabsFrom(session, rightSide: true)));
-            menu.Items.Add(CreateTabMenuItem(UiStrings.TabMenuCloseLeft, () => CloseTabsFrom(session, rightSide: false)));
-            menu.Items.Add(CreateTabMenuItem(UiStrings.TabMenuCloseAllNormal, CloseAllTabs, "Ctrl+Shift+W"));
+            var index = _sessions.IndexOf(session);
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.TabMenuCloseOthers,
+                () => CloseOtherTabs(session),
+                enabled: canMutate && _sessions.Count > 1));
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.TabMenuCloseRight,
+                () => CloseTabsFrom(session, rightSide: true),
+                enabled: canMutate && index >= 0 && index < _sessions.Count - 1));
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.TabMenuCloseLeft,
+                () => CloseTabsFrom(session, rightSide: false),
+                enabled: canMutate && index > 0));
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.TabMenuCloseAllNormal,
+                CloseAllTabs,
+                "Ctrl+Shift+W",
+                canMutate));
             menu.Items.Add(new Separator());
-            menu.Items.Add(CreateTabMenuItem(UiStrings.TabMenuSelectAll, SelectAllTabs));
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.TabMenuSelectAll,
+                SelectAllTabs,
+                enabled: _sessions.Count > 1 && !AllTabsSelected));
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.TabMenuExportWave,
@@ -353,14 +372,40 @@ public partial class MainWindow
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.TabMenuExportWaveByMarkers,
                 () => ExportTabsSeparated([session], TabExportSplit.Markers),
-                enabled: !IsUiBusy));
+                enabled: !IsUiBusy && AnyTabHasMarkers([session])));
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.TabMenuExportWaveByRegions,
                 () => ExportTabsSeparated([session], TabExportSplit.Regions),
-                enabled: !IsUiBusy));
+                enabled: !IsUiBusy && AnyTabHasRegions([session])));
         }
 
         menu.IsOpen = true;
+    }
+
+    private static bool AnyTabHasMarkers(IEnumerable<DocumentSession> sessions)
+    {
+        foreach (var session in sessions)
+        {
+            if (session.Document.Markers.Count > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool AnyTabHasRegions(IEnumerable<DocumentSession> sessions)
+    {
+        foreach (var session in sessions)
+        {
+            if (session.Document.AllowsRegionsAndLoops && session.Document.Regions.Count > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static MenuItem CreateTabMenuItem(
