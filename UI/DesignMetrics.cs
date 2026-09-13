@@ -218,7 +218,7 @@ internal static class DesignMetrics
     public static double HistoryStripRowHeight => From96(14);
 
     /// <summary>スペアナ左のラウドネスメーター幅。縦積み1列。履歴枠との間だけ詰める。</summary>
-    public static double LoudnessMeterWidth => From96(200);
+    public static double LoudnessMeterWidth => From96(224);
 
     /// <summary>正方形ゴニオ直下の位相バー高さ。</summary>
     public static double VectorScopeCorrelationHeight => From96(18);

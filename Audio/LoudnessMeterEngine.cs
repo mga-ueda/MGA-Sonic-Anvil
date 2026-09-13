@@ -38,6 +38,7 @@ internal sealed class LoudnessMeterEngine
     private double _blockSum;
     private int _blockCount;
     private float _momentaryMax = float.NegativeInfinity;
+    private float _shortTermMax = float.NegativeInfinity;
     private float _truePeak;
     private float _prevL;
     private float _prevR;
@@ -98,6 +99,7 @@ internal sealed class LoudnessMeterEngine
         _blockSum = 0;
         _blockCount = 0;
         _momentaryMax = float.NegativeInfinity;
+        _shortTermMax = float.NegativeInfinity;
         _truePeak = 0;
         _prevL = 0;
         _prevR = 0;
@@ -137,15 +139,62 @@ internal sealed class LoudnessMeterEngine
             _momentaryMax = momentary;
         }
 
+        var shortTerm = ShortTermLufs();
+        if (float.IsFinite(shortTerm) && shortTerm > _shortTermMax)
+        {
+            _shortTermMax = shortTerm;
+        }
+
         Snapshot = new LoudnessSnapshot(
             momentary,
-            ShortTermLufs(),
+            shortTerm,
             IntegratedLufs(),
             _momentaryMax,
             LoudnessRange(),
             TruePeakDb(),
             TargetLufs);
         return Snapshot;
+    }
+
+    public float MaxShortTermLufs =>
+        float.IsFinite(_shortTermMax) ? _shortTermMax : Snapshot.ShortTermLufs;
+
+    /// <summary>波形全体を一度通した表示用スナップ。Short Term はファイル内の最大。</summary>
+    public static LoudnessSnapshot MeasureFile(
+        float[] interleaved,
+        int channels,
+        int sampleRate,
+        double targetLufs = DefaultTargetLufs)
+    {
+        channels = Math.Max(1, channels);
+        sampleRate = Math.Max(1000, sampleRate);
+        var engine = new LoudnessMeterEngine { TargetLufs = ClampTargetLufs(targetLufs) };
+        var frames = interleaved.Length / channels;
+        if (frames <= 0)
+        {
+            return LoudnessSnapshot.Idle with { TargetLufs = engine.TargetLufs };
+        }
+
+        const int chunk = 8192;
+        var left = new float[chunk];
+        var right = new float[chunk];
+        var offset = 0;
+        while (offset < frames)
+        {
+            var n = Math.Min(chunk, frames - offset);
+            for (var i = 0; i < n; i++)
+            {
+                var origin = (offset + i) * channels;
+                left[i] = interleaved[origin];
+                right[i] = channels > 1 ? interleaved[origin + 1] : left[i];
+            }
+
+            engine.Process(left.AsSpan(0, n), right.AsSpan(0, n), n, sampleRate);
+            offset += n;
+        }
+
+        var snap = engine.Snapshot;
+        return snap with { ShortTermLufs = engine.MaxShortTermLufs };
     }
 
     private void Configure(int sampleRate)
@@ -166,6 +215,7 @@ internal sealed class LoudnessMeterEngine
         _momentarySum = 0;
         _shortSum = 0;
         _momentaryMax = float.NegativeInfinity;
+        _shortTermMax = float.NegativeInfinity;
     }
 
     private void PushMeanSquare(double ms)
@@ -192,7 +242,13 @@ internal sealed class LoudnessMeterEngine
 
         if (_shortCount >= _shortLen)
         {
-            _shortTermHistory.Add(_shortSum / _shortCount);
+            var shortMs = _shortSum / _shortCount;
+            _shortTermHistory.Add(shortMs);
+            var shortLufs = MeanSquareToLufs(shortMs);
+            if (float.IsFinite(shortLufs) && shortLufs > _shortTermMax)
+            {
+                _shortTermMax = shortLufs;
+            }
         }
     }
 

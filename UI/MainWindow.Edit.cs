@@ -1047,6 +1047,7 @@ public partial class MainWindow
         Waveform.SetTrailRecording(false);
         Transport.SetPlaying(false);
         ExtinguishMeter();
+        LoudnessMeter.Tick();
         Waveform.UnlockCenter();
     }
 

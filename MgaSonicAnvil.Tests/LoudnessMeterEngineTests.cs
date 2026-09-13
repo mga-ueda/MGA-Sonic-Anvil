@@ -1,4 +1,7 @@
+using System.Windows.Media;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
+using MgaSonicAnvil.UI;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
@@ -47,6 +50,46 @@ public sealed class LoudnessMeterEngineTests
         var profile = LoudnessMeterEngine.BuildShortTermProfile(interleaved, 2, rate);
         Assert.True(profile.Values.Length >= 10);
         Assert.InRange(profile.AtFrame(frames - 1), -22.5f, -19.5f);
+
+        var measured = LoudnessMeterEngine.MeasureFile(interleaved, 2, rate);
+        Assert.InRange(measured.IntegratedLufs, -22.5f, -19.5f);
+        Assert.InRange(measured.ShortTermLufs, -22.5f, -19.5f);
+        Assert.InRange(measured.TruePeakDb, -22.5f, -19f);
+    }
+
+    [Fact]
+    public void MeasureFile_ShortTermIsFileMaximum()
+    {
+        const int rate = 48000;
+        var loudFrames = rate * 4;
+        var quietFrames = rate * 4;
+        var frames = loudFrames + quietFrames;
+        var interleaved = new float[frames * 2];
+        var amp = (float)Math.Pow(10, -20d / 20d);
+        for (var i = 0; i < loudFrames; i++)
+        {
+            var s = amp * (float)Math.Sin(2 * Math.PI * 1000 * i / rate);
+            interleaved[i * 2] = s;
+            interleaved[i * 2 + 1] = s;
+        }
+
+        var engine = new LoudnessMeterEngine();
+        var left = new float[frames];
+        var right = new float[frames];
+        for (var i = 0; i < frames; i++)
+        {
+            left[i] = interleaved[i * 2];
+            right[i] = interleaved[i * 2 + 1];
+        }
+
+        var live = engine.Process(left, right, frames, rate);
+        Assert.True(live.ShortTermLufs < -40f);
+        Assert.InRange(engine.MaxShortTermLufs, -22.5f, -19.5f);
+
+        var measured = LoudnessMeterEngine.MeasureFile(interleaved, 2, rate);
+        Assert.InRange(measured.ShortTermLufs, -22.5f, -19.5f);
+        Assert.InRange(measured.IntegratedLufs, live.IntegratedLufs - 0.2f, live.IntegratedLufs + 0.2f);
+        Assert.InRange(measured.MomentaryMaxLufs, -22.5f, -19.5f);
     }
 
     [Fact]
@@ -112,4 +155,30 @@ public sealed class LoudnessMeterEngineTests
         Assert.Equal(LoudnessTraffic.Danger, LoudnessTrafficLight.ForLra(26f));
         Assert.Equal(LoudnessTraffic.Idle, LoudnessTrafficLight.ForLra(float.NaN));
     }
+
+    [Fact]
+    public void FillChip_OnlyWhenOfflineAndActive()
+    {
+        Assert.True(LoudnessMeterView.UsesFillChip(offline: true, LoudnessTraffic.Safe));
+        Assert.True(LoudnessMeterView.UsesFillChip(offline: true, LoudnessTraffic.Caution));
+        Assert.False(LoudnessMeterView.UsesFillChip(offline: true, LoudnessTraffic.Idle));
+        Assert.False(LoudnessMeterView.UsesFillChip(offline: false, LoudnessTraffic.Safe));
+    }
+
+    [Fact]
+    public void ChipText_IsBlackInDarkAndWhiteInLight()
+    {
+        Assert.Equal(Colors.Black, LoudnessMeterView.ChipTextColor(UiTheme.Dark));
+        Assert.Equal(Colors.White, LoudnessMeterView.ChipTextColor(UiTheme.Light));
+        Assert.Equal("SpectrogramScaleForeBrush", LoudnessMeterView.ChromeForeKey(UiTheme.Dark));
+        Assert.Equal("MutedForeBrush", LoudnessMeterView.ChromeForeKey(UiTheme.Light));
+        var cyan = Color.FromRgb(0x3A, 0xB8, 0xE8);
+        var darkChip = LoudnessMeterView.ShadeChipFill(cyan, UiTheme.Dark);
+        var lightChip = LoudnessMeterView.ShadeChipFill(cyan, UiTheme.Light);
+        Assert.True(Luma(darkChip) < Luma(cyan));
+        Assert.True(Luma(lightChip) > Luma(cyan));
+    }
+
+    private static double Luma(Color color) =>
+        (0.2126 * color.R + 0.7152 * color.G + 0.0722 * color.B) / 255d;
 }

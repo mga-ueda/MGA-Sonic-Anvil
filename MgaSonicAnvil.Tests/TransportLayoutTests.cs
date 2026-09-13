@@ -66,7 +66,7 @@ public sealed class TransportLayoutTests
             (UiStrings.LabelLra, UiStrings.LabelLu),
             (UiStrings.LabelTruePeak, UiStrings.LabelDb),
         };
-        var need = rows.Max(row => WidthOf(row.Item1) + 6 + WidthOf(value) + 4 + WidthOf(row.Item2)) + 4 + 6;
+        var need = rows.Max(row => WidthOf(row.Item1) + 6 + 3 + WidthOf(value) + 3 + 4 + WidthOf(row.Item2)) + 4 + 6;
         Assert.True(DesignMetrics.LoudnessMeterWidth + 0.5 >= need, $"need {need}, have {DesignMetrics.LoudnessMeterWidth}");
         Assert.Equal(176, DesignMetrics.HistoryStripWidth);
     }
