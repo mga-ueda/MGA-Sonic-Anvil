@@ -857,13 +857,7 @@ public partial class MainWindow
         {
             CaptureActiveSessionView();
             var settings = AppStorage.Settings;
-            var closed = _workspace.ClosedTabs
-                .Where(tab => tab.Session is { } session
-                    ? DocumentSessionStore.ShouldPersistClosedTab(session.Document)
-                    : tab.Pending is { } pending
-                        && DocumentSessionStore.ShouldRestoreClosedTab(pending))
-                .ToArray();
-            if (_sessions.Count == 0 && closed.Length == 0)
+            if (_sessions.Count == 0)
             {
                 DocumentSessionStore.ClearOpenDocuments(settings);
                 AppStorage.ClearAllSessionAudio();
@@ -885,42 +879,9 @@ public partial class MainWindow
                 snapshots[i].IsActive = ReferenceEquals(_sessions[i], _activeSession);
             }
 
-            var closedSnaps = new OpenDocumentSnapshot[closed.Length];
-            for (var i = 0; i < closed.Length; i++)
-            {
-                if (closed[i].Session is { } session)
-                {
-                    closedSnaps[i] = CaptureSessionSnapshot(
-                        session,
-                        i,
-                        DocumentSessionStore.FileNameForClosedIndex(i),
-                        DocumentSessionStore.OriginFileNameForClosedIndex(i),
-                        DocumentSessionStore.HistoryFileNameForClosedIndex(i),
-                        keep);
-                }
-                else
-                {
-                    closedSnaps[i] = closed[i].Pending ?? new OpenDocumentSnapshot();
-                    DocumentSessionStore.CollectReferencedSessionFiles(
-                        AppStorage.RootDirectory,
-                        closedSnaps[i],
-                        keep);
-                    DocumentSessionStore.DropUnreferencedSidecarNames(
-                        AppStorage.RootDirectory,
-                        closedSnaps[i]);
-                }
-
-                closedSnaps[i].ClosedIndex = closed[i].Index;
-            }
-
             AppStorage.ReplaceSessionFiles(keep);
             settings.OpenDocuments = snapshots;
-            settings.ClosedDocuments = closedSnaps;
-            if (snapshots.Length == 0)
-            {
-                settings.ActiveDocumentIndex = 0;
-                return;
-            }
+            settings.ClosedDocuments = [];
 
             var activeIndex = _activeSession is null ? 0 : _sessions.IndexOf(_activeSession);
             settings.ActiveDocumentIndex = Math.Clamp(activeIndex, 0, snapshots.Length - 1);
@@ -947,8 +908,7 @@ public partial class MainWindow
         var settings = AppStorage.Settings;
         var root = AppStorage.RootDirectory;
         var docs = DocumentSessionStore.ResolveOpenDocuments(settings);
-        var closedDocs = DocumentSessionStore.ResolveClosedDocuments(settings);
-        if (docs.Length == 0 && closedDocs.Length == 0)
+        if (docs.Length == 0)
         {
             return;
         }
@@ -1036,17 +996,6 @@ public partial class MainWindow
                 {
                     PumpUiAfterOpen();
                 }
-            }
-
-            foreach (var snap in closedDocs)
-            {
-                if (!DocumentSessionStore.ShouldRestoreClosedTab(snap)
-                    || !DocumentSessionStore.CanRestoreDocument(root, snap))
-                {
-                    continue;
-                }
-
-                _workspace.RememberClosedPending(snap, snap.ClosedIndex);
             }
 
             if (_sessions.Count == 0)

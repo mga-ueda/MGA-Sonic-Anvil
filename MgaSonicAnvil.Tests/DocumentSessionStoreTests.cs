@@ -138,49 +138,6 @@ public sealed class DocumentSessionStoreTests
         Assert.False(snap.Dirty);
         Assert.Equal(string.Empty, snap.SessionFileName);
         Assert.False(DocumentSessionStore.NeedsSessionAudio(snap.Dirty, snap.SourcePath));
-        Assert.False(DocumentSessionStore.ShouldPersistClosedTab(document));
-    }
-
-    [Fact]
-    public void ShouldPersistClosedTab_UnsavedRecordingOnly()
-    {
-        var recording = MakeDocument();
-        recording.CanContinueRecording = true;
-        recording.MarkUnsaved(null);
-        Assert.True(DocumentSessionStore.ShouldPersistClosedTab(recording));
-
-        var empty = new AudioDocument([], 48000, 2, 24, AudioFileKind.Wave, null)
-        {
-            CanContinueRecording = true,
-        };
-        Assert.False(DocumentSessionStore.ShouldPersistClosedTab(empty));
-
-        var saved = MakeDocument();
-        saved.MarkSaved(@"C:\rec.wav", AudioFileKind.Wave);
-        Assert.False(DocumentSessionStore.ShouldPersistClosedTab(saved));
-    }
-
-    [Fact]
-    public void ShouldRestoreClosedTab_MatchesPersistableRecordingsOnly()
-    {
-        Assert.True(DocumentSessionStore.ShouldRestoreClosedTab(new OpenDocumentSnapshot
-        {
-            CanContinueRecording = true,
-        }));
-        Assert.True(DocumentSessionStore.ShouldRestoreClosedTab(new OpenDocumentSnapshot
-        {
-            Dirty = true,
-        }));
-        Assert.False(DocumentSessionStore.ShouldRestoreClosedTab(new OpenDocumentSnapshot
-        {
-            SourcePath = @"C:\saved.wav",
-            Dirty = false,
-        }));
-        Assert.False(DocumentSessionStore.ShouldRestoreClosedTab(new OpenDocumentSnapshot
-        {
-            SourcePath = @"C:\edited.wav",
-            Dirty = true,
-        }));
     }
 
     [Fact]
@@ -286,12 +243,6 @@ public sealed class DocumentSessionStoreTests
             };
             Assert.False(DocumentSessionStore.CanRestoreDocument(root, missing));
 
-            var closedSaved = new OpenDocumentSnapshot
-            {
-                SourcePath = sourcePath,
-                Dirty = false,
-            };
-            Assert.False(DocumentSessionStore.ShouldRestoreClosedTab(closedSaved));
         }
         finally
         {
@@ -376,7 +327,7 @@ public sealed class DocumentSessionStoreTests
     }
 
     [Fact]
-    public void PruneUnreferencedSessionState_DeletesUnusedSidecarsAndClosedSavedTabs()
+    public void PruneUnreferencedSessionState_DeletesUnusedSidecarsAndAllClosedDocuments()
     {
         var root = NewTempDir("prune");
         try
@@ -409,13 +360,14 @@ public sealed class DocumentSessionStoreTests
                 [
                     new OpenDocumentSnapshot
                     {
-                        SourcePath = sourcePath,
-                        Dirty = false,
+                        CanContinueRecording = true,
+                        Dirty = true,
                         SessionFileName = "closed-0.wav",
                     },
                 ],
             };
 
+            Assert.True(DocumentSessionStore.CanRestoreDocument(root, settings.ClosedDocuments[0]));
             Assert.True(DocumentSessionStore.PruneUnreferencedSessionState(root, settings, leftover));
             Assert.False(File.Exists(leftover));
             Assert.False(File.Exists(Path.Combine(sessionDir, "doc-0.wav")));
@@ -426,6 +378,42 @@ public sealed class DocumentSessionStoreTests
             Assert.Equal(string.Empty, settings.OpenDocuments[0].SessionFileName);
             Assert.Equal(string.Empty, settings.OpenDocuments[0].OriginFileName);
             Assert.Empty(settings.ClosedDocuments);
+        }
+        finally
+        {
+            TryDeleteDir(root);
+        }
+    }
+
+    [Fact]
+    public void PruneUnreferencedSessionState_DropsLeftoverClosedRecordingsWithNoOpenTabs()
+    {
+        var root = NewTempDir("prune-closed-only");
+        try
+        {
+            var sessionDir = Path.Combine(root, DocumentSessionStore.SessionDirectoryName);
+            Directory.CreateDirectory(sessionDir);
+            File.WriteAllBytes(Path.Combine(sessionDir, "closed-0.wav"), [4]);
+
+            var settings = new AppSettings
+            {
+                ClosedDocuments =
+                [
+                    new OpenDocumentSnapshot
+                    {
+                        CanContinueRecording = true,
+                        Dirty = true,
+                        SessionFileName = "closed-0.wav",
+                    },
+                ],
+            };
+
+            Assert.True(DocumentSessionStore.CanRestoreDocument(root, settings.ClosedDocuments[0]));
+            Assert.True(DocumentSessionStore.PruneUnreferencedSessionState(root, settings));
+            Assert.False(File.Exists(Path.Combine(sessionDir, "closed-0.wav")));
+            Assert.False(Directory.Exists(sessionDir));
+            Assert.Empty(settings.ClosedDocuments);
+            Assert.Empty(DocumentSessionStore.ResolveOpenDocuments(settings));
         }
         finally
         {

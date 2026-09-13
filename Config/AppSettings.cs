@@ -132,7 +132,7 @@ internal sealed class AppSettings
     /// <summary>終了時に開いていたタブ。</summary>
     public OpenDocumentSnapshot[] OpenDocuments { get; set; } = [];
 
-    /// <summary>閉じた未保存録音。起動後に Ctrl+Shift+T で戻す。</summary>
+    /// <summary>以前の版が残した閉じたタブ。起動時に空にする。Ctrl+Shift+T は今の起動のメモリだけ。</summary>
     public OpenDocumentSnapshot[] ClosedDocuments { get; set; } = [];
 
     public int ActiveDocumentIndex { get; set; }

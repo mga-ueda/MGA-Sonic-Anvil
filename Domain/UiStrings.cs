@@ -534,8 +534,8 @@ internal static partial class UiStrings
         "使うスピーカー配置を切り替えます。デバイスとポート割り当てが一緒に変わります。一覧は設定の表示項目タブで絞れます。",
         "Switch speaker layout. The device and port assignments change with it. The list is filtered in Settings → Shown.");
     public static string TipRecord => Get(
-        "録音 (Ctrl+R)\n開始前に毎回、Silent Skip をオンにするか確認する。未保存の録音があれば末尾から続きを録る。なければ新規タブ。保存した録音には続けて録れない。終了しても作業コピーが残り、再起動や閉じたタブの再開で戻る。波形はすぐ出して、あとから整える。Silent Skip がオンならしきい値を超えたときだけ録り、下回った時点から無音を挟んで上限で止める。もう一度で停止。スピーカー配置・録音ポート・Ch の割り当てを使う。Space / Enter / Esc でも停止。",
-        "Record (Ctrl+R)\nAsks every time whether to turn Silent Skip on. Continues an unsaved recording from the end, or opens a new tab if there is none. A saved recording cannot be continued. An unsaved take is kept as a working copy and comes back on restart or Reopen Closed Tab. The waveform appears immediately and is refined after. With Silent Skip on, only audio above the threshold is recorded, and silence is inserted when the level falls (up to the Settings limit). Press again to stop. Uses the speaker layout, record ports, and Ch map. Space / Enter / Esc also stop.");
+        "録音 (Ctrl+R)\n開始前に毎回、Silent Skip をオンにするか確認する。未保存の録音があれば末尾から続きを録る。なければ新規タブ。保存した録音には続けて録れない。開いたまま終了すれば作業コピーが残り再起動で戻る。閉じたタブの再開は今の起動のうちだけ。波形はすぐ出して、あとから整える。Silent Skip がオンならしきい値を超えたときだけ録り、下回った時点から無音を挟んで上限で止める。もう一度で停止。スピーカー配置・録音ポート・Ch の割り当てを使う。Space / Enter / Esc でも停止。",
+        "Record (Ctrl+R)\nAsks every time whether to turn Silent Skip on. Continues an unsaved recording from the end, or opens a new tab if there is none. A saved recording cannot be continued. An unsaved take left open is kept as a working copy and comes back on restart. Reopen Closed Tab is only in this launch. The waveform appears immediately and is refined after. With Silent Skip on, only audio above the threshold is recorded, and silence is inserted when the level falls (up to the Settings limit). Press again to stop. Uses the speaker layout, record ports, and Ch map. Space / Enter / Esc also stop.");
     public static string TipRecordInputMap => Get(
         "各スピーカーがどのポートから入り、どの Ch へ書くか。なしは無音。右のバーは今のレベルです。Ch は再生と共通です。",
         "Which port feeds each speaker, and which file channel (Ch) it writes. Off is silence. The bar is the live level. Ch is shared with playback.");
@@ -616,11 +616,11 @@ internal static partial class UiStrings
         "MP3 として保存 (Ctrl+Shift+M)\n別名保存と同じく書き出すだけ。今のタブは開いたまま、書き出した MP3 は読み込まない。Ctrl+Shift+Alt+M で全タブを MP3 書き出し。設定の LAME があればそれを使い、空欄または無効なら Windows（既定 192 kbps）。成功時にどちらで書いたかを表示。失敗はダイアログ。マーカー／リージョン／ループは書きません",
         "Save as MP3 (Ctrl+Shift+M)\nWrites a file like Save As; keeps the current tab and does not open the written MP3. Ctrl+Shift+Alt+M exports every tab as MP3. Uses LAME when the path is valid; otherwise Windows (default 192 kbps). Success shows which encoder ran. Failures open a dialog. Markers / regions / loops are not written");
     public static string TipOpen => Get(
-        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Q でアプリを終了（タブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（何度でも）\nCtrl+Tab で次のタブ\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
-        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Q quits (open tabs and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens closed tabs (more than one)\nCtrl+Tab goes to the next tab\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
+        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
+        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
     public static string TipCloseTab => Get(
-        "タブを閉じる (Ctrl+W)。Ctrl+Shift+T で開き直せる",
-        "Close tab (Ctrl+W). Ctrl+Shift+T reopens it");
+        "タブを閉じる (Ctrl+W)。今の起動のうちなら Ctrl+Shift+T で開き直せる",
+        "Close tab (Ctrl+W). Ctrl+Shift+T reopens it in this launch");
     public static string TipTabScrollLeft => Get("左のタブを表示", "Show tabs to the left");
     public static string TipTabScrollRight => Get("右のタブを表示", "Show tabs to the right");
     public static string TipOverview => Get(

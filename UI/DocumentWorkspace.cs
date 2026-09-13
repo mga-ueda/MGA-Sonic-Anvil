@@ -1,14 +1,10 @@
 using System.IO;
-using MgaSonicAnvil.Config;
 
 namespace MgaSonicAnvil.UI;
 
-internal readonly record struct ClosedTab(
-    DocumentSession? Session,
-    OpenDocumentSnapshot? Pending,
-    int Index);
+internal readonly record struct ClosedTab(DocumentSession Session, int Index);
 
-/// <summary>開いているタブと、閉じたタブの履歴だけを持つ。</summary>
+/// <summary>開いているタブと、今の起動で閉じたタブの履歴だけを持つ。終了すると忘れる。</summary>
 internal sealed class DocumentWorkspace
 {
     public const int ClosedTabLimit = 32;
@@ -25,15 +21,9 @@ internal sealed class DocumentWorkspace
 
     public IReadOnlyList<ClosedTab> ClosedTabs => _closedTabs;
 
-    public void RememberClosed(DocumentSession session, int index) =>
-        Remember(new ClosedTab(session, null, index));
-
-    public void RememberClosedPending(OpenDocumentSnapshot snap, int index) =>
-        Remember(new ClosedTab(null, snap, index));
-
-    private void Remember(ClosedTab tab)
+    public void RememberClosed(DocumentSession session, int index)
     {
-        _closedTabs.Add(tab);
+        _closedTabs.Add(new ClosedTab(session, index));
         if (_closedTabs.Count > ClosedTabLimit)
         {
             _closedTabs.RemoveAt(0);

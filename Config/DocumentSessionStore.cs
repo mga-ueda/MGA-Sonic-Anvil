@@ -66,7 +66,7 @@ internal sealed class OpenDocumentSnapshot
     /// <summary>Wave / Aiff / Mp3。空なら復元時に変えない。</summary>
     public string SourceKind { get; set; } = string.Empty;
 
-    /// <summary>閉じたタブを再開するときの挿入位置。</summary>
+    /// <summary>以前の版が閉じたタブの挿入位置を残した。今は使わない。</summary>
     public int ClosedIndex { get; set; }
 }
 
@@ -83,6 +83,7 @@ internal static class DocumentSessionStore
 
     public static string FileNameForIndex(int index) => $"doc-{Math.Max(0, index)}.wav";
 
+    /// <summary>以前の版が書いた閉じたタブの作業コピー名。起動時に孤児として消す。</summary>
     public static string FileNameForClosedIndex(int index) => $"closed-{Math.Max(0, index)}.wav";
 
     public static string OriginFileNameForIndex(int index) => $"doc-{Math.Max(0, index)}-origin.wav";
@@ -200,16 +201,6 @@ internal static class DocumentSessionStore
         }
     }
 
-    /// <summary>終了時に作業コピーを残す未保存の録音（閉じたタブ含む）。</summary>
-    public static bool ShouldPersistClosedTab(AudioDocument document) =>
-        HasWorkingAudio(document)
-        && (document.CanContinueRecording || string.IsNullOrWhiteSpace(document.SourcePath));
-
-    /// <summary>閉じたタブとして再開できるのは未保存の録音だけ。保存済みや空は対象外。</summary>
-    public static bool ShouldRestoreClosedTab(OpenDocumentSnapshot snap) =>
-        snap.CanContinueRecording
-        || (snap.Dirty && string.IsNullOrWhiteSpace(snap.SourcePath));
-
     /// <summary>
     /// 作業コピーか保存済み元ファイルで現状の PCM が戻せる。
     /// このときは履歴の再実行は波形にも Undo 復元にも使わない。
@@ -316,20 +307,11 @@ internal static class DocumentSessionStore
     public static void CollectReferencedSessionFiles(
         string rootDirectory,
         IEnumerable<OpenDocumentSnapshot> open,
-        IEnumerable<OpenDocumentSnapshot> closed,
         ICollection<string> keep)
     {
         foreach (var snap in open)
         {
             if (CanRestoreDocument(rootDirectory, snap))
-            {
-                CollectReferencedSessionFiles(rootDirectory, snap, keep);
-            }
-        }
-
-        foreach (var snap in closed)
-        {
-            if (ShouldRestoreClosedTab(snap) && CanRestoreDocument(rootDirectory, snap))
             {
                 CollectReferencedSessionFiles(rootDirectory, snap, keep);
             }
@@ -369,8 +351,8 @@ internal static class DocumentSessionStore
     }
 
     /// <summary>
-    /// 設定が指していても、復元にも再開にも使わないセッションファイルを消す。
-    /// 閉じた保存済みタブなど、再開対象外のスナップも設定から外す。
+    /// 設定が指していても、次起動で開かないセッションファイルを消す。
+    /// 閉じたタブは世代を越えないので、ClosedDocuments とそれらの作業コピーも捨てる。
     /// </summary>
     public static bool PruneUnreferencedSessionState(
         string rootDirectory,
@@ -378,9 +360,8 @@ internal static class DocumentSessionStore
         string? leftoverSessionDocumentPath = null)
     {
         var open = settings.OpenDocuments ?? [];
-        var closed = settings.ClosedDocuments ?? [];
         var keep = new List<string>();
-        CollectReferencedSessionFiles(rootDirectory, open, closed, keep);
+        CollectReferencedSessionFiles(rootDirectory, open, keep);
 
         var sessionDir = Path.Combine(rootDirectory, SessionDirectoryName);
         RemoveOrphanSessionFiles(sessionDir, keep);
@@ -396,26 +377,9 @@ internal static class DocumentSessionStore
             }
         }
 
-        var keptClosed = new List<OpenDocumentSnapshot>(closed.Length);
-        foreach (var snap in closed)
+        if ((settings.ClosedDocuments ?? []).Length > 0)
         {
-            if (!ShouldRestoreClosedTab(snap) || !CanRestoreDocument(rootDirectory, snap))
-            {
-                changed = true;
-                continue;
-            }
-
-            if (DropUnreferencedSidecarNames(rootDirectory, snap))
-            {
-                changed = true;
-            }
-
-            keptClosed.Add(snap);
-        }
-
-        if (keptClosed.Count != closed.Length)
-        {
-            settings.ClosedDocuments = [.. keptClosed];
+            settings.ClosedDocuments = [];
             changed = true;
         }
 
@@ -667,9 +631,6 @@ internal static class DocumentSessionStore
 
     public static OpenDocumentSnapshot[] ResolveOpenDocuments(AppSettings settings) =>
         settings.OpenDocuments ?? [];
-
-    public static OpenDocumentSnapshot[] ResolveClosedDocuments(AppSettings settings) =>
-        settings.ClosedDocuments ?? [];
 
     public static void ClearOpenDocuments(AppSettings settings)
     {
