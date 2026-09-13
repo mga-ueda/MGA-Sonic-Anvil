@@ -1,5 +1,6 @@
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
@@ -12,7 +13,7 @@ internal static class ChannelWavePaint
         var color = ChannelColors.UsesLaneTint(channels)
             ? Tint(baseColor, ToBgra(ChannelSwatch.Of(channel)))
             : baseColor;
-        return muted ? Dim(color) : color;
+        return muted ? Dim(color, MuteTheme()) : color;
     }
 
     public static int Tint(int baseColor, int tint)
@@ -25,13 +26,62 @@ internal static class ChannelWavePaint
         return b | (g << 8) | (r << 16) | (baseColor & unchecked((int)0xFF000000));
     }
 
-    public static int Dim(int bgra)
+    public static int Dim(int bgra) => Dim(bgra, MuteTheme());
+
+    public static int Dim(int bgra, UiTheme theme)
     {
         var a = (bgra >> 24) & 0xFF;
         var r = (bgra >> 16) & 0xFF;
         var g = (bgra >> 8) & 0xFF;
         var b = bgra & 0xFF;
-        return (a << 24) | ((r * 2 / 7) << 16) | ((g * 2 / 7) << 8) | (b * 2 / 7);
+        if (theme == UiTheme.Light)
+        {
+            r = MixTowardLightGray(r);
+            g = MixTowardLightGray(g);
+            b = MixTowardLightGray(b);
+        }
+        else
+        {
+            r = r * 2 / 7;
+            g = g * 2 / 7;
+            b = b * 2 / 7;
+        }
+
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    /// <summary>
+    /// リソース上の波形背景が明るいときはライト扱い。
+    /// Current だけだと、配色適用後に Dark のまま残ってミュートが黒くなる。
+    /// </summary>
+    private static UiTheme MuteTheme()
+    {
+        if (UiThemeService.Current == UiTheme.Light || IsLightWaveformBack())
+        {
+            return UiTheme.Light;
+        }
+
+        return UiTheme.Dark;
+    }
+
+    private static bool IsLightWaveformBack()
+    {
+        try
+        {
+            var back = Theme.Get("WaveformBackBrush");
+            return (0.2126 * back.R) + (0.7152 * back.G) + (0.0722 * back.B) >= 128;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>ライトモードは #D2 のライトグレーへ寄せる。色相は薄く残す。</summary>
+    private static int MixTowardLightGray(int channel)
+    {
+        const int gray = 0xD2;
+        return (channel + gray * 7) / 8;
     }
 
     public static int LaneAt(int y, int height, int channels, double laneGapPx)

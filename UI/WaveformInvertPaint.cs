@@ -29,9 +29,10 @@ internal static class WaveformInvertPaint
         {
             for (var i = 0; i < count; i++)
             {
-                pixels[i] = IsWavePixel(pixels[i])
-                    ? waveformBack
-                    : WaveColorAt(i / width, height, laneWaveColors, laneGapPx, fallbackWave);
+                pixels[i] = InvertPixel(
+                    pixels[i],
+                    waveformBack,
+                    WaveColorAt(i / width, height, laneWaveColors, laneGapPx, fallbackWave));
             }
 
             return;
@@ -78,29 +79,17 @@ internal static class WaveformInvertPaint
             for (var y = 0; y < height; y++)
             {
                 var index = y * width + x;
-                pixels[index] = IsWavePixel(pixels[index])
-                    ? swappedBack
-                    : SoftenSelectionFill(
-                        WaveColorAt(y, height, laneWaveColors, laneGapPx, fallbackWave),
-                        waveformBack);
+                pixels[index] = InvertPixel(
+                    pixels[index],
+                    swappedBack,
+                    WaveColorAt(y, height, laneWaveColors, laneGapPx, fallbackWave));
             }
         }
     }
 
-    internal const byte LightFillAlpha = 176;
-
-    internal static int SoftenSelectionFill(int fill, int back) =>
-        SoftenSelectionFill(fill, back, UiThemeService.Current == UiTheme.Light);
-
-    internal static int SoftenSelectionFill(int fill, int back, bool light)
-    {
-        if (!light)
-        {
-            return fill;
-        }
-
-        return BlendOver(back, (fill & 0x00FFFFFF) | (LightFillAlpha << 24));
-    }
+    /// <summary>波形ピクセルは背景色へ、背景ピクセルは波形色へ。白黒反転ではない。</summary>
+    internal static int InvertPixel(int pixel, int back, int waveFill) =>
+        ((pixel >> 24) & 0xFF) > 0 ? back : waveFill;
 
     private static int WaveColorAt(
         int y,
@@ -121,8 +110,6 @@ internal static class WaveformInvertPaint
 
         return laneWaveColors[ChannelWavePaint.LaneAt(y, height, laneWaveColors.Count, laneGapPx)];
     }
-
-    private static bool IsWavePixel(int pixel) => ((pixel >> 24) & 0xFF) > 0;
 
     private static long FrameAtColumn(int x, int width, double viewStart, double viewSpan, long frameCount)
     {

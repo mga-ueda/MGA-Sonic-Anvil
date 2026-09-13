@@ -37,21 +37,11 @@ public sealed class WaveformInvertPaintTests
     }
 
     [Fact]
-    public void SoftenSelectionFill_Light_PullsDarkFillTowardBack()
+    public void InvertPixel_SwapsWaveAndBackground()
     {
-        var fill = unchecked((int)0xFF404040);
+        var wave = unchecked((int)0xFF626262);
         var back = unchecked((int)0xFFFAFAFA);
-        Assert.Equal(fill, WaveformInvertPaint.SoftenSelectionFill(fill, back, light: false));
-        var softened = WaveformInvertPaint.SoftenSelectionFill(fill, back, light: true);
-        Assert.True(Luma(softened) > Luma(fill));
-        Assert.True(Luma(softened) < Luma(back));
-    }
-
-    private static double Luma(int bgra)
-    {
-        var r = (bgra >> 16) & 0xFF;
-        var g = (bgra >> 8) & 0xFF;
-        var b = bgra & 0xFF;
-        return (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
+        Assert.Equal(back, WaveformInvertPaint.InvertPixel(wave, back, wave));
+        Assert.Equal(wave, WaveformInvertPaint.InvertPixel(0, back, wave));
     }
 }
