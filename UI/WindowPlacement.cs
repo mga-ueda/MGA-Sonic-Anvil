@@ -84,6 +84,92 @@ internal static class WindowPlacement
         return true;
     }
 
+    public static void CaptureColorPanel(Window window, AppSettings settings)
+    {
+        var bounds = window.WindowState == WindowState.Normal
+            ? new Rect(window.Left, window.Top, window.Width, window.Height)
+            : window.RestoreBounds;
+        settings.ColorPanelX = (int)Math.Round(bounds.X);
+        settings.ColorPanelY = (int)Math.Round(bounds.Y);
+        settings.ColorPanelWidth = (int)Math.Round(bounds.Width);
+        settings.ColorPanelHeight = (int)Math.Round(bounds.Height);
+        settings.ColorPanelHasPosition = true;
+    }
+
+    public static bool TryApplyColorPanel(Window window, AppSettings settings)
+    {
+        if (!TryReadColorPanel(settings, out var bounds, out var hasSize))
+        {
+            return false;
+        }
+
+        var width = hasSize ? Math.Max(bounds.Width, window.MinWidth) : window.Width;
+        var height = hasSize ? Math.Max(bounds.Height, window.MinHeight) : window.Height;
+        var placed = new Rect(bounds.X, bounds.Y, width, height);
+        if (!IsVisibleOnAnyScreen(placed))
+        {
+            return false;
+        }
+
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = placed.X;
+        window.Top = placed.Y;
+        if (hasSize)
+        {
+            window.Width = placed.Width;
+            window.Height = placed.Height;
+        }
+
+        return true;
+    }
+
+    public static bool TryReadColorPanel(AppSettings settings, out Rect bounds, out bool hasSize)
+    {
+        bounds = default;
+        hasSize = settings.ColorPanelWidth > 0 && settings.ColorPanelHeight > 0;
+        if (!settings.ColorPanelHasPosition)
+        {
+            return false;
+        }
+
+        var width = hasSize ? settings.ColorPanelWidth : 1;
+        var height = hasSize ? settings.ColorPanelHeight : 1;
+        bounds = new Rect(settings.ColorPanelX, settings.ColorPanelY, width, height);
+        return true;
+    }
+
+    public static void CenterOnOwner(Window window, Window owner)
+    {
+        var width = window.ActualWidth > 1 ? window.ActualWidth : window.Width;
+        var height = window.ActualHeight > 1 ? window.ActualHeight : window.Height;
+        if (width <= 1)
+        {
+            width = Math.Max(window.MinWidth, 1);
+        }
+
+        if (height <= 1)
+        {
+            height = Math.Max(window.MinHeight, 1);
+        }
+
+        var ownerWidth = owner.ActualWidth > 1 ? owner.ActualWidth : owner.Width;
+        var ownerHeight = owner.ActualHeight > 1 ? owner.ActualHeight : owner.Height;
+        var ownerRect = new Rect(
+            owner.Left,
+            owner.Top,
+            Math.Max(1, ownerWidth),
+            Math.Max(1, ownerHeight));
+        var bounds = CenteredOn(ownerRect, width, height);
+        if (!IsVisibleOnAnyScreen(bounds))
+        {
+            bounds = CenteredOn(SystemParameters.WorkArea, width, height);
+        }
+
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = bounds.X;
+        window.Top = bounds.Y;
+    }
+
     public static bool TryReadSettings(AppSettings settings, out Rect bounds, out bool hasSize)
     {
         bounds = default;

@@ -79,6 +79,7 @@
     <SolidColorBrush x:Key="WaapiToggleOnForeBrush" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="ActionCopyrightForeBrush" Color="#FF969696" />
     <SolidColorBrush x:Key="ActionLinkForeBrush" Color="#FF6EB4FF" />
+    <SolidColorBrush x:Key="ActionLinkHoverForeBrush" Color="#FF00F5FF" />
     <SolidColorBrush x:Key="StatusBarBackBrush" Color="#FF161618" />
     <SolidColorBrush x:Key="WaapiBarBackBrush" Color="#FF1D1D22" />
     <SolidColorBrush x:Key="StatusBarTitleForeBrush" Color="#FF969696" />

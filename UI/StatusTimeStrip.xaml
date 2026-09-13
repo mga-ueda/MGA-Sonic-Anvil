@@ -49,15 +49,16 @@
     <TextBlock x:Name="TotalLabel" Style="{StaticResource StatusTimecodeLabelStyle}" />
     <Border MinWidth="{x:Static ui:DesignMetrics.StatusTimecodeWidth}"
             Width="{x:Static ui:DesignMetrics.StatusTimecodeWidth}"
-            Height="20"
+            Height="{x:Static ui:DesignMetrics.StatusTimecodeBoxHeight}"
             VerticalAlignment="Center"
             Background="{DynamicResource WaveformBackBrush}">
       <TextBlock x:Name="TotalText"
+                 HorizontalAlignment="Stretch"
                  VerticalAlignment="Center"
                  TextAlignment="Center"
                  FontFamily="Consolas"
                  FontWeight="Bold"
-                 FontSize="11"
+                 FontSize="{x:Static ui:DesignMetrics.StatusTimecodeFontSize}"
                  Foreground="{DynamicResource StatusBarTitleForeBrush}"
                  Text="00:00.000" />
     </Border>

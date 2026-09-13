@@ -1,5 +1,6 @@
 using System.Windows;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
@@ -124,15 +125,43 @@ internal static class DesignMetrics
         + TransportGroupWidth(9)
         + TransportGroupWidth(4);
 
-    /// <summary>下段: MARK(3) VIEW(5) HELP(3)。</summary>
+    /// <summary>下段: MARK(3) VIEW(6) HELP(3)。</summary>
     public static double TransportBottomRowWidth =>
         TransportHostPaddingX
         + TransportGroupWidth(3)
-        + TransportGroupWidth(5)
+        + TransportGroupWidth(6)
         + TransportGroupWidth(3);
 
     public static double TransportFixedRowWidth =>
         Math.Max(TransportTopRowWidth, TransportBottomRowWidth);
+
+    /// <summary>初期 214×32 の 2/3。トランスポート左下、ボタン列の下。</summary>
+    public static double BrandLogoWidth => From96(214) * 2 / 3;
+
+    public static double BrandLogoHeight => From96(32) * 2 / 3;
+
+    public static double BrandLicenseFontSize => From96(8);
+
+    public static double BrandLicenseLineBox
+    {
+        get
+        {
+            var spacing = SystemFonts.MessageFontFamily.LineSpacing;
+            return BrandLicenseFontSize * (spacing > 0 ? spacing : 1.2);
+        }
+    }
+
+    public static double BrandLicenseHeight =>
+        BrandLicenseLineBox * BrandLicenseAlign.LineCount(UiStrings.CopyrightText);
+
+    public static double BrandLogoTextGap => From96(8);
+
+    public static double BrandRowPad => From96(6);
+
+    public static double BrandRowHeight =>
+        Math.Max(BrandLogoHeight, BrandLicenseHeight) + BrandRowPad;
+
+    public static double TransportHostMinHeight => TransportBarHeight + BrandRowHeight;
 
     /// <summary>トランスポート右の履歴・ラウドネス・スペアナと、右端メーター列。</summary>
     public static double TransportSideChromeWidth =>
@@ -158,7 +187,16 @@ internal static class DesignMetrics
 
     public static double TransportSpeakerComboWidth => From96(168);
 
-    public static double StatusTimecodeWidth => From96(86);
+    public static double StatusTimecodeFontSize => From96(13);
+
+    public static double StatusTimecodePadX => From96(4);
+
+    public static Thickness StatusTimecodePadding => new(StatusTimecodePadX, 0, StatusTimecodePadX, 0);
+
+    /// <summary>時刻文字が切れず、左右余白で中央に見える幅。</summary>
+    public static double StatusTimecodeWidth => From96(96);
+
+    public static double StatusTimecodeBoxHeight => From96(22);
 
     public static double StatusTimecodeLabelWidth => From96(22);
 
@@ -189,6 +227,12 @@ internal static class DesignMetrics
     public static double VectorScopeHeight => LevelMeterWidth + VectorScopeCorrelationHeight;
 
     public static GridLength VectorScopeHeightGrid => new(VectorScopeHeight);
+
+    /// <summary>タブ＋ボタン2行＋ロゴ行。ゴニオより高いときはこちらに合わせる。</summary>
+    public static double TransportChromeHeight =>
+        Math.Max(VectorScopeHeight, DocumentTabBarHeight + TransportHostMinHeight);
+
+    public static GridLength TransportChromeHeightGrid => new(TransportChromeHeight);
 
     public static double AudioInputHeight => Dip(30);
 

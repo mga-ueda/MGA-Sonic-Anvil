@@ -5,6 +5,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
@@ -82,11 +83,23 @@ public partial class MainWindow : Window
     private bool _closing;
     private bool _exitAfterFlush;
     private bool _bindingWorkspace;
+    private ImageSource? _brandLogoDark;
+    private ImageSource? _brandLogoLight;
+    private int _brandLogoDecodeWidth;
+    private double _brandLogoInkBottomFrac = 1;
     private TimeScrollBar TimeScroll => TimeScrollStrip.Bar;
 
     public MainWindow()
     {
         InitializeComponent();
+        DpiChanged += (_, _) =>
+        {
+            _brandLogoDark = null;
+            _brandLogoLight = null;
+            LoadBrandLogo();
+        };
+        LoadBrandLogo();
+        Loaded += (_, _) => AlignBrandLicense();
         if (!WindowPlacement.TryApply(this, AppStorage.Settings))
         {
             WindowPlacement.ApplyFirstLaunch(this);
@@ -434,11 +447,11 @@ public partial class MainWindow : Window
 
     private void RefreshLocalizedText()
     {
-        CopyrightText.Text = UiStrings.CopyrightText;
-        GitHubLink.Text = UiStrings.CopyrightGitHub;
+        BrandLicenseHost.LinkText = UiStrings.CopyrightText;
+        QueueAlignBrandLicense();
         RefreshTipsHeader();
-        TipService.Set(GitHubLink, UiStrings.TipGitHub);
-        TipService.Set(CopyrightText, UiStrings.TipCopyright);
+        TipService.Set(BrandLicenseHost, UiStrings.TipCopyright);
+        TipService.Set(BrandLogo, UiStrings.TipBrandLogo, respectsEnabled: false);
         AlwaysOnTopCheck.Content = UiStrings.LabelAlwaysOnTop;
         TipService.Set(AlwaysOnTopCheck, UiStrings.TipAlwaysOnTop);
         StatusTimes.ApplyLocalizedText();
@@ -487,9 +500,7 @@ public partial class MainWindow : Window
         RefreshStatus();
         LevelMeter.InvalidateVisual();
         LoudnessMeter.ApplyLocalizedText();
-#if DEBUG
         _colorDevPanel?.ApplyLocalizedText();
-#endif
     }
 
     private void RefreshTitle()
@@ -824,10 +835,141 @@ public partial class MainWindow : Window
         AppStorage.Save();
     }
 
-    private void GitHubLink_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void BrandLicenseHost_LinkClick(object sender, BrandLicenseLinkClickEventArgs e)
     {
-        TryOpenUrl(AppVersion.RepositoryUrl);
+        var url = e.LinkId switch
+        {
+            "mit" => AppVersion.LicenseUrl,
+            "lame" => AppVersion.LameProjectUrl,
+            _ => AppVersion.RepositoryUrl,
+        };
+        TryOpenUrl(url);
         e.Handled = true;
+    }
+
+    private void BrandLogo_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        TryOpenUrl(AppVersion.CompanyUrl);
+        e.Handled = true;
+    }
+
+    private void LoadBrandLogo()
+    {
+        try
+        {
+            var decodeWidth = BrandLogoDecodePixelWidth();
+            if (decodeWidth != _brandLogoDecodeWidth)
+            {
+                _brandLogoDark = null;
+                _brandLogoLight = null;
+                _brandLogoDecodeWidth = decodeWidth;
+            }
+
+            var theme = UiThemeService.Current;
+            var cached = theme == UiTheme.Light ? _brandLogoLight : _brandLogoDark;
+            if (cached is null)
+            {
+                using var logoStream = AppEmbeddedResources.OpenLogo(theme);
+                if (logoStream is null)
+                {
+                    BrandLogo.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+                bitmap.DecodePixelWidth = decodeWidth;
+                bitmap.StreamSource = logoStream;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                cached = bitmap;
+                if (theme == UiTheme.Light)
+                {
+                    _brandLogoLight = cached;
+                }
+                else
+                {
+                    _brandLogoDark = cached;
+                }
+            }
+
+            RenderOptions.SetBitmapScalingMode(BrandLogo, BitmapScalingMode.HighQuality);
+            BrandLogo.Source = cached;
+            BrandLogo.Visibility = Visibility.Visible;
+            if (cached is BitmapSource bitmapSource
+                && BrandLicenseAlign.TryInkFractions(bitmapSource, out _, out var bottomFrac))
+            {
+                _brandLogoInkBottomFrac = bottomFrac;
+            }
+            else
+            {
+                _brandLogoInkBottomFrac = 1;
+            }
+
+            QueueAlignBrandLicense();
+        }
+        catch
+        {
+            BrandLogo.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void BrandLogo_SizeChanged(object sender, SizeChangedEventArgs e) => QueueAlignBrandLicense();
+
+    private void BrandLicenseHost_SizeChanged(object sender, SizeChangedEventArgs e) => QueueAlignBrandLicense();
+
+    private void QueueAlignBrandLicense() =>
+        Dispatcher.BeginInvoke(AlignBrandLicense, DispatcherPriority.Loaded);
+
+    private void AlignBrandLicense()
+    {
+        if (BrandLogo.Visibility != Visibility.Visible
+            || BrandLogo.Source is not BitmapSource source)
+        {
+            return;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(BrandLicenseHost).PixelsPerDip;
+        var wwise = BrandLicenseAlign.MeasureLine(
+            BrandLicenseHost,
+            UiStrings.CopyrightWwiseLine,
+            dpi);
+        var lineBox = BrandLicenseHost.LineHeight > 0 ? BrandLicenseHost.LineHeight : wwise.Height;
+        var wwiseIndex = BrandLicenseAlign.FindLineIndex(
+            UiStrings.CopyrightText,
+            UiStrings.CopyrightWwiseLine);
+        var boxWidth = BrandLogo.ActualWidth > 0 ? BrandLogo.ActualWidth : DesignMetrics.BrandLogoWidth;
+        var boxHeight = BrandLogo.ActualHeight > 0 ? BrandLogo.ActualHeight : DesignMetrics.BrandLogoHeight;
+        var logoInkBottom = BrandLicenseAlign.LogoInkBottomInBox(
+            boxWidth,
+            boxHeight,
+            source.PixelWidth,
+            source.PixelHeight,
+            _brandLogoInkBottomFrac);
+        var shift = BrandLicenseAlign.LineBaselineShiftY(
+            logoInkBottom,
+            lineBox,
+            wwiseIndex < 0 ? 0 : wwiseIndex,
+            wwise.Baseline);
+        BrandLicenseHost.RenderTransform = null;
+        if (shift >= 0)
+        {
+            BrandLicenseHost.Margin = new Thickness(0, shift, 0, 0);
+            BrandLogo.Margin = new Thickness(0, 0, DesignMetrics.BrandLogoTextGap, 0);
+        }
+        else
+        {
+            BrandLicenseHost.Margin = new Thickness(0, 0, 0, 0);
+            BrandLogo.Margin = new Thickness(0, -shift, DesignMetrics.BrandLogoTextGap, 0);
+        }
+    }
+
+    private int BrandLogoDecodePixelWidth()
+    {
+        var scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        return Math.Max(1, (int)Math.Round(DesignMetrics.BrandLogoWidth * scale));
     }
 
     private async Task CheckForAppUpdateAsync()

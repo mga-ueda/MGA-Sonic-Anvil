@@ -2,7 +2,10 @@ namespace MgaSonicAnvil.Domain;
 
 internal static partial class UiStrings
 {
-    public static string ColorDevTitle => Get("色調整（開発者）", "Color tuning (developer)");
+    public static string ColorDevTitleFor(UiTheme theme) =>
+        theme == UiTheme.Light
+            ? Get("色設定（ライトモード）", "Color settings (Light mode)")
+            : Get("色設定（ダークモード）", "Color settings (Dark mode)");
     public static string ColorDevClose => Get("閉じる", "Close");
     public static string ColorDevResetToDefaults => Get("既定に戻す", "Reset to defaults");
     public static string ColorDevResetThis => Get("この色を既定に戻す", "Reset this color");
@@ -93,6 +96,7 @@ internal static partial class UiStrings
             "WaapiToggleOnFore" => Get("WAAPI トグル・オン文字", "WAAPI toggle · on text"),
             "ActionCopyrightFore" => Get("アクションバー・著作権文字", "Action bar · copyright text"),
             "ActionLinkFore" => Get("アクションバー・リンク", "Action bar · link"),
+            "ActionLinkHoverFore" => Get("アクションバー・リンクホバー", "Action bar · link hover"),
             "StatusBarBack" => Get("ステータスバー・背景", "Status bar · background"),
             "WaapiBarBack" => Get("WAAPI バー・背景", "WAAPI bar · background"),
             "StatusBarTitleFore" => Get("ステータスバー・見出し", "Status bar · heading"),

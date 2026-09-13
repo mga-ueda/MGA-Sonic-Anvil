@@ -117,6 +117,31 @@ public sealed class WindowPlacementTests
     }
 
     [Fact]
+    public void TryReadColorPanel_RejectsUnset()
+    {
+        Assert.False(WindowPlacement.TryReadColorPanel(new AppSettings(), out _, out _));
+    }
+
+    [Fact]
+    public void TryReadColorPanel_ReturnsSavedBounds()
+    {
+        var settings = new AppSettings
+        {
+            ColorPanelHasPosition = true,
+            ColorPanelX = 120,
+            ColorPanelY = 80,
+            ColorPanelWidth = 720,
+            ColorPanelHeight = 640,
+        };
+        Assert.True(WindowPlacement.TryReadColorPanel(settings, out var bounds, out var hasSize));
+        Assert.True(hasSize);
+        Assert.Equal(120, bounds.X);
+        Assert.Equal(80, bounds.Y);
+        Assert.Equal(720, bounds.Width);
+        Assert.Equal(640, bounds.Height);
+    }
+
+    [Fact]
     public void CenteredOn_PlacesDefaultSizeInWorkArea()
     {
         var work = new Rect(100, 50, 1920, 1080);

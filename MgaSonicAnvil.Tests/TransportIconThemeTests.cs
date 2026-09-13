@@ -99,6 +99,21 @@ public sealed class TransportIconThemeTests
     }
 
     [Fact]
+    public void ColorPalette_IsCentered()
+    {
+        RunSta(() =>
+        {
+            foreach (var theme in new[] { UiTheme.Light, UiTheme.Dark })
+            {
+                var pixels = Render(TransportIcon.ColorPalette, theme, 34, 36);
+                Assert.True(CountInk(pixels, 34, 36) >= 40, $"{theme} RGB circles should draw");
+                AssertIconCentered(TransportIcon.ColorPalette, theme, 34, 36);
+                AssertIconCentered(TransportIcon.ColorPalette, theme, 22, 22);
+            }
+        });
+    }
+
+    [Fact]
     public void Lock_IsBboxCenteredInBothThemes()
     {
         RunSta(() =>

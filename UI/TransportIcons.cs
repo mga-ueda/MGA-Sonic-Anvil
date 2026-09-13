@@ -55,6 +55,7 @@ internal enum TransportIcon
     History,
     ThemeSun,
     ThemeMoon,
+    ColorPalette,
     Tips,
     Settings,
     Help,
@@ -108,6 +109,7 @@ internal enum TransportCommand
     CenterPlayhead,
     History,
     ToggleUiTheme,
+    OpenColorPanel,
     ToggleTips,
     OpenSettings,
     OpenManual,
@@ -540,6 +542,9 @@ internal static class TransportIconDrawing
             case TransportIcon.ThemeMoon:
                 DrawThemeMoon(dc, pen, cx, cy);
                 break;
+            case TransportIcon.ColorPalette:
+                DrawColorPalette(dc, pen, brush, cx, cy);
+                break;
             case TransportIcon.Normalize:
                 dc.DrawLine(pen, new Point(10, 24), new Point(10, 16));
                 dc.DrawLine(pen, new Point(15, 24), new Point(15, 11));
@@ -664,6 +669,43 @@ internal static class TransportIconDrawing
                 new Point(cx + Math.Cos(angle) * inner, cy + Math.Sin(angle) * inner),
                 new Point(cx + Math.Cos(angle) * outer, cy + Math.Sin(angle) * outer));
         }
+    }
+
+    private static void DrawColorPalette(DrawingContext dc, Pen pen, Brush brush, double cx, double cy)
+    {
+        var stroke = OutlinePen(pen, 1.45);
+        const double radius = 6.15;
+        const double side = 7.4;
+        var rise = side * Math.Sqrt(3) / 2;
+        var top = new Point(0, -rise * 2 / 3);
+        var left = new Point(-side / 2, rise / 3);
+        var right = new Point(side / 2, rise / 3);
+        var hull = new Rect(
+            left.X - radius,
+            top.Y - radius,
+            side + radius * 2,
+            rise + radius * 2);
+        dc.PushTransform(new TranslateTransform(
+            cx - (hull.X + hull.Width * 0.5),
+            cy - (hull.Y + hull.Height * 0.5)));
+
+        dc.DrawEllipse(brush, null, left, radius, radius);
+
+        dc.PushClip(new EllipseGeometry(top, radius, radius));
+        var hatch = OutlinePen(pen, 1.15);
+        for (var i = -4; i <= 4; i++)
+        {
+            var shift = i * 2.55;
+            dc.DrawLine(
+                hatch,
+                new Point(top.X - 9 + shift, top.Y - 9),
+                new Point(top.X + 9 + shift, top.Y + 9));
+        }
+
+        dc.Pop();
+        dc.DrawEllipse(null, stroke, top, radius, radius);
+        dc.DrawEllipse(null, stroke, right, radius, radius);
+        dc.Pop();
     }
 
     private static void DrawThemeMoon(DrawingContext dc, Pen pen, double cx, double cy)

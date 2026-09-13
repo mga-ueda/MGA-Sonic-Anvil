@@ -83,6 +83,17 @@ internal sealed class AppSettings
     /// <summary>閉じたときの高さ。次回復元する。</summary>
     public int SettingsWindowHeight { get; set; }
 
+    /// <summary>色設定ウィンドウの位置。未保存なら false（初回はアプリ中央）。</summary>
+    public bool ColorPanelHasPosition { get; set; }
+
+    public int ColorPanelX { get; set; }
+
+    public int ColorPanelY { get; set; }
+
+    public int ColorPanelWidth { get; set; }
+
+    public int ColorPanelHeight { get; set; }
+
     public string UiLanguage { get; set; } = "auto";
 
     /// <summary>配色。auto / dark / light。既定は OS に従う。</summary>
@@ -158,7 +169,7 @@ internal sealed class AppSettings
 
     public string WaapiOutputDirectory { get; set; } = string.Empty;
 
-    /// <summary>色調整パネルで保存したアプリ既定色。#RRGGBB。未設定なら XAML 既定。</summary>
+    /// <summary>色設定パネルで保存したアプリ既定色。#RRGGBB。未設定なら XAML 既定。</summary>
     public Dictionary<string, string>? Colors { get; set; }
 
     public AudioOutputSettings ToAudioOutputSettings() =>

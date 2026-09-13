@@ -65,12 +65,25 @@ public sealed class UiThemeTests
         Assert.True(UiThemePalette.IsThemeable("ExportButtonFillBrush"));
         Assert.True(UiThemePalette.IsThemeable("LevelMeterTrackBackBrush"));
         Assert.True(UiThemePalette.IsThemeable("KeepTargetLockForeBrush"));
+        Assert.True(UiThemePalette.IsThemeable("ActionLinkHoverForeBrush"));
+        Assert.True(UiThemePalette.IsThemeable("SampleLoopTimeLabelForeBrush"));
+        Assert.True(UiThemePalette.IsThemeable("RegionTimeLabelForeBrush"));
+        Assert.True(UiThemePalette.IsThemeable("MarkerLabelForeBrush"));
 
         foreach (var key in UiThemePalette.ThemeableKeys)
         {
             var light = UiThemePalette.ColorFor(UiTheme.Light, key);
             Assert.True(light.A > 0, key);
         }
+    }
+
+    [Fact]
+    public void LightPalette_UsesWhiteRegionMarkerLoopLabels()
+    {
+        var white = System.Windows.Media.Color.FromRgb(0xFF, 0xFF, 0xFF);
+        Assert.Equal(white, UiThemePalette.ColorFor(UiTheme.Light, "SampleLoopTimeLabelForeBrush"));
+        Assert.Equal(white, UiThemePalette.ColorFor(UiTheme.Light, "RegionTimeLabelForeBrush"));
+        Assert.Equal(white, UiThemePalette.ColorFor(UiTheme.Light, "MarkerLabelForeBrush"));
     }
 
     [Fact]
@@ -92,6 +105,9 @@ public sealed class UiThemeTests
         Assert.Equal(
             UiThemePalette.ColorFor(UiTheme.Light, "AccentCyanBrush"),
             UiThemePalette.ColorFor(UiTheme.Light, "ActionLinkForeBrush"));
+        Assert.NotEqual(
+            UiThemePalette.ColorFor(UiTheme.Light, "ActionLinkForeBrush"),
+            UiThemePalette.ColorFor(UiTheme.Light, "ActionLinkHoverForeBrush"));
         Assert.True(Contrast(UiThemePalette.ColorFor(UiTheme.Light, "PrimaryForeBrush"), surface) >= 7);
         Assert.True(Contrast(UiThemePalette.ColorFor(UiTheme.Light, "MutedForeBrush"), surface) >= 7);
         Assert.True(Contrast(UiThemePalette.ColorFor(UiTheme.Light, "StatusBarDetailForeBrush"), chrome) >= 7);

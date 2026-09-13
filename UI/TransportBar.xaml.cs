@@ -57,7 +57,8 @@ internal partial class TransportBar : UserControl
             (TransportCommand.ToggleLoudnessView, TransportIcon.Loudness, UiStrings.TipLoudnessView, UiStrings.TooltipLoudnessView),
             (TransportCommand.CenterPlayhead, TransportIcon.Center, UiStrings.TipCenterPlayhead, UiStrings.TooltipCenterPlayhead),
             (TransportCommand.History, TransportIcon.History, UiStrings.TipEditHistory, UiStrings.TooltipHistory),
-            (TransportCommand.ToggleUiTheme, TransportIcon.ThemeMoon, UiStrings.TipUiThemeToggle, UiStrings.TooltipUiThemeToggle));
+            (TransportCommand.ToggleUiTheme, TransportIcon.ThemeMoon, UiStrings.TipUiThemeToggle, UiStrings.TooltipUiThemeToggle),
+            (TransportCommand.OpenColorPanel, TransportIcon.ColorPalette, UiStrings.TipColorPanel, UiStrings.TooltipColorPanel));
 
         AddGroup(
             bottomRow: true,
@@ -95,6 +96,7 @@ internal partial class TransportBar : UserControl
         SetTip(TransportCommand.CenterPlayhead, UiStrings.TipCenterPlayhead, UiStrings.TooltipCenterPlayhead);
         SetTip(TransportCommand.History, UiStrings.TipEditHistory, UiStrings.TooltipHistory);
         SetTip(TransportCommand.ToggleUiTheme, UiStrings.TipUiThemeToggle, UiStrings.TooltipUiThemeToggle, respectsEnabled: false);
+        SetTip(TransportCommand.OpenColorPanel, UiStrings.TipColorPanel, UiStrings.TooltipColorPanel, respectsEnabled: false);
         SetTip(TransportCommand.OpenSettings, UiStrings.TipAudioSettings, UiStrings.TooltipSettings, respectsEnabled: false);
         SetTip(TransportCommand.ToggleTips, UiStrings.TipTipsToggle, UiStrings.TooltipTipsToggle, respectsEnabled: false);
         SetTip(TransportCommand.OpenManual, UiStrings.TipManualHelp, UiStrings.TooltipManualHelp, respectsEnabled: false);
@@ -197,6 +199,7 @@ internal partial class TransportBar : UserControl
                     or TransportCommand.Record
                     or TransportCommand.OpenSettings
                     or TransportCommand.ToggleUiTheme
+                    or TransportCommand.OpenColorPanel
                     or TransportCommand.ToggleTips
                     or TransportCommand.OpenManual;
         }

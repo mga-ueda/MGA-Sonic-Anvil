@@ -1,11 +1,11 @@
 using System.Windows;
 using System.Windows.Threading;
+using MgaSonicAnvil.Config;
 
 namespace MgaSonicAnvil.UI;
 
 public partial class MainWindow
 {
-#if DEBUG
     private ColorDevPanelWindow? _colorDevPanel;
     private bool _appColorRefreshQueued;
 
@@ -45,27 +45,21 @@ public partial class MainWindow
 
     private void PositionColorDevPanel(ColorDevPanelWindow panel)
     {
-        panel.WindowStartupLocation = WindowStartupLocation.Manual;
-        panel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        var panelWidth = panel.DesiredSize.Width;
-        if (panelWidth <= 1)
+        if (WindowPlacement.TryApplyColorPanel(panel, AppStorage.Settings))
         {
-            panelWidth = panel.Width;
+            return;
         }
 
-        var work = SystemParameters.WorkArea;
-        var x = Math.Min(Left + ActualWidth + 8, work.Right - panelWidth);
-        var y = Math.Max(work.Top, Top);
-        panel.Left = Math.Max(work.Left, x);
-        panel.Top = y;
+        WindowPlacement.CenterOnOwner(panel, this);
     }
-#endif
 
     internal void ApplyUiColors() => ApplyUiColors(includeColorPanel: true);
 
     internal void ApplyUiColors(bool includeColorPanel)
     {
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        LoadBrandLogo();
+        BrandLicenseHost.ApplyColors();
         Waveform.RefreshAppearance();
         Overview.RefreshAppearance();
         Spectrum.RefreshAppearance();
@@ -82,11 +76,9 @@ public partial class MainWindow
         WaapiBar.RefreshAppearance();
         RefreshTabHeaders();
         RefreshStatus();
-#if DEBUG
         if (includeColorPanel)
         {
             _colorDevPanel?.RefreshAppearance();
         }
-#endif
     }
 }

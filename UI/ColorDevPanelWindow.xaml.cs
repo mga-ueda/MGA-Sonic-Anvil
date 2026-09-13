@@ -3,13 +3,14 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MediaColor = System.Windows.Media.Color;
 
 namespace MgaSonicAnvil.UI;
 
 /// <summary>
-/// 開発者向け色調整パネル。開いたままメイン画面を見ながら変更できる。
+/// 色設定パネル。開いたままメイン画面を見ながら変更できる。
 /// アルファは XAML 既定を維持し、パネルでは RGB（#RRGGBB）のみ編集する。
 /// </summary>
 internal partial class ColorDevPanelWindow : Window
@@ -25,9 +26,14 @@ internal partial class ColorDevPanelWindow : Window
     public ColorDevPanelWindow()
     {
         InitializeComponent();
-        Title = UiStrings.ColorDevTitle;
+        ApplyWindowTitle();
         SourceInitialized += (_, _) => DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
-        Closed += (_, _) => FlushSave();
+        Closed += (_, _) =>
+        {
+            FlushSave();
+            WindowPlacement.CaptureColorPanel(this, AppStorage.Settings);
+            AppStorage.Save();
+        };
         _saveTimer.Tick += (_, _) => FlushSave();
         Picker.ColorChanged += (_, _) => ApplyLive(Picker.Color);
         Picker.ColorCommitted += (_, _) => FlushSave();
@@ -42,7 +48,7 @@ internal partial class ColorDevPanelWindow : Window
 
     public void ApplyLocalizedText()
     {
-        Title = UiStrings.ColorDevTitle;
+        ApplyWindowTitle();
         SearchHint.Text = UiStrings.ColorDevSearch;
         EmptyHint.Text = UiStrings.ColorDevNoMatches;
         PickerHint.Text = UiStrings.ColorDevPickHint;
@@ -64,6 +70,7 @@ internal partial class ColorDevPanelWindow : Window
 
     public void RefreshAppearance()
     {
+        ApplyWindowTitle();
         RefreshRows();
         ApplyButtonLooks();
         Picker.RefreshChrome();
@@ -72,6 +79,9 @@ internal partial class ColorDevPanelWindow : Window
             SyncPickerFromSelection();
         }
     }
+
+    private void ApplyWindowTitle() =>
+        Title = UiStrings.ColorDevTitleFor(UiThemeService.Current);
 
     public void RefreshRows()
     {

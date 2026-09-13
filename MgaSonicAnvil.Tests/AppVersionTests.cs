@@ -1,5 +1,6 @@
 using System.IO;
 using MgaSonicAnvil.Domain;
+using MgaSonicAnvil.UI;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
@@ -35,5 +36,31 @@ public sealed class AppVersionTests
         var title = AppVersion.FormTitleWithFile(path);
         Assert.StartsWith(AppVersion.FormTitle, title);
         Assert.EndsWith(" [ " + Path.GetFullPath(path) + " ]", title);
+    }
+
+    [Fact]
+    public void OpenLogo_FindsEmbeddedDarkPng() =>
+        AssertPng(AppEmbeddedResources.OpenLogo(UiTheme.Dark));
+
+    [Fact]
+    public void OpenLogo_FindsEmbeddedLightPng() =>
+        AssertPng(AppEmbeddedResources.OpenLogo(UiTheme.Light));
+
+    [Fact]
+    public void OpenLogo_LightAndDark_AreDifferentImages()
+    {
+        using var dark = AppEmbeddedResources.OpenLogo(UiTheme.Dark);
+        using var light = AppEmbeddedResources.OpenLogo(UiTheme.Light);
+        Assert.NotNull(dark);
+        Assert.NotNull(light);
+        Assert.NotEqual(dark!.Length, light!.Length);
+    }
+
+    private static void AssertPng(Stream? stream)
+    {
+        Assert.NotNull(stream);
+        var header = new byte[8];
+        Assert.Equal(8, stream!.Read(header, 0, header.Length));
+        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }, header);
     }
 }

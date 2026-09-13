@@ -1,3 +1,4 @@
+using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 using Xunit;
 
@@ -23,5 +24,19 @@ public sealed class ColorDevCatalogTests
         Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#B6B6B6", "b6"));
         Assert.False(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#B6B6B6", "playhead"));
         Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#B6B6B6", " "));
+    }
+
+    [Fact]
+    public void Title_UsesModeNotDeveloper()
+    {
+        var dark = UiStrings.ColorDevTitleFor(UiTheme.Dark);
+        var light = UiStrings.ColorDevTitleFor(UiTheme.Light);
+        Assert.DoesNotContain("開発者", dark);
+        Assert.DoesNotContain("開発者", light);
+        Assert.DoesNotContain("developer", dark, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("developer", light, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEqual(dark, light);
+        Assert.True(dark.Contains("ダーク", StringComparison.Ordinal) || dark.Contains("Dark", StringComparison.Ordinal));
+        Assert.True(light.Contains("ライト", StringComparison.Ordinal) || light.Contains("Light", StringComparison.Ordinal));
     }
 }

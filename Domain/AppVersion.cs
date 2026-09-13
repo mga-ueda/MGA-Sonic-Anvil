@@ -13,6 +13,8 @@ internal static partial class AppVersion
     public const string GitHubOwner = "mga-ueda";
     public const string GitHubRepo = "MGA-Sonic-Anvil";
     public const string RepositoryUrl = "https://github.com/" + GitHubOwner + "/" + GitHubRepo;
+    public const string LicenseUrl = RepositoryUrl + "/blob/main/LICENSE";
+    public const string LameProjectUrl = "https://lame.sourceforge.io/";
     public const string CompanyName = "MIYABI GAME AUDIO INC.";
     public const string CompanyUrl = "https://www.miyabi-ga.co.jp/";
     public const string CompanyFolderName = "MGA";

@@ -155,6 +155,9 @@ public partial class MainWindow
             case TransportCommand.ToggleUiTheme:
                 UiThemeService.ToggleDarkLight();
                 break;
+            case TransportCommand.OpenColorPanel:
+                ShowColorDevPanel();
+                break;
             case TransportCommand.ToggleTips:
                 ToggleTips();
                 break;

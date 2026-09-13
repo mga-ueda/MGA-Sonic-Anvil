@@ -124,7 +124,7 @@
       </Grid.ColumnDefinitions>
       <Grid.RowDefinitions>
         <RowDefinition Height="*" />
-        <RowDefinition Height="{x:Static ui:DesignMetrics.VectorScopeHeightGrid}" />
+        <RowDefinition Height="{x:Static ui:DesignMetrics.TransportChromeHeightGrid}" />
       </Grid.RowDefinitions>
 
       <DockPanel Grid.Row="0" Grid.Column="0">
@@ -230,31 +230,40 @@
             </ScrollViewer>
           </DockPanel>
         </Border>
-        <Grid Grid.Row="1"
-              Grid.Column="0"
-              MinHeight="{x:Static ui:DesignMetrics.TransportBarHeight}"
-              Background="{DynamicResource TransportBackBrush}">
+        <DockPanel Grid.Row="1"
+                   Grid.Column="0"
+                   MinHeight="{x:Static ui:DesignMetrics.TransportHostMinHeight}"
+                   Background="{DynamicResource TransportBackBrush}">
+          <StackPanel DockPanel.Dock="Bottom"
+                      Orientation="Horizontal"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Bottom"
+                      Margin="12,0,0,4">
+            <Image x:Name="BrandLogo"
+                   Width="{x:Static ui:DesignMetrics.BrandLogoWidth}"
+                   Height="{x:Static ui:DesignMetrics.BrandLogoHeight}"
+                   Margin="0,0,8,0"
+                   VerticalAlignment="Top"
+                   Stretch="Uniform"
+                   SnapsToDevicePixels="True"
+                   UseLayoutRounding="True"
+                   RenderOptions.BitmapScalingMode="HighQuality"
+                   RenderOptions.EdgeMode="Unspecified"
+                   Cursor="Hand"
+                   SizeChanged="BrandLogo_SizeChanged"
+                   MouseLeftButtonUp="BrandLogo_MouseLeftButtonUp" />
+            <ui:BrandLicenseLabel x:Name="BrandLicenseHost"
+                                  VerticalAlignment="Top"
+                                  FontSize="{x:Static ui:DesignMetrics.BrandLicenseFontSize}"
+                                  Foreground="{DynamicResource ActionCopyrightForeBrush}"
+                                  LinkText="{x:Static domain:UiStrings.CopyrightText}"
+                                  SizeChanged="BrandLicenseHost_SizeChanged"
+                                  LinkClick="BrandLicenseHost_LinkClick" />
+          </StackPanel>
           <ui:TransportBar x:Name="Transport"
                            HorizontalAlignment="Left"
                            VerticalAlignment="Top" />
-          <StackPanel Orientation="Horizontal"
-                      HorizontalAlignment="Left"
-                      VerticalAlignment="Bottom"
-                      Margin="12,0,0,6">
-            <TextBlock x:Name="CopyrightText"
-                       FontSize="10"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource ActionCopyrightForeBrush}"
-                       Text="{x:Static domain:UiStrings.CopyrightText}" />
-            <TextBlock x:Name="GitHubLink"
-                       FontSize="10"
-                       VerticalAlignment="Center"
-                       Cursor="Hand"
-                       Foreground="{DynamicResource ActionLinkForeBrush}"
-                       Text="{x:Static domain:UiStrings.CopyrightGitHub}"
-                       MouseLeftButtonUp="GitHubLink_MouseLeftButtonUp" />
-          </StackPanel>
-        </Grid>
+        </DockPanel>
         <ui:HistoryStripView x:Name="HistoryStrip"
                              Grid.Row="0"
                              Grid.RowSpan="2"
