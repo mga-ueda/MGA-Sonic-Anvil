@@ -1051,7 +1051,6 @@ public partial class MainWindow
     {
         _waveformHeightScale = _waveformHeightScale >= 3 ? 1 : _waveformHeightScale + 1;
         ApplyWaveformHeightScale();
-        Transport.SetWaveformHeightScale(_waveformHeightScale);
         AppStorage.Settings.WaveformHeightScale = _waveformHeightScale;
         AppStorage.Save();
     }
@@ -1083,7 +1082,5 @@ public partial class MainWindow
         {
             border.MinHeight = DesignMetrics.WaveformHostMinHeight * _waveformHeightScale;
         }
-
-        Transport.SetWaveformHeightScale(_waveformHeightScale);
     }
 }

@@ -200,8 +200,6 @@ internal static class DesignMetrics
 
     public static double StatusTimecodeLabelWidth => From96(22);
 
-    public static double ToolbarButtonSide => From96(24);
-
     /// <summary>スペアナ全体（LED メーター + 下の周波数数値）。ゴニオ＋位相バーと同じ高さ。</summary>
     public static double SpectrumHeight => VectorScopeHeight;
 

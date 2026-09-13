@@ -106,14 +106,6 @@ internal partial class TransportBar : UserControl
         }
     }
 
-    public void SetWaveformHeightScale(int scale)
-    {
-        if (_buttons.TryGetValue(TransportCommand.CycleWaveformHeight, out var button))
-        {
-            button.WaveformHeightScale = scale;
-        }
-    }
-
     private void SetTip(TransportCommand command, string tip, string tooltip, bool respectsEnabled = true)
     {
         if (_buttons.TryGetValue(command, out var button))

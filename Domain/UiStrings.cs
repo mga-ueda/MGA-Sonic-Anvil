@@ -155,7 +155,6 @@ internal static partial class UiStrings
     public static string LabelFadeCurveDefaults => Get("フェードカーブ既定", "Default Fade Curves");
     public static string LabelDefaultFadeIn => Get("波形フェードイン", "Waveform Fade In");
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
-    public static string AccessibleAudioSettingsButton => Get("設定", "Settings");
     public static string TipAudioSettings => Get(
         "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出しのタブ。表示言語、配色（ダーク／ライト／Auto）、関連付け、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、フェード、MP3、同時書き出し本数。",
         "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export tabs. Language, theme (Dark / Light / Auto), file associations, speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, fades, MP3, and parallel export count.");
@@ -433,10 +432,6 @@ internal static partial class UiStrings
         "Wave|*.wav|MP3|*.mp3");
 
     public static string LabelTransportGroup => Get("TRANS", "TRANS");
-    public static string LabelNavigationGroup => Get("NAV", "NAV");
-    public static string LabelTimeZoomGroup => Get("TIME", "TIME");
-    public static string LabelAmpZoomGroup => Get("AMP", "AMP");
-    public static string LabelWaveformHeightGroup => Get("SIZE", "SIZE");
     public static string LabelEditGroup => Get("EDIT", "EDIT");
     public static string LabelMarkerGroup => Get("MARK", "MARK");
     public static string LabelFileGroup => Get("FILE", "FILE");
@@ -445,17 +440,10 @@ internal static partial class UiStrings
 
     public static string TooltipRecord => Get("録音 (Ctrl+R)", "Record (Ctrl+R)");
     public static string TooltipPlay => Get("再生 / 停止 (Space)", "Play / stop (Space)");
-    public static string TooltipStop => Get("停止 (Space)", "Stop (Space)");
-    public static string TooltipGoToStart => Get("先頭 (Ctrl+Home)", "Go to start (Ctrl+Home)");
-    public static string TooltipGoToEnd => Get("末尾 (Ctrl+End)", "Go to end (Ctrl+End)");
     public static string TooltipTimeZoomIn => Get("時間拡大 (↑)", "Zoom in time (↑)");
     public static string TooltipTimeZoomOut => Get("時間縮小 (↓)", "Zoom out time (↓)");
-    public static string TooltipTimeZoomMax => Get("時間最大 (Ctrl+↑)", "Time zoom max (Ctrl+↑)");
-    public static string TooltipTimeZoomReset => Get("全体表示 (Ctrl+↓)", "Fit all (Ctrl+↓)");
     public static string TooltipAmpZoomIn => Get("振幅拡大 (Shift+↑)", "Zoom in amplitude (Shift+↑)");
     public static string TooltipAmpZoomOut => Get("振幅縮小 (Shift+↓)", "Zoom out amplitude (Shift+↓)");
-    public static string TooltipAmpZoomMax => Get("振幅最大 (Ctrl+Shift+↑)", "Amplitude zoom max (Ctrl+Shift+↑)");
-    public static string TooltipAmpZoomReset => Get("振幅リセット (Ctrl+Shift+↓)", "Reset amplitude zoom (Ctrl+Shift+↓)");
     public static string TooltipFadeIn => Get("フェードイン (I)", "Fade in (I)");
     public static string TooltipFadeOut => Get("フェードアウト (O)", "Fade out (O)");
     public static string TooltipNormalize => Get("ノーマライズ (N)", "Normalize (N)");
@@ -465,14 +453,6 @@ internal static partial class UiStrings
     public static string TooltipTipsToggle => Get("Tips の表示", "Show Tips");
     public static string TooltipSettings => Get("設定 (Ctrl+Shift+O)", "Settings (Ctrl+Shift+O)");
     public static string TooltipManualHelp => Get("マニュアル", "Manual");
-    public static string TooltipJumpToTime => Get("時間へ移動 (G)", "Focus time (G)");
-    public static string TooltipPreviousPage => Get("表示の約 5% 戻る (PageUp)", "Back about 5% of the view (PageUp)");
-    public static string TooltipNextPage => Get("表示の約 5% 進む (PageDown)", "Forward about 5% of the view (PageDown)");
-    public static string TooltipPreviousMarker => Get("前のマーカー (Ctrl+←)", "Previous marker (Ctrl+←)");
-    public static string TooltipNextMarker => Get("次のマーカー (Ctrl+→)", "Next marker (Ctrl+→)");
-    public static string TooltipWaveformHeight => Get("波形の高さ 1×／2×／3× (H)", "Waveform height 1× / 2× / 3× (H)");
-    public static string TooltipUndo => Get("元に戻す (Ctrl+Z)", "Undo (Ctrl+Z)");
-    public static string TooltipRedo => Get("やり直し (Ctrl+Y)", "Redo (Ctrl+Y)");
     public static string TooltipFadeAround => Get("再生位置でフェード (X)", "Fade around playhead (X)");
     public static string TooltipVolume => Get("音量 (V)", "Volume (V)");
     public static string TooltipPitch => Get("ピッチ (P)", "Pitch (P)");
@@ -483,7 +463,6 @@ internal static partial class UiStrings
     public static string TooltipSetRegion => Get("選択をリージョンに (Shift+R)", "Set selection as region (Shift+R)");
     public static string TooltipOpen => Get("開く (Ctrl+O)", "Open (Ctrl+O)");
     public static string TooltipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)", "Save As (Ctrl+Shift+S)");
-    public static string TooltipAnalysisView => Get("スペクトログラム / 重ね (A)  解除 (Esc / Shift+A / Shift+V)", "Spectrogram / overlay (A)  leave (Esc / Shift+A / Shift+V)");
     public static string TooltipSpectrogramView => Get("スペクトログラム / 重ね (A)  解除 (Esc / Shift+A / Shift+V)", "Spectrogram / overlay (A)  leave (Esc / Shift+A / Shift+V)");
     public static string TooltipLoudnessView => Get("ラウドネス (V)  解除 (Esc / Shift+A / Shift+V)", "Loudness (V)  leave (Esc / Shift+A / Shift+V)");
     public static string TooltipCenterPlayhead => Get("中央寄せ / センターロック (Z)", "Center / center-lock (Z)");
@@ -491,16 +470,6 @@ internal static partial class UiStrings
     public static string TooltipUiThemeToggle => Get("ダーク / ライト", "Dark / Light");
     public static string TooltipColorPanel => Get("色設定 (Ctrl+Shift+C)", "Color settings (Ctrl+Shift+C)");
 
-    public static string TipJumpToTime => Get("時間へ移動 (G)", "Focus time (G)");
-    public static string TipPreviousPage => Get("表示の約 5% 戻る (PageUp)", "Back about 5% of the view (PageUp)");
-    public static string TipNextPage => Get("表示の約 5% 進む (PageDown)", "Forward about 5% of the view (PageDown)");
-    public static string TipPreviousMarker => Get("前のマーカー (Ctrl+←)", "Previous marker (Ctrl+←)");
-    public static string TipNextMarker => Get("次のマーカー (Ctrl+→)", "Next marker (Ctrl+→)");
-    public static string TipWaveformHeight => Get(
-        "波形の高さ (H)\n1× → 2× → 3× と循環",
-        "Waveform height (H)\nCycles 1× → 2× → 3×");
-    public static string TipUndo => Get("元に戻す (Ctrl+Z)", "Undo (Ctrl+Z)");
-    public static string TipRedo => Get("やり直し (Ctrl+Y)", "Redo (Ctrl+Y)");
     public static string TipFadeAround => Get(
         "再生位置でフェード (X)\n表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）",
         "Fade around playhead (X)\nLinear fade in the view around the playhead (before = out / after = in)");
@@ -509,9 +478,6 @@ internal static partial class UiStrings
     public static string TipSetLoop => Get("選択をサンプルループに (Shift+L)\n同じ範囲でもう一度で解除", "Set selection as sample loop (Shift+L)\nSame range again clears it");
     public static string TipSetRegion => Get("選択をリージョンに (Shift+R)\n同じ範囲で繰り返すと分割", "Set selection as region (Shift+R)\nRepeat on the same range to split");
     public static string TipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)", "Save As (Ctrl+Shift+S)");
-    public static string TipAnalysisView => Get(
-        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Esc、Shift+A、Shift+V（今の表示にかかわらず波形へ）。ボタンは 3 回で波形に戻る。暗部持ち上げは左端のバーまたは Alt+↑／↓",
-        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Esc, Shift+A, or Shift+V returns to the waveform from any view. The button returns to the waveform on the third click. Lift dark energy with the left bar or Alt+↑ / ↓");
     public static string TipSpectrogramView => Get(
         "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Esc、Shift+A、Shift+V（今の表示にかかわらず波形へ）。ボタンは 3 回で波形に戻る。暗部持ち上げは左端のバーまたは Alt+↑／↓",
         "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Esc, Shift+A, or Shift+V returns to the waveform from any view. The button returns to the waveform on the third click. Lift dark energy with the left bar or Alt+↑ / ↓");
@@ -572,17 +538,6 @@ internal static partial class UiStrings
     public static string TipPlay => Get(
         "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し\n再生中 Shift で 3 倍速（ピッチ据え置き）\n左右 Shift 同時で 3 倍巻き戻し",
         "Play / stop (Space)\nStop returns to the start position\nEnter pauses in place\nCtrl+Space from 3 seconds earlier\nAlt+Enter restarts from the playback start\nHold Shift while playing for 3× (pitch unchanged)\nBoth Shifts: 3× rewind");
-    public static string TipStop => Get("停止（開始位置へ戻る）", "Stop (return to start)");
-    public static string TipGoToStart => Get("先頭 (Ctrl+Home)", "Go to start (Ctrl+Home)");
-    public static string TipGoToEnd => Get("末尾 (Ctrl+End)", "Go to end (Ctrl+End)");
-    public static string TipTimeZoomIn => Get("時間拡大 (↑)\nホイールでも拡大", "Zoom in time (↑)\nMouse wheel also zooms");
-    public static string TipTimeZoomOut => Get("時間縮小 (↓)\nホイールでも縮小", "Zoom out time (↓)\nMouse wheel also zooms");
-    public static string TipTimeZoomMax => Get("時間 32倍 / 最大 (Ctrl+↑)", "Time zoom 32× / max (Ctrl+↑)");
-    public static string TipTimeZoomReset => Get("全体表示 (Ctrl+↓)", "Fit all (Ctrl+↓)");
-    public static string TipAmpZoomIn => Get("振幅拡大 (Shift+↑)\nCtrl+ホイールでも拡大", "Zoom in amplitude (Shift+↑)\nCtrl+wheel also zooms");
-    public static string TipAmpZoomOut => Get("振幅縮小 (Shift+↓)\nCtrl+ホイールでも縮小", "Zoom out amplitude (Shift+↓)\nCtrl+wheel also zooms");
-    public static string TipAmpZoomMax => Get("振幅最大 (Ctrl+Shift+↑)", "Amplitude zoom max (Ctrl+Shift+↑)");
-    public static string TipAmpZoomReset => Get("振幅リセット (Ctrl+Shift+↓)", "Reset amplitude zoom (Ctrl+Shift+↓)");
     public static string TipFadeIn => Get(
         "フェードイン (I)\nカーブを選び Space で試聴、Enter で実行。1–9 でカーブを選択。未選択なら全体",
         "Fade in (I)\nPick a curve, Space to preview, Enter to apply. 1–9 select a curve. Uses the whole file if nothing is selected");
@@ -759,9 +714,6 @@ internal static partial class UiStrings
     public static string TipSilentSkipThreshold => Get(
         "Silent Skip で無音とみなすピーク（dBFS）。-120 から 0。既定 -60。再生位置がこの値未満なら次の音まで飛ばします。",
         "Peak level treated as silence for Silent Skip (dBFS), from −120 to 0. Default −60. Playback jumps from below this level to the next sound.");
-    public static string TipGitHub => Get(
-        "GitHub リポジトリを開きます。",
-        "Open the GitHub repository.");
     public static string TipTimecode => Get(
         "現在時間 (G)。入力、ホイール／↑↓で調整（時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分、サンプルは1／Shift10／Ctrl100／Ctrl+Shift1000）。Enter で移動。右クリックで時間／サンプル数",
         "Current time (G). Type, or wheel / ↑↓ (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter jumps. Right-click switches time / samples");
@@ -787,10 +739,6 @@ internal static partial class UiStrings
     public static string MenuShowSamples => Get("サンプル数(_S)", "_Samples");
     public static string MenuCopy => Get("コピー(_C)", "_Copy");
     public static string MenuPaste => Get("貼り付け(_P)", "_Paste");
-    public static string MenuClearSampleLoop => Get("ループを削除", "Clear loop");
-    public static string MenuClearRegion => Get("リージョンを削除", "Clear region");
-    public static string MenuClearMarker => Get("マーカーを削除", "Clear marker");
-    public static string MenuClearMarkers => Get("選択したマーカーを削除", "Clear selected markers");
 
     public static string TabMenuCloseOthers => Get("このタブ以外を閉じる(_O)", "Close _Other Tabs");
     public static string TabMenuCloseRight => Get("このタブを含め右側を全部閉じる(_R)", "Close This and Tabs to the _Right");

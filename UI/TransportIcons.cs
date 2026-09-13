@@ -12,24 +12,7 @@ namespace MgaSonicAnvil.UI;
 internal enum TransportIcon
 {
     PlayPause,
-    Stop,
     Record,
-    JumpToTime,
-    GoToStart,
-    PreviousPage,
-    PreviousMarker,
-    NextMarker,
-    NextPage,
-    GoToEnd,
-    TimeZoomIn,
-    TimeZoomOut,
-    TimeZoomMax,
-    TimeZoomReset,
-    AmpZoomIn,
-    AmpZoomOut,
-    AmpZoomMax,
-    AmpZoomReset,
-    WaveformHeight,
     Folder,
     FadeIn,
     FadeOut,
@@ -40,8 +23,6 @@ internal enum TransportIcon
     TimeStretch,
     Reverse,
     Delete,
-    Undo,
-    Redo,
     AddMarker,
     SetLoop,
     SetRegion,
@@ -138,24 +119,6 @@ internal sealed class TransportIconButton : Button
 
     public TransportCommand CommandKind { get; init; }
 
-    private int _waveformHeightScale = 1;
-
-    public int WaveformHeightScale
-    {
-        get => _waveformHeightScale;
-        set
-        {
-            var next = value is >= 1 and <= 3 ? value : 1;
-            if (_waveformHeightScale == next)
-            {
-                return;
-            }
-
-            _waveformHeightScale = next;
-            InvalidateVisual();
-        }
-    }
-
     public TransportIcon Icon
     {
         get => (TransportIcon)GetValue(IconProperty);
@@ -225,12 +188,6 @@ internal sealed class TransportIconButton : Button
                 ? TransportIconDrawing.FolderHoverBounds(bounds)
                 : null);
         var fore = IconForeOverride ?? TransportChrome.Fore(IsEnabled);
-        if (Icon == TransportIcon.WaveformHeight)
-        {
-            DrawWaveformHeightLabel(dc, bounds, fore, WaveformHeightScale);
-            return;
-        }
-
         if (Icon == TransportIcon.Tips)
         {
             var balloonFore = IsLatched ? fore : TransportChrome.Fore(false);
@@ -317,24 +274,6 @@ internal sealed class TransportIconButton : Button
             formatted,
             new Point((bounds.Width - formatted.Width) * 0.5, (bounds.Height - formatted.Height) * 0.5));
     }
-
-    private void DrawWaveformHeightLabel(DrawingContext dc, Rect bounds, Color fore, int scale)
-    {
-        scale = scale is >= 1 and <= 3 ? scale : 1;
-        var formatted = new FormattedText(
-            "x" + scale.ToString(CultureInfo.InvariantCulture),
-            CultureInfo.CurrentUICulture,
-            FlowDirection.LeftToRight,
-            new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
-            10,
-            WpfControlHelpers.FrozenBrush(fore),
-            VisualTreeHelper.GetDpi(this).PixelsPerDip);
-        dc.DrawText(
-            formatted,
-            new Point(
-                (bounds.Width - formatted.Width) * 0.5,
-                (bounds.Height - formatted.Height) * 0.5));
-    }
 }
 
 internal static class TransportIconDrawing
@@ -396,51 +335,8 @@ internal static class TransportIconDrawing
                 }
 
                 break;
-            case TransportIcon.Stop:
-                dc.DrawRectangle(fill, stroke, new Rect(12, 12, 10, 12));
-                break;
             case TransportIcon.Record:
                 dc.DrawEllipse(fill, stroke, new Point(cx, cy), 6.2, 6.2);
-                break;
-            case TransportIcon.JumpToTime:
-                dc.DrawLine(pen, new Point(11, 11), new Point(23, 11));
-                dc.DrawLine(pen, new Point(11, 25), new Point(23, 25));
-                dc.DrawLine(pen, new Point(14, 9), new Point(12, 27));
-                dc.DrawLine(pen, new Point(22, 9), new Point(20, 27));
-                break;
-            case TransportIcon.GoToStart:
-            case TransportIcon.GoToEnd:
-                var start = icon == TransportIcon.GoToStart;
-                var lineX = start ? 9d : 25d;
-                dc.DrawLine(pen, new Point(lineX, 9), new Point(lineX, 27));
-                DrawChevron(dc, pen, cx + (start ? 2 : -2), cy, start);
-                break;
-            case TransportIcon.PreviousMarker:
-            case TransportIcon.NextMarker:
-                var prevMarker = icon == TransportIcon.PreviousMarker;
-                DrawChevron(dc, pen, cx + (prevMarker ? 3 : -3), cy, prevMarker);
-                dc.DrawLine(pen, new Point(prevMarker ? 10 : 24, 10), new Point(prevMarker ? 10 : 24, 26));
-                dc.DrawLine(pen, new Point(prevMarker ? 13 : 21, 13), new Point(prevMarker ? 13 : 21, 23));
-                break;
-            case TransportIcon.PreviousPage:
-            case TransportIcon.NextPage:
-                var prevPage = icon == TransportIcon.PreviousPage;
-                DrawChevron(dc, pen, cx + (prevPage ? -2 : 2), cy, prevPage);
-                DrawChevron(dc, pen, cx + (prevPage ? 5 : -5), cy, prevPage);
-                break;
-            case TransportIcon.TimeZoomIn:
-            case TransportIcon.TimeZoomOut:
-            case TransportIcon.TimeZoomMax:
-            case TransportIcon.TimeZoomReset:
-                DrawHorizontalZoom(dc, pen);
-                DrawZoomModifier(dc, pen, brush, icon, cx, cy);
-                break;
-            case TransportIcon.AmpZoomIn:
-            case TransportIcon.AmpZoomOut:
-            case TransportIcon.AmpZoomMax:
-            case TransportIcon.AmpZoomReset:
-                DrawVerticalZoom(dc, pen);
-                DrawZoomModifier(dc, pen, brush, icon, cx, cy);
                 break;
             case TransportIcon.Folder:
                 DrawFolder(dc, pen, cx, cy);
@@ -485,18 +381,6 @@ internal static class TransportIconDrawing
             case TransportIcon.Reverse:
                 DrawChevron(dc, pen, 13, cy, left: true);
                 DrawChevron(dc, pen, 22, cy, left: true);
-                break;
-            case TransportIcon.Undo:
-                dc.DrawLine(pen, new Point(11, 14), new Point(11, 22));
-                dc.DrawLine(pen, new Point(11, 22), new Point(23, 22));
-                dc.DrawLine(pen, new Point(11, 14), new Point(16, 10));
-                dc.DrawLine(pen, new Point(11, 14), new Point(16, 18));
-                break;
-            case TransportIcon.Redo:
-                dc.DrawLine(pen, new Point(23, 14), new Point(23, 22));
-                dc.DrawLine(pen, new Point(11, 22), new Point(23, 22));
-                dc.DrawLine(pen, new Point(23, 14), new Point(18, 10));
-                dc.DrawLine(pen, new Point(23, 14), new Point(18, 18));
                 break;
             case TransportIcon.AddMarker:
                 dc.DrawLine(pen, new Point(17, 8), new Point(17, 27));
@@ -752,33 +636,6 @@ internal static class TransportIconDrawing
         dc.DrawLine(pen, new Point(8, 20), new Point(27, 20));
     }
 
-    public static void DrawSettingsGear(DrawingContext dc, Rect bounds, Color color, Color holeColor)
-    {
-        _ = holeColor;
-        const double designW = 34d;
-        const double designH = 36d;
-        var scale = Math.Min(bounds.Width / designW, bounds.Height / designH);
-        if (scale <= 0d)
-        {
-            return;
-        }
-
-        dc.PushTransform(new TranslateTransform(
-            bounds.X + (bounds.Width - designW * scale) * 0.5,
-            bounds.Y + (bounds.Height - designH * scale) * 0.5));
-        dc.PushTransform(new ScaleTransform(scale, scale));
-        var pen = new Pen(WpfControlHelpers.FrozenBrush(color), 1.8)
-        {
-            StartLineCap = PenLineCap.Round,
-            EndLineCap = PenLineCap.Round,
-            LineJoin = PenLineJoin.Round,
-        };
-        pen.Freeze();
-        DrawGear(dc, pen, 17, 18);
-        dc.Pop();
-        dc.Pop();
-    }
-
     private static void DrawGear(DrawingContext dc, Pen pen, double cx, double cy)
     {
         const int teeth = 8;
@@ -1013,105 +870,6 @@ internal static class TransportIconDrawing
         var direction = left ? -1d : 1d;
         dc.DrawLine(pen, new Point(centerX - direction * 4, centerY - 7), new Point(centerX + direction * 3, centerY));
         dc.DrawLine(pen, new Point(centerX + direction * 3, centerY), new Point(centerX - direction * 4, centerY + 7));
-    }
-
-    private static void DrawHorizontalZoom(DrawingContext dc, Pen pen)
-    {
-        dc.DrawLine(pen, new Point(7, 18), new Point(27, 18));
-        dc.DrawLine(pen, new Point(11, 14), new Point(7, 18));
-        dc.DrawLine(pen, new Point(7, 18), new Point(11, 22));
-        dc.DrawLine(pen, new Point(23, 14), new Point(27, 18));
-        dc.DrawLine(pen, new Point(27, 18), new Point(23, 22));
-    }
-
-    private static void DrawVerticalZoom(DrawingContext dc, Pen pen)
-    {
-        dc.DrawLine(pen, new Point(17, 8), new Point(17, 28));
-        dc.DrawLine(pen, new Point(13, 12), new Point(17, 8));
-        dc.DrawLine(pen, new Point(17, 8), new Point(21, 12));
-        dc.DrawLine(pen, new Point(13, 24), new Point(17, 28));
-        dc.DrawLine(pen, new Point(17, 28), new Point(21, 24));
-    }
-
-    private static void DrawZoomModifier(
-        DrawingContext dc,
-        Pen pen,
-        Brush brush,
-        TransportIcon icon,
-        double cx,
-        double cy)
-    {
-        var isIn = icon is TransportIcon.TimeZoomIn or TransportIcon.AmpZoomIn;
-        var isOut = icon is TransportIcon.TimeZoomOut or TransportIcon.AmpZoomOut;
-        var isMax = icon is TransportIcon.TimeZoomMax or TransportIcon.AmpZoomMax;
-        if (isIn || isOut)
-        {
-            dc.DrawEllipse(null, pen, new Point(cx, cy), 5, 5);
-            dc.DrawLine(pen, new Point(cx - 3, cy), new Point(cx + 3, cy));
-            if (isIn)
-            {
-                dc.DrawLine(pen, new Point(cx, cy - 3), new Point(cx, cy + 3));
-            }
-        }
-        else if (isMax)
-        {
-            dc.DrawRectangle(null, pen, new Rect(cx - 3, cy - 3, 6, 6));
-        }
-        else
-        {
-            dc.DrawEllipse(null, pen, new Point(cx, cy), 4, 4);
-        }
-    }
-}
-
-/// <summary>ユーザーマニュアルを開く。「?」を描画する。</summary>
-internal sealed class TransportManualButton : Button
-{
-    public TransportManualButton()
-    {
-        Width = DesignMetrics.TransportButtonSide;
-        Height = DesignMetrics.TransportButtonSide;
-        Focusable = false;
-        FocusVisualStyle = null;
-        Cursor = Cursors.Hand;
-        Background = Brushes.Transparent;
-        BorderThickness = new Thickness(0);
-        OverridesDefaultStyle = true;
-        Template = new ControlTemplate(typeof(Button));
-        SnapsToDevicePixels = true;
-        TransportHover.Attach(this);
-    }
-
-    public void RefreshAppearance()
-    {
-        InvalidateVisual();
-    }
-
-    protected override HitTestResult? HitTestCore(PointHitTestParameters hitTestParameters) =>
-        new Rect(RenderSize).Contains(hitTestParameters.HitPoint)
-            ? new PointHitTestResult(this, hitTestParameters.HitPoint)
-            : null;
-
-    protected override void OnRender(DrawingContext dc)
-    {
-        var bounds = new Rect(RenderSize);
-        if (bounds.Width <= 0 || bounds.Height <= 0)
-        {
-            return;
-        }
-
-        TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed);
-        var formatted = new FormattedText(
-            "?",
-            CultureInfo.CurrentUICulture,
-            FlowDirection.LeftToRight,
-            new Typeface(new FontFamily("Segoe UI Semibold"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
-            Math.Max(12d, Math.Min(bounds.Width, bounds.Height) * 0.52),
-            WpfControlHelpers.FrozenBrush(TransportChrome.Fore(IsEnabled)),
-            VisualTreeHelper.GetDpi(this).PixelsPerDip);
-        dc.DrawText(
-            formatted,
-            new Point((bounds.Width - formatted.Width) * 0.5, (bounds.Height - formatted.Height) * 0.5));
     }
 }
 
