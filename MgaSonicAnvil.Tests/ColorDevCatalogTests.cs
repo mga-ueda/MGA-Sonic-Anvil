@@ -84,7 +84,7 @@ public sealed class ColorDevCatalogTests
     public void Catalog_CoversEveryXamlBrush()
     {
         var xaml = File.ReadAllText(FindUiColorsXaml());
-        Assert.Contains("x:Key=\"WaveFillBrush\" Color=\"#FF7CA7FF\"", xaml);
+        Assert.Contains("x:Key=\"WaveFillBrush\" Color=\"#FFC6D9FF\"", xaml);
         Assert.Contains("x:Key=\"LevelGradFloorBrush\" Color=\"#FF005C8C\"", xaml);
         Assert.Contains("x:Key=\"LevelGradLowBrush\" Color=\"#FF0071AC\"", xaml);
         Assert.Contains("x:Key=\"LevelGradCeilBrush\" Color=\"#FFC8EFFF\"", xaml);
@@ -116,11 +116,11 @@ public sealed class ColorDevCatalogTests
     [Fact]
     public void Matches_LabelKeyHexAndGroup()
     {
-        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#7CA7FF", "波形"));
-        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#7CA7FF", "wave"));
-        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#7CA7FF", "7C"));
-        Assert.False(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#7CA7FF", "playhead"));
-        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#7CA7FF", " "));
+        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#C6D9FF", "波形"));
+        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#C6D9FF", "wave"));
+        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#C6D9FF", "C6"));
+        Assert.False(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#C6D9FF", "playhead"));
+        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#C6D9FF", " "));
         Assert.True(ColorDevCatalog.Matches("エリア背景", "WaveformBackBrush", "#262626", "波形", "波形"));
         Assert.False(ColorDevCatalog.Matches("エリア背景", "WaveformBackBrush", "#262626", "波形", "playhead"));
     }

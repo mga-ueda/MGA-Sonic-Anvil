@@ -57,7 +57,7 @@ public sealed class UiThemeTests
         Assert.Equal(System.Windows.Media.Color.FromRgb(0xFA, 0xFA, 0xFA), lightWave);
         Assert.Equal(System.Windows.Media.Color.FromRgb(0x40, 0x52, 0x73), lightFill);
         Assert.NotEqual(System.Windows.Media.Color.FromRgb(0x26, 0x26, 0x26), lightWave);
-        Assert.NotEqual(System.Windows.Media.Color.FromRgb(0x7C, 0xA7, 0xFF), lightFill);
+        Assert.NotEqual(System.Windows.Media.Color.FromRgb(0xC6, 0xD9, 0xFF), lightFill);
         Assert.Equal(
             UiThemePalette.ColorFor(UiTheme.Light, "MouseGuideBrush").A,
             UiColors.DefaultFor(UiTheme.Light, "MouseGuideBrush").A);
