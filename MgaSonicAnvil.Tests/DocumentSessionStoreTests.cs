@@ -523,6 +523,22 @@ public sealed class DocumentSessionStoreTests
     }
 
     [Fact]
+    public void InsertRestoredBySourceIndex_KeepsOriginalOrder()
+    {
+        var sessions = new List<string>();
+        var restored = new List<(int SourceIndex, string Item)>();
+        var second = "b";
+        var first = "a";
+
+        DocumentSessionStore.InsertRestoredBySourceIndex(restored, sessions, 1, second);
+        DocumentSessionStore.InsertRestoredBySourceIndex(restored, sessions, 0, first);
+
+        Assert.Equal(["a", "b"], sessions);
+        Assert.Equal([0, 1], restored.Select(item => item.SourceIndex).ToArray());
+        Assert.Same(second, DocumentSessionStore.PickRestoredActive(restored, activeSourceIndex: 1));
+    }
+
+    [Fact]
     public void PickRestoredActive_SkipsMissingSource()
     {
         var kept = new object();

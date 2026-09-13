@@ -965,8 +965,8 @@ public partial class MainWindow
                 var session = await RestoreIndexedAsync(activeIndex, activeSnap).ConfigureAwait(true);
                 if (session is not null)
                 {
-                    _sessions.Add(session);
-                    restored.Add((activeIndex, session));
+                    DocumentSessionStore.InsertRestoredBySourceIndex(
+                        restored, _sessions, activeIndex, session);
                     BindWorkspace(session);
                     Waveform.Refresh();
                     Overview.InvalidateVisual();
@@ -990,8 +990,9 @@ public partial class MainWindow
                     continue;
                 }
 
-                _sessions.Add(session);
-                restored.Add((sourceIndex, session));
+                DocumentSessionStore.InsertRestoredBySourceIndex(
+                    restored, _sessions, sourceIndex, session);
+                RebuildTabBar();
                 if (showProgress)
                 {
                     PumpUiAfterOpen();
@@ -1008,6 +1009,7 @@ public partial class MainWindow
                 BindWorkspace(DocumentSessionStore.PickRestoredActive(restored, activeIndex) ?? _sessions[0]);
             }
 
+            RebuildTabBar();
             Waveform.Refresh();
             Overview.InvalidateVisual();
         }

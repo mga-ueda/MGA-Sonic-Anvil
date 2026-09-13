@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Media;
 using MgaSonicAnvil.UI;
 using Xunit;
 
@@ -27,5 +28,27 @@ public sealed class VectorScopeLayoutTests
         Assert.True(
             VectorScopeView.SurroundScopeRect(layout.Scope).Height < layout.Scope.Height,
             "scope rect is already square; measuring it again would shrink the surround view");
+    }
+
+    [Fact]
+    public void FadePixel_KeepsRgbAndLowersAlpha()
+    {
+        var pixel = (200 << 24) | (0x3A << 16) | (0xB8 << 8) | 0xE8;
+        var faded = VectorScopeView.FadePixel(pixel, fade: 0.5f, cutoff: 6);
+        Assert.Equal(100, (faded >> 24) & 0xFF);
+        Assert.Equal(0x3A, (faded >> 16) & 0xFF);
+        Assert.Equal(0xB8, (faded >> 8) & 0xFF);
+        Assert.Equal(0xE8, faded & 0xFF);
+    }
+
+    [Fact]
+    public void StampBlend_KeepsTraceHue()
+    {
+        var color = Color.FromRgb(0x3A, 0xB8, 0xE8);
+        var stamped = VectorScopeView.StampBlend(0, color, 180);
+        Assert.Equal(180, (stamped >> 24) & 0xFF);
+        Assert.Equal(color.R, (stamped >> 16) & 0xFF);
+        Assert.Equal(color.G, (stamped >> 8) & 0xFF);
+        Assert.Equal(color.B, stamped & 0xFF);
     }
 }

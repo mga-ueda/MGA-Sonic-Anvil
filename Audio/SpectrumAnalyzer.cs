@@ -362,11 +362,11 @@ internal sealed class SpectrumAnalyzer
         t = Math.Clamp(t, 0f, 1f);
         ReadOnlySpan<(float P, byte R, byte G, byte B)> stops =
         [
-            (0f, 16, 62, 86),
-            (0.26f, 20, 90, 118),
+            (0f, 0, 92, 140),
+            (0.26f, 0, 113, 172),
             (0.55f, 58, 184, 232),
             (0.82f, 200, 239, 255),
-            (1f, 248, 254, 255),
+            (1f, 200, 239, 255),
         ];
         var i = 0;
         for (; i < stops.Length - 2; i++)

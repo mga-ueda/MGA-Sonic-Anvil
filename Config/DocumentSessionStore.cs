@@ -629,6 +629,24 @@ internal static class DocumentSessionStore
         return restored.Count > 0 ? restored[0].Item : null;
     }
 
+    /// <summary>復元タブを元の並び（SourceIndex）へ差し込む。</summary>
+    public static int InsertRestoredBySourceIndex<T>(
+        IList<(int SourceIndex, T Item)> restored,
+        IList<T> sessions,
+        int sourceIndex,
+        T item)
+    {
+        var insertAt = 0;
+        while (insertAt < restored.Count && restored[insertAt].SourceIndex < sourceIndex)
+        {
+            insertAt++;
+        }
+
+        restored.Insert(insertAt, (sourceIndex, item));
+        sessions.Insert(insertAt, item);
+        return insertAt;
+    }
+
     public static OpenDocumentSnapshot[] ResolveOpenDocuments(AppSettings settings) =>
         settings.OpenDocuments ?? [];
 

@@ -17,50 +17,137 @@ internal static class UiColors
     public static void Load()
     {
         CaptureDefaults();
-        var values = AppStorage.Settings.Colors;
-        if (values is null || values.Count == 0)
-        {
-            return;
-        }
+        MigrateLegacyColors(AppStorage.Settings);
+    }
 
+    public static void ApplySaved(UiTheme theme)
+    {
         foreach (var entry in _entries)
         {
-            if (values.TryGetValue(entry.Key, out var text) && TryParseColor(text, out var color))
+            if (!UiThemePalette.IsThemeable(entry.Key))
             {
-                var alpha = GetDefaultAlpha(entry.Key);
-                Set(entry.Key, Color.FromArgb(alpha, color.R, color.G, color.B));
+                Set(entry.Key, Default(entry.Key));
             }
         }
+
+        ApplyMap(OverridesOf(AppStorage.Settings, theme), theme);
     }
 
     public static void Save()
     {
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var theme = UiThemeService.Current;
+        var current = new List<(string Key, Color Value)>(_entries.Length);
         foreach (var entry in _entries)
         {
             var color = entry.Get();
-            var alpha = GetDefaultAlpha(entry.Key);
+            var alpha = DefaultFor(theme, entry.Key).A;
             var normalized = Color.FromArgb(alpha, color.R, color.G, color.B);
             entry.Set(normalized);
-            values[entry.Key] = FormatColor(normalized);
+            current.Add((entry.Key, normalized));
         }
 
-        AppStorage.Settings.Colors = values;
+        SetOverrides(AppStorage.Settings, theme, CollectOverrides(current, key => DefaultFor(theme, key)));
         AppStorage.Save();
     }
 
     public static void ResetToDefaults()
     {
+        SetOverrides(AppStorage.Settings, UiThemeService.Current, []);
         foreach (var (key, color) in Defaults)
         {
             Set(key, color);
         }
 
         UiThemePalette.Apply(UiThemeService.Current);
+        ApplySaved(UiThemeService.Current);
+    }
+
+    public static UiColorScheme CaptureScheme() =>
+        new()
+        {
+            Light = Snapshot(UiTheme.Light),
+            Dark = Snapshot(UiTheme.Dark),
+        };
+
+    public static void ApplyScheme(UiColorScheme scheme)
+    {
+        var current = UiThemeService.Current;
+        if (scheme.Light is not null)
+        {
+            ImportBag(UiTheme.Light, scheme.Light);
+        }
+
+        if (scheme.Dark is not null)
+        {
+            ImportBag(UiTheme.Dark, scheme.Dark);
+        }
+
+        if (scheme.Light is null && scheme.Dark is null && scheme.Flat is not null)
+        {
+            ImportBag(current, scheme.Flat);
+        }
+
+        foreach (var (key, color) in Defaults)
+        {
+            Set(key, color);
+        }
+
+        UiThemePalette.Apply(current);
+        ApplySaved(current);
+    }
+
+    public static Dictionary<string, string> Snapshot(UiTheme theme)
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in _entries)
+        {
+            map[entry.Key] = FormatColor(Resolve(theme, entry.Key));
+        }
+
+        return map;
+    }
+
+    internal static Color Resolve(UiTheme theme, string key)
+    {
+        var fallback = DefaultFor(theme, key);
+        if (theme == UiThemeService.Current)
+        {
+            var live = Get(key);
+            return Color.FromArgb(fallback.A, live.R, live.G, live.B);
+        }
+
+        var bag = OverridesOf(AppStorage.Settings, theme);
+        if (bag is not null && bag.TryGetValue(key, out var text) && TryParseColor(text, out var parsed))
+        {
+            return Color.FromArgb(fallback.A, parsed.R, parsed.G, parsed.B);
+        }
+
+        return fallback;
+    }
+
+    private static void ImportBag(UiTheme theme, Dictionary<string, string> colors)
+    {
+        var current = new List<(string Key, Color Value)>(colors.Count);
+        foreach (var (key, text) in colors)
+        {
+            if (!ColorDevCatalog.Keys.Contains(key, StringComparer.OrdinalIgnoreCase)
+                || !TryParseColor(text, out var color))
+            {
+                continue;
+            }
+
+            current.Add((key, color));
+        }
+
+        SetOverrides(AppStorage.Settings, theme, CollectOverrides(current, key => DefaultFor(theme, key)));
     }
 
     public static Color Default(string key) =>
         Defaults.TryGetValue(key, out var color) ? color : Get(key);
+
+    /// <summary>いまの配色での既定。ライトはパレット、ダークは XAML スナップ。</summary>
+    public static Color DefaultFor(UiTheme theme, string key) =>
+        UiThemePalette.ColorFor(theme, key);
 
     public static Color Get(string key) => Theme.Get(key);
 
@@ -123,7 +210,7 @@ internal static class UiColors
     }
 
     public static byte GetDefaultAlpha(string key) =>
-        Defaults.TryGetValue(key, out var color) ? color.A : (byte)255;
+        DefaultFor(UiThemeService.Current, key).A;
 
     public static string FormatColor(Color color) =>
         string.Create(CultureInfo.InvariantCulture, $"#{color.R:X2}{color.G:X2}{color.B:X2}");
@@ -159,6 +246,92 @@ internal static class UiColors
     }
 
     public static SolidColorBrush Brush(Color color) => WpfControlHelpers.FrozenBrush(color);
+
+    internal static Dictionary<string, string> CollectOverrides(
+        IEnumerable<(string Key, Color Value)> current,
+        Func<string, Color> defaultFor)
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in current)
+        {
+            var fallback = defaultFor(key);
+            var normalized = Color.FromArgb(fallback.A, value.R, value.G, value.B);
+            if (normalized != fallback)
+            {
+                values[key] = FormatColor(normalized);
+            }
+        }
+
+        return values;
+    }
+
+    internal static void MigrateLegacyColors(AppSettings settings)
+    {
+        if (settings.ColorsLight is not null || settings.ColorsDark is not null)
+        {
+            return;
+        }
+
+        if (settings.Colors is not { Count: > 0 })
+        {
+            return;
+        }
+
+        var shared = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, text) in settings.Colors)
+        {
+            if (UiThemePalette.IsThemeable(key) || string.IsNullOrWhiteSpace(text))
+            {
+                continue;
+            }
+
+            shared[key] = text;
+        }
+
+        settings.Colors = null;
+        if (shared.Count == 0)
+        {
+            settings.ColorsLight = [];
+            settings.ColorsDark = [];
+            return;
+        }
+
+        settings.ColorsLight = new Dictionary<string, string>(shared, StringComparer.OrdinalIgnoreCase);
+        settings.ColorsDark = new Dictionary<string, string>(shared, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static Dictionary<string, string>? OverridesOf(AppSettings settings, UiTheme theme) =>
+        theme == UiTheme.Light ? settings.ColorsLight : settings.ColorsDark;
+
+    private static void SetOverrides(AppSettings settings, UiTheme theme, Dictionary<string, string> values)
+    {
+        if (theme == UiTheme.Light)
+        {
+            settings.ColorsLight = values;
+            return;
+        }
+
+        settings.ColorsDark = values;
+    }
+
+    private static void ApplyMap(Dictionary<string, string>? values, UiTheme theme)
+    {
+        if (values is null || values.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var entry in _entries)
+        {
+            if (!values.TryGetValue(entry.Key, out var text) || !TryParseColor(text, out var color))
+            {
+                continue;
+            }
+
+            var alpha = DefaultFor(theme, entry.Key).A;
+            Set(entry.Key, Color.FromArgb(alpha, color.R, color.G, color.B));
+        }
+    }
 
     private static void CaptureDefaults()
     {

@@ -9,6 +9,19 @@ internal static partial class UiStrings
     public static string ColorDevClose => Get("閉じる", "Close");
     public static string ColorDevResetToDefaults => Get("既定に戻す", "Reset to defaults");
     public static string ColorDevResetThis => Get("この色を既定に戻す", "Reset this color");
+    public static string ColorDevExport => Get("エクスポート", "Export");
+    public static string ColorDevImport => Get("インポート", "Import");
+    public static string ColorDevExportTitle => Get("配色を書き出す", "Export color scheme");
+    public static string ColorDevImportTitle => Get("配色を読み込む", "Import color scheme");
+    public static string FilterColorScheme => Get(
+        "配色|*.json|すべて|*.*",
+        "Color scheme|*.json|All|*.*");
+    public static string ColorDevImportFailed => Get(
+        "配色ファイルを読めませんでした。",
+        "Could not read the color scheme file.");
+    public static string ColorDevExportFailed => Get(
+        "配色ファイルを書けませんでした。",
+        "Could not write the color scheme file.");
     public static string ColorDevSearch => Get("検索", "Search");
     public static string ColorDevHex => Get("Hex", "Hex");
     public static string ColorDevPickHint => Get(
@@ -25,6 +38,7 @@ internal static partial class UiStrings
     public static string ColorDevGroupRegion => Get("リージョン", "Region");
     public static string ColorDevGroupMarker => Get("マーカー", "Marker");
     public static string ColorDevGroupMeter => Get("レベルメーター", "Level meter");
+    public static string ColorDevGroupSpectrum => Get("スペアナ", "Spectrum");
     public static string ColorDevGroupVectorScope => Get("ベクタースコープ", "Vector scope");
     public static string ColorDevGroupTransport => Get("トランスポート", "Transport");
     public static string ColorDevGroupStatus => Get("ステータスバー", "Status bar");
@@ -91,6 +105,11 @@ internal static partial class UiStrings
             "LevelMeterClipOff" => Get("クリップ消灯", "Clip off"),
             "LevelMeterClipOffBorder" => Get("クリップ消灯枠", "Clip off border"),
             "SurroundHullStroke" => Get("サラウンド RMS 枠", "Surround RMS hull"),
+            "LevelGradFloor" => Get("グラデ・暗い端", "Gradient · dark end"),
+            "LevelGradLow" => Get("グラデ・暗い中間", "Gradient · dark mid"),
+            "LevelGradMid" => Get("グラデ・中間", "Gradient · mid"),
+            "LevelGradHigh" => Get("グラデ・明るい中間", "Gradient · bright mid"),
+            "LevelGradCeil" => Get("グラデ・明るい端", "Gradient · bright end"),
             "VectorScopeBack" => Get("背景", "Background"),
             "VectorScopeTrace" => Get("軌跡", "Trace"),
             "VectorScopeGrid" => Get("十字", "Cross"),

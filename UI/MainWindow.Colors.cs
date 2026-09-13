@@ -64,6 +64,7 @@ public partial class MainWindow
         Overview.RefreshAppearance();
         Spectrum.RefreshAppearance();
         VectorScope.InvalidateVisual();
+        LevelMeterBarPaint.Invalidate();
         LevelMeter.InvalidateVisual();
         HistoryStrip.InvalidateVisual();
         HistoryOverlay.InvalidateVisual();

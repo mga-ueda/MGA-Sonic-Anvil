@@ -50,6 +50,20 @@ public sealed class UiThemeTests
     }
 
     [Fact]
+    public void DefaultFor_LightUsesPaletteNotDarkXaml()
+    {
+        var lightWave = UiColors.DefaultFor(UiTheme.Light, "WaveformBackBrush");
+        var lightFill = UiColors.DefaultFor(UiTheme.Light, "WaveFillBrush");
+        Assert.Equal(System.Windows.Media.Color.FromRgb(0xFA, 0xFA, 0xFA), lightWave);
+        Assert.Equal(System.Windows.Media.Color.FromRgb(0x40, 0x52, 0x73), lightFill);
+        Assert.NotEqual(System.Windows.Media.Color.FromRgb(0x26, 0x26, 0x26), lightWave);
+        Assert.NotEqual(System.Windows.Media.Color.FromRgb(0x7C, 0xA7, 0xFF), lightFill);
+        Assert.Equal(
+            UiThemePalette.ColorFor(UiTheme.Light, "MouseGuideBrush").A,
+            UiColors.DefaultFor(UiTheme.Light, "MouseGuideBrush").A);
+    }
+
+    [Fact]
     public void Palette_CoversThemeableKeysAndSkipsAccents()
     {
         Assert.True(UiThemePalette.IsThemeable("SurfaceBackBrush"));
@@ -201,9 +215,9 @@ public sealed class UiThemeTests
             > RelativeLuma(Composite(System.Windows.Media.Color.FromArgb(150, 0, 0, 0), waveBack)));
         Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "HistoryStripBackBrush")) > 0.6);
         Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterTrackBorderBrush")) > 0.5);
-        Assert.True(
-            RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterHoldBorderBrush"))
-            > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterTrackBorderBrush")));
+        Assert.Equal(
+            System.Windows.Media.Color.FromRgb(0xC8, 0xC8, 0xC8),
+            UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterHoldBorderBrush"));
         Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterClipOffBrush")) > 0.8);
         Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ExportButtonFillBrush")) > 0.7);
         Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ClearButtonFillBrush")) > 0.7);

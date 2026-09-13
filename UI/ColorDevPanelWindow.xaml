@@ -8,7 +8,7 @@
         ResizeMode="CanResizeWithGrip"
         ShowInTaskbar="False"
         Width="720"
-        MinWidth="640"
+        MinWidth="720"
         MinHeight="420"
         Height="640"
         Background="{DynamicResource ColorPanelBackBrush}"
@@ -94,23 +94,39 @@
       </Border>
     </Grid>
 
-    <StackPanel Grid.Row="1"
-                Orientation="Horizontal"
-                HorizontalAlignment="Right"
-                Margin="0,10,0,0">
-      <ui:RoundedButton x:Name="ResetButton"
-                        Content="{x:Static domain:UiStrings.ColorDevResetToDefaults}"
-                        MinWidth="{x:Static ui:DesignMetrics.AudioDialogButtonWidth}"
-                        Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
-                        Padding="12,0"
-                        Margin="0,0,8,0"
-                        Click="ResetButton_Click" />
-      <ui:RoundedButton x:Name="CloseButton"
-                        Content="{x:Static domain:UiStrings.ColorDevClose}"
-                        MinWidth="{x:Static ui:DesignMetrics.AudioDialogButtonWidth}"
-                        Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
-                        Padding="12,0"
-                        Click="CloseButton_Click" />
-    </StackPanel>
+    <DockPanel Grid.Row="1" Margin="0,10,0,0">
+      <StackPanel DockPanel.Dock="Left"
+                  Orientation="Horizontal">
+        <ui:RoundedButton x:Name="ImportButton"
+                          Content="{x:Static domain:UiStrings.ColorDevImport}"
+                          MinWidth="{x:Static ui:DesignMetrics.AudioDialogButtonWidth}"
+                          Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
+                          Padding="12,0"
+                          Margin="0,0,8,0"
+                          Click="ImportButton_Click" />
+        <ui:RoundedButton x:Name="ExportButton"
+                          Content="{x:Static domain:UiStrings.ColorDevExport}"
+                          MinWidth="{x:Static ui:DesignMetrics.AudioDialogButtonWidth}"
+                          Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
+                          Padding="12,0"
+                          Click="ExportButton_Click" />
+      </StackPanel>
+      <StackPanel Orientation="Horizontal"
+                  HorizontalAlignment="Right">
+        <ui:RoundedButton x:Name="ResetButton"
+                          Content="{x:Static domain:UiStrings.ColorDevResetToDefaults}"
+                          MinWidth="{x:Static ui:DesignMetrics.AudioDialogButtonWidth}"
+                          Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
+                          Padding="12,0"
+                          Margin="0,0,8,0"
+                          Click="ResetButton_Click" />
+        <ui:RoundedButton x:Name="CloseButton"
+                          Content="{x:Static domain:UiStrings.ColorDevClose}"
+                          MinWidth="{x:Static ui:DesignMetrics.AudioDialogButtonWidth}"
+                          Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
+                          Padding="12,0"
+                          Click="CloseButton_Click" />
+      </StackPanel>
+    </DockPanel>
   </Grid>
 </Window>

@@ -1,6 +1,7 @@
 using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Media;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.UI;
 using Xunit;
 
@@ -34,6 +35,72 @@ public sealed class UiColorsTests
             Assert.Equal(Color.FromRgb(0x00, 0xF5, 0xFF), brush.Color);
             Assert.Same(brush, root["WaveFillBrush"]);
         });
+    }
+
+    [Fact]
+    public void CollectOverrides_KeepsOnlyDifferences()
+    {
+        var current = new (string Key, Color Value)[]
+        {
+            ("WaveFillBrush", Color.FromRgb(0x88, 0xBB, 0xFF)),
+            ("PlayheadBrush", Color.FromRgb(0xFF, 0x00, 0x00)),
+        };
+        var defaults = new Dictionary<string, Color>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["WaveFillBrush"] = Color.FromRgb(0x88, 0xBB, 0xFF),
+            ["PlayheadBrush"] = Color.FromRgb(0x00, 0xF5, 0xFF),
+        };
+
+        var saved = UiColors.CollectOverrides(current, key => defaults[key]);
+        Assert.False(saved.ContainsKey("WaveFillBrush"));
+        Assert.Equal("#FF0000", saved["PlayheadBrush"]);
+    }
+
+    [Fact]
+    public void MigrateLegacyColors_KeepsSharedAccentsOnly()
+    {
+        var settings = new AppSettings
+        {
+            Colors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["WaveFillBrush"] = "#112233",
+                ["PlayheadBrush"] = "#FF0000",
+            },
+        };
+
+        UiColors.MigrateLegacyColors(settings);
+        Assert.Null(settings.Colors);
+        Assert.False(settings.ColorsLight!.ContainsKey("WaveFillBrush"));
+        Assert.Equal("#FF0000", settings.ColorsLight["PlayheadBrush"]);
+        Assert.Equal("#FF0000", settings.ColorsDark!["PlayheadBrush"]);
+    }
+
+    [Fact]
+    public void MigrateLegacyColors_ThemeableOnly_WritesEmptyBags()
+    {
+        var settings = new AppSettings
+        {
+            Colors = new Dictionary<string, string> { ["WaveFillBrush"] = "#112233" },
+        };
+
+        UiColors.MigrateLegacyColors(settings);
+        Assert.Null(settings.Colors);
+        Assert.Empty(settings.ColorsLight!);
+        Assert.Empty(settings.ColorsDark!);
+    }
+
+    [Fact]
+    public void MigrateLegacyColors_SkipsWhenThemeBagsExist()
+    {
+        var settings = new AppSettings
+        {
+            Colors = new Dictionary<string, string> { ["PlayheadBrush"] = "#FF0000" },
+            ColorsDark = new Dictionary<string, string> { ["PlayheadBrush"] = "#00FF00" },
+        };
+
+        UiColors.MigrateLegacyColors(settings);
+        Assert.Equal("#00FF00", settings.ColorsDark["PlayheadBrush"]);
+        Assert.Null(settings.ColorsLight);
     }
 
     private static void RunSta(Action action)

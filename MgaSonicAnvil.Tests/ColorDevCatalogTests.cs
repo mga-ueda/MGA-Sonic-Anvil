@@ -20,6 +20,8 @@ public sealed class ColorDevCatalogTests
     [InlineData("RegionTimelineBrush", "Region")]
     [InlineData("MarkerBrush", "Marker")]
     [InlineData("LevelMeterTrackBackBrush", "Meter")]
+    [InlineData("LevelGradFloorBrush", "Spectrum")]
+    [InlineData("LevelGradCeilBrush", "Spectrum")]
     [InlineData("VectorScopeBackBrush", "VectorScope")]
     [InlineData("TransportBackBrush", "Transport")]
     [InlineData("HistoryStripBackBrush", "Transport")]
@@ -46,7 +48,8 @@ public sealed class ColorDevCatalogTests
         Assert.True(ColorDevCatalog.Rank("SampleLoopTimelineBrush") < ColorDevCatalog.Rank("RegionTimelineBrush"));
         Assert.True(ColorDevCatalog.Rank("RegionTimelineBrush") < ColorDevCatalog.Rank("MarkerBrush"));
         Assert.True(ColorDevCatalog.Rank("MarkerBrush") < ColorDevCatalog.Rank("LevelMeterTrackBackBrush"));
-        Assert.True(ColorDevCatalog.Rank("LevelMeterTrackBackBrush") < ColorDevCatalog.Rank("VectorScopeBackBrush"));
+        Assert.True(ColorDevCatalog.Rank("LevelMeterTrackBackBrush") < ColorDevCatalog.Rank("LevelGradFloorBrush"));
+        Assert.True(ColorDevCatalog.Rank("LevelGradFloorBrush") < ColorDevCatalog.Rank("VectorScopeBackBrush"));
         Assert.True(ColorDevCatalog.Rank("VectorScopeBackBrush") < ColorDevCatalog.Rank("TransportBackBrush"));
         Assert.True(ColorDevCatalog.Rank("TransportBackBrush") < ColorDevCatalog.Rank("StatusBarBackBrush"));
         Assert.True(ColorDevCatalog.Rank("StatusBarBackBrush") < ColorDevCatalog.Rank("WindowBackBrush"));
@@ -81,6 +84,10 @@ public sealed class ColorDevCatalogTests
     public void Catalog_CoversEveryXamlBrush()
     {
         var xaml = File.ReadAllText(FindUiColorsXaml());
+        Assert.Contains("x:Key=\"WaveFillBrush\" Color=\"#FF7CA7FF\"", xaml);
+        Assert.Contains("x:Key=\"LevelGradFloorBrush\" Color=\"#FF005C8C\"", xaml);
+        Assert.Contains("x:Key=\"LevelGradLowBrush\" Color=\"#FF0071AC\"", xaml);
+        Assert.Contains("x:Key=\"LevelGradCeilBrush\" Color=\"#FFC8EFFF\"", xaml);
         var keys = Regex.Matches(xaml, @"x:Key=""(?<key>\w+Brush)""")
             .Select(match => match.Groups["key"].Value)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -109,11 +116,11 @@ public sealed class ColorDevCatalogTests
     [Fact]
     public void Matches_LabelKeyHexAndGroup()
     {
-        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#B6B6B6", "波形"));
-        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#B6B6B6", "wave"));
-        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#B6B6B6", "b6"));
-        Assert.False(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#B6B6B6", "playhead"));
-        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#B6B6B6", " "));
+        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#7CA7FF", "波形"));
+        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#7CA7FF", "wave"));
+        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#7CA7FF", "7C"));
+        Assert.False(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#7CA7FF", "playhead"));
+        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#7CA7FF", " "));
         Assert.True(ColorDevCatalog.Matches("エリア背景", "WaveformBackBrush", "#262626", "波形", "波形"));
         Assert.False(ColorDevCatalog.Matches("エリア背景", "WaveformBackBrush", "#262626", "波形", "playhead"));
     }

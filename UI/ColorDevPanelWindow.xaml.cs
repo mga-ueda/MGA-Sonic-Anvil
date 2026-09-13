@@ -1,8 +1,10 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MediaColor = System.Windows.Media.Color;
@@ -53,6 +55,8 @@ internal partial class ColorDevPanelWindow : Window
         EmptyHint.Text = UiStrings.ColorDevNoMatches;
         PickerHint.Text = UiStrings.ColorDevPickHint;
         ResetThisButton.Content = UiStrings.ColorDevResetThis;
+        ImportButton.Content = UiStrings.ColorDevImport;
+        ExportButton.Content = UiStrings.ColorDevExport;
         ResetButton.Content = UiStrings.ColorDevResetToDefaults;
         CloseButton.Content = UiStrings.ColorDevClose;
         Picker.ApplyLocalizedText();
@@ -93,6 +97,8 @@ internal partial class ColorDevPanelWindow : Window
     private void ApplyButtonLooks()
     {
         ActionButtonLooks.ApplyClear(ResetThisButton);
+        ActionButtonLooks.ApplyClear(ImportButton);
+        ActionButtonLooks.ApplyClear(ExportButton);
         ActionButtonLooks.ApplyClear(ResetButton);
         ActionButtonLooks.ApplyAccent(CloseButton);
     }
@@ -100,6 +106,8 @@ internal partial class ColorDevPanelWindow : Window
     private void ApplyTips()
     {
         TipService.Set(ResetThisButton, UiStrings.ColorDevResetThis);
+        TipService.Set(ImportButton, UiStrings.ColorDevImport);
+        TipService.Set(ExportButton, UiStrings.ColorDevExport);
         TipService.Set(ResetButton, UiStrings.ColorDevResetToDefaults);
         TipService.Set(CloseButton, UiStrings.ColorDevClose);
         foreach (var row in _rows.Values)
@@ -446,6 +454,90 @@ internal partial class ColorDevPanelWindow : Window
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
 
+    private void ExportButton_Click(object sender, RoutedEventArgs e)
+    {
+        FlushSave();
+        var dialog = new SaveFileDialog
+        {
+            Filter = UiStrings.FilterColorScheme,
+            Title = UiStrings.ColorDevExportTitle,
+            FileName = AppVersion.ProductName + " colors.json",
+            AddExtension = true,
+            DefaultExt = ".json",
+        };
+        SuggestColorSchemeDirectory(dialog);
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllText(dialog.FileName, UiColorScheme.Write(UiColors.CaptureScheme()));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ColorDevExportFailed,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void ImportButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = UiStrings.FilterColorScheme,
+            Title = UiStrings.ColorDevImportTitle,
+            CheckFileExists = true,
+        };
+        SuggestColorSchemeDirectory(dialog);
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!UiColorScheme.TryRead(File.ReadAllText(dialog.FileName), out var scheme))
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    UiStrings.ColorDevImportFailed,
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            UiColors.ApplyScheme(scheme);
+            RefreshAppearance();
+            FlushSave();
+            ColorsChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ColorDevImportFailed,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private static void SuggestColorSchemeDirectory(FileDialog dialog)
+    {
+        var lastDir = Path.GetDirectoryName(AppStorage.Settings.LastDocumentPath);
+        if (!string.IsNullOrWhiteSpace(lastDir) && Directory.Exists(lastDir))
+        {
+            dialog.InitialDirectory = lastDir;
+        }
+    }
+
     private void ResetButton_Click(object sender, RoutedEventArgs e)
     {
         UiColors.ResetToDefaults();
@@ -462,9 +554,7 @@ internal partial class ColorDevPanelWindow : Window
             return;
         }
 
-        var color = UiColors.Default(_selectedKey);
-        var alpha = UiColors.GetDefaultAlpha(_selectedKey);
-        FindEntry(_selectedKey)?.Set(MediaColor.FromArgb(alpha, color.R, color.G, color.B));
+        FindEntry(_selectedKey)?.Set(UiColors.DefaultFor(UiThemeService.Current, _selectedKey));
         RefreshRows();
         SyncPickerFromSelection();
         FlushSave();

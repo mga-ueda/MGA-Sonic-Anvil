@@ -176,6 +176,7 @@ internal partial class StatusTimeStrip : UserControl
         _fields[box] = state;
         box.ContextMenu = CreateMenu(field);
         box.Tag = state;
+        ImeComposition.Disable(box);
     }
 
     private ContextMenu CreateMenu(StatusTimeField field)

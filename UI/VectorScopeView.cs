@@ -438,7 +438,7 @@ internal sealed class VectorScopeView : FrameworkElement
             return;
         }
 
-        FadePixels(_persistPixels, PersistFade, fadeColor: true, cutoff: 6);
+        FadePixels(_persistPixels, PersistFade, cutoff: 6);
         if (_trailCount >= 2 && _paintFade > 0.04f)
         {
             StampTrail(layout.Scope, _trail, _trailCount, _paintFade);
@@ -446,7 +446,7 @@ internal sealed class VectorScopeView : FrameworkElement
 
         _persist!.WritePixels(new Int32Rect(0, 0, _persistW, _persistH), _persistPixels, _persistW * 4, 0);
 
-        FadePixels(_beamGhostPixels, BeamGhostFade, fadeColor: false, cutoff: 3);
+        FadePixels(_beamGhostPixels, BeamGhostFade, cutoff: 3);
         StampBeam(layout.Scope);
         _beamGhost!.WritePixels(new Int32Rect(0, 0, _persistW, _persistH), _beamGhostPixels, _persistW * 4, 0);
     }
@@ -471,34 +471,22 @@ internal sealed class VectorScopeView : FrameworkElement
         return true;
     }
 
-    private static void FadePixels(int[] pixels, float fade, bool fadeColor, int cutoff)
+    internal static int FadePixel(int pixel, float fade, int cutoff)
+    {
+        if (pixel == 0)
+        {
+            return 0;
+        }
+
+        var a = (int)(((pixel >> 24) & 0xFF) * fade);
+        return a < cutoff ? 0 : (a << 24) | (pixel & 0x00FFFFFF);
+    }
+
+    private static void FadePixels(int[] pixels, float fade, int cutoff)
     {
         for (var i = 0; i < pixels.Length; i++)
         {
-            var p = pixels[i];
-            if (p == 0)
-            {
-                continue;
-            }
-
-            var a = (int)(((p >> 24) & 0xFF) * fade);
-            if (a < cutoff)
-            {
-                pixels[i] = 0;
-                continue;
-            }
-
-            var r = (p >> 16) & 0xFF;
-            var g = (p >> 8) & 0xFF;
-            var b = p & 0xFF;
-            if (fadeColor)
-            {
-                r = (int)(r * fade);
-                g = (int)(g * fade);
-                b = (int)(b * fade);
-            }
-
-            pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
+            pixels[i] = FadePixel(pixels[i], fade, cutoff);
         }
     }
 
@@ -637,17 +625,13 @@ internal sealed class VectorScopeView : FrameworkElement
             return;
         }
 
-        var i = iy * _persistW + ix;
-        var p = dest[i];
-        var a0 = (p >> 24) & 0xFF;
-        var r0 = (p >> 16) & 0xFF;
-        var g0 = (p >> 8) & 0xFF;
-        var b0 = p & 0xFF;
-        var a1 = Math.Max(a0, (int)alpha);
-        var r1 = Math.Max(r0, (color.R * alpha) / 255);
-        var g1 = Math.Max(g0, (color.G * alpha) / 255);
-        var b1 = Math.Max(b0, (color.B * alpha) / 255);
-        dest[i] = (a1 << 24) | (r1 << 16) | (g1 << 8) | b1;
+        dest[iy * _persistW + ix] = StampBlend(dest[iy * _persistW + ix], color, alpha);
+    }
+
+    internal static int StampBlend(int dest, Color color, byte alpha)
+    {
+        var a1 = Math.Max((dest >> 24) & 0xFF, (int)alpha);
+        return (a1 << 24) | (color.R << 16) | (color.G << 8) | color.B;
     }
 
     private bool BeamAtRest() =>
@@ -824,7 +808,7 @@ internal sealed class VectorScopeView : FrameworkElement
             return;
         }
 
-        FadePixels(_persistPixels, SurroundPersistFade, fadeColor: true, cutoff: 4);
+        FadePixels(_persistPixels, SurroundPersistFade, cutoff: 4);
         var fade = Math.Clamp(_surroundPaint, 0, 1);
         if (fade >= 0.04f)
         {

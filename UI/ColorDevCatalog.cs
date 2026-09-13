@@ -14,6 +14,7 @@ internal enum ColorDevGroup
     Region,
     Marker,
     Meter,
+    Spectrum,
     VectorScope,
     Transport,
     StatusBar,
@@ -94,6 +95,12 @@ internal static class ColorDevCatalog
             ("LevelMeterClipOffBrush", ColorDevGroup.Meter),
             ("LevelMeterClipOffBorderBrush", ColorDevGroup.Meter),
             ("SurroundHullStrokeBrush", ColorDevGroup.Meter),
+
+            ("LevelGradFloorBrush", ColorDevGroup.Spectrum),
+            ("LevelGradLowBrush", ColorDevGroup.Spectrum),
+            ("LevelGradMidBrush", ColorDevGroup.Spectrum),
+            ("LevelGradHighBrush", ColorDevGroup.Spectrum),
+            ("LevelGradCeilBrush", ColorDevGroup.Spectrum),
 
             ("VectorScopeBackBrush", ColorDevGroup.VectorScope),
             ("VectorScopeTraceBrush", ColorDevGroup.VectorScope),
@@ -180,6 +187,7 @@ internal static class ColorDevCatalog
         ColorDevGroup.Region => UiStrings.ColorDevGroupRegion,
         ColorDevGroup.Marker => UiStrings.ColorDevGroupMarker,
         ColorDevGroup.Meter => UiStrings.ColorDevGroupMeter,
+        ColorDevGroup.Spectrum => UiStrings.ColorDevGroupSpectrum,
         ColorDevGroup.VectorScope => UiStrings.ColorDevGroupVectorScope,
         ColorDevGroup.Transport => UiStrings.ColorDevGroupTransport,
         ColorDevGroup.StatusBar => UiStrings.ColorDevGroupStatus,

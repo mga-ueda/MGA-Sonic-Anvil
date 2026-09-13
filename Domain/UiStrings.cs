@@ -718,12 +718,12 @@ internal static partial class UiStrings
         "Custom Hz. ↑↓ / wheel by 1 (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Tab leaves the box so 1–9 pick a row. Range 1000–384000.");
     public static string TipWaveform => Get(
         "クリックで再生位置。←→ でシーク（再生中は押しっぱなしで 3 倍早送り／巻き戻し）。ドラッグで選択。Ctrl+ドラッグでスクラブ（全chを L/R に畳む）。\n"
-        + "Esc または Shift なし移動で解除。Shift＋ドラッグ／←→ で伸長。ダブルクリックで区間（マーカー間）。トリプルクリックで全選択。ガイドはマーカー／ループ端に吸着。\n"
+        + "Esc または Shift なし移動で解除。Shift＋ドラッグ／←→ で伸長。ダブルクリックで区間（マーカー間）。Shift＋ダブルクリックでその区間を追加。トリプルクリックで全選択。ガイドはマーカー／ループ端に吸着。\n"
         + "左端のチャンネル名：クリックでソロ（再クリックで解除。Ctrl で追加。Shift でミュート）。Tab／Shift+Tab で順にソロ。\n"
         + "ホイール＝時間ズーム（再生ヘッド基準）。Shift+ホイール＝パン。Ctrl+ホイール＝振幅。\n"
         + "フラッグ／ループ端：クリックで選択、ドラッグまたは ←→ で移動。Alt+←→ は微調整。ダブルクリックで名前。右クリックでメニュー。",
         "Click to set the playhead. ←→ seek (hold during playback for 3× shuttle). Drag to select. Ctrl+drag scrubs (every channel downmixed to L/R).\n"
-        + "Esc or a move without Shift clears the selection. Shift+drag / ←→ extends it. Double-click a span (between markers). Triple-click selects all. The guide snaps to markers / loop edges.\n"
+        + "Esc or a move without Shift clears the selection. Shift+drag / ←→ extends it. Double-click a span (between markers). Shift+double-click adds that span. Triple-click selects all. The guide snaps to markers / loop edges.\n"
         + "Channel names on the left: click to solo (again to clear; Ctrl adds; Shift mutes). Tab / Shift+Tab cycle solo.\n"
         + "Wheel = time zoom (around the playhead). Shift+wheel = pan. Ctrl+wheel = amplitude.\n"
         + "Flags / loop edges: click to select, drag or ←→ to move. Alt+←→ nudges. Double-click to name. Right-click for the menu.");

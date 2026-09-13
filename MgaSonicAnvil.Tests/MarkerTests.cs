@@ -171,6 +171,21 @@ public sealed class MarkerTests
     }
 
     [Fact]
+    public void DoubleClickSpanAt_UnionAddsNeighborOrAnySpan()
+    {
+        var document = MakeDocument(frames: 100);
+        document.TryAddMarker(20);
+        document.TryAddMarker(40);
+        document.TryAddMarker(60);
+
+        var current = document.DoubleClickSpanAt(30);
+        Assert.Equal(new WaveSelection(20, 40), current);
+        Assert.Equal(new WaveSelection(20, 60), current.Union(document.DoubleClickSpanAt(50)));
+        Assert.Equal(new WaveSelection(0, 40), current.Union(document.DoubleClickSpanAt(10)));
+        Assert.Equal(new WaveSelection(20, 100), current.Union(document.DoubleClickSpanAt(80)));
+    }
+
+    [Fact]
     public void MarkerComment_StaysWithFrameAfterRenumber()
     {
         var document = MakeDocument(frames: 100);

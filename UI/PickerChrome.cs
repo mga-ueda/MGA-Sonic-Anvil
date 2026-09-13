@@ -127,6 +127,7 @@ internal static class PickerChrome
             IsTabStop = true,
         };
         TryStyle(box, "DarkTextBoxStyle");
+        ImeComposition.Disable(box);
         ScrollViewer.SetHorizontalScrollBarVisibility(box, ScrollBarVisibility.Disabled);
         return box;
     }

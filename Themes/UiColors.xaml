@@ -23,7 +23,7 @@
 
     <SolidColorBrush x:Key="WaveformBackBrush" Color="#FF262626" />
     <SolidColorBrush x:Key="WaveformRecordBackBrush" Color="#FF3A1C1C" />
-    <SolidColorBrush x:Key="WaveFillBrush" Color="#FFB6B6B6" />
+    <SolidColorBrush x:Key="WaveFillBrush" Color="#FF7CA7FF" />
     <SolidColorBrush x:Key="WaveFillOverlayBrush" Color="#FF3AB8E8" />
     <SolidColorBrush x:Key="WaveZeroLineBrush" Color="#5ACCCCCC" />
     <SolidColorBrush x:Key="WaveformScrollTrackBrush" Color="#FF121212" />
@@ -57,6 +57,11 @@
     <SolidColorBrush x:Key="SurroundHullStrokeBrush" Color="#FF5A5A5F" />
     <SolidColorBrush x:Key="LevelMeterClipOffBrush" Color="#FF280808" />
     <SolidColorBrush x:Key="LevelMeterClipOffBorderBrush" Color="#FF3A1515" />
+    <SolidColorBrush x:Key="LevelGradFloorBrush" Color="#FF005C8C" />
+    <SolidColorBrush x:Key="LevelGradLowBrush" Color="#FF0071AC" />
+    <SolidColorBrush x:Key="LevelGradMidBrush" Color="#FF3AB8E8" />
+    <SolidColorBrush x:Key="LevelGradHighBrush" Color="#FFC8EFFF" />
+    <SolidColorBrush x:Key="LevelGradCeilBrush" Color="#FFC8EFFF" />
 
     <SolidColorBrush x:Key="VectorScopeBackBrush" Color="#FF242629" />
     <SolidColorBrush x:Key="VectorScopeTraceBrush" Color="#FF3AB8E8" />

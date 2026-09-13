@@ -157,8 +157,14 @@ internal sealed class AppSettings
 
     public string WaapiOutputDirectory { get; set; } = string.Empty;
 
-    /// <summary>色設定パネルで保存したアプリ既定色。#RRGGBB。未設定なら XAML 既定。</summary>
+    /// <summary>旧版の一括色。テーマ別へ移したあと使わない。</summary>
     public Dictionary<string, string>? Colors { get; set; }
+
+    /// <summary>ライト配色の上書き。#RRGGBB。無いキーは既定。</summary>
+    public Dictionary<string, string>? ColorsLight { get; set; }
+
+    /// <summary>ダーク配色の上書き。#RRGGBB。無いキーは既定。</summary>
+    public Dictionary<string, string>? ColorsDark { get; set; }
 
     public AudioOutputSettings ToAudioOutputSettings() =>
         ResolvedSpeaker().ToAudioOutputSettings();

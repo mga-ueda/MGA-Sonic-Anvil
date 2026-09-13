@@ -321,6 +321,7 @@ internal sealed class HsvColorPicker : Grid
         box.Padding = new Thickness(6, 2, 6, 2);
         box.MinHeight = 28;
         box.VerticalContentAlignment = VerticalAlignment.Center;
+        ImeComposition.Disable(box);
     }
 
     private static Brush ThemeBrush(string key) => WpfControlHelpers.FrozenBrush(Theme.Get(key));

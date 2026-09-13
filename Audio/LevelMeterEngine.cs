@@ -185,11 +185,11 @@ internal sealed class LevelMeterEngine
         t = Math.Clamp(t, 0, 1);
         ReadOnlySpan<(double P, byte R, byte G, byte B)> stops =
         [
-            (0, 16, 62, 86),
-            (0.26, 20, 90, 118),
+            (0, 0, 92, 140),
+            (0.26, 0, 113, 172),
             (0.55, 58, 184, 232),
             (0.82, 200, 239, 255),
-            (1, 248, 254, 255),
+            (1, 200, 239, 255),
         ];
         var i = 0;
         for (; i < stops.Length - 2; i++)

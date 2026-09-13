@@ -25,10 +25,19 @@ public sealed class LevelColorThemeTests
     }
 
     [Fact]
+    public void Sample_MatchesMeterStopsAtDefaults()
+    {
+        foreach (var t in new[] { 0d, 0.26, 0.55, 0.82, 1d })
+        {
+            Assert.Equal(LevelMeterEngine.LevelColorFromNorm(t), LevelColorTheme.Sample(t));
+        }
+    }
+
+    [Fact]
     public void Color_KeepsEndsAndAvoidsSuddenLumaJumps()
     {
-        Assert.Equal(new ColorRgb(16, 62, 86), LevelColorTheme.Of(SpectrumAnalyzer.FloorDb));
-        Assert.Equal(new ColorRgb(248, 254, 255), LevelColorTheme.Of(SpectrumAnalyzer.CeilingDb));
+        Assert.Equal(new ColorRgb(0, 92, 140), LevelColorTheme.Of(SpectrumAnalyzer.FloorDb));
+        Assert.Equal(new ColorRgb(200, 239, 255), LevelColorTheme.Of(SpectrumAnalyzer.CeilingDb));
 
         var prev = Luma(LevelColorTheme.Of(SpectrumAnalyzer.FloorDb));
         var maxStep = 0d;

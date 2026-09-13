@@ -12,6 +12,14 @@ internal static class LevelMeterBarPaint
     private static LinearGradientBrush? _cyanVertical;
     private static LinearGradientBrush? _cyanHorizontal;
 
+    public static void Invalidate()
+    {
+        _cyanVertical = null;
+        _cyanHorizontal = null;
+        Array.Clear(Vertical);
+        Array.Clear(Horizontal);
+    }
+
     public static LinearGradientBrush Create(bool vertical, int channel = 0, int channels = ChannelLayout.MaxChannels)
     {
         if (!ChannelColors.UsesLaneTint(channels))
@@ -26,7 +34,7 @@ internal static class LevelMeterBarPaint
         return cache[index] ??= Build(vertical, ChannelSwatch.Of(index));
     }
 
-    /// <summary><see cref="LevelMeterEngine.LevelColor"/> と同じ停止点。</summary>
+    /// <summary><see cref="LevelColorTheme"/> と同じ停止点（色設定の LevelGrad*）。</summary>
     private static LinearGradientBrush BuildCyan(bool vertical)
     {
         var brush = new LinearGradientBrush
@@ -36,11 +44,11 @@ internal static class LevelMeterBarPaint
             MappingMode = BrushMappingMode.RelativeToBoundingBox,
             GradientStops =
             [
-                new GradientStop(Color.FromRgb(16, 62, 86), 0),
-                new GradientStop(Color.FromRgb(20, 90, 118), 0.26),
-                new GradientStop(Color.FromRgb(58, 184, 232), 0.55),
-                new GradientStop(Color.FromRgb(200, 239, 255), 0.82),
-                new GradientStop(Color.FromRgb(248, 254, 255), 1),
+                new GradientStop(LevelColorTheme.StopBrush(0), LevelColorTheme.DefaultStops[0].P),
+                new GradientStop(LevelColorTheme.StopBrush(1), LevelColorTheme.DefaultStops[1].P),
+                new GradientStop(LevelColorTheme.StopBrush(2), LevelColorTheme.DefaultStops[2].P),
+                new GradientStop(LevelColorTheme.StopBrush(3), LevelColorTheme.DefaultStops[3].P),
+                new GradientStop(LevelColorTheme.StopBrush(4), LevelColorTheme.DefaultStops[4].P),
             ],
         };
         brush.Freeze();

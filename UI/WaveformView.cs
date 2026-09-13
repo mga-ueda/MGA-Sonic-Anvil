@@ -119,6 +119,9 @@ internal sealed class WaveformView : Grid
     private WriteableBitmap? _invertBitmap;
     private AudioDocument? _invertDocument;
     private int _invertChannels;
+    private SpectrogramViewMode _invertMode;
+    private double _invertViewStart;
+    private double _invertViewSpan;
     private bool _invertDirty = true;
     private int[] _invertPixels = [];
     private int[] _wavePixels = [];
@@ -185,6 +188,7 @@ internal sealed class WaveformView : Grid
     private bool _selecting;
     private Point _dragStart;
     private long _anchorFrame;
+    private WaveSelection _pointerDownSelection;
     private long? _keyboardSelectAnchor;
     private Pen? _playheadGlowOuter;
     private Pen? _playheadGlowInner;
@@ -332,9 +336,7 @@ internal sealed class WaveformView : Grid
             EndMarkerCommentEdit(commit: false);
             ResetMarkerDragState();
             CancelPointerInteraction();
-            _invertBitmap = null;
-            _invertDocument = null;
-            _invertChannels = 0;
+            DiscardInvertBitmap();
             _previewGainAtFrame = null;
             ClearTimelineSelection(refresh: false);
             _markerSelectAnchor = null;
@@ -770,9 +772,24 @@ internal sealed class WaveformView : Grid
             _loudness.Ensure(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayerForLoudness));
         }
 
+        // オーバーレイ／スペクトログラム中の波形ビットマップはレーンも色も違う。
+        // 切り替え後に使い回すと、選択反転が古い波形のまま乗って描画が混ざる。
+        _waveDirty = true;
+        DiscardInvertBitmap();
         SyncSpectrogramBoostBar();
         InvalidateStaticLayer();
         AnalysisViewChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void DiscardInvertBitmap()
+    {
+        _invertBitmap = null;
+        _invertDocument = null;
+        _invertChannels = 0;
+        _invertMode = SpectrogramViewMode.Off;
+        _invertViewStart = 0;
+        _invertViewSpan = 0;
+        _invertDirty = true;
     }
 
     public bool NudgeSpectrogramBoost(int direction)
@@ -1246,21 +1263,30 @@ internal sealed class WaveformView : Grid
         }
     }
 
-    public void SelectSpanAt(long frame)
+    public void SelectSpanAt(long frame, bool extend = false)
     {
         if (_document is null)
         {
             return;
         }
 
-        _pendingSelectionPrerollJump = true;
         var range = _document.DoubleClickSpanAt(frame);
         if (range.IsEmpty)
         {
-            _pendingSelectionPrerollJump = false;
             return;
         }
 
+        if (extend)
+        {
+            var current = _pointerDownSelection.IsEmpty ? _document.Selection : _pointerDownSelection;
+            if (!current.IsEmpty)
+            {
+                ApplyExtendedSpan(current.Union(range), current);
+                return;
+            }
+        }
+
+        _pendingSelectionPrerollJump = true;
         var loop = _document.SampleLoop;
         var isSampleLoop = !loop.IsEmpty
             && range.StartFrame == loop.StartFrame
@@ -1277,6 +1303,21 @@ internal sealed class WaveformView : Grid
         _document.CursorFrame = cursor;
         _playheadFrame = cursor;
         EnsureFrameVisible(cursor);
+        InvalidatePlayheadLayer();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ApplyExtendedSpan(WaveSelection range, WaveSelection origin)
+    {
+        if (_document is null || range.IsEmpty)
+        {
+            return;
+        }
+
+        _keyboardSelectAnchor = range.StartFrame < origin.StartFrame
+            ? origin.EndFrame
+            : origin.StartFrame;
+        _document.Selection = range;
         InvalidatePlayheadLayer();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -1600,6 +1641,11 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        if (e.ClickCount == 1)
+        {
+            _pointerDownSelection = _document.Selection;
+        }
+
         var clickPos = e.GetPosition(this);
         if (TryHitChannelLabel(clickPos, out var labelChannel))
         {
@@ -1651,7 +1697,9 @@ internal sealed class WaveformView : Grid
             else
             {
                 ClearMarkerSelection();
-                SelectSpanAt(FrameAt(pos.X));
+                SelectSpanAt(
+                    FrameAt(pos.X),
+                    extend: (Keyboard.Modifiers & ModifierKeys.Shift) != 0);
             }
 
             e.Handled = true;
@@ -2066,7 +2114,10 @@ internal sealed class WaveformView : Grid
         var width = Math.Max(1, (int)Math.Round(bounds.Width * scaleX));
         var height = Math.Max(1, (int)Math.Round(bounds.Height * scaleY));
         WaveScroll.Quantize(_viewStart, span, width, out var quantStart, out var bmpSpan, out var bmpWidth);
-        if (_deferWaveReload && _waveBitmap is not null && !_waveDirty)
+        if (_deferWaveReload
+            && _waveBitmap is not null
+            && !_waveDirty
+            && _waveMode == _spectrogramMode)
         {
             return;
         }
@@ -2112,6 +2163,7 @@ internal sealed class WaveformView : Grid
         // 選択反転ビットマップは全画素の再生成で重い。追従スクロール中も毎回作ると
         // 静的ペイントの実測コストを押し上げ、追従の間引きが増えてカクつくため、
         // ここでは dirty にだけして、選択を実際に描くときに作る（DrawInvertedSelection）。
+        var modeChanged = _waveMode != _spectrogramMode;
         _invertDirty = true;
 
         _waveDipSize = bounds.Size;
@@ -2128,6 +2180,12 @@ internal sealed class WaveformView : Grid
         _waveLiveFrames = _document?.FrameCount ?? 0;
         _waveLivePeakFrames = _document?.Peaks.FrameCount ?? 0;
         _waveDirty = false;
+        // 解析表示から戻った直後は、オーバーレイ層が先に描いて古い反転を残すことがある。
+        // 波形を今のモードで作り直したあと、選択を載せ直す。
+        if (modeChanged)
+        {
+            _overlayHost.InvalidateVisual();
+        }
     }
 
     private bool TryShiftWaveform(
@@ -2321,6 +2379,9 @@ internal sealed class WaveformView : Grid
         _invertBitmap.WritePixels(new Int32Rect(0, 0, width, height), _invertPixels, width * 4, 0);
         _invertDocument = _document;
         _invertChannels = _document?.Channels ?? 0;
+        _invertMode = _waveMode;
+        _invertViewStart = _waveViewStart;
+        _invertViewSpan = _waveViewSpan;
         _invertDirty = false;
     }
 
@@ -2335,16 +2396,35 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        // 解析表示のビットマップ（オーバーレイの単一レーンなど）からは作らない。
+        if (_waveMode != _spectrogramMode)
+        {
+            return;
+        }
+
         if (!_invertDirty
             && _invertBitmap is not null
             && ReferenceEquals(_invertDocument, _document)
-            && _invertChannels == (_document?.Channels ?? 0))
+            && _invertChannels == (_document?.Channels ?? 0)
+            && _invertMode == _waveMode
+            && Math.Abs(_invertViewStart - _waveViewStart) < 0.01
+            && Math.Abs(_invertViewSpan - _waveViewSpan) < 0.01)
         {
             return;
         }
 
         RebuildInvertBitmap(_wavePixelWidth, _wavePixelHeight, VisualTreeHelper.GetDpi(this));
     }
+
+    private bool InvertBitmapIsCurrent() =>
+        _invertBitmap is not null
+        && !_invertDirty
+        && _invertMode == _spectrogramMode
+        && _waveMode == _spectrogramMode
+        && ReferenceEquals(_invertDocument, _document)
+        && _invertChannels == (_document?.Channels ?? 0)
+        && Math.Abs(_invertViewStart - _waveViewStart) < 0.01
+        && Math.Abs(_invertViewSpan - _waveViewSpan) < 0.01;
 
     internal static Color SpectrogramSelectionFill() => Color.FromArgb(56, 255, 255, 255);
 
@@ -2360,26 +2440,19 @@ internal sealed class WaveformView : Grid
             EnsureInvertBitmap();
         }
 
-        if (SpectrogramVisible
-            || LoudnessVisible
-            || _invertBitmap is null
-            || !ReferenceEquals(_invertDocument, _document)
-            || _invertChannels != (_document?.Channels ?? 0))
+        if (SpectrogramVisible || LoudnessVisible || !InvertBitmapIsCurrent())
         {
-            if (SpectrogramVisible || LoudnessVisible)
+            var specWave = WaveformBounds(bounds);
+            var sx0 = FrameToViewX(selection.StartFrame, start, span, bounds);
+            var sx1 = FrameToViewX(selection.EndFrame, start, span, bounds);
+            sx0 = Math.Clamp(sx0, specWave.X, specWave.Right);
+            sx1 = Math.Clamp(sx1, specWave.X, specWave.Right);
+            if (sx1 > sx0)
             {
-                var specWave = WaveformBounds(bounds);
-                var sx0 = FrameToViewX(selection.StartFrame, start, span, bounds);
-                var sx1 = FrameToViewX(selection.EndFrame, start, span, bounds);
-                sx0 = Math.Clamp(sx0, specWave.X, specWave.Right);
-                sx1 = Math.Clamp(sx1, specWave.X, specWave.Right);
-                if (sx1 > sx0)
-                {
-                    dc.DrawRectangle(
-                        WpfControlHelpers.FrozenBrush(SpectrogramSelectionFill()),
-                        null,
-                        new Rect(sx0, specWave.Y, sx1 - sx0, specWave.Height));
-                }
+                dc.DrawRectangle(
+                    WpfControlHelpers.FrozenBrush(SpectrogramSelectionFill()),
+                    null,
+                    new Rect(sx0, specWave.Y, sx1 - sx0, specWave.Height));
             }
 
             return;
@@ -2403,7 +2476,12 @@ internal sealed class WaveformView : Grid
         }
 
         dc.PushClip(clip);
-        dc.DrawImage(_invertBitmap, WaveBitmapDest(wave));
+        var group = new DrawingGroup();
+        RenderOptions.SetBitmapScalingMode(group, BitmapScalingMode.NearestNeighbor);
+        var context = group.Open();
+        context.DrawImage(_invertBitmap, WaveBitmapDest(wave));
+        context.Close();
+        dc.DrawDrawing(group);
         dc.Pop();
     }
 
@@ -5410,6 +5488,11 @@ internal sealed class WaveformView : Grid
         editor.SetResourceReference(TextBox.CaretBrushProperty, "PrimaryForeBrush");
         editor.KeyDown += (_, e) =>
         {
+            if (ImeComposition.IsComposing)
+            {
+                return;
+            }
+
             if (e.Key == Key.Enter)
             {
                 EndMarkerCommentEdit(commit: true);
@@ -5430,6 +5513,11 @@ internal sealed class WaveformView : Grid
     private void EndMarkerCommentEdit(bool commit)
     {
         if (_endingCommentEdit || _commentEditor is null || _commentEditor.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        if (ImeComposition.IsComposing)
         {
             return;
         }

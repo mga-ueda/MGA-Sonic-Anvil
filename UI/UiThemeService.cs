@@ -66,6 +66,7 @@ internal static class UiThemeService
         Current = theme;
         _applied = true;
         UiThemePalette.Apply(theme);
+        UiColors.ApplySaved(theme);
         RefreshWindowChrome();
         Changed?.Invoke(null, EventArgs.Empty);
     }

@@ -192,7 +192,7 @@ internal sealed class LevelMeterView : FrameworkElement
             return LevelColorTheme.PeakHold(holdDb, theme);
         }
 
-        return LevelMeterEngine.LevelColor(holdDb);
+        return LevelColorTheme.Sample(LevelMeterEngine.DbToNorm(holdDb));
     }
 
     private void DrawHoldLine(

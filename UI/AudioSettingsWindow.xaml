@@ -215,7 +215,8 @@
                        Style="{StaticResource DarkTextBoxStyle}"
                        Padding="6,1"
                        FontSize="11.333"
-                       VerticalContentAlignment="Center" />
+                       VerticalContentAlignment="Center"
+                       InputMethod.IsInputMethodEnabled="False" />
               <TextBlock x:Name="LoudnessTargetUnit"
                          Grid.Column="1"
                          Text="{x:Static domain:UiStrings.LabelLufs}"
@@ -239,7 +240,8 @@
                        Style="{StaticResource DarkTextBoxStyle}"
                        Padding="6,1"
                        FontSize="11.333"
-                       VerticalContentAlignment="Center" />
+                       VerticalContentAlignment="Center"
+                       InputMethod.IsInputMethodEnabled="False" />
               <TextBlock x:Name="SilentSkipThresholdUnit"
                          Grid.Column="1"
                          Text="{x:Static domain:UiStrings.LabelDb}"
@@ -280,7 +282,8 @@
                        Style="{StaticResource DarkTextBoxStyle}"
                        Padding="6,1"
                        FontSize="11.333"
-                       VerticalContentAlignment="Center" />
+                       VerticalContentAlignment="Center"
+                       InputMethod.IsInputMethodEnabled="False" />
               <TextBlock x:Name="SilentSkipRecordPadUnit"
                          Grid.Column="1"
                          Text="{x:Static domain:UiStrings.LabelMs}"

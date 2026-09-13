@@ -59,4 +59,21 @@ internal readonly record struct WaveSelection(long StartFrame, long EndFrame)
     {
         return a <= b ? new WaveSelection(a, b) : new WaveSelection(b, a);
     }
+
+    public WaveSelection Union(WaveSelection other)
+    {
+        if (IsEmpty)
+        {
+            return other;
+        }
+
+        if (other.IsEmpty)
+        {
+            return this;
+        }
+
+        return new WaveSelection(
+            Math.Min(StartFrame, other.StartFrame),
+            Math.Max(EndFrame, other.EndFrame));
+    }
 }
