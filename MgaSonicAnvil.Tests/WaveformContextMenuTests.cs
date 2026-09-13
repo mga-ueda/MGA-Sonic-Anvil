@@ -122,8 +122,14 @@ public sealed class WaveformContextMenuTests
         Assert.True(Find(ready, WaveMenuCommand.FadeIn)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.AddMarkerHere)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.Save)?.Enabled);
-        Assert.True(Find(ready, WaveMenuCommand.PlayExit)?.Enabled);
-        Assert.Equal("E", Find(ready, WaveMenuCommand.PlayExit)?.Gesture);
+        Assert.False(Find(ready, WaveMenuCommand.PlayExit)?.Enabled);
+        var waapiOn = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasDocument = true,
+            WaapiVisible = true,
+        });
+        Assert.True(Find(waapiOn, WaveMenuCommand.PlayExit)?.Enabled);
+        Assert.Equal("Alt+E", Find(waapiOn, WaveMenuCommand.PlayExit)?.Gesture);
     }
 
     [Fact]

@@ -73,9 +73,14 @@ public partial class MainWindow
         ApplyWaapiPanelVisible();
     }
 
-    /// <summary>Play -E チェックを切り替える（E キー）。WAAPI エリア非表示中も有効。</summary>
+    /// <summary>Play -E チェックを切り替える（Alt+E）。WAAPI オフ時は何もしない。</summary>
     private void TogglePlayPostExit()
     {
+        if (!_waapiPanelVisible)
+        {
+            return;
+        }
+
         // PlayPostExitChecked の setter はイベントを抑制するため、反映を明示的に呼ぶ。
         WaapiBar.PlayPostExitChecked = !WaapiBar.PlayPostExitChecked;
         ApplyPlayPostExit();

@@ -27,10 +27,10 @@ internal static partial class UiStrings
         "EXPORT 後に Wwise を前面へ出します。",
         "Bring Wwise to the front after EXPORT.");
     public static string TipPlayMinusE => Get(
-        "オンのとき、-E 部分（Exit Cue 以降）を再生します（Play post-exit）(E)。\n"
+        "オンのとき、-E 部分（Exit Cue 以降）を再生します（Play post-exit）(Alt+E)。WAAPI オンのときだけ切り替わります。\n"
         + "アプリ内プレビューではループ折り返し時に -E を二重再生し、シークバーが 2 本になります。\n"
         + "EXPORT 時は Music Playlist Container の既定トランジションルール（Any to Any）へ反映します。",
-        "When on, plays the -E section (after the Exit Cue) (Play post-exit) (E).\n"
+        "When on, plays the -E section (after the Exit Cue) (Play post-exit) (Alt+E). The key works only while WAAPI is on.\n"
         + "In-app preview double-plays -E on a loop wrap so two playheads appear.\n"
         + "EXPORT writes this to the Music Playlist Container default transition rule (Any to Any).");
     public static string TipWaapiToggle => Get(

@@ -377,7 +377,7 @@ public partial class MainWindow
             return BeginOrContinuePlaceRepeat(PlaceRepeatKind.Marker);
         }
 
-        if (key == Key.E && modifiers == ModifierKeys.None)
+        if (key == Key.E && modifiers == ModifierKeys.Alt && _waapiPanelVisible)
         {
             TogglePlayPostExit();
             return true;

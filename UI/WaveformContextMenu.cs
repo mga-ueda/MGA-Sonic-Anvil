@@ -418,7 +418,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuPreroll, WaveMenuCommand.Preroll, "Ctrl+Space", m.CanNavigate),
         Cmd(UiStrings.WaveMenuRestart, WaveMenuCommand.Restart, "Alt+Enter", m.CanNavigate),
         Cmd(UiStrings.WaveMenuLoopPlay, WaveMenuCommand.LoopPlay, "L", m.CanLoopPlay),
-        Check(UiStrings.WaveMenuPlayExit, WaveMenuCommand.PlayExit, "E", m.PlayExit, m.HasDocument && !m.IsBusy),
+        Check(UiStrings.WaveMenuPlayExit, WaveMenuCommand.PlayExit, "Alt+E", m.PlayExit, m.WaapiVisible && m.HasDocument && !m.IsBusy),
         WaveMenuSeparatorEntry.Instance,
         Check(UiStrings.WaveMenuRecord, WaveMenuCommand.Record, "Ctrl+R", m.IsRecording, !m.IsBusy),
         WaveMenuSeparatorEntry.Instance,
