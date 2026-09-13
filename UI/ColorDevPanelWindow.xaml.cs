@@ -104,9 +104,10 @@ internal partial class ColorDevPanelWindow : Window
         TipService.Set(CloseButton, UiStrings.ColorDevClose);
         foreach (var row in _rows.Values)
         {
-            TipService.Set(row.Host, row.Label);
-            TipService.Set(row.Name, row.Label);
-            TipService.Set(row.Swatch, row.Label);
+            var tip = ColorDevCatalog.Caption(row.GroupTitle, row.Label);
+            TipService.Set(row.Host, tip);
+            TipService.Set(row.Name, tip);
+            TipService.Set(row.Swatch, tip);
         }
     }
 
@@ -116,14 +117,10 @@ internal partial class ColorDevPanelWindow : Window
         _rows.Clear();
         _groups.Clear();
 
-        var items = UiColors.Entries
-            .Select(entry => (Entry: entry, Group: ColorDevCatalog.GroupOf(entry.Label)))
-            .OrderBy(item => item.Group, StringComparer.CurrentCulture)
-            .ThenBy(item => item.Entry.Label, StringComparer.CurrentCulture);
-
         ColorGroup? current = null;
-        foreach (var (entry, groupTitle) in items)
+        foreach (var entry in ColorDevCatalog.Sort(UiColors.Entries))
         {
+            var groupTitle = ColorDevCatalog.GroupTitleOf(entry.Key);
             if (current is null || !string.Equals(current.Title, groupTitle, StringComparison.CurrentCulture))
             {
                 var header = new TextBlock
@@ -138,14 +135,14 @@ internal partial class ColorDevPanelWindow : Window
                 ListPanel.Children.Add(header);
             }
 
-            var row = CreateRow(entry);
+            var row = CreateRow(entry, groupTitle);
             current.Rows.Add(row);
             _rows[entry.Key] = row;
             ListPanel.Children.Add(row.Host);
         }
     }
 
-    private ColorRow CreateRow(UiColorEntry entry)
+    private ColorRow CreateRow(UiColorEntry entry, string groupTitle)
     {
         var host = new Border
         {
@@ -201,7 +198,7 @@ internal partial class ColorDevPanelWindow : Window
         Grid.SetColumn(hex, 5);
         host.Child = grid;
 
-        var row = new ColorRow(entry.Key, host, accent, swatch, name, hex);
+        var row = new ColorRow(entry.Key, groupTitle, host, accent, swatch, name, hex);
         host.MouseLeftButtonUp += (_, _) => SelectKey(entry.Key, scrollIntoView: false);
         host.MouseEnter += (_, _) => PaintRow(row, hover: true);
         host.MouseLeave += (_, _) => PaintRow(row, hover: false);
@@ -358,7 +355,7 @@ internal partial class ColorDevPanelWindow : Window
             foreach (var row in group.Rows)
             {
                 var hex = row.Hex.Text;
-                var show = ColorDevCatalog.Matches(row.Label, row.Key, hex, query);
+                var show = ColorDevCatalog.Matches(row.Label, row.Key, hex, row.GroupTitle, query);
                 row.Host.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
                 visibleInGroup |= show;
                 any |= show;
@@ -496,6 +493,7 @@ internal partial class ColorDevPanelWindow : Window
     {
         public ColorRow(
             string key,
+            string groupTitle,
             Border host,
             Border accent,
             Border swatch,
@@ -503,6 +501,7 @@ internal partial class ColorDevPanelWindow : Window
             TextBlock hex)
         {
             Key = key;
+            GroupTitle = groupTitle;
             Host = host;
             Accent = accent;
             Swatch = swatch;
@@ -511,6 +510,8 @@ internal partial class ColorDevPanelWindow : Window
         }
 
         public string Key { get; }
+
+        public string GroupTitle { get; }
 
         public Border Host { get; }
 

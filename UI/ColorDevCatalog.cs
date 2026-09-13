@@ -1,22 +1,205 @@
+using MgaSonicAnvil.Domain;
+
 namespace MgaSonicAnvil.UI;
+
+/// <summary>色パネルのグループ。大枠の共通色のあと、メイン画面の並び（上→下、左→右）に合わせる。</summary>
+internal enum ColorDevGroup
+{
+    Shared,
+    Overview,
+    Waveform,
+    Guides,
+    Selection,
+    SampleLoop,
+    Region,
+    Marker,
+    Meter,
+    VectorScope,
+    Transport,
+    StatusBar,
+    Dialog,
+    Other,
+}
 
 /// <summary>色パネルのグループ分けと検索。</summary>
 internal static class ColorDevCatalog
 {
-    public static string GroupOf(string label)
-    {
-        var mid = label.IndexOf('・');
-        if (mid > 0)
-        {
-            return label[..mid].Trim();
-        }
+    private static readonly Dictionary<string, ColorDevGroup> Groups = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, int> Ranks = new(StringComparer.OrdinalIgnoreCase);
 
-        const string english = " · ";
-        var index = label.IndexOf(english, StringComparison.Ordinal);
-        return index > 0 ? label[..index].Trim() : label;
+    static ColorDevCatalog()
+    {
+        var catalog = new (string Key, ColorDevGroup Group)[]
+        {
+            ("SurfaceBackBrush", ColorDevGroup.Shared),
+            ("ChromeBackBrush", ColorDevGroup.Shared),
+            ("ChromeBorderBrush", ColorDevGroup.Shared),
+            ("ChromeMidBrush", ColorDevGroup.Shared),
+            ("ChromeDimBrush", ColorDevGroup.Shared),
+            ("PrimaryForeBrush", ColorDevGroup.Shared),
+            ("MutedForeBrush", ColorDevGroup.Shared),
+            ("AccentCyanBrush", ColorDevGroup.Shared),
+            ("DirtyAccentBrush", ColorDevGroup.Shared),
+            ("ScrollThumbBackBrush", ColorDevGroup.Shared),
+            ("ScrollThumbHoverBackBrush", ColorDevGroup.Shared),
+            ("ScrollThumbPressedBackBrush", ColorDevGroup.Shared),
+            ("ScrollThumbGripBrush", ColorDevGroup.Shared),
+            ("ControlHoverBorderBrush", ColorDevGroup.Shared),
+            ("DialogInputBackBrush", ColorDevGroup.Shared),
+            ("MenuSeparatorBrush", ColorDevGroup.Shared),
+            ("MenuHighlightBackBrush", ColorDevGroup.Shared),
+            ("MenuDisabledForeBrush", ColorDevGroup.Shared),
+
+            ("ProjectBarBackBrush", ColorDevGroup.Overview),
+            ("OverviewOutsideFillBrush", ColorDevGroup.Overview),
+
+            ("WaveformBackBrush", ColorDevGroup.Waveform),
+            ("WaveFillBrush", ColorDevGroup.Waveform),
+            ("WaveFillOverlayBrush", ColorDevGroup.Waveform),
+            ("WaveZeroLineBrush", ColorDevGroup.Waveform),
+            ("WaveformScrollTrackBrush", ColorDevGroup.Waveform),
+            ("TimelineWellBackBrush", ColorDevGroup.Waveform),
+            ("DbScaleForeBrush", ColorDevGroup.Waveform),
+            ("SpectrogramScaleForeBrush", ColorDevGroup.Waveform),
+
+            ("PlayheadBrush", ColorDevGroup.Guides),
+            ("SeekExitBrush", ColorDevGroup.Guides),
+            ("MouseGuideBrush", ColorDevGroup.Guides),
+            ("MouseGuideOnSelectionBrush", ColorDevGroup.Guides),
+
+            ("LoopRangeFillBrush", ColorDevGroup.Selection),
+
+            ("SampleLoopTimelineBrush", ColorDevGroup.SampleLoop),
+            ("SampleLoopWaveFillBrush", ColorDevGroup.SampleLoop),
+            ("SampleLoopTimeLabelForeBrush", ColorDevGroup.SampleLoop),
+
+            ("RegionTimelineBrush", ColorDevGroup.Region),
+            ("RegionWaveFillBrush", ColorDevGroup.Region),
+            ("RegionTimeLabelForeBrush", ColorDevGroup.Region),
+            ("RegionWaveFillAnacrusisBrush", ColorDevGroup.Region),
+            ("RegionWaveFillLoopBrush", ColorDevGroup.Region),
+            ("RegionWaveFillExitBrush", ColorDevGroup.Region),
+            ("RegionWaveFillExcludedBrush", ColorDevGroup.Region),
+
+            ("MarkerBrush", ColorDevGroup.Marker),
+            ("MarkerSelectedBrush", ColorDevGroup.Marker),
+            ("MarkerSelectedBorderBrush", ColorDevGroup.Marker),
+            ("MarkerLabelForeBrush", ColorDevGroup.Marker),
+
+            ("LevelMeterTrackBackBrush", ColorDevGroup.Meter),
+            ("LevelMeterTrackBorderBrush", ColorDevGroup.Meter),
+            ("LevelMeterHoldBorderBrush", ColorDevGroup.Meter),
+            ("LevelMeterTickBrush", ColorDevGroup.Meter),
+            ("LevelMeterClipOffBrush", ColorDevGroup.Meter),
+            ("LevelMeterClipOffBorderBrush", ColorDevGroup.Meter),
+            ("SurroundHullStrokeBrush", ColorDevGroup.Meter),
+
+            ("VectorScopeBackBrush", ColorDevGroup.VectorScope),
+            ("VectorScopeTraceBrush", ColorDevGroup.VectorScope),
+            ("VectorScopeGridBrush", ColorDevGroup.VectorScope),
+            ("VectorScopeCorrelationBrush", ColorDevGroup.VectorScope),
+
+            ("TransportBackBrush", ColorDevGroup.Transport),
+            ("TransportForeBrush", ColorDevGroup.Transport),
+            ("TransportDisabledForeBrush", ColorDevGroup.Transport),
+            ("TransportHoverBackBrush", ColorDevGroup.Transport),
+            ("TransportPressedBackBrush", ColorDevGroup.Transport),
+            ("HistoryStripBackBrush", ColorDevGroup.Transport),
+            ("HistoryStripHoverBackBrush", ColorDevGroup.Transport),
+            ("HistoryStripCurrentForeBrush", ColorDevGroup.Transport),
+            ("HistoryStripPastForeBrush", ColorDevGroup.Transport),
+            ("HistoryStripFutureForeBrush", ColorDevGroup.Transport),
+            ("ActionCopyrightForeBrush", ColorDevGroup.Transport),
+            ("ActionLinkForeBrush", ColorDevGroup.Transport),
+            ("ActionLinkHoverForeBrush", ColorDevGroup.Transport),
+            ("WaapiToggleOffBackBrush", ColorDevGroup.Transport),
+            ("WaapiToggleOffHoverBackBrush", ColorDevGroup.Transport),
+            ("WaapiToggleOffForeBrush", ColorDevGroup.Transport),
+            ("WaapiToggleOnBackBrush", ColorDevGroup.Transport),
+            ("WaapiToggleOnHoverBackBrush", ColorDevGroup.Transport),
+            ("WaapiToggleOnForeBrush", ColorDevGroup.Transport),
+
+            ("StatusBarBackBrush", ColorDevGroup.StatusBar),
+            ("WaapiBarBackBrush", ColorDevGroup.StatusBar),
+            ("StatusBarTitleForeBrush", ColorDevGroup.StatusBar),
+            ("StatusBarDetailForeBrush", ColorDevGroup.StatusBar),
+            ("StatusBarErrorDetailForeBrush", ColorDevGroup.StatusBar),
+            ("StatusBarConnectedBadgeBackBrush", ColorDevGroup.StatusBar),
+            ("StatusBarDisconnectedBadgeBackBrush", ColorDevGroup.StatusBar),
+            ("KeepTargetLockForeBrush", ColorDevGroup.StatusBar),
+            ("KeepTargetLockHoverForeBrush", ColorDevGroup.StatusBar),
+            ("KeepTargetUnlockForeBrush", ColorDevGroup.StatusBar),
+            ("KeepTargetUnlockHoverForeBrush", ColorDevGroup.StatusBar),
+            ("StatusExportButtonFillBrush", ColorDevGroup.StatusBar),
+            ("StatusExportButtonHoverFillBrush", ColorDevGroup.StatusBar),
+            ("StatusExportButtonBackBrush", ColorDevGroup.StatusBar),
+            ("StatusExportButtonHoverBackBrush", ColorDevGroup.StatusBar),
+            ("StatusExportButtonPressedBackBrush", ColorDevGroup.StatusBar),
+            ("StatusExportButtonForeBrush", ColorDevGroup.StatusBar),
+
+            ("WindowBackBrush", ColorDevGroup.Dialog),
+            ("ColorPanelBackBrush", ColorDevGroup.Dialog),
+            ("ExportButtonFillBrush", ColorDevGroup.Dialog),
+            ("ExportButtonHoverFillBrush", ColorDevGroup.Dialog),
+            ("ExportButtonBackBrush", ColorDevGroup.Dialog),
+            ("ExportButtonHoverBackBrush", ColorDevGroup.Dialog),
+            ("ExportButtonPressedBackBrush", ColorDevGroup.Dialog),
+            ("ExportButtonForeBrush", ColorDevGroup.Dialog),
+            ("ClearButtonFillBrush", ColorDevGroup.Dialog),
+            ("ClearButtonHoverFillBrush", ColorDevGroup.Dialog),
+            ("ClearButtonBackBrush", ColorDevGroup.Dialog),
+            ("ClearButtonHoverBackBrush", ColorDevGroup.Dialog),
+            ("ClearButtonPressedBackBrush", ColorDevGroup.Dialog),
+            ("ClearButtonForeBrush", ColorDevGroup.Dialog),
+        };
+
+        for (var i = 0; i < catalog.Length; i++)
+        {
+            Groups[catalog[i].Key] = catalog[i].Group;
+            Ranks[catalog[i].Key] = i;
+        }
     }
 
-    public static bool Matches(string label, string key, string hex, string? query)
+    public static IReadOnlyCollection<string> Keys => Groups.Keys;
+
+    public static ColorDevGroup GroupOf(string key) =>
+        Groups.TryGetValue(key, out var group) ? group : ColorDevGroup.Other;
+
+    public static int Rank(string key) =>
+        Ranks.TryGetValue(key, out var rank) ? rank : int.MaxValue;
+
+    public static string GroupTitle(ColorDevGroup group) => group switch
+    {
+        ColorDevGroup.Shared => UiStrings.ColorDevGroupShared,
+        ColorDevGroup.Overview => UiStrings.ColorDevGroupOverview,
+        ColorDevGroup.Waveform => UiStrings.ColorDevGroupWaveform,
+        ColorDevGroup.Guides => UiStrings.ColorDevGroupGuides,
+        ColorDevGroup.Selection => UiStrings.ColorDevGroupSelection,
+        ColorDevGroup.SampleLoop => UiStrings.ColorDevGroupSampleLoop,
+        ColorDevGroup.Region => UiStrings.ColorDevGroupRegion,
+        ColorDevGroup.Marker => UiStrings.ColorDevGroupMarker,
+        ColorDevGroup.Meter => UiStrings.ColorDevGroupMeter,
+        ColorDevGroup.VectorScope => UiStrings.ColorDevGroupVectorScope,
+        ColorDevGroup.Transport => UiStrings.ColorDevGroupTransport,
+        ColorDevGroup.StatusBar => UiStrings.ColorDevGroupStatus,
+        ColorDevGroup.Dialog => UiStrings.ColorDevGroupDialog,
+        _ => UiStrings.ColorDevGroupOther,
+    };
+
+    public static string GroupTitleOf(string key) => GroupTitle(GroupOf(key));
+
+    public static string Caption(string groupTitle, string item) =>
+        UiStrings.IsJapanese ? $"{groupTitle}・{item}" : $"{groupTitle} · {item}";
+
+    public static IEnumerable<UiColorEntry> Sort(IEnumerable<UiColorEntry> entries) =>
+        entries
+            .OrderBy(entry => Rank(entry.Key))
+            .ThenBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase);
+
+    public static bool Matches(string label, string key, string hex, string? query) =>
+        Matches(label, key, hex, groupTitle: null, query);
+
+    public static bool Matches(string label, string key, string hex, string? groupTitle, string? query)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
@@ -26,6 +209,8 @@ internal static class ColorDevCatalog
         var q = query.Trim();
         return label.Contains(q, StringComparison.OrdinalIgnoreCase)
             || key.Contains(q, StringComparison.OrdinalIgnoreCase)
-            || hex.Contains(q, StringComparison.OrdinalIgnoreCase);
+            || hex.Contains(q, StringComparison.OrdinalIgnoreCase)
+            || (!string.IsNullOrEmpty(groupTitle)
+                && groupTitle.Contains(q, StringComparison.OrdinalIgnoreCase));
     }
 }
