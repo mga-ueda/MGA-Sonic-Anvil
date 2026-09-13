@@ -24,15 +24,18 @@ internal static class WaveformInvertPaint
 
         var waveformBack = ToBgra(Theme.Get("WaveformBackBrush"));
         var fallbackWave = ToBgra(Theme.Get("WaveFillBrush"));
-        var count = width * height;
+        // 画素ごとのレーン判定は width×height 回で高くつくため、行の色を先に引く。
+        var waveColorByY = BuildWaveColorRows(height, laneWaveColors, laneGapPx, fallbackWave);
         if (document is null || document.FrameCount <= 0 || viewSpan <= 0)
         {
-            for (var i = 0; i < count; i++)
+            for (var y = 0; y < height; y++)
             {
-                pixels[i] = InvertPixel(
-                    pixels[i],
-                    waveformBack,
-                    WaveColorAt(i / width, height, laneWaveColors, laneGapPx, fallbackWave));
+                var waveFill = waveColorByY[y];
+                var row = y * width;
+                for (var x = 0; x < width; x++)
+                {
+                    pixels[row + x] = InvertPixel(pixels[row + x], waveformBack, waveFill);
+                }
             }
 
             return;
@@ -47,8 +50,10 @@ internal static class WaveformInvertPaint
         var regions = document.Regions;
         var sample = document.SampleLoop;
         var hasSampleLoop = !sample.IsEmpty;
-        var markers = document.Markers;
         var frameCount = document.FrameCount;
+        // マーカー役割（コメントの文字列解析）は列×マーカー数で繰り返さず、一度だけ解決する。
+        var underSpans = CollectUnderWaveRoleSpans(document.Markers, frameCount, anacrusis, loop, exit);
+        var removeSpans = CollectRemoveSpans(document.Markers, frameCount, remove);
 
         for (var x = 0; x < width; x++)
         {
@@ -68,23 +73,101 @@ internal static class WaveformInvertPaint
                 columnBack = BlendOver(columnBack, sampleLoop);
             }
 
-            var underRole = UnderWaveRoleBgra(markers, frame, frameCount, anacrusis, loop, exit);
+            var underRole = SpanBgraAt(underSpans, frame);
             if (underRole != 0)
             {
                 columnBack = BlendOver(columnBack, underRole);
             }
 
-            var removeOverlay = RemoveOverlayBgra(markers, frame, frameCount, remove);
+            var removeOverlay = SpanBgraAt(removeSpans, frame);
             var swappedBack = removeOverlay != 0 ? BlendOver(columnBack, removeOverlay) : columnBack;
             for (var y = 0; y < height; y++)
             {
                 var index = y * width + x;
-                pixels[index] = InvertPixel(
-                    pixels[index],
-                    swappedBack,
-                    WaveColorAt(y, height, laneWaveColors, laneGapPx, fallbackWave));
+                pixels[index] = InvertPixel(pixels[index], swappedBack, waveColorByY[y]);
             }
         }
+    }
+
+    private static int[] BuildWaveColorRows(
+        int height,
+        IReadOnlyList<int>? laneWaveColors,
+        double laneGapPx,
+        int fallback)
+    {
+        var rows = new int[height];
+        for (var y = 0; y < height; y++)
+        {
+            rows[y] = WaveColorAt(y, height, laneWaveColors, laneGapPx, fallback);
+        }
+
+        return rows;
+    }
+
+    private readonly record struct RoleSpan(long Start, long End, int Bgra);
+
+    private static List<RoleSpan> CollectUnderWaveRoleSpans(
+        IReadOnlyList<WaveMarker> markers,
+        long frameCount,
+        int anacrusis,
+        int loop,
+        int exit)
+    {
+        var spans = new List<RoleSpan>();
+        for (var i = 0; i < markers.Count; i++)
+        {
+            var role = MarkerRoles.FromComment(markers[i].Comment);
+            if (role is not (MarkerRole.Anacrusis or MarkerRole.Loop or MarkerRole.Exit))
+            {
+                continue;
+            }
+
+            var bgra = role switch
+            {
+                MarkerRole.Anacrusis => anacrusis,
+                MarkerRole.Loop => loop,
+                MarkerRole.Exit => exit,
+                _ => 0,
+            };
+            var end = i + 1 < markers.Count ? markers[i + 1].Frame : frameCount;
+            spans.Add(new RoleSpan(markers[i].Frame, end, bgra));
+        }
+
+        return spans;
+    }
+
+    private static List<RoleSpan> CollectRemoveSpans(
+        IReadOnlyList<WaveMarker> markers,
+        long frameCount,
+        int remove)
+    {
+        var spans = new List<RoleSpan>();
+        for (var i = 0; i < markers.Count; i++)
+        {
+            if (MarkerRoles.FromComment(markers[i].Comment) != MarkerRole.Remove)
+            {
+                continue;
+            }
+
+            var end = i + 1 < markers.Count ? markers[i + 1].Frame : frameCount;
+            spans.Add(new RoleSpan(markers[i].Frame, end, remove));
+        }
+
+        return spans;
+    }
+
+    /// <summary>マーカー順で最初に当たったスパンの色。無ければ 0。</summary>
+    private static int SpanBgraAt(List<RoleSpan> spans, long frame)
+    {
+        for (var i = 0; i < spans.Count; i++)
+        {
+            if (frame >= spans[i].Start && frame < spans[i].End)
+            {
+                return spans[i].Bgra;
+            }
+        }
+
+        return 0;
     }
 
     /// <summary>波形ピクセルは背景色へ、背景ピクセルは波形色へ。白黒反転ではない。</summary>
@@ -115,65 +198,6 @@ internal static class WaveformInvertPaint
     {
         var frame = (long)Math.Floor(viewStart + ((x + 0.5) / width) * viewSpan);
         return Math.Clamp(frame, 0, Math.Max(0, frameCount - 1));
-    }
-
-    private static int UnderWaveRoleBgra(
-        IReadOnlyList<WaveMarker> markers,
-        long frame,
-        long frameCount,
-        int anacrusis,
-        int loop,
-        int exit)
-    {
-        for (var i = 0; i < markers.Count; i++)
-        {
-            var role = MarkerRoles.FromComment(markers[i].Comment);
-            if (role is not (MarkerRole.Anacrusis or MarkerRole.Loop or MarkerRole.Exit))
-            {
-                continue;
-            }
-
-            var start = markers[i].Frame;
-            var end = i + 1 < markers.Count ? markers[i + 1].Frame : frameCount;
-            if (frame < start || frame >= end)
-            {
-                continue;
-            }
-
-            return role switch
-            {
-                MarkerRole.Anacrusis => anacrusis,
-                MarkerRole.Loop => loop,
-                MarkerRole.Exit => exit,
-                _ => 0,
-            };
-        }
-
-        return 0;
-    }
-
-    private static int RemoveOverlayBgra(
-        IReadOnlyList<WaveMarker> markers,
-        long frame,
-        long frameCount,
-        int remove)
-    {
-        for (var i = 0; i < markers.Count; i++)
-        {
-            if (MarkerRoles.FromComment(markers[i].Comment) != MarkerRole.Remove)
-            {
-                continue;
-            }
-
-            var start = markers[i].Frame;
-            var end = i + 1 < markers.Count ? markers[i + 1].Frame : frameCount;
-            if (frame >= start && frame < end)
-            {
-                return remove;
-            }
-        }
-
-        return 0;
     }
 
     private static int BlendOver(int destination, int source)

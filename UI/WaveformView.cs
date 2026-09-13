@@ -119,6 +119,7 @@ internal sealed class WaveformView : Grid
     private WriteableBitmap? _invertBitmap;
     private AudioDocument? _invertDocument;
     private int _invertChannels;
+    private bool _invertDirty = true;
     private int[] _invertPixels = [];
     private int[] _wavePixels = [];
     private int _wavePixelWidth;
@@ -2108,10 +2109,10 @@ internal sealed class WaveformView : Grid
         }
 
         _waveBitmap!.WritePixels(new Int32Rect(0, 0, bmpWidth, height), _wavePixels, bmpWidth * 4, 0);
-        if (!SpectrogramVisible && !LoudnessVisible && !_liveRecording)
-        {
-            RebuildInvertBitmap(bmpWidth, height, dpi);
-        }
+        // 選択反転ビットマップは全画素の再生成で重い。追従スクロール中も毎回作ると
+        // 静的ペイントの実測コストを押し上げ、追従の間引きが増えてカクつくため、
+        // ここでは dirty にだけして、選択を実際に描くときに作る（DrawInvertedSelection）。
+        _invertDirty = true;
 
         _waveDipSize = bounds.Size;
         _waveDpiX = dpi.DpiScaleX;
@@ -2313,13 +2314,36 @@ internal sealed class WaveformView : Grid
             width,
             height,
             _document,
-            _viewStart,
-            ViewSpanFrames,
+            _waveViewStart,
+            _waveViewSpan,
             LaneWaveColors(),
             LaneGapPx(dpi.DpiScaleY));
         _invertBitmap.WritePixels(new Int32Rect(0, 0, width, height), _invertPixels, width * 4, 0);
         _invertDocument = _document;
         _invertChannels = _document?.Channels ?? 0;
+        _invertDirty = false;
+    }
+
+    /// <summary>
+    /// 選択を実際に描く直前にだけ反転ビットマップを作る。波形ビットマップの
+    /// 更新ごとに全画素を作り直すと追従スクロールが大きく間引かれるため。
+    /// </summary>
+    private void EnsureInvertBitmap()
+    {
+        if (_waveBitmap is null || _wavePixelWidth <= 1 || _wavePixelHeight <= 0)
+        {
+            return;
+        }
+
+        if (!_invertDirty
+            && _invertBitmap is not null
+            && ReferenceEquals(_invertDocument, _document)
+            && _invertChannels == (_document?.Channels ?? 0))
+        {
+            return;
+        }
+
+        RebuildInvertBitmap(_wavePixelWidth, _wavePixelHeight, VisualTreeHelper.GetDpi(this));
     }
 
     internal static Color SpectrogramSelectionFill() => Color.FromArgb(56, 255, 255, 255);
@@ -2331,6 +2355,11 @@ internal sealed class WaveformView : Grid
         double span,
         WaveSelection selection)
     {
+        if (!SpectrogramVisible && !LoudnessVisible && !_liveRecording)
+        {
+            EnsureInvertBitmap();
+        }
+
         if (SpectrogramVisible
             || LoudnessVisible
             || _invertBitmap is null

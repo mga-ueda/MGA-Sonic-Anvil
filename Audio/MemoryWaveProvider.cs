@@ -709,10 +709,14 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             written = ReadCore(buffer, offset, count);
             ApplyFlushFade(buffer, offset, written);
             pushedSource = _sourceMeterThisRead > 0;
-            if (pushedSource)
-            {
-                FlushSourceMeterScratchNoLock();
-            }
+        }
+
+        // メーターへの書き込みは _gate の外で行う。UI スレッドは毎描画フレームで
+        // CursorFrame（_gate）を読むため、コールバック内の長い保持はスクロールの
+        // ジッターになる。スクラッチはこのオーディオスレッドしか触らない。
+        if (pushedSource)
+        {
+            FlushSourceMeterScratch();
         }
 
         if (written > 0)
@@ -1409,7 +1413,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _sourceMeterThisRead++;
     }
 
-    private void FlushSourceMeterScratchNoLock()
+    private void FlushSourceMeterScratch()
     {
         if (_sourceMeterScratchFrames <= 0)
         {
