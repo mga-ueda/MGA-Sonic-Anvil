@@ -1,5 +1,4 @@
 using System.IO;
-using System.Text.Json;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.Config;
@@ -14,13 +13,18 @@ internal static class AppStorage
     public const string SettingsFileName = "settings.json";
     public const string SessionDocumentFileName = "last-document.wav";
 
-    public static AppSettings Settings { get; private set; } = new();
+    public static AppSettings Settings { get; private set; } = AppSettings.CreateDefault();
+
+    /// <summary>起動時に設定を作り直した理由。通知後は <see cref="AcknowledgeSettingsReset"/> で消す。</summary>
+    public static SettingsFileReset SettingsReset { get; private set; }
 
     public static void Initialize()
     {
         Directory.CreateDirectory(RootDirectory);
         Load();
     }
+
+    public static void AcknowledgeSettingsReset() => SettingsReset = SettingsFileReset.None;
 
     public static string RootDirectory { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -77,25 +81,12 @@ internal static class AppStorage
 
     public static void Load()
     {
-        try
-        {
-            if (!File.Exists(SettingsPath))
-            {
-                Settings = new AppSettings();
-                Settings.EnsureSpeakerPresets();
-                return;
-            }
-
-            var json = File.ReadAllText(SettingsPath);
-            Settings = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings)
-                ?? new AppSettings();
-            Settings.EnsureSpeakerPresets();
-        }
-        catch
-        {
-            Settings = new AppSettings();
-            Settings.EnsureSpeakerPresets();
-        }
+        Settings = AppSettingsFile.Load(
+            SettingsPath,
+            SessionDocumentPath,
+            SessionDirectory,
+            out var reset);
+        SettingsReset = reset;
     }
 
     public static void Save()
@@ -103,8 +94,7 @@ internal static class AppStorage
         try
         {
             Directory.CreateDirectory(RootDirectory);
-            var json = JsonSerializer.Serialize(Settings, AppSettingsJsonContext.Default.AppSettings);
-            File.WriteAllText(SettingsPath, json);
+            AppSettingsFile.Write(SettingsPath, Settings);
         }
         catch
         {

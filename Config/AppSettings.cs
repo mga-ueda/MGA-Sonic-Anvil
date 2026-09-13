@@ -6,14 +6,20 @@ namespace MgaSonicAnvil.Config;
 
 internal sealed class AppSettings
 {
+    /// <summary>現行の設定ファイル世代。一致しないファイルは破棄して作り直す。</summary>
+    public const int CurrentGeneration = 1;
+
+    /// <summary>このファイルの世代。欠けている／古い値はレガシーとみなす。</summary>
+    public int SettingsGeneration { get; set; }
+
     public string AudioApi { get; set; } = "WaveOut";
 
     public string AudioDeviceId { get; set; } = string.Empty;
 
-    /// <summary>旧設定。読み込み時に SpeakerPresets へ移す。</summary>
+    /// <summary>アクティブなスピーカー定義の写し。</summary>
     public string RecordLayout { get; set; } = "Stereo";
 
-    /// <summary>旧設定。空なら RecordLayout を使っていた。</summary>
+    /// <summary>アクティブなスピーカー定義の写し。</summary>
     public string PlaybackLayout { get; set; } = string.Empty;
 
     public string RecordDeviceId { get; set; } = string.Empty;
@@ -114,46 +120,13 @@ internal sealed class AppSettings
     /// <summary>「今は開かない」にしたリモート版。同じ版では再通知しない。</summary>
     public string SkippedUpdateVersion { get; set; } = string.Empty;
 
+    /// <summary>最後に開いた／保存したファイル。ダイアログの初期フォルダに使う。</summary>
     public string LastDocumentPath { get; set; } = string.Empty;
 
-    public bool LastDocumentDirty { get; set; }
-
-    /// <summary>終了時に開いていたタブ。無ければ LastDocument* から 1 本だけ戻す。</summary>
+    /// <summary>終了時に開いていたタブ。</summary>
     public OpenDocumentSnapshot[] OpenDocuments { get; set; } = [];
 
     public int ActiveDocumentIndex { get; set; }
-
-    public long LastCursorFrame { get; set; }
-
-    public long LastSelectionStart { get; set; }
-
-    public long LastSelectionEnd { get; set; }
-
-    public double LastTimeZoom { get; set; } = 1;
-
-    public double LastAmpZoom { get; set; } = 1;
-
-    public double LastViewStart { get; set; }
-
-    public bool LastLoop { get; set; }
-
-    public long LastSampleLoopStart { get; set; }
-
-    public long LastSampleLoopEnd { get; set; }
-
-    public long LastRegionStart { get; set; }
-
-    public long LastRegionEnd { get; set; }
-
-    public long[] LastRegionStarts { get; set; } = [];
-
-    public long[] LastRegionEnds { get; set; } = [];
-
-    public string[] LastRegionNames { get; set; } = [];
-
-    public long[] LastMarkerFrames { get; set; } = [];
-
-    public string[] LastMarkerComments { get; set; } = [];
 
     public bool WaapiKeepTarget { get; set; }
 
@@ -257,29 +230,24 @@ internal sealed class AppSettings
         MirrorActiveSpeaker();
     }
 
+    public static AppSettings CreateDefault()
+    {
+        var settings = new AppSettings { SettingsGeneration = CurrentGeneration };
+        settings.EnsureSpeakerPresets();
+        return settings;
+    }
+
     /// <summary>カタログを正本にし、保存済みのデバイスとマップを載せる。</summary>
     public void EnsureSpeakerPresets()
     {
-        var saved = SpeakerPresets;
-        if (saved is not { Length: > 0 })
-        {
-            saved = SeedFromLegacyFields();
-        }
-
+        var saved = SpeakerPresets is { Length: > 0 } ? SpeakerPresets : SpeakerPreset.CreateCatalog();
         SpeakerPresets = SpeakerPreset.MergeCatalog(saved);
         if (FindSpeaker(ActiveSpeakerPresetId) is null)
         {
-            if (ChannelLayout.TryGet(RecordLayout, out var fromRecord))
-            {
-                ActiveSpeakerPresetId = fromRecord.Id;
-            }
-            else
-            {
-                ActiveSpeakerPresetId = SpeakerPreset.ResolveActiveId(
-                    SpeakerPresets,
-                    ActiveSpeakerPresetId,
-                    saved);
-            }
+            ActiveSpeakerPresetId = SpeakerPreset.ResolveActiveId(
+                SpeakerPresets,
+                ActiveSpeakerPresetId,
+                saved);
         }
 
         if (FindSpeaker(ActiveSpeakerPresetId) is null)
@@ -288,34 +256,6 @@ internal sealed class AppSettings
         }
 
         MirrorActiveSpeaker();
-    }
-
-    private SpeakerPreset[] SeedFromLegacyFields()
-    {
-        var output = new AudioOutputSettings(AudioOutputSettings.ParseApi(AudioApi), AudioDeviceId ?? string.Empty);
-        var recordChannels = ChannelLayout.Parse(RecordLayout).Channels;
-        var playChannels = ChannelLayout.Parse(
-            string.IsNullOrWhiteSpace(PlaybackLayout) ? RecordLayout : PlaybackLayout).Channels;
-        var channels = Math.Clamp(Math.Max(recordChannels, playChannels), 1, ChannelLayout.MaxChannels);
-        var target = ChannelLayout.TryGet(RecordLayout, out var named)
-            ? named
-            : ChannelLayout.PreferredForChannels(channels);
-        var catalog = SpeakerPreset.CreateCatalog();
-        foreach (var item in catalog)
-        {
-            item.ApplyAudioOutput(output);
-            if (!item.Id.Equals(target.Id, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            item.RecordInputMap = [.. RecordInputMap ?? []];
-            item.PlaybackOutputMap = [.. PlaybackOutputMap ?? []];
-            item.FileChannelMap = [.. FileChannelMap ?? []];
-        }
-
-        ActiveSpeakerPresetId = target.Id;
-        return catalog;
     }
 
     private void MirrorActiveSpeaker()

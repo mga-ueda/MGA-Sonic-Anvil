@@ -52,28 +52,14 @@ public sealed class SpeakerPresetTests
     }
 
     [Fact]
-    public void LegacySurroundSettings_MapOntoCatalogFiveOne()
+    public void EmptySpeakerPresets_UseCatalogAndDefaultStereo()
     {
-        var settings = new AppSettings
-        {
-            RecordLayout = "5.1",
-            PlaybackLayout = "5.1",
-            AudioApi = "Asio",
-            AudioDeviceId = "Fireface",
-            RecordInputMap = [0, 1, 2, 3, 4, 5],
-            PlaybackOutputMap = [0, 1, 2, 3, 4, 5],
-        };
+        var settings = new AppSettings { SpeakerPresets = [] };
         settings.EnsureSpeakerPresets();
         Assert.Equal(ChannelLayout.All.Length, settings.SpeakerPresets.Length);
-        Assert.Equal("5.1", settings.ActiveSpeakerPresetId);
-        var fiveOne = settings.FindSpeaker("5.1");
-        Assert.NotNull(fiveOne);
-        Assert.Equal(6, fiveOne!.Channels);
-        Assert.Equal([0, 1, 2, 3, 4, 5], fiveOne.PlaybackOutputMap);
-        Assert.Equal("Asio", fiveOne.AudioApi);
-        Assert.Equal("Fireface", fiveOne.AudioDeviceId);
-        Assert.Equal(6, settings.ResolvedPlaybackLayout().Channels);
-        Assert.Equal(["L", "R", "C", "LFE", "Ls", "Rs"], settings.ResolvedPlaybackLayout().Labels);
+        Assert.Equal(SpeakerPreset.DefaultId, settings.ActiveSpeakerPresetId);
+        Assert.Equal("Stereo", settings.ResolvedSpeaker().Id);
+        Assert.Equal(2, settings.ResolvedPlaybackLayout().Channels);
     }
 
     [Fact]

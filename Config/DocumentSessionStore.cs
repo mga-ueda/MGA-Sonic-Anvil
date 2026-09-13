@@ -64,7 +64,6 @@ internal sealed class OpenDocumentSnapshot
 internal static class DocumentSessionStore
 {
     public const string SessionDirectoryName = "session";
-    public const string LegacySessionFileName = "last-document.wav";
 
     public static string FileNameForIndex(int index) => $"doc-{Math.Max(0, index)}.wav";
 
@@ -170,9 +169,7 @@ internal static class DocumentSessionStore
             return string.Empty;
         }
 
-        return name.Equals(LegacySessionFileName, StringComparison.OrdinalIgnoreCase)
-            ? Path.Combine(rootDirectory, name)
-            : Path.Combine(rootDirectory, SessionDirectoryName, name);
+        return Path.Combine(rootDirectory, SessionDirectoryName, name);
     }
 
     public static bool TryResolveLoadPath(
@@ -278,96 +275,13 @@ internal static class DocumentSessionStore
         return restored.Count > 0 ? restored[0].Item : null;
     }
 
-    public static OpenDocumentSnapshot[] ResolveOpenDocuments(AppSettings settings)
-    {
-        if (settings.OpenDocuments is { Length: > 0 } docs)
-        {
-            return docs;
-        }
-
-        return HasLegacyDocument(settings) ? [FromLegacy(settings)] : [];
-    }
-
-    public static bool HasLegacyDocument(AppSettings settings) =>
-        settings.LastDocumentDirty || !string.IsNullOrWhiteSpace(settings.LastDocumentPath);
-
-    public static OpenDocumentSnapshot FromLegacy(AppSettings settings) => new()
-    {
-        SourcePath = settings.LastDocumentPath ?? string.Empty,
-        Dirty = settings.LastDocumentDirty,
-        SessionFileName = settings.LastDocumentDirty ? LegacySessionFileName : string.Empty,
-        CursorFrame = settings.LastCursorFrame,
-        SelectionStart = settings.LastSelectionStart,
-        SelectionEnd = settings.LastSelectionEnd,
-        TimeZoom = settings.LastTimeZoom,
-        AmpZoom = settings.LastAmpZoom,
-        ViewStart = settings.LastViewStart,
-        LoopEnabled = true,
-        SampleLoopStart = settings.LastSampleLoopStart,
-        SampleLoopEnd = settings.LastSampleLoopEnd,
-        RegionStarts = settings.LastRegionStarts ?? [],
-        RegionEnds = settings.LastRegionEnds ?? [],
-        RegionNames = settings.LastRegionNames ?? [],
-        MarkerFrames = settings.LastMarkerFrames ?? [],
-        MarkerComments = settings.LastMarkerComments ?? [],
-        IsActive = true,
-    };
-
-    public static void MirrorActiveToLegacy(AppSettings settings, OpenDocumentSnapshot? active)
-    {
-        if (active is null)
-        {
-            ClearLegacy(settings);
-            return;
-        }
-
-        settings.LastDocumentPath = active.SourcePath ?? string.Empty;
-        settings.LastDocumentDirty = active.Dirty;
-        settings.LastCursorFrame = active.CursorFrame;
-        settings.LastSelectionStart = active.SelectionStart;
-        settings.LastSelectionEnd = active.SelectionEnd;
-        settings.LastTimeZoom = active.TimeZoom;
-        settings.LastAmpZoom = active.AmpZoom;
-        settings.LastViewStart = active.ViewStart;
-        settings.LastLoop = active.LoopEnabled;
-        settings.LastSampleLoopStart = active.SampleLoopStart;
-        settings.LastSampleLoopEnd = active.SampleLoopEnd;
-        settings.LastRegionStarts = active.RegionStarts ?? [];
-        settings.LastRegionEnds = active.RegionEnds ?? [];
-        settings.LastRegionNames = active.RegionNames ?? [];
-        settings.LastRegionStart = settings.LastRegionStarts.Length > 0 ? settings.LastRegionStarts[0] : 0;
-        settings.LastRegionEnd = settings.LastRegionEnds.Length > 0 ? settings.LastRegionEnds[0] : 0;
-        settings.LastMarkerFrames = active.MarkerFrames ?? [];
-        settings.LastMarkerComments = active.MarkerComments ?? [];
-    }
-
-    public static void ClearLegacy(AppSettings settings)
-    {
-        settings.LastDocumentPath = string.Empty;
-        settings.LastDocumentDirty = false;
-        settings.LastCursorFrame = 0;
-        settings.LastSelectionStart = 0;
-        settings.LastSelectionEnd = 0;
-        settings.LastTimeZoom = 1;
-        settings.LastAmpZoom = 1;
-        settings.LastViewStart = 0;
-        settings.LastLoop = true;
-        settings.LastSampleLoopStart = 0;
-        settings.LastSampleLoopEnd = 0;
-        settings.LastRegionStart = 0;
-        settings.LastRegionEnd = 0;
-        settings.LastRegionStarts = [];
-        settings.LastRegionEnds = [];
-        settings.LastRegionNames = [];
-        settings.LastMarkerFrames = [];
-        settings.LastMarkerComments = [];
-    }
+    public static OpenDocumentSnapshot[] ResolveOpenDocuments(AppSettings settings) =>
+        settings.OpenDocuments ?? [];
 
     public static void ClearOpenDocuments(AppSettings settings)
     {
         settings.OpenDocuments = [];
         settings.ActiveDocumentIndex = 0;
-        ClearLegacy(settings);
     }
 
     public static void RemoveOrphanSessionFiles(string sessionDirectory, IReadOnlyCollection<string> keepFileNames)

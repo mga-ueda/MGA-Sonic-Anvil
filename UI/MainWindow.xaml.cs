@@ -355,9 +355,30 @@ public partial class MainWindow : Window
             await OpenPathsAsync(launch).ConfigureAwait(true);
         }
 
+        NotifySettingsRecreatedIfNeeded();
         UpdateLayout();
         Waveform.Refresh();
         Overview.InvalidateVisual();
+    }
+
+    private void NotifySettingsRecreatedIfNeeded()
+    {
+        var reset = AppStorage.SettingsReset;
+        if (reset is SettingsFileReset.None)
+        {
+            return;
+        }
+
+        AppStorage.AcknowledgeSettingsReset();
+        var text = reset == SettingsFileReset.Outdated
+            ? UiStrings.SettingsFileRecreatedOutdated
+            : UiStrings.SettingsFileRecreatedInvalid;
+        OwnerCenteredMessageBox.Show(
+            this,
+            text,
+            UiStrings.AppName,
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     private void BindWorkspace(DocumentSession? session)

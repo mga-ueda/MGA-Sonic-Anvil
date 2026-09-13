@@ -80,4 +80,12 @@ internal static partial class UiStrings
         "関連付けを変更できませんでした。{0}",
         "Could not change the file association. {0}",
         detail);
+
+    public static string SettingsFileRecreatedOutdated => Get(
+        "設定ファイルの世代が古いため作り直しました。設定を見直してください。",
+        "The settings file is from an older generation, so it was recreated. Please review your settings.");
+
+    public static string SettingsFileRecreatedInvalid => Get(
+        "設定ファイルが不正だったため作り直しました。設定を見直してください。",
+        "The settings file was invalid, so it was recreated. Please review your settings.");
 }

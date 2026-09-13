@@ -65,15 +65,11 @@ public sealed class DocumentSessionStoreTests
     }
 
     [Fact]
-    public void ResolveSessionAudioPath_UsesLegacyRootForOldFile()
+    public void ResolveSessionAudioPath_UsesSessionDirectory()
     {
         var root = Path.Combine(Path.GetTempPath(), "mga-session-path");
-        var legacy = new OpenDocumentSnapshot { SessionFileName = DocumentSessionStore.LegacySessionFileName };
         var current = new OpenDocumentSnapshot { SessionFileName = "doc-2.wav" };
 
-        Assert.Equal(
-            Path.Combine(root, DocumentSessionStore.LegacySessionFileName),
-            DocumentSessionStore.ResolveSessionAudioPath(root, legacy));
         Assert.Equal(
             Path.Combine(root, DocumentSessionStore.SessionDirectoryName, "doc-2.wav"),
             DocumentSessionStore.ResolveSessionAudioPath(root, current));
@@ -115,7 +111,7 @@ public sealed class DocumentSessionStoreTests
     }
 
     [Fact]
-    public void ResolveOpenDocuments_PrefersMultiTabOverLegacy()
+    public void ResolveOpenDocuments_UsesOpenDocumentsOnly()
     {
         var settings = new AppSettings
         {
@@ -129,24 +125,10 @@ public sealed class DocumentSessionStoreTests
     }
 
     [Fact]
-    public void ResolveOpenDocuments_FallsBackToLegacySingleDocument()
+    public void ResolveOpenDocuments_EmptyWhenNoSnapshots()
     {
-        var settings = new AppSettings
-        {
-            LastDocumentPath = @"C:\legacy.wav",
-            LastDocumentDirty = true,
-            LastCursorFrame = 99,
-            LastTimeZoom = 3,
-        };
-
-        var docs = DocumentSessionStore.ResolveOpenDocuments(settings);
-        Assert.Single(docs);
-        Assert.Equal(@"C:\legacy.wav", docs[0].SourcePath);
-        Assert.True(docs[0].Dirty);
-        Assert.Equal(DocumentSessionStore.LegacySessionFileName, docs[0].SessionFileName);
-        Assert.Equal(99, docs[0].CursorFrame);
-        Assert.Equal(3, docs[0].TimeZoom);
-        Assert.True(docs[0].LoopEnabled);
+        var settings = new AppSettings { LastDocumentPath = @"C:\legacy.wav" };
+        Assert.Empty(DocumentSessionStore.ResolveOpenDocuments(settings));
     }
 
     [Fact]

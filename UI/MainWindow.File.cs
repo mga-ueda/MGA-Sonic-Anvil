@@ -190,7 +190,7 @@ public partial class MainWindow
 
                 if (active.Document.SourcePath is { } openedPath)
                 {
-                    RememberOpenedPath(openedPath, dirty: false, resetMarkers: false);
+                    RememberOpenedPath(openedPath);
                 }
             }
             else
@@ -412,7 +412,7 @@ public partial class MainWindow
             history?.MarkClean();
             if (ReferenceEquals(document, _document))
             {
-                RememberOpenedPath(path, dirty: false, resetMarkers: false);
+                RememberOpenedPath(path);
             }
 
             RefreshTitle();
@@ -842,31 +842,10 @@ public partial class MainWindow
         }
     }
 
-    private void RememberOpenedPath(string path, bool dirty, bool resetMarkers)
+    private static void RememberOpenedPath(string path)
     {
-        var settings = AppStorage.Settings;
-        settings.LastDocumentPath = path;
-        settings.LastDocumentDirty = dirty;
-        if (resetMarkers)
-        {
-            StoreSessionMarkers([]);
-            settings.LastSampleLoopStart = 0;
-            settings.LastSampleLoopEnd = 0;
-            StoreSessionRegions(settings, null);
-        }
-        else
-        {
-            StoreSessionMarkers(_document?.SnapshotMarkers());
-            settings.LastSampleLoopStart = _document?.SampleLoop.StartFrame ?? 0;
-            settings.LastSampleLoopEnd = _document?.SampleLoop.EndFrame ?? 0;
-            StoreSessionRegions(settings, _document);
-        }
-
-        if (!dirty)
-        {
-            AppStorage.ClearSessionDocument();
-        }
-
+        AppStorage.Settings.LastDocumentPath = path;
+        AppStorage.ClearSessionDocument();
         AppStorage.Save();
     }
 
@@ -922,7 +901,11 @@ public partial class MainWindow
             settings.OpenDocuments = snapshots;
             var activeIndex = _activeSession is null ? 0 : _sessions.IndexOf(_activeSession);
             settings.ActiveDocumentIndex = Math.Clamp(activeIndex, 0, snapshots.Length - 1);
-            DocumentSessionStore.MirrorActiveToLegacy(settings, snapshots[settings.ActiveDocumentIndex]);
+            var activePath = snapshots[settings.ActiveDocumentIndex].SourcePath;
+            if (!string.IsNullOrWhiteSpace(activePath))
+            {
+                settings.LastDocumentPath = activePath;
+            }
         }
         catch
         {
@@ -1127,57 +1110,6 @@ public partial class MainWindow
         {
             return null;
         }
-    }
-
-    private static void StoreSessionRegions(AppSettings settings, AudioDocument? document)
-    {
-        var regions = document?.SnapshotRegions();
-        if (regions is null || regions.Length == 0)
-        {
-            settings.LastRegionStart = 0;
-            settings.LastRegionEnd = 0;
-            settings.LastRegionStarts = [];
-            settings.LastRegionEnds = [];
-            settings.LastRegionNames = [];
-            return;
-        }
-
-        var starts = new long[regions.Length];
-        var ends = new long[regions.Length];
-        var names = new string[regions.Length];
-        for (var i = 0; i < regions.Length; i++)
-        {
-            starts[i] = regions[i].StartFrame;
-            ends[i] = regions[i].EndFrame;
-            names[i] = regions[i].Name;
-        }
-
-        settings.LastRegionStarts = starts;
-        settings.LastRegionEnds = ends;
-        settings.LastRegionNames = names;
-        settings.LastRegionStart = starts[0];
-        settings.LastRegionEnd = ends[0];
-    }
-
-    private static void StoreSessionMarkers(IReadOnlyList<MarkerSnapshot>? markers)
-    {
-        if (markers is null || markers.Count == 0)
-        {
-            AppStorage.Settings.LastMarkerFrames = [];
-            AppStorage.Settings.LastMarkerComments = [];
-            return;
-        }
-
-        var frames = new long[markers.Count];
-        var comments = new string[markers.Count];
-        for (var i = 0; i < markers.Count; i++)
-        {
-            frames[i] = markers[i].Frame;
-            comments[i] = markers[i].Comment ?? string.Empty;
-        }
-
-        AppStorage.Settings.LastMarkerFrames = frames;
-        AppStorage.Settings.LastMarkerComments = comments;
     }
 
 }
