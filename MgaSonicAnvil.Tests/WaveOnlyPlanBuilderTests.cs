@@ -20,7 +20,7 @@ public sealed class WaveOnlyPlanBuilderTests
     }
 
     [Fact]
-    public void SampleLoop_SplitsIntroLoopExit()
+    public void SampleLoop_SplitsIntroLoopAndExitAfter()
     {
         var document = MakeDocument(frames: 1000);
         document.SetSampleLoop(new WaveSelection(200, 800), markDirty: false);
@@ -51,6 +51,61 @@ public sealed class WaveOnlyPlanBuilderTests
         Assert.Equal(200, segments[1].EntryCueFrame);
         Assert.Equal(800, segments[1].ExitCueFrame);
         Assert.True(segments[1].LoopInfinite);
+        Assert.Equal(new WaveSelection(800, 1000), Assert.Single(WaveOnlyPlanBuilder.ImplicitExitRanges(document)));
+    }
+
+    [Theory]
+    [InlineData("loop")]
+    [InlineData("LOOP")]
+    [InlineData("Loop")]
+    public void LoopWord_WithoutDashL_IsNotALoopRegion(string comment)
+    {
+        var document = MakeDocument(frames: 1000);
+        document.TryAddMarker(200);
+        document.TrySetMarkerComment(200, comment);
+        document.TryAddMarker(400);
+        document.TryAddMarker(600);
+        Assert.Equal(comment, document.MarkerCommentAt(200));
+
+        var regions = WaveOnlyPlanBuilder.BuildRegions(document);
+
+        Assert.Equal(WaveOnlyRegionKind.Body, Assert.Single(regions).Kind);
+        Assert.Equal(0, regions[0].StartFrame);
+        Assert.Equal(1000, regions[0].EndFrame);
+    }
+
+    [Fact]
+    public void BareSpanAfterLoopMarker_BecomesExit()
+    {
+        var document = MakeDocument(frames: 1000);
+        document.TryAddMarker(200);
+        document.TrySetMarkerComment(200, "-L");
+        document.TryAddMarker(600);
+
+        var regions = WaveOnlyPlanBuilder.BuildRegions(document);
+
+        Assert.Equal(WaveOnlyRegionKind.Loop, regions.Single(region => region.StartFrame == 200).Kind);
+        Assert.Equal(WaveOnlyRegionKind.Exit, regions.Single(region => region.StartFrame == 600).Kind);
+        Assert.Equal(new WaveSelection(600, 1000), Assert.Single(WaveOnlyPlanBuilder.ImplicitExitRanges(document)));
+
+        var loop = Assert.Single(WaveOnlyPlanBuilder.Build(document).Segments, segment => segment.LoopInfinite);
+        Assert.Equal(200, loop.StartFrame);
+        Assert.Equal(1000, loop.EndFrame);
+        Assert.Equal(600, loop.ExitCueFrame);
+    }
+
+    [Fact]
+    public void ExplicitExit_IsNotImplicit()
+    {
+        var document = MakeDocument(frames: 1000);
+        document.TryAddMarker(200);
+        document.TrySetMarkerComment(200, "-L");
+        document.TryAddMarker(600);
+        document.TrySetMarkerComment(600, "-E");
+
+        Assert.Empty(WaveOnlyPlanBuilder.ImplicitExitRanges(document));
+        Assert.Equal(WaveOnlyRegionKind.Exit, WaveOnlyPlanBuilder.BuildRegions(document)
+            .Single(region => region.StartFrame == 600).Kind);
     }
 
     [Fact]
@@ -115,7 +170,7 @@ public sealed class WaveOnlyPlanBuilderTests
     [Fact]
     public void RemoveMarker_HasNoEffect_AllRegionsExported()
     {
-        // このアプリでは -R（除外）を機能させない。通常マーカーと同じ分割点になる。
+        // このアプリでは -R（除外）を機能させない。通常マーカーと同じ分割点にもしない。
         var document = MakeDocument(frames: 800);
         document.TryAddMarker(100);
         document.TrySetMarkerComment(100, "-R");
@@ -185,6 +240,82 @@ public sealed class WaveOnlyPlanBuilderTests
         Assert.Equal(2, segments.Count);
         Assert.Equal("tone_a", segments[0].Name);
         Assert.Equal("tone_b", segments[1].Name);
+    }
+
+    [Fact]
+    public void NamedMarkersOnly_ExportWholeFile()
+    {
+        var document = MakeDocument(frames: 1000);
+        document.TryAddMarker(200);
+        document.TrySetMarkerComment(200, "Hit");
+        document.TryAddMarker(400);
+        document.TrySetMarkerComment(400, "Fill");
+        document.TryAddMarker(600);
+
+        var segment = Assert.Single(WaveOnlyPlanBuilder.Build(document).Segments);
+        Assert.Equal(0, segment.StartFrame);
+        Assert.Equal(1000, segment.EndFrame);
+    }
+
+    [Fact]
+    public void LoopAndExit_KeepStructure_WithoutNamedMarkerCues()
+    {
+        var document = MakeDocument(frames: 1000);
+        document.TryAddMarker(100);
+        document.TrySetMarkerComment(100, "-L");
+        document.TryAddMarker(500);
+        document.TrySetMarkerComment(500, "-E");
+        document.TryAddMarker(700);
+        document.TrySetMarkerComment(700, "Fill");
+
+        var plan = WaveOnlyPlanBuilder.Build(document);
+        Assert.Equal(2, plan.Segments.Count);
+        var loop = Assert.Single(plan.Segments, segment => segment.LoopInfinite);
+        Assert.Equal(100, loop.StartFrame);
+        Assert.Equal(1000, loop.EndFrame);
+        Assert.Equal(500, loop.ExitCueFrame);
+    }
+
+    [Fact]
+    public void UnnamedMarker_DoesNotCreateItsOwnSegment()
+    {
+        var document = MakeDocument(frames: 1000);
+        document.TryAddMarker(50);
+        document.TryAddMarker(200);
+        document.TrySetMarkerComment(200, "-L");
+        document.TryAddMarker(400);
+        document.TryAddMarker(700);
+        document.TrySetMarkerComment(700, "Hit");
+
+        var plan = WaveOnlyPlanBuilder.Build(document);
+        Assert.Equal(2, plan.Segments.Count);
+        Assert.Equal(0, plan.Segments[0].StartFrame);
+        Assert.Equal(200, plan.Segments[0].EndFrame);
+        Assert.False(plan.Segments[0].LoopInfinite);
+
+        var loop = plan.Segments[1];
+        Assert.True(loop.LoopInfinite);
+        Assert.Equal(200, loop.StartFrame);
+        Assert.Equal(1000, loop.EndFrame);
+        Assert.Equal(400, loop.ExitCueFrame);
+    }
+
+    [Fact]
+    public void NamedMarker_BetweenAnacrusisAndLoop_DoesNotSplitSegment()
+    {
+        var document = MakeDocument(frames: 1000);
+        document.TryAddMarker(0);
+        document.TrySetMarkerComment(0, "-A");
+        document.TryAddMarker(100);
+        document.TrySetMarkerComment(100, "Hit");
+        document.TryAddMarker(200);
+        document.TrySetMarkerComment(200, "-L");
+
+        var segment = Assert.Single(WaveOnlyPlanBuilder.Build(document).Segments);
+        Assert.Equal(0, segment.StartFrame);
+        Assert.Equal(1000, segment.EndFrame);
+        Assert.Equal(200, segment.EntryCueFrame);
+        Assert.True(segment.LoopInfinite);
     }
 
     [Fact]

@@ -310,19 +310,25 @@ internal sealed partial class WaapiStatusBar : UserControl
             projectNameClickable: projectNameClickable && projectName.Length > 0);
     }
 
-    public void UpdateDisconnectedKeepTarget(string projectName, string keptPath) =>
+    public void UpdateDisconnectedKeepTarget(
+        string projectName,
+        string keptPath,
+        bool projectNameClickable = true) =>
         UpdateDisconnectedStatus(
             projectName,
             string.IsNullOrEmpty(keptPath) ? UiStrings.StatusNoneSelected : keptPath,
             keepTargetChecked: true,
-            projectNameClickable: projectName.Length > 0);
+            projectNameClickable: projectNameClickable && projectName.Length > 0);
 
-    public void UpdateDisconnectedLastProject(string projectName, string detailText) =>
+    public void UpdateDisconnectedLastProject(
+        string projectName,
+        string detailText,
+        bool projectNameClickable = true) =>
         UpdateDisconnectedStatus(
             projectName,
             string.IsNullOrEmpty(detailText) ? UiStrings.StatusDisconnected : detailText,
             keepTargetChecked: false,
-            projectNameClickable: projectName.Length > 0);
+            projectNameClickable: projectNameClickable && projectName.Length > 0);
 
     private void UpdateDisconnectedStatus(
         string projectName,

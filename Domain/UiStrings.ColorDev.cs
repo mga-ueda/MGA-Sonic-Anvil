@@ -93,7 +93,6 @@ internal static partial class UiStrings
             "RegionWaveFillAnacrusis" => Get("波形（-A）", "Wave (-A)"),
             "RegionWaveFillLoop" => Get("波形（-L）", "Wave (-L)"),
             "RegionWaveFillExit" => Get("波形（-E）", "Wave (-E)"),
-            "RegionWaveFillExcluded" => Get("波形（-R）", "Wave (-R)"),
             "Marker" => Get("通常", "Normal"),
             "MarkerSelected" => Get("選択", "Selected"),
             "MarkerSelectedBorder" => Get("選択枠", "Selected border"),

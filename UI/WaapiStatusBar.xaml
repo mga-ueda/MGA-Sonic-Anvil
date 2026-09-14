@@ -85,6 +85,7 @@
                         Width="{x:Static ui:DesignMetrics.StatusExportButtonWidth}"
                         Height="{x:Static ui:DesignMetrics.StatusExportButtonHeight}"
                         Content="{x:Static domain:UiStrings.ButtonExport}"
+                        Focusable="False"
                         Click="ExportButton_Click" />
     </StackPanel>
   </Grid>

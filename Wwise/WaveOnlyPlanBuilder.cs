@@ -6,17 +6,18 @@ namespace MgaSonicAnvil.Wwise;
 /// <summary>
 /// Wwise IM Importer の Wave 単体モードと同じリージョン組み立て。
 /// サンプルループがあればそれを優先し、なければマーカー接尾辞（-A/-L/-E）。
-/// -A は次、-E は直前（-L）と同一セグメント。Custom Cue は出さない。
-/// IM Importer の -R（除外）はこのアプリでは機能させない（通常マーカーと同じ分割点扱い）。
+/// -A は次、-E は直前（-L）と同一セグメント。
+/// -A / -L / -E だけが区間境界。無名／名前付きは区間も Custom Cue にもしない（IM Wave 単体と同じ）。
+/// -L（サンプルループ含む）の直後が接尾辞なしなら自動で -E。
+/// IM Importer の -R（除外）はこのアプリでは機能させない。
 /// </summary>
 internal static class WaveOnlyPlanBuilder
 {
-    private const string LoopKeyword = "Loop";
-
     public static WaveOnlyPlan Build(AudioDocument document)
     {
         var containerName = SanitizeWwiseName(ResolveContainerName(document));
-        var regions = BuildRegions(document);
+        var markers = EffectiveMarkers(document);
+        var regions = BuildRegions(document, markers);
         var named = AssignUniqueNames(regions, containerName);
         return new WaveOnlyPlan
         {
@@ -26,7 +27,12 @@ internal static class WaveOnlyPlanBuilder
         };
     }
 
-    internal static IReadOnlyList<WaveOnlyRegion> BuildRegions(AudioDocument document)
+    internal static IReadOnlyList<WaveOnlyRegion> BuildRegions(AudioDocument document) =>
+        BuildRegions(document, EffectiveMarkers(document));
+
+    private static IReadOnlyList<WaveOnlyRegion> BuildRegions(
+        AudioDocument document,
+        IReadOnlyList<WaveMarker> markers)
     {
         if (document.FrameCount < 2)
         {
@@ -38,7 +44,7 @@ internal static class WaveOnlyPlanBuilder
             return FromSampleLoop(document.SampleLoop, document.FrameCount);
         }
 
-        var fromMarkers = FromMarkers(document.Markers, document.FrameCount);
+        var fromMarkers = FromMarkers(markers, document.FrameCount);
         if (HasExportableSpecialRegions(fromMarkers))
         {
             return fromMarkers;
@@ -50,6 +56,24 @@ internal static class WaveOnlyPlanBuilder
         }
 
         return fromMarkers;
+    }
+
+    /// <summary>
+    /// 計画用。ドキュメント上まだ <c>-E</c> になっていない「-L の次」も Exit として扱う。
+    /// </summary>
+    private static IReadOnlyList<WaveMarker> EffectiveMarkers(AudioDocument document)
+    {
+        var snapshots = MarkerRoles.WithAutoExitComments(
+            document.SnapshotMarkers(),
+            document.SampleLoop,
+            document.FrameCount);
+        var markers = new WaveMarker[snapshots.Length];
+        for (var i = 0; i < snapshots.Length; i++)
+        {
+            markers[i] = new WaveMarker(i, snapshots[i].Frame, snapshots[i].Comment);
+        }
+
+        return markers;
     }
 
     private static string ResolveContainerName(AudioDocument document)
@@ -84,9 +108,10 @@ internal static class WaveOnlyPlanBuilder
         regions.Add(Make(start, end, WaveOnlyRegionKind.Loop, "L"));
         if (end < frameCount)
         {
-            regions.Add(Make(end, frameCount, WaveOnlyRegionKind.Exit, "E"));
+            regions.Add(Make(end, frameCount, WaveOnlyRegionKind.Body, "Body"));
         }
 
+        ApplyAutoExitAfterLoop(regions);
         return regions;
     }
 
@@ -159,11 +184,15 @@ internal static class WaveOnlyPlanBuilder
         }
         else
         {
-            var loopKeywordMarkers = new List<WaveMarker>();
             foreach (var marker in ordered)
             {
-                splits.Add(marker.Frame);
                 var role = MarkerRoles.FromComment(marker.Comment);
+                if (role is not (MarkerRole.Anacrusis or MarkerRole.Loop or MarkerRole.Exit))
+                {
+                    continue;
+                }
+
+                splits.Add(marker.Frame);
                 switch (role)
                 {
                     case MarkerRole.Loop:
@@ -176,14 +205,7 @@ internal static class WaveOnlyPlanBuilder
                         anacrusisStarts.Add(marker.Frame);
                         break;
                 }
-
-                if (ContainsLoopKeyword(marker.Comment) && role != MarkerRole.Loop)
-                {
-                    loopKeywordMarkers.Add(marker);
-                }
             }
-
-            ApplyLoopKeywordMarkers(loopKeywordMarkers, splits, loopStarts);
         }
 
         if (loopStarts.Count == 0
@@ -229,35 +251,40 @@ internal static class WaveOnlyPlanBuilder
         return regions;
     }
 
-    private static void ApplyLoopKeywordMarkers(
-        IReadOnlyList<WaveMarker> loopKeywordMarkers,
-        SortedSet<long> splits,
-        HashSet<long> loopStarts)
+    /// <summary>
+    /// 計画上の -E のうち、マーカーに明示の <c>-E</c> が無い区間。
+    /// サンプルループの余りや、-L 直後の無名区間の下塗りに使う。
+    /// </summary>
+    internal static IEnumerable<WaveSelection> ImplicitExitRanges(AudioDocument document)
     {
-        if (loopKeywordMarkers.Count == 0)
+        foreach (var region in BuildRegions(document))
         {
-            return;
+            if (region.Kind != WaveOnlyRegionKind.Exit)
+            {
+                continue;
+            }
+
+            if (HasExplicitExitAt(document.Markers, region.StartFrame))
+            {
+                continue;
+            }
+
+            yield return new WaveSelection(region.StartFrame, region.EndFrame);
+        }
+    }
+
+    private static bool HasExplicitExitAt(IReadOnlyList<WaveMarker> markers, long frame)
+    {
+        for (var i = 0; i < markers.Count; i++)
+        {
+            if (markers[i].Frame == frame
+                && MarkerRoles.FromComment(markers[i].Comment) == MarkerRole.Exit)
+            {
+                return true;
+            }
         }
 
-        if (loopKeywordMarkers.Count == 1)
-        {
-            loopStarts.Add(loopKeywordMarkers[0].Frame);
-            return;
-        }
-
-        for (var i = 0; i + 1 < loopKeywordMarkers.Count; i += 2)
-        {
-            ApplyLoopRange(
-                loopKeywordMarkers[i].Frame,
-                loopKeywordMarkers[i + 1].Frame,
-                splits,
-                loopStarts);
-        }
-
-        if (loopKeywordMarkers.Count % 2 == 1)
-        {
-            loopStarts.Add(loopKeywordMarkers[^1].Frame);
-        }
+        return false;
     }
 
     private static void ApplyLoopRange(
@@ -307,22 +334,16 @@ internal static class WaveOnlyPlanBuilder
     private static bool HasExactSuffix(string? comment)
     {
         var role = MarkerRoles.FromComment(comment);
-        return role is MarkerRole.Anacrusis or MarkerRole.Loop or MarkerRole.Exit or MarkerRole.Remove
-            && string.Equals((comment ?? string.Empty).Trim(), RoleTag(role), StringComparison.OrdinalIgnoreCase);
+        if (role is not (MarkerRole.Anacrusis or MarkerRole.Loop or MarkerRole.Exit or MarkerRole.Remove))
+        {
+            return false;
+        }
+
+        var trim = (comment ?? string.Empty).Trim();
+        return string.Equals(trim, RoleTag(role), StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string RoleTag(MarkerRole role) => role switch
-    {
-        MarkerRole.Anacrusis => "-A",
-        MarkerRole.Loop => "-L",
-        MarkerRole.Exit => "-E",
-        MarkerRole.Remove => "-R",
-        _ => string.Empty,
-    };
-
-    private static bool ContainsLoopKeyword(string? comment) =>
-        !string.IsNullOrEmpty(comment)
-        && comment.Contains(LoopKeyword, StringComparison.OrdinalIgnoreCase);
+    private static string RoleTag(MarkerRole role) => MarkerRoles.RoleTag(role);
 
     private static WaveOnlyRegion WholeFile(long frameCount) =>
         Make(0, frameCount, WaveOnlyRegionKind.Body, "Body");
@@ -355,7 +376,7 @@ internal static class WaveOnlyPlanBuilder
                 group.Add(source[i]);
             }
 
-            if (i + 1 < source.Length && source[i + 1].Kind == WaveOnlyRegionKind.Exit)
+            while (i + 1 < source.Length && source[i + 1].Kind == WaveOnlyRegionKind.Exit)
             {
                 i++;
                 group.Add(source[i]);
@@ -375,8 +396,9 @@ internal static class WaveOnlyPlanBuilder
             var entry = first.Kind == WaveOnlyRegionKind.Anacrusis && group.Count > 1
                 ? group[1].StartFrame
                 : first.StartFrame;
-            var exit = last.Kind == WaveOnlyRegionKind.Exit && group.Count > 1
-                ? last.StartFrame
+            var firstExit = group.Find(region => region.Kind == WaveOnlyRegionKind.Exit);
+            var exit = firstExit is not null && group.Count > 1
+                ? firstExit.StartFrame
                 : last.EndFrame;
             var name = UniqueName(used, BuildSegmentName(containerName, g, groups.Count));
             segments[g] = new WaveOnlySegment

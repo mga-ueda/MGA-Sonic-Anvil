@@ -299,6 +299,19 @@ public sealed class RegionTests
     }
 
     [Fact]
+    public void SetRegionName_KeepsLoopWord()
+    {
+        var document = MakeDocument(frames: 100);
+        document.SetRegions([new WaveSelection(10, 40)]);
+        var range = new WaveSelection(10, 40);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.SetRegionName(document, range, "loop")!);
+        Assert.Equal("loop", document.RegionName(range));
+        Assert.Equal(MarkerRole.None, MarkerRoles.FromComment(document.RegionName(range)));
+        Assert.Null(ProcessEdits.SetRegionName(document, range, "loop"));
+    }
+
+    [Fact]
     public void FlagsOverlapX_DetectsHorizontalOverlap()
     {
         Assert.True(WaveformView.FlagsOverlapX(10, 20, 20, 10));

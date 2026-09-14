@@ -40,14 +40,14 @@ internal static partial class UiStrings
         "WAAPI がオフです。レベルメーター上の WAAPI をオンにすると接続します。",
         "WAAPI is off. Turn on WAAPI above the level meter to connect.");
     public static string TipExport => Get(
-        "現在の波形を Wwise Originals へ書き、Music Playlist Container としてインポートします (Ctrl+Shift+E)。\nWAAPI 接続中だけ有効。Wave 単体モード（マーカー / サンプルループ。Custom Cue は出しません）。",
-        "Write the current wave into Wwise Originals and import it as a Music Playlist Container (Ctrl+Shift+E).\nEnabled only while WAAPI is connected. Wave-only mode (markers / sample loop. No Custom Cues).");
+        "現在の波形を Wwise Originals へ書き、Music Playlist Container としてインポートします (Ctrl+Shift+E)。\nWAAPI 接続中だけ有効。Wave 単体モード（-A / -L / -E とサンプルループ。Custom Cue にはしない）。",
+        "Write the current wave into Wwise Originals and import it as a Music Playlist Container (Ctrl+Shift+E).\nEnabled only while WAAPI is connected. Wave-only mode (-A / -L / -E and the sample loop. Markers are not Custom Cues).");
     public static string TipWwiseProjectName => Get(
         "接続中の Wwise プロジェクトです。",
         "The connected Wwise project.");
     public static string TipWwiseProjectNameOpen => Get(
-        "この Wwise プロジェクトを開きます（既に開いていれば前面）。",
-        "Open this Wwise project (or bring it to the front if it is already open).");
+        "この Wwise プロジェクトを開きます（既に開いていれば前面）。未接続でも、覚えた .wproj があれば起動します。関連付けが Launcher でも、版に合う Wwise.exe を直接起動します。",
+        "Open this Wwise project (or bring it to the front if it is already open). Works while disconnected if a remembered .wproj is available. Even if the association is the Launcher, the matching Wwise.exe is started directly.");
     public static string TipOutputFolder => Get(
         "波形の書き出し先フォルダを選択します（接続中 Wwise プロジェクトの Originals 配下）。",
         "Choose the wave export folder (under Originals of the connected Wwise project).");
@@ -87,6 +87,49 @@ internal static partial class UiStrings
     public static string LogKeepTargetReselectFailed(string message) => Format(
         "Keep Target の再選択に失敗: {0}",
         "Failed to reselect Keep Target: {0}",
+        message);
+
+    public static string LogWwiseProjectPathMissing => Get(
+        "Wwise プロジェクトのファイルパスが不明なため開けません。Wwise でプロジェクトを開いた状態で一度接続してください。",
+        "Cannot open the Wwise project because its file path is unknown. Connect once with the project open in Wwise.");
+
+    public static string LogWwiseProjectFileMissing(string path) => Format(
+        "Wwise プロジェクトファイルが見つかりません: {0}",
+        "Wwise project file not found: {0}",
+        path);
+
+    public static string LogWwiseProjectBroughtToFront(string projectName) => Format(
+        "Wwise を前面に表示しました: {0}",
+        "Brought Wwise to the front: {0}",
+        projectName);
+
+    public static string LogWwiseBroughtToFront => Get(
+        "Wwise を前面にしました。",
+        "Brought Wwise to the foreground.");
+
+    public static string LogWwiseBringToFrontFailed(string detail) => Format(
+        "Wwise の前面化に失敗しました: {0}",
+        "Failed to bring Wwise to the foreground: {0}",
+        detail);
+
+    public static string LogWwiseProjectOpened(string projectName) => Format(
+        "Wwise プロジェクトを開きました: {0}",
+        "Opened Wwise project: {0}",
+        projectName);
+
+    public static string LogWwiseProjectOpenRequestFailed(string detail) => Format(
+        "Wwise への WAAPI 呼び出しに失敗しました（起動済みのため二重起動は行いません）: {0}",
+        "WAAPI call to Wwise failed (skipped launching another instance because Wwise is already running): {0}",
+        detail);
+
+    public static string LogWwiseProjectShellOpen(string projectName) => Format(
+        "Wwise プロジェクトを起動しました: {0}",
+        "Launched Wwise project: {0}",
+        projectName);
+
+    public static string LogWwiseProjectOpenFailed(string message) => Format(
+        "Wwise プロジェクトを開けませんでした: {0}",
+        "Failed to open Wwise project: {0}",
         message);
 
     public static string PreflightNoDocument => Get("開いている波形がありません。", "No wave is open.");

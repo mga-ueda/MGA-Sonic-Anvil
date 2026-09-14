@@ -81,7 +81,6 @@ internal static class ColorDevCatalog
             ("RegionWaveFillAnacrusisBrush", ColorDevGroup.Region),
             ("RegionWaveFillLoopBrush", ColorDevGroup.Region),
             ("RegionWaveFillExitBrush", ColorDevGroup.Region),
-            ("RegionWaveFillExcludedBrush", ColorDevGroup.Region),
 
             ("MarkerBrush", ColorDevGroup.Marker),
             ("MarkerSelectedBrush", ColorDevGroup.Marker),

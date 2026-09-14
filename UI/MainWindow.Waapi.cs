@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using System.IO;
+using System.Windows;
 using System.Windows.Threading;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
@@ -28,6 +28,8 @@ public partial class MainWindow
     private string _keptTargetProjectFilePath = string.Empty;
     private string _lastKnownWwiseProjectFilePath = string.Empty;
     private string _lastKnownWwiseProjectName = string.Empty;
+    private bool _wwiseProjectActivateBusy;
+    private bool _yieldedAlwaysOnTopToWwise;
 
     private void PlaceWaapiToggle()
     {
@@ -67,6 +69,7 @@ public partial class MainWindow
         WaapiBar.ProjectNameClick += (_, _) => RequestOpenOrFocusWwiseProject();
         WaapiBar.ExportClick += (_, _) => _ = ExportToWwiseAsync();
         WaapiBar.OutputFolderBrowse += (_, _) => BrowseExportOutputFolder();
+        Activated += (_, _) => RestoreAlwaysOnTopAfterWwiseFocus();
         _waapiPollTimer.Tick += async (_, _) => await PollWaapiAsync().ConfigureAwait(true);
 
         _waapiPanelVisible = settings.WaapiPanelVisible;
@@ -301,32 +304,98 @@ public partial class MainWindow
     {
         SuggestOriginalsIfOutputEmpty();
         var result = _waapiLastResult;
+        var rememberedName = ResolveRememberedWwiseProjectDisplayName(allowUnnamed: false);
+        var displayName = result is { ProjectName.Length: > 0 }
+            ? result.ProjectName
+            : rememberedName;
+        var launchPath = ResolveWwiseProjectFilePathForLaunch();
+        var hasLaunchPath = launchPath.Length > 0;
+        var clickable = hasLaunchPath && displayName.Length > 0;
+
         if (result is { Ok: true })
         {
-            var path = GetDisplayTargetPath();
             WaapiBar.UpdateSelection(
                 result.WwiseVersion,
-                result.ProjectName.Length > 0 ? result.ProjectName : _lastKnownWwiseProjectName,
-                path,
+                displayName,
+                GetDisplayTargetPath(),
                 _keepTarget,
-                projectNameClickable: _lastKnownWwiseProjectFilePath.Length > 0);
+                projectNameClickable: clickable);
             return;
         }
 
         if (_keepTarget)
         {
             WaapiBar.UpdateDisconnectedKeepTarget(
-                _lastKnownWwiseProjectName,
-                _keptTargetPath);
+                ResolveRememberedWwiseProjectDisplayName(allowUnnamed: true),
+                _keptTargetPath,
+                projectNameClickable: hasLaunchPath);
             return;
         }
 
-        if (_lastKnownWwiseProjectName.Length > 0)
+        if (displayName.Length > 0)
         {
             WaapiBar.UpdateDisconnectedLastProject(
-                _lastKnownWwiseProjectName,
-                result?.Message ?? Domain.UiStrings.StatusDisconnected);
+                displayName,
+                result?.Message ?? Domain.UiStrings.StatusDisconnected,
+                projectNameClickable: clickable);
         }
+    }
+
+    private string ResolveRememberedWwiseProjectDisplayName(bool allowUnnamed)
+    {
+        if (_lastKnownWwiseProjectName.Length > 0)
+        {
+            return _lastKnownWwiseProjectName;
+        }
+
+        var derived = DeriveWwiseProjectDisplayName(
+            _keptTargetProjectFilePath.Length > 0
+                ? _keptTargetProjectFilePath
+                : _lastKnownWwiseProjectFilePath);
+        if (derived.Length > 0)
+        {
+            return derived;
+        }
+
+        return allowUnnamed ? UiStrings.LabelUnnamedProject : string.Empty;
+    }
+
+    private static string DeriveWwiseProjectDisplayName(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return Path.GetFileNameWithoutExtension(filePath.Trim().Trim('"')) ?? string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private string ResolveWwiseProjectFilePathForLaunch()
+    {
+        if (WaapiJson.LooksLikeProjectFilePath(_keptTargetProjectFilePath))
+        {
+            return _keptTargetProjectFilePath.Trim().Trim('"');
+        }
+
+        if (WaapiJson.LooksLikeProjectFilePath(_lastKnownWwiseProjectFilePath))
+        {
+            return _lastKnownWwiseProjectFilePath.Trim().Trim('"');
+        }
+
+        var live = _waapiLastResult?.ProjectFilePath ?? string.Empty;
+        if (WaapiJson.LooksLikeProjectFilePath(live))
+        {
+            return live.Trim().Trim('"');
+        }
+
+        return WwiseProjectActivator.TryFindProjectFileNearDirectory(WaapiBar.OutputDirectory);
     }
 
     private void SuggestOriginalsIfOutputEmpty()
@@ -447,33 +516,137 @@ public partial class MainWindow
 
     private void RequestOpenOrFocusWwiseProject()
     {
-        var projectPath = _lastKnownWwiseProjectFilePath;
-        if (!WaapiJson.LooksLikeProjectFilePath(projectPath) || !System.IO.File.Exists(projectPath))
+        if (_wwiseProjectActivateBusy)
         {
             return;
         }
 
-        _ = BringWwiseToFrontAsync(projectPath);
+        var path = ResolveWwiseProjectFilePathForLaunch();
+        if (path.Length == 0)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.LogWwiseProjectPathMissing,
+                UiStrings.LabelWwise,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        RememberResolvedLaunchPath(path);
+        YieldAlwaysOnTopToWwise();
+        // クリック直後のフォアグラウンド権限のうちに、既に開いている Authoring を前面化する。
+        WwiseProjectActivator.TryFocusExistingAuthoring(path);
+        _ = OpenOrFocusWwiseProjectAsync(path);
     }
 
+    private void RememberResolvedLaunchPath(string path)
+    {
+        if (string.Equals(_lastKnownWwiseProjectFilePath, path, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _lastKnownWwiseProjectFilePath = path;
+        if (_lastKnownWwiseProjectName.Length == 0)
+        {
+            _lastKnownWwiseProjectName = DeriveWwiseProjectDisplayName(path);
+        }
+
+        PersistWaapiSettings();
+    }
+
+    private void YieldAlwaysOnTopToWwise()
+    {
+        if (!Topmost)
+        {
+            return;
+        }
+
+        _yieldedAlwaysOnTopToWwise = true;
+        Topmost = false;
+    }
+
+    private void RestoreAlwaysOnTopAfterWwiseFocus()
+    {
+        if (!_yieldedAlwaysOnTopToWwise || !AppStorage.Settings.AlwaysOnTop)
+        {
+            return;
+        }
+
+        _yieldedAlwaysOnTopToWwise = false;
+        Topmost = true;
+    }
+
+    private async Task OpenOrFocusWwiseProjectAsync(string? projectFilePath = null)
+    {
+        if (_wwiseProjectActivateBusy)
+        {
+            return;
+        }
+
+        var path = projectFilePath is { Length: > 0 }
+            ? projectFilePath
+            : ResolveWwiseProjectFilePathForLaunch();
+        if (path.Length == 0)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.LogWwiseProjectPathMissing,
+                UiStrings.LabelWwise,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        RememberResolvedLaunchPath(path);
+        _wwiseProjectActivateBusy = true;
+        try
+        {
+            YieldAlwaysOnTopToWwise();
+            var (ok, message) = await WwiseProjectActivator.OpenOrFocusAsync(_waapiSettings, path)
+                .ConfigureAwait(true);
+            if (ok)
+            {
+                YieldAlwaysOnTopToWwise();
+                WwiseProjectActivator.TryFocusExistingAuthoring(path);
+            }
+            else if (message.Length > 0 && !_closing)
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    message,
+                    UiStrings.LabelWwise,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+        finally
+        {
+            _wwiseProjectActivateBusy = false;
+        }
+    }
+
+    /// <summary>EXPORT 後の Auto Active。失敗しても EXPORT 自体は止めない。</summary>
     private async Task BringWwiseToFrontAsync(string? projectPath = null)
     {
         try
         {
-            if (_waapiLastResult?.Ok == true)
+            var path = projectPath is { Length: > 0 }
+                ? projectPath
+                : ResolveWwiseProjectFilePathForLaunch();
+            YieldAlwaysOnTopToWwise();
+            if (WaapiJson.LooksLikeProjectFilePath(path))
             {
-                using var client = new WaapiHttpClient(
-                    _waapiSettings.Url,
-                    TimeSpan.FromMilliseconds(_waapiSettings.TimeoutMs));
-                await WaapiCoreCalls.BringToForegroundAsync(client).ConfigureAwait(true);
+                WwiseProjectActivator.TryFocusExistingAuthoring(path);
+                await WwiseProjectActivator.OpenOrFocusAsync(_waapiSettings, path)
+                    .ConfigureAwait(true);
+                WwiseProjectActivator.TryFocusExistingAuthoring(path);
                 return;
             }
 
-            var path = projectPath ?? _lastKnownWwiseProjectFilePath;
-            if (WaapiJson.LooksLikeProjectFilePath(path) && System.IO.File.Exists(path))
-            {
-                Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
-            }
+            await WwiseProjectActivator.BringToForegroundAsync(_waapiSettings)
+                .ConfigureAwait(true);
         }
         catch
         {

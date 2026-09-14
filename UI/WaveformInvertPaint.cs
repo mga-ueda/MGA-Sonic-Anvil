@@ -1,6 +1,7 @@
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
+using MgaSonicAnvil.Wwise;
 
 namespace MgaSonicAnvil.UI;
 
@@ -46,14 +47,12 @@ internal static class WaveformInvertPaint
         var anacrusis = ToBgra(Theme.Get("RegionWaveFillAnacrusisBrush"));
         var loop = ToBgra(Theme.Get("RegionWaveFillLoopBrush"));
         var exit = ToBgra(Theme.Get("RegionWaveFillExitBrush"));
-        var remove = ToBgra(Theme.Get("RegionWaveFillExcludedBrush"));
         var regions = document.Regions;
         var sample = document.SampleLoop;
         var hasSampleLoop = !sample.IsEmpty;
         var frameCount = document.FrameCount;
         // マーカー役割（コメントの文字列解析）は列×マーカー数で繰り返さず、一度だけ解決する。
-        var underSpans = CollectUnderWaveRoleSpans(document.Markers, frameCount, anacrusis, loop, exit);
-        var removeSpans = CollectRemoveSpans(document.Markers, frameCount, remove);
+        var underSpans = CollectUnderWaveRoleSpans(document, anacrusis, loop, exit);
 
         for (var x = 0; x < width; x++)
         {
@@ -79,12 +78,10 @@ internal static class WaveformInvertPaint
                 columnBack = BlendOver(columnBack, underRole);
             }
 
-            var removeOverlay = SpanBgraAt(removeSpans, frame);
-            var swappedBack = removeOverlay != 0 ? BlendOver(columnBack, removeOverlay) : columnBack;
             for (var y = 0; y < height; y++)
             {
                 var index = y * width + x;
-                pixels[index] = InvertPixel(pixels[index], swappedBack, waveColorByY[y]);
+                pixels[index] = InvertPixel(pixels[index], columnBack, waveColorByY[y]);
             }
         }
     }
@@ -107,13 +104,14 @@ internal static class WaveformInvertPaint
     private readonly record struct RoleSpan(long Start, long End, int Bgra);
 
     private static List<RoleSpan> CollectUnderWaveRoleSpans(
-        IReadOnlyList<WaveMarker> markers,
-        long frameCount,
+        AudioDocument document,
         int anacrusis,
         int loop,
         int exit)
     {
         var spans = new List<RoleSpan>();
+        var markers = document.Markers;
+        var frameCount = document.FrameCount;
         for (var i = 0; i < markers.Count; i++)
         {
             var role = MarkerRoles.FromComment(markers[i].Comment);
@@ -133,24 +131,9 @@ internal static class WaveformInvertPaint
             spans.Add(new RoleSpan(markers[i].Frame, end, bgra));
         }
 
-        return spans;
-    }
-
-    private static List<RoleSpan> CollectRemoveSpans(
-        IReadOnlyList<WaveMarker> markers,
-        long frameCount,
-        int remove)
-    {
-        var spans = new List<RoleSpan>();
-        for (var i = 0; i < markers.Count; i++)
+        foreach (var range in WaveOnlyPlanBuilder.ImplicitExitRanges(document))
         {
-            if (MarkerRoles.FromComment(markers[i].Comment) != MarkerRole.Remove)
-            {
-                continue;
-            }
-
-            var end = i + 1 < markers.Count ? markers[i + 1].Frame : frameCount;
-            spans.Add(new RoleSpan(markers[i].Frame, end, remove));
+            spans.Add(new RoleSpan(range.StartFrame, range.EndFrame, exit));
         }
 
         return spans;

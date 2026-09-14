@@ -160,8 +160,6 @@ internal sealed class OverviewView : FrameworkElement
             dc.DrawImage(_bitmap, bounds);
         }
 
-        MarkerRolePaint.DrawRemoveOverlays(dc, _document, bounds, 0, _document.FrameCount);
-
         DrawInvertedSelection(dc, bounds);
         DrawVisibleWindow(dc, bounds);
         DrawMarkerLines(dc, bounds);

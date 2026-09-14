@@ -24,7 +24,15 @@ internal static partial class ProcessEdits
             after = WaveSelection.Empty;
         }
 
-        var command = new SetSampleLoopCommand(before, after, SampleLoopSummary(document.SampleRate, after));
+        var markersBefore = document.SnapshotMarkers();
+        var markersAfter = MarkerRoles.WithAutoExitComments(markersBefore, after, document.FrameCount);
+        var markersChanged = !markersBefore.AsSpan().SequenceEqual(markersAfter);
+        var command = new SetSampleLoopCommand(
+            before,
+            after,
+            SampleLoopSummary(document.SampleRate, after),
+            markersChanged ? markersBefore : null,
+            markersChanged ? markersAfter : null);
         var sourceRate = document.SampleRate;
         var sourceAfter = after;
         // 再適用は「after の状態にする」。トグルではないので同じ範囲でも解除にならない。
@@ -38,10 +46,7 @@ internal static partial class ProcessEdits
                 return null;
             }
 
-            return new SetSampleLoopCommand(
-                target.SampleLoop,
-                mapped,
-                SampleLoopSummary(target.SampleRate, mapped));
+            return SetSampleLoop(target, mapped);
         };
         command.Persist = HistoryRecipes.Range(HistoryRecipes.SetSampleLoop, sourceRate, sourceAfter);
         return command;
@@ -182,9 +187,24 @@ internal static partial class ProcessEdits
 
     public static IEditCommand AddMarker(AudioDocument document, long frame)
     {
+        var before = document.SnapshotMarkers();
+        var added = new MarkerSnapshot[before.Length + 1];
+        before.CopyTo(added, 0);
+        added[^1] = new MarkerSnapshot(frame, string.Empty);
+        var after = MarkerRoles.WithAutoExitComments(added, document.SampleLoop, document.FrameCount);
+        var labeled = after.Any(marker => marker.Frame == frame && marker.Comment.Length > 0);
+        if (labeled)
+        {
+            var replace = ApplyMarkers(document, before, after, "Add Marker");
+            if (replace is not null)
+            {
+                return replace;
+            }
+        }
+
         var command = new AddMarkerCommand(
             frame,
-            document.SnapshotMarkers(),
+            before,
             UiStrings.EditHistoryPoint(UiStrings.EditHistoryName("Add Marker"), document.SampleRate, frame));
         var sourceRate = document.SampleRate;
         command.Replay = target =>
@@ -222,9 +242,15 @@ internal static partial class ProcessEdits
     public static IEditCommand? ApplyMarkers(
         AudioDocument document,
         MarkerSnapshot[] before,
-        MarkerSnapshot[] after)
+        MarkerSnapshot[] after,
+        string name = "Add Marker")
     {
-        var command = ReplaceMarkers(before, after, "Add Marker", document.SampleRate);
+        if (after.Length > before.Length)
+        {
+            after = MarkerRoles.WithAutoExitComments(after, document.SampleLoop, document.FrameCount);
+        }
+
+        var command = ReplaceMarkers(before, after, name, document.SampleRate);
         if (command is null)
         {
             return null;
@@ -320,7 +346,10 @@ internal static partial class ProcessEdits
         return mapped;
     }
 
-    public static IEditCommand? SetMarkerComment(AudioDocument document, long frame, string comment)
+    public static IEditCommand? SetMarkerComment(
+        AudioDocument document,
+        long frame,
+        string comment)
     {
         var before = document.MarkerCommentAt(frame);
         var after = MarkerRoles.Normalize(comment);
@@ -329,6 +358,29 @@ internal static partial class ProcessEdits
             return null;
         }
 
+        if (MarkerRoles.FromComment(after) == MarkerRole.Loop)
+        {
+            var beforeMarkers = document.SnapshotMarkers();
+            var edited = new MarkerSnapshot[beforeMarkers.Length];
+            for (var i = 0; i < beforeMarkers.Length; i++)
+            {
+                edited[i] = beforeMarkers[i].Frame == frame
+                    ? beforeMarkers[i] with { Comment = after }
+                    : beforeMarkers[i];
+            }
+
+            var next = MarkerRoles.WithAutoExitComments(edited, document.SampleLoop, document.FrameCount);
+            if (!beforeMarkers.AsSpan().SequenceEqual(next))
+            {
+                var replace = ApplyMarkers(document, beforeMarkers, next, "Marker Comment");
+                if (replace is not null)
+                {
+                    return replace;
+                }
+            }
+        }
+
+        var extra = UiStrings.EditHistoryQuote(after);
         var command = new SetMarkerCommentCommand(
             frame,
             before,
@@ -337,7 +389,7 @@ internal static partial class ProcessEdits
                 UiStrings.EditHistoryName("Marker Comment"),
                 document.SampleRate,
                 frame,
-                UiStrings.EditHistoryQuote(after)));
+                extra));
         var sourceRate = document.SampleRate;
         command.Replay = target =>
             SetMarkerComment(target, EditReplay.MapFrame(frame, sourceRate, target), after);
@@ -351,7 +403,10 @@ internal static partial class ProcessEdits
         return command;
     }
 
-    public static IEditCommand? SetRegionName(AudioDocument document, WaveSelection range, string name)
+    public static IEditCommand? SetRegionName(
+        AudioDocument document,
+        WaveSelection range,
+        string name)
     {
         var before = document.RegionName(range);
         var after = MarkerRoles.Normalize(name);
@@ -360,6 +415,7 @@ internal static partial class ProcessEdits
             return null;
         }
 
+        var extra = UiStrings.EditHistoryQuote(after);
         var command = new SetRegionNameCommand(
             range,
             before,
@@ -369,7 +425,7 @@ internal static partial class ProcessEdits
                 document.SampleRate,
                 range.StartFrame,
                 range.EndFrame,
-                UiStrings.EditHistoryQuote(after)));
+                extra));
         var sourceRate = document.SampleRate;
         command.Replay = target =>
             SetRegionName(target, EditReplay.MapRange(range, sourceRate, target), after);

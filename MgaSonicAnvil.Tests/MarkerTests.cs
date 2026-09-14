@@ -206,6 +206,11 @@ public sealed class MarkerTests
     [InlineData("-a", "Anacrusis")]
     [InlineData("ーL", "Loop")]
     [InlineData("loop -L", "Loop")]
+    [InlineData("loop", "None")]
+    [InlineData("LOOP", "None")]
+    [InlineData("verse loop", "None")]
+    [InlineData("looping", "None")]
+    [InlineData("loop -E", "Exit")]
     [InlineData("-E", "Exit")]
     [InlineData("-e tail", "Exit")]
     [InlineData("-R", "Remove")]
@@ -223,6 +228,11 @@ public sealed class MarkerTests
     [InlineData("-l", "-L")]
     [InlineData("-e tail", "-E tail")]
     [InlineData("loop -r", "loop -R")]
+    [InlineData("loop", "loop")]
+    [InlineData("LOOP", "LOOP")]
+    [InlineData("verse loop", "verse loop")]
+    [InlineData("loop -L", "loop -L")]
+    [InlineData("loop -l", "loop -L")]
     [InlineData("ーl", "ーL")]
     [InlineData("-a foo -l", "-A foo -L")]
     [InlineData("-A", "-A")]
@@ -241,6 +251,84 @@ public sealed class MarkerTests
         document.TryAddMarker(20);
         Assert.True(document.TrySetMarkerComment(20, "-a pickup"));
         Assert.Equal("-A pickup", document.Markers[0].Comment);
+    }
+
+    [Fact]
+    public void SetMarkerComment_LoopRewritesNextBareMarkerToExit()
+    {
+        var document = MakeDocument(frames: 100);
+        document.TryAddMarker(20);
+        document.TryAddMarker(60);
+        document.TrySetMarkerComment(60, "tail");
+        var history = new EditHistory();
+        var command = ProcessEdits.SetMarkerComment(document, 20, "-L");
+        Assert.NotNull(command);
+        history.Do(document, command);
+
+        Assert.Equal("-L", document.MarkerCommentAt(20));
+        Assert.Equal("-E", document.MarkerCommentAt(60));
+        Assert.True(history.Undo(document));
+        Assert.Equal(string.Empty, document.MarkerCommentAt(20));
+        Assert.Equal("tail", document.MarkerCommentAt(60));
+    }
+
+    [Fact]
+    public void AddMarker_AfterLoopBecomesExit()
+    {
+        var document = MakeDocument(frames: 100);
+        document.TryAddMarker(20);
+        document.TrySetMarkerComment(20, "-L");
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.AddMarker(document, 60));
+
+        Assert.Equal("-E", document.MarkerCommentAt(60));
+        Assert.True(history.Undo(document));
+        Assert.False(document.HasMarkerAt(60));
+    }
+
+    [Fact]
+    public void SetSampleLoop_RewritesMarkerAtLoopEndToExit()
+    {
+        var document = MakeDocument(frames: 100);
+        document.TryAddMarker(20);
+        document.TryAddMarker(80);
+        var history = new EditHistory();
+        var command = ProcessEdits.SetSampleLoop(document, new WaveSelection(20, 80));
+        Assert.NotNull(command);
+        history.Do(document, command);
+
+        Assert.Equal(string.Empty, document.MarkerCommentAt(20));
+        Assert.Equal("-E", document.MarkerCommentAt(80));
+        Assert.True(history.Undo(document));
+        Assert.Equal(string.Empty, document.MarkerCommentAt(80));
+    }
+
+    [Fact]
+    public void WithAutoExitComments_DoesNotOverwriteOtherRoles()
+    {
+        var markers = new MarkerSnapshot[]
+        {
+            new(20, "-L"),
+            new(60, "-A"),
+        };
+        var after = MarkerRoles.WithAutoExitComments(markers, WaveSelection.Empty, 100);
+        Assert.Equal("-A", after[1].Comment);
+    }
+
+    [Fact]
+    public void SetMarkerComment_KeepsLoopWord()
+    {
+        var document = MakeDocument(frames: 100);
+        document.TryAddMarker(20);
+        var history = new EditHistory();
+        var command = ProcessEdits.SetMarkerComment(document, 20, "LOOP");
+        Assert.NotNull(command);
+        history.Do(document, command);
+
+        Assert.Equal("LOOP", document.MarkerCommentAt(20));
+        Assert.Equal(MarkerRole.None, MarkerRoles.FromComment(document.MarkerCommentAt(20)));
+        Assert.True(history.Undo(document));
+        Assert.Equal(string.Empty, document.MarkerCommentAt(20));
     }
 
     [Fact]

@@ -46,7 +46,7 @@ internal sealed class EmbeddedAudioMeta
                 snapshots[i] = new MarkerSnapshot(Markers[i].Frame, Markers[i].Comment);
             }
 
-            document.ReplaceMarkers(snapshots, markDirty: false);
+            document.ReplaceMarkers(snapshots, markDirty: false, normalizeComments: false);
         }
 
         if (SampleLoop is { } loop)
@@ -61,10 +61,12 @@ internal sealed class EmbeddedAudioMeta
             {
                 ranges[i] = new WaveRegion(
                     new WaveSelection(Regions[i].StartFrame, Regions[i].EndFrame),
-                    MarkerRoles.Normalize(Regions[i].Name));
+                    Regions[i].Name);
             }
 
             document.SetRegions(ranges, markDirty: false);
         }
+
+        document.ApplyAutoExitComments(markDirty: false);
     }
 }

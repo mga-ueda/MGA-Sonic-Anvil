@@ -46,7 +46,6 @@
     <SolidColorBrush x:Key="RegionWaveFillAnacrusisBrush" Color="#FF344620" />
     <SolidColorBrush x:Key="RegionWaveFillLoopBrush" Color="#FF1A3E5E" />
     <SolidColorBrush x:Key="RegionWaveFillExitBrush" Color="#FF441E1E" />
-    <SolidColorBrush x:Key="RegionWaveFillExcludedBrush" Color="#66C8C8C8" />
 
     <SolidColorBrush x:Key="LevelMeterTrackBackBrush" Color="#FF242629" />
     <SolidColorBrush x:Key="LevelMeterTrackBorderBrush" Color="#FF1A221A" />

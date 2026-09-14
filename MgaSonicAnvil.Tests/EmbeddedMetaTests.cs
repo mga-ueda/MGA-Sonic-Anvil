@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
@@ -79,6 +80,59 @@ public sealed class EmbeddedMetaTests
             var document = AudioCodec.Load(path);
             Assert.Empty(document.Markers);
             Assert.Equal(new WaveSelection(12, 32), document.SampleLoop);
+            Assert.False(document.IsDirty);
+        }
+        finally
+        {
+            TryDelete(path);
+        }
+    }
+
+    [Fact]
+    public void Load_RewritesBareMarkerAfterLoopToExit()
+    {
+        var path = TempPath("cue-auto-e");
+        try
+        {
+            WriteWave(
+                path,
+                frames: 80,
+                cues:
+                [
+                    new Cue(1, 10, "-L", 0),
+                    new Cue(2, 40, "", 0),
+                ]);
+
+            var document = AudioCodec.Load(path);
+            Assert.Equal("-L", document.Markers[0].Comment);
+            Assert.Equal("-E", document.Markers[1].Comment);
+            Assert.False(document.IsDirty);
+        }
+        finally
+        {
+            TryDelete(path);
+        }
+    }
+
+    [Fact]
+    public void Load_KeepsLoopWord()
+    {
+        var path = TempPath("cue-loop");
+        try
+        {
+            WriteWave(
+                path,
+                frames: 80,
+                cues:
+                [
+                    new Cue(1, 10, "LOOP", 0),
+                    new Cue(2, 40, "verse loop", 0),
+                ]);
+
+            var document = AudioCodec.Load(path);
+            Assert.Equal("LOOP", document.Markers[0].Comment);
+            Assert.Equal("verse loop", document.Markers[1].Comment);
+            Assert.Equal(MarkerRole.None, MarkerRoles.FromComment(document.Markers[0].Comment));
             Assert.False(document.IsDirty);
         }
         finally
@@ -191,7 +245,7 @@ public sealed class EmbeddedMetaTests
             Assert.Equal(5, document.Markers[0].Frame);
             Assert.Equal("start", document.Markers[0].Comment);
             Assert.Equal(25, document.Markers[1].Frame);
-            Assert.Equal("end", document.Markers[1].Comment);
+            Assert.Equal("-E", document.Markers[1].Comment);
             Assert.Equal(new WaveSelection(5, 25), document.SampleLoop);
         }
         finally

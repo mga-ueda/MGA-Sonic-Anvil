@@ -2,10 +2,11 @@ using System.Windows;
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
+using MgaSonicAnvil.Wwise;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>IM Importer と同じリージョン下塗り（-A/-L/-E）と -R の重ね。</summary>
+/// <summary>IM Importer と同じリージョン下塗り（-A/-L/-E）。-R は色付けしない。</summary>
 internal static class MarkerRolePaint
 {
     public static void DrawBackgrounds(
@@ -15,44 +16,17 @@ internal static class MarkerRolePaint
         double viewStart,
         double viewSpan)
     {
-        Draw(dc, document, wave, viewStart, viewSpan, overlayRemove: false);
-    }
-
-    public static void DrawRemoveOverlays(
-        DrawingContext dc,
-        AudioDocument document,
-        Rect wave,
-        double viewStart,
-        double viewSpan)
-    {
-        Draw(dc, document, wave, viewStart, viewSpan, overlayRemove: true);
-    }
-
-    private static void Draw(
-        DrawingContext dc,
-        AudioDocument document,
-        Rect wave,
-        double viewStart,
-        double viewSpan,
-        bool overlayRemove)
-    {
-        var markers = document.Markers;
-        if (markers.Count == 0 || wave.Width <= 1 || wave.Height <= 1 || viewSpan <= 0)
+        if (wave.Width <= 1 || wave.Height <= 1 || viewSpan <= 0)
         {
             return;
         }
 
+        var markers = document.Markers;
         var frames = document.FrameCount;
         for (var i = 0; i < markers.Count; i++)
         {
             var role = MarkerRoles.FromComment(markers[i].Comment);
-            if (role == MarkerRole.None)
-            {
-                continue;
-            }
-
-            var isRemove = role == MarkerRole.Remove;
-            if (isRemove != overlayRemove)
+            if (role is not (MarkerRole.Anacrusis or MarkerRole.Loop or MarkerRole.Exit))
             {
                 continue;
             }
@@ -75,6 +49,11 @@ internal static class MarkerRolePaint
             x1 = Math.Clamp(x1, wave.X, wave.Right);
             var width = Math.Max(1, x1 - x0);
             dc.DrawRectangle(BrushOf(role), null, new Rect(x0, wave.Y, width, wave.Height));
+        }
+
+        foreach (var range in WaveOnlyPlanBuilder.ImplicitExitRanges(document))
+        {
+            DrawRange(dc, range, wave, viewStart, viewSpan, "RegionWaveFillExitBrush");
         }
     }
 
@@ -156,7 +135,6 @@ internal static class MarkerRolePaint
             MarkerRole.Anacrusis => "RegionWaveFillAnacrusisBrush",
             MarkerRole.Loop => "RegionWaveFillLoopBrush",
             MarkerRole.Exit => "RegionWaveFillExitBrush",
-            MarkerRole.Remove => "RegionWaveFillExcludedBrush",
             _ => "WaveformBackBrush",
         }));
 }
