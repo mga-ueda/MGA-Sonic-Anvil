@@ -8,7 +8,7 @@ namespace MgaSonicAnvil.Wwise;
 /// サンプルループがあればそれを優先し、なければマーカー接尾辞（-A/-L/-E）。
 /// -A は次、-E は直前（-L）と同一セグメント。
 /// -A / -L / -E だけが区間境界。無名／名前付きは区間も Custom Cue にもしない（IM Wave 単体と同じ）。
-/// -L（サンプルループ含む）の直後が接尾辞なしなら自動で -E。
+/// -L（サンプルループ含む）の直後が接尾辞なしなら EXPORT では自動で -E（波形は塗らない）。
 /// IM Importer の -R（除外）はこのアプリでは機能させない。
 /// </summary>
 internal static class WaveOnlyPlanBuilder
@@ -249,42 +249,6 @@ internal static class WaveOnlyPlanBuilder
 
         ApplyAutoExitAfterLoop(regions);
         return regions;
-    }
-
-    /// <summary>
-    /// 計画上の -E のうち、マーカーに明示の <c>-E</c> が無い区間。
-    /// サンプルループの余りや、-L 直後の無名区間の下塗りに使う。
-    /// </summary>
-    internal static IEnumerable<WaveSelection> ImplicitExitRanges(AudioDocument document)
-    {
-        foreach (var region in BuildRegions(document))
-        {
-            if (region.Kind != WaveOnlyRegionKind.Exit)
-            {
-                continue;
-            }
-
-            if (HasExplicitExitAt(document.Markers, region.StartFrame))
-            {
-                continue;
-            }
-
-            yield return new WaveSelection(region.StartFrame, region.EndFrame);
-        }
-    }
-
-    private static bool HasExplicitExitAt(IReadOnlyList<WaveMarker> markers, long frame)
-    {
-        for (var i = 0; i < markers.Count; i++)
-        {
-            if (markers[i].Frame == frame
-                && MarkerRoles.FromComment(markers[i].Comment) == MarkerRole.Exit)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static void ApplyLoopRange(

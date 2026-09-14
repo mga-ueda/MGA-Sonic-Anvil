@@ -121,7 +121,8 @@ internal static class MarkerRoles
     };
 
     /// <summary>
-    /// <c>-L</c> の直後の接尾辞なしマーカーを <c>-E</c> にする。
+    /// EXPORT 計画用。ドキュメントのコメントは書き換えない。
+    /// <c>-L</c> の直後の接尾辞なしマーカーを <c>-E</c> として扱う。
     /// サンプルループ終端に接尾辞なしマーカーがあれば同様。マーカーは増やさない。
     /// </summary>
     public static MarkerSnapshot[] WithAutoExitComments(

@@ -66,7 +66,5 @@ internal sealed class EmbeddedAudioMeta
 
             document.SetRegions(ranges, markDirty: false);
         }
-
-        document.ApplyAutoExitComments(markDirty: false);
     }
 }

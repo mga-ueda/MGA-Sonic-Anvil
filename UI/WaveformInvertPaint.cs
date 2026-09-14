@@ -1,7 +1,6 @@
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
-using MgaSonicAnvil.Wwise;
 
 namespace MgaSonicAnvil.UI;
 
@@ -129,11 +128,6 @@ internal static class WaveformInvertPaint
             };
             var end = i + 1 < markers.Count ? markers[i + 1].Frame : frameCount;
             spans.Add(new RoleSpan(markers[i].Frame, end, bgra));
-        }
-
-        foreach (var range in WaveOnlyPlanBuilder.ImplicitExitRanges(document))
-        {
-            spans.Add(new RoleSpan(range.StartFrame, range.EndFrame, exit));
         }
 
         return spans;

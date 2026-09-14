@@ -228,8 +228,9 @@ public sealed class UiThemeTests
             > UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillLoopBrush").R);
         Assert.True(UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillExitBrush").R
             > UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillExitBrush").B);
-        Assert.True(UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillAnacrusisBrush").G
-            > UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillAnacrusisBrush").B);
+        var anacrusis = UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillAnacrusisBrush");
+        Assert.True(anacrusis.G > anacrusis.R);
+        Assert.True(anacrusis.G > anacrusis.B);
     }
 
     private static double Contrast(System.Windows.Media.Color a, System.Windows.Media.Color b)

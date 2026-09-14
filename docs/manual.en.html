@@ -179,8 +179,7 @@
         <li><kbd>Shift</kbd>+<kbd>L</kbd> — set the selection as the sample loop (same range again clears it).</li>
         <li><kbd>Shift</kbd>+<kbd>R</kbd> — set the selection as a region. If both ends already have a region, the first press divides it in two; the same range again divides it in three, and so on (clear with right-click / <kbd>Delete</kbd>; hold uses the same repeat timing, one history entry until you release).</li>
         <li>Click a flag to select an edge. Shift+click for a range, Ctrl+click to add. Drag or ←/→ to move (Shift ×3).</li>
-        <li>Double-click a comment / region name. <code>-A</code> lime, <code>-L</code> blue, <code>-E</code> red. <code>-R</code> is not colored. See <a href="#export-suffix">9-3</a> for what EXPORT does with them.</li>
-        <li>When you open a file, or place / edit <code>-L</code> or the sample loop, a suffix-less marker right after <code>-L</code> (or at the loop end) is replaced with <code>-E</code>. The previous name is discarded. Existing <code>-A</code> / <code>-L</code> / <code>-E</code> / <code>-R</code> are left alone.</li>
+        <li>Double-click a comment / region name. <code>-A</code> lime, <code>-L</code> blue, <code>-E</code> red (only when you write it; the span after a loop or sample loop is not painted red automatically). <code>-R</code> is not colored. See <a href="#export-suffix">9-3</a> for what EXPORT does with them.</li>
         <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> — rename.</li>
         <li>Right-click, or <kbd>Ctrl</kbd>+<kbd>Del</kbd>, deletes markers. Waveform right-click deletes all markers even if you did not click a flag. Timeline can delete all regions.</li>
       </ul>
@@ -220,8 +219,8 @@
       <h3 id="export-plan">9-2. How ranges are built</h3>
       <p>Earlier items win.</p>
       <ol>
-        <li><strong>Sample loop</strong> (the WAV smpl chunk, or <kbd>Shift</kbd>+<kbd>L</kbd>) — before the loop is Intro, the loop is <code>-L</code>. A remainder after the loop is given <code>-E</code> automatically. This beats markers.</li>
-        <li><strong>Suffixed markers</strong> (<code>-A</code> / <code>-L</code> / <code>-E</code>) — each starts a region that runs to the next suffixed marker (or the end). Unnamed and named markers do not split ranges. A suffix-less marker right after <code>-L</code> is replaced with <code>-E</code> (the previous name is discarded. Existing <code>-A</code> / <code>-L</code> / <code>-E</code> / <code>-R</code> are left alone).</li>
+        <li><strong>Sample loop</strong> (the WAV smpl chunk, or <kbd>Shift</kbd>+<kbd>L</kbd>) — before the loop is Intro, the loop is <code>-L</code>. EXPORT treats a remainder after the loop as <code>-E</code> (the waveform is not painted red). This beats markers.</li>
+        <li><strong>Suffixed markers</strong> (<code>-A</code> / <code>-L</code> / <code>-E</code>) — each starts a region that runs to the next suffixed marker (or the end). Unnamed and named markers do not split ranges. EXPORT treats a suffix-less marker right after <code>-L</code> as <code>-E</code> (the comment on the waveform is left as-is and is not painted red. Existing <code>-A</code> / <code>-L</code> / <code>-E</code> / <code>-R</code> are left alone).</li>
         <li><strong>Exactly two unsuffixed markers</strong> — the span between them becomes an implicit loop.</li>
         <li><strong>Regions</strong> (<kbd>Shift</kbd>+<kbd>R</kbd>) — used as-is when there is no sample loop and no special markers.</li>
         <li>If none of the above apply, the whole file is one range.</li>

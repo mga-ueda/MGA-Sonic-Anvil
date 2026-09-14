@@ -2,11 +2,10 @@ using System.Windows;
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
-using MgaSonicAnvil.Wwise;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>IM Importer と同じリージョン下塗り（-A/-L/-E）。-R は色付けしない。</summary>
+/// <summary>IM Importer と同じリージョン下塗り（-A/-L/-E）。-R は色付けしない。暗黙の -E は塗らない。</summary>
 internal static class MarkerRolePaint
 {
     public static void DrawBackgrounds(
@@ -49,11 +48,6 @@ internal static class MarkerRolePaint
             x1 = Math.Clamp(x1, wave.X, wave.Right);
             var width = Math.Max(1, x1 - x0);
             dc.DrawRectangle(BrushOf(role), null, new Rect(x0, wave.Y, width, wave.Height));
-        }
-
-        foreach (var range in WaveOnlyPlanBuilder.ImplicitExitRanges(document))
-        {
-            DrawRange(dc, range, wave, viewStart, viewSpan, "RegionWaveFillExitBrush");
         }
     }
 

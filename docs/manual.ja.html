@@ -179,8 +179,7 @@
         <li><kbd>Shift</kbd>+<kbd>L</kbd> …… 選択をサンプルループに（同じ範囲でもう一度で解除）。</li>
         <li><kbd>Shift</kbd>+<kbd>R</kbd> …… 選択をリージョンに。両端にリージョンがあればすぐ 2 等分。同じ範囲で続けて打つと 3…と打ち直す（解除は右クリック／<kbd>Delete</kbd>。押しっぱなしは同じ間隔で、離すまで 1 つの履歴）。</li>
         <li>フラッグをクリックで端を選択。Shift+クリックで範囲、Ctrl+クリックで追加。ドラッグまたは ←→ で移動（Shift で 3 倍）。</li>
-        <li>ダブルクリックでコメント／リージョン名。<code>-A</code> ライム、<code>-L</code> ブルー、<code>-E</code> 赤。<code>-R</code> は色を付けません。EXPORT での意味は <a href="#export-suffix">9-3</a>。</li>
-        <li>ファイルを開いたときや、<code>-L</code>／サンプルループを置いた・直したとき、<code>-L</code> の次（またはループ終端）の接尾辞なしマーカーは <code>-E</code> に置き換わります。元の名前は残しません。既存の <code>-A</code>／<code>-L</code>／<code>-E</code>／<code>-R</code> は上書きしません。</li>
+        <li>ダブルクリックでコメント／リージョン名。<code>-A</code> ライム、<code>-L</code> ブルー、<code>-E</code> 赤（書いたときだけ。ループやサンプルループの後ろは自動では赤くしません）。<code>-R</code> は色を付けません。EXPORT での意味は <a href="#export-suffix">9-3</a>。</li>
         <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> …… リネーム。</li>
         <li>右クリック、または <kbd>Ctrl</kbd>+<kbd>Del</kbd> でマーカー削除。波形の右クリックからすべてのマーカーを削除できます（フラッグを右クリックしていなくても可）。タイムラインからすべてのリージョンを削除できます。</li>
       </ul>
@@ -220,8 +219,8 @@
       <h3 id="export-plan">9-2. リージョンの組み立て</h3>
       <p>上にあるものほど優先します。</p>
       <ol>
-        <li><strong>サンプルループ</strong>（WAV の smpl、または <kbd>Shift</kbd>+<kbd>L</kbd>）…… ループ前が Intro、ループが <code>-L</code>。後ろに余りがあれば自動で <code>-E</code>。マーカーより優先します。</li>
-        <li><strong>接尾辞付きマーカー</strong>（<code>-A</code>／<code>-L</code>／<code>-E</code>）…… その位置から次の接尾辞付きマーカー（無ければ終端）までがリージョンになります。無名や名前付きマーカーは区間を切りません。<code>-L</code> の直後に接尾辞が無いマーカーがあれば <code>-E</code> に置き換えます（元の名前は残しません。<code>-A</code>／<code>-L</code>／<code>-E</code>／<code>-R</code> は上書きしません）。</li>
+        <li><strong>サンプルループ</strong>（WAV の smpl、または <kbd>Shift</kbd>+<kbd>L</kbd>）…… ループ前が Intro、ループが <code>-L</code>。後ろに余りがあれば EXPORT では <code>-E</code>（波形は赤くしない）。マーカーより優先します。</li>
+        <li><strong>接尾辞付きマーカー</strong>（<code>-A</code>／<code>-L</code>／<code>-E</code>）…… その位置から次の接尾辞付きマーカー（無ければ終端）までがリージョンになります。無名や名前付きマーカーは区間を切りません。EXPORT では <code>-L</code> の直後の接尾辞なしマーカーを <code>-E</code> として扱います（波形上のコメントは書き換えず、赤にもしません。<code>-A</code>／<code>-L</code>／<code>-E</code>／<code>-R</code> は上書きしません）。</li>
         <li><strong>接尾辞の無いマーカーがちょうど 2 点</strong>…… その間を暗黙のループにします。</li>
         <li><strong>リージョン</strong>（<kbd>Shift</kbd>+<kbd>R</kbd>）…… 特殊マーカーもサンプルループも無いとき、名前付き区間をそのまま通します。</li>
         <li>どれも無ければ、ファイル全体を 1 区間として渡します。</li>

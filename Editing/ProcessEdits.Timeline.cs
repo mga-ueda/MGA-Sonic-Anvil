@@ -24,15 +24,10 @@ internal static partial class ProcessEdits
             after = WaveSelection.Empty;
         }
 
-        var markersBefore = document.SnapshotMarkers();
-        var markersAfter = MarkerRoles.WithAutoExitComments(markersBefore, after, document.FrameCount);
-        var markersChanged = !markersBefore.AsSpan().SequenceEqual(markersAfter);
         var command = new SetSampleLoopCommand(
             before,
             after,
-            SampleLoopSummary(document.SampleRate, after),
-            markersChanged ? markersBefore : null,
-            markersChanged ? markersAfter : null);
+            SampleLoopSummary(document.SampleRate, after));
         var sourceRate = document.SampleRate;
         var sourceAfter = after;
         // 再適用は「after の状態にする」。トグルではないので同じ範囲でも解除にならない。
@@ -188,20 +183,6 @@ internal static partial class ProcessEdits
     public static IEditCommand AddMarker(AudioDocument document, long frame)
     {
         var before = document.SnapshotMarkers();
-        var added = new MarkerSnapshot[before.Length + 1];
-        before.CopyTo(added, 0);
-        added[^1] = new MarkerSnapshot(frame, string.Empty);
-        var after = MarkerRoles.WithAutoExitComments(added, document.SampleLoop, document.FrameCount);
-        var labeled = after.Any(marker => marker.Frame == frame && marker.Comment.Length > 0);
-        if (labeled)
-        {
-            var replace = ApplyMarkers(document, before, after, "Add Marker");
-            if (replace is not null)
-            {
-                return replace;
-            }
-        }
-
         var command = new AddMarkerCommand(
             frame,
             before,
@@ -245,11 +226,6 @@ internal static partial class ProcessEdits
         MarkerSnapshot[] after,
         string name = "Add Marker")
     {
-        if (after.Length > before.Length)
-        {
-            after = MarkerRoles.WithAutoExitComments(after, document.SampleLoop, document.FrameCount);
-        }
-
         var command = ReplaceMarkers(before, after, name, document.SampleRate);
         if (command is null)
         {
@@ -356,28 +332,6 @@ internal static partial class ProcessEdits
         if (before == after || !document.HasMarkerAt(frame))
         {
             return null;
-        }
-
-        if (MarkerRoles.FromComment(after) == MarkerRole.Loop)
-        {
-            var beforeMarkers = document.SnapshotMarkers();
-            var edited = new MarkerSnapshot[beforeMarkers.Length];
-            for (var i = 0; i < beforeMarkers.Length; i++)
-            {
-                edited[i] = beforeMarkers[i].Frame == frame
-                    ? beforeMarkers[i] with { Comment = after }
-                    : beforeMarkers[i];
-            }
-
-            var next = MarkerRoles.WithAutoExitComments(edited, document.SampleLoop, document.FrameCount);
-            if (!beforeMarkers.AsSpan().SequenceEqual(next))
-            {
-                var replace = ApplyMarkers(document, beforeMarkers, next, "Marker Comment");
-                if (replace is not null)
-                {
-                    return replace;
-                }
-            }
         }
 
         var extra = UiStrings.EditHistoryQuote(after);

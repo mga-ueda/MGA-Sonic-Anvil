@@ -51,7 +51,6 @@ public sealed class WaveOnlyPlanBuilderTests
         Assert.Equal(200, segments[1].EntryCueFrame);
         Assert.Equal(800, segments[1].ExitCueFrame);
         Assert.True(segments[1].LoopInfinite);
-        Assert.Equal(new WaveSelection(800, 1000), Assert.Single(WaveOnlyPlanBuilder.ImplicitExitRanges(document)));
     }
 
     [Theory]
@@ -86,7 +85,6 @@ public sealed class WaveOnlyPlanBuilderTests
 
         Assert.Equal(WaveOnlyRegionKind.Loop, regions.Single(region => region.StartFrame == 200).Kind);
         Assert.Equal(WaveOnlyRegionKind.Exit, regions.Single(region => region.StartFrame == 600).Kind);
-        Assert.Equal(new WaveSelection(600, 1000), Assert.Single(WaveOnlyPlanBuilder.ImplicitExitRanges(document)));
 
         var loop = Assert.Single(WaveOnlyPlanBuilder.Build(document).Segments, segment => segment.LoopInfinite);
         Assert.Equal(200, loop.StartFrame);
@@ -103,7 +101,6 @@ public sealed class WaveOnlyPlanBuilderTests
         document.TryAddMarker(600);
         document.TrySetMarkerComment(600, "-E");
 
-        Assert.Empty(WaveOnlyPlanBuilder.ImplicitExitRanges(document));
         Assert.Equal(WaveOnlyRegionKind.Exit, WaveOnlyPlanBuilder.BuildRegions(document)
             .Single(region => region.StartFrame == 600).Kind);
     }

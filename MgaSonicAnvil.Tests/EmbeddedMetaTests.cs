@@ -89,7 +89,7 @@ public sealed class EmbeddedMetaTests
     }
 
     [Fact]
-    public void Load_RewritesBareMarkerAfterLoopToExit()
+    public void Load_KeepsBareMarkerAfterLoop()
     {
         var path = TempPath("cue-auto-e");
         try
@@ -105,7 +105,7 @@ public sealed class EmbeddedMetaTests
 
             var document = AudioCodec.Load(path);
             Assert.Equal("-L", document.Markers[0].Comment);
-            Assert.Equal("-E", document.Markers[1].Comment);
+            Assert.Equal(string.Empty, document.Markers[1].Comment);
             Assert.False(document.IsDirty);
         }
         finally
@@ -245,7 +245,7 @@ public sealed class EmbeddedMetaTests
             Assert.Equal(5, document.Markers[0].Frame);
             Assert.Equal("start", document.Markers[0].Comment);
             Assert.Equal(25, document.Markers[1].Frame);
-            Assert.Equal("-E", document.Markers[1].Comment);
+            Assert.Equal("end", document.Markers[1].Comment);
             Assert.Equal(new WaveSelection(5, 25), document.SampleLoop);
         }
         finally

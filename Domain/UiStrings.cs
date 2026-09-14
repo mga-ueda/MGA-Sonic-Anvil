@@ -525,8 +525,8 @@ internal static partial class UiStrings
     public static string TipReverse => Get("リバース (R)\n選択範囲を時間方向に反転。未選択なら全体", "Reverse (R)\nReverse the selection in time. Uses the whole file if nothing is selected");
     public static string TipAddMarker => Get("マーカーを追加 (M / Ins)\n選択中は両端。同じ範囲で繰り返すと分割", "Add marker (M / Ins)\nPlaces both ends of a selection; repeat to split");
     public static string TipSetLoop => Get(
-        "選択をサンプルループに (Shift+L)\n同じ範囲でもう一度で解除。EXPORT ではループ前が Intro、ループが -L。後ろに余りがあれば -E。終端の接尾辞なしマーカーは -E に置き換わる",
-        "Set selection as sample loop (Shift+L)\nSame range again clears it. EXPORT treats the part before as Intro and the loop as -L. A remainder after the loop becomes -E. A suffix-less marker at the loop end is replaced with -E");
+        "選択をサンプルループに (Shift+L)\n同じ範囲でもう一度で解除。EXPORT ではループ前が Intro、ループが -L。後ろに余りがあれば -E（波形は赤くしない）",
+        "Set selection as sample loop (Shift+L)\nSame range again clears it. EXPORT treats the part before as Intro and the loop as -L. A remainder after the loop becomes -E (the waveform is not painted red)");
     public static string TipSetRegion => Get("選択をリージョンに (Shift+R)\n同じ範囲で繰り返すと分割", "Set selection as region (Shift+R)\nRepeat on the same range to split");
     public static string TipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)", "Save As (Ctrl+Shift+S)");
     public static string TipSpectrogramView => Get(

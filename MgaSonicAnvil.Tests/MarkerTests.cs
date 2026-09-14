@@ -254,7 +254,7 @@ public sealed class MarkerTests
     }
 
     [Fact]
-    public void SetMarkerComment_LoopRewritesNextBareMarkerToExit()
+    public void SetMarkerComment_LoopDoesNotRewriteNextBareMarker()
     {
         var document = MakeDocument(frames: 100);
         document.TryAddMarker(20);
@@ -266,14 +266,14 @@ public sealed class MarkerTests
         history.Do(document, command);
 
         Assert.Equal("-L", document.MarkerCommentAt(20));
-        Assert.Equal("-E", document.MarkerCommentAt(60));
+        Assert.Equal("tail", document.MarkerCommentAt(60));
         Assert.True(history.Undo(document));
         Assert.Equal(string.Empty, document.MarkerCommentAt(20));
         Assert.Equal("tail", document.MarkerCommentAt(60));
     }
 
     [Fact]
-    public void AddMarker_AfterLoopBecomesExit()
+    public void AddMarker_AfterLoopStaysUnlabeled()
     {
         var document = MakeDocument(frames: 100);
         document.TryAddMarker(20);
@@ -281,13 +281,13 @@ public sealed class MarkerTests
         var history = new EditHistory();
         history.Do(document, ProcessEdits.AddMarker(document, 60));
 
-        Assert.Equal("-E", document.MarkerCommentAt(60));
+        Assert.Equal(string.Empty, document.MarkerCommentAt(60));
         Assert.True(history.Undo(document));
         Assert.False(document.HasMarkerAt(60));
     }
 
     [Fact]
-    public void SetSampleLoop_RewritesMarkerAtLoopEndToExit()
+    public void SetSampleLoop_DoesNotRewriteMarkerAtLoopEnd()
     {
         var document = MakeDocument(frames: 100);
         document.TryAddMarker(20);
@@ -298,7 +298,7 @@ public sealed class MarkerTests
         history.Do(document, command);
 
         Assert.Equal(string.Empty, document.MarkerCommentAt(20));
-        Assert.Equal("-E", document.MarkerCommentAt(80));
+        Assert.Equal(string.Empty, document.MarkerCommentAt(80));
         Assert.True(history.Undo(document));
         Assert.Equal(string.Empty, document.MarkerCommentAt(80));
     }

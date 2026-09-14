@@ -945,22 +945,6 @@ internal sealed partial class AudioDocument
         }
     }
 
-    /// <summary>
-    /// <c>-L</c> の次、またはサンプルループ終端の接尾辞なしマーカーを <c>-E</c> にする。
-    /// </summary>
-    public bool ApplyAutoExitComments(bool markDirty = true)
-    {
-        var before = SnapshotMarkers();
-        var after = MarkerRoles.WithAutoExitComments(before, SampleLoop, FrameCount);
-        if (before.AsSpan().SequenceEqual(after))
-        {
-            return false;
-        }
-
-        ReplaceMarkers(after, markDirty, normalizeComments: false);
-        return true;
-    }
-
     public void ApplyDeleteToMarkers(long startFrame, long frameCount)
     {
         if (frameCount <= 0)

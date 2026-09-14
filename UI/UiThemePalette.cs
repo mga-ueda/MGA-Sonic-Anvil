@@ -197,7 +197,7 @@ internal static class UiThemePalette
         ["StatusBarConnectedBadgeBackBrush"] = Rgb(0x3D, 0x8E, 0xE8),
         ["StatusBarDisconnectedBadgeBackBrush"] = Rgb(0xE8, 0x5A, 0x5A),
         ["StatusBarErrorDetailForeBrush"] = Rgb(0xFF, 0x6A, 0x6A),
-        ["RegionWaveFillAnacrusisBrush"] = Argb(0x99, 0xE8, 0xB4, 0x4A),
+        ["RegionWaveFillAnacrusisBrush"] = Argb(0x99, 0x9C, 0xCC, 0x84),
         ["RegionWaveFillLoopBrush"] = Argb(0x99, 0x4A, 0x9A, 0xE8),
         ["RegionWaveFillExitBrush"] = Argb(0x99, 0xE8, 0x58, 0x58),
     };

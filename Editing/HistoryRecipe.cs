@@ -372,9 +372,6 @@ internal static class HistoryRecipes
             return null;
         }
 
-        var markersBefore = document.SnapshotMarkers();
-        var markersAfter = MarkerRoles.WithAutoExitComments(markersBefore, after, document.FrameCount);
-        var markersChanged = !markersBefore.AsSpan().SequenceEqual(markersAfter);
         var command = new SetSampleLoopCommand(
             document.SampleLoop,
             after,
@@ -384,9 +381,7 @@ internal static class HistoryRecipes
                     UiStrings.EditHistoryName("Set Sample Loop"),
                     document.SampleRate,
                     after.StartFrame,
-                    after.EndFrame),
-            markersChanged ? markersBefore : null,
-            markersChanged ? markersAfter : null);
+                    after.EndFrame));
         command.Persist = recipe;
         return command;
     }
