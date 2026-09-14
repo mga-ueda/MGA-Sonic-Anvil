@@ -316,6 +316,10 @@ public partial class MainWindow
                 () => PasteHistoryRecipesToTabs(targets),
                 "Ctrl+V",
                 enabled: canMutate && _historyRecipeClipboard.Count > 0));
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.TabMenuCopyAllTimes,
+                CopyAllTabTimes,
+                enabled: _sessions.Count > 0));
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 AllTabsSelected ? UiStrings.TabMenuExportWaveAll : UiStrings.TabMenuExportWaveSelected,
@@ -360,6 +364,10 @@ public partial class MainWindow
                 UiStrings.TabMenuSelectAll,
                 SelectAllTabs,
                 enabled: _sessions.Count > 1 && !AllTabsSelected));
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.TabMenuCopyAllTimes,
+                CopyAllTabTimes,
+                enabled: _sessions.Count > 0));
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.TabMenuExportWave,
@@ -406,6 +414,29 @@ public partial class MainWindow
         }
 
         return false;
+    }
+
+    private void CopyAllTabTimes()
+    {
+        if (_sessions.Count == 0)
+        {
+            return;
+        }
+
+        var rows = new (string FileName, long FrameCount, int SampleRate)[_sessions.Count];
+        for (var i = 0; i < _sessions.Count; i++)
+        {
+            var document = _sessions[i].Document;
+            rows[i] = (_sessions[i].DisplayName, document.FrameCount, document.SampleRate);
+        }
+
+        var text = TabTimeList.Format(rows);
+        if (text.Length == 0)
+        {
+            return;
+        }
+
+        Clipboard.SetText(text);
     }
 
     private static MenuItem CreateTabMenuItem(

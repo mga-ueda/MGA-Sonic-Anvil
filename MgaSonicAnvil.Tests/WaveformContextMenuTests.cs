@@ -1,3 +1,6 @@
+using System.Runtime.ExceptionServices;
+using System.Windows.Controls;
+using System.Windows.Input;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 using Xunit;
@@ -61,6 +64,7 @@ public sealed class WaveformContextMenuTests
 
             var commands = WaveformContextMenuBuilder.Commands(tree).ToHashSet();
             Assert.Contains(WaveMenuCommand.Undo, commands);
+            Assert.Contains(WaveMenuCommand.DeleteSilence, commands);
             Assert.Contains(WaveMenuCommand.FadeIn, commands);
             Assert.Contains(WaveMenuCommand.AddMarker, commands);
             Assert.Contains(WaveMenuCommand.DeleteAllMarkers, commands);
@@ -78,8 +82,20 @@ public sealed class WaveformContextMenuTests
             Assert.Equal("V", loudness?.Gesture);
             Assert.Contains(WaveMenuCommand.ExportWave, commands);
             Assert.Contains(WaveMenuCommand.Open, commands);
+            Assert.Contains(WaveMenuCommand.CopyAllTabTimes, commands);
             Assert.Contains(WaveMenuCommand.ClearMarkers, commands);
             Assert.Contains(WaveMenuCommand.PlayFromHere, commands);
+            var root = tree.OfType<WaveMenuItemEntry>().Select(item => item.Command).ToArray();
+            Assert.Contains(WaveMenuCommand.ClearMarkers, root);
+            Assert.Contains(WaveMenuCommand.DeleteAllMarkers, root);
+            Assert.Equal(
+                Array.IndexOf(root, WaveMenuCommand.ClearMarkers) + 1,
+                Array.IndexOf(root, WaveMenuCommand.DeleteAllMarkers));
+            Assert.DoesNotContain(
+                WaveMenuCommand.DeleteAllMarkers,
+                WaveformContextMenuBuilder.Commands(
+                    tree.OfType<WaveMenuItemEntry>().First(item => item.Header == UiStrings.WaveMenuCatTimeline).Children
+                    ?? []).ToHashSet());
         }
         finally
         {
@@ -96,6 +112,7 @@ public sealed class WaveformContextMenuTests
         Assert.Contains(WaveMenuCommand.Manual, commands);
         Assert.DoesNotContain(WaveMenuCommand.PlayFromHere, commands);
         Assert.DoesNotContain(WaveMenuCommand.ClearMarkers, commands);
+        Assert.DoesNotContain(WaveMenuCommand.DeleteAllMarkers, commands);
     }
 
     [Fact]
@@ -106,7 +123,10 @@ public sealed class WaveformContextMenuTests
         Assert.False(Find(idle, WaveMenuCommand.Cut)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.FadeIn)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.Save)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.CopyAllTabTimes)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.LoopPlay)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.Record)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.NormalizePerRegion)?.Enabled);
         Assert.True(Find(idle, WaveMenuCommand.Open)?.Enabled);
         Assert.True(Find(idle, WaveMenuCommand.Quit)?.Enabled);
         Assert.True(Find(idle, WaveMenuCommand.Manual)?.Enabled);
@@ -123,8 +143,27 @@ public sealed class WaveformContextMenuTests
         Assert.False(Find(ready, WaveMenuCommand.LoopPlay)?.Enabled);
         Assert.False(Find(ready, WaveMenuCommand.DeleteAllMarkers)?.Enabled);
         Assert.False(Find(ready, WaveMenuCommand.DeleteAllRegions)?.Enabled);
+        var withMarkers = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasDocument = true,
+            CanEdit = true,
+            HasMarkers = true,
+        });
+        Assert.True(Find(withMarkers, WaveMenuCommand.DeleteAllMarkers)?.Enabled);
+        Assert.Null(Find(withMarkers, WaveMenuCommand.ClearMarkers));
+        Assert.True(Find(ready, WaveMenuCommand.CopyAllTabTimes)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.FadeIn)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.AddMarkerHere)?.Enabled);
+        Assert.True(Find(ready, WaveMenuCommand.Record)?.Enabled);
+        Assert.False(Find(ready, WaveMenuCommand.NormalizePerRegion)?.Enabled);
+        var withRegions = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasDocument = true,
+            CanEdit = true,
+            HasRegions = true,
+            AllowsRegionsAndLoops = true,
+        });
+        Assert.True(Find(withRegions, WaveMenuCommand.NormalizePerRegion)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.Save)?.Enabled);
         Assert.False(Find(ready, WaveMenuCommand.PlayExit)?.Enabled);
         var waapiOn = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
@@ -134,6 +173,33 @@ public sealed class WaveformContextMenuTests
         });
         Assert.True(Find(waapiOn, WaveMenuCommand.PlayExit)?.Enabled);
         Assert.Equal("Alt+E", Find(waapiOn, WaveMenuCommand.PlayExit)?.Gesture);
+    }
+
+    [Fact]
+    public void Create_KeepsSubmenuOpenOnHeaderClick()
+    {
+        RunSta(() =>
+        {
+            var menu = WaveformContextMenuBuilder.Create(
+                WaveformContextMenuBuilder.Build(WaveformContextMenuModel.AllEnabledForTests()),
+                _ => { },
+                new Border());
+            var headers = menu.Items.OfType<MenuItem>().Where(item => item.HasItems).ToArray();
+            Assert.NotEmpty(headers);
+            Assert.All(headers, item => Assert.True(item.StaysOpenOnClick));
+            var leaf = menu.Items.OfType<MenuItem>().First(item => !item.HasItems);
+            Assert.False(leaf.StaysOpenOnClick);
+        });
+    }
+
+    [Fact]
+    public void MenuAccessKeys_IsContextMenuKey_MatchesAppsAndShiftF10()
+    {
+        Assert.True(MenuAccessKeys.IsContextMenuKey(Key.Apps, ModifierKeys.None));
+        Assert.True(MenuAccessKeys.IsContextMenuKey(Key.F10, ModifierKeys.Shift));
+        Assert.False(MenuAccessKeys.IsContextMenuKey(Key.F10, ModifierKeys.None));
+        Assert.False(MenuAccessKeys.IsContextMenuKey(Key.Apps, ModifierKeys.Control));
+        Assert.False(MenuAccessKeys.IsContextMenuKey(Key.Delete, ModifierKeys.None));
     }
 
     [Fact]
@@ -167,5 +233,28 @@ public sealed class WaveformContextMenuTests
         }
 
         return null;
+    }
+
+    private static void RunSta(Action action)
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null)
+        {
+            ExceptionDispatchInfo.Capture(error).Throw();
+        }
     }
 }

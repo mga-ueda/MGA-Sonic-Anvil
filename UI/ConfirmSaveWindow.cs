@@ -37,6 +37,7 @@ internal sealed class ConfirmSaveWindow : Window
         SizeToContent = SizeToContent.WidthAndHeight;
         Background = (Brush)FindResource("WindowBackBrush");
         Foreground = (Brush)FindResource("PrimaryForeBrush");
+        KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Cycle);
 
         var message = new TextBlock
         {

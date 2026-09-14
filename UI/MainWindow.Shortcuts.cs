@@ -8,6 +8,17 @@ public partial class MainWindow
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var modifiers = Keyboard.Modifiers;
+        if (MenuAccessKeys.IsContextMenuKey(key, modifiers))
+        {
+            if (!e.IsRepeat)
+            {
+                _pendingContextMenuKey = true;
+            }
+
+            e.Handled = true;
+            return;
+        }
+
         if (TryProcessShortcut(key, modifiers))
         {
             e.Handled = true;
@@ -17,6 +28,18 @@ public partial class MainWindow
     private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key is Key.Apps or Key.F10)
+        {
+            if (_pendingContextMenuKey)
+            {
+                _pendingContextMenuKey = false;
+                e.Handled = true;
+                OpenContextMenuFromKeyboard();
+            }
+
+            return;
+        }
+
         if (key is Key.Left or Key.Right)
         {
             if (_playbackShuttleDirection != 0
@@ -930,6 +953,12 @@ public partial class MainWindow
         if (key == Key.PageUp && modifiers == ModifierKeys.Control)
         {
             ActivateAdjacentTab(-1);
+            return true;
+        }
+
+        if (key == Key.N && modifiers == ModifierKeys.Control)
+        {
+            NewDocument();
             return true;
         }
 

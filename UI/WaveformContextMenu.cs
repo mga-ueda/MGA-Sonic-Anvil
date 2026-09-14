@@ -1,5 +1,6 @@
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -28,6 +29,7 @@ internal enum WaveMenuCommand
     Paste,
     PasteHistory,
     Delete,
+    DeleteSilence,
     SelectAll,
     ClearSelection,
     SelectToStart,
@@ -37,6 +39,7 @@ internal enum WaveMenuCommand
     FadeOut,
     FadeAround,
     Normalize,
+    NormalizePerRegion,
     Volume,
     Pitch,
     TimeStretch,
@@ -88,12 +91,14 @@ internal enum WaveMenuCommand
     FocusTime,
     SilentSkip,
     AlwaysOnTop,
+    NewDocument,
     Open,
     Save,
     SaveAs,
     SaveMp3,
     CloseTab,
     CloseAll,
+    CopyAllTabTimes,
     ReopenTab,
     NextTab,
     PrevTab,
@@ -219,6 +224,10 @@ internal sealed record WaveMenuItemEntry(
 
 internal static class MenuAccessKeys
 {
+    public static bool IsContextMenuKey(Key key, ModifierKeys modifiers) =>
+        key == Key.Apps && modifiers == ModifierKeys.None
+        || key == Key.F10 && modifiers == ModifierKeys.Shift;
+
     public static char? Read(string header)
     {
         if (string.IsNullOrEmpty(header))
@@ -334,6 +343,14 @@ internal static class WaveformContextMenuBuilder
                 enabled: m.CanEdit));
         }
 
+        if (m.HasDocument)
+        {
+            items.Add(Cmd(
+                UiStrings.WaveMenuDeleteAllMarkers,
+                WaveMenuCommand.DeleteAllMarkers,
+                enabled: m.CanEdit && m.HasMarkers));
+        }
+
         if (m.Hit.HitRegion)
         {
             items.Add(Cmd(UiStrings.WaveMenuClearRegion, WaveMenuCommand.ClearRegion, enabled: m.CanEdit));
@@ -368,6 +385,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuPaste, WaveMenuCommand.Paste, "Ctrl+V", m.CanEdit && m.CanPasteAudio),
         Cmd(UiStrings.WaveMenuPasteHistory, WaveMenuCommand.PasteHistory, enabled: m.CanEdit && m.CanPasteHistory),
         Cmd(UiStrings.WaveMenuDelete, WaveMenuCommand.Delete, "Delete", m.CanEdit && (m.HasSelection || m.HasSelectedMarkers || m.HasSelectedRegions)),
+        Cmd(UiStrings.WaveMenuDeleteSilence, WaveMenuCommand.DeleteSilence, enabled: m.CanEdit),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuSelectAll, WaveMenuCommand.SelectAll, "Ctrl+A", m.CanNavigate),
         Cmd(UiStrings.WaveMenuClearSelection, WaveMenuCommand.ClearSelection, "Esc", m.CanNavigate && m.HasAnySelection),
@@ -383,6 +401,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuFadeOut, WaveMenuCommand.FadeOut, "O", m.CanEdit),
         Cmd(UiStrings.WaveMenuFadeAround, WaveMenuCommand.FadeAround, "X", m.CanEdit),
         Cmd(UiStrings.WaveMenuNormalize, WaveMenuCommand.Normalize, "N", m.CanEdit),
+        Cmd(UiStrings.WaveMenuNormalizePerRegion, WaveMenuCommand.NormalizePerRegion, enabled: m.CanEdit && m.HasRegions && m.AllowsRegionsAndLoops),
         Cmd(UiStrings.WaveMenuVolume, WaveMenuCommand.Volume, "V", m.CanEdit),
         Cmd(UiStrings.WaveMenuPitch, WaveMenuCommand.Pitch, "P", m.CanEdit),
         Cmd(UiStrings.WaveMenuTimeStretch, WaveMenuCommand.TimeStretch, "T", m.CanEdit),
@@ -401,7 +420,6 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuAddMarker, WaveMenuCommand.AddMarker, "M", m.CanEdit),
         Cmd(UiStrings.WaveMenuRenameMarker, WaveMenuCommand.RenameMarker, "Ctrl+Shift+R", m.CanEdit && m.CanRenameMarker),
         Cmd(UiStrings.WaveMenuDeleteMarkers, WaveMenuCommand.DeleteMarkers, "Ctrl+Delete", m.CanEdit && m.HasMarkers),
-        Cmd(UiStrings.WaveMenuDeleteAllMarkers, WaveMenuCommand.DeleteAllMarkers, enabled: m.CanEdit && m.HasMarkers),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuSetRegion, WaveMenuCommand.SetRegion, "Shift+R", m.CanEdit && m.HasSelection && m.AllowsRegionsAndLoops),
         Cmd(UiStrings.WaveMenuRenameRegion, WaveMenuCommand.RenameRegion, enabled: m.CanEdit && m.CanRenameRegion),
@@ -424,7 +442,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuLoopPlay, WaveMenuCommand.LoopPlay, "L", m.CanLoopPlay),
         Check(UiStrings.WaveMenuPlayExit, WaveMenuCommand.PlayExit, "Alt+E", m.PlayExit, m.WaapiVisible && m.HasDocument && !m.IsBusy),
         WaveMenuSeparatorEntry.Instance,
-        Check(UiStrings.WaveMenuRecord, WaveMenuCommand.Record, "Ctrl+R", m.IsRecording, !m.IsBusy),
+        Check(UiStrings.WaveMenuRecord, WaveMenuCommand.Record, "Ctrl+R", m.IsRecording, m.HasDocument && !m.IsBusy),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuGoStart, WaveMenuCommand.GoStart, "Ctrl+Home", m.CanNavigate),
         Cmd(UiStrings.WaveMenuGoEnd, WaveMenuCommand.GoEnd, "Ctrl+End", m.CanNavigate),
@@ -463,6 +481,7 @@ internal static class WaveformContextMenuBuilder
 
     private static IReadOnlyList<WaveMenuEntry> FileItems(WaveformContextMenuModel m) =>
     [
+        Cmd(UiStrings.WaveMenuNew, WaveMenuCommand.NewDocument, "Ctrl+N", !m.IsBusy),
         Cmd(UiStrings.WaveMenuOpen, WaveMenuCommand.Open, "Ctrl+O", !m.IsBusy),
         Cmd(UiStrings.WaveMenuSave, WaveMenuCommand.Save, "Ctrl+S", m.HasDocument && !m.IsBusy && !m.IsRecording),
         Cmd(UiStrings.WaveMenuSaveAs, WaveMenuCommand.SaveAs, "Ctrl+Shift+S", m.HasDocument && !m.IsBusy && !m.IsRecording),
@@ -470,6 +489,7 @@ internal static class WaveformContextMenuBuilder
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuCloseTab, WaveMenuCommand.CloseTab, "Ctrl+W", m.HasDocument && !m.IsBusy && !m.IsRecording),
         Cmd(UiStrings.WaveMenuCloseAll, WaveMenuCommand.CloseAll, "Ctrl+Shift+W", m.HasDocument && !m.IsBusy && !m.IsRecording),
+        Cmd(UiStrings.WaveMenuCopyAllTabTimes, WaveMenuCommand.CopyAllTabTimes, enabled: m.HasDocument),
         Cmd(UiStrings.WaveMenuReopenTab, WaveMenuCommand.ReopenTab, "Ctrl+Shift+T", m.CanReopenTab && !m.IsBusy),
         Cmd(UiStrings.WaveMenuNextTab, WaveMenuCommand.NextTab, "Ctrl+Tab", m.HasMultipleTabs && !m.IsBusy),
         Cmd(UiStrings.WaveMenuPrevTab, WaveMenuCommand.PrevTab, "Ctrl+Shift+Tab", m.HasMultipleTabs && !m.IsBusy),
@@ -561,6 +581,7 @@ internal static class WaveformContextMenuBuilder
 
             if (item.Children is { Count: > 0 })
             {
+                menuItem.StaysOpenOnClick = true;
                 AddItems(menuItem.Items, item.Children, onCommand);
             }
             else if (item.Command is { } command)

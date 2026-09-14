@@ -8,6 +8,7 @@ namespace MgaSonicAnvil.UI;
 public partial class MainWindow
 {
     private WaveformContextHit _waveMenuHit = new();
+    private bool _pendingContextMenuKey;
 
     private void OpenWaveformContextMenu(WaveformContextHit hit)
     {
@@ -17,10 +18,23 @@ public partial class MainWindow
         }
 
         _waveMenuHit = hit;
+        if (_waveMenu is { IsOpen: true })
+        {
+            _waveMenu.IsOpen = false;
+        }
+
         var menu = WaveformContextMenuBuilder.Create(
             WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(hit)),
             ExecuteWaveMenu,
             Waveform);
+        _waveMenu = menu;
+        menu.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_waveMenu, menu))
+            {
+                _waveMenu = null;
+            }
+        };
         menu.IsOpen = true;
     }
 
@@ -32,11 +46,50 @@ public partial class MainWindow
         }
 
         e.Handled = true;
-        var x = e.GetPosition(Overview).X;
+        OpenOverviewContextMenu(e.GetPosition(Overview).X);
+    }
+
+    private bool OpenContextMenuFromKeyboard()
+    {
+        if (IsUiBusy)
+        {
+            return true;
+        }
+
+        if (TryOpenTabContextMenuUnderPointer())
+        {
+            return true;
+        }
+
+        if (Overview.IsMouseOver)
+        {
+            OpenOverviewContextMenu(System.Windows.Input.Mouse.GetPosition(Overview).X);
+            return true;
+        }
+
+        return Waveform.TryRequestContextMenuFromKeyboard();
+    }
+
+    private void OpenOverviewContextMenu(double x)
+    {
         OpenWaveformContextMenu(new WaveformContextHit
         {
             Frame = (long)Math.Round(Overview.FrameAt(x)),
         });
+    }
+
+    private bool TryOpenTabContextMenuUnderPointer()
+    {
+        foreach (var border in DocumentTabs.Children.OfType<System.Windows.Controls.Border>())
+        {
+            if (border.IsMouseOver && border.Tag is DocumentSession session)
+            {
+                OpenTabContextMenu(border, session);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private WaveformContextMenuModel CaptureWaveMenuModel(WaveformContextHit hit)
@@ -146,6 +199,9 @@ public partial class MainWindow
             case WaveMenuCommand.Delete:
                 ApplyDelete();
                 break;
+            case WaveMenuCommand.DeleteSilence:
+                ApplyDeleteSilence();
+                break;
             case WaveMenuCommand.SelectAll:
                 Waveform.SelectAll();
                 break;
@@ -172,6 +228,9 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.Normalize:
                 ApplyNormalize();
+                break;
+            case WaveMenuCommand.NormalizePerRegion:
+                ApplyNormalizePerRegion();
                 break;
             case WaveMenuCommand.Volume:
                 PromptVolume();
@@ -329,6 +388,9 @@ public partial class MainWindow
             case WaveMenuCommand.AlwaysOnTop:
                 AlwaysOnTopCheck.IsChecked = AlwaysOnTopCheck.IsChecked != true;
                 break;
+            case WaveMenuCommand.NewDocument:
+                NewDocument();
+                break;
             case WaveMenuCommand.Open:
                 OpenFromDialog();
                 break;
@@ -346,6 +408,9 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.CloseAll:
                 CloseAllTabs();
+                break;
+            case WaveMenuCommand.CopyAllTabTimes:
+                CopyAllTabTimes();
                 break;
             case WaveMenuCommand.ReopenTab:
                 ReopenLastClosedTab();

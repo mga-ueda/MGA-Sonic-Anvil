@@ -55,7 +55,6 @@ internal sealed class RoundedButton : Button
     {
         DefaultStyleKeyProperty.OverrideMetadata(typeof(RoundedButton),
             new FrameworkPropertyMetadata(typeof(RoundedButton)));
-        FocusableProperty.OverrideMetadata(typeof(RoundedButton), new FrameworkPropertyMetadata(false));
         FocusVisualStyleProperty.OverrideMetadata(typeof(RoundedButton), new FrameworkPropertyMetadata(null));
     }
 
@@ -73,6 +72,7 @@ internal sealed class RoundedButton : Button
         SnapsToDevicePixels = true;
         UseLayoutRounding = true;
         Template = new ControlTemplate(typeof(Button));
+        KeyboardNavigation.SetAcceptsReturn(this, true);
         IsEnabledChanged += (_, _) => InvalidateVisual();
         Loaded += (_, _) => InvalidateVisual();
     }
@@ -176,6 +176,24 @@ internal sealed class RoundedButton : Button
         base.OnMouseLeftButtonUp(e);
     }
 
+    protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
+    {
+        InvalidateVisual();
+        base.OnGotKeyboardFocus(e);
+    }
+
+    protected override void OnLostKeyboardFocus(KeyboardFocusChangedEventArgs e)
+    {
+        InvalidateVisual();
+        base.OnLostKeyboardFocus(e);
+    }
+
+    protected override void OnIsPressedChanged(DependencyPropertyChangedEventArgs e)
+    {
+        InvalidateVisual();
+        base.OnIsPressedChanged(e);
+    }
+
     protected override void OnRender(DrawingContext dc)
     {
         var width = ActualWidth;
@@ -241,12 +259,12 @@ internal sealed class RoundedButton : Button
             return DisabledBackColor;
         }
 
-        if (_pressed && PressedBackColor is Color pressed)
+        if ((_pressed || IsPressed) && PressedBackColor is Color pressed)
         {
             return pressed;
         }
 
-        if (_hover && HoverBackColor is Color hover)
+        if ((_hover || IsKeyboardFocused) && HoverBackColor is Color hover)
         {
             return hover;
         }
@@ -266,12 +284,12 @@ internal sealed class RoundedButton : Button
             return DisabledBorderColor ?? BorderColor;
         }
 
-        if (_pressed)
+        if (_pressed || IsPressed)
         {
             return PressedBorderColor ?? BorderColor;
         }
 
-        if (_hover)
+        if (_hover || IsKeyboardFocused)
         {
             return HoverBorderColor ?? BorderColor;
         }

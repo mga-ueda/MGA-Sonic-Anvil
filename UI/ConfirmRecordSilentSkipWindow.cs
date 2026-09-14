@@ -55,6 +55,7 @@ internal sealed class ConfirmRecordSilentSkipWindow : Window
         SizeToContent = SizeToContent.WidthAndHeight;
         Background = (Brush)FindResource("WindowBackBrush");
         Foreground = (Brush)FindResource("PrimaryForeBrush");
+        KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Cycle);
         UseSilentSkip = useSilentSkip;
         AddRegion = addRegion;
 

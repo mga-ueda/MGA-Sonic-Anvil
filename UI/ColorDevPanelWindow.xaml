@@ -13,6 +13,7 @@
         Height="640"
         Background="{DynamicResource ColorPanelBackBrush}"
         Foreground="{DynamicResource PrimaryForeBrush}"
+        KeyboardNavigation.TabNavigation="Cycle"
         KeyDown="Window_KeyDown">
   <Grid Margin="10">
     <Grid.RowDefinitions>

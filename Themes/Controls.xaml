@@ -751,6 +751,11 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Style.Triggers>
+            <Trigger Property="Role" Value="SubmenuHeader">
+                <Setter Property="StaysOpenOnClick" Value="True" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <!-- ContextMenu は MenuItem.SeparatorStyleKey を使う（TargetType だけでは効かない）。 -->

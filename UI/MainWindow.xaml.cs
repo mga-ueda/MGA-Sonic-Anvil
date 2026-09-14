@@ -70,6 +70,7 @@ public partial class MainWindow : Window
     private System.Windows.Controls.ContextMenu? _volumeMenu;
     private System.Windows.Controls.ContextMenu? _pitchMenu;
     private System.Windows.Controls.ContextMenu? _timeStretchMenu;
+    private System.Windows.Controls.ContextMenu? _waveMenu;
     private FormatConvertKind _formatKind;
     private FormatSizePreview? _formatSizePreview;
     private readonly EffectPreviewState _formatPreview = new();
