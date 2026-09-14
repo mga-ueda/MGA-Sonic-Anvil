@@ -10,7 +10,7 @@ Hear, cut, mark, and loop game audio — then hand a Wave-only structure to Wwis
 
 Fade, normalize, ripple-delete, copy / paste, markers / regions / sample loop, and a spectrogram — decide by ear and commit. You can prep game one-shots and loops here without bouncing between a DAW and a dedicated editor.
 
-**EXPORT talks to Wwise in Wave-only mode.** Turn on WAAPI above the level meter, pick a destination, and EXPORT writes the source wave into Originals and imports it as a Music Playlist Container (markers / sample loop; no Custom Cues). Play -E previews the loop wrap and writes Play post-exit on EXPORT.
+**EXPORT talks to Wwise in Wave-only mode.** Turn on WAAPI above the level meter, pick a destination, and EXPORT writes the source wave into Originals and imports it as a Music Playlist Container (-A / -L / -E and the sample loop; markers are not Custom Cues). Play -E previews the loop wrap and writes Play post-exit on EXPORT.
 
 **You can also write MP3.** Recording itself stays PCM. A valid LAME path in Settings uses your `lame.exe`; empty or invalid uses Windows (default 192 kbps). Right-click a tab to export the current edits as Wave or MP3 (several tabs ask for a folder; dirty tabs stay dirty).
 
