@@ -6,7 +6,7 @@ namespace MgaSonicAnvil.Audio;
 /// <summary>
 /// ピークがしきい値未満の区間を、再生では飛ばし、録音では書き込まない。録音では長い無音を pad に縮める。
 /// しきい値は dBFS。判定は瞬間値ではなく、<see cref="PeakWindowMs"/> の窓内ピーク（録音は同じ尺のホールド）。
-/// しきい値付近の周期音の谷を間引いてピッチが上がるのを防ぐ。
+/// しきい値付近の周期音の谷だけが抜けてピッチが微妙に変わる不具合を防ぐ。
 /// </summary>
 internal static class SilentSkip
 {
