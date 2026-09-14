@@ -38,6 +38,7 @@ internal partial class TransportBar : UserControl
         AddGroup(
             bottomRow: false,
             () => UiStrings.LabelFileGroup,
+            (TransportCommand.NewDocument, TransportIcon.NewDocument, UiStrings.TipNewDocument, UiStrings.TooltipNew),
             (TransportCommand.Open, TransportIcon.Folder, UiStrings.TipOpen, UiStrings.TooltipOpen),
             (TransportCommand.Save, TransportIcon.Save, UiStrings.TipSave, UiStrings.TooltipSave),
             (TransportCommand.SaveAs, TransportIcon.SaveAs, UiStrings.TipSaveAs, UiStrings.TooltipSaveAs),
@@ -87,6 +88,7 @@ internal partial class TransportBar : UserControl
         SetTip(TransportCommand.AddMarker, UiStrings.TipAddMarker, UiStrings.TooltipAddMarker);
         SetTip(TransportCommand.SetLoop, UiStrings.TipSetLoop, UiStrings.TooltipSetLoop);
         SetTip(TransportCommand.SetRegion, UiStrings.TipSetRegion, UiStrings.TooltipSetRegion);
+        SetTip(TransportCommand.NewDocument, UiStrings.TipNewDocument, UiStrings.TooltipNew);
         SetTip(TransportCommand.Open, UiStrings.TipOpen, UiStrings.TooltipOpen);
         SetTip(TransportCommand.Save, UiStrings.TipSave, UiStrings.TooltipSave);
         SetTip(TransportCommand.SaveAs, UiStrings.TipSaveAs, UiStrings.TooltipSaveAs);
@@ -188,7 +190,7 @@ internal partial class TransportBar : UserControl
         {
             button.IsEnabled = enabled
                 || command is TransportCommand.Open
-                    or TransportCommand.Record
+                    or TransportCommand.NewDocument
                     or TransportCommand.OpenSettings
                     or TransportCommand.ToggleUiTheme
                     or TransportCommand.OpenColorPanel

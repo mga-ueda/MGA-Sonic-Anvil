@@ -172,6 +172,42 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void NormalizePerRegion_FitsEachRegionPeakAndFadesEdges()
+    {
+        var samples = new float[800];
+        Array.Fill(samples, 0.05f);
+        for (var i = 40; i < 400; i++)
+        {
+            samples[i] = 0.25f;
+        }
+
+        for (var i = 450; i < 750; i++)
+        {
+            samples[i] = 0.1f;
+        }
+
+        var document = new AudioDocument(samples, 48000, 1, 24, AudioFileKind.Wave, null);
+        document.SetRegions([new WaveSelection(40, 400), new WaveSelection(450, 750)]);
+        var command = ProcessEdits.NormalizePerRegion(document, fadeMs: 2);
+        Assert.NotNull(command);
+        new EditHistory().Do(document, command);
+
+        Assert.Equal("Normalize Per Region", command!.Name);
+        Assert.Equal(0f, document.Interleaved[40], 5);
+        Assert.InRange(document.Interleaved[220], 0.97f, 1.0f);
+        Assert.Equal(0f, document.Interleaved[399], 5);
+        Assert.InRange(document.Interleaved[600], 0.97f, 1.0f);
+        Assert.Equal(0.05f, document.Interleaved[420], 5);
+    }
+
+    [Fact]
+    public void NormalizePerRegion_ReturnsNullWhenNoRegions()
+    {
+        var document = MakeConstant(frames: 8, value: 0.5f);
+        Assert.Null(ProcessEdits.NormalizePerRegion(document));
+    }
+
+    [Fact]
     public void Normalize_RaisesPeakNearMinusPointOneDb()
     {
         var samples = new float[200];
@@ -364,6 +400,134 @@ public sealed class ProcessEditsTests
         var document = MakeConstant(frames: 4, value: 0.5f);
         Assert.Null(ProcessEdits.Gain(document, new WaveSelection(0, 4), 0));
         Assert.Null(ProcessEdits.Gain(document, WaveSelection.Empty, 3));
+    }
+
+    [Fact]
+    public void DeleteSilence_RemovesSilentSpansAndShiftsMarkers()
+    {
+        const int rate = 1000;
+        const int audible = 20;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var silent = radius * 2 + 20;
+        const int tail = 20;
+        var document = MakeToneWithSilence(audible, silent, tail, rate);
+        var hole = audible + radius + 10;
+        var afterHole = audible + silent + 2;
+        document.TryAddMarker(10);
+        document.TryAddMarker(hole);
+        document.TryAddMarker(afterHole);
+        document.SetRegion(new WaveSelection(0, document.FrameCount));
+        document.SetSampleLoop(new WaveSelection(15, afterHole));
+        document.CursorFrame = afterHole;
+        var history = new EditHistory();
+        var command = ProcessEdits.DeleteSilence(document, new WaveSelection(0, document.FrameCount), -60);
+        Assert.NotNull(command);
+        var beforeCount = audible + silent + tail;
+        history.Do(document, command);
+
+        Assert.Equal(beforeCount - 20, document.FrameCount);
+        Assert.Equal(0.5f, document.Interleaved[0], 5);
+        Assert.Equal(new long[] { 10, afterHole - 20 }, document.Markers.Select(marker => marker.Frame));
+        Assert.Equal(new WaveSelection(0, document.FrameCount), document.Region);
+        Assert.Equal(new WaveSelection(15, afterHole - 20), document.SampleLoop);
+        Assert.Equal(afterHole - 20, document.CursorFrame);
+        Assert.True(history.Undo(document));
+        Assert.Equal(beforeCount, document.FrameCount);
+        Assert.Equal(new long[] { 10, hole, afterHole }, document.Markers.Select(marker => marker.Frame));
+    }
+
+    [Fact]
+    public void DeleteSilence_FadesSpliceEdges()
+    {
+        const int rate = 1000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var silent = radius * 2 + 20;
+        const int tail = 20;
+        const int audible = 20;
+        var document = MakeToneWithSilence(audible, silent, tail, rate);
+        var range = new WaveSelection(0, document.FrameCount);
+        var runs = SilentSkip.CollectAudibleSpans(
+            document.Interleaved,
+            document.Channels,
+            range.StartFrame,
+            range.EndFrame,
+            SilentSkip.LinearFromDb(-60),
+            0,
+            radius);
+        Assert.Equal(2, runs.Count);
+        var command = ProcessEdits.DeleteSilence(document, range, -60);
+        Assert.NotNull(command);
+        new EditHistory().Do(document, command);
+
+        Assert.Equal(0.5f, document.Interleaved[0], 5);
+        var firstEnd = (int)runs[0].Length - 1;
+        Assert.True(Math.Abs(document.Interleaved[firstEnd * 2]) < 0.5f);
+        Assert.True(Math.Abs(document.Interleaved[(firstEnd + 1) * 2]) < 0.5f);
+    }
+
+    [Fact]
+    public void DeleteSilence_KeepsNearThresholdTone()
+    {
+        var document = MakeNearThresholdSine(cycles: 8);
+        Assert.Null(ProcessEdits.DeleteSilence(document, new WaveSelection(0, document.FrameCount), -60));
+        Assert.Equal(document.FrameCount, document.Interleaved.Length / 2);
+    }
+
+    [Fact]
+    public void DeleteSilence_ReturnsNullWhenNoSilence()
+    {
+        var document = MakeConstant(frames: 8, value: 0.5f);
+        Assert.Null(ProcessEdits.DeleteSilence(document, new WaveSelection(0, 8), -60));
+    }
+
+    [Fact]
+    public void DeleteSilence_ReturnsNullWhenWholeFileIsSilent()
+    {
+        var document = MakeConstant(frames: 8, value: 0f);
+        Assert.Null(ProcessEdits.DeleteSilence(document, new WaveSelection(0, 8), -60));
+    }
+
+    [Fact]
+    public void DeleteSilence_DetectsSilenceOnSoloedChannelOnly()
+    {
+        const int rate = 1000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var silent = radius * 2 + 20;
+        var frames = 20 + silent + 10;
+        var samples = new float[frames * 2];
+        Array.Fill(samples, 0.5f);
+        for (var i = 20; i < 20 + silent; i++)
+        {
+            samples[i * 2] = 0f;
+        }
+
+        var document = new AudioDocument(samples, rate, 2, 24, AudioFileKind.Wave, null);
+        Assert.Null(ProcessEdits.DeleteSilence(document, new WaveSelection(0, frames), -60));
+
+        var command = ProcessEdits.DeleteSilence(
+            document,
+            new WaveSelection(0, frames),
+            -60,
+            channelMask: ChannelSolo.MaskOf(0));
+        Assert.NotNull(command);
+        new EditHistory().Do(document, command);
+        Assert.Equal(frames - 20, document.FrameCount);
+        Assert.Equal(0.5f, document.Interleaved[0], 5);
+        Assert.Equal(0.5f, document.Interleaved[1], 5);
+    }
+
+    [Fact]
+    public void DeleteSilence_RemovesPartialRangeWhenItIsAllSilent()
+    {
+        const int rate = 1000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var silent = radius * 2 + 20;
+        var document = MakeToneWithSilence(30, silent, 30, rate);
+        var core = new WaveSelection(30 + radius, 30 + silent - radius);
+        var command = ProcessEdits.DeleteSilence(document, core, -60);
+        Assert.NotNull(command);
+        new EditHistory().Do(document, command);
+        Assert.Equal(110, document.FrameCount);
     }
 
     [Fact]
@@ -712,5 +876,40 @@ public sealed class ProcessEditsTests
         }
 
         return new AudioDocument(samples, 48000, 2, 24, AudioFileKind.Wave, null);
+    }
+
+    private static AudioDocument MakeNearThresholdSine(int cycles)
+    {
+        const int rate = 48000;
+        const double hertz = 200;
+        var frames = (int)Math.Round(rate / hertz * cycles);
+        var peak = SilentSkip.LinearFromDb(-60) * 1.5f;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            var value = (float)Math.Sin(2 * Math.PI * hertz * i / rate) * peak;
+            samples[i * 2] = value;
+            samples[i * 2 + 1] = value;
+        }
+
+        return new AudioDocument(samples, rate, 2, 24, AudioFileKind.Wave, null);
+    }
+
+    private static AudioDocument MakeToneWithSilence(int audible, int silent, int tail, int sampleRate = 1000)
+    {
+        var frames = audible + silent + tail;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            if (i >= audible && i < audible + silent)
+            {
+                continue;
+            }
+
+            samples[i * 2] = 0.5f;
+            samples[i * 2 + 1] = 0.5f;
+        }
+
+        return new AudioDocument(samples, sampleRate, 2, 24, AudioFileKind.Wave, null);
     }
 }

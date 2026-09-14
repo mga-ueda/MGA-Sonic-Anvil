@@ -12,8 +12,10 @@ public partial class MainWindow
     private readonly AudioRecorder _recorder = new();
     private readonly DispatcherTimer _recordTimer;
     private DocumentSession? _recordSession;
-    private float[] _recordPrefix = [];
-    private int _recordSettledTakeSamples;
+    private float[] _recordBefore = [];
+    private long _recordStartFrame;
+    private int _recordTakeFrames;
+    private int _recordSettledTakeFrames;
     private int _recordChromeTick;
     private bool _recording;
     private bool _recordUsedSilentSkip;
@@ -33,7 +35,7 @@ public partial class MainWindow
 
     private void StartRecording()
     {
-        if (IsUiBusy || _recording)
+        if (IsUiBusy || _recording || _activeSession is not { } session)
         {
             return;
         }
@@ -49,6 +51,7 @@ public partial class MainWindow
             _player.ReleaseOutput();
         }
 
+        var document = session.Document;
         var settings = AppStorage.Settings;
         var speaker = settings.ResolvedSpeaker();
         var layout = settings.ResolvedRecordLayout();
@@ -59,7 +62,9 @@ public partial class MainWindow
                 settings.ResolvedRecordDeviceId(),
                 layout,
                 speaker.RecordInputMap,
-                speaker.FileChannelMap);
+                speaker.FileChannelMap,
+                document.Channels,
+                document.SampleRate);
         }
         catch (Exception ex)
         {
@@ -72,39 +77,21 @@ public partial class MainWindow
             return;
         }
 
-        var session = FindContinuableRecording(_recorder.SampleRate, _recorder.Channels);
-        if (session is null)
-        {
-            var channels = Math.Max(1, _recorder.Channels);
-            var document = new AudioDocument(
-                [],
-                _recorder.SampleRate,
-                channels,
-                24,
-                AudioFileKind.Wave,
-                null)
-            {
-                CanContinueRecording = true,
-            };
-            document.SetDirty(true);
-            session = new DocumentSession(document);
-            _sessions.Add(session);
-        }
-
-        _recordPrefix = CopyUsedSamples(session.Document);
-        if (_recordPrefix.Length > 0)
-        {
-            _recorder.MarkTakeHasAudio();
-        }
-
-        _recordSettledTakeSamples = 0;
+        _recordStartFrame = Math.Clamp(Waveform.PlayheadFrame, 0, document.FrameCount);
+        var tailFrames = document.FrameCount - _recordStartFrame;
+        _recordBefore = tailFrames > 0 ? document.CopyRange(_recordStartFrame, tailFrames) : [];
+        _recordTakeFrames = 0;
+        _recordSettledTakeFrames = 0;
         _recordChromeTick = 0;
         _recordSession = session;
         _recordUsedSilentSkip = SilentSkipCheck.IsChecked == true;
         _recording = true;
         ActivateSession(session);
+        document.RefreshPeaks();
         Waveform.SetLiveRecording(true);
-        Waveform.RevealFrame(session.Document.FrameCount);
+        Waveform.SetLiveRecordSettledFrame(_recordStartFrame);
+        Waveform.PlayheadFrame = _recordStartFrame;
+        Waveform.RevealFrame(_recordStartFrame);
         Overview.Refresh();
         Transport.SetRecording(true);
         _recordTimer.Start();
@@ -144,8 +131,6 @@ public partial class MainWindow
         _recordTimer.Stop();
         float[] samples;
         RecordedSpan[] spans;
-        var rate = _recorder.SampleRate;
-        var channels = _recorder.Channels;
         try
         {
             samples = _recorder.StopAndTake();
@@ -160,27 +145,56 @@ public partial class MainWindow
         _recording = false;
         Transport.SetRecording(false);
         var session = _recordSession;
+        var start = _recordStartFrame;
+        var before = _recordBefore;
         _recordSession = null;
+        _recordBefore = [];
+        _recordTakeFrames = 0;
+        _recordSettledTakeFrames = 0;
+        _recordChromeTick = 0;
         if (session is null)
         {
-            _recordPrefix = [];
             _recordUsedSilentSkip = false;
             Waveform.SetLiveRecording(false);
             return;
         }
 
-        var takeStart = PrefixFrameCount(_recordPrefix.Length, channels);
-        ApplyRecordedTake(session.Document, samples, rate, channels, rebuildPeaks: false);
-        session.Document.CommitLiveSamples(rebuildPeaks: true);
-        TryAddSilentSkipRecordRegion(session, takeStart, spans);
-        session.Document.CursorFrame = takeStart;
-        session.PlayheadFrame = takeStart;
-        _recordPrefix = [];
-        _recordSettledTakeSamples = 0;
-        _recordChromeTick = 0;
+        var document = session.Document;
+        var take = PrepareRecordTake(samples, document, spans, fadeOpenTail: true);
+        var command = ProcessEdits.RecordOverwrite(document, start, before, take);
+        if (command is null)
+        {
+            document.WriteLiveFrom(start, before);
+            document.CommitLiveSamples(rebuildPeaks: true);
+            Waveform.SetLiveRecording(false);
+            _recordUsedSilentSkip = false;
+            Waveform.PlayheadFrame = start;
+            session.PlayheadFrame = start;
+            if (ReferenceEquals(_document, document))
+            {
+                AfterEdit();
+            }
+            else
+            {
+                RefreshTabHeaders();
+            }
+
+            return;
+        }
+
+        var after = ProcessEdits.CombineTakeAndLeftover(take, before, document.Channels);
+        document.WriteLiveFrom(start, after);
+        document.CommitLiveSamples(rebuildPeaks: true);
+        session.History.AcceptApplied(document, command);
+        document.CaptureFormatOrigin();
+        var takeEnd = start + (take.Length / Math.Max(1, document.Channels));
+        TryAddSilentSkipRecordRegion(session, start, takeEnd, spans);
+        document.CursorFrame = takeEnd;
+        session.PlayheadFrame = takeEnd;
+        Waveform.PlayheadFrame = takeEnd;
         _recordUsedSilentSkip = false;
         Waveform.SetLiveRecording(false);
-        if (ReferenceEquals(_document, session.Document))
+        if (ReferenceEquals(_document, document))
         {
             AfterEdit();
         }
@@ -193,6 +207,7 @@ public partial class MainWindow
     private void TryAddSilentSkipRecordRegion(
         DocumentSession session,
         long takeStart,
+        long takeEnd,
         RecordedSpan[] spans)
     {
         if (!_recordUsedSilentSkip || !AppStorage.Settings.SilentSkipRecordAddRegion)
@@ -235,7 +250,7 @@ public partial class MainWindow
             document,
             before,
             after.ToArray(),
-            SilentSkip.RecordTakeRegion(takeStart, document.FrameCount));
+            SilentSkip.RecordTakeRegion(takeStart, takeEnd));
         if (command is null)
         {
             return;
@@ -263,104 +278,76 @@ public partial class MainWindow
         }
 
         var document = _recordSession.Document;
-        var channels = Math.Max(1, _recorder.Channels);
-        var prefix = _recordPrefix.Length;
-        var have = document.SampleCount;
-        if (have < prefix)
-        {
-            ApplyRecordedTake(document, _recorder.Snapshot(), _recorder.SampleRate, channels, rebuildPeaks: true);
-            _recordSettledTakeSamples = Math.Max(0, document.SampleCount - prefix);
-            RefreshRecordChrome(rebuildWaveform: true, rebuildOverview: true);
-            return;
-        }
-
-        var delta = _recorder.SnapshotFrom(have - prefix);
-        if (delta.Length < channels)
-        {
-            RefreshRecordChrome(rebuildWaveform: false, rebuildOverview: false);
-            return;
-        }
-
-        document.CanContinueRecording = true;
-        document.AppendLiveSamples(delta);
-        var takeSamples = document.SampleCount - prefix;
-        var settle = RecordContinue.DrawSettleFrames(_recorder.SampleRate) * channels;
-        var rebuildPeaks = takeSamples - _recordSettledTakeSamples >= settle;
+        var take = PrepareRecordTake(
+            _recorder.Snapshot(),
+            document,
+            _recorder.TakeWrittenSpans(),
+            fadeOpenTail: false);
+        var after = ProcessEdits.CombineTakeAndLeftover(take, _recordBefore, document.Channels);
+        document.WriteLiveFrom(_recordStartFrame, after);
+        _recordTakeFrames = take.Length / Math.Max(1, document.Channels);
+        var settle = RecordContinue.DrawSettleFrames(document.SampleRate);
+        var rebuildPeaks = _recordTakeFrames - _recordSettledTakeFrames >= settle;
         if (rebuildPeaks)
         {
             document.RefreshPeaks();
-            _recordSettledTakeSamples = takeSamples;
+            _recordSettledTakeFrames = _recordTakeFrames;
         }
 
-        document.CursorFrame = document.FrameCount;
+        document.CursorFrame = _recordStartFrame + _recordTakeFrames;
         RefreshRecordChrome(rebuildWaveform: true, rebuildOverview: rebuildPeaks);
     }
 
-    private void ApplyRecordedTake(
+    private float[] PrepareRecordTake(
+        float[] samples,
         AudioDocument document,
-        float[] take,
-        int sampleRate,
-        int channels,
-        bool rebuildPeaks)
+        RecordedSpan[] spans,
+        bool fadeOpenTail)
     {
-        channels = Math.Max(1, channels);
+        var take = MatchRecordTake(samples, document);
+        if (_recordUsedSilentSkip && take.Length > 0)
+        {
+            ClickGuard.FadeRecordedAudio(
+                take,
+                document.Channels,
+                spans,
+                document.SampleRate,
+                _recorder.SampleRate,
+                fadeOpenTail,
+                AppStorage.Settings.ResolvedClickGuardFadeMs());
+        }
+
+        return take;
+    }
+
+    private float[] MatchRecordTake(float[] take, AudioDocument document)
+    {
+        var channels = Math.Max(1, document.Channels);
         if (take.Length < channels)
-        {
-            take = [];
-        }
-
-        document.CanContinueRecording = true;
-        var prefixLength = _recordPrefix.Length;
-        var target = prefixLength + take.Length;
-        var have = document.SampleCount;
-        if (have < prefixLength || target < have)
-        {
-            document.ReplaceAudio(CombinePrefixAndTake(_recordPrefix, take), sampleRate, channels, 24, rebuildPeaks: true);
-        }
-        else if (target > have)
-        {
-            document.AppendLiveSamples(take.AsSpan(have - prefixLength));
-        }
-
-        if (rebuildPeaks)
-        {
-            document.RefreshPeaks();
-        }
-    }
-
-    private static int PrefixFrameCount(int prefixSamples, int channels)
-    {
-        channels = Math.Max(1, channels);
-        return Math.Max(0, prefixSamples / channels);
-    }
-
-    private static float[] CopyUsedSamples(AudioDocument document)
-    {
-        var used = document.SampleCount;
-        if (used == 0)
         {
             return [];
         }
 
-        var copy = new float[used];
-        Array.Copy(document.Interleaved, copy, used);
-        return copy;
-    }
-
-    private static float[] CombinePrefixAndTake(float[] prefix, float[] take)
-    {
-        var combined = new float[prefix.Length + take.Length];
-        if (prefix.Length > 0)
+        var aligned = take.Length - (take.Length % channels);
+        if (aligned != take.Length)
         {
-            Array.Copy(prefix, combined, prefix.Length);
+            if (aligned <= 0)
+            {
+                return [];
+            }
+
+            var trimmed = new float[aligned];
+            Array.Copy(take, trimmed, aligned);
+            take = trimmed;
         }
 
-        if (take.Length > 0)
+        var sourceRate = _recorder.SampleRate;
+        if (sourceRate >= 1000 && sourceRate != document.SampleRate)
         {
-            Array.Copy(take, 0, combined, prefix.Length, take.Length);
+            take = FormatConvert.Resample(take, channels, sourceRate, document.SampleRate);
         }
 
-        return combined;
+        return take;
     }
 
     private void RefreshRecordChrome(bool rebuildWaveform, bool rebuildOverview)
@@ -370,11 +357,13 @@ public partial class MainWindow
             return;
         }
 
+        var playhead = _recordStartFrame + _recordTakeFrames;
         Waveform.SetLiveRecording(true);
-        Waveform.PlayheadFrame = _recordSession.Document.FrameCount;
+        Waveform.SetLiveRecordSettledFrame(_recordStartFrame + _recordSettledTakeFrames);
+        Waveform.PlayheadFrame = playhead;
         if (rebuildWaveform)
         {
-            Waveform.RevealFrame(_recordSession.Document.FrameCount);
+            Waveform.RevealFrame(playhead);
             Waveform.RefreshLive(rebuildOverview);
         }
 
@@ -390,24 +379,5 @@ public partial class MainWindow
             RefreshStatus();
             RefreshTabHeaders();
         }
-    }
-
-    private DocumentSession? FindContinuableRecording(int sampleRate, int channels)
-    {
-        if (_activeSession is not null
-            && RecordContinue.Matches(_activeSession.Document, sampleRate, channels))
-        {
-            return _activeSession;
-        }
-
-        for (var i = _sessions.Count - 1; i >= 0; i--)
-        {
-            if (RecordContinue.Matches(_sessions[i].Document, sampleRate, channels))
-            {
-                return _sessions[i];
-            }
-        }
-
-        return null;
     }
 }

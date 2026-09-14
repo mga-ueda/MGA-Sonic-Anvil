@@ -34,6 +34,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("(M)", UiStrings.TooltipAddMarker);
         Assert.Contains("Shift+L", UiStrings.TooltipSetLoop);
         Assert.Contains("Shift+R", UiStrings.TooltipSetRegion);
+        Assert.Contains("Ctrl+N", UiStrings.TooltipNew);
         Assert.Contains("Ctrl+O", UiStrings.TooltipOpen);
         Assert.Contains("Ctrl+Shift+O", UiStrings.TooltipSettings);
         Assert.Contains("Ctrl+Shift+S", UiStrings.TooltipSaveAs);
@@ -46,6 +47,10 @@ public sealed class TransportToolTipTests
         Assert.Contains("Ctrl+Shift+C", UiStrings.TooltipColorPanel);
         Assert.Contains("Alt+S", UiStrings.TipSilentSkip);
         Assert.Contains("Ctrl+Space", UiStrings.TipPlay);
+        Assert.Contains("Ctrl+N", UiStrings.TipOpen);
+        Assert.Contains("Shift+F10", UiStrings.TipWaveform);
+        Assert.Contains("20", UiStrings.TipClickGuardFade);
+        Assert.Contains("Wwise.exe", UiStrings.TipWwiseProjectNameOpen);
     }
 
     [Fact]

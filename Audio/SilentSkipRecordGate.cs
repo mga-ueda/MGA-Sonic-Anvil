@@ -12,6 +12,8 @@ internal sealed class SilentSkipRecordGate
 
     private int _channels = 1;
     private int _padFrames;
+    private int _holdFrames;
+    private int _holdLeft;
     private float _floor;
     private bool _enabled;
     private bool _hasWritten;
@@ -32,6 +34,7 @@ internal sealed class SilentSkipRecordGate
         _hasWritten = hasWritten;
         _closed = false;
         _silentWritten = 0;
+        _holdLeft = 0;
         _spans.Clear();
         _writtenFrames = 0;
         _audioStart = 0;
@@ -41,11 +44,12 @@ internal sealed class SilentSkipRecordGate
         _padCommitted = false;
     }
 
-    public void Configure(bool enabled, float thresholdLinear, int padFrames, int channels)
+    public void Configure(bool enabled, float thresholdLinear, int padFrames, int channels, int holdFrames = 0)
     {
         _enabled = enabled;
         _floor = thresholdLinear;
         _padFrames = Math.Max(0, padFrames);
+        _holdFrames = Math.Max(0, holdFrames);
         _channels = Math.Max(1, channels);
         if (_silentWritten > _padFrames)
         {
@@ -78,6 +82,22 @@ internal sealed class SilentSkipRecordGate
 
         if (IsSilent(frame[.._channels]))
         {
+            if (_holdLeft > 0)
+            {
+                if (dest.Length < _channels)
+                {
+                    return 0;
+                }
+
+                _holdLeft--;
+                frame[.._channels].CopyTo(dest);
+                _hasWritten = true;
+                _closed = false;
+                _silentWritten = 0;
+                NoteAudioFrame();
+                return _channels;
+            }
+
             if (!_hasWritten)
             {
                 return 0;
@@ -114,6 +134,7 @@ internal sealed class SilentSkipRecordGate
         _hasWritten = true;
         _closed = false;
         _silentWritten = 0;
+        _holdLeft = _holdFrames;
         NoteAudioFrame();
         return _channels;
     }

@@ -1139,6 +1139,33 @@ public partial class MainWindow
         AfterTransform();
     }
 
+    private void ApplyNormalizePerRegion()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        if (!_document.AllowsRegionsAndLoops || _document.Regions.Count == 0)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoRegions, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var command = ProcessEdits.NormalizePerRegion(
+            _document,
+            channelMask: EditMask(),
+            fadeMs: AppStorage.Settings.ResolvedClickGuardFadeMs());
+        if (command is null)
+        {
+            return;
+        }
+
+        StopPlaybackForEdit();
+        _history.Do(_document, command);
+        AfterTransform();
+    }
+
     private void ApplyVolume(double gainDb)
     {
         if (_document is null)
@@ -1389,6 +1416,54 @@ public partial class MainWindow
 
         StopPlaybackForEdit();
         _history.Do(_document, ProcessEdits.Delete(_document, range, channelMask: EditMask()));
+        AfterEdit();
+    }
+
+    private void ApplyDeleteSilence()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var thresholdDb = AppStorage.Settings.ResolvedSilentSkipThresholdDb();
+        var command = ProcessEdits.DeleteSilence(
+            _document,
+            range,
+            thresholdDb,
+            channelMask: EditMask(),
+            fadeMs: AppStorage.Settings.ResolvedClickGuardFadeMs());
+        if (command is null)
+        {
+            var remaining = SilentSkip.CopyAudibleRange(
+                _document.Interleaved,
+                _document.Channels,
+                range.StartFrame,
+                range.EndFrame,
+                SilentSkip.LinearFromDb(thresholdDb),
+                EditMask(),
+                SilentSkip.PeakWindowRadiusFrames(_document.SampleRate));
+            var remainingFrames = remaining.Length / Math.Max(1, _document.Channels);
+            OwnerCenteredMessageBox.Show(
+                this,
+                remainingFrames == 0 && DeletesWholeFile(range)
+                    ? UiStrings.ErrorEmptyAfterDelete
+                    : UiStrings.ErrorNoSilenceToDelete,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        StopPlaybackForEdit();
+        _history.Do(_document, command);
         AfterEdit();
     }
 

@@ -870,7 +870,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                         srcCh,
                         _cursor / srcCh,
                         _silentSkipLinear,
-                        _soloMask))
+                        _soloMask,
+                        SilentSkip.PeakWindowRadiusFrames(_sourceRate)))
                 {
                     break;
                 }
@@ -1082,7 +1083,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return false;
         }
 
-        if (!SilentSkip.IsFrameSilent(_samples, srcCh, start, _silentSkipLinear, _soloMask))
+        var hold = SilentSkip.PeakWindowRadiusFrames(_sourceRate);
+        if (!SilentSkip.IsFrameSilent(_samples, srcCh, start, _silentSkipLinear, _soloMask, hold))
         {
             return false;
         }
@@ -1093,7 +1095,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             start,
             end,
             _silentSkipLinear,
-            _soloMask);
+            _soloMask,
+            hold);
         if (next < end)
         {
             ApplySilentSkipJump(next, srcCh, wrapped: false);
@@ -1109,7 +1112,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 (long)loopStart,
                 end,
                 _silentSkipLinear,
-                _soloMask);
+                _soloMask,
+                hold);
             if (wrap < end)
             {
                 ApplySilentSkipJump(wrap, srcCh, wrapped: true);

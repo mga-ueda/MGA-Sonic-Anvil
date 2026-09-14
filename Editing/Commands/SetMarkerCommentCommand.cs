@@ -25,7 +25,7 @@ internal sealed class SetMarkerCommentCommand : IEditCommand
 
     public HistoryRecipe? Persist { get; set; }
 
-    public void Apply(AudioDocument document) => document.TrySetMarkerComment(_frame, _after);
+    public void Apply(AudioDocument document) => document.TrySetMarkerComment(_frame, _after, normalize: false);
 
-    public void Revert(AudioDocument document) => document.TrySetMarkerComment(_frame, _before);
+    public void Revert(AudioDocument document) => document.TrySetMarkerComment(_frame, _before, normalize: false);
 }

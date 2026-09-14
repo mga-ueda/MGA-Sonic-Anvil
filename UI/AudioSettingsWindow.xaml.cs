@@ -35,6 +35,8 @@ internal partial class AudioSettingsWindow : Window
 
     public int SelectedSilentSkipRecordPadMs { get; private set; }
 
+    public int SelectedClickGuardFadeMs { get; private set; }
+
     public int SelectedMp3BitRate { get; private set; }
 
     public string SelectedLameExePath { get; private set; } = string.Empty;
@@ -50,6 +52,12 @@ internal partial class AudioSettingsWindow : Window
     public string SelectedActiveSpeakerId { get; private set; } = string.Empty;
 
     public string SelectedRecordDeviceId { get; private set; } = string.Empty;
+
+    public int SelectedDefaultSampleRate { get; private set; } = DefaultAudioFormat.SampleRate;
+
+    public int SelectedDefaultBitsPerSample { get; private set; } = DefaultAudioFormat.BitsPerSample;
+
+    public string SelectedDefaultChannelLayout { get; private set; } = DefaultAudioFormat.ChannelLayoutId;
 
     private readonly List<SpeakerPreset> _presets;
     private readonly HashSet<string> _visibleIds;
@@ -78,13 +86,17 @@ internal partial class AudioSettingsWindow : Window
         double loudnessTargetLufs,
         double silentSkipThresholdDb,
         int silentSkipRecordPadMs,
+        int clickGuardFadeMs,
         int mp3BitRate,
         string lameExePath,
         string lameOptions,
         int exportParallelism,
         IEnumerable<SpeakerPreset> presets,
         string activeSpeakerId,
-        IEnumerable<string>? visibleSpeakerIds = null)
+        IEnumerable<string>? visibleSpeakerIds = null,
+        int defaultSampleRate = DefaultAudioFormat.SampleRate,
+        int defaultBitsPerSample = DefaultAudioFormat.BitsPerSample,
+        string? defaultChannelLayout = null)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
@@ -92,6 +104,7 @@ internal partial class AudioSettingsWindow : Window
         SelectedLoudnessTargetLufs = LoudnessMeterEngine.ClampTargetLufs(loudnessTargetLufs);
         SelectedSilentSkipThresholdDb = SilentSkip.ClampThresholdDb(silentSkipThresholdDb);
         SelectedSilentSkipRecordPadMs = SilentSkip.ClampRecordPadMs(silentSkipRecordPadMs);
+        SelectedClickGuardFadeMs = ClickGuard.ClampFadeMs(clickGuardFadeMs);
         SelectedMp3BitRate = Mp3Encode.ClampWindowsBitRate(mp3BitRate);
         SelectedLameExePath = lameExePath ?? string.Empty;
         SelectedLameOptions = lameOptions ?? string.Empty;
@@ -109,6 +122,13 @@ internal partial class AudioSettingsWindow : Window
         SelectedRecordDeviceId = AudioCaptureFactory.ResolveRecordDeviceId(
             SelectedSettings.Api,
             SelectedSettings.DeviceId);
+        var format = DefaultAudioFormat.Resolve(
+            defaultSampleRate,
+            defaultBitsPerSample,
+            defaultChannelLayout);
+        SelectedDefaultSampleRate = format.SampleRate;
+        SelectedDefaultBitsPerSample = format.BitsPerSample;
+        SelectedDefaultChannelLayout = format.Layout.Id;
         _recordInputMap = [.. speaker.RecordInputMap ?? []];
         _playbackOutputMap = [.. speaker.PlaybackOutputMap ?? []];
         _fileChannelMap = [.. speaker.FileChannelMap ?? []];
@@ -145,10 +165,8 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(CancelButton);
         ActionButtonLooks.ApplyClear(LameBrowseButton);
 
-        _fadeInRow = CreateFadeRow(UiStrings.LabelDefaultFadeIn, fadeIn, isFadeIn: true);
-        _fadeOutRow = CreateFadeRow(UiStrings.LabelDefaultFadeOut, fadeOut, isFadeIn: false);
-        FadeRowsHost.Children.Add(_fadeInRow.Host);
-        FadeRowsHost.Children.Add(_fadeOutRow.Host);
+        _fadeInRow = CreateFadeRow(UiStrings.LabelDefaultFadeIn, fadeIn, isFadeIn: true, row: 0);
+        _fadeOutRow = CreateFadeRow(UiStrings.LabelDefaultFadeOut, fadeOut, isFadeIn: false, row: 1);
         UiThemeService.Changed += OnUiThemeChanged;
         Closed += (_, _) => UiThemeService.Changed -= OnUiThemeChanged;
 
@@ -159,11 +177,13 @@ internal partial class AudioSettingsWindow : Window
         LoudnessTargetBox.Text = SelectedLoudnessTargetLufs.ToString("0.#", CultureInfo.InvariantCulture);
         SilentSkipThresholdBox.Text = SelectedSilentSkipThresholdDb.ToString("0.#", CultureInfo.InvariantCulture);
         SilentSkipRecordPadBox.Text = SelectedSilentSkipRecordPadMs.ToString(CultureInfo.InvariantCulture);
+        ClickGuardFadeBox.Text = SelectedClickGuardFadeMs.ToString(CultureInfo.InvariantCulture);
         FillWindowsBitRates(SelectedMp3BitRate);
         LamePathBox.Text = SelectedLameExePath;
         LameOptionsBox.Text = Mp3Encode.ResolveLameOptions(SelectedLameOptions);
         FillExportParallelism(SelectedExportParallelism);
         FillAssociations();
+        FillDefaultAudioFormat();
         ApplyTips();
         ReflowSettingsWindow();
         WindowPlacement.TryApplySettings(this, AppStorage.Settings);
@@ -188,7 +208,15 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(LanguageCombo, UiStrings.TipUiLanguage);
         TipService.Set(ThemeLabel, UiStrings.TipUiTheme);
         TipService.Set(ThemeCombo, UiStrings.TipUiTheme);
+        TipService.Set(DefaultFormatHeader, UiStrings.TipDefaultAudioFormat);
+        TipService.Set(DefaultSampleRateLabel, UiStrings.TipDefaultAudioFormat);
+        TipService.Set(DefaultSampleRateCombo, UiStrings.TipDefaultAudioFormat);
+        TipService.Set(DefaultBitDepthLabel, UiStrings.TipDefaultAudioFormat);
+        TipService.Set(DefaultBitDepthCombo, UiStrings.TipDefaultAudioFormat);
+        TipService.Set(DefaultChannelLayoutLabel, UiStrings.TipDefaultAudioFormat);
+        TipService.Set(DefaultChannelLayoutCombo, UiStrings.TipDefaultAudioFormat);
         TipService.Set(AssociationHeader, UiStrings.TipFileAssociations);
+        TipService.Set(SpeakerIoHeader, UiStrings.TipSpeakerPreset);
         TipService.Set(SpeakerLabel, UiStrings.TipSpeakerPreset);
         TipService.Set(SpeakerCombo, UiStrings.TipSpeakerPreset);
         TipService.Set(SpeakerVisibilityHeader, UiStrings.TipSpeakerVisibility);
@@ -215,6 +243,9 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(SilentSkipRecordPadLabel, UiStrings.TipSilentSkipRecordPad);
         TipService.Set(SilentSkipRecordPadBox, UiStrings.TipSilentSkipRecordPad);
         TipService.Set(SilentSkipRecordPadUnit, UiStrings.TipSilentSkipRecordPad);
+        TipService.Set(ClickGuardFadeLabel, UiStrings.TipClickGuardFade);
+        TipService.Set(ClickGuardFadeBox, UiStrings.TipClickGuardFade);
+        TipService.Set(ClickGuardFadeUnit, UiStrings.TipClickGuardFade);
         TipService.Set(FadeDefaultsHeader, UiStrings.TipFadeCurveDefaults);
         TipService.Set(Mp3Header, UiStrings.TipMp3Encode);
         TipService.Set(WindowsBitRateLabel, UiStrings.TipWindowsMp3BitRate);
@@ -424,6 +455,20 @@ internal partial class AudioSettingsWindow : Window
         }
 
         SelectedSilentSkipRecordPadMs = recordPadMs;
+        if (!ClickGuard.TryParseFadeMs(ClickGuardFadeBox.Text, out var clickFadeMs))
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorClickGuardFadeRange,
+                UiStrings.DialogSettingsTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            ClickGuardFadeBox.Focus();
+            ClickGuardFadeBox.SelectAll();
+            return;
+        }
+
+        SelectedClickGuardFadeMs = clickFadeMs;
         SelectedMp3BitRate = WindowsBitRateCombo.SelectedItem is BitRateItem bitRate
             ? bitRate.Kbps
             : Mp3Encode.DefaultWindowsBitRateKbps;
@@ -438,6 +483,14 @@ internal partial class AudioSettingsWindow : Window
         SelectedVisibleSpeakerIds = SpeakerPreset.NormalizeVisibleIds(_visibleIds);
         SelectedActiveSpeakerId = CurrentSpeaker()?.Id ?? _presets[0].Id;
         SelectedRecordDeviceId = ReadRecordDeviceId();
+        var format = AudioFormatComboFill.Read(
+            DefaultSampleRateCombo,
+            DefaultBitDepthCombo,
+            DefaultChannelLayoutCombo,
+            _visibleIds);
+        SelectedDefaultSampleRate = format.SampleRate;
+        SelectedDefaultBitsPerSample = format.BitsPerSample;
+        SelectedDefaultChannelLayout = format.Layout.Id;
         StopProbeUi();
         DialogResult = true;
     }
@@ -461,6 +514,24 @@ internal partial class AudioSettingsWindow : Window
         {
             LamePathBox.Text = dialog.FileName;
         }
+    }
+
+    private void FillDefaultAudioFormat()
+    {
+        var current = DefaultAudioFormat.Resolve(
+            SelectedDefaultSampleRate,
+            SelectedDefaultBitsPerSample,
+            SelectedDefaultChannelLayout,
+            _visibleIds);
+        SelectedDefaultSampleRate = current.SampleRate;
+        SelectedDefaultBitsPerSample = current.BitsPerSample;
+        SelectedDefaultChannelLayout = current.Layout.Id;
+        AudioFormatComboFill.Fill(
+            DefaultSampleRateCombo,
+            DefaultBitDepthCombo,
+            DefaultChannelLayoutCombo,
+            current,
+            _visibleIds);
     }
 
     private void FillWindowsBitRates(int currentKbps)
@@ -1006,6 +1077,9 @@ internal partial class AudioSettingsWindow : Window
         var deviceMax = Math.Max(80, SystemParameters.WorkArea.Width - 200);
         ComboBoxFit.Apply(LanguageCombo);
         ComboBoxFit.Apply(ThemeCombo);
+        ComboBoxFit.Apply(DefaultSampleRateCombo);
+        ComboBoxFit.Apply(DefaultBitDepthCombo);
+        ComboBoxFit.Apply(DefaultChannelLayoutCombo);
         ComboBoxFit.Apply(SpeakerCombo);
         ComboBoxFit.Apply(ApiCombo);
         ComboBoxFit.Apply(DeviceCombo, deviceMax);
@@ -1196,8 +1270,20 @@ internal partial class AudioSettingsWindow : Window
             _visibleIds.Remove(id);
         }
 
+        var format = AudioFormatComboFill.Read(
+            DefaultSampleRateCombo,
+            DefaultBitDepthCombo,
+            DefaultChannelLayoutCombo,
+            _visibleIds);
+        SelectedDefaultSampleRate = format.SampleRate;
+        SelectedDefaultBitsPerSample = format.BitsPerSample;
+        SelectedDefaultChannelLayout = format.Layout.Id;
         FillSpeakers(SelectedActiveSpeakerId);
+        FillDefaultAudioFormat();
         ComboBoxFit.Apply(SpeakerCombo);
+        ComboBoxFit.Apply(DefaultSampleRateCombo);
+        ComboBoxFit.Apply(DefaultBitDepthCombo);
+        ComboBoxFit.Apply(DefaultChannelLayoutCombo);
     }
 
     private int CheckedVisibilityCount()
@@ -1326,23 +1412,16 @@ internal partial class AudioSettingsWindow : Window
         row.IconHost.BorderBrush = WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush"));
     }
 
-    private FadeCurveRow CreateFadeRow(string labelText, FadeShape curve, bool isFadeIn)
+    private FadeCurveRow CreateFadeRow(string labelText, FadeShape curve, bool isFadeIn, int row)
     {
         var rowHeight = DesignMetrics.FadeOptionRowHeight;
         var iconSide = FadeCurveIcons.WidthFor((int)Math.Round(rowHeight));
-
-        var host = new Grid
-        {
-            Height = rowHeight,
-            Margin = new Thickness(0, 0, 0, 2),
-        };
-        host.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        host.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(iconSide) });
 
         var label = new TextBlock
         {
             Text = labelText,
             VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 8, 2),
             Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush")),
         };
 
@@ -1350,10 +1429,12 @@ internal partial class AudioSettingsWindow : Window
         {
             Width = iconSide,
             Height = rowHeight,
+            Margin = new Thickness(0, 0, 0, 2),
             Background = WpfControlHelpers.FrozenBrush(Theme.Get("DialogInputBackBrush")),
             BorderBrush = WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush")),
             BorderThickness = new Thickness(1),
             Cursor = Cursors.Hand,
+            HorizontalAlignment = HorizontalAlignment.Left,
         };
 
         var icon = new Image
@@ -1368,14 +1449,16 @@ internal partial class AudioSettingsWindow : Window
         iconHost.MouseLeave += (_, _) =>
             iconHost.Background = WpfControlHelpers.FrozenBrush(Theme.Get("DialogInputBackBrush"));
 
-        host.Children.Add(label);
-        host.Children.Add(iconHost);
+        Grid.SetRow(label, row);
+        Grid.SetRow(iconHost, row);
         Grid.SetColumn(iconHost, 1);
+        FadeRowsHost.Children.Add(label);
+        FadeRowsHost.Children.Add(iconHost);
 
-        var row = new FadeCurveRow(host, label, icon, iconHost, curve, isFadeIn);
-        RefreshFadeRowIcon(row);
-        iconHost.MouseLeftButtonUp += (_, _) => ShowFadeCurvePicker(row);
-        return row;
+        var fadeRow = new FadeCurveRow(label, icon, iconHost, curve, isFadeIn);
+        RefreshFadeRowIcon(fadeRow);
+        iconHost.MouseLeftButtonUp += (_, _) => ShowFadeCurvePicker(fadeRow);
+        return fadeRow;
     }
 
     private void ShowFadeCurvePicker(FadeCurveRow row)
@@ -1411,15 +1494,12 @@ internal partial class AudioSettingsWindow : Window
     }
 
     private sealed class FadeCurveRow(
-        Grid host,
         TextBlock label,
         Image icon,
         Border iconHost,
         FadeShape curve,
         bool isFadeIn)
     {
-        public Grid Host { get; } = host;
-
         public TextBlock Label { get; } = label;
 
         public Image Icon { get; } = icon;

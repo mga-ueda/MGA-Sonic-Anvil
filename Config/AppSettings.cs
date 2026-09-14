@@ -37,6 +37,24 @@ internal sealed class AppSettings
     /// <summary>有効にするスピーカー定義。空は Stereo のみ。</summary>
     public string[] VisibleSpeakerPresetIds { get; set; } = [];
 
+    /// <summary>新規録音などの既定サンプリングレート。既定 48000。</summary>
+    public int DefaultSampleRate { get; set; } = DefaultAudioFormat.SampleRate;
+
+    /// <summary>新規録音などの既定ビット深度。既定 24。</summary>
+    public int DefaultBitsPerSample { get; set; } = DefaultAudioFormat.BitsPerSample;
+
+    /// <summary>新規ファイルなどの既定チャンネル配置。既定 Stereo。</summary>
+    public string DefaultChannelLayout { get; set; } = DefaultAudioFormat.ChannelLayoutId;
+
+    /// <summary>新規ダイアログで前回選んだレート。0 は既定フォーマット。</summary>
+    public int LastNewSampleRate { get; set; }
+
+    /// <summary>新規ダイアログで前回選んだビット深度。0 は既定フォーマット。</summary>
+    public int LastNewBitsPerSample { get; set; }
+
+    /// <summary>新規ダイアログで前回選んだ配置。空は既定フォーマット。</summary>
+    public string LastNewChannelLayout { get; set; } = string.Empty;
+
     public string DefaultFadeInCurve { get; set; } = nameof(FadeShape.SCurve);
 
     public string DefaultFadeOutCurve { get; set; } = nameof(FadeShape.SCurve);
@@ -68,14 +86,17 @@ internal sealed class AppSettings
     /// <summary>再生で無音区間を飛ばす。既定オフ。</summary>
     public bool SilentSkip { get; set; }
 
-    /// <summary>Silent Skip の無音しきい値（dBFS）。既定 -60。</summary>
+    /// <summary>Silent Skip と無音削除の無音しきい値（dBFS）。既定 -60。</summary>
     public double SilentSkipThresholdDb { get; set; } = global::MgaSonicAnvil.Audio.SilentSkip.DefaultThresholdDb;
 
-    /// <summary>録音 Silent Skip で、しきい値を下回った時点から書く無音の上限（ms）。再生には使わない。既定 500。</summary>
+    /// <summary>録音 Silent Skip で、しきい値を下回った時点から挿入する無音の時間（ms）。再生には使わない。既定 500。</summary>
     public int SilentSkipRecordPadMs { get; set; } = global::MgaSonicAnvil.Audio.SilentSkip.DefaultRecordPadMs;
 
     /// <summary>Silent Skip 録音の停止時、pad を挟んだ可聴／無音にリージョンを付ける。既定オフ。</summary>
     public bool SilentSkipRecordAddRegion { get; set; }
+
+    /// <summary>継ぎ目のプチノイズ防止フェード（ms）。既定 20。</summary>
+    public int ClickGuardFadeMs { get; set; } = global::MgaSonicAnvil.Audio.ClickGuard.DefaultFadeMilliseconds;
 
     public int WindowX { get; set; }
 
@@ -185,6 +206,9 @@ internal sealed class AppSettings
     public int ResolvedSilentSkipRecordPadMs() =>
         global::MgaSonicAnvil.Audio.SilentSkip.ClampRecordPadMs(SilentSkipRecordPadMs);
 
+    public int ResolvedClickGuardFadeMs() =>
+        global::MgaSonicAnvil.Audio.ClickGuard.ClampFadeMs(ClickGuardFadeMs);
+
     public SpeakerPreset ResolvedSpeaker()
     {
         EnsureSpeakerPresets();
@@ -291,6 +315,34 @@ internal sealed class AppSettings
         FileChannelMap = [.. speaker.FileChannelMap ?? []];
         RecordLayout = speaker.Id;
         PlaybackLayout = speaker.Id;
+    }
+
+    public int ResolvedDefaultSampleRate() => DefaultAudioFormat.ClampSampleRate(DefaultSampleRate);
+
+    public int ResolvedDefaultBitsPerSample() => DefaultAudioFormat.ClampBitDepth(DefaultBitsPerSample);
+
+    public ChannelLayout ResolvedDefaultChannelLayout() =>
+        DefaultAudioFormat.ClampPickerLayout(DefaultChannelLayout, ResolvedVisibleSpeakerIds());
+
+    public DefaultAudioFormat.Spec ResolvedDefaultAudioFormat() =>
+        DefaultAudioFormat.Resolve(
+            DefaultSampleRate,
+            DefaultBitsPerSample,
+            DefaultChannelLayout,
+            ResolvedVisibleSpeakerIds());
+
+    public DefaultAudioFormat.Spec ResolvedLastNewAudioFormat() =>
+        DefaultAudioFormat.Resolve(
+            LastNewSampleRate == 0 ? DefaultSampleRate : LastNewSampleRate,
+            LastNewBitsPerSample == 0 ? DefaultBitsPerSample : LastNewBitsPerSample,
+            string.IsNullOrWhiteSpace(LastNewChannelLayout) ? DefaultChannelLayout : LastNewChannelLayout,
+            ResolvedVisibleSpeakerIds());
+
+    public void RememberNewAudioFormat(DefaultAudioFormat.Spec format)
+    {
+        LastNewSampleRate = format.SampleRate;
+        LastNewBitsPerSample = format.BitsPerSample;
+        LastNewChannelLayout = format.Layout.Id;
     }
 
     public FadeShape ResolvedFadeInCurve() => FadeCurves.ParseStored(DefaultFadeInCurve);

@@ -137,6 +137,7 @@ internal sealed class WaveformView : Grid
     private SpectrogramViewMode _waveMode;
     private bool _waveDirty = true;
     private bool _liveRecording;
+    private long _liveSettledFrames = -1;
     private bool _waveLiveRecording;
     private long _waveLiveFrames;
     private long _waveLivePeakFrames;
@@ -598,11 +599,26 @@ internal sealed class WaveformView : Grid
     {
         if (_liveRecording == active)
         {
+            if (!active)
+            {
+                _liveSettledFrames = -1;
+            }
+
             return;
         }
 
         _liveRecording = active;
+        if (!active)
+        {
+            _liveSettledFrames = -1;
+        }
+
         InvalidateWaveform();
+    }
+
+    public void SetLiveRecordSettledFrame(long frame)
+    {
+        _liveSettledFrames = Math.Max(0, frame);
     }
 
     public void RevealFrame(long frame)
@@ -1913,12 +1929,31 @@ internal sealed class WaveformView : Grid
 
     protected override void OnMouseRightButtonDown(MouseButtonEventArgs e)
     {
-        if (IsEditingMarkerComment || _dragging || _markerDragging || _scrubbing)
+        if (TryRaiseContextMenu(e.GetPosition(this)))
         {
-            return;
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>メニューキー／Shift+F10。ポインタが波形上ならその位置、なければ再生位置。</summary>
+    public bool TryRequestContextMenuFromKeyboard()
+    {
+        var mouse = Mouse.GetPosition(this);
+        if (ContainsLocalPoint(mouse))
+        {
+            return TryRaiseContextMenu(mouse);
         }
 
-        var pos = e.GetPosition(this);
+        return TryRaiseContextMenu(ContextPointAtPlayhead(), PlayheadFrame);
+    }
+
+    private bool TryRaiseContextMenu(Point pos, long? frameOverride = null)
+    {
+        if (IsEditingMarkerComment || _dragging || _markerDragging || _scrubbing)
+        {
+            return false;
+        }
+
         var hitMarker = TryHitMarkerFlag(pos, out var marker);
         var hitRegion = TryHitRegionFlag(pos, out var region);
         var hitLoop = TryHitSampleLoopBar(pos);
@@ -1931,14 +1966,56 @@ internal sealed class WaveformView : Grid
         }
 
         Focus();
-        e.Handled = true;
         ContextMenuRequested?.Invoke(this, new WaveformContextHit
         {
-            Frame = PointerFrame(pos.X),
+            Frame = frameOverride ?? PointerFrame(pos.X),
             MarkerFrames = frames,
             Region = hitRegion ? region : WaveSelection.Empty,
             HitLoop = hitLoop,
         });
+        return true;
+    }
+
+    private bool ContainsLocalPoint(Point pos) =>
+        pos.X >= 0 && pos.Y >= 0 && pos.X <= Math.Max(0, ActualWidth) && pos.Y <= Math.Max(0, ActualHeight);
+
+    private Point ContextPointAtPlayhead()
+    {
+        var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
+        var x = FrameToViewX(_playheadFrame, _viewStart, ViewSpanFrames, bounds);
+        foreach (var item in _markerFlags)
+        {
+            if (item.Marker.Frame == _playheadFrame && item.Flag.Width > 0)
+            {
+                return new Point(
+                    Math.Clamp(x, item.Flag.Left, item.Flag.Right),
+                    item.Flag.Top + item.Flag.Height * 0.5);
+            }
+        }
+
+        foreach (var item in _regionFlags)
+        {
+            if (item.Frame != _playheadFrame || item.Flag.Width <= 0)
+            {
+                continue;
+            }
+
+            return new Point(
+                Math.Clamp(x, item.Flag.Left, item.Flag.Right),
+                item.Flag.Top + item.Flag.Height * 0.5);
+        }
+
+        if (TryGetLoopBarRects(out var bar, out _, out _) && bar.Width > 0)
+        {
+            var loopY = bar.Top + bar.Height * 0.5;
+            var loopPoint = new Point(Math.Clamp(x, bar.Left, bar.Right), loopY);
+            if (bar.Contains(loopPoint))
+            {
+                return loopPoint;
+            }
+        }
+
+        return new Point(x, Math.Max(1, bounds.Height * 0.5));
     }
 
     internal void PaintStatic(DrawingContext dc)
@@ -2024,11 +2101,6 @@ internal sealed class WaveformView : Grid
             else
             {
                 DrawWaveformImage(dc, wave);
-            }
-
-            if (!overlay && !loudness)
-            {
-                MarkerRolePaint.DrawRemoveOverlays(dc, _document, wave, start, span);
             }
         }
 
@@ -3046,11 +3118,14 @@ internal sealed class WaveformView : Grid
             return FillRawColumnPeaks(document, startFrame, endFrame, width, channels);
         }
 
+        var settledFrames = _liveSettledFrames >= 0
+            ? _liveSettledFrames
+            : Math.Min(document.Peaks.FrameCount, document.FrameCount);
         var settledCols = RecordContinue.CountPrefixColumns(
             startFrame,
             rangeFrames,
             width,
-            Math.Min(document.Peaks.FrameCount, document.FrameCount));
+            settledFrames);
         var peakCols = 0;
         if (settledCols > 0)
         {

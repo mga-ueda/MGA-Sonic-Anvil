@@ -26,6 +26,9 @@ public sealed class SilentSkipTests
             Assert.Contains("無音部分", UiStrings.LabelSilentSkipRecordAddRegion);
             Assert.Contains("谷の平均", UiStrings.LabelSilentSkipFloorNote);
             Assert.DoesNotContain("ピーク", UiStrings.LabelSilentSkipFloorNote);
+            Assert.Contains("無音削除", UiStrings.LabelSilentSkipThreshold);
+            Assert.Contains("無音挿入時間", UiStrings.LabelSilentSkipRecordPad);
+            Assert.DoesNotContain("上限", UiStrings.LabelSilentSkipRecordPad);
             UiStrings.SetLanguage(UiLanguage.English);
             Assert.Contains("recording", UiStrings.ConfirmRecord, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Settings", UiStrings.ConfirmRecordSilentSkip(-60, 500));
@@ -35,6 +38,9 @@ public sealed class SilentSkipTests
             Assert.Contains("silent", UiStrings.LabelSilentSkipRecordAddRegion, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("floor", UiStrings.LabelSilentSkipFloorNote, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("peak", UiStrings.LabelSilentSkipFloorNote, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Delete Silence", UiStrings.LabelSilentSkipThreshold);
+            Assert.Contains("insert duration", UiStrings.LabelSilentSkipRecordPad, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Max silence", UiStrings.LabelSilentSkipRecordPad);
         }
         finally
         {
@@ -443,24 +449,111 @@ public sealed class SilentSkipTests
     }
 
     [Fact]
+    public void PeakWindow_KeepsTroughsOfNearThresholdTone()
+    {
+        const int rate = 48000;
+        const double hertz = 200;
+        var frames = (int)Math.Round(rate / hertz * 4);
+        var peak = SilentSkip.LinearFromDb(-60) * 1.5f;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            var value = (float)Math.Sin(2 * Math.PI * hertz * i / rate) * peak;
+            samples[i * 2] = value;
+            samples[i * 2 + 1] = value;
+        }
+
+        var floor = SilentSkip.LinearFromDb(-60);
+        var hold = SilentSkip.PeakWindowRadiusFrames(rate);
+        Assert.True(SilentSkip.IsFrameSilent(samples, 2, 0, floor, 0));
+        Assert.False(SilentSkip.IsFrameSilent(samples, 2, 0, floor, 0, hold));
+        Assert.Empty(SilentSkip.CollectSilentSpans(samples, 2, 0, frames, floor, 0, hold));
+        Assert.Equal(samples.Length, SilentSkip.CopyAudibleRange(samples, 2, 0, frames, floor, 0, hold).Length);
+        Assert.Equal(0, SilentSkip.FindNextAudible(samples, 2, 0, frames, floor, 0, hold));
+    }
+
+    [Fact]
+    public void RecordGate_HoldKeepsNearThresholdTroughs()
+    {
+        const int rate = 48000;
+        const double hertz = 200;
+        var frames = (int)Math.Round(rate / hertz * 4);
+        var peak = SilentSkip.LinearFromDb(-60) * 1.5f;
+        var gate = new SilentSkipRecordGate();
+        gate.Configure(true, SilentSkip.LinearFromDb(-60), padFrames: 24000, channels: 1, SilentSkip.PeakHoldFrames(rate));
+        gate.Reset(hasWritten: false);
+        var dest = new float[frames];
+        var written = 0;
+        for (var i = 0; i < frames; i++)
+        {
+            var sample = (float)Math.Sin(2 * Math.PI * hertz * i / rate) * peak;
+            written += gate.ProcessFrame([sample], dest.AsSpan(written));
+        }
+
+        Assert.True(written > frames * 0.9);
+        Assert.Contains(dest.Take(written), value => Math.Abs(value) < SilentSkip.LinearFromDb(-60));
+    }
+
+    [Fact]
+    public void CollectSilentSpans_FindsContiguousHoles()
+    {
+        var samples = new float[20];
+        samples[4] = 0.5f;
+        samples[5] = 0.5f;
+        samples[12] = 0.4f;
+        samples[13] = 0.4f;
+        var threshold = SilentSkip.LinearFromDb(-60);
+        var spans = SilentSkip.CollectSilentSpans(samples, 2, 0, 10, threshold, 0);
+        Assert.Equal(
+            [new WaveSelection(0, 2), new WaveSelection(3, 6), new WaveSelection(7, 10)],
+            spans);
+    }
+
+    [Fact]
+    public void CollectAudibleSpans_FindsContiguousRuns()
+    {
+        var samples = new float[20];
+        samples[4] = 0.5f;
+        samples[5] = 0.5f;
+        samples[12] = 0.4f;
+        samples[13] = 0.4f;
+        var threshold = SilentSkip.LinearFromDb(-60);
+        var spans = SilentSkip.CollectAudibleSpans(samples, 2, 0, 10, threshold, 0);
+        Assert.Equal([new WaveSelection(2, 3), new WaveSelection(6, 7)], spans);
+    }
+
+    [Fact]
+    public void CopyAudibleRange_PacksFramesAboveThreshold()
+    {
+        var samples = new float[] { 0f, 0f, 0.5f, -0.4f, 0.0001f, 0.0001f, 0.002f, 0f };
+        var packed = SilentSkip.CopyAudibleRange(samples, 2, 0, 4, SilentSkip.LinearFromDb(-60), 0);
+        Assert.Equal([0.5f, -0.4f, 0.002f, 0f], packed);
+    }
+
+    [Fact]
     public void Provider_JumpsOverSilenceWhenEnabled()
     {
-        var samples = new float[200];
-        for (var i = 80; i < 200; i++)
+        const int rate = 48_000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var lead = radius + 40;
+        var samples = new float[(lead + 40) * 2];
+        for (var i = lead * 2; i < samples.Length; i++)
         {
             samples[i] = 0.25f;
         }
 
-        var document = new AudioDocument(samples, 48000, 2, 16, AudioFileKind.Wave, null);
+        var document = new AudioDocument(samples, rate, 2, 16, AudioFileKind.Wave, null);
         var provider = new PlaybackSampleProvider();
-        provider.SetDeviceSampleRate(48000);
+        provider.SetDeviceSampleRate(rate);
         provider.Bind(document, 0, playRange: null, loop: false);
         provider.SetSilentSkip(true, -60);
 
+        var pad = new float[radius * 2];
+        Assert.Equal(pad.Length, provider.Read(pad, 0, pad.Length));
         var buffer = new float[20];
         Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
         Assert.All(buffer, value => Assert.Equal(0.25f, value, 3));
-        Assert.Equal(50, provider.CursorFrame);
+        Assert.Equal(lead + 10, provider.CursorFrame);
     }
 
     [Fact]
@@ -487,36 +580,40 @@ public sealed class SilentSkipTests
     [Fact]
     public void Provider_SkipsSilenceInTheMiddleOfARead()
     {
-        var samples = new float[80];
+        const int rate = 48_000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var second = radius * 2 + 20;
+        var samples = new float[(second + 20) * 2];
         for (var frame = 0; frame < 5; frame++)
         {
             samples[frame * 2] = 0.25f;
             samples[frame * 2 + 1] = 0.25f;
         }
 
-        for (var frame = 30; frame < 40; frame++)
+        for (var frame = second; frame < second + 10; frame++)
         {
             samples[frame * 2] = 0.5f;
             samples[frame * 2 + 1] = 0.5f;
         }
 
-        var document = new AudioDocument(samples, 48000, 2, 16, AudioFileKind.Wave, null);
+        var document = new AudioDocument(samples, rate, 2, 16, AudioFileKind.Wave, null);
         var provider = new PlaybackSampleProvider();
-        provider.SetDeviceSampleRate(48000);
+        provider.SetDeviceSampleRate(rate);
         provider.Bind(document, 0, playRange: null, loop: false);
         provider.SetSilentSkip(true, -60);
 
-        var buffer = new float[20];
-        Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+        var first = new float[(5 + radius) * 2];
+        Assert.Equal(first.Length, provider.Read(first, 0, first.Length));
         for (var i = 0; i < 10; i++)
         {
-            Assert.Equal(0.25f, buffer[i], 3);
+            Assert.Equal(0.25f, first[i], 3);
         }
 
-        for (var i = 10; i < 20; i++)
-        {
-            Assert.Equal(0.5f, buffer[i], 3);
-        }
+        var pad = new float[radius * 2];
+        Assert.Equal(pad.Length, provider.Read(pad, 0, pad.Length));
+        var buffer = new float[10];
+        Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+        Assert.All(buffer, value => Assert.Equal(0.5f, value, 3));
     }
 
     [Fact]
@@ -561,23 +658,29 @@ public sealed class SilentSkipTests
     [Fact]
     public void Provider_LoopWrapsToNextAudible()
     {
-        var samples = new float[40];
-        for (var frame = 0; frame < 5; frame++)
+        const int rate = 48_000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var firstAt = radius + 10;
+        var loopEnd = firstAt + 10 + radius + 20;
+        var samples = new float[loopEnd * 2];
+        for (var frame = firstAt; frame < firstAt + 5; frame++)
         {
             samples[frame * 2] = 0.4f;
             samples[frame * 2 + 1] = 0.4f;
         }
 
-        var document = new AudioDocument(samples, 48000, 2, 16, AudioFileKind.Wave, null);
+        var document = new AudioDocument(samples, rate, 2, 16, AudioFileKind.Wave, null);
         var provider = new PlaybackSampleProvider();
-        provider.SetDeviceSampleRate(48000);
-        provider.Bind(document, 8, new WaveSelection(0, 20), loop: true);
+        provider.SetDeviceSampleRate(rate);
+        provider.Bind(document, firstAt + 10 + radius + 5, new WaveSelection(0, loopEnd), loop: true);
         provider.SetSilentSkip(true, -60);
 
+        var pad = new float[radius * 2];
+        Assert.Equal(pad.Length, provider.Read(pad, 0, pad.Length));
         var buffer = new float[8];
         Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
         Assert.All(buffer, value => Assert.Equal(0.4f, value, 3));
-        Assert.Equal(4, provider.CursorFrame);
+        Assert.Equal(firstAt + 4, provider.CursorFrame);
     }
 
     [Fact]
@@ -605,15 +708,18 @@ public sealed class SilentSkipTests
     [Fact]
     public void Provider_RewindShuttleDoesNotJumpForwardOverSilence()
     {
-        var samples = new float[200];
-        for (var i = 160; i < 200; i++)
+        const int rate = 48_000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var lead = radius + 80;
+        var samples = new float[(lead + 40) * 2];
+        for (var i = lead * 2; i < samples.Length; i++)
         {
             samples[i] = 0.25f;
         }
 
-        var document = new AudioDocument(samples, 48000, 2, 16, AudioFileKind.Wave, null);
+        var document = new AudioDocument(samples, rate, 2, 16, AudioFileKind.Wave, null);
         var provider = new PlaybackSampleProvider();
-        provider.SetDeviceSampleRate(48000);
+        provider.SetDeviceSampleRate(rate);
         provider.Bind(document, 90, playRange: null, loop: false);
         provider.SetSilentSkip(true, -60);
         provider.SetPlaybackSpeed(-PlaybackSampleProvider.FastSpeed);
@@ -623,9 +729,11 @@ public sealed class SilentSkipTests
         Assert.Equal(30, provider.CursorFrame);
 
         provider.SetPlaybackSpeed(1);
+        var pad = new float[radius * 2];
+        Assert.Equal(pad.Length, provider.Read(pad, 0, pad.Length));
         var after = new float[4];
         Assert.Equal(after.Length, provider.Read(after, 0, after.Length));
         Assert.All(after, value => Assert.Equal(0.25f, value, 3));
-        Assert.Equal(82, provider.CursorFrame);
+        Assert.Equal(lead + 2, provider.CursorFrame);
     }
 }

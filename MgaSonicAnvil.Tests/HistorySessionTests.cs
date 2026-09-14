@@ -122,6 +122,29 @@ public sealed class HistorySessionTests
     }
 
     [Fact]
+    public void TryExportImport_RestoresNormalizePerRegion()
+    {
+        var samples = new float[200];
+        Array.Fill(samples, 0.2f);
+        var document = new AudioDocument(samples, 48000, 1, 24, AudioFileKind.Wave, null);
+        document.SetRegions([new WaveSelection(20, 120)]);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.NormalizePerRegion(document)!);
+        var normalized = (float[])document.Interleaved.Clone();
+
+        var exported = history.TryExport();
+        Assert.NotNull(exported);
+        Assert.Equal(HistoryRecipes.NormalizePerRegion, exported!.Recipes[0].Kind);
+        Assert.Equal(ClickGuard.DefaultFadeMilliseconds, exported.Recipes[0].Value);
+
+        var restoredSamples = new float[200];
+        Array.Fill(restoredSamples, 0.2f);
+        var restored = new AudioDocument(restoredSamples, 48000, 1, 24, AudioFileKind.Wave, null);
+        Assert.True(EditHistory.TryImport(restored, exported, out _));
+        Assert.Equal(normalized, restored.Interleaved);
+    }
+
+    [Fact]
     public void TryExportImport_RestoresTimeStretchRatio()
     {
         var document = MakeSine(48000);
@@ -136,6 +159,46 @@ public sealed class HistorySessionTests
         var restored = MakeSine(48000);
         Assert.True(EditHistory.TryImport(restored, exported, out _));
         Assert.Equal(24000, restored.FrameCount);
+    }
+
+    [Fact]
+    public void TryExportImport_RestoresDeleteSilence()
+    {
+        const int rate = 1000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var silent = radius * 2 + 20;
+        var frames = 20 + silent + 20;
+        var samples = new float[frames * 2];
+        Array.Fill(samples, 0.5f);
+        for (var i = 20; i < 20 + silent; i++)
+        {
+            samples[i * 2] = 0f;
+            samples[i * 2 + 1] = 0f;
+        }
+
+        var document = new AudioDocument(samples, rate, 2, 24, AudioFileKind.Wave, null);
+        var history = new EditHistory();
+        var command = ProcessEdits.DeleteSilence(document, new WaveSelection(0, frames), -60);
+        Assert.NotNull(command);
+        history.Do(document, command);
+        Assert.Equal(frames - 20, document.FrameCount);
+
+        var exported = history.TryExport();
+        Assert.NotNull(exported);
+        Assert.Equal(HistoryRecipes.DeleteSilence, exported!.Recipes[0].Kind);
+        Assert.Equal(-60, exported.Recipes[0].Amount);
+
+        var restoredSamples = new float[frames * 2];
+        Array.Fill(restoredSamples, 0.5f);
+        for (var i = 20; i < 20 + silent; i++)
+        {
+            restoredSamples[i * 2] = 0f;
+            restoredSamples[i * 2 + 1] = 0f;
+        }
+
+        var restored = new AudioDocument(restoredSamples, rate, 2, 24, AudioFileKind.Wave, null);
+        Assert.True(EditHistory.TryImport(restored, exported, out _));
+        Assert.Equal(frames - 20, restored.FrameCount);
     }
 
     [Fact]

@@ -12,6 +12,50 @@ namespace MgaSonicAnvil.UI;
 
 public partial class MainWindow
 {
+    private void NewDocument()
+    {
+        if (IsUiBusy)
+        {
+            return;
+        }
+
+        StopRecording();
+        if (IsPlaybackActive())
+        {
+            StopPlayback();
+        }
+
+        var settings = AppStorage.Settings;
+        var format = NewDocumentWindow.Show(
+            this,
+            settings.ResolvedLastNewAudioFormat(),
+            settings.ResolvedVisibleSpeakerIds());
+        if (format is null)
+        {
+            return;
+        }
+
+        settings.RememberNewAudioFormat(format.Value);
+        AppStorage.Save();
+        var session = CreateEmptyDocument(format.Value);
+        ActivateSession(session);
+        AfterEdit();
+    }
+
+    private DocumentSession CreateEmptyDocument(DefaultAudioFormat.Spec format)
+    {
+        var document = new AudioDocument(
+            [],
+            format.SampleRate,
+            Math.Max(1, format.Channels),
+            format.BitsPerSample,
+            AudioFileKind.Wave,
+            null);
+        var session = new DocumentSession(document);
+        _sessions.Add(session);
+        return session;
+    }
+
     private void OpenFromDialog()
     {
         var dialog = new OpenFileDialog
@@ -693,13 +737,17 @@ public partial class MainWindow
             settings.ResolvedLoudnessTargetLufs(),
             settings.ResolvedSilentSkipThresholdDb(),
             settings.ResolvedSilentSkipRecordPadMs(),
+            settings.ResolvedClickGuardFadeMs(),
             settings.Mp3BitRate,
             settings.LameExePath,
             settings.LameOptions,
             settings.ExportParallelism,
             settings.SpeakerPresets,
             settings.ActiveSpeakerPresetId,
-            settings.VisibleSpeakerPresetIds)
+            settings.VisibleSpeakerPresetIds,
+            settings.ResolvedDefaultSampleRate(),
+            settings.ResolvedDefaultBitsPerSample(),
+            settings.ResolvedDefaultChannelLayout().Id)
         {
             Owner = this,
         };
@@ -726,6 +774,7 @@ public partial class MainWindow
         settings.LoudnessTargetLufs = dialog.SelectedLoudnessTargetLufs;
         settings.SilentSkipThresholdDb = dialog.SelectedSilentSkipThresholdDb;
         settings.SilentSkipRecordPadMs = dialog.SelectedSilentSkipRecordPadMs;
+        settings.ClickGuardFadeMs = dialog.SelectedClickGuardFadeMs;
         settings.Mp3BitRate = dialog.SelectedMp3BitRate;
         settings.LameExePath = dialog.SelectedLameExePath;
         settings.LameOptions = dialog.SelectedLameOptions;
@@ -733,6 +782,9 @@ public partial class MainWindow
         settings.ReplaceSpeakerPresets(dialog.SelectedPresets, dialog.SelectedActiveSpeakerId);
         settings.ApplyVisibleSpeakerIds(dialog.SelectedVisibleSpeakerIds);
         settings.RecordDeviceId = dialog.SelectedRecordDeviceId;
+        settings.DefaultSampleRate = dialog.SelectedDefaultSampleRate;
+        settings.DefaultBitsPerSample = dialog.SelectedDefaultBitsPerSample;
+        settings.DefaultChannelLayout = dialog.SelectedDefaultChannelLayout;
         ApplyPlayerRoute();
         LoudnessMeter.ApplyTargetFromSettings();
         Waveform.LoudnessTargetLufs = settings.ResolvedLoudnessTargetLufs();

@@ -29,6 +29,7 @@ internal static partial class UiStrings
     public static string WaveMenuPaste => Get("貼り付け(_P)", "_Paste");
     public static string WaveMenuPasteHistory => Get("編集履歴を貼り付け(_H)", "Paste Edit _History");
     public static string WaveMenuDelete => Get("削除(_D)", "_Delete");
+    public static string WaveMenuDeleteSilence => Get("無音部分を削除(_S)", "Delete _Silence");
     public static string WaveMenuSelectAll => Get("すべて選択(_A)", "Select _All");
     public static string WaveMenuClearSelection => Get("選択を解除(_L)", "C_lear Selection");
     public static string WaveMenuSelectToStart => Get("先頭まで選択(_B)", "Select to _Beginning");
@@ -39,6 +40,7 @@ internal static partial class UiStrings
     public static string WaveMenuFadeOut => Get("フェードアウト(_O)", "Fade _Out");
     public static string WaveMenuFadeAround => Get("再生位置でフェード(_X)", "Fade Around Pla_yhead");
     public static string WaveMenuNormalize => Get("ノーマライズ(_N)", "_Normalize");
+    public static string WaveMenuNormalizePerRegion => Get("リージョン毎に波形をノーマライズ(_G)", "Normalize Waveform per Re_gion");
     public static string WaveMenuVolume => Get("音量(_U)", "Vol_ume");
     public static string WaveMenuPitch => Get("ピッチ(_P)", "_Pitch");
     public static string WaveMenuTimeStretch => Get("タイムストレッチ(_T)", "_Time Stretch");
@@ -51,7 +53,7 @@ internal static partial class UiStrings
     public static string WaveMenuAddMarker => Get("マーカーを追加(_M)", "Add _Marker");
     public static string WaveMenuRenameMarker => Get("マーカー名を編集(_N)", "Re_name Marker");
     public static string WaveMenuDeleteMarkers => Get("マーカーを削除(_D)", "_Delete Markers");
-    public static string WaveMenuDeleteAllMarkers => Get("すべてのマーカーを削除(_A)", "Delete _All Markers");
+    public static string WaveMenuDeleteAllMarkers => Get("すべてのマーカーを削除(_K)", "Delete All Mar_kers");
     public static string WaveMenuSetRegion => Get("選択範囲をリージョンに(_G)", "Set Re_gion from Selection");
     public static string WaveMenuRenameRegion => Get("リージョン名を編集(_E)", "R_ename Region");
     public static string WaveMenuDeleteRegions => Get("選択したリージョンを削除(_L)", "Delete Selected Regions (_L)");
@@ -96,12 +98,14 @@ internal static partial class UiStrings
     public static string WaveMenuSilentSkip => Get("Silent Skip(_H)", "Silent Skip (_H)");
     public static string WaveMenuAlwaysOnTop => Get("常に最前面(_T)", "Always on _Top");
 
+    public static string WaveMenuNew => Get("新規(_N)", "_New");
     public static string WaveMenuOpen => Get("開く(_O)", "_Open");
     public static string WaveMenuSave => Get("上書き保存(_S)", "_Save");
     public static string WaveMenuSaveAs => Get("名前を付けて保存(_A)", "Save _As");
     public static string WaveMenuSaveMp3 => Get("MP3 として保存(_M)", "Save as _MP3");
     public static string WaveMenuCloseTab => Get("タブを閉じる(_C)", "_Close Tab");
     public static string WaveMenuCloseAll => Get("すべてのタブを閉じる(_W)", "Close All Tabs (_W)");
+    public static string WaveMenuCopyAllTabTimes => Get("すべてのタブの時間をコピー(_I)", "Copy All Tab T_imes");
     public static string WaveMenuReopenTab => Get("閉じたタブを再開(_T)", "Reopen Closed _Tab");
     public static string WaveMenuNextTab => Get("次のタブ(_B)", "Next Ta_b");
     public static string WaveMenuPrevTab => Get("前のタブ(_V)", "Pre_vious Tab");

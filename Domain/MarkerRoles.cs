@@ -53,7 +53,11 @@ internal static class MarkerRoles
             return string.Empty;
         }
 
-        var trimmed = comment.Trim();
+        return UppercaseReservedTags(comment.Trim());
+    }
+
+    private static string UppercaseReservedTags(string trimmed)
+    {
         var chars = trimmed.ToCharArray();
         var changed = false;
         for (var i = 0; i < chars.Length - 1; i++)
@@ -85,6 +89,106 @@ internal static class MarkerRoles
         }
 
         return changed ? new string(chars) : trimmed;
+    }
+
+    /// <summary>
+    /// 接尾辞が無ければコメントを予約タグへ置き換える。既に別の役割があるときは触らない。
+    /// </summary>
+    public static string EnsureTag(string? comment, MarkerRole role)
+    {
+        var tag = RoleTag(role);
+        if (tag.Length == 0)
+        {
+            return Normalize(comment);
+        }
+
+        var current = FromComment(comment);
+        if (current == role || current != MarkerRole.None)
+        {
+            return Normalize(comment);
+        }
+
+        return tag;
+    }
+
+    public static string RoleTag(MarkerRole role) => role switch
+    {
+        MarkerRole.Anacrusis => "-A",
+        MarkerRole.Loop => "-L",
+        MarkerRole.Exit => "-E",
+        MarkerRole.Remove => "-R",
+        _ => string.Empty,
+    };
+
+    /// <summary>
+    /// <c>-L</c> の直後の接尾辞なしマーカーを <c>-E</c> にする。
+    /// サンプルループ終端に接尾辞なしマーカーがあれば同様。マーカーは増やさない。
+    /// </summary>
+    public static MarkerSnapshot[] WithAutoExitComments(
+        IReadOnlyList<MarkerSnapshot> markers,
+        WaveSelection sampleLoop,
+        long frameCount)
+    {
+        var list = DistinctByFrame(markers);
+        for (var i = 0; i + 1 < list.Count; i++)
+        {
+            if (FromComment(list[i].Comment) != MarkerRole.Loop)
+            {
+                continue;
+            }
+
+            if (FromComment(list[i + 1].Comment) != MarkerRole.None)
+            {
+                continue;
+            }
+
+            list[i + 1] = list[i + 1] with
+            {
+                Comment = EnsureTag(list[i + 1].Comment, MarkerRole.Exit),
+            };
+        }
+
+        if (!sampleLoop.IsEmpty
+            && sampleLoop.EndFrame > 0
+            && sampleLoop.EndFrame < frameCount)
+        {
+            for (var i = 0; i < list.Count; i++)
+            {
+                if (list[i].Frame != sampleLoop.EndFrame)
+                {
+                    continue;
+                }
+
+                if (FromComment(list[i].Comment) == MarkerRole.None)
+                {
+                    list[i] = list[i] with
+                    {
+                        Comment = EnsureTag(list[i].Comment, MarkerRole.Exit),
+                    };
+                }
+
+                break;
+            }
+        }
+
+        return list.ToArray();
+    }
+
+    private static List<MarkerSnapshot> DistinctByFrame(IReadOnlyList<MarkerSnapshot> markers)
+    {
+        var list = new List<MarkerSnapshot>(markers.Count);
+        foreach (var marker in markers.OrderBy(item => item.Frame))
+        {
+            if (list.Count > 0 && list[^1].Frame == marker.Frame)
+            {
+                list[^1] = marker;
+                continue;
+            }
+
+            list.Add(marker);
+        }
+
+        return list;
     }
 
     private static bool IsDash(char c) => c is '-' or 'ー' or '−';

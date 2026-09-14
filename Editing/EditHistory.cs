@@ -204,6 +204,17 @@ internal sealed class EditHistory
     {
         var origin = OriginSnapshot.Capture(document);
         command.Apply(document);
+        PushApplied(document, command, origin);
+    }
+
+    /// <summary>すでに波形へ適用済みのコマンドを履歴へ載せる。録音のライブ上書き用。</summary>
+    public void AcceptApplied(AudioDocument document, IEditCommand command)
+    {
+        PushApplied(document, command, OriginSnapshot.Capture(document));
+    }
+
+    private void PushApplied(AudioDocument document, IEditCommand command, OriginSnapshot origin)
+    {
         if (_redo.Count > 0 && _cleanValid && _cleanIndex > _undo.Count)
         {
             _cleanValid = false;

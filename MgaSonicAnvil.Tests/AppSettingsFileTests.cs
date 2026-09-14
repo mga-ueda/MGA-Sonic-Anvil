@@ -31,6 +31,13 @@ public sealed class AppSettingsFileTests
             Assert.Equal(SettingsFileReset.None, reset);
             Assert.Equal(AppSettings.CurrentGeneration, settings.SettingsGeneration);
             Assert.Equal(SpeakerPreset.DefaultId, settings.ActiveSpeakerPresetId);
+            Assert.Equal(48000, settings.DefaultSampleRate);
+            Assert.Equal(24, settings.DefaultBitsPerSample);
+            Assert.Equal("Stereo", settings.DefaultChannelLayout);
+            Assert.Equal(48000, settings.ResolvedDefaultSampleRate());
+            Assert.Equal(24, settings.ResolvedDefaultBitsPerSample());
+            Assert.Equal("Stereo", settings.ResolvedDefaultChannelLayout().Id);
+            Assert.Equal(20, settings.ResolvedClickGuardFadeMs());
             Assert.False(File.Exists(path));
         }
         finally

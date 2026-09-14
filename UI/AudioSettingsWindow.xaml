@@ -17,6 +17,7 @@
         Background="{DynamicResource WindowBackBrush}"
         Foreground="{DynamicResource PrimaryForeBrush}"
         Title="{x:Static domain:UiStrings.DialogSettingsTitle}"
+        KeyboardNavigation.TabNavigation="Cycle"
         PreviewKeyDown="Window_PreviewKeyDown"
         KeyDown="Window_KeyDown">
   <Border Padding="{x:Static ui:DesignMetrics.AudioPad}">
@@ -104,6 +105,62 @@
             </Grid.RowDefinitions>
 
             <StackPanel Margin="0,0,0,14">
+              <TextBlock x:Name="DefaultFormatHeader"
+                         Text="{x:Static domain:UiStrings.LabelDefaultAudioFormat}"
+                         FontWeight="Bold"
+                         FontSize="11.333"
+                         Margin="0,0,0,6" />
+              <Grid HorizontalAlignment="Left" Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="DefaultSampleRateLabel"
+                           Text="{x:Static domain:UiStrings.LabelDefaultSampleRate}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <ComboBox x:Name="DefaultSampleRateCombo"
+                          Grid.Column="1"
+                          HorizontalAlignment="Left"
+                          Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                          Padding="6,1"
+                          FontSize="11.333"
+                          VerticalContentAlignment="Center" />
+                <TextBlock x:Name="DefaultBitDepthLabel"
+                           Grid.Column="2"
+                           Text="{x:Static domain:UiStrings.LabelDefaultBitDepth}"
+                           VerticalAlignment="Center"
+                           Margin="16,0,8,0" />
+                <ComboBox x:Name="DefaultBitDepthCombo"
+                          Grid.Column="3"
+                          HorizontalAlignment="Left"
+                          Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                          Padding="6,1"
+                          FontSize="11.333"
+                          VerticalContentAlignment="Center" />
+                <TextBlock x:Name="DefaultChannelLayoutLabel"
+                           Grid.Column="4"
+                           Text="{x:Static domain:UiStrings.LabelDefaultChannelLayout}"
+                           VerticalAlignment="Center"
+                           Margin="16,0,8,0" />
+                <ComboBox x:Name="DefaultChannelLayoutCombo"
+                          Grid.Column="5"
+                          HorizontalAlignment="Left"
+                          Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                          Padding="6,1"
+                          FontSize="11.333"
+                          VerticalContentAlignment="Center" />
+              </Grid>
+
+              <TextBlock x:Name="SpeakerIoHeader"
+                         Text="{x:Static domain:UiStrings.LabelSpeakerIo}"
+                         FontWeight="Bold"
+                         FontSize="11.333"
+                         Margin="0,0,0,6" />
               <Grid Margin="0,0,0,10">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="Auto" />
@@ -291,12 +348,44 @@
                          Margin="8,0,0,0" />
             </Grid>
 
+            <TextBlock x:Name="ClickGuardFadeLabel"
+                       Text="{x:Static domain:UiStrings.LabelClickGuardFade}"
+                       Margin="0,0,0,3" />
+            <Grid HorizontalAlignment="Left" Margin="0,0,0,16">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="ClickGuardFadeBox"
+                       Width="{x:Static ui:DesignMetrics.SettingsLoudnessBoxWidth}"
+                       Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                       Style="{StaticResource DarkTextBoxStyle}"
+                       Padding="6,1"
+                       FontSize="11.333"
+                       VerticalContentAlignment="Center"
+                       InputMethod.IsInputMethodEnabled="False" />
+              <TextBlock x:Name="ClickGuardFadeUnit"
+                         Grid.Column="1"
+                         Text="{x:Static domain:UiStrings.LabelMs}"
+                         VerticalAlignment="Center"
+                         Margin="8,0,0,0" />
+            </Grid>
+
             <TextBlock x:Name="FadeDefaultsHeader"
                        Text="{x:Static domain:UiStrings.LabelFadeCurveDefaults}"
                        FontWeight="Bold"
                        FontSize="11.333"
                        Margin="0,4,0,6" />
-            <StackPanel x:Name="FadeRowsHost" />
+            <Grid x:Name="FadeRowsHost" HorizontalAlignment="Left">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+            </Grid>
           </StackPanel>
         </TabItem>
 

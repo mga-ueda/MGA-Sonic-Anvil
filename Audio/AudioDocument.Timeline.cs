@@ -212,7 +212,7 @@ internal sealed partial class AudioDocument
         return string.Empty;
     }
 
-    public bool TrySetRegionName(WaveSelection range, string? name)
+    public bool TrySetRegionName(WaveSelection range, string? name, bool normalize = true)
     {
         for (var i = 0; i < _regions.Count; i++)
         {
@@ -221,7 +221,7 @@ internal sealed partial class AudioDocument
                 continue;
             }
 
-            var next = MarkerRoles.Normalize(name);
+            var next = normalize ? MarkerRoles.Normalize(name) : (name ?? string.Empty).Trim();
             if (_regions[i].Name == next)
             {
                 return false;
@@ -769,14 +769,14 @@ internal sealed partial class AudioDocument
     public string MarkerCommentAt(long frame) =>
         _markerComments.TryGetValue(frame, out var comment) ? comment : string.Empty;
 
-    public bool TrySetMarkerComment(long frame, string? comment)
+    public bool TrySetMarkerComment(long frame, string? comment, bool normalize = true)
     {
         if (!HasMarkerAt(frame))
         {
             return false;
         }
 
-        var trimmed = MarkerRoles.Normalize(comment);
+        var trimmed = normalize ? MarkerRoles.Normalize(comment) : (comment ?? string.Empty).Trim();
         if (MarkerCommentAt(frame) == trimmed)
         {
             return false;
@@ -916,7 +916,10 @@ internal sealed partial class AudioDocument
         IsDirty = true;
     }
 
-    public void ReplaceMarkers(IReadOnlyList<MarkerSnapshot> markers, bool markDirty = true)
+    public void ReplaceMarkers(
+        IReadOnlyList<MarkerSnapshot> markers,
+        bool markDirty = true,
+        bool normalizeComments = true)
     {
         _markerFrames.Clear();
         _markerComments.Clear();
@@ -928,7 +931,9 @@ internal sealed partial class AudioDocument
                 _markerFrames.Add(frame);
                 if (!string.IsNullOrWhiteSpace(marker.Comment))
                 {
-                    _markerComments[frame] = MarkerRoles.Normalize(marker.Comment);
+                    _markerComments[frame] = normalizeComments
+                        ? MarkerRoles.Normalize(marker.Comment)
+                        : marker.Comment.Trim();
                 }
             }
         }
@@ -938,6 +943,22 @@ internal sealed partial class AudioDocument
         {
             IsDirty = true;
         }
+    }
+
+    /// <summary>
+    /// <c>-L</c> の次、またはサンプルループ終端の接尾辞なしマーカーを <c>-E</c> にする。
+    /// </summary>
+    public bool ApplyAutoExitComments(bool markDirty = true)
+    {
+        var before = SnapshotMarkers();
+        var after = MarkerRoles.WithAutoExitComments(before, SampleLoop, FrameCount);
+        if (before.AsSpan().SequenceEqual(after))
+        {
+            return false;
+        }
+
+        ReplaceMarkers(after, markDirty, normalizeComments: false);
+        return true;
     }
 
     public void ApplyDeleteToMarkers(long startFrame, long frameCount)

@@ -84,11 +84,20 @@ internal sealed class AudioRecorder : IDisposable
         string? recordDeviceId,
         ChannelLayout layout,
         int[]? inputMap,
-        int[]? fileChannelMap = null)
+        int[]? fileChannelMap = null,
+        int destChannels = 0,
+        int preferredSampleRate = 0)
     {
         Stop();
+        if (preferredSampleRate >= 1000)
+        {
+            _sampleRate = Math.Clamp(preferredSampleRate, 1000, 384000);
+        }
+
         _speakerChannels = Math.Clamp(layout.Channels, 1, ChannelLayout.MaxChannels);
-        _destChannels = ChannelRouter.DestLaneCount(_speakerChannels, fileChannelMap);
+        _destChannels = destChannels > 0
+            ? Math.Clamp(destChannels, 1, ChannelLayout.MaxChannels)
+            : ChannelRouter.DestLaneCount(_speakerChannels, fileChannelMap);
         _fileMap = ChannelRouter.Normalize(fileChannelMap, _speakerChannels, _destChannels);
         lock (_gate)
         {
@@ -192,7 +201,7 @@ internal sealed class AudioRecorder : IDisposable
 
         var caps = WaveIn.GetCapabilities(index);
         var channels = Math.Clamp(caps.Channels, 1, ChannelLayout.MaxChannels);
-        var rate = 48000;
+        var rate = _sampleRate >= 1000 ? _sampleRate : DefaultAudioFormat.SampleRate;
         var waveIn = new WaveInEvent
         {
             DeviceNumber = index,
@@ -233,7 +242,7 @@ internal sealed class AudioRecorder : IDisposable
 
         var asio = new AsioOut(selected) { AutoStop = false };
         var inputCount = Math.Max(1, asio.DriverInputChannelCount);
-        var rate = 48000;
+        var rate = _sampleRate >= 1000 ? _sampleRate : DefaultAudioFormat.SampleRate;
         try
         {
             var live = AudioOutputFactory.ReadLiveSampleRate(asio);
@@ -277,7 +286,10 @@ internal sealed class AudioRecorder : IDisposable
         _sampleRate = Math.Clamp(sampleRate, 1000, 384000);
         _sourceChannels = Math.Max(1, sourceChannels);
         _speakerChannels = Math.Clamp(layout.Channels, 1, ChannelLayout.MaxChannels);
-        _destChannels = ChannelRouter.DestLaneCount(_speakerChannels, fileChannelMap);
+        if (_destChannels < 1)
+        {
+            _destChannels = ChannelRouter.DestLaneCount(_speakerChannels, fileChannelMap);
+        }
         _map = ChannelRouter.Normalize(inputMap, _speakerChannels, _sourceChannels);
         _fileMap = ChannelRouter.Normalize(fileChannelMap, _speakerChannels, _destChannels);
         lock (_gate)
@@ -345,7 +357,8 @@ internal sealed class AudioRecorder : IDisposable
             _silentSkip,
             _silentSkipLinear,
             SilentSkip.RecordPadFrames(_sampleRate, _silentSkipRecordPadMs),
-            destCh);
+            destCh,
+            SilentSkip.PeakHoldFrames(_sampleRate));
     }
 
     private float[] CopyUsedNoLock(int startSample)

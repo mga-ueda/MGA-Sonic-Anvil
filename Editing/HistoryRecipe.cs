@@ -87,8 +87,11 @@ internal static class HistoryRecipes
     public const string PitchShift = "PitchShift";
     public const string TimeStretch = "TimeStretch";
     public const string Reverse = "Reverse";
+    public const string NormalizePerRegion = "NormalizePerRegion";
     public const string Delete = "Delete";
+    public const string DeleteSilence = "DeleteSilence";
     public const string Paste = "Paste";
+    public const string Record = "Record";
     public const string SetSampleLoop = "SetSampleLoop";
     public const string SetRegion = "SetRegion";
     public const string RemoveRegions = "RemoveRegions";
@@ -114,8 +117,11 @@ internal static class HistoryRecipes
         PitchShift,
         TimeStretch,
         Reverse,
+        NormalizePerRegion,
         Delete,
+        DeleteSilence,
         Paste,
+        Record,
         SetSampleLoop,
         SetRegion,
         RemoveRegions,
@@ -142,8 +148,11 @@ internal static class HistoryRecipes
         PitchShift,
         TimeStretch,
         Reverse,
+        NormalizePerRegion,
         Delete,
+        DeleteSilence,
         Paste,
+        Record,
         ConvertRate,
         ConvertBits,
         ConvertChannels,
@@ -219,6 +228,26 @@ internal static class HistoryRecipes
             channel,
             channelMask);
 
+    public static HistoryRecipe FromDeleteSilence(
+        int sourceRate,
+        WaveSelection range,
+        double thresholdDb,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0,
+        int fadeMs = ClickGuard.DefaultFadeMilliseconds) =>
+        WithChannel(
+            new HistoryRecipe
+            {
+                Kind = DeleteSilence,
+                SourceRate = sourceRate,
+                Start = range.StartFrame,
+                End = range.EndFrame,
+                Amount = SilentSkip.ClampThresholdDb(thresholdDb),
+                Value = ClickGuard.ClampFadeMs(fadeMs),
+            },
+            channel,
+            channelMask);
+
     public static HistoryRecipe FromTimeStretch(
         int sourceRate,
         WaveSelection range,
@@ -262,8 +291,20 @@ internal static class HistoryRecipes
                 Audio.TimeStretch.DestFrameCountFromRatio((int)RangeOf(recipe).Length, recipe.Amount),
                 channelMask: MaskOf(recipe)),
             Reverse => ProcessEdits.Reverse(document, RangeOf(recipe), channelMask: MaskOf(recipe)),
+            NormalizePerRegion => ProcessEdits.NormalizePerRegion(
+                document,
+                RangesOf(recipe),
+                channelMask: MaskOf(recipe),
+                fadeMs: FadeMsOf(recipe)),
             Delete => ProcessEdits.Delete(document, RangeOf(recipe), channelMask: MaskOf(recipe)),
+            DeleteSilence => ProcessEdits.DeleteSilence(
+                document,
+                RangeOf(recipe),
+                recipe.Amount,
+                channelMask: MaskOf(recipe),
+                fadeMs: FadeMsOf(recipe)),
             Paste => TryPaste(document, recipe),
+            Record => TryRecord(document, recipe),
             SetSampleLoop => TrySetSampleLoop(document, recipe),
             SetRegion => TrySetRegion(document, recipe),
             RemoveRegions => ProcessEdits.RemoveRegions(document, RangesOf(recipe)),
@@ -331,6 +372,9 @@ internal static class HistoryRecipes
             return null;
         }
 
+        var markersBefore = document.SnapshotMarkers();
+        var markersAfter = MarkerRoles.WithAutoExitComments(markersBefore, after, document.FrameCount);
+        var markersChanged = !markersBefore.AsSpan().SequenceEqual(markersAfter);
         var command = new SetSampleLoopCommand(
             document.SampleLoop,
             after,
@@ -340,7 +384,9 @@ internal static class HistoryRecipes
                     UiStrings.EditHistoryName("Set Sample Loop"),
                     document.SampleRate,
                     after.StartFrame,
-                    after.EndFrame));
+                    after.EndFrame),
+            markersChanged ? markersBefore : null,
+            markersChanged ? markersAfter : null);
         command.Persist = recipe;
         return command;
     }
@@ -452,6 +498,38 @@ internal static class HistoryRecipes
         return regions;
     }
 
+    private static IEditCommand? TryRecord(AudioDocument document, HistoryRecipe recipe)
+    {
+        var samples = recipe.ClipSamples;
+        if (samples is not { Length: > 0 } || recipe.ClipChannels < 1)
+        {
+            return null;
+        }
+
+        if (recipe.ClipRate > 0 && recipe.ClipRate != document.SampleRate)
+        {
+            samples = FormatConvert.Resample(samples, recipe.ClipChannels, recipe.ClipRate, document.SampleRate);
+        }
+
+        if (recipe.ClipChannels != document.Channels)
+        {
+            samples = new AudioClip(samples, recipe.ClipChannels, document.SampleRate).AdaptTo(document.Channels);
+        }
+
+        return ProcessEdits.RecordOverwrite(document, recipe.Frame, samples);
+    }
+
+    public static HistoryRecipe FromRecord(int sourceRate, long startFrame, float[] take, int channels) =>
+        new()
+        {
+            Kind = Record,
+            SourceRate = sourceRate,
+            Frame = startFrame,
+            ClipSamples = take,
+            ClipChannels = channels,
+            ClipRate = sourceRate,
+        };
+
     public static HistoryRecipe FromPaste(
         int sourceRate,
         long insertFrame,
@@ -548,6 +626,24 @@ internal static class HistoryRecipes
             Starts = ranges.Select(item => item.StartFrame).ToArray(),
             Ends = ranges.Select(item => item.EndFrame).ToArray(),
         };
+
+    public static HistoryRecipe FromRegionEdits(
+        string kind,
+        int sourceRate,
+        IReadOnlyList<WaveSelection> ranges,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0,
+        int fadeMs = ClickGuard.DefaultFadeMilliseconds)
+    {
+        var recipe = FromRanges(kind, sourceRate, ranges);
+        recipe.Value = ClickGuard.ClampFadeMs(fadeMs);
+        return WithChannel(recipe, channel, channelMask);
+    }
+
+    internal static int FadeMsOf(HistoryRecipe recipe) =>
+        recipe.Value > 0
+            ? ClickGuard.ClampFadeMs(recipe.Value)
+            : ClickGuard.DefaultFadeMilliseconds;
 
     public static HistoryRecipe FromTimeline(
         int sourceRate,

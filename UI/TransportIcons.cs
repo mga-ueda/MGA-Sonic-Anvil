@@ -14,6 +14,7 @@ internal enum TransportIcon
     PlayPause,
     Record,
     Folder,
+    NewDocument,
     FadeIn,
     FadeOut,
     FadeAround,
@@ -80,6 +81,7 @@ internal enum TransportCommand
     AddMarker,
     SetLoop,
     SetRegion,
+    NewDocument,
     Open,
     Save,
     SaveAs,
@@ -341,6 +343,9 @@ internal static class TransportIconDrawing
             case TransportIcon.Folder:
                 DrawFolder(dc, pen, cx, cy);
                 break;
+            case TransportIcon.NewDocument:
+                DrawNewDocument(dc, pen);
+                break;
             case TransportIcon.Settings:
                 DrawGear(dc, pen, cx, cy);
                 break;
@@ -520,6 +525,19 @@ internal static class TransportIconDrawing
             bounds.Y + (bounds.Height - h) * 0.5,
             w,
             h);
+    }
+
+    private static void DrawNewDocument(DrawingContext dc, Pen pen)
+    {
+        dc.DrawLine(pen, new Point(10, 26), new Point(10, 8));
+        dc.DrawLine(pen, new Point(10, 8), new Point(18, 8));
+        dc.DrawLine(pen, new Point(18, 8), new Point(24, 14));
+        dc.DrawLine(pen, new Point(24, 14), new Point(24, 26));
+        dc.DrawLine(pen, new Point(24, 26), new Point(10, 26));
+        dc.DrawLine(pen, new Point(18, 8), new Point(18, 14));
+        dc.DrawLine(pen, new Point(18, 14), new Point(24, 14));
+        dc.DrawLine(pen, new Point(13, 17), new Point(21, 17));
+        dc.DrawLine(pen, new Point(13, 21), new Point(21, 21));
     }
 
     private static void DrawFolder(DrawingContext dc, Pen pen, double cx, double cy)

@@ -331,6 +331,27 @@ internal sealed partial class AudioDocument
         NoteSamplesChanged();
     }
 
+    /// <summary>startFrame 以降を tail で置き換える。長さは prefix + tail。録音のライブ上書き用。</summary>
+    public void WriteLiveFrom(long startFrame, ReadOnlySpan<float> tail)
+    {
+        var start = checked((int)startFrame * Channels);
+        if (start < 0 || start > SampleCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(startFrame));
+        }
+
+        var needed = checked(start + tail.Length);
+        EnsureLiveCapacity(needed, start);
+        if (!tail.IsEmpty)
+        {
+            tail.CopyTo(Interleaved.AsSpan(start, tail.Length));
+        }
+
+        _liveSampleCount = needed;
+        NoteSamplesChanged();
+        RefreshFileBytes();
+    }
+
     public void AppendLiveSamples(ReadOnlySpan<float> extra)
     {
         if (extra.IsEmpty)

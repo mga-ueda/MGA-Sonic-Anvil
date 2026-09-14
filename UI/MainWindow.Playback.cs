@@ -128,6 +128,9 @@ public partial class MainWindow
             case TransportCommand.SetRegion:
                 TrySetRegionFromSelection();
                 break;
+            case TransportCommand.NewDocument:
+                NewDocument();
+                break;
             case TransportCommand.Open:
                 OpenFromDialog();
                 break;

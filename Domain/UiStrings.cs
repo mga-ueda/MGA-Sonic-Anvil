@@ -115,13 +115,15 @@ internal static partial class UiStrings
 
     public static string LabelAlwaysOnTop => Get("Always on Top", "Always on Top");
     public static string LabelSilentSkip => Get("Silent Skip", "Silent Skip");
-    public static string LabelSilentSkipThreshold => Get("無音しきい値（Silent Skip）", "Silence threshold (Silent Skip)");
+    public static string LabelSilentSkipThreshold => Get(
+        "無音しきい値（Silent Skip / 無音削除）",
+        "Silence threshold (Silent Skip / Delete Silence)");
     public static string ErrorSilentSkipThresholdRange => Get(
         "無音しきい値は -120 から 0 の dB で入力してください。",
         "Enter a silence threshold between -120 and 0 dB.");
     public static string LabelSilentSkipRecordPad => Get(
-        "無音の上限（録音）",
-        "Max silence (record)");
+        "スキップ時の無音挿入時間",
+        "Silence insert duration on skip");
     public static string LabelConfirmRecordSilentSkip => Get(
         "Silent Skip をオンにする",
         "Turn on Silent Skip");
@@ -132,8 +134,14 @@ internal static partial class UiStrings
     public static string RegionNameRecordSilence => Get("無音", "Silence");
     public static string LabelMs => Get("ms", "ms");
     public static string ErrorSilentSkipRecordPadRange => Get(
-        "録音の無音は 0 から 10000 の ms で入力してください。",
-        "Enter a record silence pad between 0 and 10000 ms.");
+        "スキップ時の無音挿入時間は 0 から 10000 の ms で入力してください。",
+        "Enter a silence insert duration on skip between 0 and 10000 ms.");
+    public static string LabelClickGuardFade => Get(
+        "プチノイズ防止フェード",
+        "Click-prevention fade");
+    public static string ErrorClickGuardFadeRange => Get(
+        "プチノイズ防止フェードは 1 から 100 の ms で入力してください。",
+        "Enter a click-prevention fade between 1 and 100 ms.");
     public static string LabelAudioApi => Get("Audio API", "Audio API");
     public static string LabelAudioDevice => Get("オーディオデバイス", "Audio device");
     public static string LabelSettingsTabGeneral => Get("一般", "General");
@@ -144,6 +152,7 @@ internal static partial class UiStrings
     public static string LabelSettingsInput => Get("録音", "Recording");
     public static string LabelSettingsOutput => Get("再生", "Playback");
     public static string LabelSpeaker => Get("スピーカー", "Speakers");
+    public static string LabelSpeakerIo => Get("スピーカーと入出力", "Speakers and I/O");
     public static string LabelSpeakerVisibility => Get("有効にするスピーカー定義", "Speaker definitions to enable");
     public static string ButtonSineMinusTwenty => Get("Sine −20 dB", "Sine −20 dB");
     public static string ButtonChannelVoice => Get("Voice", "Voice");
@@ -169,6 +178,10 @@ internal static partial class UiStrings
     public static string LabelThemeAuto => Get("Auto", "Auto");
     public static string LabelThemeDark => Get("Dark", "Dark");
     public static string LabelThemeLight => Get("Light", "Light");
+    public static string LabelDefaultAudioFormat => Get("デフォルトオーディオフォーマット", "Default audio format");
+    public static string LabelDefaultSampleRate => Get("サンプルレート", "Sample rate");
+    public static string LabelDefaultBitDepth => Get("ビット深度", "Bit depth");
+    public static string LabelDefaultChannelLayout => Get("チャンネル", "Channels");
     public static string LabelFileAssociations => Get("関連付け", "File associations");
     public static string LabelLanguageAuto => Get("Auto", "Auto");
     public static string LabelLanguageJapanese => Get("Japanese", "Japanese");
@@ -177,8 +190,15 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeIn => Get("波形フェードイン", "Waveform Fade In");
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string TipAudioSettings => Get(
-        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出しのタブ。表示言語、配色（ダーク／ライト／Auto）、関連付け、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、フェード、MP3、同時書き出し本数。",
-        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export tabs. Language, theme (Dark / Light / Auto), file associations, speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, fades, MP3, and parallel export count.");
+        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出しのタブ。表示言語、配色（ダーク／ライト／Auto）、関連付け、デフォルトオーディオフォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip / 無音削除）、プチノイズ防止フェード、フェードカーブ、MP3、同時書き出し本数。ダイアログのボタンは Tab で移動できます。",
+        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export tabs. Language, theme (Dark / Light / Auto), file associations, default audio format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip / Delete Silence), click-prevention fade, fade curves, MP3, and parallel export count. Tab also moves to dialog buttons.");
+    public static string TipDefaultAudioFormat => Get(
+        "新規ファイル（Ctrl+N）の初期フォーマットです。既定は 48kHz / 24bit / Stereo。チャンネルは表示項目で有効にしたスピーカーと、常に選べる Mono。",
+        "Initial format for a new file (Ctrl+N). Default is 48 kHz / 24-bit / Stereo. Channels are the speakers enabled on Shown, plus Mono (always available).");
+    public static string DialogNewDocumentTitle => Get("新規", "New");
+    public static string TipNewDocument => Get(
+        "新規 (Ctrl+N)\n空のタブを作ります。フォーマットは都度選べます。候補のチャンネルは、表示項目で有効にしたスピーカーと Mono（常に選べる）。前回の指定を覚えます。",
+        "New (Ctrl+N)\nOpens an empty tab. Choose the format each time. Channels are the speakers enabled on Shown, plus Mono (always available). The last choice is remembered.");
     public static string LabelMp3Encode => Get("MP3", "MP3");
     public static string TipMp3Encode => Get(
         "MP3 保存の経路です。LAME のパスが有効なら lame.exe、空欄または無効なら Windows です。",
@@ -412,10 +432,14 @@ internal static partial class UiStrings
         "AIFF export is not supported. Choose Wave or MP3.");
     public static string ErrorNoDocument => Get("ファイルが開かれていません。", "No file is open.");
     public static string ErrorNoSelection => Get("選択範囲がありません。", "Nothing is selected.");
+    public static string ErrorNoRegions => Get("リージョンがありません。", "There are no regions.");
     public static string ErrorClipboardEmpty => Get("クリップボードが空です。", "The clipboard is empty.");
     public static string ErrorEmptyAfterDelete => Get(
         "ファイル全体は削除できません。",
         "The entire file cannot be deleted.");
+    public static string ErrorNoSilenceToDelete => Get(
+        "削除できる無音がありません。",
+        "There is no silence to delete.");
     public static string ErrorMp3NoRegionLoop => Get(
         "MP3 にはリージョンとサンプルループを付けられません。マーカーは置けますが、MP3 保存では書き出しません。",
         "MP3 cannot take regions or a sample loop. Markers are allowed, but they are not written when you save as MP3.");
@@ -475,7 +499,9 @@ internal static partial class UiStrings
     public static string TooltipTipsToggle => Get("Tips の表示", "Show Tips");
     public static string TooltipSettings => Get("設定 (Ctrl+Shift+O)", "Settings (Ctrl+Shift+O)");
     public static string TooltipManualHelp => Get("マニュアル", "Manual");
-    public static string TooltipFadeAround => Get("再生位置でフェード (X)", "Fade around playhead (X)");
+    public static string TooltipFadeAround => Get(
+        "再生位置でフェード (X)  見えている前だけアウト／後ろだけイン",
+        "Fade around playhead (X)  fade out visible before / fade in visible after");
     public static string TooltipVolume => Get("音量 (V)", "Volume (V)");
     public static string TooltipPitch => Get("ピッチ (P)", "Pitch (P)");
     public static string TooltipTimeStretch => Get("タイムストレッチ (T)", "Time stretch (T)");
@@ -484,6 +510,7 @@ internal static partial class UiStrings
     public static string TooltipSetLoop => Get("選択をループに (Shift+L)", "Set selection as loop (Shift+L)");
     public static string TooltipSetRegion => Get("選択をリージョンに (Shift+R)", "Set selection as region (Shift+R)");
     public static string TooltipOpen => Get("開く (Ctrl+O)", "Open (Ctrl+O)");
+    public static string TooltipNew => Get("新規 (Ctrl+N)", "New (Ctrl+N)");
     public static string TooltipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)", "Save As (Ctrl+Shift+S)");
     public static string TooltipSpectrogramView => Get("スペクトログラム / 重ね (A)  解除 (Esc / Shift+A / Shift+V)", "Spectrogram / overlay (A)  leave (Esc / Shift+A / Shift+V)");
     public static string TooltipLoudnessView => Get("ラウドネス (V)  解除 (Esc / Shift+A / Shift+V)", "Loudness (V)  leave (Esc / Shift+A / Shift+V)");
@@ -493,11 +520,13 @@ internal static partial class UiStrings
     public static string TooltipColorPanel => Get("色設定 (Ctrl+Shift+C)", "Color settings (Ctrl+Shift+C)");
 
     public static string TipFadeAround => Get(
-        "再生位置でフェード (X)\n表示範囲をシーク前後にリニアフェード（前=アウト / 後=イン）",
-        "Fade around playhead (X)\nLinear fade in the view around the playhead (before = out / after = in)");
+        "再生位置でフェード (X)\nシークを境に、今見えている前だけアウト／後ろだけイン（リニア）",
+        "Fade around playhead (X)\nFrom the playhead, fade out only the visible part before / fade in only the visible part after (linear)");
     public static string TipReverse => Get("リバース (R)\n選択範囲を時間方向に反転。未選択なら全体", "Reverse (R)\nReverse the selection in time. Uses the whole file if nothing is selected");
     public static string TipAddMarker => Get("マーカーを追加 (M / Ins)\n選択中は両端。同じ範囲で繰り返すと分割", "Add marker (M / Ins)\nPlaces both ends of a selection; repeat to split");
-    public static string TipSetLoop => Get("選択をサンプルループに (Shift+L)\n同じ範囲でもう一度で解除", "Set selection as sample loop (Shift+L)\nSame range again clears it");
+    public static string TipSetLoop => Get(
+        "選択をサンプルループに (Shift+L)\n同じ範囲でもう一度で解除。EXPORT ではループ前が Intro、ループが -L。後ろに余りがあれば -E。終端の接尾辞なしマーカーは -E に置き換わる",
+        "Set selection as sample loop (Shift+L)\nSame range again clears it. EXPORT treats the part before as Intro and the loop as -L. A remainder after the loop becomes -E. A suffix-less marker at the loop end is replaced with -E");
     public static string TipSetRegion => Get("選択をリージョンに (Shift+R)\n同じ範囲で繰り返すと分割", "Set selection as region (Shift+R)\nRepeat on the same range to split");
     public static string TipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)", "Save As (Ctrl+Shift+S)");
     public static string TipSpectrogramView => Get(
@@ -534,8 +563,8 @@ internal static partial class UiStrings
         "使うスピーカー配置を切り替えます。デバイスとポート割り当てが一緒に変わります。一覧は設定の表示項目タブで絞れます。",
         "Switch speaker layout. The device and port assignments change with it. The list is filtered in Settings → Shown.");
     public static string TipRecord => Get(
-        "録音 (Ctrl+R)\n開始前に毎回、Silent Skip をオンにするか確認する。未保存の録音があれば末尾から続きを録る。なければ新規タブ。保存した録音には続けて録れない。開いたまま終了すれば作業コピーが残り再起動で戻る。閉じたタブの再開は今の起動のうちだけ。波形はすぐ出して、あとから整える。Silent Skip がオンならしきい値を超えたときだけ録り、下回った時点から無音を挟んで上限で止める。もう一度で停止。スピーカー配置・録音ポート・Ch の割り当てを使う。Space / Enter / Esc でも停止。",
-        "Record (Ctrl+R)\nAsks every time whether to turn Silent Skip on. Continues an unsaved recording from the end, or opens a new tab if there is none. A saved recording cannot be continued. An unsaved take left open is kept as a working copy and comes back on restart. Reopen Closed Tab is only in this launch. The waveform appears immediately and is refined after. With Silent Skip on, only audio above the threshold is recorded, and silence is inserted when the level falls (up to the Settings limit). Press again to stop. Uses the speaker layout, record ports, and Ch map. Space / Enter / Esc also stop.");
+        "録音 (Ctrl+R)\n開始前に毎回、Silent Skip をオンにするか確認する。今開いているファイルのフォーマットで、シークバーの位置から録る。それ以降の波形は上書き（Undo で戻せる）。ファイルが無いときは始まらない（先に Ctrl+N で作るか、ファイルを開く）。波形はすぐ出して、あとから整える。Silent Skip がオンならしきい値を超えたときだけ録り、下回った時点から無音を挟んで挿入時間で止める。可聴の前後にはプチノイズ防止フェード（設定の編集タブ。既定 20 ms）をかける。もう一度で停止。スピーカー配置・録音ポート・Ch の割り当てを使う。Space / Enter / Esc でも停止。",
+        "Record (Ctrl+R)\nAsks every time whether to turn Silent Skip on. Records in the current file format from the seek bar, overwriting audio after that point (Undo restores it). Does nothing if no file is open; create one with Ctrl+N or open a file first. The waveform appears immediately and is refined after. With Silent Skip on, only audio above the threshold is recorded, and silence is inserted when the level falls (up to the insert duration in Settings). Each recorded burst gets the click-prevention fade from the Editing tab (default 20 ms) at both ends. Press again to stop. Uses the speaker layout, record ports, and Ch map. Space / Enter / Esc also stop.");
     public static string TipRecordInputMap => Get(
         "各スピーカーがどのポートから入り、どの Ch へ書くか。なしは無音。右のバーは今のレベルです。Ch は再生と共通です。",
         "Which port feeds each speaker, and which file channel (Ch) it writes. Off is silence. The bar is the live level. Ch is shared with playback.");
@@ -607,8 +636,8 @@ internal static partial class UiStrings
         "ピッチ (P)\n↑↓／ホイールで半音（Shift または Ctrl で1オクターブ）。Space で試聴、Enter で実行。未選択なら全体。±2オクターブ。長さを保つ（既定オン。Tab でチェックへ）。オフは長さも変わる。長さだけなら T。",
         "Pitch (P)\n↑↓ / wheel by a semitone (Shift or Ctrl for an octave). Space previews, Enter applies. Uses the whole file if nothing is selected. Range is ±2 octaves. Keep length (on by default. Tab moves to the checkbox). Off also changes length. T stretches time only.");
     public static string TipDelete => Get(
-        "部分削除 (Delete)\n選択範囲を詰めて削除\n選択中のマーカー / リージョンはまとめて削除\nCtrl+Del でマーカー削除",
-        "Ripple delete (Delete)\nRemove the selection and close the gap\nSelected markers / regions are deleted together\nCtrl+Del deletes markers");
+        "部分削除 (Delete)\n選択範囲を詰めて削除\n選択中のマーカー / リージョンはまとめて削除\nCtrl+Del でマーカー削除\n右クリックの「無音部分を削除」は Silent Skip と同じしきい値。継ぎ目にプチノイズ防止フェード",
+        "Ripple delete (Delete)\nRemove the selection and close the gap\nSelected markers / regions are deleted together\nCtrl+Del deletes markers\nDelete Silence on the right-click menu uses the Silent Skip threshold. Splices get the click-prevention fade");
     public static string TipSave => Get(
         "保存 (Ctrl+S)\nCtrl+Shift+S で別名保存\nCtrl+Shift+M で MP3 保存（今のタブは開いたまま。書き出した MP3 は読み込まない）\nCtrl+Shift+Alt+M で全タブを MP3 書き出し\nMP3 は PCM 16bit から再エンコード。LAME のパスが有効ならそれを使い、空欄または無効なら Windows（既定 192 kbps）。成功時に LAME / Windows を表示。失敗はダイアログ。マーカー／リージョン／ループは MP3 に書きません",
         "Save (Ctrl+S)\nCtrl+Shift+S to save as\nCtrl+Shift+M to save as MP3 (keeps the current tab; does not open the written MP3)\nCtrl+Shift+Alt+M exports every tab as MP3\nMP3 is re-encoded from 16-bit PCM. A valid LAME path is used; empty or invalid falls back to Windows (default 192 kbps). Success shows LAME / Windows. Failures open a dialog. Markers / regions / loops are not written to MP3");
@@ -616,8 +645,8 @@ internal static partial class UiStrings
         "MP3 として保存 (Ctrl+Shift+M)\n別名保存と同じく書き出すだけ。今のタブは開いたまま、書き出した MP3 は読み込まない。Ctrl+Shift+Alt+M で全タブを MP3 書き出し。設定の LAME があればそれを使い、空欄または無効なら Windows（既定 192 kbps）。成功時にどちらで書いたかを表示。失敗はダイアログ。マーカー／リージョン／ループは書きません",
         "Save as MP3 (Ctrl+Shift+M)\nWrites a file like Save As; keeps the current tab and does not open the written MP3. Ctrl+Shift+Alt+M exports every tab as MP3. Uses LAME when the path is valid; otherwise Windows (default 192 kbps). Success shows which encoder ran. Failures open a dialog. Markers / regions / loops are not written");
     public static string TipOpen => Get(
-        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
-        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
+        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+N で新規（フォーマットは都度指定）\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ\n右クリックで、すべてのタブの時間をコピー（ファイル名と長さをタブ区切り）など\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
+        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+N for a new file (choose the format each time)\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab\nRight-click to copy all tab times (file name and duration, tab-separated) and more\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
     public static string TipCloseTab => Get(
         "タブを閉じる (Ctrl+W)。今の起動のうちなら Ctrl+Shift+T で開き直せる",
         "Close tab (Ctrl+W). Ctrl+Shift+T reopens it in this launch");
@@ -721,30 +750,33 @@ internal static partial class UiStrings
         + "Esc または Shift なし移動で解除。Shift＋ドラッグ／←→ で伸長。ダブルクリックで区間（マーカー間）。Shift＋ダブルクリックでその区間を追加。トリプルクリックで全選択。ガイドはマーカー／ループ端に吸着。\n"
         + "左端のチャンネル名：クリックでソロ（再クリックで解除。Ctrl で追加。Shift でミュート）。Tab／Shift+Tab で順にソロ。\n"
         + "ホイール＝時間ズーム（再生ヘッド基準）。Shift+ホイール＝パン。Ctrl+ホイール＝振幅。\n"
-        + "フラッグ／ループ端：クリックで選択、ドラッグまたは ←→ で移動。Alt+←→ は微調整。ダブルクリックで名前。右クリックでメニュー。",
+        + "フラッグ／ループ端：クリックで選択、ドラッグまたは ←→ で移動。Alt+←→ は微調整。ダブルクリックで名前。右クリックまたはメニューキー／Shift+F10 でメニュー。",
         "Click to set the playhead. ←→ seek (hold during playback for 3× shuttle). Drag to select. Ctrl+drag scrubs (every channel downmixed to L/R).\n"
         + "Esc or a move without Shift clears the selection. Shift+drag / ←→ extends it. Double-click a span (between markers). Shift+double-click adds that span. Triple-click selects all. The guide snaps to markers / loop edges.\n"
         + "Channel names on the left: click to solo (again to clear; Ctrl adds; Shift mutes). Tab / Shift+Tab cycle solo.\n"
         + "Wheel = time zoom (around the playhead). Shift+wheel = pan. Ctrl+wheel = amplitude.\n"
-        + "Flags / loop edges: click to select, drag or ←→ to move. Alt+←→ nudges. Double-click to name. Right-click for the menu.");
+        + "Flags / loop edges: click to select, drag or ←→ to move. Alt+←→ nudges. Double-click to name. Right-click or the menu key / Shift+F10 for the menu.");
     public static string TipAlwaysOnTop => Get(
         "ウィンドウを常に最前面へ表示します。",
         "Keep the window always on top.");
     public static string TipSilentSkip => Get(
-        "無音区間を飛ばして再生し、録音中はしきい値を超えたときだけ書き込みます (Alt+S)。再生中の ←→ 早送り／巻き戻し中は飛ばしません。録音開始時にオンにするか毎回確認する。しきい値と、録音で残す無音の上限は設定の編集タブ。リージョン付加は録音開始時に指定。",
-        "Skip silent stretches during playback, and while recording write only audio above the threshold (Alt+S). Hold ←→ during playback to shuttle without skipping. Recording always asks whether to turn it on. Threshold and the record-only max silence are on the Editing tab in Settings. Adding regions is chosen when you start recording.");
+        "無音区間を飛ばして再生し、録音中はしきい値を超えたときだけ書き込みます (Alt+S)。再生中の ←→ 早送り／巻き戻し中は飛ばしません。録音開始時にオンにするか毎回確認する。しきい値（無音削除にも使う）、スキップ時の無音挿入時間、プチノイズ防止フェードは設定の編集タブ。リージョン付加は録音開始時に指定。",
+        "Skip silent stretches during playback, and while recording write only audio above the threshold (Alt+S). Hold ←→ during playback to shuttle without skipping. Recording always asks whether to turn it on. The threshold (also used by Delete Silence), the silence insert duration on skip, and the click-prevention fade are on the Editing tab in Settings. Adding regions is chosen when you start recording.");
     public static string TipSilentSkipThreshold => Get(
-        "Silent Skip で無音とみなすピーク（dBFS）。-120 から 0。既定 -60。再生ではこの値未満なら次の音まで飛ばし、録音では書き込みません。右のバーは割り当てた録音をモノラル化したピーク。赤線と数字は短区間ピークの最小の平均です。",
-        "Peak level treated as silence for Silent Skip (dBFS), from −120 to 0. Default −60. Playback jumps from below this level to the next sound. Recording does not write those frames. The bar is the assigned record ports mixed to mono. The red line and number are the average of short-block peak minima.");
+        "Silent Skip で無音とみなすピーク（dBFS）。-120 から 0。既定 -60。再生ではこの値未満なら次の音まで飛ばし、録音では書き込みません。判定は約 50ms の窓内ピークなので、しきい値付近の周期音の谷だけを間引いてピッチが上がることはありません。右クリックの「無音部分を削除」も同じしきい値です。右のバーは割り当てた録音をモノラル化したピーク。赤線と数字は短区間ピークの最小の平均です。",
+        "Peak level treated as silence for Silent Skip (dBFS), from −120 to 0. Default −60. Playback jumps from below this level to the next sound. Recording does not write those frames. The check uses a peak in a ~50 ms window, so troughs of a near-threshold tone are not stripped (that would raise pitch). Delete Silence on the right-click menu uses the same threshold. The bar is the assigned record ports mixed to mono. The red line and number are the average of short-block peak minima.");
     public static string TipSilentSkipThresholdMeter => Get(
         "バーはピーク。赤線と右の数値はピークではなく、短い区間のピークのうち小さい方をならした値（谷の平均）。しきい値の目安にします。",
         "The bar is peak. The red line and number are not peak; they average the quieter short-block peaks (avg. floor). Use them as a guide for the threshold.");
     public static string TipSilentSkipRecordPad => Get(
-        "録音専用。しきい値を下回った時点から無音を書き、この長さまで書いたら止めます。音が戻ったときにまとめて挟みません。先頭の無音と、末尾の長い無音は残しません。0 なら無音は全部捨てます。0 から 10000。既定 500。",
-        "Recording only. Silence is written as soon as the level falls, then stops at this length. It is not dumped when sound returns. Leading silence and a long tail are discarded. 0 drops every silent frame. From 0 to 10000. Default 500.");
+        "録音の Silent Skip 専用。スキップ時に挿入する無音の長さ。しきい値を下回った時点から無音を書き、この長さまで書いたら止めます。音が戻ったときにまとめて挟みません。先頭の無音と、末尾の長い無音は残しません。0 なら無音は全部捨てます。0 から 10000。既定 500。",
+        "Recording Silent Skip only. How much silence is inserted when skipping. Silence is written as soon as the level falls, then stops at this length. It is not dumped when sound returns. Leading silence and a long tail are discarded. 0 drops every silent frame. From 0 to 10000. Default 500.");
+    public static string TipClickGuardFade => Get(
+        "継ぎ目のプチノイズだけを消す短いフェード。先頭は 0 から、終端は 0 へ。リージョン毎のノーマライズ、無音部分を削除、Silent Skip 録音で使う。長い音楽用フェードにはしない。1 から 100。既定 20。",
+        "A short fade that only removes a click at a splice. Starts at 0 and ends at 0. Used by normalize per region, Delete Silence, and Silent Skip recording. Not a musical fade. From 1 to 100. Default 20.");
     public static string TipConfirmRecordSilentSkip => Get(
-        "この録音で Silent Skip を使うか。オンならしきい値を超えたときだけ録り、下回った時点から無音を挟んで上限で止めます。オフならすべて書きます。OK するとステータスバーにも反映します。",
-        "Whether to use Silent Skip for this recording. When on, only audio above the threshold is recorded, and silence is inserted when the level falls (up to the Settings limit). When off, everything is written. OK also updates the status-bar switch.");
+        "この録音で Silent Skip を使うか。オンならしきい値を超えたときだけ録り、下回った時点から無音を挟んで挿入時間で止めます。オフならすべて書きます。OK するとステータスバーにも反映します。",
+        "Whether to use Silent Skip for this recording. When on, only audio above the threshold is recorded, and silence is inserted when the level falls (up to the insert duration in Settings). When off, everything is written. OK also updates the status-bar switch.");
     public static string TipSilentSkipRecordAddRegion => Get(
         "Silent Skip 録音のときだけ。無音を pad まで挟んだとき、その無音と前後の録音それぞれにリージョンを付けます。波形の短い谷では分けません。続きの録音は新しい区間だけ。録音のたびに指定。前回の指定を初期値にする。",
         "Only when recording with Silent Skip. A region is added when silence is inserted up to the pad, plus the recorded stretches it separates. Brief dips in the waveform are not split. A continued take gets regions for the new audio only. Chosen each time you record. The last choice is the default.");
@@ -778,6 +810,7 @@ internal static partial class UiStrings
     public static string TabMenuCloseRight => Get("このタブを含め右側を全部閉じる(_R)", "Close This and Tabs to the _Right");
     public static string TabMenuCloseLeft => Get("このタブを含め左側を全部閉じる(_L)", "Close This and Tabs to the _Left");
     public static string TabMenuSelectAll => Get("全部のタブを選択する(_A)", "Select _All Tabs");
+    public static string TabMenuCopyAllTimes => WaveMenuCopyAllTabTimes;
     public static string TabMenuCloseAll => Get("すべてのタブを閉じる(_A)", "Close _All Tabs");
 
     /// <summary>通常メニュー用。「全部のタブを選択する(_A)」とアクセスキーが重ならないよう W。</summary>
@@ -850,12 +883,15 @@ internal static partial class UiStrings
         "Fade Out" => Get("フェードアウト", "Fade Out"),
         "Fade Around Playhead" => Get("再生ヘッド前後フェード", "Fade Around Playhead"),
         "Normalize" => Get("ノーマライズ", "Normalize"),
+        "Normalize Per Region" => Get("リージョン毎にノーマライズ", "Normalize per Region"),
         "Volume" => Get("音量", "Volume"),
         "Pitch Shift" => Get("ピッチ", "Pitch Shift"),
         "Time Stretch" => Get("タイムストレッチ", "Time Stretch"),
         "Reverse" => Get("リバース", "Reverse"),
         "Delete" => Get("削除", "Delete"),
+        "Delete Silence" => Get("無音部分を削除", "Delete Silence"),
         "Paste" => Get("ペースト", "Paste"),
+        "Record" => Get("録音", "Record"),
         "Add Marker" => Get("マーカー追加", "Add Marker"),
         "Marker Comment" => Get("マーカーコメント", "Marker Comment"),
         "Region Name" => Get("リージョン名", "Region Name"),

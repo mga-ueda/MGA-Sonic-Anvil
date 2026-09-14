@@ -1,3 +1,5 @@
+using MgaSonicAnvil.Domain;
+
 namespace MgaSonicAnvil.Audio;
 
 /// <summary>インターリーブ PCM の選んだチャンネルだけを触る。mask 0 は全チャンネル。</summary>
@@ -22,44 +24,80 @@ internal static class ChannelSamples
         }
     }
 
-    public static float Peak(ReadOnlySpan<float> interleaved, int channels, int mask)
+    public static float Peak(ReadOnlySpan<float> interleaved, int channels, int mask) =>
+        Peak(interleaved, channels, mask, bufferStartFrame: 0, range: null);
+
+    public static float Peak(
+        ReadOnlySpan<float> interleaved,
+        int channels,
+        int mask,
+        long bufferStartFrame,
+        WaveSelection? range)
     {
+        channels = Math.Max(1, channels);
+        var (start, end) = FrameSpan(interleaved.Length, channels, bufferStartFrame, range);
         var peak = 0f;
-        if (!IsScoped(mask, channels))
+        for (var frame = start; frame < end; frame++)
         {
-            foreach (var sample in interleaved)
+            var index = frame * channels;
+            for (var ch = 0; ch < channels; ch++)
             {
-                peak = Math.Max(peak, Math.Abs(sample));
-            }
-
-            return peak;
-        }
-
-        for (var i = 0; i < interleaved.Length; i++)
-        {
-            if (ChannelSolo.Contains(mask, i % channels))
-            {
-                peak = Math.Max(peak, Math.Abs(interleaved[i]));
+                if (ChannelSolo.Contains(mask, ch))
+                {
+                    peak = Math.Max(peak, Math.Abs(interleaved[index + ch]));
+                }
             }
         }
 
         return peak;
     }
 
-    public static void ApplyGain(float[] interleaved, int channels, int mask, float gain)
+    public static void ApplyGain(float[] interleaved, int channels, int mask, float gain) =>
+        ApplyGain(interleaved, channels, mask, gain, bufferStartFrame: 0, range: null);
+
+    public static void ApplyGain(
+        float[] interleaved,
+        int channels,
+        int mask,
+        float gain,
+        long bufferStartFrame,
+        WaveSelection? range)
     {
         if (channels < 1)
         {
             return;
         }
 
-        for (var i = 0; i < interleaved.Length; i++)
+        var (start, end) = FrameSpan(interleaved.Length, channels, bufferStartFrame, range);
+        for (var frame = start; frame < end; frame++)
         {
-            if (ChannelSolo.Contains(mask, i % channels))
+            var index = frame * channels;
+            var count = Math.Min(channels, interleaved.Length - index);
+            for (var ch = 0; ch < count; ch++)
             {
-                interleaved[i] *= gain;
+                if (ChannelSolo.Contains(mask, ch))
+                {
+                    interleaved[index + ch] *= gain;
+                }
             }
         }
+    }
+
+    private static (int Start, int End) FrameSpan(
+        int sampleCount,
+        int channels,
+        long bufferStartFrame,
+        WaveSelection? range)
+    {
+        var frames = sampleCount / Math.Max(1, channels);
+        if (range is not { } span || span.IsEmpty)
+        {
+            return (0, frames);
+        }
+
+        var start = (int)Math.Clamp(span.StartFrame - bufferStartFrame, 0, frames);
+        var end = (int)Math.Clamp(span.EndFrame - bufferStartFrame, start, frames);
+        return (start, end);
     }
 
     public static void Silence(float[] interleaved, int channels, int mask)

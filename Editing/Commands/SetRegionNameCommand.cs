@@ -25,7 +25,7 @@ internal sealed class SetRegionNameCommand : IEditCommand
 
     public HistoryRecipe? Persist { get; set; }
 
-    public void Apply(AudioDocument document) => document.TrySetRegionName(_range, _after);
+    public void Apply(AudioDocument document) => document.TrySetRegionName(_range, _after, normalize: false);
 
-    public void Revert(AudioDocument document) => document.TrySetRegionName(_range, _before);
+    public void Revert(AudioDocument document) => document.TrySetRegionName(_range, _before, normalize: false);
 }
