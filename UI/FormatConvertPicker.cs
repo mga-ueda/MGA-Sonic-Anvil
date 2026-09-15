@@ -424,7 +424,31 @@ internal static class FormatConvertPicker
 
     private static MenuItem? HighlightedItem(ContextMenu menu)
     {
-        foreach (var item in menu.Items.OfType<MenuItem>())
+        var current = CurrentSelectionProperty?.GetValue(menu) as MenuItem;
+        if (ResolveHighlightedItem(menu.Items.OfType<MenuItem>(), current) is { } resolved)
+        {
+            return resolved;
+        }
+
+        return Keyboard.FocusedElement as MenuItem
+            ?? (Keyboard.FocusedElement as DependencyObject)?.FindAncestor<MenuItem>();
+    }
+
+    /// <summary>
+    /// ハイライト切替中は旧項目も IsHighlighted のまま残ることがある。
+    /// いま選んでいる項目（preferred）を優先する。
+    /// </summary>
+    internal static MenuItem? ResolveHighlightedItem(
+        IEnumerable<MenuItem> items,
+        MenuItem? preferred)
+    {
+        var list = items as IList<MenuItem> ?? items.ToList();
+        if (preferred is not null && preferred.IsHighlighted && Contains(list, preferred))
+        {
+            return preferred;
+        }
+
+        foreach (var item in list)
         {
             if (item.IsHighlighted)
             {
@@ -432,13 +456,20 @@ internal static class FormatConvertPicker
             }
         }
 
-        if (CurrentSelectionProperty?.GetValue(menu) is MenuItem selected)
+        return preferred is not null && Contains(list, preferred) ? preferred : null;
+    }
+
+    private static bool Contains(IList<MenuItem> items, MenuItem target)
+    {
+        for (var i = 0; i < items.Count; i++)
         {
-            return selected;
+            if (ReferenceEquals(items[i], target))
+            {
+                return true;
+            }
         }
 
-        return Keyboard.FocusedElement as MenuItem
-            ?? (Keyboard.FocusedElement as DependencyObject)?.FindAncestor<MenuItem>();
+        return false;
     }
 
     private static void WireHighlightTracking(ContextMenu menu)
@@ -489,17 +520,42 @@ internal static class FormatConvertPicker
             return;
         }
 
+        CurrentSelectionProperty?.SetValue(menu, item);
         SyncMarks(menu, item);
-        NotifyHighlight(menu);
+        NotifyHighlight(menu, item);
     }
 
-    private static void NotifyHighlight(ContextMenu menu)
+    private static void NotifyHighlight(ContextMenu menu, MenuItem? source = null)
     {
-        if (menu.Tag is MenuState { OnHighlight: { } onHighlight }
-            && TryHighlightedValue(menu, out var value))
+        if (menu.Tag is not MenuState { OnHighlight: { } onHighlight })
+        {
+            return;
+        }
+
+        if (source is not null && TryItemValue(menu, source, out var value))
+        {
+            onHighlight(value);
+            return;
+        }
+
+        if (TryHighlightedValue(menu, out value))
         {
             onHighlight(value);
         }
+    }
+
+    private static bool TryItemValue(ContextMenu menu, MenuItem item, out int value)
+    {
+        if (item.Tag is int preset)
+        {
+            value = preset;
+            return true;
+        }
+
+        value = 0;
+        return menu.Tag is MenuState { CustomBox: { } box }
+            && Equals(item.Tag, "custom")
+            && TryReadCustom(box, out value);
     }
 
     private static void HighlightItem(ContextMenu menu, MenuItem target)
