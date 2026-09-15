@@ -247,7 +247,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
     {
         var typeface = WpfControlHelpers.UiBoldTypeface;
         var regular = WpfControlHelpers.UiTypeface;
-        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var dpi = UiDpi.Get(this).PixelsPerDip;
         var fore = WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush"));
         var culture = CultureInfo.CurrentUICulture;
         var baseFormatted = new FormattedText(

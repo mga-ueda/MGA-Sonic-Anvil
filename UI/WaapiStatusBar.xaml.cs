@@ -512,7 +512,7 @@ internal sealed partial class WaapiStatusBar : UserControl
             new Typeface(FontFamily, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
             10,
             WpfControlHelpers.FrozenBrush(_badgeFore),
-            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            UiDpi.Get(this).PixelsPerDip);
         var padX = 6d;
         var padY = 2d;
         var width = formatted.Width + padX * 2;

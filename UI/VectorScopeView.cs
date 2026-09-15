@@ -305,7 +305,7 @@ internal sealed class VectorScopeView : FrameworkElement
             null,
             new Rect(needleX - 1.5, track.Y, 3, track.Height));
 
-        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var dpi = UiDpi.Get(this).PixelsPerDip;
         var dim = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
         var left = Measure("-1", 8, dim, dpi);
         var right = Measure("+1", 8, dim, dpi);
@@ -453,7 +453,7 @@ internal sealed class VectorScopeView : FrameworkElement
 
     private bool EnsurePersist(Rect scope)
     {
-        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var dpi = UiDpi.Get(this).PixelsPerDip;
         var w = Math.Max(8, (int)Math.Round(scope.Width * dpi));
         var h = Math.Max(8, (int)Math.Round(scope.Height * dpi));
         if (_persist is not null && _persistW == w && _persistH == h)
@@ -820,7 +820,7 @@ internal sealed class VectorScopeView : FrameworkElement
 
     private void StampSurroundEnergy(Rect scope, double fade)
     {
-        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var dpi = UiDpi.Get(this).PixelsPerDip;
         var visual = new DrawingVisual();
         using (var dc = visual.RenderOpen())
         {
@@ -978,7 +978,7 @@ internal sealed class VectorScopeView : FrameworkElement
             cy,
             radius,
             Color.FromArgb(alpha, SurroundHullStroke.R, SurroundHullStroke.G, SurroundHullStroke.B),
-            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            UiDpi.Get(this).PixelsPerDip);
     }
 
     private static void DrawEnvelope(

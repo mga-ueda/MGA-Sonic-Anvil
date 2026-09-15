@@ -403,7 +403,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
     {
         get
         {
-            var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+            var dpi = UiDpi.Get(this).PixelsPerDip;
             return dpi > 0 ? dpi : 1d;
         }
     }

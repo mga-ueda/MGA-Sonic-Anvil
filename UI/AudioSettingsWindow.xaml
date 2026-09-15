@@ -39,6 +39,7 @@
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
               <TextBlock x:Name="LanguageLabel"
                          Text="{x:Static domain:UiStrings.LabelUiLanguage}"
@@ -58,6 +59,20 @@
                          Margin="0,8,8,0" />
               <ComboBox x:Name="ThemeCombo"
                         Grid.Row="1"
+                        Grid.Column="1"
+                        HorizontalAlignment="Left"
+                        Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                        Margin="0,8,0,0"
+                        Padding="6,1"
+                        FontSize="11.333"
+                        VerticalContentAlignment="Center" />
+              <TextBlock x:Name="UiScaleLabel"
+                         Grid.Row="2"
+                         Text="{x:Static domain:UiStrings.LabelUiScale}"
+                         VerticalAlignment="Center"
+                         Margin="0,8,8,0" />
+              <ComboBox x:Name="UiScaleCombo"
+                        Grid.Row="2"
                         Grid.Column="1"
                         HorizontalAlignment="Left"
                         Height="{x:Static ui:DesignMetrics.AudioInputHeight}"

@@ -116,6 +116,7 @@ public partial class MainWindow : Window
         ApplyMeterColumnWidth(AppStorage.Settings.MeterColumnWidth);
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
         UiThemeService.Changed += (_, _) => Dispatcher.BeginInvoke(ApplyUiColors);
+        UiScaleService.Changed += (_, _) => Dispatcher.BeginInvoke(OnUiScaleChanged);
         AlwaysOnTopCheck.IsChecked = AppStorage.Settings.AlwaysOnTop;
         Topmost = AppStorage.Settings.AlwaysOnTop;
         SilentSkipCheck.IsChecked = AppStorage.Settings.SilentSkip;
@@ -992,7 +993,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dpi = VisualTreeHelper.GetDpi(BrandLicenseHost).PixelsPerDip;
+        var dpi = UiDpi.Get(BrandLicenseHost).PixelsPerDip;
         var wwise = BrandLicenseAlign.MeasureLine(
             BrandLicenseHost,
             UiStrings.CopyrightWwiseLine,
@@ -1029,7 +1030,7 @@ public partial class MainWindow : Window
 
     private int BrandLogoDecodePixelWidth()
     {
-        var scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        var scale = UiDpi.Get(this).DpiScaleX;
         return Math.Max(1, (int)Math.Round(DesignMetrics.BrandLogoWidth * scale));
     }
 

@@ -527,7 +527,7 @@ public partial class MainWindow
             return;
         }
 
-        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var dpi = UiDpi.Get(this).PixelsPerDip;
         var slots = new DocumentTabSlot[tabs.Length];
         for (var i = 0; i < tabs.Length; i++)
         {

@@ -10,6 +10,7 @@ public partial class App : Application
         ImeComposition.Install(this);
         UiColors.Load();
         UiThemeService.Start();
+        UiScaleService.Start();
         base.OnStartup(e);
     }
 }

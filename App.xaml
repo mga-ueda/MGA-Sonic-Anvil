@@ -9,6 +9,7 @@
         <ResourceDictionary Source="Themes/Controls.xaml"/>
       </ResourceDictionary.MergedDictionaries>
       <FontFamily x:Key="AppFontFamily">Yu Gothic UI</FontFamily>
+      <ScaleTransform x:Key="UiScaleTransform" ScaleX="1" ScaleY="1"/>
       <Style x:Key="{x:Static SystemParameters.FocusVisualStyleKey}"/>
       <Style TargetType="Window">
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>

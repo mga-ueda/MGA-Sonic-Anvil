@@ -174,7 +174,7 @@ internal sealed class LevelMeterView : FrameworkElement
 
     private void DrawSharedTrackBorders(DrawingContext dc, Rect frame, double barW, int channelCount)
     {
-        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
         var pen = WpfControlHelpers.FrozenHairline(Theme.Get("LevelMeterTrackBorderBrush"), pixelsPerDip);
         dc.DrawRectangle(null, pen, frame);
         for (var i = 1; i < channelCount; i++)
@@ -224,7 +224,7 @@ internal sealed class LevelMeterView : FrameworkElement
 
     private void DrawReadouts(DrawingContext dc, Rect area, bool surround)
     {
-        var pixels = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pixels = UiDpi.Get(this).PixelsPerDip;
         var brush = LabelBrush();
         var labelWidth = Math.Max(MeasureReadout(UiStrings.LabelPeak, pixels).Width, MeasureReadout(UiStrings.LabelRms, pixels).Width);
         var intSlot = MeasureReadout("-60", pixels).Width;
@@ -322,7 +322,7 @@ internal sealed class LevelMeterView : FrameworkElement
 
     private void DrawScale(DrawingContext dc, Rect col, bool rightAlign)
     {
-        var pixels = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pixels = UiDpi.Get(this).PixelsPerDip;
         var lastBottom = double.NegativeInfinity;
         foreach (var db in LevelMeterEngine.ScaleLabels)
         {

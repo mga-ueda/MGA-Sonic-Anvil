@@ -244,7 +244,7 @@ internal sealed class TransportIconButton : Button
             new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
             10,
             WpfControlHelpers.FrozenBrush(fore),
-            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            UiDpi.Get(this).PixelsPerDip);
         dc.DrawText(
             formatted,
             new Point(
@@ -271,7 +271,7 @@ internal sealed class TransportIconButton : Button
             new Typeface(new FontFamily("Segoe UI Semibold"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
             Math.Max(12d, Math.Min(bounds.Width, bounds.Height) * 0.52),
             WpfControlHelpers.FrozenBrush(fore),
-            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            UiDpi.Get(this).PixelsPerDip);
         dc.DrawText(
             formatted,
             new Point((bounds.Width - formatted.Width) * 0.5, (bounds.Height - formatted.Height) * 0.5));

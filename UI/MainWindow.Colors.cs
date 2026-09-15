@@ -53,6 +53,12 @@ public partial class MainWindow
         WindowPlacement.CenterOnOwner(panel, this);
     }
 
+    private void OnUiScaleChanged()
+    {
+        ApplyUiColors();
+        AlignBrandLicense();
+    }
+
     internal void ApplyUiColors() => ApplyUiColors(includeColorPanel: true);
 
     internal void ApplyUiColors(bool includeColorPanel)

@@ -121,7 +121,7 @@ internal static class ComboBoxFit
     {
         if (visual is FrameworkElement { IsLoaded: true })
         {
-            var dpi = VisualTreeHelper.GetDpi(visual).PixelsPerDip;
+            var dpi = UiDpi.Get(visual).PixelsPerDip;
             if (dpi >= 0.01)
             {
                 return dpi;
@@ -130,7 +130,7 @@ internal static class ComboBoxFit
 
         if (Application.Current?.MainWindow is { } window)
         {
-            var dpi = VisualTreeHelper.GetDpi(window).PixelsPerDip;
+            var dpi = UiDpi.Get(window).PixelsPerDip;
             if (dpi >= 0.01)
             {
                 return dpi;

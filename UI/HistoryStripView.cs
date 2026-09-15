@@ -80,7 +80,7 @@ internal sealed class HistoryStripView : FrameworkElement
         }
 
         var start = HistoryStripLayout.VisibleStart(_items.Count, _currentIndex, visible);
-        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var dpi = UiDpi.Get(this).PixelsPerDip;
         var textWidth = Math.Max(0, ActualWidth - (PadX * 2));
         var current = ThemeBrush("HistoryStripCurrentForeBrush", 0x96, 0x96, 0x96);
         var past = ThemeBrush("HistoryStripPastForeBrush", 0x5B, 0x5B, 0x5B);

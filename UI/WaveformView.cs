@@ -841,7 +841,7 @@ internal sealed class WaveformView : Grid
         var wave = WaveformBounds(new Rect(RenderSize));
         var pad = DesignMetrics.SpectrogramBoostBarPad;
         double? labelW = _spectrogramMode == SpectrogramViewMode.Overlay
-            ? WpfControlHelpers.MonoText("-12", 9, Brushes.Transparent, VisualTreeHelper.GetDpi(this).PixelsPerDip).Width
+            ? WpfControlHelpers.MonoText("-12", 9, Brushes.Transparent, UiDpi.Get(this).PixelsPerDip).Width
             : null;
         var left = DesignMetrics.SpectrogramBoostBarLeft(labelW);
         _boostBar.Width = DesignMetrics.SpectrogramBoostThumbSize;
@@ -2111,7 +2111,7 @@ internal sealed class WaveformView : Grid
                 DbScaleBounds(bounds),
                 wave,
                 _loudnessTargetLufs,
-                VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                UiDpi.Get(this).PixelsPerDip);
             if (_loudness.Current is { } profile)
             {
                 _loudness.DrawOverlay(
@@ -2179,7 +2179,7 @@ internal sealed class WaveformView : Grid
 
     private void EnsureWaveformBitmap(Rect bounds)
     {
-        var dpi = VisualTreeHelper.GetDpi(this);
+        var dpi = UiDpi.Get(this);
         var span = ViewSpanFrames;
         var scaleX = Math.Max(1e-6, dpi.DpiScaleX);
         var scaleY = Math.Max(1e-6, dpi.DpiScaleY);
@@ -2485,7 +2485,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        RebuildInvertBitmap(_wavePixelWidth, _wavePixelHeight, VisualTreeHelper.GetDpi(this));
+        RebuildInvertBitmap(_wavePixelWidth, _wavePixelHeight, UiDpi.Get(this));
     }
 
     private bool InvertBitmapIsCurrent() =>
@@ -3519,7 +3519,7 @@ internal sealed class WaveformView : Grid
         }
 
         var fore = WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush"));
-        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
         var reserve = 7 + GetDbLabel("-12", pixelsPerDip, fore).Width;
         var maxName = Math.Max(8, well.Width - reserve - 2);
         var layout = ChannelLayout.ForFile(channels, _speakerLayout, _fileChannelMap);
@@ -3600,7 +3600,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
         var scale = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
         var half = laneHeight * 0.5;
         var amp = (ampHeight ?? laneHeight) * 0.5 * _ampZoom;
@@ -3837,7 +3837,7 @@ internal sealed class WaveformView : Grid
             return false;
         }
 
-        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
         var fore = WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush"));
         var reserve = 7 + GetDbLabel("-12", pixelsPerDip, fore).Width;
         var maxName = Math.Max(8, well.Width - reserve - 2);
@@ -4144,7 +4144,7 @@ internal sealed class WaveformView : Grid
         var step = NiceTimeStep(seconds);
         var startSec = start / _document.SampleRate;
         var first = Math.Floor(startSec / step) * step;
-        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
         if (Math.Abs(pixelsPerDip - _timeLabelPixelsPerDip) > 0.01)
         {
             _timeLabelCache.Clear();
@@ -4314,7 +4314,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
         var laneHeight = MarkerLaneBounds(bounds).Height;
         var split = SplitFlagLanes;
         var regions = new List<(WaveSelection Range, long Frame, double StemX, double Width, bool GrowLeft)>();
@@ -4433,7 +4433,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
         var color = Theme.Get("RegionTimelineBrush");
         var line = WpfControlHelpers.FrozenHairline(color, pixelsPerDip);
         var selectedLine = WpfControlHelpers.FrozenHairline(Theme.Get("MarkerSelectedBorderBrush"), pixelsPerDip);
@@ -4546,7 +4546,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
         var color = Theme.Get("MarkerBrush");
         var selectedColor = Theme.Get("MarkerSelectedBrush");
         var selectedBorder = Theme.Get("MarkerSelectedBorderBrush");

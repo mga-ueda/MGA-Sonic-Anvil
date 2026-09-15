@@ -16,6 +16,7 @@ internal static class DarkWindowChrome
 
     public static void ApplyImmersiveDarkTitleBar(Window window)
     {
+        UiScaleService.Attach(window);
         WindowIconHelper.Apply(window);
 
         void Apply()

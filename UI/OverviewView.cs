@@ -316,7 +316,7 @@ internal sealed class OverviewView : FrameworkElement
         }
 
         var frames = (double)_document.FrameCount;
-        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
         var pen = WpfControlHelpers.FrozenHairline(Theme.Get("MarkerBrush"), pixelsPerDip);
         var selectedPen = WpfControlHelpers.FrozenHairline(Theme.Get("MarkerSelectedBorderBrush"), pixelsPerDip);
         foreach (var marker in _document.Markers)
@@ -341,7 +341,7 @@ internal sealed class OverviewView : FrameworkElement
         }
 
         var frames = (double)_document.FrameCount;
-        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
         var pen = WpfControlHelpers.FrozenHairline(Theme.Get("RegionTimelineBrush"), pixelsPerDip);
         foreach (var region in _document.Regions)
         {
@@ -502,7 +502,7 @@ internal sealed class OverviewView : FrameworkElement
 
     private void EnsureWaveform(Rect bounds)
     {
-        var dpi = VisualTreeHelper.GetDpi(this);
+        var dpi = UiDpi.Get(this);
         var width = Math.Max(1, (int)Math.Round(bounds.Width * dpi.DpiScaleX));
         var height = Math.Max(1, (int)Math.Round(bounds.Height * dpi.DpiScaleY));
         if (!_waveDirty

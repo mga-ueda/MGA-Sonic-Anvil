@@ -142,6 +142,13 @@ public sealed class WindowPlacementTests
     }
 
     [Fact]
+    public void StoredExtent_IsUnchangedAtDefaultScale()
+    {
+        Assert.Equal(1000, WindowPlacement.FromStoredExtent(1000));
+        Assert.Equal(1000, WindowPlacement.ToStoredExtent(1000));
+    }
+
+    [Fact]
     public void CenteredOn_PlacesDefaultSizeInWorkArea()
     {
         var work = new Rect(100, 50, 1920, 1080);

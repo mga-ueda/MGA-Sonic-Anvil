@@ -14,8 +14,8 @@ internal static class WindowPlacement
             : window.RestoreBounds;
         settings.WindowX = (int)Math.Round(bounds.X);
         settings.WindowY = (int)Math.Round(bounds.Y);
-        settings.WindowWidth = (int)Math.Round(bounds.Width);
-        settings.WindowHeight = (int)Math.Round(bounds.Height);
+        settings.WindowWidth = ToStoredExtent(bounds.Width);
+        settings.WindowHeight = ToStoredExtent(bounds.Height);
         settings.WindowState = window.WindowState == WindowState.Maximized
             ? nameof(WindowState.Maximized)
             : nameof(WindowState.Normal);
@@ -28,7 +28,9 @@ internal static class WindowPlacement
             return false;
         }
 
-        if (!IsVisibleOnAnyScreen(bounds))
+        var width = FromStoredExtent(bounds.Width);
+        var height = FromStoredExtent(bounds.Height);
+        if (!IsVisibleOnAnyScreen(new Rect(bounds.X, bounds.Y, width, height)))
         {
             return false;
         }
@@ -37,8 +39,8 @@ internal static class WindowPlacement
         window.WindowState = WindowState.Normal;
         window.Left = bounds.X;
         window.Top = bounds.Y;
-        window.Width = bounds.Width;
-        window.Height = bounds.Height;
+        window.Width = width;
+        window.Height = height;
         if (maximized)
         {
             window.WindowState = WindowState.Maximized;
@@ -54,8 +56,8 @@ internal static class WindowPlacement
             : window.RestoreBounds;
         settings.SettingsWindowX = (int)Math.Round(bounds.X);
         settings.SettingsWindowY = (int)Math.Round(bounds.Y);
-        settings.SettingsWindowWidth = (int)Math.Round(bounds.Width);
-        settings.SettingsWindowHeight = (int)Math.Round(bounds.Height);
+        settings.SettingsWindowWidth = ToStoredExtent(bounds.Width);
+        settings.SettingsWindowHeight = ToStoredExtent(bounds.Height);
         settings.SettingsWindowHasPosition = true;
     }
 
@@ -66,7 +68,9 @@ internal static class WindowPlacement
             return false;
         }
 
-        var height = hasSize ? Math.Max(bounds.Height, window.MinHeight) : window.Height;
+        var height = hasSize
+            ? Math.Max(FromStoredExtent(bounds.Height), window.MinHeight)
+            : window.Height;
         var placed = new Rect(bounds.X, bounds.Y, window.Width, height);
         if (!IsVisibleOnAnyScreen(placed))
         {
@@ -91,8 +95,8 @@ internal static class WindowPlacement
             : window.RestoreBounds;
         settings.ColorPanelX = (int)Math.Round(bounds.X);
         settings.ColorPanelY = (int)Math.Round(bounds.Y);
-        settings.ColorPanelWidth = (int)Math.Round(bounds.Width);
-        settings.ColorPanelHeight = (int)Math.Round(bounds.Height);
+        settings.ColorPanelWidth = ToStoredExtent(bounds.Width);
+        settings.ColorPanelHeight = ToStoredExtent(bounds.Height);
         settings.ColorPanelHasPosition = true;
     }
 
@@ -103,8 +107,8 @@ internal static class WindowPlacement
             return false;
         }
 
-        var width = hasSize ? Math.Max(bounds.Width, window.MinWidth) : window.Width;
-        var height = hasSize ? Math.Max(bounds.Height, window.MinHeight) : window.Height;
+        var width = hasSize ? Math.Max(FromStoredExtent(bounds.Width), window.MinWidth) : window.Width;
+        var height = hasSize ? Math.Max(FromStoredExtent(bounds.Height), window.MinHeight) : window.Height;
         var placed = new Rect(bounds.X, bounds.Y, width, height);
         if (!IsVisibleOnAnyScreen(placed))
         {
@@ -187,8 +191,8 @@ internal static class WindowPlacement
 
     public static void ApplyFirstLaunch(Window window)
     {
-        var width = DesignMetrics.WindowDefaultWidth;
-        var height = DesignMetrics.WindowDefaultHeight;
+        var width = FromStoredExtent(DesignMetrics.WindowDefaultWidth);
+        var height = FromStoredExtent(DesignMetrics.WindowDefaultHeight);
         var bounds = CenteredOn(SystemParameters.WorkArea, width, height);
         window.WindowStartupLocation = WindowStartupLocation.Manual;
         window.WindowState = WindowState.Normal;
@@ -230,6 +234,14 @@ internal static class WindowPlacement
         bounds = new Rect(settings.WindowX, settings.WindowY, settings.WindowWidth, settings.WindowHeight);
         return true;
     }
+
+    internal static int ToStoredExtent(double scaled) =>
+        UiScaleService.ToStoredExtent(scaled, CurrentScale);
+
+    internal static double FromStoredExtent(double unscaled) =>
+        UiScaleService.FromStoredExtent(unscaled, CurrentScale);
+
+    private static double CurrentScale => AppStorage.Settings.ResolvedUiScale();
 
     /// <summary>
     /// いずれかのモニターの作業領域と重なるか。

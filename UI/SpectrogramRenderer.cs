@@ -105,7 +105,7 @@ internal sealed class SpectrogramRenderer
         _cache.Ensure(document, () => host.Dispatcher.BeginInvoke(() => InvalidateRequested?.Invoke()));
         if (!reuseBitmap || _bitmap is null)
         {
-            EnsureBitmap(wave, document, viewStart, viewSpan, VisualTreeHelper.GetDpi(host));
+            EnsureBitmap(wave, document, viewStart, viewSpan, UiDpi.Get(host));
         }
         if (_bitmap is not null)
         {
@@ -537,7 +537,7 @@ internal sealed class SpectrogramRenderer
     private void DrawFrequencyScale(DrawingContext dc, Rect wave, Visual host)
     {
         var maxHertz = SpectrogramEngine.DisplayMaxHertz;
-        var dpi = VisualTreeHelper.GetDpi(host).PixelsPerDip;
+        var dpi = UiDpi.Get(host).PixelsPerDip;
         var fillColor = Theme.Get("SpectrogramScaleForeBrush");
         // FormattedText の生成（文字整形）は毎ペイントだと高くつく。ラベルは固定なのでキャッシュする。
         if (Math.Abs(dpi - _scaleLabelDpi) > 0.001 || fillColor != _scaleLabelColor)

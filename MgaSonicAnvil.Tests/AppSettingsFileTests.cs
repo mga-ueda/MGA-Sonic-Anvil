@@ -40,6 +40,8 @@ public sealed class AppSettingsFileTests
             Assert.Equal(20, settings.ResolvedClickGuardFadeMs());
             Assert.Equal(500, settings.ResolvedWwisePrefetchLengthMs());
             Assert.Equal(500, settings.ResolvedWwiseLookAheadTimeMs());
+            Assert.Equal(100, settings.ResolvedUiScalePercent());
+            Assert.Equal(1, settings.ResolvedUiScale());
             Assert.False(File.Exists(path));
         }
         finally

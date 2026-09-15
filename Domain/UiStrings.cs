@@ -177,6 +177,7 @@ internal static partial class UiStrings
     public static string DialogSettingsTitle => Get("設定", "Settings");
     public static string LabelUiLanguage => Get("言語", "Language");
     public static string LabelUiTheme => Get("配色", "Theme");
+    public static string LabelUiScale => Get("表示倍率", "UI scale");
     public static string LabelThemeAuto => Get("Auto", "Auto");
     public static string LabelThemeDark => Get("Dark", "Dark");
     public static string LabelThemeLight => Get("Light", "Light");
@@ -192,8 +193,8 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeIn => Get("波形フェードイン", "Waveform Fade In");
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string TipAudioSettings => Get(
-        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出し／Wwise のタブ。表示言語、配色（ダーク／ライト／Auto）、関連付け、デフォルトオーディオフォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip / 無音削除）、プチノイズ防止フェード、フェードカーブ、MP3、同時書き出し本数、Wwise の Prefetch Length／Look-ahead Time。ダイアログのボタンは Tab で移動できます。",
-        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export / Wwise tabs. Language, theme (Dark / Light / Auto), file associations, default audio format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip / Delete Silence), click-prevention fade, fade curves, MP3, parallel export count, and Wwise Prefetch Length / Look-ahead Time. Tab also moves to dialog buttons.");
+        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出し／Wwise のタブ。表示言語、配色（ダーク／ライト／Auto）、表示倍率（100〜200%。OS の DPI に加えて拡大）、関連付け、デフォルトオーディオフォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip / 無音削除）、プチノイズ防止フェード、フェードカーブ、MP3、同時書き出し本数、Wwise の Prefetch Length／Look-ahead Time。ダイアログのボタンは Tab で移動できます。",
+        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export / Wwise tabs. Language, theme (Dark / Light / Auto), UI scale (100–200%; extra enlargement on top of the OS DPI), file associations, default audio format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip / Delete Silence), click-prevention fade, fade curves, MP3, parallel export count, and Wwise Prefetch Length / Look-ahead Time. Tab also moves to dialog buttons.");
     public static string TipDefaultAudioFormat => Get(
         "新規ファイル（Ctrl+N）の初期フォーマットです。既定は 48kHz / 24bit / Stereo。チャンネルは表示項目で有効にしたスピーカーと、常に選べる Mono。",
         "Initial format for a new file (Ctrl+N). Default is 48 kHz / 24-bit / Stereo. Channels are the speakers enabled on Shown, plus Mono (always available).");
@@ -678,6 +679,9 @@ internal static partial class UiStrings
     public static string TipUiTheme => Get(
         "配色。Auto は OS のアプリ配色に従います。背景と文字だけ変わり、再生ヘッドやマーカーなどのアクセント色は維持します。",
         "Theme. Auto follows the OS app theme. Only backgrounds and text change; accent colors such as the playhead and markers stay the same.");
+    public static string TipUiScale => Get(
+        "アプリの表示サイズ。OS の DPI に加えて拡大します。100〜200%。縮小はありません。コンボを変えた瞬間に反映します。キャンセルすると元に戻します。",
+        "App display size. Extra enlargement on top of the OS DPI. 100–200%. No shrinking. Applies as soon as you change the combo. Cancel restores the previous value.");
     public static string TipFileAssociations => Get(
         "チェックすると、その拡張子をこのアプリで開く（既定）。外すと関連付けを外す。すでにこのアプリが既定ならチェック済み。OK を待たず、今の exe へすぐ書き込みます。",
         "Check to make this app the default for that extension. Uncheck to remove the association. Types already using this app are checked. Writes to this exe immediately, without waiting for OK.");

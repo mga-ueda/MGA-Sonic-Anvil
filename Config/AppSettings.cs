@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
 using MgaSonicAnvil.Wwise;
 
@@ -138,6 +139,9 @@ internal sealed class AppSettings
 
     /// <summary>配色。auto / dark / light。既定は OS に従う。</summary>
     public string UiTheme { get; set; } = "auto";
+
+    /// <summary>アプリ表示の追加拡大（％）。100 未満は 100。上限 200。</summary>
+    public int UiScalePercent { get; set; } = UiScale.DefaultPercent;
 
     /// <summary>Tips 枠の表示。既定オン。</summary>
     public bool ShowTips { get; set; } = true;
@@ -357,6 +361,10 @@ internal sealed class AppSettings
         LastNewBitsPerSample = format.BitsPerSample;
         LastNewChannelLayout = format.Layout.Id;
     }
+
+    public int ResolvedUiScalePercent() => UiScale.ClampPercent(UiScalePercent);
+
+    public double ResolvedUiScale() => UiScale.FactorFrom(UiScalePercent);
 
     public FadeShape ResolvedFadeInCurve() => FadeCurves.ParseStored(DefaultFadeInCurve);
 

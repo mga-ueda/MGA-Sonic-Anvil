@@ -30,6 +30,8 @@ internal partial class AudioSettingsWindow : Window
 
     public UiThemeChoice SelectedTheme { get; private set; }
 
+    public int SelectedUiScalePercent { get; private set; } = UiScale.DefaultPercent;
+
     public double SelectedLoudnessTargetLufs { get; private set; }
 
     public double SelectedSilentSkipThresholdDb { get; private set; }
@@ -81,6 +83,7 @@ internal partial class AudioSettingsWindow : Window
     private string[] _inputPortNames = [];
     private string[] _outputPortNames = [];
     private float[] _meterPeaks = [];
+    private readonly int _uiScaleOpenedAt;
 
     public AudioSettingsWindow(
         AudioOutputSettings current,
@@ -103,11 +106,14 @@ internal partial class AudioSettingsWindow : Window
         int defaultBitsPerSample = DefaultAudioFormat.BitsPerSample,
         string? defaultChannelLayout = null,
         int wwisePrefetchLengthMs = WwiseTrackTiming.DefaultPrefetchLengthMs,
-        int wwiseLookAheadTimeMs = WwiseTrackTiming.DefaultLookAheadTimeMs)
+        int wwiseLookAheadTimeMs = WwiseTrackTiming.DefaultLookAheadTimeMs,
+        int uiScalePercent = UiScale.DefaultPercent)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
         SelectedTheme = theme;
+        SelectedUiScalePercent = UiScale.ClampPercent(uiScalePercent);
+        _uiScaleOpenedAt = SelectedUiScalePercent;
         SelectedLoudnessTargetLufs = LoudnessMeterEngine.ClampTargetLufs(loudnessTargetLufs);
         SelectedSilentSkipThresholdDb = SilentSkip.ClampThresholdDb(silentSkipThresholdDb);
         SelectedSilentSkipRecordPadMs = SilentSkip.ClampRecordPadMs(silentSkipRecordPadMs);
@@ -165,6 +171,8 @@ internal partial class AudioSettingsWindow : Window
         ThemeCombo.Items.Add(new ThemeItem(UiThemeChoice.Dark, UiStrings.LabelThemeDark));
         ThemeCombo.Items.Add(new ThemeItem(UiThemeChoice.Light, UiStrings.LabelThemeLight));
         SelectTheme(theme);
+        FillUiScale(SelectedUiScalePercent);
+        UiScaleCombo.SelectionChanged += UiScaleCombo_SelectionChanged;
 
         ApiCombo.Items.Add(new ApiItem(AudioOutputApi.WaveOut, UiStrings.LabelAudioApiWaveOut));
         ApiCombo.Items.Add(new ApiItem(AudioOutputApi.Wasapi, UiStrings.LabelAudioApiWasapi));
@@ -241,6 +249,8 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(LanguageCombo, UiStrings.TipUiLanguage);
         TipService.Set(ThemeLabel, UiStrings.TipUiTheme);
         TipService.Set(ThemeCombo, UiStrings.TipUiTheme);
+        TipService.Set(UiScaleLabel, UiStrings.TipUiScale);
+        TipService.Set(UiScaleCombo, UiStrings.TipUiScale);
         TipService.Set(DefaultFormatHeader, UiStrings.TipDefaultAudioFormat);
         TipService.Set(DefaultSampleRateLabel, UiStrings.TipDefaultAudioFormat);
         TipService.Set(DefaultSampleRateCombo, UiStrings.TipDefaultAudioFormat);
@@ -452,6 +462,9 @@ internal partial class AudioSettingsWindow : Window
         SelectedTheme = ThemeCombo.SelectedItem is ThemeItem themeItem
             ? themeItem.Choice
             : UiThemeChoice.Auto;
+        SelectedUiScalePercent = UiScaleCombo.SelectedItem is ScaleItem scaleItem
+            ? scaleItem.Percent
+            : UiScale.DefaultPercent;
         if (!LoudnessMeterEngine.TryParseTargetLufs(LoudnessTargetBox.Text, out var target))
         {
             OwnerCenteredMessageBox.Show(
@@ -1086,6 +1099,67 @@ internal partial class AudioSettingsWindow : Window
         ThemeCombo.SelectedIndex = 0;
     }
 
+    private void FillUiScale(int percent)
+    {
+        var current = UiScale.ClampPercent(percent);
+        UiScaleCombo.Items.Clear();
+        ScaleItem? selected = null;
+        foreach (var preset in UiScale.Percents)
+        {
+            var item = new ScaleItem(preset, UiScale.FormatPercent(preset));
+            UiScaleCombo.Items.Add(item);
+            if (preset == current)
+            {
+                selected = item;
+            }
+        }
+
+        if (selected is null)
+        {
+            selected = new ScaleItem(current, UiScale.FormatPercent(current));
+            UiScaleCombo.Items.Add(selected);
+        }
+
+        UiScaleCombo.SelectedItem = selected;
+    }
+
+    private void UiScaleCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded || UiScaleCombo.SelectedItem is not ScaleItem item)
+        {
+            return;
+        }
+
+        PreviewUiScale(item.Percent);
+        ComboBoxFit.Apply(UiScaleCombo);
+    }
+
+    private void PreviewUiScale(int percent)
+    {
+        percent = UiScale.ClampPercent(percent);
+        SelectedUiScalePercent = percent;
+        if (AppStorage.Settings.UiScalePercent == percent)
+        {
+            return;
+        }
+
+        AppStorage.Settings.UiScalePercent = percent;
+        UiScaleService.ApplyFromSettings();
+        ReflowSettingsWindow();
+    }
+
+    private void RevertUiScalePreview()
+    {
+        if (AppStorage.Settings.UiScalePercent == _uiScaleOpenedAt)
+        {
+            return;
+        }
+
+        AppStorage.Settings.UiScalePercent = _uiScaleOpenedAt;
+        SelectedUiScalePercent = _uiScaleOpenedAt;
+        UiScaleService.ApplyFromSettings();
+    }
+
     private void SelectApi(AudioOutputApi api)
     {
         foreach (ApiItem item in ApiCombo.Items)
@@ -1124,6 +1198,7 @@ internal partial class AudioSettingsWindow : Window
         var deviceMax = Math.Max(80, SystemParameters.WorkArea.Width - 200);
         ComboBoxFit.Apply(LanguageCombo);
         ComboBoxFit.Apply(ThemeCombo);
+        ComboBoxFit.Apply(UiScaleCombo);
         ComboBoxFit.Apply(DefaultSampleRateCombo);
         ComboBoxFit.Apply(DefaultBitDepthCombo);
         ComboBoxFit.Apply(DefaultChannelLayoutCombo);
@@ -1145,13 +1220,15 @@ internal partial class AudioSettingsWindow : Window
 
     private void FitWindowToAudio()
     {
+        var scale = UiScaleService.Factor;
         var pad = DesignMetrics.AudioPad.Left + DesignMetrics.AudioPad.Right;
         var chrome = WindowChromeWidth();
         var content = Math.Max(AudioTabContentWidth(), SettingsTabBarWidth());
-        var width = Math.Ceiling(
-            content + pad + chrome + DesignMetrics.SettingsWindowContentMargin);
-        var max = Math.Max(DesignMetrics.SettingsWindowMinWidth, SystemParameters.WorkArea.Width - 32);
-        width = Math.Clamp(width, DesignMetrics.SettingsWindowMinWidth, max);
+        var inner = content + pad + DesignMetrics.SettingsWindowContentMargin;
+        var width = Math.Ceiling(inner * scale + chrome);
+        var min = DesignMetrics.SettingsWindowMinWidth * scale;
+        var max = Math.Max(min, SystemParameters.WorkArea.Width - 32);
+        width = Math.Clamp(width, min, max);
         MinWidth = width;
         MaxWidth = width;
         Width = width;
@@ -1223,7 +1300,11 @@ internal partial class AudioSettingsWindow : Window
     {
         if (Content is FrameworkElement content && content.ActualWidth > 1 && ActualWidth > content.ActualWidth)
         {
-            return ActualWidth - content.ActualWidth;
+            var visual = content.ActualWidth * UiScaleService.Factor;
+            if (ActualWidth > visual)
+            {
+                return ActualWidth - visual;
+            }
         }
 
         return SystemParameters.ResizeFrameVerticalBorderWidth * 2 + 2;
@@ -1536,6 +1617,11 @@ internal partial class AudioSettingsWindow : Window
         _fadeCurveMenu = null;
         StopProbeUi();
         _probe.Dispose();
+        if (DialogResult != true)
+        {
+            RevertUiScalePreview();
+        }
+
         WindowPlacement.CaptureSettings(this, AppStorage.Settings);
         AppStorage.Save();
         base.OnClosed(e);
@@ -1565,6 +1651,11 @@ internal partial class AudioSettingsWindow : Window
     }
 
     private sealed record ThemeItem(UiThemeChoice Choice, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    private sealed record ScaleItem(int Percent, string Label)
     {
         public override string ToString() => Label;
     }

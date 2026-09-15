@@ -749,7 +749,8 @@ public partial class MainWindow
             settings.ResolvedDefaultBitsPerSample(),
             settings.ResolvedDefaultChannelLayout().Id,
             settings.ResolvedWwisePrefetchLengthMs(),
-            settings.ResolvedWwiseLookAheadTimeMs())
+            settings.ResolvedWwiseLookAheadTimeMs(),
+            settings.ResolvedUiScalePercent())
         {
             Owner = this,
         };
@@ -772,6 +773,8 @@ public partial class MainWindow
         UiStrings.SetLanguage(UiStrings.ResolveLanguage(dialog.SelectedLanguage));
         settings.UiTheme = UiThemes.ToStoredValue(dialog.SelectedTheme);
         UiThemeService.ApplyFromSettings(force: true);
+        settings.UiScalePercent = dialog.SelectedUiScalePercent;
+        UiScaleService.ApplyFromSettings();
         settings.ApplyDefaultFades(dialog.FadeInCurve, dialog.FadeOutCurve);
         settings.LoudnessTargetLufs = dialog.SelectedLoudnessTargetLufs;
         settings.SilentSkipThresholdDb = dialog.SelectedSilentSkipThresholdDb;

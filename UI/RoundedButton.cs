@@ -242,7 +242,7 @@ internal sealed class RoundedButton : Button
             new Typeface(FontFamily, FontStyle, FontWeight, FontStretch),
             FontSize,
             WpfControlHelpers.FrozenBrush(textColor),
-            VisualTreeHelper.GetDpi(this).PixelsPerDip)
+            UiDpi.Get(this).PixelsPerDip)
         {
             MaxTextWidth = Math.Max(1d, ActualWidth - Padding.Left - Padding.Right),
             Trimming = TextTrimming.CharacterEllipsis,
