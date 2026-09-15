@@ -82,15 +82,16 @@ internal sealed class LoudnessMeterView : Grid
 
         var metrics = new Grid
         {
-            Margin = new Thickness(4, 2, 6, 2),
-            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(DesignMetrics.LoudnessMeterCharWidth, 0, DesignMetrics.LoudnessMeterCharWidth, 0),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
         };
         metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         for (var i = 0; i < 5; i++)
         {
-            metrics.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            metrics.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         }
 
         AddMetric(metrics, 0, _shortCaption, _shortValueBox, _shortUnit);

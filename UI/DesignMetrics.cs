@@ -165,7 +165,7 @@ internal static class DesignMetrics
 
     /// <summary>トランスポート右の履歴・ラウドネス・スペアナと、右端メーター列。</summary>
     public static double TransportSideChromeWidth =>
-        HistoryStripWidth + From96(2)
+        HistoryStripWidth + From96(6)
         + LoudnessMeterWidth + From96(6)
         + SpectrumWidth + From96(1)
         + LevelMeterWidth;
@@ -210,13 +210,16 @@ internal static class DesignMetrics
         LevelMeterWidth * SpectrumAnalyzer.OriginalAspect + SpectrumExtraWidth;
 
     /// <summary>ラウドネス左の履歴プレビュー幅。長い題は切る。</summary>
-    public static double HistoryStripWidth => From96(176);
+    public static double HistoryStripWidth => From96(264);
 
     /// <summary>履歴プレビュー1行。</summary>
     public static double HistoryStripRowHeight => From96(14);
 
-    /// <summary>スペアナ左のラウドネスメーター幅。縦積み1列。履歴枠との間だけ詰める。</summary>
-    public static double LoudnessMeterWidth => From96(224);
+    /// <summary>ラウドネスの Consolas 12 で約1文字。左右余白に使う。</summary>
+    public static double LoudnessMeterCharWidth => From96(7);
+
+    /// <summary>スペアナ左のラウドネスメーター幅。列はキャプション／値／単位の最大幅の合計。</summary>
+    public static double LoudnessMeterWidth => From96(208);
 
     /// <summary>正方形ゴニオ直下の位相バー高さ。</summary>
     public static double VectorScopeCorrelationHeight => From96(18);
@@ -234,7 +237,7 @@ internal static class DesignMetrics
 
     public static double AudioInputHeight => Dip(30);
 
-    /// <summary>1 列タブ（一般／編集／書き出し）の本文幅。</summary>
+    /// <summary>1 列タブ（一般／編集／書き出し／Wwise）の本文幅。</summary>
     public static double SettingsPanelWidth => From96(560);
 
     /// <summary>設定ウィンドウの下限幅（タブ見出しが切れない程度）。</summary>

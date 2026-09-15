@@ -44,8 +44,9 @@ public sealed class TransportLayoutTests
     [Fact]
     public void LoudnessMeterWidth_FitsLongestCaptionValueUnit()
     {
-        var typeface = new Typeface("Consolas");
-        double WidthOf(string text)
+        var regular = new Typeface("Consolas");
+        var bold = new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
+        double WidthOf(Typeface typeface, string text)
         {
             return new FormattedText(
                 text,
@@ -57,7 +58,6 @@ public sealed class TransportLayoutTests
                 1).WidthIncludingTrailingWhitespace;
         }
 
-        var value = "-99.9";
         var rows = new[]
         {
             (UiStrings.LabelLoudnessShortTerm, UiStrings.LabelLufs),
@@ -66,8 +66,12 @@ public sealed class TransportLayoutTests
             (UiStrings.LabelLra, UiStrings.LabelLu),
             (UiStrings.LabelTruePeak, UiStrings.LabelDb),
         };
-        var need = rows.Max(row => WidthOf(row.Item1) + 6 + 3 + WidthOf(value) + 3 + 4 + WidthOf(row.Item2)) + 4 + 6;
+        var caption = rows.Max(row => WidthOf(regular, row.Item1));
+        var value = 6 + 3 + WidthOf(bold, "-99.9") + 3 + 4;
+        var unit = rows.Max(row => WidthOf(regular, row.Item2));
+        var need = caption + value + unit + DesignMetrics.LoudnessMeterCharWidth * 2;
         Assert.True(DesignMetrics.LoudnessMeterWidth + 0.5 >= need, $"need {need}, have {DesignMetrics.LoudnessMeterWidth}");
-        Assert.Equal(176, DesignMetrics.HistoryStripWidth);
+        Assert.True(DesignMetrics.LoudnessMeterWidth <= need + 8, $"slack {DesignMetrics.LoudnessMeterWidth - need}, have {DesignMetrics.LoudnessMeterWidth}");
+        Assert.Equal(264, DesignMetrics.HistoryStripWidth);
     }
 }
