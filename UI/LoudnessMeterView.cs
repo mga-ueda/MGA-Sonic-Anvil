@@ -42,8 +42,12 @@ internal sealed class LoudnessMeterView : Grid
     private LoudnessSnapshot _lastSnap = LoudnessSnapshot.Idle;
     private LoudnessSnapshot? _offline;
     private object? _offlineSamples;
+    private int _offlineRevision = int.MinValue;
+    private int _offlineSampleCount = -1;
     private int _offlineGen;
     private bool _offlineMode = true;
+    private float _previewLinear = 1f;
+    private AudioDocument? _displayDocument;
     private AudioDocument? _document;
     private Brush _safeBrush = Brushes.Transparent;
     private Brush _cautionBrush = Brushes.Transparent;
@@ -119,11 +123,56 @@ internal sealed class LoudnessMeterView : Grid
             }
 
             _document = value;
+            _previewLinear = 1f;
             InvalidateOffline();
-            if (!IsLivePlayback())
-            {
-                RefreshStopped();
-            }
+            RefreshOffline();
+        }
+    }
+
+    /// <summary>停止中メーターを今の波形で測り直す。同じバッファへの上書きも SampleRevision で検知する。</summary>
+    public void RefreshOffline()
+    {
+        if (IsLivePlayback())
+        {
+            return;
+        }
+
+        RefreshStopped();
+    }
+
+    /// <summary>V プレビュー用。再生中は出力側がゲイン済みなので、停止中の塗りだけ動かす。</summary>
+    public void SetPreviewLinearGain(float linear)
+    {
+        if (!float.IsFinite(linear) || linear < 0f)
+        {
+            linear = 0f;
+        }
+
+        if (Math.Abs(_previewLinear - linear) < 1e-7f)
+        {
+            return;
+        }
+
+        _previewLinear = linear;
+        if (!IsLivePlayback())
+        {
+            PaintSnapshot(_lastSnap, _offlineMode);
+        }
+    }
+
+    /// <summary>V 確定直前。プレビューを表示値に焼き、再計測が終わるまで塗りを戻さない。</summary>
+    public void CommitPreview()
+    {
+        if (Math.Abs(_previewLinear - 1f) < 1e-7f)
+        {
+            return;
+        }
+
+        _lastSnap = LoudnessMeterEngine.ApplyLinearGain(_lastSnap, _previewLinear);
+        _previewLinear = 1f;
+        if (!IsLivePlayback())
+        {
+            PaintSnapshot(_lastSnap, _offlineMode);
         }
     }
 
@@ -145,7 +194,7 @@ internal sealed class LoudnessMeterView : Grid
     public void ApplyTargetFromSettings()
     {
         _engine.TargetLufs = AppStorage.Settings.ResolvedLoudnessTargetLufs();
-        PaintValues(_lastSnap);
+        PaintSnapshot(_lastSnap, _offlineMode);
     }
 
     public void ApplyValueColors()
@@ -164,7 +213,7 @@ internal sealed class LoudnessMeterView : Grid
             block.Foreground = chrome;
         }
 
-        PaintValues(_lastSnap);
+        PaintSnapshot(_lastSnap, _offlineMode);
     }
 
     public void ResetLive()
@@ -175,11 +224,9 @@ internal sealed class LoudnessMeterView : Grid
     public void Reset()
     {
         ResetLive();
+        _previewLinear = 1f;
         InvalidateOffline();
-        if (!IsLivePlayback())
-        {
-            RefreshStopped();
-        }
+        RefreshOffline();
     }
 
     public void Tick()
@@ -201,6 +248,17 @@ internal sealed class LoudnessMeterView : Grid
     internal static bool UsesFillChip(bool offline, LoudnessTraffic traffic) =>
         offline && traffic is not LoudnessTraffic.Idle;
 
+    internal static bool CanReuseOffline(
+        object? cachedSamples,
+        int cachedRevision,
+        int cachedCount,
+        object? samples,
+        int revision,
+        int count) =>
+        ReferenceEquals(cachedSamples, samples)
+        && cachedRevision == revision
+        && cachedCount == count;
+
     internal static Color ChipTextColor(UiTheme theme) =>
         theme == UiTheme.Light ? Colors.White : Colors.Black;
 
@@ -218,8 +276,32 @@ internal sealed class LoudnessMeterView : Grid
 
     private void RefreshStopped()
     {
+        var document = _document;
+        if (document is null)
+        {
+            InvalidateOffline();
+            _previewLinear = 1f;
+            ApplySnapshot(LoudnessSnapshot.Idle, offline: true);
+            return;
+        }
+
         EnsureOffline();
-        ApplySnapshot(_offline ?? LoudnessSnapshot.Idle, offline: true);
+        LoudnessSnapshot? snap;
+        lock (_offlineGate)
+        {
+            snap = _offline;
+        }
+
+        if (snap is { } ready)
+        {
+            ApplySnapshot(ready, offline: true);
+            return;
+        }
+
+        if (!ReferenceEquals(_displayDocument, document))
+        {
+            ApplySnapshot(LoudnessSnapshot.Idle, offline: true);
+        }
     }
 
     private void InvalidateOffline()
@@ -229,6 +311,8 @@ internal sealed class LoudnessMeterView : Grid
             _offlineGen++;
             _offline = null;
             _offlineSamples = null;
+            _offlineRevision = int.MinValue;
+            _offlineSampleCount = -1;
         }
     }
 
@@ -243,28 +327,38 @@ internal sealed class LoudnessMeterView : Grid
 
         int gen;
         float[] samples;
+        int used;
         int rate;
         int channels;
         double target;
         lock (_offlineGate)
         {
-            if (ReferenceEquals(_offlineSamples, document.Interleaved))
+            samples = document.Interleaved;
+            used = Math.Clamp(document.SampleCount, 0, samples.Length);
+            if (CanReuseOffline(
+                    _offlineSamples,
+                    _offlineRevision,
+                    _offlineSampleCount,
+                    samples,
+                    document.SampleRevision,
+                    used))
             {
                 return;
             }
 
             gen = ++_offlineGen;
-            samples = document.Interleaved;
             rate = document.SampleRate;
             channels = document.Channels;
             target = _engine.TargetLufs;
             _offlineSamples = samples;
+            _offlineRevision = document.SampleRevision;
+            _offlineSampleCount = used;
             _offline = null;
         }
 
         Task.Run(() =>
         {
-            var snap = LoudnessMeterEngine.MeasureFile(samples, channels, rate, target);
+            var snap = LoudnessMeterEngine.MeasureFile(samples, channels, rate, target, used);
             Dispatcher.BeginInvoke(
                 () =>
                 {
@@ -291,12 +385,19 @@ internal sealed class LoudnessMeterView : Grid
     {
         _lastSnap = snap;
         _offlineMode = offline;
-        _shortValue.Text = FormatLufs(snap.ShortTermLufs);
-        _integratedValue.Text = FormatLufs(snap.IntegratedLufs);
-        _momentaryValue.Text = FormatLufs(snap.MomentaryMaxLufs);
-        _lraValue.Text = FormatLu(snap.LoudnessRangeLu);
-        _truePeakValue.Text = FormatLufs(snap.TruePeakDb);
-        PaintValues(snap);
+        _displayDocument = _document;
+        PaintSnapshot(snap, offline);
+    }
+
+    private void PaintSnapshot(LoudnessSnapshot snap, bool offline)
+    {
+        var shown = offline ? LoudnessMeterEngine.ApplyLinearGain(snap, _previewLinear) : snap;
+        _shortValue.Text = FormatLufs(shown.ShortTermLufs);
+        _integratedValue.Text = FormatLufs(shown.IntegratedLufs);
+        _momentaryValue.Text = FormatLufs(shown.MomentaryMaxLufs);
+        _lraValue.Text = FormatLu(shown.LoudnessRangeLu);
+        _truePeakValue.Text = FormatLufs(shown.TruePeakDb);
+        PaintValues(shown);
     }
 
     private void PaintValues(LoudnessSnapshot snap)

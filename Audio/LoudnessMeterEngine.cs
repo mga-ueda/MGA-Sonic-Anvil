@@ -164,12 +164,16 @@ internal sealed class LoudnessMeterEngine
         float[] interleaved,
         int channels,
         int sampleRate,
-        double targetLufs = DefaultTargetLufs)
+        double targetLufs = DefaultTargetLufs,
+        int sampleCount = -1)
     {
         channels = Math.Max(1, channels);
         sampleRate = Math.Max(1000, sampleRate);
         var engine = new LoudnessMeterEngine { TargetLufs = ClampTargetLufs(targetLufs) };
-        var frames = interleaved.Length / channels;
+        var used = sampleCount < 0
+            ? interleaved.Length
+            : Math.Clamp(sampleCount, 0, interleaved.Length);
+        var frames = used / channels;
         if (frames <= 0)
         {
             return LoudnessSnapshot.Idle with { TargetLufs = engine.TargetLufs };
@@ -515,6 +519,24 @@ internal sealed class LoudnessMeterEngine
         }
 
         return lufs + (float)(20d * Math.Log10(linearGain));
+    }
+
+    /// <summary>一定ゲイン後の表示用。LRA は変わらない。True Peak も同じ dB だけ動く。</summary>
+    public static LoudnessSnapshot ApplyLinearGain(LoudnessSnapshot snap, float linearGain)
+    {
+        if (Math.Abs(linearGain - 1f) < 1e-6f)
+        {
+            return snap;
+        }
+
+        return snap with
+        {
+            MomentaryLufs = ApplyLinearGainToLufs(snap.MomentaryLufs, linearGain),
+            ShortTermLufs = ApplyLinearGainToLufs(snap.ShortTermLufs, linearGain),
+            IntegratedLufs = ApplyLinearGainToLufs(snap.IntegratedLufs, linearGain),
+            MomentaryMaxLufs = ApplyLinearGainToLufs(snap.MomentaryMaxLufs, linearGain),
+            TruePeakDb = ApplyLinearGainToLufs(snap.TruePeakDb, linearGain),
+        };
     }
 
     private static float Hermite(float p0, float p1, float p2, float p3, float t)

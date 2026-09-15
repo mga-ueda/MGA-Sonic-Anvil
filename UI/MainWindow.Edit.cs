@@ -744,9 +744,21 @@ public partial class MainWindow
             frame < range.StartFrame || frame >= range.EndFrame
                 ? 1f
                 : linear);
+        LoudnessMeter.SetPreviewLinearGain(
+            VolumePreviewShiftsWholeFile(range) ? linear : 1f);
     }
 
-    private void ClearVolumeVisualPreview() => Waveform.SetPreviewGain(null);
+    private void ClearVolumeVisualPreview()
+    {
+        Waveform.SetPreviewGain(null);
+        LoudnessMeter.SetPreviewLinearGain(1f);
+    }
+
+    private bool VolumePreviewShiftsWholeFile(WaveSelection range) =>
+        _document is not null
+        && range.StartFrame <= 0
+        && range.EndFrame >= _document.FrameCount
+        && !ChannelSamples.IsScoped(EditMask(), _document.Channels);
 
     private void RestoreVolumeVisualIfMenuOpen()
     {
@@ -1181,6 +1193,7 @@ public partial class MainWindow
         }
 
         _volumePreview.Previewing = false;
+        LoudnessMeter.CommitPreview();
         ClearVolumeVisualPreview();
         CloseVolumeGainPicker();
         if (WaveformGainAnalyzer.IsNoOp(WaveformGainAnalyzer.SnapGainDb(gainDb)))
@@ -2056,6 +2069,7 @@ public partial class MainWindow
         Waveform.PruneMarkerSelection();
         Waveform.InvalidateSpectrogramCache();
         Waveform.Refresh();
+        LoudnessMeter.RefreshOffline();
         Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
         Overview.Refresh();
         SyncViewChrome();

@@ -138,6 +138,82 @@ public sealed class LoudnessMeterEngineTests
     }
 
     [Fact]
+    public void ApplyLinearGain_ShiftsLufsAndTruePeakButNotLra()
+    {
+        var snap = new LoudnessSnapshot(-20f, -18f, -19f, -16f, 7.5f, -3f, -24);
+        var gained = LoudnessMeterEngine.ApplyLinearGain(snap, 0.5f);
+        Assert.InRange(gained.ShortTermLufs - snap.ShortTermLufs, -6.1f, -5.9f);
+        Assert.InRange(gained.IntegratedLufs - snap.IntegratedLufs, -6.1f, -5.9f);
+        Assert.InRange(gained.MomentaryMaxLufs - snap.MomentaryMaxLufs, -6.1f, -5.9f);
+        Assert.InRange(gained.TruePeakDb - snap.TruePeakDb, -6.1f, -5.9f);
+        Assert.Equal(snap.LoudnessRangeLu, gained.LoudnessRangeLu, 5);
+        Assert.Equal(snap, LoudnessMeterEngine.ApplyLinearGain(snap, 1f));
+    }
+
+    [Fact]
+    public void MeasureFile_IgnoresSpareCapacityPastSampleCount()
+    {
+        const int rate = 48000;
+        var frames = rate * 4;
+        var used = frames * 2;
+        var interleaved = new float[used * 2];
+        var amp = (float)Math.Pow(10, -20d / 20d);
+        for (var i = 0; i < frames; i++)
+        {
+            var s = amp * (float)Math.Sin(2 * Math.PI * 1000 * i / rate);
+            interleaved[i * 2] = s;
+            interleaved[i * 2 + 1] = s;
+        }
+
+        for (var i = used; i < interleaved.Length; i++)
+        {
+            interleaved[i] = 0.9f;
+        }
+
+        var exact = LoudnessMeterEngine.MeasureFile(interleaved[..used], 2, rate);
+        var padded = LoudnessMeterEngine.MeasureFile(interleaved, 2, rate, sampleCount: used);
+        Assert.InRange(padded.IntegratedLufs, exact.IntegratedLufs - 0.15f, exact.IntegratedLufs + 0.15f);
+        Assert.InRange(padded.TruePeakDb, exact.TruePeakDb - 0.15f, exact.TruePeakDb + 0.15f);
+        Assert.True(padded.TruePeakDb < -6f);
+    }
+
+    [Fact]
+    public void MeasureFile_InPlaceGain_ShiftsIntegrated()
+    {
+        const int rate = 48000;
+        var frames = rate * 4;
+        var interleaved = new float[frames * 2];
+        var amp = (float)Math.Pow(10, -20d / 20d);
+        for (var i = 0; i < frames; i++)
+        {
+            var s = amp * (float)Math.Sin(2 * Math.PI * 1000 * i / rate);
+            interleaved[i * 2] = s;
+            interleaved[i * 2 + 1] = s;
+        }
+
+        var before = LoudnessMeterEngine.MeasureFile(interleaved, 2, rate);
+        for (var i = 0; i < interleaved.Length; i++)
+        {
+            interleaved[i] *= 0.5f;
+        }
+
+        var after = LoudnessMeterEngine.MeasureFile(interleaved, 2, rate);
+        Assert.InRange(before.IntegratedLufs - after.IntegratedLufs, 5.8f, 6.2f);
+        Assert.InRange(before.ShortTermLufs - after.ShortTermLufs, 5.8f, 6.2f);
+        Assert.InRange(before.TruePeakDb - after.TruePeakDb, 5.8f, 6.2f);
+    }
+
+    [Fact]
+    public void OfflineCache_InvalidatesWhenRevisionChangesOnSameBuffer()
+    {
+        var samples = new float[8];
+        Assert.True(LoudnessMeterView.CanReuseOffline(samples, 1, 8, samples, 1, 8));
+        Assert.False(LoudnessMeterView.CanReuseOffline(samples, 1, 8, samples, 2, 8));
+        Assert.False(LoudnessMeterView.CanReuseOffline(samples, 1, 8, samples, 1, 4));
+        Assert.False(LoudnessMeterView.CanReuseOffline(samples, 1, 8, new float[8], 1, 8));
+    }
+
+    [Fact]
     public void Profile_AtFrame_AppliesPreviewGain()
     {
         var values = new float[] { -20f, -18f };
