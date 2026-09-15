@@ -133,7 +133,14 @@ public partial class MainWindow
             {
                 if (kind == AudioFileKind.Mp3)
                 {
-                    outcomes[i] = new ExportOutcome(AudioCodec.SaveMp3(job.Document, job.Path, options, jobProgress), null);
+                    outcomes[i] = new ExportOutcome(
+                        AudioCodec.SaveMp3(
+                            job.Document,
+                            job.Path,
+                            options,
+                            jobProgress,
+                            AppStorage.Settings.ToMp3SpeakerMix()),
+                        null);
                 }
                 else if (job.FrameCount > 0)
                 {

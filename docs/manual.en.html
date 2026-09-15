@@ -88,7 +88,11 @@
             <li><a href="#shortcuts-context">Contextual</a></li>
           </ol>
         </li>
-        <li><a href="#settings">Settings and language</a></li>
+        <li><a href="#settings">Settings and language</a>
+          <ol>
+            <li><a href="#mp3-downmix">MP3 downmix</a></li>
+          </ol>
+        </li>
         <li><a href="#disclaimer">Scope</a></li>
         <li><a href="#trademarks">Trademarks and license</a></li>
       </ol>
@@ -112,7 +116,7 @@
       <ol>
         <li>Drop a Wave / AIFF / MP3, or press <kbd>Ctrl</kbd>+<kbd>O</kbd> (multiple files open as tabs; the status bar shows progress). <kbd>Ctrl</kbd>+<kbd>N</kbd> opens an empty tab (choose the format each time; the last choice is remembered; channels are enabled speakers plus Mono).</li>
         <li>Listen, cut, fade, and place markers or a loop on the waveform. For multichannel work, enable layouts on Settings → Shown first, then pick one with <span class="ui">SPEAKER</span> on the status bar. Record with <kbd>Ctrl</kbd>+<kbd>R</kbd> (a prompt asks whether to turn Silent Skip on).</li>
-        <li>Save with <kbd>Ctrl</kbd>+<kbd>S</kbd> as Wave or MP3 (AIFF export is not supported). <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> is MP3-only. Writing an MP3 is like Save As: it writes a file and keeps the current tab (the written MP3 is not opened). MP3 is re-encoded from 16-bit PCM. A valid LAME path in Settings is used; empty or invalid falls back to Windows (default 192 kbps). Markers are not written.</li>
+        <li>Save with <kbd>Ctrl</kbd>+<kbd>S</kbd> as Wave or MP3 (AIFF export is not supported). <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> is MP3-only. Writing an MP3 is like Save As: it writes a file and keeps the current tab (the written MP3 is not opened). MP3 is re-encoded from 16-bit PCM. Three or more channels, or a remapped speaker Ch, write the same stereo fold you hear with the current layout (<a href="#mp3-downmix">coefficients</a>; no prompt). A valid LAME path in Settings is used; empty or invalid falls back to Windows (default 192 kbps). Markers are not written.</li>
         <li>To send it to Wwise, turn on <span class="ui">WAAPI</span> above the level meter, pick a destination, and press <span class="ui">EXPORT</span>.</li>
       </ol>
       <div class="note">
@@ -510,7 +514,7 @@
       <h2 id="settings">11. Settings and language</h2>
       <ul>
         <li>Settings are on the gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. In Settings, New, and save-confirm dialogs, <kbd>Tab</kbd> also moves to the buttons. The window is split into General / Shown / Audio / Editing / Export / Wwise. Shown is a checklist of speaker definitions to enable (Stereo only by default; the definition in use stays listed until you switch away; at least one must stay enabled; the status-bar SPEAKER menu uses the same list). UI scale on General is 100–200% (extra enlargement on top of the OS DPI; no shrinking; applies as soon as you change the combo; Cancel restores it). File associations on General are per extension (.wav / .wave / .aif / .aiff / .mp3). Check to make this app the default; uncheck to remove it. Types already using this app start checked. The change is written for the current user to the running exe and does not wait for OK. Audio starts with the default audio format (sample rate / bit depth / channels; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono, which is always available), then a speaker layout (mono through Atmos; you do not add your own). Inside it are the API (WaveOut / WASAPI / ASIO), the device, record / playback ports and Ch (shared by record and playback; Off leaves the speaker unused; default 1, 2, 3…; switching layouts without OK asks whether to save the current one), and per-playback-port Sine −20 dB (1 kHz, or 80 Hz on LFE) plus an English spoken channel-name Voice (not on LFE). Stereo playback with no port map still downmixes the speakers. The record meters confirm a signal. Loudness target (default −24 LKFS, from −70 to 0; color scale only, does not change the audio), the silence threshold (Silent Skip / Delete Silence) (default −60 dB, from −120 to 0; playback jumps when the peak is below this, and recording does not write those frames; a ~50 ms peak window (that fixes a bug where troughs of a near-threshold tone were stripped and the pitch drifted slightly); Delete Silence uses the same threshold; a mono level meter of the assigned record ports sits beside it (the bar is peak; the red line and number are avg. floor, not peak; the Editing tab also monitors input)), the silence insert duration on skip (default 500 ms; longer gaps are shortened; 0 drops all silence; 0 to 10000; unused on playback), the click-prevention fade (default 20 ms; 1 to 100; used by normalize per region, Delete Silence, and Silent Skip recording splices), and default fade curves are on Editing. Adding regions is chosen when you start recording. MP3 and Parallel export count are on Export. Prefetch Length and Look-ahead Time are on Wwise (both default 500 ms, from 0 to 10000; Stream is always on; the first Segment look-ahead stays 50 ms). The settings window remembers its position and height when closed. Width is set automatically from the Audio tab. <kbd>Ctrl</kbd>+<kbd>Tab</kbd> goes to the next tab, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> to the previous.</li>
-        <li>MP3 uses the user-supplied <code>lame.exe</code> when the LAME path is valid, and passes the options field (input and output files are appended; the default is <code>-V2 --noreplaygain</code>, also used if the field is empty). Empty or invalid path falls back to Windows Media Foundation at 128 / 160 / 192 / 224 / 256 / 320 kbps (default 192, CBR). After writing, the app reports whether LAME or Windows ran; failures open a dialog. The written MP3 is not opened in the current tab (only overwriting the MP3 already open keeps that file). Parallel tab exports use the Parallel export count setting (default Auto = a quarter of the CPU cores; the dropdown max is half the cores; Windows MP3 is always one at a time). The last export folder is remembered. LAME is not bundled.</li>
+        <li>MP3 uses the user-supplied <code>lame.exe</code> when the LAME path is valid, and passes the options field (input and output files are appended; the default is <code>-V2 --noreplaygain</code>, also used if the field is empty). Empty or invalid path falls back to Windows Media Foundation at 128 / 160 / 192 / 224 / 256 / 320 kbps (default 192, CBR). It writes the stereo fold you hear with the current speaker layout (<a href="#mp3-downmix">coefficients</a>; no prompt). After writing, the app reports whether LAME or Windows ran; failures open a dialog. The written MP3 is not opened in the current tab (only overwriting the MP3 already open keeps that file). Parallel tab exports use the Parallel export count setting (default Auto = a quarter of the CPU cores; the dropdown max is half the cores; Windows MP3 is always one at a time). The last export folder is remembered. LAME is not bundled.</li>
         <li>UI language is also on the gear. The default is <span class="ui">Auto</span> (Japanese if the OS is Japanese, otherwise English). The Japanese locale keeps the current wording, including English labels. The same General tab has UI scale (100–200%).</li>
         <li>The manual is <span class="ui">?</span>, or GitHub Pages in the browser. It follows the UI language.</li>
         <li>Settings file: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>
@@ -519,11 +523,31 @@
         <li>On startup the app checks GitHub Releases and tells you if a newer build exists. Yes opens the release page (nothing is downloaded). No skips that version until a newer one appears. Offline, it continues quietly.</li>
       </ul>
 
+      <h3 id="mp3-downmix">11-1. MP3 downmix</h3>
+      <p>Saving or exporting MP3 folds what you hear with the current speaker layout and Ch map (the same path as stereo playback with no port map). It does not follow raw file channel order. File channels are gathered onto speakers first; unassigned speakers stay silent, and file channels that no speaker reads are omitted. If the layout has three or more speakers, those slots are then folded to L/R with the coefficients below. A Stereo layout writes only the two assigned lanes. Mono files stay mono. Solo / mute are not written. Wave export keeps the channel count. There is no prompt or warning.</p>
+      <table>
+        <thead><tr><th>Speaker order</th><th>Destination</th><th>Gain</th></tr></thead>
+        <tbody>
+          <tr><td>1st</td><td>L</td><td>1</td></tr>
+          <tr><td>2nd</td><td>R</td><td>1</td></tr>
+          <tr><td>3rd</td><td>L and R</td><td>1/√2 (about 0.707, −3 dB). Treated as center</td></tr>
+          <tr><td>4th</td><td>L and R</td><td>1/√2. LFE is included</td></tr>
+          <tr><td>5th</td><td>L</td><td>1/√2</td></tr>
+          <tr><td>6th</td><td>R</td><td>1/√2</td></tr>
+          <tr><td>7th</td><td>L</td><td>1/√2</td></tr>
+          <tr><td>8th</td><td>R</td><td>1/√2</td></tr>
+          <tr><td>9th and up</td><td>Odd slots to L, even slots to R</td><td>0.5</td></tr>
+        </tbody>
+      </table>
+      <p>The coefficients follow speaker order after the Ch map, not layout names. That matches 5.1 (L / R / C / LFE / Ls / Rs). Layouts with a different order, such as Quad or 3.0, use the same approximation as playback.</p>
+      <p>Atmos heights or objects (9.1.6 and the like), Ambisonics, and stem packs can produce an unintended mix under this fold. A dedicated fold-down or binaural path is not supported today. It will be considered if there is demand.</p>
+
       <h2 id="disclaimer">12. Scope</h2>
       <ul>
         <li>This does not cover everything Interactive Music can do. EXPORT is Wave-only (markers / sample loop).</li>
         <li>In-app preview is an approximation. Dual playheads for Play -E may not match Wwise exactly. Always verify after EXPORT.</li>
         <li>AIFF export is not supported. Choose Wave or MP3. Wave writes 8 / 16 / 24-bit (4-bit is for quantized audition and is saved as 16-bit).</li>
+        <li>Multichannel MP3 is the stereo fold of the current speaker layout. Dedicated mixes for Atmos heights / objects, Ambisonics, or stem packs are not supported today. They will be considered if there is demand.</li>
         <li>EXPORT changes the Wwise project. Back up or use version control first.</li>
       </ul>
 

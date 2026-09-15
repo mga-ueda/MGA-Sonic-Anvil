@@ -191,4 +191,85 @@ public sealed class Mp3EncodeTests
         var settings = new AppSettings { LameOptions = "   " };
         Assert.Equal(Mp3Encode.DefaultLameOptions, settings.ToMp3EncodeOptions().LameOptions);
     }
+
+    [Fact]
+    public void ForMp3Encode_LeavesMonoAndStereoUnchanged()
+    {
+        var mono = new AudioDocument([0.25f, -0.5f], 48000, 1, 24, AudioFileKind.Wave, null);
+        var stereo = new AudioDocument([0.25f, -0.5f, 0.1f, 0.2f], 48000, 2, 24, AudioFileKind.Wave, null);
+        Assert.Same(mono, AudioCodec.ForMp3Encode(mono));
+        Assert.Same(stereo, AudioCodec.ForMp3Encode(stereo));
+        Assert.Same(stereo, AudioCodec.ForMp3Encode(stereo, new Mp3SpeakerMix(2, [0, 1])));
+    }
+
+    [Fact]
+    public void ForMp3Encode_DownmixesSurroundWithPlaybackCoefficients()
+    {
+        var frame = new float[] { 0.40f, -0.20f, 0.80f, 0.50f, 0.10f, -0.30f };
+        var document = new AudioDocument(frame, 48000, 6, 16, AudioFileKind.Wave, "a.wav");
+        var prepared = AudioCodec.ForMp3Encode(document, new Mp3SpeakerMix(6, null));
+
+        Assert.NotSame(document, prepared);
+        Assert.Equal(6, document.Channels);
+        Assert.Equal(2, prepared.Channels);
+        Assert.Equal(2, prepared.Interleaved.Length);
+        ChannelMix.Downmix(frame, out var left, out var right);
+        Assert.Equal(left, prepared.Interleaved[0]);
+        Assert.Equal(right, prepared.Interleaved[1]);
+    }
+
+    [Fact]
+    public void ForMp3Encode_UsesSpeakerMapNotFileOrder()
+    {
+        var frame = new float[] { 0.10f, 0.20f, 0.80f, 0f, 0f, 0f };
+        var document = new AudioDocument(frame, 48000, 6, 16, AudioFileKind.Wave, null);
+
+        var stereo = AudioCodec.ForMp3Encode(document, new Mp3SpeakerMix(2, null));
+        Assert.Equal(2, stereo.Channels);
+        Assert.Equal(0.10f, stereo.Interleaved[0]);
+        Assert.Equal(0.20f, stereo.Interleaved[1]);
+
+        var remapped = AudioCodec.ForMp3Encode(document, new Mp3SpeakerMix(6, [2, 0, 1, 3, 4, 5]));
+        var gathered = new float[] { 0.80f, 0.10f, 0.20f, 0f, 0f, 0f };
+        ChannelMix.Downmix(gathered, out var left, out var right);
+        Assert.Equal(left, remapped.Interleaved[0]);
+        Assert.Equal(right, remapped.Interleaved[1]);
+    }
+
+    [Fact]
+    public void ForMp3Encode_SwapsStereoWhenSpeakerMapSwaps()
+    {
+        var document = new AudioDocument([0.25f, -0.5f], 48000, 2, 16, AudioFileKind.Wave, null);
+        var prepared = AudioCodec.ForMp3Encode(document, new Mp3SpeakerMix(2, [1, 0]));
+        Assert.NotSame(document, prepared);
+        Assert.Equal([-0.5f, 0.25f], prepared.Interleaved);
+    }
+
+    [Fact]
+    public void ForMp3Encode_IgnoresLiveCapacityPastSampleCount()
+    {
+        var samples = new float[12];
+        samples[0] = 0.5f;
+        samples[6] = 1f;
+        var document = new AudioDocument(samples, 48000, 6, 16, AudioFileKind.Wave, null);
+        document.WriteLiveFrom(0, samples.AsSpan(0, 6));
+
+        var prepared = AudioCodec.ForMp3Encode(document, new Mp3SpeakerMix(6, null));
+        Assert.Equal(2, prepared.Interleaved.Length);
+        ChannelMix.Downmix(samples.AsSpan(0, 6), out var left, out var right);
+        Assert.Equal(left, prepared.Interleaved[0]);
+        Assert.Equal(right, prepared.Interleaved[1]);
+    }
+
+    [Fact]
+    public void ToMp3SpeakerMix_UsesActiveSpeakerAndFileMap()
+    {
+        var settings = new AppSettings();
+        settings.EnsureSpeakerPresets();
+        settings.ActiveSpeakerPresetId = "5.1";
+        settings.FindSpeaker("5.1")!.FileChannelMap = [2, 0, 1, 3, 4, 5];
+        var mix = settings.ToMp3SpeakerMix();
+        Assert.Equal(6, mix.SpeakerChannels);
+        Assert.Equal([2, 0, 1, 3, 4, 5], mix.FileChannelMap ?? []);
+    }
 }

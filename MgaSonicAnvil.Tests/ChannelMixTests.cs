@@ -20,6 +20,18 @@ public sealed class ChannelMixTests
     }
 
     [Fact]
+    public void Downmix_UsesPlaybackCoefficientsIncludingLfeAndExtra()
+    {
+        const float k = 0.70710677f;
+        ChannelMix.Downmix(
+            [0.40f, -0.20f, 0.80f, 0.50f, 0.10f, -0.30f, 0.20f, -0.10f, 0.60f, -0.40f],
+            out var left,
+            out var right);
+        Assert.Equal(0.40f + 0.80f * k + 0.50f * k + 0.10f * k + 0.20f * k + 0.60f * 0.5f, left, 5);
+        Assert.Equal(-0.20f + 0.80f * k + 0.50f * k + -0.30f * k + -0.10f * k + -0.40f * 0.5f, right, 5);
+    }
+
+    [Fact]
     public void FrameEnvelope_KeepsInvertedStereo()
     {
         var samples = new float[] { 0.82f, -0.74f };

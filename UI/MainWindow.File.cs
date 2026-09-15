@@ -449,7 +449,11 @@ public partial class MainWindow
                 return ExportMp3WithoutReloading(document, path);
             }
 
-            var encoder = AudioCodec.Save(document, path, AppStorage.Settings.ToMp3EncodeOptions());
+            var encoder = AudioCodec.Save(
+                document,
+                path,
+                AppStorage.Settings.ToMp3EncodeOptions(),
+                AppStorage.Settings.ToMp3SpeakerMix());
             document.MarkSaved(path, AudioCodec.DetectKind(path));
             var history = _sessions.FirstOrDefault(item => ReferenceEquals(item.Document, document))?.History
                 ?? (ReferenceEquals(document, _document) ? _history : null);
@@ -552,7 +556,8 @@ public partial class MainWindow
                         document,
                         path,
                         options,
-                        new Progress<double>(p => tracker.Report(0, p, ExportJobState.Running)));
+                        new Progress<double>(p => tracker.Report(0, p, ExportJobState.Running)),
+                        AppStorage.Settings.ToMp3SpeakerMix());
                     tracker.Report(0, 1, ExportJobState.Done);
                     return used;
                 }
@@ -579,7 +584,11 @@ public partial class MainWindow
 
     private bool ExportMp3WithoutReloading(AudioDocument document, string path)
     {
-        var encoder = AudioCodec.SaveMp3(document, path, AppStorage.Settings.ToMp3EncodeOptions());
+        var encoder = AudioCodec.SaveMp3(
+            document,
+            path,
+            AppStorage.Settings.ToMp3EncodeOptions(),
+            mix: AppStorage.Settings.ToMp3SpeakerMix());
         ShowMp3EncoderResult(encoder);
         return true;
     }

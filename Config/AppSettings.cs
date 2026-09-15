@@ -378,6 +378,9 @@ internal sealed class AppSettings
 
     public Mp3EncodeOptions ToMp3EncodeOptions() =>
         new(Mp3BitRate, LameExePath ?? string.Empty, Mp3Encode.ResolveLameOptions(LameOptions));
+
+    public Mp3SpeakerMix ToMp3SpeakerMix() =>
+        new(ResolvedSpeaker().Channels, ResolvedFileChannelMap());
 }
 
 [JsonSerializable(typeof(AppSettings))]

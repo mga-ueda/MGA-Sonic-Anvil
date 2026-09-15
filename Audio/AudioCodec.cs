@@ -287,12 +287,95 @@ internal static class AudioCodec
         }
     }
 
+    /// <summary>
+    /// スピーカー配置へ寄せてから、再生と同じ係数で 2ch に畳む。
+    /// モノラルファイルはそのまま。配置が Stereo なら割り当てた 2 本だけ出す。
+    /// </summary>
+    internal static AudioDocument ForMp3Encode(AudioDocument document, Mp3SpeakerMix mix = default)
+    {
+        var fileChannels = Math.Max(1, document.Channels);
+        if (fileChannels <= 1)
+        {
+            return document;
+        }
+
+        var source = UsedInterleaved(document, fileChannels);
+        var speakers = mix.SpeakerChannels > 0
+            ? Math.Clamp(mix.SpeakerChannels, 1, ChannelLayout.MaxChannels)
+            : fileChannels;
+        var map = ChannelRouter.Normalize(mix.FileChannelMap, speakers, fileChannels);
+        var gather = NeedsSpeakerGather(map, speakers, fileChannels);
+        if (gather)
+        {
+            source = ChannelRouter.MapInterleaved(source, fileChannels, speakers, map, gather: true);
+        }
+        else if (speakers <= 2)
+        {
+            return document;
+        }
+
+        if (speakers <= 2)
+        {
+            return CopyForMp3(document, source, speakers);
+        }
+
+        return CopyForMp3(document, FormatConvert.Remix(source, speakers, destChannels: 2), channels: 2);
+    }
+
+    private static float[] UsedInterleaved(AudioDocument document, int channels)
+    {
+        var used = Math.Clamp(document.SampleCount, 0, document.Interleaved.Length);
+        used -= used % channels;
+        var source = document.Interleaved;
+        if (used == source.Length)
+        {
+            return source;
+        }
+
+        var exact = new float[used];
+        if (used > 0)
+        {
+            Array.Copy(source, exact, used);
+        }
+
+        return exact;
+    }
+
+    private static bool NeedsSpeakerGather(int[] map, int speakers, int fileChannels)
+    {
+        if (speakers != fileChannels || map.Length != speakers)
+        {
+            return true;
+        }
+
+        for (var i = 0; i < map.Length; i++)
+        {
+            if (map[i] != i)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static AudioDocument CopyForMp3(AudioDocument document, float[] interleaved, int channels) =>
+        new(
+            interleaved,
+            document.SampleRate,
+            channels,
+            document.BitsPerSample,
+            AudioFileKind.Mp3,
+            document.SourcePath);
+
     public static Mp3EncoderKind SaveMp3(
         AudioDocument document,
         string path,
         Mp3EncodeOptions options,
-        IProgress<double>? progress = null)
+        IProgress<double>? progress = null,
+        Mp3SpeakerMix mix = default)
     {
+        document = ForMp3Encode(document, mix);
         if (Mp3Encode.TryResolveLameExe(options.LameExePath, out var lameExe))
         {
             LameEncoder.Encode(document, path, lameExe, options.LameOptions, progress);
@@ -320,7 +403,11 @@ internal static class AudioCodec
         }
     }
 
-    public static Mp3EncoderKind? Save(AudioDocument document, string path, Mp3EncodeOptions options)
+    public static Mp3EncoderKind? Save(
+        AudioDocument document,
+        string path,
+        Mp3EncodeOptions options,
+        Mp3SpeakerMix mix = default)
     {
         var kind = DetectKind(path);
         if (kind == AudioFileKind.Aiff)
@@ -330,7 +417,7 @@ internal static class AudioCodec
 
         if (kind == AudioFileKind.Mp3)
         {
-            return SaveMp3(document, path, options);
+            return SaveMp3(document, path, options, mix: mix);
         }
 
         SaveWave(document, path);

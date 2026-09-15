@@ -8,6 +8,9 @@ internal readonly record struct Mp3EncodeOptions(
     string LameExePath,
     string LameOptions);
 
+/// <summary>MP3 畳みに使う今のスピーカー配置。Ch 割り当ては再生と同じ。</summary>
+internal readonly record struct Mp3SpeakerMix(int SpeakerChannels, int[]? FileChannelMap);
+
 /// <summary>MP3 出力の経路判定と LAME 引数。exe は同梱せず、ユーザー指定時だけ呼ぶ。</summary>
 internal static class Mp3Encode
 {
