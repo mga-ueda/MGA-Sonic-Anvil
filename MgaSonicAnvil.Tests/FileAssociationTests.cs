@@ -1,4 +1,6 @@
 using System.IO;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Microsoft.Win32;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
@@ -98,6 +100,48 @@ public sealed class FileAssociationTests
     }
 
     [Fact]
+    public void UserChoiceHash_MatchesPublishedVector()
+    {
+        const long fileTime = 0x01d4d98267246000;
+        Assert.Equal(
+            "PCCqEmkvW2Y=",
+            UserChoiceHash.Compute(
+                ".3g2",
+                "S-1-5-21-819709642-920330688-1657285119-500",
+                "WMP11.AssocFile.3G2",
+                fileTime));
+    }
+
+    [Fact]
+    public void IsRuntimeHost_DetectsDotnetAndTestHost()
+    {
+        Assert.True(FileAssociations.IsRuntimeHost(@"C:\Program Files\dotnet\dotnet.exe"));
+        Assert.True(FileAssociations.IsRuntimeHost(@"C:\tmp\testhost.exe"));
+        Assert.False(FileAssociations.IsRuntimeHost(@"C:\Apps\MGA Sonic Anvil.exe"));
+    }
+
+    [Fact]
+    public void SetAssociated_WritesUserChoiceForCurrentExe()
+    {
+        try
+        {
+            FileAssociations.SetAssociated(TestExtension, true);
+            using var choice = Registry.CurrentUser.OpenSubKey(
+                $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{TestExtension}\UserChoice");
+            Assert.NotNull(choice);
+            Assert.Equal(
+                FileAssociations.ProgIdFor(TestExtension),
+                choice.GetValue("ProgId") as string);
+            Assert.False(string.IsNullOrWhiteSpace(choice.GetValue("Hash") as string));
+        }
+        finally
+        {
+            FileAssociations.SetAssociated(TestExtension, false);
+            CleanupTestKeys();
+        }
+    }
+
+    [Fact]
     public void SetAssociated_RoundTripsCurrentExe()
     {
         try
@@ -120,6 +164,49 @@ public sealed class FileAssociationTests
             FileAssociations.SetAssociated(TestExtension, false);
             CleanupTestKeys();
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SetAssociated_ClearsLockedUserChoice(bool applicationsProgId)
+    {
+        var progId = applicationsProgId
+            ? @"Applications\" + FileAssociations.CurrentExeFileName()
+            : FileAssociations.ProgIdFor(TestExtension);
+        try
+        {
+            FileAssociations.SetAssociated(TestExtension, false);
+            WriteLockedUserChoice(TestExtension, progId);
+            Assert.True(FileAssociations.IsAssociated(TestExtension));
+
+            FileAssociations.SetAssociated(TestExtension, false);
+            Assert.False(FileAssociations.IsAssociated(TestExtension));
+            Assert.Null(
+                Registry.CurrentUser.OpenSubKey(
+                    $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{TestExtension}\UserChoice"));
+        }
+        finally
+        {
+            FileAssociations.SetAssociated(TestExtension, false);
+            CleanupTestKeys();
+        }
+    }
+
+    private static void WriteLockedUserChoice(string extension, string progId)
+    {
+        using var key = Registry.CurrentUser.CreateSubKey(
+            $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{extension}\UserChoice");
+        key.SetValue("ProgId", progId);
+        key.SetValue("Hash", "test");
+        var user = WindowsIdentity.GetCurrent().User
+            ?? throw new InvalidOperationException("Current user SID is missing.");
+        var security = key.GetAccessControl();
+        security.AddAccessRule(new RegistryAccessRule(
+            user,
+            RegistryRights.SetValue,
+            AccessControlType.Deny));
+        key.SetAccessControl(security);
     }
 
     private static void CleanupTestKeys()

@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using Microsoft.Win32;
 using MgaSonicAnvil.Audio;
@@ -130,15 +132,9 @@ internal static class FileAssociations
     public static string CurrentExeFileName()
     {
         var exe = ResolveExePath();
-        if (exe is not null)
+        if (exe is not null && !IsRuntimeHost(exe))
         {
-            var name = Path.GetFileName(exe);
-            if (!name.Equals("dotnet.exe", StringComparison.OrdinalIgnoreCase)
-                && !name.Equals("testhost.exe", StringComparison.OrdinalIgnoreCase)
-                && !name.Equals("testhost.dll", StringComparison.OrdinalIgnoreCase))
-            {
-                return name;
-            }
+            return Path.GetFileName(exe);
         }
 
         return "MGA Sonic Anvil.exe";
@@ -161,14 +157,15 @@ internal static class FileAssociations
 
     public static string? ResolveExePath()
     {
-        if (TryExistingFullPath(Environment.ProcessPath, out var processPath))
+        if (TryExistingFullPath(Environment.ProcessPath, out var processPath) && !IsRuntimeHost(processPath))
         {
             return processPath;
         }
 
         try
         {
-            if (TryExistingFullPath(Process.GetCurrentProcess().MainModule?.FileName, out var modulePath))
+            if (TryExistingFullPath(Process.GetCurrentProcess().MainModule?.FileName, out var modulePath)
+                && !IsRuntimeHost(modulePath))
             {
                 return modulePath;
             }
@@ -177,7 +174,25 @@ internal static class FileAssociations
         {
         }
 
-        return null;
+        if (TryExistingFullPath(Path.Combine(AppContext.BaseDirectory, AppVersion.ProductName + ".exe"), out var local))
+        {
+            return local;
+        }
+
+        return TryExistingFullPath(Environment.ProcessPath, out processPath) ? processPath : null;
+    }
+
+    public static bool IsRuntimeHost(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        var name = Path.GetFileName(path);
+        return name.Equals("dotnet.exe", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("testhost.exe", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("testhost.dll", StringComparison.OrdinalIgnoreCase);
     }
 
     public static bool IsAssociated(string extension)
@@ -229,7 +244,7 @@ internal static class FileAssociations
         WriteOpenWith(ext, progId);
         WriteApplication(exe, ext, add: true);
         WriteCapabilities(ext, progId, add: true);
-        TryDeleteUserChoice(ext);
+        WriteUserChoice(ext, progId);
         NotifyShell();
         if (!IsAssociated(ext))
         {
@@ -263,6 +278,10 @@ internal static class FileAssociations
 
         TryDeleteKey($@"{PreviousRoot}\{ext}");
         NotifyShell();
+        if (IsAssociated(ext))
+        {
+            throw new InvalidOperationException(UiStrings.ErrFileAssociationStillDefault);
+        }
     }
 
     private static string? ReadEffectiveProgId(string ext)
@@ -465,15 +484,120 @@ internal static class FileAssociations
         return TrimValue(key?.GetValue("PreviousProgId") as string);
     }
 
+    private static void WriteUserChoice(string ext, string progId)
+    {
+        using var parent = Registry.CurrentUser.CreateSubKey($@"{FileExtsRoot}\{ext}");
+        UnlockDeniedUserChoice(parent, "UserChoice");
+        UnlockDeniedUserChoice(parent, "UserChoiceLatest");
+        parent.DeleteSubKeyTree("UserChoiceLatest", throwOnMissingSubKey: false);
+
+        var key = parent.OpenSubKey("UserChoice", writable: true);
+        if (key is null)
+        {
+            parent.DeleteSubKeyTree("UserChoice", throwOnMissingSubKey: false);
+            key = parent.CreateSubKey("UserChoice");
+        }
+
+        try
+        {
+            WriteUserChoiceValues(key, ext, progId);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException)
+        {
+            key.Dispose();
+            key = null;
+            parent.DeleteSubKeyTree("UserChoice", throwOnMissingSubKey: false);
+            using var created = parent.CreateSubKey("UserChoice");
+            WriteUserChoiceValues(created, ext, progId);
+        }
+        finally
+        {
+            key?.Dispose();
+        }
+    }
+
+    private static void WriteUserChoiceValues(RegistryKey key, string ext, string progId)
+    {
+        var sid = WindowsIdentity.GetCurrent().User?.Value
+            ?? throw new InvalidOperationException(UiStrings.ErrFileAssociationNotDefault);
+        var fileTime = UserChoiceHash.ClampFileTimeToMinute(DateTime.Now.ToFileTime());
+        key.SetValue("ProgId", progId);
+        key.SetValue("Hash", UserChoiceHash.Compute(ext, sid, progId, fileTime));
+        TrySetKeyWriteTime(key, fileTime);
+    }
+
+    private static void TrySetKeyWriteTime(RegistryKey key, long fileTime)
+    {
+        try
+        {
+            var handle = key.Handle.DangerousGetHandle();
+            _ = NtSetInformationKey(handle, 0, ref fileTime, sizeof(long));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
+        {
+        }
+    }
+
     private static void TryDeleteUserChoice(string ext)
     {
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey($@"{FileExtsRoot}\{ext}", writable: true);
-            key?.DeleteSubKeyTree("UserChoice", throwOnMissingSubKey: false);
-            key?.DeleteSubKeyTree("UserChoiceLatest", throwOnMissingSubKey: false);
+            if (key is null)
+            {
+                return;
+            }
+
+            foreach (var name in new[] { "UserChoice", "UserChoiceLatest" })
+            {
+                UnlockDeniedUserChoice(key, name);
+                key.DeleteSubKeyTree(name, throwOnMissingSubKey: false);
+            }
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Windows は UserChoice に現在ユーザーの SetValue Deny を付ける。
+    /// 書き込みオープンも DeleteSubKeyTree もそこで黙って失敗するので、先に Deny を外す。
+    /// </summary>
+    private static void UnlockDeniedUserChoice(RegistryKey parent, string name)
+    {
+        try
+        {
+            using var key = parent.OpenSubKey(
+                name,
+                RegistryKeyPermissionCheck.ReadWriteSubTree,
+                RegistryRights.ChangePermissions | RegistryRights.ReadKey);
+            if (key is null)
+            {
+                return;
+            }
+
+            var security = key.GetAccessControl();
+            var changed = false;
+            foreach (RegistryAccessRule rule in security.GetAccessRules(
+                includeExplicit: true,
+                includeInherited: false,
+                typeof(SecurityIdentifier)))
+            {
+                if (rule.AccessControlType != AccessControlType.Deny)
+                {
+                    continue;
+                }
+
+                security.RemoveAccessRuleSpecific(rule);
+                changed = true;
+            }
+
+            if (changed)
+            {
+                key.SetAccessControl(security);
+            }
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException or IdentityNotMappedException)
         {
         }
     }
@@ -566,6 +690,13 @@ internal static class FileAssociations
 
     [DllImport("shell32.dll")]
     private static extern void SHChangeNotify(int wEventId, uint uFlags, IntPtr dwItem1, IntPtr dwItem2);
+
+    [DllImport("ntdll.dll")]
+    private static extern int NtSetInformationKey(
+        IntPtr keyHandle,
+        int keySetInformationClass,
+        ref long lastWriteTime,
+        int dataLength);
 
     [DllImport("shlwapi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern int AssocQueryStringW(

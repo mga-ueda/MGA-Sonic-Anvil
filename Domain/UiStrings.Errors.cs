@@ -76,6 +76,10 @@ internal static partial class UiStrings
         "Windows が既定のアプリを保護しているため、このアプリを既定にできませんでした。「プログラムから開く」には登録済みです。",
         "Windows is protecting the default app, so this app could not be made the default. It is registered under Open with.");
 
+    public static string ErrFileAssociationStillDefault => Get(
+        "Windows が既定のアプリを保護しているため、関連付けを外せませんでした。Windows の設定の既定のアプリから変更してください。",
+        "Windows is protecting the default app, so the association could not be removed. Change it in Windows Settings under Default apps.");
+
     public static string ErrFileAssociationFailed(string detail) => Format(
         "関連付けを変更できませんでした。{0}",
         "Could not change the file association. {0}",
