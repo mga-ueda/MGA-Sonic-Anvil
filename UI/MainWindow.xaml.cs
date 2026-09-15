@@ -90,6 +90,7 @@ public partial class MainWindow : Window
     private int _brandLogoDecodeWidth;
     private double _brandLogoInkBottomFrac = 1;
     private TimeScrollBar TimeScroll => TimeScrollStrip.Bar;
+    private WaveformView Waveform => _tileActiveView ?? PrimaryWaveform;
 
     public MainWindow()
     {
@@ -144,30 +145,8 @@ public partial class MainWindow : Window
         };
         StatusTimes.RequestWaveformFocus += (_, _) => Keyboard.Focus(Waveform);
         UiStrings.LanguageChanged += (_, _) => Dispatcher.BeginInvoke(RefreshLocalizedText);
-        Waveform.AnalysisViewChanged += (_, _) => Transport.SetAnalysisView(Waveform.AnalysisView);
+        HookWaveformEvents(PrimaryWaveform);
         Transport.SetAnalysisView(Waveform.AnalysisView);
-        Waveform.CursorCommitted += (_, frame) => OnCursorCommitted(frame);
-        Waveform.ScrubStarted += (_, frame) => OnScrubStarted(frame);
-        Waveform.ScrubPreviewed += (_, frame) => OnScrubPreviewed(frame);
-        Waveform.ScrubEnded += (_, e) => OnScrubEnded(e.Frame, e.Commit);
-        Waveform.MarkerCommentCommitted += (_, e) => CommitMarkerComment(e.Frame, e.Comment);
-        Waveform.RegionNameCommitted += (_, e) => CommitRegionName(e.Region, e.Name);
-        Waveform.TimelineDragStarting += (_, _) =>
-        {
-            CommitTimelineNudgeSession();
-            StopPlaceRepeat();
-        };
-        Waveform.TimelineLayoutCommitted += (_, e) =>
-            CommitTimelineLayout(e.MarkersBefore, e.RegionsBefore, e.LoopBefore);
-        Waveform.MarkersChanged += (_, _) =>
-        {
-            Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
-            Overview.Refresh();
-        };
-        Waveform.ContextMenuRequested += (_, hit) => OpenWaveformContextMenu(hit);
-        Waveform.SelectionChanged += (_, _) => OnWaveformSelectionChanged();
-        Waveform.ChannelLabelClicked += (_, e) => ToggleChannelSolo(e.Channel, e.Add, e.Mute);
-        Waveform.ViewChanged += (_, _) => SyncViewChrome();
         Overview.ViewStartChanged += (_, start) =>
         {
             Waveform.UnlockCenter();
@@ -278,7 +257,7 @@ public partial class MainWindow : Window
             StopPlaybackShuttle();
             ResetMarkerDigitEntry();
             // Closing で既に破棄済みでも安全（冪等）。
-            Waveform.DisposeSpectrogram();
+            DisposeAllWaveforms();
             _player.Dispose();
         };
 
@@ -388,31 +367,42 @@ public partial class MainWindow : Window
 
     private void BindWorkspace(DocumentSession? session)
     {
+        if (_tileMode)
+        {
+            if (session is null)
+            {
+                ExitWaveformTileMode(bindPrimary: false);
+                BindSingleWorkspace(null);
+                return;
+            }
+
+            if (_sessions.Count < 2)
+            {
+                ExitWaveformTileMode(bindPrimary: false);
+                BindSingleWorkspace(session);
+                return;
+            }
+
+            if (TryBindTiledWorkspace(session, resetInteraction: true))
+            {
+                return;
+            }
+
+            _activeSession = session;
+            RebuildTabBar();
+            RefreshTileChrome();
+            return;
+        }
+
+        BindSingleWorkspace(session);
+    }
+
+    private void BindSingleWorkspace(DocumentSession? session)
+    {
         _bindingWorkspace = true;
         try
         {
-            StatusTimes.CancelEdit();
-            Overview.CancelDrag();
-            if (Waveform.IsScrubbing)
-            {
-                Waveform.CancelScrub();
-            }
-
-            _player.Stop();
-            _playTimer.Stop();
-            CloseFadeCurvePicker();
-            CloseFormatConvertPicker();
-            CloseVolumeGainPicker();
-            ClosePitchShiftPicker();
-            CloseTimeStretchPicker();
-            CloseEditHistory(commit: true);
-            _resumeAfterScrub = false;
-            StopMarkerNudge();
-            StopSpectrogramBoostNudge();
-            StopPlaybackShuttle();
-            ResetMarkerDigitEntry();
-            StopMeterRendering();
-            Waveform.UnlockCenter();
+            ResetWorkspaceInteraction();
             _activeSession = session;
             Waveform.Document = _document;
             Overview.Document = _document;
@@ -423,6 +413,11 @@ public partial class MainWindow : Window
             ApplyChannelSolo();
             if (session is not null)
             {
+                if (session.AnalysisView is { } mode)
+                {
+                    Waveform.SetAnalysisView(mode);
+                }
+
                 Waveform.ApplyPersistedView(
                     session.TimeZoom,
                     session.AmpZoom,
@@ -432,6 +427,7 @@ public partial class MainWindow : Window
                 Waveform.LoopEnabled = session.LoopEnabled;
                 Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
                 SyncOverviewPlayhead();
+                Transport.SetAnalysisView(Waveform.AnalysisView);
             }
             else
             {
@@ -456,6 +452,43 @@ public partial class MainWindow : Window
         {
             _bindingWorkspace = false;
         }
+    }
+
+    private void ResetWorkspaceInteraction()
+    {
+        StatusTimes.CancelEdit();
+        Overview.CancelDrag();
+        if (Waveform.IsScrubbing)
+        {
+            Waveform.CancelScrub();
+        }
+
+        _player.Stop();
+        _playTimer.Stop();
+        CloseFadeCurvePicker();
+        CloseFormatConvertPicker();
+        CloseVolumeGainPicker();
+        ClosePitchShiftPicker();
+        CloseTimeStretchPicker();
+        CloseEditHistory(commit: true);
+        _resumeAfterScrub = false;
+        StopMarkerNudge();
+        StopSpectrogramBoostNudge();
+        StopPlaybackShuttle();
+        ResetMarkerDigitEntry();
+        StopMeterRendering();
+        Waveform.UnlockCenter();
+        ClearSeekTrails();
+    }
+
+    private void ClearSeekTrails()
+    {
+        ForEachWaveform(view =>
+        {
+            view.ExitPlayheadFrame = -1;
+            view.SetTrailRecording(false);
+        });
+        Overview.InvalidateVisual();
     }
 
     private void ToggleTips()
@@ -519,7 +552,7 @@ public partial class MainWindow : Window
             _waapiToggle.InvalidateVisual();
         }
 
-        Waveform.RefreshLocalizedTips();
+        ForEachWaveform(view => view.RefreshLocalizedTips());
         WaapiBar.ApplyLocalizedText();
         RefreshWaapiStatusDisplay();
         HistoryOverlay.ApplyLocalizedText();
@@ -781,7 +814,7 @@ public partial class MainWindow : Window
             // 破棄失敗でもプロセスは終える。
         }
 
-        Waveform.DisposeSpectrogram();
+        DisposeAllWaveforms();
         _exitAfterFlush = true;
         Close();
     }

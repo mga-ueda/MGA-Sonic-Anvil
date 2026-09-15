@@ -202,6 +202,24 @@ public partial class MainWindow
     private bool IsPlaybackActive() =>
         _player.IsPlaying || _player.IsScrubbing || _playTimer.IsEnabled;
 
+    private void AttachPlaybackToActiveWaveform()
+    {
+        if (!_player.IsPlaying)
+        {
+            return;
+        }
+
+        Waveform.SetTrailRecording(true);
+        Transport.SetPlaying(true);
+        if (!_playTimer.IsEnabled)
+        {
+            _playTimer.Start();
+        }
+
+        StartMeterRendering();
+        SyncOverviewPlayhead();
+    }
+
     private static bool IsPlaybackShuttleKey(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && key is Key.Left or Key.Right;
 
@@ -741,7 +759,7 @@ public partial class MainWindow
         var channels = _document?.Channels ?? 2;
         var speaker = AppStorage.Settings.ResolvedPlaybackLayout();
         var fileMap = AppStorage.Settings.ResolvedFileChannelMap();
-        Waveform.ApplySpeakerLayout(speaker, fileMap);
+        ForEachWaveform(view => view.ApplySpeakerLayout(speaker, fileMap));
         VectorScope.ApplyLayout(channels, speaker, fileMap);
         _meter.EnsureLayout(channels);
         LevelMeter.Apply(_meter.Snapshot);
@@ -1095,10 +1113,6 @@ public partial class MainWindow
 
     private void ApplyWaveformHeightScale()
     {
-        var host = Waveform.Parent as System.Windows.FrameworkElement;
-        if (host?.Parent is System.Windows.FrameworkElement border)
-        {
-            border.MinHeight = DesignMetrics.WaveformHostMinHeight * _waveformHeightScale;
-        }
+        WaveformHostBorder.MinHeight = DesignMetrics.WaveformHostMinHeight * _waveformHeightScale;
     }
 }

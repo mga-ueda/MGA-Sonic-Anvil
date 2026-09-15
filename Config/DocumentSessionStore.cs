@@ -655,6 +655,7 @@ internal static class DocumentSessionStore
         settings.OpenDocuments = [];
         settings.ClosedDocuments = [];
         settings.ActiveDocumentIndex = 0;
+        settings.WaveformTileArrange = string.Empty;
     }
 
     public static void RemoveOrphanSessionFiles(string sessionDirectory, IReadOnlyCollection<string> keepFileNames)

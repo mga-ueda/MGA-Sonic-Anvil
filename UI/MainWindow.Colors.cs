@@ -66,14 +66,16 @@ public partial class MainWindow
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
         LoadBrandLogo();
         BrandLicenseHost.ApplyColors();
-        Waveform.RefreshAppearance();
+        ForEachWaveform(view => view.RefreshAppearance());
+        RefreshTileChrome();
         Overview.RefreshAppearance();
         Spectrum.RefreshAppearance();
         VectorScope.InvalidateVisual();
         LevelMeterBarPaint.Invalidate();
         LevelMeter.InvalidateVisual();
         HistoryStrip.InvalidateVisual();
-        HistoryOverlay.InvalidateVisual();
+        HistoryOverlay.RefreshAppearance();
+        RefreshHistoryOverlay();
         LoudnessMeter.ApplyValueColors();
         Transport.RefreshAppearance();
         TimeScrollStrip.RefreshAppearance();

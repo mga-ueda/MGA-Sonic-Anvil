@@ -30,6 +30,8 @@ internal partial class AudioSettingsWindow : Window
 
     public UiThemeChoice SelectedTheme { get; private set; }
 
+    public WaveformTileArrange SelectedMultiFileArrange { get; private set; }
+
     public int SelectedUiScalePercent { get; private set; } = UiScale.DefaultPercent;
 
     public double SelectedLoudnessTargetLufs { get; private set; }
@@ -107,11 +109,13 @@ internal partial class AudioSettingsWindow : Window
         string? defaultChannelLayout = null,
         int wwisePrefetchLengthMs = WwiseTrackTiming.DefaultPrefetchLengthMs,
         int wwiseLookAheadTimeMs = WwiseTrackTiming.DefaultLookAheadTimeMs,
-        int uiScalePercent = UiScale.DefaultPercent)
+        int uiScalePercent = UiScale.DefaultPercent,
+        string? multiFileArrange = null)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
         SelectedTheme = theme;
+        SelectedMultiFileArrange = WaveformTileLayout.Parse(multiFileArrange);
         SelectedUiScalePercent = UiScale.ClampPercent(uiScalePercent);
         _uiScaleOpenedAt = SelectedUiScalePercent;
         SelectedLoudnessTargetLufs = LoudnessMeterEngine.ClampTargetLufs(loudnessTargetLufs);
@@ -171,6 +175,7 @@ internal partial class AudioSettingsWindow : Window
         ThemeCombo.Items.Add(new ThemeItem(UiThemeChoice.Dark, UiStrings.LabelThemeDark));
         ThemeCombo.Items.Add(new ThemeItem(UiThemeChoice.Light, UiStrings.LabelThemeLight));
         SelectTheme(theme);
+        FillMultiFileArrange(SelectedMultiFileArrange);
         FillUiScale(SelectedUiScalePercent);
         UiScaleCombo.SelectionChanged += UiScaleCombo_SelectionChanged;
 
@@ -251,6 +256,8 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(ThemeCombo, UiStrings.TipUiTheme);
         TipService.Set(UiScaleLabel, UiStrings.TipUiScale);
         TipService.Set(UiScaleCombo, UiStrings.TipUiScale);
+        TipService.Set(MultiFileArrangeLabel, UiStrings.TipMultiFileArrange);
+        TipService.Set(MultiFileArrangeCombo, UiStrings.TipMultiFileArrange);
         TipService.Set(DefaultFormatHeader, UiStrings.TipDefaultAudioFormat);
         TipService.Set(DefaultSampleRateLabel, UiStrings.TipDefaultAudioFormat);
         TipService.Set(DefaultSampleRateCombo, UiStrings.TipDefaultAudioFormat);
@@ -462,6 +469,9 @@ internal partial class AudioSettingsWindow : Window
         SelectedTheme = ThemeCombo.SelectedItem is ThemeItem themeItem
             ? themeItem.Choice
             : UiThemeChoice.Auto;
+        SelectedMultiFileArrange = MultiFileArrangeCombo.SelectedItem is MultiFileArrangeItem arrangeItem
+            ? arrangeItem.Arrange
+            : WaveformTileArrange.Off;
         SelectedUiScalePercent = UiScaleCombo.SelectedItem is ScaleItem scaleItem
             ? scaleItem.Percent
             : UiScale.DefaultPercent;
@@ -1099,6 +1109,28 @@ internal partial class AudioSettingsWindow : Window
         ThemeCombo.SelectedIndex = 0;
     }
 
+    private void FillMultiFileArrange(WaveformTileArrange arrange)
+    {
+        MultiFileArrangeCombo.Items.Add(
+            new MultiFileArrangeItem(WaveformTileArrange.Off, UiStrings.LabelMultiFileArrangeTabs));
+        MultiFileArrangeCombo.Items.Add(
+            new MultiFileArrangeItem(WaveformTileArrange.Horizontal, UiStrings.LabelMultiFileArrangeHorizontal));
+        MultiFileArrangeCombo.Items.Add(
+            new MultiFileArrangeItem(WaveformTileArrange.Vertical, UiStrings.LabelMultiFileArrangeVertical));
+        MultiFileArrangeCombo.Items.Add(
+            new MultiFileArrangeItem(WaveformTileArrange.Grid, UiStrings.LabelMultiFileArrangeGrid));
+        foreach (MultiFileArrangeItem item in MultiFileArrangeCombo.Items)
+        {
+            if (item.Arrange == arrange)
+            {
+                MultiFileArrangeCombo.SelectedItem = item;
+                return;
+            }
+        }
+
+        MultiFileArrangeCombo.SelectedIndex = 0;
+    }
+
     private void FillUiScale(int percent)
     {
         var current = UiScale.ClampPercent(percent);
@@ -1199,6 +1231,7 @@ internal partial class AudioSettingsWindow : Window
         ComboBoxFit.Apply(LanguageCombo);
         ComboBoxFit.Apply(ThemeCombo);
         ComboBoxFit.Apply(UiScaleCombo);
+        ComboBoxFit.Apply(MultiFileArrangeCombo);
         ComboBoxFit.Apply(DefaultSampleRateCombo);
         ComboBoxFit.Apply(DefaultBitDepthCombo);
         ComboBoxFit.Apply(DefaultChannelLayoutCombo);
@@ -1220,13 +1253,13 @@ internal partial class AudioSettingsWindow : Window
 
     private void FitWindowToAudio()
     {
-        var scale = UiScaleService.Factor;
+        // 設定ウィンドウは表示倍率の対象外（常に等倍）。
         var pad = DesignMetrics.AudioPad.Left + DesignMetrics.AudioPad.Right;
         var chrome = WindowChromeWidth();
         var content = Math.Max(AudioTabContentWidth(), SettingsTabBarWidth());
         var inner = content + pad + DesignMetrics.SettingsWindowContentMargin;
-        var width = Math.Ceiling(inner * scale + chrome);
-        var min = DesignMetrics.SettingsWindowMinWidth * scale;
+        var width = Math.Ceiling(inner + chrome);
+        var min = DesignMetrics.SettingsWindowMinWidth;
         var max = Math.Max(min, SystemParameters.WorkArea.Width - 32);
         width = Math.Clamp(width, min, max);
         MinWidth = width;
@@ -1300,11 +1333,7 @@ internal partial class AudioSettingsWindow : Window
     {
         if (Content is FrameworkElement content && content.ActualWidth > 1 && ActualWidth > content.ActualWidth)
         {
-            var visual = content.ActualWidth * UiScaleService.Factor;
-            if (ActualWidth > visual)
-            {
-                return ActualWidth - visual;
-            }
+            return ActualWidth - content.ActualWidth;
         }
 
         return SystemParameters.ResizeFrameVerticalBorderWidth * 2 + 2;
@@ -1651,6 +1680,11 @@ internal partial class AudioSettingsWindow : Window
     }
 
     private sealed record ThemeItem(UiThemeChoice Choice, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    private sealed record MultiFileArrangeItem(WaveformTileArrange Arrange, string Label)
     {
         public override string ToString() => Label;
     }

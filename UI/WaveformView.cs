@@ -570,7 +570,9 @@ internal sealed class WaveformView : Grid
     {
         get
         {
-            if (_document is null || _document.FrameCount <= 0 || ContentWidth <= 0)
+            // レイアウト前（幅0）でもズームから正しいスパンを返す。
+            // タイル化直後のバインドでスクロールバー等が一瞬潰れるのを防ぐ。
+            if (_document is null || _document.FrameCount <= 0)
             {
                 return 1;
             }

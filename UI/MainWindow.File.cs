@@ -172,6 +172,7 @@ public partial class MainWindow
         DocumentSession? opened = null;
         DocumentSession? existingFirst = null;
         List<string>? errors = null;
+        var added = 0;
         BeginOpenWork(targets.Select(path => Path.GetFileName(path) ?? path).ToArray());
         try
         {
@@ -201,6 +202,7 @@ public partial class MainWindow
                     var document = await Task.Run(() => AudioCodec.Load(path)).ConfigureAwait(true);
                     var session = new DocumentSession(document);
                     _sessions.Add(session);
+                    added++;
                     if (opened is null)
                     {
                         opened = session;
@@ -209,6 +211,7 @@ public partial class MainWindow
                     else
                     {
                         RebuildTabBar();
+                        NotifyWaveformSessionsChanged();
                     }
 
                     PumpUiAfterOpen();
@@ -247,6 +250,8 @@ public partial class MainWindow
         {
             EndOpenWork(showProgress);
         }
+
+        ApplyPreferredMultiFileArrange(added);
 
         if (errors is { Count: > 0 })
         {
@@ -761,7 +766,8 @@ public partial class MainWindow
             settings.ResolvedDefaultChannelLayout().Id,
             settings.ResolvedWwisePrefetchLengthMs(),
             settings.ResolvedWwiseLookAheadTimeMs(),
-            settings.ResolvedUiScalePercent())
+            settings.ResolvedUiScalePercent(),
+            settings.MultiFileArrange)
         {
             Owner = this,
         };
@@ -783,6 +789,7 @@ public partial class MainWindow
         settings.UiLanguage = UiStrings.ToStoredValue(dialog.SelectedLanguage);
         UiStrings.SetLanguage(UiStrings.ResolveLanguage(dialog.SelectedLanguage));
         settings.UiTheme = UiThemes.ToStoredValue(dialog.SelectedTheme);
+        settings.MultiFileArrange = WaveformTileLayout.Format(dialog.SelectedMultiFileArrange);
         UiThemeService.ApplyFromSettings(force: true);
         settings.UiScalePercent = dialog.SelectedUiScalePercent;
         UiScaleService.ApplyFromSettings();
@@ -805,7 +812,7 @@ public partial class MainWindow
         settings.DefaultChannelLayout = dialog.SelectedDefaultChannelLayout;
         ApplyPlayerRoute();
         LoudnessMeter.ApplyTargetFromSettings();
-        Waveform.LoudnessTargetLufs = settings.ResolvedLoudnessTargetLufs();
+        ForEachWaveform(view => view.LoudnessTargetLufs = settings.ResolvedLoudnessTargetLufs());
         ApplySilentSkipFromSettings();
         RefreshSpeakerMenu();
         SyncMonitorLayout();
@@ -972,6 +979,9 @@ public partial class MainWindow
 
             var activeIndex = _activeSession is null ? 0 : _sessions.IndexOf(_activeSession);
             settings.ActiveDocumentIndex = Math.Clamp(activeIndex, 0, snapshots.Length - 1);
+            settings.WaveformTileArrange = _sessions.Count >= 2
+                ? WaveformTileLayout.Format(_tileArrange)
+                : WaveformTileLayout.StoredOff;
             var activePath = snapshots[settings.ActiveDocumentIndex].SourcePath;
             if (!string.IsNullOrWhiteSpace(activePath))
             {
@@ -1104,6 +1114,8 @@ public partial class MainWindow
         {
             EndOpenWork(showProgress);
         }
+
+        ApplyPreferredOrRestoredTileArrange(settings);
 
         if (_queuedOpenPaths.Count > 0)
         {

@@ -138,7 +138,8 @@ public partial class MainWindow
             return;
         }
 
-        if (!IsDescendantOf(origin, Waveform))
+        var view = FindWaveformFromOrigin(origin);
+        if (view is null)
         {
             return;
         }
@@ -146,21 +147,21 @@ public partial class MainWindow
         var modifiers = Keyboard.Modifiers;
         if (modifiers == ModifierKeys.Shift)
         {
-            Waveform.PanByVisibleFraction(e.Delta > 0 ? -0.1 : 0.1);
+            view.PanByVisibleFraction(e.Delta > 0 ? -0.1 : 0.1);
             e.Handled = true;
             return;
         }
 
         if (modifiers == ModifierKeys.Control)
         {
-            Waveform.WheelAmpZoom(e.Delta);
+            view.WheelAmpZoom(e.Delta);
             e.Handled = true;
             return;
         }
 
         if (modifiers == ModifierKeys.None)
         {
-            Waveform.WheelTimeZoomAtPlayhead(e.Delta);
+            view.WheelTimeZoomAtPlayhead(e.Delta);
             e.Handled = true;
         }
     }
@@ -923,6 +924,12 @@ public partial class MainWindow
         if (key == Key.T && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
             ReopenLastClosedTab();
+            return true;
+        }
+
+        if (key == Key.T && modifiers == ModifierKeys.Control)
+        {
+            CycleWaveformTile();
             return true;
         }
 

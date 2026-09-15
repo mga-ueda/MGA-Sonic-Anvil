@@ -28,6 +28,11 @@ internal sealed class DocumentSession
 
     public bool LoopEnabled { get; set; } = true;
 
+    /// <summary>
+    /// 波形 / スペクトログラム / 重ね / ラウドネス。未設定ならタイル開始時に今の表示を引き継ぐ。
+    /// </summary>
+    public WaveformAnalysisView? AnalysisView { get; set; }
+
     /// <summary>波形レーンのソロ。0 は解除。bit i がそのレーン。</summary>
     public int SoloMask { get; set; }
 

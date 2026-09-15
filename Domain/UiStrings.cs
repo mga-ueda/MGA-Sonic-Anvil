@@ -178,6 +178,11 @@ internal static partial class UiStrings
     public static string LabelUiLanguage => Get("言語", "Language");
     public static string LabelUiTheme => Get("配色", "Theme");
     public static string LabelUiScale => Get("表示倍率", "UI scale");
+    public static string LabelMultiFileArrange => Get("複数ファイル", "Multiple files");
+    public static string LabelMultiFileArrangeTabs => Get("タブのまま", "Keep tabs");
+    public static string LabelMultiFileArrangeHorizontal => Get("左右", "Side by side");
+    public static string LabelMultiFileArrangeVertical => Get("上下", "Stacked");
+    public static string LabelMultiFileArrangeGrid => Get("上下左右", "Grid");
     public static string LabelThemeAuto => Get("Auto", "Auto");
     public static string LabelThemeDark => Get("Dark", "Dark");
     public static string LabelThemeLight => Get("Light", "Light");
@@ -193,8 +198,8 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeIn => Get("波形フェードイン", "Waveform Fade In");
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string TipAudioSettings => Get(
-        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出し／Wwise のタブ。表示言語、配色（ダーク／ライト／Auto）、表示倍率（100〜200%。OS の DPI に加えて拡大）、関連付け、デフォルトオーディオフォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip / 無音削除）、プチノイズ防止フェード、フェードカーブ、MP3、同時書き出し本数、Wwise の Prefetch Length／Look-ahead Time。ダイアログのボタンは Tab で移動できます。",
-        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export / Wwise tabs. Language, theme (Dark / Light / Auto), UI scale (100–200%; extra enlargement on top of the OS DPI), file associations, default audio format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip / Delete Silence), click-prevention fade, fade curves, MP3, parallel export count, and Wwise Prefetch Length / Look-ahead Time. Tab also moves to dialog buttons.");
+        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出し／Wwise のタブ。表示言語、配色（ダーク／ライト／Auto）、表示倍率（100〜200%。OS の DPI に加えて拡大）、複数ファイルの並べ方（タブのまま／左右／上下／上下左右）、関連付け、デフォルトオーディオフォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip / 無音削除）、プチノイズ防止フェード、フェードカーブ、MP3、同時書き出し本数、Wwise の Prefetch Length／Look-ahead Time。ダイアログのボタンは Tab で移動できます。",
+        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export / Wwise tabs. Language, theme (Dark / Light / Auto), UI scale (100–200%; extra enlargement on top of the OS DPI), multiple-file arrangement (keep tabs / side by side / stacked / grid), file associations, default audio format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip / Delete Silence), click-prevention fade, fade curves, MP3, parallel export count, and Wwise Prefetch Length / Look-ahead Time. Tab also moves to dialog buttons.");
     public static string TipDefaultAudioFormat => Get(
         "新規ファイル（Ctrl+N）の初期フォーマットです。既定は 48kHz / 24bit / Stereo。チャンネルは表示項目で有効にしたスピーカーと、常に選べる Mono。",
         "Initial format for a new file (Ctrl+N). Default is 48 kHz / 24-bit / Stereo. Channels are the speakers enabled on Shown, plus Mono (always available).");
@@ -648,8 +653,8 @@ internal static partial class UiStrings
         "MP3 として保存 (Ctrl+Shift+M)\n別名保存と同じく書き出すだけ。今のタブは開いたまま、書き出した MP3 は読み込まない。Ctrl+Shift+Alt+M で全タブを MP3 書き出し。設定の LAME があればそれを使い、空欄または無効なら Windows（既定 192 kbps）。成功時にどちらで書いたかを表示。失敗はダイアログ。マーカー／リージョン／ループは書きません",
         "Save as MP3 (Ctrl+Shift+M)\nWrites a file like Save As; keeps the current tab and does not open the written MP3. Ctrl+Shift+Alt+M exports every tab as MP3. Uses LAME when the path is valid; otherwise Windows (default 192 kbps). Success shows which encoder ran. Failures open a dialog. Markers / regions / loops are not written");
     public static string TipOpen => Get(
-        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+N で新規（フォーマットは都度指定）\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ\n右クリックで、すべてのタブの時間をコピー（ファイル名と長さをタブ区切り）など\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
-        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+N for a new file (choose the format each time)\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab\nRight-click to copy all tab times (file name and duration, tab-separated) and more\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
+        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+N で新規（フォーマットは都度指定）\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ\nCtrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置は飛ばす。今見ている表示モードで全タブを並べる）\n右クリックで、すべてのタブの時間をコピー（ファイル名と長さをタブ区切り）など\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
+        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+N for a new file (choose the format each time)\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab\nCtrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same. Every tab uses the current view mode)\nRight-click to copy all tab times (file name and duration, tab-separated) and more\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
     public static string TipCloseTab => Get(
         "タブを閉じる (Ctrl+W)。今の起動のうちなら Ctrl+Shift+T で開き直せる",
         "Close tab (Ctrl+W). Ctrl+Shift+T reopens it in this launch");
@@ -676,12 +681,15 @@ internal static partial class UiStrings
     public static string TipUiLanguage => Get(
         "表示言語。Auto は OS が日本語なら Japanese、それ以外は English。",
         "UI language. Auto is Japanese if the OS is Japanese, otherwise English.");
+    public static string TipMultiFileArrange => Get(
+        "2つ以上のファイルを開いたあとの並べ方です。既定はタブのまま（Ctrl+T でタイル）。左右・上下・上下左右を選ぶと、読み込み後にその配置で並べます。",
+        "How to arrange two or more files after opening them. Default is keep tabs (Ctrl+T to tile). Side by side, stacked, or grid arranges them after a load.");
     public static string TipUiTheme => Get(
         "配色。Auto は OS のアプリ配色に従います。背景と文字だけ変わり、再生ヘッドやマーカーなどのアクセント色は維持します。",
         "Theme. Auto follows the OS app theme. Only backgrounds and text change; accent colors such as the playhead and markers stay the same.");
     public static string TipUiScale => Get(
-        "アプリの表示サイズ。OS の DPI に加えて拡大します。100〜200%。縮小はありません。コンボを変えた瞬間に反映します。キャンセルすると元に戻します。",
-        "App display size. Extra enlargement on top of the OS DPI. 100–200%. No shrinking. Applies as soon as you change the combo. Cancel restores the previous value.");
+        "アプリの表示サイズ。OS の DPI に加えて拡大します。100〜200%。縮小はありません。作用するのはメインウィンドウのみで、メニューや設定などの別ウィンドウは等倍のままです。コンボを変えた瞬間に反映します。キャンセルすると元に戻します。",
+        "App display size. Extra enlargement on top of the OS DPI. 100–200%. No shrinking. Affects the main window only; menus and separate windows such as Settings stay at 100%. Applies as soon as you change the combo. Cancel restores the previous value.");
     public static string TipFileAssociations => Get(
         "チェックすると、その拡張子をこのアプリで開く（既定）。外すと関連付けを外す。すでにこのアプリが既定ならチェック済み。OK を待たず、今の exe へすぐ書き込みます。",
         "Check to make this app the default for that extension. Uncheck to remove the association. Types already using this app are checked. Writes to this exe immediately, without waiting for OK.");
@@ -756,12 +764,14 @@ internal static partial class UiStrings
         + "Esc または Shift なし移動で解除。Shift＋ドラッグ／←→ で伸長。ダブルクリックで区間（マーカー間）。Shift＋ダブルクリックでその区間を追加。トリプルクリックで全選択。ガイドはマーカー／ループ端に吸着。\n"
         + "左端のチャンネル名：クリックでソロ（再クリックで解除。Ctrl で追加。Shift でミュート）。Tab／Shift+Tab で順にソロ。\n"
         + "ホイール＝時間ズーム（再生ヘッド基準）。Shift+ホイール＝パン。Ctrl+ホイール＝振幅。\n"
-        + "フラッグ／ループ端：クリックで選択、ドラッグまたは ←→ で移動。Alt+←→ は微調整。ダブルクリックで名前。右クリックまたはメニューキー／Shift+F10 でメニュー。",
+        + "フラッグ／ループ端：クリックで選択、ドラッグまたは ←→ で移動。Alt+←→ は微調整。ダブルクリックで名前。右クリックまたはメニューキー／Shift+F10 でメニュー。\n"
+        + "Ctrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置は飛ばす）。今見ている表示モード（波形 / スペクトログラム / 重ね / ラウドネス）で全タブを並べる。並び替え中でももう一度押すと次へ進む。",
         "Click to set the playhead. ←→ seek (hold during playback for 3× shuttle). Drag to select. Ctrl+drag scrubs (every channel downmixed to L/R).\n"
         + "Esc or a move without Shift clears the selection. Shift+drag / ←→ extends it. Double-click a span (between markers). Shift+double-click adds that span. Triple-click selects all. The guide snaps to markers / loop edges.\n"
         + "Channel names on the left: click to solo (again to clear; Ctrl adds; Shift mutes). Tab / Shift+Tab cycle solo.\n"
         + "Wheel = time zoom (around the playhead). Shift+wheel = pan. Ctrl+wheel = amplitude.\n"
-        + "Flags / loop edges: click to select, drag or ←→ to move. Alt+←→ nudges. Double-click to name. Right-click or the menu key / Shift+F10 for the menu.");
+        + "Flags / loop edges: click to select, drag or ←→ to move. Alt+←→ nudges. Double-click to name. Right-click or the menu key / Shift+F10 for the menu.\n"
+        + "Ctrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same). Every tab uses the current view mode (waveform / spectrogram / overlay / loudness). Press again during arrange to skip ahead.");
     public static string TipAlwaysOnTop => Get(
         "ウィンドウを常に最前面へ表示します。",
         "Keep the window always on top.");
@@ -816,6 +826,10 @@ internal static partial class UiStrings
     public static string TabMenuCloseRight => Get("このタブを含め右側を全部閉じる(_R)", "Close This and Tabs to the _Right");
     public static string TabMenuCloseLeft => Get("このタブを含め左側を全部閉じる(_L)", "Close This and Tabs to the _Left");
     public static string TabMenuSelectAll => Get("全部のタブを選択する(_A)", "Select _All Tabs");
+    public static string TabMenuTileOff => WaveMenuTileOff;
+    public static string TabMenuTileHorizontal => WaveMenuTileHorizontal;
+    public static string TabMenuTileVertical => WaveMenuTileVertical;
+    public static string TabMenuTileGrid => WaveMenuTileGrid;
     public static string TabMenuCopyAllTimes => WaveMenuCopyAllTabTimes;
     public static string TabMenuCloseAll => Get("すべてのタブを閉じる(_A)", "Close _All Tabs");
 

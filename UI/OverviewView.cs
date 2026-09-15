@@ -60,6 +60,12 @@ internal sealed class OverviewView : FrameworkElement
         get => _document;
         set
         {
+            if (ReferenceEquals(_document, value))
+            {
+                // 同じドキュメントの再バインド（タイル切り替え等）で波形を作り直さない。
+                return;
+            }
+
             _document = value;
             _viewStart = 0;
             _viewSpan = value?.FrameCount ?? 1;

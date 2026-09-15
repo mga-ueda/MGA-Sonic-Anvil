@@ -138,6 +138,7 @@ public partial class MainWindow
             WaapiExportEnabled = WaapiBar.ExportEnabled,
             CanReopenTab = _workspace.ClosedTabs.Count > 0,
             HasMultipleTabs = _sessions.Count > 1,
+            WaveTileArrange = _tileArrange,
             CanLoopPlay = canNavigate
                 && (hasSelection
                     || !document!.SampleLoop.IsEmpty
@@ -369,6 +370,18 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.ViewLoudness:
                 Waveform.SetAnalysisView(WaveformAnalysisView.Loudness);
+                break;
+            case WaveMenuCommand.TileOff:
+                SetWaveformTileArrange(WaveformTileArrange.Off);
+                break;
+            case WaveMenuCommand.TileHorizontal:
+                SetWaveformTileArrange(WaveformTileArrange.Horizontal);
+                break;
+            case WaveMenuCommand.TileVertical:
+                SetWaveformTileArrange(WaveformTileArrange.Vertical);
+                break;
+            case WaveMenuCommand.TileGrid:
+                SetWaveformTileArrange(WaveformTileArrange.Grid);
                 break;
             case WaveMenuCommand.SoloNext:
                 CycleChannelSolo(1);

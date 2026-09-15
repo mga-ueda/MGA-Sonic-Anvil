@@ -166,6 +166,15 @@ internal sealed class AppSettings
 
     public int ActiveDocumentIndex { get; set; }
 
+    /// <summary>終了時のタイル表示。off / vertical / horizontal / grid。タブが 2 未満なら起動時は無視。</summary>
+    public string WaveformTileArrange { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 複数ファイルを開いたあとの並べ方。空／off はタブのまま（手動タイル）。
+    /// vertical / horizontal / grid で読み込み後にタイルする。
+    /// </summary>
+    public string MultiFileArrange { get; set; } = string.Empty;
+
     public bool WaapiKeepTarget { get; set; }
 
     public string WaapiKeptTargetPath { get; set; } = string.Empty;

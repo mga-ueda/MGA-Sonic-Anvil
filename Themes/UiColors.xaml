@@ -26,8 +26,8 @@
     <SolidColorBrush x:Key="WaveFillBrush" Color="#FFC6D9FF" />
     <SolidColorBrush x:Key="WaveFillOverlayBrush" Color="#FF3AB8E8" />
     <SolidColorBrush x:Key="WaveZeroLineBrush" Color="#5ACCCCCC" />
-    <SolidColorBrush x:Key="WaveformScrollTrackBrush" Color="#FF121212" />
     <SolidColorBrush x:Key="TimelineWellBackBrush" Color="#FF17171A" />
+    <SolidColorBrush x:Key="WaveformTileActiveHeaderBrush" Color="#FF1E3044" />
     <SolidColorBrush x:Key="PlayheadBrush" Color="#FF00F5FF" />
     <SolidColorBrush x:Key="SeekExitBrush" Color="#FFDC2D2D" />
     <SolidColorBrush x:Key="MouseGuideBrush" Color="#DCFFFFFF" />

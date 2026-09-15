@@ -72,6 +72,16 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.TogglePlayback, commands);
             Assert.Contains(WaveMenuCommand.ViewSpectrogram, commands);
             Assert.Contains(WaveMenuCommand.ViewLoudness, commands);
+            Assert.Contains(WaveMenuCommand.TileOff, commands);
+            Assert.Contains(WaveMenuCommand.TileHorizontal, commands);
+            Assert.Contains(WaveMenuCommand.TileVertical, commands);
+            Assert.Contains(WaveMenuCommand.TileGrid, commands);
+            var tileGrid = Find(tree, WaveMenuCommand.TileGrid);
+            Assert.True(tileGrid?.Checkable);
+            Assert.True(tileGrid?.Checked);
+            var tileOff = Find(tree, WaveMenuCommand.TileOff);
+            Assert.True(tileOff?.Checkable);
+            Assert.False(tileOff?.Checked);
             Assert.Contains(WaveMenuCommand.SilentSkip, commands);
             var silentSkip = Find(tree, WaveMenuCommand.SilentSkip);
             Assert.Equal("Alt+S", silentSkip?.Gesture);

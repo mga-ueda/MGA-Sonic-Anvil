@@ -38,13 +38,19 @@ public partial class MainWindow
             return;
         }
 
-        _activeSession.TimeZoom = Waveform.TimeZoom;
-        _activeSession.AmpZoom = Waveform.AmpZoom;
-        _activeSession.ViewStart = Waveform.ViewStart;
-        _activeSession.PlayheadFrame = Waveform.PlayheadFrame;
-        _activeSession.LoopEnabled = Waveform.LoopEnabled;
-        _activeSession.SelectedMarkerFrames.Clear();
-        _activeSession.SelectedMarkerFrames.AddRange(Waveform.SelectedMarkerFrames);
+        CaptureViewToSession(_activeSession, Waveform);
+    }
+
+    private static void CaptureViewToSession(DocumentSession session, WaveformView view)
+    {
+        session.TimeZoom = view.TimeZoom;
+        session.AmpZoom = view.AmpZoom;
+        session.ViewStart = view.ViewStart;
+        session.PlayheadFrame = view.PlayheadFrame;
+        session.LoopEnabled = view.LoopEnabled;
+        session.AnalysisView = view.AnalysisView;
+        session.SelectedMarkerFrames.Clear();
+        session.SelectedMarkerFrames.AddRange(view.SelectedMarkerFrames);
     }
 
     private void ActivateSession(DocumentSession session)
@@ -59,6 +65,7 @@ public partial class MainWindow
         if (ReferenceEquals(_activeSession, session) && ReferenceEquals(_document, session.Document))
         {
             RebuildTabBar();
+            RefreshTileChrome();
             return;
         }
 
@@ -138,6 +145,7 @@ public partial class MainWindow
             RefreshTabHeaders();
         }
 
+        NotifyWaveformSessionsChanged();
         return true;
     }
 
@@ -168,6 +176,9 @@ public partial class MainWindow
         var index = Math.Clamp(closed.Index, 0, _sessions.Count);
         _sessions.Insert(index, session);
         ActivateSession(session);
+        // ファイルが 1 つに減ってタイルが解除されていても、複数に戻ったら
+        // 既定の並べ方（設定）を適用し直す。タイル表示中ならペインへ組み込む。
+        ApplyPreferredMultiFileArrange(1);
     }
 
     private void CloseOtherTabs(DocumentSession keep)
@@ -320,6 +331,7 @@ public partial class MainWindow
                 UiStrings.TabMenuCopyAllTimes,
                 CopyAllTabTimes,
                 enabled: _sessions.Count > 0));
+            AddTileArrangeMenuItems(menu, canMutate);
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 AllTabsSelected ? UiStrings.TabMenuExportWaveAll : UiStrings.TabMenuExportWaveSelected,
@@ -373,6 +385,7 @@ public partial class MainWindow
                 UiStrings.TabMenuCopyAllTimes,
                 CopyAllTabTimes,
                 enabled: _sessions.Count > 0));
+            AddTileArrangeMenuItems(menu, canMutate);
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.TabMenuExportWave,
@@ -449,13 +462,52 @@ public partial class MainWindow
         Clipboard.SetText(text);
     }
 
+    /// <summary>タブメニューに並べ方（タブのまま／左右／上下／上下左右）を直接並べる。</summary>
+    private void AddTileArrangeMenuItems(ContextMenu menu, bool canMutate)
+    {
+        var enabled = canMutate && _sessions.Count > 1;
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateTabMenuItem(
+            UiStrings.TabMenuTileOff,
+            () => SetWaveformTileArrange(WaveformTileArrange.Off),
+            enabled: enabled,
+            checkable: true,
+            isChecked: _tileArrange == WaveformTileArrange.Off));
+        menu.Items.Add(CreateTabMenuItem(
+            UiStrings.TabMenuTileHorizontal,
+            () => SetWaveformTileArrange(WaveformTileArrange.Horizontal),
+            enabled: enabled,
+            checkable: true,
+            isChecked: _tileArrange == WaveformTileArrange.Horizontal));
+        menu.Items.Add(CreateTabMenuItem(
+            UiStrings.TabMenuTileVertical,
+            () => SetWaveformTileArrange(WaveformTileArrange.Vertical),
+            enabled: enabled,
+            checkable: true,
+            isChecked: _tileArrange == WaveformTileArrange.Vertical));
+        menu.Items.Add(CreateTabMenuItem(
+            UiStrings.TabMenuTileGrid,
+            () => SetWaveformTileArrange(WaveformTileArrange.Grid),
+            enabled: enabled,
+            checkable: true,
+            isChecked: _tileArrange == WaveformTileArrange.Grid));
+    }
+
     private static MenuItem CreateTabMenuItem(
         string header,
         Action action,
         string? gesture = null,
-        bool enabled = true)
+        bool enabled = true,
+        bool checkable = false,
+        bool isChecked = false)
     {
-        var item = new MenuItem { Header = header, IsEnabled = enabled };
+        var item = new MenuItem
+        {
+            Header = header,
+            IsEnabled = enabled,
+            IsCheckable = checkable,
+            IsChecked = isChecked,
+        };
         if (gesture is not null)
         {
             item.InputGestureText = gesture;
@@ -627,6 +679,7 @@ public partial class MainWindow
         }
 
         SyncTabOverflow();
+        RefreshTileChrome();
     }
 
     private FrameworkElement CreateTabItem(DocumentSession session)

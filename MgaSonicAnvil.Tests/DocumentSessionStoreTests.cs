@@ -558,6 +558,8 @@ public sealed class DocumentSessionStoreTests
         var settings = new AppSettings
         {
             ActiveDocumentIndex = 1,
+            WaveformTileArrange = "grid",
+            MultiFileArrange = "horizontal",
             OpenDocuments =
             [
                 new OpenDocumentSnapshot
@@ -593,6 +595,8 @@ public sealed class DocumentSessionStoreTests
 
         Assert.NotNull(back);
         Assert.Equal(1, back.ActiveDocumentIndex);
+        Assert.Equal("grid", back.WaveformTileArrange);
+        Assert.Equal("horizontal", back.MultiFileArrange);
         Assert.Equal(2, back.OpenDocuments.Length);
         Assert.True(back.OpenDocuments[0].Dirty);
         Assert.Equal("doc-0.wav", back.OpenDocuments[0].SessionFileName);
