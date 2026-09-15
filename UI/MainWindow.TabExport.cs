@@ -361,34 +361,23 @@ public partial class MainWindow
         return true;
     }
 
-    private static string ResolveExportInitialDirectory(DocumentSession session)
+    private static string ResolveExportInitialDirectory(DocumentSession session) =>
+        ResolveExportInitialDirectory(session.Document.SourcePath);
+
+    private static string ResolveExportInitialDirectory(string? sourcePath)
     {
-        var last = AppStorage.Settings.LastExportFolder;
-        if (!string.IsNullOrWhiteSpace(last) && Directory.Exists(last))
-        {
-            return last;
-        }
-
-        var fromSource = Path.GetDirectoryName(session.Document.SourcePath);
-        if (!string.IsNullOrWhiteSpace(fromSource) && Directory.Exists(fromSource))
-        {
-            return fromSource;
-        }
-
-        var fromDoc = Path.GetDirectoryName(AppStorage.Settings.LastDocumentPath);
-        return !string.IsNullOrWhiteSpace(fromDoc) && Directory.Exists(fromDoc)
-            ? fromDoc
-            : string.Empty;
+        var settings = AppStorage.Settings;
+        return ExportFolderMemory.Resolve(settings.LastExportFolder, sourcePath);
     }
 
     private static void RememberExportFolder(string? folder)
     {
-        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+        if (!ExportFolderMemory.TryNormalize(folder, out var path))
         {
             return;
         }
 
-        AppStorage.Settings.LastExportFolder = Path.GetFullPath(folder);
+        AppStorage.Settings.LastExportFolder = path;
         AppStorage.Save();
     }
 

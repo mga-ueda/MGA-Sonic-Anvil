@@ -64,13 +64,14 @@ public partial class MainWindow
             Title = UiStrings.MenuOpen,
             Multiselect = true,
         };
-        var lastDir = Path.GetDirectoryName(AppStorage.Settings.LastDocumentPath);
-        if (!string.IsNullOrWhiteSpace(lastDir) && Directory.Exists(lastDir))
+        var initial = ResolveOpenInitialDirectory();
+        if (initial.Length > 0)
         {
-            dialog.InitialDirectory = lastDir;
+            dialog.InitialDirectory = initial;
         }
         if (dialog.ShowDialog(this) == true)
         {
+            RememberOpenFolder(Path.GetDirectoryName(dialog.FileName));
             OpenPaths(dialog.FileNames);
         }
     }
@@ -439,6 +440,10 @@ public partial class MainWindow
             }
 
             path = dialog.FileName;
+            if (AudioCodec.DetectKind(path) == AudioFileKind.Mp3)
+            {
+                RememberExportFolder(Path.GetDirectoryName(path));
+            }
         }
 
         try
@@ -512,18 +517,15 @@ public partial class MainWindow
             FileName = string.IsNullOrEmpty(path)
                 ? "untitled.mp3"
                 : Path.GetFileNameWithoutExtension(path) + ".mp3",
+            InitialDirectory = ResolveExportInitialDirectory(path),
         };
-        var lastDir = Path.GetDirectoryName(path);
-        if (!string.IsNullOrWhiteSpace(lastDir) && Directory.Exists(lastDir))
-        {
-            dialog.InitialDirectory = lastDir;
-        }
 
         if (dialog.ShowDialog(this) != true)
         {
             return;
         }
 
+        RememberExportFolder(Path.GetDirectoryName(dialog.FileName));
         await ExportSingleMp3WithGlassAsync(document, dialog.FileName);
     }
 
@@ -910,6 +912,23 @@ public partial class MainWindow
         {
             OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    private static string ResolveOpenInitialDirectory()
+    {
+        var settings = AppStorage.Settings;
+        return ExportFolderMemory.Resolve(settings.LastOpenFolder, settings.LastDocumentPath);
+    }
+
+    private static void RememberOpenFolder(string? folder)
+    {
+        if (!ExportFolderMemory.TryNormalize(folder, out var path))
+        {
+            return;
+        }
+
+        AppStorage.Settings.LastOpenFolder = path;
+        AppStorage.Save();
     }
 
     private static void RememberOpenedPath(string path)

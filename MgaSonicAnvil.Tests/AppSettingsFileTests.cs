@@ -144,6 +144,8 @@ public sealed class AppSettingsFileTests
             var path = Path.Combine(root, "settings.json");
             var original = AppSettings.CreateDefault();
             original.LastDocumentPath = @"D:\keep.wav";
+            original.LastOpenFolder = @"D:\opens";
+            original.LastExportFolder = @"D:\exports";
             original.AlwaysOnTop = true;
             AppSettingsFile.Write(path, original);
 
@@ -151,6 +153,8 @@ public sealed class AppSettingsFileTests
 
             Assert.Equal(SettingsFileReset.None, reset);
             Assert.Equal(@"D:\keep.wav", settings.LastDocumentPath);
+            Assert.Equal(@"D:\opens", settings.LastOpenFolder);
+            Assert.Equal(@"D:\exports", settings.LastExportFolder);
             Assert.True(settings.AlwaysOnTop);
             Assert.Equal(AppSettings.CurrentGeneration, settings.SettingsGeneration);
         }

@@ -77,7 +77,10 @@ internal sealed class AppSettings
     /// <summary>全タブ同時書き出し数。0 は Auto（コア数の 1/4）。上限はコア数の 1/2。</summary>
     public int ExportParallelism { get; set; }
 
-    /// <summary>タブ書き出しで最後に選んだフォルダ。</summary>
+    /// <summary>「開く」で最後に選んだフォルダ。書き出し先とは別。</summary>
+    public string LastOpenFolder { get; set; } = string.Empty;
+
+    /// <summary>書き出し（タブ / MP3 として保存）で最後に選んだフォルダ。開くとは別。</summary>
     public string LastExportFolder { get; set; } = string.Empty;
 
     /// <summary>ラウドネスメーターのターゲット（LKFS）。既定 -24。</summary>
@@ -152,7 +155,7 @@ internal sealed class AppSettings
     /// <summary>「今は開かない」にしたリモート版。同じ版では再通知しない。</summary>
     public string SkippedUpdateVersion { get; set; } = string.Empty;
 
-    /// <summary>最後に開いた／保存したファイル。ダイアログの初期フォルダに使う。</summary>
+    /// <summary>最後に開いた／保存したファイル。開くダイアログの予備フォルダに使う。</summary>
     public string LastDocumentPath { get; set; } = string.Empty;
 
     /// <summary>終了時に開いていたタブ。</summary>
