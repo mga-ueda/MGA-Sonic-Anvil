@@ -344,14 +344,6 @@ internal static class WaveformContextMenuBuilder
                 enabled: m.CanEdit));
         }
 
-        if (m.HasDocument)
-        {
-            items.Add(Cmd(
-                UiStrings.WaveMenuDeleteAllMarkers,
-                WaveMenuCommand.DeleteAllMarkers,
-                enabled: m.CanEdit && m.HasMarkers));
-        }
-
         if (m.Hit.HitRegion)
         {
             items.Add(Cmd(UiStrings.WaveMenuClearRegion, WaveMenuCommand.ClearRegion, enabled: m.CanEdit));
@@ -421,6 +413,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuAddMarker, WaveMenuCommand.AddMarker, "M", m.CanEdit),
         Cmd(UiStrings.WaveMenuRenameMarker, WaveMenuCommand.RenameMarker, "Ctrl+Shift+R", m.CanEdit && m.CanRenameMarker),
         Cmd(UiStrings.WaveMenuDeleteMarkers, WaveMenuCommand.DeleteMarkers, "Ctrl+Delete", m.CanEdit && m.HasMarkers),
+        Cmd(UiStrings.WaveMenuDeleteAllMarkers, WaveMenuCommand.DeleteAllMarkers, enabled: m.CanEdit && m.HasMarkers),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuSetRegion, WaveMenuCommand.SetRegion, "Shift+R", m.CanEdit && m.HasSelection && m.AllowsRegionsAndLoops),
         Cmd(UiStrings.WaveMenuRenameRegion, WaveMenuCommand.RenameRegion, enabled: m.CanEdit && m.CanRenameRegion),

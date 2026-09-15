@@ -93,15 +93,9 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.PlayFromHere, commands);
             var root = tree.OfType<WaveMenuItemEntry>().Select(item => item.Command).ToArray();
             Assert.Contains(WaveMenuCommand.ClearMarkers, root);
-            Assert.Contains(WaveMenuCommand.DeleteAllMarkers, root);
-            Assert.Equal(
-                Array.IndexOf(root, WaveMenuCommand.ClearMarkers) + 1,
-                Array.IndexOf(root, WaveMenuCommand.DeleteAllMarkers));
-            Assert.DoesNotContain(
-                WaveMenuCommand.DeleteAllMarkers,
-                WaveformContextMenuBuilder.Commands(
-                    tree.OfType<WaveMenuItemEntry>().First(item => item.Header == UiStrings.WaveMenuCatTimeline).Children
-                    ?? []).ToHashSet());
+            Assert.DoesNotContain(WaveMenuCommand.DeleteAllMarkers, root);
+            Assert.Contains(WaveMenuCommand.DeleteAllMarkers, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
+            Assert.Contains(WaveMenuCommand.DeleteAllRegions, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
         }
         finally
         {
@@ -118,7 +112,7 @@ public sealed class WaveformContextMenuTests
         Assert.Contains(WaveMenuCommand.Manual, commands);
         Assert.DoesNotContain(WaveMenuCommand.PlayFromHere, commands);
         Assert.DoesNotContain(WaveMenuCommand.ClearMarkers, commands);
-        Assert.DoesNotContain(WaveMenuCommand.DeleteAllMarkers, commands);
+        Assert.False(Find(tree, WaveMenuCommand.DeleteAllMarkers)?.Enabled);
     }
 
     [Fact]
