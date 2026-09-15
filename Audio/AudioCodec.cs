@@ -136,6 +136,9 @@ internal static class AudioCodec
     private static readonly byte[] PcmSubFormat =
         new Guid(0x00000001, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71).ToByteArray();
 
+    private static readonly byte[] IeeeFloatSubFormat =
+        new Guid(0x00000003, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71).ToByteArray();
+
     public static void SaveWaveRange(
         AudioDocument document,
         long startFrame,
@@ -172,6 +175,7 @@ internal static class AudioCodec
     {
         8 => 8,
         24 => 24,
+        32 => 32,
         _ => 16,
     };
 
@@ -241,6 +245,12 @@ internal static class AudioCodec
         int channelMask)
     {
         writer.Write(Encoding.ASCII.GetBytes("fmt "));
+        if (bits == 32)
+        {
+            WriteIeeeFloatFmt(writer, sampleRate, channels, byteRate, blockAlign, channelMask);
+            return;
+        }
+
         if (bits <= 16)
         {
             writer.Write(16);
@@ -255,6 +265,42 @@ internal static class AudioCodec
 
         // 24-bit を 16 バイト PCM で書くと Sound Forge が raw 32 kHz として開く。
         // スピーカーマスクは元ファイルの値だけ残す。無ければ 0（未指定）。推測して埋めない。
+        WriteExtensibleFmt(writer, sampleRate, channels, bits, byteRate, blockAlign, channelMask, PcmSubFormat);
+    }
+
+    private static void WriteIeeeFloatFmt(
+        BinaryWriter writer,
+        int sampleRate,
+        int channels,
+        int byteRate,
+        int blockAlign,
+        int channelMask)
+    {
+        if (channelMask == 0)
+        {
+            writer.Write(16);
+            writer.Write((ushort)3);
+            writer.Write((ushort)channels);
+            writer.Write(sampleRate);
+            writer.Write(byteRate);
+            writer.Write((ushort)blockAlign);
+            writer.Write((ushort)32);
+            return;
+        }
+
+        WriteExtensibleFmt(writer, sampleRate, channels, 32, byteRate, blockAlign, channelMask, IeeeFloatSubFormat);
+    }
+
+    private static void WriteExtensibleFmt(
+        BinaryWriter writer,
+        int sampleRate,
+        int channels,
+        int bits,
+        int byteRate,
+        int blockAlign,
+        int channelMask,
+        byte[] subFormat)
+    {
         writer.Write(40);
         writer.Write((ushort)0xFFFE);
         writer.Write((ushort)channels);
@@ -265,7 +311,7 @@ internal static class AudioCodec
         writer.Write((ushort)22);
         writer.Write((ushort)bits);
         writer.Write(channelMask);
-        writer.Write(PcmSubFormat);
+        writer.Write(subFormat);
     }
 
     private static void DeleteSoundForgeSidecars(string path)
@@ -438,6 +484,12 @@ internal static class AudioCodec
             ReportWriteProgress(progress, index, samples.Length, progressScale, ref lastBucket);
         }
 
+        if (bits == 32)
+        {
+            WriteIeeeFloat(samples, writer, Step);
+            return;
+        }
+
         if (bits <= 8)
         {
             var buffer = new byte[samples.Length];
@@ -478,6 +530,21 @@ internal static class AudioCodec
         }
 
         writer.Write(packed);
+    }
+
+    private static void WriteIeeeFloat(float[] samples, BinaryWriter writer, Action<int> step)
+    {
+        const int chunk = 4096;
+        var buffer = new byte[chunk * sizeof(float)];
+        var offset = 0;
+        while (offset < samples.Length)
+        {
+            var take = Math.Min(chunk, samples.Length - offset);
+            Buffer.BlockCopy(samples, offset * sizeof(float), buffer, 0, take * sizeof(float));
+            writer.Write(buffer, 0, take * sizeof(float));
+            offset += take;
+            step(offset);
+        }
     }
 
     private static void ReportWriteProgress(

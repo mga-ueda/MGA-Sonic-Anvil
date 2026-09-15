@@ -81,6 +81,7 @@ public sealed class DurationFormatTests
         Assert.Equal("48kHz", UiStrings.FormatSampleRate(48000));
         Assert.Equal("44.1kHz", UiStrings.FormatSampleRate(44100));
         Assert.Equal("24bit", UiStrings.FormatBitDepth(24));
+        Assert.Equal("32bit", UiStrings.FormatBitDepth(32));
         Assert.Equal("2ch", UiStrings.FormatChannels(2));
     }
 

@@ -325,6 +325,133 @@ public sealed class FormatConvertTests
     }
 
     [Fact]
+    public void BitDepths_StayFourEightSixteenTwentyFour()
+    {
+        Assert.Equal([4, 8, 16, 24], FormatConvert.BitDepths);
+        Assert.False(FormatConvert.IsValidBitDepth(32));
+        Assert.Null(ProcessEdits.ConvertBitDepth(MakeDocument(frames: 8, sampleRate: 48000, bits: 16), 32));
+    }
+
+    [Fact]
+    public void SaveWave_WritesIeeeFloatWhenThirtyTwoBit()
+    {
+        var document = MakeDocument(frames: 8, sampleRate: 48000, bits: 32);
+        document.Interleaved[0] = 0.125f;
+        document.Interleaved[1] = -0.5f;
+        var path = Path.Combine(Path.GetTempPath(), $"sonic-anvil-32f-{Guid.NewGuid():N}.wav");
+        try
+        {
+            AudioCodec.SaveWave(document, path);
+            var fmt = ReadFmt(path);
+            Assert.Equal(16, fmt.ChunkSize);
+            Assert.Equal(3, fmt.FormatTag);
+            Assert.Equal(32, fmt.BitsPerSample);
+            Assert.Equal(8, fmt.BlockAlign);
+            Assert.Equal(48000 * 8, fmt.ByteRate);
+
+            var loaded = AudioCodec.Load(path);
+            Assert.Equal(32, loaded.BitsPerSample);
+            Assert.Equal(8, loaded.FrameCount);
+            Assert.Equal(0.125f, loaded.Interleaved[0]);
+            Assert.Equal(-0.5f, loaded.Interleaved[1]);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
+    public void SaveWave_IntegerThirtyTwoLoadsAndSavesAsIeeeFloat()
+    {
+        var source = Path.Combine(Path.GetTempPath(), $"sonic-anvil-32i-{Guid.NewGuid():N}.wav");
+        var dest = Path.Combine(Path.GetTempPath(), $"sonic-anvil-32i-out-{Guid.NewGuid():N}.wav");
+        try
+        {
+            WriteIntegerThirtyTwoPcm(source, [0.5f, -0.25f]);
+            var loaded = AudioCodec.Load(source);
+            Assert.Equal(32, loaded.BitsPerSample);
+            Assert.Equal(0.5f, loaded.Interleaved[0], 5);
+            Assert.Equal(-0.25f, loaded.Interleaved[1], 5);
+
+            AudioCodec.SaveWave(loaded, dest);
+            var fmt = ReadFmt(dest);
+            Assert.Equal(3, fmt.FormatTag);
+            Assert.Equal(32, fmt.BitsPerSample);
+
+            var roundTrip = AudioCodec.Load(dest);
+            Assert.Equal(32, roundTrip.BitsPerSample);
+            Assert.Equal(loaded.Interleaved[0], roundTrip.Interleaved[0]);
+            Assert.Equal(loaded.Interleaved[1], roundTrip.Interleaved[1]);
+        }
+        finally
+        {
+            if (File.Exists(source))
+            {
+                File.Delete(source);
+            }
+
+            if (File.Exists(dest))
+            {
+                File.Delete(dest);
+            }
+        }
+    }
+
+    [Fact]
+    public void SaveWave_ThirtyTwoBitKeepsChannelMaskWithExtensible()
+    {
+        var document = new AudioDocument(new float[48], 48000, 6, 32, AudioFileKind.Wave, null);
+        document.SetChannelMask(0x3F);
+        var path = Path.Combine(Path.GetTempPath(), $"sonic-anvil-32mask-{Guid.NewGuid():N}.wav");
+        try
+        {
+            AudioCodec.SaveWave(document, path);
+            var fmt = ReadFmt(path);
+            Assert.Equal(40, fmt.ChunkSize);
+            Assert.Equal(0xFFFE, fmt.FormatTag);
+            Assert.Equal(32, fmt.BitsPerSample);
+            Assert.Equal(0x3F, DevicePortNames.ReadWaveFileChannelMask(path));
+
+            var loaded = AudioCodec.Load(path);
+            Assert.Equal(32, loaded.BitsPerSample);
+            Assert.Equal(0x3F, loaded.ChannelMask);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
+    public void SaveWave_FourBitWritesSixteenBit()
+    {
+        var document = MakeDocument(frames: 8, sampleRate: 48000, bits: 4);
+        var path = Path.Combine(Path.GetTempPath(), $"sonic-anvil-4bit-{Guid.NewGuid():N}.wav");
+        try
+        {
+            AudioCodec.SaveWave(document, path);
+            var fmt = ReadFmt(path);
+            Assert.Equal(16, fmt.ChunkSize);
+            Assert.Equal(1, fmt.FormatTag);
+            Assert.Equal(16, fmt.BitsPerSample);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
     public void ConvertBitDepth_SupportsFourBit()
     {
         var document = MakeDocument(frames: 8, sampleRate: 48000, bits: 16);
@@ -569,6 +696,33 @@ public sealed class FormatConvertTests
     private static AudioDocument MakeDocument(int frames, int sampleRate, int bits = 16)
     {
         return new AudioDocument(new float[frames * 2], sampleRate, 2, bits, AudioFileKind.Wave, null);
+    }
+
+    private static void WriteIntegerThirtyTwoPcm(string path, float[] samples)
+    {
+        using var stream = File.Create(path);
+        using var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: false);
+        var channels = 2;
+        var sampleRate = 8000;
+        var blockAlign = channels * 4;
+        var dataBytes = samples.Length * 4;
+        writer.Write(Encoding.ASCII.GetBytes("RIFF"));
+        writer.Write(36 + dataBytes);
+        writer.Write(Encoding.ASCII.GetBytes("WAVE"));
+        writer.Write(Encoding.ASCII.GetBytes("fmt "));
+        writer.Write(16);
+        writer.Write((ushort)1);
+        writer.Write((ushort)channels);
+        writer.Write(sampleRate);
+        writer.Write(sampleRate * blockAlign);
+        writer.Write((ushort)blockAlign);
+        writer.Write((ushort)32);
+        writer.Write(Encoding.ASCII.GetBytes("data"));
+        writer.Write(dataBytes);
+        foreach (var sample in samples)
+        {
+            writer.Write((int)Math.Round(sample * 2147483647d));
+        }
     }
 
     private static float[] MakeSine(int frames, int sampleRate, double frequency = 440)

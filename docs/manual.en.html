@@ -203,7 +203,7 @@
         <li><kbd>B</kbd> — bit depth</li>
         <li><kbd>C</kbd> — file channel count (Mono / Stereo; this is not the speaker layout)</li>
       </ul>
-      <p>Presets are 8 / 11.025 / 16 / 22.05 / 32 / 44.1 / 48 / 96 kHz, bit depths 4 / 8 / 16 / 24, and channels Mono / Stereo. Custom Hz is 1000–384000, nudged with ↑↓ / wheel by 1 Hz (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). The menu sits just off the cursor. Highlighting a value updates the status size to the estimate. A frosted-glass overlay blocks the UI while converting. Confirmed fields stay red until you save. Sample rate and bit depth always convert from the PCM captured at load (or after a content edit such as fade). 48 kHz → 24 kHz then 11 kHz is rebuilt from 48 kHz, not cascaded through 24 kHz. <kbd>Space</kbd> previews rate and bit depth only (channels apply with <kbd>Enter</kbd>; 1–2 pick a row). 4-bit is for quantized audition. Wave writes only 8 / 16 / 24, so a 4-bit document is written as 16-bit.</p>
+      <p>Presets are 8 / 11.025 / 16 / 22.05 / 32 / 44.1 / 48 / 96 kHz, bit depths 4 / 8 / 16 / 24, and channels Mono / Stereo. Custom Hz is 1000–384000, nudged with ↑↓ / wheel by 1 Hz (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). The menu sits just off the cursor. Highlighting a value updates the status size to the estimate. A frosted-glass overlay blocks the UI while converting. Confirmed fields stay red until you save. Sample rate and bit depth always convert from the PCM captured at load (or after a content edit such as fade). 48 kHz → 24 kHz then 11 kHz is rebuilt from 48 kHz, not cascaded through 24 kHz. <kbd>Space</kbd> previews rate and bit depth only (channels apply with <kbd>Enter</kbd>; 1–2 pick a row). 4-bit is for quantized audition. Wave writes 8 / 16 / 24-bit, and IEEE float when the document is already 32-bit. A 4-bit document is written as 16-bit. 32-bit is not a conversion preset.</p>
 
       <h2 id="export">9. WAAPI EXPORT (Wave-only)</h2>
       <p><strong>The same assembly as <a href="https://github.com/mga-ueda/MGA-Wwise-IM-Importer">Wwise IM Importer</a>’s Wave-only mode.</strong> Keep one-shot and loop material on a single master waveform instead of pre-separating files. EXPORT writes that wave as one file into Originals and maps ranges with MusicClip trim. It creates one Music Playlist Container. <code>-A</code> / <code>-L</code> / <code>-E</code> shape ranges and Entry / Exit Cues; markers are not Custom Cues. There is no bar / tempo overlay, no multi-wave Switch, and no XML marker-track mode.</p>
@@ -559,7 +559,7 @@
       <ul>
         <li>This does not cover everything Interactive Music can do. EXPORT is Wave-only (markers / sample loop).</li>
         <li>In-app preview is an approximation. Dual playheads for Play -E may not match Wwise exactly. Always verify after EXPORT.</li>
-        <li>AIFF export is not supported. Choose Wave or MP3. Wave writes 8 / 16 / 24-bit (4-bit is for quantized audition and is saved as 16-bit).</li>
+        <li>AIFF export is not supported. Choose Wave or MP3. Wave writes 8 / 16 / 24-bit, and IEEE float when the document is already 32-bit (4-bit is for quantized audition and is saved as 16-bit. 32-bit is not a conversion preset).</li>
         <li>Multichannel MP3 is the stereo fold of the current speaker layout. Dedicated mixes for Atmos heights / objects, Ambisonics, or stem packs are not supported today. They will be considered if there is demand.</li>
         <li>EXPORT changes the Wwise project. Back up or use version control first.</li>
       </ul>
