@@ -166,6 +166,108 @@ public sealed class EditReplayTests
         Assert.Null(command.Replay!(target));
     }
 
+    [Fact]
+    public void ClearAllMarkers_Replay_RemovesEveryMarkerOnTarget()
+    {
+        var source = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        source.TryAddMarker(10);
+        source.TryAddMarker(40);
+        var command = ProcessEdits.ClearAllMarkers(source);
+        Assert.NotNull(command);
+        Assert.Equal(HistoryRecipes.ClearAllMarkers, command!.Persist?.Kind);
+
+        var target = MakeConstant(frames: 200, value: 1f, rate: 48000);
+        target.TryAddMarker(5);
+        target.TryAddMarker(80);
+        target.TryAddMarker(150);
+        var replayed = command.Replay!(target);
+        Assert.NotNull(replayed);
+        new EditHistory().Do(target, replayed!);
+        Assert.Empty(target.Markers);
+    }
+
+    [Fact]
+    public void RemoveMarkers_Replay_KeepsUnlistedMarkersOnTarget()
+    {
+        var source = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        source.TryAddMarker(10);
+        source.TryAddMarker(40);
+        source.TryAddMarker(70);
+        var command = ProcessEdits.RemoveMarkers(source, [10, 40]);
+        Assert.NotNull(command);
+        Assert.Equal(HistoryRecipes.RemoveMarkers, command!.Persist?.Kind);
+
+        var target = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        target.TryAddMarker(10);
+        target.TryAddMarker(40);
+        target.TryAddMarker(70);
+        target.TryAddMarker(90);
+        var replayed = command.Replay!(target);
+        Assert.NotNull(replayed);
+        new EditHistory().Do(target, replayed!);
+        Assert.Equal(new long[] { 70, 90 }, target.Markers.Select(marker => marker.Frame).ToArray());
+    }
+
+    [Fact]
+    public void ClearAllRegions_Replay_RemovesEveryRegionOnTarget()
+    {
+        var source = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        source.SetRegions([new WaveSelection(10, 30), new WaveSelection(50, 70)]);
+        var command = ProcessEdits.ClearAllRegions(source);
+        Assert.NotNull(command);
+        Assert.Equal(HistoryRecipes.ClearAllRegions, command!.Persist?.Kind);
+
+        var target = MakeConstant(frames: 200, value: 1f, rate: 48000);
+        target.SetRegions(
+        [
+            new WaveSelection(0, 20),
+            new WaveSelection(40, 60),
+            new WaveSelection(120, 180),
+        ]);
+        var replayed = command.Replay!(target);
+        Assert.NotNull(replayed);
+        new EditHistory().Do(target, replayed!);
+        Assert.Empty(target.Regions);
+    }
+
+    [Fact]
+    public void RemoveRegions_Replay_KeepsUnlistedRegionsOnTarget()
+    {
+        var source = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        source.SetRegions([new WaveSelection(10, 30), new WaveSelection(50, 70)]);
+        var command = ProcessEdits.RemoveRegions(source, [new WaveSelection(10, 30)]);
+        Assert.NotNull(command);
+        Assert.Equal(HistoryRecipes.RemoveRegions, command!.Persist?.Kind);
+
+        var target = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        target.SetRegions([new WaveSelection(10, 30), new WaveSelection(50, 70), new WaveSelection(80, 95)]);
+        var replayed = command.Replay!(target);
+        Assert.NotNull(replayed);
+        new EditHistory().Do(target, replayed!);
+        Assert.Equal(
+            [new WaveSelection(50, 70), new WaveSelection(80, 95)],
+            target.Regions);
+    }
+
+    [Fact]
+    public void ClearAll_Recipe_RebuildsAsClearAllOnTarget()
+    {
+        var target = MakeConstant(frames: 80, value: 1f, rate: 48000);
+        target.TryAddMarker(12);
+        target.TryAddMarker(36);
+        target.SetRegions([new WaveSelection(4, 16), new WaveSelection(40, 60)]);
+
+        var markers = HistoryRecipes.TryCreate(target, new HistoryRecipe { Kind = HistoryRecipes.ClearAllMarkers });
+        Assert.NotNull(markers);
+        new EditHistory().Do(target, markers!);
+        Assert.Empty(target.Markers);
+
+        var regions = HistoryRecipes.TryCreate(target, new HistoryRecipe { Kind = HistoryRecipes.ClearAllRegions });
+        Assert.NotNull(regions);
+        new EditHistory().Do(target, regions!);
+        Assert.Empty(target.Regions);
+    }
+
     private static AudioDocument MakeConstant(int frames, float value, int rate)
     {
         var samples = new float[frames * 2];

@@ -95,12 +95,14 @@ internal static class HistoryRecipes
     public const string SetSampleLoop = "SetSampleLoop";
     public const string SetRegion = "SetRegion";
     public const string RemoveRegions = "RemoveRegions";
+    public const string ClearAllRegions = "ClearAllRegions";
     public const string AddMarker = "AddMarker";
     public const string ReplaceMarkers = "ReplaceMarkers";
     public const string ReplaceRegions = "ReplaceRegions";
     public const string MarkerComment = "MarkerComment";
     public const string RegionName = "RegionName";
     public const string RemoveMarkers = "RemoveMarkers";
+    public const string ClearAllMarkers = "ClearAllMarkers";
     public const string MoveMarkers = "MoveMarkers";
     public const string MoveTimeline = "MoveTimeline";
     public const string ConvertRate = "ConvertRate";
@@ -125,12 +127,14 @@ internal static class HistoryRecipes
         SetSampleLoop,
         SetRegion,
         RemoveRegions,
+        ClearAllRegions,
         AddMarker,
         ReplaceMarkers,
         ReplaceRegions,
         MarkerComment,
         RegionName,
         RemoveMarkers,
+        ClearAllMarkers,
         MoveMarkers,
         MoveTimeline,
         ConvertRate,
@@ -308,12 +312,14 @@ internal static class HistoryRecipes
             SetSampleLoop => TrySetSampleLoop(document, recipe),
             SetRegion => TrySetRegion(document, recipe),
             RemoveRegions => ProcessEdits.RemoveRegions(document, RangesOf(recipe)),
+            ClearAllRegions => ProcessEdits.ClearAllRegions(document),
             AddMarker => TryAddMarker(document, recipe),
             ReplaceMarkers => ProcessEdits.ApplyMarkers(document, MarkersOf(recipe.Frames, recipe.Comments)),
             ReplaceRegions => ProcessEdits.ApplyRegions(document, RegionsOf(recipe.Starts, recipe.Ends, recipe.Names)),
             MarkerComment => ProcessEdits.SetMarkerComment(document, recipe.Frame, recipe.Text ?? ""),
             RegionName => ProcessEdits.SetRegionName(document, RangeOf(recipe), recipe.Text ?? ""),
             RemoveMarkers => ProcessEdits.RemoveMarkers(document, recipe.Frames ?? []),
+            ClearAllMarkers => ProcessEdits.ClearAllMarkers(document),
             MoveMarkers => ProcessEdits.MoveMarkers(document, recipe.Frames ?? [], recipe.Delta, out _),
             MoveTimeline => TryMoveTimeline(document, recipe),
             ConvertRate => ProcessEdits.ConvertSampleRate(document, recipe.Value),

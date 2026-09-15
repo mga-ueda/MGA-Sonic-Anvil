@@ -168,6 +168,13 @@ internal static partial class ProcessEdits
             before,
             after,
             UiStrings.EditHistoryName("Set Region") + "  解除");
+        if (after.Length == 0)
+        {
+            command.Replay = ClearAllRegions;
+            command.Persist = new HistoryRecipe { Kind = HistoryRecipes.ClearAllRegions };
+            return command;
+        }
+
         var sourceRate = document.SampleRate;
         var removedRanges = remove.ToArray();
         command.Replay = target => RemoveRegions(
@@ -178,6 +185,22 @@ internal static partial class ProcessEdits
                 .ToArray());
         command.Persist = HistoryRecipes.FromRanges(HistoryRecipes.RemoveRegions, sourceRate, removedRanges);
         return command;
+    }
+
+    public static IEditCommand? ClearAllRegions(AudioDocument document)
+    {
+        if (!document.AllowsRegionsAndLoops)
+        {
+            return null;
+        }
+
+        var before = document.SnapshotRegions();
+        if (before.Length == 0)
+        {
+            return null;
+        }
+
+        return RemoveRegions(document, before.Select(region => region.Range).ToArray());
     }
 
     public static IEditCommand AddMarker(AudioDocument document, long frame)
@@ -409,6 +432,13 @@ internal static partial class ProcessEdits
             before,
             after,
             UiStrings.EditHistoryMarkers("Delete Markers", before, after, document.SampleRate));
+        if (after.Length == 0)
+        {
+            command.Replay = ClearAllMarkers;
+            command.Persist = new HistoryRecipe { Kind = HistoryRecipes.ClearAllMarkers };
+            return command;
+        }
+
         var sourceRate = document.SampleRate;
         var removedFrames = remove.ToArray();
         command.Replay = target => RemoveMarkers(
@@ -416,6 +446,17 @@ internal static partial class ProcessEdits
             removedFrames.Select(item => EditReplay.MapFrame(item, sourceRate, target)).ToArray());
         command.Persist = HistoryRecipes.FromMarkers(HistoryRecipes.RemoveMarkers, sourceRate, removedFrames);
         return command;
+    }
+
+    public static IEditCommand? ClearAllMarkers(AudioDocument document)
+    {
+        var before = document.SnapshotMarkers();
+        if (before.Length == 0)
+        {
+            return null;
+        }
+
+        return RemoveMarkers(document, before.Select(marker => marker.Frame).ToArray());
     }
 
     public static IEditCommand? MoveMarkers(

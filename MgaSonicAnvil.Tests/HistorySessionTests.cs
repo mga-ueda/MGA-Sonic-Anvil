@@ -240,12 +240,22 @@ public sealed class HistorySessionTests
         {
             Recipes = [new HistoryRecipe { Kind = HistoryRecipes.AddMarker, Frame = 4 }],
         }));
+        Assert.True(HistoryRecipes.CanImport(new HistorySessionSnapshot
+        {
+            Recipes =
+            [
+                new HistoryRecipe { Kind = HistoryRecipes.ClearAllMarkers },
+                new HistoryRecipe { Kind = HistoryRecipes.ClearAllRegions },
+            ],
+        }));
     }
 
     [Fact]
     public void AffectsSamples_IgnoresMarkerOnlyRecipes()
     {
         Assert.False(HistoryRecipes.AffectsSamples(new HistoryRecipe { Kind = HistoryRecipes.AddMarker }));
+        Assert.False(HistoryRecipes.AffectsSamples(new HistoryRecipe { Kind = HistoryRecipes.ClearAllMarkers }));
+        Assert.False(HistoryRecipes.AffectsSamples(new HistoryRecipe { Kind = HistoryRecipes.ClearAllRegions }));
         Assert.True(HistoryRecipes.AffectsSamples(new HistoryRecipe { Kind = HistoryRecipes.FadeIn }));
         Assert.False(HistoryRecipes.AffectsSamples(new HistorySessionSnapshot
         {

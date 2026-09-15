@@ -1510,13 +1510,7 @@ public partial class MainWindow
             return;
         }
 
-        var frames = new long[_document.Markers.Count];
-        for (var i = 0; i < frames.Length; i++)
-        {
-            frames[i] = _document.Markers[i].Frame;
-        }
-
-        var command = ProcessEdits.RemoveMarkers(_document, frames);
+        var command = ProcessEdits.ClearAllMarkers(_document);
         if (command is null)
         {
             return;
@@ -1534,7 +1528,7 @@ public partial class MainWindow
             return;
         }
 
-        var command = ProcessEdits.RemoveRegions(_document, _document.Regions);
+        var command = ProcessEdits.ClearAllRegions(_document);
         if (command is null)
         {
             return;
