@@ -182,8 +182,8 @@ internal partial class StatusTimeStrip : UserControl
     private ContextMenu CreateMenu(StatusTimeField field)
     {
         var menu = new ContextMenu();
-        var timeItem = new MenuItem();
-        var sampleItem = new MenuItem();
+        var timeItem = new MenuItem { IsCheckable = true };
+        var sampleItem = new MenuItem { IsCheckable = true };
         var copyItem = new MenuItem();
         var pasteItem = new MenuItem();
         timeItem.Click += (_, _) => SetShowSamples(false);
@@ -197,8 +197,10 @@ internal partial class StatusTimeStrip : UserControl
         menu.Items.Add(pasteItem);
         menu.Opened += (_, _) =>
         {
-            timeItem.Header = Mark(!_showSamples, UiStrings.MenuShowTime);
-            sampleItem.Header = Mark(_showSamples, UiStrings.MenuShowSamples);
+            timeItem.Header = UiStrings.MenuShowTime;
+            sampleItem.Header = UiStrings.MenuShowSamples;
+            timeItem.IsChecked = !_showSamples;
+            sampleItem.IsChecked = _showSamples;
             copyItem.Header = UiStrings.MenuCopy;
             pasteItem.Header = UiStrings.MenuPaste;
             copyItem.IsEnabled = CopyText(field).Length > 0;
@@ -210,8 +212,6 @@ internal partial class StatusTimeStrip : UserControl
         };
         return menu;
     }
-
-    private static string Mark(bool on, string label) => on ? "●  " + label : "○  " + label;
 
     private void SetShowSamples(bool showSamples)
     {
