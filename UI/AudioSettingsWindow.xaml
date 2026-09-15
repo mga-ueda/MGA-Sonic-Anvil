@@ -18,8 +18,7 @@
         Foreground="{DynamicResource PrimaryForeBrush}"
         Title="{x:Static domain:UiStrings.DialogSettingsTitle}"
         KeyboardNavigation.TabNavigation="Cycle"
-        PreviewKeyDown="Window_PreviewKeyDown"
-        KeyDown="Window_KeyDown">
+        PreviewKeyDown="Window_PreviewKeyDown">
   <Border Padding="{x:Static ui:DesignMetrics.AudioPad}">
     <Grid>
       <Grid.RowDefinitions>

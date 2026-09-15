@@ -46,6 +46,12 @@ internal partial class ColorDevPanelWindow : Window
         ApplyButtonLooks();
         ApplyTips();
         UpdateSearchHint();
+        AppDialogKeys.PrepareActionButton(ImportButton);
+        AppDialogKeys.PrepareActionButton(ExportButton);
+        AppDialogKeys.PrepareActionButton(ResetButton);
+        AppDialogKeys.PrepareActionButton(ResetThisButton);
+        AppDialogKeys.PrepareActionButton(CloseButton, isCancel: true);
+        AppDialogKeys.Attach(this, Close);
     }
 
     public void ApplyLocalizedText()
@@ -441,15 +447,6 @@ internal partial class ColorDevPanelWindow : Window
 
         SelectKey(visible[index].Key, scrollIntoView: true);
         e.Handled = true;
-    }
-
-    private void Window_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Escape)
-        {
-            Close();
-            e.Handled = true;
-        }
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();

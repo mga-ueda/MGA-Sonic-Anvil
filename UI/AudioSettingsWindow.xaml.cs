@@ -164,6 +164,28 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyAccent(OkButton);
         ActionButtonLooks.ApplyClear(CancelButton);
         ActionButtonLooks.ApplyClear(LameBrowseButton);
+        AppDialogKeys.PrepareActionButton(OkButton, isDefault: true);
+        AppDialogKeys.PrepareActionButton(CancelButton, isCancel: true);
+        AppDialogKeys.PrepareActionButton(LameBrowseButton);
+        AppDialogKeys.AllowTabToLeave(SettingsTabs);
+        AppDialogKeys.Attach(
+            this,
+            () =>
+            {
+                StopProbeUi();
+                DialogResult = false;
+                Close();
+            },
+            interceptEscape: () =>
+            {
+                if (_fadeCurveMenu is not { IsOpen: true })
+                {
+                    return false;
+                }
+
+                _fadeCurveMenu.IsOpen = false;
+                return true;
+            });
 
         _fadeInRow = CreateFadeRow(UiStrings.LabelDefaultFadeIn, fadeIn, isFadeIn: true, row: 0);
         _fadeOutRow = CreateFadeRow(UiStrings.LabelDefaultFadeOut, fadeOut, isFadeIn: false, row: 1);
@@ -989,26 +1011,6 @@ internal partial class AudioSettingsWindow : Window
         {
             _syncingSpeaker = false;
         }
-    }
-
-    private void Window_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Escape)
-        {
-            return;
-        }
-
-        if (_fadeCurveMenu is { IsOpen: true })
-        {
-            _fadeCurveMenu.IsOpen = false;
-            e.Handled = true;
-            return;
-        }
-
-        StopProbeUi();
-        DialogResult = false;
-        Close();
-        e.Handled = true;
     }
 
     private void SelectLanguage(UiLanguageChoice language)

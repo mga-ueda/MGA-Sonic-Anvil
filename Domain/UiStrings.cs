@@ -164,6 +164,7 @@ internal static partial class UiStrings
     public static string ButtonCancel => Get("Cancel", "Cancel");
     public static string ButtonYes => Get("はい", "Yes");
     public static string ButtonNo => Get("いいえ", "No");
+    public static string ButtonYesNoCancel => Get("キャンセル", "Cancel");
     public static string ButtonSaveAllAndExit => Get("すべて保存して終了", "Save all and quit");
     public static string ButtonDiscardAllAndExit => Get("すべて保存せずに終了", "Quit without saving any");
     public static string ConfirmRecord => Get("録音を開始します。", "Start recording.");

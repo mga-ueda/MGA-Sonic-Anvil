@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using MgaSonicAnvil.Domain;
 
@@ -37,8 +36,6 @@ internal sealed class ConfirmSaveWindow : Window
         SizeToContent = SizeToContent.WidthAndHeight;
         Background = (Brush)FindResource("WindowBackBrush");
         Foreground = (Brush)FindResource("PrimaryForeBrush");
-        KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Cycle);
-
         var message = new TextBlock
         {
             Text = remainingDirty >= 2
@@ -53,7 +50,7 @@ internal sealed class ConfirmSaveWindow : Window
         var no = CreateButton(UiStrings.ButtonNo, ConfirmSaveChoice.Discard);
         var saveAll = CreateButton(UiStrings.ButtonSaveAllAndExit, ConfirmSaveChoice.SaveAll);
         var discardAll = CreateButton(UiStrings.ButtonDiscardAllAndExit, ConfirmSaveChoice.DiscardAll);
-        var cancel = CreateButton(UiStrings.ButtonCancel, ConfirmSaveChoice.Cancel, isCancel: true);
+        var cancel = CreateButton(UiStrings.ButtonYesNoCancel, ConfirmSaveChoice.Cancel, isCancel: true);
 
         var first = new StackPanel
         {
@@ -80,15 +77,11 @@ internal sealed class ConfirmSaveWindow : Window
 
         Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
         SourceInitialized += (_, _) => DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
-        PreviewKeyDown += (_, e) =>
+        AppDialogKeys.Attach(this, () =>
         {
-            if (e.Key == Key.Escape)
-            {
-                Choice = ConfirmSaveChoice.Cancel;
-                e.Handled = true;
-                Close();
-            }
-        };
+            Choice = ConfirmSaveChoice.Cancel;
+            Close();
+        });
         OwnerCenteredMessageBox.PlayFor(MessageBoxImage.Question);
     }
 
@@ -107,10 +100,8 @@ internal sealed class ConfirmSaveWindow : Window
                 : DesignMetrics.ConfirmSaveButtonWidth,
             Height = DesignMetrics.AudioDialogButtonHeight,
             Margin = new Thickness(8, 0, 0, 0),
-            IsDefault = isDefault,
-            IsCancel = isCancel,
-            Focusable = true,
         };
+        AppDialogKeys.PrepareActionButton(button, isDefault, isCancel);
         if (accent)
         {
             ActionButtonLooks.ApplyAccent(button);

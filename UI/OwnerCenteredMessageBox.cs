@@ -6,6 +6,7 @@ namespace MgaSonicAnvil.UI;
 
 /// <summary>
 /// オーナー中央のメッセージボックス（WPF）。
+/// はい／いいえ（／キャンセル）は自前ウィンドウ。OK だけ OS の MessageBox。
 /// WPF の <see cref="MessageBox.Show"/> はシステムサウンドを鳴らさないことがあるため、
 /// 表示前に OS のシステムイベント音を明示再生する。
 /// </summary>
@@ -28,6 +29,10 @@ internal static class OwnerCenteredMessageBox
         MessageBoxResult defaultResult = MessageBoxResult.None)
     {
         PlayFor(icon);
+        if (ConfirmChoiceWindow.UsesAppButtons(buttons))
+        {
+            return ConfirmChoiceWindow.Show(owner, text, caption, buttons, defaultResult);
+        }
 
         if (owner is null)
         {

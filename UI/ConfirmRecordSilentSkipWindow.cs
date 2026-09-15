@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using MgaSonicAnvil.Domain;
 
@@ -55,7 +54,6 @@ internal sealed class ConfirmRecordSilentSkipWindow : Window
         SizeToContent = SizeToContent.WidthAndHeight;
         Background = (Brush)FindResource("WindowBackBrush");
         Foreground = (Brush)FindResource("PrimaryForeBrush");
-        KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Cycle);
         UseSilentSkip = useSilentSkip;
         AddRegion = addRegion;
 
@@ -129,15 +127,11 @@ internal sealed class ConfirmRecordSilentSkipWindow : Window
 
         Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
         SourceInitialized += (_, _) => DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
-        PreviewKeyDown += (_, e) =>
+        AppDialogKeys.Attach(this, () =>
         {
-            if (e.Key == Key.Escape)
-            {
-                Choice = ConfirmRecordSilentSkipChoice.Cancel;
-                e.Handled = true;
-                Close();
-            }
-        };
+            Choice = ConfirmRecordSilentSkipChoice.Cancel;
+            Close();
+        });
         OwnerCenteredMessageBox.PlayFor(MessageBoxImage.Question);
     }
 
@@ -154,10 +148,8 @@ internal sealed class ConfirmRecordSilentSkipWindow : Window
             MinWidth = DesignMetrics.ConfirmSaveButtonWidth,
             Height = DesignMetrics.AudioDialogButtonHeight,
             Margin = new Thickness(8, 0, 0, 0),
-            IsDefault = isDefault,
-            IsCancel = isCancel,
-            Focusable = true,
         };
+        AppDialogKeys.PrepareActionButton(button, isDefault, isCancel);
         if (accent)
         {
             ActionButtonLooks.ApplyAccent(button);

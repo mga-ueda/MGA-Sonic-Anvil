@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
@@ -38,8 +37,6 @@ internal sealed class NewDocumentWindow : Window
         SizeToContent = SizeToContent.WidthAndHeight;
         Background = (Brush)FindResource("WindowBackBrush");
         Foreground = (Brush)FindResource("PrimaryForeBrush");
-        KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Cycle);
-
         AudioFormatComboFill.Fill(_rateCombo, _bitsCombo, _layoutCombo, current, _visibleIds);
         TipService.Set(_rateCombo, UiStrings.TipNewDocument);
         TipService.Set(_bitsCombo, UiStrings.TipNewDocument);
@@ -68,21 +65,7 @@ internal sealed class NewDocumentWindow : Window
             ComboBoxFit.Apply(_bitsCombo);
             ComboBoxFit.Apply(_layoutCombo);
         };
-        Loaded += (_, _) =>
-        {
-            if (Owner is { Topmost: true })
-            {
-                Topmost = true;
-            }
-        };
-        PreviewKeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Escape)
-            {
-                e.Handled = true;
-                Close();
-            }
-        };
+        AppDialogKeys.Attach(this, Close);
     }
 
     private void Accept()
@@ -100,10 +83,8 @@ internal sealed class NewDocumentWindow : Window
             MinWidth = DesignMetrics.ConfirmSaveButtonWidth,
             Height = DesignMetrics.AudioDialogButtonHeight,
             Margin = new Thickness(8, 0, 0, 0),
-            IsDefault = isDefault,
-            IsCancel = isCancel,
-            Focusable = true,
         };
+        AppDialogKeys.PrepareActionButton(button, isDefault, isCancel);
         if (accent)
         {
             ActionButtonLooks.ApplyAccent(button);
