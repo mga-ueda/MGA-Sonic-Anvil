@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Editing;
+using MgaSonicAnvil.Wwise;
 
 namespace MgaSonicAnvil.Config;
 
@@ -178,6 +179,12 @@ internal sealed class AppSettings
 
     public string WaapiOutputDirectory { get; set; } = string.Empty;
 
+    /// <summary>Wwise EXPORT の Prefetch Length（ms）。先頭 Segment（Zero Latency）に書く。既定 500。</summary>
+    public int WwisePrefetchLengthMs { get; set; } = WwiseTrackTiming.DefaultPrefetchLengthMs;
+
+    /// <summary>Wwise EXPORT の Look-ahead Time（ms）。2 本目以降に書く。既定 500。</summary>
+    public int WwiseLookAheadTimeMs { get; set; } = WwiseTrackTiming.DefaultLookAheadTimeMs;
+
     /// <summary>旧版の一括色。テーマ別へ移したあと使わない。</summary>
     public Dictionary<string, string>? Colors { get; set; }
 
@@ -208,6 +215,12 @@ internal sealed class AppSettings
 
     public int ResolvedClickGuardFadeMs() =>
         global::MgaSonicAnvil.Audio.ClickGuard.ClampFadeMs(ClickGuardFadeMs);
+
+    public int ResolvedWwisePrefetchLengthMs() =>
+        WwiseTrackTiming.ClampPrefetchLengthMs(WwisePrefetchLengthMs);
+
+    public int ResolvedWwiseLookAheadTimeMs() =>
+        WwiseTrackTiming.ClampLookAheadTimeMs(WwiseLookAheadTimeMs);
 
     public SpeakerPreset ResolvedSpeaker()
     {

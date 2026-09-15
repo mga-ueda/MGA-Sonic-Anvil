@@ -10,6 +10,7 @@ using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
+using MgaSonicAnvil.Wwise;
 
 namespace MgaSonicAnvil.UI;
 
@@ -36,6 +37,10 @@ internal partial class AudioSettingsWindow : Window
     public int SelectedSilentSkipRecordPadMs { get; private set; }
 
     public int SelectedClickGuardFadeMs { get; private set; }
+
+    public int SelectedWwisePrefetchLengthMs { get; private set; }
+
+    public int SelectedWwiseLookAheadTimeMs { get; private set; }
 
     public int SelectedMp3BitRate { get; private set; }
 
@@ -96,7 +101,9 @@ internal partial class AudioSettingsWindow : Window
         IEnumerable<string>? visibleSpeakerIds = null,
         int defaultSampleRate = DefaultAudioFormat.SampleRate,
         int defaultBitsPerSample = DefaultAudioFormat.BitsPerSample,
-        string? defaultChannelLayout = null)
+        string? defaultChannelLayout = null,
+        int wwisePrefetchLengthMs = WwiseTrackTiming.DefaultPrefetchLengthMs,
+        int wwiseLookAheadTimeMs = WwiseTrackTiming.DefaultLookAheadTimeMs)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
@@ -105,6 +112,8 @@ internal partial class AudioSettingsWindow : Window
         SelectedSilentSkipThresholdDb = SilentSkip.ClampThresholdDb(silentSkipThresholdDb);
         SelectedSilentSkipRecordPadMs = SilentSkip.ClampRecordPadMs(silentSkipRecordPadMs);
         SelectedClickGuardFadeMs = ClickGuard.ClampFadeMs(clickGuardFadeMs);
+        SelectedWwisePrefetchLengthMs = WwiseTrackTiming.ClampPrefetchLengthMs(wwisePrefetchLengthMs);
+        SelectedWwiseLookAheadTimeMs = WwiseTrackTiming.ClampLookAheadTimeMs(wwiseLookAheadTimeMs);
         SelectedMp3BitRate = Mp3Encode.ClampWindowsBitRate(mp3BitRate);
         SelectedLameExePath = lameExePath ?? string.Empty;
         SelectedLameOptions = lameOptions ?? string.Empty;
@@ -200,6 +209,8 @@ internal partial class AudioSettingsWindow : Window
         SilentSkipThresholdBox.Text = SelectedSilentSkipThresholdDb.ToString("0.#", CultureInfo.InvariantCulture);
         SilentSkipRecordPadBox.Text = SelectedSilentSkipRecordPadMs.ToString(CultureInfo.InvariantCulture);
         ClickGuardFadeBox.Text = SelectedClickGuardFadeMs.ToString(CultureInfo.InvariantCulture);
+        WwisePrefetchLengthBox.Text = SelectedWwisePrefetchLengthMs.ToString(CultureInfo.InvariantCulture);
+        WwiseLookAheadTimeBox.Text = SelectedWwiseLookAheadTimeMs.ToString(CultureInfo.InvariantCulture);
         FillWindowsBitRates(SelectedMp3BitRate);
         LamePathBox.Text = SelectedLameExePath;
         LameOptionsBox.Text = Mp3Encode.ResolveLameOptions(SelectedLameOptions);
@@ -268,6 +279,12 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(ClickGuardFadeLabel, UiStrings.TipClickGuardFade);
         TipService.Set(ClickGuardFadeBox, UiStrings.TipClickGuardFade);
         TipService.Set(ClickGuardFadeUnit, UiStrings.TipClickGuardFade);
+        TipService.Set(WwisePrefetchLengthLabel, UiStrings.TipWwisePrefetchLength);
+        TipService.Set(WwisePrefetchLengthBox, UiStrings.TipWwisePrefetchLength);
+        TipService.Set(WwisePrefetchLengthUnit, UiStrings.TipWwisePrefetchLength);
+        TipService.Set(WwiseLookAheadTimeLabel, UiStrings.TipWwiseLookAheadTime);
+        TipService.Set(WwiseLookAheadTimeBox, UiStrings.TipWwiseLookAheadTime);
+        TipService.Set(WwiseLookAheadTimeUnit, UiStrings.TipWwiseLookAheadTime);
         TipService.Set(FadeDefaultsHeader, UiStrings.TipFadeCurveDefaults);
         TipService.Set(Mp3Header, UiStrings.TipMp3Encode);
         TipService.Set(WindowsBitRateLabel, UiStrings.TipWindowsMp3BitRate);
@@ -491,6 +508,34 @@ internal partial class AudioSettingsWindow : Window
         }
 
         SelectedClickGuardFadeMs = clickFadeMs;
+        if (!WwiseTrackTiming.TryParsePrefetchLengthMs(WwisePrefetchLengthBox.Text, out var prefetchMs))
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorWwisePrefetchLengthRange,
+                UiStrings.DialogSettingsTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            WwisePrefetchLengthBox.Focus();
+            WwisePrefetchLengthBox.SelectAll();
+            return;
+        }
+
+        SelectedWwisePrefetchLengthMs = prefetchMs;
+        if (!WwiseTrackTiming.TryParseLookAheadTimeMs(WwiseLookAheadTimeBox.Text, out var lookAheadMs))
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorWwiseLookAheadTimeRange,
+                UiStrings.DialogSettingsTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            WwiseLookAheadTimeBox.Focus();
+            WwiseLookAheadTimeBox.SelectAll();
+            return;
+        }
+
+        SelectedWwiseLookAheadTimeMs = lookAheadMs;
         SelectedMp3BitRate = WindowsBitRateCombo.SelectedItem is BitRateItem bitRate
             ? bitRate.Kbps
             : Mp3Encode.DefaultWindowsBitRateKbps;
@@ -1139,6 +1184,7 @@ internal partial class AudioSettingsWindow : Window
             UiStrings.LabelSettingsTabAudio,
             UiStrings.LabelSettingsTabEditing,
             UiStrings.LabelSettingsTabExport,
+            UiStrings.LabelSettingsTabWwise,
         };
         var width = 0d;
         foreach (var header in headers)

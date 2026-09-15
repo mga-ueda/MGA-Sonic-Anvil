@@ -6,6 +6,20 @@ internal static partial class UiStrings
     public static string WaapiBadgeConnect => Get("CONNECT", "CONNECT");
     public static string WaapiBadgeDisconnect => Get("DISCONNECT", "DISCONNECT");
     public static string LabelWwise => Get("Wwise", "Wwise");
+    public static string LabelWwisePrefetchLength => Get("Prefetch Length", "Prefetch Length");
+    public static string LabelWwiseLookAheadTime => Get("Look-ahead Time", "Look-ahead Time");
+    public static string ErrorWwisePrefetchLengthRange => Get(
+        "Prefetch Length は 0 から 10000 の ms で入力してください。",
+        "Enter a Prefetch Length between 0 and 10000 ms.");
+    public static string ErrorWwiseLookAheadTimeRange => Get(
+        "Look-ahead Time は 0 から 10000 の ms で入力してください。",
+        "Enter a Look-ahead Time between 0 and 10000 ms.");
+    public static string TipWwisePrefetchLength => Get(
+        "EXPORT で先頭 Music Track に書く Prefetch Length。先頭は Zero Latency。Stream は常にオン（設定しない）。0 から 10000。既定 500。",
+        "Prefetch Length written on the first Music Track at EXPORT. The first track is Zero Latency. Stream is always on (not a setting). From 0 to 10000. Default 500.");
+    public static string TipWwiseLookAheadTime => Get(
+        "EXPORT で 2 本目以降の Music Track に書く Look-ahead Time。先頭は Zero Latency のため 50 ms 固定。0 から 10000。既定 500。",
+        "Look-ahead Time written on later Music Tracks at EXPORT. The first track stays at 50 ms because it is Zero Latency. From 0 to 10000. Default 500.");
     public static string LabelUnnamedProject => Get("(無名)", "(unnamed)");
     public static string LabelAutoActive => Get("Auto Active", "Auto Active");
     public static string LabelPlayMinusE => Get("Play -E", "Play -E");

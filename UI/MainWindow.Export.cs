@@ -110,7 +110,9 @@ public partial class MainWindow
                     _document,
                     preflight.TargetPath,
                     preflight.OutputDirectory,
-                    playPostExit: WaapiBar.PlayPostExitChecked)
+                    playPostExit: WaapiBar.PlayPostExitChecked,
+                    prefetchLengthMs: AppStorage.Settings.ResolvedWwisePrefetchLengthMs(),
+                    lookAheadTimeMs: AppStorage.Settings.ResolvedWwiseLookAheadTimeMs())
                 .ConfigureAwait(true);
 
             if (WaapiBar.AutoActiveChecked)

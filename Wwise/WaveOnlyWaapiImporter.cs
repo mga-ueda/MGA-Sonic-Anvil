@@ -18,9 +18,6 @@ namespace MgaSonicAnvil.Wwise;
 /// </summary>
 internal static class WaveOnlyWaapiImporter
 {
-    private const int FirstSegmentLookAheadMs = 50;
-    private const int LookAheadMs = 500;
-    private const int PrefetchLengthMs = 500;
     private const int CueTypeEntry = 0;
     private const int CueTypeExit = 1;
 
@@ -35,6 +32,8 @@ internal static class WaveOnlyWaapiImporter
         string parentPath,
         string outputDirectory,
         bool playPostExit,
+        int prefetchLengthMs,
+        int lookAheadTimeMs,
         CancellationToken cancellationToken = default)
     {
         var segments = plan.Segments;
@@ -56,7 +55,7 @@ internal static class WaveOnlyWaapiImporter
 
         await client.CallAsync(
                 WaapiUris.CoreObjectSet,
-                BuildPlaylistSetArgs(plan, parent, wavPath, document.SampleRate),
+                BuildPlaylistSetArgs(plan, parent, wavPath, document.SampleRate, prefetchLengthMs, lookAheadTimeMs),
                 new Dictionary<string, object> { ["return"] = ReturnFields },
                 cancellationToken)
             .ConfigureAwait(false);
@@ -113,16 +112,26 @@ internal static class WaveOnlyWaapiImporter
         WaveOnlyPlan plan,
         string parentPath,
         string wavPath,
-        int sampleRate)
+        int sampleRate,
+        int prefetchLengthMs,
+        int lookAheadTimeMs)
     {
         var segments = plan.Segments;
         var segmentDefs = new List<object>(segments.Count);
         var itemDefs = new List<object>(segments.Count);
         var playlistPath = $"{parentPath}\\{plan.ContainerName}";
+        prefetchLengthMs = WwiseTrackTiming.ClampPrefetchLengthMs(prefetchLengthMs);
+        lookAheadTimeMs = WwiseTrackTiming.ClampLookAheadTimeMs(lookAheadTimeMs);
         for (var i = 0; i < segments.Count; i++)
         {
             var segment = segments[i];
-            segmentDefs.Add(BuildSegmentDef(segment, wavPath, sampleRate, isFirst: i == 0));
+            segmentDefs.Add(BuildSegmentDef(
+                segment,
+                wavPath,
+                sampleRate,
+                isFirst: i == 0,
+                prefetchLengthMs,
+                lookAheadTimeMs));
             itemDefs.Add(new Dictionary<string, object?>
             {
                 ["type"] = "MusicPlaylistItem",
@@ -169,15 +178,14 @@ internal static class WaveOnlyWaapiImporter
         WaveOnlySegment segment,
         string wavPath,
         int sampleRate,
-        bool isFirst)
+        bool isFirst,
+        int prefetchLengthMs,
+        int lookAheadTimeMs)
     {
         var track = new Dictionary<string, object?>
         {
             ["type"] = "MusicTrack",
             ["name"] = segment.Name,
-            ["@IsStreamingEnabled"] = true,
-            ["@IsZeroLatency"] = isFirst,
-            ["@LookAheadTime"] = isFirst ? FirstSegmentLookAheadMs : LookAheadMs,
             ["import"] = new Dictionary<string, object?>
             {
                 ["files"] = new object[]
@@ -186,10 +194,7 @@ internal static class WaveOnlyWaapiImporter
                 },
             },
         };
-        if (isFirst)
-        {
-            track["@PreFetchLength"] = PrefetchLengthMs;
-        }
+        WwiseTrackTiming.WriteTrackProperties(track, isFirst, prefetchLengthMs, lookAheadTimeMs);
 
         return new Dictionary<string, object?>
         {

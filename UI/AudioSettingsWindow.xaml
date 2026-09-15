@@ -469,6 +469,57 @@
             </Grid>
           </StackPanel>
         </TabItem>
+
+        <TabItem Header="{x:Static domain:UiStrings.LabelSettingsTabWwise}">
+          <StackPanel MaxWidth="{x:Static ui:DesignMetrics.SettingsPanelWidth}"
+                      HorizontalAlignment="Left">
+            <TextBlock x:Name="WwisePrefetchLengthLabel"
+                       Text="{x:Static domain:UiStrings.LabelWwisePrefetchLength}"
+                       Margin="0,0,0,3" />
+            <Grid HorizontalAlignment="Left" Margin="0,0,0,16">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="WwisePrefetchLengthBox"
+                       Width="{x:Static ui:DesignMetrics.SettingsLoudnessBoxWidth}"
+                       Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                       Style="{StaticResource DarkTextBoxStyle}"
+                       Padding="6,1"
+                       FontSize="11.333"
+                       VerticalContentAlignment="Center"
+                       InputMethod.IsInputMethodEnabled="False" />
+              <TextBlock x:Name="WwisePrefetchLengthUnit"
+                         Grid.Column="1"
+                         Text="{x:Static domain:UiStrings.LabelMs}"
+                         VerticalAlignment="Center"
+                         Margin="8,0,0,0" />
+            </Grid>
+
+            <TextBlock x:Name="WwiseLookAheadTimeLabel"
+                       Text="{x:Static domain:UiStrings.LabelWwiseLookAheadTime}"
+                       Margin="0,0,0,3" />
+            <Grid HorizontalAlignment="Left">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="WwiseLookAheadTimeBox"
+                       Width="{x:Static ui:DesignMetrics.SettingsLoudnessBoxWidth}"
+                       Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                       Style="{StaticResource DarkTextBoxStyle}"
+                       Padding="6,1"
+                       FontSize="11.333"
+                       VerticalContentAlignment="Center"
+                       InputMethod.IsInputMethodEnabled="False" />
+              <TextBlock x:Name="WwiseLookAheadTimeUnit"
+                         Grid.Column="1"
+                         Text="{x:Static domain:UiStrings.LabelMs}"
+                         VerticalAlignment="Center"
+                         Margin="8,0,0,0" />
+            </Grid>
+          </StackPanel>
+        </TabItem>
       </TabControl>
 
       <StackPanel Grid.Row="1"

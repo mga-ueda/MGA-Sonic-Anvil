@@ -747,7 +747,9 @@ public partial class MainWindow
             settings.VisibleSpeakerPresetIds,
             settings.ResolvedDefaultSampleRate(),
             settings.ResolvedDefaultBitsPerSample(),
-            settings.ResolvedDefaultChannelLayout().Id)
+            settings.ResolvedDefaultChannelLayout().Id,
+            settings.ResolvedWwisePrefetchLengthMs(),
+            settings.ResolvedWwiseLookAheadTimeMs())
         {
             Owner = this,
         };
@@ -775,6 +777,8 @@ public partial class MainWindow
         settings.SilentSkipThresholdDb = dialog.SelectedSilentSkipThresholdDb;
         settings.SilentSkipRecordPadMs = dialog.SelectedSilentSkipRecordPadMs;
         settings.ClickGuardFadeMs = dialog.SelectedClickGuardFadeMs;
+        settings.WwisePrefetchLengthMs = dialog.SelectedWwisePrefetchLengthMs;
+        settings.WwiseLookAheadTimeMs = dialog.SelectedWwiseLookAheadTimeMs;
         settings.Mp3BitRate = dialog.SelectedMp3BitRate;
         settings.LameExePath = dialog.SelectedLameExePath;
         settings.LameOptions = dialog.SelectedLameOptions;

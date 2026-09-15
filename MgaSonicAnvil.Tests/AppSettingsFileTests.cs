@@ -38,6 +38,8 @@ public sealed class AppSettingsFileTests
             Assert.Equal(24, settings.ResolvedDefaultBitsPerSample());
             Assert.Equal("Stereo", settings.ResolvedDefaultChannelLayout().Id);
             Assert.Equal(20, settings.ResolvedClickGuardFadeMs());
+            Assert.Equal(500, settings.ResolvedWwisePrefetchLengthMs());
+            Assert.Equal(500, settings.ResolvedWwiseLookAheadTimeMs());
             Assert.False(File.Exists(path));
         }
         finally
@@ -98,6 +100,37 @@ public sealed class AppSettingsFileTests
         {
             TryDeleteDir(root);
         }
+    }
+
+    [Fact]
+    public void Load_CurrentGenerationWithoutWwiseTiming_UsesDefaults()
+    {
+        var root = NewTempDir("wwise-default");
+        try
+        {
+            var path = Path.Combine(root, "settings.json");
+            File.WriteAllText(path, """{"SettingsGeneration":1,"AudioApi":"WaveOut"}""");
+
+            var settings = AppSettingsFile.Load(path, leftoverSessionDocumentPath: null, sessionDirectory: null, out var reset);
+
+            Assert.Equal(SettingsFileReset.None, reset);
+            Assert.Equal(500, settings.ResolvedWwisePrefetchLengthMs());
+            Assert.Equal(500, settings.ResolvedWwiseLookAheadTimeMs());
+        }
+        finally
+        {
+            TryDeleteDir(root);
+        }
+    }
+
+    [Fact]
+    public void ResolvedWwiseTiming_ClampsOutOfRange()
+    {
+        var settings = AppSettings.CreateDefault();
+        settings.WwisePrefetchLengthMs = -10;
+        settings.WwiseLookAheadTimeMs = 99999;
+        Assert.Equal(0, settings.ResolvedWwisePrefetchLengthMs());
+        Assert.Equal(10000, settings.ResolvedWwiseLookAheadTimeMs());
     }
 
     [Fact]

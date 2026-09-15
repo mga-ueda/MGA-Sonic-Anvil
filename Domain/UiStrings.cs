@@ -149,6 +149,7 @@ internal static partial class UiStrings
     public static string LabelSettingsTabLayouts => Get("表示項目", "Shown");
     public static string LabelSettingsTabEditing => Get("編集", "Editing");
     public static string LabelSettingsTabExport => Get("書き出し", "Export");
+    public static string LabelSettingsTabWwise => Get("Wwise", "Wwise");
     public static string LabelSettingsInput => Get("録音", "Recording");
     public static string LabelSettingsOutput => Get("再生", "Playback");
     public static string LabelSpeaker => Get("スピーカー", "Speakers");
@@ -191,8 +192,8 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeIn => Get("波形フェードイン", "Waveform Fade In");
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string TipAudioSettings => Get(
-        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出しのタブ。表示言語、配色（ダーク／ライト／Auto）、関連付け、デフォルトオーディオフォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip / 無音削除）、プチノイズ防止フェード、フェードカーブ、MP3、同時書き出し本数。ダイアログのボタンは Tab で移動できます。",
-        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export tabs. Language, theme (Dark / Light / Auto), file associations, default audio format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip / Delete Silence), click-prevention fade, fade curves, MP3, and parallel export count. Tab also moves to dialog buttons.");
+        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出し／Wwise のタブ。表示言語、配色（ダーク／ライト／Auto）、関連付け、デフォルトオーディオフォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip / 無音削除）、プチノイズ防止フェード、フェードカーブ、MP3、同時書き出し本数、Wwise の Prefetch Length／Look-ahead Time。ダイアログのボタンは Tab で移動できます。",
+        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export / Wwise tabs. Language, theme (Dark / Light / Auto), file associations, default audio format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip / Delete Silence), click-prevention fade, fade curves, MP3, parallel export count, and Wwise Prefetch Length / Look-ahead Time. Tab also moves to dialog buttons.");
     public static string TipDefaultAudioFormat => Get(
         "新規ファイル（Ctrl+N）の初期フォーマットです。既定は 48kHz / 24bit / Stereo。チャンネルは表示項目で有効にしたスピーカーと、常に選べる Mono。",
         "Initial format for a new file (Ctrl+N). Default is 48 kHz / 24-bit / Stereo. Channels are the speakers enabled on Shown, plus Mono (always available).");
