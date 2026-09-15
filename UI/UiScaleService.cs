@@ -187,6 +187,23 @@ internal static class UiScaleService
     }
 
     /// <summary>
+    /// メインウィンドウ内でも等倍で見せたい要素（編集履歴などのフローティング表示）用の逆変換。
+    /// ルートの LayoutTransform を打ち消す。
+    /// </summary>
+    internal static Transform CreateCounterTransform()
+    {
+        var factor = Factor;
+        if (factor <= 1.0001)
+        {
+            return Transform.Identity;
+        }
+
+        var transform = new ScaleTransform(1d / factor, 1d / factor);
+        transform.Freeze();
+        return transform;
+    }
+
+    /// <summary>
     /// 凍結した変換。未凍結の Freezable を複数の LayoutTransform に渡すと起動時に落ちる。
     /// </summary>
     internal static Transform CreatePublishedTransform(double factor)

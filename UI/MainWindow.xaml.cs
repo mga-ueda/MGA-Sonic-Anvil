@@ -117,6 +117,8 @@ public partial class MainWindow : Window
         _waveformHeightScale = Math.Clamp(AppStorage.Settings.WaveformHeightScale, 1, 3);
         ApplyMeterColumnWidth(AppStorage.Settings.MeterColumnWidth);
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        // 編集履歴はその他ウィンドウと同じ扱いで等倍にする（ルートの表示倍率を打ち消す）。
+        HistoryOverlay.LayoutTransform = UiScaleService.CreateCounterTransform();
         UiThemeService.Changed += (_, _) => Dispatcher.BeginInvoke(ApplyUiColors);
         UiScaleService.Changed += (_, _) => Dispatcher.BeginInvoke(OnUiScaleChanged);
         AlwaysOnTopCheck.IsChecked = AppStorage.Settings.AlwaysOnTop;

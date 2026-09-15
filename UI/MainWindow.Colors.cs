@@ -55,6 +55,8 @@ public partial class MainWindow
 
     private void OnUiScaleChanged()
     {
+        // 編集履歴は等倍のまま（ルートの表示倍率を打ち消す）。
+        HistoryOverlay.LayoutTransform = UiScaleService.CreateCounterTransform();
         ApplyUiColors();
         AlignBrandLicense();
     }

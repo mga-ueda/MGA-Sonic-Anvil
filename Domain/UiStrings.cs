@@ -688,8 +688,8 @@ internal static partial class UiStrings
         "配色。Auto は OS のアプリ配色に従います。背景と文字だけ変わり、再生ヘッドやマーカーなどのアクセント色は維持します。",
         "Theme. Auto follows the OS app theme. Only backgrounds and text change; accent colors such as the playhead and markers stay the same.");
     public static string TipUiScale => Get(
-        "アプリの表示サイズ。OS の DPI に加えて拡大します。100〜200%。縮小はありません。作用するのはメインウィンドウのみで、メニューや設定などの別ウィンドウは等倍のままです。コンボを変えた瞬間に反映します。キャンセルすると元に戻します。",
-        "App display size. Extra enlargement on top of the OS DPI. 100–200%. No shrinking. Affects the main window only; menus and separate windows such as Settings stay at 100%. Applies as soon as you change the combo. Cancel restores the previous value.");
+        "アプリの表示サイズ。OS の DPI に加えて拡大します。100〜200%。縮小はありません。作用するのはメインウィンドウのみで、メニューや設定などの別ウィンドウ、編集履歴は等倍のままです。コンボを変えた瞬間に反映します。キャンセルすると元に戻します。",
+        "App display size. Extra enlargement on top of the OS DPI. 100–200%. No shrinking. Affects the main window only; menus, separate windows such as Settings, and the edit history stay at 100%. Applies as soon as you change the combo. Cancel restores the previous value.");
     public static string TipFileAssociations => Get(
         "チェックすると、その拡張子をこのアプリで開く（既定）。外すと関連付けを外す。すでにこのアプリが既定ならチェック済み。OK を待たず、今の exe へすぐ書き込みます。",
         "Check to make this app the default for that extension. Uncheck to remove the association. Types already using this app are checked. Writes to this exe immediately, without waiting for OK.");
