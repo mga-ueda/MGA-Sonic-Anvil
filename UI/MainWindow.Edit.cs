@@ -2063,5 +2063,9 @@ public partial class MainWindow
         ApplyChannelSolo();
         RefreshStatus();
         RefreshHistoryStrip();
+        if (_document.Channels != _autoSpeakerSeenChannels)
+        {
+            TryApplyAutoSpeaker();
+        }
     }
 }

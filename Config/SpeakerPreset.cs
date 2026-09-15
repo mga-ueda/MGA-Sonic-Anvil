@@ -132,6 +132,77 @@ internal sealed class SpeakerPreset
         return ordered.Count == 0 ? [.. DefaultVisibleIds] : [.. ordered];
     }
 
+    /// <summary>
+    /// 有効な定義の本数に合わせる。1〜2ch は Stereo。候補が無いか曖昧なら null。
+    /// 今の配置がすでに同じ本数なら、1〜2ch→Stereo 以外は切り替えない。
+    /// </summary>
+    public static string? ResolveAutoSpeakerId(
+        int fileChannels,
+        IEnumerable<SpeakerPreset>? presets,
+        IEnumerable<string>? visibleIds,
+        string? currentId)
+    {
+        if (fileChannels < 1)
+        {
+            return null;
+        }
+
+        fileChannels = Math.Clamp(fileChannels, 1, ChannelLayout.MaxChannels);
+        var catalog = presets as SpeakerPreset[] ?? presets?.ToArray() ?? [];
+        if (catalog.Length == 0)
+        {
+            return null;
+        }
+
+        var visible = new HashSet<string>(NormalizeVisibleIds(visibleIds), StringComparer.OrdinalIgnoreCase);
+        if (fileChannels is 1 or 2 && visible.Contains(DefaultId))
+        {
+            return SameId(currentId, DefaultId) ? null : DefaultId;
+        }
+
+        var current = FindById(catalog, currentId);
+        if (current is not null && current.Channels == fileChannels)
+        {
+            return null;
+        }
+
+        var matches = new List<SpeakerPreset>();
+        foreach (var layout in ChannelLayout.All)
+        {
+            if (layout.Channels != fileChannels || !visible.Contains(layout.Id))
+            {
+                continue;
+            }
+
+            var preset = FindById(catalog, layout.Id);
+            if (preset is not null)
+            {
+                matches.Add(preset);
+            }
+        }
+
+        if (matches.Count == 0)
+        {
+            return null;
+        }
+
+        if (matches.Count == 1)
+        {
+            return SameId(currentId, matches[0].Id) ? null : matches[0].Id;
+        }
+
+        var preferredId = ChannelLayout.PreferredForChannels(fileChannels).Id;
+        foreach (var match in matches)
+        {
+            if (match.Id.Equals(preferredId, StringComparison.OrdinalIgnoreCase))
+            {
+                return SameId(currentId, match.Id) ? null : match.Id;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>チェックした配置。今使っている配置は、外していても残す。</summary>
     public static SpeakerPreset[] FilterMenu(
         IEnumerable<SpeakerPreset> presets,
@@ -268,6 +339,9 @@ internal sealed class SpeakerPreset
 
         return DefaultId;
     }
+
+    private static bool SameId(string? a, string? b) =>
+        !string.IsNullOrWhiteSpace(a) && a.Equals(b, StringComparison.OrdinalIgnoreCase);
 
     private static SpeakerPreset? FindById(IEnumerable<SpeakerPreset> presets, string? id)
     {

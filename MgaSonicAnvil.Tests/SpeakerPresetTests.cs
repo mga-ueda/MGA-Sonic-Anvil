@@ -24,6 +24,8 @@ public sealed class SpeakerPresetTests
         Assert.Contains(settings.SpeakerPresets, preset => preset.Id == "5.1.2-Side");
         Assert.Equal(["Stereo"], settings.ResolvedVisibleSpeakerIds());
         Assert.Equal(["Stereo"], settings.MenuSpeakers().Select(preset => preset.Id));
+        Assert.False(settings.AutoSpeakerSelect);
+        Assert.False(new AppSettings().AutoSpeakerSelect);
     }
 
     [Fact]
@@ -89,6 +91,7 @@ public sealed class SpeakerPresetTests
         fiveOne.FileChannelMap = [2, 0, 1, 3, 4, 5];
         settings.ReplaceSpeakerPresets(settings.SpeakerPresets, "5.1");
         settings.ApplyVisibleSpeakerIds(["5.1", "Stereo"]);
+        settings.AutoSpeakerSelect = true;
 
         var json = JsonSerializer.Serialize(settings, AppSettingsJsonContext.Default.AppSettings);
         var back = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
@@ -100,6 +103,16 @@ public sealed class SpeakerPresetTests
         Assert.Equal([2, 3, 4, 5, 6, 7], back.ResolvedPlaybackOutputMap());
         Assert.Equal([2, 0, 1, 3, 4, 5], back.ResolvedFileChannelMap());
         Assert.Equal(["Stereo", "5.1"], back.ResolvedVisibleSpeakerIds());
+        Assert.True(back.AutoSpeakerSelect);
+    }
+
+    [Fact]
+    public void SettingsJson_MissingAutoSpeakerSelect_IsOff()
+    {
+        var json = """{"SettingsGeneration":1,"ActiveSpeakerPresetId":"Stereo"}""";
+        var back = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
+        Assert.NotNull(back);
+        Assert.False(back!.AutoSpeakerSelect);
     }
 
     [Fact]
@@ -144,4 +157,89 @@ public sealed class SpeakerPresetTests
         Assert.Equal([2, 0, 1, 3, 4, 5], settings.ResolvedFileChannelMap());
         Assert.Equal([2, 0, 1, 3, 4, 5], settings.FileChannelMap);
     }
+
+    [Fact]
+    public void ResolveAutoSpeakerId_OneTwoChannelsPreferStereo()
+    {
+        var settings = Visible("Stereo", "Mono", "5.1");
+        settings.ActiveSpeakerPresetId = "5.1";
+        Assert.Equal("Stereo", AutoId(settings, 1));
+        Assert.Equal("Stereo", AutoId(settings, 2));
+        settings.ActiveSpeakerPresetId = "Mono";
+        Assert.Equal("Stereo", AutoId(settings, 1));
+        settings.ActiveSpeakerPresetId = "Stereo";
+        Assert.Null(AutoId(settings, 1));
+        Assert.Null(AutoId(settings, 2));
+    }
+
+    [Fact]
+    public void ResolveAutoSpeakerId_MonoWhenStereoHidden()
+    {
+        var settings = Visible("Mono", "5.1");
+        settings.ActiveSpeakerPresetId = "5.1";
+        Assert.Equal("Mono", AutoId(settings, 1));
+        Assert.Null(AutoId(settings, 2));
+        settings.ActiveSpeakerPresetId = "Mono";
+        Assert.Null(AutoId(settings, 1));
+    }
+
+    [Fact]
+    public void ResolveAutoSpeakerId_SixChannelsPicksFiveOneWhenEnabled()
+    {
+        var settings = Visible("Stereo", "5.1", "5.1-Side", "6.0");
+        settings.ActiveSpeakerPresetId = "Stereo";
+        Assert.Equal("5.1", AutoId(settings, 6));
+        settings.ActiveSpeakerPresetId = "5.1";
+        Assert.Null(AutoId(settings, 6));
+        settings.ActiveSpeakerPresetId = "5.1-Side";
+        Assert.Null(AutoId(settings, 6));
+    }
+
+    [Fact]
+    public void ResolveAutoSpeakerId_UniqueSixChannelMatch()
+    {
+        var settings = Visible("Stereo", "5.1-Side");
+        settings.ActiveSpeakerPresetId = "Stereo";
+        Assert.Equal("5.1-Side", AutoId(settings, 6));
+    }
+
+    [Fact]
+    public void ResolveAutoSpeakerId_AmbiguousWithoutPreferredDoesNotSwitch()
+    {
+        var settings = Visible("Stereo", "5.1-Side", "6.0", "4.0.2");
+        settings.ActiveSpeakerPresetId = "Stereo";
+        Assert.Null(AutoId(settings, 6));
+    }
+
+    [Fact]
+    public void ResolveAutoSpeakerId_NoMatchLeavesCurrent()
+    {
+        var settings = Visible("Stereo");
+        settings.ActiveSpeakerPresetId = "Stereo";
+        Assert.Null(AutoId(settings, 6));
+        Assert.Null(AutoId(settings, 8));
+    }
+
+    [Fact]
+    public void ResolveAutoSpeakerId_EightChannelsPicksSevenOne()
+    {
+        var settings = Visible("Stereo", "7.1", "7.1-SDDS", "8.0");
+        settings.ActiveSpeakerPresetId = "Stereo";
+        Assert.Equal("7.1", AutoId(settings, 8));
+    }
+
+    private static AppSettings Visible(params string[] ids)
+    {
+        var settings = new AppSettings();
+        settings.EnsureSpeakerPresets();
+        settings.ApplyVisibleSpeakerIds(ids);
+        return settings;
+    }
+
+    private static string? AutoId(AppSettings settings, int fileChannels) =>
+        SpeakerPreset.ResolveAutoSpeakerId(
+            fileChannels,
+            settings.SpeakerPresets,
+            settings.ResolvedVisibleSpeakerIds(),
+            settings.ActiveSpeakerPresetId);
 }

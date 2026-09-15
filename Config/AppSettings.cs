@@ -39,6 +39,9 @@ internal sealed class AppSettings
     /// <summary>有効にするスピーカー定義。空は Stereo のみ。</summary>
     public string[] VisibleSpeakerPresetIds { get; set; } = [];
 
+    /// <summary>アクティブファイルの本数に合わせてスピーカー定義を選ぶ。既定オフ。</summary>
+    public bool AutoSpeakerSelect { get; set; }
+
     /// <summary>新規録音などの既定サンプリングレート。既定 48000。</summary>
     public int DefaultSampleRate { get; set; } = DefaultAudioFormat.SampleRate;
 

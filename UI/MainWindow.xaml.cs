@@ -86,6 +86,7 @@ public partial class MainWindow : Window
     private bool _closing;
     private bool _exitAfterFlush;
     private bool _bindingWorkspace;
+    private int _autoSpeakerSeenChannels = int.MinValue;
     private ImageSource? _brandLogoDark;
     private ImageSource? _brandLogoLight;
     private int _brandLogoDecodeWidth;
@@ -388,12 +389,14 @@ public partial class MainWindow : Window
 
             if (TryBindTiledWorkspace(session, resetInteraction: true))
             {
+                TryApplyAutoSpeaker();
                 return;
             }
 
             _activeSession = session;
             RebuildTabBar();
             RefreshTileChrome();
+            TryApplyAutoSpeaker();
             return;
         }
 
@@ -450,6 +453,7 @@ public partial class MainWindow : Window
             SyncViewChrome();
             RefreshStatus();
             RefreshHistoryStrip();
+            TryApplyAutoSpeaker();
         }
         finally
         {

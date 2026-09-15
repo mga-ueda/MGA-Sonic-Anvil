@@ -155,6 +155,7 @@ internal static partial class UiStrings
     public static string LabelSpeaker => Get("スピーカー", "Speakers");
     public static string LabelSpeakerIo => Get("スピーカーと入出力", "Speakers and I/O");
     public static string LabelSpeakerVisibility => Get("有効にするスピーカー定義", "Speaker definitions to enable");
+    public static string LabelAutoSpeakerSelect => Get("自動スピーカー選択", "Auto speaker selection");
     public static string ButtonSineMinusTwenty => Get("Sine −20 dB", "Sine −20 dB");
     public static string ButtonChannelVoice => Get("Voice", "Voice");
     public static string LabelPortOff => Get("なし", "Off");
@@ -198,8 +199,8 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeIn => Get("波形フェードイン", "Waveform Fade In");
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string TipAudioSettings => Get(
-        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出し／Wwise のタブ。表示言語、配色（ダーク／ライト／Auto）、表示倍率（100〜200%。OS の DPI に加えて拡大）、複数ファイルの並べ方（タブのまま／左右／上下／上下左右）、関連付け、デフォルトオーディオフォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip / 無音削除）、プチノイズ防止フェード、フェードカーブ、MP3、同時書き出し本数、Wwise の Prefetch Length／Look-ahead Time。ダイアログのボタンは Tab で移動できます。",
-        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export / Wwise tabs. Language, theme (Dark / Light / Auto), UI scale (100–200%; extra enlargement on top of the OS DPI), multiple-file arrangement (keep tabs / side by side / stacked / grid), file associations, default audio format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip / Delete Silence), click-prevention fade, fade curves, MP3, parallel export count, and Wwise Prefetch Length / Look-ahead Time. Tab also moves to dialog buttons.");
+        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／編集／書き出し／Wwise のタブ。表示言語、配色（ダーク／ライト／Auto）、表示倍率（100〜200%。OS の DPI に加えて拡大）、複数ファイルの並べ方（タブのまま／左右／上下／上下左右）、関連付け、デフォルトオーディオフォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、自動スピーカー選択（オーディオタブ。既定オフ）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip / 無音削除）、プチノイズ防止フェード、フェードカーブ、MP3、同時書き出し本数、Wwise の Prefetch Length／Look-ahead Time。ダイアログのボタンは Tab で移動できます。",
+        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Editing / Export / Wwise tabs. Language, theme (Dark / Light / Auto), UI scale (100–200%; extra enlargement on top of the OS DPI), multiple-file arrangement (keep tabs / side by side / stacked / grid), file associations, default audio format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), auto speaker selection (Audio tab; off by default), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip / Delete Silence), click-prevention fade, fade curves, MP3, parallel export count, and Wwise Prefetch Length / Look-ahead Time. Tab also moves to dialog buttons.");
     public static string TipDefaultAudioFormat => Get(
         "新規ファイル（Ctrl+N）の初期フォーマットです。既定は 48kHz / 24bit / Stereo。チャンネルは表示項目で有効にしたスピーカーと、常に選べる Mono。",
         "Initial format for a new file (Ctrl+N). Default is 48 kHz / 24-bit / Stereo. Channels are the speakers enabled on Shown, plus Mono (always available).");
@@ -565,8 +566,11 @@ internal static partial class UiStrings
         "アプリ用意のスピーカー配置。先にこれを選び、その中でデバイスとポート割り当てを決めます。一覧は表示項目タブのチェックで絞れます。変更したあと OK せずに別の配置へ切り替えると、保存するか聞きます。",
         "Built-in speaker layout. Pick this first, then set the device and port assignments inside it. The list is filtered by the Shown tab. Switching layouts without OK asks whether to save the current one.");
     public static string TipSpeakerVisibility => Get(
-        "チェックしたスピーカー定義だけ、設定とステータスバー（NOW POS の左）の一覧に出します。既定は Stereo だけです。今使っている定義は、外しても切り替えるまで残ります。全部外すことはできません。",
-        "Only enabled speaker definitions appear in Settings and the status-bar menu (left of NOW POS). Stereo is on by default. The definition in use stays listed until you switch away. At least one must stay enabled.");
+        "チェックしたスピーカー定義だけ、設定とステータスバー（NOW POS の左）の一覧に出します。既定は Stereo だけです。今使っている定義は、外しても切り替えるまで残ります。全部外すことはできません。自動スピーカー選択の候補もこの一覧です。",
+        "Only enabled speaker definitions appear in Settings and the status-bar menu (left of NOW POS). Stereo is on by default. The definition in use stays listed until you switch away. At least one must stay enabled. Auto speaker selection uses this list.");
+    public static string TipAutoSpeakerSelect => Get(
+        "オンにすると、アクティブなファイルのチャンネル数に合わせて、有効にしたスピーカー定義へ切り替えます。1〜2ch は Stereo。同じ本数が複数あるときはいちばん普通の配置（6ch なら 5.1）。今の配置がすでに同じ本数なら維持します（5.1 Side を 5.1 へ戻しません）。候補が無いか、複数あって既定が無効なら切り替えません。既定はオフ。ファイルの正体は当てません。切替は再生と録音を止め、定義ごとのデバイスとポート割り当てに載せ替えます。Stereo と 5.1 で別デバイスなら、タブを変えるたびに出力先が変わります。",
+        "When on, switches to an enabled speaker definition that matches the active file's channel count. 1–2 ch uses Stereo. If several layouts share that count, the usual one is used (5.1 for 6 ch). If the current layout already has the same count, it stays (5.1 Side is not reset to 5.1). No change if nothing matches, or if several match and the usual one is not enabled. Off by default. The file itself is not labeled. Switching stops playback and recording, and applies that definition's device and port map. If Stereo and 5.1 use different devices, the output jumps when you change tabs.");
     public static string TipSpeakerSwitch => Get(
         "使うスピーカー配置を切り替えます。デバイスとポート割り当てが一緒に変わります。一覧は設定の表示項目タブで絞れます。",
         "Switch speaker layout. The device and port assignments change with it. The list is filtered in Settings → Shown.");

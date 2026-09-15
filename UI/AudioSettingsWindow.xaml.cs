@@ -58,6 +58,8 @@ internal partial class AudioSettingsWindow : Window
 
     public string[] SelectedVisibleSpeakerIds { get; private set; } = SpeakerPreset.DefaultVisibleIds;
 
+    public bool SelectedAutoSpeakerSelect { get; private set; }
+
     public string SelectedActiveSpeakerId { get; private set; } = string.Empty;
 
     public string SelectedRecordDeviceId { get; private set; } = string.Empty;
@@ -110,7 +112,8 @@ internal partial class AudioSettingsWindow : Window
         int wwisePrefetchLengthMs = WwiseTrackTiming.DefaultPrefetchLengthMs,
         int wwiseLookAheadTimeMs = WwiseTrackTiming.DefaultLookAheadTimeMs,
         int uiScalePercent = UiScale.DefaultPercent,
-        string? multiFileArrange = null)
+        string? multiFileArrange = null,
+        bool autoSpeakerSelect = false)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
@@ -132,6 +135,7 @@ internal partial class AudioSettingsWindow : Window
         var visible = SpeakerPreset.NormalizeVisibleIds(visibleSpeakerIds);
         _visibleIds = new HashSet<string>(visible, StringComparer.OrdinalIgnoreCase);
         SelectedVisibleSpeakerIds = visible;
+        SelectedAutoSpeakerSelect = autoSpeakerSelect;
         SelectedActiveSpeakerId = string.IsNullOrWhiteSpace(activeSpeakerId)
             ? _presets[0].Id
             : activeSpeakerId;
@@ -216,6 +220,7 @@ internal partial class AudioSettingsWindow : Window
 
         FillSpeakers(SelectedActiveSpeakerId);
         FillSpeakerVisibility();
+        AutoSpeakerSelectBox.IsChecked = SelectedAutoSpeakerSelect;
         LoadSpeakerEditors(FindPreset(SelectedActiveSpeakerId) ?? _presets[0], releaseDevice: false);
         RebuildRouting();
         LoudnessTargetBox.Text = SelectedLoudnessTargetLufs.ToString("0.#", CultureInfo.InvariantCulture);
@@ -271,6 +276,7 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(SpeakerCombo, UiStrings.TipSpeakerPreset);
         TipService.Set(SpeakerVisibilityHeader, UiStrings.TipSpeakerVisibility);
         TipService.Set(SpeakerVisibilityHost, UiStrings.TipSpeakerVisibility);
+        TipService.Set(AutoSpeakerSelectBox, UiStrings.TipAutoSpeakerSelect);
         TipService.Set(ApiLabel, UiStrings.TipAudioApi);
         TipService.Set(ApiCombo, UiStrings.TipAudioApi);
         TipService.Set(DeviceLabel, UiStrings.TipAudioDevice);
@@ -571,6 +577,7 @@ internal partial class AudioSettingsWindow : Window
         SelectedSettings = ReadOutputSettings();
         SelectedPresets = SpeakerPreset.CloneAll(_presets);
         SelectedVisibleSpeakerIds = SpeakerPreset.NormalizeVisibleIds(_visibleIds);
+        SelectedAutoSpeakerSelect = AutoSpeakerSelectBox.IsChecked == true;
         SelectedActiveSpeakerId = CurrentSpeaker()?.Id ?? _presets[0].Id;
         SelectedRecordDeviceId = ReadRecordDeviceId();
         var format = AudioFormatComboFill.Read(

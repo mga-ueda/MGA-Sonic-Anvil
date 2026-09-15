@@ -767,7 +767,8 @@ public partial class MainWindow
             settings.ResolvedWwisePrefetchLengthMs(),
             settings.ResolvedWwiseLookAheadTimeMs(),
             settings.ResolvedUiScalePercent(),
-            settings.MultiFileArrange)
+            settings.MultiFileArrange,
+            settings.AutoSpeakerSelect)
         {
             Owner = this,
         };
@@ -806,6 +807,7 @@ public partial class MainWindow
         settings.ExportParallelism = dialog.SelectedExportParallelism;
         settings.ReplaceSpeakerPresets(dialog.SelectedPresets, dialog.SelectedActiveSpeakerId);
         settings.ApplyVisibleSpeakerIds(dialog.SelectedVisibleSpeakerIds);
+        settings.AutoSpeakerSelect = dialog.SelectedAutoSpeakerSelect;
         settings.RecordDeviceId = dialog.SelectedRecordDeviceId;
         settings.DefaultSampleRate = dialog.SelectedDefaultSampleRate;
         settings.DefaultBitsPerSample = dialog.SelectedDefaultBitsPerSample;
@@ -817,6 +819,7 @@ public partial class MainWindow
         RefreshSpeakerMenu();
         SyncMonitorLayout();
         ApplyOutputSettings(dialog.SelectedSettings);
+        TryApplyAutoSpeaker();
     }
 
     private void ApplySpeakerPreset(string id, bool persist)
@@ -851,6 +854,35 @@ public partial class MainWindow
         {
             AppStorage.Save();
         }
+    }
+
+    private void TryApplyAutoSpeaker()
+    {
+        var channels = _document?.Channels ?? 0;
+        if (channels < 1)
+        {
+            _autoSpeakerSeenChannels = int.MinValue;
+            return;
+        }
+
+        var settings = AppStorage.Settings;
+        if (IsRecording || !settings.AutoSpeakerSelect)
+        {
+            _autoSpeakerSeenChannels = channels;
+            return;
+        }
+
+        var id = SpeakerPreset.ResolveAutoSpeakerId(
+            channels,
+            settings.SpeakerPresets,
+            settings.ResolvedVisibleSpeakerIds(),
+            settings.ActiveSpeakerPresetId);
+        if (id is not null)
+        {
+            ApplySpeakerPreset(id, persist: true);
+        }
+
+        _autoSpeakerSeenChannels = channels;
     }
 
     private void RefreshSpeakerMenu()

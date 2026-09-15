@@ -185,6 +185,13 @@
                           VerticalContentAlignment="Center" />
               </Grid>
 
+              <CheckBox x:Name="AutoSpeakerSelectBox"
+                        Style="{StaticResource DarkCheckBoxStyle}"
+                        Content="{x:Static domain:UiStrings.LabelAutoSpeakerSelect}"
+                        Margin="0,0,0,14"
+                        VerticalAlignment="Center"
+                        VerticalContentAlignment="Center" />
+
               <TextBlock x:Name="SpeakerIoHeader"
                          Text="{x:Static domain:UiStrings.LabelSpeakerIo}"
                          FontWeight="Bold"
