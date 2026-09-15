@@ -250,6 +250,7 @@ public partial class MainWindow
                 grid.Children.Add(pane.Host);
             }
 
+            AddUnusedTileFillers(grid, _sessions.Count, rows, cols);
             _tileGrid = grid;
             if (grid.Children.Count > 0)
             {
@@ -309,7 +310,7 @@ public partial class MainWindow
         WaveformTileHost.Children.Add(_tileGrid);
     }
 
-    /// <summary>全タイルが揃ったら下の単一表示を隠し、グリッドの隙間色を確定する。</summary>
+    /// <summary>全タイルが揃ったら下の単一表示を隠す。隙間は波形エリアと同じ配色のまま。</summary>
     private void FinalizeTileReveal()
     {
         if (!_tileMode || _tileGrid is null)
@@ -317,7 +318,7 @@ public partial class MainWindow
             return;
         }
 
-        _tileGrid.Background = BrushOrTransparent("WaveformBackBrush");
+        ApplyWaveformTileBackground(_tileGrid);
         PrimaryWaveform.Document = null;
         PrimaryWaveform.Visibility = Visibility.Collapsed;
     }
@@ -326,10 +327,10 @@ public partial class MainWindow
     {
         var grid = new Grid
         {
-            Background = Brushes.Transparent,
             SnapsToDevicePixels = true,
             UseLayoutRounding = true,
         };
+        ApplyWaveformTileBackground(grid);
         for (var r = 0; r < rows; r++)
         {
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -341,6 +342,27 @@ public partial class MainWindow
         }
 
         return grid;
+    }
+
+    private static void ApplyWaveformTileBackground(Panel panel) =>
+        panel.SetResourceReference(Panel.BackgroundProperty, "WaveformBackBrush");
+
+    private static void ApplyWaveformTileBackground(Border border) =>
+        border.SetResourceReference(Border.BackgroundProperty, "WaveformBackBrush");
+
+    /// <summary>余りマスに波形背景を敷く。透明のままだとライト／ダークとも GPU の黒が見える。</summary>
+    private static void AddUnusedTileFillers(Grid grid, int count, int rows, int cols)
+    {
+        foreach (var cell in WaveformTileLayout.UnusedCells(count, rows, cols))
+        {
+            var fill = new Border { IsHitTestVisible = false };
+            ApplyWaveformTileBackground(fill);
+            Grid.SetRow(fill, cell.Row);
+            Grid.SetColumn(fill, cell.Column);
+            Grid.SetRowSpan(fill, cell.RowSpan);
+            Grid.SetColumnSpan(fill, cell.ColumnSpan);
+            grid.Children.Add(fill);
+        }
     }
 
     private void ApplyTileCell(UIElement host, int index, int rows, int cols)
@@ -639,6 +661,11 @@ public partial class MainWindow
             return;
         }
 
+        if (_tileGrid is not null)
+        {
+            ApplyWaveformTileBackground(_tileGrid);
+        }
+
         foreach (var pane in _tilePanes)
         {
             var active = ReferenceEquals(pane.Session, _activeSession);
@@ -646,7 +673,7 @@ public partial class MainWindow
             pane.Title.Text = pane.Session.TabTitle;
             pane.Title.Foreground = (Brush)FindResource(
                 dirty ? "DirtyAccentBrush" : active ? "PrimaryForeBrush" : "MutedForeBrush");
-            pane.Host.Background = BrushOrTransparent("WaveformBackBrush");
+            ApplyWaveformTileBackground(pane.Host);
             if (pane.Host.Child is DockPanel dock && dock.Children[0] is Border header)
             {
                 header.Background = BrushOrTransparent(

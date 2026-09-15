@@ -96,9 +96,10 @@ public sealed class WaveformTileLayoutTests
     [InlineData(5, 2, 3)]
     [InlineData(6, 2, 3)]
     [InlineData(7, 3, 3)]
-    [InlineData(8, 3, 3)]
-    [InlineData(9, 3, 3)]
-    public void ChooseGrid_Grid_IsNearlySquare(int count, int rows, int cols)
+        [InlineData(8, 3, 3)]
+        [InlineData(9, 3, 3)]
+        [InlineData(11, 3, 4)]
+        public void ChooseGrid_Grid_IsNearlySquare(int count, int rows, int cols)
     {
         WaveformTileLayout.ChooseGrid(WaveformTileArrange.Grid, count, out var actualRows, out var actualCols);
         Assert.Equal(rows, actualRows);
@@ -132,6 +133,33 @@ public sealed class WaveformTileLayoutTests
         Assert.Equal(1, cell.Row);
         Assert.Equal(1, cell.Column);
         Assert.Equal(1, cell.ColumnSpan);
+    }
+
+    [Fact]
+    public void UnusedCells_ElevenFiles_HasBottomRightHole()
+    {
+        var unused = WaveformTileLayout.UnusedCells(11, rows: 3, cols: 4);
+        var cell = Assert.Single(unused);
+        Assert.Equal(2, cell.Row);
+        Assert.Equal(3, cell.Column);
+        Assert.Equal(1, cell.RowSpan);
+        Assert.Equal(1, cell.ColumnSpan);
+    }
+
+    [Fact]
+    public void UnusedCells_LastItemSpansRow_HasNoHole()
+    {
+        Assert.Empty(WaveformTileLayout.UnusedCells(3, rows: 2, cols: 2));
+        Assert.Empty(WaveformTileLayout.UnusedCells(7, rows: 3, cols: 3));
+    }
+
+    [Fact]
+    public void UnusedCells_FiveFiles_HasOneHole()
+    {
+        var unused = WaveformTileLayout.UnusedCells(5, rows: 2, cols: 3);
+        var cell = Assert.Single(unused);
+        Assert.Equal(1, cell.Row);
+        Assert.Equal(2, cell.Column);
     }
 
     [Fact]

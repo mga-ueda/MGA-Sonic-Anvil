@@ -150,6 +150,47 @@ internal static class WaveformTileLayout
         return new WaveformTileCell(row, col, 1, span);
     }
 
+    /// <summary>最終行が 1 枚なら横断するので空きは出ない。11 枚の 3×4 のように余りがあるときだけ空きマス。</summary>
+    public static IReadOnlyList<WaveformTileCell> UnusedCells(int count, int rows, int cols)
+    {
+        if (count <= 0 || rows <= 0 || cols <= 0)
+        {
+            return [];
+        }
+
+        var used = new bool[rows, cols];
+        for (var i = 0; i < count; i++)
+        {
+            var cell = Cell(i, count, rows, cols);
+            for (var r = 0; r < cell.RowSpan; r++)
+            {
+                for (var c = 0; c < cell.ColumnSpan; c++)
+                {
+                    var row = cell.Row + r;
+                    var col = cell.Column + c;
+                    if ((uint)row < (uint)rows && (uint)col < (uint)cols)
+                    {
+                        used[row, col] = true;
+                    }
+                }
+            }
+        }
+
+        var unused = new List<WaveformTileCell>();
+        for (var row = 0; row < rows; row++)
+        {
+            for (var col = 0; col < cols; col++)
+            {
+                if (!used[row, col])
+                {
+                    unused.Add(new WaveformTileCell(row, col, 1, 1));
+                }
+            }
+        }
+
+        return unused;
+    }
+
     public static WaveformAnalysisView ResolveAnalysis(
         WaveformAnalysisView? stored,
         WaveformAnalysisView fallback) =>
