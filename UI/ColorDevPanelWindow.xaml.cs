@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
@@ -21,6 +22,10 @@ internal partial class ColorDevPanelWindow : Window
     private readonly List<ColorGroup> _groups = [];
     private readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
     private bool _applyingOwnChange;
+    private bool _revealPending = true;
+    private bool _parkedOffscreen;
+    private double _revealLeft;
+    private double _revealTop;
     private string? _selectedKey;
 
     public event EventHandler? ColorsChanged;
@@ -29,10 +34,13 @@ internal partial class ColorDevPanelWindow : Window
     {
         InitializeComponent();
         ApplyWindowTitle();
-        SourceInitialized += (_, _) => DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        SourceInitialized += OnFirstSourceInitialized;
+        Loaded += OnFirstLoaded;
+        ContentRendered += OnFirstContentRendered;
         Closed += (_, _) =>
         {
             FlushSave();
+            RestoreParkedPosition();
             WindowPlacement.CaptureColorPanel(this, AppStorage.Settings);
             AppStorage.Save();
         };
@@ -52,6 +60,96 @@ internal partial class ColorDevPanelWindow : Window
         AppDialogKeys.PrepareActionButton(ResetThisButton);
         AppDialogKeys.PrepareActionButton(CloseButton, isCancel: true);
         AppDialogKeys.Attach(this, Close);
+    }
+
+    /// <summary>初回は一覧とピッカーの描画後に表示する。既に出ている場合は前面へ。</summary>
+    public void Present()
+    {
+        if (!_revealPending)
+        {
+            Show();
+            Activate();
+            return;
+        }
+
+        _ = new WindowInteropHelper(this).EnsureHandle();
+        ParkOffscreen();
+        DarkWindowChrome.TrySetCloaked(this, true);
+        Show();
+    }
+
+    private void OnFirstSourceInitialized(object? sender, EventArgs e)
+    {
+        DarkWindowChrome.DisableShowTransitions(this);
+        DarkWindowChrome.SuppressEraseBackground(this);
+        DarkWindowChrome.TrySetCloaked(this, true);
+        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+    }
+
+    private void OnFirstLoaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= OnFirstLoaded;
+        UpdateLayout();
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (_revealPending)
+                {
+                    Dispatcher.BeginInvoke(Reveal, DispatcherPriority.ContextIdle);
+                }
+            },
+            DispatcherPriority.Render);
+    }
+
+    private void OnFirstContentRendered(object? sender, EventArgs e)
+    {
+        ContentRendered -= OnFirstContentRendered;
+        if (!_revealPending)
+        {
+            return;
+        }
+
+        UpdateLayout();
+        Dispatcher.BeginInvoke(Reveal, DispatcherPriority.Render);
+    }
+
+    private void Reveal()
+    {
+        if (!_revealPending)
+        {
+            return;
+        }
+
+        _revealPending = false;
+        RestoreParkedPosition();
+        DarkWindowChrome.TrySetCloaked(this, false);
+        Activate();
+    }
+
+    private void ParkOffscreen()
+    {
+        if (double.IsNaN(Left) || double.IsNaN(Top))
+        {
+            return;
+        }
+
+        _revealLeft = Left;
+        _revealTop = Top;
+        Left = -32000;
+        Top = -32000;
+        _parkedOffscreen = true;
+    }
+
+    private void RestoreParkedPosition()
+    {
+        if (!_parkedOffscreen)
+        {
+            return;
+        }
+
+        Left = _revealLeft;
+        Top = _revealTop;
+        _parkedOffscreen = false;
     }
 
     public void ApplyLocalizedText()

@@ -24,8 +24,7 @@ public partial class MainWindow
         }
 
         _colorDevPanel.RefreshAppearance();
-        _colorDevPanel.Show();
-        _colorDevPanel.Activate();
+        _colorDevPanel.Present();
     }
 
     private void QueueAppColorRefresh()
