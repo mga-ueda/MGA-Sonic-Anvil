@@ -28,8 +28,8 @@ internal sealed class EditHistoryOverlay : Border
         Width = 340;
         MaxHeight = 360;
         Padding = new Thickness(0, 0, 0, 6);
-        Background = (Brush)Application.Current.FindResource("ColorPanelBackBrush");
-        BorderBrush = (Brush)Application.Current.FindResource("ChromeBorderBrush");
+        SetResourceReference(BackgroundProperty, "ColorPanelBackBrush");
+        SetResourceReference(BorderBrushProperty, "ChromeBorderBrush");
         BorderThickness = new Thickness(1);
         SnapsToDevicePixels = true;
         Focusable = false;
@@ -40,8 +40,8 @@ internal sealed class EditHistoryOverlay : Border
             Margin = new Thickness(10, 8, 4, 2),
             FontSize = 11,
             VerticalAlignment = VerticalAlignment.Center,
-            Foreground = (Brush)Application.Current.FindResource("MutedForeBrush"),
         };
+        _title.SetResourceReference(TextBlock.ForegroundProperty, "MutedForeBrush");
         var caption = new DockPanel();
         var close = OverlayCaption.CloseButton(() => CloseRequested?.Invoke(this, EventArgs.Empty));
         OverlayCaption.PinCorner(close);
@@ -54,8 +54,8 @@ internal sealed class EditHistoryOverlay : Border
             Margin = new Thickness(10, 0, 10, 6),
             FontSize = 10,
             TextWrapping = TextWrapping.Wrap,
-            Foreground = (Brush)Application.Current.FindResource("MutedForeBrush"),
         };
+        _hint.SetResourceReference(TextBlock.ForegroundProperty, "MutedForeBrush");
         _scroll = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -69,7 +69,7 @@ internal sealed class EditHistoryOverlay : Border
         {
             _statusTimer.Stop();
             _hint.Text = UiStrings.EditHistoryHint;
-            _hint.Foreground = (Brush)Application.Current.FindResource("MutedForeBrush");
+            _hint.SetResourceReference(TextBlock.ForegroundProperty, "MutedForeBrush");
         };
 
         var root = new DockPanel();
@@ -86,8 +86,10 @@ internal sealed class EditHistoryOverlay : Border
         _statusTimer.Stop();
         _title.Text = UiStrings.EditHistoryTitle;
         _hint.Text = UiStrings.EditHistoryHint;
-        _hint.Foreground = (Brush)Application.Current.FindResource("MutedForeBrush");
+        _hint.SetResourceReference(TextBlock.ForegroundProperty, "MutedForeBrush");
     }
+
+    public void RefreshAppearance() => ApplyLocalizedText();
 
     /// <summary>ヒント行に一時メッセージ（コピー／適用件数など）を表示する。</summary>
     public void FlashStatus(string text)
@@ -104,8 +106,9 @@ internal sealed class EditHistoryOverlay : Border
         IReadOnlySet<int>? copySelected = null)
     {
         _items.Children.Clear();
-        var selectedBack = (Brush)Application.Current.FindResource("PrimaryForeBrush");
-        var selectedFore = (Brush)Application.Current.FindResource("SurfaceBackBrush");
+        // 選択行はメニューのハイライトと同じ配色（テーマ変更にも追従する）。
+        var selectedBack = (Brush)Application.Current.FindResource("MenuHighlightBackBrush");
+        var selectedFore = (Brush)Application.Current.FindResource("PrimaryForeBrush");
         var idleFore = (Brush)Application.Current.FindResource("PrimaryForeBrush");
         var futureFore = (Brush)Application.Current.FindResource("MutedForeBrush");
         var copyMark = (Brush)Application.Current.FindResource("AccentCyanBrush");
