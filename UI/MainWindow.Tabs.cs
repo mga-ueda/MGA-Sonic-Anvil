@@ -142,7 +142,8 @@ public partial class MainWindow
         else
         {
             RebuildTabBar();
-            RefreshTabHeaders();
+            // ステータスバーの「n / m Files」も更新する（RefreshTitle と RefreshTabHeaders を含む）。
+            RefreshStatus();
         }
 
         NotifyWaveformSessionsChanged();

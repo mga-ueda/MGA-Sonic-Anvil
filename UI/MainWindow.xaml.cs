@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -662,6 +663,17 @@ public partial class MainWindow : Window
 
         var estimatedBytes = _document.EstimateFileBytesFor(rate, bits, channels);
         var sizeEdited = estimatedBytes != _document.CommittedFileBytes;
+
+        // 複数ファイルを開いているときだけ、冒頭に「n / m Files」を出す。
+        if (_sessions.Count >= 2)
+        {
+            var number = _activeSession is null ? 0 : _sessions.IndexOf(_activeSession) + 1;
+            AppendStatusRun(
+                string.Create(CultureInfo.InvariantCulture, $"{number} / {_sessions.Count} Files"),
+                edited: false,
+                normal,
+                edited);
+        }
 
         AppendStatusRun(UiStrings.FormatSampleRate(rate), rate != _document.CommittedSampleRate, normal, edited);
         AppendStatusRun(UiStrings.FormatBitDepth(bits), bits != _document.CommittedBitsPerSample, normal, edited);
