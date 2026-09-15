@@ -24,25 +24,42 @@ internal static partial class ProcessEdits
             after = WaveSelection.Empty;
         }
 
+        return ApplySampleLoop(document, before, after);
+    }
+
+    /// <summary>
+    /// ループを after の範囲にする。トグルしない。セッション復元と再適用用。
+    /// </summary>
+    public static IEditCommand? ApplySampleLoop(AudioDocument document, WaveSelection after)
+    {
+        if (!document.AllowsRegionsAndLoops && !after.IsEmpty)
+        {
+            return null;
+        }
+
+        after = after.IsEmpty ? WaveSelection.Empty : after.Clamp(document.FrameCount);
+        return ApplySampleLoop(document, document.SampleLoop, after);
+    }
+
+    private static IEditCommand? ApplySampleLoop(
+        AudioDocument document,
+        WaveSelection before,
+        WaveSelection after)
+    {
+        if (before == after)
+        {
+            return null;
+        }
+
         var command = new SetSampleLoopCommand(
             before,
             after,
             SampleLoopSummary(document.SampleRate, after));
         var sourceRate = document.SampleRate;
         var sourceAfter = after;
-        // 再適用は「after の状態にする」。トグルではないので同じ範囲でも解除にならない。
-        command.Replay = target =>
-        {
-            var mapped = sourceAfter.IsEmpty
-                ? WaveSelection.Empty
-                : EditReplay.MapRange(sourceAfter, sourceRate, target);
-            if (target.SampleLoop == mapped)
-            {
-                return null;
-            }
-
-            return SetSampleLoop(target, mapped);
-        };
+        command.Replay = target => ApplySampleLoop(
+            target,
+            EditReplay.MapRange(sourceAfter, sourceRate, target));
         command.Persist = HistoryRecipes.Range(HistoryRecipes.SetSampleLoop, sourceRate, sourceAfter);
         return command;
     }
@@ -110,10 +127,7 @@ internal static partial class ProcessEdits
             // 全解除は適用先も全解除。個別は追加／解除の向きを保つ（トグルの反転を防ぐ）。
             if (sourceRange.IsEmpty)
             {
-                var targetBefore = target.SnapshotRegions();
-                return targetBefore.Length == 0
-                    ? null
-                    : new SetRegionCommand(targetBefore, [], UiStrings.EditHistoryName("Set Region") + "  解除");
+                return SetRegion(target, WaveSelection.Empty);
             }
 
             var mapped = EditReplay.MapRange(sourceRange, sourceRate, target);
@@ -536,9 +550,43 @@ internal static partial class ProcessEdits
         WaveRegion[] regionsBefore,
         WaveSelection loopBefore)
     {
-        var markersAfter = document.SnapshotMarkers();
-        var regionsAfter = document.SnapshotRegions();
-        var loopAfter = document.SampleLoop;
+        return ApplyTimeline(
+            document,
+            markersBefore,
+            document.SnapshotMarkers(),
+            regionsBefore,
+            document.SnapshotRegions(),
+            loopBefore,
+            document.SampleLoop);
+    }
+
+    /// <summary>
+    /// マーカー／リージョン／ループを after の配置にする。ドラッグ移動の再適用と
+    /// セッション復元で使う。適用先がすでに同じ配置なら null。
+    /// </summary>
+    public static IEditCommand? ApplyTimeline(
+        AudioDocument document,
+        MarkerSnapshot[] markersAfter,
+        WaveRegion[] regionsAfter,
+        WaveSelection loopAfter) =>
+        ApplyTimeline(
+            document,
+            document.SnapshotMarkers(),
+            markersAfter,
+            document.SnapshotRegions(),
+            regionsAfter,
+            document.SampleLoop,
+            loopAfter);
+
+    private static IEditCommand? ApplyTimeline(
+        AudioDocument document,
+        MarkerSnapshot[] markersBefore,
+        MarkerSnapshot[] markersAfter,
+        WaveRegion[] regionsBefore,
+        WaveRegion[] regionsAfter,
+        WaveSelection loopBefore,
+        WaveSelection loopAfter)
+    {
         if (markersBefore.AsSpan().SequenceEqual(markersAfter)
             && RegionsEqual(regionsBefore, regionsAfter)
             && loopBefore == loopAfter)
@@ -561,8 +609,14 @@ internal static partial class ProcessEdits
                 loopBefore,
                 loopAfter,
                 document.SampleRate));
+        var sourceRate = document.SampleRate;
+        command.Replay = target => ApplyTimeline(
+            target,
+            MapMarkers(markersAfter, sourceRate, target),
+            MapRegions(regionsAfter, sourceRate, target),
+            EditReplay.MapRange(loopAfter, sourceRate, target));
         command.Persist = HistoryRecipes.FromTimeline(
-            document.SampleRate,
+            sourceRate,
             markersAfter,
             regionsAfter,
             loopAfter);

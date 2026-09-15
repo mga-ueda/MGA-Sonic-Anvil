@@ -373,33 +373,14 @@ internal static class HistoryRecipes
         var after = recipe.Start == recipe.End
             ? WaveSelection.Empty
             : new WaveSelection(recipe.Start, recipe.End).Clamp(document.FrameCount);
-        if (document.SampleLoop == after)
-        {
-            return null;
-        }
-
-        var command = new SetSampleLoopCommand(
-            document.SampleLoop,
-            after,
-            after.IsEmpty
-                ? UiStrings.EditHistoryName("Set Sample Loop") + "  解除"
-                : UiStrings.EditHistoryRange(
-                    UiStrings.EditHistoryName("Set Sample Loop"),
-                    document.SampleRate,
-                    after.StartFrame,
-                    after.EndFrame));
-        command.Persist = recipe;
-        return command;
+        return ProcessEdits.ApplySampleLoop(document, after);
     }
 
     private static IEditCommand? TrySetRegion(AudioDocument document, HistoryRecipe recipe)
     {
         if (recipe.Start == recipe.End)
         {
-            var before = document.SnapshotRegions();
-            return before.Length == 0
-                ? null
-                : new SetRegionCommand(before, [], UiStrings.EditHistoryName("Set Region") + "  解除");
+            return ProcessEdits.SetRegion(document, WaveSelection.Empty);
         }
 
         var range = new WaveSelection(recipe.Start, recipe.End);
@@ -425,44 +406,7 @@ internal static class HistoryRecipes
         var loopAfter = recipe.Start == recipe.End
             ? WaveSelection.Empty
             : new WaveSelection(recipe.Start, recipe.End);
-        var markersBefore = document.SnapshotMarkers();
-        var regionsBefore = document.SnapshotRegions();
-        var loopBefore = document.SampleLoop;
-        if (markersAfter.AsSpan().SequenceEqual(markersBefore)
-            && RegionsMatch(regionsAfter, regionsBefore)
-            && loopAfter == loopBefore)
-        {
-            return null;
-        }
-
-        var command = new MoveTimelineItemsCommand(
-            markersBefore,
-            markersAfter,
-            regionsBefore,
-            regionsAfter,
-            loopBefore,
-            loopAfter,
-            UiStrings.EditHistoryName("Move Timeline"));
-        command.Persist = recipe;
-        return command;
-    }
-
-    private static bool RegionsMatch(WaveRegion[] left, WaveRegion[] right)
-    {
-        if (left.Length != right.Length)
-        {
-            return false;
-        }
-
-        for (var i = 0; i < left.Length; i++)
-        {
-            if (left[i] != right[i])
-            {
-                return false;
-            }
-        }
-
-        return true;
+        return ProcessEdits.ApplyTimeline(document, markersAfter, regionsAfter, loopAfter);
     }
 
     private static MarkerSnapshot[] MarkersOf(long[]? frames, string[]? comments)

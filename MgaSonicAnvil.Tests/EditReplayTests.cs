@@ -152,6 +152,59 @@ public sealed class EditReplayTests
     }
 
     [Fact]
+    public void MoveTimelineItems_Replay_AppliesAfterStateToTarget()
+    {
+        var source = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        source.TryAddMarker(10);
+        source.SetRegions([new WaveSelection(20, 40)]);
+        source.SetSampleLoop(new WaveSelection(50, 70));
+        var markersBefore = source.SnapshotMarkers();
+        var regionsBefore = source.SnapshotRegions();
+        var loopBefore = source.SampleLoop;
+        Assert.True(source.TryMoveMarkers([10], 5, out _));
+        Assert.True(source.TryMoveRegions([new WaveSelection(20, 40)], 5, out _));
+        Assert.True(source.TryMoveSampleLoop(5, out _));
+        var command = ProcessEdits.MoveTimelineItems(source, markersBefore, regionsBefore, loopBefore);
+        Assert.NotNull(command);
+        Assert.NotNull(command!.Replay);
+
+        var history = new EditHistory();
+        history.Do(source, command);
+        var snapshot = history.Snapshot();
+        Assert.True(snapshot[1].CanReplay);
+
+        var target = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        target.TryAddMarker(10);
+        target.SetRegions([new WaveSelection(20, 40)]);
+        target.SetSampleLoop(new WaveSelection(50, 70));
+        var replayed = command.Replay!(target);
+        Assert.NotNull(replayed);
+        new EditHistory().Do(target, replayed!);
+        Assert.Equal(15, target.Markers[0].Frame);
+        Assert.Equal(new WaveSelection(25, 45), target.Regions[0]);
+        Assert.Equal(new WaveSelection(55, 75), target.SampleLoop);
+    }
+
+    [Fact]
+    public void MoveTimelineItems_Replay_MapsFramesAcrossSampleRates()
+    {
+        var source = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        source.TryAddMarker(10);
+        var markersBefore = source.SnapshotMarkers();
+        var regionsBefore = source.SnapshotRegions();
+        var loopBefore = source.SampleLoop;
+        Assert.True(source.TryMoveMarkers([10], 10, out _));
+        var command = ProcessEdits.MoveTimelineItems(source, markersBefore, regionsBefore, loopBefore);
+        Assert.NotNull(command);
+
+        var target = MakeConstant(frames: 50, value: 1f, rate: 24000);
+        var replayed = command!.Replay!(target);
+        Assert.NotNull(replayed);
+        new EditHistory().Do(target, replayed!);
+        Assert.Equal(10, target.Markers[0].Frame);
+    }
+
+    [Fact]
     public void AddMarker_Replay_SkipsWhenMarkerExists()
     {
         var source = MakeConstant(frames: 100, value: 1f, rate: 48000);
@@ -247,6 +300,50 @@ public sealed class EditReplayTests
         Assert.Equal(
             [new WaveSelection(50, 70), new WaveSelection(80, 95)],
             target.Regions);
+    }
+
+    [Fact]
+    public void SetSampleLoop_Recipe_RestoresWithReplay()
+    {
+        var source = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        var command = ProcessEdits.SetSampleLoop(source, new WaveSelection(10, 40));
+        Assert.NotNull(command);
+        Assert.NotNull(command!.Persist);
+
+        var restored = HistoryRecipes.TryCreate(
+            MakeConstant(frames: 100, value: 1f, rate: 48000),
+            command.Persist!);
+        Assert.NotNull(restored);
+        Assert.NotNull(restored!.Replay);
+
+        var target = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        var replayed = restored.Replay!(target);
+        Assert.NotNull(replayed);
+        Assert.NotNull(replayed!.Replay);
+        new EditHistory().Do(target, replayed);
+        Assert.Equal(new WaveSelection(10, 40), target.SampleLoop);
+    }
+
+    [Fact]
+    public void SetRegion_ClearAll_ReplayResultStaysCopyable()
+    {
+        var source = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        source.SetRegions([new WaveSelection(10, 30), new WaveSelection(50, 70)]);
+        var command = ProcessEdits.SetRegion(source, WaveSelection.Empty);
+        Assert.NotNull(command);
+        Assert.NotNull(command!.Replay);
+
+        var target = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        target.SetRegions([new WaveSelection(5, 20)]);
+        var replayed = command.Replay!(target);
+        Assert.NotNull(replayed);
+        Assert.NotNull(replayed!.Replay);
+
+        var imported = MakeConstant(frames: 100, value: 1f, rate: 48000);
+        imported.SetRegions([new WaveSelection(8, 24)]);
+        var restored = HistoryRecipes.TryCreate(imported, command.Persist!);
+        Assert.NotNull(restored);
+        Assert.NotNull(restored!.Replay);
     }
 
     [Fact]
