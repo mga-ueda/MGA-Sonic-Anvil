@@ -68,6 +68,13 @@ internal static class UiScaleService
     private static void Attach(Window window, bool resize)
     {
         PublishTransform();
+        // 表示倍率はメインウィンドウの中身だけに掛ける。
+        // メニュー・ツールチップ・設定などの独自ウィンドウは OS の DPI のまま等倍。
+        if (window is not MainWindow)
+        {
+            return;
+        }
+
         var factor = Factor;
         var state = States.GetOrCreateValue(window);
         if (state.AppliedFactor <= 0)
@@ -194,14 +201,8 @@ internal static class UiScaleService
         return transform;
     }
 
-    private static void PublishTransform()
-    {
+    private static void PublishTransform() =>
         _published = CreatePublishedTransform(Factor);
-        if (Application.Current is { } app)
-        {
-            app.Resources["UiScaleTransform"] = _published;
-        }
-    }
 
     private sealed class WindowScaleState
     {

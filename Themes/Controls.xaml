@@ -6,8 +6,6 @@
         <ResourceDictionary Source="UiColors.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
-    <ScaleTransform x:Key="UiScaleTransform" ScaleX="1" ScaleY="1"/>
-
     <Geometry x:Key="FlatCheckMarkGeometry">M 1.5,4.5 L 4,7 L 9,1.5</Geometry>
 
     <Style x:Key="DarkTextBoxStyle" TargetType="TextBox">
@@ -102,7 +100,6 @@
         <Setter Property="FontSize" Value="12" />
         <Setter Property="MaxWidth" Value="420" />
         <Setter Property="HasDropShadow" Value="False" />
-        <Setter Property="LayoutTransform" Value="{DynamicResource UiScaleTransform}" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
         <Setter Property="ContentTemplate">
             <Setter.Value>
@@ -249,8 +246,7 @@
                                AllowsTransparency="True"
                                Focusable="False"
                                PopupAnimation="Slide">
-                            <Border LayoutTransform="{DynamicResource UiScaleTransform}"
-                                    Background="{DynamicResource DialogInputBackBrush}"
+                            <Border Background="{DynamicResource DialogInputBackBrush}"
                                     BorderBrush="{DynamicResource ChromeBorderBrush}"
                                     BorderThickness="1"
                                     MinWidth="{TemplateBinding ActualWidth}"
@@ -590,7 +586,6 @@
         <Setter Property="Padding" Value="0,2" />
         <Setter Property="MinWidth" Value="200" />
         <Setter Property="HasDropShadow" Value="False" />
-        <Setter Property="LayoutTransform" Value="{DynamicResource UiScaleTransform}" />
         <Setter Property="Grid.IsSharedSizeScope" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
@@ -693,8 +688,7 @@
                                HorizontalOffset="-1"
                                VerticalOffset="-2"
                                IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
-                            <Border LayoutTransform="{DynamicResource UiScaleTransform}"
-                                    Background="{DynamicResource SurfaceBackBrush}"
+                            <Border Background="{DynamicResource SurfaceBackBrush}"
                                     BorderBrush="{DynamicResource ChromeBorderBrush}"
                                     BorderThickness="1"
                                     Padding="0,2"

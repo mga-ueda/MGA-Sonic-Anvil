@@ -54,10 +54,11 @@ internal static class WindowPlacement
         var bounds = window.WindowState == WindowState.Normal
             ? new Rect(window.Left, window.Top, window.Width, window.Height)
             : window.RestoreBounds;
+        // 設定ウィンドウは表示倍率の対象外なので等倍で記録する。
         settings.SettingsWindowX = (int)Math.Round(bounds.X);
         settings.SettingsWindowY = (int)Math.Round(bounds.Y);
-        settings.SettingsWindowWidth = ToStoredExtent(bounds.Width);
-        settings.SettingsWindowHeight = ToStoredExtent(bounds.Height);
+        settings.SettingsWindowWidth = (int)Math.Round(bounds.Width);
+        settings.SettingsWindowHeight = (int)Math.Round(bounds.Height);
         settings.SettingsWindowHasPosition = true;
     }
 
@@ -69,7 +70,7 @@ internal static class WindowPlacement
         }
 
         var height = hasSize
-            ? Math.Max(FromStoredExtent(bounds.Height), window.MinHeight)
+            ? Math.Max(bounds.Height, window.MinHeight)
             : window.Height;
         var placed = new Rect(bounds.X, bounds.Y, window.Width, height);
         if (!IsVisibleOnAnyScreen(placed))
@@ -93,10 +94,11 @@ internal static class WindowPlacement
         var bounds = window.WindowState == WindowState.Normal
             ? new Rect(window.Left, window.Top, window.Width, window.Height)
             : window.RestoreBounds;
+        // 色開発パネルも表示倍率の対象外なので等倍で記録する。
         settings.ColorPanelX = (int)Math.Round(bounds.X);
         settings.ColorPanelY = (int)Math.Round(bounds.Y);
-        settings.ColorPanelWidth = ToStoredExtent(bounds.Width);
-        settings.ColorPanelHeight = ToStoredExtent(bounds.Height);
+        settings.ColorPanelWidth = (int)Math.Round(bounds.Width);
+        settings.ColorPanelHeight = (int)Math.Round(bounds.Height);
         settings.ColorPanelHasPosition = true;
     }
 
@@ -107,8 +109,8 @@ internal static class WindowPlacement
             return false;
         }
 
-        var width = hasSize ? Math.Max(FromStoredExtent(bounds.Width), window.MinWidth) : window.Width;
-        var height = hasSize ? Math.Max(FromStoredExtent(bounds.Height), window.MinHeight) : window.Height;
+        var width = hasSize ? Math.Max(bounds.Width, window.MinWidth) : window.Width;
+        var height = hasSize ? Math.Max(bounds.Height, window.MinHeight) : window.Height;
         var placed = new Rect(bounds.X, bounds.Y, width, height);
         if (!IsVisibleOnAnyScreen(placed))
         {
