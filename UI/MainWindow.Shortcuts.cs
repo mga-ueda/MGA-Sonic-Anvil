@@ -902,6 +902,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.W && modifiers == (ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Alt))
+        {
+            LaunchWwiseProjectFromShortcut();
+            return true;
+        }
+
         if (key == Key.W && modifiers == ModifierKeys.Control)
         {
             CloseDocument();

@@ -98,14 +98,36 @@ public partial class MainWindow
 
     private void ToggleWaapiPanel()
     {
-        _waapiPanelVisible = !_waapiPanelVisible;
-        ApplyWaapiPanelVisible();
-        AppStorage.Settings.WaapiPanelVisible = _waapiPanelVisible;
-        AppStorage.Save();
         if (_waapiPanelVisible)
         {
-            _ = StartWaapiAsync();
+            _waapiPanelVisible = false;
+            ApplyWaapiPanelVisible();
+            AppStorage.Settings.WaapiPanelVisible = false;
+            AppStorage.Save();
+            return;
         }
+
+        ShowWaapiPanel();
+    }
+
+    private void ShowWaapiPanel()
+    {
+        if (_waapiPanelVisible)
+        {
+            return;
+        }
+
+        _waapiPanelVisible = true;
+        ApplyWaapiPanelVisible();
+        AppStorage.Settings.WaapiPanelVisible = true;
+        AppStorage.Save();
+        _ = StartWaapiAsync();
+    }
+
+    private void LaunchWwiseProjectFromShortcut()
+    {
+        ShowWaapiPanel();
+        RequestOpenOrFocusWwiseProject();
     }
 
     private void ApplyWaapiPanelVisible()

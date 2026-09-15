@@ -48,8 +48,8 @@ internal static partial class UiStrings
         + "In-app preview double-plays -E on a loop wrap so two playheads appear.\n"
         + "EXPORT writes this to the Music Playlist Container default transition rule (Any to Any).");
     public static string TipWaapiToggle => Get(
-        "WAAPI の接続とエリア表示を切り替えます (W)。オフのときは Wwise へ接続しません。",
-        "Toggle WAAPI connection and the WAAPI area (W). Off means no connection to Wwise.");
+        "WAAPI の接続とエリア表示を切り替えます (W)。オフのときは Wwise へ接続しません。Ctrl+Alt+Shift+W でプロジェクトを起動（バーも出します）。",
+        "Toggle WAAPI connection and the WAAPI area (W). Off means no connection to Wwise. Ctrl+Alt+Shift+W launches the project (and shows the bar).");
     public static string PreflightWaapiOff => Get(
         "WAAPI がオフです。レベルメーター上の WAAPI をオンにすると接続します。",
         "WAAPI is off. Turn on WAAPI above the level meter to connect.");
@@ -60,8 +60,8 @@ internal static partial class UiStrings
         "接続中の Wwise プロジェクトです。",
         "The connected Wwise project.");
     public static string TipWwiseProjectNameOpen => Get(
-        "この Wwise プロジェクトを開きます（既に開いていれば前面）。未接続でも、覚えた .wproj があれば起動します。関連付けが Launcher でも、版に合う Wwise.exe を直接起動します。",
-        "Open this Wwise project (or bring it to the front if it is already open). Works while disconnected if a remembered .wproj is available. Even if the association is the Launcher, the matching Wwise.exe is started directly.");
+        "この Wwise プロジェクトを開きます（既に開いていれば前面）。クリック、または Ctrl+Alt+Shift+W。WAAPI がオフでもバーを出して起動します。覚えた .wproj が無ければ起動せず、その旨を出します。関連付けが Launcher でも、版に合う Wwise.exe を直接起動します。",
+        "Open this Wwise project (or bring it to the front if it is already open). Click, or Ctrl+Alt+Shift+W. Works with WAAPI off: the bar is shown, then the project launches. If no .wproj is remembered, it stays on the bar and reports that it cannot launch. Even if the association is the Launcher, the matching Wwise.exe is started directly.");
     public static string TipOutputFolder => Get(
         "波形の書き出し先フォルダを選択します（接続中 Wwise プロジェクトの Originals 配下）。",
         "Choose the wave export folder (under Originals of the connected Wwise project).");
