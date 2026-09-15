@@ -330,6 +330,7 @@ public partial class MainWindow
                 () => ExportTabs(targets, AudioFileKind.Mp3),
                 AllTabsSelected ? "Ctrl+Shift+Alt+M" : null,
                 enabled: !IsUiBusy));
+            menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 AllTabsSelected ? UiStrings.TabMenuExportWaveByMarkersAll : UiStrings.TabMenuExportWaveByMarkersSelected,
                 () => ExportTabsSeparated(targets, TabExportSplit.Markers),
@@ -338,6 +339,10 @@ public partial class MainWindow
                 AllTabsSelected ? UiStrings.TabMenuExportWaveByRegionsAll : UiStrings.TabMenuExportWaveByRegionsSelected,
                 () => ExportTabsSeparated(targets, TabExportSplit.Regions),
                 enabled: !IsUiBusy && AnyTabHasRegions(targets)));
+            menu.Items.Add(CreateTabMenuItem(
+                AllTabsSelected ? UiStrings.TabMenuExportByChannelsAll : UiStrings.TabMenuExportByChannelsSelected,
+                () => ExportTabsSeparated(targets, TabExportSplit.Channels),
+                enabled: !IsUiBusy));
         }
         else
         {
@@ -377,6 +382,7 @@ public partial class MainWindow
                 UiStrings.TabMenuExportMp3,
                 () => ExportTabs([session], AudioFileKind.Mp3),
                 enabled: !IsUiBusy));
+            menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.TabMenuExportWaveByMarkers,
                 () => ExportTabsSeparated([session], TabExportSplit.Markers),
@@ -385,6 +391,10 @@ public partial class MainWindow
                 UiStrings.TabMenuExportWaveByRegions,
                 () => ExportTabsSeparated([session], TabExportSplit.Regions),
                 enabled: !IsUiBusy && AnyTabHasRegions([session])));
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.TabMenuExportByChannels,
+                () => ExportTabsSeparated([session], TabExportSplit.Channels),
+                enabled: !IsUiBusy));
         }
 
         menu.IsOpen = true;

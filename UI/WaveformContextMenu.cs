@@ -110,6 +110,7 @@ internal enum WaveMenuCommand
     ExportMp3,
     ExportByMarkers,
     ExportByRegions,
+    ExportByChannels,
     ExportAllMp3,
     Tips,
     Manual,
@@ -505,8 +506,11 @@ internal static class WaveformContextMenuBuilder
     [
         Cmd(UiStrings.WaveMenuExportWave, WaveMenuCommand.ExportWave, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
         Cmd(UiStrings.WaveMenuExportMp3, WaveMenuCommand.ExportMp3, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
+        WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuExportByMarkers, WaveMenuCommand.ExportByMarkers, enabled: m.HasDocument && m.HasMarkers && !m.IsBusy && !m.IsRecording),
         Cmd(UiStrings.WaveMenuExportByRegions, WaveMenuCommand.ExportByRegions, enabled: m.HasDocument && m.HasRegions && m.AllowsRegionsAndLoops && !m.IsBusy && !m.IsRecording),
+        Cmd(UiStrings.WaveMenuExportByChannels, WaveMenuCommand.ExportByChannels, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
+        WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuExportAllMp3, WaveMenuCommand.ExportAllMp3, "Ctrl+Shift+Alt+M", m.HasDocument && !m.IsBusy && !m.IsRecording),
     ];
 

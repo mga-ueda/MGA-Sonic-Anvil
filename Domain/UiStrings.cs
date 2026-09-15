@@ -848,6 +848,15 @@ internal static partial class UiStrings
     public static string TabMenuExportWaveByRegionsAll => Get(
         "すべてのタブをリージョンでセパレートして書き出す(_G)",
         "Export All Tabs Separated by Re_gions");
+    public static string TabMenuExportByChannels => Get(
+        "チャンネルごとに書き出す(_C)",
+        "Export by _Channel");
+    public static string TabMenuExportByChannelsSelected => Get(
+        "選択したタブをチャンネルごとに書き出す(_C)",
+        "Export Selected Tabs by _Channel");
+    public static string TabMenuExportByChannelsAll => Get(
+        "すべてのタブをチャンネルごとに書き出す(_C)",
+        "Export All Tabs by _Channel");
 
     public static string EditHistoryTitle => Get("編集履歴", "Edit history");
     public static string EditHistoryOrigin => Get("初期状態", "Original");

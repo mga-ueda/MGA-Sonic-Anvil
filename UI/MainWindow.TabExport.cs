@@ -142,6 +142,14 @@ public partial class MainWindow
                             AppStorage.Settings.ToMp3SpeakerMix()),
                         null);
                 }
+                else if (job.SpeakerFileChannel >= 0)
+                {
+                    AudioCodec.SaveWave(
+                        SpeakerChannelExport.ExtractMono(job.Document, job.SpeakerFileChannel),
+                        job.Path,
+                        jobProgress);
+                    outcomes[i] = new ExportOutcome(null, null);
+                }
                 else if (job.FrameCount > 0)
                 {
                     AudioCodec.SaveWaveRange(job.Document, job.StartFrame, job.FrameCount, job.Path, jobProgress);
@@ -192,6 +200,11 @@ public partial class MainWindow
             return true;
         }
 
+        if (split == TabExportSplit.Channels)
+        {
+            return TryPlanChannelExportJobs(sessions, jobs);
+        }
+
         if (split != TabExportSplit.None)
         {
             return TryPlanSeparatedExportJobs(sessions, extension, split, jobs);
@@ -216,6 +229,36 @@ public partial class MainWindow
                 extension,
                 reserved);
             jobs.Add(new ExportJob(session.DisplayName, dest, session.Document));
+        }
+
+        return true;
+    }
+
+    private bool TryPlanChannelExportJobs(IReadOnlyList<DocumentSession> sessions, List<ExportJob> jobs)
+    {
+        if (!TryPickExportFolder(sessions, out var folder))
+        {
+            return false;
+        }
+
+        var layout = AppStorage.Settings.ResolvedPlaybackLayout();
+        var fileMap = AppStorage.Settings.ResolvedFileChannelMap();
+        var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var session in sessions)
+        {
+            var lanes = SpeakerChannelExport.Plan(session.Document.Channels, layout, fileMap);
+            if (lanes.Length == 0)
+            {
+                continue;
+            }
+
+            var baseName = AudioExport.SuggestBaseName(session.Document.SourcePath, session.DisplayName);
+            foreach (var lane in lanes)
+            {
+                var name = SpeakerChannelExport.FileBaseName(baseName, lane.Suffix);
+                var dest = AudioExport.UniqueInDirectory(folder, name, ".wav", reserved);
+                jobs.Add(new ExportJob(name, dest, session.Document, SpeakerFileChannel: lane.FileChannel));
+            }
         }
 
         return true;
@@ -412,7 +455,8 @@ public partial class MainWindow
         string Path,
         AudioDocument Document,
         long StartFrame = 0,
-        long FrameCount = 0)
+        long FrameCount = 0,
+        int SpeakerFileChannel = -1)
     {
         public long ExportFrameCount => FrameCount > 0 ? FrameCount : Document.FrameCount;
     }
@@ -425,4 +469,5 @@ internal enum TabExportSplit
     None,
     Markers,
     Regions,
+    Channels,
 }

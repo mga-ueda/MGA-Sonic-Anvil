@@ -81,6 +81,12 @@ public sealed class WaveformContextMenuTests
             Assert.Equal("V", volume?.Gesture);
             Assert.Equal("V", loudness?.Gesture);
             Assert.Contains(WaveMenuCommand.ExportWave, commands);
+            Assert.Contains(WaveMenuCommand.ExportByChannels, CommandsIn(tree, UiStrings.WaveMenuCatExport));
+            Assert.Contains(WaveMenuCommand.Channels, CommandsIn(tree, UiStrings.WaveMenuCatFormat));
+            Assert.Contains(WaveMenuCommand.SaveMp3, CommandsIn(tree, UiStrings.WaveMenuCatFile));
+            Assert.Contains(WaveMenuCommand.WwiseExport, CommandsIn(tree, UiStrings.WaveMenuCatFile));
+            Assert.DoesNotContain(WaveMenuCommand.ExportByChannels, CommandsIn(tree, UiStrings.WaveMenuCatFormat));
+            Assert.DoesNotContain(WaveMenuCommand.ExportByChannels, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Contains(WaveMenuCommand.Open, commands);
             Assert.Contains(WaveMenuCommand.CopyAllTabTimes, commands);
             Assert.Contains(WaveMenuCommand.ClearMarkers, commands);
@@ -209,6 +215,14 @@ public sealed class WaveformContextMenuTests
         Assert.Equal('W', MenuAccessKeys.Read("Export _Wave"));
         Assert.Equal('P', MenuAccessKeys.Read("Stop to Start (_P)"));
         Assert.Null(MenuAccessKeys.Read("No key"));
+    }
+
+    private static HashSet<WaveMenuCommand> CommandsIn(IReadOnlyList<WaveMenuEntry> entries, string category)
+    {
+        var children = entries.OfType<WaveMenuItemEntry>()
+            .First(item => item.Header == category)
+            .Children ?? [];
+        return WaveformContextMenuBuilder.Commands(children).ToHashSet();
     }
 
     private static WaveMenuItemEntry? Find(IReadOnlyList<WaveMenuEntry> entries, WaveMenuCommand command)

@@ -449,6 +449,9 @@ public partial class MainWindow
             case WaveMenuCommand.ExportByRegions:
                 ExportActiveTabSeparated(TabExportSplit.Regions);
                 break;
+            case WaveMenuCommand.ExportByChannels:
+                ExportActiveTabSeparated(TabExportSplit.Channels);
+                break;
             case WaveMenuCommand.ExportAllMp3:
                 ExportAllTabsMp3();
                 break;
