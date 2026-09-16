@@ -28,6 +28,11 @@ public partial class MainWindow
 
     private bool _tabLayoutBusy;
 
+    private TextBox? _fileNameEditor;
+    private DocumentSession? _fileNameEditSession;
+    private TextBlock? _fileNameEditTitle;
+    private bool _endingFileNameEdit;
+
     private bool HasTabSelection => _selectedTabs.Count > 0;
 
     private bool AllTabsSelected => _sessions.Count > 0 && _selectedTabs.Count == _sessions.Count;
@@ -64,8 +69,12 @@ public partial class MainWindow
         _tabSelectionAnchor = session;
         if (ReferenceEquals(_activeSession, session) && ReferenceEquals(_document, session.Document))
         {
-            RebuildTabBar();
-            RefreshTileChrome();
+            if (!IsEditingFileName)
+            {
+                RebuildTabBar();
+                RefreshTileChrome();
+            }
+
             return;
         }
 
@@ -96,7 +105,7 @@ public partial class MainWindow
     }
 
     /// <summary>閉じたら true。保存確認でキャンセルされたら false（連続クローズを中断する）。</summary>
-    private bool CloseSession(DocumentSession session)
+    private bool CloseSession(DocumentSession session, bool rememberClosed = true)
     {
         if (_recordSession is not null && ReferenceEquals(session, _recordSession))
         {
@@ -126,7 +135,10 @@ public partial class MainWindow
             CaptureActiveSessionView();
         }
 
-        RememberClosedTab(session, index);
+        if (rememberClosed)
+        {
+            RememberClosedTab(session, index);
+        }
         _sessions.RemoveAt(index);
         if (_sessions.Count == 0)
         {
@@ -352,6 +364,8 @@ public partial class MainWindow
                 "Ctrl+Shift+W",
                 canMutate));
             menu.Items.Add(new Separator());
+            AddFileNameMenuItems(menu, session, canMutate, anchor);
+            menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 AllTabsSelected ? UiStrings.TabMenuPasteToAll : UiStrings.TabMenuPasteToSelected,
                 () => PasteHistoryRecipesToTabs(targets),
@@ -398,6 +412,8 @@ public partial class MainWindow
                 CloseAllTabs,
                 "Ctrl+Shift+W",
                 canMutate));
+            menu.Items.Add(new Separator());
+            AddFileNameMenuItems(menu, session, canMutate, anchor);
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.TabMenuSelectAll,
@@ -561,11 +577,32 @@ public partial class MainWindow
         return item;
     }
 
+    private void AddFileNameMenuItems(
+        ContextMenu menu,
+        DocumentSession session,
+        bool canMutate,
+        FrameworkElement anchor)
+    {
+        menu.Items.Add(CreateTabMenuItem(
+            UiStrings.TabMenuRenameFile,
+            () => BeginFileNameEdit(session, SurfaceFromAnchor(anchor)),
+            enabled: canMutate));
+        menu.Items.Add(CreateTabMenuItem(
+            UiStrings.TabMenuDuplicateFile,
+            () => DuplicateSession(session),
+            enabled: canMutate));
+        menu.Items.Add(CreateTabMenuItem(
+            UiStrings.TabMenuDeleteFile,
+            () => DeleteSessionFile(session),
+            enabled: canMutate));
+    }
+
     private DocumentSession? FindSessionByPath(string path) =>
         _workspace.FindByPath(path);
 
     private void RebuildTabBar()
     {
+        CancelFileNameEdit();
         DocumentTabs.Children.Clear();
         foreach (var session in _sessions)
         {
@@ -723,6 +760,7 @@ public partial class MainWindow
 
         SyncTabOverflow();
         RefreshTileChrome();
+        RefreshDocumentNameChrome();
     }
 
     private FrameworkElement CreateTabItem(DocumentSession session)
@@ -748,7 +786,15 @@ public partial class MainWindow
             TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(0, 0, 6, 0),
         };
-        TipService.Set(title, session.Document.SourcePath ?? UiStrings.UntitledDocument);
+        TipService.Set(title, (session.Document.SourcePath ?? UiStrings.UntitledDocument)
+            + Environment.NewLine + UiStrings.TipRenameFile);
+        title.MouseLeftButtonDown += (_, e) =>
+        {
+            if (TryBeginFileNameEditFromClick(session, title, e))
+            {
+                e.Handled = true;
+            }
+        };
 
         var close = new TextBlock
         {
@@ -839,9 +885,19 @@ public partial class MainWindow
                 }
                 else if (session is not null)
                 {
-                    TipService.Set(block, session.Document.SourcePath ?? UiStrings.UntitledDocument);
+                    TipService.Set(
+                        block,
+                        (session.Document.SourcePath ?? UiStrings.UntitledDocument)
+                        + Environment.NewLine + UiStrings.TipRenameFile);
                 }
             }
+        }
+
+        if (_activeSession is not null && DocumentNameHost.Visibility == Visibility.Visible)
+        {
+            var path = _activeSession.Document.SourcePath ?? UiStrings.UntitledDocument;
+            TipService.Set(DocumentNameText, path + Environment.NewLine + UiStrings.TipRenameFile);
+            TipService.Set(DocumentNameHost, path);
         }
     }
 
@@ -880,10 +936,352 @@ public partial class MainWindow
                         continue;
                     }
 
-                    block.Text = session.TabTitle;
+                    if (!ReferenceEquals(block, _fileNameEditTitle))
+                    {
+                        block.Text = session.TabTitle;
+                    }
+
                     block.Foreground = titleBrush;
                 }
             }
+        }
+    }
+
+    private bool IsEditingFileName =>
+        _fileNameEditor is { Visibility: Visibility.Visible } && _fileNameEditSession is not null;
+
+    private void DocumentNameHost_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_activeSession is null)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        OpenTabContextMenu(DocumentNameHost, _activeSession);
+    }
+
+    private void DocumentNameText_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_activeSession is null)
+        {
+            return;
+        }
+
+        if (TryBeginFileNameEditFromClick(_activeSession, DocumentNameText, e))
+        {
+            e.Handled = true;
+        }
+    }
+
+    private bool TryBeginFileNameEditFromClick(
+        DocumentSession session,
+        TextBlock title,
+        MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left || e.ClickCount < 2)
+        {
+            return false;
+        }
+
+        if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != 0)
+        {
+            return false;
+        }
+
+        BeginFileNameEdit(session, SurfaceFromTitle(title));
+        return true;
+    }
+
+    private void RefreshDocumentNameChrome()
+    {
+        if (_tileMode || _activeSession is null)
+        {
+            DocumentNameHost.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        DocumentNameHost.Visibility = Visibility.Visible;
+        var session = _activeSession;
+        var dirty = session.Document.IsDirty;
+        var accent = (Brush)FindResource(dirty ? "DirtyAccentBrush" : "AccentCyanBrush");
+        DocumentNameUnderline.Background = accent;
+        if (!ReferenceEquals(DocumentNameText, _fileNameEditTitle))
+        {
+            DocumentNameText.Text = session.TabTitle;
+        }
+
+        DocumentNameText.Foreground = dirty
+            ? accent
+            : (Brush)FindResource("PrimaryForeBrush");
+        var path = session.Document.SourcePath ?? UiStrings.UntitledDocument;
+        TipService.Set(DocumentNameText, path + Environment.NewLine + UiStrings.TipRenameFile);
+        TipService.Set(DocumentNameHost, path);
+    }
+
+    private enum FileNameEditSurface
+    {
+        Tab,
+        Tile,
+        Header,
+    }
+
+    private FileNameEditSurface DefaultFileNameEditSurface()
+    {
+        if (DocumentTabHost.IsMouseOver)
+        {
+            return FileNameEditSurface.Tab;
+        }
+
+        if (DocumentNameHost.IsMouseOver)
+        {
+            return FileNameEditSurface.Header;
+        }
+
+        return _tileMode ? FileNameEditSurface.Tile : FileNameEditSurface.Header;
+    }
+
+    private FileNameEditSurface SurfaceFromAnchor(FrameworkElement anchor)
+    {
+        if (ReferenceEquals(anchor, DocumentNameHost)
+            || IsDescendantOf(anchor, DocumentNameHost))
+        {
+            return FileNameEditSurface.Header;
+        }
+
+        if (IsDescendantOf(anchor, DocumentTabHost))
+        {
+            return FileNameEditSurface.Tab;
+        }
+
+        return FileNameEditSurface.Tile;
+    }
+
+    private FileNameEditSurface SurfaceFromTitle(TextBlock title)
+    {
+        if (ReferenceEquals(title, DocumentNameText))
+        {
+            return FileNameEditSurface.Header;
+        }
+
+        if (_tileMode)
+        {
+            foreach (var pane in _tilePanes)
+            {
+                if (ReferenceEquals(pane.Title, title))
+                {
+                    return FileNameEditSurface.Tile;
+                }
+            }
+        }
+
+        return FileNameEditSurface.Tab;
+    }
+
+    private TextBlock? FindFileNameTitle(DocumentSession session, FileNameEditSurface surface)
+    {
+        switch (surface)
+        {
+            case FileNameEditSurface.Header:
+                return !_tileMode && ReferenceEquals(session, _activeSession)
+                    ? DocumentNameText
+                    : null;
+            case FileNameEditSurface.Tile:
+                return FindTilePane(session)?.Title;
+            default:
+                return FindTabTitle(session);
+        }
+    }
+
+    private TextBlock? FindTabTitle(DocumentSession session)
+    {
+        foreach (var border in DocumentTabs.Children.OfType<Border>())
+        {
+            if (border.Tag is not DocumentSession item || !ReferenceEquals(item, session)
+                || border.Child is not DockPanel dock)
+            {
+                continue;
+            }
+
+            foreach (var block in dock.Children.OfType<Grid>().SelectMany(grid => grid.Children.OfType<TextBlock>()))
+            {
+                if (block.Text != "×")
+                {
+                    return block;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private void BeginFileNameEdit(DocumentSession session) =>
+        BeginFileNameEdit(session, DefaultFileNameEditSurface());
+
+    private void BeginFileNameEdit(DocumentSession session, FileNameEditSurface surface)
+    {
+        if (IsUiBusy || IsRecording)
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(_activeSession, session))
+        {
+            ActivateSession(session);
+        }
+
+        var title = FindFileNameTitle(session, surface);
+        if (title is null)
+        {
+            return;
+        }
+
+        if (IsEditingFileName && ReferenceEquals(_fileNameEditSession, session)
+            && ReferenceEquals(_fileNameEditTitle, title))
+        {
+            _fileNameEditor?.Focus();
+            _fileNameEditor?.SelectAll();
+            return;
+        }
+
+        CancelFileNameEdit();
+        var editor = EnsureFileNameEditor();
+        _fileNameEditSession = session;
+        _fileNameEditTitle = title;
+        title.Visibility = Visibility.Collapsed;
+        var text = DocumentFileNames.NameForEdit(session.Document.SourcePath, session.DisplayName);
+        editor.Text = text;
+        PlaceFileNameEditor(title);
+        editor.Visibility = Visibility.Visible;
+        editor.Focus();
+        var stem = DocumentFileNames.StemSelectLength(text);
+        editor.Select(0, stem);
+    }
+
+    private TextBox EnsureFileNameEditor()
+    {
+        if (_fileNameEditor is not null)
+        {
+            return _fileNameEditor;
+        }
+
+        var editor = new TextBox
+        {
+            FontFamily = new FontFamily("Consolas"),
+            FontSize = 11,
+            Padding = new Thickness(2, 0, 2, 0),
+            BorderThickness = new Thickness(1),
+            VerticalAlignment = VerticalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            MinHeight = 0,
+            Visibility = Visibility.Collapsed,
+        };
+        editor.SetResourceReference(StyleProperty, "DarkTextBoxStyle");
+        editor.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
+        editor.SetResourceReference(Control.BackgroundProperty, "DialogInputBackBrush");
+        editor.SetResourceReference(Control.BorderBrushProperty, "AccentCyanBrush");
+        editor.SetResourceReference(TextBox.CaretBrushProperty, "PrimaryForeBrush");
+        editor.KeyDown += (_, e) =>
+        {
+            if (ImeComposition.IsComposing)
+            {
+                return;
+            }
+
+            if (e.Key == Key.Enter)
+            {
+                EndFileNameEdit(commit: true);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                CancelFileNameEdit();
+                e.Handled = true;
+            }
+        };
+        editor.LostFocus += (_, _) => EndFileNameEdit(commit: true);
+        _fileNameEditor = editor;
+        return editor;
+    }
+
+    private void PlaceFileNameEditor(TextBlock title)
+    {
+        var editor = _fileNameEditor!;
+        DetachFileNameEditor();
+        editor.Margin = title.Margin;
+        editor.FontSize = title.FontSize;
+        editor.FontFamily = title.FontFamily;
+        if (title.Parent is Grid grid)
+        {
+            Grid.SetColumn(editor, Grid.GetColumn(title));
+            Grid.SetRow(editor, Grid.GetRow(title));
+            grid.Children.Add(editor);
+            return;
+        }
+
+        if (title.Parent is Panel panel)
+        {
+            panel.Children.Add(editor);
+        }
+    }
+
+    private void DetachFileNameEditor()
+    {
+        if (_fileNameEditor?.Parent is Panel parent)
+        {
+            parent.Children.Remove(_fileNameEditor);
+        }
+    }
+
+    private void CancelFileNameEdit() => EndFileNameEdit(commit: false);
+
+    private void EndFileNameEdit(bool commit)
+    {
+        if (_endingFileNameEdit || _fileNameEditSession is null)
+        {
+            return;
+        }
+
+        if (commit && ImeComposition.IsComposing)
+        {
+            return;
+        }
+
+        _endingFileNameEdit = true;
+        try
+        {
+            var session = _fileNameEditSession;
+            var title = _fileNameEditTitle;
+            var typed = _fileNameEditor?.Text ?? string.Empty;
+            if (commit && string.IsNullOrWhiteSpace(typed))
+            {
+                commit = false;
+            }
+
+            if (commit && !TryCommitFileName(session, typed))
+            {
+                Dispatcher.BeginInvoke(() => _fileNameEditor?.Focus());
+                return;
+            }
+
+            if (title is not null)
+            {
+                title.Visibility = Visibility.Visible;
+            }
+
+            DetachFileNameEditor();
+            if (_fileNameEditor is not null)
+            {
+                _fileNameEditor.Visibility = Visibility.Collapsed;
+            }
+
+            _fileNameEditSession = null;
+            _fileNameEditTitle = null;
+            RefreshTabHeaders();
+        }
+        finally
+        {
+            _endingFileNameEdit = false;
         }
     }
 }

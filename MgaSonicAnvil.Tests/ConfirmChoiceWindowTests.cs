@@ -42,6 +42,33 @@ public sealed class ConfirmChoiceWindowTests
     }
 
     [Fact]
+    public void FileActionConfirmStrings_IncludeNameInBothLanguages()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Contains("tone.wav", UiStrings.ConfirmDeleteFile("tone.wav"));
+            Assert.Contains("ディスク", UiStrings.ConfirmDeleteFile("tone.wav"));
+            Assert.Contains("untitled", UiStrings.ConfirmDeleteUntitled("untitled"));
+            Assert.Contains("tone.wav", UiStrings.ConfirmDuplicateFile("tone.wav"));
+            Assert.Contains("tone 2.wav", UiStrings.ConfirmDuplicateFileAs("tone.wav", "tone 2.wav"));
+            Assert.Contains("隣", UiStrings.ConfirmDuplicateFileAs("tone.wav", "tone 2.wav"));
+            UiStrings.SetLanguage(UiLanguage.English);
+            Assert.Contains("tone.wav", UiStrings.ConfirmDeleteFile("tone.wav"));
+            Assert.Contains("disk", UiStrings.ConfirmDeleteFile("tone.wav"), StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("untitled", UiStrings.ConfirmDeleteUntitled("untitled"));
+            Assert.Contains("tone.wav", UiStrings.ConfirmDuplicateFile("tone.wav"));
+            Assert.Contains("tone 2.wav", UiStrings.ConfirmDuplicateFileAs("tone.wav", "tone 2.wav"));
+            Assert.Contains("next tab", UiStrings.ConfirmDuplicateFileAs("tone.wav", "tone 2.wav"), StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
     public void YesNoCancelLabels_StayLocalized()
     {
         var previous = UiStrings.Language;

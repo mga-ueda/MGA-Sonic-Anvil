@@ -404,10 +404,13 @@ public partial class MainWindow
 
         for (var i = WaveformTileHost.Children.Count - 1; i >= 0; i--)
         {
-            if (!ReferenceEquals(WaveformTileHost.Children[i], PrimaryWaveform))
+            var child = WaveformTileHost.Children[i];
+            if (ReferenceEquals(child, SingleWaveformHost) || ReferenceEquals(child, _tileGrid))
             {
-                WaveformTileHost.Children.RemoveAt(i);
+                continue;
             }
+
+            WaveformTileHost.Children.RemoveAt(i);
         }
 
         WaveformTileHost.Children.Add(_tileGrid);
@@ -424,6 +427,7 @@ public partial class MainWindow
         ApplyWaveformTileBackground(_tileGrid);
         PrimaryWaveform.Document = null;
         PrimaryWaveform.Visibility = Visibility.Collapsed;
+        SingleWaveformHost.Visibility = Visibility.Collapsed;
     }
 
     private Grid CreateTileGrid(int rows, int cols)
@@ -500,7 +504,8 @@ public partial class MainWindow
         _tileGrid = null;
         _tileActiveView = null;
         WaveformTileHost.Children.Clear();
-        WaveformTileHost.Children.Add(PrimaryWaveform);
+        WaveformTileHost.Children.Add(SingleWaveformHost);
+        SingleWaveformHost.Visibility = Visibility.Visible;
         PrimaryWaveform.Visibility = Visibility.Visible;
         Overview.SeekTrailSource = PrimaryWaveform;
         if (!bindPrimary)
@@ -520,6 +525,7 @@ public partial class MainWindow
         Transport.SetAnalysisView(PrimaryWaveform.AnalysisView);
         SyncViewChrome();
         RefreshStatus();
+        RefreshDocumentNameChrome();
         AttachPlaybackToActiveWaveform();
     }
 
@@ -593,15 +599,32 @@ public partial class MainWindow
         {
             Text = session.TabTitle,
             FontSize = 11,
-            Margin = new Thickness(6, 0, 6, 0),
+            FontFamily = new FontFamily("Consolas"),
+            Margin = new Thickness(10, 0, 10, 0),
+            HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
+            Cursor = Cursors.Hand,
         };
+        TipService.Set(title, (session.Document.SourcePath ?? UiStrings.UntitledDocument)
+            + Environment.NewLine + UiStrings.TipRenameFile);
+        title.MouseLeftButtonDown += (_, e) =>
+        {
+            if (TryBeginFileNameEditFromClick(session, title, e))
+            {
+                e.Handled = true;
+            }
+        };
+        var headerBody = new DockPanel();
+        headerBody.Children.Add(title);
         var header = new Border
         {
             Height = DesignMetrics.DocumentTabBarHeight,
-            Child = title,
-            Cursor = Cursors.Hand,
+            Child = headerBody,
+        };
+        header.SizeChanged += (_, _) =>
+        {
+            title.MaxWidth = Math.Max(0, header.ActualWidth - title.Margin.Left - title.Margin.Right);
         };
         header.MouseRightButtonUp += (_, e) =>
         {
@@ -792,9 +815,14 @@ public partial class MainWindow
         {
             var active = ReferenceEquals(pane.Session, _activeSession);
             var dirty = pane.Session.Document.IsDirty;
-            pane.Title.Text = pane.Session.TabTitle;
+            if (!ReferenceEquals(pane.Title, _fileNameEditTitle))
+            {
+                pane.Title.Text = pane.Session.TabTitle;
+            }
             pane.Title.Foreground = (Brush)FindResource(
                 dirty ? "DirtyAccentBrush" : active ? "PrimaryForeBrush" : "MutedForeBrush");
+            var path = pane.Session.Document.SourcePath ?? UiStrings.UntitledDocument;
+            TipService.Set(pane.Title, path + Environment.NewLine + UiStrings.TipRenameFile);
             ApplyWaveformTileBackground(pane.Host);
             if (pane.Host.Child is DockPanel dock && dock.Children[0] is Border header)
             {

@@ -107,6 +107,9 @@ internal static partial class UiStrings
     public static string WaveMenuSave => Get("上書き保存(_S)", "_Save");
     public static string WaveMenuSaveAs => Get("名前を付けて保存(_A)", "Save _As");
     public static string WaveMenuSaveMp3 => Get("MP3 として保存(_M)", "Save as _MP3");
+    public static string WaveMenuRenameFile => Get("ファイル名を変更(_F)", "Rename _File");
+    public static string WaveMenuDuplicateFile => Get("複製(_U)", "D_uplicate");
+    public static string WaveMenuDeleteFile => Get("ファイルを削除(_Y)", "Delete File (_Y)");
     public static string WaveMenuCloseTab => Get("タブを閉じる(_C)", "_Close Tab");
     /// <summary>ファイルメニュー用。開く(_O)と重ならないよう D。</summary>
     public static string WaveMenuCloseOthers => Get("このタブ以外を閉じる(_D)", "Close Other Tabs (_D)");

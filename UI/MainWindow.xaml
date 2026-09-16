@@ -161,7 +161,29 @@
               <Grid x:Name="WaveformTileHost"
                     Background="{DynamicResource WaveformBackBrush}"
                     SizeChanged="WaveformTileHost_SizeChanged">
-                <ui:WaveformView x:Name="PrimaryWaveform" ClipToBounds="True" />
+                <DockPanel x:Name="SingleWaveformHost">
+                  <Border x:Name="DocumentNameHost"
+                          DockPanel.Dock="Top"
+                          Height="{x:Static ui:DesignMetrics.DocumentTabBarHeight}"
+                          Cursor="Hand"
+                          Visibility="Collapsed"
+                          MouseRightButtonUp="DocumentNameHost_MouseRightButtonUp">
+                    <DockPanel>
+                      <Border x:Name="DocumentNameUnderline"
+                              DockPanel.Dock="Bottom"
+                              Height="2"
+                              Background="{DynamicResource AccentCyanBrush}" />
+                      <TextBlock x:Name="DocumentNameText"
+                                 FontSize="11"
+                                 FontFamily="Consolas"
+                                 VerticalAlignment="Center"
+                                 TextTrimming="CharacterEllipsis"
+                                 Margin="10,0,10,0"
+                                 MouseLeftButtonDown="DocumentNameText_MouseLeftButtonDown" />
+                    </DockPanel>
+                  </Border>
+                  <ui:WaveformView x:Name="PrimaryWaveform" ClipToBounds="True" />
+                </DockPanel>
               </Grid>
             </DockPanel>
           </Grid>

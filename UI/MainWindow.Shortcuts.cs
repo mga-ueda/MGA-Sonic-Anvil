@@ -228,6 +228,11 @@ public partial class MainWindow
             return true;
         }
 
+        if (IsEditingFileName)
+        {
+            return false;
+        }
+
         if (Waveform.IsEditingMarkerComment || StatusTimes.IsTimeFocused)
         {
             return false;
@@ -810,6 +815,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (IsEditingFileName)
+        {
+            CancelFileNameEdit();
+            return true;
+        }
+
         if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker() || ClosePitchShiftPicker() || CloseTimeStretchPicker())
         {
             return true;
@@ -891,6 +902,15 @@ public partial class MainWindow
 
     private bool TryProcessDocumentShortcut(Key key, ModifierKeys modifiers)
     {
+        if (key == Key.F2 && modifiers == ModifierKeys.None)
+        {
+            if (_activeSession is not null)
+            {
+                BeginFileNameEdit(_activeSession);
+                return true;
+            }
+        }
+
         if (key == Key.Q && modifiers == ModifierKeys.Control)
         {
             Close();

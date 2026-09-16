@@ -465,6 +465,33 @@ internal sealed partial class AudioDocument
         _liveSampleCount = -1;
     }
 
+    /// <summary>作業内容のコピー。パスは持たない（未保存の複製用）。</summary>
+    public AudioDocument CopyWorking()
+    {
+        var count = Math.Max(0, SampleCount);
+        var samples = new float[count];
+        if (count > 0)
+        {
+            Array.Copy(Interleaved, samples, count);
+        }
+
+        var copy = new AudioDocument(
+            samples,
+            SampleRate,
+            Channels,
+            BitsPerSample,
+            SourceKind,
+            sourcePath: null);
+        copy.SetChannelMask(ChannelMask);
+        copy.ReplaceMarkers(SnapshotMarkers(), markDirty: false, normalizeComments: false);
+        copy.SetRegions(SnapshotRegions(), markDirty: false);
+        copy.SetSampleLoop(SampleLoop, markDirty: false);
+        copy.Selection = Selection;
+        copy.CursorFrame = CursorFrame;
+        copy.SetDirty(true);
+        return copy;
+    }
+
     public void RefreshFileBytes()
     {
         if (!string.IsNullOrWhiteSpace(SourcePath))

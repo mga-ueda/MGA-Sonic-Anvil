@@ -94,6 +94,9 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.ExportByChannels, CommandsIn(tree, UiStrings.WaveMenuCatExport));
             Assert.Contains(WaveMenuCommand.Channels, CommandsIn(tree, UiStrings.WaveMenuCatFormat));
             Assert.Contains(WaveMenuCommand.SaveMp3, CommandsIn(tree, UiStrings.WaveMenuCatFile));
+            Assert.Contains(WaveMenuCommand.RenameFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
+            Assert.Contains(WaveMenuCommand.DuplicateFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
+            Assert.Contains(WaveMenuCommand.DeleteFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Contains(WaveMenuCommand.CloseOthers, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.True(Find(tree, WaveMenuCommand.CloseOthers)?.Enabled);
             Assert.True(Find(tree, WaveMenuCommand.CloseTabsRight)?.Enabled);
@@ -142,6 +145,9 @@ public sealed class WaveformContextMenuTests
         Assert.False(Find(idle, WaveMenuCommand.Cut)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.FadeIn)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.Save)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.RenameFile)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.DuplicateFile)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.DeleteFile)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.CopyAllTabTimes)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.CloseOthers)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.CloseTabsRight)?.Enabled);
@@ -191,7 +197,18 @@ public sealed class WaveformContextMenuTests
         });
         Assert.True(Find(withRegions, WaveMenuCommand.NormalizePerRegion)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.Save)?.Enabled);
+        Assert.True(Find(ready, WaveMenuCommand.RenameFile)?.Enabled);
+        Assert.True(Find(ready, WaveMenuCommand.DuplicateFile)?.Enabled);
+        Assert.True(Find(ready, WaveMenuCommand.DeleteFile)?.Enabled);
         Assert.False(Find(ready, WaveMenuCommand.PlayExit)?.Enabled);
+        var recording = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasDocument = true,
+            IsRecording = true,
+        });
+        Assert.False(Find(recording, WaveMenuCommand.RenameFile)?.Enabled);
+        Assert.False(Find(recording, WaveMenuCommand.DuplicateFile)?.Enabled);
+        Assert.False(Find(recording, WaveMenuCommand.DeleteFile)?.Enabled);
         var waapiOn = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
         {
             HasDocument = true,

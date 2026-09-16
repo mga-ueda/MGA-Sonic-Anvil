@@ -437,6 +437,34 @@ internal static partial class UiStrings
         total,
         name);
     public static string ErrorSaveFailed => Get("書き出しに失敗しました。", "Failed to save the file.");
+    public static string ErrorRenameFailed => Get("名前の変更に失敗しました。", "Failed to rename the file.");
+    public static string ErrorDeleteFailed => Get("ファイルの削除に失敗しました。", "Failed to delete the file.");
+    public static string ErrorDuplicateFailed => Get("ファイルの複製に失敗しました。", "Failed to duplicate the file.");
+    public static string ErrorFileNameEmpty => Get("ファイル名を入力してください。", "Enter a file name.");
+    public static string ErrorFileNameInvalid => Get("使えないファイル名です。", "That file name is not allowed.");
+    public static string ErrorFileNameExists => Get("同じ名前のファイルがあります。", "A file with that name already exists.");
+    public static string ErrorFileNameOpen => Get("そのファイルは別のタブで開いています。", "That file is already open in another tab.");
+    public static string ConfirmDeleteFile(string name) => Format(
+        "{0} をディスクから削除しますか？この操作は元に戻せません。",
+        "Delete {0} from disk? This cannot be undone.",
+        name);
+    public static string ConfirmDeleteUntitled(string name) => Format(
+        "{0} を削除しますか？タブを閉じ、未保存の変更は破棄されます。",
+        "Delete {0}? The tab will close and unsaved changes will be discarded.",
+        name);
+    public static string ConfirmDuplicateFile(string name) => Format(
+        "{0} を複製しますか？",
+        "Duplicate {0}?",
+        name);
+    public static string ConfirmDuplicateFileAs(string name, string copyName) => Format(
+        "{0} を複製しますか？{2}{1} として隣のタブで開きます。",
+        "Duplicate {0}?{2}It will open in the next tab as {1}.",
+        name,
+        copyName,
+        Environment.NewLine);
+    public static string TipRenameFile => Get(
+        "ダブルクリックでファイル名を変更します。",
+        "Double-click to rename the file.");
     public static string ErrorAiffExport => Get(
         "AIFF の書き出しには対応していません。Wave または MP3 を選んでください。",
         "AIFF export is not supported. Choose Wave or MP3.");
@@ -832,6 +860,9 @@ internal static partial class UiStrings
     public static string MenuCopy => Get("コピー(_C)", "_Copy");
     public static string MenuPaste => Get("貼り付け(_P)", "_Paste");
 
+    public static string TabMenuRenameFile => Get("ファイル名を変更(_N)", "Re_name File");
+    public static string TabMenuDuplicateFile => Get("複製(_U)", "D_uplicate");
+    public static string TabMenuDeleteFile => Get("ファイルを削除(_D)", "_Delete File");
     public static string TabMenuCloseThis => Get("このタブを閉じる(_S)", "Close Thi_s Tab");
     public static string TabMenuCloseOthers => Get("このタブ以外を閉じる(_O)", "Close _Other Tabs");
     public static string TabMenuCloseRight => Get("このタブを含め右側を全部閉じる(_R)", "Close This and Tabs to the _Right");

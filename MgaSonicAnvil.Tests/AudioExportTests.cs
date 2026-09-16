@@ -137,4 +137,24 @@ public sealed class AudioExportTests
         Assert.Equal("untitled.wav", Path.GetFileName(a));
         Assert.Equal("untitled 2.wav", Path.GetFileName(b));
     }
+
+    [Fact]
+    public void UniqueInDirectory_SkipExistingFiles_JumpsPastDisk()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "mga-unique-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var existing = Path.Combine(dir, "tone.wav");
+            File.WriteAllBytes(existing, [1]);
+            var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var dest = AudioExport.UniqueInDirectory(dir, "tone", ".wav", reserved, skipExistingFiles: true);
+            Assert.Equal("tone 2.wav", Path.GetFileName(dest));
+            Assert.False(File.Exists(dest));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
 }

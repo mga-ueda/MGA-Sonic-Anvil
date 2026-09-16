@@ -422,6 +422,27 @@ public partial class MainWindow
             case WaveMenuCommand.SaveMp3:
                 SaveAsMp3();
                 break;
+            case WaveMenuCommand.RenameFile:
+                if (_activeSession is not null)
+                {
+                    BeginFileNameEdit(_activeSession);
+                }
+
+                break;
+            case WaveMenuCommand.DuplicateFile:
+                if (_activeSession is not null)
+                {
+                    DuplicateSession(_activeSession);
+                }
+
+                break;
+            case WaveMenuCommand.DeleteFile:
+                if (_activeSession is not null)
+                {
+                    DeleteSessionFile(_activeSession);
+                }
+
+                break;
             case WaveMenuCommand.CloseTab:
                 CloseDocument();
                 break;

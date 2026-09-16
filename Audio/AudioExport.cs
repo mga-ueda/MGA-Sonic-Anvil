@@ -23,7 +23,8 @@ internal static class AudioExport
         string directory,
         string baseName,
         string extension,
-        ISet<string> reserved)
+        ISet<string> reserved,
+        bool skipExistingFiles = false)
     {
         var ext = NormalizeExtension(extension);
         var safe = SanitizeBaseName(baseName);
@@ -32,6 +33,13 @@ internal static class AudioExport
         {
             var name = n == 1 ? safe + ext : $"{safe} {n}{ext}";
             var path = Path.GetFullPath(Path.Combine(directory, name));
+            if (skipExistingFiles && File.Exists(path))
+            {
+                reserved.Add(path);
+                n++;
+                continue;
+            }
+
             if (reserved.Add(path))
             {
                 return path;

@@ -602,6 +602,362 @@ public partial class MainWindow
         CloseSession(_activeSession);
     }
 
+    private bool TryCommitFileName(DocumentSession session, string typedName)
+    {
+        var document = session.Document;
+        var fallbackDir = ResolveOpenInitialDirectory();
+        if (!DocumentFileNames.TryBuildRenamePath(
+            document.SourcePath,
+            typedName,
+            fallbackDir,
+            ".wav",
+            out var destination,
+            out var error))
+        {
+            ShowFileNameError(error);
+            return false;
+        }
+
+        if (document.SourcePath is { } source
+            && DocumentFileNames.IsSamePath(source, destination)
+            && string.Equals(Path.GetFileName(source), Path.GetFileName(destination), StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var opened = FindSessionByPath(destination);
+        if (opened is not null && !ReferenceEquals(opened, session))
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorFileNameOpen,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return false;
+        }
+
+        try
+        {
+            if (document.SourcePath is { } path && File.Exists(path))
+            {
+                if (File.Exists(destination) && !DocumentFileNames.IsSamePath(path, destination))
+                {
+                    OwnerCenteredMessageBox.Show(
+                        this,
+                        UiStrings.ErrorFileNameExists,
+                        UiStrings.AppName,
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return false;
+                }
+
+                if (IsPlaybackActive() && ReferenceEquals(session, _activeSession))
+                {
+                    StopPlayback();
+                }
+
+                MoveDocumentFile(path, destination);
+                document.SourcePath = destination;
+                document.RefreshFileBytes();
+            }
+            else
+            {
+                if (File.Exists(destination))
+                {
+                    OwnerCenteredMessageBox.Show(
+                        this,
+                        UiStrings.ErrorFileNameExists,
+                        UiStrings.AppName,
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return false;
+                }
+
+                var folder = Path.GetDirectoryName(destination);
+                if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+                {
+                    return Save(saveAs: true, document);
+                }
+
+                var encoder = AudioCodec.Save(
+                    document,
+                    destination,
+                    AppStorage.Settings.ToMp3EncodeOptions(),
+                    AppStorage.Settings.ToMp3SpeakerMix());
+                document.MarkSaved(destination, AudioCodec.DetectKind(destination));
+                session.History.MarkClean();
+                if (encoder is { } used)
+                {
+                    ShowMp3EncoderResult(used);
+                }
+            }
+
+            if (ReferenceEquals(session, _activeSession) && document.SourcePath is { } saved)
+            {
+                RememberOpenedPath(saved);
+            }
+
+            RefreshTitle();
+            RefreshStatus();
+            return true;
+        }
+        catch (NotSupportedException)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorAiffExport,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                $"{UiStrings.ErrorRenameFailed}\n{ex.Message}",
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+
+        return false;
+    }
+
+    private static void MoveDocumentFile(string source, string destination)
+    {
+        if (DocumentFileNames.IsCaseOnlyChange(source, destination))
+        {
+            var dir = Path.GetDirectoryName(source) ?? Path.GetTempPath();
+            var temp = Path.Combine(dir, "." + Guid.NewGuid().ToString("N") + Path.GetExtension(source));
+            File.Move(source, temp);
+            File.Move(temp, destination);
+            return;
+        }
+
+        File.Move(source, destination);
+    }
+
+    private void ShowFileNameError(DocumentFileNameError error)
+    {
+        var text = error == DocumentFileNameError.Empty
+            ? UiStrings.ErrorFileNameEmpty
+            : UiStrings.ErrorFileNameInvalid;
+        OwnerCenteredMessageBox.Show(
+            this,
+            text,
+            UiStrings.AppName,
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
+    private bool ConfirmFileAction(string text, MessageBoxImage icon, MessageBoxResult defaultResult)
+    {
+        OwnerCenteredMessageBox.PlayFor(icon);
+        return ConfirmChoiceWindow.Show(
+            this,
+            text,
+            UiStrings.AppName,
+            MessageBoxButton.YesNo,
+            defaultResult) == MessageBoxResult.Yes;
+    }
+
+    private void DuplicateSession(DocumentSession session)
+    {
+        if (IsUiBusy)
+        {
+            return;
+        }
+
+        string? destPath = null;
+        var confirm = UiStrings.ConfirmDuplicateFile(session.DisplayName);
+        if (session.Document.SourcePath is { } path && File.Exists(path))
+        {
+            destPath = UniqueCopyPath(path);
+            confirm = UiStrings.ConfirmDuplicateFileAs(session.DisplayName, Path.GetFileName(destPath));
+        }
+
+        if (!ConfirmFileAction(confirm, MessageBoxImage.Question, MessageBoxResult.Yes))
+        {
+            return;
+        }
+
+        if (IsRecording && ReferenceEquals(session, _recordSession))
+        {
+            StopRecording();
+        }
+
+        if (IsPlaybackActive() && ReferenceEquals(session, _activeSession))
+        {
+            StopPlayback();
+        }
+
+        try
+        {
+            var copy = CreateDuplicateSession(session, destPath);
+            CopyViewState(session, copy);
+            InsertSessionAdjacent(session, copy);
+            if (copy.Document.SourcePath is { } opened)
+            {
+                RememberOpenedPath(opened);
+            }
+        }
+        catch (NotSupportedException)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorAiffExport,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                $"{UiStrings.ErrorDuplicateFailed}\n{ex.Message}",
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private DocumentSession CreateDuplicateSession(DocumentSession session, string? destPath)
+    {
+        var document = session.Document;
+        if (document.SourcePath is { } path && File.Exists(path))
+        {
+            var dest = destPath ?? UniqueCopyPath(path);
+            if (!document.IsDirty)
+            {
+                File.Copy(path, dest);
+            }
+            else if (AudioCodec.DetectKind(path) == AudioFileKind.Aiff)
+            {
+                return new DocumentSession(document.CopyWorking());
+            }
+            else
+            {
+                AudioCodec.Save(
+                    document,
+                    dest,
+                    AppStorage.Settings.ToMp3EncodeOptions(),
+                    AppStorage.Settings.ToMp3SpeakerMix());
+            }
+
+            return new DocumentSession(AudioCodec.Load(dest));
+        }
+
+        return new DocumentSession(document.CopyWorking());
+    }
+
+    private string UniqueCopyPath(string sourcePath)
+    {
+        var dir = Path.GetDirectoryName(sourcePath);
+        if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
+        {
+            dir = ResolveOpenInitialDirectory();
+        }
+
+        if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
+        {
+            dir = Path.GetTempPath();
+        }
+
+        var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in _sessions)
+        {
+            if (item.Document.SourcePath is { } path
+                && DocumentWorkspace.TryNormalizePath(path, out var full))
+            {
+                reserved.Add(full);
+            }
+        }
+
+        return AudioExport.UniqueInDirectory(
+            dir,
+            Path.GetFileNameWithoutExtension(sourcePath),
+            Path.GetExtension(sourcePath),
+            reserved,
+            skipExistingFiles: true);
+    }
+
+    private static void CopyViewState(DocumentSession from, DocumentSession to)
+    {
+        to.TimeZoom = from.TimeZoom;
+        to.AmpZoom = from.AmpZoom;
+        to.ViewStart = from.ViewStart;
+        to.PlayheadFrame = from.PlayheadFrame;
+        to.LoopEnabled = from.LoopEnabled;
+        to.AnalysisView = from.AnalysisView;
+        to.SoloMask = from.SoloMask;
+        to.SelectedMarkerFrames.Clear();
+        to.SelectedMarkerFrames.AddRange(from.SelectedMarkerFrames);
+    }
+
+    private void InsertSessionAdjacent(DocumentSession source, DocumentSession copy)
+    {
+        var index = _sessions.IndexOf(source);
+        var insertAt = index < 0 ? _sessions.Count : index + 1;
+        _sessions.Insert(insertAt, copy);
+        ActivateSession(copy);
+        ApplyPreferredMultiFileArrange(1);
+    }
+
+    private void DeleteSessionFile(DocumentSession session)
+    {
+        if (IsUiBusy)
+        {
+            return;
+        }
+
+        var path = session.Document.SourcePath;
+        var fromDisk = !string.IsNullOrWhiteSpace(path) && File.Exists(path);
+        var confirm = fromDisk
+            ? UiStrings.ConfirmDeleteFile(session.DisplayName)
+            : UiStrings.ConfirmDeleteUntitled(session.DisplayName);
+        if (!ConfirmFileAction(confirm, MessageBoxImage.Warning, MessageBoxResult.No))
+        {
+            return;
+        }
+
+        if (!fromDisk)
+        {
+            session.Document.SetDirty(false);
+            CloseSession(session, rememberClosed: false);
+            return;
+        }
+
+        if (IsRecording && ReferenceEquals(session, _recordSession))
+        {
+            StopRecording();
+        }
+
+        if (IsPlaybackActive())
+        {
+            StopPlayback();
+        }
+
+        try
+        {
+            File.Delete(path!);
+        }
+        catch (Exception ex)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                $"{UiStrings.ErrorDeleteFailed}\n{ex.Message}",
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return;
+        }
+
+        session.Document.SetDirty(false);
+        session.Document.SourcePath = null;
+        CloseSession(session, rememberClosed: false);
+    }
+
     private enum DirtyClosePolicy
     {
         Ask,
