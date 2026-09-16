@@ -171,6 +171,9 @@ internal sealed class WaveformContextMenuModel
     public bool CanCloseTabsToRight { get; init; }
     public bool CanCloseTabsToLeft { get; init; }
     public WaveformTileArrange WaveTileArrange { get; init; }
+    public bool CanTileHorizontal { get; init; }
+    public bool CanTileVertical { get; init; }
+    public bool CanTileGrid { get; init; }
     public bool CanLoopPlay { get; init; }
     public bool CanAddMarkerHere { get; init; }
     public WaveformAnalysisView AnalysisView { get; init; }
@@ -210,6 +213,9 @@ internal sealed class WaveformContextMenuModel
         CanCloseTabsToRight = true,
         CanCloseTabsToLeft = true,
         WaveTileArrange = WaveformTileArrange.Grid,
+        CanTileHorizontal = true,
+        CanTileVertical = true,
+        CanTileGrid = true,
         CanLoopPlay = true,
         CanAddMarkerHere = true,
         AnalysisView = WaveformAnalysisView.Waveform,
@@ -480,10 +486,10 @@ internal static class WaveformContextMenuBuilder
         Check(UiStrings.WaveMenuViewOverlay, WaveMenuCommand.ViewOverlay, "A", m.AnalysisView == WaveformAnalysisView.Overlay, m.HasDocument && !m.IsBusy),
         Check(UiStrings.WaveMenuViewLoudness, WaveMenuCommand.ViewLoudness, "V", m.AnalysisView == WaveformAnalysisView.Loudness, m.HasDocument && !m.IsBusy),
         WaveMenuSeparatorEntry.Instance,
-        Check(UiStrings.WaveMenuTileOff, WaveMenuCommand.TileOff, null, m.WaveTileArrange == WaveformTileArrange.Off, m.HasMultipleTabs && !m.IsBusy),
-        Check(UiStrings.WaveMenuTileHorizontal, WaveMenuCommand.TileHorizontal, null, m.WaveTileArrange == WaveformTileArrange.Horizontal, m.HasMultipleTabs && !m.IsBusy),
-        Check(UiStrings.WaveMenuTileVertical, WaveMenuCommand.TileVertical, null, m.WaveTileArrange == WaveformTileArrange.Vertical, m.HasMultipleTabs && !m.IsBusy),
-        Check(UiStrings.WaveMenuTileGrid, WaveMenuCommand.TileGrid, null, m.WaveTileArrange == WaveformTileArrange.Grid, m.HasMultipleTabs && !m.IsBusy),
+        Check(UiStrings.WaveMenuTileOff, WaveMenuCommand.TileOff, null, m.WaveTileArrange == WaveformTileArrange.Off, CanPickTile(m, WaveformTileArrange.Off)),
+        Check(UiStrings.WaveMenuTileHorizontal, WaveMenuCommand.TileHorizontal, null, m.WaveTileArrange == WaveformTileArrange.Horizontal, CanPickTile(m, WaveformTileArrange.Horizontal)),
+        Check(UiStrings.WaveMenuTileVertical, WaveMenuCommand.TileVertical, null, m.WaveTileArrange == WaveformTileArrange.Vertical, CanPickTile(m, WaveformTileArrange.Vertical)),
+        Check(UiStrings.WaveMenuTileGrid, WaveMenuCommand.TileGrid, null, m.WaveTileArrange == WaveformTileArrange.Grid, CanPickTile(m, WaveformTileArrange.Grid)),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuSoloNext, WaveMenuCommand.SoloNext, "Tab", m.CanNavigate),
         Cmd(UiStrings.WaveMenuSoloPrev, WaveMenuCommand.SoloPrev, "Shift+Tab", m.CanNavigate),
@@ -541,6 +547,27 @@ internal static class WaveformContextMenuBuilder
 
     private static WaveMenuItemEntry Sub(string header, IReadOnlyList<WaveMenuEntry> children) =>
         new(header, Command: null, Children: children);
+
+    private static bool CanPickTile(WaveformContextMenuModel m, WaveformTileArrange arrange)
+    {
+        if (!m.HasMultipleTabs || m.IsBusy)
+        {
+            return false;
+        }
+
+        if (arrange == WaveformTileArrange.Off || m.WaveTileArrange == arrange)
+        {
+            return true;
+        }
+
+        return arrange switch
+        {
+            WaveformTileArrange.Horizontal => m.CanTileHorizontal,
+            WaveformTileArrange.Vertical => m.CanTileVertical,
+            WaveformTileArrange.Grid => m.CanTileGrid,
+            _ => false,
+        };
+    }
 
     private static WaveMenuItemEntry Cmd(
         string header,

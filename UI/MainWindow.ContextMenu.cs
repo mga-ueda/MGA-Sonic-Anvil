@@ -142,6 +142,9 @@ public partial class MainWindow
             CanCloseTabsToRight = CanCloseTabsFromActive(rightSide: true, hasDoc, busy, recording),
             CanCloseTabsToLeft = CanCloseTabsFromActive(rightSide: false, hasDoc, busy, recording),
             WaveTileArrange = _tileArrange,
+            CanTileHorizontal = CanOfferTileArrange(WaveformTileArrange.Horizontal),
+            CanTileVertical = CanOfferTileArrange(WaveformTileArrange.Vertical),
+            CanTileGrid = CanOfferTileArrange(WaveformTileArrange.Grid),
             CanLoopPlay = canNavigate
                 && (hasSelection
                     || !document!.SampleLoop.IsEmpty

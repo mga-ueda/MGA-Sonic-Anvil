@@ -159,7 +159,8 @@
                                       DockPanel.Dock="Bottom"
                                       Panel.ZIndex="1" />
               <Grid x:Name="WaveformTileHost"
-                    Background="{DynamicResource WaveformBackBrush}">
+                    Background="{DynamicResource WaveformBackBrush}"
+                    SizeChanged="WaveformTileHost_SizeChanged">
                 <ui:WaveformView x:Name="PrimaryWaveform" ClipToBounds="True" />
               </Grid>
             </DockPanel>

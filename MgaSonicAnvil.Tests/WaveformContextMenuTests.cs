@@ -148,6 +148,8 @@ public sealed class WaveformContextMenuTests
         Assert.False(Find(idle, WaveMenuCommand.CloseTabsLeft)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.ExportAllWave)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.LoopPlay)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.TileHorizontal)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.TileGrid)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.Record)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.NormalizePerRegion)?.Enabled);
         Assert.True(Find(idle, WaveMenuCommand.Open)?.Enabled);
@@ -197,6 +199,34 @@ public sealed class WaveformContextMenuTests
         });
         Assert.True(Find(waapiOn, WaveMenuCommand.PlayExit)?.Enabled);
         Assert.Equal("Alt+E", Find(waapiOn, WaveMenuCommand.PlayExit)?.Gesture);
+    }
+
+    [Fact]
+    public void Build_DisablesTileArrangesThatDoNotFit()
+    {
+        var tree = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasMultipleTabs = true,
+            CanTileHorizontal = false,
+            CanTileVertical = true,
+            CanTileGrid = false,
+        });
+        Assert.True(Find(tree, WaveMenuCommand.TileOff)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.TileHorizontal)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.TileVertical)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.TileGrid)?.Enabled);
+
+        var current = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasMultipleTabs = true,
+            WaveTileArrange = WaveformTileArrange.Horizontal,
+            CanTileHorizontal = false,
+            CanTileVertical = false,
+            CanTileGrid = false,
+        });
+        Assert.True(Find(current, WaveMenuCommand.TileHorizontal)?.Enabled);
+        Assert.True(Find(current, WaveMenuCommand.TileHorizontal)?.Checked);
+        Assert.False(Find(current, WaveMenuCommand.TileVertical)?.Enabled);
     }
 
     [Fact]

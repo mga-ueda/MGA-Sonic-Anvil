@@ -509,30 +509,29 @@ public partial class MainWindow
     /// <summary>タブメニューに並べ方（タブのまま／左右／上下／上下左右）を直接並べる。</summary>
     private void AddTileArrangeMenuItems(ContextMenu menu, bool canMutate)
     {
-        var enabled = canMutate && _sessions.Count > 1;
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateTabMenuItem(
             UiStrings.TabMenuTileOff,
             () => SetWaveformTileArrange(WaveformTileArrange.Off),
-            enabled: enabled,
+            enabled: canMutate && CanOfferTileArrange(WaveformTileArrange.Off),
             checkable: true,
             isChecked: _tileArrange == WaveformTileArrange.Off));
         menu.Items.Add(CreateTabMenuItem(
             UiStrings.TabMenuTileHorizontal,
             () => SetWaveformTileArrange(WaveformTileArrange.Horizontal),
-            enabled: enabled,
+            enabled: canMutate && CanOfferTileArrange(WaveformTileArrange.Horizontal),
             checkable: true,
             isChecked: _tileArrange == WaveformTileArrange.Horizontal));
         menu.Items.Add(CreateTabMenuItem(
             UiStrings.TabMenuTileVertical,
             () => SetWaveformTileArrange(WaveformTileArrange.Vertical),
-            enabled: enabled,
+            enabled: canMutate && CanOfferTileArrange(WaveformTileArrange.Vertical),
             checkable: true,
             isChecked: _tileArrange == WaveformTileArrange.Vertical));
         menu.Items.Add(CreateTabMenuItem(
             UiStrings.TabMenuTileGrid,
             () => SetWaveformTileArrange(WaveformTileArrange.Grid),
-            enabled: enabled,
+            enabled: canMutate && CanOfferTileArrange(WaveformTileArrange.Grid),
             checkable: true,
             isChecked: _tileArrange == WaveformTileArrange.Grid));
     }

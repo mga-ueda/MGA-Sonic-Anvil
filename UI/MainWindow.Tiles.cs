@@ -34,7 +34,13 @@ public partial class MainWindow
             return;
         }
 
-        ApplyTileArrange(arrange);
+        var usable = ResolveUsableTileArrange(arrange);
+        if (usable == WaveformTileArrange.Off)
+        {
+            return;
+        }
+
+        ApplyTileArrange(usable);
     }
 
     private void ApplyPreferredOrRestoredTileArrange(AppSettings settings)
@@ -59,8 +65,12 @@ public partial class MainWindow
         var preferred = WaveformTileLayout.Parse(AppStorage.Settings.MultiFileArrange);
         if (preferred != WaveformTileArrange.Off && (!_tileMode || openedCount >= 2))
         {
-            ApplyTileArrange(preferred);
-            return;
+            var usable = ResolveUsableTileArrange(preferred);
+            if (usable != WaveformTileArrange.Off)
+            {
+                ApplyTileArrange(usable);
+                return;
+            }
         }
 
         NotifyWaveformSessionsChanged();
@@ -79,7 +89,13 @@ public partial class MainWindow
             return;
         }
 
-        var next = WaveformTileLayout.Next(_tileArrange, _sessions.Count);
+        var (width, height) = TileHostSize();
+        var next = WaveformTileLayout.Next(_tileArrange, _sessions.Count, width, height);
+        if (next == _tileArrange)
+        {
+            return;
+        }
+
         if (next == WaveformTileArrange.Off)
         {
             ExitWaveformTileMode();
@@ -91,7 +107,7 @@ public partial class MainWindow
         Keyboard.Focus(Waveform);
     }
 
-    /// <summary>メニューから配置を直接指定する。Off で解除、同じ配置なら何もしない。</summary>
+    /// <summary>メニューから配置を直接指定する。Off で解除、同じ配置なら何もしない。左右・上下が収まらなければ格子へ、それも無理なら動かない。</summary>
     private void SetWaveformTileArrange(WaveformTileArrange arrange)
     {
         if (arrange == WaveformTileArrange.Off)
@@ -100,13 +116,95 @@ public partial class MainWindow
             {
                 ExitWaveformTileMode();
             }
-        }
-        else if (arrange != _tileArrange && _sessions.Count >= 2 && _activeSession is not null)
-        {
-            ApplyTileArrange(arrange);
+
+            Keyboard.Focus(Waveform);
+            return;
         }
 
+        if (_sessions.Count < 2 || _activeSession is null)
+        {
+            Keyboard.Focus(Waveform);
+            return;
+        }
+
+        if (arrange == _tileArrange)
+        {
+            Keyboard.Focus(Waveform);
+            return;
+        }
+
+        var usable = ResolveUsableTileArrange(arrange);
+        if (usable == WaveformTileArrange.Off)
+        {
+            return;
+        }
+
+        if (usable == _tileArrange)
+        {
+            Keyboard.Focus(Waveform);
+            return;
+        }
+
+        ApplyTileArrange(usable);
         Keyboard.Focus(Waveform);
+    }
+
+    private void WaveformTileHost_SizeChanged(object sender, SizeChangedEventArgs e) =>
+        EnsureUsableTileArrange();
+
+    /// <summary>今のタイル配置が収まらなくなったら格子を試し、それも無理なら解除する。</summary>
+    private void EnsureUsableTileArrange()
+    {
+        if (!_tileMode || _tileLayoutBusy)
+        {
+            return;
+        }
+
+        if (TileArrangeFits(_tileArrange))
+        {
+            return;
+        }
+
+        var usable = ResolveUsableTileArrange(_tileArrange);
+        if (usable == WaveformTileArrange.Off)
+        {
+            ExitWaveformTileMode();
+            return;
+        }
+
+        ApplyTileArrange(usable);
+    }
+
+    private bool CanOfferTileArrange(WaveformTileArrange arrange) =>
+        _sessions.Count > 1
+        && (arrange == WaveformTileArrange.Off
+            || arrange == _tileArrange
+            || TileArrangeFits(arrange));
+
+    private bool TileArrangeFits(WaveformTileArrange arrange)
+    {
+        var (width, height) = TileHostSize();
+        return WaveformTileLayout.Fits(arrange, _sessions.Count, width, height);
+    }
+
+    private WaveformTileArrange ResolveUsableTileArrange(WaveformTileArrange arrange)
+    {
+        var (width, height) = TileHostSize();
+        return WaveformTileLayout.Fallback(arrange, _sessions.Count, width, height);
+    }
+
+    private (double Width, double Height) TileHostSize()
+    {
+        var width = WaveformTileHost.ActualWidth;
+        var height = WaveformTileHost.ActualHeight;
+        if (width > 1 && height > 1)
+        {
+            return (width, height);
+        }
+
+        return (
+            WaveformHostBorder.ActualWidth,
+            WaveformHostBorder.ActualHeight - DesignMetrics.WaveformScrollBarHeight);
     }
 
     private void ApplyActiveAnalysisToAllSessions()
@@ -120,6 +218,11 @@ public partial class MainWindow
 
     private void ApplyTileArrange(WaveformTileArrange arrange)
     {
+        if (arrange == WaveformTileArrange.Off || !TileArrangeFits(arrange))
+        {
+            return;
+        }
+
         var fromOff = !_tileMode;
         if (fromOff)
         {
@@ -435,6 +538,19 @@ public partial class MainWindow
                 BindSingleWorkspace(_activeSession);
             }
 
+            return;
+        }
+
+        if (!TileArrangeFits(_tileArrange))
+        {
+            var usable = ResolveUsableTileArrange(_tileArrange);
+            if (usable == WaveformTileArrange.Off)
+            {
+                ExitWaveformTileMode();
+                return;
+            }
+
+            ApplyTileArrange(usable);
             return;
         }
 

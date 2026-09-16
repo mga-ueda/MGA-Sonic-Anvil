@@ -66,6 +66,92 @@ public sealed class WaveformTileLayoutTests
         Assert.Equal(WaveformTileArrange.Off, WaveformTileLayout.Next(WaveformTileArrange.Grid, 4));
     }
 
+    [Fact]
+    public void Fits_Off_AlwaysTrue()
+    {
+        Assert.True(WaveformTileLayout.Fits(WaveformTileArrange.Off, 1, 10, 10));
+        Assert.True(WaveformTileLayout.Fits(WaveformTileArrange.Off, 20, 1, 1));
+    }
+
+    [Fact]
+    public void Fits_NeedsTwoFilesAndRoomForSmallestCell()
+    {
+        var minW = WaveformTileLayout.MinTileWidth;
+        var minH = WaveformTileLayout.MinTileHeight;
+        Assert.False(WaveformTileLayout.Fits(WaveformTileArrange.Horizontal, 1, minW * 8, minH * 8));
+        Assert.True(WaveformTileLayout.Fits(WaveformTileArrange.Horizontal, 2, minW * 2, minH));
+        Assert.False(WaveformTileLayout.Fits(WaveformTileArrange.Horizontal, 2, minW * 2 - 1, minH));
+        Assert.True(WaveformTileLayout.Fits(WaveformTileArrange.Vertical, 2, minW, minH * 2));
+        Assert.False(WaveformTileLayout.Fits(WaveformTileArrange.Vertical, 2, minW, minH * 2 - 1));
+        Assert.True(WaveformTileLayout.Fits(WaveformTileArrange.Grid, 9, minW * 3, minH * 3));
+        Assert.False(WaveformTileLayout.Fits(WaveformTileArrange.Grid, 9, minW * 3 - 1, minH * 3));
+        Assert.False(WaveformTileLayout.Fits(WaveformTileArrange.Horizontal, 9, minW * 3, minH * 3));
+        Assert.False(WaveformTileLayout.Fits(WaveformTileArrange.Vertical, 9, minW * 3, minH * 3));
+    }
+
+    [Fact]
+    public void Fits_UnknownHostSize_DoesNotBlock()
+    {
+        Assert.True(WaveformTileLayout.Fits(WaveformTileArrange.Grid, 8, 0, 0));
+        Assert.True(WaveformTileLayout.Fits(WaveformTileArrange.Horizontal, 8, 1, 400));
+    }
+
+    [Fact]
+    public void Next_SkipsArrangesThatDoNotFit()
+    {
+        var minW = WaveformTileLayout.MinTileWidth;
+        var minH = WaveformTileLayout.MinTileHeight;
+        Assert.Equal(
+            WaveformTileArrange.Vertical,
+            WaveformTileLayout.Next(WaveformTileArrange.Off, 2, minW, minH * 2));
+        Assert.Equal(
+            WaveformTileArrange.Off,
+            WaveformTileLayout.Next(WaveformTileArrange.Horizontal, 2, minW * 2, minH));
+        Assert.Equal(
+            WaveformTileArrange.Grid,
+            WaveformTileLayout.Next(WaveformTileArrange.Off, 9, minW * 3, minH * 3));
+        Assert.Equal(
+            WaveformTileArrange.Off,
+            WaveformTileLayout.Next(WaveformTileArrange.Off, 9, minW, minH));
+        Assert.Equal(
+            WaveformTileArrange.Off,
+            WaveformTileLayout.Next(WaveformTileArrange.Off, 2, minW - 1, minH * 8));
+        Assert.Equal(
+            WaveformTileArrange.Grid,
+            WaveformTileLayout.Next(WaveformTileArrange.Off, 4, minW * 2, minH * 4));
+        Assert.Equal(
+            WaveformTileArrange.Grid,
+            WaveformTileLayout.Next(WaveformTileArrange.Horizontal, 4, minW * 2, minH * 2));
+        Assert.Equal(
+            WaveformTileArrange.Off,
+            WaveformTileLayout.Next(WaveformTileArrange.Horizontal, 4, minW * 2, minH));
+    }
+
+    [Fact]
+    public void Fallback_LinearUnusable_TriesGridThenOff()
+    {
+        var minW = WaveformTileLayout.MinTileWidth;
+        var minH = WaveformTileLayout.MinTileHeight;
+        Assert.Equal(
+            WaveformTileArrange.Horizontal,
+            WaveformTileLayout.Fallback(WaveformTileArrange.Horizontal, 2, minW * 2, minH));
+        Assert.Equal(
+            WaveformTileArrange.Grid,
+            WaveformTileLayout.Fallback(WaveformTileArrange.Horizontal, 4, minW * 2, minH * 4));
+        Assert.Equal(
+            WaveformTileArrange.Grid,
+            WaveformTileLayout.Fallback(WaveformTileArrange.Vertical, 9, minW * 3, minH * 3));
+        Assert.Equal(
+            WaveformTileArrange.Off,
+            WaveformTileLayout.Fallback(WaveformTileArrange.Horizontal, 9, minW, minH));
+        Assert.Equal(
+            WaveformTileArrange.Off,
+            WaveformTileLayout.Fallback(WaveformTileArrange.Grid, 9, minW, minH));
+        Assert.Equal(
+            WaveformTileArrange.Off,
+            WaveformTileLayout.Fallback(WaveformTileArrange.Off, 9, minW * 3, minH * 3));
+    }
+
     [Theory]
     [InlineData(2, 2, 1)]
     [InlineData(3, 3, 1)]

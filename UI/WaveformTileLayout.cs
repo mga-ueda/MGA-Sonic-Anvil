@@ -47,25 +47,114 @@ internal static class WaveformTileLayout
             _ => WaveformTileArrange.Off,
         };
 
+    /// <summary>タイル1枚の最小幅。dB 目盛りと波形の切れ端が見える程度。</summary>
+    public static double MinTileWidth =>
+        DesignMetrics.DbScaleWidth + DesignMetrics.From96(96);
+
+    /// <summary>タイル1枚の最小高さ。見出し＋時間軸＋波形の切れ端。</summary>
+    public static double MinTileHeight =>
+        DesignMetrics.DocumentTabBarHeight
+        + DesignMetrics.RulerHeight
+        + DesignMetrics.From96(48);
+
     /// <summary>
     /// 枚数によっては格子が横並びと同じ形になる。今まで出した配置と同じ見た目は飛ばす。
+    /// ホスト寸法を渡すと、1枚が下限を下回る配置も飛ばす。左右・上下が収まらなければ格子へ進む。
     /// </summary>
-    public static WaveformTileArrange Next(WaveformTileArrange current, int count)
+    public static WaveformTileArrange Next(WaveformTileArrange current, int count) =>
+        Next(current, count, double.PositiveInfinity, double.PositiveInfinity);
+
+    public static WaveformTileArrange Next(
+        WaveformTileArrange current,
+        int count,
+        double hostWidth,
+        double hostHeight)
     {
         var next = Next(current);
-        while (next != WaveformTileArrange.Off && ShouldSkip(current, next, count))
+        while (next != WaveformTileArrange.Off && ShouldSkip(current, next, count, hostWidth, hostHeight))
         {
+            if ((next == WaveformTileArrange.Horizontal || next == WaveformTileArrange.Vertical)
+                && !Fits(next, count, hostWidth, hostHeight)
+                && !ShouldSkip(current, WaveformTileArrange.Grid, count, hostWidth, hostHeight))
+            {
+                return WaveformTileArrange.Grid;
+            }
+
             next = Next(next);
         }
 
         return next;
     }
 
+    /// <summary>
+    /// 指定の並べ方が収まらなければ格子を試し、それも無理なら解除。
+    /// </summary>
+    public static WaveformTileArrange Fallback(
+        WaveformTileArrange arrange,
+        int count,
+        double hostWidth,
+        double hostHeight)
+    {
+        if (arrange == WaveformTileArrange.Off)
+        {
+            return WaveformTileArrange.Off;
+        }
+
+        if (Fits(arrange, count, hostWidth, hostHeight))
+        {
+            return arrange;
+        }
+
+        if (arrange != WaveformTileArrange.Grid
+            && Fits(WaveformTileArrange.Grid, count, hostWidth, hostHeight))
+        {
+            return WaveformTileArrange.Grid;
+        }
+
+        return WaveformTileArrange.Off;
+    }
+
+    /// <summary>
+    /// その配置で一番小さいマスが下限以上か。解除は常に可。寸法が未確定（1 以下）のときは判定しない。
+    /// </summary>
+    public static bool Fits(WaveformTileArrange arrange, int count, double hostWidth, double hostHeight)
+    {
+        if (arrange == WaveformTileArrange.Off)
+        {
+            return true;
+        }
+
+        if (count < 2)
+        {
+            return false;
+        }
+
+        if (hostWidth <= 1 || hostHeight <= 1)
+        {
+            return true;
+        }
+
+        ChooseGrid(arrange, count, out var rows, out var cols);
+        if (rows <= 0 || cols <= 0)
+        {
+            return false;
+        }
+
+        return hostWidth / cols >= MinTileWidth && hostHeight / rows >= MinTileHeight;
+    }
+
     private static bool ShouldSkip(
         WaveformTileArrange current,
         WaveformTileArrange candidate,
-        int count)
+        int count,
+        double hostWidth,
+        double hostHeight)
     {
+        if (!Fits(candidate, count, hostWidth, hostHeight))
+        {
+            return true;
+        }
+
         if (SameShape(current, candidate, count))
         {
             return true;
