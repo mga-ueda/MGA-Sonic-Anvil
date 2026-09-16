@@ -403,18 +403,12 @@ public partial class MainWindow
             return false;
         }
 
-        StopPlaybackForEdit();
-        var applied = ApplyHistoryRecipeClipboardCore();
-        if (applied == 0)
+        if (_activeSession is null)
         {
-            OwnerCenteredMessageBox.Show(
-                this,
-                UiStrings.EditHistoryPasteSkippedAll,
-                UiStrings.AppName,
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            return false;
         }
 
+        _ = ApplyHistoryRecipesWithBusyGlassAsync([_activeSession]);
         return true;
     }
 
@@ -458,27 +452,132 @@ public partial class MainWindow
             return;
         }
 
-        StopPlaybackForEdit();
-        var appliedAny = false;
-        var activeApplied = 0;
-        foreach (var session in targets)
+        _ = ApplyHistoryRecipesWithBusyGlassAsync(targets);
+    }
+
+    /// <summary>
+    /// 選択タブ／別ファイルへの履歴貼り付け。重いレシピはバックグラウンドで作り、
+    /// すりガラスでタブごとの進捗を出す。
+    /// </summary>
+    private async Task ApplyHistoryRecipesWithBusyGlassAsync(IReadOnlyList<DocumentSession> targets)
+    {
+        if (targets.Count == 0 || IsUiBusy)
         {
-            var applied = ApplyHistoryRecipesToSession(session);
-            appliedAny |= applied > 0;
-            if (ReferenceEquals(session, _activeSession))
+            return;
+        }
+
+        var sessions = targets.ToArray();
+        var recipes = _historyRecipeClipboard.ToArray();
+        if (recipes.Length == 0)
+        {
+            return;
+        }
+
+        _historyPasteBusy = true;
+        RefreshExportEnabled();
+        var names = sessions.Select(session => session.DisplayName).ToArray();
+        var weights = sessions.Select(session => Math.Max(1L, session.Document.FrameCount)).ToArray();
+        var progress = new double[sessions.Length];
+        var applied = new int[sessions.Length];
+        Exception? error = null;
+        try
+        {
+            StopPlaybackForEdit();
+            foreach (var session in sessions)
             {
-                activeApplied = applied;
+                PrepareSessionForHistoryPaste(session);
+            }
+
+            ShowHistoryPasteBusyGlass();
+            ReportHistoryPasteBusy(names, progress, weights);
+            var recipeCount = recipes.Length;
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                if (!IsLoaded)
+                {
+                    return;
+                }
+
+                var session = sessions[i];
+                progress[i] = Math.Max(progress[i], 0.08);
+                ReportHistoryPasteBusy(names, progress, weights);
+                for (var r = 0; r < recipes.Length; r++)
+                {
+                    var item = recipes[r];
+                    var document = session.Document;
+                    IEditCommand? command;
+                    try
+                    {
+                        command = await Task.Run(() => item.Replay(document)).ConfigureAwait(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        error = ex;
+                        progress[i] = 1;
+                        ReportHistoryPasteBusy(names, progress, weights);
+                        break;
+                    }
+
+                    if (!IsLoaded)
+                    {
+                        return;
+                    }
+
+                    if (command is not null)
+                    {
+                        session.History.Do(document, command);
+                        applied[i]++;
+                    }
+
+                    progress[i] = (r + 1) / (double)recipeCount;
+                    ReportHistoryPasteBusy(names, progress, weights);
+                }
+
+                if (error is not null)
+                {
+                    break;
+                }
+
+                progress[i] = 1;
+                ReportHistoryPasteBusy(names, progress, weights);
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex;
+        }
+        finally
+        {
+            _historyPasteBusy = false;
+            RefreshExportEnabled();
+            if (error is not null)
+            {
+                _busyGlass.HideOverlay();
+            }
+            else
+            {
+                _busyGlass.BeginFadeOut();
             }
         }
 
-        if (activeApplied > 0)
+        if (!IsLoaded)
         {
-            AfterEdit();
+            return;
         }
 
-        // 非アクティブタブのダーティ表示（* とアクセント色）を更新する。
-        RefreshTabHeaders();
-        if (!appliedAny)
+        RefreshViewsAfterHistoryPaste(sessions, applied);
+        if (error is not null)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                error.Message,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        if (applied.All(count => count == 0))
         {
             OwnerCenteredMessageBox.Show(
                 this,
@@ -487,6 +586,70 @@ public partial class MainWindow
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
+    }
+
+    private void ReportHistoryPasteBusy(string[] names, double[] progress, long[] weights)
+    {
+        var snapshot = HistoryPasteBusyProgress.Capture(names, progress, weights);
+        _busyGlass.SetExportView(
+            snapshot.Overall,
+            UiStrings.OverlayExportCount(snapshot.Finished, snapshot.Jobs.Count),
+            snapshot.Jobs);
+    }
+
+    private void PrepareSessionForHistoryPaste(DocumentSession session)
+    {
+        session.Document.Selection = WaveSelection.Empty;
+        ForEachWaveform(view =>
+        {
+            if (ReferenceEquals(view.Document, session.Document))
+            {
+                view.ClearSelection();
+            }
+        });
+    }
+
+    private void RefreshViewsAfterHistoryPaste(IReadOnlyList<DocumentSession> sessions, IReadOnlyList<int> applied)
+    {
+        var activeApplied = 0;
+        for (var i = 0; i < sessions.Count; i++)
+        {
+            if (ReferenceEquals(sessions[i], _activeSession))
+            {
+                activeApplied = applied[i];
+                break;
+            }
+        }
+
+        if (activeApplied > 0)
+        {
+            AfterEdit();
+            if (HistoryOpen)
+            {
+                _historySelectedIndex = _history.CurrentIndex;
+                _historyAnchorIndex = _history.CurrentIndex;
+                _historyCopySelection.Clear();
+                RefreshHistoryOverlay();
+            }
+        }
+
+        if (_tileMode)
+        {
+            foreach (var pane in _tilePanes)
+            {
+                for (var i = 0; i < sessions.Count; i++)
+                {
+                    if (applied[i] > 0 && ReferenceEquals(pane.Session, sessions[i]))
+                    {
+                        pane.View.InvalidateSpectrogramCache();
+                        pane.View.Refresh();
+                        break;
+                    }
+                }
+            }
+        }
+
+        RefreshTabHeaders();
     }
 
     /// <summary>1 セッションへレシピを順に適用する（画面の切替はしない）。</summary>

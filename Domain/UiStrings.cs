@@ -441,6 +441,10 @@ internal static partial class UiStrings
     public static string ErrorNoSelection => Get("選択範囲がありません。", "Nothing is selected.");
     public static string ErrorNoRegions => Get("リージョンがありません。", "There are no regions.");
     public static string ErrorClipboardEmpty => Get("クリップボードが空です。", "The clipboard is empty.");
+    public static string ErrorClipboardBusy => Get(
+        "クリップボードを開けませんでした。別のプログラムが使用中の可能性があります。",
+        "Could not open the clipboard. Another program may be using it.");
+
     public static string ErrorEmptyAfterDelete => Get(
         "ファイル全体は削除できません。",
         "The entire file cannot be deleted.");
@@ -467,6 +471,7 @@ internal static partial class UiStrings
         "Enter a loudness target between -70 and 0 LKFS.");
     public static string OverlaySampleRateConvert => Get("サンプリングレート変換", "Sample rate conversion");
     public static string OverlayPitchShift => Get("ピッチシフト", "Pitch shift");
+    public static string OverlayPasteHistory => Get("編集履歴を貼り付けています", "Pasting edit history");
     public static string OverlayOpening => Get("読み込んでいます", "Opening");
     public static string OverlayExportWave => Get("Wave を書き出しています", "Exporting Wave");
     public static string OverlayExportMp3 => Get("MP3 を書き出しています", "Exporting MP3");

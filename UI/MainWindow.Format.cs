@@ -16,6 +16,7 @@ public partial class MainWindow
     private bool _timeStretchBusy;
     private bool _tabExportBusy;
     private bool _openBusy;
+    private bool _historyPasteBusy;
 
     private bool IsUiBusy =>
         _formatConvertBusy
@@ -23,7 +24,8 @@ public partial class MainWindow
         || _timeStretchBusy
         || _tabExportBusy
         || _openBusy
-        || _exportBusy;
+        || _exportBusy
+        || _historyPasteBusy;
 
     private void PromptFormatConvert(FormatConvertKind kind)
     {
@@ -512,6 +514,9 @@ public partial class MainWindow
 
     private void ShowTimeStretchBusyGlass() =>
         ShowBusyGlass(UiStrings.OverlayTimeStretch);
+
+    private void ShowHistoryPasteBusyGlass() =>
+        ShowBusyGlass(UiStrings.OverlayPasteHistory);
 
     private void ShowBusyGlass(string message)
     {

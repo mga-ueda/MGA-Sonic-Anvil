@@ -460,7 +460,7 @@ public partial class MainWindow
             return;
         }
 
-        Clipboard.SetText(text);
+        SystemClipboard.TrySetText(text, this);
     }
 
     /// <summary>タブメニューに並べ方（タブのまま／左右／上下／上下左右）を直接並べる。</summary>

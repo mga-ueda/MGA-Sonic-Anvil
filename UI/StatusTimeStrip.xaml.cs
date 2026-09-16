@@ -204,7 +204,7 @@ internal partial class StatusTimeStrip : UserControl
             copyItem.Header = UiStrings.MenuCopy;
             pasteItem.Header = UiStrings.MenuPaste;
             copyItem.IsEnabled = CopyText(field).Length > 0;
-            pasteItem.IsEnabled = field != StatusTimeField.Total && _hasDocument && Clipboard.ContainsText();
+            pasteItem.IsEnabled = field != StatusTimeField.Total && _hasDocument && SystemClipboard.ContainsText();
             TipService.Set(timeItem, UiStrings.MenuShowTime);
             TipService.Set(sampleItem, UiStrings.MenuShowSamples);
             TipService.Set(copyItem, UiStrings.MenuCopy);
@@ -511,18 +511,27 @@ internal partial class StatusTimeStrip : UserControl
             return;
         }
 
-        Clipboard.SetText(text);
+        SystemClipboard.TrySetText(text, Window.GetWindow(this));
     }
 
     private void PasteField(StatusTimeField field)
     {
-        if (field == StatusTimeField.Total || !_hasDocument || !Clipboard.ContainsText()
-            || !TryGetBox(field, out var box))
+        if (field == StatusTimeField.Total || !_hasDocument || !TryGetBox(field, out var box))
         {
             return;
         }
 
-        var text = Clipboard.GetText();
+        if (!SystemClipboard.TryGetText(out var text))
+        {
+            SystemClipboard.ShowBusy(Window.GetWindow(this));
+            return;
+        }
+
+        if (text.Length == 0)
+        {
+            return;
+        }
+
         if (!box.IsKeyboardFocusWithin
             && UiStrings.TryParseStatusTime(text, _sampleRate, _showSamples, out var frame))
         {
