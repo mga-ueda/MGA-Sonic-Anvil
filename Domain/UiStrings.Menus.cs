@@ -108,6 +108,8 @@ internal static partial class UiStrings
     public static string WaveMenuSaveAs => Get("名前を付けて保存(_A)", "Save _As");
     public static string WaveMenuSaveMp3 => Get("MP3 として保存(_M)", "Save as _MP3");
     public static string WaveMenuCloseTab => Get("タブを閉じる(_C)", "_Close Tab");
+    /// <summary>ファイルメニュー用。開く(_O)と重ならないよう D。</summary>
+    public static string WaveMenuCloseOthers => Get("このタブ以外を閉じる(_D)", "Close Other Tabs (_D)");
     public static string WaveMenuCloseAll => Get("すべてのタブを閉じる(_W)", "Close All Tabs (_W)");
     public static string WaveMenuCopyAllTabTimes => Get("すべてのタブの時間(_I)", "All Tab T_imes");
     public static string WaveMenuReopenTab => Get("閉じたタブを再開(_T)", "Reopen Closed _Tab");
@@ -123,6 +125,7 @@ internal static partial class UiStrings
     public static string WaveMenuExportByMarkers => Get("マーカーでセパレート(_K)", "Separate by Mar_kers");
     public static string WaveMenuExportByRegions => Get("リージョンでセパレート(_G)", "Separate by Re_gions");
     public static string WaveMenuExportByChannels => Get("チャンネルごとに書き出す(_C)", "Export by _Channel");
+    public static string WaveMenuExportAllWave => Get("すべてのタブを Wave(_E)", "Export All Tabs as Wav_e");
     public static string WaveMenuExportAllMp3 => Get("すべてのタブを MP3(_A)", "Export _All Tabs as MP3");
 
     public static string WaveMenuTips => Get("Tips を表示(_T)", "Show _Tips");

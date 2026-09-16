@@ -138,6 +138,9 @@ public partial class MainWindow
             WaapiExportEnabled = WaapiBar.ExportEnabled,
             CanReopenTab = _workspace.ClosedTabs.Count > 0,
             HasMultipleTabs = _sessions.Count > 1,
+            CanCloseOtherTabs = hasDoc && !busy && !recording && _sessions.Count > 1,
+            CanCloseTabsToRight = CanCloseTabsFromActive(rightSide: true, hasDoc, busy, recording),
+            CanCloseTabsToLeft = CanCloseTabsFromActive(rightSide: false, hasDoc, busy, recording),
             WaveTileArrange = _tileArrange,
             CanLoopPlay = canNavigate
                 && (hasSelection
@@ -419,6 +422,27 @@ public partial class MainWindow
             case WaveMenuCommand.CloseTab:
                 CloseDocument();
                 break;
+            case WaveMenuCommand.CloseOthers:
+                if (_activeSession is not null)
+                {
+                    CloseOtherTabs(_activeSession);
+                }
+
+                break;
+            case WaveMenuCommand.CloseTabsRight:
+                if (_activeSession is not null)
+                {
+                    CloseTabsFrom(_activeSession, rightSide: true);
+                }
+
+                break;
+            case WaveMenuCommand.CloseTabsLeft:
+                if (_activeSession is not null)
+                {
+                    CloseTabsFrom(_activeSession, rightSide: false);
+                }
+
+                break;
             case WaveMenuCommand.CloseAll:
                 CloseAllTabs();
                 break;
@@ -464,6 +488,9 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.ExportByChannels:
                 ExportActiveTabSeparated(TabExportSplit.Channels);
+                break;
+            case WaveMenuCommand.ExportAllWave:
+                ExportAllTabsWave();
                 break;
             case WaveMenuCommand.ExportAllMp3:
                 ExportAllTabsMp3();
@@ -541,5 +568,21 @@ public partial class MainWindow
         }
 
         ExportTabsSeparated([_activeSession], split);
+    }
+
+    private bool CanCloseTabsFromActive(bool rightSide, bool hasDoc, bool busy, bool recording)
+    {
+        if (!hasDoc || busy || recording || _activeSession is null)
+        {
+            return false;
+        }
+
+        var index = _sessions.IndexOf(_activeSession);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        return rightSide ? index < _sessions.Count - 1 : index > 0;
     }
 }

@@ -832,6 +832,7 @@ internal static partial class UiStrings
     public static string MenuCopy => Get("コピー(_C)", "_Copy");
     public static string MenuPaste => Get("貼り付け(_P)", "_Paste");
 
+    public static string TabMenuCloseThis => Get("このタブを閉じる(_S)", "Close Thi_s Tab");
     public static string TabMenuCloseOthers => Get("このタブ以外を閉じる(_O)", "Close _Other Tabs");
     public static string TabMenuCloseRight => Get("このタブを含め右側を全部閉じる(_R)", "Close This and Tabs to the _Right");
     public static string TabMenuCloseLeft => Get("このタブを含め左側を全部閉じる(_L)", "Close This and Tabs to the _Left");

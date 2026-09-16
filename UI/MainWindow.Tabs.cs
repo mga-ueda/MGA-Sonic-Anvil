@@ -317,17 +317,51 @@ public partial class MainWindow
         };
 
         var canMutate = !IsUiBusy && !IsRecording;
+        var index = _sessions.IndexOf(session);
+        menu.Items.Add(CreateTabMenuItem(
+            UiStrings.TabMenuCloseThis,
+            () => CloseSession(session),
+            "Ctrl+W",
+            canMutate));
+        menu.Items.Add(CreateTabMenuItem(
+            UiStrings.TabMenuCloseOthers,
+            () => CloseOtherTabs(session),
+            enabled: canMutate && _sessions.Count > 1));
+        menu.Items.Add(CreateTabMenuItem(
+            UiStrings.TabMenuCloseRight,
+            () => CloseTabsFrom(session, rightSide: true),
+            enabled: canMutate && index >= 0 && index < _sessions.Count - 1));
+        menu.Items.Add(CreateTabMenuItem(
+            UiStrings.TabMenuCloseLeft,
+            () => CloseTabsFrom(session, rightSide: false),
+            enabled: canMutate && index > 0));
         if (HasTabSelection)
         {
             var targets = SelectedTabsInOrder();
-            menu.Items.Add(AllTabsSelected
-                ? CreateTabMenuItem(UiStrings.TabMenuCloseAll, CloseAllTabs, "Ctrl+Shift+W", canMutate)
-                : CreateTabMenuItem(UiStrings.TabMenuCloseSelected, () => CloseTabs(targets), enabled: canMutate));
+            if (!AllTabsSelected)
+            {
+                menu.Items.Add(CreateTabMenuItem(
+                    UiStrings.TabMenuCloseSelected,
+                    () => CloseTabs(targets),
+                    enabled: canMutate));
+            }
+
+            menu.Items.Add(CreateTabMenuItem(
+                AllTabsSelected ? UiStrings.TabMenuCloseAll : UiStrings.TabMenuCloseAllNormal,
+                CloseAllTabs,
+                "Ctrl+Shift+W",
+                canMutate));
+            menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 AllTabsSelected ? UiStrings.TabMenuPasteToAll : UiStrings.TabMenuPasteToSelected,
                 () => PasteHistoryRecipesToTabs(targets),
                 "Ctrl+V",
                 enabled: canMutate && _historyRecipeClipboard.Count > 0));
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.WaveMenuReopenTab,
+                ReopenLastClosedTab,
+                "Ctrl+Shift+T",
+                canMutate && _workspace.ClosedTabs.Count > 0));
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.TabMenuCopyAllTimes,
                 CopyAllTabTimes,
@@ -359,19 +393,6 @@ public partial class MainWindow
         }
         else
         {
-            var index = _sessions.IndexOf(session);
-            menu.Items.Add(CreateTabMenuItem(
-                UiStrings.TabMenuCloseOthers,
-                () => CloseOtherTabs(session),
-                enabled: canMutate && _sessions.Count > 1));
-            menu.Items.Add(CreateTabMenuItem(
-                UiStrings.TabMenuCloseRight,
-                () => CloseTabsFrom(session, rightSide: true),
-                enabled: canMutate && index >= 0 && index < _sessions.Count - 1));
-            menu.Items.Add(CreateTabMenuItem(
-                UiStrings.TabMenuCloseLeft,
-                () => CloseTabsFrom(session, rightSide: false),
-                enabled: canMutate && index > 0));
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.TabMenuCloseAllNormal,
                 CloseAllTabs,
@@ -382,6 +403,11 @@ public partial class MainWindow
                 UiStrings.TabMenuSelectAll,
                 SelectAllTabs,
                 enabled: _sessions.Count > 1 && !AllTabsSelected));
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.WaveMenuReopenTab,
+                ReopenLastClosedTab,
+                "Ctrl+Shift+T",
+                canMutate && _workspace.ClosedTabs.Count > 0));
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.TabMenuCopyAllTimes,
                 CopyAllTabTimes,

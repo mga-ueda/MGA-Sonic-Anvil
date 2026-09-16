@@ -101,6 +101,9 @@ internal enum WaveMenuCommand
     SaveAs,
     SaveMp3,
     CloseTab,
+    CloseOthers,
+    CloseTabsRight,
+    CloseTabsLeft,
     CloseAll,
     CopyAllTabTimes,
     ReopenTab,
@@ -115,6 +118,7 @@ internal enum WaveMenuCommand
     ExportByMarkers,
     ExportByRegions,
     ExportByChannels,
+    ExportAllWave,
     ExportAllMp3,
     Tips,
     Manual,
@@ -163,6 +167,9 @@ internal sealed class WaveformContextMenuModel
     public bool WaapiExportEnabled { get; init; }
     public bool CanReopenTab { get; init; }
     public bool HasMultipleTabs { get; init; }
+    public bool CanCloseOtherTabs { get; init; }
+    public bool CanCloseTabsToRight { get; init; }
+    public bool CanCloseTabsToLeft { get; init; }
     public WaveformTileArrange WaveTileArrange { get; init; }
     public bool CanLoopPlay { get; init; }
     public bool CanAddMarkerHere { get; init; }
@@ -199,6 +206,9 @@ internal sealed class WaveformContextMenuModel
         WaapiExportEnabled = true,
         CanReopenTab = true,
         HasMultipleTabs = true,
+        CanCloseOtherTabs = true,
+        CanCloseTabsToRight = true,
+        CanCloseTabsToLeft = true,
         WaveTileArrange = WaveformTileArrange.Grid,
         CanLoopPlay = true,
         CanAddMarkerHere = true,
@@ -493,6 +503,9 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuSaveMp3, WaveMenuCommand.SaveMp3, "Ctrl+Shift+M", m.HasDocument && !m.IsBusy && !m.IsRecording),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuCloseTab, WaveMenuCommand.CloseTab, "Ctrl+W", m.HasDocument && !m.IsBusy && !m.IsRecording),
+        Cmd(UiStrings.WaveMenuCloseOthers, WaveMenuCommand.CloseOthers, enabled: m.CanCloseOtherTabs),
+        Cmd(UiStrings.TabMenuCloseRight, WaveMenuCommand.CloseTabsRight, enabled: m.CanCloseTabsToRight),
+        Cmd(UiStrings.TabMenuCloseLeft, WaveMenuCommand.CloseTabsLeft, enabled: m.CanCloseTabsToLeft),
         Cmd(UiStrings.WaveMenuCloseAll, WaveMenuCommand.CloseAll, "Ctrl+Shift+W", m.HasDocument && !m.IsBusy && !m.IsRecording),
         Cmd(UiStrings.WaveMenuCopyAllTabTimes, WaveMenuCommand.CopyAllTabTimes, enabled: m.HasDocument),
         Cmd(UiStrings.WaveMenuReopenTab, WaveMenuCommand.ReopenTab, "Ctrl+Shift+T", m.CanReopenTab && !m.IsBusy),
@@ -515,6 +528,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuExportByRegions, WaveMenuCommand.ExportByRegions, enabled: m.HasDocument && m.HasRegions && m.AllowsRegionsAndLoops && !m.IsBusy && !m.IsRecording),
         Cmd(UiStrings.WaveMenuExportByChannels, WaveMenuCommand.ExportByChannels, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
         WaveMenuSeparatorEntry.Instance,
+        Cmd(UiStrings.WaveMenuExportAllWave, WaveMenuCommand.ExportAllWave, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
         Cmd(UiStrings.WaveMenuExportAllMp3, WaveMenuCommand.ExportAllMp3, "Ctrl+Shift+Alt+M", m.HasDocument && !m.IsBusy && !m.IsRecording),
     ];
 

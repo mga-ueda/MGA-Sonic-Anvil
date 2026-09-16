@@ -12,6 +12,8 @@ namespace MgaSonicAnvil.UI;
 
 public partial class MainWindow
 {
+    private void ExportAllTabsWave() => _ = ExportTabsAsync(_sessions.ToArray(), AudioFileKind.Wave);
+
     private void ExportAllTabsMp3() => _ = ExportTabsAsync(_sessions.ToArray(), AudioFileKind.Mp3);
 
     private void ExportTabs(IReadOnlyList<DocumentSession> sessions, AudioFileKind kind) =>

@@ -485,6 +485,12 @@ public partial class MainWindow
         {
             Height = DesignMetrics.DocumentTabBarHeight,
             Child = title,
+            Cursor = Cursors.Hand,
+        };
+        header.MouseRightButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            OpenTabContextMenu(header, session);
         };
         var body = new DockPanel();
         DockPanel.SetDock(header, Dock.Top);
