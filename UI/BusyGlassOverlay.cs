@@ -15,6 +15,8 @@ internal sealed class BusyGlassOverlay : FrameworkElement
 {
     private const int MaxDots = 3;
     private const int FadeOutDurationMs = 300;
+    private const int FrostRenderDivisor = 8;
+    private const int FrostBrushDivisor = 20;
     private const double ProgressBarWidth = 280;
     private const double ProgressBarHeight = 4;
     private const double JobNameWidth = 168;
@@ -28,6 +30,8 @@ internal sealed class BusyGlassOverlay : FrameworkElement
     private string _baseText = string.Empty;
     private string _statusText = string.Empty;
     private ExportJobProgress[] _jobs = [];
+    private string[] _jobFitNames = [];
+    private double _jobFitDpi;
     private int _dotCount = 1;
     private int _percent = -1;
     private bool _fading;
@@ -63,6 +67,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         _baseText = NormalizeMessage(baseText);
         _statusText = string.Empty;
         _jobs = [];
+        _jobFitNames = [];
         _dotCount = 1;
         _percent = 0;
         _paintOpacity = 1f;
@@ -93,7 +98,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
             return;
         }
 
-        var percent = (int)Math.Round(Math.Clamp(progress, 0d, 1d) * 100);
+        var percent = PaintPercent(progress);
         if (percent == _percent)
         {
             return;
@@ -111,8 +116,20 @@ internal sealed class BusyGlassOverlay : FrameworkElement
             return;
         }
 
-        _percent = (int)Math.Round(Math.Clamp(overall, 0d, 1d) * 100);
-        _statusText = status ?? string.Empty;
+        var percent = PaintPercent(overall);
+        var text = status ?? string.Empty;
+        if (percent == _percent && text == _statusText && SameJobPaint(_jobs, running))
+        {
+            return;
+        }
+
+        if (!SameJobNames(_jobs, running))
+        {
+            _jobFitNames = [];
+        }
+
+        _percent = percent;
+        _statusText = text;
         _jobs = running.Count == 0 ? [] : running.ToArray();
 
         InvalidateVisual();
@@ -140,6 +157,8 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         _paintOpacity = 1f;
         Visibility = Visibility.Collapsed;
         _frostedBrush = null;
+        _jobs = [];
+        _jobFitNames = [];
         if (_host?.Children.Contains(this) == true)
         {
             _host.Children.Remove(this);
@@ -327,6 +346,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
 
         if (_jobs.Length > 0)
         {
+            EnsureJobFitNames(regular, culture, dpi);
             var gridWidth = layout.Columns * JobRowWidth
                 + Math.Max(0, layout.Columns - 1) * BusyGlassJobLayout.ColumnGap;
             var gridX = (ActualWidth - gridWidth) / 2;
@@ -338,6 +358,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
                 DrawJobRow(
                     dc,
                     _jobs[i],
+                    _jobFitNames[i],
                     gridX + col * (JobRowWidth + BusyGlassJobLayout.ColumnGap),
                     rowY + row * layout.RowHeight,
                     opacity,
@@ -350,9 +371,25 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         dc.Pop();
     }
 
+    private void EnsureJobFitNames(Typeface typeface, CultureInfo culture, double dpi)
+    {
+        if (_jobFitNames.Length == _jobs.Length && Math.Abs(_jobFitDpi - dpi) < 0.001)
+        {
+            return;
+        }
+
+        _jobFitNames = new string[_jobs.Length];
+        _jobFitDpi = dpi;
+        for (var i = 0; i < _jobs.Length; i++)
+        {
+            _jobFitNames[i] = FitText(_jobs[i].Name, JobNameWidth, typeface, 12, culture, dpi);
+        }
+    }
+
     private void DrawJobRow(
         DrawingContext dc,
         ExportJobProgress job,
+        string name,
         double x,
         double y,
         float opacity,
@@ -360,7 +397,6 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         CultureInfo culture,
         double dpi)
     {
-        var name = FitText(job.Name, JobNameWidth, typeface, 12, culture, dpi);
         var nameText = new FormattedText(name, culture, FlowDirection.LeftToRight, typeface, 12,
             WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush")), dpi);
         dc.DrawText(nameText, new Point(x, y));
@@ -368,7 +404,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         var barY = y + Math.Max(0, (nameText.Height - ProgressBarHeight) / 2);
         DrawBar(dc, x + JobNameWidth + 8, barY, JobBarWidth, Math.Clamp(job.Progress, 0, 1), opacity);
 
-        var pct = $"{(int)Math.Round(Math.Clamp(job.Progress, 0, 1) * 100)}%";
+        var pct = $"{PaintPercent(job.Progress)}%";
         var pctText = new FormattedText(pct, culture, FlowDirection.LeftToRight, typeface, 12,
             WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush")), dpi);
         dc.DrawText(pctText, new Point(x + JobNameWidth + 8 + JobBarWidth + 8, y));
@@ -416,17 +452,26 @@ internal sealed class BusyGlassOverlay : FrameworkElement
             return text;
         }
 
-        for (var n = text.Length - 1; n > 1; n--)
+        var lo = 1;
+        var hi = text.Length - 1;
+        var best = "…";
+        while (lo <= hi)
         {
+            var n = (lo + hi) / 2;
             var cut = text[..n] + "…";
             var trial = new FormattedText(cut, culture, FlowDirection.LeftToRight, typeface, fontSize, Brushes.White, dpi);
             if (trial.Width <= maxWidth)
             {
-                return cut;
+                best = cut;
+                lo = n + 1;
+            }
+            else
+            {
+                hi = n - 1;
             }
         }
 
-        return "…";
+        return best;
     }
 
     private static ImageBrush? CaptureFrostedBrush(FrameworkElement captureSource, Rect coverBounds)
@@ -446,31 +491,42 @@ internal sealed class BusyGlassOverlay : FrameworkElement
                 return null;
             }
 
-            var rtb = new RenderTargetBitmap(fullW, fullH, 96, 96, PixelFormats.Pbgra32);
-            rtb.Render(captureSource);
-
             var cropX = Math.Clamp((int)Math.Floor(coverBounds.X), 0, fullW - 1);
             var cropY = Math.Clamp((int)Math.Floor(coverBounds.Y), 0, fullH - 1);
             var cropW = Math.Clamp((int)Math.Ceiling(coverBounds.Width), 1, fullW - cropX);
             var cropH = Math.Clamp((int)Math.Ceiling(coverBounds.Height), 1, fullH - cropY);
+            var (midW, midH) = FrostPixelSize(cropW, cropH, FrostRenderDivisor);
+            var (tinyW, tinyH) = FrostPixelSize(cropW, cropH, FrostBrushDivisor);
 
-            BitmapSource source = rtb;
-            if (cropX != 0 || cropY != 0 || cropW != fullW || cropH != fullH)
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
             {
-                var cropped = new CroppedBitmap(rtb, new Int32Rect(cropX, cropY, cropW, cropH));
-                cropped.Freeze();
-                source = cropped;
+                var brush = new VisualBrush(captureSource)
+                {
+                    Stretch = Stretch.Fill,
+                    ViewboxUnits = BrushMappingMode.RelativeToBoundingBox,
+                    Viewbox = new Rect(
+                        cropX / (double)fullW,
+                        cropY / (double)fullH,
+                        cropW / (double)fullW,
+                        cropH / (double)fullH),
+                };
+                dc.DrawRectangle(brush, null, new Rect(0, 0, midW, midH));
             }
 
-            var scaled = ScaleBitmap(source, Math.Max(1, cropW / 6), Math.Max(1, cropH / 6));
-            var tiny = ScaleBitmap(scaled, Math.Max(1, cropW / 20), Math.Max(1, cropH / 20));
-            var brush = new ImageBrush(tiny)
+            var rtb = new RenderTargetBitmap(midW, midH, 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(visual);
+            rtb.Freeze();
+            var tiny = midW == tinyW && midH == tinyH
+                ? rtb
+                : ScaleBitmap(rtb, tinyW, tinyH);
+            var image = new ImageBrush(tiny)
             {
                 Stretch = Stretch.Fill,
                 Opacity = 1,
             };
-            brush.Freeze();
-            return brush;
+            image.Freeze();
+            return image;
         }
         catch
         {
@@ -487,6 +543,58 @@ internal sealed class BusyGlassOverlay : FrameworkElement
                 height / (double)source.PixelHeight));
         scaled.Freeze();
         return scaled;
+    }
+
+    internal static int PaintPercent(double progress) =>
+        (int)Math.Round(Math.Clamp(progress, 0d, 1d) * 100);
+
+    internal static (int Width, int Height) FrostPixelSize(int sourceWidth, int sourceHeight, int divisor)
+    {
+        divisor = Math.Max(1, divisor);
+        return (
+            Math.Max(1, sourceWidth / divisor),
+            Math.Max(1, sourceHeight / divisor));
+    }
+
+    internal static bool SameJobPaint(
+        IReadOnlyList<ExportJobProgress> current,
+        IReadOnlyList<ExportJobProgress> next)
+    {
+        if (current.Count != next.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < current.Count; i++)
+        {
+            if (!string.Equals(current[i].Name, next[i].Name, StringComparison.Ordinal)
+                || PaintPercent(current[i].Progress) != PaintPercent(next[i].Progress))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    internal static bool SameJobNames(
+        IReadOnlyList<ExportJobProgress> current,
+        IReadOnlyList<ExportJobProgress> next)
+    {
+        if (current.Count != next.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < current.Count; i++)
+        {
+            if (!string.Equals(current[i].Name, next[i].Name, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 

@@ -106,14 +106,6 @@ public partial class MainWindow
         return merged.ToArray();
     }
 
-    private void PumpUiAfterOpen()
-    {
-        UpdateLayout();
-        Waveform.Refresh();
-        Overview.InvalidateVisual();
-        Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
-    }
-
     private string? _openStatusText;
     private double _openStatusRatio;
     private readonly List<string> _queuedOpenPaths = [];
@@ -181,7 +173,6 @@ public partial class MainWindow
                 var path = targets[i];
                 if (showProgress)
                 {
-                    SetOpenStatus(i + 1, targets.Count, Path.GetFileName(path));
                     SetOpenJobRunning(i);
                 }
 
@@ -203,18 +194,7 @@ public partial class MainWindow
                     var session = new DocumentSession(document);
                     _sessions.Add(session);
                     added++;
-                    if (opened is null)
-                    {
-                        opened = session;
-                        ActivateSession(session);
-                    }
-                    else
-                    {
-                        RebuildTabBar();
-                        NotifyWaveformSessionsChanged();
-                    }
-
-                    PumpUiAfterOpen();
+                    opened ??= session;
                 }
                 catch (Exception ex)
                 {
@@ -234,6 +214,10 @@ public partial class MainWindow
                 if (!ReferenceEquals(_activeSession, active))
                 {
                     ActivateSession(active);
+                }
+                else if (added > 0)
+                {
+                    RebuildTabBar();
                 }
 
                 if (active.Document.SourcePath is { } openedPath)
@@ -391,15 +375,6 @@ public partial class MainWindow
             overall,
             UiStrings.OverlayExportCount(finished, jobs.Length),
             jobs);
-        Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
-    }
-
-    private void SetOpenStatus(int current, int total, string name)
-    {
-        _openStatusText = UiStrings.StatusOpeningFiles(current, total, name);
-        _openStatusRatio = total <= 0 ? 0 : current / (double)total;
-        RefreshStatus();
-        Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
     }
 
     private void ClearOpenStatus()
@@ -1075,7 +1050,6 @@ public partial class MainWindow
                 var job = JobIndex(sourceIndex);
                 if (showProgress)
                 {
-                    SetOpenStatus(job + 1, restorable.Count, SnapshotDisplayName(snap));
                     SetOpenJobRunning(job);
                 }
 
@@ -1096,13 +1070,6 @@ public partial class MainWindow
                 {
                     DocumentSessionStore.InsertRestoredBySourceIndex(
                         restored, _sessions, activeIndex, session);
-                    BindWorkspace(session);
-                    Waveform.Refresh();
-                    Overview.InvalidateVisual();
-                    if (showProgress)
-                    {
-                        PumpUiAfterOpen();
-                    }
                 }
             }
 
@@ -1121,11 +1088,6 @@ public partial class MainWindow
 
                 DocumentSessionStore.InsertRestoredBySourceIndex(
                     restored, _sessions, sourceIndex, session);
-                RebuildTabBar();
-                if (showProgress)
-                {
-                    PumpUiAfterOpen();
-                }
             }
 
             if (_sessions.Count == 0)
@@ -1137,10 +1099,10 @@ public partial class MainWindow
             {
                 BindWorkspace(DocumentSessionStore.PickRestoredActive(restored, activeIndex) ?? _sessions[0]);
             }
-
-            RebuildTabBar();
-            Waveform.Refresh();
-            Overview.InvalidateVisual();
+            else
+            {
+                RebuildTabBar();
+            }
         }
         finally
         {
