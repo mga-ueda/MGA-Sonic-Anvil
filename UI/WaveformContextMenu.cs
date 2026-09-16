@@ -103,6 +103,7 @@ internal enum WaveMenuCommand
     SaveMp3,
     RenameFile,
     DuplicateFile,
+    MergeTabs,
     DeleteFile,
     CloseTab,
     CloseOthers,
@@ -174,6 +175,7 @@ internal sealed class WaveformContextMenuModel
     public bool CanCloseOtherTabs { get; init; }
     public bool CanCloseTabsToRight { get; init; }
     public bool CanCloseTabsToLeft { get; init; }
+    public bool CanMergeTabs { get; init; }
     public WaveformTileArrange WaveTileArrange { get; init; }
     public bool CanTileHorizontal { get; init; }
     public bool CanTileVertical { get; init; }
@@ -217,6 +219,7 @@ internal sealed class WaveformContextMenuModel
         CanCloseOtherTabs = true,
         CanCloseTabsToRight = true,
         CanCloseTabsToLeft = true,
+        CanMergeTabs = true,
         WaveTileArrange = WaveformTileArrange.Grid,
         CanTileHorizontal = true,
         CanTileVertical = true,
@@ -517,6 +520,7 @@ internal static class WaveformContextMenuBuilder
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuRenameFile, WaveMenuCommand.RenameFile, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
         Cmd(UiStrings.WaveMenuDuplicateFile, WaveMenuCommand.DuplicateFile, "Ctrl+Shift+D", m.HasDocument && !m.IsBusy && !m.IsRecording),
+        Cmd(UiStrings.WaveMenuMergeTabs, WaveMenuCommand.MergeTabs, "Ctrl+Shift+B", m.CanMergeTabs),
         Cmd(UiStrings.WaveMenuDeleteFile, WaveMenuCommand.DeleteFile, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuCloseTab, WaveMenuCommand.CloseTab, "Ctrl+W", m.HasDocument && !m.IsBusy && !m.IsRecording),

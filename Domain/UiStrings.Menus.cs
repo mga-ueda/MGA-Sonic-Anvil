@@ -110,6 +110,8 @@ internal static partial class UiStrings
     public static string WaveMenuSaveMp3 => Get("MP3 として保存(_M)", "Save as _MP3");
     public static string WaveMenuRenameFile => Get("ファイル名を変更(_F)", "Rename _File");
     public static string WaveMenuDuplicateFile => Get("複製(_U)", "D_uplicate");
+    /// <summary>アクセスキーは B が「次のタブ(B)」と重なるため J のまま。</summary>
+    public static string WaveMenuMergeTabs => Get("選択タブをバウンス(_J)", "Bounce Selected Tabs (_J)");
     public static string WaveMenuDeleteFile => Get("ファイルを削除(_Y)", "Delete File (_Y)");
     public static string WaveMenuCloseTab => Get("タブを閉じる(_C)", "_Close Tab");
     /// <summary>ファイルメニュー用。開く(_O)と重ならないよう D。</summary>

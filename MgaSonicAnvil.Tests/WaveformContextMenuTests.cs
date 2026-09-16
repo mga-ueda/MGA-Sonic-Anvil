@@ -102,6 +102,8 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.RenameFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Contains(WaveMenuCommand.DuplicateFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Equal("Ctrl+Shift+D", Find(tree, WaveMenuCommand.DuplicateFile)?.Gesture);
+            Assert.Contains(WaveMenuCommand.MergeTabs, CommandsIn(tree, UiStrings.WaveMenuCatFile));
+            Assert.Equal("Ctrl+Shift+B", Find(tree, WaveMenuCommand.MergeTabs)?.Gesture);
             Assert.Contains(WaveMenuCommand.DeleteFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Contains(WaveMenuCommand.CloseOthers, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.True(Find(tree, WaveMenuCommand.CloseOthers)?.Enabled);
@@ -153,6 +155,7 @@ public sealed class WaveformContextMenuTests
         Assert.False(Find(idle, WaveMenuCommand.Save)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.RenameFile)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.DuplicateFile)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.MergeTabs)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.DeleteFile)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.CopyAllTabTimes)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.CloseOthers)?.Enabled);
@@ -205,7 +208,14 @@ public sealed class WaveformContextMenuTests
         Assert.True(Find(ready, WaveMenuCommand.Save)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.RenameFile)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.DuplicateFile)?.Enabled);
+        Assert.False(Find(ready, WaveMenuCommand.MergeTabs)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.DeleteFile)?.Enabled);
+        var canMerge = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasDocument = true,
+            CanMergeTabs = true,
+        });
+        Assert.True(Find(canMerge, WaveMenuCommand.MergeTabs)?.Enabled);
         Assert.False(Find(ready, WaveMenuCommand.PlayExit)?.Enabled);
         var recording = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
         {
@@ -214,6 +224,7 @@ public sealed class WaveformContextMenuTests
         });
         Assert.False(Find(recording, WaveMenuCommand.RenameFile)?.Enabled);
         Assert.False(Find(recording, WaveMenuCommand.DuplicateFile)?.Enabled);
+        Assert.False(Find(recording, WaveMenuCommand.MergeTabs)?.Enabled);
         Assert.False(Find(recording, WaveMenuCommand.DeleteFile)?.Enabled);
         var waapiOn = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
         {

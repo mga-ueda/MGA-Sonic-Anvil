@@ -89,6 +89,36 @@ public partial class MainWindow
             }
         }
 
+        if (_tileMode)
+        {
+            foreach (var pane in _tilePanes)
+            {
+                if (pane.Header.IsMouseOver)
+                {
+                    OpenTabContextMenu(pane.Header, pane.Session);
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsPointerOverTileHeader()
+    {
+        if (!_tileMode)
+        {
+            return false;
+        }
+
+        foreach (var pane in _tilePanes)
+        {
+            if (pane.Header.IsMouseOver)
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 
@@ -141,6 +171,7 @@ public partial class MainWindow
             CanCloseOtherTabs = hasDoc && !busy && !recording && _sessions.Count > 1,
             CanCloseTabsToRight = CanCloseTabsFromActive(rightSide: true, hasDoc, busy, recording),
             CanCloseTabsToLeft = CanCloseTabsFromActive(rightSide: false, hasDoc, busy, recording),
+            CanMergeTabs = !busy && !recording && _selectedTabs.Count >= 2,
             WaveTileArrange = _tileArrange,
             CanTileHorizontal = CanOfferTileArrange(WaveformTileArrange.Horizontal),
             CanTileVertical = CanOfferTileArrange(WaveformTileArrange.Vertical),
@@ -439,6 +470,9 @@ public partial class MainWindow
                     DuplicateSession(_activeSession);
                 }
 
+                break;
+            case WaveMenuCommand.MergeTabs:
+                MergeSelectedTabs();
                 break;
             case WaveMenuCommand.DeleteFile:
                 if (_activeSession is not null)

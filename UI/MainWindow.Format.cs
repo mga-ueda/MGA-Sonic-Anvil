@@ -17,6 +17,7 @@ public partial class MainWindow
     private bool _tabExportBusy;
     private bool _openBusy;
     private bool _historyPasteBusy;
+    private bool _tabMergeBusy;
 
     private bool IsUiBusy =>
         _formatConvertBusy
@@ -25,7 +26,8 @@ public partial class MainWindow
         || _tabExportBusy
         || _openBusy
         || _exportBusy
-        || _historyPasteBusy;
+        || _historyPasteBusy
+        || _tabMergeBusy;
 
     private void PromptFormatConvert(FormatConvertKind kind)
     {

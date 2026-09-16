@@ -307,8 +307,9 @@ public partial class MainWindow
 
         if (key == Key.A && modifiers == ModifierKeys.Control)
         {
-            // タブバー上にポインタがあるときはタブの全選択。
-            if (DocumentTabHost.Visibility == System.Windows.Visibility.Visible && DocumentTabHost.IsMouseOver)
+            // タブバー、またはタイルの帯の上ではタブの全選択。
+            if (DocumentTabHost.Visibility == System.Windows.Visibility.Visible && DocumentTabHost.IsMouseOver
+                || IsPointerOverTileHeader())
             {
                 SelectAllTabs();
                 return true;
@@ -928,6 +929,16 @@ public partial class MainWindow
             if (_activeSession is not null && !IsRecording)
             {
                 DuplicateSession(_activeSession);
+            }
+
+            return true;
+        }
+
+        if (key == Key.B && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            if (!IsRecording && _selectedTabs.Count >= 2)
+            {
+                MergeSelectedTabs();
             }
 
             return true;

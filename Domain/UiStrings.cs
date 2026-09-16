@@ -440,6 +440,19 @@ internal static partial class UiStrings
     public static string ErrorRenameFailed => Get("名前の変更に失敗しました。", "Failed to rename the file.");
     public static string ErrorDeleteFailed => Get("ファイルの削除に失敗しました。", "Failed to delete the file.");
     public static string ErrorDuplicateFailed => Get("ファイルの複製に失敗しました。", "Failed to duplicate the file.");
+    public static string ErrorMergeFailed => Get(
+        "タブのバウンスに失敗しました。",
+        "Failed to bounce the tabs.");
+    public static string ConfirmMergeTabsAs(int count, string fileName) => Format(
+        "選択した {0} 個のタブをバウンスしますか？{2}{1} として右側のタブで開きます。",
+        "Bounce {0} selected tabs?{2}The result will open in the tab to the right as {1}.",
+        count,
+        fileName,
+        Environment.NewLine);
+    public static string ConfirmMergeTabsUntitled(int count) => Format(
+        "選択した {0} 個のタブをバウンスしますか？新しいファイルとして右側のタブで開きます。",
+        "Bounce {0} selected tabs? A new file will open in the tab to the right.",
+        count);
     public static string ErrorFileNameEmpty => Get("ファイル名を入力してください。", "Enter a file name.");
     public static string ErrorFileNameInvalid => Get("使えないファイル名です。", "That file name is not allowed.");
     public static string ErrorFileNameExists => Get("同じ名前のファイルがあります。", "A file with that name already exists.");
@@ -503,6 +516,7 @@ internal static partial class UiStrings
     public static string OverlaySampleRateConvert => Get("サンプリングレート変換", "Sample rate conversion");
     public static string OverlayPitchShift => Get("ピッチシフト", "Pitch shift");
     public static string OverlayPasteHistory => Get("編集履歴を貼り付けています", "Pasting edit history");
+    public static string OverlayMerge => Get("タブをバウンスしています", "Bouncing tabs");
     public static string OverlayOpening => Get("読み込んでいます", "Opening");
     public static string OverlayExportWave => Get("Wave を書き出しています", "Exporting Wave");
     public static string OverlayExportMp3 => Get("MP3 を書き出しています", "Exporting MP3");
@@ -691,8 +705,8 @@ internal static partial class UiStrings
         "MP3 として保存 (Ctrl+Shift+M)\n別名保存と同じく書き出すだけ。今のタブは開いたまま、書き出した MP3 は読み込まない。Ctrl+Shift+Alt+M で全タブを MP3 で保存。設定の LAME があればそれを使い、空欄または無効なら Windows（既定 192 kbps）。成功時にどちらで書いたかを表示。失敗はダイアログ。マーカー／リージョン／ループは書きません",
         "Save as MP3 (Ctrl+Shift+M)\nWrites a file like Save As; keeps the current tab and does not open the written MP3. Ctrl+Shift+Alt+M saves every tab as MP3. Uses LAME when the path is valid; otherwise Windows (default 192 kbps). Success shows which encoder ran. Failures open a dialog. Markers / regions / loops are not written");
     public static string TipOpen => Get(
-        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+N で新規（フォーマットは都度指定）\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Shift+D でファイルを複製（隣のタブで開く）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ\nCtrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置、波形エリアに収まらない配置は飛ばす。左右・上下が収まらなければ格子を試し、格子も無理なら動かない。今見ている表示モードで全タブを並べる）\n右クリックで、すべてのタブの時間（表。コピー／範囲コピー／CSV／PDF）など\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
-        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+N for a new file (choose the format each time)\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Shift+D duplicates the file (opens in the next tab)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab\nCtrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same or would not fit the waveform area. If side-by-side or stacked would not fit, it tries grid; if grid would not fit either, it does nothing. Every tab uses the current view mode)\nRight-click for all tab times (table with copy / range copy / CSV / PDF) and more\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
+        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+N で新規（フォーマットは都度指定）\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Shift+D でファイルを複製（隣のタブで開く）\nCtrl+Shift+B で選択タブをバウンス（重ねて合成した Bounce.wav を右側のタブで開く。フォーマットは左端の選択タブ）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ\nCtrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置、波形エリアに収まらない配置は飛ばす。左右・上下が収まらなければ格子を試し、格子も無理なら動かない。今見ている表示モードで全タブを並べる）\n右クリックで、すべてのタブの時間（表。コピー／範囲コピー／CSV／PDF）など\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
+        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+N for a new file (choose the format each time)\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Shift+D duplicates the file (opens in the next tab)\nCtrl+Shift+B bounces selected tabs (mixes the waveforms together and opens Bounce.wav in the tab to the right; format follows the leftmost selected tab)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab\nCtrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same or would not fit the waveform area. If side-by-side or stacked would not fit, it tries grid; if grid would not fit either, it does nothing. Every tab uses the current view mode)\nRight-click for all tab times (table with copy / range copy / CSV / PDF) and more\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
     public static string TipCloseTab => Get(
         "タブを閉じる (Ctrl+W)。今の起動のうちなら Ctrl+Shift+T で開き直せる",
         "Close tab (Ctrl+W). Ctrl+Shift+T reopens it in this launch");
@@ -901,6 +915,8 @@ internal static partial class UiStrings
     public static string TabMenuPasteToAll => Get("編集データを全てにペーストする(_V)", "Paste Copied Edits to All Tabs (_V)");
     public static string TabMenuCloseSelected => Get("選択したタブを閉じる(_A)", "Close Selected Tabs (_A)");
     public static string TabMenuPasteToSelected => Get("選択したタブにペーストする(_V)", "Paste Copied Edits to Selected Tabs (_V)");
+    /// <summary>アクセスキーは B が「タブのまま(B)」「次のタブ(B)」と重なるため J のまま。</summary>
+    public static string TabMenuMergeSelected => Get("選択タブをバウンス(_J)", "Bounce Selected Tabs (_J)");
     public static string TabMenuExportWave => Get("Wave で書き出す(_E)", "Export _Wave");
     public static string TabMenuExportMp3 => Get("MP3 で書き出す(_M)", "Export _MP3");
     public static string TabMenuExportWaveSelected => Get("選択したタブを Wave で書き出す(_E)", "Export Selected Tabs as _Wave");

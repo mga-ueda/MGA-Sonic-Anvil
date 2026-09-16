@@ -49,6 +49,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("Ctrl+Space", UiStrings.TipPlay);
         Assert.Contains("Ctrl+N", UiStrings.TipOpen);
         Assert.Contains("Ctrl+Shift+D", UiStrings.TipOpen);
+        Assert.Contains("Ctrl+Shift+B", UiStrings.TipOpen);
         Assert.Contains("Shift+F10", UiStrings.TipWaveform);
         Assert.Contains("20", UiStrings.TipClickGuardFade);
         Assert.Contains("Wwise.exe", UiStrings.TipWwiseProjectNameOpen);

@@ -1207,6 +1207,7 @@ public partial class MainWindow
         ApplyWaapiPanelVisible();
         PrimaryWaveform.ShowScaleLane = show;
         ForEachWaveform(view => view.ShowScaleLane = show);
+        RefreshTileDividers();
         OverviewScaleColumn.Width = show
             ? DesignMetrics.DbScaleWidthGrid
             : new GridLength(0);

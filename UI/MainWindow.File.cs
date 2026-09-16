@@ -1,4 +1,5 @@
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -854,6 +855,15 @@ public partial class MainWindow
     private string UniqueCopyPath(string sourcePath)
     {
         var dir = Path.GetDirectoryName(sourcePath);
+        return UniquePathInDirectory(
+            dir,
+            Path.GetFileNameWithoutExtension(sourcePath),
+            Path.GetExtension(sourcePath));
+    }
+
+    private string UniquePathInDirectory(string? directory, string baseName, string extension)
+    {
+        var dir = directory;
         if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
         {
             dir = ResolveOpenInitialDirectory();
@@ -864,6 +874,16 @@ public partial class MainWindow
             dir = Path.GetTempPath();
         }
 
+        return AudioExport.UniqueInDirectory(
+            dir,
+            baseName,
+            extension,
+            CollectReservedDocumentPaths(),
+            skipExistingFiles: true);
+    }
+
+    private HashSet<string> CollectReservedDocumentPaths()
+    {
         var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in _sessions)
         {
@@ -874,12 +894,7 @@ public partial class MainWindow
             }
         }
 
-        return AudioExport.UniqueInDirectory(
-            dir,
-            Path.GetFileNameWithoutExtension(sourcePath),
-            Path.GetExtension(sourcePath),
-            reserved,
-            skipExistingFiles: true);
+        return reserved;
     }
 
     private static void CopyViewState(DocumentSession from, DocumentSession to)
@@ -898,10 +913,130 @@ public partial class MainWindow
     private void InsertSessionAdjacent(DocumentSession source, DocumentSession copy)
     {
         var index = _sessions.IndexOf(source);
-        var insertAt = index < 0 ? _sessions.Count : index + 1;
-        _sessions.Insert(insertAt, copy);
-        ActivateSession(copy);
+        InsertSessionAt(index < 0 ? _sessions.Count : index + 1, copy);
+    }
+
+    private void InsertSessionAt(int insertAt, DocumentSession session)
+    {
+        insertAt = Math.Clamp(insertAt, 0, _sessions.Count);
+        _sessions.Insert(insertAt, session);
+        ActivateSession(session);
         ApplyPreferredMultiFileArrange(1);
+    }
+
+    private void MergeSelectedTabs() => _ = MergeSelectedTabsAsync();
+
+    private async Task MergeSelectedTabsAsync()
+    {
+        if (IsUiBusy || IsRecording)
+        {
+            return;
+        }
+
+        var sources = SelectedTabsInOrder();
+        if (sources.Length < 2)
+        {
+            return;
+        }
+
+        var destPath = TryResolveMergeDestPath(sources, TabMerge.MergedBaseName);
+        var confirm = destPath is { } path
+            ? UiStrings.ConfirmMergeTabsAs(sources.Length, Path.GetFileName(path))
+            : UiStrings.ConfirmMergeTabsUntitled(sources.Length);
+        if (!ConfirmFileAction(confirm, MessageBoxImage.Question, MessageBoxResult.Yes))
+        {
+            return;
+        }
+
+        if (IsRecording && sources.Contains(_recordSession))
+        {
+            StopRecording();
+        }
+
+        if (IsPlaybackActive())
+        {
+            StopPlayback();
+        }
+
+        _tabMergeBusy = true;
+        RefreshExportEnabled();
+        try
+        {
+            ShowBusyGlass(UiStrings.OverlayMerge);
+            var documents = sources.Select(session => session.Document).ToArray();
+            var progress = new Progress<double>(value => _busyGlass.SetProgress(value));
+            var merged = await Task.Run(() => TabMerge.Mix(documents, progress))
+                .ConfigureAwait(true);
+            if (destPath is not null)
+            {
+                await Task.Run(() => AudioCodec.SaveWave(merged, destPath, progress))
+                    .ConfigureAwait(true);
+                merged.MarkSaved(destPath, AudioFileKind.Wave);
+            }
+
+            var selectedIndices = sources.Select(session => _sessions.IndexOf(session)).ToArray();
+            var insertAt = TabMerge.InsertIndex(_sessions.Count, selectedIndices);
+            InsertSessionAt(insertAt, new DocumentSession(merged));
+            if (merged.SourcePath is { } opened)
+            {
+                RememberOpenedPath(opened);
+            }
+
+            _busyGlass.BeginFadeOut();
+        }
+        catch (Exception ex)
+        {
+            _busyGlass.HideOverlay();
+            TryDeleteAbandonedMergeFile(destPath);
+            OwnerCenteredMessageBox.Show(
+                this,
+                $"{UiStrings.ErrorMergeFailed}\n{ex.Message}",
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            _tabMergeBusy = false;
+            RefreshExportEnabled();
+        }
+    }
+
+    private string? TryResolveMergeDestPath(IReadOnlyList<DocumentSession> sources, string baseName)
+    {
+        foreach (var session in sources)
+        {
+            if (session.Document.SourcePath is not { } path || !File.Exists(path))
+            {
+                continue;
+            }
+
+            return UniquePathInDirectory(Path.GetDirectoryName(path), baseName, ".wav");
+        }
+
+        return null;
+    }
+
+    private void TryDeleteAbandonedMergeFile(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)
+            || !File.Exists(path)
+            || !DocumentWorkspace.TryNormalizePath(path, out var full)
+            || CollectReservedDocumentPaths().Contains(full))
+        {
+            return;
+        }
+
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private void DeleteSessionFile(DocumentSession session)

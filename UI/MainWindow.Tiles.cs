@@ -24,6 +24,7 @@ public partial class MainWindow
         DocumentSession Session,
         WaveformView View,
         Border Host,
+        Border Header,
         TextBlock Title);
 
     private void RestoreWaveformTileArrange(string? stored)
@@ -458,12 +459,13 @@ public partial class MainWindow
         border.SetResourceReference(Border.BackgroundProperty, "WaveformBackBrush");
 
     /// <summary>余りマスに波形背景を敷く。透明のままだとライト／ダークとも GPU の黒が見える。</summary>
-    private static void AddUnusedTileFillers(Grid grid, int count, int rows, int cols)
+    private void AddUnusedTileFillers(Grid grid, int count, int rows, int cols)
     {
         foreach (var cell in WaveformTileLayout.UnusedCells(count, rows, cols))
         {
             var fill = new Border { IsHitTestVisible = false };
             ApplyWaveformTileBackground(fill);
+            ApplyTileDivider(fill, cell, cols);
             Grid.SetRow(fill, cell.Row);
             Grid.SetColumn(fill, cell.Column);
             Grid.SetRowSpan(fill, cell.RowSpan);
@@ -472,13 +474,46 @@ public partial class MainWindow
         }
     }
 
-    private void ApplyTileCell(UIElement host, int index, int rows, int cols)
+    private void ApplyTileCell(Border host, int index, int rows, int cols)
     {
         var cell = WaveformTileLayout.Cell(index, _sessions.Count, rows, cols);
         Grid.SetRow(host, cell.Row);
         Grid.SetColumn(host, cell.Column);
         Grid.SetRowSpan(host, cell.RowSpan);
         Grid.SetColumnSpan(host, cell.ColumnSpan);
+        ApplyTileDivider(host, cell, cols);
+    }
+
+    /// <summary>
+    /// F11 最大化中だけ、隣の波形と地続きに見えないよう右端に 5px の縦仕切りを入れる。
+    /// 配色はチャンネル名・dB 目盛り列と同じ。横の境目はファイル名帯が仕切りになるので入れない。
+    /// 通常表示ではラベル列が残るため仕切りは不要。
+    /// </summary>
+    private void ApplyTileDivider(Border host, WaveformTileCell cell, int cols)
+    {
+        var divider = _waveformMaximized && cell.Column + cell.ColumnSpan < cols;
+        host.BorderThickness = new Thickness(0, 0, divider ? 5 : 0, 0);
+        host.SetResourceReference(Border.BorderBrushProperty, "TimelineWellBackBrush");
+    }
+
+    /// <summary>F11 の出入りで既存タイル（埋め草含む）の縦仕切りを付け外しする。</summary>
+    private void RefreshTileDividers()
+    {
+        if (!_tileMode || _tileGrid is null)
+        {
+            return;
+        }
+
+        var cols = _tileGrid.ColumnDefinitions.Count;
+        foreach (var child in _tileGrid.Children.OfType<Border>())
+        {
+            var cell = new WaveformTileCell(
+                Grid.GetRow(child),
+                Grid.GetColumn(child),
+                Grid.GetRowSpan(child),
+                Grid.GetColumnSpan(child));
+            ApplyTileDivider(child, cell, cols);
+        }
     }
 
     private static void DetachTileHost(FrameworkElement host)
@@ -620,11 +655,13 @@ public partial class MainWindow
         {
             Height = DesignMetrics.DocumentTabBarHeight,
             Child = headerBody,
+            Cursor = Cursors.Hand,
         };
         header.SizeChanged += (_, _) =>
         {
             title.MaxWidth = Math.Max(0, header.ActualWidth - title.Margin.Left - title.Margin.Right);
         };
+        header.MouseLeftButtonUp += (_, e) => HandleTabOrTileChromeClick(session, e);
         header.MouseRightButtonUp += (_, e) =>
         {
             e.Handled = true;
@@ -641,9 +678,15 @@ public partial class MainWindow
             SnapsToDevicePixels = true,
             UseLayoutRounding = true,
         };
-        host.PreviewMouseDown += (_, _) =>
+        host.PreviewMouseDown += (_, e) =>
         {
-            if (_tileLayoutBusy || ReferenceEquals(session, _activeSession))
+            if (_tileLayoutBusy
+                || e.OriginalSource is DependencyObject origin && IsDescendantOf(origin, header))
+            {
+                return;
+            }
+
+            if (ReferenceEquals(session, _activeSession))
             {
                 return;
             }
@@ -651,7 +694,7 @@ public partial class MainWindow
             ActivateSession(session);
         };
 
-        return new WaveformTilePane(session, view, host, title);
+        return new WaveformTilePane(session, view, host, header, title);
     }
 
     private void TearDownWaveformTiles()
@@ -813,22 +856,20 @@ public partial class MainWindow
 
         foreach (var pane in _tilePanes)
         {
-            var active = ReferenceEquals(pane.Session, _activeSession);
+            var highlighted = ReferenceEquals(pane.Session, _activeSession)
+                || _selectedTabs.Contains(pane.Session);
             var dirty = pane.Session.Document.IsDirty;
             if (!ReferenceEquals(pane.Title, _fileNameEditTitle))
             {
                 pane.Title.Text = pane.Session.TabTitle;
             }
             pane.Title.Foreground = (Brush)FindResource(
-                dirty ? "DirtyAccentBrush" : active ? "PrimaryForeBrush" : "MutedForeBrush");
+                dirty ? "DirtyAccentBrush" : highlighted ? "PrimaryForeBrush" : "MutedForeBrush");
             var path = pane.Session.Document.SourcePath ?? UiStrings.UntitledDocument;
             TipService.Set(pane.Title, path + Environment.NewLine + UiStrings.TipRenameFile);
             ApplyWaveformTileBackground(pane.Host);
-            if (pane.Host.Child is DockPanel dock && dock.Children[0] is Border header)
-            {
-                header.Background = BrushOrTransparent(
-                    active ? "WaveformTileActiveHeaderBrush" : "TimelineWellBackBrush");
-            }
+            pane.Header.Background = BrushOrTransparent(
+                highlighted ? "WaveformTileActiveHeaderBrush" : "TimelineWellBackBrush");
         }
     }
 

@@ -14,8 +14,8 @@ public partial class MainWindow
 {
     /// <summary>
     /// 複数選択されたタブ。Ctrl+クリックで個別追加、Shift+クリックで範囲、
-    /// タブ上の Ctrl+A で全選択。Esc で解除。選択中の Ctrl+V は選択タブへの
-    /// 履歴レシピ適用になる。タブのアクティブ化で解除。
+    /// タブバーまたはタイルの帯の上の Ctrl+A で全選択。Esc で解除。選択中の
+    /// Ctrl+V は選択タブへの履歴レシピ適用になる。タブのアクティブ化で解除。
     /// </summary>
     private HashSet<DocumentSession> _selectedTabs => _workspace.SelectedTabs;
 
@@ -249,6 +249,33 @@ public partial class MainWindow
         }
 
         RebuildTabBar();
+        RefreshTileChrome();
+    }
+
+    /// <summary>タブまたはタイルの帯。Ctrl で個別、Shift で範囲、通常クリックで前面。</summary>
+    private void HandleTabOrTileChromeClick(DocumentSession session, MouseButtonEventArgs e)
+    {
+        if (e.Handled)
+        {
+            return;
+        }
+
+        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
+        {
+            e.Handled = true;
+            ToggleTabSelection(session);
+            return;
+        }
+
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+        {
+            e.Handled = true;
+            SelectTabRange(session);
+            return;
+        }
+
+        e.Handled = true;
+        ActivateSession(session);
     }
 
     /// <summary>Ctrl+クリック。選択に個別追加／解除する（アクティブ化はしない）。</summary>
@@ -261,6 +288,7 @@ public partial class MainWindow
 
         _tabSelectionAnchor = session;
         RebuildTabBar();
+        RefreshTileChrome();
     }
 
     /// <summary>Shift+クリック。起点（前回操作したタブ、無ければアクティブ）から範囲選択。</summary>
@@ -287,6 +315,7 @@ public partial class MainWindow
         }
 
         RebuildTabBar();
+        RefreshTileChrome();
     }
 
     /// <summary>Esc から呼ぶ。解除したら true。</summary>
@@ -299,6 +328,7 @@ public partial class MainWindow
 
         _selectedTabs.Clear();
         RebuildTabBar();
+        RefreshTileChrome();
         return true;
     }
 
@@ -365,6 +395,15 @@ public partial class MainWindow
                 canMutate));
             menu.Items.Add(new Separator());
             AddFileNameMenuItems(menu, session, canMutate, anchor);
+            if (targets.Length >= 2)
+            {
+                menu.Items.Add(CreateTabMenuItem(
+                    UiStrings.TabMenuMergeSelected,
+                    MergeSelectedTabs,
+                    "Ctrl+Shift+B",
+                    canMutate));
+            }
+
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 AllTabsSelected ? UiStrings.TabMenuPasteToAll : UiStrings.TabMenuPasteToSelected,
@@ -828,29 +867,7 @@ public partial class MainWindow
         body.Children.Add(grid);
         ApplyTabChrome(session, body);
         border.Child = body;
-        border.MouseLeftButtonUp += (_, e) =>
-        {
-            if (e.Handled)
-            {
-                return;
-            }
-
-            if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
-            {
-                e.Handled = true;
-                ToggleTabSelection(session);
-            }
-            else if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
-            {
-                e.Handled = true;
-                SelectTabRange(session);
-            }
-            else
-            {
-                e.Handled = true;
-                ActivateSession(session);
-            }
-        };
+        border.MouseLeftButtonUp += (_, e) => HandleTabOrTileChromeClick(session, e);
         border.MouseDown += (_, e) =>
         {
             if (e.ChangedButton == MouseButton.Middle)
