@@ -191,6 +191,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.F11 && modifiers == ModifierKeys.None)
+        {
+            ToggleWaveformMaximize();
+            return true;
+        }
+
         if (TryConsumeRecordingShortcut(key, modifiers))
         {
             StopPlaybackShuttle();
@@ -850,6 +856,12 @@ public partial class MainWindow
 
         if (Waveform.TryExitAnalysisView())
         {
+            return true;
+        }
+
+        if (_waveformMaximized)
+        {
+            SetWaveformMaximized(false);
             return true;
         }
 

@@ -62,6 +62,11 @@ public partial class MainWindow : Window
     private bool _syncingChrome;
     private bool _syncingSpeakers;
     private int _waveformHeightScale;
+    private bool _waveformMaximized;
+    private WindowState _windowStateBeforeWaveformMax;
+    private WindowStyle _windowStyleBeforeWaveformMax;
+    private ResizeMode _resizeModeBeforeWaveformMax;
+    private Rect _boundsBeforeWaveformMax;
     private double _meterColumnPreferred;
     private int _playbackGeneration;
     private bool _didRestoreLastDocument;
@@ -772,7 +777,17 @@ public partial class MainWindow : Window
         _closing = true;
         // 未保存の録音 WAV 書き出しより先に実音を止める。保存を先にすると長く鳴り続ける。
         _player.BeginShutdownFlush();
-        WindowPlacement.Capture(this, AppStorage.Settings);
+        if (_waveformMaximized)
+        {
+            WindowPlacement.Capture(
+                _boundsBeforeWaveformMax,
+                _windowStateBeforeWaveformMax == WindowState.Maximized,
+                AppStorage.Settings);
+        }
+        else
+        {
+            WindowPlacement.Capture(this, AppStorage.Settings);
+        }
         HideFromTaskAndFocus();
         StopMeterRendering();
         VectorScope.StopTicks();
@@ -864,6 +879,11 @@ public partial class MainWindow : Window
     private void ApplyMeterColumnWidth(double preferred)
     {
         _meterColumnPreferred = DesignMetrics.ClampMeterColumnWidth(preferred);
+        if (_waveformMaximized)
+        {
+            return;
+        }
+
         var channels = _document?.Channels ?? 2;
         var max = LevelMeterSurroundLayout.FilledColumnWidth(channels);
         var width = Math.Min(_meterColumnPreferred, max);
@@ -885,6 +905,11 @@ public partial class MainWindow : Window
 
     private void PersistMeterColumnWidth()
     {
+        if (_waveformMaximized)
+        {
+            return;
+        }
+
         ApplyMeterColumnWidth(ReadMeterColumnWidth());
         AppStorage.Settings.MeterColumnWidth = _meterColumnPreferred;
         AppStorage.Save();

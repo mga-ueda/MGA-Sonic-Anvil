@@ -101,6 +101,7 @@ internal static partial class UiStrings
     public static string WaveMenuFocusTime => Get("時間へ移動(_G)", "Focus Time (_G)");
     public static string WaveMenuSilentSkip => Get("Silent Skip(_H)", "Silent Skip (_H)");
     public static string WaveMenuAlwaysOnTop => Get("常に最前面(_T)", "Always on _Top");
+    public static string WaveMenuMaximizeWaveform => Get("フルスクリーン(_F)", "_Fullscreen");
 
     public static string WaveMenuNew => Get("新規(_N)", "_New");
     public static string WaveMenuOpen => Get("開く(_O)", "_Open");

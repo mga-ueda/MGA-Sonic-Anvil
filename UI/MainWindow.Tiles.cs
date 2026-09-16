@@ -525,7 +525,6 @@ public partial class MainWindow
         Transport.SetAnalysisView(PrimaryWaveform.AnalysisView);
         SyncViewChrome();
         RefreshStatus();
-        RefreshDocumentNameChrome();
         AttachPlaybackToActiveWaveform();
     }
 

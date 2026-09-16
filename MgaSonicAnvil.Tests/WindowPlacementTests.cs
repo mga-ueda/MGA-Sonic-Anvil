@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Media;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.UI;
 using Xunit;
@@ -161,5 +162,38 @@ public sealed class WindowPlacementTests
         Assert.Equal(DesignMetrics.WindowDefaultHeight, bounds.Height);
         Assert.Equal(100 + (1920 - DesignMetrics.WindowDefaultWidth) / 2, bounds.X);
         Assert.Equal(50 + (1080 - DesignMetrics.WindowDefaultHeight) / 2, bounds.Y);
+    }
+
+    [Fact]
+    public void DeviceRectToDip_KeepsPixelsWhenIdentity()
+    {
+        var bounds = WindowPlacement.DeviceRectToDip(0, 0, 1920, 1080, Matrix.Identity);
+        Assert.Equal(0, bounds.X);
+        Assert.Equal(0, bounds.Y);
+        Assert.Equal(1920, bounds.Width);
+        Assert.Equal(1080, bounds.Height);
+    }
+
+    [Fact]
+    public void DeviceRectToDip_ScalesWithTransformFromDevice()
+    {
+        var fromDevice = new Matrix(0.5, 0, 0, 0.5, 0, 0);
+        var bounds = WindowPlacement.DeviceRectToDip(100, 200, 2020, 1280, fromDevice);
+        Assert.Equal(50, bounds.X);
+        Assert.Equal(100, bounds.Y);
+        Assert.Equal(960, bounds.Width);
+        Assert.Equal(540, bounds.Height);
+    }
+
+    [Fact]
+    public void Capture_WritesMaximizedFlagFromOverride()
+    {
+        var settings = new AppSettings();
+        WindowPlacement.Capture(new Rect(12, 24, 1600, 900), maximized: true, settings);
+        Assert.Equal(12, settings.WindowX);
+        Assert.Equal(24, settings.WindowY);
+        Assert.Equal(WindowPlacement.ToStoredExtent(1600), settings.WindowWidth);
+        Assert.Equal(WindowPlacement.ToStoredExtent(900), settings.WindowHeight);
+        Assert.Equal(nameof(WindowState.Maximized), settings.WindowState);
     }
 }

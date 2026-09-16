@@ -76,6 +76,11 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.TileHorizontal, commands);
             Assert.Contains(WaveMenuCommand.TileVertical, commands);
             Assert.Contains(WaveMenuCommand.TileGrid, commands);
+            Assert.Contains(WaveMenuCommand.MaximizeWaveform, commands);
+            var maximize = Find(tree, WaveMenuCommand.MaximizeWaveform);
+            Assert.True(maximize?.Checkable);
+            Assert.False(maximize?.Checked);
+            Assert.Equal("F11", maximize?.Gesture);
             var tileGrid = Find(tree, WaveMenuCommand.TileGrid);
             Assert.True(tileGrid?.Checkable);
             Assert.True(tileGrid?.Checked);

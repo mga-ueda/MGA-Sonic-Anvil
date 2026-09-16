@@ -26,6 +26,7 @@ internal static class TipService
     private static string? _currentText;
     private static int _suspendCount;
     private static bool _enabled = true;
+    private static bool _hostSuppressed;
     private static bool _pinned;
     private static bool _hostWired;
     private static DispatcherTimer? _commitTimer;
@@ -57,6 +58,18 @@ internal static class TipService
     }
 
     public static bool Pinned => _pinned;
+
+    /// <summary>波形最大化中は枠を出さない。解除すると Tips のオン／オフに戻す。</summary>
+    public static void SetHostSuppressed(bool suppressed)
+    {
+        if (_hostSuppressed == suppressed)
+        {
+            return;
+        }
+
+        _hostSuppressed = suppressed;
+        RelayoutHost();
+    }
 
     public static void BindDisplay(TextBlock display, FrameworkElement host, ScrollViewer? scroll = null)
     {
@@ -553,7 +566,7 @@ internal static class TipService
             return;
         }
 
-        if (!_enabled)
+        if (!_enabled || _hostSuppressed)
         {
             CollapseHost();
             return;

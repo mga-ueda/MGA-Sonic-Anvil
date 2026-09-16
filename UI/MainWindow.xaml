@@ -15,7 +15,8 @@
         Background="{DynamicResource SurfaceBackBrush}">
   <Grid x:Name="RootChrome">
   <DockPanel x:Name="RootDock" LastChildFill="True">
-    <Border DockPanel.Dock="Bottom"
+    <Border x:Name="StatusBarHost"
+            DockPanel.Dock="Bottom"
             Height="{x:Static ui:DesignMetrics.StatusBarHeight}"
             Background="{DynamicResource StatusBarBackBrush}">
       <Grid>
@@ -121,7 +122,7 @@
       </DockPanel>
     </Border>
 
-    <Grid>
+    <Grid x:Name="WorkGrid">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
         <ColumnDefinition x:Name="MeterColumnDef"
@@ -135,7 +136,8 @@
       </Grid.RowDefinitions>
 
       <DockPanel Grid.Row="0" Grid.Column="0">
-        <Grid DockPanel.Dock="Top"
+        <Grid x:Name="OverviewHost"
+              DockPanel.Dock="Top"
               Height="{x:Static ui:DesignMetrics.ProjectBarHeight}">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="{x:Static ui:DesignMetrics.DbScaleWidthGrid}" />
@@ -162,26 +164,6 @@
                     Background="{DynamicResource WaveformBackBrush}"
                     SizeChanged="WaveformTileHost_SizeChanged">
                 <DockPanel x:Name="SingleWaveformHost">
-                  <Border x:Name="DocumentNameHost"
-                          DockPanel.Dock="Top"
-                          Height="{x:Static ui:DesignMetrics.DocumentTabBarHeight}"
-                          Cursor="Hand"
-                          Visibility="Collapsed"
-                          MouseRightButtonUp="DocumentNameHost_MouseRightButtonUp">
-                    <DockPanel>
-                      <Border x:Name="DocumentNameUnderline"
-                              DockPanel.Dock="Bottom"
-                              Height="2"
-                              Background="{DynamicResource AccentCyanBrush}" />
-                      <TextBlock x:Name="DocumentNameText"
-                                 FontSize="11"
-                                 FontFamily="Consolas"
-                                 VerticalAlignment="Center"
-                                 TextTrimming="CharacterEllipsis"
-                                 Margin="10,0,10,0"
-                                 MouseLeftButtonDown="DocumentNameText_MouseLeftButtonDown" />
-                    </DockPanel>
-                  </Border>
                   <ui:WaveformView x:Name="PrimaryWaveform" ClipToBounds="True" />
                 </DockPanel>
               </Grid>
@@ -224,7 +206,8 @@
                             />
       </Grid>
 
-      <Grid Grid.Row="1" Grid.Column="0"
+      <Grid x:Name="TransportChromeHost"
+            Grid.Row="1" Grid.Column="0"
             Background="{DynamicResource TransportBackBrush}">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />

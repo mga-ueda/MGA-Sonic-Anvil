@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
 using MgaSonicAnvil.Config;
 
 namespace MgaSonicAnvil.UI;
@@ -12,11 +14,16 @@ internal static class WindowPlacement
         var bounds = window.WindowState == WindowState.Normal
             ? new Rect(window.Left, window.Top, window.Width, window.Height)
             : window.RestoreBounds;
+        Capture(bounds, window.WindowState == WindowState.Maximized, settings);
+    }
+
+    public static void Capture(Rect bounds, bool maximized, AppSettings settings)
+    {
         settings.WindowX = (int)Math.Round(bounds.X);
         settings.WindowY = (int)Math.Round(bounds.Y);
         settings.WindowWidth = ToStoredExtent(bounds.Width);
         settings.WindowHeight = ToStoredExtent(bounds.Height);
-        settings.WindowState = window.WindowState == WindowState.Maximized
+        settings.WindowState = maximized
             ? nameof(WindowState.Maximized)
             : nameof(WindowState.Normal);
     }
@@ -292,6 +299,55 @@ internal static class WindowPlacement
         return intersects;
     }
 
+    /// <summary>今のウィンドウがあるモニター全面（タスクバー含む）。ブラウザの F11 と同じ。</summary>
+    public static bool TryGetContainingMonitorDip(Window window, out Rect monitor)
+    {
+        monitor = default;
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            hwnd = new WindowInteropHelper(window).EnsureHandle();
+        }
+
+        if (hwnd == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        var handle = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        if (handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        if (!GetMonitorInfo(handle, ref info))
+        {
+            return false;
+        }
+
+        var fromDevice = Matrix.Identity;
+        if (HwndSource.FromHwnd(hwnd)?.CompositionTarget is { } target)
+        {
+            fromDevice = target.TransformFromDevice;
+        }
+
+        monitor = DeviceRectToDip(
+            info.Monitor.Left,
+            info.Monitor.Top,
+            info.Monitor.Right,
+            info.Monitor.Bottom,
+            fromDevice);
+        return monitor.Width > 1 && monitor.Height > 1;
+    }
+
+    internal static Rect DeviceRectToDip(int left, int top, int right, int bottom, Matrix fromDevice)
+    {
+        var a = fromDevice.Transform(new Point(left, top));
+        var b = fromDevice.Transform(new Point(right, bottom));
+        return new Rect(a, b);
+    }
+
     private static double GetPrimaryScreenScale()
     {
         const int SmCxScreen = 0;
@@ -299,6 +355,8 @@ internal static class WindowPlacement
         var pixelWidth = GetSystemMetrics(SmCxScreen);
         return dipWidth > 0 && pixelWidth > 0 ? pixelWidth / dipWidth : 1d;
     }
+
+    private const uint MonitorDefaultToNearest = 2;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeRect
@@ -319,6 +377,9 @@ internal static class WindowPlacement
     }
 
     private delegate bool MonitorEnumProc(IntPtr monitor, IntPtr hdc, ref NativeRect rect, IntPtr data);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
 
     [DllImport("user32.dll")]
     private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr clip, MonitorEnumProc callback, IntPtr data);

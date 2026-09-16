@@ -760,7 +760,6 @@ public partial class MainWindow
 
         SyncTabOverflow();
         RefreshTileChrome();
-        RefreshDocumentNameChrome();
     }
 
     private FrameworkElement CreateTabItem(DocumentSession session)
@@ -892,13 +891,6 @@ public partial class MainWindow
                 }
             }
         }
-
-        if (_activeSession is not null && DocumentNameHost.Visibility == Visibility.Visible)
-        {
-            var path = _activeSession.Document.SourcePath ?? UiStrings.UntitledDocument;
-            TipService.Set(DocumentNameText, path + Environment.NewLine + UiStrings.TipRenameFile);
-            TipService.Set(DocumentNameHost, path);
-        }
     }
 
     private Brush BrushOrTransparent(string? key) =>
@@ -950,30 +942,6 @@ public partial class MainWindow
     private bool IsEditingFileName =>
         _fileNameEditor is { Visibility: Visibility.Visible } && _fileNameEditSession is not null;
 
-    private void DocumentNameHost_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
-    {
-        if (_activeSession is null)
-        {
-            return;
-        }
-
-        e.Handled = true;
-        OpenTabContextMenu(DocumentNameHost, _activeSession);
-    }
-
-    private void DocumentNameText_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (_activeSession is null)
-        {
-            return;
-        }
-
-        if (TryBeginFileNameEditFromClick(_activeSession, DocumentNameText, e))
-        {
-            e.Handled = true;
-        }
-    }
-
     private bool TryBeginFileNameEditFromClick(
         DocumentSession session,
         TextBlock title,
@@ -993,77 +961,29 @@ public partial class MainWindow
         return true;
     }
 
-    private void RefreshDocumentNameChrome()
-    {
-        if (_tileMode || _activeSession is null)
-        {
-            DocumentNameHost.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        DocumentNameHost.Visibility = Visibility.Visible;
-        var session = _activeSession;
-        var dirty = session.Document.IsDirty;
-        var accent = (Brush)FindResource(dirty ? "DirtyAccentBrush" : "AccentCyanBrush");
-        DocumentNameUnderline.Background = accent;
-        if (!ReferenceEquals(DocumentNameText, _fileNameEditTitle))
-        {
-            DocumentNameText.Text = session.TabTitle;
-        }
-
-        DocumentNameText.Foreground = dirty
-            ? accent
-            : (Brush)FindResource("PrimaryForeBrush");
-        var path = session.Document.SourcePath ?? UiStrings.UntitledDocument;
-        TipService.Set(DocumentNameText, path + Environment.NewLine + UiStrings.TipRenameFile);
-        TipService.Set(DocumentNameHost, path);
-    }
-
     private enum FileNameEditSurface
     {
         Tab,
         Tile,
-        Header,
     }
 
-    private FileNameEditSurface DefaultFileNameEditSurface()
-    {
-        if (DocumentTabHost.IsMouseOver)
-        {
-            return FileNameEditSurface.Tab;
-        }
-
-        if (DocumentNameHost.IsMouseOver)
-        {
-            return FileNameEditSurface.Header;
-        }
-
-        return _tileMode ? FileNameEditSurface.Tile : FileNameEditSurface.Header;
-    }
+    private FileNameEditSurface DefaultFileNameEditSurface() =>
+        _tileMode && !DocumentTabHost.IsMouseOver
+            ? FileNameEditSurface.Tile
+            : FileNameEditSurface.Tab;
 
     private FileNameEditSurface SurfaceFromAnchor(FrameworkElement anchor)
     {
-        if (ReferenceEquals(anchor, DocumentNameHost)
-            || IsDescendantOf(anchor, DocumentNameHost))
-        {
-            return FileNameEditSurface.Header;
-        }
-
         if (IsDescendantOf(anchor, DocumentTabHost))
         {
             return FileNameEditSurface.Tab;
         }
 
-        return FileNameEditSurface.Tile;
+        return _tileMode ? FileNameEditSurface.Tile : FileNameEditSurface.Tab;
     }
 
     private FileNameEditSurface SurfaceFromTitle(TextBlock title)
     {
-        if (ReferenceEquals(title, DocumentNameText))
-        {
-            return FileNameEditSurface.Header;
-        }
-
         if (_tileMode)
         {
             foreach (var pane in _tilePanes)
@@ -1080,17 +1000,12 @@ public partial class MainWindow
 
     private TextBlock? FindFileNameTitle(DocumentSession session, FileNameEditSurface surface)
     {
-        switch (surface)
+        if (surface == FileNameEditSurface.Tile)
         {
-            case FileNameEditSurface.Header:
-                return !_tileMode && ReferenceEquals(session, _activeSession)
-                    ? DocumentNameText
-                    : null;
-            case FileNameEditSurface.Tile:
-                return FindTilePane(session)?.Title;
-            default:
-                return FindTabTitle(session);
+            return FindTilePane(session)?.Title;
         }
+
+        return FindTabTitle(session);
     }
 
     private TextBlock? FindTabTitle(DocumentSession session)

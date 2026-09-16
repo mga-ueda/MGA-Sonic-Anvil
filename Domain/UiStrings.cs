@@ -803,13 +803,15 @@ internal static partial class UiStrings
         + "左端のチャンネル名：クリックでソロ（再クリックで解除。Ctrl で追加。Shift でミュート）。Tab／Shift+Tab で順にソロ。\n"
         + "ホイール＝時間ズーム（再生ヘッド基準）。Shift+ホイール＝パン。Ctrl+ホイール＝振幅。\n"
         + "フラッグ／ループ端：クリックで選択、ドラッグまたは ←→ で移動。Alt+←→ は微調整。ダブルクリックで名前。右クリックまたはメニューキー／Shift+F10 でメニュー。\n"
-        + "Ctrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置、波形エリアに収まらない配置は飛ばす。左右・上下が収まらなければ格子を試し、格子も無理なら動かない）。今見ている表示モード（波形 / スペクトログラム / 重ね / ラウドネス）で全タブを並べる。並び替え中でももう一度押すと次へ進む。",
+        + "Ctrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置、波形エリアに収まらない配置は飛ばす。左右・上下が収まらなければ格子を試し、格子も無理なら動かない）。今見ている表示モード（波形 / スペクトログラム / 重ね / ラウドネス）で全タブを並べる。並び替え中でももう一度押すと次へ進む。\n"
+        + "F11 で波形エリアをフルスクリーン（タスクバーは隠す。全体波形とステータスバーは残す。タイルでも可。もう一度 F11 で戻す）。",
         "Click to set the playhead. ←→ seek (hold during playback for 3× shuttle). Drag to select. Ctrl+drag scrubs (every channel downmixed to L/R).\n"
         + "Esc or a move without Shift clears the selection. Shift+drag / ←→ extends it. Double-click a span (between markers). Shift+double-click adds that span. Triple-click selects all. The guide snaps to markers / loop edges.\n"
         + "Channel names on the left: click to solo (again to clear; Ctrl adds; Shift mutes). Tab / Shift+Tab cycle solo.\n"
         + "Wheel = time zoom (around the playhead). Shift+wheel = pan. Ctrl+wheel = amplitude.\n"
         + "Flags / loop edges: click to select, drag or ←→ to move. Alt+←→ nudges. Double-click to name. Right-click or the menu key / Shift+F10 for the menu.\n"
-        + "Ctrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same or would not fit the waveform area. If side-by-side or stacked would not fit, it tries grid; if grid would not fit either, it does nothing). Every tab uses the current view mode (waveform / spectrogram / overlay / loudness). Press again during arrange to skip ahead.");
+        + "Ctrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same or would not fit the waveform area. If side-by-side or stacked would not fit, it tries grid; if grid would not fit either, it does nothing). Every tab uses the current view mode (waveform / spectrogram / overlay / loudness). Press again during arrange to skip ahead.\n"
+        + "F11 makes the waveform area fullscreen like a browser (hides the taskbar; keeps the overview and status bar; works while tiled; F11 again restores).");
     public static string TipAlwaysOnTop => Get(
         "ウィンドウを常に最前面へ表示します。",
         "Keep the window always on top.");

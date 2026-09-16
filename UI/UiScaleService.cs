@@ -134,11 +134,17 @@ internal static class UiScaleService
             window.MaxHeight = maxHeight;
         }
 
-        if (resize && window.WindowState == WindowState.Normal)
+        if (resize && window.WindowState == WindowState.Normal
+            && window is not MainWindow { IsWaveformMaximized: true })
         {
             window.Width = ScaleExtent(window.Width, previousFactor, factor);
             window.Height = ScaleExtent(window.Height, previousFactor, factor);
             KeepOnWorkArea(window);
+        }
+
+        if (window is MainWindow { IsWaveformMaximized: true } main)
+        {
+            main.RefreshWaveformFullscreenFrame();
         }
     }
 

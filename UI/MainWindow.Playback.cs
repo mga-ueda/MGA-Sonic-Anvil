@@ -1115,4 +1115,106 @@ public partial class MainWindow
     {
         WaveformHostBorder.MinHeight = DesignMetrics.WaveformHostMinHeight * _waveformHeightScale;
     }
+
+    private void ToggleWaveformMaximize() => SetWaveformMaximized(!_waveformMaximized);
+
+    internal bool IsWaveformMaximized => _waveformMaximized;
+
+    internal void RefreshWaveformFullscreenFrame()
+    {
+        if (_waveformMaximized)
+        {
+            ApplyWaveformFullscreenFrame();
+        }
+    }
+
+    private void SetWaveformMaximized(bool maximized)
+    {
+        if (_waveformMaximized == maximized)
+        {
+            return;
+        }
+
+        if (maximized)
+        {
+            _windowStateBeforeWaveformMax = WindowState;
+            _windowStyleBeforeWaveformMax = WindowStyle;
+            _resizeModeBeforeWaveformMax = ResizeMode;
+            _boundsBeforeWaveformMax = WindowState == WindowState.Normal
+                ? new Rect(Left, Top, Width, Height)
+                : RestoreBounds;
+            _waveformMaximized = true;
+            ApplyWaveformMaximizeChrome();
+            ApplyWaveformFullscreenFrame();
+        }
+        else
+        {
+            _waveformMaximized = false;
+            RestoreWaveformWindowFrame();
+            ApplyWaveformMaximizeChrome();
+        }
+
+        Waveform.Focus();
+    }
+
+    private void ApplyWaveformFullscreenFrame()
+    {
+        WindowStyle = WindowStyle.None;
+        ResizeMode = ResizeMode.NoResize;
+        if (WindowState != WindowState.Normal)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        if (!WindowPlacement.TryGetContainingMonitorDip(this, out var monitor))
+        {
+            return;
+        }
+
+        Left = monitor.X;
+        Top = monitor.Y;
+        Width = monitor.Width;
+        Height = monitor.Height;
+    }
+
+    private void RestoreWaveformWindowFrame()
+    {
+        WindowStyle = _windowStyleBeforeWaveformMax;
+        ResizeMode = _resizeModeBeforeWaveformMax;
+        WindowState = WindowState.Normal;
+        Left = _boundsBeforeWaveformMax.X;
+        Top = _boundsBeforeWaveformMax.Y;
+        Width = Math.Max(MinWidth, _boundsBeforeWaveformMax.Width);
+        Height = Math.Max(MinHeight, _boundsBeforeWaveformMax.Height);
+        if (_windowStateBeforeWaveformMax == WindowState.Maximized)
+        {
+            WindowState = WindowState.Maximized;
+        }
+
+        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+    }
+
+    private void ApplyWaveformMaximizeChrome()
+    {
+        var show = !_waveformMaximized;
+        var visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        StatusBarHost.Visibility = Visibility.Visible;
+        OverviewHost.Visibility = Visibility.Visible;
+        TransportChromeHost.Visibility = visibility;
+        MeterColumn.Visibility = visibility;
+        MeterColumnSplitter.Visibility = visibility;
+        TipService.SetHostSuppressed(!show);
+        ApplyWaapiPanelVisible();
+        if (show)
+        {
+            WorkGrid.RowDefinitions[1].Height = DesignMetrics.TransportChromeHeightGrid;
+            ApplyMeterColumnWidth(_meterColumnPreferred);
+            return;
+        }
+
+        WorkGrid.RowDefinitions[1].Height = new GridLength(0);
+        MeterColumnDef.MinWidth = 0;
+        MeterColumnDef.MaxWidth = 0;
+        MeterColumnDef.Width = new GridLength(0);
+    }
 }

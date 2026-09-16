@@ -81,6 +81,7 @@ internal enum WaveMenuCommand
     AmpZoomReset,
     CenterPlayhead,
     CenterLock,
+    MaximizeWaveform,
     ViewWaveform,
     ViewSpectrogram,
     ViewOverlay,
@@ -177,6 +178,7 @@ internal sealed class WaveformContextMenuModel
     public bool CanTileHorizontal { get; init; }
     public bool CanTileVertical { get; init; }
     public bool CanTileGrid { get; init; }
+    public bool WaveformMaximized { get; init; }
     public bool CanLoopPlay { get; init; }
     public bool CanAddMarkerHere { get; init; }
     public WaveformAnalysisView AnalysisView { get; init; }
@@ -493,6 +495,8 @@ internal static class WaveformContextMenuBuilder
         Check(UiStrings.WaveMenuTileHorizontal, WaveMenuCommand.TileHorizontal, null, m.WaveTileArrange == WaveformTileArrange.Horizontal, CanPickTile(m, WaveformTileArrange.Horizontal)),
         Check(UiStrings.WaveMenuTileVertical, WaveMenuCommand.TileVertical, null, m.WaveTileArrange == WaveformTileArrange.Vertical, CanPickTile(m, WaveformTileArrange.Vertical)),
         Check(UiStrings.WaveMenuTileGrid, WaveMenuCommand.TileGrid, null, m.WaveTileArrange == WaveformTileArrange.Grid, CanPickTile(m, WaveformTileArrange.Grid)),
+        WaveMenuSeparatorEntry.Instance,
+        Check(UiStrings.WaveMenuMaximizeWaveform, WaveMenuCommand.MaximizeWaveform, "F11", m.WaveformMaximized, enabled: true),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuSoloNext, WaveMenuCommand.SoloNext, "Tab", m.CanNavigate),
         Cmd(UiStrings.WaveMenuSoloPrev, WaveMenuCommand.SoloPrev, "Shift+Tab", m.CanNavigate),
