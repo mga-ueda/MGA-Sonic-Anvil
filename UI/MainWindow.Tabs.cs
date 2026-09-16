@@ -590,6 +590,7 @@ public partial class MainWindow
         menu.Items.Add(CreateTabMenuItem(
             UiStrings.TabMenuDuplicateFile,
             () => DuplicateSession(session),
+            "Ctrl+Shift+D",
             enabled: canMutate));
         menu.Items.Add(CreateTabMenuItem(
             UiStrings.TabMenuDeleteFile,

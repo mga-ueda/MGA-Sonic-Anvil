@@ -516,7 +516,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuSaveMp3, WaveMenuCommand.SaveMp3, "Ctrl+Shift+M", m.HasDocument && !m.IsBusy && !m.IsRecording),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuRenameFile, WaveMenuCommand.RenameFile, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
-        Cmd(UiStrings.WaveMenuDuplicateFile, WaveMenuCommand.DuplicateFile, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
+        Cmd(UiStrings.WaveMenuDuplicateFile, WaveMenuCommand.DuplicateFile, "Ctrl+Shift+D", m.HasDocument && !m.IsBusy && !m.IsRecording),
         Cmd(UiStrings.WaveMenuDeleteFile, WaveMenuCommand.DeleteFile, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuCloseTab, WaveMenuCommand.CloseTab, "Ctrl+W", m.HasDocument && !m.IsBusy && !m.IsRecording),

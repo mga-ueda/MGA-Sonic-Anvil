@@ -101,6 +101,7 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.SaveMp3, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Contains(WaveMenuCommand.RenameFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Contains(WaveMenuCommand.DuplicateFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
+            Assert.Equal("Ctrl+Shift+D", Find(tree, WaveMenuCommand.DuplicateFile)?.Gesture);
             Assert.Contains(WaveMenuCommand.DeleteFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Contains(WaveMenuCommand.CloseOthers, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.True(Find(tree, WaveMenuCommand.CloseOthers)?.Enabled);

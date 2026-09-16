@@ -923,6 +923,16 @@ public partial class MainWindow
             }
         }
 
+        if (key == Key.D && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            if (_activeSession is not null && !IsRecording)
+            {
+                DuplicateSession(_activeSession);
+            }
+
+            return true;
+        }
+
         if (key == Key.Q && modifiers == ModifierKeys.Control)
         {
             Close();

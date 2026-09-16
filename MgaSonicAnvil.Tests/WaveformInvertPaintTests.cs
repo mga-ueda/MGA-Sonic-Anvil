@@ -22,6 +22,20 @@ public sealed class WaveformInvertPaintTests
     }
 
     [Fact]
+    public void ChannelScaleLeft_HidesLaneWhenFullscreen()
+    {
+        var bounds = new System.Windows.Rect(0, 0, 800, 400);
+        Assert.Equal(DesignMetrics.DbScaleWidth, WaveformView.ChannelScaleLeft(bounds, showScaleLane: true));
+        Assert.Equal(0, WaveformView.ChannelScaleLeft(bounds, showScaleLane: false));
+        Assert.Equal(800 - DesignMetrics.DbScaleWidth, WaveformView.ChannelScaleContentWidth(bounds, showScaleLane: true));
+        Assert.Equal(800, WaveformView.ChannelScaleContentWidth(bounds, showScaleLane: false));
+
+        var narrow = new System.Windows.Rect(0, 0, 20, 400);
+        Assert.Equal(20, WaveformView.ChannelScaleLeft(narrow, showScaleLane: true));
+        Assert.Equal(0, WaveformView.ChannelScaleLeft(narrow, showScaleLane: false));
+    }
+
+    [Fact]
     public void LaneAt_SplitsHeightWithoutGap()
     {
         Assert.Equal(0, ChannelWavePaint.LaneAt(0, 4, 2, 0));

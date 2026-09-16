@@ -140,7 +140,8 @@
               DockPanel.Dock="Top"
               Height="{x:Static ui:DesignMetrics.ProjectBarHeight}">
           <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="{x:Static ui:DesignMetrics.DbScaleWidthGrid}" />
+            <ColumnDefinition x:Name="OverviewScaleColumn"
+                              Width="{x:Static ui:DesignMetrics.DbScaleWidthGrid}" />
             <ColumnDefinition Width="*" />
           </Grid.ColumnDefinitions>
           <Border Background="{DynamicResource TransportBackBrush}" />

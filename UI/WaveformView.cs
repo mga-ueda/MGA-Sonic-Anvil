@@ -173,6 +173,7 @@ internal sealed class WaveformView : Grid
     private double _viewStart;
     private double _timeZoom = 1d;
     private double _ampZoom = 1d;
+    private bool _showScaleLane = true;
     private long _playheadFrame;
     private double? _pointerX;
     private double? _mouseGuideX;
@@ -471,6 +472,26 @@ internal sealed class WaveformView : Grid
     public bool LoopEnabled { get; set; }
 
     public bool CenterLocked { get; private set; }
+
+    /// <summary>
+    /// 左端のチャンネル名と dB 目盛り列。F11 フルスクリーンでは畳んで波形を広げる。
+    /// </summary>
+    public bool ShowScaleLane
+    {
+        get => _showScaleLane;
+        set
+        {
+            if (_showScaleLane == value)
+            {
+                return;
+            }
+
+            _showScaleLane = value;
+            _waveDirty = true;
+            SyncSpectrogramBoostBar();
+            InvalidateStaticLayer();
+        }
+    }
 
     public bool IsInteracting => _dragging || _markerDragging || _scrubbing;
 
@@ -832,7 +853,7 @@ internal sealed class WaveformView : Grid
 
     private void SyncSpectrogramBoostBar()
     {
-        var show = SpectrogramVisible;
+        var show = SpectrogramVisible && _showScaleLane;
         _boostBar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         _boostBar.IsEnabled = show && _document is not null;
         if (!show || ActualHeight <= 1)
@@ -2051,7 +2072,11 @@ internal sealed class WaveformView : Grid
         var wave = WaveformBounds(bounds);
         var span = _document is null ? 0 : ViewSpanFrames;
         var start = _viewStart;
-        DrawDbScaleWell(dc, bounds);
+        if (_showScaleLane)
+        {
+            DrawDbScaleWell(dc, bounds);
+        }
+
         SyncSpectrogramBoostBar();
         DrawMarkerLane(dc, bounds, start, span);
         DrawTimeLane(dc, bounds, start, span);
@@ -2108,12 +2133,16 @@ internal sealed class WaveformView : Grid
 
         if (loudness)
         {
-            _loudness.DrawScale(
-                dc,
-                DbScaleBounds(bounds),
-                wave,
-                _loudnessTargetLufs,
-                UiDpi.Get(this).PixelsPerDip);
+            if (_showScaleLane)
+            {
+                _loudness.DrawScale(
+                    dc,
+                    DbScaleBounds(bounds),
+                    wave,
+                    _loudnessTargetLufs,
+                    UiDpi.Get(this).PixelsPerDip);
+            }
+
             if (_loudness.Current is { } profile)
             {
                 _loudness.DrawOverlay(
@@ -2127,7 +2156,7 @@ internal sealed class WaveformView : Grid
             }
         }
 
-        if (!SpectrogramVisible && !loudness)
+        if (_showScaleLane && !SpectrogramVisible && !loudness)
         {
             var channels = Math.Max(1, _document.Channels);
             var laneGap = channels > 1 ? 4d : 0d;
@@ -2135,7 +2164,7 @@ internal sealed class WaveformView : Grid
             DrawDbScaleTicks(dc, bounds, wave, channels, laneGap, laneHeight);
             DrawChannelLabels(dc, bounds, wave, channels, laneGap, laneHeight);
         }
-        else if (overlay)
+        else if (_showScaleLane && overlay)
         {
             ResolveWaveLane(overlay: true, wave.Height, 1, 0, _ampZoom, out var laneHeight, out var origin, out var ampHeight);
             var overlayWave = new Rect(wave.X, wave.Y + origin, wave.Width, laneHeight);
@@ -3818,7 +3847,7 @@ internal sealed class WaveformView : Grid
     private bool TryHitChannelLabel(Point point, out int channel)
     {
         channel = -1;
-        if (_document is null || SpectrogramVisible || LoudnessVisible)
+        if (!_showScaleLane || _document is null || SpectrogramVisible || LoudnessVisible)
         {
             return false;
         }
@@ -3945,13 +3974,19 @@ internal sealed class WaveformView : Grid
             && bar.Contains(pos);
     }
 
-    private static double ScaleLeft(Rect bounds) =>
-        Math.Min(DbScaleLaneWidth, Math.Max(0, bounds.Width));
+    internal static double ChannelScaleLeft(Rect bounds, bool showScaleLane) =>
+        showScaleLane
+            ? Math.Min(DbScaleLaneWidth, Math.Max(0, bounds.Width))
+            : 0;
 
-    private static double ScaleContentWidth(Rect bounds) =>
-        Math.Max(0, bounds.Width - ScaleLeft(bounds));
+    internal static double ChannelScaleContentWidth(Rect bounds, bool showScaleLane) =>
+        Math.Max(0, bounds.Width - ChannelScaleLeft(bounds, showScaleLane));
 
-    private static Rect DbScaleBounds(Rect bounds) =>
+    private double ScaleLeft(Rect bounds) => ChannelScaleLeft(bounds, _showScaleLane);
+
+    private double ScaleContentWidth(Rect bounds) => ChannelScaleContentWidth(bounds, _showScaleLane);
+
+    private Rect DbScaleBounds(Rect bounds) =>
         new(0, 0, ScaleLeft(bounds), bounds.Height);
 
     private Rect WaveformBounds(Rect bounds)

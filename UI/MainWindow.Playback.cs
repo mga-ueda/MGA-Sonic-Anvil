@@ -1205,6 +1205,11 @@ public partial class MainWindow
         MeterColumnSplitter.Visibility = visibility;
         TipService.SetHostSuppressed(!show);
         ApplyWaapiPanelVisible();
+        PrimaryWaveform.ShowScaleLane = show;
+        ForEachWaveform(view => view.ShowScaleLane = show);
+        OverviewScaleColumn.Width = show
+            ? DesignMetrics.DbScaleWidthGrid
+            : new GridLength(0);
         if (show)
         {
             WorkGrid.RowDefinitions[1].Height = DesignMetrics.TransportChromeHeightGrid;
