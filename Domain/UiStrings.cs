@@ -162,6 +162,7 @@ internal static partial class UiStrings
     public static string LabelAudioApiAsio => Get("ASIO", "ASIO");
     public static string ButtonOk => Get("OK", "OK");
     public static string ButtonCancel => Get("Cancel", "Cancel");
+    public static string ButtonClose => Get("閉じる", "Close");
     public static string ButtonYes => Get("はい", "Yes");
     public static string ButtonNo => Get("いいえ", "No");
     public static string ButtonYesNoCancel => Get("キャンセル", "Cancel");
@@ -239,6 +240,8 @@ internal static partial class UiStrings
         ? Get("LAME で MP3 を書き出しました。", "Wrote the MP3 with LAME.")
         : Get("Windows で MP3 を書き出しました。", "Wrote the MP3 with Windows.");
     public static string FilterSaveWave => Get("Wave|*.wav", "Wave|*.wav");
+    public static string FilterTabTimeCsv => Get("CSV|*.csv|すべて|*.*", "CSV|*.csv|All|*.*");
+    public static string FilterTabTimePdf => Get("PDF|*.pdf|すべて|*.*", "PDF|*.pdf|All|*.*");
     public static string MenuExportWave => Get("Wave で書き出す", "Export Wave");
     public static string MenuExportMp3 => Get("MP3 で書き出す", "Export MP3");
     public static string ExportFolderTitle => Get("書き出し先フォルダ", "Export folder");
@@ -660,8 +663,8 @@ internal static partial class UiStrings
         "MP3 として保存 (Ctrl+Shift+M)\n別名保存と同じく書き出すだけ。今のタブは開いたまま、書き出した MP3 は読み込まない。Ctrl+Shift+Alt+M で全タブを MP3 書き出し。設定の LAME があればそれを使い、空欄または無効なら Windows（既定 192 kbps）。成功時にどちらで書いたかを表示。失敗はダイアログ。マーカー／リージョン／ループは書きません",
         "Save as MP3 (Ctrl+Shift+M)\nWrites a file like Save As; keeps the current tab and does not open the written MP3. Ctrl+Shift+Alt+M exports every tab as MP3. Uses LAME when the path is valid; otherwise Windows (default 192 kbps). Success shows which encoder ran. Failures open a dialog. Markers / regions / loops are not written");
     public static string TipOpen => Get(
-        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+N で新規（フォーマットは都度指定）\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ\nCtrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置は飛ばす。今見ている表示モードで全タブを並べる）\n右クリックで、すべてのタブの時間をコピー（ファイル名と長さをタブ区切り）など\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
-        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+N for a new file (choose the format each time)\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab\nCtrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same. Every tab uses the current view mode)\nRight-click to copy all tab times (file name and duration, tab-separated) and more\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
+        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+N で新規（フォーマットは都度指定）\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ\nCtrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置は飛ばす。今見ている表示モードで全タブを並べる）\n右クリックで、すべてのタブの時間（表。コピー／範囲コピー／CSV／PDF）など\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
+        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+N for a new file (choose the format each time)\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab\nCtrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same. Every tab uses the current view mode)\nRight-click for all tab times (table with copy / range copy / CSV / PDF) and more\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
     public static string TipCloseTab => Get(
         "タブを閉じる (Ctrl+W)。今の起動のうちなら Ctrl+Shift+T で開き直せる",
         "Close tab (Ctrl+W). Ctrl+Shift+T reopens it in this launch");
@@ -838,6 +841,25 @@ internal static partial class UiStrings
     public static string TabMenuTileVertical => WaveMenuTileVertical;
     public static string TabMenuTileGrid => WaveMenuTileGrid;
     public static string TabMenuCopyAllTimes => WaveMenuCopyAllTabTimes;
+    public static string TabTimeWindowTitle => Get("タブの時間", "Tab times");
+    public static string TabTimeColumnFile => Get("ファイル", "File");
+    public static string TabTimeColumnTime => Get("時間", "Time");
+    public static string TabTimeCopy => Get("コピー", "Copy");
+    public static string TabTimeSaveCsv => Get("CSV", "CSV");
+    public static string TabTimeSavePdf => Get("PDF", "PDF");
+    public static string TabTimeSaveCsvTitle => Get("CSV として保存", "Save CSV");
+    public static string TabTimeSavePdfTitle => Get("PDF として保存", "Save PDF");
+    public static string TabTimeFileNameCsv => Get("タブの時間.csv", "TabTimes.csv");
+    public static string TabTimeFileNamePdf => Get("タブの時間.pdf", "TabTimes.pdf");
+    public static string TipTabTimeCopy => Get(
+        "選択したセルをコピーします。未選択なら表全体（見出し付き）。Ctrl+C でもコピー。ドラッグで範囲選択。",
+        "Copy selected cells. Copies the whole table with headers if nothing is selected. Ctrl+C also copies. Drag to select a range.");
+    public static string TipTabTimeCsv => Get(
+        "表全体を CSV（UTF-8、Excel 向け BOM 付き）で保存します。",
+        "Save the whole table as CSV (UTF-8 with BOM for Excel).");
+    public static string TipTabTimePdf => Get(
+        "表全体を PDF で保存します。",
+        "Save the whole table as PDF.");
     public static string TabMenuCloseAll => Get("すべてのタブを閉じる(_A)", "Close _All Tabs");
 
     /// <summary>通常メニュー用。「全部のタブを選択する(_A)」とアクセスキーが重ならないよう W。</summary>

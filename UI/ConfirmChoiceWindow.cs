@@ -28,7 +28,7 @@ internal sealed class ConfirmChoiceWindow : Window
             dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
 
-        dialog.ShowDialog();
+        WindowPaintReveal.ShowDialogWhenPainted(dialog);
         return dialog.Result;
     }
 
@@ -103,7 +103,7 @@ internal sealed class ConfirmChoiceWindow : Window
         root.Children.Add(row);
         Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
 
-        SourceInitialized += (_, _) => DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        WindowPaintReveal.Attach(this);
         AppDialogKeys.Attach(this, () =>
         {
             Result = DismissResult(buttons);

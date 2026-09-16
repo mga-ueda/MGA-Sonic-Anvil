@@ -440,6 +440,8 @@ public partial class MainWindow
         return false;
     }
 
+    private TabTimeTableWindow? _tabTimeTable;
+
     private void CopyAllTabTimes()
     {
         if (_sessions.Count == 0)
@@ -447,20 +449,35 @@ public partial class MainWindow
             return;
         }
 
-        var rows = new (string FileName, long FrameCount, int SampleRate)[_sessions.Count];
+        var tabs = new (string FileName, long FrameCount, int SampleRate)[_sessions.Count];
         for (var i = 0; i < _sessions.Count; i++)
         {
             var document = _sessions[i].Document;
-            rows[i] = (_sessions[i].DisplayName, document.FrameCount, document.SampleRate);
+            tabs[i] = (_sessions[i].DisplayName, document.FrameCount, document.SampleRate);
         }
 
-        var text = TabTimeList.Format(rows);
-        if (text.Length == 0)
+        var rows = TabTimeList.FromTabs(tabs);
+        if (_tabTimeTable is null)
         {
-            return;
+            _tabTimeTable = new TabTimeTableWindow
+            {
+                Owner = this,
+                Topmost = Topmost,
+            };
+            _tabTimeTable.Closed += (_, _) => _tabTimeTable = null;
+        }
+        else
+        {
+            _tabTimeTable.Topmost = Topmost;
+            if (_tabTimeTable.WindowState == WindowState.Minimized)
+            {
+                _tabTimeTable.WindowState = WindowState.Normal;
+            }
         }
 
-        SystemClipboard.TrySetText(text, this);
+        _tabTimeTable.SetRows(rows);
+        WindowPaintReveal.ShowWhenPainted(_tabTimeTable);
+        _tabTimeTable.Activate();
     }
 
     /// <summary>タブメニューに並べ方（タブのまま／左右／上下／上下左右）を直接並べる。</summary>

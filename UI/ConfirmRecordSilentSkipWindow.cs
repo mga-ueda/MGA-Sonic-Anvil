@@ -36,7 +36,7 @@ internal sealed class ConfirmRecordSilentSkipWindow : Window
         {
             Owner = owner,
         };
-        dialog.ShowDialog();
+        WindowPaintReveal.ShowDialogWhenPainted(dialog);
         return new ConfirmRecordSilentSkipResult(dialog.Choice, dialog.UseSilentSkip, dialog.AddRegion);
     }
 
@@ -126,7 +126,7 @@ internal sealed class ConfirmRecordSilentSkipWindow : Window
         root.Children.Add(buttons);
 
         Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
-        SourceInitialized += (_, _) => DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        WindowPaintReveal.Attach(this);
         AppDialogKeys.Attach(this, () =>
         {
             Choice = ConfirmRecordSilentSkipChoice.Cancel;

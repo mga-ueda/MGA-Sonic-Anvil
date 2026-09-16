@@ -22,7 +22,7 @@ internal sealed class ConfirmSaveWindow : Window
     public static ConfirmSaveChoice Show(Window owner, string displayName, int remainingDirty)
     {
         var dialog = new ConfirmSaveWindow(displayName, remainingDirty) { Owner = owner };
-        dialog.ShowDialog();
+        WindowPaintReveal.ShowDialogWhenPainted(dialog);
         return dialog.Choice;
     }
 
@@ -76,7 +76,7 @@ internal sealed class ConfirmSaveWindow : Window
         root.Children.Add(second);
 
         Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
-        SourceInitialized += (_, _) => DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        WindowPaintReveal.Attach(this);
         AppDialogKeys.Attach(this, () =>
         {
             Choice = ConfirmSaveChoice.Cancel;

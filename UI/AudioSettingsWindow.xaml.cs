@@ -166,7 +166,7 @@ internal partial class AudioSettingsWindow : Window
         _inputEditor.MapChanged += OnInputMapChanged;
         _outputEditor.MapChanged += OnOutputMapChanged;
         _outputEditor.TestClicked += OnOutputTest;
-        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        WindowPaintReveal.Attach(this);
         VerticalResizeOnly.LockWidth(this);
         Title = UiStrings.DialogSettingsTitle;
 

@@ -22,7 +22,7 @@ internal sealed class NewDocumentWindow : Window
         {
             Owner = owner,
         };
-        return dialog.ShowDialog() == true ? dialog.SelectedFormat : null;
+        return WindowPaintReveal.ShowDialogWhenPainted(dialog) == true ? dialog.SelectedFormat : null;
     }
 
     private NewDocumentWindow(DefaultAudioFormat.Spec current, IEnumerable<string> visibleIds)
@@ -58,9 +58,9 @@ internal sealed class NewDocumentWindow : Window
         root.Children.Add(buttons);
         Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
 
+        WindowPaintReveal.Attach(this);
         SourceInitialized += (_, _) =>
         {
-            DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
             ComboBoxFit.Apply(_rateCombo);
             ComboBoxFit.Apply(_bitsCombo);
             ComboBoxFit.Apply(_layoutCombo);

@@ -64,8 +64,17 @@ internal static class DarkWindowChrome
     public static bool TrySetCloaked(Window window, bool cloaked) =>
         SetBool(window, DwmwaCloak, cloaked);
 
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Window, object> EraseHooked = new();
+
     public static void SuppressEraseBackground(Window window)
     {
+        if (EraseHooked.TryGetValue(window, out _))
+        {
+            return;
+        }
+
+        EraseHooked.Add(window, true);
+
         void Attach()
         {
             var hwnd = new WindowInteropHelper(window).Handle;

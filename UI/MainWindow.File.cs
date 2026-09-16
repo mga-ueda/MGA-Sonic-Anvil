@@ -773,7 +773,7 @@ public partial class MainWindow
             Owner = this,
         };
 
-        if (dialog.ShowDialog() != true)
+        if (WindowPaintReveal.ShowDialogWhenPainted(dialog) != true)
         {
             try
             {

@@ -109,7 +109,7 @@ internal static partial class UiStrings
     public static string WaveMenuSaveMp3 => Get("MP3 として保存(_M)", "Save as _MP3");
     public static string WaveMenuCloseTab => Get("タブを閉じる(_C)", "_Close Tab");
     public static string WaveMenuCloseAll => Get("すべてのタブを閉じる(_W)", "Close All Tabs (_W)");
-    public static string WaveMenuCopyAllTabTimes => Get("すべてのタブの時間をコピー(_I)", "Copy All Tab T_imes");
+    public static string WaveMenuCopyAllTabTimes => Get("すべてのタブの時間(_I)", "All Tab T_imes");
     public static string WaveMenuReopenTab => Get("閉じたタブを再開(_T)", "Reopen Closed _Tab");
     public static string WaveMenuNextTab => Get("次のタブ(_B)", "Next Ta_b");
     public static string WaveMenuPrevTab => Get("前のタブ(_V)", "Pre_vious Tab");

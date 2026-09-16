@@ -90,5 +90,7 @@ public partial class MainWindow
         {
             _colorDevPanel?.RefreshAppearance();
         }
+
+        _tabTimeTable?.RefreshAppearance();
     }
 }

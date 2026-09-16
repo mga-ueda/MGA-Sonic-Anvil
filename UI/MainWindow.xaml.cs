@@ -82,7 +82,6 @@ public partial class MainWindow : Window
     private readonly EffectPreviewState _pitchPreview = new();
     private readonly EffectPreviewState _timeStretchPreview = new();
     private bool _resumeAfterScrub;
-    private bool _startupRevealPending = true;
     private bool _closing;
     private bool _exitAfterFlush;
     private bool _bindingWorkspace;
@@ -118,6 +117,7 @@ public partial class MainWindow : Window
         _waveformHeightScale = Math.Clamp(AppStorage.Settings.WaveformHeightScale, 1, 3);
         ApplyMeterColumnWidth(AppStorage.Settings.MeterColumnWidth);
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        WindowPaintReveal.Attach(this, OnStartupRevealed);
         // 編集履歴はその他ウィンドウと同じ扱いで等倍にする（ルートの表示倍率を打ち消す）。
         HistoryOverlay.LayoutTransform = UiScaleService.CreateCounterTransform();
         UiThemeService.Changed += (_, _) => Dispatcher.BeginInvoke(ApplyUiColors);
@@ -270,17 +270,15 @@ public partial class MainWindow : Window
         PlaceWaapiToggle();
         InitializeWaapi();
         RefreshLocalizedText();
-        Loaded += OnStartupLoaded;
-        ContentRendered += OnStartupContentRendered;
         MgaSonicAnvil.SingleInstance.StartWatch(() =>
             Dispatcher.BeginInvoke(ActivateFromOtherInstance, DispatcherPriority.Send));
     }
 
     private void ActivateFromOtherInstance()
     {
-        if (Opacity < 1)
+        if (Opacity < 1 || WindowPaintReveal.IsPending(this))
         {
-            RevealStartupWindow();
+            WindowPaintReveal.Reveal(this);
         }
 
         ForegroundActivation.BringToFront(this);
@@ -300,29 +298,8 @@ public partial class MainWindow : Window
         OpenLaunchPaths(pending);
     }
 
-    private void OnStartupLoaded(object sender, RoutedEventArgs e)
+    private void OnStartupRevealed()
     {
-        Loaded -= OnStartupLoaded;
-        UpdateLayout();
-        // 波形復元はせず、空のクロムが描ける状態にしてから表示する。
-        Dispatcher.BeginInvoke(RevealStartupWindow, DispatcherPriority.Loaded);
-    }
-
-    private void OnStartupContentRendered(object? sender, EventArgs e)
-    {
-        ContentRendered -= OnStartupContentRendered;
-        RevealStartupWindow();
-    }
-
-    private void RevealStartupWindow()
-    {
-        if (!_startupRevealPending)
-        {
-            return;
-        }
-
-        _startupRevealPending = false;
-        Opacity = 1;
         if (LaunchFiles.HasStartup)
         {
             ForegroundActivation.BringToFront(this);
@@ -577,6 +554,7 @@ public partial class MainWindow : Window
         LevelMeter.InvalidateVisual();
         LoudnessMeter.ApplyLocalizedText();
         _colorDevPanel?.ApplyLocalizedText();
+        _tabTimeTable?.ApplyLocalizedText();
     }
 
     private void RefreshTitle()
