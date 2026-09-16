@@ -939,20 +939,21 @@ public partial class MainWindow
             return;
         }
 
-        var destPath = TryResolveMergeDestPath(sources, TabMerge.MergedBaseName);
-        var confirm = destPath is { } path
-            ? UiStrings.ConfirmMergeTabsAs(sources.Length, Path.GetFileName(path))
-            : UiStrings.ConfirmMergeTabsUntitled(sources.Length);
-        if (!ConfirmFileAction(confirm, MessageBoxImage.Question, MessageBoxResult.Yes))
+        var dialog = new SaveFileDialog
+        {
+            Filter = UiStrings.FilterSaveWave,
+            Title = UiStrings.TitleMergeTabs,
+            FileName = TabMerge.MergedBaseName + ".wav",
+            OverwritePrompt = true,
+            InitialDirectory = ResolveMergeInitialDirectory(sources),
+        };
+        if (dialog.ShowDialog(this) != true)
         {
             return;
         }
 
-        if (IsRecording && sources.Contains(_recordSession))
-        {
-            StopRecording();
-        }
-
+        var destPath = dialog.FileName;
+        RememberExportFolder(Path.GetDirectoryName(destPath));
         if (IsPlaybackActive())
         {
             StopPlayback();
@@ -967,12 +968,9 @@ public partial class MainWindow
             var progress = new Progress<double>(value => _busyGlass.SetProgress(value));
             var merged = await Task.Run(() => TabMerge.Mix(documents, progress))
                 .ConfigureAwait(true);
-            if (destPath is not null)
-            {
-                await Task.Run(() => AudioCodec.SaveWave(merged, destPath, progress))
-                    .ConfigureAwait(true);
-                merged.MarkSaved(destPath, AudioFileKind.Wave);
-            }
+            await Task.Run(() => AudioCodec.SaveWave(merged, destPath, progress))
+                .ConfigureAwait(true);
+            merged.MarkSaved(destPath, AudioFileKind.Wave);
 
             var selectedIndices = sources.Select(session => _sessions.IndexOf(session)).ToArray();
             var insertAt = TabMerge.InsertIndex(_sessions.Count, selectedIndices);
@@ -1002,19 +1000,20 @@ public partial class MainWindow
         }
     }
 
-    private string? TryResolveMergeDestPath(IReadOnlyList<DocumentSession> sources, string baseName)
+    /// <summary>保存ダイアログの初期フォルダ。ファイルを持つ最初の選択タブ、無ければ前回の書き出し先。</summary>
+    private static string ResolveMergeInitialDirectory(IReadOnlyList<DocumentSession> sources)
     {
         foreach (var session in sources)
         {
-            if (session.Document.SourcePath is not { } path || !File.Exists(path))
+            if (session.Document.SourcePath is { } path
+                && File.Exists(path)
+                && Path.GetDirectoryName(path) is { Length: > 0 } directory)
             {
-                continue;
+                return directory;
             }
-
-            return UniquePathInDirectory(Path.GetDirectoryName(path), baseName, ".wav");
         }
 
-        return null;
+        return ResolveExportInitialDirectory((string?)null);
     }
 
     private void TryDeleteAbandonedMergeFile(string? path)
