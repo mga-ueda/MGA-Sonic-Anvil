@@ -128,10 +128,8 @@ internal static partial class UiStrings
         "Silent Skip をオンにする",
         "Turn on Silent Skip");
     public static string LabelSilentSkipRecordAddRegion => Get(
-        "録音部分と無音部分にリージョンを付加",
-        "Add regions to recorded and silent parts");
-    public static string RegionNameRecordAudio => Get("録音", "Rec");
-    public static string RegionNameRecordSilence => Get("無音", "Silence");
+        "録音部分にリージョンを付加",
+        "Add regions to recorded parts");
     public static string LabelMs => Get("ms", "ms");
     public static string ErrorSilentSkipRecordPadRange => Get(
         "スキップ時の無音挿入時間は 0 から 10000 の ms で入力してください。",
@@ -798,8 +796,8 @@ internal static partial class UiStrings
         "この録音で Silent Skip を使うか。オンならしきい値を超えたときだけ録り、下回った時点から無音を挟んで挿入時間で止めます。オフならすべて書きます。OK するとステータスバーにも反映します。",
         "Whether to use Silent Skip for this recording. When on, only audio above the threshold is recorded, and silence is inserted when the level falls (up to the insert duration in Settings). When off, everything is written. OK also updates the status-bar switch.");
     public static string TipSilentSkipRecordAddRegion => Get(
-        "Silent Skip 録音のときだけ。無音を pad まで挟んだとき、その無音と前後の録音それぞれにリージョンを付けます。波形の短い谷では分けません。続きの録音は新しい区間だけ。録音のたびに指定。前回の指定を初期値にする。",
-        "Only when recording with Silent Skip. A region is added when silence is inserted up to the pad, plus the recorded stretches it separates. Brief dips in the waveform are not split. A continued take gets regions for the new audio only. Chosen each time you record. The last choice is the default.");
+        "Silent Skip 録音のときだけ。無音を pad まで挟んだとき、前後の録音それぞれにリージョンを付けます。無音には付けません。波形の短い谷では分けません。続きの録音は新しい区間だけ。録音のたびに指定。前回の指定を初期値にする。",
+        "Only when recording with Silent Skip. A region is added to each recorded stretch separated by a pad. Silence does not get a region. Brief dips in the waveform are not split. A continued take gets regions for the new audio only. Chosen each time you record. The last choice is the default.");
     public static string TipTimecode => Get(
         "現在時間 (G)。入力、ホイール／↑↓で調整（時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分、サンプルは1／Shift10／Ctrl100／Ctrl+Shift1000）。Enter で移動。右クリックで時間／サンプル数",
         "Current time (G). Type, or wheel / ↑↓ (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter jumps. Right-click switches time / samples");

@@ -542,7 +542,7 @@ internal static class SilentSkip
         return gate.SnapshotWrittenSpans();
     }
 
-    /// <summary>挟んだ pad と、それに区切られた可聴それぞれをリージョンにする。</summary>
+    /// <summary>pad で区切られた可聴だけをリージョンにする。無音には付けない。</summary>
     public static WaveRegion[] RecordPartRegions(
         IReadOnlyList<RecordedSpan> spans,
         long takeStartFrame)
@@ -552,17 +552,21 @@ internal static class SilentSkip
             return [];
         }
 
-        var regions = new WaveRegion[spans.Count];
-        for (var i = 0; i < spans.Count; i++)
+        var regions = new List<WaveRegion>(spans.Count);
+        foreach (var span in spans)
         {
-            var span = spans[i];
-            regions[i] = new WaveRegion(
+            if (span.Silent)
+            {
+                continue;
+            }
+
+            regions.Add(new WaveRegion(
                 takeStartFrame + span.StartFrame,
                 takeStartFrame + span.EndFrame,
-                span.Silent ? UiStrings.RegionNameRecordSilence : UiStrings.RegionNameRecordAudio);
+                string.Empty));
         }
 
-        return regions;
+        return [.. regions];
     }
 }
 

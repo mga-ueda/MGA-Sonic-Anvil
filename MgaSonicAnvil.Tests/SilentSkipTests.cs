@@ -23,7 +23,7 @@ public sealed class SilentSkipTests
             Assert.Contains("Silent Skip をオンにする", UiStrings.LabelConfirmRecordSilentSkip);
             Assert.Contains("リージョン", UiStrings.LabelSilentSkipRecordAddRegion);
             Assert.Contains("録音部分", UiStrings.LabelSilentSkipRecordAddRegion);
-            Assert.Contains("無音部分", UiStrings.LabelSilentSkipRecordAddRegion);
+            Assert.DoesNotContain("無音部分", UiStrings.LabelSilentSkipRecordAddRegion);
             Assert.Contains("谷の平均", UiStrings.LabelSilentSkipFloorNote);
             Assert.DoesNotContain("ピーク", UiStrings.LabelSilentSkipFloorNote);
             Assert.Contains("無音削除", UiStrings.LabelSilentSkipThreshold);
@@ -35,7 +35,7 @@ public sealed class SilentSkipTests
             Assert.Contains("Turn on Silent Skip", UiStrings.LabelConfirmRecordSilentSkip);
             Assert.Contains("region", UiStrings.LabelSilentSkipRecordAddRegion, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("recorded", UiStrings.LabelSilentSkipRecordAddRegion, StringComparison.OrdinalIgnoreCase);
-            Assert.Contains("silent", UiStrings.LabelSilentSkipRecordAddRegion, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("silent", UiStrings.LabelSilentSkipRecordAddRegion, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("floor", UiStrings.LabelSilentSkipFloorNote, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("peak", UiStrings.LabelSilentSkipFloorNote, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Delete Silence", UiStrings.LabelSilentSkipThreshold);
@@ -115,31 +115,21 @@ public sealed class SilentSkipTests
     }
 
     [Fact]
-    public void RecordPartRegions_NamesInsertedAudioAndSilence()
+    public void RecordPartRegions_LeavesNameEmpty()
     {
-        var previous = UiStrings.Language;
-        try
-        {
-            UiStrings.SetLanguage(UiLanguage.Japanese);
-            var regions = SilentSkip.RecordPartRegions(
-                [
-                    new RecordedSpan(0, 1, false),
-                    new RecordedSpan(1, 3, true),
-                    new RecordedSpan(3, 4, false),
-                ],
-                10);
-            Assert.Equal(3, regions.Length);
-            Assert.Equal(new WaveSelection(10, 11), regions[0].Range);
-            Assert.Equal(UiStrings.RegionNameRecordAudio, regions[0].Name);
-            Assert.Equal(new WaveSelection(11, 13), regions[1].Range);
-            Assert.Equal(UiStrings.RegionNameRecordSilence, regions[1].Name);
-            Assert.Equal(new WaveSelection(13, 14), regions[2].Range);
-            Assert.Equal(UiStrings.RegionNameRecordAudio, regions[2].Name);
-        }
-        finally
-        {
-            UiStrings.SetLanguage(previous);
-        }
+        var regions = SilentSkip.RecordPartRegions(
+            [
+                new RecordedSpan(0, 1, false),
+                new RecordedSpan(1, 3, true),
+                new RecordedSpan(3, 4, false),
+            ],
+            10);
+        Assert.Equal(2, regions.Length);
+        Assert.Equal(new WaveSelection(10, 11), regions[0].Range);
+        Assert.Equal(string.Empty, regions[0].Name);
+        Assert.Equal(new WaveSelection(13, 14), regions[1].Range);
+        Assert.Equal(string.Empty, regions[1].Name);
+        Assert.Empty(SilentSkip.RecordPartRegions([new RecordedSpan(0, 2, true)], 0));
     }
 
     [Fact]

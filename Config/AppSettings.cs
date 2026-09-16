@@ -100,7 +100,7 @@ internal sealed class AppSettings
     /// <summary>録音 Silent Skip で、しきい値を下回った時点から挿入する無音の時間（ms）。再生には使わない。既定 500。</summary>
     public int SilentSkipRecordPadMs { get; set; } = global::MgaSonicAnvil.Audio.SilentSkip.DefaultRecordPadMs;
 
-    /// <summary>Silent Skip 録音の停止時、pad を挟んだ可聴／無音にリージョンを付ける。既定オフ。</summary>
+    /// <summary>Silent Skip 録音の停止時、pad で区切られた可聴だけにリージョンを付ける。既定オフ。</summary>
     public bool SilentSkipRecordAddRegion { get; set; }
 
     /// <summary>継ぎ目のプチノイズ防止フェード（ms）。既定 20。</summary>
