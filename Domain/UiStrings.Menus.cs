@@ -125,8 +125,8 @@ internal static partial class UiStrings
     public static string WaveMenuExportByMarkers => Get("マーカーでセパレート(_K)", "Separate by Mar_kers");
     public static string WaveMenuExportByRegions => Get("リージョンでセパレート(_G)", "Separate by Re_gions");
     public static string WaveMenuExportByChannels => Get("チャンネルごとに書き出す(_C)", "Export by _Channel");
-    public static string WaveMenuExportAllWave => Get("すべてのタブを Wave(_E)", "Export All Tabs as Wav_e");
-    public static string WaveMenuExportAllMp3 => Get("すべてのタブを MP3(_A)", "Export _All Tabs as MP3");
+    public static string WaveMenuExportAllWave => Get("すべてのタブを Wave で保存(_E)", "Save All Tabs as Wav_e");
+    public static string WaveMenuExportAllMp3 => Get("すべてのタブを MP3 で保存(_A)", "Save All Tabs as MP3 (_A)");
 
     public static string WaveMenuTips => Get("Tips を表示(_T)", "Show _Tips");
     public static string WaveMenuManual => Get("マニュアル(_M)", "_Manual");
