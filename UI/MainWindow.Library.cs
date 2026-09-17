@@ -20,6 +20,7 @@ public partial class MainWindow
     private bool _libraryWaapiSuspended;
     private bool _restoreWaapiAfterLibrary;
     private readonly HashSet<AudioDocument> _libraryPeakJobs = [];
+    private int _libraryPeakGeneration;
     private int _libraryFolderShowGeneration;
     private string? _libraryFolderShownPath;
 
@@ -570,8 +571,8 @@ public partial class MainWindow
         ApplyLoadedLibrarySession(session);
         StartPlayback(0, prerollSeconds: 0);
         ShowLibraryArtwork(session);
-        // 再生中の全デコードは無音の原因になるので、停止後に波形ピークを作る。
-        _ = DeferStreamPeaksUntilIdleAsync(session);
+        // 再生とは別ハンドルでピーク走査する（停止待ちしない）。
+        _ = FillLibraryPeaksAsync(session);
         KeepLibraryListActive();
     }
 
@@ -591,14 +592,7 @@ public partial class MainWindow
             ApplyLoadedLibrarySession(session);
             TogglePlayback();
             ShowLibraryArtwork(session);
-            if (!IsPlaybackActive())
-            {
-                _ = FillLibraryPeaksAsync(session);
-            }
-            else
-            {
-                _ = DeferStreamPeaksUntilIdleAsync(session);
-            }
+            _ = FillLibraryPeaksAsync(session);
         }
 
         KeepLibraryListActive();
@@ -766,13 +760,6 @@ public partial class MainWindow
             return;
         }
 
-        // 再生中に同じファイルを全デコードすると MediaFoundation が競合して無音になる。
-        if (document.IsStreamPlayback && IsPlaybackActive())
-        {
-            _ = DeferStreamPeaksUntilIdleAsync(session);
-            return;
-        }
-
         var display = IsLibraryMaximized;
         if (!document.Peaks.IsEmpty && (display || !document.Peaks.NeedsEditorDetail))
         {
@@ -784,6 +771,7 @@ public partial class MainWindow
             return;
         }
 
+        var peakGeneration = ++_libraryPeakGeneration;
         var retry = false;
         try
         {
@@ -792,11 +780,32 @@ public partial class MainWindow
                 && document.SourcePath is { Length: > 0 } path
                 && File.Exists(path))
             {
-                peaks = await Task.Run(() =>
-                {
-                    using var source = AudioStreamSource.Open(path);
-                    return PeakPyramid.BuildPlayerDisplayStreaming(source);
-                }).ConfigureAwait(true);
+                var dispatcher = Dispatcher;
+                peaks = await Task.Run(() => PeakPyramid.BuildPlayerDisplayFromPath(
+                        path,
+                        onProgress: partial =>
+                        {
+                            if (peakGeneration != _libraryPeakGeneration)
+                            {
+                                return;
+                            }
+
+                            dispatcher.BeginInvoke(() =>
+                            {
+                                if (peakGeneration != _libraryPeakGeneration
+                                    || !ReferenceEquals(session.Document, document))
+                                {
+                                    return;
+                                }
+
+                                document.ReplacePeaks(partial);
+                                if (ReferenceEquals(_activeSession, session))
+                                {
+                                    Waveform.Refresh();
+                                }
+                            });
+                        }))
+                    .ConfigureAwait(true);
             }
             else
             {
@@ -809,7 +818,8 @@ public partial class MainWindow
                     .ConfigureAwait(true);
             }
 
-            if (!ReferenceEquals(session.Document, document))
+            if (peakGeneration != _libraryPeakGeneration
+                || !ReferenceEquals(session.Document, document))
             {
                 return;
             }
@@ -831,7 +841,7 @@ public partial class MainWindow
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException
-                                       or InvalidOperationException)
+                                       or InvalidOperationException or OperationCanceledException)
         {
             // ピークだけ失敗しても再生は続ける。
         }
@@ -843,24 +853,6 @@ public partial class MainWindow
         if (retry)
         {
             _ = FillLibraryPeaksAsync(session);
-        }
-    }
-
-    private async Task DeferStreamPeaksUntilIdleAsync(DocumentSession session)
-    {
-        for (var i = 0; i < 120; i++)
-        {
-            await Task.Delay(250).ConfigureAwait(true);
-            if (!IsLibraryMaximized || !ReferenceEquals(_activeSession, session))
-            {
-                return;
-            }
-
-            if (!IsPlaybackActive())
-            {
-                await FillLibraryPeaksAsync(session).ConfigureAwait(true);
-                return;
-            }
         }
     }
 

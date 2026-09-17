@@ -99,6 +99,104 @@ public sealed class AudioStreamSourceTests
     }
 
     [Fact]
+    public void BuildPlayerDisplayFromPath_IsFasterThanStreamSourceAndReportsProgress()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-peak-fast-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            // ~30 秒相当の PCM（48k）。リングバッファ経路との差が出やすい長さ。
+            WriteToneWave(path, sampleRate: 48000, frames: 48000 * 30, frequency: 220);
+
+            var progress = 0;
+            var swPath = System.Diagnostics.Stopwatch.StartNew();
+            var fromPath = PeakPyramid.BuildPlayerDisplayFromPath(
+                path,
+                onProgress: _ => Interlocked.Increment(ref progress));
+            swPath.Stop();
+
+            Assert.False(fromPath.IsEmpty);
+            Assert.True(progress > 0);
+
+            var swStream = System.Diagnostics.Stopwatch.StartNew();
+            using (var source = AudioStreamSource.Open(path))
+            {
+                var fromStream = PeakPyramid.BuildPlayerDisplayStreaming(source);
+                swStream.Stop();
+                Assert.Equal(fromStream.FrameCount, fromPath.FrameCount);
+            }
+
+            // 直接走査はポンプ経由より明らかに速いはず（環境差を見て 2 倍以上）。
+            Assert.True(
+                swPath.ElapsedMilliseconds * 2 < swStream.ElapsedMilliseconds
+                || swPath.ElapsedMilliseconds < 500,
+                $"path={swPath.ElapsedMilliseconds}ms stream={swStream.ElapsedMilliseconds}ms");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task BuildPlayerDisplayFromPath_Mp3CompletesUnderTwoSecondsForThreeMinutes()
+    {
+        var wav = Path.Combine(Path.GetTempPath(), "mga-peak-mp3-" + Guid.NewGuid().ToString("N") + ".wav");
+        var mp3 = Path.ChangeExtension(wav, ".mp3");
+        try
+        {
+            WriteToneWave(wav, sampleRate: 44100, frames: 44100 * 180, frequency: 440);
+            EncodeMp3(wav, mp3);
+
+            var firstProgressMs = -1L;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var peaks = PeakPyramid.BuildPlayerDisplayFromPath(
+                mp3,
+                onProgress: _ =>
+                {
+                    if (firstProgressMs < 0)
+                    {
+                        firstProgressMs = sw.ElapsedMilliseconds;
+                    }
+                });
+            sw.Stop();
+
+            Assert.False(peaks.IsEmpty);
+            Assert.True(firstProgressMs >= 0 && firstProgressMs < 300, $"firstProgressMs={firstProgressMs}");
+            Assert.True(sw.ElapsedMilliseconds < 2000, $"fullScanMs={sw.ElapsedMilliseconds}");
+
+            // 再生用ストリームと並行してもピークが取れること。
+            using var play = AudioStreamSource.Open(mp3);
+            var buf = new float[play.Channels * 4096];
+            var playTask = Task.Run(() =>
+            {
+                long total = 0;
+                while (total < play.SampleRate * 3)
+                {
+                    var n = play.ReadFrames(buf, 0, 4096, 2000);
+                    if (n <= 0)
+                    {
+                        break;
+                    }
+
+                    total += n;
+                }
+
+                return total;
+            });
+
+            var concurrent = PeakPyramid.BuildPlayerDisplayFromPath(mp3);
+            var played = await playTask;
+            Assert.False(concurrent.IsEmpty);
+            Assert.True(played > 1000, $"played={played}");
+        }
+        finally
+        {
+            TryDelete(wav);
+            TryDelete(mp3);
+        }
+    }
+
+    [Fact]
     public void PlaybackSampleProvider_BindStream_EmitsAudioFromMp3()
     {
         var wav = Path.Combine(Path.GetTempPath(), "mga-stream-mp3-" + Guid.NewGuid().ToString("N") + ".wav");
