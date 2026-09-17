@@ -367,6 +367,31 @@ public partial class MainWindow
             return;
         }
 
+        // タブ選択中は選択ファイル全体へ同じピッチシフトを一括適用する。
+        if (HasTabSelection)
+        {
+            _pitchPreview.Previewing = false;
+            ClosePitchShiftPicker();
+            if (Audio.PitchShift.IsNoOp(semitones))
+            {
+                return;
+            }
+
+            await RunSelectedTabsEditAsync(
+                SelectedTabsInOrder(),
+                UiStrings.OverlayPitchShift,
+                (session, progress) => session.Document.FrameCount == 0
+                    ? null
+                    : ProcessEdits.PitchShift(
+                        session.Document,
+                        TabBatchRange(session.Document),
+                        semitones,
+                        timeStretch,
+                        progress,
+                        channelMask: TabBatchEditMask(session))).ConfigureAwait(true);
+            return;
+        }
+
         var range = ActiveRange();
         if (range.IsEmpty)
         {
@@ -638,6 +663,49 @@ public partial class MainWindow
         if (range.IsEmpty)
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // タブ選択中は、アクティブに対する倍率へ換算して選択ファイル全体を一括ストレッチする。
+        if (HasTabSelection)
+        {
+            _timeStretchPreview.Previewing = false;
+            CloseTimeStretchPicker();
+            var sourceFrames = (int)range.Length;
+            var clamped = Audio.TimeStretch.ClampDestFrames(sourceFrames, destFrames);
+            if (Audio.TimeStretch.IsNoOp(sourceFrames, clamped))
+            {
+                return;
+            }
+
+            var ratio = clamped / (double)sourceFrames;
+            await RunSelectedTabsEditAsync(
+                SelectedTabsInOrder(),
+                UiStrings.OverlayTimeStretch,
+                (session, progress) =>
+                {
+                    var document = session.Document;
+                    if (document.FrameCount == 0)
+                    {
+                        return null;
+                    }
+
+                    var frames = (int)Math.Min(int.MaxValue, document.FrameCount);
+                    var dest = Audio.TimeStretch.ClampDestFrames(
+                        frames,
+                        (int)Math.Min(int.MaxValue, Math.Round(frames * ratio)));
+                    if (Audio.TimeStretch.IsNoOp(frames, dest))
+                    {
+                        return null;
+                    }
+
+                    return ProcessEdits.TimeStretch(
+                        document,
+                        TabBatchRange(document),
+                        dest,
+                        progress,
+                        channelMask: TabBatchEditMask(session));
+                }).ConfigureAwait(true);
             return;
         }
 
@@ -1071,6 +1139,27 @@ public partial class MainWindow
             return;
         }
 
+        // タブ選択中は、同じカーブで選択ファイル全体を一括フェードする。
+        if (HasTabSelection)
+        {
+            _fadePreview.Previewing = false;
+            ClearFadeCurveVisualPreview();
+            CloseFadeCurvePicker();
+            TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
+            {
+                var document = session.Document;
+                if (document.FrameCount == 0)
+                {
+                    return null;
+                }
+
+                return fadeIn
+                    ? ProcessEdits.FadeIn(document, TabBatchRange(document), shape, channelMask: TabBatchEditMask(session))
+                    : ProcessEdits.FadeOut(document, TabBatchRange(document), shape, channelMask: TabBatchEditMask(session));
+            });
+            return;
+        }
+
         var range = ActiveRange();
         if (range.IsEmpty)
         {
@@ -1114,6 +1203,16 @@ public partial class MainWindow
             return;
         }
 
+        // タブ選択中は選択ファイル全体を一括ノーマライズする。
+        if (HasTabSelection)
+        {
+            TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
+                session.Document.FrameCount == 0
+                    ? null
+                    : ProcessEdits.Normalize(session.Document, TabBatchRange(session.Document), channelMask: TabBatchEditMask(session)));
+            return;
+        }
+
         var range = ActiveRange();
         if (range.IsEmpty)
         {
@@ -1130,6 +1229,16 @@ public partial class MainWindow
     {
         if (_document is null)
         {
+            return;
+        }
+
+        // タブ選択中は選択ファイル全体を一括リバースする。
+        if (HasTabSelection)
+        {
+            TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
+                session.Document.FrameCount == 0
+                    ? null
+                    : ProcessEdits.Reverse(session.Document, TabBatchRange(session.Document), channelMask: TabBatchEditMask(session)));
             return;
         }
 
@@ -1158,6 +1267,23 @@ public partial class MainWindow
             return;
         }
 
+        // タブ選択中は選択ファイルへ一括適用。リージョンの無いファイルはスキップする。
+        if (HasTabSelection)
+        {
+            var fadeMs = AppStorage.Settings.ResolvedClickGuardFadeMs();
+            TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
+            {
+                var document = session.Document;
+                if (!document.AllowsRegionsAndLoops || document.Regions.Count == 0)
+                {
+                    return null;
+                }
+
+                return ProcessEdits.NormalizePerRegion(document, channelMask: TabBatchEditMask(session), fadeMs: fadeMs);
+            });
+            return;
+        }
+
         if (!_document.AllowsRegionsAndLoops || _document.Regions.Count == 0)
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoRegions, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1182,6 +1308,25 @@ public partial class MainWindow
     {
         if (_document is null)
         {
+            return;
+        }
+
+        // タブ選択中は選択ファイル全体へ同じゲインを一括適用する。
+        if (HasTabSelection)
+        {
+            _volumePreview.Previewing = false;
+            LoudnessMeter.CommitPreview();
+            ClearVolumeVisualPreview();
+            CloseVolumeGainPicker();
+            if (WaveformGainAnalyzer.IsNoOp(WaveformGainAnalyzer.SnapGainDb(gainDb)))
+            {
+                return;
+            }
+
+            TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
+                session.Document.FrameCount == 0
+                    ? null
+                    : ProcessEdits.Gain(session.Document, TabBatchRange(session.Document), gainDb, channelMask: TabBatchEditMask(session)));
             return;
         }
 
@@ -1436,6 +1581,23 @@ public partial class MainWindow
     {
         if (_document is null)
         {
+            return;
+        }
+
+        // タブ選択中は選択ファイル全体の無音部分を一括削除する。無音の無いファイルはスキップ。
+        if (HasTabSelection)
+        {
+            var batchThresholdDb = AppStorage.Settings.ResolvedSilentSkipThresholdDb();
+            var batchFadeMs = AppStorage.Settings.ResolvedClickGuardFadeMs();
+            TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
+                session.Document.FrameCount == 0
+                    ? null
+                    : ProcessEdits.DeleteSilence(
+                        session.Document,
+                        TabBatchRange(session.Document),
+                        batchThresholdDb,
+                        channelMask: TabBatchEditMask(session),
+                        fadeMs: batchFadeMs));
             return;
         }
 

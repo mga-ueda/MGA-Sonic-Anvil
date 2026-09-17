@@ -27,6 +27,7 @@ public partial class MainWindow
         || _openBusy
         || _exportBusy
         || _historyPasteBusy
+        || _tabBatchEditBusy
         || _tabMergeBusy;
 
     private void PromptFormatConvert(FormatConvertKind kind)
@@ -417,6 +418,23 @@ public partial class MainWindow
         CloseFormatConvertPicker();
         StopFormatPreview();
         PausePlaybackSoft();
+
+        // タブ選択中は選択ファイル全部を同じフォーマットへ一括変換する（既に同じものはスキップ）。
+        if (HasTabSelection)
+        {
+            var overlay = kind == FormatConvertKind.SampleRate
+                ? UiStrings.OverlaySampleRateConvert
+                : UiStrings.OverlayApplySelected;
+            TryRunEditOnSelectedTabs(overlay, (session, progress) => kind switch
+            {
+                FormatConvertKind.SampleRate => ProcessEdits.ConvertSampleRate(session.Document, value, progress),
+                FormatConvertKind.BitDepth => ProcessEdits.ConvertBitDepth(session.Document, value),
+                FormatConvertKind.Channels => ProcessEdits.ConvertChannels(session.Document, value),
+                _ => null,
+            });
+            return;
+        }
+
         if (kind == FormatConvertKind.SampleRate)
         {
             _ = ApplySampleRateConvertAsync(value);
