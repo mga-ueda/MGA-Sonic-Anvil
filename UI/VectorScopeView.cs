@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -1139,12 +1138,5 @@ internal sealed class VectorScopeView : FrameworkElement
     }
 
     private static FormattedText Measure(string text, double size, Brush brush, double dpi) =>
-        new(
-            text,
-            CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight,
-            WpfControlHelpers.MonoTypeface,
-            size,
-            brush,
-            dpi);
+        WpfControlHelpers.MonoRegularText(text, size, brush, dpi);
 }

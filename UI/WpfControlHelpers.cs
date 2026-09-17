@@ -16,6 +16,10 @@ internal static class WpfControlHelpers
     public static Typeface MonoTypeface { get; } =
         new(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
 
+    /// <summary>スペアナの目盛と同じ Courier New Regular。波形左 dB・ラウドネスカーブ・レベルメーター・ゴニオの数値用。</summary>
+    public static Typeface MonoRegularTypeface { get; } =
+        new(new FontFamily("Courier New"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+
     public static double DeviceHairline(double pixelsPerDip) =>
         pixelsPerDip > 0 ? 1.0 / pixelsPerDip : 1.0;
 
@@ -115,6 +119,18 @@ internal static class WpfControlHelpers
             MonoTypeface,
             fontSize,
             brush,
+            pixelsPerDip);
+
+    public static FormattedText MonoRegularText(string text, double fontSize, Brush brush, double pixelsPerDip) =>
+        new(
+            text,
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            MonoRegularTypeface,
+            fontSize,
+            brush,
+            numberSubstitution: null,
+            TextFormattingMode.Display,
             pixelsPerDip);
 
     public static void DrawCentered(DrawingContext dc, FormattedText text, Rect bounds) =>

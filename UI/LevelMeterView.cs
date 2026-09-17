@@ -311,14 +311,7 @@ internal sealed class LevelMeterView : FrameworkElement
     }
 
     private static FormattedText MeasureReadout(string text, double pixels, Brush? brush = null, double font = 8) =>
-        new(
-            text,
-            CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight,
-            WpfControlHelpers.MonoTypeface,
-            font,
-            brush ?? LabelBrush(),
-            pixels);
+        WpfControlHelpers.MonoRegularText(text, font, brush ?? LabelBrush(), pixels);
 
     private void DrawScale(DrawingContext dc, Rect col, bool rightAlign)
     {
@@ -328,14 +321,7 @@ internal sealed class LevelMeterView : FrameworkElement
         {
             var y = col.Y + (1 - LevelMeterEngine.DbToNorm(db)) * col.Height;
             var text = db == 0 ? "0" : db.ToString(CultureInfo.InvariantCulture);
-            var formatted = new FormattedText(
-                text,
-                CultureInfo.InvariantCulture,
-                FlowDirection.LeftToRight,
-                WpfControlHelpers.MonoTypeface,
-                8,
-                ScaleBrush(),
-                pixels);
+            var formatted = WpfControlHelpers.MonoRegularText(text, 8, ScaleBrush(), pixels);
             var x = rightAlign ? col.Right - formatted.Width - 1 : col.X + 1;
             var ty = db <= LevelMeterEngine.DbMin
                 ? col.Bottom - formatted.Height

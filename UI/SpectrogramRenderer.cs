@@ -538,7 +538,7 @@ internal sealed class SpectrogramRenderer
     {
         var maxHertz = SpectrogramEngine.DisplayMaxHertz;
         var dpi = UiDpi.Get(host).PixelsPerDip;
-        var fillColor = Theme.Get("SpectrogramScaleForeBrush");
+        var fillColor = FrequencyLabelFill;
         // FormattedText の生成（文字整形）は毎ペイントだと高くつく。ラベルは固定なのでキャッシュする。
         if (Math.Abs(dpi - _scaleLabelDpi) > 0.001 || fillColor != _scaleLabelColor)
         {
@@ -564,8 +564,8 @@ internal sealed class SpectrogramRenderer
             if (!_scaleLabels.TryGetValue(label, out var texts))
             {
                 texts = (
-                    WpfControlHelpers.MonoText(label, 8, fill, dpi),
-                    WpfControlHelpers.MonoText(label, 8, edge, dpi));
+                    WpfControlHelpers.MonoRegularText(label, 8, fill, dpi),
+                    WpfControlHelpers.MonoRegularText(label, 8, edge, dpi));
                 _scaleLabels[label] = texts;
             }
 

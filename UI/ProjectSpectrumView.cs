@@ -13,11 +13,6 @@ internal sealed class ProjectSpectrumView : FrameworkElement
 {
     /// <summary>Courier で読める下限。メーター目盛の 8 より一段小さい。</summary>
     private const double ChromeFontSize = 7;
-    private static readonly Typeface ChromeTypeface = new(
-        new FontFamily("Courier New"),
-        FontStyles.Normal,
-        FontWeights.Normal,
-        FontStretches.Normal);
 
     private readonly SpectrumAnalyzer _analyzer = new();
     private readonly DispatcherTimer _timer;
@@ -365,14 +360,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         new(x * px, y * px, Math.Max(0, w) * px, Math.Max(0, h) * px);
 
     private FormattedText ChromeText(string text, double fontSize, Brush brush) =>
-        new(
-            text,
-            CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight,
-            ChromeTypeface,
-            fontSize,
-            brush,
-            PixelsPerDip);
+        WpfControlHelpers.MonoRegularText(text, fontSize, brush, PixelsPerDip);
 
     private void EnsureGradient()
     {

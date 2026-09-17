@@ -246,7 +246,7 @@ public sealed class LoudnessMeterEngineTests
     {
         Assert.Equal(Colors.Black, LoudnessMeterView.ChipTextColor(UiTheme.Dark));
         Assert.Equal(Colors.White, LoudnessMeterView.ChipTextColor(UiTheme.Light));
-        Assert.Equal("SpectrogramScaleForeBrush", LoudnessMeterView.ChromeForeKey(UiTheme.Dark));
+        Assert.Equal("MutedForeBrush", LoudnessMeterView.ChromeForeKey(UiTheme.Dark));
         Assert.Equal("MutedForeBrush", LoudnessMeterView.ChromeForeKey(UiTheme.Light));
         var cyan = Color.FromRgb(0x3A, 0xB8, 0xE8);
         var darkChip = LoudnessMeterView.ShadeChipFill(cyan, UiTheme.Dark);

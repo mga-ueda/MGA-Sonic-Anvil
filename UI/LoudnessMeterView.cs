@@ -262,8 +262,7 @@ internal sealed class LoudnessMeterView : Grid
     internal static Color ChipTextColor(UiTheme theme) =>
         theme == UiTheme.Light ? Colors.White : Colors.Black;
 
-    internal static string ChromeForeKey(UiTheme theme) =>
-        theme == UiTheme.Light ? "MutedForeBrush" : "SpectrogramScaleForeBrush";
+    internal static string ChromeForeKey(UiTheme _) => "MutedForeBrush";
 
     internal static Color ShadeChipFill(Color color, UiTheme theme)
     {
@@ -490,7 +489,7 @@ internal sealed class LoudnessMeterView : Grid
         {
             FontFamily = Mono,
             FontSize = LineFontSize,
-            FontWeight = FontWeights.SemiBold,
+            FontWeight = FontWeights.Normal,
             VerticalAlignment = VerticalAlignment.Center,
             TextAlignment = TextAlignment.Right,
         };
@@ -539,9 +538,10 @@ internal sealed class LoudnessMeterView : Grid
         }
         catch (InvalidOperationException)
         {
-            return theme == UiTheme.Light
-                ? Freeze(Color.FromRgb(0x3F, 0x3F, 0x42))
-                : Freeze(Color.FromRgb(0xEB, 0xEB, 0xEB));
+            return Freeze(
+                theme == UiTheme.Light
+                    ? Color.FromRgb(0x3F, 0x3F, 0x42)
+                    : Color.FromRgb(0x96, 0x96, 0x96));
         }
     }
 

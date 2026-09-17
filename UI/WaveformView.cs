@@ -474,7 +474,7 @@ internal sealed class WaveformView : Grid
     public bool CenterLocked { get; private set; }
 
     /// <summary>
-    /// 左端のチャンネル名と dB 目盛り列。F11 フルスクリーンでは畳んで波形を広げる。
+    /// 左端のチャンネル名と dB 目盛り列。F11 フルスクリーンでは畳んで波形を広げる。F12 では残す。
     /// </summary>
     public bool ShowScaleLane
     {
@@ -864,7 +864,7 @@ internal sealed class WaveformView : Grid
         var wave = WaveformBounds(new Rect(RenderSize));
         var pad = DesignMetrics.SpectrogramBoostBarPad;
         double? labelW = _spectrogramMode == SpectrogramViewMode.Overlay
-            ? WpfControlHelpers.MonoText("-12", 9, Brushes.Transparent, UiDpi.Get(this).PixelsPerDip).Width
+            ? WpfControlHelpers.MonoRegularText("-12", 9, Brushes.Transparent, UiDpi.Get(this).PixelsPerDip).Width
             : null;
         var left = DesignMetrics.SpectrogramBoostBarLeft(labelW);
         _boostBar.Width = DesignMetrics.SpectrogramBoostThumbSize;
@@ -3551,7 +3551,7 @@ internal sealed class WaveformView : Grid
 
         var fore = WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush"));
         var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
-        var reserve = 7 + GetDbLabel("-12", pixelsPerDip, fore).Width;
+        var reserve = 7 + MeasureDbLabelWidth(pixelsPerDip);
         var maxName = Math.Max(8, well.Width - reserve - 2);
         var layout = ChannelLayout.ForFile(channels, _speakerLayout, _fileChannelMap);
         var tint = ChannelColors.UsesLaneTint(channels);
@@ -3756,17 +3756,13 @@ internal sealed class WaveformView : Grid
             return cached;
         }
 
-        var formatted = new FormattedText(
-            text,
-            CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight,
-            WpfControlHelpers.MonoTypeface,
-            9,
-            fore,
-            pixelsPerDip);
+        var formatted = WpfControlHelpers.MonoRegularText(text, 9, fore, pixelsPerDip);
         _dbLabelCache[text] = formatted;
         return formatted;
     }
+
+    private static double MeasureDbLabelWidth(double pixelsPerDip) =>
+        WpfControlHelpers.MonoRegularText("-12", 9, Brushes.Transparent, pixelsPerDip).Width;
 
     private bool ShouldDrawSamplePoints(int count, double width) =>
         count > 0
@@ -3869,8 +3865,7 @@ internal sealed class WaveformView : Grid
         }
 
         var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
-        var fore = WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush"));
-        var reserve = 7 + GetDbLabel("-12", pixelsPerDip, fore).Width;
+        var reserve = 7 + MeasureDbLabelWidth(pixelsPerDip);
         var maxName = Math.Max(8, well.Width - reserve - 2);
         if (point.X < well.X || point.X > well.X + maxName + 1)
         {

@@ -378,14 +378,7 @@ internal sealed class LoudnessOverlayRenderer
 
             y = Math.Clamp(y, wave.Y + 0.5, wave.Bottom - 0.5);
             var label = lufs.ToString("0", CultureInfo.InvariantCulture);
-            var text = new FormattedText(
-                label,
-                CultureInfo.InvariantCulture,
-                FlowDirection.LeftToRight,
-                WpfControlHelpers.MonoTypeface,
-                9,
-                fore,
-                pixelsPerDip);
+            var text = WpfControlHelpers.MonoRegularText(label, 9, fore, pixelsPerDip);
             var ty = Math.Clamp(y - text.Height * 0.5, wave.Y, wave.Bottom - text.Height);
             var tx = well.Right - 2 - text.Width;
             dc.DrawText(text, new Point(Math.Max(well.X + 2, tx), ty));
