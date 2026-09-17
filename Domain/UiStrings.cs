@@ -444,7 +444,7 @@ internal static partial class UiStrings
         "タブのバウンスに失敗しました。",
         "Failed to bounce the tabs.");
     /// <summary>バウンスの保存ダイアログのタイトル。</summary>
-    public static string TitleMergeTabs => Get("選択タブをバウンス", "Bounce Selected Tabs");
+    public static string TitleMergeTabs => Get("選択ファイルをバウンス", "Bounce Selected Files");
     public static string ErrorFileNameEmpty => Get("ファイル名を入力してください。", "Enter a file name.");
     public static string ErrorFileNameInvalid => Get("使えないファイル名です。", "That file name is not allowed.");
     public static string ErrorFileNameExists => Get("同じ名前のファイルがあります。", "A file with that name already exists.");
@@ -466,6 +466,15 @@ internal static partial class UiStrings
         "Duplicate {0}?{2}It will open in the next tab as {1}.",
         name,
         copyName,
+        Environment.NewLine);
+    public static string ConfirmDuplicateSelectedFiles(int count) => Format(
+        "選択した {0} 個のファイルを複製しますか？それぞれ元のタブの隣で開きます。",
+        "Duplicate the {0} selected files? Each copy opens next to its own tab.",
+        count);
+    public static string ConfirmDeleteSelectedFiles(int count) => Format(
+        "選択した {0} 個のファイルをディスクから削除しますか？この操作は元に戻せません。{1}（未保存のファイルはタブを閉じ、変更を破棄します）",
+        "Delete the {0} selected files from disk? This cannot be undone.{1}(Unsaved files just close and discard their changes.)",
+        count,
         Environment.NewLine);
     public static string TipRenameFile => Get(
         "ダブルクリックでファイル名を変更します。",
@@ -508,6 +517,7 @@ internal static partial class UiStrings
     public static string OverlaySampleRateConvert => Get("サンプリングレート変換", "Sample rate conversion");
     public static string OverlayPitchShift => Get("ピッチシフト", "Pitch shift");
     public static string OverlayPasteHistory => Get("編集履歴を貼り付けています", "Pasting edit history");
+    public static string OverlayApplySelected => Get("選択したファイルへ適用しています", "Applying to the selected files");
     public static string OverlayMerge => Get("タブをバウンスしています", "Bouncing tabs");
     public static string OverlayOpening => Get("読み込んでいます", "Opening");
     public static string OverlayExportWave => Get("Wave を書き出しています", "Exporting Wave");
@@ -549,8 +559,8 @@ internal static partial class UiStrings
     public static string TooltipSettings => Get("設定 (Ctrl+Shift+O)", "Settings (Ctrl+Shift+O)");
     public static string TooltipManualHelp => Get("マニュアル", "Manual");
     public static string TooltipFadeAround => Get(
-        "再生位置でフェード (X)  見えている前だけアウト／後ろだけイン",
-        "Fade around playhead (X)  fade out visible before / fade in visible after");
+        "シークバー前後をフェード (X)  見えている前だけアウト／後ろだけイン",
+        "Fade around seek bar (X)  fade out visible before / fade in visible after");
     public static string TooltipVolume => Get("音量 (V)", "Volume (V)");
     public static string TooltipPitch => Get("ピッチ (P)", "Pitch (P)");
     public static string TooltipTimeStretch => Get("タイムストレッチ (T)", "Time stretch (T)");
@@ -569,8 +579,8 @@ internal static partial class UiStrings
     public static string TooltipColorPanel => Get("色設定 (Ctrl+Shift+C)", "Color settings (Ctrl+Shift+C)");
 
     public static string TipFadeAround => Get(
-        "再生位置でフェード (X)\nシークを境に、今見えている前だけアウト／後ろだけイン（リニア）",
-        "Fade around playhead (X)\nFrom the playhead, fade out only the visible part before / fade in only the visible part after (linear)");
+        "シークバー前後をフェード (X)\nシークバーを境に、今見えている前だけアウト／後ろだけイン（リニア）",
+        "Fade around seek bar (X)\nFrom the seek bar, fade out only the visible part before / fade in only the visible part after (linear)");
     public static string TipReverse => Get("リバース (R)\n選択範囲を時間方向に反転。未選択なら全体", "Reverse (R)\nReverse the selection in time. Uses the whole file if nothing is selected");
     public static string TipAddMarker => Get("マーカーを追加 (M / Ins)\n選択中は両端。同じ範囲で繰り返すと分割", "Add marker (M / Ins)\nPlaces both ends of a selection; repeat to split");
     public static string TipSetLoop => Get(
@@ -697,8 +707,8 @@ internal static partial class UiStrings
         "MP3 として保存 (Ctrl+Shift+M)\n別名保存と同じく書き出すだけ。今のタブは開いたまま、書き出した MP3 は読み込まない。Ctrl+Shift+Alt+M で全タブを MP3 で保存。設定の LAME があればそれを使い、空欄または無効なら Windows（既定 192 kbps）。成功時にどちらで書いたかを表示。失敗はダイアログ。マーカー／リージョン／ループは書きません",
         "Save as MP3 (Ctrl+Shift+M)\nWrites a file like Save As; keeps the current tab and does not open the written MP3. Ctrl+Shift+Alt+M saves every tab as MP3. Uses LAME when the path is valid; otherwise Windows (default 192 kbps). Success shows which encoder ran. Failures open a dialog. Markers / regions / loops are not written");
     public static string TipOpen => Get(
-        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+N で新規（フォーマットは都度指定）\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Shift+D でファイルを複製（隣のタブで開く）\nCtrl+Shift+B で選択タブをバウンス（先に保存先を指定。重ねて合成した Wave を右側のタブで開く。既定名 Bounce.wav。フォーマットは左端の選択タブ）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ\nCtrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置、波形エリアに収まらない配置は飛ばす。左右・上下が収まらなければ格子を試し、格子も無理なら動かない。今見ている表示モードで全タブを並べる）\n右クリックで、すべてのタブの時間（表。コピー／範囲コピー／CSV／PDF）など\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
-        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+N for a new file (choose the format each time)\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Shift+D duplicates the file (opens in the next tab)\nCtrl+Shift+B bounces selected tabs (choose where to save first; the mixed Wave opens in the tab to the right; default name Bounce.wav; format follows the leftmost selected tab)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab\nCtrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same or would not fit the waveform area. If side-by-side or stacked would not fit, it tries grid; if grid would not fit either, it does nothing. Every tab uses the current view mode)\nRight-click for all tab times (table with copy / range copy / CSV / PDF) and more\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
+        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+N で新規（フォーマットは都度指定）\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Shift+D でファイルを複製（隣のタブで開く）\nCtrl+Shift+B で選択ファイルをバウンス（先に保存先を指定。重ねて合成した Wave を右側のタブで開く。既定名 Bounce.wav。フォーマットは左端の選択タブ）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ\nCtrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置、波形エリアに収まらない配置は飛ばす。左右・上下が収まらなければ格子を試し、格子も無理なら動かない。今見ている表示モードで全タブを並べる）\n右クリックで、すべてのファイルの時間を表示（表。コピー／範囲コピー／CSV／PDF。複数タブ選択中は選択ファイルのみ）など\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
+        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+N for a new file (choose the format each time)\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Shift+D duplicates the file (opens in the next tab)\nCtrl+Shift+B bounces selected tabs (choose where to save first; the mixed Wave opens in the tab to the right; default name Bounce.wav; format follows the leftmost selected tab)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab\nCtrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same or would not fit the waveform area. If side-by-side or stacked would not fit, it tries grid; if grid would not fit either, it does nothing. Every tab uses the current view mode)\nRight-click for all file times (table with copy / range copy / CSV / PDF; only the selected files while multiple tabs are selected) and more\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
     public static string TipCloseTab => Get(
         "タブを閉じる (Ctrl+W)。今の起動のうちなら Ctrl+Shift+T で開き直せる",
         "Close tab (Ctrl+W). Ctrl+Shift+T reopens it in this launch");
@@ -869,19 +879,29 @@ internal static partial class UiStrings
     public static string MenuPaste => Get("貼り付け(_P)", "_Paste");
 
     public static string TabMenuRenameFile => Get("ファイル名を変更(_N)", "Re_name File");
-    public static string TabMenuDuplicateFile => Get("複製(_U)", "D_uplicate");
-    public static string TabMenuDeleteFile => Get("ファイルを削除(_D)", "_Delete File");
+    public static string TabMenuDuplicateFile => WaveMenuDuplicateFile;
+    public static string TabMenuDeleteFile => WaveMenuDeleteFile;
     public static string TabMenuCloseThis => Get("このタブを閉じる(_S)", "Close Thi_s Tab");
     public static string TabMenuCloseOthers => Get("このタブ以外を閉じる(_O)", "Close _Other Tabs");
     public static string TabMenuCloseRight => Get("このタブを含め右側を全部閉じる(_R)", "Close This and Tabs to the _Right");
     public static string TabMenuCloseLeft => Get("このタブを含め左側を全部閉じる(_L)", "Close This and Tabs to the _Left");
     public static string TabMenuSelectAll => Get("全部のタブを選択する(_A)", "Select _All Tabs");
+    public static string TileSearchLabel => Get("検索", "Find");
+    public static string TileSearchSyntaxHint => Get(
+        "空白区切り = AND、| = OR（例: bgm loop|se）",
+        "Space = AND, | = OR (e.g. bgm loop|se)");
+    public static string TipTileSearch => Get(
+        "タブ名で絞り込みます。空白区切りで AND、| で OR。"
+        + "Enter で確定、Esc でキャンセル、空欄にすると解除します。",
+        "Filter tiles by tab name. Space-separated terms = AND, | = OR."
+        + " Enter confirms, Esc cancels, clear the text to remove the filter.");
     public static string TabMenuTileOff => WaveMenuTileOff;
     public static string TabMenuTileHorizontal => WaveMenuTileHorizontal;
     public static string TabMenuTileVertical => WaveMenuTileVertical;
     public static string TabMenuTileGrid => WaveMenuTileGrid;
     public static string TabMenuCopyAllTimes => WaveMenuCopyAllTabTimes;
-    public static string TabTimeWindowTitle => Get("タブの時間", "Tab times");
+    public static string TabMenuCopySelectedTimes => WaveMenuCopySelectedTabTimes;
+    public static string TabTimeWindowTitle => Get("ファイルの時間", "File times");
     public static string TabTimeColumnFile => Get("ファイル", "File");
     public static string TabTimeColumnTime => Get("時間", "Time");
     public static string TabTimeCopy => Get("コピー", "Copy");
@@ -889,8 +909,8 @@ internal static partial class UiStrings
     public static string TabTimeSavePdf => Get("PDF", "PDF");
     public static string TabTimeSaveCsvTitle => Get("CSV として保存", "Save CSV");
     public static string TabTimeSavePdfTitle => Get("PDF として保存", "Save PDF");
-    public static string TabTimeFileNameCsv => Get("タブの時間.csv", "TabTimes.csv");
-    public static string TabTimeFileNamePdf => Get("タブの時間.pdf", "TabTimes.pdf");
+    public static string TabTimeFileNameCsv => Get("ファイルの時間.csv", "FileTimes.csv");
+    public static string TabTimeFileNamePdf => Get("ファイルの時間.pdf", "FileTimes.pdf");
     public static string TipTabTimeCopy => Get(
         "選択したセルをコピーします。未選択なら表全体（見出し付き）。Ctrl+C でもコピー。ドラッグで範囲選択。",
         "Copy selected cells. Copies the whole table with headers if nothing is selected. Ctrl+C also copies. Drag to select a range.");
@@ -907,14 +927,14 @@ internal static partial class UiStrings
     public static string TabMenuPasteToAll => Get("編集データを全てにペーストする(_V)", "Paste Copied Edits to All Tabs (_V)");
     public static string TabMenuCloseSelected => Get("選択したタブを閉じる(_A)", "Close Selected Tabs (_A)");
     public static string TabMenuPasteToSelected => Get("選択したタブにペーストする(_V)", "Paste Copied Edits to Selected Tabs (_V)");
-    /// <summary>アクセスキーは B が「タブのまま(B)」「次のタブ(B)」と重なるため J のまま。</summary>
-    public static string TabMenuMergeSelected => Get("選択タブをバウンス(_J)", "Bounce Selected Tabs (_J)");
+    /// <summary>アクセスキーは B が「タブのまま(B)」と重なるため J のまま。</summary>
+    public static string TabMenuMergeSelected => WaveMenuMergeTabs;
     public static string TabMenuExportWave => Get("Wave で書き出す(_E)", "Export _Wave");
     public static string TabMenuExportMp3 => Get("MP3 で書き出す(_M)", "Export _MP3");
     public static string TabMenuExportWaveSelected => Get("選択したタブを Wave で書き出す(_E)", "Export Selected Tabs as _Wave");
-    public static string TabMenuExportMp3Selected => Get("選択したタブを MP3 で書き出す(_M)", "Export Selected Tabs as _MP3");
-    public static string TabMenuExportWaveAll => Get("すべてのタブを Wave で保存(_E)", "Save All Tabs as _Wave");
-    public static string TabMenuExportMp3All => Get("すべてのタブを MP3 で保存(_M)", "Save All Tabs as _MP3");
+    public static string TabMenuExportMp3Selected => WaveMenuExportMp3Selected;
+    public static string TabMenuExportWaveAll => Get("選択ファイルを Wave で保存(_E)", "Save Selected Files as _Wave");
+    public static string TabMenuExportMp3All => Get("選択ファイルを MP3 で保存(_M)", "Save Selected Files as _MP3");
     public static string TabMenuExportWaveByMarkers => Get(
         "マーカーでセパレートして書き出す(_K)",
         "Export Wave Separated by Mar_kers");
@@ -922,8 +942,8 @@ internal static partial class UiStrings
         "選択したタブをマーカーでセパレートして書き出す(_K)",
         "Export Selected Tabs Separated by Mar_kers");
     public static string TabMenuExportWaveByMarkersAll => Get(
-        "すべてのタブをマーカーでセパレートして書き出す(_K)",
-        "Export All Tabs Separated by Mar_kers");
+        "選択ファイルをマーカーでセパレートして書き出す(_K)",
+        "Export Selected Files Separated by Mar_kers");
     public static string TabMenuExportWaveByRegions => Get(
         "リージョンでセパレートして書き出す(_G)",
         "Export Wave Separated by Re_gions");
@@ -931,17 +951,15 @@ internal static partial class UiStrings
         "選択したタブをリージョンでセパレートして書き出す(_G)",
         "Export Selected Tabs Separated by Re_gions");
     public static string TabMenuExportWaveByRegionsAll => Get(
-        "すべてのタブをリージョンでセパレートして書き出す(_G)",
-        "Export All Tabs Separated by Re_gions");
+        "選択ファイルをリージョンでセパレートして書き出す(_G)",
+        "Export Selected Files Separated by Re_gions");
     public static string TabMenuExportByChannels => Get(
         "チャンネルごとに書き出す(_C)",
         "Export by _Channel");
-    public static string TabMenuExportByChannelsSelected => Get(
-        "選択したタブをチャンネルごとに書き出す(_C)",
-        "Export Selected Tabs by _Channel");
+    public static string TabMenuExportByChannelsSelected => WaveMenuExportByChannelsSelected;
     public static string TabMenuExportByChannelsAll => Get(
-        "すべてのタブをチャンネルごとに書き出す(_C)",
-        "Export All Tabs by _Channel");
+        "選択ファイルをチャンネルごとに書き出す(_C)",
+        "Export Selected Files by _Channel");
 
     public static string EditHistoryTitle => Get("編集履歴", "Edit history");
     public static string EditHistoryOrigin => Get("初期状態", "Original");
@@ -970,6 +988,10 @@ internal static partial class UiStrings
         "コピーした履歴はこのファイルに適用できませんでした",
         "None of the copied history steps could be applied to this file");
 
+    public static string TabBatchEditSkippedAll => Get(
+        "選択したファイルには適用できませんでした",
+        "The edit could not be applied to any of the selected files");
+
     public static string EditHistoryPasted(int applied, int total) => applied == total
         ? Get($"{applied} 件適用しました", $"Applied {applied} step(s)")
         : Get(
@@ -981,7 +1003,7 @@ internal static partial class UiStrings
         _ when name == EditHistoryOrigin || name == "初期状態" || name == "Original" => EditHistoryOrigin,
         "Fade In" => Get("フェードイン", "Fade In"),
         "Fade Out" => Get("フェードアウト", "Fade Out"),
-        "Fade Around Playhead" => Get("再生ヘッド前後フェード", "Fade Around Playhead"),
+        "Fade Around Playhead" => Get("シークバー前後フェード", "Fade Around Seek Bar"),
         "Normalize" => Get("ノーマライズ", "Normalize"),
         "Normalize Per Region" => Get("リージョン毎にノーマライズ", "Normalize per Region"),
         "Volume" => Get("音量", "Volume"),

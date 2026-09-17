@@ -25,7 +25,9 @@ public partial class MainWindow
         WaveformView View,
         Border Host,
         Border Header,
-        TextBlock Title);
+        TextBlock Title,
+        DockPanel Body,
+        Border Veil);
 
     private void RestoreWaveformTileArrange(string? stored)
     {
@@ -350,8 +352,11 @@ public partial class MainWindow
                 }
 
                 DetachTileHost(pane.Host);
+                DetachTileHost(pane.Veil);
                 ApplyTileCell(pane.Host, i, rows, cols);
+                ApplyTileVeilCell(pane.Veil, i, rows, cols);
                 grid.Children.Add(pane.Host);
+                grid.Children.Add(pane.Veil);
             }
 
             AddUnusedTileFillers(grid, _sessions.Count, rows, cols);
@@ -386,8 +391,11 @@ public partial class MainWindow
         }
 
         DetachTileHost(pane.Host);
+        DetachTileHost(pane.Veil);
         ApplyTileCell(pane.Host, index, rows, cols);
+        ApplyTileVeilCell(pane.Veil, index, rows, cols);
         _tileGrid.Children.Add(pane.Host);
+        _tileGrid.Children.Add(pane.Veil);
         RevealTileGrid();
         RefreshTileChrome();
     }
@@ -484,6 +492,16 @@ public partial class MainWindow
         ApplyTileDivider(host, cell, cols);
     }
 
+    /// <summary>検索の覆いをホストと同じセルへ重ねる。仕切り（縦仕切り・境界線）ごと覆う。</summary>
+    private void ApplyTileVeilCell(Border veil, int index, int rows, int cols)
+    {
+        var cell = WaveformTileLayout.Cell(index, _sessions.Count, rows, cols);
+        Grid.SetRow(veil, cell.Row);
+        Grid.SetColumn(veil, cell.Column);
+        Grid.SetRowSpan(veil, cell.RowSpan);
+        Grid.SetColumnSpan(veil, cell.ColumnSpan);
+    }
+
     /// <summary>
     /// F11 最大化中だけ、隣の波形と地続きに見えないよう右端に 5px の縦仕切りを入れる。
     /// 配色はチャンネル名・dB 目盛り列と同じ。横の境目はファイル名帯が仕切りになるので入れない。
@@ -507,6 +525,12 @@ public partial class MainWindow
         var cols = _tileGrid.ColumnDefinitions.Count;
         foreach (var child in _tileGrid.Children.OfType<Border>())
         {
+            // 検索の覆いには仕切りを付けない（覆い自体が仕切りごと隠す側）。
+            if (IsTileSearchVeilElement(child))
+            {
+                continue;
+            }
+
             var cell = new WaveformTileCell(
                 Grid.GetRow(child),
                 Grid.GetColumn(child),
@@ -514,6 +538,19 @@ public partial class MainWindow
                 Grid.GetColumnSpan(child));
             ApplyTileDivider(child, cell, cols);
         }
+    }
+
+    private bool IsTileSearchVeilElement(Border border)
+    {
+        foreach (var pane in _tilePanes)
+        {
+            if (ReferenceEquals(pane.Veil, border))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void DetachTileHost(FrameworkElement host)
@@ -531,6 +568,7 @@ public partial class MainWindow
             return;
         }
 
+        CloseTileSearch();
         _tileBuildGeneration++;
         CaptureAllTileViews();
         TearDownWaveformTiles();
@@ -613,6 +651,7 @@ public partial class MainWindow
             UnhookWaveformEvents(pane.View);
             pane.View.DisposeSpectrogram();
             DetachTileHost(pane.Host);
+            DetachTileHost(pane.Veil);
             _tilePanes.RemoveAt(i);
             if (ReferenceEquals(_tileActiveView, pane.View))
             {
@@ -672,14 +711,33 @@ public partial class MainWindow
         body.Children.Add(header);
         body.Children.Add(view);
 
+        // 検索フィルターでヒットしなかったタイルを暗くする覆い。ホストと同じセルへ
+        // 重ねて置くので、仕切り（5px の縦仕切りや境界の線）ごと覆える。ヒットテストを
+        // 持たせてクリック・右クリック・ホイールなどの操作も遮断する。ぼかしの
+        // はみ出しは layers のクリップで切り、隣のすりガラスと境目が出ないようにする。
+        var veil = new Border
+        {
+            Visibility = Visibility.Collapsed,
+            Background = TileSearchVeilBrush,
+        };
+        var layers = new Grid { ClipToBounds = true };
+        layers.Children.Add(body);
+
         var host = new Border
         {
-            Child = body,
+            Child = layers,
             SnapsToDevicePixels = true,
             UseLayoutRounding = true,
         };
         host.PreviewMouseDown += (_, e) =>
         {
+            // すりガラスに覆われたタイルは操作させない（アクティブ化もしない）。
+            if (IsTileSearchVeiled(session))
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (_tileLayoutBusy
                 || e.OriginalSource is DependencyObject origin && IsDescendantOf(origin, header))
             {
@@ -694,7 +752,16 @@ public partial class MainWindow
             ActivateSession(session);
         };
 
-        return new WaveformTilePane(session, view, host, header, title);
+        return new WaveformTilePane(session, view, host, header, title, body, veil);
+    }
+
+    private static readonly Brush TileSearchVeilBrush = CreateTileSearchVeilBrush();
+
+    private static Brush CreateTileSearchVeilBrush()
+    {
+        var brush = new SolidColorBrush(Color.FromArgb(0x8C, 0x00, 0x00, 0x00));
+        brush.Freeze();
+        return brush;
     }
 
     private void TearDownWaveformTiles()
@@ -856,8 +923,7 @@ public partial class MainWindow
 
         foreach (var pane in _tilePanes)
         {
-            var highlighted = ReferenceEquals(pane.Session, _activeSession)
-                || _selectedTabs.Contains(pane.Session);
+            var highlighted = IsTabChromeHighlighted(pane.Session);
             var dirty = pane.Session.Document.IsDirty;
             if (!ReferenceEquals(pane.Title, _fileNameEditTitle))
             {
@@ -871,6 +937,8 @@ public partial class MainWindow
             pane.Header.Background = BrushOrTransparent(
                 highlighted ? "WaveformTileActiveHeaderBrush" : "TimelineWellBackBrush");
         }
+
+        ApplyTileSearchVeils();
     }
 
     private void ForEachWaveform(Action<WaveformView> action)

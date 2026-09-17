@@ -169,6 +169,42 @@
                 </DockPanel>
               </Grid>
             </DockPanel>
+            <Border x:Name="TileSearchHost"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Padding="14,10"
+                    CornerRadius="6"
+                    Panel.ZIndex="20"
+                    Visibility="Collapsed"
+                    Background="{DynamicResource TransportBackBrush}"
+                    BorderBrush="{DynamicResource ChromeBorderBrush}"
+                    BorderThickness="1">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock x:Name="TileSearchLabel"
+                             VerticalAlignment="Center"
+                             FontSize="11"
+                             Margin="0,0,8,0"
+                             Foreground="{DynamicResource MutedForeBrush}" />
+                  <TextBox x:Name="TileSearchBox"
+                           Width="260"
+                           FontSize="12"
+                           FontFamily="Consolas"
+                           Padding="2,1"
+                           VerticalContentAlignment="Center"
+                           Style="{DynamicResource DarkTextBoxStyle}"
+                           Foreground="{DynamicResource PrimaryForeBrush}"
+                           Background="{DynamicResource DialogInputBackBrush}"
+                           BorderBrush="{DynamicResource AccentCyanBrush}"
+                           CaretBrush="{DynamicResource PrimaryForeBrush}"
+                           TextChanged="TileSearchBox_TextChanged" />
+                </StackPanel>
+                <TextBlock x:Name="TileSearchHint"
+                           FontSize="10.5"
+                           Margin="0,6,0,0"
+                           Foreground="{DynamicResource MutedForeBrush}" />
+              </StackPanel>
+            </Border>
           </Grid>
         </Border>
       </DockPanel>
