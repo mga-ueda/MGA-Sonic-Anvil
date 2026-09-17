@@ -1619,7 +1619,7 @@ internal sealed class LibraryBrowserView : UserControl
         headerFactory.SetValue(TextBlock.FontSizeProperty, 13d);
         headerFactory.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 8, 0));
         headerFactory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        headerFactory.SetResourceReference(TextBlock.ForegroundProperty, "AccentCyanBrush");
+        headerFactory.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
 
         var lineFactory = new FrameworkElementFactory(typeof(Border));
         lineFactory.SetValue(FrameworkElement.HeightProperty, 1d);
@@ -1635,7 +1635,7 @@ internal sealed class LibraryBrowserView : UserControl
         titleBar.AppendChild(headerFactory);
         titleBar.AppendChild(lineFactory);
 
-        // 列名はシアン見出しの下・ジャケット右。上部ヘッダーはグループ時に隠す。
+        // 列名はグループ見出しの下・ジャケット右。上部ヘッダーはグループ時に隠す。
         var headers = new FrameworkElementFactory(typeof(LibraryGroupColumnHeaders));
         headers.SetValue(DockPanel.DockProperty, Dock.Top);
         headers.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 0, 2));
@@ -1682,7 +1682,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void SyncGroupColumnHeadersVisibility()
     {
-        // グループ時はシアン見出しの下に列名を出すので、上部ヘッダーは隠す。
+        // グループ時は見出しの下に列名を出すので、上部ヘッダーは隠す。
         _grid.HeadersVisibility = _group == LibraryFileGroup.None
             ? DataGridHeadersVisibility.Column
             : DataGridHeadersVisibility.None;
@@ -2933,7 +2933,7 @@ internal static class LibraryJacketReflection
     /// <summary>接点付近の不透明度（255 基準）。やや薄めから始める。</summary>
     internal const byte PeakOpacity = 78;
     /// <summary>本体と鏡面のすき間（DIP）。</summary>
-    internal const double GapDip = 2;
+    internal const double GapDip = 1;
 }
 
 internal sealed class LibraryJacketReflectionView : Border

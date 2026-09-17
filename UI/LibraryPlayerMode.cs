@@ -23,8 +23,6 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.GoEnd
             or WaveMenuCommand.ViewLeft
             or WaveMenuCommand.ViewRight
-            or WaveMenuCommand.CenterPlayhead
-            or WaveMenuCommand.CenterLock
             or WaveMenuCommand.MaximizeWaveform
             or WaveMenuCommand.MaximizeAnalyzers
             or WaveMenuCommand.MaximizeLibrary
@@ -32,9 +30,6 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.SilentSkip
             or WaveMenuCommand.AlwaysOnTop
             or WaveMenuCommand.Open
-            or WaveMenuCommand.Save
-            or WaveMenuCommand.SaveAs
-            or WaveMenuCommand.SaveMp3
             or WaveMenuCommand.Settings
             or WaveMenuCommand.Quit
             or WaveMenuCommand.CloseTab
@@ -64,11 +59,7 @@ internal static class LibraryPlayerMode
             or TransportCommand.NextMarker
             or TransportCommand.NextPage
             or TransportCommand.GoToEnd
-            or TransportCommand.CenterPlayhead
             or TransportCommand.Open
-            or TransportCommand.Save
-            or TransportCommand.SaveAs
-            or TransportCommand.SaveMp3
             or TransportCommand.ToggleUiTheme
             or TransportCommand.OpenColorPanel
             or TransportCommand.ToggleTips
@@ -125,16 +116,13 @@ internal static class LibraryPlayerMode
         {
             (Key.Space, ModifierKeys.None or ModifierKeys.Control) => true,
             (Key.Enter, ModifierKeys.None or ModifierKeys.Alt) => true,
-            (Key.Z or Key.OemPeriod or Key.Decimal, ModifierKeys.None) => true,
             (Key.L, ModifierKeys.None) => true,
             (Key.A, ModifierKeys.Control) => true,
             (Key.W, ModifierKeys.Control) => true,
             (Key.W, ModifierKeys.Control | ModifierKeys.Shift) => true,
-            (Key.S, ModifierKeys.Alt or ModifierKeys.Control) => true,
-            (Key.S, ModifierKeys.Control | ModifierKeys.Shift) => true,
+            (Key.S, ModifierKeys.Alt) => true,
             (Key.O, ModifierKeys.Control) => true,
             (Key.O, ModifierKeys.Control | ModifierKeys.Shift) => true,
-            (Key.M, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Q, ModifierKeys.Control) => true,
             (Key.C, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.T, ModifierKeys.Control | ModifierKeys.Shift) => true,

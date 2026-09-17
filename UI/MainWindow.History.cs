@@ -32,7 +32,7 @@ public partial class MainWindow
 
     private void OpenEditHistory()
     {
-        if (_document is null)
+        if (_document is null || IsLibraryMaximized)
         {
             return;
         }

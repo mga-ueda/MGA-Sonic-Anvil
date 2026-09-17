@@ -111,7 +111,7 @@ public sealed class LibraryArtworkGlowTests
         Assert.True(brush.GradientStops[0].Color.A > brush.GradientStops[^1].Color.A);
         Assert.Equal(0, brush.GradientStops[^1].Color.A);
         Assert.InRange(LibraryJacketReflection.HeightFactor, 0.35, 0.45);
-        Assert.Equal(2, LibraryJacketReflection.GapDip);
+        Assert.Equal(1, LibraryJacketReflection.GapDip);
     }
 
     private static void RunSta(Action action)

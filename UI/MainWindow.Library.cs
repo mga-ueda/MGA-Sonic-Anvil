@@ -66,6 +66,12 @@ public partial class MainWindow
         }
 
         ForEachWaveform(view => view.SeekAndSelectOnly = show);
+        HistoryStrip.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+        if (show)
+        {
+            CloseEditHistory(commit: true);
+        }
+
         RefreshTransportCommandsEnabled();
         ApplyLibraryWaapi(show);
         ApplyLibraryPlayerHost(show);

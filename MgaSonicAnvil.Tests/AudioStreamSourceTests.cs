@@ -80,6 +80,68 @@ public sealed class AudioStreamSourceTests
     }
 
     [Fact]
+    public void BindStream_FastSpeed_UsesVariableRateNotGrainPitch()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-ff-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteRampWave(path, sampleRate: 48000, frames: 48000);
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+
+            using var source = AudioStreamSource.Open(path);
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(48000);
+            provider.BindStream(source, document, startFrame: 0, playRange: null, loop: false);
+            provider.SetPlaybackSpeed(PlaybackSampleProvider.FastSpeed);
+
+            var frames = 200;
+            var buffer = new float[frames * 2];
+            Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+            // 可変速: 3 倍なので 0,3,6…（グレイン据え置きの 0,1,2 ではない）。
+            Assert.Equal(0f, buffer[0], 3);
+            Assert.Equal(3f, buffer[2], 3);
+            Assert.Equal(6f, buffer[4], 3);
+            Assert.Equal(frames * 3, provider.CursorFrame);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void BindStream_RewindSpeed_MovesCursorBackward()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-rw-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteRampWave(path, sampleRate: 48000, frames: 48000);
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+
+            using var source = AudioStreamSource.Open(path);
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(48000);
+            provider.BindStream(source, document, startFrame: 3000, playRange: null, loop: false);
+            provider.SetPlaybackSpeed(-PlaybackSampleProvider.FastSpeed);
+
+            var frames = 100;
+            var buffer = new float[frames * 2];
+            Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+            // 逆方向可変速: 3000, 2997, 2994…
+            Assert.Equal(3000f, buffer[0], 1);
+            Assert.Equal(2997f, buffer[2], 1);
+            Assert.Equal(2994f, buffer[4], 1);
+            Assert.Equal(3000 - frames * 3, provider.CursorFrame);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void BuildPlayerDisplayStreaming_ProducesNonEmptyPeaks()
     {
         var path = Path.Combine(Path.GetTempPath(), "mga-stream-peak-" + Guid.NewGuid().ToString("N") + ".wav");
@@ -270,5 +332,18 @@ public sealed class AudioStreamSourceTests
         }
 
         writer.Write(buffer, 0, buffer.Length);
+    }
+
+    private static void WriteRampWave(string path, int sampleRate, int frames)
+    {
+        using var writer = new WaveFileWriter(path, WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, 2));
+        var buffer = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            buffer[i * 2] = i;
+            buffer[i * 2 + 1] = i;
+        }
+
+        writer.WriteSamples(buffer, 0, buffer.Length);
     }
 }
