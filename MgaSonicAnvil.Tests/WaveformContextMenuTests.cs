@@ -18,22 +18,25 @@ public sealed class WaveformContextMenuTests
             foreach (var language in new[] { UiLanguage.Japanese, UiLanguage.English })
             {
                 UiStrings.SetLanguage(language);
-                var tree = WaveformContextMenuBuilder.Build(WaveformContextMenuModel.AllEnabledForTests());
-                foreach (var group in WaveformContextMenuBuilder.AccessKeyGroups(tree))
+                foreach (var hasSelectedTabs in new[] { false, true })
                 {
-                    var keys = new List<char>();
-                    foreach (var header in group)
+                    var tree = WaveformContextMenuBuilder.Build(WaveformContextMenuModel.AllEnabledForTests(hasSelectedTabs));
+                    foreach (var group in WaveformContextMenuBuilder.AccessKeyGroups(tree))
                     {
-                        var key = MenuAccessKeys.Read(header);
-                        Assert.True(key is not null, $"{language}: missing access key: {header}");
-                        keys.Add(key.Value);
-                    }
+                        var keys = new List<char>();
+                        foreach (var header in group)
+                        {
+                            var key = MenuAccessKeys.Read(header);
+                            Assert.True(key is not null, $"{language}: missing access key: {header}");
+                            keys.Add(key.Value);
+                        }
 
-                    var dupes = keys
-                        .GroupBy(key => key)
-                        .Where(g => g.Count() > 1)
-                        .Select(g => $"{g.Key}: {string.Join(" / ", group.Where(h => MenuAccessKeys.Read(h) == g.Key))}");
-                    Assert.True(keys.Count == keys.Distinct().Count(), $"{language}: {string.Join("; ", dupes)}");
+                        var dupes = keys
+                            .GroupBy(key => key)
+                            .Where(g => g.Count() > 1)
+                            .Select(g => $"{g.Key}: {string.Join(" / ", group.Where(h => MenuAccessKeys.Read(h) == g.Key))}");
+                        Assert.True(keys.Count == keys.Distinct().Count(), $"{language} (selected={hasSelectedTabs}): {string.Join("; ", dupes)}");
+                    }
                 }
             }
         }
@@ -59,6 +62,7 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(UiStrings.WaveMenuCatPlayback, headers);
             Assert.Contains(UiStrings.WaveMenuCatView, headers);
             Assert.Contains(UiStrings.WaveMenuCatFile, headers);
+            Assert.Contains(UiStrings.WaveMenuCatTabs, headers);
             Assert.Contains(UiStrings.WaveMenuCatExport, headers);
             Assert.Contains(UiStrings.WaveMenuCatHelp, headers);
 
@@ -102,10 +106,15 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.RenameFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Contains(WaveMenuCommand.DuplicateFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Equal("Ctrl+Shift+D", Find(tree, WaveMenuCommand.DuplicateFile)?.Gesture);
-            Assert.Contains(WaveMenuCommand.MergeTabs, CommandsIn(tree, UiStrings.WaveMenuCatFile));
+            Assert.Contains(WaveMenuCommand.MergeTabs, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
             Assert.Equal("Ctrl+Shift+B", Find(tree, WaveMenuCommand.MergeTabs)?.Gesture);
             Assert.Contains(WaveMenuCommand.DeleteFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
-            Assert.Contains(WaveMenuCommand.CloseOthers, CommandsIn(tree, UiStrings.WaveMenuCatFile));
+            Assert.Contains(WaveMenuCommand.CloseTab, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
+            Assert.Contains(WaveMenuCommand.CloseOthers, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
+            Assert.Contains(WaveMenuCommand.SelectAllTabs, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
+            Assert.Contains(WaveMenuCommand.CopyAllTabTimes, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
+            Assert.DoesNotContain(WaveMenuCommand.CloseTab, CommandsIn(tree, UiStrings.WaveMenuCatFile));
+            Assert.DoesNotContain(WaveMenuCommand.MergeTabs, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.True(Find(tree, WaveMenuCommand.CloseOthers)?.Enabled);
             Assert.True(Find(tree, WaveMenuCommand.CloseTabsRight)?.Enabled);
             Assert.True(Find(tree, WaveMenuCommand.CloseTabsLeft)?.Enabled);
@@ -117,8 +126,11 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.CloseTabsRight, commands);
             Assert.Contains(WaveMenuCommand.CloseTabsLeft, commands);
             Assert.Contains(WaveMenuCommand.CopyAllTabTimes, commands);
-            Assert.Contains(WaveMenuCommand.ExportAllWave, CommandsIn(tree, UiStrings.WaveMenuCatExport));
-            Assert.Contains(WaveMenuCommand.ExportAllMp3, CommandsIn(tree, UiStrings.WaveMenuCatExport));
+            Assert.Contains(WaveMenuCommand.ExportAllWave, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
+            Assert.Contains(WaveMenuCommand.ExportAllMp3, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
+            Assert.DoesNotContain(WaveMenuCommand.ExportAllWave, CommandsIn(tree, UiStrings.WaveMenuCatExport));
+            Assert.Contains(WaveMenuCommand.TileOff, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
+            Assert.DoesNotContain(WaveMenuCommand.TileOff, CommandsIn(tree, UiStrings.WaveMenuCatView));
             Assert.Contains(WaveMenuCommand.ClearMarkers, commands);
             Assert.Contains(WaveMenuCommand.PlayFromHere, commands);
             var root = tree.OfType<WaveMenuItemEntry>().Select(item => item.Command).ToArray();

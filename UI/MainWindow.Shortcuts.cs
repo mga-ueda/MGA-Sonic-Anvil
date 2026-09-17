@@ -203,6 +203,18 @@ public partial class MainWindow
             return true;
         }
 
+        // タイル検索。Ctrl+F で開き、ボックス内では Enter / Esc だけ拾う。
+        if (TryProcessTileSearchKey(key, modifiers))
+        {
+            return true;
+        }
+
+        if (IsTileSearchFocused)
+        {
+            // 検索ボックスへの文字入力はそのまま通す（1 文字ごとに判定される）。
+            return false;
+        }
+
         if (StatusTimes.IsTimeFocused)
         {
             StopPlaybackShuttle();
@@ -302,6 +314,13 @@ public partial class MainWindow
         if (key == Key.Z && modifiers == ModifierKeys.Control)
         {
             UndoEdit();
+            return true;
+        }
+
+        if (key == Key.A && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            // タイル表示かどうかに関係なくタブを全選択。検索フィルター中はヒットしたタブのみ。
+            SelectAllTabs();
             return true;
         }
 
@@ -926,7 +945,16 @@ public partial class MainWindow
 
         if (key == Key.D && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            if (_activeSession is not null && !IsRecording)
+            if (IsRecording)
+            {
+                return true;
+            }
+
+            if (HasTabSelection)
+            {
+                DuplicateSessions(SelectedTabsInOrder());
+            }
+            else if (_activeSession is not null)
             {
                 DuplicateSession(_activeSession);
             }

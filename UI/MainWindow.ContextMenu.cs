@@ -128,6 +128,7 @@ public partial class MainWindow
         var hasDoc = document is not null;
         var recording = IsRecording;
         var busy = IsUiBusy;
+        var selectedTabs = SelectedTabsInOrder();
         var canEdit = hasDoc && !busy && !recording;
         var canNavigate = hasDoc && !busy && !recording;
         var hasSelection = hasDoc && !document!.Selection.IsEmpty;
@@ -172,6 +173,11 @@ public partial class MainWindow
             CanCloseTabsToRight = CanCloseTabsFromActive(rightSide: true, hasDoc, busy, recording),
             CanCloseTabsToLeft = CanCloseTabsFromActive(rightSide: false, hasDoc, busy, recording),
             CanMergeTabs = !busy && !recording && _selectedTabs.Count >= 2,
+            HasSelectedTabs = selectedTabs.Length > 0,
+            HasMultipleSelectedTabs = selectedTabs.Length >= 2,
+            AllTabsSelected = AllTabsSelected,
+            SelectedTabsHaveMarkers = AnyTabHasMarkers(selectedTabs),
+            SelectedTabsHaveRegions = AnyTabHasRegions(selectedTabs),
             WaveTileArrange = _tileArrange,
             CanTileHorizontal = CanOfferTileArrange(WaveformTileArrange.Horizontal),
             CanTileVertical = CanOfferTileArrange(WaveformTileArrange.Vertical),
@@ -229,7 +235,12 @@ public partial class MainWindow
                 ApplyPaste();
                 break;
             case WaveMenuCommand.PasteHistory:
-                if (_activeSession is not null)
+                // タブ選択中は選択タブへ（Ctrl+V・タブメニューと同じ挙動）。
+                if (HasTabSelection)
+                {
+                    PasteHistoryRecipesToTabs(SelectedTabsInOrder());
+                }
+                else if (_activeSession is not null)
                 {
                     PasteHistoryRecipesToTabs([_activeSession]);
                 }
@@ -325,9 +336,6 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.TogglePlayback:
                 TogglePlayback();
-                break;
-            case WaveMenuCommand.Stop:
-                ExecuteTransport(TransportCommand.Stop);
                 break;
             case WaveMenuCommand.PauseHere:
                 PausePlaybackHere();
@@ -465,7 +473,11 @@ public partial class MainWindow
 
                 break;
             case WaveMenuCommand.DuplicateFile:
-                if (_activeSession is not null)
+                if (HasTabSelection)
+                {
+                    DuplicateSessions(SelectedTabsInOrder());
+                }
+                else if (_activeSession is not null)
                 {
                     DuplicateSession(_activeSession);
                 }
@@ -475,7 +487,11 @@ public partial class MainWindow
                 MergeSelectedTabs();
                 break;
             case WaveMenuCommand.DeleteFile:
-                if (_activeSession is not null)
+                if (HasTabSelection)
+                {
+                    DeleteSessionFiles(SelectedTabsInOrder());
+                }
+                else if (_activeSession is not null)
                 {
                     DeleteSessionFile(_activeSession);
                 }
@@ -514,6 +530,9 @@ public partial class MainWindow
             case WaveMenuCommand.ReopenTab:
                 ReopenLastClosedTab();
                 break;
+            case WaveMenuCommand.SelectAllTabs:
+                SelectAllTabs();
+                break;
             case WaveMenuCommand.NextTab:
                 ActivateAdjacentTab(1);
                 break;
@@ -537,19 +556,60 @@ public partial class MainWindow
                 Close();
                 break;
             case WaveMenuCommand.ExportWave:
-                ExportActiveTab(AudioFileKind.Wave);
+                // タブ選択中は選択タブを一括書き出し（タブメニューと同じ挙動）。
+                if (HasTabSelection)
+                {
+                    ExportTabs(SelectedTabsInOrder(), AudioFileKind.Wave);
+                }
+                else
+                {
+                    ExportActiveTab(AudioFileKind.Wave);
+                }
+
                 break;
             case WaveMenuCommand.ExportMp3:
-                ExportActiveTab(AudioFileKind.Mp3);
+                if (HasTabSelection)
+                {
+                    ExportTabs(SelectedTabsInOrder(), AudioFileKind.Mp3);
+                }
+                else
+                {
+                    ExportActiveTab(AudioFileKind.Mp3);
+                }
+
                 break;
             case WaveMenuCommand.ExportByMarkers:
-                ExportActiveTabSeparated(TabExportSplit.Markers);
+                if (HasTabSelection)
+                {
+                    ExportTabsSeparated(SelectedTabsInOrder(), TabExportSplit.Markers);
+                }
+                else
+                {
+                    ExportActiveTabSeparated(TabExportSplit.Markers);
+                }
+
                 break;
             case WaveMenuCommand.ExportByRegions:
-                ExportActiveTabSeparated(TabExportSplit.Regions);
+                if (HasTabSelection)
+                {
+                    ExportTabsSeparated(SelectedTabsInOrder(), TabExportSplit.Regions);
+                }
+                else
+                {
+                    ExportActiveTabSeparated(TabExportSplit.Regions);
+                }
+
                 break;
             case WaveMenuCommand.ExportByChannels:
-                ExportActiveTabSeparated(TabExportSplit.Channels);
+                if (HasTabSelection)
+                {
+                    ExportTabsSeparated(SelectedTabsInOrder(), TabExportSplit.Channels);
+                }
+                else
+                {
+                    ExportActiveTabSeparated(TabExportSplit.Channels);
+                }
+
                 break;
             case WaveMenuCommand.ExportAllWave:
                 ExportAllTabsWave();

@@ -35,6 +35,19 @@ public partial class MainWindow
 
     private bool HasTabSelection => _selectedTabs.Count > 0;
 
+    /// <summary>複数タブが選択されているか。ファイルの時間表示は 2 件以上のときだけ選択分に絞る。</summary>
+    private bool HasMultipleTabSelection => _selectedTabs.Count >= 2;
+
+    /// <summary>
+    /// タブ／タイルの帯のハイライト。複数選択があるときは選択したものだけを光らせる
+    /// （検索フィルター中の全選択などで、選択に入っていないアクティブタブが
+    /// 選択済みに見えてしまわないように）。選択が無いときはアクティブを光らせる。
+    /// </summary>
+    private bool IsTabChromeHighlighted(DocumentSession session) =>
+        HasTabSelection
+            ? _selectedTabs.Contains(session)
+            : ReferenceEquals(session, _activeSession);
+
     private bool AllTabsSelected => _sessions.Count > 0 && _selectedTabs.Count == _sessions.Count;
     private void CaptureActiveSessionView()
     {
@@ -99,9 +112,18 @@ public partial class MainWindow
             return;
         }
 
+        // タイル検索のすりガラスに覆われたタブは飛ばす。全部覆われていたら動かない。
         var count = _sessions.Count;
-        var next = ((index + delta) % count + count) % count;
-        ActivateSession(_sessions[next]);
+        var next = index;
+        for (var step = 1; step < count; step++)
+        {
+            next = ((next + delta) % count + count) % count;
+            if (!IsTileSearchVeiled(_sessions[next]))
+            {
+                ActivateSession(_sessions[next]);
+                return;
+            }
+        }
     }
 
     /// <summary>閉じたら true。保存確認でキャンセルされたら false（連続クローズを中断する）。</summary>
@@ -235,6 +257,7 @@ public partial class MainWindow
 
     private void CloseAllTabs() => CloseTabs(_sessions.ToArray());
 
+    /// <summary>全タブを選択する。タイル検索フィルター中は検索でヒットしたタブだけ選ぶ。</summary>
     private void SelectAllTabs()
     {
         if (_sessions.Count == 0)
@@ -245,7 +268,10 @@ public partial class MainWindow
         _selectedTabs.Clear();
         foreach (var session in _sessions)
         {
-            _selectedTabs.Add(session);
+            if (!TileSearchFilterActive || TileSearchMatches(session))
+            {
+                _selectedTabs.Add(session);
+            }
         }
 
         RebuildTabBar();
@@ -394,16 +420,7 @@ public partial class MainWindow
                 "Ctrl+Shift+W",
                 canMutate));
             menu.Items.Add(new Separator());
-            AddFileNameMenuItems(menu, session, canMutate, anchor);
-            if (targets.Length >= 2)
-            {
-                menu.Items.Add(CreateTabMenuItem(
-                    UiStrings.TabMenuMergeSelected,
-                    MergeSelectedTabs,
-                    "Ctrl+Shift+B",
-                    canMutate));
-            }
-
+            AddFileNameMenuItems(menu, session, canMutate, anchor, includeMerge: targets.Length >= 2);
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 AllTabsSelected ? UiStrings.TabMenuPasteToAll : UiStrings.TabMenuPasteToSelected,
@@ -416,7 +433,7 @@ public partial class MainWindow
                 "Ctrl+Shift+T",
                 canMutate && _workspace.ClosedTabs.Count > 0));
             menu.Items.Add(CreateTabMenuItem(
-                UiStrings.TabMenuCopyAllTimes,
+                HasMultipleTabSelection ? UiStrings.TabMenuCopySelectedTimes : UiStrings.TabMenuCopyAllTimes,
                 CopyAllTabTimes,
                 enabled: _sessions.Count > 0));
             AddTileArrangeMenuItems(menu, canMutate);
@@ -525,16 +542,18 @@ public partial class MainWindow
 
     private void CopyAllTabTimes()
     {
-        if (_sessions.Count == 0)
+        // 複数選択時だけ選択ファイルに絞り、単体選択・未選択はすべてのファイルを表示する。
+        var sources = HasMultipleTabSelection ? SelectedTabsInOrder() : _sessions.ToArray();
+        if (sources.Length == 0)
         {
             return;
         }
 
-        var tabs = new (string FileName, long FrameCount, int SampleRate)[_sessions.Count];
-        for (var i = 0; i < _sessions.Count; i++)
+        var tabs = new (string FileName, long FrameCount, int SampleRate)[sources.Length];
+        for (var i = 0; i < sources.Length; i++)
         {
-            var document = _sessions[i].Document;
-            tabs[i] = (_sessions[i].DisplayName, document.FrameCount, document.SampleRate);
+            var document = sources[i].Document;
+            tabs[i] = (sources[i].DisplayName, document.FrameCount, document.SampleRate);
         }
 
         var rows = TabTimeList.FromTabs(tabs);
@@ -616,24 +635,56 @@ public partial class MainWindow
         return item;
     }
 
+    /// <summary>名前変更→複製→（バウンス）→削除。波形右クリック → ファイルの並びと同じにする。</summary>
     private void AddFileNameMenuItems(
         ContextMenu menu,
         DocumentSession session,
         bool canMutate,
-        FrameworkElement anchor)
+        FrameworkElement anchor,
+        bool includeMerge = false)
     {
+        var selected = HasTabSelection ? SelectedTabsInOrder() : null;
         menu.Items.Add(CreateTabMenuItem(
             UiStrings.TabMenuRenameFile,
             () => BeginFileNameEdit(session, SurfaceFromAnchor(anchor)),
             enabled: canMutate));
         menu.Items.Add(CreateTabMenuItem(
-            UiStrings.TabMenuDuplicateFile,
-            () => DuplicateSession(session),
+            selected is null ? UiStrings.TabMenuDuplicateFile : UiStrings.WaveMenuDuplicateFileSelected,
+            () =>
+            {
+                if (selected is null)
+                {
+                    DuplicateSession(session);
+                }
+                else
+                {
+                    DuplicateSessions(selected);
+                }
+            },
             "Ctrl+Shift+D",
             enabled: canMutate));
+        if (includeMerge)
+        {
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.TabMenuMergeSelected,
+                MergeSelectedTabs,
+                "Ctrl+Shift+B",
+                canMutate));
+        }
+
         menu.Items.Add(CreateTabMenuItem(
-            UiStrings.TabMenuDeleteFile,
-            () => DeleteSessionFile(session),
+            selected is null ? UiStrings.TabMenuDeleteFile : UiStrings.WaveMenuDeleteFileSelected,
+            () =>
+            {
+                if (selected is null)
+                {
+                    DeleteSessionFile(session);
+                }
+                else
+                {
+                    DeleteSessionFiles(selected);
+                }
+            },
             enabled: canMutate));
     }
 
@@ -804,7 +855,7 @@ public partial class MainWindow
 
     private FrameworkElement CreateTabItem(DocumentSession session)
     {
-        var active = ReferenceEquals(session, _activeSession) || _selectedTabs.Contains(session);
+        var active = IsTabChromeHighlighted(session);
         var border = new Border
         {
             Tag = session,
@@ -917,7 +968,7 @@ public partial class MainWindow
     private void ApplyTabChrome(DocumentSession session, DockPanel dock)
     {
         var dirty = session.Document.IsDirty;
-        var active = ReferenceEquals(session, _activeSession) || _selectedTabs.Contains(session);
+        var active = IsTabChromeHighlighted(session);
         var accent = (Brush)FindResource(dirty ? "DirtyAccentBrush" : "AccentCyanBrush");
         var titleBrush = dirty
             ? accent

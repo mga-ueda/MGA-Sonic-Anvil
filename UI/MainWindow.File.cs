@@ -823,6 +823,73 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>選択中のタブをまとめて複製する。確認ダイアログは 1 回にまとめる。</summary>
+    private void DuplicateSessions(IReadOnlyList<DocumentSession> sessions)
+    {
+        if (IsUiBusy || sessions.Count == 0)
+        {
+            return;
+        }
+
+        if (sessions.Count == 1)
+        {
+            DuplicateSession(sessions[0]);
+            return;
+        }
+
+        if (!ConfirmFileAction(
+            UiStrings.ConfirmDuplicateSelectedFiles(sessions.Count),
+            MessageBoxImage.Question,
+            MessageBoxResult.Yes))
+        {
+            return;
+        }
+
+        if (IsRecording && _recordSession is { } recording && sessions.Contains(recording))
+        {
+            StopRecording();
+        }
+
+        if (IsPlaybackActive() && _activeSession is { } active && sessions.Contains(active))
+        {
+            StopPlayback();
+        }
+
+        foreach (var session in sessions)
+        {
+            try
+            {
+                var copy = CreateDuplicateSession(session, destPath: null);
+                CopyViewState(session, copy);
+                InsertSessionAdjacent(session, copy);
+                if (copy.Document.SourcePath is { } opened)
+                {
+                    RememberOpenedPath(opened);
+                }
+            }
+            catch (NotSupportedException)
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    UiStrings.ErrorAiffExport,
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+            catch (Exception ex)
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    $"{UiStrings.ErrorDuplicateFailed}\n{ex.Message}",
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return;
+            }
+        }
+    }
+
     private DocumentSession CreateDuplicateSession(DocumentSession session, string? destPath)
     {
         var document = session.Document;
@@ -920,6 +987,19 @@ public partial class MainWindow
     {
         insertAt = Math.Clamp(insertAt, 0, _sessions.Count);
         _sessions.Insert(insertAt, session);
+
+        // タイル検索フィルターにヒットしない新しいタブ（バウンス結果など）は前面化しない。
+        // アクティブにするとハイライトされて選択状態に見えるうえ、すりガラスの下の
+        // 操作できないタイルがアクティブになってしまう。すりガラス側に並べるだけにする。
+        if (IsTileSearchVeiled(session))
+        {
+            ClearTabSelection();
+            RebuildTabBar();
+            RefreshStatus();
+            ApplyPreferredMultiFileArrange(1);
+            return;
+        }
+
         ActivateSession(session);
         ApplyPreferredMultiFileArrange(1);
     }
@@ -1090,6 +1170,72 @@ public partial class MainWindow
         session.Document.SetDirty(false);
         session.Document.SourcePath = null;
         CloseSession(session, rememberClosed: false);
+    }
+
+    /// <summary>選択中のタブのファイルをまとめて削除する。確認は 1 回、失敗はまとめて表示する。</summary>
+    private void DeleteSessionFiles(IReadOnlyList<DocumentSession> sessions)
+    {
+        if (IsUiBusy || sessions.Count == 0)
+        {
+            return;
+        }
+
+        if (sessions.Count == 1)
+        {
+            DeleteSessionFile(sessions[0]);
+            return;
+        }
+
+        if (!ConfirmFileAction(
+            UiStrings.ConfirmDeleteSelectedFiles(sessions.Count),
+            MessageBoxImage.Warning,
+            MessageBoxResult.No))
+        {
+            return;
+        }
+
+        if (IsRecording && _recordSession is { } recording && sessions.Contains(recording))
+        {
+            StopRecording();
+        }
+
+        if (IsPlaybackActive())
+        {
+            StopPlayback();
+        }
+
+        var failed = new List<string>();
+        foreach (var session in sessions)
+        {
+            var path = session.Document.SourcePath;
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            {
+                try
+                {
+                    File.Delete(path);
+                }
+                catch (Exception)
+                {
+                    failed.Add(session.DisplayName);
+                    continue;
+                }
+
+                session.Document.SourcePath = null;
+            }
+
+            session.Document.SetDirty(false);
+            CloseSession(session, rememberClosed: false);
+        }
+
+        if (failed.Count > 0)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                $"{UiStrings.ErrorDeleteFailed}\n{string.Join(Environment.NewLine, failed)}",
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
     }
 
     private enum DirtyClosePolicy
