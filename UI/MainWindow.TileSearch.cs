@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Effects;
 using MgaSonicAnvil.Domain;
 
@@ -198,30 +199,102 @@ public partial class MainWindow
 
     private const double TileSearchBlurRadius = 8;
 
+    /// <summary>
+    /// ぼかしをタイルの外へはみ出させる量。半径ぶん足さないと端が薄くなる。
+    /// さらに仕切りの半分（2px）を足し、隣のタイルと仕切りの中央でフルのぼかしが重なるようにする。
+    /// </summary>
+    private const double TileSearchBlurOverscan = TileSearchBlurRadius + TileDividerWidth / 2;
+
+    private const int TileSearchZUnmatched = 0;
+    private const int TileSearchZFrost = 1;
+    private const int TileSearchZMatched = 2;
+
+    /// <summary>
+    /// グリッド全体を覆う一枚の暗幕。タイル毎だとセル境界・余りマス・仕切りに線が出る。
+    /// ヒットしたタイルはこれより前面に出すので、穴が開いたように見える。
+    /// </summary>
+    private Border? _tileSearchFrost;
+
+    private static readonly Brush TileSearchVeilBrush = CreateTileSearchVeilBrush();
+
+    private static Brush CreateTileSearchVeilBrush()
+    {
+        var brush = new SolidColorBrush(Color.FromArgb(0x8C, 0x00, 0x00, 0x00));
+        brush.Freeze();
+        return brush;
+    }
+
     /// <summary>検索フィルターでヒットせず、すりガラスに覆われているか。覆われたタイルは操作できない。</summary>
     private bool IsTileSearchVeiled(DocumentSession session) =>
         TileSearchFilterActive && !TileSearchMatches(session);
 
     /// <summary>
-    /// ヒットしないタイルを暗い覆い＋ぼかし（すりガラス）にする。ぼかしは端が薄くなって
-    /// 隣のタイルとの境目に見えるため、ぼかし半径ぶん外へはみ出させてタイル境界でクリップする。
+    /// ヒットしない領域を一続きのすりガラスにする。暗幕はグリッド全体の 1 枚。
+    /// ぼかしは仕切りの半分まで伸ばして隣と中央でつなぎ、ヒットしたタイルだけ前面に残す。
+    /// 余りマス（波形の無い背景）も同じ暗幕で覆う。
     /// </summary>
     private void ApplyTileSearchVeils()
     {
+        var filter = TileSearchFilterActive;
+        EnsureTileSearchFrost(filter);
+
         foreach (var pane in _tilePanes)
         {
             var veiled = IsTileSearchVeiled(pane.Session);
-            pane.Veil.Visibility = veiled ? Visibility.Visible : Visibility.Collapsed;
-            if (veiled)
-            {
-                pane.Body.Effect ??= new BlurEffect { Radius = TileSearchBlurRadius };
-                pane.Body.Margin = new Thickness(-TileSearchBlurRadius);
-            }
-            else
-            {
-                pane.Body.Effect = null;
-                pane.Body.Margin = new Thickness(0);
-            }
+            ApplyTileSearchBlur(pane, veiled);
+            Panel.SetZIndex(pane.Host, filter && !veiled ? TileSearchZMatched : TileSearchZUnmatched);
         }
+    }
+
+    private void ApplyTileSearchBlur(WaveformTilePane pane, bool veiled)
+    {
+        if (veiled)
+        {
+            pane.Body.Effect ??= new BlurEffect { Radius = TileSearchBlurRadius };
+            pane.Body.Margin = new Thickness(-TileSearchBlurOverscan);
+            pane.Layers.ClipToBounds = false;
+            pane.Host.ClipToBounds = false;
+            return;
+        }
+
+        pane.Body.Effect = null;
+        pane.Body.Margin = new Thickness(0);
+        pane.Layers.ClipToBounds = true;
+        pane.Host.ClipToBounds = false;
+    }
+
+    private void EnsureTileSearchFrost(bool visible)
+    {
+        if (_tileGrid is null)
+        {
+            return;
+        }
+
+        if (_tileSearchFrost is null)
+        {
+            _tileSearchFrost = new Border
+            {
+                Background = TileSearchVeilBrush,
+                // セル境界の 1px 隙間をレイアウト丸めで取りこぼさない。
+                SnapsToDevicePixels = false,
+                UseLayoutRounding = false,
+            };
+        }
+
+        var rows = Math.Max(1, _tileGrid.RowDefinitions.Count);
+        var cols = Math.Max(1, _tileGrid.ColumnDefinitions.Count);
+        if (!ReferenceEquals(_tileSearchFrost.Parent, _tileGrid))
+        {
+            DetachTileHost(_tileSearchFrost);
+            Grid.SetRow(_tileSearchFrost, 0);
+            Grid.SetColumn(_tileSearchFrost, 0);
+            _tileGrid.Children.Add(_tileSearchFrost);
+        }
+
+        Grid.SetRowSpan(_tileSearchFrost, rows);
+        Grid.SetColumnSpan(_tileSearchFrost, cols);
+        Panel.SetZIndex(_tileSearchFrost, TileSearchZFrost);
+        _tileSearchFrost.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        _tileSearchFrost.IsHitTestVisible = visible;
     }
 }
