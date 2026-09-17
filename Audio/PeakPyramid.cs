@@ -7,7 +7,13 @@ namespace MgaSonicAnvil.Audio;
 /// </summary>
 internal sealed class PeakPyramid
 {
-    private const int TargetBaseBuckets = 1 << 21;
+    private const int EditorBaseBuckets = 1 << 21;
+
+    /// <summary>拡大しない表示用。短いファイルは 1 サンプル粒度のまま。</summary>
+    public const int DisplayBaseBuckets = 8192;
+
+    /// <summary>プレイヤー波形用。表示用より粗いが、1024 だとピークが立ちすぎるので中間粒度。</summary>
+    public const int PlayerDisplayBaseBuckets = 4096;
 
     private readonly float[][] _minLevels;
     private readonly float[][] _maxLevels;
@@ -35,12 +41,153 @@ internal sealed class PeakPyramid
 
     public bool IsEmpty => FrameCount <= 0 || _minLevels.Length == 0;
 
+    /// <summary>表示用 LOD のままなので、編集のズームには作り直す。</summary>
+    public bool NeedsEditorDetail
+    {
+        get
+        {
+            if (IsEmpty || FrameCount <= 0)
+            {
+                return false;
+            }
+
+            var editorBucket = (int)Math.Max(1L, (FrameCount + EditorBaseBuckets - 1) / EditorBaseBuckets);
+            return BaseBucketFrames > editorBucket;
+        }
+    }
+
     public static PeakPyramid Empty { get; } = new([[]], [[]], 1, 0, 1);
 
     public static PeakPyramid Build(float[] interleaved, int channels) =>
         Build(interleaved, channels, interleaved.Length);
 
-    public static PeakPyramid Build(float[] interleaved, int channels, int sampleCount)
+    public static PeakPyramid Build(float[] interleaved, int channels, int sampleCount) =>
+        Build(interleaved, channels, sampleCount, EditorBaseBuckets);
+
+    public static PeakPyramid BuildDisplay(float[] interleaved, int channels, int sampleCount) =>
+        Build(interleaved, channels, sampleCount, DisplayBaseBuckets);
+
+    /// <summary>プレイヤー用。モノラル・粗いバケット。各フレームのチャンネル包絡でピークを残す。</summary>
+    public static PeakPyramid BuildPlayerDisplay(float[] interleaved, int channels, int sampleCount) =>
+        BuildMonoEnvelope(interleaved, channels, sampleCount, PlayerDisplayBaseBuckets);
+
+    /// <summary>
+    /// プレイヤー用ストリーム走査。大きなチャンクで読み、モノラル包絡の min/max を粗いバケットへ積む。
+    /// 間引き読みはせず全フレームを見るので、短いピークも落ちにくい。PCM 全体は持たない。
+    /// </summary>
+    public static PeakPyramid BuildPlayerDisplayStreaming(AudioStreamSource source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var channels = Math.Max(1, source.Channels);
+        var frames = source.FrameCount;
+        if (frames <= 0)
+        {
+            return new PeakPyramid([[]], [[]], 1, 0, 1);
+        }
+
+        var maxBaseBuckets = PlayerDisplayBaseBuckets;
+        var baseBucket = (int)Math.Max(1L, (frames + maxBaseBuckets - 1) / maxBaseBuckets);
+        var baseCount = (int)((frames + baseBucket - 1) / baseBucket);
+        var mins = new float[baseCount];
+        var maxs = new float[baseCount];
+        Array.Fill(mins, float.MaxValue);
+        Array.Fill(maxs, float.MinValue);
+
+        source.SeekFrame(0);
+        const int chunkFrames = 8192;
+        var chunk = new float[chunkFrames * channels];
+        long frame = 0;
+        while (frame < frames)
+        {
+            var want = (int)Math.Min(chunkFrames, frames - frame);
+            var got = source.ReadFrames(chunk, 0, want, timeoutMs: 5000);
+            if (got <= 0)
+            {
+                break;
+            }
+
+            for (var i = 0; i < got; i++)
+            {
+                var src = i * channels;
+                ChannelMix.Envelope(chunk.AsSpan(src, channels), out var min, out var max);
+                var bucket = (int)((frame + i) / baseBucket);
+                if (min < mins[bucket])
+                {
+                    mins[bucket] = min;
+                }
+
+                if (max > maxs[bucket])
+                {
+                    maxs[bucket] = max;
+                }
+            }
+
+            frame += got;
+        }
+
+        for (var i = 0; i < mins.Length; i++)
+        {
+            if (mins[i] > maxs[i])
+            {
+                mins[i] = 0;
+                maxs[i] = 0;
+            }
+        }
+
+        return FromBasePeaks(mins, maxs, channels: 1, frames, baseBucket);
+    }
+
+    private static PeakPyramid BuildMonoEnvelope(
+        float[] interleaved,
+        int channels,
+        int sampleCount,
+        int maxBaseBuckets)
+    {
+        channels = Math.Max(1, channels);
+        sampleCount = Math.Clamp(sampleCount, 0, interleaved.Length);
+        if (sampleCount < channels)
+        {
+            return new PeakPyramid([[]], [[]], 1, 0, 1);
+        }
+
+        var frames = sampleCount / channels;
+        maxBaseBuckets = Math.Max(1, maxBaseBuckets);
+        var baseBucket = (int)Math.Max(1L, (frames + maxBaseBuckets - 1) / maxBaseBuckets);
+        var baseCount = (int)((frames + baseBucket - 1) / baseBucket);
+        var mins = new float[baseCount];
+        var maxs = new float[baseCount];
+        Array.Fill(mins, float.MaxValue);
+        Array.Fill(maxs, float.MinValue);
+
+        for (var frame = 0; frame < frames; frame++)
+        {
+            var src = frame * channels;
+            ChannelMix.Envelope(interleaved.AsSpan(src, channels), out var min, out var max);
+            var bucket = frame / baseBucket;
+            if (min < mins[bucket])
+            {
+                mins[bucket] = min;
+            }
+
+            if (max > maxs[bucket])
+            {
+                maxs[bucket] = max;
+            }
+        }
+
+        for (var i = 0; i < mins.Length; i++)
+        {
+            if (mins[i] > maxs[i])
+            {
+                mins[i] = 0;
+                maxs[i] = 0;
+            }
+        }
+
+        return FromBasePeaks(mins, maxs, channels: 1, frames, baseBucket);
+    }
+
+    public static PeakPyramid Build(float[] interleaved, int channels, int sampleCount, int maxBaseBuckets)
     {
         channels = Math.Max(1, channels);
         sampleCount = Math.Clamp(sampleCount, 0, interleaved.Length);
@@ -50,7 +197,8 @@ internal sealed class PeakPyramid
         }
 
         var frames = sampleCount / channels;
-        var baseBucket = (int)Math.Max(1L, (frames + TargetBaseBuckets - 1) / TargetBaseBuckets);
+        maxBaseBuckets = Math.Max(1, maxBaseBuckets);
+        var baseBucket = (int)Math.Max(1L, (frames + maxBaseBuckets - 1) / maxBaseBuckets);
         var baseCount = (int)((frames + baseBucket - 1) / baseBucket);
         var mins = new float[baseCount * channels];
         var maxs = new float[baseCount * channels];

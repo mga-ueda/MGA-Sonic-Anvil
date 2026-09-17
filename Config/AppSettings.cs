@@ -169,6 +169,18 @@ internal sealed class AppSettings
 
     public int ActiveDocumentIndex { get; set; }
 
+    /// <summary>F10 リストで表示する列。空は既定（ファイル／タイトル／アーティスト／アルバム／トラック／ディスク／年／ジャンル／作曲／時間／コメント）。</summary>
+    public string[] LibraryListColumns { get; set; } = [];
+
+    /// <summary>F10 リストのグループ。空はアルバム。</summary>
+    public string LibraryListGroup { get; set; } = string.Empty;
+
+    /// <summary>F10 左のフォルダツリー。空はマイミュージック。</summary>
+    public string LibraryExplorerPath { get; set; } = string.Empty;
+
+    /// <summary>F10 左のフォルダツリー幅。0 以下は既定。</summary>
+    public double LibraryExplorerWidth { get; set; }
+
     /// <summary>終了時のタイル表示。off / vertical / horizontal / grid。タブが 2 未満なら起動時は無視。</summary>
     public string WaveformTileArrange { get; set; } = string.Empty;
 
@@ -396,6 +408,24 @@ internal sealed class AppSettings
 
     public Mp3SpeakerMix ToMp3SpeakerMix() =>
         new(ResolvedSpeaker().Channels, ResolvedFileChannelMap());
+
+    public HashSet<LibraryFileColumn> ResolvedLibraryListColumns() =>
+        LibraryColumnFilter.Resolve(LibraryListColumns);
+
+    public void ApplyLibraryListColumns(IEnumerable<LibraryFileColumn> columns) =>
+        LibraryListColumns = LibraryColumnFilter.Serialize(columns);
+
+    public LibraryFileGroup ResolvedLibraryListGroup() =>
+        LibraryFileList.ParseGroup(LibraryListGroup);
+
+    public void ApplyLibraryListGroup(LibraryFileGroup group) =>
+        LibraryListGroup = LibraryFileList.SerializeGroup(group);
+
+    public string ResolvedLibraryExplorerPath() =>
+        LibraryExplorerPaths.Resolve(LibraryExplorerPath);
+
+    public void ApplyLibraryExplorerPath(string path) =>
+        LibraryExplorerPath = LibraryExplorerPaths.Resolve(path);
 }
 
 [JsonSerializable(typeof(AppSettings))]

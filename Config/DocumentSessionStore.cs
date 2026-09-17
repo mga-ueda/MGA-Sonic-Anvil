@@ -650,6 +650,10 @@ internal static class DocumentSessionStore
     public static OpenDocumentSnapshot[] ResolveOpenDocuments(AppSettings settings) =>
         settings.OpenDocuments ?? [];
 
+    /// <summary>プレイヤーのまま終了したときは開いていたファイルを残さない。</summary>
+    public static bool ShouldPersistOpenDocuments(bool libraryPlayer, int sessionCount) =>
+        !libraryPlayer && sessionCount > 0;
+
     public static void ClearOpenDocuments(AppSettings settings)
     {
         settings.OpenDocuments = [];

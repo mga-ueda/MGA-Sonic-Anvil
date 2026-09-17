@@ -14,12 +14,238 @@ internal static class AudioCodec
     public static IReadOnlyList<string> OpenExtensions { get; } =
         [".wav", ".wave", ".aif", ".aiff", ".mp3"];
 
+    /// <summary>F10 プレイヤー専用。編集オープンには含めない。</summary>
+    public static IReadOnlyList<string> PlayerOpenExtensions { get; } =
+        [".wav", ".wave", ".aif", ".aiff", ".mp3", ".m4a"];
+
     public static IReadOnlyList<string> SaveExtensions { get; } = [".wav", ".wave", ".mp3"];
 
-    public static bool IsOpenable(string path)
+    public static bool IsOpenable(string path) => MatchesExtension(path, OpenExtensions);
+
+    public static bool IsPlayerOpenable(string path) => MatchesExtension(path, PlayerOpenExtensions);
+
+    /// <summary>プレイヤーでフル PCM 展開せずストリーム再生できるか。</summary>
+    public static bool CanStreamPlay(string path)
+    {
+        var kind = DetectKind(path);
+        return kind is AudioFileKind.Mp3 or AudioFileKind.M4a
+            || kind is AudioFileKind.Wave or AudioFileKind.Aiff;
+    }
+
+    private static bool MatchesExtension(string path, IReadOnlyList<string> extensions)
     {
         var ext = Path.GetExtension(path);
-        return OpenExtensions.Any(e => e.Equals(ext, StringComparison.OrdinalIgnoreCase));
+        for (var i = 0; i < extensions.Count; i++)
+        {
+            if (extensions[i].Equals(ext, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// ドロップ／起動パスを開けるファイルへ展開する。フォルダは再帰。非対応拡張子は無視。
+    /// </summary>
+    public static string[] CollectOpenable(IEnumerable<string> paths) =>
+        CollectOpenable(paths, player: false);
+
+    public static string[] CollectPlayerOpenable(IEnumerable<string> paths) =>
+        CollectOpenable(paths, player: true);
+
+    private static string[] CollectOpenable(IEnumerable<string> paths, bool player)
+    {
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var raw in paths)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                continue;
+            }
+
+            string full;
+            try
+            {
+                full = Path.GetFullPath(raw.Trim().Trim('"'));
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (Directory.Exists(full))
+            {
+                AddOpenableFromDirectory(full, result, seen, recursive: true, player);
+                continue;
+            }
+
+            if (IsAccepted(full, player) && seen.Add(full))
+            {
+                result.Add(full);
+            }
+        }
+
+        return result.ToArray();
+    }
+
+    /// <summary>
+    /// 1 フォルダ内の開けるファイル。recursive なら配下も。非対応拡張子は無視。
+    /// </summary>
+    public static string[] CollectOpenableFromDirectory(string directory, bool recursive) =>
+        CollectOpenableFromDirectory(directory, recursive, player: false);
+
+    public static string[] CollectPlayerOpenableFromDirectory(string directory, bool recursive) =>
+        CollectOpenableFromDirectory(directory, recursive, player: true);
+
+    private static string[] CollectOpenableFromDirectory(string directory, bool recursive, bool player)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            return [];
+        }
+
+        string full;
+        try
+        {
+            full = Path.GetFullPath(directory.Trim());
+        }
+        catch
+        {
+            return [];
+        }
+
+        if (!Directory.Exists(full))
+        {
+            return [];
+        }
+
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        AddOpenableFromDirectory(full, result, seen, recursive, player);
+        return result.ToArray();
+    }
+
+    public static bool CanAcceptDrop(IEnumerable<string> paths) =>
+        CanAcceptDrop(paths, player: false);
+
+    public static bool CanAcceptPlayerDrop(IEnumerable<string> paths) =>
+        CanAcceptDrop(paths, player: true);
+
+    private static bool CanAcceptDrop(IEnumerable<string> paths, bool player)
+    {
+        foreach (var raw in paths)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                continue;
+            }
+
+            string full;
+            try
+            {
+                full = Path.GetFullPath(raw.Trim().Trim('"'));
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (Directory.Exists(full) || IsAccepted(full, player))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsAccepted(string path, bool player) =>
+        player ? IsPlayerOpenable(path) : IsOpenable(path);
+
+    private static void AddOpenableFromDirectory(
+        string directory,
+        List<string> result,
+        HashSet<string> seen,
+        bool recursive,
+        bool player)
+    {
+        var found = new List<string>();
+        if (recursive)
+        {
+            var stack = new Stack<string>();
+            stack.Push(directory);
+            while (stack.Count > 0)
+            {
+                var current = stack.Pop();
+                CollectFilesInDirectory(current, found, player);
+                try
+                {
+                    foreach (var child in Directory.EnumerateDirectories(current))
+                    {
+                        if (IsDirectoryReparsePoint(child))
+                        {
+                            continue;
+                        }
+
+                        stack.Push(child);
+                    }
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+            }
+        }
+        else
+        {
+            CollectFilesInDirectory(directory, found, player);
+        }
+
+        found.Sort(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in found)
+        {
+            if (seen.Add(file))
+            {
+                result.Add(file);
+            }
+        }
+    }
+
+    private static void CollectFilesInDirectory(string directory, List<string> found, bool player)
+    {
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(directory))
+            {
+                if (IsAccepted(file, player))
+                {
+                    found.Add(file);
+                }
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private static bool IsDirectoryReparsePoint(string path)
+    {
+        try
+        {
+            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+        }
+        catch
+        {
+            return true;
+        }
     }
 
     public static AudioFileKind DetectKind(string path)
@@ -28,6 +254,11 @@ internal static class AudioCodec
         if (ext.Equals(".mp3", StringComparison.OrdinalIgnoreCase))
         {
             return AudioFileKind.Mp3;
+        }
+
+        if (ext.Equals(".m4a", StringComparison.OrdinalIgnoreCase))
+        {
+            return AudioFileKind.M4a;
         }
 
         if (ext.Equals(".aif", StringComparison.OrdinalIgnoreCase)
@@ -39,7 +270,89 @@ internal static class AudioCodec
         return AudioFileKind.Wave;
     }
 
-    public static AudioDocument Load(string path)
+    /// <summary>プレイヤー用ストリーム。呼び出し側が Dispose する。</summary>
+    public static WaveStream OpenPlaybackStream(string path)
+    {
+        EnsureMediaFoundation();
+        return OpenReader(path);
+    }
+
+    /// <summary>ヘッダだけ読んで長さを取る。PCM は展開しない。</summary>
+    public static bool TryProbeStreamFormat(
+        string path,
+        out int sampleRate,
+        out int channels,
+        out int bitsPerSample,
+        out long frameCount)
+    {
+        sampleRate = 0;
+        channels = 0;
+        bitsPerSample = 16;
+        frameCount = 0;
+        try
+        {
+            EnsureMediaFoundation();
+            using var reader = OpenReader(path);
+            var format = reader.WaveFormat;
+            sampleRate = Math.Max(1, format.SampleRate);
+            channels = Math.Max(1, format.Channels);
+            bitsPerSample = format.BitsPerSample > 0 ? format.BitsPerSample : 16;
+            var block = Math.Max(1, format.BlockAlign);
+            frameCount = reader.Length > 0 ? reader.Length / block : 0;
+            if (frameCount <= 0 && reader.TotalTime.TotalSeconds > 0)
+            {
+                frameCount = (long)Math.Round(reader.TotalTime.TotalSeconds * sampleRate);
+            }
+
+            return frameCount > 0 && sampleRate > 0 && channels > 0;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException
+                                       or ArgumentException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>プレイヤー用。フル Load せずストリーム再生メタだけ載せる。</summary>
+    public static bool TryActivateStreamPlayback(AudioDocument document)
+    {
+        if (document.SourcePath is not { Length: > 0 } path
+            || !File.Exists(path)
+            || !CanStreamPlay(path))
+        {
+            return false;
+        }
+
+        if (TryProbeStreamFormat(path, out var rate, out var channels, out var bits, out var frames))
+        {
+            document.ActivateStreamPlayback(rate, channels, bits, frames);
+            return true;
+        }
+
+        // タグに長さがあればそれで足りる（開けるかは再生時に判明）。
+        AudioTagProbe.Ensure(document);
+        var tags = document.Tags;
+        if (tags.SampleRate > 0 && tags.Channels > 0 && tags.DurationSeconds > 0)
+        {
+            var estimated = (long)Math.Round(tags.DurationSeconds * tags.SampleRate);
+            if (estimated > 0)
+            {
+                document.ActivateStreamPlayback(
+                    tags.SampleRate,
+                    tags.Channels,
+                    tags.BitsPerSample > 0 ? tags.BitsPerSample : 16,
+                    estimated);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    internal static ISampleProvider AsSampleProvider(WaveStream stream) =>
+        AsPcmProvider(stream).ToSampleProvider();
+
+    public static AudioDocument Load(string path, bool buildPeaks = true)
     {
         EnsureMediaFoundation();
         var bits = PeekBitDepth(path);
@@ -54,7 +367,7 @@ internal static class AudioCodec
         }
 
         var interleaved = new float[checked((int)frames * channels)];
-        var provider = AsPcmProvider(stream).ToSampleProvider();
+        var provider = AsSampleProvider(stream);
         if (provider.WaveFormat.Channels != channels)
         {
             throw new InvalidDataException(
@@ -89,7 +402,8 @@ internal static class AudioCodec
             channels,
             bits <= 0 ? 16 : bits,
             DetectKind(path),
-            path);
+            path,
+            buildPeaks);
         document.SetChannelMask(DevicePortNames.ReadWaveFileChannelMask(path));
         ApplyEmbeddedMeta(document, path);
         return document;
@@ -117,6 +431,7 @@ internal static class AudioCodec
         {
             AudioFileKind.Aiff => new AiffFileReader(path),
             AudioFileKind.Mp3 => OpenMp3Reader(path),
+            AudioFileKind.M4a => OpenMediaFoundationReader(path),
             _ => new WaveFileReader(path),
         };
     }
@@ -125,13 +440,16 @@ internal static class AudioCodec
     {
         try
         {
-            return new MediaFoundationReader(path);
+            return OpenMediaFoundationReader(path);
         }
         catch
         {
             return new Mp3FileReader(path);
         }
     }
+
+    private static WaveStream OpenMediaFoundationReader(string path) =>
+        new MediaFoundationReader(path);
 
     private static readonly byte[] PcmSubFormat =
         new Guid(0x00000001, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71).ToByteArray();
@@ -405,14 +723,18 @@ internal static class AudioCodec
         return false;
     }
 
-    private static AudioDocument CopyForMp3(AudioDocument document, float[] interleaved, int channels) =>
-        new(
+    private static AudioDocument CopyForMp3(AudioDocument document, float[] interleaved, int channels)
+    {
+        var copy = new AudioDocument(
             interleaved,
             document.SampleRate,
             channels,
             document.BitsPerSample,
             AudioFileKind.Mp3,
             document.SourcePath);
+        copy.SetArtwork(document.Artwork);
+        return copy;
+    }
 
     public static Mp3EncoderKind SaveMp3(
         AudioDocument document,
@@ -425,6 +747,7 @@ internal static class AudioCodec
         if (Mp3Encode.TryResolveLameExe(options.LameExePath, out var lameExe))
         {
             LameEncoder.Encode(document, path, lameExe, options.LameOptions, progress);
+            EmbedMp3Artwork(document, path);
             return Mp3EncoderKind.Lame;
         }
 
@@ -441,11 +764,20 @@ internal static class AudioCodec
             }
 
             progress?.Report(1);
+            EmbedMp3Artwork(document, path);
             return Mp3EncoderKind.Windows;
         }
         catch (Exception ex)
         {
             throw new InvalidOperationException($"{UiStrings.ErrorWindowsMp3Failed}\n{ex.Message}", ex);
+        }
+    }
+
+    private static void EmbedMp3Artwork(AudioDocument document, string path)
+    {
+        if (document.Artwork is { Length: > 0 })
+        {
+            Id3Artwork.TryWrite(path, document.Artwork);
         }
     }
 
@@ -459,6 +791,11 @@ internal static class AudioCodec
         if (kind == AudioFileKind.Aiff)
         {
             throw new NotSupportedException(UiStrings.ErrAiffExportNotSupported);
+        }
+
+        if (kind == AudioFileKind.M4a)
+        {
+            throw new NotSupportedException(UiStrings.ErrM4aExportNotSupported);
         }
 
         if (kind == AudioFileKind.Mp3)

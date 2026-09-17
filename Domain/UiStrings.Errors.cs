@@ -19,6 +19,10 @@ internal static partial class UiStrings
         "AIFF export is not supported.",
         "AIFF export is not supported.");
 
+    public static string ErrM4aExportNotSupported => Get(
+        "M4A の書き出しには対応していません。",
+        "M4A export is not supported.");
+
     public static string ErrorNoCaptureDevice => Get(
         "録音できるデバイスがありません。",
         "No capture device is available.");

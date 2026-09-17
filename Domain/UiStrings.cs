@@ -519,7 +519,7 @@ internal static partial class UiStrings
     public static string OverlayPasteHistory => Get("編集履歴を貼り付けています", "Pasting edit history");
     public static string OverlayApplySelected => Get("選択したファイルへ適用しています", "Applying to the selected files");
     public static string OverlayMerge => Get("タブをバウンスしています", "Bouncing tabs");
-    public static string OverlayOpening => Get("読み込んでいます", "Opening");
+    public static string OverlayOpening => Get("読み込んでいます（Esc で中断）", "Opening (Esc to stop)");
     public static string OverlayExportWave => Get("Wave を書き出しています", "Exporting Wave");
     public static string OverlayExportMp3 => Get("MP3 を書き出しています", "Exporting MP3");
     public static string OverlayExportCount(int finished, int total) => Format(
@@ -707,8 +707,8 @@ internal static partial class UiStrings
         "MP3 として保存 (Ctrl+Shift+M)\n別名保存と同じく書き出すだけ。今のタブは開いたまま、書き出した MP3 は読み込まない。Ctrl+Shift+Alt+M で全タブを MP3 で保存。設定の LAME があればそれを使い、空欄または無効なら Windows（既定 192 kbps）。成功時にどちらで書いたかを表示。失敗はダイアログ。マーカー／リージョン／ループは書きません",
         "Save as MP3 (Ctrl+Shift+M)\nWrites a file like Save As; keeps the current tab and does not open the written MP3. Ctrl+Shift+Alt+M saves every tab as MP3. Uses LAME when the path is valid; otherwise Windows (default 192 kbps). Success shows which encoder ran. Failures open a dialog. Markers / regions / loops are not written");
     public static string TipOpen => Get(
-        "開く (Ctrl+O)\nドロップでも可。複数ファイルはタブで追加。\nWave / AIFF / MP3\nCtrl+N で新規（フォーマットは都度指定）\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Shift+D でファイルを複製（隣のタブで開く）\nCtrl+Shift+B で選択ファイルをバウンス（先に保存先を指定。重ねて合成した Wave を右側のタブで開く。既定名 Bounce.wav。フォーマットは左端の選択タブ）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ\nCtrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置、波形エリアに収まらない配置は飛ばす。左右・上下が収まらなければ格子を試し、格子も無理なら動かない。今見ている表示モードで全タブを並べる）\n右クリックで、すべてのファイルの時間を表示（表。コピー／範囲コピー／CSV／PDF。複数タブ選択中は選択ファイルのみ）など\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
-        "Open (Ctrl+O)\nDrop also works. Multiple files open as extra tabs.\nWave / AIFF / MP3\nCtrl+N for a new file (choose the format each time)\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Shift+D duplicates the file (opens in the next tab)\nCtrl+Shift+B bounces selected tabs (choose where to save first; the mixed Wave opens in the tab to the right; default name Bounce.wav; format follows the leftmost selected tab)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab\nCtrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same or would not fit the waveform area. If side-by-side or stacked would not fit, it tries grid; if grid would not fit either, it does nothing. Every tab uses the current view mode)\nRight-click for all file times (table with copy / range copy / CSV / PDF; only the selected files while multiple tabs are selected) and more\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
+        "開く (Ctrl+O)\nドロップでも可。フォルダは中の Wave / AIFF / MP3 を再帰的に追加（非対応は無視）。複数ファイルはタブで追加。複数読み込み中は Esc で中断（読み込み済みは残す）。\nWave / AIFF / MP3\nCtrl+N で新規（フォーマットは都度指定）\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Shift+D でファイルを複製（隣のタブで開く）\nCtrl+Shift+B で選択ファイルをバウンス（先に保存先を指定。重ねて合成した Wave を右側のタブで開く。既定名 Bounce.wav。フォーマットは左端の選択タブ）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ\nCtrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置、波形エリアに収まらない配置は飛ばす。左右・上下が収まらなければ格子を試し、格子も無理なら動かない。今見ている表示モードで全タブを並べる）\n右クリックで、すべてのファイルの時間を表示（表。コピー／範囲コピー／CSV／PDF。複数タブ選択中は選択ファイルのみ）など\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
+        "Open (Ctrl+O)\nDrop also works. A folder adds every Wave / AIFF / MP3 inside it (unsupported types are skipped). Multiple files open as extra tabs. Esc stops a multi-file load and keeps files already opened.\nWave / AIFF / MP3\nCtrl+N for a new file (choose the format each time)\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Shift+D duplicates the file (opens in the next tab)\nCtrl+Shift+B bounces selected tabs (choose where to save first; the mixed Wave opens in the tab to the right; default name Bounce.wav; format follows the leftmost selected tab)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab\nCtrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same or would not fit the waveform area. If side-by-side or stacked would not fit, it tries grid; if grid would not fit either, it does nothing. Every tab uses the current view mode)\nRight-click for all file times (table with copy / range copy / CSV / PDF; only the selected files while multiple tabs are selected) and more\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
     public static string TipCloseTab => Get(
         "タブを閉じる (Ctrl+W)。今の起動のうちなら Ctrl+Shift+T で開き直せる",
         "Close tab (Ctrl+W). Ctrl+Shift+T reopens it in this launch");
@@ -745,8 +745,14 @@ internal static partial class UiStrings
         "アプリの表示サイズ。OS の DPI に加えて拡大します。100〜200%。縮小はありません。作用するのはメインウィンドウのみで、メニューや設定などの別ウィンドウ、編集履歴は等倍のままです。コンボを変えた瞬間に反映します。キャンセルすると元に戻します。",
         "App display size. Extra enlargement on top of the OS DPI. 100–200%. No shrinking. Affects the main window only; menus, separate windows such as Settings, and the edit history stay at 100%. Applies as soon as you change the combo. Cancel restores the previous value.");
     public static string TipFileAssociations => Get(
-        "チェックすると、その拡張子をこのアプリで開く（既定）。外すと関連付けを外す。すでにこのアプリが既定ならチェック済み。OK を待たず、今の exe へすぐ書き込みます。",
-        "Check to make this app the default for that extension. Uncheck to remove the association. Types already using this app are checked. Writes to this exe immediately, without waiting for OK.");
+        "チェックすると、その拡張子をこのアプリで開く（既定）。外すと関連付けを外す。すでにこのアプリが既定ならチェック済み。OK を待たず、今の exe へすぐ書き込みます。M4A はプレイヤーモード専用（ダブルクリックすると F10 プレイヤーで開く。波形編集では開けません）。",
+        "Check to make this app the default for that extension. Uncheck to remove the association. Types already using this app are checked. Writes to this exe immediately, without waiting for OK. M4A is player-mode only (double-click opens the F10 player; it cannot be opened for waveform editing).");
+    public static string TipFileAssociationM4a => Get(
+        "M4A はプレイヤーモード専用です。関連付けるとダブルクリックで F10 プレイヤーが起動します。波形編集の Open では選べません。",
+        "M4A is player-mode only. Associating it opens the F10 player on double-click. It is not available in the editor Open dialog.");
+    public static string LabelFileAssociationPlayerOnly => Get(
+        "プレイヤーモードのみ",
+        "Player mode only");
     public static string TipLoudnessTarget => Get(
         "ラウドネスメーターのターゲット（LKFS）。-70 から 0。色分けの基準です。音声は変えません。",
         "Loudness meter target (LKFS), from -70 to 0. Used for the color scale. Does not change the audio.");
@@ -821,7 +827,8 @@ internal static partial class UiStrings
         + "フラッグ／ループ端：クリックで選択、ドラッグまたは ←→ で移動。Alt+←→ は微調整。ダブルクリックで名前。右クリックまたはメニューキー／Shift+F10 でメニュー。\n"
         + "Ctrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置、波形エリアに収まらない配置は飛ばす。左右・上下が収まらなければ格子を試し、格子も無理なら動かない）。今見ている表示モード（波形 / スペクトログラム / 重ね / ラウドネス）で全タブを並べる。並び替え中でももう一度押すと次へ進む。\n"
         + "F11 で波形エリアをフルスクリーン（タスクバーは隠す。チャンネル名と dB 目盛りも出さない。全体波形とステータスバーは残す。タイルでも可。もう一度 F11 で戻す）。\n"
-        + "F12 はタイトルバーだけ隠すフルスクリーン。タブ・トランスポート・メーター・Tips・WAAPI・チャンネル名・dB 目盛りは残す。スペクトラム／ラウドネス／レベルメーター／ベクタースコープは 1.5 倍（OS の DPI と表示倍率のうえ）。タイルでも可。もう一度 F12 で戻す。",
+        + "F12 はタイトルバーだけ隠すフルスクリーン。タブ・トランスポート・メーター・Tips・WAAPI・チャンネル名・dB 目盛りは残す。スペクトラム／ラウドネス／レベルメーター／ベクタースコープは 1.5 倍（OS の DPI と表示倍率のうえ）。タイルでも可。もう一度 F12 で戻す。\n"
+        + "F10 はプレイヤーモード。全画面にはしない。タブは出さず、上段は左にフォルダツリー、中央がファイルリスト、右に再生中ジャケットと列チェック。下段は固定の低い波形。全体波形は出さない。リストは常にアクティブ。既定はアルバムでグループし、グループごとにジャケットを出す。再生や曲送りではリストを作り直さない。入ると1曲めを選んで再生する（引数起動も同じ）。↑↓ でファイル選択。Home／End でリストの先頭／末尾。PageUp／PageDown でページ送り（キーを離すと再生。複数選択可）。Enter で再生／先頭から再生し直し。その他のキーと数字はジャンプ／シーク。波形はシークと選択だけ（拡大しない。表示用のピークは作らない。スペクトラム／ラウドネス曲線ビューには切り替えない）。編集コマンドは使えない。他モードのファイルはリストへ引き継ぐ。抜けるときは選択したファイルだけ残す。プレイヤーのまま終了したときは、読み込んだファイルは覚えない。波形は全件走査しないが、タグと時間は登録時に読む。列は右のジャケット下のチェックで出し分け（状態は覚える）。左のツリーは既定でマイミュージック、選んだ場所は覚える。フォルダを選ぶとその配下の対応ファイルをリストに出し直し、フォルダをリストへドロップすると追加する。MP3／M4A／WAVE／AIFF はフル PCM 展開せずストリーム再生する（M4A はプレイヤー専用）。ジャケット画像は選択時だけ読む。WAAPI は無効（入る前にオンなら、抜けたときに戻す）。引数に mp3／m4a が1つでも混ざるとプレイヤーで起動し、それらのファイルをリストへ載せる。もう一度 F10 で戻す。",
         "Click to set the playhead. ←→ seek (hold during playback for 3× shuttle). Drag to select. Ctrl+drag scrubs (every channel downmixed to L/R).\n"
         + "Esc or a move without Shift clears the selection. Shift+drag / ←→ extends it. Double-click a span (between markers). Shift+double-click adds that span. Triple-click selects all. The guide snaps to markers / loop edges.\n"
         + "Channel names on the left: click to solo (again to clear; Ctrl adds; Shift mutes). Tab / Shift+Tab cycle solo.\n"
@@ -829,7 +836,8 @@ internal static partial class UiStrings
         + "Flags / loop edges: click to select, drag or ←→ to move. Alt+←→ nudges. Double-click to name. Right-click or the menu key / Shift+F10 for the menu.\n"
         + "Ctrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same or would not fit the waveform area. If side-by-side or stacked would not fit, it tries grid; if grid would not fit either, it does nothing). Every tab uses the current view mode (waveform / spectrogram / overlay / loudness). Press again during arrange to skip ahead.\n"
         + "F11 makes the waveform area fullscreen like a browser (hides the taskbar; also hides channel names and the dB scale; keeps the overview and status bar; works while tiled; F11 again restores).\n"
-        + "F12 is fullscreen with only the title bar hidden. Tabs, transport, meters, Tips, WAAPI, channel names, and the dB scale stay. Spectrum, loudness, level meter, and vector scope are 1.5× (on top of OS DPI and UI scale). Works while tiled; F12 again restores.");
+        + "F12 is fullscreen with only the title bar hidden. Tabs, transport, meters, Tips, WAAPI, channel names, and the dB scale stay. Spectrum, loudness, level meter, and vector scope are 1.5× (on top of OS DPI and UI scale). Works while tiled; F12 again restores.\n"
+        + "F10 is a player, not fullscreen: no tabs, file list on top (folder tree left, list center, now-playing jacket and column checks right) and a short fixed waveform below. The overview is hidden. The list stays active. Groups default to album, with a jacket beside each group. Playback and skip do not rebuild the list. Entering selects and plays the first track (the same on launch with arguments). ↑↓ select files. Home / End jump to the first / last track. Page Up / Page Down page the list (playback starts when you release the key; multi-select allowed). Enter plays / restarts from the beginning. Other keys and digits seek / jump. The waveform only seeks and selects (no zoom; no display peaks; spectrogram / loudness-curve views stay off). Edit commands are blocked. Files from other modes are listed. Leaving keeps only the selected files. Quitting while still in player mode does not remember the loaded files. PCM is not scanned for every file; tags and duration are read on register. Checkboxes under the jacket on the right pick columns (remembered). The tree on the left starts at Music and remembers the last folder; selecting a folder replaces the list with supported files under it, and dropping a folder onto the list adds them. MP3 / M4A / WAVE / AIFF stream without a full PCM decode (M4A is player-only). Jacket images load on select. WAAPI is off (if it was on, leaving player turns it back on). If any launch argument is an MP3 or M4A, the app starts in player mode with those files listed. F10 again restores.");
     public static string TipAlwaysOnTop => Get(
         "ウィンドウを常に最前面へ表示します。",
         "Keep the window always on top.");
@@ -906,6 +914,60 @@ internal static partial class UiStrings
     public static string TabTimeWindowTitle => Get("ファイルの時間", "File times");
     public static string TabTimeColumnFile => Get("ファイル", "File");
     public static string TabTimeColumnTime => Get("時間", "Time");
+    public static string LibraryColumnName => Get("ファイル", "File");
+    public static string LibraryColumnTitle => Get("タイトル", "Title");
+    public static string LibraryColumnArtist => Get("アーティスト", "Artist");
+    public static string LibraryColumnAlbumArtist => Get("アルバムアーティスト", "Album artist");
+    public static string LibraryColumnAlbum => Get("アルバム", "Album");
+    public static string LibraryColumnTrack => Get("トラック", "Track");
+    public static string LibraryColumnDisc => Get("ディスク", "Disc");
+    public static string LibraryColumnYear => Get("年", "Year");
+    public static string LibraryColumnGenre => Get("ジャンル", "Genre");
+    public static string LibraryColumnComposer => Get("作曲", "Composer");
+    public static string LibraryColumnComment => Get("コメント", "Comment");
+    public static string LibraryColumnKind => Get("種類", "Kind");
+    public static string LibraryColumnDuration => Get("時間", "Time");
+    public static string LibraryColumnSampleRate => Get("レート", "Rate");
+    public static string LibraryColumnBitDepth => Get("ビット", "Bits");
+    public static string LibraryColumnChannels => Get("Ch", "Ch");
+    public static string LibraryColumnBitRate => Get("ビットレート", "Bit rate");
+    public static string LibraryColumnSize => Get("サイズ", "Size");
+    public static string LibraryColumnFolder => Get("フォルダ", "Folder");
+    public static string LibraryColumnJacket => Get("ジャケット", "Jacket");
+    public static string LibraryGroupLabel => Get("グループ", "Group");
+    public static string LibraryExplorerDesktop => Get("デスクトップ", "Desktop");
+    public static string LibraryExplorerDocuments => Get("ドキュメント", "Documents");
+    public static string LibraryExplorerMusic => Get("ミュージック", "Music");
+    public static string LibraryExplorerPictures => Get("ピクチャ", "Pictures");
+    public static string LibraryExplorerVideos => Get("ビデオ", "Videos");
+    public static string LibraryGroupNone => Get("なし", "None");
+    public static string LibraryGroupTitle => Get("タイトル", "Title");
+    public static string LibraryGroupArtist => Get("アーティスト", "Artist");
+    public static string LibraryGroupAlbum => Get("アルバム", "Album");
+    public static string LibraryGroupGenre => Get("ジャンル", "Genre");
+    public static string LibraryGroupYear => Get("年", "Year");
+    public static string LibraryGroupKind => Get("種類", "Kind");
+    public static string LibraryGroupSampleRate => Get("レート", "Sample rate");
+    public static string LibraryGroupBitDepth => Get("ビット深度", "Bit depth");
+    public static string LibraryGroupChannels => Get("チャンネル", "Channels");
+    public static string LibraryGroupFolder => Get("フォルダ", "Folder");
+    public static string LibraryGroupUntitled => Get("(未保存)", "(Untitled)");
+    public static string LibraryGroupBlank => Get("(なし)", "(None)");
+    public static string LibraryJacketMark => "✓";
+    public static string FormatBitRate(int kbps) =>
+        kbps <= 0 ? string.Empty : $"{kbps} kbps";
+    public static string TipLibraryList => Get(
+        "プレイヤーのファイル一覧。左のツリーでフォルダを選ぶとその直下の内容をリストに出し直す。フォルダをリストへドロップすると配下ごと追加する。Delete で選択行をリストから外す（ファイルは消さない）。列見出しでソート。既定はアルバムでグループし、グループごとにジャケットを出す。グループでタイトル／アーティスト／アルバムなどでもまとめる。常にリストがアクティブ。入ると1曲めを選んで再生する（引数起動も同じ）。↑↓ でファイル選択。Home／End でリストの先頭／末尾。PageUp／PageDown でページ送り（キーを離すと再生。Shift で範囲、Ctrl+クリックで追加、Ctrl+A で全選択）。クリックした行はすぐ再生。Enter で再生／先頭から再生し直し。Space で再生／停止。0–9 やジャンプ／シークはそのまま。編集はできない。タグと時間は登録時に読む。MP3／M4A／WAVE／AIFF はフル PCM 展開せずストリーム再生（M4A はプレイヤー専用）。ジャケット画像は選択時だけ読む。WAAPI は無効（入る前にオンなら、抜けたときに戻す）。プレイヤーを抜けると選択したファイルだけ残る。プレイヤーのまま終了したときは、読み込んだファイルは覚えない。",
+        "Player file list. Selecting a folder in the tree on the left replaces the list with files directly in that folder. Drop a folder onto the list to add recursively. Delete removes the selected rows from the list (files are never deleted). Click a column to sort. Groups default to album, with a jacket beside each group. Group by title, artist, album, and so on. The list stays active. Entering selects and plays the first track (the same on launch with arguments). ↑↓ select files. Home / End jump to the first / last track. Page Up / Page Down page the list (playback starts when you release the key. Shift for a range, Ctrl+click to add, Ctrl+A for all). Clicking a row plays it immediately. Enter plays / restarts from the beginning. Space toggles play / stop. Digit and jump / seek keys still work. Editing is blocked. Tags and duration are read when files are listed. MP3 / M4A / WAVE / AIFF stream without a full PCM decode (M4A is player-only). Jacket images load on select. WAAPI is off (if it was on, leaving player turns it back on). Leaving player mode keeps only the selected files. Quitting while still in player mode does not remember the loaded files.");
+    public static string TipLibraryJacket => Get(
+        "今再生している曲のジャケット。MP3 に埋め込みがあれば表示。WAVE は枠のみ。画像をドロップすると差し替え（MP3 はファイルへ書き込み）。ジャケットがあるときは、プレイリストの背景にだけ縦横比を崩してエリアいっぱいに置き、大きくぼかしてごくゆっくり揺らぐ。下のチェックでリストの列を出す／隠す（状態は覚える）。",
+        "Jacket of the track now playing. Shown when an MP3 has embedded art. WAVE stays an empty frame. Drop an image to replace it (written into the MP3 file). When a jacket is set, it is stretched to fill the playlist area only (aspect may change) and used as a heavily blurred background that drifts very slowly. Checkboxes below pick which list columns to show (remembered).");
+    public static string TipLibraryColumns => Get(
+        "リストに出す列。チェックした列だけ表示。状態は次の起動でも覚える。ファイル名の列は外せない。",
+        "Columns to show in the list. Only checked columns appear. The choice is remembered. The file name column stays on.");
+    public static string TipLibraryExplorer => Get(
+        "フォルダツリー。既定はマイミュージック。選んだ場所は覚える。フォルダを選ぶと、そのフォルダ直下の対応ファイルをリストに出し直す（配下のサブフォルダは含めない。上下キーでは少し待ってから読み、裏で集める）。フォルダをリストへドロップ／ダブルクリック／Enter すると配下ごと追加する。コピー／複製／削除／リネームなどファイル操作はできない。",
+        "Folder tree. Starts at Music. The last place is remembered. Selecting a folder replaces the list with supported files directly in that folder (not subfolders; ↑↓ waits briefly and loads in the background). Drop / double-click / Enter adds files under the folder recursively. File operations such as copy, duplicate, delete, and rename are not available.");
     public static string TabTimeCopy => Get("コピー", "Copy");
     public static string TabTimeSaveCsv => Get("CSV", "CSV");
     public static string TabTimeSavePdf => Get("PDF", "PDF");
@@ -1301,6 +1363,27 @@ internal static partial class UiStrings
         return string.Create(
             System.Globalization.CultureInfo.InvariantCulture,
             $"{mega:0.00} MB ({mebi:0.00} MiB / {bytes:N0} B)");
+    }
+
+    public static string FormatFileBytesCompact(long bytes)
+    {
+        if (bytes < 0)
+        {
+            bytes = 0;
+        }
+
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        if (bytes < 1000)
+        {
+            return string.Create(culture, $"{bytes} B");
+        }
+
+        if (bytes < 1_000_000)
+        {
+            return string.Create(culture, $"{bytes / 1000d:0.0} KB");
+        }
+
+        return string.Create(culture, $"{bytes / 1_000_000d:0.00} MB");
     }
 
     public static string FormatDuration(double seconds)

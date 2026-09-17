@@ -701,6 +701,7 @@ public partial class MainWindow
         }
 
         Dispatcher.BeginInvoke(SyncTabOverflow, DispatcherPriority.Loaded);
+        RefreshLibraryBrowser();
     }
 
     private void DocumentTabHost_SizeChanged(object sender, SizeChangedEventArgs e) =>

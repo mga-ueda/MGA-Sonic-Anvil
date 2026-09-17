@@ -60,7 +60,7 @@ public partial class MainWindow
 
     private void ApplyPreferredMultiFileArrange(int openedCount)
     {
-        if (_sessions.Count < 2 || _activeSession is null)
+        if (IsLibraryMaximized || _sessions.Count < 2 || _activeSession is null)
         {
             return;
         }
@@ -766,7 +766,7 @@ public partial class MainWindow
             ApplyChannelSolo();
             Overview.SetSelectedMarkerFrames(pane.View.SelectedMarkerFrames);
             SyncOverviewPlayhead();
-            Transport.SetCommandsEnabled(_document is not null);
+            Transport.SetCommandsEnabled(_document is not null, allowEdit: !IsLibraryMaximized);
             if (resetInteraction)
             {
                 Transport.SetPlaying(false);

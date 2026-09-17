@@ -405,7 +405,11 @@ internal partial class AudioSettingsWindow : Window
 
                 box.Checked += Association_Changed;
                 box.Unchecked += Association_Changed;
-                TipService.Set(box, UiStrings.TipFileAssociations);
+                TipService.Set(
+                    box,
+                    FileAssociations.IsPlayerOnlyExtension(ext)
+                        ? UiStrings.TipFileAssociationM4a
+                        : UiStrings.TipFileAssociations);
                 AssociationHost.Children.Add(box);
             }
         }

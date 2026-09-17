@@ -98,6 +98,11 @@ public partial class MainWindow
 
     private void ToggleWaapiPanel()
     {
+        if (IsLibraryMaximized)
+        {
+            return;
+        }
+
         if (_waapiPanelVisible)
         {
             _waapiPanelVisible = false;
@@ -112,7 +117,7 @@ public partial class MainWindow
 
     private void ShowWaapiPanel()
     {
-        if (_waapiPanelVisible)
+        if (IsLibraryMaximized || _waapiPanelVisible)
         {
             return;
         }
@@ -126,13 +131,20 @@ public partial class MainWindow
 
     private void LaunchWwiseProjectFromShortcut()
     {
+        if (IsLibraryMaximized)
+        {
+            return;
+        }
+
         ShowWaapiPanel();
         RequestOpenOrFocusWwiseProject();
     }
 
     private void ApplyWaapiPanelVisible()
     {
-        WaapiBar.Visibility = _waveformMaximizeMode != WaveformMaximizeMode.Waveform && _waapiPanelVisible
+        WaapiBar.Visibility = _waveformMaximizeMode is not WaveformMaximizeMode.Waveform
+            and not WaveformMaximizeMode.Library
+            && _waapiPanelVisible
             ? System.Windows.Visibility.Visible
             : System.Windows.Visibility.Collapsed;
         if (_waapiToggle is not null)
@@ -175,7 +187,7 @@ public partial class MainWindow
 
     private async Task StartWaapiAsync()
     {
-        if (!_waapiPanelVisible)
+        if (!_waapiPanelVisible || IsLibraryMaximized)
         {
             return;
         }

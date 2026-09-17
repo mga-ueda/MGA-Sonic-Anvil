@@ -18,6 +18,7 @@ public sealed class FileAssociationTests
     [InlineData(".wave", "MgaSonicAnvil.wave")]
     [InlineData(".aiff", "MgaSonicAnvil.aiff")]
     [InlineData("mp3", "MgaSonicAnvil.mp3")]
+    [InlineData(".m4a", "MgaSonicAnvil.m4a")]
     public void ProgIdFor_NormalizesExtension(string ext, string expected) =>
         Assert.Equal(expected, FileAssociations.ProgIdFor(ext));
 
@@ -29,11 +30,44 @@ public sealed class FileAssociationTests
         Assert.Equal("AIFF (.aif)", FileAssociations.FormatLabel(".aif"));
         Assert.Equal("AIFF (.aiff)", FileAssociations.FormatLabel(".AIFF"));
         Assert.Equal("MP3 (.mp3)", FileAssociations.FormatLabel("mp3"));
+        Assert.Equal(
+            "M4A (.m4a) — " + MgaSonicAnvil.Domain.UiStrings.LabelFileAssociationPlayerOnly,
+            FileAssociations.FormatLabel(".m4a"));
     }
 
     [Fact]
-    public void Extensions_MatchOpenableTypes() =>
-        Assert.Equal(AudioCodec.OpenExtensions, FileAssociations.Extensions);
+    public void IsPlayerOnlyExtension_OnlyM4a()
+    {
+        Assert.True(FileAssociations.IsPlayerOnlyExtension(".m4a"));
+        Assert.True(FileAssociations.IsPlayerOnlyExtension("M4A"));
+        Assert.False(FileAssociations.IsPlayerOnlyExtension(".mp3"));
+        Assert.False(FileAssociations.IsPlayerOnlyExtension(".wav"));
+    }
+
+    [Fact]
+    public void Extensions_MatchPlayerOpenableTypes() =>
+        Assert.Equal(AudioCodec.PlayerOpenExtensions, FileAssociations.Extensions);
+
+    [Fact]
+    public void Extensions_IncludeM4aBeyondEditorOpenable()
+    {
+        Assert.Contains(".m4a", FileAssociations.Extensions, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain(".m4a", AudioCodec.OpenExtensions, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void FormatTypeName_MarksPlayerOnlyM4a()
+    {
+        Assert.Equal(
+            AppVersion.ProductName + " Wave",
+            FileAssociations.FormatTypeName(".wav"));
+        Assert.Equal(
+            AppVersion.ProductName + " MP3",
+            FileAssociations.FormatTypeName(".mp3"));
+        Assert.Equal(
+            AppVersion.ProductName + " M4A (" + MgaSonicAnvil.Domain.UiStrings.LabelFileAssociationPlayerOnly + ")",
+            FileAssociations.FormatTypeName(".m4a"));
+    }
 
     [Fact]
     public void BuildOpenCommand_QuotesExeAndPlaceholder() =>

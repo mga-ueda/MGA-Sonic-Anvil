@@ -82,6 +82,7 @@ internal enum WaveMenuCommand
     CenterLock,
     MaximizeWaveform,
     MaximizeAnalyzers,
+    MaximizeLibrary,
     ViewWaveform,
     ViewSpectrogram,
     ViewOverlay,
@@ -198,6 +199,7 @@ internal sealed class WaveformContextMenuModel
     public bool CanTileGrid { get; init; }
     public bool WaveformMaximized { get; init; }
     public bool AnalyzersMaximized { get; init; }
+    public bool LibraryMaximized { get; init; }
     public bool CanLoopPlay { get; init; }
     public bool CanAddMarkerHere { get; init; }
     public WaveformAnalysisView AnalysisView { get; init; }
@@ -441,7 +443,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuSelectToStart, WaveMenuCommand.SelectToStart, "Ctrl+Shift+Home", m.CanNavigate),
         Cmd(UiStrings.WaveMenuSelectToEnd, WaveMenuCommand.SelectToEnd, "Ctrl+Shift+End", m.CanNavigate),
         WaveMenuSeparatorEntry.Instance,
-        Cmd(UiStrings.WaveMenuHistory, WaveMenuCommand.History, "U", m.HasDocument && !m.IsBusy),
+        Cmd(UiStrings.WaveMenuHistory, WaveMenuCommand.History, "U", m.CanEdit && m.HasDocument && !m.IsBusy),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> AudioItems(WaveformContextMenuModel m) =>
@@ -469,15 +471,15 @@ internal static class WaveformContextMenuBuilder
 
     private static IReadOnlyList<WaveMenuEntry> TimelineItems(WaveformContextMenuModel m) =>
     [
-        Cmd(UiStrings.WaveMenuTimeZoomIn, WaveMenuCommand.TimeZoomIn, "Up", m.CanNavigate),
-        Cmd(UiStrings.WaveMenuTimeZoomOut, WaveMenuCommand.TimeZoomOut, "Down", m.CanNavigate),
-        Cmd(UiStrings.WaveMenuTimeZoomMax, WaveMenuCommand.TimeZoomMax, "Ctrl+Up", m.CanNavigate),
-        Cmd(UiStrings.WaveMenuTimeZoomFit, WaveMenuCommand.TimeZoomFit, "Ctrl+Down", m.CanNavigate),
+        Cmd(UiStrings.WaveMenuTimeZoomIn, WaveMenuCommand.TimeZoomIn, "Up", m.CanNavigate && !m.LibraryMaximized),
+        Cmd(UiStrings.WaveMenuTimeZoomOut, WaveMenuCommand.TimeZoomOut, "Down", m.CanNavigate && !m.LibraryMaximized),
+        Cmd(UiStrings.WaveMenuTimeZoomMax, WaveMenuCommand.TimeZoomMax, "Ctrl+Up", m.CanNavigate && !m.LibraryMaximized),
+        Cmd(UiStrings.WaveMenuTimeZoomFit, WaveMenuCommand.TimeZoomFit, "Ctrl+Down", m.CanNavigate && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
-        Cmd(UiStrings.WaveMenuAmpZoomIn, WaveMenuCommand.AmpZoomIn, "Shift+Up", m.CanNavigate),
-        Cmd(UiStrings.WaveMenuAmpZoomOut, WaveMenuCommand.AmpZoomOut, "Shift+Down", m.CanNavigate),
-        Cmd(UiStrings.WaveMenuAmpZoomMax, WaveMenuCommand.AmpZoomMax, "Ctrl+Shift+Up", m.CanNavigate),
-        Cmd(UiStrings.WaveMenuAmpZoomReset, WaveMenuCommand.AmpZoomReset, "Ctrl+Shift+Down", m.CanNavigate),
+        Cmd(UiStrings.WaveMenuAmpZoomIn, WaveMenuCommand.AmpZoomIn, "Shift+Up", m.CanNavigate && !m.LibraryMaximized),
+        Cmd(UiStrings.WaveMenuAmpZoomOut, WaveMenuCommand.AmpZoomOut, "Shift+Down", m.CanNavigate && !m.LibraryMaximized),
+        Cmd(UiStrings.WaveMenuAmpZoomMax, WaveMenuCommand.AmpZoomMax, "Ctrl+Shift+Up", m.CanNavigate && !m.LibraryMaximized),
+        Cmd(UiStrings.WaveMenuAmpZoomReset, WaveMenuCommand.AmpZoomReset, "Ctrl+Shift+Down", m.CanNavigate && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuAddMarker, WaveMenuCommand.AddMarker, "M", m.CanEdit),
         Cmd(UiStrings.WaveMenuRenameMarker, WaveMenuCommand.RenameMarker, "Ctrl+Shift+R", m.CanEdit && m.CanRenameMarker),
@@ -503,9 +505,9 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuPreroll, WaveMenuCommand.Preroll, "Ctrl+Space", m.CanNavigate),
         Cmd(UiStrings.WaveMenuRestart, WaveMenuCommand.Restart, "Alt+Enter", m.CanNavigate),
         Cmd(UiStrings.WaveMenuLoopPlay, WaveMenuCommand.LoopPlay, "L", m.CanLoopPlay),
-        Check(UiStrings.WaveMenuPlayExit, WaveMenuCommand.PlayExit, "Alt+E", m.PlayExit, m.WaapiVisible && m.HasDocument && !m.IsBusy),
+        Check(UiStrings.WaveMenuPlayExit, WaveMenuCommand.PlayExit, "Alt+E", m.PlayExit, m.WaapiVisible && m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
-        Check(UiStrings.WaveMenuRecord, WaveMenuCommand.Record, "Ctrl+R", m.IsRecording, m.HasDocument && !m.IsBusy),
+        Check(UiStrings.WaveMenuRecord, WaveMenuCommand.Record, "Ctrl+R", m.IsRecording, m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuGoStart, WaveMenuCommand.GoStart, "Ctrl+Home", m.CanNavigate),
         Cmd(UiStrings.WaveMenuGoEnd, WaveMenuCommand.GoEnd, "Ctrl+End", m.CanNavigate),
@@ -519,18 +521,19 @@ internal static class WaveformContextMenuBuilder
         Check(UiStrings.WaveMenuCenterLock, WaveMenuCommand.CenterLock, "Z", m.CenterLocked, m.IsPlaying && !m.IsBusy),
         WaveMenuSeparatorEntry.Instance,
         Check(UiStrings.WaveMenuViewWaveform, WaveMenuCommand.ViewWaveform, "Esc / Shift+A / Shift+V", m.AnalysisView == WaveformAnalysisView.Waveform, m.HasDocument && !m.IsBusy),
-        Check(UiStrings.WaveMenuViewSpectrogram, WaveMenuCommand.ViewSpectrogram, "A", m.AnalysisView == WaveformAnalysisView.Spectrogram, m.HasDocument && !m.IsBusy),
-        Check(UiStrings.WaveMenuViewOverlay, WaveMenuCommand.ViewOverlay, "A", m.AnalysisView == WaveformAnalysisView.Overlay, m.HasDocument && !m.IsBusy),
-        Check(UiStrings.WaveMenuViewLoudness, WaveMenuCommand.ViewLoudness, "V", m.AnalysisView == WaveformAnalysisView.Loudness, m.HasDocument && !m.IsBusy),
+        Check(UiStrings.WaveMenuViewSpectrogram, WaveMenuCommand.ViewSpectrogram, "A", m.AnalysisView == WaveformAnalysisView.Spectrogram, m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
+        Check(UiStrings.WaveMenuViewOverlay, WaveMenuCommand.ViewOverlay, "A", m.AnalysisView == WaveformAnalysisView.Overlay, m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
+        Check(UiStrings.WaveMenuViewLoudness, WaveMenuCommand.ViewLoudness, "V", m.AnalysisView == WaveformAnalysisView.Loudness, m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
         Check(UiStrings.WaveMenuMaximizeWaveform, WaveMenuCommand.MaximizeWaveform, "F11", m.WaveformMaximized, enabled: true),
         Check(UiStrings.WaveMenuMaximizeAnalyzers, WaveMenuCommand.MaximizeAnalyzers, "F12", m.AnalyzersMaximized, enabled: true),
+        Check(UiStrings.WaveMenuMaximizeLibrary, WaveMenuCommand.MaximizeLibrary, "F10", m.LibraryMaximized, enabled: true),
         WaveMenuSeparatorEntry.Instance,
-        Cmd(UiStrings.WaveMenuSoloNext, WaveMenuCommand.SoloNext, "Tab", m.CanNavigate),
-        Cmd(UiStrings.WaveMenuSoloPrev, WaveMenuCommand.SoloPrev, "Shift+Tab", m.CanNavigate),
-        Cmd(UiStrings.WaveMenuSoloClear, WaveMenuCommand.SoloClear, enabled: m.CanNavigate && m.HasSolo),
+        Cmd(UiStrings.WaveMenuSoloNext, WaveMenuCommand.SoloNext, "Tab", m.CanNavigate && !m.LibraryMaximized),
+        Cmd(UiStrings.WaveMenuSoloPrev, WaveMenuCommand.SoloPrev, "Shift+Tab", m.CanNavigate && !m.LibraryMaximized),
+        Cmd(UiStrings.WaveMenuSoloClear, WaveMenuCommand.SoloClear, enabled: m.CanNavigate && m.HasSolo && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
-        Cmd(UiStrings.WaveMenuFocusTime, WaveMenuCommand.FocusTime, "G", m.HasDocument && !m.IsBusy),
+        Cmd(UiStrings.WaveMenuFocusTime, WaveMenuCommand.FocusTime, "G", m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
         Check(UiStrings.WaveMenuSilentSkip, WaveMenuCommand.SilentSkip, "Alt+S", m.SilentSkip, enabled: true),
         Check(UiStrings.WaveMenuAlwaysOnTop, WaveMenuCommand.AlwaysOnTop, checkedState: m.AlwaysOnTop, enabled: true),
     ];
@@ -538,19 +541,19 @@ internal static class WaveformContextMenuBuilder
     /// <summary>ファイルそのものへの操作だけ。タブ管理は TabItems（タブカテゴリ）に分ける。</summary>
     private static IReadOnlyList<WaveMenuEntry> FileItems(WaveformContextMenuModel m) =>
     [
-        Cmd(UiStrings.WaveMenuNew, WaveMenuCommand.NewDocument, "Ctrl+N", !m.IsBusy),
+        Cmd(UiStrings.WaveMenuNew, WaveMenuCommand.NewDocument, "Ctrl+N", !m.IsBusy && !m.LibraryMaximized),
         Cmd(UiStrings.WaveMenuOpen, WaveMenuCommand.Open, "Ctrl+O", !m.IsBusy),
         Cmd(UiStrings.WaveMenuSave, WaveMenuCommand.Save, "Ctrl+S", m.HasDocument && !m.IsBusy && !m.IsRecording),
         Cmd(UiStrings.WaveMenuSaveAs, WaveMenuCommand.SaveAs, "Ctrl+Shift+S", m.HasDocument && !m.IsBusy && !m.IsRecording),
         Cmd(UiStrings.WaveMenuSaveMp3, WaveMenuCommand.SaveMp3, "Ctrl+Shift+M", m.HasDocument && !m.IsBusy && !m.IsRecording),
         WaveMenuSeparatorEntry.Instance,
-        Cmd(UiStrings.WaveMenuRenameFile, WaveMenuCommand.RenameFile, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
-        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuDuplicateFileSelected : UiStrings.WaveMenuDuplicateFile, WaveMenuCommand.DuplicateFile, "Ctrl+Shift+D", m.HasDocument && !m.IsBusy && !m.IsRecording),
-        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuDeleteFileSelected : UiStrings.WaveMenuDeleteFile, WaveMenuCommand.DeleteFile, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
+        Cmd(UiStrings.WaveMenuRenameFile, WaveMenuCommand.RenameFile, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
+        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuDuplicateFileSelected : UiStrings.WaveMenuDuplicateFile, WaveMenuCommand.DuplicateFile, "Ctrl+Shift+D", m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
+        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuDeleteFileSelected : UiStrings.WaveMenuDeleteFile, WaveMenuCommand.DeleteFile, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuSettings, WaveMenuCommand.Settings, "Ctrl+Shift+O", !m.IsBusy),
-        Check(UiStrings.WaveMenuWaapiPanel, WaveMenuCommand.WaapiPanel, "W", m.WaapiVisible, !m.IsBusy),
-        Cmd(UiStrings.WaveMenuWwiseExport, WaveMenuCommand.WwiseExport, "Ctrl+Shift+E", m.WaapiExportEnabled && !m.IsBusy),
+        Check(UiStrings.WaveMenuWaapiPanel, WaveMenuCommand.WaapiPanel, "W", m.WaapiVisible, !m.IsBusy && !m.LibraryMaximized),
+        Cmd(UiStrings.WaveMenuWwiseExport, WaveMenuCommand.WwiseExport, "Ctrl+Shift+E", m.WaapiExportEnabled && !m.IsBusy && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuQuit, WaveMenuCommand.Quit, "Ctrl+Q"),
     ];
@@ -568,7 +571,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.TabMenuCloseAllNormal, WaveMenuCommand.CloseAll, "Ctrl+Shift+W", m.HasDocument && !m.IsBusy && !m.IsRecording),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuMergeTabs, WaveMenuCommand.MergeTabs, "Ctrl+Shift+B", m.CanMergeTabs),
-        Cmd(UiStrings.TabMenuSelectAll, WaveMenuCommand.SelectAllTabs, "Ctrl+Shift+A", m.HasMultipleTabs && !m.AllTabsSelected && !m.IsBusy),
+        Cmd(UiStrings.TabMenuSelectAll, WaveMenuCommand.SelectAllTabs, "Ctrl+Shift+A", m.HasMultipleTabs && !m.AllTabsSelected && !m.IsBusy && !m.LibraryMaximized),
         Cmd(UiStrings.WaveMenuReopenTab, WaveMenuCommand.ReopenTab, "Ctrl+Shift+T", m.CanReopenTab && !m.IsBusy),
         Cmd(m.HasMultipleSelectedTabs ? UiStrings.WaveMenuCopySelectedTabTimes : UiStrings.WaveMenuCopyAllTabTimes, WaveMenuCommand.CopyAllTabTimes, enabled: m.HasDocument),
         WaveMenuSeparatorEntry.Instance,
@@ -577,8 +580,8 @@ internal static class WaveformContextMenuBuilder
         Check(UiStrings.WaveMenuTileVertical, WaveMenuCommand.TileVertical, null, m.WaveTileArrange == WaveformTileArrange.Vertical, CanPickTile(m, WaveformTileArrange.Vertical)),
         Check(UiStrings.WaveMenuTileGrid, WaveMenuCommand.TileGrid, null, m.WaveTileArrange == WaveformTileArrange.Grid, CanPickTile(m, WaveformTileArrange.Grid)),
         WaveMenuSeparatorEntry.Instance,
-        Cmd(UiStrings.WaveMenuExportAllWave, WaveMenuCommand.ExportAllWave, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
-        Cmd(UiStrings.WaveMenuExportAllMp3, WaveMenuCommand.ExportAllMp3, "Ctrl+Shift+Alt+M", m.HasDocument && !m.IsBusy && !m.IsRecording),
+        Cmd(UiStrings.WaveMenuExportAllWave, WaveMenuCommand.ExportAllWave, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
+        Cmd(UiStrings.WaveMenuExportAllMp3, WaveMenuCommand.ExportAllMp3, "Ctrl+Shift+Alt+M", m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuNextTab, WaveMenuCommand.NextTab, "Ctrl+Tab", m.HasMultipleTabs && !m.IsBusy),
         Cmd(UiStrings.WaveMenuPrevTab, WaveMenuCommand.PrevTab, "Ctrl+Shift+Tab", m.HasMultipleTabs && !m.IsBusy),
@@ -586,18 +589,18 @@ internal static class WaveformContextMenuBuilder
 
     private static IReadOnlyList<WaveMenuEntry> ExportItems(WaveformContextMenuModel m) =>
     [
-        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuExportWaveSelected : UiStrings.WaveMenuExportWave, WaveMenuCommand.ExportWave, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
-        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuExportMp3Selected : UiStrings.WaveMenuExportMp3, WaveMenuCommand.ExportMp3, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
+        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuExportWaveSelected : UiStrings.WaveMenuExportWave, WaveMenuCommand.ExportWave, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
+        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuExportMp3Selected : UiStrings.WaveMenuExportMp3, WaveMenuCommand.ExportMp3, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuExportByMarkersSelected : UiStrings.WaveMenuExportByMarkers,
             WaveMenuCommand.ExportByMarkers,
-            enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && (m.HasSelectedTabs ? m.SelectedTabsHaveMarkers : m.HasMarkers)),
+            enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized && (m.HasSelectedTabs ? m.SelectedTabsHaveMarkers : m.HasMarkers)),
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuExportByRegionsSelected : UiStrings.WaveMenuExportByRegions,
             WaveMenuCommand.ExportByRegions,
-            enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && (m.HasSelectedTabs ? m.SelectedTabsHaveRegions : m.HasRegions && m.AllowsRegionsAndLoops)),
-        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuExportByChannelsSelected : UiStrings.WaveMenuExportByChannels, WaveMenuCommand.ExportByChannels, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording),
+            enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized && (m.HasSelectedTabs ? m.SelectedTabsHaveRegions : m.HasRegions && m.AllowsRegionsAndLoops)),
+        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuExportByChannelsSelected : UiStrings.WaveMenuExportByChannels, WaveMenuCommand.ExportByChannels, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> HelpItems(WaveformContextMenuModel m) =>
@@ -612,7 +615,7 @@ internal static class WaveformContextMenuBuilder
 
     private static bool CanPickTile(WaveformContextMenuModel m, WaveformTileArrange arrange)
     {
-        if (!m.HasMultipleTabs || m.IsBusy)
+        if (m.LibraryMaximized || !m.HasMultipleTabs || m.IsBusy)
         {
             return false;
         }

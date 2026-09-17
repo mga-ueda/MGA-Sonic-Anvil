@@ -92,5 +92,6 @@ public partial class MainWindow
         }
 
         _tabTimeTable?.RefreshAppearance();
+        LibraryBrowser.RefreshAppearance();
     }
 }

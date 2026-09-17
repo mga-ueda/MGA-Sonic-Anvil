@@ -184,18 +184,28 @@ internal partial class TransportBar : UserControl
         }
     }
 
-    public void SetCommandsEnabled(bool enabled)
+    public void SetCommandsEnabled(bool enabled, bool allowEdit = true)
     {
         foreach (var (command, button) in _buttons)
         {
-            button.IsEnabled = enabled
-                || command is TransportCommand.Open
-                    or TransportCommand.NewDocument
-                    or TransportCommand.OpenSettings
-                    or TransportCommand.ToggleUiTheme
-                    or TransportCommand.OpenColorPanel
-                    or TransportCommand.ToggleTips
-                    or TransportCommand.OpenManual;
+            if (command is TransportCommand.Open
+                or TransportCommand.OpenSettings
+                or TransportCommand.ToggleUiTheme
+                or TransportCommand.OpenColorPanel
+                or TransportCommand.ToggleTips
+                or TransportCommand.OpenManual)
+            {
+                button.IsEnabled = true;
+                continue;
+            }
+
+            if (!allowEdit && LibraryPlayerMode.BlocksTransport(command))
+            {
+                button.IsEnabled = false;
+                continue;
+            }
+
+            button.IsEnabled = enabled;
         }
     }
 

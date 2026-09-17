@@ -131,4 +131,56 @@ public sealed class PeakPyramidTests
         Assert.Equal(1, peaks.ReadRange(start, end, 1, 0, mins, maxs));
         Assert.Equal(1f, maxs[0], 5);
     }
+
+    [Fact]
+    public void BuildDisplay_KeepsShortFilesDense_CapsLongFiles()
+    {
+        var shortSamples = new float[2400];
+        shortSamples[1200] = 0.88f;
+        var shortPeaks = PeakPyramid.BuildDisplay(shortSamples, 1, shortSamples.Length);
+        Assert.Equal(1, shortPeaks.BaseBucketFrames);
+        Assert.False(shortPeaks.NeedsEditorDetail);
+
+        var longFrames = PeakPyramid.DisplayBaseBuckets * 8;
+        var longSamples = new float[longFrames];
+        longSamples[100] = 0.77f;
+        var longPeaks = PeakPyramid.BuildDisplay(longSamples, 1, longSamples.Length);
+        Assert.True(longPeaks.BaseBucketFrames > 1);
+        Assert.True(longPeaks.NeedsEditorDetail);
+        Assert.True(longPeaks.BaseBucketFrames >= longFrames / PeakPyramid.DisplayBaseBuckets);
+
+        var editor = PeakPyramid.Build(longSamples, 1, longSamples.Length);
+        Assert.True(editor.BaseBucketFrames < longPeaks.BaseBucketFrames);
+        Assert.False(editor.NeedsEditorDetail);
+
+        var mins = new float[64];
+        var maxs = new float[64];
+        Assert.Equal(64, shortPeaks.ReadRange(0, shortSamples.Length, 64, 0, mins, maxs));
+        var column = 1200 * 64 / shortSamples.Length;
+        Assert.True(maxs[column] >= 0.88f - 1e-6);
+    }
+
+    [Fact]
+    public void BuildPlayerDisplay_IsMonoCoarse_ButKeepsTransientPeak()
+    {
+        // ステレオ逆相でも Envelope ならピークが残る。
+        var frames = PeakPyramid.PlayerDisplayBaseBuckets * 4;
+        var samples = new float[frames * 2];
+        var peakAt = frames / 3;
+        samples[peakAt * 2] = 0.95f;
+        samples[peakAt * 2 + 1] = -0.95f;
+
+        var peaks = PeakPyramid.BuildPlayerDisplay(samples, 2, samples.Length);
+        Assert.Equal(1, peaks.Channels);
+        Assert.Equal(frames, peaks.FrameCount);
+        Assert.True(peaks.BaseBucketFrames >= 4);
+        Assert.True(peaks.NeedsEditorDetail);
+
+        var mins = new float[128];
+        var maxs = new float[128];
+        Assert.Equal(128, peaks.ReadRange(0, frames, 128, 0, mins, maxs));
+        var column = (int)(peakAt * 128L / frames);
+        Assert.True(maxs[column] >= 0.95f - 1e-5);
+        Assert.True(mins[column] <= -0.95f + 1e-5);
+    }
 }

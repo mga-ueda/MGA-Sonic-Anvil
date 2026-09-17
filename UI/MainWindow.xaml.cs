@@ -101,6 +101,17 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        LibraryBrowser.SessionActivated += LibraryBrowser_SessionActivated;
+        LibraryBrowser.ArtworkDropped += LibraryBrowser_ArtworkDropped;
+        LibraryBrowser.VisibleColumnsChanged += LibraryBrowser_VisibleColumnsChanged;
+        LibraryBrowser.GroupChanged += LibraryBrowser_GroupChanged;
+        LibraryBrowser.ExplorerFolderChanged += LibraryBrowser_ExplorerFolderChanged;
+        LibraryBrowser.ExplorerFolderOpened += LibraryBrowser_ExplorerFolderOpened;
+        LibraryBrowser.ExplorerWidthChanged += LibraryBrowser_ExplorerWidthChanged;
+        LibraryBrowser.SetVisibleColumns(AppStorage.Settings.ResolvedLibraryListColumns());
+        LibraryBrowser.SetGroup(AppStorage.Settings.ResolvedLibraryListGroup());
+        LibraryBrowser.SetExplorerFolder(AppStorage.Settings.ResolvedLibraryExplorerPath());
+        LibraryBrowser.SetExplorerWidth(AppStorage.Settings.LibraryExplorerWidth);
         DpiChanged += (_, _) =>
         {
             _brandLogoDark = null;
@@ -248,9 +259,10 @@ public partial class MainWindow : Window
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         PreviewKeyUp += MainWindow_PreviewKeyUp;
         PreviewMouseDown += MainWindow_PreviewMouseDown;
+        PreviewMouseUp += MainWindow_PreviewMouseUp;
         PreviewMouseWheel += MainWindow_PreviewMouseWheel;
-        Drop += MainWindow_Drop;
-        DragOver += MainWindow_DragOver;
+        PreviewDrop += MainWindow_Drop;
+        PreviewDragOver += MainWindow_DragOver;
         Closing += MainWindow_Closing;
         SizeChanged += (_, _) => SyncBusyGlassOverlayBounds();
         Closed += (_, _) =>
@@ -320,6 +332,7 @@ public partial class MainWindow : Window
     {
         var launch = MergeLaunchPaths(LaunchFiles.TakeStartup(), SingleInstance.TakePendingPaths());
         await TryRestoreLastDocumentAsync().ConfigureAwait(true);
+        EnterLibraryPlayerIfLaunchHasMp3(launch);
         if (launch.Length > 0)
         {
             await OpenPathsAsync(launch).ConfigureAwait(true);
@@ -353,6 +366,19 @@ public partial class MainWindow : Window
 
     private void BindWorkspace(DocumentSession? session)
     {
+        if (session?.Document.IsDeferredLoad == true)
+        {
+            BindSingleWorkspace(session);
+            _ = EnsureLibrarySessionLoadedAsync(session);
+            return;
+        }
+
+        if (IsLibraryMaximized)
+        {
+            BindSingleWorkspace(session);
+            return;
+        }
+
         if (_tileMode)
         {
             if (session is null)
@@ -401,18 +427,30 @@ public partial class MainWindow : Window
             ApplyChannelSolo();
             if (session is not null)
             {
-                if (session.AnalysisView is { } mode)
+                if (IsLibraryMaximized)
                 {
-                    Waveform.SetAnalysisView(mode);
+                    Waveform.SetAnalysisView(WaveformAnalysisView.Waveform);
+                    Waveform.ResetTimeZoom();
+                    Waveform.ResetAmpZoom();
+                    Waveform.PlayheadFrame = 0;
+                    Waveform.LoopEnabled = session.LoopEnabled;
+                }
+                else
+                {
+                    if (session.AnalysisView is { } mode)
+                    {
+                        Waveform.SetAnalysisView(mode);
+                    }
+
+                    Waveform.ApplyPersistedView(
+                        session.TimeZoom,
+                        session.AmpZoom,
+                        session.ViewStart,
+                        session.PlayheadFrame);
+                    Waveform.RestoreSelectedMarkers(session.SelectedMarkerFrames);
+                    Waveform.LoopEnabled = session.LoopEnabled;
                 }
 
-                Waveform.ApplyPersistedView(
-                    session.TimeZoom,
-                    session.AmpZoom,
-                    session.ViewStart,
-                    session.PlayheadFrame);
-                Waveform.RestoreSelectedMarkers(session.SelectedMarkerFrames);
-                Waveform.LoopEnabled = session.LoopEnabled;
                 Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
                 SyncOverviewPlayhead();
                 Transport.SetAnalysisView(Waveform.AnalysisView);
@@ -425,12 +463,20 @@ public partial class MainWindow : Window
             }
 
             Transport.SetPlaying(false);
-            Transport.SetCommandsEnabled(_document is not null);
+            RefreshTransportCommandsEnabled();
             ExtinguishMeter();
             SyncMonitorLayout();
-            LoudnessMeter.Document = _document;
+            LoudnessMeter.Document = IsLibraryMaximized ? null : _document;
             LoudnessMeter.ResetLive();
-            RebuildTabBar();
+            if (IsLibraryMaximized)
+            {
+                CancelFileNameEdit();
+            }
+            else
+            {
+                RebuildTabBar();
+            }
+
             RefreshTitle();
             SyncViewChrome();
             RefreshStatus();
@@ -560,6 +606,7 @@ public partial class MainWindow : Window
         LoudnessMeter.ApplyLocalizedText();
         _colorDevPanel?.ApplyLocalizedText();
         _tabTimeTable?.ApplyLocalizedText();
+        LibraryBrowser.ApplyLocalizedText();
     }
 
     private void RefreshTitle()
@@ -626,6 +673,7 @@ public partial class MainWindow : Window
         var kind = _document.SourceKind switch
         {
             AudioFileKind.Mp3 => "MP3",
+            AudioFileKind.M4a => "M4A",
             AudioFileKind.Aiff => "AIFF",
             _ => "WAVE",
         };
@@ -830,6 +878,10 @@ public partial class MainWindow : Window
         Close();
     }
 
+    /// <summary>
+    /// ファイル／フォルダのドロップ。F10 / F11 / F12 / 通常表示を問わず同じ。
+    /// ジャケット上の画像だけ F10 で差し替え、それ以外は対応拡張子を開く。
+    /// </summary>
     private void MainWindow_DragOver(object sender, DragEventArgs e)
     {
         if (IsUiBusy)
@@ -839,7 +891,26 @@ public partial class MainWindow : Window
             return;
         }
 
-        e.Effects = TryGetDroppedAudio(e, out _) ? DragDropEffects.Copy : DragDropEffects.None;
+        if (IsLibraryMaximized
+            && e.OriginalSource is System.Windows.DependencyObject origin
+            && LibraryBrowser.IsJacketOrigin(origin)
+            && LibraryBrowserView.TryGetDroppedImage(e, out _))
+        {
+            e.Effects = DragDropEffects.Copy;
+            e.Handled = true;
+            return;
+        }
+
+        if (IsLibraryMaximized
+            && e.OriginalSource is System.Windows.DependencyObject treeOrigin
+            && LibraryBrowser.IsExplorerOrigin(treeOrigin))
+        {
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
+        e.Effects = CanAcceptDroppedAudio(e) ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
     }
 
@@ -851,24 +922,68 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (IsLibraryMaximized
+            && e.OriginalSource is System.Windows.DependencyObject origin
+            && LibraryBrowser.IsJacketOrigin(origin)
+            && LibraryBrowserView.TryGetDroppedImage(e, out var image))
+        {
+            LibraryBrowser_ArtworkDropped(LibraryBrowser, image);
+            e.Handled = true;
+            return;
+        }
+
+        if (IsLibraryMaximized
+            && e.OriginalSource is System.Windows.DependencyObject treeOrigin
+            && LibraryBrowser.IsExplorerOrigin(treeOrigin))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (TryGetDroppedAudio(e, out var paths))
         {
             OpenPaths(paths);
         }
     }
 
-    private static bool TryGetDroppedAudio(DragEventArgs e, out string[] paths)
+    private bool CanAcceptDroppedAudio(DragEventArgs e)
     {
-        paths = [];
-        if (!e.Data.GetDataPresent(DataFormats.FileDrop)
-            || e.Data.GetData(DataFormats.FileDrop) is not string[] files
-            || files.Length == 0)
+        if (!TryReadDroppedPaths(e, out var files))
         {
             return false;
         }
 
-        paths = files.Where(AudioCodec.IsOpenable).ToArray();
+        return IsLibraryMaximized
+            ? AudioCodec.CanAcceptPlayerDrop(files)
+            : AudioCodec.CanAcceptDrop(files);
+    }
+
+    private bool TryGetDroppedAudio(DragEventArgs e, out string[] paths)
+    {
+        paths = [];
+        if (!TryReadDroppedPaths(e, out var files))
+        {
+            return false;
+        }
+
+        paths = IsLibraryMaximized
+            ? AudioCodec.CollectPlayerOpenable(files)
+            : AudioCodec.CollectOpenable(files);
         return paths.Length > 0;
+    }
+
+    private static bool TryReadDroppedPaths(DragEventArgs e, out string[] files)
+    {
+        files = [];
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)
+            || e.Data.GetData(DataFormats.FileDrop) is not string[] dropped
+            || dropped.Length == 0)
+        {
+            return false;
+        }
+
+        files = dropped;
+        return true;
     }
 
     private void MeterColumnSplitter_DragCompleted(object sender, DragCompletedEventArgs e)

@@ -473,6 +473,19 @@ internal sealed class WaveformView : Grid
 
     public bool CenterLocked { get; private set; }
 
+    /// <summary>F10 プレイヤー。シークと選択だけ。マーカー／ループ操作とキーボードフォーカスはしない。</summary>
+    public bool SeekAndSelectOnly
+    {
+        get => _seekAndSelectOnly;
+        set
+        {
+            _seekAndSelectOnly = value;
+            Focusable = !value;
+        }
+    }
+
+    private bool _seekAndSelectOnly;
+
     /// <summary>
     /// 左端のチャンネル名と dB 目盛り列。F11 フルスクリーンでは畳んで波形を広げる。F12 では残す。
     /// </summary>
@@ -1674,7 +1687,11 @@ internal sealed class WaveformView : Grid
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
-        Focus();
+        if (!SeekAndSelectOnly)
+        {
+            Focus();
+        }
+
         if (_document is null)
         {
             return;
@@ -1686,7 +1703,7 @@ internal sealed class WaveformView : Grid
         }
 
         var clickPos = e.GetPosition(this);
-        if (TryHitChannelLabel(clickPos, out var labelChannel))
+        if (!SeekAndSelectOnly && TryHitChannelLabel(clickPos, out var labelChannel))
         {
             ChannelLabelClicked?.Invoke(
                 this,
@@ -1722,6 +1739,16 @@ internal sealed class WaveformView : Grid
                 e.Handled = true;
                 return;
             }
+            if (SeekAndSelectOnly)
+            {
+                ClearMarkerSelection();
+                SelectSpanAt(
+                    FrameAt(pos.X),
+                    extend: (Keyboard.Modifiers & ModifierKeys.Shift) != 0);
+                e.Handled = true;
+                return;
+            }
+
             if (TryHitRegionFlag(pos, out var region, out var regionFrame))
             {
                 SelectMarkerFrames([]);
@@ -1752,21 +1779,21 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        if (TryHitRegionFlag(start, out var regionHit, out var hitFrame))
+        if (!SeekAndSelectOnly && TryHitRegionFlag(start, out var regionHit, out var hitFrame))
         {
             BeginRegionFlagInteraction(regionHit, hitFrame, start);
             e.Handled = true;
             return;
         }
 
-        if (TryHitMarkerFlag(start, out var hit))
+        if (!SeekAndSelectOnly && TryHitMarkerFlag(start, out var hit))
         {
             BeginMarkerFlagInteraction(hit, start);
             e.Handled = true;
             return;
         }
 
-        if (TryHitSampleLoopBar(start))
+        if (!SeekAndSelectOnly && TryHitSampleLoopBar(start))
         {
             BeginLoopBarInteraction(start);
             e.Handled = true;
@@ -2158,11 +2185,15 @@ internal sealed class WaveformView : Grid
 
         if (_showScaleLane && !SpectrogramVisible && !loudness)
         {
-            var channels = Math.Max(1, _document.Channels);
+            // SeekAndSelectOnly（F10）はモノラル包絡線表示なので、L/R ラベルと二重 dB は出さない。
+            var channels = SeekAndSelectOnly ? 1 : Math.Max(1, _document.Channels);
             var laneGap = channels > 1 ? 4d : 0d;
             var laneHeight = (wave.Height - laneGap * (channels - 1)) / channels;
             DrawDbScaleTicks(dc, bounds, wave, channels, laneGap, laneHeight);
-            DrawChannelLabels(dc, bounds, wave, channels, laneGap, laneHeight);
+            if (!SeekAndSelectOnly)
+            {
+                DrawChannelLabels(dc, bounds, wave, channels, laneGap, laneHeight);
+            }
         }
         else if (_showScaleLane && overlay)
         {
@@ -2664,7 +2695,10 @@ internal sealed class WaveformView : Grid
         var sourceChannels = Math.Max(1, document.Channels);
         var overlay = _spectrogramMode == SpectrogramViewMode.Overlay;
         var loudness = LoudnessVisible;
-        var monoWave = overlay || loudness;
+        var monoWave = overlay || loudness || SeekAndSelectOnly;
+        var peakChannels = document.Peaks.IsEmpty
+            ? sourceChannels
+            : Math.Max(1, document.Peaks.Channels);
         var drawChannels = monoWave ? 1 : sourceChannels;
         var laneGap = !monoWave && drawChannels > 1 ? 4d * scaleY : 0d;
         ResolveWaveLane(overlay, height, drawChannels, laneGap, _ampZoom, out var laneHeight, out var laneOrigin, out var ampHeight);
@@ -2678,8 +2712,8 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var usePolyline = IsPolylineZoom(rangeFrames, width);
-        var useRawColumns = !usePolyline && rangeFrames <= RawColumnBudget(width);
+        var usePolyline = !SeekAndSelectOnly && IsPolylineZoom(rangeFrames, width);
+        var useRawColumns = !SeekAndSelectOnly && !usePolyline && rangeFrames <= RawColumnBudget(width);
         if (loudness)
         {
             RasterLoudnessDbWaveform(
@@ -2710,23 +2744,28 @@ internal sealed class WaveformView : Grid
             }
 
             var colCount = x1 - x0;
-            EnsureColumnBuffers(colCount * sourceChannels);
+            EnsureColumnBuffers(colCount * Math.Max(sourceChannels, peakChannels));
             var count = FillWaveColumnPeaks(
                 document,
                 f0,
                 f1,
                 colCount,
-                sourceChannels,
-                useRawColumns);
+                peakChannels,
+                useRawColumns && !SeekAndSelectOnly);
             if (count <= 0)
             {
                 return;
             }
 
-            var packedChannels = sourceChannels;
-            if (monoWave)
+            var packedChannels = peakChannels;
+            if (monoWave && packedChannels > 1)
             {
-                ChannelMix.FoldPackedPeaksToMid(_columnMins, _columnMaxs, count, sourceChannels);
+                // Mid だと逆相で消える。包絡の和集合でピークを残す。
+                ChannelMix.FoldPackedPeaksToUnion(_columnMins, _columnMaxs, count, packedChannels);
+                packedChannels = 1;
+            }
+            else if (monoWave)
+            {
                 packedChannels = 1;
             }
 
@@ -6343,6 +6382,8 @@ internal sealed class WaveformView : Grid
         }
 
         _staticRebuildQueued = true;
+        // プレイヤーでも Render。ContextIdle だと再生中の CompositionTarget.Rendering と
+        // プレイタイマーが先に回り続け、初回の波形描画が後ろへ押される。
         _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, FlushStaticRebuild);
     }
 

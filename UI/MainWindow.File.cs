@@ -86,7 +86,18 @@ public partial class MainWindow
             return;
         }
 
+        EnterLibraryPlayerIfLaunchHasMp3(paths);
         OpenPaths(paths);
+    }
+
+    private void EnterLibraryPlayerIfLaunchHasMp3(IReadOnlyList<string> paths)
+    {
+        if (IsLibraryMaximized || !LaunchFiles.ContainsMp3(paths))
+        {
+            return;
+        }
+
+        SetWaveformMaximizeMode(WaveformMaximizeMode.Library);
     }
 
     private static string[] MergeLaunchPaths(params IReadOnlyList<string>[] groups)
@@ -133,10 +144,11 @@ public partial class MainWindow
 
     private void QueueOpenPaths(IReadOnlyList<string> paths)
     {
-        foreach (var path in paths)
+        foreach (var path in (IsLibraryMaximized
+                     ? AudioCodec.CollectPlayerOpenable(paths)
+                     : AudioCodec.CollectOpenable(paths)))
         {
-            if (!AudioCodec.IsOpenable(path)
-                || _queuedOpenPaths.Contains(path, StringComparer.OrdinalIgnoreCase))
+            if (_queuedOpenPaths.Contains(path, StringComparer.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -147,17 +159,26 @@ public partial class MainWindow
 
     private async Task OpenPathsAsync(IReadOnlyList<string> paths)
     {
-        var targets = new List<string>();
-        foreach (var path in paths)
-        {
-            if (AudioCodec.IsOpenable(path))
-            {
-                targets.Add(path);
-            }
-        }
+        var targets = (IsLibraryMaximized
+                ? AudioCodec.CollectPlayerOpenable(paths)
+                : AudioCodec.CollectOpenable(paths))
+            .ToList();
 
         if (targets.Count == 0)
         {
+            return;
+        }
+
+        if (IsLibraryMaximized)
+        {
+            RegisterLibraryPaths(targets);
+            if (_queuedOpenPaths.Count > 0)
+            {
+                var queued = _queuedOpenPaths.ToArray();
+                _queuedOpenPaths.Clear();
+                await OpenPathsAsync(queued).ConfigureAwait(true);
+            }
+
             return;
         }
 
@@ -167,10 +188,17 @@ public partial class MainWindow
         List<string>? errors = null;
         var added = 0;
         BeginOpenWork(targets.Select(path => Path.GetFileName(path) ?? path).ToArray());
+        var cancelled = false;
         try
         {
             for (var i = 0; i < targets.Count; i++)
             {
+                if (_openCancelRequested)
+                {
+                    cancelled = true;
+                    break;
+                }
+
                 var path = targets[i];
                 if (showProgress)
                 {
@@ -248,6 +276,12 @@ public partial class MainWindow
                 MessageBoxImage.Error);
         }
 
+        if (cancelled)
+        {
+            _queuedOpenPaths.Clear();
+            return;
+        }
+
         if (_queuedOpenPaths.Count > 0)
         {
             var queued = _queuedOpenPaths.ToArray();
@@ -259,6 +293,7 @@ public partial class MainWindow
     private void BeginOpenWork(IReadOnlyList<string> displayNames)
     {
         var targetCount = displayNames.Count;
+        _openCancelRequested = false;
         _openBusy = targetCount > 0;
         _openJobNames = displayNames.ToArray();
         _openJobProgress = new double[targetCount];
@@ -308,6 +343,7 @@ public partial class MainWindow
     private void EndOpenWork(bool showProgress)
     {
         _openBusy = false;
+        _openCancelRequested = false;
         StopWaveformLoadingHint(hide: true);
         _openJobNames = [];
         _openJobProgress = [];
@@ -383,6 +419,17 @@ public partial class MainWindow
         _openStatusText = null;
         _openStatusRatio = 0;
         RefreshStatus();
+    }
+
+    private bool TryRequestOpenCancel()
+    {
+        if (!_openBusy || _openJobNames.Length <= 1)
+        {
+            return false;
+        }
+
+        _openCancelRequested = true;
+        return true;
     }
 
     private bool Save(bool saveAs, AudioDocument? target = null)
@@ -1594,7 +1641,7 @@ public partial class MainWindow
         {
             CaptureActiveSessionView();
             var settings = AppStorage.Settings;
-            if (_sessions.Count == 0)
+            if (!DocumentSessionStore.ShouldPersistOpenDocuments(IsLibraryMaximized, _sessions.Count))
             {
                 DocumentSessionStore.ClearOpenDocuments(settings);
                 AppStorage.ClearAllSessionAudio();
@@ -1666,6 +1713,7 @@ public partial class MainWindow
 
         var showProgress = restorable.Count > 1;
         BeginOpenWork(restorable.Select(item => SnapshotDisplayName(item.Snap)).ToArray());
+        var cancelled = false;
         try
         {
             int JobIndex(int sourceIndex)
@@ -1709,8 +1757,19 @@ public partial class MainWindow
                 }
             }
 
+            if (_openCancelRequested)
+            {
+                cancelled = true;
+            }
+
             foreach (var (sourceIndex, snap) in restorable)
             {
+                if (cancelled || _openCancelRequested)
+                {
+                    cancelled = true;
+                    break;
+                }
+
                 if (sourceIndex == activeIndex)
                 {
                     continue;
@@ -1746,6 +1805,12 @@ public partial class MainWindow
         }
 
         ApplyPreferredOrRestoredTileArrange(settings);
+
+        if (cancelled)
+        {
+            _queuedOpenPaths.Clear();
+            return;
+        }
 
         if (_queuedOpenPaths.Count > 0)
         {

@@ -206,6 +206,37 @@ internal static class DesignMetrics
     /// </summary>
     public const double AnalyzerMaximizeScale = 1.5;
 
+    /// <summary>F10 プレイヤーのジャケット枠。以前のリスト高さ追従の約 1/4 の 1.2 倍。</summary>
+    public static double LibraryJacketSize => From96(96) * 1.2;
+
+    /// <summary>F10 グループ見出し左のジャケット。</summary>
+    public static double LibraryGroupJacketSize => From96(96);
+
+    /// <summary>F10 ファイルリストの上下分割で、リスト側の最低高さ。</summary>
+    public static double LibraryPaneMinHeight => From96(140);
+
+    /// <summary>F10 左のフォルダツリー幅（既定）。</summary>
+    public static double LibraryExplorerWidth => From96(220);
+
+    /// <summary>F10 フォルダツリーの最小幅。</summary>
+    public static double LibraryExplorerMinWidth => From96(120);
+
+    /// <summary>F10 フォルダツリーの最大幅。</summary>
+    public static double LibraryExplorerMaxWidth => From96(480);
+
+    public static double ClampLibraryExplorerWidth(double width)
+    {
+        if (width <= 0)
+        {
+            return LibraryExplorerWidth;
+        }
+
+        return Math.Clamp(width, LibraryExplorerMinWidth, LibraryExplorerMaxWidth);
+    }
+
+    /// <summary>F10 プレイヤーの波形エリア高さ（従来 200dip の約 2/3）。</summary>
+    public static double LibraryWaveformHeight => From96(133);
+
     /// <summary>スペアナ全体（LED メーター + 下の周波数数値）。ゴニオ＋位相バーと同じ高さ。</summary>
     public static double SpectrumHeight => VectorScopeHeight;
 

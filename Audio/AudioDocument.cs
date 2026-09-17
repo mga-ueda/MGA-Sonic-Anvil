@@ -7,6 +7,7 @@ internal enum AudioFileKind
     Wave,
     Aiff,
     Mp3,
+    M4a,
 }
 
 internal sealed partial class AudioDocument
@@ -17,7 +18,8 @@ internal sealed partial class AudioDocument
         int channels,
         int bitsPerSample,
         AudioFileKind sourceKind,
-        string? sourcePath)
+        string? sourcePath,
+        bool buildPeaks = true)
     {
         if (channels < 1)
         {
@@ -36,7 +38,52 @@ internal sealed partial class AudioDocument
         ChannelMask = 0;
         SourceKind = sourceKind;
         SourcePath = sourcePath;
-        Peaks = PeakPyramid.Build(interleaved, channels);
+        Peaks = buildPeaks
+            ? PeakPyramid.Build(interleaved, channels)
+            : PeakPyramid.Empty;
+        RefreshFileBytes();
+        CommitFormat();
+        CaptureFormatOrigin();
+    }
+
+    /// <summary>
+    /// プレイヤーモードのリスト登録用。PCM は読まず、パスとファイルサイズだけ持つ。
+    /// </summary>
+    public static AudioDocument CreateDeferred(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var document = new AudioDocument(
+            [],
+            48000,
+            1,
+            16,
+            AudioCodec.DetectKind(path),
+            path)
+        {
+            IsDeferredLoad = true,
+        };
+        return document;
+    }
+
+    /// <summary>
+    /// プレイヤーのストリーム再生用。PCM は持たず、長さとフォーマットだけ確定する。
+    /// </summary>
+    public void ActivateStreamPlayback(int sampleRate, int channels, int bitsPerSample, long frameCount)
+    {
+        if (sampleRate < 1 || channels < 1 || frameCount < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(frameCount));
+        }
+
+        SampleRate = sampleRate;
+        Channels = channels;
+        BitsPerSample = bitsPerSample <= 0 ? 16 : bitsPerSample;
+        Interleaved = [];
+        var samples = frameCount * (long)channels;
+        _liveSampleCount = samples > int.MaxValue ? int.MaxValue : (int)samples;
+        Peaks = PeakPyramid.Empty;
+        IsDeferredLoad = false;
+        IsStreamPlayback = true;
         RefreshFileBytes();
         CommitFormat();
         CaptureFormatOrigin();
@@ -81,8 +128,9 @@ internal sealed partial class AudioDocument
             Channels,
             BitsPerSample);
 
-    /// <summary>MP3 は cue/smpl を持てないのでリージョンとサンプルループは置けない。</summary>
-    public bool AllowsRegionsAndLoops => SourceKind != AudioFileKind.Mp3;
+    /// <summary>MP3 / M4A は cue/smpl を持てないのでリージョンとサンプルループは置けない。</summary>
+    public bool AllowsRegionsAndLoops =>
+        SourceKind is not (AudioFileKind.Mp3 or AudioFileKind.M4a);
 
     public AudioFileKind SourceKind { get; private set; }
 
@@ -91,9 +139,30 @@ internal sealed partial class AudioDocument
 
     public string? SourcePath { get; set; }
 
+    /// <summary>MP3 の ID3 APIC、またはドロップで付けた表示用ジャケット。WAVE は通常 null。</summary>
+    public byte[]? Artwork { get; private set; }
+
+    public bool HasArtwork => Artwork is { Length: > 0 };
+
+    /// <summary>PCM を読まずに取ったタグ。未走査は <see cref="AudioFileTags.Unprobed"/>。</summary>
+    public AudioFileTags Tags { get; private set; } = AudioFileTags.Unprobed;
+
+    public void ApplyTags(AudioFileTags tags) => Tags = tags;
+
+    public void SetArtwork(byte[]? bytes)
+    {
+        Artwork = bytes is { Length: > 0 } ? bytes.ToArray() : null;
+    }
+
     public PeakPyramid Peaks { get; private set; }
 
     public bool IsDirty { get; private set; }
+
+    /// <summary>F10 でリストへ載せただけで、まだ AudioCodec.Load していない。</summary>
+    public bool IsDeferredLoad { get; private set; }
+
+    /// <summary>プレイヤーでストリーム再生中。Interleaved は空で FrameCount だけ持つ。</summary>
+    public bool IsStreamPlayback { get; private set; }
 
     /// <summary>サンプル内容が変わった回数。マーカー等のメタだけでは増えない。</summary>
     public int SampleRevision { get; private set; }
@@ -369,6 +438,12 @@ internal sealed partial class AudioDocument
     }
 
     public void RefreshPeaks() => RebuildPeaks();
+
+    internal void ReplacePeaks(PeakPyramid peaks)
+    {
+        ArgumentNullException.ThrowIfNull(peaks);
+        Peaks = peaks;
+    }
 
     public void CommitLiveSamples(bool rebuildPeaks)
     {

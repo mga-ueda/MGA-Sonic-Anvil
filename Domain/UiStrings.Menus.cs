@@ -118,6 +118,7 @@ internal static partial class UiStrings
     public static string WaveMenuAlwaysOnTop => Get("常に最前面(_T)", "Always on _Top");
     public static string WaveMenuMaximizeWaveform => Get("フルスクリーン(_F)", "_Fullscreen");
     public static string WaveMenuMaximizeAnalyzers => Get("フルスクリーン（アナライザー）(_A)", "Fullscreen with _Analyzers");
+    public static string WaveMenuMaximizeLibrary => Get("プレイヤー(_B)", "Player (_B)");
 
     public static string WaveMenuNew => Get("新規(_N)", "_New");
     public static string WaveMenuOpen => Get("開く(_O)", "_Open");

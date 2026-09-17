@@ -6,7 +6,7 @@ namespace MgaSonicAnvil.Tests;
 
 public sealed class BusyGlassJobLayoutTests
 {
-    private const double RowWidth = 324;
+    private const double RowWidth = BusyGlassJobLayout.PreferredRowWidth;
 
     [Fact]
     public void Arrange_FewJobs_StayInOneColumn()
@@ -15,6 +15,7 @@ public sealed class BusyGlassJobLayoutTests
         Assert.Equal(1, layout.Columns);
         Assert.Equal(4, layout.Rows);
         Assert.Equal(BusyGlassJobLayout.DefaultRowHeight, layout.RowHeight);
+        Assert.Equal(RowWidth, layout.RowWidth);
     }
 
     [Fact]
@@ -27,13 +28,23 @@ public sealed class BusyGlassJobLayoutTests
     }
 
     [Fact]
-    public void Arrange_NarrowWidth_StaysOneColumn()
+    public void Arrange_NarrowWidth_AddsColumnByShrinkingRow()
     {
         var layout = BusyGlassJobLayout.Arrange(32, 400, 400, RowWidth);
-        Assert.Equal(1, layout.Columns);
-        Assert.Equal(32, layout.Rows);
-        Assert.True(layout.RowHeight <= BusyGlassJobLayout.DefaultRowHeight);
-        Assert.True(layout.RowHeight >= BusyGlassJobLayout.MinRowHeight);
+        Assert.Equal(2, layout.Columns);
+        Assert.Equal(16, layout.Rows);
+        Assert.True(layout.RowWidth < RowWidth);
+        Assert.True(layout.RowWidth >= BusyGlassJobLayout.MinRowWidth);
+        Assert.True(layout.Rows * layout.RowHeight <= 400 + 1e-6);
+    }
+
+    [Fact]
+    public void Arrange_ManyJobs_ExceedsThreeColumnsWhenNeeded()
+    {
+        var layout = BusyGlassJobLayout.Arrange(80, 1600, 200, RowWidth);
+        Assert.True(layout.Columns > 3);
+        Assert.True(layout.Rows * layout.RowHeight <= 200 + 1e-6);
+        Assert.True(layout.RowWidth >= BusyGlassJobLayout.MinRowWidth);
     }
 
     [Fact]
@@ -42,6 +53,14 @@ public sealed class BusyGlassJobLayoutTests
         var layout = BusyGlassJobLayout.Arrange(0, 800, 400, RowWidth);
         Assert.Equal(1, layout.Columns);
         Assert.Equal(0, layout.Rows);
+    }
+
+    [Fact]
+    public void SplitRow_Preferred_KeepsNameAndBar()
+    {
+        var parts = BusyGlassJobLayout.SplitRow(RowWidth);
+        Assert.Equal(BusyGlassJobLayout.PreferredNameWidth, parts.NameWidth);
+        Assert.Equal(BusyGlassJobLayout.PreferredBarWidth, parts.BarWidth);
     }
 
     [Fact]

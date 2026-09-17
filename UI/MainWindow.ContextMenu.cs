@@ -129,7 +129,7 @@ public partial class MainWindow
         var recording = IsRecording;
         var busy = IsUiBusy;
         var selectedTabs = SelectedTabsInOrder();
-        var canEdit = hasDoc && !busy && !recording;
+        var canEdit = hasDoc && !busy && !recording && !IsLibraryMaximized;
         var canNavigate = hasDoc && !busy && !recording;
         var hasSelection = hasDoc && !document!.Selection.IsEmpty;
         return new WaveformContextMenuModel
@@ -172,7 +172,7 @@ public partial class MainWindow
             CanCloseOtherTabs = hasDoc && !busy && !recording && _sessions.Count > 1,
             CanCloseTabsToRight = CanCloseTabsFromActive(rightSide: true, hasDoc, busy, recording),
             CanCloseTabsToLeft = CanCloseTabsFromActive(rightSide: false, hasDoc, busy, recording),
-            CanMergeTabs = !busy && !recording && _selectedTabs.Count >= 2,
+            CanMergeTabs = !busy && !recording && _selectedTabs.Count >= 2 && !IsLibraryMaximized,
             HasSelectedTabs = selectedTabs.Length > 0,
             HasMultipleSelectedTabs = selectedTabs.Length >= 2,
             AllTabsSelected = AllTabsSelected,
@@ -184,6 +184,7 @@ public partial class MainWindow
             CanTileGrid = CanOfferTileArrange(WaveformTileArrange.Grid),
             WaveformMaximized = _waveformMaximizeMode == WaveformMaximizeMode.Waveform,
             AnalyzersMaximized = _waveformMaximizeMode == WaveformMaximizeMode.Analyzers,
+            LibraryMaximized = _waveformMaximizeMode == WaveformMaximizeMode.Library,
             CanLoopPlay = canNavigate
                 && (hasSelection
                     || !document!.SampleLoop.IsEmpty
@@ -196,6 +197,12 @@ public partial class MainWindow
 
     private void ExecuteWaveMenu(WaveMenuCommand command)
     {
+        if (IsLibraryMaximized && LibraryPlayerMode.BlocksWaveMenu(command))
+        {
+            KeepLibraryListActive();
+            return;
+        }
+
         switch (command)
         {
             case WaveMenuCommand.ClearMarkers:
@@ -435,6 +442,9 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.MaximizeAnalyzers:
                 ToggleAnalyzerMaximize();
+                break;
+            case WaveMenuCommand.MaximizeLibrary:
+                ToggleLibraryMaximize();
                 break;
             case WaveMenuCommand.SoloNext:
                 CycleChannelSolo(1);

@@ -22,6 +22,7 @@ public partial class MainWindow
         if (TryProcessShortcut(key, modifiers))
         {
             e.Handled = true;
+            KeepLibraryListActive();
         }
     }
 
@@ -71,6 +72,13 @@ public partial class MainWindow
                 StopSpectrogramBoostNudge();
             }
 
+            TryPlayLibraryAfterArrowRelease();
+            return;
+        }
+
+        if (key is Key.Home or Key.End or Key.PageUp or Key.PageDown)
+        {
+            TryPlayLibraryAfterArrowRelease();
             return;
         }
 
@@ -96,6 +104,15 @@ public partial class MainWindow
     private void MainWindow_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (IsUiBusy)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (IsLibraryMaximized
+            && e.OriginalSource is System.Windows.DependencyObject wheelOrigin
+            && (IsDescendantOf(wheelOrigin, Overview)
+                || FindWaveformFromOrigin(wheelOrigin) is not null))
         {
             e.Handled = true;
             return;
@@ -188,6 +205,11 @@ public partial class MainWindow
         if (IsUiBusy)
         {
             StopPlaybackShuttle();
+            if (AppDialogKeys.IsEscape(key, modifiers))
+            {
+                TryRequestOpenCancel();
+            }
+
             return true;
         }
 
@@ -200,6 +222,12 @@ public partial class MainWindow
         if (key == Key.F12 && modifiers == ModifierKeys.None)
         {
             ToggleAnalyzerMaximize();
+            return true;
+        }
+
+        if (key == Key.F10 && modifiers == ModifierKeys.None)
+        {
+            ToggleLibraryMaximize();
             return true;
         }
 
@@ -218,6 +246,27 @@ public partial class MainWindow
         if (IsTileSearchFocused)
         {
             // 検索ボックスへの文字入力はそのまま通す（1 文字ごとに判定される）。
+            return false;
+        }
+
+        if (IsLibraryGroupComboFocused)
+        {
+            return false;
+        }
+
+        if (IsLibraryExplorerFocused)
+        {
+            if (key == Key.Enter && modifiers == ModifierKeys.None)
+            {
+                LibraryBrowser.OpenSelectedFolder();
+                return true;
+            }
+
+            if (LibraryPlayerMode.BlocksExplorerKey(key, modifiers))
+            {
+                return true;
+            }
+
             return false;
         }
 
@@ -240,6 +289,58 @@ public partial class MainWindow
         if (_placeRepeatKind != PlaceRepeatKind.None && !IsContinuingPlaceKey(key, modifiers))
         {
             StopPlaceRepeat();
+        }
+
+        if (IsLibraryMaximized)
+        {
+            if ((key is Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown)
+                && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+            {
+                var extend = modifiers == ModifierKeys.Shift;
+                if (key is Key.Home or Key.End)
+                {
+                    LibraryBrowser.MoveSelectionToEdge(key == Key.Home ? -1 : 1, extend);
+                }
+                else if (key is Key.PageUp or Key.PageDown)
+                {
+                    LibraryBrowser.MoveSelectionPage(key == Key.PageUp ? -1 : 1, extend);
+                }
+                else
+                {
+                    LibraryBrowser.MoveSelection(key == Key.Up ? -1 : 1, extend);
+                }
+
+                _libraryPlayOnArrowRelease = true;
+                return true;
+            }
+
+            if (key == Key.A && modifiers is ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift))
+            {
+                LibraryBrowser.SelectAllRows();
+                return true;
+            }
+
+            if (key == Key.Enter
+                && modifiers == ModifierKeys.None
+                && !LibraryBrowser.IsColumnFilterFocused)
+            {
+                _ = PlayLibrarySessionAsync(LibraryBrowser.SelectedSession ?? _activeSession);
+                return true;
+            }
+
+            // リストから外すだけ。ディスク上のファイルは絶対に消さない。
+            if (key == Key.Delete
+                && modifiers == ModifierKeys.None
+                && LibraryBrowser.IsListKeyboardFocused)
+            {
+                RemoveLibrarySelectedFromList();
+                return true;
+            }
+
+            if (!LibraryPlayerMode.AllowsKey(key, modifiers))
+            {
+                return true;
+            }
         }
 
         if (TryProcessHistoryShortcut(key, modifiers))
@@ -393,6 +494,12 @@ public partial class MainWindow
 
         if (key == Key.Space && modifiers == ModifierKeys.None)
         {
+            if (IsLibraryMaximized)
+            {
+                PlayLibrarySelectionOrToggle();
+                return true;
+            }
+
             TogglePlayback();
             return true;
         }

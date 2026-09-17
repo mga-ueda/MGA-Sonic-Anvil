@@ -19,10 +19,6 @@ internal sealed class BusyGlassOverlay : FrameworkElement
     private const int FrostBrushDivisor = 20;
     private const double ProgressBarWidth = 280;
     private const double ProgressBarHeight = 4;
-    private const double JobNameWidth = 168;
-    private const double JobBarWidth = 100;
-    private const double JobPctWidth = 40;
-    private const double JobRowWidth = JobNameWidth + 8 + JobBarWidth + 8 + JobPctWidth;
 
     private readonly DispatcherTimer _dotsTimer;
     private readonly DispatcherTimer _fadeTimer;
@@ -32,6 +28,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
     private ExportJobProgress[] _jobs = [];
     private string[] _jobFitNames = [];
     private double _jobFitDpi;
+    private double _jobFitNameWidth;
     private int _dotCount = 1;
     private int _percent = -1;
     private bool _fading;
@@ -319,7 +316,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
             _jobs.Length,
             Math.Max(0, ActualWidth - 32),
             availableJobsHeight,
-            JobRowWidth);
+            BusyGlassJobLayout.PreferredRowWidth);
         var jobsHeight = layout.Rows * layout.RowHeight;
         var blockHeight = headerHeight + jobsGap + jobsHeight;
         var x = (ActualWidth - (baseFormatted.Width + dotsReserve.Width)) / 2;
@@ -346,8 +343,9 @@ internal sealed class BusyGlassOverlay : FrameworkElement
 
         if (_jobs.Length > 0)
         {
-            EnsureJobFitNames(regular, culture, dpi);
-            var gridWidth = layout.Columns * JobRowWidth
+            var parts = BusyGlassJobLayout.SplitRow(layout.RowWidth);
+            EnsureJobFitNames(regular, culture, dpi, parts.NameWidth);
+            var gridWidth = layout.Columns * layout.RowWidth
                 + Math.Max(0, layout.Columns - 1) * BusyGlassJobLayout.ColumnGap;
             var gridX = (ActualWidth - gridWidth) / 2;
             var rowY = barY + ProgressBarHeight + 14;
@@ -359,8 +357,10 @@ internal sealed class BusyGlassOverlay : FrameworkElement
                     dc,
                     _jobs[i],
                     _jobFitNames[i],
-                    gridX + col * (JobRowWidth + BusyGlassJobLayout.ColumnGap),
+                    gridX + col * (layout.RowWidth + BusyGlassJobLayout.ColumnGap),
                     rowY + row * layout.RowHeight,
+                    parts.NameWidth,
+                    parts.BarWidth,
                     opacity,
                     regular,
                     culture,
@@ -371,18 +371,21 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         dc.Pop();
     }
 
-    private void EnsureJobFitNames(Typeface typeface, CultureInfo culture, double dpi)
+    private void EnsureJobFitNames(Typeface typeface, CultureInfo culture, double dpi, double nameWidth)
     {
-        if (_jobFitNames.Length == _jobs.Length && Math.Abs(_jobFitDpi - dpi) < 0.001)
+        if (_jobFitNames.Length == _jobs.Length
+            && Math.Abs(_jobFitDpi - dpi) < 0.001
+            && Math.Abs(_jobFitNameWidth - nameWidth) < 0.001)
         {
             return;
         }
 
         _jobFitNames = new string[_jobs.Length];
         _jobFitDpi = dpi;
+        _jobFitNameWidth = nameWidth;
         for (var i = 0; i < _jobs.Length; i++)
         {
-            _jobFitNames[i] = FitText(_jobs[i].Name, JobNameWidth, typeface, 12, culture, dpi);
+            _jobFitNames[i] = FitText(_jobs[i].Name, nameWidth, typeface, 12, culture, dpi);
         }
     }
 
@@ -392,6 +395,8 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         string name,
         double x,
         double y,
+        double nameWidth,
+        double barWidth,
         float opacity,
         Typeface typeface,
         CultureInfo culture,
@@ -402,12 +407,14 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         dc.DrawText(nameText, new Point(x, y));
 
         var barY = y + Math.Max(0, (nameText.Height - ProgressBarHeight) / 2);
-        DrawBar(dc, x + JobNameWidth + 8, barY, JobBarWidth, Math.Clamp(job.Progress, 0, 1), opacity);
+        DrawBar(dc, x + nameWidth + BusyGlassJobLayout.NameGap, barY, barWidth, Math.Clamp(job.Progress, 0, 1), opacity);
 
         var pct = $"{PaintPercent(job.Progress)}%";
         var pctText = new FormattedText(pct, culture, FlowDirection.LeftToRight, typeface, 12,
             WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush")), dpi);
-        dc.DrawText(pctText, new Point(x + JobNameWidth + 8 + JobBarWidth + 8, y));
+        dc.DrawText(
+            pctText,
+            new Point(x + nameWidth + BusyGlassJobLayout.NameGap + barWidth + BusyGlassJobLayout.BarGap, y));
     }
 
     private void DrawBar(DrawingContext dc, double x, double y, double width, double fill, float opacity)
@@ -604,34 +611,49 @@ internal static class BusyGlassJobLayout
     public const double DefaultRowHeight = 20;
     public const double MinRowHeight = 16;
     public const double ColumnGap = 16;
-    public const int MaxColumns = 3;
+    public const double NameGap = 8;
+    public const double BarGap = 8;
+    public const double PreferredNameWidth = 168;
+    public const double PreferredBarWidth = 100;
+    public const double PctWidth = 40;
+    public const double MinNameWidth = 72;
+    public const double MinBarWidth = 48;
+    public const double PreferredRowWidth =
+        PreferredNameWidth + NameGap + PreferredBarWidth + BarGap + PctWidth;
+    public const double MinRowWidth =
+        MinNameWidth + NameGap + MinBarWidth + BarGap + PctWidth;
 
-    public static (int Columns, int Rows, double RowHeight) Arrange(
+    public static (int Columns, int Rows, double RowHeight, double RowWidth) Arrange(
         int jobCount,
         double availableWidth,
         double availableHeight,
-        double rowWidth,
+        double preferredRowWidth,
         double preferredRowHeight = DefaultRowHeight)
     {
         if (jobCount <= 0)
         {
-            return (1, 0, preferredRowHeight);
+            return (1, 0, preferredRowHeight, preferredRowWidth);
         }
 
-        var maxByWidth = 1;
-        if (rowWidth > 0 && availableWidth > 0)
-        {
-            maxByWidth = Math.Max(1, (int)((availableWidth + ColumnGap) / (rowWidth + ColumnGap)));
-            maxByWidth = Math.Min(MaxColumns, maxByWidth);
-        }
+        var maxByPreferred = ColumnsThatFit(availableWidth, preferredRowWidth);
+        var maxByMin = Math.Min(jobCount, ColumnsThatFit(availableWidth, MinRowWidth));
+        maxByMin = Math.Max(maxByPreferred, maxByMin);
 
         var columns = 1;
         var rows = jobCount;
         var rowHeight = preferredRowHeight;
-        while (columns < maxByWidth && rows * rowHeight > availableHeight)
+        var rowWidth = preferredRowWidth;
+        while (columns < maxByPreferred && rows * rowHeight > availableHeight)
         {
             columns++;
             rows = (int)Math.Ceiling(jobCount / (double)columns);
+        }
+
+        while (columns < maxByMin && rows * MinRowHeight > availableHeight)
+        {
+            columns++;
+            rows = (int)Math.Ceiling(jobCount / (double)columns);
+            rowWidth = RowWidthForColumns(availableWidth, columns, preferredRowWidth);
         }
 
         if (rows > 0 && rows * rowHeight > availableHeight)
@@ -639,6 +661,54 @@ internal static class BusyGlassJobLayout
             rowHeight = Math.Max(MinRowHeight, availableHeight / rows);
         }
 
-        return (columns, rows, rowHeight);
+        if (columns > maxByPreferred)
+        {
+            rowWidth = RowWidthForColumns(availableWidth, columns, preferredRowWidth);
+        }
+
+        return (columns, rows, rowHeight, rowWidth);
+    }
+
+    public static (double NameWidth, double BarWidth) SplitRow(double rowWidth)
+    {
+        var remaining = Math.Max(0, rowWidth - NameGap - BarGap - PctWidth);
+        if (remaining >= PreferredNameWidth + PreferredBarWidth)
+        {
+            return (PreferredNameWidth, PreferredBarWidth);
+        }
+
+        if (remaining >= MinNameWidth + PreferredBarWidth)
+        {
+            return (remaining - PreferredBarWidth, PreferredBarWidth);
+        }
+
+        if (remaining >= MinNameWidth + MinBarWidth)
+        {
+            return (MinNameWidth, remaining - MinNameWidth);
+        }
+
+        var bar = Math.Max(MinBarWidth, remaining * 0.4);
+        return (Math.Max(0, remaining - bar), bar);
+    }
+
+    private static int ColumnsThatFit(double availableWidth, double rowWidth)
+    {
+        if (rowWidth <= 0 || availableWidth <= 0)
+        {
+            return 1;
+        }
+
+        return Math.Max(1, (int)((availableWidth + ColumnGap) / (rowWidth + ColumnGap)));
+    }
+
+    private static double RowWidthForColumns(double availableWidth, int columns, double preferred)
+    {
+        if (columns <= 1)
+        {
+            return Math.Clamp(availableWidth, MinRowWidth, preferred);
+        }
+
+        var width = (availableWidth - (columns - 1) * ColumnGap) / columns;
+        return Math.Clamp(width, MinRowWidth, preferred);
     }
 }

@@ -12,7 +12,26 @@ internal sealed class DocumentSession
         PlayheadFrame = document.CursorFrame;
     }
 
-    public AudioDocument Document { get; }
+    public AudioDocument Document { get; private set; }
+
+    public void ReplaceDocument(AudioDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        Document = document;
+        History = new();
+        TimeZoom = 1;
+        AmpZoom = 1;
+        ViewStart = 0;
+        PlayheadFrame = document.CursorFrame;
+        SelectedMarkerFrames.Clear();
+        AnalysisView = null;
+        SoloMask = 0;
+        LoopEnabled = true;
+        PersistedSessionAudioName = null;
+        PersistedSampleRevision = 0;
+        PersistedOriginName = null;
+        PersistedHistoryName = null;
+    }
 
     public EditHistory History { get; set; } = new();
 

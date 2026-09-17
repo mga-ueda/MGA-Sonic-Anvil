@@ -13,6 +13,12 @@ public partial class MainWindow
 {
     private void ExecuteTransport(TransportCommand command)
     {
+        if (IsLibraryMaximized && LibraryPlayerMode.BlocksTransport(command))
+        {
+            KeepLibraryListActive();
+            return;
+        }
+
         switch (command)
         {
             case TransportCommand.TogglePlayback:
@@ -1116,17 +1122,21 @@ public partial class MainWindow
         WaveformHostBorder.MinHeight = DesignMetrics.WaveformHostMinHeight * _waveformHeightScale;
     }
 
-    private void ToggleWaveformMaximize() => SetWaveformMaximizeMode(
-        _waveformMaximizeMode == WaveformMaximizeMode.Waveform
-            ? WaveformMaximizeMode.Off
-            : WaveformMaximizeMode.Waveform);
-
     private void ToggleAnalyzerMaximize() => SetWaveformMaximizeMode(
         _waveformMaximizeMode == WaveformMaximizeMode.Analyzers
             ? WaveformMaximizeMode.Off
             : WaveformMaximizeMode.Analyzers);
 
-    internal bool IsWaveformMaximized => _waveformMaximizeMode != WaveformMaximizeMode.Off;
+    private void ToggleWaveformMaximize() => SetWaveformMaximizeMode(
+        _waveformMaximizeMode == WaveformMaximizeMode.Waveform
+            ? WaveformMaximizeMode.Off
+            : WaveformMaximizeMode.Waveform);
+
+    internal bool IsWaveformMaximized =>
+        IsFullscreenMaximizeMode(_waveformMaximizeMode);
+
+    private static bool IsFullscreenMaximizeMode(WaveformMaximizeMode mode) =>
+        mode is WaveformMaximizeMode.Waveform or WaveformMaximizeMode.Analyzers;
 
     internal void RefreshWaveformFullscreenFrame()
     {
@@ -1143,8 +1153,20 @@ public partial class MainWindow
             return;
         }
 
-        var wasFullscreen = IsWaveformMaximized;
-        var wantFullscreen = mode != WaveformMaximizeMode.Off;
+        if (_waveformMaximizeMode == WaveformMaximizeMode.Library
+            && mode != WaveformMaximizeMode.Library
+            && !KeepOnlyLibrarySelectedSessions())
+        {
+            return;
+        }
+
+        if (mode == WaveformMaximizeMode.Library)
+        {
+            _libraryPlayFirstPending = true;
+        }
+
+        var wasFullscreen = IsFullscreenMaximizeMode(_waveformMaximizeMode);
+        var wantFullscreen = IsFullscreenMaximizeMode(mode);
         if (wantFullscreen && !wasFullscreen)
         {
             _windowStateBeforeWaveformMax = WindowState;
@@ -1157,9 +1179,9 @@ public partial class MainWindow
             ApplyWaveformMaximizeChrome();
             ApplyWaveformFullscreenFrame();
         }
-        else if (!wantFullscreen)
+        else if (!wantFullscreen && wasFullscreen)
         {
-            _waveformMaximizeMode = WaveformMaximizeMode.Off;
+            _waveformMaximizeMode = mode;
             RestoreWaveformWindowFrame();
             ApplyWaveformMaximizeChrome();
         }
@@ -1167,6 +1189,12 @@ public partial class MainWindow
         {
             _waveformMaximizeMode = mode;
             ApplyWaveformMaximizeChrome();
+        }
+
+        if (mode == WaveformMaximizeMode.Library)
+        {
+            LibraryBrowser.FocusList();
+            return;
         }
 
         Waveform.Focus();
@@ -1229,14 +1257,20 @@ public partial class MainWindow
     {
         var show = _waveformMaximizeMode != WaveformMaximizeMode.Waveform;
         var visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        var showOverview = _waveformMaximizeMode != WaveformMaximizeMode.Library;
         StatusBarHost.Visibility = Visibility.Visible;
-        OverviewHost.Visibility = Visibility.Visible;
+        OverviewHost.Visibility = showOverview ? Visibility.Visible : Visibility.Collapsed;
+        if (!showOverview)
+        {
+            Overview.CancelDrag();
+        }
         TransportChromeHost.Visibility = visibility;
         MeterColumn.Visibility = visibility;
         MeterColumnSplitter.Visibility = visibility;
         ApplyAnalyzerMaximizeScale();
         TipService.SetHostSuppressed(_waveformMaximizeMode == WaveformMaximizeMode.Waveform);
         ApplyWaapiPanelVisible();
+        ApplyLibraryChrome();
         PrimaryWaveform.ShowScaleLane = show;
         ForEachWaveform(view => view.ShowScaleLane = show);
         RefreshTileDividers();
@@ -1264,4 +1298,5 @@ internal enum WaveformMaximizeMode
     Off,
     Waveform,
     Analyzers,
+    Library,
 }

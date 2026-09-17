@@ -29,7 +29,11 @@ internal static class FileAssociations
     private const int AssocStrExecutable = 2;
     private const int ErrorInsufficientBuffer = unchecked((int)0x8007007A);
 
-    public static IReadOnlyList<string> Extensions => AudioCodec.OpenExtensions;
+    public static IReadOnlyList<string> Extensions => AudioCodec.PlayerOpenExtensions;
+
+    /// <summary>編集オープンではなく、プレイヤー起動専用の拡張子か。</summary>
+    public static bool IsPlayerOnlyExtension(string extension) =>
+        NormalizeExtension(extension).Equals(".m4a", StringComparison.OrdinalIgnoreCase);
 
     public static string NormalizeExtension(string extension)
     {
@@ -56,10 +60,17 @@ internal static class FileAssociations
         var kind = ext switch
         {
             ".mp3" => "MP3",
+            ".m4a" => "M4A",
             ".aif" or ".aiff" => "AIFF",
             _ => "Wave",
         };
-        return $"{kind} ({ext})";
+        var label = $"{kind} ({ext})";
+        if (IsPlayerOnlyExtension(ext))
+        {
+            label = $"{label} — {UiStrings.LabelFileAssociationPlayerOnly}";
+        }
+
+        return label;
     }
 
     public static string BuildOpenCommand(string exePath) =>
@@ -239,7 +250,7 @@ internal static class FileAssociations
             WritePreviousProgId(ext, current);
         }
 
-        WriteProgId(progId, exe);
+        WriteProgId(progId, exe, ext);
         WriteExtensionDefault(ext, progId);
         WriteOpenWith(ext, progId);
         WriteApplication(exe, ext, add: true);
@@ -363,11 +374,12 @@ internal static class FileAssociations
         return null;
     }
 
-    private static void WriteProgId(string progId, string exe)
+    private static void WriteProgId(string progId, string exe, string extension)
     {
         using var key = Registry.CurrentUser.CreateSubKey($@"{ClassesRoot}\{progId}");
-        key.SetValue(null, AppVersion.ProductName);
-        key.SetValue("FriendlyTypeName", AppVersion.ProductName);
+        var typeName = FormatTypeName(extension);
+        key.SetValue(null, typeName);
+        key.SetValue("FriendlyTypeName", typeName);
         using (var icon = key.CreateSubKey("DefaultIcon"))
         {
             icon.SetValue(null, $"\"{exe}\",0");
@@ -375,6 +387,26 @@ internal static class FileAssociations
 
         using var command = key.CreateSubKey(@"shell\open\command");
         command.SetValue(null, BuildOpenCommand(exe));
+    }
+
+    /// <summary>エクスプローラー等に出す種類名。</summary>
+    internal static string FormatTypeName(string extension)
+    {
+        var ext = NormalizeExtension(extension);
+        var kind = ext switch
+        {
+            ".mp3" => "MP3",
+            ".m4a" => "M4A",
+            ".aif" or ".aiff" => "AIFF",
+            _ => "Wave",
+        };
+        var name = $"{AppVersion.ProductName} {kind}";
+        if (IsPlayerOnlyExtension(ext))
+        {
+            name = $"{name} ({UiStrings.LabelFileAssociationPlayerOnly})";
+        }
+
+        return name;
     }
 
     private static void WriteExtensionDefault(string ext, string progId)

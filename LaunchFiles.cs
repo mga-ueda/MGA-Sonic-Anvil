@@ -24,6 +24,27 @@ internal static class LaunchFiles
     public static T? PreferOpened<T>(T? opened, T? existing) where T : class =>
         opened ?? existing;
 
+    /// <summary>起動パスに MP3 / M4A が1つでもあればプレイヤーで開く。</summary>
+    public static bool ContainsMp3(IEnumerable<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            var ext = Path.GetExtension(path);
+            if (ext.Equals(".mp3", StringComparison.OrdinalIgnoreCase)
+                || ext.Equals(".m4a", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static string[] Collect(IEnumerable<string> args)
     {
         var result = new List<string>();
@@ -44,16 +65,11 @@ internal static class LaunchFiles
                 continue;
             }
 
-            if (!AudioCodec.IsOpenable(full)
-                || result.Contains(full, StringComparer.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
             result.Add(full);
         }
 
-        return result.ToArray();
+        // 起動引数はプレイヤーも想定し、M4A を含める。
+        return AudioCodec.CollectPlayerOpenable(result);
     }
 
     private static bool IsFlag(string value) =>

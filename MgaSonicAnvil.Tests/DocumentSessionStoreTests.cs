@@ -422,6 +422,15 @@ public sealed class DocumentSessionStoreTests
     }
 
     [Fact]
+    public void ShouldPersistOpenDocuments_FalseInLibraryPlayer()
+    {
+        Assert.False(DocumentSessionStore.ShouldPersistOpenDocuments(libraryPlayer: true, sessionCount: 3));
+        Assert.False(DocumentSessionStore.ShouldPersistOpenDocuments(libraryPlayer: true, sessionCount: 0));
+        Assert.False(DocumentSessionStore.ShouldPersistOpenDocuments(libraryPlayer: false, sessionCount: 0));
+        Assert.True(DocumentSessionStore.ShouldPersistOpenDocuments(libraryPlayer: false, sessionCount: 1));
+    }
+
+    [Fact]
     public void SanitizeSessionFileName_KeepsFileNameOnly()
     {
         Assert.Equal("doc-0.wav", DocumentSessionStore.SanitizeSessionFileName(@"..\session\doc-0.wav"));

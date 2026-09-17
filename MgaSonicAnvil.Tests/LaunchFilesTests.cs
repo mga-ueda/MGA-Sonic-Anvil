@@ -35,6 +35,25 @@ public sealed class LaunchFilesTests
     }
 
     [Fact]
+    public void Collect_ExpandsFoldersAndSkipsUnsupported()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "mga-anvil-launch-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var wav = Path.Combine(root, "tone.wav");
+        File.WriteAllText(wav, "wav");
+        File.WriteAllText(Path.Combine(root, "readme.md"), "md");
+        try
+        {
+            var collected = LaunchFiles.Collect(["-top", root, "notes.txt"]);
+            Assert.Equal([wav], collected);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void PreferOpened_PrefersNewlyOpenedOverExisting()
     {
         var opened = new object();
@@ -42,6 +61,19 @@ public sealed class LaunchFilesTests
         Assert.Same(opened, LaunchFiles.PreferOpened(opened, existing));
         Assert.Same(existing, LaunchFiles.PreferOpened<object>(opened: null, existing));
         Assert.Null(LaunchFiles.PreferOpened<object>(opened: null, existing: null));
+    }
+
+    [Fact]
+    public void ContainsMp3_TrueIfAnyMp3MixedIn()
+    {
+        Assert.True(LaunchFiles.ContainsMp3(
+            [Path.GetFullPath("a.wav"), Path.GetFullPath("b.MP3")]));
+        Assert.True(LaunchFiles.ContainsMp3([Path.GetFullPath("only.mp3")]));
+        Assert.True(LaunchFiles.ContainsMp3([Path.GetFullPath("clip.m4a")]));
+        Assert.False(LaunchFiles.ContainsMp3(
+            [Path.GetFullPath("a.wav"), Path.GetFullPath("b.aiff")]));
+        Assert.False(LaunchFiles.ContainsMp3([]));
+        Assert.False(LaunchFiles.ContainsMp3(["", "  "]));
     }
 
     [Fact]

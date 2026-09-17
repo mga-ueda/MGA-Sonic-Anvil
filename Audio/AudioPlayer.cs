@@ -1,3 +1,4 @@
+using System.IO;
 using MgaSonicAnvil.Domain;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
@@ -249,7 +250,26 @@ internal sealed class AudioPlayer : IDisposable
             EndScrub();
         }
 
-        _provider.Bind(document, startFrame, playRange, loop, frameGain);
+        if (document.IsStreamPlayback
+            && document.SourcePath is { Length: > 0 } path
+            && File.Exists(path))
+        {
+            var stream = AudioStreamSource.Open(path);
+            try
+            {
+                _provider.BindStream(stream, document, startFrame, playRange, loop, frameGain);
+            }
+            catch
+            {
+                stream.Dispose();
+                throw;
+            }
+        }
+        else
+        {
+            _provider.Bind(document, startFrame, playRange, loop, frameGain);
+        }
+
         ApplyPlaybackRouting();
         EnsureDeviceMatchesProvider();
     }
@@ -268,7 +288,25 @@ internal sealed class AudioPlayer : IDisposable
             Pause();
         }
 
-        _provider.Bind(document, startFrame, playRange, loop, frameGain);
+        if (document.IsStreamPlayback
+            && document.SourcePath is { Length: > 0 } path
+            && File.Exists(path))
+        {
+            var stream = AudioStreamSource.Open(path);
+            try
+            {
+                _provider.BindStream(stream, document, startFrame, playRange, loop, frameGain);
+            }
+            catch
+            {
+                stream.Dispose();
+                throw;
+            }
+        }
+        else
+        {
+            _provider.Bind(document, startFrame, playRange, loop, frameGain);
+        }
     }
 
     public void Seek(long frame)
@@ -315,6 +353,13 @@ internal sealed class AudioPlayer : IDisposable
     public void BeginScrub(AudioDocument document, long frame)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (document.IsStreamPlayback)
+        {
+            // ストリーム再生ではグレインスクラブせずシークだけする。
+            EnsureBound(document, frame);
+            return;
+        }
+
         var refillQueued = _playing && !_scrubbing && _output is not AsioOut;
         EnsureBound(document, frame);
         _provider.SetScrubbing(true);
@@ -366,6 +411,12 @@ internal sealed class AudioPlayer : IDisposable
     public void CaptureScrub(AudioDocument document, long frame)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (document.IsStreamPlayback)
+        {
+            _provider.SeekFrame(frame);
+            return;
+        }
+
         _provider.CaptureScrub(document, frame);
     }
 
@@ -870,7 +921,26 @@ internal sealed class AudioPlayer : IDisposable
             return;
         }
 
-        _provider.Bind(document, frame, null, loop: false);
+        if (document.IsStreamPlayback
+            && document.SourcePath is { Length: > 0 } path
+            && File.Exists(path))
+        {
+            var stream = AudioStreamSource.Open(path);
+            try
+            {
+                _provider.BindStream(stream, document, frame, null, loop: false);
+            }
+            catch
+            {
+                stream.Dispose();
+                throw;
+            }
+        }
+        else
+        {
+            _provider.Bind(document, frame, null, loop: false);
+        }
+
         ApplyPlaybackRouting();
         EnsureDeviceMatchesProvider();
     }

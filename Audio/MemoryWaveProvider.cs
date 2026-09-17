@@ -127,6 +127,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private double _shuttleRead;
     private int _flushFadeRemaining;
     private int _flushFadeTotal;
+    private AudioStreamSource? _stream;
+    private AudioDocument? _boundDocument;
+    private float[] _streamFrame = [];
+    private float[] _streamCached = [];
+    private long _streamCachedAt = -1;
 
     /// <summary>ピッチ据え置きの早送り／巻き戻し倍率。</summary>
     internal const double FastSpeed = 3;
@@ -214,6 +219,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         lock (_gate)
         {
+            if (_stream is not null)
+            {
+                return ReferenceEquals(_boundDocument, document);
+            }
+
             return ReferenceEquals(_samples, document.Interleaved);
         }
     }
@@ -271,6 +281,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         lock (_gate)
         {
+            DisposeStreamNoLock();
+            _boundDocument = document;
             _samples = document.Interleaved;
             _usedSamples = Math.Clamp(document.SampleCount, 0, _samples.Length);
             _channels = Math.Max(1, document.Channels);
@@ -300,6 +312,75 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 ResetLoudnessNoLock();
             }
         }
+    }
+
+    /// <summary>プレイヤー用。ファイルをストリーム再生する。呼び出し側が開いた source の所有権を移す。</summary>
+    public void BindStream(
+        AudioStreamSource source,
+        AudioDocument document,
+        long startFrame,
+        WaveSelection? playRange,
+        bool loop,
+        Func<long, float>? frameGain = null)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        lock (_gate)
+        {
+            DisposeStreamNoLock();
+            _stream = source;
+            _boundDocument = document;
+            _samples = [];
+            _channels = Math.Max(1, source.Channels);
+            _sourceRate = Math.Max(1, source.SampleRate);
+            var frames = Math.Max(0, source.FrameCount);
+            var sampleCount = frames * (long)_channels;
+            _usedSamples = sampleCount > int.MaxValue ? int.MaxValue : (int)sampleCount;
+            if (_streamFrame.Length < _channels)
+            {
+                _streamFrame = new float[_channels];
+            }
+
+            if (_streamCached.Length < _channels)
+            {
+                _streamCached = new float[_channels];
+            }
+
+            _streamCachedAt = -1;
+            ApplyOutputConfig();
+            var start = Math.Clamp(startFrame, 0, frames);
+            source.SeekFrame(start);
+            _sourceFrame = start;
+            _cursor = checked((int)start * _channels);
+            _frameGain = frameGain;
+            _silenceOnly = false;
+            _flushFadeRemaining = 0;
+            _flushFadeTotal = 0;
+            _exitPlaying = false;
+            _shuttlePrimed = false;
+            _exitSpanStartFrame = -1;
+            _exitSpanEndFrame = -1;
+            // ストリームでは Exit レイヤーとシャトルは使わない。
+            _playExitLayer = false;
+            ApplyPlayWindowNoLock(playRange, loop);
+
+            Ended = false;
+            ResetMeterBuffers();
+            lock (_monitorGate)
+            {
+                _meterSourceChannels = Math.Max(1, _channels);
+                Array.Clear(_monitorRing);
+                _monitorWriteCount = 0;
+                ResetMeterIntervalNoLock();
+                ResetLoudnessNoLock();
+            }
+        }
+    }
+
+    private void DisposeStreamNoLock()
+    {
+        _stream?.Dispose();
+        _stream = null;
+        _boundDocument = null;
     }
 
     /// <summary>
@@ -521,6 +602,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             var next = Math.Clamp(frame, 0, max);
             _sourceFrame = next;
             _cursor = checked((int)next * _channels);
+            _stream?.SeekFrame(next);
+            _streamCachedAt = -1;
             // シークでジャンプしたら進行中の Exit 二重再生は直ちに止める（IM Importer と同じ）。
             _exitPlaying = false;
             _shuttlePrimed = false;
@@ -627,7 +710,10 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
-    private int UsedSampleCountNoLock() => Math.Clamp(_usedSamples, 0, _samples.Length);
+    private int UsedSampleCountNoLock() =>
+        _stream is not null
+            ? Math.Max(0, _usedSamples)
+            : Math.Clamp(_usedSamples, 0, _samples.Length);
 
     private int UsedFrameCountNoLock(int srcCh) =>
         srcCh <= 0 ? 0 : UsedSampleCountNoLock() / srcCh;
@@ -767,11 +853,13 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var srcCh = Math.Max(1, _channels);
         var outCh = Math.Max(1, _outputChannels);
         var framesWanted = count / outCh;
-        var writtenFrames = UsesNativeRead()
-            ? ReadCoreNative(buffer, offset, framesWanted, srcCh, outCh)
-            : UsesShuttleRead()
-                ? ReadCoreShuttle(buffer, offset, framesWanted, srcCh, outCh)
-                : ReadCoreResampled(buffer, offset, framesWanted, srcCh, outCh);
+        var writtenFrames = _stream is not null
+            ? ReadCoreStream(buffer, offset, framesWanted, srcCh, outCh)
+            : UsesNativeRead()
+                ? ReadCoreNative(buffer, offset, framesWanted, srcCh, outCh)
+                : UsesShuttleRead()
+                    ? ReadCoreShuttle(buffer, offset, framesWanted, srcCh, outCh)
+                    : ReadCoreResampled(buffer, offset, framesWanted, srcCh, outCh);
         var written = writtenFrames * outCh;
         if (_flushFadeTotal > 0 && written < count)
         {
@@ -823,6 +911,165 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         {
             _silenceOnly = true;
         }
+    }
+
+    /// <summary>ストリーム再生。デコードしながら進む。シャトル／Exit レイヤーは無効。</summary>
+    private int ReadCoreStream(float[] buffer, int offset, int framesWanted, int srcCh, int outCh)
+    {
+        if (_stream is null)
+        {
+            return 0;
+        }
+
+        var playEndFrame = srcCh <= 0 ? 0 : _playEnd / (double)srcCh;
+        var loopStartFrame = srcCh <= 0 ? 0 : _loopStart / (double)srcCh;
+        var step = PlaybackStep(resampled: _sourceRate != _deviceRate || Math.Abs(_playbackSpeed - 1d) > 1e-9);
+        var writtenFrames = 0;
+        var source = _streamFrame.AsSpan(0, srcCh);
+        while (writtenFrames < framesWanted)
+        {
+            if (_sourceFrame >= playEndFrame)
+            {
+                if (_loop && playEndFrame > loopStartFrame)
+                {
+                    _sourceFrame = loopStartFrame;
+                    _stream.SeekFrame((long)Math.Floor(loopStartFrame));
+                    _streamCachedAt = -1;
+                    continue;
+                }
+
+                Ended = true;
+                break;
+            }
+
+            // ストリーム再生では Silent Skip しない（デコード位置とリングが狂いやすい）。
+            if (!EnsureStreamFrameNoLock((long)Math.Floor(_sourceFrame), source))
+            {
+                if (_stream.Frame >= FrameCountOrStreamEnd(srcCh) || _sourceFrame + 1 >= playEndFrame)
+                {
+                    Ended = true;
+                    break;
+                }
+
+                // 先読み不足は無音で埋め、再生は止めない。
+                source.Clear();
+            }
+
+            var gain = _frameGain is { } gainAt ? gainAt((long)Math.Floor(_sourceFrame)) : 1f;
+            EmitFrame(buffer, offset, writtenFrames, outCh, source, gain);
+            _sourceFrame += Math.Max(step, 1e-6);
+            writtenFrames++;
+        }
+
+        _cursor = checked((int)Math.Clamp(_sourceFrame, 0, UsedFrameCountNoLock(srcCh)) * srcCh);
+        return writtenFrames;
+    }
+
+    private long FrameCountOrStreamEnd(int srcCh) =>
+        _stream?.FrameCount ?? UsedFrameCountNoLock(srcCh);
+
+    private bool EnsureStreamFrameNoLock(long frame, Span<float> dest)
+    {
+        if (_stream is null)
+        {
+            dest.Clear();
+            return false;
+        }
+
+        if (frame < 0 || frame >= UsedFrameCountNoLock(_channels))
+        {
+            dest.Clear();
+            return false;
+        }
+
+        if (_streamCachedAt == frame)
+        {
+            _streamCached.AsSpan(0, _channels).CopyTo(dest);
+            return true;
+        }
+
+        var current = _stream.Frame;
+        if (frame != current)
+        {
+            if (frame < current || frame > current + 64)
+            {
+                _stream.SeekFrame(frame);
+            }
+            else
+            {
+                while (_stream.Frame < frame)
+                {
+                    if (!_stream.TryReadFrame(_streamCached.AsSpan(0, _channels), timeoutMs: 0))
+                    {
+                        dest.Clear();
+                        _streamCachedAt = -1;
+                        return false;
+                    }
+                }
+            }
+        }
+
+        if (!_stream.TryReadFrame(_streamCached.AsSpan(0, _channels), timeoutMs: 0))
+        {
+            dest.Clear();
+            _streamCachedAt = -1;
+            return false;
+        }
+
+        // TryReadFrame 後は Frame == frame+1。キャッシュは frame の内容。
+        _streamCachedAt = frame;
+        _streamCached.AsSpan(0, _channels).CopyTo(dest);
+        return true;
+    }
+
+    private bool TrySkipStreamSilenceNoLock(double playEndFrame)
+    {
+        if (_stream is null || !_silentSkip)
+        {
+            return false;
+        }
+
+        var hold = SilentSkip.PeakWindowRadiusFrames(_sourceRate);
+        var frame = (long)Math.Floor(_sourceFrame);
+        var skipped = 0;
+        const int maxSkip = 48000;
+        while (frame < playEndFrame && skipped < maxSkip)
+        {
+            if (!EnsureStreamFrameNoLock(frame, _streamFrame.AsSpan(0, _channels)))
+            {
+                _sourceFrame = frame;
+                return false;
+            }
+
+            if (!IsScratchFrameSilent(hold))
+            {
+                _sourceFrame = frame;
+                _stream.SeekFrame(frame);
+                return skipped > 0;
+            }
+
+            frame++;
+            skipped++;
+        }
+
+        _sourceFrame = frame;
+        return skipped > 0;
+    }
+
+    private bool IsScratchFrameSilent(int hold)
+    {
+        _ = hold;
+        var peak = 0f;
+        for (var i = 0; i < _channels; i++)
+        {
+            var a = Math.Abs(_streamFrame[i]);
+            if (a > peak)
+            {
+                peak = a;
+            }
+        }
+
+        return peak < _silentSkipLinear;
     }
 
     private int ReadCoreNative(float[] buffer, int offset, int framesWanted, int srcCh, int outCh)

@@ -2239,6 +2239,7 @@ public partial class MainWindow
         ApplyChannelSolo();
         RefreshStatus();
         RefreshHistoryStrip();
+        RefreshLibraryBrowser();
         if (_document.Channels != _autoSpeakerSeenChannels)
         {
             TryApplyAutoSpeaker();

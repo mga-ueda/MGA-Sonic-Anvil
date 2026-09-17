@@ -16,6 +16,7 @@ public partial class MainWindow
     private bool _timeStretchBusy;
     private bool _tabExportBusy;
     private bool _openBusy;
+    private bool _openCancelRequested;
     private bool _historyPasteBusy;
     private bool _tabMergeBusy;
 

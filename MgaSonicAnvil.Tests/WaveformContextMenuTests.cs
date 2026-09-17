@@ -90,6 +90,11 @@ public sealed class WaveformContextMenuTests
             Assert.True(analyzers?.Checkable);
             Assert.False(analyzers?.Checked);
             Assert.Equal("F12", analyzers?.Gesture);
+            Assert.Contains(WaveMenuCommand.MaximizeLibrary, commands);
+            var library = Find(tree, WaveMenuCommand.MaximizeLibrary);
+            Assert.True(library?.Checkable);
+            Assert.False(library?.Checked);
+            Assert.Equal("F10", library?.Gesture);
             var tileGrid = Find(tree, WaveMenuCommand.TileGrid);
             Assert.True(tileGrid?.Checkable);
             Assert.True(tileGrid?.Checked);
@@ -250,6 +255,54 @@ public sealed class WaveformContextMenuTests
         });
         Assert.True(Find(waapiOn, WaveMenuCommand.PlayExit)?.Enabled);
         Assert.Equal("Alt+E", Find(waapiOn, WaveMenuCommand.PlayExit)?.Gesture);
+    }
+
+    [Fact]
+    public void Build_LibraryMaximized_GraysEditAndKeepsPlayback()
+    {
+        var tree = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasDocument = true,
+            CanEdit = false,
+            CanNavigate = true,
+            LibraryMaximized = true,
+            WaapiVisible = true,
+            WaapiExportEnabled = true,
+            HasMultipleTabs = true,
+            CanTileHorizontal = true,
+            CanTileVertical = true,
+            CanTileGrid = true,
+            HasSelection = true,
+            HasMarkers = true,
+            AllowsRegionsAndLoops = true,
+        });
+        Assert.False(Find(tree, WaveMenuCommand.Undo)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.FadeIn)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.AddMarker)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.TimeZoomIn)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.Record)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.NewDocument)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.RenameFile)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.DuplicateFile)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.DeleteFile)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.TileGrid)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.SoloNext)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.ExportWave)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.FocusTime)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.TogglePlayback)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.SelectAll)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.Open)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.Save)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.MaximizeLibrary)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.SilentSkip)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.GoStart)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.ViewWaveform)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.ViewSpectrogram)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.ViewOverlay)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.ViewLoudness)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.WaapiPanel)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.WwiseExport)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.PlayExit)?.Enabled);
     }
 
     [Fact]
