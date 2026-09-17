@@ -284,7 +284,8 @@
             </ScrollViewer>
           </DockPanel>
         </Border>
-        <DockPanel Grid.Row="1"
+        <DockPanel x:Name="TransportHost"
+                   Grid.Row="1"
                    Grid.Column="0"
                    MinHeight="{x:Static ui:DesignMetrics.TransportHostMinHeight}"
                    Background="{DynamicResource TransportBackBrush}">
@@ -316,7 +317,7 @@
           </StackPanel>
           <ui:TransportBar x:Name="Transport"
                            HorizontalAlignment="Left"
-                           VerticalAlignment="Top" />
+                           VerticalAlignment="Center" />
         </DockPanel>
         <ui:HistoryStripView x:Name="HistoryStrip"
                              Grid.Row="0"

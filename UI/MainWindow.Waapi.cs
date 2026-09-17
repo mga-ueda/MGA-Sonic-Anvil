@@ -132,7 +132,7 @@ public partial class MainWindow
 
     private void ApplyWaapiPanelVisible()
     {
-        WaapiBar.Visibility = !_waveformMaximized && _waapiPanelVisible
+        WaapiBar.Visibility = _waveformMaximizeMode != WaveformMaximizeMode.Waveform && _waapiPanelVisible
             ? System.Windows.Visibility.Visible
             : System.Windows.Visibility.Collapsed;
         if (_waapiToggle is not null)

@@ -9,7 +9,7 @@
              MinHeight="{x:Static ui:DesignMetrics.TransportBarHeight}"
              Background="{DynamicResource TransportBackBrush}">
   <StackPanel HorizontalAlignment="Left"
-              VerticalAlignment="Top"
+              VerticalAlignment="Center"
               Margin="8,2,8,0">
     <StackPanel x:Name="TopRow"
                 Orientation="Horizontal" />

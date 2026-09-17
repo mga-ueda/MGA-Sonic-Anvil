@@ -62,7 +62,7 @@ public partial class MainWindow : Window
     private bool _syncingChrome;
     private bool _syncingSpeakers;
     private int _waveformHeightScale;
-    private bool _waveformMaximized;
+    private WaveformMaximizeMode _waveformMaximizeMode;
     private WindowState _windowStateBeforeWaveformMax;
     private WindowStyle _windowStyleBeforeWaveformMax;
     private ResizeMode _resizeModeBeforeWaveformMax;
@@ -777,7 +777,7 @@ public partial class MainWindow : Window
         _closing = true;
         // 未保存の録音 WAV 書き出しより先に実音を止める。保存を先にすると長く鳴り続ける。
         _player.BeginShutdownFlush();
-        if (_waveformMaximized)
+        if (IsWaveformMaximized)
         {
             WindowPlacement.Capture(
                 _boundsBeforeWaveformMax,
@@ -879,7 +879,7 @@ public partial class MainWindow : Window
     private void ApplyMeterColumnWidth(double preferred)
     {
         _meterColumnPreferred = DesignMetrics.ClampMeterColumnWidth(preferred);
-        if (_waveformMaximized)
+        if (_waveformMaximizeMode == WaveformMaximizeMode.Waveform)
         {
             return;
         }
@@ -887,9 +887,10 @@ public partial class MainWindow : Window
         var channels = _document?.Channels ?? 2;
         var max = LevelMeterSurroundLayout.FilledColumnWidth(channels);
         var width = Math.Min(_meterColumnPreferred, max);
-        MeterColumnDef.MinWidth = DesignMetrics.LevelMeterWidth;
-        MeterColumnDef.MaxWidth = max;
-        MeterColumnDef.Width = new GridLength(width);
+        var scale = AnalyzerMaximizeLayoutScale;
+        MeterColumnDef.MinWidth = DesignMetrics.LevelMeterWidth * scale;
+        MeterColumnDef.MaxWidth = max * scale;
+        MeterColumnDef.Width = new GridLength(width * scale);
         var canResize = max > DesignMetrics.LevelMeterWidth + 0.5;
         MeterColumnSplitter.IsEnabled = canResize;
         MeterColumnSplitter.Cursor = canResize ? Cursors.SizeWE : Cursors.Arrow;
@@ -900,12 +901,18 @@ public partial class MainWindow : Window
         var raw = MeterColumnDef.ActualWidth > 0
             ? MeterColumnDef.ActualWidth
             : MeterColumnDef.Width.Value;
+        var scale = AnalyzerMaximizeLayoutScale;
+        if (scale > 1.0001)
+        {
+            raw /= scale;
+        }
+
         return DesignMetrics.ClampMeterColumnWidth(raw, _document?.Channels ?? 2);
     }
 
     private void PersistMeterColumnWidth()
     {
-        if (_waveformMaximized)
+        if (_waveformMaximizeMode == WaveformMaximizeMode.Waveform)
         {
             return;
         }

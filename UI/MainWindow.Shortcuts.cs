@@ -197,6 +197,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.F12 && modifiers == ModifierKeys.None)
+        {
+            ToggleAnalyzerMaximize();
+            return true;
+        }
+
         if (TryConsumeRecordingShortcut(key, modifiers))
         {
             StopPlaybackShuttle();
@@ -879,9 +885,9 @@ public partial class MainWindow
             return true;
         }
 
-        if (_waveformMaximized)
+        if (IsWaveformMaximized)
         {
-            SetWaveformMaximized(false);
+            SetWaveformMaximizeMode(WaveformMaximizeMode.Off);
             return true;
         }
 

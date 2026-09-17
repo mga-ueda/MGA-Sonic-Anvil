@@ -182,7 +182,8 @@ public partial class MainWindow
             CanTileHorizontal = CanOfferTileArrange(WaveformTileArrange.Horizontal),
             CanTileVertical = CanOfferTileArrange(WaveformTileArrange.Vertical),
             CanTileGrid = CanOfferTileArrange(WaveformTileArrange.Grid),
-            WaveformMaximized = _waveformMaximized,
+            WaveformMaximized = _waveformMaximizeMode == WaveformMaximizeMode.Waveform,
+            AnalyzersMaximized = _waveformMaximizeMode == WaveformMaximizeMode.Analyzers,
             CanLoopPlay = canNavigate
                 && (hasSelection
                     || !document!.SampleLoop.IsEmpty
@@ -431,6 +432,9 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.MaximizeWaveform:
                 ToggleWaveformMaximize();
+                break;
+            case WaveMenuCommand.MaximizeAnalyzers:
+                ToggleAnalyzerMaximize();
                 break;
             case WaveMenuCommand.SoloNext:
                 CycleChannelSolo(1);

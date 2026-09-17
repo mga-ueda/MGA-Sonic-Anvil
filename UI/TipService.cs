@@ -59,7 +59,7 @@ internal static class TipService
 
     public static bool Pinned => _pinned;
 
-    /// <summary>波形最大化中は枠を出さない。解除すると Tips のオン／オフに戻す。</summary>
+    /// <summary>F11 波形最大化中は枠を出さない。解除すると Tips のオン／オフに戻す。</summary>
     public static void SetHostSuppressed(bool suppressed)
     {
         if (_hostSuppressed == suppressed)

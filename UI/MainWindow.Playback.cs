@@ -1116,26 +1116,36 @@ public partial class MainWindow
         WaveformHostBorder.MinHeight = DesignMetrics.WaveformHostMinHeight * _waveformHeightScale;
     }
 
-    private void ToggleWaveformMaximize() => SetWaveformMaximized(!_waveformMaximized);
+    private void ToggleWaveformMaximize() => SetWaveformMaximizeMode(
+        _waveformMaximizeMode == WaveformMaximizeMode.Waveform
+            ? WaveformMaximizeMode.Off
+            : WaveformMaximizeMode.Waveform);
 
-    internal bool IsWaveformMaximized => _waveformMaximized;
+    private void ToggleAnalyzerMaximize() => SetWaveformMaximizeMode(
+        _waveformMaximizeMode == WaveformMaximizeMode.Analyzers
+            ? WaveformMaximizeMode.Off
+            : WaveformMaximizeMode.Analyzers);
+
+    internal bool IsWaveformMaximized => _waveformMaximizeMode != WaveformMaximizeMode.Off;
 
     internal void RefreshWaveformFullscreenFrame()
     {
-        if (_waveformMaximized)
+        if (IsWaveformMaximized)
         {
             ApplyWaveformFullscreenFrame();
         }
     }
 
-    private void SetWaveformMaximized(bool maximized)
+    private void SetWaveformMaximizeMode(WaveformMaximizeMode mode)
     {
-        if (_waveformMaximized == maximized)
+        if (_waveformMaximizeMode == mode)
         {
             return;
         }
 
-        if (maximized)
+        var wasFullscreen = IsWaveformMaximized;
+        var wantFullscreen = mode != WaveformMaximizeMode.Off;
+        if (wantFullscreen && !wasFullscreen)
         {
             _windowStateBeforeWaveformMax = WindowState;
             _windowStyleBeforeWaveformMax = WindowStyle;
@@ -1143,14 +1153,19 @@ public partial class MainWindow
             _boundsBeforeWaveformMax = WindowState == WindowState.Normal
                 ? new Rect(Left, Top, Width, Height)
                 : RestoreBounds;
-            _waveformMaximized = true;
+            _waveformMaximizeMode = mode;
             ApplyWaveformMaximizeChrome();
             ApplyWaveformFullscreenFrame();
         }
+        else if (!wantFullscreen)
+        {
+            _waveformMaximizeMode = WaveformMaximizeMode.Off;
+            RestoreWaveformWindowFrame();
+            ApplyWaveformMaximizeChrome();
+        }
         else
         {
-            _waveformMaximized = false;
-            RestoreWaveformWindowFrame();
+            _waveformMaximizeMode = mode;
             ApplyWaveformMaximizeChrome();
         }
 
@@ -1194,16 +1209,36 @@ public partial class MainWindow
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
     }
 
+    private double AnalyzerMaximizeLayoutScale =>
+        _waveformMaximizeMode == WaveformMaximizeMode.Analyzers
+            ? DesignMetrics.AnalyzerMaximizeScale
+            : 1d;
+
+    private void ApplyAnalyzerMaximizeScale()
+    {
+        var transform = AnalyzerMaximizeLayoutScale > 1.0001
+            ? UiScaleService.CreatePublishedTransform(AnalyzerMaximizeLayoutScale)
+            : Transform.Identity;
+        LevelMeter.LayoutTransform = transform;
+        VectorScope.LayoutTransform = transform;
+        LoudnessMeter.LayoutTransform = transform;
+        Spectrum.LayoutTransform = transform;
+    }
+
     private void ApplyWaveformMaximizeChrome()
     {
-        var show = !_waveformMaximized;
+        var show = _waveformMaximizeMode != WaveformMaximizeMode.Waveform;
         var visibility = show ? Visibility.Visible : Visibility.Collapsed;
         StatusBarHost.Visibility = Visibility.Visible;
         OverviewHost.Visibility = Visibility.Visible;
         TransportChromeHost.Visibility = visibility;
+        DocumentTabHost.Visibility = Visibility.Visible;
+        TransportHost.Visibility = Visibility.Visible;
+        HistoryStrip.Visibility = Visibility.Visible;
         MeterColumn.Visibility = visibility;
         MeterColumnSplitter.Visibility = visibility;
-        TipService.SetHostSuppressed(!show);
+        ApplyAnalyzerMaximizeScale();
+        TipService.SetHostSuppressed(_waveformMaximizeMode == WaveformMaximizeMode.Waveform);
         ApplyWaapiPanelVisible();
         PrimaryWaveform.ShowScaleLane = show;
         ForEachWaveform(view => view.ShowScaleLane = show);
@@ -1211,16 +1246,25 @@ public partial class MainWindow
         OverviewScaleColumn.Width = show
             ? DesignMetrics.DbScaleWidthGrid
             : new GridLength(0);
-        if (show)
+        if (!show)
         {
-            WorkGrid.RowDefinitions[1].Height = DesignMetrics.TransportChromeHeightGrid;
-            ApplyMeterColumnWidth(_meterColumnPreferred);
+            WorkGrid.RowDefinitions[1].Height = new GridLength(0);
+            MeterColumnDef.MinWidth = 0;
+            MeterColumnDef.MaxWidth = 0;
+            MeterColumnDef.Width = new GridLength(0);
             return;
         }
 
-        WorkGrid.RowDefinitions[1].Height = new GridLength(0);
-        MeterColumnDef.MinWidth = 0;
-        MeterColumnDef.MaxWidth = 0;
-        MeterColumnDef.Width = new GridLength(0);
+        WorkGrid.RowDefinitions[1].Height = new GridLength(Math.Max(
+            DesignMetrics.TransportChromeHeight,
+            DesignMetrics.SpectrumHeight * AnalyzerMaximizeLayoutScale));
+        ApplyMeterColumnWidth(_meterColumnPreferred);
     }
+}
+
+internal enum WaveformMaximizeMode
+{
+    Off,
+    Waveform,
+    Analyzers,
 }

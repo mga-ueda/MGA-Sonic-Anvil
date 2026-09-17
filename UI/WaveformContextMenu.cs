@@ -81,6 +81,7 @@ internal enum WaveMenuCommand
     CenterPlayhead,
     CenterLock,
     MaximizeWaveform,
+    MaximizeAnalyzers,
     ViewWaveform,
     ViewSpectrogram,
     ViewOverlay,
@@ -196,6 +197,7 @@ internal sealed class WaveformContextMenuModel
     public bool CanTileVertical { get; init; }
     public bool CanTileGrid { get; init; }
     public bool WaveformMaximized { get; init; }
+    public bool AnalyzersMaximized { get; init; }
     public bool CanLoopPlay { get; init; }
     public bool CanAddMarkerHere { get; init; }
     public WaveformAnalysisView AnalysisView { get; init; }
@@ -522,6 +524,7 @@ internal static class WaveformContextMenuBuilder
         Check(UiStrings.WaveMenuViewLoudness, WaveMenuCommand.ViewLoudness, "V", m.AnalysisView == WaveformAnalysisView.Loudness, m.HasDocument && !m.IsBusy),
         WaveMenuSeparatorEntry.Instance,
         Check(UiStrings.WaveMenuMaximizeWaveform, WaveMenuCommand.MaximizeWaveform, "F11", m.WaveformMaximized, enabled: true),
+        Check(UiStrings.WaveMenuMaximizeAnalyzers, WaveMenuCommand.MaximizeAnalyzers, "F12", m.AnalyzersMaximized, enabled: true),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuSoloNext, WaveMenuCommand.SoloNext, "Tab", m.CanNavigate),
         Cmd(UiStrings.WaveMenuSoloPrev, WaveMenuCommand.SoloPrev, "Shift+Tab", m.CanNavigate),

@@ -200,6 +200,12 @@ internal static class DesignMetrics
 
     public static double StatusTimecodeLabelWidth => From96(22);
 
+    /// <summary>
+    /// F12 アナライザー最大化でのメーター／スペアナ／ラウドネス／ゴニオの倍率。
+    /// DIP のまま掛けるので、OS の DPI とアプリの表示倍率は別途乗る。
+    /// </summary>
+    public const double AnalyzerMaximizeScale = 1.5;
+
     /// <summary>スペアナ全体（LED メーター + 下の周波数数値）。ゴニオ＋位相バーと同じ高さ。</summary>
     public static double SpectrumHeight => VectorScopeHeight;
 

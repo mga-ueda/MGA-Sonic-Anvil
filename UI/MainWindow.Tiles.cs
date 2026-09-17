@@ -496,16 +496,17 @@ public partial class MainWindow
     /// <summary>
     /// F11 最大化中だけ、隣の波形と地続きに見えないよう右端に縦仕切りを入れる。
     /// 配色はチャンネル名・dB 目盛り列と同じ。横の境目はファイル名帯が仕切りになるので入れない。
-    /// 通常表示ではラベル列が残るため仕切りは不要。
+    /// 通常表示と F12 ではラベル列が残るため仕切りは不要。
     /// </summary>
     private void ApplyTileDivider(Border host, WaveformTileCell cell, int cols)
     {
-        var divider = _waveformMaximized && cell.Column + cell.ColumnSpan < cols;
+        var divider = _waveformMaximizeMode == WaveformMaximizeMode.Waveform
+            && cell.Column + cell.ColumnSpan < cols;
         host.BorderThickness = new Thickness(0, 0, divider ? TileDividerWidth : 0, 0);
         host.SetResourceReference(Border.BorderBrushProperty, "TimelineWellBackBrush");
     }
 
-    /// <summary>F11 の出入りで既存タイル（埋め草含む）の縦仕切りを付け外しする。</summary>
+    /// <summary>F11 / F12 の出入りで既存タイル（埋め草含む）の縦仕切りを付け外しする。</summary>
     private void RefreshTileDividers()
     {
         if (!_tileMode || _tileGrid is null)
@@ -815,7 +816,7 @@ public partial class MainWindow
             session.PlayheadFrame);
         view.RestoreSelectedMarkers(session.SelectedMarkerFrames);
         view.LoopEnabled = session.LoopEnabled;
-        view.ShowScaleLane = !_waveformMaximized;
+        view.ShowScaleLane = _waveformMaximizeMode != WaveformMaximizeMode.Waveform;
         view.SetSoloMask(session.SoloMask);
         view.ApplySpeakerLayout(
             AppStorage.Settings.ResolvedPlaybackLayout(),
