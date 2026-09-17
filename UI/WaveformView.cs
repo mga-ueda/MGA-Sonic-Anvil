@@ -5724,7 +5724,7 @@ internal sealed class WaveformView : Grid
             text,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            WpfControlHelpers.MonoTypeface,
+            new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
             10,
             WpfControlHelpers.FrozenBrush(Theme.Get(brushKey)),
             pixelsPerDip);
