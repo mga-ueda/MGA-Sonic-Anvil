@@ -207,7 +207,7 @@ internal sealed class LoudnessMeterView : Grid
         _safeChipBrush = ShadeBrush(_safeBrush);
         _cautionChipBrush = ShadeBrush(_cautionBrush);
         _dangerChipBrush = ShadeBrush(_dangerBrush);
-        var chrome = ChromeFore();
+        var chrome = MutedFore();
         foreach (var block in ChromeBlocks())
         {
             block.Foreground = chrome;
@@ -261,8 +261,6 @@ internal sealed class LoudnessMeterView : Grid
 
     internal static Color ChipTextColor(UiTheme theme) =>
         theme == UiTheme.Light ? Colors.White : Colors.Black;
-
-    internal static string ChromeForeKey(UiTheme _) => "MutedForeBrush";
 
     internal static Color ShadeChipFill(Color color, UiTheme theme)
     {
@@ -529,22 +527,6 @@ internal sealed class LoudnessMeterView : Grid
 
     private static Brush ChipFore() => Freeze(ChipTextColor(UiThemeService.Current));
 
-    private static Brush ChromeFore()
-    {
-        var theme = UiThemeService.Current;
-        try
-        {
-            return WpfControlHelpers.FrozenBrush(Theme.Get(ChromeForeKey(theme)));
-        }
-        catch (InvalidOperationException)
-        {
-            return Freeze(
-                theme == UiTheme.Light
-                    ? Color.FromRgb(0x3F, 0x3F, 0x42)
-                    : Color.FromRgb(0x96, 0x96, 0x96));
-        }
-    }
-
     private static Brush ShadeBrush(Brush source)
     {
         var color = source is SolidColorBrush solid ? solid.Color : Colors.Gray;
@@ -562,13 +544,17 @@ internal sealed class LoudnessMeterView : Grid
 
     private static Brush MutedFore()
     {
+        var theme = UiThemeService.Current;
         try
         {
             return WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
         }
         catch (InvalidOperationException)
         {
-            return Freeze(Color.FromRgb(0x96, 0x96, 0x96));
+            return Freeze(
+                theme == UiTheme.Light
+                    ? Color.FromRgb(0x3F, 0x3F, 0x42)
+                    : Color.FromRgb(0x96, 0x96, 0x96));
         }
     }
 

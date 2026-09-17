@@ -111,16 +111,6 @@ internal static class WpfControlHelpers
             brush,
             pixelsPerDip);
 
-    public static FormattedText MonoText(string text, double fontSize, Brush brush, double pixelsPerDip) =>
-        new(
-            text,
-            CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight,
-            MonoTypeface,
-            fontSize,
-            brush,
-            pixelsPerDip);
-
     public static FormattedText MonoRegularText(string text, double fontSize, Brush brush, double pixelsPerDip) =>
         new(
             text,

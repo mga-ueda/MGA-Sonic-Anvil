@@ -284,8 +284,7 @@
             </ScrollViewer>
           </DockPanel>
         </Border>
-        <DockPanel x:Name="TransportHost"
-                   Grid.Row="1"
+        <DockPanel Grid.Row="1"
                    Grid.Column="0"
                    MinHeight="{x:Static ui:DesignMetrics.TransportHostMinHeight}"
                    Background="{DynamicResource TransportBackBrush}">

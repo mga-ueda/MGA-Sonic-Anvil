@@ -1232,9 +1232,6 @@ public partial class MainWindow
         StatusBarHost.Visibility = Visibility.Visible;
         OverviewHost.Visibility = Visibility.Visible;
         TransportChromeHost.Visibility = visibility;
-        DocumentTabHost.Visibility = Visibility.Visible;
-        TransportHost.Visibility = Visibility.Visible;
-        HistoryStrip.Visibility = Visibility.Visible;
         MeterColumn.Visibility = visibility;
         MeterColumnSplitter.Visibility = visibility;
         ApplyAnalyzerMaximizeScale();

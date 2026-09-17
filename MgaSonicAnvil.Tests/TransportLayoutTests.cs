@@ -79,12 +79,6 @@ public sealed class TransportLayoutTests
     public void AnalyzerMaximizeScale_IsOnePointFiveOnDipMetrics()
     {
         Assert.Equal(1.5, DesignMetrics.AnalyzerMaximizeScale);
-        Assert.Equal(
-            DesignMetrics.LevelMeterWidth * 1.5,
-            DesignMetrics.LevelMeterWidth * DesignMetrics.AnalyzerMaximizeScale);
-        Assert.Equal(
-            DesignMetrics.SpectrumHeight * 1.5,
-            DesignMetrics.SpectrumHeight * DesignMetrics.AnalyzerMaximizeScale);
         var transform = UiScaleService.CreatePublishedTransform(DesignMetrics.AnalyzerMaximizeScale);
         var scale = Assert.IsType<ScaleTransform>(transform);
         Assert.Equal(1.5, scale.ScaleX);
