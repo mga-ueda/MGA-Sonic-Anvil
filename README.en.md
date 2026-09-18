@@ -10,7 +10,7 @@ Hear, cut, mark, and loop game audio — then hand a Wave-only structure to Wwis
 
 Fade, normalize, ripple-delete, copy / paste, markers / regions / sample loop, and a spectrogram — decide by ear and commit. You can prep game one-shots and loops here without bouncing between a DAW and a dedicated editor.
 
-**Several files can be tiled for comparison, not just tabbed.** Ctrl+T cycles side by side / stacked / grid; the right-click menu picks one directly. A setting chooses the default arrangement applied after opening multiple files. While tiled, Ctrl+F searches tab names (space = AND, `|` = OR) and dims non-matching tiles under frosted glass.
+**Several files can be tiled for comparison, not just tabbed.** Ctrl+T cycles side by side / stacked / grid; the right-click menu picks one directly. A setting chooses the default arrangement applied after opening multiple files. While tiled, Ctrl+F searches tab names (space = AND, `|` = OR) and dims non-matching tiles under frosted glass. Alt+Enter closes tiles that did not match (keeps unsaved; no prompt; clears the filter).
 
 **EXPORT talks to Wwise in Wave-only mode.** Turn on WAAPI above the level meter, pick a destination, and EXPORT writes the source wave into Originals and imports it as a Music Playlist Container (-A / -L / -E and the sample loop; markers are not Custom Cues). Play -E previews the loop wrap and writes Play post-exit on EXPORT.
 

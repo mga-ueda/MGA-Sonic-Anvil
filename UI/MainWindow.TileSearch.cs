@@ -12,16 +12,14 @@ public partial class MainWindow
     /// <summary>
     /// タイル表示専用のタブ名フィルター。Ctrl+F で開き、1 文字ごとに判定する。
     /// 空白区切りは AND、| 区切りは OR。ヒットしないタイルは暗くしてすりガラスで覆う。
-    /// Enter で条件を確定、Esc は開いた時点の文字列へ戻すキャンセル、空欄で解除。
+    /// Enter で条件を確定、Alt+Enter はヒット以外を閉じてフィルター解除（未保存は残す。確認なし）。
+    /// Esc は開いた時点の文字列へ戻すキャンセル、空欄で解除。
     /// Ctrl+Shift+F はボックスを出さずに検索ワードを空にして確定（フィルター解除）する。
     /// </summary>
     private readonly List<string[]> _tileSearchGroups = [];
 
     /// <summary>Esc キャンセルで戻す、検索ボックスを開いた時点の文字列。</summary>
     private string _tileSearchTextAtOpen = string.Empty;
-
-    private static readonly char[] TileSearchOrSeparators = ['|', '｜'];
-    private static readonly char[] TileSearchAndSeparators = [' ', '\u3000', '\t'];
 
     private bool IsTileSearchFocused => TileSearchBox.IsKeyboardFocusWithin;
 
@@ -30,7 +28,7 @@ public partial class MainWindow
 
     /// <summary>
     /// 他のショートカットより先に呼ぶ。Ctrl+F はタイル表示のときだけ検索を開く。
-    /// ボックスにフォーカスがある間は Enter（確定）と Esc（キャンセル）だけ拾う。
+    /// ボックスにフォーカスがある間は Enter（確定）／Alt+Enter（ヒット以外を閉じる）と Esc（キャンセル）だけ拾う。
     /// </summary>
     private bool TryProcessTileSearchKey(Key key, ModifierKeys modifiers)
     {
@@ -68,6 +66,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.Enter && modifiers == ModifierKeys.Alt)
+        {
+            CommitTileSearchKeepHits();
+            return true;
+        }
+
         if (key == Key.Escape && modifiers == ModifierKeys.None)
         {
             CancelTileSearch();
@@ -102,6 +106,82 @@ public partial class MainWindow
         }
 
         HideTileSearchBox();
+    }
+
+    /// <summary>
+    /// Alt+Enter。ヒットしなかったタブを閉じ、未保存の編集があるタブは残す。確認は出さない。
+    /// 閉じたあとフィルターは解除する。
+    /// </summary>
+    private void CommitTileSearchKeepHits()
+    {
+        ClearTabSelection();
+        if (_tileSearchGroups.Count == 0)
+        {
+            CloseTileSearch();
+            return;
+        }
+
+        var drop = new List<DocumentSession>();
+        foreach (var session in TileSearchQuery.SessionsToDrop(_sessions, _tileSearchGroups))
+        {
+            if (ReferenceEquals(session, _recordSession))
+            {
+                continue;
+            }
+
+            drop.Add(session);
+        }
+
+        if (drop.Count > 0)
+        {
+            CloseUnmatchedTileSearchSessions(drop);
+        }
+
+        CloseTileSearch();
+    }
+
+    private void CloseUnmatchedTileSearchSessions(IReadOnlyList<DocumentSession> drop)
+    {
+        var dropSet = drop as HashSet<DocumentSession> ?? [.. drop];
+        DocumentSession? nextActive = null;
+        if (_activeSession is { } active && !dropSet.Contains(active))
+        {
+            nextActive = active;
+        }
+        else
+        {
+            foreach (var session in _sessions)
+            {
+                if (!dropSet.Contains(session))
+                {
+                    nextActive = session;
+                    break;
+                }
+            }
+        }
+
+        if (_activeSession is { } closing && dropSet.Contains(closing))
+        {
+            CaptureActiveSessionView();
+        }
+
+        DropLibrarySessionsFast(drop);
+        if (_sessions.Count == 0)
+        {
+            BindWorkspace(null);
+            ForgetClosedDocument();
+            return;
+        }
+
+        if (!ReferenceEquals(_activeSession, nextActive))
+        {
+            BindWorkspace(nextActive);
+            return;
+        }
+
+        RebuildTabBar();
+        RefreshStatus();
+        NotifyWaveformSessionsChanged();
     }
 
     /// <summary>Esc。開いた時点の文字列へ戻してボックスを閉じる。戻した文字列のフィルターは残る。</summary>
@@ -157,45 +237,12 @@ public partial class MainWindow
     private void ParseTileSearch(string text)
     {
         _tileSearchGroups.Clear();
-        foreach (var group in text.Split(TileSearchOrSeparators, StringSplitOptions.RemoveEmptyEntries))
-        {
-            var terms = group.Split(TileSearchAndSeparators, StringSplitOptions.RemoveEmptyEntries);
-            if (terms.Length > 0)
-            {
-                _tileSearchGroups.Add(terms);
-            }
-        }
+        _tileSearchGroups.AddRange(TileSearchQuery.Parse(text));
     }
 
     /// <summary>どれかの OR グループの全語（AND）をタブ名が含めばヒット。</summary>
-    private bool TileSearchMatches(DocumentSession session)
-    {
-        if (_tileSearchGroups.Count == 0)
-        {
-            return true;
-        }
-
-        var name = session.DisplayName;
-        foreach (var terms in _tileSearchGroups)
-        {
-            var all = true;
-            foreach (var term in terms)
-            {
-                if (!name.Contains(term, StringComparison.OrdinalIgnoreCase))
-                {
-                    all = false;
-                    break;
-                }
-            }
-
-            if (all)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
+    private bool TileSearchMatches(DocumentSession session) =>
+        TileSearchQuery.Matches(session.DisplayName, _tileSearchGroups);
 
     private const double TileSearchBlurRadius = 8;
 

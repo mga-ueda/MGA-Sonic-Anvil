@@ -237,7 +237,7 @@ public partial class MainWindow
             return true;
         }
 
-        // タイル検索。Ctrl+F で開き、ボックス内では Enter / Esc だけ拾う。
+        // タイル検索。Ctrl+F で開き、ボックス内では Enter / Alt+Enter / Esc を拾う。
         if (TryProcessTileSearchKey(key, modifiers))
         {
             return true;

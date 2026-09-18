@@ -220,6 +220,8 @@
                 <TextBlock x:Name="TileSearchHint"
                            FontSize="10.5"
                            Margin="0,6,0,0"
+                           TextWrapping="Wrap"
+                           MaxWidth="348"
                            Foreground="{DynamicResource MutedForeBrush}" />
               </StackPanel>
             </Border>
