@@ -59,5 +59,6 @@ public sealed class LibraryExplorerPathsTests
         Assert.Equal(min, DesignMetrics.ClampLibraryExplorerWidth(min - 10));
         Assert.Equal(max, DesignMetrics.ClampLibraryExplorerWidth(max + 50));
         Assert.Equal(min + 40, DesignMetrics.ClampLibraryExplorerWidth(min + 40));
+        Assert.Equal(1, DesignMetrics.LibraryExplorerSplitterWidth);
     }
 }

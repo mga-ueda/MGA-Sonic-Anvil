@@ -53,6 +53,7 @@ internal static partial class UiStrings
             "SurfaceBack" => Get("基本背景", "Base background"),
             "ChromeBack" => Get("クローム背景", "Chrome background"),
             "ChromeBorder" => Get("クローム境界", "Chrome border"),
+            "LibraryExplorerSplitter" => Get("プレイヤー・ツリー区切り", "Player · tree splitter"),
             "ChromeMid" => Get("中間グレー", "Mid gray"),
             "ChromeDim" => Get("無効／薄いグレー", "Disabled / dim gray"),
             "PrimaryFore" => Get("標準文字", "Standard text"),

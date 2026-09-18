@@ -224,6 +224,9 @@ internal static class DesignMetrics
     /// <summary>F10 フォルダツリーの最大幅。</summary>
     public static double LibraryExplorerMaxWidth => From96(480);
 
+    /// <summary>F10 フォルダツリーとリストの区切り。1px。</summary>
+    public static double LibraryExplorerSplitterWidth => From96(1);
+
     public static double ClampLibraryExplorerWidth(double width)
     {
         if (width <= 0)
