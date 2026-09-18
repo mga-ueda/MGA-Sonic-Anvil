@@ -51,6 +51,25 @@ public sealed class TileSearchQueryTests
         Assert.Same(cleanMiss, Assert.Single(drop));
     }
 
+    [Fact]
+    public void SessionsToDrop_EmptyQuery_DropsNone()
+    {
+        var miss = Session("se_hit.wav", dirty: false);
+        var drop = TileSearchQuery.SessionsToDrop([miss], []);
+        Assert.Empty(drop);
+        Assert.Empty(TileSearchQuery.SessionsToDrop([miss], TileSearchQuery.Parse("   ")));
+    }
+
+    [Fact]
+    public void SessionsToDrop_UsesSnapshot_NotLaterClearedGroups()
+    {
+        var miss = Session("se_hit.wav", dirty: false);
+        var snapshot = TileSearchQuery.Parse("bgm");
+        var drop = TileSearchQuery.SessionsToDrop([miss], snapshot);
+        Assert.Same(miss, Assert.Single(drop));
+        Assert.Empty(TileSearchQuery.SessionsToDrop([miss], []));
+    }
+
     private static DocumentSession Session(string name, bool dirty)
     {
         var document = new AudioDocument(

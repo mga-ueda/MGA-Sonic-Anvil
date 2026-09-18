@@ -55,6 +55,22 @@ public partial class MainWindow
             return true;
         }
 
+        // Alt でボックスからフォーカスが外れても、フィルター中／ボックス表示中は閉じる。
+        // 空クエリは全件ヒット扱いなので、解除してから判定すると誰も閉じない。
+        if (key == Key.Enter && modifiers == ModifierKeys.Alt)
+        {
+            if (!_tileMode
+                || (!IsTileSearchFocused
+                    && TileSearchHost.Visibility != Visibility.Visible
+                    && !TileSearchFilterActive))
+            {
+                return false;
+            }
+
+            CommitTileSearchKeepHits();
+            return true;
+        }
+
         if (!IsTileSearchFocused || ImeComposition.IsComposing)
         {
             return false;
@@ -63,12 +79,6 @@ public partial class MainWindow
         if (key == Key.Enter && modifiers == ModifierKeys.None)
         {
             CommitTileSearch();
-            return true;
-        }
-
-        if (key == Key.Enter && modifiers == ModifierKeys.Alt)
-        {
-            CommitTileSearchKeepHits();
             return true;
         }
 
@@ -114,15 +124,10 @@ public partial class MainWindow
     /// </summary>
     private void CommitTileSearchKeepHits()
     {
-        ClearTabSelection();
-        if (_tileSearchGroups.Count == 0)
-        {
-            CloseTileSearch();
-            return;
-        }
-
+        // フィルター解除より先に条件を固定する。空条件は全件ヒットなので、先に消すと閉じる対象が無くなる。
+        var groups = SnapshotTileSearchGroups();
         var drop = new List<DocumentSession>();
-        foreach (var session in TileSearchQuery.SessionsToDrop(_sessions, _tileSearchGroups))
+        foreach (var session in TileSearchQuery.SessionsToDrop(_sessions, groups))
         {
             if (ReferenceEquals(session, _recordSession))
             {
@@ -138,6 +143,17 @@ public partial class MainWindow
         }
 
         CloseTileSearch();
+    }
+
+    /// <summary>今画面に効いている条件。TextChanged で消えたあとも、残っているグループを優先する。</summary>
+    private List<string[]> SnapshotTileSearchGroups()
+    {
+        if (_tileSearchGroups.Count > 0)
+        {
+            return [.. _tileSearchGroups];
+        }
+
+        return TileSearchQuery.Parse(TileSearchBox.Text);
     }
 
     private void CloseUnmatchedTileSearchSessions(IReadOnlyList<DocumentSession> drop)
@@ -176,11 +192,14 @@ public partial class MainWindow
         if (!ReferenceEquals(_activeSession, nextActive))
         {
             BindWorkspace(nextActive);
-            return;
+        }
+        else
+        {
+            RebuildTabBar();
+            RefreshStatus();
         }
 
-        RebuildTabBar();
-        RefreshStatus();
+        // 前面タブを差し替えただけでは古いタイルが残る。フィルター解除より先に張り直す。
         NotifyWaveformSessionsChanged();
     }
 
