@@ -195,5 +195,61 @@ public sealed class WindowPlacementTests
         Assert.Equal(WindowPlacement.ToStoredExtent(1600), settings.WindowWidth);
         Assert.Equal(WindowPlacement.ToStoredExtent(900), settings.WindowHeight);
         Assert.Equal(nameof(WindowState.Maximized), settings.WindowState);
+        Assert.Equal(0, settings.PlayerWindowWidth);
+        Assert.Equal(string.Empty, settings.PlayerWindowState);
+    }
+
+    [Fact]
+    public void CapturePlayer_WritesSeparateSlot()
+    {
+        var settings = new AppSettings();
+        WindowPlacement.Capture(new Rect(10, 20, 1600, 900), maximized: false, settings);
+        WindowPlacement.CapturePlayer(new Rect(80, 40, 1100, 700), maximized: true, settings);
+        Assert.Equal(10, settings.WindowX);
+        Assert.Equal(20, settings.WindowY);
+        Assert.Equal(WindowPlacement.ToStoredExtent(1600), settings.WindowWidth);
+        Assert.Equal(WindowPlacement.ToStoredExtent(900), settings.WindowHeight);
+        Assert.Equal(nameof(WindowState.Normal), settings.WindowState);
+        Assert.Equal(80, settings.PlayerWindowX);
+        Assert.Equal(40, settings.PlayerWindowY);
+        Assert.Equal(WindowPlacement.ToStoredExtent(1100), settings.PlayerWindowWidth);
+        Assert.Equal(WindowPlacement.ToStoredExtent(700), settings.PlayerWindowHeight);
+        Assert.Equal(nameof(WindowState.Maximized), settings.PlayerWindowState);
+    }
+
+    [Fact]
+    public void TryReadPlayer_RejectsUnsetSize()
+    {
+        var settings = new AppSettings();
+        Assert.False(WindowPlacement.TryReadPlayer(
+            settings,
+            DesignMetrics.WindowMinWidth,
+            DesignMetrics.WindowMinHeight,
+            out _,
+            out _));
+    }
+
+    [Fact]
+    public void TryReadPlayer_AcceptsSavedBounds()
+    {
+        var settings = new AppSettings
+        {
+            PlayerWindowX = 30,
+            PlayerWindowY = 50,
+            PlayerWindowWidth = 1920,
+            PlayerWindowHeight = 720,
+            PlayerWindowState = "Maximized",
+        };
+        Assert.True(WindowPlacement.TryReadPlayer(
+            settings,
+            DesignMetrics.WindowMinWidth,
+            DesignMetrics.WindowMinHeight,
+            out var bounds,
+            out var maximized));
+        Assert.True(maximized);
+        Assert.Equal(30, bounds.X);
+        Assert.Equal(50, bounds.Y);
+        Assert.Equal(1920, bounds.Width);
+        Assert.Equal(720, bounds.Height);
     }
 }

@@ -117,6 +117,18 @@ internal sealed class AppSettings
     /// <summary>Normal / Maximized。空または不明なら通常表示。</summary>
     public string WindowState { get; set; } = string.Empty;
 
+    /// <summary>F10 プレイヤーのウィンドウ。未保存なら幅 0。</summary>
+    public int PlayerWindowX { get; set; }
+
+    public int PlayerWindowY { get; set; }
+
+    public int PlayerWindowWidth { get; set; }
+
+    public int PlayerWindowHeight { get; set; }
+
+    /// <summary>Normal / Maximized。空または不明なら通常表示。</summary>
+    public string PlayerWindowState { get; set; } = string.Empty;
+
     /// <summary>設定ウィンドウの位置。未保存なら false。</summary>
     public bool SettingsWindowHasPosition { get; set; }
 

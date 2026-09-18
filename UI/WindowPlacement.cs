@@ -6,7 +6,7 @@ using MgaSonicAnvil.Config;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>終了時の位置・サイズ・最大化を settings.json に残し、次回起動で戻す。</summary>
+/// <summary>通常／プレイヤーの位置・サイズ・最大化を settings.json に残し、切替と次回起動で戻す。</summary>
 internal static class WindowPlacement
 {
     public static void Capture(Window window, AppSettings settings)
@@ -17,27 +17,55 @@ internal static class WindowPlacement
         Capture(bounds, window.WindowState == WindowState.Maximized, settings);
     }
 
-    public static void Capture(Rect bounds, bool maximized, AppSettings settings)
+    public static void Capture(Rect bounds, bool maximized, AppSettings settings) =>
+        WriteMain(bounds, maximized, settings, player: false);
+
+    public static void CapturePlayer(Window window, AppSettings settings)
     {
-        settings.WindowX = (int)Math.Round(bounds.X);
-        settings.WindowY = (int)Math.Round(bounds.Y);
-        settings.WindowWidth = ToStoredExtent(bounds.Width);
-        settings.WindowHeight = ToStoredExtent(bounds.Height);
-        settings.WindowState = maximized
-            ? nameof(WindowState.Maximized)
-            : nameof(WindowState.Normal);
+        var bounds = window.WindowState == WindowState.Normal
+            ? new Rect(window.Left, window.Top, window.Width, window.Height)
+            : window.RestoreBounds;
+        CapturePlayer(bounds, window.WindowState == WindowState.Maximized, settings);
     }
 
-    public static bool TryApply(Window window, AppSettings settings)
+    public static void CapturePlayer(Rect bounds, bool maximized, AppSettings settings) =>
+        WriteMain(bounds, maximized, settings, player: true);
+
+    private static void WriteMain(Rect bounds, bool maximized, AppSettings settings, bool player)
     {
-        if (!TryRead(settings, window.MinWidth, window.MinHeight, out var bounds, out var maximized))
+        var x = (int)Math.Round(bounds.X);
+        var y = (int)Math.Round(bounds.Y);
+        var width = ToStoredExtent(bounds.Width);
+        var height = ToStoredExtent(bounds.Height);
+        var state = maximized
+            ? nameof(WindowState.Maximized)
+            : nameof(WindowState.Normal);
+        if (player)
         {
-            return false;
+            settings.PlayerWindowX = x;
+            settings.PlayerWindowY = y;
+            settings.PlayerWindowWidth = width;
+            settings.PlayerWindowHeight = height;
+            settings.PlayerWindowState = state;
+            return;
         }
 
-        var width = FromStoredExtent(bounds.Width);
-        var height = FromStoredExtent(bounds.Height);
-        if (!IsVisibleOnAnyScreen(new Rect(bounds.X, bounds.Y, width, height)))
+        settings.WindowX = x;
+        settings.WindowY = y;
+        settings.WindowWidth = width;
+        settings.WindowHeight = height;
+        settings.WindowState = state;
+    }
+
+    public static bool TryApply(Window window, AppSettings settings) =>
+        TryApplyMain(window, settings, player: false);
+
+    public static bool TryApplyPlayer(Window window, AppSettings settings) =>
+        TryApplyMain(window, settings, player: true);
+
+    private static bool TryApplyMain(Window window, AppSettings settings, bool player)
+    {
+        if (!TryGetDipBounds(settings, window.MinWidth, window.MinHeight, player, out var bounds, out var maximized))
         {
             return false;
         }
@@ -46,14 +74,39 @@ internal static class WindowPlacement
         window.WindowState = WindowState.Normal;
         window.Left = bounds.X;
         window.Top = bounds.Y;
-        window.Width = width;
-        window.Height = height;
+        window.Width = bounds.Width;
+        window.Height = bounds.Height;
         if (maximized)
         {
             window.WindowState = WindowState.Maximized;
         }
 
         return true;
+    }
+
+    public static bool TryGetDipBounds(
+        AppSettings settings,
+        double minWidth,
+        double minHeight,
+        bool player,
+        out Rect bounds,
+        out bool maximized)
+    {
+        bounds = default;
+        if (!(player
+                ? TryReadPlayer(settings, minWidth, minHeight, out var stored, out maximized)
+                : TryRead(settings, minWidth, minHeight, out stored, out maximized)))
+        {
+            maximized = false;
+            return false;
+        }
+
+        bounds = new Rect(
+            stored.X,
+            stored.Y,
+            FromStoredExtent(stored.Width),
+            FromStoredExtent(stored.Height));
+        return IsVisibleOnAnyScreen(bounds);
     }
 
     public static void CaptureSettings(Window window, AppSettings settings)
@@ -241,6 +294,36 @@ internal static class WindowPlacement
         }
 
         bounds = new Rect(settings.WindowX, settings.WindowY, settings.WindowWidth, settings.WindowHeight);
+        return true;
+    }
+
+    public static bool TryReadPlayer(
+        AppSettings settings,
+        double minWidth,
+        double minHeight,
+        out Rect bounds,
+        out bool maximized)
+    {
+        bounds = default;
+        maximized = string.Equals(
+            settings.PlayerWindowState,
+            nameof(WindowState.Maximized),
+            StringComparison.OrdinalIgnoreCase);
+        if (settings.PlayerWindowWidth <= 0 || settings.PlayerWindowHeight <= 0)
+        {
+            return false;
+        }
+
+        if (settings.PlayerWindowWidth < minWidth || settings.PlayerWindowHeight < minHeight)
+        {
+            return false;
+        }
+
+        bounds = new Rect(
+            settings.PlayerWindowX,
+            settings.PlayerWindowY,
+            settings.PlayerWindowWidth,
+            settings.PlayerWindowHeight);
         return true;
     }
 

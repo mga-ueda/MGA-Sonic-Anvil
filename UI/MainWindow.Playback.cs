@@ -1154,10 +1154,17 @@ public partial class MainWindow
         }
 
         if (_waveformMaximizeMode == WaveformMaximizeMode.Library
-            && mode != WaveformMaximizeMode.Library
-            && !KeepOnlyLibrarySelectedSessions())
+            && mode != WaveformMaximizeMode.Library)
         {
-            return;
+            if (!KeepOnlyLibrarySelectedSessions())
+            {
+                return;
+            }
+
+            if (IsPlaybackActive())
+            {
+                StopPlayback();
+            }
         }
 
         if (mode == WaveformMaximizeMode.Library)
@@ -1165,16 +1172,18 @@ public partial class MainWindow
             _libraryPlayFirstPending = true;
         }
 
+        var wasLibrary = _waveformMaximizeMode == WaveformMaximizeMode.Library;
+        var wantLibrary = mode == WaveformMaximizeMode.Library;
         var wasFullscreen = IsFullscreenMaximizeMode(_waveformMaximizeMode);
         var wantFullscreen = IsFullscreenMaximizeMode(mode);
+        if (!wasFullscreen)
+        {
+            PersistCurrentWindowPlacement();
+        }
+
         if (wantFullscreen && !wasFullscreen)
         {
-            _windowStateBeforeWaveformMax = WindowState;
-            _windowStyleBeforeWaveformMax = WindowStyle;
-            _resizeModeBeforeWaveformMax = ResizeMode;
-            _boundsBeforeWaveformMax = WindowState == WindowState.Normal
-                ? new Rect(Left, Top, Width, Height)
-                : RestoreBounds;
+            RememberWindowFrameBeforeFullscreen(fromLibrary: wasLibrary);
             _waveformMaximizeMode = mode;
             ApplyWaveformMaximizeChrome();
             ApplyWaveformFullscreenFrame();
@@ -1182,13 +1191,38 @@ public partial class MainWindow
         else if (!wantFullscreen && wasFullscreen)
         {
             _waveformMaximizeMode = mode;
-            RestoreWaveformWindowFrame();
+            RestoreWaveformWindowChrome();
+            if (wantLibrary)
+            {
+                if (!WindowPlacement.TryApplyPlayer(this, AppStorage.Settings))
+                {
+                    ApplyRememberedWindowFrameBounds();
+                }
+            }
+            else
+            {
+                ApplyRememberedWindowFrameBounds();
+            }
+
             ApplyWaveformMaximizeChrome();
         }
         else
         {
             _waveformMaximizeMode = mode;
             ApplyWaveformMaximizeChrome();
+            if (wantLibrary)
+            {
+                WindowPlacement.TryApplyPlayer(this, AppStorage.Settings);
+            }
+            else if (wasLibrary)
+            {
+                WindowPlacement.TryApply(this, AppStorage.Settings);
+            }
+        }
+
+        if (!wasFullscreen || wasLibrary || wantLibrary)
+        {
+            AppStorage.Save();
         }
 
         if (mode == WaveformMaximizeMode.Library)
@@ -1220,10 +1254,50 @@ public partial class MainWindow
         Height = monitor.Height;
     }
 
-    private void RestoreWaveformWindowFrame()
+    private void PersistCurrentWindowPlacement()
+    {
+        if (IsLibraryMaximized)
+        {
+            WindowPlacement.CapturePlayer(this, AppStorage.Settings);
+            return;
+        }
+
+        WindowPlacement.Capture(this, AppStorage.Settings);
+    }
+
+    private void RememberWindowFrameBeforeFullscreen(bool fromLibrary)
+    {
+        _windowStyleBeforeWaveformMax = WindowStyle;
+        _resizeModeBeforeWaveformMax = ResizeMode;
+        if (fromLibrary
+            && WindowPlacement.TryGetDipBounds(
+                AppStorage.Settings,
+                MinWidth,
+                MinHeight,
+                player: false,
+                out var editorBounds,
+                out var editorMaximized))
+        {
+            _boundsBeforeWaveformMax = editorBounds;
+            _windowStateBeforeWaveformMax = editorMaximized ? WindowState.Maximized : WindowState.Normal;
+            return;
+        }
+
+        _windowStateBeforeWaveformMax = WindowState;
+        _boundsBeforeWaveformMax = WindowState == WindowState.Normal
+            ? new Rect(Left, Top, Width, Height)
+            : RestoreBounds;
+    }
+
+    private void RestoreWaveformWindowChrome()
     {
         WindowStyle = _windowStyleBeforeWaveformMax;
         ResizeMode = _resizeModeBeforeWaveformMax;
+        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+    }
+
+    private void ApplyRememberedWindowFrameBounds()
+    {
         WindowState = WindowState.Normal;
         Left = _boundsBeforeWaveformMax.X;
         Top = _boundsBeforeWaveformMax.Y;
@@ -1233,8 +1307,12 @@ public partial class MainWindow
         {
             WindowState = WindowState.Maximized;
         }
+    }
 
-        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+    private void RestoreWaveformWindowFrame()
+    {
+        RestoreWaveformWindowChrome();
+        ApplyRememberedWindowFrameBounds();
     }
 
     private double AnalyzerMaximizeLayoutScale =>
