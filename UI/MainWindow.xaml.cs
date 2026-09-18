@@ -832,6 +832,10 @@ public partial class MainWindow : Window
                 _windowStateBeforeWaveformMax == WindowState.Maximized,
                 AppStorage.Settings);
         }
+        else if (IsLibraryMaximized)
+        {
+            WindowPlacement.CapturePlayer(this, AppStorage.Settings);
+        }
         else
         {
             WindowPlacement.Capture(this, AppStorage.Settings);
@@ -896,7 +900,9 @@ public partial class MainWindow : Window
             && LibraryBrowser.IsJacketOrigin(origin)
             && LibraryBrowserView.TryGetDroppedImage(e, out _))
         {
-            e.Effects = DragDropEffects.Copy;
+            e.Effects = LibraryBrowser.JacketReplaceEnabled
+                ? DragDropEffects.Copy
+                : DragDropEffects.None;
             e.Handled = true;
             return;
         }
@@ -927,8 +933,12 @@ public partial class MainWindow : Window
             && LibraryBrowser.IsJacketOrigin(origin)
             && LibraryBrowserView.TryGetDroppedImage(e, out var image))
         {
-            LibraryBrowser_ArtworkDropped(LibraryBrowser, image);
             e.Handled = true;
+            if (LibraryBrowser.JacketReplaceEnabled)
+            {
+                LibraryBrowser_ArtworkDropped(LibraryBrowser, image);
+            }
+
             return;
         }
 

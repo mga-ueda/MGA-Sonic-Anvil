@@ -90,6 +90,8 @@ internal sealed class LibraryBrowserView : UserControl
 
     internal event Action? GroupArtworkChanged;
 
+    public bool JacketReplaceEnabled { get; private set; }
+
     public LibraryBrowserView()
     {
         Focusable = false;
@@ -111,7 +113,14 @@ internal sealed class LibraryBrowserView : UserControl
         };
         IsVisibleChanged += (_, _) => SyncGlowDrift();
         Unloaded += (_, _) => StopGlowDrift();
+        SetArtwork(null);
     }
+
+    internal static bool AllowsJacketReplace(AudioFileKind kind) => kind == AudioFileKind.Mp3;
+
+    internal bool IsPlaceholderJacket => _artworkBytes is null;
+
+    internal ImageSource? JacketDisplaySource => _jacketImage.Source;
 
     private void ApplyGridStyles()
     {
@@ -497,6 +506,12 @@ internal sealed class LibraryBrowserView : UserControl
         ApplyGlowVeil();
         ApplyGridStyles();
         ApplyExplorerStyle();
+        if (_artworkBytes is null)
+        {
+            ShowJacketDisplay(null, realArt: false);
+        }
+
+        InvalidateGroupJackets();
     }
 
     internal static double GlowVeilOpacityFor(UiTheme theme) =>
@@ -647,20 +662,33 @@ internal sealed class LibraryBrowserView : UserControl
         _ = EnsureGroupArtworkAsync();
     }
 
-    public void SetArtwork(byte[]? bytes)
+    public void SetArtwork(AudioDocument? document) =>
+        ApplyArtwork(
+            document?.Artwork,
+            document is { } d && AllowsJacketReplace(d.SourceKind));
+
+    private void ApplyArtwork(byte[]? bytes, bool allowReplace)
     {
-        if (ArtworkEquals(_artworkBytes, bytes))
+        JacketReplaceEnabled = allowReplace;
+        var next = bytes is { Length: > 0 } ? bytes : null;
+        if (ArtworkEquals(_artworkBytes, next) && _jacketImage.Source is not null)
         {
             return;
         }
 
-        _artworkBytes = bytes is { Length: > 0 } ? bytes : null;
-        var bitmap = TryCreateBitmap(_artworkBytes, ArtworkDecodeMaxEdge);
+        _artworkBytes = next;
+        var decoded = TryCreateBitmap(next, ArtworkDecodeMaxEdge);
+        ShowJacketDisplay(decoded, realArt: decoded is not null);
+    }
+
+    private void ShowJacketDisplay(BitmapSource? decoded, bool realArt)
+    {
+        var bitmap = decoded ?? LibraryPlaceholderJacket.Bitmap;
         _jacketImage.Source = bitmap;
         _jacketReflection.Source = bitmap;
-        _jacketReflection.Visibility = bitmap is null ? Visibility.Collapsed : Visibility.Visible;
+        _jacketReflection.Visibility = Visibility.Visible;
         SyncJacketReflectionSize();
-        ApplyArtworkGlow(bitmap);
+        ApplyArtworkGlow(realArt ? bitmap : null);
     }
 
     private void SyncJacketReflectionSize()
@@ -893,7 +921,7 @@ internal sealed class LibraryBrowserView : UserControl
         _root.ColumnDefinitions.Add(_treeColumn);
         _root.ColumnDefinitions.Add(new ColumnDefinition
         {
-            Width = new GridLength(DesignMetrics.MeterColumnSplitterWidth),
+            Width = new GridLength(DesignMetrics.LibraryExplorerSplitterWidth),
         });
         _root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         _root.ColumnDefinitions.Add(_jacketColumn);
@@ -925,14 +953,15 @@ internal sealed class LibraryBrowserView : UserControl
 
         var splitter = new GridSplitter
         {
-            Width = DesignMetrics.MeterColumnSplitterWidth,
+            Width = DesignMetrics.LibraryExplorerSplitterWidth,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Stretch,
             ResizeBehavior = GridResizeBehavior.PreviousAndNext,
             ResizeDirection = GridResizeDirection.Columns,
             Cursor = Cursors.SizeWE,
+            SnapsToDevicePixels = true,
         };
-        splitter.SetResourceReference(BackgroundProperty, "ChromeBorderBrush");
+        splitter.SetResourceReference(BackgroundProperty, "LibraryExplorerSplitterBrush");
         splitter.DragCompleted += ExplorerSplitter_DragCompleted;
         Grid.SetColumn(splitter, 1);
         _root.Children.Add(splitter);
@@ -2109,7 +2138,7 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        e.Effects = DragDropEffects.Copy;
+        e.Effects = JacketReplaceEnabled ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
     }
 
@@ -2121,6 +2150,11 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         e.Handled = true;
+        if (!JacketReplaceEnabled)
+        {
+            return;
+        }
+
         ArtworkDropped?.Invoke(this, path);
     }
 
@@ -2726,6 +2760,7 @@ internal sealed class LibraryBrowserView : UserControl
             }
         }
 
+        bitmap ??= LibraryPlaceholderJacket.Bitmap;
         _groupJackets[key] = bitmap;
         return bitmap;
     }
@@ -2751,6 +2786,7 @@ internal sealed class LibraryBrowserView : UserControl
             if (row.Tag is not DocumentSession session
                 || !seen.Add(row.GroupKey)
                 || session.Document.HasArtwork
+                || session.Document.SourceKind != AudioFileKind.Mp3
                 || session.Document.SourcePath is not { Length: > 0 } path)
             {
                 continue;
@@ -3094,13 +3130,13 @@ internal sealed class LibraryGroupJacketImage : StackPanel
     private void Reload()
     {
         var owner = _owner ?? FindOwner();
-        var art = owner?.ArtworkForGroup(DataContext as CollectionViewGroup);
+        var art = owner?.ArtworkForGroup(DataContext as CollectionViewGroup)
+            ?? LibraryPlaceholderJacket.Bitmap;
         _face.Source = art;
         _reflection.Source = art;
-        // Collapsed だと列幅が潰れてヘッダーとずれるので、枠は常に確保する。
         Visibility = Visibility.Visible;
-        Opacity = art is null ? 0 : 1;
-        _reflection.Visibility = art is null ? Visibility.Hidden : Visibility.Visible;
+        Opacity = 1;
+        _reflection.Visibility = Visibility.Visible;
         SyncReflectionSize();
     }
 

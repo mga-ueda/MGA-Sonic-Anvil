@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -21,6 +22,7 @@ public partial class MainWindow
     private bool _restoreWaapiAfterLibrary;
     private readonly HashSet<AudioDocument> _libraryPeakJobs = [];
     private int _libraryPeakGeneration;
+    private CancellationTokenSource _libraryPeakCts = new();
     private int _libraryFolderShowGeneration;
     private string? _libraryFolderShownPath;
 
@@ -103,19 +105,56 @@ public partial class MainWindow
         {
             _libraryPlayFirstPending = false;
             _libraryPlayOnArrowRelease = false;
-            UpgradeLibraryPeaksForEditor();
-            if (_activeSession?.Document is { } leaving
-                && (leaving.IsDeferredLoad || leaving.IsStreamPlayback))
-            {
-                _ = EnsureLibrarySessionLoadedAsync(_activeSession);
-            }
+            _ = LeaveLibraryMaximizeAsync();
         }
+    }
+
+    /// <summary>
+    /// プレイヤー退出。再生は先に止めてからクロームを戻し、そのあとフル PCM へ昇格する。
+    /// </summary>
+    private async Task LeaveLibraryMaximizeAsync()
+    {
+        var session = _activeSession;
+        CancelLibraryPeakJobs();
+        UpgradeLibraryPeaksForEditor();
+        if (session is null || !LibraryPlayerMode.NeedsEditorPcmUpgrade(session.Document))
+        {
+            return;
+        }
+
+        session.PlayheadFrame = Waveform.PlayheadFrame;
+        session.Document.CursorFrame = Waveform.PlayheadFrame;
+
+        // レイアウトと波形の初回描画を、フルデコードより先に通す。
+        await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Loaded);
+        if (!ReferenceEquals(session, _activeSession)
+            || IsLibraryMaximized
+            || !LibraryPlayerMode.NeedsEditorPcmUpgrade(session.Document))
+        {
+            return;
+        }
+
+        await EnsureLibrarySessionLoadedAsync(session).ConfigureAwait(true);
+    }
+
+    private void CancelLibraryPeakJobs()
+    {
+        _libraryPeakGeneration++;
+        var previous = _libraryPeakCts;
+        _libraryPeakCts = new CancellationTokenSource();
+        previous.Cancel();
+        previous.Dispose();
     }
 
     private void UpgradeLibraryPeaksForEditor()
     {
         foreach (var session in _sessions)
         {
+            if (!LibraryPlayerMode.NeedsEditorPeakUpgrade(session.Document))
+            {
+                continue;
+            }
+
             _ = FillLibraryPeaksAsync(session);
         }
     }
@@ -237,38 +276,92 @@ public partial class MainWindow
             return true;
         }
 
-        var cancelled = false;
-        RunCloseBatch(drop, () =>
+        var dirty = new List<DocumentSession>();
+        var clean = new List<DocumentSession>();
+        foreach (var session in drop)
         {
-            foreach (var session in drop)
+            if (session.Document.IsDirty)
             {
-                if (ReferenceEquals(session, _activeSession))
+                dirty.Add(session);
+            }
+            else
+            {
+                clean.Add(session);
+            }
+        }
+
+        // 未編集は 1 件ずつ CloseSession しない。タブ再構築の繰り返しが再生中に重い。
+        if (clean.Count > 0)
+        {
+            DropLibrarySessionsFast(clean);
+        }
+
+        if (dirty.Count > 0)
+        {
+            var cancelled = false;
+            RunCloseBatch(dirty, () =>
+            {
+                foreach (var session in dirty)
                 {
-                    continue;
+                    if (ReferenceEquals(session, _activeSession))
+                    {
+                        continue;
+                    }
+
+                    if (!CloseSession(session, rememberClosed: !session.Document.IsDeferredLoad))
+                    {
+                        cancelled = true;
+                        return;
+                    }
                 }
 
-                if (!CloseSession(session, rememberClosed: !session.Document.IsDeferredLoad))
+                if (_activeSession is { } active
+                    && dirty.Contains(active)
+                    && !CloseSession(active, rememberClosed: !active.Document.IsDeferredLoad))
                 {
                     cancelled = true;
-                    return;
                 }
-            }
+            });
 
-            if (_activeSession is { } active
-                && Array.IndexOf(drop, active) >= 0
-                && !CloseSession(active, rememberClosed: !active.Document.IsDeferredLoad))
+            if (cancelled)
             {
-                cancelled = true;
+                return false;
             }
-        });
-
-        if (cancelled)
-        {
-            return false;
         }
 
         ApplyLibraryHandoffSelection(keep, current);
+        if (clean.Count > 0)
+        {
+            NotifyWaveformSessionsChanged();
+        }
+
         return true;
+    }
+
+    private void DropLibrarySessionsFast(IReadOnlyList<DocumentSession> drop)
+    {
+        var dropSet = drop as HashSet<DocumentSession> ?? [.. drop];
+        for (var i = _sessions.Count - 1; i >= 0; i--)
+        {
+            var session = _sessions[i];
+            if (!dropSet.Contains(session))
+            {
+                continue;
+            }
+
+            _selectedTabs.Remove(session);
+            if (ReferenceEquals(_tabSelectionAnchor, session))
+            {
+                _tabSelectionAnchor = null;
+            }
+
+            if (!session.Document.IsDeferredLoad)
+            {
+                RememberClosedTab(session, i);
+            }
+
+            _sessions.RemoveAt(i);
+        }
     }
 
     private void ApplyLibraryHandoffSelection(
@@ -508,7 +601,7 @@ public partial class MainWindow
         }
 
         LibraryBrowser.SetSessions(_sessions, first, selected);
-        LibraryBrowser.SetArtwork(first?.Document?.Artwork);
+        LibraryBrowser.SetArtwork(first?.Document);
         _ = PlayLibrarySessionAsync(first);
     }
 
@@ -722,6 +815,7 @@ public partial class MainWindow
 
             var tags = session.Document.Tags;
             var previousArt = session.Document.Artwork;
+            loaded.CursorFrame = Math.Clamp(session.PlayheadFrame, 0, loaded.FrameCount);
             session.ReplaceDocument(loaded);
             loaded.ApplyTags(tags);
             if (!loaded.HasArtwork && previousArt is { Length: > 0 })
@@ -778,6 +872,7 @@ public partial class MainWindow
         }
 
         var peakGeneration = ++_libraryPeakGeneration;
+        var token = _libraryPeakCts.Token;
         var retry = false;
         try
         {
@@ -810,8 +905,9 @@ public partial class MainWindow
                                     Waveform.Refresh();
                                 }
                             });
-                        }))
-                    .ConfigureAwait(true);
+                        },
+                        token),
+                    token).ConfigureAwait(true);
             }
             else
             {
@@ -820,8 +916,8 @@ public partial class MainWindow
                 var sampleCount = document.SampleCount;
                 peaks = await Task.Run(() => display
                         ? PeakPyramid.BuildPlayerDisplay(interleaved, channels, sampleCount)
-                        : PeakPyramid.Build(interleaved, channels, sampleCount))
-                    .ConfigureAwait(true);
+                        : PeakPyramid.Build(interleaved, channels, sampleCount),
+                    token).ConfigureAwait(true);
             }
 
             if (peakGeneration != _libraryPeakGeneration
@@ -893,7 +989,7 @@ public partial class MainWindow
 
         var hadArt = session.Document.HasArtwork;
         ScanLibraryArtwork(session);
-        LibraryBrowser.SetArtwork(session.Document.Artwork);
+        LibraryBrowser.SetArtwork(session.Document);
         if (!hadArt && session.Document.HasArtwork)
         {
             LibraryBrowser.UpdateSessionRow(session);
@@ -924,16 +1020,20 @@ public partial class MainWindow
             return;
         }
 
+        var document = session.Document;
+        if (!LibraryBrowserView.AllowsJacketReplace(document.SourceKind))
+        {
+            return;
+        }
+
         if (!LibraryBrowserView.TryReadImageBytes(path, out var bytes))
         {
             return;
         }
 
-        var document = session.Document;
         document.SetArtwork(bytes);
-        LibraryBrowser.SetArtwork(bytes);
-        if (document.SourceKind == AudioFileKind.Mp3
-            && document.SourcePath is { Length: > 0 } filePath
+        LibraryBrowser.SetArtwork(document);
+        if (document.SourcePath is { Length: > 0 } filePath
             && File.Exists(filePath))
         {
             Id3Artwork.TryWrite(filePath, bytes);
@@ -1083,7 +1183,7 @@ public partial class MainWindow
                 LibraryBrowser.AppendSession(session, select);
                 if (select)
                 {
-                    LibraryBrowser.SetArtwork(session.Document.Artwork);
+                    LibraryBrowser.SetArtwork(session.Document);
                     if (playFirst)
                     {
                         _ = PlayLibrarySessionAsync(session);

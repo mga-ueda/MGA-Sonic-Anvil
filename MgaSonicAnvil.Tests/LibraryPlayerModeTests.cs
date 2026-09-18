@@ -138,6 +138,23 @@ public sealed class LibraryPlayerModeTests
     }
 
     [Fact]
+    public void NeedsEditorPcmUpgrade_IsStreamOrDeferred()
+    {
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid() + ".mp3");
+        var deferred = AudioDocument.CreateDeferred(path);
+        Assert.True(LibraryPlayerMode.NeedsEditorPcmUpgrade(deferred));
+        Assert.False(LibraryPlayerMode.NeedsEditorPeakUpgrade(deferred));
+
+        deferred.ActivateStreamPlayback(44100, 2, 16, 88200);
+        Assert.True(LibraryPlayerMode.NeedsEditorPcmUpgrade(deferred));
+        Assert.False(LibraryPlayerMode.NeedsEditorPeakUpgrade(deferred));
+
+        var pcm = new AudioDocument([], 48000, 1, 16, AudioFileKind.Wave, "a.wav");
+        Assert.False(LibraryPlayerMode.NeedsEditorPcmUpgrade(pcm));
+        Assert.True(LibraryPlayerMode.NeedsEditorPeakUpgrade(pcm));
+    }
+
+    [Fact]
     public void FirstSession_IsListHead()
     {
         var first = Session("a.wav");

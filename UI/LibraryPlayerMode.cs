@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using MgaSonicAnvil.Audio;
 
 namespace MgaSonicAnvil.UI;
 
@@ -248,6 +249,16 @@ internal static class LibraryPlayerMode
 
         return [.. drop];
     }
+
+    /// <summary>エディタ復帰でフル PCM が必要なストリーム／遅延読み込み。</summary>
+    public static bool NeedsEditorPcmUpgrade(AudioDocument document) =>
+        document.IsDeferredLoad || document.IsStreamPlayback;
+
+    /// <summary>
+    /// 既に PCM があるファイルだけピークを作り直す。ストリームはフル Load が兼ねる。
+    /// </summary>
+    public static bool NeedsEditorPeakUpgrade(AudioDocument document) =>
+        !NeedsEditorPcmUpgrade(document);
 
     /// <summary>プレイヤーに入ったときに選んで再生する先頭のファイル。</summary>
     public static DocumentSession? FirstSession(IReadOnlyList<DocumentSession> sessions) =>
