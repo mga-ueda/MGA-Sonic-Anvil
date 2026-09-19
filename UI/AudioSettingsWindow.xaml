@@ -108,20 +108,40 @@
 
         <TabItem x:Name="LayoutsTab" Header="{x:Static domain:UiStrings.LabelSettingsTabLayouts}">
           <Grid>
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-            <TextBlock x:Name="SpeakerVisibilityHeader"
-                       Text="{x:Static domain:UiStrings.LabelSpeakerVisibility}"
-                       FontWeight="Bold"
-                       FontSize="11.333"
-                       Margin="0,0,0,8"
-                       TextWrapping="Wrap" />
-            <ScrollViewer Grid.Row="1"
-                          VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
-              <StackPanel x:Name="SpeakerVisibilityHost" />
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="{x:Static ui:DesignMetrics.SettingsColumnGapGrid}" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ScrollViewer Style="{StaticResource SettingsColumnScrollViewerStyle}">
+              <StackPanel>
+                <TextBlock x:Name="SpeakerVisibilityHeader"
+                           Text="{x:Static domain:UiStrings.LabelSpeakerVisibility}"
+                           FontWeight="Bold"
+                           FontSize="11.333"
+                           Margin="0,0,0,8"
+                           TextWrapping="Wrap" />
+                <StackPanel x:Name="SpeakerVisibilityHost" />
+              </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer Grid.Column="2"
+                          Style="{StaticResource SettingsColumnScrollViewerStyle}">
+              <StackPanel>
+                <TextBlock x:Name="LibraryColumnsHeader"
+                           Text="{x:Static domain:UiStrings.LabelLibraryListColumns}"
+                           FontWeight="Bold"
+                           FontSize="11.333"
+                           Margin="0,0,0,4" />
+                <TextBlock x:Name="LibraryColumnsHint"
+                           Text="{x:Static domain:UiStrings.LabelLibraryListColumnsHint}"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Opacity="0.85"
+                           Margin="0,0,0,8" />
+                <StackPanel x:Name="LibraryColumnsHost" />
+              </StackPanel>
             </ScrollViewer>
           </Grid>
         </TabItem>
@@ -185,18 +205,6 @@
                                 Padding="12,0"
                                 Click="LibraryExplorerRootDownButton_Click" />
             </StackPanel>
-            <TextBlock x:Name="LibraryColumnsHeader"
-                       Text="{x:Static domain:UiStrings.LabelLibraryListColumns}"
-                       FontWeight="Bold"
-                       FontSize="11.333"
-                       Margin="0,16,0,4" />
-            <TextBlock x:Name="LibraryColumnsHint"
-                       Text="{x:Static domain:UiStrings.LabelLibraryListColumnsHint}"
-                       FontSize="11"
-                       TextWrapping="Wrap"
-                       Opacity="0.85"
-                       Margin="0,0,0,8" />
-            <StackPanel x:Name="LibraryColumnsHost" />
           </StackPanel>
           </ScrollViewer>
         </TabItem>

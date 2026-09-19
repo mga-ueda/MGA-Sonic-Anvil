@@ -294,6 +294,9 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(SpeakerCombo, UiStrings.TipSpeakerPreset);
         TipService.Set(SpeakerVisibilityHeader, UiStrings.TipSpeakerVisibility);
         TipService.Set(SpeakerVisibilityHost, UiStrings.TipSpeakerVisibility);
+        TipService.Set(LibraryColumnsHeader, UiStrings.TipLibraryColumns);
+        TipService.Set(LibraryColumnsHint, UiStrings.TipLibraryColumns);
+        TipService.Set(LibraryColumnsHost, UiStrings.TipLibraryColumns);
         TipService.Set(AutoSpeakerSelectBox, UiStrings.TipAutoSpeakerSelect);
         TipService.Set(ApiLabel, UiStrings.TipAudioApi);
         TipService.Set(ApiCombo, UiStrings.TipAudioApi);
