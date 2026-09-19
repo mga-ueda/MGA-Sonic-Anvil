@@ -170,6 +170,16 @@ public sealed class LibraryExplorerPathsTests
     }
 
     [Fact]
+    public void LibraryHoverIdle_HidesWhenStillEvenIfNear()
+    {
+        Assert.Equal(3, LibraryHoverIdle.HideAfterSeconds);
+        Assert.True(LibraryHoverIdle.ShouldReveal(near: true, held: false, idle: false));
+        Assert.False(LibraryHoverIdle.ShouldReveal(near: true, held: false, idle: true));
+        Assert.True(LibraryHoverIdle.ShouldReveal(near: false, held: true, idle: true));
+        Assert.False(LibraryHoverIdle.ShouldReveal(near: false, held: false, idle: false));
+    }
+
+    [Fact]
     public void ClampLibraryFavoritesSplit_UsesHalfAndBounds()
     {
         Assert.Equal(DesignMetrics.LibraryFavoritesSplitDefault, DesignMetrics.ClampLibraryFavoritesSplit(0));

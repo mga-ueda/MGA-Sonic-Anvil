@@ -12,6 +12,8 @@ public sealed class LibraryPlayerModeTests
     {
         Assert.True(LibraryPlayerMode.HidesWaveformContextMenu(playerMode: true));
         Assert.False(LibraryPlayerMode.HidesWaveformContextMenu(playerMode: false));
+        Assert.False(LibraryPlayerMode.ShowsCueOverlays(playerMode: true));
+        Assert.True(LibraryPlayerMode.ShowsCueOverlays(playerMode: false));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.TogglePlayback));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SelectAll));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SeekHere));

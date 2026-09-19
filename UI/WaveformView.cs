@@ -60,7 +60,7 @@ internal sealed class WaveformView : Grid
     }
 
     private int FlagLaneCount =>
-        _document is null
+        !LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly) || _document is null
             ? 0
             : CountFlagLaneRows(_document.Markers.Count > 0, _document.Regions.Count > 0);
 
@@ -2144,7 +2144,7 @@ internal sealed class WaveformView : Grid
 
         if (!SpectrogramVisible || overlay || loudness)
         {
-            if (!overlay && !loudness)
+            if (!overlay && !loudness && LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly))
             {
                 MarkerRolePaint.DrawRegion(dc, _document, wave, start, span, "RegionWaveFillBrush");
                 MarkerRolePaint.DrawSampleLoop(dc, _document, wave, start, span, "SampleLoopWaveFillBrush");
@@ -2235,9 +2235,18 @@ internal sealed class WaveformView : Grid
             DrawRange(dc, bounds, start, span, _document.Selection, Theme.Get("LoopRangeFillBrush"));
         }
 
-        RefreshFlagStacks(bounds, start, span);
-        DrawRegionFlags(dc, bounds, start, span);
-        DrawMarkers(dc, bounds, start, span);
+        if (LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly))
+        {
+            RefreshFlagStacks(bounds, start, span);
+            DrawRegionFlags(dc, bounds, start, span);
+            DrawMarkers(dc, bounds, start, span);
+            return;
+        }
+
+        _markerFlags.Clear();
+        _regionFlags.Clear();
+        _markerFlagLayout.Clear();
+        _regionFlagLayout.Clear();
     }
 
     internal void PaintPlayhead(DrawingContext dc)
@@ -2539,7 +2548,8 @@ internal sealed class WaveformView : Grid
             LaneWaveColors(),
             LaneGapPx(dpi.DpiScaleY),
             playerLight: SeekAndSelectOnly && UiThemeService.Current == UiTheme.Light,
-            shadeLanes: SeekAndSelectOnly);
+            shadeLanes: SeekAndSelectOnly,
+            omitCueFills: !LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly));
         _invertBitmap.WritePixels(new Int32Rect(0, 0, width, height), _invertPixels, width * 4, 0);
         _invertDocument = _document;
         _invertChannels = _document?.Channels ?? 0;
@@ -4319,7 +4329,7 @@ internal sealed class WaveformView : Grid
         {
             dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TimelineWellBackBrush")), null, lane);
         }
-        if (_document is not null)
+        if (_document is not null && LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly))
         {
             DrawSampleLoopBar(dc, lane, start, span);
         }
@@ -4344,7 +4354,7 @@ internal sealed class WaveformView : Grid
         }
 
         var loop = _document.SampleLoop;
-        var hasLoop = !loop.IsEmpty;
+        var hasLoop = LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly) && !loop.IsEmpty;
         var tick = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("DbScaleForeBrush")), 1);
         tick.Freeze();
         const double minGap = 72;

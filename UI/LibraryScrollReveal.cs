@@ -3,8 +3,59 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace MgaSonicAnvil.UI;
+
+/// <summary>プレイヤーのホバー表示。動かないと約 3 秒で消す。</summary>
+internal static class LibraryHoverIdle
+{
+    public const double HideAfterSeconds = 3;
+
+    public static TimeSpan HideAfter { get; } = TimeSpan.FromSeconds(HideAfterSeconds);
+
+    /// <summary>ドラッグ中は出す。止まっていれば近くても出さない。</summary>
+    public static bool ShouldReveal(bool near, bool held, bool idle) =>
+        held || (near && !idle);
+
+    public static void Arm(FrameworkElement host, Action onIdle)
+    {
+        host.SetValue(IdleCallbackProperty, onIdle);
+        var timer = (DispatcherTimer?)host.GetValue(IdleTimerProperty);
+        if (timer is null)
+        {
+            timer = new DispatcherTimer { Interval = HideAfter };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                (host.GetValue(IdleCallbackProperty) as Action)?.Invoke();
+            };
+            host.SetValue(IdleTimerProperty, timer);
+            host.Unloaded += (_, _) => timer.Stop();
+        }
+
+        timer.Stop();
+        timer.Start();
+    }
+
+    public static void Disarm(FrameworkElement host)
+    {
+        if (host.GetValue(IdleTimerProperty) is DispatcherTimer timer)
+        {
+            timer.Stop();
+        }
+    }
+
+    private static readonly DependencyProperty IdleTimerProperty = DependencyProperty.RegisterAttached(
+        "IdleTimer",
+        typeof(DispatcherTimer),
+        typeof(LibraryHoverIdle));
+
+    private static readonly DependencyProperty IdleCallbackProperty = DependencyProperty.RegisterAttached(
+        "IdleCallback",
+        typeof(Action),
+        typeof(LibraryHoverIdle));
+}
 
 /// <summary>プレイヤーのスクロールバー。普段は隠し、端に近いときだけ出す。</summary>
 internal static class LibraryScrollReveal
@@ -32,7 +83,7 @@ internal static class LibraryScrollReveal
 
     private static void Host_PreviewMouseMove(object sender, MouseEventArgs e)
     {
-        if (sender is not DependencyObject host)
+        if (sender is not FrameworkElement host)
         {
             return;
         }
@@ -48,18 +99,33 @@ internal static class LibraryScrollReveal
         Apply(
             viewer,
             IsNearEdge(pos.X, viewer.ActualWidth, distance),
-            IsNearEdge(pos.Y, viewer.ActualHeight, distance));
+            IsNearEdge(pos.Y, viewer.ActualHeight, distance),
+            idle: false);
+        LibraryHoverIdle.Arm(host, () => OnScrollIdle(host));
+    }
+
+    private static void OnScrollIdle(FrameworkElement host)
+    {
+        var viewer = FindScrollViewer(host);
+        Apply(viewer, vertical: false, horizontal: false, idle: true);
+        if (viewer is not null && EnumerateScrollBars(viewer).Any(IsHeld))
+        {
+            LibraryHoverIdle.Arm(host, () => OnScrollIdle(host));
+        }
     }
 
     private static void Host_MouseLeave(object sender, MouseEventArgs e)
     {
-        if (sender is DependencyObject host)
+        if (sender is not FrameworkElement host)
         {
-            Apply(FindScrollViewer(host), vertical: false, horizontal: false);
+            return;
         }
+
+        LibraryHoverIdle.Disarm(host);
+        Apply(FindScrollViewer(host), vertical: false, horizontal: false, idle: true);
     }
 
-    private static void Apply(ScrollViewer? viewer, bool vertical, bool horizontal)
+    private static void Apply(ScrollViewer? viewer, bool vertical, bool horizontal, bool idle)
     {
         if (viewer is null)
         {
@@ -68,14 +134,13 @@ internal static class LibraryScrollReveal
 
         foreach (var bar in EnumerateScrollBars(viewer))
         {
-            var show = IsHeld(bar)
-                || (bar.Orientation == Orientation.Vertical ? vertical : horizontal);
-            SetRevealed(bar, show);
+            var near = bar.Orientation == Orientation.Vertical ? vertical : horizontal;
+            SetRevealed(bar, LibraryHoverIdle.ShouldReveal(near, IsHeld(bar), idle));
         }
     }
 
     private static bool IsHeld(ScrollBar bar) =>
-        bar.IsMouseOver || IsThumbDragging(bar);
+        IsThumbDragging(bar);
 
     private static bool IsThumbDragging(DependencyObject root)
     {
@@ -148,12 +213,27 @@ internal static class LibrarySplitterReveal
         ColumnDefinition treeColumn,
         RowDefinition explorerRow)
     {
-        root.PreviewMouseMove += (_, e) => Update(root, e, vertical, horizontal, treeColumn, explorerRow);
+        root.PreviewMouseMove += (_, e) =>
+        {
+            Update(root, e, vertical, horizontal, treeColumn, explorerRow, idle: false);
+            LibraryHoverIdle.Arm(root, () => OnSplitterIdle(root, vertical, horizontal));
+        };
         root.MouseLeave += (_, _) =>
         {
-            Reveal(vertical, show: false);
-            Reveal(horizontal, show: false);
+            LibraryHoverIdle.Disarm(root);
+            Reveal(vertical, show: false, idle: true);
+            Reveal(horizontal, show: false, idle: true);
         };
+    }
+
+    private static void OnSplitterIdle(FrameworkElement root, GridSplitter vertical, GridSplitter horizontal)
+    {
+        Reveal(vertical, show: false, idle: true);
+        Reveal(horizontal, show: false, idle: true);
+        if (vertical.IsDragging || horizontal.IsDragging)
+        {
+            LibraryHoverIdle.Arm(root, () => OnSplitterIdle(root, vertical, horizontal));
+        }
     }
 
     private static void Update(
@@ -162,19 +242,21 @@ internal static class LibrarySplitterReveal
         GridSplitter vertical,
         GridSplitter horizontal,
         ColumnDefinition treeColumn,
-        RowDefinition explorerRow)
+        RowDefinition explorerRow,
+        bool idle)
     {
         var pos = e.GetPosition(root);
         var distance = DesignMetrics.LibrarySplitterRevealDistance;
         var treeWidth = treeColumn.ActualWidth;
-        Reveal(vertical, IsNearLine(pos.X, treeWidth, distance));
+        Reveal(vertical, IsNearLine(pos.X, treeWidth, distance), idle);
         Reveal(
             horizontal,
-            pos.X <= treeWidth + distance && IsNearLine(pos.Y, explorerRow.ActualHeight, distance));
+            pos.X <= treeWidth + distance && IsNearLine(pos.Y, explorerRow.ActualHeight, distance),
+            idle);
     }
 
-    private static void Reveal(GridSplitter splitter, bool show)
-    {
-        LibraryScrollReveal.SetRevealed(splitter, show || splitter.IsDragging);
-    }
+    private static void Reveal(GridSplitter splitter, bool show, bool idle) =>
+        LibraryScrollReveal.SetRevealed(
+            splitter,
+            LibraryHoverIdle.ShouldReveal(show, splitter.IsDragging, idle));
 }

@@ -408,11 +408,25 @@
             </Setter.Value>
         </Setter>
         <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Opacity" Value="1" />
-            </Trigger>
             <Trigger Property="ui:LibraryScrollReveal.Revealed" Value="True">
-                <Setter Property="Opacity" Value="1" />
+                <Trigger.EnterActions>
+                    <BeginStoryboard HandoffBehavior="SnapshotAndReplace">
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                             To="1"
+                                             Duration="0:0:0.12" />
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                    <BeginStoryboard HandoffBehavior="SnapshotAndReplace">
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                             To="0"
+                                             Duration="0:0:0.35" />
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.ExitActions>
             </Trigger>
             <Trigger Property="Orientation" Value="Vertical">
                 <Setter Property="MaxWidth" Value="{x:Static ui:DesignMetrics.SettingsScrollBarWidth}" />
@@ -439,7 +453,7 @@
         </Style.Triggers>
     </Style>
 
-    <!-- ツリー／お気に入り／リストの区切り。普段は出さず、ホバー／ドラッグ時だけ 1px。 -->
+    <!-- ツリー／お気に入り／リストの区切り。普段は出さず、近いとき／ドラッグ時だけ 1px。 -->
     <Style x:Key="LibrarySplitterStyle" TargetType="GridSplitter">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Focusable" Value="False" />
@@ -462,14 +476,30 @@
                             <Setter TargetName="Line" Property="HorizontalAlignment" Value="Stretch" />
                             <Setter TargetName="Line" Property="VerticalAlignment" Value="Center" />
                         </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Line" Property="Opacity" Value="0.20" />
-                        </Trigger>
                         <Trigger Property="IsDragging" Value="True">
                             <Setter TargetName="Line" Property="Opacity" Value="0.32" />
                         </Trigger>
                         <Trigger Property="ui:LibraryScrollReveal.Revealed" Value="True">
-                            <Setter TargetName="Line" Property="Opacity" Value="0.20" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard HandoffBehavior="SnapshotAndReplace">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Line"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0.20"
+                                                         Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard HandoffBehavior="SnapshotAndReplace">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Line"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="0:0:0.35" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

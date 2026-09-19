@@ -9,6 +9,9 @@ internal static class LibraryPlayerMode
     /// <summary>プレイヤーでは波形の右クリック／メニューキーを出さない。</summary>
     public static bool HidesWaveformContextMenu(bool playerMode) => playerMode;
 
+    /// <summary>プレイヤーではマーカー／リージョン／ループを波形に出さない。</summary>
+    public static bool ShowsCueOverlays(bool playerMode) => !playerMode;
+
     public static bool BlocksWaveMenu(WaveMenuCommand command) => command switch
     {
         WaveMenuCommand.PlayFromHere

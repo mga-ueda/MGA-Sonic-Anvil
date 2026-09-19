@@ -60,6 +60,8 @@ public sealed class TransportToolTipTests
         Assert.Contains("F10", UiStrings.TipWaveform);
         Assert.Contains("*", UiStrings.TipWaveform);
         Assert.Contains("No Image", UiStrings.TipWaveform);
+        Assert.Contains("マーカー／リージョン／ループは出さない", UiStrings.TipWaveform);
+        Assert.Contains("約3秒", UiStrings.TipWaveform);
         Assert.Contains("ドラッグ", UiStrings.TipLibraryColumns);
         Assert.Contains("20", UiStrings.TipClickGuardFade);
         Assert.Contains("Wwise.exe", UiStrings.TipWwiseProjectNameOpen);

@@ -23,7 +23,8 @@ internal static class WaveformInvertPaint
         IReadOnlyList<int>? laneWaveColors = null,
         double laneGapPx = 0,
         bool playerLight = false,
-        bool shadeLanes = false)
+        bool shadeLanes = false,
+        bool omitCueFills = false)
     {
         if (width <= 0 || height <= 0 || pixels.Length < width * height)
         {
@@ -62,17 +63,17 @@ internal static class WaveformInvertPaint
             return;
         }
 
-        var regionFill = ToBgra(Theme.Get("RegionWaveFillBrush"));
-        var sampleLoop = ToBgra(Theme.Get("SampleLoopWaveFillBrush"));
-        var anacrusis = ToBgra(Theme.Get("RegionWaveFillAnacrusisBrush"));
-        var loop = ToBgra(Theme.Get("RegionWaveFillLoopBrush"));
-        var exit = ToBgra(Theme.Get("RegionWaveFillExitBrush"));
-        var regions = document.Regions;
-        var sample = document.SampleLoop;
+        var regionFill = omitCueFills ? 0 : ToBgra(Theme.Get("RegionWaveFillBrush"));
+        var sampleLoop = omitCueFills ? 0 : ToBgra(Theme.Get("SampleLoopWaveFillBrush"));
+        var anacrusis = omitCueFills ? 0 : ToBgra(Theme.Get("RegionWaveFillAnacrusisBrush"));
+        var loop = omitCueFills ? 0 : ToBgra(Theme.Get("RegionWaveFillLoopBrush"));
+        var exit = omitCueFills ? 0 : ToBgra(Theme.Get("RegionWaveFillExitBrush"));
+        IReadOnlyList<WaveSelection> regions = omitCueFills ? [] : document.Regions;
+        var sample = omitCueFills ? WaveSelection.Empty : document.SampleLoop;
         var hasSampleLoop = !sample.IsEmpty;
         var frameCount = document.FrameCount;
         // マーカー役割（コメントの文字列解析）は列×マーカー数で繰り返さず、一度だけ解決する。
-        var underSpans = CollectUnderWaveRoleSpans(document, anacrusis, loop, exit);
+        List<RoleSpan> underSpans = omitCueFills ? [] : CollectUnderWaveRoleSpans(document, anacrusis, loop, exit);
 
         for (var x = 0; x < width; x++)
         {
