@@ -7,7 +7,7 @@ namespace MgaSonicAnvil.UI;
 /// <summary>設定の録音ポート行用。メインのレベルメーターと同じグラデ。</summary>
 internal sealed class ChannelLevelBar : FrameworkElement
 {
-    private static readonly Color FloorLine = Color.FromRgb(0xFF, 0x00, 0x00);
+    private static Color FloorLine => Theme.Get("LevelMeterClipOnBrush");
     private const float FloorMix = 0.22f;
     private const double FloorLineWidth = 2;
 

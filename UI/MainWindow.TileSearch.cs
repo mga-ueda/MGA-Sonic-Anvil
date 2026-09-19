@@ -281,15 +281,6 @@ public partial class MainWindow
     /// </summary>
     private Border? _tileSearchFrost;
 
-    private static readonly Brush TileSearchVeilBrush = CreateTileSearchVeilBrush();
-
-    private static Brush CreateTileSearchVeilBrush()
-    {
-        var brush = new SolidColorBrush(Color.FromArgb(0x8C, 0x00, 0x00, 0x00));
-        brush.Freeze();
-        return brush;
-    }
-
     /// <summary>検索フィルターでヒットせず、すりガラスに覆われているか。覆われたタイルは操作できない。</summary>
     private bool IsTileSearchVeiled(DocumentSession session) =>
         TileSearchFilterActive && !TileSearchMatches(session);
@@ -340,11 +331,11 @@ public partial class MainWindow
         {
             _tileSearchFrost = new Border
             {
-                Background = TileSearchVeilBrush,
                 // セル境界の 1px 隙間をレイアウト丸めで取りこぼさない。
                 SnapsToDevicePixels = false,
                 UseLayoutRounding = false,
             };
+            _tileSearchFrost.SetResourceReference(Border.BackgroundProperty, "TileSearchVeilBrush");
         }
 
         var rows = Math.Max(1, _tileGrid.RowDefinitions.Count);

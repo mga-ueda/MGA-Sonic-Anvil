@@ -31,6 +31,35 @@ internal sealed class SpectrogramBoostBar : Slider
         UseLayoutRounding = true;
         SetResourceReference(StyleProperty, "SpectrogramBoostBarStyle");
         IsEnabledChanged += (_, _) => Cursor = IsEnabled ? Cursors.Hand : Cursors.Arrow;
+        Loaded += (_, _) => ApplyTrackBrush();
+    }
+
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+        ApplyTrackBrush();
+    }
+
+    internal void ApplyTrackBrush()
+    {
+        if (Template?.FindName("TrackBack", this) is Border track)
+        {
+            track.Background = CreateTrackBrush();
+        }
+    }
+
+    internal static Brush CreateTrackBrush()
+    {
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new Point(0.5, 1),
+            EndPoint = new Point(0.5, 0),
+        };
+        brush.GradientStops.Add(new GradientStop(Theme.Get("SpectrogramBoostFloorBrush"), 0));
+        brush.GradientStops.Add(new GradientStop(Theme.Get("SpectrogramBoostMidBrush"), 0.5));
+        brush.GradientStops.Add(new GradientStop(Theme.Get("SpectrogramBoostCeilBrush"), 1));
+        brush.Freeze();
+        return brush;
     }
 
     public double BoostUnit => Math.Clamp(Value, Minimum, Maximum);
@@ -48,7 +77,7 @@ internal sealed class SpectrogramBoostBar : Slider
     public void Nudge(int direction) =>
         Value = NudgeUnit(Value, direction, SmallChange);
 
-    internal static Color TrackOrange => Color.FromRgb(0x9C, 0x2E, 0x00);
+    internal static Color TrackOrange => Theme.Get("SpectrogramBoostFloorBrush");
 
-    internal static Color TrackWhite => Colors.White;
+    internal static Color TrackWhite => Theme.Get("SpectrogramBoostCeilBrush");
 }

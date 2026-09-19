@@ -18,17 +18,7 @@ internal static class FadeCurveIcons
 
     public static int CanvasSize(int pixelSize) => Math.Max(8, pixelSize) + CanvasPad * 2;
 
-    private static Color CurveColor()
-    {
-        try
-        {
-            return Theme.Get("PrimaryForeBrush");
-        }
-        catch (InvalidOperationException)
-        {
-            return Color.FromArgb(220, 220, 220, 220);
-        }
-    }
+    private static Color CurveColor() => Theme.Get("PrimaryForeBrush");
 
     public static ImageSource Create(
         FadeShape shape,

@@ -474,8 +474,8 @@ internal partial class AudioSettingsWindow : Window
         LibraryExplorerRootsList.SetResourceReference(BorderBrushProperty, "ChromeBorderBrush");
         LibraryExplorerRootsList.BorderThickness = new Thickness(1);
 
-        var highlight = ResolveThemeBrush("MenuHighlightBackBrush", Color.FromRgb(0x37, 0x37, 0x3A));
-        var fore = ResolveThemeBrush("PrimaryForeBrush", Color.FromRgb(0xE8, 0xE8, 0xEA));
+        var highlight = ResolveThemeBrush("MenuHighlightBackBrush");
+        var fore = ResolveThemeBrush("PrimaryForeBrush");
         LibraryExplorerRootsList.Resources[SystemColors.HighlightBrushKey] = highlight;
         LibraryExplorerRootsList.Resources[SystemColors.HighlightTextBrushKey] = fore;
         LibraryExplorerRootsList.Resources[SystemColors.InactiveSelectionHighlightBrushKey] = highlight;
@@ -491,17 +491,8 @@ internal partial class AudioSettingsWindow : Window
         LibraryExplorerRootsList.ItemContainerStyle = itemStyle;
     }
 
-    private static Brush ResolveThemeBrush(string key, Color fallback)
-    {
-        if (Application.Current?.TryFindResource(key) is Brush brush)
-        {
-            return brush;
-        }
-
-        var created = new SolidColorBrush(fallback);
-        created.Freeze();
-        return created;
-    }
+    private static Brush ResolveThemeBrush(string key) =>
+        WpfControlHelpers.FrozenBrush(Theme.Get(key));
 
     private void LibraryExplorerRootAddButton_Click(object sender, RoutedEventArgs e)
     {

@@ -466,7 +466,7 @@ internal sealed partial class WaapiStatusBar : UserControl
     {
         _badgeText = UiStrings.WaapiBadgeConnect;
         _badgeBack = Theme.Get("StatusBarConnectedBadgeBackBrush");
-        _badgeFore = Colors.White;
+        _badgeFore = Theme.Get("WaapiToggleOnForeBrush");
         _badgeFilled = true;
     }
 
@@ -474,7 +474,7 @@ internal sealed partial class WaapiStatusBar : UserControl
     {
         _badgeText = UiStrings.WaapiBadgeDisconnect;
         _badgeBack = Theme.Get("StatusBarDisconnectedBadgeBackBrush");
-        _badgeFore = Colors.White;
+        _badgeFore = Theme.Get("WaapiToggleOnForeBrush");
         _badgeFilled = true;
     }
 

@@ -549,7 +549,7 @@ internal sealed class SpectrogramRenderer
 
         var fill = WpfControlHelpers.FrozenBrush(fillColor);
         var edge = WpfControlHelpers.FrozenBrush(FrequencyLabelEdge);
-        var grid = WpfControlHelpers.FrozenHairline(Color.FromArgb(26, 255, 255, 255), dpi);
+        var grid = WpfControlHelpers.FrozenHairline(Theme.Get("SpectrogramGridBrush"), dpi);
         foreach (var mark in SpectrogramEngine.FrequencyMarks)
         {
             if (mark < SpectrogramEngine.MinHertz || mark > maxHertz * 1.001)
@@ -575,9 +575,9 @@ internal sealed class SpectrogramRenderer
         }
     }
 
-    internal static Color FrequencyLabelFill => Color.FromRgb(0xEB, 0xEB, 0xEB);
+    internal static Color FrequencyLabelFill => Theme.Get("SpectrogramScaleForeBrush");
 
-    internal static Color FrequencyLabelEdge => Colors.Black;
+    internal static Color FrequencyLabelEdge => Theme.Get("SpectrogramScaleEdgeBrush");
 
     internal static readonly (double X, double Y)[] FrequencyLabelHalo =
     [

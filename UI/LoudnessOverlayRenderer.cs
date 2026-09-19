@@ -14,9 +14,6 @@ internal sealed class LoudnessOverlayRenderer
     public const double BandLu = 6;
 
     private static readonly double[] MarkOffsets = [6, 0, -3, -12, -21];
-    private static readonly Pen SafePen = CreatePen(Colors.Cyan, 1.6);
-    private static readonly Pen CautionPen = CreatePen(Color.FromRgb(255, 128, 0), 1.6);
-    private static readonly Pen DangerPen = CreatePen(Colors.Red, 2.4);
 
     private readonly object _gate = new();
     private int _generation;
@@ -178,23 +175,23 @@ internal sealed class LoudnessOverlayRenderer
 
     private static Brush BandBrush(LoudnessTraffic traffic)
     {
-        LoudnessTrafficLight.Rgb(traffic, out var r, out var g, out var b);
+        var color = Theme.Get(TrafficKey(traffic));
         var shade = IsLight ? 0.55 : 0.28;
         return IsLight
             ? WpfControlHelpers.FrozenBrush(Color.FromArgb(
                 0xA0,
-                (byte)Math.Round(r * shade),
-                (byte)Math.Round(g * shade),
-                (byte)Math.Round(b * shade)))
+                (byte)Math.Round(color.R * shade),
+                (byte)Math.Round(color.G * shade),
+                (byte)Math.Round(color.B * shade)))
             : WpfControlHelpers.FrozenBrush(Color.FromRgb(
-                (byte)Math.Round(r * shade),
-                (byte)Math.Round(g * shade),
-                (byte)Math.Round(b * shade)));
+                (byte)Math.Round(color.R * shade),
+                (byte)Math.Round(color.G * shade),
+                (byte)Math.Round(color.B * shade)));
     }
 
     private static void DrawGrid(DrawingContext dc, Rect wave, double target)
     {
-        var pen = new Pen(WpfControlHelpers.FrozenBrush(HairlineInk(36, 40)), 1);
+        var pen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("LoudnessGridBrush")), 1);
         pen.Freeze();
         foreach (var lufs in ScaleMarks(target))
         {
@@ -206,7 +203,7 @@ internal sealed class LoudnessOverlayRenderer
     private static void DrawTarget(DrawingContext dc, Rect wave, double target)
     {
         var y = LufsToY(target, wave, target);
-        var pen = new Pen(WpfControlHelpers.FrozenBrush(HairlineInk(200, 48)), 1.2);
+        var pen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("LoudnessTargetLineBrush")), 1.2);
         pen.Freeze();
         dc.DrawLine(pen, new Point(wave.X, y), new Point(wave.Right, y));
     }
@@ -222,7 +219,7 @@ internal sealed class LoudnessOverlayRenderer
     {
         var width = Math.Max(1, (int)Math.Ceiling(wave.Width));
         var lu = LoudnessTrafficLight.LufsApproachLu;
-        var fill = WpfControlHelpers.FrozenBrush(Color.FromArgb(56, 255, 255, 255));
+        var fill = WpfControlHelpers.FrozenBrush(Theme.Get("SpectrogramSelectionFillBrush"));
         var upper = new List<Point>(width + 1);
         var lower = new List<Point>(width + 1);
 
@@ -335,11 +332,17 @@ internal sealed class LoudnessOverlayRenderer
             });
     }
 
-    private static Pen CurvePen(LoudnessTraffic traffic) => traffic switch
+    private static Pen CurvePen(LoudnessTraffic traffic)
     {
-        LoudnessTraffic.Caution => CautionPen,
-        LoudnessTraffic.Danger => DangerPen,
-        _ => SafePen,
+        var thickness = traffic == LoudnessTraffic.Danger ? 2.4 : 1.6;
+        return CreatePen(Theme.Get(TrafficKey(traffic)), thickness);
+    }
+
+    private static string TrafficKey(LoudnessTraffic traffic) => traffic switch
+    {
+        LoudnessTraffic.Caution => "LoudnessCautionBrush",
+        LoudnessTraffic.Danger => "LoudnessDangerBrush",
+        _ => "LoudnessSafeBrush",
     };
 
     private static Pen CreatePen(Color color, double thickness)
@@ -352,13 +355,6 @@ internal sealed class LoudnessOverlayRenderer
     }
 
     private static bool IsLight => UiThemeService.Current == UiTheme.Light;
-
-    private static Color HairlineInk(byte darkAlpha, byte lightGray)
-    {
-        return IsLight
-            ? Color.FromArgb(darkAlpha, lightGray, lightGray, (byte)(lightGray + 4))
-            : Color.FromArgb(darkAlpha, 255, 255, 255);
-    }
 
     private static void DrawScaleLabels(
         DrawingContext dc,

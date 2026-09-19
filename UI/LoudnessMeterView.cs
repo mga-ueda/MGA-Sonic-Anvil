@@ -199,9 +199,9 @@ internal sealed class LoudnessMeterView : Grid
 
     public void ApplyValueColors()
     {
-        _safeBrush = ThemeBrush("VectorScopeTraceBrush", LoudnessTrafficLight.SafeR, LoudnessTrafficLight.SafeG, LoudnessTrafficLight.SafeB);
-        _cautionBrush = ThemeBrush("MarkerBrush", LoudnessTrafficLight.CautionR, LoudnessTrafficLight.CautionG, LoudnessTrafficLight.CautionB);
-        _dangerBrush = ThemeBrush("StatusBarErrorDetailForeBrush", LoudnessTrafficLight.DangerR, LoudnessTrafficLight.DangerG, LoudnessTrafficLight.DangerB);
+        _safeBrush = WpfControlHelpers.FrozenBrush(Theme.Get("VectorScopeTraceBrush"));
+        _cautionBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MarkerBrush"));
+        _dangerBrush = WpfControlHelpers.FrozenBrush(Theme.Get("StatusBarErrorDetailForeBrush"));
         _idleBrush = MutedFore();
         _chipFore = ChipFore();
         _safeChipBrush = ShadeBrush(_safeBrush);
@@ -260,7 +260,7 @@ internal sealed class LoudnessMeterView : Grid
         && cachedCount == count;
 
     internal static Color ChipTextColor(UiTheme theme) =>
-        theme == UiTheme.Light ? Colors.White : Colors.Black;
+        UiThemePalette.ColorFor(theme, "LoudnessChipForeBrush");
 
     internal static Color ShadeChipFill(Color color, UiTheme theme)
     {
@@ -513,23 +513,11 @@ internal sealed class LoudnessMeterView : Grid
             TextWrapping = TextWrapping.NoWrap,
         };
 
-    private static Brush ThemeBrush(string key, byte r, byte g, byte b)
-    {
-        try
-        {
-            return WpfControlHelpers.FrozenBrush(Theme.Get(key));
-        }
-        catch (InvalidOperationException)
-        {
-            return Freeze(Color.FromRgb(r, g, b));
-        }
-    }
-
-    private static Brush ChipFore() => Freeze(ChipTextColor(UiThemeService.Current));
+    private static Brush ChipFore() => Freeze(Theme.Get("LoudnessChipForeBrush"));
 
     private static Brush ShadeBrush(Brush source)
     {
-        var color = source is SolidColorBrush solid ? solid.Color : Colors.Gray;
+        var color = source is SolidColorBrush solid ? solid.Color : Theme.Get("MutedForeBrush");
         return Freeze(ShadeChipFill(color, UiThemeService.Current));
     }
 
@@ -542,21 +530,8 @@ internal sealed class LoudnessMeterView : Grid
             (byte)Math.Round(from.B + (to.B - from.B) * amount));
     }
 
-    private static Brush MutedFore()
-    {
-        var theme = UiThemeService.Current;
-        try
-        {
-            return WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
-        }
-        catch (InvalidOperationException)
-        {
-            return Freeze(
-                theme == UiTheme.Light
-                    ? Color.FromRgb(0x3F, 0x3F, 0x42)
-                    : Color.FromRgb(0x96, 0x96, 0x96));
-        }
-    }
+    private static Brush MutedFore() =>
+        WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
 
     private static SolidColorBrush Freeze(Color color)
     {
