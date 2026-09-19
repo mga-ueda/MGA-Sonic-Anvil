@@ -740,8 +740,6 @@ internal sealed class WaveformView : Grid
         ApplyMouseGuideOverlay();
     }
 
-    public void RefreshOverlay() => InvalidatePlayheadLayer();
-
     public bool SpectrogramVisible =>
         _spectrogramMode is SpectrogramViewMode.Spectrogram or SpectrogramViewMode.Overlay;
 
@@ -791,15 +789,11 @@ internal sealed class WaveformView : Grid
             _ => WaveformAnalysisView.Spectrogram,
         });
 
-    public void ExitSpectrogramView() => ExitAnalysisView();
-
     public void ToggleLoudnessView() =>
         SetAnalysisView(
             _spectrogramMode == SpectrogramViewMode.Loudness
                 ? WaveformAnalysisView.Waveform
                 : WaveformAnalysisView.Loudness);
-
-    public void ExitLoudnessView() => ExitAnalysisView();
 
     public void ExitAnalysisView() => SetAnalysisView(WaveformAnalysisView.Waveform);
 
@@ -832,18 +826,6 @@ internal sealed class WaveformView : Grid
                 InvalidateStaticLayer();
             }
         }
-    }
-
-    public void ToggleAnalysisView()
-    {
-        _spectrogramMode = _spectrogramMode switch
-        {
-            SpectrogramViewMode.Off => SpectrogramViewMode.Spectrogram,
-            SpectrogramViewMode.Spectrogram => SpectrogramViewMode.Overlay,
-            SpectrogramViewMode.Overlay => SpectrogramViewMode.Loudness,
-            _ => SpectrogramViewMode.Off,
-        };
-        ApplyAnalysisView();
     }
 
     private void ApplyAnalysisView()

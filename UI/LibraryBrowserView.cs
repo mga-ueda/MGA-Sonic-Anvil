@@ -304,21 +304,6 @@ internal sealed class LibraryBrowserView : UserControl
 
     internal Dock PlaylistGroupDock => DockPanel.GetDock(_playlistGroupHost);
 
-    public bool IsGroupComboOrigin(System.Windows.DependencyObject? origin)
-    {
-        while (origin is not null)
-        {
-            if (ReferenceEquals(origin, _groupCombo))
-            {
-                return true;
-            }
-
-            origin = VisualTreeHelper.GetParent(origin);
-        }
-
-        return false;
-    }
-
     public bool IsExplorerOrigin(System.Windows.DependencyObject? origin)
     {
         while (origin is not null)
@@ -885,7 +870,7 @@ internal sealed class LibraryBrowserView : UserControl
         _restoreListFocusGeneration++;
     }
 
-    internal void RestorePlaylistFocusIfNeeded()
+    private void RestorePlaylistFocusIfNeeded()
     {
         if (_restoreListFocus || _grid.IsKeyboardFocusWithin)
         {
@@ -2350,17 +2335,6 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         return FolderDisplayName(path);
-    }
-
-    private void AddSpecialRoot(Environment.SpecialFolder folder, string header)
-    {
-        var path = SpecialFolderPath(folder);
-        if (string.IsNullOrEmpty(path))
-        {
-            return;
-        }
-
-        AddFolderItem(_folderTree.Items, path, header);
     }
 
     private static string SpecialFolderPath(Environment.SpecialFolder folder)

@@ -43,9 +43,6 @@ public partial class MainWindow
     private bool ShowWaveformScaleLane =>
         _waveformMaximizeMode != WaveformMaximizeMode.Waveform && !IsLibraryMaximized;
 
-    internal bool IsLibraryListFocused =>
-        IsLibraryMaximized && LibraryBrowser.IsListKeyboardFocused;
-
     internal bool IsLibraryGroupComboFocused =>
         IsLibraryMaximized && LibraryBrowser.IsGroupComboFocused;
 

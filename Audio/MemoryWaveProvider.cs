@@ -317,17 +317,6 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
-    public int MeterChannels
-    {
-        get
-        {
-            lock (_monitorGate)
-            {
-                return Math.Max(1, _meterSourceChannels);
-            }
-        }
-    }
-
     public void Bind(
         AudioDocument document,
         long startFrame,
