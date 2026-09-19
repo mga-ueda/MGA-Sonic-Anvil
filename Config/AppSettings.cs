@@ -190,6 +190,9 @@ internal sealed class AppSettings
     /// <summary>F10 左のフォルダツリー。空はマイミュージック（ルート解決後）。</summary>
     public string LibraryExplorerPath { get; set; } = string.Empty;
 
+    /// <summary>F10 ツリーで展開していたフォルダ。無いものは起動時に落とす。</summary>
+    public string[] LibraryExplorerExpanded { get; set; } = [];
+
     /// <summary>F10 ツリーのルート。空はマイミュージックのみ。</summary>
     public string[] LibraryExplorerRoots { get; set; } = [];
 
@@ -453,6 +456,12 @@ internal sealed class AppSettings
 
     public void ApplyLibraryExplorerRoots(IEnumerable<string> roots) =>
         LibraryExplorerRoots = LibraryExplorerPaths.SerializeRoots(roots);
+
+    public string[] ResolvedLibraryExplorerExpanded() =>
+        LibraryExplorerPaths.ResolveExpanded(LibraryExplorerExpanded);
+
+    public void ApplyLibraryExplorerExpanded(IEnumerable<string> paths) =>
+        LibraryExplorerExpanded = LibraryExplorerPaths.SerializeExpanded(paths);
 
     public string[] ResolvedLibraryFavoritePaths() =>
         LibraryFavoritePaths.Resolve(LibraryFavorites);

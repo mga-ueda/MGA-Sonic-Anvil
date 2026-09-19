@@ -116,6 +116,19 @@ public sealed class LibraryExplorerPathsTests
         Assert.Equal([LibraryExplorerPaths.DefaultRootFolder()], settings.ResolvedLibraryExplorerRoots());
         settings.ApplyLibraryExplorerPath(Path.Combine(Path.GetTempPath(), "mga-anvil-missing-apply-" + Guid.NewGuid().ToString("N")));
         Assert.Equal(LibraryExplorerPaths.DefaultRootFolder(), settings.LibraryExplorerPath);
+        var folder = Path.Combine(Path.GetTempPath(), "mga-anvil-expanded-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            settings.ApplyLibraryExplorerExpanded([folder, folder, Path.Combine(Path.GetTempPath(), "mga-missing-expanded")]);
+            Assert.Equal(
+                [Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)],
+                settings.ResolvedLibraryExplorerExpanded());
+        }
+        finally
+        {
+            Directory.Delete(folder);
+        }
     }
 
     [Fact]
@@ -130,6 +143,30 @@ public sealed class LibraryExplorerPathsTests
         Assert.Equal(max, DesignMetrics.ClampLibraryExplorerWidth(max + 50));
         Assert.Equal(min + 40, DesignMetrics.ClampLibraryExplorerWidth(min + 40));
         Assert.Equal(1, DesignMetrics.LibraryExplorerSplitterWidth);
+        Assert.Equal(24, DesignMetrics.LibrarySplitterHitThickness);
+        Assert.Equal(DesignMetrics.LibrarySplitterHitThickness, DesignMetrics.LibraryFavoritesSplitterHitHeight);
+        Assert.Equal(240, DesignMetrics.LibrarySplitterRevealDistance);
+        Assert.Equal(320, DesignMetrics.LibraryScrollRevealDistance);
+    }
+
+    [Fact]
+    public void LibraryScrollReveal_NearEdge_UsesDistance()
+    {
+        Assert.False(LibraryScrollReveal.IsNearEdge(67, 100, 32));
+        Assert.True(LibraryScrollReveal.IsNearEdge(68, 100, 32));
+        Assert.True(LibraryScrollReveal.IsNearEdge(99, 100, 32));
+        Assert.True(LibraryScrollReveal.IsNearEdge(0, 20, 32));
+        Assert.False(LibraryScrollReveal.IsNearEdge(50, 0, 32));
+    }
+
+    [Fact]
+    public void LibrarySplitterReveal_NearLine_UsesDistance()
+    {
+        Assert.False(LibrarySplitterReveal.IsNearLine(500, 0, 240));
+        Assert.True(LibrarySplitterReveal.IsNearLine(240, 0, 240));
+        Assert.True(LibrarySplitterReveal.IsNearLine(0, 0, 240));
+        Assert.True(LibrarySplitterReveal.IsNearLine(220, 220, 240));
+        Assert.False(LibrarySplitterReveal.IsNearLine(500, 220, 240));
     }
 
     [Fact]

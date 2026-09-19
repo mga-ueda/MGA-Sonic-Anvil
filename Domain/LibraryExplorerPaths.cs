@@ -91,6 +91,44 @@ internal static class LibraryExplorerPaths
 
     public static string[] SerializeRoots(IEnumerable<string> roots) => ResolveRoots(roots.ToArray());
 
+    /// <summary>展開していたフォルダ。無いパスは落とす。並びはフルパス。</summary>
+    public static string[] ResolveExpanded(IEnumerable<string>? saved)
+    {
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (saved is null)
+        {
+            return [];
+        }
+
+        foreach (var raw in saved)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                continue;
+            }
+
+            try
+            {
+                var full = Path.GetFullPath(raw.Trim())
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (!Directory.Exists(full) || !seen.Add(full))
+                {
+                    continue;
+                }
+
+                result.Add(full);
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+            }
+        }
+
+        return [.. result];
+    }
+
+    public static string[] SerializeExpanded(IEnumerable<string> paths) => ResolveExpanded(paths);
+
     /// <summary>選択を1段動かす。並びの相対順は保つ。端では動かない。</summary>
     public static void MoveSelected<T>(IList<T> items, IReadOnlySet<T> selected, int direction)
         where T : notnull
