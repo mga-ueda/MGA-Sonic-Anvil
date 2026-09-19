@@ -52,6 +52,9 @@ internal sealed class AudioPlayer : IDisposable
 
     public long CursorFrame => _provider.CursorFrame;
 
+    /// <summary>スキップ連打中の到達位置。フェードアウト中のみ。</summary>
+    public long? PendingSeekFrame => _provider.PendingSeekFrame;
+
     /// <summary>
     /// 描画専用の補間付き再生位置。CursorFrame はオーディオバッファ単位
     /// （ASIO で 10〜20ms 刻み）でしか進まず、60fps 描画と干渉してジャダーに
@@ -374,6 +377,18 @@ internal sealed class AudioPlayer : IDisposable
         {
             _discardQueuedOutput = true;
         }
+    }
+
+    public void SeekWithCrossfade(long frame, int fadeMilliseconds)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!_playing || _scrubbing || fadeMilliseconds <= 0)
+        {
+            Seek(frame);
+            return;
+        }
+
+        _provider.SeekFrameCrossfade(frame, fadeMilliseconds);
     }
 
     public void SetPlayWindow(WaveSelection? playRange, bool loop)

@@ -122,12 +122,24 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private float _silentSkipLinear = SilentSkip.LinearFromDb(SilentSkip.DefaultThresholdDb);
     /// <summary>再生ヘッドの進行倍率。1 / <see cref="FastSpeed"/> / -<see cref="FastSpeed"/>。</summary>
     private double _playbackSpeed = 1;
+    private float _shuttleOutputGain = 1f;
     private bool _shuttlePrimed;
     private bool _shuttleFadeIn;
     private double _shuttleOrigin;
     private double _shuttleRead;
     private int _flushFadeRemaining;
     private int _flushFadeTotal;
+    /// <summary>1＝推移元フェードアウトと推移先フェードインを同時。0 はなし。</summary>
+    private int _seekFadePhase;
+    private int _seekFadePos;
+    private int _seekFadeFrames;
+    private long _seekFadeTarget;
+    private double _seekFadeOutFrame;
+    private AudioStreamSource? _seekFadeOutStream;
+    private float[] _seekFadeOutSrc = [];
+    private float[] _seekFadeOutCached = [];
+    private long _seekFadeOutCachedAt = -1;
+    private float[] _seekFadeMix = [];
     private AudioStreamSource? _stream;
     private AudioStreamSource? _gaplessStream;
     private AudioDocument? _gaplessDocument;
@@ -136,19 +148,28 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private float[] _streamFrame = [];
     private float[] _streamCached = [];
     private long _streamCachedAt = -1;
-    /// <summary>ストリーム早戻し用。前方シークをまとめて読み、逆方向へ可変速で再生する。</summary>
+    /// <summary>ストリーム早戻し。デコード済みを逆方向へ再生し、次チャンクは重ならせてつなぐ。</summary>
     private float[] _streamReverseBuf = [];
     private long _streamReverseBufStart = -1;
     private int _streamReverseBufFrames;
+    private float[] _streamReverseNext = [];
+    private long _streamReverseNextStart = -1;
+    private int _streamReverseNextFrames;
+    private float[] _streamReverseLast = [];
     /// <summary>1 回の Read でリングから捨てる無音の上限。超えたら次のコールバックへ回す。</summary>
     private int _streamSkipBudget;
     private bool _streamSkipYield;
     private const int StreamSilentSkipMaxFrames = 8192;
 
-    /// <summary>ピッチ据え置きの早送り／巻き戻し倍率。</summary>
+    /// <summary>早送りはピッチ据え置きグレイン、巻き戻しは逆再生。</summary>
     internal const double FastSpeed = 3;
+    /// <summary>1／3（および ←→ 早送り）の推移中に下げる音量。</summary>
+    internal const double ShuttleGainDb = -4;
+    internal static readonly float ShuttleGainLinear = (float)Math.Pow(10, ShuttleGainDb / 20.0);
     private const double ShuttleGrainSeconds = 0.03;
     private const double ShuttleTaperSeconds = 0.004;
+    private const double StreamReverseChunkSeconds = 0.16;
+    private const double StreamReverseOverlapSeconds = 0.02;
 
     public WaveFormat WaveFormat { get; private set; } =
         WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
@@ -262,6 +283,18 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
+    /// <summary>クロスフェード中のスキップ先。連打はここへ積む。</summary>
+    public long? PendingSeekFrame
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _seekFadePhase == 1 ? (long)Math.Floor(_sourceFrame) : null;
+            }
+        }
+    }
+
     public int SourceSampleRate
     {
         get
@@ -320,6 +353,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _silenceOnly = false;
             _flushFadeRemaining = 0;
             _flushFadeTotal = 0;
+            ClearSeekFadeNoLock();
             _exitPlaying = false;
             _shuttlePrimed = false;
             _exitSpanStartFrame = -1;
@@ -383,6 +417,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _silenceOnly = false;
             _flushFadeRemaining = 0;
             _flushFadeTotal = 0;
+            ClearSeekFadeNoLock();
             _exitPlaying = false;
             _shuttlePrimed = false;
             _exitSpanStartFrame = -1;
@@ -501,6 +536,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return false;
         }
 
+        if (_seekFadePhase != 0)
+        {
+            return false;
+        }
+
         if (Math.Abs(_playbackSpeed - 1d) > 1e-6)
         {
             return false;
@@ -541,6 +581,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _silenceOnly = false;
         _flushFadeRemaining = 0;
         _flushFadeTotal = 0;
+        ClearSeekFadeNoLock();
         _exitPlaying = false;
         _shuttlePrimed = false;
         _playExitLayer = false;
@@ -602,6 +643,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             // フェードで実音を足すと、終了時に先読みへまた音が入る。
             _flushFadeTotal = 0;
             _flushFadeRemaining = 0;
+            ClearSeekFadeNoLock();
             _silenceOnly = true;
             _paused = false;
             ResetMeterBuffers();
@@ -802,18 +844,166 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         lock (_gate)
         {
+            ClearSeekFadeNoLock();
+            SeekFrameNoLock(frame);
+        }
+    }
+
+    /// <summary>
+    /// クロスフェードでシークする。再生中のみ。停止・一時停止は即ジャンプ。
+    /// 推移元をフェードアウトしながら、同時に推移先をフェードインする。
+    /// </summary>
+    public void SeekFrameCrossfade(long frame, int fadeMilliseconds)
+    {
+        lock (_gate)
+        {
             var max = UsedFrameCountNoLock(_channels);
             var next = Math.Clamp(frame, 0, max);
+            var current = _channels <= 0 ? 0L : (long)Math.Floor(_sourceFrame);
+            if (_paused || _silenceOnly || fadeMilliseconds <= 0 || next == current)
+            {
+                ClearSeekFadeNoLock();
+                SeekFrameNoLock(next);
+                return;
+            }
+
+            var fadeFrames = SeekCrossfadeFrames(_deviceRate, fadeMilliseconds);
+            if (_seekFadePhase == 1)
+            {
+                RetargetSeekFadeIncomingNoLock(next);
+                return;
+            }
+
+            BeginSeekFadeNoLock(current, next, fadeFrames);
+        }
+    }
+
+    internal static int SeekCrossfadeFrames(int sampleRate, int milliseconds)
+    {
+        var ms = Math.Clamp(milliseconds, 1, 2000);
+        return Math.Max(1, Math.Max(1, sampleRate) * ms / 1000);
+    }
+
+    private void SeekFrameNoLock(long frame)
+    {
+        var max = UsedFrameCountNoLock(_channels);
+        var next = Math.Clamp(frame, 0, max);
+        _sourceFrame = next;
+        _cursor = checked((int)next * _channels);
+        // 音声スレッドも UI も _gate を握ったまま来る。先読み待ちで数秒止めない。
+        _stream?.SeekFrame(next, prebufferTimeoutMs: 0);
+        _streamCachedAt = -1;
+        ClearStreamReverseBuf();
+        // シークでジャンプしたら進行中の Exit 二重再生は直ちに止める（IM Importer と同じ）。
+        _exitPlaying = false;
+        _shuttlePrimed = false;
+        Ended = false;
+    }
+
+    private void ClearSeekFadeNoLock()
+    {
+        DisposeSeekFadeOutNoLock();
+        _seekFadePhase = 0;
+        _seekFadePos = 0;
+        _seekFadeFrames = 0;
+        _seekFadeOutFrame = 0;
+        _seekFadeOutCachedAt = -1;
+    }
+
+    private void CompleteSeekFadeNoLock()
+    {
+        DisposeSeekFadeOutNoLock();
+        ClearSeekFadeNoLock();
+    }
+
+    private void DisposeSeekFadeOutNoLock()
+    {
+        var outgoing = _seekFadeOutStream;
+        _seekFadeOutStream = null;
+        if (outgoing is null)
+        {
+            return;
+        }
+
+        ThreadPool.UnsafeQueueUserWorkItem(
+            static state =>
+            {
+                try
+                {
+                    ((AudioStreamSource)state!).Dispose();
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+            },
+            outgoing);
+    }
+
+    private void BeginSeekFadeNoLock(long from, long next, int fadeFrames)
+    {
+        _seekFadeOutFrame = from;
+        _seekFadeTarget = next;
+        _seekFadeFrames = Math.Max(1, fadeFrames);
+        _seekFadePos = 0;
+        _seekFadePhase = 1;
+        if (_stream is not null)
+        {
+            var incoming = TryOpenSeekFadeIncoming(next);
+            if (incoming is null)
+            {
+                ClearSeekFadeNoLock();
+                SeekFrameNoLock(next);
+                return;
+            }
+
+            _seekFadeOutStream = _stream;
+            _seekFadeOutFrame = _stream.Frame;
+            _seekFadeOutCachedAt = -1;
+            _stream = incoming;
             _sourceFrame = next;
-            _cursor = checked((int)next * _channels);
-            // 音声スレッドも UI も _gate を握ったまま来る。先読み待ちで数秒止めない。
-            _stream?.SeekFrame(next, prebufferTimeoutMs: 0);
+            _cursor = checked((int)next * Math.Max(1, _channels));
             _streamCachedAt = -1;
             ClearStreamReverseBuf();
-            // シークでジャンプしたら進行中の Exit 二重再生は直ちに止める（IM Importer と同じ）。
-            _exitPlaying = false;
-            _shuttlePrimed = false;
             Ended = false;
+            return;
+        }
+
+        _sourceFrame = next;
+        _cursor = checked((int)next * Math.Max(1, _channels));
+    }
+
+    private void RetargetSeekFadeIncomingNoLock(long next)
+    {
+        _seekFadeTarget = next;
+        if (_stream is not null)
+        {
+            _stream.SeekFrame(next, prebufferTimeoutMs: 0);
+            _streamCachedAt = -1;
+            ClearStreamReverseBuf();
+        }
+
+        _sourceFrame = next;
+        _cursor = checked((int)next * Math.Max(1, _channels));
+        Ended = false;
+    }
+
+    private AudioStreamSource? TryOpenSeekFadeIncoming(long frame)
+    {
+        var path = _boundDocument?.SourcePath;
+        if (path is not { Length: > 0 } || !File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            var source = AudioStreamSource.Open(path, prebufferTimeoutMs: 0);
+            source.SeekFrame(frame, prebufferTimeoutMs: 0);
+            return source;
+        }
+        catch
+        {
+            return null;
         }
     }
 
@@ -845,6 +1035,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         lock (_gate)
         {
+            if (paused)
+            {
+                CompleteSeekFadeNoLock();
+            }
+
             _paused = paused;
         }
     }
@@ -893,7 +1088,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             }
 
             _playbackSpeed = next;
+            _shuttleOutputGain = Math.Abs(next) > 1.5 ? ShuttleGainLinear : 1f;
             _shuttlePrimed = false;
+            CompleteSeekFadeNoLock();
             ClearStreamReverseBuf();
             return true;
         }
@@ -1001,6 +1198,14 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _sourceMeterScratchFrames = 0;
             written = ReadCore(buffer, offset, count);
             ApplyFlushFade(buffer, offset, written);
+            if (_flushFadeTotal > 0)
+            {
+                ClearSeekFadeNoLock();
+            }
+            else
+            {
+                ApplySeekCrossfade(buffer, offset, ref written);
+            }
             pushedSource = _sourceMeterThisRead > 0;
         }
 
@@ -1081,7 +1286,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _sourceRate == _deviceRate && Math.Abs(_playbackSpeed - 1d) < 1e-9;
 
     private bool UsesShuttleRead() =>
-        Math.Abs(_playbackSpeed - 1d) > 1e-9;
+        _playbackSpeed > 1.5;
 
     private double PlaybackStep(bool resampled) =>
         (resampled ? _sourceRate / (double)_deviceRate : 1d) * _playbackSpeed;
@@ -1118,6 +1323,126 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         {
             _silenceOnly = true;
         }
+    }
+
+    private void ApplySeekCrossfade(float[] buffer, int offset, ref int written)
+    {
+        if (_seekFadePhase == 0 || written <= 0)
+        {
+            return;
+        }
+
+        var srcCh = Math.Max(1, _channels);
+        var outCh = Math.Max(1, _outputChannels);
+        var frames = written / outCh;
+        if (_seekFadeOutSrc.Length < srcCh)
+        {
+            _seekFadeOutSrc = new float[srcCh];
+        }
+
+        if (_seekFadeMix.Length < outCh)
+        {
+            _seekFadeMix = new float[outCh];
+        }
+
+        var outStep = PlaybackStep(_sourceRate != _deviceRate || Math.Abs(_playbackSpeed - 1d) > 1e-9);
+        if (Math.Abs(outStep) < 1e-6)
+        {
+            outStep = outStep < 0 ? -1e-6 : 1e-6;
+        }
+
+        var i = 0;
+        while (i < frames && _seekFadePhase == 1)
+        {
+            var t = _seekFadeFrames <= 0 ? 1f : _seekFadePos / (float)_seekFadeFrames;
+            var gOut = MathF.Cos(0.5f * MathF.PI * Math.Clamp(t, 0f, 1f));
+            var gIn = MathF.Sin(0.5f * MathF.PI * Math.Clamp(t, 0f, 1f));
+            ReadSeekFadeOutSource(srcCh, outStep, _seekFadeOutSrc);
+            Array.Clear(_seekFadeMix, 0, outCh);
+            EmitFrame(_seekFadeMix, 0, 0, outCh, _seekFadeOutSrc, 1f);
+            var dest = offset + i * outCh;
+            for (var channel = 0; channel < outCh; channel++)
+            {
+                buffer[dest + channel] = _seekFadeMix[channel] * gOut + buffer[dest + channel] * gIn;
+            }
+
+            _seekFadePos++;
+            i++;
+            if (_seekFadePos >= _seekFadeFrames)
+            {
+                ClearSeekFadeNoLock();
+            }
+        }
+    }
+
+    private void ReadSeekFadeOutSource(int srcCh, double outStep, Span<float> dest)
+    {
+        if (_seekFadeOutStream is not null)
+        {
+            ReadSeekFadeOutStream(srcCh, dest);
+            _seekFadeOutFrame += outStep;
+            return;
+        }
+
+        var frameCount = UsedFrameCountNoLock(srcCh);
+        ReadShuttleSource(_seekFadeOutFrame, srcCh, frameCount, dest);
+        _seekFadeOutFrame += outStep;
+    }
+
+    /// <summary>
+    /// 推移元ストリームもフェードインと同じソース歩幅で進める。
+    /// 出力レートと違うと、1 出力フレーム＝1 ソースフレームではピッチがずれる。
+    /// </summary>
+    private void ReadSeekFadeOutStream(int srcCh, Span<float> dest)
+    {
+        var stream = _seekFadeOutStream;
+        if (stream is null)
+        {
+            dest.Clear();
+            return;
+        }
+
+        if (_seekFadeOutCached.Length < srcCh)
+        {
+            _seekFadeOutCached = new float[srcCh];
+        }
+
+        var want = (long)Math.Floor(_seekFadeOutFrame);
+        if (want < 0)
+        {
+            dest.Clear();
+            return;
+        }
+
+        if (_seekFadeOutCachedAt == want)
+        {
+            _seekFadeOutCached.AsSpan(0, srcCh).CopyTo(dest);
+            return;
+        }
+
+        var skipped = 0;
+        while (stream.Frame < want && skipped < 4096)
+        {
+            if (!stream.TryReadFrame(_seekFadeOutCached.AsSpan(0, srcCh), timeoutMs: 0))
+            {
+                dest.Clear();
+                _seekFadeOutCachedAt = -1;
+                return;
+            }
+
+            skipped++;
+        }
+
+        if (stream.Frame != want
+            || !stream.TryReadFrame(_seekFadeOutCached.AsSpan(0, srcCh), timeoutMs: 0))
+        {
+            dest.Clear();
+            _seekFadeOutCachedAt = -1;
+            return;
+        }
+
+        _seekFadeOutCachedAt = want;
+        _seekFadeOutCached.AsSpan(0, srcCh).CopyTo(dest);
     }
 
     /// <summary>
@@ -1247,8 +1572,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var frameCount = FrameCountOrStreamEnd(srcCh);
         var writtenFrames = 0;
         var source = _streamFrame.AsSpan(0, srcCh);
-        // 約 0.25 秒分。シーク回数を抑えつつ連続した逆再生にする。
-        var chunkFrames = Math.Max(1024, (int)Math.Round(_sourceRate * 0.25));
+        var chunkFrames = Math.Max(1024, (int)Math.Round(_sourceRate * StreamReverseChunkSeconds));
+        var overlapFrames = Math.Max(256, (int)Math.Round(_sourceRate * StreamReverseOverlapSeconds));
+        EnsureReverseLast(srcCh);
         while (writtenFrames < framesWanted)
         {
             var canLoop = _loop && playEndFrame > loopStartFrame;
@@ -1274,11 +1600,39 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             }
 
             var frame = (long)Math.Floor(_sourceFrame);
-            if (!TryReadStreamReverseFrame(frame, srcCh, frameCount, loopStartFrame, chunkFrames, source))
+            var got = false;
+            for (var attempt = 0; attempt < 4 && !got; attempt++)
             {
-                source.Clear();
+                got = TryReadStreamReverseFrame(frame, srcCh, frameCount, loopStartFrame, chunkFrames, overlapFrames, source);
             }
 
+            if (!got)
+            {
+                if (_streamReverseLast.Length >= srcCh)
+                {
+                    _streamReverseLast.AsSpan(0, srcCh).CopyTo(source);
+                    var remain = framesWanted - writtenFrames;
+                    for (var i = 0; i < remain; i++)
+                    {
+                        var hold = 1f - (i / (float)Math.Max(1, remain));
+                        EmitFrame(buffer, offset, writtenFrames, outCh, source, 0.35f * hold);
+                        writtenFrames++;
+                    }
+                }
+                else
+                {
+                    source.Clear();
+                    while (writtenFrames < framesWanted)
+                    {
+                        EmitFrame(buffer, offset, writtenFrames, outCh, source, 0f);
+                        writtenFrames++;
+                    }
+                }
+
+                break;
+            }
+
+            source.CopyTo(_streamReverseLast.AsSpan(0, srcCh));
             var gain = _frameGain is { } gainAt ? gainAt(Math.Clamp(frame, 0, Math.Max(0, frameCount - 1))) : 1f;
             EmitFrame(buffer, offset, writtenFrames, outCh, source, gain);
             _sourceFrame += step;
@@ -1295,6 +1649,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         long frameCount,
         double loopStartFrame,
         int chunkFrames,
+        int overlapFrames,
         Span<float> dest)
     {
         if (frame < 0 || frame >= frameCount)
@@ -1303,37 +1658,87 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return false;
         }
 
-        var index = (int)(frame - _streamReverseBufStart);
-        if (_streamReverseBufFrames > 0 && (uint)index < (uint)_streamReverseBufFrames)
+        PrefetchStreamReverseNext(frame, srcCh, frameCount, loopStartFrame, chunkFrames, overlapFrames);
+        var fromCurrent = TryCopyReverseBuf(frame, _streamReverseBufStart, _streamReverseBufFrames, _streamReverseBuf, srcCh, dest);
+        var nextIndex = (int)(frame - _streamReverseNextStart);
+        var fromNext = _streamReverseNextStart >= 0
+            && _streamReverseNextFrames > 0
+            && _streamReverseNext.Length >= srcCh
+            && (uint)nextIndex < (uint)_streamReverseNextFrames;
+        if (fromCurrent && fromNext)
         {
-            _streamReverseBuf.AsSpan(index * srcCh, srcCh).CopyTo(dest);
+            var t = overlapFrames <= 0
+                ? 0f
+                : Math.Clamp((frame - _streamReverseBufStart) / (float)overlapFrames, 0f, 1f);
+            var gCurrent = MathF.Sin(0.5f * MathF.PI * t);
+            var gNext = MathF.Cos(0.5f * MathF.PI * t);
+            var nextAt = nextIndex * srcCh;
+            for (var i = 0; i < srcCh; i++)
+            {
+                dest[i] = dest[i] * gCurrent + _streamReverseNext[nextAt + i] * gNext;
+            }
+
             return true;
         }
 
+        if (fromCurrent)
+        {
+            return true;
+        }
+
+        if (fromNext)
+        {
+            _streamReverseNext.AsSpan(nextIndex * srcCh, srcCh).CopyTo(dest);
+            if (frame < _streamReverseBufStart)
+            {
+                PromoteReverseNext();
+            }
+
+            return true;
+        }
+
+        return FillStreamReverseCurrent(frame, srcCh, frameCount, loopStartFrame, chunkFrames, dest);
+    }
+
+    private static bool TryCopyReverseBuf(
+        long frame,
+        long start,
+        int filled,
+        float[] buf,
+        int srcCh,
+        Span<float> dest)
+    {
+        var index = (int)(frame - start);
+        if (start < 0 || filled <= 0 || buf.Length < srcCh || (uint)index >= (uint)filled)
+        {
+            return false;
+        }
+
+        buf.AsSpan(index * srcCh, srcCh).CopyTo(dest);
+        return true;
+    }
+
+    private bool FillStreamReverseCurrent(
+        long frame,
+        int srcCh,
+        long frameCount,
+        double loopStartFrame,
+        int chunkFrames,
+        Span<float> dest)
+    {
         var end = frame;
         var start = Math.Max((long)Math.Floor(loopStartFrame), end - chunkFrames + 1);
         start = Math.Clamp(start, 0, Math.Max(0, frameCount - 1));
         end = Math.Clamp(end, start, Math.Max(0, frameCount - 1));
-        var len = (int)(end - start + 1);
-        var need = len * srcCh;
-        if (_streamReverseBuf.Length < need)
-        {
-            _streamReverseBuf = new float[need];
-        }
-
-        Array.Clear(_streamReverseBuf, 0, need);
-        for (var i = 0; i < len; i++)
-        {
-            if (EnsureStreamFrameNoLock(start + i, _streamFrame.AsSpan(0, srcCh)))
-            {
-                _streamFrame.AsSpan(0, srcCh).CopyTo(_streamReverseBuf.AsSpan(i * srcCh, srcCh));
-            }
-        }
-
-        _streamReverseBufStart = start;
-        _streamReverseBufFrames = len;
-        index = (int)(frame - start);
-        if ((uint)index >= (uint)len)
+        FillReverseWindow(
+            ref _streamReverseBuf,
+            ref _streamReverseBufStart,
+            ref _streamReverseBufFrames,
+            start,
+            end,
+            srcCh);
+        var index = (int)(frame - _streamReverseBufStart);
+        if (_streamReverseBufFrames <= 0 || (uint)index >= (uint)_streamReverseBufFrames)
         {
             dest.Clear();
             return false;
@@ -1343,10 +1748,129 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         return true;
     }
 
+    private void PrefetchStreamReverseNext(
+        long frame,
+        int srcCh,
+        long frameCount,
+        double loopStartFrame,
+        int chunkFrames,
+        int overlapFrames)
+    {
+        if (_streamReverseBufFrames <= 0 || _streamReverseBufStart < 0)
+        {
+            return;
+        }
+
+        if (frame - _streamReverseBufStart > overlapFrames * 2)
+        {
+            return;
+        }
+
+        var loopStart = (long)Math.Floor(loopStartFrame);
+        var nextEnd = Math.Min(frameCount - 1, _streamReverseBufStart + overlapFrames - 1);
+        var nextStart = Math.Max(loopStart, nextEnd - chunkFrames + 1);
+        nextStart = Math.Clamp(nextStart, 0, Math.Max(0, frameCount - 1));
+        if (nextStart >= _streamReverseBufStart)
+        {
+            return;
+        }
+
+        FillReverseWindow(
+            ref _streamReverseNext,
+            ref _streamReverseNextStart,
+            ref _streamReverseNextFrames,
+            nextStart,
+            nextEnd,
+            srcCh);
+    }
+
+    private void FillReverseWindow(
+        ref float[] buf,
+        ref long bufStart,
+        ref int bufFrames,
+        long start,
+        long end,
+        int srcCh)
+    {
+        var len = (int)(end - start + 1);
+        if (len <= 0)
+        {
+            return;
+        }
+
+        if (bufStart == start && bufFrames >= len)
+        {
+            return;
+        }
+
+        var need = len * srcCh;
+        if (buf.Length < need)
+        {
+            buf = new float[need];
+        }
+
+        long filledFrom;
+        if (bufStart == start && bufFrames > 0)
+        {
+            filledFrom = start + bufFrames;
+        }
+        else
+        {
+            Array.Clear(buf, 0, need);
+            bufStart = start;
+            bufFrames = 0;
+            filledFrom = start;
+            if (_stream is not null && _stream.Frame != filledFrom)
+            {
+                _stream.SeekFrame(filledFrom, prebufferTimeoutMs: 0);
+                _streamCachedAt = -1;
+            }
+        }
+
+        bufFrames += FillStreamReverseRange(buf, start, filledFrom, end, srcCh);
+    }
+
+    private void PromoteReverseNext()
+    {
+        _streamReverseBuf = _streamReverseNext;
+        _streamReverseBufStart = _streamReverseNextStart;
+        _streamReverseBufFrames = _streamReverseNextFrames;
+        _streamReverseNext = [];
+        _streamReverseNextStart = -1;
+        _streamReverseNextFrames = 0;
+    }
+
+    private int FillStreamReverseRange(float[] buf, long start, long from, long end, int srcCh)
+    {
+        var got = 0;
+        for (var frame = from; frame <= end; frame++)
+        {
+            if (!EnsureStreamFrameNoLock(frame, _streamFrame.AsSpan(0, srcCh)))
+            {
+                break;
+            }
+
+            _streamFrame.AsSpan(0, srcCh).CopyTo(buf.AsSpan((int)(frame - start) * srcCh, srcCh));
+            got++;
+        }
+
+        return got;
+    }
+
+    private void EnsureReverseLast(int srcCh)
+    {
+        if (_streamReverseLast.Length < srcCh)
+        {
+            _streamReverseLast = new float[srcCh];
+        }
+    }
+
     private void ClearStreamReverseBuf()
     {
         _streamReverseBufStart = -1;
         _streamReverseBufFrames = 0;
+        _streamReverseNextStart = -1;
+        _streamReverseNextFrames = 0;
     }
 
     private long FrameCountOrStreamEnd(int srcCh) =>
@@ -1658,7 +2182,30 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var source = frame[..Math.Min(srcCh, ChannelLayout.MaxChannels)];
         while (writtenFrames < framesWanted)
         {
-            if (_sourceFrame >= playEndFrame)
+            if (step < 0)
+            {
+                var canLoop = _loop && playEndFrame > loopStartFrame;
+                if (_sourceFrame < loopStartFrame && canLoop)
+                {
+                    _sourceFrame = playEndFrame - (loopStartFrame - _sourceFrame);
+                    if (_sourceFrame >= playEndFrame)
+                    {
+                        _sourceFrame = Math.Max(loopStartFrame, playEndFrame - 1);
+                    }
+
+                    continue;
+                }
+
+                if (_sourceFrame <= loopStartFrame && !canLoop)
+                {
+                    _sourceFrame = loopStartFrame;
+                    source.Clear();
+                    EmitFrame(buffer, offset, writtenFrames, outCh, source, 0f);
+                    writtenFrames++;
+                    continue;
+                }
+            }
+            else if (_sourceFrame >= playEndFrame)
             {
                 if (_loop && playEndFrame > loopStartFrame)
                 {
@@ -1831,7 +2378,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     /// <returns>カーソルを動かした（続きの判定が必要）。</returns>
     private bool TrySkipSilenceNoLock(int srcCh, long start)
     {
-        if (!_silentSkip || _usedSamples <= 0 || UsesShuttleRead())
+        if (!_silentSkip || _usedSamples <= 0 || UsesShuttleRead() || _playbackSpeed < 0)
         {
             return false;
         }
@@ -2002,6 +2549,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         ReadOnlySpan<float> source,
         float gain)
     {
+        gain *= _shuttleOutputGain;
         source = ApplySolo(source);
         PushSourceFrame(source, gain);
         if (_directRoute)

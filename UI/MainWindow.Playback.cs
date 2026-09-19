@@ -15,7 +15,6 @@ public partial class MainWindow
     {
         if (IsLibraryMaximized && LibraryPlayerMode.BlocksTransport(command))
         {
-            KeepLibraryListActive();
             return;
         }
 
@@ -232,8 +231,10 @@ public partial class MainWindow
         SyncOverviewPlayhead();
     }
 
-    private static bool IsPlaybackShuttleKey(Key key, ModifierKeys modifiers) =>
-        modifiers == ModifierKeys.None && key is Key.Left or Key.Right;
+    private bool IsPlaybackShuttleKey(Key key, ModifierKeys modifiers) =>
+        IsLibraryMaximized
+            ? LibraryPlayerMode.IsPlayerShuttleKey(key, modifiers)
+            : modifiers == ModifierKeys.None && key is Key.Left or Key.Right;
 
     private bool CanPlaybackShuttle() =>
         _player.IsPlaying && !_player.IsScrubbing && !AnyEffectPreviewing;
@@ -250,6 +251,7 @@ public partial class MainWindow
             return true;
         }
 
+        StopSeekNudge();
         _playbackShuttleDirection = direction;
         _player.SetPlaybackSpeed(
             direction < 0 ? -PlaybackSampleProvider.FastSpeed : PlaybackSampleProvider.FastSpeed);
@@ -444,7 +446,7 @@ public partial class MainWindow
         }
     }
 
-    private void SeekFrame(long frame)
+    private void SeekFrame(long frame, int crossfadeMilliseconds = 0)
     {
         if (_document is null)
         {
@@ -459,7 +461,15 @@ public partial class MainWindow
             SyncPlayWindowFromDocument();
         }
 
-        _player.Seek(frame);
+        if (crossfadeMilliseconds > 0 && _player.IsPlaying)
+        {
+            _player.SeekWithCrossfade(frame, crossfadeMilliseconds);
+        }
+        else
+        {
+            _player.Seek(frame);
+        }
+
         SyncOverviewPlayhead();
         RefreshStatus();
     }
@@ -655,7 +665,7 @@ public partial class MainWindow
             return;
         }
 
-        var frame = _player.SmoothCursorFrame;
+        var frame = _player.PendingSeekFrame ?? _player.SmoothCursorFrame;
         _document.CursorFrame = frame;
         if (!Waveform.IsInteracting)
         {
@@ -835,6 +845,7 @@ public partial class MainWindow
         }
 
         StopPlaybackShuttle();
+        StopSeekNudge();
         _resumeAfterScrub = _player.IsPlaying && !_player.IsScrubbing;
         if (_fadePreview.Previewing)
         {

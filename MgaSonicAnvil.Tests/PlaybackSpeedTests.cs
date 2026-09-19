@@ -62,7 +62,7 @@ public sealed class PlaybackSpeedTests
         Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
         for (var i = 0; i < frames; i++)
         {
-            Assert.Equal(samples[i * 2], buffer[i * 2], 3);
+            Assert.Equal(samples[i * 2] * PlaybackSampleProvider.ShuttleGainLinear, buffer[i * 2], 3);
         }
 
         Assert.Equal(frames * 3, provider.CursorFrame);
@@ -101,12 +101,12 @@ public sealed class PlaybackSpeedTests
         var buffer = new float[20 * 2];
         Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
         Assert.Equal(140, provider.CursorFrame);
-        Assert.Equal(0.2f, buffer[0], 3);
-        Assert.Equal(0.2f, buffer[2], 3);
+        Assert.Equal(0.2f * PlaybackSampleProvider.ShuttleGainLinear, buffer[0], 3);
+        Assert.Equal(0.2f * PlaybackSampleProvider.ShuttleGainLinear, buffer[2], 3);
     }
 
     [Fact]
-    public void RewindSpeed_PlaysOriginalPitchBackward()
+    public void RewindSpeed_PlaysSamplesBackward()
     {
         var samples = new float[80 * 2];
         for (var i = 0; i < 80; i++)
@@ -123,9 +123,9 @@ public sealed class PlaybackSpeedTests
 
         var buffer = new float[8 * 2];
         Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
-        Assert.Equal(40f, buffer[0], 3);
-        Assert.Equal(39f, buffer[2], 3);
-        Assert.Equal(38f, buffer[4], 3);
+        Assert.Equal(40f * PlaybackSampleProvider.ShuttleGainLinear, buffer[0], 3);
+        Assert.Equal(37f * PlaybackSampleProvider.ShuttleGainLinear, buffer[2], 3);
+        Assert.Equal(34f * PlaybackSampleProvider.ShuttleGainLinear, buffer[4], 3);
         Assert.Equal(16, provider.CursorFrame);
     }
 
@@ -161,6 +161,29 @@ public sealed class PlaybackSpeedTests
         Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
         // 出力 20 フレーム × (48k/96k) × 3 = 30 ソースフレーム。
         Assert.Equal(30, provider.CursorFrame);
+    }
+
+    [Fact]
+    public void Shuttle_AttenuatesBy4dB_AndRestoresAtUnity()
+    {
+        Assert.Equal(-4, PlaybackSampleProvider.ShuttleGainDb);
+        Assert.InRange(PlaybackSampleProvider.ShuttleGainLinear, 0.62f, 0.64f);
+
+        var provider = MakeProvider(300);
+        provider.SetPlaybackSpeed(PlaybackSampleProvider.FastSpeed);
+        var fast = new float[20 * 2];
+        Assert.Equal(fast.Length, provider.Read(fast, 0, fast.Length));
+        Assert.Equal(0.2f * PlaybackSampleProvider.ShuttleGainLinear, fast[0], 3);
+
+        provider.SetPlaybackSpeed(-PlaybackSampleProvider.FastSpeed);
+        var rewind = new float[10 * 2];
+        Assert.Equal(rewind.Length, provider.Read(rewind, 0, rewind.Length));
+        Assert.Equal(0.2f * PlaybackSampleProvider.ShuttleGainLinear, rewind[0], 3);
+
+        provider.SetPlaybackSpeed(1);
+        var unity = new float[10 * 2];
+        Assert.Equal(unity.Length, provider.Read(unity, 0, unity.Length));
+        Assert.Equal(0.2f, unity[0], 3);
     }
 
     private static PlaybackSampleProvider MakeProvider(int frames)
