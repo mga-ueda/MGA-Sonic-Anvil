@@ -155,7 +155,10 @@ internal sealed class LevelMeterView : FrameworkElement
             trackPen,
             track);
 
-        DrawTicks(dc, track);
+        if (!WashThrough)
+        {
+            DrawTicks(dc, track);
+        }
 
         var pct = isPeak ? meter.PeakPct : meter.RmsPct;
         var barH = track.Height * Math.Clamp(pct, 0, 100) / 100d;
@@ -197,10 +200,26 @@ internal sealed class LevelMeterView : FrameworkElement
         return new Rect(track.X + 1, y, Math.Max(1, track.Width - 2), lineH);
     }
 
+    /// <summary>プレイヤーではチャンネル区切りの縦罫を描かない。</summary>
+    internal static bool DrawsVerticalTrackRules(bool washThrough) => !washThrough;
+
+    /// <summary>プレイヤーは全幅で横目盛を繋ぐ。編集は縦罫を避けるため 1px 内側。</summary>
+    internal static double TickInset(bool washThrough) => washThrough ? 0 : 1;
+
     private void DrawSharedTrackBorders(DrawingContext dc, Rect frame, double barW, int channelCount)
     {
         var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
         var pen = WpfControlHelpers.FrozenHairline(TrackBorderColor(), pixelsPerDip);
+        if (!DrawsVerticalTrackRules(WashThrough))
+        {
+            var top = WpfControlHelpers.SnapDeviceCenter(frame.Top, pixelsPerDip);
+            var bottom = WpfControlHelpers.SnapDeviceCenter(frame.Bottom, pixelsPerDip);
+            dc.DrawLine(pen, new Point(frame.Left, top), new Point(frame.Right, top));
+            dc.DrawLine(pen, new Point(frame.Left, bottom), new Point(frame.Right, bottom));
+            DrawTicks(dc, frame);
+            return;
+        }
+
         dc.DrawRectangle(null, pen, frame);
         for (var i = 1; i < channelCount; i++)
         {
@@ -384,10 +403,11 @@ internal sealed class LevelMeterView : FrameworkElement
             WpfControlHelpers.FrozenBrush(PlayerMeterChrome.Grid("LevelMeterTickBrush", WashThrough)),
             1);
         pen.Freeze();
+        var inset = TickInset(WashThrough);
         foreach (var db in LevelMeterEngine.ScaleLabels)
         {
             var y = track.Y + (1 - LevelMeterEngine.DbToNorm(db)) * track.Height;
-            dc.DrawLine(pen, new Point(track.X + 1, y), new Point(track.Right - 1, y));
+            dc.DrawLine(pen, new Point(track.X + inset, y), new Point(track.Right - inset, y));
         }
     }
 }

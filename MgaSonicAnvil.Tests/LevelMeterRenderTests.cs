@@ -19,6 +19,20 @@ public sealed class LevelMeterRenderTests
     private static readonly Color TransportBack = Color.FromRgb(0x1B, 0x1D, 0x24);
 
     [Fact]
+    public void PlayerMode_OmitsVerticalTrackRules()
+    {
+        Assert.False(LevelMeterView.DrawsVerticalTrackRules(washThrough: true));
+        Assert.True(LevelMeterView.DrawsVerticalTrackRules(washThrough: false));
+    }
+
+    [Fact]
+    public void PlayerMode_JoinsHorizontalTicksAcrossTrack()
+    {
+        Assert.Equal(0, LevelMeterView.TickInset(washThrough: true));
+        Assert.Equal(1, LevelMeterView.TickInset(washThrough: false));
+    }
+
+    [Fact]
     public void SurroundTrack_LeavesStereoReadoutGap()
     {
         var bounds = new Rect(0, 0, DesignMetrics.LevelMeterWidth, 400);
