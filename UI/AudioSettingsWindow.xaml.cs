@@ -142,9 +142,8 @@ internal partial class AudioSettingsWindow : Window
         _visibleIds = new HashSet<string>(visible, StringComparer.OrdinalIgnoreCase);
         SelectedVisibleSpeakerIds = visible;
         SelectedLibraryExplorerRoots = LibraryExplorerPaths.ResolveRoots(libraryExplorerRoots?.ToArray());
-        SelectedLibraryListColumns = libraryListColumns is null
-            ? [.. LibraryColumnFilter.Defaults]
-            : [.. LibraryColumnFilter.Resolve(LibraryColumnFilter.Serialize(libraryListColumns))];
+        SelectedLibraryListColumns = LibraryColumnFilter.Resolve(
+            libraryListColumns is null ? null : LibraryColumnFilter.Serialize(libraryListColumns));
         SelectedAutoSpeakerSelect = autoSpeakerSelect;
         SelectedActiveSpeakerId = string.IsNullOrWhiteSpace(activeSpeakerId)
             ? _presets[0].Id
@@ -457,7 +456,7 @@ internal partial class AudioSettingsWindow : Window
             }
         }
 
-        return [.. LibraryColumnFilter.Resolve(LibraryColumnFilter.Serialize(set))];
+        return LibraryColumnFilter.Merge(SelectedLibraryListColumns, set);
     }
 
     private void ApplyLibraryExplorerRootButtons()

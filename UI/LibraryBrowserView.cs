@@ -117,7 +117,8 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly Dictionary<LibraryFileColumn, DataGridTextColumn> _columns = [];
     private readonly Dictionary<LibraryFileColumn, LibrarySortHeader> _sortHeaders = [];
     private int _sortChromeTicket;
-    private HashSet<LibraryFileColumn> _visibleColumns = [.. LibraryColumnFilter.Defaults];
+    private LibraryFileColumn[] _visibleColumns = [.. LibraryColumnFilter.Defaults];
+    private bool _columnOrderBusy;
     private bool _syncing;
     private int _syncGeneration;
     private bool _deferActivate;
@@ -373,6 +374,13 @@ internal sealed class LibraryBrowserView : UserControl
 
     internal double ColumnPixelWidth(LibraryFileColumn column) =>
         _columns.TryGetValue(column, out var gridColumn) ? gridColumn.Width.Value : 0;
+
+    internal IReadOnlyList<LibraryFileColumn> VisibleColumnOrder => _visibleColumns;
+
+    internal int ColumnDisplayIndex(LibraryFileColumn column) =>
+        _columns.TryGetValue(column, out var gridColumn) ? gridColumn.DisplayIndex : -1;
+
+    internal int GroupSpacerDisplayIndex => _groupSpacer.DisplayIndex;
 
     public DocumentSession? SelectedSession =>
         _grid.SelectedItem is LibraryFileRow { Tag: DocumentSession session } ? session : null;
@@ -937,8 +945,11 @@ internal sealed class LibraryBrowserView : UserControl
         FillGroupOptions();
         TipService.Set(_grid, UiStrings.TipLibraryList);
         TipService.Set(_groupCombo, UiStrings.TipLibraryList);
+        TipService.Set(_playlistLabel, UiStrings.TipLibraryJacket);
         TipService.Set(_folderTree, UiStrings.TipLibraryExplorer);
+        TipService.Set(_explorerLabel, UiStrings.TipLibraryExplorer);
         TipService.Set(_favoritesList, UiStrings.TipLibraryFavorites);
+        TipService.Set(_favoritesLabel, UiStrings.TipLibraryFavorites);
         _explorerLabel.Text = UiStrings.LibraryExplorerLabel;
         _favoritesLabel.Text = UiStrings.LibraryFavoritesLabel;
         _playlistLabel.Text = UiStrings.LibraryPlaylistLabel;
@@ -3073,6 +3084,7 @@ internal sealed class LibraryBrowserView : UserControl
         _grid.FontSize = LibraryListFontSize;
         _grid.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
         _grid.Sorting += Grid_Sorting;
+        _grid.ColumnReordered += Grid_ColumnReordered;
         _grid.SelectionChanged += Grid_SelectionChanged;
         _grid.PreviewMouseLeftButtonDown += Grid_PreviewMouseLeftButtonDown;
         _grid.MouseDoubleClick += Grid_MouseDoubleClick;
@@ -3136,6 +3148,7 @@ internal sealed class LibraryBrowserView : UserControl
         _groupSpacer.Visibility = grouped ? Visibility.Visible : Visibility.Collapsed;
         _grid.FrozenColumnCount = grouped ? 1 : 0;
         SetPlaylistBandLeft(_grid, grouped ? GroupJacketColumnWidth : 0);
+        ApplyColumnDisplayOrder(_visibleColumns);
     }
 
     internal void EnsureGroupScrollHook()
@@ -3275,24 +3288,144 @@ internal sealed class LibraryBrowserView : UserControl
         _ = EnsureGroupArtworkAsync();
     }
 
-    private void ApplyColumnVisibility(HashSet<LibraryFileColumn> visible, bool notify)
+    private void ApplyColumnVisibility(IReadOnlyList<LibraryFileColumn> visible, bool notify)
     {
-        visible.Add(LibraryFileColumn.Name);
-        _visibleColumns = visible;
+        var ordered = LibraryColumnFilter.Resolve(LibraryColumnFilter.Serialize(visible));
+        _visibleColumns = ordered;
+        var set = new HashSet<LibraryFileColumn>(ordered);
         foreach (var pair in _columns)
         {
-            pair.Value.Visibility = visible.Contains(pair.Key)
+            pair.Value.Visibility = set.Contains(pair.Key)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }
 
         if (notify)
         {
-            VisibleColumnsChanged?.Invoke(this, visible);
+            VisibleColumnsChanged?.Invoke(this, ordered);
         }
 
         RequestFitColumns();
         SyncGroupChrome();
+    }
+
+    private void ApplyColumnDisplayOrder(IReadOnlyList<LibraryFileColumn> visible)
+    {
+        if (_columns.Count == 0)
+        {
+            return;
+        }
+
+        _columnOrderBusy = true;
+        try
+        {
+            var ordered = new List<DataGridColumn>(_grid.Columns.Count);
+            var grouped = _group != LibraryFileGroup.None;
+            if (grouped)
+            {
+                ordered.Add(_groupSpacer);
+            }
+
+            var seen = new HashSet<LibraryFileColumn>();
+            foreach (var column in visible)
+            {
+                if (_columns.TryGetValue(column, out var gridColumn) && seen.Add(column))
+                {
+                    ordered.Add(gridColumn);
+                }
+            }
+
+            foreach (var column in LibraryColumnFilter.All)
+            {
+                if (!seen.Contains(column) && _columns.TryGetValue(column, out var gridColumn))
+                {
+                    ordered.Add(gridColumn);
+                }
+            }
+
+            if (!grouped)
+            {
+                ordered.Add(_groupSpacer);
+            }
+
+            for (var i = 0; i < ordered.Count; i++)
+            {
+                if (ordered[i].DisplayIndex != i)
+                {
+                    ordered[i].DisplayIndex = i;
+                }
+            }
+        }
+        finally
+        {
+            _columnOrderBusy = false;
+        }
+    }
+
+    private LibraryFileColumn[] ReadVisibleColumnOrder()
+    {
+        var visible = new List<(int Index, LibraryFileColumn Column)>(_columns.Count);
+        foreach (var pair in _columns)
+        {
+            if (pair.Value.Visibility == Visibility.Visible)
+            {
+                visible.Add((pair.Value.DisplayIndex, pair.Key));
+            }
+        }
+
+        visible.Sort(static (left, right) => left.Index.CompareTo(right.Index));
+        var result = new LibraryFileColumn[visible.Count];
+        for (var i = 0; i < visible.Count; i++)
+        {
+            result[i] = visible[i].Column;
+        }
+
+        if (result.Length == 0 || Array.IndexOf(result, LibraryFileColumn.Name) < 0)
+        {
+            return LibraryColumnFilter.Resolve(LibraryColumnFilter.Serialize(result));
+        }
+
+        return result;
+    }
+
+    private void Grid_ColumnReordered(object? sender, DataGridColumnEventArgs e)
+    {
+        if (_columnOrderBusy)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(CommitColumnOrder, DispatcherPriority.Background);
+    }
+
+    internal void CommitColumnOrder()
+    {
+        if (_columnOrderBusy)
+        {
+            return;
+        }
+
+        var next = ReadVisibleColumnOrder();
+        ApplyColumnDisplayOrder(next);
+        if (next.SequenceEqual(_visibleColumns))
+        {
+            return;
+        }
+
+        _visibleColumns = next;
+        VisibleColumnsChanged?.Invoke(this, next);
+        RequestFitColumns();
+    }
+
+    internal void MoveVisibleColumnForTests(LibraryFileColumn column, int displayIndex)
+    {
+        if (!_columns.TryGetValue(column, out var gridColumn))
+        {
+            return;
+        }
+
+        gridColumn.DisplayIndex = displayIndex;
+        CommitColumnOrder();
     }
 
     private static string ColumnHeader(LibraryFileColumn column) =>

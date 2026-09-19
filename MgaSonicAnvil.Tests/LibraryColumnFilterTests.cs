@@ -9,7 +9,7 @@ public sealed class LibraryColumnFilterTests
     public void Resolve_Empty_UsesDefaultsIncludingName()
     {
         var resolved = LibraryColumnFilter.Resolve([]);
-        Assert.Equal(LibraryColumnFilter.Defaults, resolved.OrderBy(c => Array.IndexOf(LibraryColumnFilter.All, c)));
+        Assert.Equal(LibraryColumnFilter.Defaults, resolved);
         Assert.Contains(LibraryFileColumn.Name, resolved);
         Assert.Contains(LibraryFileColumn.Title, resolved);
         Assert.Contains(LibraryFileColumn.Artist, resolved);
@@ -60,20 +60,62 @@ public sealed class LibraryColumnFilterTests
     public void Resolve_StoredNames_KeepsNameEvenIfOmitted()
     {
         var resolved = LibraryColumnFilter.Resolve(["Title", "BitRate", "Unknown"]);
-        Assert.Contains(LibraryFileColumn.Name, resolved);
-        Assert.Contains(LibraryFileColumn.Title, resolved);
-        Assert.Contains(LibraryFileColumn.BitRate, resolved);
-        Assert.DoesNotContain(LibraryFileColumn.Artist, resolved);
-        Assert.Equal(3, resolved.Count);
+        Assert.Equal(
+            [LibraryFileColumn.Name, LibraryFileColumn.Title, LibraryFileColumn.BitRate],
+            resolved);
     }
 
     [Fact]
-    public void Serialize_ThenResolve_RoundtripsVisibleSet()
+    public void Serialize_PreservesGivenOrder()
+    {
+        var stored = LibraryColumnFilter.Serialize(
+            [LibraryFileColumn.Duration, LibraryFileColumn.Name, LibraryFileColumn.Title]);
+        Assert.Equal(["Duration", "Name", "Title"], stored);
+        Assert.Equal(
+            [LibraryFileColumn.Duration, LibraryFileColumn.Name, LibraryFileColumn.Title],
+            LibraryColumnFilter.Resolve(stored));
+    }
+
+    [Fact]
+    public void Serialize_ThenResolve_RoundtripsVisibleOrder()
     {
         var stored = LibraryColumnFilter.Serialize(
             [LibraryFileColumn.Title, LibraryFileColumn.Folder, LibraryFileColumn.Name]);
         var resolved = LibraryColumnFilter.Resolve(stored);
-        Assert.Equal(LibraryColumnFilter.Serialize(resolved), stored);
-        Assert.Equal(["Name", "Title", "Folder"], stored);
+        Assert.Equal(["Title", "Folder", "Name"], stored);
+        Assert.Equal(stored, LibraryColumnFilter.Serialize(resolved));
+        Assert.Equal(
+            [LibraryFileColumn.Title, LibraryFileColumn.Folder, LibraryFileColumn.Name],
+            resolved);
+    }
+
+    [Fact]
+    public void Merge_KeepsPreviousOrderAndAppendsNew()
+    {
+        var merged = LibraryColumnFilter.Merge(
+            [LibraryFileColumn.Title, LibraryFileColumn.Name, LibraryFileColumn.Duration],
+            [
+                LibraryFileColumn.Name,
+                LibraryFileColumn.Duration,
+                LibraryFileColumn.Folder,
+                LibraryFileColumn.Title,
+            ]);
+        Assert.Equal(
+            [
+                LibraryFileColumn.Title,
+                LibraryFileColumn.Name,
+                LibraryFileColumn.Duration,
+                LibraryFileColumn.Folder,
+            ],
+            merged);
+    }
+
+    [Fact]
+    public void Merge_DropsUncheckedAndKeepsName()
+    {
+        var merged = LibraryColumnFilter.Merge(
+            LibraryColumnFilter.Defaults,
+            [LibraryFileColumn.Name, LibraryFileColumn.Album]);
+        Assert.Equal([LibraryFileColumn.Name, LibraryFileColumn.Album], merged);
     }
 }

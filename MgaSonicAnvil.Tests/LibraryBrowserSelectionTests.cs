@@ -1036,6 +1036,50 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void SetVisibleColumns_RemembersDisplayOrderAndSavesOnReorder()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            LibraryFileColumn[]? saved = null;
+            view.VisibleColumnsChanged += (_, columns) => saved = [.. columns];
+            var order = new[]
+            {
+                LibraryFileColumn.Duration,
+                LibraryFileColumn.Name,
+                LibraryFileColumn.Title,
+            };
+            view.SetVisibleColumns(order);
+            Assert.Equal(order, view.VisibleColumnOrder);
+            Assert.Equal(0, view.GroupSpacerDisplayIndex);
+            Assert.True(
+                view.ColumnDisplayIndex(LibraryFileColumn.Duration)
+                < view.ColumnDisplayIndex(LibraryFileColumn.Name));
+            Assert.True(
+                view.ColumnDisplayIndex(LibraryFileColumn.Name)
+                < view.ColumnDisplayIndex(LibraryFileColumn.Title));
+
+            view.MoveVisibleColumnForTests(
+                LibraryFileColumn.Duration,
+                view.ColumnDisplayIndex(LibraryFileColumn.Title));
+            Assert.NotNull(saved);
+            Assert.Equal(3, saved!.Length);
+            Assert.Equal(LibraryFileColumn.Duration, saved[^1]);
+            Assert.Contains(LibraryFileColumn.Name, saved);
+            Assert.Contains(LibraryFileColumn.Title, saved);
+            Assert.Equal(saved, view.VisibleColumnOrder);
+
+            view.SetVisibleColumns(LibraryColumnFilter.Defaults);
+            view.SetVisibleColumns(saved);
+            Assert.Equal(saved, view.VisibleColumnOrder);
+            Assert.True(
+                view.ColumnDisplayIndex(LibraryFileColumn.Title)
+                < view.ColumnDisplayIndex(LibraryFileColumn.Duration));
+        });
+    }
+
+    [Fact]
     public void Grouped_HorizontalScroll_KeepsHeaderAlignedWithCells()
     {
         RunSta(() =>

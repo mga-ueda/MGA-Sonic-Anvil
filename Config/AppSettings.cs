@@ -433,7 +433,7 @@ internal sealed class AppSettings
     public Mp3SpeakerMix ToMp3SpeakerMix() =>
         new(ResolvedSpeaker().Channels, ResolvedFileChannelMap());
 
-    public HashSet<LibraryFileColumn> ResolvedLibraryListColumns() =>
+    public LibraryFileColumn[] ResolvedLibraryListColumns() =>
         LibraryColumnFilter.Resolve(LibraryListColumns);
 
     public void ApplyLibraryListColumns(IEnumerable<LibraryFileColumn> columns) =>
