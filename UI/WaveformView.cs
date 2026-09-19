@@ -42,8 +42,12 @@ internal sealed class WaveformView : Grid
     private const int TrailMaxSamples = 900;
     private const double TrailDiscontinuitySec = 1.25;
 
-    /// <summary>プレイヤー波形。背景アニメーションが透ける濃さ。</summary>
-    internal const double PlayerWaveOpacity = 0.58;
+    /// <summary>プレイヤー波形。背景アニメーションが透ける濃さ。ライトはエディタより薄く、白寄せ後も読める濃さ。</summary>
+    internal const double PlayerWaveOpacityDark = 0.58;
+    internal const double PlayerWaveOpacityLight = 0.50;
+
+    internal static double PlayerWaveOpacityFor(UiTheme theme) =>
+        theme == UiTheme.Light ? PlayerWaveOpacityLight : PlayerWaveOpacityDark;
 
     private const double MouseGuideMoveEpsilonPx = 0.5;
     private static double TimeLaneHeight => DesignMetrics.RulerHeight;
@@ -856,22 +860,11 @@ internal sealed class WaveformView : Grid
 
         // オーバーレイ／スペクトログラム中の波形ビットマップはレーンも色も違う。
         // 切り替え後に使い回すと、選択反転が古い波形のまま乗って描画が混ざる。
-        _waveDirty = true;
         DiscardInvertBitmap();
+        _waveDirty = true;
         SyncSpectrogramBoostBar();
         InvalidateStaticLayer();
         AnalysisViewChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    private void DiscardInvertBitmap()
-    {
-        _invertBitmap = null;
-        _invertDocument = null;
-        _invertChannels = 0;
-        _invertMode = SpectrogramViewMode.Off;
-        _invertViewStart = 0;
-        _invertViewSpan = 0;
-        _invertDirty = true;
     }
 
     public bool NudgeSpectrogramBoost(int direction)
@@ -2187,7 +2180,7 @@ internal sealed class WaveformView : Grid
             }
             else if (SeekAndSelectOnly)
             {
-                dc.PushOpacity(PlayerWaveOpacity);
+                dc.PushOpacity(PlayerWaveOpacityFor(UiThemeService.Current));
                 DrawWaveformImage(dc, wave);
                 dc.Pop();
             }
@@ -2342,11 +2335,8 @@ internal sealed class WaveformView : Grid
         }
 
         _waveBitmap!.WritePixels(new Int32Rect(0, 0, bmpWidth, height), _wavePixels, bmpWidth * 4, 0);
-        // 選択反転ビットマップは全画素の再生成で重い。追従スクロール中も毎回作ると
-        // 静的ペイントの実測コストを押し上げ、追従の間引きが増えてカクつくため、
-        // ここでは dirty にだけして、選択を実際に描くときに作る（DrawInvertedSelection）。
-        var modeChanged = _waveMode != _spectrogramMode;
         _invertDirty = true;
+        var modeChanged = _waveMode != _spectrogramMode;
 
         _waveDipSize = bounds.Size;
         _waveDpiX = dpi.DpiScaleX;
@@ -2524,6 +2514,14 @@ internal sealed class WaveformView : Grid
             null);
     }
 
+    private void DiscardInvertBitmap()
+    {
+        _invertBitmap = null;
+        _invertPixels = [];
+        _invertDocument = null;
+        _invertDirty = true;
+    }
+
     private void RebuildInvertBitmap(int width, int height, DpiScale dpi)
     {
         if (_waveBitmap is null)
@@ -2559,7 +2557,9 @@ internal sealed class WaveformView : Grid
             _waveViewStart,
             _waveViewSpan,
             LaneWaveColors(),
-            LaneGapPx(dpi.DpiScaleY));
+            LaneGapPx(dpi.DpiScaleY),
+            playerLight: SeekAndSelectOnly && UiThemeService.Current == UiTheme.Light,
+            shadeLanes: SeekAndSelectOnly);
         _invertBitmap.WritePixels(new Int32Rect(0, 0, width, height), _invertPixels, width * 4, 0);
         _invertDocument = _document;
         _invertChannels = _document?.Channels ?? 0;
@@ -2612,6 +2612,12 @@ internal sealed class WaveformView : Grid
 
     internal static Color SpectrogramSelectionFill() => Color.FromArgb(56, 255, 255, 255);
 
+    private double LaneGapPx(double dpiScaleY)
+    {
+        var channels = SeekAndSelectOnly ? 1 : Math.Max(1, _document?.Channels ?? 1);
+        return channels > 1 ? 4d * dpiScaleY : 0d;
+    }
+
     private void DrawInvertedSelection(
         DrawingContext dc,
         Rect bounds,
@@ -2619,6 +2625,7 @@ internal sealed class WaveformView : Grid
         double span,
         WaveSelection selection)
     {
+        var playerLight = SeekAndSelectOnly && UiThemeService.Current == UiTheme.Light;
         if (!SpectrogramVisible && !LoudnessVisible && !_liveRecording)
         {
             EnsureInvertBitmap();
@@ -2626,19 +2633,7 @@ internal sealed class WaveformView : Grid
 
         if (SpectrogramVisible || LoudnessVisible || !InvertBitmapIsCurrent())
         {
-            var specWave = WaveformBounds(bounds);
-            var sx0 = FrameToViewX(selection.StartFrame, start, span, bounds);
-            var sx1 = FrameToViewX(selection.EndFrame, start, span, bounds);
-            sx0 = Math.Clamp(sx0, specWave.X, specWave.Right);
-            sx1 = Math.Clamp(sx1, specWave.X, specWave.Right);
-            if (sx1 > sx0)
-            {
-                dc.DrawRectangle(
-                    WpfControlHelpers.FrozenBrush(SpectrogramSelectionFill()),
-                    null,
-                    new Rect(sx0, specWave.Y, sx1 - sx0, specWave.Height));
-            }
-
+            DrawRange(dc, bounds, start, span, selection, Theme.Get("WaveSelectionFillBrush"));
             return;
         }
 
@@ -2660,6 +2655,7 @@ internal sealed class WaveformView : Grid
         }
 
         dc.PushClip(clip);
+        dc.PushOpacity(WaveformInvertPaint.SelectionInvertOpacityFor(playerLight));
         var group = new DrawingGroup();
         RenderOptions.SetBitmapScalingMode(group, BitmapScalingMode.NearestNeighbor);
         var context = group.Open();
@@ -2667,6 +2663,12 @@ internal sealed class WaveformView : Grid
         context.Close();
         dc.DrawDrawing(group);
         dc.Pop();
+        dc.Pop();
+
+        if (!playerLight)
+        {
+            DrawRange(dc, bounds, start, span, selection, Theme.Get("WaveSelectionFillBrush"));
+        }
     }
 
     private Geometry? SelectionLaneClip(Rect wave, double x0, double width)
@@ -3575,7 +3577,7 @@ internal sealed class WaveformView : Grid
         var p = buffer + y1 * stride + x;
         for (var y = y1; y <= y2; y++)
         {
-            *p = WaveformLaneGradient.Shade(color, y + 0.5, mid, halfHeight);
+            *p = WaveformLaneGradient.Shade(color, y + 0.5, mid, halfHeight, UiThemeService.Current);
             p += stride;
         }
     }
@@ -3957,16 +3959,29 @@ internal sealed class WaveformView : Grid
 
     private int WavePaintBgraFor(int channel)
     {
+        int color;
         if (channel >= 0
             && !LoudnessVisible
             && _spectrogramMode != SpectrogramViewMode.Overlay)
         {
-            return ChannelWavePaint.FillBgra(channel, _document?.Channels ?? 1, IsLaneMuted(channel));
+            color = ChannelWavePaint.FillBgra(channel, _document?.Channels ?? 1, IsLaneMuted(channel));
+        }
+        else
+        {
+            color = WavePaintBgra;
+            if (channel >= 0 && IsLaneMuted(channel))
+            {
+                color = ChannelWavePaint.Dim(color);
+            }
         }
 
-        var color = WavePaintBgra;
-        return channel >= 0 && IsLaneMuted(channel) ? ChannelWavePaint.Dim(color) : color;
+        return PlayerAwareWaveFill(color);
     }
+
+    private int PlayerAwareWaveFill(int color) =>
+        SeekAndSelectOnly
+            ? WaveformLaneGradient.PlayerFill(color, UiThemeService.Current)
+            : color;
 
     private int[] LaneWaveColors()
     {
@@ -3974,14 +3989,11 @@ internal sealed class WaveformView : Grid
         var colors = new int[channels];
         for (var ch = 0; ch < channels; ch++)
         {
-            colors[ch] = ChannelWavePaint.FillBgra(ch, channels, IsLaneMuted(ch));
+            colors[ch] = PlayerAwareWaveFill(ChannelWavePaint.FillBgra(ch, channels, IsLaneMuted(ch)));
         }
 
         return colors;
     }
-
-    private double LaneGapPx(double scaleY) =>
-        (_document?.Channels ?? 1) > 1 ? scaleY * 4 : 0;
 
     private static int ToBgra(Color color) =>
         color.B | (color.G << 8) | (color.R << 16) | (color.A << 24);

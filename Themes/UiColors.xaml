@@ -9,7 +9,7 @@
     <SolidColorBrush x:Key="WindowBackBrush" Color="#FF1E1E1E" />
     <SolidColorBrush x:Key="ChromeBackBrush" Color="#FF1A1B26" />
     <SolidColorBrush x:Key="ChromeBorderBrush" Color="#FF37373A" />
-    <SolidColorBrush x:Key="LibraryExplorerSplitterBrush" Color="#FF37373A" />
+    <SolidColorBrush x:Key="LibraryExplorerSplitterBrush" Color="#4037373A" />
     <SolidColorBrush x:Key="ChromeMidBrush" Color="#FF484848" />
     <SolidColorBrush x:Key="ChromeDimBrush" Color="#FF5B5B5B" />
     <SolidColorBrush x:Key="ScrollThumbBackBrush" Color="#FF484848" />
@@ -33,6 +33,7 @@
     <SolidColorBrush x:Key="SeekExitBrush" Color="#FFDC2D2D" />
     <SolidColorBrush x:Key="MouseGuideBrush" Color="#DCFFFFFF" />
     <SolidColorBrush x:Key="MouseGuideOnSelectionBrush" Color="#DC000000" />
+    <SolidColorBrush x:Key="WaveSelectionFillBrush" Color="#38FFFFFF" />
     <SolidColorBrush x:Key="LoopRangeFillBrush" Color="#1A1A3E5E" />
     <SolidColorBrush x:Key="SampleLoopTimelineBrush" Color="#FF4A7FA0" />
     <SolidColorBrush x:Key="SampleLoopWaveFillBrush" Color="#334A7FA0" />

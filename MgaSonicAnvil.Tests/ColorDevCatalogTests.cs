@@ -15,6 +15,7 @@ public sealed class ColorDevCatalogTests
     [InlineData("ProjectBarBackBrush", "Overview")]
     [InlineData("WaveFillBrush", "Waveform")]
     [InlineData("PlayheadBrush", "Guides")]
+    [InlineData("WaveSelectionFillBrush", "Selection")]
     [InlineData("LoopRangeFillBrush", "Selection")]
     [InlineData("SampleLoopTimelineBrush", "SampleLoop")]
     [InlineData("RegionTimelineBrush", "Region")]
@@ -43,7 +44,8 @@ public sealed class ColorDevCatalogTests
         Assert.True(ColorDevCatalog.Rank("SurfaceBackBrush") < ColorDevCatalog.Rank("ProjectBarBackBrush"));
         Assert.True(ColorDevCatalog.Rank("ProjectBarBackBrush") < ColorDevCatalog.Rank("WaveFillBrush"));
         Assert.True(ColorDevCatalog.Rank("WaveFillBrush") < ColorDevCatalog.Rank("PlayheadBrush"));
-        Assert.True(ColorDevCatalog.Rank("PlayheadBrush") < ColorDevCatalog.Rank("LoopRangeFillBrush"));
+        Assert.True(ColorDevCatalog.Rank("PlayheadBrush") < ColorDevCatalog.Rank("WaveSelectionFillBrush"));
+        Assert.True(ColorDevCatalog.Rank("WaveSelectionFillBrush") < ColorDevCatalog.Rank("LoopRangeFillBrush"));
         Assert.True(ColorDevCatalog.Rank("LoopRangeFillBrush") < ColorDevCatalog.Rank("SampleLoopTimelineBrush"));
         Assert.True(ColorDevCatalog.Rank("SampleLoopTimelineBrush") < ColorDevCatalog.Rank("RegionTimelineBrush"));
         Assert.True(ColorDevCatalog.Rank("RegionTimelineBrush") < ColorDevCatalog.Rank("MarkerBrush"));

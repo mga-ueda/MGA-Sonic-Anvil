@@ -61,11 +61,68 @@ public sealed class WaveformInvertPaintTests
     }
 
     [Fact]
-    public void SpectrogramSelectionFill_LightIsBrightWash()
+    public void InvertPixel_PlayerLight_WaveGoesToFillEmptyIsPale()
+    {
+        var wave = unchecked((int)0xFF405273);
+        var back = unchecked((int)0xFFFAFAFA);
+        var pale = unchecked((int)0xFFA8B4C4);
+        var invertedWave = WaveformInvertPaint.InvertPixel(wave, back, pale, playerLight: true, invertWave: wave);
+        var invertedEmpty = WaveformInvertPaint.InvertPixel(0, back, pale, playerLight: true, invertWave: wave);
+        Assert.Equal(wave, invertedWave);
+        Assert.NotEqual(back, invertedWave);
+        Assert.True(((invertedEmpty >> 16) & 0xFF) > ((pale >> 16) & 0xFF));
+        Assert.True(((invertedEmpty >> 8) & 0xFF) > ((pale >> 8) & 0xFF));
+    }
+
+    [Fact]
+    public void ApplyLaneShade_KeepsCenterAndDarkensEdge()
+    {
+        var fill = unchecked((int)0xFFC6D9FF);
+        var center = WaveformInvertPaint.ApplyLaneShade(fill, 50, 101, UiTheme.Dark);
+        var edge = WaveformInvertPaint.ApplyLaneShade(fill, 0, 101, UiTheme.Dark);
+        Assert.Equal(fill, center);
+        Assert.True(((edge >> 16) & 0xFF) < ((center >> 16) & 0xFF));
+        var inverted = WaveformInvertPaint.InvertShaded(
+            fill,
+            back: unchecked((int)0xFF1A1A1A),
+            waveFill: fill,
+            playerLight: false,
+            invertWave: fill,
+            y: 0,
+            height: 100,
+            shadeLanes: true,
+            UiTheme.Dark);
+        Assert.NotEqual(unchecked((int)0xFF1A1A1A), inverted);
+    }
+
+    [Fact]
+    public void SelectionInvertOpacity_LetsOriginalShowThrough()
+    {
+        Assert.True(WaveformInvertPaint.SelectionInvertOpacity < 1);
+        Assert.True(WaveformInvertPaint.SelectionInvertOpacity >= 0.4);
+        Assert.True(WaveformInvertPaint.SelectionInvertOpacity <= 0.7);
+        Assert.True(WaveformInvertPaint.SelectionInvertOpacityFor(playerLight: true)
+            > WaveformInvertPaint.SelectionInvertOpacityFor(playerLight: false));
+        Assert.True(WaveformInvertPaint.SelectionInvertOpacityFor(playerLight: true) < 1);
+    }
+
+    [Fact]
+    public void WaveSelectionFill_IsTranslucentNeutralWash()
+    {
+        var fill = UiThemePalette.ColorFor(UiTheme.Light, "WaveSelectionFillBrush");
+        var cyan = UiThemePalette.ColorFor(UiTheme.Light, "AccentCyanBrush");
+        Assert.Equal(0x38, fill.A);
+        Assert.True(fill.R == fill.G && fill.G == fill.B);
+        Assert.False(fill.R == cyan.R && fill.G == cyan.G && fill.B == cyan.B);
+    }
+
+    [Fact]
+    public void SpectrogramSelectionFill_IsTranslucentWhite()
     {
         var fill = WaveformView.SpectrogramSelectionFill();
-        var old = UiThemePalette.ColorFor(UiTheme.Light, "LoopRangeFillBrush");
-        Assert.True(fill.R + fill.G + fill.B > old.R + old.G + old.B);
+        Assert.Equal(56, fill.A);
         Assert.Equal(255, fill.R);
+        Assert.Equal(255, fill.G);
+        Assert.Equal(255, fill.B);
     }
 }

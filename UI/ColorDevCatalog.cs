@@ -70,6 +70,7 @@ internal static class ColorDevCatalog
             ("MouseGuideBrush", ColorDevGroup.Guides),
             ("MouseGuideOnSelectionBrush", ColorDevGroup.Guides),
 
+            ("WaveSelectionFillBrush", ColorDevGroup.Selection),
             ("LoopRangeFillBrush", ColorDevGroup.Selection),
 
             ("SampleLoopTimelineBrush", ColorDevGroup.SampleLoop),

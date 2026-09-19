@@ -7,6 +7,14 @@ namespace MgaSonicAnvil.UI;
 /// <summary>選択範囲で波形色と背景（リージョン下塗り含む）を入れ替える。</summary>
 internal static class WaveformInvertPaint
 {
+    /// <summary>反転ビットマップを不透明で重ねると下地が消えるので、透かして重ねる。</summary>
+    public const double SelectionInvertOpacity = 0.55;
+    /// <summary>ライトのプレイヤー。空きの反転塗りを白へ寄せて薄くする。</summary>
+    public const double PlayerLightEmptyTowardWhite = 0.78;
+
+    public static double SelectionInvertOpacityFor(bool playerLight) =>
+        playerLight ? 0.7 : SelectionInvertOpacity;
+
     public static void RebuildInPlace(
         int[] pixels,
         int width,
@@ -15,7 +23,9 @@ internal static class WaveformInvertPaint
         double viewStart,
         double viewSpan,
         IReadOnlyList<int>? laneWaveColors = null,
-        double laneGapPx = 0)
+        double laneGapPx = 0,
+        bool playerLight = false,
+        bool shadeLanes = false)
     {
         if (width <= 0 || height <= 0 || pixels.Length < width * height)
         {
@@ -23,9 +33,13 @@ internal static class WaveformInvertPaint
         }
 
         var waveformBack = ToBgra(Theme.Get("WaveformBackBrush"));
-        var fallbackWave = ToBgra(Theme.Get("WaveFillBrush"));
+        var sourceWave = ToBgra(Theme.Get("WaveFillBrush"));
+        var fallbackWave = playerLight
+            ? WaveformLaneGradient.PlayerFill(sourceWave, UiTheme.Light)
+            : sourceWave;
         // 画素ごとのレーン判定は width×height 回で高くつくため、行の色を先に引く。
         var waveColorByY = BuildWaveColorRows(height, laneWaveColors, laneGapPx, fallbackWave);
+        var shadeTheme = playerLight ? UiTheme.Light : UiThemeService.Current;
         if (document is null || document.FrameCount <= 0 || viewSpan <= 0)
         {
             for (var y = 0; y < height; y++)
@@ -34,7 +48,16 @@ internal static class WaveformInvertPaint
                 var row = y * width;
                 for (var x = 0; x < width; x++)
                 {
-                    pixels[row + x] = InvertPixel(pixels[row + x], waveformBack, waveFill);
+                    pixels[row + x] = InvertShaded(
+                        pixels[row + x],
+                        waveformBack,
+                        waveFill,
+                        playerLight,
+                        sourceWave,
+                        y,
+                        height,
+                        shadeLanes,
+                        shadeTheme);
                 }
             }
 
@@ -80,7 +103,16 @@ internal static class WaveformInvertPaint
             for (var y = 0; y < height; y++)
             {
                 var index = y * width + x;
-                pixels[index] = InvertPixel(pixels[index], columnBack, waveColorByY[y]);
+                pixels[index] = InvertShaded(
+                    pixels[index],
+                    columnBack,
+                    waveColorByY[y],
+                    playerLight,
+                    sourceWave,
+                    y,
+                    height,
+                    shadeLanes,
+                    shadeTheme);
             }
         }
     }
@@ -149,7 +181,47 @@ internal static class WaveformInvertPaint
 
     /// <summary>波形ピクセルは背景色へ、背景ピクセルは波形色へ。白黒反転ではない。</summary>
     internal static int InvertPixel(int pixel, int back, int waveFill) =>
-        ((pixel >> 24) & 0xFF) > 0 ? back : waveFill;
+        InvertPixel(pixel, back, waveFill, playerLight: false, invertWave: waveFill);
+
+    internal static int InvertPixel(int pixel, int back, int waveFill, bool playerLight, int invertWave)
+    {
+        var hasWave = ((pixel >> 24) & 0xFF) > 0;
+        if (playerLight)
+        {
+            return hasWave
+                ? invertWave
+                : WaveformLaneGradient.MixTowardWhite(waveFill, PlayerLightEmptyTowardWhite);
+        }
+
+        return hasWave ? back : waveFill;
+    }
+
+    internal static int InvertShaded(
+        int pixel,
+        int back,
+        int waveFill,
+        bool playerLight,
+        int invertWave,
+        int y,
+        int height,
+        bool shadeLanes,
+        UiTheme theme)
+    {
+        var inverted = InvertPixel(pixel, back, waveFill, playerLight, invertWave);
+        return shadeLanes ? ApplyLaneShade(inverted, y, height, theme) : inverted;
+    }
+
+    /// <summary>プレイヤー波形と同じく、レーン中心が明るく端が沈む。</summary>
+    internal static int ApplyLaneShade(int bgra, int y, int height, UiTheme theme)
+    {
+        if (height <= 1)
+        {
+            return bgra;
+        }
+
+        var mid = height * 0.5;
+        return WaveformLaneGradient.Shade(bgra, y + 0.5, mid, mid, theme);
+    }
 
     private static int WaveColorAt(
         int y,
