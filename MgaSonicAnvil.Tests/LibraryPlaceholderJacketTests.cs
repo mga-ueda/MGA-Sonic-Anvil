@@ -21,10 +21,11 @@ public sealed class LibraryPlaceholderJacketTests
     }
 
     [Fact]
-    public void Render_IsSquareFrozenGradientWithNote()
+    public void Render_IsSquareVerticalGradientWithNoImage()
     {
         RunSta(() =>
         {
+            Assert.Equal("No Image", LibraryPlaceholderJacket.Label);
             var dark = LibraryPlaceholderJacket.Render(UiTheme.Dark);
             var light = LibraryPlaceholderJacket.Render(UiTheme.Light);
             Assert.True(dark.IsFrozen);
@@ -35,8 +36,8 @@ public sealed class LibraryPlaceholderJacketTests
             var darkPixels = Copy(dark);
             var lightPixels = Copy(light);
             Assert.NotEqual(darkPixels[0], lightPixels[0]);
-            Assert.True(CountNoteLike(darkPixels, dark.PixelWidth, minLuma: 160) > 400);
-            Assert.True(CountNoteLike(lightPixels, light.PixelWidth, maxLuma: 110) > 400);
+            AssertVerticalWash(darkPixels, dark.PixelWidth);
+            AssertVerticalWash(lightPixels, light.PixelWidth);
         });
     }
 
@@ -101,29 +102,19 @@ public sealed class LibraryPlaceholderJacketTests
         return pixels;
     }
 
-    private static int CountNoteLike(byte[] pixels, int width, int minLuma = -1, int maxLuma = 256)
+    private static void AssertVerticalWash(byte[] pixels, int width)
     {
-        var count = 0;
-        var height = pixels.Length / (width * 4);
-        for (var y = 0; y < height; y++)
-        {
-            for (var x = 0; x < width; x++)
-            {
-                var i = ((y * width) + x) * 4;
-                if (pixels[i + 3] < 200)
-                {
-                    continue;
-                }
+        var top = Luma(pixels, width, 8, 8);
+        var topCenter = Luma(pixels, width, width / 2, 8);
+        var bottom = Luma(pixels, width, 8, width - 9);
+        Assert.True(Math.Abs(top - topCenter) < 12);
+        Assert.True(top > bottom + 16);
+    }
 
-                var luma = ((pixels[i + 2] * 2) + (pixels[i + 1] * 3) + pixels[i]) / 6;
-                if (luma >= minLuma && luma <= maxLuma)
-                {
-                    count++;
-                }
-            }
-        }
-
-        return count;
+    private static int Luma(byte[] pixels, int width, int x, int y)
+    {
+        var i = ((y * width) + x) * 4;
+        return ((pixels[i + 2] * 2) + (pixels[i + 1] * 3) + pixels[i]) / 6;
     }
 
     private static void EnsureTheme()
