@@ -109,6 +109,47 @@ public sealed class AudioCodecCollectOpenableTests
     }
 
     [Fact]
+    public void CollectPlayerOpenableDirectoryLayer_DepthFirstRegistersDeepFolderBeforeSibling()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "mga-anvil-dfs-" + Guid.NewGuid().ToString("N"));
+        var deepFolder = Path.Combine(root, "a", "nested");
+        var sibling = Path.Combine(root, "z");
+        Directory.CreateDirectory(deepFolder);
+        Directory.CreateDirectory(sibling);
+        var first = Path.Combine(deepFolder, "first.wav");
+        var later = Path.Combine(sibling, "later.wav");
+        File.WriteAllText(first, "wav");
+        File.WriteAllText(later, "wav");
+        try
+        {
+            Assert.Equal([first, later], WalkPlayerOpenableDepthFirst(root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    /// <summary>MainWindow.OpenLibraryFoldersRecursiveAsync と同じ深さ優先。</summary>
+    private static string[] WalkPlayerOpenableDepthFirst(string directory)
+    {
+        var remaining = new Stack<string>();
+        remaining.Push(directory);
+        var result = new List<string>();
+        while (remaining.Count > 0)
+        {
+            AudioCodec.CollectPlayerOpenableDirectoryLayer(remaining.Pop(), out var files, out var children);
+            result.AddRange(files);
+            for (var i = children.Length - 1; i >= 0; i--)
+            {
+                remaining.Push(children[i]);
+            }
+        }
+
+        return [.. result];
+    }
+
+    [Fact]
     public void CollectOpenable_EmptyFolder_ReturnsNothing()
     {
         var root = Path.Combine(Path.GetTempPath(), "mga-anvil-drop-empty-" + Guid.NewGuid().ToString("N"));

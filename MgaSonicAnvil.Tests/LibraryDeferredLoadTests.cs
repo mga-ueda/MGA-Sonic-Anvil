@@ -47,6 +47,43 @@ public sealed class LibraryDeferredLoadTests
     }
 
     [Fact]
+    public void CompressedBitRate_UsesTagsForMp3AndM4a()
+    {
+        var mp3 = new AudioDocument([], 44100, 2, 16, AudioFileKind.Mp3, "a.mp3", buildPeaks: false);
+        mp3.ApplyTags(new AudioFileTags { Probed = true, BitRateKbps = 320 });
+        Assert.Equal(320, mp3.CompressedBitRateKbps);
+
+        var m4a = new AudioDocument([], 48000, 2, 16, AudioFileKind.M4a, "a.m4a", buildPeaks: false);
+        m4a.ApplyTags(new AudioFileTags { Probed = true, BitRateKbps = 256 });
+        Assert.Equal(256, m4a.CompressedBitRateKbps);
+    }
+
+    [Fact]
+    public void CompressedBitRate_WaveStaysZero()
+    {
+        var wave = new AudioDocument(new float[48], 48000, 1, 16, AudioFileKind.Wave, null);
+        wave.ApplyTags(new AudioFileTags { Probed = true, BitRateKbps = 1411 });
+        Assert.Equal(0, wave.CompressedBitRateKbps);
+    }
+
+    [Fact]
+    public void CompressedBitRate_EstimatesFromFileSizeWhenTagsMissing()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mp3");
+        File.WriteAllBytes(path, new byte[192_000]);
+        try
+        {
+            var document = AudioDocument.CreateDeferred(path);
+            document.ActivateStreamPlayback(48000, 2, 16, 48000);
+            Assert.Equal(1536, document.CompressedBitRateKbps);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Constructor_CanSkipPeakBuild()
     {
         var samples = new float[480];

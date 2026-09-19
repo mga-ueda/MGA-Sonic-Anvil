@@ -20,6 +20,10 @@ public partial class MainWindow
 
     /// <summary>ツリーの Enter（クリア後）だけ true。Shift+Enter の追加では立てない。</summary>
     private bool _libraryExplorerPlayOnOpen;
+    /// <summary>再帰追加中に再生する最初の登録曲。グループ再配置で他曲へ飛ばないようにする。</summary>
+    private DocumentSession? _libraryFolderPlaySession;
+    /// <summary>プレイリスト置換中は空セッションで既定ウォッシュへ落とさない。</summary>
+    private bool _libraryHoldJacketWash;
     private bool _libraryPlayOnArrowRelease;
     private bool _libraryWaapiSuspended;
     private bool _restoreWaapiAfterLibrary;
@@ -126,6 +130,7 @@ public partial class MainWindow
             _libraryWavePaintTicket++;
             _libraryPlayFirstPending = false;
             _libraryPlayOnArrowRelease = false;
+            _libraryHoldJacketWash = false;
             _ = LeaveLibraryMaximizeAsync();
         }
     }
@@ -299,27 +304,6 @@ public partial class MainWindow
         ShowLibraryArtworkOrClear(_activeSession);
     }
 
-    private void KeepLibraryListActive()
-    {
-        if (!IsLibraryMaximized
-            || IsLibraryGroupComboFocused
-            || IsLibraryExplorerFocused
-            || IsLibraryFavoritesFocused
-            || LibraryBrowser.IsListKeyboardFocused)
-        {
-            return;
-        }
-
-        if (_sessions.Count == 0)
-        {
-            LibraryBrowser.FocusExplorer();
-        }
-        else
-        {
-            LibraryBrowser.FocusList();
-        }
-    }
-
     /// <summary>
     /// プレイヤーを抜けるとき、リストで選んだファイルだけ残す。保存確認でキャンセルしたら false。
     /// </summary>
@@ -464,67 +448,32 @@ public partial class MainWindow
         RefreshTileChrome();
     }
 
-    private void MainWindow_PreviewMouseUp(object sender, MouseButtonEventArgs e)
-    {
-        if (_waveMenu is { IsOpen: true })
-        {
-            return;
-        }
-
-        if (e.OriginalSource is DependencyObject origin
-            && (LibraryBrowser.IsExplorerOrigin(origin)
-                || LibraryBrowser.IsExplorerFocused
-                || LibraryBrowser.IsGroupComboOrigin(origin)
-                || LibraryBrowser.IsGroupComboFocused
-                || IsComboOrPopupOrigin(origin)))
-        {
-            return;
-        }
-
-        if (!IsLibraryMaximized)
-        {
-            return;
-        }
-
-        // Preview 中にリストへフォーカスすると、Silent Skip などの CheckBox が
-        // LostKeyboardFocus で IsPressed を落としてクリックが無効になる。
-        Dispatcher.BeginInvoke(KeepLibraryListActive, DispatcherPriority.Input);
-    }
-
-    private static bool IsComboOrPopupOrigin(DependencyObject? origin)
-    {
-        while (origin is not null)
-        {
-            if (origin is ComboBox or System.Windows.Controls.Primitives.Popup)
-            {
-                return true;
-            }
-
-            origin = System.Windows.Media.VisualTreeHelper.GetParent(origin)
-                ?? System.Windows.LogicalTreeHelper.GetParent(origin);
-        }
-
-        return false;
-    }
-
     private void LibraryBrowser_SessionActivated(object? sender, DocumentSession session)
     {
+        // フォルダ再帰追加中は、最初に登録した曲以外へ再生を付け替えない。
+        if (_libraryFolderPlaySession is not null)
+        {
+            if (ReferenceEquals(session, _libraryFolderPlaySession))
+            {
+                ShowLibraryArtwork(session);
+            }
+
+            return;
+        }
+
         // 停止中のクリックや選択は再生しない。再生中だけその曲へ切り替える。
         if (!IsPlaybackActive())
         {
             ShowLibraryArtwork(session);
-            KeepLibraryListActive();
             return;
         }
 
         _ = PlayLibrarySessionAsync(session);
-        KeepLibraryListActive();
     }
 
     private void LibraryBrowser_SessionPlayRequested(object? sender, DocumentSession session)
     {
         _ = PlayLibrarySessionAsync(session);
-        KeepLibraryListActive();
     }
 
     private void RegisterLibraryPaths(IReadOnlyList<string> paths) =>
@@ -640,7 +589,6 @@ public partial class MainWindow
         LibraryBrowser.SetSessions(_sessions, next, [next]);
         RefreshStatus();
         _ = PlayLibrarySessionAsync(next);
-        KeepLibraryListActive();
     }
 
     private DocumentSession? NextLibrarySessionAfter(HashSet<DocumentSession> dropSet)
@@ -733,7 +681,6 @@ public partial class MainWindow
         next ??= _sessions[0];
         LibraryBrowser.SetSessions(_sessions, next, [next]);
         _ = PlayLibrarySessionAsync(next);
-        KeepLibraryListActive();
     }
 
     private void SelectAndPlayFirstLibraryTrack()
@@ -748,7 +695,12 @@ public partial class MainWindow
         }
 
         LibraryBrowser.SetSessions(_sessions, first, selected);
-        LibraryBrowser.SetArtwork(first?.Document);
+        LibraryBrowser.SetArtwork(first?.Document, keepCurrentIfEmpty: first is null && _libraryHoldJacketWash);
+        if (first is not null)
+        {
+            _libraryHoldJacketWash = false;
+        }
+
         _ = PlayLibrarySessionAsync(first);
     }
 
@@ -756,10 +708,11 @@ public partial class MainWindow
     {
         if (session is null)
         {
-            LibraryBrowser.SetArtwork(null);
+            LibraryBrowser.SetArtwork(null, keepCurrentIfEmpty: _libraryHoldJacketWash);
             return;
         }
 
+        _libraryHoldJacketWash = false;
         ShowLibraryArtwork(session);
     }
 
@@ -975,6 +928,132 @@ public partial class MainWindow
         return true;
     }
 
+    private bool TryStepLibraryPlaylist(int direction)
+    {
+        var session = direction < 0
+            ? LibraryBrowser.PreviousPlaylistSession(_activeSession)
+            : LibraryBrowser.NextPlaylistSession(_activeSession);
+        if (session is null)
+        {
+            return false;
+        }
+
+        PausePlaybackSoft();
+        _ = PlayLibrarySessionAsync(session);
+        return true;
+    }
+
+    private void ToggleLibraryPlayPause()
+    {
+        if (IsPlaybackActive())
+        {
+            PausePlaybackHere();
+            return;
+        }
+
+        if (_document is not null)
+        {
+            StartPlayback(_document.CursorFrame, prerollSeconds: 0);
+            return;
+        }
+
+        _ = PlayLibrarySessionAsync(LibraryBrowser.SelectedSession ?? _activeSession);
+    }
+
+    private void RestartLibraryTrack()
+    {
+        var session = _activeSession ?? LibraryBrowser.SelectedSession;
+        if (session is not null)
+        {
+            _ = PlayLibrarySessionAsync(session);
+            return;
+        }
+
+        if (_document is not null)
+        {
+            StartPlayback(0, prerollSeconds: 0);
+        }
+    }
+
+    private void SeekLibraryBySeconds(double seconds)
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var frames = (long)Math.Round(_document.SampleRate * seconds);
+        var current = _player.PendingSeekFrame
+            ?? (IsPlaybackActive() ? _player.CursorFrame : _document.CursorFrame);
+        SeekFrame(
+            current + frames,
+            IsPlaybackActive() ? LibraryPlayerMode.SeekNudgeFadeMilliseconds : 0);
+    }
+
+    private bool BeginOrContinueSeekNudge(int direction)
+    {
+        if (direction == 0 || _document is null)
+        {
+            return false;
+        }
+
+        if (_seekNudgeDirection == direction && _seekNudgeTimer.IsEnabled)
+        {
+            return true;
+        }
+
+        SeekLibraryBySeconds(
+            direction < 0 ? -LibraryPlayerMode.SeekNudgeSeconds : LibraryPlayerMode.SeekNudgeSeconds);
+        _seekNudgeDirection = direction;
+        _seekNudgeRepeatStarted = false;
+        _seekNudgeTimer.Stop();
+        _seekNudgeTimer.Interval = TimeSpan.FromMilliseconds(
+            LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: false));
+        _seekNudgeTimer.Start();
+        return true;
+    }
+
+    private void OnSeekNudgeTick()
+    {
+        if (_seekNudgeDirection == 0 || !IsSeekNudgeHeld(_seekNudgeDirection))
+        {
+            StopSeekNudge();
+            return;
+        }
+
+        SeekLibraryBySeconds(
+            _seekNudgeDirection < 0
+                ? -LibraryPlayerMode.SeekNudgeSeconds
+                : LibraryPlayerMode.SeekNudgeSeconds);
+        if (_seekNudgeRepeatStarted)
+        {
+            return;
+        }
+
+        _seekNudgeRepeatStarted = true;
+        _seekNudgeTimer.Stop();
+        _seekNudgeTimer.Interval = TimeSpan.FromMilliseconds(
+            LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: true));
+        _seekNudgeTimer.Start();
+    }
+
+    private static bool IsSeekNudgeHeld(int direction)
+    {
+        var keyDown = direction < 0
+            ? Keyboard.IsKeyDown(Key.NumPad7)
+            : Keyboard.IsKeyDown(Key.NumPad9);
+        return keyDown && Keyboard.Modifiers == ModifierKeys.None;
+    }
+
+    private void StopSeekNudge()
+    {
+        _seekNudgeDirection = 0;
+        _seekNudgeRepeatStarted = false;
+        _seekNudgeTimer.Stop();
+        _seekNudgeTimer.Interval = TimeSpan.FromMilliseconds(
+            LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: false));
+    }
+
     private async Task PlayLibrarySessionAsync(DocumentSession? session)
     {
         CancelLibraryGapless();
@@ -985,6 +1064,7 @@ public partial class MainWindow
             return;
         }
 
+        ShowLibraryArtwork(session);
         await EnsureLibrarySessionLoadedAsync(session).ConfigureAwait(true);
         if (session.Document.IsDeferredLoad
             || !ReferenceEquals(_libraryLoadSession, session))
@@ -1008,7 +1088,6 @@ public partial class MainWindow
         ScheduleLibraryGaplessPrefetch();
         // 再生とは別ハンドルでピーク走査する（停止待ちしない）。
         _ = FillLibraryPeaksAsync(session);
-        KeepLibraryListActive();
     }
 
     private async void PlayLibrarySelectionOrToggle()
@@ -1017,10 +1096,10 @@ public partial class MainWindow
         if (session is null)
         {
             TogglePlayback();
-            KeepLibraryListActive();
             return;
         }
 
+        ShowLibraryArtwork(session);
         await EnsureLibrarySessionLoadedAsync(session).ConfigureAwait(true);
         if (!session.Document.IsDeferredLoad)
         {
@@ -1029,8 +1108,6 @@ public partial class MainWindow
             ShowLibraryArtwork(session);
             _ = FillLibraryPeaksAsync(session);
         }
-
-        KeepLibraryListActive();
     }
 
     private Task EnsureLibrarySessionLoadedAsync(DocumentSession session)
@@ -1383,6 +1460,7 @@ public partial class MainWindow
 
         var hadArt = session.Document.HasArtwork;
         ScanLibraryArtwork(session);
+        _libraryHoldJacketWash = false;
         LibraryBrowser.SetArtwork(session.Document);
         if (!hadArt && session.Document.HasArtwork)
         {
@@ -1435,6 +1513,12 @@ public partial class MainWindow
         AppStorage.Save();
     }
 
+    private void LibraryBrowser_ExplorerExpandedChanged(object? sender, IReadOnlyList<string> paths)
+    {
+        AppStorage.Settings.ApplyLibraryExplorerExpanded(paths);
+        AppStorage.Save();
+    }
+
     private void LibraryBrowser_ExplorerWidthChanged(object? sender, double width)
     {
         AppStorage.Settings.LibraryExplorerWidth = DesignMetrics.ClampLibraryExplorerWidth(width);
@@ -1459,20 +1543,23 @@ public partial class MainWindow
     private void LibraryBrowser_FavoritesActivated(object? sender, LibraryFavoritesActivateEventArgs e)
     {
         var files = AudioCodec.CollectPlayerOpenable(e.Paths);
-        if (files.Length == 0)
-        {
-            return;
-        }
-
         if (e.ClearPlaylist)
         {
+            _libraryHoldJacketWash = files.Length > 0;
             if (!TryClearLibrarySessions())
             {
+                _libraryHoldJacketWash = false;
                 return;
             }
 
+            // 再生できる曲が無くても、クリア後の空リストと同じ（既定の背景へ戻す）。
             _libraryPlayFirstPending = true;
             RegisterLibraryPaths(files, play: true);
+            return;
+        }
+
+        if (files.Length == 0)
+        {
             return;
         }
 
@@ -1493,8 +1580,10 @@ public partial class MainWindow
             return;
         }
 
+        _libraryHoldJacketWash = true;
         if (!TryClearLibrarySessions())
         {
+            _libraryHoldJacketWash = false;
             return;
         }
 
@@ -1518,12 +1607,13 @@ public partial class MainWindow
         var playFirst = _libraryExplorerPlayOnOpen;
         _libraryExplorerPlayOnOpen = false;
         var generation = ++_libraryFolderShowGeneration;
-        var remaining = new Queue<string>();
-        foreach (var path in folders)
+        _libraryFolderPlaySession = null;
+        var remaining = new Stack<string>();
+        for (var i = folders.Count - 1; i >= 0; i--)
         {
             try
             {
-                remaining.Enqueue(Path.GetFullPath(path));
+                remaining.Push(Path.GetFullPath(folders[i]));
             }
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
             {
@@ -1532,6 +1622,7 @@ public partial class MainWindow
 
         if (remaining.Count == 0)
         {
+            ReleaseHeldLibraryJacket();
             return;
         }
 
@@ -1541,28 +1632,37 @@ public partial class MainWindow
         {
             while (remaining.Count > 0)
             {
-                if (generation != _libraryFolderShowGeneration || !IsLibraryMaximized)
+                if (generation != _libraryFolderShowGeneration)
                 {
                     LibraryBrowser.FinishIncrementalSessionLoad();
                     return;
                 }
 
-                var current = remaining.Dequeue();
+                if (!IsLibraryMaximized)
+                {
+                    LibraryBrowser.FinishIncrementalSessionLoad();
+                    _libraryHoldJacketWash = false;
+                    return;
+                }
+
+                var current = remaining.Pop();
                 var layer = await Task.Run(() =>
                 {
                     AudioCodec.CollectPlayerOpenableDirectoryLayer(current, out var files, out var children);
                     return (files, children);
                 }).ConfigureAwait(true);
 
-                if (generation != _libraryFolderShowGeneration || !IsLibraryMaximized)
+                if (generation != _libraryFolderShowGeneration)
                 {
                     LibraryBrowser.FinishIncrementalSessionLoad();
                     return;
                 }
 
-                foreach (var child in layer.children)
+                if (!IsLibraryMaximized)
                 {
-                    remaining.Enqueue(child);
+                    LibraryBrowser.FinishIncrementalSessionLoad();
+                    _libraryHoldJacketWash = false;
+                    return;
                 }
 
                 foreach (var file in layer.files)
@@ -1582,15 +1682,43 @@ public partial class MainWindow
 
                     firstHandled = true;
                 }
+
+                for (var i = layer.children.Length - 1; i >= 0; i--)
+                {
+                    remaining.Push(layer.children[i]);
+                }
             }
 
             if (generation == _libraryFolderShowGeneration && IsLibraryMaximized)
             {
                 LibraryBrowser.FinishIncrementalSessionLoad();
+                if (firstHandled)
+                {
+                    _libraryHoldJacketWash = false;
+                    if (playFirst && _libraryFolderPlaySession is { } first)
+                    {
+                        LibraryBrowser.SelectSessionQuiet(first);
+                    }
+                }
+                else
+                {
+                    ReleaseHeldLibraryJacket();
+                }
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            if (generation == _libraryFolderShowGeneration)
+            {
+                ReleaseHeldLibraryJacket();
+            }
+        }
+        finally
+        {
+            if (generation == _libraryFolderShowGeneration)
+            {
+                _libraryFolderPlaySession = null;
+            }
         }
     }
 
@@ -1621,6 +1749,11 @@ public partial class MainWindow
         }
 
         _sessions.Add(session);
+        if (play)
+        {
+            _libraryFolderPlaySession = session;
+        }
+
         if (select)
         {
             ScanLibraryArtwork(session);
@@ -1629,6 +1762,7 @@ public partial class MainWindow
         LibraryBrowser.AppendSession(session, select);
         if (select)
         {
+            _libraryHoldJacketWash = false;
             LibraryBrowser.SetArtwork(session.Document);
             if (play)
             {
@@ -1639,6 +1773,20 @@ public partial class MainWindow
         // 1 件ごとに UI へ制御を返す（キー連打・描画を止めない）。
         await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Background);
         return true;
+    }
+
+    private void ReleaseHeldLibraryJacket()
+    {
+        if (!_libraryHoldJacketWash)
+        {
+            return;
+        }
+
+        _libraryHoldJacketWash = false;
+        if (_sessions.Count == 0 && IsLibraryMaximized)
+        {
+            LibraryBrowser.SetArtwork(null);
+        }
     }
 
     private bool TryClearLibrarySessions()
