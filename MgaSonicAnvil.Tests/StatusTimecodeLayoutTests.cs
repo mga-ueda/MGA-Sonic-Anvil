@@ -14,7 +14,8 @@ public sealed class StatusTimecodeLayoutTests
     public void StatusTimecodeWidth_FitsCenteredTimecode(string text)
     {
         var measured = Measure(text);
-        var content = DesignMetrics.StatusTimecodeWidth - DesignMetrics.StatusTimecodePadX * 2;
+        const double border = 2;
+        var content = DesignMetrics.StatusTimecodeWidth - DesignMetrics.StatusTimecodePadX * 2 - border;
         Assert.True(content >= measured.Width + 8, $"need {measured.Width + 8}, have {content}");
         Assert.True(DesignMetrics.StatusTimecodeBoxHeight >= measured.Height);
         Assert.True(DesignMetrics.StatusBarHeight >= DesignMetrics.StatusTimecodeBoxHeight);

@@ -194,10 +194,10 @@ public sealed class LibraryBrowserSelectionTests
                 < LibraryBrowserView.LibraryHoverFillAlpha);
             var navy = Color.FromRgb(0x1A, 0x90, 0xA8);
             var lightRgb = LibraryBrowserView.LibrarySelectionRgb(navy, UiTheme.Light);
-            Assert.True(lightRgb.R > navy.R);
-            Assert.True(lightRgb.G > navy.G);
-            Assert.True(lightRgb.B > navy.B);
-            Assert.Equal(navy, LibraryBrowserView.LibrarySelectionRgb(navy, UiTheme.Dark));
+            Assert.Equal(UiThemePalette.ColorFor(UiTheme.Light, "PlayerSelectionFillBrush"), lightRgb);
+            Assert.Equal(
+                UiThemePalette.ColorFor(UiTheme.Dark, "PlayerSelectionFillBrush"),
+                LibraryBrowserView.LibrarySelectionRgb(navy, UiTheme.Dark));
         });
     }
 

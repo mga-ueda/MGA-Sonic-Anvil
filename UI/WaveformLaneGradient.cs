@@ -11,14 +11,15 @@ internal static class WaveformLaneGradient
     /// <summary>端での輝度倍率。1 がそのまま、小さいほど暗い。</summary>
     public const double EdgeBrightness = 0.55;
 
-    /// <summary>ライトのプレイヤー波形。エディタの濃い塗りを白へ寄せる割合。</summary>
-    public const double PlayerFillTowardWhite = 0.22;
-
     /// <summary>
-    /// ライトのプレイヤーでは、エディタと同じ WaveFill だと白地に濃すぎるので薄くする。
+    /// ライトのプレイヤーでは、色設定の PlayerWaveFill を使う。
     /// </summary>
-    public static int PlayerFill(int bgra, UiTheme theme) =>
-        theme == UiTheme.Light ? MixTowardWhite(bgra, PlayerFillTowardWhite) : bgra;
+    public static int PlayerFill(int bgra, UiTheme theme)
+    {
+        var fill = PlayerChrome.Get("PlayerWaveFillBrush", theme);
+        var a = (bgra >> 24) & 0xFF;
+        return (a << 24) | (fill.R << 16) | (fill.G << 8) | fill.B;
+    }
 
     /// <summary>
     /// mid を中心に、|y-mid| / halfHeight で端へ暗い色へ寄せる。

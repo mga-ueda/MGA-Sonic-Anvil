@@ -43,11 +43,8 @@ internal sealed class WaveformView : Grid
     private const double TrailDiscontinuitySec = 1.25;
 
     /// <summary>プレイヤー波形。背景アニメーションが透ける濃さ。ライトはエディタより薄く、白寄せ後も読める濃さ。</summary>
-    internal const double PlayerWaveOpacityDark = 0.58;
-    internal const double PlayerWaveOpacityLight = 0.50;
-
     internal static double PlayerWaveOpacityFor(UiTheme theme) =>
-        theme == UiTheme.Light ? PlayerWaveOpacityLight : PlayerWaveOpacityDark;
+        PlayerChrome.Get("PlayerWaveFillBrush", theme).A / 255d;
 
     private const double MouseGuideMoveEpsilonPx = 0.5;
     private static double TimeLaneHeight => DesignMetrics.RulerHeight;
@@ -736,6 +733,7 @@ internal sealed class WaveformView : Grid
         _zeroBgra = 0;
         _playheadCore = null;
         _exitPlayheadCore = null;
+        _boostBar.ApplyTrackBrush();
         InvalidateWaveform();
         ApplyMouseGuideOverlay();
     }
@@ -2592,7 +2590,7 @@ internal sealed class WaveformView : Grid
         && Math.Abs(_invertViewStart - _waveViewStart) < 0.01
         && Math.Abs(_invertViewSpan - _waveViewSpan) < 0.01;
 
-    internal static Color SpectrogramSelectionFill() => Color.FromArgb(56, 255, 255, 255);
+    internal static Color SpectrogramSelectionFill() => Theme.Get("SpectrogramSelectionFillBrush");
 
     private double LaneGapPx(double dpiScaleY)
     {
@@ -3713,7 +3711,7 @@ internal sealed class WaveformView : Grid
         {
             var muted = IsLaneMuted(ch);
             var nameFore = tint
-                ? Brushes.White
+                ? WpfControlHelpers.FrozenBrush(Theme.Get("ChannelLabelOnTintForeBrush"))
                 : WpfControlHelpers.FrozenBrush(Theme.Get(muted ? "MutedForeBrush" : "PrimaryForeBrush"));
             var top = wave.Y + ch * (laneHeight + laneGap);
             var name = layout.LabelAt(ch);
@@ -3926,7 +3924,7 @@ internal sealed class WaveformView : Grid
 
         _waveBgra = ToBgra(Theme.Get("WaveFillBrush"));
         _waveOverlayBgra = ToBgra(Theme.Get("WaveFillOverlayBrush"));
-        _loudnessWaveBgra = ToBgra(Colors.White);
+        _loudnessWaveBgra = ToBgra(Theme.Get("LoudnessWaveFillBrush"));
         _zeroBgra = ToBgra(Theme.Get("WaveZeroLineBrush"));
     }
 
@@ -3960,10 +3958,16 @@ internal sealed class WaveformView : Grid
         return PlayerAwareWaveFill(color);
     }
 
-    private int PlayerAwareWaveFill(int color) =>
-        SeekAndSelectOnly
-            ? WaveformLaneGradient.PlayerFill(color, UiThemeService.Current)
-            : color;
+    private int PlayerAwareWaveFill(int color)
+    {
+        if (!SeekAndSelectOnly)
+        {
+            return color;
+        }
+
+        var fill = PlayerChrome.Get("PlayerWaveFillBrush");
+        return fill.B | (fill.G << 8) | (fill.R << 16) | unchecked((int)0xFF000000);
+    }
 
     private int[] LaneWaveColors()
     {
@@ -5176,7 +5180,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var grip = WpfControlHelpers.FrozenBrush(Color.FromRgb(0x8E, 0xC4, 0xDC));
+        var grip = WpfControlHelpers.FrozenBrush(Theme.Get("SampleLoopGripBrush"));
         var selected = WpfControlHelpers.FrozenBrush(Theme.Get("MarkerSelectedBorderBrush"));
         dc.DrawRectangle(_loopStartSelected ? selected : grip, null, startHandle);
         dc.DrawRectangle(_loopEndSelected ? selected : grip, null, endHandle);

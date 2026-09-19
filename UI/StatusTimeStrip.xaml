@@ -47,20 +47,24 @@
              GotKeyboardFocus="Field_GotKeyboardFocus"
              LostKeyboardFocus="Field_LostKeyboardFocus" />
     <TextBlock x:Name="TotalLabel" Style="{StaticResource StatusTimecodeLabelStyle}" />
-    <Border MinWidth="{x:Static ui:DesignMetrics.StatusTimecodeWidth}"
-            Width="{x:Static ui:DesignMetrics.StatusTimecodeWidth}"
-            Height="{x:Static ui:DesignMetrics.StatusTimecodeBoxHeight}"
-            VerticalAlignment="Center"
-            Background="{DynamicResource WaveformBackBrush}">
+    <Grid MinWidth="{x:Static ui:DesignMetrics.StatusTimecodeWidth}"
+          Width="{x:Static ui:DesignMetrics.StatusTimecodeWidth}"
+          Height="{x:Static ui:DesignMetrics.StatusTimecodeBoxHeight}"
+          VerticalAlignment="Center">
+      <Border Background="{DynamicResource PlayerComboFillBrush}"
+              BorderBrush="{DynamicResource PlayerComboFillBrush}"
+              BorderThickness="1"
+              IsHitTestVisible="False" />
       <TextBlock x:Name="TotalText"
                  HorizontalAlignment="Stretch"
                  VerticalAlignment="Center"
                  TextAlignment="Center"
+                 Margin="{x:Static ui:DesignMetrics.StatusTimecodePadding}"
                  FontFamily="Consolas"
                  FontWeight="Bold"
                  FontSize="{x:Static ui:DesignMetrics.StatusTimecodeFontSize}"
                  Foreground="{DynamicResource StatusBarTitleForeBrush}"
                  Text="00:00.000" />
-    </Border>
+    </Grid>
   </StackPanel>
 </UserControl>

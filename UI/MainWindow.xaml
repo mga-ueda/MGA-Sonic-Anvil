@@ -14,6 +14,10 @@
         ToolTipService.IsEnabled="False"
         Background="{DynamicResource SurfaceBackBrush}">
   <Grid x:Name="RootChrome">
+    <Grid x:Name="PlayerWaveGlowHost"
+          IsHitTestVisible="False"
+          Visibility="Collapsed"
+          ClipToBounds="True" />
   <DockPanel x:Name="RootDock" LastChildFill="True">
     <Border x:Name="StatusBarHost"
             DockPanel.Dock="Bottom"
@@ -68,9 +72,10 @@
                      Width="Auto"
                      Text="{x:Static domain:UiStrings.LabelStatusSpeaker}" />
           <ComboBox x:Name="SpeakerMenu"
-                    Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                    Style="{StaticResource LibraryComboBoxStyle}"
+                    Height="{x:Static ui:DesignMetrics.StatusTimecodeBoxHeight}"
                     MinWidth="{x:Static ui:DesignMetrics.TransportSpeakerComboWidth}"
-                    MaxHeight="22"
+                    MaxHeight="{x:Static ui:DesignMetrics.StatusTimecodeBoxHeight}"
                     Padding="6,1,6,1"
                     FontSize="11"
                     VerticalAlignment="Center"
@@ -162,12 +167,6 @@
               <RowDefinition Height="Auto" />
               <RowDefinition x:Name="LibraryWaveformRowDef" Height="*" />
             </Grid.RowDefinitions>
-            <Grid x:Name="PlayerWaveGlowHost"
-                  Grid.RowSpan="3"
-                  Panel.ZIndex="0"
-                  IsHitTestVisible="False"
-                  Visibility="Collapsed"
-                  ClipToBounds="True" />
             <ui:LibraryBrowserView x:Name="LibraryBrowser"
                                    Panel.ZIndex="1"
                                    Visibility="Collapsed" />
@@ -312,7 +311,8 @@
             </ScrollViewer>
           </DockPanel>
         </Border>
-        <DockPanel Grid.Row="1"
+        <DockPanel x:Name="TransportBarHost"
+                   Grid.Row="1"
                    Grid.Column="0"
                    MinHeight="{x:Static ui:DesignMetrics.TransportHostMinHeight}"
                    Background="{DynamicResource TransportBackBrush}">

@@ -20,9 +20,12 @@ internal sealed class LevelMeterView : FrameworkElement
     internal static double TrackHeight(Rect bounds) =>
         Math.Max(24, bounds.Bottom - TrackBottomGap - (bounds.Y + LampHeight));
 
-    private static readonly Color ClipOn = Color.FromRgb(0xFF, 0x00, 0x00);
+    private static Color ClipOn => Theme.Get("LevelMeterClipOnBrush");
 
     private LevelMeterSnapshot _snapshot = LevelMeterSnapshot.Idle;
+
+    /// <summary>プレイヤー中はクロム塗りをせず、ジャケットウォッシュを透かす。</summary>
+    internal bool WashThrough { get; set; }
 
     public LevelMeterView()
     {
@@ -53,7 +56,11 @@ internal sealed class LevelMeterView : FrameworkElement
             return;
         }
 
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
+        if (!WashThrough)
+        {
+            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
+        }
+
         if (!_snapshot.ShowRms && _snapshot.Channels.Length > 2)
         {
             DrawSurround(dc, bounds);
@@ -135,16 +142,17 @@ internal sealed class LevelMeterView : FrameworkElement
             dc.DrawRectangle(WpfControlHelpers.FrozenBrush(fill), new Pen(WpfControlHelpers.FrozenBrush(border), 1), lamp);
             if (clip)
             {
-                dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Color.FromArgb(80, 255, 0, 0)), null, lamp);
+                dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("LevelMeterClipOnOverlayBrush")), null, lamp);
             }
         }
 
         var track = new Rect(unit.X, unit.Y + LampHeight, unit.Width, trackHeight);
+        var trackPen = strokeTrack
+            ? new Pen(WpfControlHelpers.FrozenBrush(TrackBorderColor()), 1)
+            : null;
         dc.DrawRectangle(
-            WpfControlHelpers.FrozenBrush(Theme.Get("LevelMeterTrackBackBrush")),
-            strokeTrack
-                ? new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("LevelMeterTrackBorderBrush")), 1)
-                : null,
+            WashThrough ? null : WpfControlHelpers.FrozenBrush(Theme.Get("LevelMeterTrackBackBrush")),
+            trackPen,
             track);
 
         DrawTicks(dc, track);
@@ -192,7 +200,7 @@ internal sealed class LevelMeterView : FrameworkElement
     private void DrawSharedTrackBorders(DrawingContext dc, Rect frame, double barW, int channelCount)
     {
         var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
-        var pen = WpfControlHelpers.FrozenHairline(Theme.Get("LevelMeterTrackBorderBrush"), pixelsPerDip);
+        var pen = WpfControlHelpers.FrozenHairline(TrackBorderColor(), pixelsPerDip);
         dc.DrawRectangle(null, pen, frame);
         for (var i = 1; i < channelCount; i++)
         {
@@ -367,9 +375,14 @@ internal sealed class LevelMeterView : FrameworkElement
     private static Brush ScaleBrush() =>
         WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
 
-    private static void DrawTicks(DrawingContext dc, Rect track)
+    private Color TrackBorderColor() =>
+        PlayerMeterChrome.Grid("LevelMeterTrackBorderBrush", WashThrough);
+
+    private void DrawTicks(DrawingContext dc, Rect track)
     {
-        var pen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("LevelMeterTickBrush")), 1);
+        var pen = new Pen(
+            WpfControlHelpers.FrozenBrush(PlayerMeterChrome.Grid("LevelMeterTickBrush", WashThrough)),
+            1);
         pen.Freeze();
         foreach (var db in LevelMeterEngine.ScaleLabels)
         {

@@ -41,7 +41,8 @@ public sealed class WaveformLaneGradientTests
         Assert.True(((pale >> 16) & 0xFF) > ((navy >> 16) & 0xFF));
         Assert.True(((pale >> 8) & 0xFF) > ((navy >> 8) & 0xFF));
         Assert.True((pale & 0xFF) > (navy & 0xFF));
-        Assert.Equal(navy, WaveformLaneGradient.PlayerFill(navy, UiTheme.Dark));
+        var dark = WaveformLaneGradient.PlayerFill(navy, UiTheme.Dark);
+        Assert.True(((dark >> 16) & 0xFF) > ((navy >> 16) & 0xFF));
     }
 
     [Fact]
@@ -55,8 +56,8 @@ public sealed class WaveformLaneGradientTests
     [Fact]
     public void PlayerWaveOpacity_LightIsPalerThanDark()
     {
-        Assert.Equal(0.58, WaveformView.PlayerWaveOpacityFor(UiTheme.Dark));
         Assert.True(WaveformView.PlayerWaveOpacityFor(UiTheme.Light) < WaveformView.PlayerWaveOpacityFor(UiTheme.Dark));
-        Assert.Equal(WaveformView.PlayerWaveOpacityLight, WaveformView.PlayerWaveOpacityFor(UiTheme.Light));
+        Assert.InRange(WaveformView.PlayerWaveOpacityFor(UiTheme.Dark), 0.55, 0.62);
+        Assert.InRange(WaveformView.PlayerWaveOpacityFor(UiTheme.Light), 0.45, 0.55);
     }
 }

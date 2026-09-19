@@ -21,8 +21,6 @@ internal sealed class LibraryBrowserView : UserControl
 {
     /// <summary>色抽出用の縮小長辺。ピクセル数はごく少ない。</summary>
     internal const int GlowSampleEdge = 12;
-    private const double GlowVeilOpacityDark = 0.42;
-    private const double GlowVeilOpacityLight = 0.58;
     internal const double GlowDriftScaleFrom = 1.08;
     internal const double GlowDriftScaleTo = 1.22;
     internal const double GlowDriftX = 72;
@@ -36,32 +34,35 @@ internal sealed class LibraryBrowserView : UserControl
     internal const int GlowWashTurnSteps = 4;
     internal const double GlowWashTurnSeconds = 20;
     internal const double GlowWashTurnFadeSeconds = 10;
-    private const double GlowDriftBleed = 80;
+    /// <summary>フルウィンドウの Scale 1.22 とドリフトが端を空けない余白。</summary>
+    private const double GlowDriftBleed = 240;
     /// <summary>ツリーとプレイリストで揃える文字サイズ。</summary>
     internal const double LibraryListFontSize = 11;
     /// <summary>セル左右 Margin。</summary>
     internal const double LibraryColumnCellPadX = 8;
     /// <summary>ツリー／お気に入り／プレイリストの選択塗り。ジャケットを透かす。</summary>
-    internal const byte LibrarySelectionFillAlpha = 0x28;
+    internal static byte LibrarySelectionFillAlpha =>
+        PlayerChrome.Get("PlayerSelectionFillBrush", UiTheme.Dark).A;
     /// <summary>ライトは白地にシアンが沈むので、選択を濃くする。</summary>
-    internal const byte LibrarySelectionFillAlphaLight = 0x70;
-    /// <summary>ライトの選択シアンを白へ寄せて、少し明るい帯にする。</summary>
-    internal const double LibrarySelectionLightTowardWhite = 0.32;
+    internal static byte LibrarySelectionFillAlphaLight =>
+        PlayerChrome.Get("PlayerSelectionFillBrush", UiTheme.Light).A;
     /// <summary>同マウスオーバー塗り。選択より濃く、行が判る明るさ。</summary>
-    internal const byte LibraryHoverFillAlpha = 0x98;
+    internal static byte LibraryHoverFillAlpha => PlayerChrome.Get("PlayerHoverFillBrush").A;
     /// <summary>列見出し左右 Padding。</summary>
     internal const double LibraryColumnHeaderPadX = 8;
     /// <summary>ソート中の見出しの ▼▲（余白込み）。</summary>
     internal const double LibraryColumnSortPad =
         LibrarySortHeader.MarksGap + ((LibrarySortHeader.MarkMargin + LibrarySortHeader.MarkWidth) * 2);
     internal const double PaneFocusLineHeight = 36;
-    internal const byte PaneFocusLineAlpha = 0x14;
+    internal static byte PaneFocusLineAlpha =>
+        PlayerChrome.Get("PlayerPaneFocusLineBrush", UiTheme.Dark).A;
     /// <summary>ライトは白地に白が乗らないので、暗い色をやや濃くする。</summary>
-    internal const byte PaneFocusLineAlphaLight = 0x3C;
+    internal static byte PaneFocusLineAlphaLight =>
+        PlayerChrome.Get("PlayerPaneFocusLineBrush", UiTheme.Light).A;
     internal const string PlaylistRowBandName = "PlaylistRowBand";
-    internal static readonly Color FallbackWashNavy = Color.FromRgb(0x1B, 0x3A, 0x6B);
-    internal static readonly Color FallbackWashCyan = Color.FromRgb(0x00, 0xF5, 0xFF);
-    internal static readonly Color FallbackWashWhite = Color.FromRgb(0xFF, 0xFF, 0xFF);
+    internal static Color FallbackWashNavy => PlayerChrome.Get("PlayerFallbackWashNavyBrush");
+    internal static Color FallbackWashCyan => PlayerChrome.Get("PlayerFallbackWashCyanBrush");
+    internal static Color FallbackWashWhite => PlayerChrome.Get("PlayerFallbackWashWhiteBrush");
     private static Brush[]? _fallbackWashTurns;
     /// <summary>ジャケット／グロー用デコードの長辺上限。APIC 原寸展開を避ける。</summary>
     private const int ArtworkDecodeMaxEdge = 512;
@@ -277,7 +278,7 @@ internal sealed class LibraryBrowserView : UserControl
         _grid.RowStyle = rowStyle;
         _grid.RowBackground = Brushes.Transparent;
         _grid.AlternatingRowBackground = Brushes.Transparent;
-        var fore = ResolveThemeBrush("PrimaryForeBrush", Color.FromRgb(0xE8, 0xE8, 0xEA));
+        var fore = ResolveThemeBrush("PrimaryForeBrush");
         ApplyNavSelectionResources(_grid, selected, fore);
         SetPlaylistBandLeft(_grid, _group != LibraryFileGroup.None ? GroupJacketColumnWidth : 0);
         RefreshSortChrome();
@@ -963,6 +964,8 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void RefreshAppearance()
     {
+        LibraryPlaceholderJacket.Invalidate();
+        _fallbackWashTurns = null;
         ApplyGlowVeil();
         ApplyGridStyles();
         ApplyExplorerStyle();
@@ -977,7 +980,7 @@ internal sealed class LibraryBrowserView : UserControl
     }
 
     internal static double GlowVeilOpacityFor(UiTheme theme) =>
-        theme == UiTheme.Light ? GlowVeilOpacityLight : GlowVeilOpacityDark;
+        PlayerChrome.Get("PlayerGlowVeilBrush", theme).A / 255d;
 
     public void SetSessions(
         IReadOnlyList<DocumentSession> sessions,
@@ -1793,7 +1796,7 @@ internal sealed class LibraryBrowserView : UserControl
         // 既定のシステム選択色（非アクティブ時の白など）をアプリの色に差し替える。
         var hover = GrayHoverBrush();
         var selected = CyanSelectionBrush();
-        var fore = ResolveThemeBrush("PrimaryForeBrush", Color.FromRgb(0xE8, 0xE8, 0xEA));
+        var fore = ResolveThemeBrush("PrimaryForeBrush");
         ApplyNavSelectionResources(_folderTree, selected, fore);
 
         var itemStyle = new Style(typeof(TreeViewItem));
@@ -1828,7 +1831,7 @@ internal sealed class LibraryBrowserView : UserControl
     {
         var hover = GrayHoverBrush();
         var selected = CyanSelectionBrush();
-        var fore = ResolveThemeBrush("PrimaryForeBrush", Color.FromRgb(0xE8, 0xE8, 0xEA));
+        var fore = ResolveThemeBrush("PrimaryForeBrush");
         ApplyNavSelectionResources(_favoritesList, selected, fore);
 
         var itemStyle = new Style(typeof(ListBoxItem));
@@ -1853,52 +1856,16 @@ internal sealed class LibraryBrowserView : UserControl
     }
 
     internal static byte LibrarySelectionFillAlphaFor(UiTheme theme) =>
-        theme == UiTheme.Light ? LibrarySelectionFillAlphaLight : LibrarySelectionFillAlpha;
+        PlayerChrome.Get("PlayerSelectionFillBrush", theme).A;
 
     internal static Color LibrarySelectionRgb(Color accent, UiTheme theme) =>
-        theme == UiTheme.Light
-            ? MixRgbTowardWhite(accent, LibrarySelectionLightTowardWhite)
-            : accent;
+        PlayerChrome.Get("PlayerSelectionFillBrush", theme);
 
-    internal static Brush CyanSelectionBrush()
-    {
-        var theme = UiThemeService.Current;
-        return WithAlpha(
-            LibrarySelectionRgb(Theme.Get("AccentCyanBrush"), theme),
-            LibrarySelectionFillAlphaFor(theme));
-    }
+    internal static Brush CyanSelectionBrush() =>
+        PlayerChrome.Brush("PlayerSelectionFillBrush");
 
     internal static Brush GrayHoverBrush() =>
-        WithAlpha(
-            ResolveThemeBrush("MenuHighlightBackBrush", Color.FromRgb(0x37, 0x37, 0x3A)),
-            LibraryHoverFillAlpha);
-
-    private static Brush WithAlpha(Color color, byte alpha)
-    {
-        var brush = new SolidColorBrush(Color.FromArgb(alpha, color.R, color.G, color.B));
-        brush.Freeze();
-        return brush;
-    }
-
-    private static Color MixRgbTowardWhite(Color color, double amount)
-    {
-        amount = Math.Clamp(amount, 0, 1);
-        return Color.FromRgb(
-            MixRgbChannel(color.R, amount),
-            MixRgbChannel(color.G, amount),
-            MixRgbChannel(color.B, amount));
-    }
-
-    private static byte MixRgbChannel(byte channel, double amount) =>
-        (byte)Math.Clamp((int)Math.Round(channel + ((255 - channel) * amount)), 0, 255);
-
-    private static Brush WithAlpha(Brush source, byte alpha)
-    {
-        var color = source is SolidColorBrush solid
-            ? solid.Color
-            : Color.FromRgb(0x37, 0x37, 0x3A);
-        return WithAlpha(color, alpha);
-    }
+        PlayerChrome.Brush("PlayerHoverFillBrush");
 
     private void PinColumnHeaders()
     {
@@ -2113,17 +2080,8 @@ internal sealed class LibraryBrowserView : UserControl
             Binding.DoNothing;
     }
 
-    private static Brush ResolveThemeBrush(string key, Color fallback)
-    {
-        if (Application.Current?.TryFindResource(key) is Brush brush)
-        {
-            return brush;
-        }
-
-        var created = new SolidColorBrush(fallback);
-        created.Freeze();
-        return created;
-    }
+    private static Brush ResolveThemeBrush(string key) =>
+        WpfControlHelpers.FrozenBrush(Theme.Get(key));
 
     private static readonly DependencyProperty TreeMarkedProperty = DependencyProperty.RegisterAttached(
         "TreeMarked",
@@ -3944,24 +3902,17 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void ApplyGlowVeil()
     {
-        var light = UiThemeService.Current == UiTheme.Light;
-        var opacity = GlowVeilOpacityFor(UiThemeService.Current);
+        var veil = PlayerChrome.Get("PlayerGlowVeilBrush");
+        var brush = WpfControlHelpers.FrozenBrush(Color.FromRgb(veil.R, veil.G, veil.B));
+        _veil.Background = brush;
+        _waveVeil.Background = brush;
+        var opacity = veil.A / 255d;
         _veil.Opacity = opacity;
         _waveVeil.Opacity = opacity;
-        if (light)
-        {
-            _veil.Background = Brushes.White;
-            _waveVeil.Background = Brushes.White;
-        }
-        else
-        {
-            _veil.SetResourceReference(Border.BackgroundProperty, "SurfaceBackBrush");
-            _waveVeil.SetResourceReference(Border.BackgroundProperty, "SurfaceBackBrush");
-        }
     }
 
     /// <summary>
-    /// リストと波形をまたぐ一枚のウォッシュ。プレイヤー中だけ伸ばし、リスト側の別アニメは畳む。
+    /// ウィンドウ全体を一枚のウォッシュ。プレイヤー中だけ伸ばし、リスト側の別アニメは畳む。
     /// </summary>
     internal void BindWaveformGlow(Grid host)
     {
@@ -3994,7 +3945,7 @@ internal sealed class LibraryBrowserView : UserControl
         SyncWashTurns();
     }
 
-    /// <summary>プレイヤー表示中は波形まで一枚で広げる。編集画面では畳む。</summary>
+    /// <summary>プレイヤー表示中はウィンドウ全体に一枚で広げる。編集画面では畳む。</summary>
     internal void SetGlowExtendsWaveform(bool extend)
     {
         if (_extendGlow == extend)
@@ -4139,9 +4090,7 @@ internal sealed class LibraryBrowserView : UserControl
     }
 
     internal static Color PaneFocusLineColor(UiTheme theme) =>
-        theme == UiTheme.Light
-            ? Color.FromArgb(PaneFocusLineAlphaLight, 0x2C, 0x2C, 0x30)
-            : Color.FromArgb(PaneFocusLineAlpha, 255, 255, 255);
+        PlayerChrome.Get("PlayerPaneFocusLineBrush", theme);
 
     internal static Brush CreatePaneFocusLineBrush() =>
         CreatePaneFocusLineBrush(UiThemeService.Current);
@@ -4498,7 +4447,7 @@ internal sealed class LibraryBrowserView : UserControl
         var pixels = CopySamplePixels(source, GlowSampleEdge);
         if (pixels.Length < 4)
         {
-            return Enumerable.Repeat(Color.FromRgb(0x5A, 0x6A, 0x88), count).ToArray();
+            return Enumerable.Repeat(PlayerChrome.Get("PlayerFallbackWashNavyBrush"), count).ToArray();
         }
 
         var candidates = new List<(Color Color, double Score, double Hue)>(pixels.Length / 4);
@@ -4542,7 +4491,7 @@ internal sealed class LibraryBrowserView : UserControl
             }
 
             var avg = n == 0
-                ? Color.FromRgb(0x5A, 0x6A, 0x88)
+                ? PlayerChrome.Get("PlayerFallbackWashNavyBrush")
                 : BoostAmbient(
                     Color.FromRgb((byte)(sumR / n), (byte)(sumG / n), (byte)(sumB / n)),
                     saturation: 0.35,
@@ -5128,8 +5077,6 @@ internal static class LibraryJacketReflection
 {
     /// <summary>鏡面の見える高さ（元画像に対する比率）。</summary>
     internal const double HeightFactor = 0.40;
-    /// <summary>接点付近の不透明度（255 基準）。やや薄めから始める。</summary>
-    internal const byte PeakOpacity = 78;
     /// <summary>本体と鏡面のすき間（DIP）。</summary>
     internal const double GapDip = 1;
 }
@@ -5146,7 +5093,6 @@ internal sealed class LibraryJacketReflectionView : Border
         Margin = new Thickness(0, LibraryJacketReflection.GapDip, 0, 0);
         Padding = new Thickness(0);
         BorderThickness = new Thickness(0);
-        // マスクは反転の外側。接点（上）が濃く、下へ透明。
         OpacityMask = CreateOpacityMask();
 
         _image.Stretch = Stretch.Uniform;
@@ -5191,20 +5137,22 @@ internal sealed class LibraryJacketReflectionView : Border
         height = pixelHeight * scale;
     }
 
+    internal void RefreshMask() => OpacityMask = CreateOpacityMask();
+
     internal static Brush CreateOpacityMask()
     {
+        var peak = Theme.Get("PlayerJacketReflectionBrush");
         var brush = new LinearGradientBrush
         {
             StartPoint = new Point(0.5, 0),
             EndPoint = new Point(0.5, 1),
             MappingMode = BrushMappingMode.RelativeToBoundingBox,
         };
+        brush.GradientStops.Add(new GradientStop(peak, 0));
         brush.GradientStops.Add(new GradientStop(
-            Color.FromArgb(LibraryJacketReflection.PeakOpacity, 255, 255, 255), 0));
+            Color.FromArgb((byte)(peak.A * 0.45), peak.R, peak.G, peak.B), 0.35));
         brush.GradientStops.Add(new GradientStop(
-            Color.FromArgb((byte)(LibraryJacketReflection.PeakOpacity * 0.45), 255, 255, 255), 0.35));
-        brush.GradientStops.Add(new GradientStop(
-            Color.FromArgb((byte)(LibraryJacketReflection.PeakOpacity * 0.12), 255, 255, 255), 0.72));
+            Color.FromArgb((byte)(peak.A * 0.12), peak.R, peak.G, peak.B), 0.72));
         brush.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
         brush.Freeze();
         return brush;
@@ -5341,6 +5289,7 @@ internal sealed class LibraryGroupJacketImage : StackPanel
             ?? LibraryPlaceholderJacket.Bitmap;
         _face.Source = art;
         _reflection.Source = art;
+        _reflection.RefreshMask();
         Visibility = Visibility.Visible;
         Opacity = 1;
         _reflection.Visibility = Visibility.Visible;

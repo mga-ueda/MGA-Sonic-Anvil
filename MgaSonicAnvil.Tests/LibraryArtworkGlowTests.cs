@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
@@ -313,6 +314,23 @@ public sealed class LibraryArtworkGlowTests
             Application.Current.Resources["MenuHighlightBackBrush"] = new SolidColorBrush(Color.FromRgb(0x37, 0x37, 0x3A));
             var view = new LibraryBrowserView();
             Assert.True(view.GlowFillsLibraryChrome);
+        });
+    }
+
+    [Fact]
+    public void SetGlowExtendsWaveform_ShowsBoundHost()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var host = new Grid { Visibility = Visibility.Collapsed };
+            var view = new LibraryBrowserView();
+            view.BindWaveformGlow(host);
+            Assert.Equal(Visibility.Collapsed, host.Visibility);
+            view.SetGlowExtendsWaveform(true);
+            Assert.Equal(Visibility.Visible, host.Visibility);
+            view.SetGlowExtendsWaveform(false);
+            Assert.Equal(Visibility.Collapsed, host.Visibility);
         });
     }
 

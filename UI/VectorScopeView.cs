@@ -27,7 +27,8 @@ internal sealed class VectorScopeView : FrameworkElement
     private const double ScopeInset = 4;
     private const float StereoMaxGain = 3.5f;
     private const float SurroundMaxGain = 1.7f;
-    private static Color SurroundHullStroke => Theme.Get("SurroundHullStrokeBrush");
+    private Color SurroundHullStroke =>
+        PlayerMeterChrome.Grid("SurroundHullStrokeBrush", WashThrough);
 
     private readonly DispatcherTimer _timer;
     private readonly float[] _left = new float[LevelMeterEngine.WindowFrames];
@@ -67,6 +68,9 @@ internal sealed class VectorScopeView : FrameworkElement
     private int[] _beamGhostPixels = [];
     private int _persistW;
     private int _persistH;
+
+    /// <summary>プレイヤー中はクロム塗りをせず、ジャケットウォッシュを透かす。</summary>
+    internal bool WashThrough { get; set; }
 
     public VectorScopeView()
     {
@@ -150,7 +154,11 @@ internal sealed class VectorScopeView : FrameworkElement
             return;
         }
 
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
+        if (!WashThrough)
+        {
+            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
+        }
+
         var layout = MeasureLayout(bounds);
         if (ShowSurround)
         {
@@ -183,10 +191,9 @@ internal sealed class VectorScopeView : FrameworkElement
 
     private void DrawScope(DrawingContext dc, Rect scope)
     {
-        var back = Theme.Get("VectorScopeBackBrush");
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(back), null, scope);
+        DrawScopeBack(dc, scope);
 
-        var grid = Theme.Get("VectorScopeGridBrush");
+        var grid = PlayerMeterChrome.Grid("VectorScopeGridBrush", WashThrough);
         var gridPen = new Pen(WpfControlHelpers.FrozenBrush(grid), 0.6);
         gridPen.Freeze();
         var midX = scope.X + scope.Width * 0.5;
@@ -276,7 +283,11 @@ internal sealed class VectorScopeView : FrameworkElement
 
     private void DrawCorrelation(DrawingContext dc, Rect area)
     {
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, area);
+        if (!WashThrough)
+        {
+            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, area);
+        }
+
         var trackHeight = 5d;
         var track = new Rect(
             area.X + CorrelationSidePad,
@@ -888,9 +899,19 @@ internal sealed class VectorScopeView : FrameworkElement
 
     internal static Rect SurroundScopeRect(Rect bounds) => MeasureLayout(bounds).Scope;
 
+    private void DrawScopeBack(DrawingContext dc, Rect scope)
+    {
+        if (WashThrough)
+        {
+            return;
+        }
+
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("VectorScopeBackBrush")), null, scope);
+    }
+
     private void DrawSurround(DrawingContext dc, Rect scope)
     {
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("VectorScopeBackBrush")), null, scope);
+        DrawScopeBack(dc, scope);
         ScopeGeometry(scope, out var cx, out var cy, out var radius);
         DrawSurroundGrid(dc, cx, cy, radius);
         if (SurroundPersistEnabled && _persist is not null)
@@ -909,9 +930,9 @@ internal sealed class VectorScopeView : FrameworkElement
         DrawSurroundHull(dc, cx, cy, radius, fade, persist: false);
     }
 
-    private static void DrawSurroundGrid(DrawingContext dc, double cx, double cy, double radius)
+    private void DrawSurroundGrid(DrawingContext dc, double cx, double cy, double radius)
     {
-        var grid = Theme.Get("VectorScopeGridBrush");
+        var grid = PlayerMeterChrome.Grid("VectorScopeGridBrush", WashThrough);
         var pen = new Pen(WpfControlHelpers.FrozenBrush(grid), 0.6);
         pen.Freeze();
         foreach (var t in new[] { 1d / 3d, 2d / 3d, 1d })

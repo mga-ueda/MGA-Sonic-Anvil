@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
@@ -61,7 +62,16 @@ public partial class MainWindow
     {
         var show = IsLibraryMaximized;
         LibraryBrowser.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        LibraryBrowser.SetGlowExtendsWaveform(show);
+        if (show)
+        {
+            LibraryBrowser.SetGlowExtendsWaveform(true);
+            ApplyLibraryWashChrome(true);
+        }
+        else
+        {
+            ApplyLibraryWashChrome(false);
+            LibraryBrowser.SetGlowExtendsWaveform(false);
+        }
         LibrarySplitter.Visibility = Visibility.Collapsed;
         DocumentTabHost.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
         LibraryRowDef.MinHeight = show ? DesignMetrics.LibraryPaneMinHeight : 0;
@@ -84,14 +94,6 @@ public partial class MainWindow
         }
 
         ForEachWaveform(view => view.SeekAndSelectOnly = show);
-        if (show)
-        {
-            WaveformTileHost.Background = null;
-        }
-        else
-        {
-            WaveformTileHost.SetResourceReference(Panel.BackgroundProperty, "WaveformBackBrush");
-        }
         TimeScrollStrip.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
         HistoryStrip.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
         if (show)
@@ -130,6 +132,54 @@ public partial class MainWindow
             _libraryHoldJacketWash = false;
             _ = LeaveLibraryMaximizeAsync();
         }
+    }
+
+    /// <summary>
+    /// プレイヤー中はクロムの塗りを外し、ウィンドウ全体のジャケットウォッシュを透かす。
+    /// 入るときはグローを出してから塗りを外し、出るときは先に塗りを戻す。
+    /// </summary>
+    private void ApplyLibraryWashChrome(bool show)
+    {
+        if (show)
+        {
+            StatusBarHost.Background = Brushes.Transparent;
+            TipsPanel.Background = Brushes.Transparent;
+            WaveformHostBorder.Background = Brushes.Transparent;
+            WaveformTileHost.Background = null;
+            MeterColumn.Background = Brushes.Transparent;
+            MeterTopSlot.Background = Brushes.Transparent;
+            TransportChromeHost.Background = Brushes.Transparent;
+            DocumentTabHost.Background = Brushes.Transparent;
+            TransportBarHost.Background = Brushes.Transparent;
+            LoudnessMeter.Background = Brushes.Transparent;
+        }
+        else
+        {
+            StatusBarHost.SetResourceReference(Border.BackgroundProperty, "StatusBarBackBrush");
+            TipsPanel.SetResourceReference(Border.BackgroundProperty, "WaapiBarBackBrush");
+            WaveformHostBorder.SetResourceReference(Border.BackgroundProperty, "WaveformBackBrush");
+            WaveformTileHost.SetResourceReference(Panel.BackgroundProperty, "WaveformBackBrush");
+            MeterColumn.SetResourceReference(Panel.BackgroundProperty, "TransportBackBrush");
+            MeterTopSlot.SetResourceReference(Border.BackgroundProperty, "TransportBackBrush");
+            TransportChromeHost.SetResourceReference(Panel.BackgroundProperty, "TransportBackBrush");
+            DocumentTabHost.SetResourceReference(Border.BackgroundProperty, "TransportBackBrush");
+            TransportBarHost.SetResourceReference(Panel.BackgroundProperty, "TransportBackBrush");
+            LoudnessMeter.SetResourceReference(Panel.BackgroundProperty, "TransportBackBrush");
+        }
+
+        LevelMeter.WashThrough = show;
+        VectorScope.WashThrough = show;
+        Spectrum.WashThrough = show;
+        Transport.SetWashThrough(show);
+        if (_waapiToggle is not null)
+        {
+            _waapiToggle.WashThrough = show;
+            _waapiToggle.InvalidateVisual();
+        }
+
+        LevelMeter.InvalidateVisual();
+        VectorScope.InvalidateVisual();
+        Spectrum.InvalidateVisual();
     }
 
     /// <summary>

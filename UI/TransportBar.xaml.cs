@@ -204,6 +204,24 @@ internal partial class TransportBar : UserControl
     public FrameworkElement? ButtonFor(TransportCommand command) =>
         _buttons.TryGetValue(command, out var button) ? button : null;
 
+    public void SetWashThrough(bool wash)
+    {
+        if (wash)
+        {
+            Background = Brushes.Transparent;
+        }
+        else
+        {
+            SetResourceReference(BackgroundProperty, "TransportBackBrush");
+        }
+
+        foreach (var button in _buttons.Values)
+        {
+            button.WashThrough = wash;
+            button.InvalidateVisual();
+        }
+    }
+
     public void RefreshAppearance()
     {
         SetUiTheme(UiThemeService.Current);

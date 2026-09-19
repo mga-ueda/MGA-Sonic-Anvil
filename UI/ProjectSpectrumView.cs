@@ -32,6 +32,9 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         set => SetValue(BackgroundProperty, value);
     }
 
+    /// <summary>プレイヤー中はクロム塗りをせず、ジャケットウォッシュを透かす。</summary>
+    internal bool WashThrough { get; set; }
+
     public ProjectSpectrumView()
     {
         MinHeight = DesignMetrics.SpectrumHeight;
@@ -95,17 +98,21 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         var g = ComputePlot(wPx, hPx);
         var px = 1d / dpi;
 
-        var chrome = WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush"));
-        var plotBack = WpfControlHelpers.FrozenBrush(Theme.Get("VectorScopeBackBrush"));
-        dc.DrawRectangle(chrome, null, bounds);
+        if (!WashThrough)
+        {
+            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, bounds);
+        }
         var plot = new Rect(g.PlotX * px, g.PlotY * px, g.PlotW * px, g.PlotH * px);
         if (plot.Width <= 0 || plot.Height <= 0)
         {
             return;
         }
 
-        dc.DrawRectangle(plotBack, null, plot);
-        DrawDbGrid(dc, g, px);
+        if (!WashThrough)
+        {
+            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("VectorScopeBackBrush")), null, plot);
+        }
+        DrawDbGrid(dc, g, px, WashThrough);
         EnsureGradient();
 
         var bands = _analyzer.CurrentBands;
@@ -209,17 +216,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         return Math.Max(1, (int)Math.Ceiling((ft.Width + 3) * PixelsPerDip));
     }
 
-    private static Color LabelColor()
-    {
-        try
-        {
-            return Theme.Get("MutedForeBrush");
-        }
-        catch (InvalidOperationException)
-        {
-            return Color.FromRgb(0x96, 0x96, 0x96);
-        }
-    }
+    private static Color LabelColor() => Theme.Get("MutedForeBrush");
 
     private PlotGeometry ComputePlot(int wPx, int hPx)
     {
@@ -240,9 +237,11 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         return new PlotGeometry(plotX, plotY, plotW, plotH, padL, padR, ShowDb: true, ShowHz: true, wPx, hPx);
     }
 
-    private static void DrawDbGrid(DrawingContext dc, PlotGeometry g, double px)
+    private static void DrawDbGrid(DrawingContext dc, PlotGeometry g, double px, bool player)
     {
-        var pen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("VectorScopeGridBrush")), 0.6);
+        var pen = new Pen(
+            WpfControlHelpers.FrozenBrush(PlayerMeterChrome.Grid("VectorScopeGridBrush", player)),
+            0.6);
         pen.Freeze();
         var x0 = g.PlotX * px;
         var x1 = (g.PlotX + g.PlotW) * px;

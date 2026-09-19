@@ -9,8 +9,6 @@ internal static class WaveformInvertPaint
 {
     /// <summary>反転ビットマップを不透明で重ねると下地が消えるので、透かして重ねる。</summary>
     public const double SelectionInvertOpacity = 0.55;
-    /// <summary>ライトのプレイヤー。空きの反転塗りを白へ寄せて薄くする。</summary>
-    public const double PlayerLightEmptyTowardWhite = 0.78;
 
     public static double SelectionInvertOpacityFor(bool playerLight) =>
         playerLight ? 0.7 : SelectionInvertOpacity;
@@ -190,7 +188,7 @@ internal static class WaveformInvertPaint
         {
             return hasWave
                 ? invertWave
-                : WaveformLaneGradient.MixTowardWhite(waveFill, PlayerLightEmptyTowardWhite);
+                : ToBgra(PlayerChrome.Get("PlayerWaveSelectionEmptyBrush", UiTheme.Light));
         }
 
         return hasWave ? back : waveFill;

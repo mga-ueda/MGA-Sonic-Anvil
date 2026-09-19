@@ -18,6 +18,8 @@ internal static class LibraryPlaceholderJacket
     private static UiTheme _theme;
     private static BitmapSource? _bitmap;
 
+    public static void Invalidate() => _bitmap = null;
+
     public static BitmapSource Bitmap
     {
         get
@@ -39,16 +41,9 @@ internal static class LibraryPlaceholderJacket
         using (var dc = visual.RenderOpen())
         {
             var rect = new Rect(0, 0, PixelSize, PixelSize);
-            var light = theme == UiTheme.Light;
-            var top = light
-                ? Color.FromRgb(0xE8, 0xE8, 0xEC)
-                : Color.FromRgb(0x5C, 0x5C, 0x62);
-            var bottom = light
-                ? Color.FromRgb(0xB0, 0xB0, 0xB6)
-                : Color.FromRgb(0x2A, 0x2A, 0x2E);
-            var label = light
-                ? Color.FromRgb(0x5A, 0x5A, 0x62)
-                : Color.FromRgb(0xC8, 0xC8, 0xCE);
+            var top = PlayerChrome.Get("PlayerPlaceholderJacketTopBrush", theme);
+            var bottom = PlayerChrome.Get("PlayerPlaceholderJacketBottomBrush", theme);
+            var label = PlayerChrome.Get("PlayerPlaceholderJacketForeBrush", theme);
 
             var fill = new LinearGradientBrush
             {

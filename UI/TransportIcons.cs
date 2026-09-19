@@ -147,6 +147,9 @@ internal sealed class TransportIconButton : Button
 
     public bool QuietChrome { get; set; }
 
+    /// <summary>プレイヤー中はスロット塗りをせず、ジャケットウォッシュを透かす。</summary>
+    public bool WashThrough { get; set; }
+
     public Color? IconForeOverride { get; set; }
 
     public TransportIconButton()
@@ -191,7 +194,7 @@ internal sealed class TransportIconButton : Button
             IsMouseOver,
             IsPressed,
             backKey,
-            fillSlot: !QuietChrome,
+            fillSlot: !QuietChrome && !WashThrough,
             hoverBounds: QuietChrome && Icon == TransportIcon.Folder
                 ? TransportIconDrawing.FolderHoverBounds(bounds)
                 : null);
@@ -216,7 +219,7 @@ internal sealed class TransportIconButton : Button
         }
         if (Icon == TransportIcon.Record && IsLatched)
         {
-            fore = Color.FromRgb(0xE2, 0x4B, 0x4A);
+            fore = Theme.Get("RecordLatchForeBrush");
         }
 
         if (Icon is TransportIcon.Analysis or TransportIcon.Overlay or TransportIcon.Loudness)
@@ -231,15 +234,17 @@ internal sealed class TransportIconButton : Button
     {
         var on = IsLatched;
         var hover = IsEnabled && IsMouseOver && !IsPressed;
-        var back = on
-            ? Theme.Get(hover ? "WaapiToggleOnHoverBackBrush" : "WaapiToggleOnBackBrush")
-            : Theme.Get(hover ? "WaapiToggleOffHoverBackBrush" : "WaapiToggleOffBackBrush");
+        var back = WaapiChipBack(on, hover);
         var fore = on
             ? Theme.Get("WaapiToggleOnForeBrush")
             : Theme.Get("WaapiToggleOffForeBrush");
 
         var slotKey = QuietChrome ? "ProjectBarBackBrush" : "TransportBackBrush";
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get(slotKey)), null, bounds);
+        if (!WashThrough)
+        {
+            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get(slotKey)), null, bounds);
+        }
+
         var chip = new Rect(2, 6, Math.Max(1, bounds.Width - 4), Math.Max(1, bounds.Height - 12));
         dc.DrawRoundedRectangle(WpfControlHelpers.FrozenBrush(back), null, chip, 3, 3);
 
@@ -258,11 +263,30 @@ internal sealed class TransportIconButton : Button
                 (bounds.Height - formatted.Height) * 0.5));
     }
 
+    private Color WaapiChipBack(bool on, bool hover)
+    {
+        if (WashThrough)
+        {
+            return PlayerChrome.Get(on
+                ? hover ? "PlayerWaapiToggleOnHoverBackBrush" : "PlayerWaapiToggleOnBackBrush"
+                : hover ? "PlayerWaapiToggleOffHoverBackBrush" : "PlayerWaapiToggleOffBackBrush");
+        }
+
+        return on
+            ? Theme.Get(hover ? "WaapiToggleOnHoverBackBrush" : "WaapiToggleOnBackBrush")
+            : Theme.Get(hover ? "WaapiToggleOffHoverBackBrush" : "WaapiToggleOffBackBrush");
+    }
+
     private Color ChromeHole(string backKey)
     {
         if (IsEnabled && (IsMouseOver || IsPressed))
         {
             return Theme.Get(IsPressed ? "TransportPressedBackBrush" : "TransportHoverBackBrush");
+        }
+
+        if (WashThrough)
+        {
+            return Colors.Transparent;
         }
 
         return Theme.Get(backKey);

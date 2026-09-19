@@ -47,6 +47,7 @@ public partial class MainWindow
         button.Click += (_, _) => ToggleWaapiPanel();
         MeterTopSlot.Child = button;
         _waapiToggle = button;
+        button.WashThrough = IsLibraryMaximized;
     }
 
     private void InitializeWaapi()

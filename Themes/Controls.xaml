@@ -73,21 +73,44 @@
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="Foreground" Value="{DynamicResource StatusBarTitleForeBrush}" />
-        <Setter Property="Background" Value="{DynamicResource WaveformBackBrush}" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryForeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Margin" Value="0,0,4,0" />
         <Setter Property="InputMethod.IsInputMethodEnabled" Value="False" />
         <Setter Property="CaretBrush" Value="{DynamicResource AccentCyanBrush}" />
         <Setter Property="SelectionBrush" Value="{DynamicResource AccentCyanBrush}" />
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{DynamicResource TransportHoverBackBrush}" />
-            </Trigger>
-            <Trigger Property="IsKeyboardFocused" Value="True">
-                <Setter Property="Background" Value="{DynamicResource DialogInputBackBrush}" />
-            </Trigger>
-        </Style.Triggers>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Grid SnapsToDevicePixels="True">
+                        <Border x:Name="Fill"
+                                Background="{DynamicResource PlayerComboFillBrush}"
+                                BorderBrush="{DynamicResource PlayerComboFillBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                IsHitTestVisible="False" />
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="{TemplateBinding Padding}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      HorizontalAlignment="Stretch" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Fill" Property="Background" Value="{DynamicResource PlayerComboHoverFillBrush}" />
+                            <Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource ControlHoverBorderBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Fill" Property="Background" Value="{DynamicResource PlayerComboHoverFillBrush}" />
+                            <Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource ControlHoverBorderBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource ChromeDimBrush}" />
+                            <Setter TargetName="Fill" Property="Background" Value="{DynamicResource PlayerComboDisabledFillBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- App-wide Control Foreground is light; default ToolTip is light → unreadable. -->
@@ -463,10 +486,9 @@
                 <ControlTemplate TargetType="ComboBox">
                     <Grid SnapsToDevicePixels="True">
                         <Border x:Name="Fill"
-                                Background="{DynamicResource PrimaryForeBrush}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
+                                Background="{DynamicResource PlayerComboFillBrush}"
+                                BorderBrush="{DynamicResource PlayerComboFillBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                Opacity="0.18"
                                 IsHitTestVisible="False" />
                         <Border x:Name="Border" Background="Transparent" BorderThickness="0">
                             <Grid>
@@ -522,12 +544,10 @@
                                PopupAnimation="Slide">
                             <Grid MinWidth="{TemplateBinding ActualWidth}"
                                   MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                <Border Background="{DynamicResource PrimaryForeBrush}"
-                                        Opacity="0.48"
+                                <Border Background="{DynamicResource PlayerComboDropFillBrush}"
                                         IsHitTestVisible="False" />
-                                <Border BorderBrush="{DynamicResource PrimaryForeBrush}"
+                                <Border BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                         BorderThickness="1"
-                                        Opacity="0.32"
                                         IsHitTestVisible="False" />
                                 <ScrollViewer Margin="1" SnapsToDevicePixels="True"
                                               HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
@@ -543,16 +563,16 @@
                             <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible" />
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Fill" Property="Opacity" Value="0.32" />
+                            <Setter TargetName="Fill" Property="Background" Value="{DynamicResource PlayerComboHoverFillBrush}" />
                             <Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource ControlHoverBorderBrush}" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="Fill" Property="Opacity" Value="0.32" />
+                            <Setter TargetName="Fill" Property="Background" Value="{DynamicResource PlayerComboHoverFillBrush}" />
                             <Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource ControlHoverBorderBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{DynamicResource ChromeDimBrush}" />
-                            <Setter TargetName="Fill" Property="Opacity" Value="0.08" />
+                            <Setter TargetName="Fill" Property="Background" Value="{DynamicResource PlayerComboDisabledFillBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -606,18 +626,18 @@
                           Height="{x:Static ui:DesignMetrics.SpectrogramBoostThumbSize}">
                         <Ellipse x:Name="Dot"
                                  Margin="0.6"
-                                 Fill="#F4F4F4"
-                                 Stroke="#2A2A2A"
+                                 Fill="{DynamicResource SpectrogramBoostThumbFillBrush}"
+                                 Stroke="{DynamicResource SpectrogramBoostThumbStrokeBrush}"
                                  StrokeThickness="1.2" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Dot" Property="Fill" Value="#FFFFFF" />
-                            <Setter TargetName="Dot" Property="Stroke" Value="#111111" />
+                            <Setter TargetName="Dot" Property="Fill" Value="{DynamicResource SpectrogramBoostThumbHoverFillBrush}" />
+                            <Setter TargetName="Dot" Property="Stroke" Value="{DynamicResource SpectrogramBoostThumbHoverStrokeBrush}" />
                         </Trigger>
                         <Trigger Property="IsDragging" Value="True">
-                            <Setter TargetName="Dot" Property="Fill" Value="#FFFFFF" />
-                            <Setter TargetName="Dot" Property="Stroke" Value="#111111" />
+                            <Setter TargetName="Dot" Property="Fill" Value="{DynamicResource SpectrogramBoostThumbHoverFillBrush}" />
+                            <Setter TargetName="Dot" Property="Stroke" Value="{DynamicResource SpectrogramBoostThumbHoverStrokeBrush}" />
                             <Setter TargetName="Dot" Property="StrokeThickness" Value="1.8" />
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -642,15 +662,7 @@
                                 Width="{x:Static ui:DesignMetrics.SpectrogramBoostBarWidth}"
                                 HorizontalAlignment="Center"
                                 CornerRadius="4"
-                                SnapsToDevicePixels="True">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0.5,1" EndPoint="0.5,0">
-                                    <GradientStop Color="#9C2E00" Offset="0" />
-                                    <GradientStop Color="#FF9A20" Offset="0.5" />
-                                    <GradientStop Color="#FFFFFF" Offset="1" />
-                                </LinearGradientBrush>
-                            </Border.Background>
-                        </Border>
+                                SnapsToDevicePixels="True" />
                         <!-- 下が 0（オフ）、上が最大。 -->
                         <Track x:Name="PART_Track">
                             <Track.DecreaseRepeatButton>
