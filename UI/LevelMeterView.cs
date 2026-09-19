@@ -10,12 +10,12 @@ internal sealed class LevelMeterView : FrameworkElement
 {
     private const double ScaleColWidth = LevelMeterSurroundLayout.ScaleColWidth;
     private const double BarWidth = LevelMeterSurroundLayout.MaxBarWidth;
-    private const double LampHeight = 4;
+    internal const double LampHeight = 4;
     private const double ReadoutLineHeight = 12;
     private const double ReadoutHeight = ReadoutLineHeight * 2;
     /// <summary>ステレオの数値行と同じ。サラウンドでもメーター下にこの隙間を残す。</summary>
     internal const double TrackBottomGap = ReadoutHeight;
-    private const double HoldLineHeight = 3;
+    internal const double HoldLineHeight = 3;
 
     internal static double TrackHeight(Rect bounds) =>
         Math.Max(24, bounds.Bottom - TrackBottomGap - (bounds.Y + LampHeight));
@@ -172,6 +172,23 @@ internal sealed class LevelMeterView : FrameworkElement
         }
     }
 
+    /// <summary>
+    /// ホールド線をトラック内に収める。0 dB でもクリップランプへはみ出さない。
+    /// </summary>
+    internal static Rect HoldLineRect(Rect track, double holdPct)
+    {
+        var lineH = Math.Min(HoldLineHeight, Math.Max(0, track.Height));
+        if (lineH <= 0)
+        {
+            return Rect.Empty;
+        }
+
+        var holdBottom = track.Height * Math.Clamp(holdPct, 0, 100) / 100d;
+        var y = track.Bottom - holdBottom - lineH;
+        y = Math.Clamp(y, track.Y, track.Bottom - lineH);
+        return new Rect(track.X + 1, y, Math.Max(1, track.Width - 2), lineH);
+    }
+
     private void DrawSharedTrackBorders(DrawingContext dc, Rect frame, double barW, int channelCount)
     {
         var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
@@ -203,8 +220,12 @@ internal sealed class LevelMeterView : FrameworkElement
         int channel,
         bool isPeakHold)
     {
-        var holdBottom = track.Height * Math.Clamp(holdPct, 0, 100) / 100d;
-        var y = track.Bottom - holdBottom - HoldLineHeight;
+        var line = HoldLineRect(track, holdPct);
+        if (line.IsEmpty)
+        {
+            return;
+        }
+
         Brush fill;
         if (ChannelColors.UsesLaneTint(_snapshot.Channels.Length))
         {
@@ -216,10 +237,12 @@ internal sealed class LevelMeterView : FrameworkElement
             fill = WpfControlHelpers.FrozenBrush(Color.FromRgb(rgb.R, rgb.G, rgb.B));
         }
 
+        dc.PushClip(new RectangleGeometry(track));
         dc.DrawRectangle(
             fill,
             new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("LevelMeterHoldBorderBrush")), 1),
-            new Rect(track.X + 1, y, Math.Max(1, track.Width - 2), HoldLineHeight));
+            line);
+        dc.Pop();
     }
 
     private void DrawReadouts(DrawingContext dc, Rect area, bool surround)

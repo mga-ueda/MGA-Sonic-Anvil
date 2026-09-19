@@ -22,9 +22,11 @@ internal sealed class LevelMeterEngine
     public const double RmsHoldLineReleaseSec = 0.48;
     public const double HoldLineEpsilonDb = 0.05;
     public const double ClipHoldSec = 2.0;
+    /// <summary>0 dBFS。内部は float なので、ちょうど 1.0 はフルスケール到達であり超過ではない。</summary>
+    public const float ClipLinear = 1f;
 
     private ChannelState[] _states = [new(), new()];
-    private DateTime[] _clipUntil = new DateTime[2];
+    private double[] _clipUntilSec = new double[2];
 
     public LevelMeterSnapshot Snapshot { get; private set; } = LevelMeterSnapshot.Idle;
 
@@ -35,7 +37,7 @@ internal sealed class LevelMeterEngine
             state.Reset();
         }
 
-        Array.Clear(_clipUntil);
+        ClearClipHold();
         Snapshot = LevelMeterSnapshot.IdleFor(_states.Length);
     }
 
@@ -47,7 +49,7 @@ internal sealed class LevelMeterEngine
             state.Reset();
         }
 
-        Array.Clear(_clipUntil);
+        ClearClipHold();
         Snapshot = LevelMeterSnapshot.IdleFor(n);
     }
 
@@ -65,7 +67,7 @@ internal sealed class LevelMeterEngine
             state.Reset();
         }
 
-        Array.Clear(_clipUntil);
+        ClearClipHold();
         Snapshot = LevelMeterSnapshot.IdleFor(n);
     }
 
@@ -99,19 +101,18 @@ internal sealed class LevelMeterEngine
         EnsureStates(n);
         var meters = new ChannelMeter[n];
         var clips = new bool[n];
-        var now = DateTime.UtcNow;
         for (var i = 0; i < n; i++)
         {
             var peak = hasSamples && i < peaks.Length ? peaks[i] : _states[i].LastPeak;
             var rmsVal = hasSamples && i < rms.Length ? rms[i] : _states[i].LastRms;
             var meter = Measure(_states[i], peak, rmsVal, nowSeconds);
-            if (meter.InstPeakDb >= 0)
+            if (hasSamples && i < peaks.Length && IsClipPeak(peaks[i]))
             {
-                _clipUntil[i] = now.AddSeconds(ClipHoldSec);
+                _clipUntilSec[i] = nowSeconds + ClipHoldSec;
             }
 
             meters[i] = meter;
-            clips[i] = now < _clipUntil[i];
+            clips[i] = nowSeconds < _clipUntilSec[i];
         }
 
         Snapshot = new LevelMeterSnapshot(meters, clips, ShowRms: n <= 2);
@@ -126,19 +127,23 @@ internal sealed class LevelMeterEngine
         }
 
         var next = new ChannelState[channels];
-        var clips = new DateTime[channels];
+        var clips = new double[channels];
         for (var i = 0; i < channels; i++)
         {
             next[i] = i < _states.Length ? _states[i] : new ChannelState();
-            if (i < _clipUntil.Length)
+            if (i < _clipUntilSec.Length)
             {
-                clips[i] = _clipUntil[i];
+                clips[i] = _clipUntilSec[i];
             }
         }
 
         _states = next;
-        _clipUntil = clips;
+        _clipUntilSec = clips;
     }
+
+    public static bool IsClipPeak(float linear) => linear > ClipLinear;
+
+    private void ClearClipHold() => Array.Clear(_clipUntilSec);
 
     public static double ToDb(double linear) =>
         20d * Math.Log10(Math.Max(linear, 1e-8));
@@ -172,7 +177,13 @@ internal sealed class LevelMeterEngine
             return "-60.0";
         }
 
-        return Math.Min(DbMax, db).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+        var text = db.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+        if (db > 0 && text[0] != '+' && text[0] != '-')
+        {
+            return "+" + text;
+        }
+
+        return text;
     }
 
     public static IReadOnlyList<double> ScaleLabels { get; } =
@@ -252,7 +263,7 @@ internal sealed class LevelMeterEngine
             peakHeldDb = Math.Max(instPeakDb, peakHeldDb - PeakReleaseDbPerSec * dt);
         }
 
-        peakHeldDb = Math.Clamp(peakHeldDb, DbMin, DbMax);
+        peakHeldDb = Math.Max(DbMin, peakHeldDb);
         st.PeakHeldDb = peakHeldDb;
 
         var rmsHeldDb = st.RmsHeldDb;
@@ -266,7 +277,7 @@ internal sealed class LevelMeterEngine
             rmsHeldDb = Math.Max(instRmsDb, rmsHeldDb - PeakReleaseDbPerSec * dt);
         }
 
-        rmsHeldDb = Math.Clamp(rmsHeldDb, DbMin, DbMax);
+        rmsHeldDb = Math.Max(DbMin, rmsHeldDb);
         st.RmsHeldDb = rmsHeldDb;
         TrackRmsHoldLine(ref st.RmsHoldLineDb, rmsHeldDb, dt);
 

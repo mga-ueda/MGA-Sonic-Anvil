@@ -23,7 +23,30 @@ public sealed class LevelMeterRenderTests
     {
         var bounds = new Rect(0, 0, DesignMetrics.LevelMeterWidth, 400);
         Assert.Equal(24, LevelMeterView.TrackBottomGap);
-        Assert.Equal(bounds.Height - 4 - LevelMeterView.TrackBottomGap, LevelMeterView.TrackHeight(bounds));
+        Assert.Equal(
+            bounds.Height - LevelMeterView.LampHeight - LevelMeterView.TrackBottomGap,
+            LevelMeterView.TrackHeight(bounds));
+    }
+
+    [Fact]
+    public void HoldLine_StaysInsideTrackAndBelowClipLamp()
+    {
+        var lamp = new Rect(10, 0, 12, LevelMeterView.LampHeight);
+        var track = new Rect(10, LevelMeterView.LampHeight, 12, 200);
+        var top = LevelMeterView.HoldLineRect(track, 100);
+        var mid = LevelMeterView.HoldLineRect(track, 50);
+        var floor = LevelMeterView.HoldLineRect(track, 0);
+
+        Assert.Equal(LevelMeterView.HoldLineHeight, top.Height);
+        Assert.True(top.Top >= track.Top);
+        Assert.True(top.Bottom <= track.Bottom);
+        Assert.True(top.Top >= lamp.Bottom);
+        Assert.False(top.Y < lamp.Bottom && top.Bottom > lamp.Top);
+
+        Assert.True(mid.Top >= track.Top);
+        Assert.True(mid.Bottom <= track.Bottom);
+        Assert.True(floor.Top >= track.Top);
+        Assert.Equal(track.Bottom, floor.Bottom);
     }
 
     [Fact]

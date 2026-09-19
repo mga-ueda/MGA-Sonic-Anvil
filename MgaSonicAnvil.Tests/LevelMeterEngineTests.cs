@@ -41,6 +41,9 @@ public sealed class LevelMeterEngineTests
         Assert.Equal("-50.0", LevelMeterEngine.FormatReadout(-50));
         Assert.Equal("0.0", LevelMeterEngine.FormatReadout(0));
         Assert.Equal("-6.0", LevelMeterEngine.FormatReadout(-6.02));
+        Assert.Equal("+0.1", LevelMeterEngine.FormatReadout(0.12));
+        Assert.Equal("+1.2", LevelMeterEngine.FormatReadout(1.16));
+        Assert.Equal("+0.0", LevelMeterEngine.FormatReadout(0.04));
     }
 
     [Fact]
@@ -61,10 +64,27 @@ public sealed class LevelMeterEngineTests
     }
 
     [Fact]
-    public void Update_LightsClipWhenPeakHitsFullScale()
+    public void Update_DoesNotLightClipAtExactlyFullScale()
     {
         var left = new float[LevelMeterEngine.WindowFrames];
-        left[0] = 1f;
+        left[0] = LevelMeterEngine.ClipLinear;
+        var right = new float[LevelMeterEngine.WindowFrames];
+
+        var engine = new LevelMeterEngine();
+        var snap = engine.Update(left, right, nowSeconds: 0.5);
+
+        Assert.False(LevelMeterEngine.IsClipPeak(LevelMeterEngine.ClipLinear));
+        Assert.False(snap.ClipLeft);
+        Assert.False(snap.ClipRight);
+        Assert.Equal(0, snap.Left.InstPeakDb, 6);
+        Assert.Equal("0.0", LevelMeterEngine.FormatReadout(snap.Left.PeakHeldDb));
+    }
+
+    [Fact]
+    public void Update_LightsClipWhenPeakExceedsFullScale()
+    {
+        var left = new float[LevelMeterEngine.WindowFrames];
+        left[0] = 1.1220185f;
         var right = new float[LevelMeterEngine.WindowFrames];
 
         var engine = new LevelMeterEngine();
@@ -72,7 +92,33 @@ public sealed class LevelMeterEngineTests
 
         Assert.True(snap.ClipLeft);
         Assert.False(snap.ClipRight);
-        Assert.Equal(0, snap.Left.InstPeakDb, 6);
+        Assert.True(snap.Left.InstPeakDb > 0);
+        Assert.StartsWith("+", LevelMeterEngine.FormatReadout(snap.Left.PeakHeldDb));
+    }
+
+    [Fact]
+    public void Update_DoesNotRetriggerClipWithoutNewSamples()
+    {
+        var engine = new LevelMeterEngine();
+        var snap = engine.Update([1.2f, 0f], [0.1f, 0f], nowSeconds: 1, hasSamples: true);
+        Assert.True(snap.ClipLeft);
+
+        snap = engine.Update([1.2f, 0f], [0.1f, 0f], nowSeconds: 1 + LevelMeterEngine.ClipHoldSec + 0.1, hasSamples: false);
+        Assert.False(snap.ClipLeft);
+    }
+
+    [Fact]
+    public void Update_ClipHoldExpiresAfterTwoSecondsOfQuiet()
+    {
+        var engine = new LevelMeterEngine();
+        var snap = engine.Update([1.2f, 0f], [0.1f, 0f], nowSeconds: 1, hasSamples: true);
+        Assert.True(snap.ClipLeft);
+
+        snap = engine.Update([0.1f, 0f], [0.05f, 0f], nowSeconds: 2.9, hasSamples: true);
+        Assert.True(snap.ClipLeft);
+
+        snap = engine.Update([0.1f, 0f], [0.05f, 0f], nowSeconds: 3.1, hasSamples: true);
+        Assert.False(snap.ClipLeft);
     }
 
     [Fact]
@@ -200,15 +246,16 @@ public sealed class LevelMeterEngineTests
     [Fact]
     public void Update_SurroundHidesRmsAndKeepsAllPeaks()
     {
-        var peaks = new float[] { 0.5f, 0.25f, 1f, 0.1f, 0.2f, 0.3f };
+        var peaks = new float[] { 0.5f, 0.25f, 1.1220185f, 0.1f, 0.2f, 0.3f };
         var rms = new float[] { 0.2f, 0.1f, 0.4f, 0.05f, 0.1f, 0.15f };
         var engine = new LevelMeterEngine();
         var snap = engine.Update(peaks, rms, nowSeconds: 1, hasSamples: true);
 
         Assert.False(snap.ShowRms);
         Assert.Equal(6, snap.Channels.Length);
-        Assert.Equal(LevelMeterEngine.ToDb(1), snap.Channels[2].InstPeakDb, 6);
+        Assert.Equal(LevelMeterEngine.ToDb(1.1220185f), snap.Channels[2].InstPeakDb, 5);
         Assert.True(snap.Clips[2]);
+        Assert.False(snap.Clips[0]);
         Assert.Equal(snap.Channels[2].PeakHeldDb, snap.LoudestPeakHeldDb, 6);
         Assert.Equal(
             snap.Channels.Max(channel => channel.RmsHeldDb),
