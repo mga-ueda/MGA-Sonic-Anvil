@@ -230,6 +230,15 @@ internal static class DesignMetrics
     /// <summary>F10 フォルダツリーとリストの区切り。1px。</summary>
     public static double LibraryExplorerSplitterWidth => From96(1);
 
+    /// <summary>ツリー区切りの掴み幅。線は 1px。表示判定は LibrarySplitterRevealDistance。</summary>
+    public static double LibrarySplitterHitThickness => From96(24);
+
+    /// <summary>ツリー区切りを出す距離。掴みより広く、中身のクリックは奪わない。</summary>
+    public static double LibrarySplitterRevealDistance => From96(240);
+
+    /// <summary>ツリーとお気に入りの区切りの当たり。</summary>
+    public static double LibraryFavoritesSplitterHitHeight => LibrarySplitterHitThickness;
+
     /// <summary>F10 お気に入りペインの最低高さ。</summary>
     public static double LibraryFavoritesMinHeight => From96(80);
 
@@ -326,6 +335,9 @@ internal static class DesignMetrics
 
     /// <summary>列のコンボ／メーターとスクロールバーのあいだ。</summary>
     public static double SettingsScrollBarGap => From96(8);
+
+    /// <summary>プレイヤーのスクロールバーを出す距離。端からこの幅までマウスが近いと表示。</summary>
+    public static double LibraryScrollRevealDistance => From96(320);
 
     /// <summary>オーディオタブの入力／出力列のすき間。</summary>
     public static double SettingsColumnGap => From96(20);

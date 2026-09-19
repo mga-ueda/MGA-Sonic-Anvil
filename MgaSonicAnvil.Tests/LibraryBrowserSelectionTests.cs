@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
@@ -64,6 +65,83 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void UpdateSessionRow_KeepsPlaylistKeyboardFocus()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("aaa.wav");
+            var second = Session("bbb.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions([first, second], second, [second]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            view.FocusList();
+            Flush();
+            Assert.True(view.IsListKeyboardFocused);
+            second.Document.SetArtwork([1, 2, 3, 4]);
+            view.UpdateSessionRow(second);
+            Flush();
+            Assert.True(view.IsListKeyboardFocused);
+            Assert.Same(second, view.SelectedSession);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void SelectSessionQuiet_KeepsPlaylistKeyboardFocus()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("aaa.wav");
+            var second = Session("bbb.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions([first, second], first, [first]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            view.FocusList();
+            Flush();
+            Assert.True(view.IsListKeyboardFocused);
+            view.SelectSessionQuiet(second);
+            Flush();
+            Assert.True(view.IsListKeyboardFocused);
+            Assert.Same(second, view.SelectedSession);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void GroupJacket_DoesNotStealHits()
+    {
+        RunSta(() =>
+        {
+            var jacket = new LibraryGroupJacketImage();
+            Assert.False(jacket.IsHitTestVisible);
+        });
+    }
+
+    [Fact]
     public void Layout_HasExplorerThenList()
     {
         RunSta(() =>
@@ -71,6 +149,18 @@ public sealed class LibraryBrowserSelectionTests
             EnsureTheme();
             var view = new LibraryBrowserView();
             Assert.Equal(3, view.RootColumnCount);
+            Assert.Equal(UiStrings.LibraryExplorerLabel, view.ExplorerPaneTitle);
+            Assert.Equal(UiStrings.LibraryFavoritesLabel, view.FavoritesPaneTitle);
+            Assert.Equal(UiStrings.LibraryPlaylistLabel, view.PlaylistPaneTitle);
+            Assert.Equal(Dock.Right, view.PlaylistGroupDock);
+            Assert.Equal(DesignMetrics.LibraryFavoritesSplitterHitHeight, view.FavoritesSplitter.Height);
+            Assert.Equal(VerticalAlignment.Center, view.FavoritesSplitter.VerticalAlignment);
+            Assert.Equal(Cursors.SizeNS, view.FavoritesSplitter.Cursor);
+            Assert.Equal(DesignMetrics.LibrarySplitterHitThickness, view.ExplorerSplitter.Width);
+            Assert.Equal(HorizontalAlignment.Center, view.ExplorerSplitter.HorizontalAlignment);
+            Assert.Equal(Cursors.SizeWE, view.ExplorerSplitter.Cursor);
+            Assert.False(view.ExplorerSplitter.Focusable);
+            Assert.False(view.FavoritesSplitter.Focusable);
         });
     }
 
@@ -78,6 +168,218 @@ public sealed class LibraryBrowserSelectionTests
     public void GroupJacketColumnWidth_MatchesJacketPlusMargins()
     {
         Assert.Equal(DesignMetrics.LibraryGroupJacketSize + 16, LibraryBrowserView.GroupJacketColumnWidth);
+    }
+
+    [Fact]
+    public void SelectionAndHoverFills_AreTranslucent()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var selected = Assert.IsType<SolidColorBrush>(LibraryBrowserView.CyanSelectionBrush());
+            var hover = Assert.IsType<SolidColorBrush>(LibraryBrowserView.GrayHoverBrush());
+            Assert.Equal(
+                LibraryBrowserView.LibrarySelectionFillAlphaFor(UiThemeService.Current),
+                selected.Color.A);
+            Assert.Equal(LibraryBrowserView.LibraryHoverFillAlpha, hover.Color.A);
+            Assert.True(selected.Color.A < 255);
+            Assert.True(hover.Color.A < 255);
+            Assert.True(hover.Color.A > LibraryBrowserView.LibrarySelectionFillAlpha);
+            Assert.True(hover.Color.A > 0x70);
+            Assert.True(
+                LibraryBrowserView.LibrarySelectionFillAlphaLight
+                > LibraryBrowserView.LibrarySelectionFillAlpha);
+            Assert.True(
+                LibraryBrowserView.LibrarySelectionFillAlphaLight
+                < LibraryBrowserView.LibraryHoverFillAlpha);
+            var navy = Color.FromRgb(0x1A, 0x90, 0xA8);
+            var lightRgb = LibraryBrowserView.LibrarySelectionRgb(navy, UiTheme.Light);
+            Assert.True(lightRgb.R > navy.R);
+            Assert.True(lightRgb.G > navy.G);
+            Assert.True(lightRgb.B > navy.B);
+            Assert.Equal(navy, LibraryBrowserView.LibrarySelectionRgb(navy, UiTheme.Dark));
+        });
+    }
+
+    [Fact]
+    public void ExplorerNestedFolders_UseSameHoverTemplate()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var root = Path.Combine(Path.GetTempPath(), "mga-tree-hover-" + Guid.NewGuid().ToString("N"));
+            var childPath = Path.Combine(root, "sub");
+            Directory.CreateDirectory(childPath);
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                view.UpdateLayout();
+                Flush();
+
+                var folder = view.ExplorerFirstFolder;
+                Assert.NotNull(folder);
+                Assert.NotNull(folder.Style);
+                folder.ApplyTemplate();
+                Assert.IsType<Border>(folder.Template.FindName("Bd", folder));
+
+                folder.IsExpanded = true;
+                Flush();
+                var nested = folder.Items.OfType<TreeViewItem>().FirstOrDefault(item => item.Tag is string);
+                Assert.NotNull(nested);
+                Assert.Same(folder.Style, nested.Style);
+                nested.ApplyTemplate();
+                Assert.IsType<Border>(nested.Template.FindName("Bd", nested));
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void RefreshAppearance_ReappliesTreeHoverToExistingFolders()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var root = Path.Combine(Path.GetTempPath(), "mga-tree-restyle-" + Guid.NewGuid().ToString("N"));
+            var childPath = Path.Combine(root, "sub");
+            Directory.CreateDirectory(childPath);
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+
+                var folder = view.ExplorerFirstFolder;
+                Assert.NotNull(folder);
+                folder.IsExpanded = true;
+                Flush();
+                var nested = folder.Items.OfType<TreeViewItem>().FirstOrDefault(item => item.Tag is string);
+                Assert.NotNull(nested);
+                var before = folder.Style;
+
+                view.RefreshAppearance();
+                Flush();
+                Assert.Same(view.ExplorerItemStyle, folder.Style);
+                Assert.Same(view.ExplorerItemStyle, nested.Style);
+                Assert.NotSame(before, folder.Style);
+
+                var hover = Assert.IsType<SolidColorBrush>(LibraryBrowserView.GrayHoverBrush());
+                var template = Assert.IsType<ControlTemplate>(folder.Template);
+                var trigger = template.Triggers.OfType<Trigger>()
+                    .First(item => item.SourceName == "Bd" && item.Property == UIElement.IsMouseOverProperty);
+                var fill = Assert.IsType<SolidColorBrush>(trigger.Setters.OfType<Setter>().First().Value);
+                Assert.Equal(hover.Color, fill.Color);
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void ExplorerStarAndSlash_ExpandAndCollapseSubtree()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var root = Path.Combine(Path.GetTempPath(), "mga-tree-expand-" + Guid.NewGuid().ToString("N"));
+            var nestedPath = Path.Combine(root, "sub");
+            var deepPath = Path.Combine(nestedPath, "deep");
+            Directory.CreateDirectory(deepPath);
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                view.UpdateLayout();
+                Flush();
+
+                var folder = view.ExplorerFirstFolder;
+                Assert.NotNull(folder);
+                folder.IsSelected = true;
+                Assert.True(view.ExpandSelectedExplorerSubtree());
+                Flush();
+                Assert.True(folder.IsExpanded);
+                var nested = folder.Items.OfType<TreeViewItem>().FirstOrDefault(item => item.Tag is string);
+                Assert.NotNull(nested);
+                Assert.True(nested.IsExpanded);
+                var deep = nested.Items.OfType<TreeViewItem>().FirstOrDefault(item => item.Tag is string);
+                Assert.NotNull(deep);
+                Assert.True(deep.IsExpanded);
+                Assert.Contains(
+                    Path.GetFullPath(nestedPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    view.ExplorerExpandedPaths,
+                    StringComparer.OrdinalIgnoreCase);
+
+                Assert.True(view.CollapseSelectedExplorerSubtree());
+                Flush();
+                Assert.False(folder.IsExpanded);
+                Assert.False(nested.IsExpanded);
+                Assert.False(deep.IsExpanded);
+
+                view.SetExplorerExpanded([root, nestedPath, deepPath]);
+                Flush();
+                Assert.True(folder.IsExpanded);
+                nested = folder.Items.OfType<TreeViewItem>().FirstOrDefault(item => item.Tag is string);
+                Assert.NotNull(nested);
+                Assert.True(nested.IsExpanded);
+                deep = nested.Items.OfType<TreeViewItem>().FirstOrDefault(item => item.Tag is string);
+                Assert.NotNull(deep);
+                Assert.True(deep.IsExpanded);
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
     }
 
     [Fact]
@@ -119,6 +421,25 @@ public sealed class LibraryBrowserSelectionTests
             view.FocusList();
             Flush();
             Assert.True(view.IsListKeyboardFocused);
+            Assert.Equal(Visibility.Visible, view.ListFocusLineVisibility);
+            Assert.Equal(Visibility.Collapsed, view.TreeFocusLineVisibility);
+            Assert.Equal(LibraryPane.Explorer, LibraryPlayerMode.NextPane(view.ActivePane, reverse: false));
+            view.CyclePaneFocus(reverse: false);
+            Flush();
+            Assert.True(view.IsExplorerFocused);
+            Assert.Equal(Visibility.Visible, view.TreeFocusLineVisibility);
+            Assert.Equal(Visibility.Collapsed, view.ListFocusLineVisibility);
+            view.CyclePaneFocus(reverse: false);
+            Flush();
+            Assert.True(view.IsFavoritesFocused);
+            Assert.Equal(Visibility.Visible, view.FavoritesFocusLineVisibility);
+            view.CyclePaneFocus(reverse: false);
+            Flush();
+            Assert.True(view.IsListKeyboardFocused);
+            view.CyclePaneFocus(reverse: true);
+            Flush();
+            Assert.True(view.IsFavoritesFocused);
+            Assert.Equal(36, LibraryBrowserView.PaneFocusLineHeight);
             window.Close();
         });
     }
@@ -179,13 +500,69 @@ public sealed class LibraryBrowserSelectionTests
             Flush();
             Assert.True(view.TryOpenKeyboardContextMenu());
             Assert.Equal(UiStrings.LibraryMenuRemoveFromFavorites, view.OpenContextMenuHeader);
+            Assert.True(view.HasOpenContextMenu);
             view.CloseKeyboardContextMenu();
+            Assert.False(view.HasOpenContextMenu);
 
             view.FocusList();
             Flush();
+            Assert.True(view.IsListOrigin(view.FileGrid));
             Assert.True(view.TryOpenKeyboardContextMenu());
             Assert.Equal(UiStrings.LibraryMenuClearFromPlaylist, view.OpenContextMenuHeader);
+            Assert.True(view.HasOpenContextMenu);
             view.CloseKeyboardContextMenu();
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void Playlist_ShiftAndCtrlSelect_KeepsMultipleRows()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.mp3");
+            var second = Session("02 b.mp3");
+            var third = Session("03 c.mp3");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions([first, second, third], first, [first]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            view.MoveSelection(1, extend: true);
+            Flush();
+            Assert.Equal(2, view.SelectedSessions.Length);
+            Assert.Contains(first, view.SelectedSessions);
+            Assert.Contains(second, view.SelectedSessions);
+
+            view.SelectSessionQuiet(first);
+            Flush();
+            Assert.Equal(2, view.SelectedSessions.Length);
+
+            view.ApplyPlaylistModifierClick(2, shift: false, control: true);
+            Flush();
+            Assert.Equal(3, view.SelectedSessions.Length);
+            Assert.Contains(third, view.SelectedSessions);
+
+            view.ApplyPlaylistModifierClick(1, shift: false, control: true);
+            Flush();
+            Assert.Equal(2, view.SelectedSessions.Length);
+            Assert.DoesNotContain(second, view.SelectedSessions);
+
+            view.SelectAllRows();
+            Flush();
+            Assert.Equal(3, view.SelectedSessions.Length);
             window.Close();
         });
     }
@@ -216,6 +593,14 @@ public sealed class LibraryBrowserSelectionTests
             view.SetSessions([first], first, [first]);
             Assert.Same(first, view.NextPlaylistSession(first));
             Assert.Same(first, view.NextPlaylistSession(null));
+
+            view.SetSessions([first, second, third], first, [first]);
+            Assert.Same(third, view.PreviousPlaylistSession(first));
+            Assert.Same(first, view.PreviousPlaylistSession(second));
+            Assert.Same(second, view.PreviousPlaylistSession(third));
+            Assert.Same(third, view.PreviousPlaylistSession(null));
+            view.SetSessions([first], first, [first]);
+            Assert.Same(first, view.PreviousPlaylistSession(first));
         });
     }
 
@@ -394,11 +779,14 @@ public sealed class LibraryBrowserSelectionTests
             Assert.True(artist > 24, $"artist width was {artist}");
             Assert.True(album > artist + 40, $"album {album} should be wider than artist {artist}");
             Assert.True(
-                artist < 120,
+                artist < 96,
                 $"artist column should pack to short content, was {artist}");
             Assert.True(
-                name < 220,
+                name < 180,
                 $"file column should pack to short names, was {name}");
+            Assert.True(
+                LibraryBrowserView.LibraryColumnHeaderPadX * 2 + LibraryBrowserView.LibraryColumnSortPad < 48,
+                "header chrome must stay tight so short columns do not pick up extra width");
             window.Close();
         });
     }
@@ -453,7 +841,67 @@ public sealed class LibraryBrowserSelectionTests
             foreach (var cell in spacerCells)
             {
                 Assert.Equal(Brushes.Transparent, cell.Background);
+                Assert.Equal(new Thickness(0), cell.BorderThickness);
             }
+
+            var selectedRows = FindDescendants<DataGridRow>(view.FileGrid)
+                .Where(row => row.IsSelected)
+                .ToList();
+            Assert.NotEmpty(selectedRows);
+            foreach (var row in selectedRows)
+            {
+                var band = AssertSelectedRowBand(row);
+                Assert.Equal(LibraryBrowserView.GroupJacketColumnWidth, band.Margin.Left, 3);
+            }
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void Playlist_SelectedRowBand_FillsBehindTransparentCells()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("aaa.wav");
+            var second = Session("bbb.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 400,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions([first, second], second, [second]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            var selectedCells = FindDescendants<DataGridCell>(view.FileGrid)
+                .Where(cell => cell.IsSelected)
+                .ToList();
+            Assert.True(selectedCells.Count >= 2);
+            foreach (var cell in selectedCells)
+            {
+                Assert.Equal(Brushes.Transparent, cell.Background);
+                Assert.Equal(new Thickness(0), cell.BorderThickness);
+            }
+
+            var selectedRows = FindDescendants<DataGridRow>(view.FileGrid)
+                .Where(row => row.IsSelected)
+                .ToList();
+            Assert.Single(selectedRows);
+            var band = AssertSelectedRowBand(selectedRows[0]);
+            Assert.Equal(0, band.Margin.Left);
+            var brush = Assert.IsType<SolidColorBrush>(band.Background);
+            Assert.Equal(0x00, brush.Color.R);
+            Assert.Equal(0xF5, brush.Color.G);
+            Assert.Equal(0xFF, brush.Color.B);
 
             window.Close();
         });
@@ -814,6 +1262,38 @@ public sealed class LibraryBrowserSelectionTests
                 yield return nested;
             }
         }
+    }
+
+    private static Border AssertSelectedRowBand(DataGridRow row)
+    {
+        var named = FindDescendants<Border>(row)
+            .FirstOrDefault(border => border.Name == LibraryBrowserView.PlaylistRowBandName);
+        var presenter = FindDescendants<DataGridCellsPresenter>(row).FirstOrDefault();
+        var band = named;
+        if (band is null && presenter is not null)
+        {
+            var parent = VisualTreeHelper.GetParent(presenter);
+            if (parent is Border parentBand)
+            {
+                band = parentBand;
+            }
+            else if (parent is not null)
+            {
+                band = FindDescendants<Border>(parent)
+                    .FirstOrDefault(border => border.Name == LibraryBrowserView.PlaylistRowBandName);
+            }
+        }
+
+        Assert.True(
+            band is not null,
+            presenter is null
+                ? "DataGridCellsPresenter was not found."
+                : $"Row band Border was not found. CellsPresenter parent is {VisualTreeHelper.GetParent(presenter)?.GetType().Name ?? "null"}.");
+        var brush = Assert.IsType<SolidColorBrush>(band!.Background);
+        Assert.Equal(
+            LibraryBrowserView.LibrarySelectionFillAlphaFor(UiThemeService.Current),
+            brush.Color.A);
+        return band;
     }
 
     private static DocumentSession Session(string name) =>

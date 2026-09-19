@@ -368,6 +368,7 @@
 
     <Style x:Key="LibraryScrollBarStyle" TargetType="ScrollBar">
         <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Opacity" Value="0" />
         <Setter Property="Width" Value="{x:Static ui:DesignMetrics.SettingsScrollBarWidth}" />
         <Setter Property="MinWidth" Value="{x:Static ui:DesignMetrics.SettingsScrollBarWidth}" />
         <Setter Property="Template">
@@ -384,6 +385,12 @@
             </Setter.Value>
         </Setter>
         <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Opacity" Value="1" />
+            </Trigger>
+            <Trigger Property="ui:LibraryScrollReveal.Revealed" Value="True">
+                <Setter Property="Opacity" Value="1" />
+            </Trigger>
             <Trigger Property="Orientation" Value="Vertical">
                 <Setter Property="MaxWidth" Value="{x:Static ui:DesignMetrics.SettingsScrollBarWidth}" />
             </Trigger>
@@ -409,18 +416,42 @@
         </Style.Triggers>
     </Style>
 
-    <!-- ツリー／お気に入り／リストの区切り。つまみと同じ色と透明度。 -->
+    <!-- ツリー／お気に入り／リストの区切り。普段は出さず、ホバー／ドラッグ時だけ 1px。 -->
     <Style x:Key="LibrarySplitterStyle" TargetType="GridSplitter">
-        <Setter Property="Background" Value="{DynamicResource PrimaryForeBrush}" />
-        <Setter Property="Opacity" Value="0.18" />
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Opacity" Value="0.32" />
-            </Trigger>
-            <Trigger Property="IsDragging" Value="True">
-                <Setter Property="Opacity" Value="0.48" />
-            </Trigger>
-        </Style.Triggers>
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Border Background="Transparent">
+                        <Rectangle x:Name="Line"
+                                   Width="1"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Stretch"
+                                   Fill="{DynamicResource PrimaryForeBrush}"
+                                   Opacity="0"
+                                   SnapsToDevicePixels="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="ResizeDirection" Value="Rows">
+                            <Setter TargetName="Line" Property="Width" Value="Auto" />
+                            <Setter TargetName="Line" Property="Height" Value="1" />
+                            <Setter TargetName="Line" Property="HorizontalAlignment" Value="Stretch" />
+                            <Setter TargetName="Line" Property="VerticalAlignment" Value="Center" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Line" Property="Opacity" Value="0.20" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="Line" Property="Opacity" Value="0.32" />
+                        </Trigger>
+                        <Trigger Property="ui:LibraryScrollReveal.Revealed" Value="True">
+                            <Setter TargetName="Line" Property="Opacity" Value="0.20" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- プレイヤーのグループ。文字と矢印は不透明のまま、地だけつまみと同じ濃さで透かす。 -->
