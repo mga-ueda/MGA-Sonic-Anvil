@@ -44,6 +44,10 @@ internal enum TransportIcon
     Lock,
     Unlock,
     Waapi,
+    PlayerMode,
+    EditorMode,
+    AnalyzerMaximize,
+    AnalyzerRestore,
 }
 
 internal enum TransportCommand
@@ -97,6 +101,8 @@ internal enum TransportCommand
     OpenSettings,
     OpenManual,
     ToggleWaapi,
+    ToggleLibraryMaximize,
+    ToggleAnalyzerMaximize,
 }
 
 internal sealed class TransportIconButton : Button
@@ -476,6 +482,18 @@ internal static class TransportIconDrawing
             case TransportIcon.Unlock:
                 DrawPadlock(dc, stroke, brush, open: true, designW * 0.5, designH * 0.5);
                 break;
+            case TransportIcon.PlayerMode:
+                DrawPlayerMode(dc, pen);
+                break;
+            case TransportIcon.EditorMode:
+                DrawEditorMode(dc, pen);
+                break;
+            case TransportIcon.AnalyzerMaximize:
+                DrawAnalyzerMaximize(dc, pen);
+                break;
+            case TransportIcon.AnalyzerRestore:
+                DrawAnalyzerRestore(dc, pen);
+                break;
         }
 
         dc.Pop();
@@ -489,6 +507,61 @@ internal static class TransportIconDrawing
         dc.DrawLine(pen, new Point(17, 24), new Point(17, 16));
         dc.DrawLine(pen, new Point(21, 24), new Point(21, 10));
         dc.DrawLine(pen, new Point(25, 24), new Point(25, 14));
+    }
+
+    /// <summary>プレイリスト行＋再生。プレイヤーへ切替。</summary>
+    private static void DrawPlayerMode(DrawingContext dc, Pen pen)
+    {
+        var play = new StreamGeometry();
+        using (var ctx = play.Open())
+        {
+            ctx.BeginFigure(new Point(8, 11), true, true);
+            ctx.LineTo(new Point(14, 18), true, false);
+            ctx.LineTo(new Point(8, 25), true, false);
+        }
+
+        play.Freeze();
+        dc.DrawGeometry(null, pen, play);
+        dc.DrawLine(pen, new Point(17, 12), new Point(26, 12));
+        dc.DrawLine(pen, new Point(17, 18), new Point(26, 18));
+        dc.DrawLine(pen, new Point(17, 24), new Point(26, 24));
+    }
+
+    /// <summary>波形。エディタへ戻す。</summary>
+    private static void DrawEditorMode(DrawingContext dc, Pen pen)
+    {
+        var wave = new StreamGeometry();
+        using (var ctx = wave.Open())
+        {
+            ctx.BeginFigure(new Point(7, 18), false, false);
+            ctx.LineTo(new Point(11, 11), true, false);
+            ctx.LineTo(new Point(15, 25), true, false);
+            ctx.LineTo(new Point(19, 13), true, false);
+            ctx.LineTo(new Point(23, 23), true, false);
+            ctx.LineTo(new Point(27, 18), true, false);
+        }
+
+        wave.Freeze();
+        dc.DrawGeometry(null, pen, wave);
+    }
+
+    /// <summary>メーター列。アナライザー最大化へ。</summary>
+    private static void DrawAnalyzerMaximize(DrawingContext dc, Pen pen)
+    {
+        dc.DrawLine(pen, new Point(8, 26), new Point(8, 16));
+        dc.DrawLine(pen, new Point(13, 26), new Point(13, 10));
+        dc.DrawLine(pen, new Point(18, 26), new Point(18, 14));
+        dc.DrawRectangle(null, pen, new Rect(22, 10, 5, 16));
+    }
+
+    /// <summary>入れ子の窓。アナライザー最大化を解除。</summary>
+    private static void DrawAnalyzerRestore(DrawingContext dc, Pen pen)
+    {
+        dc.DrawRectangle(null, pen, new Rect(11, 14, 14, 12));
+        dc.DrawLine(pen, new Point(14, 14), new Point(14, 10));
+        dc.DrawLine(pen, new Point(14, 10), new Point(26, 10));
+        dc.DrawLine(pen, new Point(26, 10), new Point(26, 20));
+        dc.DrawLine(pen, new Point(26, 20), new Point(25, 20));
     }
 
     private static void DrawWaveformOverlay(DrawingContext dc, Pen pen)

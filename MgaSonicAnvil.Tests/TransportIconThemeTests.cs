@@ -80,6 +80,30 @@ public sealed class TransportIconThemeTests
     }
 
     [Fact]
+    public void ModeToggleIcons_DrawInBothThemes()
+    {
+        RunSta(() =>
+        {
+            foreach (var theme in new[] { UiTheme.Light, UiTheme.Dark })
+            {
+                foreach (var icon in new[]
+                {
+                    TransportIcon.PlayerMode,
+                    TransportIcon.EditorMode,
+                    TransportIcon.AnalyzerMaximize,
+                    TransportIcon.AnalyzerRestore,
+                })
+                {
+                    var pixels = Render(icon, theme, 34, 36);
+                    Assert.True(
+                        CountInk(pixels, 34, 36) >= 20,
+                        $"{theme} {icon} should draw");
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void Moon_IsHollowCenteredWithUpperRightBite()
     {
         RunSta(() =>

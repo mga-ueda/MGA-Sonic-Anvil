@@ -1426,7 +1426,9 @@ public partial class MainWindow
             settings.ResolvedWwiseLookAheadTimeMs(),
             settings.ResolvedUiScalePercent(),
             settings.MultiFileArrange,
-            settings.AutoSpeakerSelect)
+            settings.AutoSpeakerSelect,
+            settings.ResolvedLibraryExplorerRoots(),
+            settings.ResolvedLibraryListColumns())
         {
             Owner = this,
         };
@@ -1449,6 +1451,10 @@ public partial class MainWindow
         UiStrings.SetLanguage(UiStrings.ResolveLanguage(dialog.SelectedLanguage));
         settings.UiTheme = UiThemes.ToStoredValue(dialog.SelectedTheme);
         settings.MultiFileArrange = WaveformTileLayout.Format(dialog.SelectedMultiFileArrange);
+        settings.ApplyLibraryExplorerRoots(dialog.SelectedLibraryExplorerRoots);
+        LibraryBrowser.SetExplorerRoots(settings.ResolvedLibraryExplorerRoots());
+        settings.ApplyLibraryListColumns(dialog.SelectedLibraryListColumns);
+        LibraryBrowser.SetVisibleColumns(settings.ResolvedLibraryListColumns());
         UiThemeService.ApplyFromSettings(force: true);
         settings.UiScalePercent = dialog.SelectedUiScalePercent;
         UiScaleService.ApplyFromSettings();

@@ -188,6 +188,8 @@ internal sealed class AudioPlayer : IDisposable
 
     public double PlaybackSpeed => _provider.PlaybackSpeed;
 
+    public bool IsStreamBound => _provider.IsStreamBound;
+
     /// <summary>
     /// 再生速度。出力を止めずに切り替える。速度が変わったときだけ外挿の起点を更新する。
     /// </summary>
@@ -242,7 +244,8 @@ internal sealed class AudioPlayer : IDisposable
         long startFrame,
         WaveSelection? playRange,
         bool loop,
-        Func<long, float>? frameGain = null)
+        Func<long, float>? frameGain = null,
+        bool preferStream = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_scrubbing)
@@ -250,28 +253,39 @@ internal sealed class AudioPlayer : IDisposable
             EndScrub();
         }
 
-        if (document.IsStreamPlayback
-            && document.SourcePath is { Length: > 0 } path
-            && File.Exists(path))
-        {
-            var stream = AudioStreamSource.Open(path);
-            try
-            {
-                _provider.BindStream(stream, document, startFrame, playRange, loop, frameGain);
-            }
-            catch
-            {
-                stream.Dispose();
-                throw;
-            }
-        }
-        else
-        {
-            _provider.Bind(document, startFrame, playRange, loop, frameGain);
-        }
-
+        BindPlaybackSource(document, startFrame, playRange, loop, frameGain, preferStream);
         ApplyPlaybackRouting();
         EnsureDeviceMatchesProvider();
+    }
+
+    public bool HasGaplessArmed => _provider.HasGaplessArmed;
+
+    /// <summary>次曲のストリームを再生中のデバイスへ予約する。成功時に所有権を移す。</summary>
+    public bool TryArmGapless(AudioStreamSource source, AudioDocument document)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _provider.TryArmGapless(source, document);
+    }
+
+    public void ClearGaplessNext()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _provider.ClearGaplessNext();
+    }
+
+    public bool TryTakeGaplessAdvance(out AudioDocument? document)
+    {
+        if (_disposed)
+        {
+            document = null;
+            return false;
+        }
+
+        return _provider.TryTakeGaplessAdvance(out document);
     }
 
     /// <summary>デバイスを捨てずに中身だけ差し替える。再生中の ASIO Stop を避ける。</summary>
@@ -280,7 +294,8 @@ internal sealed class AudioPlayer : IDisposable
         long startFrame,
         WaveSelection? playRange,
         bool loop,
-        Func<long, float>? frameGain = null)
+        Func<long, float>? frameGain = null,
+        bool preferStream = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_playing)
@@ -288,24 +303,66 @@ internal sealed class AudioPlayer : IDisposable
             Pause();
         }
 
-        if (document.IsStreamPlayback
-            && document.SourcePath is { Length: > 0 } path
-            && File.Exists(path))
+        BindPlaybackSource(document, startFrame, playRange, loop, frameGain, preferStream);
+    }
+
+    /// <summary>
+    /// プレイヤーは PCM 展開後も可変速（ピッチが変わる）で再生する。
+    /// エディタのメモリ再生へ落とすと左右キーがピッチ据え置きのグレインになる。
+    /// </summary>
+    internal static bool ShouldBindPlaybackStream(AudioDocument document, bool preferStream)
+    {
+        if (document.SourcePath is not { Length: > 0 } path || !File.Exists(path))
         {
-            var stream = AudioStreamSource.Open(path);
-            try
-            {
-                _provider.BindStream(stream, document, startFrame, playRange, loop, frameGain);
-            }
-            catch
-            {
-                stream.Dispose();
-                throw;
-            }
+            return false;
         }
-        else
+
+        if (document.IsStreamPlayback)
+        {
+            return true;
+        }
+
+        return preferStream && AudioCodec.CanStreamPlay(path);
+    }
+
+    private void BindPlaybackSource(
+        AudioDocument document,
+        long startFrame,
+        WaveSelection? playRange,
+        bool loop,
+        Func<long, float>? frameGain,
+        bool preferStream)
+    {
+        if (!ShouldBindPlaybackStream(document, preferStream))
         {
             _provider.Bind(document, startFrame, playRange, loop, frameGain);
+            return;
+        }
+
+        AudioStreamSource stream;
+        try
+        {
+            stream = AudioStreamSource.Open(document.SourcePath!);
+        }
+        catch
+        {
+            if (document.IsStreamPlayback)
+            {
+                throw;
+            }
+
+            _provider.Bind(document, startFrame, playRange, loop, frameGain);
+            return;
+        }
+
+        try
+        {
+            _provider.BindStream(stream, document, startFrame, playRange, loop, frameGain);
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
         }
     }
 
@@ -353,7 +410,7 @@ internal sealed class AudioPlayer : IDisposable
     public void BeginScrub(AudioDocument document, long frame)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (document.IsStreamPlayback)
+        if (document.IsStreamPlayback || _provider.IsStreamBound)
         {
             // ストリーム再生ではグレインスクラブせずシークだけする。
             EnsureBound(document, frame);
@@ -411,7 +468,7 @@ internal sealed class AudioPlayer : IDisposable
     public void CaptureScrub(AudioDocument document, long frame)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (document.IsStreamPlayback)
+        if (document.IsStreamPlayback || _provider.IsStreamBound)
         {
             _provider.SeekFrame(frame);
             return;
@@ -669,6 +726,7 @@ internal sealed class AudioPlayer : IDisposable
         try
         {
             FlushStopOutput();
+            _provider.ClearGaplessNext();
         }
         finally
         {
@@ -921,11 +979,9 @@ internal sealed class AudioPlayer : IDisposable
             return;
         }
 
-        if (document.IsStreamPlayback
-            && document.SourcePath is { Length: > 0 } path
-            && File.Exists(path))
+        if (ShouldBindPlaybackStream(document, preferStream: false))
         {
-            var stream = AudioStreamSource.Open(path);
+            var stream = AudioStreamSource.Open(document.SourcePath!);
             try
             {
                 _provider.BindStream(stream, document, frame, null, loop: false);

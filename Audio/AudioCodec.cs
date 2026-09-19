@@ -100,6 +100,66 @@ internal static class AudioCodec
     public static string[] CollectPlayerOpenableFromDirectory(string directory, bool recursive) =>
         CollectOpenableFromDirectory(directory, recursive, player: true);
 
+    /// <summary>
+    /// プレイヤー用の再帰走査 1 段。今のフォルダのファイル（名前順）と、続けて見る子フォルダ。
+    /// ジャンクションは子に含めない。フォルダ全体の収集を待たずに 1 曲ずつ載せる用。
+    /// </summary>
+    public static void CollectPlayerOpenableDirectoryLayer(
+        string directory,
+        out string[] files,
+        out string[] children)
+    {
+        files = [];
+        children = [];
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            return;
+        }
+
+        string full;
+        try
+        {
+            full = Path.GetFullPath(directory.Trim());
+        }
+        catch
+        {
+            return;
+        }
+
+        if (!Directory.Exists(full))
+        {
+            return;
+        }
+
+        var found = new List<string>();
+        CollectFilesInDirectory(full, found, player: true);
+        found.Sort(StringComparer.OrdinalIgnoreCase);
+        files = found.ToArray();
+
+        var nested = new List<string>();
+        try
+        {
+            foreach (var child in Directory.EnumerateDirectories(full))
+            {
+                if (IsDirectoryReparsePoint(child))
+                {
+                    continue;
+                }
+
+                nested.Add(child);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+
+        nested.Sort(StringComparer.OrdinalIgnoreCase);
+        children = nested.ToArray();
+    }
+
     private static string[] CollectOpenableFromDirectory(string directory, bool recursive, bool player)
     {
         if (string.IsNullOrWhiteSpace(directory))
@@ -307,7 +367,8 @@ internal static class AudioCodec
             return frameCount > 0 && sampleRate > 0 && channels > 0;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException
-                                       or ArgumentException or NotSupportedException)
+                                       or ArgumentException or NotSupportedException
+                                       or System.Runtime.InteropServices.COMException)
         {
             return false;
         }

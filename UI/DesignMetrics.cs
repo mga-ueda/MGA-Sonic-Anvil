@@ -125,11 +125,11 @@ internal static class DesignMetrics
         + TransportGroupWidth(9)
         + TransportGroupWidth(4);
 
-    /// <summary>下段: MARK(3) VIEW(6) HELP(3)。</summary>
+    /// <summary>下段: MARK(3) VIEW(8) HELP(3)。</summary>
     public static double TransportBottomRowWidth =>
         TransportHostPaddingX
         + TransportGroupWidth(3)
-        + TransportGroupWidth(6)
+        + TransportGroupWidth(8)
         + TransportGroupWidth(3);
 
     public static double TransportFixedRowWidth =>
@@ -212,6 +212,9 @@ internal static class DesignMetrics
     /// <summary>F10 グループ見出し左のジャケット。</summary>
     public static double LibraryGroupJacketSize => From96(96);
 
+    /// <summary>F10 リスト列の自動幅上限。フォルダパスが極端に長くてもレイアウトを壊さない。</summary>
+    public static double LibraryColumnMaxWidth => From96(420);
+
     /// <summary>F10 ファイルリストの上下分割で、リスト側の最低高さ。</summary>
     public static double LibraryPaneMinHeight => From96(140);
 
@@ -226,6 +229,26 @@ internal static class DesignMetrics
 
     /// <summary>F10 フォルダツリーとリストの区切り。1px。</summary>
     public static double LibraryExplorerSplitterWidth => From96(1);
+
+    /// <summary>F10 お気に入りペインの最低高さ。</summary>
+    public static double LibraryFavoritesMinHeight => From96(80);
+
+    /// <summary>未保存のときのお気に入り高さ比。ツリーと折半。</summary>
+    public const double LibraryFavoritesSplitDefault = 0.5;
+
+    public const double LibraryFavoritesSplitMin = 0.12;
+
+    public const double LibraryFavoritesSplitMax = 0.88;
+
+    public static double ClampLibraryFavoritesSplit(double ratio)
+    {
+        if (double.IsNaN(ratio) || ratio <= 0d || ratio >= 1d)
+        {
+            return LibraryFavoritesSplitDefault;
+        }
+
+        return Math.Clamp(ratio, LibraryFavoritesSplitMin, LibraryFavoritesSplitMax);
+    }
 
     public static double ClampLibraryExplorerWidth(double width)
     {

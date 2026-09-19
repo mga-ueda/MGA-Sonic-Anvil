@@ -816,7 +816,7 @@ public partial class MainWindow
             session.PlayheadFrame);
         view.RestoreSelectedMarkers(session.SelectedMarkerFrames);
         view.LoopEnabled = session.LoopEnabled;
-        view.ShowScaleLane = _waveformMaximizeMode != WaveformMaximizeMode.Waveform;
+        view.ShowScaleLane = ShowWaveformScaleLane;
         view.SetSoloMask(session.SoloMask);
         view.ApplySpeakerLayout(
             AppStorage.Settings.ResolvedPlaybackLayout(),

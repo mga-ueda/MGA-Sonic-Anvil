@@ -303,6 +303,9 @@ public sealed class WaveformContextMenuTests
         Assert.False(Find(tree, WaveMenuCommand.WaapiPanel)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.WwiseExport)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.PlayExit)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.CloseTab)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.CloseAll)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.CloseOthers)?.Enabled);
     }
 
     [Fact]

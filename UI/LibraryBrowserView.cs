@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
@@ -15,7 +16,7 @@ using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>F10 上段。左フォルダツリー、中央リスト、右は再生中ジャケットと列チェック。</summary>
+/// <summary>F10 上段。左フォルダツリー、中央リスト。ジャケットは背面のぼかしだけ。</summary>
 internal sealed class LibraryBrowserView : UserControl
 {
     /// <summary>色抽出用の縮小長辺。ピクセル数はごく少ない。</summary>
@@ -31,6 +32,12 @@ internal sealed class LibraryBrowserView : UserControl
     internal const double GlowDriftYSeconds = 13;
     internal const int GlowDriftFrameRate = 16;
     private const double GlowDriftBleed = 80;
+    /// <summary>ツリーとプレイリストで揃える文字サイズ。</summary>
+    internal const double LibraryListFontSize = 11;
+    internal static readonly Color FallbackWashNavy = Color.FromRgb(0x1B, 0x3A, 0x6B);
+    internal static readonly Color FallbackWashCyan = Color.FromRgb(0x00, 0xF5, 0xFF);
+    internal static readonly Color FallbackWashWhite = Color.FromRgb(0xFF, 0xFF, 0xFF);
+    private static Brush? _fallbackAmbientWash;
     /// <summary>ジャケット／グロー用デコードの長辺上限。APIC 原寸展開を避ける。</summary>
     private const int ArtworkDecodeMaxEdge = 512;
 
@@ -40,43 +47,57 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly TranslateTransform _glowTranslate = new();
     private bool _glowDriftRunning;
     private readonly Border _veil = new();
+    private readonly Grid _waveGlow = new();
+    private readonly Border _waveVeil = new();
+    private readonly ScaleTransform _waveGlowScale = new(GlowDriftScaleFrom, GlowDriftScaleFrom);
+    private readonly TranslateTransform _waveGlowTranslate = new();
+    private Grid? _waveGlowHost;
+    private bool _extendGlow;
     private readonly Grid _root = new();
     private readonly ColumnDefinition _treeColumn = new();
+    private readonly RowDefinition _explorerTreeRow = new() { Height = new GridLength(1, GridUnitType.Star) };
+    private readonly RowDefinition _favoritesRow = new() { Height = new GridLength(1, GridUnitType.Star) };
     private readonly TreeView _folderTree = new();
-    private readonly ColumnDefinition _jacketColumn = new();
-    private readonly Border _jacketFrame = new();
-    private readonly Image _jacketImage = new();
-    private readonly StackPanel _jacketStack = new();
-    private LibraryJacketReflectionView _jacketReflection = null!;
-    private readonly ScrollViewer _columnFilterScroll = new();
-    private readonly StackPanel _columnFilterPanel = new();
-    private readonly Dictionary<LibraryFileColumn, CheckBox> _columnChecks = [];
+    private readonly TextBlock _favoritesLabel = new();
+    private readonly ListBox _favoritesList = new();
+    private readonly ObservableCollection<LibraryFavoriteRow> _favorites = [];
+    private readonly HashSet<TreeViewItem> _treeMultiSelected = [];
+    private string[] _explorerRoots = LibraryExplorerPaths.ResolveRoots(null);
     private readonly ComboBox _groupCombo = new();
     private readonly TextBlock _groupLabel = new();
     private readonly DataGrid _grid = new();
+    private DataGridTextColumn _groupSpacer = null!;
+    private bool _gridScrollHooked;
     private readonly Dictionary<LibraryFileColumn, DataGridTextColumn> _columns = [];
+    private readonly Dictionary<LibraryFileColumn, LibrarySortHeader> _sortHeaders = [];
+    private int _sortChromeTicket;
     private HashSet<LibraryFileColumn> _visibleColumns = [.. LibraryColumnFilter.Defaults];
     private bool _syncing;
     private int _syncGeneration;
-    private bool _syncingColumns;
     private bool _deferActivate;
     private LibraryFileColumn _sortColumn = LibraryFileColumn.Album;
     private LibrarySortDirection _sortDirection = LibrarySortDirection.Ascending;
+    private Brush _rowSelectedBrush = Brushes.Transparent;
     private LibraryFileGroup _group = LibraryFileGroup.Album;
     private IReadOnlyList<LibraryFileRow> _rows = [];
     private ObservableCollection<LibraryFileRow> _items = [];
     private readonly Dictionary<string, BitmapSource?> _groupJackets = new(StringComparer.Ordinal);
+    private bool _groupJacketsInvalidateQueued;
+    private bool _fitColumnsQueued;
     private int _anchorIndex;
     private bool _artworkGlow;
     private byte[]? _artworkBytes;
+    private BitmapSource? _jacketBitmap;
     private int _groupArtLoad;
     private bool _treeSyncing;
     private Point? _treeDragStart;
     private TreeViewItem? _treeDragItem;
+    private Point? _favoritesDragStart;
 
     public event EventHandler<DocumentSession>? SessionActivated;
 
-    public event EventHandler<string>? ArtworkDropped;
+    /// <summary>ダブルクリック。停止中でも再生する。</summary>
+    public event EventHandler<DocumentSession>? SessionPlayRequested;
 
     public event EventHandler<IReadOnlyCollection<LibraryFileColumn>>? VisibleColumnsChanged;
 
@@ -86,9 +107,27 @@ internal sealed class LibraryBrowserView : UserControl
 
     public event EventHandler<string>? ExplorerFolderOpened;
 
+    /// <summary>複数フォルダを再帰追加。引数はフォルダパス。</summary>
+    public event EventHandler<IReadOnlyList<string>>? ExplorerFoldersOpened;
+
     public event EventHandler<double>? ExplorerWidthChanged;
 
+    /// <summary>お気に入りペインの高さ比（0–1）。</summary>
+    public event EventHandler<double>? FavoritesSplitChanged;
+
+    public event EventHandler<IReadOnlyList<string>>? FavoritesChanged;
+
+    /// <summary>お気に入りをプレイリストへ。true ならクリアして追加し再生。</summary>
+    public event EventHandler<LibraryFavoritesActivateEventArgs>? FavoritesActivated;
+
+    /// <summary>ツリーの Enter と同じ。プレイリストを空にしてから選んだフォルダを載せる。</summary>
+    public event EventHandler? ExplorerReplacePlaylistRequested;
+
+    public event EventHandler? ClearPlaylistRequested;
+
     internal event Action? GroupArtworkChanged;
+
+    internal event EventHandler? GroupViewportChanged;
 
     public bool JacketReplaceEnabled { get; private set; }
 
@@ -100,18 +139,22 @@ internal sealed class LibraryBrowserView : UserControl
         BuildLayout();
         ConfigureGrid();
         ConfigureGroupCombo();
-        BuildColumnFilter();
         ApplyColumnVisibility(_visibleColumns, notify: false);
         ApplyLocalizedText();
         ApplyGridStyles();
         Loaded += (_, _) =>
         {
             FitColumns();
-            SyncGroupColumnHeadersVisibility();
-            EnsureGroupHeaderScrollHook();
+            SyncGroupChrome();
+            EnsureGroupScrollHook();
+            PinColumnHeaders();
             SyncGlowDrift();
         };
-        IsVisibleChanged += (_, _) => SyncGlowDrift();
+        IsVisibleChanged += (_, _) =>
+        {
+            EnsureGroupScrollHook();
+            SyncGlowDrift();
+        };
         Unloaded += (_, _) => StopGlowDrift();
         SetArtwork(null);
     }
@@ -120,7 +163,14 @@ internal sealed class LibraryBrowserView : UserControl
 
     internal bool IsPlaceholderJacket => _artworkBytes is null;
 
-    internal ImageSource? JacketDisplaySource => _jacketImage.Source;
+    /// <summary>ジャケットのぼかしがツリー・お気に入り・プレイリストまで届く。</summary>
+    internal bool GlowFillsLibraryChrome =>
+        Grid.GetColumnSpan(_glowHost) == _root.ColumnDefinitions.Count
+        && Grid.GetColumnSpan(_veil) == _root.ColumnDefinitions.Count
+        && ReferenceEquals(VisualTreeHelper.GetParent(_glowHost), _root)
+        && ReferenceEquals(VisualTreeHelper.GetParent(_veil), _root);
+
+    internal ImageSource? JacketDisplaySource => _jacketBitmap;
 
     private void ApplyGridStyles()
     {
@@ -135,13 +185,17 @@ internal sealed class LibraryBrowserView : UserControl
                 ? Brushes.Transparent
                 : new DynamicResourceExtension("ColorPanelBackBrush")));
         headerStyle.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
-        headerStyle.Setters.Add(new Setter(Control.BorderBrushProperty, new DynamicResourceExtension("ChromeBorderBrush")));
-        headerStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 1)));
-        headerStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 4, 8, 4)));
+        headerStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
+        headerStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 2, 8, 2)));
         headerStyle.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
-        headerStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+        headerStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
         headerStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
+        headerStyle.Setters.Add(new Setter(Control.BorderBrushProperty, Brushes.Transparent));
+        headerStyle.Setters.Add(new Setter(Control.TemplateProperty, ColumnHeaderTemplate()));
         _grid.ColumnHeaderStyle = headerStyle;
+        PinColumnHeaders();
+
+        _rowSelectedBrush = selected;
 
         var cellStyle = new Style(typeof(DataGridCell));
         cellStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
@@ -154,6 +208,8 @@ internal sealed class LibraryBrowserView : UserControl
         selectedTrigger.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
         cellStyle.Triggers.Add(selectedTrigger);
         _grid.CellStyle = cellStyle;
+        ApplyGroupSpacerCellStyle();
+        ApplyColumnCellStyles();
 
         var rowStyle = new Style(typeof(DataGridRow));
         rowStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
@@ -165,54 +221,22 @@ internal sealed class LibraryBrowserView : UserControl
         _grid.RowStyle = rowStyle;
         _grid.RowBackground = Brushes.Transparent;
         _grid.AlternatingRowBackground = Brushes.Transparent;
+        RefreshSortChrome();
     }
 
     public bool IsListKeyboardFocused => _grid.IsKeyboardFocusWithin;
 
     public bool IsGroupComboFocused => _groupCombo.IsKeyboardFocusWithin;
 
-    public bool IsColumnFilterFocused => _columnFilterScroll.IsKeyboardFocusWithin;
-
     public bool IsExplorerFocused => _folderTree.IsKeyboardFocusWithin;
+
+    public bool IsFavoritesFocused => _favoritesList.IsKeyboardFocusWithin;
 
     public bool IsGroupComboOrigin(System.Windows.DependencyObject? origin)
     {
         while (origin is not null)
         {
             if (ReferenceEquals(origin, _groupCombo))
-            {
-                return true;
-            }
-
-            origin = VisualTreeHelper.GetParent(origin);
-        }
-
-        return false;
-    }
-
-    public bool IsColumnFilterOrigin(System.Windows.DependencyObject? origin)
-    {
-        while (origin is not null)
-        {
-            if (ReferenceEquals(origin, _columnFilterScroll) || ReferenceEquals(origin, _columnFilterPanel))
-            {
-                return true;
-            }
-
-            origin = VisualTreeHelper.GetParent(origin);
-        }
-
-        return false;
-    }
-
-    public bool IsJacketOrigin(System.Windows.DependencyObject? origin)
-    {
-        while (origin is not null)
-        {
-            if (ReferenceEquals(origin, _jacketFrame)
-                || ReferenceEquals(origin, _jacketImage)
-                || ReferenceEquals(origin, _jacketStack)
-                || ReferenceEquals(origin, _jacketReflection))
             {
                 return true;
             }
@@ -238,9 +262,31 @@ internal sealed class LibraryBrowserView : UserControl
         return false;
     }
 
+    public bool IsFavoritesOrigin(System.Windows.DependencyObject? origin)
+    {
+        while (origin is not null)
+        {
+            if (ReferenceEquals(origin, _favoritesList) || ReferenceEquals(origin, _favoritesLabel))
+            {
+                return true;
+            }
+
+            origin = VisualTreeHelper.GetParent(origin);
+        }
+
+        return false;
+    }
+
     internal object? BoundItemsSource => _grid.ItemsSource;
 
+    internal FrameworkElement FileGrid => _grid;
+
     internal int RootColumnCount => _root.ColumnDefinitions.Count;
+
+    internal void RecalculateColumnWidths() => FitColumns();
+
+    internal double ColumnPixelWidth(LibraryFileColumn column) =>
+        _columns.TryGetValue(column, out var gridColumn) ? gridColumn.Width.Value : 0;
 
     public DocumentSession? SelectedSession =>
         _grid.SelectedItem is LibraryFileRow { Tag: DocumentSession session } ? session : null;
@@ -267,6 +313,81 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
+    /// <summary>表示順の次の曲。最後の次は先頭。1曲なら同じ曲。</summary>
+    public DocumentSession? NextPlaylistSession(DocumentSession? current)
+    {
+        var order = PlaylistOrder();
+        if (order.Count == 0)
+        {
+            return null;
+        }
+
+        var index = -1;
+        if (current is not null)
+        {
+            for (var i = 0; i < order.Count; i++)
+            {
+                if (ReferenceEquals(order[i], current))
+                {
+                    index = i;
+                    break;
+                }
+            }
+        }
+
+        var next = LibraryPlayerMode.NextLoopIndex(order.Count, index);
+        return next < 0 ? null : order[next];
+    }
+
+    /// <summary>再生追従で行を選ぶ。クリック再生は起こさない。</summary>
+    public void SelectSessionQuiet(DocumentSession session)
+    {
+        _deferActivate = true;
+        try
+        {
+            ApplyRowSelectionCore(session, [session]);
+        }
+        finally
+        {
+            _deferActivate = false;
+        }
+
+        if (_grid.SelectedItem is not null)
+        {
+            EnsureRowVisible(_grid.SelectedItem);
+        }
+    }
+
+    private List<DocumentSession> PlaylistOrder()
+    {
+        var order = new List<DocumentSession>();
+        if (_grid.ItemsSource is not null)
+        {
+            foreach (var item in _grid.Items)
+            {
+                if (item is LibraryFileRow { Tag: DocumentSession session })
+                {
+                    order.Add(session);
+                }
+            }
+        }
+
+        if (order.Count > 0)
+        {
+            return order;
+        }
+
+        foreach (var row in _rows)
+        {
+            if (row.Tag is DocumentSession session)
+            {
+                order.Add(session);
+            }
+        }
+
+        return order;
+    }
+
     public void FocusList()
     {
         EnsureListFocused();
@@ -274,6 +395,126 @@ internal sealed class LibraryBrowserView : UserControl
         {
             EnsureRowVisible(_grid.SelectedItem);
         }
+    }
+
+    public void FocusExplorer()
+    {
+        if (_folderTree.SelectedItem is TreeViewItem selected)
+        {
+            selected.BringIntoView();
+            selected.Focus();
+            return;
+        }
+
+        if (_folderTree.Items.OfType<TreeViewItem>().FirstOrDefault() is { } first)
+        {
+            first.IsSelected = true;
+            first.BringIntoView();
+            first.Focus();
+            return;
+        }
+
+        _folderTree.Focus();
+    }
+
+    public void FocusFavorites()
+    {
+        if (_favoritesList.SelectedItem is { } selected
+            && _favoritesList.ItemContainerGenerator.ContainerFromItem(selected) is UIElement row)
+        {
+            row.Focus();
+            return;
+        }
+
+        if (_favoritesList.Items.Count > 0)
+        {
+            _favoritesList.SelectedIndex = 0;
+            if (_favoritesList.ItemContainerGenerator.ContainerFromIndex(0) is UIElement first)
+            {
+                first.Focus();
+                return;
+            }
+        }
+
+        _favoritesList.Focus();
+    }
+
+    /// <summary>メニューキー。フォーカス中のツリー／お気に入り／プレイリストのメニューを開く。</summary>
+    public bool TryOpenKeyboardContextMenu()
+    {
+        if (IsExplorerFocused)
+        {
+            return OpenOwnedContextMenu(_folderTree);
+        }
+
+        if (IsFavoritesFocused)
+        {
+            return OpenOwnedContextMenu(_favoritesList);
+        }
+
+        if (IsListKeyboardFocused)
+        {
+            return OpenOwnedContextMenu(_grid);
+        }
+
+        return false;
+    }
+
+    internal string? OpenContextMenuHeader =>
+        OpenContextMenuItems.FirstOrDefault()?.Header as string;
+
+    internal MenuItem[] OpenContextMenuItems
+    {
+        get
+        {
+            foreach (var menu in new[] { _folderTree.ContextMenu, _favoritesList.ContextMenu, _grid.ContextMenu })
+            {
+                if (menu is { IsOpen: true })
+                {
+                    return menu.Items.OfType<MenuItem>().ToArray();
+                }
+            }
+
+            return [];
+        }
+    }
+
+    internal void CloseKeyboardContextMenu()
+    {
+        if (_folderTree.ContextMenu is { } explorer)
+        {
+            explorer.IsOpen = false;
+        }
+
+        if (_favoritesList.ContextMenu is { } favorites)
+        {
+            favorites.IsOpen = false;
+        }
+
+        if (_grid.ContextMenu is { } list)
+        {
+            list.IsOpen = false;
+        }
+    }
+
+    private static bool OpenOwnedContextMenu(FrameworkElement owner)
+    {
+        if (owner.ContextMenu is not { } menu)
+        {
+            return false;
+        }
+
+        var anchor = Keyboard.FocusedElement as FrameworkElement;
+        if (anchor is null
+            || (!ReferenceEquals(anchor, owner) && !owner.IsAncestorOf(anchor)))
+        {
+            anchor = owner;
+        }
+
+        menu.PlacementTarget = anchor;
+        menu.Placement = PlacementMode.Center;
+        menu.IsOpen = true;
+        return true;
     }
 
     public void MoveSelection(int delta, bool extend = false)
@@ -413,17 +654,27 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        if (_grid.SelectedItem is { } item
-            && _grid.ItemContainerGenerator.ContainerFromItem(item) is UIElement row)
+        if (_grid.Items.Count > 0 && _grid.SelectedIndex < 0)
         {
-            row.Focus();
+            _grid.SelectedIndex = 0;
+        }
+
+        if (_grid.SelectedItem is { } item
+            && _grid.ItemContainerGenerator.ContainerFromItem(item) is UIElement row
+            && row.Focus())
+        {
             return;
         }
 
-        if (_grid.SelectedItem is not null || _grid.Items.Count == 0)
+        if (_grid.SelectedIndex >= 0
+            && _grid.ItemContainerGenerator.ContainerFromIndex(_grid.SelectedIndex) is UIElement realized
+            && realized.Focus())
         {
-            _grid.Focus();
+            return;
         }
+
+        Keyboard.Focus(_grid);
+        _grid.Focus();
     }
 
     private void EnsureRowVisible(object item)
@@ -480,25 +731,20 @@ internal sealed class LibraryBrowserView : UserControl
         foreach (var column in LibraryColumnFilter.All)
         {
             SetColumnHeader(column, ColumnHeader(column));
-            if (_columnChecks.TryGetValue(column, out var check))
-            {
-                check.Content = new TextBlock
-                {
-                    Text = ColumnHeader(column),
-                    TextWrapping = TextWrapping.Wrap,
-                };
-            }
         }
 
         FillGroupOptions();
         TipService.Set(_grid, UiStrings.TipLibraryList);
-        TipService.Set(_jacketFrame, UiStrings.TipLibraryJacket);
-        TipService.Set(_columnFilterScroll, UiStrings.TipLibraryColumns);
         TipService.Set(_groupCombo, UiStrings.TipLibraryList);
         TipService.Set(_folderTree, UiStrings.TipLibraryExplorer);
+        TipService.Set(_favoritesList, UiStrings.TipLibraryFavorites);
+        _favoritesLabel.Text = UiStrings.LibraryFavoritesLabel;
+        RebuildExplorerContextMenu();
+        RebuildFavoritesContextMenu();
+        RebuildListContextMenu();
         RelabelExplorerRoots();
         FitColumns();
-        NotifyGroupColumnHeadersChanged();
+        SyncGroupChrome();
     }
 
     public void RefreshAppearance()
@@ -506,6 +752,7 @@ internal sealed class LibraryBrowserView : UserControl
         ApplyGlowVeil();
         ApplyGridStyles();
         ApplyExplorerStyle();
+        ApplyFavoritesStyle();
         if (_artworkBytes is null)
         {
             ShowJacketDisplay(null, realArt: false);
@@ -589,7 +836,6 @@ internal sealed class LibraryBrowserView : UserControl
                 EndRowSync();
             }
 
-            RequestFitColumns();
             InvalidateGroupJackets();
             return;
         }
@@ -671,7 +917,7 @@ internal sealed class LibraryBrowserView : UserControl
     {
         JacketReplaceEnabled = allowReplace;
         var next = bytes is { Length: > 0 } ? bytes : null;
-        if (ArtworkEquals(_artworkBytes, next) && _jacketImage.Source is not null)
+        if (ArtworkEquals(_artworkBytes, next) && _jacketBitmap is not null)
         {
             return;
         }
@@ -684,33 +930,8 @@ internal sealed class LibraryBrowserView : UserControl
     private void ShowJacketDisplay(BitmapSource? decoded, bool realArt)
     {
         var bitmap = decoded ?? LibraryPlaceholderJacket.Bitmap;
-        _jacketImage.Source = bitmap;
-        _jacketReflection.Source = bitmap;
-        _jacketReflection.Visibility = Visibility.Visible;
-        SyncJacketReflectionSize();
+        _jacketBitmap = bitmap;
         ApplyArtworkGlow(realArt ? bitmap : null);
-    }
-
-    private void SyncJacketReflectionSize()
-    {
-        var w = _jacketImage.ActualWidth;
-        var h = _jacketImage.ActualHeight;
-        if (w < 1 || h < 1)
-        {
-            if (_jacketImage.Source is not BitmapSource bmp || bmp.PixelWidth < 1 || bmp.PixelHeight < 1)
-            {
-                return;
-            }
-
-            LibraryJacketReflectionView.FitWithin(
-                DesignMetrics.LibraryJacketSize,
-                bmp.PixelWidth,
-                bmp.PixelHeight,
-                out w,
-                out h);
-        }
-
-        _jacketReflection.SyncFaceSize(w, h);
     }
 
     private void BindRows(DocumentSession? active, IReadOnlyList<DocumentSession>? selected)
@@ -739,6 +960,7 @@ internal sealed class LibraryBrowserView : UserControl
 
         _grid.ItemsSource = view;
         ApplyRowSelectionCore(active, selected);
+        RefreshSortChrome();
     }
 
     private void BeginRowSync()
@@ -873,6 +1095,75 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void SetExplorerFolder(string path) => RevealFolder(path);
 
+    public void SetExplorerRoots(IEnumerable<string> roots)
+    {
+        var next = LibraryExplorerPaths.ResolveRoots(roots.ToArray());
+        if (_explorerRoots.SequenceEqual(next, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var current = TryGetSelectedExplorerFolder(out var selected) ? selected : string.Empty;
+        _explorerRoots = next;
+        BuildExplorerRoots();
+        if (!string.IsNullOrEmpty(current))
+        {
+            RevealFolder(current);
+        }
+    }
+
+    public void SetFavorites(IEnumerable<string> paths)
+    {
+        var next = LibraryFavoritePaths.Resolve(paths.ToArray());
+        _favorites.Clear();
+        foreach (var path in next)
+        {
+            _favorites.Add(LibraryFavoriteRow.FromPath(path));
+        }
+    }
+
+    public string[] FavoritePaths =>
+        _favorites.Select(row => row.Path).ToArray();
+
+    public string[] SelectedFavoritePaths
+    {
+        get
+        {
+            if (_favoritesList.SelectedItems.Count == 0)
+            {
+                return [];
+            }
+
+            var result = new List<string>(_favoritesList.SelectedItems.Count);
+            foreach (var item in _favoritesList.SelectedItems)
+            {
+                if (item is LibraryFavoriteRow row)
+                {
+                    result.Add(row.Path);
+                }
+            }
+
+            return [.. result];
+        }
+    }
+
+    public string[] SelectedExplorerFolders
+    {
+        get
+        {
+            if (_treeMultiSelected.Count > 0)
+            {
+                return _treeMultiSelected
+                    .Where(item => item.Tag is string)
+                    .Select(item => (string)item.Tag!)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+            }
+
+            return TryGetSelectedExplorerFolder(out var path) ? [path] : [];
+        }
+    }
+
     public void SetExplorerWidth(double width)
     {
         var clamped = DesignMetrics.ClampLibraryExplorerWidth(width);
@@ -887,12 +1178,96 @@ internal sealed class LibraryBrowserView : UserControl
         return DesignMetrics.ClampLibraryExplorerWidth(raw);
     }
 
+    public void SetFavoritesSplit(double ratio)
+    {
+        var clamped = DesignMetrics.ClampLibraryFavoritesSplit(ratio);
+        _explorerTreeRow.Height = new GridLength(Math.Max(0.01d, 1d - clamped), GridUnitType.Star);
+        _favoritesRow.Height = new GridLength(clamped, GridUnitType.Star);
+    }
+
+    public double ReadFavoritesSplit()
+    {
+        var tree = _explorerTreeRow.ActualHeight;
+        var favorites = _favoritesRow.ActualHeight;
+        var total = tree + favorites;
+        if (total <= 1d)
+        {
+            return DesignMetrics.LibraryFavoritesSplitDefault;
+        }
+
+        return DesignMetrics.ClampLibraryFavoritesSplit(favorites / total);
+    }
+
     public void OpenSelectedFolder()
     {
-        if (TryGetSelectedExplorerFolder(out var folder))
+        var folders = SelectedExplorerFolders;
+        if (folders.Length == 0)
         {
-            ExplorerFolderOpened?.Invoke(this, folder);
+            return;
         }
+
+        if (folders.Length == 1)
+        {
+            ExplorerFolderOpened?.Invoke(this, folders[0]);
+            return;
+        }
+
+        ExplorerFoldersOpened?.Invoke(this, folders);
+    }
+
+    /// <summary>右クリック「プレイリストをクリアして追加」。Enter と同じ。</summary>
+    public void ReplacePlaylistFromSelection()
+    {
+        if (SelectedExplorerFolders.Length == 0)
+        {
+            return;
+        }
+
+        ExplorerReplacePlaylistRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void AddSelectedExplorerToFavorites()
+    {
+        var folders = SelectedExplorerFolders;
+        if (folders.Length == 0)
+        {
+            return;
+        }
+
+        AddFavoritePaths(folders);
+    }
+
+    public void RemoveSelectedFavorites()
+    {
+        var selected = SelectedFavoritePaths;
+        if (selected.Length == 0)
+        {
+            return;
+        }
+
+        var drop = new HashSet<string>(selected, StringComparer.OrdinalIgnoreCase);
+        for (var i = _favorites.Count - 1; i >= 0; i--)
+        {
+            if (drop.Contains(_favorites[i].Path))
+            {
+                _favorites.RemoveAt(i);
+            }
+        }
+
+        FavoritesChanged?.Invoke(this, FavoritePaths);
+    }
+
+    public void AddFavoritePaths(IEnumerable<string> paths)
+    {
+        var merged = LibraryFavoritePaths.Merge(FavoritePaths, paths);
+        if (merged.Length == FavoritePaths.Length
+            && merged.SequenceEqual(FavoritePaths, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        SetFavorites(merged);
+        FavoritesChanged?.Invoke(this, FavoritePaths);
     }
 
     public bool TryGetSelectedExplorerFolder(out string path)
@@ -914,42 +1289,94 @@ internal sealed class LibraryBrowserView : UserControl
         _treeColumn.Width = new GridLength(treeWidth);
         _treeColumn.MinWidth = DesignMetrics.LibraryExplorerMinWidth;
         _treeColumn.MaxWidth = DesignMetrics.LibraryExplorerMaxWidth;
-        var jacketOuter = DesignMetrics.LibraryJacketSize + 12;
-        _jacketColumn.Width = new GridLength(jacketOuter);
-        _jacketColumn.MinWidth = jacketOuter;
-        _jacketColumn.MaxWidth = jacketOuter;
         _root.ColumnDefinitions.Add(_treeColumn);
         _root.ColumnDefinitions.Add(new ColumnDefinition
         {
             Width = new GridLength(DesignMetrics.LibraryExplorerSplitterWidth),
         });
         _root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        _root.ColumnDefinitions.Add(_jacketColumn);
 
         ApplyExplorerStyle();
-        _folderTree.ContextMenu = null;
+        ApplyFavoritesStyle();
         _folderTree.AllowDrop = false;
         _folderTree.SelectedItemChanged += FolderTree_SelectedItemChanged;
         _folderTree.MouseDoubleClick += FolderTree_MouseDoubleClick;
         _folderTree.PreviewMouseLeftButtonDown += FolderTree_PreviewMouseLeftButtonDown;
         _folderTree.PreviewMouseMove += FolderTree_PreviewMouseMove;
         _folderTree.PreviewMouseLeftButtonUp += FolderTree_PreviewMouseLeftButtonUp;
-        _folderTree.PreviewMouseRightButtonDown += (_, e) => e.Handled = true;
-        _folderTree.PreviewMouseRightButtonUp += (_, e) => e.Handled = true;
+        _folderTree.PreviewMouseRightButtonDown += FolderTree_PreviewMouseRightButtonDown;
         _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, (_, e) => e.Handled = true));
         _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Cut, (_, e) => e.Handled = true));
         _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Paste, (_, e) => e.Handled = true));
         _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Delete, (_, e) => e.Handled = true));
         BuildExplorerRoots();
+        RebuildExplorerContextMenu();
+
+        _favoritesLabel.Margin = new Thickness(8, 6, 8, 2);
+        _favoritesLabel.FontSize = 11;
+        _favoritesLabel.FontWeight = FontWeights.SemiBold;
+        _favoritesLabel.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
+        _favoritesList.ItemsSource = _favorites;
+        _favoritesList.DisplayMemberPath = nameof(LibraryFavoriteRow.Name);
+        _favoritesList.SelectionMode = SelectionMode.Extended;
+        _favoritesList.BorderThickness = new Thickness(0);
+        _favoritesList.Background = Brushes.Transparent;
+        _favoritesList.Padding = new Thickness(4, 2, 4, 6);
+        _favoritesList.FontSize = 11;
+        _favoritesList.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
+        _favoritesList.PreviewKeyDown += FavoritesList_PreviewKeyDown;
+        _favoritesList.PreviewMouseLeftButtonDown += FavoritesList_PreviewMouseLeftButtonDown;
+        _favoritesList.PreviewMouseMove += FavoritesList_PreviewMouseMove;
+        _favoritesList.PreviewMouseLeftButtonUp += (_, _) => _favoritesDragStart = null;
+        _favoritesList.AllowDrop = true;
+        _favoritesList.PreviewDragOver += FavoritesList_PreviewDragOver;
+        _favoritesList.Drop += FavoritesList_Drop;
+        RebuildFavoritesContextMenu();
+
+        var treePane = new Grid();
+        _explorerTreeRow.MinHeight = DesignMetrics.LibraryFavoritesMinHeight;
+        _favoritesRow.MinHeight = DesignMetrics.LibraryFavoritesMinHeight;
+        treePane.RowDefinitions.Add(_explorerTreeRow);
+        treePane.RowDefinitions.Add(new RowDefinition
+        {
+            Height = new GridLength(DesignMetrics.LibraryExplorerSplitterWidth),
+        });
+        treePane.RowDefinitions.Add(_favoritesRow);
+        treePane.Background = Brushes.Transparent;
 
         var treeHost = new Border
         {
             BorderThickness = new Thickness(0),
             Child = _folderTree,
+            Background = Brushes.Transparent,
         };
-        treeHost.SetResourceReference(Border.BackgroundProperty, "SurfaceBackBrush");
-        Grid.SetColumn(treeHost, 0);
-        _root.Children.Add(treeHost);
+        Grid.SetRow(treeHost, 0);
+        treePane.Children.Add(treeHost);
+
+        var favoritesSplitter = new GridSplitter
+        {
+            Height = DesignMetrics.LibraryExplorerSplitterWidth,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            ResizeBehavior = GridResizeBehavior.PreviousAndNext,
+            ResizeDirection = GridResizeDirection.Rows,
+            Cursor = Cursors.SizeNS,
+            SnapsToDevicePixels = true,
+        };
+        ApplyLibrarySplitterChrome(favoritesSplitter);
+        favoritesSplitter.DragCompleted += FavoritesSplitter_DragCompleted;
+        Grid.SetRow(favoritesSplitter, 1);
+        treePane.Children.Add(favoritesSplitter);
+
+        var favoritesPane = new DockPanel();
+        DockPanel.SetDock(_favoritesLabel, Dock.Top);
+        favoritesPane.Children.Add(_favoritesLabel);
+        favoritesPane.Children.Add(_favoritesList);
+        Grid.SetRow(favoritesPane, 2);
+        treePane.Children.Add(favoritesPane);
+
+        Grid.SetColumn(treePane, 0);
+        _root.Children.Add(treePane);
 
         var splitter = new GridSplitter
         {
@@ -961,63 +1388,10 @@ internal sealed class LibraryBrowserView : UserControl
             Cursor = Cursors.SizeWE,
             SnapsToDevicePixels = true,
         };
-        splitter.SetResourceReference(BackgroundProperty, "LibraryExplorerSplitterBrush");
+        ApplyLibrarySplitterChrome(splitter);
         splitter.DragCompleted += ExplorerSplitter_DragCompleted;
         Grid.SetColumn(splitter, 1);
         _root.Children.Add(splitter);
-
-        _jacketImage.Stretch = Stretch.Uniform;
-        _jacketImage.SnapsToDevicePixels = true;
-        _jacketImage.MaxWidth = DesignMetrics.LibraryJacketSize;
-        _jacketImage.MaxHeight = DesignMetrics.LibraryJacketSize;
-        // 枠は最大正方形。実画像サイズに合わせて反射を密着させる。
-        _jacketImage.Width = double.NaN;
-        _jacketImage.Height = double.NaN;
-        _jacketImage.HorizontalAlignment = HorizontalAlignment.Center;
-        _jacketImage.VerticalAlignment = VerticalAlignment.Bottom;
-        RenderOptions.SetBitmapScalingMode(_jacketImage, BitmapScalingMode.HighQuality);
-        _jacketFrame.Child = _jacketImage;
-        _jacketFrame.Width = DesignMetrics.LibraryJacketSize;
-        _jacketFrame.MinHeight = 0;
-        _jacketFrame.HorizontalAlignment = HorizontalAlignment.Left;
-        _jacketFrame.VerticalAlignment = VerticalAlignment.Top;
-        _jacketFrame.Margin = new Thickness(0);
-        _jacketFrame.Padding = new Thickness(0);
-        _jacketFrame.AllowDrop = true;
-        _jacketFrame.BorderThickness = new Thickness(0);
-        _jacketFrame.Background = Brushes.Transparent;
-        _jacketFrame.PreviewDragOver += Jacket_PreviewDragOver;
-        _jacketFrame.Drop += Jacket_Drop;
-        _jacketImage.SizeChanged += (_, _) => SyncJacketReflectionSize();
-
-        _jacketReflection = new LibraryJacketReflectionView(DesignMetrics.LibraryJacketSize)
-        {
-            Visibility = Visibility.Collapsed,
-        };
-
-        _jacketStack.Orientation = Orientation.Vertical;
-        _jacketStack.HorizontalAlignment = HorizontalAlignment.Left;
-        _jacketStack.Margin = new Thickness(4, 8, 8, 8);
-        _jacketStack.Children.Add(_jacketFrame);
-        _jacketStack.Children.Add(_jacketReflection);
-
-        _columnFilterScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
-        _columnFilterScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
-        _columnFilterScroll.Margin = new Thickness(4, 0, 8, 8);
-        _columnFilterScroll.Padding = new Thickness(0);
-        _columnFilterScroll.Focusable = true;
-        _columnFilterScroll.Background = Brushes.Transparent;
-        _columnFilterPanel.Background = Brushes.Transparent;
-        _columnFilterScroll.Content = _columnFilterPanel;
-        _columnFilterPanel.Orientation = Orientation.Vertical;
-
-        var right = new DockPanel();
-        right.SetResourceReference(Panel.BackgroundProperty, "SurfaceBackBrush");
-        DockPanel.SetDock(_jacketStack, Dock.Top);
-        right.Children.Add(_jacketStack);
-        right.Children.Add(_columnFilterScroll);
-        Grid.SetColumn(right, 3);
-        _root.Children.Add(right);
 
         _groupLabel.VerticalAlignment = VerticalAlignment.Center;
         _groupLabel.Margin = new Thickness(0, 0, 8, 0);
@@ -1027,7 +1401,7 @@ internal sealed class LibraryBrowserView : UserControl
         _groupCombo.Height = DesignMetrics.AudioInputHeight;
         _groupCombo.FontSize = 11;
         _groupCombo.VerticalContentAlignment = VerticalAlignment.Center;
-        _groupCombo.SetResourceReference(StyleProperty, "DarkComboBoxStyle");
+        _groupCombo.SetResourceReference(StyleProperty, "LibraryComboBoxStyle");
         _groupCombo.SelectionChanged += GroupCombo_SelectionChanged;
 
         var bar = new DockPanel { LastChildFill = false, Margin = new Thickness(8, 6, 8, 6) };
@@ -1054,19 +1428,43 @@ internal sealed class LibraryBrowserView : UserControl
         _veil.Visibility = Visibility.Collapsed;
         ApplyGlowVeil();
 
-        var listPane = new Grid { ClipToBounds = true };
-        listPane.SetResourceReference(Panel.BackgroundProperty, "SurfaceBackBrush");
-        listPane.Children.Add(_glowHost);
-        listPane.Children.Add(_veil);
+        var listPane = new Grid { Background = Brushes.Transparent };
         listPane.Children.Add(list);
         Grid.SetColumn(listPane, 2);
         _root.Children.Add(listPane);
-        _root.Background = Brushes.Transparent;
+
+        Grid.SetColumnSpan(_glowHost, _root.ColumnDefinitions.Count);
+        Grid.SetColumnSpan(_veil, _root.ColumnDefinitions.Count);
+        _root.Children.Insert(0, _veil);
+        _root.Children.Insert(0, _glowHost);
+        _root.SetResourceReference(Panel.BackgroundProperty, "SurfaceBackBrush");
 
         _host.ClipToBounds = true;
         _host.Children.Add(_root);
         Content = _host;
         SetResourceReference(BackgroundProperty, "SurfaceBackBrush");
+        ApplyLibraryScrollBarStyle();
+    }
+
+    private void ApplyLibraryScrollBarStyle()
+    {
+        if (TryFindResource("LibraryScrollBarStyle") is not Style style)
+        {
+            return;
+        }
+
+        Resources.Add(typeof(ScrollBar), style);
+    }
+
+    private void ApplyLibrarySplitterChrome(GridSplitter splitter)
+    {
+        if (TryFindResource("LibrarySplitterStyle") is Style style)
+        {
+            splitter.Style = style;
+            return;
+        }
+
+        splitter.SetResourceReference(BackgroundProperty, "LibraryExplorerSplitterBrush");
     }
 
     private void ApplyExplorerStyle()
@@ -1074,38 +1472,137 @@ internal sealed class LibraryBrowserView : UserControl
         _folderTree.Background = Brushes.Transparent;
         _folderTree.BorderThickness = new Thickness(0);
         _folderTree.Padding = new Thickness(4, 6, 4, 6);
-        _folderTree.FontSize = 11;
+        _folderTree.FontSize = LibraryListFontSize;
         ScrollViewer.SetHorizontalScrollBarVisibility(_folderTree, ScrollBarVisibility.Auto);
         ScrollViewer.SetVerticalScrollBarVisibility(_folderTree, ScrollBarVisibility.Auto);
         _folderTree.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
         VirtualizingPanel.SetIsVirtualizing(_folderTree, true);
         VirtualizingPanel.SetVirtualizationMode(_folderTree, VirtualizationMode.Recycling);
 
-        // 既定のシステム選択色（非アクティブ時の白など）をアプリのハイライトに差し替える。
-        var highlight = ResolveThemeBrush("MenuHighlightBackBrush", Color.FromRgb(0x37, 0x37, 0x3A));
+        // 既定のシステム選択色（非アクティブ時の白など）をアプリの色に差し替える。
+        var hover = GrayHoverBrush();
+        var selected = CyanSelectionBrush();
         var fore = ResolveThemeBrush("PrimaryForeBrush", Color.FromRgb(0xE8, 0xE8, 0xEA));
-        _folderTree.Resources[SystemColors.HighlightBrushKey] = highlight;
-        _folderTree.Resources[SystemColors.HighlightTextBrushKey] = fore;
-        _folderTree.Resources[SystemColors.InactiveSelectionHighlightBrushKey] = highlight;
-        _folderTree.Resources[SystemColors.InactiveSelectionHighlightTextBrushKey] = fore;
-        _folderTree.Resources[SystemColors.ControlBrushKey] = Brushes.Transparent;
+        ApplyNavSelectionResources(_folderTree, selected, fore);
 
         var itemStyle = new Style(typeof(TreeViewItem));
         itemStyle.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
         itemStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
-        itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(2, 1, 2, 1)));
+        itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(2, 1, 4, 1)));
         itemStyle.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
-        var selected = new Trigger { Property = TreeViewItem.IsSelectedProperty, Value = true };
-        selected.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
-        selected.Setters.Add(new Setter(Control.BackgroundProperty, new DynamicResourceExtension("MenuHighlightBackBrush")));
-        itemStyle.Triggers.Add(selected);
-        var inactive = new MultiTrigger();
-        inactive.Conditions.Add(new Condition(TreeViewItem.IsSelectedProperty, true));
-        inactive.Conditions.Add(new Condition(TreeViewItem.IsSelectionActiveProperty, false));
-        inactive.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
-        inactive.Setters.Add(new Setter(Control.BackgroundProperty, new DynamicResourceExtension("MenuHighlightBackBrush")));
-        itemStyle.Triggers.Add(inactive);
+        itemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
+        itemStyle.Setters.Add(new Setter(Control.TemplateProperty, TreeNavTemplate(hover, selected)));
         _folderTree.ItemContainerStyle = itemStyle;
+        ApplyTreeMultiSelectChrome();
+    }
+
+    private void ApplyFavoritesStyle()
+    {
+        var hover = GrayHoverBrush();
+        var selected = CyanSelectionBrush();
+        var fore = ResolveThemeBrush("PrimaryForeBrush", Color.FromRgb(0xE8, 0xE8, 0xEA));
+        ApplyNavSelectionResources(_favoritesList, selected, fore);
+
+        var itemStyle = new Style(typeof(ListBoxItem));
+        itemStyle.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
+        itemStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+        itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(4, 2, 6, 2)));
+        itemStyle.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
+        itemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+        itemStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
+        itemStyle.Setters.Add(new Setter(Control.TemplateProperty, ListNavTemplate(hover, selected)));
+        _favoritesList.ItemContainerStyle = itemStyle;
+    }
+
+    private static void ApplyNavSelectionResources(FrameworkElement host, Brush selected, Brush fore)
+    {
+        host.Resources[SystemColors.HighlightBrushKey] = selected;
+        host.Resources[SystemColors.HighlightTextBrushKey] = fore;
+        host.Resources[SystemColors.InactiveSelectionHighlightBrushKey] = selected;
+        host.Resources[SystemColors.InactiveSelectionHighlightTextBrushKey] = fore;
+        // ControlBrush はスクロールの右下角に出る。選択色に使うと黒い四角になる。
+        host.Resources[SystemColors.ControlBrushKey] = Brushes.Transparent;
+    }
+
+    private static Brush GrayHoverBrush() =>
+        ResolveThemeBrush("MenuHighlightBackBrush", Color.FromRgb(0x37, 0x37, 0x3A));
+
+    private void PinColumnHeaders()
+    {
+        if (FindDescendant<DataGridColumnHeadersPresenter>(_grid) is { } headers)
+        {
+            Panel.SetZIndex(headers, 8);
+        }
+    }
+
+    private static ControlTemplate ColumnHeaderTemplate()
+    {
+        var header = new FrameworkElementFactory(typeof(ContentPresenter));
+        header.SetValue(ContentPresenter.ContentProperty, new TemplateBindingExtension(ContentControl.ContentProperty));
+        header.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        header.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+
+        var bd = new FrameworkElementFactory(typeof(Border));
+        bd.Name = "Bd";
+        bd.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+        bd.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
+        bd.SetValue(Border.BorderBrushProperty, Brushes.Transparent);
+        bd.SetValue(Border.BorderThicknessProperty, new Thickness(0));
+        bd.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+        bd.AppendChild(header);
+
+        var root = new FrameworkElementFactory(typeof(Grid));
+        root.AppendChild(bd);
+        root.AppendChild(HeaderGripper("PART_LeftHeaderGripper", HorizontalAlignment.Left));
+        root.AppendChild(HeaderGripper("PART_RightHeaderGripper", HorizontalAlignment.Right));
+        return new ControlTemplate(typeof(DataGridColumnHeader)) { VisualTree = root };
+    }
+
+    private static FrameworkElementFactory HeaderGripper(string name, HorizontalAlignment align)
+    {
+        var thumb = new FrameworkElementFactory(typeof(Thumb));
+        thumb.Name = name;
+        thumb.SetValue(FrameworkElement.WidthProperty, 8d);
+        thumb.SetValue(FrameworkElement.HorizontalAlignmentProperty, align);
+        thumb.SetValue(FrameworkElement.CursorProperty, Cursors.SizeWE);
+        thumb.SetValue(UIElement.OpacityProperty, 0d);
+        thumb.SetValue(Control.BackgroundProperty, Brushes.Transparent);
+        thumb.SetValue(Control.TemplateProperty, InvisibleThumbTemplate());
+        return thumb;
+    }
+
+    private static ControlTemplate InvisibleThumbTemplate()
+    {
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        return new ControlTemplate(typeof(Thumb)) { VisualTree = border };
+    }
+
+    private void ApplyColumnCellStyles()
+    {
+        foreach (var (_, gridColumn) in _columns)
+        {
+            var cell = new Style(typeof(DataGridCell));
+            cell.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
+            cell.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+            cell.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
+            cell.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
+            cell.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
+            cell.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+            var selected = new Trigger { Property = DataGridCell.IsSelectedProperty, Value = true };
+            selected.Setters.Add(new Setter(Control.BackgroundProperty, _rowSelectedBrush));
+            selected.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
+            cell.Triggers.Add(selected);
+            gridColumn.CellStyle = cell;
+        }
+    }
+
+    private static Brush CyanSelectionBrush()
+    {
+        var accent = Theme.Get("AccentCyanBrush");
+        var brush = new SolidColorBrush(Color.FromArgb(80, accent.R, accent.G, accent.B));
+        brush.Freeze();
+        return brush;
     }
 
     private static Brush ResolveThemeBrush(string key, Color fallback)
@@ -1120,31 +1617,148 @@ internal sealed class LibraryBrowserView : UserControl
         return created;
     }
 
+    private static readonly DependencyProperty TreeMarkedProperty = DependencyProperty.RegisterAttached(
+        "TreeMarked",
+        typeof(bool),
+        typeof(LibraryBrowserView),
+        new PropertyMetadata(false));
+
+    /// <summary>見出しの上だけグレー。子の上では親が反応しない。選択と Ctrl 複数はシアン。</summary>
+    private static ControlTemplate TreeNavTemplate(Brush hover, Brush selected)
+    {
+        var expander = new FrameworkElementFactory(typeof(ToggleButton));
+        expander.Name = "Expander";
+        expander.SetValue(UIElement.FocusableProperty, false);
+        expander.SetValue(Control.WidthProperty, 16d);
+        expander.SetValue(Control.HeightProperty, 16d);
+        expander.SetValue(Control.ForegroundProperty, new TemplateBindingExtension(Control.ForegroundProperty));
+        expander.SetValue(Control.TemplateProperty, TreeExpanderTemplate());
+        expander.SetBinding(ToggleButton.IsCheckedProperty, new Binding(nameof(TreeViewItem.IsExpanded))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+            Mode = BindingMode.TwoWay,
+        });
+
+        expander.SetValue(DockPanel.DockProperty, Dock.Left);
+
+        var header = new FrameworkElementFactory(typeof(ContentPresenter));
+        header.SetValue(ContentPresenter.ContentSourceProperty, "Header");
+        header.SetValue(FrameworkElement.HorizontalAlignmentProperty, new TemplateBindingExtension(Control.HorizontalContentAlignmentProperty));
+
+        var bd = new FrameworkElementFactory(typeof(Border));
+        bd.Name = "Bd";
+        bd.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+        bd.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
+        bd.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+        bd.AppendChild(header);
+
+        var row = new FrameworkElementFactory(typeof(DockPanel));
+        row.AppendChild(expander);
+        row.AppendChild(bd);
+
+        var items = new FrameworkElementFactory(typeof(ItemsPresenter));
+        items.Name = "ItemsHost";
+        items.SetValue(FrameworkElement.MarginProperty, new Thickness(16, 0, 0, 0));
+
+        var root = new FrameworkElementFactory(typeof(StackPanel));
+        root.AppendChild(row);
+        root.AppendChild(items);
+
+        var template = new ControlTemplate(typeof(TreeViewItem)) { VisualTree = root };
+        template.Triggers.Add(new Trigger
+        {
+            Property = TreeViewItem.HasItemsProperty,
+            Value = false,
+            Setters = { new Setter(UIElement.VisibilityProperty, Visibility.Hidden, "Expander") },
+        });
+        template.Triggers.Add(new Trigger
+        {
+            Property = TreeViewItem.IsExpandedProperty,
+            Value = false,
+            Setters = { new Setter(UIElement.VisibilityProperty, Visibility.Collapsed, "ItemsHost") },
+        });
+
+        var hoverOver = new MultiTrigger();
+        hoverOver.Conditions.Add(new Condition(UIElement.IsMouseOverProperty, true, "Bd"));
+        hoverOver.Conditions.Add(new Condition(TreeViewItem.IsSelectedProperty, false));
+        hoverOver.Conditions.Add(new Condition(TreeMarkedProperty, false));
+        hoverOver.Setters.Add(new Setter(Border.BackgroundProperty, hover, "Bd"));
+        template.Triggers.Add(hoverOver);
+        template.Triggers.Add(new Trigger
+        {
+            Property = TreeViewItem.IsSelectedProperty,
+            Value = true,
+            Setters = { new Setter(Border.BackgroundProperty, selected, "Bd") },
+        });
+        template.Triggers.Add(new Trigger
+        {
+            Property = TreeMarkedProperty,
+            Value = true,
+            Setters = { new Setter(Border.BackgroundProperty, selected, "Bd") },
+        });
+        return template;
+    }
+
+    private static ControlTemplate TreeExpanderTemplate()
+    {
+        var glyph = new FrameworkElementFactory(typeof(TextBlock));
+        glyph.Name = "Glyph";
+        glyph.SetValue(TextBlock.TextProperty, "▸");
+        glyph.SetValue(TextBlock.FontSizeProperty, 9d);
+        glyph.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        glyph.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+        glyph.SetValue(TextBlock.ForegroundProperty, new TemplateBindingExtension(Control.ForegroundProperty));
+
+        var template = new ControlTemplate(typeof(ToggleButton)) { VisualTree = glyph };
+        template.Triggers.Add(new Trigger
+        {
+            Property = ToggleButton.IsCheckedProperty,
+            Value = true,
+            Setters = { new Setter(TextBlock.TextProperty, "▾", "Glyph") },
+        });
+        return template;
+    }
+
+    private static ControlTemplate ListNavTemplate(Brush hover, Brush selected)
+    {
+        var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+        presenter.SetValue(FrameworkElement.HorizontalAlignmentProperty, new TemplateBindingExtension(Control.HorizontalContentAlignmentProperty));
+        presenter.SetValue(FrameworkElement.VerticalAlignmentProperty, new TemplateBindingExtension(Control.VerticalContentAlignmentProperty));
+
+        var bd = new FrameworkElementFactory(typeof(Border));
+        bd.Name = "Bd";
+        bd.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+        bd.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
+        bd.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+        bd.AppendChild(presenter);
+
+        var template = new ControlTemplate(typeof(ListBoxItem)) { VisualTree = bd };
+        var hoverOver = new MultiTrigger();
+        hoverOver.Conditions.Add(new Condition(UIElement.IsMouseOverProperty, true, "Bd"));
+        hoverOver.Conditions.Add(new Condition(ListBoxItem.IsSelectedProperty, false));
+        hoverOver.Setters.Add(new Setter(Border.BackgroundProperty, hover, "Bd"));
+        template.Triggers.Add(hoverOver);
+        template.Triggers.Add(new Trigger
+        {
+            Property = ListBoxItem.IsSelectedProperty,
+            Value = true,
+            Setters = { new Setter(Border.BackgroundProperty, selected, "Bd") },
+        });
+        return template;
+    }
+
     private void BuildExplorerRoots()
     {
+        _treeMultiSelected.Clear();
         _folderTree.Items.Clear();
-        AddSpecialRoot(Environment.SpecialFolder.Desktop, UiStrings.LibraryExplorerDesktop);
-        AddSpecialRoot(Environment.SpecialFolder.MyDocuments, UiStrings.LibraryExplorerDocuments);
-        AddSpecialRoot(Environment.SpecialFolder.MyMusic, UiStrings.LibraryExplorerMusic);
-        AddSpecialRoot(Environment.SpecialFolder.MyPictures, UiStrings.LibraryExplorerPictures);
-        AddSpecialRoot(Environment.SpecialFolder.MyVideos, UiStrings.LibraryExplorerVideos);
-        try
+        foreach (var root in _explorerRoots)
         {
-            foreach (var drive in DriveInfo.GetDrives())
+            if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
             {
-                if (!drive.IsReady)
-                {
-                    continue;
-                }
-
-                AddFolderItem(_folderTree.Items, drive.RootDirectory.FullName, DriveHeader(drive));
+                continue;
             }
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
+
+            AddFolderItem(_folderTree.Items, root, ExplorerRootHeader(root));
         }
     }
 
@@ -1397,8 +2011,16 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        if (e.NewValue is TreeViewItem { Tag: string path } && Directory.Exists(path))
+        if (e.NewValue is TreeViewItem { Tag: string path } item && Directory.Exists(path))
         {
+            if ((Keyboard.Modifiers & ModifierKeys.Control) == 0
+                && (_treeMultiSelected.Count != 1 || !_treeMultiSelected.Contains(item)))
+            {
+                ClearTreeMultiSelect();
+                _treeMultiSelected.Add(item);
+                ApplyTreeMultiSelectChrome();
+            }
+
             ExplorerFolderChanged?.Invoke(this, path);
         }
     }
@@ -1412,22 +2034,100 @@ internal sealed class LibraryBrowserView : UserControl
     {
         _treeDragStart = null;
         _treeDragItem = null;
-        if (e.OriginalSource is DependencyObject origin
-            && FindTreeViewItem(origin) is { Tag: string } item
-            && FindTreeExpandToggle(origin) is null)
+        if (e.OriginalSource is not DependencyObject origin
+            || FindTreeViewItem(origin) is not { Tag: string } item
+            || FindTreeExpandToggle(origin) is not null)
         {
-            _treeDragStart = e.GetPosition(null);
-            _treeDragItem = item;
+            return;
         }
+
+        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
+        {
+            ToggleTreeMultiSelect(item);
+            item.IsSelected = true;
+            e.Handled = true;
+            return;
+        }
+
+        ClearTreeMultiSelect();
+        _treeMultiSelected.Add(item);
+        ApplyTreeMultiSelectChrome();
+        _treeDragStart = e.GetPosition(null);
+        _treeDragItem = item;
+    }
+
+    private void FolderTree_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject origin
+            && FindTreeViewItem(origin) is { Tag: string } item)
+        {
+            if (!_treeMultiSelected.Contains(item))
+            {
+                ClearTreeMultiSelect();
+                _treeMultiSelected.Add(item);
+                ApplyTreeMultiSelectChrome();
+                item.IsSelected = true;
+            }
+        }
+    }
+
+    private void ToggleTreeMultiSelect(TreeViewItem item)
+    {
+        if (!_treeMultiSelected.Add(item))
+        {
+            _treeMultiSelected.Remove(item);
+        }
+
+        ApplyTreeMultiSelectChrome();
+    }
+
+    private void ClearTreeMultiSelect()
+    {
+        if (_treeMultiSelected.Count == 0)
+        {
+            return;
+        }
+
+        _treeMultiSelected.Clear();
+        ApplyTreeMultiSelectChrome();
+    }
+
+    private void ApplyTreeMultiSelectChrome()
+    {
+        var selected = CyanSelectionBrush();
+        void Walk(ItemCollection items)
+        {
+            foreach (var raw in items)
+            {
+                if (raw is not TreeViewItem child)
+                {
+                    continue;
+                }
+
+                var marked = _treeMultiSelected.Contains(child);
+                child.SetValue(TreeMarkedProperty, marked);
+                child.Background = marked ? selected : Brushes.Transparent;
+                if (child.Items.Count > 0)
+                {
+                    Walk(child.Items);
+                }
+            }
+        }
+
+        Walk(_folderTree.Items);
     }
 
     private void FolderTree_PreviewMouseMove(object sender, MouseEventArgs e)
     {
         if (_treeDragStart is null
             || _treeDragItem is null
-            || e.LeftButton != MouseButtonState.Pressed
-            || _treeDragItem.Tag is not string path
-            || !Directory.Exists(path))
+            || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var paths = SelectedExplorerFolders;
+        if (paths.Length == 0)
         {
             return;
         }
@@ -1442,7 +2142,7 @@ internal sealed class LibraryBrowserView : UserControl
         var item = _treeDragItem;
         _treeDragStart = null;
         _treeDragItem = null;
-        var data = new DataObject(DataFormats.FileDrop, new[] { path });
+        var data = new DataObject(DataFormats.FileDrop, paths);
         DragDrop.DoDragDrop(item, data, DragDropEffects.Copy);
     }
 
@@ -1492,6 +2192,13 @@ internal sealed class LibraryBrowserView : UserControl
         var width = ReadExplorerWidth();
         SetExplorerWidth(width);
         ExplorerWidthChanged?.Invoke(this, width);
+    }
+
+    private void FavoritesSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        var ratio = ReadFavoritesSplit();
+        SetFavoritesSplit(ratio);
+        FavoritesSplitChanged?.Invoke(this, ratio);
     }
 
     private static IEnumerable<string> EnumerateSubdirs(string path)
@@ -1590,31 +2297,34 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void ConfigureGrid()
     {
-        AddColumn(LibraryFileColumn.Name, nameof(LibraryFileRow.Name), min: 96);
-        AddColumn(LibraryFileColumn.Title, nameof(LibraryFileRow.Title), min: 80);
-        AddColumn(LibraryFileColumn.Artist, nameof(LibraryFileRow.Artist), min: 72);
-        AddColumn(LibraryFileColumn.Album, nameof(LibraryFileRow.Album), min: 72);
-        AddColumn(LibraryFileColumn.Track, nameof(LibraryFileRow.Track), min: 44, right: true);
-        AddColumn(LibraryFileColumn.Disc, nameof(LibraryFileRow.Disc), min: 40, right: true);
-        AddColumn(LibraryFileColumn.Year, nameof(LibraryFileRow.Year), min: 48, right: true);
-        AddColumn(LibraryFileColumn.Genre, nameof(LibraryFileRow.Genre), min: 64);
-        AddColumn(LibraryFileColumn.Composer, nameof(LibraryFileRow.Composer), min: 72);
-        AddColumn(LibraryFileColumn.Duration, nameof(LibraryFileRow.DurationText), min: 88, right: true);
-        AddColumn(LibraryFileColumn.Comment, nameof(LibraryFileRow.Comment), min: 72);
-        AddColumn(LibraryFileColumn.AlbumArtist, nameof(LibraryFileRow.AlbumArtist), min: 80);
-        AddColumn(LibraryFileColumn.Kind, nameof(LibraryFileRow.Kind), min: 56);
-        AddColumn(LibraryFileColumn.SampleRate, nameof(LibraryFileRow.SampleRateText), min: 64, right: true);
-        AddColumn(LibraryFileColumn.BitDepth, nameof(LibraryFileRow.BitDepthText), min: 52, right: true);
-        AddColumn(LibraryFileColumn.Channels, nameof(LibraryFileRow.ChannelsText), min: 44, right: true);
-        AddColumn(LibraryFileColumn.BitRate, nameof(LibraryFileRow.BitRateText), min: 72, right: true);
-        AddColumn(LibraryFileColumn.Size, nameof(LibraryFileRow.SizeText), min: 72, right: true);
-        AddColumn(LibraryFileColumn.Folder, nameof(LibraryFileRow.Folder), min: 80);
-        AddColumn(LibraryFileColumn.Jacket, nameof(LibraryFileRow.JacketText), min: 72);
+        AddGroupSpacerColumn();
+        AddColumn(LibraryFileColumn.Name, nameof(LibraryFileRow.Name), min: 56);
+        AddColumn(LibraryFileColumn.Title, nameof(LibraryFileRow.Title), min: 48);
+        AddColumn(LibraryFileColumn.Artist, nameof(LibraryFileRow.Artist), min: 40);
+        AddColumn(LibraryFileColumn.Album, nameof(LibraryFileRow.Album), min: 48);
+        AddColumn(LibraryFileColumn.Track, nameof(LibraryFileRow.Track), min: 36, right: true);
+        AddColumn(LibraryFileColumn.Disc, nameof(LibraryFileRow.Disc), min: 36, right: true);
+        AddColumn(LibraryFileColumn.Year, nameof(LibraryFileRow.Year), min: 40, right: true);
+        AddColumn(LibraryFileColumn.Genre, nameof(LibraryFileRow.Genre), min: 40);
+        AddColumn(LibraryFileColumn.Composer, nameof(LibraryFileRow.Composer), min: 48);
+        AddColumn(LibraryFileColumn.Duration, nameof(LibraryFileRow.DurationText), min: 52, right: true);
+        AddColumn(LibraryFileColumn.Comment, nameof(LibraryFileRow.Comment), min: 48);
+        AddColumn(LibraryFileColumn.AlbumArtist, nameof(LibraryFileRow.AlbumArtist), min: 48);
+        AddColumn(LibraryFileColumn.Kind, nameof(LibraryFileRow.Kind), min: 40);
+        AddColumn(LibraryFileColumn.SampleRate, nameof(LibraryFileRow.SampleRateText), min: 48, right: true);
+        AddColumn(LibraryFileColumn.BitDepth, nameof(LibraryFileRow.BitDepthText), min: 40, right: true);
+        AddColumn(LibraryFileColumn.Channels, nameof(LibraryFileRow.ChannelsText), min: 36, right: true);
+        AddColumn(LibraryFileColumn.BitRate, nameof(LibraryFileRow.BitRateText), min: 48, right: true);
+        AddColumn(LibraryFileColumn.Size, nameof(LibraryFileRow.SizeText), min: 48, right: true);
+        AddColumn(LibraryFileColumn.Folder, nameof(LibraryFileRow.Folder), min: 56);
+        AddColumn(LibraryFileColumn.Jacket, nameof(LibraryFileRow.JacketText), min: 40);
 
         if (_columns.TryGetValue(LibraryFileColumn.Album, out var albumColumn))
         {
             albumColumn.SortDirection = System.ComponentModel.ListSortDirection.Ascending;
         }
+
+        RefreshSortChrome();
 
         _grid.AutoGenerateColumns = false;
         _grid.IsReadOnly = true;
@@ -1624,11 +2334,18 @@ internal sealed class LibraryBrowserView : UserControl
         _grid.CanUserSortColumns = true;
         _grid.CanUserResizeRows = false;
         _grid.HeadersVisibility = DataGridHeadersVisibility.Column;
-        _grid.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
+        _grid.GridLinesVisibility = DataGridGridLinesVisibility.None;
+        _grid.HorizontalGridLinesBrush = Brushes.Transparent;
+        _grid.VerticalGridLinesBrush = Brushes.Transparent;
         _grid.SelectionUnit = DataGridSelectionUnit.FullRow;
         _grid.SelectionMode = DataGridSelectionMode.Extended;
         _grid.ClipboardCopyMode = DataGridClipboardCopyMode.None;
-        _grid.EnableRowVirtualization = false;
+        // 1000 行超を全部実体化すると ↓ リピートと列幅再計算が止まる。グループ時も仮想化する。
+        _grid.EnableRowVirtualization = true;
+        VirtualizingPanel.SetIsVirtualizing(_grid, true);
+        VirtualizingPanel.SetIsVirtualizingWhenGrouping(_grid, true);
+        VirtualizingPanel.SetVirtualizationMode(_grid, VirtualizationMode.Standard);
+        VirtualizingPanel.SetScrollUnit(_grid, ScrollUnit.Item);
         _grid.RowHeaderWidth = 0;
         _grid.MinRowHeight = 24;
         _grid.VerticalContentAlignment = VerticalAlignment.Center;
@@ -1636,58 +2353,34 @@ internal sealed class LibraryBrowserView : UserControl
         _grid.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
         _grid.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
         _grid.Background = Brushes.Transparent;
+        _grid.FontSize = LibraryListFontSize;
         _grid.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
-        _grid.SetResourceReference(DataGrid.HorizontalGridLinesBrushProperty, "ChromeBorderBrush");
         _grid.Sorting += Grid_Sorting;
         _grid.SelectionChanged += Grid_SelectionChanged;
         _grid.MouseDoubleClick += Grid_MouseDoubleClick;
+        RebuildListContextMenu();
 
-        var headerFactory = new FrameworkElementFactory(typeof(TextBlock));
-        headerFactory.SetBinding(TextBlock.TextProperty, new Binding("Name"));
-        headerFactory.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold);
-        headerFactory.SetValue(TextBlock.FontSizeProperty, 13d);
-        headerFactory.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 8, 0));
-        headerFactory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        headerFactory.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
-
-        var lineFactory = new FrameworkElementFactory(typeof(Border));
-        lineFactory.SetValue(FrameworkElement.HeightProperty, 1d);
-        lineFactory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        lineFactory.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 10, 0, 0));
-        lineFactory.SetResourceReference(Border.BackgroundProperty, "ChromeBorderBrush");
-
-        var titleBar = new FrameworkElementFactory(typeof(DockPanel));
-        titleBar.SetValue(DockPanel.LastChildFillProperty, true);
-        titleBar.SetValue(FrameworkElement.MarginProperty, new Thickness(8, 8, 8, 4));
-        titleBar.SetValue(DockPanel.DockProperty, Dock.Top);
-        headerFactory.SetValue(DockPanel.DockProperty, Dock.Left);
-        titleBar.AppendChild(headerFactory);
-        titleBar.AppendChild(lineFactory);
-
-        // 列名はグループ見出しの下・ジャケット右。上部ヘッダーはグループ時に隠す。
-        var headers = new FrameworkElementFactory(typeof(LibraryGroupColumnHeaders));
-        headers.SetValue(DockPanel.DockProperty, Dock.Top);
-        headers.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 0, 2));
+        var headerFactory = new FrameworkElementFactory(typeof(LibraryGroupHeader));
+        headerFactory.SetValue(DockPanel.DockProperty, Dock.Top);
 
         var jacket = new FrameworkElementFactory(typeof(LibraryGroupJacketImage));
-        jacket.SetValue(DockPanel.DockProperty, Dock.Left);
+        jacket.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+        jacket.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Top);
+        jacket.SetValue(Panel.ZIndexProperty, 1);
 
         var items = new FrameworkElementFactory(typeof(ItemsPresenter));
+        items.SetValue(Panel.ZIndexProperty, 0);
 
-        var content = new FrameworkElementFactory(typeof(DockPanel));
-        content.SetValue(DockPanel.LastChildFillProperty, true);
-        content.AppendChild(headers);
-        content.AppendChild(items);
-
-        var stage = new FrameworkElementFactory(typeof(DockPanel));
-        stage.SetValue(DockPanel.LastChildFillProperty, true);
+        var stage = new FrameworkElementFactory(typeof(Grid));
+        stage.SetValue(FrameworkElement.ClipToBoundsProperty, true);
+        stage.AppendChild(items);
         stage.AppendChild(jacket);
-        stage.AppendChild(content);
 
         var body = new FrameworkElementFactory(typeof(DockPanel));
         body.SetValue(DockPanel.LastChildFillProperty, true);
         body.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 0, 10));
-        body.AppendChild(titleBar);
+        body.SetValue(FrameworkElement.ClipToBoundsProperty, false);
+        body.AppendChild(headerFactory);
         body.AppendChild(stage);
 
         var template = new ControlTemplate(typeof(GroupItem)) { VisualTree = body };
@@ -1696,61 +2389,90 @@ internal sealed class LibraryBrowserView : UserControl
         container.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
         container.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
 
+        container.Setters.Add(new Setter(FrameworkElement.ClipToBoundsProperty, false));
+
         _grid.GroupStyle.Clear();
         _grid.GroupStyle.Add(new GroupStyle
         {
             ContainerStyle = container,
             HidesIfEmpty = true,
         });
-        SyncGroupColumnHeadersVisibility();
+        SyncGroupChrome();
     }
 
-    /// <summary>グループ左のジャケット幅（余白込み）。</summary>
+    /// <summary>グループ左のジャケット幅（余白込み）。先頭のスペーサ列と一致させる。</summary>
     internal static double GroupJacketColumnWidth =>
         DesignMetrics.LibraryGroupJacketSize + 16;
 
-    private void SyncGroupColumnHeadersVisibility()
+    internal DataGridHeadersVisibility HeadersVisibility => _grid.HeadersVisibility;
+
+    internal Visibility GroupSpacerVisibility => _groupSpacer.Visibility;
+
+    internal int FrozenColumnCount => _grid.FrozenColumnCount;
+
+    private void SyncGroupChrome()
     {
-        // グループ時は見出しの下に列名を出すので、上部ヘッダーは隠す。
-        _grid.HeadersVisibility = _group == LibraryFileGroup.None
-            ? DataGridHeadersVisibility.Column
-            : DataGridHeadersVisibility.None;
-        NotifyGroupColumnHeadersChanged();
+        _grid.HeadersVisibility = DataGridHeadersVisibility.Column;
+        var grouped = _group != LibraryFileGroup.None;
+        _groupSpacer.Visibility = grouped ? Visibility.Visible : Visibility.Collapsed;
+        _grid.FrozenColumnCount = grouped ? 1 : 0;
     }
 
-    internal event EventHandler? GroupColumnHeadersChanged;
-    internal event EventHandler<double>? GroupHeaderScrollOffsetChanged;
-
-    private void NotifyGroupColumnHeadersChanged() =>
-        GroupColumnHeadersChanged?.Invoke(this, EventArgs.Empty);
-
-    private bool _gridScrollHooked;
-
-    private void EnsureGroupHeaderScrollHook()
+    internal void EnsureGroupScrollHook()
     {
         if (_gridScrollHooked)
         {
             return;
         }
 
-        if (FindDescendant<ScrollViewer>(_grid) is not { } scroll)
+        if (FindDataGridScrollViewer() is not { } scroll)
         {
             return;
         }
 
-        scroll.ScrollChanged += GridScroll_ScrollChanged;
+        scroll.ScrollChanged += GridScroll_Changed;
+        _grid.SizeChanged += (_, _) => GroupViewportChanged?.Invoke(this, EventArgs.Empty);
         _gridScrollHooked = true;
+        GroupViewportChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void GridScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    private void GridScroll_Changed(object sender, ScrollChangedEventArgs e)
     {
-        if (e.HorizontalChange == 0 && e.ExtentWidthChange == 0 && e.ViewportWidthChange == 0)
+        if (e.VerticalChange == 0
+            && e.ViewportHeightChange == 0
+            && e.ExtentHeightChange == 0
+            && e.HorizontalChange == 0
+            && e.ViewportWidthChange == 0
+            && e.ExtentWidthChange == 0)
         {
             return;
         }
 
-        GroupHeaderScrollOffsetChanged?.Invoke(this, ((ScrollViewer)sender).HorizontalOffset);
+        GroupViewportChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    internal double RowsViewportTop()
+    {
+        if (FindDescendant<DataGridColumnHeadersPresenter>(_grid) is { } headers
+            && headers.ActualHeight > 0)
+        {
+            try
+            {
+                var top = headers.TransformToAncestor(_grid).Transform(new Point(0, 0)).Y;
+                return top + headers.ActualHeight;
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        return _grid.ColumnHeaderHeight > 0 && !double.IsNaN(_grid.ColumnHeaderHeight)
+            ? _grid.ColumnHeaderHeight
+            : 28;
+    }
+
+    internal double GroupHorizontalOffset() =>
+        FindDataGridScrollViewer()?.HorizontalOffset ?? 0;
 
     private static T? FindDescendant<T>(DependencyObject root)
         where T : DependencyObject
@@ -1772,31 +2494,6 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         return null;
-    }
-
-    internal IEnumerable<(string Header, double Width, DataGridColumn Column)> EnumerateVisibleGridColumns()
-    {
-        foreach (var column in _grid.Columns)
-        {
-            if (column.Visibility != Visibility.Visible)
-            {
-                continue;
-            }
-
-            var width = column.ActualWidth > 1 ? column.ActualWidth : column.Width.DisplayValue;
-            if (width <= 0)
-            {
-                width = column.MinWidth;
-            }
-
-            yield return (column.Header?.ToString() ?? string.Empty, width, column);
-        }
-    }
-
-    internal void SortByGridColumn(DataGridColumn column)
-    {
-        var args = new DataGridSortingEventArgs(column);
-        Grid_Sorting(_grid, args);
     }
 
     private void ConfigureGroupCombo()
@@ -1844,7 +2541,7 @@ internal sealed class LibraryBrowserView : UserControl
 
         _group = group;
         _groupCombo.SelectedValue = group;
-        SyncGroupColumnHeadersVisibility();
+        SyncGroupChrome();
         if (_grid.ItemsSource is null)
         {
             return;
@@ -1858,82 +2555,15 @@ internal sealed class LibraryBrowserView : UserControl
         _ = EnsureGroupArtworkAsync();
     }
 
-    private void BuildColumnFilter()
-    {
-        _columnFilterPanel.Children.Clear();
-        _columnChecks.Clear();
-        foreach (var column in LibraryColumnFilter.All)
-        {
-            var locked = LibraryColumnFilter.IsLocked(column);
-            var check = new CheckBox
-            {
-                Tag = column,
-                Content = new TextBlock
-                {
-                    Text = ColumnHeader(column),
-                    TextWrapping = TextWrapping.Wrap,
-                },
-                Margin = new Thickness(0, 0, 0, 6),
-                IsEnabled = !locked,
-                VerticalContentAlignment = VerticalAlignment.Center,
-                Focusable = true,
-            };
-            check.SetResourceReference(StyleProperty, "DarkCheckBoxStyle");
-
-            check.Checked += ColumnCheck_Changed;
-            check.Unchecked += ColumnCheck_Changed;
-            _columnChecks[column] = check;
-            _columnFilterPanel.Children.Add(check);
-        }
-    }
-
-    private void ColumnCheck_Changed(object sender, RoutedEventArgs e)
-    {
-        if (_syncingColumns || sender is not CheckBox { Tag: LibraryFileColumn column } check)
-        {
-            return;
-        }
-
-        if (LibraryColumnFilter.IsLocked(column))
-        {
-            check.IsChecked = true;
-            return;
-        }
-
-        var set = new HashSet<LibraryFileColumn> { LibraryFileColumn.Name };
-        foreach (var pair in _columnChecks)
-        {
-            if (pair.Value.IsChecked == true)
-            {
-                set.Add(pair.Key);
-            }
-        }
-
-        ApplyColumnVisibility(set, notify: true);
-    }
-
     private void ApplyColumnVisibility(HashSet<LibraryFileColumn> visible, bool notify)
     {
         visible.Add(LibraryFileColumn.Name);
         _visibleColumns = visible;
-        _syncingColumns = true;
-        try
+        foreach (var pair in _columns)
         {
-            foreach (var pair in _columns)
-            {
-                pair.Value.Visibility = visible.Contains(pair.Key)
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-            }
-
-            foreach (var pair in _columnChecks)
-            {
-                pair.Value.IsChecked = visible.Contains(pair.Key);
-            }
-        }
-        finally
-        {
-            _syncingColumns = false;
+            pair.Value.Visibility = visible.Contains(pair.Key)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         if (notify)
@@ -1942,33 +2572,51 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         RequestFitColumns();
-        NotifyGroupColumnHeadersChanged();
+        SyncGroupChrome();
     }
 
     private static string ColumnHeader(LibraryFileColumn column) =>
-        column switch
+        UiStrings.LibraryColumnLabel(column);
+
+    private void AddGroupSpacerColumn()
+    {
+        var empty = new Style(typeof(TextBlock));
+        empty.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
+        _groupSpacer = new DataGridTextColumn
         {
-            LibraryFileColumn.Title => UiStrings.LibraryColumnTitle,
-            LibraryFileColumn.Artist => UiStrings.LibraryColumnArtist,
-            LibraryFileColumn.AlbumArtist => UiStrings.LibraryColumnAlbumArtist,
-            LibraryFileColumn.Album => UiStrings.LibraryColumnAlbum,
-            LibraryFileColumn.Track => UiStrings.LibraryColumnTrack,
-            LibraryFileColumn.Disc => UiStrings.LibraryColumnDisc,
-            LibraryFileColumn.Year => UiStrings.LibraryColumnYear,
-            LibraryFileColumn.Genre => UiStrings.LibraryColumnGenre,
-            LibraryFileColumn.Composer => UiStrings.LibraryColumnComposer,
-            LibraryFileColumn.Comment => UiStrings.LibraryColumnComment,
-            LibraryFileColumn.Kind => UiStrings.LibraryColumnKind,
-            LibraryFileColumn.Duration => UiStrings.LibraryColumnDuration,
-            LibraryFileColumn.SampleRate => UiStrings.LibraryColumnSampleRate,
-            LibraryFileColumn.BitDepth => UiStrings.LibraryColumnBitDepth,
-            LibraryFileColumn.Channels => UiStrings.LibraryColumnChannels,
-            LibraryFileColumn.BitRate => UiStrings.LibraryColumnBitRate,
-            LibraryFileColumn.Size => UiStrings.LibraryColumnSize,
-            LibraryFileColumn.Folder => UiStrings.LibraryColumnFolder,
-            LibraryFileColumn.Jacket => UiStrings.LibraryColumnJacket,
-            _ => UiStrings.LibraryColumnName,
+            Header = string.Empty,
+            Binding = new Binding(nameof(LibraryFileRow.Name)),
+            Width = new DataGridLength(GroupJacketColumnWidth),
+            MinWidth = GroupJacketColumnWidth,
+            MaxWidth = GroupJacketColumnWidth,
+            IsReadOnly = true,
+            CanUserSort = false,
+            CanUserResize = false,
+            CanUserReorder = false,
+            ElementStyle = empty,
         };
+        ApplyGroupSpacerCellStyle();
+        _grid.Columns.Add(_groupSpacer);
+    }
+
+    private void ApplyGroupSpacerCellStyle()
+    {
+        if (_groupSpacer is null)
+        {
+            return;
+        }
+
+        var cell = new Style(typeof(DataGridCell));
+        cell.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
+        cell.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+        cell.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+        cell.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
+        var selected = new Trigger { Property = DataGridCell.IsSelectedProperty, Value = true };
+        selected.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+        selected.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
+        cell.Triggers.Add(selected);
+        _groupSpacer.CellStyle = cell;
+    }
 
     private void AddColumn(
         LibraryFileColumn column,
@@ -1989,48 +2637,181 @@ internal sealed class LibraryBrowserView : UserControl
         {
             Binding = new Binding(binding),
             MinWidth = DesignMetrics.From96(min),
-            Width = DataGridLength.Auto,
+            Width = DataGridLength.SizeToCells,
             IsReadOnly = true,
             ElementStyle = text,
             CanUserSort = true,
             SortMemberPath = binding,
         };
+        var sortHeader = new LibrarySortHeader(ColumnHeader(column));
+        _sortHeaders[column] = sortHeader;
+        gridColumn.Header = sortHeader;
         _columns[column] = gridColumn;
         _grid.Columns.Add(gridColumn);
     }
 
     private void RequestFitColumns()
     {
-        if (!IsLoaded)
+        if (!IsLoaded || _fitColumnsQueued)
         {
             return;
         }
 
-        Dispatcher.BeginInvoke(FitColumns, DispatcherPriority.Loaded);
+        _fitColumnsQueued = true;
+        Dispatcher.BeginInvoke(() =>
+        {
+            _fitColumnsQueued = false;
+            FitColumns();
+        }, DispatcherPriority.Background);
     }
 
     private void FitColumns()
     {
-        foreach (var column in _grid.Columns)
+        var fontSize = _grid.FontSize > 0 ? _grid.FontSize : 12;
+        // セル左右 Margin 8+8。見出しは Padding と、文字の直後に置く ▼▲ ぶんを足す。
+        const double cellPad = 16;
+        const double headerPad = 72;
+        var family = _grid.FontFamily ?? new FontFamily("Yu Gothic UI");
+        var typeface = new Typeface(family, _grid.FontStyle, _grid.FontWeight, _grid.FontStretch);
+        var headerFace = new Typeface(family, _grid.FontStyle, FontWeights.SemiBold, _grid.FontStretch);
+        var dpi = 1d;
+        if (_grid.IsLoaded)
+        {
+            try
+            {
+                dpi = VisualTreeHelper.GetDpi(_grid).PixelsPerDip;
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        var cache = new Dictionary<string, double>(StringComparer.Ordinal);
+        double Measure(string text, Typeface face)
+        {
+            if (text.Length == 0)
+            {
+                return 0;
+            }
+
+            var key = ReferenceEquals(face, headerFace) ? text + "\u0001" : text;
+            if (!cache.TryGetValue(key, out var width))
+            {
+                var formatted = new FormattedText(
+                    text,
+                    System.Globalization.CultureInfo.CurrentUICulture,
+                    FlowDirection.LeftToRight,
+                    face,
+                    fontSize,
+                    Brushes.Black,
+                    dpi);
+                width = formatted.WidthIncludingTrailingWhitespace;
+                cache[key] = width;
+            }
+
+            return width;
+        }
+
+        foreach (var (kind, column) in _columns)
         {
             if (column.Visibility != Visibility.Visible)
             {
                 continue;
             }
 
-            column.Width = 0;
-            column.Width = new DataGridLength(1, DataGridLengthUnitType.Auto);
-        }
+            var max = Measure(ColumnHeader(kind), headerFace) + headerPad;
+            foreach (var row in _items)
+            {
+                var text = CellText(row, kind);
+                if (text.Length == 0)
+                {
+                    continue;
+                }
 
-        EnsureGroupHeaderScrollHook();
-        NotifyGroupColumnHeadersChanged();
+                var width = Measure(text, typeface) + cellPad;
+                if (width > max)
+                {
+                    max = width;
+                }
+            }
+
+            var fitted = Math.Clamp(
+                Math.Ceiling(max),
+                column.MinWidth,
+                DesignMetrics.LibraryColumnMaxWidth);
+            column.Width = new DataGridLength(fitted, DataGridLengthUnitType.Pixel);
+        }
     }
+
+    private static string CellText(LibraryFileRow row, LibraryFileColumn column) =>
+        column switch
+        {
+            LibraryFileColumn.Title => row.Title,
+            LibraryFileColumn.Artist => row.Artist,
+            LibraryFileColumn.AlbumArtist => row.AlbumArtist,
+            LibraryFileColumn.Album => row.Album,
+            LibraryFileColumn.Track => row.Track,
+            LibraryFileColumn.Disc => row.Disc,
+            LibraryFileColumn.Year => row.Year,
+            LibraryFileColumn.Genre => row.Genre,
+            LibraryFileColumn.Composer => row.Composer,
+            LibraryFileColumn.Comment => row.Comment,
+            LibraryFileColumn.Duration => row.DurationText,
+            LibraryFileColumn.Kind => row.Kind,
+            LibraryFileColumn.SampleRate => row.SampleRateText,
+            LibraryFileColumn.BitDepth => row.BitDepthText,
+            LibraryFileColumn.Channels => row.ChannelsText,
+            LibraryFileColumn.BitRate => row.BitRateText,
+            LibraryFileColumn.Size => row.SizeText,
+            LibraryFileColumn.Folder => row.Folder,
+            LibraryFileColumn.Jacket => row.JacketText,
+            _ => row.Name,
+        };
 
     private void SetColumnHeader(LibraryFileColumn column, string header)
     {
-        if (_columns.TryGetValue(column, out var gridColumn))
+        if (_sortHeaders.TryGetValue(column, out var sortHeader))
         {
-            gridColumn.Header = header;
+            sortHeader.Label = header;
+        }
+    }
+
+    /// <summary>
+    /// ItemsSource の差し替えで DataGrid が SortDirection を落としても、見出し側の ▼▲ は残す。
+    /// </summary>
+    private void RefreshSortChrome()
+    {
+        ApplySortChrome();
+        var ticket = ++_sortChromeTicket;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (ticket == _sortChromeTicket)
+                {
+                    ApplySortChrome();
+                }
+            },
+            DispatcherPriority.ContextIdle);
+    }
+
+    private void ApplySortChrome()
+    {
+        var ascending = _sortDirection == LibrarySortDirection.Ascending;
+        var direction = ascending
+            ? ListSortDirection.Ascending
+            : ListSortDirection.Descending;
+        foreach (var pair in _sortHeaders)
+        {
+            pair.Value.ShowSort(pair.Key == _sortColumn, ascending);
+        }
+
+        foreach (var item in _columns)
+        {
+            var next = item.Key == _sortColumn ? (ListSortDirection?)direction : null;
+            if (!Equals(item.Value.SortDirection, next))
+            {
+                item.Value.SortDirection = next;
+            }
         }
     }
 
@@ -2070,6 +2851,7 @@ internal sealed class LibraryBrowserView : UserControl
                 : null;
         }
 
+        RefreshSortChrome();
         var active = SelectedSession;
         var selected = SelectedSessions;
         _rows = LibraryFileList.Sort(_rows, _sortColumn, _sortDirection);
@@ -2109,7 +2891,7 @@ internal sealed class LibraryBrowserView : UserControl
     {
         if (SelectedSession is { } session)
         {
-            SessionActivated?.Invoke(this, session);
+            SessionPlayRequested?.Invoke(this, session);
         }
     }
 
@@ -2124,116 +2906,11 @@ internal sealed class LibraryBrowserView : UserControl
         var active = SelectedSession;
         var selected = SelectedSessions;
         LibraryFileList.ApplyGroupKeys(_rows, _group);
-        SyncGroupColumnHeadersVisibility();
+        SyncGroupChrome();
         BindRows(active, selected);
         InvalidateGroupJackets();
         _ = EnsureGroupArtworkAsync();
         GroupChanged?.Invoke(this, group);
-    }
-
-    private void Jacket_PreviewDragOver(object sender, DragEventArgs e)
-    {
-        if (!TryGetDroppedImage(e, out _))
-        {
-            return;
-        }
-
-        e.Effects = JacketReplaceEnabled ? DragDropEffects.Copy : DragDropEffects.None;
-        e.Handled = true;
-    }
-
-    private void Jacket_Drop(object sender, DragEventArgs e)
-    {
-        if (!TryGetDroppedImage(e, out var path))
-        {
-            return;
-        }
-
-        e.Handled = true;
-        if (!JacketReplaceEnabled)
-        {
-            return;
-        }
-
-        ArtworkDropped?.Invoke(this, path);
-    }
-
-    internal static bool TryGetDroppedImage(DragEventArgs e, out string path)
-    {
-        path = string.Empty;
-        if (!e.Data.GetDataPresent(DataFormats.FileDrop)
-            || e.Data.GetData(DataFormats.FileDrop) is not string[] files
-            || files.Length == 0)
-        {
-            return false;
-        }
-
-        foreach (var file in files)
-        {
-            if (Id3Artwork.IsImagePath(file) && File.Exists(file))
-            {
-                path = file;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    internal static bool TryReadImageBytes(string path, out byte[] bytes)
-    {
-        bytes = [];
-        try
-        {
-            bytes = File.ReadAllBytes(path);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            return false;
-        }
-
-        if (bytes.Length == 0)
-        {
-            return false;
-        }
-
-        var mime = Id3Artwork.LooksLikeImage(bytes) ? Id3Artwork.MimeFromImage(bytes) : string.Empty;
-        if (mime is "image/jpeg" or "image/png")
-        {
-            return true;
-        }
-
-        return TryEncodePng(bytes, out bytes);
-    }
-
-    private static bool TryEncodePng(byte[] source, out byte[] png)
-    {
-        png = [];
-        try
-        {
-            BitmapSource bitmap;
-            using (var stream = new MemoryStream(source, writable: false))
-            {
-                var image = new BitmapImage();
-                image.BeginInit();
-                image.CacheOption = BitmapCacheOption.OnLoad;
-                image.StreamSource = stream;
-                image.EndInit();
-                image.Freeze();
-                bitmap = image;
-            }
-
-            var encoder = new PngBitmapEncoder();
-            encoder.Frames.Add(BitmapFrame.Create(bitmap));
-            using var output = new MemoryStream();
-            encoder.Save(output);
-            png = output.ToArray();
-            return png.Length > 0;
-        }
-        catch (Exception ex) when (ex is IOException or NotSupportedException or ArgumentException)
-        {
-            return false;
-        }
     }
 
     private bool TryPatchBoundRows(IReadOnlyList<LibraryFileRow> rows)
@@ -2280,36 +2957,75 @@ internal sealed class LibraryBrowserView : UserControl
     private void ApplyGlowVeil()
     {
         var light = UiThemeService.Current == UiTheme.Light;
-        _veil.Opacity = GlowVeilOpacityFor(UiThemeService.Current);
+        var opacity = GlowVeilOpacityFor(UiThemeService.Current);
+        _veil.Opacity = opacity;
+        _waveVeil.Opacity = opacity;
         if (light)
         {
             _veil.Background = Brushes.White;
+            _waveVeil.Background = Brushes.White;
         }
         else
         {
             _veil.SetResourceReference(Border.BackgroundProperty, "SurfaceBackBrush");
+            _waveVeil.SetResourceReference(Border.BackgroundProperty, "SurfaceBackBrush");
         }
     }
 
-    private void ApplyArtworkGlow(BitmapSource? bitmap)
+    /// <summary>
+    /// リストと波形をまたぐ一枚のウォッシュ。プレイヤー中だけ伸ばし、リスト側の別アニメは畳む。
+    /// </summary>
+    internal void BindWaveformGlow(Grid host)
     {
-        var show = bitmap is not null;
-        var glowChanged = _artworkGlow != show;
-        _artworkGlow = show;
-        if (show)
+        _waveGlowHost = host;
+        var drift = new TransformGroup();
+        drift.Children.Add(_waveGlowScale);
+        drift.Children.Add(_waveGlowTranslate);
+        _waveGlow.RenderTransform = drift;
+        _waveGlow.RenderTransformOrigin = new Point(0.5, 0.5);
+        _waveGlow.IsHitTestVisible = false;
+        _waveGlow.SnapsToDevicePixels = false;
+        _waveGlow.UseLayoutRounding = false;
+        _waveGlow.Margin = new Thickness(-GlowDriftBleed);
+        _waveGlow.Visibility = Visibility.Collapsed;
+        _waveVeil.IsHitTestVisible = false;
+        _waveVeil.Visibility = Visibility.Collapsed;
+        host.Children.Add(_waveGlow);
+        host.Children.Add(_waveVeil);
+        ApplyGlowVeil();
+        if (_artworkGlow && _glowHost.Background is { } brush)
         {
-            _glowHost.Background = CreateAmbientWash(bitmap!);
-            _glowHost.Visibility = Visibility.Visible;
-            _veil.Visibility = Visibility.Visible;
-        }
-        else
-        {
-            _glowHost.Visibility = Visibility.Collapsed;
-            _veil.Visibility = Visibility.Collapsed;
-            _glowHost.Background = null;
+            _waveGlow.Background = brush;
         }
 
-        SyncGlowDrift();
+        PlaceArtworkGlow();
+        RestartGlowDrift();
+    }
+
+    /// <summary>プレイヤー表示中は波形まで一枚で広げる。編集画面では畳む。</summary>
+    internal void SetGlowExtendsWaveform(bool extend)
+    {
+        if (_extendGlow == extend)
+        {
+            return;
+        }
+
+        _extendGlow = extend;
+        PlaceArtworkGlow();
+        RestartGlowDrift();
+    }
+
+    private bool UseUnifiedGlow => _artworkGlow && _extendGlow && _waveGlowHost is not null;
+
+    private void ApplyArtworkGlow(BitmapSource? bitmap)
+    {
+        var wash = bitmap is null ? CreateFallbackAmbientWash() : CreateAmbientWash(bitmap);
+        var glowChanged = !_artworkGlow;
+        _artworkGlow = true;
+        _glowHost.Background = wash;
+        _waveGlow.Background = wash;
+        PlaceArtworkGlow();
+        RestartGlowDrift();
 
         if (glowChanged)
         {
@@ -2326,6 +3042,68 @@ internal sealed class LibraryBrowserView : UserControl
                 EndRowSync();
             }
         }
+    }
+
+    private void PlaceArtworkGlow()
+    {
+        if (UseUnifiedGlow)
+        {
+            if (_glowHost.Background is { } wash)
+            {
+                _waveGlow.Background = wash;
+            }
+
+            _glowHost.Visibility = Visibility.Collapsed;
+            _veil.Visibility = Visibility.Collapsed;
+            _waveGlow.Visibility = Visibility.Visible;
+            _waveVeil.Visibility = Visibility.Visible;
+            _waveGlowHost!.Visibility = Visibility.Visible;
+            Background = Brushes.Transparent;
+            _root.Background = Brushes.Transparent;
+            return;
+        }
+
+        if (_artworkGlow)
+        {
+            _glowHost.Visibility = Visibility.Visible;
+            _veil.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            _glowHost.Visibility = Visibility.Collapsed;
+            _veil.Visibility = Visibility.Collapsed;
+            _glowHost.Background = null;
+        }
+
+        HideWaveGlowHost();
+        RestoreLibrarySurface();
+    }
+
+    private void HideWaveGlowHost()
+    {
+        _waveGlow.Visibility = Visibility.Collapsed;
+        _waveVeil.Visibility = Visibility.Collapsed;
+        _waveGlow.Background = null;
+        if (_waveGlowHost is not null)
+        {
+            _waveGlowHost.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void RestoreLibrarySurface()
+    {
+        SetResourceReference(BackgroundProperty, "SurfaceBackBrush");
+        _root.SetResourceReference(Panel.BackgroundProperty, "SurfaceBackBrush");
+    }
+
+    private void RestartGlowDrift()
+    {
+        if (_glowDriftRunning)
+        {
+            StopGlowDrift();
+        }
+
+        SyncGlowDrift();
     }
 
     private void SyncGlowDrift()
@@ -2348,11 +3126,24 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void StartGlowDrift()
     {
-        _glowScale.BeginAnimation(ScaleTransform.ScaleXProperty, CreateGlowDriftPulse(GlowDriftScaleFrom, GlowDriftScaleTo, GlowDriftScaleSeconds));
-        _glowScale.BeginAnimation(ScaleTransform.ScaleYProperty, CreateGlowDriftPulse(GlowDriftScaleFrom, GlowDriftScaleTo, GlowDriftScaleSeconds));
-        _glowTranslate.BeginAnimation(TranslateTransform.XProperty, CreateGlowDriftPulse(-GlowDriftX, GlowDriftX, GlowDriftXSeconds));
-        _glowTranslate.BeginAnimation(TranslateTransform.YProperty, CreateGlowDriftPulse(-GlowDriftY, GlowDriftY, GlowDriftYSeconds));
+        if (UseUnifiedGlow)
+        {
+            AnimateGlowDrift(_waveGlowScale, _waveGlowTranslate);
+        }
+        else
+        {
+            AnimateGlowDrift(_glowScale, _glowTranslate);
+        }
+
         _glowDriftRunning = true;
+    }
+
+    private static void AnimateGlowDrift(ScaleTransform scale, TranslateTransform translate)
+    {
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, CreateGlowDriftPulse(GlowDriftScaleFrom, GlowDriftScaleTo, GlowDriftScaleSeconds));
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, CreateGlowDriftPulse(GlowDriftScaleFrom, GlowDriftScaleTo, GlowDriftScaleSeconds));
+        translate.BeginAnimation(TranslateTransform.XProperty, CreateGlowDriftPulse(-GlowDriftX, GlowDriftX, GlowDriftXSeconds));
+        translate.BeginAnimation(TranslateTransform.YProperty, CreateGlowDriftPulse(-GlowDriftY, GlowDriftY, GlowDriftYSeconds));
     }
 
     private void StopGlowDrift()
@@ -2361,10 +3152,18 @@ internal sealed class LibraryBrowserView : UserControl
         _glowScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
         _glowTranslate.BeginAnimation(TranslateTransform.XProperty, null);
         _glowTranslate.BeginAnimation(TranslateTransform.YProperty, null);
+        _waveGlowScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        _waveGlowScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        _waveGlowTranslate.BeginAnimation(TranslateTransform.XProperty, null);
+        _waveGlowTranslate.BeginAnimation(TranslateTransform.YProperty, null);
         _glowScale.ScaleX = GlowDriftScaleFrom;
         _glowScale.ScaleY = GlowDriftScaleFrom;
         _glowTranslate.X = 0;
         _glowTranslate.Y = 0;
+        _waveGlowScale.ScaleX = GlowDriftScaleFrom;
+        _waveGlowScale.ScaleY = GlowDriftScaleFrom;
+        _waveGlowTranslate.X = 0;
+        _waveGlowTranslate.Y = 0;
         _glowDriftRunning = false;
     }
 
@@ -2404,13 +3203,40 @@ internal sealed class LibraryBrowserView : UserControl
     internal static Brush CreateAmbientWash(BitmapSource source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        var colors = SampleArtworkColors(source, 3);
+        return CreateWash(SampleArtworkColors(source, 3));
+    }
+
+    /// <summary>ジャケットが無い、または未読み込みのときのネイビー・シアン・白。</summary>
+    internal static Brush CreateFallbackAmbientWash()
+    {
+        if (_fallbackAmbientWash is not null)
+        {
+            return _fallbackAmbientWash;
+        }
+
+        var group = new DrawingGroup();
+        var navy = new SolidColorBrush(FallbackWashNavy);
+        navy.Freeze();
+        group.Children.Add(new GeometryDrawing(navy, null, new RectangleGeometry(new Rect(0, 0, 1, 1))));
+        AddColorBlob(group, FallbackWashCyan, new Point(0.72, 0.38), 0.52, alpha: 200);
+        AddColorBlob(group, FallbackWashWhite, new Point(0.30, 0.62), 0.46, alpha: 175);
+        AddColorBlob(group, FallbackWashNavy, new Point(0.50, 0.22), 0.58, alpha: 170);
+        _fallbackAmbientWash = FreezeWash(group);
+        return _fallbackAmbientWash;
+    }
+
+    private static Brush CreateWash(Color[] colors)
+    {
         var group = new DrawingGroup();
         AddColorBlob(group, colors[0], new Point(0.32, 0.38), 0.55, alpha: 210);
         AddColorBlob(group, colors[1], new Point(0.72, 0.42), 0.50, alpha: 180);
         AddColorBlob(group, colors[2], new Point(0.48, 0.78), 0.58, alpha: 160);
-        group.Freeze();
+        return FreezeWash(group);
+    }
 
+    private static DrawingBrush FreezeWash(DrawingGroup group)
+    {
+        group.Freeze();
         var brush = new DrawingBrush(group)
         {
             Stretch = Stretch.Fill,
@@ -2768,7 +3594,17 @@ internal sealed class LibraryBrowserView : UserControl
     private void InvalidateGroupJackets()
     {
         _groupJackets.Clear();
-        GroupArtworkChanged?.Invoke();
+        if (_groupJacketsInvalidateQueued)
+        {
+            return;
+        }
+
+        _groupJacketsInvalidateQueued = true;
+        Dispatcher.BeginInvoke(() =>
+        {
+            _groupJacketsInvalidateQueued = false;
+            GroupArtworkChanged?.Invoke();
+        }, DispatcherPriority.Background);
     }
 
     private async Task EnsureGroupArtworkAsync()
@@ -2786,7 +3622,7 @@ internal sealed class LibraryBrowserView : UserControl
             if (row.Tag is not DocumentSession session
                 || !seen.Add(row.GroupKey)
                 || session.Document.HasArtwork
-                || session.Document.SourceKind != AudioFileKind.Mp3
+                || session.Document.SourceKind is not (AudioFileKind.Mp3 or AudioFileKind.M4a)
                 || session.Document.SourcePath is not { Length: > 0 } path)
             {
                 continue;
@@ -2802,14 +3638,15 @@ internal sealed class LibraryBrowserView : UserControl
                 return;
             }
 
+            var kind = session.Document.SourceKind;
             var bytes = await Task.Run(() =>
             {
-                if (Id3Artwork.TryRead(path, out var art))
+                if (kind == AudioFileKind.M4a)
                 {
-                    return art;
+                    return M4aArtwork.TryRead(path, out var art) ? art : [];
                 }
 
-                return Array.Empty<byte>();
+                return Id3Artwork.TryRead(path, out var mp3) ? mp3 : [];
             }).ConfigureAwait(true);
             if (gen != _groupArtLoad || bytes.Length == 0)
             {
@@ -2821,144 +3658,243 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
-    private sealed record GroupOption(LibraryFileGroup Group, string Label);
-}
-
-internal sealed class LibraryGroupColumnHeaders : Border
-{
-    private readonly StackPanel _row = new() { Orientation = Orientation.Horizontal };
-    private readonly TranslateTransform _scroll = new();
-    private LibraryBrowserView? _owner;
-    private bool _syncing;
-
-    public LibraryGroupColumnHeaders()
+    private void RebuildExplorerContextMenu()
     {
-        ClipToBounds = true;
-        SnapsToDevicePixels = true;
-        Background = Brushes.Transparent;
-        BorderThickness = new Thickness(0, 0, 0, 1);
-        SetResourceReference(BorderBrushProperty, "ChromeBorderBrush");
-        Padding = new Thickness(0, 0, 0, 2);
-        var host = new Grid { ClipToBounds = true, Height = 24 };
-        _row.RenderTransform = _scroll;
-        _row.HorizontalAlignment = HorizontalAlignment.Left;
-        _row.VerticalAlignment = VerticalAlignment.Center;
-        host.Children.Add(_row);
-        Child = host;
-        Loaded += OnLoaded;
-        Unloaded += OnUnloaded;
-        SizeChanged += (_, _) => Sync();
+        var menu = new ContextMenu();
+        var replace = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuReplacePlaylist,
+            InputGestureText = "Enter",
+        };
+        replace.Click += (_, _) => ReplacePlaylistFromSelection();
+        var append = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuAppendPlaylist,
+            InputGestureText = "Shift+Enter",
+        };
+        append.Click += (_, _) => OpenSelectedFolder();
+        var add = new MenuItem { Header = UiStrings.LibraryMenuAddToFavorites };
+        add.Click += (_, _) => AddSelectedExplorerToFavorites();
+        menu.Items.Add(replace);
+        menu.Items.Add(append);
+        menu.Items.Add(add);
+        menu.Opened += (_, _) =>
+        {
+            var enabled = SelectedExplorerFolders.Length > 0;
+            replace.IsEnabled = enabled;
+            append.IsEnabled = enabled;
+            add.IsEnabled = enabled;
+        };
+        _folderTree.ContextMenu = menu;
     }
 
-    private void OnLoaded(object sender, RoutedEventArgs e)
+    private void RebuildFavoritesContextMenu()
     {
-        _owner = FindOwner();
-        if (_owner is null)
+        var menu = new ContextMenu();
+        var remove = new MenuItem { Header = UiStrings.LibraryMenuRemoveFromFavorites };
+        remove.Click += (_, _) => RemoveSelectedFavorites();
+        menu.Items.Add(remove);
+        menu.Opened += (_, _) =>
         {
-            return;
-        }
-
-        _owner.GroupColumnHeadersChanged -= OnOwnerChanged;
-        _owner.GroupColumnHeadersChanged += OnOwnerChanged;
-        _owner.GroupHeaderScrollOffsetChanged -= OnScrollOffset;
-        _owner.GroupHeaderScrollOffsetChanged += OnScrollOffset;
-        Sync();
+            remove.IsEnabled = SelectedFavoritePaths.Length > 0;
+        };
+        _favoritesList.ContextMenu = menu;
     }
 
-    private void OnUnloaded(object sender, RoutedEventArgs e)
+    private void RebuildListContextMenu()
     {
-        if (_owner is null)
+        var menu = new ContextMenu();
+        var clear = new MenuItem { Header = UiStrings.LibraryMenuClearFromPlaylist };
+        clear.Click += (_, _) => ClearPlaylistRequested?.Invoke(this, EventArgs.Empty);
+        menu.Items.Add(clear);
+        menu.Opened += (_, _) =>
         {
-            return;
-        }
-
-        _owner.GroupColumnHeadersChanged -= OnOwnerChanged;
-        _owner.GroupHeaderScrollOffsetChanged -= OnScrollOffset;
-        _owner = null;
+            clear.IsEnabled = SelectedSessions.Length > 0;
+        };
+        _grid.ContextMenu = menu;
     }
 
-    private void OnOwnerChanged(object? sender, EventArgs e) => Sync();
-
-    private void OnScrollOffset(object? sender, double offset) =>
-        _scroll.X = -offset;
-
-    private void Sync()
+    private void FavoritesList_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (_syncing)
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None)
         {
+            RemoveSelectedFavorites();
+            e.Handled = true;
             return;
         }
 
-        var owner = _owner ?? FindOwner();
-        if (owner is null)
+        if (key == Key.Enter
+            && Keyboard.Modifiers is ModifierKeys.None or ModifierKeys.Shift)
         {
-            return;
-        }
-
-        _syncing = true;
-        try
-        {
-            _row.Children.Clear();
-            foreach (var (header, width, column) in owner.EnumerateVisibleGridColumns())
+            var paths = SelectedFavoritePaths;
+            if (paths.Length == 0)
             {
-                var label = new TextBlock
-                {
-                    Text = header,
-                    FontWeight = FontWeights.SemiBold,
-                    FontSize = 11,
-                    Margin = new Thickness(8, 2, 8, 2),
-                    VerticalAlignment = VerticalAlignment.Center,
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                };
-                label.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
-
-                var cell = new Border
-                {
-                    Width = Math.Max(24, width),
-                    Child = label,
-                    Background = Brushes.Transparent,
-                    BorderThickness = new Thickness(0, 0, 1, 0),
-                    Cursor = Cursors.Hand,
-                    Tag = column,
-                };
-                cell.SetResourceReference(Border.BorderBrushProperty, "ChromeBorderBrush");
-                cell.MouseLeftButtonUp += Header_Click;
-                _row.Children.Add(cell);
+                e.Handled = true;
+                return;
             }
-        }
-        finally
-        {
-            _syncing = false;
+
+            FavoritesActivated?.Invoke(
+                this,
+                new LibraryFavoritesActivateEventArgs(paths, clearPlaylist: Keyboard.Modifiers == ModifierKeys.None));
+            e.Handled = true;
         }
     }
 
-    private void Header_Click(object sender, MouseButtonEventArgs e)
+    private void FavoritesList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not FrameworkElement { Tag: DataGridColumn column })
+        _favoritesDragStart = e.GetPosition(null);
+    }
+
+    private void FavoritesList_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_favoritesDragStart is null || e.LeftButton != MouseButtonState.Pressed)
         {
             return;
         }
 
-        (_owner ?? FindOwner())?.SortByGridColumn(column);
+        var paths = SelectedFavoritePaths;
+        if (paths.Length == 0)
+        {
+            return;
+        }
+
+        var delta = e.GetPosition(null) - _favoritesDragStart.Value;
+        if (Math.Abs(delta.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(delta.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        _favoritesDragStart = null;
+        var data = new DataObject(DataFormats.FileDrop, paths);
+        DragDrop.DoDragDrop(_favoritesList, data, DragDropEffects.Copy);
+    }
+
+    private void FavoritesList_PreviewDragOver(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            return;
+        }
+
+        e.Effects = DragDropEffects.Copy;
         e.Handled = true;
     }
 
-    private LibraryBrowserView? FindOwner()
+    private void FavoritesList_Drop(object sender, DragEventArgs e)
     {
-        DependencyObject? current = this;
-        while (current is not null)
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)
+            || e.Data.GetData(DataFormats.FileDrop) is not string[] dropped)
         {
-            if (current is LibraryBrowserView view)
-            {
-                return view;
-            }
-
-            current = VisualTreeHelper.GetParent(current)
-                ?? (current as FrameworkElement)?.Parent;
+            return;
         }
 
-        return null;
+        e.Handled = true;
+        AddFavoritePaths(dropped);
     }
+
+    private sealed record GroupOption(LibraryFileGroup Group, string Label);
+}
+
+/// <summary>
+/// 列見出し。▼▲ を自分で持つ。DataGrid の SortDirection トリガーは読み込みで消える。
+/// </summary>
+internal sealed class LibrarySortHeader : StackPanel
+{
+    private readonly TextBlock _label;
+    private readonly System.Windows.Shapes.Path _down;
+    private readonly System.Windows.Shapes.Path _up;
+
+    public LibrarySortHeader(string label)
+    {
+        Orientation = Orientation.Horizontal;
+        VerticalAlignment = VerticalAlignment.Center;
+        _label = new TextBlock
+        {
+            Text = label,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var marks = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4, 0, 0, 0),
+        };
+        _down = CreateMark("ArrowDown", "M0,0 L8,0 L4,6 Z");
+        _up = CreateMark("ArrowUp", "M0,6 L8,6 L4,0 Z");
+        marks.Children.Add(_down);
+        marks.Children.Add(_up);
+        Children.Add(_label);
+        Children.Add(marks);
+        ShowSort(active: false, ascending: true);
+    }
+
+    public string Label
+    {
+        get => _label.Text;
+        set => _label.Text = value;
+    }
+
+    public void ShowSort(bool active, bool ascending)
+    {
+        var show = active ? Visibility.Visible : Visibility.Collapsed;
+        _down.Visibility = show;
+        _up.Visibility = show;
+        if (!active)
+        {
+            return;
+        }
+
+        _up.SetResourceReference(
+            System.Windows.Shapes.Shape.FillProperty,
+            ascending ? "AccentCyanBrush" : "PrimaryForeBrush");
+        _down.SetResourceReference(
+            System.Windows.Shapes.Shape.FillProperty,
+            ascending ? "PrimaryForeBrush" : "AccentCyanBrush");
+        _up.Opacity = 1;
+        _down.Opacity = 1;
+    }
+
+    private static System.Windows.Shapes.Path CreateMark(string name, string data) =>
+        new()
+        {
+            Name = name,
+            Data = Geometry.Parse(data),
+            Width = 6,
+            Height = 5,
+            Stretch = Stretch.Fill,
+            Margin = new Thickness(3, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false,
+        };
+}
+
+internal sealed class LibraryFavoritesActivateEventArgs : EventArgs
+{
+    public LibraryFavoritesActivateEventArgs(IReadOnlyList<string> paths, bool clearPlaylist)
+    {
+        Paths = paths;
+        ClearPlaylist = clearPlaylist;
+    }
+
+    public IReadOnlyList<string> Paths { get; }
+
+    public bool ClearPlaylist { get; }
+}
+
+internal sealed class LibraryFavoriteRow
+{
+    public required string Path { get; init; }
+
+    public required string Name { get; init; }
+
+    public static LibraryFavoriteRow FromPath(string path) =>
+        new()
+        {
+            Path = path,
+            Name = LibraryFavoritePaths.DisplayName(path),
+        };
 }
 
 /// <summary>ジャケット下の床映り込み（同寸の上下反転＋接点側が濃く下へフェード）。</summary>
@@ -3053,15 +3989,19 @@ internal sealed class LibraryGroupJacketImage : StackPanel
 {
     private readonly Image _face = new();
     private readonly LibraryJacketReflectionView _reflection;
+    private readonly TranslateTransform _stick = new();
+    private readonly LibraryGroupHorizontalPin _pin;
     private LibraryBrowserView? _owner;
 
     public LibraryGroupJacketImage()
     {
+        _pin = new LibraryGroupHorizontalPin(_stick);
         Orientation = Orientation.Vertical;
         HorizontalAlignment = HorizontalAlignment.Left;
         VerticalAlignment = VerticalAlignment.Top;
         Margin = new Thickness(8, 0, 8, 4);
         Width = DesignMetrics.LibraryGroupJacketSize;
+        RenderTransform = _stick;
 
         var size = DesignMetrics.LibraryGroupJacketSize;
         _face.MaxWidth = size;
@@ -3082,7 +4022,10 @@ internal sealed class LibraryGroupJacketImage : StackPanel
         DataContextChanged += (_, _) => Reload();
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+        SizeChanged += (_, _) => UpdateSticky();
     }
+
+    internal double StickyOffsetY => _stick.Y;
 
     private void SyncReflectionSize()
     {
@@ -3109,13 +4052,17 @@ internal sealed class LibraryGroupJacketImage : StackPanel
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         _owner = FindOwner();
+        _owner?.EnsureGroupScrollHook();
         if (_owner is not null)
         {
             _owner.GroupArtworkChanged -= Reload;
             _owner.GroupArtworkChanged += Reload;
+            _owner.GroupViewportChanged -= OnViewportChanged;
+            _owner.GroupViewportChanged += OnViewportChanged;
         }
 
         Reload();
+        UpdateSticky();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -3123,7 +4070,40 @@ internal sealed class LibraryGroupJacketImage : StackPanel
         if (_owner is not null)
         {
             _owner.GroupArtworkChanged -= Reload;
+            _owner.GroupViewportChanged -= OnViewportChanged;
             _owner = null;
+        }
+
+        _stick.Y = 0;
+        _pin.Reset();
+    }
+
+    private void OnViewportChanged(object? sender, EventArgs e) => UpdateSticky();
+
+    private void UpdateSticky()
+    {
+        if (_owner is null || Parent is not FrameworkElement stage || ActualHeight < 1)
+        {
+            return;
+        }
+
+        _owner.EnsureGroupScrollHook();
+
+        try
+        {
+            var headerBottom = _owner.RowsViewportTop();
+            var natural = TransformToAncestor(_owner.FileGrid).Transform(new Point(0, 0)).Y - _stick.Y;
+            var max = Math.Max(0, stage.ActualHeight - ActualHeight);
+            var offset = Math.Clamp(headerBottom - natural, 0, max);
+            if (Math.Abs(_stick.Y - offset) > 0.5)
+            {
+                _stick.Y = offset;
+            }
+
+            _pin.Update(_owner, this);
+        }
+        catch (InvalidOperationException)
+        {
         }
     }
 
@@ -3138,6 +4118,128 @@ internal sealed class LibraryGroupJacketImage : StackPanel
         Opacity = 1;
         _reflection.Visibility = Visibility.Visible;
         SyncReflectionSize();
+    }
+
+    private LibraryBrowserView? FindOwner()
+    {
+        DependencyObject? current = this;
+        while (current is not null)
+        {
+            if (current is LibraryBrowserView view)
+            {
+                return view;
+            }
+
+            current = VisualTreeHelper.GetParent(current)
+                ?? LogicalTreeHelper.GetParent(current);
+        }
+
+        return null;
+    }
+}
+
+/// <summary>
+/// 横スクロール分だけ右へ戻し、グループ名とジャケットをビューポート左に残す。
+/// </summary>
+internal sealed class LibraryGroupHorizontalPin
+{
+    private readonly TranslateTransform _stick;
+    private double? _restX;
+
+    public LibraryGroupHorizontalPin(TranslateTransform stick) => _stick = stick;
+
+    public void Reset()
+    {
+        _restX = null;
+        _stick.X = 0;
+    }
+
+    public void Update(LibraryBrowserView owner, FrameworkElement element)
+    {
+        double natural;
+        try
+        {
+            natural = element.TransformToAncestor(owner.FileGrid).Transform(new Point(0, 0)).X - _stick.X;
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+
+        var scroll = owner.GroupHorizontalOffset();
+        if (scroll < 1)
+        {
+            _restX = natural;
+        }
+        else
+        {
+            _restX ??= natural + scroll;
+        }
+
+        var target = Math.Max(0, _restX.Value - natural);
+        if (Math.Abs(_stick.X - target) > 0.5)
+        {
+            _stick.X = target;
+        }
+    }
+}
+
+internal sealed class LibraryGroupHeader : TextBlock
+{
+    private readonly TranslateTransform _stick = new();
+    private readonly LibraryGroupHorizontalPin _pin;
+    private LibraryBrowserView? _owner;
+
+    public LibraryGroupHeader()
+    {
+        _pin = new LibraryGroupHorizontalPin(_stick);
+        SetBinding(TextProperty, new Binding("Name"));
+        FontWeight = FontWeights.SemiBold;
+        FontSize = LibraryBrowserView.LibraryListFontSize;
+        Margin = new Thickness(8, 8, 8, 4);
+        VerticalAlignment = VerticalAlignment.Center;
+        HorizontalAlignment = HorizontalAlignment.Left;
+        SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
+        RenderTransform = _stick;
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        _owner = FindOwner();
+        _owner?.EnsureGroupScrollHook();
+        if (_owner is not null)
+        {
+            _owner.GroupViewportChanged -= OnViewportChanged;
+            _owner.GroupViewportChanged += OnViewportChanged;
+        }
+
+        UpdatePin();
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (_owner is not null)
+        {
+            _owner.GroupViewportChanged -= OnViewportChanged;
+            _owner = null;
+        }
+
+        _pin.Reset();
+    }
+
+    private void OnViewportChanged(object? sender, EventArgs e) => UpdatePin();
+
+    private void UpdatePin()
+    {
+        if (_owner is null)
+        {
+            return;
+        }
+
+        _owner.EnsureGroupScrollHook();
+        _pin.Update(_owner, this);
     }
 
     private LibraryBrowserView? FindOwner()

@@ -126,6 +126,81 @@
           </Grid>
         </TabItem>
 
+        <TabItem x:Name="PlayerTab" Header="{x:Static domain:UiStrings.LabelSettingsTabPlayer}">
+          <ScrollViewer VerticalScrollBarVisibility="Auto"
+                        HorizontalScrollBarVisibility="Disabled">
+          <StackPanel MaxWidth="{x:Static ui:DesignMetrics.SettingsPanelWidth}"
+                      HorizontalAlignment="Left">
+            <TextBlock x:Name="LibraryExplorerRootsHeader"
+                       Text="{x:Static domain:UiStrings.LabelLibraryExplorerRoots}"
+                       FontWeight="Bold"
+                       FontSize="11.333"
+                       Margin="0,0,0,4" />
+            <TextBlock x:Name="LibraryExplorerRootsHint"
+                       Text="{x:Static domain:UiStrings.LabelLibraryExplorerRootsHint}"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       Opacity="0.85"
+                       Margin="0,0,0,8" />
+            <ListBox x:Name="LibraryExplorerRootsList"
+                     Height="160"
+                     FontSize="11"
+                     Padding="2"
+                     DisplayMemberPath="Path"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     ScrollViewer.CanContentScroll="False"
+                     SelectionMode="Extended"
+                     AllowDrop="True"
+                     PreviewMouseLeftButtonDown="LibraryExplorerRootsList_PreviewMouseLeftButtonDown"
+                     PreviewMouseMove="LibraryExplorerRootsList_PreviewMouseMove"
+                     DragOver="LibraryExplorerRootsList_DragOver"
+                     Drop="LibraryExplorerRootsList_Drop"
+                     SelectionChanged="LibraryExplorerRootsList_SelectionChanged" />
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+              <ui:RoundedButton x:Name="LibraryExplorerRootAddButton"
+                                Content="{x:Static domain:UiStrings.ButtonLibraryExplorerRootAdd}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="72"
+                                Padding="12,0"
+                                Margin="0,0,8,0"
+                                Click="LibraryExplorerRootAddButton_Click" />
+              <ui:RoundedButton x:Name="LibraryExplorerRootRemoveButton"
+                                Content="{x:Static domain:UiStrings.ButtonLibraryExplorerRootRemove}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="72"
+                                Padding="12,0"
+                                Margin="0,0,8,0"
+                                Click="LibraryExplorerRootRemoveButton_Click" />
+              <ui:RoundedButton x:Name="LibraryExplorerRootUpButton"
+                                Content="{x:Static domain:UiStrings.ButtonLibraryExplorerRootUp}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="72"
+                                Padding="12,0"
+                                Margin="0,0,8,0"
+                                Click="LibraryExplorerRootUpButton_Click" />
+              <ui:RoundedButton x:Name="LibraryExplorerRootDownButton"
+                                Content="{x:Static domain:UiStrings.ButtonLibraryExplorerRootDown}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="72"
+                                Padding="12,0"
+                                Click="LibraryExplorerRootDownButton_Click" />
+            </StackPanel>
+            <TextBlock x:Name="LibraryColumnsHeader"
+                       Text="{x:Static domain:UiStrings.LabelLibraryListColumns}"
+                       FontWeight="Bold"
+                       FontSize="11.333"
+                       Margin="0,16,0,4" />
+            <TextBlock x:Name="LibraryColumnsHint"
+                       Text="{x:Static domain:UiStrings.LabelLibraryListColumnsHint}"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       Opacity="0.85"
+                       Margin="0,0,0,8" />
+            <StackPanel x:Name="LibraryColumnsHost" />
+          </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
         <TabItem x:Name="AudioTab" Header="{x:Static domain:UiStrings.LabelSettingsTabAudio}">
           <Grid x:Name="AudioTabBody">
             <Grid.RowDefinitions>

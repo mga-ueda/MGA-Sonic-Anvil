@@ -63,21 +63,29 @@ internal static class AudioTagProbe
     private static bool TryReadM4a(string path, out AudioFileTags tags)
     {
         tags = AudioFileTags.Empty;
-        if (!AudioCodec.TryProbeStreamFormat(path, out var rate, out var channels, out var bits, out var frames))
+        var hasFormat = AudioCodec.TryProbeStreamFormat(
+            path,
+            out var rate,
+            out var channels,
+            out var bits,
+            out var frames);
+        var builder = new AudioFileTagsBuilder();
+        var hasMeta = M4aArtwork.TryFillTags(path, builder);
+        if (!hasFormat && !hasMeta)
         {
             return false;
         }
 
-        var builder = new AudioFileTagsBuilder
+        if (hasFormat)
         {
-            SampleRate = rate,
-            Channels = channels,
-            BitsPerSample = bits,
-            DurationSeconds = rate > 0 ? frames / (double)rate : 0,
-        };
-        if (builder.DurationSeconds > 0)
-        {
-            builder.BitRateKbps = (int)Math.Round(new FileInfo(path).Length * 8d / builder.DurationSeconds / 1000d);
+            builder.SampleRate = rate;
+            builder.Channels = channels;
+            builder.BitsPerSample = bits;
+            builder.DurationSeconds = rate > 0 ? frames / (double)rate : 0;
+            if (builder.DurationSeconds > 0)
+            {
+                builder.BitRateKbps = (int)Math.Round(new FileInfo(path).Length * 8d / builder.DurationSeconds / 1000d);
+            }
         }
 
         tags = builder.ToTags();

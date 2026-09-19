@@ -73,6 +73,42 @@ public sealed class AudioCodecCollectOpenableTests
     }
 
     [Fact]
+    public void CollectPlayerOpenableDirectoryLayer_RootBeforeChildren()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "mga-anvil-layer-" + Guid.NewGuid().ToString("N"));
+        var nested = Path.Combine(root, "nested");
+        var deep = Path.Combine(nested, "deep");
+        Directory.CreateDirectory(deep);
+        var top = Path.Combine(root, "top.wav");
+        var nestedFile = Path.Combine(nested, "child.mp3");
+        var deepFile = Path.Combine(deep, "leaf.m4a");
+        var skipped = Path.Combine(root, "notes.txt");
+        File.WriteAllText(top, "wav");
+        File.WriteAllText(nestedFile, "mp3");
+        File.WriteAllText(deepFile, "m4a");
+        File.WriteAllText(skipped, "txt");
+        try
+        {
+            AudioCodec.CollectPlayerOpenableDirectoryLayer(root, out var files, out var children);
+            Assert.Equal([top], files);
+            Assert.Equal([nested], children);
+            Assert.DoesNotContain(skipped, files, StringComparer.OrdinalIgnoreCase);
+
+            AudioCodec.CollectPlayerOpenableDirectoryLayer(nested, out files, out children);
+            Assert.Equal([nestedFile], files);
+            Assert.Equal([deep], children);
+
+            AudioCodec.CollectPlayerOpenableDirectoryLayer(deep, out files, out children);
+            Assert.Equal([deepFile], files);
+            Assert.Empty(children);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void CollectOpenable_EmptyFolder_ReturnsNothing()
     {
         var root = Path.Combine(Path.GetTempPath(), "mga-anvil-drop-empty-" + Guid.NewGuid().ToString("N"));

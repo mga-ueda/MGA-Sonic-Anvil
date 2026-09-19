@@ -14,7 +14,7 @@
     <SolidColorBrush x:Key="ChromeDimBrush" Color="#FF5B5B5B" />
     <SolidColorBrush x:Key="ScrollThumbBackBrush" Color="#FF484848" />
     <SolidColorBrush x:Key="ScrollThumbHoverBackBrush" Color="#FF5B5B5B" />
-    <SolidColorBrush x:Key="ScrollThumbPressedBackBrush" Color="#FFEBEBEB" />
+    <SolidColorBrush x:Key="ScrollThumbPressedBackBrush" Color="#FF6E6E6E" />
     <SolidColorBrush x:Key="ScrollThumbGripBrush" Color="#FF969696" />
     <SolidColorBrush x:Key="ControlHoverBorderBrush" Color="#FF505050" />
     <SolidColorBrush x:Key="DialogInputBackBrush" Color="#FF1C1C1E" />

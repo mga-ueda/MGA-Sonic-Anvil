@@ -187,11 +187,20 @@ internal sealed class AppSettings
     /// <summary>F10 リストのグループ。空はアルバム。</summary>
     public string LibraryListGroup { get; set; } = string.Empty;
 
-    /// <summary>F10 左のフォルダツリー。空はマイミュージック。</summary>
+    /// <summary>F10 左のフォルダツリー。空はマイミュージック（ルート解決後）。</summary>
     public string LibraryExplorerPath { get; set; } = string.Empty;
+
+    /// <summary>F10 ツリーのルート。空はマイミュージックのみ。</summary>
+    public string[] LibraryExplorerRoots { get; set; } = [];
+
+    /// <summary>F10 お気に入り（ファイル／フォルダのパス）。存在しないものは起動時に落とす。</summary>
+    public string[] LibraryFavorites { get; set; } = [];
 
     /// <summary>F10 左のフォルダツリー幅。0 以下は既定。</summary>
     public double LibraryExplorerWidth { get; set; }
+
+    /// <summary>F10 お気に入りの高さ比（ツリーとの合計に対するお気に入り側）。0 は半分。</summary>
+    public double LibraryFavoritesSplit { get; set; }
 
     /// <summary>終了時のタイル表示。off / vertical / horizontal / grid。タブが 2 未満なら起動時は無視。</summary>
     public string WaveformTileArrange { get; set; } = string.Empty;
@@ -438,6 +447,18 @@ internal sealed class AppSettings
 
     public void ApplyLibraryExplorerPath(string path) =>
         LibraryExplorerPath = LibraryExplorerPaths.Resolve(path);
+
+    public string[] ResolvedLibraryExplorerRoots() =>
+        LibraryExplorerPaths.ResolveRoots(LibraryExplorerRoots);
+
+    public void ApplyLibraryExplorerRoots(IEnumerable<string> roots) =>
+        LibraryExplorerRoots = LibraryExplorerPaths.SerializeRoots(roots);
+
+    public string[] ResolvedLibraryFavoritePaths() =>
+        LibraryFavoritePaths.Resolve(LibraryFavorites);
+
+    public void ApplyLibraryFavoritePaths(IEnumerable<string> paths) =>
+        LibraryFavorites = LibraryFavoritePaths.Serialize(paths);
 }
 
 [JsonSerializable(typeof(AppSettings))]

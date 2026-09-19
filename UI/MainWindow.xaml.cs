@@ -101,17 +101,27 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        LibraryBrowser.BindWaveformGlow(PlayerWaveGlowHost);
         LibraryBrowser.SessionActivated += LibraryBrowser_SessionActivated;
-        LibraryBrowser.ArtworkDropped += LibraryBrowser_ArtworkDropped;
+        LibraryBrowser.SessionPlayRequested += LibraryBrowser_SessionPlayRequested;
         LibraryBrowser.VisibleColumnsChanged += LibraryBrowser_VisibleColumnsChanged;
         LibraryBrowser.GroupChanged += LibraryBrowser_GroupChanged;
         LibraryBrowser.ExplorerFolderChanged += LibraryBrowser_ExplorerFolderChanged;
         LibraryBrowser.ExplorerFolderOpened += LibraryBrowser_ExplorerFolderOpened;
+        LibraryBrowser.ExplorerFoldersOpened += LibraryBrowser_ExplorerFoldersOpened;
         LibraryBrowser.ExplorerWidthChanged += LibraryBrowser_ExplorerWidthChanged;
+        LibraryBrowser.FavoritesSplitChanged += LibraryBrowser_FavoritesSplitChanged;
+        LibraryBrowser.FavoritesChanged += LibraryBrowser_FavoritesChanged;
+        LibraryBrowser.FavoritesActivated += LibraryBrowser_FavoritesActivated;
+        LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
+        LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;
         LibraryBrowser.SetVisibleColumns(AppStorage.Settings.ResolvedLibraryListColumns());
         LibraryBrowser.SetGroup(AppStorage.Settings.ResolvedLibraryListGroup());
+        LibraryBrowser.SetExplorerRoots(AppStorage.Settings.ResolvedLibraryExplorerRoots());
         LibraryBrowser.SetExplorerFolder(AppStorage.Settings.ResolvedLibraryExplorerPath());
         LibraryBrowser.SetExplorerWidth(AppStorage.Settings.LibraryExplorerWidth);
+        LibraryBrowser.SetFavoritesSplit(AppStorage.Settings.LibraryFavoritesSplit);
+        LibraryBrowser.SetFavorites(AppStorage.Settings.ResolvedLibraryFavoritePaths());
         DpiChanged += (_, _) =>
         {
             _brandLogoDark = null;
@@ -577,6 +587,7 @@ public partial class MainWindow : Window
         TipService.Set(TabScrollLeft, UiStrings.TipTabScrollLeft);
         TipService.Set(TabScrollRight, UiStrings.TipTabScrollRight);
         Transport.ApplyLocalizedTips();
+        Transport.SetMaximizeMode(_waveformMaximizeMode);
         SpeakerMenuLabel.Text = UiStrings.LabelStatusSpeaker;
         TipService.Set(SpeakerMenuLabel, UiStrings.TipSpeakerSwitch, respectsEnabled: false);
         TipService.Set(SpeakerMenu, UiStrings.TipSpeakerSwitch);
@@ -884,7 +895,6 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// ファイル／フォルダのドロップ。F10 / F11 / F12 / 通常表示を問わず同じ。
-    /// ジャケット上の画像だけ F10 で差し替え、それ以外は対応拡張子を開く。
     /// </summary>
     private void MainWindow_DragOver(object sender, DragEventArgs e)
     {
@@ -896,22 +906,19 @@ public partial class MainWindow : Window
         }
 
         if (IsLibraryMaximized
-            && e.OriginalSource is System.Windows.DependencyObject origin
-            && LibraryBrowser.IsJacketOrigin(origin)
-            && LibraryBrowserView.TryGetDroppedImage(e, out _))
+            && e.OriginalSource is System.Windows.DependencyObject treeOrigin
+            && LibraryBrowser.IsExplorerOrigin(treeOrigin))
         {
-            e.Effects = LibraryBrowser.JacketReplaceEnabled
-                ? DragDropEffects.Copy
-                : DragDropEffects.None;
+            e.Effects = DragDropEffects.None;
             e.Handled = true;
             return;
         }
 
         if (IsLibraryMaximized
-            && e.OriginalSource is System.Windows.DependencyObject treeOrigin
-            && LibraryBrowser.IsExplorerOrigin(treeOrigin))
+            && e.OriginalSource is System.Windows.DependencyObject favoritesOrigin
+            && LibraryBrowser.IsFavoritesOrigin(favoritesOrigin))
         {
-            e.Effects = DragDropEffects.None;
+            e.Effects = DragDropEffects.Copy;
             e.Handled = true;
             return;
         }
@@ -929,24 +936,18 @@ public partial class MainWindow : Window
         }
 
         if (IsLibraryMaximized
-            && e.OriginalSource is System.Windows.DependencyObject origin
-            && LibraryBrowser.IsJacketOrigin(origin)
-            && LibraryBrowserView.TryGetDroppedImage(e, out var image))
-        {
-            e.Handled = true;
-            if (LibraryBrowser.JacketReplaceEnabled)
-            {
-                LibraryBrowser_ArtworkDropped(LibraryBrowser, image);
-            }
-
-            return;
-        }
-
-        if (IsLibraryMaximized
             && e.OriginalSource is System.Windows.DependencyObject treeOrigin
             && LibraryBrowser.IsExplorerOrigin(treeOrigin))
         {
             e.Handled = true;
+            return;
+        }
+
+        // お気に入りへのドロップは登録だけ。プレイリストへは足さない。
+        if (IsLibraryMaximized
+            && e.OriginalSource is System.Windows.DependencyObject favoritesOrigin
+            && LibraryBrowser.IsFavoritesOrigin(favoritesOrigin))
+        {
             return;
         }
 

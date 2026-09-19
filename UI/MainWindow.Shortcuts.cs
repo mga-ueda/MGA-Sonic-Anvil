@@ -22,7 +22,11 @@ public partial class MainWindow
         if (TryProcessShortcut(key, modifiers))
         {
             e.Handled = true;
-            KeepLibraryListActive();
+            // F1–F3 はペイン切替そのものなので、直後にリストへ引き戻さない。
+            if (modifiers != ModifierKeys.None || key is not (Key.F1 or Key.F2 or Key.F3))
+            {
+                KeepLibraryListActive();
+            }
         }
     }
 
@@ -254,12 +258,46 @@ public partial class MainWindow
             return false;
         }
 
+        // プレイヤー専用: F1 ツリー / F2 お気に入り / F3 プレイリスト
+        if (IsLibraryMaximized
+            && modifiers == ModifierKeys.None
+            && key is Key.F1 or Key.F2 or Key.F3)
+        {
+            switch (key)
+            {
+                case Key.F1:
+                    LibraryBrowser.FocusExplorer();
+                    break;
+                case Key.F2:
+                    LibraryBrowser.FocusFavorites();
+                    break;
+                default:
+                    LibraryBrowser.FocusList();
+                    break;
+            }
+
+            return true;
+        }
+
         if (IsLibraryExplorerFocused)
         {
             if (key == Key.Enter && modifiers == ModifierKeys.None)
             {
+                ReplaceLibraryFromExplorerFolder();
+                return true;
+            }
+
+            if (key == Key.Enter && modifiers == ModifierKeys.Shift)
+            {
+                // プレイリストへ足すだけ。再生は始めず、再生中も止めない。
                 LibraryBrowser.OpenSelectedFolder();
                 return true;
+            }
+
+            if (LibraryPlayerMode.ExplorerOwnsHorizontal(key, modifiers))
+            {
+                StopPlaybackShuttle();
+                return false;
             }
 
             if (LibraryPlayerMode.BlocksExplorerKey(key, modifiers))
@@ -267,7 +305,36 @@ public partial class MainWindow
                 return true;
             }
 
-            return false;
+            // Ctrl+Q などアプリ共通ショートカットは続行。タイプアヘッドはツリーへ渡す。
+            if (!LibraryPlayerMode.AllowsKey(key, modifiers))
+            {
+                return false;
+            }
+        }
+
+        if (IsLibraryFavoritesFocused)
+        {
+            // Enter / Shift+Enter / Delete はお気に入りリスト側で処理。
+            // ここで握るとプレイリストの Enter（再生）に吸われ、追加されない。
+            if (key == Key.Enter && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+            {
+                return false;
+            }
+
+            if (key == Key.Delete && modifiers == ModifierKeys.None)
+            {
+                return false;
+            }
+
+            if (LibraryPlayerMode.BlocksExplorerKey(key, modifiers))
+            {
+                return true;
+            }
+
+            if (!LibraryPlayerMode.AllowsKey(key, modifiers))
+            {
+                return false;
+            }
         }
 
         if (StatusTimes.IsTimeFocused)
@@ -321,19 +388,24 @@ public partial class MainWindow
             }
 
             if (key == Key.Enter
-                && modifiers == ModifierKeys.None
-                && !LibraryBrowser.IsColumnFilterFocused)
+                && modifiers == ModifierKeys.None)
             {
                 _ = PlayLibrarySessionAsync(LibraryBrowser.SelectedSession ?? _activeSession);
                 return true;
             }
 
             // リストから外すだけ。ディスク上のファイルは絶対に消さない。
-            if (key == Key.Delete
-                && modifiers == ModifierKeys.None
-                && LibraryBrowser.IsListKeyboardFocused)
+            // 波形にフォーカスが残っていても、選択行を外す。
+            if (key == Key.Delete && modifiers == ModifierKeys.None)
             {
                 RemoveLibrarySelectedFromList();
+                return true;
+            }
+
+            // タブを閉じない。リストから外すのも Delete のみ。
+            if (key == Key.W
+                && modifiers is ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift))
+            {
                 return true;
             }
 

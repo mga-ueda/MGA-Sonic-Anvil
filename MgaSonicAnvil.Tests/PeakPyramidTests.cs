@@ -173,6 +173,8 @@ public sealed class PeakPyramidTests
         var peaks = PeakPyramid.BuildPlayerDisplay(samples, 2, samples.Length);
         Assert.Equal(1, peaks.Channels);
         Assert.Equal(frames, peaks.FrameCount);
+        Assert.Equal(frames, peaks.FilledFrames);
+        Assert.False(peaks.IsBuilding);
         Assert.True(peaks.BaseBucketFrames >= 4);
         Assert.True(peaks.NeedsEditorDetail);
 
@@ -182,5 +184,32 @@ public sealed class PeakPyramidTests
         var column = (int)(peakAt * 128L / frames);
         Assert.True(maxs[column] >= 0.95f - 1e-5);
         Assert.True(mins[column] <= -0.95f + 1e-5);
+    }
+
+    [Fact]
+    public void FindNextAudibleFrame_SkipsSilentPrefix()
+    {
+        var frames = PeakPyramid.PlayerDisplayBaseBuckets * 4;
+        var samples = new float[frames];
+        var audibleAt = frames / 2;
+        samples[audibleAt] = 0.5f;
+        var peaks = PeakPyramid.BuildPlayerDisplay(samples, 1, samples.Length);
+        var threshold = SilentSkip.LinearFromDb(-60);
+
+        Assert.True(peaks.TryIsSilent(0, threshold, holdFrames: 0, out var leading));
+        Assert.True(leading);
+
+        var next = peaks.FindNextAudibleFrame(0, frames, threshold);
+        Assert.InRange(next, audibleAt - peaks.BaseBucketFrames, audibleAt);
+
+        Assert.True(peaks.TryIsSilent(audibleAt, threshold, holdFrames: 0, out var atAudio));
+        Assert.False(atAudio);
+    }
+
+    [Fact]
+    public void TryIsSilent_EmptyPeaks_CannotDecide()
+    {
+        Assert.False(PeakPyramid.Empty.TryIsSilent(0, 0.001f, 0, out _));
+        Assert.Equal(0, PeakPyramid.Empty.FindNextAudibleFrame(0, 100, 0.001f));
     }
 }

@@ -84,7 +84,7 @@ internal sealed class AudioStreamSource : IDisposable
         }
     }
 
-    public void SeekFrame(long frame)
+    public void SeekFrame(long frame, int prebufferTimeoutMs = 3000)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_reader is null)
@@ -113,7 +113,10 @@ internal sealed class AudioStreamSource : IDisposable
         ResetProvider();
         var version = Interlocked.Increment(ref _seekVersion);
         StartPump(version);
-        WaitForPrebuffer(PrebufferFrames, timeoutMs: 3000);
+        if (prebufferTimeoutMs > 0)
+        {
+            WaitForPrebuffer(PrebufferFrames, prebufferTimeoutMs);
+        }
     }
 
     /// <summary>1 フレーム分を読む。EOF／欠落なら false。timeoutMs=0 は待たない（音声スレッド用）。</summary>
@@ -242,16 +245,14 @@ internal sealed class AudioStreamSource : IDisposable
 
             if (_samples is null || _readerEof || _pumpFrame >= FrameCount)
             {
-                _readerEof = true;
-                _hasData.Set();
+                MarkReaderEof();
                 return;
             }
 
             var wantFrames = (int)Math.Min(Math.Min(ChunkFrames, free), FrameCount - _pumpFrame);
             if (wantFrames <= 0)
             {
-                _readerEof = true;
-                _hasData.Set();
+                MarkReaderEof();
                 return;
             }
 
@@ -262,15 +263,13 @@ internal sealed class AudioStreamSource : IDisposable
             }
             catch
             {
-                _readerEof = true;
-                _hasData.Set();
+                MarkReaderEof();
                 return;
             }
 
             if (got < Channels)
             {
-                _readerEof = true;
-                _hasData.Set();
+                MarkReaderEof();
                 return;
             }
 
@@ -306,6 +305,74 @@ internal sealed class AudioStreamSource : IDisposable
         }
 
         _hasSpace.Set();
+    }
+
+    /// <summary>デコードが終わり、リングにも残っていない。</summary>
+    public bool IsDrained
+    {
+        get
+        {
+            lock (_ringGate)
+            {
+                return _readerEof && _availableFrames <= 0;
+            }
+        }
+    }
+
+    /// <summary>リング先頭から offset 先の abs ピーク。足りなければ false。</summary>
+    public bool TryPeekAbsPeak(int offset, int frames, out float peak)
+    {
+        peak = 0f;
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (offset < 0 || frames <= 0)
+        {
+            return false;
+        }
+
+        lock (_ringGate)
+        {
+            if (offset + frames > _availableFrames)
+            {
+                return false;
+            }
+
+            var pos = _readPos + offset;
+            if (pos >= RingFrames)
+            {
+                pos -= RingFrames;
+            }
+
+            for (var i = 0; i < frames; i++)
+            {
+                var src = pos * Channels;
+                for (var ch = 0; ch < Channels; ch++)
+                {
+                    var a = Math.Abs(_ring[src + ch]);
+                    if (a > peak)
+                    {
+                        peak = a;
+                    }
+                }
+
+                pos++;
+                if (pos >= RingFrames)
+                {
+                    pos = 0;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private void MarkReaderEof()
+    {
+        lock (_ringGate)
+        {
+            _readerEof = true;
+        }
+
+        _hasData.Set();
     }
 
     private bool TryPopFrame(Span<float> dest, int timeoutMs)

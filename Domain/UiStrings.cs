@@ -145,9 +145,23 @@ internal static partial class UiStrings
     public static string LabelSettingsTabGeneral => Get("一般", "General");
     public static string LabelSettingsTabAudio => Get("オーディオ", "Audio");
     public static string LabelSettingsTabLayouts => Get("表示項目", "Shown");
+    public static string LabelSettingsTabPlayer => Get("プレイヤー", "Player");
     public static string LabelSettingsTabEditing => Get("編集", "Editing");
     public static string LabelSettingsTabExport => Get("書き出し", "Export");
     public static string LabelSettingsTabWwise => Get("Wwise", "Wwise");
+    public static string LabelLibraryExplorerRoots => Get("ツリーのルート", "Tree roots");
+    public static string LabelLibraryExplorerRootsHint => Get(
+        "プレイヤー左のフォルダツリーに出すルート。上から順。空ならマイミュージック。登録・削除・ドラッグか上へ下へで並び替え。",
+        "Roots in the player folder tree, top to bottom. Empty means Music. Add, remove, or reorder by drag or Up / Down.");
+    public static string LabelLibraryListColumns => Get("プレイリストの列", "Playlist columns");
+    public static string LabelLibraryListColumnsHint => Get(
+        "チェックした列だけプレイリストに出す。ファイル名は外せない。状態は覚える。",
+        "Only checked columns appear in the playlist. The file name column stays on. The choice is remembered.");
+    public static string ButtonLibraryExplorerRootAdd => Get("登録…", "Add…");
+    public static string TitleLibraryExplorerRootAdd => Get("フォルダを追加", "Add folder");
+    public static string ButtonLibraryExplorerRootRemove => Get("削除", "Remove");
+    public static string ButtonLibraryExplorerRootUp => Get("上へ", "Up");
+    public static string ButtonLibraryExplorerRootDown => Get("下へ", "Down");
     public static string LabelSettingsInput => Get("録音", "Recording");
     public static string LabelSettingsOutput => Get("再生", "Playback");
     public static string LabelSpeaker => Get("スピーカー", "Speakers");
@@ -575,6 +589,10 @@ internal static partial class UiStrings
     public static string TooltipLoudnessView => Get("ラウドネス (V)  解除 (Esc / Shift+A / Shift+V)", "Loudness (V)  leave (Esc / Shift+A / Shift+V)");
     public static string TooltipCenterPlayhead => Get("中央寄せ / センターロック (Z)", "Center / center-lock (Z)");
     public static string TooltipHistory => Get("編集履歴 (U)", "Edit history (U)");
+    public static string TooltipLibraryMaximize => Get("プレイヤー (F10)", "Player (F10)");
+    public static string TooltipLibraryMaximizeOff => Get("エディタ (F10)", "Editor (F10)");
+    public static string TooltipAnalyzerMaximize => Get("フルスクリーン（アナライザー） (F12)", "Fullscreen with analyzers (F12)");
+    public static string TooltipAnalyzerMaximizeOff => Get("アナライザー最大化を解除 (F12)", "Leave analyzer fullscreen (F12)");
     public static string TooltipUiThemeToggle => Get("ダーク / ライト", "Dark / Light");
     public static string TooltipColorPanel => Get("色設定 (Ctrl+Shift+C)", "Color settings (Ctrl+Shift+C)");
 
@@ -597,6 +615,18 @@ internal static partial class UiStrings
     public static string TipCenterPlayhead => Get(
         "中央寄せ (Z / .)\n再生中はセンターロックの切替",
         "Center (Z / .)\nToggles center-lock while playing");
+    public static string TipLibraryMaximize => Get(
+        "プレイヤー (F10)\nリストと短い波形の再生モードへ。編集はできない",
+        "Player (F10)\nList and short-waveform playback mode. Edits are blocked");
+    public static string TipLibraryMaximizeOff => Get(
+        "エディタ (F10)\n波形編集モードへ戻す",
+        "Editor (F10)\nReturn to waveform editing");
+    public static string TipAnalyzerMaximize => Get(
+        "フルスクリーン（アナライザー） (F12)\nタイトルバーだけ隠し、メーター類を 1.5 倍にする",
+        "Fullscreen with analyzers (F12)\nHides only the title bar and scales meters 1.5×");
+    public static string TipAnalyzerMaximizeOff => Get(
+        "アナライザー最大化を解除 (F12)\n通常のウィンドウ表示へ戻す",
+        "Leave analyzer fullscreen (F12)\nRestore the normal window chrome");
     public static string TipUiThemeToggle => Get(
         "ダークとライトを切り替えます。設定の配色は明示的な Dark / Light になります（Auto は外れます）。",
         "Switch Dark and Light. Settings theme becomes an explicit Dark / Light (Auto is cleared).");
@@ -828,7 +858,7 @@ internal static partial class UiStrings
         + "Ctrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置、波形エリアに収まらない配置は飛ばす。左右・上下が収まらなければ格子を試し、格子も無理なら動かない）。今見ている表示モード（波形 / スペクトログラム / 重ね / ラウドネス）で全タブを並べる。並び替え中でももう一度押すと次へ進む。\n"
         + "F11 で波形エリアをフルスクリーン（タスクバーは隠す。チャンネル名と dB 目盛りも出さない。全体波形とステータスバーは残す。タイルでも可。もう一度 F11 で戻す）。\n"
         + "F12 はタイトルバーだけ隠すフルスクリーン。タブ・トランスポート・メーター・Tips・WAAPI・チャンネル名・dB 目盛りは残す。スペクトラム／ラウドネス／レベルメーター／ベクタースコープは 1.5 倍（OS の DPI と表示倍率のうえ）。タイルでも可。もう一度 F12 で戻す。\n"
-        + "F10 はプレイヤーモード。全画面にはしない。タブは出さず、上段は左にフォルダツリー、中央がファイルリスト、右に再生中ジャケットと列チェック。下段は固定の低い波形。全体波形は出さない。リストは常にアクティブ。既定はアルバムでグループし、グループごとにジャケットを出す。再生や曲送りではリストを作り直さない。入ると1曲めを選んで再生する（引数起動も同じ）。↑↓ でファイル選択。Home／End でリストの先頭／末尾。PageUp／PageDown でページ送り（キーを離すと再生。複数選択可）。Enter で再生／先頭から再生し直し。その他のキーと数字はジャンプ／シーク。波形はシークと選択だけ（拡大しない。表示用のピークだけ作る。短いファイルは粗くしない。スペクトラム／ラウドネス曲線ビューには切り替えない）。編集コマンドは使えない。他モードのファイルはリストへ引き継ぐ。抜けるときは再生を止めてから、選択したファイルだけ残す。プレイヤーのまま終了したときは、読み込んだファイルは覚えない。ウィンドウの位置とサイズは通常モードと別々に覚え、切り替えで戻す。波形は全件走査しないが、タグと時間は登録時に読む。列は右のジャケット下のチェックで出し分け（状態は覚える）。左のツリーは既定でマイミュージック、選んだ場所は覚える。フォルダを選ぶとその直下の対応ファイルをリストに出し直し、フォルダをリストへドロップすると配下ごと追加する。MP3／M4A／WAVE／AIFF はフル PCM 展開せずストリーム再生する（M4A はプレイヤー専用）。ジャケットは選択時に読む。埋め込みが無ければ音符のプレースホルダ（WAVE 等は差し替え不可。MP3 はドロップで差し替え）。WAAPI は無効（入る前にオンなら、抜けたときに戻す）。引数に mp3／m4a が1つでも混ざるとプレイヤーで起動し、それらのファイルをリストへ載せる。もう一度 F10 で戻す。",
+        + "F10 はプレイヤーモード。全画面にはしない。タブは出さず、上段は左にフォルダツリー、中央がファイルリスト。下段は固定の低い波形。全体波形は出さない。リストは常にアクティブ。既定はアルバムでグループし、グループごとにジャケットを出す。再生や曲送りではリストを作り直さない。入ると1曲めを選んで再生する（引数起動も同じ）。再生開始と同時に次の曲を先読みし、終わったら隙間なく次を再生する。最後の次は先頭に戻って再生を続ける。↑↓ でファイル選択。Home／End でリストの先頭／末尾。PageUp／PageDown でページ送り（再生中はキーを離すとその曲へ。停止中は選択だけ。複数選択可）。F1 でツリー、F2 でお気に入り、F3 でプレイリストにフォーカス。ツリーでは ←→ でフォルダを展開／折りたたみ（早送りにしない）。Enter で再生／先頭から再生し直し。その他のキーと数字はジャンプ／シーク。波形はシークと選択だけ（拡大しない。表示用のピークだけ作る。短いファイルは粗くしない。スペクトラム／ラウドネス曲線ビューには切り替えない）。編集コマンドは使えない。他モードのファイルはリストへ引き継ぐ。抜けるときは再生を止めてから、選択したファイルだけ残す。プレイヤーのまま終了したときは、読み込んだファイルは覚えない。ウィンドウの位置とサイズは通常モードと別々に覚え、切り替えで戻す。波形は全件走査しないが、タグと時間は登録時に読む。列の出し分けは設定のプレイヤー（状態は覚える）。左のツリーは既定でマイミュージック、選んだ場所と、お気に入りとの仕切り位置は覚える。フォルダを選んでもリストへは自動で載せない。ツリーの Enter はプレイリストをクリアしてそのフォルダ配下を載せる。Shift+Enter とダブルクリック、リストへのフォルダドロップは配下ごと追加する。MP3／M4A／WAVE／AIFF はフル PCM 展開せずストリーム再生する（M4A はプレイヤー専用）。ジャケットは選択時に読む。埋め込みが無ければ音符のプレースホルダ。WAAPI は無効（入る前にオンなら、抜けたときに戻す）。引数に mp3／m4a が1つでも混ざるとプレイヤーで起動し、それらのファイルをリストへ載せる。もう一度 F10 で戻す。",
         "Click to set the playhead. ←→ seek (hold during playback for 3× shuttle). Drag to select. Ctrl+drag scrubs (every channel downmixed to L/R).\n"
         + "Esc or a move without Shift clears the selection. Shift+drag / ←→ extends it. Double-click a span (between markers). Shift+double-click adds that span. Triple-click selects all. The guide snaps to markers / loop edges.\n"
         + "Channel names on the left: click to solo (again to clear; Ctrl adds; Shift mutes). Tab / Shift+Tab cycle solo.\n"
@@ -837,7 +867,7 @@ internal static partial class UiStrings
         + "Ctrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same or would not fit the waveform area. If side-by-side or stacked would not fit, it tries grid; if grid would not fit either, it does nothing). Every tab uses the current view mode (waveform / spectrogram / overlay / loudness). Press again during arrange to skip ahead.\n"
         + "F11 makes the waveform area fullscreen like a browser (hides the taskbar; also hides channel names and the dB scale; keeps the overview and status bar; works while tiled; F11 again restores).\n"
         + "F12 is fullscreen with only the title bar hidden. Tabs, transport, meters, Tips, WAAPI, channel names, and the dB scale stay. Spectrum, loudness, level meter, and vector scope are 1.5× (on top of OS DPI and UI scale). Works while tiled; F12 again restores.\n"
-        + "F10 is a player, not fullscreen: no tabs, file list on top (folder tree left, list center, now-playing jacket and column checks right) and a short fixed waveform below. The overview is hidden. The list stays active. Groups default to album, with a jacket beside each group. Playback and skip do not rebuild the list. Entering selects and plays the first track (the same on launch with arguments). ↑↓ select files. Home / End jump to the first / last track. Page Up / Page Down page the list (playback starts when you release the key; multi-select allowed). Enter plays / restarts from the beginning. Other keys and digits seek / jump. The waveform only seeks and selects (no zoom; display-resolution peaks only; short files stay dense; spectrogram / loudness-curve views stay off). Edit commands are blocked. Files from other modes are listed. Leaving stops playback first, then keeps only the selected files. Quitting while still in player mode does not remember the loaded files. Window position and size are remembered separately from editor mode and restored when you switch. PCM is not scanned for every file; tags and duration are read on register. Checkboxes under the jacket on the right pick columns (remembered). The tree on the left starts at Music and remembers the last folder; selecting a folder replaces the list with files directly in that folder, and dropping a folder onto the list adds them recursively. MP3 / M4A / WAVE / AIFF stream without a full PCM decode (M4A is player-only). Jacket images load on select; a note placeholder is used when none is embedded (WAVE and similar cannot replace art; MP3 can by dropping an image). WAAPI is off (if it was on, leaving player turns it back on). If any launch argument is an MP3 or M4A, the app starts in player mode with those files listed. F10 again restores.");
+        + "F10 is a player, not fullscreen: no tabs, file list on top (folder tree left, list center) and a short fixed waveform below. The overview is hidden. The list stays active. Groups default to album, with a jacket beside each group. Playback and skip do not rebuild the list. Entering selects and plays the first track (the same on launch with arguments). The next track is read ahead as soon as playback starts, then plays without a gap. After the last, playback returns to the first and keeps going. ↑↓ select files. Home / End jump to the first / last track. Page Up / Page Down page the list (while playing, releasing the key switches to that track; while stopped, selection only; multi-select allowed). F1 focuses the tree, F2 Favorites, F3 the playlist. On the tree, ←→ expands or collapses folders (not shuttle). Enter plays / restarts from the beginning. Other keys and digits seek / jump. The waveform only seeks and selects (no zoom; display-resolution peaks only; short files stay dense; spectrogram / loudness-curve views stay off). Edit commands are blocked. Files from other modes are listed. Leaving stops playback first, then keeps only the selected files. Quitting while still in player mode does not remember the loaded files. Window position and size are remembered separately from editor mode and restored when you switch. PCM is not scanned for every file; tags and duration are read on register. Playlist columns are chosen in Settings → Player (remembered). The tree on the left starts at Music and remembers the last folder and the split with Favorites; selecting a folder does not add it to the list. Enter on the tree clears the playlist, then adds that folder recursively. Shift+Enter, double-click, or dropping a folder onto the list, adds them recursively. MP3 / M4A / WAVE / AIFF stream without a full PCM decode (M4A is player-only). Jacket images load on select; a note placeholder is used when none is embedded. WAAPI is off (if it was on, leaving player turns it back on). If any launch argument is an MP3 or M4A, the app starts in player mode with those files listed. F10 again restores.");
     public static string TipAlwaysOnTop => Get(
         "ウィンドウを常に最前面へ表示します。",
         "Keep the window always on top.");
@@ -936,12 +966,41 @@ internal static partial class UiStrings
     public static string LibraryColumnSize => Get("サイズ", "Size");
     public static string LibraryColumnFolder => Get("フォルダ", "Folder");
     public static string LibraryColumnJacket => Get("ジャケット", "Jacket");
+    public static string LibraryColumnLabel(LibraryFileColumn column) => column switch
+    {
+        LibraryFileColumn.Title => LibraryColumnTitle,
+        LibraryFileColumn.Artist => LibraryColumnArtist,
+        LibraryFileColumn.AlbumArtist => LibraryColumnAlbumArtist,
+        LibraryFileColumn.Album => LibraryColumnAlbum,
+        LibraryFileColumn.Track => LibraryColumnTrack,
+        LibraryFileColumn.Disc => LibraryColumnDisc,
+        LibraryFileColumn.Year => LibraryColumnYear,
+        LibraryFileColumn.Genre => LibraryColumnGenre,
+        LibraryFileColumn.Composer => LibraryColumnComposer,
+        LibraryFileColumn.Comment => LibraryColumnComment,
+        LibraryFileColumn.Kind => LibraryColumnKind,
+        LibraryFileColumn.Duration => LibraryColumnDuration,
+        LibraryFileColumn.SampleRate => LibraryColumnSampleRate,
+        LibraryFileColumn.BitDepth => LibraryColumnBitDepth,
+        LibraryFileColumn.Channels => LibraryColumnChannels,
+        LibraryFileColumn.BitRate => LibraryColumnBitRate,
+        LibraryFileColumn.Size => LibraryColumnSize,
+        LibraryFileColumn.Folder => LibraryColumnFolder,
+        LibraryFileColumn.Jacket => LibraryColumnJacket,
+        _ => LibraryColumnName,
+    };
     public static string LibraryGroupLabel => Get("グループ", "Group");
     public static string LibraryExplorerDesktop => Get("デスクトップ", "Desktop");
     public static string LibraryExplorerDocuments => Get("ドキュメント", "Documents");
     public static string LibraryExplorerMusic => Get("ミュージック", "Music");
     public static string LibraryExplorerPictures => Get("ピクチャ", "Pictures");
     public static string LibraryExplorerVideos => Get("ビデオ", "Videos");
+    public static string LibraryFavoritesLabel => Get("お気に入り", "Favorites");
+    public static string LibraryMenuAddToFavorites => Get("お気に入りへ追加", "Add to Favorites");
+    public static string LibraryMenuReplacePlaylist => Get("プレイリストをクリアして追加", "Clear Playlist and Add");
+    public static string LibraryMenuAppendPlaylist => Get("プレイリストへ追加", "Add to Playlist");
+    public static string LibraryMenuRemoveFromFavorites => Get("お気に入りから削除", "Remove from Favorites");
+    public static string LibraryMenuClearFromPlaylist => Get("プレイリストからクリア", "Clear from Playlist");
     public static string LibraryGroupNone => Get("なし", "None");
     public static string LibraryGroupTitle => Get("タイトル", "Title");
     public static string LibraryGroupArtist => Get("アーティスト", "Artist");
@@ -959,17 +1018,20 @@ internal static partial class UiStrings
     public static string FormatBitRate(int kbps) =>
         kbps <= 0 ? string.Empty : $"{kbps} kbps";
     public static string TipLibraryList => Get(
-        "プレイヤーのファイル一覧。左のツリーでフォルダを選ぶとその直下の内容をリストに出し直す。フォルダをリストへドロップすると配下ごと追加する。Delete で選択行をリストから外す（ファイルは消さない）。列見出しでソート。既定はアルバムでグループし、グループごとにジャケットを出す。グループでタイトル／アーティスト／アルバムなどでもまとめる。常にリストがアクティブ。入ると1曲めを選んで再生する（引数起動も同じ）。↑↓ でファイル選択。Home／End でリストの先頭／末尾。PageUp／PageDown でページ送り（キーを離すと再生。Shift で範囲、Ctrl+クリックで追加、Ctrl+A で全選択）。クリックした行はすぐ再生。Enter で再生／先頭から再生し直し。Space で再生／停止。0–9 やジャンプ／シークはそのまま。編集はできない。タグと時間は登録時に読む。MP3／M4A／WAVE／AIFF はフル PCM 展開せずストリーム再生（M4A はプレイヤー専用）。ジャケットは選択時に読む。埋め込みが無ければ音符のプレースホルダ。WAVE 等は差し替え不可。WAAPI は無効（入る前にオンなら、抜けたときに戻す）。プレイヤーを抜けると再生を止めてから、選択したファイルだけ残る。プレイヤーのまま終了したときは、読み込んだファイルは覚えない。",
-        "Player file list. Selecting a folder in the tree on the left replaces the list with files directly in that folder. Drop a folder onto the list to add recursively. Delete removes the selected rows from the list (files are never deleted). Click a column to sort. Groups default to album, with a jacket beside each group. Group by title, artist, album, and so on. The list stays active. Entering selects and plays the first track (the same on launch with arguments). ↑↓ select files. Home / End jump to the first / last track. Page Up / Page Down page the list (playback starts when you release the key. Shift for a range, Ctrl+click to add, Ctrl+A for all). Clicking a row plays it immediately. Enter plays / restarts from the beginning. Space toggles play / stop. Digit and jump / seek keys still work. Editing is blocked. Tags and duration are read when files are listed. MP3 / M4A / WAVE / AIFF stream without a full PCM decode (M4A is player-only). Jacket images load on select; a note placeholder is used when none is embedded. WAVE and similar cannot replace art. WAAPI is off (if it was on, leaving player turns it back on). Leaving player mode stops playback first, then keeps only the selected files. Quitting while still in player mode does not remember the loaded files.");
+        "プレイヤーのファイル一覧。左のツリーでフォルダを選んでもリストへは自動で載せない。フォルダをリストへドロップすると配下ごと追加する。Delete または右クリック／メニューキー「プレイリストからクリア」で選択行をリストから外す（ファイルは消さない。Ctrl+W では閉じない）。ソート中の列は見出しに小さい ▼▲ を出し、有効な方向だけシアン。既定はアルバムでグループし、グループごとにジャケットを出す。グループでタイトル／アーティスト／アルバムなどでもまとめる。常にリストがアクティブ。入ると1曲めを選んで再生する（引数起動も同じ）。再生開始と同時に次の曲を先読みし、終わったら隙間なく次を再生する。最後の次は先頭に戻って再生を続ける。↑↓ でファイル選択。Home／End でリストの先頭／末尾。PageUp／PageDown でページ送り（再生中はキーを離すとその曲へ。停止中は選択だけ。Shift で範囲、Ctrl+クリックで追加、Ctrl+A で全選択）。F1 でツリー、F2 でお気に入り、F3 でこのリストにフォーカス。停止中はクリックしてもカーソルで選んでも再生しない。再生中にクリックした行はその曲へ切り替える。ダブルクリック、Enter で再生／先頭から再生し直し。Space で再生／停止。0–9 やジャンプ／シークはそのまま。編集はできない。タグと時間は登録時に読む。MP3／M4A／WAVE／AIFF はフル PCM 展開せずストリーム再生（M4A はプレイヤー専用）。ジャケットは選択時に読む。埋め込みが無ければ音符のプレースホルダ。WAVE 等は差し替え不可。WAAPI は無効（入る前にオンなら、抜けたときに戻す）。プレイヤーを抜けると再生を止めてから、選択したファイルだけ残る。プレイヤーのまま終了したときは、読み込んだファイルは覚えない。",
+        "Player file list. Selecting a folder in the tree on the left does not add it to the list. Drop a folder onto the list to add recursively. Delete, right-click, or the menu key Clear from Playlist removes selected rows from the list (files are never deleted. Ctrl+W does not close). The sorted column shows small ▼▲ in the header, and only the active direction is cyan. Groups default to album, with a jacket beside each group. Group by title, artist, album, and so on. The list stays active. Entering selects and plays the first track (the same on launch with arguments). The next track is read ahead as soon as playback starts, then plays without a gap. After the last, playback returns to the first and keeps going. ↑↓ select files. Home / End jump to the first / last track. Page Up / Page Down page the list (while playing, releasing the key switches to that track; while stopped, selection only. Shift for a range, Ctrl+click to add, Ctrl+A for all). F1 focuses the tree, F2 Favorites, F3 this list. While stopped, a click or cursor selection does not start playback. While playing, a click switches to that track. Double-click or Enter plays / restarts from the beginning. Space toggles play / stop. Digit and jump / seek keys still work. Editing is blocked. Tags and duration are read when files are listed. MP3 / M4A / WAVE / AIFF stream without a full PCM decode (M4A is player-only). Jacket images load on select; a note placeholder is used when none is embedded. WAVE and similar cannot replace art. WAAPI is off (if it was on, leaving player turns it back on). Leaving player mode stops playback first, then keeps only the selected files. Quitting while still in player mode does not remember the loaded files.");
     public static string TipLibraryJacket => Get(
-        "今再生している曲のジャケット。埋め込みが無ければグレーのグラデに八分音符のプレースホルダ。WAVE / AIFF / M4A は表示のみ（差し替え不可）。MP3 は画像ドロップで差し替え（ファイルへ書き込み）。本物のジャケットがあるときは、プレイリストの背景にだけ縦横比を崩してエリアいっぱいに置き、大きくぼかしてごくゆっくり揺らぐ。下のチェックでリストの列を出す／隠す（状態は覚える）。",
-        "Jacket of the track now playing. If none is embedded, a gray gradient with a centered eighth note is shown. WAVE / AIFF / M4A are display-only (cannot replace). Drop an image onto an MP3 to replace it (written into the file). When a real jacket is set, it is stretched to fill the playlist area only (aspect may change) and used as a heavily blurred background that drifts very slowly. Checkboxes below pick which list columns to show (remembered).");
+        "本物のジャケットがあるときは、ツリー・お気に入り・プレイリストの背面に縦横比を崩して置き、大きくぼかしてごくゆっくり揺らぐ。埋め込みが無ければ背面は出さない。",
+        "When a real jacket is set, it is stretched across the tree, Favorites, and playlist (aspect may change) and used as a heavily blurred background that drifts very slowly. No background when none is embedded.");
     public static string TipLibraryColumns => Get(
-        "リストに出す列。チェックした列だけ表示。状態は次の起動でも覚える。ファイル名の列は外せない。",
-        "Columns to show in the list. Only checked columns appear. The choice is remembered. The file name column stays on.");
+        "設定のプレイヤーで、リストに出す列を選ぶ。チェックした列だけ表示。状態は次の起動でも覚える。ファイル名の列は外せない。",
+        "Choose list columns in Settings → Player. Only checked columns appear. The choice is remembered. The file name column stays on.");
     public static string TipLibraryExplorer => Get(
-        "フォルダツリー。既定はマイミュージック。選んだ場所は覚える。フォルダを選ぶと、そのフォルダ直下の対応ファイルをリストに出し直す（配下のサブフォルダは含めない。上下キーでは少し待ってから読み、裏で集める）。フォルダをリストへドロップすると配下ごと追加する。ダブルクリック／Enter はそのフォルダ直下をリストへ追加する（再帰しない）。コピー／複製／削除／リネームなどファイル操作はできない。",
-        "Folder tree. Starts at Music. The last place is remembered. Selecting a folder replaces the list with supported files directly in that folder (not subfolders; ↑↓ waits briefly and loads in the background). Drop a folder onto the list to add recursively. Double-click / Enter adds files directly in that folder (not recursive). File operations such as copy, duplicate, delete, and rename are not available.");
+        "フォルダツリー。ルートは設定のプレイヤーで複数登録できる（既定はマイミュージック。上から順。登録・削除・並び替え）。選んだ場所と、お気に入りとの仕切り位置は覚える。Ctrl+クリックで複数フォルダを選択。右クリックまたはメニューキーで、プレイリストをクリアして追加、プレイリストへ追加、お気に入りへ追加。フォルダを選んでもリストへは自動で載せない。フォルダをリストへドロップすると配下ごと追加する。ダブルクリックは配下を再帰的に追加する。Enter はプレイリストをクリアしてから、そのフォルダ配下を再帰的に載せる。Shift+Enter はクリアせず追加する（フォルダを見つけ次第、1曲ずつ。裏で集める）。F1 でこのツリーにフォーカス。←→ はフォルダの展開と折りたたみ（早送り／巻き戻しにはならない）。コピー／複製／削除／リネームなどファイル操作はできない。",
+        "Folder tree. Roots can be registered in Settings → Player (default Music, top to bottom; add, remove, reorder). The last place, and the split with Favorites, are remembered. Ctrl+click selects multiple folders. Right-click or the menu key can clear the playlist and add, add to the playlist, or add to Favorites. Selecting a folder does not add it to the list. Drop a folder onto the list to add recursively. Double-click appends files from that folder and its subfolders. Enter clears the playlist, then adds that folder recursively. Shift+Enter appends only (as each folder is found, tracks are added one by one in the background). F1 focuses this tree. ←→ expands or collapses folders (not shuttle). File operations such as copy, duplicate, delete, and rename are not available.");
+    public static string TipLibraryFavorites => Get(
+        "お気に入り。名前だけ表示（フルパスは出さない）。複数選択可。プレイリストへドラッグで追加。Enter でプレイリストをクリアして追加し即再生。Shift+Enter は追加のみ。Delete、右クリック、またはメニューキーで登録を外す（ファイルは消さない）。F2 でここへフォーカス。",
+        "Favorites. Names only (no full path). Multi-select. Drag onto the playlist to add. Enter clears the playlist, adds, and plays. Shift+Enter appends only. Delete, right-click, or the menu key removes the registration (files are never deleted). F2 focuses here.");
     public static string TabTimeCopy => Get("コピー", "Copy");
     public static string TabTimeSaveCsv => Get("CSV", "CSV");
     public static string TabTimeSavePdf => Get("PDF", "PDF");

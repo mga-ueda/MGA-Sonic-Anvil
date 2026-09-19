@@ -1,4 +1,6 @@
 using System.Runtime.ExceptionServices;
+using System.Threading;
+using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
@@ -66,6 +68,59 @@ public sealed class LibraryArtworkGlowTests
     }
 
     [Fact]
+    public void FallbackWash_IsNavyCyanWhite()
+    {
+        RunSta(() =>
+        {
+            var brush = Assert.IsType<DrawingBrush>(LibraryBrowserView.CreateFallbackAmbientWash());
+            Assert.True(brush.IsFrozen);
+            Assert.Same(brush, LibraryBrowserView.CreateFallbackAmbientWash());
+            var colors = new List<Color>();
+            CollectColors(brush.Drawing, colors);
+            Assert.Contains(colors, color => SameRgb(color, LibraryBrowserView.FallbackWashNavy));
+            Assert.Contains(colors, color => SameRgb(color, LibraryBrowserView.FallbackWashCyan));
+            Assert.Contains(colors, color => SameRgb(color, LibraryBrowserView.FallbackWashWhite));
+        });
+    }
+
+    private static void CollectColors(Drawing? drawing, List<Color> colors)
+    {
+        switch (drawing)
+        {
+            case DrawingGroup group:
+                foreach (var child in group.Children)
+                {
+                    CollectColors(child, colors);
+                }
+
+                break;
+            case GeometryDrawing geometry:
+                CollectBrush(geometry.Brush, colors);
+                break;
+        }
+    }
+
+    private static void CollectBrush(Brush? brush, List<Color> colors)
+    {
+        switch (brush)
+        {
+            case SolidColorBrush solid:
+                colors.Add(solid.Color);
+                break;
+            case GradientBrush gradient:
+                foreach (var stop in gradient.GradientStops)
+                {
+                    colors.Add(stop.Color);
+                }
+
+                break;
+        }
+    }
+
+    private static bool SameRgb(Color color, Color expected) =>
+        color.R == expected.R && color.G == expected.G && color.B == expected.B;
+
+    [Fact]
     public void GlowVeilOpacity_IsBrighterInLight()
     {
         Assert.Equal(0.42, LibraryBrowserView.GlowVeilOpacityFor(UiTheme.Dark), 3);
@@ -100,6 +155,24 @@ public sealed class LibraryArtworkGlowTests
             Assert.Equal(TimeSpan.FromSeconds(16), pulse.Duration.TimeSpan);
             Assert.Equal(16, Timeline.GetDesiredFrameRate(pulse));
             Assert.IsType<SineEase>(pulse.EasingFunction);
+        });
+    }
+
+    [Fact]
+    public void GlowHost_SpansTreeFavoritesAndPlaylist()
+    {
+        RunSta(() =>
+        {
+            if (Application.Current is null)
+            {
+                _ = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            }
+
+            Application.Current!.Resources["AccentCyanBrush"] = new SolidColorBrush(Color.FromRgb(0x6C, 0xB6, 0xFF));
+            Application.Current.Resources["PrimaryForeBrush"] = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xEA));
+            Application.Current.Resources["MenuHighlightBackBrush"] = new SolidColorBrush(Color.FromRgb(0x37, 0x37, 0x3A));
+            var view = new LibraryBrowserView();
+            Assert.True(view.GlowFillsLibraryChrome);
         });
     }
 

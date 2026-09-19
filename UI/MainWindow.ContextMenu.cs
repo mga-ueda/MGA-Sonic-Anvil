@@ -56,6 +56,11 @@ public partial class MainWindow
             return true;
         }
 
+        if (LibraryBrowser.TryOpenKeyboardContextMenu())
+        {
+            return true;
+        }
+
         if (TryOpenTabContextMenuUnderPointer())
         {
             return true;

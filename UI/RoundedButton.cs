@@ -194,6 +194,38 @@ internal sealed class RoundedButton : Button
         base.OnIsPressedChanged(e);
     }
 
+    protected override Size MeasureOverride(Size constraint)
+    {
+        var text = Content as string ?? Content?.ToString() ?? string.Empty;
+        var width = Padding.Left + Padding.Right;
+        var height = Padding.Top + Padding.Bottom;
+        if (!string.IsNullOrEmpty(text))
+        {
+            var formatted = new FormattedText(
+                text,
+                CultureInfo.CurrentUICulture,
+                FlowDirection,
+                new Typeface(FontFamily, FontStyle, FontWeight, FontStretch),
+                FontSize,
+                Brushes.Black,
+                UiDpi.Get(this).PixelsPerDip);
+            width += formatted.Width;
+            height += formatted.Height;
+        }
+
+        if (!double.IsInfinity(constraint.Width))
+        {
+            width = Math.Min(width, constraint.Width);
+        }
+
+        if (!double.IsInfinity(constraint.Height))
+        {
+            height = Math.Min(height, constraint.Height);
+        }
+
+        return new Size(Math.Max(0d, width), Math.Max(0d, height));
+    }
+
     protected override void OnRender(DrawingContext dc)
     {
         var width = ActualWidth;

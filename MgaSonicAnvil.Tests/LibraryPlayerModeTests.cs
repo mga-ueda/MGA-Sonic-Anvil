@@ -36,6 +36,11 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.TimeZoomIn));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ExportWave));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.FocusTime));
+        Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.CloseTab));
+        Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.CloseOthers));
+        Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.CloseTabsRight));
+        Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.CloseTabsLeft));
+        Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.CloseAll));
     }
 
     [Fact]
@@ -44,6 +49,8 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.TogglePlayback));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.GoToStart));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.Open));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleLibraryMaximize));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleAnalyzerMaximize));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.Save));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.SaveAs));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.SaveMp3));
@@ -86,7 +93,8 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.S, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.M, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Z, ModifierKeys.None));
-        Assert.True(LibraryPlayerMode.AllowsKey(Key.W, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.AllowsKey(Key.W, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.AllowsKey(Key.W, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.W, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.E, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.F4, ModifierKeys.None));
@@ -104,7 +112,6 @@ public sealed class LibraryPlayerModeTests
     {
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.Delete, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.Back, ModifierKeys.None));
-        Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.F2, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.C, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.X, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.V, ModifierKeys.Control));
@@ -112,7 +119,26 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Up, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Left, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Enter, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Enter, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F1, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F2, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F3, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F10, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Q, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Left, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Right, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Left, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Left, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Up, ModifierKeys.None));
+    }
+
+    [Fact]
+    public void AllowsKey_PlayerPaneFocusKeys()
+    {
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.F1, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.F2, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.F3, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.AllowsKey(Key.F2, ModifierKeys.Control));
     }
 
     [Fact]
@@ -171,6 +197,12 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(-1, LibraryPlayerMode.EdgeIndex(0, 1));
         Assert.Equal(1, LibraryPlayerMode.PageStep(1));
         Assert.Equal(7, LibraryPlayerMode.PageStep(8));
+        Assert.Equal(1, LibraryPlayerMode.NextLoopIndex(3, 0));
+        Assert.Equal(2, LibraryPlayerMode.NextLoopIndex(3, 1));
+        Assert.Equal(0, LibraryPlayerMode.NextLoopIndex(3, 2));
+        Assert.Equal(0, LibraryPlayerMode.NextLoopIndex(3, -1));
+        Assert.Equal(0, LibraryPlayerMode.NextLoopIndex(1, 0));
+        Assert.Equal(-1, LibraryPlayerMode.NextLoopIndex(0, 0));
     }
 
     private static DocumentSession Session(string name) =>

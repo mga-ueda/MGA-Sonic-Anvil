@@ -177,6 +177,12 @@ public partial class MainWindow
             case TransportCommand.OpenManual:
                 ManualViewer.Open(this);
                 break;
+            case TransportCommand.ToggleLibraryMaximize:
+                ToggleLibraryMaximize();
+                break;
+            case TransportCommand.ToggleAnalyzerMaximize:
+                ToggleAnalyzerMaximize();
+                break;
             case TransportCommand.ToggleWaapi:
                 ToggleWaapiPanel();
                 break;
@@ -324,7 +330,12 @@ public partial class MainWindow
         {
             _meter.Reset();
             LoudnessMeter.ResetLive();
-            _player.Prepare(_document, startFrame, playRange, loop: playRange is not null);
+            _player.Prepare(
+                _document,
+                startFrame,
+                playRange,
+                loop: playRange is not null,
+                preferStream: IsLibraryMaximized);
             _player.SetExitSpan(ComputeExitLayerSpan(playRange));
             _player.Play();
             _playbackGeneration = _player.Generation;
@@ -334,6 +345,47 @@ public partial class MainWindow
             Transport.SetPlaying(true);
             Waveform.PlayheadFrame = startFrame;
             SyncOverviewPlayhead();
+        }
+        catch (Exception ex)
+        {
+            PausePlaybackSoft();
+            OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    /// <summary>
+    /// エディタで PCM のまま再生している曲を、プレイヤーへ戻したときに可変速へ戻す。
+    /// 波形用の PCM とピークは捨てない。
+    /// </summary>
+    private void ResumePlayerVariableRate()
+    {
+        if (_document is null || !IsPlaybackActive() || _player.IsStreamBound)
+        {
+            return;
+        }
+
+        if (_document.SourcePath is not { Length: > 0 } path
+            || !File.Exists(path)
+            || !AudioCodec.CanStreamPlay(path))
+        {
+            return;
+        }
+
+        WaveSelection? playRange = _document.Selection.IsEmpty ? null : _document.Selection;
+        var frame = _player.SmoothCursorFrame;
+        try
+        {
+            _player.Rebind(
+                _document,
+                frame,
+                playRange,
+                loop: playRange is not null,
+                preferStream: true);
+            _player.SetExitSpan(ComputeExitLayerSpan(playRange));
+            _player.Play();
+            _playbackGeneration = _player.Generation;
+            _playTimer.Start();
+            StartMeterRendering();
         }
         catch (Exception ex)
         {
@@ -596,6 +648,8 @@ public partial class MainWindow
 
     private void SyncPlaybackVisuals()
     {
+        AdoptLibraryGaplessAdvance();
+        ScheduleLibraryGaplessPrefetch();
         if (_document is null)
         {
             return;
@@ -895,6 +949,11 @@ public partial class MainWindow
             || TryHandleEffectPreviewEnded(_pitchPreview, () => StopPreviewToResume(_pitchPreview))
             || TryHandleEffectPreviewEnded(_timeStretchPreview, () => StopPreviewToResume(_timeStretchPreview))
             || TryHandleEffectPreviewEnded(_formatPreview, StopFormatPreview))
+        {
+            return;
+        }
+
+        if (IsLibraryMaximized && TryAdvanceLibraryPlaylist())
         {
             return;
         }
@@ -1220,6 +1279,11 @@ public partial class MainWindow
             }
         }
 
+        if (wantLibrary)
+        {
+            ScheduleLibraryWaveformPaint();
+        }
+
         if (!wasFullscreen || wasLibrary || wantLibrary)
         {
             AppStorage.Save();
@@ -1227,7 +1291,16 @@ public partial class MainWindow
 
         if (mode == WaveformMaximizeMode.Library)
         {
-            LibraryBrowser.FocusList();
+            ResumePlayerVariableRate();
+            if (_sessions.Count == 0)
+            {
+                LibraryBrowser.FocusExplorer();
+            }
+            else
+            {
+                LibraryBrowser.FocusList();
+            }
+
             return;
         }
 
@@ -1349,8 +1422,9 @@ public partial class MainWindow
         TipService.SetHostSuppressed(_waveformMaximizeMode == WaveformMaximizeMode.Waveform);
         ApplyWaapiPanelVisible();
         ApplyLibraryChrome();
-        PrimaryWaveform.ShowScaleLane = show;
-        ForEachWaveform(view => view.ShowScaleLane = show);
+        Transport.SetMaximizeMode(_waveformMaximizeMode);
+        PrimaryWaveform.ShowScaleLane = ShowWaveformScaleLane;
+        ForEachWaveform(view => view.ShowScaleLane = ShowWaveformScaleLane);
         RefreshTileDividers();
         OverviewScaleColumn.Width = show
             ? DesignMetrics.DbScaleWidthGrid

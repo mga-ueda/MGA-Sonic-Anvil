@@ -1,6 +1,6 @@
 namespace MgaSonicAnvil.Domain;
 
-/// <summary>F10 リストの列。表示チェックと設定の読み書き。</summary>
+/// <summary>プレイリストの列。設定の読み書き。</summary>
 internal static class LibraryColumnFilter
 {
     public static readonly LibraryFileColumn[] All =

@@ -23,18 +23,26 @@ internal sealed class PeakPyramid
         float[][] maxLevels,
         int channels,
         long frameCount,
-        int baseBucketFrames)
+        int baseBucketFrames,
+        long filledFrames)
     {
         _minLevels = minLevels;
         _maxLevels = maxLevels;
         Channels = channels;
         FrameCount = frameCount;
         BaseBucketFrames = baseBucketFrames;
+        FilledFrames = Math.Clamp(filledFrames, 0, Math.Max(0, frameCount));
     }
 
     public int Channels { get; }
 
     public long FrameCount { get; }
+
+    /// <summary>シーケンシャル構築で埋まったフレーム。完成時は FrameCount と同じ。</summary>
+    public long FilledFrames { get; }
+
+    /// <summary>プレイヤーの順次ピーク構築中。</summary>
+    public bool IsBuilding => !IsEmpty && FilledFrames < FrameCount;
 
     /// <summary>基底レベル 1 バケットあたりのフレーム数（1 なら全サンプル保持と等価）。</summary>
     public int BaseBucketFrames { get; }
@@ -56,7 +64,7 @@ internal sealed class PeakPyramid
         }
     }
 
-    public static PeakPyramid Empty { get; } = new([[]], [[]], 1, 0, 1);
+    public static PeakPyramid Empty { get; } = new([[]], [[]], 1, 0, 1, 0);
 
     public static PeakPyramid Build(float[] interleaved, int channels) =>
         Build(interleaved, channels, interleaved.Length);
@@ -93,54 +101,11 @@ internal sealed class PeakPyramid
 
         if (frames <= 0)
         {
-            return new PeakPyramid([[]], [[]], 1, 0, 1);
+            return new PeakPyramid([[]], [[]], 1, 0, 1, 0);
         }
 
         var provider = AudioCodec.AsSampleProvider(stream);
         return BuildPlayerDisplayFromProvider(provider, channels, frames, onProgress, cancellationToken);
-    }
-
-    /// <summary>
-    /// プレイヤー用ストリーム走査（互換）。再生ポンプ経由なので遅い。パスがあるなら
-    /// <see cref="BuildPlayerDisplayFromPath"/> を使う。
-    /// </summary>
-    public static PeakPyramid BuildPlayerDisplayStreaming(AudioStreamSource source)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-        source.SeekFrame(0);
-        var channels = Math.Max(1, source.Channels);
-        var frames = source.FrameCount;
-        if (frames <= 0)
-        {
-            return new PeakPyramid([[]], [[]], 1, 0, 1);
-        }
-
-        var maxBaseBuckets = PlayerDisplayBaseBuckets;
-        var baseBucket = (int)Math.Max(1L, (frames + maxBaseBuckets - 1) / maxBaseBuckets);
-        var baseCount = (int)((frames + baseBucket - 1) / baseBucket);
-        var mins = new float[baseCount];
-        var maxs = new float[baseCount];
-        Array.Fill(mins, float.MaxValue);
-        Array.Fill(maxs, float.MinValue);
-
-        const int chunkFrames = 65536;
-        var chunk = new float[chunkFrames * channels];
-        long frame = 0;
-        while (frame < frames)
-        {
-            var want = (int)Math.Min(chunkFrames, frames - frame);
-            var got = source.ReadFrames(chunk, 0, want, timeoutMs: 5000);
-            if (got <= 0)
-            {
-                break;
-            }
-
-            AccumulateMonoEnvelope(chunk, channels, got, frame, baseBucket, mins, maxs);
-            frame += got;
-        }
-
-        FinalizeUnsetBuckets(mins, maxs);
-        return FromBasePeaks(mins, maxs, channels: 1, frames, baseBucket);
     }
 
     private static PeakPyramid BuildPlayerDisplayFromProvider(
@@ -189,13 +154,13 @@ internal sealed class PeakPyramid
                 if (now - lastProgressMs >= 40 || frame >= frames)
                 {
                     lastProgressMs = now;
-                    onProgress(SnapshotPlayerPeaks(mins, maxs, frames, baseBucket));
+                    onProgress(SnapshotPlayerPeaks(mins, maxs, frames, frame, baseBucket));
                 }
             }
         }
 
         FinalizeUnsetBuckets(mins, maxs);
-        return FromBasePeaks(mins, maxs, channels: 1, frames, baseBucket);
+        return FromBasePeaks(mins, maxs, channels: 1, frames, baseBucket, frame);
     }
 
     private static void AccumulateMonoEnvelope(
@@ -257,12 +222,13 @@ internal sealed class PeakPyramid
         float[] mins,
         float[] maxs,
         long frames,
+        long filledFrames,
         int baseBucket)
     {
         var snapMin = (float[])mins.Clone();
         var snapMax = (float[])maxs.Clone();
         FinalizeUnsetBuckets(snapMin, snapMax);
-        return FromBasePeaks(snapMin, snapMax, channels: 1, frames, baseBucket);
+        return FromBasePeaks(snapMin, snapMax, channels: 1, frames, baseBucket, filledFrames);
     }
 
     private static PeakPyramid BuildMonoEnvelope(
@@ -275,7 +241,7 @@ internal sealed class PeakPyramid
         sampleCount = Math.Clamp(sampleCount, 0, interleaved.Length);
         if (sampleCount < channels)
         {
-            return new PeakPyramid([[]], [[]], 1, 0, 1);
+            return new PeakPyramid([[]], [[]], 1, 0, 1, 0);
         }
 
         var frames = sampleCount / channels;
@@ -312,7 +278,7 @@ internal sealed class PeakPyramid
             }
         }
 
-        return FromBasePeaks(mins, maxs, channels: 1, frames, baseBucket);
+        return FromBasePeaks(mins, maxs, channels: 1, frames, baseBucket, frames);
     }
 
     public static PeakPyramid Build(float[] interleaved, int channels, int sampleCount, int maxBaseBuckets)
@@ -321,7 +287,7 @@ internal sealed class PeakPyramid
         sampleCount = Math.Clamp(sampleCount, 0, interleaved.Length);
         if (sampleCount < channels)
         {
-            return new PeakPyramid([[]], [[]], channels, 0, 1);
+            return new PeakPyramid([[]], [[]], channels, 0, 1, 0);
         }
 
         var frames = sampleCount / channels;
@@ -363,7 +329,103 @@ internal sealed class PeakPyramid
             }
         }
 
-        return FromBasePeaks(mins, maxs, channels, frames, baseBucket);
+        return FromBasePeaks(mins, maxs, channels, frames, baseBucket, frames);
+    }
+
+    /// <summary>
+    /// ピーク上で frame 付近が無音か。未走査・空なら判定できないので false。
+    /// </summary>
+    public bool TryIsSilent(long frame, float thresholdLinear, int holdFrames, out bool silent)
+    {
+        silent = false;
+        if (IsEmpty || BaseBucketFrames <= 0 || _minLevels.Length == 0)
+        {
+            return false;
+        }
+
+        var filled = Math.Min(FilledFrames, FrameCount);
+        if (frame < 0 || frame >= filled)
+        {
+            return false;
+        }
+
+        holdFrames = Math.Max(0, holdFrames);
+        var from = Math.Max(0, frame - holdFrames);
+        var to = frame + holdFrames + 1;
+        if (to > filled)
+        {
+            if (IsBuilding)
+            {
+                return false;
+            }
+
+            to = filled;
+        }
+
+        silent = FindNextAudibleFrame(from, to, thresholdLinear) >= to;
+        return true;
+    }
+
+    /// <summary>
+    /// [startFrame, endFrame) のうち、しきい値以上のピークがある最初のフレーム（バケット先頭）。
+    /// ピークが無いか未走査なら startFrame。残りが無音なら走査末尾。
+    /// </summary>
+    public long FindNextAudibleFrame(long startFrame, long endFrame, float thresholdLinear)
+    {
+        if (IsEmpty || BaseBucketFrames <= 0 || _minLevels.Length == 0)
+        {
+            return startFrame;
+        }
+
+        var filled = Math.Min(FilledFrames, FrameCount);
+        if (filled <= 0)
+        {
+            return startFrame;
+        }
+
+        startFrame = Math.Clamp(startFrame, 0, filled);
+        endFrame = Math.Clamp(endFrame, startFrame, filled);
+        if (startFrame >= endFrame)
+        {
+            return endFrame;
+        }
+
+        var channels = Math.Max(1, Channels);
+        var mins = _minLevels[0];
+        var maxs = _maxLevels[0];
+        var bucketCount = mins.Length / channels;
+        if (bucketCount <= 0)
+        {
+            return startFrame;
+        }
+
+        var floor = Math.Max(0f, thresholdLinear);
+        var first = (int)Math.Min(bucketCount - 1, startFrame / BaseBucketFrames);
+        var last = (int)Math.Min(bucketCount - 1, (endFrame - 1) / BaseBucketFrames);
+        for (var b = first; b <= last; b++)
+        {
+            if (BucketAbsPeak(mins, maxs, channels, b) >= floor)
+            {
+                var at = (long)b * BaseBucketFrames;
+                return at < startFrame ? startFrame : Math.Min(at, endFrame);
+            }
+        }
+
+        return endFrame;
+    }
+
+    private static float BucketAbsPeak(float[] mins, float[] maxs, int channels, int bucket)
+    {
+        var peak = 0f;
+        var index = bucket * channels;
+        for (var ch = 0; ch < channels; ch++)
+        {
+            var at = index + ch;
+            peak = Math.Max(peak, Math.Abs(mins[at]));
+            peak = Math.Max(peak, Math.Abs(maxs[at]));
+        }
+
+        return peak;
     }
 
     /// <summary>
@@ -532,7 +594,8 @@ internal sealed class PeakPyramid
         float[] maxs,
         int channels,
         long frameCount,
-        int baseBucket)
+        int baseBucket,
+        long filledFrames)
     {
         var minLevels = new List<float[]> { mins };
         var maxLevels = new List<float[]> { maxs };
@@ -560,6 +623,6 @@ internal sealed class PeakPyramid
             maxLevels.Add(nextMax);
         }
 
-        return new PeakPyramid([.. minLevels], [.. maxLevels], channels, frameCount, baseBucket);
+        return new PeakPyramid([.. minLevels], [.. maxLevels], channels, frameCount, baseBucket, filledFrames);
     }
 }

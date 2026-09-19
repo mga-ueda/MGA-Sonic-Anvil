@@ -162,7 +162,14 @@
               <RowDefinition Height="Auto" />
               <RowDefinition x:Name="LibraryWaveformRowDef" Height="*" />
             </Grid.RowDefinitions>
+            <Grid x:Name="PlayerWaveGlowHost"
+                  Grid.RowSpan="3"
+                  Panel.ZIndex="0"
+                  IsHitTestVisible="False"
+                  Visibility="Collapsed"
+                  ClipToBounds="True" />
             <ui:LibraryBrowserView x:Name="LibraryBrowser"
+                                   Panel.ZIndex="1"
                                    Visibility="Collapsed" />
             <GridSplitter x:Name="LibrarySplitter"
                           Grid.Row="1"
@@ -174,7 +181,7 @@
                           Background="{DynamicResource ChromeBorderBrush}"
                           Cursor="SizeNS"
                           Visibility="Collapsed" />
-            <Grid Grid.Row="2">
+            <Grid Grid.Row="2" Panel.ZIndex="2" ClipToBounds="True">
             <DockPanel ClipToBounds="True">
               <ui:WaveformScrollStrip x:Name="TimeScrollStrip"
                                       DockPanel.Dock="Bottom"

@@ -139,7 +139,7 @@ internal sealed partial class AudioDocument
 
     public string? SourcePath { get; set; }
 
-    /// <summary>MP3 の ID3 APIC。WAVE 等は持たない（表示はプレースホルダ）。</summary>
+    /// <summary>MP3 の ID3 APIC / M4A の covr。WAVE 等は持たない（表示はプレースホルダ）。</summary>
     public byte[]? Artwork { get; private set; }
 
     public bool HasArtwork => Artwork is { Length: > 0 };

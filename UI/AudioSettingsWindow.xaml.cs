@@ -58,6 +58,9 @@ internal partial class AudioSettingsWindow : Window
 
     public string[] SelectedVisibleSpeakerIds { get; private set; } = SpeakerPreset.DefaultVisibleIds;
 
+    public string[] SelectedLibraryExplorerRoots { get; private set; } = [];
+    public LibraryFileColumn[] SelectedLibraryListColumns { get; private set; } = [.. LibraryColumnFilter.Defaults];
+
     public bool SelectedAutoSpeakerSelect { get; private set; }
 
     public string SelectedActiveSpeakerId { get; private set; } = string.Empty;
@@ -88,6 +91,7 @@ internal partial class AudioSettingsWindow : Window
     private string[] _outputPortNames = [];
     private float[] _meterPeaks = [];
     private readonly int _uiScaleOpenedAt;
+    private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecks = [];
 
     public AudioSettingsWindow(
         AudioOutputSettings current,
@@ -113,7 +117,9 @@ internal partial class AudioSettingsWindow : Window
         int wwiseLookAheadTimeMs = WwiseTrackTiming.DefaultLookAheadTimeMs,
         int uiScalePercent = UiScale.DefaultPercent,
         string? multiFileArrange = null,
-        bool autoSpeakerSelect = false)
+        bool autoSpeakerSelect = false,
+        IEnumerable<string>? libraryExplorerRoots = null,
+        IEnumerable<LibraryFileColumn>? libraryListColumns = null)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
@@ -135,6 +141,10 @@ internal partial class AudioSettingsWindow : Window
         var visible = SpeakerPreset.NormalizeVisibleIds(visibleSpeakerIds);
         _visibleIds = new HashSet<string>(visible, StringComparer.OrdinalIgnoreCase);
         SelectedVisibleSpeakerIds = visible;
+        SelectedLibraryExplorerRoots = LibraryExplorerPaths.ResolveRoots(libraryExplorerRoots?.ToArray());
+        SelectedLibraryListColumns = libraryListColumns is null
+            ? [.. LibraryColumnFilter.Defaults]
+            : [.. LibraryColumnFilter.Resolve(LibraryColumnFilter.Serialize(libraryListColumns))];
         SelectedAutoSpeakerSelect = autoSpeakerSelect;
         SelectedActiveSpeakerId = string.IsNullOrWhiteSpace(activeSpeakerId)
             ? _presets[0].Id
@@ -190,9 +200,15 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyAccent(OkButton);
         ActionButtonLooks.ApplyClear(CancelButton);
         ActionButtonLooks.ApplyClear(LameBrowseButton);
+        ApplyLibraryExplorerRootButtons();
+        ApplyLibraryExplorerRootsChrome();
         AppDialogKeys.PrepareActionButton(OkButton, isDefault: true);
         AppDialogKeys.PrepareActionButton(CancelButton, isCancel: true);
         AppDialogKeys.PrepareActionButton(LameBrowseButton);
+        AppDialogKeys.PrepareActionButton(LibraryExplorerRootAddButton);
+        AppDialogKeys.PrepareActionButton(LibraryExplorerRootRemoveButton);
+        AppDialogKeys.PrepareActionButton(LibraryExplorerRootUpButton);
+        AppDialogKeys.PrepareActionButton(LibraryExplorerRootDownButton);
         AppDialogKeys.AllowTabToLeave(SettingsTabs);
         AppDialogKeys.Attach(
             this,
@@ -234,6 +250,8 @@ internal partial class AudioSettingsWindow : Window
         LameOptionsBox.Text = Mp3Encode.ResolveLameOptions(SelectedLameOptions);
         FillExportParallelism(SelectedExportParallelism);
         FillAssociations();
+        FillLibraryExplorerRoots();
+        FillLibraryColumns();
         FillDefaultAudioFormat();
         ApplyTips();
         ReflowSettingsWindow();
@@ -379,6 +397,339 @@ internal partial class AudioSettingsWindow : Window
         }
 
         LoadSpeakerEditors(next.Preset, releaseDevice: true);
+    }
+
+    private void FillLibraryExplorerRoots()
+    {
+        LibraryExplorerRootsList.Items.Clear();
+        foreach (var path in SelectedLibraryExplorerRoots)
+        {
+            LibraryExplorerRootsList.Items.Add(new LibraryExplorerRootItem(path));
+        }
+
+        RefreshLibraryExplorerRootButtons();
+    }
+
+    private void FillLibraryColumns()
+    {
+        LibraryColumnsHost.Children.Clear();
+        _libraryColumnChecks.Clear();
+        var style = TryFindResource("DarkCheckBoxStyle") as Style;
+        var visible = new HashSet<LibraryFileColumn>(SelectedLibraryListColumns);
+        foreach (var column in LibraryColumnFilter.All)
+        {
+            var locked = LibraryColumnFilter.IsLocked(column);
+            var box = new CheckBox
+            {
+                Content = new TextBlock
+                {
+                    Text = UiStrings.LibraryColumnLabel(column),
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                IsChecked = locked || visible.Contains(column),
+                IsEnabled = !locked,
+                Margin = new Thickness(0, 0, 0, 6),
+                Tag = column,
+                VerticalContentAlignment = VerticalAlignment.Center,
+            };
+            if (style is not null)
+            {
+                box.Style = style;
+            }
+
+            TipService.Set(box, UiStrings.TipLibraryColumns);
+            _libraryColumnChecks[column] = box;
+            LibraryColumnsHost.Children.Add(box);
+        }
+    }
+
+    private LibraryFileColumn[] ReadLibraryColumns()
+    {
+        var set = new HashSet<LibraryFileColumn> { LibraryFileColumn.Name };
+        foreach (var pair in _libraryColumnChecks)
+        {
+            if (pair.Value.IsChecked == true)
+            {
+                set.Add(pair.Key);
+            }
+        }
+
+        return [.. LibraryColumnFilter.Resolve(LibraryColumnFilter.Serialize(set))];
+    }
+
+    private void ApplyLibraryExplorerRootButtons()
+    {
+        ActionButtonLooks.ApplyClear(LibraryExplorerRootAddButton);
+        ActionButtonLooks.ApplyClear(LibraryExplorerRootRemoveButton);
+        ActionButtonLooks.ApplyClear(LibraryExplorerRootUpButton);
+        ActionButtonLooks.ApplyClear(LibraryExplorerRootDownButton);
+    }
+
+    private void ApplyLibraryExplorerRootsChrome()
+    {
+        LibraryExplorerRootsList.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
+        LibraryExplorerRootsList.SetResourceReference(BackgroundProperty, "DialogInputBackBrush");
+        LibraryExplorerRootsList.SetResourceReference(BorderBrushProperty, "ChromeBorderBrush");
+        LibraryExplorerRootsList.BorderThickness = new Thickness(1);
+
+        var highlight = ResolveThemeBrush("MenuHighlightBackBrush", Color.FromRgb(0x37, 0x37, 0x3A));
+        var fore = ResolveThemeBrush("PrimaryForeBrush", Color.FromRgb(0xE8, 0xE8, 0xEA));
+        LibraryExplorerRootsList.Resources[SystemColors.HighlightBrushKey] = highlight;
+        LibraryExplorerRootsList.Resources[SystemColors.HighlightTextBrushKey] = fore;
+        LibraryExplorerRootsList.Resources[SystemColors.InactiveSelectionHighlightBrushKey] = highlight;
+        LibraryExplorerRootsList.Resources[SystemColors.InactiveSelectionHighlightTextBrushKey] = fore;
+        LibraryExplorerRootsList.Resources[SystemColors.ControlBrushKey] = Brushes.Transparent;
+
+        var itemStyle = new Style(typeof(ListBoxItem));
+        itemStyle.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
+        itemStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+        itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(6, 3, 6, 3)));
+        itemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
+        itemStyle.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
+        LibraryExplorerRootsList.ItemContainerStyle = itemStyle;
+    }
+
+    private static Brush ResolveThemeBrush(string key, Color fallback)
+    {
+        if (Application.Current?.TryFindResource(key) is Brush brush)
+        {
+            return brush;
+        }
+
+        var created = new SolidColorBrush(fallback);
+        created.Freeze();
+        return created;
+    }
+
+    private void LibraryExplorerRootAddButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = UiStrings.TitleLibraryExplorerRootAdd,
+        };
+        if (dialog.ShowDialog(this) != true || string.IsNullOrWhiteSpace(dialog.FolderName))
+        {
+            return;
+        }
+
+        string full;
+        try
+        {
+            full = Path.GetFullPath(dialog.FolderName)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return;
+        }
+
+        foreach (var existing in LibraryExplorerRootsList.Items.OfType<LibraryExplorerRootItem>())
+        {
+            if (existing.Path.Equals(full, StringComparison.OrdinalIgnoreCase))
+            {
+                LibraryExplorerRootsList.SelectedItem = existing;
+                return;
+            }
+        }
+
+        var item = new LibraryExplorerRootItem(full);
+        LibraryExplorerRootsList.Items.Add(item);
+        LibraryExplorerRootsList.SelectedItem = item;
+    }
+
+    private void LibraryExplorerRootRemoveButton_Click(object sender, RoutedEventArgs e)
+    {
+        var selected = LibraryExplorerRootsList.SelectedItems.OfType<LibraryExplorerRootItem>().ToArray();
+        if (selected.Length == 0)
+        {
+            return;
+        }
+
+        foreach (var item in selected)
+        {
+            LibraryExplorerRootsList.Items.Remove(item);
+        }
+
+        if (LibraryExplorerRootsList.Items.Count == 0)
+        {
+            foreach (var path in LibraryExplorerPaths.ResolveRoots(null))
+            {
+                LibraryExplorerRootsList.Items.Add(new LibraryExplorerRootItem(path));
+            }
+        }
+
+        RefreshLibraryExplorerRootButtons();
+    }
+
+    private void LibraryExplorerRootUpButton_Click(object sender, RoutedEventArgs e) =>
+        MoveLibraryExplorerRoots(-1);
+
+    private void LibraryExplorerRootDownButton_Click(object sender, RoutedEventArgs e) =>
+        MoveLibraryExplorerRoots(1);
+
+    private void LibraryExplorerRootsList_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        RefreshLibraryExplorerRootButtons();
+
+    private void MoveLibraryExplorerRoots(int direction)
+    {
+        var items = LibraryExplorerRootsList.Items.OfType<LibraryExplorerRootItem>().ToList();
+        var selected = LibraryExplorerRootsList.SelectedItems.OfType<LibraryExplorerRootItem>().ToHashSet();
+        if (selected.Count == 0)
+        {
+            return;
+        }
+
+        LibraryExplorerPaths.MoveSelected(items, selected, direction);
+        LibraryExplorerRootsList.Items.Clear();
+        foreach (var item in items)
+        {
+            LibraryExplorerRootsList.Items.Add(item);
+        }
+
+        LibraryExplorerRootsList.SelectedItems.Clear();
+        foreach (var item in selected)
+        {
+            LibraryExplorerRootsList.SelectedItems.Add(item);
+        }
+
+        if (LibraryExplorerRootsList.SelectedItem is LibraryExplorerRootItem focus)
+        {
+            LibraryExplorerRootsList.ScrollIntoView(focus);
+        }
+
+        RefreshLibraryExplorerRootButtons();
+    }
+
+    private void RefreshLibraryExplorerRootButtons()
+    {
+        var items = LibraryExplorerRootsList.Items.OfType<LibraryExplorerRootItem>().ToList();
+        var selected = LibraryExplorerRootsList.SelectedItems.OfType<LibraryExplorerRootItem>().ToHashSet();
+        var min = int.MaxValue;
+        var max = -1;
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (!selected.Contains(items[i]))
+            {
+                continue;
+            }
+
+            min = Math.Min(min, i);
+            max = Math.Max(max, i);
+        }
+
+        LibraryExplorerRootRemoveButton.IsEnabled = selected.Count > 0;
+        LibraryExplorerRootUpButton.IsEnabled = selected.Count > 0 && min > 0;
+        LibraryExplorerRootDownButton.IsEnabled = selected.Count > 0 && max >= 0 && max < items.Count - 1;
+    }
+
+    private const string RootDragFormat = "Mga.LibraryExplorerRoot";
+    private Point _rootsDragOrigin;
+    private LibraryExplorerRootItem? _rootsDragItem;
+
+    private void LibraryExplorerRootsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _rootsDragOrigin = e.GetPosition(LibraryExplorerRootsList);
+        _rootsDragItem = RootItemAt(_rootsDragOrigin);
+    }
+
+    private void LibraryExplorerRootsList_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_rootsDragItem is null || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var pos = e.GetPosition(LibraryExplorerRootsList);
+        if (Math.Abs(pos.X - _rootsDragOrigin.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(pos.Y - _rootsDragOrigin.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        var dragged = _rootsDragItem;
+        _rootsDragItem = null;
+        DragDrop.DoDragDrop(
+            LibraryExplorerRootsList,
+            new DataObject(RootDragFormat, dragged),
+            DragDropEffects.Move);
+    }
+
+    private void LibraryExplorerRootsList_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(RootDragFormat)
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void LibraryExplorerRootsList_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(RootDragFormat) is not LibraryExplorerRootItem dragged)
+        {
+            return;
+        }
+
+        var items = LibraryExplorerRootsList.Items;
+        var from = items.IndexOf(dragged);
+        if (from < 0)
+        {
+            return;
+        }
+
+        var to = DropIndex(e.GetPosition(LibraryExplorerRootsList));
+        if (to > from)
+        {
+            to--;
+        }
+
+        if (to == from || to < 0)
+        {
+            return;
+        }
+
+        items.RemoveAt(from);
+        items.Insert(to, dragged);
+        LibraryExplorerRootsList.SelectedItem = dragged;
+        e.Handled = true;
+    }
+
+    private int DropIndex(Point point)
+    {
+        if (RootContainerAt(point) is not ListBoxItem container)
+        {
+            return LibraryExplorerRootsList.Items.Count;
+        }
+
+        var index = LibraryExplorerRootsList.ItemContainerGenerator.IndexFromContainer(container);
+        if (index < 0)
+        {
+            return LibraryExplorerRootsList.Items.Count;
+        }
+
+        var top = container.TranslatePoint(new Point(0, 0), LibraryExplorerRootsList).Y;
+        return point.Y > top + (container.ActualHeight / 2d) ? index + 1 : index;
+    }
+
+    private LibraryExplorerRootItem? RootItemAt(Point point)
+    {
+        if (RootContainerAt(point) is not ListBoxItem container)
+        {
+            return null;
+        }
+
+        return container.DataContext as LibraryExplorerRootItem
+            ?? container.Content as LibraryExplorerRootItem;
+    }
+
+    private ListBoxItem? RootContainerAt(Point point)
+    {
+        var hit = LibraryExplorerRootsList.InputHitTest(point) as DependencyObject;
+        while (hit != null && hit is not ListBoxItem)
+        {
+            hit = VisualTreeHelper.GetParent(hit);
+        }
+
+        return hit as ListBoxItem;
     }
 
     private void FillAssociations()
@@ -581,6 +932,12 @@ internal partial class AudioSettingsWindow : Window
         SelectedSettings = ReadOutputSettings();
         SelectedPresets = SpeakerPreset.CloneAll(_presets);
         SelectedVisibleSpeakerIds = SpeakerPreset.NormalizeVisibleIds(_visibleIds);
+        SelectedLibraryExplorerRoots = LibraryExplorerRootsList.Items
+            .OfType<LibraryExplorerRootItem>()
+            .Select(item => item.Path)
+            .ToArray();
+        SelectedLibraryExplorerRoots = LibraryExplorerPaths.ResolveRoots(SelectedLibraryExplorerRoots);
+        SelectedLibraryListColumns = ReadLibraryColumns();
         SelectedAutoSpeakerSelect = AutoSpeakerSelectBox.IsChecked == true;
         SelectedActiveSpeakerId = CurrentSpeaker()?.Id ?? _presets[0].Id;
         SelectedRecordDeviceId = ReadRecordDeviceId();
@@ -1302,6 +1659,7 @@ internal partial class AudioSettingsWindow : Window
         {
             UiStrings.LabelSettingsTabGeneral,
             UiStrings.LabelSettingsTabLayouts,
+            UiStrings.LabelSettingsTabPlayer,
             UiStrings.LabelSettingsTabAudio,
             UiStrings.LabelSettingsTabEditing,
             UiStrings.LabelSettingsTabExport,
@@ -1571,6 +1929,8 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyAccent(OkButton);
         ActionButtonLooks.ApplyClear(CancelButton);
         ActionButtonLooks.ApplyClear(LameBrowseButton);
+        ApplyLibraryExplorerRootButtons();
+        ApplyLibraryExplorerRootsChrome();
         RefreshTestButtons();
     }
 
@@ -1688,6 +2048,11 @@ internal partial class AudioSettingsWindow : Window
     private sealed record LanguageItem(UiLanguageChoice Choice, string Label)
     {
         public override string ToString() => Label;
+    }
+
+    private sealed record LibraryExplorerRootItem(string Path)
+    {
+        public override string ToString() => Path;
     }
 
     private sealed record ThemeItem(UiThemeChoice Choice, string Label)

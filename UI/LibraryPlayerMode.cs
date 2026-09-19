@@ -33,11 +33,6 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.Open
             or WaveMenuCommand.Settings
             or WaveMenuCommand.Quit
-            or WaveMenuCommand.CloseTab
-            or WaveMenuCommand.CloseOthers
-            or WaveMenuCommand.CloseTabsRight
-            or WaveMenuCommand.CloseTabsLeft
-            or WaveMenuCommand.CloseAll
             or WaveMenuCommand.ReopenTab
             or WaveMenuCommand.NextTab
             or WaveMenuCommand.PrevTab
@@ -66,13 +61,15 @@ internal static class LibraryPlayerMode
             or TransportCommand.ToggleTips
             or TransportCommand.OpenSettings
             or TransportCommand.OpenManual
+            or TransportCommand.ToggleLibraryMaximize
+            or TransportCommand.ToggleAnalyzerMaximize
             => false,
         _ => true,
     };
 
     /// <summary>
     /// プレイヤーで通すキー。↑↓・Home／End・PageUp／PageDown はファイル選択として別処理するので含めない。
-    /// Delete はリスト除外として別処理するので含めない（波形削除へ落とさない）。
+    /// Delete はリスト除外として別処理。Ctrl+W は閉じない（リスト除外も Delete のみ）。
     /// </summary>
     public static bool AllowsKey(Key key, ModifierKeys modifiers)
     {
@@ -82,6 +79,11 @@ internal static class LibraryPlayerMode
         }
 
         if (key is Key.Escape or Key.F10 or Key.F11 or Key.F12 or Key.Apps)
+        {
+            return true;
+        }
+
+        if (modifiers == ModifierKeys.None && key is Key.F1 or Key.F2 or Key.F3)
         {
             return true;
         }
@@ -119,8 +121,6 @@ internal static class LibraryPlayerMode
             (Key.Enter, ModifierKeys.None or ModifierKeys.Alt) => true,
             (Key.L, ModifierKeys.None) => true,
             (Key.A, ModifierKeys.Control) => true,
-            (Key.W, ModifierKeys.Control) => true,
-            (Key.W, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.S, ModifierKeys.Alt) => true,
             (Key.O, ModifierKeys.Control) => true,
             (Key.O, ModifierKeys.Control | ModifierKeys.Shift) => true,
@@ -132,6 +132,10 @@ internal static class LibraryPlayerMode
             _ => false,
         };
     }
+
+    /// <summary>ツリーが左右を使う。再生中の早送り／巻き戻しにはしない。</summary>
+    public static bool ExplorerOwnsHorizontal(Key key, ModifierKeys modifiers) =>
+        key is Key.Left or Key.Right && modifiers == ModifierKeys.None;
 
     /// <summary>
     /// フォルダツリーで拒否するキー（コピー／削除／リネーム等）。ナビと Enter 以外はここで止める。
@@ -151,13 +155,18 @@ internal static class LibraryPlayerMode
             return false;
         }
 
-        if (key == Key.Enter && modifiers == ModifierKeys.None)
+        if (key == Key.Enter && modifiers is ModifierKeys.None or ModifierKeys.Shift)
         {
             return false;
         }
 
-        // アプリ共通のモード切替・終了などはツリーからでも通す。
+        // アプリ共通のモード切替・終了、プレイヤーのペイン切替はツリーからでも通す。
         if (key is Key.Escape or Key.F10 or Key.F11 or Key.F12 or Key.Apps)
+        {
+            return false;
+        }
+
+        if (modifiers == ModifierKeys.None && key is Key.F1 or Key.F2 or Key.F3)
         {
             return false;
         }
@@ -178,8 +187,9 @@ internal static class LibraryPlayerMode
             return false;
         }
 
-        // 削除・リネーム・コピー／切り取り／貼り付け・複製などファイル操作系はすべて止める。
-        if (key is Key.Delete or Key.Back or Key.F2)
+        // 削除・バックスペース・コピー／切り取り／貼り付け・複製などファイル操作系はすべて止める。
+        // F2 はプレイヤーでお気に入りフォーカスに使うので、ここでは止めない。
+        if (key is Key.Delete or Key.Back)
         {
             return true;
         }
@@ -266,6 +276,22 @@ internal static class LibraryPlayerMode
 
     public static int EdgeIndex(int count, int edge) =>
         count <= 0 ? -1 : edge < 0 ? 0 : count - 1;
+
+    /// <summary>曲が終わった次。末尾の次は先頭。今の曲が見つからなければ先頭。空なら -1。</summary>
+    public static int NextLoopIndex(int count, int current)
+    {
+        if (count <= 0)
+        {
+            return -1;
+        }
+
+        if (current < 0 || current >= count - 1)
+        {
+            return 0;
+        }
+
+        return current + 1;
+    }
 
     public static int PageStep(int visibleRows) =>
         Math.Max(1, visibleRows - 1);

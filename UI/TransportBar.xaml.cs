@@ -58,6 +58,8 @@ internal partial class TransportBar : UserControl
             (TransportCommand.ToggleLoudnessView, TransportIcon.Loudness, UiStrings.TipLoudnessView, UiStrings.TooltipLoudnessView),
             (TransportCommand.CenterPlayhead, TransportIcon.Center, UiStrings.TipCenterPlayhead, UiStrings.TooltipCenterPlayhead),
             (TransportCommand.History, TransportIcon.History, UiStrings.TipEditHistory, UiStrings.TooltipHistory),
+            (TransportCommand.ToggleLibraryMaximize, TransportIcon.PlayerMode, UiStrings.TipLibraryMaximize, UiStrings.TooltipLibraryMaximize),
+            (TransportCommand.ToggleAnalyzerMaximize, TransportIcon.AnalyzerMaximize, UiStrings.TipAnalyzerMaximize, UiStrings.TooltipAnalyzerMaximize),
             (TransportCommand.ToggleUiTheme, TransportIcon.ThemeMoon, UiStrings.TipUiThemeToggle, UiStrings.TooltipUiThemeToggle),
             (TransportCommand.OpenColorPanel, TransportIcon.ColorPalette, UiStrings.TipColorPanel, UiStrings.TooltipColorPanel));
 
@@ -97,6 +99,8 @@ internal partial class TransportBar : UserControl
         SetTip(TransportCommand.ToggleLoudnessView, UiStrings.TipLoudnessView, UiStrings.TooltipLoudnessView);
         SetTip(TransportCommand.CenterPlayhead, UiStrings.TipCenterPlayhead, UiStrings.TooltipCenterPlayhead);
         SetTip(TransportCommand.History, UiStrings.TipEditHistory, UiStrings.TooltipHistory);
+        SetTip(TransportCommand.ToggleLibraryMaximize, UiStrings.TipLibraryMaximize, UiStrings.TooltipLibraryMaximize, respectsEnabled: false);
+        SetTip(TransportCommand.ToggleAnalyzerMaximize, UiStrings.TipAnalyzerMaximize, UiStrings.TooltipAnalyzerMaximize, respectsEnabled: false);
         SetTip(TransportCommand.ToggleUiTheme, UiStrings.TipUiThemeToggle, UiStrings.TooltipUiThemeToggle, respectsEnabled: false);
         SetTip(TransportCommand.OpenColorPanel, UiStrings.TipColorPanel, UiStrings.TooltipColorPanel, respectsEnabled: false);
         SetTip(TransportCommand.OpenSettings, UiStrings.TipAudioSettings, UiStrings.TooltipSettings, respectsEnabled: false);
@@ -166,6 +170,37 @@ internal partial class TransportBar : UserControl
         }
     }
 
+    public void SetMaximizeMode(WaveformMaximizeMode mode)
+    {
+        if (_buttons.TryGetValue(TransportCommand.ToggleLibraryMaximize, out var library))
+        {
+            var player = mode == WaveformMaximizeMode.Library;
+            library.Icon = player ? TransportIcon.EditorMode : TransportIcon.PlayerMode;
+            library.IsLatched = player;
+            TipService.Set(
+                library,
+                player ? UiStrings.TipLibraryMaximizeOff : UiStrings.TipLibraryMaximize,
+                respectsEnabled: false);
+            TransportToolTip.Attach(
+                library,
+                player ? UiStrings.TooltipLibraryMaximizeOff : UiStrings.TooltipLibraryMaximize);
+        }
+
+        if (_buttons.TryGetValue(TransportCommand.ToggleAnalyzerMaximize, out var analyzers))
+        {
+            var on = mode == WaveformMaximizeMode.Analyzers;
+            analyzers.Icon = on ? TransportIcon.AnalyzerRestore : TransportIcon.AnalyzerMaximize;
+            analyzers.IsLatched = on;
+            TipService.Set(
+                analyzers,
+                on ? UiStrings.TipAnalyzerMaximizeOff : UiStrings.TipAnalyzerMaximize,
+                respectsEnabled: false);
+            TransportToolTip.Attach(
+                analyzers,
+                on ? UiStrings.TooltipAnalyzerMaximizeOff : UiStrings.TooltipAnalyzerMaximize);
+        }
+    }
+
     public FrameworkElement? ButtonFor(TransportCommand command) =>
         _buttons.TryGetValue(command, out var button) ? button : null;
 
@@ -193,7 +228,9 @@ internal partial class TransportBar : UserControl
                 or TransportCommand.ToggleUiTheme
                 or TransportCommand.OpenColorPanel
                 or TransportCommand.ToggleTips
-                or TransportCommand.OpenManual)
+                or TransportCommand.OpenManual
+                or TransportCommand.ToggleLibraryMaximize
+                or TransportCommand.ToggleAnalyzerMaximize)
             {
                 button.IsEnabled = true;
                 continue;

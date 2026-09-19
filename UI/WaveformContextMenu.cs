@@ -564,11 +564,11 @@ internal static class WaveformContextMenuBuilder
     /// </summary>
     private static IReadOnlyList<WaveMenuEntry> TabItems(WaveformContextMenuModel m) =>
     [
-        Cmd(UiStrings.TabMenuCloseThis, WaveMenuCommand.CloseTab, "Ctrl+W", m.HasDocument && !m.IsBusy && !m.IsRecording),
-        Cmd(UiStrings.TabMenuCloseOthers, WaveMenuCommand.CloseOthers, enabled: m.CanCloseOtherTabs),
-        Cmd(UiStrings.TabMenuCloseRight, WaveMenuCommand.CloseTabsRight, enabled: m.CanCloseTabsToRight),
-        Cmd(UiStrings.TabMenuCloseLeft, WaveMenuCommand.CloseTabsLeft, enabled: m.CanCloseTabsToLeft),
-        Cmd(UiStrings.TabMenuCloseAllNormal, WaveMenuCommand.CloseAll, "Ctrl+Shift+W", m.HasDocument && !m.IsBusy && !m.IsRecording),
+        Cmd(UiStrings.TabMenuCloseThis, WaveMenuCommand.CloseTab, "Ctrl+W", m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
+        Cmd(UiStrings.TabMenuCloseOthers, WaveMenuCommand.CloseOthers, enabled: m.CanCloseOtherTabs && !m.LibraryMaximized),
+        Cmd(UiStrings.TabMenuCloseRight, WaveMenuCommand.CloseTabsRight, enabled: m.CanCloseTabsToRight && !m.LibraryMaximized),
+        Cmd(UiStrings.TabMenuCloseLeft, WaveMenuCommand.CloseTabsLeft, enabled: m.CanCloseTabsToLeft && !m.LibraryMaximized),
+        Cmd(UiStrings.TabMenuCloseAllNormal, WaveMenuCommand.CloseAll, "Ctrl+Shift+W", m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuMergeTabs, WaveMenuCommand.MergeTabs, "Ctrl+Shift+B", m.CanMergeTabs),
         Cmd(UiStrings.TabMenuSelectAll, WaveMenuCommand.SelectAllTabs, "Ctrl+Shift+A", m.HasMultipleTabs && !m.AllTabsSelected && !m.IsBusy && !m.LibraryMaximized),

@@ -42,6 +42,9 @@ internal sealed class WaveformView : Grid
     private const int TrailMaxSamples = 900;
     private const double TrailDiscontinuitySec = 1.25;
 
+    /// <summary>プレイヤー波形。背景アニメーションが透ける濃さ。</summary>
+    internal const double PlayerWaveOpacity = 0.58;
+
     private const double MouseGuideMoveEpsilonPx = 0.5;
     private static double TimeLaneHeight => DesignMetrics.RulerHeight;
 
@@ -135,12 +138,14 @@ internal sealed class WaveformView : Grid
     private double _waveViewSpan;
     private double _waveAmpZoom;
     private SpectrogramViewMode _waveMode;
+    private bool _waveSeekOnly;
     private bool _waveDirty = true;
     private bool _liveRecording;
     private long _liveSettledFrames = -1;
     private bool _waveLiveRecording;
     private long _waveLiveFrames;
     private long _waveLivePeakFrames;
+    private long _wavePeakFilled;
     private SpectrogramViewMode _spectrogramMode;
     private readonly SpectrogramRenderer _spectrogram = new();
     private readonly SpectrogramBoostBar _boostBar = new();
@@ -152,6 +157,7 @@ internal sealed class WaveformView : Grid
     private double _staticPaintEndMs;
     private double _followRebuildAtMs;
     private bool _staticRebuildQueued;
+    private bool _staticRebuildAgain;
     private bool _deferWaveReload;
     private bool _deferredStaticQueued;
     private bool _viewChangedQueued;
@@ -481,13 +487,17 @@ internal sealed class WaveformView : Grid
         {
             _seekAndSelectOnly = value;
             Focusable = !value;
+            // スクロール中の遅延ビットマップをプレイヤー描画に流用すると、全体表示へ戻した瞬間に画面外へずれる。
+            _deferWaveReload = false;
+            _waveDirty = true;
+            InvalidateStaticLayer();
         }
     }
 
     private bool _seekAndSelectOnly;
 
     /// <summary>
-    /// 左端のチャンネル名と dB 目盛り列。F11 フルスクリーンでは畳んで波形を広げる。F12 では残す。
+    /// 左端のチャンネル名と dB 目盛り列。F11 とプレイヤーでは畳んで波形を広げる。
     /// </summary>
     public bool ShowScaleLane
     {
@@ -500,6 +510,7 @@ internal sealed class WaveformView : Grid
             }
 
             _showScaleLane = value;
+            _deferWaveReload = false;
             _waveDirty = true;
             SyncSpectrogramBoostBar();
             InvalidateStaticLayer();
@@ -616,6 +627,25 @@ internal sealed class WaveformView : Grid
     }
 
     public void Refresh() => InvalidateWaveform();
+
+    /// <summary>
+    /// ピークの途中描画。静的層は Render 優先で入力より先に走るので、
+    /// 実測コスト分の休止を挟まないと再生中にキーとマウスが飢える。
+    /// </summary>
+    public void RefreshThrottled()
+    {
+        var nowMs = System.Diagnostics.Stopwatch.GetTimestamp()
+            * 1000d / System.Diagnostics.Stopwatch.Frequency;
+        var idleMs = Math.Max(Math.Max(_staticPaintMs, _staticPaintLastMs) * 1.5, 32d);
+        var lastMs = Math.Max(_followRebuildAtMs, _staticPaintEndMs);
+        if (nowMs - lastMs < idleMs)
+        {
+            return;
+        }
+
+        _followRebuildAtMs = nowMs;
+        InvalidateWaveform();
+    }
 
     /// <summary>
     /// 録音中の追従。キャッシュを捨てず、新しい列だけ足す／スクロール差分だけずらす。
@@ -2086,10 +2116,13 @@ internal sealed class WaveformView : Grid
     private void PaintStaticCore(DrawingContext dc)
     {
         var bounds = new Rect(_staticHost.RenderSize);
-        dc.DrawRectangle(
-            WpfControlHelpers.FrozenBrush(Theme.Get(_liveRecording ? "WaveformRecordBackBrush" : "WaveformBackBrush")),
-            null,
-            bounds);
+        if (!SeekAndSelectOnly)
+        {
+            dc.DrawRectangle(
+                WpfControlHelpers.FrozenBrush(Theme.Get(_liveRecording ? "WaveformRecordBackBrush" : "WaveformBackBrush")),
+                null,
+                bounds);
+        }
         if (Math.Abs(_appliedMarkerLaneHeight - MarkerLaneHeight) > 0.01)
         {
             _appliedMarkerLaneHeight = MarkerLaneHeight;
@@ -2149,6 +2182,12 @@ internal sealed class WaveformView : Grid
             if (loudness)
             {
                 dc.PushOpacity(0.75);
+                DrawWaveformImage(dc, wave);
+                dc.Pop();
+            }
+            else if (SeekAndSelectOnly)
+            {
+                dc.PushOpacity(PlayerWaveOpacity);
                 DrawWaveformImage(dc, wave);
                 dc.Pop();
             }
@@ -2251,7 +2290,12 @@ internal sealed class WaveformView : Grid
         if (_deferWaveReload
             && _waveBitmap is not null
             && !_waveDirty
-            && _waveMode == _spectrogramMode)
+            && _waveMode == _spectrogramMode
+            && _waveSeekOnly == SeekAndSelectOnly
+            && _wavePixelWidth == bmpWidth
+            && _wavePixelHeight == height
+            && Math.Abs(_waveViewSpan - bmpSpan) < bmpSpan / Math.Max(1, bmpWidth) * 0.01
+            && Math.Abs(_waveAmpZoom - _ampZoom) < 1e-6)
         {
             return;
         }
@@ -2267,10 +2311,12 @@ internal sealed class WaveformView : Grid
             && Math.Abs(_waveViewSpan - bmpSpan) < bmpSpan / bmpWidth * 0.01
             && Math.Abs(_waveAmpZoom - _ampZoom) < 1e-6
             && _waveMode == _spectrogramMode
+            && _waveSeekOnly == SeekAndSelectOnly
             && _waveChannels == (_document?.Channels ?? 0)
             && _waveLiveRecording == _liveRecording
             && _waveLiveFrames == (_document?.FrameCount ?? 0)
-            && _waveLivePeakFrames == (_document?.Peaks.FrameCount ?? 0))
+            && _waveLivePeakFrames == (_document?.Peaks.FrameCount ?? 0)
+            && _wavePeakFilled == (_document?.Peaks.FilledFrames ?? 0))
         {
             return;
         }
@@ -2285,6 +2331,8 @@ internal sealed class WaveformView : Grid
             && Math.Abs(_waveViewSpan - bmpSpan) < 0.01
             && Math.Abs(_waveAmpZoom - _ampZoom) < 1e-6
             && _waveMode == _spectrogramMode
+            && _waveSeekOnly == SeekAndSelectOnly
+            && _wavePeakFilled == (_document?.Peaks.FilledFrames ?? 0)
             && (TryShiftWaveform(quantStart, bmpSpan, bmpWidth, height, scaleX, scaleY)
                 || TryPaintLiveTail(quantStart, bmpSpan, bmpWidth, height, scaleX, scaleY));
         if (!reused)
@@ -2307,12 +2355,14 @@ internal sealed class WaveformView : Grid
         _waveViewSpan = bmpSpan;
         _waveAmpZoom = _ampZoom;
         _waveMode = _spectrogramMode;
+        _waveSeekOnly = SeekAndSelectOnly;
         _wavePixelWidth = bmpWidth;
         _wavePixelHeight = height;
         _waveChannels = _document?.Channels ?? 0;
         _waveLiveRecording = _liveRecording;
         _waveLiveFrames = _document?.FrameCount ?? 0;
         _waveLivePeakFrames = _document?.Peaks.FrameCount ?? 0;
+        _wavePeakFilled = _document?.Peaks.FilledFrames ?? 0;
         _waveDirty = false;
         // 解析表示から戻った直後は、オーバーレイ層が先に描いて古い反転を残すことがある。
         // 波形を今のモードで作り直したあと、選択を載せ直す。
@@ -3131,7 +3181,25 @@ internal sealed class WaveformView : Grid
                 lo = Math.Max(lo, _columnYLo[px + 1]);
             }
 
-            FillVLine(buffer, stride, width, clipTop, clipBottom, px, hi, lo, color);
+            if (SeekAndSelectOnly)
+            {
+                FillVLineGradient(
+                    buffer,
+                    stride,
+                    width,
+                    clipTop,
+                    clipBottom,
+                    px,
+                    hi,
+                    lo,
+                    color,
+                    mid,
+                    laneHeight * 0.5);
+            }
+            else
+            {
+                FillVLine(buffer, stride, width, clipTop, clipBottom, px, hi, lo, color);
+            }
         }
     }
 
@@ -3466,6 +3534,52 @@ internal sealed class WaveformView : Grid
         }
     }
 
+    private static unsafe void FillVLineGradient(
+        int* buffer,
+        int stride,
+        int width,
+        int clipTop,
+        int clipBottom,
+        int x,
+        int y1,
+        int y2,
+        int color,
+        double mid,
+        double halfHeight)
+    {
+        if ((uint)x >= (uint)width)
+        {
+            return;
+        }
+
+        if (y1 > y2)
+        {
+            (y1, y2) = (y2, y1);
+        }
+
+        if (y1 < clipTop)
+        {
+            y1 = clipTop;
+        }
+
+        if (y2 >= clipBottom)
+        {
+            y2 = clipBottom - 1;
+        }
+
+        if (y1 > y2)
+        {
+            return;
+        }
+
+        var p = buffer + y1 * stride + x;
+        for (var y = y1; y <= y2; y++)
+        {
+            *p = WaveformLaneGradient.Shade(color, y + 0.5, mid, halfHeight);
+            p += stride;
+        }
+    }
+
     private static unsafe void FillDot(
         int* buffer,
         int stride,
@@ -3647,7 +3761,7 @@ internal sealed class WaveformView : Grid
     private void DrawDbScaleWell(DrawingContext dc, Rect bounds)
     {
         var well = DbScaleBounds(bounds);
-        if (well.Width <= 1)
+        if (well.Width <= 1 || SeekAndSelectOnly)
         {
             return;
         }
@@ -4189,7 +4303,10 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TimelineWellBackBrush")), null, lane);
+        if (!SeekAndSelectOnly)
+        {
+            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TimelineWellBackBrush")), null, lane);
+        }
     }
 
     private void DrawTimeLane(DrawingContext dc, Rect bounds, double start, double span)
@@ -4200,7 +4317,10 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TimelineWellBackBrush")), null, lane);
+        if (!SeekAndSelectOnly)
+        {
+            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TimelineWellBackBrush")), null, lane);
+        }
         if (_document is not null)
         {
             DrawSampleLoopBar(dc, lane, start, span);
@@ -5835,6 +5955,8 @@ internal sealed class WaveformView : Grid
         var newSpan = ViewSpanFrames;
         var max = Math.Max(0d, _document.FrameCount - newSpan);
         _viewStart = Math.Clamp(anchorFrame - newSpan * ratio, 0d, max);
+        _deferWaveReload = false;
+        _waveDirty = true;
         InvalidateStaticLayer();
         RaiseViewChanged();
     }
@@ -6378,6 +6500,8 @@ internal sealed class WaveformView : Grid
         _snapCacheDirty = true;
         if (_staticRebuildQueued)
         {
+            // 行高が変わる SizeChanged が、先に積んだ描画に消されるとエディタサイズのまま残る。
+            _staticRebuildAgain = true;
             return;
         }
 
@@ -6390,10 +6514,16 @@ internal sealed class WaveformView : Grid
     private void FlushStaticRebuild()
     {
         _staticRebuildQueued = false;
+        var again = _staticRebuildAgain;
+        _staticRebuildAgain = false;
         SyncMouseGuideHeight();
         _staticHost.InvalidateVisual();
         _overlayHost.InvalidateVisual();
         _playheadHost.InvalidateVisual();
+        if (again)
+        {
+            InvalidateStaticLayer();
+        }
     }
 
     private void InvalidatePlayheadLayer()

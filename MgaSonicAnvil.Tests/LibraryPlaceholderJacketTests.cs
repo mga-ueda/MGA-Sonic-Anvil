@@ -66,6 +66,17 @@ public sealed class LibraryPlaceholderJacketTests
             Assert.False(view.IsPlaceholderJacket);
             Assert.True(view.JacketReplaceEnabled);
             Assert.NotNull(view.JacketDisplaySource);
+
+            var m4a = new AudioDocument(new float[48], 48000, 1, 16, AudioFileKind.M4a, "a.m4a");
+            view.SetArtwork(m4a);
+            Assert.True(view.IsPlaceholderJacket);
+            Assert.False(view.JacketReplaceEnabled);
+
+            m4a.SetArtwork(OnePixelPng);
+            view.SetArtwork(m4a);
+            Assert.False(view.IsPlaceholderJacket);
+            Assert.False(view.JacketReplaceEnabled);
+            Assert.NotNull(view.JacketDisplaySource);
         });
     }
 
