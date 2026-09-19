@@ -78,6 +78,7 @@ public sealed class UiThemeTests
         Assert.True(UiThemePalette.IsThemeable("ExportButtonBackBrush"));
         Assert.True(UiThemePalette.IsThemeable("ExportButtonFillBrush"));
         Assert.True(UiThemePalette.IsThemeable("LevelMeterTrackBackBrush"));
+        Assert.True(UiThemePalette.IsThemeable("PlayerLevelMeterTickBrush"));
         Assert.True(UiThemePalette.IsThemeable("KeepTargetLockForeBrush"));
         Assert.True(UiThemePalette.IsThemeable("ActionLinkHoverForeBrush"));
         Assert.True(UiThemePalette.IsThemeable("SampleLoopTimeLabelForeBrush"));
@@ -215,6 +216,9 @@ public sealed class UiThemeTests
             > RelativeLuma(Composite(System.Windows.Media.Color.FromArgb(150, 0, 0, 0), waveBack)));
         Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "HistoryStripBackBrush")) > 0.6);
         Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterTrackBorderBrush")) > 0.5);
+        Assert.True(
+            RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "PlayerLevelMeterTickBrush"))
+            < RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterTickBrush")));
         Assert.Equal(
             System.Windows.Media.Color.FromRgb(0xC8, 0xC8, 0xC8),
             UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterHoldBorderBrush"));

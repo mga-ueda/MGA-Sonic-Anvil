@@ -20,10 +20,12 @@ public sealed class ColorDevCatalogTests
     [InlineData("SampleLoopTimelineBrush", "SampleLoop")]
     [InlineData("RegionTimelineBrush", "Region")]
     [InlineData("MarkerBrush", "Marker")]
-    [InlineData("LevelMeterTrackBackBrush", "Meter")]
+    [InlineData("LoudnessSafeBrush", "Loudness")]
+    [InlineData("LevelMeterClipOnBrush", "Meter")]
     [InlineData("LevelGradFloorBrush", "Spectrum")]
     [InlineData("LevelGradCeilBrush", "Spectrum")]
     [InlineData("VectorScopeBackBrush", "VectorScope")]
+    [InlineData("PlayerLevelMeterTickBrush", "Player")]
     [InlineData("TransportBackBrush", "Transport")]
     [InlineData("HistoryStripBackBrush", "Transport")]
     [InlineData("ActionCopyrightForeBrush", "Transport")]
@@ -49,13 +51,21 @@ public sealed class ColorDevCatalogTests
         Assert.True(ColorDevCatalog.Rank("LoopRangeFillBrush") < ColorDevCatalog.Rank("SampleLoopTimelineBrush"));
         Assert.True(ColorDevCatalog.Rank("SampleLoopTimelineBrush") < ColorDevCatalog.Rank("RegionTimelineBrush"));
         Assert.True(ColorDevCatalog.Rank("RegionTimelineBrush") < ColorDevCatalog.Rank("MarkerBrush"));
-        Assert.True(ColorDevCatalog.Rank("MarkerBrush") < ColorDevCatalog.Rank("LevelMeterTrackBackBrush"));
+        Assert.True(ColorDevCatalog.Rank("MarkerBrush") < ColorDevCatalog.Rank("LoudnessWaveFillBrush"));
+        Assert.True(ColorDevCatalog.Rank("LoudnessWaveFillBrush") < ColorDevCatalog.Rank("LevelMeterTrackBackBrush"));
         Assert.True(ColorDevCatalog.Rank("LevelMeterTrackBackBrush") < ColorDevCatalog.Rank("LevelGradFloorBrush"));
         Assert.True(ColorDevCatalog.Rank("LevelGradFloorBrush") < ColorDevCatalog.Rank("VectorScopeBackBrush"));
-        Assert.True(ColorDevCatalog.Rank("VectorScopeBackBrush") < ColorDevCatalog.Rank("TransportBackBrush"));
+        Assert.True(ColorDevCatalog.Rank("VectorScopeBackBrush") < ColorDevCatalog.Rank("PlayerLevelMeterTickBrush"));
+        Assert.True(ColorDevCatalog.Rank("PlayerLevelMeterTickBrush") < ColorDevCatalog.Rank("TransportBackBrush"));
         Assert.True(ColorDevCatalog.Rank("TransportBackBrush") < ColorDevCatalog.Rank("StatusBarBackBrush"));
         Assert.True(ColorDevCatalog.Rank("StatusBarBackBrush") < ColorDevCatalog.Rank("WindowBackBrush"));
-        Assert.True(ColorDevCatalog.Rank("WindowBackBrush") < ColorDevCatalog.Rank("UnknownBrush"));
+        Assert.True(ColorDevCatalog.Rank("SampleLoopTimelineBrush") < ColorDevCatalog.Rank("SampleLoopGripBrush"));
+        Assert.True(ColorDevCatalog.Rank("SampleLoopGripBrush") < ColorDevCatalog.Rank("SampleLoopWaveFillBrush"));
+        Assert.True(ColorDevCatalog.Rank("SpectrogramGridBrush") < ColorDevCatalog.Rank("SpectrogramScaleForeBrush"));
+        Assert.True(ColorDevCatalog.Rank("SpectrogramScaleForeBrush") < ColorDevCatalog.Rank("SpectrogramScaleEdgeBrush"));
+        Assert.True(ColorDevCatalog.Rank("PlayerPlaceholderJacketForeBrush") < ColorDevCatalog.Rank("PlayerJacketReflectionBrush"));
+        Assert.True(ColorDevCatalog.Rank("PlayerJacketReflectionBrush") < ColorDevCatalog.Rank("PlayerFallbackWashNavyBrush"));
+        Assert.True(ColorDevCatalog.Rank("TransportPressedBackBrush") < ColorDevCatalog.Rank("RecordLatchForeBrush"));
     }
 
     [Fact]
@@ -69,12 +79,14 @@ public sealed class ColorDevCatalogTests
             Assert.Equal("波形", ColorDevCatalog.GroupTitle(ColorDevGroup.Waveform));
             Assert.Equal("ガイド", ColorDevCatalog.GroupTitle(ColorDevGroup.Guides));
             Assert.Equal("トランスポート", ColorDevCatalog.GroupTitle(ColorDevGroup.Transport));
+            Assert.Equal("プレイヤー", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
 
             UiStrings.SetLanguage(UiLanguage.English);
             Assert.Equal("Shared", ColorDevCatalog.GroupTitle(ColorDevGroup.Shared));
             Assert.Equal("Waveform", ColorDevCatalog.GroupTitle(ColorDevGroup.Waveform));
             Assert.Equal("Guides", ColorDevCatalog.GroupTitle(ColorDevGroup.Guides));
             Assert.Equal("Transport", ColorDevCatalog.GroupTitle(ColorDevGroup.Transport));
+            Assert.Equal("Player", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
         }
         finally
         {
@@ -87,7 +99,15 @@ public sealed class ColorDevCatalogTests
     {
         var xaml = File.ReadAllText(FindUiColorsXaml());
         Assert.Contains("x:Key=\"WaveFillBrush\" Color=\"#FFC6D9FF\"", xaml);
-        Assert.Contains("x:Key=\"LevelGradFloorBrush\" Color=\"#FF005C8C\"", xaml);
+        Assert.Contains("x:Key=\"PlayerPlaceholderJacketTopBrush\" Color=\"#FF5C5C62\"", xaml);
+        Assert.Contains("x:Key=\"PlayerWaveFillBrush\" Color=\"#94C6D9FF\"", xaml);
+        Assert.Contains("x:Key=\"PlayerFallbackWashNavyBrush\" Color=\"#FF1B3A6B\"", xaml);
+        Assert.Contains("x:Key=\"PlayerLevelMeterTrackBorderBrush\" Color=\"#FF5A605A\"", xaml);
+        Assert.Contains("x:Key=\"PlayerLevelMeterTickBrush\" Color=\"#60FFFFFF\"", xaml);
+        Assert.Contains("x:Key=\"PlayerVectorScopeGridBrush\" Color=\"#FF717174\"", xaml);
+        Assert.Contains("x:Key=\"LevelMeterClipOnBrush\" Color=\"#FFFF0000\"", xaml);
+        Assert.Contains("x:Key=\"LoudnessSafeBrush\" Color=\"#FF00FFFF\"", xaml);
+        Assert.Contains("x:Key=\"RecordLatchForeBrush\" Color=\"#FFE24B4A\"", xaml);
         Assert.Contains("x:Key=\"LevelGradLowBrush\" Color=\"#FF0071AC\"", xaml);
         Assert.Contains("x:Key=\"LevelGradCeilBrush\" Color=\"#FFC8EFFF\"", xaml);
         var keys = Regex.Matches(xaml, @"x:Key=""(?<key>\w+Brush)""")

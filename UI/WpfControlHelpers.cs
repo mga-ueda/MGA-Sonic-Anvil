@@ -156,6 +156,11 @@ internal static class Theme
             return brush.Color;
         }
 
+        if (UiThemePalette.TryMap(UiThemeService.Current, key, out var mapped))
+        {
+            return mapped;
+        }
+
         throw new InvalidOperationException(UiStrings.ErrUndefinedColorKey(key));
     }
 }
