@@ -19,14 +19,9 @@ public partial class MainWindow
             return;
         }
 
-        if (TryProcessShortcut(key, modifiers))
+        if (TryProcessShortcut(key, modifiers, e.IsRepeat))
         {
             e.Handled = true;
-            // F1–F3 はペイン切替そのものなので、直後にリストへ引き戻さない。
-            if (modifiers != ModifierKeys.None || key is not (Key.F1 or Key.F2 or Key.F3))
-            {
-                KeepLibraryListActive();
-            }
         }
     }
 
@@ -45,11 +40,23 @@ public partial class MainWindow
             return;
         }
 
-        if (key is Key.Left or Key.Right)
+        if (key is Key.NumPad7 or Key.NumPad9)
+        {
+            if (_seekNudgeDirection != 0
+                && (key == Key.NumPad7 && _seekNudgeDirection < 0
+                    || key == Key.NumPad9 && _seekNudgeDirection > 0))
+            {
+                StopSeekNudge();
+            }
+
+            return;
+        }
+
+        if (key is Key.Left or Key.Right or Key.NumPad1 or Key.NumPad3)
         {
             if (_playbackShuttleDirection != 0
-                && (key == Key.Left && _playbackShuttleDirection < 0
-                    || key == Key.Right && _playbackShuttleDirection > 0))
+                && (key is Key.Left or Key.NumPad1 && _playbackShuttleDirection < 0
+                    || key is Key.Right or Key.NumPad3 && _playbackShuttleDirection > 0))
             {
                 StopPlaybackShuttle();
             }
@@ -204,11 +211,12 @@ public partial class MainWindow
         return false;
     }
 
-    private bool TryProcessShortcut(Key key, ModifierKeys modifiers)
+    private bool TryProcessShortcut(Key key, ModifierKeys modifiers, bool isRepeat = false)
     {
         if (IsUiBusy)
         {
             StopPlaybackShuttle();
+            StopSeekNudge();
             if (AppDialogKeys.IsEscape(key, modifiers))
             {
                 TryRequestOpenCancel();
@@ -231,6 +239,7 @@ public partial class MainWindow
 
         if (key == Key.F10 && modifiers == ModifierKeys.None)
         {
+            StopSeekNudge();
             ToggleLibraryMaximize();
             return true;
         }
@@ -238,6 +247,7 @@ public partial class MainWindow
         if (TryConsumeRecordingShortcut(key, modifiers))
         {
             StopPlaybackShuttle();
+            StopSeekNudge();
             return true;
         }
 
@@ -253,30 +263,53 @@ public partial class MainWindow
             return false;
         }
 
-        if (IsLibraryGroupComboFocused)
+        // プレイヤー専用: Tab 循環 / F1 ツリー / F2 お気に入り / F3 プレイリスト
+        if (IsLibraryMaximized && IsLibraryPaneCycleShortcut(key, modifiers))
         {
-            return false;
-        }
-
-        // プレイヤー専用: F1 ツリー / F2 お気に入り / F3 プレイリスト
-        if (IsLibraryMaximized
-            && modifiers == ModifierKeys.None
-            && key is Key.F1 or Key.F2 or Key.F3)
-        {
-            switch (key)
+            if (key == Key.Tab)
             {
-                case Key.F1:
-                    LibraryBrowser.FocusExplorer();
-                    break;
-                case Key.F2:
-                    LibraryBrowser.FocusFavorites();
-                    break;
-                default:
-                    LibraryBrowser.FocusList();
-                    break;
+                LibraryBrowser.CyclePaneFocus(reverse: modifiers == ModifierKeys.Shift);
+            }
+            else
+            {
+                switch (key)
+                {
+                    case Key.F1:
+                        LibraryBrowser.FocusExplorer();
+                        break;
+                    case Key.F2:
+                        LibraryBrowser.FocusFavorites();
+                        break;
+                    default:
+                        LibraryBrowser.FocusList();
+                        break;
+                }
             }
 
             return true;
+        }
+
+        if (IsLibraryMaximized && TryHandleLibraryPlayerNumpad(key, modifiers, isRepeat))
+        {
+            return true;
+        }
+
+        if (IsLibraryMaximized
+            && key is Key.Left or Key.Right
+            && modifiers == ModifierKeys.None)
+        {
+            StopPlaybackShuttle();
+            if (IsLibraryExplorerFocused)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        if (IsLibraryGroupComboFocused)
+        {
+            return false;
         }
 
         if (IsLibraryExplorerFocused)
@@ -291,6 +324,18 @@ public partial class MainWindow
             {
                 // プレイリストへ足すだけ。再生は始めず、再生中も止めない。
                 LibraryBrowser.OpenSelectedFolder();
+                return true;
+            }
+
+            if (LibraryPlayerMode.IsExplorerExpandAll(key, modifiers))
+            {
+                LibraryBrowser.ExpandSelectedExplorerSubtree();
+                return true;
+            }
+
+            if (LibraryPlayerMode.IsExplorerCollapseSubtree(key, modifiers))
+            {
+                LibraryBrowser.CollapseSelectedExplorerSubtree();
                 return true;
             }
 
@@ -377,7 +422,7 @@ public partial class MainWindow
                     LibraryBrowser.MoveSelection(key == Key.Up ? -1 : 1, extend);
                 }
 
-                _libraryPlayOnArrowRelease = true;
+                _libraryPlayOnArrowRelease = !extend;
                 return true;
             }
 
@@ -955,7 +1000,8 @@ public partial class MainWindow
         }
 
         if (TryDigitPercent(key, out var percent)
-            && (modifiers == ModifierKeys.None || modifiers == ModifierKeys.Shift))
+            && (modifiers == ModifierKeys.None || modifiers == ModifierKeys.Shift)
+            && !(IsLibraryMaximized && key is >= Key.NumPad0 and <= Key.NumPad9))
         {
             JumpByVisiblePercent(percent, extendSelection: modifiers == ModifierKeys.Shift);
             return true;
@@ -1213,12 +1259,22 @@ public partial class MainWindow
 
         if (key == Key.Tab && modifiers == ModifierKeys.None)
         {
+            if (IsLibraryMaximized)
+            {
+                return true;
+            }
+
             CycleChannelSolo(1);
             return true;
         }
 
         if (key == Key.Tab && modifiers == ModifierKeys.Shift)
         {
+            if (IsLibraryMaximized)
+            {
+                return true;
+            }
+
             CycleChannelSolo(-1);
             return true;
         }
@@ -1413,7 +1469,9 @@ public partial class MainWindow
 
     private bool TryJumpToMarkerByNumpad(Key key, ModifierKeys modifiers)
     {
-        if (_document is null || _document.Markers.Count == 0)
+        if (IsLibraryMaximized
+            || _document is null
+            || _document.Markers.Count == 0)
         {
             return false;
         }
@@ -1513,6 +1571,72 @@ public partial class MainWindow
         }
 
         percent = digit / 10d;
+        return true;
+    }
+
+    private static bool IsLibraryPaneCycleShortcut(Key key, ModifierKeys modifiers) =>
+        LibraryPlayerMode.IsPaneCycleKey(key, modifiers)
+        || (modifiers == ModifierKeys.None && key is Key.F1 or Key.F2 or Key.F3);
+
+    private bool TryHandleLibraryPlayerNumpad(Key key, ModifierKeys modifiers, bool isRepeat)
+    {
+        if (!LibraryPlayerMode.IsPlayerNumpadKey(key, modifiers))
+        {
+            return false;
+        }
+
+        if (!LibraryPlayerMode.IsPlayerShuttleKey(key, modifiers))
+        {
+            StopPlaybackShuttle();
+        }
+
+        if (!LibraryPlayerMode.IsPlayerSeekNudgeKey(key, modifiers))
+        {
+            StopSeekNudge();
+        }
+
+        var command = LibraryPlayerMode.PlayerNumpadCommand(key, modifiers);
+        if (isRepeat && command is not (LibraryNumpadCommand.Rewind or LibraryNumpadCommand.FastForward))
+        {
+            return true;
+        }
+
+        switch (command)
+        {
+            case LibraryNumpadCommand.PlayPause:
+                ToggleLibraryPlayPause();
+                break;
+            case LibraryNumpadCommand.Restart:
+                RestartLibraryTrack();
+                break;
+            case LibraryNumpadCommand.PreviousTrack:
+                TryStepLibraryPlaylist(-1);
+                break;
+            case LibraryNumpadCommand.NextTrack:
+                TryStepLibraryPlaylist(1);
+                break;
+            case LibraryNumpadCommand.SeekBack:
+                BeginOrContinueSeekNudge(-1);
+                break;
+            case LibraryNumpadCommand.SeekForward:
+                BeginOrContinueSeekNudge(1);
+                break;
+            case LibraryNumpadCommand.Rewind:
+                if (CanPlaybackShuttle())
+                {
+                    BeginOrContinuePlaybackShuttle(-1);
+                }
+
+                break;
+            case LibraryNumpadCommand.FastForward:
+                if (CanPlaybackShuttle())
+                {
+                    BeginOrContinuePlaybackShuttle(1);
+                }
+
+                break;
+        }
+
         return true;
     }
 }

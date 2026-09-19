@@ -6,6 +6,9 @@ namespace MgaSonicAnvil.UI;
 /// <summary>F10 プレイヤーモードで拒否する編集系コマンドと、リストから通すキー。</summary>
 internal static class LibraryPlayerMode
 {
+    /// <summary>プレイヤーでは波形の右クリック／メニューキーを出さない。</summary>
+    public static bool HidesWaveformContextMenu(bool playerMode) => playerMode;
+
     public static bool BlocksWaveMenu(WaveMenuCommand command) => command switch
     {
         WaveMenuCommand.PlayFromHere
@@ -88,6 +91,11 @@ internal static class LibraryPlayerMode
             return true;
         }
 
+        if (key == Key.Tab && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        {
+            return true;
+        }
+
         if (key == Key.F4 && (modifiers & ModifierKeys.Alt) != 0)
         {
             return true;
@@ -137,6 +145,15 @@ internal static class LibraryPlayerMode
     public static bool ExplorerOwnsHorizontal(Key key, ModifierKeys modifiers) =>
         key is Key.Left or Key.Right && modifiers == ModifierKeys.None;
 
+    /// <summary>エクスプローラーの *。テンキーと Shift+8。</summary>
+    public static bool IsExplorerExpandAll(Key key, ModifierKeys modifiers) =>
+        (key == Key.Multiply && modifiers == ModifierKeys.None)
+        || (key == Key.D8 && modifiers == ModifierKeys.Shift);
+
+    /// <summary>エクスプローラーの /。テンキーと Oem2（日本語キーボードの /）。</summary>
+    public static bool IsExplorerCollapseSubtree(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None && key is Key.Divide or Key.Oem2;
+
     /// <summary>
     /// フォルダツリーで拒否するキー（コピー／削除／リネーム等）。ナビと Enter 以外はここで止める。
     /// </summary>
@@ -147,10 +164,22 @@ internal static class LibraryPlayerMode
             return false;
         }
 
+        // 設定 (Ctrl+Shift+O) など AllowsKey のアプリ共通ショートカットはツリーからでも通す。
+        if (AllowsKey(key, modifiers)
+            && (modifiers & (ModifierKeys.Control | ModifierKeys.Alt)) != 0)
+        {
+            return false;
+        }
+
         if (modifiers is ModifierKeys.None or ModifierKeys.Shift
             && key is Key.Up or Key.Down or Key.Left or Key.Right
                 or Key.Home or Key.End or Key.PageUp or Key.PageDown
                 or Key.Add or Key.Subtract or Key.OemPlus or Key.OemMinus)
+        {
+            return false;
+        }
+
+        if (IsExplorerExpandAll(key, modifiers) || IsExplorerCollapseSubtree(key, modifiers))
         {
             return false;
         }
@@ -167,6 +196,11 @@ internal static class LibraryPlayerMode
         }
 
         if (modifiers == ModifierKeys.None && key is Key.F1 or Key.F2 or Key.F3)
+        {
+            return false;
+        }
+
+        if (key == Key.Tab && modifiers is ModifierKeys.None or ModifierKeys.Shift)
         {
             return false;
         }
@@ -293,8 +327,88 @@ internal static class LibraryPlayerMode
         return current + 1;
     }
 
+    /// <summary>曲が戻る前。先頭の前は末尾。今の曲が見つからなければ末尾。空なら -1。</summary>
+    public static int PreviousLoopIndex(int count, int current)
+    {
+        if (count <= 0)
+        {
+            return -1;
+        }
+
+        if (current <= 0 || current >= count)
+        {
+            return count - 1;
+        }
+
+        return current - 1;
+    }
+
+    /// <summary>プレイヤーのスキップ秒。テンキー 7／9。</summary>
+    public const double SeekNudgeSeconds = 5;
+
+    /// <summary>スキップ時のクロスフェード。推移元のフェードアウトと同時に、推移先をフェードイン（0.75 秒）。</summary>
+    public const int SeekNudgeFadeMilliseconds = 750;
+
+    /// <summary>7／9 押しっぱなしの最初のリピートまでの待ち。短い押しの誤リピートを防ぐ。</summary>
+    public const int SeekNudgeRepeatDelayMs = 250;
+
+    /// <summary>待ちのあとの 7／9 リピート間隔。</summary>
+    public const int SeekNudgeRepeatIntervalMs = 200;
+
+    public static int SeekNudgeTimerIntervalMs(bool repeatStarted) =>
+        repeatStarted ? SeekNudgeRepeatIntervalMs : SeekNudgeRepeatDelayMs;
+
+    public static bool IsPlayerNumpadKey(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None && key is >= Key.NumPad0 and <= Key.NumPad9;
+
+    public static bool IsPlayerShuttleKey(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None && key is Key.NumPad1 or Key.NumPad3;
+
+    public static bool IsPlayerSeekNudgeKey(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None && key is Key.NumPad7 or Key.NumPad9;
+
+    public static LibraryNumpadCommand PlayerNumpadCommand(Key key, ModifierKeys modifiers)
+    {
+        if (!IsPlayerNumpadKey(key, modifiers))
+        {
+            return LibraryNumpadCommand.None;
+        }
+
+        return key switch
+        {
+            Key.NumPad0 => LibraryNumpadCommand.PlayPause,
+            Key.NumPad1 => LibraryNumpadCommand.Rewind,
+            Key.NumPad3 => LibraryNumpadCommand.FastForward,
+            Key.NumPad4 => LibraryNumpadCommand.PreviousTrack,
+            Key.NumPad5 => LibraryNumpadCommand.Restart,
+            Key.NumPad6 => LibraryNumpadCommand.NextTrack,
+            Key.NumPad7 => LibraryNumpadCommand.SeekBack,
+            Key.NumPad9 => LibraryNumpadCommand.SeekForward,
+            _ => LibraryNumpadCommand.None,
+        };
+    }
+
     public static int PageStep(int visibleRows) =>
         Math.Max(1, visibleRows - 1);
+
+    public static bool IsPaneCycleKey(Key key, ModifierKeys modifiers) =>
+        key == Key.Tab && modifiers is ModifierKeys.None or ModifierKeys.Shift;
+
+    /// <summary>Tab：ツリー → お気に入り → プレイリスト → ツリー。Shift+Tab は逆。</summary>
+    public static LibraryPane NextPane(LibraryPane current, bool reverse) =>
+        reverse
+            ? current switch
+            {
+                LibraryPane.List => LibraryPane.Favorites,
+                LibraryPane.Favorites => LibraryPane.Explorer,
+                _ => LibraryPane.List,
+            }
+            : current switch
+            {
+                LibraryPane.Explorer => LibraryPane.Favorites,
+                LibraryPane.Favorites => LibraryPane.List,
+                _ => LibraryPane.Explorer,
+            };
 
     private static bool IsModifierOnly(Key key) =>
         key is Key.LeftShift or Key.RightShift
@@ -305,4 +419,24 @@ internal static class LibraryPlayerMode
 
     private static bool IsDigitKey(Key key) =>
         key is >= Key.D0 and <= Key.D9 or >= Key.NumPad0 and <= Key.NumPad9;
+}
+
+internal enum LibraryPane
+{
+    Explorer,
+    Favorites,
+    List,
+}
+
+internal enum LibraryNumpadCommand
+{
+    None,
+    PlayPause,
+    Restart,
+    PreviousTrack,
+    NextTrack,
+    SeekBack,
+    SeekForward,
+    Rewind,
+    FastForward,
 }

@@ -36,6 +36,9 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _markerNudgeTimer;
     private readonly DispatcherTimer _placeRepeatTimer;
     private readonly DispatcherTimer _boostNudgeTimer;
+    private readonly DispatcherTimer _seekNudgeTimer;
+    private int _seekNudgeDirection;
+    private bool _seekNudgeRepeatStarted;
     private PlaceRepeatKind _placeRepeatKind;
     private bool _placeRepeatStarted;
     private int _boostNudgeDirection;
@@ -107,6 +110,7 @@ public partial class MainWindow : Window
         LibraryBrowser.VisibleColumnsChanged += LibraryBrowser_VisibleColumnsChanged;
         LibraryBrowser.GroupChanged += LibraryBrowser_GroupChanged;
         LibraryBrowser.ExplorerFolderChanged += LibraryBrowser_ExplorerFolderChanged;
+        LibraryBrowser.ExplorerExpandedChanged += LibraryBrowser_ExplorerExpandedChanged;
         LibraryBrowser.ExplorerFolderOpened += LibraryBrowser_ExplorerFolderOpened;
         LibraryBrowser.ExplorerFoldersOpened += LibraryBrowser_ExplorerFoldersOpened;
         LibraryBrowser.ExplorerWidthChanged += LibraryBrowser_ExplorerWidthChanged;
@@ -118,6 +122,7 @@ public partial class MainWindow : Window
         LibraryBrowser.SetVisibleColumns(AppStorage.Settings.ResolvedLibraryListColumns());
         LibraryBrowser.SetGroup(AppStorage.Settings.ResolvedLibraryListGroup());
         LibraryBrowser.SetExplorerRoots(AppStorage.Settings.ResolvedLibraryExplorerRoots());
+        LibraryBrowser.SetExplorerExpanded(AppStorage.Settings.ResolvedLibraryExplorerExpanded());
         LibraryBrowser.SetExplorerFolder(AppStorage.Settings.ResolvedLibraryExplorerPath());
         LibraryBrowser.SetExplorerWidth(AppStorage.Settings.LibraryExplorerWidth);
         LibraryBrowser.SetFavoritesSplit(AppStorage.Settings.LibraryFavoritesSplit);
@@ -257,6 +262,11 @@ public partial class MainWindow : Window
         _placeRepeatTimer.Tick += (_, _) => OnPlaceRepeatTick();
         _boostNudgeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs) };
         _boostNudgeTimer.Tick += (_, _) => OnSpectrogramBoostNudgeTick();
+        _seekNudgeTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(LibraryPlayerMode.SeekNudgeRepeatDelayMs),
+        };
+        _seekNudgeTimer.Tick += (_, _) => OnSeekNudgeTick();
 
         Deactivated += (_, _) =>
         {
@@ -264,12 +274,12 @@ public partial class MainWindow : Window
             StopPlaceRepeat();
             StopSpectrogramBoostNudge();
             StopPlaybackShuttle();
+            StopSeekNudge();
             CloseEditHistory(commit: true);
         };
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         PreviewKeyUp += MainWindow_PreviewKeyUp;
         PreviewMouseDown += MainWindow_PreviewMouseDown;
-        PreviewMouseUp += MainWindow_PreviewMouseUp;
         PreviewMouseWheel += MainWindow_PreviewMouseWheel;
         PreviewDrop += MainWindow_Drop;
         PreviewDragOver += MainWindow_DragOver;
@@ -286,6 +296,7 @@ public partial class MainWindow : Window
             StopPlaceRepeat();
             StopSpectrogramBoostNudge();
             StopPlaybackShuttle();
+            StopSeekNudge();
             ResetMarkerDigitEntry();
             // Closing で既に破棄済みでも安全（冪等）。
             DisposeAllWaveforms();
@@ -520,6 +531,7 @@ public partial class MainWindow : Window
         StopMarkerNudge();
         StopSpectrogramBoostNudge();
         StopPlaybackShuttle();
+        StopSeekNudge();
         ResetMarkerDigitEntry();
         StopMeterRendering();
         Waveform.UnlockCenter();
@@ -727,6 +739,16 @@ public partial class MainWindow : Window
         AppendStatusRun(UiStrings.FormatBitDepth(bits), bits != _document.CommittedBitsPerSample, normal, edited);
         AppendStatusRun(UiStrings.FormatChannels(channels), channels != _document.CommittedChannels, normal, edited);
         AppendStatusRun(kind, edited: false, normal, edited);
+        if (_document.SourceKind is AudioFileKind.Mp3 or AudioFileKind.M4a)
+        {
+            AudioTagProbe.Ensure(_document);
+            var bitRate = UiStrings.FormatBitRate(_document.CompressedBitRateKbps);
+            if (bitRate.Length > 0)
+            {
+                AppendStatusRun(bitRate, edited: false, normal, edited);
+            }
+        }
+
         AppendStatusRun(
             UiStrings.FormatFileBytes(sizeEdited ? estimatedBytes : _document.FileBytes),
             sizeEdited,
@@ -859,6 +881,7 @@ public partial class MainWindow : Window
         StopMarkerNudge();
         StopSpectrogramBoostNudge();
         StopPlaybackShuttle();
+        StopSeekNudge();
         _ = FinishExitAfterFlushAsync();
     }
 

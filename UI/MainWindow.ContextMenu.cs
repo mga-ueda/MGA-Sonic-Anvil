@@ -12,7 +12,7 @@ public partial class MainWindow
 
     private void OpenWaveformContextMenu(WaveformContextHit hit)
     {
-        if (IsUiBusy)
+        if (IsUiBusy || LibraryPlayerMode.HidesWaveformContextMenu(IsLibraryMaximized))
         {
             return;
         }
@@ -69,6 +69,11 @@ public partial class MainWindow
         if (Overview.IsMouseOver)
         {
             OpenOverviewContextMenu(System.Windows.Input.Mouse.GetPosition(Overview).X);
+            return true;
+        }
+
+        if (LibraryPlayerMode.HidesWaveformContextMenu(IsLibraryMaximized))
+        {
             return true;
         }
 
@@ -204,7 +209,6 @@ public partial class MainWindow
     {
         if (IsLibraryMaximized && LibraryPlayerMode.BlocksWaveMenu(command))
         {
-            KeepLibraryListActive();
             return;
         }
 

@@ -10,6 +10,8 @@ public sealed class LibraryPlayerModeTests
     [Fact]
     public void BlocksWaveMenu_AllowsPlaybackSeekSelectAndView()
     {
+        Assert.True(LibraryPlayerMode.HidesWaveformContextMenu(playerMode: true));
+        Assert.False(LibraryPlayerMode.HidesWaveformContextMenu(playerMode: false));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.TogglePlayback));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SelectAll));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SeekHere));
@@ -88,6 +90,9 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.AllowsKey(Key.F4, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Space, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Q, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.O, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.O, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.S, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.S, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.S, ModifierKeys.Control | ModifierKeys.Shift));
@@ -104,7 +109,8 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Left, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.G, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.AllowsKey(Key.Tab, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Tab, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Tab, ModifierKeys.Shift));
     }
 
     [Fact]
@@ -123,8 +129,23 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F1, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F2, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F3, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Tab, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Tab, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F10, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Q, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.O, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.O, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.C, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Multiply, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.D8, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Divide, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Oem2, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsExplorerExpandAll(Key.Multiply, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsExplorerExpandAll(Key.D8, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsExplorerExpandAll(Key.D8, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Divide, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Oem2, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Oem2, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Left, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Right, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Left, ModifierKeys.Shift));
@@ -139,6 +160,15 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.AllowsKey(Key.F2, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.F3, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.F2, ModifierKeys.Control));
+        Assert.Equal(LibraryPane.Favorites, LibraryPlayerMode.NextPane(LibraryPane.Explorer, reverse: false));
+        Assert.Equal(LibraryPane.List, LibraryPlayerMode.NextPane(LibraryPane.Favorites, reverse: false));
+        Assert.Equal(LibraryPane.Explorer, LibraryPlayerMode.NextPane(LibraryPane.List, reverse: false));
+        Assert.Equal(LibraryPane.List, LibraryPlayerMode.NextPane(LibraryPane.Explorer, reverse: true));
+        Assert.Equal(LibraryPane.Explorer, LibraryPlayerMode.NextPane(LibraryPane.Favorites, reverse: true));
+        Assert.Equal(LibraryPane.Favorites, LibraryPlayerMode.NextPane(LibraryPane.List, reverse: true));
+        Assert.True(LibraryPlayerMode.IsPaneCycleKey(Key.Tab, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPaneCycleKey(Key.Tab, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsPaneCycleKey(Key.Tab, ModifierKeys.Control));
     }
 
     [Fact]
@@ -203,6 +233,47 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(0, LibraryPlayerMode.NextLoopIndex(3, -1));
         Assert.Equal(0, LibraryPlayerMode.NextLoopIndex(1, 0));
         Assert.Equal(-1, LibraryPlayerMode.NextLoopIndex(0, 0));
+        Assert.Equal(2, LibraryPlayerMode.PreviousLoopIndex(3, 0));
+        Assert.Equal(0, LibraryPlayerMode.PreviousLoopIndex(3, 1));
+        Assert.Equal(1, LibraryPlayerMode.PreviousLoopIndex(3, 2));
+        Assert.Equal(2, LibraryPlayerMode.PreviousLoopIndex(3, -1));
+        Assert.Equal(0, LibraryPlayerMode.PreviousLoopIndex(1, 0));
+        Assert.Equal(-1, LibraryPlayerMode.PreviousLoopIndex(0, 0));
+    }
+
+    [Fact]
+    public void PlayerNumpad_MapsTransport_NotPercent()
+    {
+        Assert.Equal(LibraryNumpadCommand.PlayPause, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad0, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.Rewind, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad1, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad2, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.FastForward, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad3, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.PreviousTrack, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad4, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.Restart, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad5, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.NextTrack, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad6, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.SeekBack, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad7, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad8, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.SeekForward, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad9, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad5, ModifierKeys.Shift));
+        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.D5, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.Left, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerNumpadKey(Key.NumPad7, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlayerNumpadKey(Key.D7, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerShuttleKey(Key.NumPad1, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerShuttleKey(Key.NumPad3, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlayerShuttleKey(Key.Left, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlayerShuttleKey(Key.Right, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.NumPad7, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.NumPad9, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.NumPad1, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.D7, ModifierKeys.None));
+        Assert.Equal(5, LibraryPlayerMode.SeekNudgeSeconds);
+        Assert.Equal(750, LibraryPlayerMode.SeekNudgeFadeMilliseconds);
+        Assert.Equal(250, LibraryPlayerMode.SeekNudgeRepeatDelayMs);
+        Assert.Equal(200, LibraryPlayerMode.SeekNudgeRepeatIntervalMs);
+        Assert.True(LibraryPlayerMode.SeekNudgeRepeatDelayMs > LibraryPlayerMode.SeekNudgeRepeatIntervalMs);
+        Assert.Equal(250, LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: false));
+        Assert.Equal(200, LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: true));
     }
 
     private static DocumentSession Session(string name) =>
