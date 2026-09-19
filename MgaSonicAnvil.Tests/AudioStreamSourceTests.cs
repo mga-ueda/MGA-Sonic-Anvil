@@ -255,8 +255,8 @@ public sealed class AudioStreamSourceTests
             Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
             // 可変速: 3 倍なので 0,3,6…（グレイン据え置きの 0,1,2 ではない）。
             Assert.Equal(0f, buffer[0], 3);
-            Assert.Equal(3f, buffer[2], 3);
-            Assert.Equal(6f, buffer[4], 3);
+            Assert.Equal(3f * PlaybackSampleProvider.ShuttleGainLinear, buffer[2], 3);
+            Assert.Equal(6f * PlaybackSampleProvider.ShuttleGainLinear, buffer[4], 3);
             Assert.Equal(frames * 3, provider.CursorFrame);
         }
         finally
@@ -290,8 +290,8 @@ public sealed class AudioStreamSourceTests
             var buffer = new float[frames * 2];
             Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
             Assert.Equal(0f, buffer[0], 3);
-            Assert.Equal(3f, buffer[2], 3);
-            Assert.Equal(6f, buffer[4], 3);
+            Assert.Equal(3f * PlaybackSampleProvider.ShuttleGainLinear, buffer[2], 3);
+            Assert.Equal(6f * PlaybackSampleProvider.ShuttleGainLinear, buffer[4], 3);
             Assert.Equal(samples, document.Interleaved.Length);
             Assert.False(document.Peaks.IsEmpty);
             Assert.False(document.IsStreamPlayback);
@@ -322,9 +322,9 @@ public sealed class AudioStreamSourceTests
             var buffer = new float[frames * 2];
             Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
             // 逆方向可変速: 3000, 2997, 2994…
-            Assert.Equal(3000f, buffer[0], 1);
-            Assert.Equal(2997f, buffer[2], 1);
-            Assert.Equal(2994f, buffer[4], 1);
+            Assert.Equal(3000f * PlaybackSampleProvider.ShuttleGainLinear, buffer[0], 1);
+            Assert.Equal(2997f * PlaybackSampleProvider.ShuttleGainLinear, buffer[2], 1);
+            Assert.Equal(2994f * PlaybackSampleProvider.ShuttleGainLinear, buffer[4], 1);
             Assert.Equal(3000 - frames * 3, provider.CursorFrame);
         }
         finally

@@ -37,7 +37,7 @@ internal static class M4aArtwork
         artwork = [];
         try
         {
-            using var stream = File.OpenRead(path);
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             var state = new ScanState { Builder = new AudioFileTagsBuilder(), IncludePicture = true };
             TryFill(stream, state);
             artwork = state.Artwork;
@@ -54,7 +54,7 @@ internal static class M4aArtwork
     {
         try
         {
-            using var stream = File.OpenRead(path);
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             var state = new ScanState { Builder = builder, IncludePicture = false };
             TryFill(stream, state);
             return state.Applied;

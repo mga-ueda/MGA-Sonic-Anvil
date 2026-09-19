@@ -74,7 +74,7 @@ internal static class Id3Artwork
         artwork = [];
         try
         {
-            using var stream = File.OpenRead(path);
+            using var stream = OpenSharedRead(path);
             return TryRead(stream, out artwork);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -82,6 +82,9 @@ internal static class Id3Artwork
             return false;
         }
     }
+
+    private static FileStream OpenSharedRead(string path) =>
+        new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
     public static bool TryRead(Stream stream, out byte[] artwork)
     {

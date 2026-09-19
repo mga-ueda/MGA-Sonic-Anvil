@@ -32,7 +32,7 @@ internal sealed class AudioStreamSource : IDisposable
     private bool _disposed;
     private bool _readerEof;
 
-    private AudioStreamSource(WaveStream reader, long frameCount)
+    private AudioStreamSource(WaveStream reader, long frameCount, int prebufferTimeoutMs)
     {
         _reader = reader;
         SampleRate = Math.Max(1, reader.WaveFormat.SampleRate);
@@ -43,7 +43,10 @@ internal sealed class AudioStreamSource : IDisposable
         _pumpScratch = new float[ChunkFrames * Channels];
         ResetProvider();
         StartPump(seekVersion: 0);
-        WaitForPrebuffer(PrebufferFrames, timeoutMs: 3000);
+        if (prebufferTimeoutMs > 0)
+        {
+            WaitForPrebuffer(PrebufferFrames, prebufferTimeoutMs);
+        }
     }
 
     public int SampleRate { get; }
@@ -56,7 +59,7 @@ internal sealed class AudioStreamSource : IDisposable
 
     public long Frame => _frame;
 
-    public static AudioStreamSource Open(string path)
+    public static AudioStreamSource Open(string path, int prebufferTimeoutMs = 3000)
     {
         var reader = AudioCodec.OpenPlaybackStream(path);
         try
@@ -75,7 +78,7 @@ internal sealed class AudioStreamSource : IDisposable
                 throw new InvalidDataException(UiStrings.ErrEmptyAudioFile);
             }
 
-            return new AudioStreamSource(reader, frames);
+            return new AudioStreamSource(reader, frames, prebufferTimeoutMs);
         }
         catch
         {

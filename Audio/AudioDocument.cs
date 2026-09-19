@@ -172,6 +172,30 @@ internal sealed partial class AudioDocument
 
     public long FileBytes { get; private set; }
 
+    /// <summary>MP3 / M4A のビットレート。WAVE / AIFF は 0。タグが無ければファイルサイズから平均する。</summary>
+    public int CompressedBitRateKbps
+    {
+        get
+        {
+            if (SourceKind is not (AudioFileKind.Mp3 or AudioFileKind.M4a))
+            {
+                return 0;
+            }
+
+            if (Tags.BitRateKbps > 0)
+            {
+                return Tags.BitRateKbps;
+            }
+
+            if (FileBytes <= 0 || DurationSeconds <= 0)
+            {
+                return 0;
+            }
+
+            return Math.Max(1, (int)Math.Round(FileBytes * 8d / DurationSeconds / 1000d));
+        }
+    }
+
     public DateTime? FileLastWriteTime { get; private set; }
 
     public long FrameCount => Channels <= 0 ? 0 : SampleCount / Channels;
