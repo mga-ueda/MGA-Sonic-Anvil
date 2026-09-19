@@ -3026,14 +3026,14 @@ internal sealed class LibraryBrowserView : UserControl
         AddGroupSpacerColumn();
         AddColumn(LibraryFileColumn.Name, nameof(LibraryFileRow.Name));
         AddColumn(LibraryFileColumn.Title, nameof(LibraryFileRow.Title));
-        AddColumn(LibraryFileColumn.Artist, nameof(LibraryFileRow.Artist));
         AddColumn(LibraryFileColumn.Album, nameof(LibraryFileRow.Album));
+        AddColumn(LibraryFileColumn.Artist, nameof(LibraryFileRow.Artist));
+        AddColumn(LibraryFileColumn.Composer, nameof(LibraryFileRow.Composer));
+        AddColumn(LibraryFileColumn.Duration, nameof(LibraryFileRow.DurationText), right: true);
         AddColumn(LibraryFileColumn.Track, nameof(LibraryFileRow.Track), right: true);
         AddColumn(LibraryFileColumn.Disc, nameof(LibraryFileRow.Disc), right: true);
         AddColumn(LibraryFileColumn.Year, nameof(LibraryFileRow.Year), right: true);
         AddColumn(LibraryFileColumn.Genre, nameof(LibraryFileRow.Genre));
-        AddColumn(LibraryFileColumn.Composer, nameof(LibraryFileRow.Composer));
-        AddColumn(LibraryFileColumn.Duration, nameof(LibraryFileRow.DurationText), right: true);
         AddColumn(LibraryFileColumn.Comment, nameof(LibraryFileRow.Comment));
         AddColumn(LibraryFileColumn.AlbumArtist, nameof(LibraryFileRow.AlbumArtist));
         AddColumn(LibraryFileColumn.Kind, nameof(LibraryFileRow.Kind));

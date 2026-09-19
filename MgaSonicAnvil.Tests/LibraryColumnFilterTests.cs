@@ -34,14 +34,14 @@ public sealed class LibraryColumnFilterTests
             {
                 LibraryFileColumn.Name,
                 LibraryFileColumn.Title,
-                LibraryFileColumn.Artist,
                 LibraryFileColumn.Album,
+                LibraryFileColumn.Artist,
+                LibraryFileColumn.Composer,
+                LibraryFileColumn.Duration,
                 LibraryFileColumn.Track,
                 LibraryFileColumn.Disc,
                 LibraryFileColumn.Year,
                 LibraryFileColumn.Genre,
-                LibraryFileColumn.Composer,
-                LibraryFileColumn.Duration,
                 LibraryFileColumn.Comment,
             },
             LibraryColumnFilter.Defaults);
@@ -50,7 +50,7 @@ public sealed class LibraryColumnFilterTests
             LibraryColumnFilter.All[..LibraryColumnFilter.Defaults.Length]);
         Assert.Equal(
             [
-                "Name", "Title", "Artist", "Album", "Track", "Disc", "Year", "Genre", "Composer", "Duration",
+                "Name", "Title", "Album", "Artist", "Composer", "Duration", "Track", "Disc", "Year", "Genre",
                 "Comment",
             ],
             LibraryColumnFilter.Serialize(LibraryColumnFilter.Defaults));
