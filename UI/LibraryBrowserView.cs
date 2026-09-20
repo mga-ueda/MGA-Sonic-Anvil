@@ -2048,6 +2048,8 @@ internal sealed class LibraryBrowserView : UserControl
 
         ApplyExplorerStyle();
         ApplyFavoritesStyle();
+        ImeComposition.Disable(_folderTree);
+        ImeComposition.Disable(_favoritesList);
         _folderTree.AllowDrop = false;
         _folderTree.SelectedItemChanged += FolderTree_SelectedItemChanged;
         _folderTree.MouseDoubleClick += FolderTree_MouseDoubleClick;
@@ -3837,6 +3839,7 @@ internal sealed class LibraryBrowserView : UserControl
 
         _grid.AutoGenerateColumns = false;
         _grid.IsReadOnly = true;
+        ImeComposition.Disable(_grid);
         _grid.CanUserAddRows = false;
         _grid.CanUserDeleteRows = false;
         _grid.CanUserReorderColumns = true;

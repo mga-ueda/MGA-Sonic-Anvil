@@ -299,6 +299,11 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.NumPad9, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.NumPad1, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.D7, ModifierKeys.None));
+        Assert.Equal(Key.D5, LibraryPlayerMode.ResolveDigitKey(Key.ImeProcessed, Key.D5));
+        Assert.Equal(Key.D0, LibraryPlayerMode.ResolveDigitKey(Key.ImeProcessed, Key.D0));
+        Assert.Equal(Key.NumPad7, LibraryPlayerMode.ResolveDigitKey(Key.ImeProcessed, Key.NumPad7));
+        Assert.Equal(Key.ImeProcessed, LibraryPlayerMode.ResolveDigitKey(Key.ImeProcessed, Key.A));
+        Assert.Equal(Key.D3, LibraryPlayerMode.ResolveDigitKey(Key.D3, Key.D5));
         Assert.Equal(5, LibraryPlayerMode.SeekNudgeSeconds);
         Assert.Equal(750, LibraryPlayerMode.SeekNudgeFadeMilliseconds);
         Assert.Equal(250, LibraryPlayerMode.SeekNudgeRepeatDelayMs);

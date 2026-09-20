@@ -639,6 +639,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
     private bool StreamExhausted(double playEndFrame)
     {
+        if (_playbackSpeed < 0)
+        {
+            return false;
+        }
+
         if (_stream is null)
         {
             return _sourceFrame + 1 >= playEndFrame;
@@ -651,6 +656,19 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
         var srcCh = Math.Max(1, _channels);
         return _stream.Frame >= FrameCountOrStreamEnd(srcCh) || _sourceFrame + 1 >= playEndFrame;
+    }
+
+    private void ResumeStreamAfterReverseNoLock()
+    {
+        if (_stream is null)
+        {
+            return;
+        }
+
+        var end = Math.Max(1, FrameCountOrStreamEnd(Math.Max(1, _channels)));
+        var frame = (long)Math.Clamp(Math.Floor(_sourceFrame), 0, end - 1);
+        _stream.SeekFrame(frame, prebufferTimeoutMs: 0);
+        InvalidateStreamCursorCacheNoLock();
     }
 
     /// <summary>
@@ -1111,12 +1129,19 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 return false;
             }
 
+            var leaveReverse = _playbackSpeed < 0 && next > 0;
             _playbackSpeed = next;
             _shuttleOutputGain = Math.Abs(next) > 1.5 ? ShuttleGainLinear : 1f;
             _shuttlePrimed = false;
+            Ended = false;
             CompleteSeekFadeNoLock();
             InvalidateStreamSrcWinNoLock();
             ClearStreamReverseBuf();
+            if (leaveReverse)
+            {
+                ResumeStreamAfterReverseNoLock();
+            }
+
             return true;
         }
     }
@@ -1670,12 +1695,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             }
 
             var frame = (long)Math.Floor(_sourceFrame);
-            var got = false;
-            for (var attempt = 0; attempt < 4 && !got; attempt++)
-            {
-                got = TryReadStreamReverseFrame(
-                    frame, srcCh, frameCount, loopStartFrame, chunkFrames, overlapFrames, source);
-            }
+            var got = TryReadStreamReverseFrame(
+                frame, srcCh, frameCount, loopStartFrame, chunkFrames, overlapFrames, source);
 
             if (got && UsesStreamRateConvert())
             {
@@ -1684,11 +1705,16 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
             if (!got)
             {
-                // チャンクがまだ届いていなければ、このコールバックを捨てずに次フレームで埋め続ける。
+                // 届くまで音声スレッドでは待たない（Seek 完了待ちは 7/9・1/3 を重くする）。
+                // このコールバックの残りは無音。次のデバイス周期でチャンクを取り直す。
                 source.Clear();
-                EmitFrame(buffer, offset, writtenFrames, outCh, source, 0f);
-                writtenFrames++;
-                continue;
+                while (writtenFrames < framesWanted)
+                {
+                    EmitFrame(buffer, offset, writtenFrames, outCh, source, 0f);
+                    writtenFrames++;
+                }
+
+                break;
             }
 
             source.CopyTo(_streamReverseLast.AsSpan(0, srcCh));
@@ -1762,8 +1788,13 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return false;
         }
 
-        PrefetchStreamReverseNext(frame, srcCh, frameCount, loopStartFrame, chunkFrames, overlapFrames);
         var fromCurrent = TryCopyReverseBuf(frame, _streamReverseBufStart, _streamReverseBufFrames, _streamReverseBuf, srcCh, dest);
+        if (fromCurrent)
+        {
+            // 今のチャンクがメモリにあるときだけ次を先読みする。先にシークするとポンプを奪う。
+            PrefetchStreamReverseNext(frame, srcCh, frameCount, loopStartFrame, chunkFrames, overlapFrames);
+        }
+
         var nextIndex = (int)(frame - _streamReverseNextStart);
         var fromNext = _streamReverseNextStart >= 0
             && _streamReverseNextFrames > 0

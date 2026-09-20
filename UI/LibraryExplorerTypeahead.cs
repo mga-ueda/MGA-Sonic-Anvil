@@ -24,8 +24,9 @@ internal static class LibraryExplorerTypeahead
             return false;
         }
 
-        // テンキーはプレイヤーの再生操作のまま。上段の数字だけフォルダ名に使う。
-        if (key is >= Key.NumPad0 and <= Key.NumPad9)
+        // テンキーは再生操作、上段の数字は割合ジャンプのまま。文字だけフォルダ名に使う。
+        if (key is >= Key.NumPad0 and <= Key.NumPad9
+            || key is >= Key.D0 and <= Key.D9)
         {
             return false;
         }
@@ -33,12 +34,6 @@ internal static class LibraryExplorerTypeahead
         if (key is >= Key.A and <= Key.Z)
         {
             character = ((char)('a' + (key - Key.A))).ToString();
-            return true;
-        }
-
-        if (modifiers == ModifierKeys.None && key is >= Key.D0 and <= Key.D9)
-        {
-            character = ((char)('0' + (key - Key.D0))).ToString();
             return true;
         }
 
@@ -52,15 +47,18 @@ internal static class LibraryExplorerTypeahead
             return false;
         }
 
+        var digitsOnly = true;
         foreach (var c in text)
         {
             if (char.IsControl(c) || char.IsWhiteSpace(c))
             {
                 return false;
             }
+
+            digitsOnly &= char.IsDigit(c);
         }
 
-        return true;
+        return !digitsOnly;
     }
 
     public static string Append(

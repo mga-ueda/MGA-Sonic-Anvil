@@ -511,6 +511,13 @@ internal static class LibraryPlayerMode
             or Key.LWin or Key.RWin
             or Key.CapsLock or Key.NumLock or Key.Scroll;
 
+    /// <summary>
+    /// IME が上段／テンキーの数字を ImeProcessed にした場合、割合ジャンプとテンキー操作へ戻す。
+    /// かな入力の文字キーはそのまま（A などのショートカットにしない）。
+    /// </summary>
+    public static Key ResolveDigitKey(Key key, Key imeProcessedKey) =>
+        key == Key.ImeProcessed && IsDigitKey(imeProcessedKey) ? imeProcessedKey : key;
+
     private static bool IsDigitKey(Key key) =>
         key is >= Key.D0 and <= Key.D9 or >= Key.NumPad0 and <= Key.NumPad9;
 }

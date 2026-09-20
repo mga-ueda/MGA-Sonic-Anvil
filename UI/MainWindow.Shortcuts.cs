@@ -7,6 +7,7 @@ public partial class MainWindow
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        key = LibraryPlayerMode.ResolveDigitKey(key, e.ImeProcessedKey);
         var modifiers = Keyboard.Modifiers;
         if (MenuAccessKeys.IsContextMenuKey(key, modifiers))
         {
@@ -28,6 +29,7 @@ public partial class MainWindow
     private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        key = LibraryPlayerMode.ResolveDigitKey(key, e.ImeProcessedKey);
         if (key is Key.Apps or Key.F10)
         {
             if (_pendingContextMenuKey)
@@ -301,6 +303,21 @@ public partial class MainWindow
         }
 
         if (IsLibraryMaximized && TryHandleLibraryPlayerNumpad(key, modifiers, isRepeat))
+        {
+            return true;
+        }
+
+        // 上段 0–9 はどのペインからでも割合ジャンプ。検索欄・時刻欄・コンボには渡す。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !StatusTimes.IsTimeFocused
+            && !IsEditingFileName
+            && _volumeMenu is not { IsOpen: true }
+            && _pitchMenu is not { IsOpen: true }
+            && _timeStretchMenu is not { IsOpen: true }
+            && _fadeMenu is not { IsOpen: true }
+            && _formatMenu is not { IsOpen: true }
+            && TryHandleLibraryTopRowPercentJump(key, modifiers))
         {
             return true;
         }
@@ -1692,6 +1709,19 @@ public partial class MainWindow
                 break;
         }
 
+        return true;
+    }
+
+    private bool TryHandleLibraryTopRowPercentJump(Key key, ModifierKeys modifiers)
+    {
+        if (modifiers is not (ModifierKeys.None or ModifierKeys.Shift)
+            || key is < Key.D0 or > Key.D9
+            || !TryDigitPercent(key, out var percent))
+        {
+            return false;
+        }
+
+        JumpByVisiblePercent(percent, extendSelection: modifiers == ModifierKeys.Shift);
         return true;
     }
 }

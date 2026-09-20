@@ -451,12 +451,54 @@ public sealed class AudioStreamSourceTests
 
             var frames = 100;
             var buffer = new float[frames * 2];
+            var gain = PlaybackSampleProvider.ShuttleGainLinear;
+            var first = -1;
+            var until = Environment.TickCount64 + 500;
+            while (first < 0 && Environment.TickCount64 < until)
+            {
+                Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+                for (var i = 0; i < frames; i++)
+                {
+                    if (Math.Abs(buffer[i * 2]) >= 1f)
+                    {
+                        first = i;
+                        break;
+                    }
+                }
+            }
+
+            Assert.True(first >= 0 && first < frames - 8, "早戻しの音が出ていない");
+            Assert.InRange(buffer[first * 2], (3000 - 400) * gain, (3000 + 80) * gain);
+            Assert.True(buffer[(frames - 1) * 2] < buffer[first * 2], "逆方向に進んでいない");
+            Assert.True(provider.CursorFrame < 3000 - 50, $"cursor={provider.CursorFrame}");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void BindStream_RewindUnderrun_ReturnsImmediatelyWithoutEnding()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-rw-underrun-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteRampWave(path, sampleRate: 44100, frames: 44100);
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+
+            using var source = AudioStreamSource.Open(path);
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(48000);
+            provider.BindStream(source, document, startFrame: 20000, playRange: null, loop: false);
+            provider.SetPlaybackSpeed(-PlaybackSampleProvider.FastSpeed);
+
+            var buffer = new float[4096 * 2];
+            var started = Environment.TickCount64;
             Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
-            // 逆方向可変速: 3000, 2997, 2994…
-            Assert.Equal(3000f * PlaybackSampleProvider.ShuttleGainLinear, buffer[0], 1);
-            Assert.Equal(2997f * PlaybackSampleProvider.ShuttleGainLinear, buffer[2], 1);
-            Assert.Equal(2994f * PlaybackSampleProvider.ShuttleGainLinear, buffer[4], 1);
-            Assert.Equal(3000 - frames * 3, provider.CursorFrame);
+            Assert.True(Environment.TickCount64 - started < 80);
+            Assert.False(provider.Ended);
         }
         finally
         {
@@ -483,7 +525,11 @@ public sealed class AudioStreamSourceTests
 
             var frames = 200;
             var buffer = new float[frames * 2];
-            Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+            var until = Environment.TickCount64 + 500;
+            while (provider.CursorFrame >= origin - 100 && Environment.TickCount64 < until)
+            {
+                Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+            }
 
             Assert.True(provider.CursorFrame < origin - 100, $"cursor={provider.CursorFrame}");
             var gain = PlaybackSampleProvider.ShuttleGainLinear;
@@ -494,7 +540,7 @@ public sealed class AudioStreamSourceTests
             }
 
             Assert.True(first < frames - 8, "早戻しの音が出ていない");
-            Assert.InRange(buffer[first * 2], (origin - 200) * gain, (origin + 80) * gain);
+            Assert.InRange(buffer[first * 2], (origin - 800) * gain, (origin + 80) * gain);
             Assert.True(buffer[(frames - 1) * 2] < buffer[first * 2], "逆方向に進んでいない");
         }
         finally
@@ -533,6 +579,43 @@ public sealed class AudioStreamSourceTests
             Assert.True(
                 provider.CursorFrame < afterPlay - 100,
                 $"afterPlay={afterPlay} cursor={provider.CursorFrame}");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void BindStream_RepeatedRewindAndUnity_DoesNotEnd()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-rw-repeat-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteRampWave(path, sampleRate: 44100, frames: 44100);
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+
+            using var source = AudioStreamSource.Open(path);
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(48000);
+            provider.BindStream(source, document, startFrame: 22000, playRange: null, loop: false);
+
+            var buffer = new float[256 * 2];
+            for (var i = 0; i < 12; i++)
+            {
+                Assert.True(provider.SetPlaybackSpeed(-PlaybackSampleProvider.FastSpeed));
+                Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+                Assert.False(provider.Ended);
+                Assert.True(provider.SetPlaybackSpeed(1));
+                Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+                Assert.False(provider.Ended);
+            }
+
+            var after = provider.CursorFrame;
+            Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+            Assert.False(provider.Ended);
+            Assert.True(provider.CursorFrame > after, $"after={after} cursor={provider.CursorFrame}");
         }
         finally
         {

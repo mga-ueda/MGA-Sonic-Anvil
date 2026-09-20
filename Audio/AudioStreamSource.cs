@@ -34,6 +34,8 @@ internal sealed class AudioStreamSource : IDisposable
     private bool _disposed;
     private bool _readerEof;
 
+    private int _emptyReads;
+
     private AudioStreamSource(WaveStream reader, long frameCount, int prebufferTimeoutMs)
     {
         _reader = reader;
@@ -108,6 +110,7 @@ internal sealed class AudioStreamSource : IDisposable
             _readPos = 0;
             _writePos = 0;
             _availableFrames = 0;
+            _emptyReads = 0;
         }
 
         Interlocked.Increment(ref _seekVersion);
@@ -291,8 +294,12 @@ internal sealed class AudioStreamSource : IDisposable
             }
             catch
             {
-                MarkReaderEof();
-                _hasSpace.WaitOne(50);
+                if (NoteEmptyRead())
+                {
+                    MarkReaderEof();
+                }
+
+                _hasSpace.WaitOne(10);
                 continue;
             }
 
@@ -303,16 +310,29 @@ internal sealed class AudioStreamSource : IDisposable
 
             if (got < Channels)
             {
-                MarkReaderEof();
-                _hasSpace.WaitOne(50);
+                // シーク直後の 0 読みを EOF にすると、早戻し解除で再生が止まる。
+                if (NoteEmptyRead() || _pumpFrame + 1 >= FrameCount)
+                {
+                    MarkReaderEof();
+                }
+
+                _hasSpace.WaitOne(10);
                 continue;
             }
+
+            _emptyReads = 0;
 
             var gotFrames = got / Channels;
             PushFrames(_pumpScratch, gotFrames);
             _pumpFrame += gotFrames;
             _hasData.Set();
         }
+    }
+
+    private bool NoteEmptyRead()
+    {
+        _emptyReads++;
+        return _emptyReads >= 8;
     }
 
     private bool HasPendingSeek()
@@ -346,6 +366,7 @@ internal sealed class AudioStreamSource : IDisposable
 
             _pumpFrame = _hasPendingSeek ? _pendingSeekFrame : next;
             _readerEof = false;
+            _emptyReads = 0;
         }
 
         return true;
