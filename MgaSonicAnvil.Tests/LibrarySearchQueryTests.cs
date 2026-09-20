@@ -207,6 +207,15 @@ public sealed class LibrarySearchQueryTests
         }
     }
 
+    [Fact]
+    public void PlaylistWalk_Inactive_IncludesEveryFileAndChild()
+    {
+        var walk = LibraryExplorerPlaylistWalk.Inactive;
+        Assert.False(walk.Active);
+        Assert.True(walk.IncludeFile(@"C:\Music\a.wav", folderHit: false));
+        Assert.True(walk.IncludeChild(@"C:\Music\Album", folderHit: false));
+    }
+
     private static void WriteWav(string path) => File.WriteAllBytes(path, [0]);
 
     private static HashSet<string> Names(IEnumerable<string> paths) =>

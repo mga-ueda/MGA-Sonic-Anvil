@@ -283,6 +283,72 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void Explorer_CtrlMultiSelect_PressKeepsFoldersForCopy()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var root = Path.Combine(Path.GetTempPath(), "mga-tree-multi-" + Guid.NewGuid().ToString("N"));
+            var firstPath = Path.Combine(root, "Alpha");
+            var secondPath = Path.Combine(root, "Beta");
+            Directory.CreateDirectory(firstPath);
+            Directory.CreateDirectory(secondPath);
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                var folder = view.ExplorerFirstFolder;
+                Assert.NotNull(folder);
+                folder.IsExpanded = true;
+                Flush();
+                var children = folder.Items.OfType<TreeViewItem>()
+                    .Where(item => item.Tag is string)
+                    .ToArray();
+                Assert.True(children.Length >= 2);
+                view.BeginExplorerPlainPress(children[0], control: false);
+                view.BeginExplorerPlainPress(children[1], control: true);
+                Flush();
+                Assert.Equal(2, view.SelectedExplorerFolders.Length);
+                Assert.True(view.ShouldHoldExplorerMultiSelect(children[0]));
+
+                view.BeginExplorerPlainPress(children[0], control: false);
+                Flush();
+                Assert.Equal(2, view.SelectedExplorerFolders.Length);
+                view.FocusExplorer();
+                Flush();
+                var copies = view.SelectedCopyPaths();
+                Assert.Contains(Path.GetFullPath(firstPath), copies);
+                Assert.Contains(Path.GetFullPath(secondPath), copies);
+                Assert.Equal(2, copies.Length);
+
+                view.AbandonExplorerPendingClick();
+                view.CompleteExplorerPlainPress();
+                Flush();
+                Assert.Equal(2, view.SelectedExplorerFolders.Length);
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void ExplorerNestedFolders_UseSameHoverTemplate()
     {
         RunSta(() =>
@@ -567,10 +633,13 @@ public sealed class LibraryBrowserSelectionTests
                 UiStrings.LibraryMenuReplacePlaylist,
                 UiStrings.LibraryMenuAppendPlaylist,
                 UiStrings.LibraryMenuAddToFavorites,
+                UiStrings.LibraryMenuCopy,
+                UiStrings.LibraryMenuOpenInExplorer,
             ],
             items.Select(item => (string)item.Header).ToArray());
             Assert.Equal("Enter", items[0].InputGestureText);
             Assert.Equal("Shift+Enter", items[1].InputGestureText);
+            Assert.Equal("Ctrl+C", items[3].InputGestureText);
             items[0].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             items[1].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             Assert.Equal(1, replaced);
@@ -579,8 +648,26 @@ public sealed class LibraryBrowserSelectionTests
 
             view.FocusFavorites();
             Flush();
+            LibraryFavoritesActivateEventArgs? favoritesArgs = null;
+            view.FavoritesActivated += (_, e) => favoritesArgs = e;
             Assert.True(view.TryOpenKeyboardContextMenu());
-            Assert.Equal(UiStrings.LibraryMenuRemoveFromFavorites, view.OpenContextMenuHeader);
+            Assert.Equal(
+            [
+                UiStrings.LibraryMenuReplacePlaylist,
+                UiStrings.LibraryMenuAppendPlaylist,
+                UiStrings.LibraryMenuRemoveFromFavorites,
+                UiStrings.LibraryMenuCopy,
+                UiStrings.LibraryMenuOpenInExplorer,
+            ],
+            view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());
+            Assert.Equal("Enter", view.OpenContextMenuItems[0].InputGestureText);
+            Assert.Equal("Shift+Enter", view.OpenContextMenuItems[1].InputGestureText);
+            Assert.Equal("Ctrl+C", view.OpenContextMenuItems[3].InputGestureText);
+            view.OpenContextMenuItems[0].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.True(favoritesArgs is { ClearPlaylist: true });
+            favoritesArgs = null;
+            view.OpenContextMenuItems[1].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.True(favoritesArgs is { ClearPlaylist: false });
             Assert.True(view.HasOpenContextMenu);
             view.CloseKeyboardContextMenu();
             Assert.False(view.HasOpenContextMenu);
@@ -589,9 +676,252 @@ public sealed class LibraryBrowserSelectionTests
             Flush();
             Assert.True(view.IsListOrigin(view.FileGrid));
             Assert.True(view.TryOpenKeyboardContextMenu());
-            Assert.Equal(UiStrings.LibraryMenuClearFromPlaylist, view.OpenContextMenuHeader);
+            Assert.Equal(
+            [
+                UiStrings.LibraryMenuClearFromPlaylist,
+                UiStrings.LibraryMenuCopy,
+                UiStrings.LibraryMenuOpenInExplorer,
+            ],
+            view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());
+            Assert.Equal("Ctrl+C", view.OpenContextMenuItems[1].InputGestureText);
             Assert.True(view.HasOpenContextMenu);
             view.CloseKeyboardContextMenu();
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void SelectedCopyPaths_Playlist_UsesExistingFiles()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var path = Path.Combine(Path.GetTempPath(), "mga-copy-" + Guid.NewGuid().ToString("N") + ".wav");
+            File.WriteAllBytes(path, [0]);
+            try
+            {
+                var session = new DocumentSession(AudioDocument.CreateDeferred(path));
+                var view = new LibraryBrowserView();
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                view.SetGroup(LibraryFileGroup.None);
+                view.SetSessions([session], session, [session]);
+                Flush();
+                view.FocusList();
+                Flush();
+                Assert.Equal([Path.GetFullPath(path)], view.SelectedCopyPaths());
+                Assert.Equal([Path.GetFullPath(path)], view.SelectedRevealPaths());
+                window.Close();
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        });
+    }
+
+    [Fact]
+    public void PlaylistCopyPathsFromRow_Unselected_UsesClickedFile()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var firstPath = Path.Combine(Path.GetTempPath(), "mga-pl-a-" + Guid.NewGuid().ToString("N") + ".wav");
+            var secondPath = Path.Combine(Path.GetTempPath(), "mga-pl-b-" + Guid.NewGuid().ToString("N") + ".wav");
+            File.WriteAllBytes(firstPath, [0]);
+            File.WriteAllBytes(secondPath, [0]);
+            try
+            {
+                var first = new DocumentSession(AudioDocument.CreateDeferred(firstPath));
+                var second = new DocumentSession(AudioDocument.CreateDeferred(secondPath));
+                var view = new LibraryBrowserView();
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                view.SetGroup(LibraryFileGroup.None);
+                view.SetSessions([first, second], first, [first]);
+                Flush();
+                var clicked = ((System.Collections.IEnumerable)view.BoundItemsSource!)
+                    .OfType<LibraryFileRow>()
+                    .First(row => ReferenceEquals(row.Tag, second));
+                Assert.Equal([Path.GetFullPath(secondPath)], view.PlaylistCopyPathsFromRow(clicked));
+                window.Close();
+            }
+            finally
+            {
+                File.Delete(firstPath);
+                File.Delete(secondPath);
+            }
+        });
+    }
+
+    [Fact]
+    public void PlaylistCopyPathsFromRow_Selected_UsesAllSelected()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var firstPath = Path.Combine(Path.GetTempPath(), "mga-pl-c-" + Guid.NewGuid().ToString("N") + ".wav");
+            var secondPath = Path.Combine(Path.GetTempPath(), "mga-pl-d-" + Guid.NewGuid().ToString("N") + ".wav");
+            File.WriteAllBytes(firstPath, [0]);
+            File.WriteAllBytes(secondPath, [0]);
+            try
+            {
+                var first = new DocumentSession(AudioDocument.CreateDeferred(firstPath));
+                var second = new DocumentSession(AudioDocument.CreateDeferred(secondPath));
+                var view = new LibraryBrowserView();
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                view.SetGroup(LibraryFileGroup.None);
+                view.SetSessions([first, second], first, [first, second]);
+                Flush();
+                var clicked = ((System.Collections.IEnumerable)view.BoundItemsSource!)
+                    .OfType<LibraryFileRow>()
+                    .First(row => ReferenceEquals(row.Tag, first));
+                Assert.Equal(
+                    [Path.GetFullPath(firstPath), Path.GetFullPath(secondPath)],
+                    view.PlaylistCopyPathsFromRow(clicked));
+                window.Close();
+            }
+            finally
+            {
+                File.Delete(firstPath);
+                File.Delete(secondPath);
+            }
+        });
+    }
+
+    [Fact]
+    public void Playlist_PressOnMultiSelect_KeepsSelectionUntilRelease()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.mp3");
+            var second = Session("02 b.mp3");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions([first, second], first, [first, second]);
+            Flush();
+            var clicked = ((System.Collections.IEnumerable)view.BoundItemsSource!)
+                .OfType<LibraryFileRow>()
+                .First(row => ReferenceEquals(row.Tag, second));
+            Assert.True(view.ShouldHoldPlaylistMultiSelect(clicked, clickCount: 1));
+            view.BeginPlaylistPlainPress(clicked, clickCount: 1);
+            Flush();
+            Assert.Equal(2, view.SelectedSessions.Length);
+            Assert.Contains(first, view.SelectedSessions);
+            Assert.Contains(second, view.SelectedSessions);
+
+            view.CompletePlaylistPlainPress();
+            Flush();
+            Assert.Equal([second], view.SelectedSessions);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void Playlist_PressOnMultiSelect_DragKeepsSelection()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.mp3");
+            var second = Session("02 b.mp3");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions([first, second], first, [first, second]);
+            Flush();
+            var clicked = ((System.Collections.IEnumerable)view.BoundItemsSource!)
+                .OfType<LibraryFileRow>()
+                .First(row => ReferenceEquals(row.Tag, second));
+            view.BeginPlaylistPlainPress(clicked, clickCount: 1);
+            view.AbandonPlaylistPendingClick();
+            view.CompletePlaylistPlainPress();
+            Flush();
+            Assert.Equal(2, view.SelectedSessions.Length);
+            Assert.Contains(first, view.SelectedSessions);
+            Assert.Contains(second, view.SelectedSessions);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void Favorites_DoubleClick_AppendsWithoutClearing()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var music = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+            if (string.IsNullOrWhiteSpace(music) || !Directory.Exists(music))
+            {
+                music = Path.GetTempPath();
+            }
+
+            var view = new LibraryBrowserView();
+            view.SetFavorites([music]);
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            Flush();
+            view.FocusFavorites();
+            Flush();
+
+            LibraryFavoritesActivateEventArgs? args = null;
+            view.FavoritesActivated += (_, e) => args = e;
+            view.ActivateSelectedFavorites(clearPlaylist: false);
+            Assert.NotNull(args);
+            Assert.False(args!.ClearPlaylist);
+            Assert.Contains(Path.GetFullPath(music), args.Paths.Select(Path.GetFullPath));
+
+            args = null;
+            view.ActivateSelectedFavorites(clearPlaylist: true);
+            Assert.NotNull(args);
+            Assert.True(args!.ClearPlaylist);
             window.Close();
         });
     }

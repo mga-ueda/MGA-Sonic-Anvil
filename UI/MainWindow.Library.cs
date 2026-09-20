@@ -1834,28 +1834,31 @@ public partial class MainWindow
 
     private void LibraryBrowser_FavoritesActivated(object? sender, LibraryFavoritesActivateEventArgs e)
     {
-        var files = AudioCodec.CollectPlayerOpenable(e.Paths);
+        if (e.Paths.Count == 0)
+        {
+            return;
+        }
+
         if (e.ClearPlaylist)
         {
-            _libraryHoldJacketWash = files.Length > 0;
+            _libraryHoldJacketWash = true;
             if (!TryClearLibrarySessions())
             {
                 _libraryHoldJacketWash = false;
                 return;
             }
 
-            // 再生できる曲が無くても、クリア後の空リストと同じ（既定の背景へ戻す）。
-            _libraryPlayFirstPending = true;
-            RegisterLibraryPaths(files, play: true);
-            return;
+            _libraryExplorerPlayOnOpen = true;
         }
 
-        if (files.Length == 0)
+        try
         {
-            return;
+            _ = OpenLibraryFoldersRecursiveAsync(e.Paths, LibraryExplorerPlaylistWalk.Inactive);
         }
-
-        RegisterLibraryPaths(files, play: false);
+        finally
+        {
+            _libraryExplorerPlayOnOpen = false;
+        }
     }
 
     private void LibraryBrowser_ExplorerFoldersOpened(object? sender, IReadOnlyList<string> folders) =>
@@ -1891,17 +1894,20 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// フォルダ配下を再帰収集し、1 曲ずつ載せる。
+    /// フォルダ配下（と単体ファイル）を再帰収集し、1 曲ずつ載せる。
     /// 再生するのは Enter（クリア後）だけ。Shift+Enter・ダブルクリック・追加メニューは再生も停止もしない。
-    /// 検索中は見えているフォルダだけ。ファイル名ヒットはそのファイル、フォルダ名ヒットは配下すべて。
+    /// 検索中のツリーは見えているフォルダだけ。ファイル名ヒットはそのファイル、フォルダ名ヒットは配下すべて。
+    /// お気に入りは検索フィルタを掛けない。
     /// </summary>
-    private async Task OpenLibraryFoldersRecursiveAsync(IReadOnlyList<string> folders)
+    private async Task OpenLibraryFoldersRecursiveAsync(
+        IReadOnlyList<string> folders,
+        LibraryExplorerPlaylistWalk? walk = null)
     {
         var playFirst = _libraryExplorerPlayOnOpen;
         _libraryExplorerPlayOnOpen = false;
         var generation = ++_libraryFolderShowGeneration;
         _libraryFolderPlaySession = null;
-        var walk = LibraryBrowser.SnapshotExplorerPlaylistWalk();
+        var filter = walk ?? LibraryBrowser.SnapshotExplorerPlaylistWalk();
         var remaining = new Stack<(string Path, bool AncestorHit)>();
         for (var i = folders.Count - 1; i >= 0; i--)
         {
@@ -1940,14 +1946,39 @@ public partial class MainWindow
                 }
 
                 var current = remaining.Pop();
+                if (!Directory.Exists(current.Path))
+                {
+                    if (File.Exists(current.Path)
+                        && AudioCodec.IsPlayerOpenable(current.Path)
+                        && filter.IncludeFile(current.Path, current.AncestorHit)
+                        && FindSessionByPath(current.Path) is null)
+                    {
+                        var selectFile = playFirst && !firstHandled;
+                        if (!await TryAppendLibrarySessionAsync(
+                                current.Path,
+                                generation,
+                                selectFile,
+                                play: selectFile)
+                            .ConfigureAwait(true))
+                        {
+                            LibraryBrowser.FinishIncrementalSessionLoad();
+                            return;
+                        }
+
+                        firstHandled = true;
+                    }
+
+                    continue;
+                }
+
                 var layer = await Task.Run(() =>
                 {
-                    var folderHit = walk.FolderNameHit(current.Path, current.AncestorHit);
+                    var folderHit = filter.FolderNameHit(current.Path, current.AncestorHit);
                     AudioCodec.CollectPlayerOpenableDirectoryLayer(current.Path, out var files, out var children);
                     var included = new List<string>();
                     foreach (var file in files)
                     {
-                        if (walk.IncludeFile(file, folderHit))
+                        if (filter.IncludeFile(file, folderHit))
                         {
                             included.Add(file);
                         }
@@ -1956,7 +1987,7 @@ public partial class MainWindow
                     var next = new List<(string Path, bool AncestorHit)>();
                     foreach (var child in children)
                     {
-                        if (walk.IncludeChild(child, folderHit))
+                        if (filter.IncludeChild(child, folderHit))
                         {
                             next.Add((child, folderHit));
                         }

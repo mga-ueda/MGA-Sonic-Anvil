@@ -472,6 +472,12 @@ public partial class MainWindow
                 return true;
             }
 
+            if (key == Key.C && modifiers == ModifierKeys.Control)
+            {
+                LibraryBrowser.CopySelected();
+                return true;
+            }
+
             if (key == Key.Enter
                 && modifiers == ModifierKeys.None)
             {

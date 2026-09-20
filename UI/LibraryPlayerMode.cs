@@ -140,6 +140,7 @@ internal static class LibraryPlayerMode
             (Key.O, ModifierKeys.Control) => true,
             (Key.O, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Q, ModifierKeys.Control) => true,
+            (Key.C, ModifierKeys.Control) => true,
             (Key.C, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.T, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Tab, ModifierKeys.Control) => true,
@@ -162,7 +163,7 @@ internal static class LibraryPlayerMode
         modifiers == ModifierKeys.None && key is Key.Divide or Key.Oem2;
 
     /// <summary>
-    /// フォルダツリーで拒否するキー（コピー／削除／リネーム等）。ナビと Enter 以外はここで止める。
+    /// フォルダツリーで拒否するキー（切り取り／貼り付け／削除／リネーム等）。コピーとナビと Enter 以外はここで止める。
     /// </summary>
     public static bool BlocksExplorerKey(Key key, ModifierKeys modifiers)
     {
@@ -228,7 +229,7 @@ internal static class LibraryPlayerMode
             return false;
         }
 
-        // 削除・バックスペース・コピー／切り取り／貼り付け・複製などファイル操作系はすべて止める。
+        // 削除・バックスペース・切り取り／貼り付け・複製などファイル操作系は止める。Ctrl+C はコピーとして通す。
         // F2 はプレイヤーでお気に入りフォーカスに使うので、ここでは止めない。
         if (key is Key.Delete or Key.Back)
         {
@@ -236,7 +237,7 @@ internal static class LibraryPlayerMode
         }
 
         if ((modifiers & ModifierKeys.Control) != 0
-            && key is Key.C or Key.X or Key.V or Key.D or Key.A or Key.N or Key.R)
+            && key is Key.X or Key.V or Key.D or Key.A or Key.N or Key.R)
         {
             return true;
         }

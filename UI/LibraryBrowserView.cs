@@ -158,7 +158,13 @@ internal sealed class LibraryBrowserView : UserControl
     private bool _treeSyncing;
     private Point? _treeDragStart;
     private TreeViewItem? _treeDragItem;
+    private string[] _treeDragPaths = [];
+    private TreeViewItem? _treePendingSingleSelect;
     private Point? _favoritesDragStart;
+    private Point? _playlistDragStart;
+    private string[] _playlistDragPaths = [];
+    private bool _playlistDragBusy;
+    private LibraryFileRow? _playlistPendingSingleSelect;
 
     public event EventHandler<DocumentSession>? SessionActivated;
 
@@ -216,6 +222,8 @@ internal sealed class LibraryBrowserView : UserControl
         _folderTree.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _favoritesList.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _grid.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
+        PreviewMouseMove += PlaylistHost_PreviewMouseMove;
+        PreviewMouseLeftButtonUp += PlaylistHost_PreviewMouseLeftButtonUp;
         _groupCombo.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _explorerSearchBox.IsKeyboardFocusWithinChanged += (_, _) =>
         {
@@ -957,6 +965,43 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
+    /// <summary>選択中の実ファイル／フォルダをクリップボードへコピー（移動ではない）。</summary>
+    public void CopySelected() => CopyPaths(SelectedCopyPaths());
+
+    /// <summary>選択中の場所をエクスプローラーで開く。</summary>
+    public void ShowSelectedInExplorer() =>
+        LibraryShellFiles.TryOpenInExplorer(SelectedRevealPaths());
+
+    internal string[] SelectedCopyPaths() => CopyPathsFor(ActivePane);
+
+    internal string[] SelectedRevealPaths() => RevealPathsFor(ActivePane);
+
+    private void CopyPaths(string[] paths)
+    {
+        if (paths.Length == 0)
+        {
+            return;
+        }
+
+        SystemClipboard.TrySetFileDropCopy(paths, Window.GetWindow(this));
+    }
+
+    private string[] CopyPathsFor(LibraryPane pane) =>
+        pane switch
+        {
+            LibraryPane.Explorer => SelectedExplorerTransferPaths(),
+            LibraryPane.Favorites => LibraryShellFiles.ExistingPaths(SelectedFavoritePaths),
+            _ => SelectedPlaylistCopyPaths(),
+        };
+
+    private string[] RevealPathsFor(LibraryPane pane) =>
+        pane switch
+        {
+            LibraryPane.Explorer => LibraryShellFiles.ExistingPaths(SelectedExplorerFolders),
+            LibraryPane.Favorites => LibraryShellFiles.ExistingPaths(SelectedFavoritePaths),
+            _ => SelectedPlaylistCopyPaths(),
+        };
+
     private static bool OpenOwnedContextMenu(FrameworkElement owner)
     {
         if (owner.ContextMenu is not { } menu)
@@ -1297,6 +1342,11 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void RestorePlaylistFocusIfNeeded()
     {
+        if (_playlistDragBusy)
+        {
+            return;
+        }
+
         if (_restoreListFocus || _grid.IsKeyboardFocusWithin)
         {
             EnsureListFocused();
@@ -2060,7 +2110,7 @@ internal sealed class LibraryBrowserView : UserControl
         _folderTree.PreviewKeyDown += FolderTree_PreviewKeyDown;
         _folderTree.PreviewTextInput += FolderTree_PreviewTextInput;
         _folderTree.IsTextSearchEnabled = false;
-        _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, (_, e) => e.Handled = true));
+        BindLibraryCopyCommand(_folderTree, LibraryPane.Explorer);
         _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Cut, (_, e) => e.Handled = true));
         _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Paste, (_, e) => e.Handled = true));
         _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Delete, (_, e) => e.Handled = true));
@@ -2082,6 +2132,8 @@ internal sealed class LibraryBrowserView : UserControl
         _favoritesList.PreviewMouseLeftButtonDown += FavoritesList_PreviewMouseLeftButtonDown;
         _favoritesList.PreviewMouseMove += FavoritesList_PreviewMouseMove;
         _favoritesList.PreviewMouseLeftButtonUp += (_, _) => _favoritesDragStart = null;
+        _favoritesList.MouseDoubleClick += FavoritesList_MouseDoubleClick;
+        BindLibraryCopyCommand(_favoritesList, LibraryPane.Favorites);
         _favoritesList.AllowDrop = true;
         _favoritesList.PreviewDragOver += FavoritesList_PreviewDragOver;
         _favoritesList.Drop += FavoritesList_Drop;
@@ -3456,7 +3508,7 @@ internal sealed class LibraryBrowserView : UserControl
         if (e.NewValue is TreeViewItem { Tag: string path } item && Directory.Exists(path))
         {
             if ((Keyboard.Modifiers & ModifierKeys.Control) == 0
-                && (_treeMultiSelected.Count != 1 || !_treeMultiSelected.Contains(item)))
+                && !_treeMultiSelected.Contains(item))
             {
                 ClearTreeMultiSelect();
                 _treeMultiSelected.Add(item);
@@ -3475,8 +3527,7 @@ internal sealed class LibraryBrowserView : UserControl
     private void FolderTree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         CancelPlaylistFocusRestore();
-        _treeDragStart = null;
-        _treeDragItem = null;
+        ClearTreeDrag();
         if (e.OriginalSource is not DependencyObject origin
             || FindTreeViewItem(origin) is not { Tag: string } item
             || FindTreeExpandToggle(origin) is not null)
@@ -3486,17 +3537,18 @@ internal sealed class LibraryBrowserView : UserControl
 
         if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
         {
-            ToggleTreeMultiSelect(item);
-            item.IsSelected = true;
+            BeginExplorerPlainPress(item, control: true);
+            _treeDragStart = e.GetPosition(null);
             e.Handled = true;
             return;
         }
 
-        ClearTreeMultiSelect();
-        _treeMultiSelected.Add(item);
-        ApplyTreeMultiSelectChrome();
+        BeginExplorerPlainPress(item, control: false);
         _treeDragStart = e.GetPosition(null);
-        _treeDragItem = item;
+        if (_treePendingSingleSelect is not null)
+        {
+            e.Handled = true;
+        }
     }
 
     private void FolderTree_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -3618,7 +3670,9 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        var paths = SelectedExplorerFolders;
+        var paths = _treeDragPaths.Length > 0
+            ? _treeDragPaths
+            : SelectedExplorerTransferPaths();
         if (paths.Length == 0)
         {
             return;
@@ -3632,26 +3686,69 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         var item = _treeDragItem;
-        _treeDragStart = null;
-        _treeDragItem = null;
-        var walk = SnapshotExplorerPlaylistWalk();
-        if (walk.Active)
-        {
-            paths = LibrarySearchQuery.CollectPlaylistFiles(paths, walk.Groups, walk.Visible);
-            if (paths.Length == 0)
-            {
-                return;
-            }
-        }
-
-        var data = new DataObject(DataFormats.FileDrop, paths);
-        DragDrop.DoDragDrop(item, data, DragDropEffects.Copy);
+        ClearTreeDrag();
+        BeginFileCopyDrag(item, paths);
     }
 
-    private void FolderTree_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void FolderTree_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e) =>
+        CompleteExplorerPlainPress();
+
+    private void ClearTreeDrag()
     {
         _treeDragStart = null;
         _treeDragItem = null;
+        _treeDragPaths = [];
+        _treePendingSingleSelect = null;
+    }
+
+    internal void BeginExplorerPlainPress(TreeViewItem item, bool control)
+    {
+        if (control)
+        {
+            ToggleTreeMultiSelect(item);
+            item.IsSelected = true;
+            _treePendingSingleSelect = null;
+            ArmTreeDrag(item);
+            return;
+        }
+
+        if (ShouldHoldExplorerMultiSelect(item))
+        {
+            _treePendingSingleSelect = item;
+            ArmTreeDrag(item);
+            return;
+        }
+
+        ClearTreeMultiSelect();
+        _treeMultiSelected.Add(item);
+        ApplyTreeMultiSelectChrome();
+        ArmTreeDrag(item);
+    }
+
+    internal void CompleteExplorerPlainPress()
+    {
+        var pending = _treePendingSingleSelect;
+        ClearTreeDrag();
+        if (pending is null)
+        {
+            return;
+        }
+
+        ClearTreeMultiSelect();
+        _treeMultiSelected.Add(pending);
+        ApplyTreeMultiSelectChrome();
+        pending.IsSelected = true;
+    }
+
+    internal void AbandonExplorerPendingClick() => _treePendingSingleSelect = null;
+
+    internal bool ShouldHoldExplorerMultiSelect(TreeViewItem item) =>
+        _treeMultiSelected.Count > 1 && _treeMultiSelected.Contains(item);
+
+    private void ArmTreeDrag(TreeViewItem item)
+    {
+        _treeDragItem = item;
+        _treeDragPaths = SelectedExplorerTransferPaths();
     }
 
     private static TreeViewItem? FindTreeViewItem(DependencyObject? origin)
@@ -3852,6 +3949,7 @@ internal sealed class LibraryBrowserView : UserControl
         _grid.SelectionUnit = DataGridSelectionUnit.FullRow;
         _grid.SelectionMode = DataGridSelectionMode.Extended;
         _grid.ClipboardCopyMode = DataGridClipboardCopyMode.None;
+        BindLibraryCopyCommand(_grid, LibraryPane.List);
         // 1000 行超を全部実体化すると ↓ リピートと列幅再計算が止まる。グループ時も仮想化する。
         _grid.EnableRowVirtualization = true;
         VirtualizingPanel.SetIsVirtualizing(_grid, true);
@@ -4550,8 +4648,18 @@ internal sealed class LibraryBrowserView : UserControl
         var shift = (modifiers & ModifierKeys.Shift) != 0;
         if (!control && !shift)
         {
+            BeginPlaylistPlainPress(row, e.ClickCount);
+            _playlistDragStart = e.GetPosition(null);
+            if (_playlistPendingSingleSelect is not null)
+            {
+                e.Handled = true;
+                CaptureMouse();
+            }
+
             return;
         }
+
+        ClearPlaylistDrag();
 
         var index = _grid.Items.IndexOf(row);
         if (index < 0)
@@ -4562,6 +4670,147 @@ internal sealed class LibraryBrowserView : UserControl
         e.Handled = true;
         ApplyPlaylistModifierClick(index, shift, control);
         EnsureListFocused();
+    }
+
+    private void PlaylistHost_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_playlistDragBusy
+            || _playlistDragStart is null
+            || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var delta = e.GetPosition(null) - _playlistDragStart.Value;
+        if (Math.Abs(delta.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(delta.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        var paths = _playlistDragPaths.Length > 0
+            ? _playlistDragPaths
+            : SelectedPlaylistCopyPaths();
+        if (paths.Length == 0)
+        {
+            return;
+        }
+
+        ClearPlaylistDrag();
+        CancelPlaylistFocusRestore();
+        _playlistDragBusy = true;
+        ReleasePlaylistMouseCapture();
+        if (Mouse.Captured is not null)
+        {
+            Mouse.Capture(null);
+        }
+
+        // DataGrid の選択ドラッグと同じマウス処理から同期で入れると、
+        // OLE が即キャンセルされる。フォーカス復帰の Loaded も入れ子ループで走る。
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                try
+                {
+                    if (Mouse.LeftButton != MouseButtonState.Pressed)
+                    {
+                        return;
+                    }
+
+                    if (Mouse.Captured is not null)
+                    {
+                        Mouse.Capture(null);
+                    }
+
+                    BeginFileCopyDrag(this, paths);
+                }
+                finally
+                {
+                    _playlistDragBusy = false;
+                }
+            },
+            DispatcherPriority.Input);
+    }
+
+    private void PlaylistHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e) =>
+        CompletePlaylistPlainPress();
+
+    private void ClearPlaylistDrag()
+    {
+        _playlistDragStart = null;
+        _playlistDragPaths = [];
+        _playlistPendingSingleSelect = null;
+    }
+
+    internal void AbandonPlaylistPendingClick() => _playlistPendingSingleSelect = null;
+
+    private void ReleasePlaylistMouseCapture()
+    {
+        if (IsMouseCaptured)
+        {
+            ReleaseMouseCapture();
+        }
+    }
+
+    internal void BeginPlaylistPlainPress(LibraryFileRow row, int clickCount)
+    {
+        _playlistDragPaths = PlaylistCopyPathsFromRow(row);
+        _playlistPendingSingleSelect = ShouldHoldPlaylistMultiSelect(row, clickCount)
+            ? row
+            : null;
+    }
+
+    internal void CompletePlaylistPlainPress()
+    {
+        ReleasePlaylistMouseCapture();
+        var pending = _playlistPendingSingleSelect;
+        var busy = _playlistDragBusy;
+        ClearPlaylistDrag();
+        if (pending is null || busy)
+        {
+            return;
+        }
+
+        SelectOnlyPlaylistRow(pending);
+    }
+
+    internal bool ShouldHoldPlaylistMultiSelect(LibraryFileRow row, int clickCount) =>
+        clickCount == 1
+        && _grid.SelectedItems.Count > 1
+        && _grid.SelectedItems.Contains(row);
+
+    internal void SelectOnlyPlaylistRow(LibraryFileRow row)
+    {
+        if (row.Tag is not DocumentSession session)
+        {
+            return;
+        }
+
+        _syncing = true;
+        try
+        {
+            ApplyRowSelectionCore(session, [session]);
+        }
+        finally
+        {
+            _syncing = false;
+        }
+
+        SessionActivated?.Invoke(this, session);
+    }
+
+    internal string[] PlaylistCopyPathsFromRow(LibraryFileRow row)
+    {
+        if (row.Tag is not DocumentSession clicked)
+        {
+            return [];
+        }
+
+        var selected = SelectedSessions;
+        DocumentSession[] sessions = selected.Contains(clicked) && selected.Length > 0
+            ? selected
+            : [clicked];
+        return LibraryShellFiles.ExistingPaths(sessions.Select(session => session.Document.SourcePath));
     }
 
     internal void ApplyPlaylistModifierClick(int index, bool shift, bool control)
@@ -5691,12 +5940,15 @@ internal sealed class LibraryBrowserView : UserControl
         menu.Items.Add(replace);
         menu.Items.Add(append);
         menu.Items.Add(add);
+        AddCopyAndExplorerMenuItems(menu, LibraryPane.Explorer, out var copy, out var explorer);
         menu.Opened += (_, _) =>
         {
             var enabled = SelectedExplorerFolders.Length > 0;
             replace.IsEnabled = enabled;
             append.IsEnabled = enabled;
             add.IsEnabled = enabled;
+            copy.IsEnabled = SelectedExplorerTransferPaths().Length > 0;
+            explorer.IsEnabled = LibraryShellFiles.ExistingPaths(SelectedExplorerFolders).Length > 0;
         };
         _folderTree.ContextMenu = menu;
     }
@@ -5704,12 +5956,33 @@ internal sealed class LibraryBrowserView : UserControl
     private void RebuildFavoritesContextMenu()
     {
         var menu = new ContextMenu();
+        var replace = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuReplacePlaylist,
+            InputGestureText = "Enter",
+        };
+        replace.Click += (_, _) => ActivateSelectedFavorites(clearPlaylist: true);
+        var append = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuAppendPlaylist,
+            InputGestureText = "Shift+Enter",
+        };
+        append.Click += (_, _) => ActivateSelectedFavorites(clearPlaylist: false);
         var remove = new MenuItem { Header = UiStrings.LibraryMenuRemoveFromFavorites };
         remove.Click += (_, _) => RemoveSelectedFavorites();
+        menu.Items.Add(replace);
+        menu.Items.Add(append);
         menu.Items.Add(remove);
+        AddCopyAndExplorerMenuItems(menu, LibraryPane.Favorites, out var copy, out var explorer);
         menu.Opened += (_, _) =>
         {
-            remove.IsEnabled = SelectedFavoritePaths.Length > 0;
+            var paths = LibraryShellFiles.ExistingPaths(SelectedFavoritePaths);
+            var selected = SelectedFavoritePaths.Length > 0;
+            replace.IsEnabled = selected;
+            append.IsEnabled = selected;
+            remove.IsEnabled = selected;
+            copy.IsEnabled = paths.Length > 0;
+            explorer.IsEnabled = paths.Length > 0;
         };
         _favoritesList.ContextMenu = menu;
     }
@@ -5720,11 +5993,91 @@ internal sealed class LibraryBrowserView : UserControl
         var clear = new MenuItem { Header = UiStrings.LibraryMenuClearFromPlaylist };
         clear.Click += (_, _) => ClearPlaylistRequested?.Invoke(this, EventArgs.Empty);
         menu.Items.Add(clear);
+        AddCopyAndExplorerMenuItems(menu, LibraryPane.List, out var copy, out var explorer);
         menu.Opened += (_, _) =>
         {
+            var paths = SelectedPlaylistCopyPaths();
             clear.IsEnabled = SelectedSessions.Length > 0;
+            copy.IsEnabled = paths.Length > 0;
+            explorer.IsEnabled = paths.Length > 0;
         };
         _grid.ContextMenu = menu;
+    }
+
+    private void AddCopyAndExplorerMenuItems(ContextMenu menu, LibraryPane pane, out MenuItem copy, out MenuItem explorer)
+    {
+        copy = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuCopy,
+            InputGestureText = "Ctrl+C",
+        };
+        copy.Click += (_, _) => CopyPaths(CopyPathsFor(pane));
+        explorer = new MenuItem { Header = UiStrings.LibraryMenuOpenInExplorer };
+        explorer.Click += (_, _) => LibraryShellFiles.TryOpenInExplorer(RevealPathsFor(pane));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(copy);
+        menu.Items.Add(explorer);
+    }
+
+    private void BindLibraryCopyCommand(UIElement target, LibraryPane pane)
+    {
+        target.CommandBindings.Add(new CommandBinding(
+            ApplicationCommands.Copy,
+            (_, e) =>
+            {
+                CopyPaths(CopyPathsFor(pane));
+                e.Handled = true;
+            },
+            (_, e) =>
+            {
+                e.CanExecute = CopyPathsFor(pane).Length > 0;
+                e.Handled = true;
+            }));
+    }
+
+    private string[] SelectedExplorerTransferPaths()
+    {
+        var paths = SelectedExplorerFolders;
+        if (paths.Length == 0)
+        {
+            return [];
+        }
+
+        var walk = SnapshotExplorerPlaylistWalk();
+        if (walk.Active)
+        {
+            paths = LibrarySearchQuery.CollectPlaylistFiles(paths, walk.Groups, walk.Visible);
+        }
+
+        return LibraryShellFiles.ExistingPaths(paths);
+    }
+
+    private string[] SelectedPlaylistCopyPaths()
+    {
+        var sessions = SelectedSessions;
+        if (sessions.Length == 0)
+        {
+            return [];
+        }
+
+        var paths = new string[sessions.Length];
+        for (var i = 0; i < sessions.Length; i++)
+        {
+            paths[i] = sessions[i].Document.SourcePath ?? string.Empty;
+        }
+
+        return LibraryShellFiles.ExistingPaths(paths);
+    }
+
+    private static void BeginFileCopyDrag(DependencyObject source, string[] paths)
+    {
+        var data = LibraryShellFiles.CreateOleCopyData(paths);
+        if (data is null)
+        {
+            return;
+        }
+
+        DragDrop.DoDragDrop(source, data, DragDropEffects.Copy);
     }
 
     private void FavoritesList_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -5740,18 +6093,24 @@ internal sealed class LibraryBrowserView : UserControl
         if (key == Key.Enter
             && Keyboard.Modifiers is ModifierKeys.None or ModifierKeys.Shift)
         {
-            var paths = SelectedFavoritePaths;
-            if (paths.Length == 0)
-            {
-                e.Handled = true;
-                return;
-            }
-
-            FavoritesActivated?.Invoke(
-                this,
-                new LibraryFavoritesActivateEventArgs(paths, clearPlaylist: Keyboard.Modifiers == ModifierKeys.None));
+            ActivateSelectedFavorites(clearPlaylist: Keyboard.Modifiers == ModifierKeys.None);
             e.Handled = true;
         }
+    }
+
+    private void FavoritesList_MouseDoubleClick(object sender, MouseButtonEventArgs e) =>
+        ActivateSelectedFavorites(clearPlaylist: false);
+
+    /// <summary>ダブルクリックはツリーと同じ（クリアせず追加。再生しない）。</summary>
+    internal void ActivateSelectedFavorites(bool clearPlaylist)
+    {
+        var paths = SelectedFavoritePaths;
+        if (paths.Length == 0)
+        {
+            return;
+        }
+
+        FavoritesActivated?.Invoke(this, new LibraryFavoritesActivateEventArgs(paths, clearPlaylist));
     }
 
     private void FavoritesList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -5781,8 +6140,7 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         _favoritesDragStart = null;
-        var data = new DataObject(DataFormats.FileDrop, paths);
-        DragDrop.DoDragDrop(_favoritesList, data, DragDropEffects.Copy);
+        BeginFileCopyDrag(_favoritesList, LibraryShellFiles.ExistingPaths(paths));
     }
 
     private void FavoritesList_PreviewDragOver(object sender, DragEventArgs e)

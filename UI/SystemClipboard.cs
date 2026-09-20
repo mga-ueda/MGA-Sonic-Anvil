@@ -25,6 +25,49 @@ internal static class SystemClipboard
             Clipboard.Flush);
     }
 
+    public static bool TrySetFileDropCopy(IReadOnlyList<string> paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        var data = LibraryShellFiles.CreateOleCopyData(paths);
+        if (data is null)
+        {
+            return false;
+        }
+
+        return TryCompleteSet(
+            () => Clipboard.SetDataObject(data, copy: false),
+            Clipboard.Flush);
+    }
+
+    public static void TrySetFileDropCopy(IReadOnlyList<string> paths, Window? owner)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        if (LibraryShellFiles.ExistingPaths(paths).Length == 0)
+        {
+            return;
+        }
+
+        var dispatcher = owner?.Dispatcher ?? Dispatcher.CurrentDispatcher;
+        RetryWhenIdle(
+            dispatcher,
+            remaining =>
+            {
+                if (TrySetFileDropCopy(paths))
+                {
+                    return true;
+                }
+
+                if (remaining <= 1)
+                {
+                    ShowBusy(owner);
+                    return true;
+                }
+
+                return false;
+            },
+            RetryAttempts);
+    }
+
     public static void TrySetText(string text, Window? owner)
     {
         ArgumentNullException.ThrowIfNull(text);

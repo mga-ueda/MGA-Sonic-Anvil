@@ -67,6 +67,18 @@ public sealed class TransportToolTipTests
         Assert.Contains("ラウドネス", UiStrings.TipWaveform);
         Assert.Contains("最初から消す", UiStrings.TipWaveform);
         Assert.Contains("1秒でフェードアウト", UiStrings.TipWaveform);
+        Assert.Contains("Ctrl+C", UiStrings.TipWaveform);
+        Assert.Contains("エクスプローラーで開く", UiStrings.TipWaveform);
+        Assert.Contains("Ctrl+C", UiStrings.TipLibraryExplorer);
+        Assert.Contains("エクスプローラーで開く", UiStrings.TipLibraryExplorer);
+        Assert.Contains("Ctrl+C", UiStrings.TipLibraryFavorites);
+        Assert.Contains("エクスプローラーで開く", UiStrings.TipLibraryFavorites);
+        Assert.Contains("ダブルクリック", UiStrings.TipLibraryFavorites);
+        Assert.Contains("プレイリストをクリアして追加", UiStrings.TipLibraryFavorites);
+        Assert.Contains("プレイリストへ追加", UiStrings.TipLibraryFavorites);
+        Assert.Contains("1曲ずつ", UiStrings.TipLibraryFavorites);
+        Assert.Contains("Ctrl+C", UiStrings.TipLibraryList);
+        Assert.Contains("エクスプローラーで開く", UiStrings.TipLibraryList);
         Assert.Contains("ドラッグ", UiStrings.TipLibraryColumns);
         Assert.Contains("20", UiStrings.TipClickGuardFade);
         Assert.Contains("Wwise.exe", UiStrings.TipWwiseProjectNameOpen);

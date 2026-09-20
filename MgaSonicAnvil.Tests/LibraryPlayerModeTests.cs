@@ -114,7 +114,7 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Up, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.M, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Delete, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Left, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.G, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Tab, ModifierKeys.None));
@@ -126,7 +126,7 @@ public sealed class LibraryPlayerModeTests
     {
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.Delete, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.Back, ModifierKeys.None));
-        Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.C, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.C, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.X, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.V, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.D, ModifierKeys.Control | ModifierKeys.Shift));
