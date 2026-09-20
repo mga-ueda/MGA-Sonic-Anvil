@@ -584,6 +584,50 @@ public sealed class AudioStreamSourceTests
         }
     }
 
+    [Fact]
+    public void BindStream_RateMismatch_ReconstructsWithoutAliasImages()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-src-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteToneWave(path, sampleRate: 8000, frames: 800, frequency: 1000);
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+
+            using var source = AudioStreamSource.Open(path);
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(48000);
+            provider.BindStream(source, document, startFrame: 0, playRange: null, loop: false);
+            provider.SetSilentSkip(false, -60);
+
+            var buffer = new float[1920];
+            var got = 0;
+            for (var n = 0; n < 30 && got < buffer.Length; n++)
+            {
+                var read = provider.Read(buffer, got, buffer.Length - got);
+                if (read <= 0)
+                {
+                    break;
+                }
+
+                got += read;
+            }
+
+            Assert.True(got >= 1920, $"got={got}");
+            var left = Enumerable.Range(0, 960).Select(i => buffer[i * 2]).ToArray();
+            Assert.True(left.Max(Math.Abs) > 0.2f, "信号が出ていない");
+            for (var i = 9; i < left.Length; i++)
+            {
+                var jump = Math.Abs(left[i] - left[i - 1]);
+                Assert.True(jump < 0.25f, $"frame {i}: 隣接差 {jump} が大きい（階段＝折り返しイメージ）");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static void EncodeMp3(string wavPath, string mp3Path)
     {
         NAudio.MediaFoundation.MediaFoundationApi.Startup();

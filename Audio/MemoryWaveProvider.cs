@@ -153,6 +153,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private float[] _streamFrame = [];
     private float[] _streamCached = [];
     private long _streamCachedAt = -1;
+    /// <summary>ストリーム SRC 用。sinc が参照するソースフレームの滑り窓。</summary>
+    private float[] _streamSrcWin = [];
+    private long _streamSrcWinStart = -1;
+    private int _streamSrcWinFrames;
+    private const int StreamSrcWinSlack = 32;
     /// <summary>ストリーム早戻し。デコード済みを逆方向へ再生し、次チャンクは重ならせてつなぐ。</summary>
     private float[] _streamReverseBuf = [];
     private long _streamReverseBufStart = -1;
@@ -398,7 +403,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 _streamCached = new float[_channels];
             }
 
-            _streamCachedAt = -1;
+            InvalidateStreamCursorCacheNoLock();
             ClearStreamReverseBuf();
             ClearGaplessNoLock();
             NoteGaplessAdvancedNoLock(null);
@@ -438,6 +443,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var stream = _stream;
         _stream = null;
         _boundDocument = null;
+        InvalidateStreamCursorCacheNoLock();
         if (stream is null)
         {
             return;
@@ -592,7 +598,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _streamCached = new float[_channels];
         }
 
-        _streamCachedAt = -1;
+        InvalidateStreamCursorCacheNoLock();
         ClearStreamReverseBuf();
         _sourceFrame = 0;
         _cursor = 0;
@@ -911,7 +917,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _cursor = checked((int)next * _channels);
         // 音声スレッドも UI も _gate を握ったまま来る。先読み待ちで数秒止めない。
         _stream?.SeekFrame(next, prebufferTimeoutMs: 0);
-        _streamCachedAt = -1;
+        InvalidateStreamCursorCacheNoLock();
         ClearStreamReverseBuf();
         // シークでジャンプしたら進行中の Exit 二重再生は直ちに止める（IM Importer と同じ）。
         _exitPlaying = false;
@@ -991,6 +997,10 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var srcCh = Math.Max(1, _channels);
         var sourceNeed = Math.Max(1, (int)Math.Ceiling(
             fadeFrames * (_sourceRate / (double)Math.Max(1, _deviceRate))));
+        if (UsesStreamRateConvert())
+        {
+            sourceNeed += FormatConvert.ResampleEdgePad;
+        }
         var need = sourceNeed * srcCh;
         if (_seekFadeOutPcm.Length < need)
         {
@@ -1007,7 +1017,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         if (_stream is not null)
         {
             _stream.SeekFrame(next, prebufferTimeoutMs: 0);
-            _streamCachedAt = -1;
+            InvalidateStreamCursorCacheNoLock();
             ClearStreamReverseBuf();
         }
 
@@ -1105,6 +1115,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _shuttleOutputGain = Math.Abs(next) > 1.5 ? ShuttleGainLinear : 1f;
             _shuttlePrimed = false;
             CompleteSeekFadeNoLock();
+            InvalidateStreamSrcWinNoLock();
             ClearStreamReverseBuf();
             return true;
         }
@@ -1413,6 +1424,25 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
     private void ReadSeekFadeOutPcm(int srcCh, Span<float> dest)
     {
+        if (_seekFadeOutPcmFrames <= 0 || _seekFadeOutPcm.Length < srcCh)
+        {
+            dest.Clear();
+            return;
+        }
+
+        if (UsesStreamRateConvert())
+        {
+            FormatConvert.ResampleFrameBandlimited(
+                _seekFadeOutPcm,
+                srcCh,
+                _seekFadeOutPcmPos,
+                _seekFadeOutPcmFrames,
+                _sourceRate,
+                _deviceRate,
+                dest);
+            return;
+        }
+
         var index = (int)Math.Floor(_seekFadeOutPcmPos);
         if (index < 0 || index >= _seekFadeOutPcmFrames || _seekFadeOutPcm.Length < (index + 1) * srcCh)
         {
@@ -1527,7 +1557,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 {
                     _sourceFrame = loopStartFrame;
                     _stream.SeekFrame((long)Math.Floor(loopStartFrame), prebufferTimeoutMs: 0);
-                    _streamCachedAt = -1;
+                    InvalidateStreamCursorCacheNoLock();
                     continue;
                 }
 
@@ -1551,7 +1581,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 continue;
             }
 
-            if (!EnsureStreamFrameNoLock((long)Math.Floor(_sourceFrame), source))
+            if (!TryReadStreamPlayFrameNoLock(source, srcCh))
             {
                 if (TryHandoffGapless(playEndFrame))
                 {
@@ -1643,7 +1673,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             var got = false;
             for (var attempt = 0; attempt < 4 && !got; attempt++)
             {
-                got = TryReadStreamReverseFrame(frame, srcCh, frameCount, loopStartFrame, chunkFrames, overlapFrames, source);
+                got = UsesStreamRateConvert()
+                    ? TryReadStreamReverseResampled(
+                        srcCh, frameCount, loopStartFrame, chunkFrames, source)
+                    : TryReadStreamReverseFrame(
+                        frame, srcCh, frameCount, loopStartFrame, chunkFrames, overlapFrames, source);
             }
 
             if (!got)
@@ -1681,6 +1715,61 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
         _cursor = checked((int)Math.Clamp(_sourceFrame, 0, frameCount) * srcCh);
         return writtenFrames;
+    }
+
+    private bool TryReadStreamReverseResampled(
+        int srcCh,
+        long frameCount,
+        double loopStartFrame,
+        int chunkFrames,
+        Span<float> dest)
+    {
+        var pad = FormatConvert.ResampleEdgePad;
+        var center = (long)Math.Floor(_sourceFrame);
+        if (center < 0 || center >= frameCount)
+        {
+            dest.Clear();
+            return false;
+        }
+
+        var end = Math.Clamp(center + pad, 0, Math.Max(0, frameCount - 1));
+        var start = Math.Max((long)Math.Floor(loopStartFrame), center - chunkFrames + 1);
+        start = Math.Clamp(start, 0, Math.Max(0, frameCount - 1));
+        if (end < start)
+        {
+            dest.Clear();
+            return false;
+        }
+
+        FillReverseWindow(
+            ref _streamReverseBuf,
+            ref _streamReverseBufStart,
+            ref _streamReverseBufFrames,
+            start,
+            end,
+            srcCh);
+        if (_streamReverseBufFrames <= 0 || _streamReverseBufStart < 0)
+        {
+            dest.Clear();
+            return false;
+        }
+
+        var local = _sourceFrame - _streamReverseBufStart;
+        if (local < 0 || local >= _streamReverseBufFrames)
+        {
+            dest.Clear();
+            return false;
+        }
+
+        FormatConvert.ResampleFrameBandlimited(
+            _streamReverseBuf,
+            srcCh,
+            local,
+            _streamReverseBufFrames,
+            _sourceRate,
+            _deviceRate,
+            dest);
+        return true;
     }
 
     private bool TryReadStreamReverseFrame(
@@ -1863,7 +1952,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             if (_stream is not null && _stream.Frame != filledFrom)
             {
                 _stream.SeekFrame(filledFrom, prebufferTimeoutMs: 0);
-                _streamCachedAt = -1;
+                InvalidateStreamCursorCacheNoLock();
             }
         }
 
@@ -1896,13 +1985,13 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         if (_stream.Frame != from)
         {
             _stream.SeekFrame(from, prebufferTimeoutMs: 0);
-            _streamCachedAt = -1;
+            InvalidateStreamCursorCacheNoLock();
         }
 
         var got = _stream.ReadFrames(buf, (int)(from - start) * srcCh, want, timeoutMs: 0);
         if (got > 0)
         {
-            _streamCachedAt = -1;
+            InvalidateStreamCursorCacheNoLock();
         }
 
         return got;
@@ -1927,6 +2016,224 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private long FrameCountOrStreamEnd(int srcCh) =>
         _stream?.FrameCount ?? UsedFrameCountNoLock(srcCh);
 
+    private bool UsesStreamRateConvert() =>
+        _sourceRate != _deviceRate;
+
+    private void InvalidateStreamSrcWinNoLock()
+    {
+        _streamSrcWinStart = -1;
+        _streamSrcWinFrames = 0;
+    }
+
+    private void InvalidateStreamCursorCacheNoLock()
+    {
+        _streamCachedAt = -1;
+        InvalidateStreamSrcWinNoLock();
+    }
+
+    private bool StreamSrcWinContainsFrame(long frame) =>
+        _streamSrcWinStart >= 0
+        && frame >= _streamSrcWinStart
+        && frame < _streamSrcWinStart + _streamSrcWinFrames;
+
+    private bool TryCopyStreamSrcWin(long frame, Span<float> dest)
+    {
+        var srcCh = Math.Max(1, _channels);
+        var index = (int)(frame - _streamSrcWinStart);
+        if (!StreamSrcWinContainsFrame(frame)
+            || dest.Length < srcCh
+            || _streamSrcWin.Length < (index + 1) * srcCh)
+        {
+            return false;
+        }
+
+        _streamSrcWin.AsSpan(index * srcCh, srcCh).CopyTo(dest);
+        return true;
+    }
+
+    private void EnsureStreamSrcWinCapacity(int frames, int srcCh)
+    {
+        srcCh = Math.Max(1, srcCh);
+        var capFrames = _streamSrcWin.Length / srcCh;
+        if (capFrames >= frames)
+        {
+            return;
+        }
+
+        var nextFrames = Math.Max(frames, Math.Max(64, capFrames * 2));
+        var next = new float[nextFrames * srcCh];
+        if (_streamSrcWinFrames > 0 && _streamSrcWin.Length >= _streamSrcWinFrames * srcCh)
+        {
+            Array.Copy(_streamSrcWin, next, _streamSrcWinFrames * srcCh);
+        }
+
+        _streamSrcWin = next;
+    }
+
+    private void DropStreamSrcWinBefore(long from, int srcCh)
+    {
+        var drop = (int)(from - _streamSrcWinStart);
+        if (drop <= 0)
+        {
+            return;
+        }
+
+        var remain = _streamSrcWinFrames - drop;
+        if (remain <= 0)
+        {
+            _streamSrcWinStart = from;
+            _streamSrcWinFrames = 0;
+            return;
+        }
+
+        Array.Copy(_streamSrcWin, drop * srcCh, _streamSrcWin, 0, remain * srcCh);
+        _streamSrcWinStart = from;
+        _streamSrcWinFrames = remain;
+    }
+
+    private bool FillStreamSrcWinToNoLock(long toInclusive, int srcCh)
+    {
+        while (_streamSrcWinStart + _streamSrcWinFrames <= toInclusive)
+        {
+            var frame = _streamSrcWinStart + _streamSrcWinFrames;
+            EnsureStreamSrcWinCapacity(_streamSrcWinFrames + 1, srcCh);
+            var dest = _streamSrcWin.AsSpan(_streamSrcWinFrames * srcCh, srcCh);
+            if (!ReadStreamFrameRawNoLock(frame, dest))
+            {
+                return _streamSrcWinFrames > 0;
+            }
+
+            if (_streamCached.Length < srcCh)
+            {
+                _streamCached = new float[srcCh];
+            }
+
+            dest.CopyTo(_streamCached.AsSpan(0, srcCh));
+            _streamCachedAt = frame;
+            _streamSrcWinFrames++;
+        }
+
+        return true;
+    }
+
+    private bool EnsureStreamSrcWinNoLock(long from, long to, int srcCh)
+    {
+        if (_stream is null || srcCh <= 0)
+        {
+            return false;
+        }
+
+        var maxFrame = Math.Max(0, UsedFrameCountNoLock(srcCh) - 1);
+        from = Math.Clamp(from, 0, maxFrame);
+        to = Math.Clamp(to, from, maxFrame);
+        var streamPos = _stream.Frame;
+        if (_streamSrcWinStart >= 0 && _streamSrcWinFrames > 0)
+        {
+            var winEnd = _streamSrcWinStart + _streamSrcWinFrames;
+            if (from < _streamSrcWinStart)
+            {
+                // 左側が足りなくても巻き戻しシークしない。sinc が端を繰り返す。
+                from = _streamSrcWinStart;
+                if (to < from)
+                {
+                    to = from;
+                }
+            }
+
+            if (from >= _streamSrcWinStart && from < winEnd)
+            {
+                DropStreamSrcWinBefore(from, srcCh);
+            }
+            else
+            {
+                InvalidateStreamSrcWinNoLock();
+                _streamSrcWinStart = Math.Clamp(Math.Max(from, streamPos), 0, maxFrame);
+                _streamSrcWinFrames = 0;
+            }
+        }
+        else
+        {
+            _streamSrcWinStart = Math.Clamp(Math.Max(from, streamPos), 0, maxFrame);
+            _streamSrcWinFrames = 0;
+        }
+
+        var slackTo = Math.Min(maxFrame, Math.Max(to, _streamSrcWinStart) + StreamSrcWinSlack);
+        FillStreamSrcWinToNoLock(slackTo, srcCh);
+        return _streamSrcWinFrames > 0;
+    }
+
+    private bool TryReadStreamPlayFrameNoLock(Span<float> dest, int srcCh)
+    {
+        if (!UsesStreamRateConvert())
+        {
+            return EnsureStreamFrameNoLock((long)Math.Floor(_sourceFrame), dest);
+        }
+
+        var pad = FormatConvert.ResampleEdgePad;
+        var center = (long)Math.Floor(_sourceFrame);
+        EnsureStreamSrcWinNoLock(center - pad, center + pad, srcCh);
+        if (_streamSrcWinFrames <= 0 || _streamSrcWinStart < 0)
+        {
+            dest.Clear();
+            return false;
+        }
+
+        FormatConvert.ResampleFrameBandlimited(
+            _streamSrcWin,
+            srcCh,
+            _sourceFrame - _streamSrcWinStart,
+            _streamSrcWinFrames,
+            _sourceRate,
+            _deviceRate,
+            dest);
+        return true;
+    }
+
+    /// <summary>
+    /// リングから 1 フレーム読む。音声スレッドでは巻き戻しシークしない。
+    /// </summary>
+    private bool ReadStreamFrameRawNoLock(long frame, Span<float> dest)
+    {
+        if (_stream is null)
+        {
+            dest.Clear();
+            return false;
+        }
+
+        var current = _stream.Frame;
+        if (frame < current)
+        {
+            dest.Clear();
+            return false;
+        }
+
+        if (frame > current)
+        {
+            if (frame - current > 4096)
+            {
+                dest.Clear();
+                return false;
+            }
+
+            while (_stream.Frame < frame)
+            {
+                if (!_stream.TryReadFrame(_streamCached.AsSpan(0, _channels), timeoutMs: 0))
+                {
+                    dest.Clear();
+                    return false;
+                }
+            }
+        }
+
+        if (!_stream.TryReadFrame(dest, timeoutMs: 0))
+        {
+            dest.Clear();
+            return false;
+        }
+
+        return true;
+    }
+
     private bool EnsureStreamFrameNoLock(long frame, Span<float> dest)
     {
         if (_stream is null)
@@ -1941,45 +2248,32 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return false;
         }
 
+        if (TryCopyStreamSrcWin(frame, dest))
+        {
+            return true;
+        }
+
         if (_streamCachedAt == frame)
         {
             _streamCached.AsSpan(0, _channels).CopyTo(dest);
             return true;
         }
 
-        var current = _stream.Frame;
-        if (frame != current)
-        {
-            // 数十フレームの先行はデコード遅れ。シークするとポンプを捨て、
-            // Drive 上では _gate を数秒握るので、再生が続くほど操作が重くなる。
-            if (frame < current || frame - current > 4096)
-            {
-                _stream.SeekFrame(frame, prebufferTimeoutMs: 0);
-            }
-            else
-            {
-                while (_stream.Frame < frame)
-                {
-                    if (!_stream.TryReadFrame(_streamCached.AsSpan(0, _channels), timeoutMs: 0))
-                    {
-                        dest.Clear();
-                        _streamCachedAt = -1;
-                        return false;
-                    }
-                }
-            }
-        }
-
-        if (!_stream.TryReadFrame(_streamCached.AsSpan(0, _channels), timeoutMs: 0))
+        EnsureStreamSrcWinNoLock(frame, frame, Math.Max(1, _channels));
+        if (!TryCopyStreamSrcWin(frame, dest))
         {
             dest.Clear();
             _streamCachedAt = -1;
             return false;
         }
 
-        // TryReadFrame 後は Frame == frame+1。キャッシュは frame の内容。
+        if (_streamCached.Length < dest.Length)
+        {
+            _streamCached = new float[Math.Max(_channels, dest.Length)];
+        }
+
+        dest.CopyTo(_streamCached.AsSpan(0, dest.Length));
         _streamCachedAt = frame;
-        _streamCached.AsSpan(0, _channels).CopyTo(dest);
         return true;
     }
 
@@ -2105,7 +2399,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         _sourceFrame = frame;
         _cursor = CursorSampleFromFrame(frame);
-        _streamCachedAt = -1;
+        InvalidateStreamCursorCacheNoLock();
         if (_stream is null)
         {
             return;
