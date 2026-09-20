@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -434,7 +435,25 @@ public partial class MainWindow
 
     private bool Save(bool saveAs, AudioDocument? target = null)
     {
-        var document = target ?? _document;
+        if (target is not null)
+        {
+            return SaveDocument(saveAs, target);
+        }
+
+        var sessions = HasTabSelection
+            ? SelectedTabsInOrder()
+            : _activeSession is null ? [] : [_activeSession];
+        if (sessions.Length >= 2)
+        {
+            _ = SaveSessionsAsync(sessions, saveAs);
+            return true;
+        }
+
+        return SaveDocument(saveAs, sessions.Length == 1 ? sessions[0].Document : _document);
+    }
+
+    private bool SaveDocument(bool saveAs, AudioDocument? document)
+    {
         if (document is null)
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
@@ -442,12 +461,7 @@ public partial class MainWindow
         }
 
         var path = document.SourcePath;
-        var kind = path is null ? AudioFileKind.Wave : AudioCodec.DetectKind(path);
-        if (saveAs
-            || string.IsNullOrEmpty(path)
-            || kind == AudioFileKind.Aiff
-            || !AudioCodec.SaveExtensions.Any(ext =>
-                ext.Equals(System.IO.Path.GetExtension(path), StringComparison.OrdinalIgnoreCase)))
+        if (saveAs || !AudioSave.CanOverwrite(path))
         {
             var dialog = new SaveFileDialog
             {
@@ -456,22 +470,20 @@ public partial class MainWindow
                 FileName = string.IsNullOrEmpty(path)
                     ? "untitled.wav"
                     : Path.GetFileNameWithoutExtension(path) + ".wav",
+                InitialDirectory = ResolveExportInitialDirectory(path),
             };
-            var lastDir = Path.GetDirectoryName(path);
-            if (!string.IsNullOrWhiteSpace(lastDir) && Directory.Exists(lastDir))
-            {
-                dialog.InitialDirectory = lastDir;
-            }
             if (dialog.ShowDialog(this) != true)
             {
                 return false;
             }
 
             path = dialog.FileName;
-            if (AudioCodec.DetectKind(path) == AudioFileKind.Mp3)
-            {
-                RememberExportFolder(Path.GetDirectoryName(path));
-            }
+            RememberExportFolder(Path.GetDirectoryName(path));
+        }
+
+        if (string.IsNullOrEmpty(path))
+        {
+            return false;
         }
 
         try
@@ -515,6 +527,233 @@ public partial class MainWindow
         }
 
         return false;
+    }
+
+    private async Task SaveSessionsAsync(IReadOnlyList<DocumentSession> sessions, bool saveAs)
+    {
+        if (IsUiBusy)
+        {
+            return;
+        }
+
+        if (sessions.Count == 0)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!TryPlanSaveJobs(sessions, saveAs, out var jobs) || jobs.Count == 0)
+        {
+            return;
+        }
+
+        var overwrite = ConfirmNewPathOverwrites(jobs);
+        if (overwrite == MessageBoxResult.Cancel)
+        {
+            return;
+        }
+
+        if (overwrite == MessageBoxResult.No)
+        {
+            jobs.RemoveAll(job => File.Exists(job.Path) && !SameDocumentPath(job.Document.SourcePath, job.Path));
+            if (jobs.Count == 0)
+            {
+                return;
+            }
+        }
+
+        StopPlaybackForExport();
+        var options = AppStorage.Settings.ToMp3EncodeOptions();
+        var mix = AppStorage.Settings.ToMp3SpeakerMix();
+        var outcomes = new ExportOutcome[jobs.Count];
+        var anyMp3 = jobs.Any(job => AudioCodec.DetectKind(job.Path) == AudioFileKind.Mp3);
+        var parallelism = anyMp3 && !Mp3Encode.UsesLame(options.LameExePath)
+            ? 1
+            : AudioExport.WorkerCount(jobs.Count, AppStorage.Settings.ExportParallelism);
+        var tracker = new ExportProgressTracker(
+            jobs.Select(job => job.Name).ToArray(),
+            jobs.Select(job => job.ExportFrameCount).ToArray(),
+            new Progress<ExportProgressSnapshot>(ApplyExportProgress));
+
+        _tabExportBusy = true;
+        try
+        {
+            ShowSaveBusyGlass();
+            ApplyExportProgress(tracker.Capture());
+            await Task.Run(() =>
+            {
+                Parallel.For(0, jobs.Count, new ParallelOptions { MaxDegreeOfParallelism = parallelism }, i =>
+                {
+                    var job = jobs[i];
+                    tracker.Report(i, 0, ExportJobState.Running);
+                    try
+                    {
+                        outcomes[i] = new ExportOutcome(
+                            AudioCodec.Save(job.Document, job.Path, options, mix),
+                            null);
+                        tracker.Report(i, 1, ExportJobState.Done);
+                    }
+                    catch (Exception ex)
+                    {
+                        tracker.Report(i, 1, ExportJobState.Failed);
+                        outcomes[i] = new ExportOutcome(null, ex);
+                    }
+                });
+            }).ConfigureAwait(true);
+        }
+        finally
+        {
+            _tabExportBusy = false;
+            _busyGlass.HideOverlay();
+        }
+
+        var failed = 0;
+        var errors = new StringBuilder();
+        Mp3EncoderKind? encoder = null;
+        for (var i = 0; i < outcomes.Length; i++)
+        {
+            var outcome = outcomes[i];
+            if (outcome.Error is { } ex)
+            {
+                failed++;
+                if (errors.Length > 0)
+                {
+                    errors.AppendLine();
+                }
+
+                errors.Append(jobs[i].Name).Append(": ").Append(ex.Message);
+                continue;
+            }
+
+            var job = jobs[i];
+            var destKind = AudioCodec.DetectKind(job.Path);
+            if (destKind == AudioFileKind.Mp3 && !SameDocumentPath(job.Document.SourcePath, job.Path))
+            {
+                encoder ??= outcome.Encoder;
+                continue;
+            }
+
+            job.Document.MarkSaved(job.Path, destKind);
+            var session = _sessions.FirstOrDefault(item => ReferenceEquals(item.Document, job.Document));
+            session?.History.MarkClean();
+            if (ReferenceEquals(job.Document, _document))
+            {
+                RememberOpenedPath(job.Path);
+            }
+
+            encoder ??= outcome.Encoder;
+        }
+
+        RebuildTabBar();
+        RefreshTitle();
+        RefreshStatus();
+        if (failed > 0)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                $"{UiStrings.ErrorSaveFailed}\n{errors}",
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return;
+        }
+
+        if (encoder is { } used)
+        {
+            ShowMp3EncoderResult(used);
+        }
+    }
+
+    private bool TryPlanSaveJobs(IReadOnlyList<DocumentSession> sessions, bool saveAs, out List<ExportJob> jobs)
+    {
+        jobs = [];
+        if (saveAs)
+        {
+            if (!TryPickExportFolder(sessions, out var folder, UiStrings.SaveFolderTitle))
+            {
+                return false;
+            }
+
+            var paths = AudioSave.PlanFolderWavePaths(
+                sessions.Select(session => (session.Document.SourcePath, session.DisplayName)).ToArray(),
+                folder);
+            for (var i = 0; i < sessions.Count; i++)
+            {
+                jobs.Add(new ExportJob(sessions[i].DisplayName, paths[i], sessions[i].Document));
+            }
+
+            return true;
+        }
+
+        var needFolder = new List<DocumentSession>();
+        foreach (var session in sessions)
+        {
+            if (AudioSave.CanOverwrite(session.Document.SourcePath))
+            {
+                jobs.Add(new ExportJob(session.DisplayName, session.Document.SourcePath!, session.Document));
+            }
+            else
+            {
+                needFolder.Add(session);
+            }
+        }
+
+        if (needFolder.Count == 0)
+        {
+            return true;
+        }
+
+        if (!TryPickExportFolder(needFolder, out var destFolder, UiStrings.SaveFolderTitle))
+        {
+            return false;
+        }
+
+        var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var job in jobs)
+        {
+            reserved.Add(Path.GetFullPath(job.Path));
+        }
+
+        var planned = AudioSave.PlanFolderWavePaths(
+            needFolder.Select(session => (session.Document.SourcePath, session.DisplayName)).ToArray(),
+            destFolder,
+            reserved);
+        for (var i = 0; i < needFolder.Count; i++)
+        {
+            jobs.Add(new ExportJob(needFolder[i].DisplayName, planned[i], needFolder[i].Document));
+        }
+
+        return true;
+    }
+
+    private MessageBoxResult ConfirmNewPathOverwrites(List<ExportJob> jobs)
+    {
+        var existing = jobs
+            .Where(job => File.Exists(job.Path) && !SameDocumentPath(job.Document.SourcePath, job.Path))
+            .Select(job => Path.GetFileName(job.Path))
+            .ToArray();
+        if (existing.Length == 0)
+        {
+            return MessageBoxResult.Yes;
+        }
+
+        return OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.ConfirmOverwriteFiles(existing.Length, AudioExport.FormatOverwritePreview(existing)),
+            UiStrings.AppName,
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+    }
+
+    private void ShowSaveBusyGlass()
+    {
+        RootChrome.UpdateLayout();
+        RootDock.UpdateLayout();
+        _busyGlass.ShowOverlay(
+            RootChrome,
+            RootDock,
+            GetBusyGlassCoverBounds(),
+            UiStrings.OverlaySave);
     }
 
     private bool SaveAsMp3(AudioDocument? target = null)

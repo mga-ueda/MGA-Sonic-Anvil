@@ -2,7 +2,7 @@ using System.IO;
 
 namespace MgaSonicAnvil.Config;
 
-/// <summary>開く／書き出しダイアログの初期フォルダ。settings.json の LastOpenFolder と LastExportFolder に残す。</summary>
+/// <summary>開く／保存・書き出しダイアログの初期フォルダ。settings.json の LastOpenFolder と LastExportFolder に残す。</summary>
 internal static class ExportFolderMemory
 {
     public static string Resolve(string? lastFolder, string? filePath)

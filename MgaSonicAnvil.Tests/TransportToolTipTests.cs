@@ -20,6 +20,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("(N)", UiStrings.TooltipNormalize);
         Assert.Contains("Delete", UiStrings.TooltipDelete);
         Assert.Contains("Ctrl+S", UiStrings.TooltipSave);
+        Assert.Contains("Ctrl+Shift+S", UiStrings.TooltipSaveAs);
         Assert.Contains("Ctrl+Shift+M", UiStrings.TooltipSaveMp3);
         Assert.Contains("Ctrl+R", UiStrings.TooltipRecord);
         Assert.Contains("(X)", UiStrings.TooltipFadeAround);
@@ -37,7 +38,6 @@ public sealed class TransportToolTipTests
         Assert.Contains("Ctrl+N", UiStrings.TooltipNew);
         Assert.Contains("Ctrl+O", UiStrings.TooltipOpen);
         Assert.Contains("Ctrl+Shift+O", UiStrings.TooltipSettings);
-        Assert.Contains("Ctrl+Shift+S", UiStrings.TooltipSaveAs);
         Assert.Contains("(A)", UiStrings.TooltipSpectrogramView);
         Assert.Contains("Esc", UiStrings.TooltipSpectrogramView);
         Assert.Contains("Shift+A", UiStrings.TooltipSpectrogramView);

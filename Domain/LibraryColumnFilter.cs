@@ -15,6 +15,7 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.Disc,
         LibraryFileColumn.Year,
         LibraryFileColumn.Genre,
+        LibraryFileColumn.Date,
         LibraryFileColumn.Comment,
         LibraryFileColumn.AlbumArtist,
         LibraryFileColumn.Kind,
@@ -39,6 +40,7 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.Disc,
         LibraryFileColumn.Year,
         LibraryFileColumn.Genre,
+        LibraryFileColumn.Date,
         LibraryFileColumn.Comment,
     ];
 
@@ -71,6 +73,16 @@ internal static class LibraryColumnFilter
         if (!seen.Contains(LibraryFileColumn.Name))
         {
             result.Insert(0, LibraryFileColumn.Name);
+            seen.Add(LibraryFileColumn.Name);
+        }
+
+        if (!seen.Contains(LibraryFileColumn.Date) && IsLegacyDefaultSet(seen))
+        {
+            InsertDateAtDefaultPlace(result);
+        }
+        else if (IsPreviousDefaultColumnOrder(result))
+        {
+            return [.. Defaults];
         }
 
         return [.. result];
@@ -134,5 +146,102 @@ internal static class LibraryColumnFilter
         }
 
         return [.. result];
+    }
+
+    private static readonly LibraryFileColumn[][] PreviousDefaultOrders =
+    [
+        [
+            LibraryFileColumn.Name,
+            LibraryFileColumn.Title,
+            LibraryFileColumn.Album,
+            LibraryFileColumn.Artist,
+            LibraryFileColumn.Composer,
+            LibraryFileColumn.Duration,
+            LibraryFileColumn.Track,
+            LibraryFileColumn.Disc,
+            LibraryFileColumn.Year,
+            LibraryFileColumn.Genre,
+            LibraryFileColumn.Comment,
+            LibraryFileColumn.Date,
+        ],
+        [
+            LibraryFileColumn.Name,
+            LibraryFileColumn.Title,
+            LibraryFileColumn.Album,
+            LibraryFileColumn.Artist,
+            LibraryFileColumn.Composer,
+            LibraryFileColumn.Duration,
+            LibraryFileColumn.Track,
+            LibraryFileColumn.Disc,
+            LibraryFileColumn.Year,
+            LibraryFileColumn.Date,
+            LibraryFileColumn.Genre,
+            LibraryFileColumn.Comment,
+        ],
+    ];
+
+    private static bool IsLegacyDefaultSet(HashSet<LibraryFileColumn> seen)
+    {
+        if (seen.Count != Defaults.Length - 1)
+        {
+            return false;
+        }
+
+        foreach (var column in Defaults)
+        {
+            if (column != LibraryFileColumn.Date && !seen.Contains(column))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsPreviousDefaultColumnOrder(List<LibraryFileColumn> stored)
+    {
+        foreach (var previous in PreviousDefaultOrders)
+        {
+            if (stored.Count != previous.Length)
+            {
+                continue;
+            }
+
+            var match = true;
+            for (var i = 0; i < previous.Length; i++)
+            {
+                if (stored[i] != previous[i])
+                {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void InsertDateAtDefaultPlace(List<LibraryFileColumn> result)
+    {
+        var genre = result.IndexOf(LibraryFileColumn.Genre);
+        if (genre >= 0)
+        {
+            result.Insert(genre + 1, LibraryFileColumn.Date);
+            return;
+        }
+
+        var comment = result.IndexOf(LibraryFileColumn.Comment);
+        if (comment >= 0)
+        {
+            result.Insert(comment, LibraryFileColumn.Date);
+            return;
+        }
+
+        result.Add(LibraryFileColumn.Date);
     }
 }

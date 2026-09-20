@@ -21,6 +21,7 @@ public sealed class LibraryColumnFilterTests
         Assert.Contains(LibraryFileColumn.Composer, resolved);
         Assert.Contains(LibraryFileColumn.Duration, resolved);
         Assert.Contains(LibraryFileColumn.Comment, resolved);
+        Assert.Contains(LibraryFileColumn.Date, resolved);
         Assert.DoesNotContain(LibraryFileColumn.Jacket, resolved);
         Assert.DoesNotContain(LibraryFileColumn.Kind, resolved);
         Assert.DoesNotContain(LibraryFileColumn.AlbumArtist, resolved);
@@ -42,6 +43,7 @@ public sealed class LibraryColumnFilterTests
                 LibraryFileColumn.Disc,
                 LibraryFileColumn.Year,
                 LibraryFileColumn.Genre,
+                LibraryFileColumn.Date,
                 LibraryFileColumn.Comment,
             },
             LibraryColumnFilter.Defaults);
@@ -51,7 +53,7 @@ public sealed class LibraryColumnFilterTests
         Assert.Equal(
             [
                 "Name", "Title", "Album", "Artist", "Composer", "Duration", "Track", "Disc", "Year", "Genre",
-                "Comment",
+                "Date", "Comment",
             ],
             LibraryColumnFilter.Serialize(LibraryColumnFilter.Defaults));
     }
@@ -62,6 +64,71 @@ public sealed class LibraryColumnFilterTests
         var resolved = LibraryColumnFilter.Resolve(["Title", "BitRate", "Unknown"]);
         Assert.Equal(
             [LibraryFileColumn.Name, LibraryFileColumn.Title, LibraryFileColumn.BitRate],
+            resolved);
+    }
+
+    [Fact]
+    public void Resolve_LegacyDefaultsWithoutDate_AddsDate()
+    {
+        var resolved = LibraryColumnFilter.Resolve(
+            [
+                "Name", "Title", "Album", "Artist", "Composer", "Duration", "Track", "Disc", "Year", "Genre",
+                "Comment",
+            ]);
+        Assert.Equal(LibraryColumnFilter.Defaults, resolved);
+        Assert.Contains(LibraryFileColumn.Date, resolved);
+        Assert.True(Array.IndexOf(resolved, LibraryFileColumn.Genre)
+            < Array.IndexOf(resolved, LibraryFileColumn.Date));
+        Assert.True(Array.IndexOf(resolved, LibraryFileColumn.Date)
+            < Array.IndexOf(resolved, LibraryFileColumn.Comment));
+    }
+
+    [Fact]
+    public void Resolve_PreviousDefaultWithDateAfterComment_MovesDateBetweenGenreAndComment()
+    {
+        var resolved = LibraryColumnFilter.Resolve(
+            [
+                "Name", "Title", "Album", "Artist", "Composer", "Duration", "Track", "Disc", "Year", "Genre",
+                "Comment", "Date",
+            ]);
+        Assert.Equal(LibraryColumnFilter.Defaults, resolved);
+    }
+
+    [Fact]
+    public void Resolve_PreviousDefaultWithDateBeforeGenre_MovesDateBetweenGenreAndComment()
+    {
+        var resolved = LibraryColumnFilter.Resolve(
+            [
+                "Name", "Title", "Album", "Artist", "Composer", "Duration", "Track", "Disc", "Year", "Date",
+                "Genre", "Comment",
+            ]);
+        Assert.Equal(LibraryColumnFilter.Defaults, resolved);
+    }
+
+    [Fact]
+    public void Resolve_CustomOrder_KeepsDateWhereSaved()
+    {
+        var resolved = LibraryColumnFilter.Resolve(
+            [
+                "Name", "Title", "Album", "Artist", "Composer", "Duration", "Track", "Disc", "Year", "Genre",
+                "Comment", "Date", "Folder",
+            ]);
+        Assert.Equal(
+            [
+                LibraryFileColumn.Name,
+                LibraryFileColumn.Title,
+                LibraryFileColumn.Album,
+                LibraryFileColumn.Artist,
+                LibraryFileColumn.Composer,
+                LibraryFileColumn.Duration,
+                LibraryFileColumn.Track,
+                LibraryFileColumn.Disc,
+                LibraryFileColumn.Year,
+                LibraryFileColumn.Genre,
+                LibraryFileColumn.Comment,
+                LibraryFileColumn.Date,
+                LibraryFileColumn.Folder,
+            ],
             resolved);
     }
 

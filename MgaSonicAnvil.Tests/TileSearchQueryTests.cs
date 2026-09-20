@@ -32,6 +32,15 @@ public sealed class TileSearchQueryTests
     }
 
     [Fact]
+    public void MatchesAny_AndTerms_CanHitDifferentTexts()
+    {
+        var query = TileSearchQuery.Parse("beatles yesterday");
+        Assert.True(TileSearchQuery.MatchesAny(["The Beatles", "Yesterday"], query));
+        Assert.False(TileSearchQuery.MatchesAny(["The Beatles", "Help!"], query));
+        Assert.True(TileSearchQuery.MatchesAny(["yesterday beatles"], query));
+    }
+
+    [Fact]
     public void ShouldKeep_UnmatchedDirty()
     {
         Assert.True(TileSearchQuery.ShouldKeep(matches: true, isDirty: false));

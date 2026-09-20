@@ -95,6 +95,7 @@ public partial class MainWindow
             ApplyWaveformHeightScale();
         }
 
+        PrimaryWaveform.SeekAndSelectOnly = show;
         ForEachWaveform(view => view.SeekAndSelectOnly = show);
         TimeScrollStrip.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
         HistoryStrip.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
@@ -214,31 +215,68 @@ public partial class MainWindow
 
     /// <summary>
     /// プレイヤー退出。再生は先に止めてからクロームを戻し、そのあとフル PCM へ昇格する。
+    /// 133px 帯のままだとタイルが収まらず 1 本に落ちるので、レイアウト後に並べ直す。
     /// </summary>
     private async Task LeaveLibraryMaximizeAsync()
     {
-        var session = _activeSession;
+        var active = _activeSession;
         CancelLibraryPeakJobs();
         CancelLibraryGapless();
-        UpgradeLibraryPeaksForEditor();
-        if (session is null || !LibraryPlayerMode.NeedsEditorPcmUpgrade(session.Document))
+        if (active is not null)
         {
-            return;
+            active.PlayheadFrame = Waveform.PlayheadFrame;
+            active.Document.CursorFrame = Waveform.PlayheadFrame;
         }
-
-        session.PlayheadFrame = Waveform.PlayheadFrame;
-        session.Document.CursorFrame = Waveform.PlayheadFrame;
 
         // レイアウトと波形の初回描画を、フルデコードより先に通す。
         await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Loaded);
-        if (!ReferenceEquals(session, _activeSession)
-            || IsLibraryMaximized
-            || !LibraryPlayerMode.NeedsEditorPcmUpgrade(session.Document))
+        if (IsLibraryMaximized)
         {
             return;
         }
 
-        await EnsureLibrarySessionLoadedAsync(session).ConfigureAwait(true);
+        if (active is not null
+            && ReferenceEquals(active, _activeSession)
+            && LibraryPlayerMode.NeedsEditorPcmUpgrade(active.Document))
+        {
+            await EnsureLibrarySessionLoadedAsync(active).ConfigureAwait(true);
+            if (IsLibraryMaximized)
+            {
+                return;
+            }
+        }
+
+        ApplyPreferredMultiFileArrange(_sessions.Count);
+        await UpgradeKeptLibrarySessionsForEditorAsync(active).ConfigureAwait(true);
+        if (IsLibraryMaximized)
+        {
+            return;
+        }
+
+        UpgradeLibraryPeaksForEditor();
+        ForEachWaveform(view => view.Refresh());
+        Overview.Refresh();
+    }
+
+    /// <summary>選択して残したファイルを、表示中以外もフル PCM へ。タイルが空／1 レーンのまま残らない。</summary>
+    private async Task UpgradeKeptLibrarySessionsForEditorAsync(DocumentSession? active)
+    {
+        var sessions = _sessions.ToArray();
+        foreach (var session in sessions)
+        {
+            if (IsLibraryMaximized || !_sessions.Contains(session))
+            {
+                return;
+            }
+
+            if (ReferenceEquals(session, active)
+                || !LibraryPlayerMode.NeedsEditorPcmUpgrade(session.Document))
+            {
+                continue;
+            }
+
+            await EnsureLibrarySessionLoadedAsync(session, bind: false).ConfigureAwait(true);
+        }
     }
 
     private void CancelLibraryPeakJobs()
@@ -464,9 +502,9 @@ public partial class MainWindow
         }
 
         ApplyLibraryHandoffSelection(keep, current);
-        if (clean.Count > 0)
+        if (_tileMode)
         {
-            NotifyWaveformSessionsChanged();
+            DropStaleTilePanes();
         }
 
         return true;
@@ -1215,9 +1253,9 @@ public partial class MainWindow
         }
     }
 
-    private Task EnsureLibrarySessionLoadedAsync(DocumentSession session)
+    private Task EnsureLibrarySessionLoadedAsync(DocumentSession session, bool bind = true)
     {
-        if (IsPlaybackActive() && !ReferenceEquals(session, _activeSession))
+        if (bind && IsPlaybackActive() && !ReferenceEquals(session, _activeSession))
         {
             StopPlayback();
         }
@@ -1242,7 +1280,7 @@ public partial class MainWindow
         // エディタ復帰時はストリームをフル PCM に昇格する。
         if (session.Document.IsStreamPlayback)
         {
-            return LoadDeferredLibrarySessionAsync(session, gen);
+            return LoadDeferredLibrarySessionAsync(session, gen, bind);
         }
 
         if (!session.Document.IsDeferredLoad)
@@ -1250,7 +1288,7 @@ public partial class MainWindow
             return Task.CompletedTask;
         }
 
-        return LoadDeferredLibrarySessionAsync(session, gen);
+        return LoadDeferredLibrarySessionAsync(session, gen, bind);
     }
 
     private async Task ActivateStreamLibrarySessionAsync(DocumentSession session, int generation)
@@ -1277,7 +1315,7 @@ public partial class MainWindow
             if (!ok)
             {
                 // ストリーム不可なら従来どおりフル展開。
-                await LoadDeferredLibrarySessionAsync(session, generation).ConfigureAwait(true);
+                await LoadDeferredLibrarySessionAsync(session, generation, bind: true).ConfigureAwait(true);
                 return;
             }
         }
@@ -1309,7 +1347,7 @@ public partial class MainWindow
         }
     }
 
-    private async Task LoadDeferredLibrarySessionAsync(DocumentSession session, int generation)
+    private async Task LoadDeferredLibrarySessionAsync(DocumentSession session, int generation, bool bind = true)
     {
         var path = session.Document.SourcePath;
         if (string.IsNullOrWhiteSpace(path))
@@ -1363,10 +1401,13 @@ public partial class MainWindow
 
         if (generation != _libraryLoadGeneration || !ReferenceEquals(session, _libraryLoadSession))
         {
-            return;
+            if (bind || !_sessions.Contains(session))
+            {
+                return;
+            }
         }
 
-        ApplyLoadedLibrarySession(session);
+        ApplyLoadedLibrarySession(session, bind);
         _ = FillLibraryPeaksAsync(session);
     }
 
@@ -1381,9 +1422,8 @@ public partial class MainWindow
         var display = IsLibraryMaximized;
         TrimUnwantedLibraryPeakJobs();
         // 途中スナップショット（未走査は 0）が残っている間は、完成までやり直す。
-        if (!document.Peaks.IsEmpty
-            && !document.Peaks.IsBuilding
-            && (display || !document.Peaks.NeedsEditorDetail))
+        // プレイヤー包絡（1ch）をエディタで使い続けるとレーンが 1 本のまま。
+        if (LibraryPlayerMode.CanReusePeaks(display, document))
         {
             // エディタで作り終えたピークは作り直さない。ただし表示中の波形はプレイヤー帯で描き直す。
             if (display && ReferenceEquals(_activeSession, session))
@@ -1391,6 +1431,11 @@ public partial class MainWindow
                 Waveform.Refresh();
             }
 
+            return;
+        }
+
+        if (!display && document.IsStreamPlayback)
+        {
             return;
         }
 
@@ -1521,26 +1566,40 @@ public partial class MainWindow
         }
 
         document.ReplacePeaks(peaks);
-        if (!ReferenceEquals(_activeSession, session))
+        RefreshLibrarySessionWaveform(session, throttlePaint);
+        return true;
+    }
+
+    private void RefreshLibrarySessionWaveform(DocumentSession session, bool throttlePaint)
+    {
+        WaveformView? view = null;
+        if (FindTilePane(session) is { } pane)
         {
-            return true;
+            view = pane.View;
+        }
+        else if (ReferenceEquals(_activeSession, session))
+        {
+            view = Waveform;
+        }
+
+        if (view is null)
+        {
+            return;
         }
 
         if (throttlePaint)
         {
-            Waveform.RefreshThrottled();
+            view.RefreshThrottled();
         }
         else
         {
-            Waveform.Refresh();
+            view.Refresh();
         }
 
-        if (!IsLibraryMaximized)
+        if (!IsLibraryMaximized && ReferenceEquals(_activeSession, session))
         {
             Overview.Refresh();
         }
-
-        return true;
     }
 
     private static bool IsNewerLibraryPeaks(PeakPyramid current, PeakPyramid incoming)
@@ -1560,8 +1619,14 @@ public partial class MainWindow
         return incoming.FilledFrames >= current.FilledFrames;
     }
 
-    private void ApplyLoadedLibrarySession(DocumentSession session)
+    private void ApplyLoadedLibrarySession(DocumentSession session, bool bind = true)
     {
+        if (!bind)
+        {
+            ApplyBackgroundLibrarySession(session);
+            return;
+        }
+
         var needsBind = !ReferenceEquals(session, _activeSession)
             || _tileActiveView is not null
             || !ReferenceEquals(Waveform.Document, session.Document);
@@ -1580,6 +1645,22 @@ public partial class MainWindow
         if (needsBind)
         {
             BindWorkspace(session);
+        }
+    }
+
+    /// <summary>非表示タブ／タイルをフル PCM に差し替える。アクティブへ切り替えない。</summary>
+    private void ApplyBackgroundLibrarySession(DocumentSession session)
+    {
+        if (FindTilePane(session) is { } pane)
+        {
+            ApplySessionToView(pane.View, session, applyAnalysis: false);
+            pane.View.Refresh();
+            RefreshTileChrome();
+        }
+
+        if (IsLibraryMaximized)
+        {
+            LibraryBrowser.UpdateSessionRow(session);
         }
     }
 
@@ -1733,6 +1814,7 @@ public partial class MainWindow
     /// <summary>
     /// フォルダ配下を再帰収集し、1 曲ずつ載せる。
     /// 再生するのは Enter（クリア後）だけ。Shift+Enter・ダブルクリック・追加メニューは再生も停止もしない。
+    /// 検索中は見えているフォルダだけ。ファイル名ヒットはそのファイル、フォルダ名ヒットは配下すべて。
     /// </summary>
     private async Task OpenLibraryFoldersRecursiveAsync(IReadOnlyList<string> folders)
     {
@@ -1740,12 +1822,13 @@ public partial class MainWindow
         _libraryExplorerPlayOnOpen = false;
         var generation = ++_libraryFolderShowGeneration;
         _libraryFolderPlaySession = null;
-        var remaining = new Stack<string>();
+        var walk = LibraryBrowser.SnapshotExplorerPlaylistWalk();
+        var remaining = new Stack<(string Path, bool AncestorHit)>();
         for (var i = folders.Count - 1; i >= 0; i--)
         {
             try
             {
-                remaining.Push(Path.GetFullPath(folders[i]));
+                remaining.Push((Path.GetFullPath(folders[i]), false));
             }
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
             {
@@ -1780,8 +1863,27 @@ public partial class MainWindow
                 var current = remaining.Pop();
                 var layer = await Task.Run(() =>
                 {
-                    AudioCodec.CollectPlayerOpenableDirectoryLayer(current, out var files, out var children);
-                    return (files, children);
+                    var folderHit = walk.FolderNameHit(current.Path, current.AncestorHit);
+                    AudioCodec.CollectPlayerOpenableDirectoryLayer(current.Path, out var files, out var children);
+                    var included = new List<string>();
+                    foreach (var file in files)
+                    {
+                        if (walk.IncludeFile(file, folderHit))
+                        {
+                            included.Add(file);
+                        }
+                    }
+
+                    var next = new List<(string Path, bool AncestorHit)>();
+                    foreach (var child in children)
+                    {
+                        if (walk.IncludeChild(child, folderHit))
+                        {
+                            next.Add((child, folderHit));
+                        }
+                    }
+
+                    return (files: included.ToArray(), children: next.ToArray());
                 }).ConfigureAwait(true);
 
                 if (generation != _libraryFolderShowGeneration)

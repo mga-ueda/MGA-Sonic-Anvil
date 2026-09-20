@@ -24,7 +24,13 @@ internal static class TileSearchQuery
         return groups;
     }
 
-    public static bool Matches(string displayName, IReadOnlyList<string[]> groups)
+    public static bool Matches(string displayName, IReadOnlyList<string[]> groups) =>
+        MatchesAny([displayName], groups);
+
+    /// <summary>
+    /// AND 語はどれかの文字列に含まれればよい（列をまたいでよい）。OR グループはどれか一つ。
+    /// </summary>
+    public static bool MatchesAny(IEnumerable<string> texts, IReadOnlyList<string[]> groups)
     {
         if (groups.Count == 0)
         {
@@ -36,7 +42,17 @@ internal static class TileSearchQuery
             var all = true;
             foreach (var term in terms)
             {
-                if (!displayName.Contains(term, StringComparison.OrdinalIgnoreCase))
+                var hit = false;
+                foreach (var text in texts)
+                {
+                    if (text.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    {
+                        hit = true;
+                        break;
+                    }
+                }
+
+                if (!hit)
                 {
                     all = false;
                     break;

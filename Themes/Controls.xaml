@@ -619,6 +619,53 @@
         </Setter>
     </Style>
 
+    <!-- プレイヤーの検索。グループコンボと同じ透かし塗り。文字とキャレットは不透明。 -->
+    <Style x:Key="LibrarySearchBoxStyle" TargetType="TextBox" BasedOn="{StaticResource DarkTextBoxStyle}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="6,0,6,0" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="MinHeight" Value="{x:Static ui:DesignMetrics.AudioInputHeight}" />
+        <Setter Property="Height" Value="{x:Static ui:DesignMetrics.AudioInputHeight}" />
+        <Setter Property="MaxHeight" Value="{x:Static ui:DesignMetrics.AudioInputHeight}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="CaretBrush" Value="{DynamicResource AccentCyanBrush}" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource AccentCyanBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Grid SnapsToDevicePixels="True">
+                        <Border x:Name="Fill"
+                                Background="{DynamicResource PlayerComboFillBrush}"
+                                BorderBrush="{DynamicResource PlayerComboFillBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                IsHitTestVisible="False" />
+                        <Border Background="Transparent" BorderThickness="0">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Fill" Property="Background" Value="{DynamicResource PlayerComboHoverFillBrush}" />
+                            <Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource ControlHoverBorderBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Fill" Property="Background" Value="{DynamicResource PlayerComboHoverFillBrush}" />
+                            <Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource ControlHoverBorderBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource ChromeDimBrush}" />
+                            <Setter TargetName="Fill" Property="Background" Value="{DynamicResource PlayerComboDisabledFillBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ステータスのスピーカー。地は時刻欄の色設定に従う。 -->
     <Style x:Key="StatusTimecodeComboStyle" TargetType="ComboBox" BasedOn="{StaticResource LibraryComboBoxStyle}">
         <Setter Property="Background" Value="{DynamicResource StatusTimecodeFillBrush}" />

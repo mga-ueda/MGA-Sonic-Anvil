@@ -147,6 +147,7 @@ internal sealed class WaveformView : Grid
     private long _waveLiveFrames;
     private long _waveLivePeakFrames;
     private long _wavePeakFilled;
+    private int _wavePeakChannels;
     private SpectrogramViewMode _spectrogramMode;
     private readonly SpectrogramRenderer _spectrogram = new();
     private readonly SpectrogramBoostBar _boostBar = new();
@@ -2299,7 +2300,8 @@ internal sealed class WaveformView : Grid
             && _waveLiveRecording == _liveRecording
             && _waveLiveFrames == (_document?.FrameCount ?? 0)
             && _waveLivePeakFrames == (_document?.Peaks.FrameCount ?? 0)
-            && _wavePeakFilled == (_document?.Peaks.FilledFrames ?? 0))
+            && _wavePeakFilled == (_document?.Peaks.FilledFrames ?? 0)
+            && _wavePeakChannels == (_document?.Peaks.Channels ?? 0))
         {
             return;
         }
@@ -2316,6 +2318,7 @@ internal sealed class WaveformView : Grid
             && _waveMode == _spectrogramMode
             && _waveSeekOnly == SeekAndSelectOnly
             && _wavePeakFilled == (_document?.Peaks.FilledFrames ?? 0)
+            && _wavePeakChannels == (_document?.Peaks.Channels ?? 0)
             && (TryShiftWaveform(quantStart, bmpSpan, bmpWidth, height, scaleX, scaleY)
                 || TryPaintLiveTail(quantStart, bmpSpan, bmpWidth, height, scaleX, scaleY));
         if (!reused)
@@ -2343,6 +2346,7 @@ internal sealed class WaveformView : Grid
         _waveLiveFrames = _document?.FrameCount ?? 0;
         _waveLivePeakFrames = _document?.Peaks.FrameCount ?? 0;
         _wavePeakFilled = _document?.Peaks.FilledFrames ?? 0;
+        _wavePeakChannels = _document?.Peaks.Channels ?? 0;
         _waveDirty = false;
         // 解析表示から戻った直後は、オーバーレイ層が先に描いて古い反転を残すことがある。
         // 波形を今のモードで作り直したあと、選択を載せ直す。
@@ -2765,24 +2769,43 @@ internal sealed class WaveformView : Grid
         var overlay = _spectrogramMode == SpectrogramViewMode.Overlay;
         var loudness = LoudnessVisible;
         var monoWave = overlay || loudness || SeekAndSelectOnly;
+        var hasPcm = !document.IsDeferredLoad
+            && !document.IsStreamPlayback
+            && document.SampleCount >= sourceChannels;
         var peakChannels = document.Peaks.IsEmpty
             ? sourceChannels
             : Math.Max(1, document.Peaks.Channels);
-        var drawChannels = monoWave ? 1 : sourceChannels;
-        var laneGap = !monoWave && drawChannels > 1 ? 4d * scaleY : 0d;
-        ResolveWaveLane(overlay, height, drawChannels, laneGap, _ampZoom, out var laneHeight, out var laneOrigin, out var ampHeight);
+        var peaksMatchLanes = document.Peaks.IsEmpty
+            ? hasPcm
+            : peakChannels == sourceChannels;
         x0 = Math.Clamp(x0, 0, width);
         x1 = Math.Clamp(x1, x0, width);
         var startFrame = Math.Clamp((long)Math.Floor(start), 0, drawable);
         var endFrame = Math.Clamp((long)Math.Ceiling(start + span), startFrame, drawable);
         var rangeFrames = endFrame - startFrame;
-        if (rangeFrames <= 0 || laneHeight < 1 || x1 <= x0)
+        if (rangeFrames <= 0 || x1 <= x0)
         {
             return;
         }
 
-        var usePolyline = !SeekAndSelectOnly && IsPolylineZoom(rangeFrames, width);
-        var useRawColumns = !SeekAndSelectOnly && !usePolyline && rangeFrames <= RawColumnBudget(width);
+        var usePolyline = !SeekAndSelectOnly && hasPcm && IsPolylineZoom(rangeFrames, width);
+        var useRawColumns = !SeekAndSelectOnly
+            && hasPcm
+            && !usePolyline
+            && rangeFrames <= RawColumnBudget(width);
+        var canSplitLanes = peaksMatchLanes || usePolyline || useRawColumns;
+        var drawChannels = monoWave ? 1 : (canSplitLanes ? sourceChannels : peakChannels);
+        if (!monoWave && (usePolyline || useRawColumns))
+        {
+            peakChannels = sourceChannels;
+        }
+
+        var laneGap = !monoWave && drawChannels > 1 ? 4d * scaleY : 0d;
+        ResolveWaveLane(overlay, height, drawChannels, laneGap, _ampZoom, out var laneHeight, out var laneOrigin, out var ampHeight);
+        if (laneHeight < 1)
+        {
+            return;
+        }
         if (loudness)
         {
             RasterLoudnessDbWaveform(

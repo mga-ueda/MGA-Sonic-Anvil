@@ -94,4 +94,13 @@ public sealed class DurationFormatTests
         Assert.Equal("1.05 MB (1.00 MiB / 1,048,576 B)", UiStrings.FormatFileBytes(1024 * 1024));
     }
 
+    [Fact]
+    public void FormatFileDate_CompactLocalStamp()
+    {
+        Assert.Equal(string.Empty, UiStrings.FormatFileDate(null));
+        Assert.Equal(string.Empty, UiStrings.FormatFileDate(DateTime.MinValue));
+        Assert.Equal(
+            "2026/09/20 23:12",
+            UiStrings.FormatFileDate(new DateTime(2026, 9, 20, 23, 12, 45)));
+    }
 }

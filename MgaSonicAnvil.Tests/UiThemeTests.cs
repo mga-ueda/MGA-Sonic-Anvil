@@ -154,6 +154,24 @@ public sealed class UiThemeTests
             > RelativeLuma(System.Windows.Media.Color.FromRgb(0x5A, 0x5A, 0x5F)));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PlayerComboFill_KeepsSearchTextReadable(bool light)
+    {
+        var theme = light ? UiTheme.Light : UiTheme.Dark;
+        var surface = theme == UiTheme.Light
+            ? UiThemePalette.ColorFor(theme, "SurfaceBackBrush")
+            : System.Windows.Media.Color.FromRgb(0x1E, 0x1E, 0x1E);
+        var fill = Composite(UiThemePalette.ColorFor(theme, "PlayerComboFillBrush"), surface);
+        var hover = Composite(UiThemePalette.ColorFor(theme, "PlayerComboHoverFillBrush"), surface);
+        var fore = UiThemePalette.ColorFor(theme, "PrimaryForeBrush");
+        var muted = UiThemePalette.ColorFor(theme, "MutedForeBrush");
+        Assert.True(Contrast(fore, fill) >= 4.5, $"{theme} typed on fill");
+        Assert.True(Contrast(fore, hover) >= 4.5, $"{theme} typed on hover");
+        Assert.True(Contrast(muted, fill) >= 3, $"{theme} hint on fill");
+    }
+
     [Fact]
     public void LightPalette_KeepsBrighterAsEnabled()
     {

@@ -140,6 +140,8 @@ public sealed class PeakPyramidTests
         var shortPeaks = PeakPyramid.BuildDisplay(shortSamples, 1, shortSamples.Length);
         Assert.Equal(1, shortPeaks.BaseBucketFrames);
         Assert.False(shortPeaks.NeedsEditorDetail);
+        Assert.False(shortPeaks.NeedsEditorRebuild(1));
+        Assert.True(shortPeaks.NeedsEditorRebuild(2));
 
         var longFrames = PeakPyramid.DisplayBaseBuckets * 8;
         var longSamples = new float[longFrames];
@@ -177,6 +179,15 @@ public sealed class PeakPyramidTests
         Assert.False(peaks.IsBuilding);
         Assert.True(peaks.BaseBucketFrames >= 4);
         Assert.True(peaks.NeedsEditorDetail);
+        Assert.True(peaks.NeedsEditorRebuild(2));
+        Assert.True(peaks.NeedsEditorRebuild(1));
+
+        var shortStereo = new float[128];
+        var shortPeaks = PeakPyramid.BuildPlayerDisplay(shortStereo, 2, shortStereo.Length);
+        Assert.Equal(1, shortPeaks.Channels);
+        Assert.False(shortPeaks.NeedsEditorDetail);
+        Assert.True(shortPeaks.NeedsEditorRebuild(2));
+        Assert.False(shortPeaks.NeedsEditorRebuild(1));
 
         var mins = new float[128];
         var maxs = new float[128];

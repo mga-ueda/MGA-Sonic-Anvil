@@ -107,6 +107,25 @@ public sealed class LibraryFileListTests
     }
 
     [Fact]
+    public void Sort_Date_UsesTicksNotText()
+    {
+        var early = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Local);
+        var mid = new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Local);
+        var late = new DateTime(2026, 9, 20, 23, 12, 0, DateTimeKind.Local);
+        var rows = new[]
+        {
+            Row("b.wav", date: late),
+            Row("a.wav", date: early),
+            Row("c.wav", date: mid),
+        };
+        var sorted = LibraryFileList.Sort(rows, LibraryFileColumn.Date, LibrarySortDirection.Ascending);
+        Assert.Equal(["a.wav", "c.wav", "b.wav"], sorted.Select(row => row.Name).ToArray());
+
+        sorted = LibraryFileList.Sort(rows, LibraryFileColumn.Date, LibrarySortDirection.Descending);
+        Assert.Equal(["b.wav", "c.wav", "a.wav"], sorted.Select(row => row.Name).ToArray());
+    }
+
+    [Fact]
     public void GroupLabel_BlankTitle_UsesPlaceholder()
     {
         var previous = UiStrings.Language;
@@ -150,7 +169,8 @@ public sealed class LibraryFileListTests
         int rate = 48000,
         string folder = "",
         bool artwork = false,
-        string title = "") =>
+        string title = "",
+        DateTime date = default) =>
         new()
         {
             Name = name,
@@ -166,6 +186,8 @@ public sealed class LibraryFileListTests
             ChannelsText = UiStrings.FormatChannels(2),
             FileBytes = 1000,
             SizeText = "1.0 KB",
+            FileDate = date,
+            DateText = UiStrings.FormatFileDate(date),
             Folder = folder,
             HasArtwork = artwork,
             JacketText = artwork ? UiStrings.LibraryJacketMark : string.Empty,

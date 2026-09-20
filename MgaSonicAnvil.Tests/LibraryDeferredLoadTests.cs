@@ -131,6 +131,9 @@ public sealed class LibraryDeferredLoadTests
             Assert.Equal(string.Empty, row.ChannelsText);
             Assert.Equal(2048, row.FileBytes);
             Assert.Equal(Path.GetDirectoryName(path), row.Folder);
+            Assert.True(session.Document.FileLastWriteTime.HasValue);
+            Assert.Equal(session.Document.FileLastWriteTime.Value, row.FileDate);
+            Assert.False(string.IsNullOrEmpty(row.DateText));
         }
         finally
         {

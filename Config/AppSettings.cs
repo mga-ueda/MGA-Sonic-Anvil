@@ -83,7 +83,7 @@ internal sealed class AppSettings
     /// <summary>「開く」で最後に選んだフォルダ。書き出し先とは別。</summary>
     public string LastOpenFolder { get; set; } = string.Empty;
 
-    /// <summary>書き出し（タブ / MP3 として保存）で最後に選んだフォルダ。開くとは別。</summary>
+    /// <summary>保存／書き出しで最後に選んだフォルダ。開くとは別。</summary>
     public string LastExportFolder { get; set; } = string.Empty;
 
     /// <summary>ラウドネスメーターのターゲット（LKFS）。既定 -24。</summary>

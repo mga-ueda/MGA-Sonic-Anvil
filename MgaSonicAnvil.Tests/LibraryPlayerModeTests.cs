@@ -88,6 +88,8 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.A, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.A, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.A, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.F, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.AllowsKey(Key.F, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.V, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.LeftShift, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.F4, ModifierKeys.Alt));
@@ -172,6 +174,10 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsPaneCycleKey(Key.Tab, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsPaneCycleKey(Key.Tab, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.IsPaneCycleKey(Key.Tab, ModifierKeys.Control));
+        Assert.Equal(LibraryPane.Explorer, LibraryPlayerMode.SearchPane(LibraryPane.Explorer));
+        Assert.Equal(LibraryPane.Explorer, LibraryPlayerMode.SearchPane(LibraryPane.Favorites));
+        Assert.Equal(LibraryPane.List, LibraryPlayerMode.SearchPane(LibraryPane.List));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F, ModifierKeys.Control));
     }
 
     [Fact]
@@ -211,6 +217,29 @@ public sealed class LibraryPlayerModeTests
         var pcm = new AudioDocument([], 48000, 1, 16, AudioFileKind.Wave, "a.wav");
         Assert.False(LibraryPlayerMode.NeedsEditorPcmUpgrade(pcm));
         Assert.True(LibraryPlayerMode.NeedsEditorPeakUpgrade(pcm));
+        Assert.False(LibraryPlayerMode.CanReusePeaks(playerMode: false, pcm));
+        Assert.False(LibraryPlayerMode.CanReusePeaks(playerMode: true, pcm));
+    }
+
+    [Fact]
+    public void NeedsEditorPeakUpgrade_RebuildsPlayerMonoEnvelope()
+    {
+        var samples = new float[400];
+        samples[2] = 0.9f;
+        samples[3] = -0.4f;
+        var pcm = new AudioDocument(samples, 48000, 2, 16, AudioFileKind.Wave, "a.wav");
+        Assert.False(LibraryPlayerMode.NeedsEditorPcmUpgrade(pcm));
+        Assert.False(pcm.Peaks.NeedsEditorRebuild(pcm.Channels));
+        Assert.False(LibraryPlayerMode.NeedsEditorPeakUpgrade(pcm));
+        Assert.True(LibraryPlayerMode.CanReusePeaks(playerMode: false, pcm));
+
+        pcm.ReplacePeaks(PeakPyramid.BuildPlayerDisplay(samples, 2, samples.Length));
+        Assert.Equal(1, pcm.Peaks.Channels);
+        Assert.False(pcm.Peaks.NeedsEditorDetail);
+        Assert.True(pcm.Peaks.NeedsEditorRebuild(pcm.Channels));
+        Assert.True(LibraryPlayerMode.NeedsEditorPeakUpgrade(pcm));
+        Assert.True(LibraryPlayerMode.CanReusePeaks(playerMode: true, pcm));
+        Assert.False(LibraryPlayerMode.CanReusePeaks(playerMode: false, pcm));
     }
 
     [Fact]

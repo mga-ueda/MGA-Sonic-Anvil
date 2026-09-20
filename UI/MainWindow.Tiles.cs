@@ -581,7 +581,7 @@ public partial class MainWindow
 
     private void NotifyWaveformSessionsChanged()
     {
-        if (!_tileMode)
+        if (!_tileMode || IsLibraryMaximized)
         {
             return;
         }

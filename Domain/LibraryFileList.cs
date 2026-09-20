@@ -20,6 +20,7 @@ internal enum LibraryFileColumn
     Channels,
     BitRate,
     Size,
+    Date,
     Folder,
     Jacket,
 }
@@ -103,6 +104,10 @@ internal sealed class LibraryFileRow
     public long FileBytes { get; init; }
 
     public string SizeText { get; init; } = string.Empty;
+
+    public DateTime FileDate { get; init; }
+
+    public string DateText { get; init; } = string.Empty;
 
     public string Folder { get; init; } = string.Empty;
 
@@ -195,6 +200,7 @@ internal static class LibraryFileList
         && left.ChannelsText == right.ChannelsText
         && left.BitRateText == right.BitRateText
         && left.SizeText == right.SizeText
+        && left.DateText == right.DateText
         && left.Folder == right.Folder
         && left.JacketText == right.JacketText
         && left.GroupKey == right.GroupKey;
@@ -225,6 +231,7 @@ internal static class LibraryFileList
             LibraryFileColumn.Channels => left.Channels.CompareTo(right.Channels),
             LibraryFileColumn.BitRate => left.BitRateKbps.CompareTo(right.BitRateKbps),
             LibraryFileColumn.Size => left.FileBytes.CompareTo(right.FileBytes),
+            LibraryFileColumn.Date => left.FileDate.CompareTo(right.FileDate),
             LibraryFileColumn.Folder => string.Compare(left.Folder, right.Folder, StringComparison.CurrentCultureIgnoreCase),
             LibraryFileColumn.Jacket => left.HasArtwork.CompareTo(right.HasArtwork),
             _ => string.Compare(left.Name, right.Name, StringComparison.CurrentCultureIgnoreCase),

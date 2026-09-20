@@ -345,12 +345,12 @@ public partial class MainWindow
         return true;
     }
 
-    private bool TryPickExportFolder(IReadOnlyList<DocumentSession> sessions, out string folder)
+    private bool TryPickExportFolder(IReadOnlyList<DocumentSession> sessions, out string folder, string? title = null)
     {
         folder = string.Empty;
         var folderDialog = new OpenFolderDialog
         {
-            Title = UiStrings.ExportFolderTitle,
+            Title = title ?? UiStrings.ExportFolderTitle,
             InitialDirectory = ResolveExportInitialDirectory(sessions[0]),
         };
         if (folderDialog.ShowDialog(this) != true)

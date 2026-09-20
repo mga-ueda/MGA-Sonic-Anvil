@@ -252,6 +252,12 @@ public partial class MainWindow
         }
 
         // タイル検索。Ctrl+F で開き、ボックス内では Enter / Alt+Enter / Esc を拾う。
+        // プレイヤーではライブラリ／プレイリスト検索が Ctrl+F を使う。
+        if (IsLibraryMaximized && TryProcessLibrarySearchKey(key, modifiers))
+        {
+            return true;
+        }
+
         if (TryProcessTileSearchKey(key, modifiers))
         {
             return true;
@@ -287,6 +293,11 @@ public partial class MainWindow
             }
 
             return true;
+        }
+
+        if (IsLibraryMaximized && LibraryBrowser.IsSearchFocused)
+        {
+            return false;
         }
 
         if (IsLibraryMaximized && TryHandleLibraryPlayerNumpad(key, modifiers, isRepeat))
@@ -1577,6 +1588,38 @@ public partial class MainWindow
     private static bool IsLibraryPaneCycleShortcut(Key key, ModifierKeys modifiers) =>
         LibraryPlayerMode.IsPaneCycleKey(key, modifiers)
         || (modifiers == ModifierKeys.None && key is Key.F1 or Key.F2 or Key.F3);
+
+    /// <summary>
+    /// プレイヤーのライブラリ／プレイリスト検索。Ctrl+F でフォーカス中のペインの検索へ。
+    /// Enter で決定してツリーまたはリストへ戻る。Esc は未確定の入力を捨てる。
+    /// </summary>
+    private bool TryProcessLibrarySearchKey(Key key, ModifierKeys modifiers)
+    {
+        if (key == Key.F && modifiers == ModifierKeys.Control)
+        {
+            LibraryBrowser.FocusPaneSearch(LibraryBrowser.ActivePane);
+            return true;
+        }
+
+        if (!LibraryBrowser.IsSearchFocused || ImeComposition.IsComposing)
+        {
+            return false;
+        }
+
+        if (key == Key.Enter && modifiers == ModifierKeys.None)
+        {
+            LibraryBrowser.CommitSearchFocus();
+            return true;
+        }
+
+        if (key == Key.Escape && modifiers == ModifierKeys.None)
+        {
+            LibraryBrowser.CancelSearchFocus();
+            return true;
+        }
+
+        return false;
+    }
 
     private bool TryHandleLibraryPlayerNumpad(Key key, ModifierKeys modifiers, bool isRepeat)
     {

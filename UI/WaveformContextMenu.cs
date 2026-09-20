@@ -543,8 +543,8 @@ internal static class WaveformContextMenuBuilder
     [
         Cmd(UiStrings.WaveMenuNew, WaveMenuCommand.NewDocument, "Ctrl+N", !m.IsBusy && !m.LibraryMaximized),
         Cmd(UiStrings.WaveMenuOpen, WaveMenuCommand.Open, "Ctrl+O", !m.IsBusy),
-        Cmd(UiStrings.WaveMenuSave, WaveMenuCommand.Save, "Ctrl+S", m.HasDocument && !m.IsBusy && !m.IsRecording),
-        Cmd(UiStrings.WaveMenuSaveAs, WaveMenuCommand.SaveAs, "Ctrl+Shift+S", m.HasDocument && !m.IsBusy && !m.IsRecording),
+        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuSaveSelected : UiStrings.WaveMenuSave, WaveMenuCommand.Save, "Ctrl+S", m.HasDocument && !m.IsBusy && !m.IsRecording),
+        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuSaveAsSelected : UiStrings.WaveMenuSaveAs, WaveMenuCommand.SaveAs, "Ctrl+Shift+S", m.HasDocument && !m.IsBusy && !m.IsRecording),
         Cmd(UiStrings.WaveMenuSaveMp3, WaveMenuCommand.SaveMp3, "Ctrl+Shift+M", m.HasDocument && !m.IsBusy && !m.IsRecording),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuRenameFile, WaveMenuCommand.RenameFile, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),

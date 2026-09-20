@@ -47,6 +47,26 @@ public sealed class WaveformContextMenuTests
     }
 
     [Fact]
+    public void FileSave_UsesSelectedLabels()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            var single = WaveformContextMenuBuilder.Build(WaveformContextMenuModel.AllEnabledForTests());
+            Assert.Equal(UiStrings.WaveMenuSave, Find(single, WaveMenuCommand.Save)?.Header);
+            Assert.Equal(UiStrings.WaveMenuSaveAs, Find(single, WaveMenuCommand.SaveAs)?.Header);
+            var selected = WaveformContextMenuBuilder.Build(WaveformContextMenuModel.AllEnabledForTests(hasSelectedTabs: true));
+            Assert.Equal(UiStrings.WaveMenuSaveSelected, Find(selected, WaveMenuCommand.Save)?.Header);
+            Assert.Equal(UiStrings.WaveMenuSaveAsSelected, Find(selected, WaveMenuCommand.SaveAs)?.Header);
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
     public void Build_IncludesCategoriesAndCoreCommands()
     {
         var previous = UiStrings.Language;

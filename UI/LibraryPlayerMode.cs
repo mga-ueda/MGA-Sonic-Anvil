@@ -133,6 +133,7 @@ internal static class LibraryPlayerMode
             (Key.Enter, ModifierKeys.None or ModifierKeys.Alt) => true,
             (Key.L, ModifierKeys.None) => true,
             (Key.A, ModifierKeys.Control) => true,
+            (Key.F, ModifierKeys.Control) => true,
             (Key.S, ModifierKeys.Alt) => true,
             (Key.O, ModifierKeys.Control) => true,
             (Key.O, ModifierKeys.Control | ModifierKeys.Shift) => true,
@@ -303,10 +304,24 @@ internal static class LibraryPlayerMode
         document.IsDeferredLoad || document.IsStreamPlayback;
 
     /// <summary>
+    /// プレイヤーの完成ピークをそのまま出してよいか。エディタではチャンネル数と粒度が要る。
+    /// </summary>
+    public static bool CanReusePeaks(bool playerMode, AudioDocument document)
+    {
+        if (document.Peaks.IsEmpty || document.Peaks.IsBuilding)
+        {
+            return false;
+        }
+
+        return playerMode || !document.Peaks.NeedsEditorRebuild(document.Channels);
+    }
+
+    /// <summary>
     /// 既に PCM があるファイルだけピークを作り直す。ストリームはフル Load が兼ねる。
+    /// プレイヤー包絡（モノラル）のままだと、エディタでレーンが 1 本しか出ない。
     /// </summary>
     public static bool NeedsEditorPeakUpgrade(AudioDocument document) =>
-        !NeedsEditorPcmUpgrade(document);
+        !NeedsEditorPcmUpgrade(document) && !CanReusePeaks(playerMode: false, document);
 
     /// <summary>プレイヤーに入ったときに選んで再生する先頭のファイル。</summary>
     public static DocumentSession? FirstSession(IReadOnlyList<DocumentSession> sessions) =>
@@ -466,6 +481,12 @@ internal static class LibraryPlayerMode
 
     public static bool IsPaneCycleKey(Key key, ModifierKeys modifiers) =>
         key == Key.Tab && modifiers is ModifierKeys.None or ModifierKeys.Shift;
+
+    /// <summary>
+    /// Ctrl+F の行き先。プレイリストならリスト検索、ツリー／お気に入りはライブラリ検索。
+    /// </summary>
+    public static LibraryPane SearchPane(LibraryPane current) =>
+        current == LibraryPane.List ? LibraryPane.List : LibraryPane.Explorer;
 
     /// <summary>Tab：ツリー → お気に入り → プレイリスト → ツリー。Shift+Tab は逆。</summary>
     public static LibraryPane NextPane(LibraryPane current, bool reverse) =>

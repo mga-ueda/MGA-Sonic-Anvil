@@ -113,6 +113,17 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly ComboBox _groupCombo = new();
     private readonly TextBlock _playlistLabel = new();
     private readonly TextBlock _groupLabel = new();
+    private readonly TextBox _explorerSearchBox = new();
+    private readonly TextBlock _explorerSearchHint = new();
+    private readonly TextBox _playlistSearchBox = new();
+    private readonly TextBlock _playlistSearchHint = new();
+    private readonly List<string[]> _playlistSearchGroups = [];
+    private readonly List<string[]> _explorerSearchGroups = [];
+    private string _explorerSearchCommitted = string.Empty;
+    private string _playlistSearchCommitted = string.Empty;
+    private int _explorerFocusTicket;
+    private int _listFocusTicket;
+    private HashSet<string>? _explorerVisibleFolders;
     private readonly StackPanel _playlistGroupHost = new() { Orientation = Orientation.Horizontal };
     private readonly DataGrid _grid = new();
     private DataGridTextColumn _groupSpacer = null!;
@@ -203,6 +214,26 @@ internal sealed class LibraryBrowserView : UserControl
         _favoritesList.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _grid.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _groupCombo.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
+        _explorerSearchBox.IsKeyboardFocusWithinChanged += (_, _) =>
+        {
+            if (!_explorerSearchBox.IsKeyboardFocusWithin)
+            {
+                RestoreSearchBox(_explorerSearchBox, _explorerSearchCommitted, _explorerSearchHint);
+            }
+
+            SyncPaneFocusChrome();
+            SyncSearchHint(_explorerSearchBox, _explorerSearchHint);
+        };
+        _playlistSearchBox.IsKeyboardFocusWithinChanged += (_, _) =>
+        {
+            if (!_playlistSearchBox.IsKeyboardFocusWithin)
+            {
+                RestoreSearchBox(_playlistSearchBox, _playlistSearchCommitted, _playlistSearchHint);
+            }
+
+            SyncPaneFocusChrome();
+            SyncSearchHint(_playlistSearchBox, _playlistSearchHint);
+        };
         _washTurnTimer.Tick += (_, _) => AdvanceWashTurn();
         Loaded += (_, _) =>
         {
@@ -286,11 +317,21 @@ internal sealed class LibraryBrowserView : UserControl
         RefreshSortChrome();
     }
 
-    public bool IsListKeyboardFocused => _grid.IsKeyboardFocusWithin;
+    public bool IsListKeyboardFocused => _grid.IsKeyboardFocusWithin || IsPlaylistSearchFocused;
 
     public bool IsGroupComboFocused => _groupCombo.IsKeyboardFocusWithin;
 
-    public bool IsExplorerFocused => _folderTree.IsKeyboardFocusWithin;
+    public bool IsExplorerSearchFocused => _explorerSearchBox.IsKeyboardFocusWithin;
+
+    public bool IsPlaylistSearchFocused => _playlistSearchBox.IsKeyboardFocusWithin;
+
+    public bool IsSearchFocused => IsExplorerSearchFocused || IsPlaylistSearchFocused;
+
+    public bool IsExplorerFocused => _folderTree.IsKeyboardFocusWithin || IsExplorerSearchFocused;
+
+    public bool IsExplorerTreeFocused => _folderTree.IsKeyboardFocusWithin;
+
+    public bool IsPlaylistGridFocused => _grid.IsKeyboardFocusWithin;
 
     public bool IsFavoritesFocused => _favoritesList.IsKeyboardFocusWithin;
 
@@ -312,7 +353,10 @@ internal sealed class LibraryBrowserView : UserControl
     {
         while (origin is not null)
         {
-            if (ReferenceEquals(origin, _folderTree) || ReferenceEquals(origin, _explorerLabel))
+            if (ReferenceEquals(origin, _folderTree)
+                || ReferenceEquals(origin, _explorerLabel)
+                || ReferenceEquals(origin, _explorerSearchBox)
+                || ReferenceEquals(origin, _explorerSearchHint))
             {
                 return true;
             }
@@ -342,7 +386,10 @@ internal sealed class LibraryBrowserView : UserControl
     {
         while (origin is not null)
         {
-            if (ReferenceEquals(origin, _grid) || ReferenceEquals(origin, _playlistLabel))
+            if (ReferenceEquals(origin, _grid)
+                || ReferenceEquals(origin, _playlistLabel)
+                || ReferenceEquals(origin, _playlistSearchBox)
+                || ReferenceEquals(origin, _playlistSearchHint))
             {
                 return true;
             }
@@ -363,6 +410,16 @@ internal sealed class LibraryBrowserView : UserControl
     internal int BoundRowCount => _items.Count;
 
     internal FrameworkElement FileGrid => _grid;
+
+    internal ComboBox GroupCombo => _groupCombo;
+
+    internal TextBox ExplorerSearchBox => _explorerSearchBox;
+
+    internal TextBox PlaylistSearchBox => _playlistSearchBox;
+
+    internal TextBlock ExplorerSearchHint => _explorerSearchHint;
+
+    internal TextBlock PlaylistSearchHint => _playlistSearchHint;
 
     internal int RootColumnCount => _root.ColumnDefinitions.Count;
 
@@ -529,22 +586,146 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
+    public void FocusExplorerSearch()
+    {
+        CancelPlaylistFocusRestore();
+        _explorerSearchBox.Focus();
+        _explorerSearchBox.SelectAll();
+    }
+
+    public void FocusPlaylistSearch()
+    {
+        CancelPlaylistFocusRestore();
+        _playlistSearchBox.Focus();
+        _playlistSearchBox.SelectAll();
+    }
+
+    public void FocusPaneSearch(LibraryPane pane)
+    {
+        if (LibraryPlayerMode.SearchPane(pane) == LibraryPane.List)
+        {
+            FocusPlaylistSearch();
+            return;
+        }
+
+        FocusExplorerSearch();
+    }
+
+    /// <summary>Enter。入力を検索に反映し、ツリーまたはプレイリストへフォーカスを返す。</summary>
+    public void CommitSearchFocus()
+    {
+        if (IsExplorerSearchFocused)
+        {
+            ApplyExplorerSearchSync(_explorerSearchBox.Text);
+            RequestExplorerFocus();
+            return;
+        }
+
+        if (IsPlaylistSearchFocused)
+        {
+            CommitPlaylistSearch();
+            RequestListFocus();
+        }
+    }
+
+    /// <summary>Esc。未確定の入力を捨てて、ツリーまたはプレイリストへフォーカスを返す。</summary>
+    public void CancelSearchFocus()
+    {
+        if (IsExplorerSearchFocused)
+        {
+            RestoreSearchBox(_explorerSearchBox, _explorerSearchCommitted, _explorerSearchHint);
+            RequestExplorerFocus();
+            return;
+        }
+
+        if (IsPlaylistSearchFocused)
+        {
+            RestoreSearchBox(_playlistSearchBox, _playlistSearchCommitted, _playlistSearchHint);
+            RequestListFocus();
+        }
+    }
+
+    private void RequestExplorerFocus()
+    {
+        var ticket = ++_explorerFocusTicket;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (ticket != _explorerFocusTicket)
+                {
+                    return;
+                }
+
+                FocusExplorer();
+            },
+            DispatcherPriority.Loaded);
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (ticket != _explorerFocusTicket)
+                {
+                    return;
+                }
+
+                if (!IsExplorerTreeFocused)
+                {
+                    FocusExplorer();
+                }
+            },
+            DispatcherPriority.Input);
+    }
+
+    private void RequestListFocus()
+    {
+        var ticket = ++_listFocusTicket;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (ticket != _listFocusTicket)
+                {
+                    return;
+                }
+
+                FocusList();
+            },
+            DispatcherPriority.Loaded);
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (ticket != _listFocusTicket)
+                {
+                    return;
+                }
+
+                if (!IsPlaylistGridFocused)
+                {
+                    FocusList();
+                }
+            },
+            DispatcherPriority.Input);
+    }
+
     public void FocusExplorer()
     {
         CancelPlaylistFocusRestore();
+        _folderTree.UpdateLayout();
         if (_folderTree.SelectedItem is TreeViewItem selected)
         {
             selected.BringIntoView();
-            selected.Focus();
-            return;
+            if (selected.Focus())
+            {
+                return;
+            }
         }
 
         if (_folderTree.Items.OfType<TreeViewItem>().FirstOrDefault() is { } first)
         {
             first.IsSelected = true;
             first.BringIntoView();
-            first.Focus();
-            return;
+            if (first.Focus())
+            {
+                return;
+            }
         }
 
         _folderTree.Focus();
@@ -1084,9 +1265,13 @@ internal sealed class LibraryBrowserView : UserControl
         TipService.Set(_explorerLabel, UiStrings.TipLibraryExplorer);
         TipService.Set(_favoritesList, UiStrings.TipLibraryFavorites);
         TipService.Set(_favoritesLabel, UiStrings.TipLibraryFavorites);
+        TipService.Set(_explorerSearchBox, UiStrings.TipLibraryExplorerSearch);
+        TipService.Set(_playlistSearchBox, UiStrings.TipLibraryPlaylistSearch);
         _explorerLabel.Text = UiStrings.LibraryExplorerLabel;
         _favoritesLabel.Text = UiStrings.LibraryFavoritesLabel;
         _playlistLabel.Text = UiStrings.LibraryPlaylistLabel;
+        _explorerSearchHint.Text = UiStrings.LibrarySearchHint;
+        _playlistSearchHint.Text = UiStrings.LibrarySearchHint;
         RebuildExplorerContextMenu();
         RebuildFavoritesContextMenu();
         RebuildListContextMenu();
@@ -1206,7 +1391,7 @@ internal sealed class LibraryBrowserView : UserControl
         var row = CreateRow(session);
         row.GroupKey = LibraryFileList.GroupLabel(row, _group);
 
-        if (_grid.ItemsSource is null || _items.Count == 0)
+        if (_grid.ItemsSource is null || _rows.Count == 0)
         {
             _rows = [row];
             BeginRowSync();
@@ -1230,26 +1415,36 @@ internal sealed class LibraryBrowserView : UserControl
             insertAt++;
         }
 
+        var rowIndex = 0;
+        while (rowIndex < _rows.Count
+            && LibraryFileList.Compare(_rows[rowIndex], row, _sortColumn, _sortDirection) <= 0)
+        {
+            rowIndex++;
+        }
+
         BeginRowSync();
         try
         {
-            _items.Insert(insertAt, row);
             var nextRows = new LibraryFileRow[_rows.Count + 1];
-            for (var i = 0; i < insertAt; i++)
+            for (var i = 0; i < rowIndex; i++)
             {
                 nextRows[i] = _rows[i];
             }
 
-            nextRows[insertAt] = row;
-            for (var i = insertAt; i < _rows.Count; i++)
+            nextRows[rowIndex] = row;
+            for (var i = rowIndex; i < _rows.Count; i++)
             {
                 nextRows[i + 1] = _rows[i];
             }
 
             _rows = nextRows;
-            if (select)
+            if (PlaylistRowMatches(row))
             {
-                ApplyRowSelectionCore(session, [session]);
+                _items.Insert(insertAt, row);
+                if (select)
+                {
+                    ApplyRowSelectionCore(session, [session]);
+                }
             }
         }
         finally
@@ -1334,7 +1529,10 @@ internal sealed class LibraryBrowserView : UserControl
         _items.Clear();
         foreach (var row in _rows)
         {
-            _items.Add(row);
+            if (PlaylistRowMatches(row))
+            {
+                _items.Add(row);
+            }
         }
 
         var view = new ListCollectionView(_items);
@@ -1345,6 +1543,14 @@ internal sealed class LibraryBrowserView : UserControl
 
         _grid.ItemsSource = view;
         ApplyRowSelectionCore(active, selected);
+        if (_grid.SelectedItem is null && _items.Count > 0 && _playlistSearchGroups.Count > 0)
+        {
+            if (_items[0].Tag is DocumentSession first)
+            {
+                ApplyRowSelectionCore(first, [first]);
+            }
+        }
+
         RefreshSortChrome();
     }
 
@@ -1540,7 +1746,14 @@ internal sealed class LibraryBrowserView : UserControl
 
         var current = TryGetSelectedExplorerFolder(out var selected) ? selected : string.Empty;
         _explorerRoots = next;
-        BuildExplorerRoots();
+        if (_explorerSearchGroups.Count > 0)
+        {
+            ApplyExplorerSearchSync(_explorerSearchCommitted);
+        }
+        else
+        {
+            BuildExplorerRoots();
+        }
         if (!string.IsNullOrEmpty(current))
         {
             RevealFolder(current);
@@ -1781,8 +1994,18 @@ internal sealed class LibraryBrowserView : UserControl
         treePane.ClipToBounds = false;
 
         var explorerPane = new DockPanel { Background = Brushes.Transparent };
-        DockPanel.SetDock(_explorerLabel, Dock.Top);
-        explorerPane.Children.Add(_explorerLabel);
+        var explorerHeader = new DockPanel { LastChildFill = true };
+        var explorerSearch = CreateSearchEditor(_explorerSearchBox, _explorerSearchHint);
+        explorerSearch.Width = DesignMetrics.From96(120);
+        explorerSearch.MinWidth = DesignMetrics.From96(72);
+        explorerSearch.Margin = new Thickness(0, 6, 8, 6);
+        explorerSearch.VerticalAlignment = VerticalAlignment.Center;
+        DockPanel.SetDock(explorerSearch, Dock.Right);
+        explorerHeader.Children.Add(explorerSearch);
+        _explorerLabel.VerticalAlignment = VerticalAlignment.Center;
+        explorerHeader.Children.Add(_explorerLabel);
+        DockPanel.SetDock(explorerHeader, Dock.Top);
+        explorerPane.Children.Add(explorerHeader);
         explorerPane.Children.Add(_folderTree);
         var treeHost = new Grid { Background = Brushes.Transparent };
         treeHost.Children.Add(explorerPane);
@@ -1835,6 +2058,13 @@ internal sealed class LibraryBrowserView : UserControl
         var bar = new DockPanel { Margin = new Thickness(8, 6, 8, 6) };
         DockPanel.SetDock(_playlistGroupHost, Dock.Right);
         bar.Children.Add(_playlistGroupHost);
+        var playlistSearch = CreateSearchEditor(_playlistSearchBox, _playlistSearchHint);
+        playlistSearch.Width = DesignMetrics.From96(180);
+        playlistSearch.MinWidth = DesignMetrics.From96(96);
+        playlistSearch.Margin = new Thickness(8, 0, 8, 0);
+        playlistSearch.VerticalAlignment = VerticalAlignment.Center;
+        DockPanel.SetDock(playlistSearch, Dock.Right);
+        bar.Children.Add(playlistSearch);
         _playlistLabel.VerticalAlignment = VerticalAlignment.Center;
         _playlistLabel.TextTrimming = TextTrimming.CharacterEllipsis;
         bar.Children.Add(_playlistLabel);
@@ -1907,6 +2137,277 @@ internal sealed class LibraryBrowserView : UserControl
         label.FontWeight = FontWeights.SemiBold;
         label.VerticalAlignment = VerticalAlignment.Center;
         label.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
+    }
+
+    private Grid CreateSearchEditor(TextBox box, TextBlock hint)
+    {
+        box.FontSize = LibraryListFontSize;
+        box.Height = DesignMetrics.AudioInputHeight;
+        box.AcceptsReturn = false;
+        box.AcceptsTab = false;
+        box.VerticalContentAlignment = VerticalAlignment.Center;
+        box.SetResourceReference(StyleProperty, "LibrarySearchBoxStyle");
+        box.TextChanged += (_, _) => SyncSearchHint(box, hint);
+        KeyboardNavigation.SetIsTabStop(box, false);
+
+        hint.FontSize = LibraryListFontSize;
+        hint.Margin = new Thickness(8, 0, 0, 0);
+        hint.VerticalAlignment = VerticalAlignment.Center;
+        hint.IsHitTestVisible = false;
+        hint.SetResourceReference(TextBlock.ForegroundProperty, "MutedForeBrush");
+
+        var host = new Grid { VerticalAlignment = VerticalAlignment.Center };
+        host.Children.Add(box);
+        host.Children.Add(hint);
+        SyncSearchHint(box, hint);
+        return host;
+    }
+
+    private static void SyncSearchHint(TextBox box, TextBlock hint) =>
+        hint.Visibility = string.IsNullOrEmpty(box.Text) && !box.IsKeyboardFocused
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+    private void RestoreSearchBox(TextBox box, string committed, TextBlock hint)
+    {
+        if (box.Text == committed)
+        {
+            SyncSearchHint(box, hint);
+            return;
+        }
+
+        box.Text = committed;
+        SyncSearchHint(box, hint);
+    }
+
+    private void CommitPlaylistSearch()
+    {
+        _playlistSearchCommitted = _playlistSearchBox.Text;
+        ApplyPlaylistSearch(_playlistSearchCommitted);
+    }
+
+    private bool PlaylistRowMatches(LibraryFileRow row) =>
+        LibrarySearchQuery.MatchesRow(row, _playlistSearchGroups);
+
+    private void ApplyPlaylistSearch(string text)
+    {
+        _playlistSearchGroups.Clear();
+        _playlistSearchGroups.AddRange(LibrarySearchQuery.Parse(text));
+        var active = SelectedSession;
+        var selected = SelectedSessions;
+        BindRows(active, selected);
+    }
+
+    internal void ApplyExplorerSearchSync(string text)
+    {
+        if (_explorerSearchBox.Text != text)
+        {
+            _explorerSearchBox.Text = text;
+        }
+
+        SyncSearchHint(_explorerSearchBox, _explorerSearchHint);
+        _explorerSearchCommitted = text;
+        var groups = LibrarySearchQuery.Parse(text);
+        _explorerSearchGroups.Clear();
+        _explorerSearchGroups.AddRange(groups);
+        if (groups.Count == 0)
+        {
+            _explorerVisibleFolders = null;
+            RebuildExplorerTree();
+            return;
+        }
+
+        var index = CollectExplorerIndex(_explorerRoots);
+        ApplyExplorerFilter(index.Files, index.Folders, groups);
+    }
+
+    internal void ApplyPlaylistSearchSync(string text)
+    {
+        if (_playlistSearchBox.Text != text)
+        {
+            _playlistSearchBox.Text = text;
+        }
+
+        SyncSearchHint(_playlistSearchBox, _playlistSearchHint);
+        _playlistSearchCommitted = text;
+        ApplyPlaylistSearch(text);
+    }
+
+    internal IReadOnlyList<string> ExplorerVisibleFolderPaths
+    {
+        get
+        {
+            var paths = new List<string>();
+            CollectExplorerFolderPaths(_folderTree.Items, paths);
+            return paths;
+        }
+    }
+
+    internal LibraryExplorerPlaylistWalk SnapshotExplorerPlaylistWalk()
+    {
+        if (_explorerSearchGroups.Count == 0)
+        {
+            return LibraryExplorerPlaylistWalk.Inactive;
+        }
+
+        var groups = new string[_explorerSearchGroups.Count][];
+        for (var i = 0; i < _explorerSearchGroups.Count; i++)
+        {
+            groups[i] = (string[])_explorerSearchGroups[i].Clone();
+        }
+
+        var visible = _explorerVisibleFolders is { } set
+            ? new HashSet<string>(set, StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        return new LibraryExplorerPlaylistWalk(groups, visible);
+    }
+
+    private static void CollectExplorerFolderPaths(ItemCollection items, List<string> paths)
+    {
+        foreach (var raw in items)
+        {
+            if (raw is not TreeViewItem { Tag: string path } item)
+            {
+                continue;
+            }
+
+            paths.Add(NormalizeFolderPath(path));
+            if (item.Items.Count > 0)
+            {
+                CollectExplorerFolderPaths(item.Items, paths);
+            }
+        }
+    }
+
+    private void ApplyExplorerFilter(
+        IReadOnlyList<string> files,
+        IReadOnlyList<string> folders,
+        IReadOnlyList<string[]> groups)
+    {
+        var visible = LibrarySearchQuery.VisibleFolders(_explorerRoots, files, folders, groups);
+        _explorerVisibleFolders = visible;
+        RebuildExplorerTree();
+    }
+
+    private void RebuildExplorerTree()
+    {
+        if (_explorerVisibleFolders is { } visible)
+        {
+            BuildFilteredExplorer(visible);
+            return;
+        }
+
+        BuildExplorerRoots();
+    }
+
+    private (string[] Files, string[] Folders) CollectExplorerIndex(IReadOnlyList<string> roots)
+    {
+        var files = CollectExplorerFiles(roots);
+        var folders = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var root in roots)
+        {
+            if (string.IsNullOrEmpty(root))
+            {
+                continue;
+            }
+
+            CollectExplorerFolders(root, folders, seen);
+        }
+
+        return (files, [.. folders]);
+    }
+
+    private void CollectExplorerFolders(string path, List<string> folders, HashSet<string> seen)
+    {
+        var full = NormalizeFolderPath(path);
+        if (full.Length == 0 || !seen.Add(full))
+        {
+            return;
+        }
+
+        folders.Add(full);
+        foreach (var child in EnumerateSubdirs(path))
+        {
+            CollectExplorerFolders(child, folders, seen);
+        }
+    }
+
+    private static string[] CollectExplorerFiles(IReadOnlyList<string> roots)
+    {
+        var files = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var root in roots)
+        {
+            if (string.IsNullOrEmpty(root))
+            {
+                continue;
+            }
+
+            foreach (var file in AudioCodec.CollectPlayerOpenableFromDirectory(root, recursive: true))
+            {
+                if (seen.Add(file))
+                {
+                    files.Add(file);
+                }
+            }
+        }
+
+        return [.. files];
+    }
+
+    private void BuildFilteredExplorer(HashSet<string> visible)
+    {
+        _treeMultiSelected.Clear();
+        _treeSyncing = true;
+        _treeExpansionBusy = true;
+        try
+        {
+            _folderTree.Items.Clear();
+            foreach (var root in _explorerRoots)
+            {
+                if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
+                {
+                    continue;
+                }
+
+                var full = NormalizeFolderPath(root);
+                if (!visible.Contains(full))
+                {
+                    continue;
+                }
+
+                var item = AddFolderItem(_folderTree.Items, root, ExplorerRootHeader(root));
+                LoadFilteredChildren(item, visible);
+                item.IsExpanded = true;
+            }
+        }
+        finally
+        {
+            _treeExpansionBusy = false;
+            _treeSyncing = false;
+        }
+    }
+
+    private void LoadFilteredChildren(TreeViewItem item, HashSet<string> visible)
+    {
+        if (item.Tag is not string path)
+        {
+            return;
+        }
+
+        item.Items.Clear();
+        foreach (var dir in EnumerateSubdirs(path))
+        {
+            if (!visible.Contains(NormalizeFolderPath(dir)))
+            {
+                continue;
+            }
+
+            var child = AddFolderItem(item.Items, dir, FolderDisplayName(dir));
+            LoadFilteredChildren(child, visible);
+            child.IsExpanded = true;
+        }
     }
 
     private void ApplyLibraryScrollBarStyle()
@@ -2578,8 +3079,15 @@ internal sealed class LibraryBrowserView : UserControl
 
         foreach (var dir in EnumerateSubdirs(path))
         {
+            if (_explorerVisibleFolders is { } visible
+                && !visible.Contains(NormalizeFolderPath(dir)))
+            {
+                continue;
+            }
+
             var child = AddFolderItem(item.Items, dir, FolderDisplayName(dir));
-            if (_explorerExpanded.Contains(NormalizeFolderPath(dir)))
+            if (_explorerVisibleFolders is not null
+                || _explorerExpanded.Contains(NormalizeFolderPath(dir)))
             {
                 child.IsExpanded = true;
             }
@@ -2802,6 +3310,11 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void RememberExplorerExpanded(TreeViewItem item, bool expanded)
     {
+        if (_explorerVisibleFolders is not null)
+        {
+            return;
+        }
+
         if (item.Tag is not string path)
         {
             return;
@@ -2983,6 +3496,16 @@ internal sealed class LibraryBrowserView : UserControl
         var item = _treeDragItem;
         _treeDragStart = null;
         _treeDragItem = null;
+        var walk = SnapshotExplorerPlaylistWalk();
+        if (walk.Active)
+        {
+            paths = LibrarySearchQuery.CollectPlaylistFiles(paths, walk.Groups, walk.Visible);
+            if (paths.Length == 0)
+            {
+                return;
+            }
+        }
+
         var data = new DataObject(DataFormats.FileDrop, paths);
         DragDrop.DoDragDrop(item, data, DragDropEffects.Copy);
     }
@@ -3064,16 +3587,24 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
-    private static bool HasAnySubdir(string path)
+    private bool HasAnySubdir(string path)
     {
         try
         {
             foreach (var dir in Directory.EnumerateDirectories(path))
             {
-                if (!ShouldSkipFolder(dir))
+                if (ShouldSkipFolder(dir))
                 {
-                    return true;
+                    continue;
                 }
+
+                if (_explorerVisibleFolders is { } visible
+                    && !visible.Contains(NormalizeFolderPath(dir)))
+                {
+                    continue;
+                }
+
+                return true;
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
@@ -3149,6 +3680,7 @@ internal sealed class LibraryBrowserView : UserControl
         AddColumn(LibraryFileColumn.Disc, nameof(LibraryFileRow.Disc), right: true);
         AddColumn(LibraryFileColumn.Year, nameof(LibraryFileRow.Year), right: true);
         AddColumn(LibraryFileColumn.Genre, nameof(LibraryFileRow.Genre));
+        AddColumn(LibraryFileColumn.Date, nameof(LibraryFileRow.DateText));
         AddColumn(LibraryFileColumn.Comment, nameof(LibraryFileRow.Comment));
         AddColumn(LibraryFileColumn.AlbumArtist, nameof(LibraryFileRow.AlbumArtist));
         AddColumn(LibraryFileColumn.Kind, nameof(LibraryFileRow.Kind));
@@ -3737,6 +4269,7 @@ internal sealed class LibraryBrowserView : UserControl
             LibraryFileColumn.Channels => row.ChannelsText,
             LibraryFileColumn.BitRate => row.BitRateText,
             LibraryFileColumn.Size => row.SizeText,
+            LibraryFileColumn.Date => row.DateText,
             LibraryFileColumn.Folder => row.Folder,
             LibraryFileColumn.Jacket => row.JacketText,
             _ => row.Name,
@@ -3808,6 +4341,7 @@ internal sealed class LibraryBrowserView : UserControl
                 or LibraryFileColumn.Channels
                 or LibraryFileColumn.BitRate
                 or LibraryFileColumn.Size
+                or LibraryFileColumn.Date
                 or LibraryFileColumn.Track
                 or LibraryFileColumn.Disc
                 or LibraryFileColumn.Year
@@ -4012,7 +4546,9 @@ internal sealed class LibraryBrowserView : UserControl
 
     private bool TryPatchBoundRows(IReadOnlyList<LibraryFileRow> rows)
     {
-        if (_grid.ItemsSource is null || _items.Count != rows.Count)
+        if (_playlistSearchGroups.Count > 0
+            || _grid.ItemsSource is null
+            || _items.Count != rows.Count)
         {
             return false;
         }
@@ -4882,6 +5418,8 @@ internal sealed class LibraryBrowserView : UserControl
             BitRateText = UiStrings.FormatBitRate(bitRate),
             FileBytes = document.FileBytes,
             SizeText = UiStrings.FormatFileBytesCompact(document.FileBytes),
+            FileDate = document.FileLastWriteTime ?? default,
+            DateText = UiStrings.FormatFileDate(document.FileLastWriteTime),
             Folder = string.IsNullOrEmpty(path)
                 ? string.Empty
                 : Path.GetDirectoryName(path) ?? string.Empty,

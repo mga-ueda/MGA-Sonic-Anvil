@@ -64,6 +64,25 @@ internal sealed class PeakPyramid
         }
     }
 
+    /// <summary>
+    /// エディタのレーン分割に使えない。プレイヤーはチャンネル包絡を 1 本に畳むので、
+    /// 粒度が十分でもステレオ／マルチは作り直す。
+    /// </summary>
+    public bool NeedsEditorRebuild(int documentChannels)
+    {
+        if (IsEmpty || FrameCount <= 0)
+        {
+            return false;
+        }
+
+        if (Channels != Math.Max(1, documentChannels))
+        {
+            return true;
+        }
+
+        return NeedsEditorDetail;
+    }
+
     public static PeakPyramid Empty { get; } = new([[]], [[]], 1, 0, 1, 0);
 
     public static PeakPyramid Build(float[] interleaved, int channels) =>
