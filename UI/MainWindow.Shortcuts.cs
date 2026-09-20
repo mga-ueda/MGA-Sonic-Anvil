@@ -325,8 +325,17 @@ public partial class MainWindow
 
         if (IsLibraryExplorerFocused)
         {
+            if (!LibraryBrowser.IsExplorerSearchFocused)
+            {
+                if (LibraryBrowser.TryExplorerTypeahead(key, modifiers))
+                {
+                    return true;
+                }
+            }
+
             if (key == Key.Enter && modifiers == ModifierKeys.None)
             {
+                LibraryBrowser.ClearExplorerTypeahead();
                 ReplaceLibraryFromExplorerFolder();
                 return true;
             }
@@ -334,18 +343,21 @@ public partial class MainWindow
             if (key == Key.Enter && modifiers == ModifierKeys.Shift)
             {
                 // プレイリストへ足すだけ。再生は始めず、再生中も止めない。
+                LibraryBrowser.ClearExplorerTypeahead();
                 LibraryBrowser.OpenSelectedFolder();
                 return true;
             }
 
             if (LibraryPlayerMode.IsExplorerExpandAll(key, modifiers))
             {
+                LibraryBrowser.ClearExplorerTypeahead();
                 LibraryBrowser.ExpandSelectedExplorerSubtree();
                 return true;
             }
 
             if (LibraryPlayerMode.IsExplorerCollapseSubtree(key, modifiers))
             {
+                LibraryBrowser.ClearExplorerTypeahead();
                 LibraryBrowser.CollapseSelectedExplorerSubtree();
                 return true;
             }

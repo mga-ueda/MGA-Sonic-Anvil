@@ -124,6 +124,9 @@ internal sealed class LibraryBrowserView : UserControl
     private int _explorerFocusTicket;
     private int _listFocusTicket;
     private HashSet<string>? _explorerVisibleFolders;
+    private string _explorerTypeahead = "";
+    private DateTimeOffset _explorerTypeaheadAt = DateTimeOffset.MinValue;
+    private string _explorerTypeaheadIgnoreText = "";
     private readonly StackPanel _playlistGroupHost = new() { Orientation = Orientation.Horizontal };
     private readonly DataGrid _grid = new();
     private DataGridTextColumn _groupSpacer = null!;
@@ -579,6 +582,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void FocusList()
     {
+        ClearExplorerTypeahead();
         EnsureListFocused();
         if (_grid.SelectedItem is not null)
         {
@@ -588,6 +592,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void FocusExplorerSearch()
     {
+        ClearExplorerTypeahead();
         CancelPlaylistFocusRestore();
         _explorerSearchBox.Focus();
         _explorerSearchBox.SelectAll();
@@ -731,8 +736,105 @@ internal sealed class LibraryBrowserView : UserControl
         _folderTree.Focus();
     }
 
+    internal string ExplorerTypeaheadQuery => _explorerTypeahead;
+
+    /// <summary>矢印・ペイン移動などで打ち込みを捨てる。1秒の打ち直しとは別。</summary>
+    public bool ClearExplorerTypeahead()
+    {
+        _explorerTypeaheadIgnoreText = "";
+        if (_explorerTypeahead.Length == 0)
+        {
+            return false;
+        }
+
+        _explorerTypeahead = "";
+        return true;
+    }
+
+    public bool TryExplorerTypeahead(Key key, ModifierKeys modifiers)
+    {
+        if (!LibraryExplorerTypeahead.TryMapChar(key, modifiers, out var character))
+        {
+            return false;
+        }
+
+        _explorerTypeaheadIgnoreText = character;
+        return TryAppendExplorerTypeahead(character);
+    }
+
+    private bool TryAppendExplorerTypeahead(string next)
+    {
+        if (!LibraryExplorerTypeahead.IsTypeaheadText(next))
+        {
+            return false;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        _explorerTypeahead = LibraryExplorerTypeahead.Append(
+            _explorerTypeahead,
+            next,
+            now,
+            _explorerTypeaheadAt,
+            LibraryExplorerTypeahead.IdleReset);
+        _explorerTypeaheadAt = now;
+        ActivateExplorerTypeaheadMatch();
+        return true;
+    }
+
+    private void ActivateExplorerTypeaheadMatch()
+    {
+        var items = new List<TreeViewItem>();
+        CollectExplorerTypeaheadItems(_folderTree.Items, items);
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        var names = new string[items.Count];
+        var current = -1;
+        var selected = _folderTree.SelectedItem as TreeViewItem;
+        for (var i = 0; i < items.Count; i++)
+        {
+            names[i] = items[i].Header as string ?? "";
+            if (ReferenceEquals(items[i], selected))
+            {
+                current = i;
+            }
+        }
+
+        var match = LibraryExplorerTypeahead.FindMatchIndex(names, _explorerTypeahead, current);
+        if (match < 0)
+        {
+            return;
+        }
+
+        var item = items[match];
+        ClearTreeMultiSelect();
+        item.IsSelected = true;
+        item.BringIntoView();
+        item.Focus();
+    }
+
+    private static void CollectExplorerTypeaheadItems(ItemCollection items, List<TreeViewItem> dest)
+    {
+        foreach (var raw in items)
+        {
+            if (raw is not TreeViewItem item || item.Tag is not string)
+            {
+                continue;
+            }
+
+            dest.Add(item);
+            if (item.Items.Count > 0)
+            {
+                CollectExplorerTypeaheadItems(item.Items, dest);
+            }
+        }
+    }
+
     public void FocusFavorites()
     {
+        ClearExplorerTypeahead();
         CancelPlaylistFocusRestore();
         if (_favoritesList.SelectedItem is { } selected
             && _favoritesList.ItemContainerGenerator.ContainerFromItem(selected) is UIElement row)
@@ -1954,6 +2056,8 @@ internal sealed class LibraryBrowserView : UserControl
         _folderTree.PreviewMouseLeftButtonUp += FolderTree_PreviewMouseLeftButtonUp;
         _folderTree.PreviewMouseRightButtonDown += FolderTree_PreviewMouseRightButtonDown;
         _folderTree.PreviewKeyDown += FolderTree_PreviewKeyDown;
+        _folderTree.PreviewTextInput += FolderTree_PreviewTextInput;
+        _folderTree.IsTextSearchEnabled = false;
         _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, (_, e) => e.Handled = true));
         _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Cut, (_, e) => e.Handled = true));
         _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Paste, (_, e) => e.Handled = true));
@@ -2892,6 +2996,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void BuildExplorerRoots()
     {
+        ClearExplorerTypeahead();
         _treeMultiSelected.Clear();
         _folderTree.Items.Clear();
         foreach (var root in _explorerRoots)
@@ -3413,6 +3518,7 @@ internal sealed class LibraryBrowserView : UserControl
         var modifiers = Keyboard.Modifiers;
         if (LibraryPlayerMode.IsExplorerExpandAll(key, modifiers))
         {
+            ClearExplorerTypeahead();
             ExpandSelectedExplorerSubtree();
             e.Handled = true;
             return;
@@ -3420,7 +3526,37 @@ internal sealed class LibraryBrowserView : UserControl
 
         if (LibraryPlayerMode.IsExplorerCollapseSubtree(key, modifiers))
         {
+            ClearExplorerTypeahead();
             CollapseSelectedExplorerSubtree();
+            e.Handled = true;
+            return;
+        }
+
+        if (key is Key.Up or Key.Down or Key.Left or Key.Right
+            or Key.Home or Key.End or Key.PageUp or Key.PageDown
+            or Key.Enter or Key.Tab)
+        {
+            ClearExplorerTypeahead();
+        }
+    }
+
+    private void FolderTree_PreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        if (!LibraryExplorerTypeahead.IsTypeaheadText(e.Text))
+        {
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(_explorerTypeaheadIgnoreText)
+            && string.Equals(e.Text, _explorerTypeaheadIgnoreText, StringComparison.OrdinalIgnoreCase))
+        {
+            _explorerTypeaheadIgnoreText = "";
+            e.Handled = true;
+            return;
+        }
+
+        if (TryAppendExplorerTypeahead(e.Text))
+        {
             e.Handled = true;
         }
     }

@@ -227,6 +227,62 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void ExplorerTypeahead_TThenTa_SelectsTaskNotTest()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var root = Path.Combine(Path.GetTempPath(), "mga-tree-type-" + Guid.NewGuid().ToString("N"));
+            var test = Path.Combine(root, "Test");
+            var task = Path.Combine(root, "Task");
+            Directory.CreateDirectory(test);
+            Directory.CreateDirectory(task);
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                var folder = view.ExplorerFirstFolder;
+                Assert.NotNull(folder);
+                folder.IsExpanded = true;
+                Flush();
+
+                Assert.True(view.TryExplorerTypeahead(Key.T, ModifierKeys.None));
+                Assert.Equal("t", view.ExplorerTypeaheadQuery);
+                Assert.True(view.TryGetSelectedExplorerFolder(out var afterT));
+                var afterTName = Path.GetFileName(afterT);
+                Assert.True(
+                    afterTName.Equals("Test", StringComparison.OrdinalIgnoreCase)
+                    || afterTName.Equals("Task", StringComparison.OrdinalIgnoreCase),
+                    afterTName);
+
+                Assert.True(view.TryExplorerTypeahead(Key.A, ModifierKeys.None));
+                Assert.Equal("ta", view.ExplorerTypeaheadQuery);
+                Assert.True(view.TryGetSelectedExplorerFolder(out var afterTa));
+                Assert.Equal(Path.GetFullPath(task), Path.GetFullPath(afterTa));
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void ExplorerNestedFolders_UseSameHoverTemplate()
     {
         RunSta(() =>
