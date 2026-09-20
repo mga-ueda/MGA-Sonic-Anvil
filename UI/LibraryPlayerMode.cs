@@ -1,4 +1,6 @@
+using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 
@@ -326,6 +328,49 @@ internal static class LibraryPlayerMode
     /// <summary>プレイヤーに入ったときに選んで再生する先頭のファイル。</summary>
     public static DocumentSession? FirstSession(IReadOnlyList<DocumentSession> sessions) =>
         sessions.Count == 0 ? null : sessions[0];
+
+    /// <summary>
+    /// プレイヤーではプレイリストが空のときレベルメーター／スペアナ／ラウドネス／ゴニオ／サラウンドを出さない。
+    /// エディタでは常に出す。
+    /// </summary>
+    public static bool ShowsPlayerMeters(bool playerMode, int playlistCount) =>
+        !playerMode || playlistCount > 0;
+
+    /// <summary>
+    /// 音声信号で動くメーターはフェードせず即出す。停止中の追加だけ 1 秒フェード。
+    /// </summary>
+    public static bool InstantPlayerMeterReveal(bool show, bool signalMoving) =>
+        show && signalMoving;
+
+    /// <summary>
+    /// プレイヤー突入は消えた状態から。空リストで一度出してフェードアウトしない。
+    /// 再生中の即表示は先に消さない。
+    /// </summary>
+    public static bool SnapPlayerMetersHiddenOnEnter(bool enteringPlayer, bool instantReveal) =>
+        enteringPlayer && !instantReveal;
+
+    /// <summary>メーターのフェード。ジャケットのクロスフェードと同じ 1 秒。</summary>
+    public const double MeterFadeSeconds = 1;
+
+    public const int MeterFadeFrameRate = 30;
+
+    public static DoubleAnimation CreateMeterFade(double from, double to)
+    {
+        var rising = to > from;
+        var anim = new DoubleAnimation
+        {
+            From = from,
+            To = to,
+            Duration = TimeSpan.FromSeconds(MeterFadeSeconds),
+            FillBehavior = FillBehavior.HoldEnd,
+            EasingFunction = new SineEase
+            {
+                EasingMode = rising ? EasingMode.EaseOut : EasingMode.EaseIn,
+            },
+        };
+        Timeline.SetDesiredFrameRate(anim, MeterFadeFrameRate);
+        return anim;
+    }
 
     public static int EdgeIndex(int count, int edge) =>
         count <= 0 ? -1 : edge < 0 ? 0 : count - 1;

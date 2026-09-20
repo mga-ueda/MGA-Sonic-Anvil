@@ -713,6 +713,11 @@ public partial class MainWindow
 
     private void StartMeterRendering()
     {
+        if (IsLibraryMaximized)
+        {
+            SyncPlayerMeterFade();
+        }
+
         if (_meterRendering)
         {
             return;

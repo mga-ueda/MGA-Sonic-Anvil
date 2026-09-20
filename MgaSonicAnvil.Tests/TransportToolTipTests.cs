@@ -62,6 +62,11 @@ public sealed class TransportToolTipTests
         Assert.Contains("No Image", UiStrings.TipWaveform);
         Assert.Contains("マーカー／リージョン／ループは出さない", UiStrings.TipWaveform);
         Assert.Contains("約3秒", UiStrings.TipWaveform);
+        Assert.Contains("1秒でフェードイン", UiStrings.TipWaveform);
+        Assert.Contains("即表示", UiStrings.TipWaveform);
+        Assert.Contains("ラウドネス", UiStrings.TipWaveform);
+        Assert.Contains("最初から消す", UiStrings.TipWaveform);
+        Assert.Contains("1秒でフェードアウト", UiStrings.TipWaveform);
         Assert.Contains("ドラッグ", UiStrings.TipLibraryColumns);
         Assert.Contains("20", UiStrings.TipClickGuardFade);
         Assert.Contains("Wwise.exe", UiStrings.TipWwiseProjectNameOpen);

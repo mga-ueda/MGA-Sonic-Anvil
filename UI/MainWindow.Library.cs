@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
@@ -38,6 +39,8 @@ public partial class MainWindow
     private DocumentSession? _gaplessTarget;
     private bool _gaplessInFlight;
     private bool _gaplessFailed;
+    private bool _playerMeterChrome;
+    private bool? _playerMetersShown;
 
     internal bool IsLibraryMaximized => _waveformMaximizeMode == WaveformMaximizeMode.Library;
 
@@ -135,7 +138,74 @@ public partial class MainWindow
             _libraryHoldJacketWash = false;
             _ = LeaveLibraryMaximizeAsync();
         }
+
+        SyncPlayerMeterFade();
     }
+
+    /// <summary>
+    /// プレイヤーのレベルメーター／スペアナ／ラウドネス／ゴニオ／サラウンド。
+    /// 突入は消えた状態から。空なら出したままフェードアウトしない。
+    /// 停止中の追加は 1 秒フェードイン、音声で動き始めたら即表示。空になったら 1 秒フェードアウト。
+    /// </summary>
+    private void SyncPlayerMeterFade()
+    {
+        var player = IsLibraryMaximized;
+        var show = LibraryPlayerMode.ShowsPlayerMeters(player, _sessions.Count);
+        var entering = player && !_playerMeterChrome;
+        var leaving = !player && _playerMeterChrome;
+        _playerMeterChrome = player;
+        var instantReveal = LibraryPlayerMode.InstantPlayerMeterReveal(
+            show,
+            player && IsPlaybackActive());
+
+        if (leaving)
+        {
+            ApplyPlayerMeterFade(visible: true, instant: true);
+            _playerMetersShown = true;
+            return;
+        }
+
+        if (LibraryPlayerMode.SnapPlayerMetersHiddenOnEnter(entering, instantReveal))
+        {
+            ApplyPlayerMeterFade(visible: false, instant: true);
+            _playerMetersShown = false;
+        }
+
+        if (_playerMetersShown == show)
+        {
+            if (show && instantReveal)
+            {
+                ApplyPlayerMeterFade(visible: true, instant: true);
+            }
+
+            return;
+        }
+
+        ApplyPlayerMeterFade(show, instantReveal);
+        _playerMetersShown = show;
+    }
+
+    private void ApplyPlayerMeterFade(bool visible, bool instant)
+    {
+        var to = visible ? 1d : 0d;
+        foreach (var target in PlayerMeterFadeTargets())
+        {
+            var from = target.Opacity;
+            target.BeginAnimation(UIElement.OpacityProperty, null);
+            target.Opacity = from;
+            target.IsHitTestVisible = visible;
+            if (instant || Math.Abs(from - to) < 0.001)
+            {
+                target.Opacity = to;
+                continue;
+            }
+
+            target.BeginAnimation(UIElement.OpacityProperty, LibraryPlayerMode.CreateMeterFade(from, to));
+        }
+    }
+
+    private UIElement[] PlayerMeterFadeTargets() =>
+        [LevelMeter, VectorScope, Spectrum, LoudnessMeter];
 
     /// <summary>
     /// プレイヤー中はクロムの塗りを外し、ウィンドウ全体のジャケットウォッシュを透かす。
@@ -643,6 +713,7 @@ public partial class MainWindow
                     LibraryBrowser.SelectedSessions);
             }
 
+            SyncPlayerMeterFade();
             return;
         }
 
@@ -650,6 +721,7 @@ public partial class MainWindow
         {
             SelectAndPlayFirstLibraryTrack();
             _libraryPlayFirstPending = false;
+            SyncPlayerMeterFade();
             return;
         }
 
@@ -663,6 +735,8 @@ public partial class MainWindow
         {
             _ = PlayLibrarySessionAsync(active);
         }
+
+        SyncPlayerMeterFade();
     }
 
     /// <summary>
@@ -711,12 +785,14 @@ public partial class MainWindow
             LibraryBrowser.SetSessions(_sessions, null);
             LibraryBrowser.SetArtwork(null);
             RefreshStatus();
+            SyncPlayerMeterFade();
             return;
         }
 
         next ??= _sessions[0];
         LibraryBrowser.SetSessions(_sessions, next, [next]);
         RefreshStatus();
+        SyncPlayerMeterFade();
         _ = PlayLibrarySessionAsync(next);
     }
 
@@ -797,6 +873,7 @@ public partial class MainWindow
 
         if (cancelled)
         {
+            SyncPlayerMeterFade();
             return;
         }
 
@@ -804,11 +881,13 @@ public partial class MainWindow
         {
             LibraryBrowser.SetSessions(_sessions, null);
             LibraryBrowser.SetArtwork(null);
+            SyncPlayerMeterFade();
             return;
         }
 
         next ??= _sessions[0];
         LibraryBrowser.SetSessions(_sessions, next, [next]);
+        SyncPlayerMeterFade();
         _ = PlayLibrarySessionAsync(next);
     }
 
@@ -1994,6 +2073,7 @@ public partial class MainWindow
         }
 
         LibraryBrowser.AppendSession(session, select);
+        SyncPlayerMeterFade();
         if (select)
         {
             _libraryHoldJacketWash = false;
@@ -2061,6 +2141,7 @@ public partial class MainWindow
             BindWorkspace(null);
             RebuildTabBar();
             NotifyWaveformSessionsChanged();
+            SyncPlayerMeterFade();
             return true;
         }
 
@@ -2095,6 +2176,7 @@ public partial class MainWindow
             LibraryBrowser.SetSessions(_sessions, _activeSession);
         }
 
+        SyncPlayerMeterFade();
         return !cancelled;
     }
 }

@@ -1,4 +1,7 @@
+using System.Runtime.ExceptionServices;
+using System.Threading;
 using System.Windows.Input;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.UI;
@@ -252,6 +255,47 @@ public sealed class LibraryPlayerModeTests
     }
 
     [Fact]
+    public void ShowsPlayerMeters_HidesWhenPlaylistEmpty()
+    {
+        Assert.True(LibraryPlayerMode.ShowsPlayerMeters(playerMode: false, playlistCount: 0));
+        Assert.True(LibraryPlayerMode.ShowsPlayerMeters(playerMode: false, playlistCount: 2));
+        Assert.False(LibraryPlayerMode.ShowsPlayerMeters(playerMode: true, playlistCount: 0));
+        Assert.True(LibraryPlayerMode.ShowsPlayerMeters(playerMode: true, playlistCount: 1));
+        Assert.False(LibraryPlayerMode.InstantPlayerMeterReveal(show: false, signalMoving: true));
+        Assert.False(LibraryPlayerMode.InstantPlayerMeterReveal(show: true, signalMoving: false));
+        Assert.True(LibraryPlayerMode.InstantPlayerMeterReveal(show: true, signalMoving: true));
+        Assert.True(LibraryPlayerMode.SnapPlayerMetersHiddenOnEnter(enteringPlayer: true, instantReveal: false));
+        Assert.False(LibraryPlayerMode.SnapPlayerMetersHiddenOnEnter(enteringPlayer: true, instantReveal: true));
+        Assert.False(LibraryPlayerMode.SnapPlayerMetersHiddenOnEnter(enteringPlayer: false, instantReveal: false));
+        Assert.Equal(1, LibraryPlayerMode.MeterFadeSeconds);
+        Assert.True(LibraryPlayerMode.MeterFadeFrameRate >= 24);
+        Assert.True(LibraryPlayerMode.MeterFadeFrameRate <= 60);
+    }
+
+    [Fact]
+    public void CreateMeterFade_IsOneSecondSine()
+    {
+        RunSta(() =>
+        {
+            var fadeIn = LibraryPlayerMode.CreateMeterFade(0, 1);
+            var fadeOut = LibraryPlayerMode.CreateMeterFade(1, 0);
+            Assert.Equal(TimeSpan.FromSeconds(1), fadeIn.Duration.TimeSpan);
+            Assert.Equal(0, fadeIn.From);
+            Assert.Equal(1, fadeIn.To);
+            Assert.Equal(1, fadeOut.From);
+            Assert.Equal(0, fadeOut.To);
+            Assert.Equal(FillBehavior.HoldEnd, fadeIn.FillBehavior);
+            var fadeInEase = Assert.IsType<SineEase>(fadeIn.EasingFunction);
+            var fadeOutEase = Assert.IsType<SineEase>(fadeOut.EasingFunction);
+            Assert.Equal(EasingMode.EaseOut, fadeInEase.EasingMode);
+            Assert.Equal(EasingMode.EaseIn, fadeOutEase.EasingMode);
+            Assert.False(fadeIn.AutoReverse);
+            Assert.Equal(LibraryPlayerMode.MeterFadeFrameRate, Timeline.GetDesiredFrameRate(fadeIn));
+            Assert.Equal(LibraryPlayerMode.MeterFadeFrameRate, Timeline.GetDesiredFrameRate(fadeOut));
+        });
+    }
+
+    [Fact]
     public void ListNav_HomeEndPageAndVisibleStep()
     {
         Assert.Equal(0, LibraryPlayerMode.EdgeIndex(4, -1));
@@ -351,4 +395,27 @@ public sealed class LibraryPlayerModeTests
 
     private static DocumentSession Session(string name) =>
         new(new AudioDocument([], 48000, 1, 16, AudioFileKind.Wave, name));
+
+    private static void RunSta(Action action)
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null)
+        {
+            ExceptionDispatchInfo.Capture(error).Throw();
+        }
+    }
 }
