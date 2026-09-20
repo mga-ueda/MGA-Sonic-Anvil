@@ -186,7 +186,8 @@ internal sealed class WaveformView : Grid
     private double? _mouseGuideX;
     private double _appliedGuideX = double.NaN;
     private bool _guideOverSelection;
-    private bool _mouseGuideQueued;
+    private double _lastPlayheadPaintX = double.NaN;
+    private long _lastPlayheadPaintAt;
     private bool _snapCacheDirty = true;
     private readonly List<(double X, long Frame)> _snapPoints = [];
     private long _hoverCursorAt;
@@ -389,7 +390,7 @@ internal sealed class WaveformView : Grid
                 RecordTrailSample(value, _trailSamples);
             }
 
-            InvalidatePlayheadOnly();
+            InvalidatePlayheadOnlyIfDue();
         }
     }
 
@@ -413,7 +414,7 @@ internal sealed class WaveformView : Grid
             RecordTrailSample(frame, _trailSamples);
         }
 
-        InvalidatePlayheadOnly();
+        InvalidatePlayheadOnlyIfDue();
     }
 
     /// <summary>
@@ -450,7 +451,7 @@ internal sealed class WaveformView : Grid
                 RecordTrailSample(value, _exitTrailSamples);
             }
 
-            InvalidatePlayheadOnly();
+            InvalidatePlayheadOnlyIfDue();
         }
     }
 
@@ -1849,7 +1850,7 @@ internal sealed class WaveformView : Grid
     {
         var pos = e.GetPosition(this);
         SetMouseGuideFromX(pos.X);
-        QueueMouseGuideOverlay();
+        ApplyMouseGuideOverlay();
 
         if (_dragging && _scrubbing && _document is not null)
         {
@@ -6184,22 +6185,7 @@ internal sealed class WaveformView : Grid
             : x;
     }
 
-    private void QueueMouseGuideOverlay()
-    {
-        if (_mouseGuideQueued)
-        {
-            return;
-        }
-
-        _mouseGuideQueued = true;
-        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, FlushMouseGuideOverlay);
-    }
-
-    private void FlushMouseGuideOverlay()
-    {
-        _mouseGuideQueued = false;
-        ApplyMouseGuideOverlay();
-    }
+    private void QueueMouseGuideOverlay() => ApplyMouseGuideOverlay();
 
     private bool TrySnapXToMarker(double mouseX, HashSet<long>? exclude, out double snappedX, out long frame)
     {
@@ -6541,6 +6527,30 @@ internal sealed class WaveformView : Grid
     }
 
     private void InvalidatePlayheadOnly() => _playheadHost.InvalidateVisual();
+
+    private void InvalidatePlayheadOnlyIfDue()
+    {
+        if (ActualWidth <= 1)
+        {
+            InvalidatePlayheadOnly();
+            return;
+        }
+
+        var x = FrameToViewX(
+            _playheadFrame,
+            _viewStart,
+            ViewSpanFrames,
+            new Rect(0, 0, ActualWidth, ActualHeight));
+        var now = Environment.TickCount64;
+        if (!LibraryPlayerMode.ShouldRefreshPlayheadPaint(_lastPlayheadPaintX, _lastPlayheadPaintAt, x, now))
+        {
+            return;
+        }
+
+        _lastPlayheadPaintX = x;
+        _lastPlayheadPaintAt = now;
+        InvalidatePlayheadOnly();
+    }
 
     private void DrawPlayhead(DrawingContext dc, Rect bounds, double start, double span)
     {

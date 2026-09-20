@@ -24,6 +24,8 @@ internal sealed class OverviewView : FrameworkElement
     private int _zeroBgra;
     private HashSet<long>? _selectedMarkerFrames;
     private long _exitPlayheadFrame = -1;
+    private double _lastPlayheadPaintX = double.NaN;
+    private long _lastPlayheadPaintAt;
     private Pen? _playheadGlowOuter;
     private Pen? _playheadGlowInner;
     private Pen? _playheadCore;
@@ -113,8 +115,28 @@ internal sealed class OverviewView : FrameworkElement
         if (_exitPlayheadFrame != exitFrame)
         {
             _exitPlayheadFrame = exitFrame;
+            _lastPlayheadPaintX = double.NaN;
+            _lastPlayheadPaintAt = Environment.TickCount64;
+            InvalidateVisual();
+            return;
         }
 
+        if (_document is null || _document.FrameCount <= 0 || ActualWidth <= 1)
+        {
+            InvalidateVisual();
+            return;
+        }
+
+        var playFrame = _seekTrailSource?.PlayheadFrame ?? _document.CursorFrame;
+        var x = playFrame / (double)_document.FrameCount * ActualWidth;
+        var now = Environment.TickCount64;
+        if (!LibraryPlayerMode.ShouldRefreshPlayheadPaint(_lastPlayheadPaintX, _lastPlayheadPaintAt, x, now))
+        {
+            return;
+        }
+
+        _lastPlayheadPaintX = x;
+        _lastPlayheadPaintAt = now;
         InvalidateVisual();
     }
 

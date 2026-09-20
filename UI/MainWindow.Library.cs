@@ -29,6 +29,7 @@ public partial class MainWindow
     private bool _libraryWaapiSuspended;
     private bool _restoreWaapiAfterLibrary;
     private readonly HashSet<AudioDocument> _libraryPeakJobs = [];
+    private readonly Dictionary<AudioDocument, CancellationTokenSource> _libraryPeakJobCts = [];
     private int _libraryPeakGeneration;
     private int _libraryWavePaintTicket;
     private CancellationTokenSource _libraryPeakCts = new();
@@ -242,10 +243,52 @@ public partial class MainWindow
     private void CancelLibraryPeakJobs()
     {
         _libraryPeakGeneration++;
+        _libraryPeakJobs.Clear();
+        foreach (var job in _libraryPeakJobCts.Values)
+        {
+            try
+            {
+                job.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
+        _libraryPeakJobCts.Clear();
         var previous = _libraryPeakCts;
         _libraryPeakCts = new CancellationTokenSource();
         previous.Cancel();
         previous.Dispose();
+    }
+
+    /// <summary>
+    /// 表示中と次曲以外の走査だけ止める。世代は進めない（今の波形を途中で捨てない）。
+    /// </summary>
+    private void TrimUnwantedLibraryPeakJobs()
+    {
+        if (!IsLibraryMaximized)
+        {
+            return;
+        }
+
+        var playing = _activeSession?.Document;
+        var next = _gaplessTarget?.Document;
+        foreach (var pair in _libraryPeakJobCts)
+        {
+            if (LibraryPlayerMode.KeepPeakJob(pair.Key, playing, next))
+            {
+                continue;
+            }
+
+            try
+            {
+                pair.Value.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
     }
 
     private void UpgradeLibraryPeaksForEditor()
@@ -864,6 +907,11 @@ public partial class MainWindow
                 || !ReferenceEquals(next, LibraryBrowser.NextPlaylistSession(_activeSession)))
             {
                 source.Dispose();
+                if (token == _gaplessToken)
+                {
+                    _gaplessFailed = true;
+                }
+
                 return;
             }
 
@@ -914,12 +962,17 @@ public partial class MainWindow
             return null;
         }
 
-        return AudioStreamSource.Open(path);
+        return AudioStreamSource.Open(path, prebufferTimeoutMs: 200);
     }
 
     private bool AdoptLibraryGaplessAdvance()
     {
-        if (!IsLibraryMaximized || !_player.TryTakeGaplessAdvance(out var document) || document is null)
+        if (!IsLibraryMaximized || !_player.HasGaplessAdvancePending)
+        {
+            return false;
+        }
+
+        if (!_player.TryTakeGaplessAdvance(out var document) || document is null)
         {
             return false;
         }
@@ -1053,6 +1106,7 @@ public partial class MainWindow
             direction < 0 ? -LibraryPlayerMode.SeekNudgeSeconds : LibraryPlayerMode.SeekNudgeSeconds);
         _seekNudgeDirection = direction;
         _seekNudgeRepeatStarted = false;
+        _seekNudgeLastAt = Environment.TickCount64;
         _seekNudgeTimer.Stop();
         _seekNudgeTimer.Interval = TimeSpan.FromMilliseconds(
             LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: false));
@@ -1068,10 +1122,13 @@ public partial class MainWindow
             return;
         }
 
-        SeekLibraryBySeconds(
-            _seekNudgeDirection < 0
-                ? -LibraryPlayerMode.SeekNudgeSeconds
-                : LibraryPlayerMode.SeekNudgeSeconds);
+        var now = Environment.TickCount64;
+        var seconds = _seekNudgeDirection < 0
+            ? -LibraryPlayerMode.SeekNudgeCatchUpSeconds(now - _seekNudgeLastAt, _seekNudgeRepeatStarted)
+            : LibraryPlayerMode.SeekNudgeCatchUpSeconds(now - _seekNudgeLastAt, _seekNudgeRepeatStarted);
+        SeekLibraryBySeconds(seconds);
+
+        _seekNudgeLastAt = now;
         if (_seekNudgeRepeatStarted)
         {
             return;
@@ -1321,6 +1378,7 @@ public partial class MainWindow
         }
 
         var display = IsLibraryMaximized;
+        TrimUnwantedLibraryPeakJobs();
         // 途中スナップショット（未走査は 0）が残っている間は、完成までやり直す。
         if (!document.Peaks.IsEmpty
             && !document.Peaks.IsBuilding
@@ -1340,11 +1398,12 @@ public partial class MainWindow
             return;
         }
 
-        // 世代はライブラリを閉じたときだけ進める。曲ごとの開始で進めると、
-        // 次曲の先読みが再生中の走査を無効にし、途中のピークのまま波形が途切れる。
         var peakGeneration = _libraryPeakGeneration;
-        var progressGate = new int[1];
-        var token = _libraryPeakCts.Token;
+        var pendingPartial = new PeakPyramid?[1];
+        var invokePending = 0;
+        var jobCts = CancellationTokenSource.CreateLinkedTokenSource(_libraryPeakCts.Token);
+        _libraryPeakJobCts[document] = jobCts;
+        var token = jobCts.Token;
         var retry = false;
         try
         {
@@ -1363,16 +1422,23 @@ public partial class MainWindow
                                 return;
                             }
 
-                            var ticket = Interlocked.Increment(ref progressGate[0]);
+                            Volatile.Write(ref pendingPartial[0], partial);
+                            if (Interlocked.Exchange(ref invokePending, 1) != 0)
+                            {
+                                return;
+                            }
+
                             // Normal は Input より先。長いピーク走査中にキーとマウスが飢える。
                             dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
                             {
-                                if (ticket != Volatile.Read(ref progressGate[0]))
+                                Interlocked.Exchange(ref invokePending, 0);
+                                var snapshot = Volatile.Read(ref pendingPartial[0]);
+                                if (snapshot is null || peakGeneration != _libraryPeakGeneration)
                                 {
                                     return;
                                 }
 
-                                TryApplyLibraryPeaks(session, document, peakGeneration, partial, throttlePaint: true);
+                                TryApplyLibraryPeaks(session, document, peakGeneration, snapshot, throttlePaint: true);
                             });
                         },
                         token),
@@ -1389,8 +1455,6 @@ public partial class MainWindow
                     token).ConfigureAwait(true);
             }
 
-            // キューに残った途中描画が、このあと完成ピークを上書きしないようにする。
-            Interlocked.Increment(ref progressGate[0]);
             var superseded = peakGeneration != _libraryPeakGeneration
                 || !ReferenceEquals(session.Document, document);
             if (!superseded && IsLibraryMaximized != display && !document.IsStreamPlayback)
@@ -1406,10 +1470,30 @@ public partial class MainWindow
                                        or InvalidOperationException or OperationCanceledException)
         {
             // ピークだけ失敗しても再生は続ける。
+            // 今の曲の走査が次曲の先読みで止まったときは、世代を進めずにやり直す。
+            if (ex is OperationCanceledException
+                && IsLibraryMaximized
+                && _sessions.Contains(session)
+                && ReferenceEquals(_activeSession, session)
+                && ReferenceEquals(session.Document, document)
+                && document.Peaks.IsBuilding)
+            {
+                retry = true;
+            }
         }
         finally
         {
-            _libraryPeakJobs.Remove(document);
+            if (_libraryPeakJobCts.TryGetValue(document, out var tracked)
+                && ReferenceEquals(tracked, jobCts))
+            {
+                _libraryPeakJobCts.Remove(document);
+            }
+
+            jobCts.Dispose();
+            if (peakGeneration == _libraryPeakGeneration)
+            {
+                _libraryPeakJobs.Remove(document);
+            }
         }
 
         if (retry)
@@ -1840,9 +1924,16 @@ public partial class MainWindow
     {
         if (_sessions.Count == 0)
         {
+            if (IsLibraryMaximized)
+            {
+                LibraryBrowser.SetSessions(_sessions, null);
+            }
+
             return true;
         }
 
+        CancelLibraryGapless();
+        CancelLibraryPeakJobs();
         if (IsPlaybackActive())
         {
             StopPlayback();
@@ -1895,6 +1986,11 @@ public partial class MainWindow
                 cancelled = true;
             }
         });
+
+        if (!cancelled && IsLibraryMaximized)
+        {
+            LibraryBrowser.SetSessions(_sessions, _activeSession);
+        }
 
         return !cancelled;
     }

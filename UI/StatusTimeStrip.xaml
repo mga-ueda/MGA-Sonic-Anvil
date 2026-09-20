@@ -8,44 +8,60 @@
     <TextBlock x:Name="CurrentLabel"
                Style="{StaticResource StatusTimecodeLabelStyle}"
                PreviewMouseWheel="Label_PreviewMouseWheel" />
-    <TextBox x:Name="CurrentBox"
-             Style="{StaticResource StatusTimecodeStyle}"
-             Text="00:00.000"
-             PreviewKeyDown="Field_PreviewKeyDown"
-             PreviewMouseWheel="Field_PreviewMouseWheel"
-             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"
-             GotKeyboardFocus="Field_GotKeyboardFocus"
-             LostKeyboardFocus="Field_LostKeyboardFocus" />
+    <Grid>
+      <TextBox x:Name="CurrentBox"
+               Style="{StaticResource StatusTimecodeStyle}"
+               PreviewKeyDown="Field_PreviewKeyDown"
+               PreviewMouseWheel="Field_PreviewMouseWheel"
+               PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"
+               GotKeyboardFocus="Field_GotKeyboardFocus"
+               LostKeyboardFocus="Field_LostKeyboardFocus" />
+      <TextBlock x:Name="CurrentDisplay"
+                 Style="{StaticResource StatusTimecodeOverlayStyle}"
+                 Text="00:00.000" />
+    </Grid>
     <TextBlock x:Name="SelStartLabel"
                Style="{StaticResource StatusTimecodeLabelStyle}"
                PreviewMouseWheel="Label_PreviewMouseWheel" />
-    <TextBox x:Name="SelStartBox"
-             Style="{StaticResource StatusTimecodeStyle}"
-             PreviewKeyDown="Field_PreviewKeyDown"
-             PreviewMouseWheel="Field_PreviewMouseWheel"
-             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"
-             GotKeyboardFocus="Field_GotKeyboardFocus"
-             LostKeyboardFocus="Field_LostKeyboardFocus" />
+    <Grid>
+      <TextBox x:Name="SelStartBox"
+               Style="{StaticResource StatusTimecodeStyle}"
+               PreviewKeyDown="Field_PreviewKeyDown"
+               PreviewMouseWheel="Field_PreviewMouseWheel"
+               PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"
+               GotKeyboardFocus="Field_GotKeyboardFocus"
+               LostKeyboardFocus="Field_LostKeyboardFocus" />
+      <TextBlock x:Name="SelStartDisplay"
+                 Style="{StaticResource StatusTimecodeOverlayStyle}" />
+    </Grid>
     <TextBlock x:Name="SelLengthLabel"
                Style="{StaticResource StatusTimecodeLabelStyle}"
                PreviewMouseWheel="Label_PreviewMouseWheel" />
-    <TextBox x:Name="SelLengthBox"
-             Style="{StaticResource StatusTimecodeStyle}"
-             PreviewKeyDown="Field_PreviewKeyDown"
-             PreviewMouseWheel="Field_PreviewMouseWheel"
-             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"
-             GotKeyboardFocus="Field_GotKeyboardFocus"
-             LostKeyboardFocus="Field_LostKeyboardFocus" />
+    <Grid>
+      <TextBox x:Name="SelLengthBox"
+               Style="{StaticResource StatusTimecodeStyle}"
+               PreviewKeyDown="Field_PreviewKeyDown"
+               PreviewMouseWheel="Field_PreviewMouseWheel"
+               PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"
+               GotKeyboardFocus="Field_GotKeyboardFocus"
+               LostKeyboardFocus="Field_LostKeyboardFocus" />
+      <TextBlock x:Name="SelLengthDisplay"
+                 Style="{StaticResource StatusTimecodeOverlayStyle}" />
+    </Grid>
     <TextBlock x:Name="SelEndLabel"
                Style="{StaticResource StatusTimecodeLabelStyle}"
                PreviewMouseWheel="Label_PreviewMouseWheel" />
-    <TextBox x:Name="SelEndBox"
-             Style="{StaticResource StatusTimecodeStyle}"
-             PreviewKeyDown="Field_PreviewKeyDown"
-             PreviewMouseWheel="Field_PreviewMouseWheel"
-             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"
-             GotKeyboardFocus="Field_GotKeyboardFocus"
-             LostKeyboardFocus="Field_LostKeyboardFocus" />
+    <Grid>
+      <TextBox x:Name="SelEndBox"
+               Style="{StaticResource StatusTimecodeStyle}"
+               PreviewKeyDown="Field_PreviewKeyDown"
+               PreviewMouseWheel="Field_PreviewMouseWheel"
+               PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"
+               GotKeyboardFocus="Field_GotKeyboardFocus"
+               LostKeyboardFocus="Field_LostKeyboardFocus" />
+      <TextBlock x:Name="SelEndDisplay"
+                 Style="{StaticResource StatusTimecodeOverlayStyle}" />
+    </Grid>
     <TextBlock x:Name="TotalLabel" Style="{StaticResource StatusTimecodeLabelStyle}" />
     <Grid MinWidth="{x:Static ui:DesignMetrics.StatusTimecodeWidth}"
           Width="{x:Static ui:DesignMetrics.StatusTimecodeWidth}"

@@ -31,6 +31,8 @@ public partial class MainWindow : Window
     private readonly Stopwatch _meterClock = Stopwatch.StartNew();
     private bool _meterRendering;
     private TimeSpan _lastRenderingTime;
+    private long _lastPlaybackVisualStamp;
+    private bool _analyzerTickQueued;
     private readonly DispatcherTimer _playTimer;
     private readonly DispatcherTimer _markerDigitTimer;
     private readonly DispatcherTimer _markerNudgeTimer;
@@ -39,6 +41,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _seekNudgeTimer;
     private int _seekNudgeDirection;
     private bool _seekNudgeRepeatStarted;
+    private long _seekNudgeLastAt;
     private PlaceRepeatKind _placeRepeatKind;
     private bool _placeRepeatStarted;
     private int _boostNudgeDirection;
@@ -262,7 +265,7 @@ public partial class MainWindow : Window
         _placeRepeatTimer.Tick += (_, _) => OnPlaceRepeatTick();
         _boostNudgeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs) };
         _boostNudgeTimer.Tick += (_, _) => OnSpectrogramBoostNudgeTick();
-        _seekNudgeTimer = new DispatcherTimer
+        _seekNudgeTimer = new DispatcherTimer(LibraryPlayerMode.SeekNudgeTimerPriority)
         {
             Interval = TimeSpan.FromMilliseconds(LibraryPlayerMode.SeekNudgeRepeatDelayMs),
         };

@@ -29,6 +29,8 @@ internal sealed class LibraryBrowserView : UserControl
     internal const double GlowDriftXSeconds = 9;
     internal const double GlowDriftYSeconds = 13;
     internal const int GlowDriftFrameRate = 16;
+    /// <summary>全画面ウォッシュのキャッシュ解像度。1 だとクロスフェードのたびに巨大ビットマップを作り直す。</summary>
+    internal const double GlowCacheRenderAtScale = 0.35;
     internal const double GlowCrossfadeSeconds = 1;
     internal const int GlowCrossfadeFrameRate = 30;
     internal const int GlowWashTurnSteps = 4;
@@ -358,6 +360,8 @@ internal sealed class LibraryBrowserView : UserControl
 
     internal object? BoundItemsSource => _grid.ItemsSource;
 
+    internal int BoundRowCount => _items.Count;
+
     internal FrameworkElement FileGrid => _grid;
 
     internal int RootColumnCount => _root.ColumnDefinitions.Count;
@@ -409,56 +413,81 @@ internal sealed class LibraryBrowserView : UserControl
     }
 
     /// <summary>表示順の次の曲。最後の次は先頭。1曲なら同じ曲。</summary>
-    public DocumentSession? NextPlaylistSession(DocumentSession? current)
-    {
-        var order = PlaylistOrder();
-        if (order.Count == 0)
-        {
-            return null;
-        }
-
-        var index = -1;
-        if (current is not null)
-        {
-            for (var i = 0; i < order.Count; i++)
-            {
-                if (ReferenceEquals(order[i], current))
-                {
-                    index = i;
-                    break;
-                }
-            }
-        }
-
-        var next = LibraryPlayerMode.NextLoopIndex(order.Count, index);
-        return next < 0 ? null : order[next];
-    }
+    public DocumentSession? NextPlaylistSession(DocumentSession? current) =>
+        PlaylistSessionByLoop(current, previous: false);
 
     /// <summary>表示順の前の曲。先頭の前は末尾。1曲なら同じ曲。</summary>
-    public DocumentSession? PreviousPlaylistSession(DocumentSession? current)
+    public DocumentSession? PreviousPlaylistSession(DocumentSession? current) =>
+        PlaylistSessionByLoop(current, previous: true);
+
+    /// <summary>
+    /// 再生中の 60fps からも呼ばれる。DataGrid.Items はグループ化ビューを歩いて
+    /// コンテナ生成まで起こすので使わない。並べ済みの _items を直接見る。
+    /// </summary>
+    private DocumentSession? PlaylistSessionByLoop(DocumentSession? current, bool previous)
     {
-        var order = PlaylistOrder();
-        if (order.Count == 0)
+        var rows = PlaylistRows();
+        var count = 0;
+        foreach (var row in rows)
+        {
+            if (row.Tag is DocumentSession)
+            {
+                count++;
+            }
+        }
+
+        if (count <= 0)
         {
             return null;
         }
 
         var index = -1;
-        if (current is not null)
+        var i = 0;
+        foreach (var row in rows)
         {
-            for (var i = 0; i < order.Count; i++)
+            if (row.Tag is not DocumentSession session)
             {
-                if (ReferenceEquals(order[i], current))
-                {
-                    index = i;
-                    break;
-                }
+                continue;
             }
+
+            if (current is not null && ReferenceEquals(session, current))
+            {
+                index = i;
+                break;
+            }
+
+            i++;
         }
 
-        var previous = LibraryPlayerMode.PreviousLoopIndex(order.Count, index);
-        return previous < 0 ? null : order[previous];
+        var at = previous
+            ? LibraryPlayerMode.PreviousLoopIndex(count, index)
+            : LibraryPlayerMode.NextLoopIndex(count, index);
+        if (at < 0)
+        {
+            return null;
+        }
+
+        i = 0;
+        foreach (var row in rows)
+        {
+            if (row.Tag is not DocumentSession session)
+            {
+                continue;
+            }
+
+            if (i == at)
+            {
+                return session;
+            }
+
+            i++;
+        }
+
+        return null;
     }
+
+    private IEnumerable<LibraryFileRow> PlaylistRows() =>
+        _items.Count > 0 ? _items : _rows;
 
     /// <summary>再生追従で行を選ぶ。クリック再生は起こさない。複数選択は今の曲が含まれていれば残す。</summary>
     public void SelectSessionQuiet(DocumentSession session)
@@ -489,36 +518,6 @@ internal sealed class LibraryBrowserView : UserControl
         {
             EnsureRowVisible(_grid.SelectedItem);
         }
-    }
-
-    private List<DocumentSession> PlaylistOrder()
-    {
-        var order = new List<DocumentSession>();
-        if (_grid.ItemsSource is not null)
-        {
-            foreach (var item in _grid.Items)
-            {
-                if (item is LibraryFileRow { Tag: DocumentSession session })
-                {
-                    order.Add(session);
-                }
-            }
-        }
-
-        if (order.Count > 0)
-        {
-            return order;
-        }
-
-        foreach (var row in _rows)
-        {
-            if (row.Tag is DocumentSession session)
-            {
-                order.Add(session);
-            }
-        }
-
-        return order;
     }
 
     public void FocusList()
@@ -697,38 +696,44 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void MoveSelection(int delta, bool extend = false)
     {
-        if (delta == 0 || _grid.Items.Count == 0)
+        if (delta == 0)
         {
             return;
         }
 
-        var index = _grid.SelectedIndex;
+        var count = CountPlaylistFiles();
+        if (count <= 0)
+        {
+            return;
+        }
+
+        var index = PlaylistFileIndexOfSelected();
         if (index < 0)
         {
-            index = delta > 0 ? 0 : _grid.Items.Count - 1;
+            index = delta > 0 ? 0 : count - 1;
         }
         else
         {
-            index = Math.Clamp(index + delta, 0, _grid.Items.Count - 1);
+            index = Math.Clamp(index + delta, 0, count - 1);
         }
 
-        ApplyMoveSelection(index, extend);
+        ApplyMoveSelectionFile(index, extend);
     }
 
     public void MoveSelectionToEdge(int edge, bool extend = false)
     {
-        var index = LibraryPlayerMode.EdgeIndex(_grid.Items.Count, edge);
+        var index = LibraryPlayerMode.EdgeIndex(CountPlaylistFiles(), edge);
         if (index < 0)
         {
             return;
         }
 
-        ApplyMoveSelection(index, extend);
+        ApplyMoveSelectionFile(index, extend);
     }
 
     public void MoveSelectionPage(int direction, bool extend = false)
     {
-        if (direction == 0 || _grid.Items.Count == 0)
+        if (direction == 0)
         {
             return;
         }
@@ -737,19 +742,87 @@ internal sealed class LibraryBrowserView : UserControl
         MoveSelection(direction < 0 ? -step : step, extend);
     }
 
-    private void ApplyMoveSelection(int index, bool extend)
+    private int CountPlaylistFiles()
     {
+        var count = 0;
+        foreach (var row in PlaylistRows())
+        {
+            if (row.Tag is DocumentSession)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private int PlaylistFileIndexOfSelected()
+    {
+        var selected = SelectedSession;
+        if (selected is null)
+        {
+            return -1;
+        }
+
+        var index = 0;
+        foreach (var row in PlaylistRows())
+        {
+            if (row.Tag is not DocumentSession session)
+            {
+                continue;
+            }
+
+            if (ReferenceEquals(session, selected))
+            {
+                return index;
+            }
+
+            index++;
+        }
+
+        return -1;
+    }
+
+    private LibraryFileRow? PlaylistFileAt(int index)
+    {
+        var i = 0;
+        foreach (var row in PlaylistRows())
+        {
+            if (row.Tag is not DocumentSession)
+            {
+                continue;
+            }
+
+            if (i == index)
+            {
+                return row;
+            }
+
+            i++;
+        }
+
+        return null;
+    }
+
+    private void ApplyMoveSelectionFile(int index, bool extend)
+    {
+        var row = PlaylistFileAt(index);
+        if (row is null)
+        {
+            return;
+        }
+
         _deferActivate = true;
         try
         {
             if (!extend)
             {
                 _anchorIndex = index;
-                _grid.SelectedIndex = index;
+                _grid.SelectedItem = row;
             }
             else
             {
-                SelectRange(_anchorIndex, index);
+                SelectPlaylistFileRange(_anchorIndex, index);
             }
         }
         finally
@@ -758,9 +831,69 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         EnsureListFocused();
-        if (_grid.Items[index] is LibraryFileRow row)
+        EnsureRowVisible(row);
+    }
+
+    private void SelectPlaylistFileRange(int from, int to)
+    {
+        var count = CountPlaylistFiles();
+        if (count <= 0)
         {
-            EnsureRowVisible(row);
+            return;
+        }
+
+        from = Math.Clamp(from, 0, count - 1);
+        to = Math.Clamp(to, 0, count - 1);
+        var lo = Math.Min(from, to);
+        var hi = Math.Max(from, to);
+        _syncing = true;
+        try
+        {
+            _grid.SelectedItems.Clear();
+            var i = 0;
+            LibraryFileRow? current = null;
+            foreach (var row in PlaylistRows())
+            {
+                if (row.Tag is not DocumentSession)
+                {
+                    continue;
+                }
+
+                if (i >= lo && i <= hi)
+                {
+                    _grid.SelectedItems.Add(row);
+                    if (i == to)
+                    {
+                        current = row;
+                    }
+                }
+
+                i++;
+            }
+
+            if (current is not null)
+            {
+                _grid.SelectedItem = current;
+                i = 0;
+                foreach (var row in PlaylistRows())
+                {
+                    if (row.Tag is not DocumentSession)
+                    {
+                        continue;
+                    }
+
+                    if (i >= lo && i <= hi && !_grid.SelectedItems.Contains(row))
+                    {
+                        _grid.SelectedItems.Add(row);
+                    }
+
+                    i++;
+                }
+            }
+        }
+        finally
+        {
+            _syncing = false;
         }
     }
 
@@ -1197,7 +1330,13 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void BindRowsCore(DocumentSession? active, IReadOnlyList<DocumentSession>? selected)
     {
-        _items = new ObservableCollection<LibraryFileRow>(_rows);
+        DetachBoundRows();
+        _items.Clear();
+        foreach (var row in _rows)
+        {
+            _items.Add(row);
+        }
+
         var view = new ListCollectionView(_items);
         if (_group != LibraryFileGroup.None)
         {
@@ -1207,6 +1346,23 @@ internal sealed class LibraryBrowserView : UserControl
         _grid.ItemsSource = view;
         ApplyRowSelectionCore(active, selected);
         RefreshSortChrome();
+    }
+
+    /// <summary>
+    /// DataGrid のグループ化 CollectionView を切る。ItemsSource を差し替えるだけでは
+    /// グループと行コンテナが残り、フォルダを渡り歩くほど操作が重くなる。
+    /// </summary>
+    private void DetachBoundRows()
+    {
+        if (_grid.ItemsSource is ListCollectionView view)
+        {
+            _grid.ItemsSource = null;
+            view.GroupDescriptions.Clear();
+            view.DetachFromSourceCollection();
+            return;
+        }
+
+        _grid.ItemsSource = null;
     }
 
     private void BeginRowSync()
@@ -1693,6 +1849,7 @@ internal sealed class LibraryBrowserView : UserControl
         drift.Children.Add(_glowTranslate);
         _glowHost.RenderTransform = drift;
         _glowHost.RenderTransformOrigin = new Point(0.5, 0.5);
+        _glowHost.CacheMode = CreateGlowBitmapCache();
         _glowHost.IsHitTestVisible = false;
         _glowHost.SnapsToDevicePixels = false;
         _glowHost.UseLayoutRounding = false;
@@ -3922,6 +4079,7 @@ internal sealed class LibraryBrowserView : UserControl
         drift.Children.Add(_waveGlowTranslate);
         _waveGlow.RenderTransform = drift;
         _waveGlow.RenderTransformOrigin = new Point(0.5, 0.5);
+        _waveGlow.CacheMode = CreateGlowBitmapCache();
         _waveGlow.IsHitTestVisible = false;
         _waveGlow.SnapsToDevicePixels = false;
         _waveGlow.UseLayoutRounding = false;
@@ -4117,6 +4275,16 @@ internal sealed class LibraryBrowserView : UserControl
         SnapsToDevicePixels = false,
         UseLayoutRounding = false,
         Opacity = 0,
+    };
+
+    /// <summary>
+    /// ドリフトをビットマップ化して、背面ウォッシュの再描画がリストまで汚さない。
+    /// </summary>
+    private static BitmapCache CreateGlowBitmapCache() => new()
+    {
+        EnableClearType = false,
+        SnapsToDevicePixels = false,
+        RenderAtScale = GlowCacheRenderAtScale,
     };
 
     private void PlaceArtworkGlow()

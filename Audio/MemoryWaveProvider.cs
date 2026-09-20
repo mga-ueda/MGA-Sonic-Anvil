@@ -140,10 +140,15 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private float[] _seekFadeOutCached = [];
     private long _seekFadeOutCachedAt = -1;
     private float[] _seekFadeMix = [];
+    private float[] _seekFadeOutPcm = [];
+    private int _seekFadeOutPcmFrames;
+    private double _seekFadeOutPcmPos;
     private AudioStreamSource? _stream;
     private AudioStreamSource? _gaplessStream;
     private AudioDocument? _gaplessDocument;
     private AudioDocument? _gaplessAdvanced;
+    private volatile int _gaplessAdvancePending;
+    private volatile bool _gaplessArmed;
     private AudioDocument? _boundDocument;
     private float[] _streamFrame = [];
     private float[] _streamCached = [];
@@ -283,7 +288,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
-    /// <summary>クロスフェード中のスキップ先。連打はここへ積む。</summary>
+    /// <summary>クロスフェード中のスキップ先。連打はここへ積む。ヘッドは目標から進める。</summary>
     public long? PendingSeekFrame
     {
         get
@@ -328,7 +333,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         {
             DisposeStreamNoLock();
             ClearGaplessNoLock();
-            _gaplessAdvanced = null;
+            NoteGaplessAdvancedNoLock(null);
             _boundDocument = document;
             _samples = document.Interleaved;
             _usedSamples = Math.Clamp(document.SampleCount, 0, _samples.Length);
@@ -396,7 +401,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _streamCachedAt = -1;
             ClearStreamReverseBuf();
             ClearGaplessNoLock();
-            _gaplessAdvanced = null;
+            NoteGaplessAdvancedNoLock(null);
             ApplyOutputConfig();
             var start = Math.Clamp(startFrame, 0, frames);
             source.SeekFrame(start, prebufferTimeoutMs: 200);
@@ -444,8 +449,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return;
         }
 
-        // StopPump はデコードスレッドの終了を最大 1 秒待つ。
-        // 音声コールバックで待つと、その間デバイスが枯れてバッファ分の無音になる。
+        // StopPump は Dispose 時だけ待つ。音声コールバックではキューへ逃がす。
         ThreadPool.UnsafeQueueUserWorkItem(
             static state =>
             {
@@ -460,14 +464,25 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             stream);
     }
 
-    public bool HasGaplessArmed
+    public bool HasGaplessArmed => _gaplessArmed;
+
+    public bool HasGaplessAdvancePending => _gaplessAdvancePending != 0;
+
+    /// <summary>描画用。カーソル・フェード・Exit・速度を 1 ロックで取る。</summary>
+    internal void ReadPlaybackVisuals(
+        out long cursor,
+        out bool seekFading,
+        out long exitFrame,
+        out double speed,
+        out int sourceRate)
     {
-        get
+        lock (_gate)
         {
-            lock (_gate)
-            {
-                return _gaplessStream is not null;
-            }
+            cursor = _channels <= 0 ? 0 : (long)Math.Floor(_sourceFrame);
+            seekFading = _seekFadePhase == 1;
+            exitFrame = _exitPlaying ? (long)Math.Floor(_exitFrame) : -1;
+            speed = _playbackSpeed;
+            sourceRate = _sourceRate;
         }
     }
 
@@ -488,6 +503,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             ClearGaplessNoLock();
             _gaplessStream = source;
             _gaplessDocument = document;
+            _gaplessArmed = true;
             return true;
         }
     }
@@ -502,12 +518,24 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
     public bool TryTakeGaplessAdvance(out AudioDocument? document)
     {
+        if (_gaplessAdvancePending == 0)
+        {
+            document = null;
+            return false;
+        }
+
         lock (_gate)
         {
             document = _gaplessAdvanced;
-            _gaplessAdvanced = null;
+            NoteGaplessAdvancedNoLock(null);
             return document is not null;
         }
+    }
+
+    private void NoteGaplessAdvancedNoLock(AudioDocument? document)
+    {
+        _gaplessAdvanced = document;
+        _gaplessAdvancePending = document is null ? 0 : 1;
     }
 
     private void ClearGaplessNoLock()
@@ -515,6 +543,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _gaplessStream?.Dispose();
         _gaplessStream = null;
         _gaplessDocument = null;
+        _gaplessArmed = false;
     }
 
     /// <summary>現在のストリーム終端で、先読みした次の曲へデバイスを止めずに切り替える。</summary>
@@ -539,6 +568,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var document = _gaplessDocument;
         _gaplessStream = null;
         _gaplessDocument = null;
+        _gaplessArmed = false;
         var outChannels = _outputChannels;
         var waveChannels = WaveFormat.Channels;
         var waveRate = WaveFormat.SampleRate;
@@ -593,7 +623,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             ResetLoudnessNoLock();
         }
 
-        _gaplessAdvanced = document;
+        NoteGaplessAdvancedNoLock(document);
         return true;
     }
 
@@ -897,6 +927,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _seekFadeFrames = 0;
         _seekFadeOutFrame = 0;
         _seekFadeOutCachedAt = -1;
+        _seekFadeOutPcmFrames = 0;
+        _seekFadeOutPcmPos = 0;
     }
 
     private void CompleteSeekFadeNoLock()
@@ -935,25 +967,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _seekFadeFrames = Math.Max(1, fadeFrames);
         _seekFadePos = 0;
         _seekFadePhase = 1;
+        Ended = false;
         if (_stream is not null)
         {
-            var incoming = TryOpenSeekFadeIncoming(next);
-            if (incoming is null)
-            {
-                ClearSeekFadeNoLock();
-                SeekFrameNoLock(next);
-                return;
-            }
-
-            _seekFadeOutStream = _stream;
-            _seekFadeOutFrame = _stream.Frame;
-            _seekFadeOutCachedAt = -1;
-            _stream = incoming;
-            _sourceFrame = next;
-            _cursor = checked((int)next * Math.Max(1, _channels));
-            _streamCachedAt = -1;
-            ClearStreamReverseBuf();
-            Ended = false;
+            CaptureSeekFadeOutPcmNoLock(fadeFrames);
+            SeekFrameNoLock(next);
             return;
         }
 
@@ -961,9 +979,31 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _cursor = checked((int)next * Math.Max(1, _channels));
     }
 
+    private void CaptureSeekFadeOutPcmNoLock(int fadeFrames)
+    {
+        _seekFadeOutPcmFrames = 0;
+        _seekFadeOutPcmPos = 0;
+        if (_stream is null || fadeFrames <= 0)
+        {
+            return;
+        }
+
+        var srcCh = Math.Max(1, _channels);
+        var sourceNeed = Math.Max(1, (int)Math.Ceiling(
+            fadeFrames * (_sourceRate / (double)Math.Max(1, _deviceRate))));
+        var need = sourceNeed * srcCh;
+        if (_seekFadeOutPcm.Length < need)
+        {
+            _seekFadeOutPcm = new float[need];
+        }
+
+        _seekFadeOutPcmFrames = _stream.DrainFrames(_seekFadeOutPcm, sourceNeed);
+    }
+
     private void RetargetSeekFadeIncomingNoLock(long next)
     {
         _seekFadeTarget = next;
+        Ended = false;
         if (_stream is not null)
         {
             _stream.SeekFrame(next, prebufferTimeoutMs: 0);
@@ -973,27 +1013,12 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
         _sourceFrame = next;
         _cursor = checked((int)next * Math.Max(1, _channels));
-        Ended = false;
     }
 
-    private AudioStreamSource? TryOpenSeekFadeIncoming(long frame)
+    internal bool WaitSeekFadeIncoming(int timeoutMs)
     {
-        var path = _boundDocument?.SourcePath;
-        if (path is not { Length: > 0 } || !File.Exists(path))
-        {
-            return null;
-        }
-
-        try
-        {
-            var source = AudioStreamSource.Open(path, prebufferTimeoutMs: 0);
-            source.SeekFrame(frame, prebufferTimeoutMs: 0);
-            return source;
-        }
-        catch
-        {
-            return null;
-        }
+        _ = timeoutMs;
+        return true;
     }
 
     public void SetScrubbing(bool scrubbing)
@@ -1366,6 +1391,13 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
     private void ReadSeekFadeOutSource(int srcCh, double outStep, Span<float> dest)
     {
+        if (_seekFadeOutPcmFrames > 0)
+        {
+            ReadSeekFadeOutPcm(srcCh, dest);
+            _seekFadeOutPcmPos += outStep;
+            return;
+        }
+
         if (_seekFadeOutStream is not null)
         {
             ReadSeekFadeOutStream(srcCh, dest);
@@ -1376,6 +1408,18 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var frameCount = UsedFrameCountNoLock(srcCh);
         ReadShuttleSource(_seekFadeOutFrame, srcCh, frameCount, dest);
         _seekFadeOutFrame += outStep;
+    }
+
+    private void ReadSeekFadeOutPcm(int srcCh, Span<float> dest)
+    {
+        var index = (int)Math.Floor(_seekFadeOutPcmPos);
+        if (index < 0 || index >= _seekFadeOutPcmFrames || _seekFadeOutPcm.Length < (index + 1) * srcCh)
+        {
+            dest.Clear();
+            return;
+        }
+
+        _seekFadeOutPcm.AsSpan(index * srcCh, srcCh).CopyTo(dest);
     }
 
     /// <summary>
@@ -1527,10 +1571,16 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
                 // 先読み不足でヘッドを進めると、次の読みがリングより先へ離れて
                 // SeekFrame が _gate を握ったままポンプ再起動を待つ。無音のまま位置を保つ。
+                // ジャンプ直後のフェード中だけはヘッドを止めるとシークバーが硬直する。
                 source.Clear();
                 while (writtenFrames < framesWanted)
                 {
                     EmitFrame(buffer, offset, writtenFrames, outCh, source, 0f);
+                    if (_seekFadePhase == 1)
+                    {
+                        _sourceFrame += step;
+                    }
+
                     writtenFrames++;
                 }
 
@@ -1799,7 +1849,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
 
         long filledFrom;
-        if (bufStart == start && bufFrames > 0)
+        if (bufStart == start)
         {
             filledFrom = start + bufFrames;
         }
@@ -1831,16 +1881,27 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
     private int FillStreamReverseRange(float[] buf, long start, long from, long end, int srcCh)
     {
-        var got = 0;
-        for (var frame = from; frame <= end; frame++)
+        if (_stream is null || from > end)
         {
-            if (!EnsureStreamFrameNoLock(frame, _streamFrame.AsSpan(0, srcCh)))
-            {
-                break;
-            }
+            return 0;
+        }
 
-            _streamFrame.AsSpan(0, srcCh).CopyTo(buf.AsSpan((int)(frame - start) * srcCh, srcCh));
-            got++;
+        var want = (int)(end - from + 1);
+        if (want <= 0)
+        {
+            return 0;
+        }
+
+        if (_stream.Frame != from)
+        {
+            _stream.SeekFrame(from, prebufferTimeoutMs: 0);
+            _streamCachedAt = -1;
+        }
+
+        var got = _stream.ReadFrames(buf, (int)(from - start) * srcCh, want, timeoutMs: 0);
+        if (got > 0)
+        {
+            _streamCachedAt = -1;
         }
 
         return got;

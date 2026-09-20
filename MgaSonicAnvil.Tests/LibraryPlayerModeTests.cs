@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.UI;
 using Xunit;
@@ -276,6 +277,42 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.SeekNudgeRepeatDelayMs > LibraryPlayerMode.SeekNudgeRepeatIntervalMs);
         Assert.Equal(250, LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: false));
         Assert.Equal(200, LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: true));
+        Assert.Equal(DispatcherPriority.Send, LibraryPlayerMode.SeekNudgeTimerPriority);
+        Assert.Equal(1, LibraryPlayerMode.SeekNudgeCatchUpSteps(50, repeatStarted: true));
+        Assert.Equal(1, LibraryPlayerMode.SeekNudgeCatchUpSteps(199, repeatStarted: true));
+        Assert.Equal(2, LibraryPlayerMode.SeekNudgeCatchUpSteps(400, repeatStarted: true));
+        Assert.Equal(3, LibraryPlayerMode.SeekNudgeCatchUpSteps(2000, repeatStarted: true));
+        Assert.Equal(5, LibraryPlayerMode.SeekNudgeCatchUpSeconds(50, repeatStarted: true));
+        Assert.Equal(10, LibraryPlayerMode.SeekNudgeCatchUpSeconds(400, repeatStarted: true));
+        Assert.Equal(15, LibraryPlayerMode.SeekNudgeCatchUpSeconds(2000, repeatStarted: true));
+        Assert.Equal(16, LibraryPlayerMode.PlaybackVisualMinIntervalMs);
+        Assert.True(LibraryPlayerMode.PlaybackVisualMinIntervalMs >= 14);
+        Assert.True(LibraryPlayerMode.PlaybackVisualMinIntervalMs <= 20);
+        Assert.Equal(DispatcherPriority.Background, LibraryPlayerMode.AnalyzerTickPriority);
+        Assert.True(LibraryPlayerMode.AnalyzerTickPriority < DispatcherPriority.Input);
+        Assert.Equal(50, LibraryPlayerMode.PlayheadIdleInvalidateMs);
+        Assert.True(LibraryPlayerMode.ShouldRefreshPlayheadPaint(double.NaN, 0, 10, 0));
+        Assert.False(LibraryPlayerMode.ShouldRefreshPlayheadPaint(10, 100, 10.2, 120));
+        Assert.True(LibraryPlayerMode.ShouldRefreshPlayheadPaint(10, 100, 10.2, 160));
+        Assert.True(LibraryPlayerMode.ShouldRefreshPlayheadPaint(10, 100, 11, 110));
+        Assert.True(LibraryPlayerMode.PlayerNumpadRepeatIsHold(LibraryNumpadCommand.SeekForward));
+        Assert.True(LibraryPlayerMode.PlayerNumpadRepeatIsHold(LibraryNumpadCommand.SeekBack));
+        Assert.True(LibraryPlayerMode.PlayerNumpadRepeatIsHold(LibraryNumpadCommand.Rewind));
+        Assert.False(LibraryPlayerMode.PlayerNumpadRepeatIsHold(LibraryNumpadCommand.NextTrack));
+    }
+
+    [Fact]
+    public void KeepPeakJob_KeepsPlayingAndNextOnly()
+    {
+        var playing = Session("now.mp3").Document;
+        var next = Session("next.mp3").Document;
+        var other = Session("other.mp3").Document;
+        Assert.True(LibraryPlayerMode.KeepPeakJob(playing, playing, next));
+        Assert.True(LibraryPlayerMode.KeepPeakJob(next, playing, next));
+        Assert.False(LibraryPlayerMode.KeepPeakJob(other, playing, next));
+        Assert.True(LibraryPlayerMode.KeepPeakJob(playing, playing, null));
+        Assert.False(LibraryPlayerMode.KeepPeakJob(other, playing, null));
+        Assert.False(LibraryPlayerMode.KeepPeakJob(other, null, null));
     }
 
     private static DocumentSession Session(string name) =>

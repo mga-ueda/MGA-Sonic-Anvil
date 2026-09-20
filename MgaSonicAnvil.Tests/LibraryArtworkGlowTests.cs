@@ -260,6 +260,8 @@ public sealed class LibraryArtworkGlowTests
         Assert.NotEqual(LibraryBrowserView.GlowDriftXSeconds, LibraryBrowserView.GlowDriftYSeconds);
         Assert.True(LibraryBrowserView.GlowDriftFrameRate >= 12);
         Assert.True(LibraryBrowserView.GlowDriftFrameRate <= 24);
+        Assert.True(LibraryBrowserView.GlowCacheRenderAtScale >= 0.2);
+        Assert.True(LibraryBrowserView.GlowCacheRenderAtScale <= 0.5);
         Assert.True(LibraryBrowserView.GlowSampleEdge >= 8);
         Assert.True(LibraryBrowserView.GlowSampleEdge <= 24);
         Assert.Equal(1, LibraryBrowserView.GlowCrossfadeSeconds);

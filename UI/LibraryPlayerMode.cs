@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 
 namespace MgaSonicAnvil.UI;
@@ -314,6 +315,20 @@ internal static class LibraryPlayerMode
     public static int EdgeIndex(int count, int edge) =>
         count <= 0 ? -1 : edge < 0 ? 0 : count - 1;
 
+    /// <summary>
+    /// プレイヤーのピーク走査を残す曲。表示中と次曲先読みだけ。
+    /// 世代を進めてまとめて止めると、今の波形が途中のまま切れる。
+    /// </summary>
+    public static bool KeepPeakJob(AudioDocument document, AudioDocument? playing, AudioDocument? next)
+    {
+        if (playing is not null && ReferenceEquals(document, playing))
+        {
+            return true;
+        }
+
+        return next is not null && ReferenceEquals(document, next);
+    }
+
     /// <summary>曲が終わった次。末尾の次は先頭。今の曲が見つからなければ先頭。空なら -1。</summary>
     public static int NextLoopIndex(int count, int current)
     {
@@ -360,6 +375,61 @@ internal static class LibraryPlayerMode
 
     public static int SeekNudgeTimerIntervalMs(bool repeatStarted) =>
         repeatStarted ? SeekNudgeRepeatIntervalMs : SeekNudgeRepeatDelayMs;
+
+    /// <summary>
+    /// 押しっぱなしのリピートは Background タイマーだと、描画が重いと Tick が落ちる。
+    /// Send なら CompositionTarget.Rendering より先に進む。
+    /// </summary>
+    public const DispatcherPriority SeekNudgeTimerPriority = DispatcherPriority.Send;
+
+    /// <summary>遅延した Tick で一度に足す上限。止めすぎず、溜め込みすぎない。</summary>
+    public const int SeekNudgeCatchUpMax = 3;
+
+    public static int SeekNudgeCatchUpSteps(long elapsedMs, bool repeatStarted)
+    {
+        var interval = SeekNudgeTimerIntervalMs(repeatStarted);
+        if (elapsedMs < interval || interval <= 0)
+        {
+            return 1;
+        }
+
+        return (int)Math.Clamp(elapsedMs / interval, 1, SeekNudgeCatchUpMax);
+    }
+
+    public static double SeekNudgeCatchUpSeconds(long elapsedMs, bool repeatStarted) =>
+        SeekNudgeSeconds * SeekNudgeCatchUpSteps(elapsedMs, repeatStarted);
+
+    /// <summary>
+    /// 再生ヘッド同期の最短間隔。144Hz でも 60fps 相当に抑え、7／9 のタイマーを飢餓させない。
+    /// </summary>
+    public const int PlaybackVisualMinIntervalMs = 16;
+
+    /// <summary>
+    /// スペアナ／ゴニオ／ラウドネスは CompositionTarget.Rendering（Render）に載せない。
+    /// Render は Input より先なので、重いとマウスとキーがワンテンポ遅れる。
+    /// </summary>
+    public const DispatcherPriority AnalyzerTickPriority = DispatcherPriority.Background;
+
+    /// <summary>再生ヘッドが同じピクセルに居るときの再描画間隔。残光の減衰用。</summary>
+    public const int PlayheadIdleInvalidateMs = 50;
+
+    public const double PlayheadMoveEpsilonPx = 0.5;
+
+    public static bool ShouldRefreshPlayheadPaint(double lastX, long lastAtMs, double nextX, long nowMs)
+    {
+        if (double.IsNaN(lastX) || Math.Abs(nextX - lastX) >= PlayheadMoveEpsilonPx)
+        {
+            return true;
+        }
+
+        return nowMs - lastAtMs >= PlayheadIdleInvalidateMs;
+    }
+
+    public static bool PlayerNumpadRepeatIsHold(LibraryNumpadCommand command) =>
+        command is LibraryNumpadCommand.Rewind
+            or LibraryNumpadCommand.FastForward
+            or LibraryNumpadCommand.SeekBack
+            or LibraryNumpadCommand.SeekForward;
 
     public static bool IsPlayerNumpadKey(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && key is >= Key.NumPad0 and <= Key.NumPad9;

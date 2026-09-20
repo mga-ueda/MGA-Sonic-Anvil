@@ -113,6 +113,21 @@
         </Setter>
     </Style>
 
+    <!-- 再生中の時刻は毎フレーム更新される。TextBox.Text の書き換えは TextContainer 編集
+         + TSF(IME) 通知 + Undo 管理で UI スレッドを蝕むため、表示は TextBox に重ねた
+         TextBlock が担い、TextBox には編集開始時のみ文字列を入れる。 -->
+    <Style x:Key="StatusTimecodeOverlayStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Consolas" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="{x:Static ui:DesignMetrics.StatusTimecodeFontSize}" />
+        <Setter Property="Foreground" Value="{DynamicResource StatusBarTitleForeBrush}" />
+        <Setter Property="Padding" Value="{x:Static ui:DesignMetrics.StatusTimecodePadding}" />
+        <Setter Property="Margin" Value="0,0,4,0" />
+        <Setter Property="TextAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
+
     <!-- App-wide Control Foreground is light; default ToolTip is light → unreadable. -->
     <Style x:Key="DarkToolTipStyle" TargetType="ToolTip">
         <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />

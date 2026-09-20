@@ -26,6 +26,7 @@ internal partial class StatusTimeStrip : UserControl
     private bool _hasDocument;
     private bool _showSamples;
     private bool _committing;
+    private bool? _displayHasDocument;
     private IInputElement? _focusReturn;
 
     public event EventHandler<long>? CurrentCommitted;
@@ -42,10 +43,10 @@ internal partial class StatusTimeStrip : UserControl
     {
         InitializeComponent();
         _showSamples = AppStorage.Settings.StatusShowSamples;
-        Bind(CurrentBox, StatusTimeField.Current);
-        Bind(SelStartBox, StatusTimeField.SelStart);
-        Bind(SelLengthBox, StatusTimeField.SelLength);
-        Bind(SelEndBox, StatusTimeField.SelEnd);
+        Bind(CurrentBox, CurrentDisplay, StatusTimeField.Current);
+        Bind(SelStartBox, SelStartDisplay, StatusTimeField.SelStart);
+        Bind(SelLengthBox, SelLengthDisplay, StatusTimeField.SelLength);
+        Bind(SelEndBox, SelEndDisplay, StatusTimeField.SelEnd);
         TotalText.ContextMenu = CreateMenu(StatusTimeField.Total);
         ContextMenu = CreateMenu(StatusTimeField.Total);
         ApplyLocalizedText();
@@ -83,6 +84,16 @@ internal partial class StatusTimeStrip : UserControl
         _totalFrames = Math.Max(0, totalFrames);
         _sampleRate = sampleRate;
         _hasDocument = hasDocument;
+        if (_displayHasDocument != hasDocument)
+        {
+            _displayHasDocument = hasDocument;
+            var brushKey = hasDocument ? "StatusBarTitleForeBrush" : "ChromeDimBrush";
+            foreach (var state in _fields.Values)
+            {
+                state.Display.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+            }
+        }
+
         CurrentBox.IsEnabled = hasDocument;
         SelStartBox.IsEnabled = hasDocument;
         SelLengthBox.IsEnabled = hasDocument;
@@ -170,12 +181,13 @@ internal partial class StatusTimeStrip : UserControl
         RequestWaveformFocus?.Invoke(this, EventArgs.Empty);
     }
 
-    private void Bind(TextBox box, StatusTimeField field)
+    private void Bind(TextBox box, TextBlock display, StatusTimeField field)
     {
-        var state = new FieldState(field, box);
+        var state = new FieldState(field, box, display);
         _fields[box] = state;
         box.ContextMenu = CreateMenu(field);
         box.Tag = state;
+        box.IsUndoEnabled = false;
         ImeComposition.Disable(box);
     }
 
@@ -233,7 +245,7 @@ internal partial class StatusTimeStrip : UserControl
         {
             if (!state.Editing)
             {
-                Write(state.Box, FormatField(state.Field));
+                WriteDisplay(state, FormatField(state.Field));
             }
         }
 
@@ -244,12 +256,33 @@ internal partial class StatusTimeStrip : UserControl
         }
     }
 
+    // 再生中は毎フレーム呼ばれる。TextBox.Text を触ると TextContainer 編集 + TSF 通知 +
+    // Undo 管理が UI スレッドに載り続けるため、非編集時の表示は TextBlock のみ更新する。
+    private static void WriteDisplay(FieldState state, string text)
+    {
+        if (state.Display.Text != text)
+        {
+            state.Display.Text = text;
+        }
+    }
+
     private static void Write(TextBox box, string text)
     {
         if (box.Text != text)
         {
             box.Text = text;
         }
+    }
+
+    private void ShowDisplay(FieldState state)
+    {
+        if (state.Box.Text.Length > 0)
+        {
+            state.Box.Clear();
+        }
+
+        WriteDisplay(state, FormatField(state.Field));
+        state.Display.Visibility = Visibility.Visible;
     }
 
     private string FormatField(StatusTimeField field)
@@ -309,10 +342,14 @@ internal partial class StatusTimeStrip : UserControl
         }
 
         ApplyValue(state.Field, value);
-        Write(state.Box, FormatField(state.Field));
         if (state.Box.IsKeyboardFocusWithin)
         {
+            Write(state.Box, FormatField(state.Field));
             state.Box.CaretIndex = state.Box.Text.Length;
+        }
+        else
+        {
+            WriteDisplay(state, FormatField(state.Field));
         }
     }
 
@@ -374,6 +411,12 @@ internal partial class StatusTimeStrip : UserControl
         }
 
         state.Editing = true;
+        if (box.Text.Length == 0)
+        {
+            Write(box, FormatField(state.Field));
+        }
+
+        state.Display.Visibility = Visibility.Hidden;
         if (state.SelectAllOnFocus)
         {
             state.SelectAllOnFocus = false;
@@ -444,7 +487,7 @@ internal partial class StatusTimeStrip : UserControl
     {
         if (!state.Editing)
         {
-            Write(state.Box, FormatField(state.Field));
+            ShowDisplay(state);
             return;
         }
 
@@ -454,10 +497,11 @@ internal partial class StatusTimeStrip : UserControl
             state.Editing = false;
             if (commit && TryCommit(state))
             {
+                ShowDisplay(state);
                 return;
             }
 
-            Write(state.Box, FormatField(state.Field));
+            ShowDisplay(state);
             if (state.Box.IsKeyboardFocusWithin && !commit)
             {
                 Keyboard.ClearFocus();
@@ -575,11 +619,13 @@ internal partial class StatusTimeStrip : UserControl
         return false;
     }
 
-    private sealed class FieldState(StatusTimeField field, TextBox box)
+    private sealed class FieldState(StatusTimeField field, TextBox box, TextBlock display)
     {
         public StatusTimeField Field { get; } = field;
 
         public TextBox Box { get; } = box;
+
+        public TextBlock Display { get; } = display;
 
         public bool Editing { get; set; }
 

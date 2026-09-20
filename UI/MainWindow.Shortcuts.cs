@@ -1596,7 +1596,7 @@ public partial class MainWindow
         }
 
         var command = LibraryPlayerMode.PlayerNumpadCommand(key, modifiers);
-        if (isRepeat && command is not (LibraryNumpadCommand.Rewind or LibraryNumpadCommand.FastForward))
+        if (isRepeat && !LibraryPlayerMode.PlayerNumpadRepeatIsHold(command))
         {
             return true;
         }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -659,20 +660,23 @@ public partial class MainWindow
     private void SyncPlaybackVisuals()
     {
         AdoptLibraryGaplessAdvance();
-        ScheduleLibraryGaplessPrefetch();
         if (_document is null)
         {
             return;
         }
 
-        var frame = _player.PendingSeekFrame ?? _player.SmoothCursorFrame;
+        _player.ReadPlayheadVisuals(out var frame, out var exitFrame);
         _document.CursorFrame = frame;
         if (!Waveform.IsInteracting)
         {
             Waveform.PlayheadFrame = frame;
-            Waveform.ExitPlayheadFrame = _player.ExitCursorFrame;
+            Waveform.ExitPlayheadFrame = exitFrame;
             Waveform.FollowPlayhead();
-            SyncOverviewPlayhead();
+            if (OverviewHost.Visibility == Visibility.Visible)
+            {
+                SyncOverviewPlayhead();
+            }
+
             SyncTransportPosition(frame);
         }
     }
@@ -717,6 +721,51 @@ public partial class MainWindow
             _lastRenderingTime = rendering.RenderingTime;
         }
 
+        var nowStamp = Stopwatch.GetTimestamp();
+        var minTicks = LibraryPlayerMode.PlaybackVisualMinIntervalMs / 1000d * Stopwatch.Frequency;
+        if (nowStamp - _lastPlaybackVisualStamp < minTicks)
+        {
+            return;
+        }
+
+        _lastPlaybackVisualStamp = nowStamp;
+
+        if (AnyEffectPreviewing)
+        {
+            SyncPreviewPlayhead();
+            QueueAnalyzerTick();
+            return;
+        }
+
+        // 再生ヘッドだけ vsync 側。スペアナ／ゴニオは Render より低い優先度へ回し、
+        // マウスとキー（Input）が描画の後ろに並ばないようにする。
+        if (_playTimer.IsEnabled && !_player.IsScrubbing)
+        {
+            SyncPlaybackVisuals();
+        }
+
+        QueueAnalyzerTick();
+    }
+
+    private void QueueAnalyzerTick()
+    {
+        if (_analyzerTickQueued)
+        {
+            return;
+        }
+
+        _analyzerTickQueued = true;
+        _ = Dispatcher.BeginInvoke(LibraryPlayerMode.AnalyzerTickPriority, FlushAnalyzerTick);
+    }
+
+    private void FlushAnalyzerTick()
+    {
+        _analyzerTickQueued = false;
+        if (!_player.IsPlaying)
+        {
+            return;
+        }
+
         Span<float> peaks = stackalloc float[ChannelLayout.MaxChannels];
         Span<float> rms = stackalloc float[ChannelLayout.MaxChannels];
         var hasSamples = _player.TakeMeterInterval(peaks, rms, out var meterChannels);
@@ -725,23 +774,9 @@ public partial class MainWindow
             rms[..Math.Max(1, meterChannels)],
             _meterClock.Elapsed.TotalSeconds,
             hasSamples));
-        // スペアナ・ゴニオも Background タイマー飢餓を避けてフレーム駆動で更新する。
         Spectrum.Tick();
         LoudnessMeter.Tick();
         VectorScope.Tick();
-        if (AnyEffectPreviewing)
-        {
-            SyncPreviewPlayhead();
-            return;
-        }
-
-        // 再生ヘッド・追従スクロールは vsync 同期でサンプリングしないとジッターが
-        // 見えるため、ここ（毎フレーム）で行う。重い静的再描画は WaveformView 側の
-        // 適応間引き（ペイント終了からコスト比例の休止を必ず挟む）が抑えるので入力飢餓にはならない。
-        if (_playTimer.IsEnabled && !_player.IsScrubbing)
-        {
-            SyncPlaybackVisuals();
-        }
     }
 
     private void SyncPreviewPlayhead()

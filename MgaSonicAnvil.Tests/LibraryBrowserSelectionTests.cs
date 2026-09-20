@@ -41,6 +41,31 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void SetSessions_Empty_ThenAppend_DoesNotKeepOldRows()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("aaa.wav");
+            var second = Session("bbb.wav");
+            var third = Session("ccc.wav");
+            var view = new LibraryBrowserView();
+            view.SetSessions([first, second], first, [first]);
+            Flush();
+            Assert.Equal(2, view.BoundRowCount);
+
+            view.SetSessions([], null);
+            Flush();
+            Assert.Equal(0, view.BoundRowCount);
+
+            view.AppendSession(third, select: true);
+            Flush();
+            Assert.Equal(1, view.BoundRowCount);
+            Assert.Same(third, view.SelectedSession);
+        });
+    }
+
+    [Fact]
     public void UpdateSessionRow_Artwork_KeepsSelectionAndItemsSource()
     {
         RunSta(() =>

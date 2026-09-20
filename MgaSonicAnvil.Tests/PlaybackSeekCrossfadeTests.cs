@@ -47,6 +47,32 @@ public sealed class PlaybackSeekCrossfadeTests
     }
 
     [Fact]
+    public void SeekFrameCrossfade_PendingSeekFrameAdvancesDuringFade()
+    {
+        var rate = 48000;
+        var fadeMs = 80;
+        var fadeFrames = PlaybackSampleProvider.SeekCrossfadeFrames(rate, fadeMs);
+        var frames = fadeFrames * 4;
+        var samples = new float[frames * 2];
+        Array.Fill(samples, 0.5f);
+        var document = new AudioDocument(samples, rate, 2, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.SetDeviceSampleRate(rate);
+        provider.Bind(document, 0, playRange: null, loop: false);
+
+        var prime = new float[10 * 2];
+        Assert.Equal(prime.Length, provider.Read(prime, 0, prime.Length));
+        provider.SeekFrameCrossfade(200, fadeMs);
+        Assert.Equal(200, provider.PendingSeekFrame);
+
+        var half = Math.Max(1, fadeFrames / 2);
+        var mixed = new float[half * 2];
+        Assert.Equal(mixed.Length, provider.Read(mixed, 0, mixed.Length));
+        Assert.Equal(200 + half, provider.PendingSeekFrame);
+        Assert.Equal(200 + half, provider.CursorFrame);
+    }
+
+    [Fact]
     public void SeekNudgeCrossfade_Is750Milliseconds()
     {
         Assert.Equal(750, LibraryPlayerMode.SeekNudgeFadeMilliseconds);
@@ -145,6 +171,7 @@ public sealed class PlaybackSeekCrossfadeTests
             var prime = new float[deviceRate / 10 * 2];
             Assert.True(provider.Read(prime, 0, prime.Length) > 0);
             provider.SeekFrameCrossfade(srcRate, fadeMilliseconds: 80);
+            Assert.True(provider.WaitSeekFadeIncoming(2000));
 
             var mixed = new float[deviceRate / 25 * 2];
             Assert.True(provider.Read(mixed, 0, mixed.Length) >= mixed.Length / 2);
@@ -153,6 +180,47 @@ public sealed class PlaybackSeekCrossfadeTests
             Assert.True(measured < hz * deviceRate / srcRate - 15);
 
             provider.Bind(new AudioDocument([0f, 0f], 48000, 1, 16, AudioFileKind.Wave, null), 0, null, false);
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(path);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    [Fact]
+    public void SeekFrameCrossfade_Stream_RepeatedJumpsStayOnOneDecoder()
+    {
+        var rate = 48000;
+        var path = Path.Combine(Path.GetTempPath(), "mga-seek-repeat-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteToneWave(path, rate, rate * 4, 440);
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+            var source = AudioStreamSource.Open(path, prebufferTimeoutMs: 1000);
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(rate);
+            provider.BindStream(source, document, startFrame: 0, playRange: null, loop: false);
+
+            var prime = new float[rate / 20 * 2];
+            Assert.True(provider.Read(prime, 0, prime.Length) > 0);
+            var started = Environment.TickCount64;
+            var slice = new float[256 * 2];
+            for (var i = 0; i < 20; i++)
+            {
+                provider.SeekFrameCrossfade(rate / 2 + i * 1000, fadeMilliseconds: 80);
+                Assert.Equal(rate / 2 + i * 1000, provider.PendingSeekFrame);
+                Assert.True(provider.Read(slice, 0, slice.Length) > 0);
+            }
+
+            Assert.True(Environment.TickCount64 - started < 500);
+            provider.Bind(new AudioDocument([0f, 0f], rate, 1, 16, AudioFileKind.Wave, null), 0, null, false);
         }
         finally
         {

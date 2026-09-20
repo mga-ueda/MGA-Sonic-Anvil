@@ -65,67 +65,77 @@ internal sealed class AudioPlayer : IDisposable
     {
         get
         {
-            var raw = _provider.CursorFrame;
-            var now = System.Diagnostics.Stopwatch.GetTimestamp();
-            if (!_playing || _scrubbing)
+            _provider.ReadPlaybackVisuals(out var raw, out _, out _, out var speed, out var sourceRate);
+            return SmoothFrom(raw, speed, sourceRate);
+        }
+    }
+
+    public void ReadPlayheadVisuals(out long playhead, out long exitFrame)
+    {
+        _provider.ReadPlaybackVisuals(out var raw, out var fading, out exitFrame, out var speed, out var sourceRate);
+        playhead = fading ? raw : SmoothFrom(raw, speed, sourceRate);
+    }
+
+    private long SmoothFrom(long raw, double speed, int sourceRate)
+    {
+        var now = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (!_playing || _scrubbing)
+        {
+            _smoothRawFrame = raw;
+            _smoothShownFrame = raw;
+            _smoothStampTicks = now;
+            return raw;
+        }
+
+        if (raw != _smoothRawFrame)
+        {
+            var delta = raw - _smoothRawFrame;
+            var discontinuity = speed < 0 ? delta > 0 : delta < 0;
+            var maxStep = (long)(sourceRate * 0.25 * Math.Max(1, Math.Abs(speed)));
+            if (Math.Abs(delta) > maxStep)
             {
-                _smoothRawFrame = raw;
+                discontinuity = true;
+            }
+
+            _smoothRawFrame = raw;
+            _smoothStampTicks = now;
+            if (discontinuity)
+            {
+                // ループ折り返し・大きなシークは追いかけず即座に反映する。
                 _smoothShownFrame = raw;
-                _smoothStampTicks = now;
                 return raw;
             }
+        }
 
-            var speed = _provider.PlaybackSpeed;
-            if (raw != _smoothRawFrame)
+        // 外挿は 1 バッファ相当（80ms）まで。出力停止時の暴走を防ぐ。
+        var elapsedSec = Math.Min(
+            0.08,
+            (now - _smoothStampTicks) / (double)System.Diagnostics.Stopwatch.Frequency);
+        var value = _smoothRawFrame
+            + (long)(elapsedSec * sourceRate * speed);
+        // 生カーソル更新の直後に外挿分だけ戻って見えないよう、進行方向の単調性を保つ。
+        if (_smoothShownFrame >= 0)
+        {
+            if (speed < 0)
             {
-                var delta = raw - _smoothRawFrame;
-                var discontinuity = speed < 0 ? delta > 0 : delta < 0;
-                var maxStep = (long)(_provider.SourceSampleRate * 0.25 * Math.Max(1, Math.Abs(speed)));
-                if (Math.Abs(delta) > maxStep)
-                {
-                    discontinuity = true;
-                }
-
-                _smoothRawFrame = raw;
-                _smoothStampTicks = now;
-                if (discontinuity)
-                {
-                    // ループ折り返し・大きなシークは追いかけず即座に反映する。
-                    _smoothShownFrame = raw;
-                    return raw;
-                }
-            }
-
-            // 外挿は 1 バッファ相当（80ms）まで。出力停止時の暴走を防ぐ。
-            var elapsedSec = Math.Min(
-                0.08,
-                (now - _smoothStampTicks) / (double)System.Diagnostics.Stopwatch.Frequency);
-            var value = _smoothRawFrame
-                + (long)(elapsedSec * _provider.SourceSampleRate * speed);
-            // 生カーソル更新の直後に外挿分だけ戻って見えないよう、進行方向の単調性を保つ。
-            if (_smoothShownFrame >= 0)
-            {
-                if (speed < 0)
-                {
-                    if (value > _smoothShownFrame)
-                    {
-                        value = _smoothShownFrame;
-                    }
-                }
-                else if (value < _smoothShownFrame)
+                if (value > _smoothShownFrame)
                 {
                     value = _smoothShownFrame;
                 }
             }
-
-            if (value < 0)
+            else if (value < _smoothShownFrame)
             {
-                value = 0;
+                value = _smoothShownFrame;
             }
-
-            _smoothShownFrame = value;
-            return value;
         }
+
+        if (value < 0)
+        {
+            value = 0;
+        }
+
+        _smoothShownFrame = value;
+        return value;
     }
 
     public bool ProviderEnded
@@ -263,6 +273,8 @@ internal sealed class AudioPlayer : IDisposable
 
     public bool HasGaplessArmed => _provider.HasGaplessArmed;
 
+    public bool HasGaplessAdvancePending => _provider.HasGaplessAdvancePending;
+
     /// <summary>次曲のストリームを再生中のデバイスへ予約する。成功時に所有権を移す。</summary>
     public bool TryArmGapless(AudioStreamSource source, AudioDocument document)
     {
@@ -389,6 +401,10 @@ internal sealed class AudioPlayer : IDisposable
         }
 
         _provider.SeekFrameCrossfade(frame, fadeMilliseconds);
+        var shown = _provider.PendingSeekFrame ?? _provider.CursorFrame;
+        _smoothRawFrame = shown;
+        _smoothShownFrame = shown;
+        _smoothStampTicks = System.Diagnostics.Stopwatch.GetTimestamp();
     }
 
     public void SetPlayWindow(WaveSelection? playRange, bool loop)

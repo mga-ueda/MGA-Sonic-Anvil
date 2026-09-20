@@ -44,6 +44,85 @@ public sealed class AudioStreamSourceTests
     }
 
     [Fact]
+    public void SeekFrame_RepeatedJumps_KeepSinglePumpAndReadableFrames()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-seek-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteToneWave(path, sampleRate: 44100, frames: 44100, frequency: 440);
+            using var source = AudioStreamSource.Open(path, prebufferTimeoutMs: 1000);
+            var frame = new float[2];
+            Assert.True(source.TryReadFrame(frame, timeoutMs: 1000));
+            for (var i = 0; i < 40; i++)
+            {
+                var at = 1000 + ((i * 997) % 30000);
+                source.SeekFrame(at, prebufferTimeoutMs: 200);
+                Assert.Equal(at, source.Frame);
+                Assert.True(source.TryReadFrame(frame, timeoutMs: 1000), $"seek {i} at {at}");
+                Assert.Equal(at + 1, source.Frame);
+                Assert.True(Math.Max(Math.Abs(frame[0]), Math.Abs(frame[1])) > 0.01f);
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void SeekFrame_ZeroTimeout_RepeatedJumpsReturnImmediately()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-seek-fast-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteToneWave(path, sampleRate: 44100, frames: 44100, frequency: 440);
+            using var source = AudioStreamSource.Open(path, prebufferTimeoutMs: 1000);
+            var started = Environment.TickCount64;
+            for (var i = 0; i < 40; i++)
+            {
+                var at = 1000 + ((i * 997) % 30000);
+                source.SeekFrame(at, prebufferTimeoutMs: 0);
+                Assert.Equal(at, source.Frame);
+            }
+
+            Assert.True(Environment.TickCount64 - started < 250);
+            var frame = new float[2];
+            Assert.True(source.TryReadFrame(frame, timeoutMs: 1000));
+            Assert.True(Math.Max(Math.Abs(frame[0]), Math.Abs(frame[1])) > 0.01f);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ReadFrames_BulkCopy_KeepsToneAndAdvancesFrame()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-bulk-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteToneWave(path, sampleRate: 44100, frames: 4410, frequency: 440);
+            using var source = AudioStreamSource.Open(path, prebufferTimeoutMs: 1000);
+            var buffer = new float[512 * source.Channels];
+            var got = source.ReadFrames(buffer, 0, 512, timeoutMs: 1000);
+            Assert.True(got >= 256);
+            Assert.Equal(got, source.Frame);
+            var peak = 0f;
+            for (var i = 0; i < got * source.Channels; i++)
+            {
+                peak = Math.Max(peak, Math.Abs(buffer[i]));
+            }
+
+            Assert.True(peak > 0.1f);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void PlaybackSampleProvider_BindStream_EmitsAudio()
     {
         var path = Path.Combine(Path.GetTempPath(), "mga-stream-play-" + Guid.NewGuid().ToString("N") + ".wav");
