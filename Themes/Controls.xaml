@@ -73,8 +73,8 @@
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryForeBrush}" />
+        <Setter Property="Background" Value="{DynamicResource StatusTimecodeFillBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StatusTimecodeFillBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Margin" Value="0,0,4,0" />
         <Setter Property="InputMethod.IsInputMethodEnabled" Value="False" />
@@ -85,8 +85,8 @@
                 <ControlTemplate TargetType="TextBox">
                     <Grid SnapsToDevicePixels="True">
                         <Border x:Name="Fill"
-                                Background="{DynamicResource StatusTimecodeFillBrush}"
-                                BorderBrush="{DynamicResource StatusTimecodeFillBrush}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 IsHitTestVisible="False" />
                         <ScrollViewer x:Name="PART_ContentHost"
@@ -612,6 +612,105 @@
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{DynamicResource ChromeDimBrush}" />
                             <Setter TargetName="Fill" Property="Background" Value="{DynamicResource PlayerComboDisabledFillBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ステータスのスピーカー。地は時刻欄の色設定に従う。 -->
+    <Style x:Key="StatusTimecodeComboStyle" TargetType="ComboBox" BasedOn="{StaticResource LibraryComboBoxStyle}">
+        <Setter Property="Background" Value="{DynamicResource StatusTimecodeFillBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid SnapsToDevicePixels="True">
+                        <Border x:Name="Fill"
+                                Background="{DynamicResource StatusTimecodeFillBrush}"
+                                BorderBrush="{DynamicResource StatusTimecodeFillBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                IsHitTestVisible="False" />
+                        <Border Background="Transparent" BorderThickness="0">
+                            <Grid>
+                                <ToggleButton Style="{StaticResource DarkComboBoxToggleButtonStyle}"
+                                              Focusable="False"
+                                              HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Stretch"
+                                              IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                              ClickMode="Press" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="22" />
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter x:Name="ContentSite"
+                                                      Margin="{TemplateBinding Padding}"
+                                                      VerticalAlignment="Center"
+                                                      HorizontalAlignment="Stretch"
+                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                      ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                                      TextElement.Foreground="{TemplateBinding Foreground}"
+                                                      IsHitTestVisible="False">
+                                        <ContentPresenter.Resources>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="VerticalAlignment" Value="Center" />
+                                                <Setter Property="TextWrapping" Value="NoWrap" />
+                                            </Style>
+                                        </ContentPresenter.Resources>
+                                    </ContentPresenter>
+                                    <TextBox x:Name="PART_EditableTextBox"
+                                             Grid.Column="0"
+                                             Margin="{TemplateBinding Padding}"
+                                             Padding="0"
+                                             VerticalContentAlignment="Center"
+                                             VerticalAlignment="Center"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             Foreground="{TemplateBinding Foreground}"
+                                             CaretBrush="{DynamicResource AccentCyanBrush}"
+                                             SelectionBrush="{DynamicResource AccentCyanBrush}"
+                                             SelectionOpacity="0.35"
+                                             Focusable="True"
+                                             Visibility="Collapsed"
+                                             IsReadOnly="{TemplateBinding IsReadOnly}" />
+                                </Grid>
+                            </Grid>
+                        </Border>
+                        <Popup Placement="Bottom"
+                               IsOpen="{TemplateBinding IsDropDownOpen}"
+                               AllowsTransparency="True"
+                               Focusable="False"
+                               PopupAnimation="Slide">
+                            <Grid MinWidth="{TemplateBinding ActualWidth}"
+                                  MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                <Border Background="{DynamicResource StatusTimecodeFillBrush}"
+                                        IsHitTestVisible="False" />
+                                <Border BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
+                                        BorderThickness="1"
+                                        IsHitTestVisible="False" />
+                                <ScrollViewer Margin="1" SnapsToDevicePixels="True"
+                                              HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                                              VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
+                                </ScrollViewer>
+                            </Grid>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEditable" Value="True">
+                            <Setter TargetName="ContentSite" Property="Visibility" Value="Collapsed" />
+                            <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource ControlHoverBorderBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource ControlHoverBorderBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource ChromeDimBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

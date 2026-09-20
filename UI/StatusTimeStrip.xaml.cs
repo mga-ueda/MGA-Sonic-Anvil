@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
@@ -55,19 +54,15 @@ internal partial class StatusTimeStrip : UserControl
 
     internal void UsePlayerComboFill(bool player)
     {
-        var sourceKey = player ? "PlayerComboFillBrush" : "StatusTimecodeFillBrush";
-        if (Application.Current?.TryFindResource(sourceKey) is not SolidColorBrush source)
+        var key = player ? "PlayerComboFillBrush" : "StatusTimecodeFillBrush";
+        foreach (var box in new[] { CurrentBox, SelStartBox, SelLengthBox, SelEndBox })
         {
-            return;
+            box.SetResourceReference(Control.BackgroundProperty, key);
+            box.SetResourceReference(Control.BorderBrushProperty, key);
         }
 
-        var copy = (SolidColorBrush)source.Clone();
-        if (copy.CanFreeze)
-        {
-            copy.Freeze();
-        }
-
-        Resources["StatusTimecodeFillBrush"] = copy;
+        TotalFill.SetResourceReference(Border.BackgroundProperty, key);
+        TotalFill.SetResourceReference(Border.BorderBrushProperty, key);
     }
 
     public void ApplyLocalizedText()

@@ -72,7 +72,7 @@
                      Width="Auto"
                      Text="{x:Static domain:UiStrings.LabelStatusSpeaker}" />
           <ComboBox x:Name="SpeakerMenu"
-                    Style="{StaticResource LibraryComboBoxStyle}"
+                    Style="{StaticResource StatusTimecodeComboStyle}"
                     Height="{x:Static ui:DesignMetrics.StatusTimecodeBoxHeight}"
                     MinWidth="{x:Static ui:DesignMetrics.TransportSpeakerComboWidth}"
                     MaxHeight="{x:Static ui:DesignMetrics.StatusTimecodeBoxHeight}"
@@ -80,14 +80,7 @@
                     FontSize="11"
                     VerticalAlignment="Center"
                     VerticalContentAlignment="Center"
-                    SelectionChanged="SpeakerMenu_SelectionChanged">
-            <ComboBox.Resources>
-              <SolidColorBrush x:Key="PlayerComboFillBrush" Color="#FF242428" />
-              <SolidColorBrush x:Key="PlayerComboHoverFillBrush" Color="#FF242428" />
-              <SolidColorBrush x:Key="PlayerComboDisabledFillBrush" Color="#FF242428" />
-              <SolidColorBrush x:Key="PlayerComboDropFillBrush" Color="#FF242428" />
-            </ComboBox.Resources>
-          </ComboBox>
+                    SelectionChanged="SpeakerMenu_SelectionChanged" />
         </StackPanel>
         <ui:StatusTimeStrip x:Name="StatusTimes"
                             Grid.Column="2"

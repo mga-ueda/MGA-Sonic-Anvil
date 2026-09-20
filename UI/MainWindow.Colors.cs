@@ -1,5 +1,4 @@
 using System.Windows;
-using System.Windows.Media;
 using System.Windows.Threading;
 using MgaSonicAnvil.Config;
 
@@ -101,36 +100,8 @@ public partial class MainWindow
     {
         var player = IsLibraryMaximized;
         StatusTimes.UsePlayerComboFill(player);
-        if (player)
-        {
-            AssignSpeakerBrush("PlayerComboFillBrush", "PlayerComboFillBrush");
-            AssignSpeakerBrush("PlayerComboHoverFillBrush", "PlayerComboHoverFillBrush");
-            AssignSpeakerBrush("PlayerComboDisabledFillBrush", "PlayerComboDisabledFillBrush");
-            AssignSpeakerBrush("PlayerComboDropFillBrush", "PlayerComboDropFillBrush");
-            return;
-        }
-
-        AssignSpeakerBrush("PlayerComboFillBrush", "StatusTimecodeFillBrush");
-        AssignSpeakerBrush("PlayerComboHoverFillBrush", "StatusTimecodeFillBrush");
-        AssignSpeakerBrush("PlayerComboDisabledFillBrush", "StatusTimecodeFillBrush");
-        AssignSpeakerBrush("PlayerComboDropFillBrush", "StatusTimecodeFillBrush");
-    }
-
-    private void AssignSpeakerBrush(string localKey, string sourceKey)
-    {
-        if (Application.Current?.TryFindResource(sourceKey) is not SolidColorBrush source)
-        {
-            return;
-        }
-
-        // テンプレートはローカルキーを DynamicResource で引く。
-        // アプリ資源のブラシをそのまま入れると親が二重になるので、その時点の色をコピーする。
-        var copy = (SolidColorBrush)source.Clone();
-        if (copy.CanFreeze)
-        {
-            copy.Freeze();
-        }
-
-        SpeakerMenu.Resources[localKey] = copy;
+        SpeakerMenu.SetResourceReference(
+            FrameworkElement.StyleProperty,
+            player ? "LibraryComboBoxStyle" : "StatusTimecodeComboStyle");
     }
 }
