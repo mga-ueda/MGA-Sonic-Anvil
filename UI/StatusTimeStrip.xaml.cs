@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
@@ -26,7 +27,6 @@ internal partial class StatusTimeStrip : UserControl
     private bool _hasDocument;
     private bool _showSamples;
     private bool _committing;
-    private bool? _displayHasDocument;
     private IInputElement? _focusReturn;
 
     public event EventHandler<long>? CurrentCommitted;
@@ -51,6 +51,23 @@ internal partial class StatusTimeStrip : UserControl
         ContextMenu = CreateMenu(StatusTimeField.Total);
         ApplyLocalizedText();
         SetState(0, WaveSelection.Empty, 0, 0, hasDocument: false);
+    }
+
+    internal void UsePlayerComboFill(bool player)
+    {
+        var sourceKey = player ? "PlayerComboFillBrush" : "StatusTimecodeFillBrush";
+        if (Application.Current?.TryFindResource(sourceKey) is not SolidColorBrush source)
+        {
+            return;
+        }
+
+        var copy = (SolidColorBrush)source.Clone();
+        if (copy.CanFreeze)
+        {
+            copy.Freeze();
+        }
+
+        Resources["StatusTimecodeFillBrush"] = copy;
     }
 
     public void ApplyLocalizedText()
@@ -84,16 +101,6 @@ internal partial class StatusTimeStrip : UserControl
         _totalFrames = Math.Max(0, totalFrames);
         _sampleRate = sampleRate;
         _hasDocument = hasDocument;
-        if (_displayHasDocument != hasDocument)
-        {
-            _displayHasDocument = hasDocument;
-            var brushKey = hasDocument ? "StatusBarTitleForeBrush" : "ChromeDimBrush";
-            foreach (var state in _fields.Values)
-            {
-                state.Display.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
-            }
-        }
-
         CurrentBox.IsEnabled = hasDocument;
         SelStartBox.IsEnabled = hasDocument;
         SelLengthBox.IsEnabled = hasDocument;

@@ -186,6 +186,7 @@ internal static partial class UiStrings
             "WaapiToggleOnHoverBack" => Get("WAAPI オン・ホバー", "WAAPI on · hover"),
             "WaapiToggleOnFore" => Get("WAAPI オン・文字", "WAAPI on · text"),
             "StatusBarBack" => Get("背景", "Background"),
+            "StatusTimecodeFill" => Get("時刻欄", "Timecode well"),
             "WaapiBarBack" => Get("WAAPI バー背景", "WAAPI bar background"),
             "StatusBarTitleFore" => Get("見出し", "Heading"),
             "StatusBarDetailFore" => Get("詳細文字", "Detail text"),

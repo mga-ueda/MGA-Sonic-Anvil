@@ -2624,7 +2624,25 @@ internal sealed class WaveformView : Grid
 
         if (SpectrogramVisible || LoudnessVisible || !InvertBitmapIsCurrent())
         {
-            DrawRange(dc, bounds, start, span, selection, Theme.Get("WaveSelectionFillBrush"));
+            if (SeekAndSelectOnly)
+            {
+                DrawRange(dc, bounds, start, span, selection, Theme.Get("WaveSelectionFillBrush"));
+                return;
+            }
+
+            var specWave = WaveformBounds(bounds);
+            var sx0 = FrameToViewX(selection.StartFrame, start, span, bounds);
+            var sx1 = FrameToViewX(selection.EndFrame, start, span, bounds);
+            sx0 = Math.Clamp(sx0, specWave.X, specWave.Right);
+            sx1 = Math.Clamp(sx1, specWave.X, specWave.Right);
+            if (sx1 > sx0)
+            {
+                dc.DrawRectangle(
+                    WpfControlHelpers.FrozenBrush(SpectrogramSelectionFill()),
+                    null,
+                    new Rect(sx0, specWave.Y, sx1 - sx0, specWave.Height));
+            }
+
             return;
         }
 
@@ -2646,17 +2664,25 @@ internal sealed class WaveformView : Grid
         }
 
         dc.PushClip(clip);
-        dc.PushOpacity(WaveformInvertPaint.SelectionInvertOpacityFor(playerLight));
+        if (SeekAndSelectOnly)
+        {
+            dc.PushOpacity(WaveformInvertPaint.SelectionInvertOpacityFor(playerLight));
+        }
+
         var group = new DrawingGroup();
         RenderOptions.SetBitmapScalingMode(group, BitmapScalingMode.NearestNeighbor);
         var context = group.Open();
         context.DrawImage(_invertBitmap, WaveBitmapDest(wave));
         context.Close();
         dc.DrawDrawing(group);
-        dc.Pop();
+        if (SeekAndSelectOnly)
+        {
+            dc.Pop();
+        }
+
         dc.Pop();
 
-        if (!playerLight)
+        if (SeekAndSelectOnly && !playerLight)
         {
             DrawRange(dc, bounds, start, span, selection, Theme.Get("WaveSelectionFillBrush"));
         }

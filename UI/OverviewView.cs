@@ -328,23 +328,18 @@ internal sealed class OverviewView : FrameworkElement
             return;
         }
 
+        if (_invertBitmap is null)
+        {
+            return;
+        }
+
         x0 = Math.Clamp(x0, 0, bounds.Width);
         x1 = Math.Clamp(x1, 0, bounds.Width);
         var width = Math.Max(1, x1 - x0);
         var clip = new Rect(x0, 0, width, bounds.Height);
-        if (_invertBitmap is not null)
-        {
-            dc.PushClip(new RectangleGeometry(clip));
-            dc.PushOpacity(WaveformInvertPaint.SelectionInvertOpacity);
-            dc.DrawImage(_invertBitmap, bounds);
-            dc.Pop();
-            dc.Pop();
-        }
-
-        dc.DrawRectangle(
-            WpfControlHelpers.FrozenBrush(Theme.Get("WaveSelectionFillBrush")),
-            null,
-            clip);
+        dc.PushClip(new RectangleGeometry(clip));
+        dc.DrawImage(_invertBitmap, bounds);
+        dc.Pop();
     }
 
     private void DrawMarkerLines(DrawingContext dc, Rect bounds)

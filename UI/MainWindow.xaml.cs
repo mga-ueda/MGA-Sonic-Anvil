@@ -154,7 +154,12 @@ public partial class MainWindow : Window
         WindowPaintReveal.Attach(this, OnStartupRevealed);
         // 編集履歴はその他ウィンドウと同じ扱いで等倍にする（ルートの表示倍率を打ち消す）。
         HistoryOverlay.LayoutTransform = UiScaleService.CreateCounterTransform();
-        UiThemeService.Changed += (_, _) => Dispatcher.BeginInvoke(ApplyUiColors);
+        ApplyStatusFieldChrome();
+        UiThemeService.Changed += (_, _) =>
+        {
+            ApplyStatusFieldChrome();
+            Dispatcher.BeginInvoke(ApplyUiColors);
+        };
         UiScaleService.Changed += (_, _) => Dispatcher.BeginInvoke(OnUiScaleChanged);
         AlwaysOnTopCheck.IsChecked = AppStorage.Settings.AlwaysOnTop;
         Topmost = AppStorage.Settings.AlwaysOnTop;

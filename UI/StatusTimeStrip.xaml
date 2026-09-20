@@ -4,6 +4,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="clr-namespace:MgaSonicAnvil.UI"
              Focusable="False">
+  <UserControl.Resources>
+    <SolidColorBrush x:Key="StatusTimecodeFillBrush" Color="#FF242428" />
+  </UserControl.Resources>
   <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
     <TextBlock x:Name="CurrentLabel"
                Style="{StaticResource StatusTimecodeLabelStyle}"
@@ -67,8 +70,8 @@
           Width="{x:Static ui:DesignMetrics.StatusTimecodeWidth}"
           Height="{x:Static ui:DesignMetrics.StatusTimecodeBoxHeight}"
           VerticalAlignment="Center">
-      <Border Background="{DynamicResource PlayerComboFillBrush}"
-              BorderBrush="{DynamicResource PlayerComboFillBrush}"
+      <Border Background="{DynamicResource StatusTimecodeFillBrush}"
+              BorderBrush="{DynamicResource StatusTimecodeFillBrush}"
               BorderThickness="1"
               IsHitTestVisible="False" />
       <TextBlock x:Name="TotalText"
@@ -77,9 +80,9 @@
                  TextAlignment="Center"
                  Margin="{x:Static ui:DesignMetrics.StatusTimecodePadding}"
                  FontFamily="Consolas"
-                 FontWeight="Bold"
+                 FontWeight="Normal"
                  FontSize="{x:Static ui:DesignMetrics.StatusTimecodeFontSize}"
-                 Foreground="{DynamicResource StatusBarTitleForeBrush}"
+                 Foreground="{DynamicResource PrimaryForeBrush}"
                  Text="00:00.000" />
     </Grid>
   </StackPanel>

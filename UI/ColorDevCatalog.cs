@@ -182,6 +182,7 @@ internal static class ColorDevCatalog
             ("WaapiToggleOnForeBrush", ColorDevGroup.Transport),
 
             ("StatusBarBackBrush", ColorDevGroup.StatusBar),
+            ("StatusTimecodeFillBrush", ColorDevGroup.StatusBar),
             ("WaapiBarBackBrush", ColorDevGroup.StatusBar),
             ("StatusBarTitleForeBrush", ColorDevGroup.StatusBar),
             ("StatusBarDetailForeBrush", ColorDevGroup.StatusBar),

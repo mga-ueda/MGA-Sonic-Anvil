@@ -80,7 +80,14 @@
                     FontSize="11"
                     VerticalAlignment="Center"
                     VerticalContentAlignment="Center"
-                    SelectionChanged="SpeakerMenu_SelectionChanged" />
+                    SelectionChanged="SpeakerMenu_SelectionChanged">
+            <ComboBox.Resources>
+              <SolidColorBrush x:Key="PlayerComboFillBrush" Color="#FF242428" />
+              <SolidColorBrush x:Key="PlayerComboHoverFillBrush" Color="#FF242428" />
+              <SolidColorBrush x:Key="PlayerComboDisabledFillBrush" Color="#FF242428" />
+              <SolidColorBrush x:Key="PlayerComboDropFillBrush" Color="#FF242428" />
+            </ComboBox.Resources>
+          </ComboBox>
         </StackPanel>
         <ui:StatusTimeStrip x:Name="StatusTimes"
                             Grid.Column="2"

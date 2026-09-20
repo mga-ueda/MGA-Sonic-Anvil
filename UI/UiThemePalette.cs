@@ -96,6 +96,7 @@ internal static class UiThemePalette
         "ActionLinkForeBrush",
         "ActionLinkHoverForeBrush",
         "StatusBarBackBrush",
+        "StatusTimecodeFillBrush",
         "WaapiBarBackBrush",
         "StatusBarTitleForeBrush",
         "StatusBarDetailForeBrush",
@@ -248,6 +249,7 @@ internal static class UiThemePalette
         ["ActionLinkForeBrush"] = Rgb(0x1A, 0x90, 0xA8),
         ["ActionLinkHoverForeBrush"] = Rgb(0x00, 0xA8, 0xC0),
         ["StatusBarBackBrush"] = Rgb(0xE6, 0xE6, 0xE8),
+        ["StatusTimecodeFillBrush"] = Rgb(0xF0, 0xF0, 0xF2),
         ["WaapiBarBackBrush"] = Rgb(0xE6, 0xE6, 0xEA),
         ["StatusBarTitleForeBrush"] = Rgb(0x3F, 0x3F, 0x42),
         ["StatusBarDetailForeBrush"] = Rgb(0x2C, 0x2C, 0x30),
@@ -288,6 +290,7 @@ internal static class UiThemePalette
     {
         ["PrimaryForeBrush"] = Rgb(0xEB, 0xEB, 0xEB),
         ["MutedForeBrush"] = Rgb(0x96, 0x96, 0x96),
+        ["StatusTimecodeFillBrush"] = Rgb(0x24, 0x24, 0x28),
         ["PlayerPlaceholderJacketTopBrush"] = Rgb(0x5C, 0x5C, 0x62),
         ["PlayerPlaceholderJacketBottomBrush"] = Rgb(0x2A, 0x2A, 0x2E),
         ["PlayerPlaceholderJacketForeBrush"] = Rgb(0xC8, 0xC8, 0xCE),

@@ -56,13 +56,13 @@
         <Setter Property="TextAlignment" Value="Center" />
         <Setter Property="Width" Value="{x:Static ui:DesignMetrics.StatusTimecodeLabelWidth}" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="Foreground" Value="{DynamicResource StatusBarTitleForeBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
         <Setter Property="Margin" Value="0,0,3,0" />
     </Style>
 
     <Style x:Key="StatusTimecodeStyle" TargetType="TextBox" BasedOn="{StaticResource DarkTextBoxStyle}">
         <Setter Property="FontFamily" Value="Consolas" />
-        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontWeight" Value="Normal" />
         <Setter Property="FontSize" Value="{x:Static ui:DesignMetrics.StatusTimecodeFontSize}" />
         <Setter Property="Padding" Value="{x:Static ui:DesignMetrics.StatusTimecodePadding}" />
         <Setter Property="MinWidth" Value="{x:Static ui:DesignMetrics.StatusTimecodeWidth}" />
@@ -72,7 +72,7 @@
         <Setter Property="TextAlignment" Value="Center" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="Foreground" Value="{DynamicResource StatusBarTitleForeBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="{DynamicResource PrimaryForeBrush}" />
         <Setter Property="BorderThickness" Value="1" />
@@ -85,8 +85,8 @@
                 <ControlTemplate TargetType="TextBox">
                     <Grid SnapsToDevicePixels="True">
                         <Border x:Name="Fill"
-                                Background="{DynamicResource PlayerComboFillBrush}"
-                                BorderBrush="{DynamicResource PlayerComboFillBrush}"
+                                Background="{DynamicResource StatusTimecodeFillBrush}"
+                                BorderBrush="{DynamicResource StatusTimecodeFillBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 IsHitTestVisible="False" />
                         <ScrollViewer x:Name="PART_ContentHost"
@@ -96,16 +96,10 @@
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Fill" Property="Background" Value="{DynamicResource PlayerComboHoverFillBrush}" />
                             <Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource ControlHoverBorderBrush}" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Fill" Property="Background" Value="{DynamicResource PlayerComboHoverFillBrush}" />
                             <Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource ControlHoverBorderBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Foreground" Value="{DynamicResource ChromeDimBrush}" />
-                            <Setter TargetName="Fill" Property="Background" Value="{DynamicResource PlayerComboDisabledFillBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -118,9 +112,9 @@
          TextBlock が担い、TextBox には編集開始時のみ文字列を入れる。 -->
     <Style x:Key="StatusTimecodeOverlayStyle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="Consolas" />
-        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontWeight" Value="Normal" />
         <Setter Property="FontSize" Value="{x:Static ui:DesignMetrics.StatusTimecodeFontSize}" />
-        <Setter Property="Foreground" Value="{DynamicResource StatusBarTitleForeBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
         <Setter Property="Padding" Value="{x:Static ui:DesignMetrics.StatusTimecodePadding}" />
         <Setter Property="Margin" Value="0,0,4,0" />
         <Setter Property="TextAlignment" Value="Center" />

@@ -62,6 +62,7 @@ public partial class MainWindow
     private void ApplyLibraryChrome()
     {
         var show = IsLibraryMaximized;
+        ApplyStatusFieldChrome();
         LibraryBrowser.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         if (show)
         {

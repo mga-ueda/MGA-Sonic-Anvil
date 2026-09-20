@@ -27,7 +27,7 @@ public sealed class StatusTimecodeLayoutTests
             text,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+            new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
             DesignMetrics.StatusTimecodeFontSize,
             Brushes.Black,
             1);
