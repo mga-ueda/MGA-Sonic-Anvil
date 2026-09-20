@@ -465,6 +465,82 @@ public sealed class AudioStreamSourceTests
     }
 
     [Fact]
+    public void BindStream_RewindSpeed_RateMismatch_MovesCursorBackward()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-rw-src-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteRampWave(path, sampleRate: 44100, frames: 44100);
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+
+            using var source = AudioStreamSource.Open(path);
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(48000);
+            var origin = 3000L;
+            provider.BindStream(source, document, startFrame: origin, playRange: null, loop: false);
+            provider.SetPlaybackSpeed(-PlaybackSampleProvider.FastSpeed);
+
+            var frames = 200;
+            var buffer = new float[frames * 2];
+            Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+
+            Assert.True(provider.CursorFrame < origin - 100, $"cursor={provider.CursorFrame}");
+            var gain = PlaybackSampleProvider.ShuttleGainLinear;
+            var first = 0;
+            while (first < frames && Math.Abs(buffer[first * 2]) < 1f)
+            {
+                first++;
+            }
+
+            Assert.True(first < frames - 8, "早戻しの音が出ていない");
+            Assert.InRange(buffer[first * 2], (origin - 200) * gain, (origin + 80) * gain);
+            Assert.True(buffer[(frames - 1) * 2] < buffer[first * 2], "逆方向に進んでいない");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void BindStream_RewindAfterForwardPlay_RateMismatch_MovesCursorBackward()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-rw-src-play-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteRampWave(path, sampleRate: 44100, frames: 44100);
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+
+            using var source = AudioStreamSource.Open(path);
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(48000);
+            provider.BindStream(source, document, startFrame: 8000, playRange: null, loop: false);
+
+            var play = new float[200 * 2];
+            Assert.Equal(play.Length, provider.Read(play, 0, play.Length));
+            var afterPlay = provider.CursorFrame;
+            Assert.True(afterPlay > 8000, $"afterPlay={afterPlay}");
+
+            provider.SetPlaybackSpeed(-PlaybackSampleProvider.FastSpeed);
+            var rewind = new float[200 * 2];
+            for (var n = 0; n < 20 && provider.CursorFrame >= afterPlay - 100; n++)
+            {
+                Assert.Equal(rewind.Length, provider.Read(rewind, 0, rewind.Length));
+            }
+
+            Assert.True(
+                provider.CursorFrame < afterPlay - 100,
+                $"afterPlay={afterPlay} cursor={provider.CursorFrame}");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void BuildPlayerDisplayFromPath_ReportsProgress()
     {
         var path = Path.Combine(Path.GetTempPath(), "mga-stream-peak-fast-" + Guid.NewGuid().ToString("N") + ".wav");
