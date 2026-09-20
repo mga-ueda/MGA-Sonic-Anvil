@@ -322,22 +322,19 @@ internal sealed class AudioPlayer : IDisposable
     }
 
     /// <summary>
-    /// プレイヤーは PCM 展開後も可変速（ピッチが変わる）で再生する。
-    /// エディタのメモリ再生へ落とすと左右キーがピッチ据え置きのグレインになる。
+    /// プレイヤー（preferStream）は PCM 展開後も可変速（ピッチが変わる）で再生する。
+    /// エディタはストリーム文書でもここを false にし、メモリ再生のピッチ据え置きグレインにする。
     /// </summary>
     internal static bool ShouldBindPlaybackStream(AudioDocument document, bool preferStream)
     {
-        if (document.SourcePath is not { Length: > 0 } path || !File.Exists(path))
+        if (!preferStream
+            || document.SourcePath is not { Length: > 0 } path
+            || !File.Exists(path))
         {
             return false;
         }
 
-        if (document.IsStreamPlayback)
-        {
-            return true;
-        }
-
-        return preferStream && AudioCodec.CanStreamPlay(path);
+        return document.IsStreamPlayback || AudioCodec.CanStreamPlay(path);
     }
 
     private void BindPlaybackSource(
@@ -1010,7 +1007,9 @@ internal sealed class AudioPlayer : IDisposable
             return;
         }
 
-        if (ShouldBindPlaybackStream(document, preferStream: false))
+        if (ShouldBindPlaybackStream(
+            document,
+            preferStream: document.IsStreamPlayback || _provider.IsStreamBound))
         {
             var stream = AudioStreamSource.Open(document.SourcePath!);
             try

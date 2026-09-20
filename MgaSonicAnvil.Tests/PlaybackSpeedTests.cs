@@ -124,9 +124,39 @@ public sealed class PlaybackSpeedTests
         var buffer = new float[8 * 2];
         Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
         Assert.Equal(40f * PlaybackSampleProvider.ShuttleGainLinear, buffer[0], 3);
-        Assert.Equal(37f * PlaybackSampleProvider.ShuttleGainLinear, buffer[2], 3);
-        Assert.Equal(34f * PlaybackSampleProvider.ShuttleGainLinear, buffer[4], 3);
+        Assert.Equal(39f * PlaybackSampleProvider.ShuttleGainLinear, buffer[2], 3);
+        Assert.Equal(38f * PlaybackSampleProvider.ShuttleGainLinear, buffer[4], 3);
         Assert.Equal(16, provider.CursorFrame);
+    }
+
+    [Fact]
+    public void RewindSpeed_KeepsOriginalPitchOnFirstGrain()
+    {
+        var rate = 48000;
+        var samples = new float[rate * 2];
+        for (var i = 0; i < rate; i++)
+        {
+            var value = (float)Math.Sin(2 * Math.PI * 1000 * i / rate);
+            samples[i * 2] = value;
+            samples[i * 2 + 1] = value;
+        }
+
+        var document = new AudioDocument(samples, rate, 2, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.SetDeviceSampleRate(rate);
+        var origin = 8000;
+        provider.Bind(document, origin, playRange: null, loop: false);
+        provider.SetPlaybackSpeed(-PlaybackSampleProvider.FastSpeed);
+
+        var frames = 1000;
+        var buffer = new float[frames * 2];
+        Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+        for (var i = 0; i < frames; i++)
+        {
+            Assert.Equal(samples[(origin - i) * 2] * PlaybackSampleProvider.ShuttleGainLinear, buffer[i * 2], 3);
+        }
+
+        Assert.Equal(origin - frames * 3, provider.CursorFrame);
     }
 
     [Fact]

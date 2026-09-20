@@ -1299,8 +1299,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private bool UsesNativeRead() =>
         _sourceRate == _deviceRate && Math.Abs(_playbackSpeed - 1d) < 1e-9;
 
+    // メモリ再生の早送り／早戻し。ストリームは Read 側で先に分岐するのでここには来ない。
     private bool UsesShuttleRead() =>
-        _playbackSpeed > 1.5;
+        Math.Abs(_playbackSpeed) > 1.5;
 
     private double PlaybackStep(bool resampled) =>
         (resampled ? _sourceRate / (double)_deviceRate : 1d) * _playbackSpeed;

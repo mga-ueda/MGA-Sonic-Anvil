@@ -75,6 +75,7 @@ public partial class MainWindow : Window
     private Rect _boundsBeforeWaveformMax;
     private double _meterColumnPreferred;
     private int _playbackGeneration;
+    private int _editorPlayAfterPcmTicket;
     private bool _didRestoreLastDocument;
     private TransportIconButton? _waapiToggle;
     private System.Windows.Controls.ContextMenu? _fadeMenu;
@@ -395,7 +396,9 @@ public partial class MainWindow : Window
 
     private void BindWorkspace(DocumentSession? session)
     {
-        if (session?.Document.IsDeferredLoad == true)
+        if (session is not null
+            && (session.Document.IsDeferredLoad
+                || (!IsLibraryMaximized && session.Document.IsStreamPlayback)))
         {
             BindSingleWorkspace(session);
             _ = EnsureLibrarySessionLoadedAsync(session);

@@ -382,6 +382,58 @@ public sealed class AudioStreamSourceTests
     }
 
     [Fact]
+    public void ShouldBindPlaybackStream_EditorDoesNotFollowPlayerStreamFlag()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-editor-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteRampWave(path, sampleRate: 48000, frames: 48000);
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+            Assert.True(document.IsStreamPlayback);
+            Assert.False(AudioPlayer.ShouldBindPlaybackStream(document, preferStream: false));
+            Assert.True(AudioPlayer.ShouldBindPlaybackStream(document, preferStream: true));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void EditorHandoff_LoadedPcmRewind_KeepsOriginalPitch()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-handoff-rw-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteRampWave(path, sampleRate: 48000, frames: 80);
+            var streamDoc = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(streamDoc));
+            Assert.False(AudioPlayer.ShouldBindPlaybackStream(streamDoc, preferStream: false));
+
+            var loaded = AudioCodec.Load(path, buildPeaks: false);
+            Assert.False(loaded.IsStreamPlayback);
+            Assert.False(AudioPlayer.ShouldBindPlaybackStream(loaded, preferStream: false));
+
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(48000);
+            provider.Bind(loaded, 40, playRange: null, loop: false);
+            provider.SetPlaybackSpeed(-PlaybackSampleProvider.FastSpeed);
+
+            var buffer = new float[8 * 2];
+            Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+            Assert.Equal(40f * PlaybackSampleProvider.ShuttleGainLinear, buffer[0], 3);
+            Assert.Equal(39f * PlaybackSampleProvider.ShuttleGainLinear, buffer[2], 3);
+            Assert.Equal(38f * PlaybackSampleProvider.ShuttleGainLinear, buffer[4], 3);
+            Assert.Equal(16, provider.CursorFrame);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void BindStream_RewindSpeed_MovesCursorBackward()
     {
         var path = Path.Combine(Path.GetTempPath(), "mga-stream-rw-" + Guid.NewGuid().ToString("N") + ".wav");

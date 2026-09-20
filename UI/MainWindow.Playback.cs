@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -319,6 +320,15 @@ public partial class MainWindow
             return;
         }
 
+        // プレイヤーから戻った MP3 などは、昇格前だとストリーム早戻し（ピッチ変化）のままになる。
+        if (!IsLibraryMaximized
+            && _activeSession is { } session
+            && LibraryPlayerMode.NeedsEditorPcmUpgrade(session.Document))
+        {
+            _ = StartPlaybackAfterEditorPcmAsync(session, startFrame, prerollSeconds);
+            return;
+        }
+
         WaveSelection? playRange = _document.Selection.IsEmpty ? null : _document.Selection;
         if (playRange is { } range && (startFrame < range.StartFrame || startFrame >= range.EndFrame))
         {
@@ -354,6 +364,25 @@ public partial class MainWindow
             PausePlaybackSoft();
             OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    private async Task StartPlaybackAfterEditorPcmAsync(
+        DocumentSession session,
+        long startFrame,
+        double prerollSeconds)
+    {
+        var ticket = ++_editorPlayAfterPcmTicket;
+        await EnsureLibrarySessionLoadedAsync(session).ConfigureAwait(true);
+        if (ticket != _editorPlayAfterPcmTicket
+            || IsLibraryMaximized
+            || !ReferenceEquals(_activeSession, session)
+            || _document is null
+            || LibraryPlayerMode.NeedsEditorPcmUpgrade(session.Document))
+        {
+            return;
+        }
+
+        StartPlayback(startFrame, prerollSeconds);
     }
 
     /// <summary>
@@ -440,6 +469,7 @@ public partial class MainWindow
 
     private void HaltPlaybackToStart()
     {
+        _editorPlayAfterPcmTicket++;
         PausePlaybackSoft();
         if (_document is not null)
         {
