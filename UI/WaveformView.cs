@@ -6038,7 +6038,7 @@ internal sealed class WaveformView : Grid
 
         _viewStart = next;
         _snapCacheDirty = true;
-        QueueMouseGuideOverlay();
+        ApplyMouseGuideOverlay();
         if (deferReload)
         {
             // キャッシュした波形／スペクトログラムをずらして先にスクロールする。
@@ -6184,8 +6184,6 @@ internal sealed class WaveformView : Grid
             ? snappedX
             : x;
     }
-
-    private void QueueMouseGuideOverlay() => ApplyMouseGuideOverlay();
 
     private bool TrySnapXToMarker(double mouseX, HashSet<long>? exclude, out double snappedX, out long frame)
     {
