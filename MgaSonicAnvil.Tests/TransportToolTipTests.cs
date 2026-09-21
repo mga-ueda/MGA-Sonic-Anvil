@@ -71,8 +71,12 @@ public sealed class TransportToolTipTests
         Assert.Contains("エクスプローラーで開く", UiStrings.TipWaveform);
         Assert.Contains("Ctrl+C", UiStrings.TipLibraryExplorer);
         Assert.Contains("エクスプローラーで開く", UiStrings.TipLibraryExplorer);
+        Assert.Contains("Shift+↑↓", UiStrings.TipLibraryExplorer);
+        Assert.Contains("Shift+クリック", UiStrings.TipLibraryExplorer);
         Assert.Contains("Ctrl+C", UiStrings.TipLibraryFavorites);
         Assert.Contains("エクスプローラーで開く", UiStrings.TipLibraryFavorites);
+        Assert.Contains("Shift+↑↓", UiStrings.TipLibraryFavorites);
+        Assert.Contains("Shift+クリック", UiStrings.TipLibraryFavorites);
         Assert.Contains("ダブルクリック", UiStrings.TipLibraryFavorites);
         Assert.Contains("プレイリストをクリアして追加", UiStrings.TipLibraryFavorites);
         Assert.Contains("プレイリストへ追加", UiStrings.TipLibraryFavorites);

@@ -349,6 +349,86 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void Explorer_ShiftArrow_SelectsVisibleRange()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var root = Path.Combine(Path.GetTempPath(), "mga-tree-shift-" + Guid.NewGuid().ToString("N"));
+            var firstPath = Path.Combine(root, "Alpha");
+            var secondPath = Path.Combine(root, "Beta");
+            var thirdPath = Path.Combine(root, "Gamma");
+            Directory.CreateDirectory(firstPath);
+            Directory.CreateDirectory(secondPath);
+            Directory.CreateDirectory(thirdPath);
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                var folder = view.ExplorerFirstFolder;
+                Assert.NotNull(folder);
+                folder.IsExpanded = true;
+                Flush();
+                var children = folder.Items.OfType<TreeViewItem>()
+                    .Where(item => item.Tag is string)
+                    .ToArray();
+                Assert.True(children.Length >= 3);
+                children[0].IsSelected = true;
+                view.BeginExplorerPlainPress(children[0], control: false);
+                Flush();
+                view.MoveExplorerSelection(1, extend: true);
+                Flush();
+                Assert.Equal(2, view.SelectedExplorerFolders.Length);
+                Assert.Contains(Path.GetFullPath(firstPath), view.SelectedExplorerFolders.Select(Path.GetFullPath));
+                Assert.Contains(Path.GetFullPath(secondPath), view.SelectedExplorerFolders.Select(Path.GetFullPath));
+
+                view.MoveExplorerSelection(1, extend: true);
+                Flush();
+                Assert.Equal(3, view.SelectedExplorerFolders.Length);
+                Assert.Contains(Path.GetFullPath(thirdPath), view.SelectedExplorerFolders.Select(Path.GetFullPath));
+
+                view.MoveExplorerSelection(-1, extend: true);
+                Flush();
+                Assert.Equal(2, view.SelectedExplorerFolders.Length);
+                Assert.DoesNotContain(Path.GetFullPath(thirdPath), view.SelectedExplorerFolders.Select(Path.GetFullPath));
+
+                view.MoveExplorerSelection(1, extend: false);
+                Flush();
+                var lastFolder = Assert.Single(view.SelectedExplorerFolders);
+                Assert.Equal(Path.GetFullPath(thirdPath), Path.GetFullPath(lastFolder));
+
+                children[0].IsSelected = true;
+                view.BeginExplorerPlainPress(children[0], control: false);
+                Flush();
+                view.ApplyExplorerShiftClick(children[2]);
+                Flush();
+                Assert.Equal(3, view.SelectedExplorerFolders.Length);
+                Assert.Contains(Path.GetFullPath(firstPath), view.SelectedExplorerFolders.Select(Path.GetFullPath));
+                Assert.Contains(Path.GetFullPath(thirdPath), view.SelectedExplorerFolders.Select(Path.GetFullPath));
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void ExplorerNestedFolders_UseSameHoverTemplate()
     {
         RunSta(() =>
@@ -956,6 +1036,76 @@ public sealed class LibraryBrowserSelectionTests
             Flush();
             Assert.True(view.IsListKeyboardFocused);
             window.Close();
+        });
+    }
+
+    [Fact]
+    public void Favorites_ShiftArrow_SelectsRange()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var root = Path.Combine(Path.GetTempPath(), "mga-fav-shift-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            var first = Path.Combine(root, "a.txt");
+            var second = Path.Combine(root, "b.txt");
+            var third = Path.Combine(root, "c.txt");
+            File.WriteAllText(first, "");
+            File.WriteAllText(second, "");
+            File.WriteAllText(third, "");
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetFavorites([first, second, third]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                view.FocusFavorites();
+                Flush();
+                view.MoveFavoritesSelection(1, extend: true);
+                Flush();
+                Assert.Equal(2, view.SelectedFavoritePaths.Length);
+                Assert.Contains(Path.GetFullPath(first), view.SelectedFavoritePaths.Select(Path.GetFullPath));
+                Assert.Contains(Path.GetFullPath(second), view.SelectedFavoritePaths.Select(Path.GetFullPath));
+
+                view.MoveFavoritesSelection(1, extend: true);
+                Flush();
+                Assert.Equal(3, view.SelectedFavoritePaths.Length);
+
+                view.MoveFavoritesSelection(-1, extend: true);
+                Flush();
+                Assert.Equal(2, view.SelectedFavoritePaths.Length);
+                Assert.DoesNotContain(Path.GetFullPath(third), view.SelectedFavoritePaths.Select(Path.GetFullPath));
+
+                view.MoveFavoritesSelection(1, extend: false);
+                Flush();
+                var last = Assert.Single(view.SelectedFavoritePaths);
+                Assert.Equal(Path.GetFullPath(third), Path.GetFullPath(last));
+
+                view.MoveFavoritesSelection(-2, extend: false);
+                Flush();
+                view.ApplyFavoritesShiftClick(2);
+                Flush();
+                Assert.Equal(3, view.SelectedFavoritePaths.Length);
+                Assert.Contains(Path.GetFullPath(first), view.SelectedFavoritePaths.Select(Path.GetFullPath));
+                Assert.Contains(Path.GetFullPath(third), view.SelectedFavoritePaths.Select(Path.GetFullPath));
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
         });
     }
 

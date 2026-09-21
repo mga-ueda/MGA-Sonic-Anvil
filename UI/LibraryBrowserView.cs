@@ -107,6 +107,7 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly Border _listFocusLine = CreatePaneFocusLine();
     private readonly ObservableCollection<LibraryFavoriteRow> _favorites = [];
     private readonly HashSet<TreeViewItem> _treeMultiSelected = [];
+    private TreeViewItem? _treeSelectionAnchor;
     private string[] _explorerRoots = LibraryExplorerPaths.ResolveRoots(null);
     private readonly HashSet<string> _explorerExpanded = new(StringComparer.OrdinalIgnoreCase);
     private bool _treeExpansionBusy;
@@ -160,7 +161,11 @@ internal sealed class LibraryBrowserView : UserControl
     private TreeViewItem? _treeDragItem;
     private string[] _treeDragPaths = [];
     private TreeViewItem? _treePendingSingleSelect;
+    private bool _treeRangeBusy;
     private Point? _favoritesDragStart;
+    private int _favoritesAnchorIndex = -1;
+    private int _favoritesCaretIndex = -1;
+    private bool _favoritesRangeBusy;
     private Point? _playlistDragStart;
     private string[] _playlistDragPaths = [];
     private bool _playlistDragBusy;
@@ -818,6 +823,7 @@ internal sealed class LibraryBrowserView : UserControl
 
         var item = items[match];
         ClearTreeMultiSelect();
+        _treeSelectionAnchor = item;
         item.IsSelected = true;
         item.BringIntoView();
         item.Focus();
@@ -1915,6 +1921,8 @@ internal sealed class LibraryBrowserView : UserControl
     public void SetFavorites(IEnumerable<string> paths)
     {
         var next = LibraryFavoritePaths.Resolve(paths.ToArray());
+        _favoritesAnchorIndex = -1;
+        _favoritesCaretIndex = -1;
         _favorites.Clear();
         foreach (var path in next)
         {
@@ -2129,6 +2137,7 @@ internal sealed class LibraryBrowserView : UserControl
         _favoritesList.FontSize = 11;
         _favoritesList.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
         _favoritesList.PreviewKeyDown += FavoritesList_PreviewKeyDown;
+        _favoritesList.SelectionChanged += FavoritesList_SelectionChanged;
         _favoritesList.PreviewMouseLeftButtonDown += FavoritesList_PreviewMouseLeftButtonDown;
         _favoritesList.PreviewMouseMove += FavoritesList_PreviewMouseMove;
         _favoritesList.PreviewMouseLeftButtonUp += (_, _) => _favoritesDragStart = null;
@@ -2517,6 +2526,7 @@ internal sealed class LibraryBrowserView : UserControl
     private void BuildFilteredExplorer(HashSet<string> visible)
     {
         _treeMultiSelected.Clear();
+        _treeSelectionAnchor = null;
         _treeSyncing = true;
         _treeExpansionBusy = true;
         try
@@ -3052,6 +3062,7 @@ internal sealed class LibraryBrowserView : UserControl
     {
         ClearExplorerTypeahead();
         _treeMultiSelected.Clear();
+        _treeSelectionAnchor = null;
         _folderTree.Items.Clear();
         foreach (var root in _explorerRoots)
         {
@@ -3507,12 +3518,22 @@ internal sealed class LibraryBrowserView : UserControl
 
         if (e.NewValue is TreeViewItem { Tag: string path } item && Directory.Exists(path))
         {
-            if ((Keyboard.Modifiers & ModifierKeys.Control) == 0
-                && !_treeMultiSelected.Contains(item))
+            if (!_treeRangeBusy)
             {
-                ClearTreeMultiSelect();
-                _treeMultiSelected.Add(item);
-                ApplyTreeMultiSelectChrome();
+                var modifiers = Keyboard.Modifiers;
+                if ((modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0)
+                {
+                    _treeSelectionAnchor = item;
+                }
+
+                if ((modifiers & ModifierKeys.Control) == 0
+                    && (modifiers & ModifierKeys.Shift) == 0
+                    && !_treeMultiSelected.Contains(item))
+                {
+                    ClearTreeMultiSelect();
+                    _treeMultiSelected.Add(item);
+                    ApplyTreeMultiSelectChrome();
+                }
             }
 
             ExplorerFolderChanged?.Invoke(this, path);
@@ -3535,9 +3556,12 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
+        var modifiers = Keyboard.Modifiers;
+        var control = (modifiers & ModifierKeys.Control) != 0;
+        var shift = (modifiers & ModifierKeys.Shift) != 0;
+        if (control || shift)
         {
-            BeginExplorerPlainPress(item, control: true);
+            BeginExplorerPlainPress(item, control, shift);
             _treeDragStart = e.GetPosition(null);
             e.Handled = true;
             return;
@@ -3561,6 +3585,7 @@ internal sealed class LibraryBrowserView : UserControl
                 ClearTreeMultiSelect();
                 _treeMultiSelected.Add(item);
                 ApplyTreeMultiSelectChrome();
+                _treeSelectionAnchor = item;
                 item.IsSelected = true;
             }
         }
@@ -3586,7 +3611,16 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        if (key is Key.Up or Key.Down or Key.Left or Key.Right
+        if (key is Key.Up or Key.Down
+            && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        {
+            ClearExplorerTypeahead();
+            MoveExplorerSelection(key == Key.Up ? -1 : 1, extend: modifiers == ModifierKeys.Shift);
+            e.Handled = true;
+            return;
+        }
+
+        if (key is Key.Left or Key.Right
             or Key.Home or Key.End or Key.PageUp or Key.PageDown
             or Key.Enter or Key.Tab)
         {
@@ -3701,8 +3735,16 @@ internal sealed class LibraryBrowserView : UserControl
         _treePendingSingleSelect = null;
     }
 
-    internal void BeginExplorerPlainPress(TreeViewItem item, bool control)
+    internal void BeginExplorerPlainPress(TreeViewItem item, bool control, bool shift = false)
     {
+        if (shift)
+        {
+            ApplyExplorerShiftClick(item);
+            _treePendingSingleSelect = null;
+            ArmTreeDrag(item);
+            return;
+        }
+
         if (control)
         {
             ToggleTreeMultiSelect(item);
@@ -3722,6 +3764,7 @@ internal sealed class LibraryBrowserView : UserControl
         ClearTreeMultiSelect();
         _treeMultiSelected.Add(item);
         ApplyTreeMultiSelectChrome();
+        _treeSelectionAnchor = item;
         ArmTreeDrag(item);
     }
 
@@ -3737,6 +3780,7 @@ internal sealed class LibraryBrowserView : UserControl
         ClearTreeMultiSelect();
         _treeMultiSelected.Add(pending);
         ApplyTreeMultiSelectChrome();
+        _treeSelectionAnchor = pending;
         pending.IsSelected = true;
     }
 
@@ -3744,6 +3788,135 @@ internal sealed class LibraryBrowserView : UserControl
 
     internal bool ShouldHoldExplorerMultiSelect(TreeViewItem item) =>
         _treeMultiSelected.Count > 1 && _treeMultiSelected.Contains(item);
+
+    internal void MoveExplorerSelection(int delta, bool extend = false)
+    {
+        if (delta == 0)
+        {
+            return;
+        }
+
+        var items = VisibleExplorerItems();
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        var caret = CurrentExplorerItem();
+        var index = caret is null ? -1 : items.IndexOf(caret);
+        if (index < 0)
+        {
+            index = delta > 0 ? 0 : items.Count - 1;
+        }
+        else
+        {
+            index = Math.Clamp(index + delta, 0, items.Count - 1);
+        }
+
+        ApplyExplorerMoveSelection(items[index], caret, extend);
+    }
+
+    internal void ApplyExplorerShiftClick(TreeViewItem item)
+    {
+        ApplyExplorerMoveSelection(item, CurrentExplorerItem(), extend: true);
+    }
+
+    private void ApplyExplorerMoveSelection(TreeViewItem current, TreeViewItem? caret, bool extend)
+    {
+        _treeRangeBusy = true;
+        try
+        {
+            if (!extend)
+            {
+                _treeSelectionAnchor = current;
+                ClearTreeMultiSelect();
+                _treeMultiSelected.Add(current);
+                ApplyTreeMultiSelectChrome();
+                current.IsSelected = true;
+                current.BringIntoView();
+                current.Focus();
+                return;
+            }
+
+            _treeSelectionAnchor ??= caret ?? current;
+            SelectExplorerVisibleRange(_treeSelectionAnchor, current);
+            current.IsSelected = true;
+            current.BringIntoView();
+            current.Focus();
+        }
+        finally
+        {
+            _treeRangeBusy = false;
+        }
+    }
+
+    private void SelectExplorerVisibleRange(TreeViewItem from, TreeViewItem to)
+    {
+        var items = VisibleExplorerItems();
+        var start = items.IndexOf(from);
+        var end = items.IndexOf(to);
+        if (end < 0)
+        {
+            return;
+        }
+
+        if (start < 0)
+        {
+            start = end;
+        }
+
+        var lo = Math.Min(start, end);
+        var hi = Math.Max(start, end);
+        _treeMultiSelected.Clear();
+        for (var i = lo; i <= hi; i++)
+        {
+            _treeMultiSelected.Add(items[i]);
+        }
+
+        ApplyTreeMultiSelectChrome();
+    }
+
+    private TreeViewItem? CurrentExplorerItem()
+    {
+        if (_folderTree.SelectedItem is TreeViewItem { Tag: string } selected)
+        {
+            return selected;
+        }
+
+        foreach (var item in _treeMultiSelected)
+        {
+            if (item.Tag is string)
+            {
+                return item;
+            }
+        }
+
+        return null;
+    }
+
+    private List<TreeViewItem> VisibleExplorerItems()
+    {
+        var items = new List<TreeViewItem>();
+        CollectVisibleExplorerItems(_folderTree.Items, items);
+        return items;
+    }
+
+    private static void CollectVisibleExplorerItems(ItemCollection items, List<TreeViewItem> dest)
+    {
+        foreach (var raw in items)
+        {
+            if (raw is not TreeViewItem item || item.Tag is not string)
+            {
+                continue;
+            }
+
+            dest.Add(item);
+            if (item.IsExpanded && item.Items.Count > 0)
+            {
+                CollectVisibleExplorerItems(item.Items, dest);
+            }
+        }
+    }
 
     private void ArmTreeDrag(TreeViewItem item)
     {
@@ -6083,7 +6256,8 @@ internal sealed class LibraryBrowserView : UserControl
     private void FavoritesList_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None)
+        var modifiers = Keyboard.Modifiers;
+        if (key == Key.Delete && modifiers == ModifierKeys.None)
         {
             RemoveSelectedFavorites();
             e.Handled = true;
@@ -6091,10 +6265,143 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         if (key == Key.Enter
-            && Keyboard.Modifiers is ModifierKeys.None or ModifierKeys.Shift)
+            && modifiers is ModifierKeys.None or ModifierKeys.Shift)
         {
-            ActivateSelectedFavorites(clearPlaylist: Keyboard.Modifiers == ModifierKeys.None);
+            ActivateSelectedFavorites(clearPlaylist: modifiers == ModifierKeys.None);
             e.Handled = true;
+            return;
+        }
+
+        if (key is Key.Up or Key.Down
+            && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        {
+            MoveFavoritesSelection(key == Key.Up ? -1 : 1, extend: modifiers == ModifierKeys.Shift);
+            e.Handled = true;
+        }
+    }
+
+    private void FavoritesList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_favoritesRangeBusy || (Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+        {
+            return;
+        }
+
+        _favoritesAnchorIndex = _favoritesList.SelectedIndex;
+        _favoritesCaretIndex = _favoritesAnchorIndex;
+    }
+
+    internal void MoveFavoritesSelection(int delta, bool extend = false)
+    {
+        if (delta == 0)
+        {
+            return;
+        }
+
+        var count = _favorites.Count;
+        if (count <= 0)
+        {
+            return;
+        }
+
+        var caret = FavoritesCaretIndex();
+        var index = caret;
+        if (index < 0)
+        {
+            index = delta > 0 ? 0 : count - 1;
+        }
+        else
+        {
+            index = Math.Clamp(index + delta, 0, count - 1);
+        }
+
+        ApplyFavoritesMoveSelection(index, caret, extend);
+    }
+
+    internal void ApplyFavoritesShiftClick(int index)
+    {
+        ApplyFavoritesMoveSelection(index, FavoritesCaretIndex(), extend: true);
+    }
+
+    private int FavoritesCaretIndex()
+    {
+        if (Keyboard.FocusedElement is ListBoxItem focused)
+        {
+            var focusedIndex = _favoritesList.ItemContainerGenerator.IndexFromContainer(focused);
+            if (focusedIndex >= 0)
+            {
+                return focusedIndex;
+            }
+        }
+
+        if (_favoritesCaretIndex >= 0 && _favoritesCaretIndex < _favorites.Count)
+        {
+            return _favoritesCaretIndex;
+        }
+
+        return _favoritesList.SelectedIndex;
+    }
+
+    private void ApplyFavoritesMoveSelection(int index, int caret, bool extend)
+    {
+        _favoritesRangeBusy = true;
+        try
+        {
+            if (!extend)
+            {
+                _favoritesAnchorIndex = index;
+                _favoritesCaretIndex = index;
+                _favoritesList.SelectedIndex = index;
+                RevealFavorite(index);
+                return;
+            }
+
+            if (_favoritesAnchorIndex < 0)
+            {
+                _favoritesAnchorIndex = Math.Max(0, caret);
+            }
+
+            _favoritesCaretIndex = index;
+            SelectFavoritesRange(_favoritesAnchorIndex, index);
+            RevealFavorite(index);
+        }
+        finally
+        {
+            _favoritesRangeBusy = false;
+        }
+    }
+
+    private void SelectFavoritesRange(int from, int to)
+    {
+        var count = _favorites.Count;
+        if (count <= 0)
+        {
+            return;
+        }
+
+        from = Math.Clamp(from, 0, count - 1);
+        to = Math.Clamp(to, 0, count - 1);
+        var lo = Math.Min(from, to);
+        var hi = Math.Max(from, to);
+        _favoritesList.SelectedItems.Clear();
+        for (var i = lo; i <= hi; i++)
+        {
+            _favoritesList.SelectedItems.Add(_favorites[i]);
+        }
+    }
+
+    private void RevealFavorite(int index)
+    {
+        if (index < 0 || index >= _favorites.Count)
+        {
+            return;
+        }
+
+        var row = _favorites[index];
+        _favoritesList.ScrollIntoView(row);
+        if (_favoritesList.ItemContainerGenerator.ContainerFromIndex(index) is UIElement item)
+        {
+            item.Focus();
         }
     }
 
@@ -6117,6 +6424,35 @@ internal sealed class LibraryBrowserView : UserControl
     {
         CancelPlaylistFocusRestore();
         _favoritesDragStart = e.GetPosition(null);
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) == 0
+            || e.OriginalSource is not DependencyObject origin)
+        {
+            return;
+        }
+
+        var index = FavoritesIndexFromOrigin(origin);
+        if (index < 0)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        ApplyFavoritesShiftClick(index);
+    }
+
+    private int FavoritesIndexFromOrigin(DependencyObject? origin)
+    {
+        while (origin is not null)
+        {
+            if (origin is ListBoxItem item)
+            {
+                return _favoritesList.ItemContainerGenerator.IndexFromContainer(item);
+            }
+
+            origin = VisualTreeHelper.GetParent(origin);
+        }
+
+        return -1;
     }
 
     private void FavoritesList_PreviewMouseMove(object sender, MouseEventArgs e)

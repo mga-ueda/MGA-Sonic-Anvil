@@ -131,6 +131,8 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.V, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.D, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Up, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Up, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Down, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Left, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Enter, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Enter, ModifierKeys.Shift));
