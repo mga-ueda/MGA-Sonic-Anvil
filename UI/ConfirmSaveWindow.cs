@@ -14,7 +14,7 @@ internal enum ConfirmSaveChoice
     DiscardAll,
 }
 
-/// <summary>未保存が複数あるときの保存確認。はい／いいえに加え、残りをまとめて終了できる。</summary>
+/// <summary>未保存が複数あるときの保存確認。はい／いいえに加え、残りをまとめて閉じられる。</summary>
 internal sealed class ConfirmSaveWindow : Window
 {
     public ConfirmSaveChoice Choice { get; private set; } = ConfirmSaveChoice.Cancel;
@@ -48,8 +48,8 @@ internal sealed class ConfirmSaveWindow : Window
 
         var yes = CreateButton(UiStrings.ButtonYes, ConfirmSaveChoice.Save, accent: true, isDefault: true);
         var no = CreateButton(UiStrings.ButtonNo, ConfirmSaveChoice.Discard);
-        var saveAll = CreateButton(UiStrings.ButtonSaveAllAndExit, ConfirmSaveChoice.SaveAll);
-        var discardAll = CreateButton(UiStrings.ButtonDiscardAllAndExit, ConfirmSaveChoice.DiscardAll);
+        var saveAll = CreateButton(UiStrings.ButtonSaveAllAndClose, ConfirmSaveChoice.SaveAll);
+        var discardAll = CreateButton(UiStrings.ButtonDiscardAllAndClose, ConfirmSaveChoice.DiscardAll);
         var cancel = CreateButton(UiStrings.ButtonYesNoCancel, ConfirmSaveChoice.Cancel, isCancel: true);
 
         var first = new StackPanel

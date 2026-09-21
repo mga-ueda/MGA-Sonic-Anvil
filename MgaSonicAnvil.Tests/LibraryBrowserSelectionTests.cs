@@ -927,6 +927,39 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void RequestListFocus_MovesFromExplorer()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.mp3");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions([first], first, [first]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            view.FocusExplorer();
+            Flush();
+            Assert.True(view.IsExplorerFocused);
+
+            view.RequestListFocus();
+            Flush();
+            Assert.True(view.IsListKeyboardFocused);
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void Playlist_ShiftAndCtrlSelect_KeepsMultipleRows()
     {
         RunSta(() =>

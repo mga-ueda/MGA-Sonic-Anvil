@@ -77,6 +77,8 @@ public sealed class TransportToolTipTests
         Assert.Contains("プレイリストをクリアして追加", UiStrings.TipLibraryFavorites);
         Assert.Contains("プレイリストへ追加", UiStrings.TipLibraryFavorites);
         Assert.Contains("1曲ずつ", UiStrings.TipLibraryFavorites);
+        Assert.Contains("プレイリストをアクティブにする", UiStrings.TipLibraryExplorer);
+        Assert.Contains("プレイリストをアクティブにする", UiStrings.TipLibraryFavorites);
         Assert.Contains("Ctrl+C", UiStrings.TipLibraryList);
         Assert.Contains("エクスプローラーで開く", UiStrings.TipLibraryList);
         Assert.Contains("ドラッグ", UiStrings.TipLibraryColumns);

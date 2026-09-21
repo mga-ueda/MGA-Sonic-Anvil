@@ -907,6 +907,7 @@ public partial class MainWindow
         if (first is not null)
         {
             _libraryHoldJacketWash = false;
+            LibraryBrowser.RequestListFocus();
         }
 
         _ = PlayLibrarySessionAsync(first);
@@ -1896,6 +1897,7 @@ public partial class MainWindow
     /// <summary>
     /// フォルダ配下（と単体ファイル）を再帰収集し、1 曲ずつ載せる。
     /// 再生するのは Enter（クリア後）だけ。Shift+Enter・ダブルクリック・追加メニューは再生も停止もしない。
+    /// 再生が始まる追加（Enter）だけ、最初の曲を載せたときにプレイリストへフォーカスする。
     /// 検索中のツリーは見えているフォルダだけ。ファイル名ヒットはそのファイル、フォルダ名ヒットは配下すべて。
     /// お気に入りは検索フィルタを掛けない。
     /// </summary>
@@ -1928,6 +1930,25 @@ public partial class MainWindow
 
         _libraryPlayFirstPending = false;
         var firstHandled = false;
+        async Task<bool> AppendFoundAsync(string path)
+        {
+            var first = !firstHandled;
+            var select = playFirst && first;
+            if (!await TryAppendLibrarySessionAsync(path, generation, select, play: select)
+                    .ConfigureAwait(true))
+            {
+                return false;
+            }
+
+            if (first && playFirst)
+            {
+                LibraryBrowser.RequestListFocus();
+            }
+
+            firstHandled = true;
+            return true;
+        }
+
         try
         {
             while (remaining.Count > 0)
@@ -1953,19 +1974,11 @@ public partial class MainWindow
                         && filter.IncludeFile(current.Path, current.AncestorHit)
                         && FindSessionByPath(current.Path) is null)
                     {
-                        var selectFile = playFirst && !firstHandled;
-                        if (!await TryAppendLibrarySessionAsync(
-                                current.Path,
-                                generation,
-                                selectFile,
-                                play: selectFile)
-                            .ConfigureAwait(true))
+                        if (!await AppendFoundAsync(current.Path).ConfigureAwait(true))
                         {
                             LibraryBrowser.FinishIncrementalSessionLoad();
                             return;
                         }
-
-                        firstHandled = true;
                     }
 
                     continue;
@@ -2016,15 +2029,11 @@ public partial class MainWindow
                         continue;
                     }
 
-                    var select = playFirst && !firstHandled;
-                    if (!await TryAppendLibrarySessionAsync(file, generation, select, play: select)
-                            .ConfigureAwait(true))
+                    if (!await AppendFoundAsync(file).ConfigureAwait(true))
                     {
                         LibraryBrowser.FinishIncrementalSessionLoad();
                         return;
                     }
-
-                    firstHandled = true;
                 }
 
                 for (var i = layer.children.Length - 1; i >= 0; i--)

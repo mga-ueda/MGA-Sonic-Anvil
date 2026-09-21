@@ -688,7 +688,7 @@ internal sealed class LibraryBrowserView : UserControl
             DispatcherPriority.Input);
     }
 
-    private void RequestListFocus()
+    internal void RequestListFocus()
     {
         var ticket = ++_listFocusTicket;
         Dispatcher.BeginInvoke(
