@@ -351,9 +351,9 @@ public sealed class RegionTests
     }
 
     [Fact]
-    public void ChainFlagRow_CloseMarkersKeepFullWidthAndLineUp()
+    public void PlaceFlagRow_CloseMarkersStayOnStemAndMayOverlap()
     {
-        var packed = WaveformView.ChainFlagRow(
+        var packed = WaveformView.PlaceFlagRow(
         [
             new WaveformView.PackedTimelineFlag(10, 20, GrowLeft: false),
             new WaveformView.PackedTimelineFlag(16, 20, GrowLeft: false),
@@ -363,17 +363,15 @@ public sealed class RegionTests
         Assert.Equal(20, packed[1].Width);
         Assert.Equal(18, packed[2].Width);
         Assert.Equal(10, packed[0].Left);
-        Assert.Equal(packed[0].Right, packed[1].Left);
-        Assert.Equal(packed[1].Right, packed[2].Left);
-        Assert.Equal(10, packed[0].StemX);
-        Assert.Equal(16, packed[1].StemX);
-        Assert.Equal(16, packed[2].StemX);
+        Assert.Equal(16, packed[1].Left);
+        Assert.Equal(16, packed[2].Left);
+        Assert.True(packed[0].Right > packed[1].Left);
     }
 
     [Fact]
-    public void ChainFlagRow_FarMarkersStayOnStem()
+    public void PlaceFlagRow_FarMarkersStayOnStem()
     {
-        var packed = WaveformView.ChainFlagRow(
+        var packed = WaveformView.PlaceFlagRow(
         [
             new WaveformView.PackedTimelineFlag(10, 20, GrowLeft: false),
             new WaveformView.PackedTimelineFlag(80, 16, GrowLeft: false),
@@ -382,6 +380,28 @@ public sealed class RegionTests
         Assert.Equal(0, packed[1].Offset);
         Assert.Equal(10, packed[0].Left);
         Assert.Equal(80, packed[1].Left);
+    }
+
+    [Fact]
+    public void MarkerFlagGrowsLeft_OnlyAtFileEnd()
+    {
+        Assert.False(WaveformView.MarkerFlagGrowsLeft(0, 100));
+        Assert.False(WaveformView.MarkerFlagGrowsLeft(99, 100));
+        Assert.True(WaveformView.MarkerFlagGrowsLeft(100, 100));
+        Assert.True(WaveformView.MarkerFlagGrowsLeft(101, 100));
+        Assert.False(WaveformView.MarkerFlagGrowsLeft(0, 0));
+    }
+
+    [Fact]
+    public void PackedTimelineFlag_GrowLeft_PlacesBoxLeftOfStem()
+    {
+        var right = new WaveformView.PackedTimelineFlag(100, 20, GrowLeft: false);
+        Assert.Equal(100, right.Left);
+        Assert.Equal(120, right.Right);
+
+        var left = new WaveformView.PackedTimelineFlag(100, 20, GrowLeft: true);
+        Assert.Equal(80, left.Left);
+        Assert.Equal(100, left.Right);
     }
 
     [Fact]

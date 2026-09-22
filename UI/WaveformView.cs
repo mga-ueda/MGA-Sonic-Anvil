@@ -4207,6 +4207,10 @@ internal sealed class WaveformView : Grid
 
     internal const double FlagProximityPad = 8;
 
+    /// <summary>ファイル末端のマーカー旗は右にはみ出さないよう左向き。</summary>
+    internal static bool MarkerFlagGrowsLeft(long frame, long frameCount) =>
+        frameCount > 0 && frame >= frameCount;
+
     internal readonly record struct PackedTimelineFlag(double StemX, double Width, bool GrowLeft, double Offset = 0)
     {
         public double Left => (GrowLeft ? StemX - Width : StemX) + Offset;
@@ -4282,42 +4286,21 @@ internal sealed class WaveformView : Grid
         return packed;
     }
 
-    internal static PackedTimelineFlag[] ChainFlagRow(IReadOnlyList<PackedTimelineFlag> flags)
+    /// <summary>マーカー旗は茎位置に置く。密集時は重なってよい（連結してはみ出さない）。</summary>
+    internal static PackedTimelineFlag[] PlaceFlagRow(IReadOnlyList<PackedTimelineFlag> flags)
     {
         if (flags.Count == 0)
         {
             return [];
         }
 
-        if (flags.Count == 1)
-        {
-            return [flags[0] with { Offset = 0 }];
-        }
-
-        var packed = new PackedTimelineFlag[flags.Count];
-        var order = new int[flags.Count];
+        var placed = new PackedTimelineFlag[flags.Count];
         for (var i = 0; i < flags.Count; i++)
         {
-            packed[i] = flags[i] with { Offset = 0 };
-            order[i] = i;
+            placed[i] = flags[i] with { Offset = 0 };
         }
 
-        Array.Sort(order, (left, right) =>
-        {
-            var cmp = packed[left].StemX.CompareTo(packed[right].StemX);
-            return cmp != 0 ? cmp : left.CompareTo(right);
-        });
-
-        var chainRight = double.NegativeInfinity;
-        foreach (var i in order)
-        {
-            var flag = packed[i];
-            var left = Math.Max(flag.StemX, chainRight);
-            packed[i] = flag with { Offset = left - flag.StemX };
-            chainRight = left + flag.Width;
-        }
-
-        return packed;
+        return placed;
     }
 
     internal static Rect FullFlagRect(double x, double width, double laneHeight) =>
@@ -4574,7 +4557,7 @@ internal sealed class WaveformView : Grid
             TryCollectFlag(regions, bounds, start, span, region, region.EndFrame, id, growLeft: true, pixelsPerDip);
         }
 
-        var markers = new List<(long Frame, double StemX, double Width)>();
+        var markers = new List<(long Frame, double StemX, double Width, bool GrowLeft)>();
         foreach (var marker in _document.Markers)
         {
             var x = FrameToViewX(marker.Frame, start, span, bounds);
@@ -4583,7 +4566,11 @@ internal sealed class WaveformView : Grid
                 continue;
             }
 
-            markers.Add((marker.Frame, x, MeasureFlagWidth(marker.Id.ToString(CultureInfo.InvariantCulture), pixelsPerDip)));
+            markers.Add((
+                marker.Frame,
+                x,
+                MeasureFlagWidth(marker.Id.ToString(CultureInfo.InvariantCulture), pixelsPerDip),
+                MarkerFlagGrowsLeft(marker.Frame, _document.FrameCount)));
         }
 
         var top = new List<(bool Region, WaveSelection Range, long Frame, PackedTimelineFlag Flag)>(regions.Count + markers.Count);
@@ -4595,7 +4582,7 @@ internal sealed class WaveformView : Grid
 
         foreach (var marker in markers)
         {
-            var flag = new PackedTimelineFlag(marker.StemX, marker.Width, GrowLeft: false);
+            var flag = new PackedTimelineFlag(marker.StemX, marker.Width, marker.GrowLeft);
             if (split)
             {
                 bottom.Add((marker.Frame, flag));
@@ -4606,10 +4593,10 @@ internal sealed class WaveformView : Grid
             }
         }
 
-        ApplyPackedRow(top, laneHeight, split, topRow: true, chain: top.TrueForAll(item => !item.Region));
+        ApplyPackedRow(top, laneHeight, split, topRow: true, pack: top.Exists(static item => item.Region));
         if (bottom.Count > 0)
         {
-            var packed = ChainFlagRow(bottom.ConvertAll(item => item.Flag));
+            var packed = PlaceFlagRow(bottom.ConvertAll(item => item.Flag));
             for (var i = 0; i < bottom.Count; i++)
             {
                 _markerFlagLayout[bottom[i].Frame] = LaneFlagRect(packed[i].Left, packed[i].Width, laneHeight, split: true, top: false);
@@ -4622,16 +4609,16 @@ internal sealed class WaveformView : Grid
         double laneHeight,
         bool split,
         bool topRow,
-        bool chain)
+        bool pack)
     {
         if (row.Count == 0)
         {
             return;
         }
 
-        var packed = chain
-            ? ChainFlagRow(row.ConvertAll(item => item.Flag))
-            : PackFlagRow(row.ConvertAll(item => item.Flag));
+        var packed = pack
+            ? PackFlagRow(row.ConvertAll(item => item.Flag))
+            : PlaceFlagRow(row.ConvertAll(item => item.Flag));
         for (var i = 0; i < row.Count; i++)
         {
             var item = row[i];
@@ -4824,10 +4811,17 @@ internal sealed class WaveformView : Grid
             var selected = _selectedMarkerFrames.Contains(marker.Frame);
             var idText = GetMarkerLabel(marker.Id.ToString(CultureInfo.InvariantCulture), pixelsPerDip);
             const double padX = 3;
+            var growLeft = MarkerFlagGrowsLeft(marker.Frame, _document.FrameCount);
             if (!_markerFlagLayout.TryGetValue(marker.Frame, out var box))
             {
                 var boxW = MeasureFlagWidth(marker.Id.ToString(CultureInfo.InvariantCulture), pixelsPerDip);
-                box = LaneFlagRect(x, boxW, lane.Height, SplitFlagLanes, top: !SplitFlagLanes);
+                var left = growLeft ? x - boxW : x;
+                box = LaneFlagRect(left, boxW, lane.Height, SplitFlagLanes, top: !SplitFlagLanes);
+            }
+            else if (!growLeft && Math.Abs(box.Right - x) <= 0.51)
+            {
+                // レイアウトが左向き旗ならコメントも左へ。
+                growLeft = true;
             }
 
             _markerFlags.Add((marker, box));
@@ -4854,9 +4848,16 @@ internal sealed class WaveformView : Grid
             {
                 var commentText = GetMarkerCommentLabel(TruncateMarkerComment(marker.Comment), pixelsPerDip, selected);
                 const double commentGap = 2;
-                var commentX = box.Right + commentGap;
+                // 末端（左向き旗）は旗の左、通常は旗の右。
+                var commentX = growLeft
+                    ? box.X - commentGap - commentText.Width
+                    : box.Right + commentGap;
                 var commentY = box.Y + Math.Max(0, (box.Height - commentText.Height) * 0.5);
-                if (commentX + commentText.Width <= bounds.Width
+                var contentLeft = ScaleLeft(bounds);
+                var visible = growLeft
+                    ? commentX + commentText.Width > contentLeft && commentX < bounds.Width
+                    : commentX + commentText.Width <= bounds.Width && commentX >= contentLeft;
+                if (visible
                     && !TextOverlapsOtherFlag(commentX, commentText.Width, commentY, commentText.Height, box))
                 {
                     dc.DrawText(commentText, new Point(commentX, commentY));
@@ -5782,12 +5783,40 @@ internal sealed class WaveformView : Grid
         if (flag.Width < 8)
         {
             var x = FrameToViewX(marker.Frame, _viewStart, ViewSpanFrames, new Rect(0, 0, ActualWidth, ActualHeight));
-            flag = LaneFlagRect(x, 24, MarkerLaneHeight, SplitFlagLanes, top: !SplitFlagLanes);
+            var boxW = 24d;
+            var growLeftFallback = _document is not null
+                && MarkerFlagGrowsLeft(marker.Frame, _document.FrameCount);
+            flag = LaneFlagRect(
+                growLeftFallback ? x - boxW : x,
+                boxW,
+                MarkerLaneHeight,
+                SplitFlagLanes,
+                top: !SplitFlagLanes);
         }
 
         const double commentGap = 2;
-        var editorX = flag.Right + commentGap;
-        _commentEditor.Width = Math.Clamp(160, 80, Math.Max(80, ActualWidth - editorX));
+        var growLeft = _document is not null
+            && MarkerFlagGrowsLeft(marker.Frame, _document.FrameCount);
+        var contentLeft = ContentLeft;
+        double editorX;
+        double editorWidth;
+        if (growLeft)
+        {
+            editorWidth = Math.Clamp(160, 80, Math.Max(40, flag.X - contentLeft - commentGap));
+            editorX = flag.X - commentGap - editorWidth;
+            if (editorX < contentLeft)
+            {
+                editorX = contentLeft;
+                editorWidth = Math.Max(40, flag.X - commentGap - editorX);
+            }
+        }
+        else
+        {
+            editorX = flag.Right + commentGap;
+            editorWidth = Math.Clamp(160, 80, Math.Max(80, ActualWidth - editorX));
+        }
+
+        _commentEditor.Width = editorWidth;
         _commentEditor.Height = Math.Max(12, flag.Height);
         _commentEditor.Margin = new Thickness(editorX, flag.Y, 0, 0);
     }
