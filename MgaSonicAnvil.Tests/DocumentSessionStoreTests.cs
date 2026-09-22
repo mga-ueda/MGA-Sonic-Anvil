@@ -42,7 +42,30 @@ public sealed class DocumentSessionStoreTests
         Assert.Equal("intro", target.SnapshotRegions()[0].Name);
         Assert.True(target.Selection.IsEmpty);
         Assert.Equal(0, target.CursorFrame);
-        Assert.False(target.IsDirty);
+        Assert.True(target.IsDirty);
+    }
+
+    [Fact]
+    public void ApplyMeta_DirtyMarkerOnly_KeepsUnsavedFlagWithoutSessionAudio()
+    {
+        var source = MakeDocument();
+        source.SourcePath = @"D:\src\tone.wav";
+        source.TryAddMarker(24);
+        source.SetDirty(true);
+
+        var snap = DocumentSessionStore.Capture(source, DefaultView(), index: 0);
+        Assert.True(snap.Dirty);
+        // Capture 時点では名前が付くが、終了時にサンプル不変なら Skip で空になる。
+        // 復元は元ファイル + メタだけ、という経路をここで再現する。
+        snap.SessionFileName = string.Empty;
+
+        var target = MakeDocument();
+        target.SourcePath = snap.SourcePath;
+        DocumentSessionStore.ApplyMeta(target, snap);
+
+        Assert.True(target.IsDirty);
+        Assert.Equal(snap.SourcePath, target.SourcePath);
+        Assert.True(target.HasMarkerAt(24));
     }
 
     [Theory]

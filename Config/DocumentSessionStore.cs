@@ -593,6 +593,9 @@ internal static class DocumentSessionStore
         document.CursorFrame = 0;
         document.CanContinueRecording = snap.CanContinueRecording
             || (snap.Dirty && string.IsNullOrWhiteSpace(snap.SourcePath));
+        // マーカーのみの未保存など、PCM は元ファイルから読んでもメタはセッション側。
+        // Dirty を戻さないとタブが赤くならず、保存済みに見える。
+        document.SetDirty(snap.Dirty);
     }
 
     public static int ResolveActiveIndex(IReadOnlyList<OpenDocumentSnapshot> docs, int savedIndex)
