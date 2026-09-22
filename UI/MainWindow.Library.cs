@@ -2097,8 +2097,6 @@ public partial class MainWindow
 
     private void LibraryBrowser_ShuffleChanged(object? sender, EventArgs e)
     {
-        AppStorage.Settings.LibraryShuffle = LibraryBrowser.ShuffleEnabled;
-        AppStorage.Save();
         if (IsLibraryMaximized && IsPlaybackActive())
         {
             ScheduleLibraryGaplessPrefetch();

@@ -8,6 +8,13 @@ namespace MgaSonicAnvil.Tests;
 public sealed class AppSettingsFileTests
 {
     [Fact]
+    public void Write_OmitsLibraryShuffle()
+    {
+        var json = JsonSerializer.Serialize(AppSettings.CreateDefault(), AppSettingsJsonContext.Default.AppSettings);
+        Assert.DoesNotContain("LibraryShuffle", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TryReadGeneration_MissingField_IsZero()
     {
         Assert.True(AppSettingsFile.TryReadGeneration("""{"AudioApi":"WaveOut"}""", out var generation));
@@ -76,6 +83,7 @@ public sealed class AppSettingsFileTests
             var written = JsonSerializer.Deserialize(File.ReadAllText(path), AppSettingsJsonContext.Default.AppSettings);
             Assert.NotNull(written);
             Assert.Equal(AppSettings.CurrentGeneration, written!.SettingsGeneration);
+            Assert.DoesNotContain("LibraryShuffle", File.ReadAllText(path), StringComparison.Ordinal);
         }
         finally
         {

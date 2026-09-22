@@ -1229,6 +1229,21 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void ShuffleEnabled_ToggleWorksWhenPlaylistEmpty()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            Assert.Equal(0, view.BoundRowCount);
+            view.ToggleShuffle();
+            Assert.True(view.ShuffleEnabled);
+            view.ToggleShuffle();
+            Assert.False(view.ShuffleEnabled);
+        });
+    }
+
+    [Fact]
     public void ShuffleEnabled_DefaultsOff()
     {
         RunSta(() =>

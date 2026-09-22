@@ -140,6 +140,7 @@ internal static class LibraryPlayerMode
             (Key.Space, ModifierKeys.None or ModifierKeys.Control) => true,
             (Key.Enter, ModifierKeys.None or ModifierKeys.Alt) => true,
             (Key.L, ModifierKeys.None) => true,
+            (Key.R, ModifierKeys.None) => true,
             (Key.A, ModifierKeys.Control) => true,
             (Key.F, ModifierKeys.Control) => true,
             (Key.S, ModifierKeys.Alt) => true,
@@ -155,6 +156,13 @@ internal static class LibraryPlayerMode
             _ => false,
         };
     }
+
+    /// <summary>
+    /// ランダム再生の切替。プレイリストが空でも、ツリー／お気に入りフォーカスでも効く。
+    /// 検索欄では文字入力のまま。
+    /// </summary>
+    public static bool IsShuffleToggle(Key key, ModifierKeys modifiers) =>
+        key == Key.R && modifiers == ModifierKeys.None;
 
     /// <summary>ツリーが左右を使う。再生中の早送り／巻き戻しにはしない。</summary>
     public static bool ExplorerOwnsHorizontal(Key key, ModifierKeys modifiers) =>

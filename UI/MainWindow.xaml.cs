@@ -135,7 +135,6 @@ public partial class MainWindow : Window
         LibraryBrowser.SetExplorerWidth(AppStorage.Settings.LibraryExplorerWidth);
         LibraryBrowser.SetFavoritesSplit(AppStorage.Settings.LibraryFavoritesSplit);
         LibraryBrowser.SetFavorites(AppStorage.Settings.ResolvedLibraryFavoritePaths());
-        LibraryBrowser.ShuffleEnabled = AppStorage.Settings.LibraryShuffle;
         DpiChanged += (_, _) =>
         {
             _brandLogoDark = null;

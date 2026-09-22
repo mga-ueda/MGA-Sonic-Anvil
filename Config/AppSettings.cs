@@ -217,9 +217,6 @@ internal sealed class AppSettings
     /// <summary>F10 お気に入りの高さ比（ツリーとの合計に対するお気に入り側）。0 は半分。</summary>
     public double LibraryFavoritesSplit { get; set; }
 
-    /// <summary>F10 ランダム再生。既定オフ。一巡するまで同じ曲を繰り返さない。</summary>
-    public bool LibraryShuffle { get; set; }
-
     /// <summary>終了時のタイル表示。off / vertical / horizontal / grid。タブが 2 未満なら起動時は無視。</summary>
     public string WaveformTileArrange { get; set; } = string.Empty;
 

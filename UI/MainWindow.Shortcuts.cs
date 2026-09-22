@@ -315,6 +315,16 @@ public partial class MainWindow
             return false;
         }
 
+        // 空リストでツリーにフォーカスがあっても R はランダム切替。タイプアヘッドより先に拾う。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && LibraryPlayerMode.IsShuffleToggle(key, modifiers))
+        {
+            LibraryBrowser.ToggleShuffle();
+            return true;
+        }
+
         // Ctrl+←／↑／→／↓ でペインフォーカス（エディタのマーカー移動／時間ズームは使わない）
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
@@ -531,19 +541,6 @@ public partial class MainWindow
             if (key == Key.Z && modifiers == ModifierKeys.Control)
             {
                 TryUndoLibraryPlaylistRemove();
-                return true;
-            }
-
-            if (key == Key.R && modifiers == ModifierKeys.None)
-            {
-                if (IsLibraryExplorerFocused
-                    || LibraryBrowser.IsSearchFocused
-                    || IsLibraryGroupComboFocused)
-                {
-                    return false;
-                }
-
-                LibraryBrowser.ToggleShuffle();
                 return true;
             }
 

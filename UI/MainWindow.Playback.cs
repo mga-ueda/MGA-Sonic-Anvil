@@ -1350,6 +1350,8 @@ public partial class MainWindow
                 return;
             }
 
+            LibraryBrowser.ShuffleEnabled = false;
+
             if (IsPlaybackActive())
             {
                 StopPlayback();
