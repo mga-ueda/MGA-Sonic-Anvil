@@ -49,7 +49,8 @@ internal partial class TransportBar : UserControl
             () => UiStrings.LabelMarkerGroup,
             (TransportCommand.AddMarker, TransportIcon.AddMarker, UiStrings.TipAddMarker, UiStrings.TooltipAddMarker),
             (TransportCommand.SetLoop, TransportIcon.SetLoop, UiStrings.TipSetLoop, UiStrings.TooltipSetLoop),
-            (TransportCommand.SetRegion, TransportIcon.SetRegion, UiStrings.TipSetRegion, UiStrings.TooltipSetRegion));
+            (TransportCommand.SetRegion, TransportIcon.SetRegion, UiStrings.TipSetRegion, UiStrings.TooltipSetRegion),
+            (TransportCommand.ToggleRangeClick, TransportIcon.RangeClick, UiStrings.TipRangeClick, UiStrings.TooltipRangeClick));
 
         AddGroup(
             bottomRow: true,
@@ -90,6 +91,7 @@ internal partial class TransportBar : UserControl
         SetTip(TransportCommand.AddMarker, UiStrings.TipAddMarker, UiStrings.TooltipAddMarker);
         SetTip(TransportCommand.SetLoop, UiStrings.TipSetLoop, UiStrings.TooltipSetLoop);
         SetTip(TransportCommand.SetRegion, UiStrings.TipSetRegion, UiStrings.TooltipSetRegion);
+        SetTip(TransportCommand.ToggleRangeClick, UiStrings.TipRangeClick, UiStrings.TooltipRangeClick);
         SetTip(TransportCommand.NewDocument, UiStrings.TipNewDocument, UiStrings.TooltipNew);
         SetTip(TransportCommand.Open, UiStrings.TipOpen, UiStrings.TooltipOpen);
         SetTip(TransportCommand.Save, UiStrings.TipSave, UiStrings.TooltipSave);
@@ -141,6 +143,15 @@ internal partial class TransportBar : UserControl
         if (_buttons.TryGetValue(TransportCommand.ToggleTips, out var button))
         {
             button.IsLatched = visible;
+            button.InvalidateVisual();
+        }
+    }
+
+    public void SetRangeClickEnabled(bool enabled)
+    {
+        if (_buttons.TryGetValue(TransportCommand.ToggleRangeClick, out var button))
+        {
+            button.IsLatched = enabled;
             button.InvalidateVisual();
         }
     }

@@ -199,6 +199,9 @@ internal sealed class AudioPlayer : IDisposable
     public void SetSilentSkip(bool enabled, double thresholdDb) =>
         _provider.SetSilentSkip(enabled, thresholdDb);
 
+    public void SetRangeClickFrames(long[] frames, int groupSize = 0) =>
+        _provider.SetRangeClickFrames(frames, groupSize);
+
     public double PlaybackSpeed => _provider.PlaybackSpeed;
 
     public bool IsStreamBound => _provider.IsStreamBound;
@@ -370,6 +373,20 @@ internal sealed class AudioPlayer : IDisposable
         try
         {
             _provider.BindStream(stream, document, startFrame, playRange, loop, frameGain);
+            if (document.IsStreamPlayback || document.IsDeferredLoad)
+            {
+                // UI の尺は document、再生は stream。低レートなどでずれたら stream に揃える。
+                if (document.SampleRate != stream.SampleRate
+                    || document.Channels != stream.Channels
+                    || document.FrameCount != stream.FrameCount)
+                {
+                    document.SyncStreamPlaybackMeta(
+                        stream.SampleRate,
+                        stream.Channels,
+                        stream.BitsPerSample,
+                        stream.FrameCount);
+                }
+            }
         }
         catch
         {

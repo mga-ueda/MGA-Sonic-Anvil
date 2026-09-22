@@ -22,6 +22,11 @@ public sealed class TransportLayoutTests
         Assert.True(DesignMetrics.TransportChromeHeight
             >= DesignMetrics.DocumentTabBarHeight + DesignMetrics.TransportHostMinHeight);
         Assert.True(DesignMetrics.TransportChromeHeight >= DesignMetrics.VectorScopeHeight);
+        Assert.True(DesignMetrics.MinimalPlayerWindowMinWidth < DesignMetrics.WindowMinWidth);
+        Assert.True(DesignMetrics.MinimalPlayerWindowMinWidth >= DesignMetrics.From96(280));
+        Assert.True(DesignMetrics.MinimalPlayerWindowMinHeight < DesignMetrics.WindowMinHeight);
+        Assert.True(DesignMetrics.MinimalPlayerWindowMinHeight
+            >= DesignMetrics.LibraryPaneMinHeight + DesignMetrics.LibraryWaveformHeight);
     }
 
     [Fact]

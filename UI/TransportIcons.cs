@@ -27,6 +27,7 @@ internal enum TransportIcon
     AddMarker,
     SetLoop,
     SetRegion,
+    RangeClick,
     Save,
     SaveAs,
     SaveMp3,
@@ -85,6 +86,7 @@ internal enum TransportCommand
     AddMarker,
     SetLoop,
     SetRegion,
+    ToggleRangeClick,
     NewDocument,
     Open,
     Save,
@@ -222,7 +224,7 @@ internal sealed class TransportIconButton : Button
             fore = Theme.Get("RecordLatchForeBrush");
         }
 
-        if (Icon is TransportIcon.Analysis or TransportIcon.Overlay or TransportIcon.Loudness)
+        if (Icon is TransportIcon.Analysis or TransportIcon.Overlay or TransportIcon.Loudness or TransportIcon.RangeClick)
         {
             fore = IsLatched ? fore : TransportChrome.Fore(false);
         }
@@ -432,6 +434,12 @@ internal static class TransportIconDrawing
                 dc.DrawLine(pen, new Point(24, 10), new Point(24, 26));
                 dc.DrawLine(pen, new Point(24, 10), new Point(20, 10));
                 dc.DrawLine(pen, new Point(24, 26), new Point(20, 26));
+                break;
+            case TransportIcon.RangeClick:
+                // Hi Low Low — 範囲クリックの拍イメージ
+                dc.DrawLine(pen, new Point(11, 9), new Point(11, 27));
+                dc.DrawLine(pen, new Point(17, 15), new Point(17, 27));
+                dc.DrawLine(pen, new Point(23, 15), new Point(23, 27));
                 break;
             case TransportIcon.Analysis:
                 DrawSpectrumBars(dc, pen);

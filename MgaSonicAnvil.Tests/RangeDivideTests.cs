@@ -320,6 +320,114 @@ public sealed class RangeDivideTests
             document.Regions);
     }
 
+    [Fact]
+    public void ClickFrames_EmptyWithoutMarkersOrWhenSelectionEmpty()
+    {
+        var document = MakeDocument(100);
+        document.Selection = new WaveSelection(10, 90);
+        Assert.Empty(DocumentRangeDivide.ClickFrames(document));
+
+        document.TryAddMarker(10);
+        document.TryAddMarker(50);
+        document.TryAddMarker(90);
+        Assert.Equal(new long[] { 10, 50, 90 }, DocumentRangeDivide.ClickFrames(document));
+
+        document.Selection = WaveSelection.Empty;
+        Assert.Empty(DocumentRangeDivide.ClickFrames(document));
+    }
+
+    [Fact]
+    public void ClickFrames_UnionsMarkersAndRegionEdgesInSelection()
+    {
+        var document = MakeDocument(90);
+        document.Selection = new WaveSelection(0, 90);
+        document.TryAddMarker(0);
+        document.TryAddMarker(45);
+        document.TryAddMarker(90);
+        ProcessEdits.DivideRegions(document, new WaveSelection(0, 90), 0, 3)!.Apply(document);
+        Assert.Equal(
+            new long[] { 0, 30, 45, 60, 90 },
+            DocumentRangeDivide.ClickFrames(document));
+    }
+
+    [Fact]
+    public void ClickFrames_OnlyMarkersInsideCurrentSelection()
+    {
+        var document = MakeDocument(100);
+        document.TryAddMarker(0);
+        document.TryAddMarker(40);
+        document.TryAddMarker(80);
+        document.Selection = new WaveSelection(10, 90);
+        Assert.Equal(new long[] { 40, 80 }, DocumentRangeDivide.ClickFrames(document));
+    }
+
+    [Fact]
+    public void ClickFrames_FourParts_AreFourBeatsOfFourFour()
+    {
+        var document = MakeDocument(80);
+        document.Selection = new WaveSelection(0, 80);
+        ProcessEdits.DivideMarkers(document, document.Selection, 0, 4)!.Apply(document);
+        var frames = DocumentRangeDivide.ClickFrames(document);
+        Assert.Equal(new long[] { 0, 20, 40, 60, 80 }, frames);
+        Assert.Equal(4, RangeClickMeter.BeatCount(frames, document.Selection));
+        Assert.Equal(4, RangeClickMeter.GroupSize(4));
+    }
+
+    [Fact]
+    public void ClickFrames_ThreeParts_AreThreeBeatsOfThreeFour()
+    {
+        var document = MakeDocument(90);
+        document.Selection = new WaveSelection(0, 90);
+        ProcessEdits.DivideRegions(document, document.Selection, 0, 3)!.Apply(document);
+        var frames = DocumentRangeDivide.ClickFrames(document);
+        Assert.Equal(new long[] { 0, 30, 60, 90 }, frames);
+        Assert.Equal(3, RangeClickMeter.BeatCount(frames, document.Selection));
+        Assert.Equal(3, RangeClickMeter.GroupSize(3));
+    }
+
+    [Fact]
+    public void RestoreStates_AfterUndoKeepsMarkerDivideForClicks()
+    {
+        var document = MakeDocument(80);
+        var history = new EditHistory();
+        var range = new WaveSelection(0, 80);
+        document.Selection = range;
+        history.Do(document, ProcessEdits.DivideMarkers(document, range, 0, 1)!);
+        history.Do(document, ProcessEdits.DivideMarkers(document, range, 1, 2)!);
+        history.Do(document, ProcessEdits.DivideMarkers(document, range, 2, 4)!);
+        Assert.True(history.Undo(document));
+        document.Selection = range;
+
+        DocumentRangeDivide.RestoreStates(document, out var markers, out var regions);
+        Assert.Null(regions);
+        Assert.NotNull(markers);
+        Assert.Equal(2, markers!.Value.Parts);
+        Assert.Equal(
+            new long[] { 0, 40, 80 },
+            DocumentRangeDivide.ClickFrames(document));
+    }
+
+    [Fact]
+    public void InferMarkerParts_IgnoresUnrelatedMarkersOutsideEqualGrid()
+    {
+        var document = MakeDocument(100);
+        var range = new WaveSelection(0, 80);
+        document.TryAddMarker(0);
+        document.TryAddMarker(40);
+        document.TryAddMarker(80);
+        document.TryAddMarker(90);
+        Assert.Equal(2, DocumentRangeDivide.InferMarkerParts(document, range));
+    }
+
+    [Fact]
+    public void InferRegionParts_FindsEqualSplit()
+    {
+        var document = MakeDocument(90);
+        var range = new WaveSelection(0, 90);
+        ProcessEdits.DivideRegions(document, range, 0, 3)!.Apply(document);
+        Assert.Equal(3, DocumentRangeDivide.InferRegionParts(document, range));
+    }
+
     private static AudioDocument MakeDocument(int frames) =>
         new(new float[frames * 2], 48000, 2, 24, AudioFileKind.Wave, null);
 }

@@ -1417,6 +1417,7 @@ public partial class MainWindow
 
             _markerDivide = new RangeDivideState(_document, range.StartFrame, range.EndFrame, next);
             AfterMarkerEdit();
+            SyncRangeClicks();
             return true;
         }
 
@@ -2220,8 +2221,7 @@ public partial class MainWindow
 
     private void AfterEdit()
     {
-        _markerDivide = null;
-        _regionDivide = null;
+        RestoreRangeDivideAfterEdit();
         if (_document is null)
         {
             return;
@@ -2244,5 +2244,21 @@ public partial class MainWindow
         {
             TryApplyAutoSpeaker();
         }
+    }
+
+    /// <summary>
+    /// Undo／編集後も選択が残っていれば、等分マーカー／リージョンからクリック枠を復元する。
+    /// オン／オフ状態は触らない（ユーザー設定のまま）。
+    /// </summary>
+    private void RestoreRangeDivideAfterEdit()
+    {
+        _markerDivide = null;
+        _regionDivide = null;
+        if (_document is not null && !_document.Selection.IsEmpty)
+        {
+            DocumentRangeDivide.RestoreStates(_document, out _markerDivide, out _regionDivide);
+        }
+
+        SyncRangeClicks();
     }
 }

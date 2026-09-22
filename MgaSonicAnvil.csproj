@@ -60,6 +60,12 @@
     <EmbeddedResource Include="Assets\Branding\MiyabiGameAudio.Light.png">
       <LogicalName>MgaSonicAnvil.Branding.MiyabiGameAudio.Light.png</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="Assets\Click\Low.wav">
+      <LogicalName>MgaSonicAnvil.Assets.Click.Low.wav</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\Click\High.wav">
+      <LogicalName>MgaSonicAnvil.Assets.Click.High.wav</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>

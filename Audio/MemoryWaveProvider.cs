@@ -143,6 +143,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private float[] _seekFadeOutPcm = [];
     private int _seekFadeOutPcmFrames;
     private double _seekFadeOutPcmPos;
+    private readonly RangeClickMixer _rangeClicks = new();
     private AudioStreamSource? _stream;
     private AudioStreamSource? _gaplessStream;
     private AudioDocument? _gaplessDocument;
@@ -203,6 +204,66 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         {
             _deviceRate = Math.Clamp(sampleRate, 1000, 384000);
             WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(_deviceRate, Math.Max(1, _outputChannels));
+            _rangeClicks.SetDeviceRate(_deviceRate);
+        }
+    }
+
+    /// <summary>テスト用。本番は Low / High.wav を <see cref="EnsureRangeClickSamples"/> で読む。</summary>
+    public void SetRangeClickSample(float[] mono, int sampleRate)
+    {
+        lock (_gate)
+        {
+            _rangeClicks.SetSample(mono, sampleRate);
+            _rangeClicks.SetDeviceRate(_deviceRate);
+        }
+    }
+
+    public void SetRangeClickSamples(float[] low, float[] high, int sampleRate)
+    {
+        lock (_gate)
+        {
+            _rangeClicks.SetSamples(low, high, sampleRate);
+            _rangeClicks.SetDeviceRate(_deviceRate);
+        }
+    }
+
+    public void EnsureRangeClickSamples()
+    {
+        var needLow = !_rangeClicks.HasSample;
+        var needHigh = !_rangeClicks.HasHighSample;
+        if (!needLow && !needHigh)
+        {
+            return;
+        }
+
+        var low = needLow ? RangeClickSample.LoadLow() : default;
+        var high = needHigh ? RangeClickSample.LoadHigh() : default;
+        lock (_gate)
+        {
+            if (needLow && !_rangeClicks.HasSample)
+            {
+                _rangeClicks.SetLowSample(low.Samples, low.SampleRate);
+            }
+
+            if (needHigh && !_rangeClicks.HasHighSample)
+            {
+                _rangeClicks.SetHighSample(high.Samples, high.SampleRate);
+            }
+
+            _rangeClicks.SetDeviceRate(_deviceRate);
+        }
+    }
+
+    public void SetRangeClickFrames(long[] frames, int groupSize = 0)
+    {
+        if (frames.Length > 0)
+        {
+            EnsureRangeClickSamples();
+        }
+
+        lock (_gate)
+        {
+            _rangeClicks.SetTriggers(frames, groupSize);
         }
     }
 
@@ -358,6 +419,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _exitSpanStartFrame = -1;
             _exitSpanEndFrame = -1;
             ApplyPlayWindowNoLock(playRange, loop);
+            _rangeClicks.ResetVoice();
 
             Ended = false;
             ResetMeterBuffers();
@@ -424,6 +486,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             // ストリームでは Exit／ピッチ据え置きグレインは使わない（可変速）。
             _playExitLayer = false;
             ApplyPlayWindowNoLock(playRange, loop);
+            _rangeClicks.ResetVoice();
 
             Ended = false;
             ResetMeterBuffers();
@@ -940,6 +1003,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         // シークでジャンプしたら進行中の Exit 二重再生は直ちに止める（IM Importer と同じ）。
         _exitPlaying = false;
         _shuttlePrimed = false;
+        _rangeClicks.ResetVoice();
         Ended = false;
     }
 
@@ -1410,7 +1474,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             var gIn = MathF.Sin(0.5f * MathF.PI * Math.Clamp(t, 0f, 1f));
             ReadSeekFadeOutSource(srcCh, outStep, _seekFadeOutSrc);
             Array.Clear(_seekFadeMix, 0, outCh);
-            EmitFrame(_seekFadeMix, 0, 0, outCh, _seekFadeOutSrc, 1f);
+            EmitFrame(_seekFadeMix, 0, 0, outCh, _seekFadeOutSrc, 1f, mixClicks: false);
             var dest = offset + i * outCh;
             for (var channel = 0; channel < outCh; channel++)
             {
@@ -2893,7 +2957,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         var source = _samples.AsSpan(sourceIndex, srcCh);
         var gain = _frameGain is { } gainAt ? gainAt(sourceFrame) : 1f;
-        EmitFrame(buffer, offset, writtenFrames, outCh, source, gain);
+        EmitFrame(buffer, offset, writtenFrames, outCh, source, gain, sourceFrame);
     }
 
     /// <summary>1 フレーム分のソース信号をメーターへ流し、ルーティングして出力へ書く。</summary>
@@ -2903,7 +2967,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         int writtenFrames,
         int outCh,
         ReadOnlySpan<float> source,
-        float gain)
+        float gain,
+        long? clickSourceFrame = null,
+        bool mixClicks = true)
     {
         gain *= _shuttleOutputGain;
         source = ApplySolo(source);
@@ -2917,6 +2983,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 var sample = source[0] * gain;
                 dest[_monoLeftPort] = sample;
                 dest[_monoRightPort] = sample;
+                MixRangeClick(buffer, offset, writtenFrames, outCh, clickSourceFrame, mixClicks);
                 return;
             }
 
@@ -2930,6 +2997,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 }
             }
 
+            MixRangeClick(buffer, offset, writtenFrames, outCh, clickSourceFrame, mixClicks);
             return;
         }
 
@@ -2941,6 +3009,33 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
 
         WriteFrame(buffer, offset, writtenFrames, outCh, left, right);
+        MixRangeClick(buffer, offset, writtenFrames, outCh, clickSourceFrame, mixClicks);
+    }
+
+    private void MixRangeClick(
+        float[] buffer,
+        int offset,
+        int writtenFrames,
+        int outCh,
+        long? clickSourceFrame,
+        bool mixClicks)
+    {
+        if (!mixClicks || !_rangeClicks.Enabled)
+        {
+            return;
+        }
+
+        var sample = _rangeClicks.Advance(clickSourceFrame ?? (long)Math.Floor(_sourceFrame));
+        if (sample == 0f || outCh <= 0)
+        {
+            return;
+        }
+
+        var dest = offset + writtenFrames * outCh;
+        for (var channel = 0; channel < outCh; channel++)
+        {
+            buffer[dest + channel] += sample;
+        }
     }
 
     private ReadOnlySpan<float> ApplySolo(ReadOnlySpan<float> source)
