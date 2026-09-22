@@ -305,17 +305,26 @@ public sealed class UiThemeTests
             }
         }
 
-        if (Application.Current is null)
+        var app = Application.Current;
+        var dispatcher = app?.Dispatcher;
+        if (dispatcher is not null
+            && dispatcher.Thread.IsAlive
+            && !dispatcher.HasShutdownStarted
+            && !dispatcher.CheckAccess())
         {
-            RunSta(() =>
-            {
-                _ = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-                Body();
-            });
+            dispatcher.Invoke(Body);
             return;
         }
 
-        Application.Current.Dispatcher.Invoke(Body);
+        RunSta(() =>
+        {
+            if (Application.Current is null)
+            {
+                _ = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            }
+
+            Body();
+        });
     }
 
     private static void Restore(Application app, string key, object? saved)

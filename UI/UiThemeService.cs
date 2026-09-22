@@ -139,12 +139,25 @@ internal static class UiThemeService
 
     private static void RefreshWindowChrome()
     {
-        if (Application.Current is null)
+        var app = Application.Current;
+        if (app is null)
         {
             return;
         }
 
-        foreach (Window window in Application.Current.Windows)
+        var dispatcher = app.Dispatcher;
+        if (!dispatcher.CheckAccess())
+        {
+            if (!dispatcher.Thread.IsAlive || dispatcher.HasShutdownStarted)
+            {
+                return;
+            }
+
+            dispatcher.Invoke(RefreshWindowChrome);
+            return;
+        }
+
+        foreach (Window window in app.Windows)
         {
             DarkWindowChrome.ApplyImmersiveDarkTitleBar(window);
         }
