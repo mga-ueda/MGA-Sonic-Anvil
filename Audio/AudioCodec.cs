@@ -337,6 +337,41 @@ internal static class AudioCodec
         return OpenReader(path);
     }
 
+    /// <summary>
+    /// WaveStream の長さ。Length/BlockAlign と TotalTime が食い違うときは TotalTime を優先する。
+    /// MediaFoundation は低サンプルレートなどで Length がずれることがある。
+    /// </summary>
+    public static long EstimateStreamFrameCount(WaveStream reader)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+        var format = reader.WaveFormat;
+        var sampleRate = Math.Max(1, format.SampleRate);
+        var block = Math.Max(1, format.BlockAlign);
+        var fromLength = reader.Length > 0 ? reader.Length / block : 0L;
+        var totalSeconds = reader.TotalTime.TotalSeconds;
+        var fromTime = totalSeconds > 0
+            ? (long)Math.Round(totalSeconds * sampleRate)
+            : 0L;
+        if (fromLength <= 0)
+        {
+            return Math.Max(0, fromTime);
+        }
+
+        if (fromTime <= 0)
+        {
+            return fromLength;
+        }
+
+        var ratio = fromLength / (double)fromTime;
+        // 5% 超えのずれは Length 側を疑う（低レート MF など）。
+        if (ratio < 0.95 || ratio > 1.05)
+        {
+            return fromTime;
+        }
+
+        return fromLength;
+    }
+
     /// <summary>ヘッダだけ読んで長さを取る。PCM は展開しない。</summary>
     public static bool TryProbeStreamFormat(
         string path,
@@ -357,12 +392,7 @@ internal static class AudioCodec
             sampleRate = Math.Max(1, format.SampleRate);
             channels = Math.Max(1, format.Channels);
             bitsPerSample = format.BitsPerSample > 0 ? format.BitsPerSample : 16;
-            var block = Math.Max(1, format.BlockAlign);
-            frameCount = reader.Length > 0 ? reader.Length / block : 0;
-            if (frameCount <= 0 && reader.TotalTime.TotalSeconds > 0)
-            {
-                frameCount = (long)Math.Round(reader.TotalTime.TotalSeconds * sampleRate);
-            }
+            frameCount = EstimateStreamFrameCount(reader);
 
             return frameCount > 0 && sampleRate > 0 && channels > 0;
         }

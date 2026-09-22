@@ -70,6 +70,19 @@ internal sealed partial class AudioDocument
     /// </summary>
     public void ActivateStreamPlayback(int sampleRate, int channels, int bitsPerSample, long frameCount)
     {
+        SyncStreamPlaybackMeta(sampleRate, channels, bitsPerSample, frameCount, clearPeaks: true);
+    }
+
+    /// <summary>
+    /// ストリーム確定後にレート／長さを揃える。ピークは残す（波形とタイムラインの尺合わせ）。
+    /// </summary>
+    public void SyncStreamPlaybackMeta(
+        int sampleRate,
+        int channels,
+        int bitsPerSample,
+        long frameCount,
+        bool clearPeaks = false)
+    {
         if (sampleRate < 1 || channels < 1 || frameCount < 1)
         {
             throw new ArgumentOutOfRangeException(nameof(frameCount));
@@ -81,7 +94,11 @@ internal sealed partial class AudioDocument
         Interleaved = [];
         var samples = frameCount * (long)channels;
         _liveSampleCount = samples > int.MaxValue ? int.MaxValue : (int)samples;
-        Peaks = PeakPyramid.Empty;
+        if (clearPeaks)
+        {
+            Peaks = PeakPyramid.Empty;
+        }
+
         IsDeferredLoad = false;
         IsStreamPlayback = true;
         RefreshFileBytes();

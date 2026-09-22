@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.UI;
@@ -44,6 +45,87 @@ public sealed class LibraryDeferredLoadTests
         Assert.True(document.Peaks.IsEmpty);
         Assert.True(AudioCodec.CanStreamPlay(path));
         Assert.True(AudioCodec.CanStreamPlay(Path.ChangeExtension(path, ".m4a")));
+    }
+
+    [Theory]
+    [InlineData(8000)]
+    [InlineData(11025)]
+    [InlineData(16000)]
+    [InlineData(22050)]
+    public void LowSampleRateWave_StreamMetaMatchesPeaksAndDuration(int sampleRate)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"mga-low-sr-{sampleRate}-{Guid.NewGuid():N}.wav");
+        try
+        {
+            var frames = sampleRate * 2;
+            WriteMonoToneWave(path, sampleRate, frames, frequency: 440);
+
+            Assert.True(AudioCodec.TryProbeStreamFormat(path, out var rate, out _, out _, out var probedFrames));
+            Assert.Equal(sampleRate, rate);
+            Assert.Equal(frames, probedFrames);
+
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+            Assert.Equal(sampleRate, document.SampleRate);
+            Assert.Equal(frames, document.FrameCount);
+            Assert.Equal(2.0, document.DurationSeconds, 3);
+
+            var peaks = PeakPyramid.BuildPlayerDisplayFromPath(path);
+            Assert.False(peaks.IsBuilding);
+            Assert.Equal(document.FrameCount, peaks.FrameCount);
+            Assert.Equal(peaks.FrameCount, peaks.FilledFrames);
+
+            using var stream = AudioStreamSource.Open(path, prebufferTimeoutMs: 0);
+            Assert.Equal(document.SampleRate, stream.SampleRate);
+            Assert.Equal(document.FrameCount, stream.FrameCount);
+        }
+        finally
+        {
+            TryDelete(path);
+        }
+    }
+
+    [Fact]
+    public void SyncStreamPlaybackMeta_KeepsPeaksWhenAligningLength()
+    {
+        var document = AudioDocument.CreateDeferred("x.wav");
+        document.ActivateStreamPlayback(8000, 1, 16, 16000);
+        var peaks = PeakPyramid.BuildPlayerDisplay(new float[8000], channels: 1, sampleCount: 8000);
+        document.ReplacePeaks(peaks);
+        Assert.False(document.Peaks.IsEmpty);
+
+        document.SyncStreamPlaybackMeta(8000, 1, 16, peaks.FrameCount);
+        Assert.Equal(peaks.FrameCount, document.FrameCount);
+        Assert.Same(peaks, document.Peaks);
+        Assert.True(document.IsStreamPlayback);
+        Assert.Empty(document.Interleaved);
+    }
+
+    private static void WriteMonoToneWave(string path, int sampleRate, int frames, double frequency)
+    {
+        using var writer = new NAudio.Wave.WaveFileWriter(path, new NAudio.Wave.WaveFormat(sampleRate, 16, 1));
+        var buffer = new float[frames];
+        for (var i = 0; i < frames; i++)
+        {
+            buffer[i] = (float)(Math.Sin(2 * Math.PI * frequency * i / sampleRate) * 0.2);
+        }
+
+        writer.WriteSamples(buffer, 0, frames);
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+            // ignore
+        }
     }
 
     [Fact]

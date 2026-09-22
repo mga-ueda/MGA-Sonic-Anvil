@@ -68,14 +68,7 @@ internal sealed class AudioStreamSource : IDisposable
         var reader = AudioCodec.OpenPlaybackStream(path);
         try
         {
-            var format = reader.WaveFormat;
-            var block = Math.Max(1, format.BlockAlign);
-            var frames = reader.Length > 0 ? reader.Length / block : 0;
-            if (frames <= 0 && reader.TotalTime.TotalSeconds > 0)
-            {
-                frames = (long)Math.Round(reader.TotalTime.TotalSeconds * format.SampleRate);
-            }
-
+            var frames = AudioCodec.EstimateStreamFrameCount(reader);
             if (frames <= 0)
             {
                 reader.Dispose();

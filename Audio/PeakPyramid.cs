@@ -111,13 +111,7 @@ internal sealed class PeakPyramid
         using var stream = AudioCodec.OpenPlaybackStream(path);
         var format = stream.WaveFormat;
         var channels = Math.Max(1, format.Channels);
-        var block = Math.Max(1, format.BlockAlign);
-        var frames = stream.Length > 0 ? stream.Length / block : 0;
-        if (frames <= 0 && stream.TotalTime.TotalSeconds > 0 && format.SampleRate > 0)
-        {
-            frames = (long)Math.Round(stream.TotalTime.TotalSeconds * format.SampleRate);
-        }
-
+        var frames = AudioCodec.EstimateStreamFrameCount(stream);
         if (frames <= 0)
         {
             return new PeakPyramid([[]], [[]], 1, 0, 1, 0);
@@ -179,7 +173,9 @@ internal sealed class PeakPyramid
         }
 
         FinalizeUnsetBuckets(mins, maxs);
-        return FromBasePeaks(mins, maxs, channels: 1, frames, baseBucket, frame);
+        // 推定より早く EOF なら、埋まった長さを正とする（タイムラインと波形の尺を揃える）。
+        var actual = Math.Max(1, frame);
+        return FromBasePeaks(mins, maxs, channels: 1, actual, baseBucket, actual);
     }
 
     private static void AccumulateMonoEnvelope(
@@ -498,7 +494,9 @@ internal sealed class PeakPyramid
         }
 
         var channels = Channels;
-        var buckets = (int)Math.Min(peakCount, rangeFrames);
+        // フレーム数が画素数より少なくても全カラムを埋める。
+        // 低サンプルレートでは FrameCount < 幅 になりやすく、Min すると波形だけ左に縮む。
+        var buckets = peakCount;
         var framesPerBucket = rangeFrames / (double)buckets;
         var level = 0;
         while (level + 1 < _minLevels.Length

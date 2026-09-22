@@ -14,6 +14,22 @@ public sealed class PeakPyramidTests
     }
 
     [Fact]
+    public void ReadRange_WhenFewerFramesThanColumns_FillsAllColumns()
+    {
+        const int frames = 100;
+        var samples = new float[frames];
+        samples[0] = 0.95f;
+        samples[frames - 1] = -0.9f;
+        var peaks = PeakPyramid.Build(samples, 1);
+        var mins = new float[500];
+        var maxs = new float[500];
+        Assert.Equal(500, peaks.ReadRange(0, frames, 500, 0, mins, maxs));
+        Assert.True(maxs[0] >= 0.9f);
+        Assert.True(mins[^1] <= -0.85f);
+        Assert.Contains(maxs, v => v >= 0.9f);
+    }
+
+    [Fact]
     public void ReadRange_PreservesSpikeInOwningColumn()
     {
         var frames = 4096;
@@ -30,6 +46,26 @@ public sealed class PeakPyramidTests
         var column = 2000 * 64 / frames;
         Assert.True(maxs[column] >= 0.93f - 1e-6);
         Assert.True(mins[column] <= -0.87f + 1e-6);
+    }
+
+    [Fact]
+    public void ReadRangePacked_LowFrameCount_MatchesPixelWidth()
+    {
+        // 4000Hz・短いクリップで画面幅よりフレームが少ない典型。
+        const int frames = 800;
+        var samples = new float[frames];
+        Array.Fill(samples, 0.5f);
+        samples[0] = 0.9f;
+        samples[^1] = -0.9f;
+        var peaks = PeakPyramid.BuildPlayerDisplay(samples, channels: 1, sampleCount: frames);
+        const int width = 1920;
+        var mins = new float[width];
+        var maxs = new float[width];
+        Assert.Equal(width, peaks.ReadRangePacked(0, frames, width, mins, maxs));
+        Assert.True(maxs[0] >= 0.8f);
+        Assert.True(mins[^1] <= -0.8f);
+        // 全カラムに値が入っている（未描画の 0 埋め残りがない）。
+        Assert.DoesNotContain(0f, maxs);
     }
 
     [Fact]
