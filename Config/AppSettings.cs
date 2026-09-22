@@ -129,6 +129,18 @@ internal sealed class AppSettings
     /// <summary>Normal / Maximized。空または不明なら通常表示。</summary>
     public string PlayerWindowState { get; set; } = string.Empty;
 
+    /// <summary>F9 ミニマムプレイヤーのウィンドウ。未保存なら幅 0。</summary>
+    public int MinimalPlayerWindowX { get; set; }
+
+    public int MinimalPlayerWindowY { get; set; }
+
+    public int MinimalPlayerWindowWidth { get; set; }
+
+    public int MinimalPlayerWindowHeight { get; set; }
+
+    /// <summary>Normal / Maximized。空または不明なら通常表示。</summary>
+    public string MinimalPlayerWindowState { get; set; } = string.Empty;
+
     /// <summary>設定ウィンドウの位置。未保存なら false。</summary>
     public bool SettingsWindowHasPosition { get; set; }
 
@@ -204,6 +216,9 @@ internal sealed class AppSettings
 
     /// <summary>F10 お気に入りの高さ比（ツリーとの合計に対するお気に入り側）。0 は半分。</summary>
     public double LibraryFavoritesSplit { get; set; }
+
+    /// <summary>F10 ランダム再生。既定オフ。一巡するまで同じ曲を繰り返さない。</summary>
+    public bool LibraryShuffle { get; set; }
 
     /// <summary>終了時のタイル表示。off / vertical / horizontal / grid。タブが 2 未満なら起動時は無視。</summary>
     public string WaveformTileArrange { get; set; } = string.Empty;

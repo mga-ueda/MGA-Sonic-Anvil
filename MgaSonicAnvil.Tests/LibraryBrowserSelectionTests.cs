@@ -1199,6 +1199,47 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void NextPlaylistSession_ShufflePlaysEachOncePerCycle()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var tracks = Enumerable.Range(0, 5)
+                .Select(i => Session($"{i:00} t.mp3"))
+                .ToArray();
+            var view = new LibraryBrowserView();
+            view.SetSessions(tracks, tracks[0], [tracks[0]]);
+            view.ShuffleEnabled = true;
+
+            var seen = new HashSet<DocumentSession> { tracks[0] };
+            var cursor = tracks[0];
+            for (var i = 1; i < 5; i++)
+            {
+                var next = view.NextPlaylistSession(cursor);
+                Assert.NotNull(next);
+                Assert.True(seen.Add(next!));
+                cursor = next!;
+            }
+
+            Assert.Equal(5, seen.Count);
+            var again = view.NextPlaylistSession(cursor);
+            Assert.NotNull(again);
+            Assert.NotSame(cursor, again);
+        });
+    }
+
+    [Fact]
+    public void ShuffleEnabled_DefaultsOff()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            Assert.False(view.ShuffleEnabled);
+        });
+    }
+
+    [Fact]
     public void ColumnHeader_MarksSortedColumn()
     {
         RunSta(() =>

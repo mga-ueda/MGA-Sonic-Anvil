@@ -94,10 +94,13 @@ internal sealed class LibraryBrowserView : UserControl
     private bool _extendGlow;
     private readonly Grid _root = new();
     private readonly ColumnDefinition _treeColumn = new();
+    private readonly ColumnDefinition _treeSplitterColumn = new();
     private readonly RowDefinition _explorerTreeRow = new() { Height = new GridLength(1, GridUnitType.Star) };
     private readonly RowDefinition _favoritesRow = new() { Height = new GridLength(1, GridUnitType.Star) };
     private readonly LibraryHoverSplitter _favoritesSplitter = new();
     private readonly LibraryHoverSplitter _explorerSplitter = new();
+    private bool _sidePanesVisible = true;
+    private double _sidePanesRememberedWidth;
     private readonly TreeView _folderTree = new();
     private readonly TextBlock _explorerLabel = new();
     private readonly TextBlock _favoritesLabel = new();
@@ -118,6 +121,10 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly TextBlock _explorerSearchHint = new();
     private readonly TextBox _playlistSearchBox = new();
     private readonly TextBlock _playlistSearchHint = new();
+    private readonly CheckBox _shuffleCheck = new();
+    private readonly LibraryPlaylistShuffle _shuffle = new();
+    private bool _shuffleEnabled;
+    private bool _shuffleBusy;
     private readonly List<string[]> _playlistSearchGroups = [];
     private readonly List<string[]> _explorerSearchGroups = [];
     private string _explorerSearchCommitted = string.Empty;
@@ -485,13 +492,51 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
-    /// <summary>表示順の次の曲。最後の次は先頭。1曲なら同じ曲。</summary>
+    /// <summary>表示順の次の曲。最後の次は先頭。1曲なら同じ曲。ランダム時は一巡まで非重複。</summary>
     public DocumentSession? NextPlaylistSession(DocumentSession? current) =>
         PlaylistSessionByLoop(current, previous: false);
 
-    /// <summary>表示順の前の曲。先頭の前は末尾。1曲なら同じ曲。</summary>
+    /// <summary>表示順の前の曲。先頭の前は末尾。1曲なら同じ曲。ランダム時は抽選順を戻る。</summary>
     public DocumentSession? PreviousPlaylistSession(DocumentSession? current) =>
         PlaylistSessionByLoop(current, previous: true);
+
+    public bool ShuffleEnabled
+    {
+        get => _shuffleEnabled;
+        set => SetShuffleEnabled(value, raise: true);
+    }
+
+    public event EventHandler? ShuffleChanged;
+
+    public void ToggleShuffle() => ShuffleEnabled = !ShuffleEnabled;
+
+    private void SetShuffleEnabled(bool enabled, bool raise)
+    {
+        if (_shuffleEnabled == enabled)
+        {
+            return;
+        }
+
+        _shuffleEnabled = enabled;
+        _shuffle.Clear();
+        if (_shuffleCheck.IsChecked != enabled)
+        {
+            _shuffleBusy = true;
+            try
+            {
+                _shuffleCheck.IsChecked = enabled;
+            }
+            finally
+            {
+                _shuffleBusy = false;
+            }
+        }
+
+        if (raise)
+        {
+            ShuffleChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
 
     /// <summary>
     /// 再生中の 60fps からも呼ばれる。DataGrid.Items はグループ化ビューを歩いて
@@ -532,9 +577,26 @@ internal sealed class LibraryBrowserView : UserControl
             i++;
         }
 
-        var at = previous
-            ? LibraryPlayerMode.PreviousLoopIndex(count, index)
-            : LibraryPlayerMode.NextLoopIndex(count, index);
+        int at;
+        if (index < 0)
+        {
+            at = _shuffleEnabled
+                ? (previous ? _shuffle.Last(count) : _shuffle.First(count))
+                : (previous
+                    ? LibraryPlayerMode.PreviousLoopIndex(count, -1)
+                    : LibraryPlayerMode.NextLoopIndex(count, -1));
+        }
+        else
+        {
+            at = previous
+                ? (_shuffleEnabled
+                    ? _shuffle.Previous(count, index)
+                    : LibraryPlayerMode.PreviousLoopIndex(count, index))
+                : (_shuffleEnabled
+                    ? _shuffle.Next(count, index)
+                    : LibraryPlayerMode.NextLoopIndex(count, index));
+        }
+
         if (at < 0)
         {
             return null;
@@ -663,8 +725,9 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
-    private void RequestExplorerFocus()
+    internal void RequestExplorerFocus()
     {
+        _listFocusTicket++;
         var ticket = ++_explorerFocusTicket;
         Dispatcher.BeginInvoke(
             () =>
@@ -695,6 +758,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     internal void RequestListFocus()
     {
+        _explorerFocusTicket++;
         var ticket = ++_listFocusTicket;
         Dispatcher.BeginInvoke(
             () =>
@@ -1425,9 +1489,11 @@ internal sealed class LibraryBrowserView : UserControl
         TipService.Set(_favoritesLabel, UiStrings.TipLibraryFavorites);
         TipService.Set(_explorerSearchBox, UiStrings.TipLibraryExplorerSearch);
         TipService.Set(_playlistSearchBox, UiStrings.TipLibraryPlaylistSearch);
+        TipService.Set(_shuffleCheck, UiStrings.TipLibraryShuffle);
         _explorerLabel.Text = UiStrings.LibraryExplorerLabel;
         _favoritesLabel.Text = UiStrings.LibraryFavoritesLabel;
         _playlistLabel.Text = UiStrings.LibraryPlaylistLabel;
+        _shuffleCheck.Content = UiStrings.LabelLibraryShuffle;
         _explorerSearchHint.Text = UiStrings.LibrarySearchHint;
         _playlistSearchHint.Text = UiStrings.LibrarySearchHint;
         RebuildExplorerContextMenu();
@@ -1472,6 +1538,7 @@ internal sealed class LibraryBrowserView : UserControl
 
         _rows = LibraryFileList.Sort(rows, _sortColumn, _sortDirection);
         LibraryFileList.ApplyGroupKeys(_rows, _group);
+        _shuffle.Clear();
         BeginRowSync();
         try
         {
@@ -1975,11 +2042,65 @@ internal sealed class LibraryBrowserView : UserControl
     public void SetExplorerWidth(double width)
     {
         var clamped = DesignMetrics.ClampLibraryExplorerWidth(width);
+        _sidePanesRememberedWidth = clamped;
+        if (!_sidePanesVisible)
+        {
+            return;
+        }
+
         _treeColumn.Width = new GridLength(clamped);
+    }
+
+    /// <summary>
+    /// F9 ミニマム。ライブラリ／お気に入り列だけ畳む（プレイリストは残す）。幅は覚える。
+    /// </summary>
+    public void SetSidePanesVisible(bool show)
+    {
+        if (_sidePanesVisible == show)
+        {
+            return;
+        }
+
+        if (!show)
+        {
+            var current = _treeColumn.ActualWidth > 1
+                ? ReadExplorerWidth()
+                : (_sidePanesRememberedWidth > 0
+                    ? _sidePanesRememberedWidth
+                    : DesignMetrics.LibraryExplorerWidth);
+            _sidePanesRememberedWidth = DesignMetrics.ClampLibraryExplorerWidth(current);
+            _treeColumn.MinWidth = 0;
+            _treeColumn.MaxWidth = 0;
+            _treeColumn.Width = new GridLength(0);
+            _treeSplitterColumn.Width = new GridLength(0);
+            _explorerSplitter.Visibility = Visibility.Collapsed;
+            _sidePanesVisible = false;
+            if (IsExplorerFocused || IsFavoritesFocused)
+            {
+                FocusList();
+            }
+
+            return;
+        }
+
+        _sidePanesVisible = true;
+        _treeColumn.MinWidth = DesignMetrics.LibraryExplorerMinWidth;
+        _treeColumn.MaxWidth = DesignMetrics.LibraryExplorerMaxWidth;
+        var width = _sidePanesRememberedWidth > 0
+            ? _sidePanesRememberedWidth
+            : DesignMetrics.LibraryExplorerWidth;
+        _treeColumn.Width = new GridLength(DesignMetrics.ClampLibraryExplorerWidth(width));
+        _treeSplitterColumn.Width = new GridLength(DesignMetrics.LibraryExplorerSplitterWidth);
+        _explorerSplitter.Visibility = Visibility.Visible;
     }
 
     public double ReadExplorerWidth()
     {
+        if (!_sidePanesVisible && _sidePanesRememberedWidth > 0)
+        {
+            return DesignMetrics.ClampLibraryExplorerWidth(_sidePanesRememberedWidth);
+        }
+
         var raw = _treeColumn.ActualWidth > 0
             ? _treeColumn.ActualWidth
             : _treeColumn.Width.Value;
@@ -2094,14 +2215,13 @@ internal sealed class LibraryBrowserView : UserControl
     private void BuildLayout()
     {
         var treeWidth = DesignMetrics.LibraryExplorerWidth;
+        _sidePanesRememberedWidth = treeWidth;
         _treeColumn.Width = new GridLength(treeWidth);
         _treeColumn.MinWidth = DesignMetrics.LibraryExplorerMinWidth;
         _treeColumn.MaxWidth = DesignMetrics.LibraryExplorerMaxWidth;
+        _treeSplitterColumn.Width = new GridLength(DesignMetrics.LibraryExplorerSplitterWidth);
         _root.ColumnDefinitions.Add(_treeColumn);
-        _root.ColumnDefinitions.Add(new ColumnDefinition
-        {
-            Width = new GridLength(DesignMetrics.LibraryExplorerSplitterWidth),
-        });
+        _root.ColumnDefinitions.Add(_treeSplitterColumn);
         _root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
         ApplyExplorerStyle();
@@ -2232,6 +2352,18 @@ internal sealed class LibraryBrowserView : UserControl
         playlistSearch.VerticalAlignment = VerticalAlignment.Center;
         DockPanel.SetDock(playlistSearch, Dock.Right);
         bar.Children.Add(playlistSearch);
+
+        _shuffleCheck.Style = TryFindResource("DarkCheckBoxStyle") as Style;
+        _shuffleCheck.Content = UiStrings.LabelLibraryShuffle;
+        _shuffleCheck.VerticalAlignment = VerticalAlignment.Center;
+        _shuffleCheck.FontSize = 11;
+        _shuffleCheck.Margin = new Thickness(8, 0, 0, 0);
+        _shuffleCheck.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
+        _shuffleCheck.Checked += ShuffleCheck_Changed;
+        _shuffleCheck.Unchecked += ShuffleCheck_Changed;
+        DockPanel.SetDock(_shuffleCheck, Dock.Right);
+        bar.Children.Add(_shuffleCheck);
+
         _playlistLabel.VerticalAlignment = VerticalAlignment.Center;
         _playlistLabel.TextTrimming = TextTrimming.CharacterEllipsis;
         bar.Children.Add(_playlistLabel);
@@ -5103,6 +5235,16 @@ internal sealed class LibraryBrowserView : UserControl
         InvalidateGroupJackets();
         _ = EnsureGroupArtworkAsync();
         GroupChanged?.Invoke(this, group);
+    }
+
+    private void ShuffleCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_shuffleBusy)
+        {
+            return;
+        }
+
+        SetShuffleEnabled(_shuffleCheck.IsChecked == true, raise: true);
     }
 
     private bool TryPatchBoundRows(IReadOnlyList<LibraryFileRow> rows)
