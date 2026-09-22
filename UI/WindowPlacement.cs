@@ -6,32 +6,30 @@ using MgaSonicAnvil.Config;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>通常／プレイヤーの位置・サイズ・最大化を settings.json に残し、切替と次回起動で戻す。</summary>
+/// <summary>通常／F10 プレイヤー／F9 ミニマムの位置・サイズ・最大化を settings.json に残し、切替と次回起動で戻す。</summary>
 internal static class WindowPlacement
 {
-    public static void Capture(Window window, AppSettings settings)
-    {
-        var bounds = window.WindowState == WindowState.Normal
-            ? new Rect(window.Left, window.Top, window.Width, window.Height)
-            : window.RestoreBounds;
-        Capture(bounds, window.WindowState == WindowState.Maximized, settings);
-    }
+    public static void Capture(Window window, AppSettings settings) =>
+        Capture(window, settings, MainWindowPlacementKind.Editor);
 
     public static void Capture(Rect bounds, bool maximized, AppSettings settings) =>
-        WriteMain(bounds, maximized, settings, player: false);
+        WriteMain(bounds, maximized, settings, MainWindowPlacementKind.Editor);
 
-    public static void CapturePlayer(Window window, AppSettings settings)
+    public static void CapturePlayer(Rect bounds, bool maximized, AppSettings settings) =>
+        WriteMain(bounds, maximized, settings, MainWindowPlacementKind.Player);
+
+    public static void CaptureMinimalPlayer(Rect bounds, bool maximized, AppSettings settings) =>
+        WriteMain(bounds, maximized, settings, MainWindowPlacementKind.MinimalPlayer);
+
+    public static void Capture(Window window, AppSettings settings, MainWindowPlacementKind kind)
     {
         var bounds = window.WindowState == WindowState.Normal
             ? new Rect(window.Left, window.Top, window.Width, window.Height)
             : window.RestoreBounds;
-        CapturePlayer(bounds, window.WindowState == WindowState.Maximized, settings);
+        WriteMain(bounds, window.WindowState == WindowState.Maximized, settings, kind);
     }
 
-    public static void CapturePlayer(Rect bounds, bool maximized, AppSettings settings) =>
-        WriteMain(bounds, maximized, settings, player: true);
-
-    private static void WriteMain(Rect bounds, bool maximized, AppSettings settings, bool player)
+    private static void WriteMain(Rect bounds, bool maximized, AppSettings settings, MainWindowPlacementKind kind)
     {
         var x = (int)Math.Round(bounds.X);
         var y = (int)Math.Round(bounds.Y);
@@ -40,32 +38,38 @@ internal static class WindowPlacement
         var state = maximized
             ? nameof(WindowState.Maximized)
             : nameof(WindowState.Normal);
-        if (player)
+        switch (kind)
         {
-            settings.PlayerWindowX = x;
-            settings.PlayerWindowY = y;
-            settings.PlayerWindowWidth = width;
-            settings.PlayerWindowHeight = height;
-            settings.PlayerWindowState = state;
-            return;
+            case MainWindowPlacementKind.Player:
+                settings.PlayerWindowX = x;
+                settings.PlayerWindowY = y;
+                settings.PlayerWindowWidth = width;
+                settings.PlayerWindowHeight = height;
+                settings.PlayerWindowState = state;
+                return;
+            case MainWindowPlacementKind.MinimalPlayer:
+                settings.MinimalPlayerWindowX = x;
+                settings.MinimalPlayerWindowY = y;
+                settings.MinimalPlayerWindowWidth = width;
+                settings.MinimalPlayerWindowHeight = height;
+                settings.MinimalPlayerWindowState = state;
+                return;
+            default:
+                settings.WindowX = x;
+                settings.WindowY = y;
+                settings.WindowWidth = width;
+                settings.WindowHeight = height;
+                settings.WindowState = state;
+                return;
         }
-
-        settings.WindowX = x;
-        settings.WindowY = y;
-        settings.WindowWidth = width;
-        settings.WindowHeight = height;
-        settings.WindowState = state;
     }
 
     public static bool TryApply(Window window, AppSettings settings) =>
-        TryApplyMain(window, settings, player: false);
+        TryApply(window, settings, MainWindowPlacementKind.Editor);
 
-    public static bool TryApplyPlayer(Window window, AppSettings settings) =>
-        TryApplyMain(window, settings, player: true);
-
-    private static bool TryApplyMain(Window window, AppSettings settings, bool player)
+    public static bool TryApply(Window window, AppSettings settings, MainWindowPlacementKind kind)
     {
-        if (!TryGetDipBounds(settings, window.MinWidth, window.MinHeight, player, out var bounds, out var maximized))
+        if (!TryGetDipBounds(settings, window.MinWidth, window.MinHeight, kind, out var bounds, out var maximized))
         {
             return false;
         }
@@ -88,14 +92,12 @@ internal static class WindowPlacement
         AppSettings settings,
         double minWidth,
         double minHeight,
-        bool player,
+        MainWindowPlacementKind kind,
         out Rect bounds,
         out bool maximized)
     {
         bounds = default;
-        if (!(player
-                ? TryReadPlayer(settings, minWidth, minHeight, out var stored, out maximized)
-                : TryRead(settings, minWidth, minHeight, out stored, out maximized)))
+        if (!TryRead(settings, minWidth, minHeight, kind, out var stored, out maximized))
         {
             maximized = false;
             return false;
@@ -276,54 +278,79 @@ internal static class WindowPlacement
         double minWidth,
         double minHeight,
         out Rect bounds,
-        out bool maximized)
-    {
-        bounds = default;
-        maximized = string.Equals(
-            settings.WindowState,
-            nameof(WindowState.Maximized),
-            StringComparison.OrdinalIgnoreCase);
-        if (settings.WindowWidth <= 0 || settings.WindowHeight <= 0)
-        {
-            return false;
-        }
-
-        if (settings.WindowWidth < minWidth || settings.WindowHeight < minHeight)
-        {
-            return false;
-        }
-
-        bounds = new Rect(settings.WindowX, settings.WindowY, settings.WindowWidth, settings.WindowHeight);
-        return true;
-    }
+        out bool maximized) =>
+        TryRead(settings, minWidth, minHeight, MainWindowPlacementKind.Editor, out bounds, out maximized);
 
     public static bool TryReadPlayer(
         AppSettings settings,
         double minWidth,
         double minHeight,
         out Rect bounds,
+        out bool maximized) =>
+        TryRead(settings, minWidth, minHeight, MainWindowPlacementKind.Player, out bounds, out maximized);
+
+    public static bool TryReadMinimalPlayer(
+        AppSettings settings,
+        double minWidth,
+        double minHeight,
+        out Rect bounds,
+        out bool maximized) =>
+        TryRead(settings, minWidth, minHeight, MainWindowPlacementKind.MinimalPlayer, out bounds, out maximized);
+
+    public static bool TryRead(
+        AppSettings settings,
+        double minWidth,
+        double minHeight,
+        MainWindowPlacementKind kind,
+        out Rect bounds,
         out bool maximized)
     {
         bounds = default;
+        var state = kind switch
+        {
+            MainWindowPlacementKind.Player => settings.PlayerWindowState,
+            MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowState,
+            _ => settings.WindowState,
+        };
         maximized = string.Equals(
-            settings.PlayerWindowState,
+            state,
             nameof(WindowState.Maximized),
             StringComparison.OrdinalIgnoreCase);
-        if (settings.PlayerWindowWidth <= 0 || settings.PlayerWindowHeight <= 0)
+        var width = kind switch
+        {
+            MainWindowPlacementKind.Player => settings.PlayerWindowWidth,
+            MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowWidth,
+            _ => settings.WindowWidth,
+        };
+        var height = kind switch
+        {
+            MainWindowPlacementKind.Player => settings.PlayerWindowHeight,
+            MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowHeight,
+            _ => settings.WindowHeight,
+        };
+        if (width <= 0 || height <= 0)
         {
             return false;
         }
 
-        if (settings.PlayerWindowWidth < minWidth || settings.PlayerWindowHeight < minHeight)
+        if (width < minWidth || height < minHeight)
         {
             return false;
         }
 
-        bounds = new Rect(
-            settings.PlayerWindowX,
-            settings.PlayerWindowY,
-            settings.PlayerWindowWidth,
-            settings.PlayerWindowHeight);
+        var x = kind switch
+        {
+            MainWindowPlacementKind.Player => settings.PlayerWindowX,
+            MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowX,
+            _ => settings.WindowX,
+        };
+        var y = kind switch
+        {
+            MainWindowPlacementKind.Player => settings.PlayerWindowY,
+            MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowY,
+            _ => settings.WindowY,
+        };
+        bounds = new Rect(x, y, width, height);
         return true;
     }
 
@@ -472,4 +499,12 @@ internal static class WindowPlacement
 
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int index);
+}
+
+/// <summary>メインウィンドウの配置スロット。エディタ／F10／F9 で別々に覚える。</summary>
+internal enum MainWindowPlacementKind
+{
+    Editor,
+    Player,
+    MinimalPlayer,
 }

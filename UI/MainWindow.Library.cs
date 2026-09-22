@@ -27,6 +27,12 @@ public partial class MainWindow
     /// <summary>プレイリスト置換中は空セッションで既定ウォッシュへ落とさない。</summary>
     private bool _libraryHoldJacketWash;
     private bool _libraryPlayOnArrowRelease;
+    /// <summary>Space 再生。true のあいだは曲末で次へ進まず停止する。</summary>
+    private bool _libraryStopAfterTrack;
+    /// <summary>F9。プレイヤーのサイド／メーター／トランスポート／ステータスを隠す。波形は残す。再生は止めない。</summary>
+    private bool _libraryMinimalChrome;
+    private bool _libraryPlayerHostActive;
+    private readonly LibraryPlaylistRemoveUndo _libraryPlaylistUndo = new();
     private bool _libraryWaapiSuspended;
     private bool _restoreWaapiAfterLibrary;
     private readonly HashSet<AudioDocument> _libraryPeakJobs = [];
@@ -57,10 +63,83 @@ public partial class MainWindow
     internal bool IsLibraryFavoritesFocused =>
         IsLibraryMaximized && LibraryBrowser.IsFavoritesFocused;
 
-    private void ToggleLibraryMaximize() => SetWaveformMaximizeMode(
-        _waveformMaximizeMode == WaveformMaximizeMode.Library
-            ? WaveformMaximizeMode.Off
-            : WaveformMaximizeMode.Library);
+    private void ToggleLibraryMaximize()
+    {
+        // F9 ミニマム中の F10 はエディタへ落とさず、通常の F10 プレイヤーへ戻す。
+        if (IsLibraryMaximized && _libraryMinimalChrome)
+        {
+            LeaveLibraryMinimalChrome();
+            return;
+        }
+
+        SetWaveformMaximizeMode(
+            _waveformMaximizeMode == WaveformMaximizeMode.Library
+                ? WaveformMaximizeMode.Off
+                : WaveformMaximizeMode.Library);
+    }
+
+    /// <summary>
+    /// F9 ミニマムプレイヤー。どのモードからでも入れる。
+    /// ミニマム中の F9／F10 で通常の F10 プレイヤーへ戻す（Esc や F1 では戻さない）。
+    /// 切替時にウィンドウ位置・サイズをスロットへ記憶／復元する。再生中はそのまま。
+    /// </summary>
+    private void ToggleLibraryMinimalChrome()
+    {
+        if (IsLibraryMaximized && _libraryMinimalChrome)
+        {
+            LeaveLibraryMinimalChrome();
+            return;
+        }
+
+        EnterLibraryMinimalChrome();
+    }
+
+    /// <summary>ミニマム解除 → 通常の F10。F9／F10 から。</summary>
+    private void LeaveLibraryMinimalChrome()
+    {
+        if (!IsLibraryMaximized || !_libraryMinimalChrome)
+        {
+            return;
+        }
+
+        PersistCurrentWindowPlacement();
+        _libraryMinimalChrome = false;
+        ApplyWaveformMaximizeChrome();
+        TryApplyCurrentModePlacement();
+        AppStorage.Save();
+        FocusLibraryPaneForPlaylist();
+    }
+
+    private void EnterLibraryMinimalChrome()
+    {
+        if (IsLibraryMaximized)
+        {
+            if (_libraryMinimalChrome)
+            {
+                return;
+            }
+
+            PersistCurrentWindowPlacement();
+            _libraryMinimalChrome = true;
+            ApplyWaveformMaximizeChrome();
+            TryApplyCurrentModePlacement();
+            AppStorage.Save();
+            LibraryBrowser.FocusList();
+            return;
+        }
+
+        var preservePlayback = IsPlaybackActive();
+        _libraryMinimalChrome = true;
+        SetWaveformMaximizeMode(
+            WaveformMaximizeMode.Library,
+            playFirstOnLibrary: !preservePlayback);
+        // SetWaveformMaximizeMode がフルスクリーン復帰でフラグを戻すことがあるので再適用。
+        _libraryMinimalChrome = true;
+        ApplyWaveformMaximizeChrome();
+        TryApplyCurrentModePlacement();
+        AppStorage.Save();
+        LibraryBrowser.FocusList();
+    }
 
     private void ApplyLibraryChrome()
     {
@@ -135,7 +214,9 @@ public partial class MainWindow
             _libraryWavePaintTicket++;
             _libraryPlayFirstPending = false;
             _libraryPlayOnArrowRelease = false;
+            _libraryStopAfterTrack = false;
             _libraryHoldJacketWash = false;
+            _libraryPlaylistUndo.Clear();
             _ = LeaveLibraryMaximizeAsync();
         }
 
@@ -474,14 +555,40 @@ public partial class MainWindow
             SingleWaveformHost.Visibility = Visibility.Visible;
             PrimaryWaveform.Visibility = Visibility.Visible;
             _tileActiveView = null;
+
+            // F9↔F10 のクローム切替で毎回 Bind すると ResetWorkspaceInteraction が再生を止める。
             if (_activeSession is not null)
             {
-                BindSingleWorkspace(_activeSession);
+                var sameDocument = ReferenceEquals(Waveform.Document, _activeSession.Document);
+                if (_libraryPlayerHostActive && sameDocument)
+                {
+                    if (IsPlaybackActive())
+                    {
+                        AttachPlaybackToActiveWaveform();
+                    }
+
+                    ScheduleLibraryWaveformPaint();
+                }
+                else if (sameDocument && IsPlaybackActive())
+                {
+                    Waveform.SetAnalysisView(WaveformAnalysisView.Waveform);
+                    Waveform.ResetTimeZoom();
+                    Waveform.ResetAmpZoom();
+                    Waveform.LoopEnabled = _activeSession.LoopEnabled;
+                    AttachPlaybackToActiveWaveform();
+                    ScheduleLibraryWaveformPaint();
+                }
+                else
+                {
+                    BindSingleWorkspace(_activeSession);
+                }
             }
 
+            _libraryPlayerHostActive = true;
             return;
         }
 
+        _libraryPlayerHostActive = false;
         if (_tileMode && _tileGrid is not null)
         {
             _tileGrid.Visibility = Visibility.Visible;
@@ -660,10 +767,10 @@ public partial class MainWindow
             return;
         }
 
-        // 停止中のクリックや選択は再生しない。再生中だけその曲へ切り替える。
+        // 停止中のクリックや選択は再生しない。選択曲の波形だけ出す。再生中だけその曲へ切り替える。
         if (!IsPlaybackActive())
         {
-            ShowLibraryArtwork(session);
+            PreviewLibrarySession(session);
             return;
         }
 
@@ -761,8 +868,38 @@ public partial class MainWindow
         }
 
         var dropSet = new HashSet<DocumentSession>(selected);
+        var removedSessions = new DocumentSession[selected.Length];
+        var removedIndices = new int[selected.Length];
+        var removedCount = 0;
+        foreach (var session in selected)
+        {
+            var index = _sessions.IndexOf(session);
+            if (index < 0)
+            {
+                continue;
+            }
+
+            removedSessions[removedCount] = session;
+            removedIndices[removedCount] = index;
+            removedCount++;
+        }
+
+        if (removedCount == 0)
+        {
+            return;
+        }
+
+        if (removedCount != removedSessions.Length)
+        {
+            Array.Resize(ref removedSessions, removedCount);
+            Array.Resize(ref removedIndices, removedCount);
+        }
+
         var next = NextLibrarySessionAfter(dropSet);
-        if (IsPlaybackActive() && _activeSession is { } playing && dropSet.Contains(playing))
+        var resumePlayback = IsPlaybackActive()
+            && _activeSession is { } playing
+            && dropSet.Contains(playing);
+        if (resumePlayback)
         {
             StopPlayback();
         }
@@ -776,6 +913,7 @@ public partial class MainWindow
             }
         }
 
+        _libraryPlaylistUndo.Push(removedSessions, removedIndices);
         _sessions.RemoveAll(dropSet.Contains);
         DetachTabItems(dropSet);
 
@@ -786,6 +924,7 @@ public partial class MainWindow
             LibraryBrowser.SetArtwork(null);
             RefreshStatus();
             SyncPlayerMeterFade();
+            ActivateLibraryExplorerIfPlaylistEmpty();
             return;
         }
 
@@ -793,7 +932,36 @@ public partial class MainWindow
         LibraryBrowser.SetSessions(_sessions, next, [next]);
         RefreshStatus();
         SyncPlayerMeterFade();
-        _ = PlayLibrarySessionAsync(next);
+        if (resumePlayback)
+        {
+            _ = PlayLibrarySessionAsync(next);
+            return;
+        }
+
+        PreviewLibrarySession(next);
+    }
+
+    /// <summary>プレイヤー中の Ctrl+Z。Delete で外した曲を戻す。</summary>
+    private bool TryUndoLibraryPlaylistRemove()
+    {
+        if (!IsLibraryMaximized || !_libraryPlaylistUndo.TryPop(out var sessions, out var indices))
+        {
+            return false;
+        }
+
+        LibraryPlaylistRemoveUndo.RestoreInto(_sessions, sessions, indices);
+        LibraryBrowser.SetSessions(_sessions, sessions[0], sessions);
+        RefreshStatus();
+        SyncPlayerMeterFade();
+        if (IsPlaybackActive())
+        {
+            LibraryBrowser.RequestListFocus();
+            return true;
+        }
+
+        PreviewLibrarySession(sessions[0]);
+        LibraryBrowser.RequestListFocus();
+        return true;
     }
 
     private DocumentSession? NextLibrarySessionAfter(HashSet<DocumentSession> dropSet)
@@ -840,8 +1008,10 @@ public partial class MainWindow
     {
         var dropSet = new HashSet<DocumentSession>(drop);
         DocumentSession? next = NextLibrarySessionAfter(dropSet);
-
-        if (IsPlaybackActive() && _activeSession is { } playing && dropSet.Contains(playing))
+        var resumePlayback = IsPlaybackActive()
+            && _activeSession is { } playing
+            && dropSet.Contains(playing);
+        if (resumePlayback)
         {
             StopPlayback();
         }
@@ -882,13 +1052,20 @@ public partial class MainWindow
             LibraryBrowser.SetSessions(_sessions, null);
             LibraryBrowser.SetArtwork(null);
             SyncPlayerMeterFade();
+            ActivateLibraryExplorerIfPlaylistEmpty();
             return;
         }
 
         next ??= _sessions[0];
         LibraryBrowser.SetSessions(_sessions, next, [next]);
         SyncPlayerMeterFade();
-        _ = PlayLibrarySessionAsync(next);
+        if (resumePlayback)
+        {
+            _ = PlayLibrarySessionAsync(next);
+            return;
+        }
+
+        PreviewLibrarySession(next);
     }
 
     private void SelectAndPlayFirstLibraryTrack()
@@ -922,7 +1099,49 @@ public partial class MainWindow
         }
 
         _libraryHoldJacketWash = false;
+        PreviewLibrarySession(session);
+    }
+
+    /// <summary>
+    /// 停止中に選択曲のジャケットと波形を出す。再生は始めない。
+    /// </summary>
+    private void PreviewLibrarySession(DocumentSession session)
+    {
+        if (!IsLibraryMaximized)
+        {
+            return;
+        }
+
         ShowLibraryArtwork(session);
+        if (IsPlaybackActive())
+        {
+            return;
+        }
+
+        _ = ShowLibrarySessionWaveformAsync(session);
+    }
+
+    private async Task ShowLibrarySessionWaveformAsync(DocumentSession session)
+    {
+        await EnsureLibrarySessionLoadedAsync(session, bind: true).ConfigureAwait(true);
+        if (!ReferenceEquals(_libraryLoadSession, session)
+            || !IsLibraryMaximized
+            || IsPlaybackActive())
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(Waveform.Document, session.Document)
+            || !ReferenceEquals(_activeSession, session))
+        {
+            ApplyLoadedLibrarySession(session);
+        }
+        else
+        {
+            ScheduleLibraryWaveformPaint();
+        }
+
+        _ = FillLibraryPeaksAsync(session);
     }
 
     private void ProbeLibraryTags()
@@ -957,7 +1176,7 @@ public partial class MainWindow
         {
             if (session is not null)
             {
-                ShowLibraryArtwork(session);
+                PreviewLibrarySession(session);
             }
 
             return;
@@ -977,7 +1196,10 @@ public partial class MainWindow
 
     private void ScheduleLibraryGaplessPrefetch()
     {
-        if (!IsLibraryMaximized || !IsPlaybackActive() || _activeSession is null)
+        if (!IsLibraryMaximized
+            || !IsPlaybackActive()
+            || _activeSession is null
+            || _libraryStopAfterTrack)
         {
             return;
         }
@@ -1086,7 +1308,7 @@ public partial class MainWindow
 
     private bool AdoptLibraryGaplessAdvance()
     {
-        if (!IsLibraryMaximized || !_player.HasGaplessAdvancePending)
+        if (!IsLibraryMaximized || _libraryStopAfterTrack || !_player.HasGaplessAdvancePending)
         {
             return false;
         }
@@ -1136,6 +1358,11 @@ public partial class MainWindow
 
     private bool TryAdvanceLibraryPlaylist()
     {
+        if (_libraryStopAfterTrack)
+        {
+            return false;
+        }
+
         var next = LibraryBrowser.NextPlaylistSession(_activeSession);
         if (next is null)
         {
@@ -1170,9 +1397,11 @@ public partial class MainWindow
             return;
         }
 
+        _libraryStopAfterTrack = false;
         if (_document is not null)
         {
             StartPlayback(_document.CursorFrame, prerollSeconds: 0);
+            ScheduleLibraryGaplessPrefetch();
             return;
         }
 
@@ -1181,6 +1410,7 @@ public partial class MainWindow
 
     private void RestartLibraryTrack()
     {
+        _libraryStopAfterTrack = false;
         var session = _activeSession ?? LibraryBrowser.SelectedSession;
         if (session is not null)
         {
@@ -1191,6 +1421,7 @@ public partial class MainWindow
         if (_document is not null)
         {
             StartPlayback(0, prerollSeconds: 0);
+            ScheduleLibraryGaplessPrefetch();
         }
     }
 
@@ -1277,10 +1508,11 @@ public partial class MainWindow
             LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: false));
     }
 
-    private async Task PlayLibrarySessionAsync(DocumentSession? session)
+    private async Task PlayLibrarySessionAsync(DocumentSession? session, bool stopAfterTrack = false)
     {
         CancelLibraryGapless();
         _libraryPlayOnArrowRelease = false;
+        _libraryStopAfterTrack = stopAfterTrack;
         if (session is null)
         {
             LibraryBrowser.SetArtwork(null);
@@ -1308,29 +1540,55 @@ public partial class MainWindow
         ApplyLoadedLibrarySession(session);
         StartPlayback(0, prerollSeconds: 0);
         ShowLibraryArtwork(session);
-        ScheduleLibraryGaplessPrefetch();
+        if (!stopAfterTrack)
+        {
+            ScheduleLibraryGaplessPrefetch();
+        }
+
         // 再生とは別ハンドルでピーク走査する（停止待ちしない）。
         _ = FillLibraryPeaksAsync(session);
     }
 
-    private async void PlayLibrarySelectionOrToggle()
+    /// <summary>
+    /// Space。選択曲を先頭から再生し、終わったら停止する。再生中なら開始位置へ戻して止める。
+    /// </summary>
+    private async void PlayLibrarySelectionOnceOrToggle()
     {
-        var session = LibraryBrowser.SelectedSession ?? _activeSession;
-        if (session is null)
+        if (IsPlaybackActive())
         {
-            TogglePlayback();
+            HaltPlaybackToStart();
+            _libraryStopAfterTrack = false;
             return;
         }
 
-        ShowLibraryArtwork(session);
-        await EnsureLibrarySessionLoadedAsync(session).ConfigureAwait(true);
-        if (!session.Document.IsDeferredLoad)
+        var session = LibraryBrowser.SelectedSession ?? _activeSession;
+        if (session is null)
         {
-            ApplyLoadedLibrarySession(session);
-            TogglePlayback();
-            ShowLibraryArtwork(session);
-            _ = FillLibraryPeaksAsync(session);
+            return;
         }
+
+        await PlayLibrarySessionAsync(session, stopAfterTrack: true).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// トランスポートの再生ボタン。Enter と同じく連続再生（曲末で次へ）。
+    /// </summary>
+    private void ToggleLibraryTransportPlayback()
+    {
+        if (IsRecording)
+        {
+            StopRecording();
+            return;
+        }
+
+        if (IsPlaybackActive())
+        {
+            HaltPlaybackToStart();
+            _libraryStopAfterTrack = false;
+            return;
+        }
+
+        _ = PlayLibrarySessionAsync(LibraryBrowser.SelectedSession ?? _activeSession);
     }
 
     private Task EnsureLibrarySessionLoadedAsync(DocumentSession session, bool bind = true)
@@ -1646,6 +1904,19 @@ public partial class MainWindow
         }
 
         document.ReplacePeaks(peaks);
+        if (document.IsStreamPlayback
+            && !peaks.IsEmpty
+            && !peaks.IsBuilding
+            && peaks.FrameCount > 0
+            && peaks.FrameCount != document.FrameCount)
+        {
+            document.SyncStreamPlaybackMeta(
+                document.SampleRate,
+                document.Channels,
+                document.BitsPerSample,
+                peaks.FrameCount);
+        }
+
         RefreshLibrarySessionWaveform(session, throttlePaint);
         return true;
     }
@@ -1822,6 +2093,16 @@ public partial class MainWindow
     {
         AppStorage.Settings.LibraryFavoritesSplit = DesignMetrics.ClampLibraryFavoritesSplit(ratio);
         AppStorage.Save();
+    }
+
+    private void LibraryBrowser_ShuffleChanged(object? sender, EventArgs e)
+    {
+        AppStorage.Settings.LibraryShuffle = LibraryBrowser.ShuffleEnabled;
+        AppStorage.Save();
+        if (IsLibraryMaximized && IsPlaybackActive())
+        {
+            ScheduleLibraryGaplessPrefetch();
+        }
     }
 
     private void LibraryBrowser_FavoritesChanged(object? sender, IReadOnlyList<string> paths)
@@ -2140,7 +2421,39 @@ public partial class MainWindow
         if (_sessions.Count == 0 && IsLibraryMaximized)
         {
             LibraryBrowser.SetArtwork(null);
+            ActivateLibraryExplorerIfPlaylistEmpty();
         }
+    }
+
+    /// <summary>
+    /// プレイリストが空のままならライブラリ（フォルダツリー）をアクティブにする。
+    /// クリア直後に再追加する途中（ジャケット保持中）は呼ばない。
+    /// </summary>
+    private void ActivateLibraryExplorerIfPlaylistEmpty()
+    {
+        if (!IsLibraryMaximized || _sessions.Count != 0 || _libraryHoldJacketWash)
+        {
+            return;
+        }
+
+        LibraryBrowser.RequestExplorerFocus();
+    }
+
+    /// <summary>F10 突入／ミニマム解除。空ならツリー、曲があればプレイリスト。</summary>
+    private void FocusLibraryPaneForPlaylist()
+    {
+        if (!IsLibraryMaximized || _libraryMinimalChrome)
+        {
+            return;
+        }
+
+        if (_sessions.Count == 0)
+        {
+            ActivateLibraryExplorerIfPlaylistEmpty();
+            return;
+        }
+
+        LibraryBrowser.RequestListFocus();
     }
 
     private bool TryClearLibrarySessions()

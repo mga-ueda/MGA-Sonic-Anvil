@@ -87,7 +87,7 @@ internal static class LibraryPlayerMode
             return true;
         }
 
-        if (key is Key.Escape or Key.F10 or Key.F11 or Key.F12 or Key.Apps)
+        if (key is Key.Escape or Key.F9 or Key.F10 or Key.F11 or Key.F12 or Key.Apps)
         {
             return true;
         }
@@ -112,7 +112,13 @@ internal static class LibraryPlayerMode
             return true;
         }
 
-        if ((key is Key.Left or Key.Right) && (modifiers & ModifierKeys.Alt) == 0)
+        if ((key is Key.Left or Key.Right)
+            && modifiers is ModifierKeys.None or ModifierKeys.Control)
+        {
+            return true;
+        }
+
+        if ((key is Key.Up or Key.Down) && modifiers == ModifierKeys.Control)
         {
             return true;
         }
@@ -142,6 +148,7 @@ internal static class LibraryPlayerMode
             (Key.Q, ModifierKeys.Control) => true,
             (Key.C, ModifierKeys.Control) => true,
             (Key.C, ModifierKeys.Control | ModifierKeys.Shift) => true,
+            (Key.Z, ModifierKeys.Control) => true,
             (Key.T, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Tab, ModifierKeys.Control) => true,
             (Key.Tab, ModifierKeys.Control | ModifierKeys.Shift) => true,
@@ -527,6 +534,14 @@ internal static class LibraryPlayerMode
 
     public static bool IsPaneCycleKey(Key key, ModifierKeys modifiers) =>
         key == Key.Tab && modifiers is ModifierKeys.None or ModifierKeys.Shift;
+
+    /// <summary>
+    /// Ctrl+←／↑ ライブラリ、Ctrl+→ プレイリスト、Ctrl+↓ お気に入り。
+    /// エディタのマーカー移動／ズームは引き継がない。
+    /// </summary>
+    public static bool IsPaneFocusArrow(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.Control
+        && key is Key.Left or Key.Right or Key.Up or Key.Down;
 
     /// <summary>
     /// Ctrl+F の行き先。プレイリストならリスト検索、ツリー／お気に入りはライブラリ検索。

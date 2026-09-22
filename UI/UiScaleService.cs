@@ -65,6 +65,35 @@ internal static class UiScaleService
         return value * (factor / previousFactor);
     }
 
+    /// <summary>
+    /// 表示倍率の基準となる最小幅を差し替え、現在の倍率でウィンドウへ反映する。
+    /// F9 ミニマムなどモードで下限が変わるときに使う。
+    /// </summary>
+    internal static void SetUnscaledMinWidth(Window window, double unscaledMinWidth)
+    {
+        var state = States.GetOrCreateValue(window);
+        state.MinWidth = unscaledMinWidth;
+        var factor = state.AppliedFactor > 0 ? state.AppliedFactor : Factor;
+        var scaled = ScaleFinite(unscaledMinWidth, factor);
+        if (!double.IsNaN(scaled))
+        {
+            window.MinWidth = scaled;
+        }
+    }
+
+    /// <summary>表示倍率の基準となる最小高さを差し替え、現在の倍率でウィンドウへ反映する。</summary>
+    internal static void SetUnscaledMinHeight(Window window, double unscaledMinHeight)
+    {
+        var state = States.GetOrCreateValue(window);
+        state.MinHeight = unscaledMinHeight;
+        var factor = state.AppliedFactor > 0 ? state.AppliedFactor : Factor;
+        var scaled = ScaleFinite(unscaledMinHeight, factor);
+        if (!double.IsNaN(scaled))
+        {
+            window.MinHeight = scaled;
+        }
+    }
+
     private static void Attach(Window window, bool resize)
     {
         PublishTransform();

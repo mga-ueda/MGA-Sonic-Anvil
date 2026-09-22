@@ -23,7 +23,15 @@ public partial class MainWindow
         switch (command)
         {
             case TransportCommand.TogglePlayback:
-                TogglePlayback();
+                if (IsLibraryMaximized)
+                {
+                    ToggleLibraryTransportPlayback();
+                }
+                else
+                {
+                    TogglePlayback();
+                }
+
                 break;
             case TransportCommand.Stop:
                 if (IsRecording)
@@ -134,6 +142,9 @@ public partial class MainWindow
                 break;
             case TransportCommand.SetRegion:
                 TrySetRegionFromSelection();
+                break;
+            case TransportCommand.ToggleRangeClick:
+                ToggleRangeClick();
                 break;
             case TransportCommand.NewDocument:
                 NewDocument();
@@ -350,6 +361,7 @@ public partial class MainWindow
                 loop: playRange is not null,
                 preferStream: IsLibraryMaximized);
             _player.SetExitSpan(ComputeExitLayerSpan(playRange));
+            SyncRangeClicks();
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
@@ -588,8 +600,37 @@ public partial class MainWindow
         return start >= 0 ? new WaveSelection(start, end) : null;
     }
 
+    /// <summary>
+    /// 範囲選択中のマーカー／リージョン端を再生時にクリックで鳴らす。
+    /// 拍数が 4 で割れるなら Hi Low Low Low、3 なら Hi Low Low。
+    /// オン／オフはユーザー操作のみ（既定オフ。自動ではオンにもオフにもしない）。
+    /// </summary>
+    private void ToggleRangeClick()
+    {
+        _rangeClickEnabled = !_rangeClickEnabled;
+        Transport.SetRangeClickEnabled(_rangeClickEnabled);
+        SyncRangeClicks();
+        Waveform.Focus();
+    }
+
+    private void SyncRangeClicks()
+    {
+        if (!_rangeClickEnabled || IsLibraryMaximized || _document is null || _document.Selection.IsEmpty)
+        {
+            _player.SetRangeClickFrames([]);
+            return;
+        }
+
+        var frames = DocumentRangeDivide.ClickFrames(_document);
+        var group = RangeClickMeter.GroupSize(
+            RangeClickMeter.BeatCount(frames, _document.Selection));
+        _player.SetRangeClickFrames(frames, group);
+    }
+
     private void OnWaveformSelectionChanged()
     {
+        SyncRangeClicks();
+
         Overview.InvalidateVisual();
         RefreshStatus();
         if (_document is null || !_player.IsPlaying)
@@ -1034,6 +1075,13 @@ public partial class MainWindow
             return;
         }
 
+        if (IsLibraryMaximized && _libraryStopAfterTrack)
+        {
+            _libraryStopAfterTrack = false;
+            HaltPlaybackToStart();
+            return;
+        }
+
         if (IsLibraryMaximized && TryAdvanceLibraryPlaylist())
         {
             return;
@@ -1209,6 +1257,7 @@ public partial class MainWindow
 
         _regionDivide = new RangeDivideState(_document, range.StartFrame, range.EndFrame, next);
         AfterMarkerEdit();
+        SyncRangeClicks();
         return true;
     }
 
@@ -1286,7 +1335,7 @@ public partial class MainWindow
         }
     }
 
-    private void SetWaveformMaximizeMode(WaveformMaximizeMode mode)
+    private void SetWaveformMaximizeMode(WaveformMaximizeMode mode, bool? playFirstOnLibrary = null)
     {
         if (_waveformMaximizeMode == mode)
         {
@@ -1309,7 +1358,8 @@ public partial class MainWindow
 
         if (mode == WaveformMaximizeMode.Library)
         {
-            _libraryPlayFirstPending = true;
+            _libraryPlayFirstPending = playFirstOnLibrary ?? true;
+            SyncRangeClicks();
         }
 
         var wasLibrary = _waveformMaximizeMode == WaveformMaximizeMode.Library;
@@ -1331,10 +1381,15 @@ public partial class MainWindow
         else if (!wantFullscreen && wasFullscreen)
         {
             _waveformMaximizeMode = mode;
+            if (wantLibrary && wasFullscreen)
+            {
+                _libraryMinimalChrome = _minimalBeforeWaveformMax;
+            }
+
             RestoreWaveformWindowChrome();
             if (wantLibrary)
             {
-                if (!WindowPlacement.TryApplyPlayer(this, AppStorage.Settings))
+                if (!TryApplyCurrentModePlacement())
                 {
                     ApplyRememberedWindowFrameBounds();
                 }
@@ -1350,13 +1405,9 @@ public partial class MainWindow
         {
             _waveformMaximizeMode = mode;
             ApplyWaveformMaximizeChrome();
-            if (wantLibrary)
+            if (wantLibrary || wasLibrary)
             {
-                WindowPlacement.TryApplyPlayer(this, AppStorage.Settings);
-            }
-            else if (wasLibrary)
-            {
-                WindowPlacement.TryApply(this, AppStorage.Settings);
+                TryApplyCurrentModePlacement();
             }
         }
 
@@ -1373,15 +1424,7 @@ public partial class MainWindow
         if (mode == WaveformMaximizeMode.Library)
         {
             ResumePlayerVariableRate();
-            if (_sessions.Count == 0)
-            {
-                LibraryBrowser.FocusExplorer();
-            }
-            else
-            {
-                LibraryBrowser.FocusList();
-            }
-
+            FocusLibraryPaneForPlaylist();
             return;
         }
 
@@ -1410,25 +1453,43 @@ public partial class MainWindow
 
     private void PersistCurrentWindowPlacement()
     {
-        if (IsLibraryMaximized)
+        if (IsFullscreenMaximizeMode(_waveformMaximizeMode))
         {
-            WindowPlacement.CapturePlayer(this, AppStorage.Settings);
             return;
         }
 
-        WindowPlacement.Capture(this, AppStorage.Settings);
+        WindowPlacement.Capture(this, AppStorage.Settings, CurrentPlacementKind());
+    }
+
+    private bool TryApplyCurrentModePlacement() =>
+        WindowPlacement.TryApply(this, AppStorage.Settings, CurrentPlacementKind());
+
+    private MainWindowPlacementKind CurrentPlacementKind()
+    {
+        if (IsLibraryMaximized && _libraryMinimalChrome)
+        {
+            return MainWindowPlacementKind.MinimalPlayer;
+        }
+
+        if (IsLibraryMaximized)
+        {
+            return MainWindowPlacementKind.Player;
+        }
+
+        return MainWindowPlacementKind.Editor;
     }
 
     private void RememberWindowFrameBeforeFullscreen(bool fromLibrary)
     {
         _windowStyleBeforeWaveformMax = WindowStyle;
         _resizeModeBeforeWaveformMax = ResizeMode;
+        _minimalBeforeWaveformMax = fromLibrary && _libraryMinimalChrome;
         if (fromLibrary
             && WindowPlacement.TryGetDipBounds(
                 AppStorage.Settings,
                 MinWidth,
                 MinHeight,
-                player: false,
+                MainWindowPlacementKind.Editor,
                 out var editorBounds,
                 out var editorMaximized))
         {
@@ -1523,6 +1584,63 @@ public partial class MainWindow
             DesignMetrics.TransportChromeHeight,
             DesignMetrics.SpectrumHeight * AnalyzerMaximizeLayoutScale));
         ApplyMeterColumnWidth(_meterColumnPreferred);
+        ApplyLibraryMinimalChrome();
+    }
+
+    /// <summary>
+    /// F9。プレイヤー中だけサイド列・ステータス・トランスポート／メーター列を畳む。
+    /// 波形は残す。再生と Alt+S（Silent Skip）は続ける。
+    /// ApplyWaveformMaximizeChrome のあとに呼ぶ。
+    /// </summary>
+    private void ApplyLibraryMinimalChrome()
+    {
+        if (!IsLibraryMaximized)
+        {
+            LibraryBrowser.SetSidePanesVisible(true);
+            SyncWindowMinSizeForMode(minimal: false);
+            return;
+        }
+
+        LibraryBrowser.SetSidePanesVisible(!_libraryMinimalChrome);
+        if (!_libraryMinimalChrome || _waveformMaximizeMode == WaveformMaximizeMode.Waveform)
+        {
+            SyncWindowMinSizeForMode(minimal: false);
+            return;
+        }
+
+        TransportChromeHost.Visibility = Visibility.Collapsed;
+        MeterColumn.Visibility = Visibility.Collapsed;
+        MeterColumnSplitter.Visibility = Visibility.Collapsed;
+        StatusBarHost.Visibility = Visibility.Collapsed;
+        WorkGrid.RowDefinitions[1].Height = new GridLength(0);
+        MeterColumnDef.MinWidth = 0;
+        MeterColumnDef.MaxWidth = 0;
+        MeterColumnDef.Width = new GridLength(0);
+        SyncWindowMinSizeForMode(minimal: true);
+    }
+
+    private void SyncWindowMinSizeForMode(bool minimal)
+    {
+        var unscaledWidth = minimal
+            ? DesignMetrics.MinimalPlayerWindowMinWidth
+            : DesignMetrics.WindowMinWidth;
+        var unscaledHeight = minimal
+            ? DesignMetrics.MinimalPlayerWindowMinHeight
+            : DesignMetrics.WindowMinHeight;
+        UiScaleService.SetUnscaledMinWidth(this, unscaledWidth);
+        UiScaleService.SetUnscaledMinHeight(this, unscaledHeight);
+        if (WindowState == WindowState.Normal)
+        {
+            if (Width < MinWidth)
+            {
+                Width = MinWidth;
+            }
+
+            if (Height < MinHeight)
+            {
+                Height = MinHeight;
+            }
+        }
     }
 }
 

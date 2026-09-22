@@ -79,7 +79,19 @@ public sealed class LibraryPlayerModeTests
     {
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Space, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Enter, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.F9, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Left, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Left, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Right, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Down, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Up, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.AllowsKey(Key.Left, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.AllowsKey(Key.Left, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsPaneFocusArrow(Key.Left, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsPaneFocusArrow(Key.Right, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsPaneFocusArrow(Key.Down, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsPaneFocusArrow(Key.Up, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.IsPaneFocusArrow(Key.Left, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Home, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.PageDown, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Home, ModifierKeys.None));
@@ -115,7 +127,10 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.M, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Delete, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Z, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.AllowsKey(Key.Z, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Left, ModifierKeys.Alt));
+        Assert.False(LibraryPlayerMode.AllowsKey(Key.Right, ModifierKeys.Alt | ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.G, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Tab, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Tab, ModifierKeys.Shift));

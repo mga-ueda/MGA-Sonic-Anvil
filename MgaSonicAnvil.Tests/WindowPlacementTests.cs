@@ -230,26 +230,78 @@ public sealed class WindowPlacementTests
     }
 
     [Fact]
-    public void TryReadPlayer_AcceptsSavedBounds()
+    public void CaptureMinimalPlayer_WritesSeparateSlot()
     {
+        var settings = new AppSettings();
+        WindowPlacement.Capture(new Rect(10, 20, 1600, 900), maximized: false, settings);
+        WindowPlacement.CapturePlayer(new Rect(80, 40, 1100, 700), maximized: true, settings);
+        WindowPlacement.CaptureMinimalPlayer(new Rect(200, 100, 900, 500), maximized: false, settings);
+        Assert.Equal(WindowPlacement.ToStoredExtent(1600), settings.WindowWidth);
+        Assert.Equal(WindowPlacement.ToStoredExtent(1100), settings.PlayerWindowWidth);
+        Assert.Equal(200, settings.MinimalPlayerWindowX);
+        Assert.Equal(100, settings.MinimalPlayerWindowY);
+        Assert.Equal(WindowPlacement.ToStoredExtent(900), settings.MinimalPlayerWindowWidth);
+        Assert.Equal(WindowPlacement.ToStoredExtent(500), settings.MinimalPlayerWindowHeight);
+        Assert.Equal(nameof(WindowState.Normal), settings.MinimalPlayerWindowState);
+    }
+
+    [Fact]
+    public void TryReadMinimalPlayer_AcceptsSavedBounds()
+    {
+        var width = DesignMetrics.MinimalPlayerWindowMinWidth + 40;
         var settings = new AppSettings
         {
-            PlayerWindowX = 30,
-            PlayerWindowY = 50,
-            PlayerWindowWidth = 1920,
-            PlayerWindowHeight = 720,
-            PlayerWindowState = "Maximized",
+            MinimalPlayerWindowX = 15,
+            MinimalPlayerWindowY = 25,
+            MinimalPlayerWindowWidth = (int)Math.Ceiling(width),
+            MinimalPlayerWindowHeight = 720,
+            MinimalPlayerWindowState = "Maximized",
         };
-        Assert.True(WindowPlacement.TryReadPlayer(
+        Assert.True(WindowPlacement.TryReadMinimalPlayer(
             settings,
-            DesignMetrics.WindowMinWidth,
+            DesignMetrics.MinimalPlayerWindowMinWidth,
             DesignMetrics.WindowMinHeight,
             out var bounds,
             out var maximized));
         Assert.True(maximized);
-        Assert.Equal(30, bounds.X);
-        Assert.Equal(50, bounds.Y);
-        Assert.Equal(1920, bounds.Width);
+        Assert.Equal(15, bounds.X);
+        Assert.Equal(25, bounds.Y);
+        Assert.Equal((int)Math.Ceiling(width), bounds.Width);
         Assert.Equal(720, bounds.Height);
+    }
+
+    [Fact]
+    public void TryReadMinimalPlayer_AcceptsWidthBelowEditorMinimum()
+    {
+        Assert.True(DesignMetrics.MinimalPlayerWindowMinWidth < DesignMetrics.WindowMinWidth);
+        var width = (int)Math.Ceiling(DesignMetrics.MinimalPlayerWindowMinWidth + 20);
+        Assert.True(width < DesignMetrics.WindowMinWidth);
+        var settings = new AppSettings
+        {
+            MinimalPlayerWindowX = 10,
+            MinimalPlayerWindowY = 20,
+            MinimalPlayerWindowWidth = width,
+            MinimalPlayerWindowHeight = (int)Math.Ceiling(DesignMetrics.WindowMinHeight + 40),
+            MinimalPlayerWindowState = nameof(WindowState.Normal),
+        };
+        Assert.True(WindowPlacement.TryReadMinimalPlayer(
+            settings,
+            DesignMetrics.MinimalPlayerWindowMinWidth,
+            DesignMetrics.WindowMinHeight,
+            out var bounds,
+            out var maximized));
+        Assert.False(maximized);
+        Assert.Equal(width, bounds.Width);
+    }
+
+    [Fact]
+    public void TryReadMinimalPlayer_RejectsUnsetSize()
+    {
+        Assert.False(WindowPlacement.TryReadMinimalPlayer(
+            new AppSettings(),
+            DesignMetrics.MinimalPlayerWindowMinWidth,
+            DesignMetrics.WindowMinHeight,
+            out _,
+            out _));
     }
 }

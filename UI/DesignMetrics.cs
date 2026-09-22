@@ -20,6 +20,16 @@ internal static class DesignMetrics
     public static double WindowMinWidth =>
         Math.Ceiling(TransportFixedRowWidth + TransportSideChromeWidth + WindowFramePad);
 
+    /// <summary>
+    /// F9 ミニマム。プレイリスト列だけなのでトランスポート／メーター幅は不要。
+    /// 検索欄・グループコンボが破綻しない程度の下限。
+    /// </summary>
+    public static double MinimalPlayerWindowMinWidth => From96(280) + WindowFramePad;
+
+    /// <summary>F9 ミニマム。プレイリスト＋波形（ステータスバーなし）。</summary>
+    public static double MinimalPlayerWindowMinHeight =>
+        LibraryPaneMinHeight + LibraryWaveformHeight + WindowFramePad;
+
     public static double WindowMinHeight => From96(420);
 
     public static double WindowDefaultWidth => WindowMinWidth;

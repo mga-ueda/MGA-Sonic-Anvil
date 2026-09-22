@@ -239,10 +239,23 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.F9 && modifiers == ModifierKeys.None)
+        {
+            ToggleLibraryMinimalChrome();
+            return true;
+        }
+
         if (key == Key.F10 && modifiers == ModifierKeys.None)
         {
             StopSeekNudge();
             ToggleLibraryMaximize();
+            return true;
+        }
+
+        // プレイヤーでも Silent Skip トグルはステータスバー非表示の F9 中も効かせる。
+        if (key == Key.S && modifiers == ModifierKeys.Alt)
+        {
+            SilentSkipCheck.IsChecked = SilentSkipCheck.IsChecked != true;
             return true;
         }
 
@@ -300,6 +313,28 @@ public partial class MainWindow
         if (IsLibraryMaximized && LibraryBrowser.IsSearchFocused)
         {
             return false;
+        }
+
+        // Ctrl+←／↑／→／↓ でペインフォーカス（エディタのマーカー移動／時間ズームは使わない）
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && LibraryPlayerMode.IsPaneFocusArrow(key, modifiers))
+        {
+            switch (key)
+            {
+                case Key.Left:
+                case Key.Up:
+                    LibraryBrowser.FocusExplorer();
+                    break;
+                case Key.Right:
+                    LibraryBrowser.FocusList();
+                    break;
+                default:
+                    LibraryBrowser.FocusFavorites();
+                    break;
+            }
+
+            return true;
         }
 
         if (IsLibraryMaximized && TryHandleLibraryPlayerNumpad(key, modifiers, isRepeat))
@@ -493,6 +528,25 @@ public partial class MainWindow
                 return true;
             }
 
+            if (key == Key.Z && modifiers == ModifierKeys.Control)
+            {
+                TryUndoLibraryPlaylistRemove();
+                return true;
+            }
+
+            if (key == Key.R && modifiers == ModifierKeys.None)
+            {
+                if (IsLibraryExplorerFocused
+                    || LibraryBrowser.IsSearchFocused
+                    || IsLibraryGroupComboFocused)
+                {
+                    return false;
+                }
+
+                LibraryBrowser.ToggleShuffle();
+                return true;
+            }
+
             // タブを閉じない。リストから外すのも Delete のみ。
             if (key == Key.W
                 && modifiers is ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift))
@@ -644,12 +698,6 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.S && modifiers == ModifierKeys.Alt)
-        {
-            SilentSkipCheck.IsChecked = SilentSkipCheck.IsChecked != true;
-            return true;
-        }
-
         if (key == Key.Enter && modifiers == ModifierKeys.None)
         {
             return PausePlaybackHere();
@@ -659,7 +707,7 @@ public partial class MainWindow
         {
             if (IsLibraryMaximized)
             {
-                PlayLibrarySelectionOrToggle();
+                PlayLibrarySelectionOnceOrToggle();
                 return true;
             }
 
@@ -721,6 +769,12 @@ public partial class MainWindow
         if (key is Key.M or Key.Insert && modifiers == ModifierKeys.None)
         {
             return BeginOrContinuePlaceRepeat(PlaceRepeatKind.Marker);
+        }
+
+        if (key == Key.K && modifiers == ModifierKeys.None)
+        {
+            ToggleRangeClick();
+            return true;
         }
 
         if (key == Key.E && modifiers == ModifierKeys.Alt && _waapiPanelVisible)

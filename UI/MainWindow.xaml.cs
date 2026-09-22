@@ -61,6 +61,8 @@ public partial class MainWindow : Window
     private AudioDocument? _document => _activeSession?.Document;
     private RangeDivideState? _markerDivide;
     private RangeDivideState? _regionDivide;
+    /// <summary>範囲等分クリックのユーザー設定。既定オフ。自動ではオンにしない。</summary>
+    private bool _rangeClickEnabled;
     private AudioClip? _clipboard;
     private AudioOutputSettings _outputSettings;
     private long _lastPlaybackStart;
@@ -73,6 +75,7 @@ public partial class MainWindow : Window
     private WindowStyle _windowStyleBeforeWaveformMax;
     private ResizeMode _resizeModeBeforeWaveformMax;
     private Rect _boundsBeforeWaveformMax;
+    private bool _minimalBeforeWaveformMax;
     private double _meterColumnPreferred;
     private int _playbackGeneration;
     private int _editorPlayAfterPcmTicket;
@@ -121,6 +124,7 @@ public partial class MainWindow : Window
         LibraryBrowser.FavoritesSplitChanged += LibraryBrowser_FavoritesSplitChanged;
         LibraryBrowser.FavoritesChanged += LibraryBrowser_FavoritesChanged;
         LibraryBrowser.FavoritesActivated += LibraryBrowser_FavoritesActivated;
+        LibraryBrowser.ShuffleChanged += LibraryBrowser_ShuffleChanged;
         LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
         LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;
         LibraryBrowser.SetVisibleColumns(AppStorage.Settings.ResolvedLibraryListColumns());
@@ -131,6 +135,7 @@ public partial class MainWindow : Window
         LibraryBrowser.SetExplorerWidth(AppStorage.Settings.LibraryExplorerWidth);
         LibraryBrowser.SetFavoritesSplit(AppStorage.Settings.LibraryFavoritesSplit);
         LibraryBrowser.SetFavorites(AppStorage.Settings.ResolvedLibraryFavoritePaths());
+        LibraryBrowser.ShuffleEnabled = AppStorage.Settings.LibraryShuffle;
         DpiChanged += (_, _) =>
         {
             _brandLogoDark = null;
@@ -514,6 +519,7 @@ public partial class MainWindow : Window
             RefreshStatus();
             RefreshHistoryStrip();
             TryApplyAutoSpeaker();
+            SyncRangeClicks();
         }
         finally
         {
@@ -876,13 +882,9 @@ public partial class MainWindow : Window
                 _windowStateBeforeWaveformMax == WindowState.Maximized,
                 AppStorage.Settings);
         }
-        else if (IsLibraryMaximized)
-        {
-            WindowPlacement.CapturePlayer(this, AppStorage.Settings);
-        }
         else
         {
-            WindowPlacement.Capture(this, AppStorage.Settings);
+            PersistCurrentWindowPlacement();
         }
         HideFromTaskAndFocus();
         StopMeterRendering();
@@ -1039,6 +1041,15 @@ public partial class MainWindow : Window
     private void ApplyMeterColumnWidth(double preferred)
     {
         _meterColumnPreferred = DesignMetrics.ClampMeterColumnWidth(preferred);
+        // F9 ミニマムではメーター列を空けたままにしない（Bind / SyncMonitorLayout で幅が戻るのを防ぐ）。
+        if (_libraryMinimalChrome)
+        {
+            MeterColumnDef.MinWidth = 0;
+            MeterColumnDef.MaxWidth = 0;
+            MeterColumnDef.Width = new GridLength(0);
+            return;
+        }
+
         if (_waveformMaximizeMode == WaveformMaximizeMode.Waveform)
         {
             return;
@@ -1073,6 +1084,12 @@ public partial class MainWindow : Window
     private void PersistMeterColumnWidth()
     {
         if (_waveformMaximizeMode == WaveformMaximizeMode.Waveform)
+        {
+            return;
+        }
+
+        // F9 中はメーター列幅を触らない（空のデッドスペースになる）。
+        if (_libraryMinimalChrome)
         {
             return;
         }
