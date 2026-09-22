@@ -1194,12 +1194,19 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             }
 
             var leaveReverse = _playbackSpeed < 0 && next > 0;
+            var enterReverse = _playbackSpeed > 0 && next < 0;
             _playbackSpeed = next;
             _shuttleOutputGain = Math.Abs(next) > 1.5 ? ShuttleGainLinear : 1f;
             _shuttlePrimed = false;
             Ended = false;
             CompleteSeekFadeNoLock();
-            InvalidateStreamSrcWinNoLock();
+            // 正方向の 1↔3 で窓を捨てると、リングは先読み分だけヘッドより前にいる。
+            // 音声スレッドは巻き戻さないので、早送りの読みが失敗したままヘッドが止まる。
+            if (leaveReverse || enterReverse)
+            {
+                InvalidateStreamSrcWinNoLock();
+            }
+
             ClearStreamReverseBuf();
             if (leaveReverse)
             {

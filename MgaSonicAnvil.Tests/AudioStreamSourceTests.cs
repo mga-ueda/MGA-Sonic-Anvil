@@ -345,6 +345,48 @@ public sealed class AudioStreamSourceTests
     }
 
     [Fact]
+    public void BindStream_FastSpeedAfterPlayback_KeepsAdvancing()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-ff-live-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            WriteRampWave(path, sampleRate: 48000, frames: 48000);
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+
+            using var source = AudioStreamSource.Open(path);
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(48000);
+            provider.BindStream(source, document, startFrame: 0, playRange: null, loop: false);
+
+            var warmFrames = 400;
+            var warm = new float[warmFrames * 2];
+            Assert.Equal(warm.Length, provider.Read(warm, 0, warm.Length));
+            var origin = provider.CursorFrame;
+            Assert.Equal(warmFrames, origin);
+
+            provider.SetPlaybackSpeed(PlaybackSampleProvider.FastSpeed);
+            var frames = 100;
+            var buffer = new float[frames * 2];
+            Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+            var gain = PlaybackSampleProvider.ShuttleGainLinear;
+            Assert.Equal(origin * gain, buffer[0], 1);
+            Assert.InRange(provider.CursorFrame, origin + frames * 2, origin + frames * 3 + 2);
+
+            Assert.True(provider.SetPlaybackSpeed(1));
+            var after = provider.CursorFrame;
+            var restore = new float[frames * 2];
+            Assert.Equal(restore.Length, provider.Read(restore, 0, restore.Length));
+            Assert.Equal(after * 1f, restore[0], 1);
+            Assert.Equal(after + frames, provider.CursorFrame);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void LoadedPcm_BindStream_FastSpeed_KeepsPeaksAndUsesVariableRate()
     {
         var path = Path.Combine(Path.GetTempPath(), "mga-pcm-ff-" + Guid.NewGuid().ToString("N") + ".wav");
