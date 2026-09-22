@@ -1003,7 +1003,7 @@ internal static partial class UiStrings
     public static string LibraryExplorerLabel => Get("ライブラリ", "Library");
     public static string LibraryPlaylistLabel => Get("プレイリスト", "Playlist");
     public static string LibrarySearchHint => Get("検索", "Find");
-    public static string LabelLibraryShuffle => Get("ランダム再生(_R)", "Shuffle (_R)");
+    public static string LabelLibraryShuffle => Get("ランダム再生 (R)", "Shuffle (R)");
     public static string TipLibraryShuffle => Get(
         "ランダム再生 (R)\nプレイリストを一通り再生し終わるまで同じ曲を繰り返さない。すべて再生したら再度抽選する。既定はオフ。プレイリストが空でも切替できる。プレイヤーを抜けるとオフに戻す。設定には記憶しない。",
         "Shuffle (R)\nDoes not repeat a track until the whole playlist has played once. After that, the order is reshuffled. Off by default. Works when the playlist is empty. Leaving player turns it off. Not saved in settings.");

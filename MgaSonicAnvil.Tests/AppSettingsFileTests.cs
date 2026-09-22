@@ -12,6 +12,33 @@ public sealed class AppSettingsFileTests
     {
         var json = JsonSerializer.Serialize(AppSettings.CreateDefault(), AppSettingsJsonContext.Default.AppSettings);
         Assert.DoesNotContain("LibraryShuffle", json, StringComparison.Ordinal);
+        Assert.False(AppSettingsFile.ContainsLegacyLibraryShuffle(json));
+    }
+
+    [Fact]
+    public void Load_RewritesLegacyLibraryShuffleOut()
+    {
+        var root = NewTempDir("shuffle");
+        try
+        {
+            var path = Path.Combine(root, "settings.json");
+            AppSettingsFile.Write(path, AppSettings.CreateDefault());
+            var json = File.ReadAllText(path).Replace(
+                "\"SettingsGeneration\": 1,",
+                "\"SettingsGeneration\": 1,\n  \"LibraryShuffle\": true,",
+                StringComparison.Ordinal);
+            File.WriteAllText(path, json);
+            Assert.True(AppSettingsFile.ContainsLegacyLibraryShuffle(json));
+
+            var settings = AppSettingsFile.Load(path, leftoverSessionDocumentPath: null, sessionDirectory: null, out var reset);
+            Assert.Equal(SettingsFileReset.None, reset);
+            Assert.Equal(AppSettings.CurrentGeneration, settings.SettingsGeneration);
+            Assert.False(AppSettingsFile.ContainsLegacyLibraryShuffle(File.ReadAllText(path)));
+        }
+        finally
+        {
+            TryDeleteDir(root);
+        }
     }
 
     [Fact]

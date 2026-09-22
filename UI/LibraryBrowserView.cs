@@ -510,15 +510,22 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void ToggleShuffle() => ShuffleEnabled = !ShuffleEnabled;
 
+    public void ResetShuffle() => SetShuffleEnabled(false, raise: false);
+
     private void SetShuffleEnabled(bool enabled, bool raise)
     {
-        if (_shuffleEnabled == enabled)
+        var changed = _shuffleEnabled != enabled;
+        if (!changed && _shuffleCheck.IsChecked == enabled)
         {
             return;
         }
 
         _shuffleEnabled = enabled;
-        _shuffle.Clear();
+        if (changed)
+        {
+            _shuffle.Clear();
+        }
+
         if (_shuffleCheck.IsChecked != enabled)
         {
             _shuffleBusy = true;
@@ -532,7 +539,7 @@ internal sealed class LibraryBrowserView : UserControl
             }
         }
 
-        if (raise)
+        if (changed && raise)
         {
             ShuffleChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -2355,6 +2362,8 @@ internal sealed class LibraryBrowserView : UserControl
 
         _shuffleCheck.Style = TryFindResource("DarkCheckBoxStyle") as Style;
         _shuffleCheck.Content = UiStrings.LabelLibraryShuffle;
+        _shuffleCheck.IsChecked = false;
+        _shuffleCheck.Focusable = false;
         _shuffleCheck.VerticalAlignment = VerticalAlignment.Center;
         _shuffleCheck.FontSize = 11;
         _shuffleCheck.Margin = new Thickness(8, 0, 0, 0);

@@ -45,6 +45,18 @@ internal static class AppSettingsFile
             }
 
             settings.EnsureSpeakerPresets();
+            if (ContainsLegacyLibraryShuffle(json))
+            {
+                try
+                {
+                    Write(settingsPath, settings);
+                }
+                catch
+                {
+                    // 次回 Save で落ちる。起動は続ける。
+                }
+            }
+
             return settings;
         }
         catch
@@ -78,6 +90,33 @@ internal static class AppSettingsFile
             }
 
             return property.TryGetInt32(out generation);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>旧版が書いていた F10 ランダム。アプリ設定には残さない。</summary>
+    internal static bool ContainsLegacyLibraryShuffle(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            foreach (var property in doc.RootElement.EnumerateObject())
+            {
+                if (property.Name.Equals("LibraryShuffle", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
         catch
         {

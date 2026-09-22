@@ -146,6 +146,7 @@ public partial class MainWindow
         var show = IsLibraryMaximized;
         ApplyStatusFieldChrome();
         LibraryBrowser.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        LibraryBrowser.IsEnabled = show;
         if (show)
         {
             LibraryBrowser.SetGlowExtendsWaveform(true);
@@ -153,6 +154,7 @@ public partial class MainWindow
         }
         else
         {
+            LibraryBrowser.ResetShuffle();
             ApplyLibraryWashChrome(false);
             LibraryBrowser.SetGlowExtendsWaveform(false);
         }

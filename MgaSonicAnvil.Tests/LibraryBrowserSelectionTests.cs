@@ -1255,6 +1255,37 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void LabelLibraryShuffle_HasNoAccessKey()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryShuffle));
+            UiStrings.SetLanguage(UiLanguage.English);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryShuffle));
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
+    public void ResetShuffle_TurnsOffAfterEnable()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            view.ShuffleEnabled = true;
+            Assert.True(view.ShuffleEnabled);
+            view.ResetShuffle();
+            Assert.False(view.ShuffleEnabled);
+        });
+    }
+
+    [Fact]
     public void ColumnHeader_MarksSortedColumn()
     {
         RunSta(() =>
