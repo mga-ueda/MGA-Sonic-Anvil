@@ -92,8 +92,8 @@ public sealed class TransportToolTipTests
         Assert.Contains("Space はその曲だけ", UiStrings.TipLibraryList);
         Assert.Contains("トランスポートの再生", UiStrings.TipLibraryList);
         Assert.Contains("終わったら次の曲へ進む", UiStrings.TipLibraryList);
-        Assert.Contains("F9 でミニマム", UiStrings.TipLibraryList);
-        Assert.Contains("ステータスバーを隠", UiStrings.TipLibraryList);
+        Assert.Contains("F9 でプレイリストと波形だけを出す", UiStrings.TipLibraryList);
+        Assert.Contains("ステータスバーは出さない", UiStrings.TipLibraryList);
         Assert.Contains("F1 または Ctrl+←／Ctrl+↑", UiStrings.TipLibraryList);
         Assert.Contains("Ctrl+→", UiStrings.TipLibraryList);
         Assert.Contains("Ctrl+↓", UiStrings.TipLibraryFavorites);
