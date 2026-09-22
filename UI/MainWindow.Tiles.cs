@@ -688,7 +688,7 @@ public partial class MainWindow
         body.Children.Add(header);
         body.Children.Add(view);
 
-        // 検索のぼかしはタイル境界を越えて隣へ混ぜる。クリップはグリッド全体側。
+        // 検索のぼかしは Effect が描画ではみ出す。クリップはグリッド全体側。
         var layers = new Grid { ClipToBounds = true };
         layers.Children.Add(body);
 

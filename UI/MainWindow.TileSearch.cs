@@ -263,14 +263,6 @@ public partial class MainWindow
     private bool TileSearchMatches(DocumentSession session) =>
         TileSearchQuery.Matches(session.DisplayName, _tileSearchGroups);
 
-    private const double TileSearchBlurRadius = 8;
-
-    /// <summary>
-    /// ぼかしをタイルの外へはみ出させる量。半径ぶん足さないと端が薄くなる。
-    /// さらに仕切りの半分（2px）を足し、隣のタイルと仕切りの中央でフルのぼかしが重なるようにする。
-    /// </summary>
-    private const double TileSearchBlurOverscan = TileSearchBlurRadius + TileDividerWidth / 2;
-
     private const int TileSearchZUnmatched = 0;
     private const int TileSearchZFrost = 1;
     private const int TileSearchZMatched = 2;
@@ -287,7 +279,7 @@ public partial class MainWindow
 
     /// <summary>
     /// ヒットしない領域を一続きのすりガラスにする。暗幕はグリッド全体の 1 枚。
-    /// ぼかしは仕切りの半分まで伸ばして隣と中央でつなぎ、ヒットしたタイルだけ前面に残す。
+    /// ぼかしはレイアウトを変えず Effect のはみ出しだけ見せ、ヒットしたタイルだけ前面に残す。
     /// 余りマス（波形の無い背景）も同じ暗幕で覆う。
     /// </summary>
     private void ApplyTileSearchVeils()
@@ -305,18 +297,11 @@ public partial class MainWindow
 
     private void ApplyTileSearchBlur(WaveformTilePane pane, bool veiled)
     {
-        if (veiled)
-        {
-            pane.Body.Effect ??= new BlurEffect { Radius = TileSearchBlurRadius };
-            pane.Body.Margin = new Thickness(-TileSearchBlurOverscan);
-            pane.Layers.ClipToBounds = false;
-            pane.Host.ClipToBounds = false;
-            return;
-        }
-
-        pane.Body.Effect = null;
-        pane.Body.Margin = new Thickness(0);
-        pane.Layers.ClipToBounds = true;
+        pane.Body.Effect = veiled
+            ? pane.Body.Effect ?? new BlurEffect { Radius = TileSearchBlurLayout.Radius }
+            : null;
+        pane.Body.Margin = TileSearchBlurLayout.BodyMargin;
+        pane.Layers.ClipToBounds = TileSearchBlurLayout.ClipLayersToBounds(veiled);
         pane.Host.ClipToBounds = false;
     }
 
