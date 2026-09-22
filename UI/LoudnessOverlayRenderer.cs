@@ -354,7 +354,7 @@ internal sealed class LoudnessOverlayRenderer
         return pen;
     }
 
-    private static bool IsLight => UiThemeService.Current == UiTheme.Light;
+    private static bool IsLight => UiThemeService.Painted == UiTheme.Light;
 
     private static void DrawScaleLabels(
         DrawingContext dc,

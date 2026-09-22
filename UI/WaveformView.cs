@@ -2162,7 +2162,7 @@ internal sealed class WaveformView : Grid
             }
             else if (SeekAndSelectOnly)
             {
-                dc.PushOpacity(PlayerWaveOpacityFor(UiThemeService.Current));
+                dc.PushOpacity(PlayerWaveOpacityFor(UiThemeService.Painted));
                 DrawWaveformImage(dc, wave);
                 dc.Pop();
             }
@@ -2552,7 +2552,7 @@ internal sealed class WaveformView : Grid
             _waveViewSpan,
             LaneWaveColors(),
             LaneGapPx(dpi.DpiScaleY),
-            playerLight: SeekAndSelectOnly && UiThemeService.Current == UiTheme.Light,
+            playerLight: SeekAndSelectOnly && UiThemeService.Painted == UiTheme.Light,
             shadeLanes: SeekAndSelectOnly,
             omitCueFills: !LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly));
         _invertBitmap.WritePixels(new Int32Rect(0, 0, width, height), _invertPixels, width * 4, 0);
@@ -2620,7 +2620,7 @@ internal sealed class WaveformView : Grid
         double span,
         WaveSelection selection)
     {
-        var playerLight = SeekAndSelectOnly && UiThemeService.Current == UiTheme.Light;
+        var playerLight = SeekAndSelectOnly && UiThemeService.Painted == UiTheme.Light;
         if (!SpectrogramVisible && !LoudnessVisible && !_liveRecording)
         {
             EnsureInvertBitmap();
@@ -3617,7 +3617,7 @@ internal sealed class WaveformView : Grid
         var p = buffer + y1 * stride + x;
         for (var y = y1; y <= y2; y++)
         {
-            *p = WaveformLaneGradient.Shade(color, y + 0.5, mid, halfHeight, UiThemeService.Current);
+            *p = WaveformLaneGradient.Shade(color, y + 0.5, mid, halfHeight, UiThemeService.Painted);
             p += stride;
         }
     }

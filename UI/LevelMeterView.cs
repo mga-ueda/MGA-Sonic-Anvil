@@ -260,7 +260,7 @@ internal sealed class LevelMeterView : FrameworkElement
         }
         else
         {
-            var rgb = HoldFillColor(holdDb, isPeakHold, UiThemeService.Current);
+            var rgb = HoldFillColor(holdDb, isPeakHold, UiThemeService.Painted);
             fill = WpfControlHelpers.FrozenBrush(Color.FromRgb(rgb.R, rgb.G, rgb.B));
         }
 

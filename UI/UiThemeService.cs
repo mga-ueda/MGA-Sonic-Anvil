@@ -15,6 +15,11 @@ internal static class UiThemeService
 
     public static UiTheme Current { get; private set; } = UiTheme.Dark;
 
+    /// <summary>画面に塗っている配色。プレイヤー中は設定がライトでもダーク。</summary>
+    public static UiTheme Painted { get; private set; } = UiTheme.Dark;
+
+    private static bool _playerForcesDark;
+
     public static void Start()
     {
         if (_started)
@@ -56,17 +61,40 @@ internal static class UiThemeService
         Apply(UiThemes.Resolve(choice, OsUsesLightTheme()), force: true);
     }
 
+    /// <summary>プレイヤー表示中は、設定がライトでもダークの色を塗る。</summary>
+    public static void SetPlayerForcesDark(bool player)
+    {
+        if (_playerForcesDark == player)
+        {
+            return;
+        }
+
+        _playerForcesDark = player;
+        Paint();
+    }
+
     public static void Apply(UiTheme theme, bool force = false)
     {
-        if (!force && _applied && theme == Current)
+        var painted = ResolvePainted(theme);
+        if (!force && _applied && theme == Current && painted == Painted)
         {
             return;
         }
 
         Current = theme;
+        Paint();
+    }
+
+    private static UiTheme ResolvePainted(UiTheme theme) =>
+        _playerForcesDark ? UiTheme.Dark : theme;
+
+    private static void Paint()
+    {
+        var painted = ResolvePainted(Current);
+        Painted = painted;
         _applied = true;
-        UiThemePalette.Apply(theme);
-        UiColors.ApplySaved(theme);
+        UiThemePalette.Apply(painted);
+        UiColors.ApplySaved(painted);
         RefreshWindowChrome();
         Changed?.Invoke(null, EventArgs.Empty);
     }

@@ -6,11 +6,11 @@ namespace MgaSonicAnvil.UI;
 
 internal static class PlayerChrome
 {
-    internal static Color Get(string key) => Get(key, UiThemeService.Current);
+    internal static Color Get(string key) => Get(key, UiThemeService.Painted);
 
     internal static Color Get(string key, UiTheme theme)
     {
-        if (theme == UiThemeService.Current
+        if (theme == UiThemeService.Painted
             && Application.Current?.TryFindResource(key) is SolidColorBrush brush)
         {
             return brush.Color;

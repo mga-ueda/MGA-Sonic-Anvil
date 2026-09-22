@@ -24,7 +24,7 @@ internal static class LibraryPlaceholderJacket
     {
         get
         {
-            var theme = UiThemeService.Current;
+            var theme = UiThemeService.Painted;
             if (_bitmap is null || _theme != theme)
             {
                 _theme = theme;

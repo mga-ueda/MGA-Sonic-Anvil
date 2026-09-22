@@ -35,9 +35,8 @@ public sealed class LibraryPlaceholderJacketTests
 
             var darkPixels = Copy(dark);
             var lightPixels = Copy(light);
-            Assert.NotEqual(darkPixels[0], lightPixels[0]);
+            Assert.Equal(darkPixels, lightPixels);
             AssertVerticalWash(darkPixels, dark.PixelWidth);
-            AssertVerticalWash(lightPixels, light.PixelWidth);
         });
     }
 

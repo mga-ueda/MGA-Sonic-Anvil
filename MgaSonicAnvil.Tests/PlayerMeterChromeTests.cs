@@ -72,13 +72,17 @@ public sealed class PlayerMeterChromeTests
             PlayerMeterChrome.Grid(Color.FromRgb(0x5A, 0x5A, 0x5F), player: true),
             Color.FromRgb(0x88, 0x88, 0x8C));
 
-        var lightGrid = Color.FromRgb(0xC8, 0xC8, 0xCC);
-        var bakedLight = PlayerMeterChrome.Grid(lightGrid, player: true);
-        Assert.Equal(bakedLight, UiThemePalette.ColorFor(UiTheme.Light, PlayerMeterChrome.TrackBorderKey));
-        Assert.Equal(bakedLight, UiThemePalette.ColorFor(UiTheme.Light, PlayerMeterChrome.TickKey));
-        Assert.Equal(bakedLight, UiThemePalette.ColorFor(UiTheme.Light, PlayerMeterChrome.ScopeGridKey));
         Assert.Equal(
-            PlayerMeterChrome.Grid(Color.FromRgb(0x9A, 0x9A, 0xA0), player: true),
+            UiThemePalette.ColorFor(UiTheme.Dark, PlayerMeterChrome.TrackBorderKey),
+            UiThemePalette.ColorFor(UiTheme.Light, PlayerMeterChrome.TrackBorderKey));
+        Assert.Equal(
+            UiThemePalette.ColorFor(UiTheme.Dark, PlayerMeterChrome.TickKey),
+            UiThemePalette.ColorFor(UiTheme.Light, PlayerMeterChrome.TickKey));
+        Assert.Equal(
+            UiThemePalette.ColorFor(UiTheme.Dark, PlayerMeterChrome.ScopeGridKey),
+            UiThemePalette.ColorFor(UiTheme.Light, PlayerMeterChrome.ScopeGridKey));
+        Assert.Equal(
+            UiThemePalette.ColorFor(UiTheme.Dark, PlayerMeterChrome.HullKey),
             UiThemePalette.ColorFor(UiTheme.Light, PlayerMeterChrome.HullKey));
     }
 

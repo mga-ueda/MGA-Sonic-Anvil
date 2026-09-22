@@ -42,7 +42,7 @@ internal static class LevelColorTheme
         return Math.Clamp((db - SpectrumAnalyzer.FloorDb) / span, 0, 1);
     }
 
-    public static ColorRgb PeakHold(double db) => PeakHold(db, UiThemeService.Current);
+    public static ColorRgb PeakHold(double db) => PeakHold(db, UiThemeService.Painted);
 
     public static ColorRgb PeakHold(double db, UiTheme theme)
     {

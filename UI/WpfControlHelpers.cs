@@ -156,7 +156,7 @@ internal static class Theme
             return brush.Color;
         }
 
-        if (UiThemePalette.TryMap(UiThemeService.Current, key, out var mapped))
+        if (UiThemePalette.TryMap(UiThemeService.Painted, key, out var mapped))
         {
             return mapped;
         }

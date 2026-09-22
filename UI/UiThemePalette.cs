@@ -177,32 +177,6 @@ internal static class UiThemePalette
         ["LevelMeterTrackBorderBrush"] = Rgb(0xC8, 0xC8, 0xCC),
         ["LevelMeterHoldBorderBrush"] = Rgb(0xC8, 0xC8, 0xC8),
         ["LevelMeterTickBrush"] = Rgb(0xC8, 0xC8, 0xCC),
-        ["PlayerPlaceholderJacketTopBrush"] = Rgb(0xE8, 0xE8, 0xEC),
-        ["PlayerPlaceholderJacketBottomBrush"] = Rgb(0xB0, 0xB0, 0xB6),
-        ["PlayerPlaceholderJacketForeBrush"] = Rgb(0x5A, 0x5A, 0x62),
-        ["PlayerFallbackWashNavyBrush"] = Rgb(0x1B, 0x3A, 0x6B),
-        ["PlayerFallbackWashCyanBrush"] = Rgb(0x00, 0xF5, 0xFF),
-        ["PlayerFallbackWashWhiteBrush"] = Rgb(0xFF, 0xFF, 0xFF),
-        ["PlayerGlowVeilBrush"] = Argb(0x94, 0xFF, 0xFF, 0xFF),
-        ["PlayerPaneFocusLineBrush"] = Argb(0x3C, 0x2C, 0x2C, 0x30),
-        ["PlayerSelectionFillBrush"] = Argb(0x70, 0x63, 0xB4, 0xC4),
-        ["PlayerHoverFillBrush"] = Argb(0x98, 0xD8, 0xD9, 0xE2),
-        ["PlayerComboFillBrush"] = Argb(0x2E, 0x1A, 0x1A, 0x1A),
-        ["PlayerComboHoverFillBrush"] = Argb(0x52, 0x1A, 0x1A, 0x1A),
-        ["PlayerComboDisabledFillBrush"] = Argb(0x14, 0x1A, 0x1A, 0x1A),
-        ["PlayerComboDropFillBrush"] = Argb(0x7A, 0x1A, 0x1A, 0x1A),
-        ["PlayerComboDropBorderBrush"] = Argb(0x52, 0x1A, 0x1A, 0x1A),
-        ["PlayerWaveFillBrush"] = Argb(0x80, 0x6A, 0x78, 0x92),
-        ["PlayerWaveSelectionEmptyBrush"] = Rgb(0xD5, 0xD9, 0xE0),
-        ["PlayerLevelMeterTrackBorderBrush"] = Rgb(0x98, 0x98, 0x9B),
-        ["PlayerLevelMeterTickBrush"] = Rgb(0x98, 0x98, 0x9B),
-        ["PlayerVectorScopeGridBrush"] = Rgb(0x98, 0x98, 0x9B),
-        ["PlayerSurroundHullStrokeBrush"] = Rgb(0x75, 0x75, 0x7A),
-        ["PlayerWaapiToggleOffBackBrush"] = Argb(0x8C, 0xD4, 0xD4, 0xD8),
-        ["PlayerWaapiToggleOffHoverBackBrush"] = Argb(0x8C, 0xE8, 0xE8, 0xEC),
-        ["PlayerWaapiToggleOnBackBrush"] = Argb(0x8C, 0x3D, 0x8E, 0xE8),
-        ["PlayerWaapiToggleOnHoverBackBrush"] = Argb(0x8C, 0x5A, 0xA4, 0xF2),
-        ["PlayerJacketReflectionBrush"] = Argb(0x4E, 0xFF, 0xFF, 0xFF),
         ["DbScaleForeBrush"] = Rgb(0x3F, 0x3F, 0x42),
         ["SpectrogramScaleForeBrush"] = Rgb(0xEB, 0xEB, 0xEB),
         ["SpectrogramSelectionFillBrush"] = Argb(0x38, 0xFF, 0xFF, 0xFF),
@@ -357,6 +331,11 @@ internal static class UiThemePalette
 
     public static Color ColorFor(UiTheme theme, string key)
     {
+        if (SharedPlayerColor(key, out var shared))
+        {
+            return shared;
+        }
+
         if (theme == UiTheme.Light && Light.TryGetValue(key, out var light))
         {
             return light;
@@ -372,12 +351,24 @@ internal static class UiThemePalette
 
     internal static bool TryMap(UiTheme theme, string key, out Color color)
     {
+        if (SharedPlayerColor(key, out color))
+        {
+            return true;
+        }
+
         if (theme == UiTheme.Light && Light.TryGetValue(key, out color))
         {
             return true;
         }
 
         return Dark.TryGetValue(key, out color);
+    }
+
+    /// <summary>プレイヤー色はテーマに関係なくダークの値。</summary>
+    private static bool SharedPlayerColor(string key, out Color color)
+    {
+        color = default;
+        return ColorDevCatalog.IsPlayerShared(key) && Dark.TryGetValue(key, out color);
     }
 
     private static Color Rgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);

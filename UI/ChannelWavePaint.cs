@@ -56,7 +56,7 @@ internal static class ChannelWavePaint
     /// </summary>
     private static UiTheme MuteTheme()
     {
-        if (UiThemeService.Current == UiTheme.Light || IsLightWaveformBack())
+        if (UiThemeService.Painted == UiTheme.Light || IsLightWaveformBack())
         {
             return UiTheme.Light;
         }

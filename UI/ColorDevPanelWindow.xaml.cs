@@ -104,7 +104,7 @@ internal partial class ColorDevPanelWindow : Window
     }
 
     private void ApplyWindowTitle() =>
-        Title = UiStrings.ColorDevTitleFor(UiThemeService.Current);
+        Title = UiStrings.ColorDevTitleFor(UiThemeService.Painted);
 
     public void RefreshRows()
     {
@@ -564,7 +564,7 @@ internal partial class ColorDevPanelWindow : Window
             return;
         }
 
-        FindEntry(_selectedKey)?.Set(UiColors.DefaultFor(UiThemeService.Current, _selectedKey));
+        FindEntry(_selectedKey)?.Set(UiColors.DefaultFor(UiThemeService.Painted, _selectedKey));
         RefreshRows();
         SyncPickerFromSelection();
         FlushSave();

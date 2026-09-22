@@ -30,7 +30,7 @@ internal static class DarkWindowChrome
                 return;
             }
 
-            var useDarkMode = UiThemeService.Current == UiTheme.Dark ? 1 : 0;
+            var useDarkMode = UiThemeService.Painted == UiTheme.Dark ? 1 : 0;
             if (DwmSetWindowAttribute(hwnd, DwmwaUseImmersiveDarkMode, ref useDarkMode, sizeof(int)) != 0)
             {
                 _ = DwmSetWindowAttribute(

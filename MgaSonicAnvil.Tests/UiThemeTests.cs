@@ -1,3 +1,6 @@
+using System.Runtime.ExceptionServices;
+using System.Windows;
+using System.Windows.Media;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 using Xunit;
@@ -234,9 +237,9 @@ public sealed class UiThemeTests
             > RelativeLuma(Composite(System.Windows.Media.Color.FromArgb(150, 0, 0, 0), waveBack)));
         Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "HistoryStripBackBrush")) > 0.6);
         Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterTrackBorderBrush")) > 0.5);
-        Assert.True(
-            RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "PlayerLevelMeterTickBrush"))
-            < RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterTickBrush")));
+        Assert.Equal(
+            UiThemePalette.ColorFor(UiTheme.Dark, "PlayerLevelMeterTickBrush"),
+            UiThemePalette.ColorFor(UiTheme.Light, "PlayerLevelMeterTickBrush"));
         Assert.Equal(
             System.Windows.Media.Color.FromRgb(0xC8, 0xC8, 0xC8),
             UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterHoldBorderBrush"));
@@ -256,6 +259,97 @@ public sealed class UiThemeTests
         Assert.True(anacrusis.A < 0x80);
         Assert.True(UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillLoopBrush").A < 0x80);
         Assert.True(UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillExitBrush").A < 0x80);
+    }
+
+    [Fact]
+    public void LightSetting_PlayerPaintsDarkTextAndSurface()
+    {
+        void Body()
+        {
+            var app = Application.Current!;
+            var previous = UiThemeService.Current;
+            var fore = app.Resources.Contains("PrimaryForeBrush") ? app.Resources["PrimaryForeBrush"] : null;
+            var back = app.Resources.Contains("SurfaceBackBrush") ? app.Resources["SurfaceBackBrush"] : null;
+            var muted = app.Resources.Contains("MutedForeBrush") ? app.Resources["MutedForeBrush"] : null;
+            try
+            {
+                app.Resources["PrimaryForeBrush"] = new SolidColorBrush(Color.FromRgb(0xEB, 0xEB, 0xEB));
+                app.Resources["SurfaceBackBrush"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E));
+                app.Resources["MutedForeBrush"] = new SolidColorBrush(Color.FromRgb(0x96, 0x96, 0x96));
+                UiColors.Load();
+                UiThemeService.Apply(UiTheme.Light, force: true);
+
+                Assert.Equal(Color.FromRgb(0x1A, 0x1A, 0x1A), Brush("PrimaryForeBrush"));
+                Assert.Equal(UiTheme.Light, UiThemeService.Painted);
+
+                UiThemeService.SetPlayerForcesDark(true);
+                Assert.Equal(UiTheme.Light, UiThemeService.Current);
+                Assert.Equal(UiTheme.Dark, UiThemeService.Painted);
+                Assert.Equal(Color.FromRgb(0xEB, 0xEB, 0xEB), Brush("PrimaryForeBrush"));
+                Assert.Equal(Color.FromRgb(0x96, 0x96, 0x96), Brush("MutedForeBrush"));
+                Assert.Equal(Color.FromRgb(0x1E, 0x1E, 0x1E), Brush("SurfaceBackBrush"));
+
+                UiThemeService.SetPlayerForcesDark(false);
+                Assert.Equal(UiTheme.Light, UiThemeService.Painted);
+                Assert.Equal(Color.FromRgb(0x1A, 0x1A, 0x1A), Brush("PrimaryForeBrush"));
+
+                Color Brush(string key) => ((SolidColorBrush)app.Resources[key]).Color;
+            }
+            finally
+            {
+                UiThemeService.SetPlayerForcesDark(false);
+                UiThemeService.Apply(previous, force: true);
+                Restore(app, "PrimaryForeBrush", fore);
+                Restore(app, "SurfaceBackBrush", back);
+                Restore(app, "MutedForeBrush", muted);
+            }
+        }
+
+        if (Application.Current is null)
+        {
+            RunSta(() =>
+            {
+                _ = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+                Body();
+            });
+            return;
+        }
+
+        Application.Current.Dispatcher.Invoke(Body);
+    }
+
+    private static void Restore(Application app, string key, object? saved)
+    {
+        if (saved is null)
+        {
+            app.Resources.Remove(key);
+            return;
+        }
+
+        app.Resources[key] = saved;
+    }
+
+    private static void RunSta(Action action)
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null)
+        {
+            ExceptionDispatchInfo.Capture(error).Throw();
+        }
     }
 
     private static double Contrast(System.Windows.Media.Color a, System.Windows.Media.Color b)

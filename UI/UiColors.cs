@@ -18,6 +18,7 @@ internal static class UiColors
     {
         CaptureDefaults();
         MigrateLegacyColors(AppStorage.Settings);
+        UnifyPlayerOverridesFromDark(AppStorage.Settings);
     }
 
     public static void ApplySaved(UiTheme theme)
@@ -35,7 +36,7 @@ internal static class UiColors
 
     public static void Save()
     {
-        var theme = UiThemeService.Current;
+        var theme = UiThemeService.Painted;
         var current = new List<(string Key, Color Value)>(_entries.Length);
         foreach (var entry in _entries)
         {
@@ -47,19 +48,22 @@ internal static class UiColors
         }
 
         SetOverrides(AppStorage.Settings, theme, CollectOverrides(current, key => DefaultFor(theme, key)));
+        MirrorPlayerOverrides(AppStorage.Settings, theme);
         AppStorage.Save();
     }
 
     public static void ResetToDefaults()
     {
-        SetOverrides(AppStorage.Settings, UiThemeService.Current, []);
+        var theme = UiThemeService.Painted;
+        SetOverrides(AppStorage.Settings, theme, []);
+        MirrorPlayerOverrides(AppStorage.Settings, theme);
         foreach (var (key, color) in Defaults)
         {
             Set(key, color);
         }
 
-        UiThemePalette.Apply(UiThemeService.Current);
-        ApplySaved(UiThemeService.Current);
+        UiThemePalette.Apply(UiThemeService.Painted);
+        ApplySaved(UiThemeService.Painted);
     }
 
     public static UiColorScheme CaptureScheme() =>
@@ -71,7 +75,7 @@ internal static class UiColors
 
     public static void ApplyScheme(UiColorScheme scheme)
     {
-        var current = UiThemeService.Current;
+        var current = UiThemeService.Painted;
         if (scheme.Light is not null)
         {
             ImportBag(UiTheme.Light, scheme.Light);
@@ -85,6 +89,15 @@ internal static class UiColors
         if (scheme.Light is null && scheme.Dark is null && scheme.Flat is not null)
         {
             ImportBag(current, scheme.Flat);
+        }
+
+        if (scheme.Dark is not null)
+        {
+            UnifyPlayerOverridesFromDark(AppStorage.Settings);
+        }
+        else if (scheme.Light is not null || scheme.Flat is not null)
+        {
+            MirrorPlayerOverrides(AppStorage.Settings, scheme.Light is not null ? UiTheme.Light : current);
         }
 
         foreach (var (key, color) in Defaults)
@@ -110,7 +123,7 @@ internal static class UiColors
     internal static Color Resolve(UiTheme theme, string key)
     {
         var fallback = DefaultFor(theme, key);
-        if (theme == UiThemeService.Current)
+        if (theme == UiThemeService.Painted)
         {
             var live = Get(key);
             return Color.FromArgb(fallback.A, live.R, live.G, live.B);
@@ -210,7 +223,7 @@ internal static class UiColors
     }
 
     public static byte GetDefaultAlpha(string key) =>
-        DefaultFor(UiThemeService.Current, key).A;
+        DefaultFor(UiThemeService.Painted, key).A;
 
     public static string FormatColor(Color color) =>
         string.Create(CultureInfo.InvariantCulture, $"#{color.R:X2}{color.G:X2}{color.B:X2}");
@@ -312,6 +325,99 @@ internal static class UiColors
         }
 
         settings.ColorsDark = values;
+    }
+
+    /// <summary>
+    /// いま保存したテーマのプレイヤー色を、もう一方のテーマへ写す。
+    /// プレイヤー色はライト／ダークで一つの値。
+    /// </summary>
+    internal static void MirrorPlayerOverrides(AppSettings settings, UiTheme source)
+    {
+        var from = OverridesOf(settings, source);
+        var other = source == UiTheme.Light ? UiTheme.Dark : UiTheme.Light;
+        var to = OverridesOf(settings, other);
+        if (ReferenceEquals(from, to))
+        {
+            return;
+        }
+
+        var created = to is null;
+        to ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        StripPlayerKeys(to);
+        if (from is not null)
+        {
+            CopyPlayerKeys(from, to);
+        }
+
+        if (created && to.Count == 0)
+        {
+            return;
+        }
+
+        SetOverrides(settings, other, to);
+    }
+
+    /// <summary>既存の分かれをダーク側のプレイヤー色へ揃える。</summary>
+    internal static void UnifyPlayerOverridesFromDark(AppSettings settings)
+    {
+        var dark = settings.ColorsDark;
+        if (settings.ColorsLight is null)
+        {
+            if (dark is null)
+            {
+                return;
+            }
+
+            var created = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            CopyPlayerKeys(dark, created);
+            if (created.Count > 0)
+            {
+                settings.ColorsLight = created;
+            }
+
+            return;
+        }
+
+        StripPlayerKeys(settings.ColorsLight);
+        if (dark is null)
+        {
+            return;
+        }
+
+        CopyPlayerKeys(dark, settings.ColorsLight);
+    }
+
+    private static void CopyPlayerKeys(Dictionary<string, string> from, Dictionary<string, string> to)
+    {
+        foreach (var (key, value) in from)
+        {
+            if (ColorDevCatalog.IsPlayerShared(key))
+            {
+                to[key] = value;
+            }
+        }
+    }
+
+    private static void StripPlayerKeys(Dictionary<string, string> bag)
+    {
+        List<string>? drop = null;
+        foreach (var key in bag.Keys)
+        {
+            if (ColorDevCatalog.IsPlayerShared(key))
+            {
+                (drop ??= []).Add(key);
+            }
+        }
+
+        if (drop is null)
+        {
+            return;
+        }
+
+        foreach (var key in drop)
+        {
+            bag.Remove(key);
+        }
     }
 
     private static void ApplyMap(Dictionary<string, string>? values, UiTheme theme)

@@ -518,7 +518,7 @@ internal sealed class LoudnessMeterView : Grid
     private static Brush ShadeBrush(Brush source)
     {
         var color = source is SolidColorBrush solid ? solid.Color : Theme.Get("MutedForeBrush");
-        return Freeze(ShadeChipFill(color, UiThemeService.Current));
+        return Freeze(ShadeChipFill(color, UiThemeService.Painted));
     }
 
     private static Color Mix(Color from, Color to, double amount)

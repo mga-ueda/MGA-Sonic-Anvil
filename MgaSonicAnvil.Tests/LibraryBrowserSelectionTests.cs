@@ -211,9 +211,9 @@ public sealed class LibraryBrowserSelectionTests
             Assert.True(hover.Color.A < 255);
             Assert.True(hover.Color.A > LibraryBrowserView.LibrarySelectionFillAlpha);
             Assert.True(hover.Color.A > 0x70);
-            Assert.True(
-                LibraryBrowserView.LibrarySelectionFillAlphaLight
-                > LibraryBrowserView.LibrarySelectionFillAlpha);
+            Assert.Equal(
+                LibraryBrowserView.LibrarySelectionFillAlpha,
+                LibraryBrowserView.LibrarySelectionFillAlphaLight);
             Assert.True(
                 LibraryBrowserView.LibrarySelectionFillAlphaLight
                 < LibraryBrowserView.LibraryHoverFillAlpha);

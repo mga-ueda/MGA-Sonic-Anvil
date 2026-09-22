@@ -54,10 +54,9 @@ public sealed class WaveformLaneGradientTests
     }
 
     [Fact]
-    public void PlayerWaveOpacity_LightIsPalerThanDark()
+    public void PlayerWaveOpacity_IsSharedWithDark()
     {
-        Assert.True(WaveformView.PlayerWaveOpacityFor(UiTheme.Light) < WaveformView.PlayerWaveOpacityFor(UiTheme.Dark));
+        Assert.Equal(WaveformView.PlayerWaveOpacityFor(UiTheme.Dark), WaveformView.PlayerWaveOpacityFor(UiTheme.Light));
         Assert.InRange(WaveformView.PlayerWaveOpacityFor(UiTheme.Dark), 0.55, 0.62);
-        Assert.InRange(WaveformView.PlayerWaveOpacityFor(UiTheme.Light), 0.45, 0.55);
     }
 }

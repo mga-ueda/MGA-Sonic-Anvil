@@ -1164,7 +1164,7 @@ public partial class MainWindow : Window
                 _brandLogoDecodeWidth = decodeWidth;
             }
 
-            var theme = UiThemeService.Current;
+            var theme = UiThemeService.Painted;
             var cached = theme == UiTheme.Light ? _brandLogoLight : _brandLogoDark;
             if (cached is null)
             {

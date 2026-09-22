@@ -38,7 +38,7 @@ internal static class WaveformInvertPaint
             : sourceWave;
         // 画素ごとのレーン判定は width×height 回で高くつくため、行の色を先に引く。
         var waveColorByY = BuildWaveColorRows(height, laneWaveColors, laneGapPx, fallbackWave);
-        var shadeTheme = playerLight ? UiTheme.Light : UiThemeService.Current;
+        var shadeTheme = playerLight ? UiTheme.Light : UiThemeService.Painted;
         if (document is null || document.FrameCount <= 0 || viewSpan <= 0)
         {
             for (var y = 0; y < height; y++)

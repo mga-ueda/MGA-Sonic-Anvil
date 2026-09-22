@@ -144,9 +144,9 @@ public sealed class LibraryArtworkGlowTests
 
                 var light = Assert.IsType<LinearGradientBrush>(LibraryBrowserView.CreatePaneFocusLineBrush(UiTheme.Light));
                 Assert.Equal(lightAlpha, light.GradientStops[0].Color.A);
+                Assert.Equal(darkAlpha, lightAlpha);
                 Assert.Equal(lightAlpha, LibraryBrowserView.PaneFocusLineAlphaLight);
-                Assert.True(light.GradientStops[0].Color.A > LibraryBrowserView.PaneFocusLineAlpha);
-                Assert.True(light.GradientStops[0].Color.R < 0x80);
+                Assert.Equal(brush.GradientStops[0].Color, light.GradientStops[0].Color);
                 Assert.Equal(0, light.GradientStops[^1].Color.A);
             });
         });
@@ -243,7 +243,7 @@ public sealed class LibraryArtworkGlowTests
         color.R == expected.R && color.G == expected.G && color.B == expected.B;
 
     [Fact]
-    public void GlowVeilOpacity_IsBrighterInLight()
+    public void GlowVeilOpacity_IsSharedWithDark()
     {
         RunSta(() =>
         {
@@ -251,10 +251,9 @@ public sealed class LibraryArtworkGlowTests
             {
                 var dark = UiThemePalette.ColorFor(UiTheme.Dark, "PlayerGlowVeilBrush").A / 255d;
                 var light = UiThemePalette.ColorFor(UiTheme.Light, "PlayerGlowVeilBrush").A / 255d;
+                Assert.Equal(dark, light);
                 Assert.Equal(dark, LibraryBrowserView.GlowVeilOpacityFor(UiTheme.Dark), 3);
                 Assert.Equal(light, LibraryBrowserView.GlowVeilOpacityFor(UiTheme.Light), 3);
-                Assert.True(LibraryBrowserView.GlowVeilOpacityFor(UiTheme.Light)
-                    > LibraryBrowserView.GlowVeilOpacityFor(UiTheme.Dark));
             });
         });
     }

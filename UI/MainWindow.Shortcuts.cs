@@ -1207,12 +1207,6 @@ public partial class MainWindow
             return true;
         }
 
-        if (IsWaveformMaximized)
-        {
-            SetWaveformMaximizeMode(WaveformMaximizeMode.Off);
-            return true;
-        }
-
         return true;
     }
 

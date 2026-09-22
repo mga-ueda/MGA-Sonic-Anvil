@@ -228,6 +228,9 @@ internal static class ColorDevCatalog
     public static ColorDevGroup GroupOf(string key) =>
         Groups.TryGetValue(key, out var group) ? group : ColorDevGroup.Other;
 
+    /// <summary>プレイヤー色はライト／ダークで分けず、ダークの色を両方で使う。</summary>
+    public static bool IsPlayerShared(string key) => GroupOf(key) == ColorDevGroup.Player;
+
     public static int Rank(string key) =>
         Ranks.TryGetValue(key, out var rank) ? rank : int.MaxValue;
 

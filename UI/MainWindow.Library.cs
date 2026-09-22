@@ -80,21 +80,38 @@ public partial class MainWindow
 
     /// <summary>
     /// F9 ミニマムプレイヤー。どのモードからでも入れる。
-    /// ミニマム中の F9／F10 で通常の F10 プレイヤーへ戻す（Esc や F1 では戻さない）。
-    /// 切替時にウィンドウ位置・サイズをスロットへ記憶／復元する。再生中はそのまま。
+    /// ミニマム中の F9 は通常のエディタへ戻す。F10 は通常の F10 プレイヤーへ戻す（Esc や F1 では戻さない）。
+    /// 切替時にウィンドウ位置・サイズをスロットへ記憶／復元する。F10 へ戻るときは再生を続ける。
     /// </summary>
     private void ToggleLibraryMinimalChrome()
     {
         if (IsLibraryMaximized && _libraryMinimalChrome)
         {
-            LeaveLibraryMinimalChrome();
+            LeaveMinimalToEditor();
             return;
         }
 
         EnterLibraryMinimalChrome();
     }
 
-    /// <summary>ミニマム解除 → 通常の F10。F9／F10 から。</summary>
+    /// <summary>ミニマム中の F9。通常のエディタへ戻す。F9 のウィンドウ位置は残す。</summary>
+    private void LeaveMinimalToEditor()
+    {
+        if (!IsLibraryMaximized || !_libraryMinimalChrome)
+        {
+            return;
+        }
+
+        SetWaveformMaximizeMode(WaveformMaximizeMode.Off);
+        if (IsLibraryMaximized)
+        {
+            return;
+        }
+
+        _libraryMinimalChrome = false;
+    }
+
+    /// <summary>ミニマム解除 → 通常の F10。F10 から。</summary>
     private void LeaveLibraryMinimalChrome()
     {
         if (!IsLibraryMaximized || !_libraryMinimalChrome)
@@ -144,6 +161,7 @@ public partial class MainWindow
     private void ApplyLibraryChrome()
     {
         var show = IsLibraryMaximized;
+        UiThemeService.SetPlayerForcesDark(show);
         ApplyStatusFieldChrome();
         LibraryBrowser.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         LibraryBrowser.IsEnabled = show;

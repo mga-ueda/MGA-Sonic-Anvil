@@ -79,14 +79,14 @@ public sealed class ColorDevCatalogTests
             Assert.Equal("波形", ColorDevCatalog.GroupTitle(ColorDevGroup.Waveform));
             Assert.Equal("ガイド", ColorDevCatalog.GroupTitle(ColorDevGroup.Guides));
             Assert.Equal("トランスポート", ColorDevCatalog.GroupTitle(ColorDevGroup.Transport));
-            Assert.Equal("プレイヤー", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
+            Assert.Equal("プレイヤー（共通）", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
 
             UiStrings.SetLanguage(UiLanguage.English);
             Assert.Equal("Shared", ColorDevCatalog.GroupTitle(ColorDevGroup.Shared));
             Assert.Equal("Waveform", ColorDevCatalog.GroupTitle(ColorDevGroup.Waveform));
             Assert.Equal("Guides", ColorDevCatalog.GroupTitle(ColorDevGroup.Guides));
             Assert.Equal("Transport", ColorDevCatalog.GroupTitle(ColorDevGroup.Transport));
-            Assert.Equal("Player", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
+            Assert.Equal("Player (shared)", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
         }
         finally
         {

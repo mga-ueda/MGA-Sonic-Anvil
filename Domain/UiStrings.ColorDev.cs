@@ -41,7 +41,7 @@ internal static partial class UiStrings
     public static string ColorDevGroupMeter => Get("レベルメーター", "Level meter");
     public static string ColorDevGroupSpectrum => Get("スペアナ", "Spectrum");
     public static string ColorDevGroupVectorScope => Get("ベクタースコープ", "Vector scope");
-    public static string ColorDevGroupPlayer => Get("プレイヤー", "Player");
+    public static string ColorDevGroupPlayer => Get("プレイヤー（共通）", "Player (shared)");
     public static string ColorDevGroupTransport => Get("トランスポート", "Transport");
     public static string ColorDevGroupStatus => Get("ステータスバー", "Status bar");
     public static string ColorDevGroupDialog => Get("ダイアログ", "Dialog");

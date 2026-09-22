@@ -5499,7 +5499,7 @@ internal sealed class LibraryBrowserView : UserControl
         PlayerChrome.Get("PlayerPaneFocusLineBrush", theme);
 
     internal static Brush CreatePaneFocusLineBrush() =>
-        CreatePaneFocusLineBrush(UiThemeService.Current);
+        CreatePaneFocusLineBrush(UiThemeService.Painted);
 
     internal static Brush CreatePaneFocusLineBrush(UiTheme theme)
     {
