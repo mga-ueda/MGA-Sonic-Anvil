@@ -278,10 +278,9 @@ public sealed class LibraryPlayerModeTests
     [Fact]
     public void ShowsPlayerMeters_HidesWhenPlaylistEmpty()
     {
-        Assert.True(LibraryPlayerMode.ShowsPlayerMeters(playerMode: false, playlistCount: 0));
-        Assert.True(LibraryPlayerMode.ShowsPlayerMeters(playerMode: false, playlistCount: 2));
-        Assert.False(LibraryPlayerMode.ShowsPlayerMeters(playerMode: true, playlistCount: 0));
-        Assert.True(LibraryPlayerMode.ShowsPlayerMeters(playerMode: true, playlistCount: 1));
+        Assert.False(LibraryPlayerMode.ShowsPlayerMeters(playlistCount: 0));
+        Assert.True(LibraryPlayerMode.ShowsPlayerMeters(playlistCount: 1));
+        Assert.True(LibraryPlayerMode.ShowsPlayerMeters(playlistCount: 2));
         Assert.False(LibraryPlayerMode.InstantPlayerMeterReveal(show: false, signalMoving: true));
         Assert.False(LibraryPlayerMode.InstantPlayerMeterReveal(show: true, signalMoving: false));
         Assert.True(LibraryPlayerMode.InstantPlayerMeterReveal(show: true, signalMoving: true));

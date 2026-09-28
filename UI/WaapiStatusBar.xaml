@@ -6,7 +6,7 @@
              xmlns:domain="clr-namespace:MgaSonicAnvil.Domain"
              Height="{x:Static ui:DesignMetrics.WaapiBarHeight}"
              Focusable="False"
-             Background="{DynamicResource WaapiBarBackBrush}">
+             Background="Transparent">
   <Grid Margin="8,0">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="Auto" />
@@ -56,6 +56,8 @@
              Height="{x:Static ui:DesignMetrics.StatusOutputPathHeight}"
              HorizontalAlignment="Stretch"
              Style="{StaticResource DarkTextBoxStyle}"
+             Background="{DynamicResource PlayerComboFillBrush}"
+             BorderBrush="{DynamicResource PlayerComboFillBrush}"
              FontSize="11"
              Padding="4,1"
              IsReadOnly="True"

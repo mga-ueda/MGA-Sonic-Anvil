@@ -242,15 +242,54 @@ public sealed class LoudnessMeterEngineTests
     }
 
     [Fact]
-    public void ChipText_IsBlackInDarkAndWhiteInLight()
+    public void ChipText_IsWhiteOnDarkAndDarkOnLight()
     {
-        Assert.Equal(Colors.Black, LoudnessMeterView.ChipTextColor(UiTheme.Dark));
-        Assert.Equal(Colors.White, LoudnessMeterView.ChipTextColor(UiTheme.Light));
+        Assert.Equal(
+            UiThemePalette.ColorFor(UiTheme.Dark, "LoudnessChipForeBrush"),
+            LoudnessMeterView.ChipTextColor(UiTheme.Dark));
+        Assert.Equal(
+            UiThemePalette.ColorFor(UiTheme.Light, "LoudnessChipForeBrush"),
+            LoudnessMeterView.ChipTextColor(UiTheme.Light));
+        Assert.True(Luma(LoudnessMeterView.ChipTextColor(UiTheme.Dark)) > 0.8);
+        Assert.True(Luma(LoudnessMeterView.ChipTextColor(UiTheme.Light)) < 0.2);
         var cyan = Color.FromRgb(0x3A, 0xB8, 0xE8);
         var darkChip = LoudnessMeterView.ShadeChipFill(cyan, UiTheme.Dark);
         var lightChip = LoudnessMeterView.ShadeChipFill(cyan, UiTheme.Light);
         Assert.True(Luma(darkChip) < Luma(cyan));
         Assert.True(Luma(lightChip) > Luma(cyan));
+        // 0.55 混ぜのほうが 0.22 より暗い。
+        var milder = MixTowardBlack(cyan, 0.22);
+        Assert.True(Luma(darkChip) < Luma(milder));
+        Assert.Equal(0xFF, darkChip.A);
+        Assert.Equal(0xFF, lightChip.A);
+
+        // 注意（琥珀）と超過（赤）は黒へ混ぜても緑成分で判別できる。
+        var caution = LoudnessMeterView.ShadeChipFill(
+            Color.FromRgb(
+                LoudnessTrafficLight.CautionR,
+                LoudnessTrafficLight.CautionG,
+                LoudnessTrafficLight.CautionB),
+            UiTheme.Dark);
+        var danger = LoudnessMeterView.ShadeChipFill(
+            Color.FromRgb(
+                LoudnessTrafficLight.DangerR,
+                LoudnessTrafficLight.DangerG,
+                LoudnessTrafficLight.DangerB),
+            UiTheme.Dark);
+        Assert.True(caution.G - danger.G >= 40);
+        Assert.True(danger.G < 40);
+        Assert.True(caution.B < 24);
+        Assert.True(Luma(caution) < 0.35);
+        Assert.True(Luma(danger) < 0.35);
+    }
+
+    private static Color MixTowardBlack(Color color, double amount)
+    {
+        amount = Math.Clamp(amount, 0, 1);
+        return Color.FromRgb(
+            (byte)Math.Round(color.R * (1 - amount)),
+            (byte)Math.Round(color.G * (1 - amount)),
+            (byte)Math.Round(color.B * (1 - amount)));
     }
 
     private static double Luma(Color color) =>

@@ -28,7 +28,7 @@
     <SolidColorBrush x:Key="WaveFillOverlayBrush" Color="#FF3AB8E8" />
     <SolidColorBrush x:Key="WaveZeroLineBrush" Color="#5ACCCCCC" />
     <SolidColorBrush x:Key="TimelineWellBackBrush" Color="#FF17171A" />
-    <SolidColorBrush x:Key="WaveformTileActiveHeaderBrush" Color="#FF1E3044" />
+    <SolidColorBrush x:Key="WaveformTileActiveHeaderBrush" Color="#FF4A7A98" />
     <SolidColorBrush x:Key="TileSearchVeilBrush" Color="#8C000000" />
     <SolidColorBrush x:Key="ChannelLabelOnTintForeBrush" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="PlayheadBrush" Color="#FF00F5FF" />
@@ -51,6 +51,7 @@
     <SolidColorBrush x:Key="RegionWaveFillAnacrusisBrush" Color="#FF344620" />
     <SolidColorBrush x:Key="RegionWaveFillLoopBrush" Color="#FF1A3E5E" />
     <SolidColorBrush x:Key="RegionWaveFillExitBrush" Color="#FF441E1E" />
+    <SolidColorBrush x:Key="RegionWaveFillExcludedBrush" Color="#FF3A3A3E" />
 
     <SolidColorBrush x:Key="LevelMeterTrackBackBrush" Color="#FF242629" />
     <SolidColorBrush x:Key="LevelMeterTrackBorderBrush" Color="#FF1A221A" />
@@ -59,18 +60,18 @@
     <SolidColorBrush x:Key="PlayerPlaceholderJacketTopBrush" Color="#FF5C5C62" />
     <SolidColorBrush x:Key="PlayerPlaceholderJacketBottomBrush" Color="#FF2A2A2E" />
     <SolidColorBrush x:Key="PlayerPlaceholderJacketForeBrush" Color="#FFC8C8CE" />
-    <SolidColorBrush x:Key="PlayerFallbackWashNavyBrush" Color="#FF1B3A6B" />
-    <SolidColorBrush x:Key="PlayerFallbackWashCyanBrush" Color="#FF00F5FF" />
-    <SolidColorBrush x:Key="PlayerFallbackWashWhiteBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="PlayerFallbackWashNavyBrush" Color="#FF0B1B49" />
+    <SolidColorBrush x:Key="PlayerFallbackWashBlueBrush" Color="#FF1A56A0" />
+    <SolidColorBrush x:Key="PlayerFallbackWashCyanBrush" Color="#FF0B6895" />
     <SolidColorBrush x:Key="PlayerGlowVeilBrush" Color="#6B1E1E1E" />
     <SolidColorBrush x:Key="PlayerPaneFocusLineBrush" Color="#14FFFFFF" />
     <SolidColorBrush x:Key="PlayerSelectionFillBrush" Color="#2800F5FF" />
-    <SolidColorBrush x:Key="PlayerHoverFillBrush" Color="#9837373A" />
+    <SolidColorBrush x:Key="PlayerHoverFillBrush" Color="#98686870" />
     <SolidColorBrush x:Key="PlayerComboFillBrush" Color="#2EEBEBEB" />
     <SolidColorBrush x:Key="PlayerComboHoverFillBrush" Color="#52EBEBEB" />
     <SolidColorBrush x:Key="PlayerComboDisabledFillBrush" Color="#14EBEBEB" />
-    <SolidColorBrush x:Key="PlayerComboDropFillBrush" Color="#7AEBEBEB" />
-    <SolidColorBrush x:Key="PlayerComboDropBorderBrush" Color="#52EBEBEB" />
+    <SolidColorBrush x:Key="PlayerComboDropFillBrush" Color="#EC22232E" />
+    <SolidColorBrush x:Key="PlayerComboDropBorderBrush" Color="#A8686870" />
     <SolidColorBrush x:Key="PlayerWaveFillBrush" Color="#94C6D9FF" />
     <SolidColorBrush x:Key="PlayerWaveSelectionEmptyBrush" Color="#FFC6D9FF" />
     <SolidColorBrush x:Key="PlayerLevelMeterTrackBorderBrush" Color="#FF5A605A" />
@@ -95,10 +96,10 @@
     <SolidColorBrush x:Key="SpectrogramBoostThumbHoverFillBrush" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="SpectrogramBoostThumbHoverStrokeBrush" Color="#FF111111" />
     <SolidColorBrush x:Key="LoudnessSafeBrush" Color="#FF00FFFF" />
-    <SolidColorBrush x:Key="LoudnessCautionBrush" Color="#FFFF8000" />
-    <SolidColorBrush x:Key="LoudnessDangerBrush" Color="#FFFF0000" />
+    <SolidColorBrush x:Key="LoudnessCautionBrush" Color="#FFD89820" />
+    <SolidColorBrush x:Key="LoudnessDangerBrush" Color="#FFB83840" />
     <SolidColorBrush x:Key="LoudnessWaveFillBrush" Color="#FFFFFFFF" />
-    <SolidColorBrush x:Key="LoudnessChipForeBrush" Color="#FF000000" />
+    <SolidColorBrush x:Key="LoudnessChipForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="LoudnessGridBrush" Color="#24FFFFFF" />
     <SolidColorBrush x:Key="LoudnessTargetLineBrush" Color="#C8FFFFFF" />
     <SolidColorBrush x:Key="SurroundHullStrokeBrush" Color="#FF5A5A5F" />
@@ -122,10 +123,10 @@
     <SolidColorBrush x:Key="TransportForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="RecordLatchForeBrush" Color="#FFE24B4A" />
     <SolidColorBrush x:Key="TransportDisabledForeBrush" Color="#FF5B5B5B" />
-    <SolidColorBrush x:Key="TransportHoverBackBrush" Color="#FF37373A" />
-    <SolidColorBrush x:Key="TransportPressedBackBrush" Color="#FF484848" />
+    <SolidColorBrush x:Key="TransportHoverBackBrush" Color="#98686870" />
+    <SolidColorBrush x:Key="TransportPressedBackBrush" Color="#B07A7A82" />
     <SolidColorBrush x:Key="HistoryStripBackBrush" Color="#FF1C1D28" />
-    <SolidColorBrush x:Key="HistoryStripHoverBackBrush" Color="#FF22232E" />
+    <SolidColorBrush x:Key="HistoryStripHoverBackBrush" Color="#9837373A" />
     <SolidColorBrush x:Key="HistoryStripCurrentForeBrush" Color="#FF969696" />
     <SolidColorBrush x:Key="HistoryStripPastForeBrush" Color="#FF5B5B5B" />
     <SolidColorBrush x:Key="HistoryStripFutureForeBrush" Color="#FF484848" />

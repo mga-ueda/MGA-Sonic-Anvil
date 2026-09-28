@@ -98,10 +98,7 @@ public partial class MainWindow
 
     private void ApplyStatusFieldChrome()
     {
-        var player = IsLibraryMaximized;
-        StatusTimes.UsePlayerComboFill(player);
-        SpeakerMenu.SetResourceReference(
-            FrameworkElement.StyleProperty,
-            player ? "LibraryComboBoxStyle" : "StatusTimecodeComboStyle");
+        StatusTimes.UsePlayerComboFill(true);
+        SpeakerMenu.SetResourceReference(FrameworkElement.StyleProperty, "LibraryComboBoxStyle");
     }
 }

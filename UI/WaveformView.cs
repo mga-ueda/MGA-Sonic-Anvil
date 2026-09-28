@@ -498,6 +498,25 @@ internal sealed class WaveformView : Grid
     }
 
     private bool _seekAndSelectOnly;
+    private bool _showPlayhead = true;
+
+    /// <summary>
+    /// 再生ヘッド（シアンのシークバー）。タイルではアクティブ波形だけ出す。
+    /// </summary>
+    public bool ShowPlayhead
+    {
+        get => _showPlayhead;
+        set
+        {
+            if (_showPlayhead == value)
+            {
+                return;
+            }
+
+            _showPlayhead = value;
+            InvalidatePlayheadOnly();
+        }
+    }
 
     /// <summary>
     /// 左端のチャンネル名と dB 目盛り列。F11 とプレイヤーでは畳んで波形を広げる。
@@ -2091,10 +2110,10 @@ internal sealed class WaveformView : Grid
     private void PaintStaticCore(DrawingContext dc)
     {
         var bounds = new Rect(_staticHost.RenderSize);
-        if (!SeekAndSelectOnly)
+        if (!SeekAndSelectOnly && _liveRecording)
         {
             dc.DrawRectangle(
-                WpfControlHelpers.FrozenBrush(Theme.Get(_liveRecording ? "WaveformRecordBackBrush" : "WaveformBackBrush")),
+                WpfControlHelpers.FrozenBrush(Theme.Get("WaveformRecordBackBrush")),
                 null,
                 bounds);
         }
@@ -2107,13 +2126,7 @@ internal sealed class WaveformView : Grid
         var wave = WaveformBounds(bounds);
         var span = _document is null ? 0 : ViewSpanFrames;
         var start = _viewStart;
-        if (_showScaleLane)
-        {
-            DrawDbScaleWell(dc, bounds);
-        }
-
         SyncSpectrogramBoostBar();
-        DrawMarkerLane(dc, bounds, start, span);
         DrawTimeLane(dc, bounds, start, span);
         if (_document is null || _document.FrameCount <= 0 || wave.Width <= 1 || wave.Height <= 1)
         {
@@ -2253,6 +2266,11 @@ internal sealed class WaveformView : Grid
 
     internal void PaintPlayhead(DrawingContext dc)
     {
+        if (!_showPlayhead)
+        {
+            return;
+        }
+
         var bounds = new Rect(_playheadHost.RenderSize);
         if (_document is null || _document.FrameCount <= 0 || bounds.Width <= 1 || bounds.Height <= 1)
         {
@@ -3789,26 +3807,18 @@ internal sealed class WaveformView : Grid
             dc.PushClip(new RectangleGeometry(new Rect(well.X, top, maxName + 1, laneHeight)));
             if (tint)
             {
-                dc.DrawRectangle(
+                var radius = DesignMetrics.ControlCornerRadius;
+                dc.DrawRoundedRectangle(
                     ChannelSwatch.Brush(ch, muted),
                     null,
-                    new Rect(badgeX, badgeY, badgeW, badgeH));
+                    new Rect(badgeX, badgeY, badgeW, badgeH),
+                    radius,
+                    radius);
             }
 
             dc.DrawText(text, new Point(x, y));
             dc.Pop();
         }
-    }
-
-    private void DrawDbScaleWell(DrawingContext dc, Rect bounds)
-    {
-        var well = DbScaleBounds(bounds);
-        if (well.Width <= 1 || SeekAndSelectOnly)
-        {
-            return;
-        }
-
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TransportBackBrush")), null, well);
     }
 
     private void DrawDbScaleTicks(
@@ -4323,6 +4333,15 @@ internal sealed class WaveformView : Grid
     internal static Rect LaneFlagRect(double x, double width, double laneHeight, bool split, bool top) =>
         split ? SplitFlagRect(x, width, laneHeight, top) : FullFlagRect(x, width, laneHeight);
 
+    /// <summary>旗の軸辺をポールの内側に合わせる（アンチエイリアスのはみ出し防止）。</summary>
+    internal static Rect AlignFlagToStem(Rect box, double stemX, bool growLeft, double inset = 0)
+    {
+        inset = Math.Max(0, inset);
+        return growLeft
+            ? new Rect(stemX - inset - box.Width, box.Y, box.Width, box.Height)
+            : new Rect(stemX + inset, box.Y, box.Width, box.Height);
+    }
+
     private static Rect TimelineFlagRect(double x, double width, double laneHeight, bool top) =>
         SplitFlagRect(x, width, laneHeight, top);
 
@@ -4336,20 +4355,6 @@ internal sealed class WaveformView : Grid
     private double FrameToViewX(double frame, double start, double span, Rect bounds) =>
         ScaleLeft(bounds) + FrameToX(frame, start, span, ScaleContentWidth(bounds));
 
-    private void DrawMarkerLane(DrawingContext dc, Rect bounds, double start, double span)
-    {
-        var lane = MarkerLaneBounds(bounds);
-        if (lane.Height <= 1)
-        {
-            return;
-        }
-
-        if (!SeekAndSelectOnly)
-        {
-            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TimelineWellBackBrush")), null, lane);
-        }
-    }
-
     private void DrawTimeLane(DrawingContext dc, Rect bounds, double start, double span)
     {
         var lane = TimeLaneBounds(bounds);
@@ -4358,10 +4363,6 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        if (!SeekAndSelectOnly)
-        {
-            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TimelineWellBackBrush")), null, lane);
-        }
         if (_document is not null && LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly))
         {
             DrawSampleLoopBar(dc, lane, start, span);
@@ -4709,28 +4710,35 @@ internal sealed class WaveformView : Grid
         }
 
         var xs = WpfControlHelpers.SnapDeviceCenter(x, pixelsPerDip);
-        dc.DrawLine(selected ? selectedLine : line, new Point(xs, 0), new Point(xs, bounds.Height));
+        var stem = selected ? selectedLine : line;
         if (lane.Height <= 2)
         {
+            dc.DrawLine(stem, new Point(xs, 0), new Point(xs, bounds.Height));
             return;
         }
 
         var idText = GetMarkerLabel(id.ToString(CultureInfo.InvariantCulture), pixelsPerDip);
         const double padX = 3;
+        var growLeft = frame != region.StartFrame;
         if (!_regionFlagLayout.TryGetValue((region, frame), out var box))
         {
-            var growLeft = frame != region.StartFrame;
             var boxW = MeasureFlagWidth(id.ToString(CultureInfo.InvariantCulture), pixelsPerDip);
             box = LaneFlagRect(growLeft ? x - boxW : x, boxW, lane.Height, SplitFlagLanes, top: true);
         }
 
+        // ポールの内側に旗を置き、線は旗の後に描いて突き抜けを隠す。
+        var inset = WpfControlHelpers.DeviceHairline(pixelsPerDip) * 0.5;
+        box = AlignFlagToStem(box, xs, growLeft, inset);
         _regionFlags.Add((region, frame, box));
-        dc.DrawRectangle(fill, selected ? selectedPen : null, box);
-        dc.PushClip(new RectangleGeometry(box));
+        var flag = WpfControlHelpers.FlagGeometry(box, DesignMetrics.ControlCornerRadius, stemOnLeft: !growLeft);
+        dc.DrawGeometry(fill, selected ? selectedPen : null, flag);
+        dc.PushClip(flag);
         dc.DrawText(
             idText,
             new Point(box.X + padX, box.Y + Math.Max(0, (box.Height - idText.Height) * 0.5)));
         dc.Pop();
+        // 旗の上辺から下へ。上にはみ出す先端を出さない。
+        dc.DrawLine(stem, new Point(xs, box.Top), new Point(xs, bounds.Height));
 
         if (frame != region.StartFrame || _document is null || _commentEditRegion == region)
         {
@@ -4825,24 +4833,35 @@ internal sealed class WaveformView : Grid
             }
 
             _markerFlags.Add((marker, box));
-            var lineTop = lane.Height > 2 ? box.Bottom : 0;
             var xs = WpfControlHelpers.SnapDeviceCenter(x, pixelsPerDip);
-            dc.DrawLine(selected ? selectedLine : line, new Point(xs, lineTop), new Point(xs, bounds.Height));
+            var stem = selected ? selectedLine : line;
             if (lane.Height <= 2)
             {
-                continue;
-            }
-            if (editing && marker.Frame == _commentEditFrame)
-            {
+                dc.DrawLine(stem, new Point(xs, 0), new Point(xs, bounds.Height));
                 continue;
             }
 
-            dc.DrawRectangle(selected ? selectedFill : fill, selected ? selectedPen : null, box);
-            dc.PushClip(new RectangleGeometry(box));
+            var inset = WpfControlHelpers.DeviceHairline(pixelsPerDip) * 0.5;
+            box = AlignFlagToStem(box, xs, growLeft, inset);
+            _markerFlags[^1] = (marker, box);
+            if (editing && marker.Frame == _commentEditFrame)
+            {
+                dc.DrawLine(stem, new Point(xs, box.Bottom), new Point(xs, bounds.Height));
+                continue;
+            }
+
+            var flag = WpfControlHelpers.FlagGeometry(
+                box,
+                DesignMetrics.ControlCornerRadius,
+                stemOnLeft: !growLeft);
+            dc.DrawGeometry(selected ? selectedFill : fill, selected ? selectedPen : null, flag);
+            dc.PushClip(flag);
             dc.DrawText(
                 idText,
                 new Point(box.X + padX, box.Y + Math.Max(0, (box.Height - idText.Height) * 0.5)));
             dc.Pop();
+            // 旗の下辺から。角への突き抜けを避けるため旗の後に描く。
+            dc.DrawLine(stem, new Point(xs, box.Bottom), new Point(xs, bounds.Height));
 
             if (!string.IsNullOrEmpty(marker.Comment))
             {
@@ -5235,7 +5254,13 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("SampleLoopTimelineBrush")), null, bar);
+        var radius = DesignMetrics.ControlCornerRadius;
+        dc.DrawRoundedRectangle(
+            WpfControlHelpers.FrozenBrush(Theme.Get("SampleLoopTimelineBrush")),
+            null,
+            bar,
+            radius,
+            radius);
         if (!TryGetLoopBarRects(out _, out var startHandle, out var endHandle))
         {
             return;
@@ -5243,8 +5268,8 @@ internal sealed class WaveformView : Grid
 
         var grip = WpfControlHelpers.FrozenBrush(Theme.Get("SampleLoopGripBrush"));
         var selected = WpfControlHelpers.FrozenBrush(Theme.Get("MarkerSelectedBorderBrush"));
-        dc.DrawRectangle(_loopStartSelected ? selected : grip, null, startHandle);
-        dc.DrawRectangle(_loopEndSelected ? selected : grip, null, endHandle);
+        dc.DrawRoundedRectangle(_loopStartSelected ? selected : grip, null, startHandle, radius, radius);
+        dc.DrawRoundedRectangle(_loopEndSelected ? selected : grip, null, endHandle, radius, radius);
     }
 
     private void BeginLoopBarInteraction(Point start)

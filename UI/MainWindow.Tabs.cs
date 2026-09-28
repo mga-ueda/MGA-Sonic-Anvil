@@ -99,7 +99,7 @@ public partial class MainWindow
         BindWorkspace(session);
     }
 
-    private void ActivateAdjacentTab(int delta)
+    private void ActivateAdjacentTab(int delta, bool wrap = true)
     {
         if (_sessions.Count <= 1 || _activeSession is null)
         {
@@ -112,17 +112,16 @@ public partial class MainWindow
             return;
         }
 
-        // タイル検索のすりガラスに覆われたタブは飛ばす。全部覆われていたら動かない。
-        var count = _sessions.Count;
-        var next = index;
-        for (var step = 1; step < count; step++)
+        // 単発は端から反対側へ回る。長押し連続は端で一旦止まる。
+        var next = DocumentTabLayout.AdjacentIndex(
+            index,
+            _sessions.Count,
+            delta,
+            i => IsTileSearchVeiled(_sessions[i]),
+            wrap);
+        if (next != index)
         {
-            next = ((next + delta) % count + count) % count;
-            if (!IsTileSearchVeiled(_sessions[next]))
-            {
-                ActivateSession(_sessions[next]);
-                return;
-            }
+            ActivateSession(_sessions[next]);
         }
     }
 
@@ -856,12 +855,11 @@ public partial class MainWindow
 
     private FrameworkElement CreateTabItem(DocumentSession session)
     {
-        var active = IsTabChromeHighlighted(session);
         var border = new Border
         {
             Tag = session,
-            Background = BrushOrTransparent(active ? "DialogInputBackBrush" : "TimelineWellBackBrush"),
-            BorderBrush = (Brush)FindResource("ChromeBorderBrush"),
+            Background = Brushes.Transparent,
+            BorderBrush = (Brush)FindResource("PlayerComboDropBorderBrush"),
             BorderThickness = new Thickness(0, 0, 1, 0),
             Cursor = Cursors.Hand,
             MinWidth = 0,
@@ -963,9 +961,6 @@ public partial class MainWindow
         }
     }
 
-    private Brush BrushOrTransparent(string? key) =>
-        key is null ? Brushes.Transparent : (Brush)FindResource(key);
-
     private void ApplyTabChrome(DocumentSession session, DockPanel dock)
     {
         var dirty = session.Document.IsDirty;
@@ -977,8 +972,8 @@ public partial class MainWindow
 
         if (dock.Parent is Border host)
         {
-            host.Background = BrushOrTransparent(active ? "DialogInputBackBrush" : "TimelineWellBackBrush");
-            host.BorderBrush = (Brush)FindResource("ChromeBorderBrush");
+            host.Background = Brushes.Transparent;
+            host.BorderBrush = (Brush)FindResource("PlayerComboDropBorderBrush");
         }
 
         foreach (var child in dock.Children)
@@ -1163,7 +1158,7 @@ public partial class MainWindow
         };
         editor.SetResourceReference(StyleProperty, "DarkTextBoxStyle");
         editor.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
-        editor.SetResourceReference(Control.BackgroundProperty, "DialogInputBackBrush");
+        editor.SetResourceReference(Control.BackgroundProperty, "PlayerComboFillBrush");
         editor.SetResourceReference(Control.BorderBrushProperty, "AccentCyanBrush");
         editor.SetResourceReference(TextBox.CaretBrushProperty, "PrimaryForeBrush");
         editor.KeyDown += (_, e) =>

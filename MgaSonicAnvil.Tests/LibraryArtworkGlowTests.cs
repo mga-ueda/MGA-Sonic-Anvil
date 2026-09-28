@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
@@ -153,7 +154,7 @@ public sealed class LibraryArtworkGlowTests
     }
 
     [Fact]
-    public void FallbackWash_IsNavyCyanWhite()
+    public void FallbackWash_IsNavyBlueCyan()
     {
         RunSta(() =>
         {
@@ -163,8 +164,8 @@ public sealed class LibraryArtworkGlowTests
             var colors = new List<Color>();
             CollectColors(brush.Drawing, colors);
             Assert.Contains(colors, color => SameRgb(color, LibraryBrowserView.FallbackWashNavy));
+            Assert.Contains(colors, color => SameRgb(color, LibraryBrowserView.FallbackWashBlue));
             Assert.Contains(colors, color => SameRgb(color, LibraryBrowserView.FallbackWashCyan));
-            Assert.Contains(colors, color => SameRgb(color, LibraryBrowserView.FallbackWashWhite));
         });
     }
 
@@ -281,6 +282,8 @@ public sealed class LibraryArtworkGlowTests
         Assert.True(LibraryBrowserView.GlowDriftFrameRate <= 24);
         Assert.True(LibraryBrowserView.GlowCacheRenderAtScale >= 0.2);
         Assert.True(LibraryBrowserView.GlowCacheRenderAtScale <= 0.5);
+        Assert.InRange(LibraryBrowserView.GlowCacheWidth, 640, 2560);
+        Assert.InRange(LibraryBrowserView.GlowCacheHeight, 360, 1440);
         Assert.True(LibraryBrowserView.GlowSampleEdge >= 8);
         Assert.True(LibraryBrowserView.GlowSampleEdge <= 24);
         Assert.Equal(1, LibraryBrowserView.GlowCrossfadeSeconds);
@@ -339,6 +342,64 @@ public sealed class LibraryArtworkGlowTests
     }
 
     [Fact]
+    public void GlowDrift_ContinuesWithoutRedrawingWhenArtworkOrSizeChanges()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            Window? window = null;
+            try
+            {
+                var host = new Grid();
+                var view = new LibraryBrowserView();
+                var root = new Grid();
+                root.Children.Add(host);
+                root.Children.Add(view);
+                view.BindWaveformGlow(host);
+                window = new Window
+                {
+                    Content = root,
+                    Width = 640,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                    SizeToContent = SizeToContent.Manual,
+                };
+                window.Show();
+                view.UseWindowFallbackWash();
+                Flush();
+
+                var starts = view.GlowDriftStartCount;
+                Assert.True(starts >= 1);
+                Assert.True(view.AmbientGlowAnimating);
+                Assert.Equal(LibraryBrowserView.GlowCacheWidth, view.WaveGlowLayoutWidth);
+                Assert.True(window.ActualWidth < 1200);
+                var cover = view.WaveGlowCoverScale;
+                Assert.True(cover > 0);
+
+                var art = new AudioDocument(new float[48], 48000, 1, 16, AudioFileKind.Mp3, "cover.mp3");
+                art.SetArtwork(PngPixel(220, 40, 40));
+                view.SetArtwork(art);
+                Flush();
+                Assert.Equal(starts, view.GlowDriftStartCount);
+                Assert.False(view.GlowUsesFallback);
+                Assert.Equal(LibraryBrowserView.GlowCacheWidth, view.WaveGlowLayoutWidth);
+
+                window.Width = 1500;
+                window.Height = 900;
+                Flush();
+                Assert.Equal(starts, view.GlowDriftStartCount);
+                Assert.Equal(LibraryBrowserView.GlowCacheWidth, view.WaveGlowLayoutWidth);
+                Assert.NotEqual(cover, view.WaveGlowCoverScale);
+            }
+            finally
+            {
+                window?.Close();
+            }
+        });
+    }
+
+    [Fact]
     public void SetGlowExtendsWaveform_ShowsBoundHost()
     {
         RunSta(() =>
@@ -365,6 +426,9 @@ public sealed class LibraryArtworkGlowTests
         Assert.InRange(LibraryJacketReflection.HeightFactor, 0.35, 0.45);
         Assert.Equal(1, LibraryJacketReflection.GapDip);
     }
+
+    private static void Flush() =>
+        Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
 
     private static void RunSta(Action action)
     {

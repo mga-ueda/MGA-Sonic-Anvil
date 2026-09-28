@@ -26,6 +26,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                             SnapsToDevicePixels="True">
                         <ScrollViewer x:Name="PART_ContentHost"
                                       Margin="{TemplateBinding Padding}"
@@ -88,6 +89,7 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                 IsHitTestVisible="False" />
                         <ScrollViewer x:Name="PART_ContentHost"
                                       Margin="{TemplateBinding Padding}"
@@ -193,7 +195,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">
-                            <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource MenuHighlightBackBrush}" />
+                            <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource PlayerHoverFillBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{DynamicResource ChromeDimBrush}" />
@@ -206,7 +208,7 @@
 
     <Style x:Key="DarkComboBoxStyle" TargetType="ComboBox">
         <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
-        <Setter Property="Background" Value="{DynamicResource DialogInputBackBrush}" />
+        <Setter Property="Background" Value="{DynamicResource PlayerComboFillBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource ChromeBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="6,0,6,0" />
@@ -226,7 +228,8 @@
                         <Border x:Name="Border"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}">
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}">
                             <Grid>
                                 <ToggleButton Style="{StaticResource DarkComboBoxToggleButtonStyle}"
                                               Focusable="False"
@@ -278,12 +281,13 @@
                                AllowsTransparency="True"
                                Focusable="False"
                                PopupAnimation="Slide">
-                            <Border Background="{DynamicResource DialogInputBackBrush}"
-                                    BorderBrush="{DynamicResource ChromeBorderBrush}"
+                            <Border Background="{DynamicResource PlayerComboDropFillBrush}"
+                                    BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                     BorderThickness="1"
+                                    CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                     MinWidth="{TemplateBinding ActualWidth}"
                                     MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                <ScrollViewer Margin="0" SnapsToDevicePixels="True"
+                                <ScrollViewer Margin="0" Background="Transparent" SnapsToDevicePixels="True"
                                               HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                                               VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
@@ -304,7 +308,7 @@
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{DynamicResource ChromeDimBrush}" />
-                            <Setter TargetName="Border" Property="Background" Value="{DynamicResource SurfaceBackBrush}" />
+                            <Setter TargetName="Border" Property="Background" Value="{DynamicResource PlayerComboDisabledFillBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -313,28 +317,28 @@
     </Style>
 
     <Style x:Key="DarkScrollBarThumbStyle" TargetType="Thumb">
+        <Setter Property="Opacity" Value="0.18" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
-                    <Border x:Name="ThumbBorder"
-                            Background="{DynamicResource ScrollThumbBackBrush}"
+                    <Border Background="{DynamicResource PrimaryForeBrush}"
                             CornerRadius="2"
                             Margin="1" />
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource ScrollThumbHoverBackBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsDragging" Value="True">
-                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource ScrollThumbPressedBackBrush}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Opacity" Value="0.32" />
+            </Trigger>
+            <Trigger Property="IsDragging" Value="True">
+                <Setter Property="Opacity" Value="0.48" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <Style x:Key="DarkScrollBarStyle" TargetType="ScrollBar">
-        <Setter Property="Background" Value="{DynamicResource SurfaceBackBrush}" />
+        <Setter Property="Background" Value="Transparent" />
         <Setter Property="Width" Value="{x:Static ui:DesignMetrics.SettingsScrollBarWidth}" />
         <Setter Property="MinWidth" Value="{x:Static ui:DesignMetrics.SettingsScrollBarWidth}" />
         <Setter Property="Template">
@@ -528,6 +532,7 @@
                                 Background="{DynamicResource PlayerComboFillBrush}"
                                 BorderBrush="{DynamicResource PlayerComboFillBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                 IsHitTestVisible="False" />
                         <Border x:Name="Border" Background="Transparent" BorderThickness="0">
                             <Grid>
@@ -584,11 +589,13 @@
                             <Grid MinWidth="{TemplateBinding ActualWidth}"
                                   MaxHeight="{TemplateBinding MaxDropDownHeight}">
                                 <Border Background="{DynamicResource PlayerComboDropFillBrush}"
+                                        CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                         IsHitTestVisible="False" />
                                 <Border BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                         BorderThickness="1"
+                                        CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                         IsHitTestVisible="False" />
-                                <ScrollViewer Margin="1" SnapsToDevicePixels="True"
+                                <ScrollViewer Margin="1" Background="Transparent" SnapsToDevicePixels="True"
                                               HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                                               VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
@@ -640,6 +647,7 @@
                                 Background="{DynamicResource PlayerComboFillBrush}"
                                 BorderBrush="{DynamicResource PlayerComboFillBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                 IsHitTestVisible="False" />
                         <Border Background="Transparent" BorderThickness="0">
                             <ScrollViewer x:Name="PART_ContentHost"
@@ -677,6 +685,7 @@
                                 Background="{DynamicResource StatusTimecodeFillBrush}"
                                 BorderBrush="{DynamicResource StatusTimecodeFillBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                 IsHitTestVisible="False" />
                         <Border Background="Transparent" BorderThickness="0">
                             <Grid>
@@ -733,11 +742,13 @@
                             <Grid MinWidth="{TemplateBinding ActualWidth}"
                                   MaxHeight="{TemplateBinding MaxDropDownHeight}">
                                 <Border Background="{DynamicResource StatusTimecodeFillBrush}"
+                                        CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                         IsHitTestVisible="False" />
                                 <Border BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                         BorderThickness="1"
+                                        CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                         IsHitTestVisible="False" />
-                                <ScrollViewer Margin="1" SnapsToDevicePixels="True"
+                                <ScrollViewer Margin="1" Background="Transparent" SnapsToDevicePixels="True"
                                               HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                                               VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
@@ -765,40 +776,26 @@
         </Setter>
     </Style>
 
+    <!-- 見た目だけ細く。Thumb 自体はレーン高さいっぱいのままヒットする。 -->
     <Style x:Key="TimeScrollBarThumbStyle" TargetType="Thumb">
+        <Setter Property="Opacity" Value="0.18" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
-                    <Border x:Name="ThumbBorder"
-                            Background="{DynamicResource ScrollThumbBackBrush}"
+                    <Border Background="{DynamicResource PrimaryForeBrush}"
                             CornerRadius="2"
-                            Margin="1">
-                        <Grid>
-                            <Rectangle Width="2"
-                                       HorizontalAlignment="Left"
-                                       Margin="3,3,0,3"
-                                       Fill="{DynamicResource ScrollThumbGripBrush}"
-                                       RadiusX="0.5"
-                                       RadiusY="0.5" />
-                            <Rectangle Width="2"
-                                       HorizontalAlignment="Right"
-                                       Margin="0,3,3,3"
-                                       Fill="{DynamicResource ScrollThumbGripBrush}"
-                                       RadiusX="0.5"
-                                       RadiusY="0.5" />
-                        </Grid>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource ScrollThumbHoverBackBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsDragging" Value="True">
-                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource ScrollThumbPressedBackBrush}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
+                            Margin="{x:Static ui:DesignMetrics.WaveformScrollThumbMargin}" />
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Opacity" Value="0.32" />
+            </Trigger>
+            <Trigger Property="IsDragging" Value="True">
+                <Setter Property="Opacity" Value="0.48" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <Style x:Key="SpectrogramBoostBarThumbStyle" TargetType="Thumb">
@@ -878,7 +875,7 @@
     </Style>
 
     <Style x:Key="TimeScrollBarStyle" TargetType="ScrollBar">
-        <Setter Property="Background" Value="{DynamicResource TimelineWellBackBrush}" />
+        <Setter Property="Background" Value="Transparent" />
         <Setter Property="Orientation" Value="Horizontal" />
         <Setter Property="Focusable" Value="False" />
         <Setter Property="Width" Value="Auto" />
@@ -955,6 +952,7 @@
                                 Background="Transparent"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                 SnapsToDevicePixels="True">
                             <Viewbox Width="10" Height="10"
                                      HorizontalAlignment="Center"
@@ -992,9 +990,9 @@
 
     <Style x:Key="DarkContextMenuStyle" TargetType="ContextMenu">
         <Setter Property="OverridesDefaultStyle" Value="True" />
-        <Setter Property="Background" Value="{DynamicResource SurfaceBackBrush}" />
+        <Setter Property="Background" Value="{DynamicResource PlayerComboDropFillBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource ChromeBorderBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource PlayerComboDropBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="0,2" />
         <Setter Property="MinWidth" Value="200" />
@@ -1006,6 +1004,7 @@
                     <Border Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True"
                             ClipToBounds="False">
@@ -1101,14 +1100,15 @@
                                HorizontalOffset="-1"
                                VerticalOffset="-2"
                                IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
-                            <Border Background="{DynamicResource SurfaceBackBrush}"
-                                    BorderBrush="{DynamicResource ChromeBorderBrush}"
+                            <Border Background="{DynamicResource PlayerComboDropFillBrush}"
+                                    BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                     BorderThickness="1"
+                                    CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                     Padding="0,2"
                                     MinWidth="200"
                                     SnapsToDevicePixels="True"
                                     Grid.IsSharedSizeScope="True">
-                                <ScrollViewer CanContentScroll="True">
+                                <ScrollViewer Background="Transparent" CanContentScroll="True">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"
                                                     Margin="0"
                                                     SnapsToDevicePixels="True"/>
@@ -1145,14 +1145,14 @@
                                 <Condition Property="IsHighlighted" Value="True" />
                                 <Condition Property="IsEnabled" Value="True" />
                             </MultiTrigger.Conditions>
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MenuHighlightBackBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PlayerHoverFillBrush}" />
                         </MultiTrigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
                                 <Condition Property="IsSubmenuOpen" Value="True" />
                                 <Condition Property="IsEnabled" Value="True" />
                             </MultiTrigger.Conditions>
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MenuHighlightBackBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PlayerHoverFillBrush}" />
                         </MultiTrigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{DynamicResource MenuDisabledForeBrush}" />
@@ -1269,7 +1269,7 @@
                             <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TransportHoverBackBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PlayerHoverFillBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

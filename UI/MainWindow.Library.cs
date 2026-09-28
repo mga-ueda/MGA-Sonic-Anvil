@@ -19,6 +19,7 @@ public partial class MainWindow
     private int _libraryLoadGeneration;
     private DocumentSession? _libraryLoadSession;
     private bool _libraryPlayFirstPending;
+    private int _libraryEnterPlayGeneration;
 
     /// <summary>ツリーの Enter（クリア後）だけ true。Shift+Enter の追加では立てない。</summary>
     private bool _libraryExplorerPlayOnOpen;
@@ -149,19 +150,14 @@ public partial class MainWindow
         _libraryMinimalChrome = true;
         SetWaveformMaximizeMode(
             WaveformMaximizeMode.Library,
-            playFirstOnLibrary: !preservePlayback);
-        // SetWaveformMaximizeMode がフルスクリーン復帰でフラグを戻すことがあるので再適用。
-        _libraryMinimalChrome = true;
-        ApplyWaveformMaximizeChrome();
-        TryApplyCurrentModePlacement();
-        AppStorage.Save();
+            playFirstOnLibrary: !preservePlayback,
+            retainMinimalChrome: true);
         LibraryBrowser.FocusList();
     }
 
     private void ApplyLibraryChrome()
     {
         var show = IsLibraryMaximized;
-        UiThemeService.SetPlayerForcesDark(show);
         ApplyStatusFieldChrome();
         LibraryBrowser.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         LibraryBrowser.IsEnabled = show;
@@ -173,8 +169,8 @@ public partial class MainWindow
         else
         {
             LibraryBrowser.ResetShuffle();
-            ApplyLibraryWashChrome(false);
-            LibraryBrowser.SetGlowExtendsWaveform(false);
+            LibraryBrowser.UseWindowFallbackWash();
+            ApplyLibraryWashChrome(true);
         }
         LibrarySplitter.Visibility = Visibility.Collapsed;
         DocumentTabHost.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
@@ -214,11 +210,8 @@ public partial class MainWindow
             ProbeLibraryTags();
             if (_libraryPlayFirstPending)
             {
-                SelectAndPlayFirstLibraryTrack();
-                if (_sessions.Count > 0)
-                {
-                    _libraryPlayFirstPending = false;
-                }
+                // 再生はクロムの描画が終わってから。ここでは選択だけ。
+                SelectLibraryFirstTrackForEnter();
             }
             else
             {
@@ -232,6 +225,7 @@ public partial class MainWindow
         else
         {
             _libraryWavePaintTicket++;
+            _libraryEnterPlayGeneration++;
             _libraryPlayFirstPending = false;
             _libraryPlayOnArrowRelease = false;
             _libraryStopAfterTrack = false;
@@ -244,14 +238,14 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// プレイヤーのレベルメーター／スペアナ／ラウドネス／ゴニオ／サラウンド。
-    /// 突入は消えた状態から。空なら出したままフェードアウトしない。
-    /// 停止中の追加は 1 秒フェードイン、音声で動き始めたら即表示。空になったら 1 秒フェードアウト。
+    /// レベルメーター／スペアナ／ラウドネス／ゴニオと、エディタの波形スクロール。
+    /// 波形が無いときは出さない。読み込みは 1 秒フェードイン、閉じたら 1 秒フェードアウト。
+    /// プレイヤーは音声で動き始めたら即表示。突入は消えた状態から。
     /// </summary>
     private void SyncPlayerMeterFade()
     {
         var player = IsLibraryMaximized;
-        var show = LibraryPlayerMode.ShowsPlayerMeters(player, _sessions.Count);
+        var show = LibraryPlayerMode.ShowsPlayerMeters(_sessions.Count);
         var entering = player && !_playerMeterChrome;
         var leaving = !player && _playerMeterChrome;
         _playerMeterChrome = player;
@@ -261,8 +255,8 @@ public partial class MainWindow
 
         if (leaving)
         {
-            ApplyPlayerMeterFade(visible: true, instant: true);
-            _playerMetersShown = true;
+            ApplyPlayerMeterFade(visible: show, instant: true);
+            _playerMetersShown = show;
             return;
         }
 
@@ -306,7 +300,7 @@ public partial class MainWindow
     }
 
     private UIElement[] PlayerMeterFadeTargets() =>
-        [LevelMeter, VectorScope, Spectrum, LoudnessMeter];
+        [LevelMeter, VectorScope, Spectrum, LoudnessMeter, TimeScrollStrip];
 
     /// <summary>
     /// プレイヤー中はクロムの塗りを外し、ウィンドウ全体のジャケットウォッシュを透かす。
@@ -324,8 +318,11 @@ public partial class MainWindow
             MeterTopSlot.Background = Brushes.Transparent;
             TransportChromeHost.Background = Brushes.Transparent;
             DocumentTabHost.Background = Brushes.Transparent;
+            DocumentTabScroll.Background = Brushes.Transparent;
+            DocumentTabs.Background = Brushes.Transparent;
             TransportBarHost.Background = Brushes.Transparent;
             LoudnessMeter.Background = Brushes.Transparent;
+            WaapiBar.Background = Brushes.Transparent;
         }
         else
         {
@@ -339,6 +336,7 @@ public partial class MainWindow
             DocumentTabHost.SetResourceReference(Border.BackgroundProperty, "TransportBackBrush");
             TransportBarHost.SetResourceReference(Panel.BackgroundProperty, "TransportBackBrush");
             LoudnessMeter.SetResourceReference(Panel.BackgroundProperty, "TransportBackBrush");
+            WaapiBar.SetResourceReference(Control.BackgroundProperty, "WaapiBarBackBrush");
         }
 
         LevelMeter.WashThrough = show;
@@ -760,15 +758,8 @@ public partial class MainWindow
             BindWorkspace(current);
         }
 
+        // プレイヤーでの複数選択はエディタへ持ち越さない。
         _selectedTabs.Clear();
-        if (remaining.Count >= 2)
-        {
-            foreach (var session in remaining)
-            {
-                _selectedTabs.Add(session);
-            }
-        }
-
         _tabSelectionAnchor = current;
         RebuildTabBar();
         RefreshTileChrome();
@@ -1086,6 +1077,93 @@ public partial class MainWindow
         }
 
         PreviewLibrarySession(next);
+    }
+
+    /// <summary>プレイヤー突入の一覧。再生と背景の差し替えはしない。</summary>
+    private void SelectLibraryFirstTrackForEnter()
+    {
+        var first = LibraryPlayerMode.FirstSession(_sessions);
+        IReadOnlyList<DocumentSession> selected = first is null ? [] : [first];
+        LibraryBrowser.SetSessions(_sessions, first, selected);
+        if (first is not null)
+        {
+            _libraryHoldJacketWash = false;
+            LibraryBrowser.RequestListFocus();
+        }
+    }
+
+    /// <summary>
+    /// 一覧と波形を描いてから再生する。描画完了前に音が始まらないようにする。
+    /// 動いている背景は描き直さず、そのまま続ける。
+    /// </summary>
+    private void ScheduleLibraryEnterPlayback()
+    {
+        if (!_libraryPlayFirstPending)
+        {
+            return;
+        }
+
+        var generation = ++_libraryEnterPlayGeneration;
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.ContextIdle,
+            () => _ = PlayLibraryEnterAfterPaintAsync(generation));
+    }
+
+    private async Task PlayLibraryEnterAfterPaintAsync(int generation)
+    {
+        if (!LibraryEnterPlaybackStillPending(generation))
+        {
+            return;
+        }
+
+        var first = LibraryPlayerMode.FirstSession(_sessions);
+        var keepGlow = LibraryBrowser.AmbientGlowAnimating;
+        if (first is not null)
+        {
+            await EnsureLibrarySessionLoadedAsync(first).ConfigureAwait(true);
+            if (!LibraryEnterPlaybackStillPending(generation))
+            {
+                return;
+            }
+
+            if (!first.Document.IsDeferredLoad && ReferenceEquals(_libraryLoadSession, first))
+            {
+                LibraryBrowser.SelectSessionQuiet(first);
+                ApplyLoadedLibrarySession(first);
+            }
+        }
+
+        await WaitForPresentedFrameAsync().ConfigureAwait(true);
+        if (!LibraryEnterPlaybackStillPending(generation))
+        {
+            return;
+        }
+
+        if (_sessions.Count > 0)
+        {
+            _libraryPlayFirstPending = false;
+        }
+
+        await PlayLibrarySessionAsync(first, keepAmbientGlow: keepGlow).ConfigureAwait(true);
+    }
+
+    private bool LibraryEnterPlaybackStillPending(int generation) =>
+        generation == _libraryEnterPlayGeneration && IsLibraryMaximized && _libraryPlayFirstPending;
+
+    /// <summary>次のフレームの描画パスが走ったあとで続ける。</summary>
+    private static Task WaitForPresentedFrameAsync()
+    {
+        var done = new TaskCompletionSource();
+        EventHandler rendered = null!;
+        rendered = (_, _) =>
+        {
+            CompositionTarget.Rendering -= rendered;
+            Dispatcher.CurrentDispatcher.BeginInvoke(
+                () => done.TrySetResult(),
+                DispatcherPriority.Normal);
+        };
+        CompositionTarget.Rendering += rendered;
+        return done.Task;
     }
 
     private void SelectAndPlayFirstLibraryTrack()
@@ -1528,18 +1606,28 @@ public partial class MainWindow
             LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: false));
     }
 
-    private async Task PlayLibrarySessionAsync(DocumentSession? session, bool stopAfterTrack = false)
+    private async Task PlayLibrarySessionAsync(
+        DocumentSession? session,
+        bool stopAfterTrack = false,
+        bool keepAmbientGlow = false)
     {
         CancelLibraryGapless();
         _libraryPlayOnArrowRelease = false;
         _libraryStopAfterTrack = stopAfterTrack;
         if (session is null)
         {
-            LibraryBrowser.SetArtwork(null);
+            if (!keepAmbientGlow)
+            {
+                LibraryBrowser.SetArtwork(null);
+            }
+
             return;
         }
 
-        ShowLibraryArtwork(session);
+        if (!keepAmbientGlow)
+        {
+            ShowLibraryArtwork(session);
+        }
         await EnsureLibrarySessionLoadedAsync(session).ConfigureAwait(true);
         if (session.Document.IsDeferredLoad
             || !ReferenceEquals(_libraryLoadSession, session))
@@ -1559,7 +1647,10 @@ public partial class MainWindow
 
         ApplyLoadedLibrarySession(session);
         StartPlayback(0, prerollSeconds: 0);
-        ShowLibraryArtwork(session);
+        if (!keepAmbientGlow)
+        {
+            ShowLibraryArtwork(session);
+        }
         if (!stopAfterTrack)
         {
             ScheduleLibraryGaplessPrefetch();

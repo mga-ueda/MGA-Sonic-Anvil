@@ -615,7 +615,7 @@ public partial class MainWindow
             return true;
         }
 
-        if (TryProcessDocumentShortcut(key, modifiers))
+        if (TryProcessDocumentShortcut(key, modifiers, isRepeat))
         {
             return true;
         }
@@ -1254,7 +1254,7 @@ public partial class MainWindow
         return false;
     }
 
-    private bool TryProcessDocumentShortcut(Key key, ModifierKeys modifiers)
+    private bool TryProcessDocumentShortcut(Key key, ModifierKeys modifiers, bool isRepeat = false)
     {
         if (key == Key.F2 && modifiers == ModifierKeys.None)
         {
@@ -1338,13 +1338,13 @@ public partial class MainWindow
 
         if (key == Key.Tab && modifiers == ModifierKeys.Control)
         {
-            ActivateAdjacentTab(1);
+            ActivateAdjacentTab(1, wrap: !isRepeat);
             return true;
         }
 
         if (key == Key.Tab && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            ActivateAdjacentTab(-1);
+            ActivateAdjacentTab(-1, wrap: !isRepeat);
             return true;
         }
 
@@ -1372,13 +1372,13 @@ public partial class MainWindow
 
         if (key == Key.PageDown && modifiers == ModifierKeys.Control)
         {
-            ActivateAdjacentTab(1);
+            ActivateAdjacentTab(1, wrap: !isRepeat);
             return true;
         }
 
         if (key == Key.PageUp && modifiers == ModifierKeys.Control)
         {
-            ActivateAdjacentTab(-1);
+            ActivateAdjacentTab(-1, wrap: !isRepeat);
             return true;
         }
 

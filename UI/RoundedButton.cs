@@ -13,7 +13,7 @@ internal sealed class RoundedButton : Button
 
     public static readonly DependencyProperty CornerRadiusProperty =
         DependencyProperty.Register(nameof(CornerRadius), typeof(double), typeof(RoundedButton),
-            new FrameworkPropertyMetadata(8d, FrameworkPropertyMetadataOptions.AffectsRender));
+            new FrameworkPropertyMetadata(DesignMetrics.ControlCornerRadius, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty HoverBackColorProperty =
         DependencyProperty.Register(nameof(HoverBackColor), typeof(Color?), typeof(RoundedButton),
@@ -352,7 +352,8 @@ internal static class ActionButtonLooks
             Theme.Get("ExportButtonPressedBackBrush"),
             Theme.Get("ExportButtonForeBrush"));
 
-    public static void ApplyStatusExport(RoundedButton button) =>
+    public static void ApplyStatusExport(RoundedButton button)
+    {
         Apply(
             button,
             Theme.Get("StatusExportButtonFillBrush"),
@@ -360,7 +361,12 @@ internal static class ActionButtonLooks
             Theme.Get("StatusExportButtonBackBrush"),
             Theme.Get("StatusExportButtonHoverBackBrush"),
             Theme.Get("StatusExportButtonPressedBackBrush"),
-            Theme.Get("StatusExportButtonForeBrush"));
+            Theme.Get("StatusExportButtonForeBrush"),
+            borderSize: 1);
+        button.DisabledBackColor = Theme.Get("PlayerComboDisabledFillBrush");
+        button.DisabledBorderColor = Theme.Get("PlayerComboDisabledFillBrush");
+        button.InvalidateVisual();
+    }
 
     private static void Apply(
         RoundedButton button,

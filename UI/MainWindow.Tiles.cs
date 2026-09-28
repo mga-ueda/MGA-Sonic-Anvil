@@ -457,10 +457,10 @@ public partial class MainWindow
     }
 
     private static void ApplyWaveformTileBackground(Panel panel) =>
-        panel.SetResourceReference(Panel.BackgroundProperty, "WaveformBackBrush");
+        panel.Background = Brushes.Transparent;
 
     private static void ApplyWaveformTileBackground(Border border) =>
-        border.SetResourceReference(Border.BackgroundProperty, "WaveformBackBrush");
+        border.Background = Brushes.Transparent;
 
     /// <summary>余りマスに波形背景を敷く。透明のままだとライト／ダークとも GPU の黒が見える。</summary>
     private void AddUnusedTileFillers(Grid grid, int count, int rows, int cols)
@@ -558,6 +558,7 @@ public partial class MainWindow
         WaveformTileHost.Children.Add(SingleWaveformHost);
         SingleWaveformHost.Visibility = Visibility.Visible;
         PrimaryWaveform.Visibility = Visibility.Visible;
+        PrimaryWaveform.ShowPlayhead = true;
         Overview.SeekTrailSource = PrimaryWaveform;
         if (!bindPrimary)
         {
@@ -895,8 +896,11 @@ public partial class MainWindow
             var path = pane.Session.Document.SourcePath ?? UiStrings.UntitledDocument;
             TipService.Set(pane.Title, path + Environment.NewLine + UiStrings.TipRenameFile);
             ApplyWaveformTileBackground(pane.Host);
-            pane.Header.Background = BrushOrTransparent(
-                highlighted ? "WaveformTileActiveHeaderBrush" : "TimelineWellBackBrush");
+            pane.Header.Background = highlighted
+                ? (Brush)FindResource("WaveformTileActiveHeaderBrush")
+                : Brushes.Transparent;
+            // アクティブ以外はシアンのシークバーを出さない。
+            pane.View.ShowPlayhead = ReferenceEquals(pane.Session, _activeSession);
         }
 
         ApplyTileSearchVeils();

@@ -48,7 +48,7 @@ internal sealed class TabScrollButton : Button
             return;
         }
 
-        TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed);
+        TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed, fillSlot: false);
         DrawChevron(dc, bounds, PointLeft, TransportChrome.Fore(IsEnabled));
     }
 

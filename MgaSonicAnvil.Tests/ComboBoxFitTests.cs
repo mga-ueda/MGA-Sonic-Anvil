@@ -28,12 +28,30 @@ public sealed class ComboBoxFitTests
     }
 
     [Fact]
-    public void WrapTabIndex_CyclesForwardAndBack()
+    public void StepTabIndex_WrapsUnlessPausedAtEnds()
     {
-        Assert.Equal(1, AudioSettingsWindow.WrapTabIndex(0, 4, 1));
-        Assert.Equal(0, AudioSettingsWindow.WrapTabIndex(3, 4, 1));
-        Assert.Equal(3, AudioSettingsWindow.WrapTabIndex(0, 4, -1));
-        Assert.Equal(0, AudioSettingsWindow.WrapTabIndex(0, 1, 1));
+        Assert.Equal(1, AudioSettingsWindow.StepTabIndex(0, 4, 1));
+        Assert.Equal(0, AudioSettingsWindow.StepTabIndex(3, 4, 1));
+        Assert.Equal(3, AudioSettingsWindow.StepTabIndex(0, 4, -1));
+        Assert.Equal(3, AudioSettingsWindow.StepTabIndex(3, 4, 1, wrap: false));
+        Assert.Equal(0, AudioSettingsWindow.StepTabIndex(0, 4, -1, wrap: false));
+        Assert.Equal(2, AudioSettingsWindow.StepTabIndex(3, 4, -1, wrap: false));
+        Assert.Equal(0, AudioSettingsWindow.StepTabIndex(0, 1, 1));
+    }
+
+    [Fact]
+    public void AdjacentIndex_WrapsUnlessPausedAtEnds()
+    {
+        Assert.Equal(1, DocumentTabLayout.AdjacentIndex(0, 4, 1));
+        Assert.Equal(0, DocumentTabLayout.AdjacentIndex(3, 4, 1));
+        Assert.Equal(3, DocumentTabLayout.AdjacentIndex(0, 4, -1));
+        Assert.Equal(3, DocumentTabLayout.AdjacentIndex(3, 4, 1, wrap: false));
+        Assert.Equal(0, DocumentTabLayout.AdjacentIndex(0, 4, -1, wrap: false));
+        Assert.Equal(2, DocumentTabLayout.AdjacentIndex(0, 4, 1, i => i == 1));
+        Assert.Equal(0, DocumentTabLayout.AdjacentIndex(0, 4, 1, _ => true));
+        Assert.Equal(1, DocumentTabLayout.AdjacentIndex(3, 4, -1, i => i == 2));
+        Assert.Equal(2, DocumentTabLayout.AdjacentIndex(0, 4, 1, i => i == 1, wrap: false));
+        Assert.Equal(0, DocumentTabLayout.AdjacentIndex(0, 4, 1, i => i is 1 or 2 or 3, wrap: false));
     }
 
     [Theory]

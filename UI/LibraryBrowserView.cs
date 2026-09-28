@@ -31,6 +31,12 @@ internal sealed class LibraryBrowserView : UserControl
     internal const int GlowDriftFrameRate = 16;
     /// <summary>全画面ウォッシュのキャッシュ解像度。1 だとクロスフェードのたびに巨大ビットマップを作り直す。</summary>
     internal const double GlowCacheRenderAtScale = 0.35;
+    /// <summary>
+    /// ウォッシュのレイアウト寸法。ウィンドウサイズには追従させない。
+    /// 追従すると BitmapCache がモード切替（F11／F12 → F10／F9）のたびに全面を描き直す。
+    /// </summary>
+    internal const double GlowCacheWidth = 1600;
+    internal const double GlowCacheHeight = 900;
     internal const double GlowCrossfadeSeconds = 1;
     internal const int GlowCrossfadeFrameRate = 30;
     internal const int GlowWashTurnSteps = 4;
@@ -63,8 +69,8 @@ internal sealed class LibraryBrowserView : UserControl
         PlayerChrome.Get("PlayerPaneFocusLineBrush", UiTheme.Light).A;
     internal const string PlaylistRowBandName = "PlaylistRowBand";
     internal static Color FallbackWashNavy => PlayerChrome.Get("PlayerFallbackWashNavyBrush");
+    internal static Color FallbackWashBlue => PlayerChrome.Get("PlayerFallbackWashBlueBrush");
     internal static Color FallbackWashCyan => PlayerChrome.Get("PlayerFallbackWashCyanBrush");
-    internal static Color FallbackWashWhite => PlayerChrome.Get("PlayerFallbackWashWhiteBrush");
     private static Brush[]? _fallbackWashTurns;
     /// <summary>ジャケット／グロー用デコードの長辺上限。APIC 原寸展開を避ける。</summary>
     private const int ArtworkDecodeMaxEdge = 512;
@@ -76,6 +82,8 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly ScaleTransform _glowScale = new(GlowDriftScaleFrom, GlowDriftScaleFrom);
     private readonly TranslateTransform _glowTranslate = new();
     private bool _glowDriftRunning;
+    private bool _glowDriftUsesWave;
+    private int _glowDriftStartCount;
     private readonly DispatcherTimer _washTurnTimer = new()
     {
         Interval = TimeSpan.FromSeconds(GlowWashTurnSeconds),
@@ -84,12 +92,20 @@ internal sealed class LibraryBrowserView : UserControl
     private int _washTurn;
     private readonly Border _veil = new();
     private readonly Grid _waveGlow = new();
+    /// <summary>固定寸法のウォッシュを窓いっぱいに置く。Canvas の要求サイズは 0 なので窓を押し広げない。</summary>
+    private readonly Canvas _waveGlowCanvas = new()
+    {
+        IsHitTestVisible = false,
+        HorizontalAlignment = HorizontalAlignment.Stretch,
+        VerticalAlignment = VerticalAlignment.Stretch,
+    };
     private readonly Border _waveGlowFrom = CreateGlowWashLayer();
     private readonly Border _waveGlowTo = CreateGlowWashLayer();
     private readonly Border _waveVeil = new();
     private Brush? _glowWash;
     private readonly ScaleTransform _waveGlowScale = new(GlowDriftScaleFrom, GlowDriftScaleFrom);
     private readonly TranslateTransform _waveGlowTranslate = new();
+    private readonly ScaleTransform _waveGlowCover = new(1, 1);
     private Grid? _waveGlowHost;
     private bool _extendGlow;
     private readonly Grid _root = new();
@@ -162,6 +178,16 @@ internal sealed class LibraryBrowserView : UserControl
     private byte[]? _artworkBytes;
     private BitmapSource? _jacketBitmap;
     internal bool GlowUsesFallback { get; private set; }
+
+    /// <summary>ドリフトを実際に開始した回数。継続では増えない。</summary>
+    internal int GlowDriftStartCount => _glowDriftStartCount;
+
+    /// <summary>モード突入で背景を描き直さず、今の動きを続ける。</summary>
+    internal bool AmbientGlowAnimating => _glowDriftRunning && _artworkGlow;
+
+    internal double WaveGlowLayoutWidth => _waveGlow.Width;
+
+    internal double WaveGlowCoverScale => _waveGlowCover.ScaleX;
     private int _groupArtLoad;
     private bool _treeSyncing;
     private Point? _treeDragStart;
@@ -5322,7 +5348,11 @@ internal sealed class LibraryBrowserView : UserControl
     internal void BindWaveformGlow(Grid host)
     {
         _waveGlowHost = host;
+        // レイアウト寸法は固定。窓の拡縮はカバー用スケールだけを変え、ビットマップは描き直さない。
+        _waveGlow.Width = GlowCacheWidth;
+        _waveGlow.Height = GlowCacheHeight;
         var drift = new TransformGroup();
+        drift.Children.Add(_waveGlowCover);
         drift.Children.Add(_waveGlowScale);
         drift.Children.Add(_waveGlowTranslate);
         _waveGlow.RenderTransform = drift;
@@ -5331,8 +5361,8 @@ internal sealed class LibraryBrowserView : UserControl
         _waveGlow.IsHitTestVisible = false;
         _waveGlow.SnapsToDevicePixels = false;
         _waveGlow.UseLayoutRounding = false;
-        _waveGlow.Margin = new Thickness(-GlowDriftBleed);
         _waveGlow.Visibility = Visibility.Collapsed;
+        host.SizeChanged += (_, _) => SyncWaveGlowCover();
         _waveVeil.IsHitTestVisible = false;
         _waveVeil.Visibility = Visibility.Collapsed;
         if (_waveGlow.Children.Count == 0)
@@ -5341,14 +5371,22 @@ internal sealed class LibraryBrowserView : UserControl
             _waveGlow.Children.Add(_waveGlowTo);
         }
 
-        host.Children.Add(_waveGlow);
+        _waveGlowCanvas.Children.Add(_waveGlow);
+        host.Children.Add(_waveGlowCanvas);
         host.Children.Add(_waveVeil);
         ApplyGlowVeil();
         CopyGlowWash(_glowFrom, _glowTo, _waveGlowFrom, _waveGlowTo);
 
         PlaceArtworkGlow();
-        RestartGlowDrift();
-        SyncWashTurns();
+        SyncWaveGlowCover();
+        ContinueGlowDrift();
+    }
+
+    /// <summary>エディタの背景。プレイヤーのフォールバックウォッシュをウィンドウ全体に出す。</summary>
+    internal void UseWindowFallbackWash()
+    {
+        _extendGlow = true;
+        ApplyArtworkGlow(null);
     }
 
     /// <summary>プレイヤー表示中はウィンドウ全体に一枚で広げる。編集画面では畳む。</summary>
@@ -5361,7 +5399,8 @@ internal sealed class LibraryBrowserView : UserControl
 
         _extendGlow = extend;
         PlaceArtworkGlow();
-        RestartGlowDrift();
+        SyncWaveGlowCover();
+        ContinueGlowDrift();
     }
 
     private bool UseUnifiedGlow => _artworkGlow && _extendGlow && _waveGlowHost is not null;
@@ -5377,7 +5416,8 @@ internal sealed class LibraryBrowserView : UserControl
         ApplyWashTurns(turns);
 
         PlaceArtworkGlow();
-        RestartGlowDrift();
+        SyncWaveGlowCover();
+        ContinueGlowDrift();
 
         if (glowChanged)
         {
@@ -5580,8 +5620,19 @@ internal sealed class LibraryBrowserView : UserControl
         _root.SetResourceReference(Panel.BackgroundProperty, "SurfaceBackBrush");
     }
 
-    private void RestartGlowDrift()
+    /// <summary>
+    /// すでに動いているドリフトは止めない。止めると位置が初期値に戻り、キャッシュも描き直される。
+    /// アニメの載せ先（窓全体／リスト内）が変わったときだけ付け替える。
+    /// </summary>
+    private void ContinueGlowDrift()
     {
+        var useWave = UseUnifiedGlow;
+        if (_glowDriftRunning && _glowDriftUsesWave == useWave)
+        {
+            SyncWashTurns();
+            return;
+        }
+
         if (_glowDriftRunning)
         {
             StopGlowDrift();
@@ -5591,9 +5642,39 @@ internal sealed class LibraryBrowserView : UserControl
         SyncWashTurns();
     }
 
+    /// <summary>ホストサイズに合わせて拡大するだけ。要素寸法は変えない。</summary>
+    private void SyncWaveGlowCover()
+    {
+        if (_waveGlowHost is null)
+        {
+            return;
+        }
+
+        var width = _waveGlowHost.ActualWidth;
+        var height = _waveGlowHost.ActualHeight;
+        if (width < 1 || height < 1)
+        {
+            return;
+        }
+
+        Canvas.SetLeft(_waveGlow, (width - GlowCacheWidth) / 2);
+        Canvas.SetTop(_waveGlow, (height - GlowCacheHeight) / 2);
+        var coverX = (width + (GlowDriftBleed * 2)) / GlowCacheWidth;
+        var coverY = (height + (GlowDriftBleed * 2)) / GlowCacheHeight;
+        var cover = Math.Max(coverX, coverY);
+        if (Math.Abs(_waveGlowCover.ScaleX - cover) < 0.0001
+            && Math.Abs(_waveGlowCover.ScaleY - cover) < 0.0001)
+        {
+            return;
+        }
+
+        _waveGlowCover.ScaleX = cover;
+        _waveGlowCover.ScaleY = cover;
+    }
+
     private void SyncGlowDrift()
     {
-        var run = _artworkGlow && IsVisible && IsLoaded;
+        var run = _artworkGlow && GlowAnimationAlive();
         if (run == _glowDriftRunning)
         {
             return;
@@ -5611,7 +5692,8 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void StartGlowDrift()
     {
-        if (UseUnifiedGlow)
+        _glowDriftUsesWave = UseUnifiedGlow;
+        if (_glowDriftUsesWave)
         {
             AnimateGlowDrift(_waveGlowScale, _waveGlowTranslate);
         }
@@ -5621,6 +5703,7 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         _glowDriftRunning = true;
+        _glowDriftStartCount++;
     }
 
     private static void AnimateGlowDrift(ScaleTransform scale, TranslateTransform translate)
@@ -5652,17 +5735,25 @@ internal sealed class LibraryBrowserView : UserControl
         _glowDriftRunning = false;
     }
 
+    private bool GlowAnimationAlive() =>
+        IsLoaded && (IsVisible || (_extendGlow && _waveGlowHost is { Visibility: Visibility.Visible }));
+
     private void SyncWashTurns()
     {
-        var run = _artworkGlow && IsVisible && IsLoaded && _washTurns.Length > 1;
-        if (run)
-        {
-            StartWashTurns();
-        }
-        else
+        var run = _artworkGlow && GlowAnimationAlive() && _washTurns.Length > 1;
+        if (!run)
         {
             StopWashTurns();
+            return;
         }
+
+        // 色の回りも、動いているタイマーはリセットしない。
+        if (_washTurnTimer.IsEnabled)
+        {
+            return;
+        }
+
+        StartWashTurns();
     }
 
     private void StartWashTurns()
@@ -5789,7 +5880,7 @@ internal sealed class LibraryBrowserView : UserControl
         navy.Freeze();
         group.Children.Add(new GeometryDrawing(navy, null, new RectangleGeometry(new Rect(0, 0, 1, 1))));
         AddColorBlob(group, FallbackWashCyan, new Point(0.72, 0.38), 0.52, alpha: 200);
-        AddColorBlob(group, FallbackWashWhite, new Point(0.30, 0.62), 0.46, alpha: 175);
+        AddColorBlob(group, FallbackWashBlue, new Point(0.30, 0.62), 0.46, alpha: 175);
         AddColorBlob(group, FallbackWashNavy, new Point(0.50, 0.22), 0.58, alpha: 170);
         ApplyWashTurn(group, quarterTurns);
         return FreezeWash(group);
@@ -5964,7 +6055,8 @@ internal sealed class LibraryBrowserView : UserControl
     {
         ToHsl(color.R, color.G, color.B, out var h, out var s, out var l);
         s = Math.Clamp(Math.Max(s, saturation) * 1.25 + 0.08, 0.2, 0.95);
-        l = Math.Clamp(Math.Max(l, lightness * 0.9), 0.28, 0.72);
+        // 1トーン落として、背面アニメが前面のUIを食わないようにする。
+        l = Math.Clamp(Math.Max(l, lightness * 0.9) - 0.06, 0.22, 0.65);
         FromHsl(h, s, l, out var r, out var g, out var b);
         return Color.FromRgb(r, g, b);
     }

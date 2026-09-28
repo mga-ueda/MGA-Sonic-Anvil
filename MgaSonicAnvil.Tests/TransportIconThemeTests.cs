@@ -104,25 +104,6 @@ public sealed class TransportIconThemeTests
     }
 
     [Fact]
-    public void Moon_IsHollowCenteredWithUpperRightBite()
-    {
-        RunSta(() =>
-        {
-            var pixels = Render(TransportIcon.ThemeMoon, UiTheme.Dark, 34, 36);
-            Assert.False(IsInk(pixels, 34, 13, 20), "moon body should be hollow");
-            Assert.False(IsInk(pixels, 34, 23, 12), "moon bite should stay upper-right");
-
-            var lowerLeft = CountInkIn(pixels, 34, 36, 6, 16, 18, 28);
-            var upperRight = CountInkIn(pixels, 34, 36, 18, 28, 6, 16);
-            Assert.True(lowerLeft > upperRight, $"upper-right bite expected: ll={lowerLeft} ur={upperRight}");
-
-            Centroid(pixels, 34, 36, out var cx, out var cy);
-            Assert.InRange(cx, 15.2, 18.8);
-            Assert.InRange(cy, 16.2, 19.8);
-        });
-    }
-
-    [Fact]
     public void ColorPalette_IsCentered()
     {
         RunSta(() =>

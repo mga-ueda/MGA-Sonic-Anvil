@@ -126,4 +126,53 @@ internal static class DocumentTabLayout
             overflow -= shrunk;
         }
     }
+
+    /// <summary>
+    /// 送り／戻し。wrap なら端で反対側へ回る。長押し連続では wrap=false で端に一旦止まる。
+    /// skip が true の位置は飛ばす。
+    /// </summary>
+    public static int AdjacentIndex(
+        int index,
+        int count,
+        int delta,
+        Func<int, bool>? skip = null,
+        bool wrap = true)
+    {
+        if (count <= 0)
+        {
+            return 0;
+        }
+
+        index = Math.Clamp(index, 0, count - 1);
+        if (count == 1 || delta == 0)
+        {
+            return index;
+        }
+
+        var step = delta > 0 ? 1 : -1;
+        if (!wrap)
+        {
+            for (var i = index + step; i >= 0 && i < count; i += step)
+            {
+                if (skip is null || !skip(i))
+                {
+                    return i;
+                }
+            }
+
+            return index;
+        }
+
+        var next = index;
+        for (var n = 1; n < count; n++)
+        {
+            next = (next + step + count) % count;
+            if (skip is null || !skip(next))
+            {
+                return next;
+            }
+        }
+
+        return index;
+    }
 }

@@ -71,6 +71,7 @@
               Background="{DynamicResource StatusTimecodeFillBrush}"
               BorderBrush="{DynamicResource StatusTimecodeFillBrush}"
               BorderThickness="1"
+              CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
               IsHitTestVisible="False" />
       <TextBlock x:Name="TotalText"
                  HorizontalAlignment="Stretch"

@@ -20,7 +20,7 @@ internal static class OverlayCaption
         close.Margin = CornerMargin;
     }
 
-    public static Border CloseButton(Action onClose)
+    public static Border CloseButton(Action onClose, bool clearRest = false)
     {
         var mark = new CloseMark();
         mark.SetResourceReference(CloseMark.ForegroundProperty, "MutedForeBrush");
@@ -32,7 +32,7 @@ internal static class OverlayCaption
             BorderThickness = new Thickness(1),
             Cursor = Cursors.Hand,
             Child = mark,
-            Style = CloseStyle(),
+            Style = CloseStyle(clearRest),
         };
         hit.MouseEnter += (_, _) =>
             mark.SetResourceReference(CloseMark.ForegroundProperty, "PrimaryForeBrush");
@@ -48,10 +48,12 @@ internal static class OverlayCaption
         return hit;
     }
 
-    private static Style CloseStyle()
+    private static Style CloseStyle(bool clearRest)
     {
         var style = new Style(typeof(Border));
-        style.Setters.Add(new Setter(Border.BackgroundProperty, new DynamicResourceExtension("ColorPanelBackBrush")));
+        style.Setters.Add(new Setter(
+            Border.BackgroundProperty,
+            clearRest ? Brushes.Transparent : new DynamicResourceExtension("ColorPanelBackBrush")));
         style.Setters.Add(new Setter(Border.BorderBrushProperty, new DynamicResourceExtension("ChromeBorderBrush")));
         var hover = new Trigger
         {

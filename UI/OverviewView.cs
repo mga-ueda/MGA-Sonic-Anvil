@@ -173,7 +173,6 @@ internal sealed class OverviewView : FrameworkElement
     protected override void OnRender(DrawingContext dc)
     {
         var bounds = new Rect(RenderSize);
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("WaveformBackBrush")), null, bounds);
         if (_document is null || _document.FrameCount <= 0 || bounds.Width <= 1 || bounds.Height <= 1)
         {
             return;

@@ -28,8 +28,8 @@ internal sealed class EditHistoryOverlay : Border
         Width = 340;
         MaxHeight = 360;
         Padding = new Thickness(0, 0, 0, 6);
-        SetResourceReference(BackgroundProperty, "ColorPanelBackBrush");
-        SetResourceReference(BorderBrushProperty, "ChromeBorderBrush");
+        Background = Brushes.Transparent;
+        SetResourceReference(BorderBrushProperty, "PlayerComboDropBorderBrush");
         BorderThickness = new Thickness(1);
         SnapsToDevicePixels = true;
         Focusable = false;
@@ -43,7 +43,9 @@ internal sealed class EditHistoryOverlay : Border
         };
         _title.SetResourceReference(TextBlock.ForegroundProperty, "MutedForeBrush");
         var caption = new DockPanel();
-        var close = OverlayCaption.CloseButton(() => CloseRequested?.Invoke(this, EventArgs.Empty));
+        var close = OverlayCaption.CloseButton(
+            () => CloseRequested?.Invoke(this, EventArgs.Empty),
+            clearRest: true);
         OverlayCaption.PinCorner(close);
         DockPanel.SetDock(close, Dock.Right);
         caption.Children.Add(close);

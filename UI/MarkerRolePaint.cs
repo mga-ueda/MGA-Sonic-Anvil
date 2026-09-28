@@ -5,7 +5,7 @@ using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>IM Importer と同じリージョン下塗り（-A/-L/-E）。-R は色付けしない。暗黙の -E は塗らない。</summary>
+/// <summary>IM Importer と同じリージョン下塗り（-A/-L/-E/-R）。暗黙の -E は塗らない。</summary>
 internal static class MarkerRolePaint
 {
     public static void DrawBackgrounds(
@@ -25,7 +25,7 @@ internal static class MarkerRolePaint
         for (var i = 0; i < markers.Count; i++)
         {
             var role = MarkerRoles.FromComment(markers[i].Comment);
-            if (role is not (MarkerRole.Anacrusis or MarkerRole.Loop or MarkerRole.Exit))
+            if (role is not (MarkerRole.Anacrusis or MarkerRole.Loop or MarkerRole.Exit or MarkerRole.Remove))
             {
                 continue;
             }
@@ -129,6 +129,7 @@ internal static class MarkerRolePaint
             MarkerRole.Anacrusis => "RegionWaveFillAnacrusisBrush",
             MarkerRole.Loop => "RegionWaveFillLoopBrush",
             MarkerRole.Exit => "RegionWaveFillExitBrush",
+            MarkerRole.Remove => "RegionWaveFillExcludedBrush",
             _ => "WaveformBackBrush",
         }));
 }

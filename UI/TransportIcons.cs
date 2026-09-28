@@ -36,8 +36,6 @@ internal enum TransportIcon
     Loudness,
     Center,
     History,
-    ThemeSun,
-    ThemeMoon,
     ColorPalette,
     Tips,
     Settings,
@@ -97,7 +95,6 @@ internal enum TransportCommand
     ToggleLoudnessView,
     CenterPlayhead,
     History,
-    ToggleUiTheme,
     OpenColorPanel,
     ToggleTips,
     OpenSettings,
@@ -248,7 +245,12 @@ internal sealed class TransportIconButton : Button
         }
 
         var chip = new Rect(2, 6, Math.Max(1, bounds.Width - 4), Math.Max(1, bounds.Height - 12));
-        dc.DrawRoundedRectangle(WpfControlHelpers.FrozenBrush(back), null, chip, 3, 3);
+        dc.DrawRoundedRectangle(
+            WpfControlHelpers.FrozenBrush(back),
+            null,
+            chip,
+            DesignMetrics.ControlCornerRadius,
+            DesignMetrics.ControlCornerRadius);
 
         var formatted = new FormattedText(
             UiStrings.WaapiTitle,
@@ -463,12 +465,6 @@ internal static class TransportIconDrawing
                 dc.DrawLine(pen, new Point(17, 13), new Point(17, 18));
                 dc.DrawLine(pen, new Point(17, 18), new Point(21, 21));
                 break;
-            case TransportIcon.ThemeSun:
-                DrawThemeSun(dc, pen, cx, cy);
-                break;
-            case TransportIcon.ThemeMoon:
-                DrawThemeMoon(dc, pen, cx, cy);
-                break;
             case TransportIcon.ColorPalette:
                 DrawColorPalette(dc, pen, brush, cx, cy);
                 break;
@@ -663,21 +659,6 @@ internal static class TransportIconDrawing
         dc.Pop();
     }
 
-    private static void DrawThemeSun(DrawingContext dc, Pen pen, double cx, double cy)
-    {
-        dc.DrawEllipse(null, pen, new Point(cx, cy), 5.0, 5.0);
-        for (var i = 0; i < 8; i++)
-        {
-            var angle = i * Math.PI / 4d;
-            var inner = 7.0;
-            var outer = 9.2;
-            dc.DrawLine(
-                pen,
-                new Point(cx + Math.Cos(angle) * inner, cy + Math.Sin(angle) * inner),
-                new Point(cx + Math.Cos(angle) * outer, cy + Math.Sin(angle) * outer));
-        }
-    }
-
     private static void DrawColorPalette(DrawingContext dc, Pen pen, Brush brush, double cx, double cy)
     {
         var stroke = OutlinePen(pen, 1.45);
@@ -713,32 +694,6 @@ internal static class TransportIconDrawing
         dc.DrawEllipse(null, stroke, top, radius, radius);
         dc.DrawEllipse(null, stroke, right, radius, radius);
         dc.Pop();
-    }
-
-    private static void DrawThemeMoon(DrawingContext dc, Pen pen, double cx, double cy)
-    {
-        const double bodyR = 7.4;
-        const double cutR = 5.5;
-        var body = new Point(cx, cy);
-        var cut = new Point(cx + 2.8, cy - 2.8);
-        var crescent = new CombinedGeometry(
-            GeometryCombineMode.Exclude,
-            new EllipseGeometry(body, bodyR, bodyR),
-            new EllipseGeometry(cut, cutR, cutR));
-        crescent.Freeze();
-        var bounds = crescent.Bounds;
-        if (!bounds.IsEmpty)
-        {
-            dc.PushTransform(new TranslateTransform(
-                cx - (bounds.X + bounds.Width * 0.5),
-                cy - (bounds.Y + bounds.Height * 0.5)));
-        }
-
-        dc.DrawGeometry(null, OutlinePen(pen, 1.45), crescent);
-        if (!bounds.IsEmpty)
-        {
-            dc.Pop();
-        }
     }
 
     private static void DrawLoudnessCurve(DrawingContext dc, Pen pen)
@@ -1034,7 +989,8 @@ internal static class TransportChrome
             const double pad = 3d;
             var rect = hoverBounds
                 ?? new Rect(pad, pad, Math.Max(1, bounds.Width - pad * 2), Math.Max(1, bounds.Height - pad * 2));
-            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(fill), null, rect);
+            var radius = DesignMetrics.ControlCornerRadius;
+            dc.DrawRoundedRectangle(WpfControlHelpers.FrozenBrush(fill), null, rect, radius, radius);
         }
     }
 

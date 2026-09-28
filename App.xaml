@@ -35,7 +35,7 @@
       </Style>
       <Style TargetType="TabControl" BasedOn="{StaticResource DarkTabControlStyle}"/>
       <Style TargetType="TabItem" BasedOn="{StaticResource DarkTabItemStyle}"/>
-      <Style TargetType="ComboBox" BasedOn="{StaticResource DarkComboBoxStyle}"/>
+      <Style TargetType="ComboBox" BasedOn="{StaticResource LibraryComboBoxStyle}"/>
       <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkScrollBarStyle}"/>
       <Style TargetType="ToolTip" BasedOn="{StaticResource DarkToolTipStyle}"/>
       <Style TargetType="ContextMenu" BasedOn="{StaticResource DarkContextMenuStyle}"/>

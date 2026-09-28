@@ -58,6 +58,11 @@ internal static class DesignMetrics
 
     public static double StatusOutputPathHeight => From96(22);
 
+    /// <summary>入力欄・ボタン・バッジ・マーカー旗など共通の角丸。</summary>
+    public const double ControlCornerRadius = 3;
+
+    public static CornerRadius ControlCorner { get; } = new(ControlCornerRadius);
+
     public static double DocumentTabBarHeight => From96(22);
 
     public static double DocumentTabScrollButtonWidth => From96(20);
@@ -81,6 +86,18 @@ internal static class DesignMetrics
     public static double WaveformScrollBarHeight => From96(16);
 
     public static GridLength WaveformScrollBarHeightGrid => new(WaveformScrollBarHeight);
+
+    /// <summary>時間スクロールつまみの見た目高さ（レーン専有は WaveformScrollBarHeight）。</summary>
+    public static double WaveformScrollThumbVisualHeight => WaveformScrollBarHeight * (2.0 / 3.0);
+
+    public static Thickness WaveformScrollThumbMargin
+    {
+        get
+        {
+            var y = (WaveformScrollBarHeight - WaveformScrollThumbVisualHeight) * 0.5;
+            return new Thickness(1, y, 1, y);
+        }
+    }
 
     public static double WaveformScrollButtonWidth => From96(16);
 

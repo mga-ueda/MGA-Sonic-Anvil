@@ -1646,7 +1646,6 @@ public partial class MainWindow
             settings.ResolvedFadeInCurve(),
             settings.ResolvedFadeOutCurve(),
             UiStrings.ParseLanguageChoice(settings.UiLanguage),
-            UiThemes.ParseChoice(settings.UiTheme),
             settings.ResolvedLoudnessTargetLufs(),
             settings.ResolvedSilentSkipThresholdDb(),
             settings.ResolvedSilentSkipRecordPadMs(),
@@ -1688,7 +1687,7 @@ public partial class MainWindow
 
         settings.UiLanguage = UiStrings.ToStoredValue(dialog.SelectedLanguage);
         UiStrings.SetLanguage(UiStrings.ResolveLanguage(dialog.SelectedLanguage));
-        settings.UiTheme = UiThemes.ToStoredValue(dialog.SelectedTheme);
+        settings.UiTheme = UiThemes.ToStoredValue(UiThemeChoice.Dark);
         settings.MultiFileArrange = WaveformTileLayout.Format(dialog.SelectedMultiFileArrange);
         settings.ApplyLibraryExplorerRoots(dialog.SelectedLibraryExplorerRoots);
         LibraryBrowser.SetExplorerRoots(settings.ResolvedLibraryExplorerRoots());

@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace MgaSonicAnvil.UI;
 
@@ -36,7 +37,7 @@ internal sealed class TimeScrollBar : ScrollBar
         HorizontalAlignment = HorizontalAlignment.Stretch;
         // 派生型には App.xaml の ScrollBar 暗黙スタイルが当たらない。
         SetResourceReference(StyleProperty, "TimeScrollBarStyle");
-        SetResourceReference(BackgroundProperty, "TimelineWellBackBrush");
+        Background = Brushes.Transparent;
     }
 
     public event EventHandler<TimeScrollView>? RangeChanged;

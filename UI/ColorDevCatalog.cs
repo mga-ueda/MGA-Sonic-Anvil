@@ -98,6 +98,7 @@ internal static class ColorDevCatalog
             ("RegionWaveFillAnacrusisBrush", ColorDevGroup.Region),
             ("RegionWaveFillLoopBrush", ColorDevGroup.Region),
             ("RegionWaveFillExitBrush", ColorDevGroup.Region),
+            ("RegionWaveFillExcludedBrush", ColorDevGroup.Region),
 
             ("MarkerBrush", ColorDevGroup.Marker),
             ("MarkerSelectedBrush", ColorDevGroup.Marker),
@@ -138,8 +139,8 @@ internal static class ColorDevCatalog
             ("PlayerPlaceholderJacketForeBrush", ColorDevGroup.Player),
             ("PlayerJacketReflectionBrush", ColorDevGroup.Player),
             ("PlayerFallbackWashNavyBrush", ColorDevGroup.Player),
+            ("PlayerFallbackWashBlueBrush", ColorDevGroup.Player),
             ("PlayerFallbackWashCyanBrush", ColorDevGroup.Player),
-            ("PlayerFallbackWashWhiteBrush", ColorDevGroup.Player),
             ("PlayerGlowVeilBrush", ColorDevGroup.Player),
             ("PlayerPaneFocusLineBrush", ColorDevGroup.Player),
             ("PlayerSelectionFillBrush", ColorDevGroup.Player),

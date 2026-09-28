@@ -133,7 +133,6 @@ public sealed class TransportToolTipTests
         Assert.DoesNotContain("\n", UiStrings.TooltipSave);
         Assert.DoesNotContain("\n", UiStrings.TooltipSaveMp3);
         Assert.DoesNotContain("\n", UiStrings.TooltipDelete);
-        Assert.DoesNotContain("\n", UiStrings.TooltipUiThemeToggle);
         Assert.DoesNotContain("\n", UiStrings.TooltipColorPanel);
     }
 }

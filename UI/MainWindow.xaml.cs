@@ -112,6 +112,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         LibraryBrowser.BindWaveformGlow(PlayerWaveGlowHost);
+        // エディタもプレイヤーと同じウォッシュ。モード切替（F11／F12）を待たない。
+        LibraryBrowser.UseWindowFallbackWash();
         LibraryBrowser.SessionActivated += LibraryBrowser_SessionActivated;
         LibraryBrowser.SessionPlayRequested += LibraryBrowser_SessionPlayRequested;
         LibraryBrowser.VisibleColumnsChanged += LibraryBrowser_VisibleColumnsChanged;
@@ -319,6 +321,7 @@ public partial class MainWindow : Window
         ApplyWaveformHeightScale();
         BindWorkspace(null);
         PlaceWaapiToggle();
+        ApplyLibraryWashChrome(true);
         InitializeWaapi();
         RefreshLocalizedText();
         MgaSonicAnvil.SingleInstance.StartWatch(() =>
@@ -400,6 +403,7 @@ public partial class MainWindow : Window
 
     private void BindWorkspace(DocumentSession? session)
     {
+        SyncPlayerMeterFade();
         if (session is not null
             && (session.Document.IsDeferredLoad
                 || (!IsLibraryMaximized && session.Document.IsStreamPlayback)))

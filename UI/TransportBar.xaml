@@ -7,7 +7,7 @@
              ToolTipService.IsEnabled="True"
              MinWidth="{x:Static ui:DesignMetrics.TransportFixedRowWidth}"
              MinHeight="{x:Static ui:DesignMetrics.TransportBarHeight}"
-             Background="{DynamicResource TransportBackBrush}">
+             Background="Transparent">
   <StackPanel HorizontalAlignment="Left"
               VerticalAlignment="Center"
               Margin="8,2,8,0">

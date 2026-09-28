@@ -12,7 +12,7 @@
         Opacity="0"
         AllowDrop="True"
         ToolTipService.IsEnabled="False"
-        Background="{DynamicResource SurfaceBackBrush}">
+        Background="Transparent">
   <Grid x:Name="RootChrome">
     <Grid x:Name="PlayerWaveGlowHost"
           IsHitTestVisible="False"
@@ -22,7 +22,7 @@
     <Border x:Name="StatusBarHost"
             DockPanel.Dock="Bottom"
             Height="{x:Static ui:DesignMetrics.StatusBarHeight}"
-            Background="{DynamicResource StatusBarBackBrush}">
+            Background="Transparent">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
@@ -95,7 +95,7 @@
             DockPanel.Dock="Bottom"
             Height="{x:Static ui:DesignMetrics.TipsPanelHeight}"
             Visibility="Collapsed"
-            Background="{DynamicResource WaapiBarBackBrush}"
+            Background="Transparent"
             BorderBrush="{DynamicResource ChromeBorderBrush}"
             BorderThickness="1">
       <DockPanel LastChildFill="True">
@@ -149,16 +149,16 @@
                               Width="{x:Static ui:DesignMetrics.DbScaleWidthGrid}" />
             <ColumnDefinition Width="*" />
           </Grid.ColumnDefinitions>
-          <Border Background="{DynamicResource TransportBackBrush}" />
+          <Border Background="Transparent" />
           <Border Grid.Column="1"
                   Padding="{x:Static ui:DesignMetrics.OverviewPad}"
-                  Background="{DynamicResource ProjectBarBackBrush}">
+                  Background="Transparent">
             <ui:OverviewView x:Name="Overview"
                              MouseRightButtonDown="Overview_MouseRightButtonDown" />
           </Border>
         </Grid>
         <Border x:Name="WaveformHostBorder"
-                Background="{DynamicResource WaveformBackBrush}"
+                Background="Transparent"
                 MinHeight="{x:Static ui:DesignMetrics.WaveformHostMinHeight}"
                 AllowDrop="True">
           <Grid>
@@ -184,9 +184,11 @@
             <DockPanel ClipToBounds="True">
               <ui:WaveformScrollStrip x:Name="TimeScrollStrip"
                                       DockPanel.Dock="Bottom"
-                                      Panel.ZIndex="1" />
+                                      Panel.ZIndex="1"
+                                      Opacity="0"
+                                      IsHitTestVisible="False" />
               <Grid x:Name="WaveformTileHost"
-                    Background="{DynamicResource WaveformBackBrush}"
+                    Background="Transparent"
                     SizeChanged="WaveformTileHost_SizeChanged">
                 <DockPanel x:Name="SingleWaveformHost">
                   <ui:WaveformView x:Name="PrimaryWaveform" ClipToBounds="True" />
@@ -251,7 +253,7 @@
                     DragCompleted="MeterColumnSplitter_DragCompleted" />
       <Grid x:Name="MeterColumn"
             Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
-            Background="{DynamicResource TransportBackBrush}">
+            Background="Transparent">
         <Grid.RowDefinitions>
           <RowDefinition Height="{x:Static ui:DesignMetrics.ProjectBarHeightGrid}" />
           <RowDefinition Height="*" />
@@ -259,20 +261,23 @@
         </Grid.RowDefinitions>
         <Border x:Name="MeterTopSlot"
                 Grid.Row="0"
-                Background="{DynamicResource TransportBackBrush}" />
+                Background="Transparent" />
         <ui:LevelMeterView x:Name="LevelMeter"
                            Grid.Row="1"
-                           VerticalAlignment="Stretch" />
+                           VerticalAlignment="Stretch"
+                           Opacity="0"
+                           IsHitTestVisible="False" />
         <ui:VectorScopeView x:Name="VectorScope"
                             Grid.Row="2"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Bottom"
-                            />
+                            Opacity="0"
+                            IsHitTestVisible="False" />
       </Grid>
 
       <Grid x:Name="TransportChromeHost"
             Grid.Row="1" Grid.Column="0"
-            Background="{DynamicResource TransportBackBrush}">
+            Background="Transparent">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
@@ -287,7 +292,7 @@
                 Grid.Row="0"
                 Grid.Column="0"
                 Height="{x:Static ui:DesignMetrics.DocumentTabBarHeight}"
-                Background="{DynamicResource TransportBackBrush}"
+                Background="Transparent"
                 SizeChanged="DocumentTabHost_SizeChanged">
           <DockPanel>
             <ui:TabScrollButton x:Name="TabScrollLeft"
@@ -300,6 +305,7 @@
                                 Visibility="Collapsed"
                                 Click="TabScrollRight_Click" />
             <ScrollViewer x:Name="DocumentTabScroll"
+                          Background="Transparent"
                           HorizontalScrollBarVisibility="Hidden"
                           VerticalScrollBarVisibility="Disabled"
                           Focusable="False"
@@ -315,7 +321,7 @@
                    Grid.Row="1"
                    Grid.Column="0"
                    MinHeight="{x:Static ui:DesignMetrics.TransportHostMinHeight}"
-                   Background="{DynamicResource TransportBackBrush}">
+                   Background="Transparent">
           <StackPanel DockPanel.Dock="Bottom"
                       Orientation="Horizontal"
                       HorizontalAlignment="Left"
@@ -359,13 +365,17 @@
                               Grid.Column="2"
                               Margin="0,0,6,0"
                               VerticalAlignment="Stretch"
-                              Background="{DynamicResource TransportBackBrush}" />
+                              Background="Transparent"
+                              Opacity="0"
+                              IsHitTestVisible="False" />
         <ui:ProjectSpectrumView x:Name="Spectrum"
                                 Grid.Row="0"
                                 Grid.RowSpan="2"
                                 Grid.Column="3"
                                 Height="{x:Static ui:DesignMetrics.SpectrumHeight}"
                                 Margin="0,0,1,0"
+                                Opacity="0"
+                                IsHitTestVisible="False"
                                 VerticalAlignment="Top" />
       </Grid>
     </Grid>

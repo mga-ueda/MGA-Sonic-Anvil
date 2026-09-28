@@ -199,9 +199,9 @@ internal sealed class LoudnessMeterView : Grid
 
     public void ApplyValueColors()
     {
-        _safeBrush = WpfControlHelpers.FrozenBrush(Theme.Get("VectorScopeTraceBrush"));
-        _cautionBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MarkerBrush"));
-        _dangerBrush = WpfControlHelpers.FrozenBrush(Theme.Get("StatusBarErrorDetailForeBrush"));
+        _safeBrush = WpfControlHelpers.FrozenBrush(Theme.Get("LoudnessSafeBrush"));
+        _cautionBrush = WpfControlHelpers.FrozenBrush(Theme.Get("LoudnessCautionBrush"));
+        _dangerBrush = WpfControlHelpers.FrozenBrush(Theme.Get("LoudnessDangerBrush"));
         _idleBrush = MutedFore();
         _chipFore = ChipFore();
         _safeChipBrush = ShadeBrush(_safeBrush);
@@ -265,7 +265,10 @@ internal sealed class LoudnessMeterView : Grid
     internal static Color ShadeChipFill(Color color, UiTheme theme)
     {
         var toward = theme == UiTheme.Light ? Colors.White : Colors.Black;
-        return Mix(color, toward, 0.22);
+        // ダークはネオンを落とすが、琥珀と赤の差は緑成分で残す。
+        var amount = theme == UiTheme.Light ? 0.22 : 0.55;
+        var shaded = Mix(color, toward, amount);
+        return Color.FromArgb(0xFF, shaded.R, shaded.G, shaded.B);
     }
 
     private bool IsLivePlayback() =>
@@ -494,7 +497,7 @@ internal sealed class LoudnessMeterView : Grid
         var box = new Border
         {
             Child = value,
-            CornerRadius = new CornerRadius(2),
+            CornerRadius = DesignMetrics.ControlCorner,
             Padding = new Thickness(3, 1, 3, 1),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(6, 0, 4, 0),

@@ -638,15 +638,15 @@ internal static class LoudnessTrafficLight
     public const double LraCautionLu = 20;
     public const double LraLimitLu = 25;
 
-    public const byte SafeR = 0x3A;
-    public const byte SafeG = 0xB8;
-    public const byte SafeB = 0xE8;
-    public const byte CautionR = 0xFF;
-    public const byte CautionG = 0x8A;
-    public const byte CautionB = 0x1A;
-    public const byte DangerR = 0xFF;
-    public const byte DangerG = 0x6E;
-    public const byte DangerB = 0x6E;
+    public const byte SafeR = 0x00;
+    public const byte SafeG = 0xFF;
+    public const byte SafeB = 0xFF;
+    public const byte CautionR = 0xD8;
+    public const byte CautionG = 0x98;
+    public const byte CautionB = 0x20;
+    public const byte DangerR = 0xB8;
+    public const byte DangerG = 0x38;
+    public const byte DangerB = 0x40;
 
     public static void Rgb(LoudnessTraffic traffic, out byte r, out byte g, out byte b)
     {

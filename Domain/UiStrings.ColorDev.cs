@@ -41,7 +41,7 @@ internal static partial class UiStrings
     public static string ColorDevGroupMeter => Get("レベルメーター", "Level meter");
     public static string ColorDevGroupSpectrum => Get("スペアナ", "Spectrum");
     public static string ColorDevGroupVectorScope => Get("ベクタースコープ", "Vector scope");
-    public static string ColorDevGroupPlayer => Get("プレイヤー（共通）", "Player (shared)");
+    public static string ColorDevGroupPlayer => Get("プレイヤー", "Player");
     public static string ColorDevGroupTransport => Get("トランスポート", "Transport");
     public static string ColorDevGroupStatus => Get("ステータスバー", "Status bar");
     public static string ColorDevGroupDialog => Get("ダイアログ", "Dialog");
@@ -117,6 +117,7 @@ internal static partial class UiStrings
             "RegionWaveFillAnacrusis" => Get("波形（-A）", "Wave (-A)"),
             "RegionWaveFillLoop" => Get("波形（-L）", "Wave (-L)"),
             "RegionWaveFillExit" => Get("波形（-E）", "Wave (-E)"),
+            "RegionWaveFillExcluded" => Get("波形（-R）", "Wave (-R)"),
             "Marker" => Get("通常", "Normal"),
             "MarkerSelected" => Get("選択", "Selected"),
             "MarkerSelectedBorder" => Get("選択枠", "Selected border"),
@@ -129,8 +130,8 @@ internal static partial class UiStrings
             "PlayerPlaceholderJacketBottom" => Get("ジャケットなし・下", "No jacket · bottom"),
             "PlayerPlaceholderJacketFore" => Get("ジャケットなし・文字", "No jacket · text"),
             "PlayerFallbackWashNavy" => Get("ジャケットなし背面・ネイビー", "No-jacket wash · navy"),
+            "PlayerFallbackWashBlue" => Get("ジャケットなし背面・ブルー", "No-jacket wash · blue"),
             "PlayerFallbackWashCyan" => Get("ジャケットなし背面・シアン", "No-jacket wash · cyan"),
-            "PlayerFallbackWashWhite" => Get("ジャケットなし背面・白", "No-jacket wash · white"),
             "PlayerGlowVeil" => Get("ウォッシュのベール", "Wash veil"),
             "PlayerPaneFocusLine" => Get("ペインフォーカス", "Pane focus"),
             "PlayerSelectionFill" => Get("選択", "Selection"),

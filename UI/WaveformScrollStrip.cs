@@ -34,7 +34,7 @@ internal sealed class WaveformScrollStrip : Grid
         ClipToBounds = true;
         SnapsToDevicePixels = true;
         UseLayoutRounding = true;
-        SetResourceReference(BackgroundProperty, "TimelineWellBackBrush");
+        Background = Brushes.Transparent;
 
         ColumnDefinitions.Add(ButtonColumn());
         ColumnDefinitions.Add(ButtonColumn());
@@ -167,13 +167,13 @@ internal sealed class WaveformScrollButton : RepeatButton
             return;
         }
 
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("TimelineWellBackBrush")), null, bounds);
         if (IsEnabled && (IsMouseOver || IsPressed))
         {
             var fill = IsPressed
                 ? Theme.Get("TransportPressedBackBrush")
                 : Theme.Get("TransportHoverBackBrush");
-            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(fill), null, bounds);
+            var radius = DesignMetrics.ControlCornerRadius;
+            dc.DrawRoundedRectangle(WpfControlHelpers.FrozenBrush(fill), null, bounds, radius, radius);
         }
 
         DrawGlyph(dc, bounds, TransportChrome.Fore(IsEnabled));

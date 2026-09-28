@@ -63,6 +63,19 @@ internal static class WpfControlHelpers
         return geometry;
     }
 
+    /// <summary>旗。ポール側は直角、反対側だけ角丸。</summary>
+    public static StreamGeometry FlagGeometry(Rect bounds, double radius, bool stemOnLeft)
+    {
+        var geometry = new StreamGeometry();
+        using (var ctx = geometry.Open())
+        {
+            AddFlagRect(ctx, bounds, radius, stemOnLeft);
+        }
+
+        geometry.Freeze();
+        return geometry;
+    }
+
     public static void AddRoundedRect(StreamGeometryContext ctx, Rect bounds, double radius)
     {
         radius = Math.Max(0d, Math.Min(radius, Math.Min(bounds.Width, bounds.Height) / 2d));
@@ -85,6 +98,43 @@ internal static class WpfControlHelpers
         ctx.ArcTo(new Point(x + w, y + r), new Size(r, r), 0, false, SweepDirection.Clockwise, isStroked: true, isSmoothJoin: true);
         ctx.LineTo(new Point(x + w, y + h - r), isStroked: true, isSmoothJoin: false);
         ctx.ArcTo(new Point(x + w - r, y + h), new Size(r, r), 0, false, SweepDirection.Clockwise, isStroked: true, isSmoothJoin: true);
+        ctx.LineTo(new Point(x + r, y + h), isStroked: true, isSmoothJoin: false);
+        ctx.ArcTo(new Point(x, y + h - r), new Size(r, r), 0, false, SweepDirection.Clockwise, isStroked: true, isSmoothJoin: true);
+        ctx.LineTo(new Point(x, y + r), isStroked: true, isSmoothJoin: false);
+        ctx.ArcTo(new Point(x + r, y), new Size(r, r), 0, false, SweepDirection.Clockwise, isStroked: true, isSmoothJoin: true);
+    }
+
+    public static void AddFlagRect(StreamGeometryContext ctx, Rect bounds, double radius, bool stemOnLeft)
+    {
+        radius = Math.Max(0d, Math.Min(radius, Math.Min(bounds.Width, bounds.Height) / 2d));
+        var x = bounds.X;
+        var y = bounds.Y;
+        var w = bounds.Width;
+        var h = bounds.Height;
+        if (radius <= 0d)
+        {
+            ctx.BeginFigure(bounds.TopLeft, isFilled: true, isClosed: true);
+            ctx.LineTo(bounds.TopRight, isStroked: true, isSmoothJoin: false);
+            ctx.LineTo(bounds.BottomRight, isStroked: true, isSmoothJoin: false);
+            ctx.LineTo(bounds.BottomLeft, isStroked: true, isSmoothJoin: false);
+            return;
+        }
+
+        var r = radius;
+        if (stemOnLeft)
+        {
+            ctx.BeginFigure(new Point(x, y), isFilled: true, isClosed: true);
+            ctx.LineTo(new Point(x + w - r, y), isStroked: true, isSmoothJoin: false);
+            ctx.ArcTo(new Point(x + w, y + r), new Size(r, r), 0, false, SweepDirection.Clockwise, isStroked: true, isSmoothJoin: true);
+            ctx.LineTo(new Point(x + w, y + h - r), isStroked: true, isSmoothJoin: false);
+            ctx.ArcTo(new Point(x + w - r, y + h), new Size(r, r), 0, false, SweepDirection.Clockwise, isStroked: true, isSmoothJoin: true);
+            ctx.LineTo(new Point(x, y + h), isStroked: true, isSmoothJoin: false);
+            return;
+        }
+
+        ctx.BeginFigure(new Point(x + r, y), isFilled: true, isClosed: true);
+        ctx.LineTo(new Point(x + w, y), isStroked: true, isSmoothJoin: false);
+        ctx.LineTo(new Point(x + w, y + h), isStroked: true, isSmoothJoin: false);
         ctx.LineTo(new Point(x + r, y + h), isStroked: true, isSmoothJoin: false);
         ctx.ArcTo(new Point(x, y + h - r), new Size(r, r), 0, false, SweepDirection.Clockwise, isStroked: true, isSmoothJoin: true);
         ctx.LineTo(new Point(x, y + r), isStroked: true, isSmoothJoin: false);

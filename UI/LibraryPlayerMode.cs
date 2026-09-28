@@ -65,7 +65,6 @@ internal static class LibraryPlayerMode
             or TransportCommand.NextPage
             or TransportCommand.GoToEnd
             or TransportCommand.Open
-            or TransportCommand.ToggleUiTheme
             or TransportCommand.OpenColorPanel
             or TransportCommand.ToggleTips
             or TransportCommand.OpenSettings
@@ -346,11 +345,10 @@ internal static class LibraryPlayerMode
         sessions.Count == 0 ? null : sessions[0];
 
     /// <summary>
-    /// プレイヤーではプレイリストが空のときレベルメーター／スペアナ／ラウドネス／ゴニオ／サラウンドを出さない。
-    /// エディタでは常に出す。
+    /// 開いている波形が無いとき、レベルメーター／スペアナ／ラウドネス／ゴニオを出さない。
+    /// プレイヤーもエディタも同じ。
     /// </summary>
-    public static bool ShowsPlayerMeters(bool playerMode, int playlistCount) =>
-        !playerMode || playlistCount > 0;
+    public static bool ShowsPlayerMeters(int playlistCount) => playlistCount > 0;
 
     /// <summary>
     /// 音声信号で動くメーターはフェードせず即出す。停止中の追加だけ 1 秒フェード。

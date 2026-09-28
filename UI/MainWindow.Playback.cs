@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
@@ -173,9 +174,6 @@ public partial class MainWindow
                 break;
             case TransportCommand.History:
                 OpenEditHistory();
-                break;
-            case TransportCommand.ToggleUiTheme:
-                UiThemeService.ToggleDarkLight();
                 break;
             case TransportCommand.OpenColorPanel:
                 ShowColorDevPanel();
@@ -1335,7 +1333,10 @@ public partial class MainWindow
         }
     }
 
-    private void SetWaveformMaximizeMode(WaveformMaximizeMode mode, bool? playFirstOnLibrary = null)
+    private void SetWaveformMaximizeMode(
+        WaveformMaximizeMode mode,
+        bool? playFirstOnLibrary = null,
+        bool retainMinimalChrome = false)
     {
         if (_waveformMaximizeMode == mode)
         {
@@ -1383,7 +1384,7 @@ public partial class MainWindow
         else if (!wantFullscreen && wasFullscreen)
         {
             _waveformMaximizeMode = mode;
-            if (wantLibrary && wasFullscreen)
+            if (wantLibrary && wasFullscreen && !retainMinimalChrome)
             {
                 _libraryMinimalChrome = _minimalBeforeWaveformMax;
             }
@@ -1416,11 +1417,12 @@ public partial class MainWindow
         if (wantLibrary)
         {
             ScheduleLibraryWaveformPaint();
+            ScheduleLibraryEnterPlayback();
         }
 
         if (!wasFullscreen || wasLibrary || wantLibrary)
         {
-            AppStorage.Save();
+            Dispatcher.BeginInvoke(AppStorage.Save, DispatcherPriority.Background);
         }
 
         if (mode == WaveformMaximizeMode.Library)

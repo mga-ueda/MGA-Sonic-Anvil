@@ -68,12 +68,15 @@ internal static class WaveformInvertPaint
         var anacrusis = omitCueFills ? 0 : ToBgra(Theme.Get("RegionWaveFillAnacrusisBrush"));
         var loop = omitCueFills ? 0 : ToBgra(Theme.Get("RegionWaveFillLoopBrush"));
         var exit = omitCueFills ? 0 : ToBgra(Theme.Get("RegionWaveFillExitBrush"));
+        var remove = omitCueFills ? 0 : ToBgra(Theme.Get("RegionWaveFillExcludedBrush"));
         IReadOnlyList<WaveSelection> regions = omitCueFills ? [] : document.Regions;
         var sample = omitCueFills ? WaveSelection.Empty : document.SampleLoop;
         var hasSampleLoop = !sample.IsEmpty;
         var frameCount = document.FrameCount;
         // マーカー役割（コメントの文字列解析）は列×マーカー数で繰り返さず、一度だけ解決する。
-        List<RoleSpan> underSpans = omitCueFills ? [] : CollectUnderWaveRoleSpans(document, anacrusis, loop, exit);
+        List<RoleSpan> underSpans = omitCueFills
+            ? []
+            : CollectUnderWaveRoleSpans(document, anacrusis, loop, exit, remove);
 
         for (var x = 0; x < width; x++)
         {
@@ -137,7 +140,8 @@ internal static class WaveformInvertPaint
         AudioDocument document,
         int anacrusis,
         int loop,
-        int exit)
+        int exit,
+        int remove)
     {
         var spans = new List<RoleSpan>();
         var markers = document.Markers;
@@ -145,7 +149,7 @@ internal static class WaveformInvertPaint
         for (var i = 0; i < markers.Count; i++)
         {
             var role = MarkerRoles.FromComment(markers[i].Comment);
-            if (role is not (MarkerRole.Anacrusis or MarkerRole.Loop or MarkerRole.Exit))
+            if (role is not (MarkerRole.Anacrusis or MarkerRole.Loop or MarkerRole.Exit or MarkerRole.Remove))
             {
                 continue;
             }
@@ -155,6 +159,7 @@ internal static class WaveformInvertPaint
                 MarkerRole.Anacrusis => anacrusis,
                 MarkerRole.Loop => loop,
                 MarkerRole.Exit => exit,
+                MarkerRole.Remove => remove,
                 _ => 0,
             };
             var end = i + 1 < markers.Count ? markers[i + 1].Frame : frameCount;

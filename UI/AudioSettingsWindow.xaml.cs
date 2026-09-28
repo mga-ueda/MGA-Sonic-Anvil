@@ -28,8 +28,6 @@ internal partial class AudioSettingsWindow : Window
 
     public UiLanguageChoice SelectedLanguage { get; private set; }
 
-    public UiThemeChoice SelectedTheme { get; private set; }
-
     public WaveformTileArrange SelectedMultiFileArrange { get; private set; }
 
     public int SelectedUiScalePercent { get; private set; } = UiScale.DefaultPercent;
@@ -98,7 +96,6 @@ internal partial class AudioSettingsWindow : Window
         FadeShape fadeIn,
         FadeShape fadeOut,
         UiLanguageChoice language,
-        UiThemeChoice theme,
         double loudnessTargetLufs,
         double silentSkipThresholdDb,
         int silentSkipRecordPadMs,
@@ -123,7 +120,6 @@ internal partial class AudioSettingsWindow : Window
     {
         SelectedSettings = current;
         SelectedLanguage = language;
-        SelectedTheme = theme;
         SelectedMultiFileArrange = WaveformTileLayout.Parse(multiFileArrange);
         SelectedUiScalePercent = UiScale.ClampPercent(uiScalePercent);
         _uiScaleOpenedAt = SelectedUiScalePercent;
@@ -183,11 +179,6 @@ internal partial class AudioSettingsWindow : Window
         LanguageCombo.Items.Add(new LanguageItem(UiLanguageChoice.Japanese, UiStrings.LabelLanguageJapanese));
         LanguageCombo.Items.Add(new LanguageItem(UiLanguageChoice.English, UiStrings.LabelLanguageEnglish));
         SelectLanguage(language);
-
-        ThemeCombo.Items.Add(new ThemeItem(UiThemeChoice.Auto, UiStrings.LabelThemeAuto));
-        ThemeCombo.Items.Add(new ThemeItem(UiThemeChoice.Dark, UiStrings.LabelThemeDark));
-        ThemeCombo.Items.Add(new ThemeItem(UiThemeChoice.Light, UiStrings.LabelThemeLight));
-        SelectTheme(theme);
         FillMultiFileArrange(SelectedMultiFileArrange);
         FillUiScale(SelectedUiScalePercent);
         UiScaleCombo.SelectionChanged += UiScaleCombo_SelectionChanged;
@@ -274,8 +265,6 @@ internal partial class AudioSettingsWindow : Window
     {
         TipService.Set(LanguageLabel, UiStrings.TipUiLanguage);
         TipService.Set(LanguageCombo, UiStrings.TipUiLanguage);
-        TipService.Set(ThemeLabel, UiStrings.TipUiTheme);
-        TipService.Set(ThemeCombo, UiStrings.TipUiTheme);
         TipService.Set(UiScaleLabel, UiStrings.TipUiScale);
         TipService.Set(UiScaleCombo, UiStrings.TipUiScale);
         TipService.Set(MultiFileArrangeLabel, UiStrings.TipMultiFileArrange);
@@ -820,9 +809,6 @@ internal partial class AudioSettingsWindow : Window
         SelectedLanguage = LanguageCombo.SelectedItem is LanguageItem item
             ? item.Choice
             : UiLanguageChoice.Auto;
-        SelectedTheme = ThemeCombo.SelectedItem is ThemeItem themeItem
-            ? themeItem.Choice
-            : UiThemeChoice.Auto;
         SelectedMultiFileArrange = MultiFileArrangeCombo.SelectedItem is MultiFileArrangeItem arrangeItem
             ? arrangeItem.Arrange
             : WaveformTileArrange.Off;
@@ -1372,25 +1358,28 @@ internal partial class AudioSettingsWindow : Window
         }
 
         var delta = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift ? -1 : 1;
-        CycleSettingsTab(delta);
+        CycleSettingsTab(delta, wrap: !e.IsRepeat);
         e.Handled = true;
     }
 
-    private void CycleSettingsTab(int delta)
+    private void CycleSettingsTab(int delta, bool wrap = true)
     {
         var count = SettingsTabs.Items.Count;
-        var next = WrapTabIndex(SettingsTabs.SelectedIndex, count, delta);
+        var next = StepTabIndex(SettingsTabs.SelectedIndex, count, delta, wrap);
         if (next != SettingsTabs.SelectedIndex)
         {
             SettingsTabs.SelectedIndex = next;
         }
     }
 
-    internal static int WrapTabIndex(int index, int count, int delta)
+    /// <summary>
+    /// 送り／戻し。wrap なら端で反対側へ。長押し連続では wrap=false で端に一旦止まる。
+    /// </summary>
+    internal static int StepTabIndex(int index, int count, int delta, bool wrap = true)
     {
-        if (count < 2)
+        if (count < 1)
         {
-            return Math.Max(0, index);
+            return 0;
         }
 
         if (index < 0)
@@ -1398,7 +1387,18 @@ internal partial class AudioSettingsWindow : Window
             index = 0;
         }
 
-        return (index + delta % count + count) % count;
+        if (count == 1 || delta == 0)
+        {
+            return Math.Clamp(index, 0, count - 1);
+        }
+
+        var step = Math.Sign(delta);
+        if (!wrap)
+        {
+            return Math.Clamp(index + step, 0, count - 1);
+        }
+
+        return (index + step + count) % count;
     }
 
     internal static bool ShouldConfirmSpeakerSave(bool dirty, string? currentId, string? nextId)
@@ -1454,20 +1454,6 @@ internal partial class AudioSettingsWindow : Window
         }
 
         LanguageCombo.SelectedIndex = 0;
-    }
-
-    private void SelectTheme(UiThemeChoice theme)
-    {
-        foreach (ThemeItem item in ThemeCombo.Items)
-        {
-            if (item.Choice == theme)
-            {
-                ThemeCombo.SelectedItem = item;
-                return;
-            }
-        }
-
-        ThemeCombo.SelectedIndex = 0;
     }
 
     private void FillMultiFileArrange(WaveformTileArrange arrange)
@@ -1590,7 +1576,6 @@ internal partial class AudioSettingsWindow : Window
     {
         var deviceMax = Math.Max(80, SystemParameters.WorkArea.Width - 200);
         ComboBoxFit.Apply(LanguageCombo);
-        ComboBoxFit.Apply(ThemeCombo);
         ComboBoxFit.Apply(UiScaleCombo);
         ComboBoxFit.Apply(MultiFileArrangeCombo);
         ComboBoxFit.Apply(DefaultSampleRateCombo);
@@ -2046,11 +2031,6 @@ internal partial class AudioSettingsWindow : Window
     private sealed record LibraryExplorerRootItem(string Path)
     {
         public override string ToString() => Path;
-    }
-
-    private sealed record ThemeItem(UiThemeChoice Choice, string Label)
-    {
-        public override string ToString() => Label;
     }
 
     private sealed record MultiFileArrangeItem(WaveformTileArrange Arrange, string Label)

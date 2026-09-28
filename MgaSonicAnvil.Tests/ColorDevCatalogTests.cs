@@ -79,14 +79,14 @@ public sealed class ColorDevCatalogTests
             Assert.Equal("波形", ColorDevCatalog.GroupTitle(ColorDevGroup.Waveform));
             Assert.Equal("ガイド", ColorDevCatalog.GroupTitle(ColorDevGroup.Guides));
             Assert.Equal("トランスポート", ColorDevCatalog.GroupTitle(ColorDevGroup.Transport));
-            Assert.Equal("プレイヤー（共通）", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
+            Assert.Equal("プレイヤー", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
 
             UiStrings.SetLanguage(UiLanguage.English);
             Assert.Equal("Shared", ColorDevCatalog.GroupTitle(ColorDevGroup.Shared));
             Assert.Equal("Waveform", ColorDevCatalog.GroupTitle(ColorDevGroup.Waveform));
             Assert.Equal("Guides", ColorDevCatalog.GroupTitle(ColorDevGroup.Guides));
             Assert.Equal("Transport", ColorDevCatalog.GroupTitle(ColorDevGroup.Transport));
-            Assert.Equal("Player (shared)", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
+            Assert.Equal("Player", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
         }
         finally
         {
@@ -101,7 +101,7 @@ public sealed class ColorDevCatalogTests
         Assert.Contains("x:Key=\"WaveFillBrush\" Color=\"#FFC6D9FF\"", xaml);
         Assert.Contains("x:Key=\"PlayerPlaceholderJacketTopBrush\" Color=\"#FF5C5C62\"", xaml);
         Assert.Contains("x:Key=\"PlayerWaveFillBrush\" Color=\"#94C6D9FF\"", xaml);
-        Assert.Contains("x:Key=\"PlayerFallbackWashNavyBrush\" Color=\"#FF1B3A6B\"", xaml);
+        Assert.Contains("x:Key=\"PlayerFallbackWashNavyBrush\" Color=\"#FF0B1B49\"", xaml);
         Assert.Contains("x:Key=\"PlayerLevelMeterTrackBorderBrush\" Color=\"#FF5A605A\"", xaml);
         Assert.Contains("x:Key=\"PlayerLevelMeterTickBrush\" Color=\"#60FFFFFF\"", xaml);
         Assert.Contains("x:Key=\"PlayerVectorScopeGridBrush\" Color=\"#FF717174\"", xaml);

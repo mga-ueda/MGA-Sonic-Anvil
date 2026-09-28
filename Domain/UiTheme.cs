@@ -66,8 +66,4 @@ internal static class UiThemes
             UiThemeChoice.Dark => "dark",
             _ => "auto",
         };
-
-    /// <summary>解決済みの配色を反転する。Auto は外れる。</summary>
-    public static UiThemeChoice ToggledChoice(UiTheme current) =>
-        current == UiTheme.Light ? UiThemeChoice.Dark : UiThemeChoice.Light;
 }

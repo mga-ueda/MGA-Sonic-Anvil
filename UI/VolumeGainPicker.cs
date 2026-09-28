@@ -308,9 +308,9 @@ internal static class VolumeGainPicker
     {
         var key = traffic switch
         {
-            LoudnessTraffic.Caution => "MarkerBrush",
-            LoudnessTraffic.Danger => "StatusBarErrorDetailForeBrush",
-            LoudnessTraffic.Safe => "VectorScopeTraceBrush",
+            LoudnessTraffic.Caution => "LoudnessCautionBrush",
+            LoudnessTraffic.Danger => "LoudnessDangerBrush",
+            LoudnessTraffic.Safe => "LoudnessSafeBrush",
             _ => "MutedForeBrush",
         };
         return WpfControlHelpers.FrozenBrush(Theme.Get(key));

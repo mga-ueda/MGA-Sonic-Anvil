@@ -62,11 +62,16 @@ internal sealed class HistoryStripView : FrameworkElement
 
     protected override void OnRender(DrawingContext dc)
     {
-        var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
-        dc.DrawRectangle(
-            ThemeBrush(_hover ? "HistoryStripHoverBackBrush" : "HistoryStripBackBrush"),
-            null,
-            bounds);
+        if (_hover)
+        {
+            var radius = DesignMetrics.ControlCornerRadius;
+            dc.DrawRoundedRectangle(
+                ThemeBrush("HistoryStripHoverBackBrush"),
+                null,
+                new Rect(0, 0, ActualWidth, ActualHeight),
+                radius,
+                radius);
+        }
 
         var rowHeight = DesignMetrics.HistoryStripRowHeight;
         var visible = HistoryStripLayout.VisibleCount(ActualHeight, rowHeight, PadY);

@@ -1,11 +1,9 @@
 using System.Windows;
-using Microsoft.Win32;
-using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>設定と OS 配色から背景／文字を入れ替える。</summary>
+/// <summary>配色を適用する。実行時はダーク固定。</summary>
 internal static class UiThemeService
 {
     private static bool _started;
@@ -15,10 +13,8 @@ internal static class UiThemeService
 
     public static UiTheme Current { get; private set; } = UiTheme.Dark;
 
-    /// <summary>画面に塗っている配色。プレイヤー中は設定がライトでもダーク。</summary>
+    /// <summary>画面に塗っている配色。実行時はダーク固定。</summary>
     public static UiTheme Painted { get; private set; } = UiTheme.Dark;
-
-    private static bool _playerForcesDark;
 
     public static void Start()
     {
@@ -29,7 +25,6 @@ internal static class UiThemeService
 
         _started = true;
         ApplyFromSettings(force: true);
-        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         if (Application.Current is { } app)
         {
             app.Exit += (_, _) => Stop();
@@ -38,45 +33,17 @@ internal static class UiThemeService
 
     public static void Stop()
     {
-        if (!_started)
-        {
-            return;
-        }
-
-        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         _started = false;
     }
 
     public static void ApplyFromSettings(bool force = false)
     {
-        var choice = UiThemes.ParseChoice(AppStorage.Settings.UiTheme);
-        Apply(UiThemes.Resolve(choice, OsUsesLightTheme()), force);
-    }
-
-    public static void ToggleDarkLight()
-    {
-        var choice = UiThemes.ToggledChoice(Current);
-        AppStorage.Settings.UiTheme = UiThemes.ToStoredValue(choice);
-        AppStorage.Save();
-        Apply(UiThemes.Resolve(choice, OsUsesLightTheme()), force: true);
-    }
-
-    /// <summary>プレイヤー表示中は、設定がライトでもダークの色を塗る。</summary>
-    public static void SetPlayerForcesDark(bool player)
-    {
-        if (_playerForcesDark == player)
-        {
-            return;
-        }
-
-        _playerForcesDark = player;
-        Paint();
+        Apply(UiTheme.Dark, force);
     }
 
     public static void Apply(UiTheme theme, bool force = false)
     {
-        var painted = ResolvePainted(theme);
-        if (!force && _applied && theme == Current && painted == Painted)
+        if (!force && _applied && theme == Current && theme == Painted)
         {
             return;
         }
@@ -85,56 +52,14 @@ internal static class UiThemeService
         Paint();
     }
 
-    private static UiTheme ResolvePainted(UiTheme theme) =>
-        _playerForcesDark ? UiTheme.Dark : theme;
-
     private static void Paint()
     {
-        var painted = ResolvePainted(Current);
-        Painted = painted;
+        Painted = Current;
         _applied = true;
-        UiThemePalette.Apply(painted);
-        UiColors.ApplySaved(painted);
+        UiThemePalette.Apply(Painted);
+        UiColors.ApplySaved(Painted);
         RefreshWindowChrome();
         Changed?.Invoke(null, EventArgs.Empty);
-    }
-
-    public static bool OsUsesLightTheme()
-    {
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(
-                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-            var value = key?.GetValue("AppsUseLightTheme");
-            return value is int flag && flag != 0
-                || value is uint unsigned && unsigned != 0;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
-    {
-        if (e.Category is not (UserPreferenceCategory.General or UserPreferenceCategory.Color))
-        {
-            return;
-        }
-
-        var app = Application.Current;
-        if (app is null)
-        {
-            return;
-        }
-
-        if (app.Dispatcher.CheckAccess())
-        {
-            ApplyFromSettings();
-            return;
-        }
-
-        _ = app.Dispatcher.BeginInvoke(static () => ApplyFromSettings());
     }
 
     private static void RefreshWindowChrome()

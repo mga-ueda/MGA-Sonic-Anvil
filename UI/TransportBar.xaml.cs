@@ -61,7 +61,6 @@ internal partial class TransportBar : UserControl
             (TransportCommand.History, TransportIcon.History, UiStrings.TipEditHistory, UiStrings.TooltipHistory),
             (TransportCommand.ToggleLibraryMaximize, TransportIcon.PlayerMode, UiStrings.TipLibraryMaximize, UiStrings.TooltipLibraryMaximize),
             (TransportCommand.ToggleAnalyzerMaximize, TransportIcon.AnalyzerMaximize, UiStrings.TipAnalyzerMaximize, UiStrings.TooltipAnalyzerMaximize),
-            (TransportCommand.ToggleUiTheme, TransportIcon.ThemeMoon, UiStrings.TipUiThemeToggle, UiStrings.TooltipUiThemeToggle),
             (TransportCommand.OpenColorPanel, TransportIcon.ColorPalette, UiStrings.TipColorPanel, UiStrings.TooltipColorPanel));
 
         AddGroup(
@@ -72,7 +71,6 @@ internal partial class TransportBar : UserControl
             (TransportCommand.OpenManual, TransportIcon.Help, UiStrings.TipManualHelp, UiStrings.TooltipManualHelp));
 
         ApplyLocalizedTips();
-        SetUiTheme(UiThemeService.Current);
     }
 
     public void ApplyLocalizedTips()
@@ -103,7 +101,6 @@ internal partial class TransportBar : UserControl
         SetTip(TransportCommand.History, UiStrings.TipEditHistory, UiStrings.TooltipHistory);
         SetTip(TransportCommand.ToggleLibraryMaximize, UiStrings.TipLibraryMaximize, UiStrings.TooltipLibraryMaximize, respectsEnabled: false);
         SetTip(TransportCommand.ToggleAnalyzerMaximize, UiStrings.TipAnalyzerMaximize, UiStrings.TooltipAnalyzerMaximize, respectsEnabled: false);
-        SetTip(TransportCommand.ToggleUiTheme, UiStrings.TipUiThemeToggle, UiStrings.TooltipUiThemeToggle, respectsEnabled: false);
         SetTip(TransportCommand.OpenColorPanel, UiStrings.TipColorPanel, UiStrings.TooltipColorPanel, respectsEnabled: false);
         SetTip(TransportCommand.OpenSettings, UiStrings.TipAudioSettings, UiStrings.TooltipSettings, respectsEnabled: false);
         SetTip(TransportCommand.ToggleTips, UiStrings.TipTipsToggle, UiStrings.TooltipTipsToggle, respectsEnabled: false);
@@ -153,15 +150,6 @@ internal partial class TransportBar : UserControl
         {
             button.IsLatched = enabled;
             button.InvalidateVisual();
-        }
-    }
-
-    public void SetUiTheme(UiTheme theme)
-    {
-        if (_buttons.TryGetValue(TransportCommand.ToggleUiTheme, out var button))
-        {
-            button.Icon = theme == UiTheme.Light ? TransportIcon.ThemeSun : TransportIcon.ThemeMoon;
-            button.IsLatched = theme == UiTheme.Light;
         }
     }
 
@@ -235,7 +223,6 @@ internal partial class TransportBar : UserControl
 
     public void RefreshAppearance()
     {
-        SetUiTheme(UiThemeService.Current);
         InvalidateVisual();
         foreach (var button in _buttons.Values)
         {
@@ -254,7 +241,6 @@ internal partial class TransportBar : UserControl
         {
             if (command is TransportCommand.Open
                 or TransportCommand.OpenSettings
-                or TransportCommand.ToggleUiTheme
                 or TransportCommand.OpenColorPanel
                 or TransportCommand.ToggleTips
                 or TransportCommand.OpenManual
