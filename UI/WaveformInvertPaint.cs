@@ -24,9 +24,19 @@ internal static class WaveformInvertPaint
         double laneGapPx = 0,
         bool playerLight = false,
         bool shadeLanes = false,
-        bool omitCueFills = false)
+        bool omitCueFills = false,
+        int colStart = 0,
+        int colEnd = -1)
     {
         if (width <= 0 || height <= 0 || pixels.Length < width * height)
+        {
+            return;
+        }
+
+        // 選択列だけ反転すれば拡縮中も本物の見た目を保てるので、範囲を絞れるようにする。
+        var xStart = Math.Clamp(colStart, 0, width);
+        var xEnd = colEnd < 0 ? width : Math.Clamp(colEnd, xStart, width);
+        if (xEnd <= xStart)
         {
             return;
         }
@@ -45,7 +55,7 @@ internal static class WaveformInvertPaint
             {
                 var waveFill = waveColorByY[y];
                 var row = y * width;
-                for (var x = 0; x < width; x++)
+                for (var x = xStart; x < xEnd; x++)
                 {
                     pixels[row + x] = InvertShaded(
                         pixels[row + x],
@@ -78,7 +88,7 @@ internal static class WaveformInvertPaint
             ? []
             : CollectUnderWaveRoleSpans(document, anacrusis, loop, exit, remove);
 
-        for (var x = 0; x < width; x++)
+        for (var x = xStart; x < xEnd; x++)
         {
             var frame = FrameAtColumn(x, width, viewStart, viewSpan, frameCount);
             var columnBack = waveformBack;

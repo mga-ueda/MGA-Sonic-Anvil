@@ -126,7 +126,10 @@ internal sealed class WaveformView : Grid
     private SpectrogramViewMode _invertMode;
     private double _invertViewStart;
     private double _invertViewSpan;
+    private double _invertAmpZoom;
     private bool _invertDirty = true;
+    private int _invertColStart;
+    private int _invertColEnd;
     private int[] _invertPixels = [];
     private int[] _wavePixels = [];
     private int _wavePixelWidth;
@@ -2346,7 +2349,7 @@ internal sealed class WaveformView : Grid
         }
 
         _waveBitmap!.WritePixels(new Int32Rect(0, 0, bmpWidth, height), _wavePixels, bmpWidth * 4, 0);
-        _invertDirty = true;
+        MarkInvertDirty();
         var modeChanged = _waveMode != _spectrogramMode;
 
         _waveDipSize = bounds.Size;
@@ -2531,10 +2534,15 @@ internal sealed class WaveformView : Grid
         _invertBitmap = null;
         _invertPixels = [];
         _invertDocument = null;
+        MarkInvertDirty();
+    }
+
+    private void MarkInvertDirty()
+    {
         _invertDirty = true;
     }
 
-    private void RebuildInvertBitmap(int width, int height, DpiScale dpi)
+    private void RebuildInvertBitmap(int width, int height, DpiScale dpi, int colStart, int colEnd)
     {
         if (_waveBitmap is null)
         {
@@ -2560,6 +2568,11 @@ internal sealed class WaveformView : Grid
             _invertPixels = new int[needed];
         }
 
+        var xStart = Math.Clamp(colStart, 0, width);
+        var xEnd = Math.Clamp(colEnd < 0 ? width : colEnd, xStart, width);
+
+        // 波形全体をコピーし直してから対象列だけ反転する。前回反転した列は素の波形で上書き
+        // されるので、選択が動いても古い反転が別の場所に残らない（クリップと合わせて正しい）。
         _waveBitmap.CopyPixels(new Int32Rect(0, 0, width, height), _invertPixels, width * 4, 0);
         WaveformInvertPaint.RebuildInPlace(
             _invertPixels,
@@ -2572,21 +2585,43 @@ internal sealed class WaveformView : Grid
             LaneGapPx(dpi.DpiScaleY),
             playerLight: SeekAndSelectOnly && UiThemeService.Painted == UiTheme.Light,
             shadeLanes: SeekAndSelectOnly,
-            omitCueFills: !LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly));
+            omitCueFills: !LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly),
+            colStart: xStart,
+            colEnd: xEnd);
         _invertBitmap.WritePixels(new Int32Rect(0, 0, width, height), _invertPixels, width * 4, 0);
         _invertDocument = _document;
         _invertChannels = _document?.Channels ?? 0;
         _invertMode = _waveMode;
         _invertViewStart = _waveViewStart;
         _invertViewSpan = _waveViewSpan;
+        _invertAmpZoom = _waveAmpZoom;
+        _invertColStart = xStart;
+        _invertColEnd = xEnd;
         _invertDirty = false;
     }
 
+    /// <summary>現在の選択が反転ビットマップで必要とする列範囲（両端を 1 列だけ余分に取る）。</summary>
+    private void SelectionInvertColumns(int width, out int colStart, out int colEnd)
+    {
+        var selection = _document?.Selection ?? WaveSelection.Empty;
+        if (_document is null || selection.IsEmpty || _waveViewSpan <= 0 || width <= 0)
+        {
+            colStart = 0;
+            colEnd = width;
+            return;
+        }
+
+        var c0 = (selection.StartFrame - _waveViewStart) / _waveViewSpan * width;
+        var c1 = (selection.EndFrame - _waveViewStart) / _waveViewSpan * width;
+        colStart = Math.Clamp((int)Math.Floor(c0) - 1, 0, width);
+        colEnd = Math.Clamp((int)Math.Ceiling(c1) + 1, colStart, width);
+    }
+
     /// <summary>
-    /// 選択を実際に描く直前にだけ反転ビットマップを作る。波形ビットマップの
-    /// 更新ごとに全画素を作り直すと追従スクロールが大きく間引かれるため。
+    /// 現在の選択が必要とする列だけを同期で反転しておく。選択列に限れば全画素反転より
+    /// はるかに軽いので、拡縮中でも本物の反転見た目を保ったまま毎フレーム作り直せる。
     /// </summary>
-    private void EnsureInvertBitmap()
+    private void EnsureSelectionInvert()
     {
         if (_waveBitmap is null || _wavePixelWidth <= 1 || _wavePixelHeight <= 0)
         {
@@ -2599,18 +2634,22 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        SelectionInvertColumns(_wavePixelWidth, out var colStart, out var colEnd);
         if (!_invertDirty
             && _invertBitmap is not null
             && ReferenceEquals(_invertDocument, _document)
             && _invertChannels == (_document?.Channels ?? 0)
             && _invertMode == _waveMode
             && Math.Abs(_invertViewStart - _waveViewStart) < 0.01
-            && Math.Abs(_invertViewSpan - _waveViewSpan) < 0.01)
+            && Math.Abs(_invertViewSpan - _waveViewSpan) < 0.01
+            && Math.Abs(_invertAmpZoom - _waveAmpZoom) < 1e-6
+            && colStart >= _invertColStart
+            && colEnd <= _invertColEnd)
         {
             return;
         }
 
-        RebuildInvertBitmap(_wavePixelWidth, _wavePixelHeight, UiDpi.Get(this));
+        RebuildInvertBitmap(_wavePixelWidth, _wavePixelHeight, UiDpi.Get(this), colStart, colEnd);
     }
 
     private bool InvertBitmapIsCurrent() =>
@@ -2621,7 +2660,8 @@ internal sealed class WaveformView : Grid
         && ReferenceEquals(_invertDocument, _document)
         && _invertChannels == (_document?.Channels ?? 0)
         && Math.Abs(_invertViewStart - _waveViewStart) < 0.01
-        && Math.Abs(_invertViewSpan - _waveViewSpan) < 0.01;
+        && Math.Abs(_invertViewSpan - _waveViewSpan) < 0.01
+        && Math.Abs(_invertAmpZoom - _waveAmpZoom) < 1e-6;
 
     internal static Color SpectrogramSelectionFill() => Theme.Get("SpectrogramSelectionFillBrush");
 
@@ -2641,12 +2681,17 @@ internal sealed class WaveformView : Grid
         var playerLight = SeekAndSelectOnly && UiThemeService.Painted == UiTheme.Light;
         if (!SpectrogramVisible && !LoudnessVisible && !_liveRecording)
         {
-            EnsureInvertBitmap();
+            // 選択列だけを同期反転しておくと拡縮中も本物の見た目を保てる（全画素反転より軽い）。
+            // オーバーレイ層が静的層より先に描く場合でも、波形を先に整えてから反転を作ることで
+            // 「新しい波形の上に前ズームの反転」が出るのを防ぐ。
+            EnsureWaveformBitmap(WaveformBounds(bounds));
+            EnsureSelectionInvert();
         }
 
         if (SpectrogramVisible || LoudnessVisible || !InvertBitmapIsCurrent())
         {
-            if (SeekAndSelectOnly)
+            // 反転待ち・プレイヤー・解析表示は安い塗りで繋ぐ（拡縮中の全画素反転を避ける）。
+            if (SeekAndSelectOnly || !SpectrogramVisible && !LoudnessVisible)
             {
                 DrawRange(dc, bounds, start, span, selection, Theme.Get("WaveSelectionFillBrush"));
                 return;
@@ -6069,6 +6114,8 @@ internal sealed class WaveformView : Grid
         _viewStart = Math.Clamp(anchorFrame - newSpan * ratio, 0d, max);
         _deferWaveReload = false;
         _waveDirty = true;
+        // オーバーレイが先に描くと古い反転が「現在」扱いになるので、拡縮時点で無効化する。
+        MarkInvertDirty();
         InvalidateStaticLayer();
         RaiseViewChanged();
     }
@@ -6094,6 +6141,8 @@ internal sealed class WaveformView : Grid
         EndMarkerCommentEdit(commit: true);
         _timeZoom = nextZoom;
         _viewStart = nextStart;
+        _waveDirty = true;
+        MarkInvertDirty();
         InvalidateStaticLayer();
         RaiseViewChanged();
     }
@@ -6107,6 +6156,8 @@ internal sealed class WaveformView : Grid
         }
 
         _ampZoom = next;
+        _waveDirty = true;
+        MarkInvertDirty();
         InvalidateStaticLayer();
         RaiseViewChanged();
     }
