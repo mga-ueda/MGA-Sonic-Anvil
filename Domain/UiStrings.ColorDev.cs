@@ -2,10 +2,9 @@ namespace MgaSonicAnvil.Domain;
 
 internal static partial class UiStrings
 {
-    public static string ColorDevTitleFor(UiTheme theme) =>
-        theme == UiTheme.Light
-            ? Get("色設定（ライトモード）", "Color settings (Light mode)")
-            : Get("色設定（ダークモード）", "Color settings (Dark mode)");
+    /// <summary>実行時の配色はダーク固定。テーマ引数は呼び出し互換のため残す。</summary>
+    public static string ColorDevTitleFor(UiTheme _) =>
+        Get("色設定", "Color settings");
     public static string ColorDevClose => Get("閉じる", "Close");
     public static string ColorDevResetToDefaults => Get("既定に戻す", "Reset to defaults");
     public static string ColorDevResetThis => Get("この色を既定に戻す", "Reset this color");
