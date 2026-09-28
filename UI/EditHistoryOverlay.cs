@@ -28,9 +28,11 @@ internal sealed class EditHistoryOverlay : Border
         Width = 340;
         MaxHeight = 360;
         Padding = new Thickness(0, 0, 0, 6);
-        Background = Brushes.Transparent;
+        // サンプルレート変換と同じコンテキストメニューの塗りと枠。
+        SetResourceReference(BackgroundProperty, "PlayerComboDropFillBrush");
         SetResourceReference(BorderBrushProperty, "PlayerComboDropBorderBrush");
         BorderThickness = new Thickness(1);
+        CornerRadius = DesignMetrics.ControlCorner;
         SnapsToDevicePixels = true;
         Focusable = false;
 
