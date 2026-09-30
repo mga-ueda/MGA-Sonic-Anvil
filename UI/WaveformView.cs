@@ -59,10 +59,46 @@ internal sealed class WaveformView : Grid
         return hasMarkers && hasRegions ? 2 : 1;
     }
 
-    private int FlagLaneCount =>
-        !LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly) || _document is null
-            ? 0
-            : CountFlagLaneRows(_document.Markers.Count > 0, _document.Regions.Count > 0);
+    /// <summary>
+    /// 0 以上ならマーカーレーン行数をこの値に固定。負ならドキュメント内容から自動。
+    /// タイル表示で他タイルとレーン高さを揃えるときに使う。
+    /// </summary>
+    public int ForcedFlagLaneRows
+    {
+        get => _forcedFlagLaneRows;
+        set
+        {
+            value = Math.Clamp(value, -1, 2);
+            if (_forcedFlagLaneRows == value)
+            {
+                return;
+            }
+
+            _forcedFlagLaneRows = value;
+            _appliedMarkerLaneHeight = -1;
+            _waveDirty = true;
+            _staticHost.InvalidateVisual();
+            _overlayHost.InvalidateVisual();
+        }
+    }
+
+    private int FlagLaneCount
+    {
+        get
+        {
+            if (!LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly) || _document is null)
+            {
+                return 0;
+            }
+
+            if (_forcedFlagLaneRows >= 0)
+            {
+                return _forcedFlagLaneRows;
+            }
+
+            return CountFlagLaneRows(_document.Markers.Count > 0, _document.Regions.Count > 0);
+        }
+    }
 
     private bool SplitFlagLanes => FlagLaneCount > 1;
 
@@ -157,6 +193,7 @@ internal sealed class WaveformView : Grid
     private readonly LoudnessOverlayRenderer _loudness = new();
     private double _loudnessTargetLufs = LoudnessMeterEngine.DefaultTargetLufs;
     private double _appliedMarkerLaneHeight = -1;
+    private int _forcedFlagLaneRows = -1;
     private double _staticPaintMs;
     private double _staticPaintLastMs;
     private double _staticPaintEndMs;

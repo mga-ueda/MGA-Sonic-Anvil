@@ -232,6 +232,8 @@ public partial class MainWindow
             CaptureActiveSessionView();
             ApplyActiveAnalysisToAllSessions();
             _tileNeedsInitialBind = true;
+            // タイルを重ねる前に単一表示を消す。残したままだと直前の波形の上にタイルが載る。
+            ClearSingleWaveformForTiles();
         }
         else
         {
@@ -281,6 +283,7 @@ public partial class MainWindow
             {
                 _tilePanes.Add(pane);
                 PlaceTilePane(pane);
+                SyncTileFlagLaneRows();
             }
             else
             {
@@ -293,6 +296,7 @@ public partial class MainWindow
 
         _tilePanes.Add(pane);
         PlaceTilePane(pane);
+        SyncTileFlagLaneRows();
         if (ReferenceEquals(session, _activeSession) || _tileActiveView is null)
         {
             var reset = _tileNeedsInitialBind && !IsPlaybackActive();
@@ -395,8 +399,8 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// タイル用グリッドを前面に重ねる。ちらつき防止のため、単一表示の波形は
-    /// 消さずに下へ残し、タイルが揃った時点（<see cref="FinalizeTileReveal"/>）で隠す。
+    /// タイル用グリッドを前面に出す。単一表示は <see cref="ClearSingleWaveformForTiles"/> で
+    /// すでに消してある想定。古いグリッドだけ取り除く。
     /// </summary>
     private void RevealTileGrid()
     {
@@ -419,7 +423,15 @@ public partial class MainWindow
         WaveformTileHost.Children.Add(_tileGrid);
     }
 
-    /// <summary>全タイルが揃ったら下の単一表示を隠す。隙間は波形エリアと同じ配色のまま。</summary>
+    /// <summary>タイルへ入る前に単一波形の描画を消す。Document も外して再描画コストを切る。</summary>
+    private void ClearSingleWaveformForTiles()
+    {
+        PrimaryWaveform.Document = null;
+        PrimaryWaveform.Visibility = Visibility.Collapsed;
+        SingleWaveformHost.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>全タイルが揃ったあとの仕上げ。単一表示のクリアは念のため再実行する。</summary>
     private void FinalizeTileReveal()
     {
         if (!_tileMode || _tileGrid is null)
@@ -428,9 +440,7 @@ public partial class MainWindow
         }
 
         ApplyWaveformTileBackground(_tileGrid);
-        PrimaryWaveform.Document = null;
-        PrimaryWaveform.Visibility = Visibility.Collapsed;
-        SingleWaveformHost.Visibility = Visibility.Collapsed;
+        ClearSingleWaveformForTiles();
     }
 
     private Grid CreateTileGrid(int rows, int cols)
@@ -559,6 +569,7 @@ public partial class MainWindow
         SingleWaveformHost.Visibility = Visibility.Visible;
         PrimaryWaveform.Visibility = Visibility.Visible;
         PrimaryWaveform.ShowPlayhead = true;
+        PrimaryWaveform.ForcedFlagLaneRows = -1;
         Overview.SeekTrailSource = PrimaryWaveform;
         if (!bindPrimary)
         {
@@ -883,6 +894,7 @@ public partial class MainWindow
             ApplyWaveformTileBackground(_tileGrid);
         }
 
+        SyncTileFlagLaneRows();
         foreach (var pane in _tilePanes)
         {
             var highlighted = IsTabChromeHighlighted(pane.Session);
@@ -904,6 +916,34 @@ public partial class MainWindow
         }
 
         ApplyTileSearchVeils();
+    }
+
+    /// <summary>
+    /// タイル表示ではマーカー／リージョンが無いタイルでもレーンを確保し、
+    /// 波形の中心線がずれないようにする。行数は全タイルの最大（最低 1）。
+    /// </summary>
+    private void SyncTileFlagLaneRows()
+    {
+        if (!_tileMode || _tilePanes.Count == 0)
+        {
+            return;
+        }
+
+        var rows = 1;
+        foreach (var pane in _tilePanes)
+        {
+            var document = pane.Session.Document;
+            rows = Math.Max(
+                rows,
+                WaveformView.CountFlagLaneRows(
+                    document.Markers.Count > 0,
+                    document.Regions.Count > 0));
+        }
+
+        foreach (var pane in _tilePanes)
+        {
+            pane.View.ForcedFlagLaneRows = rows;
+        }
     }
 
     private void ForEachWaveform(Action<WaveformView> action)

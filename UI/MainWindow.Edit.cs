@@ -2171,6 +2171,7 @@ public partial class MainWindow
             return;
         }
 
+        SyncTileFlagLaneRows();
         Waveform.PruneMarkerSelection();
         Waveform.Refresh();
         Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
@@ -2227,6 +2228,7 @@ public partial class MainWindow
             return;
         }
 
+        SyncTileFlagLaneRows();
         Waveform.PlayheadFrame = _document.CursorFrame;
         Waveform.PruneMarkerSelection();
         Waveform.InvalidateSpectrogramCache();

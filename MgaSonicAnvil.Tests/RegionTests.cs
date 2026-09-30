@@ -448,6 +448,19 @@ public sealed class RegionTests
     }
 
     [Fact]
+    public void TileFlagLaneRows_UsesAtLeastOneEvenWithoutCues()
+    {
+        // タイル揃え: マーカー無しでも最低1行。両種あるタイルに合わせて最大2。
+        var empty = WaveformView.CountFlagLaneRows(false, false);
+        var markersOnly = WaveformView.CountFlagLaneRows(true, false);
+        var both = WaveformView.CountFlagLaneRows(true, true);
+        Assert.Equal(0, empty);
+        Assert.Equal(1, Math.Max(1, empty));
+        Assert.Equal(1, Math.Max(1, markersOnly));
+        Assert.Equal(2, Math.Max(1, both));
+    }
+
+    [Fact]
     public void LaneFlagRect_UsesFullLaneWhenNotSplit()
     {
         var full = WaveformView.LaneFlagRect(8, 16, laneHeight: 32, split: false, top: true);
