@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
@@ -12,6 +13,14 @@ namespace MgaSonicAnvil.UI;
 
 public partial class MainWindow
 {
+    private static readonly TimeSpan DocumentTabAccentSlide = TimeSpan.FromMilliseconds(220);
+
+    private Border? _documentTabAccent;
+    private DocumentSession? _documentTabAccentSession;
+    private bool _documentTabAccentPlaced;
+    private int _documentTabAccentTicket;
+    private bool _documentTabAccentAnimatePending;
+
     /// <summary>
     /// 複数選択されたタブ。Ctrl+クリックで個別追加、Shift+クリックで範囲、
     /// タブバーまたはタイルの帯の上の Ctrl+A で全選択。Esc で解除。選択中の
@@ -699,12 +708,30 @@ public partial class MainWindow
             DocumentTabs.Children.Add(CreateTabItem(session));
         }
 
-        Dispatcher.BeginInvoke(SyncTabOverflow, DispatcherPriority.Loaded);
+        // 下線の Canvas 位置は残す。直後の RefreshTabHeaders がスライドする。
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                SyncTabOverflow();
+                if (!_documentTabAccentAnimatePending)
+                {
+                    MoveDocumentTabAccent(animate: false);
+                }
+            },
+            DispatcherPriority.Loaded);
         RefreshLibraryBrowser();
     }
 
-    private void DocumentTabHost_SizeChanged(object sender, SizeChangedEventArgs e) =>
+    private void DocumentTabHost_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
         SyncTabOverflow();
+        if (_documentTabAccentAnimatePending)
+        {
+            return;
+        }
+
+        MoveDocumentTabAccent(animate: false);
+    }
 
     private void DocumentTabScroll_ScrollChanged(object sender, ScrollChangedEventArgs e) =>
         SyncTabOverflow();
@@ -839,6 +866,15 @@ public partial class MainWindow
 
     private void RefreshTabHeaders()
     {
+        EnsureDocumentTabAccent();
+        var previous = _documentTabAccentSession;
+        var fromLeft = _documentTabAccentPlaced && _documentTabAccent is not null
+            ? Canvas.GetLeft(_documentTabAccent)
+            : double.NaN;
+        var fromWidth = _documentTabAccentPlaced && _documentTabAccent is not null
+            ? _documentTabAccent.Width
+            : double.NaN;
+
         foreach (var border in DocumentTabs.Children.OfType<Border>())
         {
             if (border.Tag is not DocumentSession session || border.Child is not DockPanel dock)
@@ -851,6 +887,143 @@ public partial class MainWindow
 
         SyncTabOverflow();
         RefreshTileChrome();
+        var animate = previous is not null
+            && _activeSession is not null
+            && !ReferenceEquals(previous, _activeSession)
+            && !double.IsNaN(fromLeft);
+        _documentTabAccentAnimatePending = animate;
+        var ticket = ++_documentTabAccentTicket;
+        // 幅割り当て後の ActualWidth で下線を置く。開始位置はレイアウト前に撮った値。
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (ticket != _documentTabAccentTicket)
+                {
+                    return;
+                }
+
+                MoveDocumentTabAccent(animate, fromLeft, fromWidth);
+                _documentTabAccentAnimatePending = false;
+            },
+            DispatcherPriority.Loaded);
+    }
+
+    private void EnsureDocumentTabAccent()
+    {
+        if (_documentTabAccent is not null)
+        {
+            return;
+        }
+
+        var accent = new Border
+        {
+            Height = 2,
+            Width = 0,
+            SnapsToDevicePixels = true,
+            IsHitTestVisible = false,
+            Background = WpfControlHelpers.FrozenBrush(Theme.Get("AccentCyanBrush")),
+        };
+        DocumentTabAccentHost.Children.Add(accent);
+        _documentTabAccent = accent;
+    }
+
+    private void MoveDocumentTabAccent(
+        bool animate,
+        double fromLeft = double.NaN,
+        double fromWidth = double.NaN)
+    {
+        EnsureDocumentTabAccent();
+        var accent = _documentTabAccent!;
+        if (_activeSession is null
+            || DocumentTabs.Children.OfType<Border>()
+                .FirstOrDefault(b => ReferenceEquals(b.Tag, _activeSession)) is not { } item
+            || item.ActualWidth <= 0)
+        {
+            accent.BeginAnimation(Canvas.LeftProperty, null);
+            accent.BeginAnimation(FrameworkElement.WidthProperty, null);
+            accent.Width = 0;
+            _documentTabAccentPlaced = false;
+            _documentTabAccentSession = null;
+            return;
+        }
+
+        Point origin;
+        Point bottom;
+        try
+        {
+            origin = item.TranslatePoint(new Point(0, 0), DocumentTabAccentHost);
+            bottom = item.TranslatePoint(new Point(0, item.ActualHeight), DocumentTabAccentHost);
+        }
+        catch (InvalidOperationException)
+        {
+            Dispatcher.BeginInvoke(() => MoveDocumentTabAccent(animate: false), DispatcherPriority.Loaded);
+            return;
+        }
+
+        if (item.ActualHeight < 1 || bottom.Y <= origin.Y)
+        {
+            Dispatcher.BeginInvoke(() => MoveDocumentTabAccent(animate: false), DispatcherPriority.Loaded);
+            return;
+        }
+
+        var dirty = _activeSession.Document.IsDirty;
+        accent.Background = WpfControlHelpers.FrozenBrush(Theme.Get(
+            dirty ? "DirtyAccentBrush" : "AccentCyanBrush"));
+
+        var left = origin.X;
+        var width = item.ActualWidth;
+        var top = bottom.Y - accent.Height;
+        Canvas.SetTop(accent, top);
+
+        if (!animate || !_documentTabAccentPlaced || double.IsNaN(fromLeft))
+        {
+            accent.BeginAnimation(Canvas.LeftProperty, null);
+            accent.BeginAnimation(FrameworkElement.WidthProperty, null);
+            Canvas.SetLeft(accent, left);
+            accent.Width = width;
+            _documentTabAccentPlaced = true;
+            _documentTabAccentSession = _activeSession;
+            return;
+        }
+
+        // SizeChanged 等で先にスナップされていても、クリック前の位置からスライドする。
+        var startWidth = double.IsNaN(fromWidth) ? accent.Width : fromWidth;
+        accent.BeginAnimation(Canvas.LeftProperty, null);
+        accent.BeginAnimation(FrameworkElement.WidthProperty, null);
+        Canvas.SetLeft(accent, fromLeft);
+        accent.Width = startWidth;
+        AnimateDocumentTabAccent(Canvas.LeftProperty, fromLeft, left);
+        AnimateDocumentTabAccent(FrameworkElement.WidthProperty, startWidth, width);
+        _documentTabAccentPlaced = true;
+        _documentTabAccentSession = _activeSession;
+    }
+
+    private void AnimateDocumentTabAccent(DependencyProperty property, double from, double to)
+    {
+        var accent = _documentTabAccent;
+        if (accent is null)
+        {
+            return;
+        }
+
+        if (Math.Abs(from - to) < 0.5)
+        {
+            accent.BeginAnimation(property, null);
+            accent.SetValue(property, to);
+            return;
+        }
+
+        var anim = new DoubleAnimation(from, to, DocumentTabAccentSlide)
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut },
+            FillBehavior = FillBehavior.Stop,
+        };
+        anim.Completed += (_, _) =>
+        {
+            accent.BeginAnimation(property, null);
+            accent.SetValue(property, to);
+        };
+        accent.BeginAnimation(property, anim);
     }
 
     private FrameworkElement CreateTabItem(DocumentSession session)
@@ -911,9 +1084,6 @@ public partial class MainWindow
         grid.Children.Add(close);
 
         var body = new DockPanel();
-        var underline = new Border { Height = 2 };
-        DockPanel.SetDock(underline, Dock.Bottom);
-        body.Children.Add(underline);
         body.Children.Add(grid);
         ApplyTabChrome(session, body);
         border.Child = body;
@@ -978,12 +1148,7 @@ public partial class MainWindow
 
         foreach (var child in dock.Children)
         {
-            if (child is Border underline && underline.Height == 2)
-            {
-                underline.Background = active ? accent : Brushes.Transparent;
-                underline.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
-            }
-            else if (child is Grid grid)
+            if (child is Grid grid)
             {
                 foreach (var block in grid.Children.OfType<TextBlock>())
                 {
