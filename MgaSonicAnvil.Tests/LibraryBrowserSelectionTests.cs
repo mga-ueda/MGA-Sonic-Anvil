@@ -1877,12 +1877,11 @@ public sealed class LibraryBrowserSelectionTests
 
             var menu = view.ColumnHeaderContextMenuForTests;
             Assert.NotNull(menu);
-            Assert.Equal(LibraryColumnFilter.All.Length, menu!.Items.OfType<MenuItem>().Count());
-
-            var name = menu.Items.OfType<MenuItem>()
-                .First(item => item.Tag is LibraryFileColumn.Name);
-            Assert.True(name.IsChecked);
-            Assert.False(name.IsEnabled);
+            var toggleable = LibraryColumnFilter.All.Count(c => !LibraryColumnFilter.IsLocked(c));
+            Assert.Equal(toggleable, menu!.Items.OfType<MenuItem>().Count());
+            Assert.DoesNotContain(
+                menu.Items.OfType<MenuItem>(),
+                item => item.Tag is LibraryFileColumn.Name);
 
             var kind = menu.Items.OfType<MenuItem>()
                 .First(item => item.Tag is LibraryFileColumn.Kind);
