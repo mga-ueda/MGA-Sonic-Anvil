@@ -283,6 +283,65 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void RefreshExplorer_PicksUpNewFolder_KeepsSelection()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var root = Path.Combine(Path.GetTempPath(), "mga-tree-refresh-" + Guid.NewGuid().ToString("N"));
+            var alpha = Path.Combine(root, "Alpha");
+            Directory.CreateDirectory(alpha);
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                var folder = view.ExplorerFirstFolder;
+                Assert.NotNull(folder);
+                folder.IsExpanded = true;
+                Flush();
+                view.SetExplorerFolder(alpha);
+                Flush();
+                Assert.True(view.TryGetSelectedExplorerFolder(out var selected));
+                Assert.Equal(Path.GetFullPath(alpha), Path.GetFullPath(selected));
+
+                var beta = Path.Combine(root, "Beta");
+                Directory.CreateDirectory(beta);
+                view.RefreshExplorer();
+                Flush();
+
+                Assert.True(view.TryGetSelectedExplorerFolder(out var after));
+                Assert.Equal(Path.GetFullPath(alpha), Path.GetFullPath(after));
+                var names = view.ExplorerFirstFolder!
+                    .Items.OfType<TreeViewItem>()
+                    .Where(item => item.Tag is string)
+                    .Select(item => Path.GetFileName((string)item.Tag!))
+                    .ToArray();
+                Assert.Contains("Alpha", names, StringComparer.OrdinalIgnoreCase);
+                Assert.Contains("Beta", names, StringComparer.OrdinalIgnoreCase);
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void Explorer_CtrlMultiSelect_PressKeepsFoldersForCopy()
     {
         RunSta(() =>
@@ -1323,7 +1382,9 @@ public sealed class LibraryBrowserSelectionTests
             AssertSortMarks(album, ascending: true);
             Assert.True(CountCyanInHeader(window, album) > 8);
 
-            view.SetSessions([Session("01 a.mp3")], null, []);
+            var session = Session("01 a.mp3");
+            session.Document.ApplyTags(new AudioFileTags { Probed = true, Album = "Test Album" });
+            view.SetSessions([session], null, []);
             Flush();
             view.UpdateLayout();
             Flush();
@@ -1480,6 +1541,13 @@ public sealed class LibraryBrowserSelectionTests
             EnsureTheme();
             var view = new LibraryBrowserView();
             Assert.Equal(DataGridHeadersVisibility.Column, view.HeadersVisibility);
+            // 曲が無い／Wave のみのときは No Image 枠も出さない。
+            Assert.Equal(Visibility.Collapsed, view.GroupSpacerVisibility);
+            Assert.Equal(0, view.FrozenColumnCount);
+
+            var mp3 = Session("song.mp3");
+            mp3.Document.ApplyTags(new AudioFileTags { Probed = true, Album = "A" });
+            view.SetSessions([mp3], mp3, [mp3]);
             Assert.Equal(Visibility.Visible, view.GroupSpacerVisibility);
             Assert.Equal(1, view.FrozenColumnCount);
 
@@ -1487,6 +1555,37 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Equal(DataGridHeadersVisibility.Column, view.HeadersVisibility);
             Assert.Equal(Visibility.Collapsed, view.GroupSpacerVisibility);
             Assert.Equal(0, view.FrozenColumnCount);
+        });
+    }
+
+    [Fact]
+    public void Grouped_WaveOnly_HidesNoImageJacketFrame()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var wave = Session("kick.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 400,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions([wave], wave, [wave]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            Assert.Equal(Visibility.Collapsed, view.GroupSpacerVisibility);
+            Assert.Equal(0, view.FrozenColumnCount);
+            Assert.DoesNotContain(
+                FindDescendants<LibraryGroupJacketImage>(view.FileGrid),
+                image => image.Visibility == Visibility.Visible);
+            window.Close();
         });
     }
 
@@ -1757,6 +1856,58 @@ public sealed class LibraryBrowserSelectionTests
             Assert.True(
                 view.ColumnDisplayIndex(LibraryFileColumn.Title)
                 < view.ColumnDisplayIndex(LibraryFileColumn.Duration));
+        });
+    }
+
+    [Fact]
+    public void ColumnHeaderContextMenu_TogglesColumnAndNotifies()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            LibraryFileColumn[]? saved = null;
+            view.VisibleColumnsChanged += (_, columns) => saved = [.. columns];
+            view.SetVisibleColumns(
+                [
+                    LibraryFileColumn.Name,
+                    LibraryFileColumn.Title,
+                    LibraryFileColumn.Duration,
+                ]);
+
+            var menu = view.ColumnHeaderContextMenuForTests;
+            Assert.NotNull(menu);
+            Assert.Equal(LibraryColumnFilter.All.Length, menu!.Items.OfType<MenuItem>().Count());
+
+            var name = menu.Items.OfType<MenuItem>()
+                .First(item => item.Tag is LibraryFileColumn.Name);
+            Assert.True(name.IsChecked);
+            Assert.False(name.IsEnabled);
+
+            var kind = menu.Items.OfType<MenuItem>()
+                .First(item => item.Tag is LibraryFileColumn.Kind);
+            Assert.False(kind.IsChecked);
+            Assert.True(kind.IsEnabled);
+
+            menu.IsOpen = true;
+            Assert.True(view.HasOpenContextMenu);
+            kind.IsChecked = true;
+            kind.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.NotNull(saved);
+            Assert.Contains(LibraryFileColumn.Kind, saved!);
+            Assert.Contains(LibraryFileColumn.Name, saved);
+            Assert.Contains(LibraryFileColumn.Title, saved);
+            Assert.Contains(LibraryFileColumn.Duration, saved);
+            Assert.Equal(saved, view.VisibleColumnOrder);
+
+            var title = menu.Items.OfType<MenuItem>()
+                .First(item => item.Tag is LibraryFileColumn.Title);
+            title.IsChecked = false;
+            title.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.DoesNotContain(LibraryFileColumn.Title, saved!);
+            Assert.Contains(LibraryFileColumn.Kind, saved);
+            view.CloseKeyboardContextMenu();
+            Assert.False(view.HasOpenContextMenu);
         });
     }
 

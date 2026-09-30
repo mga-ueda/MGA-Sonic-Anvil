@@ -234,6 +234,19 @@ public sealed class PeakPyramidTests
     }
 
     [Fact]
+    public void BuildPlaylistBarsFromPeaks_IsFixedLengthAndNormalized()
+    {
+        var frames = PeakPyramid.PlaylistBarCount * 16;
+        var samples = new float[frames];
+        samples[frames / 2] = 0.5f;
+        var peaks = PeakPyramid.BuildPlayerDisplay(samples, 1, samples.Length);
+        var bars = PeakPyramid.BuildPlaylistBarsFromPeaks(peaks);
+        Assert.Equal(PeakPyramid.PlaylistBarCount, bars.Length);
+        Assert.Contains(bars, static v => v >= 0.99f);
+        Assert.All(bars, static v => Assert.InRange(v, 0f, 1f));
+    }
+
+    [Fact]
     public void FindNextAudibleFrame_SkipsSilentPrefix()
     {
         var frames = PeakPyramid.PlayerDisplayBaseBuckets * 4;

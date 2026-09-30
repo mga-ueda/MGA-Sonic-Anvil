@@ -130,6 +130,11 @@ public partial class MainWindow : Window
         LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
         LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;
         LibraryBrowser.SetVisibleColumns(AppStorage.Settings.ResolvedLibraryListColumns());
+        LibraryBrowser.SetPlaylistWaveformOptions(
+            AppStorage.Settings.ResolvedLibraryPlaylistWaveformSize(),
+            AppStorage.Settings.LibraryPlaylistWaveformAutoLargeForWaveOnly,
+            AppStorage.Settings.LibraryHideParentFolderForMp3Only,
+            AppStorage.Settings.LibraryHideWaveformForMp3Only);
         LibraryBrowser.SetGroup(AppStorage.Settings.ResolvedLibraryListGroup());
         LibraryBrowser.SetExplorerRoots(AppStorage.Settings.ResolvedLibraryExplorerRoots());
         LibraryBrowser.SetExplorerExpanded(AppStorage.Settings.ResolvedLibraryExplorerExpanded());

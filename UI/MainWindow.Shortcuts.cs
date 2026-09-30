@@ -310,6 +310,14 @@ public partial class MainWindow
             return true;
         }
 
+        // F5 はツリー更新。ライブラリが非アクティブでも効き、フォーカスもツリーへ移す。
+        if (IsLibraryMaximized && LibraryPlayerMode.IsExplorerRefresh(key, modifiers))
+        {
+            LibraryBrowser.RefreshExplorer();
+            LibraryBrowser.FocusExplorer();
+            return true;
+        }
+
         if (IsLibraryMaximized && LibraryBrowser.IsSearchFocused)
         {
             return false;

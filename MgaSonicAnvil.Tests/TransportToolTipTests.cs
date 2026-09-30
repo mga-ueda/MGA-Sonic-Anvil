@@ -98,6 +98,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("Ctrl+→", UiStrings.TipLibraryList);
         Assert.Contains("Ctrl+↓", UiStrings.TipLibraryFavorites);
         Assert.Contains("ドラッグ", UiStrings.TipLibraryColumns);
+        Assert.Contains("右クリック", UiStrings.TipLibraryColumns);
         Assert.Contains("20", UiStrings.TipClickGuardFade);
         Assert.Contains("Wwise.exe", UiStrings.TipWwiseProjectNameOpen);
         Assert.Contains("Ctrl+Alt+Shift+W", UiStrings.TipWwiseProjectNameOpen);

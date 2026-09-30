@@ -196,7 +196,19 @@ internal sealed class AppSettings
     /// <summary>F10 リストで表示する列。空は既定（ファイル／タイトル／アーティスト／アルバム／トラック／ディスク／年／ジャンル／作曲／時間／コメント）。</summary>
     public string[] LibraryListColumns { get; set; } = [];
 
-    /// <summary>F10 リストのグループ。空はアルバム。</summary>
+    /// <summary>プレイリスト波形列の幅。S / M / L。空または不正は L。</summary>
+    public string LibraryPlaylistWaveformSize { get; set; } = "L";
+
+    /// <summary>WAVE だけのプレイリストでは波形列を自動で L。既定オン。</summary>
+    public bool LibraryPlaylistWaveformAutoLargeForWaveOnly { get; set; } = true;
+
+    /// <summary>MP3 だけのプレイリストでは親フォルダ列を出さない。既定オン。</summary>
+    public bool LibraryHideParentFolderForMp3Only { get; set; } = true;
+
+    /// <summary>MP3 だけのプレイリストでは波形表示列を出さない。既定オン。</summary>
+    public bool LibraryHideWaveformForMp3Only { get; set; } = true;
+
+    /// <summary>F10 リストのグループ。空は親フォルダ。</summary>
     public string LibraryListGroup { get; set; } = string.Empty;
 
     /// <summary>F10 左のフォルダツリー。空はマイミュージック（ルート解決後）。</summary>
@@ -450,6 +462,12 @@ internal sealed class AppSettings
 
     public void ApplyLibraryListColumns(IEnumerable<LibraryFileColumn> columns) =>
         LibraryListColumns = LibraryColumnFilter.Serialize(columns);
+
+    public LibraryPlaylistWaveformSize ResolvedLibraryPlaylistWaveformSize() =>
+        LibraryPlaylistWaveformSizes.Parse(LibraryPlaylistWaveformSize);
+
+    public void ApplyLibraryPlaylistWaveformSize(LibraryPlaylistWaveformSize size) =>
+        LibraryPlaylistWaveformSize = LibraryPlaylistWaveformSizes.Format(size);
 
     public LibraryFileGroup ResolvedLibraryListGroup() =>
         LibraryFileList.ParseGroup(LibraryListGroup);

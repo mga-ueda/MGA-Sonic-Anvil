@@ -48,6 +48,7 @@ internal static class LibrarySearchQuery
         yield return row.SizeText;
         yield return row.DateText;
         yield return row.Folder;
+        yield return row.ParentFolder;
         yield return row.JacketText;
     }
 

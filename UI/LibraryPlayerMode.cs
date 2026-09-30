@@ -91,7 +91,7 @@ internal static class LibraryPlayerMode
             return true;
         }
 
-        if (modifiers == ModifierKeys.None && key is Key.F1 or Key.F2 or Key.F3)
+        if (modifiers == ModifierKeys.None && key is Key.F1 or Key.F2 or Key.F3 or Key.F5)
         {
             return true;
         }
@@ -163,6 +163,12 @@ internal static class LibraryPlayerMode
     public static bool IsShuffleToggle(Key key, ModifierKeys modifiers) =>
         key == Key.R && modifiers == ModifierKeys.None;
 
+    /// <summary>
+    /// フォルダツリーの更新とフォーカス移動。プレイリスト／お気に入り／波形フォーカスでも効く。
+    /// </summary>
+    public static bool IsExplorerRefresh(Key key, ModifierKeys modifiers) =>
+        key == Key.F5 && modifiers == ModifierKeys.None;
+
     /// <summary>ツリーが左右を使う。再生中の早送り／巻き戻しにはしない。</summary>
     public static bool ExplorerOwnsHorizontal(Key key, ModifierKeys modifiers) =>
         key is Key.Left or Key.Right && modifiers == ModifierKeys.None;
@@ -217,7 +223,7 @@ internal static class LibraryPlayerMode
             return false;
         }
 
-        if (modifiers == ModifierKeys.None && key is Key.F1 or Key.F2 or Key.F3)
+        if (modifiers == ModifierKeys.None && key is Key.F1 or Key.F2 or Key.F3 or Key.F5)
         {
             return false;
         }

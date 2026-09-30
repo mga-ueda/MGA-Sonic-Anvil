@@ -155,8 +155,15 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly DataGrid _grid = new();
     private DataGridTextColumn _groupSpacer = null!;
     private bool _gridScrollHooked;
-    private readonly Dictionary<LibraryFileColumn, DataGridTextColumn> _columns = [];
+    private readonly Dictionary<LibraryFileColumn, DataGridColumn> _columns = [];
     private readonly Dictionary<LibraryFileColumn, LibrarySortHeader> _sortHeaders = [];
+    private CancellationTokenSource? _playlistWaveCts;
+    private int _playlistWaveGeneration;
+    private LibraryPlaylistWaveformSize _playlistWavePreferredSize = LibraryPlaylistWaveformSize.L;
+    private bool _playlistWaveAutoLargeForWaveOnly = true;
+    private bool _hideParentFolderForMp3Only = true;
+    private bool _hideWaveformForMp3Only = true;
+    private ContextMenu? _columnHeaderMenu;
     private int _sortChromeTicket;
     private LibraryFileColumn[] _visibleColumns = [.. LibraryColumnFilter.Defaults];
     private bool _columnOrderBusy;
@@ -165,9 +172,9 @@ internal sealed class LibraryBrowserView : UserControl
     private bool _deferActivate;
     private bool _restoreListFocus;
     private int _restoreListFocusGeneration;
-    private LibraryFileColumn _sortColumn = LibraryFileColumn.Album;
+    private LibraryFileColumn? _sortColumn = LibraryFileColumn.Album;
     private LibrarySortDirection _sortDirection = LibrarySortDirection.Ascending;
-    private LibraryFileGroup _group = LibraryFileGroup.Album;
+    private LibraryFileGroup _group = LibraryFileGroup.Folder;
     private IReadOnlyList<LibraryFileRow> _rows = [];
     private ObservableCollection<LibraryFileRow> _items = [];
     private readonly Dictionary<string, BitmapSource?> _groupJackets = new(StringComparer.Ordinal);
@@ -342,6 +349,8 @@ internal sealed class LibraryBrowserView : UserControl
         headerStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
         headerStyle.Setters.Add(new Setter(Control.BorderBrushProperty, Brushes.Transparent));
         headerStyle.Setters.Add(new Setter(Control.TemplateProperty, ColumnHeaderTemplate()));
+        _columnHeaderMenu ??= CreateColumnHeaderContextMenu();
+        headerStyle.Setters.Add(new Setter(FrameworkElement.ContextMenuProperty, _columnHeaderMenu));
         _grid.ColumnHeaderStyle = headerStyle;
         PinColumnHeaders();
 
@@ -362,7 +371,7 @@ internal sealed class LibraryBrowserView : UserControl
         _grid.AlternatingRowBackground = Brushes.Transparent;
         var fore = ResolveThemeBrush("PrimaryForeBrush");
         ApplyNavSelectionResources(_grid, selected, fore);
-        SetPlaylistBandLeft(_grid, _group != LibraryFileGroup.None ? GroupJacketColumnWidth : 0);
+        SetPlaylistBandLeft(_grid, ShowsGroupJackets ? GroupJacketColumnWidth : 0);
         RefreshSortChrome();
     }
 
@@ -452,7 +461,8 @@ internal sealed class LibraryBrowserView : UserControl
     public bool HasOpenContextMenu =>
         _folderTree.ContextMenu is { IsOpen: true }
         || _favoritesList.ContextMenu is { IsOpen: true }
-        || _grid.ContextMenu is { IsOpen: true };
+        || _grid.ContextMenu is { IsOpen: true }
+        || _columnHeaderMenu is { IsOpen: true };
 
     internal object? BoundItemsSource => _grid.ItemsSource;
 
@@ -1038,7 +1048,13 @@ internal sealed class LibraryBrowserView : UserControl
     {
         get
         {
-            foreach (var menu in new[] { _folderTree.ContextMenu, _favoritesList.ContextMenu, _grid.ContextMenu })
+            foreach (var menu in new[]
+                     {
+                         _folderTree.ContextMenu,
+                         _favoritesList.ContextMenu,
+                         _grid.ContextMenu,
+                         _columnHeaderMenu,
+                     })
             {
                 if (menu is { IsOpen: true })
                 {
@@ -1066,7 +1082,14 @@ internal sealed class LibraryBrowserView : UserControl
         {
             list.IsOpen = false;
         }
+
+        if (_columnHeaderMenu is { } columns)
+        {
+            columns.IsOpen = false;
+        }
     }
+
+    internal ContextMenu? ColumnHeaderContextMenuForTests => _columnHeaderMenu;
 
     /// <summary>選択中の実ファイル／フォルダをクリップボードへコピー（移動ではない）。</summary>
     public void CopySelected() => CopyPaths(SelectedCopyPaths());
@@ -1532,6 +1555,7 @@ internal sealed class LibraryBrowserView : UserControl
         RebuildExplorerContextMenu();
         RebuildFavoritesContextMenu();
         RebuildListContextMenu();
+        RebuildColumnHeaderContextMenu();
         RelabelExplorerRoots();
         FitColumns();
         SyncGroupChrome();
@@ -1569,7 +1593,7 @@ internal sealed class LibraryBrowserView : UserControl
             rows[i] = CreateRow(sessions[i]);
         }
 
-        _rows = LibraryFileList.Sort(rows, _sortColumn, _sortDirection);
+        _rows = SortRows(rows);
         LibraryFileList.ApplyGroupKeys(_rows, _group);
         _shuffle.Clear();
         BeginRowSync();
@@ -1589,9 +1613,10 @@ internal sealed class LibraryBrowserView : UserControl
             EndRowSync();
         }
 
-        RequestFitColumns();
+        RefreshEffectiveColumns();
         InvalidateGroupJackets();
         _ = EnsureGroupArtworkAsync();
+        RefreshPlaylistWaveformSize(reschedule: true);
     }
 
     public void UpdateSessionRow(DocumentSession session)
@@ -1636,6 +1661,7 @@ internal sealed class LibraryBrowserView : UserControl
                 EnsureListFocused();
             }
 
+            RefreshEffectiveColumns();
             InvalidateGroupJackets();
             return;
         }
@@ -1662,22 +1688,36 @@ internal sealed class LibraryBrowserView : UserControl
                 EndRowSync();
             }
 
-            RequestFitColumns();
+            RefreshEffectiveColumns();
             return;
         }
 
         var insertAt = 0;
-        while (insertAt < _items.Count
-            && LibraryFileList.Compare(_items[insertAt], row, _sortColumn, _sortDirection) <= 0)
+        if (_sortColumn is { } sortColumn)
         {
-            insertAt++;
+            while (insertAt < _items.Count
+                && LibraryFileList.Compare(_items[insertAt], row, sortColumn, _sortDirection) <= 0)
+            {
+                insertAt++;
+            }
+        }
+        else
+        {
+            insertAt = _items.Count;
         }
 
         var rowIndex = 0;
-        while (rowIndex < _rows.Count
-            && LibraryFileList.Compare(_rows[rowIndex], row, _sortColumn, _sortDirection) <= 0)
+        if (_sortColumn is { } sortForRows)
         {
-            rowIndex++;
+            while (rowIndex < _rows.Count
+                && LibraryFileList.Compare(_rows[rowIndex], row, sortForRows, _sortDirection) <= 0)
+            {
+                rowIndex++;
+            }
+        }
+        else
+        {
+            rowIndex = _rows.Count;
         }
 
         BeginRowSync();
@@ -1709,13 +1749,16 @@ internal sealed class LibraryBrowserView : UserControl
         {
             EndRowSync();
         }
+
+        RefreshEffectiveColumns();
     }
 
     public void FinishIncrementalSessionLoad()
     {
-        RequestFitColumns();
+        RefreshEffectiveColumns();
         InvalidateGroupJackets();
         _ = EnsureGroupArtworkAsync();
+        RefreshPlaylistWaveformSize(reschedule: true);
     }
 
     public void SetArtwork(AudioDocument? document, bool keepCurrentIfEmpty = false) =>
@@ -1969,6 +2012,34 @@ internal sealed class LibraryBrowserView : UserControl
     }
 
     public void SetExplorerFolder(string path) => RevealFolder(path);
+
+    /// <summary>
+    /// ディスク上のフォルダ一覧を取り込み直す。展開状態は残し、選択もできるだけ戻す。
+    /// </summary>
+    public void RefreshExplorer()
+    {
+        ClearExplorerTypeahead();
+        var selected = SelectedExplorerFolders;
+        if (_explorerSearchGroups.Count > 0)
+        {
+            ApplyExplorerSearchSync(_explorerSearchCommitted);
+        }
+        else
+        {
+            RebuildExplorerTree();
+        }
+
+        if (selected.Length == 0)
+        {
+            return;
+        }
+
+        RevealFolder(selected[0]);
+        if (selected.Length > 1)
+        {
+            RestoreExplorerMultiSelect(selected);
+        }
+    }
 
     public void SetExplorerExpanded(IEnumerable<string> paths)
     {
@@ -3455,6 +3526,35 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
+    private void RestoreExplorerMultiSelect(IReadOnlyList<string> paths)
+    {
+        _treeMultiSelected.Clear();
+        _treeSyncing = true;
+        try
+        {
+            foreach (var path in paths)
+            {
+                var target = LibraryExplorerPaths.Resolve(path);
+                if (string.IsNullOrEmpty(target) || !Directory.Exists(target))
+                {
+                    continue;
+                }
+
+                SelectFolderPath(target);
+                if (_folderTree.SelectedItem is TreeViewItem item)
+                {
+                    _treeMultiSelected.Add(item);
+                }
+            }
+        }
+        finally
+        {
+            _treeSyncing = false;
+        }
+
+        ApplyTreeMultiSelectChrome();
+    }
+
     private void SelectFolderPath(string target)
     {
         var full = NormalizeFolderPath(target);
@@ -4257,6 +4357,8 @@ internal sealed class LibraryBrowserView : UserControl
         AddColumn(LibraryFileColumn.Genre, nameof(LibraryFileRow.Genre));
         AddColumn(LibraryFileColumn.Date, nameof(LibraryFileRow.DateText));
         AddColumn(LibraryFileColumn.Comment, nameof(LibraryFileRow.Comment));
+        AddColumn(LibraryFileColumn.ParentFolder, nameof(LibraryFileRow.ParentFolder));
+        AddWaveformColumn();
         AddColumn(LibraryFileColumn.AlbumArtist, nameof(LibraryFileRow.AlbumArtist));
         AddColumn(LibraryFileColumn.Kind, nameof(LibraryFileRow.Kind));
         AddColumn(LibraryFileColumn.SampleRate, nameof(LibraryFileRow.SampleRateText), right: true);
@@ -4365,13 +4467,38 @@ internal sealed class LibraryBrowserView : UserControl
 
     internal int FrozenColumnCount => _grid.FrozenColumnCount;
 
+    /// <summary>
+    /// グループ左のジャケット枠。Wave / AIFF だけでは No Image も出さない。
+    /// MP3 / M4A が1曲でもあれば枠を残す。
+    /// </summary>
+    private bool ShowsGroupJackets
+    {
+        get
+        {
+            if (_group == LibraryFileGroup.None)
+            {
+                return false;
+            }
+
+            foreach (var row in _rows)
+            {
+                if (LibraryColumnFilter.JacketEligibleKind(row.Kind))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
     private void SyncGroupChrome()
     {
         _grid.HeadersVisibility = DataGridHeadersVisibility.Column;
-        var grouped = _group != LibraryFileGroup.None;
-        _groupSpacer.Visibility = grouped ? Visibility.Visible : Visibility.Collapsed;
-        _grid.FrozenColumnCount = grouped ? 1 : 0;
-        SetPlaylistBandLeft(_grid, grouped ? GroupJacketColumnWidth : 0);
+        var showJackets = ShowsGroupJackets;
+        _groupSpacer.Visibility = showJackets ? Visibility.Visible : Visibility.Collapsed;
+        _grid.FrozenColumnCount = showJackets ? 1 : 0;
+        SetPlaylistBandLeft(_grid, showJackets ? GroupJacketColumnWidth : 0);
         ApplyColumnDisplayOrder(_visibleColumns);
     }
 
@@ -4516,13 +4643,7 @@ internal sealed class LibraryBrowserView : UserControl
     {
         var ordered = LibraryColumnFilter.Resolve(LibraryColumnFilter.Serialize(visible));
         _visibleColumns = ordered;
-        var set = new HashSet<LibraryFileColumn>(ordered);
-        foreach (var pair in _columns)
-        {
-            pair.Value.Visibility = set.Contains(pair.Key)
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-        }
+        ApplyEffectiveColumnVisibility();
 
         if (notify)
         {
@@ -4531,6 +4652,71 @@ internal sealed class LibraryBrowserView : UserControl
 
         RequestFitColumns();
         SyncGroupChrome();
+        RefreshPlaylistWaveformSize(reschedule: true);
+    }
+
+    /// <summary>
+    /// 設定でオンの列のうち、プレイリストに値が無い列は隠す。値が付けば出す。
+    /// ソート中の列が隠れたらソート無しにする。
+    /// </summary>
+    private void ApplyEffectiveColumnVisibility()
+    {
+        var enabled = new HashSet<LibraryFileColumn>(_visibleColumns);
+        var used = CurrentUsedColumns();
+        if (_sortColumn is { } sort
+            && !LibraryColumnFilter.IsEffectivelyVisible(sort, enabled, used))
+        {
+            ClearSort(resort: false);
+        }
+
+        foreach (var pair in _columns)
+        {
+            pair.Value.Visibility = LibraryColumnFilter.IsEffectivelyVisible(pair.Key, enabled, used)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+    }
+
+    private HashSet<LibraryFileColumn>? CurrentUsedColumns() =>
+        LibraryColumnFilter.UsedColumns(
+            _rows,
+            _hideParentFolderForMp3Only,
+            _hideWaveformForMp3Only);
+
+    private void ClearSort(bool resort)
+    {
+        if (_sortColumn is null)
+        {
+            return;
+        }
+
+        _sortColumn = null;
+        foreach (var item in _columns)
+        {
+            item.Value.SortDirection = null;
+        }
+
+        RefreshSortChrome();
+        if (!resort)
+        {
+            return;
+        }
+
+        var active = SelectedSession;
+        var selected = SelectedSessions;
+        BindRows(active, selected);
+    }
+
+    private IReadOnlyList<LibraryFileRow> SortRows(IReadOnlyList<LibraryFileRow> rows) =>
+        _sortColumn is { } column
+            ? LibraryFileList.Sort(rows, column, _sortDirection)
+            : rows;
+
+    private void RefreshEffectiveColumns()
+    {
+        ApplyEffectiveColumnVisibility();
+        SyncGroupChrome();
+        RequestFitColumns();
     }
 
     private void ApplyColumnDisplayOrder(IReadOnlyList<LibraryFileColumn> visible)
@@ -4717,6 +4903,30 @@ internal sealed class LibraryBrowserView : UserControl
         _grid.Columns.Add(gridColumn);
     }
 
+    private void AddWaveformColumn()
+    {
+        var width = LibraryPlaylistWaveform.ColumnWidth;
+        var factory = new FrameworkElementFactory(typeof(LibraryPlaylistWaveformCell));
+        factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
+        factory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Stretch);
+        var cellTemplate = new DataTemplate(typeof(LibraryFileRow)) { VisualTree = factory };
+        var gridColumn = new DataGridTemplateColumn
+        {
+            CellTemplate = cellTemplate,
+            MinWidth = width,
+            MaxWidth = width,
+            Width = new DataGridLength(width),
+            IsReadOnly = true,
+            CanUserSort = false,
+            CanUserResize = false,
+        };
+        var sortHeader = new LibrarySortHeader(ColumnHeader(LibraryFileColumn.Waveform));
+        _sortHeaders[LibraryFileColumn.Waveform] = sortHeader;
+        gridColumn.Header = sortHeader;
+        _columns[LibraryFileColumn.Waveform] = gridColumn;
+        _grid.Columns.Add(gridColumn);
+    }
+
     private void RequestFitColumns()
     {
         if (!IsLoaded || _fitColumnsQueued)
@@ -4795,6 +5005,16 @@ internal sealed class LibraryBrowserView : UserControl
                 continue;
             }
 
+            if (kind == LibraryFileColumn.Waveform)
+            {
+                var waveWidth = LibraryPlaylistWaveform.ColumnWidth;
+                column.MinWidth = 0;
+                column.MaxWidth = waveWidth;
+                column.Width = new DataGridLength(waveWidth, DataGridLengthUnitType.Pixel);
+                column.MinWidth = waveWidth;
+                continue;
+            }
+
             var max = Measure(ColumnHeader(kind), headerFace) + headerPad;
             if (kind == _sortColumn)
             {
@@ -4826,31 +5046,192 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
-    private static string CellText(LibraryFileRow row, LibraryFileColumn column) =>
-        column switch
+    private void SchedulePlaylistWaveforms()
+    {
+        CancelPlaylistWaveforms();
+        if (!IsWaveformColumnEffectivelyVisible() || _items.Count == 0)
         {
-            LibraryFileColumn.Title => row.Title,
-            LibraryFileColumn.Artist => row.Artist,
-            LibraryFileColumn.AlbumArtist => row.AlbumArtist,
-            LibraryFileColumn.Album => row.Album,
-            LibraryFileColumn.Track => row.Track,
-            LibraryFileColumn.Disc => row.Disc,
-            LibraryFileColumn.Year => row.Year,
-            LibraryFileColumn.Genre => row.Genre,
-            LibraryFileColumn.Composer => row.Composer,
-            LibraryFileColumn.Comment => row.Comment,
-            LibraryFileColumn.Duration => row.DurationText,
-            LibraryFileColumn.Kind => row.Kind,
-            LibraryFileColumn.SampleRate => row.SampleRateText,
-            LibraryFileColumn.BitDepth => row.BitDepthText,
-            LibraryFileColumn.Channels => row.ChannelsText,
-            LibraryFileColumn.BitRate => row.BitRateText,
-            LibraryFileColumn.Size => row.SizeText,
-            LibraryFileColumn.Date => row.DateText,
-            LibraryFileColumn.Folder => row.Folder,
-            LibraryFileColumn.Jacket => row.JacketText,
-            _ => row.Name,
-        };
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _playlistWaveCts = cts;
+        var generation = ++_playlistWaveGeneration;
+        var token = cts.Token;
+        _ = RunPlaylistWaveformsAsync(generation, token);
+    }
+
+    private void CancelPlaylistWaveforms()
+    {
+        _playlistWaveGeneration++;
+        if (_playlistWaveCts is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _playlistWaveCts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
+        _playlistWaveCts.Dispose();
+        _playlistWaveCts = null;
+    }
+
+    private bool IsWaveformColumnEffectivelyVisible()
+    {
+        if (!_columns.TryGetValue(LibraryFileColumn.Waveform, out var column)
+            || column.Visibility != Visibility.Visible)
+        {
+            return false;
+        }
+
+        return LibraryColumnFilter.IsEffectivelyVisible(
+            LibraryFileColumn.Waveform,
+            _visibleColumns,
+            CurrentUsedColumns());
+    }
+
+    /// <summary>設定の S/M/L・WAVE オンリー自動 L・MP3 オンリー列隠しを反映する。</summary>
+    public void SetPlaylistWaveformOptions(
+        LibraryPlaylistWaveformSize preferredSize,
+        bool autoLargeForWaveOnly,
+        bool hideParentFolderForMp3Only = true,
+        bool hideWaveformForMp3Only = true)
+    {
+        _playlistWavePreferredSize = preferredSize is LibraryPlaylistWaveformSize.S
+            or LibraryPlaylistWaveformSize.M
+            ? preferredSize
+            : LibraryPlaylistWaveformSize.L;
+        _playlistWaveAutoLargeForWaveOnly = autoLargeForWaveOnly;
+        _hideParentFolderForMp3Only = hideParentFolderForMp3Only;
+        _hideWaveformForMp3Only = hideWaveformForMp3Only;
+        ApplyEffectiveColumnVisibility();
+        SyncGroupChrome();
+        RequestFitColumns();
+        RefreshPlaylistWaveformSize(reschedule: true);
+    }
+
+    private void RefreshPlaylistWaveformSize(bool reschedule)
+    {
+        var next = LibraryPlaylistWaveformSizes.Resolve(
+            _playlistWavePreferredSize,
+            _playlistWaveAutoLargeForWaveOnly,
+            _rows);
+        LibraryPlaylistWaveform.SetEffectiveSize(next);
+        ApplyWaveformColumnWidth();
+        if (reschedule)
+        {
+            SchedulePlaylistWaveforms();
+        }
+    }
+
+    private void ApplyWaveformColumnWidth()
+    {
+        if (!_columns.TryGetValue(LibraryFileColumn.Waveform, out var column))
+        {
+            return;
+        }
+
+        var width = LibraryPlaylistWaveform.ColumnWidth;
+        column.MinWidth = 0;
+        column.MaxWidth = width;
+        column.Width = new DataGridLength(width, DataGridLengthUnitType.Pixel);
+        column.MinWidth = width;
+    }
+
+    private async Task RunPlaylistWaveformsAsync(int generation, CancellationToken cancellationToken)
+    {
+        // リスト描画と入力を優先。ApplicationIdle のあとで波形を埋め始める。
+        try
+        {
+            await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.ApplicationIdle);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        if (generation != _playlistWaveGeneration || cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        var barCount = LibraryPlaylistWaveform.BarCount;
+        var paths = new List<(string Path, PeakPyramid? Peaks)>(_items.Count);
+        foreach (var row in _items)
+        {
+            if (row.Tag is not DocumentSession session
+                || session.Document.SourcePath is not { Length: > 0 } path)
+            {
+                continue;
+            }
+
+            if (LibraryPlaylistWaveform.HasEntry(path, barCount))
+            {
+                continue;
+            }
+
+            paths.Add((path, session.Document.Peaks.IsEmpty ? null : session.Document.Peaks));
+        }
+
+        foreach (var (path, peaks) in paths)
+        {
+            if (generation != _playlistWaveGeneration || cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (LibraryPlaylistWaveform.BarCount != barCount)
+            {
+                return;
+            }
+
+            if (LibraryPlaylistWaveform.HasEntry(path, barCount))
+            {
+                continue;
+            }
+
+            float[] bars;
+            try
+            {
+                bars = await Task.Run(
+                    () => LibraryPlaylistWaveform.BuildBars(path, peaks, barCount, cancellationToken),
+                    cancellationToken).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch
+            {
+                bars = new float[barCount];
+            }
+
+            if (generation != _playlistWaveGeneration || cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            LibraryPlaylistWaveform.Set(path, barCount, bars);
+
+            // 1 曲ごとに UI へ制御を返す（キー・スクロールを止めない）。
+            try
+            {
+                await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Background);
+            }
+            catch (TaskCanceledException)
+            {
+                return;
+            }
+        }
+    }
+
+    private static string CellText(LibraryFileRow row, LibraryFileColumn column) =>
+        LibraryFileList.CellText(row, column);
 
     private void SetColumnHeader(LibraryFileColumn column, string header)
     {
@@ -4886,12 +5267,14 @@ internal sealed class LibraryBrowserView : UserControl
             : ListSortDirection.Descending;
         foreach (var pair in _sortHeaders)
         {
-            pair.Value.ShowSort(pair.Key == _sortColumn, ascending);
+            pair.Value.ShowSort(_sortColumn is { } sort && pair.Key == sort, ascending);
         }
 
         foreach (var item in _columns)
         {
-            var next = item.Key == _sortColumn ? (ListSortDirection?)direction : null;
+            var next = _sortColumn is { } sort && item.Key == sort
+                ? (ListSortDirection?)direction
+                : null;
             if (!Equals(item.Value.SortDirection, next))
             {
                 item.Value.SortDirection = next;
@@ -4939,7 +5322,7 @@ internal sealed class LibraryBrowserView : UserControl
         RefreshSortChrome();
         var active = SelectedSession;
         var selected = SelectedSessions;
-        _rows = LibraryFileList.Sort(_rows, _sortColumn, _sortDirection);
+        _rows = SortRows(_rows);
         LibraryFileList.ApplyGroupKeys(_rows, _group);
         BindRows(active, selected);
     }
@@ -6227,6 +6610,7 @@ internal sealed class LibraryBrowserView : UserControl
             Folder = string.IsNullOrEmpty(path)
                 ? string.Empty
                 : Path.GetDirectoryName(path) ?? string.Empty,
+            ParentFolder = LibraryFileList.ParentFolderName(path),
             HasArtwork = hasArt,
             JacketText = hasArt ? UiStrings.LibraryJacketMark : string.Empty,
         };
@@ -6264,7 +6648,12 @@ internal sealed class LibraryBrowserView : UserControl
             }
         }
 
-        bitmap ??= LibraryPlaceholderJacket.Bitmap;
+        if (bitmap is null)
+        {
+            // Wave のみのときは No Image も出さない。MP3 / M4A があるときだけ枠用のプレースホルダ。
+            bitmap = ShowsGroupJackets ? LibraryPlaceholderJacket.Bitmap : null;
+        }
+
         _groupJackets[key] = bitmap;
         return bitmap;
     }
@@ -6418,6 +6807,80 @@ internal sealed class LibraryBrowserView : UserControl
             explorer.IsEnabled = paths.Length > 0;
         };
         _grid.ContextMenu = menu;
+    }
+
+    private void RebuildColumnHeaderContextMenu()
+    {
+        _columnHeaderMenu = CreateColumnHeaderContextMenu();
+        ApplyGridStyles();
+    }
+
+    private ContextMenu CreateColumnHeaderContextMenu()
+    {
+        var menu = new ContextMenu();
+        var enabled = new HashSet<LibraryFileColumn>(_visibleColumns);
+        foreach (var column in LibraryColumnFilter.All)
+        {
+            if (LibraryColumnFilter.IsLocked(column))
+            {
+                continue;
+            }
+
+            var item = new MenuItem
+            {
+                Header = ColumnHeader(column),
+                IsCheckable = true,
+                IsChecked = enabled.Contains(column),
+                StaysOpenOnClick = true,
+                Tag = column,
+            };
+            item.Click += ColumnHeaderMenu_Toggle;
+            menu.Items.Add(item);
+        }
+
+        menu.Opened += (_, _) => SyncColumnHeaderMenuChecks();
+        return menu;
+    }
+
+    private void SyncColumnHeaderMenuChecks()
+    {
+        if (_columnHeaderMenu is null)
+        {
+            return;
+        }
+
+        var enabled = new HashSet<LibraryFileColumn>(_visibleColumns);
+        foreach (var item in _columnHeaderMenu.Items.OfType<MenuItem>())
+        {
+            if (item.Tag is not LibraryFileColumn column)
+            {
+                continue;
+            }
+
+            item.IsChecked = enabled.Contains(column);
+        }
+    }
+
+    private void ColumnHeaderMenu_Toggle(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: LibraryFileColumn column } item
+            || LibraryColumnFilter.IsLocked(column))
+        {
+            return;
+        }
+
+        var selected = new HashSet<LibraryFileColumn>(_visibleColumns) { LibraryFileColumn.Name };
+        if (item.IsChecked == true)
+        {
+            selected.Add(column);
+        }
+        else
+        {
+            selected.Remove(column);
+        }
+
+        ApplyColumnVisibility(LibraryColumnFilter.Merge(_visibleColumns, selected), notify: true);
+        SyncColumnHeaderMenuChecks();
     }
 
     private void AddCopyAndExplorerMenuItems(ContextMenu menu, LibraryPane pane, out MenuItem copy, out MenuItem explorer)
@@ -7067,8 +7530,15 @@ internal sealed class LibraryGroupJacketImage : StackPanel
     private void Reload()
     {
         var owner = _owner ?? FindOwner();
-        var art = owner?.ArtworkForGroup(DataContext as CollectionViewGroup)
-            ?? LibraryPlaceholderJacket.Bitmap;
+        var art = owner?.ArtworkForGroup(DataContext as CollectionViewGroup);
+        if (art is null)
+        {
+            _face.Source = null;
+            _reflection.Source = null;
+            Visibility = Visibility.Collapsed;
+            return;
+        }
+
         _face.Source = art;
         _reflection.Source = art;
         _reflection.RefreshMask();

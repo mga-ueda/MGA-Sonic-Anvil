@@ -15,6 +15,12 @@ internal sealed class PeakPyramid
     /// <summary>プレイヤー波形用。表示用より粗いが、1024 だとピークが立ちすぎるので中間粒度。</summary>
     public const int PlayerDisplayBaseBuckets = 4096;
 
+    /// <summary>プレイリスト列用。S の棒本数。M/L はこの倍数。</summary>
+    public const int PlaylistBarCount = 48;
+
+    /// <summary>プレイリスト列の最大棒本数（L = S×3）。</summary>
+    public const int PlaylistBarCountMax = PlaylistBarCount * 3;
+
     private readonly float[][] _minLevels;
     private readonly float[][] _maxLevels;
 
@@ -119,6 +125,154 @@ internal sealed class PeakPyramid
 
         var provider = AudioCodec.AsSampleProvider(stream);
         return BuildPlayerDisplayFromProvider(provider, channels, frames, onProgress, cancellationToken);
+    }
+
+    /// <summary>
+    /// プレイリスト列用。全曲共通の粗い棒本数へ正規化した振幅（0..1）。
+    /// デコードは避けられないが、バケット数を抑え標本を間引いて速くする。
+    /// </summary>
+    public static float[] BuildPlaylistBarsFromPath(
+        string path,
+        int barCount = PlaylistBarCount,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        barCount = Math.Clamp(barCount, 1, PlaylistBarCountMax);
+        using var stream = AudioCodec.OpenPlaybackStream(path);
+        var format = stream.WaveFormat;
+        var channels = Math.Max(1, format.Channels);
+        var frames = AudioCodec.EstimateStreamFrameCount(stream);
+        if (frames <= 0)
+        {
+            return new float[barCount];
+        }
+
+        var provider = AudioCodec.AsSampleProvider(stream);
+        return BuildPlaylistBarsFromProvider(provider, channels, frames, barCount, cancellationToken);
+    }
+
+    /// <summary>既存ピークからプレイリスト棒を起こす（再デコードしない）。</summary>
+    public static float[] BuildPlaylistBarsFromPeaks(PeakPyramid peaks, int barCount = PlaylistBarCount)
+    {
+        barCount = Math.Clamp(barCount, 1, PlaylistBarCountMax);
+        if (peaks.IsEmpty || peaks.FrameCount <= 0)
+        {
+            return new float[barCount];
+        }
+
+        var mins = new float[barCount];
+        var maxs = new float[barCount];
+        var written = peaks.ReadRange(
+            0,
+            peaks.FrameCount,
+            barCount,
+            channel: 0,
+            mins,
+            maxs);
+        var bars = new float[barCount];
+        var peak = 0f;
+        for (var i = 0; i < written; i++)
+        {
+            var amp = Math.Max(Math.Abs(mins[i]), Math.Abs(maxs[i]));
+            bars[i] = amp;
+            if (amp > peak)
+            {
+                peak = amp;
+            }
+        }
+
+        if (peak > 0f)
+        {
+            var scale = 1f / peak;
+            for (var i = 0; i < written; i++)
+            {
+                bars[i] *= scale;
+            }
+        }
+
+        return bars;
+    }
+
+    private static float[] BuildPlaylistBarsFromProvider(
+        NAudio.Wave.ISampleProvider provider,
+        int channels,
+        long frames,
+        int barCount,
+        CancellationToken cancellationToken)
+    {
+        channels = Math.Max(1, channels);
+        barCount = Math.Clamp(barCount, 1, PlaylistBarCountMax);
+        var bars = new float[barCount];
+        var baseBucket = Math.Max(1L, (frames + barCount - 1) / barCount);
+        // 棒あたり数サンプルで足りる。間引きは荒くて良い。
+        var stride = Math.Max(1, (int)(baseBucket / 8));
+
+        const int chunkFrames = 65536;
+        var chunk = new float[chunkFrames * channels];
+        long frame = 0;
+        while (frame < frames)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var wantSamples = (int)Math.Min((long)chunk.Length, (frames - frame) * channels);
+            var gotSamples = provider.Read(chunk, 0, wantSamples);
+            if (gotSamples <= 0)
+            {
+                break;
+            }
+
+            var gotFrames = gotSamples / channels;
+            if (gotFrames <= 0)
+            {
+                break;
+            }
+
+            for (var i = 0; i < gotFrames; i += stride)
+            {
+                var src = i * channels;
+                float amp;
+                if (channels == 1)
+                {
+                    amp = Math.Abs(chunk[src]);
+                }
+                else if (channels == 2)
+                {
+                    amp = Math.Max(Math.Abs(chunk[src]), Math.Abs(chunk[src + 1]));
+                }
+                else
+                {
+                    ChannelMix.Envelope(chunk.AsSpan(src, channels), out var min, out var max);
+                    amp = Math.Max(Math.Abs(min), Math.Abs(max));
+                }
+
+                var bucket = (int)Math.Min(barCount - 1, (frame + i) / baseBucket);
+                if (amp > bars[bucket])
+                {
+                    bars[bucket] = amp;
+                }
+            }
+
+            frame += gotFrames;
+        }
+
+        var peak = 0f;
+        for (var i = 0; i < bars.Length; i++)
+        {
+            if (bars[i] > peak)
+            {
+                peak = bars[i];
+            }
+        }
+
+        if (peak > 0f)
+        {
+            var scale = 1f / peak;
+            for (var i = 0; i < bars.Length; i++)
+            {
+                bars[i] *= scale;
+            }
+        }
+
+        return bars;
     }
 
     private static PeakPyramid BuildPlayerDisplayFromProvider(

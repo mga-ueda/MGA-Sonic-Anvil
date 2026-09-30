@@ -3,6 +3,8 @@ namespace MgaSonicAnvil.Domain;
 internal enum LibraryFileColumn
 {
     Name,
+    ParentFolder,
+    Waveform,
     Title,
     Artist,
     AlbumArtist,
@@ -111,6 +113,8 @@ internal sealed class LibraryFileRow
 
     public string Folder { get; init; } = string.Empty;
 
+    public string ParentFolder { get; init; } = string.Empty;
+
     public bool HasArtwork { get; init; }
 
     public string JacketText { get; init; } = string.Empty;
@@ -133,9 +137,9 @@ internal static class LibraryFileList
             LibraryFileGroup.SampleRate => row.SampleRateText,
             LibraryFileGroup.BitDepth => row.BitDepthText,
             LibraryFileGroup.Channels => row.ChannelsText,
-            LibraryFileGroup.Folder => row.Folder.Length == 0
+            LibraryFileGroup.Folder => row.ParentFolder.Length == 0
                 ? UiStrings.LibraryGroupUntitled
-                : row.Folder,
+                : row.ParentFolder,
             _ => string.Empty,
         };
 
@@ -171,12 +175,12 @@ internal static class LibraryFileList
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            return LibraryFileGroup.Album;
+            return LibraryFileGroup.Folder;
         }
 
         return Enum.TryParse(value, ignoreCase: true, out LibraryFileGroup group)
             ? group
-            : LibraryFileGroup.Album;
+            : LibraryFileGroup.Folder;
     }
 
     public static string SerializeGroup(LibraryFileGroup group) => group.ToString();
@@ -202,8 +206,64 @@ internal static class LibraryFileList
         && left.SizeText == right.SizeText
         && left.DateText == right.DateText
         && left.Folder == right.Folder
+        && left.ParentFolder == right.ParentFolder
         && left.JacketText == right.JacketText
         && left.GroupKey == right.GroupKey;
+
+    public static string CellText(LibraryFileRow row, LibraryFileColumn column) =>
+        column switch
+        {
+            LibraryFileColumn.Title => row.Title,
+            LibraryFileColumn.Artist => row.Artist,
+            LibraryFileColumn.AlbumArtist => row.AlbumArtist,
+            LibraryFileColumn.Album => row.Album,
+            LibraryFileColumn.Track => row.Track,
+            LibraryFileColumn.Disc => row.Disc,
+            LibraryFileColumn.Year => row.Year,
+            LibraryFileColumn.Genre => row.Genre,
+            LibraryFileColumn.Composer => row.Composer,
+            LibraryFileColumn.Comment => row.Comment,
+            LibraryFileColumn.Duration => row.DurationText,
+            LibraryFileColumn.Kind => row.Kind,
+            LibraryFileColumn.SampleRate => row.SampleRateText,
+            LibraryFileColumn.BitDepth => row.BitDepthText,
+            LibraryFileColumn.Channels => row.ChannelsText,
+            LibraryFileColumn.BitRate => row.BitRateText,
+            LibraryFileColumn.Size => row.SizeText,
+            LibraryFileColumn.Date => row.DateText,
+            LibraryFileColumn.Folder => row.Folder,
+            LibraryFileColumn.ParentFolder => row.ParentFolder,
+            LibraryFileColumn.Waveform => string.Empty,
+            LibraryFileColumn.Jacket => row.JacketText,
+            _ => row.Name,
+        };
+
+    /// <summary>フルパスから親フォルダ名だけ取る。ルートはドライブ文字など。</summary>
+    public static string ParentFolderName(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            var folder = Path.GetDirectoryName(path);
+            if (string.IsNullOrEmpty(folder))
+            {
+                return string.Empty;
+            }
+
+            var name = Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            return string.IsNullOrEmpty(name)
+                ? folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                : name;
+        }
+        catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException)
+        {
+            return string.Empty;
+        }
+    }
 
     public static int Compare(
         LibraryFileRow left,
@@ -233,6 +293,11 @@ internal static class LibraryFileList
             LibraryFileColumn.Size => left.FileBytes.CompareTo(right.FileBytes),
             LibraryFileColumn.Date => left.FileDate.CompareTo(right.FileDate),
             LibraryFileColumn.Folder => string.Compare(left.Folder, right.Folder, StringComparison.CurrentCultureIgnoreCase),
+            LibraryFileColumn.ParentFolder => string.Compare(
+                left.ParentFolder,
+                right.ParentFolder,
+                StringComparison.CurrentCultureIgnoreCase),
+            LibraryFileColumn.Waveform => 0,
             LibraryFileColumn.Jacket => left.HasArtwork.CompareTo(right.HasArtwork),
             _ => string.Compare(left.Name, right.Name, StringComparison.CurrentCultureIgnoreCase),
         };

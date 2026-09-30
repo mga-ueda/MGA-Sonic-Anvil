@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -58,6 +59,15 @@ internal partial class AudioSettingsWindow : Window
 
     public string[] SelectedLibraryExplorerRoots { get; private set; } = [];
     public LibraryFileColumn[] SelectedLibraryListColumns { get; private set; } = [.. LibraryColumnFilter.Defaults];
+
+    public LibraryPlaylistWaveformSize SelectedLibraryPlaylistWaveformSize { get; private set; } =
+        LibraryPlaylistWaveformSize.L;
+
+    public bool SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly { get; private set; } = true;
+
+    public bool SelectedLibraryHideParentFolderForMp3Only { get; private set; } = true;
+
+    public bool SelectedLibraryHideWaveformForMp3Only { get; private set; } = true;
 
     public bool SelectedAutoSpeakerSelect { get; private set; }
 
@@ -116,7 +126,11 @@ internal partial class AudioSettingsWindow : Window
         string? multiFileArrange = null,
         bool autoSpeakerSelect = false,
         IEnumerable<string>? libraryExplorerRoots = null,
-        IEnumerable<LibraryFileColumn>? libraryListColumns = null)
+        IEnumerable<LibraryFileColumn>? libraryListColumns = null,
+        LibraryPlaylistWaveformSize libraryPlaylistWaveformSize = LibraryPlaylistWaveformSize.L,
+        bool libraryPlaylistWaveformAutoLargeForWaveOnly = true,
+        bool libraryHideParentFolderForMp3Only = true,
+        bool libraryHideWaveformForMp3Only = true)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
@@ -140,6 +154,13 @@ internal partial class AudioSettingsWindow : Window
         SelectedLibraryExplorerRoots = LibraryExplorerPaths.ResolveRoots(libraryExplorerRoots?.ToArray());
         SelectedLibraryListColumns = LibraryColumnFilter.Resolve(
             libraryListColumns is null ? null : LibraryColumnFilter.Serialize(libraryListColumns));
+        SelectedLibraryPlaylistWaveformSize = libraryPlaylistWaveformSize is LibraryPlaylistWaveformSize.S
+            or LibraryPlaylistWaveformSize.M
+            ? libraryPlaylistWaveformSize
+            : LibraryPlaylistWaveformSize.L;
+        SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly = libraryPlaylistWaveformAutoLargeForWaveOnly;
+        SelectedLibraryHideParentFolderForMp3Only = libraryHideParentFolderForMp3Only;
+        SelectedLibraryHideWaveformForMp3Only = libraryHideWaveformForMp3Only;
         SelectedAutoSpeakerSelect = autoSpeakerSelect;
         SelectedActiveSpeakerId = string.IsNullOrWhiteSpace(activeSpeakerId)
             ? _presets[0].Id
@@ -223,6 +244,7 @@ internal partial class AudioSettingsWindow : Window
         _fadeOutRow = CreateFadeRow(UiStrings.LabelDefaultFadeOut, fadeOut, isFadeIn: false, row: 1);
         UiThemeService.Changed += OnUiThemeChanged;
         Closed += (_, _) => UiThemeService.Changed -= OnUiThemeChanged;
+        ApplySettingsTabChrome();
 
         FillSpeakers(SelectedActiveSpeakerId);
         FillSpeakerVisibility();
@@ -242,6 +264,7 @@ internal partial class AudioSettingsWindow : Window
         FillAssociations();
         FillLibraryExplorerRoots();
         FillLibraryColumns();
+        FillLibraryPlaylistWaveformOptions();
         FillDefaultAudioFormat();
         ApplyTips();
         ReflowSettingsWindow();
@@ -283,8 +306,13 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(SpeakerVisibilityHeader, UiStrings.TipSpeakerVisibility);
         TipService.Set(SpeakerVisibilityHost, UiStrings.TipSpeakerVisibility);
         TipService.Set(LibraryColumnsHeader, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryColumnsHint, UiStrings.TipLibraryColumns);
+        TipService.Set(LibraryColumnChecksHeader, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnsHost, UiStrings.TipLibraryColumns);
+        TipService.Set(LibraryPlaylistWaveformSizeHeader, UiStrings.TipLibraryPlaylistWaveformSize);
+        TipService.Set(LibraryPlaylistWaveformSizeCombo, UiStrings.TipLibraryPlaylistWaveformSize);
+        TipService.Set(LibraryPlaylistWaveformAutoLargeBox, UiStrings.TipLibraryPlaylistWaveformAutoLarge);
+        TipService.Set(LibraryHideParentFolderForMp3OnlyBox, UiStrings.TipLibraryHideParentFolderForMp3Only);
+        TipService.Set(LibraryHideWaveformForMp3OnlyBox, UiStrings.TipLibraryHideWaveformForMp3Only);
         TipService.Set(AutoSpeakerSelectBox, UiStrings.TipAutoSpeakerSelect);
         TipService.Set(ApiLabel, UiStrings.TipAudioApi);
         TipService.Set(ApiCombo, UiStrings.TipAudioApi);
@@ -409,7 +437,11 @@ internal partial class AudioSettingsWindow : Window
         var visible = new HashSet<LibraryFileColumn>(SelectedLibraryListColumns);
         foreach (var column in LibraryColumnFilter.All)
         {
-            var locked = LibraryColumnFilter.IsLocked(column);
+            if (LibraryColumnFilter.IsLocked(column))
+            {
+                continue;
+            }
+
             var box = new CheckBox
             {
                 Content = new TextBlock
@@ -417,8 +449,7 @@ internal partial class AudioSettingsWindow : Window
                     Text = UiStrings.LibraryColumnLabel(column),
                     TextWrapping = TextWrapping.Wrap,
                 },
-                IsChecked = locked || visible.Contains(column),
-                IsEnabled = !locked,
+                IsChecked = visible.Contains(column),
                 Margin = new Thickness(0, 0, 0, 6),
                 Tag = column,
                 VerticalContentAlignment = VerticalAlignment.Center,
@@ -446,6 +477,40 @@ internal partial class AudioSettingsWindow : Window
         }
 
         return LibraryColumnFilter.Merge(SelectedLibraryListColumns, set);
+    }
+
+    private void FillLibraryPlaylistWaveformOptions()
+    {
+        LibraryPlaylistWaveformSizeCombo.Items.Clear();
+        LibraryPlaylistWaveformSizeCombo.Items.Add(
+            new LibraryPlaylistWaveformSizeItem(
+                LibraryPlaylistWaveformSize.S,
+                UiStrings.LabelLibraryPlaylistWaveformSizeS));
+        LibraryPlaylistWaveformSizeCombo.Items.Add(
+            new LibraryPlaylistWaveformSizeItem(
+                LibraryPlaylistWaveformSize.M,
+                UiStrings.LabelLibraryPlaylistWaveformSizeM));
+        LibraryPlaylistWaveformSizeCombo.Items.Add(
+            new LibraryPlaylistWaveformSizeItem(
+                LibraryPlaylistWaveformSize.L,
+                UiStrings.LabelLibraryPlaylistWaveformSizeL));
+        foreach (LibraryPlaylistWaveformSizeItem item in LibraryPlaylistWaveformSizeCombo.Items)
+        {
+            if (item.Size == SelectedLibraryPlaylistWaveformSize)
+            {
+                LibraryPlaylistWaveformSizeCombo.SelectedItem = item;
+                break;
+            }
+        }
+
+        if (LibraryPlaylistWaveformSizeCombo.SelectedItem is null)
+        {
+            LibraryPlaylistWaveformSizeCombo.SelectedIndex = 0;
+        }
+
+        LibraryPlaylistWaveformAutoLargeBox.IsChecked = SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly;
+        LibraryHideParentFolderForMp3OnlyBox.IsChecked = SelectedLibraryHideParentFolderForMp3Only;
+        LibraryHideWaveformForMp3OnlyBox.IsChecked = SelectedLibraryHideWaveformForMp3Only;
     }
 
     private void ApplyLibraryExplorerRootButtons()
@@ -917,6 +982,16 @@ internal partial class AudioSettingsWindow : Window
             .ToArray();
         SelectedLibraryExplorerRoots = LibraryExplorerPaths.ResolveRoots(SelectedLibraryExplorerRoots);
         SelectedLibraryListColumns = ReadLibraryColumns();
+        SelectedLibraryPlaylistWaveformSize =
+            LibraryPlaylistWaveformSizeCombo.SelectedItem is LibraryPlaylistWaveformSizeItem sizeItem
+                ? sizeItem.Size
+                : LibraryPlaylistWaveformSize.L;
+        SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly =
+            LibraryPlaylistWaveformAutoLargeBox.IsChecked != false;
+        SelectedLibraryHideParentFolderForMp3Only =
+            LibraryHideParentFolderForMp3OnlyBox.IsChecked != false;
+        SelectedLibraryHideWaveformForMp3Only =
+            LibraryHideWaveformForMp3OnlyBox.IsChecked != false;
         SelectedAutoSpeakerSelect = AutoSpeakerSelectBox.IsChecked == true;
         SelectedActiveSpeakerId = CurrentSpeaker()?.Id ?? _presets[0].Id;
         SelectedRecordDeviceId = ReadRecordDeviceId();
@@ -1578,6 +1653,7 @@ internal partial class AudioSettingsWindow : Window
         ComboBoxFit.Apply(LanguageCombo);
         ComboBoxFit.Apply(UiScaleCombo);
         ComboBoxFit.Apply(MultiFileArrangeCombo);
+        ComboBoxFit.Apply(LibraryPlaylistWaveformSizeCombo);
         ComboBoxFit.Apply(DefaultSampleRateCombo);
         ComboBoxFit.Apply(DefaultBitDepthCombo);
         ComboBoxFit.Apply(DefaultChannelLayoutCombo);
@@ -1637,8 +1713,8 @@ internal partial class AudioSettingsWindow : Window
         {
             UiStrings.LabelSettingsTabGeneral,
             UiStrings.LabelSettingsTabLayouts,
-            UiStrings.LabelSettingsTabPlayer,
             UiStrings.LabelSettingsTabAudio,
+            UiStrings.LabelSettingsTabPlayer,
             UiStrings.LabelSettingsTabEditing,
             UiStrings.LabelSettingsTabExport,
             UiStrings.LabelSettingsTabWwise,
@@ -1900,6 +1976,8 @@ internal partial class AudioSettingsWindow : Window
     private void OnUiThemeChanged(object? sender, EventArgs e)
     {
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        ApplySettingsTabChrome();
+        SlidingTabAccent.RefreshAllBrushes();
         RefreshFadeRowChrome(_fadeInRow);
         RefreshFadeRowIcon(_fadeInRow);
         RefreshFadeRowChrome(_fadeOutRow);
@@ -1910,6 +1988,61 @@ internal partial class AudioSettingsWindow : Window
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
         RefreshTestButtons();
+    }
+
+    /// <summary>
+    /// 設定タブは DynamicResource を使わず固定ブラシにする。
+    /// Tips 更新などでアプリ全体が再評価されると下線がちらつくため。
+    /// </summary>
+    private void ApplySettingsTabChrome()
+    {
+        var muted = ResolveThemeBrush("MutedForeBrush");
+        var primary = ResolveThemeBrush("PrimaryForeBrush");
+        var hover = ResolveThemeBrush("PlayerHoverFillBrush");
+
+        var itemStyle = new Style(typeof(TabItem));
+        itemStyle.Setters.Add(new Setter(Control.ForegroundProperty, muted));
+        itemStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+        itemStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
+        itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12, 6, 12, 6)));
+        itemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+        itemStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Stretch));
+        itemStyle.Setters.Add(new Setter(Control.FontSizeProperty, 12d));
+        itemStyle.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
+
+        var template = new ControlTemplate(typeof(TabItem));
+        var borderFactory = new FrameworkElementFactory(typeof(Border), "Bd");
+        // TabItem.IsMouseOver は本文上でも true になるので、ヘッダー Border だけ見る。
+        borderFactory.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        borderFactory.SetValue(Border.BorderBrushProperty, Brushes.Transparent);
+        borderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(0));
+        borderFactory.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
+        borderFactory.SetValue(Border.SnapsToDevicePixelsProperty, true);
+        var contentFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+        contentFactory.SetValue(ContentPresenter.ContentSourceProperty, "Header");
+        contentFactory.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        contentFactory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        contentFactory.SetValue(TextElement.ForegroundProperty, new TemplateBindingExtension(Control.ForegroundProperty));
+        borderFactory.AppendChild(contentFactory);
+        template.VisualTree = borderFactory;
+
+        var selectedTrigger = new Trigger { Property = TabItem.IsSelectedProperty, Value = true };
+        // 下線は SlidingTabAccent が隣からスライドさせる。ここでは文字色だけ。
+        selectedTrigger.Setters.Add(new Setter(Control.ForegroundProperty, primary));
+        template.Triggers.Add(selectedTrigger);
+
+        var hoverTrigger = new Trigger
+        {
+            SourceName = "Bd",
+            Property = UIElement.IsMouseOverProperty,
+            Value = true,
+        };
+        hoverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, hover, "Bd"));
+        template.Triggers.Add(hoverTrigger);
+
+        itemStyle.Setters.Add(new Setter(Control.TemplateProperty, template));
+        SettingsTabs.ItemContainerStyle = itemStyle;
+        SlidingTabAccent.Attach(SettingsTabs);
     }
 
     private static void RefreshFadeRowChrome(FadeCurveRow row)
@@ -2034,6 +2167,11 @@ internal partial class AudioSettingsWindow : Window
     }
 
     private sealed record MultiFileArrangeItem(WaveformTileArrange Arrange, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    private sealed record LibraryPlaylistWaveformSizeItem(LibraryPlaylistWaveformSize Size, string Label)
     {
         public override string ToString() => Label;
     }

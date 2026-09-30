@@ -1666,12 +1666,27 @@ public partial class MainWindow
             settings.MultiFileArrange,
             settings.AutoSpeakerSelect,
             settings.ResolvedLibraryExplorerRoots(),
-            settings.ResolvedLibraryListColumns())
+            settings.ResolvedLibraryListColumns(),
+            settings.ResolvedLibraryPlaylistWaveformSize(),
+            settings.LibraryPlaylistWaveformAutoLargeForWaveOnly,
+            settings.LibraryHideParentFolderForMp3Only,
+            settings.LibraryHideWaveformForMp3Only)
         {
             Owner = this,
         };
 
-        if (WindowPaintReveal.ShowDialogWhenPainted(dialog) != true)
+        TipService.Suspend();
+        bool? accepted;
+        try
+        {
+            accepted = WindowPaintReveal.ShowDialogWhenPainted(dialog);
+        }
+        finally
+        {
+            TipService.Resume();
+        }
+
+        if (accepted != true)
         {
             try
             {
@@ -1693,6 +1708,18 @@ public partial class MainWindow
         LibraryBrowser.SetExplorerRoots(settings.ResolvedLibraryExplorerRoots());
         settings.ApplyLibraryListColumns(dialog.SelectedLibraryListColumns);
         LibraryBrowser.SetVisibleColumns(settings.ResolvedLibraryListColumns());
+        settings.ApplyLibraryPlaylistWaveformSize(dialog.SelectedLibraryPlaylistWaveformSize);
+        settings.LibraryPlaylistWaveformAutoLargeForWaveOnly =
+            dialog.SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly;
+        settings.LibraryHideParentFolderForMp3Only =
+            dialog.SelectedLibraryHideParentFolderForMp3Only;
+        settings.LibraryHideWaveformForMp3Only =
+            dialog.SelectedLibraryHideWaveformForMp3Only;
+        LibraryBrowser.SetPlaylistWaveformOptions(
+            settings.ResolvedLibraryPlaylistWaveformSize(),
+            settings.LibraryPlaylistWaveformAutoLargeForWaveOnly,
+            settings.LibraryHideParentFolderForMp3Only,
+            settings.LibraryHideWaveformForMp3Only);
         UiThemeService.ApplyFromSettings(force: true);
         settings.UiScalePercent = dialog.SelectedUiScalePercent;
         UiScaleService.ApplyFromSettings();

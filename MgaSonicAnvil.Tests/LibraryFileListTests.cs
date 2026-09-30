@@ -6,6 +6,15 @@ namespace MgaSonicAnvil.Tests;
 public sealed class LibraryFileListTests
 {
     [Fact]
+    public void ParentFolderName_UsesImmediateFolder()
+    {
+        Assert.Equal("sfx", LibraryFileList.ParentFolderName(@"D:\music\sfx\kick.wav"));
+        Assert.Equal("Music", LibraryFileList.ParentFolderName(@"C:\Users\me\Music\song.mp3"));
+        Assert.Equal(string.Empty, LibraryFileList.ParentFolderName(""));
+        Assert.Equal(string.Empty, LibraryFileList.ParentFolderName(null));
+    }
+
+    [Fact]
     public void Sort_Duration_UsesSecondsNotText()
     {
         var rows = new[]
@@ -37,7 +46,7 @@ public sealed class LibraryFileListTests
     }
 
     [Fact]
-    public void GroupLabel_UsesFolderOrUntitled()
+    public void GroupLabel_UsesParentFolderOrUntitled()
     {
         var previous = UiStrings.Language;
         try
@@ -47,9 +56,10 @@ public sealed class LibraryFileListTests
             var untitled = Row("b.wav", folder: "");
             Assert.Equal("WAVE", LibraryFileList.GroupLabel(withFolder, LibraryFileGroup.Kind));
             Assert.Equal("48kHz", LibraryFileList.GroupLabel(withFolder, LibraryFileGroup.SampleRate));
-            Assert.Equal(@"D:\sfx", LibraryFileList.GroupLabel(withFolder, LibraryFileGroup.Folder));
+            Assert.Equal("sfx", LibraryFileList.GroupLabel(withFolder, LibraryFileGroup.Folder));
             Assert.Equal("(Untitled)", LibraryFileList.GroupLabel(untitled, LibraryFileGroup.Folder));
             Assert.Equal(string.Empty, LibraryFileList.GroupLabel(withFolder, LibraryFileGroup.None));
+            Assert.Equal("Parent folder", UiStrings.LibraryGroupFolder);
         }
         finally
         {
@@ -71,14 +81,16 @@ public sealed class LibraryFileListTests
     }
 
     [Fact]
-    public void ParseGroup_EmptyOrUnknown_IsAlbum()
+    public void ParseGroup_EmptyOrUnknown_IsFolder()
     {
-        Assert.Equal(LibraryFileGroup.Album, LibraryFileList.ParseGroup(null));
-        Assert.Equal(LibraryFileGroup.Album, LibraryFileList.ParseGroup(""));
-        Assert.Equal(LibraryFileGroup.Album, LibraryFileList.ParseGroup("nope"));
+        Assert.Equal(LibraryFileGroup.Folder, LibraryFileList.ParseGroup(null));
+        Assert.Equal(LibraryFileGroup.Folder, LibraryFileList.ParseGroup(""));
+        Assert.Equal(LibraryFileGroup.Folder, LibraryFileList.ParseGroup("nope"));
         Assert.Equal(LibraryFileGroup.None, LibraryFileList.ParseGroup("None"));
         Assert.Equal(LibraryFileGroup.Album, LibraryFileList.ParseGroup("Album"));
+        Assert.Equal(LibraryFileGroup.Folder, LibraryFileList.ParseGroup("Folder"));
         Assert.Equal("Album", LibraryFileList.SerializeGroup(LibraryFileGroup.Album));
+        Assert.Equal("Folder", LibraryFileList.SerializeGroup(LibraryFileGroup.Folder));
     }
 
     [Fact]
@@ -189,6 +201,9 @@ public sealed class LibraryFileListTests
             FileDate = date,
             DateText = UiStrings.FormatFileDate(date),
             Folder = folder,
+            ParentFolder = string.IsNullOrEmpty(folder)
+                ? string.Empty
+                : LibraryFileList.ParentFolderName(folder + "\\x.wav"),
             HasArtwork = artwork,
             JacketText = artwork ? UiStrings.LibraryJacketMark : string.Empty,
         };
