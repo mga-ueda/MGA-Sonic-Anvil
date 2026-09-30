@@ -54,6 +54,15 @@ public sealed class ComboBoxFitTests
         Assert.Equal(0, DocumentTabLayout.AdjacentIndex(0, 4, 1, i => i is 1 or 2 or 3, wrap: false));
     }
 
+    [Fact]
+    public void FirstVisibleIndex_SkipsVeiledTiles()
+    {
+        Assert.Equal(-1, DocumentTabLayout.FirstVisibleIndex(0));
+        Assert.Equal(0, DocumentTabLayout.FirstVisibleIndex(4));
+        Assert.Equal(2, DocumentTabLayout.FirstVisibleIndex(4, i => i < 2));
+        Assert.Equal(-1, DocumentTabLayout.FirstVisibleIndex(4, _ => true));
+    }
+
     [Theory]
     [InlineData(false, "Stereo", "5.1", false)]
     [InlineData(true, "Stereo", "Stereo", false)]

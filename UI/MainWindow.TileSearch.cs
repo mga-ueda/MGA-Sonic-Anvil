@@ -250,6 +250,36 @@ public partial class MainWindow
         // 条件が変わると古いタブ選択はヒット状況と食い違うので解除する。
         ClearTabSelection();
         ApplyTileSearchVeils();
+        // 以前のファイルがアクティブのまま残らないよう、いま操作できる先頭へ移す。
+        ActivateFirstMatchingTile();
+    }
+
+    /// <summary>
+    /// 絞り込み中は、ヒットした先頭（タブ順。タイルの左上から）の波形をアクティブにする。
+    /// すでにそのファイルなら何もしない。ヒットが無いときと、フィルター解除時は動かさない。
+    /// </summary>
+    private void ActivateFirstMatchingTile()
+    {
+        if (!TileSearchFilterActive)
+        {
+            return;
+        }
+
+        var index = DocumentTabLayout.FirstVisibleIndex(
+            _sessions.Count,
+            i => IsTileSearchVeiled(_sessions[i]));
+        if (index < 0)
+        {
+            return;
+        }
+
+        var session = _sessions[index];
+        if (ReferenceEquals(session, _activeSession))
+        {
+            return;
+        }
+
+        ActivateSession(session);
     }
 
     /// <summary>| で OR グループへ分け、各グループを空白で AND 語へ分ける。</summary>

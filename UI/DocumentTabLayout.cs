@@ -175,4 +175,25 @@ internal static class DocumentTabLayout
 
         return index;
     }
+
+    /// <summary>
+    /// 先頭から見て、skip が false の最初の位置。全部 skip、または count が 0 なら -1。
+    /// </summary>
+    public static int FirstVisibleIndex(int count, Func<int, bool>? skip = null)
+    {
+        if (count <= 0)
+        {
+            return -1;
+        }
+
+        for (var i = 0; i < count; i++)
+        {
+            if (skip is null || !skip(i))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
 }
