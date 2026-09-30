@@ -13,6 +13,7 @@ public partial class App : Application
             typeof(ContextMenu),
             FrameworkElement.LoadedEvent,
             new RoutedEventHandler(RevealContextMenuWash));
+        SlidingTabAccent.Install();
         ImeComposition.Install(this);
         UiColors.Load();
         UiThemeService.Start();

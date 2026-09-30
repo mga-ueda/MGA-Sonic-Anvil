@@ -1252,10 +1252,14 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TabItem">
+                    <!--
+                      TabItem.IsMouseOver は本文（SelectedContent）上でも true になる。
+                      ヘッダー Border の IsMouseOver だけ見る。
+                    -->
                     <Border x:Name="Bd"
-                            Background="{TemplateBinding Background}"
+                            Background="Transparent"
                             BorderBrush="Transparent"
-                            BorderThickness="0,0,0,2"
+                            BorderThickness="0"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
                         <ContentPresenter ContentSource="Header"
@@ -1265,10 +1269,9 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentCyanBrush}" />
                             <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
                         </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
+                        <Trigger SourceName="Bd" Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PlayerHoverFillBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>

@@ -54,6 +54,7 @@ internal static class TipService
             }
 
             RelayoutHost();
+            UpdateLockChrome();
         }
     }
 
@@ -69,6 +70,7 @@ internal static class TipService
 
         _hostSuppressed = suppressed;
         RelayoutHost();
+        UpdateLockChrome();
     }
 
     public static void BindDisplay(TextBlock display, FrameworkElement host, ScrollViewer? scroll = null)
@@ -335,6 +337,18 @@ internal static class TipService
 
     private static void CommitHoverTip(string? tip, object? source)
     {
+        // 設定など別ウィンドウからのホバーでメイン Tips 枠を動かすと、
+        // オーナー側レイアウト更新でモーダル子の DynamicResource（タブ下線など）がちらつく。
+        if (source is DependencyObject sourceNode
+            && _host is not null
+            && Window.GetWindow(sourceNode) is { } sourceWindow
+            && Window.GetWindow(_host) is { } hostWindow
+            && !ReferenceEquals(sourceWindow, hostWindow))
+        {
+            CancelPending();
+            return;
+        }
+
         if (string.IsNullOrEmpty(tip))
         {
             _activeSource = null;
@@ -572,8 +586,8 @@ internal static class TipService
             return;
         }
 
+        // 高さだけ合わせる。毎回 BorderBrush を張り直すと DynamicResource 利用箇所（設定タブの下線など）が点滅する。
         SetHostHeight(DesignMetrics.TipsPanelHeight);
-        UpdateLockChrome();
     }
 
     private static void UpdateLockChrome()
@@ -583,15 +597,11 @@ internal static class TipService
             return;
         }
 
-        if (_pinned)
-        {
-            border.SetValue(
-                Border.BorderBrushProperty,
-                WpfControlHelpers.FrozenBrush(Theme.Get("AccentCyanBrush")));
-            return;
-        }
-
-        border.SetResourceReference(Border.BorderBrushProperty, "ChromeBorderBrush");
+        // SetResourceReference もアプリ全体の DynamicResource 再評価を誘発するので使わない。
+        border.SetValue(
+            Border.BorderBrushProperty,
+            WpfControlHelpers.FrozenBrush(Theme.Get(
+                _pinned ? "AccentCyanBrush" : "ChromeBorderBrush")));
     }
 
     private static void CollapseHost()
