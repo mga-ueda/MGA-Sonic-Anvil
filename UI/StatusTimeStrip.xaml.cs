@@ -91,20 +91,31 @@ internal partial class StatusTimeStrip : UserControl
             CancelEdit();
         }
 
+        if (!hasDocument)
+        {
+            _currentFrame = 0;
+            _selection = WaveSelection.Empty;
+            _totalFrames = 0;
+            _sampleRate = 0;
+            _hasDocument = false;
+            CurrentBox.IsEnabled = false;
+            SelStartBox.IsEnabled = false;
+            SelLengthBox.IsEnabled = false;
+            SelEndBox.IsEnabled = false;
+            CancelEdit();
+            RefreshTexts();
+            return;
+        }
+
         _currentFrame = Math.Max(0, currentFrame);
         _selection = selection;
         _totalFrames = Math.Max(0, totalFrames);
         _sampleRate = sampleRate;
-        _hasDocument = hasDocument;
-        CurrentBox.IsEnabled = hasDocument;
-        SelStartBox.IsEnabled = hasDocument;
-        SelLengthBox.IsEnabled = hasDocument;
-        SelEndBox.IsEnabled = hasDocument;
-        if (!hasDocument)
-        {
-            CancelEdit();
-        }
-
+        _hasDocument = true;
+        CurrentBox.IsEnabled = true;
+        SelStartBox.IsEnabled = true;
+        SelLengthBox.IsEnabled = true;
+        SelEndBox.IsEnabled = true;
         RefreshTexts();
     }
 
@@ -287,23 +298,38 @@ internal partial class StatusTimeStrip : UserControl
         state.Display.Visibility = Visibility.Visible;
     }
 
-    private string FormatField(StatusTimeField field)
+    private string FormatField(StatusTimeField field) =>
+        FormatFieldText(field, _hasDocument, _currentFrame, _selection, _totalFrames, _sampleRate, _showSamples);
+
+    internal static string FormatFieldText(
+        StatusTimeField field,
+        bool hasDocument,
+        long currentFrame,
+        WaveSelection selection,
+        long totalFrames,
+        int sampleRate,
+        bool showSamples)
     {
+        if (!hasDocument)
+        {
+            return string.Empty;
+        }
+
         if (field is StatusTimeField.SelStart or StatusTimeField.SelLength or StatusTimeField.SelEnd
-            && _selection.IsEmpty)
+            && selection.IsEmpty)
         {
             return string.Empty;
         }
 
         var frame = field switch
         {
-            StatusTimeField.Current => _currentFrame,
-            StatusTimeField.SelStart => _selection.StartFrame,
-            StatusTimeField.SelLength => _selection.Length,
-            StatusTimeField.SelEnd => _selection.EndFrame,
-            _ => _totalFrames,
+            StatusTimeField.Current => currentFrame,
+            StatusTimeField.SelStart => selection.StartFrame,
+            StatusTimeField.SelLength => selection.Length,
+            StatusTimeField.SelEnd => selection.EndFrame,
+            _ => totalFrames,
         };
-        return UiStrings.FormatStatusTime(frame, _sampleRate, _showSamples);
+        return UiStrings.FormatStatusTime(frame, sampleRate, showSamples);
     }
 
     private void Field_PreviewMouseWheel(object sender, MouseWheelEventArgs e)

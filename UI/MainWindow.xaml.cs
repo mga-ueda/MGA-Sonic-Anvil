@@ -800,12 +800,19 @@ public partial class MainWindow : Window
 
     private void SyncTransportPosition(long? frame = null)
     {
+        if (_document is null)
+        {
+            // 遅延 ViewChanged が古い PlayheadFrame を sampleRate=0 で載せないよう、常に空表示へ戻す。
+            StatusTimes.SetState(0, WaveSelection.Empty, 0, 0, hasDocument: false);
+            return;
+        }
+
         StatusTimes.SetState(
             frame ?? Waveform.PlayheadFrame,
-            _document?.Selection ?? WaveSelection.Empty,
-            _document?.FrameCount ?? 0,
-            _document?.SampleRate ?? 0,
-            _document is not null);
+            _document.Selection,
+            _document.FrameCount,
+            _document.SampleRate,
+            hasDocument: true);
     }
 
     private long VisibleCenterFrame() => VisibleCenterFrameAt(Overview.ViewStart);

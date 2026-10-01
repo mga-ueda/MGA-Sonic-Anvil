@@ -73,4 +73,57 @@ public sealed class StatusTimeEditTests
         var next = StatusTimeEdit.ApplyLength(new WaveSelection(480, 490), 100, playhead: 0, frameCount: 500);
         Assert.Equal(new WaveSelection(480, 500), next);
     }
+
+    [Fact]
+    public void FormatFieldText_WithoutDocument_IsBlank()
+    {
+        // 閉じたあとに古いフレームと sampleRate=0 が残っても、空表示にする。
+        foreach (StatusTimeField field in Enum.GetValues<StatusTimeField>())
+        {
+            var text = StatusTimeStrip.FormatFieldText(
+                field,
+                hasDocument: false,
+                currentFrame: 8_640_000,
+                selection: new WaveSelection(100, 200),
+                totalFrames: 8_640_000,
+                sampleRate: 0,
+                showSamples: false);
+            Assert.Equal(string.Empty, text);
+        }
+    }
+
+    [Fact]
+    public void FormatFieldText_WithDocument_ShowsTimecode()
+    {
+        Assert.Equal(
+            "00:01.000",
+            StatusTimeStrip.FormatFieldText(
+                StatusTimeField.Current,
+                hasDocument: true,
+                currentFrame: 48000,
+                selection: WaveSelection.Empty,
+                totalFrames: 96000,
+                sampleRate: 48000,
+                showSamples: false));
+        Assert.Equal(
+            string.Empty,
+            StatusTimeStrip.FormatFieldText(
+                StatusTimeField.SelStart,
+                hasDocument: true,
+                currentFrame: 0,
+                selection: WaveSelection.Empty,
+                totalFrames: 96000,
+                sampleRate: 48000,
+                showSamples: false));
+        Assert.Equal(
+            "00:02.000",
+            StatusTimeStrip.FormatFieldText(
+                StatusTimeField.Total,
+                hasDocument: true,
+                currentFrame: 0,
+                selection: WaveSelection.Empty,
+                totalFrames: 96000,
+                sampleRate: 48000,
+                showSamples: false));
+    }
 }

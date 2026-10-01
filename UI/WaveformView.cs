@@ -381,6 +381,11 @@ internal sealed class WaveformView : Grid
             _timeZoom = 1d;
             _ampZoom = 1d;
             _viewStart = 0;
+            if (value is null)
+            {
+                _playheadFrame = 0;
+            }
+
             CenterLocked = false;
             _liveRecording = false;
             SetTrailRecording(false);
