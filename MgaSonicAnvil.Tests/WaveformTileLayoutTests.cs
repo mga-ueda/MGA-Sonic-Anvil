@@ -152,6 +152,25 @@ public sealed class WaveformTileLayoutTests
             WaveformTileLayout.Fallback(WaveformTileArrange.Off, 9, minW * 3, minH * 3));
     }
 
+    /// <summary>
+    /// F10 帯（133px）では 2 曲の縦タイルが収まらず格子（＝横並び）へ落ちる。
+    /// プレイヤー突入後にこの Fallback を走らせると下部にタイルが残る原因になる。
+    /// </summary>
+    [Fact]
+    public void Fallback_VerticalTwoAtLibraryWaveformHeight_BecomesSideBySideGrid()
+    {
+        var width = WaveformTileLayout.MinTileWidth * 4;
+        var height = DesignMetrics.LibraryWaveformHeight;
+        Assert.True(height < WaveformTileLayout.MinTileHeight * 2);
+        Assert.False(WaveformTileLayout.Fits(WaveformTileArrange.Vertical, 2, width, height));
+        Assert.Equal(
+            WaveformTileArrange.Grid,
+            WaveformTileLayout.Fallback(WaveformTileArrange.Vertical, 2, width, height));
+        WaveformTileLayout.ChooseGrid(WaveformTileArrange.Grid, 2, out var rows, out var cols);
+        Assert.Equal(1, rows);
+        Assert.Equal(2, cols);
+    }
+
     [Theory]
     [InlineData(2, 2, 1)]
     [InlineData(3, 3, 1)]

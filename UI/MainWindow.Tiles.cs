@@ -158,7 +158,8 @@ public partial class MainWindow
     /// <summary>今のタイル配置が収まらなくなったら格子を試し、それも無理なら解除する。</summary>
     private void EnsureUsableTileArrange()
     {
-        if (!_tileMode || _tileLayoutBusy)
+        // プレイヤー帯は単一波形だけ。ここで張り直すと F10 下部にタイルが残る。
+        if (!_tileMode || _tileLayoutBusy || IsLibraryMaximized)
         {
             return;
         }
@@ -221,7 +222,7 @@ public partial class MainWindow
 
     private void ApplyTileArrange(WaveformTileArrange arrange)
     {
-        if (arrange == WaveformTileArrange.Off || !TileArrangeFits(arrange))
+        if (IsLibraryMaximized || arrange == WaveformTileArrange.Off || !TileArrangeFits(arrange))
         {
             return;
         }

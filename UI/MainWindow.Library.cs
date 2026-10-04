@@ -33,6 +33,8 @@ public partial class MainWindow
     /// <summary>F9。プレイヤーのサイド／メーター／トランスポート／ステータスを隠す。波形は残す。再生は止めない。</summary>
     private bool _libraryMinimalChrome;
     private bool _libraryPlayerHostActive;
+    /// <summary>F10 突入前のタイル配置。退出後に付け直す。</summary>
+    private WaveformTileArrange _librarySuspendedTileArrange;
     private readonly LibraryPlaylistRemoveUndo _libraryPlaylistUndo = new();
     private bool _libraryWaapiSuspended;
     private bool _restoreWaapiAfterLibrary;
@@ -415,7 +417,7 @@ public partial class MainWindow
             }
         }
 
-        ApplyPreferredMultiFileArrange(_sessions.Count);
+        RestoreLibrarySuspendedTileArrange();
         await UpgradeKeptLibrarySessionsForEditorAsync(active).ConfigureAwait(true);
         if (IsLibraryMaximized)
         {
@@ -565,14 +567,19 @@ public partial class MainWindow
     {
         if (show)
         {
-            if (_tileGrid is not null)
+            // Collapsed だけでは足りない。133px 帯への SizeChanged で EnsureUsableTileArrange が
+            // 縦→格子へ張り直し、プレイヤー下部にタイルが復活する。
+            _librarySuspendedTileArrange = _tileArrange;
+            if (_tileMode || _tilePanes.Count > 0 || _tileGrid is not null)
             {
-                _tileGrid.Visibility = Visibility.Collapsed;
+                ExitWaveformTileMode(bindPrimary: false);
             }
-
-            SingleWaveformHost.Visibility = Visibility.Visible;
-            PrimaryWaveform.Visibility = Visibility.Visible;
-            _tileActiveView = null;
+            else
+            {
+                SingleWaveformHost.Visibility = Visibility.Visible;
+                PrimaryWaveform.Visibility = Visibility.Visible;
+                _tileActiveView = null;
+            }
 
             // F9↔F10 のクローム切替で毎回 Bind すると ResetWorkspaceInteraction が再生を止める。
             if (_activeSession is not null)
@@ -607,14 +614,27 @@ public partial class MainWindow
         }
 
         _libraryPlayerHostActive = false;
-        if (_tileMode && _tileGrid is not null)
+        // タイルは LeaveLibraryMaximizeAsync → RestoreLibrarySuspendedTileArrange で付け直す。
+    }
+
+    /// <summary>
+    /// F10 で外したタイルを、エディタのレイアウトが戻ってから付け直す。
+    /// 退避が無ければ設定の複数ファイル配置へ。
+    /// </summary>
+    private void RestoreLibrarySuspendedTileArrange()
+    {
+        var suspended = _librarySuspendedTileArrange;
+        _librarySuspendedTileArrange = WaveformTileArrange.Off;
+        if (suspended != WaveformTileArrange.Off)
         {
-            _tileGrid.Visibility = Visibility.Visible;
-            if (_activeSession is not null)
+            RestoreWaveformTileArrange(WaveformTileLayout.Format(suspended));
+            if (_tileMode)
             {
-                TryBindTiledWorkspace(_activeSession, resetInteraction: false);
+                return;
             }
         }
+
+        ApplyPreferredMultiFileArrange(_sessions.Count);
     }
 
     private void RefreshLibraryBrowser()
