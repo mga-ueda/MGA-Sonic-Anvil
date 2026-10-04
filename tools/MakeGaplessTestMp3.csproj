@@ -4,9 +4,12 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>MakeGaplessTestMp3</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="MakeGaplessTestMp3.cs" />
+    <Compile Remove="BuildAppIcon.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
   </ItemGroup>
 </Project>
