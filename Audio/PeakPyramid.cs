@@ -123,8 +123,7 @@ internal sealed class PeakPyramid
             return new PeakPyramid([[]], [[]], 1, 0, 1, 0);
         }
 
-        var provider = AudioCodec.AsSampleProvider(stream);
-        return BuildPlayerDisplayFromProvider(provider, channels, frames, onProgress, cancellationToken);
+        return BuildPlayerDisplayFromProvider(stream, channels, frames, onProgress, cancellationToken);
     }
 
     /// <summary>
@@ -147,9 +146,12 @@ internal sealed class PeakPyramid
             return new float[barCount];
         }
 
-        var provider = AudioCodec.AsSampleProvider(stream);
-        return BuildPlaylistBarsFromProvider(provider, channels, frames, barCount, cancellationToken);
+        return BuildPlaylistBarsFromProvider(stream, channels, frames, barCount, cancellationToken);
     }
+
+    /// <summary>走査中のピークは後半が 0 のままなので、プレイリスト棒に使わない。</summary>
+    public static bool CanBuildPlaylistBarsFromPeaks(PeakPyramid peaks) =>
+        !peaks.IsEmpty && !peaks.IsBuilding && peaks.FrameCount > 0;
 
     /// <summary>既存ピークからプレイリスト棒を起こす（再デコードしない）。</summary>
     public static float[] BuildPlaylistBarsFromPeaks(PeakPyramid peaks, int barCount = PlaylistBarCount)
@@ -194,7 +196,7 @@ internal sealed class PeakPyramid
     }
 
     private static float[] BuildPlaylistBarsFromProvider(
-        NAudio.Wave.ISampleProvider provider,
+        NAudio.Wave.WaveStream stream,
         int channels,
         long frames,
         int barCount,
@@ -209,24 +211,36 @@ internal sealed class PeakPyramid
 
         const int chunkFrames = 65536;
         var chunk = new float[chunkFrames * channels];
+        var provider = AudioCodec.AsSampleProvider(stream);
         long frame = 0;
         var emptyReads = 0;
-        while (frame < frames)
+        var recoveries = 0;
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var wantSamples = (int)Math.Min((long)chunk.Length, (frames - frame) * channels);
+            var hintFrames = frame < frames ? frames - frame : chunkFrames;
+            var wantSamples = (int)Math.Min((long)chunk.Length, hintFrames * channels);
             wantSamples -= wantSamples % channels;
             if (wantSamples < channels)
             {
                 break;
             }
 
-            var gotSamples = provider.Read(chunk, 0, wantSamples);
+            var gotSamples = ReadSamples(provider, chunk, wantSamples);
             if (gotSamples <= 0)
             {
                 emptyReads++;
-                if (emptyReads > 8)
+                if (frame >= frames || emptyReads > 8)
                 {
+                    if (frame < frames
+                        && recoveries < 2
+                        && TryRecoverSampleProvider(stream, frame, ref provider))
+                    {
+                        recoveries++;
+                        emptyReads = 0;
+                        continue;
+                    }
+
                     break;
                 }
 
@@ -290,7 +304,7 @@ internal sealed class PeakPyramid
     }
 
     private static PeakPyramid BuildPlayerDisplayFromProvider(
-        NAudio.Wave.ISampleProvider provider,
+        NAudio.Wave.WaveStream stream,
         int channels,
         long frames,
         Action<PeakPyramid>? onProgress,
@@ -299,7 +313,7 @@ internal sealed class PeakPyramid
         channels = Math.Max(1, channels);
         var maxBaseBuckets = PlayerDisplayBaseBuckets;
         var baseBucket = (int)Math.Max(1L, (frames + maxBaseBuckets - 1) / maxBaseBuckets);
-        var baseCount = (int)((frames + baseBucket - 1) / baseBucket);
+        var baseCount = Math.Max(1, (int)((frames + baseBucket - 1) / baseBucket));
         var mins = new float[baseCount];
         var maxs = new float[baseCount];
         Array.Fill(mins, float.MaxValue);
@@ -308,25 +322,38 @@ internal sealed class PeakPyramid
         // 大きなチャンクで MF デコードの呼び出し回数を減らす。
         const int chunkFrames = 65536;
         var chunk = new float[chunkFrames * channels];
+        var provider = AudioCodec.AsSampleProvider(stream);
         long frame = 0;
         var emptyReads = 0;
+        var recoveries = 0;
         var lastProgressMs = Environment.TickCount64;
-        while (frame < frames)
+        var timelineFrames = Math.Max(1, frames);
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var wantSamples = (int)Math.Min((long)chunk.Length, (frames - frame) * channels);
+            var hintFrames = frame < timelineFrames ? timelineFrames - frame : chunkFrames;
+            var wantSamples = (int)Math.Min((long)chunk.Length, hintFrames * channels);
             wantSamples -= wantSamples % channels;
             if (wantSamples < channels)
             {
                 break;
             }
 
-            var gotSamples = provider.Read(chunk, 0, wantSamples);
+            var gotSamples = ReadSamples(provider, chunk, wantSamples);
             if (gotSamples <= 0)
             {
                 emptyReads++;
-                if (emptyReads > 8)
+                if (frame >= timelineFrames || emptyReads > 8)
                 {
+                    if (frame < timelineFrames
+                        && recoveries < 2
+                        && TryRecoverSampleProvider(stream, frame, ref provider))
+                    {
+                        recoveries++;
+                        emptyReads = 0;
+                        continue;
+                    }
+
                     break;
                 }
 
@@ -340,24 +367,106 @@ internal sealed class PeakPyramid
                 break;
             }
 
+            EnsureMonoBuckets(ref mins, ref maxs, frame + gotFrames, baseBucket);
             AccumulateMonoEnvelope(chunk, channels, gotFrames, frame, baseBucket, mins, maxs);
             frame += gotFrames;
+            if (frame > timelineFrames)
+            {
+                timelineFrames = frame;
+            }
 
             if (onProgress is not null)
             {
                 var now = Environment.TickCount64;
-                if (now - lastProgressMs >= 40 || frame >= frames)
+                if (now - lastProgressMs >= 40 || frame >= timelineFrames)
                 {
                     lastProgressMs = now;
-                    onProgress(SnapshotPlayerPeaks(mins, maxs, frames, frame, baseBucket));
+                    onProgress(SnapshotPlayerPeaks(mins, maxs, timelineFrames, frame, baseBucket));
                 }
             }
         }
 
+        TrimMonoBuckets(ref mins, ref maxs, frame, baseBucket);
         FinalizeUnsetBuckets(mins, maxs);
         // 推定より早く EOF なら、埋まった長さを正とする（タイムラインと波形の尺を揃える）。
         var actual = Math.Max(1, frame);
         return FromBasePeaks(mins, maxs, channels: 1, actual, baseBucket, actual);
+    }
+
+    private static int ReadSamples(NAudio.Wave.ISampleProvider provider, float[] chunk, int wantSamples)
+    {
+        try
+        {
+            return provider.Read(chunk, 0, wantSamples);
+        }
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException
+                                       or InvalidOperationException
+                                       or InvalidDataException)
+        {
+            // Media Foundation は Length を超えると 0xC00D36B2 で落ちる。
+            return 0;
+        }
+    }
+
+    private static bool TryRecoverSampleProvider(
+        NAudio.Wave.WaveStream stream,
+        long frame,
+        ref NAudio.Wave.ISampleProvider provider)
+    {
+        // MF は Position 代入が SetCurrentPosition になり、ファイルによっては 0xC00D36B2。
+        if (stream is not BlockAlignedWaveStream)
+        {
+            return false;
+        }
+
+        try
+        {
+            var block = Math.Max(1, stream.WaveFormat.BlockAlign);
+            var pos = frame * (long)block;
+            if (pos < 0 || (stream.Length > 0 && pos >= stream.Length))
+            {
+                return false;
+            }
+
+            stream.Position = pos;
+            provider = AudioCodec.AsSampleProvider(stream);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void EnsureMonoBuckets(ref float[] mins, ref float[] maxs, long frameCount, int baseBucket)
+    {
+        var needed = Math.Max(1, (int)((Math.Max(1, frameCount) + baseBucket - 1) / baseBucket));
+        if (needed <= mins.Length)
+        {
+            return;
+        }
+
+        var next = Math.Max(needed, mins.Length * 2);
+        var newMin = new float[next];
+        var newMax = new float[next];
+        Array.Fill(newMin, float.MaxValue);
+        Array.Fill(newMax, float.MinValue);
+        Array.Copy(mins, newMin, mins.Length);
+        Array.Copy(maxs, newMax, maxs.Length);
+        mins = newMin;
+        maxs = newMax;
+    }
+
+    private static void TrimMonoBuckets(ref float[] mins, ref float[] maxs, long frameCount, int baseBucket)
+    {
+        var used = Math.Max(1, (int)((Math.Max(1, frameCount) + baseBucket - 1) / baseBucket));
+        if (used >= mins.Length)
+        {
+            return;
+        }
+
+        Array.Resize(ref mins, used);
+        Array.Resize(ref maxs, used);
     }
 
     private static void AccumulateMonoEnvelope(
@@ -391,6 +500,10 @@ internal sealed class PeakPyramid
             }
 
             var bucket = (int)((startFrame + i) / baseBucket);
+            if ((uint)bucket >= (uint)mins.Length)
+            {
+                continue;
+            }
             if (min < mins[bucket])
             {
                 mins[bucket] = min;
@@ -824,4 +937,13 @@ internal sealed class PeakPyramid
 
         return new PeakPyramid([.. minLevels], [.. maxLevels], channels, frameCount, baseBucket, filledFrames);
     }
+
+    /// <summary>テスト用。走査途中のモノラル包絡を再現する。</summary>
+    internal static PeakPyramid CreateMonoForTests(
+        float[] mins,
+        float[] maxs,
+        long frameCount,
+        int baseBucket,
+        long filledFrames) =>
+        FromBasePeaks(mins, maxs, channels: 1, frameCount, Math.Max(1, baseBucket), filledFrames);
 }

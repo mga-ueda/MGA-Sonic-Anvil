@@ -247,6 +247,35 @@ public sealed class PeakPyramidTests
     }
 
     [Fact]
+    public void CanBuildPlaylistBarsFromPeaks_RejectsInProgressScan()
+    {
+        const int buckets = 8;
+        const int baseBucket = 100;
+        var mins = new float[buckets];
+        var maxs = new float[buckets];
+        Array.Fill(mins, -0.4f);
+        Array.Fill(maxs, 0.4f);
+        for (var i = buckets / 2; i < buckets; i++)
+        {
+            mins[i] = 0;
+            maxs[i] = 0;
+        }
+
+        var building = PeakPyramid.CreateMonoForTests(
+            mins,
+            maxs,
+            frameCount: buckets * baseBucket,
+            baseBucket,
+            filledFrames: buckets * baseBucket / 2);
+        Assert.True(building.IsBuilding);
+        Assert.False(PeakPyramid.CanBuildPlaylistBarsFromPeaks(building));
+
+        var bars = PeakPyramid.BuildPlaylistBarsFromPeaks(building, buckets);
+        Assert.Equal(0f, bars[^1]);
+        Assert.True(bars[0] > 0.9f);
+    }
+
+    [Fact]
     public void FindNextAudibleFrame_SkipsSilentPrefix()
     {
         var frames = PeakPyramid.PlayerDisplayBaseBuckets * 4;

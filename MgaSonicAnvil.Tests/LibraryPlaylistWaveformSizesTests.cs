@@ -1,5 +1,7 @@
+using System.IO;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
+using MgaSonicAnvil.UI;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
@@ -69,5 +71,60 @@ public sealed class LibraryPlaylistWaveformSizesTests
         var bars = PeakPyramid.BuildPlaylistBarsFromPeaks(peaks, 96);
         Assert.Equal(96, bars.Length);
         Assert.Contains(bars, static v => v >= 0.99f);
+    }
+
+    [Fact]
+    public void BuildBars_SkipsInProgressPeaksSoTailStaysAudible()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-pl-wave-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            const int frames = 8000;
+            using (var writer = new NAudio.Wave.WaveFileWriter(path, new NAudio.Wave.WaveFormat(8000, 16, 1)))
+            {
+                var samples = new float[frames];
+                for (var i = 0; i < frames; i++)
+                {
+                    samples[i] = i >= frames / 2 ? 0.8f : 0.05f;
+                }
+
+                writer.WriteSamples(samples, 0, samples.Length);
+            }
+
+            const int buckets = 8;
+            const int baseBucket = frames / buckets;
+            var mins = new float[buckets];
+            var maxs = new float[buckets];
+            Array.Fill(mins, -0.05f);
+            Array.Fill(maxs, 0.05f);
+            for (var i = buckets / 2; i < buckets; i++)
+            {
+                mins[i] = 0;
+                maxs[i] = 0;
+            }
+
+            var building = PeakPyramid.CreateMonoForTests(
+                mins,
+                maxs,
+                frames,
+                baseBucket,
+                filledFrames: frames / 2);
+            var fromBuilding = PeakPyramid.BuildPlaylistBarsFromPeaks(building, buckets);
+            Assert.Equal(0f, fromBuilding[^1]);
+
+            var bars = LibraryPlaylistWaveform.BuildBars(path, building, buckets, CancellationToken.None);
+            Assert.True(bars[^1] > 0.9f, $"tail={bars[^1]}");
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(path);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
     }
 }

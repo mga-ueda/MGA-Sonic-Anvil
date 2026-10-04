@@ -293,6 +293,38 @@ public sealed class LibraryPlayerModeTests
     }
 
     [Fact]
+    public void IsNewerLibraryPeaks_DoesNotReplaceCompleteWithInProgress()
+    {
+        const int buckets = 8;
+        const int baseBucket = 100;
+        var estimate = buckets * baseBucket;
+        var actual = estimate - 6;
+        var completeMins = new float[buckets];
+        var completeMaxs = new float[buckets];
+        Array.Fill(completeMins, -0.4f);
+        Array.Fill(completeMaxs, 0.4f);
+        var complete = PeakPyramid.CreateMonoForTests(completeMins, completeMaxs, actual, baseBucket, actual);
+        Assert.False(complete.IsBuilding);
+
+        var partialMins = new float[buckets];
+        var partialMaxs = new float[buckets];
+        Array.Fill(partialMins, -0.4f, 0, buckets / 2);
+        Array.Fill(partialMaxs, 0.4f, 0, buckets / 2);
+        var partial = PeakPyramid.CreateMonoForTests(
+            partialMins,
+            partialMaxs,
+            estimate,
+            baseBucket,
+            filledFrames: estimate / 2);
+        Assert.True(partial.IsBuilding);
+
+        Assert.False(LibraryPlayerMode.IsNewerLibraryPeaks(complete, partial));
+        Assert.True(LibraryPlayerMode.IsNewerLibraryPeaks(partial, complete));
+        Assert.True(LibraryPlayerMode.IsNewerLibraryPeaks(PeakPyramid.Empty, complete));
+        Assert.False(LibraryPlayerMode.IsNewerLibraryPeaks(complete, PeakPyramid.Empty));
+    }
+
+    [Fact]
     public void FirstSession_IsListHead()
     {
         var first = Session("a.wav");

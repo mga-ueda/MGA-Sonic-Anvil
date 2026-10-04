@@ -5497,6 +5497,16 @@ internal sealed class LibraryBrowserView : UserControl
         SetColumnPixelWidth(column, LibraryPlaylistWaveform.ColumnWidth);
     }
 
+    public void ApplyCompletedPlaylistWaveform(string path, PeakPyramid peaks)
+    {
+        if (!IsWaveformColumnEffectivelyVisible())
+        {
+            return;
+        }
+
+        LibraryPlaylistWaveform.SetFromCompletedPeaks(path, peaks);
+    }
+
     private async Task RunPlaylistWaveformsAsync(int generation, CancellationToken cancellationToken)
     {
         // リスト描画と入力を優先。ApplicationIdle のあとで波形を埋め始める。
@@ -5529,7 +5539,9 @@ internal sealed class LibraryBrowserView : UserControl
                 continue;
             }
 
-            paths.Add((path, session.Document.Peaks.IsEmpty ? null : session.Document.Peaks));
+            paths.Add((path, PeakPyramid.CanBuildPlaylistBarsFromPeaks(session.Document.Peaks)
+                ? session.Document.Peaks
+                : null));
         }
 
         foreach (var (path, peaks) in paths)

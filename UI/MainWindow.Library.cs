@@ -2112,11 +2112,12 @@ public partial class MainWindow
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException
-                                       or InvalidOperationException or OperationCanceledException)
+                                       or InvalidOperationException or OperationCanceledException
+                                       or System.Runtime.InteropServices.COMException)
         {
             // ピークだけ失敗しても再生は続ける。
             // 今の曲の走査が次曲の先読みで止まったときは、世代を進めずにやり直す。
-            if (ex is OperationCanceledException
+            if (ex is (OperationCanceledException or System.Runtime.InteropServices.COMException)
                 && IsLibraryMaximized
                 && _sessions.Contains(session)
                 && ReferenceEquals(_activeSession, session)
@@ -2159,7 +2160,7 @@ public partial class MainWindow
     {
         if (peakGeneration != _libraryPeakGeneration
             || !ReferenceEquals(session.Document, document)
-            || !IsNewerLibraryPeaks(document.Peaks, peaks))
+            || !LibraryPlayerMode.IsNewerLibraryPeaks(document.Peaks, peaks))
         {
             return false;
         }
@@ -2176,6 +2177,11 @@ public partial class MainWindow
                 document.Channels,
                 document.BitsPerSample,
                 peaks.FrameCount);
+        }
+
+        if (!peaks.IsBuilding && document.SourcePath is { Length: > 0 } path)
+        {
+            LibraryBrowser.ApplyCompletedPlaylistWaveform(path, peaks);
         }
 
         RefreshLibrarySessionWaveform(session, throttlePaint);
@@ -2212,23 +2218,6 @@ public partial class MainWindow
         {
             Overview.Refresh();
         }
-    }
-
-    private static bool IsNewerLibraryPeaks(PeakPyramid current, PeakPyramid incoming)
-    {
-        if (incoming.IsEmpty)
-        {
-            return false;
-        }
-
-        if (current.IsEmpty
-            || current.FrameCount != incoming.FrameCount
-            || current.Channels != incoming.Channels)
-        {
-            return true;
-        }
-
-        return incoming.FilledFrames >= current.FilledFrames;
     }
 
     private void ApplyLoadedLibrarySession(DocumentSession session, bool bind = true)

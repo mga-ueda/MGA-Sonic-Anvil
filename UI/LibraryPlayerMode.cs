@@ -367,6 +367,45 @@ internal static class LibraryPlayerMode
     }
 
     /// <summary>
+    /// 同じ曲のピーク差し替え。完成を走査中スナップショットで戻さない。
+    /// 推定尺と実デコードが数フレームずれると FrameCount だけ見て古い途中結果が勝ってしまう。
+    /// </summary>
+    public static bool IsNewerLibraryPeaks(PeakPyramid current, PeakPyramid incoming)
+    {
+        if (incoming.IsEmpty)
+        {
+            return false;
+        }
+
+        if (current.IsEmpty)
+        {
+            return true;
+        }
+
+        if (!current.IsBuilding && incoming.IsBuilding)
+        {
+            return false;
+        }
+
+        if (!incoming.IsBuilding && current.IsBuilding)
+        {
+            return true;
+        }
+
+        if (current.Channels != incoming.Channels)
+        {
+            return !incoming.IsBuilding || incoming.FilledFrames >= current.FilledFrames;
+        }
+
+        if (current.FrameCount != incoming.FrameCount)
+        {
+            return !incoming.IsBuilding || incoming.FilledFrames >= current.FilledFrames;
+        }
+
+        return incoming.FilledFrames >= current.FilledFrames;
+    }
+
+    /// <summary>
     /// 既に PCM があるファイルだけピークを作り直す。ストリームはフル Load が兼ねる。
     /// プレイヤー包絡（モノラル）のままだと、エディタでレーンが 1 本しか出ない。
     /// </summary>

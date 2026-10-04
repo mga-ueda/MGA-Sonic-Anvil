@@ -58,15 +58,26 @@ internal static class LibraryPlaylistWaveform
         BarsUpdated?.Invoke(path);
     }
 
+    public static void SetFromCompletedPeaks(string path, PeakPyramid peaks)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !PeakPyramid.CanBuildPlaylistBarsFromPeaks(peaks))
+        {
+            return;
+        }
+
+        var barCount = BarCount;
+        Set(path, barCount, PeakPyramid.BuildPlaylistBarsFromPeaks(peaks, barCount));
+    }
+
     public static float[] BuildBars(
         string path,
         PeakPyramid? peaks,
         int barCount,
         CancellationToken cancellationToken)
     {
-        if (peaks is { IsEmpty: false } ready)
+        if (peaks is not null && PeakPyramid.CanBuildPlaylistBarsFromPeaks(peaks))
         {
-            return PeakPyramid.BuildPlaylistBarsFromPeaks(ready, barCount);
+            return PeakPyramid.BuildPlaylistBarsFromPeaks(peaks, barCount);
         }
 
         return PeakPyramid.BuildPlaylistBarsFromPath(path, barCount, cancellationToken);
