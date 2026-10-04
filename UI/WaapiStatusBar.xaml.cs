@@ -585,7 +585,9 @@ internal sealed partial class WaapiStatusBar : UserControl
         PlayPostExitChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void KeepLockButton_Click(object sender, RoutedEventArgs e)
+    public bool KeepTargetToggleEnabled => _keepLockEnabled;
+
+    public void ToggleKeepTarget()
     {
         if (!_keepLockEnabled)
         {
@@ -595,6 +597,8 @@ internal sealed partial class WaapiStatusBar : UserControl
         KeepTargetChecked = !KeepTargetChecked;
         KeepTargetChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    private void KeepLockButton_Click(object sender, RoutedEventArgs e) => ToggleKeepTarget();
 
     private void ProjectNameLabel_Click(object sender, MouseButtonEventArgs e)
     {

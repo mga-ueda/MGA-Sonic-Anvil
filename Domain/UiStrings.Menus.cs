@@ -21,6 +21,7 @@ internal static partial class UiStrings
     public static string WaveMenuCatFile => Get("ファイル(_F)", "_File");
     public static string WaveMenuCatTabs => Get("タブ(_B)", "Ta_bs");
     public static string WaveMenuCatExport => Get("書き出し(_X)", "E_xport");
+    public static string WaveMenuCatWwise => Get("Wwise(_W)", "_Wwise");
     public static string WaveMenuCatHelp => Get("ヘルプ(_H)", "_Help");
 
     public static string WaveMenuUndo => Get("元に戻す(_U)", "_Undo");
@@ -76,6 +77,8 @@ internal static partial class UiStrings
     public static string WaveMenuDeleteAllRegions => Get("すべてのリージョンを削除(_R)", "Delete All _Regions");
     public static string WaveMenuSetLoop => Get("選択範囲をループに(_O)", "Set Sample L_oop from Selection");
     public static string WaveMenuClearLoopItem => Get("ループを削除(_C)", "_Clear Loop");
+    /// <summary>再生カテゴリへ移動。ショートカット表示は K。</summary>
+    public static string WaveMenuRangeClick => Get("範囲メトロノーム(_K)", "Range Metronome (_K)");
     public static string WaveMenuPrevMarker => Get("前のマーカーへ(_P)", "_Previous Marker");
     public static string WaveMenuNextMarker => Get("次のマーカーへ(_X)", "Ne_xt Marker");
 
@@ -86,6 +89,8 @@ internal static partial class UiStrings
     public static string WaveMenuRestart => Get("やり直し再生(_A)", "Rest_art Playback");
     public static string WaveMenuLoopPlay => Get("ループ再生(_L)", "_Loop Play");
     public static string WaveMenuPlayExit => Get("Play -E(_X)", "Play -E (_X)");
+    /// <summary>再生カテゴリ内で Preroll(R) と重ならないよう U。ショートカット表示は R。</summary>
+    public static string WaveMenuShuffle => Get("ランダム再生(_U)", "Sh_uffle");
     public static string WaveMenuRecord => Get("録音(_C)", "Re_cord");
     public static string WaveMenuGoStart => Get("先頭へ(_H)", "Go to Start (_H)");
     public static string WaveMenuGoEnd => Get("末尾へ(_N)", "Go to E_nd");
@@ -116,6 +121,10 @@ internal static partial class UiStrings
     public static string WaveMenuFocusTime => Get("時間へ移動(_G)", "Focus Time (_G)");
     public static string WaveMenuSilentSkip => Get("Silent Skip(_H)", "Silent Skip (_H)");
     public static string WaveMenuAlwaysOnTop => Get("常に最前面(_T)", "Always on _Top");
+    /// <summary>表示カテゴリ内でソロ解除(E) と重なる E をやめて O。</summary>
+    public static string WaveMenuSettings => Get("設定(_O)", "Settings (_O)");
+    /// <summary>表示カテゴリ内で Center(C) と重ならないよう R（Color）。</summary>
+    public static string WaveMenuColorPanel => Get("色設定(_R)", "Colo_r Settings");
     public static string WaveMenuMaximizeWaveform => Get("フルスクリーン(_F)", "_Fullscreen");
     public static string WaveMenuMaximizeAnalyzers => Get("フルスクリーン（アナライザー）(_A)", "Fullscreen with _Analyzers");
     public static string WaveMenuMaximizeLibrary => Get("プレイヤー(_B)", "Player (_B)");
@@ -130,19 +139,23 @@ internal static partial class UiStrings
     public static string WaveMenuRenameFile => Get("ファイル名を変更(_F)", "Rename _File");
     public static string WaveMenuDuplicateFile => Get("ファイルを複製(_U)", "D_uplicate File");
     public static string WaveMenuDuplicateFileSelected => Get("選択ファイルを複製(_U)", "D_uplicate Selected Files");
-    /// <summary>アクセスキーは B が「次のタブ(B)」と重なるため J のまま。</summary>
+    /// <summary>書き出しカテゴリへ移動。J は既存の Wave／MP3／セパレートと重ならない。</summary>
     public static string WaveMenuMergeTabs => Get("選択ファイルをバウンス(_J)", "Bounce Selected Files (_J)");
     public static string WaveMenuDeleteFile => Get("ファイルを削除(_D)", "_Delete File");
     public static string WaveMenuDeleteFileSelected => Get("選択ファイルを削除(_D)", "_Delete Selected Files");
+    /// <summary>表示カテゴリへ移動。I は既存の表示項目と重ならない。</summary>
     public static string WaveMenuCopyAllTabTimes => Get("すべてのファイルの時間を表示(_I)", "Show All File T_imes");
     public static string WaveMenuCopySelectedTabTimes => Get("選択ファイルの時間を表示(_I)", "Show Selected File T_imes");
     public static string WaveMenuReopenTab => Get("閉じたタブを再開(_T)", "Reopen Closed _Tab");
     /// <summary>タイル配置がタブカテゴリへ来て「タブのまま(B)」と重なるため、アクセスキーは B をやめて N。</summary>
     public static string WaveMenuNextTab => Get("次のタブ(_N)", "_Next Tab");
     public static string WaveMenuPrevTab => Get("前のタブ(_V)", "Pre_vious Tab");
-    public static string WaveMenuSettings => Get("設定(_E)", "S_ettings");
+    /// <summary>Wwise カテゴリ内。Play -E(X) と重なる X をやめて E。</summary>
     public static string WaveMenuWaapiPanel => Get("WAAPI パネル(_P)", "WAAPI _Panel");
-    public static string WaveMenuWwiseExport => Get("Wwise へ EXPORT(_X)", "EXPORT to Wwise (_X)");
+    public static string WaveMenuKeepTarget => Get("Keep Target(_K)", "Keep Target (_K)");
+    public static string WaveMenuAutoActive => Get("Auto Active(_A)", "Auto Active (_A)");
+    public static string WaveMenuWwiseExport => Get("Wwise へ EXPORT(_E)", "EXPORT to Wwise (_E)");
+    public static string WaveMenuOutputFolder => Get("書き出し先フォルダ(_F)", "Output Folder (_F)");
     public static string WaveMenuQuit => Get("終了(_Q)", "_Quit");
 
     public static string WaveMenuExportWave => Get("Wave で書き出す(_W)", "Export _Wave");
@@ -156,8 +169,8 @@ internal static partial class UiStrings
     public static string WaveMenuExportByChannels => Get("チャンネルごとに書き出す(_C)", "Export by _Channel");
     public static string WaveMenuExportByChannelsSelected => Get("選択したタブをチャンネルごとに書き出す(_C)", "Export Selected Tabs by _Channel");
     public static string WaveMenuExportAllWave => Get("すべてのタブを Wave で保存(_E)", "Save All Tabs as Wav_e");
-    /// <summary>タブカテゴリへ移動したため、アクセスキーは「全部のタブを選択する(A)」と重なる A をやめて M。</summary>
-    public static string WaveMenuExportAllMp3 => Get("すべてのタブを MP3 で保存(_M)", "Save All Tabs as _MP3");
+    /// <summary>書き出しカテゴリへ移動したため、MP3 で書き出す(M) と重なる M をやめて A。</summary>
+    public static string WaveMenuExportAllMp3 => Get("すべてのタブを MP3 で保存(_A)", "Save All Tabs as MP3 (_A)");
 
     public static string WaveMenuTips => Get("Tips を表示(_T)", "Show _Tips");
     public static string WaveMenuManual => Get("マニュアル(_M)", "_Manual");

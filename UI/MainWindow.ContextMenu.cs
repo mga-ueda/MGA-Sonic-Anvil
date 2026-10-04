@@ -176,6 +176,11 @@ public partial class MainWindow
             TipsVisible = AppStorage.Settings.ShowTips,
             WaapiVisible = _waapiPanelVisible,
             PlayExit = WaapiBar.PlayPostExitChecked,
+            RangeClick = _rangeClickEnabled,
+            Shuffle = LibraryBrowser.ShuffleEnabled,
+            KeepTarget = WaapiBar.KeepTargetChecked,
+            AutoActive = WaapiBar.AutoActiveChecked,
+            CanKeepTarget = WaapiBar.KeepTargetToggleEnabled,
             WaapiExportEnabled = WaapiBar.ExportEnabled,
             CanReopenTab = _workspace.ClosedTabs.Count > 0,
             HasMultipleTabs = _sessions.Count > 1,
@@ -368,6 +373,12 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.PlayExit:
                 TogglePlayPostExit();
+                break;
+            case WaveMenuCommand.Shuffle:
+                LibraryBrowser.ToggleShuffle();
+                break;
+            case WaveMenuCommand.RangeClick:
+                ToggleRangeClick();
                 break;
             case WaveMenuCommand.Record:
                 ToggleRecording();
@@ -565,8 +576,21 @@ public partial class MainWindow
             case WaveMenuCommand.Settings:
                 OpenSettings();
                 break;
+            case WaveMenuCommand.ColorPanel:
+                ShowColorDevPanel();
+                break;
             case WaveMenuCommand.WaapiPanel:
                 ToggleWaapiPanel();
+                break;
+            case WaveMenuCommand.KeepTarget:
+                WaapiBar.ToggleKeepTarget();
+                break;
+            case WaveMenuCommand.AutoActive:
+                WaapiBar.AutoActiveChecked = !WaapiBar.AutoActiveChecked;
+                PersistWaapiSettings();
+                break;
+            case WaveMenuCommand.OutputFolder:
+                BrowseExportOutputFolder();
                 break;
             case WaveMenuCommand.WwiseExport:
                 if (WaapiBar.ExportEnabled)

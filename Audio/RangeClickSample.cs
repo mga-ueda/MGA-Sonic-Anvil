@@ -3,17 +3,17 @@ using NAudio.Wave;
 
 namespace MgaSonicAnvil.Audio;
 
-/// <summary>範囲等分の確認用クリック。Low が拍、High が小節頭。</summary>
+/// <summary>範囲メトロノーム用サンプル。Low が拍、High が小節頭。</summary>
 internal static class RangeClickSample
 {
     internal const string LowResourceName = "MgaSonicAnvil.Assets.Click.Low.wav";
     internal const string HighResourceName = "MgaSonicAnvil.Assets.Click.High.wav";
 
     public static (float[] Samples, int SampleRate) LoadLow() =>
-        LoadNamed(LowResourceName, "Range click Low.wav is missing.");
+        LoadNamed(LowResourceName, "Range metronome Low.wav is missing.");
 
     public static (float[] Samples, int SampleRate) LoadHigh() =>
-        LoadNamed(HighResourceName, "Range click High.wav is missing.");
+        LoadNamed(HighResourceName, "Range metronome High.wav is missing.");
 
     private static (float[] Samples, int SampleRate) LoadNamed(string name, string missing)
     {

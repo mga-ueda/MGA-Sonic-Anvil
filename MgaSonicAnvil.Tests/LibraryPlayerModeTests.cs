@@ -14,7 +14,7 @@ public sealed class LibraryPlayerModeTests
     [Fact]
     public void BlocksWaveMenu_AllowsPlaybackSeekSelectAndView()
     {
-        Assert.True(LibraryPlayerMode.HidesWaveformContextMenu(playerMode: true));
+        Assert.False(LibraryPlayerMode.HidesWaveformContextMenu(playerMode: true));
         Assert.False(LibraryPlayerMode.HidesWaveformContextMenu(playerMode: false));
         Assert.False(LibraryPlayerMode.ShowsCueOverlays(playerMode: true));
         Assert.True(LibraryPlayerMode.ShowsCueOverlays(playerMode: false));
@@ -31,10 +31,13 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SilentSkip));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Manual));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ViewWaveform));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Shuffle));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ViewSpectrogram));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ViewOverlay));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ViewLoudness));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.WaapiPanel));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ColorPanel));
+        Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.RangeClick));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.WwiseExport));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.PlayExit));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Cut));

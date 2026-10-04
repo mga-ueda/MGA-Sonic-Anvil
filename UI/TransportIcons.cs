@@ -438,7 +438,7 @@ internal static class TransportIconDrawing
                 dc.DrawLine(pen, new Point(24, 26), new Point(20, 26));
                 break;
             case TransportIcon.RangeClick:
-                // Hi Low Low — 範囲クリックの拍イメージ
+                // Hi Low Low — 範囲メトロノームの拍イメージ
                 dc.DrawLine(pen, new Point(11, 9), new Point(11, 27));
                 dc.DrawLine(pen, new Point(17, 15), new Point(17, 27));
                 dc.DrawLine(pen, new Point(23, 15), new Point(23, 27));

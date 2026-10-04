@@ -9,8 +9,10 @@ namespace MgaSonicAnvil.UI;
 /// <summary>F10 プレイヤーモードで拒否する編集系コマンドと、リストから通すキー。</summary>
 internal static class LibraryPlayerMode
 {
-    /// <summary>プレイヤーでは波形の右クリック／メニューキーを出さない。</summary>
-    public static bool HidesWaveformContextMenu(bool playerMode) => playerMode;
+    /// <summary>プレイヤーでも波形メニューを出す（編集系は <see cref="BlocksWaveMenu"/> で拒否）。</summary>
+#pragma warning disable IDE0060 // 呼び出し側の名前付き引数 playerMode を残す
+    public static bool HidesWaveformContextMenu(bool playerMode) => false;
+#pragma warning restore IDE0060
 
     /// <summary>プレイヤーではマーカー／リージョン／ループを波形に出さない。</summary>
     public static bool ShowsCueOverlays(bool playerMode) => !playerMode;
@@ -29,6 +31,7 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.Preroll
             or WaveMenuCommand.Restart
             or WaveMenuCommand.LoopPlay
+            or WaveMenuCommand.Shuffle
             or WaveMenuCommand.GoStart
             or WaveMenuCommand.GoEnd
             or WaveMenuCommand.ViewLeft
@@ -41,6 +44,7 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.AlwaysOnTop
             or WaveMenuCommand.Open
             or WaveMenuCommand.Settings
+            or WaveMenuCommand.ColorPanel
             or WaveMenuCommand.Quit
             or WaveMenuCommand.ReopenTab
             or WaveMenuCommand.NextTab
