@@ -344,6 +344,9 @@ public partial class MainWindow
             startFrame = range.StartFrame;
         }
 
+        var gapless = Mp3Gapless.ResolveWindow(_document, _document.FrameCount, playRange);
+        startFrame = Mp3Gapless.ClampStart(startFrame, gapless, _document.FrameCount);
+
         _lastPlaybackStart = startFrame;
 
         _ = prerollSeconds;

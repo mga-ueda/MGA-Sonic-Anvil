@@ -181,6 +181,7 @@ public partial class MainWindow : Window
         AlwaysOnTopCheck.IsChecked = AppStorage.Settings.AlwaysOnTop;
         Topmost = AppStorage.Settings.AlwaysOnTop;
         SilentSkipCheck.IsChecked = AppStorage.Settings.SilentSkip;
+        Mp3Gapless.Enabled = AppStorage.Settings.GaplessPlayback;
         ApplySilentSkipFromSettings();
 
         Transport.CommandInvoked += (_, command) => ExecuteTransport(command);

@@ -73,6 +73,8 @@ internal partial class AudioSettingsWindow : Window
 
     public bool SelectedLibraryHideWaveformForMp3Only { get; private set; } = true;
 
+    public bool SelectedGaplessPlayback { get; private set; } = true;
+
     public bool SelectedAutoSpeakerSelect { get; private set; }
 
     public string SelectedActiveSpeakerId { get; private set; } = string.Empty;
@@ -136,7 +138,8 @@ internal partial class AudioSettingsWindow : Window
         LibraryPlaylistWaveformSize libraryPlaylistWaveformSize = LibraryPlaylistWaveformSize.L,
         bool libraryPlaylistWaveformAutoLargeForWaveOnly = true,
         bool libraryHideParentFolderForMp3Only = true,
-        bool libraryHideWaveformForMp3Only = true)
+        bool libraryHideWaveformForMp3Only = true,
+        bool gaplessPlayback = true)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
@@ -173,6 +176,7 @@ internal partial class AudioSettingsWindow : Window
         SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly = libraryPlaylistWaveformAutoLargeForWaveOnly;
         SelectedLibraryHideParentFolderForMp3Only = libraryHideParentFolderForMp3Only;
         SelectedLibraryHideWaveformForMp3Only = libraryHideWaveformForMp3Only;
+        SelectedGaplessPlayback = gaplessPlayback;
         SelectedAutoSpeakerSelect = autoSpeakerSelect;
         SelectedActiveSpeakerId = string.IsNullOrWhiteSpace(activeSpeakerId)
             ? _presets[0].Id
@@ -377,6 +381,7 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(LameOptionsBox, UiStrings.TipLameOptions);
         TipService.Set(ExportParallelLabel, UiStrings.TipExportParallel);
         TipService.Set(ExportParallelCombo, UiStrings.TipExportParallel);
+        TipService.Set(GaplessPlaybackBox, UiStrings.TipGaplessPlayback);
         TipService.Set(OkButton, UiStrings.TipSettingsOk);
         TipService.Set(CancelButton, UiStrings.TipSettingsCancel);
     }
@@ -447,6 +452,7 @@ internal partial class AudioSettingsWindow : Window
             LibraryExplorerRootsList.Items.Add(new LibraryExplorerRootItem(path));
         }
 
+        GaplessPlaybackBox.IsChecked = SelectedGaplessPlayback;
         RefreshLibraryExplorerRootButtons();
     }
 
@@ -1058,6 +1064,7 @@ internal partial class AudioSettingsWindow : Window
             LibraryHideParentFolderForMp3OnlyBox.IsChecked != false;
         SelectedLibraryHideWaveformForMp3Only =
             LibraryHideWaveformForMp3OnlyBox.IsChecked != false;
+        SelectedGaplessPlayback = GaplessPlaybackBox.IsChecked != false;
         SelectedAutoSpeakerSelect = AutoSpeakerSelectBox.IsChecked == true;
         SelectedActiveSpeakerId = CurrentSpeaker()?.Id ?? _presets[0].Id;
         SelectedRecordDeviceId = ReadRecordDeviceId();
@@ -1748,7 +1755,8 @@ internal partial class AudioSettingsWindow : Window
         var content = Max(
             AudioTabContentWidth(),
             SettingsTabBarWidth(),
-            LayoutsTabContentWidth());
+            LayoutsTabContentWidth(),
+            PlayerTabContentWidth());
         var inner = content + pad + DesignMetrics.SettingsWindowContentMargin;
         var width = Math.Ceiling(inner + chrome);
         var min = DesignMetrics.SettingsWindowMinWidth;
@@ -1810,6 +1818,14 @@ internal partial class AudioSettingsWindow : Window
             options,
             wave + DesignMetrics.SettingsColumnGap + mp3);
         return speakers + DesignMetrics.SettingsColumnGap + playlist;
+    }
+
+    private double PlayerTabContentWidth()
+    {
+        var gutter = DesignMetrics.SettingsScrollBarGap + DesignMetrics.SettingsScrollBarWidth;
+        return Max(
+            MeasureCheckBoxContentWidth(GaplessPlaybackBox),
+            LabelWidth(LibraryExplorerRootsHeader)) + gutter;
     }
 
     private double MeasureSpeakerVisibilityWidth()

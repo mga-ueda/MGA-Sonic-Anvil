@@ -91,6 +91,9 @@ internal sealed class AppSettings
 
     public bool AlwaysOnTop { get; set; }
 
+    /// <summary>再生で MP3 の encoder delay／padding を飛ばす。既定オン。</summary>
+    public bool GaplessPlayback { get; set; } = true;
+
     /// <summary>再生で無音区間を飛ばす。既定オフ。</summary>
     public bool SilentSkip { get; set; }
 

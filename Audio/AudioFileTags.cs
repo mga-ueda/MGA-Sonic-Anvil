@@ -45,6 +45,12 @@ internal sealed class AudioFileTags
 
     public int BitRateKbps { get; init; }
 
+    /// <summary>LAME Xing／Info の encoder delay（サンプル）。未記載は 0。</summary>
+    public int EncoderDelayFrames { get; init; }
+
+    /// <summary>LAME Xing／Info の padding（サンプル）。未記載は 0。</summary>
+    public int EncoderPaddingFrames { get; init; }
+
     public bool HasArtwork { get; init; }
 }
 
@@ -81,6 +87,10 @@ internal sealed class AudioFileTagsBuilder
     public int BitRateKbps { get; set; }
 
     public int LengthMillis { get; set; }
+
+    public int EncoderDelayFrames { get; set; }
+
+    public int EncoderPaddingFrames { get; set; }
 
     public bool HasArtwork { get; set; }
 
@@ -120,6 +130,8 @@ internal sealed class AudioFileTagsBuilder
             BitsPerSample = BitsPerSample,
             Channels = Channels,
             BitRateKbps = BitRateKbps,
+            EncoderDelayFrames = EncoderDelayFrames,
+            EncoderPaddingFrames = EncoderPaddingFrames,
             HasArtwork = HasArtwork,
         };
     }

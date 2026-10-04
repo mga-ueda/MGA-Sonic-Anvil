@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 using Xunit;
 
@@ -192,6 +193,28 @@ public sealed class LibraryDeferredLoadTests
         var document = new AudioDocument([], 48000, 2, 24, AudioFileKind.Wave, null);
         Assert.False(document.IsDeferredLoad);
         Assert.Equal(0, document.FrameCount);
+    }
+
+    [Fact]
+    public void CreateRow_KeepsTagDurationWhenStreamLengthDiffersByEncoderDelay()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mp3");
+        var document = AudioDocument.CreateDeferred(path);
+        document.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 10,
+            SampleRate = 44100,
+            Channels = 2,
+            BitsPerSample = 16,
+        });
+        // Xing 10s に対し、デコード側だけ 1 フレーム（1152 samples @ 44.1kHz ≈ 26ms）長い。
+        document.ActivateStreamPlayback(44100, 2, 16, 441000 + 1152);
+
+        var row = LibraryBrowserView.CreateRow(new DocumentSession(document));
+        Assert.Equal(10, row.DurationSeconds, 3);
+        Assert.Equal(UiStrings.FormatDuration(10), row.DurationText);
+        Assert.True(document.DurationSeconds > 10);
     }
 
     [Fact]

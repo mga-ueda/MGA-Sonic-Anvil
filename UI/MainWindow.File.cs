@@ -1683,7 +1683,8 @@ public partial class MainWindow
             settings.ResolvedLibraryPlaylistWaveformSize(),
             settings.LibraryPlaylistWaveformAutoLargeForWaveOnly,
             settings.LibraryHideParentFolderForMp3Only,
-            settings.LibraryHideWaveformForMp3Only)
+            settings.LibraryHideWaveformForMp3Only,
+            settings.GaplessPlayback)
         {
             Owner = this,
         };
@@ -1734,6 +1735,8 @@ public partial class MainWindow
             dialog.SelectedLibraryHideParentFolderForMp3Only;
         settings.LibraryHideWaveformForMp3Only =
             dialog.SelectedLibraryHideWaveformForMp3Only;
+        settings.GaplessPlayback = dialog.SelectedGaplessPlayback;
+        Mp3Gapless.Enabled = settings.GaplessPlayback;
         LibraryBrowser.SetPlaylistWaveformOptions(
             settings.ResolvedLibraryPlaylistWaveformSize(),
             settings.LibraryPlaylistWaveformAutoLargeForWaveOnly,

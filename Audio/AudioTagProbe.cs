@@ -157,7 +157,14 @@ internal static class AudioTagProbe
             builder.BitRateKbps = bitRate;
         }
 
-        if (TryReadXing(stream, channels, sampleRate >= 32000, out var frames, out var bytes))
+        if (TryReadXing(
+                stream,
+                channels,
+                sampleRate >= 32000,
+                out var frames,
+                out var bytes,
+                out var delay,
+                out var padding))
         {
             if (frames > 0 && sampleRate > 0)
             {
@@ -168,6 +175,9 @@ internal static class AudioTagProbe
             {
                 builder.BitRateKbps = (int)Math.Round(bytes * 8d / builder.DurationSeconds / 1000d);
             }
+
+            builder.EncoderDelayFrames = delay;
+            builder.EncoderPaddingFrames = padding;
         }
         else if (builder.DurationSeconds <= 0 && bitRate > 0)
         {
@@ -288,10 +298,19 @@ internal static class AudioTagProbe
         return mpeg25 ? rates25[index] : rates2[index];
     }
 
-    private static bool TryReadXing(Stream stream, int channels, bool mpeg1, out int frames, out int bytes)
+    private static bool TryReadXing(
+        Stream stream,
+        int channels,
+        bool mpeg1,
+        out int frames,
+        out int bytes,
+        out int delay,
+        out int padding)
     {
         frames = 0;
         bytes = 0;
+        delay = 0;
+        padding = 0;
         var side = mpeg1 ? (channels == 1 ? 17 : 32) : (channels == 1 ? 9 : 17);
         var origin = stream.Position;
         stream.Position = origin + 4 + side;
@@ -341,8 +360,52 @@ internal static class AudioTagProbe
             bytes = BinaryPrimitives.ReadInt32BigEndian(size);
         }
 
+        if ((flags & 4) != 0)
+        {
+            stream.Position += 100;
+        }
+
+        if ((flags & 8) != 0)
+        {
+            stream.Position += 4;
+        }
+
+        TryReadLameDelayPadding(stream, out delay, out padding);
         stream.Position = origin;
-        return frames > 0 || bytes > 0;
+        return frames > 0 || bytes > 0 || delay > 0 || padding > 0;
+    }
+
+    /// <summary>LAME Info タグ。encoder delay 12bit + padding 12bit。</summary>
+    private static void TryReadLameDelayPadding(Stream stream, out int delay, out int padding)
+    {
+        delay = 0;
+        padding = 0;
+        if (stream.Position + 24 > stream.Length)
+        {
+            return;
+        }
+
+        var lame = new byte[24];
+        if (stream.Read(lame, 0, 24) != 24)
+        {
+            return;
+        }
+
+        var marker = Encoding.ASCII.GetString(lame, 0, 4);
+        if (marker is not ("LAME" or "GOGO" or "Lavc" or "Lavf"))
+        {
+            return;
+        }
+
+        var readDelay = (lame[21] << 4) | (lame[22] >> 4);
+        var readPadding = ((lame[22] & 0x0F) << 8) | lame[23];
+        if (readDelay is < 0 or > 4095 || readPadding is < 0 or > 4095)
+        {
+            return;
+        }
+
+        delay = readDelay;
+        padding = readPadding;
     }
 
     private static void ReadId3V1(Stream stream, AudioFileTagsBuilder builder)

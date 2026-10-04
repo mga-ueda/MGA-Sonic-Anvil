@@ -4544,7 +4544,11 @@ internal sealed class LibraryBrowserView : UserControl
         AddColumn(LibraryFileColumn.Album, nameof(LibraryFileRow.Album));
         AddColumn(LibraryFileColumn.Artist, nameof(LibraryFileRow.Artist));
         AddColumn(LibraryFileColumn.Composer, nameof(LibraryFileRow.Composer));
-        AddColumn(LibraryFileColumn.Duration, nameof(LibraryFileRow.DurationText), right: true);
+        AddColumn(
+            LibraryFileColumn.Duration,
+            nameof(LibraryFileRow.DurationText),
+            right: true,
+            trim: false);
         AddColumn(LibraryFileColumn.Track, nameof(LibraryFileRow.Track), right: true);
         AddColumn(LibraryFileColumn.Disc, nameof(LibraryFileRow.Disc), right: true);
         AddColumn(LibraryFileColumn.Year, nameof(LibraryFileRow.Year), right: true);
@@ -5187,10 +5191,13 @@ internal sealed class LibraryBrowserView : UserControl
         LibraryFileColumn column,
         string binding,
         bool right = false,
-        string? nonDefaultBinding = null)
+        string? nonDefaultBinding = null,
+        bool trim = true)
     {
         var text = new Style(typeof(TextBlock));
-        text.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
+        text.Setters.Add(new Setter(
+            TextBlock.TextTrimmingProperty,
+            trim ? TextTrimming.CharacterEllipsis : TextTrimming.None));
         text.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(LibraryColumnCellPadX, 0, LibraryColumnCellPadX, 0)));
         text.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
         text.Setters.Add(new Setter(TextBlock.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
@@ -5353,6 +5360,12 @@ internal sealed class LibraryBrowserView : UserControl
                 }
 
                 var width = Measure(text, typeface) + cellPad;
+                if (kind == LibraryFileColumn.Duration)
+                {
+                    // 列幅ぴったりだとホバー再スナップで末尾ミリ秒が欠けて、時間が変わったように見える。
+                    width += 2;
+                }
+
                 if (width > max)
                 {
                     max = width;
@@ -6980,7 +6993,11 @@ internal sealed class LibraryBrowserView : UserControl
         var path = document.SourcePath;
         var tags = document.Tags;
         var deferred = document.IsDeferredLoad;
-        var duration = deferred ? tags.DurationSeconds : document.DurationSeconds;
+        // MP3 は Xing と Media Foundation／実デコードがエンコーダ遅延ぶん（数十 ms）ずれる。
+        // リストは最初に出したタグ尺のままにする（ホバーやピーク確定でミリ秒が跳ねない）。
+        var duration = tags.DurationSeconds > 0
+            ? tags.DurationSeconds
+            : deferred ? 0 : document.DurationSeconds;
         var sampleRate = deferred ? tags.SampleRate : document.SampleRate;
         var bits = deferred ? tags.BitsPerSample : document.BitsPerSample;
         var channels = deferred ? tags.Channels : document.Channels;

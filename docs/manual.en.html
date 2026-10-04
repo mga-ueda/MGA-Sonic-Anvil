@@ -158,6 +158,7 @@
         <a href="#layout-tile">Tiling</a>
         <a href="#layout-transport">Transport</a>
         <a href="#layout-silent">Silent Skip</a>
+        <a href="#layout-gapless">Gapless</a>
         <a href="#layout-top">On top</a>
         <a href="#layout-meters">Meters</a>
         <a href="#layout-tips">Tips</a>
@@ -206,7 +207,7 @@
           <li>Stereo playback with no port map still downmixes the speakers.</li>
         </ul>
         <h4>Player</h4>
-        <p>Registers the left tree roots. Default is Music. Add, remove, and reorder top to bottom.</p>
+        <p><strong>Gapless playback</strong> is first (on by default; see <a href="#layout-gapless">Gapless playback</a>). Then the left tree roots. Default is Music. Add, remove, and reorder top to bottom.</p>
         <h4>Editing</h4>
         <ul>
           <li><strong>Loudness target</strong> — LKFS.</li>
@@ -273,6 +274,7 @@
           <li>While stopped, selecting a track shows its waveform without playing. Adding tracks fades them in over 1 second; when they start moving with the audio they appear immediately. Clearing the list fades them out over 1 second.</li>
           <li><kbd>R</kbd> toggles shuffle. No repeats until the playlist has played once. Works on an empty list. Off by default. Leaving player turns it off. Not saved.</li>
           <li>Playback starts as soon as the stream is ready (full PCM is not decoded). It does not wait for the waveform.</li>
+          <li>Continuous playback prefetches the next track and joins without stopping the device. MP3 encoder silence at the start and end is reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
           <li>Arrow keys do not shuttle. The numpad (NumLock on) works from any pane.
             <ul>
               <li>0 — play / pause</li>
@@ -435,6 +437,19 @@
         </ul>
       </article>
 
+      <article class="part" id="layout-gapless">
+        <h3>Gapless playback</h3>
+        <p class="where">Settings → Player, first item. On by default.</p>
+        <p>Use this when the source had no silence between tracks and you want to hear them joined again. Splitting a continuous CD (a live set, classical) into one MP3 per track adds a short encoder delay at the start and padding at the end of each file, so playback sounds gapped. When on, the app skips encoder delay and padding written in the LAME tag, and prefetches the next track. It does not detect silence and skip every quiet stretch (that is Silent Skip).</p>
+        <ul>
+          <li>Files with no tag (older encoders, Windows MP3) have nothing to skip, so they play as decoded.</li>
+          <li>If the tag numbers are wrong, an attack at the start or a reverb tail at the end can lose a few tens of milliseconds. If the decoder already stripped the same silence, it can be cut twice.</li>
+          <li>Silence that a ripper wrote into the file (for example a two-second CD index gap) is not removed by this setting.</li>
+          <li>Even when on, a slight gap can remain at the encode boundary or from the device buffer. It is not guaranteed to match the CD exactly.</li>
+          <li>When off, playback includes the encoder silence. The waveform duration display does not change either way.</li>
+        </ul>
+      </article>
+
       <article class="part" id="layout-top">
         <h3>Always on Top</h3>
         <p class="where">Right of Silent Skip, left of <span class="ui">SPEAKER</span></p>
@@ -515,6 +530,7 @@
         <li><kbd>Ctrl</kbd>+<kbd>Space</kbd> — from 3 seconds earlier.</li>
         <li><kbd>Alt</kbd>+<kbd>Enter</kbd> — restart from the playback start (while the tile search box has focus, closes tiles that did not match instead).</li>
         <li><kbd>Alt</kbd>+<kbd>S</kbd> — Silent Skip. Skip silent stretches during playback, and while recording write only audio above the threshold (off by default; threshold is in Settings, default −60 dB). Hold ← / → during playback to shuttle without skipping. Recording always asks whether to turn Silent Skip on (the checkbox starts from the status-bar switch; OK updates it). The prompt shows the current threshold and silence insert duration (changeable in Settings). The region checkbox is enabled only when Silent Skip is on (off by default; remembered).</li>
+        <li>Player continuous playback prefetches the next track. MP3 encoder silence at the start and end is reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
         <li><kbd>Ctrl</kbd>+drag — scrub. Every channel is downmixed to L/R (the level meter moves on L/R only).</li>
         <li><kbd>G</kbd> — type NOW POS in the status bar. Enter jumps. Copy / paste allowed. Right-click switches time / samples.</li>
         <li><kbd>Z</kbd> or <kbd>.</kbd> (the numpad <kbd>.</kbd> is the same) — center. Toggles center-lock while playing; clears it when stopped.</li>

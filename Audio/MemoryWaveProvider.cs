@@ -408,7 +408,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _channels = Math.Max(1, document.Channels);
             _sourceRate = Math.Max(1, document.SampleRate);
             ApplyOutputConfig();
-            var start = Math.Clamp(startFrame, 0, document.FrameCount);
+            var window = Mp3Gapless.ResolveWindow(document, document.FrameCount, playRange);
+            playRange = window;
+            var start = Mp3Gapless.ClampStart(startFrame, window, document.FrameCount);
             _sourceFrame = start;
             _cursor = checked((int)start * _channels);
             _frameGain = frameGain;
@@ -472,7 +474,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             ClearGaplessNoLock();
             NoteGaplessAdvancedNoLock(null);
             ApplyOutputConfig();
-            var start = Math.Clamp(startFrame, 0, frames);
+            var window = Mp3Gapless.ResolveWindow(document, frames, playRange);
+            playRange = window;
+            var start = Mp3Gapless.ClampStart(startFrame, window, frames);
             source.SeekFrame(start, prebufferTimeoutMs: 200);
             _sourceFrame = start;
             _cursor = checked((int)start * _channels);
@@ -572,6 +576,13 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             }
 
             ClearGaplessNoLock();
+            var window = Mp3Gapless.ResolveWindow(document, source.FrameCount, playRange: null);
+            var start = Mp3Gapless.ClampStart(0, window, source.FrameCount);
+            if (start > 0)
+            {
+                source.SeekFrame(start, prebufferTimeoutMs: 0);
+            }
+
             _gaplessStream = source;
             _gaplessDocument = document;
             _gaplessArmed = true;
@@ -678,8 +689,15 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
         InvalidateStreamCursorCacheNoLock();
         ClearStreamReverseBuf();
-        _sourceFrame = 0;
-        _cursor = 0;
+        var window = Mp3Gapless.ResolveWindow(document, frames, playRange: null);
+        var start = Mp3Gapless.ClampStart(0, window, frames);
+        if (start != next.Frame)
+        {
+            next.SeekFrame(start, prebufferTimeoutMs: 0);
+        }
+
+        _sourceFrame = start;
+        _cursor = checked((int)start * Math.Max(1, _channels));
         _frameGain = null;
         _silenceOnly = false;
         _flushFadeRemaining = 0;
@@ -697,7 +715,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return false;
         }
 
-        ApplyPlayWindowNoLock(null, loop: false);
+        ApplyPlayWindowNoLock(window, loop: false);
         Ended = false;
         ResetMeterBuffers();
         lock (_monitorGate)
@@ -1242,7 +1260,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         lock (_gate)
         {
-            ApplyPlayWindowNoLock(playRange, loop);
+            var frames = UsedFrameCountNoLock(Math.Max(1, _channels));
+            ApplyPlayWindowNoLock(Mp3Gapless.ResolveWindow(_boundDocument, frames, playRange), loop);
 
             // 再生ウィンドウが変わったら進行中の Exit は止める（-E 区間は呼び出し側が再設定する）。
             _exitPlaying = false;
