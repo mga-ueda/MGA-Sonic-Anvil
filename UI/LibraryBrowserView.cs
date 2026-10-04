@@ -162,8 +162,6 @@ internal sealed class LibraryBrowserView : UserControl
     private int _playlistWaveGeneration;
     private LibraryPlaylistWaveformSize _playlistWavePreferredSize = LibraryPlaylistWaveformSize.L;
     private bool _playlistWaveAutoLargeForWaveOnly = true;
-    private bool _hideParentFolderForMp3Only = true;
-    private bool _hideWaveformForMp3Only = true;
     private int _defaultSampleRate = DefaultAudioFormat.SampleRate;
     private int _defaultBitsPerSample = DefaultAudioFormat.BitsPerSample;
     private int _defaultChannels = ChannelLayout.Stereo.Channels;
@@ -176,6 +174,11 @@ internal sealed class LibraryBrowserView : UserControl
     private bool _mixedColumnsCustomized;
     private LibraryFileColumn[] _visibleColumns = [.. LibraryColumnFilter.WaveDefaults];
     private bool _columnOrderBusy;
+    private int _columnOrderCommitGate;
+    private bool _columnChromeFadingOut;
+    private int _columnChromeFadeTicket;
+    private HashSet<LibraryFileColumn>? _fadingColumnSnapshot;
+    private LibraryPlaylistColumnKind _playlistColumnKind = LibraryPlaylistColumnKind.Mixed;
     private bool _syncing;
     private int _syncGeneration;
     private bool _deferActivate;
@@ -320,6 +323,12 @@ internal sealed class LibraryBrowserView : UserControl
         {
             StopGlowDrift();
             StopWashTurns();
+            CancelColumnChromeFade(resetOpacity: true);
+            if (_rows.Count == 0)
+            {
+                CollapseAllPlaylistColumns();
+                _grid.HeadersVisibility = DataGridHeadersVisibility.None;
+            }
         };
         SetArtwork(null);
     }
@@ -509,6 +518,8 @@ internal sealed class LibraryBrowserView : UserControl
         _columns.TryGetValue(column, out var gridColumn)
             ? gridColumn.Visibility
             : Visibility.Collapsed;
+
+    internal bool ColumnChromeFadingOut => _columnChromeFadingOut;
 
     internal IReadOnlyList<LibraryFileColumn> VisibleColumnOrder => _visibleColumns;
 
@@ -1620,30 +1631,48 @@ internal sealed class LibraryBrowserView : UserControl
             rows[i] = CreateRowWithDefaults(sessions[i]);
         }
 
-        _rows = SortRows(rows);
-        LibraryFileList.ApplyGroupKeys(_rows, _group);
-        _shuffle.Clear();
-        BeginRowSync();
+        BeginColumnOrderCommitGate();
         try
         {
-            if (TryPatchBoundRows(_rows))
+            if (sessions.Count == 0)
             {
-                ApplyRowSelectionCore(active, preserve);
+                PrepareEmptyPlaylistColumnFade();
             }
-            else
+
+            _rows = SortRows(rows);
+            LibraryFileList.ApplyGroupKeys(_rows, _group);
+            _shuffle.Clear();
+            BeginRowSync();
+            try
             {
-                BindRowsCore(active, preserve);
+                if (TryPatchBoundRows(_rows))
+                {
+                    ApplyRowSelectionCore(active, preserve);
+                }
+                else
+                {
+                    BindRowsCore(active, preserve);
+                }
             }
+            finally
+            {
+                EndRowSync();
+            }
+
+            EnforceFadingColumnSnapshotIfEmpty();
+            RefreshEffectiveColumns();
         }
         finally
         {
-            EndRowSync();
+            EndColumnOrderCommitGate();
         }
 
-        RefreshEffectiveColumns();
         InvalidateGroupJackets();
         _ = EnsureGroupArtworkAsync();
-        RefreshPlaylistWaveformSize(reschedule: true);
+        if (!_columnChromeFadingOut)
+        {
+            RefreshPlaylistWaveformSize(reschedule: true);
+        }
     }
 
     public void UpdateSessionRow(DocumentSession session)
@@ -1704,18 +1733,27 @@ internal sealed class LibraryBrowserView : UserControl
 
         if (_grid.ItemsSource is null || _rows.Count == 0)
         {
-            _rows = [row];
-            BeginRowSync();
+            BeginColumnOrderCommitGate();
             try
             {
-                BindRowsCore(select ? session : null, select ? [session] : null);
+                _rows = [row];
+                BeginRowSync();
+                try
+                {
+                    BindRowsCore(select ? session : null, select ? [session] : null);
+                }
+                finally
+                {
+                    EndRowSync();
+                }
+
+                RefreshEffectiveColumns();
             }
             finally
             {
-                EndRowSync();
+                EndColumnOrderCommitGate();
             }
 
-            RefreshEffectiveColumns();
             return;
         }
 
@@ -1747,37 +1785,45 @@ internal sealed class LibraryBrowserView : UserControl
             rowIndex = _rows.Count;
         }
 
-        BeginRowSync();
+        BeginColumnOrderCommitGate();
         try
         {
-            var nextRows = new LibraryFileRow[_rows.Count + 1];
-            for (var i = 0; i < rowIndex; i++)
+            BeginRowSync();
+            try
             {
-                nextRows[i] = _rows[i];
-            }
-
-            nextRows[rowIndex] = row;
-            for (var i = rowIndex; i < _rows.Count; i++)
-            {
-                nextRows[i + 1] = _rows[i];
-            }
-
-            _rows = nextRows;
-            if (PlaylistRowMatches(row))
-            {
-                _items.Insert(insertAt, row);
-                if (select)
+                var nextRows = new LibraryFileRow[_rows.Count + 1];
+                for (var i = 0; i < rowIndex; i++)
                 {
-                    ApplyRowSelectionCore(session, [session]);
+                    nextRows[i] = _rows[i];
+                }
+
+                nextRows[rowIndex] = row;
+                for (var i = rowIndex; i < _rows.Count; i++)
+                {
+                    nextRows[i + 1] = _rows[i];
+                }
+
+                _rows = nextRows;
+                if (PlaylistRowMatches(row))
+                {
+                    _items.Insert(insertAt, row);
+                    if (select)
+                    {
+                        ApplyRowSelectionCore(session, [session]);
+                    }
                 }
             }
+            finally
+            {
+                EndRowSync();
+            }
+
+            RefreshEffectiveColumns();
         }
         finally
         {
-            EndRowSync();
+            EndColumnOrderCommitGate();
         }
-
-        RefreshEffectiveColumns();
     }
 
     public void FinishIncrementalSessionLoad()
@@ -4696,7 +4742,7 @@ internal sealed class LibraryBrowserView : UserControl
 
             foreach (var row in _rows)
             {
-                if (LibraryColumnFilter.JacketEligibleKind(row.Kind))
+                if (LibraryColumnFilter.JacketEligibleKind(LibraryColumnFilter.EffectiveKind(row)))
                 {
                     return true;
                 }
@@ -4708,12 +4754,21 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void SyncGroupChrome()
     {
-        _grid.HeadersVisibility = DataGridHeadersVisibility.Column;
+        _grid.HeadersVisibility = _rows.Count > 0 || _columnChromeFadingOut
+            ? DataGridHeadersVisibility.Column
+            : DataGridHeadersVisibility.None;
         var showJackets = ShowsGroupJackets;
-        _groupSpacer.Visibility = showJackets ? Visibility.Visible : Visibility.Collapsed;
-        _grid.FrozenColumnCount = showJackets ? 1 : 0;
-        SetPlaylistBandLeft(_grid, showJackets ? GroupJacketColumnWidth : 0);
-        ApplyColumnDisplayOrder(_visibleColumns);
+        if (!_columnChromeFadingOut)
+        {
+            _groupSpacer.Visibility = showJackets ? Visibility.Visible : Visibility.Collapsed;
+            _grid.FrozenColumnCount = showJackets ? 1 : 0;
+            SetPlaylistBandLeft(_grid, showJackets ? GroupJacketColumnWidth : 0);
+        }
+
+        if (!KeepsColumnLayoutWhileEmpty())
+        {
+            ApplyColumnDisplayOrder(_visibleColumns);
+        }
     }
 
     internal void EnsureGroupScrollHook()
@@ -4855,7 +4910,7 @@ internal sealed class LibraryBrowserView : UserControl
                 _waveColumns,
                 _mp3Columns)
             : LibraryColumnFilter.Union(_waveColumns, _mp3Columns);
-        ApplyActiveColumnVisibility(notify: false);
+        ApplyActiveColumnVisibility(notify: false, forceLayout: true);
     }
 
     /// <summary>テスト用。両方のプリセットへ同じ列を入れる。</summary>
@@ -4902,7 +4957,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void ApplyColumnVisibility(IReadOnlyList<LibraryFileColumn> visible, bool notify)
     {
-        var kind = LibraryColumnFilter.ClassifyPlaylistColumns(_rows);
+        var kind = CurrentPlaylistColumnKind();
         LibraryColumnFilter.ApplyVisibleChange(
             kind,
             _waveColumns,
@@ -4921,15 +4976,20 @@ internal sealed class LibraryBrowserView : UserControl
         ApplyActiveColumnVisibility(notify);
     }
 
-    private void ApplyActiveColumnVisibility(bool notify)
+    private void ApplyActiveColumnVisibility(bool notify, bool forceLayout = false)
     {
-        _visibleColumns = LibraryColumnFilter.ResolveActive(
-            _rows,
-            _waveColumns,
-            _mp3Columns,
-            _mixedColumns);
-        ApplyColumnDisplayOrder(_visibleColumns);
+        if (forceLayout || !KeepsColumnLayoutWhileEmpty())
+        {
+            _visibleColumns = LibraryColumnFilter.ResolveActive(
+                _rows,
+                _waveColumns,
+                _mp3Columns,
+                _mixedColumns);
+            ApplyColumnDisplayOrder(_visibleColumns);
+        }
+
         ApplyEffectiveColumnVisibility();
+        EnforceFadingColumnSnapshotIfEmpty();
 
         if (notify)
         {
@@ -4944,37 +5004,243 @@ internal sealed class LibraryBrowserView : UserControl
 
         RequestFitColumns();
         SyncGroupChrome();
-        RefreshPlaylistWaveformSize(reschedule: true);
+        if (!_columnChromeFadingOut)
+        {
+            RefreshPlaylistWaveformSize(reschedule: true);
+        }
     }
 
     /// <summary>
     /// 設定でオンの列のうち、プレイリストに値が無い列は隠す。値が付けば出す。
+    /// 空のプレイリストは列をすべて隠す。ソートは曲が入るまで残す。
+    /// 表示中から空にしたときはメーターと同じ 1 秒でフェードアウトする。
     /// ソート中の列が隠れたらソート無しにする。
     /// </summary>
     private void ApplyEffectiveColumnVisibility()
     {
-        var enabled = new HashSet<LibraryFileColumn>(_visibleColumns);
-        var used = CurrentUsedColumns();
-        if (_sortColumn is { } sort
-            && !LibraryColumnFilter.IsEffectivelyVisible(sort, enabled, used))
+        if (_rows.Count > 0)
         {
-            ClearSort(resort: false);
+            _playlistColumnKind = LibraryColumnFilter.ClassifyPlaylistColumns(_rows);
+            _visibleColumns = LibraryColumnFilter.ResolveActive(
+                _rows,
+                _waveColumns,
+                _mp3Columns,
+                _mixedColumns);
+            var enabled = new HashSet<LibraryFileColumn>(_visibleColumns);
+            var used = CurrentUsedColumns();
+            if (_sortColumn is { } sort
+                && !LibraryColumnFilter.IsEffectivelyVisible(sort, enabled, used))
+            {
+                ClearSort(resort: false);
+            }
+
+            CancelColumnChromeFade(resetOpacity: true);
+            foreach (var pair in _columns)
+            {
+                pair.Value.Visibility = LibraryColumnFilter.IsEffectivelyVisible(pair.Key, enabled, used)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+
+            return;
+        }
+
+        if (_columnChromeFadingOut)
+        {
+            EnforceFadingColumnSnapshot();
+            return;
+        }
+
+        if (!AnyPlaylistColumnShown())
+        {
+            CancelColumnChromeFade(resetOpacity: true);
+            return;
+        }
+
+        if (BeginColumnChromeFadeOut())
+        {
+            return;
+        }
+
+        CollapseAllPlaylistColumns();
+    }
+
+    private LibraryPlaylistColumnKind CurrentPlaylistColumnKind() =>
+        _rows.Count == 0
+            ? _playlistColumnKind
+            : LibraryColumnFilter.ClassifyPlaylistColumns(_rows);
+
+    private void BeginColumnOrderCommitGate() => _columnOrderCommitGate++;
+
+    private void EndColumnOrderCommitGate()
+    {
+        if (_columnOrderCommitGate > 0)
+        {
+            _columnOrderCommitGate--;
+        }
+    }
+
+    private bool SuppressesColumnOrderCommit() =>
+        _columnOrderBusy
+        || _columnOrderCommitGate > 0
+        || _columnChromeFadingOut
+        || _fadingColumnSnapshot is not null;
+
+    private void PrepareEmptyPlaylistColumnFade()
+    {
+        if (_columnChromeFadingOut || !AnyPlaylistColumnShown())
+        {
+            return;
+        }
+
+        BeginColumnChromeFadeOut();
+    }
+
+    private bool KeepsColumnLayoutWhileEmpty() =>
+        _rows.Count == 0
+        && (AnyPlaylistColumnShown() || _columnChromeFadingOut || _fadingColumnSnapshot is not null);
+
+    private bool AnyPlaylistColumnShown()
+    {
+        foreach (var pair in _columns)
+        {
+            if (pair.Value.Visibility == Visibility.Visible)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool BeginColumnChromeFadeOut()
+    {
+        if (!IsLoaded)
+        {
+            return false;
+        }
+
+        if (FindDescendant<DataGridColumnHeadersPresenter>(_grid) is not { } headers)
+        {
+            UpdateLayout();
+            headers = FindDescendant<DataGridColumnHeadersPresenter>(_grid);
+            if (headers is null)
+            {
+                return false;
+            }
+        }
+
+        _columnChromeFadingOut = true;
+        CaptureFadingColumnSnapshot();
+        var ticket = ++_columnChromeFadeTicket;
+        var from = headers.Opacity;
+        headers.BeginAnimation(UIElement.OpacityProperty, null);
+        headers.Opacity = from;
+        if (from <= 0.001)
+        {
+            FinishColumnChromeFadeOut(ticket);
+            return true;
+        }
+
+        var anim = LibraryPlayerMode.CreateMeterFade(from, 0);
+        anim.Completed += (_, _) => FinishColumnChromeFadeOut(ticket);
+        headers.BeginAnimation(UIElement.OpacityProperty, anim);
+        return true;
+    }
+
+    private void FinishColumnChromeFadeOut(int ticket)
+    {
+        if (ticket != _columnChromeFadeTicket)
+        {
+            return;
+        }
+
+        _columnChromeFadingOut = false;
+        _fadingColumnSnapshot = null;
+        if (_rows.Count > 0)
+        {
+            ResetColumnHeaderOpacity();
+            ApplyEffectiveColumnVisibility();
+            SyncGroupChrome();
+            RequestFitColumns();
+            return;
+        }
+
+        CollapseAllPlaylistColumns();
+        ResetColumnHeaderOpacity();
+        SyncGroupChrome();
+        RequestFitColumns();
+    }
+
+    private void CaptureFadingColumnSnapshot()
+    {
+        var snapshot = new HashSet<LibraryFileColumn>();
+        foreach (var pair in _columns)
+        {
+            if (pair.Value.Visibility == Visibility.Visible)
+            {
+                snapshot.Add(pair.Key);
+            }
+        }
+
+        _fadingColumnSnapshot = snapshot;
+    }
+
+    private void EnforceFadingColumnSnapshotIfEmpty()
+    {
+        if (_rows.Count == 0)
+        {
+            EnforceFadingColumnSnapshot();
+        }
+    }
+
+    private void EnforceFadingColumnSnapshot()
+    {
+        if (_fadingColumnSnapshot is not { Count: > 0 } snapshot)
+        {
+            return;
         }
 
         foreach (var pair in _columns)
         {
-            pair.Value.Visibility = LibraryColumnFilter.IsEffectivelyVisible(pair.Key, enabled, used)
+            pair.Value.Visibility = snapshot.Contains(pair.Key)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }
     }
 
+    private void CollapseAllPlaylistColumns()
+    {
+        foreach (var pair in _columns)
+        {
+            pair.Value.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void CancelColumnChromeFade(bool resetOpacity)
+    {
+        _columnChromeFadeTicket++;
+        _columnChromeFadingOut = false;
+        _fadingColumnSnapshot = null;
+        if (resetOpacity)
+        {
+            ResetColumnHeaderOpacity();
+        }
+    }
+
+    private void ResetColumnHeaderOpacity()
+    {
+        if (FindDescendant<DataGridColumnHeadersPresenter>(_grid) is not { } headers)
+        {
+            return;
+        }
+
+        headers.BeginAnimation(UIElement.OpacityProperty, null);
+        headers.Opacity = 1;
+    }
+
     private HashSet<LibraryFileColumn>? CurrentUsedColumns() =>
-        LibraryColumnFilter.UsedColumns(
-            _rows,
-            _hideParentFolderForMp3Only,
-            hideWaveformForMp3Only: _hideWaveformForMp3Only
-                && Array.IndexOf(_visibleColumns, LibraryFileColumn.Waveform) < 0);
+        LibraryColumnFilter.UsedColumns(_rows);
 
     private void ClearSort(bool resort)
     {
@@ -5007,20 +5273,32 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void RefreshEffectiveColumns()
     {
-        var next = LibraryColumnFilter.ResolveActive(
-            _rows,
-            _waveColumns,
-            _mp3Columns,
-            _mixedColumns);
-        if (!next.SequenceEqual(_visibleColumns))
+        BeginColumnOrderCommitGate();
+        try
         {
-            _visibleColumns = next;
-            ApplyColumnDisplayOrder(_visibleColumns);
-        }
+            if (!KeepsColumnLayoutWhileEmpty())
+            {
+                var next = LibraryColumnFilter.ResolveActive(
+                    _rows,
+                    _waveColumns,
+                    _mp3Columns,
+                    _mixedColumns);
+                if (!next.SequenceEqual(_visibleColumns))
+                {
+                    _visibleColumns = next;
+                    ApplyColumnDisplayOrder(_visibleColumns);
+                }
+            }
 
-        ApplyEffectiveColumnVisibility();
-        SyncGroupChrome();
-        RequestFitColumns();
+            ApplyEffectiveColumnVisibility();
+            EnforceFadingColumnSnapshotIfEmpty();
+            SyncGroupChrome();
+            RequestFitColumns();
+        }
+        finally
+        {
+            EndColumnOrderCommitGate();
+        }
     }
 
     private void ApplyColumnDisplayOrder(IReadOnlyList<LibraryFileColumn> visible)
@@ -5081,10 +5359,13 @@ internal sealed class LibraryBrowserView : UserControl
         var visible = new List<(int Index, LibraryFileColumn Column)>(_columns.Count);
         foreach (var pair in _columns)
         {
-            if (pair.Value.Visibility == Visibility.Visible)
+            if (pair.Value.Visibility != Visibility.Visible
+                && (_rows.Count > 0 || Array.IndexOf(_visibleColumns, pair.Key) < 0))
             {
-                visible.Add((pair.Value.DisplayIndex, pair.Key));
+                continue;
             }
+
+            visible.Add((pair.Value.DisplayIndex, pair.Key));
         }
 
         visible.Sort(static (left, right) => left.Index.CompareTo(right.Index));
@@ -5096,7 +5377,7 @@ internal sealed class LibraryBrowserView : UserControl
 
         if (result.Length == 0 || Array.IndexOf(result, LibraryFileColumn.Name) < 0)
         {
-            return LibraryColumnFilter.Resolve(LibraryColumnFilter.Serialize(result));
+            return [.. _visibleColumns];
         }
 
         return result;
@@ -5114,7 +5395,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     internal void CommitColumnOrder()
     {
-        if (_columnOrderBusy)
+        if (SuppressesColumnOrderCommit())
         {
             return;
         }
@@ -5265,7 +5546,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void RequestFitColumns()
     {
-        if (!IsLoaded || _fitColumnsQueued)
+        if (!IsLoaded || _fitColumnsQueued || _columnChromeFadingOut)
         {
             return;
         }
@@ -5274,12 +5555,22 @@ internal sealed class LibraryBrowserView : UserControl
         Dispatcher.BeginInvoke(() =>
         {
             _fitColumnsQueued = false;
+            if (_columnChromeFadingOut)
+            {
+                return;
+            }
+
             FitColumns();
         }, DispatcherPriority.Background);
     }
 
     private void FitColumns()
     {
+        if (_columnChromeFadingOut)
+        {
+            return;
+        }
+
         var fontSize = _grid.FontSize > 0 ? _grid.FontSize : LibraryListFontSize;
         var cellPad = LibraryColumnCellPadX * 2;
         var headerPad = LibraryColumnHeaderPadX * 2;
@@ -5452,39 +5743,17 @@ internal sealed class LibraryBrowserView : UserControl
             CurrentUsedColumns());
     }
 
-    /// <summary>設定の S/M/L・WAVE オンリー自動 L・MP3 オンリー列隠しを反映する。</summary>
+    /// <summary>設定の S/M/L・WAVE オンリー自動 L を反映する。</summary>
     public void SetPlaylistWaveformOptions(
         LibraryPlaylistWaveformSize preferredSize,
-        bool autoLargeForWaveOnly,
-        bool hideParentFolderForMp3Only = true,
-        bool hideWaveformForMp3Only = true)
+        bool autoLargeForWaveOnly)
     {
         _playlistWavePreferredSize = preferredSize is LibraryPlaylistWaveformSize.S
             or LibraryPlaylistWaveformSize.M
             ? preferredSize
             : LibraryPlaylistWaveformSize.L;
         _playlistWaveAutoLargeForWaveOnly = autoLargeForWaveOnly;
-        _hideParentFolderForMp3Only = hideParentFolderForMp3Only;
-        _hideWaveformForMp3Only = hideWaveformForMp3Only;
-        if (!_hideWaveformForMp3Only)
-        {
-            var mp3 = LibraryColumnFilter.WithWaveform(_mp3Columns);
-            if (!mp3.SequenceEqual(_mp3Columns))
-            {
-                _mp3Columns = mp3;
-                if (!_mixedColumnsCustomized)
-                {
-                    _mixedColumns = LibraryColumnFilter.Union(_waveColumns, _mp3Columns);
-                }
-
-                ApplyActiveColumnVisibility(notify: true);
-                return;
-            }
-        }
-
-        ApplyEffectiveColumnVisibility();
-        SyncGroupChrome();
-        RequestFitColumns();
+        ApplyActiveColumnVisibility(notify: false);
         RefreshPlaylistWaveformSize(reschedule: true);
     }
 

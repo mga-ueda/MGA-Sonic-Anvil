@@ -48,7 +48,7 @@ internal static class LibraryPlaylistWaveformSizes
 
         foreach (var row in rows)
         {
-            if (!string.Equals(row.Kind, "WAVE", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(LibraryColumnFilter.EffectiveKind(row), "WAVE", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }

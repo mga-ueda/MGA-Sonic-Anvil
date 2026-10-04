@@ -149,14 +149,6 @@
                           Style="{StaticResource DarkCheckBoxStyle}"
                           Content="{x:Static domain:UiStrings.LabelLibraryPlaylistWaveformAutoLarge}"
                           Margin="0,0,0,8" />
-                <CheckBox x:Name="LibraryHideParentFolderForMp3OnlyBox"
-                          Style="{StaticResource DarkCheckBoxStyle}"
-                          Content="{x:Static domain:UiStrings.LabelLibraryHideParentFolderForMp3Only}"
-                          Margin="0,0,0,8" />
-                <CheckBox x:Name="LibraryHideWaveformForMp3OnlyBox"
-                          Style="{StaticResource DarkCheckBoxStyle}"
-                          Content="{x:Static domain:UiStrings.LabelLibraryHideWaveformForMp3Only}"
-                          Margin="0,0,0,8" />
               </StackPanel>
 
               <GridSplitter x:Name="LayoutsPlaylistSplitter"

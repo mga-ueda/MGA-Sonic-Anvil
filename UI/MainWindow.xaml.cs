@@ -136,9 +136,7 @@ public partial class MainWindow : Window
             mixedCustomized: AppStorage.Settings.LibraryListColumnsMixed.Length > 0);
         LibraryBrowser.SetPlaylistWaveformOptions(
             AppStorage.Settings.ResolvedLibraryPlaylistWaveformSize(),
-            AppStorage.Settings.LibraryPlaylistWaveformAutoLargeForWaveOnly,
-            AppStorage.Settings.LibraryHideParentFolderForMp3Only,
-            AppStorage.Settings.LibraryHideWaveformForMp3Only);
+            AppStorage.Settings.LibraryPlaylistWaveformAutoLargeForWaveOnly);
         LibraryBrowser.SetDefaultAudioFormat(AppStorage.Settings.ResolvedDefaultAudioFormat());
         LibraryBrowser.SetGroup(AppStorage.Settings.ResolvedLibraryListGroup());
         LibraryBrowser.SetExplorerRoots(AppStorage.Settings.ResolvedLibraryExplorerRoots());

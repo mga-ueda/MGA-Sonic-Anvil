@@ -298,9 +298,15 @@ public sealed class LibraryColumnFilterTests
     }
 
     [Fact]
-    public void UsedColumns_EmptyPlaylist_ReturnsNull()
+    public void UsedColumns_EmptyPlaylist_ReturnsEmpty()
     {
-        Assert.Null(LibraryColumnFilter.UsedColumns([]));
+        var used = LibraryColumnFilter.UsedColumns([]);
+        Assert.NotNull(used);
+        Assert.Empty(used);
+        Assert.False(LibraryColumnFilter.IsEffectivelyVisible(
+            LibraryFileColumn.Name,
+            LibraryColumnFilter.WaveDefaults,
+            used));
     }
 
     [Fact]
@@ -368,6 +374,18 @@ public sealed class LibraryColumnFilterTests
                     new LibraryFileRow { Name = "a.mp3", Kind = "MP3" },
                     new LibraryFileRow { Name = "b.m4a", Kind = "M4A" },
                 ]));
+        Assert.Equal(
+            LibraryPlaylistColumnKind.Mp3,
+            LibraryColumnFilter.ClassifyPlaylistColumns(
+                [new LibraryFileRow { Name = "song.mp3", Kind = "WAVE" }]));
+        Assert.True(LibraryColumnFilter.IsMp3Only(
+            [new LibraryFileRow { Name = "song.mp3", Kind = "WAVE" }]));
+        Assert.Equal("MP3", LibraryColumnFilter.EffectiveKind(
+            new LibraryFileRow { Name = "song.mp3", Kind = "WAVE" }));
+        Assert.Equal(
+            LibraryPlaylistColumnKind.Mp3,
+            LibraryColumnFilter.ClassifyPlaylistColumns(
+                [new LibraryFileRow { Name = "song.mp3", Kind = "Mp3" }]));
         Assert.Equal(
             LibraryPlaylistColumnKind.Mixed,
             LibraryColumnFilter.ClassifyPlaylistColumns(
@@ -556,7 +574,7 @@ public sealed class LibraryColumnFilterTests
     }
 
     [Fact]
-    public void UsedColumns_Mp3Only_CanHideParentFolderAndWaveform()
+    public void UsedColumns_Mp3Only_KeepsParentFolderAndWaveformWhenPresent()
     {
         var row = new LibraryFileRow
         {
@@ -567,31 +585,18 @@ public sealed class LibraryColumnFilterTests
             DurationText = "0:01",
         };
 
-        var used = LibraryColumnFilter.UsedColumns(
-            [row],
-            hideParentFolderForMp3Only: true,
-            hideWaveformForMp3Only: true);
+        var used = LibraryColumnFilter.UsedColumns([row]);
         Assert.NotNull(used);
         Assert.True(LibraryColumnFilter.IsMp3Only([row]));
-        Assert.DoesNotContain(LibraryFileColumn.ParentFolder, used);
-        Assert.DoesNotContain(LibraryFileColumn.Waveform, used);
+        Assert.Contains(LibraryFileColumn.ParentFolder, used);
+        Assert.Contains(LibraryFileColumn.Waveform, used);
         Assert.Contains(LibraryFileColumn.Title, used);
-
-        var shown = LibraryColumnFilter.UsedColumns(
-            [row],
-            hideParentFolderForMp3Only: false,
-            hideWaveformForMp3Only: false);
-        Assert.NotNull(shown);
-        Assert.Contains(LibraryFileColumn.ParentFolder, shown!);
-        Assert.Contains(LibraryFileColumn.Waveform, shown);
 
         var mixed = LibraryColumnFilter.UsedColumns(
             [
                 row,
                 new LibraryFileRow { Name = "kick.wav", Kind = "WAVE", ParentFolder = "sfx" },
-            ],
-            hideParentFolderForMp3Only: true,
-            hideWaveformForMp3Only: true);
+            ]);
         Assert.NotNull(mixed);
         Assert.False(LibraryColumnFilter.IsMp3Only(
             [
@@ -656,7 +661,7 @@ public sealed class LibraryColumnFilterTests
     }
 
     [Fact]
-    public void IsEffectivelyVisible_ShowsWhenUsedOrEmptyPlaylist()
+    public void IsEffectivelyVisible_ShowsWhenUsedOrNoFilter()
     {
         var enabled = new HashSet<LibraryFileColumn>
         {
@@ -680,5 +685,9 @@ public sealed class LibraryColumnFilterTests
             LibraryFileColumn.Album,
             enabled,
             used: null));
+        Assert.False(LibraryColumnFilter.IsEffectivelyVisible(
+            LibraryFileColumn.Name,
+            enabled,
+            used: []));
     }
 }

@@ -69,10 +69,6 @@ internal partial class AudioSettingsWindow : Window
 
     public bool SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly { get; private set; } = true;
 
-    public bool SelectedLibraryHideParentFolderForMp3Only { get; private set; } = true;
-
-    public bool SelectedLibraryHideWaveformForMp3Only { get; private set; } = true;
-
     public bool SelectedGaplessPlayback { get; private set; } = true;
 
     public bool SelectedAutoSpeakerSelect { get; private set; }
@@ -137,8 +133,6 @@ internal partial class AudioSettingsWindow : Window
         IEnumerable<LibraryFileColumn>? libraryListColumnsMp3 = null,
         LibraryPlaylistWaveformSize libraryPlaylistWaveformSize = LibraryPlaylistWaveformSize.L,
         bool libraryPlaylistWaveformAutoLargeForWaveOnly = true,
-        bool libraryHideParentFolderForMp3Only = true,
-        bool libraryHideWaveformForMp3Only = true,
         bool gaplessPlayback = true)
     {
         SelectedSettings = current;
@@ -174,8 +168,6 @@ internal partial class AudioSettingsWindow : Window
             ? libraryPlaylistWaveformSize
             : LibraryPlaylistWaveformSize.L;
         SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly = libraryPlaylistWaveformAutoLargeForWaveOnly;
-        SelectedLibraryHideParentFolderForMp3Only = libraryHideParentFolderForMp3Only;
-        SelectedLibraryHideWaveformForMp3Only = libraryHideWaveformForMp3Only;
         SelectedGaplessPlayback = gaplessPlayback;
         SelectedAutoSpeakerSelect = autoSpeakerSelect;
         SelectedActiveSpeakerId = string.IsNullOrWhiteSpace(activeSpeakerId)
@@ -336,8 +328,6 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(LibraryPlaylistWaveformSizeHeader, UiStrings.TipLibraryPlaylistWaveformSize);
         TipService.Set(LibraryPlaylistWaveformSizeCombo, UiStrings.TipLibraryPlaylistWaveformSize);
         TipService.Set(LibraryPlaylistWaveformAutoLargeBox, UiStrings.TipLibraryPlaylistWaveformAutoLarge);
-        TipService.Set(LibraryHideParentFolderForMp3OnlyBox, UiStrings.TipLibraryHideParentFolderForMp3Only);
-        TipService.Set(LibraryHideWaveformForMp3OnlyBox, UiStrings.TipLibraryHideWaveformForMp3Only);
         TipService.Set(AutoSpeakerSelectBox, UiStrings.TipAutoSpeakerSelect);
         TipService.Set(ApiLabel, UiStrings.TipAudioApi);
         TipService.Set(ApiCombo, UiStrings.TipAudioApi);
@@ -576,8 +566,6 @@ internal partial class AudioSettingsWindow : Window
         }
 
         LibraryPlaylistWaveformAutoLargeBox.IsChecked = SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly;
-        LibraryHideParentFolderForMp3OnlyBox.IsChecked = SelectedLibraryHideParentFolderForMp3Only;
-        LibraryHideWaveformForMp3OnlyBox.IsChecked = SelectedLibraryHideWaveformForMp3Only;
     }
 
     private void ApplyLibraryExplorerRootButtons()
@@ -1060,10 +1048,6 @@ internal partial class AudioSettingsWindow : Window
                 : LibraryPlaylistWaveformSize.L;
         SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly =
             LibraryPlaylistWaveformAutoLargeBox.IsChecked != false;
-        SelectedLibraryHideParentFolderForMp3Only =
-            LibraryHideParentFolderForMp3OnlyBox.IsChecked != false;
-        SelectedLibraryHideWaveformForMp3Only =
-            LibraryHideWaveformForMp3OnlyBox.IsChecked != false;
         SelectedGaplessPlayback = GaplessPlaybackBox.IsChecked != false;
         SelectedAutoSpeakerSelect = AutoSpeakerSelectBox.IsChecked == true;
         SelectedActiveSpeakerId = CurrentSpeaker()?.Id ?? _presets[0].Id;
@@ -1804,9 +1788,7 @@ internal partial class AudioSettingsWindow : Window
         var options = Max(
             LabelWidth(LibraryColumnsHeader),
             waveformRow,
-            MeasureCheckBoxContentWidth(LibraryPlaylistWaveformAutoLargeBox),
-            MeasureCheckBoxContentWidth(LibraryHideParentFolderForMp3OnlyBox),
-            MeasureCheckBoxContentWidth(LibraryHideWaveformForMp3OnlyBox)) + gutter;
+            MeasureCheckBoxContentWidth(LibraryPlaylistWaveformAutoLargeBox)) + gutter;
         var wave = Max(
             LabelWidth(LibraryColumnChecksHeader),
             LabelWidth(LibraryColumnsWaveHeader) + 8 + DesignMetrics.From96(88),

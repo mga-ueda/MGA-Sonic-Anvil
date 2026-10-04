@@ -2900,6 +2900,11 @@ public partial class MainWindow
             BindWorkspace(null);
             RebuildTabBar();
             NotifyWaveformSessionsChanged();
+            if (IsLibraryMaximized)
+            {
+                LibraryBrowser.SetSessions(_sessions, null);
+            }
+
             SyncPlayerMeterFade();
             return true;
         }

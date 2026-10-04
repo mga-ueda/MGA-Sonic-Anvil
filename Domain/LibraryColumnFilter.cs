@@ -156,21 +156,18 @@ internal static class LibraryColumnFilter
     }
 
     /// <summary>
-    /// プレイリストに値が1件でもある列。空リストは null（設定どおり全部出す）。
+    /// プレイリストに値が1件でもある列。空リストは空集合（列をすべて隠す）。
+    /// null は使用フィルタ無し（設定どおり全部出す）。
     /// ジャケットは値が無くても、埋め込み可能な形式（MP3 / M4A）が1件あれば出す。
     /// Wave / AIFF だけでは隠し、混在したら出す。
     /// 波形は曲が1件でもあれば出す（中身は後から埋める）。
-    /// MP3 のみのとき、設定に応じて親フォルダ／波形を used から外す。
-    /// 列側で波形表示がオンなら、呼び出し側は hideWaveformForMp3Only を渡さない。
+    /// 親フォルダ／波形を出すかは Wave / MP3 の列プリセット側。
     /// </summary>
-    public static HashSet<LibraryFileColumn>? UsedColumns(
-        IReadOnlyList<LibraryFileRow> rows,
-        bool hideParentFolderForMp3Only = false,
-        bool hideWaveformForMp3Only = false)
+    public static HashSet<LibraryFileColumn>? UsedColumns(IReadOnlyList<LibraryFileRow> rows)
     {
         if (rows.Count == 0)
         {
-            return null;
+            return [];
         }
 
         var used = new HashSet<LibraryFileColumn>
@@ -181,7 +178,7 @@ internal static class LibraryColumnFilter
         var jacketEligible = false;
         foreach (var row in rows)
         {
-            if (!jacketEligible && JacketEligibleKind(row.Kind))
+            if (!jacketEligible && JacketEligibleKind(EffectiveKind(row)))
             {
                 jacketEligible = true;
                 used.Add(LibraryFileColumn.Jacket);
@@ -207,19 +204,6 @@ internal static class LibraryColumnFilter
             }
         }
 
-        if (IsMp3Only(rows))
-        {
-            if (hideParentFolderForMp3Only)
-            {
-                used.Remove(LibraryFileColumn.ParentFolder);
-            }
-
-            if (hideWaveformForMp3Only)
-            {
-                used.Remove(LibraryFileColumn.Waveform);
-            }
-        }
-
         return used;
     }
 
@@ -233,7 +217,7 @@ internal static class LibraryColumnFilter
 
         foreach (var row in rows)
         {
-            if (!string.Equals(row.Kind, "MP3", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(EffectiveKind(row), "MP3", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
@@ -244,13 +228,58 @@ internal static class LibraryColumnFilter
 
     /// <summary>ジャケット列を出し得る形式。Wave / AIFF は埋め込みできない。</summary>
     public static bool JacketEligibleKind(string kind) =>
-        kind is "MP3" or "M4A";
+        IsTagFamilyKind(kind);
 
     public static bool IsPcmFamilyKind(string kind) =>
-        kind is "WAVE" or "AIFF";
+        kind.Equals("WAVE", StringComparison.OrdinalIgnoreCase)
+        || kind.Equals("AIFF", StringComparison.OrdinalIgnoreCase);
 
     public static bool IsTagFamilyKind(string kind) =>
-        kind is "MP3" or "M4A";
+        kind.Equals("MP3", StringComparison.OrdinalIgnoreCase)
+        || kind.Equals("M4A", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 列判定に使う形式。ファイル名の拡張子を優先し、無ければ Kind 文字列。
+    /// Kind が WAVE のままでも .mp3 なら MP3 とみなす。
+    /// </summary>
+    public static string EffectiveKind(LibraryFileRow row)
+    {
+        var fromName = KindFromFileName(row.Name);
+        if (fromName is not null)
+        {
+            return fromName;
+        }
+
+        return string.IsNullOrWhiteSpace(row.Kind) ? "WAVE" : row.Kind;
+    }
+
+    public static string? KindFromFileName(string name)
+    {
+        var ext = Path.GetExtension(name);
+        if (ext.Equals(".mp3", StringComparison.OrdinalIgnoreCase))
+        {
+            return "MP3";
+        }
+
+        if (ext.Equals(".m4a", StringComparison.OrdinalIgnoreCase))
+        {
+            return "M4A";
+        }
+
+        if (ext.Equals(".aif", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".aiff", StringComparison.OrdinalIgnoreCase))
+        {
+            return "AIFF";
+        }
+
+        if (ext.Equals(".wav", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".wave", StringComparison.OrdinalIgnoreCase))
+        {
+            return "WAVE";
+        }
+
+        return null;
+    }
 
     /// <summary>空・混在は Mixed。WAVE/AIFF のみ Wave。MP3/M4A のみ Mp3。</summary>
     public static LibraryPlaylistColumnKind ClassifyPlaylistColumns(IReadOnlyList<LibraryFileRow> rows)
@@ -264,12 +293,13 @@ internal static class LibraryColumnFilter
         var tag = true;
         foreach (var row in rows)
         {
-            if (!IsPcmFamilyKind(row.Kind))
+            var kind = EffectiveKind(row);
+            if (!IsPcmFamilyKind(kind))
             {
                 pcm = false;
             }
 
-            if (!IsTagFamilyKind(row.Kind))
+            if (!IsTagFamilyKind(kind))
             {
                 tag = false;
             }
@@ -298,6 +328,11 @@ internal static class LibraryColumnFilter
         IReadOnlyCollection<LibraryFileColumn> enabled,
         HashSet<LibraryFileColumn>? used)
     {
+        if (used is { Count: 0 })
+        {
+            return false;
+        }
+
         if (IsLocked(column))
         {
             return true;

@@ -1383,10 +1383,7 @@ public sealed class LibraryBrowserSelectionTests
             Flush();
             view.UpdateLayout();
             Flush();
-
-            var album = HeaderLabeled(view, UiStrings.LibraryColumnAlbum);
-            AssertSortMarks(album, ascending: true);
-            Assert.True(CountCyanInHeader(window, album) > 8);
+            Assert.Equal(DataGridHeadersVisibility.None, view.HeadersVisibility);
 
             var session = Session("01 a.mp3");
             session.Document.ApplyTags(new AudioFileTags { Probed = true, Album = "Test Album" });
@@ -1394,7 +1391,7 @@ public sealed class LibraryBrowserSelectionTests
             Flush();
             view.UpdateLayout();
             Flush();
-            album = HeaderLabeled(view, UiStrings.LibraryColumnAlbum);
+            var album = HeaderLabeled(view, UiStrings.LibraryColumnAlbum);
             AssertSortMarks(album, ascending: true);
             Assert.True(CountCyanInHeader(window, album) > 8, "marks vanished after load");
 
@@ -1697,13 +1694,169 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void EmptyPlaylist_HidesEveryColumnIncludingName()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            foreach (var column in LibraryColumnFilter.All)
+            {
+                Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(column));
+            }
+
+            Assert.Equal(DataGridHeadersVisibility.None, view.HeadersVisibility);
+            Assert.Equal(Visibility.Collapsed, view.GroupSpacerVisibility);
+
+            var wave = Session("kick.wav");
+            view.SetSessions([wave], wave, [wave]);
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Name));
+            Assert.Equal(DataGridHeadersVisibility.Column, view.HeadersVisibility);
+
+            view.SetSessions([], null, []);
+            foreach (var column in LibraryColumnFilter.All)
+            {
+                Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(column));
+            }
+
+            Assert.Equal(DataGridHeadersVisibility.None, view.HeadersVisibility);
+        });
+    }
+
+    [Fact]
+    public void EmptyPlaylist_FadesColumnHeadersBeforeHiding()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 400,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            var wave = Session("kick.wav");
+            view.SetSessions([wave], wave, [wave]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Name));
+            Assert.Equal(DataGridHeadersVisibility.Column, view.HeadersVisibility);
+
+            view.SetSessions([], null, []);
+            Assert.True(view.ColumnChromeFadingOut);
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Name));
+            Assert.Equal(DataGridHeadersVisibility.Column, view.HeadersVisibility);
+
+            PumpUntil(
+                () => !view.ColumnChromeFadingOut,
+                TimeSpan.FromSeconds(LibraryPlayerMode.MeterFadeSeconds + 0.5));
+            Assert.False(view.ColumnChromeFadingOut);
+            foreach (var column in LibraryColumnFilter.All)
+            {
+                Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(column));
+            }
+
+            Assert.Equal(DataGridHeadersVisibility.None, view.HeadersVisibility);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void EmptyPlaylist_Mp3Only_FadesWithoutShowingWaveColumns()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var mp3 = Session("song.mp3");
+            mp3.Document.ApplyTags(new AudioFileTags { Probed = true, Title = "Song" });
+            var view = new LibraryBrowserView();
+            view.SetVisibleColumnPresets(
+                LibraryColumnFilter.WaveDefaults,
+                LibraryColumnFilter.Mp3Defaults);
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 400,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions([mp3], mp3, [mp3]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Name));
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Title));
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.SampleRate));
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.BitDepth));
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.Waveform));
+
+            view.SetSessions([], null, []);
+            Flush();
+            Assert.True(view.ColumnChromeFadingOut);
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Name));
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Title));
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.SampleRate));
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.BitDepth));
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.Waveform));
+            Assert.Equal(LibraryColumnFilter.Mp3Defaults, view.Mp3ColumnOrder);
+
+            view.AppendSession(mp3, select: true);
+            Flush();
+            Assert.False(view.ColumnChromeFadingOut);
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Title));
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.SampleRate));
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.Waveform));
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void Mp3AfterWavePlaylist_SwitchesToMp3Columns()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var wave = Session("kick.wav");
+            var mp3 = Session("song.mp3");
+            mp3.Document.ApplyTags(new AudioFileTags { Probed = true, Title = "Song" });
+            var view = new LibraryBrowserView();
+            view.SetVisibleColumnPresets(
+                LibraryColumnFilter.WaveDefaults,
+                LibraryColumnFilter.Mp3Defaults);
+            view.SetSessions([wave], wave, [wave]);
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Waveform));
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.Title));
+
+            view.SetSessions([mp3], mp3, [mp3]);
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Title));
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.Waveform));
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.SampleRate));
+            Assert.Equal(LibraryColumnFilter.Mp3Defaults, view.Mp3ColumnOrder);
+            Assert.Equal(LibraryColumnFilter.Mp3Defaults, view.VisibleColumnOrder);
+
+            view.SetVisibleColumnPresets(
+                LibraryColumnFilter.WaveDefaults,
+                LibraryColumnFilter.Mp3Defaults);
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Title));
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.Waveform));
+        });
+    }
+
+    [Fact]
     public void Grouped_KeepsNativeHeadersAndJacketSpacer()
     {
         RunSta(() =>
         {
             EnsureTheme();
             var view = new LibraryBrowserView();
-            Assert.Equal(DataGridHeadersVisibility.Column, view.HeadersVisibility);
+            Assert.Equal(DataGridHeadersVisibility.None, view.HeadersVisibility);
             // 曲が無い／Wave のみのときは No Image 枠も出さない。
             Assert.Equal(Visibility.Collapsed, view.GroupSpacerVisibility);
             Assert.Equal(0, view.FrozenColumnCount);
@@ -1711,6 +1864,7 @@ public sealed class LibraryBrowserSelectionTests
             var mp3 = Session("song.mp3");
             mp3.Document.ApplyTags(new AudioFileTags { Probed = true, Album = "A" });
             view.SetSessions([mp3], mp3, [mp3]);
+            Assert.Equal(DataGridHeadersVisibility.Column, view.HeadersVisibility);
             Assert.Equal(Visibility.Visible, view.GroupSpacerVisibility);
             Assert.Equal(1, view.FrozenColumnCount);
 
@@ -1722,7 +1876,7 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
-    public void Mp3Only_WaveformColumnOn_ShowsEvenWhenHideForMp3Only()
+    public void Mp3Only_WaveformColumnOn_ShowsWaveform()
     {
         RunSta(() =>
         {
@@ -1730,11 +1884,6 @@ public sealed class LibraryBrowserSelectionTests
             var mp3 = Session("song.mp3");
             mp3.Document.ApplyTags(new AudioFileTags { Probed = true, Title = "Song" });
             var view = new LibraryBrowserView();
-            view.SetPlaylistWaveformOptions(
-                LibraryPlaylistWaveformSize.L,
-                autoLargeForWaveOnly: true,
-                hideParentFolderForMp3Only: true,
-                hideWaveformForMp3Only: true);
             view.SetSessions([mp3], mp3, [mp3]);
             Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.Waveform));
 
@@ -1745,7 +1894,7 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
-    public void Mp3Only_HideWaveformOff_ShowsWaveformColumn()
+    public void Mp3Only_WaveformInMp3Preset_ShowsWaveformColumn()
     {
         RunSta(() =>
         {
@@ -1759,11 +1908,9 @@ public sealed class LibraryBrowserSelectionTests
             view.SetSessions([mp3], mp3, [mp3]);
             Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.Waveform));
 
-            view.SetPlaylistWaveformOptions(
-                LibraryPlaylistWaveformSize.L,
-                autoLargeForWaveOnly: true,
-                hideParentFolderForMp3Only: true,
-                hideWaveformForMp3Only: false);
+            view.SetVisibleColumnPresets(
+                LibraryColumnFilter.WaveDefaults,
+                LibraryColumnFilter.WithWaveform(LibraryColumnFilter.Mp3Defaults));
             Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Waveform));
             Assert.Contains(LibraryFileColumn.Waveform, view.Mp3ColumnOrder);
         });
@@ -2432,6 +2579,32 @@ public sealed class LibraryBrowserSelectionTests
 
     private static void Flush() =>
         Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+
+    private static void PumpUntil(Func<bool> done, TimeSpan timeout)
+    {
+        var frame = new DispatcherFrame();
+        var timer = new DispatcherTimer { Interval = timeout };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            frame.Continue = false;
+        };
+        var poll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+        poll.Tick += (_, _) =>
+        {
+            if (!done())
+            {
+                return;
+            }
+
+            poll.Stop();
+            timer.Stop();
+            frame.Continue = false;
+        };
+        timer.Start();
+        poll.Start();
+        Dispatcher.PushFrame(frame);
+    }
 
     private static void RunSta(Action action)
     {
