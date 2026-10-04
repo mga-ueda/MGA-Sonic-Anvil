@@ -4916,7 +4916,7 @@ internal sealed class LibraryBrowserView : UserControl
     /// <summary>テスト用。両方のプリセットへ同じ列を入れる。</summary>
     public void SetVisibleColumns(IEnumerable<LibraryFileColumn> columns)
     {
-        var ordered = LibraryColumnFilter.Resolve(
+        var ordered = LibraryColumnFilter.ResolveWave(
             LibraryColumnFilter.Serialize(columns, LibraryColumnFilter.WaveDefaults));
         SetVisibleColumnPresets(ordered, ordered);
     }

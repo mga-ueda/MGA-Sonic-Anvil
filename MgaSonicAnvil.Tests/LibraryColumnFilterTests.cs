@@ -9,8 +9,8 @@ public sealed class LibraryColumnFilterTests
     [Fact]
     public void Resolve_Empty_UsesDefaultsIncludingNameRateBitChParentFolderAndWaveform()
     {
-        var resolved = LibraryColumnFilter.Resolve([]);
-        Assert.Equal(LibraryColumnFilter.Defaults, resolved);
+        var resolved = LibraryColumnFilter.ResolveWave([]);
+        Assert.Equal(LibraryColumnFilter.WaveDefaults, resolved);
         Assert.Contains(LibraryFileColumn.Name, resolved);
         Assert.Contains(LibraryFileColumn.SampleRate, resolved);
         Assert.Contains(LibraryFileColumn.BitDepth, resolved);
@@ -50,7 +50,6 @@ public sealed class LibraryColumnFilterTests
                 LibraryFileColumn.Waveform,
             },
             LibraryColumnFilter.WaveDefaults);
-        Assert.Equal(LibraryColumnFilter.WaveDefaults, LibraryColumnFilter.Defaults);
         Assert.Equal(
             LibraryColumnFilter.WaveDefaults,
             LibraryColumnFilter.All[..LibraryColumnFilter.WaveDefaults.Length]);
@@ -122,7 +121,7 @@ public sealed class LibraryColumnFilterTests
     [Fact]
     public void Resolve_StoredNames_KeepsNameEvenIfOmitted()
     {
-        var resolved = LibraryColumnFilter.Resolve(["Title", "BitRate", "Unknown"]);
+        var resolved = LibraryColumnFilter.ResolveWave(["Title", "BitRate", "Unknown"]);
         Assert.Equal(
             [LibraryFileColumn.Name, LibraryFileColumn.Title, LibraryFileColumn.BitRate],
             resolved);
@@ -131,12 +130,12 @@ public sealed class LibraryColumnFilterTests
     [Fact]
     public void Resolve_LegacyDefaultsWithoutDate_MovesToCurrentDefaults()
     {
-        var resolved = LibraryColumnFilter.Resolve(
+        var resolved = LibraryColumnFilter.ResolveWave(
             [
                 "Name", "Title", "Album", "Artist", "Composer", "Duration", "Track", "Disc", "Year", "Genre",
                 "Comment",
             ]);
-        Assert.Equal(LibraryColumnFilter.Defaults, resolved);
+        Assert.Equal(LibraryColumnFilter.WaveDefaults, resolved);
         Assert.Equal(LibraryFileColumn.Waveform, resolved[^1]);
         Assert.Equal(LibraryFileColumn.ParentFolder, resolved[^2]);
         Assert.Equal(LibraryFileColumn.SampleRate, resolved[1]);
@@ -147,12 +146,12 @@ public sealed class LibraryColumnFilterTests
     [Fact]
     public void Resolve_PreviousDefaultWithDate_MovesToCurrentDefaults()
     {
-        var resolved = LibraryColumnFilter.Resolve(
+        var resolved = LibraryColumnFilter.ResolveWave(
             [
                 "Name", "Title", "Album", "Artist", "Composer", "Duration", "Track", "Disc", "Year", "Genre",
                 "Date", "Comment",
             ]);
-        Assert.Equal(LibraryColumnFilter.Defaults, resolved);
+        Assert.Equal(LibraryColumnFilter.WaveDefaults, resolved);
         Assert.Equal(LibraryFileColumn.Waveform, resolved[^1]);
         Assert.Equal(LibraryFileColumn.ParentFolder, resolved[^2]);
     }
@@ -160,47 +159,47 @@ public sealed class LibraryColumnFilterTests
     [Fact]
     public void Resolve_ParentFolderAfterName_MovesToDefaultsWithWaveform()
     {
-        var resolved = LibraryColumnFilter.Resolve(
+        var resolved = LibraryColumnFilter.ResolveWave(
             [
                 "Name", "ParentFolder", "Title", "Album", "Artist", "Composer", "Duration", "Track", "Disc",
                 "Year", "Genre", "Date", "Comment",
             ]);
-        Assert.Equal(LibraryColumnFilter.Defaults, resolved);
+        Assert.Equal(LibraryColumnFilter.WaveDefaults, resolved);
         Assert.Equal(LibraryFileColumn.Waveform, resolved[^1]);
     }
 
     [Fact]
     public void Resolve_PreviousDefaultWithParentFolder_MovesToCurrentDefaults()
     {
-        var resolved = LibraryColumnFilter.Resolve(
+        var resolved = LibraryColumnFilter.ResolveWave(
             [
                 "Name", "Title", "Album", "Artist", "Composer", "Duration", "Track", "Disc", "Year", "Genre",
                 "Date", "Comment", "ParentFolder",
             ]);
-        Assert.Equal(LibraryColumnFilter.Defaults, resolved);
+        Assert.Equal(LibraryColumnFilter.WaveDefaults, resolved);
         Assert.Equal(LibraryFileColumn.Waveform, resolved[^1]);
     }
 
     [Fact]
     public void Resolve_PreviousDefaultWithDateAfterComment_MovesToCurrentDefaults()
     {
-        var resolved = LibraryColumnFilter.Resolve(
+        var resolved = LibraryColumnFilter.ResolveWave(
             [
                 "Name", "Title", "Album", "Artist", "Composer", "Duration", "Track", "Disc", "Year", "Genre",
                 "Comment", "Date",
             ]);
-        Assert.Equal(LibraryColumnFilter.Defaults, resolved);
+        Assert.Equal(LibraryColumnFilter.WaveDefaults, resolved);
     }
 
     [Fact]
     public void Resolve_PreviousDefaultWithDateBeforeGenre_MovesToCurrentDefaults()
     {
-        var resolved = LibraryColumnFilter.Resolve(
+        var resolved = LibraryColumnFilter.ResolveWave(
             [
                 "Name", "Title", "Album", "Artist", "Composer", "Duration", "Track", "Disc", "Year", "Date",
                 "Genre", "Comment",
             ]);
-        Assert.Equal(LibraryColumnFilter.Defaults, resolved);
+        Assert.Equal(LibraryColumnFilter.WaveDefaults, resolved);
     }
 
     [Fact]
@@ -219,7 +218,7 @@ public sealed class LibraryColumnFilterTests
     [Fact]
     public void Resolve_CustomOrder_KeepsDateWhereSaved()
     {
-        var resolved = LibraryColumnFilter.Resolve(
+        var resolved = LibraryColumnFilter.ResolveWave(
             [
                 "Name", "Title", "Album", "Artist", "Composer", "Duration", "Track", "Disc", "Year", "Genre",
                 "Comment", "Date", "Folder",
@@ -251,7 +250,7 @@ public sealed class LibraryColumnFilterTests
         Assert.Equal(["Duration", "Name", "Title"], stored);
         Assert.Equal(
             [LibraryFileColumn.Duration, LibraryFileColumn.Name, LibraryFileColumn.Title],
-            LibraryColumnFilter.Resolve(stored));
+            LibraryColumnFilter.ResolveWave(stored));
     }
 
     [Fact]
@@ -259,7 +258,7 @@ public sealed class LibraryColumnFilterTests
     {
         var stored = LibraryColumnFilter.Serialize(
             [LibraryFileColumn.Title, LibraryFileColumn.Folder, LibraryFileColumn.Name]);
-        var resolved = LibraryColumnFilter.Resolve(stored);
+        var resolved = LibraryColumnFilter.ResolveWave(stored);
         Assert.Equal(["Title", "Folder", "Name"], stored);
         Assert.Equal(stored, LibraryColumnFilter.Serialize(resolved));
         Assert.Equal(
@@ -292,7 +291,7 @@ public sealed class LibraryColumnFilterTests
     public void Merge_DropsUncheckedAndKeepsName()
     {
         var merged = LibraryColumnFilter.Merge(
-            LibraryColumnFilter.Defaults,
+            LibraryColumnFilter.WaveDefaults,
             [LibraryFileColumn.Name, LibraryFileColumn.Album]);
         Assert.Equal([LibraryFileColumn.Name, LibraryFileColumn.Album], merged);
     }
@@ -378,8 +377,6 @@ public sealed class LibraryColumnFilterTests
             LibraryPlaylistColumnKind.Mp3,
             LibraryColumnFilter.ClassifyPlaylistColumns(
                 [new LibraryFileRow { Name = "song.mp3", Kind = "WAVE" }]));
-        Assert.True(LibraryColumnFilter.IsMp3Only(
-            [new LibraryFileRow { Name = "song.mp3", Kind = "WAVE" }]));
         Assert.Equal("MP3", LibraryColumnFilter.EffectiveKind(
             new LibraryFileRow { Name = "song.mp3", Kind = "WAVE" }));
         Assert.Equal(
@@ -587,7 +584,6 @@ public sealed class LibraryColumnFilterTests
 
         var used = LibraryColumnFilter.UsedColumns([row]);
         Assert.NotNull(used);
-        Assert.True(LibraryColumnFilter.IsMp3Only([row]));
         Assert.Contains(LibraryFileColumn.ParentFolder, used);
         Assert.Contains(LibraryFileColumn.Waveform, used);
         Assert.Contains(LibraryFileColumn.Title, used);
@@ -598,11 +594,6 @@ public sealed class LibraryColumnFilterTests
                 new LibraryFileRow { Name = "kick.wav", Kind = "WAVE", ParentFolder = "sfx" },
             ]);
         Assert.NotNull(mixed);
-        Assert.False(LibraryColumnFilter.IsMp3Only(
-            [
-                row,
-                new LibraryFileRow { Name = "kick.wav", Kind = "WAVE" },
-            ]));
         Assert.Contains(LibraryFileColumn.ParentFolder, mixed!);
         Assert.Contains(LibraryFileColumn.Waveform, mixed);
     }
@@ -610,23 +601,15 @@ public sealed class LibraryColumnFilterTests
     [Fact]
     public void ResolveMp3_Mp3DefaultsWithWaveform_KeepsWaveform()
     {
-        var stored = LibraryColumnFilter.Serialize(
-            LibraryColumnFilter.WithWaveform(LibraryColumnFilter.Mp3Defaults),
-            LibraryColumnFilter.Mp3Defaults);
+        LibraryFileColumn[] withWave =
+        [
+            .. LibraryColumnFilter.Mp3Defaults,
+            LibraryFileColumn.Waveform,
+        ];
+        var stored = LibraryColumnFilter.Serialize(withWave, LibraryColumnFilter.Mp3Defaults);
         var resolved = LibraryColumnFilter.ResolveMp3(stored);
         Assert.Contains(LibraryFileColumn.Waveform, resolved);
-        Assert.Equal(LibraryColumnFilter.WithWaveform(LibraryColumnFilter.Mp3Defaults), resolved);
-    }
-
-    [Fact]
-    public void WithWaveform_Mp3Defaults_InsertsAfterParentFolder()
-    {
-        var withWave = LibraryColumnFilter.WithWaveform(LibraryColumnFilter.Mp3Defaults);
-        Assert.Contains(LibraryFileColumn.Waveform, withWave);
-        Assert.Equal(
-            Array.IndexOf(LibraryColumnFilter.Mp3Defaults, LibraryFileColumn.ParentFolder) + 1,
-            Array.IndexOf(withWave, LibraryFileColumn.Waveform));
-        Assert.Equal(withWave, LibraryColumnFilter.WithWaveform(withWave));
+        Assert.Equal(withWave, resolved);
     }
 
     [Fact]

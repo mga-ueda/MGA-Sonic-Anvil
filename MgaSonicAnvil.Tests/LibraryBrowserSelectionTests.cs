@@ -1910,7 +1910,7 @@ public sealed class LibraryBrowserSelectionTests
 
             view.SetVisibleColumnPresets(
                 LibraryColumnFilter.WaveDefaults,
-                LibraryColumnFilter.WithWaveform(LibraryColumnFilter.Mp3Defaults));
+                [.. LibraryColumnFilter.Mp3Defaults, LibraryFileColumn.Waveform]);
             Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Waveform));
             Assert.Contains(LibraryFileColumn.Waveform, view.Mp3ColumnOrder);
         });

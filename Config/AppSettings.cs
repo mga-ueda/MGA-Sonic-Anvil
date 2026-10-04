@@ -487,10 +487,6 @@ internal sealed class AppSettings
             ResolvedLibraryListColumnsMp3());
     }
 
-    /// <summary>互換。アクティブ種別が無いときは Wave 側。</summary>
-    public LibraryFileColumn[] ResolvedLibraryListColumns() =>
-        ResolvedLibraryListColumnsWave();
-
     public void ApplyLibraryListColumnsWave(IEnumerable<LibraryFileColumn> columns)
     {
         MigrateLegacyLibraryListColumns();
@@ -539,10 +535,6 @@ internal sealed class AppSettings
             LibraryColumnFilter.MixedDefaults);
         LibraryListColumns = [];
     }
-
-    /// <summary>互換。両方へ同じ列を書く。</summary>
-    public void ApplyLibraryListColumns(IEnumerable<LibraryFileColumn> columns) =>
-        ApplyLibraryListColumnPresets(columns, columns);
 
     private void MigrateLegacyLibraryListColumns()
     {

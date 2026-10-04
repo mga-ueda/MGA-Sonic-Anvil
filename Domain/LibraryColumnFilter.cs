@@ -118,20 +118,9 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.Jacket,
     ];
 
-    /// <summary>互換。Wave 既定と同じ。</summary>
-    public static LibraryFileColumn[] Defaults => WaveDefaults;
-
     public static bool IsLocked(LibraryFileColumn column) => column == LibraryFileColumn.Name;
 
     /// <summary>設定のチェック並び。既定順のあと、その形式で選べる残りの列。</summary>
-    public static IEnumerable<LibraryFileColumn> SettingsCheckOrder(
-        IReadOnlyList<LibraryFileColumn> defaults) =>
-        SettingsCheckOrder(
-            defaults,
-            ReferenceEquals(defaults, Mp3Defaults) || defaults.SequenceEqual(Mp3Defaults)
-                ? Mp3SettingsColumns
-                : WaveSettingsColumns);
-
     public static IEnumerable<LibraryFileColumn> SettingsCheckOrder(
         IReadOnlyList<LibraryFileColumn> defaults,
         IReadOnlyList<LibraryFileColumn> settingsColumns)
@@ -205,25 +194,6 @@ internal static class LibraryColumnFilter
         }
 
         return used;
-    }
-
-    /// <summary>MP3 だけなら true。空リストは false。</summary>
-    public static bool IsMp3Only(IReadOnlyList<LibraryFileRow> rows)
-    {
-        if (rows.Count == 0)
-        {
-            return false;
-        }
-
-        foreach (var row in rows)
-        {
-            if (!string.Equals(EffectiveKind(row), "MP3", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     /// <summary>ジャケット列を出し得る形式。Wave / AIFF は埋め込みできない。</summary>
@@ -371,10 +341,6 @@ internal static class LibraryColumnFilter
 
         return Resolve(stored, MixedDefaults, migratePreviousDefaults: false);
     }
-
-    /// <summary>互換。Wave 既定で解決する。</summary>
-    public static LibraryFileColumn[] Resolve(string[]? stored) =>
-        ResolveWave(stored);
 
     public static LibraryFileColumn[] ResolveActive(
         IReadOnlyList<LibraryFileRow> rows,
@@ -846,33 +812,6 @@ internal static class LibraryColumnFilter
 
     private static void InsertParentFolderAtDefaultPlace(List<LibraryFileColumn> result) =>
         result.Add(LibraryFileColumn.ParentFolder);
-
-    /// <summary>波形列が無ければ親フォルダの直後（無ければ末尾）へ入れる。</summary>
-    public static LibraryFileColumn[] WithWaveform(IReadOnlyList<LibraryFileColumn> columns)
-    {
-        var result = new List<LibraryFileColumn>(columns.Count + 1);
-        var seen = new HashSet<LibraryFileColumn>();
-        foreach (var column in columns)
-        {
-            if (Array.IndexOf(All, column) >= 0 && seen.Add(column))
-            {
-                result.Add(column);
-            }
-        }
-
-        if (!seen.Contains(LibraryFileColumn.Name))
-        {
-            result.Insert(0, LibraryFileColumn.Name);
-            seen.Add(LibraryFileColumn.Name);
-        }
-
-        if (!seen.Contains(LibraryFileColumn.Waveform))
-        {
-            InsertWaveformAtDefaultPlace(result);
-        }
-
-        return [.. result];
-    }
 
     private static void InsertWaveformAtDefaultPlace(List<LibraryFileColumn> result)
     {

@@ -91,7 +91,7 @@
           <ol>
             <li><a href="#export-how">Steps</a></li>
             <li><a href="#export-plan">How ranges are built</a></li>
-            <li><a href="#export-suffix">Suffixes</a></li>
+            <li><a href="#export-suffix">Name endings</a></li>
             <li><a href="#export-wwise">What Wwise gets</a></li>
           </ol>
         </li>
@@ -106,7 +106,7 @@
             <li><a href="#shortcuts-format">Format</a></li>
             <li><a href="#shortcuts-waapi">WAAPI</a></li>
             <li><a href="#shortcuts-mouse">Mouse / pointer</a></li>
-            <li><a href="#shortcuts-context">Contextual</a></li>
+            <li><a href="#shortcuts-context">Per screen</a></li>
           </ol>
         </li>
         <li><a href="#settings">Settings and language</a>
@@ -122,30 +122,29 @@
     <main>
       <header>
         <h1>MGA Sonic Anvil Manual</h1>
-        <p class="lead">Hear, cut, mark, and loop game audio — then hand a Wave-only structure to Wwise.</p>
+        <p class="lead">Hear, cut, and tidy audio, add markers and loops, then send a Wave file to Wwise.</p>
       </header>
-      <div class="note">
-        <p>This manual was written with AI. Some parts may be too long or unclear — sorry about that. We plan to tidy it up once feature updates settle down.</p>
-      </div>
 
       <h2 id="about">1. What this app does</h2>
       <div class="hero">
-        <p><strong>A waveform editor and Wave-only EXPORT into Wwise Interactive Music, in one window.</strong></p>
-        <p>Fade, normalize, ripple-delete, copy / paste, markers / regions / sample loop, and a spectrogram — decide by ear and commit.</p>
-        <p><strong>EXPORT talks to Wwise in Wave-only mode.</strong> It writes the source wave into Originals and imports it as a Music Playlist Container (<code>-A</code> / <code>-L</code> / <code>-E</code> and the sample loop; markers are not Custom Cues).</p>
-        <p>You can save an open wave as Wave or MP3. Right-click a tab to export the current edits as Wave or MP3.</p>
-        <p>Create a new file with <kbd>Ctrl</kbd>+<kbd>N</kbd> or open a file, then record with <kbd>Ctrl</kbd>+<kbd>R</kbd>. A prompt always asks whether to turn Silent Skip on. Recording uses the current file format and starts at the seek bar, overwriting audio after that point (Undo restores it). It does not start if no file is open. Recording stays PCM; MP3 is only when you save or export. An unsaved take left open comes back on restart. A closed tab can be reopened with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> in this launch only. Speaker layouts (mono through Atmos) and the Ch map are switched in Settings and the status-bar <span class="ui">SPEAKER</span> menu.</p>
+        <p><strong>Edit waveforms and send them to Wwise in one window.</strong></p>
+        <p>Fade, match loudness, delete unused parts, copy / paste, markers, regions, loops, and a spectrogram. Listen, decide, and apply.</p>
+        <p><strong>Wwise gets a single Wave file.</strong> The original wave is written to Originals and imported as Interactive Music. Markers ending in <code>-A</code> / <code>-L</code> / <code>-E</code> and the sample loop are used (not Custom Cues). See <a href="#export">WAAPI EXPORT</a>.</p>
+        <p>You can save an open file as Wave or MP3. Right-click a tab to write the current edits to another file.</p>
+        <p>New file: <kbd>Ctrl</kbd>+<kbd>N</kbd>. After opening, record with <kbd>Ctrl</kbd>+<kbd>R</kbd>. Before recording, you are always asked whether to use Silent Skip (skip silence). Recording uses the current file format and overwrites from the playhead (Undo restores it). It does not start if no file is open.</p>
+        <p>Recording stays as raw audio. MP3 is only when you save or export. Unsaved work in tabs that were still open comes back on the next launch. A closed tab can be reopened with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> until you quit the app.</p>
+        <p>Speaker layouts (mono through Atmos) and which channels play are switched in Settings and the <span class="ui">SPEAKER</span> menu at the bottom of the window.</p>
       </div>
 
       <h2 id="quickstart">2. Quick start</h2>
       <ol>
-        <li>Drop a Wave / AIFF / MP3, or press <kbd>Ctrl</kbd>+<kbd>O</kbd> (M4A is player-only; multiple files open as tabs; dropping a folder adds every supported file inside it and skips unsupported extensions; the status bar shows progress; <kbd>Esc</kbd> stops a multi-file load and keeps files already opened; the Open dialog remembers its last folder, separate from save / export). <kbd>Ctrl</kbd>+<kbd>N</kbd> opens an empty tab (choose the format each time; the last choice is remembered; channels are enabled speakers plus Mono).</li>
-        <li>Listen, cut, fade, and place markers or a loop on the waveform. For multichannel work, enable layouts on Settings → Shown first, then pick one with <span class="ui">SPEAKER</span> on the status bar. Record with <kbd>Ctrl</kbd>+<kbd>R</kbd> (a prompt asks whether to turn Silent Skip on).</li>
-        <li>Save with <kbd>Ctrl</kbd>+<kbd>S</kbd> as Wave or MP3 (AIFF export is not supported). With several tabs selected, Save and Save As (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) act on every selected file. Save overwrites files that already have a path; untitled or AIFF files ask for a folder and write Wave. Save As asks for a folder, writes each file as Wave, and points the tabs at those files (unlike Export, the tab follows the new file). <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> is MP3-only. Writing an MP3 is like Save As: it writes a file and keeps the current tab (the written MP3 is not opened). MP3 is re-encoded from 16-bit PCM. Three or more channels, or a remapped speaker Ch, write the same stereo fold you hear with the current layout (<a href="#mp3-downmix">coefficients</a>; no prompt). A valid LAME path in Settings is used; empty or invalid falls back to Windows (default 192 kbps). Markers are not written.</li>
+        <li>Drop a Wave / AIFF / MP3, or press <kbd>Ctrl</kbd>+<kbd>O</kbd>. M4A is player-only. Several files open as tabs. Dropping a folder adds every supported file inside it (unsupported types are skipped). The status bar shows progress. <kbd>Esc</kbd> stops a multi-file load and keeps files already opened. The Open dialog remembers its last folder, separate from save / export. <kbd>Ctrl</kbd>+<kbd>N</kbd> opens an empty tab. Choose the format each time; the last choice is remembered. Channels are the speakers you enabled, plus Mono.</li>
+        <li>Listen, cut, fade, and place markers or a loop on the waveform. For files with many channels, enable layouts on Settings → Shown first, then pick one with <span class="ui">SPEAKER</span> at the bottom. Record with <kbd>Ctrl</kbd>+<kbd>R</kbd> (a prompt asks whether to use Silent Skip).</li>
+        <li>Save with <kbd>Ctrl</kbd>+<kbd>S</kbd> as Wave or MP3 (you cannot write AIFF). With several tabs selected, Save and Save As (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) act on every selected file. Save overwrites files that already have a location; unsaved or AIFF files ask for a folder and write Wave. Save As asks for a folder, writes each file as Wave, and the tabs then point at those files (unlike Export, the tab follows the new file). <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> is MP3-only: it writes a file and keeps the current tab (the written MP3 is not opened). MP3 is rebuilt from 16-bit audio. Three or more channels, or a remapped speaker, write the same stereo mix you hear now (see <a href="#mp3-downmix">MP3 downmix</a>; no prompt). A valid LAME location in Settings is used; empty or invalid uses Windows (default 192 kbps). Markers are not written to MP3.</li>
         <li>To send it to Wwise, turn on <span class="ui">WAAPI</span> above the level meter, pick a destination, and press <span class="ui">EXPORT</span>.</li>
       </ol>
       <div class="note">
-        <p>Settings live in <code>%LocalAppData%\MGA\MGA Sonic Anvil\</code>. Nothing is written next to the exe. Closing the app also stores open tabs, unsaved edits, unsaved recordings, and edit history (when the operations can be replayed) there. Quitting while still in player mode does not remember the loaded files. Reopen Closed Tab (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>) is only for tabs closed in this launch. It is forgotten after quit.</p>
+        <p>Settings and open tabs are stored in this PC’s user folder (<code>%LocalAppData%\MGA\MGA Sonic Anvil\</code>). Nothing is written next to the app. Quitting while still in player mode does not remember the playlist. Reopen Closed Tab (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>) is only for tabs closed before you quit.</p>
       </div>
 
       <h2 id="layout">3. Layout</h2>
@@ -187,26 +186,26 @@
         <h4>General</h4>
         <ul>
           <li><strong>UI language</strong> — Auto / Japanese / English. Auto is Japanese if the OS is Japanese, otherwise English.</li>
-          <li><strong>UI scale</strong> — 100–200%. Extra enlargement on top of the OS DPI; no shrinking. Affects the main window only. Context menus, separate windows such as Settings, and the edit history stay at 100%. Applies as soon as you change the combo. Cancel restores it.</li>
+          <li><strong>UI scale</strong> — 100–200%. Extra enlargement on top of Windows display scaling; you cannot shrink. Affects the main window only. Menus, Settings, and edit history stay at 100%. Applies as soon as you change it. Cancel restores it.</li>
           <li><strong>Multiple files</strong> — how to arrange two or more files after opening them: keep tabs / side by side / stacked / grid. Default is keep tabs.</li>
-          <li><strong>File associations</strong> — Wave / AIFF / MP3 / M4A. M4A is player-only. Check to make this app the default, uncheck to remove. Already-default types are checked. Writes to this exe immediately.</li>
+          <li><strong>File associations</strong> — Wave / AIFF / MP3 / M4A. M4A is player-only. Check to open that type with this app; uncheck to remove. Types already using this app start checked. The change applies immediately.</li>
         </ul>
         <h4>Shown</h4>
         <ul>
           <li><strong>Speaker definitions</strong> — checklist of definitions to enable. Stereo only by default. The definition in use stays listed until you switch away. At least one must stay enabled. The status-bar SPEAKER menu uses the same list.</li>
-          <li><strong>Playlist columns</strong> — choose WAVE and MP3 sets separately (each list shows only columns that make sense for that format; the file name column is always shown; an empty playlist hides every column). WAVE / AIFF-only lists use the WAVE set, MP3 / M4A-only lists use the MP3 set, and mixed lists use the union until you customize them while mixed. While mixed, header reorder / on-off is remembered only for the mixed layout and does not change the WAVE / MP3 settings. Changing the WAVE / MP3 settings (or header changes in a single-format list) clears the mixed memory and returns to the union. Each set can be reset to defaults. WAVE defaults are file / rate / bits / Ch / time / date / parent folder / waveform. MP3 defaults are file / title / album / artist / composer / time / track / disc / year / genre / date / comment / parent folder (waveform off). Columns with no values stay hidden and reappear when a value shows up (Jacket stays hidden for WAVE / AIFF only and appears when MP3 / M4A is present). Right-click a column header to turn columns on or off; the choice is saved for the active format set.</li>
+          <li><strong>Playlist columns</strong> — choose WAVE and MP3 sets separately (only columns that make sense for that format; the file name is always shown; an empty playlist hides every column). WAVE / AIFF-only lists use the WAVE set, MP3 / M4A-only lists use the MP3 set. Mixed lists start with both sets combined. While mixed, dragging a header to reorder or right-clicking to show/hide is remembered only for that mixed list and does not change the WAVE / MP3 settings. Changing the WAVE / MP3 settings goes back to combining both sets. Each set can be reset. WAVE starts as file / rate / bits / Ch / time / date / parent folder / waveform. MP3 starts as file / title / album / artist / composer / time / track / disc / year / genre / date / comment / parent folder (waveform off). Empty columns hide and come back when a value appears. Jacket stays hidden for WAVE / AIFF only and appears when MP3 / M4A is present. Drag a header to reorder; right-click to turn columns on or off.</li>
           <li><strong>Waveform width</strong> — S (short) / M (medium) / L (long). L is the default. M is 2× S, L is 3× S. Bar thinning stays the same; only the length changes. Waveforms fill in after the list paints, as rough bars.</li>
           <li><strong>Use L-size waveform automatically for WAVE-only playlists</strong> — on by default. WAVE-only lists ignore the S / M / L combo and use L. Mixed playlists use the chosen S / M / L.</li>
         </ul>
         <h4>Audio</h4>
         <ul>
-          <li><strong>Default audio format</strong> — 48 kHz / 24-bit / Stereo by default. Used for new files. Channels are enabled speakers plus Mono, which is always available.</li>
+          <li><strong>Default Wave format</strong> — 48 kHz / 24-bit / Stereo by default. Used for new files. Channels are enabled speakers plus Mono, which is always available.</li>
           <li><strong>Auto speaker selection</strong> — off by default. See <a href="#auto-speaker">details</a>.</li>
           <li><strong>Speaker layout</strong> — mono through Atmos, including game-oriented variants such as Quad, LCRS, 2.1, and 5.1 Side. You do not add your own. The file itself stays numbered. Each speaker is assigned a file channel (Ch), and only those lanes show L / C / LFE and so on. The default is 1, 2, 3…. Switching layouts without OK asks whether to save the current one.</li>
           <li><strong>API and device</strong> — WaveOut / WASAPI / ASIO, and the audio device.</li>
           <li><strong>Record / playback ports and Ch</strong> — speaker names come from the layout, port names from the device. Ch is shared by record and playback. Off leaves the speaker unused. Record has level meters.</li>
           <li><strong>Test tone</strong> — per-playback-port Sine −20 dB (1 kHz, or 80 Hz on LFE) plus an English spoken channel-name Voice (not on LFE).</li>
-          <li>Stereo playback with no port map still downmixes the speakers.</li>
+          <li>Stereo playback with no ports chosen still mixes the speakers to left and right.</li>
         </ul>
         <h4>Player</h4>
         <p><strong>Gapless playback</strong> is first (on by default; see <a href="#layout-gapless">Gapless playback</a>). Then the left tree roots. Default is Music. Add, remove, and reorder top to bottom.</p>
@@ -226,7 +225,7 @@
           <li><strong>Parallel export count</strong> — default Auto = a quarter of the CPU cores. The dropdown max is half the cores.</li>
         </ul>
         <h4>Wwise</h4>
-        <p>Music Track timing for EXPORT. Stream is always on. Prefetch Length and Look-ahead Time both default to 500 ms, from 0 to 10000. The first Segment is Zero Latency with a fixed 50 ms look-ahead. Prefetch is on the first track; Look-ahead is on later tracks.</p>
+        <p>Music Track timing for EXPORT. Streaming is always on. Prefetch Length and Look-ahead Time both start at 500 ms (0 to 10000). Prefetch is on the first track; look-ahead is on later tracks. The first track’s look-ahead stays 50 ms.</p>
       </article>
 
       <article class="part" id="layout-overview">
@@ -248,7 +247,7 @@
         <h4>Fullscreen</h4>
         <ul>
           <li><kbd>F11</kbd> — waveform area fullscreen, like a browser. Hides tabs, transport, meters, Tips, WAAPI, channel names, the dB scale, the window frame, and the taskbar. Keeps the overview and status bar. Works while tiled. <kbd>F11</kbd> again restores.</li>
-          <li><kbd>F12</kbd> — fullscreen with only the title bar hidden. Tabs, transport, meters, Tips, WAAPI, channel names, and the dB scale stay. Spectrum, loudness, level meter, and vector scope are 1.5× on top of OS DPI and UI scale. Works while tiled. <kbd>F12</kbd> again restores.</li>
+          <li><kbd>F12</kbd> — fullscreen with only the title bar hidden. Tabs, transport, meters, Tips, WAAPI, channel names, and the dB scale stay. Spectrum, loudness, level meter, and vector scope are 1.5× on top of Windows display scaling and UI scale. Works while tiled. <kbd>F12</kbd> again restores.</li>
         </ul>
       </article>
 
@@ -271,12 +270,12 @@
         </ul>
         <h4>Playback</h4>
         <ul>
-          <li>Entering selects and plays the first track (the same on launch with arguments).</li>
+          <li>Entering selects and plays the first track (the same when you start the app with files).</li>
           <li><kbd>Enter</kbd> or transport Play restarts from the beginning and continues to the next track. <kbd>Space</kbd> plays that track only and stops when it ends.</li>
           <li>While stopped, selecting a track shows its waveform without playing. Adding tracks fades them in over 1 second; when they start moving with the audio they appear immediately. Clearing the list fades them out over 1 second.</li>
           <li><kbd>R</kbd> toggles shuffle. No repeats until the playlist has played once. Works on an empty list. Off by default. Leaving player turns it off. Not saved.</li>
-          <li>Playback starts as soon as the stream is ready (full PCM is not decoded). It does not wait for the waveform.</li>
-          <li>Continuous playback prefetches the next track and joins without stopping the device. MP3 encoder silence at the start and end is reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
+          <li>Playback starts as soon as sound can play. It does not wait for the waveform to finish drawing.</li>
+          <li>Continuous playback prepares the next track and joins without stopping. Tiny extra silence at the start and end of MP3 / M4A is reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
           <li>Arrow keys do not shuttle. The numpad (NumLock on) works from any pane.
             <ul>
               <li>0 — play / pause</li>
@@ -297,7 +296,7 @@
         </ul>
         <h4>Library</h4>
         <ul>
-          <li>Opened files are listed without decoding PCM. Tags and duration are read for every file and shown as columns. Playlist columns are chosen separately for WAVE and MP3 in Settings → Shown (header order is remembered; mixed-list order is stored separately and resets to the union when WAVE / MP3 settings change). Empty columns hide automatically; waveform width is on the same Shown tab.</li>
+          <li>Opened files are listed without loading every waveform at once. Names, times, and similar info are read when files are added. Playlist columns are chosen separately for WAVE and MP3 in Settings → Shown. Empty columns hide automatically; waveform width is on the same Shown tab.</li>
           <li>The tree on the left starts at Music and remembers the last folder, which folders were expanded, and the split with Favorites.</li>
           <li>Splitters and scrollbars appear when the pointer nears them, then fade out after about 3 s of no movement. Selecting a folder does not add it to the list.</li>
           <li><kbd>*</kbd> expands all under the selection. <kbd>/</kbd> collapses it.</li>
@@ -315,7 +314,7 @@
         </ul>
         <h4>Entering and leaving</h4>
         <ul>
-          <li>If any launch argument is an MP3 or M4A, the app starts in player mode with those files listed. Player mode does not show the multi-file frosted-glass overlay.</li>
+          <li>If you start the app with an MP3 or M4A, it opens in player mode with those files listed. Player mode does not show the multi-file dim overlay.</li>
           <li>WAAPI is off. If it was on, leaving player turns it back on. Files from other modes are listed.</li>
           <li>Leaving player mode stops playback first, then keeps only the selected files and clears tab multi-selection. Quitting while still in player mode does not remember the loaded files.</li>
         </ul>
@@ -325,7 +324,7 @@
         <h3>Loading</h3>
         <ul>
           <li>A slow single-file load shows <span class="ui">Now Loading ...</span> in the center.</li>
-          <li>Two or more files get a frosted-glass overlay with an overall bar and a bar per file. <kbd>Esc</kbd> stops the load and keeps files already opened.</li>
+          <li>Two or more files get a dim overlay with an overall bar and a bar per file. <kbd>Esc</kbd> stops the load and keeps files already opened.</li>
         </ul>
       </article>
 
@@ -341,7 +340,7 @@
         <ul>
           <li>Close with <kbd>Ctrl</kbd>+<kbd>W</kbd>. Quit with <kbd>Ctrl</kbd>+<kbd>Q</kbd>.</li>
           <li>Reopen a closed tab with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> (tabs closed in this launch; more than one).</li>
-          <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> also closes all tabs. Closing several tabs with two or more dirty ones also offers “Save all and close” and “Close without saving any”.</li>
+          <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> also closes all tabs. Closing several tabs with two or more unsaved ones also offers “Save all and close” and “Close without saving any”.</li>
         </ul>
         <h4>Right-click</h4>
         <ul>
@@ -363,12 +362,12 @@
         </ul>
         <h4>Export</h4>
         <ul>
-          <li>Export writes the current edits to another file (dirty tabs stay dirty). One tab opens a Save dialog; several tabs ask for a folder.</li>
+          <li>Export writes the current edits to another file (unsaved tabs stay unsaved). One tab opens a Save dialog; several tabs ask for a folder.</li>
           <li>Overwrite is confirmed when the destination already exists: Yes = overwrite, No = skip those files, Cancel = stop. A long list shows the count and the first names only.</li>
           <li>Separate export always asks for a folder. Markers need two or more spans; regions need at least one (tabs that do not qualify are skipped). Names append <code>_1</code> (or <code>_01</code> and so on so the digits match the count).</li>
           <li>Channel export writes Wave from the current speaker layout and Ch map (not file channel order or names; unassigned speakers are skipped). Names use the layout labels such as <code>_L</code> / <code>_C</code> / <code>_LFE</code>. It asks for a folder.</li>
           <li>Batch names use the source file name (or the tab title if unsaved). A clash gets <code> 2</code> and up. The last export folder is remembered (separate from Open).</li>
-          <li>While it runs, a frosted-glass overlay blocks the UI and shows an overall bar plus a bar for every song encoding in parallel (more columns when they would not fit).</li>
+          <li>While it runs, a dim overlay blocks the UI and shows an overall bar plus a bar for every song encoding in parallel (more columns when they would not fit).</li>
           <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> saves every tab as MP3 (waveform right-click → Tabs; keeps the current tabs; there is no key for batch Wave).</li>
         </ul>
         <h4>Multi-select</h4>
@@ -376,7 +375,7 @@
           <li><kbd>Ctrl</kbd>+click toggles, <kbd>Shift</kbd>+click selects a range, and <kbd>Ctrl</kbd>+<kbd>A</kbd> while the pointer is over the tab bar or a tile file-name strip selects all. Selected tabs and tile strips are highlighted. <kbd>Esc</kbd> deselects.</li>
           <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> selects every tab regardless of the pointer position or tiling. While the tile search filter is active, only the tabs the search matched. Tile strips use the same multi-select.</li>
           <li>With a selection, the right-click menu keeps Close Other / Right / Left, and becomes “Close Selected/All Tabs” / “Bounce Selected Files” / “Duplicate Selected Files” / “Delete Selected Files” / “Paste Copied Edits to Selected/All Tabs” / “Export Selected Tabs as Wave / MP3” / “Export Selected Tabs Separated by Markers / Regions” / “Export Selected Tabs by Channel”. When every tab is selected, those labels switch to “Save / Export Selected Files …”. Wave / MP3 become “Save Selected Files as …”.</li>
-          <li><kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to every selected tab at once. A frosted-glass overlay blocks the UI and shows an overall bar plus a bar per tab.</li>
+          <li><kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to every selected tab at once. A dim overlay blocks the UI and shows an overall bar plus a bar per tab.</li>
         </ul>
         <h4>When the bar is full</h4>
         <p>When tabs no longer fit, inactive tabs shrink first. Scroll arrows appear only if a title would fall below 6 characters.</p>
@@ -402,9 +401,9 @@
           <li>Right-click the file-name strip for the same menu as a tab.</li>
         </ul>
         <h4>Search</h4>
-        <p>While tiled, <kbd>Ctrl</kbd>+<kbd>F</kbd> opens a tab-name search (filter). A search box appears in the center of the waveform area (the AND / OR syntax is shown inside the box). Every typed character re-evaluates the match. Tiles that do not match are darkened and covered with frosted glass.</p>
+        <p>While tiled, <kbd>Ctrl</kbd>+<kbd>F</kbd> opens a tab-name search. A search box appears in the center of the waveform area (it shows how to match all words or any word). The list updates as you type. Tiles that do not match are darkened and covered with a dim overlay.</p>
         <ul>
-          <li>Space-separated terms are ANDed and <code>|</code> separates OR groups (for example <code>bgm loop|se</code> = contains both bgm and loop, or contains se; case-insensitive).</li>
+          <li>Words separated by spaces must all match, and <code>|</code> means any group may match (for example <code>bgm loop|se</code> = contains both bgm and loop, or contains se; capital letters do not matter).</li>
           <li><kbd>Enter</kbd> confirms the condition and closes the box. The filter stays. <kbd>Ctrl</kbd>+<kbd>F</kbd> again reopens it with the same condition.</li>
           <li><kbd>Esc</kbd> cancels by restoring the text from when the box was opened, then closes the box. Clear the text to remove the filter.</li>
           <li><kbd>Alt</kbd>+<kbd>Enter</kbd> closes tiles that did not match (keeps unsaved edits; no prompt; clears the filter).</li>
@@ -412,7 +411,7 @@
           <li>Covered tiles cannot be used. Clicking does not activate them, and <kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageUp</kbd> / <kbd>PageDown</kbd> skip them.</li>
           <li>Changing the text to narrow the filter makes the first matching waveform active (tab order, from the top-left tile). If that file is already active, it stays. If nothing matches, the active file is left unchanged. Clearing the text to remove the filter also leaves the active file.</li>
           <li>Confirming the search never selects tabs by itself. Changing or confirming the search text also clears any leftover tab multi-selection. Select explicitly with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>, which selects only the tabs the search matched while the filter is active.</li>
-          <li>If a new tab added while the filter is active (a bounce or duplicate) has a name that does not match, it is neither brought to the front nor selected — it just joins the frosted side. Leaving tile view also resets the search.</li>
+          <li>If a new tab added while the filter is active (a bounce or duplicate) has a name that does not match, it is neither brought to the front nor selected — it just stays dimmed. Leaving tile view also resets the search.</li>
         </ul>
       </article>
 
@@ -442,13 +441,13 @@
       <article class="part" id="layout-gapless">
         <h3>Gapless playback</h3>
         <p class="where">Settings → Player, first item. On by default.</p>
-        <p>Use this when the source had no silence between tracks and you want to hear them joined again. Splitting a continuous CD (a live set, classical) into one MP3 per track adds a short encoder delay at the start and padding at the end of each file, so playback sounds gapped. When on, the app skips encoder delay and padding written in the LAME tag, and prefetches the next track. It does not detect silence and skip every quiet stretch (that is Silent Skip).</p>
+        <p>Use this when tracks should play as one continuous piece. Splitting a live set or classical album into one MP3 or M4A per track can add a tiny silence at the start and end of each file. When on, that silence is skipped so the next track joins smoothly. It does not skip every quiet stretch (that is Silent Skip).</p>
         <ul>
-          <li>Files with no tag (older encoders, Windows MP3) have nothing to skip, so they play as decoded.</li>
-          <li>If the tag numbers are wrong, an attack at the start or a reverb tail at the end can lose a few tens of milliseconds. If the decoder already stripped the same silence, it can be cut twice.</li>
-          <li>Silence that a ripper wrote into the file (for example a two-second CD index gap) is not removed by this setting.</li>
-          <li>Even when on, a slight gap can remain at the encode boundary or from the device buffer. It is not guaranteed to match the CD exactly.</li>
-          <li>When off, playback includes the encoder silence. The waveform duration display does not change either way.</li>
+          <li>Files with no length information (older files, Windows MP3) play as they are.</li>
+          <li>If the information is wrong, a few tens of milliseconds can be missing at the start or end. If the silence is already gone, it is not cut again.</li>
+          <li>Long gaps that were written into the file (for example two seconds between tracks) are not removed.</li>
+          <li>Even when on, a slight gap can remain. It may not match a CD exactly.</li>
+          <li>When off, the extra silence is included. The waveform length on screen does not change either way.</li>
         </ul>
       </article>
 
@@ -470,7 +469,7 @@
         </ul>
         <h4>Spectrum and channel color</h4>
         <ul>
-          <li>The spectrum mixes every channel into the same LED-band display as Layer Music Checker.</li>
+          <li>The spectrum mixes every channel into one band display.</li>
           <li>Waveform channel names come from the speaker-to-Ch map (L / C / LFE and so on on assigned lanes). Unassigned lanes stay numbered from 1. The default is 1, 2, 3….</li>
           <li>For three or more channels, names are white on a rounded color badge in a common appearance order (16 colors for Atmos 9.1.6). The waveform lanes take a light wash of the same colors. The level-meter bars use the same colors.</li>
         </ul>
@@ -478,7 +477,7 @@
         <p>Cyan gradient. The inner two bars are Peak (red lamps clip), the outer two are RMS (both have hold lines). Numbers below are Peak then RMS. The meter does not show channel names.</p>
         <h4>Three or more channels</h4>
         <ul>
-          <li>The vector scope is replaced by a surround view that uses the same map (file headers are not used to invent names).</li>
+          <li>The vector scope is replaced by a surround view that uses the same map (channel names come from the layout you picked, not from the file).</li>
           <li>Energy uses the same channel colors as the waveform. Size is channel level. The outline texture is that channel's recent waveform (the tip is now, the flanks are a few milliseconds earlier).</li>
           <li>One thin dark-gray outline wraps the overall spread. The outline holds peaks briefly, then falls slowly.</li>
           <li>The level meter shows one Peak bar per channel, with Peak hold and a slower RMS hold.</li>
@@ -494,7 +493,7 @@
         <h3>Tips</h3>
         <p class="where">Above the WAAPI bar. Fixed height.</p>
         <ul>
-          <li>Hover a control to see its description; overflow scrolls. The first tip appears immediately. Moving to another control or away waits 300 ms before replacing or clearing.</li>
+          <li>Hover a control to see its description; overflow scrolls. Tips appear right away. Moving to another control waits a moment before switching.</li>
           <li>Click the heading or body to lock (cyan frame, <span class="ui">Tips (Locked)</span>). Click again to unlock. The text does not change while locked or while the pointer is on the panel.</li>
           <li>Transport buttons also show a short tooltip (with the shortcut; wraps, no ellipsis). Other controls have no floating tooltip.</li>
         </ul>
@@ -503,7 +502,7 @@
       <article class="part" id="layout-waapi">
         <h3>WAAPI bar</h3>
         <p>Connection, destination, <span class="ui">Play -E</span>, <span class="ui">Auto Active</span>, <span class="ui">EXPORT</span>.</p>
-        <p>Click the project name, or press <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>, to open or focus Wwise Authoring. Shows the bar first even if WAAPI is off. If no <code>.wproj</code> is remembered, it only shows the bar and reports that it cannot launch.</p>
+        <p>Click the project name, or press <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>, to open or bring Wwise to the front. Shows the bar first even if WAAPI is off. If no project is remembered, it only shows the bar and reports that it cannot launch.</p>
       </article>
 
       <article class="part" id="layout-status">
@@ -519,9 +518,7 @@
 
       </div>
       <div class="note">
-        <p>About bounce. The mix is a plain 32-bit float sum. Unlike a DAW bounce it runs no plugins, automation, or sends, which is why it is fast (only tabs with a different sample rate get resampled, using sinc interpolation).</p>
-        <p>The summing itself loses no quality and is essentially the same as a DAW's internal summing bus. It applies no gain staging, though: loud waveforms stacked together can exceed 0 dBFS and will clip when written to the Wave file.</p>
-        <p>With enough headroom it can stand in for a DAW mixdown, but since there is no limiter, dither, or other finishing, we don't actively recommend that. Lower the source levels beforehand, or check the peaks on the waveform and level meter after bouncing.</p>
+        <p>The selected tabs are stacked into a new Wave. Plugins and effects are not applied. It is fast, but loud files stacked together can clip — lower the levels first, or check the peaks afterward. Files of different length are lined up before stacking.</p>
       </div>
 
       <h2 id="playback">4. Playback</h2>
@@ -532,15 +529,15 @@
         <li><kbd>Ctrl</kbd>+<kbd>Space</kbd> — from 3 seconds earlier.</li>
         <li><kbd>Alt</kbd>+<kbd>Enter</kbd> — restart from the playback start (while the tile search box has focus, closes tiles that did not match instead).</li>
         <li><kbd>Alt</kbd>+<kbd>S</kbd> — Silent Skip. Skip silent stretches during playback, and while recording write only audio above the threshold (off by default; threshold is in Settings, default −60 dB). Hold ← / → during playback to shuttle without skipping. Recording always asks whether to turn Silent Skip on (the checkbox starts from the status-bar switch; OK updates it). The prompt shows the current threshold and silence insert duration (changeable in Settings). The region checkbox is enabled only when Silent Skip is on (off by default; remembered).</li>
-        <li>Player continuous playback prefetches the next track. MP3 encoder silence at the start and end is reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
-        <li><kbd>Ctrl</kbd>+drag — scrub. Every channel is downmixed to L/R (the level meter moves on L/R only).</li>
+        <li>Player continuous playback prepares the next track. Tiny silences at the start and end of MP3 / M4A are reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
+        <li><kbd>Ctrl</kbd>+drag — scrub. Every channel is mixed to left and right (the level meter moves on L/R only).</li>
         <li><kbd>G</kbd> — type NOW POS in the status bar. Enter jumps. Copy / paste allowed. Right-click switches time / samples.</li>
         <li><kbd>Z</kbd> or <kbd>.</kbd> (the numpad <kbd>.</kbd> is the same) — center. Toggles center-lock while playing; clears it when stopped.</li>
         <li><kbd>L</kbd> — loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</li>
         <li><kbd>K</kbd> — range metronome. Metronome clicks at equal-divide markers/regions. Toggle with the button or <kbd>K</kbd> (off by default; never auto-on). Also available from waveform right-click → Playback.</li>
         <li><kbd>Tab</kbd> — solo a channel. Other lanes go gray and stay muted. Again moves to the next channel; <kbd>Shift</kbd>+<kbd>Tab</kbd> goes backward. Past the last clears solo. Click a channel name on the left to solo (click the same name again to clear; <kbd>Ctrl</kbd>+click adds; <kbd>Shift</kbd>+click mutes / unmutes). The time selection does not change. Waveform edits apply only to that channel. Works while playing or stopped.</li>
         <li><kbd>Ctrl</kbd>+<kbd>N</kbd> — new file. Opens an empty tab. Choose the format each time (the last choice is remembered). Channels are the speakers enabled on Shown, plus Mono (always available).</li>
-        <li><kbd>Ctrl</kbd>+<kbd>R</kbd> — record. A prompt appears every time asking whether to turn Silent Skip on (the checkbox starts from the status-bar switch; OK updates it; the prompt shows the current threshold and silence insert duration, changeable in Settings; the region checkbox is enabled only when Silent Skip is on; off by default; remembered). Records in the current file format from the seek bar. Audio after that point is overwritten (Undo restores it; audio past the take stays; a longer take extends the file). It does not start if no file is open (create one with <kbd>Ctrl</kbd>+<kbd>N</kbd> or open a file first). Recording stays PCM; MP3 is only on save / export. An unsaved take left open is kept as a working copy and comes back on the next launch. A closed tab can be reopened with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> in this launch only. Press again, or Space / Enter / Esc, to stop. While recording, the waveform background turns reddish. New audio appears immediately as a rough waveform, then settles into the usual drawing. With Silent Skip on, only audio above the threshold is written. Each recorded burst gets a short fade from the Editing tab in Settings (default 20 ms) at both ends. Silence is inserted when the level falls and stops at the record max (default 500 ms). Checking the region box adds one for each recorded stretch and each silent pad when you stop. Record ports, playback ports, and Ch are assigned inside that layout (Ch is shared by record and playback; Off leaves the speaker unused).</li>
+        <li><kbd>Ctrl</kbd>+<kbd>R</kbd> — record. A prompt appears every time asking whether to turn Silent Skip on (the checkbox starts from the status-bar switch; OK updates it; the prompt shows the current threshold and silence insert duration, changeable in Settings; the region checkbox is enabled only when Silent Skip is on; off by default; remembered). Records in the current file format from the seek bar. Audio after that point is overwritten (Undo restores it; audio past the take stays; a longer take extends the file). It does not start if no file is open (create one with <kbd>Ctrl</kbd>+<kbd>N</kbd> or open a file first). Recording stays as raw audio; MP3 is only on save / export. An unsaved take left open is kept as a working copy and comes back on the next launch. A closed tab can be reopened with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> in this launch only. Press again, or Space / Enter / Esc, to stop. While recording, the waveform background turns reddish. New audio appears immediately as a rough waveform, then settles into the usual drawing. With Silent Skip on, only audio above the threshold is written. Each recorded burst gets a short fade from the Editing tab in Settings (default 20 ms) at both ends. Silence is inserted when the level falls and stops at the record max (default 500 ms). Checking the region box adds one for each recorded stretch and each silent pad when you stop. Record ports, playback ports, and Ch are assigned inside that layout (Ch is shared by record and playback; Off leaves the speaker unused).</li>
         <li>Stereo playback with no port map still downmixes the speakers to L/R. Mono with two or more ports plays the same signal on L and R.</li>
       </ul>
 
@@ -550,18 +547,18 @@
         <li><span class="ui">FADE IN</span> <kbd>I</kbd> / <span class="ui">FADE OUT</span> <kbd>O</kbd> — pick a curve, Space to preview, Enter to apply. 1–9 select a curve.</li>
         <li><kbd>X</kbd> — fade around seek bar: from the playhead, fade out only the visible part before / fade in only the visible part after (linear).</li>
         <li><kbd>V</kbd> — shows the loudness curve and opens volume. Type a dB value, or use ↑↓ / wheel by 0.1 dB (Shift 1 / Ctrl 3 / Ctrl+Shift 6). Space previews, Enter applies. The menu shows how whole-file Integrated LKFS / RMS / Peak will change. The Short Term curve and the stopped meter follow the same dB. <kbd>Esc</kbd> or <kbd>Shift</kbd>+<kbd>V</kbd> closes the curve.</li>
-        <li><kbd>P</kbd> — pitch. ↑↓ / wheel by a semitone (Shift or Ctrl for an octave). Space previews, Enter applies. Range is ±2 octaves. Keep length is on by default (<kbd>Tab</kbd> moves to the checkbox). Off also changes length, like playback speed. A frosted-glass overlay shows progress while it runs.</li>
-        <li><kbd>T</kbd> — time stretch (pitch stays). Uses the selection, or the whole file. Destination time and ratio (%) stay linked. ↑↓ / wheel (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; ratio: 0.1 / Shift 1 / Ctrl 10 / Ctrl+Shift 25%). <kbd>Tab</kbd> switches fields. Space previews, Enter applies. Range is 10–1000%. A frosted-glass overlay shows progress while it runs.</li>
+        <li><kbd>P</kbd> — pitch. ↑↓ / wheel by a semitone (Shift or Ctrl for an octave). Space previews, Enter applies. Range is ±2 octaves. Keep length is on by default (<kbd>Tab</kbd> moves to the checkbox). Off also changes length, like playback speed. A dim overlay shows progress while it runs.</li>
+        <li><kbd>T</kbd> — time stretch (pitch stays). Uses the selection, or the whole file. Destination time and ratio (%) stay linked. ↑↓ / wheel (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; ratio: 0.1 / Shift 1 / Ctrl 10 / Ctrl+Shift 25%). <kbd>Tab</kbd> switches fields. Space previews, Enter applies. Range is 10–1000%. A dim overlay shows progress while it runs.</li>
         <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> — fit the peak to -0.1 dB.</li>
         <li><kbd>R</kbd> — reverse. Uses the selection, or the whole file. Audio only; markers / regions / loops stay put.</li>
         <li>Waveform right-click → Audio → Normalize Waveform per Region — fit each region's peak to −0.1 dB. A short fade from the Editing tab in Settings (default 20 ms, to zero) is applied at each region's start and end to avoid a click.</li>
-        <li><span class="ui">DELETE</span> — ripple-delete the selection. Selected markers / regions go with it.</li>
-        <li>Waveform right-click → Edit → Delete Silence — ripple-delete frames below the Silent Skip threshold (the selection, or the whole file). The threshold is on the Editing tab in Settings (default −60 dB). A ~50 ms peak window is used. That fixes a bug where troughs of a near-threshold tone were stripped and the pitch drifted slightly. Splice points get a short fade from the Editing tab in Settings (default 20 ms) so they do not click. The whole file cannot be emptied.</li>
+        <li><span class="ui">DELETE</span> — delete the selection and close the gap. Selected markers / regions go with it.</li>
+        <li>Waveform right-click → Edit → Delete Silence — delete quiet parts below the Silent Skip threshold (the selection, or the whole file). The threshold is on the Editing tab in Settings (default −60 dB). Splice points get a short fade (default 20 ms) so they do not click. The whole file cannot be emptied.</li>
         <li><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd> — cut / copy / paste (markers in range included; a matching region is included too).</li>
         <li><kbd>U</kbd> — edit history. ↑↓ move, Enter apply, Esc cancel. Uses the same fill as the sample-rate convert picker list. Clicking the list left of loudness also opens it.</li>
-        <li>History copy &amp; paste — inside the history, <kbd>Ctrl</kbd>+click to select steps (Shift+click or <kbd>Shift</kbd>+<kbd>↑↓</kbd> for a range, <kbd>Ctrl</kbd>+<kbd>A</kbd> for all), then <kbd>Ctrl</kbd>+<kbd>C</kbd>. Press <kbd>Ctrl</kbd>+<kbd>V</kbd> in another file to re-apply the same processing (its history window does not need to be open). The copy persists until you copy something else, so you can switch tabs and press <kbd>Ctrl</kbd>+<kbd>V</kbd> repeatedly to apply it to multiple files. Pasting onto several selected tabs, or a slow step such as pitch shift, shows a frosted-glass overlay with an overall bar and a bar per tab. <kbd>Ctrl</kbd>+<kbd>C</kbd> with no selection copies every step up to the current position. Ranges are mapped by time across sample rates, and gain-type edits such as normalize are recomputed on the target. The only step you cannot copy is Original (it is not an edit; <kbd>Ctrl</kbd>+<kbd>A</kbd> leaves it uncolored).</li>
+        <li>History copy &amp; paste — inside the history, <kbd>Ctrl</kbd>+click to select steps (Shift+click or <kbd>Shift</kbd>+<kbd>↑↓</kbd> for a range, <kbd>Ctrl</kbd>+<kbd>A</kbd> for all), then <kbd>Ctrl</kbd>+<kbd>C</kbd>. Press <kbd>Ctrl</kbd>+<kbd>V</kbd> in another file to apply the same edits (its history window does not need to be open). The copy stays until you copy something else, so you can switch tabs and press <kbd>Ctrl</kbd>+<kbd>V</kbd> on each file. Pasting onto several selected tabs, or a slow step such as pitch, shows a dim overlay with progress. <kbd>Ctrl</kbd>+<kbd>C</kbd> with no selection copies every step up to the current position. Ranges line up by playback time, and matching loudness is done again on the target. The only step you cannot copy is Original (it is not an edit; <kbd>Ctrl</kbd>+<kbd>A</kbd> leaves it uncolored).</li>
         <li>History paste skips or surprises — each step is tried on the target; ones that do not fit are skipped (“Applied 3 of 5”). Examples that skip: adding a marker at a time that already has one, a delete / fade whose range falls off a shorter file, Delete Silence when the target has no silence, converting to the rate / bit depth / channel count the target already has, a marker comment where that marker is missing, and regions / loops onto an MP3. Dragging or nudging markers / regions / loops, and hold-to-subdivide, copy the layout at that moment. Pasting only the move onto another take replaces that take’s markers (include the adds through the moves if you want the same sequence). Times clamp to the end of a shorter file. An edit made with a channel soloed applies to the same channel index. Record / waveform-paste history carries the audio that was inserted. After <kbd>Ctrl</kbd>+<kbd>C</kbd> on the waveform, <kbd>Ctrl</kbd>+<kbd>V</kbd> pastes audio, not history.</li>
-        <li>Applying to the selected files — with two or more tabs selected (<kbd>Ctrl</kbd>+click / <kbd>Shift</kbd>+click / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>), fade in / fade out, normalize, normalize per region, volume, pitch, time stretch, reverse, delete silence, sample-rate / bit-depth / channel conversion, Save (<kbd>Ctrl</kbd>+<kbd>S</kbd>), and Save As (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) run on every selected file (each whole file, honoring each file's own channel solo). The right-click menu names change accordingly, e.g. “Normalize Selected Files (N)” and “Save Selected Files (S) / Save Selected Files As (A)”. Save overwrites files that already have a path; untitled or AIFF files ask for a folder and write Wave. Save As asks for a folder, writes each as Wave, and points the tabs at those files (unlike Export, the tab follows the new file). Curve and dB previews play on the active file; Enter applies to all selected files. Time stretch converts the target into a ratio and applies it per file. Files the edit cannot apply to (no regions, no silence, already in that format, and so on) are skipped; if everything is skipped you get a note. While running, a frosted-glass overlay shows overall and per-file progress and blocks input (the tile-search filter's frosting stays and this stacks on top). Export and history paste follow the same rule: with tabs selected, waveform right-click → Export's “Export Wave / MP3”, “Separate by Markers / Regions” and “Export by Channel” become “… Selected Tabs” and export the selected tabs in one go, and Edit → “Paste Copied Edits” becomes “Paste Copied Edits to Selected Tabs” (or “Paste Copied Edits to All Tabs” when everything is selected), same as <kbd>Ctrl</kbd>+<kbd>V</kbd>. Duplicate and Delete File also switch to “Duplicate Selected Files (U)” (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> too) and “Delete Selected Files (D)” and run on every selected file (one confirmation; each copy opens next to its own tab; files that could not be deleted are listed at the end). Waveform right-click → Tabs also has “Select All Tabs (A)” (same as <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>). Fade around seek bar (<kbd>X</kbd>) and cut / copy / paste / delete stay on the active file only.</li>
+        <li>Applying to the selected files — with two or more tabs selected (<kbd>Ctrl</kbd>+click / <kbd>Shift</kbd>+click / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>), fade in / fade out, normalize, normalize per region, volume, pitch, time stretch, reverse, delete silence, sample-rate / bit-depth / channel conversion, Save (<kbd>Ctrl</kbd>+<kbd>S</kbd>), and Save As (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) run on every selected file (each whole file, using that file’s own solo). The right-click menu names change accordingly, e.g. “Normalize Selected Files (N)” and “Save Selected Files (S) / Save Selected Files As (A)”. Save overwrites files that already have a path; untitled or AIFF files ask for a folder and write Wave. Save As asks for a folder, writes each as Wave, and points the tabs at those files (unlike Export, the tab follows the new file). Curve and dB previews play on the active file; Enter applies to all selected files. Time stretch converts the target into a ratio and applies it per file. Files the edit cannot apply to (no regions, no silence, already in that format, and so on) are skipped; if everything is skipped you get a note. While running, a dim overlay shows overall and per-file progress and blocks input (the tile-search overlay stays and this stacks on top). Export and history paste follow the same rule: with tabs selected, waveform right-click → Export's “Export Wave / MP3”, “Separate by Markers / Regions” and “Export by Channel” become “… Selected Tabs” and export the selected tabs in one go, and Edit → “Paste Copied Edits” becomes “Paste Copied Edits to Selected Tabs” (or “Paste Copied Edits to All Tabs” when everything is selected), same as <kbd>Ctrl</kbd>+<kbd>V</kbd>. Duplicate and Delete File also switch to “Duplicate Selected Files (U)” (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> too) and “Delete Selected Files (D)” and run on every selected file (one confirmation; each copy opens next to its own tab; files that could not be deleted are listed at the end). Waveform right-click → Tabs also has “Select All Tabs (A)” (same as <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>). Fade around seek bar (<kbd>X</kbd>) and cut / copy / paste / delete stay on the active file only.</li>
         <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> also redo) — undo / redo.</li>
       </ul>
 
@@ -576,11 +573,13 @@
         <li>Right-click, or <kbd>Ctrl</kbd>+<kbd>Del</kbd>, deletes markers. Delete all markers and delete all regions are on Timeline.</li>
       </ul>
       <div class="note">
-        <p>WAV cue / adtl (markers and regions) and smpl (sample loop) are read and written on save. MP3 cannot take regions or a sample loop. Markers are allowed, but they are not written when you save as MP3 (re-encode does not carry metadata).</p>
+        <p>Markers, regions, and loops are stored in the Wave file when you save. MP3 cannot take regions or a loop. Markers are allowed, but they are not written when you save as MP3.</p>
       </div>
 
       <h2 id="spectrogram">7. Spectrogram / loudness analysis</h2>
-      <p><kbd>A</kbd> cycles spectrogram / overlay. <kbd>V</kbd> shows loudness analysis (the Short Term curve) and opens volume input. <kbd>Esc</kbd>, <kbd>Shift</kbd>+<kbd>A</kbd>, or <kbd>Shift</kbd>+<kbd>V</kbd> returns to the waveform from any view (<kbd>Esc</kbd> first cancels typing or the selection). The VIEW loudness button toggles the view only. <kbd>L</kbd> loops from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>). Loudness analysis draws the Short Term LKFS curve. The white width is ±1 LU around the curve (1 LU = 1 LKFS; the same “approaching” window as the meter), drawn as a translucent fill. The waveform is a Mid-mix peak-dBFS line on the same vertical axis as LKFS (0 dBFS = 0 on the scale). At sample-level zoom it connects each sample with a line, same as the regular waveform. dBFS and LKFS are not the same, but peak and loudness can be compared at the same height. The background bands use the same blue / orange / red as the meter (red from 0 to the target, orange for the next 6 LU, blue below). The curve is primary cyan / orange / red; the red segment is a little thicker. The left scale is LKFS (waveform dB in the regular view). The white line is the Settings target. Overlay draws the waveform shape on top of the spectrogram (no translucent wash). It does not paint <code>-A</code> / <code>-L</code> / <code>-E</code>, sample-loop, or region fills (flags and lines stay; spectrogram-only and loudness analysis also skip those fills). The overlay waveform is also a single Mid-mix of the channels. At sample-level zoom it uses the same dots and connecting lines as the regular waveform. At amplitude zoom 1 it uses the middle half; amplifying fills the full height. Colors are display-normalized so the file's peak reads as 0 dBFS (the audio itself is untouched); the gain is measured once at load / edit analysis time, never in real time. Dark bins are lifted so they stay readable, without crushing the highlights. In spectrogram / overlay, drag the bar on the left or hold <kbd>Alt</kbd>+↑ / ↓ to change the lift. The frequency axis is logarithmic and tighter toward the bass (below 100 Hz is barely visible). The top of the scale is 24 kHz. When the whole file fits on screen — such as a short SE at fit — each screen column runs its own FFT and draws sharp, without interpolation. Any zoomed view draws smoothly interpolated columns from the full-file cache, keeping zooming and follow-scroll light. Scrolling shifts columns and computes only what is missing.</p>
+      <p><kbd>A</kbd> cycles spectrogram / overlay. <kbd>V</kbd> shows the loudness curve and opens volume. <kbd>Esc</kbd>, <kbd>Shift</kbd>+<kbd>A</kbd>, or <kbd>Shift</kbd>+<kbd>V</kbd> returns to the waveform. The VIEW loudness button toggles the view only. <kbd>L</kbd> loops from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</p>
+      <p>The loudness view draws how loud the sound is over time (Short Term). The white band around the curve is a small “getting close to the limit” zone, like the meter. Peak level is drawn on the same height so you can compare. Blue / orange / red match the meter. The left numbers are loudness (LKFS); the white line is the target in Settings.</p>
+      <p>Overlay draws the waveform shape on top of the spectrogram. Dark areas can be lifted with the bar on the left or <kbd>Alt</kbd>+↑ / ↓ so they stay readable. Low frequencies take more vertical space (below 100 Hz is barely visible). The top of the scale is 24 kHz. When the whole file fits on screen, the picture is sharp. When zoomed in, it stays smooth so scrolling does not feel heavy.</p>
 
       <h2 id="format">8. Format conversion</h2>
       <ul>
@@ -588,11 +587,11 @@
         <li><kbd>B</kbd> — bit depth</li>
         <li><kbd>C</kbd> — file channel count (Mono / Stereo; this is not the speaker layout)</li>
       </ul>
-      <p>Presets are 8 / 11.025 / 16 / 22.05 / 32 / 44.1 / 48 / 96 kHz, bit depths 4 / 8 / 16 / 24, and channels Mono / Stereo. Custom Hz is 1000–384000, nudged with ↑↓ / wheel by 1 Hz (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). The menu sits just off the cursor. Highlighting a value updates the status size to the estimate. A frosted-glass overlay blocks the UI while converting. Confirmed fields stay red until you save. Sample rate and bit depth always convert from the PCM captured at load (or after a content edit such as fade). 48 kHz → 24 kHz then 11 kHz is rebuilt from 48 kHz, not cascaded through 24 kHz. <kbd>Space</kbd> previews rate and bit depth only (channels apply with <kbd>Enter</kbd>; 1–2 pick a row). 4-bit is for quantized audition. Wave writes 8 / 16 / 24-bit, and IEEE float when the document is already 32-bit. A 4-bit document is written as 16-bit. 32-bit is not a conversion preset.</p>
+      <p>Presets are 8 / 11.025 / 16 / 22.05 / 32 / 44.1 / 48 / 96 kHz, bit depths 4 / 8 / 16 / 24, and channels Mono / Stereo. Custom Hz is 1000–384000. The menu sits just off the cursor. Highlighting a value updates the estimated file size. A dim overlay blocks the window while converting. Confirmed fields stay red until you save. Sample rate and bit depth always rebuild from the original audio (or after an edit such as fade). 48 kHz → 24 kHz then 11 kHz is rebuilt from 48 kHz, not through 24 kHz. <kbd>Space</kbd> previews rate and bit depth only. 4-bit is for listening. Wave writes 8 / 16 / 24-bit, and keeps 32-bit when the file already is. A 4-bit document is written as 16-bit. 32-bit is not a conversion preset.</p>
 
       <h2 id="export">9. WAAPI EXPORT (Wave-only)</h2>
-      <p><strong>The same assembly as <a href="https://github.com/mga-ueda/MGA-Wwise-IM-Importer">Wwise IM Importer</a>’s Wave-only mode.</strong> Keep one-shot and loop material on a single master waveform instead of pre-separating files. EXPORT writes that wave as one file into Originals and maps ranges with MusicClip trim. It creates one Music Playlist Container. <code>-A</code> / <code>-L</code> / <code>-E</code> shape ranges and Entry / Exit Cues; markers are not Custom Cues. There is no bar / tempo overlay, no multi-wave Switch, and no XML marker-track mode.</p>
-      <p>This app is also a waveform editor, so fades and other edits are baked into the source before it is handed over. Markers and the sample loop are written into the WAV on save.</p>
+      <p><strong>Keep one-shot and loop material on a single Wave, then send it to Wwise.</strong> You do not have to split files first. EXPORT writes that wave as one file into Originals and trims clips to each range. It creates one Interactive Music playlist. <code>-A</code> / <code>-L</code> / <code>-E</code> shape ranges and entry / exit points; markers are not Custom Cues. There is no bar / tempo overlay and no multi-wave switching.</p>
+      <p>Fades and other edits are written into the wave before it is handed over. Markers and the sample loop are saved into the Wave file.</p>
 
       <h3 id="export-how">9-1. Steps</h3>
       <ol>
@@ -603,48 +602,48 @@
         <li><span class="ui">EXPORT</span> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>. Enabled only while WAAPI is connected.</li>
       </ol>
       <ul>
-        <li><span class="ui">Play -E</span> (<kbd>Alt</kbd>+<kbd>E</kbd>, while WAAPI is on) — play after the Exit Cue. In-app preview double-plays -E on a loop wrap so two playheads appear. EXPORT writes Play post-exit on the Music Playlist Container default transition rule (Any to Any).</li>
+        <li><span class="ui">Play -E</span> (<kbd>Alt</kbd>+<kbd>E</kbd>, while WAAPI is on) — keep playing after the exit. Preview in this app plays that tail twice on a loop wrap, so two playheads appear. EXPORT keeps playing after the exit on a transition.</li>
         <li><span class="ui">Auto Active</span> — bring Wwise to the front after EXPORT.</li>
-        <li>Project name — click, or press <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>, to open or focus Wwise Authoring. Works with WAAPI off: the bar is shown, then the project launches. If no <code>.wproj</code> is remembered, it stays on the bar and reports that it cannot launch. Even if the <code>.wproj</code> association is the Launcher, the matching <code>Wwise.exe</code> is started directly.</li>
+        <li>Project name — click, or press <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>, to open or bring Wwise to the front. Works with WAAPI off: the bar is shown, then the project launches. If no project is remembered, it stays on the bar and reports that it cannot launch.</li>
       </ul>
 
       <h3 id="export-plan">9-2. How ranges are built</h3>
       <p>Earlier items win.</p>
       <ol>
-        <li><strong>Sample loop</strong> (the WAV smpl chunk, or <kbd>Shift</kbd>+<kbd>L</kbd>) — before the loop is Intro, the loop is <code>-L</code>. EXPORT treats a remainder after the loop as <code>-E</code> (the waveform is not painted red). This beats markers.</li>
-        <li><strong>Suffixed markers</strong> (<code>-A</code> / <code>-L</code> / <code>-E</code>) — each starts a region that runs to the next suffixed marker (or the end). Unnamed and named markers do not split ranges. EXPORT treats a suffix-less marker right after <code>-L</code> as <code>-E</code> (the comment on the waveform is left as-is and is not painted red. Existing <code>-A</code> / <code>-L</code> / <code>-E</code> / <code>-R</code> are left alone).</li>
-        <li><strong>Exactly two unsuffixed markers</strong> — the span between them becomes an implicit loop.</li>
+        <li><strong>Sample loop</strong> (the loop already in the Wave, or <kbd>Shift</kbd>+<kbd>L</kbd>) — before the loop is Intro, the loop is <code>-L</code>. EXPORT treats leftover audio after the loop as <code>-E</code> (the waveform is not painted red). This beats markers.</li>
+        <li><strong>Markers ending in <code>-A</code> / <code>-L</code> / <code>-E</code></strong> — each starts a range that runs to the next such marker (or the end). Markers without that ending do not split ranges. EXPORT treats a marker right after <code>-L</code> with no ending as <code>-E</code> (the comment on the waveform is left as-is and is not painted red. Existing <code>-A</code> / <code>-L</code> / <code>-E</code> / <code>-R</code> are left alone).</li>
+        <li><strong>Exactly two markers with no ending</strong> — the span between them is treated as a loop.</li>
         <li><strong>Regions</strong> (<kbd>Shift</kbd>+<kbd>R</kbd>) — used as-is when there is no sample loop and no special markers.</li>
         <li>If none of the above apply, the whole file is one range.</li>
       </ol>
 
-      <h3 id="export-suffix">9-3. Suffixes</h3>
+      <h3 id="export-suffix">9-3. Name endings</h3>
       <table>
-        <thead><tr><th>Suffix</th><th>Meaning</th></tr></thead>
+        <thead><tr><th>Ending</th><th>Meaning</th></tr></thead>
         <tbody>
           <tr><td><code>-L</code></td><td>Loop. Loops in preview and becomes an infinitely looping Music Segment in Wwise.</td></tr>
           <tr><td><code>-E</code></td><td>After the Exit Cue (the tail). Bundled into the same Music Segment as the preceding <code>-L</code> so it can overlap the next piece on a transition.</td></tr>
           <tr><td><code>-A</code></td><td>Before the Entry Cue (pickup). Bundled into the same Music Segment as the next range.</td></tr>
-          <tr><td><code>-R</code></td><td>The exclude suffix used by <a href="https://github.com/mga-ueda/MGA-Wwise-IM-Importer">Wwise IM Importer</a>. This app does not support that behavior.</td></tr>
+          <tr><td><code>-R</code></td><td>A mark used by another import tool. This app ignores it.</td></tr>
         </tbody>
       </table>
-      <p>Markers are <strong>not</strong> written as Wwise <strong>Custom Cues</strong> (same as <a href="https://github.com/mga-ueda/MGA-Wwise-IM-Importer">Wwise IM Importer</a> Wave-only). <code>-A</code> / <code>-L</code> / <code>-E</code> only shape ranges and Entry / Exit Cues.</p>
+      <p>Markers are <strong>not</strong> written as Wwise <strong>Custom Cues</strong>. <code>-A</code> / <code>-L</code> / <code>-E</code> only shape ranges and entry / exit points.</p>
 
       <h3 id="export-wwise">9-4. What Wwise gets</h3>
       <ul>
-        <li>One Music Playlist Container (named after the file). Sequential play; each range is a Playlist Item.</li>
-        <li>Music Segments. One range keeps the file name; several become <code>_a</code> / <code>_b</code>…. Loop ranges use Loop Count 0 (infinite). <code>-A</code> and <code>-E</code> share a Segment with their neighbor; only the Entry / Exit Cues move. Markers are not Custom Cues.</li>
-        <li>The source wave is not split. Every clip references the same WAV and uses Begin / End Trim for the range.</li>
-        <li>The first Segment is Zero Latency, 50 ms look-ahead, and Prefetch from the Wwise tab in Settings (default 500 ms). Later Segments use Look-ahead from the same tab (default 500 ms). Stream is always on.</li>
-        <li>Tempo 120 / 4/4 is overridden (there is no bar management).</li>
-        <li>With <span class="ui">Play -E</span> on, Play post-exit is set on the playlist default rule (Any to Any).</li>
+        <li>One music playlist (named after the file). Plays in order; each range is one item.</li>
+        <li>Music segments. One range keeps the file name; several become <code>_a</code> / <code>_b</code>…. Loop ranges loop forever. <code>-A</code> and <code>-E</code> share a segment with their neighbor; only the entry / exit points move. Markers are not Custom Cues.</li>
+        <li>The source wave is not split. Every clip uses the same WAV and trims to the range.</li>
+        <li>The first range starts quickly. Prefetch and later look-ahead come from the Wwise tab in Settings (default 500 ms). Streaming is always on.</li>
+        <li>Tempo is set to 120 / 4/4 (there is no bar management).</li>
+        <li>With <span class="ui">Play -E</span> on, the tail after the exit still plays on a transition.</li>
       </ul>
       <div class="note">
         <p>An existing container of the same name is replaced. A WAV of the same name under Originals is overwritten without asking. Always verify the result in Wwise.</p>
       </div>
 
       <h2 id="shortcuts">10. Shortcuts</h2>
-      <p>This section lists every implemented shortcut, including ones already described earlier. Contextual keys apply only while that UI is open. The waveform Tips panel shows the same operations.</p>
+      <p>This section lists the keyboard shortcuts, including ones already described earlier. Keys in the later tables apply only while that screen is open. Hover Tips show the same operations.</p>
 
       <h3 id="shortcuts-file">File / tabs</h3>
       <table>
@@ -661,14 +660,14 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Save as MP3 (keeps the current tab)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd></td><td>Save all tabs as MP3 (waveform right-click → Tabs; the same gesture appears on the tab menu when every tab is selected)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>Quit (tabs left open and unsaved working copies come back on the next launch)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close tab (asks to save if dirty; several dirty tabs can be finished together)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close tab (asks to save if unsaved; several unsaved tabs can be finished together)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Reopen a closed tab (newest first; tabs closed in this launch; more than one)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Close all tabs</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageDown</kbd></td><td>Next tab (wraps from end to start; key-repeat pauses at the ends; wrap again only after release and repress; while the tile search filter is active, matched tabs only)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageUp</kbd></td><td>Previous tab (same)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select all. A triple-click on the waveform does the same. Over the tab bar or a tile file-name strip, selects every tab. On the player list, selects every row</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Select every tab (regardless of the pointer position or tiling; while the tile search filter is active, only the tabs the search matched; also via waveform right-click → Tabs → “Select All Tabs (A)”. In player mode, selects every list row)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Tab-name search (tile view; every typed character re-evaluates; non-matching tiles are darkened under frosted glass; narrowing makes the first matching waveform active; space-separated terms = AND, <code>|</code> = OR; <kbd>Enter</kbd> confirms, <kbd>Alt</kbd>+<kbd>Enter</kbd> closes tiles that did not match (keeps unsaved; no prompt; clears the filter), <kbd>Esc</kbd> cancels, clear the text to remove the filter). In player mode, activates the search editor of the focused library or playlist pane</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Tab-name search (tile view; updates as you type; non-matching tiles are darkened under a dim overlay; narrowing makes the first matching waveform active; space-separated words = all must match, <code>|</code> = any may match; <kbd>Enter</kbd> confirms, <kbd>Alt</kbd>+<kbd>Enter</kbd> closes tiles that did not match (keeps unsaved; no prompt; clears the filter), <kbd>Esc</kbd> cancels, clear the text to remove the filter). In player mode, activates search in the focused library or playlist</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></td><td>Empty the search word and confirm = remove the search filter (only while a search word is set; runs silently without showing the box)</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Cancel edit, menu, tile search (while its box has focus), scrub, tab selection, the waveform selection, then spectrogram / loudness view, in that order</td></tr>
         </tbody>
@@ -709,7 +708,7 @@
           <tr><td><kbd>H</kbd></td><td>Cycle the waveform height ×1 → ×2 → ×3 (remembered on the next launch)</td></tr>
           <tr><td><kbd>F10</kbd></td><td>Player mode / exit. Not fullscreen. <kbd>F10</kbd> again restores. Screen, playback, library, and jacket are under <a href="#layout-player">Layout</a>.</td></tr>
           <tr><td><kbd>F11</kbd></td><td>Fullscreen / restore the waveform area (hides the taskbar, like a browser; also hides channel names and the dB scale; keeps the overview and status bar; works while tiled; <kbd>F11</kbd> again restores)</td></tr>
-          <tr><td><kbd>F12</kbd></td><td>Fullscreen / restore with only the title bar hidden (tabs, transport, meters, Tips, WAAPI, channel names, and the dB scale stay; spectrum, loudness, level meter, and vector scope are 1.5× on top of OS DPI and UI scale; works while tiled; <kbd>F12</kbd> again restores)</td></tr>
+          <tr><td><kbd>F12</kbd></td><td>Fullscreen / restore with only the title bar hidden (tabs, transport, meters, Tips, WAAPI, channel names, and the dB scale stay; spectrum, loudness, level meter, and vector scope are 1.5× on top of Windows display scaling and UI scale; works while tiled; <kbd>F12</kbd> again restores)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Cycle the tile arrangement (side by side → stacked → grid → off; identical-looking or too-cramped arrangements are skipped; if side-by-side or stacked would not fit, grid is tried; if grid would not fit either, it does nothing; two or more tabs)</td></tr>
           <tr><td><kbd>A</kbd></td><td>Cycle spectrogram / overlay</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>A</kbd></td><td>Return to the waveform (from any view)</td></tr>
@@ -744,7 +743,7 @@
       </table>
 
       <h3 id="shortcuts-edit">Edit</h3>
-      <p>With multiple tabs selected, fade / normalize (incl. per region) / volume / pitch / time stretch / reverse / delete silence / sample-rate, bit-depth and channel conversion apply to every selected file. Save (<kbd>Ctrl</kbd>+<kbd>S</kbd>) and Save As (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) do the same (menu names change to “… Selected Files”; files the edit cannot apply to are skipped; a frosted-glass overlay shows progress and blocks input while running).</p>
+      <p>With multiple tabs selected, fade / normalize (incl. per region) / volume / pitch / time stretch / reverse / delete silence / sample-rate, bit-depth and channel conversion apply to every selected file. Save (<kbd>Ctrl</kbd>+<kbd>S</kbd>) and Save As (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) do the same (menu names change to “… Selected Files”; files the edit cannot apply to are skipped; a dim overlay shows progress and blocks input while running).</p>
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
@@ -752,15 +751,15 @@
           <tr><td><kbd>O</kbd></td><td>Fade out</td></tr>
           <tr><td><kbd>X</kbd></td><td>Fade around seek bar: from the playhead, fade out only the visible part before / fade in only the visible part after (linear). Not a multi-tab batch command</td></tr>
           <tr><td><kbd>V</kbd></td><td>Show the loudness curve and volume (type dB; ↑↓ / wheel, Space preview, Enter apply; shows whole-file LKFS / RMS / Peak first; <kbd>Esc</kbd> / <kbd>Shift</kbd>+<kbd>V</kbd> closes it)</td></tr>
-          <tr><td><kbd>P</kbd></td><td>Pitch (semitones; ↑↓ / wheel, Shift for an octave; Space preview, Enter apply; ±2 octaves; keep length on by default; frosted-glass progress while running)</td></tr>
-          <tr><td><kbd>T</kbd></td><td>Time stretch (time and ratio stay linked; Space preview, Enter apply; frosted glass while running)</td></tr>
+          <tr><td><kbd>P</kbd></td><td>Pitch (semitones; ↑↓ / wheel, Shift for an octave; Space preview, Enter apply; ±2 octaves; keep length on by default; dim overlay progress while running)</td></tr>
+          <tr><td><kbd>T</kbd></td><td>Time stretch (time and ratio stay linked; Space preview, Enter apply; a dim overlay while running)</td></tr>
           <tr><td><kbd>N</kbd></td><td>Normalize (peak −0.1 dB)</td></tr>
           <tr><td><kbd>R</kbd></td><td>Reverse (selection, or the whole file; audio only; markers / regions / loops stay put)</td></tr>
           <tr><td>Right-click → Audio → Normalize Waveform per Region</td><td>Fit each region's peak to −0.1 dB; short fades from Settings (default 20 ms) at the edges</td></tr>
           <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Ripple-delete the selection. Selected markers / regions go with it (does nothing in the player. Removing rows from the list is <kbd>Delete</kbd> only; files are never deleted. <kbd>Ctrl</kbd>+<kbd>W</kbd> does not close)</td></tr>
           <tr><td>Right-click → Edit → Delete Silence</td><td>Ripple-delete frames below the Silent Skip threshold (selection, or the whole file). Splice points get a short fade from Settings (default 20 ms)</td></tr>
           <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same menu as right-click (not on the player waveform)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd></td><td>Cut / copy / paste (markers in range included; a matching region is included too). With tabs selected, <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to those tabs (frosted glass and progress when it takes time)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd></td><td>Cut / copy / paste (markers in range included; a matching region is included too). With tabs selected, <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to those tabs (a dim overlay and progress when it takes time)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Y</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Redo</td></tr>
           <tr><td><kbd>U</kbd></td><td>Edit history</td></tr>
@@ -797,7 +796,7 @@
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td><kbd>W</kbd></td><td>Toggle the WAAPI bar</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Launch or focus the Wwise project (shows the WAAPI bar even if it was off; if no <code>.wproj</code> is remembered, notify and do not launch)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Launch or bring the Wwise project to the front (shows the WAAPI bar even if it was off; if no project is remembered, notify and do not launch)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>E</kbd></td><td>Toggle Play -E (while WAAPI is on)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Wwise EXPORT (Wave-only)</td></tr>
         </tbody>
@@ -829,7 +828,7 @@
         </tbody>
       </table>
 
-      <h3 id="shortcuts-context">Contextual</h3>
+      <h3 id="shortcuts-context">Per screen</h3>
       <p>While edit history is open (other shortcuts do not apply)</p>
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
@@ -929,7 +928,7 @@
           <tr><td>Tree / Favorites <kbd>Shift</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd> / click</td><td>Select a range (<kbd>Ctrl</kbd>+click adds)</td></tr>
           <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>First / last track in the list</td></tr>
           <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Page the list (while playing, releasing switches to that track; while stopped, selection only; multi-select allowed)</td></tr>
-          <tr><td><kbd>Enter</kbd></td><td>On the list, restart from the beginning and continue to the next track when it ends (transport Play does the same continuous playback with gapless prefetch). On the tree, clear the playlist, then add supported files from that folder and its subfolders (while searching, only visible folders: matching files when the hit is a file name, or everything in a folder whose name matched; depth-first; playback starts with the first file registered and does not jump when grouping reorders the list; focuses the playlist when playback starts)</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>On the list, restart from the beginning and continue to the next track when it ends (transport Play does the same continuous playback with gapless). On the tree, clear the playlist, then add supported files from that folder and its subfolders (while searching, only visible folders: matching files when the hit is a file name, or everything in a folder whose name matched; inner folders first; playback starts with the first file added and does not jump when grouping reorders the list; focuses the playlist when playback starts)</td></tr>
           <tr><td>Tree <kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>Append that folder and its subfolders to the playlist without clearing it (same search scope as Enter)</td></tr>
           <tr><td>Tree / Favorites double-click</td><td>Append only (does not play; one track at a time as found)</td></tr>
           <tr><td><kbd>Space</kbd></td><td>Play only the selected track from the beginning and stop when it ends (does not advance; while playing, stops and returns to the start. Different from Enter / transport continuous playback)</td></tr>
@@ -956,8 +955,8 @@
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td>Typing</td><td>Does not filter yet. Space-separated terms = AND, <code>|</code> = OR. Case-insensitive</td></tr>
-          <tr><td>Library search</td><td>Partial match on file names and folder names. The tree keeps folders that contain a hit, folders whose name matched, and ancestors up to the root (branches with no hit are hidden). AND terms may hit a file name and a folder name. Enter on the tree adds only visible folders (matching files when the hit is a file name, or everything in a folder whose name matched)</td></tr>
-          <tr><td>Playlist search</td><td>Every column is searched, visible or not. AND terms may hit different columns (e.g. artist + title). Only matching rows stay. Next / previous track also walk only the visible rows</td></tr>
+          <tr><td>Library search</td><td>Partial match on file names and folder names. The tree keeps folders that contain a hit, folders whose name matched, and the folders above them (branches with no hit are hidden). Words separated by spaces may hit a file name and a folder name. Enter on the tree adds only visible folders (matching files when the hit is a file name, or everything in a folder whose name matched)</td></tr>
+          <tr><td>Playlist search</td><td>Every column is searched, visible or not. Words separated by spaces may hit different columns (e.g. artist + title) and all must match. Only matching rows stay. Next / previous track also walk only the visible rows</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>Apply the typed condition and return focus to the tree (library) or the list (playlist). An empty box removes the filter</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Discard the typed text and return focus (the current filter stays)</td></tr>
         </tbody>
@@ -976,58 +975,54 @@
       <p>In Settings, <kbd>Esc</kbd> closes the window. The UI ignores input while a format conversion, tab export, or multi-file open is running.</p>
 
       <h2 id="settings">11. Settings and language</h2>
+      <p>Settings are the gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. Tabs are General / Shown / Audio / Player / Editing / Export / Wwise. Details for each item are under <a href="#layout-settings">Layout → Settings</a>. <kbd>Esc</kbd> closes the window.</p>
       <ul>
-        <li>Settings are on the gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. In Settings, New, and save-confirm dialogs, <kbd>Tab</kbd> also moves to the buttons. The window is split into General / Shown / Audio / Player / Editing / Export / Wwise. Player registers the left tree roots (default Music; add, remove, and reorder top to bottom). Shown is a checklist of speaker definitions to enable (Stereo only by default; the definition in use stays listed until you switch away; at least one must stay enabled; the status-bar SPEAKER menu uses the same list) and playlist columns (WAVE and MP3 sets chosen separately; the file name column is always shown; an empty playlist hides every column; WAVE / AIFF-only uses WAVE, MP3 / M4A-only uses MP3, mixed uses the union until customized while mixed; mixed header changes are remembered separately and clear back to the union when WAVE / MP3 settings change; each set can be reset; columns with no values stay hidden and reappear when a value shows up; right-click a column header to turn columns on or off). Waveform width is S / M / L (default L; M is 2× S, L is 3× S). WAVE-only auto L is on by default. General has the UI language, UI scale 100–200% (extra enlargement on top of the OS DPI; no shrinking; affects the main window only — context menus, separate windows such as Settings, and the edit history stay at 100%; applies as soon as you change the combo; Cancel restores it), and Multiple files (how to arrange two or more files after opening them: keep tabs / side by side / stacked / grid; default is keep tabs). File associations on General are per extension (.wav / .wave / .aif / .aiff / .mp3 / .m4a; .m4a is player-only). Check to make this app the default; uncheck to remove it. Types already using this app start checked. The change is written for the current user to the running exe and does not wait for OK. Audio starts with the default audio format (sample rate / bit depth / channels; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono, which is always available), then Auto speaker selection (off by default; see <a href="#auto-speaker">details</a>), then a speaker layout (mono through Atmos; you do not add your own). Inside it are the API (WaveOut / WASAPI / ASIO), the device, record / playback ports and Ch (shared by record and playback; Off leaves the speaker unused; default 1, 2, 3…; switching layouts without OK asks whether to save the current one), and per-playback-port Sine −20 dB (1 kHz, or 80 Hz on LFE) plus an English spoken channel-name Voice (not on LFE). Stereo playback with no port map still downmixes the speakers. The record meters confirm a signal. Loudness target (default −24 LKFS, from −70 to 0; color scale only, does not change the audio), the silence threshold (Silent Skip / Delete Silence) (default −60 dB, from −120 to 0; playback jumps when the peak is below this, and recording does not write those frames; a ~50 ms peak window (that fixes a bug where troughs of a near-threshold tone were stripped and the pitch drifted slightly); Delete Silence uses the same threshold; a mono level meter of the assigned record ports sits beside it (the bar is peak; the red line and number are avg. floor, not peak; the Editing tab also monitors input)), the silence insert duration on skip (default 500 ms; longer gaps are shortened; 0 drops all silence; 0 to 10000; unused on playback), the click-prevention fade (default 20 ms; 1 to 100; used by normalize per region, Delete Silence, and Silent Skip recording splices), and default fade curves are on Editing. Adding regions is chosen when you start recording. MP3 and Parallel export count are on Export. Prefetch Length and Look-ahead Time are on Wwise (both default 500 ms, from 0 to 10000; Stream is always on; the first Segment look-ahead stays 50 ms). The settings window remembers its position and height when closed. Width is set automatically from the Audio tab. <kbd>Ctrl</kbd>+<kbd>Tab</kbd> goes to the next tab, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> to the previous.</li>
-        <li>MP3 uses the user-supplied <code>lame.exe</code> when the LAME path is valid, and passes the options field (input and output files are appended; the default is <code>-V2 --noreplaygain</code>, also used if the field is empty). Empty or invalid path falls back to Windows Media Foundation at 128 / 160 / 192 / 224 / 256 / 320 kbps (default 192, CBR). It writes the stereo fold you hear with the current speaker layout (<a href="#mp3-downmix">coefficients</a>; no prompt). After writing, the app reports whether LAME or Windows ran; failures open a dialog. The written MP3 is not opened in the current tab (only overwriting the MP3 already open keeps that file). Parallel tab exports use the Parallel export count setting (default Auto = a quarter of the CPU cores; the dropdown max is half the cores; Windows MP3 is always one at a time). The last save / export folder is stored in settings.json and reused for Save As, the save folder, Save as MP3, and tab export (separate from Open). LAME is not bundled.</li>
-        <li>UI language is also on the gear. The default is <span class="ui">Auto</span> (Japanese if the OS is Japanese, otherwise English). The Japanese locale keeps the current wording, including English labels. The same General tab has UI scale (100–200%; main window only), and the Multiple files arrangement.</li>
-        <li>The manual is <span class="ui">?</span>, or GitHub Pages in the browser. It follows the UI language.</li>
-        <li>Settings file: <code>%LocalAppData%\MGA\MGA Sonic Anvil\settings.json</code></li>
-        <li>Closing the app (<kbd>Ctrl</kbd>+<kbd>Q</kbd>, or the window close button) remembers every open tab (including which one was in front), the window position and size (including maximized), and unsaved edits and unsaved recordings (kept as a working copy), and restores only the tabs that were still open (multiple tabs show the same frosted-glass progress as opening). Player and editor placements are stored separately and restored when you press <kbd>F10</kbd>. Quitting while still in player mode does not remember the loaded files; the next launch is a normal empty session. A tab you closed before quit does not come back. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> is also only for tabs closed in this launch. Edit history is restored too when the operations can be replayed (Undo back to the original still works). Time / amplitude zoom, waveform selection, and the playhead reset to their defaults. Closing a tab still asks to save. Two or more dirty tabs also offer “Save all and close” and “Close without saving any”.</li>
-        <li>Only one instance runs. A second start brings the existing window forward and opens the files you passed (Wave / AIFF as extra tabs; MP3 / M4A enter player mode).</li>
-        <li>On startup the app checks GitHub Releases and tells you if a newer build exists. Yes opens the release page (nothing is downloaded). No skips that version until a newer one appears. Offline, it continues quietly.</li>
+        <li>Language is on General. The default is <span class="ui">Auto</span> (Japanese if the PC is Japanese, otherwise English). The Japanese UI may still show some English labels.</li>
+        <li>The manual is <span class="ui">?</span>, or in the browser. It follows the UI language.</li>
+        <li>Settings and open tabs are stored in this PC’s user folder (<code>%LocalAppData%\MGA\MGA Sonic Anvil\</code>). Nothing is written next to the app.</li>
+        <li>MP3 uses LAME when the path in Settings is valid; otherwise Windows writes it (128–320 kbps, default 192). It writes the stereo mix you hear now (see <a href="#mp3-downmix">details</a>). The written MP3 is not opened in the current tab. LAME is not included with this app.</li>
+        <li>Closing the app remembers open tabs and window position. Player and editor sizes are separate. Unsaved edits come back on the next launch. Quitting in player mode does not remember the playlist.</li>
+        <li>Only one copy of the app runs. A second start brings the existing window forward and opens the files you passed (mp3 / m4a start the player).</li>
+        <li>On startup, you are told if a newer version exists. Yes opens the download page (nothing is downloaded automatically). No skips that version. Offline, it continues quietly.</li>
       </ul>
 
       <h3 id="auto-speaker">11-1. Auto speaker selection</h3>
-      <p>A checkbox on Settings → Audio, under Default audio format. It is off by default. When on, the app switches to an enabled speaker definition that matches the active file's channel count. It runs when you open a file, bring a tab to the front, create a new file, or convert the channel count (including Undo / Redo). It looks at the count only; it does not guess 5.1 from a file header.</p>
+      <p>A checkbox on Settings → Audio, under Default Wave format. It is off by default. When on, the app switches to an enabled layout that matches the number of channels in the current file. It runs when you open a file, bring a tab to the front, create a new file, or convert the channel count. It looks at the count only; it does not guess 5.1 from the file type.</p>
       <ul>
-        <li><strong>Convenience</strong> — 1–2 ch uses Stereo. 6 ch picks 5.1 when that definition is enabled. If exactly one enabled definition has that count, it is used (5.1 Side alone for 6 ch). The same rule applies to every count (7.1 for 8 ch, and so on). With only Stereo enabled, a 6 ch file is left as-is.</li>
-        <li><strong>Caveats</strong> — If the current layout already has the same count, it stays (5.1 Side is not reset to 5.1). If several layouts share that count and the usual one is not enabled, nothing changes. Switching stops playback and recording, and applies that definition's device and port map. If Stereo is headphones and 5.1 is another interface, the output jumps when you change tabs. Leave this off if you want to keep hearing a 6 ch file folded to Stereo.</li>
+        <li><strong>When it helps</strong> — 1–2 channels use Stereo. 6 channels pick 5.1 when that layout is enabled. If only one enabled layout has that count, it is used. With only Stereo enabled, a 6-channel file is left as-is.</li>
+        <li><strong>Watch out</strong> — If the current layout already has the same count, it stays. Switching stops playback and recording, and uses that layout’s device. If Stereo is headphones and 5.1 is another interface, the output jumps when you change tabs. Leave this off if you want to keep hearing a 6-channel file mixed down to Stereo.</li>
       </ul>
 
       <h3 id="mp3-downmix">11-2. MP3 downmix</h3>
-      <p>Saving or exporting MP3 folds what you hear with the current speaker layout and Ch map (the same path as stereo playback with no port map). It does not follow raw file channel order. File channels are gathered onto speakers first; unassigned speakers stay silent, and file channels that no speaker reads are omitted. If the layout has three or more speakers, those slots are then folded to L/R with the coefficients below. A Stereo layout writes only the two assigned lanes. Mono files stay mono. Solo / mute are not written. Wave export keeps the channel count. There is no prompt or warning.</p>
+      <p>Saving or exporting MP3 writes the stereo mix you hear with the current speaker layout. It does not follow raw file channel order. Wave export keeps the channel count. There is no prompt.</p>
       <table>
-        <thead><tr><th>Speaker order</th><th>Destination</th><th>Gain</th></tr></thead>
+        <thead><tr><th>Speaker order</th><th>Goes to</th><th>How it is mixed</th></tr></thead>
         <tbody>
-          <tr><td>1st</td><td>L</td><td>1</td></tr>
-          <tr><td>2nd</td><td>R</td><td>1</td></tr>
-          <tr><td>3rd</td><td>L and R</td><td>1/√2 (about 0.707, −3 dB). Treated as center</td></tr>
-          <tr><td>4th</td><td>L and R</td><td>1/√2. LFE is included</td></tr>
-          <tr><td>5th</td><td>L</td><td>1/√2</td></tr>
-          <tr><td>6th</td><td>R</td><td>1/√2</td></tr>
-          <tr><td>7th</td><td>L</td><td>1/√2</td></tr>
-          <tr><td>8th</td><td>R</td><td>1/√2</td></tr>
-          <tr><td>9th and up</td><td>Odd slots to L, even slots to R</td><td>0.5</td></tr>
+          <tr><td>1st</td><td>L</td><td>Full</td></tr>
+          <tr><td>2nd</td><td>R</td><td>Full</td></tr>
+          <tr><td>3rd</td><td>L and R</td><td>A little quieter (center)</td></tr>
+          <tr><td>4th</td><td>L and R</td><td>A little quieter (includes LFE)</td></tr>
+          <tr><td>5th–8th</td><td>Odd to L, even to R</td><td>A little quieter</td></tr>
+          <tr><td>9th and up</td><td>Odd to L, even to R</td><td>Quieter still</td></tr>
         </tbody>
       </table>
-      <p>The coefficients follow speaker order after the Ch map, not layout names. That matches 5.1 (L / R / C / LFE / Ls / Rs). Layouts with a different order, such as Quad or 3.0, use the same approximation as playback.</p>
-      <p>Atmos heights or objects (9.1.6 and the like), Ambisonics, and stem packs can produce an unintended mix under this fold. A dedicated fold-down or binaural path is not supported today. It will be considered if there is demand.</p>
+      <p>This matches 5.1 (L / R / C / LFE / Ls / Rs). Atmos height speakers or unusual layouts can come out unbalanced.</p>
 
       <h2 id="disclaimer">12. Scope</h2>
       <ul>
-        <li>This does not cover everything Interactive Music can do. EXPORT is Wave-only (markers / sample loop).</li>
-        <li>In-app preview is an approximation. Dual playheads for Play -E may not match Wwise exactly. Always verify after EXPORT.</li>
-        <li>AIFF export is not supported. Choose Wave or MP3. Wave writes 8 / 16 / 24-bit, and IEEE float when the document is already 32-bit (4-bit is for quantized audition and is saved as 16-bit. 32-bit is not a conversion preset).</li>
-        <li>Multichannel MP3 is the stereo fold of the current speaker layout. Dedicated mixes for Atmos heights / objects, Ambisonics, or stem packs are not supported today. They will be considered if there is demand.</li>
-        <li>EXPORT changes the Wwise project. Back up or use version control first.</li>
+        <li>This does not cover everything Interactive Music can do. EXPORT is a single Wave (markers / sample loop).</li>
+        <li>In-app preview is a guide. Always check the result in Wwise after EXPORT.</li>
+        <li>You cannot write AIFF. Choose Wave or MP3. Wave writes 8 / 16 / 24-bit, and keeps 32-bit when the file already is (4-bit is for listening and is saved as 16-bit).</li>
+        <li>Multichannel MP3 is the stereo mix you hear now.</li>
+        <li>EXPORT changes the Wwise project. Back up first.</li>
       </ul>
 
       <h2 id="trademarks">13. Trademarks and license</h2>
       <ul>
         <li><strong>Wwise®</strong> / <strong>Audiokinetic®</strong> are trademarks of Audiokinetic Inc. This tool is unofficial. WAAPI requires a valid Wwise license.</li>
         <li>This app is released under the <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/LICENSE">MIT License</a>.</li>
-        <li><strong>LAME</strong> is the name of the LAME project and is licensed under the LGPL. This app does not bundle, modify, link, or redistribute it; it only runs a user-supplied <code>lame.exe</code> as a process. Obtaining LAME and complying with its license is the user’s responsibility. This tool is unofficial.</li>
-        <li><strong>Signalsmith Stretch</strong> is Signalsmith Audio’s pitch/time library (MIT). It is bundled for pitch shift.</li>
+        <li><strong>LAME</strong> is the name of the LAME project. It is not included. The app only runs the <code>lame.exe</code> you set in Settings. Getting LAME and following its license is up to you.</li>
+        <li><strong>Signalsmith Stretch</strong> is the library used for pitch change.</li>
       </ul>
       <footer>© MIYABI GAME AUDIO INC. — MGA Sonic Anvil User Manual (en)</footer>
     </main>
