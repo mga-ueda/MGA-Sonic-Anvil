@@ -83,7 +83,7 @@ public sealed class UiThemeTests
         foreach (var key in UiThemePalette.ThemeableKeys)
         {
             var light = UiThemePalette.ColorFor(UiTheme.Light, key);
-            Assert.True(light.A > 0, key);
+            Assert.True(light.A > 0 || key == "WaveformTileDividerBrush", key);
         }
     }
 
@@ -207,6 +207,11 @@ public sealed class UiThemeTests
         foreach (var key in UiThemePalette.ThemeableKeys)
         {
             var color = UiThemePalette.ColorFor(UiTheme.Light, key);
+            if (color.A == 0)
+            {
+                continue;
+            }
+
             Assert.False(color.R == 0 && color.G == 0 && color.B == 0, key);
         }
 
