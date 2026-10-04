@@ -50,6 +50,8 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.NextTab
             or WaveMenuCommand.PrevTab
             or WaveMenuCommand.CopyAllTabTimes
+            or WaveMenuCommand.CopySelectionTime
+            or WaveMenuCommand.CopySelectionTimePath
             or WaveMenuCommand.CopyFileName
             or WaveMenuCommand.CopyFilePath
             or WaveMenuCommand.Tips

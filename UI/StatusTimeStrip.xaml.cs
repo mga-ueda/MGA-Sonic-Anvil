@@ -34,6 +34,11 @@ internal partial class StatusTimeStrip : UserControl
 
     public event EventHandler? RequestWaveformFocus;
 
+    public event EventHandler<SelectionClipboardPathKind>? CopySelectionTimeRequested;
+
+    /// <summary>選択範囲の時間コピーの有効性と、複数タブ選択時の見出し切り替え。</summary>
+    public Func<(bool CanCopy, bool HasSelectedTabs)>? SelectionCopyState { get; set; }
+
     public bool IsTimeFocused => _fields.Keys.Any(box => box.IsKeyboardFocusWithin);
 
     public bool IsEditing => _fields.Values.Any(state => state.Editing) || IsTimeFocused;
@@ -211,15 +216,24 @@ internal partial class StatusTimeStrip : UserControl
         var sampleItem = new MenuItem { IsCheckable = true };
         var copyItem = new MenuItem();
         var pasteItem = new MenuItem();
+        var copyTimeItem = new MenuItem();
+        var copyTimePathItem = new MenuItem();
         timeItem.Click += (_, _) => SetShowSamples(false);
         sampleItem.Click += (_, _) => SetShowSamples(true);
         copyItem.Click += (_, _) => CopyField(field);
         pasteItem.Click += (_, _) => PasteField(field);
+        copyTimeItem.Click += (_, _) =>
+            CopySelectionTimeRequested?.Invoke(this, SelectionClipboardPathKind.FileName);
+        copyTimePathItem.Click += (_, _) =>
+            CopySelectionTimeRequested?.Invoke(this, SelectionClipboardPathKind.FullPath);
         menu.Items.Add(timeItem);
         menu.Items.Add(sampleItem);
         menu.Items.Add(new Separator());
         menu.Items.Add(copyItem);
         menu.Items.Add(pasteItem);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(copyTimeItem);
+        menu.Items.Add(copyTimePathItem);
         menu.Opened += (_, _) =>
         {
             timeItem.Header = UiStrings.MenuShowTime;
@@ -230,10 +244,22 @@ internal partial class StatusTimeStrip : UserControl
             pasteItem.Header = UiStrings.MenuPaste;
             copyItem.IsEnabled = CopyText(field).Length > 0;
             pasteItem.IsEnabled = field != StatusTimeField.Total && _hasDocument && SystemClipboard.ContainsText();
+            var (canCopySelection, hasSelectedTabs) = SelectionCopyState?.Invoke()
+                ?? (!_selection.IsEmpty, false);
+            copyTimeItem.Header = hasSelectedTabs
+                ? UiStrings.MenuCopySelectionTimeSelected
+                : UiStrings.MenuCopySelectionTime;
+            copyTimePathItem.Header = hasSelectedTabs
+                ? UiStrings.MenuCopySelectionTimePathSelected
+                : UiStrings.MenuCopySelectionTimePath;
+            copyTimeItem.IsEnabled = canCopySelection;
+            copyTimePathItem.IsEnabled = canCopySelection;
             TipService.Set(timeItem, UiStrings.MenuShowTime);
             TipService.Set(sampleItem, UiStrings.MenuShowSamples);
             TipService.Set(copyItem, UiStrings.MenuCopy);
             TipService.Set(pasteItem, UiStrings.MenuPaste);
+            TipService.Set(copyTimeItem, (string)copyTimeItem.Header);
+            TipService.Set(copyTimePathItem, (string)copyTimePathItem.Header);
         };
         return menu;
     }

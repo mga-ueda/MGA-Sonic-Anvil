@@ -444,6 +444,7 @@ public partial class MainWindow
                 HasMultipleTabSelection ? UiStrings.TabMenuCopySelectedTimes : UiStrings.TabMenuCopyAllTimes,
                 CopyAllTabTimes,
                 enabled: _sessions.Count > 0));
+            AddSelectionTimeMenuItems(menu, targets);
             AddTileArrangeMenuItems(menu, canMutate);
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
@@ -492,6 +493,7 @@ public partial class MainWindow
                 UiStrings.TabMenuCopyAllTimes,
                 CopyAllTabTimes,
                 enabled: _sessions.Count > 0));
+            AddSelectionTimeMenuItems(menu, [session]);
             AddTileArrangeMenuItems(menu, canMutate);
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
@@ -641,6 +643,20 @@ public partial class MainWindow
         item.Click += (_, _) => action();
         TipService.Set(item, gesture is null ? header : $"{header}\n{gesture}");
         return item;
+    }
+
+    private void AddSelectionTimeMenuItems(ContextMenu menu, IReadOnlyList<DocumentSession> sessions)
+    {
+        var items = CaptureSelectionClipboardItems(sessions);
+        var canCopy = SelectionClipboardText.CanCopy(items);
+        menu.Items.Add(CreateTabMenuItem(
+            HasTabSelection ? UiStrings.WaveMenuCopySelectionTimeSelected : UiStrings.WaveMenuCopySelectionTime,
+            () => CopySelectionTimes(SelectionClipboardPathKind.FileName, sessions),
+            enabled: canCopy));
+        menu.Items.Add(CreateTabMenuItem(
+            HasTabSelection ? UiStrings.WaveMenuCopySelectionTimePathSelected : UiStrings.WaveMenuCopySelectionTimePath,
+            () => CopySelectionTimes(SelectionClipboardPathKind.FullPath, sessions),
+            enabled: canCopy));
     }
 
     /// <summary>名前変更→複製→（バウンス）→削除。波形右クリック → ファイルの並びと同じにする。</summary>

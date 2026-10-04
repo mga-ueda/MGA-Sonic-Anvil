@@ -937,6 +937,10 @@ internal static partial class UiStrings
     public static string MenuShowSamples => Get("サンプル数(_S)", "_Samples");
     public static string MenuCopy => Get("コピー(_C)", "_Copy");
     public static string MenuPaste => Get("貼り付け(_P)", "_Paste");
+    public static string MenuCopySelectionTime => WaveMenuCopySelectionTime;
+    public static string MenuCopySelectionTimeSelected => WaveMenuCopySelectionTimeSelected;
+    public static string MenuCopySelectionTimePath => WaveMenuCopySelectionTimePath;
+    public static string MenuCopySelectionTimePathSelected => WaveMenuCopySelectionTimePathSelected;
 
     public static string TabMenuRenameFile => Get("ファイル名を変更(_N)", "Re_name File");
     public static string TabMenuDuplicateFile => WaveMenuDuplicateFile;

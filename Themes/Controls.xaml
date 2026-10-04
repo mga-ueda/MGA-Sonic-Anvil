@@ -998,6 +998,7 @@
         <Setter Property="MinWidth" Value="200" />
         <Setter Property="HasDropShadow" Value="False" />
         <Setter Property="Grid.IsSharedSizeScope" Value="True" />
+        <Setter Property="TextBlock.TextAlignment" Value="Left" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ContextMenu">
@@ -1065,15 +1066,21 @@
                                                   ContentSource="Header"
                                                   RecognizesAccessKey="True"
                                                   VerticalAlignment="Center"
-                                                  HorizontalAlignment="Stretch">
+                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}">
                                     <ContentPresenter.Resources>
+                                        <!-- PlacementTarget（例: 中央寄せタイムコード）から TextAlignment が
+                                             継承されないよう、メニュー見出しは常に左寄せにする。 -->
                                         <Style TargetType="TextBlock">
                                             <Setter Property="VerticalAlignment" Value="Center" />
+                                            <Setter Property="HorizontalAlignment" Value="Left" />
+                                            <Setter Property="TextAlignment" Value="Left" />
                                             <Setter Property="TextWrapping" Value="NoWrap" />
                                             <Setter Property="TextTrimming" Value="None" />
                                             <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=MenuItem}}" />
                                         </Style>
                                         <Style TargetType="AccessText">
+                                            <Setter Property="HorizontalAlignment" Value="Left" />
+                                            <Setter Property="TextAlignment" Value="Left" />
                                             <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=MenuItem}}" />
                                         </Style>
                                     </ContentPresenter.Resources>

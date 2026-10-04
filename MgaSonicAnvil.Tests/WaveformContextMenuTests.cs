@@ -58,11 +58,15 @@ public sealed class WaveformContextMenuTests
             Assert.Equal(UiStrings.WaveMenuSaveAs, Find(single, WaveMenuCommand.SaveAs)?.Header);
             Assert.Equal(UiStrings.WaveMenuCopyFileName, Find(single, WaveMenuCommand.CopyFileName)?.Header);
             Assert.Equal(UiStrings.WaveMenuCopyFilePath, Find(single, WaveMenuCommand.CopyFilePath)?.Header);
+            Assert.Equal(UiStrings.WaveMenuCopySelectionTime, Find(single, WaveMenuCommand.CopySelectionTime)?.Header);
+            Assert.Equal(UiStrings.WaveMenuCopySelectionTimePath, Find(single, WaveMenuCommand.CopySelectionTimePath)?.Header);
             var selected = WaveformContextMenuBuilder.Build(WaveformContextMenuModel.AllEnabledForTests(hasSelectedTabs: true));
             Assert.Equal(UiStrings.WaveMenuSaveSelected, Find(selected, WaveMenuCommand.Save)?.Header);
             Assert.Equal(UiStrings.WaveMenuSaveAsSelected, Find(selected, WaveMenuCommand.SaveAs)?.Header);
             Assert.Equal(UiStrings.WaveMenuCopyFileNameSelected, Find(selected, WaveMenuCommand.CopyFileName)?.Header);
             Assert.Equal(UiStrings.WaveMenuCopyFilePathSelected, Find(selected, WaveMenuCommand.CopyFilePath)?.Header);
+            Assert.Equal(UiStrings.WaveMenuCopySelectionTimeSelected, Find(selected, WaveMenuCommand.CopySelectionTime)?.Header);
+            Assert.Equal(UiStrings.WaveMenuCopySelectionTimePathSelected, Find(selected, WaveMenuCommand.CopySelectionTimePath)?.Header);
         }
         finally
         {
@@ -188,8 +192,13 @@ public sealed class WaveformContextMenuTests
             Assert.DoesNotContain(WaveMenuCommand.TileOff, CommandsIn(tree, UiStrings.WaveMenuCatView));
             Assert.Contains(WaveMenuCommand.ClearMarkers, commands);
             Assert.Contains(WaveMenuCommand.PlayFromHere, commands);
+            Assert.Contains(WaveMenuCommand.CopySelectionTime, commands);
+            Assert.Contains(WaveMenuCommand.CopySelectionTimePath, commands);
             var root = tree.OfType<WaveMenuItemEntry>().Select(item => item.Command).ToArray();
             Assert.Contains(WaveMenuCommand.ClearMarkers, root);
+            Assert.Contains(WaveMenuCommand.CopySelectionTime, root);
+            Assert.Contains(WaveMenuCommand.CopySelectionTimePath, root);
+            Assert.DoesNotContain(WaveMenuCommand.CopySelectionTime, CommandsIn(tree, UiStrings.WaveMenuCatEdit));
             Assert.DoesNotContain(WaveMenuCommand.DeleteAllMarkers, root);
             Assert.Contains(WaveMenuCommand.DeleteAllMarkers, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
             Assert.Contains(WaveMenuCommand.DeleteAllRegions, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));

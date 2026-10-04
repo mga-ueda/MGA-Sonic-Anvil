@@ -155,6 +155,7 @@ public partial class MainWindow
                 || Waveform.HasSelectedMarkers
                 || Waveform.HasSelectedRegions
                 || Waveform.HasSelectedTimelineItems,
+            CanCopySelectionTimes = SelectionClipboardText.CanCopy(CaptureSelectionClipboardItems()),
             CanUndo = hasDoc && _history.CanUndo,
             CanRedo = hasDoc && _history.CanRedo,
             CanPasteAudio = _clipboard is { IsEmpty: false },
@@ -285,6 +286,12 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.SelectToEnd:
                 Waveform.SelectToDocumentEdge(1);
+                break;
+            case WaveMenuCommand.CopySelectionTime:
+                CopySelectionTimes(SelectionClipboardPathKind.FileName);
+                break;
+            case WaveMenuCommand.CopySelectionTimePath:
+                CopySelectionTimes(SelectionClipboardPathKind.FullPath);
                 break;
             case WaveMenuCommand.History:
                 OpenEditHistory();
@@ -680,6 +687,43 @@ public partial class MainWindow
                 TryOpenUrl(AppVersion.RepositoryUrl);
                 break;
         }
+    }
+
+    private void CopySelectionTimes(
+        SelectionClipboardPathKind pathKind,
+        IReadOnlyList<DocumentSession>? sessions = null)
+    {
+        var text = SelectionClipboardText.Format(
+            CaptureSelectionClipboardItems(sessions),
+            pathKind,
+            AppStorage.Settings.StatusShowSamples);
+        if (text.Length == 0)
+        {
+            return;
+        }
+
+        SystemClipboard.TrySetText(text, this);
+    }
+
+    private (string? SourcePath, string DisplayName, WaveSelection Selection, int SampleRate)[] CaptureSelectionClipboardItems(
+        IReadOnlyList<DocumentSession>? sessions = null)
+    {
+        sessions ??= HasTabSelection
+            ? SelectedTabsInOrder()
+            : _activeSession is null ? [] : [_activeSession];
+        if (sessions.Count == 0)
+        {
+            return [];
+        }
+
+        var items = new (string? SourcePath, string DisplayName, WaveSelection Selection, int SampleRate)[sessions.Count];
+        for (var i = 0; i < sessions.Count; i++)
+        {
+            var document = sessions[i].Document;
+            items[i] = (document.SourcePath, sessions[i].DisplayName, document.Selection, document.SampleRate);
+        }
+
+        return items;
     }
 
     private void CopySessionPathTexts(bool fullPath)

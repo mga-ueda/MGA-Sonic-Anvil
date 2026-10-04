@@ -34,6 +34,8 @@ internal enum WaveMenuCommand
     ClearSelection,
     SelectToStart,
     SelectToEnd,
+    CopySelectionTime,
+    CopySelectionTimePath,
     History,
     FadeIn,
     FadeOut,
@@ -160,6 +162,9 @@ internal sealed class WaveformContextMenuModel
     public bool IsRecording { get; init; }
     public bool HasSelection { get; init; }
     public bool HasAnySelection { get; init; }
+
+    /// <summary>アクティブ／選択タブのいずれかに波形選択があるか（選択開始・終了のコピー可否）。</summary>
+    public bool CanCopySelectionTimes { get; init; }
     public bool CanUndo { get; init; }
     public bool CanRedo { get; init; }
     public bool CanPasteAudio { get; init; }
@@ -229,6 +234,7 @@ internal sealed class WaveformContextMenuModel
         IsPlaying = true,
         HasSelection = true,
         HasAnySelection = true,
+        CanCopySelectionTimes = true,
         CanUndo = true,
         CanRedo = true,
         CanPasteAudio = true,
@@ -438,6 +444,14 @@ internal static class WaveformContextMenuBuilder
         items.Add(Cmd(UiStrings.WaveMenuSeekHere, WaveMenuCommand.SeekHere, enabled: m.CanNavigate));
         items.Add(Cmd(UiStrings.WaveMenuAddMarkerHere, WaveMenuCommand.AddMarkerHere, enabled: m.CanAddMarkerHere));
         items.Add(Cmd(UiStrings.WaveMenuSelectSpanHere, WaveMenuCommand.SelectSpanHere, enabled: m.CanNavigate));
+        items.Add(Cmd(
+            m.HasSelectedTabs ? UiStrings.WaveMenuCopySelectionTimeSelected : UiStrings.WaveMenuCopySelectionTime,
+            WaveMenuCommand.CopySelectionTime,
+            enabled: m.CanCopySelectionTimes));
+        items.Add(Cmd(
+            m.HasSelectedTabs ? UiStrings.WaveMenuCopySelectionTimePathSelected : UiStrings.WaveMenuCopySelectionTimePath,
+            WaveMenuCommand.CopySelectionTimePath,
+            enabled: m.CanCopySelectionTimes));
     }
 
     private static IReadOnlyList<WaveMenuEntry> EditItems(WaveformContextMenuModel m) =>

@@ -199,6 +199,12 @@ public partial class MainWindow : Window
             Waveform.SetSelection(range);
         };
         StatusTimes.RequestWaveformFocus += (_, _) => Keyboard.Focus(Waveform);
+        StatusTimes.SelectionCopyState = () =>
+        {
+            var items = CaptureSelectionClipboardItems();
+            return (SelectionClipboardText.CanCopy(items), HasTabSelection);
+        };
+        StatusTimes.CopySelectionTimeRequested += (_, pathKind) => CopySelectionTimes(pathKind);
         UiStrings.LanguageChanged += (_, _) => Dispatcher.BeginInvoke(RefreshLocalizedText);
         HookWaveformEvents(PrimaryWaveform);
         Transport.SetAnalysisView(Waveform.AnalysisView);

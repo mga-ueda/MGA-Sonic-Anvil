@@ -40,6 +40,11 @@ internal static partial class UiStrings
     public static string WaveMenuClearSelection => Get("選択を解除(_L)", "C_lear Selection");
     public static string WaveMenuSelectToStart => Get("先頭まで選択(_B)", "Select to _Beginning");
     public static string WaveMenuSelectToEnd => Get("末尾まで選択(_N)", "Select to E_nd");
+    public static string WaveMenuCopySelectionTime => Get("選択範囲の時間をコピー(_K)", "Copy Selection Time (_K)");
+    public static string WaveMenuCopySelectionTimeSelected => Get("選択ファイルの選択範囲の時間をコピー(_K)", "Copy Selected Selection Times (_K)");
+    /// <summary>ルートメニューで Wwise(_W) と重ならないよう Q。</summary>
+    public static string WaveMenuCopySelectionTimePath => Get("選択範囲の時間をフルパスでコピー(_Q)", "Copy Selection Time with Full Path (_Q)");
+    public static string WaveMenuCopySelectionTimePathSelected => Get("選択ファイルの選択範囲の時間をフルパスでコピー(_Q)", "Copy Selected Selection Times with Full Path (_Q)");
     public static string WaveMenuHistory => Get("編集履歴(_E)", "_Edit History");
 
     public static string WaveMenuFadeIn => Get("フェードイン(_I)", "Fade _In");
