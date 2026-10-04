@@ -217,7 +217,7 @@ internal sealed class AppSettings
     /// <summary>MP3 だけのプレイリストでは親フォルダ列を出さない。既定オン。</summary>
     public bool LibraryHideParentFolderForMp3Only { get; set; } = true;
 
-    /// <summary>MP3 だけのプレイリストでは波形表示列を出さない。既定オン。</summary>
+    /// <summary>MP3 だけのプレイリストでは波形表示列を出さない。既定オン。列で波形をオンにすれば出す。</summary>
     public bool LibraryHideWaveformForMp3Only { get; set; } = true;
 
     /// <summary>F10 リストのグループ。空は親フォルダ。</summary>

@@ -181,8 +181,8 @@ internal static partial class UiStrings
         "MP3 オンリーのときは波形表示を出さない",
         "Hide waveform for MP3-only playlists");
     public static string TipLibraryHideWaveformForMp3Only => Get(
-        "プレイリストが MP3 だけのとき、波形表示列を自動で隠す。既定オン。他形式が混ざると表示する（列自体がオンの場合）。",
-        "When the playlist is MP3-only, hide the waveform column. On by default. Mixed playlists show it again if the column is enabled.");
+        "プレイリストが MP3 だけのとき、波形表示列を自動で隠す。既定オン。列の波形表示をオンにすれば、MP3 だけでも表示する。",
+        "When the playlist is MP3-only, hide the waveform column. On by default. Turning the waveform column on still shows it for MP3-only playlists.");
     public static string ButtonLibraryExplorerRootAdd => Get("登録…", "Add…");
     public static string TitleLibraryExplorerRootAdd => Get("フォルダを追加", "Add folder");
     public static string ButtonLibraryExplorerRootRemove => Get("削除", "Remove");

@@ -1722,6 +1722,54 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void Mp3Only_WaveformColumnOn_ShowsEvenWhenHideForMp3Only()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var mp3 = Session("song.mp3");
+            mp3.Document.ApplyTags(new AudioFileTags { Probed = true, Title = "Song" });
+            var view = new LibraryBrowserView();
+            view.SetPlaylistWaveformOptions(
+                LibraryPlaylistWaveformSize.L,
+                autoLargeForWaveOnly: true,
+                hideParentFolderForMp3Only: true,
+                hideWaveformForMp3Only: true);
+            view.SetSessions([mp3], mp3, [mp3]);
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.Waveform));
+
+            view.SetColumnEnabledForTests(LibraryFileColumn.Waveform, enabled: true);
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Waveform));
+            Assert.Contains(LibraryFileColumn.Waveform, view.Mp3ColumnOrder);
+        });
+    }
+
+    [Fact]
+    public void Mp3Only_HideWaveformOff_ShowsWaveformColumn()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var mp3 = Session("song.mp3");
+            mp3.Document.ApplyTags(new AudioFileTags { Probed = true, Title = "Song" });
+            var view = new LibraryBrowserView();
+            view.SetVisibleColumnPresets(
+                LibraryColumnFilter.WaveDefaults,
+                LibraryColumnFilter.Mp3Defaults);
+            view.SetSessions([mp3], mp3, [mp3]);
+            Assert.Equal(Visibility.Collapsed, view.ColumnVisibility(LibraryFileColumn.Waveform));
+
+            view.SetPlaylistWaveformOptions(
+                LibraryPlaylistWaveformSize.L,
+                autoLargeForWaveOnly: true,
+                hideParentFolderForMp3Only: true,
+                hideWaveformForMp3Only: false);
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Waveform));
+            Assert.Contains(LibraryFileColumn.Waveform, view.Mp3ColumnOrder);
+        });
+    }
+
+    [Fact]
     public void Grouped_WaveOnly_HidesNoImageJacketFrame()
     {
         RunSta(() =>

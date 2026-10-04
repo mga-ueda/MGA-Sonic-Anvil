@@ -58,7 +58,7 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.Waveform,
     ];
 
-    /// <summary>MP3 / M4A 向け既定（波形表示はオフ）。</summary>
+    /// <summary>MP3 / M4A 向け既定（波形表示はオフ。列をオンにすれば MP3 だけでも出す）。</summary>
     public static readonly LibraryFileColumn[] Mp3Defaults =
     [
         LibraryFileColumn.Name,
@@ -161,6 +161,7 @@ internal static class LibraryColumnFilter
     /// Wave / AIFF だけでは隠し、混在したら出す。
     /// 波形は曲が1件でもあれば出す（中身は後から埋める）。
     /// MP3 のみのとき、設定に応じて親フォルダ／波形を used から外す。
+    /// 列側で波形表示がオンなら、呼び出し側は hideWaveformForMp3Only を渡さない。
     /// </summary>
     public static HashSet<LibraryFileColumn>? UsedColumns(
         IReadOnlyList<LibraryFileRow> rows,
@@ -540,7 +541,12 @@ internal static class LibraryColumnFilter
 
         if (migratePreviousDefaults && IsPreviousDefaultColumnOrder(result))
         {
-            return [.. defaults];
+            // MP3 で波形をオンにした並びは、旧既定（タグ列＋波形）と同じ形になる。消さない。
+            if (!ReferenceEquals(defaults, Mp3Defaults)
+                || !seen.Contains(LibraryFileColumn.Waveform))
+            {
+                return [.. defaults];
+            }
         }
 
         if (ReferenceEquals(defaults, WaveDefaults))
@@ -805,6 +811,33 @@ internal static class LibraryColumnFilter
 
     private static void InsertParentFolderAtDefaultPlace(List<LibraryFileColumn> result) =>
         result.Add(LibraryFileColumn.ParentFolder);
+
+    /// <summary>波形列が無ければ親フォルダの直後（無ければ末尾）へ入れる。</summary>
+    public static LibraryFileColumn[] WithWaveform(IReadOnlyList<LibraryFileColumn> columns)
+    {
+        var result = new List<LibraryFileColumn>(columns.Count + 1);
+        var seen = new HashSet<LibraryFileColumn>();
+        foreach (var column in columns)
+        {
+            if (Array.IndexOf(All, column) >= 0 && seen.Add(column))
+            {
+                result.Add(column);
+            }
+        }
+
+        if (!seen.Contains(LibraryFileColumn.Name))
+        {
+            result.Insert(0, LibraryFileColumn.Name);
+            seen.Add(LibraryFileColumn.Name);
+        }
+
+        if (!seen.Contains(LibraryFileColumn.Waveform))
+        {
+            InsertWaveformAtDefaultPlace(result);
+        }
+
+        return [.. result];
+    }
 
     private static void InsertWaveformAtDefaultPlace(List<LibraryFileColumn> result)
     {

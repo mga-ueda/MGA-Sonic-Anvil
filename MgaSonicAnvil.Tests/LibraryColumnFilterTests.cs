@@ -204,7 +204,7 @@ public sealed class LibraryColumnFilterTests
     }
 
     [Fact]
-    public void Resolve_PreviousDefaultWithWaveform_MovesToWaveOrMp3Defaults()
+    public void Resolve_PreviousDefaultWithWaveform_WaveGoesToDefaults_Mp3KeepsWaveform()
     {
         string[] previous =
         [
@@ -212,7 +212,7 @@ public sealed class LibraryColumnFilterTests
             "Date", "Comment", "ParentFolder", "Waveform",
         ];
         Assert.Equal(LibraryColumnFilter.WaveDefaults, LibraryColumnFilter.ResolveWave(previous));
-        Assert.Equal(LibraryColumnFilter.Mp3Defaults, LibraryColumnFilter.ResolveMp3(previous));
+        Assert.Contains(LibraryFileColumn.Waveform, LibraryColumnFilter.ResolveMp3(previous));
         Assert.True(LibraryColumnFilter.IsLegacyDefaultStored(previous));
     }
 
@@ -600,6 +600,28 @@ public sealed class LibraryColumnFilterTests
             ]));
         Assert.Contains(LibraryFileColumn.ParentFolder, mixed!);
         Assert.Contains(LibraryFileColumn.Waveform, mixed);
+    }
+
+    [Fact]
+    public void ResolveMp3_Mp3DefaultsWithWaveform_KeepsWaveform()
+    {
+        var stored = LibraryColumnFilter.Serialize(
+            LibraryColumnFilter.WithWaveform(LibraryColumnFilter.Mp3Defaults),
+            LibraryColumnFilter.Mp3Defaults);
+        var resolved = LibraryColumnFilter.ResolveMp3(stored);
+        Assert.Contains(LibraryFileColumn.Waveform, resolved);
+        Assert.Equal(LibraryColumnFilter.WithWaveform(LibraryColumnFilter.Mp3Defaults), resolved);
+    }
+
+    [Fact]
+    public void WithWaveform_Mp3Defaults_InsertsAfterParentFolder()
+    {
+        var withWave = LibraryColumnFilter.WithWaveform(LibraryColumnFilter.Mp3Defaults);
+        Assert.Contains(LibraryFileColumn.Waveform, withWave);
+        Assert.Equal(
+            Array.IndexOf(LibraryColumnFilter.Mp3Defaults, LibraryFileColumn.ParentFolder) + 1,
+            Array.IndexOf(withWave, LibraryFileColumn.Waveform));
+        Assert.Equal(withWave, LibraryColumnFilter.WithWaveform(withWave));
     }
 
     [Fact]

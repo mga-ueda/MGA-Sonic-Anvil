@@ -505,6 +505,11 @@ internal sealed class LibraryBrowserView : UserControl
     internal double ColumnPixelWidth(LibraryFileColumn column) =>
         _columns.TryGetValue(column, out var gridColumn) ? gridColumn.Width.Value : 0;
 
+    internal Visibility ColumnVisibility(LibraryFileColumn column) =>
+        _columns.TryGetValue(column, out var gridColumn)
+            ? gridColumn.Visibility
+            : Visibility.Collapsed;
+
     internal IReadOnlyList<LibraryFileColumn> VisibleColumnOrder => _visibleColumns;
 
     internal int ColumnDisplayIndex(LibraryFileColumn column) =>
@@ -4962,7 +4967,8 @@ internal sealed class LibraryBrowserView : UserControl
         LibraryColumnFilter.UsedColumns(
             _rows,
             _hideParentFolderForMp3Only,
-            _hideWaveformForMp3Only);
+            hideWaveformForMp3Only: _hideWaveformForMp3Only
+                && Array.IndexOf(_visibleColumns, LibraryFileColumn.Waveform) < 0);
 
     private void ClearSort(bool resort)
     {
@@ -5115,6 +5121,21 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         ApplyColumnVisibility(next, notify: true);
+    }
+
+    internal void SetColumnEnabledForTests(LibraryFileColumn column, bool enabled)
+    {
+        var selected = new HashSet<LibraryFileColumn>(_visibleColumns) { LibraryFileColumn.Name };
+        if (enabled)
+        {
+            selected.Add(column);
+        }
+        else
+        {
+            selected.Remove(column);
+        }
+
+        ApplyColumnVisibility(LibraryColumnFilter.Merge(_visibleColumns, selected), notify: true);
     }
 
     internal void MoveVisibleColumnForTests(LibraryFileColumn column, int displayIndex)
@@ -5430,6 +5451,22 @@ internal sealed class LibraryBrowserView : UserControl
         _playlistWaveAutoLargeForWaveOnly = autoLargeForWaveOnly;
         _hideParentFolderForMp3Only = hideParentFolderForMp3Only;
         _hideWaveformForMp3Only = hideWaveformForMp3Only;
+        if (!_hideWaveformForMp3Only)
+        {
+            var mp3 = LibraryColumnFilter.WithWaveform(_mp3Columns);
+            if (!mp3.SequenceEqual(_mp3Columns))
+            {
+                _mp3Columns = mp3;
+                if (!_mixedColumnsCustomized)
+                {
+                    _mixedColumns = LibraryColumnFilter.Union(_waveColumns, _mp3Columns);
+                }
+
+                ApplyActiveColumnVisibility(notify: true);
+                return;
+            }
+        }
+
         ApplyEffectiveColumnVisibility();
         SyncGroupChrome();
         RequestFitColumns();
