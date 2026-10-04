@@ -323,12 +323,14 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         lock (_gate)
         {
-            if (_stream is not null)
+            // ストリーム文書の Interleaved は Array.Empty なので、参照比較だけでは解放後も一致する。
+            if (_boundDocument is not null || _stream is not null)
             {
                 return ReferenceEquals(_boundDocument, document);
             }
 
-            return ReferenceEquals(_samples, document.Interleaved);
+            var samples = document.Interleaved;
+            return samples.Length > 0 && ReferenceEquals(_samples, samples);
         }
     }
 
@@ -582,6 +584,19 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         lock (_gate)
         {
             ClearGaplessNoLock();
+        }
+    }
+
+    /// <summary>
+    /// 再生用ストリームとギャップレス先読みを閉じる。停止後もファイルを掴み続けない。
+    /// </summary>
+    public void ReleaseStreamSource()
+    {
+        lock (_gate)
+        {
+            ClearGaplessNoLock();
+            NoteGaplessAdvancedNoLock(null);
+            DisposeStreamNoLock();
         }
     }
 

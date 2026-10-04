@@ -935,6 +935,9 @@ public partial class MainWindow
             StopPlayback();
         }
 
+        ReleaseLibraryStreamsForRemoved(dropSet);
+        CancelLibraryPeakJobsFor(dropSet);
+
         foreach (var session in selected)
         {
             _selectedTabs.Remove(session);
@@ -969,7 +972,87 @@ public partial class MainWindow
             return;
         }
 
+        if (IsPlaybackActive())
+        {
+            ScheduleLibraryGaplessPrefetch();
+        }
+
         PreviewLibrarySession(next);
+    }
+
+    /// <summary>
+    /// 外した曲の再生／先読みストリームを閉じる。Pause だけではハンドルが残る。
+    /// </summary>
+    private void ReleaseLibraryStreamsForRemoved(HashSet<DocumentSession> dropSet)
+    {
+        var dropGapless = _gaplessTarget is not null && dropSet.Contains(_gaplessTarget);
+        var dropActive = _activeSession is { } active && dropSet.Contains(active);
+        if (dropGapless || dropActive)
+        {
+            CancelLibraryGapless();
+        }
+
+        if (WillClearAllLibrarySessions(dropSet) || PlayerHoldsStreamFor(dropSet))
+        {
+            CancelLibraryGapless();
+            _player.ReleaseStreamSource();
+        }
+    }
+
+    private bool WillClearAllLibrarySessions(HashSet<DocumentSession> dropSet)
+    {
+        if (_sessions.Count == 0)
+        {
+            return true;
+        }
+
+        foreach (var session in _sessions)
+        {
+            if (!dropSet.Contains(session))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool PlayerHoldsStreamFor(IEnumerable<DocumentSession> sessions)
+    {
+        if (!_player.IsStreamBound)
+        {
+            return false;
+        }
+
+        foreach (var session in sessions)
+        {
+            if (_player.IsBoundTo(session.Document))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void CancelLibraryPeakJobsFor(IEnumerable<DocumentSession> sessions)
+    {
+        foreach (var session in sessions)
+        {
+            var document = session.Document;
+            if (!_libraryPeakJobCts.TryGetValue(document, out var job))
+            {
+                continue;
+            }
+
+            try
+            {
+                job.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
     }
 
     /// <summary>プレイヤー中の Ctrl+Z。Delete で外した曲を戻す。</summary>
@@ -1047,6 +1130,9 @@ public partial class MainWindow
             StopPlayback();
         }
 
+        ReleaseLibraryStreamsForRemoved(dropSet);
+        CancelLibraryPeakJobsFor(dropSet);
+
         var cancelled = false;
         RunCloseBatch(drop, () =>
         {
@@ -1094,6 +1180,11 @@ public partial class MainWindow
         {
             _ = PlayLibrarySessionAsync(next);
             return;
+        }
+
+        if (IsPlaybackActive())
+        {
+            ScheduleLibraryGaplessPrefetch();
         }
 
         PreviewLibrarySession(next);

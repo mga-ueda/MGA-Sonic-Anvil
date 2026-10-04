@@ -1357,6 +1357,10 @@ public partial class MainWindow
             {
                 StopPlayback();
             }
+
+            // エディタへ戻す前にストリームを閉じる。Pause だけでは元ファイルが掴みっぱなしになる。
+            CancelLibraryGapless();
+            _player.ReleaseStreamSource();
         }
 
         if (mode == WaveformMaximizeMode.Library)

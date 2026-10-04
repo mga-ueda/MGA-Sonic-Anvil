@@ -206,6 +206,18 @@ internal sealed class AudioPlayer : IDisposable
 
     public bool IsStreamBound => _provider.IsStreamBound;
 
+    public bool IsBoundTo(AudioDocument document) => _provider.IsBoundTo(document);
+
+    /// <summary>
+    /// ストリーム再生とギャップレス先読みのファイルハンドルを閉じる。
+    /// Pause だけでは掴んだままになるので、リストから外す／プレイヤー退出時に呼ぶ。
+    /// </summary>
+    public void ReleaseStreamSource()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _provider.ReleaseStreamSource();
+    }
+
     /// <summary>
     /// 再生速度。出力を止めずに切り替える。速度が変わったときだけ外挿の起点を更新する。
     /// </summary>
