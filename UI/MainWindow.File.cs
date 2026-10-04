@@ -1748,6 +1748,7 @@ public partial class MainWindow
         settings.DefaultSampleRate = dialog.SelectedDefaultSampleRate;
         settings.DefaultBitsPerSample = dialog.SelectedDefaultBitsPerSample;
         settings.DefaultChannelLayout = dialog.SelectedDefaultChannelLayout;
+        LibraryBrowser.SetDefaultAudioFormat(settings.ResolvedDefaultAudioFormat());
         ApplyPlayerRoute();
         LoudnessMeter.ApplyTargetFromSettings();
         ForEachWaveform(view => view.LoudnessTargetLufs = settings.ResolvedLoudnessTargetLufs());

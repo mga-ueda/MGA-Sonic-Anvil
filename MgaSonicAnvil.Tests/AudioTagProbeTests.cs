@@ -39,6 +39,9 @@ public sealed class AudioTagProbeTests
             Assert.Equal(1, row.DurationSeconds, 3);
             Assert.Equal("48kHz", row.SampleRateText);
             Assert.Equal("16bit", row.BitDepthText);
+            Assert.False(row.SampleRateNonDefault);
+            Assert.True(row.BitDepthNonDefault);
+            Assert.True(row.ChannelsNonDefault);
         }
         finally
         {

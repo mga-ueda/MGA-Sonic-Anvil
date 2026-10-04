@@ -73,6 +73,7 @@
     <SolidColorBrush x:Key="PlayerComboDropFillBrush" Color="#EC22232E" />
     <SolidColorBrush x:Key="PlayerComboDropBorderBrush" Color="#A8686870" />
     <SolidColorBrush x:Key="PlayerWaveFillBrush" Color="#94C6D9FF" />
+    <SolidColorBrush x:Key="PlayerFormatMismatchForeBrush" Color="#FFFF8A1A" />
     <SolidColorBrush x:Key="PlayerWaveSelectionEmptyBrush" Color="#FFC6D9FF" />
     <SolidColorBrush x:Key="PlayerLevelMeterTrackBorderBrush" Color="#FF5A605A" />
     <SolidColorBrush x:Key="PlayerLevelMeterTickBrush" Color="#60FFFFFF" />

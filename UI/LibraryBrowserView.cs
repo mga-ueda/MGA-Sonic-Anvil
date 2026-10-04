@@ -163,6 +163,9 @@ internal sealed class LibraryBrowserView : UserControl
     private bool _playlistWaveAutoLargeForWaveOnly = true;
     private bool _hideParentFolderForMp3Only = true;
     private bool _hideWaveformForMp3Only = true;
+    private int _defaultSampleRate = DefaultAudioFormat.SampleRate;
+    private int _defaultBitsPerSample = DefaultAudioFormat.BitsPerSample;
+    private int _defaultChannels = ChannelLayout.Stereo.Channels;
     private ContextMenu? _columnHeaderMenu;
     private int _sortChromeTicket;
     private LibraryFileColumn[] _waveColumns = [.. LibraryColumnFilter.WaveDefaults];
@@ -1606,7 +1609,7 @@ internal sealed class LibraryBrowserView : UserControl
         var rows = new LibraryFileRow[sessions.Count];
         for (var i = 0; i < sessions.Count; i++)
         {
-            rows[i] = CreateRow(sessions[i]);
+            rows[i] = CreateRowWithDefaults(sessions[i]);
         }
 
         _rows = SortRows(rows);
@@ -1637,7 +1640,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void UpdateSessionRow(DocumentSession session)
     {
-        var next = CreateRow(session);
+        var next = CreateRowWithDefaults(session);
         for (var i = 0; i < _items.Count; i++)
         {
             if (!ReferenceEquals(_items[i].Tag, session))
@@ -1688,7 +1691,7 @@ internal sealed class LibraryBrowserView : UserControl
     /// </summary>
     public void AppendSession(DocumentSession session, bool select)
     {
-        var row = CreateRow(session);
+        var row = CreateRowWithDefaults(session);
         row.GroupKey = LibraryFileList.GroupLabel(row, _group);
 
         if (_grid.ItemsSource is null || _rows.Count == 0)
@@ -4433,9 +4436,21 @@ internal sealed class LibraryBrowserView : UserControl
         AddWaveformColumn();
         AddColumn(LibraryFileColumn.AlbumArtist, nameof(LibraryFileRow.AlbumArtist));
         AddColumn(LibraryFileColumn.Kind, nameof(LibraryFileRow.Kind));
-        AddColumn(LibraryFileColumn.SampleRate, nameof(LibraryFileRow.SampleRateText), right: true);
-        AddColumn(LibraryFileColumn.BitDepth, nameof(LibraryFileRow.BitDepthText), right: true);
-        AddColumn(LibraryFileColumn.Channels, nameof(LibraryFileRow.ChannelsText), right: true);
+        AddColumn(
+            LibraryFileColumn.SampleRate,
+            nameof(LibraryFileRow.SampleRateText),
+            right: true,
+            nonDefaultBinding: nameof(LibraryFileRow.SampleRateNonDefault));
+        AddColumn(
+            LibraryFileColumn.BitDepth,
+            nameof(LibraryFileRow.BitDepthText),
+            right: true,
+            nonDefaultBinding: nameof(LibraryFileRow.BitDepthNonDefault));
+        AddColumn(
+            LibraryFileColumn.Channels,
+            nameof(LibraryFileRow.ChannelsText),
+            right: true,
+            nonDefaultBinding: nameof(LibraryFileRow.ChannelsNonDefault));
         AddColumn(LibraryFileColumn.BitRate, nameof(LibraryFileRow.BitRateText), right: true);
         AddColumn(LibraryFileColumn.Size, nameof(LibraryFileRow.SizeText), right: true);
         AddColumn(LibraryFileColumn.Folder, nameof(LibraryFileRow.Folder));
@@ -5018,15 +5033,31 @@ internal sealed class LibraryBrowserView : UserControl
     private void AddColumn(
         LibraryFileColumn column,
         string binding,
-        bool right = false)
+        bool right = false,
+        string? nonDefaultBinding = null)
     {
         var text = new Style(typeof(TextBlock));
         text.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
         text.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(LibraryColumnCellPadX, 0, LibraryColumnCellPadX, 0)));
         text.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
+        text.Setters.Add(new Setter(TextBlock.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
         if (right)
         {
             text.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right));
+        }
+
+        if (nonDefaultBinding is not null)
+        {
+            // 既定 Wave 設定と違うレート／ビット／Ch だけ着色（行全体は塗らない）。色は色設定。
+            var mismatch = new DataTrigger
+            {
+                Binding = new Binding(nonDefaultBinding),
+                Value = true,
+            };
+            mismatch.Setters.Add(new Setter(
+                TextBlock.ForegroundProperty,
+                new DynamicResourceExtension(LibraryPlayerMode.FormatMismatchForeBrushKey)));
+            text.Triggers.Add(mismatch);
         }
 
         var gridColumn = new DataGridTextColumn
@@ -6712,7 +6743,57 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
-    internal static LibraryFileRow CreateRow(DocumentSession session)
+    /// <summary>設定の既定 Wave フォーマット。違うレート／ビット／Ch をオレンジにする基準。</summary>
+    public void SetDefaultAudioFormat(DefaultAudioFormat.Spec format)
+    {
+        var rate = format.SampleRate;
+        var bits = format.BitsPerSample;
+        var channels = format.Channels;
+        if (_defaultSampleRate == rate
+            && _defaultBitsPerSample == bits
+            && _defaultChannels == channels)
+        {
+            return;
+        }
+
+        _defaultSampleRate = rate;
+        _defaultBitsPerSample = bits;
+        _defaultChannels = channels;
+        if (_rows.Count == 0)
+        {
+            return;
+        }
+
+        var active = SelectedSession;
+        var selected = SelectedSessions;
+        var rows = new LibraryFileRow[_rows.Count];
+        for (var i = 0; i < _rows.Count; i++)
+        {
+            rows[i] = _rows[i].Tag is DocumentSession session
+                ? CreateRowWithDefaults(session)
+                : _rows[i];
+        }
+
+        _rows = SortRows(rows);
+        LibraryFileList.ApplyGroupKeys(_rows, _group);
+        BindRows(active, selected);
+    }
+
+    internal static LibraryFileRow CreateRow(DocumentSession session) =>
+        CreateRow(
+            session,
+            DefaultAudioFormat.SampleRate,
+            DefaultAudioFormat.BitsPerSample,
+            ChannelLayout.Stereo.Channels);
+
+    private LibraryFileRow CreateRowWithDefaults(DocumentSession session) =>
+        CreateRow(session, _defaultSampleRate, _defaultBitsPerSample, _defaultChannels);
+
+    internal static LibraryFileRow CreateRow(
+        DocumentSession session,
+        int defaultSampleRate,
+        int defaultBitsPerSample,
+        int defaultChannels)
     {
         var document = session.Document;
         var path = document.SourcePath;
@@ -6755,6 +6836,9 @@ internal sealed class LibraryBrowserView : UserControl
             BitDepthText = bits > 0 ? UiStrings.FormatBitDepth(bits) : string.Empty,
             Channels = channels,
             ChannelsText = channels > 0 ? UiStrings.FormatChannels(channels) : string.Empty,
+            SampleRateNonDefault = LibraryPlayerMode.HighlightsFormatValue(sampleRate, defaultSampleRate),
+            BitDepthNonDefault = LibraryPlayerMode.HighlightsFormatValue(bits, defaultBitsPerSample),
+            ChannelsNonDefault = LibraryPlayerMode.HighlightsFormatValue(channels, defaultChannels),
             BitRateKbps = bitRate,
             BitRateText = UiStrings.FormatBitRate(bitRate),
             FileBytes = document.FileBytes,

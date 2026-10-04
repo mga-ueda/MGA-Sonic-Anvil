@@ -20,6 +20,7 @@ public sealed class ColorDevCatalogTests
     [InlineData("SampleLoopTimelineBrush", "SampleLoop")]
     [InlineData("RegionTimelineBrush", "Region")]
     [InlineData("MarkerBrush", "Marker")]
+    [InlineData("PlayerFormatMismatchForeBrush", "Player")]
     [InlineData("LoudnessSafeBrush", "Loudness")]
     [InlineData("LevelMeterClipOnBrush", "Meter")]
     [InlineData("LevelGradFloorBrush", "Spectrum")]
@@ -101,6 +102,7 @@ public sealed class ColorDevCatalogTests
         Assert.Contains("x:Key=\"WaveFillBrush\" Color=\"#FFC6D9FF\"", xaml);
         Assert.Contains("x:Key=\"PlayerPlaceholderJacketTopBrush\" Color=\"#FF5C5C62\"", xaml);
         Assert.Contains("x:Key=\"PlayerWaveFillBrush\" Color=\"#94C6D9FF\"", xaml);
+        Assert.Contains("x:Key=\"PlayerFormatMismatchForeBrush\" Color=\"#FFFF8A1A\"", xaml);
         Assert.Contains("x:Key=\"PlayerFallbackWashNavyBrush\" Color=\"#FF0B1B49\"", xaml);
         Assert.Contains("x:Key=\"PlayerLevelMeterTrackBorderBrush\" Color=\"#FF5A605A\"", xaml);
         Assert.Contains("x:Key=\"PlayerLevelMeterTickBrush\" Color=\"#60FFFFFF\"", xaml);

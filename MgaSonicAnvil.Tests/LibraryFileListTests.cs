@@ -163,6 +163,9 @@ public sealed class LibraryFileListTests
         Assert.True(LibraryFileList.SameContent(left, right));
         Assert.False(LibraryFileList.SameContent(left, Row("a.wav", title: "Other")));
         Assert.False(LibraryFileList.SameContent(left, Row("b.wav", title: "Song", artwork: true)));
+        Assert.False(LibraryFileList.SameContent(
+            left,
+            Row("a.wav", title: "Song", artwork: true, rateNonDefault: true)));
     }
 
     [Fact]
@@ -182,7 +185,8 @@ public sealed class LibraryFileListTests
         string folder = "",
         bool artwork = false,
         string title = "",
-        DateTime date = default) =>
+        DateTime date = default,
+        bool rateNonDefault = false) =>
         new()
         {
             Name = name,
@@ -196,6 +200,7 @@ public sealed class LibraryFileListTests
             BitDepthText = UiStrings.FormatBitDepth(24),
             Channels = 2,
             ChannelsText = UiStrings.FormatChannels(2),
+            SampleRateNonDefault = rateNonDefault,
             FileBytes = 1000,
             SizeText = "1.0 KB",
             FileDate = date,

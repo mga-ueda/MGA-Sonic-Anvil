@@ -1,9 +1,11 @@
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 using Xunit;
 
@@ -333,6 +335,23 @@ public sealed class LibraryPlayerModeTests
             Assert.Equal(LibraryPlayerMode.MeterFadeFrameRate, Timeline.GetDesiredFrameRate(fadeIn));
             Assert.Equal(LibraryPlayerMode.MeterFadeFrameRate, Timeline.GetDesiredFrameRate(fadeOut));
         });
+    }
+
+    [Fact]
+    public void HighlightsFormatValue_OnlyKnownNonDefaults()
+    {
+        Assert.Equal("PlayerFormatMismatchForeBrush", LibraryPlayerMode.FormatMismatchForeBrushKey);
+        Assert.Equal(ColorDevGroup.Player, ColorDevCatalog.GroupOf(LibraryPlayerMode.FormatMismatchForeBrushKey));
+        Assert.True(UiThemePalette.IsThemeable(LibraryPlayerMode.FormatMismatchForeBrushKey));
+        Assert.Equal(
+            Color.FromRgb(0xFF, 0x8A, 0x1A),
+            UiThemePalette.ColorFor(UiTheme.Dark, LibraryPlayerMode.FormatMismatchForeBrushKey));
+        Assert.False(LibraryPlayerMode.HighlightsFormatValue(0, 48000));
+        Assert.False(LibraryPlayerMode.HighlightsFormatValue(48000, 48000));
+        Assert.True(LibraryPlayerMode.HighlightsFormatValue(44100, 48000));
+        Assert.True(LibraryPlayerMode.HighlightsFormatValue(16, 24));
+        Assert.True(LibraryPlayerMode.HighlightsFormatValue(1, 2));
+        Assert.False(LibraryPlayerMode.HighlightsFormatValue(2, 2));
     }
 
     [Fact]

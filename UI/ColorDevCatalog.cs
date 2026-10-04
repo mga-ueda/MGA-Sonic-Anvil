@@ -151,6 +151,7 @@ internal static class ColorDevCatalog
             ("PlayerComboDropFillBrush", ColorDevGroup.Player),
             ("PlayerComboDropBorderBrush", ColorDevGroup.Player),
             ("PlayerWaveFillBrush", ColorDevGroup.Player),
+            ("PlayerFormatMismatchForeBrush", ColorDevGroup.Player),
             ("PlayerWaveSelectionEmptyBrush", ColorDevGroup.Player),
             ("PlayerLevelMeterTrackBorderBrush", ColorDevGroup.Player),
             ("PlayerLevelMeterTickBrush", ColorDevGroup.Player),

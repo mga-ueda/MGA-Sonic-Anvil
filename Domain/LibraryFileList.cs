@@ -99,6 +99,15 @@ internal sealed class LibraryFileRow
 
     public string ChannelsText { get; init; } = string.Empty;
 
+    /// <summary>既定 Wave 設定のサンプルレートと違う（プレイヤーでオレンジ表示）。</summary>
+    public bool SampleRateNonDefault { get; init; }
+
+    /// <summary>既定 Wave 設定のビット深度と違う（プレイヤーでオレンジ表示）。</summary>
+    public bool BitDepthNonDefault { get; init; }
+
+    /// <summary>既定 Wave 設定のチャンネル数と違う（プレイヤーでオレンジ表示）。</summary>
+    public bool ChannelsNonDefault { get; init; }
+
     public int BitRateKbps { get; init; }
 
     public string BitRateText { get; init; } = string.Empty;
@@ -202,6 +211,9 @@ internal static class LibraryFileList
         && left.SampleRateText == right.SampleRateText
         && left.BitDepthText == right.BitDepthText
         && left.ChannelsText == right.ChannelsText
+        && left.SampleRateNonDefault == right.SampleRateNonDefault
+        && left.BitDepthNonDefault == right.BitDepthNonDefault
+        && left.ChannelsNonDefault == right.ChannelsNonDefault
         && left.BitRateText == right.BitRateText
         && left.SizeText == right.SizeText
         && left.DateText == right.DateText

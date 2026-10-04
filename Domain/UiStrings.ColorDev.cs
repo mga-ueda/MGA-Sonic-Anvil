@@ -141,6 +141,9 @@ internal static partial class UiStrings
             "PlayerComboDropFill" => Get("コンボ・リスト塗り", "Combo · list fill"),
             "PlayerComboDropBorder" => Get("コンボ・リスト枠", "Combo · list border"),
             "PlayerWaveFill" => Get("波形", "Waveform"),
+            "PlayerFormatMismatchFore" => Get(
+                "既定フォーマットと違う文字",
+                "Text differing from default format"),
             "PlayerWaveSelectionEmpty" => Get("波形・選択の空き", "Waveform · selection empty"),
             "PlayerLevelMeterTrackBorder" => Get("トラック枠", "Track border"),
             "PlayerLevelMeterTick" => Get("目盛", "Ticks"),
