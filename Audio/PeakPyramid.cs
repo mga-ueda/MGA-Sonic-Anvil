@@ -210,16 +210,30 @@ internal sealed class PeakPyramid
         const int chunkFrames = 65536;
         var chunk = new float[chunkFrames * channels];
         long frame = 0;
+        var emptyReads = 0;
         while (frame < frames)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var wantSamples = (int)Math.Min((long)chunk.Length, (frames - frame) * channels);
-            var gotSamples = provider.Read(chunk, 0, wantSamples);
-            if (gotSamples <= 0)
+            wantSamples -= wantSamples % channels;
+            if (wantSamples < channels)
             {
                 break;
             }
 
+            var gotSamples = provider.Read(chunk, 0, wantSamples);
+            if (gotSamples <= 0)
+            {
+                emptyReads++;
+                if (emptyReads > 8)
+                {
+                    break;
+                }
+
+                continue;
+            }
+
+            emptyReads = 0;
             var gotFrames = gotSamples / channels;
             if (gotFrames <= 0)
             {
@@ -295,17 +309,31 @@ internal sealed class PeakPyramid
         const int chunkFrames = 65536;
         var chunk = new float[chunkFrames * channels];
         long frame = 0;
+        var emptyReads = 0;
         var lastProgressMs = Environment.TickCount64;
         while (frame < frames)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var wantSamples = (int)Math.Min((long)chunk.Length, (frames - frame) * channels);
-            var gotSamples = provider.Read(chunk, 0, wantSamples);
-            if (gotSamples <= 0)
+            wantSamples -= wantSamples % channels;
+            if (wantSamples < channels)
             {
                 break;
             }
 
+            var gotSamples = provider.Read(chunk, 0, wantSamples);
+            if (gotSamples <= 0)
+            {
+                emptyReads++;
+                if (emptyReads > 8)
+                {
+                    break;
+                }
+
+                continue;
+            }
+
+            emptyReads = 0;
             var gotFrames = gotSamples / channels;
             if (gotFrames <= 0)
             {

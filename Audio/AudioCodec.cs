@@ -518,13 +518,18 @@ internal static class AudioCodec
     private static WaveStream OpenReader(string path)
     {
         var kind = DetectKind(path);
-        return kind switch
+        WaveStream reader = kind switch
         {
             AudioFileKind.Aiff => new AiffFileReader(path),
             AudioFileKind.Mp3 => OpenMp3Reader(path),
             AudioFileKind.M4a => OpenMediaFoundationReader(path),
             _ => new WaveFileReader(path),
         };
+        // 24-bit WAV の短い Read 対策。MF（MP3/M4A）は Position 代入が
+        // SetCurrentPosition になり、ファイルによっては 0xC00D36B2 で落ちる。
+        return reader is WaveFileReader or AiffFileReader
+            ? new BlockAlignedWaveStream(reader)
+            : reader;
     }
 
     private static WaveStream OpenMp3Reader(string path)
