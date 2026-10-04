@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using MgaSonicAnvil.Domain;
@@ -52,17 +53,27 @@ internal static class AudioOutputFactory
     public static IWavePlayer Create(AudioOutputSettings settings, out string? fallbackMessage)
     {
         fallbackMessage = null;
-        try
+        var elapsed = Stopwatch.StartNew();
+        while (true)
         {
-            return CreateCore(settings);
-        }
-        catch (Exception ex) when (settings.Api != AudioOutputApi.WaveOut
-            || !string.IsNullOrWhiteSpace(settings.DeviceId))
-        {
-            fallbackMessage =
-                $"Requested {AudioOutputSettings.ToStoredValue(settings.Api)}"
-                + $" device '{settings.DeviceId}' failed ({ex.Message}); falling back to WaveOut default.";
-            return CreateWaveOut(deviceNumber: -1);
+            try
+            {
+                return CreateCore(settings);
+            }
+            catch (Exception ex) when (settings.Api != AudioOutputApi.WaveOut
+                || !string.IsNullOrWhiteSpace(settings.DeviceId))
+            {
+                if (AudioDeviceOpenRetry.ShouldRetry(settings.Api, ex, elapsed.Elapsed))
+                {
+                    Thread.Sleep(AudioDeviceOpenRetry.SleepMilliseconds);
+                    continue;
+                }
+
+                fallbackMessage =
+                    $"Requested {AudioOutputSettings.ToStoredValue(settings.Api)}"
+                    + $" device '{settings.DeviceId}' failed ({ex.Message}); falling back to WaveOut default.";
+                return CreateWaveOut(deviceNumber: -1);
+            }
         }
     }
 

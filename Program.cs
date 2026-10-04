@@ -11,7 +11,7 @@ static class Program
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         var files = LaunchFiles.Collect(args);
-        if (!SingleInstance.TryAcquire())
+        if (!SingleInstance.TryAcquireOrTakeOver())
         {
             SingleInstance.RequestActivate(files);
             return;

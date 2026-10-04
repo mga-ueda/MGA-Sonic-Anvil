@@ -345,6 +345,13 @@ public partial class MainWindow : Window
 
     private void ActivateFromOtherInstance()
     {
+        if (_closing)
+        {
+            // 終了中の窓は出さない。パスはキューに残し、引き継いだプロセスが読む。
+            SingleInstance.NotifyActivated();
+            return;
+        }
+
         if (Opacity < 1 || WindowPaintReveal.IsPending(this))
         {
             WindowPaintReveal.Reveal(this);
@@ -898,6 +905,7 @@ public partial class MainWindow : Window
 
         e.Cancel = true;
         _closing = true;
+        SingleInstance.MarkExiting();
         // 未保存の録音 WAV 書き出しより先に実音を止める。保存を先にすると長く鳴り続ける。
         _player.BeginShutdownFlush();
         if (IsWaveformMaximized)
@@ -942,6 +950,15 @@ public partial class MainWindow : Window
             AppStorage.Settings.MeterColumnWidth = _meterColumnPreferred;
             PersistWaapiSettings();
             AppStorage.Save();
+        }
+        catch
+        {
+            // 保存失敗でもプロセスは終える。
+        }
+
+        SingleInstance.ReleaseForHandoff();
+        try
+        {
             await _player.DisposeAsync().ConfigureAwait(true);
         }
         catch
