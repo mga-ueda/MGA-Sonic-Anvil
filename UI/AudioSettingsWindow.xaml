@@ -401,25 +401,30 @@
         </TabItem>
 
         <TabItem x:Name="PlayerTab" Header="{x:Static domain:UiStrings.LabelSettingsTabPlayer}">
+          <!-- ルート一覧はウィンドウ左右パッド内いっぱい。マージンは外枠 AudioPad と同じ。 -->
           <ScrollViewer VerticalScrollBarVisibility="Auto"
-                        HorizontalScrollBarVisibility="Disabled">
-          <StackPanel MaxWidth="{x:Static ui:DesignMetrics.SettingsPanelWidth}"
-                      HorizontalAlignment="Left">
+                        HorizontalScrollBarVisibility="Disabled"
+                        HorizontalContentAlignment="Stretch">
+          <StackPanel HorizontalAlignment="Stretch">
             <TextBlock x:Name="LibraryExplorerRootsHeader"
                        Text="{x:Static domain:UiStrings.LabelLibraryExplorerRoots}"
                        FontWeight="Bold"
                        FontSize="11.333"
-                       Margin="0,0,0,4" />
+                       Margin="0,0,0,4"
+                       HorizontalAlignment="Left" />
             <TextBlock x:Name="LibraryExplorerRootsHint"
                        Text="{x:Static domain:UiStrings.LabelLibraryExplorerRootsHint}"
                        FontSize="11"
                        TextWrapping="Wrap"
                        Opacity="0.85"
-                       Margin="0,0,0,8" />
+                       Margin="0,0,0,8"
+                       HorizontalAlignment="Stretch" />
             <ListBox x:Name="LibraryExplorerRootsList"
                      Height="160"
                      FontSize="11"
                      Padding="2"
+                     HorizontalAlignment="Stretch"
+                     HorizontalContentAlignment="Stretch"
                      DisplayMemberPath="Path"
                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
                      ScrollViewer.CanContentScroll="False"
@@ -430,7 +435,9 @@
                      DragOver="LibraryExplorerRootsList_DragOver"
                      Drop="LibraryExplorerRootsList_Drop"
                      SelectionChanged="LibraryExplorerRootsList_SelectionChanged" />
-            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,8,0,0"
+                        HorizontalAlignment="Left">
               <ui:RoundedButton x:Name="LibraryExplorerRootAddButton"
                                 Content="{x:Static domain:UiStrings.ButtonLibraryExplorerRootAdd}"
                                 Height="{x:Static ui:DesignMetrics.AudioInputHeight}"

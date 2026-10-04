@@ -345,10 +345,11 @@ internal static class DesignMetrics
     /// <summary>オーディオタブ内容の外側に足す余白。</summary>
     public static double SettingsWindowContentMargin => From96(16);
 
-    /// <summary>設定ウィンドウの初期高さ。チャンネル数で中はスクロール。</summary>
-    public static double SettingsWindowHeight => From96(600);
+    /// <summary>設定ウィンドウの初期高さ。オーディオのチャンネル行は中でスクロール。</summary>
+    public static double SettingsWindowHeight => From96(640);
 
-    public static double SettingsWindowMinHeight => From96(420);
+    /// <summary>編集タブ（フェード既定まで）が見切れない下限。編集タブに縦スクロールは無い。</summary>
+    public static double SettingsWindowMinHeight => From96(520);
 
     public static double SettingsWindowMaxHeight => From96(780);
 

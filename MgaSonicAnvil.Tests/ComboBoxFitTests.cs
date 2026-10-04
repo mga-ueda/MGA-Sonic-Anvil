@@ -40,6 +40,14 @@ public sealed class ComboBoxFitTests
     }
 
     [Fact]
+    public void SettingsWindowChromeWidth_IsStableFrameOnly()
+    {
+        var chrome = AudioSettingsWindow.SettingsWindowChromeWidth();
+        Assert.True(chrome > 0);
+        Assert.Equal(chrome, AudioSettingsWindow.SettingsWindowChromeWidth());
+    }
+
+    [Fact]
     public void AdjacentIndex_WrapsUnlessPausedAtEnds()
     {
         Assert.Equal(1, DocumentTabLayout.AdjacentIndex(0, 4, 1));

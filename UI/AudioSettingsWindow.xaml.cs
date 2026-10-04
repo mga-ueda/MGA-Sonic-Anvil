@@ -1742,8 +1742,9 @@ internal partial class AudioSettingsWindow : Window
     private void FitWindowToAudio()
     {
         // 設定ウィンドウは表示倍率の対象外（常に等倍）。
+        // 幅は文字計測だけから決める。ActualWidth を拾うと、広げたあとにまた広がる。
         var pad = DesignMetrics.AudioPad.Left + DesignMetrics.AudioPad.Right;
-        var chrome = WindowChromeWidth();
+        var chrome = SettingsWindowChromeWidth();
         var content = Max(
             AudioTabContentWidth(),
             SettingsTabBarWidth(),
@@ -1757,6 +1758,12 @@ internal partial class AudioSettingsWindow : Window
         MaxWidth = width;
         Width = width;
     }
+
+    /// <summary>
+    /// 枠だけ。ActualWidth − Content は、レイアウト前や中身が左寄せのとき膨らみ、タブ切替で幅が増え続ける。
+    /// </summary>
+    internal static double SettingsWindowChromeWidth() =>
+        SystemParameters.ResizeFrameVerticalBorderWidth * 2 + 2;
 
     private double AudioTabContentWidth()
     {
@@ -1782,11 +1789,10 @@ internal partial class AudioSettingsWindow : Window
         var speakers = Max(
             LabelWidth(SpeakerVisibilityHeader),
             MeasureSpeakerVisibilityWidth()) + gutter;
-        var waveformRow = LabelWidth(LibraryPlaylistWaveformSizeHeader)
-            + 8
-            + (LibraryPlaylistWaveformSizeCombo.ActualWidth > 0
-                ? LibraryPlaylistWaveformSizeCombo.ActualWidth
-                : DesignMetrics.From96(72));
+        var waveformCombo = LibraryPlaylistWaveformSizeCombo.Width > 1
+            ? LibraryPlaylistWaveformSizeCombo.Width
+            : DesignMetrics.From96(72);
+        var waveformRow = LabelWidth(LibraryPlaylistWaveformSizeHeader) + 8 + waveformCombo;
         var options = Max(
             LabelWidth(LibraryColumnsHeader),
             waveformRow,
@@ -1878,15 +1884,9 @@ internal partial class AudioSettingsWindow : Window
     private double LabeledComboWidth(TextBlock label, ComboBox combo) =>
         LabelWidth(label) + DesignMetrics.SettingsLabelComboGap + combo.Width;
 
-    private double LabelWidth(TextBlock label)
-    {
-        if (label.ActualWidth > 1)
-        {
-            return label.ActualWidth;
-        }
-
-        return ComboBoxFit.MeasureText(label, label.Text ?? string.Empty, label.FontSize, label.FontWeight);
-    }
+    private double LabelWidth(TextBlock label) =>
+        // Wrap 後の ActualWidth は列幅いっぱいに伸びるので、文字幅だけ使う。
+        ComboBoxFit.MeasureText(label, label.Text ?? string.Empty, label.FontSize, label.FontWeight);
 
     private static double Max(params double[] values)
     {
@@ -1897,16 +1897,6 @@ internal partial class AudioSettingsWindow : Window
         }
 
         return max;
-    }
-
-    private double WindowChromeWidth()
-    {
-        if (Content is FrameworkElement content && content.ActualWidth > 1 && ActualWidth > content.ActualWidth)
-        {
-            return ActualWidth - content.ActualWidth;
-        }
-
-        return SystemParameters.ResizeFrameVerticalBorderWidth * 2 + 2;
     }
 
     private void FillSpeakers(string selectedId)
