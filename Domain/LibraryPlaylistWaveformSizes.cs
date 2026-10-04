@@ -14,9 +14,17 @@ internal static class LibraryPlaylistWaveformSizes
     public const int BaseBarCount = 48;
 
     public static int BarCount(LibraryPlaylistWaveformSize size) =>
-        BaseBarCount * Math.Clamp((int)size, 1, 3);
+        BaseBarCount * (int)Clamp(size);
 
-    public static LibraryPlaylistWaveformSize Parse(string? value)
+    public static LibraryPlaylistWaveformSize Clamp(LibraryPlaylistWaveformSize size) =>
+        size is LibraryPlaylistWaveformSize.S or LibraryPlaylistWaveformSize.M
+            ? size
+            : LibraryPlaylistWaveformSize.L;
+
+    public static LibraryPlaylistWaveformSize Parse(string? value) =>
+        Parse(value, LibraryPlaylistWaveformSize.L);
+
+    public static LibraryPlaylistWaveformSize Parse(string? value, LibraryPlaylistWaveformSize fallback)
     {
         if (string.Equals(value, "S", StringComparison.OrdinalIgnoreCase))
         {
@@ -28,7 +36,12 @@ internal static class LibraryPlaylistWaveformSizes
             return LibraryPlaylistWaveformSize.M;
         }
 
-        return LibraryPlaylistWaveformSize.L;
+        if (string.Equals(value, "L", StringComparison.OrdinalIgnoreCase))
+        {
+            return LibraryPlaylistWaveformSize.L;
+        }
+
+        return Clamp(fallback);
     }
 
     public static string Format(LibraryPlaylistWaveformSize size) => size switch
@@ -38,37 +51,22 @@ internal static class LibraryPlaylistWaveformSizes
         _ => "L",
     };
 
-    /// <summary>WAVE だけなら true。空リストは false。</summary>
-    public static bool IsWaveOnly(IReadOnlyList<LibraryFileRow> rows)
-    {
-        if (rows.Count == 0)
-        {
-            return false;
-        }
-
-        foreach (var row in rows)
-        {
-            if (!string.Equals(LibraryColumnFilter.EffectiveKind(row), "WAVE", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
+    /// <summary>
+    /// WAVE / AIFF だけなら Wave 側、MP3 / M4A だけなら MP3 側。
+    /// 空・混在は広い方（列は1本なので、狭い設定で片方が潰れないようにする）。
+    /// </summary>
     public static LibraryPlaylistWaveformSize Resolve(
-        LibraryPlaylistWaveformSize preferred,
-        bool autoLargeForWaveOnly,
+        LibraryPlaylistWaveformSize wave,
+        LibraryPlaylistWaveformSize mp3,
         IReadOnlyList<LibraryFileRow> rows)
     {
-        if (autoLargeForWaveOnly && IsWaveOnly(rows))
+        wave = Clamp(wave);
+        mp3 = Clamp(mp3);
+        return LibraryColumnFilter.ClassifyPlaylistColumns(rows) switch
         {
-            return LibraryPlaylistWaveformSize.L;
-        }
-
-        return preferred is LibraryPlaylistWaveformSize.S or LibraryPlaylistWaveformSize.M
-            ? preferred
-            : LibraryPlaylistWaveformSize.L;
+            LibraryPlaylistColumnKind.Wave => wave,
+            LibraryPlaylistColumnKind.Mp3 => mp3,
+            _ => wave >= mp3 ? wave : mp3,
+        };
     }
 }

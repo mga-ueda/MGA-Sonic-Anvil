@@ -18,7 +18,7 @@ public sealed class LibraryPlaylistWaveformSizesTests
     }
 
     [Fact]
-    public void Parse_DefaultsToL()
+    public void Parse_UnknownUsesFallback()
     {
         Assert.Equal(LibraryPlaylistWaveformSize.L, LibraryPlaylistWaveformSizes.Parse(null));
         Assert.Equal(LibraryPlaylistWaveformSize.L, LibraryPlaylistWaveformSizes.Parse(""));
@@ -26,39 +26,42 @@ public sealed class LibraryPlaylistWaveformSizesTests
         Assert.Equal(LibraryPlaylistWaveformSize.S, LibraryPlaylistWaveformSizes.Parse("s"));
         Assert.Equal(LibraryPlaylistWaveformSize.M, LibraryPlaylistWaveformSizes.Parse("m"));
         Assert.Equal(LibraryPlaylistWaveformSize.L, LibraryPlaylistWaveformSizes.Parse("L"));
+        Assert.Equal(LibraryPlaylistWaveformSize.S, LibraryPlaylistWaveformSizes.Parse(null, LibraryPlaylistWaveformSize.S));
+        Assert.Equal(LibraryPlaylistWaveformSize.S, LibraryPlaylistWaveformSizes.Parse("", LibraryPlaylistWaveformSize.S));
+        Assert.Equal(LibraryPlaylistWaveformSize.S, LibraryPlaylistWaveformSizes.Parse("x", LibraryPlaylistWaveformSize.S));
+        Assert.Equal(LibraryPlaylistWaveformSize.L, LibraryPlaylistWaveformSizes.Parse("L", LibraryPlaylistWaveformSize.S));
     }
 
     [Fact]
-    public void IsWaveOnly_RequiresAllWave()
+    public void Resolve_UsesWaveAndMp3SizesByPlaylistKind()
     {
-        Assert.False(LibraryPlaylistWaveformSizes.IsWaveOnly([]));
-        Assert.True(LibraryPlaylistWaveformSizes.IsWaveOnly(
-            [new LibraryFileRow { Name = "a.wav", Kind = "WAVE" }]));
-        Assert.False(LibraryPlaylistWaveformSizes.IsWaveOnly(
-            [
-                new LibraryFileRow { Name = "a.wav", Kind = "WAVE" },
-                new LibraryFileRow { Name = "b.mp3", Kind = "MP3" },
-            ]));
-        Assert.False(LibraryPlaylistWaveformSizes.IsWaveOnly(
-            [new LibraryFileRow { Name = "a.aiff", Kind = "AIFF" }]));
-    }
+        var wave = new LibraryFileRow[] { new() { Name = "a.wav" } };
+        var aiff = new LibraryFileRow[] { new() { Name = "a.aiff" } };
+        var mp3 = new LibraryFileRow[] { new() { Name = "a.mp3" } };
+        var mixed = new LibraryFileRow[]
+        {
+            new() { Name = "a.wav" },
+            new() { Name = "b.mp3" },
+        };
 
-    [Fact]
-    public void Resolve_AutoLargeUsesLForWaveOnly()
-    {
-        var wave = new LibraryFileRow[] { new() { Name = "a.wav", Kind = "WAVE" } };
         Assert.Equal(
             LibraryPlaylistWaveformSize.L,
-            LibraryPlaylistWaveformSizes.Resolve(LibraryPlaylistWaveformSize.S, true, wave));
-        Assert.Equal(
-            LibraryPlaylistWaveformSize.S,
-            LibraryPlaylistWaveformSizes.Resolve(LibraryPlaylistWaveformSize.S, false, wave));
+            LibraryPlaylistWaveformSizes.Resolve(LibraryPlaylistWaveformSize.L, LibraryPlaylistWaveformSize.S, wave));
         Assert.Equal(
             LibraryPlaylistWaveformSize.M,
-            LibraryPlaylistWaveformSizes.Resolve(
-                LibraryPlaylistWaveformSize.M,
-                true,
-                [new LibraryFileRow { Name = "a.mp3", Kind = "MP3" }]));
+            LibraryPlaylistWaveformSizes.Resolve(LibraryPlaylistWaveformSize.M, LibraryPlaylistWaveformSize.S, aiff));
+        Assert.Equal(
+            LibraryPlaylistWaveformSize.S,
+            LibraryPlaylistWaveformSizes.Resolve(LibraryPlaylistWaveformSize.L, LibraryPlaylistWaveformSize.S, mp3));
+        Assert.Equal(
+            LibraryPlaylistWaveformSize.L,
+            LibraryPlaylistWaveformSizes.Resolve(LibraryPlaylistWaveformSize.L, LibraryPlaylistWaveformSize.S, mixed));
+        Assert.Equal(
+            LibraryPlaylistWaveformSize.M,
+            LibraryPlaylistWaveformSizes.Resolve(LibraryPlaylistWaveformSize.S, LibraryPlaylistWaveformSize.M, mixed));
+        Assert.Equal(
+            LibraryPlaylistWaveformSize.L,
+            LibraryPlaylistWaveformSizes.Resolve(LibraryPlaylistWaveformSize.L, LibraryPlaylistWaveformSize.S, []));
     }
 
     [Fact]

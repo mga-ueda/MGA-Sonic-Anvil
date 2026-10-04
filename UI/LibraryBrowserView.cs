@@ -160,8 +160,8 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly Dictionary<LibraryFileColumn, LibrarySortHeader> _sortHeaders = [];
     private CancellationTokenSource? _playlistWaveCts;
     private int _playlistWaveGeneration;
-    private LibraryPlaylistWaveformSize _playlistWavePreferredSize = LibraryPlaylistWaveformSize.L;
-    private bool _playlistWaveAutoLargeForWaveOnly = true;
+    private LibraryPlaylistWaveformSize _playlistWaveSizeWave = LibraryPlaylistWaveformSize.L;
+    private LibraryPlaylistWaveformSize _playlistWaveSizeMp3 = LibraryPlaylistWaveformSize.L;
     private int _defaultSampleRate = DefaultAudioFormat.SampleRate;
     private int _defaultBitsPerSample = DefaultAudioFormat.BitsPerSample;
     private int _defaultChannels = ChannelLayout.Stereo.Channels;
@@ -5743,16 +5743,13 @@ internal sealed class LibraryBrowserView : UserControl
             CurrentUsedColumns());
     }
 
-    /// <summary>設定の S/M/L・WAVE オンリー自動 L を反映する。</summary>
+    /// <summary>設定の Wave / MP3 それぞれの S/M/L を反映する。</summary>
     public void SetPlaylistWaveformOptions(
-        LibraryPlaylistWaveformSize preferredSize,
-        bool autoLargeForWaveOnly)
+        LibraryPlaylistWaveformSize waveSize,
+        LibraryPlaylistWaveformSize mp3Size)
     {
-        _playlistWavePreferredSize = preferredSize is LibraryPlaylistWaveformSize.S
-            or LibraryPlaylistWaveformSize.M
-            ? preferredSize
-            : LibraryPlaylistWaveformSize.L;
-        _playlistWaveAutoLargeForWaveOnly = autoLargeForWaveOnly;
+        _playlistWaveSizeWave = LibraryPlaylistWaveformSizes.Clamp(waveSize);
+        _playlistWaveSizeMp3 = LibraryPlaylistWaveformSizes.Clamp(mp3Size);
         ApplyActiveColumnVisibility(notify: false);
         RefreshPlaylistWaveformSize(reschedule: true);
     }
@@ -5760,8 +5757,8 @@ internal sealed class LibraryBrowserView : UserControl
     private void RefreshPlaylistWaveformSize(bool reschedule)
     {
         var next = LibraryPlaylistWaveformSizes.Resolve(
-            _playlistWavePreferredSize,
-            _playlistWaveAutoLargeForWaveOnly,
+            _playlistWaveSizeWave,
+            _playlistWaveSizeMp3,
             _rows);
         LibraryPlaylistWaveform.SetEffectiveSize(next);
         ApplyWaveformColumnWidth();

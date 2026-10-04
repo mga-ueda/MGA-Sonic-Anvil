@@ -113,68 +113,18 @@
 
             <Grid x:Name="LayoutsPlaylistPane" Grid.Column="2">
               <Grid.RowDefinitions>
-                <RowDefinition x:Name="LayoutsPlaylistOptionsRow" Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition x:Name="LayoutsPlaylistColumnsRow" Height="*" MinHeight="160" />
+                <RowDefinition Height="*" MinHeight="160" />
               </Grid.RowDefinitions>
 
-              <!-- スプリッター上部: スクロールバーなし。内容が常に収まる Auto 高さ。 -->
-              <StackPanel>
-                <TextBlock x:Name="LibraryColumnsHeader"
-                           Text="{x:Static domain:UiStrings.LabelLibraryListColumns}"
-                           FontWeight="Bold"
-                           FontSize="11.333"
-                           Margin="0,0,0,8"
-                           TextWrapping="Wrap" />
-                <Grid Margin="0,0,0,8">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                  </Grid.ColumnDefinitions>
-                  <TextBlock x:Name="LibraryPlaylistWaveformSizeHeader"
-                             Text="{x:Static domain:UiStrings.LabelLibraryPlaylistWaveformSize}"
-                             FontWeight="Bold"
-                             FontSize="11.333"
-                             VerticalAlignment="Center"
-                             Margin="0,0,8,0"
-                             TextWrapping="Wrap" />
-                  <ComboBox x:Name="LibraryPlaylistWaveformSizeCombo"
-                            Grid.Column="1"
-                            Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                            HorizontalAlignment="Left"
-                            MinWidth="72"
-                            VerticalAlignment="Center" />
-                </Grid>
-                <CheckBox x:Name="LibraryPlaylistWaveformAutoLargeBox"
-                          Style="{StaticResource DarkCheckBoxStyle}"
-                          Content="{x:Static domain:UiStrings.LabelLibraryPlaylistWaveformAutoLarge}"
-                          Margin="0,0,0,8" />
-              </StackPanel>
+              <TextBlock x:Name="LibraryColumnsHeader"
+                         Text="{x:Static domain:UiStrings.LabelLibraryListColumns}"
+                         FontWeight="Bold"
+                         FontSize="11.333"
+                         Margin="0,0,0,8"
+                         TextWrapping="Wrap" />
 
-              <GridSplitter x:Name="LayoutsPlaylistSplitter"
-                            Grid.Row="1"
-                            Height="{x:Static ui:DesignMetrics.LibrarySplitterHitThickness}"
-                            HorizontalAlignment="Stretch"
-                            VerticalAlignment="Center"
-                            ResizeBehavior="PreviousAndNext"
-                            ResizeDirection="Rows"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            ShowsPreview="False"
-                            Cursor="SizeNS" />
-
-              <Grid Grid.Row="2">
-                <Grid.RowDefinitions>
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-                <TextBlock x:Name="LibraryColumnChecksHeader"
-                           Text="{x:Static domain:UiStrings.LabelLibraryListColumnChecks}"
-                           FontWeight="Bold"
-                           FontSize="11.333"
-                           Margin="0,0,0,8"
-                           TextWrapping="Wrap" />
-                <Grid Grid.Row="1">
+              <Grid Grid.Row="1">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" MinWidth="120" />
                     <ColumnDefinition Width="{x:Static ui:DesignMetrics.SettingsColumnGapGrid}" />
@@ -190,6 +140,25 @@
                                  Margin="0,0,0,8"
                                  TextWrapping="Wrap" />
                       <StackPanel x:Name="LibraryColumnsWaveHost" />
+                      <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="LibraryPlaylistWaveformSizeWaveHeader"
+                                   Text="{x:Static domain:UiStrings.LabelLibraryPlaylistWaveformSize}"
+                                   FontWeight="Bold"
+                                   FontSize="11.333"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"
+                                   TextWrapping="Wrap" />
+                        <ComboBox x:Name="LibraryPlaylistWaveformSizeWaveCombo"
+                                  Grid.Column="1"
+                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                  HorizontalAlignment="Left"
+                                  MinWidth="72"
+                                  VerticalAlignment="Center" />
+                      </Grid>
                       <ui:RoundedButton x:Name="LibraryColumnsWaveResetButton"
                                         Content="{x:Static domain:UiStrings.LabelLibraryListColumnsReset}"
                                         Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
@@ -211,6 +180,25 @@
                                  Margin="0,0,0,8"
                                  TextWrapping="Wrap" />
                       <StackPanel x:Name="LibraryColumnsMp3Host" />
+                      <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="LibraryPlaylistWaveformSizeMp3Header"
+                                   Text="{x:Static domain:UiStrings.LabelLibraryPlaylistWaveformSize}"
+                                   FontWeight="Bold"
+                                   FontSize="11.333"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"
+                                   TextWrapping="Wrap" />
+                        <ComboBox x:Name="LibraryPlaylistWaveformSizeMp3Combo"
+                                  Grid.Column="1"
+                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                  HorizontalAlignment="Left"
+                                  MinWidth="72"
+                                  VerticalAlignment="Center" />
+                      </Grid>
                       <ui:RoundedButton x:Name="LibraryColumnsMp3ResetButton"
                                         Content="{x:Static domain:UiStrings.LabelLibraryListColumnsReset}"
                                         Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
@@ -221,7 +209,6 @@
                                         Click="LibraryColumnsMp3ResetButton_Click" />
                     </StackPanel>
                   </ScrollViewer>
-                </Grid>
               </Grid>
             </Grid>
           </Grid>

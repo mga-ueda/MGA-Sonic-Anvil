@@ -34,9 +34,7 @@ internal static class LibraryPlaylistWaveform
 
     public static void SetEffectiveSize(LibraryPlaylistWaveformSize size)
     {
-        size = size is LibraryPlaylistWaveformSize.S or LibraryPlaylistWaveformSize.M
-            ? size
-            : LibraryPlaylistWaveformSize.L;
+        size = LibraryPlaylistWaveformSizes.Clamp(size);
         if (_effectiveSize == size)
         {
             return;

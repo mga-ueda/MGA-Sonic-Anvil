@@ -211,11 +211,11 @@ internal sealed class AppSettings
     /// </summary>
     public string[] LibraryListColumnsMixed { get; set; } = [];
 
-    /// <summary>プレイリスト波形列の幅。S / M / L。空または不正は L。</summary>
-    public string LibraryPlaylistWaveformSize { get; set; } = "L";
+    /// <summary>WAVE / AIFF 向けプレイリスト波形列の幅。S / M / L。空または不正は L。</summary>
+    public string LibraryPlaylistWaveformSizeWave { get; set; } = "L";
 
-    /// <summary>WAVE だけのプレイリストでは波形列を自動で L。既定オン。</summary>
-    public bool LibraryPlaylistWaveformAutoLargeForWaveOnly { get; set; } = true;
+    /// <summary>MP3 / M4A 向けプレイリスト波形列の幅。S / M / L。空または不正は L。</summary>
+    public string LibraryPlaylistWaveformSizeMp3 { get; set; } = "L";
 
     /// <summary>F10 リストのグループ。空は親フォルダ。</summary>
     public string LibraryListGroup { get; set; } = string.Empty;
@@ -559,11 +559,17 @@ internal sealed class AppSettings
         LibraryListColumns = [];
     }
 
-    public LibraryPlaylistWaveformSize ResolvedLibraryPlaylistWaveformSize() =>
-        LibraryPlaylistWaveformSizes.Parse(LibraryPlaylistWaveformSize);
+    public LibraryPlaylistWaveformSize ResolvedLibraryPlaylistWaveformSizeWave() =>
+        LibraryPlaylistWaveformSizes.Parse(LibraryPlaylistWaveformSizeWave, LibraryPlaylistWaveformSize.L);
 
-    public void ApplyLibraryPlaylistWaveformSize(LibraryPlaylistWaveformSize size) =>
-        LibraryPlaylistWaveformSize = LibraryPlaylistWaveformSizes.Format(size);
+    public LibraryPlaylistWaveformSize ResolvedLibraryPlaylistWaveformSizeMp3() =>
+        LibraryPlaylistWaveformSizes.Parse(LibraryPlaylistWaveformSizeMp3, LibraryPlaylistWaveformSize.L);
+
+    public void ApplyLibraryPlaylistWaveformSizeWave(LibraryPlaylistWaveformSize size) =>
+        LibraryPlaylistWaveformSizeWave = LibraryPlaylistWaveformSizes.Format(size);
+
+    public void ApplyLibraryPlaylistWaveformSizeMp3(LibraryPlaylistWaveformSize size) =>
+        LibraryPlaylistWaveformSizeMp3 = LibraryPlaylistWaveformSizes.Format(size);
 
     public LibraryFileGroup ResolvedLibraryListGroup() =>
         LibraryFileList.ParseGroup(LibraryListGroup);

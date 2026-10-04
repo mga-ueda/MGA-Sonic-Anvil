@@ -64,10 +64,11 @@ internal partial class AudioSettingsWindow : Window
     public LibraryFileColumn[] SelectedLibraryListColumnsMp3 { get; private set; } =
         [.. LibraryColumnFilter.Mp3Defaults];
 
-    public LibraryPlaylistWaveformSize SelectedLibraryPlaylistWaveformSize { get; private set; } =
+    public LibraryPlaylistWaveformSize SelectedLibraryPlaylistWaveformSizeWave { get; private set; } =
         LibraryPlaylistWaveformSize.L;
 
-    public bool SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly { get; private set; } = true;
+    public LibraryPlaylistWaveformSize SelectedLibraryPlaylistWaveformSizeMp3 { get; private set; } =
+        LibraryPlaylistWaveformSize.L;
 
     public bool SelectedGaplessPlayback { get; private set; } = true;
 
@@ -131,8 +132,8 @@ internal partial class AudioSettingsWindow : Window
         IEnumerable<string>? libraryExplorerRoots = null,
         IEnumerable<LibraryFileColumn>? libraryListColumnsWave = null,
         IEnumerable<LibraryFileColumn>? libraryListColumnsMp3 = null,
-        LibraryPlaylistWaveformSize libraryPlaylistWaveformSize = LibraryPlaylistWaveformSize.L,
-        bool libraryPlaylistWaveformAutoLargeForWaveOnly = true,
+        LibraryPlaylistWaveformSize libraryPlaylistWaveformSizeWave = LibraryPlaylistWaveformSize.L,
+        LibraryPlaylistWaveformSize libraryPlaylistWaveformSizeMp3 = LibraryPlaylistWaveformSize.L,
         bool gaplessPlayback = true)
     {
         SelectedSettings = current;
@@ -163,11 +164,10 @@ internal partial class AudioSettingsWindow : Window
             libraryListColumnsMp3 is null
                 ? null
                 : LibraryColumnFilter.Serialize(libraryListColumnsMp3, LibraryColumnFilter.Mp3Defaults));
-        SelectedLibraryPlaylistWaveformSize = libraryPlaylistWaveformSize is LibraryPlaylistWaveformSize.S
-            or LibraryPlaylistWaveformSize.M
-            ? libraryPlaylistWaveformSize
-            : LibraryPlaylistWaveformSize.L;
-        SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly = libraryPlaylistWaveformAutoLargeForWaveOnly;
+        SelectedLibraryPlaylistWaveformSizeWave =
+            LibraryPlaylistWaveformSizes.Clamp(libraryPlaylistWaveformSizeWave);
+        SelectedLibraryPlaylistWaveformSizeMp3 =
+            LibraryPlaylistWaveformSizes.Clamp(libraryPlaylistWaveformSizeMp3);
         SelectedGaplessPlayback = gaplessPlayback;
         SelectedAutoSpeakerSelect = autoSpeakerSelect;
         SelectedActiveSpeakerId = string.IsNullOrWhiteSpace(activeSpeakerId)
@@ -318,16 +318,16 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(SpeakerVisibilityHeader, UiStrings.TipSpeakerVisibility);
         TipService.Set(SpeakerVisibilityHost, UiStrings.TipSpeakerVisibility);
         TipService.Set(LibraryColumnsHeader, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryColumnChecksHeader, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnsWaveHeader, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnsMp3Header, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnsWaveHost, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnsMp3Host, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnsWaveResetButton, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnsMp3ResetButton, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryPlaylistWaveformSizeHeader, UiStrings.TipLibraryPlaylistWaveformSize);
-        TipService.Set(LibraryPlaylistWaveformSizeCombo, UiStrings.TipLibraryPlaylistWaveformSize);
-        TipService.Set(LibraryPlaylistWaveformAutoLargeBox, UiStrings.TipLibraryPlaylistWaveformAutoLarge);
+        TipService.Set(LibraryPlaylistWaveformSizeWaveHeader, UiStrings.TipLibraryPlaylistWaveformSize);
+        TipService.Set(LibraryPlaylistWaveformSizeWaveCombo, UiStrings.TipLibraryPlaylistWaveformSize);
+        TipService.Set(LibraryPlaylistWaveformSizeMp3Header, UiStrings.TipLibraryPlaylistWaveformSize);
+        TipService.Set(LibraryPlaylistWaveformSizeMp3Combo, UiStrings.TipLibraryPlaylistWaveformSize);
         TipService.Set(AutoSpeakerSelectBox, UiStrings.TipAutoSpeakerSelect);
         TipService.Set(ApiLabel, UiStrings.TipAudioApi);
         TipService.Set(ApiCombo, UiStrings.TipAudioApi);
@@ -517,55 +517,80 @@ internal partial class AudioSettingsWindow : Window
     private void LibraryColumnsWaveResetButton_Click(object sender, RoutedEventArgs e)
     {
         SelectedLibraryListColumnsWave = [.. LibraryColumnFilter.WaveDefaults];
+        SelectedLibraryPlaylistWaveformSizeWave = LibraryPlaylistWaveformSize.L;
         FillLibraryColumnHost(
             LibraryColumnsWaveHost,
             _libraryColumnChecksWave,
             SelectedLibraryListColumnsWave,
             LibraryColumnFilter.WaveDefaults,
             LibraryColumnFilter.WaveSettingsColumns);
+        SelectLibraryPlaylistWaveformSize(
+            LibraryPlaylistWaveformSizeWaveCombo,
+            SelectedLibraryPlaylistWaveformSizeWave);
     }
 
     private void LibraryColumnsMp3ResetButton_Click(object sender, RoutedEventArgs e)
     {
         SelectedLibraryListColumnsMp3 = [.. LibraryColumnFilter.Mp3Defaults];
+        SelectedLibraryPlaylistWaveformSizeMp3 = LibraryPlaylistWaveformSize.L;
         FillLibraryColumnHost(
             LibraryColumnsMp3Host,
             _libraryColumnChecksMp3,
             SelectedLibraryListColumnsMp3,
             LibraryColumnFilter.Mp3Defaults,
             LibraryColumnFilter.Mp3SettingsColumns);
+        SelectLibraryPlaylistWaveformSize(
+            LibraryPlaylistWaveformSizeMp3Combo,
+            SelectedLibraryPlaylistWaveformSizeMp3);
     }
 
     private void FillLibraryPlaylistWaveformOptions()
     {
-        LibraryPlaylistWaveformSizeCombo.Items.Clear();
-        LibraryPlaylistWaveformSizeCombo.Items.Add(
+        FillLibraryPlaylistWaveformCombo(
+            LibraryPlaylistWaveformSizeWaveCombo,
+            SelectedLibraryPlaylistWaveformSizeWave);
+        FillLibraryPlaylistWaveformCombo(
+            LibraryPlaylistWaveformSizeMp3Combo,
+            SelectedLibraryPlaylistWaveformSizeMp3);
+    }
+
+    private void FillLibraryPlaylistWaveformCombo(
+        ComboBox combo,
+        LibraryPlaylistWaveformSize selected)
+    {
+        combo.Items.Clear();
+        combo.Items.Add(
             new LibraryPlaylistWaveformSizeItem(
                 LibraryPlaylistWaveformSize.S,
                 UiStrings.LabelLibraryPlaylistWaveformSizeS));
-        LibraryPlaylistWaveformSizeCombo.Items.Add(
+        combo.Items.Add(
             new LibraryPlaylistWaveformSizeItem(
                 LibraryPlaylistWaveformSize.M,
                 UiStrings.LabelLibraryPlaylistWaveformSizeM));
-        LibraryPlaylistWaveformSizeCombo.Items.Add(
+        combo.Items.Add(
             new LibraryPlaylistWaveformSizeItem(
                 LibraryPlaylistWaveformSize.L,
                 UiStrings.LabelLibraryPlaylistWaveformSizeL));
-        foreach (LibraryPlaylistWaveformSizeItem item in LibraryPlaylistWaveformSizeCombo.Items)
+        SelectLibraryPlaylistWaveformSize(combo, selected);
+    }
+
+    private static void SelectLibraryPlaylistWaveformSize(
+        ComboBox combo,
+        LibraryPlaylistWaveformSize selected)
+    {
+        foreach (LibraryPlaylistWaveformSizeItem item in combo.Items)
         {
-            if (item.Size == SelectedLibraryPlaylistWaveformSize)
+            if (item.Size == selected)
             {
-                LibraryPlaylistWaveformSizeCombo.SelectedItem = item;
-                break;
+                combo.SelectedItem = item;
+                return;
             }
         }
 
-        if (LibraryPlaylistWaveformSizeCombo.SelectedItem is null)
+        if (combo.Items.Count > 0)
         {
-            LibraryPlaylistWaveformSizeCombo.SelectedIndex = 0;
+            combo.SelectedIndex = 0;
         }
-
-        LibraryPlaylistWaveformAutoLargeBox.IsChecked = SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly;
     }
 
     private void ApplyLibraryExplorerRootButtons()
@@ -1042,12 +1067,12 @@ internal partial class AudioSettingsWindow : Window
         SelectedLibraryListColumnsMp3 = ReadLibraryColumns(
             _libraryColumnChecksMp3,
             SelectedLibraryListColumnsMp3);
-        SelectedLibraryPlaylistWaveformSize =
-            LibraryPlaylistWaveformSizeCombo.SelectedItem is LibraryPlaylistWaveformSizeItem sizeItem
-                ? sizeItem.Size
-                : LibraryPlaylistWaveformSize.L;
-        SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly =
-            LibraryPlaylistWaveformAutoLargeBox.IsChecked != false;
+        SelectedLibraryPlaylistWaveformSizeWave = ReadLibraryPlaylistWaveformSize(
+            LibraryPlaylistWaveformSizeWaveCombo,
+            LibraryPlaylistWaveformSize.L);
+        SelectedLibraryPlaylistWaveformSizeMp3 = ReadLibraryPlaylistWaveformSize(
+            LibraryPlaylistWaveformSizeMp3Combo,
+            LibraryPlaylistWaveformSize.L);
         SelectedGaplessPlayback = GaplessPlaybackBox.IsChecked != false;
         SelectedAutoSpeakerSelect = AutoSpeakerSelectBox.IsChecked == true;
         SelectedActiveSpeakerId = CurrentSpeaker()?.Id ?? _presets[0].Id;
@@ -1710,7 +1735,8 @@ internal partial class AudioSettingsWindow : Window
         ComboBoxFit.Apply(LanguageCombo);
         ComboBoxFit.Apply(UiScaleCombo);
         ComboBoxFit.Apply(MultiFileArrangeCombo);
-        ComboBoxFit.Apply(LibraryPlaylistWaveformSizeCombo);
+        ComboBoxFit.Apply(LibraryPlaylistWaveformSizeWaveCombo);
+        ComboBoxFit.Apply(LibraryPlaylistWaveformSizeMp3Combo);
         ComboBoxFit.Apply(DefaultSampleRateCombo);
         ComboBoxFit.Apply(DefaultBitDepthCombo);
         ComboBoxFit.Apply(DefaultChannelLayoutCombo);
@@ -1781,20 +1807,22 @@ internal partial class AudioSettingsWindow : Window
         var speakers = Max(
             LabelWidth(SpeakerVisibilityHeader),
             MeasureSpeakerVisibilityWidth()) + gutter;
-        var waveformCombo = LibraryPlaylistWaveformSizeCombo.Width > 1
-            ? LibraryPlaylistWaveformSizeCombo.Width
-            : DesignMetrics.From96(72);
-        var waveformRow = LabelWidth(LibraryPlaylistWaveformSizeHeader) + 8 + waveformCombo;
-        var options = Max(
-            LabelWidth(LibraryColumnsHeader),
-            waveformRow,
-            MeasureCheckBoxContentWidth(LibraryPlaylistWaveformAutoLargeBox)) + gutter;
+        var waveformCombo = Math.Max(
+            LibraryPlaylistWaveformSizeWaveCombo.Width > 1
+                ? LibraryPlaylistWaveformSizeWaveCombo.Width
+                : DesignMetrics.From96(72),
+            LibraryPlaylistWaveformSizeMp3Combo.Width > 1
+                ? LibraryPlaylistWaveformSizeMp3Combo.Width
+                : DesignMetrics.From96(72));
+        var waveformRow = LabelWidth(LibraryPlaylistWaveformSizeWaveHeader) + 8 + waveformCombo;
+        var options = LabelWidth(LibraryColumnsHeader) + gutter;
         var wave = Max(
-            LabelWidth(LibraryColumnChecksHeader),
             LabelWidth(LibraryColumnsWaveHeader) + 8 + DesignMetrics.From96(88),
+            waveformRow,
             MeasureLibraryColumnChecksWidth()) + gutter;
         var mp3 = Max(
             LabelWidth(LibraryColumnsMp3Header) + 8 + DesignMetrics.From96(88),
+            waveformRow,
             MeasureLibraryColumnChecksWidth()) + gutter;
         var playlist = Math.Max(
             options,
@@ -2302,6 +2330,13 @@ internal partial class AudioSettingsWindow : Window
     {
         public override string ToString() => Path;
     }
+
+    private static LibraryPlaylistWaveformSize ReadLibraryPlaylistWaveformSize(
+        ComboBox combo,
+        LibraryPlaylistWaveformSize fallback) =>
+        combo.SelectedItem is LibraryPlaylistWaveformSizeItem sizeItem
+            ? sizeItem.Size
+            : fallback;
 
     private sealed record MultiFileArrangeItem(WaveformTileArrange Arrange, string Label)
     {

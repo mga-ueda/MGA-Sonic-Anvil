@@ -1680,8 +1680,8 @@ public partial class MainWindow
             settings.ResolvedLibraryExplorerRoots(),
             settings.ResolvedLibraryListColumnsWave(),
             settings.ResolvedLibraryListColumnsMp3(),
-            settings.ResolvedLibraryPlaylistWaveformSize(),
-            settings.LibraryPlaylistWaveformAutoLargeForWaveOnly,
+            settings.ResolvedLibraryPlaylistWaveformSizeWave(),
+            settings.ResolvedLibraryPlaylistWaveformSizeMp3(),
             settings.GaplessPlayback)
         {
             Owner = this,
@@ -1726,14 +1726,13 @@ public partial class MainWindow
             settings.ResolvedLibraryListColumnsMp3(),
             settings.ResolvedLibraryListColumnsMixed(),
             mixedCustomized: settings.LibraryListColumnsMixed.Length > 0);
-        settings.ApplyLibraryPlaylistWaveformSize(dialog.SelectedLibraryPlaylistWaveformSize);
-        settings.LibraryPlaylistWaveformAutoLargeForWaveOnly =
-            dialog.SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly;
+        settings.ApplyLibraryPlaylistWaveformSizeWave(dialog.SelectedLibraryPlaylistWaveformSizeWave);
+        settings.ApplyLibraryPlaylistWaveformSizeMp3(dialog.SelectedLibraryPlaylistWaveformSizeMp3);
         settings.GaplessPlayback = dialog.SelectedGaplessPlayback;
         Mp3Gapless.Enabled = settings.GaplessPlayback;
         LibraryBrowser.SetPlaylistWaveformOptions(
-            settings.ResolvedLibraryPlaylistWaveformSize(),
-            settings.LibraryPlaylistWaveformAutoLargeForWaveOnly);
+            settings.ResolvedLibraryPlaylistWaveformSizeWave(),
+            settings.ResolvedLibraryPlaylistWaveformSizeMp3());
         UiThemeService.ApplyFromSettings(force: true);
         settings.UiScalePercent = dialog.SelectedUiScalePercent;
         UiScaleService.ApplyFromSettings();
