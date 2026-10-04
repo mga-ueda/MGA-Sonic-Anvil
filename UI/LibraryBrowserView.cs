@@ -710,6 +710,8 @@ internal sealed class LibraryBrowserView : UserControl
         {
             EnsureRowVisible(_grid.SelectedItem);
         }
+
+        RefreshGroupJacketsForActiveRow();
     }
 
     public void FocusList()
@@ -5732,6 +5734,7 @@ internal sealed class LibraryBrowserView : UserControl
             _anchorIndex = _grid.SelectedIndex;
         }
 
+        RefreshGroupJacketsForActiveRow();
         SessionActivated?.Invoke(this, session);
     }
 
@@ -5899,6 +5902,7 @@ internal sealed class LibraryBrowserView : UserControl
             _syncing = false;
         }
 
+        RefreshGroupJacketsForActiveRow();
         SessionActivated?.Invoke(this, session);
     }
 
@@ -5935,6 +5939,8 @@ internal sealed class LibraryBrowserView : UserControl
         {
             _deferActivate = false;
         }
+
+        RefreshGroupJacketsForActiveRow();
     }
 
     private void ToggleSelectionAt(int index)
@@ -7069,30 +7075,72 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         var key = name.ToString() ?? string.Empty;
-        if (_groupJackets.TryGetValue(key, out var cached))
+        var active = _grid.SelectedItem as LibraryFileRow;
+        var activeInGroup = LibraryGroupJacketPick.ContainsActive(group.Items, active);
+        if (!activeInGroup && _groupJackets.TryGetValue(key, out var cached))
         {
             return cached;
         }
 
-        BitmapSource? bitmap = null;
-        foreach (var item in group.Items)
+        if (!_groupJackets.ContainsKey(key))
         {
-            if (item is LibraryFileRow { Tag: DocumentSession session }
-                && session.Document.Artwork is { Length: > 0 } bytes)
+            var first = LibraryGroupJacketPick.Resolve(group.Items, active: null);
+            _groupJackets[key] = BitmapForGroupRow(first);
+        }
+
+        if (activeInGroup)
+        {
+            return BitmapForGroupRow(LibraryGroupJacketPick.Resolve(group.Items, active));
+        }
+
+        return _groupJackets[key];
+    }
+
+    private BitmapSource? BitmapForGroupRow(LibraryFileRow? row)
+    {
+        if (row?.Tag is DocumentSession session
+            && session.Document.Artwork is { Length: > 0 } bytes)
+        {
+            var decoded = TryCreateBitmap(bytes, ArtworkDecodeMaxEdge);
+            if (decoded is not null)
             {
-                bitmap = TryCreateBitmap(bytes, ArtworkDecodeMaxEdge);
-                break;
+                return decoded;
             }
         }
 
-        if (bitmap is null)
+        // Wave のみのときは No Image も出さない。MP3 / M4A があるときだけ枠用のプレースホルダ。
+        return ShowsGroupJackets ? LibraryPlaceholderJacket.Bitmap : null;
+    }
+
+    internal CollectionViewGroup? PlaylistGroupAt(int index)
+    {
+        if (_grid.ItemsSource is not ListCollectionView { Groups: { } groups }
+            || index < 0
+            || index >= groups.Count)
         {
-            // Wave のみのときは No Image も出さない。MP3 / M4A があるときだけ枠用のプレースホルダ。
-            bitmap = ShowsGroupJackets ? LibraryPlaceholderJacket.Bitmap : null;
+            return null;
         }
 
-        _groupJackets[key] = bitmap;
-        return bitmap;
+        return groups[index] as CollectionViewGroup;
+    }
+
+    internal CollectionViewGroup? PlaylistGroupNamed(string name)
+    {
+        if (_grid.ItemsSource is not ListCollectionView { Groups: { } groups })
+        {
+            return null;
+        }
+
+        foreach (var item in groups)
+        {
+            if (item is CollectionViewGroup group
+                && string.Equals(group.Name?.ToString(), name, StringComparison.Ordinal))
+            {
+                return group;
+            }
+        }
+
+        return null;
     }
 
     private void InvalidateGroupJackets()
@@ -7111,6 +7159,18 @@ internal sealed class LibraryBrowserView : UserControl
         }, DispatcherPriority.Background);
     }
 
+    /// <summary>選択行のジャケットへグループ枠を付け替える。1曲目のキャッシュは残す。</summary>
+    private void RefreshGroupJacketsForActiveRow()
+    {
+        if (_group == LibraryFileGroup.None)
+        {
+            return;
+        }
+
+        GroupArtworkChanged?.Invoke();
+        _ = EnsureSessionArtworkAsync(SelectedSession, generation: null);
+    }
+
     private async Task EnsureGroupArtworkAsync()
     {
         if (_group == LibraryFileGroup.None)
@@ -7121,13 +7181,19 @@ internal sealed class LibraryBrowserView : UserControl
         var gen = ++_groupArtLoad;
         var pending = new List<(DocumentSession Session, string Path)>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        var selected = SelectedSession;
         foreach (var row in _items)
         {
             if (row.Tag is not DocumentSession session
-                || !seen.Add(row.GroupKey)
                 || session.Document.HasArtwork
                 || session.Document.SourceKind is not (AudioFileKind.Mp3 or AudioFileKind.M4a)
                 || session.Document.SourcePath is not { Length: > 0 } path)
+            {
+                continue;
+            }
+
+            var isSelected = ReferenceEquals(session, selected);
+            if (!isSelected && !seen.Add(row.GroupKey))
             {
                 continue;
             }
@@ -7142,24 +7208,49 @@ internal sealed class LibraryBrowserView : UserControl
                 return;
             }
 
-            var kind = session.Document.SourceKind;
-            var bytes = await Task.Run(() =>
-            {
-                if (kind == AudioFileKind.M4a)
-                {
-                    return M4aArtwork.TryRead(path, out var art) ? art : [];
-                }
-
-                return Id3Artwork.TryRead(path, out var mp3) ? mp3 : [];
-            }).ConfigureAwait(true);
-            if (gen != _groupArtLoad || bytes.Length == 0)
-            {
-                continue;
-            }
-
-            session.Document.SetArtwork(bytes);
-            UpdateSessionRow(session);
+            await ApplyEmbeddedArtworkAsync(session, path, gen).ConfigureAwait(true);
         }
+    }
+
+    private Task EnsureSessionArtworkAsync(DocumentSession? session, int? generation)
+    {
+        if (session is null
+            || session.Document.HasArtwork
+            || session.Document.SourceKind is not (AudioFileKind.Mp3 or AudioFileKind.M4a)
+            || session.Document.SourcePath is not { Length: > 0 } path)
+        {
+            return Task.CompletedTask;
+        }
+
+        return ApplyEmbeddedArtworkAsync(session, path, generation);
+    }
+
+    private async Task ApplyEmbeddedArtworkAsync(DocumentSession session, string path, int? generation)
+    {
+        var kind = session.Document.SourceKind;
+        var bytes = await Task.Run(() => ReadEmbeddedArtwork(kind, path)).ConfigureAwait(true);
+        if (generation is { } gen && gen != _groupArtLoad)
+        {
+            return;
+        }
+
+        if (bytes.Length == 0 || session.Document.HasArtwork)
+        {
+            return;
+        }
+
+        session.Document.SetArtwork(bytes);
+        UpdateSessionRow(session);
+    }
+
+    private static byte[] ReadEmbeddedArtwork(AudioFileKind kind, string path)
+    {
+        if (kind == AudioFileKind.M4a)
+        {
+            return M4aArtwork.TryRead(path, out var art) ? art : [];
+        }
+
+        return Id3Artwork.TryRead(path, out var mp3) ? mp3 : [];
     }
 
     private void RebuildExplorerContextMenu()

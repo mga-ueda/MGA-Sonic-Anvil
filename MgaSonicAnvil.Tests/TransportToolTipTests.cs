@@ -83,6 +83,8 @@ public sealed class TransportToolTipTests
         Assert.Contains("Ctrl+C", UiStrings.TipLibraryList);
         Assert.Contains("エクスプローラーで開く", UiStrings.TipLibraryList);
         Assert.Contains("No Image", UiStrings.TipLibraryList);
+        Assert.Contains("行ごとには出さない", UiStrings.TipLibraryList);
+        Assert.Contains("選択行のものを出す", UiStrings.TipLibraryList);
         Assert.Contains("1秒でフェードイン", UiStrings.TipLibraryList);
         Assert.Contains("即表示", UiStrings.TipLibraryList);
         Assert.Contains("最初から消す", UiStrings.TipLibraryList);
