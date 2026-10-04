@@ -5595,7 +5595,8 @@ internal sealed class LibraryBrowserView : UserControl
                 return;
             }
 
-            LibraryPlaylistWaveform.Set(path, barCount, bars);
+            // 走査中に先読みピークが埋めたら、推定尺の粗い棒で上書きしない。
+            LibraryPlaylistWaveform.TrySet(path, barCount, bars);
 
             // 1 曲ごとに UI へ制御を返す（キー・スクロールを止めない）。
             try

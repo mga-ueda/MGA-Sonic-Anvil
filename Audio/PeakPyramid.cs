@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace MgaSonicAnvil.Audio;
 
 /// <summary>
@@ -7,6 +9,9 @@ namespace MgaSonicAnvil.Audio;
 /// </summary>
 internal sealed class PeakPyramid
 {
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> DecodeGates =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private const int EditorBaseBuckets = 1 << 21;
 
     /// <summary>拡大しない表示用。短いファイルは 1 サンプル粒度のまま。</summary>
@@ -114,16 +119,25 @@ internal sealed class PeakPyramid
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        using var stream = AudioCodec.OpenPlaybackStream(path);
-        var format = stream.WaveFormat;
-        var channels = Math.Max(1, format.Channels);
-        var frames = AudioCodec.EstimateStreamFrameCount(stream);
-        if (frames <= 0)
+        var gate = PathDecodeGate(path);
+        gate.Wait(cancellationToken);
+        try
         {
-            return new PeakPyramid([[]], [[]], 1, 0, 1, 0);
-        }
+            using var stream = AudioCodec.OpenPlaybackStream(path);
+            var format = stream.WaveFormat;
+            var channels = Math.Max(1, format.Channels);
+            var frames = AudioCodec.EstimateStreamFrameCount(stream);
+            if (frames <= 0)
+            {
+                return new PeakPyramid([[]], [[]], 1, 0, 1, 0);
+            }
 
-        return BuildPlayerDisplayFromProvider(stream, channels, frames, onProgress, cancellationToken);
+            return BuildPlayerDisplayFromProvider(stream, channels, frames, onProgress, cancellationToken);
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     /// <summary>
@@ -137,16 +151,25 @@ internal sealed class PeakPyramid
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         barCount = Math.Clamp(barCount, 1, PlaylistBarCountMax);
-        using var stream = AudioCodec.OpenPlaybackStream(path);
-        var format = stream.WaveFormat;
-        var channels = Math.Max(1, format.Channels);
-        var frames = AudioCodec.EstimateStreamFrameCount(stream);
-        if (frames <= 0)
+        var gate = PathDecodeGate(path);
+        gate.Wait(cancellationToken);
+        try
         {
-            return new float[barCount];
-        }
+            using var stream = AudioCodec.OpenPlaybackStream(path);
+            var format = stream.WaveFormat;
+            var channels = Math.Max(1, format.Channels);
+            var frames = AudioCodec.EstimateStreamFrameCount(stream);
+            if (frames <= 0)
+            {
+                return new float[barCount];
+            }
 
-        return BuildPlaylistBarsFromProvider(stream, channels, frames, barCount, cancellationToken);
+            return BuildPlaylistBarsFromProvider(stream, channels, frames, barCount, cancellationToken);
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     /// <summary>走査中のピークは後半が 0 のままなので、プレイリスト棒に使わない。</summary>
@@ -204,10 +227,11 @@ internal sealed class PeakPyramid
     {
         channels = Math.Max(1, channels);
         barCount = Math.Clamp(barCount, 1, PlaylistBarCountMax);
-        var bars = new float[barCount];
-        var baseBucket = Math.Max(1L, (frames + barCount - 1) / barCount);
+        var estimate = Math.Max(1, frames);
+        var baseBucket = Math.Max(1L, (estimate + barCount - 1) / barCount);
         // 棒あたり数サンプルで足りる。間引きは荒くて良い。
         var stride = Math.Max(1, (int)(baseBucket / 8));
+        var samples = new List<(long Frame, float Amp)>(barCount * 8);
 
         const int chunkFrames = 65536;
         var chunk = new float[chunkFrames * channels];
@@ -218,7 +242,7 @@ internal sealed class PeakPyramid
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var hintFrames = frame < frames ? frames - frame : chunkFrames;
+            var hintFrames = frame < estimate ? estimate - frame : chunkFrames;
             var wantSamples = (int)Math.Min((long)chunk.Length, hintFrames * channels);
             wantSamples -= wantSamples % channels;
             if (wantSamples < channels)
@@ -230,9 +254,9 @@ internal sealed class PeakPyramid
             if (gotSamples <= 0)
             {
                 emptyReads++;
-                if (frame >= frames || emptyReads > 8)
+                if (frame >= estimate || emptyReads > 8)
                 {
-                    if (frame < frames
+                    if (frame < estimate
                         && recoveries < 2
                         && TryRecoverSampleProvider(stream, frame, ref provider))
                     {
@@ -272,14 +296,42 @@ internal sealed class PeakPyramid
                     amp = Math.Max(Math.Abs(min), Math.Abs(max));
                 }
 
-                var bucket = (int)Math.Min(barCount - 1, (frame + i) / baseBucket);
-                if (amp > bars[bucket])
+                if (amp > 0f)
                 {
-                    bars[bucket] = amp;
+                    samples.Add((frame + i, amp));
                 }
             }
 
             frame += gotFrames;
+        }
+
+        return RebinPlaylistAmps(samples, frame, barCount);
+    }
+
+    /// <summary>
+    /// 推定尺ではなく実デコード長で棒へ載せる。短いと末尾に寄り、長いと後半が空になる。
+    /// </summary>
+    internal static float[] RebinPlaylistAmps(
+        IReadOnlyList<(long Frame, float Amp)> samples,
+        long actualFrames,
+        int barCount)
+    {
+        barCount = Math.Clamp(barCount, 1, PlaylistBarCountMax);
+        var bars = new float[barCount];
+        var span = Math.Max(1, actualFrames);
+        for (var i = 0; i < samples.Count; i++)
+        {
+            var (sampleFrame, amp) = samples[i];
+            if (amp <= 0f)
+            {
+                continue;
+            }
+
+            var bucket = (int)Math.Min(barCount - 1, sampleFrame * barCount / span);
+            if (amp > bars[bucket])
+            {
+                bars[bucket] = amp;
+            }
         }
 
         var peak = 0f;
@@ -937,6 +989,9 @@ internal sealed class PeakPyramid
 
         return new PeakPyramid([.. minLevels], [.. maxLevels], channels, frameCount, baseBucket, filledFrames);
     }
+
+    private static SemaphoreSlim PathDecodeGate(string path) =>
+        DecodeGates.GetOrAdd(path, static _ => new SemaphoreSlim(1, 1));
 
     /// <summary>テスト用。走査途中のモノラル包絡を再現する。</summary>
     internal static PeakPyramid CreateMonoForTests(

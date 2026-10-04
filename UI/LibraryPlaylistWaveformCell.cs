@@ -58,6 +58,18 @@ internal static class LibraryPlaylistWaveform
         BarsUpdated?.Invoke(path);
     }
 
+    /// <summary>先に埋まった棒は差し替えない（先読みピークで2曲目が跳ねるのを防ぐ）。</summary>
+    public static bool TrySet(string path, int barCount, float[] bars)
+    {
+        if (!Cache.TryAdd(CacheKey(path, barCount), bars))
+        {
+            return false;
+        }
+
+        BarsUpdated?.Invoke(path);
+        return true;
+    }
+
     public static void SetFromCompletedPeaks(string path, PeakPyramid peaks)
     {
         if (string.IsNullOrWhiteSpace(path) || !PeakPyramid.CanBuildPlaylistBarsFromPeaks(peaks))
@@ -66,7 +78,7 @@ internal static class LibraryPlaylistWaveform
         }
 
         var barCount = BarCount;
-        Set(path, barCount, PeakPyramid.BuildPlaylistBarsFromPeaks(peaks, barCount));
+        TrySet(path, barCount, PeakPyramid.BuildPlaylistBarsFromPeaks(peaks, barCount));
     }
 
     public static float[] BuildBars(

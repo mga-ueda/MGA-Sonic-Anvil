@@ -127,4 +127,26 @@ public sealed class LibraryPlaylistWaveformSizesTests
             }
         }
     }
+
+    [Fact]
+    public void TrySet_DoesNotReplaceExistingBars()
+    {
+        var path = @"C:\playlist-wave-first-wins\" + Guid.NewGuid().ToString("N") + ".mp3";
+        var barCount = LibraryPlaylistWaveform.BarCount;
+        var first = new float[barCount];
+        first[0] = 1f;
+        var second = new float[barCount];
+        second[^1] = 1f;
+
+        Assert.True(LibraryPlaylistWaveform.TrySet(path, barCount, first));
+        Assert.False(LibraryPlaylistWaveform.TrySet(path, barCount, second));
+        Assert.True(LibraryPlaylistWaveform.TryGet(path, barCount, out var stored));
+        Assert.Equal(1f, stored[0]);
+        Assert.Equal(0f, stored[^1]);
+
+        var peaks = PeakPyramid.BuildPlayerDisplay(second, 1, second.Length);
+        LibraryPlaylistWaveform.SetFromCompletedPeaks(path, peaks);
+        Assert.True(LibraryPlaylistWaveform.TryGet(path, barCount, out stored));
+        Assert.Equal(1f, stored[0]);
+    }
 }

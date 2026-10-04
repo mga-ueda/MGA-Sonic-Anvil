@@ -39,6 +39,7 @@ public partial class MainWindow
     private bool _libraryWaapiSuspended;
     private bool _restoreWaapiAfterLibrary;
     private readonly HashSet<AudioDocument> _libraryPeakJobs = [];
+    private readonly Dictionary<AudioDocument, Task> _libraryPeakTasks = [];
     private readonly Dictionary<AudioDocument, CancellationTokenSource> _libraryPeakJobCts = [];
     private int _libraryPeakGeneration;
     private int _libraryWavePaintTicket;
@@ -469,6 +470,7 @@ public partial class MainWindow
     {
         _libraryPeakGeneration++;
         _libraryPeakJobs.Clear();
+        _libraryPeakTasks.Clear();
         foreach (var job in _libraryPeakJobCts.Values)
         {
             try
@@ -1470,8 +1472,51 @@ public partial class MainWindow
         _gaplessInFlight = true;
         _gaplessFailed = false;
         var token = _gaplessToken;
-        _ = FillLibraryPeaksAsync(next);
-        _ = PrefetchLibraryGaplessAsync(next, token);
+        _ = ArmLibraryGaplessAfterPeaksAsync(next, token);
+    }
+
+    /// <summary>
+    /// 次曲のピーク走査が終わってから先読みストリームを開く。
+    /// 同じ MP3 を Media Foundation で二重に開くと、プレイリスト波形が壊れる。
+    /// </summary>
+    private async Task ArmLibraryGaplessAfterPeaksAsync(DocumentSession next, int token)
+    {
+        var startedPrefetch = false;
+        try
+        {
+            if (_activeSession is { } playing)
+            {
+                await FillLibraryPeaksAsync(playing).ConfigureAwait(true);
+            }
+
+            if (token != _gaplessToken)
+            {
+                return;
+            }
+
+            await FillLibraryPeaksAsync(next).ConfigureAwait(true);
+            if (token != _gaplessToken)
+            {
+                return;
+            }
+
+            startedPrefetch = true;
+            await PrefetchLibraryGaplessAsync(next, token).ConfigureAwait(true);
+        }
+        catch
+        {
+            if (token == _gaplessToken)
+            {
+                _gaplessFailed = true;
+            }
+        }
+        finally
+        {
+            if (!startedPrefetch && token == _gaplessToken)
+            {
+                _gaplessInFlight = false;
+            }
+        }
     }
 
     private async Task PrefetchLibraryGaplessAsync(DocumentSession next, int token)
@@ -1509,10 +1554,6 @@ public partial class MainWindow
             {
                 source.Dispose();
                 _gaplessFailed = true;
-            }
-            else
-            {
-                _ = FillLibraryPeaksAsync(next);
             }
         }
         catch
@@ -1801,13 +1842,13 @@ public partial class MainWindow
         {
             ShowLibraryArtwork(session);
         }
+        // 再生とは別ハンドルでピーク走査する（停止待ちしない）。
+        // 次曲の先読みは、今の曲と次曲の走査が終わってから開く。
+        _ = FillLibraryPeaksAsync(session);
         if (!stopAfterTrack)
         {
             ScheduleLibraryGaplessPrefetch();
         }
-
-        // 再生とは別ハンドルでピーク走査する（停止待ちしない）。
-        _ = FillLibraryPeaksAsync(session);
     }
 
     /// <summary>
@@ -2010,12 +2051,12 @@ public partial class MainWindow
         _ = FillLibraryPeaksAsync(session);
     }
 
-    private async Task FillLibraryPeaksAsync(DocumentSession session)
+    private Task FillLibraryPeaksAsync(DocumentSession session)
     {
         var document = session.Document;
         if (document.IsDeferredLoad)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         var display = IsLibraryMaximized;
@@ -2030,19 +2071,36 @@ public partial class MainWindow
                 Waveform.Refresh();
             }
 
-            return;
+            return Task.CompletedTask;
         }
 
         if (!display && document.IsStreamPlayback)
         {
-            return;
+            return Task.CompletedTask;
+        }
+
+        if (_libraryPeakTasks.TryGetValue(document, out var running)
+            && !running.IsCompleted)
+        {
+            return running;
         }
 
         if (!_libraryPeakJobs.Add(document))
         {
-            return;
+            return Task.CompletedTask;
         }
 
+        Task task = null!;
+        task = FillLibraryPeaksCoreAsync(session, document, display);
+        _libraryPeakTasks[document] = task;
+        return task;
+    }
+
+    private async Task FillLibraryPeaksCoreAsync(
+        DocumentSession session,
+        AudioDocument document,
+        bool display)
+    {
         var peakGeneration = _libraryPeakGeneration;
         var pendingPartial = new PeakPyramid?[1];
         var invokePending = 0;
@@ -2138,6 +2196,12 @@ public partial class MainWindow
             jobCts.Dispose();
             if (peakGeneration == _libraryPeakGeneration)
             {
+                if (_libraryPeakTasks.TryGetValue(document, out var trackedTask)
+                    && trackedTask.IsCompleted)
+                {
+                    _libraryPeakTasks.Remove(document);
+                }
+
                 _libraryPeakJobs.Remove(document);
             }
         }

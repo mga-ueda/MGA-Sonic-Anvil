@@ -247,6 +247,24 @@ public sealed class PeakPyramidTests
     }
 
     [Fact]
+    public void RebinPlaylistAmps_UsesActualLengthNotEstimate()
+    {
+        const int bars = 8;
+        // 推定が短いと末尾へ寄り、実尺で載せ直すと中央のピークが中央の棒へ来る。
+        var samples = new List<(long Frame, float Amp)>
+        {
+            (0, 0.1f),
+            (50, 1f),
+            (99, 0.1f),
+        };
+        var rebinned = PeakPyramid.RebinPlaylistAmps(samples, actualFrames: 100, bars);
+        Assert.Equal(bars, rebinned.Length);
+        Assert.True(rebinned[4] >= 0.99f, string.Join(',', rebinned));
+        Assert.True(rebinned[0] < 0.5f);
+        Assert.True(rebinned[^1] < 0.5f);
+    }
+
+    [Fact]
     public void CanBuildPlaylistBarsFromPeaks_RejectsInProgressScan()
     {
         const int buckets = 8;
