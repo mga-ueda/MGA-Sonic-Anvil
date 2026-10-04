@@ -828,68 +828,92 @@ public partial class MainWindow
         _ = PlayLibrarySessionAsync(session);
     }
 
-    private void RegisterLibraryPaths(IReadOnlyList<string> paths) =>
-        RegisterLibraryPaths(paths, play: true);
+    private Task RegisterLibraryPathsAsync(IReadOnlyList<string> paths) =>
+        RegisterLibraryPathsAsync(paths, play: true);
 
-    private void RegisterLibraryPaths(IReadOnlyList<string> paths, bool play)
+    private async Task RegisterLibraryPathsAsync(IReadOnlyList<string> paths, bool play)
     {
         // 進行中のフォルダ追加を止めて、起動・ドロップを優先する。
         CancelLibraryFolderShow();
         var playFirst = play && (_libraryPlayFirstPending || _sessions.Count == 0);
         DocumentSession? opened = null;
         DocumentSession? existingFirst = null;
-        foreach (var path in paths)
+        var showProgress = paths.Count > 1;
+        try
         {
-            var existing = FindSessionByPath(path);
-            if (existing is not null)
+            for (var i = 0; i < paths.Count; i++)
             {
-                existingFirst ??= existing;
-                continue;
+                var path = paths[i];
+                if (showProgress)
+                {
+                    SetOpenStatus(i + 1, paths.Count, Path.GetFileName(path) ?? path);
+                }
+
+                var existing = FindSessionByPath(path);
+                if (existing is not null)
+                {
+                    existingFirst ??= existing;
+                    continue;
+                }
+
+                var session = await Task.Run(() =>
+                {
+                    var document = AudioDocument.CreateDeferred(path);
+                    AudioTagProbe.Ensure(document);
+                    return new DocumentSession(document);
+                }).ConfigureAwait(true);
+
+                _sessions.Add(session);
+                opened ??= session;
+
+                // 1 件ごとに UI へ制御を返す（キー連打・描画を止めない）。
+                await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Background);
             }
 
-            var document = AudioDocument.CreateDeferred(path);
-            AudioTagProbe.Ensure(document);
-            var session = new DocumentSession(document);
-            _sessions.Add(session);
-            opened ??= session;
-        }
-
-        RebuildTabBar();
-        if (!play)
-        {
-            // 追加だけ。選択も再生中の曲も動かさない（選択変更は SessionActivated で再生し直す）。
-            if (IsLibraryMaximized)
+            RebuildTabBar();
+            if (!play)
             {
-                LibraryBrowser.SetSessions(
-                    _sessions,
-                    LibraryBrowser.SelectedSession,
-                    LibraryBrowser.SelectedSessions);
+                // 追加だけ。選択も再生中の曲も動かさない（選択変更は SessionActivated で再生し直す）。
+                if (IsLibraryMaximized)
+                {
+                    LibraryBrowser.SetSessions(
+                        _sessions,
+                        LibraryBrowser.SelectedSession,
+                        LibraryBrowser.SelectedSessions);
+                }
+
+                SyncPlayerMeterFade();
+                return;
+            }
+
+            if (playFirst)
+            {
+                SelectAndPlayFirstLibraryTrack();
+                _libraryPlayFirstPending = false;
+                SyncPlayerMeterFade();
+                return;
+            }
+
+            var active = LaunchFiles.PreferOpened(opened, existingFirst);
+            if (IsLibraryMaximized && active is not null)
+            {
+                LibraryBrowser.SetSessions(_sessions, active, [active]);
+            }
+
+            if (active is not null)
+            {
+                _ = PlayLibrarySessionAsync(active);
             }
 
             SyncPlayerMeterFade();
-            return;
         }
-
-        if (playFirst)
+        finally
         {
-            SelectAndPlayFirstLibraryTrack();
-            _libraryPlayFirstPending = false;
-            SyncPlayerMeterFade();
-            return;
+            if (showProgress)
+            {
+                ClearOpenStatus();
+            }
         }
-
-        var active = LaunchFiles.PreferOpened(opened, existingFirst);
-        if (IsLibraryMaximized && active is not null)
-        {
-            LibraryBrowser.SetSessions(_sessions, active, [active]);
-        }
-
-        if (active is not null)
-        {
-            _ = PlayLibrarySessionAsync(active);
-        }
-
-        SyncPlayerMeterFade();
     }
 
     /// <summary>
@@ -2436,6 +2460,8 @@ public partial class MainWindow
         _libraryExplorerPlayOnOpen = false;
         var generation = ++_libraryFolderShowGeneration;
         _libraryFolderPlaySession = null;
+        // 前の追加が残した進捗表示を消す（世代不一致の finally では消さないため）。
+        ClearOpenStatus();
         var filter = walk ?? LibraryBrowser.SnapshotExplorerPlaylistWalk();
         var remaining = new Stack<(string Path, bool AncestorHit)>();
         for (var i = folders.Count - 1; i >= 0; i--)
@@ -2457,10 +2483,39 @@ public partial class MainWindow
 
         _libraryPlayFirstPending = false;
         var firstHandled = false;
+        var loaded = 0;
+        var planned = 0;
+        var showProgress = false;
+
+        void PlanFiles(int count)
+        {
+            if (count <= 0)
+            {
+                return;
+            }
+
+            planned += count;
+            if (planned > 1)
+            {
+                showProgress = true;
+            }
+        }
+
         async Task<bool> AppendFoundAsync(string path)
         {
+            if (generation != _libraryFolderShowGeneration || !IsLibraryMaximized)
+            {
+                return false;
+            }
+
             var first = !firstHandled;
             var select = playFirst && first;
+            loaded++;
+            if (showProgress)
+            {
+                SetOpenStatus(loaded, planned, Path.GetFileName(path) ?? path);
+            }
+
             if (!await TryAppendLibrarySessionAsync(path, generation, select, play: select)
                     .ConfigureAwait(true))
             {
@@ -2501,6 +2556,7 @@ public partial class MainWindow
                         && filter.IncludeFile(current.Path, current.AncestorHit)
                         && FindSessionByPath(current.Path) is null)
                     {
+                        PlanFiles(1);
                         if (!await AppendFoundAsync(current.Path).ConfigureAwait(true))
                         {
                             if (generation != _libraryFolderShowGeneration)
@@ -2553,6 +2609,16 @@ public partial class MainWindow
                     return;
                 }
 
+                var fresh = 0;
+                foreach (var file in layer.files)
+                {
+                    if (FindSessionByPath(file) is null)
+                    {
+                        fresh++;
+                    }
+                }
+
+                PlanFiles(fresh);
                 foreach (var file in layer.files)
                 {
                     if (FindSessionByPath(file) is not null)
@@ -2615,6 +2681,10 @@ public partial class MainWindow
             if (generation == _libraryFolderShowGeneration)
             {
                 _libraryFolderPlaySession = null;
+                if (showProgress)
+                {
+                    ClearOpenStatus();
+                }
             }
         }
     }
@@ -2733,6 +2803,7 @@ public partial class MainWindow
     {
         _libraryFolderShowGeneration++;
         _libraryFolderPlaySession = null;
+        ClearOpenStatus();
     }
 
     private bool TryClearLibrarySessions()

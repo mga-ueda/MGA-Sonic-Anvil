@@ -172,7 +172,7 @@ public partial class MainWindow
 
         if (IsLibraryMaximized)
         {
-            RegisterLibraryPaths(targets);
+            await RegisterLibraryPathsAsync(targets).ConfigureAwait(true);
             if (_queuedOpenPaths.Count > 0)
             {
                 var queued = _queuedOpenPaths.ToArray();
@@ -415,8 +415,20 @@ public partial class MainWindow
             jobs);
     }
 
+    private void SetOpenStatus(int current, int total, string name)
+    {
+        _openStatusText = UiStrings.StatusOpeningFiles(current, total, name);
+        _openStatusRatio = total <= 0 ? 0 : current / (double)total;
+        RefreshStatus();
+    }
+
     private void ClearOpenStatus()
     {
+        if (_openStatusText is null && _openStatusRatio == 0)
+        {
+            return;
+        }
+
         _openStatusText = null;
         _openStatusRatio = 0;
         RefreshStatus();
