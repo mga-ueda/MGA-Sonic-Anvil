@@ -819,7 +819,7 @@ public partial class MainWindow
     private void RegisterLibraryPaths(IReadOnlyList<string> paths, bool play)
     {
         // 進行中のフォルダ追加を止めて、起動・ドロップを優先する。
-        _libraryFolderShowGeneration++;
+        CancelLibraryFolderShow();
         var playFirst = play && (_libraryPlayFirstPending || _sessions.Count == 0);
         DocumentSession? opened = null;
         DocumentSession? existingFirst = null;
@@ -2456,7 +2456,7 @@ public partial class MainWindow
             {
                 if (generation != _libraryFolderShowGeneration)
                 {
-                    LibraryBrowser.FinishIncrementalSessionLoad();
+                    // 新しい Enter / 追加が進行中。波形仕上げはそちらに任せる。
                     return;
                 }
 
@@ -2477,6 +2477,11 @@ public partial class MainWindow
                     {
                         if (!await AppendFoundAsync(current.Path).ConfigureAwait(true))
                         {
+                            if (generation != _libraryFolderShowGeneration)
+                            {
+                                return;
+                            }
+
                             LibraryBrowser.FinishIncrementalSessionLoad();
                             return;
                         }
@@ -2512,7 +2517,6 @@ public partial class MainWindow
 
                 if (generation != _libraryFolderShowGeneration)
                 {
-                    LibraryBrowser.FinishIncrementalSessionLoad();
                     return;
                 }
 
@@ -2532,6 +2536,11 @@ public partial class MainWindow
 
                     if (!await AppendFoundAsync(file).ConfigureAwait(true))
                     {
+                        if (generation != _libraryFolderShowGeneration)
+                        {
+                            return;
+                        }
+
                         LibraryBrowser.FinishIncrementalSessionLoad();
                         return;
                     }
@@ -2693,8 +2702,18 @@ public partial class MainWindow
         LibraryBrowser.RequestListFocus();
     }
 
+    /// <summary>進行中のフォルダ再帰追加を破棄する（Enter 置換・ドロップなど）。</summary>
+    private void CancelLibraryFolderShow()
+    {
+        _libraryFolderShowGeneration++;
+        _libraryFolderPlaySession = null;
+    }
+
     private bool TryClearLibrarySessions()
     {
+        // Enter 置換などはクリア直後〜新走査開始前に、前回の非同期追加が戻ってこないよう世代を進める。
+        CancelLibraryFolderShow();
+
         if (_sessions.Count == 0)
         {
             if (IsLibraryMaximized)
