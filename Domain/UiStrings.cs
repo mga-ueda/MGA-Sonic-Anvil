@@ -163,13 +163,13 @@ internal static partial class UiStrings
     public static string LabelLibraryPlaylistWaveformSizeM => Get("M（中）", "M (medium)");
     public static string LabelLibraryPlaylistWaveformSizeL => Get("L（長）", "L (long)");
     public static string LabelLibraryPlaylistWaveformAutoLarge => Get(
-        "Wave オンリーのときは自動で L",
-        "Use L automatically for WAVE-only playlists");
+        "Wave オンリーのときは波形表示を自動で L サイズにする",
+        "Use L-size waveform automatically for WAVE-only playlists");
     public static string TipLibraryPlaylistWaveformSize => Get(
         "プレイリストの波形表示列の幅。L が既定。M は S の 2 倍、L は 3 倍。棒の間引きは同じで、長さだけ変える。",
         "Width of the playlist waveform column. L is the default. M is 2× S, L is 3× S. Bar thinning stays the same; only the length changes.");
     public static string TipLibraryPlaylistWaveformAutoLarge => Get(
-        "プレイリストが WAVE だけのとき、波形表示を自動で L にする。既定オン。MP3 などが混ざると選んだ S / M / L に戻る。",
+        "プレイリストが WAVE だけのとき、波形表示を自動で L サイズにする。既定オン。MP3 などが混ざると選んだ S / M / L に戻る。",
         "When the playlist is WAVE-only, the waveform column switches to L automatically. On by default. Mixed playlists (e.g. with MP3) use the chosen S / M / L.");
     public static string LabelLibraryHideParentFolderForMp3Only => Get(
         "MP3 オンリーのときは親フォルダを出さない",
