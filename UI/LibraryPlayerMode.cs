@@ -151,6 +151,7 @@ internal static class LibraryPlayerMode
             (Key.A, ModifierKeys.Control) => true,
             (Key.F, ModifierKeys.Control) => true,
             (Key.S, ModifierKeys.Alt) => true,
+            (Key.A, ModifierKeys.Alt) => true,
             (Key.O, ModifierKeys.Control) => true,
             (Key.O, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Q, ModifierKeys.Control) => true,

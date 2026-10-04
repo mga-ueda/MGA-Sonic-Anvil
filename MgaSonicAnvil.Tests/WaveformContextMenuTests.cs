@@ -133,6 +133,9 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.SilentSkip, commands);
             var silentSkip = Find(tree, WaveMenuCommand.SilentSkip);
             Assert.Equal("Alt+S", silentSkip?.Gesture);
+            Assert.Contains(WaveMenuCommand.AlwaysOnTop, commands);
+            var alwaysOnTop = Find(tree, WaveMenuCommand.AlwaysOnTop);
+            Assert.Equal("Alt+A", alwaysOnTop?.Gesture);
             Assert.Contains(WaveMenuCommand.Volume, commands);
             var volume = Find(tree, WaveMenuCommand.Volume);
             var loudness = Find(tree, WaveMenuCommand.ViewLoudness);

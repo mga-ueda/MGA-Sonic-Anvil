@@ -252,10 +252,16 @@ public partial class MainWindow
             return true;
         }
 
-        // プレイヤーでも Silent Skip トグルはステータスバー非表示の F9 中も効かせる。
+        // プレイヤーでも Silent Skip / Always on Top はステータスバー非表示の F9 中も効かせる。
         if (key == Key.S && modifiers == ModifierKeys.Alt)
         {
             SilentSkipCheck.IsChecked = SilentSkipCheck.IsChecked != true;
+            return true;
+        }
+
+        if (key == Key.A && modifiers == ModifierKeys.Alt)
+        {
+            AlwaysOnTopCheck.IsChecked = AlwaysOnTopCheck.IsChecked != true;
             return true;
         }
 

@@ -1599,7 +1599,7 @@ public partial class MainWindow
 
     /// <summary>
     /// F9。プレイヤー中だけサイド列・ステータス・トランスポート／メーター列を畳む。
-    /// 波形は残す。再生と Alt+S（Silent Skip）は続ける。
+    /// 波形は残す。再生と Alt+S（Silent Skip）／Alt+A（Always on Top）は続ける。
     /// ApplyWaveformMaximizeChrome のあとに呼ぶ。
     /// </summary>
     private void ApplyLibraryMinimalChrome()

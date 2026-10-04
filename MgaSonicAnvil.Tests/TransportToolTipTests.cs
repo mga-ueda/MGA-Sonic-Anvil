@@ -51,6 +51,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("F12", UiStrings.TooltipAnalyzerMaximizeOff);
         Assert.Contains("Ctrl+Shift+C", UiStrings.TooltipColorPanel);
         Assert.Contains("Alt+S", UiStrings.TipSilentSkip);
+        Assert.Contains("Alt+A", UiStrings.TipAlwaysOnTop);
         Assert.Contains("Ctrl+Space", UiStrings.TipPlay);
         Assert.Contains("プレイヤーでは Space／Enter", UiStrings.TipPlay);
         Assert.Contains("プレイリストの Tips", UiStrings.TipPlay);

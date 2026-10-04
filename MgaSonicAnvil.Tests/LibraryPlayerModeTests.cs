@@ -123,6 +123,7 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.AllowsKey(Key.O, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.S, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.A, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.R, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsShuffleToggle(Key.R, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsShuffleToggle(Key.R, ModifierKeys.Control));

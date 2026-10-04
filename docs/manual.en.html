@@ -262,7 +262,7 @@
           <li>While the playlist is empty, every list column stays hidden (clearing a visible list fades the headers in 1 second), and the level meter, spectrum, loudness, gonio, and surround meter stay hidden (they start hidden when you enter player). An empty playlist focuses the library (folder tree).</li>
           <li><kbd>F9</kbd> shows only the playlist and waveform (to save desktop space; from any mode).
             <ul>
-              <li>Library, Favorites, meters, analyzers, transport, and status bar stay hidden. Alt+S Silent Skip still works.</li>
+              <li>Library, Favorites, meters, analyzers, transport, and status bar stay hidden. Alt+S Silent Skip and Alt+A Always on Top still work.</li>
               <li>F9 again returns to the editor (stops playback, then keeps only the selected files and clears tab multi-selection).</li>
               <li>F10 returns to the normal player and keeps playback going.</li>
             </ul>
@@ -455,7 +455,7 @@
       <article class="part" id="layout-top">
         <h3>Always on Top</h3>
         <p class="where">Right of Silent Skip, left of <span class="ui">SPEAKER</span></p>
-        <p>Keeps the window in front.</p>
+        <p>Keeps the window in front. Toggle with <kbd>Alt</kbd>+<kbd>A</kbd>.</p>
       </article>
 
       <article class="part" id="layout-meters">
@@ -511,7 +511,7 @@
         <ul>
           <li><strong>File position</strong> — with two or more files open, the front shows the position and count, e.g. <code>1 / 10 Files</code>.</li>
           <li><strong>Format</strong> — name is on the tab. Sample rate / bit depth / channels turn red after conversion until you save. MP3 / M4A also show bit rate. Size is MB (MiB / B), and turns red as an estimate after conversion or a range delete that changes length.</li>
-          <li><strong>Silent Skip and Always on Top</strong> — left of <span class="ui">SPEAKER</span>. Silent Skip is <kbd>Alt</kbd>+<kbd>S</kbd>. Skips silence on playback, and records only above the threshold. Threshold is in Settings.</li>
+          <li><strong>Silent Skip and Always on Top</strong> — left of <span class="ui">SPEAKER</span>. Silent Skip is <kbd>Alt</kbd>+<kbd>S</kbd>. Always on Top is <kbd>Alt</kbd>+<kbd>A</kbd>. Skips silence on playback, and records only above the threshold. Threshold is in Settings.</li>
           <li><strong><span class="ui">SPEAKER</span></strong> — switches the speaker layout. Same list as Shown. The definition in use stays listed until you switch away. Auto speaker selection, off by default, switches to a matching enabled definition.</li>
           <li><strong>Times</strong> — current / selection start / selection length / selection end / total. All but total are editable. Wheel / ↑↓ nudge: time by 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min, samples by 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000. Right-click switches time and samples.</li>
         </ul>
@@ -718,6 +718,7 @@
           <tr><td><kbd>Shift</kbd>+<kbd>V</kbd></td><td>Return to the waveform (from any view)</td></tr>
           <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Solo a channel (next / previous; past the last clears it; or click a name on the left; Ctrl+click adds; Shift+click mutes / unmutes; the time selection does not change; edits stay on those lanes; muted lanes go gray)</td></tr>
           <tr><td><kbd>G</kbd></td><td>Edit NOW POS in the status bar</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>A</kbd></td><td>Always on Top (pin / unpin the window; works in every mode, including F9)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></td><td>Color settings (dark UI)</td></tr>
         </tbody>
       </table>
@@ -915,7 +916,7 @@
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td><kbd>F9</kbd></td><td>Shows only the playlist and waveform (toggle; off by default; for when you want to save desktop space). Available from any mode. The library, Favorites, level meters, analyzers, transport, and status bar stay hidden. Alt+S (Silent Skip) still works. <kbd>F9</kbd> again returns to the editor (stops playback, then keeps only the selected files and clears tab multi-selection). <kbd>F10</kbd> returns to the normal F10 player and keeps playback going. Each mode remembers its own window position and size</td></tr>
+          <tr><td><kbd>F9</kbd></td><td>Shows only the playlist and waveform (toggle; off by default; for when you want to save desktop space). Available from any mode. The library, Favorites, level meters, analyzers, transport, and status bar stay hidden. Alt+S (Silent Skip) and Alt+A (Always on Top) still work. <kbd>F9</kbd> again returns to the editor (stops playback, then keeps only the selected files and clears tab multi-selection). <kbd>F10</kbd> returns to the normal F10 player and keeps playback going. Each mode remembers its own window position and size</td></tr>
           <tr><td><kbd>F1</kbd></td><td>Focus the folder tree (same as <kbd>Ctrl</kbd>+← / <kbd>Ctrl</kbd>+↑)</td></tr>
           <tr><td><kbd>F2</kbd></td><td>Focus Favorites</td></tr>
           <tr><td><kbd>F3</kbd></td><td>Focus the playlist</td></tr>

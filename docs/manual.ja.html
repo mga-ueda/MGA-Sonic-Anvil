@@ -293,7 +293,7 @@
           <li>プレイリストが空のときは列をすべて隠し（表示中から空にしたときは1秒でフェードアウト）、レベルメーター・スペアナ・ラウドネス・ゴニオ／サラウンドメーターを出さず、入ったときは最初から消します。空のときはライブラリ（フォルダツリー）にフォーカスします。</li>
           <li><kbd>F9</kbd> でプレイリストと波形だけを出します（デスクトップの占有面積を節約したいとき。どのモードからでも）。
             <ul>
-              <li>ライブラリ／お気に入り／メーター／アナライザ／トランスポート／ステータスバーは出ません。Alt+S（Silent Skip）は効きます。</li>
+              <li>ライブラリ／お気に入り／メーター／アナライザ／トランスポート／ステータスバーは出ません。Alt+S（Silent Skip）と Alt+A（Always on Top）は効きます。</li>
               <li>もう一度 <kbd>F9</kbd> で通常のエディタへ戻します（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除）。</li>
               <li><kbd>F10</kbd> で通常のプレイヤー表示に戻し、再生は続けます。</li>
             </ul>
@@ -500,7 +500,7 @@
       <article class="part" id="layout-top">
         <h3>Always on Top</h3>
         <p class="where">Silent Skip の右、<span class="ui">SPEAKER</span> の左</p>
-        <p>ウィンドウを最前面に固定します。</p>
+        <p>ウィンドウを最前面に固定します。<kbd>Alt</kbd>+<kbd>A</kbd> で切り替えます。</p>
       </article>
 
       <article class="part" id="layout-meters">
@@ -561,7 +561,7 @@
         <ul>
           <li><strong>ファイル位置</strong> …… 2 ファイル以上開いているときは、冒頭に <code>1 / 10 Files</code> のように何番目／全数を表示します。</li>
           <li><strong>ファイル情報</strong> …… サンプリングレートなど（名前はタブ側）。レート／ビット深度／チャンネルを変換すると、該当項目が保存まで赤になります。MP3／M4A はビットレートも表示します。容量は MB（MiB / B）。変換や範囲削除で変わると推測サイズが赤になります。</li>
-          <li><strong>Silent Skip と Always on Top</strong> …… NOW POS の左。Silent Skip は <kbd>Alt</kbd>+<kbd>S</kbd>。無音を飛ばして再生し、録音ではしきい値超だけ書きます。しきい値は設定です。</li>
+          <li><strong>Silent Skip と Always on Top</strong> …… NOW POS の左。Silent Skip は <kbd>Alt</kbd>+<kbd>S</kbd>。Always on Top は <kbd>Alt</kbd>+<kbd>A</kbd>。無音を飛ばして再生し、録音ではしきい値超だけ書きます。しきい値は設定です。</li>
           <li><strong><span class="ui">SPEAKER</span></strong> …… その右でスピーカー配置を切り替えます。一覧は表示項目タブと同じです。今使っている定義は外しても、切り替えるまで残ります。自動スピーカー選択がオンなら、ファイルの本数に合う定義へ切り替えます。既定オフ。</li>
           <li><strong>時間</strong> …… 現在時間／選択開始／選択範囲／選択終了／トータル。トータル以外は入力・ホイール／↑↓で調整します。時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分、サンプルは 1／Shift 10／Ctrl 100／Ctrl+Shift 1000。右クリックで時間とサンプル数を切り替えます。</li>
         </ul>
@@ -849,6 +849,7 @@
           <tr><td><kbd>Shift</kbd>+<kbd>V</kbd></td><td>通常の波形表示へ（今の表示にかかわらず）</td></tr>
           <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>チャンネルをソロ（次／前。最後の次で解除。左端の名前をクリックでも可。Ctrl＋クリックで追加。Shift＋クリックでミュート／解除。時間選択は変えない。編集はそのレーンだけ。ミュートはグレー）</td></tr>
           <tr><td><kbd>G</kbd></td><td>ステータスバーの NOW POS を入力</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>A</kbd></td><td>Always on Top（ウィンドウを最前面に固定／解除。どのモードでも。F9 中も効く）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></td><td>色設定（ダーク固定）</td></tr>
         </tbody>
       </table>
@@ -1055,7 +1056,7 @@
       <table>
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
-          <tr><td><kbd>F9</kbd></td><td>プレイリストと波形だけを出す（トグル。既定オフ。デスクトップの占有面積を節約したいとき）。どのモードからでも入れる。ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出さない。Alt+S（Silent Skip）は効く。もう一度 <kbd>F9</kbd> で通常のエディタへ戻す（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除する）。<kbd>F10</kbd> で通常のプレイヤー（F10）表示に戻す（再生は続ける）。ウィンドウ位置・サイズはモード別に覚える</td></tr>
+          <tr><td><kbd>F9</kbd></td><td>プレイリストと波形だけを出す（トグル。既定オフ。デスクトップの占有面積を節約したいとき）。どのモードからでも入れる。ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出さない。Alt+S（Silent Skip）と Alt+A（Always on Top）は効く。もう一度 <kbd>F9</kbd> で通常のエディタへ戻す（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除する）。<kbd>F10</kbd> で通常のプレイヤー（F10）表示に戻す（再生は続ける）。ウィンドウ位置・サイズはモード別に覚える</td></tr>
           <tr><td><kbd>F1</kbd></td><td>フォルダツリーをアクティブ（<kbd>Ctrl</kbd>+←／<kbd>Ctrl</kbd>+↑ と同じ）</td></tr>
           <tr><td><kbd>F2</kbd></td><td>お気に入りをアクティブ</td></tr>
           <tr><td><kbd>F3</kbd></td><td>プレイリストをアクティブ</td></tr>
