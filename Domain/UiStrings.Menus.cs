@@ -137,6 +137,11 @@ internal static partial class UiStrings
     public static string WaveMenuSaveAsSelected => Get("選択ファイルを名前を付けて保存(_A)", "Save Selected Files _As");
     public static string WaveMenuSaveMp3 => Get("MP3 として保存(_M)", "Save as _MP3");
     public static string WaveMenuRenameFile => Get("ファイル名を変更(_F)", "Rename _File");
+    /// <summary>ファイルカテゴリ内。Rename(F)／Duplicate(U)／Delete(D) と重ならない E／P。</summary>
+    public static string WaveMenuCopyFileName => Get("ファイル名をコピー(_E)", "Copy File Nam_e");
+    public static string WaveMenuCopyFileNameSelected => Get("選択ファイルのファイル名をコピー(_E)", "Copy Selected File Nam_es");
+    public static string WaveMenuCopyFilePath => Get("フルパスをコピー(_P)", "Copy Full _Path");
+    public static string WaveMenuCopyFilePathSelected => Get("選択ファイルのフルパスをコピー(_P)", "Copy Selected Full _Paths");
     public static string WaveMenuDuplicateFile => Get("ファイルを複製(_U)", "D_uplicate File");
     public static string WaveMenuDuplicateFileSelected => Get("選択ファイルを複製(_U)", "D_uplicate Selected Files");
     /// <summary>書き出しカテゴリへ移動。J は既存の Wave／MP3／セパレートと重ならない。</summary>

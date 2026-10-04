@@ -76,6 +76,33 @@ public sealed class DocumentFileNamesTests
         Assert.True(DocumentFileNames.IsCaseOnlyChange(a, b));
         Assert.False(DocumentFileNames.IsCaseOnlyChange(a, Path.Combine(dir, "other.wav")));
     }
+
+    [Fact]
+    public void ClipboardFileNames_JoinsNamesAndKeepsUntitledDisplay()
+    {
+        var text = DocumentFileNames.ClipboardFileNames(
+        [
+            (@"D:\src\a.wav", "a.wav"),
+            (null, "無題"),
+            (@"D:\src\b.wav", "b.wav"),
+        ]);
+        Assert.Equal("a.wav\r\n無題\r\nb.wav", text);
+        Assert.Equal("tone.wav\r\nfolder", DocumentFileNames.ClipboardFileNames(
+        [
+            @"D:\src\tone.wav",
+            @"D:\src\folder\",
+        ]));
+    }
+
+    [Fact]
+    public void ClipboardFullPaths_JoinsResolvedPathsAndSkipsEmpty()
+    {
+        var a = Path.Combine(Path.GetTempPath(), "a.wav");
+        var b = Path.Combine(Path.GetTempPath(), "b.wav");
+        var text = DocumentFileNames.ClipboardFullPaths([a, null, "  ", b]);
+        Assert.Equal(Path.GetFullPath(a) + "\r\n" + Path.GetFullPath(b), text);
+        Assert.Equal(string.Empty, DocumentFileNames.ClipboardFullPaths([null, ""]));
+    }
 }
 
 public sealed class AudioDocumentCopyTests

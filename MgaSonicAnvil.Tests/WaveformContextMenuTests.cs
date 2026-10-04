@@ -56,9 +56,13 @@ public sealed class WaveformContextMenuTests
             var single = WaveformContextMenuBuilder.Build(WaveformContextMenuModel.AllEnabledForTests());
             Assert.Equal(UiStrings.WaveMenuSave, Find(single, WaveMenuCommand.Save)?.Header);
             Assert.Equal(UiStrings.WaveMenuSaveAs, Find(single, WaveMenuCommand.SaveAs)?.Header);
+            Assert.Equal(UiStrings.WaveMenuCopyFileName, Find(single, WaveMenuCommand.CopyFileName)?.Header);
+            Assert.Equal(UiStrings.WaveMenuCopyFilePath, Find(single, WaveMenuCommand.CopyFilePath)?.Header);
             var selected = WaveformContextMenuBuilder.Build(WaveformContextMenuModel.AllEnabledForTests(hasSelectedTabs: true));
             Assert.Equal(UiStrings.WaveMenuSaveSelected, Find(selected, WaveMenuCommand.Save)?.Header);
             Assert.Equal(UiStrings.WaveMenuSaveAsSelected, Find(selected, WaveMenuCommand.SaveAs)?.Header);
+            Assert.Equal(UiStrings.WaveMenuCopyFileNameSelected, Find(selected, WaveMenuCommand.CopyFileName)?.Header);
+            Assert.Equal(UiStrings.WaveMenuCopyFilePathSelected, Find(selected, WaveMenuCommand.CopyFilePath)?.Header);
         }
         finally
         {
@@ -217,6 +221,8 @@ public sealed class WaveformContextMenuTests
         Assert.False(Find(idle, WaveMenuCommand.FadeIn)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.Save)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.RenameFile)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.CopyFileName)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.CopyFilePath)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.DuplicateFile)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.MergeTabs)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.DeleteFile)?.Enabled);
@@ -270,6 +276,8 @@ public sealed class WaveformContextMenuTests
         Assert.True(Find(withRegions, WaveMenuCommand.NormalizePerRegion)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.Save)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.RenameFile)?.Enabled);
+        Assert.True(Find(ready, WaveMenuCommand.CopyFileName)?.Enabled);
+        Assert.True(Find(ready, WaveMenuCommand.CopyFilePath)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.DuplicateFile)?.Enabled);
         Assert.False(Find(ready, WaveMenuCommand.MergeTabs)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.DeleteFile)?.Enabled);
@@ -324,6 +332,8 @@ public sealed class WaveformContextMenuTests
         Assert.False(Find(tree, WaveMenuCommand.Record)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.NewDocument)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.RenameFile)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.CopyFileName)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.CopyFilePath)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.DuplicateFile)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.DeleteFile)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.TileGrid)?.Enabled);

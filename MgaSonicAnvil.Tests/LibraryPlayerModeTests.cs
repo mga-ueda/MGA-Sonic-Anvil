@@ -37,6 +37,8 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ViewLoudness));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.WaapiPanel));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ColorPanel));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.CopyFileName));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.CopyFilePath));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.RangeClick));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.WwiseExport));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.PlayExit));

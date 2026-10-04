@@ -652,10 +652,17 @@ public partial class MainWindow
         bool includeMerge = false)
     {
         var selected = HasTabSelection ? SelectedTabsInOrder() : null;
+        var pathTargets = selected ?? [session];
         menu.Items.Add(CreateTabMenuItem(
             UiStrings.TabMenuRenameFile,
             () => BeginFileNameEdit(session, SurfaceFromAnchor(anchor)),
             enabled: canMutate));
+        menu.Items.Add(CreateTabMenuItem(
+            selected is null ? UiStrings.WaveMenuCopyFileName : UiStrings.WaveMenuCopyFileNameSelected,
+            () => CopySessionPathTexts(pathTargets, fullPath: false)));
+        menu.Items.Add(CreateTabMenuItem(
+            selected is null ? UiStrings.WaveMenuCopyFilePath : UiStrings.WaveMenuCopyFilePathSelected,
+            () => CopySessionPathTexts(pathTargets, fullPath: true)));
         menu.Items.Add(CreateTabMenuItem(
             selected is null ? UiStrings.TabMenuDuplicateFile : UiStrings.WaveMenuDuplicateFileSelected,
             () =>

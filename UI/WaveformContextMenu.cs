@@ -105,6 +105,8 @@ internal enum WaveMenuCommand
     SaveAs,
     SaveMp3,
     RenameFile,
+    CopyFileName,
+    CopyFilePath,
     DuplicateFile,
     MergeTabs,
     DeleteFile,
@@ -570,6 +572,14 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuSaveMp3, WaveMenuCommand.SaveMp3, "Ctrl+Shift+M", m.HasDocument && !m.IsBusy && !m.IsRecording),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuRenameFile, WaveMenuCommand.RenameFile, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
+        Cmd(
+            m.HasSelectedTabs ? UiStrings.WaveMenuCopyFileNameSelected : UiStrings.WaveMenuCopyFileName,
+            WaveMenuCommand.CopyFileName,
+            enabled: m.HasDocument),
+        Cmd(
+            m.HasSelectedTabs ? UiStrings.WaveMenuCopyFilePathSelected : UiStrings.WaveMenuCopyFilePath,
+            WaveMenuCommand.CopyFilePath,
+            enabled: m.HasDocument),
         Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuDuplicateFileSelected : UiStrings.WaveMenuDuplicateFile, WaveMenuCommand.DuplicateFile, "Ctrl+Shift+D", m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
         Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuDeleteFileSelected : UiStrings.WaveMenuDeleteFile, WaveMenuCommand.DeleteFile, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,

@@ -6825,15 +6825,19 @@ internal sealed class LibraryBrowserView : UserControl
         menu.Items.Add(replace);
         menu.Items.Add(append);
         menu.Items.Add(add);
-        AddCopyAndExplorerMenuItems(menu, LibraryPane.Explorer, out var copy, out var explorer);
+        AddCopyAndExplorerMenuItems(menu, LibraryPane.Explorer, out var copy, out var copyNames, out var copyPaths, out var explorer);
         menu.Opened += (_, _) =>
         {
             var enabled = SelectedExplorerFolders.Length > 0;
+            var transfer = SelectedExplorerTransferPaths();
+            var reveal = LibraryShellFiles.ExistingPaths(SelectedExplorerFolders);
             replace.IsEnabled = enabled;
             append.IsEnabled = enabled;
             add.IsEnabled = enabled;
-            copy.IsEnabled = SelectedExplorerTransferPaths().Length > 0;
-            explorer.IsEnabled = LibraryShellFiles.ExistingPaths(SelectedExplorerFolders).Length > 0;
+            copy.IsEnabled = transfer.Length > 0;
+            copyNames.IsEnabled = transfer.Length > 0;
+            copyPaths.IsEnabled = transfer.Length > 0;
+            explorer.IsEnabled = reveal.Length > 0;
         };
         _folderTree.ContextMenu = menu;
     }
@@ -6858,7 +6862,7 @@ internal sealed class LibraryBrowserView : UserControl
         menu.Items.Add(replace);
         menu.Items.Add(append);
         menu.Items.Add(remove);
-        AddCopyAndExplorerMenuItems(menu, LibraryPane.Favorites, out var copy, out var explorer);
+        AddCopyAndExplorerMenuItems(menu, LibraryPane.Favorites, out var copy, out var copyNames, out var copyPaths, out var explorer);
         menu.Opened += (_, _) =>
         {
             var paths = LibraryShellFiles.ExistingPaths(SelectedFavoritePaths);
@@ -6867,6 +6871,8 @@ internal sealed class LibraryBrowserView : UserControl
             append.IsEnabled = selected;
             remove.IsEnabled = selected;
             copy.IsEnabled = paths.Length > 0;
+            copyNames.IsEnabled = paths.Length > 0;
+            copyPaths.IsEnabled = paths.Length > 0;
             explorer.IsEnabled = paths.Length > 0;
         };
         _favoritesList.ContextMenu = menu;
@@ -6878,12 +6884,14 @@ internal sealed class LibraryBrowserView : UserControl
         var clear = new MenuItem { Header = UiStrings.LibraryMenuClearFromPlaylist };
         clear.Click += (_, _) => ClearPlaylistRequested?.Invoke(this, EventArgs.Empty);
         menu.Items.Add(clear);
-        AddCopyAndExplorerMenuItems(menu, LibraryPane.List, out var copy, out var explorer);
+        AddCopyAndExplorerMenuItems(menu, LibraryPane.List, out var copy, out var copyNames, out var copyPaths, out var explorer);
         menu.Opened += (_, _) =>
         {
             var paths = SelectedPlaylistCopyPaths();
             clear.IsEnabled = SelectedSessions.Length > 0;
             copy.IsEnabled = paths.Length > 0;
+            copyNames.IsEnabled = paths.Length > 0;
+            copyPaths.IsEnabled = paths.Length > 0;
             explorer.IsEnabled = paths.Length > 0;
         };
         _grid.ContextMenu = menu;
@@ -6963,7 +6971,13 @@ internal sealed class LibraryBrowserView : UserControl
         SyncColumnHeaderMenuChecks();
     }
 
-    private void AddCopyAndExplorerMenuItems(ContextMenu menu, LibraryPane pane, out MenuItem copy, out MenuItem explorer)
+    private void AddCopyAndExplorerMenuItems(
+        ContextMenu menu,
+        LibraryPane pane,
+        out MenuItem copy,
+        out MenuItem copyNames,
+        out MenuItem copyPaths,
+        out MenuItem explorer)
     {
         copy = new MenuItem
         {
@@ -6971,11 +6985,30 @@ internal sealed class LibraryBrowserView : UserControl
             InputGestureText = "Ctrl+C",
         };
         copy.Click += (_, _) => CopyPaths(CopyPathsFor(pane));
+        copyNames = new MenuItem { Header = UiStrings.LibraryMenuCopyFileName };
+        copyNames.Click += (_, _) => CopyPathTexts(CopyPathsFor(pane), fullPath: false);
+        copyPaths = new MenuItem { Header = UiStrings.LibraryMenuCopyFilePath };
+        copyPaths.Click += (_, _) => CopyPathTexts(CopyPathsFor(pane), fullPath: true);
         explorer = new MenuItem { Header = UiStrings.LibraryMenuOpenInExplorer };
         explorer.Click += (_, _) => LibraryShellFiles.TryOpenInExplorer(RevealPathsFor(pane));
         menu.Items.Add(new Separator());
         menu.Items.Add(copy);
+        menu.Items.Add(copyNames);
+        menu.Items.Add(copyPaths);
         menu.Items.Add(explorer);
+    }
+
+    private void CopyPathTexts(string[] paths, bool fullPath)
+    {
+        var text = fullPath
+            ? DocumentFileNames.ClipboardFullPaths(paths)
+            : DocumentFileNames.ClipboardFileNames(paths);
+        if (text.Length == 0)
+        {
+            return;
+        }
+
+        SystemClipboard.TrySetText(text, Window.GetWindow(this));
     }
 
     private void BindLibraryCopyCommand(UIElement target, LibraryPane pane)

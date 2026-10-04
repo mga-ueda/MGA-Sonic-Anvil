@@ -773,6 +773,8 @@ public sealed class LibraryBrowserSelectionTests
                 UiStrings.LibraryMenuAppendPlaylist,
                 UiStrings.LibraryMenuAddToFavorites,
                 UiStrings.LibraryMenuCopy,
+                UiStrings.LibraryMenuCopyFileName,
+                UiStrings.LibraryMenuCopyFilePath,
                 UiStrings.LibraryMenuOpenInExplorer,
             ],
             items.Select(item => (string)item.Header).ToArray());
@@ -796,6 +798,8 @@ public sealed class LibraryBrowserSelectionTests
                 UiStrings.LibraryMenuAppendPlaylist,
                 UiStrings.LibraryMenuRemoveFromFavorites,
                 UiStrings.LibraryMenuCopy,
+                UiStrings.LibraryMenuCopyFileName,
+                UiStrings.LibraryMenuCopyFilePath,
                 UiStrings.LibraryMenuOpenInExplorer,
             ],
             view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());
@@ -819,6 +823,8 @@ public sealed class LibraryBrowserSelectionTests
             [
                 UiStrings.LibraryMenuClearFromPlaylist,
                 UiStrings.LibraryMenuCopy,
+                UiStrings.LibraryMenuCopyFileName,
+                UiStrings.LibraryMenuCopyFilePath,
                 UiStrings.LibraryMenuOpenInExplorer,
             ],
             view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());

@@ -506,6 +506,12 @@ public partial class MainWindow
                 }
 
                 break;
+            case WaveMenuCommand.CopyFileName:
+                CopySessionPathTexts(fullPath: false);
+                break;
+            case WaveMenuCommand.CopyFilePath:
+                CopySessionPathTexts(fullPath: true);
+                break;
             case WaveMenuCommand.DuplicateFile:
                 if (HasTabSelection)
                 {
@@ -674,6 +680,52 @@ public partial class MainWindow
                 TryOpenUrl(AppVersion.RepositoryUrl);
                 break;
         }
+    }
+
+    private void CopySessionPathTexts(bool fullPath)
+    {
+        var sessions = HasTabSelection
+            ? SelectedTabsInOrder()
+            : _activeSession is null ? [] : [_activeSession];
+        CopySessionPathTexts(sessions, fullPath);
+    }
+
+    private void CopySessionPathTexts(IReadOnlyList<DocumentSession> sessions, bool fullPath)
+    {
+        if (sessions.Count == 0)
+        {
+            return;
+        }
+
+        string text;
+        if (fullPath)
+        {
+            var paths = new string?[sessions.Count];
+            for (var i = 0; i < sessions.Count; i++)
+            {
+                paths[i] = sessions[i].Document.SourcePath;
+            }
+
+            text = DocumentFileNames.ClipboardFullPaths(paths);
+        }
+        else
+        {
+            var items = new (string? SourcePath, string DisplayName)[sessions.Count];
+            for (var i = 0; i < sessions.Count; i++)
+            {
+                var session = sessions[i];
+                items[i] = (session.Document.SourcePath, session.DisplayName);
+            }
+
+            text = DocumentFileNames.ClipboardFileNames(items);
+        }
+
+        if (text.Length == 0)
+        {
+            return;
+        }
+
+        SystemClipboard.TrySetText(text, this);
     }
 
     private void PlayFromFrame(long frame)

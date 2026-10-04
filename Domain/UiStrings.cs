@@ -1043,6 +1043,8 @@ internal static partial class UiStrings
     public static string LibraryMenuRemoveFromFavorites => Get("お気に入りから削除", "Remove from Favorites");
     public static string LibraryMenuClearFromPlaylist => Get("プレイリストからクリア", "Clear from Playlist");
     public static string LibraryMenuCopy => Get("コピー", "Copy");
+    public static string LibraryMenuCopyFileName => Get("ファイル名をコピー", "Copy File Name");
+    public static string LibraryMenuCopyFilePath => Get("フルパスをコピー", "Copy Full Path");
     public static string LibraryMenuOpenInExplorer => Get("エクスプローラーで開く", "Open in Explorer");
     public static string LibraryGroupNone => Get("なし", "None");
     public static string LibraryGroupTitle => Get("タイトル", "Title");
