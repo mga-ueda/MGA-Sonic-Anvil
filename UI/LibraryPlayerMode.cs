@@ -359,13 +359,13 @@ internal static class LibraryPlayerMode
         sessions.Count == 0 ? null : sessions[0];
 
     /// <summary>
-    /// 既定 Wave 設定と違うレート／ビット／Ch。0（未確定）は着色しない。
+    /// 既定 Wave フォーマットと違うレート／ビット／Ch。0（未確定）は着色しない。
     /// 着色は該当セルだけ（行全体ではない）。色は <see cref="FormatMismatchForeBrushKey"/>。
     /// </summary>
     public static bool HighlightsFormatValue(int value, int defaultValue) =>
         value > 0 && value != defaultValue;
 
-    /// <summary>既定フォーマットと違うプレイリスト文字。色設定のプレイヤー項目。</summary>
+    /// <summary>既定 Wave フォーマットと違うプレイリスト文字。色設定のプレイヤー項目。</summary>
     public const string FormatMismatchForeBrushKey = "PlayerFormatMismatchForeBrush";
 
     /// <summary>

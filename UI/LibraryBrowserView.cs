@@ -5048,7 +5048,7 @@ internal sealed class LibraryBrowserView : UserControl
 
         if (nonDefaultBinding is not null)
         {
-            // 既定 Wave 設定と違うレート／ビット／Ch だけ着色（行全体は塗らない）。色は色設定。
+            // 既定 Wave フォーマットと違うレート／ビット／Ch だけ着色（行全体は塗らない）。色は色設定。
             var mismatch = new DataTrigger
             {
                 Binding = new Binding(nonDefaultBinding),

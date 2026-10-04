@@ -1,6 +1,6 @@
 namespace MgaSonicAnvil.Audio;
 
-/// <summary>新規ファイルなどの既定フォーマット。既定は 48 kHz / 24 bit / Stereo。</summary>
+/// <summary>新規ファイルなどの既定 Wave フォーマット。既定は 48 kHz / 24 bit / Stereo。</summary>
 internal static class DefaultAudioFormat
 {
     public const int SampleRate = 48000;
