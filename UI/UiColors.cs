@@ -41,10 +41,7 @@ internal static class UiColors
         foreach (var entry in _entries)
         {
             var color = entry.Get();
-            var alpha = DefaultFor(theme, entry.Key).A;
-            var normalized = Color.FromArgb(alpha, color.R, color.G, color.B);
-            entry.Set(normalized);
-            current.Add((entry.Key, normalized));
+            current.Add((entry.Key, color));
         }
 
         SetOverrides(AppStorage.Settings, theme, CollectOverrides(current, key => DefaultFor(theme, key)));
@@ -125,14 +122,13 @@ internal static class UiColors
         var fallback = DefaultFor(theme, key);
         if (theme == UiThemeService.Painted)
         {
-            var live = Get(key);
-            return Color.FromArgb(fallback.A, live.R, live.G, live.B);
+            return Get(key);
         }
 
         var bag = OverridesOf(AppStorage.Settings, theme);
         if (bag is not null && bag.TryGetValue(key, out var text) && TryParseColor(text, out var parsed))
         {
-            return Color.FromArgb(fallback.A, parsed.R, parsed.G, parsed.B);
+            return WithParsedAlpha(parsed, text, fallback.A);
         }
 
         return fallback;
@@ -149,7 +145,8 @@ internal static class UiColors
                 continue;
             }
 
-            current.Add((key, color));
+            var fallback = DefaultFor(theme, key);
+            current.Add((key, WithParsedAlpha(color, text, fallback.A)));
         }
 
         SetOverrides(AppStorage.Settings, theme, CollectOverrides(current, key => DefaultFor(theme, key)));
@@ -226,8 +223,13 @@ internal static class UiColors
         DefaultFor(UiThemeService.Painted, key).A;
 
     public static string FormatColor(Color color) =>
-        string.Create(CultureInfo.InvariantCulture, $"#{color.R:X2}{color.G:X2}{color.B:X2}");
+        color.A == 255
+            ? string.Create(CultureInfo.InvariantCulture, $"#{color.R:X2}{color.G:X2}{color.B:X2}")
+            : string.Create(
+                CultureInfo.InvariantCulture,
+                $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}");
 
+    /// <summary>6 桁は不透明 RGB。8 桁はアルファ付き（#AARRGGBB）。</summary>
     public static bool TryParseColor(string text, out Color color)
     {
         color = default;
@@ -258,6 +260,20 @@ internal static class UiColors
         return true;
     }
 
+    /// <summary>古い 6 桁上書きは既定アルファを保ち、8 桁は指定アルファを使う。</summary>
+    internal static Color WithParsedAlpha(Color parsed, string text, byte fallbackAlpha)
+    {
+        var hex = text.Trim();
+        if (hex.StartsWith('#'))
+        {
+            hex = hex[1..];
+        }
+
+        return hex.Length == 8
+            ? parsed
+            : Color.FromArgb(fallbackAlpha, parsed.R, parsed.G, parsed.B);
+    }
+
     public static SolidColorBrush Brush(Color color) => WpfControlHelpers.FrozenBrush(color);
 
     internal static Dictionary<string, string> CollectOverrides(
@@ -268,10 +284,9 @@ internal static class UiColors
         foreach (var (key, value) in current)
         {
             var fallback = defaultFor(key);
-            var normalized = Color.FromArgb(fallback.A, value.R, value.G, value.B);
-            if (normalized != fallback)
+            if (value != fallback)
             {
-                values[key] = FormatColor(normalized);
+                values[key] = FormatColor(value);
             }
         }
 
@@ -434,8 +449,8 @@ internal static class UiColors
                 continue;
             }
 
-            var alpha = DefaultFor(theme, entry.Key).A;
-            Set(entry.Key, Color.FromArgb(alpha, color.R, color.G, color.B));
+            var fallback = DefaultFor(theme, entry.Key);
+            Set(entry.Key, WithParsedAlpha(color, text, fallback.A));
         }
     }
 

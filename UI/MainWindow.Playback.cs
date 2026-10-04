@@ -1573,8 +1573,7 @@ public partial class MainWindow
         ApplyWaapiPanelVisible();
         ApplyLibraryChrome();
         Transport.SetMaximizeMode(_waveformMaximizeMode);
-        PrimaryWaveform.ShowScaleLane = ShowWaveformScaleLane;
-        ForEachWaveform(view => view.ShowScaleLane = ShowWaveformScaleLane);
+        ApplyWaveformScaleLanes();
         RefreshTileDividers();
         OverviewScaleColumn.Width = show
             ? DesignMetrics.DbScaleWidthGrid

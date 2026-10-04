@@ -59,4 +59,12 @@ public sealed class HsvColorTests
         Assert.Equal(255, HsvColorPicker.ChannelFromPoint(255, 255), 6);
         Assert.Equal(127.5, HsvColorPicker.ChannelFromPoint(127.5, 255), 6);
     }
+
+    [Fact]
+    public void UnitFromPoint_MapsNormalizedRange()
+    {
+        Assert.Equal(0, HsvColorPicker.UnitFromPoint(0, 100), 6);
+        Assert.Equal(1, HsvColorPicker.UnitFromPoint(100, 100), 6);
+        Assert.Equal(0.25, HsvColorPicker.UnitFromPoint(25, 100), 6);
+    }
 }

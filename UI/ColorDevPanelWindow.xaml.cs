@@ -13,7 +13,7 @@ namespace MgaSonicAnvil.UI;
 
 /// <summary>
 /// 色設定パネル。開いたままメイン画面を見ながら変更できる。
-/// アルファは XAML 既定を維持し、パネルでは RGB（#RRGGBB）のみ編集する。
+/// RGB に加え透明度（A / #AARRGGBB）も編集できる。
 /// </summary>
 internal partial class ColorDevPanelWindow : Window
 {
@@ -21,6 +21,7 @@ internal partial class ColorDevPanelWindow : Window
     private readonly List<ColorGroup> _groups = [];
     private readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
     private bool _applyingOwnChange;
+    private bool _filterAfterImeQueued;
     private string? _selectedKey;
 
     public event EventHandler? ColorsChanged;
@@ -29,7 +30,7 @@ internal partial class ColorDevPanelWindow : Window
     {
         InitializeComponent();
         ApplyWindowTitle();
-        WindowPaintReveal.Attach(this, activateOnReveal: true);
+        WindowPaintReveal.Attach(this, FocusSearchBox, activateOnReveal: true);
         Closed += (_, _) =>
         {
             FlushSave();
@@ -61,10 +62,23 @@ internal partial class ColorDevPanelWindow : Window
         {
             Show();
             Activate();
+            FocusSearchBox();
             return;
         }
 
         WindowPaintReveal.ShowWhenPainted(this);
+    }
+
+    private void FocusSearchBox()
+    {
+        if (SearchBox is null)
+        {
+            return;
+        }
+
+        Keyboard.Focus(SearchBox);
+        SearchBox.SelectAll();
+        UpdateSearchHint();
     }
 
     public void ApplyLocalizedText()
@@ -247,12 +261,31 @@ internal partial class ColorDevPanelWindow : Window
 
     private static void PaintColor(ColorRow row, MediaColor color)
     {
-        var rgb = MediaColor.FromRgb(color.R, color.G, color.B);
-        row.Swatch.Background = UiColors.Brush(rgb);
+        row.Swatch.Background = color.A < 255
+            ? CreateAlphaSwatchBrush(color)
+            : UiColors.Brush(color);
         row.Swatch.BorderBrush = WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush"));
         row.Hex.Text = UiColors.FormatColor(color);
         row.Hex.Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
         row.Name.Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush"));
+    }
+
+    private static Brush CreateAlphaSwatchBrush(MediaColor color)
+    {
+        var group = new DrawingGroup();
+        using (var dc = group.Open())
+        {
+            dc.DrawRectangle(HsvColorPicker.CheckerboardBrush(), null, new Rect(0, 0, 1, 1));
+            dc.DrawRectangle(UiColors.Brush(color), null, new Rect(0, 0, 1, 1));
+        }
+
+        var brush = new DrawingBrush(group)
+        {
+            Stretch = Stretch.Fill,
+            TileMode = TileMode.None,
+        };
+        brush.Freeze();
+        return brush;
     }
 
     private void PaintRow(ColorRow row, bool hover)
@@ -275,7 +308,7 @@ internal partial class ColorDevPanelWindow : Window
         }
     }
 
-    private void SelectKey(string key, bool scrollIntoView)
+    private void SelectKey(string key, bool scrollIntoView, bool focusList = true)
     {
         if (!_rows.TryGetValue(key, out var row))
         {
@@ -295,10 +328,14 @@ internal partial class ColorDevPanelWindow : Window
             row.Host.BringIntoView();
         }
 
-        Scroll.Focus();
+        // 検索中にフォーカスを奪うと IME 変換が強制確定され、ハング／FailFast する。
+        if (focusList && ShouldFocusListAfterSelect(SearchBox.IsKeyboardFocusWithin))
+        {
+            Scroll.Focus();
+        }
     }
 
-    private void SelectFirstVisible()
+    private void SelectFirstVisible(bool focusList = false)
     {
         var first = VisibleRows().FirstOrDefault();
         if (first is null)
@@ -312,8 +349,14 @@ internal partial class ColorDevPanelWindow : Window
             return;
         }
 
-        SelectKey(first.Key, scrollIntoView: false);
+        SelectKey(first.Key, scrollIntoView: false, focusList);
     }
+
+    /// <summary>検索ボックスにいるときは一覧へフォーカスを移さない。</summary>
+    internal static bool ShouldFocusListAfterSelect(bool searchBoxFocused) => !searchBoxFocused;
+
+    /// <summary>IME 変換中は選択の付け替えを遅らせる。</summary>
+    internal static bool ShouldReselectWhileFiltering(bool imeComposing) => !imeComposing;
 
     private void SyncPickerFromSelection()
     {
@@ -328,11 +371,10 @@ internal partial class ColorDevPanelWindow : Window
             return;
         }
 
-        var color = entry.Get();
-        Picker.SetColor(MediaColor.FromRgb(color.R, color.G, color.B));
+        Picker.SetColor(entry.Get());
     }
 
-    private void ApplyLive(MediaColor rgb)
+    private void ApplyLive(MediaColor color)
     {
         if (_selectedKey is null)
         {
@@ -345,11 +387,10 @@ internal partial class ColorDevPanelWindow : Window
             return;
         }
 
-        var alpha = UiColors.GetDefaultAlpha(_selectedKey);
         _applyingOwnChange = true;
         try
         {
-            entry.Set(MediaColor.FromArgb(alpha, rgb.R, rgb.G, rgb.B));
+            entry.Set(color);
             if (_rows.TryGetValue(_selectedKey, out var row))
             {
                 PaintColor(row, entry.Get());
@@ -372,7 +413,7 @@ internal partial class ColorDevPanelWindow : Window
         UiColors.Save();
     }
 
-    private void ApplyFilter()
+    private void ApplyFilter(bool reselect = true)
     {
         var query = SearchBox.Text;
         var any = false;
@@ -393,10 +434,12 @@ internal partial class ColorDevPanelWindow : Window
 
         EmptyHint.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
         Scroll.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
-        if (_selectedKey is null || !_rows.TryGetValue(_selectedKey, out var selected)
-            || selected.Host.Visibility != Visibility.Visible)
+        if (reselect
+            && ShouldReselectWhileFiltering(ImeComposition.IsComposing)
+            && (_selectedKey is null || !_rows.TryGetValue(_selectedKey, out var selected)
+                || selected.Host.Visibility != Visibility.Visible))
         {
-            SelectFirstVisible();
+            SelectFirstVisible(focusList: false);
         }
     }
 
@@ -412,7 +455,36 @@ internal partial class ColorDevPanelWindow : Window
             return;
         }
 
-        ApplyFilter();
+        if (ImeComposition.IsComposing)
+        {
+            ApplyFilter(reselect: false);
+            QueueFilterAfterIme();
+            return;
+        }
+
+        ApplyFilter(reselect: true);
+    }
+
+    private void QueueFilterAfterIme()
+    {
+        if (_filterAfterImeQueued)
+        {
+            return;
+        }
+
+        _filterAfterImeQueued = true;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                _filterAfterImeQueued = false;
+                if (Picker is null || ListPanel is null || ImeComposition.IsComposing)
+                {
+                    return;
+                }
+
+                ApplyFilter(reselect: true);
+            },
+            DispatcherPriority.Input);
     }
 
     private void SearchBox_FocusChanged(object sender, KeyboardFocusChangedEventArgs e) =>

@@ -29,6 +29,7 @@
     <SolidColorBrush x:Key="WaveZeroLineBrush" Color="#5ACCCCCC" />
     <SolidColorBrush x:Key="TimelineWellBackBrush" Color="#FF17171A" />
     <SolidColorBrush x:Key="WaveformTileActiveHeaderBrush" Color="#FF4A7A98" />
+    <SolidColorBrush x:Key="WaveformTileDividerBrush" Color="#00000000" />
     <SolidColorBrush x:Key="TileSearchVeilBrush" Color="#8C000000" />
     <SolidColorBrush x:Key="ChannelLabelOnTintForeBrush" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="PlayheadBrush" Color="#FF00F5FF" />

@@ -566,7 +566,7 @@ internal sealed class WaveformView : Grid
     }
 
     /// <summary>
-    /// 左端のチャンネル名と dB 目盛り列。F11 とプレイヤーでは畳んで波形を広げる。
+    /// 左端のチャンネル名と dB 目盛り列。F11・プレイヤー、および F12 のタイル中は畳んで波形を広げる。
     /// </summary>
     public bool ShowScaleLane
     {

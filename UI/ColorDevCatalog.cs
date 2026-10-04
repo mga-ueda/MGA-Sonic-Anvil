@@ -60,6 +60,7 @@ internal static class ColorDevCatalog
             ("WaveformBackBrush", ColorDevGroup.Waveform),
             ("WaveformRecordBackBrush", ColorDevGroup.Waveform),
             ("WaveformTileActiveHeaderBrush", ColorDevGroup.Waveform),
+            ("WaveformTileDividerBrush", ColorDevGroup.Waveform),
             ("TileSearchVeilBrush", ColorDevGroup.Waveform),
             ("TimelineWellBackBrush", ColorDevGroup.Waveform),
             ("WaveFillBrush", ColorDevGroup.Waveform),

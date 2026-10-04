@@ -58,6 +58,44 @@ public sealed class UiColorsTests
     }
 
     [Fact]
+    public void FormatColor_IncludesAlphaWhenTransparent()
+    {
+        Assert.Equal("#112233", UiColors.FormatColor(Color.FromRgb(0x11, 0x22, 0x33)));
+        Assert.Equal(
+            "#80112233",
+            UiColors.FormatColor(Color.FromArgb(0x80, 0x11, 0x22, 0x33)));
+    }
+
+    [Fact]
+    public void WithParsedAlpha_KeepsLegacySixDigitAlpha()
+    {
+        var parsed = Color.FromRgb(0x11, 0x22, 0x33);
+        var kept = UiColors.WithParsedAlpha(parsed, "#112233", 0x8C);
+        Assert.Equal(0x8C, kept.A);
+        Assert.Equal(0x11, kept.R);
+
+        Assert.True(UiColors.TryParseColor("#40112233", out var eight));
+        var full = UiColors.WithParsedAlpha(eight, "#40112233", 0x8C);
+        Assert.Equal(0x40, full.A);
+    }
+
+    [Fact]
+    public void CollectOverrides_PersistsAlphaChange()
+    {
+        var current = new (string Key, Color Value)[]
+        {
+            ("TileSearchVeilBrush", Color.FromArgb(0x40, 0x00, 0x00, 0x00)),
+        };
+        var defaults = new Dictionary<string, Color>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["TileSearchVeilBrush"] = Color.FromArgb(0x8C, 0x00, 0x00, 0x00),
+        };
+
+        var saved = UiColors.CollectOverrides(current, key => defaults[key]);
+        Assert.Equal("#40000000", saved["TileSearchVeilBrush"]);
+    }
+
+    [Fact]
     public void MigrateLegacyColors_KeepsSharedAccentsOnly()
     {
         var settings = new AppSettings

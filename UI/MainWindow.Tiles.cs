@@ -242,6 +242,8 @@ public partial class MainWindow
         }
 
         _tileArrange = arrange;
+        // F12 中はタイル突入で dB 列を畳み、仕切りを出す。
+        ApplyWaveformScaleLanes();
         var generation = ++_tileBuildGeneration;
         RelayoutTileGrid();
         if (fromOff)
@@ -500,21 +502,25 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// F11 最大化中のタイル右端の縦仕切り幅。偶数にして、検索のすりガラスが左右から半分ずつ重なれるようにする。
+    /// F11 / F12 タイルの右端縦仕切り幅。偶数にして、検索のすりガラスが左右から半分ずつ重なれるようにする。
     /// </summary>
     private const double TileDividerWidth = 4;
 
+    /// <summary>F11 と F12 では dB 列を畳む代わりに縦仕切りを出す。</summary>
+    private bool ShowTileDividers =>
+        _waveformMaximizeMode is WaveformMaximizeMode.Waveform or WaveformMaximizeMode.Analyzers;
+
     /// <summary>
-    /// F11 最大化中だけ、隣の波形と地続きに見えないよう右端に縦仕切りを入れる。
-    /// 配色はチャンネル名・dB 目盛り列と同じ。横の境目はファイル名帯が仕切りになるので入れない。
-    /// 通常表示と F12 ではラベル列が残るため仕切りは不要。
+    /// F11 / F12 中だけ、隣の波形と地続きに見えないよう右端に隙間を空ける。
+    /// 既定の仕切り色は透明で、背後の動的背景が見える。不透明色を指定すれば帯にもできる。
+    /// 横の境目はファイル名帯が仕切りになるので入れない。
+    /// 通常表示ではラベル列が残るため仕切りは不要。
     /// </summary>
     private void ApplyTileDivider(Border host, WaveformTileCell cell, int cols)
     {
-        var divider = _waveformMaximizeMode == WaveformMaximizeMode.Waveform
-            && cell.Column + cell.ColumnSpan < cols;
+        var divider = ShowTileDividers && cell.Column + cell.ColumnSpan < cols;
         host.BorderThickness = new Thickness(0, 0, divider ? TileDividerWidth : 0, 0);
-        host.SetResourceReference(Border.BorderBrushProperty, "TimelineWellBackBrush");
+        host.SetResourceReference(Border.BorderBrushProperty, "WaveformTileDividerBrush");
     }
 
     /// <summary>F11 / F12 の出入りで既存タイル（埋め草含む）の縦仕切りを付け外しする。</summary>
@@ -571,6 +577,8 @@ public partial class MainWindow
         PrimaryWaveform.Visibility = Visibility.Visible;
         PrimaryWaveform.ShowPlayhead = true;
         PrimaryWaveform.ForcedFlagLaneRows = -1;
+        // F12 中はタイル解除で dB 列を戻す。
+        ApplyWaveformScaleLanes();
         Overview.SeekTrailSource = PrimaryWaveform;
         if (!bindPrimary)
         {

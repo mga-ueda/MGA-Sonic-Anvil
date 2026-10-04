@@ -7,22 +7,32 @@ using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>彩度×明度の正方形、色相バー、Hex / RGB。ドラッグ中はライブで色が変わる。</summary>
+/// <summary>彩度×明度の正方形、色相バー、明暗、Hex / RGB / 透明度。ドラッグ中はライブで色が変わる。</summary>
 internal sealed class HsvColorPicker : Grid
 {
+    private const double ChannelValueWidth = 56;
+
     private readonly SvBoard _sv = new();
     private readonly HueBar _hue = new();
+    private readonly BrightnessBar _brightness = new();
     private readonly ChannelBar _red = new(Channel.R);
     private readonly ChannelBar _green = new(Channel.G);
     private readonly ChannelBar _blue = new(Channel.B);
+    private readonly ChannelBar _alpha = new(Channel.A);
     private readonly TextBlock _hexCaption = new();
+    private readonly TextBlock _brightnessCaption = new();
+    private readonly TextBlock _alphaCaption = new();
     private readonly TextBox _hexBox = new();
     private readonly TextBox _rBox = new();
     private readonly TextBox _gBox = new();
     private readonly TextBox _bBox = new();
+    private readonly TextBox _aBox = new();
+    private readonly Border _previewBack = new();
     private readonly Border _preview = new();
+    private FrameworkElement? _alphaRow;
     private bool _suppressFields;
     private HsvColor _hsv = new(0d, 0d, 1d);
+    private byte _alphaValue = 255;
 
     public event EventHandler? ColorChanged;
 
@@ -33,35 +43,50 @@ internal sealed class HsvColorPicker : Grid
         Build();
         _sv.Moved += (_, _) => SetHsv(_hsv.WithSaturationValue(_sv.Saturation, _sv.Value), raise: true);
         _hue.Moved += (_, _) => SetHsv(_hsv.WithHue(_hue.Hue), raise: true);
+        _brightness.Moved += (_, _) => SetHsv(_hsv.WithSaturationValue(_hsv.S, _brightness.Value), raise: true);
         _red.Moved += (_, _) => SetRgbChannel(Channel.R, _red.Value);
         _green.Moved += (_, _) => SetRgbChannel(Channel.G, _green.Value);
         _blue.Moved += (_, _) => SetRgbChannel(Channel.B, _blue.Value);
+        _alpha.Moved += (_, _) => SetAlpha(_alpha.Value);
         _sv.Committed += (_, _) => ColorCommitted?.Invoke(this, EventArgs.Empty);
         _hue.Committed += (_, _) => ColorCommitted?.Invoke(this, EventArgs.Empty);
+        _brightness.Committed += (_, _) => ColorCommitted?.Invoke(this, EventArgs.Empty);
         _red.Committed += (_, _) => ColorCommitted?.Invoke(this, EventArgs.Empty);
         _green.Committed += (_, _) => ColorCommitted?.Invoke(this, EventArgs.Empty);
         _blue.Committed += (_, _) => ColorCommitted?.Invoke(this, EventArgs.Empty);
+        _alpha.Committed += (_, _) => ColorCommitted?.Invoke(this, EventArgs.Empty);
         _hexBox.LostFocus += (_, _) => TryApplyHex(_hexBox.Text, commit: true);
         _hexBox.TextChanged += (_, _) => TryApplyHex(_hexBox.Text, commit: false);
         _hexBox.KeyDown += Field_KeyDown;
         _rBox.LostFocus += (_, _) => TryApplyChannel(_rBox, Channel.R, commit: true);
         _gBox.LostFocus += (_, _) => TryApplyChannel(_gBox, Channel.G, commit: true);
         _bBox.LostFocus += (_, _) => TryApplyChannel(_bBox, Channel.B, commit: true);
+        _aBox.LostFocus += (_, _) => TryApplyChannel(_aBox, Channel.A, commit: true);
         _rBox.TextChanged += (_, _) => TryApplyChannel(_rBox, Channel.R, commit: false);
         _gBox.TextChanged += (_, _) => TryApplyChannel(_gBox, Channel.G, commit: false);
         _bBox.TextChanged += (_, _) => TryApplyChannel(_bBox, Channel.B, commit: false);
+        _aBox.TextChanged += (_, _) => TryApplyChannel(_aBox, Channel.A, commit: false);
         _rBox.KeyDown += Field_KeyDown;
         _gBox.KeyDown += Field_KeyDown;
         _bBox.KeyDown += Field_KeyDown;
+        _aBox.KeyDown += Field_KeyDown;
         SetHsv(_hsv, raise: false);
         ApplyLocalizedText();
         RefreshChrome();
     }
 
-    public Color Color => _hsv.ToRgb();
+    public Color Color
+    {
+        get
+        {
+            var rgb = _hsv.ToRgb();
+            return Color.FromArgb(_alphaValue, rgb.R, rgb.G, rgb.B);
+        }
+    }
 
     public void SetColor(Color color)
     {
+        _alphaValue = color.A;
         var next = HsvColor.FromRgb(color);
         if (next.S < 0.001)
         {
@@ -74,6 +99,11 @@ internal sealed class HsvColorPicker : Grid
     public void ApplyLocalizedText()
     {
         _hexCaption.Text = UiStrings.ColorDevHex;
+        _brightnessCaption.Text = UiStrings.ColorDevBrightness;
+        _alphaCaption.Text = UiStrings.ColorDevAlpha;
+        TipService.Set(this, UiStrings.ColorDevPickHint);
+        TipService.Set(_alphaRow ?? _aBox, UiStrings.ColorDevPickHint);
+        TipService.Set(_hexBox, UiStrings.ColorDevPickHint);
     }
 
     public void RefreshChrome()
@@ -82,13 +112,19 @@ internal sealed class HsvColorPicker : Grid
         StyleField(_rBox);
         StyleField(_gBox);
         StyleField(_bBox);
+        StyleField(_aBox);
         _hexCaption.Foreground = ThemeBrush("MutedForeBrush");
+        _brightnessCaption.Foreground = ThemeBrush("MutedForeBrush");
+        _alphaCaption.Foreground = ThemeBrush("MutedForeBrush");
         _preview.BorderBrush = ThemeBrush("ChromeBorderBrush");
+        _previewBack.Background = CheckerboardBrush();
         _sv.InvalidateVisual();
         _hue.InvalidateVisual();
+        _brightness.InvalidateVisual();
         _red.InvalidateVisual();
         _green.InvalidateVisual();
         _blue.InvalidateVisual();
+        _alpha.InvalidateVisual();
     }
 
     internal static (double S, double V) SvFromPoint(double x, double y, Size size)
@@ -109,9 +145,14 @@ internal sealed class HsvColorPicker : Grid
     internal static double ChannelFromPoint(double x, double width) =>
         width <= 0d ? 0d : Math.Clamp(x / width, 0d, 1d) * 255d;
 
+    internal static double UnitFromPoint(double x, double width) =>
+        width <= 0d ? 0d : Math.Clamp(x / width, 0d, 1d);
+
     private void Build()
     {
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(176) });
+        RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -132,37 +173,86 @@ internal sealed class HsvColorPicker : Grid
         _hexCaption.VerticalAlignment = VerticalAlignment.Center;
         _hexCaption.Margin = new Thickness(0, 0, 8, 0);
         _hexBox.FontFamily = new FontFamily("Consolas");
-        _hexBox.MaxLength = 7;
+        _hexBox.MaxLength = 9;
         _hexBox.Margin = new Thickness(0, 0, 8, 0);
+        _previewBack.Width = 36;
+        _previewBack.Height = 28;
+        _previewBack.CornerRadius = new CornerRadius(6);
+        _previewBack.Background = CheckerboardBrush();
         _preview.Width = 36;
         _preview.Height = 28;
         _preview.CornerRadius = new CornerRadius(6);
         _preview.BorderThickness = new Thickness(1);
+        var previewHost = new Grid();
+        previewHost.Children.Add(_previewBack);
+        previewHost.Children.Add(_preview);
         hexRow.Children.Add(_hexCaption);
         hexRow.Children.Add(_hexBox);
-        hexRow.Children.Add(_preview);
+        hexRow.Children.Add(previewHost);
         SetColumn(_hexBox, 1);
-        SetColumn(_preview, 2);
+        SetColumn(previewHost, 2);
         Children.Add(hexRow);
         SetRow(hexRow, 2);
 
-        Children.Add(ChannelRow("R", _red, _rBox, 3, new Thickness(0, 10, 0, 0)));
-        Children.Add(ChannelRow("G", _green, _gBox, 4, new Thickness(0, 6, 0, 0)));
-        Children.Add(ChannelRow("B", _blue, _bBox, 5, new Thickness(0, 6, 0, 0)));
+        Children.Add(BrightnessRow(3, new Thickness(0, 10, 0, 0)));
+        Children.Add(ChannelRow("R", _red, _rBox, 4, new Thickness(0, 10, 0, 0)));
+        Children.Add(ChannelRow("G", _green, _gBox, 5, new Thickness(0, 6, 0, 0)));
+        Children.Add(ChannelRow("B", _blue, _bBox, 6, new Thickness(0, 6, 0, 0)));
+        _alphaRow = LabeledChannelRow(_alphaCaption, _alpha, _aBox, 7, new Thickness(0, 6, 0, 0));
+        Children.Add(_alphaRow);
     }
 
-    private UIElement ChannelRow(string caption, ChannelBar bar, TextBox box, int row, Thickness margin)
+    private FrameworkElement BrightnessRow(int row, Thickness margin)
     {
         var host = new Grid { Margin = margin };
-        host.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
+        host.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         host.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        host.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(44) });
+        _brightnessCaption.VerticalAlignment = VerticalAlignment.Center;
+        _brightnessCaption.Margin = new Thickness(0, 0, 8, 0);
+        _brightnessCaption.FontWeight = FontWeights.SemiBold;
+        _brightness.Height = 16;
+        _brightness.Margin = new Thickness(0, 2, 0, 2);
+        host.Children.Add(_brightnessCaption);
+        host.Children.Add(_brightness);
+        SetColumn(_brightness, 1);
+        SetRow(host, row);
+        return host;
+    }
+
+    private FrameworkElement ChannelRow(string caption, ChannelBar bar, TextBox box, int row, Thickness margin)
+    {
         var label = new TextBlock
         {
             Text = caption,
             VerticalAlignment = VerticalAlignment.Center,
             FontWeight = FontWeights.SemiBold,
+            Width = 18,
         };
+        return LabeledChannelRow(label, bar, box, row, margin, labelWidth: 18);
+    }
+
+    private FrameworkElement LabeledChannelRow(
+        FrameworkElement label,
+        ChannelBar bar,
+        TextBox box,
+        int row,
+        Thickness margin,
+        double labelWidth = double.NaN)
+    {
+        var host = new Grid { Margin = margin };
+        host.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = double.IsNaN(labelWidth) ? GridLength.Auto : new GridLength(labelWidth),
+        });
+        host.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        host.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ChannelValueWidth) });
+        if (label is TextBlock text)
+        {
+            text.VerticalAlignment = VerticalAlignment.Center;
+            text.FontWeight = FontWeights.SemiBold;
+            text.Margin = new Thickness(0, 0, 8, 0);
+        }
+
         bar.Height = 16;
         bar.Margin = new Thickness(0, 2, 8, 2);
         box.FontFamily = new FontFamily("Consolas");
@@ -203,6 +293,10 @@ internal sealed class HsvColorPicker : Grid
         {
             TryApplyChannel(_bBox, Channel.B, commit: true);
         }
+        else if (sender == _aBox)
+        {
+            TryApplyChannel(_aBox, Channel.A, commit: true);
+        }
     }
 
     private void TryApplyHex(string text, bool commit)
@@ -222,7 +316,21 @@ internal sealed class HsvColorPicker : Grid
             return;
         }
 
-        SetHsv(HsvColor.FromRgb(parsed), raise: true);
+        var hex = text.Trim();
+        if (hex.StartsWith('#'))
+        {
+            hex = hex[1..];
+        }
+
+        // 6 桁は RGB だけ差し替え、いまの透明度を保つ。8 桁はアルファ込み。
+        _alphaValue = hex.Length == 8 ? parsed.A : _alphaValue;
+        var next = HsvColor.FromRgb(parsed);
+        if (next.S < 0.001)
+        {
+            next = new HsvColor(_hsv.H, next.S, next.V);
+        }
+
+        SetHsv(next, raise: true);
         if (commit)
         {
             ColorCommitted?.Invoke(this, EventArgs.Empty);
@@ -246,11 +354,25 @@ internal sealed class HsvColorPicker : Grid
             return;
         }
 
-        SetRgbChannel(channel, value);
+        if (channel == Channel.A)
+        {
+            SetAlpha(value);
+        }
+        else
+        {
+            SetRgbChannel(channel, value);
+        }
+
         if (commit)
         {
             ColorCommitted?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    private void SetAlpha(double value)
+    {
+        _alphaValue = (byte)Math.Clamp((int)Math.Round(value), 0, 255);
+        SetHsv(_hsv, raise: true);
     }
 
     private void SetRgbChannel(Channel channel, double value)
@@ -276,12 +398,15 @@ internal sealed class HsvColorPicker : Grid
     {
         _hsv = hsv;
         var rgb = hsv.ToRgb();
+        var argb = Color.FromArgb(_alphaValue, rgb.R, rgb.G, rgb.B);
         _sv.SetHsv(hsv);
         _hue.Hue = hsv.H;
-        _red.Set(rgb, rgb.R);
-        _green.Set(rgb, rgb.G);
-        _blue.Set(rgb, rgb.B);
-        _preview.Background = UiColors.Brush(rgb);
+        _brightness.Set(hsv);
+        _red.Set(argb, rgb.R);
+        _green.Set(argb, rgb.G);
+        _blue.Set(argb, rgb.B);
+        _alpha.Set(argb, _alphaValue);
+        _preview.Background = UiColors.Brush(argb);
         WriteFields();
         if (raise)
         {
@@ -299,11 +424,12 @@ internal sealed class HsvColorPicker : Grid
         _suppressFields = true;
         try
         {
-            var rgb = _hsv.ToRgb();
-            _hexBox.Text = UiColors.FormatColor(rgb);
-            _rBox.Text = rgb.R.ToString(CultureInfo.InvariantCulture);
-            _gBox.Text = rgb.G.ToString(CultureInfo.InvariantCulture);
-            _bBox.Text = rgb.B.ToString(CultureInfo.InvariantCulture);
+            var color = Color;
+            _hexBox.Text = UiColors.FormatColor(color);
+            _rBox.Text = color.R.ToString(CultureInfo.InvariantCulture);
+            _gBox.Text = color.G.ToString(CultureInfo.InvariantCulture);
+            _bBox.Text = color.B.ToString(CultureInfo.InvariantCulture);
+            _aBox.Text = color.A.ToString(CultureInfo.InvariantCulture);
         }
         finally
         {
@@ -318,7 +444,7 @@ internal sealed class HsvColorPicker : Grid
             box.Style = style;
         }
 
-        box.Padding = new Thickness(6, 2, 6, 2);
+        box.Padding = new Thickness(4, 2, 4, 2);
         box.MinHeight = 28;
         box.VerticalContentAlignment = VerticalAlignment.Center;
         ImeComposition.Disable(box);
@@ -326,11 +452,36 @@ internal sealed class HsvColorPicker : Grid
 
     private static Brush ThemeBrush(string key) => WpfControlHelpers.FrozenBrush(Theme.Get(key));
 
+    internal static Brush CheckerboardBrush()
+    {
+        const double cell = 6d;
+        var group = new DrawingGroup();
+        var light = WpfControlHelpers.FrozenBrush(Color.FromRgb(0xC8, 0xC8, 0xC8));
+        var dark = WpfControlHelpers.FrozenBrush(Color.FromRgb(0x88, 0x88, 0x88));
+        using (var dc = group.Open())
+        {
+            dc.DrawRectangle(light, null, new Rect(0, 0, cell * 2, cell * 2));
+            dc.DrawRectangle(dark, null, new Rect(0, 0, cell, cell));
+            dc.DrawRectangle(dark, null, new Rect(cell, cell, cell, cell));
+        }
+
+        var brush = new DrawingBrush(group)
+        {
+            TileMode = TileMode.Tile,
+            Viewport = new Rect(0, 0, cell * 2, cell * 2),
+            ViewportUnits = BrushMappingMode.Absolute,
+            Stretch = Stretch.None,
+        };
+        brush.Freeze();
+        return brush;
+    }
+
     private enum Channel
     {
         R,
         G,
         B,
+        A,
     }
 
     private abstract class DragSurface : FrameworkElement
@@ -492,6 +643,52 @@ internal sealed class HsvColorPicker : Grid
         }
     }
 
+    private sealed class BrightnessBar : DragSurface
+    {
+        private HsvColor _hsv = new(0d, 0d, 1d);
+
+        public double Value { get; private set; } = 1d;
+
+        public void Set(HsvColor hsv)
+        {
+            _hsv = hsv;
+            Value = hsv.V;
+            InvalidateVisual();
+        }
+
+        protected override void DragTo(Point point)
+        {
+            Value = UnitFromPoint(point.X, RenderSize.Width);
+            InvalidateVisual();
+        }
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            var bounds = new Rect(RenderSize);
+            if (bounds.Width <= 0d || bounds.Height <= 0d)
+            {
+                return;
+            }
+
+            var dark = new HsvColor(_hsv.H, _hsv.S, 0d).ToRgb();
+            var bright = new HsvColor(_hsv.H, _hsv.S, 1d).ToRgb();
+            var fill = new LinearGradientBrush(dark, bright, new Point(0, 0.5), new Point(1, 0.5));
+            fill.Freeze();
+            var clip = WpfControlHelpers.RoundedRectGeometry(bounds, 4);
+            dc.PushClip(clip);
+            dc.DrawRectangle(fill, null, bounds);
+            dc.Pop();
+            var border = new Pen(ThemeBrush("ChromeBorderBrush"), 1);
+            if (border.CanFreeze)
+            {
+                border.Freeze();
+            }
+
+            dc.DrawGeometry(null, border, clip);
+            DrawThumb(dc, Value * bounds.Width, bounds.Height * 0.5, _hsv.ToRgb());
+        }
+    }
+
     private sealed class ChannelBar : DragSurface
     {
         private readonly Channel _channel;
@@ -522,23 +719,36 @@ internal sealed class HsvColorPicker : Grid
                 return;
             }
 
-            var start = _channel switch
-            {
-                Channel.R => Color.FromRgb(0, _rgb.G, _rgb.B),
-                Channel.G => Color.FromRgb(_rgb.R, 0, _rgb.B),
-                _ => Color.FromRgb(_rgb.R, _rgb.G, 0),
-            };
-            var end = _channel switch
-            {
-                Channel.R => Color.FromRgb(255, _rgb.G, _rgb.B),
-                Channel.G => Color.FromRgb(_rgb.R, 255, _rgb.B),
-                _ => Color.FromRgb(_rgb.R, _rgb.G, 255),
-            };
-            var fill = new LinearGradientBrush(start, end, new Point(0, 0.5), new Point(1, 0.5));
-            fill.Freeze();
             var clip = WpfControlHelpers.RoundedRectGeometry(bounds, 4);
             dc.PushClip(clip);
-            dc.DrawRectangle(fill, null, bounds);
+            if (_channel == Channel.A)
+            {
+                dc.DrawRectangle(CheckerboardBrush(), null, bounds);
+                var start = Color.FromArgb(0, _rgb.R, _rgb.G, _rgb.B);
+                var end = Color.FromArgb(255, _rgb.R, _rgb.G, _rgb.B);
+                var alphaFill = new LinearGradientBrush(start, end, new Point(0, 0.5), new Point(1, 0.5));
+                alphaFill.Freeze();
+                dc.DrawRectangle(alphaFill, null, bounds);
+            }
+            else
+            {
+                var start = _channel switch
+                {
+                    Channel.R => Color.FromRgb(0, _rgb.G, _rgb.B),
+                    Channel.G => Color.FromRgb(_rgb.R, 0, _rgb.B),
+                    _ => Color.FromRgb(_rgb.R, _rgb.G, 0),
+                };
+                var end = _channel switch
+                {
+                    Channel.R => Color.FromRgb(255, _rgb.G, _rgb.B),
+                    Channel.G => Color.FromRgb(_rgb.R, 255, _rgb.B),
+                    _ => Color.FromRgb(_rgb.R, _rgb.G, 255),
+                };
+                var fill = new LinearGradientBrush(start, end, new Point(0, 0.5), new Point(1, 0.5));
+                fill.Freeze();
+                dc.DrawRectangle(fill, null, bounds);
+            }
+
             dc.Pop();
             var border = new Pen(ThemeBrush("ChromeBorderBrush"), 1);
             if (border.CanFreeze)
@@ -547,7 +757,10 @@ internal sealed class HsvColorPicker : Grid
             }
 
             dc.DrawGeometry(null, border, clip);
-            DrawThumb(dc, Value / 255d * bounds.Width, bounds.Height * 0.5, _rgb);
+            var thumb = _channel == Channel.A
+                ? Color.FromArgb(255, _rgb.R, _rgb.G, _rgb.B)
+                : Color.FromRgb(_rgb.R, _rgb.G, _rgb.B);
+            DrawThumb(dc, Value / 255d * bounds.Width, bounds.Height * 0.5, thumb);
         }
     }
 

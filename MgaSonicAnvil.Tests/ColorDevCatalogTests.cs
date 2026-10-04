@@ -145,8 +145,29 @@ public sealed class ColorDevCatalogTests
         Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#C6D9FF", "C6"));
         Assert.False(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#C6D9FF", "playhead"));
         Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#C6D9FF", " "));
-        Assert.True(ColorDevCatalog.Matches("エリア背景", "WaveformBackBrush", "#262626", "波形", "波形"));
-        Assert.False(ColorDevCatalog.Matches("エリア背景", "WaveformBackBrush", "#262626", "波形", "playhead"));
+        Assert.True(ColorDevCatalog.Matches("エリア背景（固定）", "WaveformBackBrush", "#262626", "波形", "波形"));
+        Assert.False(ColorDevCatalog.Matches("エリア背景（固定）", "WaveformBackBrush", "#262626", "波形", "playhead"));
+        Assert.True(ColorDevCatalog.Matches(
+            "マーカー編集欄",
+            "TimelineWellBackBrush",
+            "#17171A",
+            "波形",
+            "編集"));
+        Assert.True(ColorDevCatalog.Matches(
+            "タイル仕切り",
+            "WaveformTileDividerBrush",
+            "#00000000",
+            "波形",
+            "仕切り"));
+    }
+
+    [Fact]
+    public void SearchFilter_DoesNotStealFocusOrReselectDuringIme()
+    {
+        Assert.False(ColorDevPanelWindow.ShouldFocusListAfterSelect(searchBoxFocused: true));
+        Assert.True(ColorDevPanelWindow.ShouldFocusListAfterSelect(searchBoxFocused: false));
+        Assert.False(ColorDevPanelWindow.ShouldReselectWhileFiltering(imeComposing: true));
+        Assert.True(ColorDevPanelWindow.ShouldReselectWhileFiltering(imeComposing: false));
     }
 
     [Fact]

@@ -22,10 +22,12 @@ internal static partial class UiStrings
         "配色ファイルを書けませんでした。",
         "Could not write the color scheme file.");
     public static string ColorDevSearch => Get("検索", "Search");
-    public static string ColorDevHex => Get("Hex", "Hex");
+    public static string ColorDevHex => Get("Hex（#AARRGGBB）", "Hex (#AARRGGBB)");
+    public static string ColorDevBrightness => Get("明暗", "Brightness");
+    public static string ColorDevAlpha => Get("透明", "Opacity");
     public static string ColorDevPickHint => Get(
-        "左の一覧から色を選ぶと、ここで調整できます。",
-        "Select a color on the left to edit it here.");
+        "左の一覧から色を選ぶと、ここで調整できます。透明度は「透明」スライダー（0=透明〜255=不透明）か、Hex の8桁（#AARRGGBB）で指定できます。明暗スライダーで明るさだけ変えられます。",
+        "Select a color on the left to edit it here. Set transparency with the Opacity slider (0=transparent…255=opaque) or an 8-digit Hex (#AARRGGBB). Use Brightness to lighten or darken only.");
     public static string ColorDevNoMatches => Get("一致する色がありません。", "No matching colors.");
 
     public static string ColorDevGroupShared => Get("共通", "Shared");
@@ -72,13 +74,14 @@ internal static partial class UiStrings
             "MenuDisabledFore" => Get("メニュー無効文字", "Menu disabled text"),
             "ProjectBarBack" => Get("背景", "Background"),
             "OverviewOutsideFill" => Get("範囲外", "Outside view"),
-            "WaveformBack" => Get("エリア背景", "Area background"),
+            "WaveformBack" => Get("エリア背景（固定）", "Area background (solid)"),
             "WaveformRecordBack" => Get("録音中の背景", "Recording background"),
             "WaveFill" => Get("波形", "Waveform"),
             "WaveFillOverlay" => Get("スペクトログラム重ね", "Spectrogram overlay"),
             "WaveZeroLine" => Get("0 dB 線", "0 dB line"),
-            "TimelineWellBack" => Get("タイムライン背景", "Timeline background"),
+            "TimelineWellBack" => Get("マーカー編集欄", "Marker edit field"),
             "WaveformTileActiveHeader" => Get("タイル・アクティブ見出し", "Tile · active header"),
+            "WaveformTileDivider" => Get("タイル仕切り", "Tile divider"),
             "TileSearchVeil" => Get("タイル検索の暗幕", "Tile search veil"),
             "ChannelLabelOnTintFore" => Get("チャンネル名（色バッジ上）", "Channel name (on tint)"),
             "DbScaleFore" => Get("音量目盛", "Volume scale"),

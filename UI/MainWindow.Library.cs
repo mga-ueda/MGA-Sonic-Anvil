@@ -53,9 +53,24 @@ public partial class MainWindow
 
     internal bool IsLibraryMaximized => _waveformMaximizeMode == WaveformMaximizeMode.Library;
 
-    /// <summary>F11 とプレイヤーでは dB 目盛り列を畳む。編集時だけ残す。</summary>
+    /// <summary>
+    /// F11・プレイヤーでは dB 目盛り列を畳む。
+    /// F12 は単一表示では残し、タイル中は仕切りに代えるため畳む。編集時だけ常に残す。
+    /// </summary>
     private bool ShowWaveformScaleLane =>
-        _waveformMaximizeMode != WaveformMaximizeMode.Waveform && !IsLibraryMaximized;
+        !IsLibraryMaximized
+        && _waveformMaximizeMode switch
+        {
+            WaveformMaximizeMode.Waveform => false,
+            WaveformMaximizeMode.Analyzers => !_tileMode,
+            _ => true,
+        };
+
+    private void ApplyWaveformScaleLanes()
+    {
+        PrimaryWaveform.ShowScaleLane = ShowWaveformScaleLane;
+        ForEachWaveform(view => view.ShowScaleLane = ShowWaveformScaleLane);
+    }
 
     internal bool IsLibraryGroupComboFocused =>
         IsLibraryMaximized && LibraryBrowser.IsGroupComboFocused;
