@@ -1470,6 +1470,163 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void PlaylistWaveformCompletion_KeepsSelectionOnPlayingRow()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new DocumentSession[40];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                sessions[i] = Session($"{i:00} track.wav");
+            }
+
+            var first = sessions[0];
+            var target = sessions[25];
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 1000,
+                Height = 360,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            // 実機どおり：先頭選択でフォーカスを掴んでから↓で別行へ移し、その後に波形を埋める。
+            view.SetSessions(sessions, first, [first]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            view.FocusList();
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            view.MoveSelection(25);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            var activations = 0;
+            view.SessionActivated += (_, _) => activations++;
+            Assert.Same(target, view.SelectedSession);
+
+            // 列幅の再計算（FitColumns）＋各行波形の完了を交互に流す。
+            var barCount = LibraryPlaylistWaveform.BarCount;
+            foreach (var session in sessions)
+            {
+                var bars = new float[barCount];
+                for (var i = 0; i < barCount; i++)
+                {
+                    bars[i] = 0.5f;
+                }
+
+                LibraryPlaylistWaveform.Set(session.Document.SourcePath!, barCount, bars);
+                view.RecalculateColumnWidths();
+                Flush();
+                view.UpdateLayout();
+                Flush();
+            }
+
+            Assert.Same(target, view.SelectedSession);
+            var selectedSessions = view.SelectedSessions;
+            Assert.Single(selectedSessions);
+            Assert.Same(target, selectedSessions[0]);
+            Assert.Equal(0, activations);
+
+            // DataGrid の現在セルも選択行へ固定され続けていること。ここが先頭行へ戻ると
+            // レイアウト／フォーカスのパスでシアンが1行目へ飛ぶ。
+            var grid = Assert.IsAssignableFrom<DataGrid>(view.FileGrid);
+            var currentSession = (grid.CurrentItem as LibraryFileRow)?.Tag as DocumentSession;
+            Assert.Same(target, currentSession);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void MoveSelection_PinsDataGridCurrentItemToSelectedRow()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("aaa.wav");
+            var second = Session("bbb.wav");
+            var third = Session("ccc.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 400,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions([first, second, third], first, [first]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            view.FocusList();
+            Flush();
+
+            view.MoveSelection(2);
+            Flush();
+
+            Assert.Same(third, view.SelectedSession);
+            var grid = Assert.IsAssignableFrom<DataGrid>(view.FileGrid);
+            var currentSession = (grid.CurrentItem as LibraryFileRow)?.Tag as DocumentSession;
+            Assert.Same(third, currentSession);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void ShouldRestoreFolderPlaySelection_KeepsUserMovedRow()
+    {
+        var first = Session("first.wav");
+        var moved = Session("moved.wav");
+        Assert.True(MainWindow.ShouldRestoreFolderPlaySelection(null, first));
+        Assert.True(MainWindow.ShouldRestoreFolderPlaySelection(first, first));
+        Assert.False(MainWindow.ShouldRestoreFolderPlaySelection(moved, first));
+    }
+
+    [Fact]
+    public void SetSessions_PinsCollectionViewCurrentToSelection_NotFirstRow()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("aaa.wav");
+            var second = Session("bbb.wav");
+            var third = Session("ccc.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 400,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions([first, second, third], third, [third]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            // CollectionView の CurrentItem が先頭行（＝WPF が IsSelected を寄せる足がかり）
+            // ではなく、実際の選択行に固定されていること。
+            var cv = Assert.IsAssignableFrom<System.ComponentModel.ICollectionView>(view.BoundItemsSource);
+            var currentSession = (cv.CurrentItem as LibraryFileRow)?.Tag as DocumentSession;
+            Assert.Same(third, currentSession);
+            Assert.Same(third, view.SelectedSession);
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void FitColumns_PacksToContent()
     {
         RunSta(() =>

@@ -2440,7 +2440,15 @@ public partial class MainWindow
                     _libraryHoldJacketWash = false;
                     if (playFirst && _libraryFolderPlaySession is { } first)
                     {
-                        LibraryBrowser.SelectSessionQuiet(first);
+                        // 読み込み中に↓等で別行へ移した選択は残す。
+                        // ここで常に先頭へ Quiet 選択すると、FinishIncrementalSessionLoad
+                        // （行波形の開始）と同じタイミングでシアンだけ1行目へ飛び、
+                        // 再生中の曲（_activeSession）と食い違う。
+                        var selected = LibraryBrowser.SelectedSession;
+                        if (ShouldRestoreFolderPlaySelection(selected, first))
+                        {
+                            LibraryBrowser.SelectSessionQuiet(first);
+                        }
                     }
                 }
                 else
@@ -2464,6 +2472,15 @@ public partial class MainWindow
             }
         }
     }
+
+    /// <summary>
+    /// フォルダ登録完了時に先頭曲へ選択を戻してよいか。
+    /// 読み込み中にユーザーが別行へ移していれば false（シアンを奪わない）。
+    /// </summary>
+    internal static bool ShouldRestoreFolderPlaySelection(
+        DocumentSession? selected,
+        DocumentSession first) =>
+        selected is null || ReferenceEquals(selected, first);
 
     /// <summary>
     /// 1 曲を裏でタグ読みしてリストへ追加。generation が変わったら false（途中キャンセル）。

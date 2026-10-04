@@ -76,10 +76,19 @@ internal static class LibraryPlaylistWaveform
 }
 
 /// <summary>プレイリスト行の粗い波形セル。データが来るまで空。</summary>
+/// <remarks>
+/// 波形は <see cref="FrameworkElement.OnRender"/>（＝<c>InvalidateVisual</c>）ではなく、
+/// 子 <see cref="DrawingVisual"/> へ直接描く。<c>InvalidateVisual</c> は内部で
+/// <c>InvalidateArrange</c> を呼ぶため、各行の棒が埋まるたびに DataGrid 全体の再アレンジが走る。
+/// 子ビジュアルへの描き直しならレイアウトを触らない。
+/// </remarks>
 internal sealed class LibraryPlaylistWaveformCell : FrameworkElement
 {
+    private readonly DrawingVisual _visual = new();
     private string? _path;
     private float[]? _bars;
+    private double _lastWidth;
+    private double _lastHeight;
 
     public LibraryPlaylistWaveformCell()
     {
@@ -89,6 +98,7 @@ internal sealed class LibraryPlaylistWaveformCell : FrameworkElement
         HorizontalAlignment = HorizontalAlignment.Stretch;
         VerticalAlignment = VerticalAlignment.Stretch;
         MinHeight = 16;
+        AddVisualChild(_visual);
         DataContextChanged += (_, _) => BindRow();
         Loaded += (_, _) =>
         {
@@ -101,6 +111,25 @@ internal sealed class LibraryPlaylistWaveformCell : FrameworkElement
             LibraryPlaylistWaveform.BarsUpdated -= OnBarsUpdated;
             LibraryPlaylistWaveform.EffectiveSizeChanged -= OnEffectiveSizeChanged;
         };
+    }
+
+    protected override int VisualChildrenCount => 1;
+
+    protected override Visual GetVisualChild(int index) =>
+        index == 0 ? _visual : throw new ArgumentOutOfRangeException(nameof(index));
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        var result = base.ArrangeOverride(finalSize);
+        if (Math.Abs(_lastWidth - finalSize.Width) > 0.1
+            || Math.Abs(_lastHeight - finalSize.Height) > 0.1)
+        {
+            _lastWidth = finalSize.Width;
+            _lastHeight = finalSize.Height;
+            RedrawVisual();
+        }
+
+        return result;
     }
 
     private void OnEffectiveSizeChanged()
@@ -131,7 +160,8 @@ internal sealed class LibraryPlaylistWaveformCell : FrameworkElement
         if (LibraryPlaylistWaveform.TryGet(path, LibraryPlaylistWaveform.BarCount, out var bars))
         {
             _bars = bars;
-            InvalidateVisual();
+            // レイアウトは触らず、子ビジュアルだけ描き直す。
+            RedrawVisual();
         }
     }
 
@@ -183,13 +213,16 @@ internal sealed class LibraryPlaylistWaveformCell : FrameworkElement
             }
         }
 
-        InvalidateVisual();
+        RedrawVisual();
     }
 
-    protected override void OnRender(DrawingContext dc)
+    private void RedrawVisual()
     {
+        using var dc = _visual.RenderOpen();
         var bars = _bars;
-        if (bars is null || bars.Length == 0 || ActualHeight <= 0 || ActualWidth <= 0)
+        var width = _lastWidth > 0 ? _lastWidth : ActualWidth;
+        var height = _lastHeight > 0 ? _lastHeight : ActualHeight;
+        if (bars is null || bars.Length == 0 || height <= 0 || width <= 0)
         {
             return;
         }
@@ -201,7 +234,7 @@ internal sealed class LibraryPlaylistWaveformCell : FrameworkElement
             fill.R,
             fill.G,
             fill.B));
-        var midY = ActualHeight * 0.5;
+        var midY = height * 0.5;
         var maxHalf = Math.Max(1.0, midY - 1);
         var x = LibraryBrowserView.LibraryColumnCellPadX;
         var count = Math.Min(bars.Length, LibraryPlaylistWaveform.BarCount);
@@ -210,12 +243,12 @@ internal sealed class LibraryPlaylistWaveformCell : FrameworkElement
             var amp = Math.Clamp(bars[i], 0f, 1f);
             if (amp > 0f)
             {
-                var height = Math.Max(1.0, amp * maxHalf * 2);
-                var top = midY - (height * 0.5);
+                var barHeight = Math.Max(1.0, amp * maxHalf * 2);
+                var top = midY - (barHeight * 0.5);
                 dc.DrawRectangle(
                     brush,
                     null,
-                    new Rect(x, top, LibraryPlaylistWaveform.BarThickness, height));
+                    new Rect(x, top, LibraryPlaylistWaveform.BarThickness, barHeight));
             }
 
             x += LibraryPlaylistWaveform.BarThickness + LibraryPlaylistWaveform.BarGap;

@@ -1278,6 +1278,11 @@ internal sealed class LibraryBrowserView : UserControl
             {
                 SelectPlaylistFileRange(_anchorIndex, index);
             }
+
+            // キー移動は SelectedItem だけ変えがちで、CurrentItem が先頭のまま残る。
+            // 行波形の遅延描画でレイアウトが走ると、古い CurrentItem を手がかりに
+            // シアン帯が1行目へ寄って見えることがある。
+            PinSelectionCurrent();
         }
         finally
         {
@@ -1344,6 +1349,8 @@ internal sealed class LibraryBrowserView : UserControl
                     i++;
                 }
             }
+
+            PinSelectionCurrent();
         }
         finally
         {
@@ -1414,21 +1421,25 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void EnsureListFocused()
     {
+        // フォーカス済みでも CurrentItem は選択行へ揃える。
+        // IsKeyboardFocusWithin の早期 return だと、矢印キー移動後に CurrentItem が
+        // 先頭のまま残り、行波形描画中のレイアウトでシアンが1行目へ寄る。
+        PinSelectionCurrent();
+
         if (_grid.IsKeyboardFocusWithin)
         {
             return;
         }
 
-        if (_grid.Items.Count > 0 && _grid.SelectedIndex < 0)
-        {
-            _grid.SelectedIndex = 0;
-        }
+        // 未選択でも先頭を選ばない（シアン＝IsSelected が1行目へ固定されるのを防ぐ）。
 
-        if (_grid.SelectedItem is { } item
-            && _grid.ItemContainerGenerator.ContainerFromItem(item) is UIElement row
-            && row.Focus())
+        if (_grid.SelectedItem is { } item)
         {
-            return;
+            if (_grid.ItemContainerGenerator.ContainerFromItem(item) is UIElement row
+                && row.Focus())
+            {
+                return;
+            }
         }
 
         if (_grid.SelectedIndex >= 0
@@ -1842,6 +1853,9 @@ internal sealed class LibraryBrowserView : UserControl
             view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(LibraryFileRow.GroupKey)));
         }
 
+        // 新規 ListCollectionView は CurrentItem が先頭を指す。選択適用前に外して、
+        // WPF が先頭行へ IsSelected を寄せる足がかりを与えない。
+        view.MoveCurrentToPosition(-1);
         _grid.ItemsSource = view;
         ApplyRowSelectionCore(active, selected);
         if (_grid.SelectedItem is null && _items.Count > 0 && _playlistSearchGroups.Count > 0)
@@ -1966,11 +1980,62 @@ internal sealed class LibraryBrowserView : UserControl
             }
 
             _anchorIndex = _grid.SelectedIndex;
+            PinSelectionCurrent();
             _grid.ScrollIntoView(current);
         }
         else
         {
             _anchorIndex = -1;
+            PinSelectionCurrent();
+        }
+    }
+
+    /// <summary>
+    /// DataGrid / CollectionView の CurrentItem を選択行へ揃える。
+    /// 未選択なら外す。再生追従や強制復帰はしない。
+    /// </summary>
+    private void PinSelectionCurrent()
+    {
+        if (_grid.SelectedItem is { } item)
+        {
+            if (!ReferenceEquals(_grid.CurrentItem, item))
+            {
+                _grid.CurrentItem = item;
+            }
+
+            PinCollectionViewCurrent(item);
+            return;
+        }
+
+        PinCollectionViewCurrent(null);
+    }
+
+    /// <summary>
+    /// グループ化 <see cref="ListCollectionView"/> の CurrentItem は既定で先頭（行1）を指す。
+    /// 行の差し替え（UpdateSessionRow の Replace）やレイアウト更新のたびに WPF が
+    /// この CurrentItem を手がかりに IsSelected を先頭へ寄せ、シアンが1行目へ飛ぶ。
+    /// 選択中の行へ CurrentItem を固定し、未選択なら外す。再生追従や強制復帰はしない。
+    /// </summary>
+    private void PinCollectionViewCurrent(object? current)
+    {
+        if (_grid.ItemsSource is not ICollectionView view)
+        {
+            return;
+        }
+
+        if (current is null)
+        {
+            if (view.CurrentItem is not null || view.CurrentPosition >= 0)
+            {
+                view.MoveCurrentToPosition(-1);
+            }
+
+            return;
+        }
+
+        if (!ReferenceEquals(view.CurrentItem, current))
+        {
+            view.MoveCurrentTo(current);
         }
     }
 
@@ -2004,6 +2069,8 @@ internal sealed class LibraryBrowserView : UserControl
                     _grid.SelectedItems.Add(item);
                 }
             }
+
+            PinSelectionCurrent();
         }
         finally
         {
@@ -4390,6 +4457,8 @@ internal sealed class LibraryBrowserView : UserControl
         _grid.VerticalGridLinesBrush = Brushes.Transparent;
         _grid.SelectionUnit = DataGridSelectionUnit.FullRow;
         _grid.SelectionMode = DataGridSelectionMode.Extended;
+        // 列再レイアウトで CurrentItem が先頭へ動いても、選択シアンを追従させない。
+        _grid.IsSynchronizedWithCurrentItem = false;
         _grid.ClipboardCopyMode = DataGridClipboardCopyMode.None;
         BindLibraryCopyCommand(_grid, LibraryPane.List);
         // 1000 行超を全部実体化すると ↓ リピートと列幅再計算が止まる。グループ時も仮想化する。
@@ -5007,11 +5076,7 @@ internal sealed class LibraryBrowserView : UserControl
 
             if (kind == LibraryFileColumn.Waveform)
             {
-                var waveWidth = LibraryPlaylistWaveform.ColumnWidth;
-                column.MinWidth = 0;
-                column.MaxWidth = waveWidth;
-                column.Width = new DataGridLength(waveWidth, DataGridLengthUnitType.Pixel);
-                column.MinWidth = waveWidth;
+                SetColumnPixelWidth(column, LibraryPlaylistWaveform.ColumnWidth);
                 continue;
             }
 
@@ -5040,10 +5105,29 @@ internal sealed class LibraryBrowserView : UserControl
                 Math.Ceiling(max),
                 1,
                 DesignMetrics.LibraryColumnMaxWidth);
-            column.MinWidth = 0;
-            column.Width = new DataGridLength(fitted, DataGridLengthUnitType.Pixel);
-            column.MinWidth = fitted;
+            SetColumnPixelWidth(column, fitted);
         }
+    }
+
+    /// <summary>
+    /// 幅が同じなら触らない。MinWidth=0 経由の再レイアウトは無駄な列再計算を招くため避ける。
+    /// </summary>
+    private static bool SetColumnPixelWidth(DataGridColumn column, double width)
+    {
+        width = Math.Max(0, width);
+        if (column.Width.IsAbsolute
+            && Math.Abs(column.Width.Value - width) < 0.5
+            && Math.Abs(column.MinWidth - width) < 0.5
+            && (double.IsPositiveInfinity(column.MaxWidth) || Math.Abs(column.MaxWidth - width) < 0.5))
+        {
+            return false;
+        }
+
+        column.MinWidth = 0;
+        column.MaxWidth = width;
+        column.Width = new DataGridLength(width, DataGridLengthUnitType.Pixel);
+        column.MinWidth = width;
+        return true;
     }
 
     private void SchedulePlaylistWaveforms()
@@ -5136,11 +5220,7 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        var width = LibraryPlaylistWaveform.ColumnWidth;
-        column.MinWidth = 0;
-        column.MaxWidth = width;
-        column.Width = new DataGridLength(width, DataGridLengthUnitType.Pixel);
-        column.MinWidth = width;
+        SetColumnPixelWidth(column, LibraryPlaylistWaveform.ColumnWidth);
     }
 
     private async Task RunPlaylistWaveformsAsync(int generation, CancellationToken cancellationToken)
