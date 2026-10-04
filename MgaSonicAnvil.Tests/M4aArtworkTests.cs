@@ -96,6 +96,70 @@ public sealed class M4aArtworkTests
     }
 
     [Fact]
+    public void TryFillTags_ItunesSmpbFreeform_FillsDelay()
+    {
+        var path = WriteTemp(BuildM4a(
+            cover: null,
+            isoMeta: true,
+            prependMdat: false,
+            itunesDelay: 0x210,
+            itunesPadding: 0x400,
+            itunesOriginal: 0x10000));
+        try
+        {
+            Assert.True(AudioTagProbe.TryRead(path, out var tags));
+            Assert.Equal(0x210, tags.EncoderDelayFrames);
+            Assert.Equal(0x400, tags.EncoderPaddingFrames);
+            Assert.Equal(0x10000, tags.EncoderOriginalFrames);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TryFillTags_EditList_FillsDelayAndPadding()
+    {
+        var path = WriteTemp(BuildM4aElst(delay: 2112, play: 100000, frames: 100, frameSamples: 1024));
+        try
+        {
+            Assert.True(AudioTagProbe.TryRead(path, out var tags));
+            Assert.Equal(2112, tags.EncoderDelayFrames);
+            Assert.Equal(102400 - 2112 - 100000, tags.EncoderPaddingFrames);
+            Assert.Equal(100000, tags.EncoderOriginalFrames);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TryFillTags_ItunesSmpbWinsOverEditList()
+    {
+        var path = WriteTemp(BuildM4a(
+            cover: null,
+            isoMeta: true,
+            prependMdat: false,
+            itunesDelay: 528,
+            itunesPadding: 64,
+            itunesOriginal: 44100,
+            includeEditList: true));
+        try
+        {
+            Assert.True(AudioTagProbe.TryRead(path, out var tags));
+            Assert.Equal(528, tags.EncoderDelayFrames);
+            Assert.Equal(64, tags.EncoderPaddingFrames);
+            Assert.Equal(44100, tags.EncoderOriginalFrames);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void TryRead_WithoutCovr_IsFalse()
     {
         var path = WriteTemp(BuildM4a(cover: null, isoMeta: true, prependMdat: false));
@@ -132,7 +196,11 @@ public sealed class M4aArtworkTests
         int track = 0,
         int trackTotal = 0,
         int disc = 0,
-        int discTotal = 0)
+        int discTotal = 0,
+        int itunesDelay = 0,
+        int itunesPadding = 0,
+        long itunesOriginal = 0,
+        bool includeEditList = false)
     {
         var items = new List<byte[]>();
         AddText(items, 0xA96E616D, title);
@@ -153,13 +221,82 @@ public sealed class M4aArtworkTests
             items.Add(TypedBox(0x636F7672, Box("data", dataPayload)));
         }
 
+        if (itunesDelay > 0 || itunesPadding > 0)
+        {
+            items.Add(ItunesSmpbItem(itunesDelay, itunesPadding, itunesOriginal));
+        }
+
         var ilst = TypedBox(0x696C7374, Concat(items.ToArray()));
         var metaBody = isoMeta ? Concat(new byte[4], ilst) : ilst;
-        var moov = Box("moov", Box("udta", Box("meta", metaBody)));
+        var udta = Box("udta", Box("meta", metaBody));
+        var moovBody = includeEditList
+            ? Concat(MovieHeader(44100), SoundTrackElst(2112, 100000, 100, 1024), udta)
+            : udta;
+        var moov = Box("moov", moovBody);
         var ftyp = Box("ftyp", Encoding.ASCII.GetBytes("M4A " + "\0\0\0\0" + "M4A mp42"));
         return prependMdat
             ? Concat(ftyp, Box("mdat", new byte[64]), moov)
             : Concat(ftyp, moov);
+    }
+
+    private static byte[] BuildM4aElst(int delay, int play, int frames, int frameSamples)
+    {
+        var ftyp = Box("ftyp", Encoding.ASCII.GetBytes("M4A " + "\0\0\0\0" + "M4A mp42"));
+        var moov = Box("moov", Concat(MovieHeader(44100), SoundTrackElst(delay, play, frames, frameSamples)));
+        return Concat(ftyp, moov);
+    }
+
+    private static byte[] ItunesSmpbItem(int delay, int padding, long original)
+    {
+        var text = string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $" 00000000 {delay:X8} {padding:X8} {original:X16}");
+        var utf8 = Encoding.UTF8.GetBytes(text);
+        var dataPayload = new byte[8 + utf8.Length];
+        dataPayload[3] = 1;
+        utf8.CopyTo(dataPayload, 8);
+        return TypedBox(0x2D2D2D2D, Concat(
+            FullBoxLabel("mean", "com.apple.iTunes"),
+            FullBoxLabel("name", "iTunSMPB"),
+            Box("data", dataPayload)));
+    }
+
+    private static byte[] FullBoxLabel(string type, string text)
+    {
+        var utf8 = Encoding.UTF8.GetBytes(text);
+        var payload = new byte[4 + utf8.Length];
+        utf8.CopyTo(payload, 4);
+        return Box(type, payload);
+    }
+
+    private static byte[] MovieHeader(int timescale)
+    {
+        var body = new byte[20];
+        BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12), (uint)timescale);
+        return Box("mvhd", body);
+    }
+
+    private static byte[] SoundTrackElst(int delay, int play, int frames, int frameSamples)
+    {
+        var mdhd = new byte[20];
+        BinaryPrimitives.WriteUInt32BigEndian(mdhd.AsSpan(12), 44100);
+        var hdlr = new byte[12];
+        Encoding.ASCII.GetBytes("soun").CopyTo(hdlr, 8);
+        var stts = new byte[16];
+        BinaryPrimitives.WriteUInt32BigEndian(stts.AsSpan(4), 1);
+        BinaryPrimitives.WriteUInt32BigEndian(stts.AsSpan(8), (uint)frames);
+        BinaryPrimitives.WriteUInt32BigEndian(stts.AsSpan(12), (uint)frameSamples);
+        var elst = new byte[20];
+        BinaryPrimitives.WriteUInt32BigEndian(elst.AsSpan(4), 1);
+        BinaryPrimitives.WriteUInt32BigEndian(elst.AsSpan(8), (uint)play);
+        BinaryPrimitives.WriteInt32BigEndian(elst.AsSpan(12), delay);
+        BinaryPrimitives.WriteUInt32BigEndian(elst.AsSpan(16), 0x00010000);
+        var mdia = Box("mdia", Concat(
+            Box("mdhd", mdhd),
+            Box("hdlr", hdlr),
+            Box("minf", Box("stbl", Box("stts", stts)))));
+        var edts = Box("edts", Box("elst", elst));
+        return Box("trak", Concat(edts, mdia));
     }
 
     private static void AddText(List<byte[]> items, uint type, string? text)

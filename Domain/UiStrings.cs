@@ -185,8 +185,8 @@ internal static partial class UiStrings
         "When the playlist is MP3-only, hide the waveform column. On by default. Turning the waveform column on still shows it for MP3-only playlists.");
     public static string LabelGaplessPlayback => Get("ギャップレス再生", "Gapless playback");
     public static string TipGaplessPlayback => Get(
-        "MP3 の LAME タグにある encoder delay／padding を再生から外す。CD で繋がっていた曲の継ぎ目の無音を減らす。ヘッダが無いファイルはそのまま。デコーダが既に削っているときは二重に切らない。既定オン。",
-        "Skip MP3 encoder delay and padding from LAME tags during playback. Reduces the silence between tracks that were continuous on CD. Files without the tag are unchanged. If the decoder already stripped them, they are not cut twice. On by default.");
+        "MP3 の LAME タグ、iTunes の iTunSMPB、AAC（M4A）の encoder delay／padding を再生から外す。CD で繋がっていた曲の継ぎ目の無音を減らす。ヘッダが無いファイルはそのまま。デコーダが既に削っているときは二重に切らない。既定オン。",
+        "Skip encoder delay and padding from MP3 LAME tags, iTunes iTunSMPB, and AAC (M4A) during playback. Reduces the silence between tracks that were continuous on CD. Files without the tag are unchanged. If the decoder already stripped them, they are not cut twice. On by default.");
     public static string ButtonLibraryExplorerRootAdd => Get("登録…", "Add…");
     public static string TitleLibraryExplorerRootAdd => Get("フォルダを追加", "Add folder");
     public static string ButtonLibraryExplorerRootRemove => Get("削除", "Remove");

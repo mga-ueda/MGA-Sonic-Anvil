@@ -16,6 +16,18 @@ internal static class M4aArtwork
     private const uint TypeData = 0x64617461;
     private const uint TypeHdlr = 0x68646C72;
     private const uint TypeKeys = 0x6B657973;
+    private const uint TypeMvhd = 0x6D766864;
+    private const uint TypeTrak = 0x7472616B;
+    private const uint TypeMdia = 0x6D646961;
+    private const uint TypeMdhd = 0x6D646864;
+    private const uint TypeMinf = 0x6D696E66;
+    private const uint TypeStbl = 0x7374626C;
+    private const uint TypeStts = 0x73747473;
+    private const uint TypeEdts = 0x65647473;
+    private const uint TypeElst = 0x656C7374;
+    private const uint TypeMean = 0x6D65616E;
+    private const uint TypeFreeName = 0x6E616D65;
+    private const uint TypeFreeform = 0x2D2D2D2D;
     private const uint TypeName = 0xA96E616D;
     private const uint TypeArtist = 0xA9415254;
     private const uint TypeArtistLower = 0xA9617274;
@@ -78,6 +90,8 @@ internal static class M4aArtwork
 
             stream.Position = boxEnd;
         }
+
+        ApplyEditList(state);
     }
 
     private static void WalkMoov(Stream stream, long start, long end, ScanState state)
@@ -92,6 +106,14 @@ internal static class M4aArtwork
             else if (type == TypeMeta)
             {
                 WalkMeta(stream, dataStart, boxEnd, state);
+            }
+            else if (type == TypeMvhd)
+            {
+                state.MovieTimescale = ReadTimescale(stream, dataStart, boxEnd);
+            }
+            else if (type == TypeTrak)
+            {
+                WalkTrak(stream, dataStart, boxEnd, state);
             }
 
             stream.Position = boxEnd;
@@ -151,8 +173,199 @@ internal static class M4aArtwork
         }
     }
 
+    private static void WalkTrak(Stream stream, long start, long end, ScanState state)
+    {
+        var sound = false;
+        var mediaTimescale = 0;
+        var decoded = 0L;
+        var delay = 0L;
+        var play = 0L;
+        stream.Position = start;
+        while (TryReadBoxHeader(stream, end, out var type, out var dataStart, out var boxEnd))
+        {
+            if (type == TypeMdia)
+            {
+                WalkMdia(stream, dataStart, boxEnd, ref sound, ref mediaTimescale, ref decoded);
+            }
+            else if (type == TypeEdts)
+            {
+                WalkEdts(stream, dataStart, boxEnd, ref delay, ref play);
+            }
+
+            stream.Position = boxEnd;
+        }
+
+        if (!sound || state.EditDelay > 0 || state.EditPadding > 0)
+        {
+            return;
+        }
+
+        var rate = state.Builder.SampleRate > 0
+            ? state.Builder.SampleRate
+            : (mediaTimescale > 0 ? mediaTimescale : state.MovieTimescale);
+        var delaySamples = ToSamples(delay, mediaTimescale, rate);
+        if (delaySamples <= 0 || delaySamples > int.MaxValue)
+        {
+            return;
+        }
+
+        state.EditDelay = (int)delaySamples;
+        var playSamples = ToSamples(play, state.MovieTimescale > 0 ? state.MovieTimescale : mediaTimescale, rate);
+        if (playSamples > 0)
+        {
+            state.EditOriginal = playSamples;
+        }
+
+        if (decoded > delaySamples)
+        {
+            var remain = decoded - delaySamples - Math.Max(0, playSamples);
+            if (remain > 0 && remain <= int.MaxValue)
+            {
+                state.EditPadding = (int)remain;
+            }
+
+            if (state.EditOriginal <= 0)
+            {
+                state.EditOriginal = decoded - delaySamples - state.EditPadding;
+            }
+        }
+    }
+
+    private static void WalkMdia(
+        Stream stream,
+        long start,
+        long end,
+        ref bool sound,
+        ref int mediaTimescale,
+        ref long decoded)
+    {
+        stream.Position = start;
+        while (TryReadBoxHeader(stream, end, out var type, out var dataStart, out var boxEnd))
+        {
+            if (type == TypeHdlr)
+            {
+                sound = ReadHandler(stream, dataStart, boxEnd) == 0x736F756E;
+            }
+            else if (type == TypeMdhd)
+            {
+                mediaTimescale = ReadTimescale(stream, dataStart, boxEnd);
+            }
+            else if (type == TypeMinf)
+            {
+                WalkMinf(stream, dataStart, boxEnd, ref decoded);
+            }
+
+            stream.Position = boxEnd;
+        }
+    }
+
+    private static void WalkMinf(Stream stream, long start, long end, ref long decoded)
+    {
+        stream.Position = start;
+        while (TryReadBoxHeader(stream, end, out var type, out var dataStart, out var boxEnd))
+        {
+            if (type == TypeStbl)
+            {
+                WalkStbl(stream, dataStart, boxEnd, ref decoded);
+            }
+
+            stream.Position = boxEnd;
+        }
+    }
+
+    private static void WalkStbl(Stream stream, long start, long end, ref long decoded)
+    {
+        stream.Position = start;
+        while (TryReadBoxHeader(stream, end, out var type, out var dataStart, out var boxEnd))
+        {
+            if (type == TypeStts)
+            {
+                decoded = ReadSttsSamples(stream, dataStart, boxEnd);
+            }
+
+            stream.Position = boxEnd;
+        }
+    }
+
+    private static void WalkEdts(Stream stream, long start, long end, ref long delay, ref long play)
+    {
+        stream.Position = start;
+        while (TryReadBoxHeader(stream, end, out var type, out var dataStart, out var boxEnd))
+        {
+            if (type == TypeElst)
+            {
+                ReadElst(stream, dataStart, boxEnd, ref delay, ref play);
+            }
+
+            stream.Position = boxEnd;
+        }
+    }
+
+    private static void ApplyEditList(ScanState state)
+    {
+        if (state.EditDelay <= 0 && state.EditPadding <= 0)
+        {
+            return;
+        }
+
+        if (state.Builder.EncoderDelayFrames <= 0 && state.Builder.EncoderPaddingFrames <= 0)
+        {
+            state.Builder.EncoderDelayFrames = state.EditDelay;
+            state.Builder.EncoderPaddingFrames = state.EditPadding;
+            state.Applied = true;
+        }
+
+        if (state.EditOriginal > 0 && state.Builder.EncoderOriginalFrames <= 0)
+        {
+            state.Builder.EncoderOriginalFrames = state.EditOriginal;
+            state.Applied = true;
+        }
+    }
+
+    private static void ApplyItunesFreeform(Stream stream, long start, long end, ScanState state)
+    {
+        var mean = string.Empty;
+        var name = string.Empty;
+        var text = string.Empty;
+        stream.Position = start;
+        while (TryReadBoxHeader(stream, end, out var type, out var dataStart, out var boxEnd))
+        {
+            if (type == TypeMean)
+            {
+                mean = ReadFreeformLabel(stream, dataStart, boxEnd);
+            }
+            else if (type == TypeFreeName)
+            {
+                name = ReadFreeformLabel(stream, dataStart, boxEnd);
+            }
+            else if (type == TypeData && TryReadDataPayload(stream, dataStart, boxEnd, out var dataType, out var payload))
+            {
+                text = DecodeText(dataType, payload);
+            }
+
+            stream.Position = boxEnd;
+        }
+
+        if (!mean.Equals("com.apple.iTunes", StringComparison.OrdinalIgnoreCase)
+            && mean.Length > 0)
+        {
+            return;
+        }
+
+        if (ItunesGapless.TryApply(state.Builder, name, text, overwrite: true))
+        {
+            state.Applied = true;
+        }
+    }
+
     private static void ApplyItem(Stream stream, uint type, long start, long end, ScanState state)
     {
+        if (type == TypeFreeform)
+        {
+            ApplyItunesFreeform(stream, start, end, state);
+            return;
+        }
+
         if (type == TypeCovr)
         {
             ApplyCover(stream, start, end, state);
@@ -462,5 +675,191 @@ internal static class M4aArtwork
         public byte[] Artwork { get; set; } = [];
 
         public bool Applied { get; set; }
+
+        public int MovieTimescale { get; set; }
+
+        public int EditDelay { get; set; }
+
+        public int EditPadding { get; set; }
+
+        public long EditOriginal { get; set; }
+    }
+
+    private static int ReadTimescale(Stream stream, long start, long end)
+    {
+        if (end - start < 16)
+        {
+            return 0;
+        }
+
+        stream.Position = start;
+        var version = stream.ReadByte();
+        if (version < 0)
+        {
+            return 0;
+        }
+
+        var skip = version == 1 ? 19 : 11;
+        if (start + 1 + skip + 4 > end)
+        {
+            return 0;
+        }
+
+        stream.Position = start + 1 + skip;
+        Span<byte> buf = stackalloc byte[4];
+        return stream.Read(buf) == 4 ? (int)BinaryPrimitives.ReadUInt32BigEndian(buf) : 0;
+    }
+
+    private static uint ReadHandler(Stream stream, long start, long end)
+    {
+        if (end - start < 12)
+        {
+            return 0;
+        }
+
+        stream.Position = start + 8;
+        Span<byte> buf = stackalloc byte[4];
+        return stream.Read(buf) == 4 ? BinaryPrimitives.ReadUInt32BigEndian(buf) : 0;
+    }
+
+    private static long ReadSttsSamples(Stream stream, long start, long end)
+    {
+        if (end - start < 8)
+        {
+            return 0;
+        }
+
+        stream.Position = start;
+        Span<byte> head = stackalloc byte[8];
+        if (stream.Read(head) != 8)
+        {
+            return 0;
+        }
+
+        var count = BinaryPrimitives.ReadUInt32BigEndian(head[4..]);
+        var total = 0L;
+        Span<byte> entry = stackalloc byte[8];
+        for (var i = 0; i < count; i++)
+        {
+            if (stream.Position + 8 > end || stream.Read(entry) != 8)
+            {
+                break;
+            }
+
+            var sampleCount = BinaryPrimitives.ReadUInt32BigEndian(entry);
+            var delta = BinaryPrimitives.ReadUInt32BigEndian(entry[4..]);
+            total += sampleCount * (long)delta;
+        }
+
+        return total;
+    }
+
+    private static void ReadElst(Stream stream, long start, long end, ref long delay, ref long play)
+    {
+        if (end - start < 8)
+        {
+            return;
+        }
+
+        stream.Position = start;
+        var version = stream.ReadByte();
+        if (version < 0)
+        {
+            return;
+        }
+
+        stream.Position = start + 4;
+        Span<byte> countBuf = stackalloc byte[4];
+        if (stream.Read(countBuf) != 4)
+        {
+            return;
+        }
+
+        var count = BinaryPrimitives.ReadUInt32BigEndian(countBuf);
+        var wide = version == 1;
+        var entry = wide ? 20 : 12;
+        for (var i = 0; i < count; i++)
+        {
+            if (stream.Position + entry > end)
+            {
+                return;
+            }
+
+            if (wide)
+            {
+                Span<byte> row = stackalloc byte[20];
+                if (stream.Read(row) != 20)
+                {
+                    return;
+                }
+
+                var media = BinaryPrimitives.ReadInt64BigEndian(row[8..]);
+                if (media < 0)
+                {
+                    continue;
+                }
+
+                play = (long)BinaryPrimitives.ReadUInt64BigEndian(row);
+                delay = media;
+                return;
+            }
+            else
+            {
+                Span<byte> row = stackalloc byte[12];
+                if (stream.Read(row) != 12)
+                {
+                    return;
+                }
+
+                var media = BinaryPrimitives.ReadInt32BigEndian(row[4..]);
+                if (media < 0)
+                {
+                    continue;
+                }
+
+                play = BinaryPrimitives.ReadUInt32BigEndian(row);
+                delay = media;
+                return;
+            }
+        }
+    }
+
+    private static string ReadFreeformLabel(Stream stream, long start, long end)
+    {
+        var bodyStart = start + 4;
+        if (bodyStart > end)
+        {
+            bodyStart = start;
+        }
+
+        var length = end - bodyStart;
+        if (length <= 0 || length > MaxTextBytes)
+        {
+            return string.Empty;
+        }
+
+        stream.Position = bodyStart;
+        var payload = new byte[length];
+        if (stream.Read(payload, 0, payload.Length) != payload.Length)
+        {
+            return string.Empty;
+        }
+
+        return Encoding.UTF8.GetString(payload).Trim('\0').Trim();
+    }
+
+    private static long ToSamples(long value, int fromTimescale, int sampleRate)
+    {
+        if (value <= 0)
+        {
+            return 0;
+        }
+
+        if (fromTimescale <= 0 || sampleRate <= 0 || fromTimescale == sampleRate)
+        {
+            return value;
+        }
+
+        return (long)Math.Round(value * (double)sampleRate / fromTimescale);
     }
 }

@@ -3,8 +3,8 @@ using MgaSonicAnvil.Domain;
 namespace MgaSonicAnvil.Audio;
 
 /// <summary>
-/// MP3 の LAME delay／padding を再生から外す。ヘッダが無いファイルはそのまま。
-/// デコーダが既に削っているときは二重に切らない。
+/// MP3 の LAME／iTunSMPB、AAC（M4A）の delay／padding を再生から外す。
+/// ヘッダが無いファイルはそのまま。デコーダが既に削っているときは二重に切らない。
 /// </summary>
 internal static class Mp3Gapless
 {
@@ -21,6 +21,14 @@ internal static class Mp3Gapless
         delay = Math.Max(0, tags.EncoderDelayFrames);
         padding = Math.Max(0, tags.EncoderPaddingFrames);
         if ((delay <= 0 && padding <= 0) || decodedFrames <= delay + padding + 1)
+        {
+            delay = 0;
+            padding = 0;
+            return false;
+        }
+
+        if (tags.EncoderOriginalFrames > 0
+            && Math.Abs(decodedFrames - tags.EncoderOriginalFrames) <= 64)
         {
             delay = 0;
             padding = 0;

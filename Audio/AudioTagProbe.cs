@@ -176,8 +176,19 @@ internal static class AudioTagProbe
                 builder.BitRateKbps = (int)Math.Round(bytes * 8d / builder.DurationSeconds / 1000d);
             }
 
-            builder.EncoderDelayFrames = delay;
-            builder.EncoderPaddingFrames = padding;
+            if (delay > 0 || padding > 0)
+            {
+                builder.EncoderDelayFrames = delay;
+                builder.EncoderPaddingFrames = padding;
+                if (frames > 0)
+                {
+                    var original = frames * (long)samplesPerFrame - delay - padding;
+                    if (original > 0)
+                    {
+                        builder.EncoderOriginalFrames = original;
+                    }
+                }
+            }
         }
         else if (builder.DurationSeconds <= 0 && bitRate > 0)
         {

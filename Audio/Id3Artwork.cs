@@ -155,6 +155,13 @@ internal static class Id3Artwork
                 continue;
             }
 
+            if (TryDecodeDescribed(frame.Id, frame.Data, out var description, out var described)
+                && (ItunesGapless.TryApply(builder, description, described, overwrite: false)
+                    || ItunesGapless.IsHiddenComment(description)))
+            {
+                continue;
+            }
+
             var text = DecodeTextFrame(version, frame.Id, frame.Data);
             if (text.Length == 0)
             {
@@ -446,6 +453,23 @@ internal static class Id3Artwork
         return artwork.Length > 0 && LooksLikeImage(artwork);
     }
 
+    private static bool TryDecodeDescribed(string id, byte[] data, out string description, out string text)
+    {
+        description = string.Empty;
+        text = string.Empty;
+        if (id is "COMM" or "COM" or "USLT" or "ULT")
+        {
+            return TryDecodeComment(data, out description, out text);
+        }
+
+        if (id is "TXXX" or "TXX")
+        {
+            return TryDecodeTxxx(data, out description, out text);
+        }
+
+        return false;
+    }
+
     private static string DecodeTextFrame(int version, string id, byte[] data)
     {
         if (data.Length < 2)
@@ -466,26 +490,53 @@ internal static class Id3Artwork
         return string.Empty;
     }
 
-    private static string DecodeComment(byte[] data)
+    private static string DecodeComment(byte[] data) =>
+        TryDecodeComment(data, out _, out var text) ? text : string.Empty;
+
+    private static bool TryDecodeComment(byte[] data, out string description, out string text)
     {
+        description = string.Empty;
+        text = string.Empty;
         if (data.Length < 5)
         {
-            return string.Empty;
+            return false;
         }
 
         var encoding = data[0];
         var offset = 4;
-        if (!TryReadTerminated(data, ref offset, latin1: encoding is 0 or 3, out _))
+        if (!TryReadTerminated(data, ref offset, latin1: encoding is 0 or 3, out description))
         {
-            return string.Empty;
+            return false;
         }
 
         if (offset >= data.Length)
         {
-            return string.Empty;
+            return false;
         }
 
-        return NormalizeText(DecodeEncoded(encoding, data.AsSpan(offset)));
+        text = NormalizeText(DecodeEncoded(encoding, data.AsSpan(offset)));
+        return text.Length > 0 || description.Length > 0;
+    }
+
+    private static bool TryDecodeTxxx(byte[] data, out string description, out string text)
+    {
+        description = string.Empty;
+        text = string.Empty;
+        if (data.Length < 2)
+        {
+            return false;
+        }
+
+        var encoding = data[0];
+        var offset = 1;
+        if (!TryReadTerminated(data, ref offset, latin1: encoding is 0 or 3, out description)
+            || offset >= data.Length)
+        {
+            return false;
+        }
+
+        text = NormalizeText(DecodeEncoded(encoding, data.AsSpan(offset)));
+        return text.Length > 0 || description.Length > 0;
     }
 
     private static string DecodeEncoded(byte encoding, ReadOnlySpan<byte> payload)

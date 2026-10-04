@@ -45,11 +45,14 @@ internal sealed class AudioFileTags
 
     public int BitRateKbps { get; init; }
 
-    /// <summary>LAME Xing／Info の encoder delay（サンプル）。未記載は 0。</summary>
+    /// <summary>LAME Xing／Info または iTunSMPB／M4A elst の encoder delay（サンプル）。未記載は 0。</summary>
     public int EncoderDelayFrames { get; init; }
 
-    /// <summary>LAME Xing／Info の padding（サンプル）。未記載は 0。</summary>
+    /// <summary>LAME Xing／Info または iTunSMPB／M4A elst の padding（サンプル）。未記載は 0。</summary>
     public int EncoderPaddingFrames { get; init; }
+
+    /// <summary>エンコード前の長さ（サンプル）。iTunSMPB または LAME から。未記載は 0。</summary>
+    public long EncoderOriginalFrames { get; init; }
 
     public bool HasArtwork { get; init; }
 }
@@ -92,6 +95,8 @@ internal sealed class AudioFileTagsBuilder
 
     public int EncoderPaddingFrames { get; set; }
 
+    public long EncoderOriginalFrames { get; set; }
+
     public bool HasArtwork { get; set; }
 
     public AudioFileTags ToTags()
@@ -132,6 +137,7 @@ internal sealed class AudioFileTagsBuilder
             BitRateKbps = BitRateKbps,
             EncoderDelayFrames = EncoderDelayFrames,
             EncoderPaddingFrames = EncoderPaddingFrames,
+            EncoderOriginalFrames = EncoderOriginalFrames,
             HasArtwork = HasArtwork,
         };
     }
