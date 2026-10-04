@@ -401,6 +401,8 @@ internal sealed class WaveformView : Grid
             _loudness.Invalidate();
             InvalidateWaveform();
             SyncSpectrogramBoostBar();
+            // Document が null になっても MouseLeave は起きないため、ガイドを明示的に更新する。
+            ApplyMouseGuideOverlay();
             RaiseViewChanged();
         }
     }
