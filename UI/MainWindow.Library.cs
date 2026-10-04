@@ -2281,9 +2281,20 @@ public partial class MainWindow
         }
     }
 
-    private void LibraryBrowser_VisibleColumnsChanged(object? sender, IReadOnlyCollection<LibraryFileColumn> columns)
+    private void LibraryBrowser_VisibleColumnPresetsChanged(object? sender, LibraryColumnPresets presets)
     {
-        AppStorage.Settings.ApplyLibraryListColumns(columns);
+        if (presets.PersistMixed)
+        {
+            AppStorage.Settings.ApplyLibraryListColumnPresets(
+                presets.Wave,
+                presets.Mp3,
+                presets.Mixed);
+        }
+        else
+        {
+            AppStorage.Settings.ApplyLibraryListColumnPresets(presets.Wave, presets.Mp3);
+        }
+
         AppStorage.Save();
     }
 

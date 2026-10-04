@@ -92,11 +92,11 @@
         </TabItem>
 
         <TabItem x:Name="LayoutsTab" Header="{x:Static domain:UiStrings.LabelSettingsTabLayouts}">
-          <Grid>
+          <Grid x:Name="LayoutsTabBody">
             <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="*" MinWidth="120" />
               <ColumnDefinition Width="{x:Static ui:DesignMetrics.SettingsColumnGapGrid}" />
-              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="2*" MinWidth="280" />
             </Grid.ColumnDefinitions>
 
             <ScrollViewer Style="{StaticResource SettingsColumnScrollViewerStyle}">
@@ -111,22 +111,40 @@
               </StackPanel>
             </ScrollViewer>
 
-            <ScrollViewer Grid.Column="2"
-                          Style="{StaticResource SettingsColumnScrollViewerStyle}">
+            <Grid x:Name="LayoutsPlaylistPane" Grid.Column="2">
+              <Grid.RowDefinitions>
+                <RowDefinition x:Name="LayoutsPlaylistOptionsRow" Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition x:Name="LayoutsPlaylistColumnsRow" Height="*" MinHeight="160" />
+              </Grid.RowDefinitions>
+
+              <!-- スプリッター上部: スクロールバーなし。内容が常に収まる Auto 高さ。 -->
               <StackPanel>
                 <TextBlock x:Name="LibraryColumnsHeader"
                            Text="{x:Static domain:UiStrings.LabelLibraryListColumns}"
                            FontWeight="Bold"
                            FontSize="11.333"
-                           Margin="0,0,0,8" />
-                <TextBlock x:Name="LibraryPlaylistWaveformSizeHeader"
-                           Text="{x:Static domain:UiStrings.LabelLibraryPlaylistWaveformSize}"
-                           FontWeight="Bold"
-                           FontSize="11.333"
-                           Margin="0,0,0,4" />
-                <ComboBox x:Name="LibraryPlaylistWaveformSizeCombo"
-                          Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                          Margin="0,0,0,8" />
+                           Margin="0,0,0,8"
+                           TextWrapping="Wrap" />
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock x:Name="LibraryPlaylistWaveformSizeHeader"
+                             Text="{x:Static domain:UiStrings.LabelLibraryPlaylistWaveformSize}"
+                             FontWeight="Bold"
+                             FontSize="11.333"
+                             VerticalAlignment="Center"
+                             Margin="0,0,8,0"
+                             TextWrapping="Wrap" />
+                  <ComboBox x:Name="LibraryPlaylistWaveformSizeCombo"
+                            Grid.Column="1"
+                            Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                            HorizontalAlignment="Left"
+                            MinWidth="72"
+                            VerticalAlignment="Center" />
+                </Grid>
                 <CheckBox x:Name="LibraryPlaylistWaveformAutoLargeBox"
                           Style="{StaticResource DarkCheckBoxStyle}"
                           Content="{x:Static domain:UiStrings.LabelLibraryPlaylistWaveformAutoLarge}"
@@ -138,15 +156,82 @@
                 <CheckBox x:Name="LibraryHideWaveformForMp3OnlyBox"
                           Style="{StaticResource DarkCheckBoxStyle}"
                           Content="{x:Static domain:UiStrings.LabelLibraryHideWaveformForMp3Only}"
-                          Margin="0,0,0,12" />
+                          Margin="0,0,0,8" />
+              </StackPanel>
+
+              <GridSplitter x:Name="LayoutsPlaylistSplitter"
+                            Grid.Row="1"
+                            Height="{x:Static ui:DesignMetrics.LibrarySplitterHitThickness}"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Center"
+                            ResizeBehavior="PreviousAndNext"
+                            ResizeDirection="Rows"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            ShowsPreview="False"
+                            Cursor="SizeNS" />
+
+              <Grid Grid.Row="2">
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
                 <TextBlock x:Name="LibraryColumnChecksHeader"
                            Text="{x:Static domain:UiStrings.LabelLibraryListColumnChecks}"
                            FontWeight="Bold"
                            FontSize="11.333"
-                           Margin="0,0,0,8" />
-                <StackPanel x:Name="LibraryColumnsHost" />
-              </StackPanel>
-            </ScrollViewer>
+                           Margin="0,0,0,8"
+                           TextWrapping="Wrap" />
+                <Grid Grid.Row="1">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="120" />
+                    <ColumnDefinition Width="{x:Static ui:DesignMetrics.SettingsColumnGapGrid}" />
+                    <ColumnDefinition Width="*" MinWidth="120" />
+                  </Grid.ColumnDefinitions>
+
+                  <ScrollViewer Style="{StaticResource SettingsColumnScrollViewerStyle}">
+                    <StackPanel>
+                      <TextBlock x:Name="LibraryColumnsWaveHeader"
+                                 Text="{x:Static domain:UiStrings.LabelLibraryListColumnsWave}"
+                                 FontWeight="Bold"
+                                 FontSize="11.333"
+                                 Margin="0,0,0,8"
+                                 TextWrapping="Wrap" />
+                      <StackPanel x:Name="LibraryColumnsWaveHost" />
+                      <ui:RoundedButton x:Name="LibraryColumnsWaveResetButton"
+                                        Content="{x:Static domain:UiStrings.LabelLibraryListColumnsReset}"
+                                        Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
+                                        MinWidth="88"
+                                        HorizontalAlignment="Left"
+                                        Margin="0,8,0,0"
+                                        Padding="12,0"
+                                        Click="LibraryColumnsWaveResetButton_Click" />
+                    </StackPanel>
+                  </ScrollViewer>
+
+                  <ScrollViewer Grid.Column="2"
+                                Style="{StaticResource SettingsColumnScrollViewerStyle}">
+                    <StackPanel>
+                      <TextBlock x:Name="LibraryColumnsMp3Header"
+                                 Text="{x:Static domain:UiStrings.LabelLibraryListColumnsMp3}"
+                                 FontWeight="Bold"
+                                 FontSize="11.333"
+                                 Margin="0,0,0,8"
+                                 TextWrapping="Wrap" />
+                      <StackPanel x:Name="LibraryColumnsMp3Host" />
+                      <ui:RoundedButton x:Name="LibraryColumnsMp3ResetButton"
+                                        Content="{x:Static domain:UiStrings.LabelLibraryListColumnsReset}"
+                                        Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
+                                        MinWidth="88"
+                                        HorizontalAlignment="Left"
+                                        Margin="0,8,0,0"
+                                        Padding="12,0"
+                                        Click="LibraryColumnsMp3ResetButton_Click" />
+                    </StackPanel>
+                  </ScrollViewer>
+                </Grid>
+              </Grid>
+            </Grid>
           </Grid>
         </TabItem>
 

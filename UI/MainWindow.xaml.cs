@@ -116,7 +116,7 @@ public partial class MainWindow : Window
         LibraryBrowser.UseWindowFallbackWash();
         LibraryBrowser.SessionActivated += LibraryBrowser_SessionActivated;
         LibraryBrowser.SessionPlayRequested += LibraryBrowser_SessionPlayRequested;
-        LibraryBrowser.VisibleColumnsChanged += LibraryBrowser_VisibleColumnsChanged;
+        LibraryBrowser.VisibleColumnPresetsChanged += LibraryBrowser_VisibleColumnPresetsChanged;
         LibraryBrowser.GroupChanged += LibraryBrowser_GroupChanged;
         LibraryBrowser.ExplorerFolderChanged += LibraryBrowser_ExplorerFolderChanged;
         LibraryBrowser.ExplorerExpandedChanged += LibraryBrowser_ExplorerExpandedChanged;
@@ -129,7 +129,11 @@ public partial class MainWindow : Window
         LibraryBrowser.ShuffleChanged += LibraryBrowser_ShuffleChanged;
         LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
         LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;
-        LibraryBrowser.SetVisibleColumns(AppStorage.Settings.ResolvedLibraryListColumns());
+        LibraryBrowser.SetVisibleColumnPresets(
+            AppStorage.Settings.ResolvedLibraryListColumnsWave(),
+            AppStorage.Settings.ResolvedLibraryListColumnsMp3(),
+            AppStorage.Settings.ResolvedLibraryListColumnsMixed(),
+            mixedCustomized: AppStorage.Settings.LibraryListColumnsMixed.Length > 0);
         LibraryBrowser.SetPlaylistWaveformOptions(
             AppStorage.Settings.ResolvedLibraryPlaylistWaveformSize(),
             AppStorage.Settings.LibraryPlaylistWaveformAutoLargeForWaveOnly,

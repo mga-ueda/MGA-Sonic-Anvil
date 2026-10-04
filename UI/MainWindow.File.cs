@@ -1666,7 +1666,8 @@ public partial class MainWindow
             settings.MultiFileArrange,
             settings.AutoSpeakerSelect,
             settings.ResolvedLibraryExplorerRoots(),
-            settings.ResolvedLibraryListColumns(),
+            settings.ResolvedLibraryListColumnsWave(),
+            settings.ResolvedLibraryListColumnsMp3(),
             settings.ResolvedLibraryPlaylistWaveformSize(),
             settings.LibraryPlaylistWaveformAutoLargeForWaveOnly,
             settings.LibraryHideParentFolderForMp3Only,
@@ -1706,8 +1707,14 @@ public partial class MainWindow
         settings.MultiFileArrange = WaveformTileLayout.Format(dialog.SelectedMultiFileArrange);
         settings.ApplyLibraryExplorerRoots(dialog.SelectedLibraryExplorerRoots);
         LibraryBrowser.SetExplorerRoots(settings.ResolvedLibraryExplorerRoots());
-        settings.ApplyLibraryListColumns(dialog.SelectedLibraryListColumns);
-        LibraryBrowser.SetVisibleColumns(settings.ResolvedLibraryListColumns());
+        settings.ApplyLibraryListColumnPresets(
+            dialog.SelectedLibraryListColumnsWave,
+            dialog.SelectedLibraryListColumnsMp3);
+        LibraryBrowser.SetVisibleColumnPresets(
+            settings.ResolvedLibraryListColumnsWave(),
+            settings.ResolvedLibraryListColumnsMp3(),
+            settings.ResolvedLibraryListColumnsMixed(),
+            mixedCustomized: settings.LibraryListColumnsMixed.Length > 0);
         settings.ApplyLibraryPlaylistWaveformSize(dialog.SelectedLibraryPlaylistWaveformSize);
         settings.LibraryPlaylistWaveformAutoLargeForWaveOnly =
             dialog.SelectedLibraryPlaylistWaveformAutoLargeForWaveOnly;

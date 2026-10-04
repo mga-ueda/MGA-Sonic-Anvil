@@ -165,7 +165,12 @@ internal sealed class LibraryBrowserView : UserControl
     private bool _hideWaveformForMp3Only = true;
     private ContextMenu? _columnHeaderMenu;
     private int _sortChromeTicket;
-    private LibraryFileColumn[] _visibleColumns = [.. LibraryColumnFilter.Defaults];
+    private LibraryFileColumn[] _waveColumns = [.. LibraryColumnFilter.WaveDefaults];
+    private LibraryFileColumn[] _mp3Columns = [.. LibraryColumnFilter.Mp3Defaults];
+    private LibraryFileColumn[] _mixedColumns =
+        LibraryColumnFilter.Union(LibraryColumnFilter.WaveDefaults, LibraryColumnFilter.Mp3Defaults);
+    private bool _mixedColumnsCustomized;
+    private LibraryFileColumn[] _visibleColumns = [.. LibraryColumnFilter.WaveDefaults];
     private bool _columnOrderBusy;
     private bool _syncing;
     private int _syncGeneration;
@@ -216,7 +221,7 @@ internal sealed class LibraryBrowserView : UserControl
     /// <summary>ダブルクリック。停止中でも再生する。</summary>
     public event EventHandler<DocumentSession>? SessionPlayRequested;
 
-    public event EventHandler<IReadOnlyCollection<LibraryFileColumn>>? VisibleColumnsChanged;
+    public event EventHandler<LibraryColumnPresets>? VisibleColumnPresetsChanged;
 
     public event EventHandler<LibraryFileGroup>? GroupChanged;
 
@@ -259,7 +264,7 @@ internal sealed class LibraryBrowserView : UserControl
         BuildLayout();
         ConfigureGrid();
         ConfigureGroupCombo();
-        ApplyColumnVisibility(_visibleColumns, notify: false);
+        ApplyActiveColumnVisibility(notify: false);
         ApplyLocalizedText();
         ApplyGridStyles();
         KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.None);
@@ -4675,10 +4680,39 @@ internal sealed class LibraryBrowserView : UserControl
         _groupCombo.SelectedValue = selected;
     }
 
+    public void SetVisibleColumnPresets(
+        IEnumerable<LibraryFileColumn> waveColumns,
+        IEnumerable<LibraryFileColumn> mp3Columns,
+        IEnumerable<LibraryFileColumn>? mixedColumns = null,
+        bool mixedCustomized = false)
+    {
+        _waveColumns = LibraryColumnFilter.ResolveWave(
+            LibraryColumnFilter.Serialize(waveColumns, LibraryColumnFilter.WaveDefaults));
+        _mp3Columns = LibraryColumnFilter.ResolveMp3(
+            LibraryColumnFilter.Serialize(mp3Columns, LibraryColumnFilter.Mp3Defaults));
+        _mixedColumnsCustomized = mixedCustomized && mixedColumns is not null;
+        _mixedColumns = _mixedColumnsCustomized
+            ? LibraryColumnFilter.ResolveMixed(
+                LibraryColumnFilter.Serialize(mixedColumns!, LibraryColumnFilter.MixedDefaults),
+                _waveColumns,
+                _mp3Columns)
+            : LibraryColumnFilter.Union(_waveColumns, _mp3Columns);
+        ApplyActiveColumnVisibility(notify: false);
+    }
+
+    /// <summary>テスト用。両方のプリセットへ同じ列を入れる。</summary>
     public void SetVisibleColumns(IEnumerable<LibraryFileColumn> columns)
     {
-        ApplyColumnVisibility(LibraryColumnFilter.Resolve(LibraryColumnFilter.Serialize(columns)), notify: false);
+        var ordered = LibraryColumnFilter.Resolve(
+            LibraryColumnFilter.Serialize(columns, LibraryColumnFilter.WaveDefaults));
+        SetVisibleColumnPresets(ordered, ordered);
     }
+
+    internal IReadOnlyList<LibraryFileColumn> WaveColumnOrder => _waveColumns;
+
+    internal IReadOnlyList<LibraryFileColumn> Mp3ColumnOrder => _mp3Columns;
+
+    internal IReadOnlyList<LibraryFileColumn> MixedColumnOrder => _mixedColumns;
 
     public void SetGroup(LibraryFileGroup group)
     {
@@ -4710,13 +4744,44 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void ApplyColumnVisibility(IReadOnlyList<LibraryFileColumn> visible, bool notify)
     {
-        var ordered = LibraryColumnFilter.Resolve(LibraryColumnFilter.Serialize(visible));
-        _visibleColumns = ordered;
+        var kind = LibraryColumnFilter.ClassifyPlaylistColumns(_rows);
+        LibraryColumnFilter.ApplyVisibleChange(
+            kind,
+            _waveColumns,
+            _mp3Columns,
+            _mixedColumns,
+            visible,
+            out var wave,
+            out var mp3,
+            out var mixed);
+        _waveColumns = wave;
+        _mp3Columns = mp3;
+        _mixedColumns = mixed;
+        // Wave / MP3 を変えたら混在は和集合へ戻す。混在を弄ったときだけユーザー設定になる。
+        _mixedColumnsCustomized = kind == LibraryPlaylistColumnKind.Mixed;
+
+        ApplyActiveColumnVisibility(notify);
+    }
+
+    private void ApplyActiveColumnVisibility(bool notify)
+    {
+        _visibleColumns = LibraryColumnFilter.ResolveActive(
+            _rows,
+            _waveColumns,
+            _mp3Columns,
+            _mixedColumns);
+        ApplyColumnDisplayOrder(_visibleColumns);
         ApplyEffectiveColumnVisibility();
 
         if (notify)
         {
-            VisibleColumnsChanged?.Invoke(this, ordered);
+            VisibleColumnPresetsChanged?.Invoke(
+                this,
+                new LibraryColumnPresets(
+                    _waveColumns,
+                    _mp3Columns,
+                    _mixedColumns,
+                    PersistMixed: _mixedColumnsCustomized));
         }
 
         RequestFitColumns();
@@ -4783,6 +4848,17 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void RefreshEffectiveColumns()
     {
+        var next = LibraryColumnFilter.ResolveActive(
+            _rows,
+            _waveColumns,
+            _mp3Columns,
+            _mixedColumns);
+        if (!next.SequenceEqual(_visibleColumns))
+        {
+            _visibleColumns = next;
+            ApplyColumnDisplayOrder(_visibleColumns);
+        }
+
         ApplyEffectiveColumnVisibility();
         SyncGroupChrome();
         RequestFitColumns();
@@ -4891,9 +4967,7 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        _visibleColumns = next;
-        VisibleColumnsChanged?.Invoke(this, next);
-        RequestFitColumns();
+        ApplyColumnVisibility(next, notify: true);
     }
 
     internal void MoveVisibleColumnForTests(LibraryFileColumn column, int displayIndex)

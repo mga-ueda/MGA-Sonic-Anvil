@@ -1985,8 +1985,8 @@ public sealed class LibraryBrowserSelectionTests
         {
             EnsureTheme();
             var view = new LibraryBrowserView();
-            LibraryFileColumn[]? saved = null;
-            view.VisibleColumnsChanged += (_, columns) => saved = [.. columns];
+            LibraryColumnPresets? saved = null;
+            view.VisibleColumnPresetsChanged += (_, presets) => saved = presets;
             var order = new[]
             {
                 LibraryFileColumn.Duration,
@@ -1994,28 +1994,51 @@ public sealed class LibraryBrowserSelectionTests
                 LibraryFileColumn.Title,
             };
             view.SetVisibleColumns(order);
-            Assert.Equal(order, view.VisibleColumnOrder);
+            var active = LibraryColumnFilter.ResolveActive([], order, order);
+            Assert.Equal(active, view.VisibleColumnOrder);
             Assert.Equal(0, view.GroupSpacerDisplayIndex);
             Assert.True(
-                view.ColumnDisplayIndex(LibraryFileColumn.Duration)
-                < view.ColumnDisplayIndex(LibraryFileColumn.Name));
-            Assert.True(
                 view.ColumnDisplayIndex(LibraryFileColumn.Name)
+                < view.ColumnDisplayIndex(LibraryFileColumn.Duration));
+            Assert.True(
+                view.ColumnDisplayIndex(LibraryFileColumn.Duration)
                 < view.ColumnDisplayIndex(LibraryFileColumn.Title));
 
             view.MoveVisibleColumnForTests(
                 LibraryFileColumn.Duration,
                 view.ColumnDisplayIndex(LibraryFileColumn.Title));
             Assert.NotNull(saved);
-            Assert.Equal(3, saved!.Length);
-            Assert.Equal(LibraryFileColumn.Duration, saved[^1]);
-            Assert.Contains(LibraryFileColumn.Name, saved);
-            Assert.Contains(LibraryFileColumn.Title, saved);
-            Assert.Equal(saved, view.VisibleColumnOrder);
+            Assert.Equal(saved!.Value.Wave, view.WaveColumnOrder);
+            Assert.Equal(saved.Value.Mp3, view.Mp3ColumnOrder);
+            Assert.Equal(saved.Value.Mixed, view.MixedColumnOrder);
+            Assert.True(saved.Value.PersistMixed);
+            Assert.Equal(
+                LibraryColumnFilter.ResolveActive(
+                    [],
+                    saved.Value.Wave,
+                    saved.Value.Mp3,
+                    saved.Value.Mixed),
+                view.VisibleColumnOrder);
+            Assert.Contains(LibraryFileColumn.Name, saved.Value.Mixed);
+            Assert.Contains(LibraryFileColumn.Title, saved.Value.Mixed);
+            Assert.Equal(LibraryFileColumn.Duration, saved.Value.Mixed[^1]);
+            // 空／混在の並べ替えは混在プリセットだけ。Wave / MP3 設定は触らない。
+            Assert.Equal(view.WaveColumnOrder, saved.Value.Wave);
+            Assert.Equal(view.Mp3ColumnOrder, saved.Value.Mp3);
+            Assert.NotEqual(saved.Value.Mixed, saved.Value.Wave);
 
-            view.SetVisibleColumns(LibraryColumnFilter.Defaults);
-            view.SetVisibleColumns(saved);
-            Assert.Equal(saved, view.VisibleColumnOrder);
+            view.SetVisibleColumnPresets(
+                LibraryColumnFilter.WaveDefaults,
+                LibraryColumnFilter.Mp3Defaults,
+                saved.Value.Mixed,
+                mixedCustomized: true);
+            Assert.Equal(
+                LibraryColumnFilter.ResolveActive(
+                    [],
+                    LibraryColumnFilter.WaveDefaults,
+                    LibraryColumnFilter.Mp3Defaults,
+                    saved.Value.Mixed),
+                view.VisibleColumnOrder);
             Assert.True(
                 view.ColumnDisplayIndex(LibraryFileColumn.Title)
                 < view.ColumnDisplayIndex(LibraryFileColumn.Duration));
@@ -2029,8 +2052,8 @@ public sealed class LibraryBrowserSelectionTests
         {
             EnsureTheme();
             var view = new LibraryBrowserView();
-            LibraryFileColumn[]? saved = null;
-            view.VisibleColumnsChanged += (_, columns) => saved = [.. columns];
+            LibraryColumnPresets? saved = null;
+            view.VisibleColumnPresetsChanged += (_, presets) => saved = presets;
             view.SetVisibleColumns(
                 [
                     LibraryFileColumn.Name,
@@ -2056,18 +2079,26 @@ public sealed class LibraryBrowserSelectionTests
             kind.IsChecked = true;
             kind.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             Assert.NotNull(saved);
-            Assert.Contains(LibraryFileColumn.Kind, saved!);
-            Assert.Contains(LibraryFileColumn.Name, saved);
-            Assert.Contains(LibraryFileColumn.Title, saved);
-            Assert.Contains(LibraryFileColumn.Duration, saved);
-            Assert.Equal(saved, view.VisibleColumnOrder);
+            Assert.True(saved!.Value.PersistMixed);
+            Assert.Contains(LibraryFileColumn.Kind, saved.Value.Mixed);
+            Assert.Contains(LibraryFileColumn.Name, saved.Value.Mixed);
+            Assert.Contains(LibraryFileColumn.Title, saved.Value.Mixed);
+            Assert.Contains(LibraryFileColumn.Duration, saved.Value.Mixed);
+            Assert.DoesNotContain(LibraryFileColumn.Kind, saved.Value.Wave);
+            Assert.Equal(
+                LibraryColumnFilter.ResolveActive(
+                    [],
+                    saved.Value.Wave,
+                    saved.Value.Mp3,
+                    saved.Value.Mixed),
+                view.VisibleColumnOrder);
 
             var title = menu.Items.OfType<MenuItem>()
                 .First(item => item.Tag is LibraryFileColumn.Title);
             title.IsChecked = false;
             title.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
-            Assert.DoesNotContain(LibraryFileColumn.Title, saved!);
-            Assert.Contains(LibraryFileColumn.Kind, saved);
+            Assert.DoesNotContain(LibraryFileColumn.Title, saved!.Value.Mixed);
+            Assert.Contains(LibraryFileColumn.Kind, saved.Value.Mixed);
             view.CloseKeyboardContextMenu();
             Assert.False(view.HasOpenContextMenu);
         });

@@ -193,8 +193,20 @@ internal sealed class AppSettings
 
     public int ActiveDocumentIndex { get; set; }
 
-    /// <summary>F10 リストで表示する列。空は既定（ファイル／タイトル／アーティスト／アルバム／トラック／ディスク／年／ジャンル／作曲／時間／コメント）。</summary>
+    /// <summary>旧単一列設定。読み取り互換のみ。新フィールドへ移したら空にする。</summary>
     public string[] LibraryListColumns { get; set; } = [];
+
+    /// <summary>WAVE / AIFF 向け列。空は既定（ファイル／レート／ビット／Ch／時間／日付／親フォルダ／波形表示）。</summary>
+    public string[] LibraryListColumnsWave { get; set; } = [];
+
+    /// <summary>MP3 / M4A 向け列。空は既定（ファイル／タイトル／アルバム／…／親フォルダ。波形表示はオフ）。</summary>
+    public string[] LibraryListColumnsMp3 { get; set; } = [];
+
+    /// <summary>
+    /// 混在プレイリスト向け列。空は Wave / MP3 設定の和集合。
+    /// Wave / MP3 を変えるとクリアする。設定 UI には出さない。
+    /// </summary>
+    public string[] LibraryListColumnsMixed { get; set; } = [];
 
     /// <summary>プレイリスト波形列の幅。S / M / L。空または不正は L。</summary>
     public string LibraryPlaylistWaveformSize { get; set; } = "L";
@@ -457,11 +469,106 @@ internal sealed class AppSettings
     public Mp3SpeakerMix ToMp3SpeakerMix() =>
         new(ResolvedSpeaker().Channels, ResolvedFileChannelMap());
 
-    public LibraryFileColumn[] ResolvedLibraryListColumns() =>
-        LibraryColumnFilter.Resolve(LibraryListColumns);
+    public LibraryFileColumn[] ResolvedLibraryListColumnsWave()
+    {
+        MigrateLegacyLibraryListColumns();
+        return LibraryColumnFilter.ResolveWave(LibraryListColumnsWave);
+    }
 
+    public LibraryFileColumn[] ResolvedLibraryListColumnsMp3()
+    {
+        MigrateLegacyLibraryListColumns();
+        return LibraryColumnFilter.ResolveMp3(LibraryListColumnsMp3);
+    }
+
+    public LibraryFileColumn[] ResolvedLibraryListColumnsMixed()
+    {
+        MigrateLegacyLibraryListColumns();
+        return LibraryColumnFilter.ResolveMixed(
+            LibraryListColumnsMixed,
+            ResolvedLibraryListColumnsWave(),
+            ResolvedLibraryListColumnsMp3());
+    }
+
+    /// <summary>互換。アクティブ種別が無いときは Wave 側。</summary>
+    public LibraryFileColumn[] ResolvedLibraryListColumns() =>
+        ResolvedLibraryListColumnsWave();
+
+    public void ApplyLibraryListColumnsWave(IEnumerable<LibraryFileColumn> columns)
+    {
+        MigrateLegacyLibraryListColumns();
+        LibraryListColumnsWave = LibraryColumnFilter.Serialize(columns, LibraryColumnFilter.WaveDefaults);
+        LibraryListColumnsMixed = [];
+        LibraryListColumns = [];
+    }
+
+    public void ApplyLibraryListColumnsMp3(IEnumerable<LibraryFileColumn> columns)
+    {
+        MigrateLegacyLibraryListColumns();
+        LibraryListColumnsMp3 = LibraryColumnFilter.Serialize(columns, LibraryColumnFilter.Mp3Defaults);
+        LibraryListColumnsMixed = [];
+        LibraryListColumns = [];
+    }
+
+    public void ApplyLibraryListColumnsMixed(IEnumerable<LibraryFileColumn> columns)
+    {
+        MigrateLegacyLibraryListColumns();
+        LibraryListColumnsMixed = LibraryColumnFilter.Serialize(
+            columns,
+            LibraryColumnFilter.MixedDefaults);
+        LibraryListColumns = [];
+    }
+
+    /// <summary>Wave / MP3 を更新し、混在のユーザー記憶を捨てて和集合へ戻す。</summary>
+    public void ApplyLibraryListColumnPresets(
+        IEnumerable<LibraryFileColumn> waveColumns,
+        IEnumerable<LibraryFileColumn> mp3Columns)
+    {
+        LibraryListColumnsWave = LibraryColumnFilter.Serialize(waveColumns, LibraryColumnFilter.WaveDefaults);
+        LibraryListColumnsMp3 = LibraryColumnFilter.Serialize(mp3Columns, LibraryColumnFilter.Mp3Defaults);
+        LibraryListColumnsMixed = [];
+        LibraryListColumns = [];
+    }
+
+    public void ApplyLibraryListColumnPresets(
+        IEnumerable<LibraryFileColumn> waveColumns,
+        IEnumerable<LibraryFileColumn> mp3Columns,
+        IEnumerable<LibraryFileColumn> mixedColumns)
+    {
+        LibraryListColumnsWave = LibraryColumnFilter.Serialize(waveColumns, LibraryColumnFilter.WaveDefaults);
+        LibraryListColumnsMp3 = LibraryColumnFilter.Serialize(mp3Columns, LibraryColumnFilter.Mp3Defaults);
+        LibraryListColumnsMixed = LibraryColumnFilter.Serialize(
+            mixedColumns,
+            LibraryColumnFilter.MixedDefaults);
+        LibraryListColumns = [];
+    }
+
+    /// <summary>互換。両方へ同じ列を書く。</summary>
     public void ApplyLibraryListColumns(IEnumerable<LibraryFileColumn> columns) =>
-        LibraryListColumns = LibraryColumnFilter.Serialize(columns);
+        ApplyLibraryListColumnPresets(columns, columns);
+
+    private void MigrateLegacyLibraryListColumns()
+    {
+        if (LibraryListColumnsWave.Length > 0 || LibraryListColumnsMp3.Length > 0)
+        {
+            return;
+        }
+
+        if (LibraryListColumns.Length == 0)
+        {
+            return;
+        }
+
+        if (LibraryColumnFilter.IsLegacyDefaultStored(LibraryListColumns))
+        {
+            LibraryListColumns = [];
+            return;
+        }
+
+        LibraryListColumnsWave = LibraryListColumns;
+        LibraryListColumnsMp3 = LibraryListColumns;
+        LibraryListColumns = [];
+    }
 
     public LibraryPlaylistWaveformSize ResolvedLibraryPlaylistWaveformSize() =>
         LibraryPlaylistWaveformSizes.Parse(LibraryPlaylistWaveformSize);

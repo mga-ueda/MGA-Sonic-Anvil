@@ -30,7 +30,7 @@
     <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
     <PublishDir>$(MSBuildThisFileDirectory)publish\</PublishDir>
     <NoWarn>$(NoWarn);SYSLIB1054</NoWarn>
-    <DefaultItemExcludes>$(DefaultItemExcludes);MgaSonicAnvil.Tests\**;tools\**;native\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);MgaSonicAnvil.Tests\**;tools\**;native\**;artifacts\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

@@ -58,7 +58,11 @@ internal partial class AudioSettingsWindow : Window
     public string[] SelectedVisibleSpeakerIds { get; private set; } = SpeakerPreset.DefaultVisibleIds;
 
     public string[] SelectedLibraryExplorerRoots { get; private set; } = [];
-    public LibraryFileColumn[] SelectedLibraryListColumns { get; private set; } = [.. LibraryColumnFilter.Defaults];
+    public LibraryFileColumn[] SelectedLibraryListColumnsWave { get; private set; } =
+        [.. LibraryColumnFilter.WaveDefaults];
+
+    public LibraryFileColumn[] SelectedLibraryListColumnsMp3 { get; private set; } =
+        [.. LibraryColumnFilter.Mp3Defaults];
 
     public LibraryPlaylistWaveformSize SelectedLibraryPlaylistWaveformSize { get; private set; } =
         LibraryPlaylistWaveformSize.L;
@@ -99,7 +103,8 @@ internal partial class AudioSettingsWindow : Window
     private string[] _outputPortNames = [];
     private float[] _meterPeaks = [];
     private readonly int _uiScaleOpenedAt;
-    private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecks = [];
+    private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecksWave = [];
+    private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecksMp3 = [];
 
     public AudioSettingsWindow(
         AudioOutputSettings current,
@@ -126,7 +131,8 @@ internal partial class AudioSettingsWindow : Window
         string? multiFileArrange = null,
         bool autoSpeakerSelect = false,
         IEnumerable<string>? libraryExplorerRoots = null,
-        IEnumerable<LibraryFileColumn>? libraryListColumns = null,
+        IEnumerable<LibraryFileColumn>? libraryListColumnsWave = null,
+        IEnumerable<LibraryFileColumn>? libraryListColumnsMp3 = null,
         LibraryPlaylistWaveformSize libraryPlaylistWaveformSize = LibraryPlaylistWaveformSize.L,
         bool libraryPlaylistWaveformAutoLargeForWaveOnly = true,
         bool libraryHideParentFolderForMp3Only = true,
@@ -152,8 +158,14 @@ internal partial class AudioSettingsWindow : Window
         _visibleIds = new HashSet<string>(visible, StringComparer.OrdinalIgnoreCase);
         SelectedVisibleSpeakerIds = visible;
         SelectedLibraryExplorerRoots = LibraryExplorerPaths.ResolveRoots(libraryExplorerRoots?.ToArray());
-        SelectedLibraryListColumns = LibraryColumnFilter.Resolve(
-            libraryListColumns is null ? null : LibraryColumnFilter.Serialize(libraryListColumns));
+        SelectedLibraryListColumnsWave = LibraryColumnFilter.ResolveWave(
+            libraryListColumnsWave is null
+                ? null
+                : LibraryColumnFilter.Serialize(libraryListColumnsWave, LibraryColumnFilter.WaveDefaults));
+        SelectedLibraryListColumnsMp3 = LibraryColumnFilter.ResolveMp3(
+            libraryListColumnsMp3 is null
+                ? null
+                : LibraryColumnFilter.Serialize(libraryListColumnsMp3, LibraryColumnFilter.Mp3Defaults));
         SelectedLibraryPlaylistWaveformSize = libraryPlaylistWaveformSize is LibraryPlaylistWaveformSize.S
             or LibraryPlaylistWaveformSize.M
             ? libraryPlaylistWaveformSize
@@ -211,11 +223,15 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyAccent(OkButton);
         ActionButtonLooks.ApplyClear(CancelButton);
         ActionButtonLooks.ApplyClear(LameBrowseButton);
+        ActionButtonLooks.ApplyClear(LibraryColumnsWaveResetButton);
+        ActionButtonLooks.ApplyClear(LibraryColumnsMp3ResetButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
         AppDialogKeys.PrepareActionButton(OkButton, isDefault: true);
         AppDialogKeys.PrepareActionButton(CancelButton, isCancel: true);
         AppDialogKeys.PrepareActionButton(LameBrowseButton);
+        AppDialogKeys.PrepareActionButton(LibraryColumnsWaveResetButton);
+        AppDialogKeys.PrepareActionButton(LibraryColumnsMp3ResetButton);
         AppDialogKeys.PrepareActionButton(LibraryExplorerRootAddButton);
         AppDialogKeys.PrepareActionButton(LibraryExplorerRootRemoveButton);
         AppDialogKeys.PrepareActionButton(LibraryExplorerRootUpButton);
@@ -307,7 +323,12 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(SpeakerVisibilityHost, UiStrings.TipSpeakerVisibility);
         TipService.Set(LibraryColumnsHeader, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnChecksHeader, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryColumnsHost, UiStrings.TipLibraryColumns);
+        TipService.Set(LibraryColumnsWaveHeader, UiStrings.TipLibraryColumns);
+        TipService.Set(LibraryColumnsMp3Header, UiStrings.TipLibraryColumns);
+        TipService.Set(LibraryColumnsWaveHost, UiStrings.TipLibraryColumns);
+        TipService.Set(LibraryColumnsMp3Host, UiStrings.TipLibraryColumns);
+        TipService.Set(LibraryColumnsWaveResetButton, UiStrings.TipLibraryColumns);
+        TipService.Set(LibraryColumnsMp3ResetButton, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryPlaylistWaveformSizeHeader, UiStrings.TipLibraryPlaylistWaveformSize);
         TipService.Set(LibraryPlaylistWaveformSizeCombo, UiStrings.TipLibraryPlaylistWaveformSize);
         TipService.Set(LibraryPlaylistWaveformAutoLargeBox, UiStrings.TipLibraryPlaylistWaveformAutoLarge);
@@ -431,17 +452,33 @@ internal partial class AudioSettingsWindow : Window
 
     private void FillLibraryColumns()
     {
-        LibraryColumnsHost.Children.Clear();
-        _libraryColumnChecks.Clear();
-        var style = TryFindResource("DarkCheckBoxStyle") as Style;
-        var visible = new HashSet<LibraryFileColumn>(SelectedLibraryListColumns);
-        foreach (var column in LibraryColumnFilter.All)
-        {
-            if (LibraryColumnFilter.IsLocked(column))
-            {
-                continue;
-            }
+        FillLibraryColumnHost(
+            LibraryColumnsWaveHost,
+            _libraryColumnChecksWave,
+            SelectedLibraryListColumnsWave,
+            LibraryColumnFilter.WaveDefaults,
+            LibraryColumnFilter.WaveSettingsColumns);
+        FillLibraryColumnHost(
+            LibraryColumnsMp3Host,
+            _libraryColumnChecksMp3,
+            SelectedLibraryListColumnsMp3,
+            LibraryColumnFilter.Mp3Defaults,
+            LibraryColumnFilter.Mp3SettingsColumns);
+    }
 
+    private void FillLibraryColumnHost(
+        Panel host,
+        Dictionary<LibraryFileColumn, CheckBox> checks,
+        IReadOnlyList<LibraryFileColumn> selected,
+        IReadOnlyList<LibraryFileColumn> defaults,
+        IReadOnlyList<LibraryFileColumn> settingsColumns)
+    {
+        host.Children.Clear();
+        checks.Clear();
+        var style = TryFindResource("DarkCheckBoxStyle") as Style;
+        var visible = new HashSet<LibraryFileColumn>(selected);
+        foreach (var column in LibraryColumnFilter.SettingsCheckOrder(defaults, settingsColumns))
+        {
             var box = new CheckBox
             {
                 Content = new TextBlock
@@ -460,15 +497,17 @@ internal partial class AudioSettingsWindow : Window
             }
 
             TipService.Set(box, UiStrings.TipLibraryColumns);
-            _libraryColumnChecks[column] = box;
-            LibraryColumnsHost.Children.Add(box);
+            checks[column] = box;
+            host.Children.Add(box);
         }
     }
 
-    private LibraryFileColumn[] ReadLibraryColumns()
+    private LibraryFileColumn[] ReadLibraryColumns(
+        Dictionary<LibraryFileColumn, CheckBox> checks,
+        IReadOnlyList<LibraryFileColumn> previous)
     {
         var set = new HashSet<LibraryFileColumn> { LibraryFileColumn.Name };
-        foreach (var pair in _libraryColumnChecks)
+        foreach (var pair in checks)
         {
             if (pair.Value.IsChecked == true)
             {
@@ -476,7 +515,29 @@ internal partial class AudioSettingsWindow : Window
             }
         }
 
-        return LibraryColumnFilter.Merge(SelectedLibraryListColumns, set);
+        return LibraryColumnFilter.Merge(previous, set);
+    }
+
+    private void LibraryColumnsWaveResetButton_Click(object sender, RoutedEventArgs e)
+    {
+        SelectedLibraryListColumnsWave = [.. LibraryColumnFilter.WaveDefaults];
+        FillLibraryColumnHost(
+            LibraryColumnsWaveHost,
+            _libraryColumnChecksWave,
+            SelectedLibraryListColumnsWave,
+            LibraryColumnFilter.WaveDefaults,
+            LibraryColumnFilter.WaveSettingsColumns);
+    }
+
+    private void LibraryColumnsMp3ResetButton_Click(object sender, RoutedEventArgs e)
+    {
+        SelectedLibraryListColumnsMp3 = [.. LibraryColumnFilter.Mp3Defaults];
+        FillLibraryColumnHost(
+            LibraryColumnsMp3Host,
+            _libraryColumnChecksMp3,
+            SelectedLibraryListColumnsMp3,
+            LibraryColumnFilter.Mp3Defaults,
+            LibraryColumnFilter.Mp3SettingsColumns);
     }
 
     private void FillLibraryPlaylistWaveformOptions()
@@ -981,7 +1042,12 @@ internal partial class AudioSettingsWindow : Window
             .Select(item => item.Path)
             .ToArray();
         SelectedLibraryExplorerRoots = LibraryExplorerPaths.ResolveRoots(SelectedLibraryExplorerRoots);
-        SelectedLibraryListColumns = ReadLibraryColumns();
+        SelectedLibraryListColumnsWave = ReadLibraryColumns(
+            _libraryColumnChecksWave,
+            SelectedLibraryListColumnsWave);
+        SelectedLibraryListColumnsMp3 = ReadLibraryColumns(
+            _libraryColumnChecksMp3,
+            SelectedLibraryListColumnsMp3);
         SelectedLibraryPlaylistWaveformSize =
             LibraryPlaylistWaveformSizeCombo.SelectedItem is LibraryPlaylistWaveformSizeItem sizeItem
                 ? sizeItem.Size
@@ -1678,7 +1744,10 @@ internal partial class AudioSettingsWindow : Window
         // 設定ウィンドウは表示倍率の対象外（常に等倍）。
         var pad = DesignMetrics.AudioPad.Left + DesignMetrics.AudioPad.Right;
         var chrome = WindowChromeWidth();
-        var content = Math.Max(AudioTabContentWidth(), SettingsTabBarWidth());
+        var content = Max(
+            AudioTabContentWidth(),
+            SettingsTabBarWidth(),
+            LayoutsTabContentWidth());
         var inner = content + pad + DesignMetrics.SettingsWindowContentMargin;
         var width = Math.Ceiling(inner + chrome);
         var min = DesignMetrics.SettingsWindowMinWidth;
@@ -1705,6 +1774,84 @@ internal partial class AudioSettingsWindow : Window
             _outputEditor.FittedRowWidth) + gutter;
         var columns = record + DesignMetrics.SettingsColumnGap + play;
         return Math.Max(top, columns);
+    }
+
+    private double LayoutsTabContentWidth()
+    {
+        var gutter = DesignMetrics.SettingsScrollBarGap + DesignMetrics.SettingsScrollBarWidth;
+        var speakers = Max(
+            LabelWidth(SpeakerVisibilityHeader),
+            MeasureSpeakerVisibilityWidth()) + gutter;
+        var waveformRow = LabelWidth(LibraryPlaylistWaveformSizeHeader)
+            + 8
+            + (LibraryPlaylistWaveformSizeCombo.ActualWidth > 0
+                ? LibraryPlaylistWaveformSizeCombo.ActualWidth
+                : DesignMetrics.From96(72));
+        var options = Max(
+            LabelWidth(LibraryColumnsHeader),
+            waveformRow,
+            MeasureCheckBoxContentWidth(LibraryPlaylistWaveformAutoLargeBox),
+            MeasureCheckBoxContentWidth(LibraryHideParentFolderForMp3OnlyBox),
+            MeasureCheckBoxContentWidth(LibraryHideWaveformForMp3OnlyBox)) + gutter;
+        var wave = Max(
+            LabelWidth(LibraryColumnChecksHeader),
+            LabelWidth(LibraryColumnsWaveHeader) + 8 + DesignMetrics.From96(88),
+            MeasureLibraryColumnChecksWidth()) + gutter;
+        var mp3 = Max(
+            LabelWidth(LibraryColumnsMp3Header) + 8 + DesignMetrics.From96(88),
+            MeasureLibraryColumnChecksWidth()) + gutter;
+        var playlist = Math.Max(
+            options,
+            wave + DesignMetrics.SettingsColumnGap + mp3);
+        return speakers + DesignMetrics.SettingsColumnGap + playlist;
+    }
+
+    private double MeasureSpeakerVisibilityWidth()
+    {
+        var widest = 0d;
+        foreach (var child in SpeakerVisibilityHost.Children)
+        {
+            if (child is CheckBox box)
+            {
+                widest = Math.Max(widest, MeasureCheckBoxContentWidth(box));
+            }
+        }
+
+        return widest;
+    }
+
+    private double MeasureLibraryColumnChecksWidth()
+    {
+        var widest = 0d;
+        foreach (var column in LibraryColumnFilter.All)
+        {
+            if (LibraryColumnFilter.IsLocked(column))
+            {
+                continue;
+            }
+
+            widest = Math.Max(
+                widest,
+                ComboBoxFit.MeasureText(this, UiStrings.LibraryColumnLabel(column), 11.333) + 28);
+        }
+
+        return widest;
+    }
+
+    private double MeasureCheckBoxContentWidth(CheckBox box)
+    {
+        var text = box.Content switch
+        {
+            TextBlock block => block.Text ?? string.Empty,
+            string s => s,
+            _ => box.Content?.ToString() ?? string.Empty,
+        };
+        if (string.IsNullOrEmpty(text))
+        {
+            return DesignMetrics.From96(120);
+        }
+
+        return ComboBoxFit.MeasureText(this, text, 11.333) + 28;
     }
 
     private double SettingsTabBarWidth()
@@ -1985,6 +2132,8 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyAccent(OkButton);
         ActionButtonLooks.ApplyClear(CancelButton);
         ActionButtonLooks.ApplyClear(LameBrowseButton);
+        ActionButtonLooks.ApplyClear(LibraryColumnsWaveResetButton);
+        ActionButtonLooks.ApplyClear(LibraryColumnsMp3ResetButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
         RefreshTestButtons();

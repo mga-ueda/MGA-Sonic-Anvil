@@ -1,11 +1,100 @@
 namespace MgaSonicAnvil.Domain;
 
+/// <summary>プレイリスト列プリセットの種別。</summary>
+internal enum LibraryPlaylistColumnKind
+{
+    Wave,
+    Mp3,
+    Mixed,
+}
+
+/// <summary>Wave / MP3 / 混在それぞれの表示列。</summary>
+internal readonly record struct LibraryColumnPresets(
+    IReadOnlyList<LibraryFileColumn> Wave,
+    IReadOnlyList<LibraryFileColumn> Mp3,
+    IReadOnlyList<LibraryFileColumn> Mixed,
+    bool PersistMixed = false);
+
 /// <summary>プレイリストの列。設定の読み書き。並びは保存順。</summary>
 internal static class LibraryColumnFilter
 {
     public static readonly LibraryFileColumn[] All =
     [
         LibraryFileColumn.Name,
+        LibraryFileColumn.SampleRate,
+        LibraryFileColumn.BitDepth,
+        LibraryFileColumn.Channels,
+        LibraryFileColumn.Duration,
+        LibraryFileColumn.Date,
+        LibraryFileColumn.ParentFolder,
+        LibraryFileColumn.Waveform,
+        LibraryFileColumn.Title,
+        LibraryFileColumn.Album,
+        LibraryFileColumn.Artist,
+        LibraryFileColumn.Composer,
+        LibraryFileColumn.Track,
+        LibraryFileColumn.Disc,
+        LibraryFileColumn.Year,
+        LibraryFileColumn.Genre,
+        LibraryFileColumn.Comment,
+        LibraryFileColumn.AlbumArtist,
+        LibraryFileColumn.Kind,
+        LibraryFileColumn.BitRate,
+        LibraryFileColumn.Size,
+        LibraryFileColumn.Folder,
+        LibraryFileColumn.Jacket,
+    ];
+
+    /// <summary>WAVE / AIFF 向け既定。</summary>
+    public static readonly LibraryFileColumn[] WaveDefaults =
+    [
+        LibraryFileColumn.Name,
+        LibraryFileColumn.SampleRate,
+        LibraryFileColumn.BitDepth,
+        LibraryFileColumn.Channels,
+        LibraryFileColumn.Duration,
+        LibraryFileColumn.Date,
+        LibraryFileColumn.ParentFolder,
+        LibraryFileColumn.Waveform,
+    ];
+
+    /// <summary>MP3 / M4A 向け既定（波形表示はオフ）。</summary>
+    public static readonly LibraryFileColumn[] Mp3Defaults =
+    [
+        LibraryFileColumn.Name,
+        LibraryFileColumn.Title,
+        LibraryFileColumn.Album,
+        LibraryFileColumn.Artist,
+        LibraryFileColumn.Composer,
+        LibraryFileColumn.Duration,
+        LibraryFileColumn.Track,
+        LibraryFileColumn.Disc,
+        LibraryFileColumn.Year,
+        LibraryFileColumn.Genre,
+        LibraryFileColumn.Date,
+        LibraryFileColumn.Comment,
+        LibraryFileColumn.ParentFolder,
+    ];
+
+    /// <summary>Wave 設定で選べる列（Name 以外）。タグ／ジャケット／ビットレートは出さない。</summary>
+    public static readonly LibraryFileColumn[] WaveSettingsColumns =
+    [
+        LibraryFileColumn.SampleRate,
+        LibraryFileColumn.BitDepth,
+        LibraryFileColumn.Channels,
+        LibraryFileColumn.Duration,
+        LibraryFileColumn.Date,
+        LibraryFileColumn.ParentFolder,
+        LibraryFileColumn.Waveform,
+        LibraryFileColumn.Kind,
+        LibraryFileColumn.Size,
+        LibraryFileColumn.Folder,
+        LibraryFileColumn.Comment,
+    ];
+
+    /// <summary>MP3 設定で選べる列（Name 以外）。ビット深度は出さない。</summary>
+    public static readonly LibraryFileColumn[] Mp3SettingsColumns =
+    [
         LibraryFileColumn.Title,
         LibraryFileColumn.Album,
         LibraryFileColumn.Artist,
@@ -22,7 +111,6 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.AlbumArtist,
         LibraryFileColumn.Kind,
         LibraryFileColumn.SampleRate,
-        LibraryFileColumn.BitDepth,
         LibraryFileColumn.Channels,
         LibraryFileColumn.BitRate,
         LibraryFileColumn.Size,
@@ -30,25 +118,42 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.Jacket,
     ];
 
-    public static readonly LibraryFileColumn[] Defaults =
-    [
-        LibraryFileColumn.Name,
-        LibraryFileColumn.Title,
-        LibraryFileColumn.Album,
-        LibraryFileColumn.Artist,
-        LibraryFileColumn.Composer,
-        LibraryFileColumn.Duration,
-        LibraryFileColumn.Track,
-        LibraryFileColumn.Disc,
-        LibraryFileColumn.Year,
-        LibraryFileColumn.Genre,
-        LibraryFileColumn.Date,
-        LibraryFileColumn.Comment,
-        LibraryFileColumn.ParentFolder,
-        LibraryFileColumn.Waveform,
-    ];
+    /// <summary>互換。Wave 既定と同じ。</summary>
+    public static LibraryFileColumn[] Defaults => WaveDefaults;
 
     public static bool IsLocked(LibraryFileColumn column) => column == LibraryFileColumn.Name;
+
+    /// <summary>設定のチェック並び。既定順のあと、その形式で選べる残りの列。</summary>
+    public static IEnumerable<LibraryFileColumn> SettingsCheckOrder(
+        IReadOnlyList<LibraryFileColumn> defaults) =>
+        SettingsCheckOrder(
+            defaults,
+            ReferenceEquals(defaults, Mp3Defaults) || defaults.SequenceEqual(Mp3Defaults)
+                ? Mp3SettingsColumns
+                : WaveSettingsColumns);
+
+    public static IEnumerable<LibraryFileColumn> SettingsCheckOrder(
+        IReadOnlyList<LibraryFileColumn> defaults,
+        IReadOnlyList<LibraryFileColumn> settingsColumns)
+    {
+        var allowed = new HashSet<LibraryFileColumn>(settingsColumns);
+        var seen = new HashSet<LibraryFileColumn>();
+        foreach (var column in defaults)
+        {
+            if (!IsLocked(column) && allowed.Contains(column) && seen.Add(column))
+            {
+                yield return column;
+            }
+        }
+
+        foreach (var column in settingsColumns)
+        {
+            if (!IsLocked(column) && seen.Add(column))
+            {
+                yield return column;
+            }
+        }
+    }
 
     /// <summary>
     /// プレイリストに値が1件でもある列。空リストは null（設定どおり全部出す）。
@@ -140,6 +245,53 @@ internal static class LibraryColumnFilter
     public static bool JacketEligibleKind(string kind) =>
         kind is "MP3" or "M4A";
 
+    public static bool IsPcmFamilyKind(string kind) =>
+        kind is "WAVE" or "AIFF";
+
+    public static bool IsTagFamilyKind(string kind) =>
+        kind is "MP3" or "M4A";
+
+    /// <summary>空・混在は Mixed。WAVE/AIFF のみ Wave。MP3/M4A のみ Mp3。</summary>
+    public static LibraryPlaylistColumnKind ClassifyPlaylistColumns(IReadOnlyList<LibraryFileRow> rows)
+    {
+        if (rows.Count == 0)
+        {
+            return LibraryPlaylistColumnKind.Mixed;
+        }
+
+        var pcm = true;
+        var tag = true;
+        foreach (var row in rows)
+        {
+            if (!IsPcmFamilyKind(row.Kind))
+            {
+                pcm = false;
+            }
+
+            if (!IsTagFamilyKind(row.Kind))
+            {
+                tag = false;
+            }
+
+            if (!pcm && !tag)
+            {
+                return LibraryPlaylistColumnKind.Mixed;
+            }
+        }
+
+        if (pcm)
+        {
+            return LibraryPlaylistColumnKind.Wave;
+        }
+
+        if (tag)
+        {
+            return LibraryPlaylistColumnKind.Mp3;
+        }
+
+        return LibraryPlaylistColumnKind.Mixed;
+    }
+
     public static bool IsEffectivelyVisible(
         LibraryFileColumn column,
         IReadOnlyCollection<LibraryFileColumn> enabled,
@@ -158,62 +310,152 @@ internal static class LibraryColumnFilter
         return used is null || used.Contains(column);
     }
 
-    public static LibraryFileColumn[] Resolve(string[]? stored)
+    /// <summary>混在の初期並び。Wave 既定のあと MP3 側だけの列。</summary>
+    public static LibraryFileColumn[] MixedDefaults => Union(WaveDefaults, Mp3Defaults);
+
+    public static LibraryFileColumn[] ResolveWave(string[]? stored) =>
+        Resolve(stored, WaveDefaults, migratePreviousDefaults: true);
+
+    public static LibraryFileColumn[] ResolveMp3(string[]? stored) =>
+        Resolve(stored, Mp3Defaults, migratePreviousDefaults: true);
+
+    /// <summary>
+    /// 混在用。空ならいまの Wave / MP3 設定の和集合。
+    /// 一度でも保存されていればその並びを使う。
+    /// </summary>
+    public static LibraryFileColumn[] ResolveMixed(
+        string[]? stored,
+        IReadOnlyList<LibraryFileColumn> waveColumns,
+        IReadOnlyList<LibraryFileColumn> mp3Columns)
     {
         if (stored is not { Length: > 0 })
         {
-            return [.. Defaults];
+            return Union(waveColumns, mp3Columns);
         }
 
-        var result = new List<LibraryFileColumn>(stored.Length + 1);
-        var seen = new HashSet<LibraryFileColumn>();
-        foreach (var name in stored)
+        return Resolve(stored, MixedDefaults, migratePreviousDefaults: false);
+    }
+
+    /// <summary>互換。Wave 既定で解決する。</summary>
+    public static LibraryFileColumn[] Resolve(string[]? stored) =>
+        ResolveWave(stored);
+
+    public static LibraryFileColumn[] ResolveActive(
+        IReadOnlyList<LibraryFileRow> rows,
+        IReadOnlyList<LibraryFileColumn> waveColumns,
+        IReadOnlyList<LibraryFileColumn> mp3Columns,
+        IReadOnlyList<LibraryFileColumn>? mixedColumns = null)
+    {
+        var wave = Normalize(waveColumns, WaveDefaults);
+        var mp3 = Normalize(mp3Columns, Mp3Defaults);
+        return ClassifyPlaylistColumns(rows) switch
         {
-            if (Enum.TryParse(name, ignoreCase: true, out LibraryFileColumn column)
-                && Array.IndexOf(All, column) >= 0
-                && seen.Add(column))
+            LibraryPlaylistColumnKind.Wave => wave,
+            LibraryPlaylistColumnKind.Mp3 => mp3,
+            _ => mixedColumns is null || mixedColumns.Count == 0
+                ? Union(wave, mp3)
+                : Normalize(mixedColumns, MixedDefaults),
+        };
+    }
+
+    /// <summary>Wave 順を先に、MP3 側だけの列を後ろへ。</summary>
+    public static LibraryFileColumn[] Union(
+        IReadOnlyList<LibraryFileColumn> waveColumns,
+        IReadOnlyList<LibraryFileColumn> mp3Columns)
+    {
+        var result = new List<LibraryFileColumn>(waveColumns.Count + mp3Columns.Count);
+        var seen = new HashSet<LibraryFileColumn>();
+        void Add(LibraryFileColumn column)
+        {
+            if (Array.IndexOf(All, column) >= 0 && seen.Add(column))
             {
                 result.Add(column);
             }
         }
 
-        if (result.Count == 0)
+        Add(LibraryFileColumn.Name);
+        foreach (var column in waveColumns)
         {
-            return [.. Defaults];
+            Add(column);
         }
 
-        if (!seen.Contains(LibraryFileColumn.Name))
+        foreach (var column in mp3Columns)
         {
-            result.Insert(0, LibraryFileColumn.Name);
-            seen.Add(LibraryFileColumn.Name);
+            Add(column);
         }
 
-        if (IsPreviousDefaultColumnOrder(result))
-        {
-            return [.. Defaults];
-        }
-
-        if (!seen.Contains(LibraryFileColumn.Date) && IsLegacyDefaultSet(seen))
-        {
-            InsertDateAtDefaultPlace(result);
-            seen.Add(LibraryFileColumn.Date);
-        }
-
-        if (!seen.Contains(LibraryFileColumn.ParentFolder) && IsLegacyDefaultWithoutParentFolder(seen))
-        {
-            InsertParentFolderAtDefaultPlace(result);
-            seen.Add(LibraryFileColumn.ParentFolder);
-        }
-
-        if (!seen.Contains(LibraryFileColumn.Waveform) && IsLegacyDefaultWithoutWaveform(seen))
-        {
-            InsertWaveformAtDefaultPlace(result);
-        }
-
-        return [.. result];
+        return result.Count == 0 ? [.. WaveDefaults] : [.. result];
     }
 
-    public static string[] Serialize(IEnumerable<LibraryFileColumn> columns)
+    /// <summary>
+    /// ヘッダー変更をプリセットへ書き戻す。
+    /// Wave / Mp3 を変えたときは混在を和集合へ戻す。混在の操作は混在だけ更新する。
+    /// </summary>
+    public static void ApplyVisibleChange(
+        LibraryPlaylistColumnKind kind,
+        IReadOnlyList<LibraryFileColumn> previousWave,
+        IReadOnlyList<LibraryFileColumn> previousMp3,
+        IReadOnlyList<LibraryFileColumn> previousMixed,
+        IReadOnlyList<LibraryFileColumn> nextVisible,
+        out LibraryFileColumn[] wave,
+        out LibraryFileColumn[] mp3,
+        out LibraryFileColumn[] mixed)
+    {
+        var prevWave = Normalize(previousWave, WaveDefaults);
+        var prevMp3 = Normalize(previousMp3, Mp3Defaults);
+        _ = previousMixed;
+        switch (kind)
+        {
+            case LibraryPlaylistColumnKind.Wave:
+                wave = Normalize(nextVisible, WaveDefaults);
+                mp3 = prevMp3;
+                mixed = Union(wave, mp3);
+                return;
+            case LibraryPlaylistColumnKind.Mp3:
+                wave = prevWave;
+                mp3 = Normalize(nextVisible, Mp3Defaults);
+                mixed = Union(wave, mp3);
+                return;
+            default:
+                wave = prevWave;
+                mp3 = prevMp3;
+                mixed = Normalize(nextVisible, MixedDefaults);
+                return;
+        }
+    }
+
+    /// <summary>旧単一設定が既定並び（または空）なら true。カスタムは false。</summary>
+    public static bool IsLegacyDefaultStored(string[]? stored)
+    {
+        if (stored is not { Length: > 0 })
+        {
+            return true;
+        }
+
+        var parsed = ParseStored(stored);
+        if (parsed.Count == 0)
+        {
+            return true;
+        }
+
+        if (!parsed.Contains(LibraryFileColumn.Name))
+        {
+            parsed.Insert(0, LibraryFileColumn.Name);
+        }
+
+        if (IsPreviousDefaultColumnOrder(parsed))
+        {
+            return true;
+        }
+
+        return parsed.Count == WaveDefaults.Length
+            && parsed.SequenceEqual(WaveDefaults);
+    }
+
+    public static string[] Serialize(IEnumerable<LibraryFileColumn> columns) =>
+        Serialize(columns, WaveDefaults);
+
+    public static string[] Serialize(IEnumerable<LibraryFileColumn> columns, LibraryFileColumn[] fallback)
     {
         var names = new List<string>(All.Length);
         var seen = new HashSet<LibraryFileColumn>();
@@ -230,7 +472,7 @@ internal static class LibraryColumnFilter
             names.Insert(0, LibraryFileColumn.Name.ToString());
         }
 
-        return names.Count == 0 ? Serialize(Defaults) : [.. names];
+        return names.Count == 0 ? Serialize(fallback, fallback) : [.. names];
     }
 
     /// <summary>チェックの増減は既存の並びを保ち、新規は既定順の末尾へ。</summary>
@@ -273,6 +515,88 @@ internal static class LibraryColumnFilter
         return [.. result];
     }
 
+    private static LibraryFileColumn[] Resolve(
+        string[]? stored,
+        LibraryFileColumn[] defaults,
+        bool migratePreviousDefaults)
+    {
+        if (stored is not { Length: > 0 })
+        {
+            return [.. defaults];
+        }
+
+        var result = ParseStored(stored);
+        if (result.Count == 0)
+        {
+            return [.. defaults];
+        }
+
+        var seen = new HashSet<LibraryFileColumn>(result);
+        if (!seen.Contains(LibraryFileColumn.Name))
+        {
+            result.Insert(0, LibraryFileColumn.Name);
+            seen.Add(LibraryFileColumn.Name);
+        }
+
+        if (migratePreviousDefaults && IsPreviousDefaultColumnOrder(result))
+        {
+            return [.. defaults];
+        }
+
+        if (ReferenceEquals(defaults, WaveDefaults))
+        {
+            if (!seen.Contains(LibraryFileColumn.Date) && IsLegacyDefaultSet(seen, defaults))
+            {
+                InsertDateAtDefaultPlace(result);
+                seen.Add(LibraryFileColumn.Date);
+            }
+
+            if (!seen.Contains(LibraryFileColumn.ParentFolder)
+                && IsLegacyDefaultWithoutParentFolder(seen, defaults))
+            {
+                InsertParentFolderAtDefaultPlace(result);
+                seen.Add(LibraryFileColumn.ParentFolder);
+            }
+
+            if (!seen.Contains(LibraryFileColumn.Waveform)
+                && IsLegacyDefaultWithoutWaveform(seen, defaults))
+            {
+                InsertWaveformAtDefaultPlace(result);
+            }
+        }
+
+        return [.. result];
+    }
+
+    private static List<LibraryFileColumn> ParseStored(string[] stored)
+    {
+        var result = new List<LibraryFileColumn>(stored.Length + 1);
+        var seen = new HashSet<LibraryFileColumn>();
+        foreach (var name in stored)
+        {
+            if (Enum.TryParse(name, ignoreCase: true, out LibraryFileColumn column)
+                && Array.IndexOf(All, column) >= 0
+                && seen.Add(column))
+            {
+                result.Add(column);
+            }
+        }
+
+        return result;
+    }
+
+    private static LibraryFileColumn[] Normalize(
+        IReadOnlyList<LibraryFileColumn> columns,
+        LibraryFileColumn[] fallback)
+    {
+        if (columns.Count == 0)
+        {
+            return [.. fallback];
+        }
+
+        return Resolve(Serialize(columns, fallback), fallback, migratePreviousDefaults: false);
+    }
+
     private static readonly LibraryFileColumn[][] PreviousDefaultOrders =
     [
         [
@@ -287,6 +611,19 @@ internal static class LibraryColumnFilter
             LibraryFileColumn.Year,
             LibraryFileColumn.Genre,
             LibraryFileColumn.Comment,
+        ],
+        [
+            LibraryFileColumn.Name,
+            LibraryFileColumn.Title,
+            LibraryFileColumn.Album,
+            LibraryFileColumn.Artist,
+            LibraryFileColumn.Composer,
+            LibraryFileColumn.Duration,
+            LibraryFileColumn.Track,
+            LibraryFileColumn.Disc,
+            LibraryFileColumn.Year,
+            LibraryFileColumn.Genre,
+            LibraryFileColumn.Comment,
             LibraryFileColumn.Date,
         ],
         [
@@ -346,18 +683,35 @@ internal static class LibraryColumnFilter
             LibraryFileColumn.Date,
             LibraryFileColumn.Comment,
             LibraryFileColumn.ParentFolder,
+        ],
+        [
+            LibraryFileColumn.Name,
+            LibraryFileColumn.Title,
+            LibraryFileColumn.Album,
+            LibraryFileColumn.Artist,
+            LibraryFileColumn.Composer,
+            LibraryFileColumn.Duration,
+            LibraryFileColumn.Track,
+            LibraryFileColumn.Disc,
+            LibraryFileColumn.Year,
+            LibraryFileColumn.Genre,
+            LibraryFileColumn.Date,
+            LibraryFileColumn.Comment,
+            LibraryFileColumn.ParentFolder,
+            LibraryFileColumn.Waveform,
         ],
     ];
 
-    /// <summary>親フォルダ追加前の既定セット（日付あり）。</summary>
-    private static bool IsLegacyDefaultWithoutParentFolder(HashSet<LibraryFileColumn> seen)
+    private static bool IsLegacyDefaultWithoutParentFolder(
+        HashSet<LibraryFileColumn> seen,
+        LibraryFileColumn[] defaults)
     {
-        if (seen.Count != Defaults.Length - 2)
+        if (seen.Count != defaults.Length - 2)
         {
             return false;
         }
 
-        foreach (var column in Defaults)
+        foreach (var column in defaults)
         {
             if (column is LibraryFileColumn.ParentFolder or LibraryFileColumn.Waveform)
             {
@@ -373,15 +727,16 @@ internal static class LibraryColumnFilter
         return true;
     }
 
-    /// <summary>波形追加前の既定セット（親フォルダあり）。</summary>
-    private static bool IsLegacyDefaultWithoutWaveform(HashSet<LibraryFileColumn> seen)
+    private static bool IsLegacyDefaultWithoutWaveform(
+        HashSet<LibraryFileColumn> seen,
+        LibraryFileColumn[] defaults)
     {
-        if (seen.Count != Defaults.Length - 1)
+        if (seen.Count != defaults.Length - 1)
         {
             return false;
         }
 
-        foreach (var column in Defaults)
+        foreach (var column in defaults)
         {
             if (column != LibraryFileColumn.Waveform && !seen.Contains(column))
             {
@@ -392,16 +747,17 @@ internal static class LibraryColumnFilter
         return true;
     }
 
-    private static bool IsLegacyDefaultSet(HashSet<LibraryFileColumn> seen)
+    private static bool IsLegacyDefaultSet(
+        HashSet<LibraryFileColumn> seen,
+        LibraryFileColumn[] defaults)
     {
-        // 日付・親フォルダ・波形追加前の既定。
-        var expected = Defaults.Length - 3;
+        var expected = defaults.Length - 3;
         if (seen.Count != expected)
         {
             return false;
         }
 
-        foreach (var column in Defaults)
+        foreach (var column in defaults)
         {
             if (column is LibraryFileColumn.Date
                 or LibraryFileColumn.ParentFolder
@@ -464,6 +820,13 @@ internal static class LibraryColumnFilter
 
     private static void InsertDateAtDefaultPlace(List<LibraryFileColumn> result)
     {
+        var duration = result.IndexOf(LibraryFileColumn.Duration);
+        if (duration >= 0)
+        {
+            result.Insert(duration + 1, LibraryFileColumn.Date);
+            return;
+        }
+
         var genre = result.IndexOf(LibraryFileColumn.Genre);
         if (genre >= 0)
         {
