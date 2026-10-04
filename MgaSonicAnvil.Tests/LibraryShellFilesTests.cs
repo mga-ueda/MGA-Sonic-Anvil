@@ -66,10 +66,9 @@ public sealed class LibraryShellFilesTests
     }
 
     [Fact]
-    public void DropEffectCopy_IsOleCopyNotMove()
+    public void DropEffectCopy_IsOleCopy()
     {
         Assert.Equal(1, LibraryShellFiles.DropEffectCopy);
-        Assert.Equal(2, LibraryShellFiles.DropEffectMove);
     }
 
     [Fact]

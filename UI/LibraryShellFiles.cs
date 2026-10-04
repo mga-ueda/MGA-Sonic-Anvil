@@ -13,11 +13,8 @@ internal static class LibraryShellFiles
 {
     internal const string PreferredDropEffectFormat = "Preferred DropEffect";
 
-    /// <summary>DROPEFFECT_COPY = 1。2 は DROPEFFECT_MOVE（FO_COPY と取り違えない）。</summary>
+    /// <summary>DROPEFFECT_COPY = 1。移動（2）は使わない（FO_COPY と取り違えない）。</summary>
     internal const int DropEffectCopy = 1;
-
-    /// <summary>DROPEFFECT_MOVE。Preferred DropEffect にこれを書くと Explorer は移動する。</summary>
-    internal const int DropEffectMove = 2;
 
     public static string[] ExistingPaths(IEnumerable<string?> paths)
     {
