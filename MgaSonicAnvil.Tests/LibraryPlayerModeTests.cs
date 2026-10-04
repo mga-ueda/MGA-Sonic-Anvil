@@ -187,6 +187,10 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Oem2, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Left, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Right, ModifierKeys.None));
+        Assert.Equal(0, LibraryPlayerMode.VerticalBringIntoViewDelta(10, 20, 80));
+        Assert.Equal(-30, LibraryPlayerMode.VerticalBringIntoViewDelta(-30, 20, 80));
+        Assert.Equal(40, LibraryPlayerMode.VerticalBringIntoViewDelta(100, 20, 80));
+        Assert.Equal(0, LibraryPlayerMode.VerticalBringIntoViewDelta(0, 20, 0));
         Assert.False(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Left, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Left, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Up, ModifierKeys.None));

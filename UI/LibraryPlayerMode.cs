@@ -181,6 +181,25 @@ internal static class LibraryPlayerMode
     public static bool ExplorerOwnsHorizontal(Key key, ModifierKeys modifiers) =>
         key is Key.Left or Key.Right && modifiers == ModifierKeys.None;
 
+    /// <summary>
+    /// ツリー選択は横に追従しない。行の縦位置だけビューへ入れる量。
+    /// </summary>
+    public static double VerticalBringIntoViewDelta(double y, double height, double viewportHeight)
+    {
+        if (viewportHeight <= 0 || height <= 0 || double.IsNaN(y) || double.IsNaN(height))
+        {
+            return 0;
+        }
+
+        if (y < 0)
+        {
+            return y;
+        }
+
+        var overflow = y + height - viewportHeight;
+        return overflow > 0 ? overflow : 0;
+    }
+
     /// <summary>エクスプローラーの *。テンキーと Shift+8。</summary>
     public static bool IsExplorerExpandAll(Key key, ModifierKeys modifiers) =>
         (key == Key.Multiply && modifiers == ModifierKeys.None)

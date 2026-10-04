@@ -130,6 +130,7 @@ internal sealed class LibraryBrowserView : UserControl
     private string[] _explorerRoots = LibraryExplorerPaths.ResolveRoots(null);
     private readonly HashSet<string> _explorerExpanded = new(StringComparer.OrdinalIgnoreCase);
     private bool _treeExpansionBusy;
+    private bool _explorerBringIntoViewBusy;
     private readonly ComboBox _groupCombo = new();
     private readonly TextBlock _playlistLabel = new();
     private readonly TextBlock _groupLabel = new();
@@ -2492,7 +2493,7 @@ internal sealed class LibraryBrowserView : UserControl
         var favoritesSplitter = _favoritesSplitter;
         favoritesSplitter.Height = DesignMetrics.LibraryFavoritesSplitterHitHeight;
         favoritesSplitter.HorizontalAlignment = HorizontalAlignment.Stretch;
-        favoritesSplitter.VerticalAlignment = VerticalAlignment.Center;
+        favoritesSplitter.VerticalAlignment = VerticalAlignment.Top;
         favoritesSplitter.ResizeBehavior = GridResizeBehavior.PreviousAndNext;
         favoritesSplitter.ResizeDirection = GridResizeDirection.Rows;
         favoritesSplitter.Cursor = Cursors.SizeNS;
@@ -2580,7 +2581,7 @@ internal sealed class LibraryBrowserView : UserControl
 
         var splitter = _explorerSplitter;
         splitter.Width = DesignMetrics.LibrarySplitterHitThickness;
-        splitter.HorizontalAlignment = HorizontalAlignment.Center;
+        splitter.HorizontalAlignment = HorizontalAlignment.Left;
         splitter.VerticalAlignment = VerticalAlignment.Stretch;
         splitter.ResizeBehavior = GridResizeBehavior.PreviousAndNext;
         splitter.ResizeDirection = GridResizeDirection.Columns;
@@ -2914,7 +2915,9 @@ internal sealed class LibraryBrowserView : UserControl
         splitter.Background = Brushes.Transparent;
     }
 
-    /// <summary>1px のマスに置いても、当たりがマスで切れない。</summary>
+    /// <summary>
+    /// 1px のマスに置いても当たりがマスで切れない。はみ出しはツリー側ではなく隣ペインへ。
+    /// </summary>
     private sealed class LibraryHoverSplitter : GridSplitter
     {
         protected override Geometry GetLayoutClip(Size layoutSlotSize) => null!;
@@ -2945,10 +2948,121 @@ internal sealed class LibraryBrowserView : UserControl
         itemStyle.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
         itemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
         itemStyle.Setters.Add(new Setter(Control.TemplateProperty, TreeNavTemplate(hover, selected)));
+        itemStyle.Setters.Add(new EventSetter(
+            RequestBringIntoViewEvent,
+            new RequestBringIntoViewEventHandler(ExplorerItem_RequestBringIntoView)));
         _folderTree.Resources[typeof(TreeViewItem)] = itemStyle;
         _folderTree.ItemContainerStyle = itemStyle;
         ApplyTreeItemStyle(_folderTree.Items, itemStyle);
         ApplyTreeMultiSelectChrome();
+    }
+
+    /// <summary>
+    /// 既定の BringIntoView は長い名前で横に飛ぶ。縦は ScrollViewer に任せ、横位置は戻す。
+    /// </summary>
+    private void ExplorerItem_RequestBringIntoView(object sender, RequestBringIntoViewEventArgs e)
+    {
+        if (_explorerBringIntoViewBusy || sender is not TreeViewItem item)
+        {
+            return;
+        }
+
+        if (FindDescendantScrollViewer(_folderTree) is not { } scroll)
+        {
+            return;
+        }
+
+        if (FindAncestor<ScrollBar>(e.OriginalSource as DependencyObject) is not null
+            || IsExplorerHorizontalScrollHeld(scroll))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        var header = FindExplorerHeader(item) ?? item;
+        var height = header.ActualHeight > 0 ? header.ActualHeight : 1;
+        var keepX = scroll.HorizontalOffset;
+        e.Handled = true;
+        _explorerBringIntoViewBusy = true;
+        try
+        {
+            header.BringIntoView(new Rect(0, 0, 1, height));
+        }
+        finally
+        {
+            _explorerBringIntoViewBusy = false;
+        }
+
+        RestoreExplorerHorizontalOffset(scroll, keepX);
+    }
+
+    private static void RestoreExplorerHorizontalOffset(ScrollViewer scroll, double offset)
+    {
+        if (IsExplorerHorizontalScrollHeld(scroll))
+        {
+            return;
+        }
+
+        scroll.ScrollToHorizontalOffset(offset);
+    }
+
+    private static bool IsExplorerHorizontalScrollHeld(ScrollViewer scroll)
+    {
+        var count = VisualTreeHelper.GetChildrenCount(scroll);
+        for (var i = 0; i < count; i++)
+        {
+            if (FindHorizontalScrollThumb(VisualTreeHelper.GetChild(scroll, i)) is { IsDragging: true })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static Thumb? FindHorizontalScrollThumb(DependencyObject root)
+    {
+        if (root is ScrollBar { Orientation: Orientation.Horizontal } bar)
+        {
+            return FindDescendant<Thumb>(bar);
+        }
+
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var found = FindHorizontalScrollThumb(VisualTreeHelper.GetChild(root, i));
+            if (found is not null)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    private static FrameworkElement? FindExplorerHeader(DependencyObject root)
+    {
+        if (root is ItemsPresenter)
+        {
+            return null;
+        }
+
+        if (root is FrameworkElement { Name: "Bd" } header)
+        {
+            return header;
+        }
+
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var found = FindExplorerHeader(VisualTreeHelper.GetChild(root, i));
+            if (found is not null)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     private static void ApplyTreeItemStyle(ItemCollection items, Style style)
@@ -4664,6 +4778,24 @@ internal sealed class LibraryBrowserView : UserControl
             {
                 return nested;
             }
+        }
+
+        return null;
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? origin)
+        where T : DependencyObject
+    {
+        while (origin is not null)
+        {
+            if (origin is T match)
+            {
+                return match;
+            }
+
+            origin = origin is Visual
+                ? VisualTreeHelper.GetParent(origin)
+                : LogicalTreeHelper.GetParent(origin);
         }
 
         return null;

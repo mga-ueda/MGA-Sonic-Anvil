@@ -179,10 +179,10 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Equal(UiStrings.LibraryPlaylistLabel, view.PlaylistPaneTitle);
             Assert.Equal(Dock.Right, view.PlaylistGroupDock);
             Assert.Equal(DesignMetrics.LibraryFavoritesSplitterHitHeight, view.FavoritesSplitter.Height);
-            Assert.Equal(VerticalAlignment.Center, view.FavoritesSplitter.VerticalAlignment);
+            Assert.Equal(VerticalAlignment.Top, view.FavoritesSplitter.VerticalAlignment);
             Assert.Equal(Cursors.SizeNS, view.FavoritesSplitter.Cursor);
             Assert.Equal(DesignMetrics.LibrarySplitterHitThickness, view.ExplorerSplitter.Width);
-            Assert.Equal(HorizontalAlignment.Center, view.ExplorerSplitter.HorizontalAlignment);
+            Assert.Equal(HorizontalAlignment.Left, view.ExplorerSplitter.HorizontalAlignment);
             Assert.Equal(Cursors.SizeWE, view.ExplorerSplitter.Cursor);
             Assert.False(view.ExplorerSplitter.Focusable);
             Assert.False(view.FavoritesSplitter.Focusable);

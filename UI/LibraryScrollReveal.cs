@@ -79,7 +79,40 @@ internal static class LibraryScrollReveal
     }
 
     public static bool IsNearEdge(double position, double length, double distance) =>
-        length > 0 && position >= length - distance;
+        IsNearEnd(position, length, distance, outsideSlop: 0);
+
+    /// <summary>
+    /// ビューの終端付近。スプリッターがはみ出す外側だけ余裕を見る。
+    /// </summary>
+    public static bool IsNearEnd(double position, double length, double distance, double outsideSlop)
+    {
+        if (length <= 0)
+        {
+            return false;
+        }
+
+        return position >= length - distance && position <= length + outsideSlop;
+    }
+
+    /// <summary>縦バー。右端付近かつ、そのビューの高さの中。</summary>
+    public static bool IsOverVerticalBar(
+        double x,
+        double y,
+        double width,
+        double height,
+        double distance,
+        double slop) =>
+        IsNearEnd(x, width, distance, slop) && y >= -slop && y <= height + slop;
+
+    /// <summary>横バー。下端付近かつ、そのビューの幅の中。隣ペインでは出さない。</summary>
+    public static bool IsOverHorizontalBar(
+        double x,
+        double y,
+        double width,
+        double height,
+        double distance,
+        double slop) =>
+        IsNearEnd(y, height, distance, slop) && x >= -slop && x <= width + slop;
 
     private static void Host_PreviewMouseMove(object sender, MouseEventArgs e)
     {
@@ -96,10 +129,11 @@ internal static class LibraryScrollReveal
 
         var pos = e.GetPosition(viewer);
         var distance = DesignMetrics.LibraryScrollRevealDistance;
+        var slop = DesignMetrics.LibrarySplitterHitThickness;
         Apply(
             viewer,
-            IsNearEdge(pos.X, viewer.ActualWidth, distance),
-            IsNearEdge(pos.Y, viewer.ActualHeight, distance),
+            IsOverVerticalBar(pos.X, pos.Y, viewer.ActualWidth, viewer.ActualHeight, distance, slop),
+            IsOverHorizontalBar(pos.X, pos.Y, viewer.ActualWidth, viewer.ActualHeight, distance, slop),
             idle: false);
         LibraryHoverIdle.Arm(host, () => OnScrollIdle(host));
     }

@@ -157,6 +157,13 @@ public sealed class LibraryExplorerPathsTests
         Assert.True(LibraryScrollReveal.IsNearEdge(99, 100, 32));
         Assert.True(LibraryScrollReveal.IsNearEdge(0, 20, 32));
         Assert.False(LibraryScrollReveal.IsNearEdge(50, 0, 32));
+        Assert.True(LibraryScrollReveal.IsNearEnd(110, 100, 32, 24));
+        Assert.False(LibraryScrollReveal.IsNearEnd(150, 100, 32, 24));
+        Assert.False(LibraryScrollReveal.IsNearEnd(50, 100, 32, 24));
+        Assert.True(LibraryScrollReveal.IsOverHorizontalBar(50, 90, 100, 100, 32, 24));
+        Assert.False(LibraryScrollReveal.IsOverHorizontalBar(400, 90, 100, 100, 32, 24));
+        Assert.True(LibraryScrollReveal.IsOverVerticalBar(90, 50, 100, 100, 32, 24));
+        Assert.False(LibraryScrollReveal.IsOverVerticalBar(90, 400, 100, 100, 32, 24));
     }
 
     [Fact]
