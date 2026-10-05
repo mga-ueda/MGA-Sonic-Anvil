@@ -154,6 +154,33 @@ internal sealed class LibraryBrowserView : UserControl
     private string _explorerTypeaheadIgnoreText = "";
     private readonly StackPanel _playlistGroupHost = new() { Orientation = Orientation.Horizontal };
     private readonly DataGrid _grid = new();
+    private readonly LibraryVisualStage _visualStage = new();
+
+    /// <summary>B で固定した PDF ページ。静止の背面レイヤー（ドリフトやウォッシュ加工なし）。</summary>
+    private readonly Grid _pinnedPdfHost = new()
+    {
+        Background = Brushes.Black,
+        ClipToBounds = true,
+        IsHitTestVisible = false,
+        Visibility = Visibility.Collapsed,
+    };
+
+    private readonly Image _pinnedPdfImage = new()
+    {
+        Stretch = Stretch.Uniform,
+        IsHitTestVisible = false,
+        HorizontalAlignment = HorizontalAlignment.Center,
+        VerticalAlignment = VerticalAlignment.Center,
+    };
+
+    private readonly Border _pinnedPdfDim = new()
+    {
+        Background = Brushes.Black,
+        Opacity = LibraryVisualStage.StoppedDimOpacity,
+        IsHitTestVisible = false,
+    };
+
+    private bool _pdfBackgroundPinned;
     private DataGridTextColumn _groupSpacer = null!;
     private bool _gridScrollHooked;
     private readonly Dictionary<LibraryFileColumn, DataGridColumn> _columns = [];
@@ -228,6 +255,12 @@ internal sealed class LibraryBrowserView : UserControl
     /// <summary>ダブルクリック。停止中でも再生する。</summary>
     public event EventHandler<DocumentSession>? SessionPlayRequested;
 
+    public event EventHandler? PlaylistVisualEnded;
+
+    public event EventHandler<TimeSpan>? PlaylistVisualOpened;
+
+    public event EventHandler? PlaylistVisualStateChanged;
+
     public event EventHandler<LibraryColumnPresets>? VisibleColumnPresetsChanged;
 
     public event EventHandler<LibraryFileGroup>? GroupChanged;
@@ -269,6 +302,8 @@ internal sealed class LibraryBrowserView : UserControl
         SnapsToDevicePixels = true;
         UseLayoutRounding = true;
         BuildLayout();
+        _visualStage.Ended += (_, _) => PlaylistVisualEnded?.Invoke(this, EventArgs.Empty);
+        _visualStage.Opened += (_, duration) => PlaylistVisualOpened?.Invoke(this, duration);
         ConfigureGrid();
         ConfigureGroupCombo();
         ApplyActiveColumnVisibility(notify: false);
@@ -560,6 +595,118 @@ internal sealed class LibraryBrowserView : UserControl
     /// <summary>表示順の前の曲。先頭の前は末尾。1曲なら同じ曲。ランダム時は抽選順を戻る。</summary>
     public DocumentSession? PreviousPlaylistSession(DocumentSession? current) =>
         PlaylistSessionByLoop(current, previous: true);
+
+    public bool PlaylistVisualPlaying => _visualStage.IsPlaying;
+
+    public bool PlaylistVisualShown => _visualStage.IsShown;
+
+    public bool PlaylistVisualIsVideo => _visualStage.IsVideo;
+
+    public bool PlaylistVisualIsPdf => _visualStage.IsPdf;
+
+    public bool PdfBackgroundPinned => _pdfBackgroundPinned;
+
+    public TimeSpan PlaylistVisualPosition => _visualStage.Position;
+
+    public void HidePlaylistVisual()
+    {
+        _visualStage.Hide();
+        PlaceArtworkGlow();
+        PlaylistVisualStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void ShowPlaylistVisual(DocumentSession session, bool play)
+    {
+        var path = session.Document.SourcePath;
+        if (string.IsNullOrWhiteSpace(path) || !LibraryPlaylistDocuments.IsVisual(session.Document))
+        {
+            HidePlaylistVisual();
+            return;
+        }
+
+        if (LibraryPlaylistDocuments.IsPdf(session.Document))
+        {
+            var position = session.Document.SampleRate > 0
+                ? TimeSpan.FromSeconds(session.Document.CursorFrame / (double)session.Document.SampleRate)
+                : TimeSpan.Zero;
+            _visualStage.ShowPdf(path, play, position);
+            PlaceArtworkGlow();
+            PlaylistVisualStateChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        var playPath = path;
+        if (LibraryPlaylistDocuments.IsVideo(path) && VideoProxy.TryGetDisplayPath(path, out var display))
+        {
+            playPath = display;
+        }
+
+        _visualStage.ShowVideo(playPath, play);
+        if (session.Document.SampleRate > 0 && session.Document.CursorFrame > 0)
+        {
+            _visualStage.Seek(TimeSpan.FromSeconds(
+                session.Document.CursorFrame / (double)session.Document.SampleRate));
+        }
+
+        PlaceArtworkGlow();
+        PlaylistVisualStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SetPlaylistVisualPlaying(bool playing)
+    {
+        _visualStage.SetPlaying(playing);
+        PlaylistVisualStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>本再生停止後、指定位置の暗いプレビューへ移す。</summary>
+    public void EnterPlaylistVisualDimPreview(TimeSpan position)
+    {
+        _visualStage.EnterDimPreviewAt(position);
+        PlaylistVisualStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SeekPlaylistVisual(TimeSpan position) => _visualStage.Seek(position);
+
+    public void SetPlaylistVisualSpeed(double ratio) => _visualStage.SetSpeedRatio(ratio);
+
+    public bool TryStepPlaylistPdfPage(int delta) => _visualStage.TryStepPdfPage(delta);
+
+    public bool TryGoPlaylistPdfPageEdge(int edge) => _visualStage.TryGoPdfPageEdge(edge);
+
+    public bool TryZoomPlaylistPdf(int direction, bool isRepeat) =>
+        _visualStage.TryZoomPdf(direction, isRepeat);
+
+    public void ResetPlaylistPdfZoomLatch() => _visualStage.ResetPdfZoomLatch();
+
+    /// <summary>
+    /// 表示中の PDF ページを静止背景へ固定する（既に固定中なら差し替え）。
+    /// 呼び出し側で表示を閉じる。
+    /// </summary>
+    public bool TryPinPdfBackground()
+    {
+        if (!_visualStage.TryClonePdfBitmap(out var bitmap) || bitmap is null)
+        {
+            return false;
+        }
+
+        _pinnedPdfImage.Source = bitmap;
+        _pdfBackgroundPinned = true;
+        PlaceArtworkGlow();
+        return true;
+    }
+
+    public void ClearPdfBackgroundPin()
+    {
+        if (!_pdfBackgroundPinned && _pinnedPdfHost.Visibility != Visibility.Visible)
+        {
+            _pinnedPdfImage.Source = null;
+            return;
+        }
+
+        _pdfBackgroundPinned = false;
+        _pinnedPdfImage.Source = null;
+        PlaceArtworkGlow();
+    }
 
     public bool ShuffleEnabled
     {
@@ -6417,9 +6564,32 @@ internal sealed class LibraryBrowserView : UserControl
         ContinueGlowDrift();
     }
 
+    /// <summary>動画／PDF を窓全体の背面（ウォッシュより前、クロームより後ろ）に置く。</summary>
+    internal void BindWindowVisual(Grid host)
+    {
+        host.IsHitTestVisible = false;
+        host.ClipToBounds = true;
+        if (_pinnedPdfHost.Children.Count == 0)
+        {
+            _pinnedPdfHost.Children.Add(_pinnedPdfImage);
+            _pinnedPdfHost.Children.Add(_pinnedPdfDim);
+        }
+
+        if (!ReferenceEquals(VisualTreeHelper.GetParent(_pinnedPdfHost), host))
+        {
+            host.Children.Insert(0, _pinnedPdfHost);
+        }
+
+        if (!ReferenceEquals(VisualTreeHelper.GetParent(_visualStage), host))
+        {
+            host.Children.Add(_visualStage);
+        }
+    }
+
     /// <summary>エディタの背景。プレイヤーのフォールバックウォッシュをウィンドウ全体に出す。</summary>
     internal void UseWindowFallbackWash()
     {
+        ClearPdfBackgroundPin();
         _extendGlow = true;
         ApplyArtworkGlow(null);
     }
@@ -6612,6 +6782,40 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void PlaceArtworkGlow()
     {
+        // PDF 固定背景は PlayerVisualHost 側。通常のジャケットウォッシュは重ねない。
+        if (_pdfBackgroundPinned)
+        {
+            _pinnedPdfHost.Visibility = Visibility.Visible;
+            _glowHost.Visibility = Visibility.Collapsed;
+            _veil.Visibility = Visibility.Collapsed;
+            HideWaveGlowHost();
+            Background = Brushes.Transparent;
+            _root.Background = Brushes.Transparent;
+            return;
+        }
+
+        _pinnedPdfHost.Visibility = Visibility.Collapsed;
+
+        if (_visualStage.IsShown)
+        {
+            _glowHost.Visibility = Visibility.Collapsed;
+            _veil.Visibility = Visibility.Collapsed;
+            Background = Brushes.Transparent;
+            _root.Background = Brushes.Transparent;
+            if (UseUnifiedGlow)
+            {
+                _waveGlow.Visibility = Visibility.Visible;
+                _waveVeil.Visibility = Visibility.Visible;
+                _waveGlowHost!.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                HideWaveGlowHost();
+            }
+
+            return;
+        }
+
         if (UseUnifiedGlow)
         {
             _glowHost.Visibility = Visibility.Collapsed;
@@ -6709,6 +6913,16 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void SyncGlowDrift()
     {
+        if (_pdfBackgroundPinned)
+        {
+            if (_glowDriftRunning)
+            {
+                StopGlowDrift();
+            }
+
+            return;
+        }
+
         var run = _artworkGlow && GlowAnimationAlive();
         if (run == _glowDriftRunning)
         {
@@ -7330,6 +7544,9 @@ internal sealed class LibraryBrowserView : UserControl
         AudioFileKind.Mp3 => "MP3",
         AudioFileKind.M4a => "M4A",
         AudioFileKind.Aiff => "AIFF",
+        AudioFileKind.Mp4 => "MP4",
+        AudioFileKind.Mov => "MOV",
+        AudioFileKind.Pdf => "PDF",
         _ => "WAVE",
     };
 

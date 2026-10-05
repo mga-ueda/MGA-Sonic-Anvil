@@ -72,6 +72,14 @@ internal partial class AudioSettingsWindow : Window
 
     public bool SelectedGaplessPlayback { get; private set; } = true;
 
+    public bool SelectedLibraryShowPlaylistPdf { get; private set; } = true;
+
+    public bool SelectedLibraryShowPlaylistMov { get; private set; } = true;
+
+    public bool SelectedLibraryShowPlaylistMp4 { get; private set; } = true;
+
+    public int SelectedVideoProxyRetentionDays { get; private set; } = VideoProxy.DefaultRetentionDays;
+
     public bool SelectedAutoSpeakerSelect { get; private set; }
 
     public string SelectedActiveSpeakerId { get; private set; } = string.Empty;
@@ -134,7 +142,11 @@ internal partial class AudioSettingsWindow : Window
         IEnumerable<LibraryFileColumn>? libraryListColumnsMp3 = null,
         LibraryPlaylistWaveformSize libraryPlaylistWaveformSizeWave = LibraryPlaylistWaveformSize.L,
         LibraryPlaylistWaveformSize libraryPlaylistWaveformSizeMp3 = LibraryPlaylistWaveformSize.L,
-        bool gaplessPlayback = true)
+        bool gaplessPlayback = true,
+        bool libraryShowPlaylistPdf = true,
+        bool libraryShowPlaylistMov = true,
+        bool libraryShowPlaylistMp4 = true,
+        int videoProxyRetentionDays = VideoProxy.DefaultRetentionDays)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
@@ -169,6 +181,10 @@ internal partial class AudioSettingsWindow : Window
         SelectedLibraryPlaylistWaveformSizeMp3 =
             LibraryPlaylistWaveformSizes.Clamp(libraryPlaylistWaveformSizeMp3);
         SelectedGaplessPlayback = gaplessPlayback;
+        SelectedLibraryShowPlaylistPdf = libraryShowPlaylistPdf;
+        SelectedLibraryShowPlaylistMov = libraryShowPlaylistMov;
+        SelectedLibraryShowPlaylistMp4 = libraryShowPlaylistMp4;
+        SelectedVideoProxyRetentionDays = VideoProxy.ClampRetentionDays(videoProxyRetentionDays);
         SelectedAutoSpeakerSelect = autoSpeakerSelect;
         SelectedActiveSpeakerId = string.IsNullOrWhiteSpace(activeSpeakerId)
             ? _presets[0].Id
@@ -277,6 +293,7 @@ internal partial class AudioSettingsWindow : Window
         FillLibraryExplorerRoots();
         FillLibraryColumns();
         FillLibraryPlaylistWaveformOptions();
+        FillVideoProxyRetention();
         FillDefaultAudioFormat();
         ApplyTips();
         ReflowSettingsWindow();
@@ -372,6 +389,12 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(ExportParallelLabel, UiStrings.TipExportParallel);
         TipService.Set(ExportParallelCombo, UiStrings.TipExportParallel);
         TipService.Set(GaplessPlaybackBox, UiStrings.TipGaplessPlayback);
+        TipService.Set(LibraryPlaylistDocumentsHeader, UiStrings.TipLibraryPlaylistDocuments);
+        TipService.Set(LibraryShowPlaylistPdfBox, UiStrings.TipLibraryPlaylistDocuments);
+        TipService.Set(LibraryShowPlaylistMovBox, UiStrings.TipLibraryPlaylistDocuments);
+        TipService.Set(LibraryShowPlaylistMp4Box, UiStrings.TipLibraryPlaylistDocuments);
+        TipService.Set(VideoProxyRetentionHeader, UiStrings.TipVideoProxyRetention);
+        TipService.Set(VideoProxyRetentionCombo, UiStrings.TipVideoProxyRetention);
         TipService.Set(OkButton, UiStrings.TipSettingsOk);
         TipService.Set(CancelButton, UiStrings.TipSettingsCancel);
     }
@@ -448,6 +471,9 @@ internal partial class AudioSettingsWindow : Window
 
     private void FillLibraryColumns()
     {
+        LibraryShowPlaylistPdfBox.IsChecked = SelectedLibraryShowPlaylistPdf;
+        LibraryShowPlaylistMovBox.IsChecked = SelectedLibraryShowPlaylistMov;
+        LibraryShowPlaylistMp4Box.IsChecked = SelectedLibraryShowPlaylistMp4;
         FillLibraryColumnHost(
             LibraryColumnsWaveHost,
             _libraryColumnChecksWave,
@@ -573,6 +599,28 @@ internal partial class AudioSettingsWindow : Window
                 UiStrings.LabelLibraryPlaylistWaveformSizeL));
         SelectLibraryPlaylistWaveformSize(combo, selected);
     }
+
+    private void FillVideoProxyRetention()
+    {
+        VideoProxyRetentionCombo.Items.Clear();
+        VideoProxyRetentionItem? selected = null;
+        foreach (var days in VideoProxy.RetentionChoices)
+        {
+            var item = new VideoProxyRetentionItem(days, UiStrings.LabelVideoProxyRetentionDays(days));
+            VideoProxyRetentionCombo.Items.Add(item);
+            if (days == SelectedVideoProxyRetentionDays)
+            {
+                selected = item;
+            }
+        }
+
+        VideoProxyRetentionCombo.SelectedItem = selected ?? VideoProxyRetentionCombo.Items[0];
+    }
+
+    private int ReadVideoProxyRetentionDays() =>
+        VideoProxyRetentionCombo.SelectedItem is VideoProxyRetentionItem item
+            ? VideoProxy.ClampRetentionDays(item.Days)
+            : VideoProxy.DefaultRetentionDays;
 
     private static void SelectLibraryPlaylistWaveformSize(
         ComboBox combo,
@@ -1074,6 +1122,10 @@ internal partial class AudioSettingsWindow : Window
             LibraryPlaylistWaveformSizeMp3Combo,
             LibraryPlaylistWaveformSize.L);
         SelectedGaplessPlayback = GaplessPlaybackBox.IsChecked != false;
+        SelectedLibraryShowPlaylistPdf = LibraryShowPlaylistPdfBox.IsChecked != false;
+        SelectedLibraryShowPlaylistMov = LibraryShowPlaylistMovBox.IsChecked != false;
+        SelectedLibraryShowPlaylistMp4 = LibraryShowPlaylistMp4Box.IsChecked != false;
+        SelectedVideoProxyRetentionDays = ReadVideoProxyRetentionDays();
         SelectedAutoSpeakerSelect = AutoSpeakerSelectBox.IsChecked == true;
         SelectedActiveSpeakerId = CurrentSpeaker()?.Id ?? _presets[0].Id;
         SelectedRecordDeviceId = ReadRecordDeviceId();
@@ -1453,6 +1505,10 @@ internal partial class AudioSettingsWindow : Window
         {
             Height = maxH;
         }
+        else if (Height < DesignMetrics.SettingsWindowHeight)
+        {
+            Height = Math.Min(DesignMetrics.SettingsWindowHeight, maxH);
+        }
 
         if (Left + Width > work.Right)
         {
@@ -1737,6 +1793,7 @@ internal partial class AudioSettingsWindow : Window
         ComboBoxFit.Apply(MultiFileArrangeCombo);
         ComboBoxFit.Apply(LibraryPlaylistWaveformSizeWaveCombo);
         ComboBoxFit.Apply(LibraryPlaylistWaveformSizeMp3Combo);
+        ComboBoxFit.Apply(VideoProxyRetentionCombo);
         ComboBoxFit.Apply(DefaultSampleRateCombo);
         ComboBoxFit.Apply(DefaultBitDepthCombo);
         ComboBoxFit.Apply(DefaultChannelLayoutCombo);
@@ -1815,7 +1872,6 @@ internal partial class AudioSettingsWindow : Window
                 ? LibraryPlaylistWaveformSizeMp3Combo.Width
                 : DesignMetrics.From96(72));
         var waveformRow = LabelWidth(LibraryPlaylistWaveformSizeWaveHeader) + 8 + waveformCombo;
-        var options = LabelWidth(LibraryColumnsHeader) + gutter;
         var wave = Max(
             LabelWidth(LibraryColumnsWaveHeader) + 8 + DesignMetrics.From96(88),
             waveformRow,
@@ -1824,8 +1880,16 @@ internal partial class AudioSettingsWindow : Window
             LabelWidth(LibraryColumnsMp3Header) + 8 + DesignMetrics.From96(88),
             waveformRow,
             MeasureLibraryColumnChecksWidth()) + gutter;
-        var playlist = Math.Max(
-            options,
+        var playlistDocs = Max(
+            LabelWidth(LibraryPlaylistDocumentsHeader) + gutter,
+            MeasureCheckBoxContentWidth(LibraryShowPlaylistPdfBox) + gutter,
+            LabelWidth(VideoProxyRetentionHeader) + 8 + (
+                VideoProxyRetentionCombo.Width > 1
+                    ? VideoProxyRetentionCombo.Width
+                    : DesignMetrics.From96(72)) + gutter);
+        var playlist = Max(
+            LabelWidth(LibraryColumnsHeader) + gutter,
+            playlistDocs,
             wave + DesignMetrics.SettingsColumnGap + mp3);
         return speakers + DesignMetrics.SettingsColumnGap + playlist;
     }
@@ -2344,6 +2408,11 @@ internal partial class AudioSettingsWindow : Window
     }
 
     private sealed record LibraryPlaylistWaveformSizeItem(LibraryPlaylistWaveformSize Size, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    private sealed record VideoProxyRetentionItem(int Days, string Label)
     {
         public override string ToString() => Label;
     }

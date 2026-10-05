@@ -222,7 +222,10 @@ public partial class MainWindow
     }
 
     private bool IsPlaybackActive() =>
-        _player.IsPlaying || _player.IsScrubbing || _playTimer.IsEnabled;
+        _player.IsPlaying
+        || _player.IsScrubbing
+        || _playTimer.IsEnabled
+        || LibraryBrowser.PlaylistVisualPlaying;
 
     private void AttachPlaybackToActiveWaveform()
     {
@@ -248,7 +251,8 @@ public partial class MainWindow
             : modifiers == ModifierKeys.None && key is Key.Left or Key.Right;
 
     private bool CanPlaybackShuttle() =>
-        _player.IsPlaying && !_player.IsScrubbing && !AnyEffectPreviewing;
+        (LibraryBrowser.PlaylistVisualPlaying && LibraryBrowser.PlaylistVisualShown)
+        || (_player.IsPlaying && !_player.IsScrubbing && !AnyEffectPreviewing);
 
     private bool BeginOrContinuePlaybackShuttle(int direction)
     {
@@ -264,6 +268,19 @@ public partial class MainWindow
 
         StopSeekNudge();
         _playbackShuttleDirection = direction;
+        if (LibraryBrowser.PlaylistVisualPlaying)
+        {
+            // 映像は SpeedRatio±3 ではなく、音声クロックへ毎ティック合わせる。
+            LibraryBrowser.SetPlaylistVisualSpeed(0);
+            if (_player.IsPlaying)
+            {
+                _player.SetPlaybackSpeed(
+                    direction < 0 ? -PlaybackSampleProvider.FastSpeed : PlaybackSampleProvider.FastSpeed);
+            }
+
+            return true;
+        }
+
         _player.SetPlaybackSpeed(
             direction < 0 ? -PlaybackSampleProvider.FastSpeed : PlaybackSampleProvider.FastSpeed);
         return true;
@@ -277,6 +294,11 @@ public partial class MainWindow
         }
 
         _playbackShuttleDirection = 0;
+        if (LibraryBrowser.PlaylistVisualShown)
+        {
+            LibraryBrowser.SetPlaylistVisualSpeed(1);
+        }
+
         _player.SetPlaybackSpeed(1);
     }
 
@@ -329,7 +351,18 @@ public partial class MainWindow
             return;
         }
 
-        // プレイヤーから戻った MP3 などは、昇格前だとストリーム早戻し（ピッチ変化）のままになる。
+        if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVisual(_document))
+        {
+            _lastPlaybackStart = startFrame;
+            LibraryBrowser.ShowPlaylistVisual(_activeSession!, play: true);
+            LibraryBrowser.SeekPlaylistVisual(
+                TimeSpan.FromSeconds(startFrame / (double)Math.Max(1, _document.SampleRate)));
+            if (!LibraryPlaylistDocuments.IsVideo(_document))
+            {
+                Transport.SetPlaying(true);
+                return;
+            }
+        }
         if (!IsLibraryMaximized
             && _activeSession is { } session
             && LibraryPlayerMode.NeedsEditorPcmUpgrade(session.Document))
@@ -458,7 +491,9 @@ public partial class MainWindow
             return false;
         }
 
-        var frame = _player.CursorFrame;
+        var frame = LibraryPlaylistDocuments.IsPdf(_document)
+            ? _document.CursorFrame
+            : _player.CursorFrame;
         if (_pitchPreview.Previewing)
         {
             frame += _pitchPreview.Origin;
@@ -483,11 +518,37 @@ public partial class MainWindow
     private void HaltPlaybackToStart()
     {
         _editorPlayAfterPcmTicket++;
+        // ライブラリの動画本再生停止は、先頭へ戻さず止めた位置の暗いプレビューへ移す。
+        var stayOnVideoPreview = IsLibraryMaximized
+            && LibraryBrowser.PlaylistVisualShown
+            && LibraryBrowser.PlaylistVisualIsVideo;
+        var stopPos = stayOnVideoPreview
+            ? LibraryBrowser.PlaylistVisualPosition
+            : (TimeSpan?)null;
+
         PausePlaybackSoft();
-        if (_document is not null)
+        if (_document is null)
         {
-            SeekFrame(_lastPlaybackStart);
+            return;
         }
+
+        if (stopPos is { } pos)
+        {
+            var rate = Math.Max(1, _document.SampleRate);
+            var frame = Math.Clamp(
+                (long)Math.Round(pos.TotalSeconds * rate),
+                0,
+                _document.FrameCount);
+            _document.CursorFrame = frame;
+            Waveform.PlayheadFrame = frame;
+            // PauseSoft のあとでも止めた地点から暗いプレビューへ確定させる。
+            LibraryBrowser.EnterPlaylistVisualDimPreview(pos);
+            SyncOverviewPlayhead();
+            RefreshStatus();
+            return;
+        }
+
+        SeekFrame(_lastPlaybackStart);
     }
 
     private void SeekFrame(long frame, int crossfadeMilliseconds = 0)
@@ -500,6 +561,21 @@ public partial class MainWindow
         frame = Math.Clamp(frame, 0, _document.FrameCount);
         _document.CursorFrame = frame;
         Waveform.PlayheadFrame = frame;
+        if (IsLibraryMaximized && LibraryPlaylistDocuments.IsPdf(_document))
+        {
+            LibraryBrowser.SeekPlaylistVisual(
+                TimeSpan.FromSeconds(frame / (double)Math.Max(1, _document.SampleRate)));
+            SyncOverviewPlayhead();
+            RefreshStatus();
+            return;
+        }
+
+        if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVideo(_document))
+        {
+            LibraryBrowser.SeekPlaylistVisual(
+                TimeSpan.FromSeconds(frame / (double)Math.Max(1, _document.SampleRate)));
+        }
+
         if (_player.IsPlaying)
         {
             SyncPlayWindowFromDocument();
@@ -532,6 +608,21 @@ public partial class MainWindow
 
         _document.CursorFrame = frame;
         Waveform.PlayheadFrame = frame;
+        if (IsLibraryMaximized && LibraryPlaylistDocuments.IsPdf(_document))
+        {
+            LibraryBrowser.SeekPlaylistVisual(
+                TimeSpan.FromSeconds(frame / (double)Math.Max(1, _document.SampleRate)));
+            SyncOverviewPlayhead();
+            RefreshStatus();
+            return;
+        }
+
+        if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVideo(_document))
+        {
+            LibraryBrowser.SeekPlaylistVisual(
+                TimeSpan.FromSeconds(frame / (double)Math.Max(1, _document.SampleRate)));
+        }
+
         if (_player.IsPlaying && !Waveform.IsInteracting)
         {
             SyncPlayWindowFromDocument();
@@ -737,8 +828,37 @@ public partial class MainWindow
             return;
         }
 
+        if (IsLibraryMaximized && LibraryPlaylistDocuments.IsPdf(_document))
+        {
+            var seconds = LibraryBrowser.PlaylistVisualPosition.TotalSeconds;
+            var visualFrame = (long)Math.Round(seconds * Math.Max(1, _document.SampleRate));
+            visualFrame = Math.Clamp(visualFrame, 0, Math.Max(0, _document.FrameCount));
+            _document.CursorFrame = visualFrame;
+            if (!Waveform.IsInteracting)
+            {
+                Waveform.PlayheadFrame = visualFrame;
+                Waveform.FollowPlayhead();
+                SyncTransportPosition(visualFrame);
+            }
+
+            return;
+        }
+
         _player.ReadPlayheadVisuals(out var frame, out var exitFrame);
         _document.CursorFrame = frame;
+        if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVideo(_document) && !Waveform.IsInteracting)
+        {
+            var audioSeconds = frame / (double)Math.Max(1, _document.SampleRate);
+            var drift = Math.Abs(audioSeconds - LibraryBrowser.PlaylistVisualPosition.TotalSeconds);
+            var shuttle = _playbackShuttleDirection != 0;
+            var threshold = shuttle
+                ? LibraryPlayerMode.VideoShuttleSeekSeconds
+                : LibraryPlayerMode.VideoClockSeekSeconds;
+            if (shuttle || !_player.IsPlaying || drift > threshold)
+            {
+                LibraryBrowser.SeekPlaylistVisual(TimeSpan.FromSeconds(audioSeconds));
+            }
+        }
         if (!Waveform.IsInteracting)
         {
             Waveform.PlayheadFrame = frame;
@@ -1349,6 +1469,7 @@ public partial class MainWindow
         if (_waveformMaximizeMode == WaveformMaximizeMode.Library
             && mode != WaveformMaximizeMode.Library)
         {
+            SetPlaylistVideoFullscreen(false);
             if (!KeepOnlyLibrarySelectedSessions())
             {
                 return;
@@ -1464,7 +1585,9 @@ public partial class MainWindow
 
     private void PersistCurrentWindowPlacement()
     {
-        if (IsFullscreenMaximizeMode(_waveformMaximizeMode))
+        if (IsFullscreenMaximizeMode(_waveformMaximizeMode)
+            || _playlistVideoFullscreen
+            || WindowStyle == WindowStyle.None)
         {
             return;
         }

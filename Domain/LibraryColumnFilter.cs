@@ -248,6 +248,21 @@ internal static class LibraryColumnFilter
             return "WAVE";
         }
 
+        if (ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            return "PDF";
+        }
+
+        if (ext.Equals(".mov", StringComparison.OrdinalIgnoreCase))
+        {
+            return "MOV";
+        }
+
+        if (ext.Equals(".mp4", StringComparison.OrdinalIgnoreCase))
+        {
+            return "MP4";
+        }
+
         return null;
     }
 

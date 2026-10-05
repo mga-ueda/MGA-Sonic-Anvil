@@ -1121,6 +1121,15 @@ public partial class MainWindow
         StopPlaybackShuttle();
         ReleaseStuckScrub();
         _player.Pause();
+        if (IsLibraryMaximized)
+        {
+            LibraryBrowser.SetPlaylistVisualPlaying(false);
+            EnsurePlaylistVideoWindowRestored();
+        }
+        else
+        {
+            LibraryBrowser.HidePlaylistVisual();
+        }
 
         _playTimer.Stop();
         StopMeterRendering();

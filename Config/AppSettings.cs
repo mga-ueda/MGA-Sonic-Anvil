@@ -94,6 +94,18 @@ internal sealed class AppSettings
     /// <summary>再生で MP3／M4A の encoder delay／padding を飛ばす。既定オン。</summary>
     public bool GaplessPlayback { get; set; } = true;
 
+    /// <summary>プレイリストに PDF を載せる。既定オン。プレイヤー専用。</summary>
+    public bool LibraryShowPlaylistPdf { get; set; } = true;
+
+    /// <summary>プレイリストに MOV を載せる。既定オン。プレイヤー専用。</summary>
+    public bool LibraryShowPlaylistMov { get; set; } = true;
+
+    /// <summary>プレイリストに MP4 を載せる。既定オン。プレイヤー専用。</summary>
+    public bool LibraryShowPlaylistMp4 { get; set; } = true;
+
+    /// <summary>動画プロキシを残す日数。1 / 7 / 14 / 30。既定 7。</summary>
+    public int VideoProxyRetentionDays { get; set; } = VideoProxy.DefaultRetentionDays;
+
     /// <summary>再生で無音区間を飛ばす。既定オフ。</summary>
     public bool SilentSkip { get; set; }
 
@@ -303,6 +315,9 @@ internal sealed class AppSettings
 
     public int ResolvedClickGuardFadeMs() =>
         global::MgaSonicAnvil.Audio.ClickGuard.ClampFadeMs(ClickGuardFadeMs);
+
+    public int ResolvedVideoProxyRetentionDays() =>
+        VideoProxy.ClampRetentionDays(VideoProxyRetentionDays);
 
     public int ResolvedWwisePrefetchLengthMs() =>
         WwiseTrackTiming.ClampPrefetchLengthMs(WwisePrefetchLengthMs);

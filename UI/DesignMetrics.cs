@@ -216,6 +216,24 @@ internal static class DesignMetrics
 
     public static double StatusTimecodeFontSize => From96(13);
 
+    /// <summary>動画再生中、下中央に出す時刻。2 行分の枠を先に確保し、選択行は下へ伸ばす。</summary>
+    public static double PlaylistVideoTimecodeFontSize => From96(32);
+
+    public static double PlaylistVideoTimecodeLineHeight => From96(40);
+
+    public static double PlaylistVideoTimecodeLineGap => From96(4);
+
+    public static Thickness PlaylistVideoTimecodeMargin => new(0, 0, 0, From96(24));
+
+    public static Thickness PlaylistVideoTimecodePadding => new(From96(14), From96(8), From96(14), From96(8));
+
+    public static double PlaylistVideoTimecodeHostHeight =>
+        PlaylistVideoTimecodePadding.Top
+        + PlaylistVideoTimecodeLineHeight
+        + PlaylistVideoTimecodeLineGap
+        + PlaylistVideoTimecodeLineHeight
+        + PlaylistVideoTimecodePadding.Bottom;
+
     public static double StatusTimecodePadX => From96(4);
 
     public static Thickness StatusTimecodePadding => new(StatusTimecodePadX, 0, StatusTimecodePadX, 0);
@@ -346,12 +364,12 @@ internal static class DesignMetrics
     public static double SettingsWindowContentMargin => From96(16);
 
     /// <summary>設定ウィンドウの初期高さ。オーディオのチャンネル行は中でスクロール。</summary>
-    public static double SettingsWindowHeight => From96(640);
+    public static double SettingsWindowHeight => From96(720);
 
     /// <summary>編集タブ（フェード既定まで）が見切れない下限。編集タブに縦スクロールは無い。</summary>
-    public static double SettingsWindowMinHeight => From96(520);
+    public static double SettingsWindowMinHeight => From96(560);
 
-    public static double SettingsWindowMaxHeight => From96(780);
+    public static double SettingsWindowMaxHeight => From96(880);
 
     /// <summary>設定のラベルとコンボのあいだ。</summary>
     public static double SettingsLabelComboGap => From96(8);

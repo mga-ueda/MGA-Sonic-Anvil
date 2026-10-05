@@ -114,17 +114,65 @@
             <Grid x:Name="LayoutsPlaylistPane" Grid.Column="2">
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" MinHeight="160" />
               </Grid.RowDefinitions>
 
+              <StackPanel Margin="0,0,0,12">
+                <TextBlock x:Name="LibraryPlaylistDocumentsHeader"
+                           Text="{x:Static domain:UiStrings.LabelLibraryPlaylistDocuments}"
+                           FontWeight="Bold"
+                           FontSize="11.333"
+                           Margin="0,0,0,8"
+                           TextWrapping="Wrap" />
+                <CheckBox x:Name="LibraryShowPlaylistPdfBox"
+                          Style="{StaticResource DarkCheckBoxStyle}"
+                          Content="{x:Static domain:UiStrings.LabelLibraryShowPlaylistPdf}"
+                          MinHeight="22"
+                          HorizontalAlignment="Left"
+                          Margin="0,0,0,6" />
+                <CheckBox x:Name="LibraryShowPlaylistMovBox"
+                          Style="{StaticResource DarkCheckBoxStyle}"
+                          Content="{x:Static domain:UiStrings.LabelLibraryShowPlaylistMov}"
+                          MinHeight="22"
+                          HorizontalAlignment="Left"
+                          Margin="0,0,0,6" />
+                <CheckBox x:Name="LibraryShowPlaylistMp4Box"
+                          Style="{StaticResource DarkCheckBoxStyle}"
+                          Content="{x:Static domain:UiStrings.LabelLibraryShowPlaylistMp4}"
+                          MinHeight="22"
+                          HorizontalAlignment="Left"
+                          Margin="0,0,0,8" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock x:Name="VideoProxyRetentionHeader"
+                             Text="{x:Static domain:UiStrings.LabelVideoProxyRetention}"
+                             FontWeight="Bold"
+                             FontSize="11.333"
+                             VerticalAlignment="Center"
+                             Margin="0,0,8,0"
+                             TextWrapping="Wrap" />
+                  <ComboBox x:Name="VideoProxyRetentionCombo"
+                            Grid.Column="1"
+                            Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                            HorizontalAlignment="Left"
+                            MinWidth="72"
+                            VerticalAlignment="Center" />
+                </Grid>
+              </StackPanel>
+
               <TextBlock x:Name="LibraryColumnsHeader"
+                         Grid.Row="1"
                          Text="{x:Static domain:UiStrings.LabelLibraryListColumns}"
                          FontWeight="Bold"
                          FontSize="11.333"
                          Margin="0,0,0,8"
                          TextWrapping="Wrap" />
 
-              <Grid Grid.Row="1">
+              <Grid Grid.Row="2">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" MinWidth="120" />
                     <ColumnDefinition Width="{x:Static ui:DesignMetrics.SettingsColumnGapGrid}" />
@@ -381,22 +429,28 @@
 
         <TabItem x:Name="PlayerTab" Header="{x:Static domain:UiStrings.LabelSettingsTabPlayer}">
           <!-- ルート一覧はウィンドウ左右パッド内いっぱい。マージンは外枠 AudioPad と同じ。 -->
-          <ScrollViewer VerticalScrollBarVisibility="Auto"
-                        HorizontalScrollBarVisibility="Disabled"
-                        HorizontalContentAlignment="Stretch">
-          <StackPanel HorizontalAlignment="Stretch">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" MinHeight="220" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <CheckBox x:Name="GaplessPlaybackBox"
                       Style="{StaticResource DarkCheckBoxStyle}"
                       Content="{x:Static domain:UiStrings.LabelGaplessPlayback}"
                       HorizontalAlignment="Left"
                       Margin="0,0,0,16" />
             <TextBlock x:Name="LibraryExplorerRootsHeader"
+                       Grid.Row="1"
                        Text="{x:Static domain:UiStrings.LabelLibraryExplorerRoots}"
                        FontWeight="Bold"
                        FontSize="11.333"
                        Margin="0,0,0,4"
                        HorizontalAlignment="Left" />
             <TextBlock x:Name="LibraryExplorerRootsHint"
+                       Grid.Row="2"
                        Text="{x:Static domain:UiStrings.LabelLibraryExplorerRootsHint}"
                        FontSize="11"
                        TextWrapping="Wrap"
@@ -404,11 +458,12 @@
                        Margin="0,0,0,8"
                        HorizontalAlignment="Stretch" />
             <ListBox x:Name="LibraryExplorerRootsList"
-                     Height="160"
+                     Grid.Row="3"
                      FontSize="11"
                      Padding="2"
                      HorizontalAlignment="Stretch"
                      HorizontalContentAlignment="Stretch"
+                     VerticalAlignment="Stretch"
                      DisplayMemberPath="Path"
                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
                      ScrollViewer.CanContentScroll="False"
@@ -419,7 +474,8 @@
                      DragOver="LibraryExplorerRootsList_DragOver"
                      Drop="LibraryExplorerRootsList_Drop"
                      SelectionChanged="LibraryExplorerRootsList_SelectionChanged" />
-            <StackPanel Orientation="Horizontal"
+            <StackPanel Grid.Row="4"
+                        Orientation="Horizontal"
                         Margin="0,8,0,0"
                         HorizontalAlignment="Left">
               <ui:RoundedButton x:Name="LibraryExplorerRootAddButton"
@@ -450,8 +506,7 @@
                                 Padding="12,0"
                                 Click="LibraryExplorerRootDownButton_Click" />
             </StackPanel>
-          </StackPanel>
-          </ScrollViewer>
+          </Grid>
         </TabItem>
 
         <TabItem x:Name="EditingTab" Header="{x:Static domain:UiStrings.LabelSettingsTabEditing}">

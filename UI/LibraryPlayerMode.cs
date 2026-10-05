@@ -1,8 +1,11 @@
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
@@ -328,6 +331,25 @@ internal static class LibraryPlayerMode
         return active is null ? [] : [active];
     }
 
+    public static DocumentSession[] ExcludeEditorBlocked(IReadOnlyList<DocumentSession> sessions)
+    {
+        if (sessions.Count == 0)
+        {
+            return [];
+        }
+
+        var keep = new List<DocumentSession>(sessions.Count);
+        foreach (var session in sessions)
+        {
+            if (!LibraryPlaylistDocuments.BlocksEditor(session.Document))
+            {
+                keep.Add(session);
+            }
+        }
+
+        return [.. keep];
+    }
+
     public static DocumentSession[] SessionsToDrop(
         IReadOnlyList<DocumentSession> all,
         IReadOnlyCollection<DocumentSession> keep)
@@ -350,9 +372,10 @@ internal static class LibraryPlayerMode
         return [.. drop];
     }
 
-    /// <summary>エディタ復帰でフル PCM が必要なストリーム／遅延読み込み。</summary>
+    /// <summary>エディタ復帰でフル PCM が必要なストリーム／遅延読み込み。動画／PDF は昇格しない。</summary>
     public static bool NeedsEditorPcmUpgrade(AudioDocument document) =>
-        document.IsDeferredLoad || document.IsStreamPlayback;
+        !LibraryPlaylistDocuments.BlocksEditor(document)
+        && (document.IsDeferredLoad || document.IsStreamPlayback);
 
     /// <summary>
     /// プレイヤーの完成ピークをそのまま出してよいか。エディタではチャンネル数と粒度が要る。
@@ -451,6 +474,110 @@ internal static class LibraryPlayerMode
 
     public const int MeterFadeFrameRate = 30;
 
+    /// <summary>
+    /// 動画再生中、または PDF 表示モード中は前面クロームを隠す。
+    /// 選択プレビュー（暗表示）ではクロームを残す。
+    /// </summary>
+    public static bool HidesChromeForPlaylistVisual(
+        bool player,
+        bool visualShown,
+        bool visualPlaying,
+        bool isPdf,
+        bool isVideo)
+    {
+        if (!player || !visualShown || !visualPlaying)
+        {
+            return false;
+        }
+
+        return isPdf || isVideo;
+    }
+
+    /// <summary>再生中の映像へ合わせ直す最小ずれ。これ未満のシークは MediaElement を落とす。</summary>
+    public const double VideoClockSeekSeconds = 1;
+
+    /// <summary>1／3 早送り・巻き戻し中は、ほぼ毎フレーム映像を音声へ合わせる。</summary>
+    public const double VideoShuttleSeekSeconds = 1.0 / 60;
+
+    /// <summary>ブラウザの F11 と同じ、モニタ一面の全画面（動画／PDF）。</summary>
+    public static bool IsVideoFullscreenToggle(Key key, ModifierKeys modifiers) =>
+        key == Key.F && modifiers == ModifierKeys.None;
+
+    /// <summary>波形・アナライザ・タイムコード（選択範囲）一式の表示切替。</summary>
+    public static bool IsVideoHudToggle(Key key, ModifierKeys modifiers) =>
+        key == Key.A && modifiers == ModifierKeys.None;
+
+    /// <summary>PDF ページを静止背景レイヤーへ固定／解除（固定時は表示を閉じる）。</summary>
+    public static bool IsPdfBackgroundPinToggle(Key key, ModifierKeys modifiers) =>
+        key == Key.B && modifiers == ModifierKeys.None;
+
+    /// <summary>PDF 表示中のページめくり・先頭／末尾。</summary>
+    public static bool IsPdfPageKey(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None
+        && key is Key.Left or Key.Right or Key.PageUp or Key.PageDown or Key.Home or Key.End;
+
+    /// <summary>キーボード／テンキーの +。</summary>
+    public static bool IsPdfZoomInKey(Key key, ModifierKeys modifiers) =>
+        key == Key.Add && modifiers == ModifierKeys.None
+        || key == Key.OemPlus && modifiers is ModifierKeys.None or ModifierKeys.Shift;
+
+    /// <summary>キーボード／テンキーの -。</summary>
+    public static bool IsPdfZoomOutKey(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None && key is Key.Subtract or Key.OemMinus;
+
+    /// <summary>
+    /// PDF 表示中はプレイリスト操作キーを奪う（選択移動・除外・全選択・前後曲など）。
+    /// 表示を抜けると通常どおり。
+    /// </summary>
+    public static bool BlocksPlaylistWhilePdf(Key key, ModifierKeys modifiers)
+    {
+        if (modifiers is ModifierKeys.None or ModifierKeys.Shift
+            && key is Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown)
+        {
+            return true;
+        }
+
+        if (key == Key.Delete && modifiers == ModifierKeys.None)
+        {
+            return true;
+        }
+
+        // Enter／Space は表示解除として別処理する。
+        if (IsShuffleToggle(key, modifiers))
+        {
+            return true;
+        }
+
+        if (key == Key.A && modifiers is ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            return true;
+        }
+
+        if (key == Key.C && modifiers == ModifierKeys.Control)
+        {
+            return true;
+        }
+
+        if (key == Key.Z && modifiers == ModifierKeys.Control)
+        {
+            return true;
+        }
+
+        // テンキーの前後曲・再生し直しはプレイリスト操作扱い。
+        if (modifiers == ModifierKeys.None && key is Key.NumPad4 or Key.NumPad5 or Key.NumPad6)
+        {
+            return true;
+        }
+
+        return IsPaneCycleKey(key, modifiers)
+            || (modifiers == ModifierKeys.None && key is Key.F1 or Key.F2 or Key.F3)
+            || IsPaneFocusArrow(key, modifiers);
+    }
+
+    /// <summary>動画再生中は Silent Skip をかけない。チェックボックスは触らない。</summary>
+    public static bool IgnoresSilentSkipForVideo(bool player, bool videoPlaying) =>
+        player && videoPlaying;
+
     public static DoubleAnimation CreateMeterFade(double from, double to)
     {
         var rising = to > from;
@@ -467,6 +594,58 @@ internal static class LibraryPlayerMode
         };
         Timeline.SetDesiredFrameRate(anim, MeterFadeFrameRate);
         return anim;
+    }
+
+    public static void FadeElementOpacity(UIElement target, double to, bool instant, bool? hitTestVisible = null)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        // 先にアニメを外す。HoldEnd の実効値を from に書くと、消えたまま固着する。
+        target.BeginAnimation(UIElement.OpacityProperty, null);
+        var from = target.Opacity;
+        if (hitTestVisible is { } hit)
+        {
+            target.IsHitTestVisible = hit;
+        }
+
+        if (instant || Math.Abs(from - to) < 0.001)
+        {
+            target.Opacity = to;
+            return;
+        }
+
+        var anim = CreateMeterFade(from, to);
+        anim.Completed += (_, _) =>
+        {
+            target.BeginAnimation(UIElement.OpacityProperty, null);
+            target.Opacity = to;
+        };
+        target.BeginAnimation(UIElement.OpacityProperty, anim);
+    }
+
+    /// <summary>映像の上に乗っているときだけ、読みやすいドロップシャドウ。</summary>
+    public static void SetVideoUiShadow(UIElement target, bool on)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        if (!on)
+        {
+            target.Effect = null;
+            return;
+        }
+
+        if (target.Effect is DropShadowEffect)
+        {
+            return;
+        }
+
+        target.Effect = new DropShadowEffect
+        {
+            BlurRadius = 22,
+            ShadowDepth = 0,
+            Direction = 0,
+            Color = Colors.Black,
+            Opacity = 0.95,
+            RenderingBias = RenderingBias.Performance,
+        };
     }
 
     public static int EdgeIndex(int count, int edge) =>

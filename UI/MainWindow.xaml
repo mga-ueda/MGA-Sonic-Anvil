@@ -18,6 +18,9 @@
           IsHitTestVisible="False"
           Visibility="Collapsed"
           ClipToBounds="True" />
+    <Grid x:Name="PlayerVisualHost"
+          IsHitTestVisible="False"
+          ClipToBounds="True" />
   <DockPanel x:Name="RootDock" LastChildFill="True">
     <Border x:Name="StatusBarHost"
             DockPanel.Dock="Bottom"
@@ -390,5 +393,41 @@
                            VerticalAlignment="Center"
                            CloseRequested="HistoryOverlay_CloseRequested"
                            ItemClicked="HistoryOverlay_ItemClicked" />
+    <Grid x:Name="PlaylistVideoTimecode"
+          HorizontalAlignment="Center"
+          VerticalAlignment="Bottom"
+          Height="{x:Static ui:DesignMetrics.PlaylistVideoTimecodeHostHeight}"
+          Margin="{x:Static ui:DesignMetrics.PlaylistVideoTimecodeMargin}"
+          Opacity="0"
+          IsHitTestVisible="False">
+      <Border VerticalAlignment="Top"
+              HorizontalAlignment="Center"
+              Padding="{x:Static ui:DesignMetrics.PlaylistVideoTimecodePadding}"
+              CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+              Background="#99000000">
+        <StackPanel>
+          <TextBlock x:Name="PlaylistVideoNowEndText"
+                     Height="{x:Static ui:DesignMetrics.PlaylistVideoTimecodeLineHeight}"
+                     FontFamily="Consolas"
+                     FontSize="{x:Static ui:DesignMetrics.PlaylistVideoTimecodeFontSize}"
+                     FontWeight="Normal"
+                     TextAlignment="Center"
+                     TextWrapping="NoWrap"
+                     Foreground="#F5F5F5"
+                     Text="00:00.000 / 00:00.000" />
+          <TextBlock x:Name="PlaylistVideoSelText"
+                     Height="{x:Static ui:DesignMetrics.PlaylistVideoTimecodeLineHeight}"
+                     Margin="0,4,0,0"
+                     FontFamily="Consolas"
+                     FontSize="{x:Static ui:DesignMetrics.PlaylistVideoTimecodeFontSize}"
+                     FontWeight="Normal"
+                     TextAlignment="Center"
+                     TextWrapping="NoWrap"
+                     Visibility="Collapsed"
+                     Foreground="#F5F5F5"
+                     Text="00:00.000 / 00:00.000" />
+        </StackPanel>
+      </Border>
+    </Grid>
   </Grid>
 </Window>

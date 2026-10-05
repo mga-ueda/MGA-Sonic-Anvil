@@ -23,6 +23,9 @@ static class Program
             AppStorage.Initialize();
             SpectrogramCache.DeleteLeftoverTempFiles();
             LameEncoder.DeleteLeftoverTemps();
+            VideoProxy.PruneExpired(
+                AppStorage.Settings.ResolvedVideoProxyRetentionDays(),
+                DateTime.UtcNow);
             Domain.UiStrings.SetLanguage(Domain.UiStrings.ParseLanguage(AppStorage.Settings.UiLanguage));
             var app = new App();
             app.InitializeComponent();

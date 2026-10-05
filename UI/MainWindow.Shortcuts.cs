@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
@@ -91,7 +92,17 @@ public partial class MainWindow
 
         if (key is Key.Home or Key.End or Key.PageUp or Key.PageDown)
         {
-            TryPlayLibraryAfterArrowRelease();
+            if (!LibraryBrowser.PlaylistVisualIsPdf)
+            {
+                TryPlayLibraryAfterArrowRelease();
+            }
+
+            return;
+        }
+
+        if (key is Key.Add or Key.Subtract or Key.OemPlus or Key.OemMinus)
+        {
+            LibraryBrowser.ResetPlaylistPdfZoomLatch();
             return;
         }
 
@@ -290,6 +301,19 @@ public partial class MainWindow
             return false;
         }
 
+        if (IsLibraryMaximized && LibraryBrowser.IsSearchFocused)
+        {
+            return false;
+        }
+
+        // PDF 表示中はページ／拡縮を優先し、プレイリスト操作キーは奪う。
+        if (IsLibraryMaximized
+            && LibraryBrowser.PlaylistVisualIsPdf
+            && TryHandlePlaylistPdfKey(key, modifiers, isRepeat))
+        {
+            return true;
+        }
+
         // プレイヤー専用: Tab 循環 / F1 ツリー / F2 お気に入り / F3 プレイリスト
         if (IsLibraryMaximized && IsLibraryPaneCycleShortcut(key, modifiers))
         {
@@ -322,11 +346,6 @@ public partial class MainWindow
             LibraryBrowser.RefreshExplorer();
             LibraryBrowser.FocusExplorer();
             return true;
-        }
-
-        if (IsLibraryMaximized && LibraryBrowser.IsSearchFocused)
-        {
-            return false;
         }
 
         // 空リストでツリーにフォーカスがあっても R はランダム切替。タイプアヘッドより先に拾う。
@@ -362,6 +381,28 @@ public partial class MainWindow
         }
 
         if (IsLibraryMaximized && TryHandleLibraryPlayerNumpad(key, modifiers, isRepeat))
+        {
+            return true;
+        }
+
+        if (IsLibraryMaximized
+            && LibraryPlayerMode.IsVideoFullscreenToggle(key, modifiers)
+            && TryTogglePlaylistVideoFullscreen())
+        {
+            return true;
+        }
+
+        if (IsLibraryMaximized
+            && LibraryPlayerMode.IsVideoHudToggle(key, modifiers)
+            && TryTogglePlaylistVideoHud())
+        {
+            return true;
+        }
+
+        if (IsLibraryMaximized
+            && !isRepeat
+            && LibraryPlayerMode.IsPdfBackgroundPinToggle(key, modifiers)
+            && TryTogglePdfBackgroundPin())
         {
             return true;
         }
@@ -1788,5 +1829,90 @@ public partial class MainWindow
 
         JumpByVisiblePercent(percent, extendSelection: modifiers == ModifierKeys.Shift);
         return true;
+    }
+
+    private bool TryHandlePlaylistPdfKey(Key key, ModifierKeys modifiers, bool isRepeat)
+    {
+        // 選択プレビュー（暗表示）ではプレイリスト操作のまま。表示モード中だけ奪う。
+        if (!LibraryBrowser.PlaylistVisualIsPdf || !LibraryBrowser.PlaylistVisualPlaying)
+        {
+            return false;
+        }
+
+        if (LibraryPlayerMode.IsPdfZoomInKey(key, modifiers))
+        {
+            return LibraryBrowser.TryZoomPlaylistPdf(1, isRepeat);
+        }
+
+        if (LibraryPlayerMode.IsPdfZoomOutKey(key, modifiers))
+        {
+            return LibraryBrowser.TryZoomPlaylistPdf(-1, isRepeat);
+        }
+
+        if (modifiers == ModifierKeys.None && key is Key.Enter or Key.Space)
+        {
+            if (!isRepeat)
+            {
+                ExitPlaylistPdfView();
+            }
+
+            return true;
+        }
+
+        if (LibraryPlayerMode.IsPdfPageKey(key, modifiers))
+        {
+            _libraryPlayOnArrowRelease = false;
+            switch (key)
+            {
+                case Key.Left:
+                case Key.PageUp:
+                    if (LibraryBrowser.TryStepPlaylistPdfPage(-1))
+                    {
+                        SyncPlaylistPdfCursorFromVisual();
+                    }
+
+                    return true;
+                case Key.Right:
+                case Key.PageDown:
+                    if (LibraryBrowser.TryStepPlaylistPdfPage(1))
+                    {
+                        SyncPlaylistPdfCursorFromVisual();
+                    }
+
+                    return true;
+                case Key.Home:
+                    if (LibraryBrowser.TryGoPlaylistPdfPageEdge(-1))
+                    {
+                        SyncPlaylistPdfCursorFromVisual();
+                    }
+
+                    return true;
+                case Key.End:
+                    if (LibraryBrowser.TryGoPlaylistPdfPageEdge(1))
+                    {
+                        SyncPlaylistPdfCursorFromVisual();
+                    }
+
+                    return true;
+            }
+        }
+
+        return LibraryPlayerMode.BlocksPlaylistWhilePdf(key, modifiers);
+    }
+
+    private void SyncPlaylistPdfCursorFromVisual()
+    {
+        if (_document is null || !LibraryPlaylistDocuments.IsPdf(_document))
+        {
+            return;
+        }
+
+        var rate = Math.Max(1, _document.SampleRate);
+        var frame = (long)Math.Round(LibraryBrowser.PlaylistVisualPosition.TotalSeconds * rate);
+        frame = Math.Clamp(frame, 0, _document.FrameCount);
+        _document.CursorFrame = frame;
+        Waveform.PlayheadFrame = frame;
+        SyncOverviewPlayhead();
+        RefreshStatus();
     }
 }
