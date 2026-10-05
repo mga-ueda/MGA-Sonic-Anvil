@@ -22,14 +22,16 @@ internal static class AudioCodec
 
     public static bool IsOpenable(string path) => MatchesExtension(path, OpenExtensions);
 
-    public static bool IsPlayerOpenable(string path) => MatchesExtension(path, PlayerOpenExtensions);
+    public static bool IsPlayerOpenable(string path) =>
+        MatchesExtension(path, PlayerOpenExtensions) || LibraryPlaylistDocuments.ShouldList(path);
 
     /// <summary>プレイヤーでフル PCM 展開せずストリーム再生できるか。</summary>
     public static bool CanStreamPlay(string path)
     {
         var kind = DetectKind(path);
         return kind is AudioFileKind.Mp3 or AudioFileKind.M4a
-            || kind is AudioFileKind.Wave or AudioFileKind.Aiff;
+            or AudioFileKind.Mp4 or AudioFileKind.Mov
+            or AudioFileKind.Wave or AudioFileKind.Aiff;
     }
 
     private static bool MatchesExtension(string path, IReadOnlyList<string> extensions)
@@ -321,6 +323,21 @@ internal static class AudioCodec
             return AudioFileKind.M4a;
         }
 
+        if (ext.Equals(".mp4", StringComparison.OrdinalIgnoreCase))
+        {
+            return AudioFileKind.Mp4;
+        }
+
+        if (ext.Equals(".mov", StringComparison.OrdinalIgnoreCase))
+        {
+            return AudioFileKind.Mov;
+        }
+
+        if (ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            return AudioFileKind.Pdf;
+        }
+
         if (ext.Equals(".aif", StringComparison.OrdinalIgnoreCase)
             || ext.Equals(".aiff", StringComparison.OrdinalIgnoreCase))
         {
@@ -334,7 +351,23 @@ internal static class AudioCodec
     public static WaveStream OpenPlaybackStream(string path)
     {
         EnsureMediaFoundation();
-        return OpenReader(path);
+        try
+        {
+            return OpenReader(path);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or NotSupportedException
+                                       or FormatException
+                                       or System.Runtime.InteropServices.COMException)
+        {
+            if (LibraryPlaylistDocuments.IsVideo(path)
+                && VideoProxy.TryGetCached(path, out var proxy)
+                && !string.Equals(proxy, path, StringComparison.OrdinalIgnoreCase))
+            {
+                return OpenReader(proxy);
+            }
+
+            throw;
+        }
     }
 
     /// <summary>
@@ -397,7 +430,7 @@ internal static class AudioCodec
             return frameCount > 0 && sampleRate > 0 && channels > 0;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException
-                                       or ArgumentException or NotSupportedException
+                                       or ArgumentException or NotSupportedException or FormatException
                                        or System.Runtime.InteropServices.COMException)
         {
             return false;
@@ -414,7 +447,10 @@ internal static class AudioCodec
             return false;
         }
 
-        if (TryProbeStreamFormat(path, out var rate, out var channels, out var bits, out var frames))
+        if (TryProbeStreamFormat(path, out var rate, out var channels, out var bits, out var frames)
+            || (LibraryPlaylistDocuments.IsVideo(path)
+                && VideoProxy.TryGetCached(path, out var proxy)
+                && TryProbeStreamFormat(proxy, out rate, out channels, out bits, out frames)))
         {
             document.ActivateStreamPlayback(rate, channels, bits, frames);
             return true;
@@ -445,6 +481,11 @@ internal static class AudioCodec
 
     public static AudioDocument Load(string path, bool buildPeaks = true)
     {
+        if (LibraryPlaylistDocuments.IsDocument(path))
+        {
+            throw new NotSupportedException(UiStrings.ErrorOpenFailed);
+        }
+
         EnsureMediaFoundation();
         var bits = PeekBitDepth(path);
         using var stream = OpenReader(path);
@@ -518,13 +559,17 @@ internal static class AudioCodec
     private static WaveStream OpenReader(string path)
     {
         var kind = DetectKind(path);
-        WaveStream reader = kind switch
-        {
-            AudioFileKind.Aiff => new AiffFileReader(path),
-            AudioFileKind.Mp3 => OpenMp3Reader(path),
-            AudioFileKind.M4a => OpenMediaFoundationReader(path),
-            _ => new WaveFileReader(path),
-        };
+        // 動画プロキシ（.avi MJPEG）や MP4/MOV は WAVE ヘッダではない。
+        WaveStream reader =
+            kind is AudioFileKind.M4a or AudioFileKind.Mp4 or AudioFileKind.Mov
+            || Path.GetExtension(path).Equals(".avi", StringComparison.OrdinalIgnoreCase)
+                ? OpenMediaFoundationReader(path)
+                : kind switch
+                {
+                    AudioFileKind.Aiff => new AiffFileReader(path),
+                    AudioFileKind.Mp3 => OpenMp3Reader(path),
+                    _ => new WaveFileReader(path),
+                };
         // 24-bit WAV の短い Read 対策。MF（MP3/M4A）は Position 代入が
         // SetCurrentPosition になり、ファイルによっては 0xC00D36B2 で落ちる。
         return reader is WaveFileReader or AiffFileReader

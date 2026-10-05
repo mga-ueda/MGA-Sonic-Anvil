@@ -1,5 +1,6 @@
 using System.IO;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil;
 
@@ -24,7 +25,7 @@ internal static class LaunchFiles
     public static T? PreferOpened<T>(T? opened, T? existing) where T : class =>
         opened ?? existing;
 
-    /// <summary>起動パスに MP3 / M4A が1つでもあればプレイヤーで開く。</summary>
+    /// <summary>起動パスに MP3 / M4A、またはプレイヤー専用の PDF／動画があればプレイヤーで開く。</summary>
     public static bool ContainsMp3(IEnumerable<string> paths)
     {
         foreach (var path in paths)
@@ -36,7 +37,8 @@ internal static class LaunchFiles
 
             var ext = Path.GetExtension(path);
             if (ext.Equals(".mp3", StringComparison.OrdinalIgnoreCase)
-                || ext.Equals(".m4a", StringComparison.OrdinalIgnoreCase))
+                || ext.Equals(".m4a", StringComparison.OrdinalIgnoreCase)
+                || LibraryPlaylistDocuments.ShouldList(path))
             {
                 return true;
             }

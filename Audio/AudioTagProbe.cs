@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Globalization;
 using System.Text;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.Audio;
 
@@ -31,6 +32,16 @@ internal static class AudioTagProbe
         try
         {
             var kind = AudioCodec.DetectKind(path);
+            if (LibraryPlaylistDocuments.IsPdf(kind))
+            {
+                return TryReadPdf(path, out tags);
+            }
+
+            if (LibraryPlaylistDocuments.IsVideo(kind))
+            {
+                return TryReadVideo(path, out tags);
+            }
+
             if (kind == AudioFileKind.M4a)
             {
                 return TryReadM4a(path, out tags);
@@ -89,6 +100,22 @@ internal static class AudioTagProbe
         }
 
         tags = builder.ToTags();
+        return true;
+    }
+
+    private static bool TryReadPdf(string path, out AudioFileTags tags)
+    {
+        // ページ数は表示時に非同期で取る。ここでの同期 WinRT は UI を止める。
+        _ = path;
+        tags = new AudioFileTags { Probed = true };
+        return true;
+    }
+
+    private static bool TryReadVideo(string path, out AudioFileTags tags)
+    {
+        // 長さは MediaOpened で直す。フォルダ走査中の同期プローブは追加を止める。
+        _ = path;
+        tags = new AudioFileTags { Probed = true };
         return true;
     }
 

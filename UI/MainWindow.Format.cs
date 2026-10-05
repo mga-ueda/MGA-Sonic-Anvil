@@ -19,6 +19,7 @@ public partial class MainWindow
     private bool _openCancelRequested;
     private bool _historyPasteBusy;
     private bool _tabMergeBusy;
+    private bool _videoProxyBusy;
 
     private bool IsUiBusy =>
         _formatConvertBusy
@@ -29,7 +30,8 @@ public partial class MainWindow
         || _exportBusy
         || _historyPasteBusy
         || _tabBatchEditBusy
-        || _tabMergeBusy;
+        || _tabMergeBusy
+        || _videoProxyBusy;
 
     private void PromptFormatConvert(FormatConvertKind kind)
     {

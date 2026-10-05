@@ -40,6 +40,9 @@ public sealed class FileAssociationTests
     {
         Assert.True(FileAssociations.IsPlayerOnlyExtension(".m4a"));
         Assert.True(FileAssociations.IsPlayerOnlyExtension("M4A"));
+        Assert.False(FileAssociations.IsPlayerOnlyExtension(".pdf"));
+        Assert.False(FileAssociations.IsPlayerOnlyExtension(".mp4"));
+        Assert.False(FileAssociations.IsPlayerOnlyExtension(".mov"));
         Assert.False(FileAssociations.IsPlayerOnlyExtension(".mp3"));
         Assert.False(FileAssociations.IsPlayerOnlyExtension(".wav"));
     }

@@ -8,6 +8,9 @@ internal enum AudioFileKind
     Aiff,
     Mp3,
     M4a,
+    Mp4,
+    Mov,
+    Pdf,
 }
 
 internal sealed partial class AudioDocument

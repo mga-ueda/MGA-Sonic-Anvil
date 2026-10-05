@@ -3,6 +3,8 @@ using System.Threading;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
@@ -347,6 +349,24 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.SnapPlayerMetersHiddenOnEnter(enteringPlayer: true, instantReveal: true));
         Assert.False(LibraryPlayerMode.SnapPlayerMetersHiddenOnEnter(enteringPlayer: false, instantReveal: false));
         Assert.Equal(1, LibraryPlayerMode.MeterFadeSeconds);
+        Assert.True(LibraryPlayerMode.HidesChromeForPlaylistVisual(
+            player: true, visualShown: true, visualPlaying: true, isPdf: true, isVideo: false));
+        Assert.False(LibraryPlayerMode.HidesChromeForPlaylistVisual(
+            player: true, visualShown: true, visualPlaying: false, isPdf: true, isVideo: false));
+        Assert.False(LibraryPlayerMode.HidesChromeForPlaylistVisual(
+            player: true, visualShown: true, visualPlaying: false, isPdf: false, isVideo: true));
+        Assert.True(LibraryPlayerMode.IsVideoFullscreenToggle(Key.F, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsVideoFullscreenToggle(Key.F, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsVideoHudToggle(Key.A, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsVideoHudToggle(Key.A, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsPdfBackgroundPinToggle(Key.B, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPdfBackgroundPinToggle(Key.B, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IgnoresSilentSkipForVideo(player: true, videoPlaying: true));
+        Assert.False(LibraryPlayerMode.IgnoresSilentSkipForVideo(player: true, videoPlaying: false));
+        Assert.False(LibraryPlayerMode.IgnoresSilentSkipForVideo(player: false, videoPlaying: true));
+        Assert.Equal(1, LibraryPlayerMode.VideoClockSeekSeconds);
+        Assert.True(LibraryPlayerMode.VideoShuttleSeekSeconds > 0);
+        Assert.True(LibraryPlayerMode.VideoShuttleSeekSeconds < LibraryPlayerMode.VideoClockSeekSeconds);
         Assert.True(LibraryPlayerMode.MeterFadeFrameRate >= 24);
         Assert.True(LibraryPlayerMode.MeterFadeFrameRate <= 60);
     }
@@ -371,6 +391,33 @@ public sealed class LibraryPlayerModeTests
             Assert.False(fadeIn.AutoReverse);
             Assert.Equal(LibraryPlayerMode.MeterFadeFrameRate, Timeline.GetDesiredFrameRate(fadeIn));
             Assert.Equal(LibraryPlayerMode.MeterFadeFrameRate, Timeline.GetDesiredFrameRate(fadeOut));
+        });
+    }
+
+    [Fact]
+    public void SetVideoUiShadow_AddsAndClears()
+    {
+        RunSta(() =>
+        {
+            var box = new Rectangle();
+            LibraryPlayerMode.SetVideoUiShadow(box, on: true);
+            Assert.IsType<DropShadowEffect>(box.Effect);
+            LibraryPlayerMode.SetVideoUiShadow(box, on: false);
+            Assert.Null(box.Effect);
+        });
+    }
+
+    [Fact]
+    public void FadeElementOpacity_InstantRestoreAfterHeldFadeOut()
+    {
+        RunSta(() =>
+        {
+            var box = new Rectangle { Opacity = 1 };
+            LibraryPlayerMode.FadeElementOpacity(box, 0, instant: false);
+            Assert.True(box.HasAnimatedProperties);
+            LibraryPlayerMode.FadeElementOpacity(box, 1, instant: true);
+            Assert.Equal(1, box.Opacity);
+            Assert.False(box.HasAnimatedProperties);
         });
     }
 

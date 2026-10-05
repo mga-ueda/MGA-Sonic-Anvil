@@ -57,14 +57,7 @@ internal static class FileAssociations
     public static string FormatLabel(string extension)
     {
         var ext = NormalizeExtension(extension);
-        var kind = ext switch
-        {
-            ".mp3" => "MP3",
-            ".m4a" => "M4A",
-            ".aif" or ".aiff" => "AIFF",
-            _ => "Wave",
-        };
-        var label = $"{kind} ({ext})";
+        var label = $"{KindName(ext)} ({ext})";
         if (IsPlayerOnlyExtension(ext))
         {
             label = $"{label} — {UiStrings.LabelFileAssociationPlayerOnly}";
@@ -393,14 +386,7 @@ internal static class FileAssociations
     internal static string FormatTypeName(string extension)
     {
         var ext = NormalizeExtension(extension);
-        var kind = ext switch
-        {
-            ".mp3" => "MP3",
-            ".m4a" => "M4A",
-            ".aif" or ".aiff" => "AIFF",
-            _ => "Wave",
-        };
-        var name = $"{AppVersion.ProductName} {kind}";
+        var name = $"{AppVersion.ProductName} {KindName(ext)}";
         if (IsPlayerOnlyExtension(ext))
         {
             name = $"{name} ({UiStrings.LabelFileAssociationPlayerOnly})";
@@ -408,6 +394,14 @@ internal static class FileAssociations
 
         return name;
     }
+
+    private static string KindName(string ext) => ext switch
+    {
+        ".mp3" => "MP3",
+        ".m4a" => "M4A",
+        ".aif" or ".aiff" => "AIFF",
+        _ => "Wave",
+    };
 
     private static void WriteExtensionDefault(string ext, string progId)
     {

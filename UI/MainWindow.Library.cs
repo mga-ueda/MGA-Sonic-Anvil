@@ -38,6 +38,7 @@ public partial class MainWindow
     private readonly LibraryPlaylistRemoveUndo _libraryPlaylistUndo = new();
     private bool _libraryWaapiSuspended;
     private bool _restoreWaapiAfterLibrary;
+    private CancellationTokenSource? _videoProxyCts;
     private readonly HashSet<AudioDocument> _libraryPeakJobs = [];
     private readonly Dictionary<AudioDocument, Task> _libraryPeakTasks = [];
     private readonly Dictionary<AudioDocument, CancellationTokenSource> _libraryPeakJobCts = [];
@@ -51,6 +52,14 @@ public partial class MainWindow
     private bool _gaplessFailed;
     private bool _playerMeterChrome;
     private bool? _playerMetersShown;
+    private bool _playlistVideoChromeVisible = true;
+    private bool _playlistVideoHud = true;
+    private bool _playlistPdfChromeSession;
+    private bool _playlistVideoFullscreen;
+    private WindowState _windowStateBeforeVideoFullscreen;
+    private WindowStyle _windowStyleBeforeVideoFullscreen;
+    private ResizeMode _resizeModeBeforeVideoFullscreen;
+    private Rect _boundsBeforeVideoFullscreen;
 
     internal bool IsLibraryMaximized => _waveformMaximizeMode == WaveformMaximizeMode.Library;
 
@@ -186,6 +195,7 @@ public partial class MainWindow
         }
         else
         {
+            LibraryBrowser.ClearPdfBackgroundPin();
             LibraryBrowser.ResetShuffle();
             LibraryBrowser.UseWindowFallbackWash();
             ApplyLibraryWashChrome(true);
@@ -213,6 +223,7 @@ public partial class MainWindow
 
         PrimaryWaveform.SeekAndSelectOnly = show;
         ForEachWaveform(view => view.SeekAndSelectOnly = show);
+        SyncPlaylistVideoChromeFade();
         TimeScrollStrip.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
         HistoryStrip.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
         if (show)
@@ -298,27 +309,428 @@ public partial class MainWindow
         _playerMetersShown = show;
     }
 
+    private void SyncPlaylistVideoChromeFade()
+    {
+        var hide = LibraryPlayerMode.HidesChromeForPlaylistVisual(
+            IsLibraryMaximized,
+            LibraryBrowser.PlaylistVisualShown,
+            LibraryBrowser.PlaylistVisualPlaying,
+            LibraryBrowser.PlaylistVisualIsPdf,
+            LibraryBrowser.PlaylistVisualIsVideo);
+        ApplySilentSkipFromSettings();
+        if (LibraryBrowser.PlaylistVisualIsPdf)
+        {
+            // PDF 表示セッション開始時は HUD も閉じる（A で出せる）。
+            if (!_playlistPdfChromeSession)
+            {
+                _playlistPdfChromeSession = true;
+                _playlistVideoHud = false;
+            }
+        }
+        else
+        {
+            _playlistPdfChromeSession = false;
+        }
+
+        if (!hide)
+        {
+            EnsurePlaylistVideoWindowRestored();
+            _playlistVideoHud = true;
+        }
+
+        var visible = !hide;
+        var instant = !IsLibraryMaximized;
+        if (_playlistVideoChromeVisible != visible || instant)
+        {
+            _playlistVideoChromeVisible = visible;
+            LibraryPlayerMode.FadeElementOpacity(RootDock, 1, instant: true, hitTestVisible: true);
+            foreach (var target in PlaylistVideoChromeTargets())
+            {
+                LibraryPlayerMode.FadeElementOpacity(
+                    target,
+                    visible ? 1 : 0,
+                    instant,
+                    hitTestVisible: visible);
+            }
+        }
+        else if (visible)
+        {
+            // 状態フラグは見えるのに Opacity アニメで消えたまま、を起こさない。
+            EnsurePlaylistVideoChromeOpaque();
+        }
+
+        ApplyPlaylistVideoHudFade(hide && !_playlistVideoHud, instant);
+        // タイムコード／選択範囲も A トグル対象。動画再生中かつ HUD 表示のときだけ出す。
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistVideoTimecode,
+            hide && _playlistVideoHud && LibraryBrowser.PlaylistVisualIsVideo ? 1 : 0,
+            instant,
+            hitTestVisible: false);
+        if (!hide)
+        {
+            EnsurePlaylistVideoHudOpaque();
+        }
+        else if (_playlistVideoHud && LibraryPlayerMode.ShowsPlayerMeters(_sessions.Count))
+        {
+            foreach (var meter in PlaylistVideoKeepMeters())
+            {
+                LibraryPlayerMode.FadeElementOpacity(meter, 1, instant: true, hitTestVisible: true);
+            }
+        }
+
+        SyncPlaylistVideoUiShadows(
+            !hide,
+            hide && !_playlistVideoHud && LibraryBrowser.PlaylistVisualIsVideo);
+    }
+
+    private void EnsurePlaylistVideoWindowRestored()
+    {
+        SetPlaylistVideoFullscreen(false);
+        if (!IsLibraryMaximized)
+        {
+            return;
+        }
+
+        if (WindowStyle == WindowStyle.None)
+        {
+            WindowStyle = WindowStyle.SingleBorderWindow;
+            ResizeMode = ResizeMode.CanResize;
+            DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        }
+
+        // 全画面のモニター寸法が settings に残っていると、ステータスバーがタスクバー下に隠れる。
+        if (IsLikelyExclusiveFullscreenSize())
+        {
+            RestorePlaylistVideoWindowBounds();
+        }
+    }
+
+    private void RestorePlaylistVideoWindowBounds()
+    {
+        WindowState = WindowState.Normal;
+        var bounds = _boundsBeforeVideoFullscreen;
+        if (bounds.Width >= MinWidth
+            && bounds.Height >= MinHeight
+            && !IsMonitorCoveringBounds(bounds))
+        {
+            Left = bounds.X;
+            Top = bounds.Y;
+            Width = Math.Max(MinWidth, bounds.Width);
+            Height = Math.Max(MinHeight, bounds.Height);
+            if (_windowStateBeforeVideoFullscreen == WindowState.Maximized)
+            {
+                WindowState = WindowState.Maximized;
+            }
+
+            PersistCurrentWindowPlacement();
+            return;
+        }
+
+        if (TryApplyCurrentModePlacement() && !IsLikelyExclusiveFullscreenSize())
+        {
+            PersistCurrentWindowPlacement();
+            return;
+        }
+
+        FitPlayerToWorkArea();
+        PersistCurrentWindowPlacement();
+    }
+
+    private bool IsLikelyExclusiveFullscreenSize()
+    {
+        if (WindowState == WindowState.Maximized)
+        {
+            return false;
+        }
+
+        if (!WindowPlacement.TryGetContainingMonitorDip(this, out var monitor))
+        {
+            return false;
+        }
+
+        return Width >= monitor.Width - 4 && Height >= monitor.Height - 4;
+    }
+
+    private bool IsMonitorCoveringBounds(Rect bounds)
+    {
+        if (WindowPlacement.TryGetContainingMonitorDip(this, out var monitor))
+        {
+            return bounds.Width >= monitor.Width - 4 && bounds.Height >= monitor.Height - 4;
+        }
+
+        return bounds.Width >= SystemParameters.PrimaryScreenWidth - 4
+            && bounds.Height >= SystemParameters.PrimaryScreenHeight - 4;
+    }
+
+    private void FitPlayerToWorkArea()
+    {
+        var work = SystemParameters.WorkArea;
+        if (WindowPlacement.TryGetContainingMonitorDip(this, out var monitor))
+        {
+            // モニター全面ではなく作業領域相当（タスクバー分を引いた高さ）に収める。
+            work = new Rect(
+                monitor.X,
+                monitor.Y,
+                monitor.Width,
+                Math.Max(MinHeight, monitor.Height - 48));
+        }
+
+        WindowState = WindowState.Normal;
+        Width = Math.Max(MinWidth, work.Width * 0.9);
+        Height = Math.Max(MinHeight, work.Height * 0.9);
+        Left = work.X + Math.Max(0, (work.Width - Width) * 0.5);
+        Top = work.Y + Math.Max(0, (work.Height - Height) * 0.5);
+    }
+
+    private void EnsurePlaylistVideoChromeOpaque()
+    {
+        LibraryPlayerMode.FadeElementOpacity(RootDock, 1, instant: true, hitTestVisible: true);
+        foreach (var target in PlaylistVideoChromeTargets())
+        {
+            if (target.Opacity < 0.999 || !target.IsHitTestVisible)
+            {
+                LibraryPlayerMode.FadeElementOpacity(target, 1, instant: true, hitTestVisible: true);
+            }
+        }
+
+        if (StatusBarHost.Visibility != Visibility.Visible && !_libraryMinimalChrome)
+        {
+            StatusBarHost.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void EnsurePlaylistVideoHudOpaque()
+    {
+        if (!LibraryPlayerMode.ShowsPlayerMeters(_sessions.Count))
+        {
+            return;
+        }
+
+        foreach (var target in PlaylistVideoHudTargets())
+        {
+            if (target.Opacity < 0.999 || !target.IsHitTestVisible)
+            {
+                LibraryPlayerMode.FadeElementOpacity(target, 1, instant: true, hitTestVisible: true);
+            }
+        }
+    }
+
+    private void ApplyPlaylistVideoHudFade(bool hideHud, bool instant)
+    {
+        foreach (var target in PlaylistVideoHudTargets())
+        {
+            LibraryPlayerMode.FadeElementOpacity(
+                target,
+                hideHud ? 0 : 1,
+                instant,
+                hitTestVisible: !hideHud);
+        }
+    }
+
+    private bool TryTogglePlaylistVideoFullscreen()
+    {
+        if (!IsLibraryMaximized)
+        {
+            return false;
+        }
+
+        // 解除は映像の有無にかかわらず受け付ける（再生終了後に全画面が残ったとき用）。
+        if (_playlistVideoFullscreen)
+        {
+            SetPlaylistVideoFullscreen(false);
+            return true;
+        }
+
+        if (!LibraryBrowser.PlaylistVisualShown
+            || !(LibraryBrowser.PlaylistVisualIsVideo || LibraryBrowser.PlaylistVisualIsPdf))
+        {
+            return false;
+        }
+
+        SetPlaylistVideoFullscreen(true);
+        return true;
+    }
+
+    private bool TryTogglePlaylistVideoHud()
+    {
+        if (!IsPlaylistVisualHudContext())
+        {
+            return false;
+        }
+
+        _playlistVideoHud = !_playlistVideoHud;
+        ApplyPlaylistVideoHudFade(!_playlistVideoHud, instant: false);
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistVideoTimecode,
+            _playlistVideoHud && LibraryBrowser.PlaylistVisualIsVideo ? 1 : 0,
+            instant: false,
+            hitTestVisible: false);
+        SyncPlaylistVideoUiShadows(
+            _playlistVideoChromeVisible,
+            LibraryBrowser.PlaylistVisualIsVideo
+                && LibraryBrowser.PlaylistVisualPlaying
+                && !_playlistVideoHud);
+        return true;
+    }
+
+    private bool TryTogglePdfBackgroundPin()
+    {
+        if (!IsLibraryMaximized)
+        {
+            return false;
+        }
+
+        // PDF 表示中は常に今のページで固定し直し、即抜ける（既にオンでも 1 回で反映）。
+        if (LibraryBrowser.PlaylistVisualIsPdf)
+        {
+            if (!LibraryBrowser.TryPinPdfBackground())
+            {
+                return false;
+            }
+
+            ExitPlaylistPdfView();
+            return true;
+        }
+
+        // 表示していないときの B は解除。
+        if (LibraryBrowser.PdfBackgroundPinned)
+        {
+            LibraryBrowser.ClearPdfBackgroundPin();
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// PDF 表示を閉じる（Enter／Space）。B で固定した背景は残す。
+    /// </summary>
+    private void ExitPlaylistPdfView()
+    {
+        if (!LibraryBrowser.PlaylistVisualIsPdf)
+        {
+            return;
+        }
+
+        _libraryStopAfterTrack = false;
+        SetPlaylistVideoFullscreen(false);
+        LibraryBrowser.HidePlaylistVisual();
+        Transport.SetPlaying(false);
+        EnsurePlaylistVideoWindowRestored();
+    }
+
+    private bool IsPlaylistVideoPlaying() =>
+        IsLibraryMaximized
+        && LibraryBrowser.PlaylistVisualShown
+        && LibraryBrowser.PlaylistVisualIsVideo
+        && LibraryBrowser.PlaylistVisualPlaying;
+
+    private bool IsPlaylistVisualHudContext() =>
+        IsLibraryMaximized
+        && LibraryBrowser.PlaylistVisualShown
+        && LibraryBrowser.PlaylistVisualPlaying
+        && (LibraryBrowser.PlaylistVisualIsPdf || LibraryBrowser.PlaylistVisualIsVideo);
+
+    private void SetPlaylistVideoFullscreen(bool on)
+    {
+        if (_playlistVideoFullscreen == on)
+        {
+            return;
+        }
+
+        if (on)
+        {
+            PersistCurrentWindowPlacement();
+            _windowStyleBeforeVideoFullscreen = WindowStyle == WindowStyle.None
+                ? WindowStyle.SingleBorderWindow
+                : WindowStyle;
+            _resizeModeBeforeVideoFullscreen = ResizeMode == ResizeMode.NoResize
+                ? ResizeMode.CanResize
+                : ResizeMode;
+            _windowStateBeforeVideoFullscreen = WindowState;
+            _boundsBeforeVideoFullscreen = WindowState == WindowState.Normal
+                ? new Rect(Left, Top, Width, Height)
+                : RestoreBounds;
+            _playlistVideoFullscreen = true;
+            ApplyWaveformFullscreenFrame();
+            return;
+        }
+
+        // settings ではなく入る直前の寸法へ戻す（全画面中にモニター寸法が保存されるとステータスバーが隠れる）。
+        _playlistVideoFullscreen = false;
+        WindowStyle = _windowStyleBeforeVideoFullscreen == WindowStyle.None
+            ? WindowStyle.SingleBorderWindow
+            : _windowStyleBeforeVideoFullscreen;
+        ResizeMode = _resizeModeBeforeVideoFullscreen == ResizeMode.NoResize
+            ? ResizeMode.CanResize
+            : _resizeModeBeforeVideoFullscreen;
+        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        RestorePlaylistVideoWindowBounds();
+    }
+
+    /// <summary>動画再生中に隠す前面 UI。波形・レベル／スペアナ／ゴニオ／サラウンド／ラウドネスは残す。</summary>
+    private UIElement[] PlaylistVideoChromeTargets() =>
+        [
+            StatusBarHost,
+            WaapiBar,
+            TipsPanel,
+            LibraryBrowser,
+            LibrarySplitter,
+            MeterColumnSplitter,
+            TransportBarHost,
+            DocumentTabHost,
+            HistoryStrip,
+        ];
+
+    private UIElement[] PlaylistVideoKeepMeters() =>
+        [LevelMeter, VectorScope, Spectrum, LoudnessMeter];
+
+    private UIElement[] PlaylistVideoHudTargets() =>
+        [WaveformHostBorder, LevelMeter, VectorScope, Spectrum, LoudnessMeter];
+
+    private void SyncPlaylistVideoUiShadows(bool chromeVisible, bool hideHud)
+    {
+        var video = IsLibraryMaximized
+            && LibraryBrowser.PlaylistVisualShown
+            && LibraryBrowser.PlaylistVisualIsVideo;
+        foreach (var target in PlaylistVideoChromeTargets())
+        {
+            LibraryPlayerMode.SetVideoUiShadow(target, video && chromeVisible);
+        }
+
+        foreach (var target in PlaylistVideoHudTargets())
+        {
+            LibraryPlayerMode.SetVideoUiShadow(target, video && !hideHud);
+        }
+
+        LibraryPlayerMode.SetVideoUiShadow(PlaylistVideoTimecode, video && !hideHud);
+    }
+
     private void ApplyPlayerMeterFade(bool visible, bool instant)
     {
+        if (visible
+            && !_playlistVideoHud
+            && LibraryPlayerMode.HidesChromeForPlaylistVisual(
+                IsLibraryMaximized,
+                LibraryBrowser.PlaylistVisualShown,
+                LibraryBrowser.PlaylistVisualPlaying,
+                LibraryBrowser.PlaylistVisualIsPdf,
+                LibraryBrowser.PlaylistVisualIsVideo))
+        {
+            visible = false;
+        }
+
         var to = visible ? 1d : 0d;
         foreach (var target in PlayerMeterFadeTargets())
         {
-            var from = target.Opacity;
-            target.BeginAnimation(UIElement.OpacityProperty, null);
-            target.Opacity = from;
-            target.IsHitTestVisible = visible;
-            if (instant || Math.Abs(from - to) < 0.001)
-            {
-                target.Opacity = to;
-                continue;
-            }
-
-            target.BeginAnimation(UIElement.OpacityProperty, LibraryPlayerMode.CreateMeterFade(from, to));
+            LibraryPlayerMode.FadeElementOpacity(target, to, instant, hitTestVisible: visible);
         }
     }
 
     private UIElement[] PlayerMeterFadeTargets() =>
-        [LevelMeter, VectorScope, Spectrum, LoudnessMeter, TimeScrollStrip];
+        _playlistVideoChromeVisible
+            ? [LevelMeter, VectorScope, Spectrum, LoudnessMeter, TimeScrollStrip]
+            : [LevelMeter, VectorScope, Spectrum, LoudnessMeter];
 
     /// <summary>
     /// プレイヤー中はクロムの塗りを外し、ウィンドウ全体のジャケットウォッシュを透かす。
@@ -631,6 +1043,7 @@ public partial class MainWindow
         }
 
         _libraryPlayerHostActive = false;
+        LibraryBrowser.HidePlaylistVisual();
         // タイルは LeaveLibraryMaximizeAsync → RestoreLibrarySuspendedTileArrange で付け直す。
     }
 
@@ -672,7 +1085,12 @@ public partial class MainWindow
     {
         var selected = LibraryBrowser.SelectedSessions;
         var current = LibraryBrowser.SelectedSession ?? _activeSession;
-        var keep = LibraryPlayerMode.SessionsToKeep(selected, current);
+        var keep = LibraryPlayerMode.ExcludeEditorBlocked(
+            LibraryPlayerMode.SessionsToKeep(selected, current));
+        if (current is not null && LibraryPlaylistDocuments.BlocksEditor(current.Document))
+        {
+            current = keep.Length > 0 ? keep[0] : null;
+        }
         var drop = LibraryPlayerMode.SessionsToDrop(_sessions, keep);
         if (drop.Length == 0)
         {
@@ -1362,7 +1780,31 @@ public partial class MainWindow
             return;
         }
 
+        if (LibraryPlaylistDocuments.IsVisual(session.Document))
+        {
+            if (!IsPlaybackActive())
+            {
+                // 映像の Open／表示を最優先。波形・タグ・ジャケットはその後。
+                if (CanShowPlaylistVideo(session.Document))
+                {
+                    LibraryBrowser.ShowPlaylistVisual(session, play: false);
+                }
+                else
+                {
+                    LibraryBrowser.HidePlaylistVisual();
+                }
+
+                ActivateVisualLibraryMeta(session);
+                ApplyLoadedLibrarySession(session);
+                _ = FillLibraryPeaksAsync(session);
+                ShowLibraryArtwork(session);
+            }
+
+            return;
+        }
+
         ShowLibraryArtwork(session);
+        LibraryBrowser.HidePlaylistVisual();
         if (IsPlaybackActive())
         {
             return;
@@ -1449,13 +1891,14 @@ public partial class MainWindow
         if (!IsLibraryMaximized
             || !IsPlaybackActive()
             || _activeSession is null
-            || _libraryStopAfterTrack)
+            || _libraryStopAfterTrack
+            || LibraryPlaylistDocuments.IsVisual(_activeSession.Document))
         {
             return;
         }
 
         var next = LibraryBrowser.NextPlaylistSession(_activeSession);
-        if (next is null)
+        if (next is null || LibraryPlaylistDocuments.IsVisual(next.Document))
         {
             return;
         }
@@ -1826,6 +2269,17 @@ public partial class MainWindow
             return;
         }
 
+        if (LibraryPlaylistDocuments.IsVideo(session.Document)
+            && !await TryPrepareVideoProxyAsync(session).ConfigureAwait(true))
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(_libraryLoadSession, session))
+        {
+            return;
+        }
+
         if (IsLibraryMaximized)
         {
             LibraryBrowser.SelectSessionQuiet(session);
@@ -1837,6 +2291,19 @@ public partial class MainWindow
         }
 
         ApplyLoadedLibrarySession(session);
+        if (LibraryPlaylistDocuments.IsVisual(session.Document))
+        {
+            StartLibraryVisualPlayback(session, stopAfterTrack);
+            if (!keepAmbientGlow)
+            {
+                ShowLibraryArtwork(session);
+            }
+
+            return;
+        }
+
+        SetPlaylistVideoFullscreen(false);
+        LibraryBrowser.HidePlaylistVisual();
         StartPlayback(0, prerollSeconds: 0);
         if (!keepAmbientGlow)
         {
@@ -1898,6 +2365,14 @@ public partial class MainWindow
         if (bind && IsPlaybackActive() && !ReferenceEquals(session, _activeSession))
         {
             StopPlayback();
+        }
+
+        if (LibraryPlaylistDocuments.IsVisual(session.Document))
+        {
+            _libraryLoadGeneration++;
+            _libraryLoadSession = session;
+            ActivateVisualLibraryMeta(session);
+            return Task.CompletedTask;
         }
 
         _libraryLoadGeneration++;
@@ -2054,7 +2529,7 @@ public partial class MainWindow
     private Task FillLibraryPeaksAsync(DocumentSession session)
     {
         var document = session.Document;
-        if (document.IsDeferredLoad)
+        if (document.IsDeferredLoad || LibraryPlaylistDocuments.IsPdf(document))
         {
             return Task.CompletedTask;
         }
@@ -2116,8 +2591,15 @@ public partial class MainWindow
                 && File.Exists(path))
             {
                 var dispatcher = Dispatcher;
+                var peakPath = path;
+                if (LibraryPlaylistDocuments.IsVideo(path)
+                    && VideoProxy.TryGetCached(path, out var proxy))
+                {
+                    peakPath = proxy;
+                }
+
                 peaks = await Task.Run(() => PeakPyramid.BuildPlayerDisplayFromPath(
-                        path,
+                        peakPath,
                         onProgress: partial =>
                         {
                             if (peakGeneration != _libraryPeakGeneration)
@@ -2509,6 +2991,10 @@ public partial class MainWindow
         IReadOnlyList<string> folders,
         LibraryExplorerPlaylistWalk? walk = null)
     {
+        LibraryPlaylistDocuments.Apply(
+            AppStorage.Settings.LibraryShowPlaylistPdf,
+            AppStorage.Settings.LibraryShowPlaylistMov,
+            AppStorage.Settings.LibraryShowPlaylistMp4);
         var playFirst = _libraryExplorerPlayOnOpen;
         _libraryExplorerPlayOnOpen = false;
         var generation = ++_libraryFolderShowGeneration;
@@ -2765,12 +3251,20 @@ public partial class MainWindow
             return false;
         }
 
-        var session = await Task.Run(() =>
+        DocumentSession session;
+        try
         {
-            var document = AudioDocument.CreateDeferred(file);
-            AudioTagProbe.Ensure(document);
-            return new DocumentSession(document);
-        }).ConfigureAwait(true);
+            session = await Task.Run(() =>
+            {
+                var document = AudioDocument.CreateDeferred(file);
+                AudioTagProbe.Ensure(document);
+                return new DocumentSession(document);
+            }).ConfigureAwait(true);
+        }
+        catch (Exception)
+        {
+            return true;
+        }
 
         if (generation != _libraryFolderShowGeneration || !IsLibraryMaximized)
         {
@@ -2942,5 +3436,193 @@ public partial class MainWindow
 
         SyncPlayerMeterFade();
         return !cancelled;
+    }
+
+    private void ActivateVisualLibraryMeta(DocumentSession session)
+    {
+        var document = session.Document;
+        if (!LibraryPlaylistDocuments.IsVisual(document)
+            || document.SourcePath is not { Length: > 0 } path)
+        {
+            return;
+        }
+
+        if (document.IsStreamPlayback && document.FrameCount > 0 && !LibraryPlaylistDocuments.IsVideo(document))
+        {
+            return;
+        }
+
+        if (LibraryPlaylistDocuments.IsVideo(document) && AudioCodec.TryActivateStreamPlayback(document))
+        {
+            return;
+        }
+
+        var seconds = LibraryPlaylistDocuments.IsPdf(document)
+            ? LibraryPlaylistDocuments.PdfSecondsPerPage
+            : 1;
+        document.ActivateStreamPlayback(
+            48000,
+            2,
+            16,
+            Math.Max(1, (long)Math.Round(seconds * 48000)));
+    }
+
+    private void StartLibraryVisualPlayback(DocumentSession session, bool stopAfterTrack)
+    {
+        if (LibraryPlaylistDocuments.IsPdf(session.Document))
+        {
+            // タイムラインが無いので表示モードで止める（連続再生でも次へは進まない）。
+            // play:true で明るくクロームを隠し、Transport は停止のまま。
+            _libraryStopAfterTrack = true;
+            LibraryBrowser.ShowPlaylistVisual(session, play: true);
+            _lastPlaybackStart = 0;
+            session.Document.CursorFrame = 0;
+            Waveform.PlayheadFrame = 0;
+            Transport.SetPlaying(false);
+            return;
+        }
+
+        _libraryStopAfterTrack = stopAfterTrack;
+        LibraryBrowser.ShowPlaylistVisual(session, play: true);
+        _lastPlaybackStart = 0;
+        session.Document.CursorFrame = 0;
+        Waveform.PlayheadFrame = 0;
+        StartPlayback(0, prerollSeconds: 0);
+        _ = FillLibraryPeaksAsync(session);
+    }
+
+    private static bool CanShowPlaylistVideo(AudioDocument document)
+    {
+        if (!LibraryPlaylistDocuments.IsVideo(document)
+            || document.SourcePath is not { Length: > 0 } path)
+        {
+            return LibraryPlaylistDocuments.IsPdf(document);
+        }
+
+        return VideoCodecProbe.CanPlayWithoutProxy(path) || VideoProxy.TryGetCached(path, out _);
+    }
+
+    private async Task<bool> TryPrepareVideoProxyAsync(DocumentSession session)
+    {
+        if (!LibraryPlaylistDocuments.IsVideo(session.Document)
+            || session.Document.SourcePath is not { Length: > 0 } path)
+        {
+            return false;
+        }
+
+        var needsEncode = !CanShowPlaylistVideo(session.Document);
+        if (needsEncode && IsUiBusy)
+        {
+            return false;
+        }
+
+        var token = CancellationToken.None;
+        if (needsEncode)
+        {
+            _videoProxyCts?.Cancel();
+            _videoProxyCts?.Dispose();
+            _videoProxyCts = new CancellationTokenSource();
+            token = _videoProxyCts.Token;
+            _videoProxyBusy = true;
+            ShowBusyGlass(UiStrings.OverlayVideoProxy);
+        }
+
+        try
+        {
+            IProgress<double>? progress = needsEncode
+                ? new Progress<double>(p => _busyGlass.SetProgress(p))
+                : null;
+            await VideoProxy.EnsurePlayableAsync(path, progress, token).ConfigureAwait(true);
+            if (!IsLoaded || !ReferenceEquals(_libraryLoadSession, session) || token.IsCancellationRequested)
+            {
+                return false;
+            }
+
+            ActivateVisualLibraryMeta(session);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            if (IsLoaded)
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    ex.Message,
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+
+            return false;
+        }
+        finally
+        {
+            if (needsEncode)
+            {
+                _videoProxyBusy = false;
+                if (_busyGlass.IsShowingBusy)
+                {
+                    _busyGlass.BeginFadeOut();
+                }
+            }
+        }
+    }
+
+    private void DropPlaylistDocumentSessionsIfDisabled()
+    {
+        var drop = new List<DocumentSession>();
+        foreach (var session in _sessions)
+        {
+            if (LibraryPlaylistDocuments.IsVisual(session.Document)
+                && !LibraryPlaylistDocuments.ShouldList(session.Document.SourcePath))
+            {
+                drop.Add(session);
+            }
+        }
+
+        if (drop.Count == 0)
+        {
+            return;
+        }
+
+        LibraryBrowser.HidePlaylistVisual();
+        DropLibrarySessionsFast(drop);
+        if (IsLibraryMaximized)
+        {
+            LibraryBrowser.SetSessions(_sessions, _activeSession, LibraryBrowser.SelectedSessions);
+        }
+
+        SyncPlayerMeterFade();
+    }
+
+    private void LibraryBrowser_PlaylistVisualEnded(object? sender, EventArgs e) =>
+        Dispatcher.BeginInvoke(() => OnPlaybackEnded(_playbackGeneration));
+
+    private void LibraryBrowser_PlaylistVisualOpened(object? sender, TimeSpan duration)
+    {
+        if (_document is null
+            || !LibraryPlaylistDocuments.IsVisual(_document)
+            || duration <= TimeSpan.Zero
+            || _document.SampleRate < 1)
+        {
+            return;
+        }
+
+        var frames = Math.Max(1, (long)Math.Round(duration.TotalSeconds * _document.SampleRate));
+        _document.SyncStreamPlaybackMeta(
+            _document.SampleRate,
+            _document.Channels,
+            _document.BitsPerSample,
+            frames);
+        if (_activeSession is not null)
+        {
+            LibraryBrowser.UpdateSessionRow(_activeSession);
+        }
+
+        RefreshStatus();
     }
 }

@@ -19,11 +19,13 @@ public sealed class BrandLicenseNoticeTests
         Assert.Contains(UiStrings.CopyrightWwiseLine, text, StringComparison.Ordinal);
         Assert.Contains(UiStrings.CopyrightMitLink, text, StringComparison.Ordinal);
         Assert.Contains(UiStrings.CopyrightLameLink, text, StringComparison.Ordinal);
+        Assert.Contains(UiStrings.CopyrightFfmpegLink, text, StringComparison.Ordinal);
         Assert.DoesNotContain("SIL Open Font License", text, StringComparison.Ordinal);
         Assert.Equal(2, BrandLicenseAlign.LineCount(text));
         var first = BrandLicenseAlign.FirstLine(text);
         Assert.Contains(
-            UiStrings.CopyrightGitHub + " / " + UiStrings.CopyrightMitLink + " / " + UiStrings.CopyrightLameLink,
+            UiStrings.CopyrightGitHub + " / " + UiStrings.CopyrightMitLink + " / " + UiStrings.CopyrightLameLink
+                + " / " + UiStrings.CopyrightFfmpegLink,
             first,
             StringComparison.Ordinal);
         Assert.Equal(1, BrandLicenseAlign.FindLineIndex(text, UiStrings.CopyrightWwiseLine));
@@ -38,11 +40,13 @@ public sealed class BrandLicenseNoticeTests
             UiStrings.SetLanguage(UiLanguage.English);
             Assert.Contains("MIT License", UiStrings.TipCopyright, StringComparison.Ordinal);
             Assert.Contains("LAME", UiStrings.TipCopyright, StringComparison.Ordinal);
+            Assert.Contains("FFmpeg", UiStrings.TipCopyright, StringComparison.Ordinal);
             Assert.Contains("WAAPI", UiStrings.TipCopyright, StringComparison.Ordinal);
             Assert.Contains("Wwise", UiStrings.TipCopyright, StringComparison.Ordinal);
             UiStrings.SetLanguage(UiLanguage.Japanese);
             Assert.Contains("MIT License", UiStrings.TipCopyright, StringComparison.Ordinal);
             Assert.Contains("LAME", UiStrings.TipCopyright, StringComparison.Ordinal);
+            Assert.Contains("FFmpeg", UiStrings.TipCopyright, StringComparison.Ordinal);
             Assert.Contains("WAAPI", UiStrings.TipCopyright, StringComparison.Ordinal);
         }
         finally
@@ -56,6 +60,7 @@ public sealed class BrandLicenseNoticeTests
     {
         Assert.Equal(AppVersion.RepositoryUrl + "/blob/main/LICENSE", AppVersion.LicenseUrl);
         Assert.Equal("https://lame.sourceforge.io/", AppVersion.LameProjectUrl);
+        Assert.Equal("https://ffmpeg.org/", AppVersion.FfmpegProjectUrl);
     }
 
     [Fact]

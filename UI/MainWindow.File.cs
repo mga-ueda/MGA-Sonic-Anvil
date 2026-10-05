@@ -62,7 +62,9 @@ public partial class MainWindow
     {
         var dialog = new OpenFileDialog
         {
-            Filter = UiStrings.FilterOpenAudio,
+            Filter = IsLibraryMaximized && LibraryPlaylistDocuments.AnyEnabled
+                ? UiStrings.FilterOpenPlayer
+                : UiStrings.FilterOpenAudio,
             Title = UiStrings.MenuOpen,
             Multiselect = true,
         };
@@ -436,6 +438,12 @@ public partial class MainWindow
 
     private bool TryRequestOpenCancel()
     {
+        if (_videoProxyBusy)
+        {
+            _videoProxyCts?.Cancel();
+            return true;
+        }
+
         if (!_openBusy || _openJobNames.Length <= 1)
         {
             return false;
@@ -1682,7 +1690,11 @@ public partial class MainWindow
             settings.ResolvedLibraryListColumnsMp3(),
             settings.ResolvedLibraryPlaylistWaveformSizeWave(),
             settings.ResolvedLibraryPlaylistWaveformSizeMp3(),
-            settings.GaplessPlayback)
+            settings.GaplessPlayback,
+            settings.LibraryShowPlaylistPdf,
+            settings.LibraryShowPlaylistMov,
+            settings.LibraryShowPlaylistMp4,
+            settings.ResolvedVideoProxyRetentionDays())
         {
             Owner = this,
         };
@@ -1730,6 +1742,16 @@ public partial class MainWindow
         settings.ApplyLibraryPlaylistWaveformSizeMp3(dialog.SelectedLibraryPlaylistWaveformSizeMp3);
         settings.GaplessPlayback = dialog.SelectedGaplessPlayback;
         Mp3Gapless.Enabled = settings.GaplessPlayback;
+        settings.LibraryShowPlaylistPdf = dialog.SelectedLibraryShowPlaylistPdf;
+        settings.LibraryShowPlaylistMov = dialog.SelectedLibraryShowPlaylistMov;
+        settings.LibraryShowPlaylistMp4 = dialog.SelectedLibraryShowPlaylistMp4;
+        settings.VideoProxyRetentionDays = dialog.SelectedVideoProxyRetentionDays;
+        LibraryPlaylistDocuments.Apply(
+            settings.LibraryShowPlaylistPdf,
+            settings.LibraryShowPlaylistMov,
+            settings.LibraryShowPlaylistMp4);
+        VideoProxy.PruneExpired(settings.ResolvedVideoProxyRetentionDays(), DateTime.UtcNow);
+        DropPlaylistDocumentSessionsIfDisabled();
         LibraryBrowser.SetPlaylistWaveformOptions(
             settings.ResolvedLibraryPlaylistWaveformSizeWave(),
             settings.ResolvedLibraryPlaylistWaveformSizeMp3());

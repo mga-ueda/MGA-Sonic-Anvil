@@ -223,7 +223,7 @@ internal static class LameEncoder
         return true;
     }
 
-    private static string PreferShortPath(string path)
+    internal static string PreferShortPath(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
         {

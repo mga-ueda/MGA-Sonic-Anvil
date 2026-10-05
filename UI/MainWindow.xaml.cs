@@ -112,10 +112,14 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         LibraryBrowser.BindWaveformGlow(PlayerWaveGlowHost);
+        LibraryBrowser.BindWindowVisual(PlayerVisualHost);
         // エディタもプレイヤーと同じウォッシュ。モード切替（F11／F12）を待たない。
         LibraryBrowser.UseWindowFallbackWash();
         LibraryBrowser.SessionActivated += LibraryBrowser_SessionActivated;
         LibraryBrowser.SessionPlayRequested += LibraryBrowser_SessionPlayRequested;
+        LibraryBrowser.PlaylistVisualEnded += LibraryBrowser_PlaylistVisualEnded;
+        LibraryBrowser.PlaylistVisualOpened += LibraryBrowser_PlaylistVisualOpened;
+        LibraryBrowser.PlaylistVisualStateChanged += (_, _) => SyncPlaylistVideoChromeFade();
         LibraryBrowser.VisibleColumnPresetsChanged += LibraryBrowser_VisibleColumnPresetsChanged;
         LibraryBrowser.GroupChanged += LibraryBrowser_GroupChanged;
         LibraryBrowser.ExplorerFolderChanged += LibraryBrowser_ExplorerFolderChanged;
@@ -821,6 +825,8 @@ public partial class MainWindow : Window
         {
             // 遅延 ViewChanged が古い PlayheadFrame を sampleRate=0 で載せないよう、常に空表示へ戻す。
             StatusTimes.SetState(0, WaveSelection.Empty, 0, 0, hasDocument: false);
+            PlaylistVideoNowEndText.Text = "00:00.000 / 00:00.000";
+            PlaylistVideoSelText.Visibility = Visibility.Collapsed;
             return;
         }
 
@@ -830,6 +836,61 @@ public partial class MainWindow : Window
             _document.FrameCount,
             _document.SampleRate,
             hasDocument: true);
+        RefreshPlaylistVideoTimecode(
+            frame ?? Waveform.PlayheadFrame,
+            _document.Selection,
+            _document.FrameCount,
+            _document.SampleRate);
+    }
+
+    private void RefreshPlaylistVideoTimecode(
+        long nowFrame,
+        WaveSelection selection,
+        long endFrame,
+        int sampleRate)
+    {
+        var samples = AppStorage.Settings.StatusShowSamples;
+        var now = StatusTimeStrip.FormatFieldText(
+            StatusTimeField.Current,
+            hasDocument: true,
+            nowFrame,
+            selection,
+            endFrame,
+            sampleRate,
+            samples);
+        var end = StatusTimeStrip.FormatFieldText(
+            StatusTimeField.Total,
+            hasDocument: true,
+            nowFrame,
+            selection,
+            endFrame,
+            sampleRate,
+            samples);
+        PlaylistVideoNowEndText.Text = now + " / " + end;
+        if (selection.IsEmpty)
+        {
+            PlaylistVideoSelText.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var selStart = StatusTimeStrip.FormatFieldText(
+            StatusTimeField.SelStart,
+            hasDocument: true,
+            nowFrame,
+            selection,
+            endFrame,
+            sampleRate,
+            samples);
+        var selEnd = StatusTimeStrip.FormatFieldText(
+            StatusTimeField.SelEnd,
+            hasDocument: true,
+            nowFrame,
+            selection,
+            endFrame,
+            sampleRate,
+            samples);
+        PlaylistVideoSelText.Text = selStart + " / " + selEnd;
+        PlaylistVideoSelText.Visibility = Visibility.Visible;
     }
 
     private long VisibleCenterFrame() => VisibleCenterFrameAt(Overview.ViewStart);
@@ -1168,7 +1229,10 @@ public partial class MainWindow : Window
 
     private void ApplySilentSkipFromSettings()
     {
-        var enabled = SilentSkipCheck.IsChecked == true;
+        var enabled = SilentSkipCheck.IsChecked == true
+            && !LibraryPlayerMode.IgnoresSilentSkipForVideo(
+                IsLibraryMaximized,
+                LibraryBrowser.PlaylistVisualPlaying && LibraryBrowser.PlaylistVisualIsVideo);
         var thresholdDb = AppStorage.Settings.ResolvedSilentSkipThresholdDb();
         _player.SetSilentSkip(enabled, thresholdDb);
         _recorder.SetSilentSkip(
@@ -1183,6 +1247,7 @@ public partial class MainWindow : Window
         {
             "mit" => AppVersion.LicenseUrl,
             "lame" => AppVersion.LameProjectUrl,
+            "ffmpeg" => AppVersion.FfmpegProjectUrl,
             _ => AppVersion.RepositoryUrl,
         };
         TryOpenUrl(url);

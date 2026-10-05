@@ -15,6 +15,9 @@ internal static class AppStorage
 
     public static AppSettings Settings { get; private set; } = AppSettings.CreateDefault();
 
+    /// <summary>ディスクから読んだあとだけ Save する。未読の既定値で settings.json を潰さない。</summary>
+    internal static bool Loaded { get; private set; }
+
     /// <summary>起動時に設定を作り直した理由。通知後は <see cref="AcknowledgeSettingsReset"/> で消す。</summary>
     public static SettingsFileReset SettingsReset { get; private set; }
 
@@ -99,10 +102,20 @@ internal static class AppStorage
             SessionDirectory,
             out var reset);
         SettingsReset = reset;
+        Loaded = true;
+        LibraryPlaylistDocuments.Apply(
+            Settings.LibraryShowPlaylistPdf,
+            Settings.LibraryShowPlaylistMov,
+            Settings.LibraryShowPlaylistMp4);
     }
 
     public static void Save()
     {
+        if (!Loaded)
+        {
+            return;
+        }
+
         try
         {
             Directory.CreateDirectory(RootDirectory);
