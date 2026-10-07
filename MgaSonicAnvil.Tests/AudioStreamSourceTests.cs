@@ -898,6 +898,58 @@ public sealed class AudioStreamSourceTests
         writer.Write(buffer, 0, buffer.Length);
     }
 
+    [Fact]
+    public void CreateSilence_ReadsZerosAndGrowsLength()
+    {
+        using var source = AudioStreamSource.CreateSilence(48000, 2, 16, 4800);
+        Assert.True(source.IsSilence);
+        Assert.Equal(48000, source.SampleRate);
+        Assert.Equal(2, source.Channels);
+        Assert.Equal(4800, source.FrameCount);
+
+        var frame = new float[2];
+        Assert.True(source.TryReadFrame(frame, timeoutMs: 1000));
+        Assert.Equal(0f, frame[0]);
+        Assert.Equal(0f, frame[1]);
+
+        source.GrowFrameCount(9600);
+        Assert.Equal(9600, source.FrameCount);
+        source.SeekFrame(4799, prebufferTimeoutMs: 200);
+        Assert.True(source.TryReadFrame(frame, timeoutMs: 1000));
+        Assert.True(source.TryReadFrame(frame, timeoutMs: 1000));
+        Assert.Equal(4801, source.Frame);
+    }
+
+    [Fact]
+    public void OpenLibraryPlaybackSource_VideoWithoutAudio_ReturnsSilence()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-silent-video-" + Guid.NewGuid().ToString("N") + ".mp4");
+        File.WriteAllBytes(path, [0, 1, 2, 3]);
+        try
+        {
+            var document = new AudioDocument([], 48000, 2, 16, AudioFileKind.Mp4, path, buildPeaks: false);
+            document.ActivateStreamPlayback(48000, 2, 16, 48000);
+            using var source = AudioPlayer.OpenLibraryPlaybackSource(document, prebufferTimeoutMs: 0);
+            Assert.True(source.IsSilence);
+            Assert.Equal(48000, source.FrameCount);
+            Assert.Equal(48000, source.SampleRate);
+            Assert.Equal(2, source.Channels);
+
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(48000);
+            provider.BindStream(source, document, startFrame: 0, playRange: null, loop: false);
+            var buffer = new float[256];
+            Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+            Assert.All(buffer, sample => Assert.Equal(0f, sample));
+            provider.GrowSilenceFrames(96000);
+            Assert.Equal(96000, source.FrameCount);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static void WriteToneWave(string path, int sampleRate, int frames, double frequency)
     {
         var format = new WaveFormat(sampleRate, 16, 2);
