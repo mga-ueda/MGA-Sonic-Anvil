@@ -20,6 +20,12 @@ internal static class LibraryPlayerMode
     /// <summary>プレイヤーではマーカー／リージョン／ループを波形に出さない。</summary>
     public static bool ShowsCueOverlays(bool playerMode) => !playerMode;
 
+    /// <summary>
+    /// 波形の再生ヘッド（シークバー）とマウス直下ガイド。
+    /// プレイヤーの PDF はタイムラインが無いので出さない。
+    /// </summary>
+    public static bool ShowsSeekCursors(bool playerMode, bool isPdf) => !playerMode || !isPdf;
+
     public static bool BlocksWaveMenu(WaveMenuCommand command) => command switch
     {
         WaveMenuCommand.PlayFromHere
@@ -169,6 +175,13 @@ internal static class LibraryPlayerMode
     }
 
     /// <summary>
+    /// Space 単独再生はプレイリストがアクティブなときだけ。
+    /// ライブラリ（フォルダツリー）／お気に入りでは始めない。検索欄は呼び出し前に弾く。
+    /// </summary>
+    public static bool PlaysLibrarySelectionOnSpace(bool explorerFocused, bool favoritesFocused) =>
+        !explorerFocused && !favoritesFocused;
+
+    /// <summary>
     /// ランダム再生の切替。プレイリストが空でも、ツリー／お気に入りフォーカスでも効く。
     /// 検索欄では文字入力のまま。
     /// </summary>
@@ -272,6 +285,12 @@ internal static class LibraryPlayerMode
         if (key == Key.Space && modifiers == ModifierKeys.Alt)
         {
             return false;
+        }
+
+        // Space 単独再生はプレイリストだけ。ツリーではアイコン選択などにも使わせない。
+        if (key == Key.Space && modifiers == ModifierKeys.None)
+        {
+            return true;
         }
 
         if ((key == Key.Q && modifiers == ModifierKeys.Control)
@@ -472,20 +491,35 @@ internal static class LibraryPlayerMode
     /// <summary>メーターのフェード。ジャケットのクロスフェードと同じ 1 秒。</summary>
     public const double MeterFadeSeconds = 1;
 
+    /// <summary>ホバー↔本再生／PDF 表示の前面クローム。メーター用の 1 秒より短く。</summary>
+    public const double ChromeFadeSeconds = 0.2;
+
     public const int MeterFadeFrameRate = 30;
 
     /// <summary>
     /// 動画再生中、または PDF 表示モード中は前面クロームを隠す。
     /// 選択プレビュー（暗表示）ではクロームを残す。
+    /// 上下キーなどで次の本再生へつなぐあいだは <paramref name="bridgeHold"/> で隠したままにする。
     /// </summary>
     public static bool HidesChromeForPlaylistVisual(
         bool player,
         bool visualShown,
         bool visualPlaying,
         bool isPdf,
-        bool isVideo)
+        bool isVideo,
+        bool bridgeHold = false)
     {
-        if (!player || !visualShown || !visualPlaying)
+        if (!player || !visualShown)
+        {
+            return false;
+        }
+
+        if (bridgeHold && (isPdf || isVideo || visualPlaying))
+        {
+            return true;
+        }
+
+        if (!visualPlaying)
         {
             return false;
         }
@@ -493,23 +527,186 @@ internal static class LibraryPlayerMode
         return isPdf || isVideo;
     }
 
+    /// <summary>
+    /// 映像／PDF の本再生から次の映像／PDF 本再生へ移るとき、クロームを出さない。
+    /// </summary>
+    public static bool HoldsPlaylistVisualChromeBridge(
+        bool currentVisualPlaying,
+        bool nextIsVisual) =>
+        currentVisualPlaying && nextIsVisual;
+
+    /// <summary>
+    /// PDF の明るい表示に入った瞬間だけ HUD を閉じる。
+    /// 暗い選択プレビューでセッションを立てると、Space／Enter 後にアナライザが残る。
+    /// </summary>
+    public static bool StartsPdfChromeHudSession(bool isPdf, bool chromeHidden, bool sessionActive) =>
+        isPdf && chromeHidden && !sessionActive;
+
+    /// <summary>明るい PDF 表示中だけセッションを維持（A トグルを覚える）。</summary>
+    public static bool HoldsPdfChromeHudSession(bool isPdf, bool chromeHidden) =>
+        isPdf && chromeHidden;
+
+    /// <summary>
+    /// PDF の HUD 閉じセッションを終えて動画本再生へ移ったとき、アナライザ HUD を戻す。
+    /// クロームをつないだまま移ると !hide の復帰経路に乗らない。
+    /// </summary>
+    public static bool RestoresVideoHudAfterPdfSession(
+        bool pdfSessionWasActive,
+        bool stillHoldsPdfSession,
+        bool chromeHidden,
+        bool isVideo) =>
+        pdfSessionWasActive && !stillHoldsPdfSession && chromeHidden && isVideo;
+
     /// <summary>再生中の映像へ合わせ直す最小ずれ。これ未満のシークは MediaElement を落とす。</summary>
     public const double VideoClockSeekSeconds = 1;
 
     /// <summary>1／3 早送り・巻き戻し中は、ほぼ毎フレーム映像を音声へ合わせる。</summary>
     public const double VideoShuttleSeekSeconds = 1.0 / 60;
 
-    /// <summary>ブラウザの F11 と同じ、モニタ一面の全画面（動画／PDF）。</summary>
+    /// <summary>
+    /// 動画ファイルは映像クロックでシークバーを進める（本再生・1/4 速プレビュー）。
+    /// wave / mp3 などは音声側（AudioPlayer）の再生ヘッドを使う。
+    /// </summary>
+    public static bool DrivesPlayheadWhileVideoPlays(
+        bool playerMode,
+        bool isVideoFile,
+        bool videoClockRunning) =>
+        playerMode && isVideoFile && videoClockRunning;
+
+    /// <summary>
+    /// プレイヤーで曲を切り替えても、ホバー映像のシークバー用タイマーを殺さない。
+    /// Bind は ResetWorkspaceInteraction を呼ぶが、1本目は既にバインド済みでスキップされ、2本目だけ止まる。
+    /// </summary>
+    public static bool PreservesVisualPlayheadOnBind(bool playerMode) => playerMode;
+
+    /// <summary>
+    /// 同じ動画のホバー／暗いプレビュー中に本再生へ移るときは、いまの映像位置から続ける。
+    /// 別ファイルへ移るとき（上下キーなど）は先頭から。
+    /// </summary>
+    public static long HoverResumeFrame(
+        bool hoverVideoShown,
+        bool visualPlaying,
+        bool sameClip,
+        double positionSeconds,
+        int sampleRate,
+        long frameCount)
+    {
+        if (!hoverVideoShown || visualPlaying || !sameClip)
+        {
+            return 0;
+        }
+
+        var rate = Math.Max(1, sampleRate);
+        var frame = (long)Math.Round(Math.Max(0, positionSeconds) * rate);
+        if (frameCount <= 0)
+        {
+            return frame;
+        }
+
+        return Math.Clamp(frame, 0, frameCount);
+    }
+
+    public static long FrameFromSeconds(double seconds, int sampleRate, long frameCount)
+    {
+        var rate = Math.Max(1, sampleRate);
+        var frame = (long)Math.Round(Math.Max(0, seconds) * rate);
+        return Math.Clamp(frame, 0, Math.Max(0, frameCount));
+    }
+
+    /// <summary>MediaElement の尺がまだ無いときは、タグ／mvhd の尺でシークバーを進める。</summary>
+    public static TimeSpan VisualDurationOrFallback(TimeSpan natural, TimeSpan fallback)
+    {
+        if (natural > TimeSpan.Zero)
+        {
+            return natural;
+        }
+
+        return fallback > TimeSpan.Zero ? fallback : TimeSpan.Zero;
+    }
+
+    /// <summary>
+    /// MediaElement.Position は無音だと更新されないことがあるので、経過時間で再生位置を出す。
+    /// </summary>
+    public static TimeSpan VisualPlayPosition(
+        TimeSpan origin,
+        double elapsedSeconds,
+        double speed,
+        TimeSpan duration)
+    {
+        var seconds = origin.TotalSeconds + (Math.Max(0, elapsedSeconds) * speed);
+        if (seconds < 0)
+        {
+            return TimeSpan.Zero;
+        }
+
+        var pos = TimeSpan.FromSeconds(seconds);
+        if (duration > TimeSpan.Zero && pos > duration)
+        {
+            return duration;
+        }
+
+        return pos;
+    }
+
+    /// <summary>選択範囲ループ。範囲が無ければそのまま。</summary>
+    public static long WrapLoopFrame(long frame, long start, long end)
+    {
+        var length = end - start;
+        if (length <= 0)
+        {
+            return frame;
+        }
+
+        if (frame < start)
+        {
+            return start;
+        }
+
+        if (frame < end)
+        {
+            return frame;
+        }
+
+        return start + ((frame - start) % length);
+    }
+
+    public static bool NeedsLoopSeek(long frame, long start, long end) =>
+        end > start && (frame < start || frame >= end);
+
+    /// <summary>ブラウザの F11 と同じ、モニタ一面の全画面（動画／PDF）。解除もユーザー操作のみ。</summary>
     public static bool IsVideoFullscreenToggle(Key key, ModifierKeys modifiers) =>
         key == Key.F && modifiers == ModifierKeys.None;
 
-    /// <summary>波形・アナライザ・タイムコード（選択範囲）一式の表示切替。</summary>
+    /// <summary>波形・アナライザ・ファイル名の表示切替（タイムコードは含まない）。</summary>
     public static bool IsVideoHudToggle(Key key, ModifierKeys modifiers) =>
         key == Key.A && modifiers == ModifierKeys.None;
+
+    /// <summary>動画本再生中の大きなタイムコード（選択範囲）の表示切替。</summary>
+    public static bool IsVideoTimecodeToggle(Key key, ModifierKeys modifiers) =>
+        key == Key.T && modifiers == ModifierKeys.None;
+
+    /// <summary>前面クロームが消えている本再生中だけ、タイムコードを出せる。</summary>
+    public static bool ShowsPlaylistVideoTimecode(bool chromeHidden, bool timecodeOn, bool isVideo) =>
+        chromeHidden && timecodeOn && isVideo;
+
+    /// <summary>前面クロームが消えている動画本再生中、A で HUD が出ているときだけ左下のファイル名を出す。</summary>
+    public static bool ShowsPlaylistVideoFileName(bool chromeHidden, bool hudOn, bool isVideo) =>
+        chromeHidden && hudOn && isVideo;
 
     /// <summary>PDF ページを静止背景レイヤーへ固定／解除（固定時は表示を閉じる）。</summary>
     public static bool IsPdfBackgroundPinToggle(Key key, ModifierKeys modifiers) =>
         key == Key.B && modifiers == ModifierKeys.None;
+
+    /// <summary>
+    /// 明るい PDF 表示を Enter／Space で抜けるときは暗いプレビューへ戻す。
+    /// B で静止背景に固定したあとはプレビューを出さず、固定レイヤーだけ残す。
+    /// </summary>
+    public static bool RestoresPdfDimPreviewOnExit(bool backgroundPinned) => !backgroundPinned;
+
+    /// <summary>
+    /// プレイリストの Enter。再生中は止め、停止中だけ先頭から連続再生を始める。
+    /// </summary>
+    public static bool StartsLibraryPlaybackOnEnter(bool playbackActive) => !playbackActive;
 
     /// <summary>PDF 表示中のページめくり・先頭／末尾。</summary>
     public static bool IsPdfPageKey(Key key, ModifierKeys modifiers) =>
@@ -526,13 +723,14 @@ internal static class LibraryPlayerMode
         modifiers == ModifierKeys.None && key is Key.Subtract or Key.OemMinus;
 
     /// <summary>
-    /// PDF 表示中はプレイリスト操作キーを奪う（選択移動・除外・全選択・前後曲など）。
-    /// 表示を抜けると通常どおり。
+    /// PDF 表示中はプレイリスト操作キーを奪う（除外・全選択・ページキーなど）。
+    /// ↑↓ は前後ファイルへ移すので奪わない。表示を抜けると通常どおり。
     /// </summary>
     public static bool BlocksPlaylistWhilePdf(Key key, ModifierKeys modifiers)
     {
+        // Home／End／Page はページ操作。↑↓ はプレイリスト移動として通す。
         if (modifiers is ModifierKeys.None or ModifierKeys.Shift
-            && key is Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown)
+            && key is Key.Home or Key.End or Key.PageUp or Key.PageDown)
         {
             return true;
         }
@@ -574,18 +772,21 @@ internal static class LibraryPlayerMode
             || IsPaneFocusArrow(key, modifiers);
     }
 
-    /// <summary>動画再生中は Silent Skip をかけない。チェックボックスは触らない。</summary>
+    /// <summary>プレイヤーで動画を出しているとき（本再生・ホバー）は Silent Skip をかけない。チェックボックスは触らない。</summary>
     public static bool IgnoresSilentSkipForVideo(bool player, bool videoPlaying) =>
         player && videoPlaying;
 
-    public static DoubleAnimation CreateMeterFade(double from, double to)
+    public static DoubleAnimation CreateMeterFade(double from, double to) =>
+        CreateOpacityFade(from, to, MeterFadeSeconds);
+
+    public static DoubleAnimation CreateOpacityFade(double from, double to, double seconds)
     {
         var rising = to > from;
         var anim = new DoubleAnimation
         {
             From = from,
             To = to,
-            Duration = TimeSpan.FromSeconds(MeterFadeSeconds),
+            Duration = TimeSpan.FromSeconds(Math.Max(0, seconds)),
             FillBehavior = FillBehavior.HoldEnd,
             EasingFunction = new SineEase
             {
@@ -596,12 +797,18 @@ internal static class LibraryPlayerMode
         return anim;
     }
 
-    public static void FadeElementOpacity(UIElement target, double to, bool instant, bool? hitTestVisible = null)
+    public static void FadeElementOpacity(
+        UIElement target,
+        double to,
+        bool instant,
+        bool? hitTestVisible = null,
+        double? seconds = null)
     {
         ArgumentNullException.ThrowIfNull(target);
-        // 先にアニメを外す。HoldEnd の実効値を from に書くと、消えたまま固着する。
-        target.BeginAnimation(UIElement.OpacityProperty, null);
+        // 表示中の値を残してからアニメを外す。先に外すと HoldEnd の 0 がローカル 1 に飛び、フェードインが省略される。
         var from = target.Opacity;
+        target.BeginAnimation(UIElement.OpacityProperty, null);
+        target.Opacity = from;
         if (hitTestVisible is { } hit)
         {
             target.IsHitTestVisible = hit;
@@ -613,7 +820,7 @@ internal static class LibraryPlayerMode
             return;
         }
 
-        var anim = CreateMeterFade(from, to);
+        var anim = CreateOpacityFade(from, to, seconds ?? MeterFadeSeconds);
         anim.Completed += (_, _) =>
         {
             target.BeginAnimation(UIElement.OpacityProperty, null);

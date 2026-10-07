@@ -64,7 +64,6 @@ public sealed class ColorDevCatalogTests
         Assert.True(ColorDevCatalog.Rank("SampleLoopGripBrush") < ColorDevCatalog.Rank("SampleLoopWaveFillBrush"));
         Assert.True(ColorDevCatalog.Rank("SpectrogramGridBrush") < ColorDevCatalog.Rank("SpectrogramScaleForeBrush"));
         Assert.True(ColorDevCatalog.Rank("SpectrogramScaleForeBrush") < ColorDevCatalog.Rank("SpectrogramScaleEdgeBrush"));
-        Assert.True(ColorDevCatalog.Rank("PlayerPlaceholderJacketForeBrush") < ColorDevCatalog.Rank("PlayerJacketReflectionBrush"));
         Assert.True(ColorDevCatalog.Rank("PlayerJacketReflectionBrush") < ColorDevCatalog.Rank("PlayerFallbackWashNavyBrush"));
         Assert.True(ColorDevCatalog.Rank("TransportPressedBackBrush") < ColorDevCatalog.Rank("RecordLatchForeBrush"));
     }
@@ -100,7 +99,6 @@ public sealed class ColorDevCatalogTests
     {
         var xaml = File.ReadAllText(FindUiColorsXaml());
         Assert.Contains("x:Key=\"WaveFillBrush\" Color=\"#FFC6D9FF\"", xaml);
-        Assert.Contains("x:Key=\"PlayerPlaceholderJacketTopBrush\" Color=\"#FF5C5C62\"", xaml);
         Assert.Contains("x:Key=\"PlayerWaveFillBrush\" Color=\"#94C6D9FF\"", xaml);
         Assert.Contains("x:Key=\"PlayerFormatMismatchForeBrush\" Color=\"#FFFF8A1A\"", xaml);
         Assert.Contains("x:Key=\"PlayerFallbackWashNavyBrush\" Color=\"#FF0B1B49\"", xaml);

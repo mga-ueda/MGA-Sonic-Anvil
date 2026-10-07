@@ -613,7 +613,7 @@ public sealed class LibraryColumnFilterTests
     }
 
     [Fact]
-    public void UsedColumns_Mp3WithoutArt_StillShowsJacketColumn()
+    public void UsedColumns_Mp3WithoutArt_HidesJacketColumn()
     {
         var row = new LibraryFileRow
         {
@@ -625,19 +625,33 @@ public sealed class LibraryColumnFilterTests
 
         var used = LibraryColumnFilter.UsedColumns([row]);
         Assert.NotNull(used);
-        Assert.Contains(LibraryFileColumn.Jacket, used);
+        Assert.DoesNotContain(LibraryFileColumn.Jacket, used);
         Assert.Contains(LibraryFileColumn.Title, used);
-        Assert.False(LibraryColumnFilter.JacketEligibleKind("WAVE"));
-        Assert.False(LibraryColumnFilter.JacketEligibleKind("AIFF"));
-        Assert.True(LibraryColumnFilter.JacketEligibleKind("MP3"));
-        Assert.True(LibraryColumnFilter.JacketEligibleKind("M4A"));
+        Assert.True(LibraryColumnFilter.IsVideoFamilyKind("MOV"));
+        Assert.True(LibraryColumnFilter.IsVisualFamilyKind("PDF"));
+    }
+
+    [Fact]
+    public void UsedColumns_MovWithArt_ShowsJacketColumn()
+    {
+        var row = new LibraryFileRow
+        {
+            Name = "clip.mov",
+            Kind = "MOV",
+            HasArtwork = true,
+            JacketText = UiStrings.LibraryJacketMark,
+        };
+
+        var used = LibraryColumnFilter.UsedColumns([row]);
+        Assert.NotNull(used);
+        Assert.Contains(LibraryFileColumn.Jacket, used);
     }
 
     [Fact]
     public void UsedColumns_WavePlusMp3_ShowsJacketColumn()
     {
         var wave = new LibraryFileRow { Name = "kick.wav", Kind = "WAVE" };
-        var mp3 = new LibraryFileRow { Name = "song.mp3", Kind = "MP3" };
+        var mp3 = new LibraryFileRow { Name = "song.mp3", Kind = "MP3", HasArtwork = true, JacketText = UiStrings.LibraryJacketMark };
         var used = LibraryColumnFilter.UsedColumns([wave, mp3]);
         Assert.NotNull(used);
         Assert.Contains(LibraryFileColumn.Jacket, used);
