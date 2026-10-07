@@ -54,7 +54,10 @@ public partial class MainWindow
     private bool? _playerMetersShown;
     private bool _playlistVideoChromeVisible = true;
     private bool _playlistVideoHud = true;
+    private bool _playlistVideoTimecode = true;
     private bool _playlistPdfChromeSession;
+    /// <summary>映像／PDF 本再生のつなぎでクロームを出さない。</summary>
+    private bool _playlistVisualChromeBridge;
     private bool _playlistVideoFullscreen;
     private WindowState _windowStateBeforeVideoFullscreen;
     private WindowStyle _windowStyleBeforeVideoFullscreen;
@@ -316,24 +319,35 @@ public partial class MainWindow
             LibraryBrowser.PlaylistVisualShown,
             LibraryBrowser.PlaylistVisualPlaying,
             LibraryBrowser.PlaylistVisualIsPdf,
-            LibraryBrowser.PlaylistVisualIsVideo);
+            LibraryBrowser.PlaylistVisualIsVideo,
+            _playlistVisualChromeBridge);
         ApplySilentSkipFromSettings();
-        if (LibraryBrowser.PlaylistVisualIsPdf)
+        var heldPdfHudSession = _playlistPdfChromeSession;
+        if (LibraryPlayerMode.StartsPdfChromeHudSession(
+            LibraryBrowser.PlaylistVisualIsPdf,
+            hide,
+            _playlistPdfChromeSession))
         {
-            // PDF 表示セッション開始時は HUD も閉じる（A で出せる）。
-            if (!_playlistPdfChromeSession)
-            {
-                _playlistPdfChromeSession = true;
-                _playlistVideoHud = false;
-            }
+            _playlistPdfChromeSession = true;
+            _playlistVideoHud = false;
         }
-        else
+        else if (!LibraryPlayerMode.HoldsPdfChromeHudSession(LibraryBrowser.PlaylistVisualIsPdf, hide))
         {
             _playlistPdfChromeSession = false;
+            if (LibraryPlayerMode.RestoresVideoHudAfterPdfSession(
+                    heldPdfHudSession,
+                    stillHoldsPdfSession: false,
+                    hide,
+                    LibraryBrowser.PlaylistVisualIsVideo))
+            {
+                // PDF→動画の本再生つなぎ。クロームは出したまま HUD（アナライザ）だけ戻す。
+                _playlistVideoHud = true;
+            }
         }
 
         if (!hide)
         {
+            // F 全画面はここでは解除しない（ユーザーの F でのみ戻す）。
             EnsurePlaylistVideoWindowRestored();
             _playlistVideoHud = true;
         }
@@ -350,7 +364,8 @@ public partial class MainWindow
                     target,
                     visible ? 1 : 0,
                     instant,
-                    hitTestVisible: visible);
+                    hitTestVisible: visible,
+                    seconds: LibraryPlayerMode.ChromeFadeSeconds);
             }
         }
         else if (visible)
@@ -360,12 +375,25 @@ public partial class MainWindow
         }
 
         ApplyPlaylistVideoHudFade(hide && !_playlistVideoHud, instant);
-        // タイムコード／選択範囲も A トグル対象。動画再生中かつ HUD 表示のときだけ出す。
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaylistVideoTimecode,
-            hide && _playlistVideoHud && LibraryBrowser.PlaylistVisualIsVideo ? 1 : 0,
-            instant,
-            hitTestVisible: false);
+        if (IsLibraryMaximized
+            && LibraryBrowser.PlaylistVisualShown
+            && LibraryBrowser.PlaylistVisualIsVideo)
+        {
+            EnsureLibraryVisualPlayheadTicker();
+        }
+
+        ApplyPlaylistVideoTimecodeFade(
+            LibraryPlayerMode.ShowsPlaylistVideoTimecode(
+                hide,
+                _playlistVideoTimecode,
+                LibraryBrowser.PlaylistVisualIsVideo),
+            instant);
+        ApplyPlaylistVideoFileNameFade(
+            LibraryPlayerMode.ShowsPlaylistVideoFileName(
+                hide,
+                _playlistVideoHud,
+                LibraryBrowser.PlaylistVisualIsVideo),
+            instant);
         if (!hide)
         {
             EnsurePlaylistVideoHudOpaque();
@@ -385,7 +413,12 @@ public partial class MainWindow
 
     private void EnsurePlaylistVideoWindowRestored()
     {
-        SetPlaylistVideoFullscreen(false);
+        // F 全画面中はウィンドウ寸法も触らない（停止やクローム復帰で勝手に戻さない）。
+        if (_playlistVideoFullscreen)
+        {
+            return;
+        }
+
         if (!IsLibraryMaximized)
         {
             return;
@@ -523,7 +556,8 @@ public partial class MainWindow
                 target,
                 hideHud ? 0 : 1,
                 instant,
-                hitTestVisible: !hideHud);
+                hitTestVisible: !hideHud,
+                seconds: LibraryPlayerMode.ChromeFadeSeconds);
         }
     }
 
@@ -560,17 +594,71 @@ public partial class MainWindow
 
         _playlistVideoHud = !_playlistVideoHud;
         ApplyPlaylistVideoHudFade(!_playlistVideoHud, instant: false);
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaylistVideoTimecode,
-            _playlistVideoHud && LibraryBrowser.PlaylistVisualIsVideo ? 1 : 0,
-            instant: false,
-            hitTestVisible: false);
+        ApplyPlaylistVideoFileNameFade(
+            LibraryPlayerMode.ShowsPlaylistVideoFileName(
+                !_playlistVideoChromeVisible,
+                _playlistVideoHud,
+                LibraryBrowser.PlaylistVisualIsVideo),
+            instant: false);
         SyncPlaylistVideoUiShadows(
             _playlistVideoChromeVisible,
             LibraryBrowser.PlaylistVisualIsVideo
                 && LibraryBrowser.PlaylistVisualPlaying
                 && !_playlistVideoHud);
         return true;
+    }
+
+    private bool TryTogglePlaylistVideoTimecode()
+    {
+        if (!IsLibraryMaximized
+            || !LibraryBrowser.PlaylistVisualShown
+            || !LibraryBrowser.PlaylistVisualIsVideo
+            || !LibraryBrowser.PlaylistVisualPlaying)
+        {
+            return false;
+        }
+
+        _playlistVideoTimecode = !_playlistVideoTimecode;
+        ApplyPlaylistVideoTimecodeFade(
+            LibraryPlayerMode.ShowsPlaylistVideoTimecode(
+                !_playlistVideoChromeVisible,
+                _playlistVideoTimecode,
+                isVideo: true),
+            instant: false);
+        return true;
+    }
+
+    private void ApplyPlaylistVideoTimecodeFade(bool show, bool instant)
+    {
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistVideoTimecode,
+            show ? 1 : 0,
+            instant,
+            hitTestVisible: false,
+            seconds: LibraryPlayerMode.ChromeFadeSeconds);
+    }
+
+    private void ApplyPlaylistVideoFileNameFade(bool show, bool instant)
+    {
+        if (show)
+        {
+            RefreshPlaylistVideoFileName();
+        }
+
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistVideoFileName,
+            show ? 1 : 0,
+            instant,
+            hitTestVisible: false,
+            seconds: LibraryPlayerMode.ChromeFadeSeconds);
+    }
+
+    private void RefreshPlaylistVideoFileName()
+    {
+        PlaylistVideoFileName.Text = _activeSession?.DisplayName
+            ?? (_document?.SourcePath is { Length: > 0 } path
+                ? System.IO.Path.GetFileName(path)
+                : string.Empty);
     }
 
     private bool TryTogglePdfBackgroundPin()
@@ -588,7 +676,7 @@ public partial class MainWindow
                 return false;
             }
 
-            ExitPlaylistPdfView();
+            ExitPlaylistPdfView(restoreDimPreview: false);
             return true;
         }
 
@@ -603,18 +691,30 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// PDF 表示を閉じる（Enter／Space）。B で固定した背景は残す。
+    /// PDF の明るい表示を閉じる（Enter／Space）。暗いプレビューへ戻す。
+    /// B 固定直後は <paramref name="restoreDimPreview"/> を false にし、静止背景だけ残す。
     /// </summary>
-    private void ExitPlaylistPdfView()
+    private void ExitPlaylistPdfView(bool restoreDimPreview = true)
     {
         if (!LibraryBrowser.PlaylistVisualIsPdf)
         {
             return;
         }
 
+        SyncPlaylistPdfCursorFromVisual();
         _libraryStopAfterTrack = false;
         SetPlaylistVideoFullscreen(false);
-        LibraryBrowser.HidePlaylistVisual();
+        if (restoreDimPreview
+            && LibraryPlayerMode.RestoresPdfDimPreviewOnExit(LibraryBrowser.PdfBackgroundPinned))
+        {
+            // Hide すると背面の暗いプレビューまで消える。本再生と同じく dim へ戻す。
+            LibraryBrowser.SetPlaylistVisualPlaying(false);
+        }
+        else
+        {
+            LibraryBrowser.HidePlaylistVisual();
+        }
+
         Transport.SetPlaying(false);
         EnsurePlaylistVideoWindowRestored();
     }
@@ -703,6 +803,7 @@ public partial class MainWindow
             LibraryPlayerMode.SetVideoUiShadow(target, video && !hideHud);
         }
 
+        LibraryPlayerMode.SetVideoUiShadow(PlaylistVideoFileName, video && !hideHud);
         LibraryPlayerMode.SetVideoUiShadow(PlaylistVideoTimecode, video && !hideHud);
     }
 
@@ -715,7 +816,8 @@ public partial class MainWindow
                 LibraryBrowser.PlaylistVisualShown,
                 LibraryBrowser.PlaylistVisualPlaying,
                 LibraryBrowser.PlaylistVisualIsPdf,
-                LibraryBrowser.PlaylistVisualIsVideo))
+                LibraryBrowser.PlaylistVisualIsVideo,
+                _playlistVisualChromeBridge))
         {
             visible = false;
         }
@@ -1227,7 +1329,14 @@ public partial class MainWindow
         {
             if (ReferenceEquals(session, _libraryFolderPlaySession))
             {
-                ShowLibraryArtwork(session);
+                if (!IsPlaybackActive())
+                {
+                    PreviewLibrarySession(session);
+                }
+                else
+                {
+                    ShowLibraryArtwork(session);
+                }
             }
 
             return;
@@ -1293,13 +1402,22 @@ public partial class MainWindow
             RebuildTabBar();
             if (!play)
             {
-                // 追加だけ。選択も再生中の曲も動かさない（選択変更は SessionActivated で再生し直す）。
+                // 追加だけ。既存の選択は動かさない。空リストへ足したときだけ 1 行目を選び、停止中プレビューを出す。
                 if (IsLibraryMaximized)
                 {
-                    LibraryBrowser.SetSessions(
-                        _sessions,
-                        LibraryBrowser.SelectedSession,
-                        LibraryBrowser.SelectedSessions);
+                    var keep = LibraryBrowser.SelectedSession;
+                    var keepMany = LibraryBrowser.SelectedSessions;
+                    if (keep is null)
+                    {
+                        keep = LibraryPlayerMode.FirstSession(_sessions);
+                        if (keep is not null)
+                        {
+                            keepMany = [keep];
+                        }
+                    }
+
+                    LibraryBrowser.SetSessions(_sessions, keep, keepMany);
+                    PreviewIdleLibrarySession(keep);
                 }
 
                 SyncPlayerMeterFade();
@@ -1753,6 +1871,7 @@ public partial class MainWindow
         {
             _libraryHoldJacketWash = false;
             LibraryBrowser.RequestListFocus();
+            PreviewLibrarySession(first);
         }
 
         _ = PlayLibrarySessionAsync(first);
@@ -1771,6 +1890,19 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// 停止中だけ選択曲の暗いプレビュー／波形を出す。再生中は触らない。
+    /// </summary>
+    private void PreviewIdleLibrarySession(DocumentSession? session)
+    {
+        if (session is null || IsPlaybackActive())
+        {
+            return;
+        }
+
+        PreviewLibrarySession(session);
+    }
+
+    /// <summary>
     /// 停止中に選択曲のジャケットと波形を出す。再生は始めない。
     /// </summary>
     private void PreviewLibrarySession(DocumentSession session)
@@ -1785,17 +1917,12 @@ public partial class MainWindow
             if (!IsPlaybackActive())
             {
                 // 映像の Open／表示を最優先。波形・タグ・ジャケットはその後。
-                if (CanShowPlaylistVideo(session.Document))
-                {
-                    LibraryBrowser.ShowPlaylistVisual(session, play: false);
-                }
-                else
-                {
-                    LibraryBrowser.HidePlaylistVisual();
-                }
-
+                // ホバー／選択プレビューはプロキシを待たず原ファイルでも開く（本再生で必要なら作る）。
+                // Shift+Enter 追加は SessionActivated を飛ばすので、呼び出し側がここで開く。
                 ActivateVisualLibraryMeta(session);
+                LibraryBrowser.ShowPlaylistVisual(session, play: false);
                 ApplyLoadedLibrarySession(session);
+                EnsureLibraryVisualPlayheadTicker();
                 _ = FillLibraryPeaksAsync(session);
                 ShowLibraryArtwork(session);
             }
@@ -2030,12 +2157,13 @@ public partial class MainWindow
         if (!document.IsStreamPlayback
             && document.Interleaved.Length == 0
             && document.Peaks.IsEmpty
-            && !AudioCodec.TryActivateStreamPlayback(document))
+            && !AudioCodec.TryActivateStreamPlayback(document)
+            && !LibraryPlaylistDocuments.IsVideo(document))
         {
             return null;
         }
 
-        return AudioStreamSource.Open(path, prebufferTimeoutMs: 200);
+        return AudioPlayer.OpenLibraryPlaybackSource(document, prebufferTimeoutMs: 200);
     }
 
     private bool AdoptLibraryGaplessAdvance()
@@ -2101,7 +2229,6 @@ public partial class MainWindow
             return false;
         }
 
-        PausePlaybackSoft();
         _ = PlayLibrarySessionAsync(next);
         return true;
     }
@@ -2116,7 +2243,6 @@ public partial class MainWindow
             return false;
         }
 
-        PausePlaybackSoft();
         _ = PlayLibrarySessionAsync(session);
         return true;
     }
@@ -2144,6 +2270,19 @@ public partial class MainWindow
     {
         _libraryStopAfterTrack = false;
         var session = _activeSession ?? LibraryBrowser.SelectedSession;
+        if (session is not null
+            && IsLibraryMaximized
+            && LibraryPlaylistDocuments.IsVideo(session.Document)
+            && LibraryBrowser.PlaylistVisualShown
+            && LibraryBrowser.PlaylistVisualIsVideo)
+        {
+            // 止め直すとクローム（プレイリスト）が一瞬見える。本再生のまま 0 へシークする。
+            session.Document.CursorFrame = 0;
+            Waveform.PlayheadFrame = 0;
+            StartPlayback(0, prerollSeconds: 0);
+            return;
+        }
+
         if (session is not null)
         {
             _ = PlayLibrarySessionAsync(session);
@@ -2250,6 +2389,7 @@ public partial class MainWindow
         _libraryStopAfterTrack = stopAfterTrack;
         if (session is null)
         {
+            ClearPlaylistVisualChromeBridge();
             if (!keepAmbientGlow)
             {
                 LibraryBrowser.SetArtwork(null);
@@ -2258,64 +2398,127 @@ public partial class MainWindow
             return;
         }
 
-        if (!keepAmbientGlow)
+        var bridgeChrome = LibraryPlayerMode.HoldsPlaylistVisualChromeBridge(
+            LibraryBrowser.PlaylistVisualPlaying,
+            LibraryPlaylistDocuments.IsVisual(session.Document));
+        if (bridgeChrome)
         {
-            ShowLibraryArtwork(session);
-        }
-        await EnsureLibrarySessionLoadedAsync(session).ConfigureAwait(true);
-        if (session.Document.IsDeferredLoad
-            || !ReferenceEquals(_libraryLoadSession, session))
-        {
-            return;
+            BeginPlaylistVisualChromeBridge();
         }
 
-        if (LibraryPlaylistDocuments.IsVideo(session.Document)
-            && !await TryPrepareVideoProxyAsync(session).ConfigureAwait(true))
+        try
         {
-            return;
-        }
-
-        if (!ReferenceEquals(_libraryLoadSession, session))
-        {
-            return;
-        }
-
-        if (IsLibraryMaximized)
-        {
-            LibraryBrowser.SelectSessionQuiet(session);
-        }
-
-        if (IsPlaybackActive())
-        {
-            StopPlayback();
-        }
-
-        ApplyLoadedLibrarySession(session);
-        if (LibraryPlaylistDocuments.IsVisual(session.Document))
-        {
-            StartLibraryVisualPlayback(session, stopAfterTrack);
             if (!keepAmbientGlow)
             {
                 ShowLibraryArtwork(session);
             }
 
+            await EnsureLibrarySessionLoadedAsync(session).ConfigureAwait(true);
+            if (!ReferenceEquals(_libraryLoadSession, session))
+            {
+                return;
+            }
+
+            if (session.Document.IsDeferredLoad
+                && !LibraryPlaylistDocuments.IsVisual(session.Document))
+            {
+                return;
+            }
+
+            if (LibraryPlaylistDocuments.IsVideo(session.Document))
+            {
+                ActivateVisualLibraryMeta(session);
+            }
+
+            if (!ReferenceEquals(_libraryLoadSession, session))
+            {
+                return;
+            }
+
+            if (IsLibraryMaximized)
+            {
+                LibraryBrowser.SelectSessionQuiet(session);
+            }
+
+            if (IsPlaybackActive())
+            {
+                // 次の本再生へつなぐときは暗いプレビューへ落とさない
+                //（プレイリストが一瞬見える／dim・格子が本再生に残る）。
+                if (bridgeChrome)
+                {
+                    PausePlaybackSoft(keepPlaylistVisual: true);
+                }
+                else
+                {
+                    StopPlayback();
+                }
+            }
+
+            ApplyLoadedLibrarySession(session);
+            if (LibraryPlaylistDocuments.IsVisual(session.Document))
+            {
+                if (LibraryPlaylistDocuments.IsVideo(session.Document)
+                    && !await TryPrepareVideoProxyAsync(session).ConfigureAwait(true))
+                {
+                    return;
+                }
+
+                if (!ReferenceEquals(_libraryLoadSession, session))
+                {
+                    return;
+                }
+
+                StartLibraryVisualPlayback(session, stopAfterTrack);
+                if (!keepAmbientGlow)
+                {
+                    ShowLibraryArtwork(session);
+                }
+
+                return;
+            }
+
+            SetPlaylistVideoFullscreen(false);
+            LibraryBrowser.HidePlaylistVisual();
+            StartPlayback(0, prerollSeconds: 0);
+            if (!keepAmbientGlow)
+            {
+                ShowLibraryArtwork(session);
+            }
+
+            // 再生とは別ハンドルでピーク走査する（停止待ちしない）。
+            // 次曲の先読みは、今の曲と次曲の走査が終わってから開く。
+            _ = FillLibraryPeaksAsync(session);
+            if (!stopAfterTrack)
+            {
+                ScheduleLibraryGaplessPrefetch();
+            }
+        }
+        finally
+        {
+            ClearPlaylistVisualChromeBridge();
+        }
+    }
+
+    private void BeginPlaylistVisualChromeBridge()
+    {
+        if (_playlistVisualChromeBridge)
+        {
             return;
         }
 
-        SetPlaylistVideoFullscreen(false);
-        LibraryBrowser.HidePlaylistVisual();
-        StartPlayback(0, prerollSeconds: 0);
-        if (!keepAmbientGlow)
+        _playlistVisualChromeBridge = true;
+        SyncPlaylistVideoChromeFade();
+    }
+
+    private void ClearPlaylistVisualChromeBridge()
+    {
+        if (!_playlistVisualChromeBridge)
         {
-            ShowLibraryArtwork(session);
+            return;
         }
-        // 再生とは別ハンドルでピーク走査する（停止待ちしない）。
-        // 次曲の先読みは、今の曲と次曲の走査が終わってから開く。
-        _ = FillLibraryPeaksAsync(session);
-        if (!stopAfterTrack)
-        {
-            ScheduleLibraryGaplessPrefetch();
-        }
+
+        _playlistVisualChromeBridge = false;
+        SyncPlaylistVideoChromeFade();
     }
 
     /// <summary>
@@ -2350,7 +2553,7 @@ public partial class MainWindow
             return;
         }
 
-        if (IsPlaybackActive())
+        if (!LibraryPlayerMode.StartsLibraryPlaybackOnEnter(IsPlaybackActive()))
         {
             HaltPlaybackToStart();
             _libraryStopAfterTrack = false;
@@ -2852,6 +3055,13 @@ public partial class MainWindow
             && M4aArtwork.TryRead(path, out var cover))
         {
             document.SetArtwork(cover);
+            return;
+        }
+
+        if (LibraryPlaylistDocuments.IsVideo(document)
+            && VideoArtwork.TryRead(path, out var frame))
+        {
+            document.SetArtwork(frame);
         }
     }
 
@@ -3048,14 +3258,14 @@ public partial class MainWindow
             }
 
             var first = !firstHandled;
-            var select = playFirst && first;
+            var select = ShouldSelectAppendedLibrarySession(playFirst, first, playlistWasEmpty: _sessions.Count == 0);
             loaded++;
             if (showProgress)
             {
                 SetOpenStatus(loaded, planned, Path.GetFileName(path) ?? path);
             }
 
-            if (!await TryAppendLibrarySessionAsync(path, generation, select, play: select)
+            if (!await TryAppendLibrarySessionAsync(path, generation, select, play: playFirst && first)
                     .ConfigureAwait(true))
             {
                 return false;
@@ -3201,6 +3411,10 @@ public partial class MainWindow
                             LibraryBrowser.SelectSessionQuiet(first);
                         }
                     }
+                    else if (!playFirst)
+                    {
+                        PreviewIdleLibrarySession(LibraryBrowser.SelectedSession);
+                    }
                 }
                 else
                 {
@@ -3236,6 +3450,15 @@ public partial class MainWindow
         DocumentSession? selected,
         DocumentSession first) =>
         selected is null || ReferenceEquals(selected, first);
+
+    /// <summary>
+    /// 追加した曲をリストで選ぶか。Enter 再生は先頭のみ。Shift+Enter は空リストへ足したときだけ 1 行目を選ぶ。
+    /// </summary>
+    internal static bool ShouldSelectAppendedLibrarySession(
+        bool playFirst,
+        bool firstInBatch,
+        bool playlistWasEmpty) =>
+        firstInBatch && (playFirst || playlistWasEmpty);
 
     /// <summary>
     /// 1 曲を裏でタグ読みしてリストへ追加。generation が変わったら false（途中キャンセル）。
@@ -3287,10 +3510,14 @@ public partial class MainWindow
         if (select)
         {
             _libraryHoldJacketWash = false;
-            LibraryBrowser.SetArtwork(session.Document);
             if (play)
             {
+                LibraryBrowser.SetArtwork(session.Document);
                 _ = PlayLibrarySessionAsync(session);
+            }
+            else
+            {
+                PreviewLibrarySession(session);
             }
         }
 
@@ -3447,9 +3674,18 @@ public partial class MainWindow
             return;
         }
 
-        if (document.IsStreamPlayback && document.FrameCount > 0 && !LibraryPlaylistDocuments.IsVideo(document))
+        if (document.IsStreamPlayback && document.FrameCount > 0 && document.SampleRate > 0
+            && !LibraryPlaylistDocuments.IsVideo(document))
         {
             return;
+        }
+
+        if (LibraryPlaylistDocuments.IsVideo(document)
+            && document.Tags.SampleRate <= 0
+            && AudioTagProbe.TryRead(path, out var fresh)
+            && fresh.SampleRate > 0)
+        {
+            document.ApplyTags(fresh);
         }
 
         if (LibraryPlaylistDocuments.IsVideo(document) && AudioCodec.TryActivateStreamPlayback(document))
@@ -3457,14 +3693,35 @@ public partial class MainWindow
             return;
         }
 
+        AudioTagProbe.Ensure(document);
+        var taggedSeconds = document.Tags.DurationSeconds;
+        var visualSeconds = LibraryBrowser.PlaylistVisualDuration.TotalSeconds;
         var seconds = LibraryPlaylistDocuments.IsPdf(document)
             ? LibraryPlaylistDocuments.PdfSecondsPerPage
-            : 1;
-        document.ActivateStreamPlayback(
-            48000,
-            2,
-            16,
-            Math.Max(1, (long)Math.Round(seconds * 48000)));
+            : taggedSeconds > 0
+                ? taggedSeconds
+                : Math.Max(1, visualSeconds);
+        var frames = Math.Max(1, (long)Math.Round(seconds * 48000));
+
+        // 音声が無くても MediaOpened／タグの映像尺は残す。ダミーのレートは列に出さない。
+        if (LibraryPlaylistDocuments.IsVideo(document)
+            && document.IsStreamPlayback
+            && document.FrameCount > 0
+            && document.SampleRate > 0)
+        {
+            if (frames > document.FrameCount)
+            {
+                document.SyncStreamPlaybackMeta(
+                    document.SampleRate,
+                    document.Channels,
+                    document.BitsPerSample,
+                    frames);
+            }
+
+            return;
+        }
+
+        document.ActivateStreamPlayback(48000, 2, 16, frames);
     }
 
     private void StartLibraryVisualPlayback(DocumentSession session, bool stopAfterTrack)
@@ -3483,11 +3740,18 @@ public partial class MainWindow
         }
 
         _libraryStopAfterTrack = stopAfterTrack;
+        var startFrame = LibraryPlayerMode.HoverResumeFrame(
+            LibraryBrowser.PlaylistVisualShown && LibraryBrowser.PlaylistVisualIsVideo,
+            LibraryBrowser.PlaylistVisualPlaying,
+            LibraryBrowser.IsPlaylistVisualSameSource(session.Document.SourcePath),
+            LibraryBrowser.PlaylistVisualPosition.TotalSeconds,
+            session.Document.SampleRate,
+            session.Document.FrameCount);
+        session.Document.CursorFrame = startFrame;
+        Waveform.PlayheadFrame = startFrame;
         LibraryBrowser.ShowPlaylistVisual(session, play: true);
-        _lastPlaybackStart = 0;
-        session.Document.CursorFrame = 0;
-        Waveform.PlayheadFrame = 0;
-        StartPlayback(0, prerollSeconds: 0);
+        _lastPlaybackStart = startFrame;
+        StartPlayback(startFrame, prerollSeconds: 0);
         _ = FillLibraryPeaksAsync(session);
     }
 
@@ -3510,7 +3774,7 @@ public partial class MainWindow
             return false;
         }
 
-        var needsEncode = !CanShowPlaylistVideo(session.Document);
+        var needsEncode = !CanShowPlaylistVideo(session.Document) && VideoProxy.CanEncodeProxy();
         if (needsEncode && IsUiBusy)
         {
             return false;
@@ -3539,6 +3803,14 @@ public partial class MainWindow
             }
 
             ActivateVisualLibraryMeta(session);
+            if (!session.Document.HasArtwork
+                && session.Document.SourcePath is { Length: > 0 } source
+                && VideoArtwork.TryRead(source, out var frame))
+            {
+                session.Document.SetArtwork(frame);
+                LibraryBrowser.UpdateSessionRow(session);
+            }
+
             return true;
         }
         catch (OperationCanceledException)
@@ -3600,7 +3872,38 @@ public partial class MainWindow
     }
 
     private void LibraryBrowser_PlaylistVisualEnded(object? sender, EventArgs e) =>
-        Dispatcher.BeginInvoke(() => OnPlaybackEnded(_playbackGeneration));
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (TryRestartPlaylistVisualLoop())
+            {
+                return;
+            }
+
+            if (_player.IsPlaying)
+            {
+                return;
+            }
+
+            OnPlaybackEnded(_playbackGeneration);
+        });
+
+    private bool TryRestartPlaylistVisualLoop()
+    {
+        if (_document is null
+            || _document.Selection.IsEmpty
+            || !IsLibraryMaximized
+            || !LibraryBrowser.PlaylistVisualPlaying
+            || !LibraryBrowser.PlaylistVisualIsVideo)
+        {
+            return false;
+        }
+
+        LibraryBrowser.SeekPlaylistVisual(
+            TimeSpan.FromSeconds(
+                _document.Selection.StartFrame / (double)Math.Max(1, _document.SampleRate)));
+        EnsureLibraryVisualPlaybackClock();
+        return true;
+    }
 
     private void LibraryBrowser_PlaylistVisualOpened(object? sender, TimeSpan duration)
     {
@@ -3618,11 +3921,24 @@ public partial class MainWindow
             _document.Channels,
             _document.BitsPerSample,
             frames);
+        // PDF はページ秒を時間列に載せない。動画だけタグ尺を覚える。
+        if (!LibraryPlaylistDocuments.IsPdf(_document)
+            && (_document.Tags.DurationSeconds <= 0
+                || Math.Abs(_document.Tags.DurationSeconds - duration.TotalSeconds) > 0.05))
+        {
+            _document.ApplyTags(_document.Tags.WithDurationSeconds(duration.TotalSeconds));
+        }
+        if (IsPlaybackActive())
+        {
+            _player.SyncSilenceLength(frames);
+        }
         if (_activeSession is not null)
         {
             LibraryBrowser.UpdateSessionRow(_activeSession);
         }
 
+        Waveform.ResetTimeZoom();
+        ScheduleLibraryWaveformPaint();
         RefreshStatus();
     }
 }

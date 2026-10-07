@@ -1116,15 +1116,22 @@ public partial class MainWindow
         _resumeAfterScrub = false;
     }
 
-    private void PausePlaybackSoft()
+    /// <param name="keepPlaylistVisual">
+    /// true なら映像／PDF の本再生表示はそのまま（暗いプレビューへ落とさない）。
+    /// 上下キーで次の本再生へつなぐとき用。
+    /// </param>
+    private void PausePlaybackSoft(bool keepPlaylistVisual = false)
     {
         StopPlaybackShuttle();
         ReleaseStuckScrub();
         _player.Pause();
         if (IsLibraryMaximized)
         {
-            LibraryBrowser.SetPlaylistVisualPlaying(false);
-            EnsurePlaylistVideoWindowRestored();
+            if (!keepPlaylistVisual)
+            {
+                LibraryBrowser.SetPlaylistVisualPlaying(false);
+                EnsurePlaylistVideoWindowRestored();
+            }
         }
         else
         {

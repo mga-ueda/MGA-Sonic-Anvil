@@ -257,4 +257,30 @@ public sealed class LibraryDeferredLoadTests
         Assert.False(session.Document.IsDeferredLoad);
         Assert.Equal(48, session.Document.FrameCount);
     }
+
+    [Fact]
+    public void CreateRow_Pdf_HidesDummyAudioFormatAfterActivate()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pdf");
+        File.WriteAllBytes(path, "%PDF-1.4"u8.ToArray());
+        try
+        {
+            var document = AudioDocument.CreateDeferred(path);
+            document.ApplyTags(new AudioFileTags { Probed = true });
+            document.ActivateStreamPlayback(48000, 2, 16, 240000);
+            document.ApplyTags(document.Tags.WithDurationSeconds(25));
+            var row = LibraryBrowserView.CreateRow(new DocumentSession(document));
+            Assert.Equal("PDF", row.Kind);
+            Assert.Equal(0, row.DurationSeconds);
+            Assert.Equal(string.Empty, row.DurationText);
+            Assert.Equal(string.Empty, row.SampleRateText);
+            Assert.Equal(string.Empty, row.BitDepthText);
+            Assert.Equal(string.Empty, row.ChannelsText);
+            Assert.Equal(string.Empty, row.BitRateText);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
 }

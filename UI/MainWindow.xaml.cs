@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private long _lastPlaybackVisualStamp;
     private bool _analyzerTickQueued;
     private readonly DispatcherTimer _playTimer;
+    private readonly DispatcherTimer _visualPlayheadTimer;
     private readonly DispatcherTimer _markerDigitTimer;
     private readonly DispatcherTimer _markerNudgeTimer;
     private readonly DispatcherTimer _placeRepeatTimer;
@@ -288,6 +289,11 @@ public partial class MainWindow : Window
             Interval = TimeSpan.FromMilliseconds(16),
         };
         _playTimer.Tick += (_, _) => OnPlayTick();
+        _visualPlayheadTimer = new DispatcherTimer(DispatcherPriority.Input)
+        {
+            Interval = TimeSpan.FromMilliseconds(16),
+        };
+        _visualPlayheadTimer.Tick += (_, _) => OnVisualPlayheadTick();
         _markerDigitTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(750) };
         _markerDigitTimer.Tick += (_, _) => ResetMarkerDigitEntry();
         _markerNudgeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimelineNudgeRepeatDelayMs) };
@@ -323,6 +329,7 @@ public partial class MainWindow : Window
         {
             StopMeterRendering();
             _playTimer.Stop();
+            _visualPlayheadTimer.Stop();
             _recordTimer.Stop();
             _recorder.Dispose();
             _waapiPollTimer.Stop();
@@ -567,6 +574,12 @@ public partial class MainWindow : Window
 
         _player.Stop();
         _playTimer.Stop();
+        if (!LibraryPlayerMode.PreservesVisualPlayheadOnBind(IsLibraryMaximized))
+        {
+            _visualPlayheadTimer.Stop();
+            StopMeterRendering();
+        }
+
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
@@ -579,7 +592,6 @@ public partial class MainWindow : Window
         StopPlaybackShuttle();
         StopSeekNudge();
         ResetMarkerDigitEntry();
-        StopMeterRendering();
         Waveform.UnlockCenter();
         ClearSeekTrails();
     }
@@ -985,6 +997,7 @@ public partial class MainWindow : Window
         VectorScope.StopTicks();
         Spectrum.StopTicks();
         _playTimer.Stop();
+        _visualPlayheadTimer.Stop();
         StopMarkerNudge();
         StopSpectrogramBoostNudge();
         StopPlaybackShuttle();
@@ -1232,7 +1245,7 @@ public partial class MainWindow : Window
         var enabled = SilentSkipCheck.IsChecked == true
             && !LibraryPlayerMode.IgnoresSilentSkipForVideo(
                 IsLibraryMaximized,
-                LibraryBrowser.PlaylistVisualPlaying && LibraryBrowser.PlaylistVisualIsVideo);
+                LibraryBrowser.PlaylistVisualIsVideo);
         var thresholdDb = AppStorage.Settings.ResolvedSilentSkipThresholdDb();
         _player.SetSilentSkip(enabled, thresholdDb);
         _recorder.SetSilentSkip(

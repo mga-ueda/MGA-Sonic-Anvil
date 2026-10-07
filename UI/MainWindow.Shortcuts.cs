@@ -400,6 +400,13 @@ public partial class MainWindow
         }
 
         if (IsLibraryMaximized
+            && LibraryPlayerMode.IsVideoTimecodeToggle(key, modifiers)
+            && TryTogglePlaylistVideoTimecode())
+        {
+            return true;
+        }
+
+        if (IsLibraryMaximized
             && !isRepeat
             && LibraryPlayerMode.IsPdfBackgroundPinToggle(key, modifiers)
             && TryTogglePdfBackgroundPin())
@@ -581,7 +588,9 @@ public partial class MainWindow
             if (key == Key.Enter
                 && modifiers == ModifierKeys.None)
             {
-                _ = PlayLibrarySessionAsync(LibraryBrowser.SelectedSession ?? _activeSession);
+                // 再生中は止める（動画は暗いプレビューへ）。停止中だけ先頭から連続再生。
+                // 常に Play すると本再生中に抜けられず即再生し直してしまう。
+                ToggleLibraryTransportPlayback();
                 return true;
             }
 
@@ -759,6 +768,13 @@ public partial class MainWindow
         {
             if (IsLibraryMaximized)
             {
+                if (!LibraryPlayerMode.PlaysLibrarySelectionOnSpace(
+                        IsLibraryExplorerFocused,
+                        IsLibraryFavoritesFocused))
+                {
+                    return true;
+                }
+
                 PlayLibrarySelectionOnceOrToggle();
                 return true;
             }
