@@ -141,27 +141,7 @@
                           Style="{StaticResource DarkCheckBoxStyle}"
                           Content="{x:Static domain:UiStrings.LabelLibraryShowPlaylistMp4}"
                           MinHeight="22"
-                          HorizontalAlignment="Left"
-                          Margin="0,0,0,8" />
-                <Grid>
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                  </Grid.ColumnDefinitions>
-                  <TextBlock x:Name="VideoProxyRetentionHeader"
-                             Text="{x:Static domain:UiStrings.LabelVideoProxyRetention}"
-                             FontWeight="Bold"
-                             FontSize="11.333"
-                             VerticalAlignment="Center"
-                             Margin="0,0,8,0"
-                             TextWrapping="Wrap" />
-                  <ComboBox x:Name="VideoProxyRetentionCombo"
-                            Grid.Column="1"
-                            Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                            HorizontalAlignment="Left"
-                            MinWidth="72"
-                            VerticalAlignment="Center" />
-                </Grid>
+                          HorizontalAlignment="Left" />
               </StackPanel>
 
               <TextBlock x:Name="LibraryColumnsHeader"
@@ -646,29 +626,11 @@
         <TabItem Header="{x:Static domain:UiStrings.LabelSettingsTabExport}">
           <StackPanel MaxWidth="{x:Static ui:DesignMetrics.SettingsPanelWidth}"
                       HorizontalAlignment="Left">
-            <TextBlock x:Name="Mp3Header"
-                       Text="{x:Static domain:UiStrings.LabelMp3Encode}"
+            <TextBlock x:Name="ExportAudioHeader"
+                       Text="{x:Static domain:UiStrings.LabelSettingsExportAudio}"
                        FontWeight="Bold"
                        FontSize="11.333"
                        Margin="0,0,0,6" />
-
-            <Grid HorizontalAlignment="Left" Margin="0,0,0,12">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <TextBlock x:Name="WindowsBitRateLabel"
-                         Text="{x:Static domain:UiStrings.LabelWindowsMp3BitRate}"
-                         VerticalAlignment="Center"
-                         Margin="0,0,8,0" />
-              <ComboBox x:Name="WindowsBitRateCombo"
-                        Grid.Column="1"
-                        HorizontalAlignment="Left"
-                        Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                        Padding="6,1"
-                        FontSize="11.333"
-                        VerticalContentAlignment="Center" />
-            </Grid>
 
             <TextBlock x:Name="LamePathLabel"
                        Text="{x:Static domain:UiStrings.LabelLamePath}"
@@ -702,9 +664,27 @@
                      Padding="6,1"
                      FontSize="11.333"
                      VerticalContentAlignment="Center"
-                     Margin="0,0,0,16" />
+                     Margin="0,0,0,12" />
 
-            <Grid HorizontalAlignment="Left">
+            <Grid HorizontalAlignment="Left" Margin="0,0,0,12">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock x:Name="WindowsBitRateLabel"
+                         Text="{x:Static domain:UiStrings.LabelWindowsMp3BitRate}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,8,0" />
+              <ComboBox x:Name="WindowsBitRateCombo"
+                        Grid.Column="1"
+                        HorizontalAlignment="Left"
+                        Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                        Padding="6,1"
+                        FontSize="11.333"
+                        VerticalContentAlignment="Center" />
+            </Grid>
+
+            <Grid HorizontalAlignment="Left" Margin="0,0,0,20">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
@@ -721,6 +701,76 @@
                         FontSize="11.333"
                         VerticalContentAlignment="Center"
                         SelectionChanged="ExportParallelCombo_SelectionChanged" />
+            </Grid>
+
+            <TextBlock x:Name="ExportMovieHeader"
+                       Text="{x:Static domain:UiStrings.LabelSettingsExportMovie}"
+                       FontWeight="Bold"
+                       FontSize="11.333"
+                       Margin="0,0,0,6" />
+
+            <TextBlock x:Name="FfmpegPathLabel"
+                       Text="{x:Static domain:UiStrings.LabelFfmpegPath}"
+                       Margin="0,0,0,3" />
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="FfmpegPathBox"
+                       Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                       Style="{StaticResource DarkTextBoxStyle}"
+                       Padding="6,1"
+                       FontSize="11.333"
+                       VerticalContentAlignment="Center" />
+              <ui:RoundedButton x:Name="FfmpegBrowseButton"
+                                Grid.Column="1"
+                                Content="{x:Static domain:UiStrings.ButtonBrowse}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="64"
+                                Margin="8,0,0,0"
+                                Click="FfmpegBrowseButton_Click" />
+            </Grid>
+
+            <CheckBox x:Name="VideoProxyDisableAutoEncodeBox"
+                      Style="{StaticResource DarkCheckBoxStyle}"
+                      Content="{x:Static domain:UiStrings.LabelVideoProxyDisableAutoEncode}"
+                      HorizontalAlignment="Left"
+                      Margin="0,0,0,12" />
+
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <TextBlock x:Name="VideoProxyRetentionHeader"
+                         Text="{x:Static domain:UiStrings.LabelVideoProxyRetention}"
+                         FontSize="11.333"
+                         VerticalAlignment="Center"
+                         Margin="0,0,8,0"
+                         TextWrapping="Wrap" />
+              <ComboBox x:Name="VideoProxyRetentionCombo"
+                        Grid.Column="1"
+                        Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                        HorizontalAlignment="Left"
+                        MinWidth="72"
+                        VerticalAlignment="Center" />
+            </Grid>
+            <Grid HorizontalAlignment="Left" Margin="0,8,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock x:Name="VideoProxyUsageText"
+                         FontSize="11.333"
+                         VerticalAlignment="Center"
+                         Margin="0,0,8,0" />
+              <ui:RoundedButton x:Name="VideoProxyClearAllButton"
+                                Grid.Column="1"
+                                Content="{x:Static domain:UiStrings.ButtonVideoProxyClearAll}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="96"
+                                Click="VideoProxyClearAllButton_Click" />
             </Grid>
           </StackPanel>
         </TabItem>

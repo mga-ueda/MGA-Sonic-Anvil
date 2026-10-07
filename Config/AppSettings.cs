@@ -103,6 +103,12 @@ internal sealed class AppSettings
     /// <summary>プレイリストに MP4 を載せる。既定オン。プレイヤー専用。</summary>
     public bool LibraryShowPlaylistMp4 { get; set; } = true;
 
+    /// <summary>ユーザー用意の ffmpeg.exe。空または無効ならプロキシは作らない。</summary>
+    public string FfmpegExePath { get; set; } = string.Empty;
+
+    /// <summary>オンなら本再生でもプロキシを自動生成しない。既定オフ。</summary>
+    public bool VideoProxyDisableAutoEncode { get; set; }
+
     /// <summary>動画プロキシを残す日数。1 / 7 / 14 / 30。既定 7。</summary>
     public int VideoProxyRetentionDays { get; set; } = VideoProxy.DefaultRetentionDays;
 

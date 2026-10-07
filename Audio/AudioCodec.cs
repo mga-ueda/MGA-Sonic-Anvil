@@ -366,6 +366,13 @@ internal static class AudioCodec
                 return OpenReader(proxy);
             }
 
+            // ipcm など MediaFoundation が拾えない音声。映像プロキシは作らず WAV だけ抜く。
+            if (LibraryPlaylistDocuments.IsVideo(path)
+                && VideoProxy.TryEnsureDecodedAudio(path, out var wav))
+            {
+                return OpenReader(wav);
+            }
+
             throw;
         }
     }
@@ -450,9 +457,13 @@ internal static class AudioCodec
         if (TryProbeStreamFormat(path, out var rate, out var channels, out var bits, out var frames)
             || (LibraryPlaylistDocuments.IsVideo(path)
                 && VideoProxy.TryGetCached(path, out var proxy)
-                && TryProbeStreamFormat(proxy, out rate, out channels, out bits, out frames)))
+                && TryProbeStreamFormat(proxy, out rate, out channels, out bits, out frames))
+            || (LibraryPlaylistDocuments.IsVideo(path)
+                && VideoProxy.TryGetCachedAudio(path, out var wav)
+                && TryProbeStreamFormat(wav, out rate, out channels, out bits, out frames)))
         {
             document.ActivateStreamPlayback(rate, channels, bits, frames);
+            RememberVideoAudioTags(document, rate, channels, bits, frames);
             return true;
         }
 
@@ -474,6 +485,22 @@ internal static class AudioCodec
         }
 
         return false;
+    }
+
+    private static void RememberVideoAudioTags(
+        AudioDocument document,
+        int sampleRate,
+        int channels,
+        int bits,
+        long frames)
+    {
+        if (!LibraryPlaylistDocuments.IsVideo(document))
+        {
+            return;
+        }
+
+        var duration = sampleRate > 0 ? frames / (double)sampleRate : 0;
+        document.ApplyTags(document.Tags.WithAudioFormat(sampleRate, channels, bits, duration));
     }
 
     internal static ISampleProvider AsSampleProvider(WaveStream stream) =>

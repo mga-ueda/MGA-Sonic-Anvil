@@ -234,6 +234,16 @@ internal static class DesignMetrics
         + PlaylistVideoTimecodeLineHeight
         + PlaylistVideoTimecodePadding.Bottom;
 
+    /// <summary>動画本再生中、左下に出すファイル名。</summary>
+    public static double PlaylistVideoFileNameFontSize => From96(18);
+
+    public static double PlaylistVideoFileNameLineHeight => From96(24);
+
+    public static Thickness PlaylistVideoFileNameMargin => new(From96(24), 0, From96(24), From96(24));
+
+    /// <summary>中央タイムコードと被らないよう、左寄りの最大幅。</summary>
+    public static double PlaylistVideoFileNameMaxWidth => From96(420);
+
     public static double StatusTimecodePadX => From96(4);
 
     public static Thickness StatusTimecodePadding => new(StatusTimecodePadX, 0, StatusTimecodePadX, 0);
@@ -254,8 +264,14 @@ internal static class DesignMetrics
     /// <summary>F10 プレイヤーのジャケット枠。以前のリスト高さ追従の約 1/4 の 1.2 倍。</summary>
     public static double LibraryJacketSize => From96(96) * 1.2;
 
-    /// <summary>F10 グループ見出し左のジャケット。</summary>
+    /// <summary>F10 グループ見出し左のジャケット（音楽は正方形）。</summary>
     public static double LibraryGroupJacketSize => From96(96);
+
+    /// <summary>動画／PDF 行サムネイルの幅。グループ左の正方形と同じ。</summary>
+    public static double LibraryVisualJacketWidth => LibraryGroupJacketSize;
+
+    /// <summary>動画／PDF は 16:9 を想定した高さ。正方形にしない。</summary>
+    public static double LibraryVisualJacketHeight => LibraryVisualJacketWidth * 9d / 16d;
 
     /// <summary>F10 リスト列の自動幅上限。フォルダパスが極端に長くてもレイアウトを壊さない。</summary>
     public static double LibraryColumnMaxWidth => From96(420);
@@ -354,7 +370,7 @@ internal static class DesignMetrics
 
     public static double AudioInputHeight => Dip(30);
 
-    /// <summary>1 列タブ（一般／編集／書き出し／Wwise）の本文幅。</summary>
+    /// <summary>1 列タブ（一般／編集／書き出し・パス／Wwise）の本文幅。</summary>
     public static double SettingsPanelWidth => From96(560);
 
     /// <summary>設定ウィンドウの下限幅（タブ見出しが切れない程度）。</summary>

@@ -80,6 +80,10 @@ internal partial class AudioSettingsWindow : Window
 
     public int SelectedVideoProxyRetentionDays { get; private set; } = VideoProxy.DefaultRetentionDays;
 
+    public string SelectedFfmpegExePath { get; private set; } = string.Empty;
+
+    public bool SelectedVideoProxyDisableAutoEncode { get; private set; }
+
     public bool SelectedAutoSpeakerSelect { get; private set; }
 
     public string SelectedActiveSpeakerId { get; private set; } = string.Empty;
@@ -146,7 +150,9 @@ internal partial class AudioSettingsWindow : Window
         bool libraryShowPlaylistPdf = true,
         bool libraryShowPlaylistMov = true,
         bool libraryShowPlaylistMp4 = true,
-        int videoProxyRetentionDays = VideoProxy.DefaultRetentionDays)
+        int videoProxyRetentionDays = VideoProxy.DefaultRetentionDays,
+        string? ffmpegExePath = null,
+        bool videoProxyDisableAutoEncode = false)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
@@ -185,6 +191,8 @@ internal partial class AudioSettingsWindow : Window
         SelectedLibraryShowPlaylistMov = libraryShowPlaylistMov;
         SelectedLibraryShowPlaylistMp4 = libraryShowPlaylistMp4;
         SelectedVideoProxyRetentionDays = VideoProxy.ClampRetentionDays(videoProxyRetentionDays);
+        SelectedFfmpegExePath = ffmpegExePath ?? string.Empty;
+        SelectedVideoProxyDisableAutoEncode = videoProxyDisableAutoEncode;
         SelectedAutoSpeakerSelect = autoSpeakerSelect;
         SelectedActiveSpeakerId = string.IsNullOrWhiteSpace(activeSpeakerId)
             ? _presets[0].Id
@@ -235,6 +243,8 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyAccent(OkButton);
         ActionButtonLooks.ApplyClear(CancelButton);
         ActionButtonLooks.ApplyClear(LameBrowseButton);
+        ActionButtonLooks.ApplyClear(FfmpegBrowseButton);
+        ActionButtonLooks.ApplyClear(VideoProxyClearAllButton);
         ActionButtonLooks.ApplyClear(LibraryColumnsWaveResetButton);
         ActionButtonLooks.ApplyClear(LibraryColumnsMp3ResetButton);
         ApplyLibraryExplorerRootButtons();
@@ -242,6 +252,8 @@ internal partial class AudioSettingsWindow : Window
         AppDialogKeys.PrepareActionButton(OkButton, isDefault: true);
         AppDialogKeys.PrepareActionButton(CancelButton, isCancel: true);
         AppDialogKeys.PrepareActionButton(LameBrowseButton);
+        AppDialogKeys.PrepareActionButton(FfmpegBrowseButton);
+        AppDialogKeys.PrepareActionButton(VideoProxyClearAllButton);
         AppDialogKeys.PrepareActionButton(LibraryColumnsWaveResetButton);
         AppDialogKeys.PrepareActionButton(LibraryColumnsMp3ResetButton);
         AppDialogKeys.PrepareActionButton(LibraryExplorerRootAddButton);
@@ -294,6 +306,9 @@ internal partial class AudioSettingsWindow : Window
         FillLibraryColumns();
         FillLibraryPlaylistWaveformOptions();
         FillVideoProxyRetention();
+        RefreshVideoProxyUsage();
+        FfmpegPathBox.Text = SelectedFfmpegExePath;
+        VideoProxyDisableAutoEncodeBox.IsChecked = SelectedVideoProxyDisableAutoEncode;
         FillDefaultAudioFormat();
         ApplyTips();
         ReflowSettingsWindow();
@@ -378,7 +393,7 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(WwiseLookAheadTimeBox, UiStrings.TipWwiseLookAheadTime);
         TipService.Set(WwiseLookAheadTimeUnit, UiStrings.TipWwiseLookAheadTime);
         TipService.Set(FadeDefaultsHeader, UiStrings.TipFadeCurveDefaults);
-        TipService.Set(Mp3Header, UiStrings.TipMp3Encode);
+        TipService.Set(ExportAudioHeader, UiStrings.TipMp3Encode);
         TipService.Set(WindowsBitRateLabel, UiStrings.TipWindowsMp3BitRate);
         TipService.Set(WindowsBitRateCombo, UiStrings.TipWindowsMp3BitRate);
         TipService.Set(LamePathLabel, UiStrings.TipLamePath);
@@ -393,8 +408,15 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(LibraryShowPlaylistPdfBox, UiStrings.TipLibraryPlaylistDocuments);
         TipService.Set(LibraryShowPlaylistMovBox, UiStrings.TipLibraryPlaylistDocuments);
         TipService.Set(LibraryShowPlaylistMp4Box, UiStrings.TipLibraryPlaylistDocuments);
+        TipService.Set(ExportMovieHeader, UiStrings.TipFfmpegPath);
+        TipService.Set(FfmpegPathLabel, UiStrings.TipFfmpegPath);
+        TipService.Set(FfmpegPathBox, UiStrings.TipFfmpegPath);
+        TipService.Set(FfmpegBrowseButton, UiStrings.TipFfmpegBrowse);
+        TipService.Set(VideoProxyDisableAutoEncodeBox, UiStrings.TipVideoProxyDisableAutoEncode);
         TipService.Set(VideoProxyRetentionHeader, UiStrings.TipVideoProxyRetention);
         TipService.Set(VideoProxyRetentionCombo, UiStrings.TipVideoProxyRetention);
+        TipService.Set(VideoProxyUsageText, UiStrings.TipVideoProxyUsage);
+        TipService.Set(VideoProxyClearAllButton, UiStrings.TipVideoProxyClearAll);
         TipService.Set(OkButton, UiStrings.TipSettingsOk);
         TipService.Set(CancelButton, UiStrings.TipSettingsCancel);
     }
@@ -621,6 +643,9 @@ internal partial class AudioSettingsWindow : Window
         VideoProxyRetentionCombo.SelectedItem is VideoProxyRetentionItem item
             ? VideoProxy.ClampRetentionDays(item.Days)
             : VideoProxy.DefaultRetentionDays;
+
+    private void RefreshVideoProxyUsage() =>
+        VideoProxyUsageText.Text = UiStrings.LabelVideoProxyUsage(VideoProxy.GetUsageBytes());
 
     private static void SelectLibraryPlaylistWaveformSize(
         ComboBox combo,
@@ -1126,6 +1151,8 @@ internal partial class AudioSettingsWindow : Window
         SelectedLibraryShowPlaylistMov = LibraryShowPlaylistMovBox.IsChecked != false;
         SelectedLibraryShowPlaylistMp4 = LibraryShowPlaylistMp4Box.IsChecked != false;
         SelectedVideoProxyRetentionDays = ReadVideoProxyRetentionDays();
+        SelectedFfmpegExePath = FfmpegPathBox.Text.Trim();
+        SelectedVideoProxyDisableAutoEncode = VideoProxyDisableAutoEncodeBox.IsChecked == true;
         SelectedAutoSpeakerSelect = AutoSpeakerSelectBox.IsChecked == true;
         SelectedActiveSpeakerId = CurrentSpeaker()?.Id ?? _presets[0].Id;
         SelectedRecordDeviceId = ReadRecordDeviceId();
@@ -1160,6 +1187,51 @@ internal partial class AudioSettingsWindow : Window
         {
             LamePathBox.Text = dialog.FileName;
         }
+    }
+
+    private void FfmpegBrowseButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = UiStrings.FilterFfmpegExe,
+            Title = UiStrings.LabelFfmpegPath,
+            CheckFileExists = true,
+        };
+        var current = FfmpegPathBox.Text.Trim().Trim('"');
+        var dir = Path.GetDirectoryName(current);
+        if (!string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir))
+        {
+            dialog.InitialDirectory = dir;
+        }
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            FfmpegPathBox.Text = dialog.FileName;
+        }
+    }
+
+    private void VideoProxyClearAllButton_Click(object sender, RoutedEventArgs e)
+    {
+        var answer = OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.ConfirmVideoProxyClearAll,
+            UiStrings.DialogSettingsTitle,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var removed = VideoProxy.ClearAll();
+        RefreshVideoProxyUsage();
+        OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.InfoVideoProxyCleared(removed),
+            UiStrings.DialogSettingsTitle,
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     private void FillDefaultAudioFormat()
@@ -1882,11 +1954,7 @@ internal partial class AudioSettingsWindow : Window
             MeasureLibraryColumnChecksWidth()) + gutter;
         var playlistDocs = Max(
             LabelWidth(LibraryPlaylistDocumentsHeader) + gutter,
-            MeasureCheckBoxContentWidth(LibraryShowPlaylistPdfBox) + gutter,
-            LabelWidth(VideoProxyRetentionHeader) + 8 + (
-                VideoProxyRetentionCombo.Width > 1
-                    ? VideoProxyRetentionCombo.Width
-                    : DesignMetrics.From96(72)) + gutter);
+            MeasureCheckBoxContentWidth(LibraryShowPlaylistPdfBox) + gutter);
         var playlist = Max(
             LabelWidth(LibraryColumnsHeader) + gutter,
             playlistDocs,
@@ -2212,6 +2280,8 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyAccent(OkButton);
         ActionButtonLooks.ApplyClear(CancelButton);
         ActionButtonLooks.ApplyClear(LameBrowseButton);
+        ActionButtonLooks.ApplyClear(FfmpegBrowseButton);
+        ActionButtonLooks.ApplyClear(VideoProxyClearAllButton);
         ActionButtonLooks.ApplyClear(LibraryColumnsWaveResetButton);
         ActionButtonLooks.ApplyClear(LibraryColumnsMp3ResetButton);
         ApplyLibraryExplorerRootButtons();

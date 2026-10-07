@@ -35,6 +35,65 @@ public sealed class VideoProxyRetentionTests
             """{"SettingsGeneration":1}""",
             AppSettingsJsonContext.Default.AppSettings);
         Assert.Equal(7, missing!.ResolvedVideoProxyRetentionDays());
+        Assert.Equal(string.Empty, missing.FfmpegExePath);
+        Assert.False(missing.VideoProxyDisableAutoEncode);
+        Assert.False(new AppSettings().VideoProxyDisableAutoEncode);
+        Assert.False(AppSettings.CreateDefault().VideoProxyDisableAutoEncode);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\"\"")]
+    public void TryResolveFfmpegExe_Empty_IsMissing(string? path)
+    {
+        Assert.False(VideoProxy.TryResolveFfmpegExe(path, out var exe));
+        Assert.Equal(string.Empty, exe);
+    }
+
+    [Fact]
+    public void TryResolveFfmpegExe_MissingFile_IsMissing()
+    {
+        var missing = Path.Combine(Path.GetTempPath(), $"missing-ffmpeg-{Guid.NewGuid():N}.exe");
+        Assert.False(VideoProxy.TryResolveFfmpegExe(missing, out _));
+    }
+
+    [Fact]
+    public void TryResolveFfmpegExe_ExistingFile_UsesPath()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            Assert.True(VideoProxy.TryResolveFfmpegExe(path, out var exe));
+            Assert.Equal(Path.GetFullPath(path), exe);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Settings_RoundTripFfmpegExePath()
+    {
+        var json = JsonSerializer.Serialize(
+            new AppSettings { FfmpegExePath = @"C:\tools\ffmpeg.exe" },
+            AppSettingsJsonContext.Default.AppSettings);
+        var back = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
+        Assert.Equal(@"C:\tools\ffmpeg.exe", back!.FfmpegExePath);
+        Assert.Equal(string.Empty, AppSettings.CreateDefault().FfmpegExePath);
+    }
+
+    [Fact]
+    public void Settings_RoundTripVideoProxyDisableAutoEncode()
+    {
+        var json = JsonSerializer.Serialize(
+            new AppSettings { VideoProxyDisableAutoEncode = true },
+            AppSettingsJsonContext.Default.AppSettings);
+        var back = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
+        Assert.True(back!.VideoProxyDisableAutoEncode);
+        Assert.False(AppSettings.CreateDefault().VideoProxyDisableAutoEncode);
     }
 
     [Fact]
@@ -76,6 +135,55 @@ public sealed class VideoProxyRetentionTests
     }
 
     [Fact]
+    public void ClearAll_RemovesEveryProxyAndPart()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "mga-proxy-clear-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var keepAge = Path.Combine(dir, "fresh.avi");
+            var old = Path.Combine(dir, "old.avi");
+            var part = Path.Combine(dir, "job.avi.part");
+            File.WriteAllText(keepAge, "k");
+            File.WriteAllText(old, "o");
+            File.WriteAllText(part, "p");
+            File.SetLastWriteTimeUtc(keepAge, DateTime.UtcNow);
+            File.SetLastWriteTimeUtc(old, DateTime.UtcNow.AddDays(-30));
+
+            Assert.Equal(3, VideoProxy.ClearAll(dir));
+            Assert.False(File.Exists(keepAge));
+            Assert.False(File.Exists(old));
+            Assert.False(File.Exists(part));
+            Assert.Equal(0, VideoProxy.ClearAll(dir));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void GetUsageBytes_SumsProxyAndPartFiles()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "mga-proxy-usage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            Assert.Equal(0, VideoProxy.GetUsageBytes(dir));
+            Assert.Equal(0, VideoProxy.GetUsageBytes(Path.Combine(dir, "missing")));
+
+            File.WriteAllBytes(Path.Combine(dir, "a.avi"), new byte[100]);
+            File.WriteAllBytes(Path.Combine(dir, "b.wav"), new byte[250]);
+            File.WriteAllBytes(Path.Combine(dir, "c.avi.part"), new byte[50]);
+            Assert.Equal(400, VideoProxy.GetUsageBytes(dir));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void FfmpegArgs_ForceAviMjpegForPartFile()
     {
         var args = VideoProxy.BuildFfmpegArguments(@"C:\clip.mov", @"C:\cache\ab.avi.part");
@@ -95,6 +203,30 @@ public sealed class VideoProxyRetentionTests
         Assert.Contains("mjpeg", args);
         Assert.DoesNotContain("fps=30", args);
         Assert.Contains("pcm_s16le", args);
+    }
+
+    [Fact]
+    public void FfmpegArgs_StillExtractIsSingleJpegFrame()
+    {
+        var args = VideoProxy.BuildStillExtractArguments(@"C:\clip.mov", @"C:\tmp\frame.jpg", 256);
+        Assert.Contains("-frames:v", args);
+        Assert.Contains("1", args);
+        Assert.Contains("scale=256:-1", args);
+        Assert.Contains("image2", args);
+        Assert.DoesNotContain("mjpeg", args);
+        Assert.Equal(@"C:\tmp\frame.jpg", args[^1]);
+    }
+
+    [Fact]
+    public void FfmpegArgs_AudioExtractIsWavWithoutVideo()
+    {
+        var args = VideoProxy.BuildAudioExtractArguments(@"C:\clip.mp4", @"C:\cache\ab.wav");
+        Assert.Contains("-vn", args);
+        Assert.Contains("0:a:0", args);
+        Assert.Contains("pcm_s16le", args);
+        Assert.Contains("wav", args);
+        Assert.DoesNotContain("mjpeg", args);
+        Assert.Equal(@"C:\cache\ab.wav", args[^1]);
     }
 
     [Fact]

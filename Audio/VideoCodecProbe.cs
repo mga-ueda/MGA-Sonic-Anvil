@@ -40,9 +40,30 @@ internal static class VideoCodecProbe
             || tag.Equals("dmb1", StringComparison.OrdinalIgnoreCase);
     }
 
-    public static bool TryReadVideoFourCcs(string path, out IReadOnlyList<string> fourccs)
+    public static bool TryReadVideoFourCcs(string path, out IReadOnlyList<string> fourccs) =>
+        TryRead(path, out fourccs, out _);
+
+    /// <summary>映像 fourcc と、音声の有無に依らないコンテナ尺（mvhd／mdhd）。</summary>
+    public static bool TryRead(string path, out IReadOnlyList<string> fourccs, out double durationSeconds) =>
+        TryRead(path, out fourccs, out durationSeconds, out _, out _, out _);
+
+    /// <summary>
+    /// 映像 fourcc・コンテナ尺に加え、音声トラックがあればレート／ch／bit。
+    /// MediaFoundation が読めない ipcm などもボックスから取る。
+    /// </summary>
+    public static bool TryRead(
+        string path,
+        out IReadOnlyList<string> fourccs,
+        out double durationSeconds,
+        out int audioSampleRate,
+        out int audioChannels,
+        out int audioBits)
     {
         fourccs = [];
+        durationSeconds = 0;
+        audioSampleRate = 0;
+        audioChannels = 0;
+        audioBits = 0;
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
             return false;
@@ -56,14 +77,27 @@ internal static class VideoCodecProbe
                 FileAccess.Read,
                 FileShare.ReadWrite | FileShare.Delete);
             var found = new List<string>();
-            Walk(stream, 0, stream.Length, found, inMoov: false);
-            if (found.Count == 0)
+            var movieSeconds = 0d;
+            var trackSeconds = 0d;
+            Walk(
+                stream,
+                0,
+                stream.Length,
+                found,
+                inMoov: false,
+                ref movieSeconds,
+                ref trackSeconds,
+                ref audioSampleRate,
+                ref audioChannels,
+                ref audioBits);
+            durationSeconds = movieSeconds > 0 ? movieSeconds : trackSeconds;
+            if (found.Count == 0 && durationSeconds <= 0 && audioSampleRate <= 0)
             {
                 return false;
             }
 
             fourccs = found;
-            return true;
+            return found.Count > 0 || durationSeconds > 0 || audioSampleRate > 0;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
@@ -71,7 +105,17 @@ internal static class VideoCodecProbe
         }
     }
 
-    private static void Walk(Stream stream, long start, long end, List<string> found, bool inMoov)
+    private static void Walk(
+        Stream stream,
+        long start,
+        long end,
+        List<string> found,
+        bool inMoov,
+        ref double movieSeconds,
+        ref double trackSeconds,
+        ref int audioSampleRate,
+        ref int audioChannels,
+        ref int audioBits)
     {
         var offset = start;
         var header = new byte[16];
@@ -91,11 +135,42 @@ internal static class VideoCodecProbe
 
             if (type == "moov" || type == "trak" || type == "mdia" || type == "minf" || type == "stbl")
             {
-                Walk(stream, payloadStart, next, found, inMoov: true);
+                Walk(
+                    stream,
+                    payloadStart,
+                    next,
+                    found,
+                    inMoov: true,
+                    ref movieSeconds,
+                    ref trackSeconds,
+                    ref audioSampleRate,
+                    ref audioChannels,
+                    ref audioBits);
+            }
+            else if (inMoov && type == "mvhd")
+            {
+                if (TryReadHeaderDuration(stream, payloadStart, next, out var seconds) && seconds > movieSeconds)
+                {
+                    movieSeconds = seconds;
+                }
+            }
+            else if (inMoov && type == "mdhd")
+            {
+                if (TryReadHeaderDuration(stream, payloadStart, next, out var seconds) && seconds > trackSeconds)
+                {
+                    trackSeconds = seconds;
+                }
             }
             else if (inMoov && type == "stsd")
             {
-                ReadStsd(stream, payloadStart, next, found);
+                ReadStsd(
+                    stream,
+                    payloadStart,
+                    next,
+                    found,
+                    ref audioSampleRate,
+                    ref audioChannels,
+                    ref audioBits);
             }
 
             if (size < 8)
@@ -107,7 +182,62 @@ internal static class VideoCodecProbe
         }
     }
 
-    private static void ReadStsd(Stream stream, long start, long end, List<string> found)
+    /// <summary>mvhd / mdhd の timescale と duration。音声トラックが無くても映像尺が取れる。</summary>
+    private static bool TryReadHeaderDuration(Stream stream, long start, long end, out double seconds)
+    {
+        seconds = 0;
+        var length = end - start;
+        if (length < 20)
+        {
+            return false;
+        }
+
+        var body = new byte[(int)Math.Min(length, 32)];
+        stream.Position = start;
+        if (stream.Read(body, 0, body.Length) < 20)
+        {
+            return false;
+        }
+
+        uint timescale;
+        ulong duration;
+        if (body[0] == 1)
+        {
+            if (body.Length < 32)
+            {
+                return false;
+            }
+
+            timescale = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(20, 4));
+            duration = BinaryPrimitives.ReadUInt64BigEndian(body.AsSpan(24, 8));
+        }
+        else
+        {
+            timescale = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+            duration = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(16, 4));
+            if (duration == uint.MaxValue)
+            {
+                return false;
+            }
+        }
+
+        if (timescale == 0 || duration == 0)
+        {
+            return false;
+        }
+
+        seconds = duration / (double)timescale;
+        return seconds > 0;
+    }
+
+    private static void ReadStsd(
+        Stream stream,
+        long start,
+        long end,
+        List<string> found,
+        ref int audioSampleRate,
+        ref int audioChannels,
+        ref int audioBits)
     {
         if (end - start < 8)
         {
@@ -139,7 +269,18 @@ internal static class VideoCodecProbe
             }
 
             var fourcc = Encoding.ASCII.GetString(header, 4, 4);
-            if (!IsHintOrMetaSample(fourcc))
+            var entryEnd = Math.Min(end, offset + size);
+            if (IsAudioSample(fourcc))
+            {
+                TryParseAudioSample(
+                    stream,
+                    offset,
+                    entryEnd,
+                    ref audioSampleRate,
+                    ref audioChannels,
+                    ref audioBits);
+            }
+            else if (!IsHintOrMetaSample(fourcc))
             {
                 found.Add(fourcc);
             }
@@ -148,9 +289,9 @@ internal static class VideoCodecProbe
         }
     }
 
-    private static bool IsHintOrMetaSample(string fourcc) =>
-        fourcc.Equals("tmcd", StringComparison.OrdinalIgnoreCase)
-        || fourcc.Equals("mp4a", StringComparison.OrdinalIgnoreCase)
+    internal static bool IsAudioSample(string fourcc) =>
+        fourcc.Equals("mp4a", StringComparison.OrdinalIgnoreCase)
+        || fourcc.Equals("ipcm", StringComparison.OrdinalIgnoreCase)
         || fourcc.Equals("lpcm", StringComparison.OrdinalIgnoreCase)
         || fourcc.Equals("sowt", StringComparison.OrdinalIgnoreCase)
         || fourcc.Equals("twos", StringComparison.OrdinalIgnoreCase)
@@ -161,7 +302,82 @@ internal static class VideoCodecProbe
         || fourcc.Equals("raw ", StringComparison.OrdinalIgnoreCase)
         || fourcc.Equals("ulaw", StringComparison.OrdinalIgnoreCase)
         || fourcc.Equals("alaw", StringComparison.OrdinalIgnoreCase)
-        || fourcc.Equals("aac ", StringComparison.OrdinalIgnoreCase);
+        || fourcc.Equals("aac ", StringComparison.OrdinalIgnoreCase)
+        || fourcc.Equals("opus", StringComparison.OrdinalIgnoreCase)
+        || fourcc.Equals("fLaC", StringComparison.OrdinalIgnoreCase)
+        || fourcc.Equals("ac-3", StringComparison.OrdinalIgnoreCase)
+        || fourcc.Equals("ec-3", StringComparison.OrdinalIgnoreCase)
+        || fourcc.Equals("samr", StringComparison.OrdinalIgnoreCase);
+
+    private static void TryParseAudioSample(
+        Stream stream,
+        long start,
+        long end,
+        ref int audioSampleRate,
+        ref int audioChannels,
+        ref int audioBits)
+    {
+        var length = end - start;
+        if (length < 36)
+        {
+            return;
+        }
+
+        var body = new byte[(int)Math.Min(length, 256)];
+        stream.Position = start;
+        var read = stream.Read(body, 0, body.Length);
+        if (read < 36)
+        {
+            return;
+        }
+
+        var channels = BinaryPrimitives.ReadUInt16BigEndian(body.AsSpan(24, 2));
+        var bits = BinaryPrimitives.ReadUInt16BigEndian(body.AsSpan(26, 2));
+        var packedRate = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(32, 4));
+        var rate = (int)(packedRate >> 16);
+        if (rate <= 0)
+        {
+            rate = packedRate > int.MaxValue ? 0 : (int)packedRate;
+        }
+
+        for (var i = 36; i + 10 <= read; i++)
+        {
+            if (body[i] != (byte)'p' || body[i + 1] != (byte)'c'
+                || body[i + 2] != (byte)'m' || body[i + 3] != (byte)'C')
+            {
+                continue;
+            }
+
+            var pcmBits = body[i + 9];
+            if (pcmBits is 8 or 16 or 24 or 32)
+            {
+                bits = pcmBits;
+            }
+
+            break;
+        }
+
+        if (rate > 0)
+        {
+            audioSampleRate = rate;
+        }
+
+        if (channels > 0)
+        {
+            audioChannels = channels;
+        }
+
+        if (bits > 0)
+        {
+            audioBits = bits;
+        }
+    }
+
+    private static bool IsHintOrMetaSample(string fourcc) =>
+        fourcc.Equals("tmcd", StringComparison.OrdinalIgnoreCase)
+        || fourcc.Equals("text", StringComparison.OrdinalIgnoreCase)
+        || fourcc.Equals("mett", StringComparison.OrdinalIgnoreCase)
+        || fourcc.Equals("metx", StringComparison.OrdinalIgnoreCase);
 
     private static bool TryReadBox(
         Stream stream,

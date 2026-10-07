@@ -55,6 +55,44 @@ internal sealed class AudioFileTags
     public long EncoderOriginalFrames { get; init; }
 
     public bool HasArtwork { get; init; }
+
+    public AudioFileTags WithDurationSeconds(double seconds) =>
+        WithPlaybackDisplay(seconds, SampleRate, Channels, BitsPerSample);
+
+    public AudioFileTags WithAudioFormat(int sampleRate, int channels, int bitsPerSample, double durationSeconds) =>
+        WithPlaybackDisplay(
+            DurationSeconds > 0 ? DurationSeconds : durationSeconds,
+            sampleRate,
+            channels,
+            bitsPerSample);
+
+    private AudioFileTags WithPlaybackDisplay(double durationSeconds, int sampleRate, int channels, int bitsPerSample) =>
+        new()
+        {
+            Probed = true,
+            Title = Title,
+            Artist = Artist,
+            Album = Album,
+            AlbumArtist = AlbumArtist,
+            Track = Track,
+            TrackNumber = TrackNumber,
+            Disc = Disc,
+            DiscNumber = DiscNumber,
+            Year = Year,
+            YearNumber = YearNumber,
+            Genre = Genre,
+            Comment = Comment,
+            Composer = Composer,
+            DurationSeconds = durationSeconds,
+            SampleRate = sampleRate,
+            BitsPerSample = bitsPerSample,
+            Channels = channels,
+            BitRateKbps = BitRateKbps,
+            EncoderDelayFrames = EncoderDelayFrames,
+            EncoderPaddingFrames = EncoderPaddingFrames,
+            EncoderOriginalFrames = EncoderOriginalFrames,
+            HasArtwork = HasArtwork,
+        };
 }
 
 internal sealed class AudioFileTagsBuilder

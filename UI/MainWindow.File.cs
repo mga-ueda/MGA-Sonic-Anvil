@@ -1694,7 +1694,9 @@ public partial class MainWindow
             settings.LibraryShowPlaylistPdf,
             settings.LibraryShowPlaylistMov,
             settings.LibraryShowPlaylistMp4,
-            settings.ResolvedVideoProxyRetentionDays())
+            settings.ResolvedVideoProxyRetentionDays(),
+            settings.FfmpegExePath,
+            settings.VideoProxyDisableAutoEncode)
         {
             Owner = this,
         };
@@ -1746,6 +1748,8 @@ public partial class MainWindow
         settings.LibraryShowPlaylistMov = dialog.SelectedLibraryShowPlaylistMov;
         settings.LibraryShowPlaylistMp4 = dialog.SelectedLibraryShowPlaylistMp4;
         settings.VideoProxyRetentionDays = dialog.SelectedVideoProxyRetentionDays;
+        settings.FfmpegExePath = dialog.SelectedFfmpegExePath;
+        settings.VideoProxyDisableAutoEncode = dialog.SelectedVideoProxyDisableAutoEncode;
         LibraryPlaylistDocuments.Apply(
             settings.LibraryShowPlaylistPdf,
             settings.LibraryShowPlaylistMov,
