@@ -147,8 +147,8 @@ internal static class LibraryColumnFilter
     /// <summary>
     /// プレイリストに値が1件でもある列。空リストは空集合（列をすべて隠す）。
     /// null は使用フィルタ無し（設定どおり全部出す）。
-    /// ジャケットは値が無くても、埋め込み可能な形式（MP3 / M4A）が1件あれば出す。
-    /// Wave / AIFF だけでは隠し、混在したら出す。
+    /// ジャケットは実際に画像がある行が1件でもあれば出す。
+    /// 無いときは列も枠も出さない。
     /// 波形は曲が1件でもあれば出す（中身は後から埋める）。
     /// 親フォルダ／波形を出すかは Wave / MP3 の列プリセット側。
     /// </summary>
@@ -167,7 +167,7 @@ internal static class LibraryColumnFilter
         var jacketEligible = false;
         foreach (var row in rows)
         {
-            if (!jacketEligible && JacketEligibleKind(EffectiveKind(row)))
+            if (!jacketEligible && row.HasArtwork)
             {
                 jacketEligible = true;
                 used.Add(LibraryFileColumn.Jacket);
@@ -196,10 +196,6 @@ internal static class LibraryColumnFilter
         return used;
     }
 
-    /// <summary>ジャケット列を出し得る形式。Wave / AIFF は埋め込みできない。</summary>
-    public static bool JacketEligibleKind(string kind) =>
-        IsTagFamilyKind(kind);
-
     public static bool IsPcmFamilyKind(string kind) =>
         kind.Equals("WAVE", StringComparison.OrdinalIgnoreCase)
         || kind.Equals("AIFF", StringComparison.OrdinalIgnoreCase);
@@ -207,6 +203,16 @@ internal static class LibraryColumnFilter
     public static bool IsTagFamilyKind(string kind) =>
         kind.Equals("MP3", StringComparison.OrdinalIgnoreCase)
         || kind.Equals("M4A", StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsVideoFamilyKind(string kind) =>
+        kind.Equals("MOV", StringComparison.OrdinalIgnoreCase)
+        || kind.Equals("MP4", StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsPdfFamilyKind(string kind) =>
+        kind.Equals("PDF", StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsVisualFamilyKind(string kind) =>
+        IsVideoFamilyKind(kind) || IsPdfFamilyKind(kind);
 
     /// <summary>
     /// 列判定に使う形式。ファイル名の拡張子を優先し、無ければ Kind 文字列。

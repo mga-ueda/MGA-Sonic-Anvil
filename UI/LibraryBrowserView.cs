@@ -181,7 +181,8 @@ internal sealed class LibraryBrowserView : UserControl
     };
 
     private bool _pdfBackgroundPinned;
-    private DataGridTextColumn _groupSpacer = null!;
+    private string? _playlistVisualSourcePath;
+    private DataGridColumn _groupSpacer = null!;
     private bool _gridScrollHooked;
     private readonly Dictionary<LibraryFileColumn, DataGridColumn> _columns = [];
     private readonly Dictionary<LibraryFileColumn, LibrarySortHeader> _sortHeaders = [];
@@ -598,6 +599,8 @@ internal sealed class LibraryBrowserView : UserControl
 
     public bool PlaylistVisualPlaying => _visualStage.IsPlaying;
 
+    public bool PlaylistVisualClockRunning => _visualStage.VisualClockRunning;
+
     public bool PlaylistVisualShown => _visualStage.IsShown;
 
     public bool PlaylistVisualIsVideo => _visualStage.IsVideo;
@@ -608,8 +611,17 @@ internal sealed class LibraryBrowserView : UserControl
 
     public TimeSpan PlaylistVisualPosition => _visualStage.Position;
 
+    public TimeSpan PlaylistVisualDuration => _visualStage.Duration;
+
+    /// <summary>いま背面に出している映像／PDF の元ファイル。プロキシパスではない。</summary>
+    public bool IsPlaylistVisualSameSource(string? sourcePath) =>
+        !string.IsNullOrWhiteSpace(sourcePath)
+        && !string.IsNullOrWhiteSpace(_playlistVisualSourcePath)
+        && string.Equals(_playlistVisualSourcePath, sourcePath, StringComparison.OrdinalIgnoreCase);
+
     public void HidePlaylistVisual()
     {
+        _playlistVisualSourcePath = null;
         _visualStage.Hide();
         PlaceArtworkGlow();
         PlaylistVisualStateChanged?.Invoke(this, EventArgs.Empty);
@@ -623,6 +635,8 @@ internal sealed class LibraryBrowserView : UserControl
             HidePlaylistVisual();
             return;
         }
+
+        _playlistVisualSourcePath = path;
 
         if (LibraryPlaylistDocuments.IsPdf(session.Document))
         {
@@ -641,8 +655,21 @@ internal sealed class LibraryBrowserView : UserControl
             playPath = display;
         }
 
-        _visualStage.ShowVideo(playPath, play);
-        if (session.Document.SampleRate > 0 && session.Document.CursorFrame > 0)
+        var fallback = TimeSpan.Zero;
+        var tagged = session.Document.Tags.DurationSeconds;
+        if (tagged > 0)
+        {
+            fallback = TimeSpan.FromSeconds(tagged);
+        }
+        else if (session.Document.SampleRate > 0 && session.Document.FrameCount > 0)
+        {
+            fallback = TimeSpan.FromSeconds(session.Document.FrameCount / (double)session.Document.SampleRate);
+        }
+
+        _visualStage.ShowVideo(playPath, play, fallback);
+        if (play
+            && session.Document.SampleRate > 0
+            && session.Document.CursorFrame > 0)
         {
             _visualStage.Seek(TimeSpan.FromSeconds(
                 session.Document.CursorFrame / (double)session.Document.SampleRate));
@@ -1748,7 +1775,6 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void RefreshAppearance()
     {
-        LibraryPlaceholderJacket.Invalidate();
         _fallbackWashTurns = null;
         ApplyGlowVeil();
         ApplyGridStyles();
@@ -2024,9 +2050,9 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void ShowJacketDisplay(BitmapSource? decoded, bool realArt)
     {
-        var bitmap = decoded ?? LibraryPlaceholderJacket.Bitmap;
+        var bitmap = decoded;
         _jacketBitmap = bitmap;
-        ApplyArtworkGlow(realArt ? bitmap : null);
+        ApplyArtworkGlow(realArt && bitmap is not null ? bitmap : null);
     }
 
     private void BindRows(DocumentSession? active, IReadOnlyList<DocumentSession>? selected)
@@ -4875,8 +4901,7 @@ internal sealed class LibraryBrowserView : UserControl
     internal int FrozenColumnCount => _grid.FrozenColumnCount;
 
     /// <summary>
-    /// グループ左のジャケット枠。Wave / AIFF だけでは No Image も出さない。
-    /// MP3 / M4A が1曲でもあれば枠を残す。
+    /// グループ左のジャケット枠。実ジャケットが1件も無いときは出さない。
     /// </summary>
     private bool ShowsGroupJackets
     {
@@ -4889,7 +4914,7 @@ internal sealed class LibraryBrowserView : UserControl
 
             foreach (var row in _rows)
             {
-                if (LibraryColumnFilter.JacketEligibleKind(LibraryColumnFilter.EffectiveKind(row)))
+                if (row.HasArtwork)
                 {
                     return true;
                 }
@@ -5588,12 +5613,14 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void AddGroupSpacerColumn()
     {
-        var empty = new Style(typeof(TextBlock));
-        empty.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
-        _groupSpacer = new DataGridTextColumn
+        var jacket = new FrameworkElementFactory(typeof(LibraryRowJacketImage));
+        jacket.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        jacket.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        var cell = new DataTemplate(typeof(LibraryFileRow)) { VisualTree = jacket };
+        _groupSpacer = new DataGridTemplateColumn
         {
             Header = string.Empty,
-            Binding = new Binding(nameof(LibraryFileRow.Name)),
+            CellTemplate = cell,
             Width = new DataGridLength(GroupJacketColumnWidth),
             MinWidth = GroupJacketColumnWidth,
             MaxWidth = GroupJacketColumnWidth,
@@ -5601,7 +5628,6 @@ internal sealed class LibraryBrowserView : UserControl
             CanUserSort = false,
             CanUserResize = false,
             CanUserReorder = false,
-            ElementStyle = empty,
         };
         ApplyGroupSpacerCellStyle();
         _grid.Columns.Add(_groupSpacer);
@@ -7395,7 +7421,7 @@ internal sealed class LibraryBrowserView : UserControl
         b = (byte)Math.Clamp((int)Math.Round(Hue(p, q, hk - 1d / 3) * 255), 0, 255);
     }
 
-    private static BitmapSource? TryCreateBitmap(byte[]? bytes, int decodeMaxEdge = 0)
+    internal static BitmapSource? TryCreateBitmap(byte[]? bytes, int decodeMaxEdge = 0)
     {
         if (bytes is not { Length: > 0 })
         {
@@ -7482,12 +7508,17 @@ internal sealed class LibraryBrowserView : UserControl
         var deferred = document.IsDeferredLoad;
         // MP3 は Xing と Media Foundation／実デコードがエンコーダ遅延ぶん（数十 ms）ずれる。
         // リストは最初に出したタグ尺のままにする（ホバーやピーク確定でミリ秒が跳ねない）。
-        var duration = tags.DurationSeconds > 0
-            ? tags.DurationSeconds
-            : deferred ? 0 : document.DurationSeconds;
-        var sampleRate = deferred ? tags.SampleRate : document.SampleRate;
-        var bits = deferred ? tags.BitsPerSample : document.BitsPerSample;
-        var channels = deferred ? tags.Channels : document.Channels;
+        // PDF のページ秒は時計用だけで、時間列には出さない。
+        var duration = LibraryPlaylistDocuments.IsPdf(document)
+            ? 0
+            : tags.DurationSeconds > 0
+                ? tags.DurationSeconds
+                : deferred ? 0 : document.DurationSeconds;
+        var hideAudioFormat = LibraryPlaylistDocuments.IsVisual(document) && tags.SampleRate <= 0;
+        // PDF と音声の無い動画の 48kHz/16bit は再生時計用ダミー。列には出さない。
+        var sampleRate = hideAudioFormat ? 0 : deferred ? tags.SampleRate : document.SampleRate;
+        var bits = hideAudioFormat ? 0 : deferred ? tags.BitsPerSample : document.BitsPerSample;
+        var channels = hideAudioFormat ? 0 : deferred ? tags.Channels : document.Channels;
         var bitRate = tags.BitRateKbps;
         if (bitRate <= 0 && sampleRate > 0 && channels > 0 && bits > 0)
         {
@@ -7557,6 +7588,11 @@ internal sealed class LibraryBrowserView : UserControl
             return null;
         }
 
+        if (GroupShowsRowVideoJackets(group))
+        {
+            return null;
+        }
+
         var key = name.ToString() ?? string.Empty;
         var active = _grid.SelectedItem as LibraryFileRow;
         var activeInGroup = LibraryGroupJacketPick.ContainsActive(group.Items, active);
@@ -7591,9 +7627,11 @@ internal sealed class LibraryBrowserView : UserControl
             }
         }
 
-        // Wave のみのときは No Image も出さない。MP3 / M4A があるときだけ枠用のプレースホルダ。
-        return ShowsGroupJackets ? LibraryPlaceholderJacket.Bitmap : null;
+        return null;
     }
+
+    internal static bool GroupShowsRowVideoJackets(CollectionViewGroup group) =>
+        LibraryArtworkScan.UsesRowJackets(group.Items);
 
     internal CollectionViewGroup? PlaylistGroupAt(int index)
     {
@@ -7656,27 +7694,27 @@ internal sealed class LibraryBrowserView : UserControl
 
     private async Task EnsureGroupArtworkAsync()
     {
-        if (_group == LibraryFileGroup.None)
-        {
-            return;
-        }
-
         var gen = ++_groupArtLoad;
         var pending = new List<(DocumentSession Session, string Path)>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var selected = SelectedSession;
-        foreach (var row in _items)
+        var grouped = _group != LibraryFileGroup.None;
+        foreach (var row in _rows)
         {
             if (row.Tag is not DocumentSession session
                 || session.Document.HasArtwork
-                || session.Document.SourceKind is not (AudioFileKind.Mp3 or AudioFileKind.M4a)
+                || !LibraryArtworkScan.CanRead(session.Document.SourceKind)
                 || session.Document.SourcePath is not { Length: > 0 } path)
             {
                 continue;
             }
 
-            var isSelected = ReferenceEquals(session, selected);
-            if (!isSelected && !seen.Add(row.GroupKey))
+            if (!LibraryArtworkScan.ShouldLoad(
+                    grouped,
+                    session.Document.SourceKind,
+                    ReferenceEquals(session, selected),
+                    row.GroupKey,
+                    seen))
             {
                 continue;
             }
@@ -7699,7 +7737,7 @@ internal sealed class LibraryBrowserView : UserControl
     {
         if (session is null
             || session.Document.HasArtwork
-            || session.Document.SourceKind is not (AudioFileKind.Mp3 or AudioFileKind.M4a)
+            || !LibraryArtworkScan.CanRead(session.Document.SourceKind)
             || session.Document.SourcePath is not { Length: > 0 } path)
         {
             return Task.CompletedTask;
@@ -7711,7 +7749,17 @@ internal sealed class LibraryBrowserView : UserControl
     private async Task ApplyEmbeddedArtworkAsync(DocumentSession session, string path, int? generation)
     {
         var kind = session.Document.SourceKind;
-        var bytes = await Task.Run(() => ReadEmbeddedArtwork(kind, path)).ConfigureAwait(true);
+        byte[] bytes;
+        try
+        {
+            bytes = LibraryArtworkScan.IsPdfKind(kind)
+                ? await LibraryPdfPages.RenderPngAsync(path, 0, VideoArtwork.Edge).ConfigureAwait(true) ?? []
+                : await Task.Run(() => ReadEmbeddedArtwork(kind, path)).ConfigureAwait(true);
+        }
+        catch (Exception)
+        {
+            return;
+        }
         if (generation is { } gen && gen != _groupArtLoad)
         {
             return;
@@ -7724,6 +7772,10 @@ internal sealed class LibraryBrowserView : UserControl
 
         session.Document.SetArtwork(bytes);
         UpdateSessionRow(session);
+        if (ReferenceEquals(session, SelectedSession))
+        {
+            SetArtwork(session.Document);
+        }
     }
 
     private static byte[] ReadEmbeddedArtwork(AudioFileKind kind, string path)
@@ -7731,6 +7783,11 @@ internal sealed class LibraryBrowserView : UserControl
         if (kind == AudioFileKind.M4a)
         {
             return M4aArtwork.TryRead(path, out var art) ? art : [];
+        }
+
+        if (LibraryArtworkScan.IsVideoKind(kind))
+        {
+            return VideoArtwork.TryRead(path, out var frame) ? frame : [];
         }
 
         return Id3Artwork.TryRead(path, out var mp3) ? mp3 : [];
@@ -8445,6 +8502,60 @@ internal sealed class LibraryJacketReflectionView : Border
         brush.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
         brush.Freeze();
         return brush;
+    }
+}
+
+/// <summary>グループ時の各動画／PDF 行ジャケット。音楽グループは左の1枚のまま。</summary>
+internal sealed class LibraryRowJacketImage : Image
+{
+    public LibraryRowJacketImage()
+    {
+        var width = DesignMetrics.LibraryVisualJacketWidth;
+        var height = DesignMetrics.LibraryVisualJacketHeight;
+        Width = width;
+        Height = height;
+        MaxWidth = width;
+        MaxHeight = height;
+        MinWidth = width;
+        Stretch = Stretch.Uniform;
+        Margin = new Thickness(8, 2, 8, 2);
+        SnapsToDevicePixels = true;
+        IsHitTestVisible = false;
+        RenderOptions.SetBitmapScalingMode(this, BitmapScalingMode.HighQuality);
+        DataContextChanged += (_, _) => Reload();
+        Loaded += (_, _) => Reload();
+    }
+
+    private void Reload()
+    {
+        if (DataContext is not LibraryFileRow row
+            || !LibraryColumnFilter.IsVisualFamilyKind(LibraryColumnFilter.EffectiveKind(row)))
+        {
+            Source = null;
+            MinHeight = 0;
+            Height = 0;
+            Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        MinHeight = DesignMetrics.LibraryVisualJacketHeight;
+        Height = DesignMetrics.LibraryVisualJacketHeight;
+        Visibility = Visibility.Visible;
+        if (row.Tag is DocumentSession session
+            && session.Document.Artwork is { Length: > 0 } bytes)
+        {
+            var decoded = LibraryBrowserView.TryCreateBitmap(bytes, 256);
+            if (decoded is not null)
+            {
+                Source = decoded;
+                return;
+            }
+        }
+
+        Source = null;
+        MinHeight = 0;
+        Height = 0;
+        Visibility = Visibility.Collapsed;
     }
 }
 

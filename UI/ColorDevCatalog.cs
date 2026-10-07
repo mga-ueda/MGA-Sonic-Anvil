@@ -135,9 +135,6 @@ internal static class ColorDevCatalog
             ("VectorScopeGridBrush", ColorDevGroup.VectorScope),
             ("VectorScopeCorrelationBrush", ColorDevGroup.VectorScope),
 
-            ("PlayerPlaceholderJacketTopBrush", ColorDevGroup.Player),
-            ("PlayerPlaceholderJacketBottomBrush", ColorDevGroup.Player),
-            ("PlayerPlaceholderJacketForeBrush", ColorDevGroup.Player),
             ("PlayerJacketReflectionBrush", ColorDevGroup.Player),
             ("PlayerFallbackWashNavyBrush", ColorDevGroup.Player),
             ("PlayerFallbackWashBlueBrush", ColorDevGroup.Player),

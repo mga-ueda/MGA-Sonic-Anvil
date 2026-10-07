@@ -1,9 +1,7 @@
 using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using MgaSonicAnvil.Audio;
-using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 using Xunit;
 
@@ -21,44 +19,26 @@ public sealed class LibraryPlaceholderJacketTests
     }
 
     [Fact]
-    public void Render_IsSquareVerticalGradientWithNoImage()
-    {
-        RunSta(() =>
-        {
-            Assert.Equal("No Image", LibraryPlaceholderJacket.Label);
-            var dark = LibraryPlaceholderJacket.Render(UiTheme.Dark);
-            var light = LibraryPlaceholderJacket.Render(UiTheme.Light);
-            Assert.True(dark.IsFrozen);
-            Assert.Equal(LibraryPlaceholderJacket.PixelSize, dark.PixelWidth);
-            Assert.Equal(LibraryPlaceholderJacket.PixelSize, dark.PixelHeight);
-            Assert.Equal(dark.PixelWidth, light.PixelWidth);
-
-            var darkPixels = Copy(dark);
-            var lightPixels = Copy(light);
-            Assert.Equal(darkPixels, lightPixels);
-            AssertVerticalWash(darkPixels, dark.PixelWidth);
-        });
-    }
-
-    [Fact]
     public void SetArtwork_ShowsPlaceholder_ReplaceOnlyForMp3()
     {
         RunSta(() =>
         {
             EnsureTheme();
             var view = new LibraryBrowserView();
-            Assert.NotNull(view.JacketDisplaySource);
+            Assert.Null(view.JacketDisplaySource);
             Assert.True(view.IsPlaceholderJacket);
             Assert.False(view.JacketReplaceEnabled);
 
             var wave = new AudioDocument(new float[48], 48000, 1, 16, AudioFileKind.Wave, "a.wav");
             view.SetArtwork(wave);
             Assert.True(view.IsPlaceholderJacket);
+            Assert.Null(view.JacketDisplaySource);
             Assert.False(view.JacketReplaceEnabled);
 
             var mp3 = new AudioDocument(new float[48], 48000, 1, 16, AudioFileKind.Mp3, "a.mp3");
             view.SetArtwork(mp3);
             Assert.True(view.IsPlaceholderJacket);
+            Assert.Null(view.JacketDisplaySource);
             Assert.True(view.JacketReplaceEnabled);
 
             mp3.SetArtwork(OnePixelPng);
@@ -70,6 +50,7 @@ public sealed class LibraryPlaceholderJacketTests
             var m4a = new AudioDocument(new float[48], 48000, 1, 16, AudioFileKind.M4a, "a.m4a");
             view.SetArtwork(m4a);
             Assert.True(view.IsPlaceholderJacket);
+            Assert.Null(view.JacketDisplaySource);
             Assert.False(view.JacketReplaceEnabled);
 
             m4a.SetArtwork(OnePixelPng);
@@ -91,30 +72,6 @@ public sealed class LibraryPlaceholderJacketTests
         0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00,
         0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
     ];
-
-    private static byte[] Copy(BitmapSource source)
-    {
-        var width = source.PixelWidth;
-        var height = source.PixelHeight;
-        var pixels = new byte[width * height * 4];
-        source.CopyPixels(pixels, width * 4, 0);
-        return pixels;
-    }
-
-    private static void AssertVerticalWash(byte[] pixels, int width)
-    {
-        var top = Luma(pixels, width, 8, 8);
-        var topCenter = Luma(pixels, width, width / 2, 8);
-        var bottom = Luma(pixels, width, 8, width - 9);
-        Assert.True(Math.Abs(top - topCenter) < 12);
-        Assert.True(top > bottom + 16);
-    }
-
-    private static int Luma(byte[] pixels, int width, int x, int y)
-    {
-        var i = ((y * width) + x) * 4;
-        return ((pixels[i + 2] * 2) + (pixels[i + 1] * 3) + pixels[i]) / 6;
-    }
 
     private static void EnsureTheme()
     {

@@ -58,9 +58,6 @@
     <SolidColorBrush x:Key="LevelMeterTrackBorderBrush" Color="#FF1A221A" />
     <SolidColorBrush x:Key="LevelMeterHoldBorderBrush" Color="#FF1A221A" />
     <SolidColorBrush x:Key="LevelMeterTickBrush" Color="#38FFFFFF" />
-    <SolidColorBrush x:Key="PlayerPlaceholderJacketTopBrush" Color="#FF5C5C62" />
-    <SolidColorBrush x:Key="PlayerPlaceholderJacketBottomBrush" Color="#FF2A2A2E" />
-    <SolidColorBrush x:Key="PlayerPlaceholderJacketForeBrush" Color="#FFC8C8CE" />
     <SolidColorBrush x:Key="PlayerFallbackWashNavyBrush" Color="#FF0B1B49" />
     <SolidColorBrush x:Key="PlayerFallbackWashBlueBrush" Color="#FF1A56A0" />
     <SolidColorBrush x:Key="PlayerFallbackWashCyanBrush" Color="#FF0B6895" />
