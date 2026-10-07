@@ -95,6 +95,13 @@ public sealed class DurationFormatTests
     }
 
     [Fact]
+    public void LabelVideoProxyUsage_UsesCompactSize()
+    {
+        Assert.Contains(UiStrings.FormatFileBytesCompact(0), UiStrings.LabelVideoProxyUsage(0));
+        Assert.Contains(UiStrings.FormatFileBytesCompact(1_500_000), UiStrings.LabelVideoProxyUsage(1_500_000));
+    }
+
+    [Fact]
     public void FormatFileDate_CompactLocalStamp()
     {
         Assert.Equal(string.Empty, UiStrings.FormatFileDate(null));

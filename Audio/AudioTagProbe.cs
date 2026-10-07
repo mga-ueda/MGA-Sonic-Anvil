@@ -113,9 +113,29 @@ internal static class AudioTagProbe
 
     private static bool TryReadVideo(string path, out AudioFileTags tags)
     {
-        // 長さは MediaOpened で直す。フォルダ走査中の同期プローブは追加を止める。
-        _ = path;
-        tags = new AudioFileTags { Probed = true };
+        tags = AudioFileTags.Empty;
+        // MediaFoundation の音声プローブはフォルダ追加を止める。尺と音声フォーマットはボックスから。
+        if (!VideoCodecProbe.TryRead(
+                path,
+                out _,
+                out var duration,
+                out var rate,
+                out var channels,
+                out var bits)
+            || (duration <= 0 && rate <= 0))
+        {
+            tags = new AudioFileTags { Probed = true };
+            return true;
+        }
+
+        tags = new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = duration,
+            SampleRate = rate,
+            Channels = channels,
+            BitsPerSample = bits,
+        };
         return true;
     }
 

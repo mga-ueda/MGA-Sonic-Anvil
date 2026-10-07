@@ -11,12 +11,13 @@ namespace MgaSonicAnvil.Audio;
 
 /// <summary>
 /// MJPEG / Photo JPEG 以外の MOV / MP4 を、スクラブしやすい MJPEG AVI プロキシへ落とす。
-/// ffmpeg は同梱せず PATH 上のものを呼ぶ。
+/// ffmpeg は同梱せず、設定の ffmpeg.exe だけを呼ぶ。空欄または無効ならプロキシは作らない。
 /// </summary>
 internal static class VideoProxy
 {
     /// <summary>フレーム内完結の MJPEG。フレームレートはソースのまま。</summary>
     internal const string EncodeVersion = "mjpeg-avi-srcfps";
+    internal const string AudioExtractVersion = "pcm-wav-s16";
     internal const int DefaultRetentionDays = 7;
 
     /// <summary>
@@ -46,6 +47,7 @@ internal static class VideoProxy
 
     private static readonly object Gate = new();
     private static readonly Dictionary<string, string> DisplayBySource = new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, string> AudioBySource = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, Task<string>> InFlight = new(StringComparer.Ordinal);
     private static readonly Regex DurationLine = new(
         @"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)",
@@ -76,6 +78,82 @@ internal static class VideoProxy
         }
     }
 
+    public static bool TryGetCachedAudio(string sourcePath, out string audioPath)
+    {
+        lock (Gate)
+        {
+            return TryGetCachedAudioCore(sourcePath, out audioPath);
+        }
+    }
+
+    /// <summary>
+    /// 映像プロキシは作らず、ピーク／再生用に音声だけ WAV へ落とす（ipcm など MF 非対応）。
+    /// </summary>
+    public static bool TryEnsureDecodedAudio(string sourcePath, out string audioPath)
+    {
+        audioPath = string.Empty;
+        if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+        {
+            return false;
+        }
+
+        if (TryGetCachedAudio(sourcePath, out audioPath))
+        {
+            return true;
+        }
+
+        var ffmpeg = FindFfmpeg();
+        if (ffmpeg is null)
+        {
+            return false;
+        }
+
+        var output = AudioCachePath(sourcePath);
+        var temp = output + ".part";
+        try
+        {
+            Directory.CreateDirectory(CacheDirectory);
+            if (File.Exists(temp))
+            {
+                File.Delete(temp);
+            }
+
+            if (!RunAudioExtract(ffmpeg, sourcePath, temp))
+            {
+                return false;
+            }
+
+            if (File.Exists(output))
+            {
+                File.Delete(output);
+            }
+
+            File.Move(temp, output);
+            lock (Gate)
+            {
+                AudioBySource[SourceKey(sourcePath)] = output;
+            }
+
+            audioPath = output;
+            return File.Exists(output);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            try
+            {
+                if (File.Exists(temp))
+                {
+                    File.Delete(temp);
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+    }
+
     public static async Task<string> EnsurePlayableAsync(
         string sourcePath,
         IProgress<double>? progress,
@@ -98,6 +176,13 @@ internal static class VideoProxy
         {
             progress?.Report(1);
             return cached;
+        }
+
+        if (!CanEncodeProxy())
+        {
+            Remember(sourcePath, sourcePath);
+            progress?.Report(1);
+            return sourcePath;
         }
 
         var key = SourceKey(sourcePath);
@@ -145,7 +230,9 @@ internal static class VideoProxy
         var ffmpeg = FindFfmpeg();
         if (ffmpeg is null)
         {
-            throw new InvalidOperationException(UiStrings.ErrorVideoProxyNeedsFfmpeg);
+            Remember(sourcePath, sourcePath);
+            progress?.Report(1);
+            return sourcePath;
         }
 
         var output = CachePath(sourcePath);
@@ -215,22 +302,30 @@ internal static class VideoProxy
         return EncodeProgressShare + (FinalizeProgressCap - EncodeProgressShare) * t;
     }
 
-    internal static string? FindFfmpeg()
+    /// <summary>設定の ffmpeg.exe が実在し、自動生成を止めていないときだけプロキシを作る。</summary>
+    public static bool CanEncodeProxy() =>
+        !AppStorage.Settings.VideoProxyDisableAutoEncode && FindFfmpeg() is not null;
+
+    public static bool TryResolveFfmpegExe(string? path, out string exe)
     {
-        var fromPath = FindOnPath("ffmpeg.exe") ?? FindOnPath("ffmpeg");
-        if (fromPath is not null)
+        exe = string.Empty;
+        if (string.IsNullOrWhiteSpace(path))
         {
-            return fromPath;
+            return false;
         }
 
-        var winget = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Microsoft",
-            "WinGet",
-            "Links",
-            "ffmpeg.exe");
-        return File.Exists(winget) ? winget : null;
+        var trimmed = path.Trim().Trim('"');
+        if (trimmed.Length == 0 || !File.Exists(trimmed))
+        {
+            return false;
+        }
+
+        exe = Path.GetFullPath(trimmed);
+        return true;
     }
+
+    internal static string? FindFfmpeg() =>
+        TryResolveFfmpegExe(AppStorage.Settings.FfmpegExePath, out var exe) ? exe : null;
 
     internal static string CachePath(string sourcePath)
     {
@@ -239,6 +334,15 @@ internal static class VideoProxy
         var stamp = SourceKey(sourcePath) + "|" + length + "|" + EncodeVersion;
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(stamp)))[..16].ToLowerInvariant();
         return Path.Combine(CacheDirectory, hash + ".avi");
+    }
+
+    internal static string AudioCachePath(string sourcePath)
+    {
+        var info = new FileInfo(sourcePath);
+        var length = info.Exists ? info.Length.ToString(CultureInfo.InvariantCulture) : "0";
+        var stamp = SourceKey(sourcePath) + "|" + length + "|" + AudioExtractVersion;
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(stamp)))[..16].ToLowerInvariant();
+        return Path.Combine(CacheDirectory, hash + ".wav");
     }
 
     /// <summary>パス表記のゆれで別キャッシュにしない。更新日時はキーに入れない（再生のたびに変わるファイルがある）。</summary>
@@ -314,6 +418,78 @@ internal static class VideoProxy
         return removed;
     }
 
+    /// <summary>保存期間を無視して、プロキシと打ち捨て .part を今すぐ全部消す。</summary>
+    public static int ClearAll() => ClearAll(CacheDirectory);
+
+    /// <summary>キャッシュ内のプロキシと打ち捨て .part の合計バイト数。</summary>
+    public static long GetUsageBytes() => GetUsageBytes(CacheDirectory);
+
+    internal static long GetUsageBytes(string directory)
+    {
+        if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+        {
+            return 0;
+        }
+
+        string[] files;
+        try
+        {
+            files = Directory.GetFiles(directory);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return 0;
+        }
+
+        long total = 0;
+        foreach (var file in files)
+        {
+            try
+            {
+                total += new FileInfo(file).Length;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+
+        return total;
+    }
+
+    internal static int ClearAll(string directory)
+    {
+        if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+        {
+            return 0;
+        }
+
+        string[] files;
+        try
+        {
+            files = Directory.GetFiles(directory);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return 0;
+        }
+
+        var removed = 0;
+        foreach (var file in files)
+        {
+            try
+            {
+                File.Delete(file);
+                removed++;
+            }
+            catch
+            {
+            }
+        }
+
+        ForgetMissing();
+        return removed;
+    }
+
     private static void ForgetMissing()
     {
         lock (Gate)
@@ -331,6 +507,20 @@ internal static class VideoProxy
             for (var i = 0; i < drop.Count; i++)
             {
                 DisplayBySource.Remove(drop[i]);
+            }
+
+            drop.Clear();
+            foreach (var pair in AudioBySource)
+            {
+                if (!File.Exists(pair.Value))
+                {
+                    drop.Add(pair.Key);
+                }
+            }
+
+            for (var i = 0; i < drop.Count; i++)
+            {
+                AudioBySource.Remove(drop[i]);
             }
         }
     }
@@ -363,6 +553,28 @@ internal static class VideoProxy
         {
             Touch(proxyPath);
             RememberUnlocked(sourcePath, proxyPath);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryGetCachedAudioCore(string sourcePath, out string audioPath)
+    {
+        if (AudioBySource.TryGetValue(SourceKey(sourcePath), out var remembered)
+            && File.Exists(remembered)
+            && new FileInfo(remembered).Length > 0)
+        {
+            Touch(remembered);
+            audioPath = remembered;
+            return true;
+        }
+
+        audioPath = AudioCachePath(sourcePath);
+        if (File.Exists(audioPath) && new FileInfo(audioPath).Length > 0)
+        {
+            Touch(audioPath);
+            AudioBySource[SourceKey(sourcePath)] = audioPath;
             return true;
         }
 
@@ -486,7 +698,8 @@ internal static class VideoProxy
 
     private static bool IsProxyExtension(string ext) =>
         ext.Equals(".avi", StringComparison.OrdinalIgnoreCase)
-        || ext.Equals(".mp4", StringComparison.OrdinalIgnoreCase);
+        || ext.Equals(".mp4", StringComparison.OrdinalIgnoreCase)
+        || ext.Equals(".wav", StringComparison.OrdinalIgnoreCase);
 
     internal static IReadOnlyList<string> BuildFfmpegArguments(string input, string output)
     {
@@ -521,6 +734,174 @@ internal static class VideoProxy
             "avi",
             output,
         ];
+    }
+
+    /// <summary>一覧ジャケット用。プロキシがあればそれを見て、無ければ原ファイルの先頭フレーム。</summary>
+    public static bool TryExtractStillJpeg(string sourcePath, int edge, out byte[] jpeg)
+    {
+        jpeg = [];
+        if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+        {
+            return false;
+        }
+
+        var ffmpeg = FindFfmpeg();
+        if (ffmpeg is null)
+        {
+            return false;
+        }
+
+        var input = sourcePath;
+        if (TryGetCached(sourcePath, out var proxy))
+        {
+            input = proxy;
+        }
+
+        var output = Path.Combine(Path.GetTempPath(), "mga-thumb-" + Guid.NewGuid().ToString("N") + ".jpg");
+        try
+        {
+            if (!RunStillExtract(ffmpeg, input, output, edge))
+            {
+                return false;
+            }
+
+            jpeg = File.ReadAllBytes(output);
+            return jpeg.Length > 0;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return false;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(output))
+                {
+                    File.Delete(output);
+                }
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    internal static IReadOnlyList<string> BuildStillExtractArguments(string input, string output, int edge)
+    {
+        var source = LameEncoder.PreferShortPath(input);
+        var size = Math.Clamp(edge, 32, 1024);
+        return
+        [
+            "-hide_banner",
+            "-nostdin",
+            "-y",
+            "-i",
+            source,
+            "-an",
+            "-frames:v",
+            "1",
+            "-vf",
+            "scale=" + size.ToString(CultureInfo.InvariantCulture) + ":-1",
+            "-q:v",
+            "5",
+            "-f",
+            "image2",
+            output,
+        ];
+    }
+
+    private static bool RunStillExtract(string ffmpeg, string input, string output, int edge)
+    {
+        var start = new ProcessStartInfo(ffmpeg)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true,
+        };
+        foreach (var arg in BuildStillExtractArguments(input, output, edge))
+        {
+            start.ArgumentList.Add(arg);
+        }
+
+        using var process = new Process { StartInfo = start };
+        if (!process.Start())
+        {
+            return false;
+        }
+
+        process.StandardError.ReadToEnd();
+        if (!process.WaitForExit(60_000))
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
+        return process.ExitCode == 0 && File.Exists(output) && new FileInfo(output).Length > 32;
+    }
+
+    internal static IReadOnlyList<string> BuildAudioExtractArguments(string input, string output)
+    {
+        var source = LameEncoder.PreferShortPath(input);
+        return
+        [
+            "-hide_banner",
+            "-nostdin",
+            "-y",
+            "-i",
+            source,
+            "-map",
+            "0:a:0",
+            "-vn",
+            "-c:a",
+            "pcm_s16le",
+            "-f",
+            "wav",
+            output,
+        ];
+    }
+
+    private static bool RunAudioExtract(string ffmpeg, string input, string output)
+    {
+        var start = new ProcessStartInfo(ffmpeg)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true,
+        };
+        foreach (var arg in BuildAudioExtractArguments(input, output))
+        {
+            start.ArgumentList.Add(arg);
+        }
+
+        using var process = new Process { StartInfo = start };
+        if (!process.Start())
+        {
+            return false;
+        }
+
+        process.StandardError.ReadToEnd();
+        if (!process.WaitForExit(120_000))
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
+        return process.ExitCode == 0 && File.Exists(output) && new FileInfo(output).Length > 44;
     }
 
     internal static string LastFfmpegError(string log)
@@ -705,25 +1086,6 @@ internal static class VideoProxy
 
             progress?.Report(value);
         }
-    }
-
-    private static string? FindOnPath(string name)
-    {
-        foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator))
-        {
-            if (string.IsNullOrWhiteSpace(dir))
-            {
-                continue;
-            }
-
-            var candidate = Path.Combine(dir.Trim(), name);
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
-
-        return null;
     }
 
     private static void TryKill(Process process)
