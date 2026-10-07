@@ -352,6 +352,35 @@ internal sealed class AudioPlayer : IDisposable
         return document.IsStreamPlayback || AudioCodec.CanStreamPlay(path);
     }
 
+    /// <summary>
+    /// 動画で音声ストリームが無い／開けないときは無音で尺だけ進める（警告は出さない）。
+    /// </summary>
+    internal static AudioStreamSource OpenLibraryPlaybackSource(
+        AudioDocument document,
+        int prebufferTimeoutMs = 3000)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        try
+        {
+            return AudioStreamSource.Open(document.SourcePath!, prebufferTimeoutMs);
+        }
+        catch (Exception) when (LibraryPlaylistDocuments.IsVideo(document))
+        {
+            return AudioStreamSource.CreateSilence(
+                Math.Max(1, document.SampleRate),
+                Math.Max(1, document.Channels),
+                document.BitsPerSample,
+                Math.Max(1, document.FrameCount));
+        }
+    }
+
+    /// <summary>無音動画の尺が MediaOpened で伸びたとき、再生中のストリームに合わせる。</summary>
+    public void SyncSilenceLength(long frameCount)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _provider.GrowSilenceFrames(frameCount);
+    }
+
     private void BindPlaybackSource(
         AudioDocument document,
         long startFrame,
@@ -369,7 +398,7 @@ internal sealed class AudioPlayer : IDisposable
         AudioStreamSource stream;
         try
         {
-            stream = AudioStreamSource.Open(document.SourcePath!);
+            stream = OpenLibraryPlaybackSource(document);
         }
         catch
         {
@@ -1040,7 +1069,7 @@ internal sealed class AudioPlayer : IDisposable
             document,
             preferStream: document.IsStreamPlayback || _provider.IsStreamBound))
         {
-            var stream = AudioStreamSource.Open(document.SourcePath!);
+            var stream = OpenLibraryPlaybackSource(document);
             try
             {
                 _provider.BindStream(stream, document, frame, null, loop: false);

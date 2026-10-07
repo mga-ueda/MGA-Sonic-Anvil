@@ -39,6 +39,7 @@ internal sealed class AudioStreamSource : IDisposable
     private AudioStreamSource(WaveStream reader, long frameCount, int prebufferTimeoutMs)
     {
         _reader = reader;
+        IsSilence = reader is SilentWaveStream;
         SampleRate = Math.Max(1, reader.WaveFormat.SampleRate);
         Channels = Math.Max(1, reader.WaveFormat.Channels);
         FrameCount = Math.Max(0, frameCount);
@@ -59,9 +60,51 @@ internal sealed class AudioStreamSource : IDisposable
 
     public int BitsPerSample { get; }
 
-    public long FrameCount { get; }
+    public long FrameCount { get; private set; }
+
+    public bool IsSilence { get; }
 
     public long Frame => _frame;
+
+    /// <summary>音声の無い動画用。指定尺の無音をストリームとして出す。</summary>
+    public static AudioStreamSource CreateSilence(
+        int sampleRate,
+        int channels,
+        int bitsPerSample,
+        long frameCount,
+        int prebufferTimeoutMs = 0)
+    {
+        var frames = Math.Max(1, frameCount);
+        var reader = new SilentWaveStream(sampleRate, channels, bitsPerSample, frames);
+        return new AudioStreamSource(reader, frames, prebufferTimeoutMs);
+    }
+
+    /// <summary>映像尺が後から分かったとき、無音ストリームだけ伸ばす。</summary>
+    public void GrowFrameCount(long frameCount)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!IsSilence || frameCount <= FrameCount)
+        {
+            return;
+        }
+
+        if (_reader is SilentWaveStream silent)
+        {
+            silent.GrowToFrames(frameCount);
+        }
+
+        FrameCount = frameCount;
+        lock (_ringGate)
+        {
+            if (_pumpFrame < FrameCount)
+            {
+                _readerEof = false;
+            }
+        }
+
+        _hasSpace.Set();
+        _hasData.Set();
+    }
 
     public static AudioStreamSource Open(string path, int prebufferTimeoutMs = 3000)
     {

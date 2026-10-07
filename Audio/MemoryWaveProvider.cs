@@ -345,6 +345,32 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
+    /// <summary>無音ストリームの尺を映像の NaturalDuration に合わせる。</summary>
+    public void GrowSilenceFrames(long frameCount)
+    {
+        lock (_gate)
+        {
+            if (_stream is not { IsSilence: true } || frameCount <= 0)
+            {
+                return;
+            }
+
+            _stream.GrowFrameCount(frameCount);
+            var sampleCount = Math.Max(0, _stream.FrameCount) * (long)Math.Max(1, _channels);
+            _usedSamples = sampleCount > int.MaxValue ? int.MaxValue : (int)sampleCount;
+            if (!_loop)
+            {
+                _playEnd = _usedSamples;
+            }
+
+            var cursorSamples = _sourceFrame * Math.Max(1, _channels);
+            if (cursorSamples < _playEnd)
+            {
+                Ended = false;
+            }
+        }
+    }
+
     public long CursorFrame
     {
         get
