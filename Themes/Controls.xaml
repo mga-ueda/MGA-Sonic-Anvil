@@ -8,6 +8,13 @@
 
     <Geometry x:Key="FlatCheckMarkGeometry">M 1.5,4.5 L 4,7 L 9,1.5</Geometry>
 
+    <!-- 既定の EditorContextMenu は IME 再変換候補を足す。パス欄ではゴミに見えるので編集コマンドだけにする。 -->
+    <ContextMenu x:Key="DarkTextBoxContextMenu" x:Shared="False">
+        <MenuItem Command="ApplicationCommands.Cut" />
+        <MenuItem Command="ApplicationCommands.Copy" />
+        <MenuItem Command="ApplicationCommands.Paste" />
+    </ContextMenu>
+
     <Style x:Key="DarkTextBoxStyle" TargetType="TextBox">
         <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
         <Setter Property="Background" Value="{DynamicResource DialogInputBackBrush}" />
@@ -19,6 +26,7 @@
         <Setter Property="SelectionBrush" Value="{DynamicResource AccentCyanBrush}" />
         <Setter Property="SelectionOpacity" Value="0.35" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="ContextMenu" Value="{DynamicResource DarkTextBoxContextMenu}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
@@ -272,7 +280,8 @@
                                              SelectionOpacity="0.35"
                                              Focusable="True"
                                              Visibility="Collapsed"
-                                             IsReadOnly="{TemplateBinding IsReadOnly}" />
+                                             IsReadOnly="{TemplateBinding IsReadOnly}"
+                                             ContextMenu="{DynamicResource DarkTextBoxContextMenu}" />
                                 </Grid>
                             </Grid>
                         </Border>
@@ -577,7 +586,8 @@
                                              SelectionOpacity="0.35"
                                              Focusable="True"
                                              Visibility="Collapsed"
-                                             IsReadOnly="{TemplateBinding IsReadOnly}" />
+                                             IsReadOnly="{TemplateBinding IsReadOnly}"
+                                             ContextMenu="{DynamicResource DarkTextBoxContextMenu}" />
                                 </Grid>
                             </Grid>
                         </Border>
@@ -730,7 +740,8 @@
                                              SelectionOpacity="0.35"
                                              Focusable="True"
                                              Visibility="Collapsed"
-                                             IsReadOnly="{TemplateBinding IsReadOnly}" />
+                                             IsReadOnly="{TemplateBinding IsReadOnly}"
+                                             ContextMenu="{DynamicResource DarkTextBoxContextMenu}" />
                                 </Grid>
                             </Grid>
                         </Border>
