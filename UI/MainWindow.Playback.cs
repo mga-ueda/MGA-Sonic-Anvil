@@ -398,16 +398,23 @@ public partial class MainWindow
             SyncRangeClicks();
             _player.Play();
             _playbackGeneration = _player.Generation;
-            _playTimer.Start();
-            StartMeterRendering();
-            Waveform.SetTrailRecording(true);
-            Transport.SetPlaying(true);
+            EnsureLibraryVisualPlaybackClock();
             Waveform.PlayheadFrame = startFrame;
             SyncOverviewPlayhead();
         }
         catch (Exception ex)
         {
             PausePlaybackSoft();
+            if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVideo(_document))
+            {
+                LibraryBrowser.ShowPlaylistVisual(_activeSession!, play: true);
+                LibraryBrowser.SeekPlaylistVisual(
+                    TimeSpan.FromSeconds(startFrame / (double)Math.Max(1, _document.SampleRate)));
+                EnsureLibraryVisualPlaybackClock();
+                Waveform.PlayheadFrame = startFrame;
+                return;
+            }
+
             OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -725,7 +732,7 @@ public partial class MainWindow
 
         Overview.InvalidateVisual();
         RefreshStatus();
-        if (_document is null || !_player.IsPlaying)
+        if (_document is null || !IsPlaybackActive())
         {
             _ = Waveform.TakePendingSelectionPrerollJump();
             return;
@@ -749,7 +756,7 @@ public partial class MainWindow
             return;
         }
 
-        var cursor = _player.CursorFrame;
+        var cursor = _player.IsPlaying ? _player.CursorFrame : Waveform.PlayheadFrame;
         var inside = cursor >= selection.StartFrame && cursor < selection.EndFrame;
         if (inside)
         {
@@ -809,6 +816,16 @@ public partial class MainWindow
 
         if (_player.ProviderEnded)
         {
+            if (IsLibraryVideoPlayheadClock() && !_player.IsPlaying)
+            {
+                if (!_meterRendering)
+                {
+                    SyncPlaybackVisuals();
+                }
+
+                return;
+            }
+
             OnPlaybackEnded(_playbackGeneration);
             return;
         }
@@ -830,9 +847,10 @@ public partial class MainWindow
 
         if (IsLibraryMaximized && LibraryPlaylistDocuments.IsPdf(_document))
         {
-            var seconds = LibraryBrowser.PlaylistVisualPosition.TotalSeconds;
-            var visualFrame = (long)Math.Round(seconds * Math.Max(1, _document.SampleRate));
-            visualFrame = Math.Clamp(visualFrame, 0, Math.Max(0, _document.FrameCount));
+            var visualFrame = LibraryPlayerMode.FrameFromSeconds(
+                LibraryBrowser.PlaylistVisualPosition.TotalSeconds,
+                _document.SampleRate,
+                _document.FrameCount);
             _document.CursorFrame = visualFrame;
             if (!Waveform.IsInteracting)
             {
@@ -844,21 +862,27 @@ public partial class MainWindow
             return;
         }
 
-        _player.ReadPlayheadVisuals(out var frame, out var exitFrame);
-        _document.CursorFrame = frame;
-        if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVideo(_document) && !Waveform.IsInteracting)
+        var videoPlaying = IsLibraryVideoPlayheadClock();
+        long frame;
+        long exitFrame = -1;
+        if (videoPlaying)
         {
-            var audioSeconds = frame / (double)Math.Max(1, _document.SampleRate);
-            var drift = Math.Abs(audioSeconds - LibraryBrowser.PlaylistVisualPosition.TotalSeconds);
-            var shuttle = _playbackShuttleDirection != 0;
-            var threshold = shuttle
-                ? LibraryPlayerMode.VideoShuttleSeekSeconds
-                : LibraryPlayerMode.VideoClockSeekSeconds;
-            if (shuttle || !_player.IsPlaying || drift > threshold)
+            EnsurePlaylistVideoTimelineLength();
+            frame = LibraryPlayerMode.FrameFromSeconds(
+                LibraryBrowser.PlaylistVisualPosition.TotalSeconds,
+                _document.SampleRate,
+                _document.FrameCount);
+            if (!Waveform.IsInteracting)
             {
-                LibraryBrowser.SeekPlaylistVisual(TimeSpan.FromSeconds(audioSeconds));
+                ApplyPlaylistVideoLoopAndClock(ref frame);
             }
         }
+        else
+        {
+            _player.ReadPlayheadVisuals(out frame, out exitFrame);
+        }
+
+        _document.CursorFrame = frame;
         if (!Waveform.IsInteracting)
         {
             Waveform.PlayheadFrame = frame;
@@ -871,6 +895,105 @@ public partial class MainWindow
 
             SyncTransportPosition(frame);
         }
+    }
+
+    private bool IsLibraryVideoPlayheadClock() =>
+        _document is not null
+        && LibraryPlayerMode.DrivesPlayheadWhileVideoPlays(
+            IsLibraryMaximized,
+            LibraryPlaylistDocuments.IsVideo(_document),
+            LibraryBrowser.PlaylistVisualClockRunning && LibraryBrowser.PlaylistVisualIsVideo);
+
+    private void EnsureLibraryVisualPlaybackClock()
+    {
+        // 動画は映像クロック、wave / mp3 は _playTimer＋音声ヘッド。音声が出ている本再生だけ _playTimer を回す。
+        if (_player.IsPlaying && !_playTimer.IsEnabled)
+        {
+            _playTimer.Start();
+        }
+
+        EnsureLibraryVisualPlayheadTicker();
+        Waveform.SetTrailRecording(true);
+        Transport.SetPlaying(true);
+    }
+
+    /// <summary>ホバー／プレビュー用。本再生の _playTimer とは別にし、Space の再生判定を汚さない。</summary>
+    private void OnVisualPlayheadTick()
+    {
+        if (IsLibraryVideoPlayheadClock() && !_player.IsScrubbing && !Waveform.IsScrubbing)
+        {
+            SyncPlaybackVisuals();
+        }
+    }
+
+    /// <summary>音声が出ていなくても、映像クロックでシークバーを動かす（本再生判定には使わない）。</summary>
+    private void EnsureLibraryVisualPlayheadTicker()
+    {
+        StartMeterRendering();
+        if (!_visualPlayheadTimer.IsEnabled)
+        {
+            _visualPlayheadTimer.Start();
+        }
+    }
+
+    /// <summary>
+    /// 動画の本再生：シークバーは映像の再生位置。音声出力の有無には依存しない。
+    /// 選択範囲があればその範囲でループする。
+    /// </summary>
+    private void ApplyPlaylistVideoLoopAndClock(ref long frame)
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var loop = _document.Selection;
+        var rate = Math.Max(1, _document.SampleRate);
+        if (!loop.IsEmpty && LibraryPlayerMode.NeedsLoopSeek(frame, loop.StartFrame, loop.EndFrame))
+        {
+            frame = LibraryPlayerMode.WrapLoopFrame(frame, loop.StartFrame, loop.EndFrame);
+            LibraryBrowser.SeekPlaylistVisual(TimeSpan.FromSeconds(frame / (double)rate));
+        }
+
+        if (_playbackShuttleDirection != 0 && _player.IsPlaying)
+        {
+            _player.ReadPlayheadVisuals(out var audioFrame, out _);
+            LibraryBrowser.SeekPlaylistVisual(TimeSpan.FromSeconds(audioFrame / (double)rate));
+            frame = audioFrame;
+        }
+    }
+
+    private void EnsurePlaylistVideoTimelineLength()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var duration = LibraryBrowser.PlaylistVisualDuration;
+        if (duration <= TimeSpan.Zero || _document.SampleRate < 1)
+        {
+            return;
+        }
+
+        var frames = Math.Max(1, (long)Math.Round(duration.TotalSeconds * _document.SampleRate));
+        if (frames == _document.FrameCount)
+        {
+            return;
+        }
+
+        _document.SyncStreamPlaybackMeta(
+            _document.SampleRate,
+            _document.Channels,
+            _document.BitsPerSample,
+            frames);
+        if (_document.Tags.DurationSeconds <= 0
+            || Math.Abs(_document.Tags.DurationSeconds - duration.TotalSeconds) > 0.05)
+        {
+            _document.ApplyTags(_document.Tags.WithDurationSeconds(duration.TotalSeconds));
+        }
+        Waveform.ResetTimeZoom();
+        ScheduleLibraryWaveformPaint();
     }
 
     private void StartMeterRendering()
@@ -902,7 +1025,7 @@ public partial class MainWindow
 
     private void OnMeterRendering(object? sender, EventArgs e)
     {
-        if (!_player.IsPlaying)
+        if (!_player.IsPlaying && !IsLibraryVideoPlayheadClock())
         {
             return;
         }
@@ -937,6 +1060,10 @@ public partial class MainWindow
         // 再生ヘッドだけ vsync 側。スペアナ／ゴニオは Render より低い優先度へ回し、
         // マウスとキー（Input）が描画の後ろに並ばないようにする。
         if (_playTimer.IsEnabled && !_player.IsScrubbing)
+        {
+            SyncPlaybackVisuals();
+        }
+        else if (IsLibraryVideoPlayheadClock() && !_player.IsScrubbing)
         {
             SyncPlaybackVisuals();
         }
@@ -1120,6 +1247,11 @@ public partial class MainWindow
         {
             _resumeAfterScrub = false;
             PausePlaybackSoft();
+            if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVideo(_document))
+            {
+                return;
+            }
+
             OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }

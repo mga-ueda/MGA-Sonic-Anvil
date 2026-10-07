@@ -401,6 +401,7 @@ internal sealed class WaveformView : Grid
             _loudness.Invalidate();
             InvalidateWaveform();
             SyncSpectrogramBoostBar();
+            Cursor = ShowsSeekCursors ? Cursors.IBeam : Cursors.Arrow;
             // Document が null になっても MouseLeave は起きないため、ガイドを明示的に更新する。
             ApplyMouseGuideOverlay();
             RaiseViewChanged();
@@ -541,8 +542,15 @@ internal sealed class WaveformView : Grid
             _deferWaveReload = false;
             _waveDirty = true;
             InvalidateStaticLayer();
+            ApplyMouseGuideOverlay();
+            InvalidatePlayheadOnly();
         }
     }
+
+    private bool ShowsSeekCursors =>
+        LibraryPlayerMode.ShowsSeekCursors(
+            SeekAndSelectOnly,
+            _document is not null && LibraryPlaylistDocuments.IsPdf(_document));
 
     private bool _seekAndSelectOnly;
     private bool _showPlayhead = true;
@@ -1768,6 +1776,12 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        if (!ShowsSeekCursors)
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (e.ClickCount == 1)
         {
             _pointerDownSelection = _document.Selection;
@@ -2313,7 +2327,7 @@ internal sealed class WaveformView : Grid
 
     internal void PaintPlayhead(DrawingContext dc)
     {
-        if (!_showPlayhead)
+        if (!_showPlayhead || !ShowsSeekCursors)
         {
             return;
         }
@@ -6969,6 +6983,20 @@ internal sealed class WaveformView : Grid
 
     private void ApplyMouseGuideOverlay()
     {
+        if (!ShowsSeekCursors)
+        {
+            ClearMouseGuide();
+            if (_mouseGuideBar.Visibility != Visibility.Collapsed)
+            {
+                _mouseGuideBar.Visibility = Visibility.Collapsed;
+            }
+
+            _appliedGuideX = double.NaN;
+            _guideOverSelection = false;
+            _mouseGuideBar.Fill = _mouseGuideBrush;
+            return;
+        }
+
         ResolveMouseGuideX();
         if (_mouseGuideX is not double mx || _document is null)
         {
@@ -7019,7 +7047,11 @@ internal sealed class WaveformView : Grid
         }
 
         Cursor next;
-        if (TryHitChannelLabel(pos, out _))
+        if (!ShowsSeekCursors)
+        {
+            next = Cursors.Arrow;
+        }
+        else if (TryHitChannelLabel(pos, out _))
         {
             next = Cursors.Hand;
         }

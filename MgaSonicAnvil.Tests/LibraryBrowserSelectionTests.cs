@@ -193,6 +193,10 @@ public sealed class LibraryBrowserSelectionTests
     public void GroupJacketColumnWidth_MatchesJacketPlusMargins()
     {
         Assert.Equal(DesignMetrics.LibraryGroupJacketSize + 16, LibraryBrowserView.GroupJacketColumnWidth);
+        Assert.Equal(
+            DesignMetrics.LibraryVisualJacketWidth * 9d / 16d,
+            DesignMetrics.LibraryVisualJacketHeight);
+        Assert.True(DesignMetrics.LibraryVisualJacketHeight < DesignMetrics.LibraryGroupJacketSize);
     }
 
     [Fact]
@@ -1596,6 +1600,17 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void ShouldSelectAppendedLibrarySession_ShiftEnterSelectsOnlyEmptyPlaylistHead()
+    {
+        Assert.True(MainWindow.ShouldSelectAppendedLibrarySession(playFirst: true, firstInBatch: true, playlistWasEmpty: true));
+        Assert.True(MainWindow.ShouldSelectAppendedLibrarySession(playFirst: true, firstInBatch: true, playlistWasEmpty: false));
+        Assert.False(MainWindow.ShouldSelectAppendedLibrarySession(playFirst: true, firstInBatch: false, playlistWasEmpty: true));
+        Assert.True(MainWindow.ShouldSelectAppendedLibrarySession(playFirst: false, firstInBatch: true, playlistWasEmpty: true));
+        Assert.False(MainWindow.ShouldSelectAppendedLibrarySession(playFirst: false, firstInBatch: true, playlistWasEmpty: false));
+        Assert.False(MainWindow.ShouldSelectAppendedLibrarySession(playFirst: false, firstInBatch: false, playlistWasEmpty: true));
+    }
+
+    [Fact]
     public void SetSessions_PinsCollectionViewCurrentToSelection_NotFirstRow()
     {
         RunSta(() =>
@@ -1857,7 +1872,7 @@ public sealed class LibraryBrowserSelectionTests
             EnsureTheme();
             var view = new LibraryBrowserView();
             Assert.Equal(DataGridHeadersVisibility.None, view.HeadersVisibility);
-            // 曲が無い／Wave のみのときは No Image 枠も出さない。
+            // 曲が無い／実ジャケットが無いときは枠を出さない。
             Assert.Equal(Visibility.Collapsed, view.GroupSpacerVisibility);
             Assert.Equal(0, view.FrozenColumnCount);
 
@@ -1865,6 +1880,10 @@ public sealed class LibraryBrowserSelectionTests
             mp3.Document.ApplyTags(new AudioFileTags { Probed = true, Album = "A" });
             view.SetSessions([mp3], mp3, [mp3]);
             Assert.Equal(DataGridHeadersVisibility.Column, view.HeadersVisibility);
+            Assert.Equal(Visibility.Collapsed, view.GroupSpacerVisibility);
+
+            mp3.Document.SetArtwork(OnePixelPng);
+            view.SetSessions([mp3], mp3, [mp3]);
             Assert.Equal(Visibility.Visible, view.GroupSpacerVisibility);
             Assert.Equal(1, view.FrozenColumnCount);
 
@@ -1955,8 +1974,10 @@ public sealed class LibraryBrowserSelectionTests
             EnsureTheme();
             var first = Session("aaa.mp3");
             first.Document.ApplyTags(new AudioFileTags { Probed = true, Album = "A", Title = "One" });
+            first.Document.SetArtwork(OnePixelPng);
             var second = Session("bbb.mp3");
             second.Document.ApplyTags(new AudioFileTags { Probed = true, Album = "A", Title = "Two" });
+            second.Document.SetArtwork(OnePixelPng);
             var view = new LibraryBrowserView();
             var window = new Window
             {
@@ -2064,6 +2085,7 @@ public sealed class LibraryBrowserSelectionTests
                     Artist = "CAPCOM",
                 });
                 sessions[i] = new DocumentSession(document);
+                document.SetArtwork(OnePixelPng);
             }
 
             var view = new LibraryBrowserView();
@@ -2119,6 +2141,7 @@ public sealed class LibraryBrowserSelectionTests
                     Artist = "CAPCOM",
                 });
                 sessions[i] = new DocumentSession(document);
+                document.SetArtwork(OnePixelPng);
             }
 
             // プレーヤー起動時と同じく、一覧は高さ 0 で畳んだまま載る。
@@ -2319,6 +2342,7 @@ public sealed class LibraryBrowserSelectionTests
                     Comment = Path.Combine(@"V:\very\long\folder\path\for\scroll", $"disc{i}"),
                 });
                 sessions[i] = new DocumentSession(document);
+                document.SetArtwork(OnePixelPng);
             }
 
             var view = new LibraryBrowserView();
@@ -2373,6 +2397,7 @@ public sealed class LibraryBrowserSelectionTests
                     Comment = Path.Combine(@"V:\very\long\folder\path\for\scroll", $"disc{i}"),
                 });
                 sessions[i] = new DocumentSession(document);
+                document.SetArtwork(OnePixelPng);
             }
 
             var view = new LibraryBrowserView();
@@ -2562,6 +2587,18 @@ public sealed class LibraryBrowserSelectionTests
 
     private static DocumentSession Session(string name) =>
         new(AudioDocument.CreateDeferred(Path.Combine(Path.GetTempPath(), name)));
+
+    private static readonly byte[] OnePixelPng =
+    [
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+        0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54,
+        0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01,
+        0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00,
+        0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+    ];
 
     private static void EnsureTheme()
     {
