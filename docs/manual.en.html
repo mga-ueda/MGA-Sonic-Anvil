@@ -181,7 +181,7 @@
         <ul>
           <li>In Settings, New, and save-confirm dialogs, <kbd>Tab</kbd> also moves to the buttons.</li>
           <li><kbd>Ctrl</kbd>+<kbd>Tab</kbd> goes to the next tab, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> to the previous. <kbd>Esc</kbd> closes it.</li>
-          <li>Width follows the Audio tab. Tabs are General / Shown / Audio / Player / Editing / Export / Wwise.</li>
+          <li>Width follows the Audio tab. Tabs are General / Shown / Audio / Player / Editing / Export · Paths / Wwise.</li>
         </ul>
         <h4>General</h4>
         <ul>
@@ -193,7 +193,7 @@
         <h4>Shown</h4>
         <ul>
           <li><strong>Speaker definitions</strong> — checklist of definitions to enable. Stereo only by default. The definition in use stays listed until you switch away. At least one must stay enabled. The status-bar SPEAKER menu uses the same list.</li>
-          <li><strong>Documents and video in the playlist</strong> — PDF / MOV / MP4 as separate checks. All on by default. Unchecked types are skipped on folder add and drop. Player-only; they are never handed to the editor. Non-MJPEG / Photo JPEG video proxies are deleted after the retention (1 / 7 / 14 / 30 days; default 7), counted from last use, at startup and when this setting changes.</li>
+          <li><strong>Documents and video in the playlist</strong> — PDF / MOV / MP4 as separate checks. All on by default. Unchecked types are skipped on folder add and drop. Player-only; they are never handed to the editor.</li>
           <li><strong>Playlist columns</strong> — choose WAVE and MP3 sets separately (only columns that make sense for that format; the file name is always shown; an empty playlist hides every column). WAVE / AIFF-only lists use the WAVE set, MP3 / M4A-only lists use the MP3 set. Mixed lists start with both sets combined. While mixed, dragging a header to reorder or right-clicking to show/hide is remembered only for that mixed list and does not change the WAVE / MP3 settings. Changing the WAVE / MP3 settings goes back to combining both sets. Each set can be reset. WAVE starts as file / rate / bits / Ch / time / date / parent folder / waveform. MP3 starts as file / title / album / artist / composer / time / track / disc / year / genre / date / comment / parent folder (waveform off). Empty columns hide and come back when a value appears. Jacket stays hidden for WAVE / AIFF only and appears when MP3 / M4A is present. Drag a header to reorder; right-click to turn columns on or off.</li>
           <li><strong>Waveform width</strong> — choose separately for WAVE and MP3 at the bottom of each column checklist. S (short) / M (medium) / L (long). WAVE and MP3 both default to L. M is 2× S, L is 3× S. WAVE / AIFF-only lists use the WAVE width, MP3 / M4A-only lists use the MP3 width, and mixed lists use the wider of the two. Reset to defaults also restores that side's width. Waveforms fill in after the list paints, as rough bars.</li>
         </ul>
@@ -219,10 +219,10 @@
           <li><strong>Default fade curves</strong>.</li>
           <li>Adding regions is chosen when you start recording.</li>
         </ul>
-        <h4>Export</h4>
+        <h4>Export · Paths</h4>
         <ul>
-          <li><strong>MP3</strong> — Windows bit rate when not using LAME / LAME path / LAME options.</li>
-          <li><strong>Parallel export count</strong> — default Auto = a quarter of the CPU cores. The dropdown max is half the cores.</li>
+          <li><strong>Audio</strong> — LAME path / LAME options / Windows bit rate when not using LAME / parallel export count (default Auto = a quarter of the CPU cores; dropdown max is half the cores).</li>
+          <li><strong>Movie</strong> — FFmpeg path / Do not auto-build proxies (off by default) / video proxy retention / Delete all (clears every stored proxy now, ignoring retention; asks first).</li>
         </ul>
         <h4>Wwise</h4>
         <p>Music Track timing for EXPORT. Streaming is always on. Prefetch Length and Look-ahead Time both start at 500 ms (0 to 10000). Prefetch is on the first track; look-ahead is on later tracks. The first track’s look-ahead stays 50 ms.</p>
@@ -257,7 +257,7 @@
         <h4>Screen</h4>
         <ul>
           <li>Tabs are hidden. File list on top (folder tree left, list center) and a short fixed-height waveform below. The overview is hidden.</li>
-          <li>Groups default to parent folder, with a jacket beside each group. Playback and skip do not rebuild the list.</li>
+          <li>Groups default to parent folder, with a jacket beside each group. Video always shows a jacket on each row, even when grouped. Playback and skip do not rebuild the list.</li>
           <li>While the playlist is empty, every list column stays hidden (clearing a visible list fades the headers in 1 second), and the level meter, spectrum, loudness, gonio, and surround meter stay hidden (they start hidden when you enter player). An empty playlist focuses the library (folder tree).</li>
           <li><kbd>F9</kbd> shows only the playlist and waveform (to save desktop space; from any mode).
             <ul>
@@ -271,12 +271,12 @@
         <h4>Playback</h4>
         <ul>
           <li>Entering selects and plays the first track (the same when you start the app with files).</li>
-          <li><kbd>Enter</kbd> or transport Play restarts from the beginning and continues to the next track. <kbd>Space</kbd> plays that track only and stops when it ends.</li>
+          <li><kbd>Enter</kbd> or transport Play restarts from the beginning and continues to the next track (while playing, stops; video stays in the dim+mesh preview). <kbd>Space</kbd> plays that track only and stops when it ends.</li>
           <li>While stopped, selecting a track shows its waveform without playing. Selecting PDF / video also shows a dim back-stage preview (video: dim + mesh + silent 1/4-speed loop; PDF: dim only, no mesh and no frosted glass). Adding tracks fades them in over 1 second; when they start moving with the audio they appear immediately. Clearing the list fades them out over 1 second.</li>
           <li><kbd>R</kbd> toggles shuffle. No repeats until the playlist has played once. Works on an empty list. Off by default. Leaving player turns it off. Not saved.</li>
           <li>Playback starts as soon as sound can play. It does not wait for the waveform to finish drawing.</li>
           <li>Continuous playback prepares the next track and joins without stopping. Tiny extra silence at the start and end of MP3 / M4A is reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
-          <li>Types checked under <strong>Documents and video in the playlist</strong> (PDF / MOV / MP4; all on by default) appear in the list. Video plays like audio (continuous or single track) behind the whole window, in front of the artwork wash and behind the list and waveform. Its audio feeds the meters, spectrum, and live loudness, and the waveform is drawn. MOV / MP4 codecs are inspected: MJPEG / Photo JPEG play as-is; anything else (such as ProRes) is transcoded to an MJPEG AVI playback proxy at the source frame rate with ffmpeg first (for smooth scrubbing) (frosted-glass progress; Esc cancels; ffmpeg is not bundled, PATH only). Proxies are removed after the retention in Settings (default 7 days from last use). Real playback goes bright and clears dim / mesh. Front chrome fades out over 1 s only during real video playback or bright PDF view—not during the dim selection preview. During real playback the waveform, level meter, spectrum, goniometer, surround meter, and loudness stay; large current and end times sit centered at the bottom (selection start and end appear on a second reserved line while a range is selected); <kbd>A</kbd> fades the waveform, analyzers, and timecode (selection range) on or off (during real playback / bright PDF view); <kbd>F</kbd> is the same as browser F11 fullscreen for video / PDF while shown (including the dim preview; F again restores). Bright PDF view also hides front chrome (<kbd>A</kbd> brings waveform etc. back; <kbd>Enter</kbd> / <kbd>Space</kbd> leaves the view). <kbd>B</kbd> dims the current page, pins it as a still background, and leaves immediately (works from the dim preview too; stays behind music or video; no drift; B again restores the normal wash; leaving for the editor discards it). Silent Skip is ignored while video plays (the checkbox is unchanged). Stop / pause keeps the frame (no jump to start, no blackout): it fades to the dim preview with mesh and a silent 1/4-speed loop; front UI fades back in over 1 s. Playing another track hides this layer so the wash shows. Seek and 5 s skip match the waveform. PDF is included in continuous play: when reached it opens in bright view and playback stops (no timeline). In bright PDF view, <kbd>←</kbd> / <kbd>→</kbd> and <kbd>PageUp</kbd> / <kbd>PageDown</kbd> turn pages, <kbd>Home</kbd> / <kbd>End</kbd> go to the first / last page, and <kbd>+</kbd> / <kbd>-</kbd> (including the numpad) zoom (100% fits the whole page in the window, up to 300%; pauses once at fit-width or fit-height; release and press again to go further; zoom is forgotten when another file is shown). Playlist shortcuts are disabled until the PDF view is left. Video and PDF stay in player mode and are never handed to the editor.</li>
+          <li>Types checked under <strong>Documents and video in the playlist</strong> (PDF / MOV / MP4; all on by default) appear in the list. Video plays like audio (continuous or single track) behind the whole window, in front of the artwork wash and behind the list and waveform. Its audio feeds the meters, spectrum, and live loudness, and the waveform is drawn. MOV / MP4 codecs are inspected: MJPEG / Photo JPEG play as-is; anything else (such as ProRes) is transcoded to an MJPEG AVI playback proxy at the source frame rate with ffmpeg first (for smooth scrubbing) (frosted-glass progress; Esc cancels; ffmpeg is not bundled; set ffmpeg.exe in Settings. Empty or invalid skips the proxy and tries the original file (no error)). Proxies are removed after the retention in Settings (default 7 days from last use). Real playback goes bright and clears dim / mesh. Front chrome fades out over 0.2 s only during real video playback or bright PDF view—not during the dim selection preview. During real playback the waveform, level meter, spectrum, goniometer, surround meter, and loudness stay; large current and end times sit centered at the bottom (selection start and end appear on a second reserved line while a range is selected); the playing file name sits at the bottom left; <kbd>A</kbd> fades the waveform, analyzers, and file name on or off (not the timecode; during real playback / bright PDF view); <kbd>T</kbd> toggles the timecode (selection range; during real video playback); <kbd>F</kbd> is the same as browser F11 fullscreen for video / PDF while shown (including the dim preview; F again restores; stopping playback does not exit it). Bright PDF view also hides front chrome (<kbd>A</kbd> brings waveform etc. back; <kbd>Enter</kbd> / <kbd>Space</kbd> leaves the view). <kbd>B</kbd> dims the current page, pins it as a still background, and leaves immediately (works from the dim preview too; stays behind music or video; no drift; B again restores the normal wash; leaving for the editor discards it). Silent Skip is ignored while video plays (the checkbox is unchanged). Stop / pause keeps the frame (no jump to start, no blackout): it fades to the dim preview with mesh and a silent 1/4-speed loop; front UI fades back in over 0.2 s. Playing another track hides this layer so the wash shows. Seek and 5 s skip match the waveform. PDF is included in continuous play: when reached it opens in bright view and playback stops (no timeline). In bright PDF view, <kbd>←</kbd> / <kbd>→</kbd> and <kbd>PageUp</kbd> / <kbd>PageDown</kbd> turn pages, <kbd>Home</kbd> / <kbd>End</kbd> go to the first / last page, and <kbd>+</kbd> / <kbd>-</kbd> (including the numpad) zoom (100% fits the whole page in the window, up to 300%; pauses once at fit-width or fit-height; release and press again to go further; zoom is forgotten when another file is shown). Playlist shortcuts are disabled until the PDF view is left. Video and PDF stay in player mode and are never handed to the editor.</li>
           <li>Arrow keys do not shuttle. The numpad (NumLock on) works from any pane.
             <ul>
               <li>0 — play / pause</li>
@@ -309,7 +309,7 @@
         <p>The waveform only seeks and selects. No right-click, menu key, or Shift+F10 menu. No marker / region / loop overlay. Selection is inverted and translucent. No zoom. Display-resolution peaks only. Short files stay dense. Spectrogram / loudness-curve views stay off. Edit commands are blocked and grayed out.</p>
         <h4>Jacket and background</h4>
         <ul>
-          <li>Jacket images load when a row is selected. A No Image placeholder is used when none is embedded. WAVE / AIFF-only playlists hide the jacket frame entirely (it appears when MP3 / M4A is present).</li>
+          <li>Jacket images appear only when a file actually has art. Rows without art stay blank. If the playlist has none, the jacket area is hidden.</li>
           <li>Drop an image on the jacket to replace it on MP3 only (written into the file). WAVE / AIFF / M4A cannot be replaced.</li>
           <li>When a jacket is set, it is stretched to fill the whole player window (aspect may change) and used as a heavily blurred background, including the transport, meters, and status bar.</li>
         </ul>
@@ -524,8 +524,8 @@
 
       <h2 id="playback">4. Playback</h2>
       <ul>
-        <li><kbd>Space</kbd> — play / stop. For audio, stop returns to the start position. For video, it stays at the stop frame in the dim+mesh preview (no jump to start). In player mode, plays only the selected track and stops when it ends (does not continue the playlist). During bright PDF view, leaves the PDF.</li>
-        <li><kbd>Enter</kbd> — pause in place. On the player list, restart from the beginning and continue to the next track when it ends (transport Play does the same continuous playback).</li>
+        <li><kbd>Space</kbd> — play / stop. For audio, stop returns to the start position. For video, it stays at the stop frame in the dim+mesh preview (no jump to start). In player mode, plays only the selected track and stops when it ends (does not continue the playlist). During bright PDF view, returns to the dim preview.</li>
+        <li><kbd>Enter</kbd> — pause in place. On the player list, restart from the beginning and continue to the next track when it ends (while playing, stops; video stays in the dim+mesh preview; transport Play is the same).</li>
         <li>← / → — while stopped, seek (about 1 px of the view; 1 sample when dots are shown). Hold during playback for 3× shuttle at the original pitch (−4 dB while held). Release restores speed and volume. Silent Skip does not run while you hold. Player mode does not shuttle with the arrows (numpad <kbd>1</kbd> / <kbd>3</kbd>).</li>
         <li><kbd>Ctrl</kbd>+<kbd>Space</kbd> — from 3 seconds earlier.</li>
         <li><kbd>Alt</kbd>+<kbd>Enter</kbd> — restart from the playback start (while the tile search box has focus, closes tiles that did not match instead).</li>
@@ -678,8 +678,8 @@
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td><kbd>Space</kbd></td><td>Play / stop (audio returns to the start; video stays at the stop frame in the dim+mesh preview; in player mode, play that track only and stop when it ends; during bright PDF view, leave the PDF)</td></tr>
-          <tr><td><kbd>Enter</kbd></td><td>Pause in place (on the player list: restart from the beginning and continue to the next track; transport Play does the same continuous playback)</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Play / stop (audio returns to the start; video stays at the stop frame in the dim+mesh preview; in player mode, play that track only and stop when it ends; during bright PDF view, return to the dim preview)</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Pause in place (on the player list: restart from the beginning and continue to the next track; while playing, stop — video to dim+mesh preview; transport Play is the same)</td></tr>
           <tr><td>← / →</td><td>Hold during playback for 3× shuttle (original pitch; −4 dB while held; Silent Skip pauses). Seek when stopped. Unused in player mode (numpad <kbd>1</kbd> / <kbd>3</kbd>)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Play from 3 seconds earlier</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from the playback start (while the tile search box has focus, closes tiles that did not match instead)</td></tr>
@@ -921,8 +921,9 @@
           <tr><td><kbd>F2</kbd></td><td>Focus Favorites</td></tr>
           <tr><td><kbd>F3</kbd></td><td>Focus the playlist</td></tr>
           <tr><td><kbd>F5</kbd></td><td>Refresh the folder tree and move focus there (re-reads folders from disk; keeps expansion and selection when possible; works from the playlist, Favorites, or waveform too)</td></tr>
-          <tr><td><kbd>F</kbd></td><td>While video or PDF is shown (including the dim preview), fullscreen like browser F11 / restore (covers the taskbar)</td></tr>
-          <tr><td><kbd>A</kbd></td><td>During real video playback or bright PDF view, fade the waveform, analyzers, and timecode (selection range; video only) on or off</td></tr>
+          <tr><td><kbd>F</kbd></td><td>While video or PDF is shown (including the dim preview), fullscreen like browser F11 / restore (covers the taskbar; stopping playback does not exit it)</td></tr>
+          <tr><td><kbd>A</kbd></td><td>During real video playback or bright PDF view, fade the waveform, analyzers, and file name on or off (not the timecode)</td></tr>
+          <tr><td><kbd>T</kbd></td><td>During real video playback, toggle the timecode (selection range)</td></tr>
           <tr><td><kbd>B</kbd></td><td>While a PDF is shown (including the dim preview), dim and pin the current page as a still background and leave the view / unpin (stays behind music or video; no drift; discarded when leaving for the editor)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+← / <kbd>Ctrl</kbd>+↑</td><td>Focus the folder tree (same as F1)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+→</td><td>Focus the playlist (same as F3)</td></tr>
@@ -931,14 +932,14 @@
           <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Select files (<kbd>Shift</kbd> for a range)</td></tr>
           <tr><td>Tree / Favorites <kbd>Shift</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd> / click</td><td>Select a range (<kbd>Ctrl</kbd>+click adds)</td></tr>
           <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>First / last track in the list. In bright PDF view, first / last page</td></tr>
-          <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Page the list (while playing, releasing switches to that track; while stopped, selection only; multi-select allowed). In bright PDF view, turn PDF pages (playlist shortcuts disabled)</td></tr>
-          <tr><td>PDF <kbd>←</kbd> / <kbd>→</kbd></td><td>Previous / next page in bright PDF view (playlist shortcuts disabled)</td></tr>
+          <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Page the list (while playing, releasing switches to that track; while stopped, selection only; multi-select allowed). In bright PDF view, turn PDF pages (Up/Down still change files; playlist chrome stays hidden while bridging)</td></tr>
+          <tr><td>PDF <kbd>←</kbd> / <kbd>→</kbd></td><td>Previous / next page in bright PDF view (Up/Down still change files)</td></tr>
           <tr><td>PDF <kbd>+</kbd> / <kbd>-</kbd></td><td>Zoom in / out (100% fits the whole page in the window, up to 300%; pauses at fit-width or fit-height; numpad works; forgotten when another file is shown)</td></tr>
           <tr><td>PDF <kbd>Enter</kbd> / <kbd>Space</kbd></td><td>Leave bright PDF view (keeps a still background pinned with B)</td></tr>
-          <tr><td><kbd>Enter</kbd></td><td>On the list, restart from the beginning and continue to the next track when it ends (transport Play does the same continuous playback with gapless). On the tree, clear the playlist, then add supported files from that folder and its subfolders (while searching, only visible folders: matching files when the hit is a file name, or everything in a folder whose name matched; inner folders first; playback starts with the first file added and does not jump when grouping reorders the list; focuses the playlist when playback starts)</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>On the list, restart from the beginning and continue to the next track when it ends (while playing, stop — video to dim+mesh preview; transport Play is the same continuous playback with gapless). On the tree, clear the playlist, then add supported files from that folder and its subfolders (while searching, only visible folders: matching files when the hit is a file name, or everything in a folder whose name matched; inner folders first; playback starts with the first file added and does not jump when grouping reorders the list; focuses the playlist when playback starts)</td></tr>
           <tr><td>Tree <kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>Append that folder and its subfolders to the playlist without clearing it (same search scope as Enter)</td></tr>
           <tr><td>Tree / Favorites double-click</td><td>Append only (does not play; one track at a time as found)</td></tr>
-          <tr><td><kbd>Space</kbd></td><td>Play only the selected track from the beginning and stop when it ends (does not advance; while playing: audio returns to the start; video stays at the stop frame in the dim+mesh preview; during bright PDF view, leave the PDF. Different from Enter / transport continuous playback)</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Play only the selected track from the beginning and stop when it ends (does not advance; while playing: audio returns to the start; video stays at the stop frame in the dim+mesh preview; during bright PDF view, return to the dim preview. Different from Enter / transport continuous playback)</td></tr>
           <tr><td><kbd>R</kbd></td><td>Toggle shuffle (works on an empty playlist; off by default; does not repeat a track until the playlist has played once; leaving player turns it off; not saved in settings)</td></tr>
           <tr><td>← / →</td><td>On the tree, expand / collapse folders. Do not shuttle</td></tr>
           <tr><td>Tree <kbd>*</kbd></td><td>Expand all folders under the selection (same as Explorer; numpad <kbd>*</kbd> or Shift+8; expansion is remembered)</td></tr>
@@ -982,7 +983,7 @@
       <p>In Settings, <kbd>Esc</kbd> closes the window. The UI ignores input while a format conversion, tab export, or multi-file open is running.</p>
 
       <h2 id="settings">11. Settings and language</h2>
-      <p>Settings are the gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. Tabs are General / Shown / Audio / Player / Editing / Export / Wwise. Details for each item are under <a href="#layout-settings">Layout → Settings</a>. <kbd>Esc</kbd> closes the window.</p>
+      <p>Settings are the gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. Tabs are General / Shown / Audio / Player / Editing / Export · Paths / Wwise. Details for each item are under <a href="#layout-settings">Layout → Settings</a>. <kbd>Esc</kbd> closes the window.</p>
       <ul>
         <li>Language is on General. The default is <span class="ui">Auto</span> (Japanese if the PC is Japanese, otherwise English). The Japanese UI may still show some English labels.</li>
         <li>The manual is <span class="ui">?</span>, or in the browser. It follows the UI language.</li>
@@ -1029,6 +1030,7 @@
         <li><strong>Wwise®</strong> / <strong>Audiokinetic®</strong> are trademarks of Audiokinetic Inc. This tool is unofficial. WAAPI requires a valid Wwise license.</li>
         <li>This app is released under the <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/LICENSE">MIT License</a>.</li>
         <li><strong>LAME</strong> is the name of the LAME project. It is not included. The app only runs the <code>lame.exe</code> you set in Settings. Getting LAME and following its license is up to you.</li>
+        <li><strong>FFmpeg</strong> is the name of the FFmpeg project. It is not included. The app only runs the <code>ffmpeg.exe</code> you set in Settings. Empty or invalid skips the video proxy. Getting FFmpeg and following its license is up to you.</li>
         <li><strong>Signalsmith Stretch</strong> is the library used for pitch change.</li>
       </ul>
       <footer>© MIYABI GAME AUDIO INC. — MGA Sonic Anvil User Manual (en)</footer>
