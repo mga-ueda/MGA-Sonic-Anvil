@@ -1120,14 +1120,22 @@ public partial class MainWindow
     /// true なら映像／PDF の本再生表示はそのまま（暗いプレビューへ落とさない）。
     /// 上下キーで次の本再生へつなぐとき用。
     /// </param>
-    private void PausePlaybackSoft(bool keepPlaylistVisual = false)
+    /// <param name="freezePlaylistVisual">
+    /// true なら映像を現在フレームで一時停止する（暗い 1/4 速プレビューへ落とさない）。
+    /// テンキー 0 の一時停止用。
+    /// </param>
+    private void PausePlaybackSoft(bool keepPlaylistVisual = false, bool freezePlaylistVisual = false)
     {
         StopPlaybackShuttle();
         ReleaseStuckScrub();
         _player.Pause();
         if (IsLibraryMaximized)
         {
-            if (!keepPlaylistVisual)
+            if (freezePlaylistVisual)
+            {
+                LibraryBrowser.PausePlaylistVisualFrame();
+            }
+            else if (!keepPlaylistVisual)
             {
                 LibraryBrowser.SetPlaylistVisualPlaying(false);
                 EnsurePlaylistVideoWindowRestored();

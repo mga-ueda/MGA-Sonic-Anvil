@@ -74,6 +74,37 @@ public sealed class LibraryPlayerModeTests
     }
 
     [Fact]
+    public void WantsAmbientSpill_WhenUniformLeavesLetterboxOrPillarbox()
+    {
+        // 縦長 → 横長ステージ（ピラーボックス）
+        Assert.True(LibraryVisualStage.WantsAmbientSpill(1080, 1920, 1920, 1080));
+        // 4:3 → 16:9（ピラーボックス）
+        Assert.True(LibraryVisualStage.WantsAmbientSpill(640, 480, 1920, 1080));
+        // 16:9 → 縦長ウィンドウ（レターボックス）
+        Assert.True(LibraryVisualStage.WantsAmbientSpill(1920, 1080, 900, 1600));
+        // アスペクト一致 → 黒帯なし
+        Assert.False(LibraryVisualStage.WantsAmbientSpill(1920, 1080, 1920, 1080));
+        Assert.False(LibraryVisualStage.WantsAmbientSpill(640, 480, 800, 600));
+        Assert.False(LibraryVisualStage.WantsAmbientSpill(0, 1920, 1920, 1080));
+        Assert.False(LibraryVisualStage.WantsAmbientSpill(1080, 1920, 0, 1080));
+        Assert.InRange(LibraryVisualStage.AmbientSpillBlurRadius, 48, 96);
+        Assert.InRange(LibraryVisualStage.AmbientSpillScale, 1.08, 1.2);
+        Assert.InRange(LibraryVisualStage.AmbientSpillOpacity, 0.2, 0.45);
+        Assert.InRange(LibraryVisualStage.AmbientSpillAspectEpsilon, 0.005, 0.05);
+
+        var portrait = LibraryVisualStage.UniformContentRect(1080, 1920, 1920, 1080);
+        Assert.False(portrait.IsEmpty);
+        Assert.Equal(1080, portrait.Height, 3);
+        Assert.Equal(1080 * (1080 / 1920d), portrait.Width, 3);
+        Assert.Equal((1920 - portrait.Width) * 0.5, portrait.X, 3);
+        Assert.Equal(0, portrait.Y, 3);
+
+        var fourByThree = LibraryVisualStage.UniformContentRect(640, 480, 1920, 1080);
+        Assert.True(fourByThree.Width < 1920);
+        Assert.Equal(1080, fourByThree.Height, 3);
+    }
+
+    [Fact]
     public void WrapLoopFrame_RestartsAtSelectionStart()
     {
         Assert.True(LibraryPlayerMode.DrivesPlayheadWhileVideoPlays(
@@ -439,6 +470,12 @@ public sealed class LibraryPlayerModeTests
             player: true, visualShown: true, visualPlaying: false, isPdf: false, isVideo: true));
         Assert.True(LibraryPlayerMode.HidesChromeForPlaylistVisual(
             player: true, visualShown: true, visualPlaying: false, isPdf: false, isVideo: true, bridgeHold: true));
+        Assert.True(LibraryPlayerMode.HidesChromeForPlaylistVisual(
+            player: true, visualShown: true, visualPlaying: false, isPdf: false, isVideo: true,
+            immersivePauseHold: true));
+        Assert.False(LibraryPlayerMode.HidesChromeForPlaylistVisual(
+            player: true, visualShown: true, visualPlaying: false, isPdf: false, isVideo: false,
+            immersivePauseHold: true));
         Assert.True(LibraryPlayerMode.HoldsPlaylistVisualChromeBridge(
             currentVisualPlaying: true, nextIsVisual: true));
         Assert.False(LibraryPlayerMode.HoldsPlaylistVisualChromeBridge(

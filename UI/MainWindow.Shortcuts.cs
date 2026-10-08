@@ -1843,7 +1843,19 @@ public partial class MainWindow
             return false;
         }
 
+        // シークや行更新のあとでプレイリストへフォーカスが吸い戻されないように残す。
+        var keepExplorer = IsLibraryExplorerFocused;
+        var keepFavorites = IsLibraryFavoritesFocused;
         JumpByVisiblePercent(percent, extendSelection: modifiers == ModifierKeys.Shift);
+        if (keepExplorer)
+        {
+            LibraryBrowser.RequestExplorerFocus();
+        }
+        else if (keepFavorites)
+        {
+            LibraryBrowser.FocusFavorites();
+        }
+
         return true;
     }
 

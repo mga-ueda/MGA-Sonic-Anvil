@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MgaSonicAnvil.Domain;
@@ -27,6 +28,18 @@ internal sealed class LibraryVisualStage : Grid
     /// <summary>本再生停止 → 暗いプレビューへの暗転秒数（現状から）。</summary>
     internal const double PreviewDimFadeSeconds = 0.25;
 
+    /// <summary>映像枠まわりへにじませるぼかし。フル塗りつぶしには使わない。</summary>
+    internal const double AmbientSpillBlurRadius = 72;
+
+    /// <summary>映像と同じ枠を広げ、縁から光をこぼす。</summary>
+    internal const double AmbientSpillScale = 1.12;
+
+    /// <summary>光漏れの不透明度。</summary>
+    internal const double AmbientSpillOpacity = 0.32;
+
+    /// <summary>映像と描画エリアのアスペクト差。これ未満は黒帯なしとみなす。</summary>
+    internal const double AmbientSpillAspectEpsilon = 0.02;
+
     /// <summary>格子（少し荒め）。線 1px。</summary>
     private const double MeshCell = 4;
 
@@ -43,6 +56,42 @@ internal sealed class LibraryVisualStage : Grid
         IsHitTestVisible = false,
         Volume = 0,
         Visibility = Visibility.Collapsed,
+    };
+
+    /// <summary>
+    /// 黒帯は黒のまま。本編と同ソースの映像を映像枠だけ広げてぼかし、縁に光をこぼす。
+    /// </summary>
+    private readonly Grid _spillHost = new()
+    {
+        ClipToBounds = true,
+        IsHitTestVisible = false,
+        Visibility = Visibility.Collapsed,
+    };
+
+    private readonly MediaElement _spillMedia = new()
+    {
+        LoadedBehavior = MediaState.Manual,
+        UnloadedBehavior = MediaState.Manual,
+        Stretch = Stretch.Fill,
+        ScrubbingEnabled = true,
+        IsHitTestVisible = false,
+        Volume = 0,
+    };
+
+    private readonly Border _spill = new()
+    {
+        HorizontalAlignment = HorizontalAlignment.Left,
+        VerticalAlignment = VerticalAlignment.Top,
+        IsHitTestVisible = false,
+        Opacity = AmbientSpillOpacity,
+        RenderTransformOrigin = new Point(0.5, 0.5),
+        RenderTransform = new ScaleTransform(AmbientSpillScale, AmbientSpillScale),
+        Effect = new BlurEffect
+        {
+            Radius = AmbientSpillBlurRadius,
+            KernelType = KernelType.Gaussian,
+            RenderingBias = RenderingBias.Performance,
+        },
     };
 
     private readonly Grid _pdfHost = new()
@@ -80,6 +129,9 @@ internal sealed class LibraryVisualStage : Grid
     private string? _path;
     private bool _video;
     private bool _playing;
+
+    /// <summary>本再生の一時停止。暗いプレビューへ落とさず、現在フレームで止める。</summary>
+    private bool _framePaused;
     private int _pdfPage;
     private int _pdfPages = 1;
     private int _pdfLoadTicket;
@@ -101,16 +153,31 @@ internal sealed class LibraryVisualStage : Grid
         Background = Brushes.Black;
         Visibility = Visibility.Collapsed;
         SnapsToDevicePixels = true;
+        _spill.Child = _spillMedia;
+        _spillHost.Children.Add(_spill);
         _pdfHost.Children.Add(_pdf);
-        // Media / PDF → dim で暗く → 格子。
+        // 光漏れ → Media / PDF → dim で暗く → 格子。
+        Children.Add(_spillHost);
         Children.Add(_media);
         Children.Add(_pdfHost);
         Children.Add(_dim);
         Children.Add(_mesh);
         _mesh.CacheMode = new BitmapCache { EnableClearType = false, SnapsToDevicePixels = true };
-        SizeChanged += (_, _) => ApplyPdfLayout();
+        SizeChanged += (_, _) =>
+        {
+            ApplyPdfLayout();
+            if (_video && IsShown)
+            {
+                SyncAmbientSpill();
+            }
+        };
         _media.MediaEnded += (_, _) =>
         {
+            if (_framePaused)
+            {
+                return;
+            }
+
             if (_video && !_playing && IsShown)
             {
                 RestartPreviewLoop();
@@ -137,7 +204,8 @@ internal sealed class LibraryVisualStage : Grid
                 Opened?.Invoke(this, duration);
             }
 
-            if (_video && !_playing)
+            SyncAmbientSpill();
+            if (_video && !_playing && !_framePaused)
             {
                 RestartHoverPreviewAtStart();
             }
@@ -146,6 +214,55 @@ internal sealed class LibraryVisualStage : Grid
         {
             // プロキシ無しのコーデックは開けないことがある。ホバーではエラーを出さない。
         };
+    }
+
+    /// <summary>
+    /// Stretch.Uniform で黒帯が出るとき。縦長・4:3・横長のレターボックスなど。
+    /// </summary>
+    internal static bool WantsAmbientSpill(
+        int naturalWidth,
+        int naturalHeight,
+        double stageWidth,
+        double stageHeight)
+    {
+        if (naturalWidth <= 0 || naturalHeight <= 0 || stageWidth <= 0 || stageHeight <= 0)
+        {
+            return false;
+        }
+
+        var videoAspect = naturalWidth / (double)naturalHeight;
+        var stageAspect = stageWidth / stageHeight;
+        return Math.Abs(videoAspect - stageAspect) > AmbientSpillAspectEpsilon;
+    }
+
+    /// <summary>MediaElement Stretch.Uniform と同じ表示矩形。</summary>
+    internal static Rect UniformContentRect(
+        int naturalWidth,
+        int naturalHeight,
+        double stageWidth,
+        double stageHeight)
+    {
+        if (naturalWidth <= 0 || naturalHeight <= 0 || stageWidth <= 0 || stageHeight <= 0)
+        {
+            return Rect.Empty;
+        }
+
+        var videoAspect = naturalWidth / (double)naturalHeight;
+        var stageAspect = stageWidth / stageHeight;
+        double width;
+        double height;
+        if (videoAspect > stageAspect)
+        {
+            width = stageWidth;
+            height = stageWidth / videoAspect;
+        }
+        else
+        {
+            height = stageHeight;
+            width = stageHeight * videoAspect;
+        }
+
+        return new Rect((stageWidth - width) * 0.5, (stageHeight - height) * 0.5, width, height);
     }
 
     public event EventHandler? Ended;
@@ -220,15 +337,25 @@ internal sealed class LibraryVisualStage : Grid
         StopMedia();
         LibraryPlayerMode.FadeElementOpacity(_dim, StoppedDimOpacity, instant: true);
         LibraryPlayerMode.FadeElementOpacity(_media, 1, instant: true);
-        _media.SpeedRatio = 1;
+        try
+        {
+            _media.SpeedRatio = 1;
+            _spillMedia.SpeedRatio = 1;
+        }
+        catch
+        {
+        }
+
         _path = null;
         _playing = false;
+        _framePaused = false;
         _fallbackDuration = TimeSpan.Zero;
         StopVisualClock();
         _previewLoopStart = TimeSpan.Zero;
         ResetPdfView();
         _pdfSharp = null;
         ClearPdfSources();
+        ClearAmbientSpill();
         SyncPreviewFx(active: false, instant: true);
         _media.BeginAnimation(OpacityProperty, null);
         _media.Opacity = 1;
@@ -261,6 +388,7 @@ internal sealed class LibraryVisualStage : Grid
         if (pathChanged)
         {
             _fallbackDuration = fallbackDuration > TimeSpan.Zero ? fallbackDuration : TimeSpan.Zero;
+            ClearAmbientSpill();
         }
         else if (fallbackDuration > TimeSpan.Zero)
         {
@@ -286,11 +414,11 @@ internal sealed class LibraryVisualStage : Grid
             _path = path;
             try
             {
-                _media.Source = new Uri(path, UriKind.Absolute);
+                SetMediaSource(new Uri(path, UriKind.Absolute));
             }
             catch (UriFormatException)
             {
-                _media.Source = new Uri(path);
+                SetMediaSource(new Uri(path));
             }
         }
         else
@@ -301,14 +429,8 @@ internal sealed class LibraryVisualStage : Grid
         if (!play)
         {
             SyncPreviewFx(active: true);
-            try
-            {
-                // 前クリップの Position が残ると、新しいファイルが途中から開く。
-                _media.Position = TimeSpan.Zero;
-            }
-            catch
-            {
-            }
+            // 前クリップの Position が残ると、新しいファイルが途中から開く。
+            SetMediaPosition(TimeSpan.Zero);
 
             // SnapMediaBlack の Opacity=0 をここで戻す。Opened 待ちだと暗いまま残る。
             StartPreviewLoop(fadeIn: true);
@@ -332,6 +454,7 @@ internal sealed class LibraryVisualStage : Grid
         StopMedia();
         _video = false;
         _previewLoopStart = TimeSpan.Zero;
+        ClearAmbientSpill();
         SyncPreviewFx(active: false, instant: true);
         _media.Visibility = Visibility.Collapsed;
         _pdfHost.Visibility = Visibility.Visible;
@@ -358,9 +481,12 @@ internal sealed class LibraryVisualStage : Grid
 
     public void SetPlaying(bool playing, bool fromPreviewAllowed = true)
     {
-        var fromPreview = fromPreviewAllowed && _video && !_playing && playing;
-        var alreadyPlaying = _video && _playing && playing;
+        var fromFramePause = fromPreviewAllowed && _video && _framePaused && playing;
+        var fromPreview = fromPreviewAllowed && _video && !_playing && playing && !_framePaused;
+        var alreadyPlaying = _video && _playing && playing && !_framePaused;
         _playing = playing;
+        _framePaused = false;
+
         if (!_video)
         {
             // PDF 選択プレビューは暗くするだけ（メッシュなし）。
@@ -377,16 +503,7 @@ internal sealed class LibraryVisualStage : Grid
 
         if (alreadyPlaying)
         {
-            try
-            {
-                _media.SpeedRatio = 1;
-                _media.Volume = 0;
-                _media.Play();
-            }
-            catch
-            {
-            }
-
+            PlayMedia(speedRatio: 1);
             _media.BeginAnimation(OpacityProperty, null);
             _media.Opacity = 1;
             return;
@@ -398,19 +515,10 @@ internal sealed class LibraryVisualStage : Grid
             // 本再生へ戻すときは dim／格子を即消す（つなぎ中のプレビュー・アニメ残留を防ぐ）。
             ApplyVideoDim(instant: true, playing: true);
             SyncPreviewFx(active: false, instant: true);
-            if (fromPreview)
+            if (fromPreview || fromFramePause)
             {
                 var pos = CurrentVisualPosition();
-                try
-                {
-                    _media.SpeedRatio = 1;
-                    _media.Volume = 0;
-                    _media.Play();
-                }
-                catch
-                {
-                }
-
+                PlayMedia(speedRatio: 1);
                 _media.BeginAnimation(OpacityProperty, null);
                 _media.Opacity = 1;
                 BeginVisualClock(pos, speed: 1);
@@ -419,17 +527,8 @@ internal sealed class LibraryVisualStage : Grid
             {
                 // 新しいクリップの本再生は真っ黒から。
                 SnapMediaBlack();
-                try
-                {
-                    _media.Position = TimeSpan.Zero;
-                }
-                catch
-                {
-                }
-
-                _media.SpeedRatio = 1;
-                _media.Volume = 0;
-                _media.Play();
+                SetMediaPosition(TimeSpan.Zero);
+                PlayMedia(speedRatio: 1);
                 BeginVisualClock(TimeSpan.Zero, speed: 1);
                 BeginVideoFadeIn();
             }
@@ -442,6 +541,28 @@ internal sealed class LibraryVisualStage : Grid
             StopVisualClock(pos);
             EnterDimPreviewAt(pos);
         }
+    }
+
+    /// <summary>
+    /// 本再生をその場で一時停止する。暗いプレビュー（1/4 速ループ）へは落とさない。
+    /// </summary>
+    public void PauseAtCurrentFrame()
+    {
+        if (!_video || !IsShown)
+        {
+            return;
+        }
+
+        CancelPreviewSeek();
+        var pos = CurrentVisualPosition();
+        StopVisualClock(pos);
+        PauseMedia();
+        _playing = false;
+        _framePaused = true;
+        ApplyVideoDim(instant: true, playing: true);
+        SyncPreviewFx(active: false, instant: true);
+        _media.BeginAnimation(OpacityProperty, null);
+        _media.Opacity = 1;
     }
 
     private void ApplyVideoDim(bool instant, bool playing = false)
@@ -489,6 +610,7 @@ internal sealed class LibraryVisualStage : Grid
         }
 
         _playing = false;
+        _framePaused = false;
         if (position < TimeSpan.Zero)
         {
             position = TimeSpan.Zero;
@@ -497,17 +619,8 @@ internal sealed class LibraryVisualStage : Grid
         _previewLoopStart = position;
         _media.BeginAnimation(OpacityProperty, null);
         _media.Opacity = 1;
-        try
-        {
-            _media.Position = position;
-            _media.Volume = 0;
-            _media.SpeedRatio = PreviewLoopSpeed;
-            _media.Play();
-        }
-        catch
-        {
-        }
-
+        SetMediaPosition(position);
+        PlayMedia(PreviewLoopSpeed);
         FadeDimToPreview();
         SyncPreviewFx(active: true);
         BeginVisualClock(position, PreviewLoopSpeed);
@@ -597,20 +710,13 @@ internal sealed class LibraryVisualStage : Grid
     /// <summary>ホバーは常に 0 秒から。暗転の自動スキップはしない。</summary>
     private void RestartHoverPreviewAtStart()
     {
-        if (!_video || _playing || !IsShown)
+        if (!_video || _playing || _framePaused || !IsShown)
         {
             return;
         }
 
         _previewLoopStart = TimeSpan.Zero;
-        try
-        {
-            _media.Position = TimeSpan.Zero;
-        }
-        catch
-        {
-        }
-
+        SetMediaPosition(TimeSpan.Zero);
         StartPreviewLoop(fadeIn: false);
     }
 
@@ -662,50 +768,34 @@ internal sealed class LibraryVisualStage : Grid
 
     private void StartPreviewLoop(bool fadeIn)
     {
-        if (!_video || _playing || !IsShown)
+        if (!_video || _playing || _framePaused || !IsShown)
         {
             return;
         }
 
-        try
+        BeginVisualClock(_previewLoopStart, PreviewLoopSpeed);
+        PlayMedia(PreviewLoopSpeed);
+        if (fadeIn)
         {
-            _media.Volume = 0;
-            _media.SpeedRatio = PreviewLoopSpeed;
-            BeginVisualClock(_previewLoopStart, PreviewLoopSpeed);
-            _media.Play();
-            if (fadeIn)
-            {
-                BeginVideoFadeIn();
-            }
-            else
-            {
-                _media.BeginAnimation(OpacityProperty, null);
-                _media.Opacity = 1;
-            }
+            BeginVideoFadeIn();
         }
-        catch
+        else
         {
+            _media.BeginAnimation(OpacityProperty, null);
+            _media.Opacity = 1;
         }
     }
 
     private void RestartPreviewLoop()
     {
-        if (!_video || _playing || !IsShown)
+        if (!_video || _playing || _framePaused || !IsShown)
         {
             return;
         }
 
-        try
-        {
-            _media.Position = _previewLoopStart;
-            _media.Volume = 0;
-            _media.SpeedRatio = PreviewLoopSpeed;
-            _media.Play();
-            BeginVisualClock(_previewLoopStart, PreviewLoopSpeed);
-        }
-        catch
-        {
-        }
+        SetMediaPosition(_previewLoopStart);
+        PlayMedia(PreviewLoopSpeed);
+        BeginVisualClock(_previewLoopStart, PreviewLoopSpeed);
     }
 
     public void Seek(TimeSpan position)
@@ -722,30 +812,29 @@ internal sealed class LibraryVisualStage : Grid
 
         if (_video)
         {
-            try
+            var duration = _media.NaturalDuration.HasTimeSpan
+                ? _media.NaturalDuration.TimeSpan
+                : TimeSpan.MaxValue;
+            if (position > duration)
             {
-                var duration = _media.NaturalDuration.HasTimeSpan
-                    ? _media.NaturalDuration.TimeSpan
-                    : TimeSpan.MaxValue;
-                if (position > duration)
-                {
-                    position = duration;
-                }
-
-                _media.Position = position;
-                if (_playing)
-                {
-                    _media.Play();
-                    BeginVisualClock(position, speed: 1);
-                }
-                else
-                {
-                    _media.Play();
-                    BeginVisualClock(position, PreviewLoopSpeed);
-                }
+                position = duration;
             }
-            catch
+
+            SetMediaPosition(position);
+            if (_playing)
             {
+                PlayMedia(speedRatio: 1);
+                BeginVisualClock(position, speed: 1);
+            }
+            else if (_framePaused)
+            {
+                PauseMedia();
+                StopVisualClock(position);
+            }
+            else
+            {
+                PlayMedia(PreviewLoopSpeed);
+                BeginVisualClock(position, PreviewLoopSpeed);
             }
 
             return;
@@ -889,27 +978,28 @@ internal sealed class LibraryVisualStage : Grid
             return;
         }
 
-        try
+        // MediaElement の負の SpeedRatio／高速再生はカクつきやすい。
+        // 早送り・巻き戻しは一時停止して Position スクラブで追従する。
+        if (ratio <= 0 || Math.Abs(ratio - 1) > 0.001)
         {
-            // MediaElement の負の SpeedRatio／高速再生はカクつきやすい。
-            // 早送り・巻き戻しは一時停止して Position スクラブで追従する。
-            if (ratio <= 0 || Math.Abs(ratio - 1) > 0.001)
+            try
             {
                 _media.SpeedRatio = 1;
-                _media.Pause();
-                StopVisualClock(CurrentVisualPosition());
-                return;
+                _spillMedia.SpeedRatio = 1;
+            }
+            catch
+            {
             }
 
-            _media.SpeedRatio = 1;
-            if (_playing)
-            {
-                _media.Play();
-                BeginVisualClock(CurrentVisualPosition(), speed: 1);
-            }
+            PauseMedia();
+            StopVisualClock(CurrentVisualPosition());
+            return;
         }
-        catch
+
+        if (_playing)
         {
+            PlayMedia(speedRatio: 1);
+            BeginVisualClock(CurrentVisualPosition(), speed: 1);
         }
     }
 
@@ -1009,12 +1099,178 @@ internal sealed class LibraryVisualStage : Grid
         Opened?.Invoke(this, Duration);
     }
 
-    private void StopMedia()
+    private void StopMedia() => ClearMediaSource();
+
+    /// <summary>
+    /// 映像とステージのアスペクトがずれて黒帯が出るときだけ、再生中フレームの光漏れを出す。
+    /// </summary>
+    private void SyncAmbientSpill()
+    {
+        if (!_video || !IsShown)
+        {
+            ClearAmbientSpill();
+            return;
+        }
+
+        var width = _media.NaturalVideoWidth;
+        var height = _media.NaturalVideoHeight;
+        if (width <= 0
+            || height <= 0
+            || !WantsAmbientSpill(width, height, ActualWidth, ActualHeight))
+        {
+            PauseSpillMedia();
+            _spillHost.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        LayoutAmbientSpill(width, height);
+        _spillHost.Visibility = Visibility.Visible;
+        MirrorSpillTransport();
+    }
+
+    private void LayoutAmbientSpill(int naturalWidth, int naturalHeight)
+    {
+        var rect = UniformContentRect(naturalWidth, naturalHeight, ActualWidth, ActualHeight);
+        if (rect.IsEmpty)
+        {
+            _spill.Width = 0;
+            _spill.Height = 0;
+            _spill.Margin = new Thickness(0);
+            return;
+        }
+
+        _spill.Width = rect.Width;
+        _spill.Height = rect.Height;
+        _spill.Margin = new Thickness(rect.X, rect.Y, 0, 0);
+    }
+
+    private void ClearAmbientSpill()
+    {
+        PauseSpillMedia();
+        _spillHost.Visibility = Visibility.Collapsed;
+        _spill.Width = 0;
+        _spill.Height = 0;
+        _spill.Margin = new Thickness(0);
+    }
+
+    private void SetMediaSource(Uri uri)
+    {
+        _media.Source = uri;
+        try
+        {
+            _spillMedia.Source = uri;
+        }
+        catch
+        {
+        }
+    }
+
+    private void ClearMediaSource()
     {
         try
         {
             _media.Stop();
             _media.Source = null;
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            _spillMedia.Stop();
+            _spillMedia.Source = null;
+        }
+        catch
+        {
+        }
+    }
+
+    private void SetMediaPosition(TimeSpan position)
+    {
+        try
+        {
+            _media.Position = position;
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            _spillMedia.Position = position;
+        }
+        catch
+        {
+        }
+    }
+
+    private void PlayMedia(double speedRatio)
+    {
+        try
+        {
+            _media.Volume = 0;
+            _media.SpeedRatio = speedRatio;
+            _media.Play();
+        }
+        catch
+        {
+        }
+
+        if (_spillHost.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        try
+        {
+            _spillMedia.Volume = 0;
+            _spillMedia.SpeedRatio = speedRatio;
+            _spillMedia.Play();
+        }
+        catch
+        {
+        }
+    }
+
+    private void PauseMedia()
+    {
+        try
+        {
+            _media.Pause();
+        }
+        catch
+        {
+        }
+
+        PauseSpillMedia();
+    }
+
+    private void PauseSpillMedia()
+    {
+        try
+        {
+            _spillMedia.Pause();
+        }
+        catch
+        {
+        }
+    }
+
+    /// <summary>本編の位置・速度に光漏れ側を合わせる。</summary>
+    private void MirrorSpillTransport()
+    {
+        if (_spillHost.Visibility != Visibility.Visible || !_video)
+        {
+            return;
+        }
+
+        try
+        {
+            _spillMedia.Volume = 0;
+            _spillMedia.SpeedRatio = _media.SpeedRatio;
+            _spillMedia.Position = _media.Position;
+            _spillMedia.Play();
         }
         catch
         {

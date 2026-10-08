@@ -351,6 +351,9 @@ public partial class MainWindow
             return;
         }
 
+        // 再開後に Enter で止められるよう、一時停止ホールドはここで外す（再生開始でクロームは隠れる）。
+        ClearPlaylistVideoImmersivePause(sync: false);
+
         if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVisual(_document))
         {
             _lastPlaybackStart = startFrame;
@@ -491,7 +494,7 @@ public partial class MainWindow
         PausePlaybackSoft();
     }
 
-    private bool PausePlaybackHere()
+    private bool PausePlaybackHere(bool immersiveVideoHold = false)
     {
         if (_document is null || !IsPlaybackActive())
         {
@@ -515,7 +518,18 @@ public partial class MainWindow
         _volumePreview.Previewing = false;
         _pitchPreview.Previewing = false;
         _timeStretchPreview.Previewing = false;
-        PausePlaybackSoft();
+        // テンキー 0 はフレーム一時停止＋クローム維持。Enter などはその場停止でクロームを戻す。
+        if (immersiveVideoHold)
+        {
+            _playlistVideoImmersivePause = true;
+            PausePlaybackSoft(freezePlaylistVisual: true);
+        }
+        else
+        {
+            ClearPlaylistVideoImmersivePause(sync: false);
+            PausePlaybackSoft();
+        }
+
         SeekFrame(frame);
         RestoreFadeVisualIfMenuOpen();
         RestoreVolumeVisualIfMenuOpen();
@@ -525,6 +539,8 @@ public partial class MainWindow
     private void HaltPlaybackToStart()
     {
         _editorPlayAfterPcmTicket++;
+        // Space の停止はクロームを戻す（テンキー 0 の一時停止ホールドは解除）。
+        ClearPlaylistVideoImmersivePause(sync: false);
         // ライブラリの動画本再生停止は、先頭へ戻さず止めた位置の暗いプレビューへ移す。
         var stayOnVideoPreview = IsLibraryMaximized
             && LibraryBrowser.PlaylistVisualShown
