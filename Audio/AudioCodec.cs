@@ -18,6 +18,10 @@ internal static class AudioCodec
     public static IReadOnlyList<string> PlayerOpenExtensions { get; } =
         [".wav", ".wave", ".aif", ".aiff", ".mp3", ".m4a"];
 
+    /// <summary>関連付け・引数起動用の動画。プレイリストのオン／オフとは独立。</summary>
+    public static IReadOnlyList<string> PlayerVideoExtensions { get; } =
+        [".mp4", ".mov", ".avi", ".mkv", ".webm", ".mpg", ".mpeg"];
+
     public static IReadOnlyList<string> SaveExtensions { get; } = [".wav", ".wave", ".mp3"];
 
     public static bool IsOpenable(string path) => MatchesExtension(path, OpenExtensions);
@@ -25,12 +29,18 @@ internal static class AudioCodec
     public static bool IsPlayerOpenable(string path) =>
         MatchesExtension(path, PlayerOpenExtensions) || LibraryPlaylistDocuments.ShouldList(path);
 
+    /// <summary>引数起動／関連付け。設定の動画トグルがオフでも PDF／動画を受け付ける。</summary>
+    public static bool IsLaunchOpenable(string path) =>
+        MatchesExtension(path, PlayerOpenExtensions) || LibraryPlaylistDocuments.IsDocument(path);
+
     /// <summary>プレイヤーでフル PCM 展開せずストリーム再生できるか。</summary>
     public static bool CanStreamPlay(string path)
     {
         var kind = DetectKind(path);
         return kind is AudioFileKind.Mp3 or AudioFileKind.M4a
             or AudioFileKind.Mp4 or AudioFileKind.Mov
+            or AudioFileKind.Avi or AudioFileKind.Mkv or AudioFileKind.Webm
+            or AudioFileKind.Mpg
             or AudioFileKind.Wave or AudioFileKind.Aiff;
     }
 
@@ -57,7 +67,14 @@ internal static class AudioCodec
     public static string[] CollectPlayerOpenable(IEnumerable<string> paths) =>
         CollectOpenable(paths, player: true);
 
-    private static string[] CollectOpenable(IEnumerable<string> paths, bool player)
+    /// <summary>引数起動用。設定の動画トグルがオフでも PDF／動画を含める。</summary>
+    public static string[] CollectLaunchOpenable(IEnumerable<string> paths) =>
+        CollectOpenable(paths, player: true, launchDocuments: true);
+
+    private static string[] CollectOpenable(
+        IEnumerable<string> paths,
+        bool player,
+        bool launchDocuments = false)
     {
         var result = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -80,11 +97,11 @@ internal static class AudioCodec
 
             if (Directory.Exists(full))
             {
-                AddOpenableFromDirectory(full, result, seen, recursive: true, player);
+                AddOpenableFromDirectory(full, result, seen, recursive: true, player, launchDocuments);
                 continue;
             }
 
-            if (IsAccepted(full, player) && seen.Add(full))
+            if (IsAccepted(full, player, launchDocuments) && seen.Add(full))
             {
                 result.Add(full);
             }
@@ -224,15 +241,18 @@ internal static class AudioCodec
         return false;
     }
 
-    private static bool IsAccepted(string path, bool player) =>
-        player ? IsPlayerOpenable(path) : IsOpenable(path);
+    private static bool IsAccepted(string path, bool player, bool launchDocuments = false) =>
+        player
+            ? launchDocuments ? IsLaunchOpenable(path) : IsPlayerOpenable(path)
+            : IsOpenable(path);
 
     private static void AddOpenableFromDirectory(
         string directory,
         List<string> result,
         HashSet<string> seen,
         bool recursive,
-        bool player)
+        bool player,
+        bool launchDocuments = false)
     {
         var found = new List<string>();
         if (recursive)
@@ -242,7 +262,7 @@ internal static class AudioCodec
             while (stack.Count > 0)
             {
                 var current = stack.Pop();
-                CollectFilesInDirectory(current, found, player);
+                CollectFilesInDirectory(current, found, player, launchDocuments);
                 try
                 {
                     foreach (var child in Directory.EnumerateDirectories(current))
@@ -265,7 +285,7 @@ internal static class AudioCodec
         }
         else
         {
-            CollectFilesInDirectory(directory, found, player);
+            CollectFilesInDirectory(directory, found, player, launchDocuments);
         }
 
         found.Sort(StringComparer.OrdinalIgnoreCase);
@@ -278,13 +298,17 @@ internal static class AudioCodec
         }
     }
 
-    private static void CollectFilesInDirectory(string directory, List<string> found, bool player)
+    private static void CollectFilesInDirectory(
+        string directory,
+        List<string> found,
+        bool player,
+        bool launchDocuments = false)
     {
         try
         {
             foreach (var file in Directory.EnumerateFiles(directory))
             {
-                if (IsAccepted(file, player))
+                if (IsAccepted(file, player, launchDocuments))
                 {
                     found.Add(file);
                 }
@@ -331,6 +355,26 @@ internal static class AudioCodec
         if (ext.Equals(".mov", StringComparison.OrdinalIgnoreCase))
         {
             return AudioFileKind.Mov;
+        }
+
+        if (ext.Equals(".avi", StringComparison.OrdinalIgnoreCase))
+        {
+            return AudioFileKind.Avi;
+        }
+
+        if (ext.Equals(".mkv", StringComparison.OrdinalIgnoreCase))
+        {
+            return AudioFileKind.Mkv;
+        }
+
+        if (ext.Equals(".webm", StringComparison.OrdinalIgnoreCase))
+        {
+            return AudioFileKind.Webm;
+        }
+
+        if (LibraryPlaylistDocuments.IsMpgExtension(ext))
+        {
+            return AudioFileKind.Mpg;
         }
 
         if (ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
@@ -586,9 +630,11 @@ internal static class AudioCodec
     private static WaveStream OpenReader(string path)
     {
         var kind = DetectKind(path);
-        // 動画プロキシ（.avi MJPEG）や MP4/MOV は WAVE ヘッダではない。
+        // 動画プロキシ（.avi MJPEG）や MP4/MOV/AVI/MKV/WebM は WAVE ヘッダではない。
         WaveStream reader =
             kind is AudioFileKind.M4a or AudioFileKind.Mp4 or AudioFileKind.Mov
+                or AudioFileKind.Avi or AudioFileKind.Mkv or AudioFileKind.Webm
+                or AudioFileKind.Mpg
             || Path.GetExtension(path).Equals(".avi", StringComparison.OrdinalIgnoreCase)
                 ? OpenMediaFoundationReader(path)
                 : kind switch

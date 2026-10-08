@@ -17,22 +17,34 @@ internal static class WindowPaintReveal
         public bool Pending = true;
         public bool Attached;
         public bool ActivateOnReveal;
-        public Action? OnRevealed;
+        public bool AutoReveal = true;
+        public bool PaintNotified;
+        public bool PaintCallbackInvoked;
+        public Action? OnPainted;
     }
 
     public static bool IsPending(Window window) =>
         States.TryGetValue(window, out var state) && state.Pending;
 
-    public static void Attach(Window window, Action? onRevealed = null, bool activateOnReveal = false)
+    /// <param name="autoReveal">
+    /// false のとき描画準備後もクロークしたまま <paramref name="onPainted"/> だけ呼ぶ。
+    /// 呼び出し側が <see cref="Reveal"/> するまで画面に出さない。
+    /// </param>
+    public static void Attach(
+        Window window,
+        Action? onPainted = null,
+        bool activateOnReveal = false,
+        bool autoReveal = true)
     {
         ArgumentNullException.ThrowIfNull(window);
         var state = States.GetValue(window, _ => new State());
-        if (onRevealed is not null)
+        if (onPainted is not null)
         {
-            state.OnRevealed = onRevealed;
+            state.OnPainted = onPainted;
         }
 
         state.ActivateOnReveal = activateOnReveal;
+        state.AutoReveal = autoReveal;
         if (state.Attached)
         {
             return;
@@ -109,7 +121,35 @@ internal static class WindowPaintReveal
             window.Activate();
         }
 
-        state.OnRevealed?.Invoke();
+        InvokePainted(state);
+    }
+
+    private static void NotifyPainted(Window window)
+    {
+        if (!States.TryGetValue(window, out var state) || state.PaintNotified)
+        {
+            return;
+        }
+
+        state.PaintNotified = true;
+        if (state.AutoReveal)
+        {
+            Reveal(window);
+            return;
+        }
+
+        InvokePainted(state);
+    }
+
+    private static void InvokePainted(State state)
+    {
+        if (state.PaintCallbackInvoked)
+        {
+            return;
+        }
+
+        state.PaintCallbackInvoked = true;
+        state.OnPainted?.Invoke();
     }
 
     private static void OnLoaded(object sender, RoutedEventArgs e)
@@ -118,7 +158,9 @@ internal static class WindowPaintReveal
         window.Loaded -= OnLoaded;
         window.UpdateLayout();
         window.Dispatcher.BeginInvoke(
-            () => window.Dispatcher.BeginInvoke(() => Reveal(window), DispatcherPriority.ContextIdle),
+            () => window.Dispatcher.BeginInvoke(
+                () => NotifyPainted(window),
+                DispatcherPriority.ContextIdle),
             DispatcherPriority.Render);
     }
 
@@ -127,6 +169,8 @@ internal static class WindowPaintReveal
         var window = (Window)sender!;
         window.ContentRendered -= OnContentRendered;
         window.UpdateLayout();
-        window.Dispatcher.BeginInvoke(() => Reveal(window), DispatcherPriority.ContextIdle);
+        window.Dispatcher.BeginInvoke(
+            () => NotifyPainted(window),
+            DispatcherPriority.ContextIdle);
     }
 }

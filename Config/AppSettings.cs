@@ -97,11 +97,38 @@ internal sealed class AppSettings
     /// <summary>プレイリストに PDF を載せる。既定オン。プレイヤー専用。</summary>
     public bool LibraryShowPlaylistPdf { get; set; } = true;
 
-    /// <summary>プレイリストに MOV を載せる。既定オン。プレイヤー専用。</summary>
-    public bool LibraryShowPlaylistMov { get; set; } = true;
+    /// <summary>プレイリストに MOV を載せる。既定オフ。プレイヤー専用。</summary>
+    public bool LibraryShowPlaylistMov { get; set; }
 
-    /// <summary>プレイリストに MP4 を載せる。既定オン。プレイヤー専用。</summary>
-    public bool LibraryShowPlaylistMp4 { get; set; } = true;
+    /// <summary>プレイリストに MP4 を載せる。既定オフ。プレイヤー専用。</summary>
+    public bool LibraryShowPlaylistMp4 { get; set; }
+
+    /// <summary>プレイリストに AVI を載せる。既定オフ。プレイヤー専用。</summary>
+    public bool LibraryShowPlaylistAvi { get; set; }
+
+    /// <summary>プレイリストに MKV を載せる。既定オフ。プレイヤー専用。</summary>
+    public bool LibraryShowPlaylistMkv { get; set; }
+
+    /// <summary>プレイリストに WebM を載せる。既定オフ。プレイヤー専用。</summary>
+    public bool LibraryShowPlaylistWebm { get; set; }
+
+    /// <summary>プレイリストに MPG / MPEG を載せる。既定オフ。プレイヤー専用。</summary>
+    public bool LibraryShowPlaylistMpg { get; set; }
+
+    /// <summary>動画引数起動ウィンドウの中心 X（DIP）。HasPosition のときだけ使う。</summary>
+    public int VideoLaunchWindowX { get; set; }
+
+    /// <summary>動画引数起動ウィンドウの中心 Y（DIP）。HasPosition のときだけ使う。</summary>
+    public int VideoLaunchWindowY { get; set; }
+
+    /// <summary>動画引数起動の中心位置を覚えたか。サイズは都度動画の原寸。</summary>
+    public bool VideoLaunchWindowHasPosition { get; set; }
+
+    /// <summary>動画ミニ（F8／引数起動）の A（波形・アナライザ・ファイル名）。既定オフ。</summary>
+    public bool VideoLaunchHud { get; set; }
+
+    /// <summary>動画ミニ（F8／引数起動）の T（タイムコード）。既定オフ。</summary>
+    public bool VideoLaunchTimecode { get; set; }
 
     /// <summary>ユーザー用意の ffmpeg.exe。空または無効ならプロキシは作らない。</summary>
     public string FfmpegExePath { get; set; } = string.Empty;

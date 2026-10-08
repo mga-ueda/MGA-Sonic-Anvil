@@ -628,6 +628,9 @@ public sealed class LibraryColumnFilterTests
         Assert.DoesNotContain(LibraryFileColumn.Jacket, used);
         Assert.Contains(LibraryFileColumn.Title, used);
         Assert.True(LibraryColumnFilter.IsVideoFamilyKind("MOV"));
+        Assert.True(LibraryColumnFilter.IsVideoFamilyKind("AVI"));
+        Assert.True(LibraryColumnFilter.IsVideoFamilyKind("MKV"));
+        Assert.True(LibraryColumnFilter.IsVideoFamilyKind("WEBM"));
         Assert.True(LibraryColumnFilter.IsVisualFamilyKind("PDF"));
     }
 

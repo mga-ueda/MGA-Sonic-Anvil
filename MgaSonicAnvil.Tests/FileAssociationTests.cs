@@ -36,20 +36,45 @@ public sealed class FileAssociationTests
     }
 
     [Fact]
-    public void IsPlayerOnlyExtension_OnlyM4a()
+    public void IsPlayerOnlyExtension_M4aAndVideos()
     {
         Assert.True(FileAssociations.IsPlayerOnlyExtension(".m4a"));
         Assert.True(FileAssociations.IsPlayerOnlyExtension("M4A"));
+        Assert.True(FileAssociations.IsPlayerOnlyExtension(".mp4"));
+        Assert.True(FileAssociations.IsPlayerOnlyExtension(".mov"));
+        Assert.True(FileAssociations.IsPlayerOnlyExtension(".avi"));
+        Assert.True(FileAssociations.IsPlayerOnlyExtension(".mkv"));
+        Assert.True(FileAssociations.IsPlayerOnlyExtension(".webm"));
+        Assert.True(FileAssociations.IsPlayerOnlyExtension(".mpg"));
+        Assert.True(FileAssociations.IsPlayerOnlyExtension(".mpeg"));
         Assert.False(FileAssociations.IsPlayerOnlyExtension(".pdf"));
-        Assert.False(FileAssociations.IsPlayerOnlyExtension(".mp4"));
-        Assert.False(FileAssociations.IsPlayerOnlyExtension(".mov"));
         Assert.False(FileAssociations.IsPlayerOnlyExtension(".mp3"));
         Assert.False(FileAssociations.IsPlayerOnlyExtension(".wav"));
     }
 
     [Fact]
-    public void Extensions_MatchPlayerOpenableTypes() =>
-        Assert.Equal(AudioCodec.PlayerOpenExtensions, FileAssociations.Extensions);
+    public void Extensions_SplitAudioAndVideoCategories()
+    {
+        Assert.Equal(AudioCodec.PlayerOpenExtensions, FileAssociations.AudioExtensions);
+        Assert.Equal(AudioCodec.PlayerVideoExtensions, FileAssociations.VideoExtensions);
+        foreach (var ext in FileAssociations.AudioExtensions)
+        {
+            Assert.Contains(ext, FileAssociations.Extensions);
+            Assert.DoesNotContain(ext, FileAssociations.VideoExtensions);
+        }
+
+        foreach (var ext in FileAssociations.VideoExtensions)
+        {
+            Assert.Contains(ext, FileAssociations.Extensions);
+            Assert.DoesNotContain(ext, FileAssociations.AudioExtensions);
+        }
+
+        Assert.False(string.IsNullOrWhiteSpace(UiStrings.LabelFileAssociationsAudio));
+        Assert.False(string.IsNullOrWhiteSpace(UiStrings.LabelFileAssociationsVideo));
+        Assert.NotEqual(
+            UiStrings.LabelFileAssociationsAudio,
+            UiStrings.LabelFileAssociationsVideo);
+    }
 
     [Fact]
     public void Extensions_IncludeM4aBeyondEditorOpenable()

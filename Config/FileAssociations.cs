@@ -29,11 +29,39 @@ internal static class FileAssociations
     private const int AssocStrExecutable = 2;
     private const int ErrorInsufficientBuffer = unchecked((int)0x8007007A);
 
-    public static IReadOnlyList<string> Extensions => AudioCodec.PlayerOpenExtensions;
+    public static IReadOnlyList<string> AudioExtensions => AudioCodec.PlayerOpenExtensions;
+
+    public static IReadOnlyList<string> VideoExtensions => AudioCodec.PlayerVideoExtensions;
+
+    public static IReadOnlyList<string> Extensions { get; } = BuildExtensions();
+
+    private static string[] BuildExtensions()
+    {
+        var list = new List<string>(AudioExtensions.Count + VideoExtensions.Count);
+        list.AddRange(AudioExtensions);
+        list.AddRange(VideoExtensions);
+        return list.ToArray();
+    }
 
     /// <summary>編集オープンではなく、プレイヤー起動専用の拡張子か。</summary>
-    public static bool IsPlayerOnlyExtension(string extension) =>
-        NormalizeExtension(extension).Equals(".m4a", StringComparison.OrdinalIgnoreCase);
+    public static bool IsPlayerOnlyExtension(string extension)
+    {
+        var ext = NormalizeExtension(extension);
+        if (ext.Equals(".m4a", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        for (var i = 0; i < VideoExtensions.Count; i++)
+        {
+            if (VideoExtensions[i].Equals(ext, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public static string NormalizeExtension(string extension)
     {
@@ -400,6 +428,12 @@ internal static class FileAssociations
         ".mp3" => "MP3",
         ".m4a" => "M4A",
         ".aif" or ".aiff" => "AIFF",
+        ".mp4" => "MP4",
+        ".mov" => "MOV",
+        ".avi" => "AVI",
+        ".mkv" => "MKV",
+        ".webm" => "WebM",
+        ".mpg" or ".mpeg" => "MPEG",
         _ => "Wave",
     };
 

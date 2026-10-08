@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -101,6 +102,11 @@ public partial class MainWindow : Window
     private bool _closing;
     private bool _exitAfterFlush;
     private bool _bindingWorkspace;
+    /// <summary>動画ファイルの引数／関連付け起動。専用サイズ（原寸）と位置記憶。</summary>
+    private bool _videoLaunchPlacement;
+    /// <summary>動画起動で映像が開くまでウィンドウを出さないための待ち。</summary>
+    private TaskCompletionSource<bool>? _videoLaunchShowReady;
+    private DispatcherTimer? _videoLaunchPlacementSaveTimer;
     private int _autoSpeakerSeenChannels = int.MinValue;
     private ImageSource? _brandLogoDark;
     private ImageSource? _brandLogoLight;
@@ -158,7 +164,13 @@ public partial class MainWindow : Window
         };
         LoadBrandLogo();
         Loaded += (_, _) => AlignBrandLicense();
-        if (!WindowPlacement.TryApply(this, AppStorage.Settings))
+        if (LaunchFiles.StartupHasVideo())
+        {
+            BeginVideoLaunchSession();
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            WindowState = WindowState.Normal;
+        }
+        else if (!WindowPlacement.TryApply(this, AppStorage.Settings))
         {
             WindowPlacement.ApplyFirstLaunch(this);
         }
@@ -171,7 +183,11 @@ public partial class MainWindow : Window
         _waveformHeightScale = Math.Clamp(AppStorage.Settings.WaveformHeightScale, 1, 3);
         ApplyMeterColumnWidth(AppStorage.Settings.MeterColumnWidth);
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
-        WindowPaintReveal.Attach(this, OnStartupRevealed);
+        // 動画の関連付け起動はミニプレイヤーへ切り替えてから出す（エディタが一瞬見えないように）。
+        WindowPaintReveal.Attach(
+            this,
+            OnStartupRevealed,
+            autoReveal: !_videoLaunchPlacement);
         // 編集履歴はその他ウィンドウと同じ扱いで等倍にする（ルートの表示倍率を打ち消す）。
         HistoryOverlay.LayoutTransform = UiScaleService.CreateCounterTransform();
         ApplyStatusFieldChrome();
@@ -324,7 +340,14 @@ public partial class MainWindow : Window
         PreviewDrop += MainWindow_Drop;
         PreviewDragOver += MainWindow_DragOver;
         Closing += MainWindow_Closing;
-        SizeChanged += (_, _) => SyncBusyGlassOverlayBounds();
+        SizeChanged += (_, _) =>
+        {
+            SyncBusyGlassOverlayBounds();
+            RememberVideoLaunchPlacementIfNeeded();
+            SyncWindowProportionalOverlayScale();
+            SchedulePlaylistVideoFileNamePlacement();
+        };
+        LocationChanged += (_, _) => RememberVideoLaunchPlacementIfNeeded();
         Closed += (_, _) =>
         {
             StopMeterRendering();
@@ -387,12 +410,25 @@ public partial class MainWindow : Window
 
     private void OnStartupRevealed()
     {
-        if (LaunchFiles.HasStartup)
+        // クローク中（動画起動の遅延表示）は前面化しない。Reveal 後に行う。
+        if (LaunchFiles.HasStartup && !WindowPaintReveal.IsPending(this))
         {
             ForegroundActivation.BringToFront(this);
         }
 
+        // 動画起動はクロークのままミニプレイヤーへ先に入れる（アイドル待ちのあいだもエディタを残さない）。
+        if (_videoLaunchPlacement && LaunchFiles.HasStartup)
+        {
+            var peek = LaunchFiles.PeekStartup();
+            if (LaunchFiles.ContainsVideo(peek))
+            {
+                EnterLibraryPlayerIfLaunchHasMp3(peek);
+                UpdateLayout();
+            }
+        }
+
         // 表示を先に出し、前回ドキュメントの読み込みは次のアイドルへ回す。
+        // 動画起動は映像が開くまでクロークを維持する。
         Dispatcher.BeginInvoke(RestoreLastDocumentAfterReveal, DispatcherPriority.ApplicationIdle);
         Dispatcher.BeginInvoke(() => _ = StartWaapiAsync(), DispatcherPriority.ApplicationIdle);
         _ = CheckForAppUpdateAsync();
@@ -401,18 +437,64 @@ public partial class MainWindow : Window
     private async void RestoreLastDocumentAfterReveal()
     {
         var launch = MergeLaunchPaths(LaunchFiles.TakeStartup(), SingleInstance.TakePendingPaths());
+        var videoLaunch = LaunchFiles.ContainsVideo(launch);
+        if (videoLaunch)
+        {
+            BeginVideoLaunchSession();
+            _videoLaunchShowReady = new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            EnterLibraryPlayerIfLaunchHasMp3(launch);
+            UpdateLayout();
+            // 前回ドキュメントを戻すとエディタが一瞬見えるので、関連付け動画起動ではスキップする。
+            _didRestoreLastDocument = true;
+            // DWM クローク中は Opacity を戻して MediaElement を描けるようにする（画面には出ない）。
+            if (Opacity < 1)
+            {
+                Opacity = 1;
+            }
+
+            if (launch.Length > 0)
+            {
+                await OpenLaunchPathsAsync(launch).ConfigureAwait(true);
+                var ready = _videoLaunchShowReady.Task;
+                var finished = await Task.WhenAny(ready, Task.Delay(3_000)).ConfigureAwait(true);
+                if (finished == ready)
+                {
+                    await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Render);
+                }
+            }
+
+            _videoLaunchShowReady = null;
+            NotifySettingsRecreatedIfNeeded();
+            UpdateLayout();
+            if (WindowPaintReveal.IsPending(this))
+            {
+                WindowPaintReveal.Reveal(this);
+                ForegroundActivation.BringToFront(this);
+            }
+
+            return;
+        }
+
         await TryRestoreLastDocumentAsync().ConfigureAwait(true);
         EnterLibraryPlayerIfLaunchHasMp3(launch);
         if (launch.Length > 0)
         {
-            await OpenPathsAsync(launch).ConfigureAwait(true);
+            await OpenLaunchPathsAsync(launch).ConfigureAwait(true);
         }
 
         NotifySettingsRecreatedIfNeeded();
         UpdateLayout();
         Waveform.Refresh();
         Overview.InvalidateVisual();
+        if (WindowPaintReveal.IsPending(this))
+        {
+            WindowPaintReveal.Reveal(this);
+        }
     }
+
+    private void SignalVideoLaunchShowReady() =>
+        _videoLaunchShowReady?.TrySetResult(true);
 
     private void NotifySettingsRecreatedIfNeeded()
     {
@@ -981,7 +1063,11 @@ public partial class MainWindow : Window
         SingleInstance.MarkExiting();
         // 未保存の録音 WAV 書き出しより先に実音を止める。保存を先にすると長く鳴り続ける。
         _player.BeginShutdownFlush();
-        if (IsWaveformMaximized)
+        if (_videoLaunchPlacement && IsLibraryMaximized && !_playlistVideoFullscreen)
+        {
+            WindowPlacement.CaptureVideoLaunchPosition(this, AppStorage.Settings);
+        }
+        else if (IsWaveformMaximized)
         {
             WindowPlacement.Capture(
                 _boundsBeforeWaveformMax,
@@ -1157,8 +1243,9 @@ public partial class MainWindow : Window
     private void ApplyMeterColumnWidth(double preferred)
     {
         _meterColumnPreferred = DesignMetrics.ClampMeterColumnWidth(preferred);
-        // F9 ミニマムではメーター列を空けたままにしない（Bind / SyncMonitorLayout で幅が戻るのを防ぐ）。
-        if (_libraryMinimalChrome)
+        // F8／F9 ミニマムではメーター列を空けたままにしない（Bind / SyncMonitorLayout で幅が戻るのを防ぐ）。
+        // F9 だけメーター列を畳む。F8 動画ミニはアナライザを出す。
+        if (_libraryMinimalChrome && !_videoLaunchPlacement)
         {
             MeterColumnDef.MinWidth = 0;
             MeterColumnDef.MaxWidth = 0;
@@ -1174,10 +1261,11 @@ public partial class MainWindow : Window
         var channels = _document?.Channels ?? 2;
         var max = LevelMeterSurroundLayout.FilledColumnWidth(channels);
         var width = Math.Min(_meterColumnPreferred, max);
-        var scale = AnalyzerMaximizeLayoutScale;
-        MeterColumnDef.MinWidth = DesignMetrics.LevelMeterWidth * scale;
-        MeterColumnDef.MaxWidth = max * scale;
-        MeterColumnDef.Width = new GridLength(width * scale);
+        var scale = AnalyzerLayoutScale;
+        var (colMin, colMax, colWidth) = LibraryPlayerMode.VideoMiniMeterColumnWidths(width, max, scale);
+        MeterColumnDef.MinWidth = colMin;
+        MeterColumnDef.MaxWidth = colMax;
+        MeterColumnDef.Width = new GridLength(colWidth);
         var canResize = max > DesignMetrics.LevelMeterWidth + 0.5;
         MeterColumnSplitter.IsEnabled = canResize;
         MeterColumnSplitter.Cursor = canResize ? Cursors.SizeWE : Cursors.Arrow;
@@ -1188,8 +1276,8 @@ public partial class MainWindow : Window
         var raw = MeterColumnDef.ActualWidth > 0
             ? MeterColumnDef.ActualWidth
             : MeterColumnDef.Width.Value;
-        var scale = AnalyzerMaximizeLayoutScale;
-        if (scale > 1.0001)
+        var scale = AnalyzerLayoutScale;
+        if (Math.Abs(scale - 1d) > 0.0001)
         {
             raw /= scale;
         }
@@ -1204,7 +1292,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        // F9 中はメーター列幅を触らない（空のデッドスペースになる）。
+        // F8／F9 中はメーター列幅を触らない（空のデッドスペースになる）。
         if (_libraryMinimalChrome)
         {
             return;

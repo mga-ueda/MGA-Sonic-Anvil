@@ -607,6 +607,9 @@ internal sealed class LibraryBrowserView : UserControl
 
     public bool PlaylistVisualIsPdf => _visualStage.IsPdf;
 
+    public bool TryGetPlaylistVideoNaturalPixels(out int width, out int height) =>
+        _visualStage.TryGetNaturalVideoPixels(out width, out height);
+
     public bool PdfBackgroundPinned => _pdfBackgroundPinned;
 
     public TimeSpan PlaylistVisualPosition => _visualStage.Position;
@@ -1913,16 +1916,96 @@ internal sealed class LibraryBrowserView : UserControl
         var row = CreateRowWithDefaults(session);
         row.GroupKey = LibraryFileList.GroupLabel(row, _group);
 
-        if (_grid.ItemsSource is null || _rows.Count == 0)
+        // 非選択追加では DataGrid の自動選択→SessionActivated を Loaded まで抑止する。
+        var heldActivate = _deferActivate;
+        if (!select)
         {
+            _deferActivate = true;
+        }
+
+        try
+        {
+            if (_grid.ItemsSource is null || _rows.Count == 0)
+            {
+                BeginColumnOrderCommitGate();
+                try
+                {
+                    _rows = [row];
+                    BeginRowSync();
+                    try
+                    {
+                        BindRowsCore(select ? session : null, select ? [session] : null);
+                    }
+                    finally
+                    {
+                        EndRowSync();
+                    }
+
+                    RefreshEffectiveColumns();
+                }
+                finally
+                {
+                    EndColumnOrderCommitGate();
+                }
+
+                return;
+            }
+
+            var insertAt = 0;
+            if (_sortColumn is { } sortColumn)
+            {
+                while (insertAt < _items.Count
+                    && LibraryFileList.Compare(_items[insertAt], row, sortColumn, _sortDirection) <= 0)
+                {
+                    insertAt++;
+                }
+            }
+            else
+            {
+                insertAt = _items.Count;
+            }
+
+            var rowIndex = 0;
+            if (_sortColumn is { } sortForRows)
+            {
+                while (rowIndex < _rows.Count
+                    && LibraryFileList.Compare(_rows[rowIndex], row, sortForRows, _sortDirection) <= 0)
+                {
+                    rowIndex++;
+                }
+            }
+            else
+            {
+                rowIndex = _rows.Count;
+            }
+
             BeginColumnOrderCommitGate();
             try
             {
-                _rows = [row];
                 BeginRowSync();
                 try
                 {
-                    BindRowsCore(select ? session : null, select ? [session] : null);
+                    var nextRows = new LibraryFileRow[_rows.Count + 1];
+                    for (var i = 0; i < rowIndex; i++)
+                    {
+                        nextRows[i] = _rows[i];
+                    }
+
+                    nextRows[rowIndex] = row;
+                    for (var i = rowIndex; i < _rows.Count; i++)
+                    {
+                        nextRows[i + 1] = _rows[i];
+                    }
+
+                    _rows = nextRows;
+                    if (PlaylistRowMatches(row))
+                    {
+                        _items.Insert(insertAt, row);
+                        if (select)
+                        {
+                            ApplyRowSelectionCore(session, [session]);
+                        }
+                    }
                 }
                 finally
                 {
@@ -1935,76 +2018,23 @@ internal sealed class LibraryBrowserView : UserControl
             {
                 EndColumnOrderCommitGate();
             }
-
-            return;
-        }
-
-        var insertAt = 0;
-        if (_sortColumn is { } sortColumn)
-        {
-            while (insertAt < _items.Count
-                && LibraryFileList.Compare(_items[insertAt], row, sortColumn, _sortDirection) <= 0)
-            {
-                insertAt++;
-            }
-        }
-        else
-        {
-            insertAt = _items.Count;
-        }
-
-        var rowIndex = 0;
-        if (_sortColumn is { } sortForRows)
-        {
-            while (rowIndex < _rows.Count
-                && LibraryFileList.Compare(_rows[rowIndex], row, sortForRows, _sortDirection) <= 0)
-            {
-                rowIndex++;
-            }
-        }
-        else
-        {
-            rowIndex = _rows.Count;
-        }
-
-        BeginColumnOrderCommitGate();
-        try
-        {
-            BeginRowSync();
-            try
-            {
-                var nextRows = new LibraryFileRow[_rows.Count + 1];
-                for (var i = 0; i < rowIndex; i++)
-                {
-                    nextRows[i] = _rows[i];
-                }
-
-                nextRows[rowIndex] = row;
-                for (var i = rowIndex; i < _rows.Count; i++)
-                {
-                    nextRows[i + 1] = _rows[i];
-                }
-
-                _rows = nextRows;
-                if (PlaylistRowMatches(row))
-                {
-                    _items.Insert(insertAt, row);
-                    if (select)
-                    {
-                        ApplyRowSelectionCore(session, [session]);
-                    }
-                }
-            }
-            finally
-            {
-                EndRowSync();
-            }
-
-            RefreshEffectiveColumns();
         }
         finally
         {
-            EndColumnOrderCommitGate();
+            if (!select)
+            {
+                // EndRowSync の _syncing 解除（Loaded）より後で戻し、自動選択の窓を閉じる。
+                var gen = _syncGeneration;
+                Dispatcher.BeginInvoke(
+                    () =>
+                    {
+                        if (gen == _syncGeneration)
+                        {
+                            _deferActivate = heldActivate;
+                        }
+                    },
+                    DispatcherPriority.ContextIdle);
+            }
         }
     }
 
@@ -7591,6 +7621,10 @@ internal sealed class LibraryBrowserView : UserControl
         AudioFileKind.Aiff => "AIFF",
         AudioFileKind.Mp4 => "MP4",
         AudioFileKind.Mov => "MOV",
+        AudioFileKind.Avi => "AVI",
+        AudioFileKind.Mkv => "MKV",
+        AudioFileKind.Webm => "WEBM",
+        AudioFileKind.Mpg => "MPG",
         AudioFileKind.Pdf => "PDF",
         _ => "WAVE",
     };

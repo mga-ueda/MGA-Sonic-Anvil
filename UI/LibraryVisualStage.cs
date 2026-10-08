@@ -203,6 +203,10 @@ internal sealed class LibraryVisualStage : Grid
 
                 Opened?.Invoke(this, duration);
             }
+            else if (_video)
+            {
+                Opened?.Invoke(this, Duration);
+            }
 
             SyncAmbientSpill();
             if (_video && !_playing && !_framePaused)
@@ -276,6 +280,13 @@ internal sealed class LibraryVisualStage : Grid
     public bool VisualClockRunning => _video && IsShown && _visualClock.IsRunning;
 
     public bool IsVideo => _video && IsShown;
+
+    public bool TryGetNaturalVideoPixels(out int width, out int height)
+    {
+        width = _media.NaturalVideoWidth;
+        height = _media.NaturalVideoHeight;
+        return _video && width > 0 && height > 0;
+    }
 
     public bool IsPdf => !_video && IsShown;
 
@@ -397,8 +408,10 @@ internal sealed class LibraryVisualStage : Grid
 
         if (!play)
         {
+            // Space 一時停止の _framePaused が残ると StartPreviewLoop が即 return して暗い 1/4 速が始まらない。
             ApplyVideoDim(instant: true);
             _playing = false;
+            _framePaused = false;
             StopVisualClock(TimeSpan.Zero);
             _previewLoopStart = TimeSpan.Zero;
         }
@@ -411,6 +424,7 @@ internal sealed class LibraryVisualStage : Grid
             StopVisualClock(TimeSpan.Zero);
             _previewLoopStart = TimeSpan.Zero;
             _playing = false;
+            _framePaused = false;
             _path = path;
             try
             {
@@ -823,8 +837,18 @@ internal sealed class LibraryVisualStage : Grid
             SetMediaPosition(position);
             if (_playing)
             {
-                PlayMedia(speedRatio: 1);
-                BeginVisualClock(position, speed: 1);
+                if (LibraryPlayerMode.VideoSeekIsShuttleScrub(_playing, _visualClock.IsRunning))
+                {
+                    // テンキー 1／3: 一時停止のままコマ送り。Play すると 1 倍に戻る。
+                    PauseMedia();
+                    _visualOrigin = position < TimeSpan.Zero ? TimeSpan.Zero : position;
+                    _visualSpeed = 0;
+                }
+                else
+                {
+                    PlayMedia(speedRatio: 1);
+                    BeginVisualClock(position, speed: 1);
+                }
             }
             else if (_framePaused)
             {
@@ -833,6 +857,7 @@ internal sealed class LibraryVisualStage : Grid
             }
             else
             {
+                // 暗い選択プレビューの 1/4 速ループは維持する。
                 PlayMedia(PreviewLoopSpeed);
                 BeginVisualClock(position, PreviewLoopSpeed);
             }
@@ -980,7 +1005,7 @@ internal sealed class LibraryVisualStage : Grid
 
         // MediaElement の負の SpeedRatio／高速再生はカクつきやすい。
         // 早送り・巻き戻しは一時停止して Position スクラブで追従する。
-        if (ratio <= 0 || Math.Abs(ratio - 1) > 0.001)
+        if (ratio <= 0)
         {
             try
             {
@@ -992,7 +1017,14 @@ internal sealed class LibraryVisualStage : Grid
             }
 
             PauseMedia();
+            // _playing は維持し、Stop 時に同じ本再生として 1 倍へ戻せるようにする。
             StopVisualClock(CurrentVisualPosition());
+            return;
+        }
+
+        if (Math.Abs(ratio - 1) > 0.001)
+        {
+            // 本再生の再開以外の倍率は MediaElement に任せず、呼び出し側のプレビュー経路を使う。
             return;
         }
 
@@ -1000,6 +1032,14 @@ internal sealed class LibraryVisualStage : Grid
         {
             PlayMedia(speedRatio: 1);
             BeginVisualClock(CurrentVisualPosition(), speed: 1);
+            return;
+        }
+
+        // シャトル解除などがプレビュー表示中に ratio=1 で来ても、暗い 1/4 速を維持する。
+        if (!_framePaused)
+        {
+            PlayMedia(PreviewLoopSpeed);
+            BeginVisualClock(CurrentVisualPosition(), PreviewLoopSpeed);
         }
     }
 
@@ -1265,10 +1305,26 @@ internal sealed class LibraryVisualStage : Grid
             return;
         }
 
+        // フレーム一時停止中に SizeChanged→Sync で Play すると光漏れだけ 1 倍で回り出す。
+        if (_framePaused)
+        {
+            try
+            {
+                _spillMedia.Position = _media.Position;
+            }
+            catch
+            {
+            }
+
+            PauseSpillMedia();
+            return;
+        }
+
         try
         {
             _spillMedia.Volume = 0;
-            _spillMedia.SpeedRatio = _media.SpeedRatio;
+            // 暗いプレビュー中は本編 SpeedRatio が 1 のままでも 1/4 に揃える。
+            _spillMedia.SpeedRatio = _playing ? _media.SpeedRatio : PreviewLoopSpeed;
             _spillMedia.Position = _media.Position;
             _spillMedia.Play();
         }

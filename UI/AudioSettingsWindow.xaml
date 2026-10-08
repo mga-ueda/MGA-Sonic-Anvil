@@ -87,7 +87,13 @@
                        FontWeight="Bold"
                        FontSize="11.333"
                        Margin="0,16,0,6" />
-            <StackPanel x:Name="AssociationHost" />
+            <Grid x:Name="AssociationHost">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="140" />
+                <ColumnDefinition Width="{x:Static ui:DesignMetrics.SettingsColumnGapGrid}" />
+                <ColumnDefinition Width="*" MinWidth="140" />
+              </Grid.ColumnDefinitions>
+            </Grid>
           </StackPanel>
         </TabItem>
 
@@ -128,20 +134,45 @@
                 <CheckBox x:Name="LibraryShowPlaylistPdfBox"
                           Style="{StaticResource DarkCheckBoxStyle}"
                           Content="{x:Static domain:UiStrings.LabelLibraryShowPlaylistPdf}"
-                          MinHeight="22"
                           HorizontalAlignment="Left"
-                          Margin="0,0,0,6" />
+                          Margin="0,0,0,6"
+                          VerticalContentAlignment="Center" />
                 <CheckBox x:Name="LibraryShowPlaylistMovBox"
                           Style="{StaticResource DarkCheckBoxStyle}"
                           Content="{x:Static domain:UiStrings.LabelLibraryShowPlaylistMov}"
-                          MinHeight="22"
                           HorizontalAlignment="Left"
-                          Margin="0,0,0,6" />
+                          Margin="0,0,0,6"
+                          VerticalContentAlignment="Center" />
                 <CheckBox x:Name="LibraryShowPlaylistMp4Box"
                           Style="{StaticResource DarkCheckBoxStyle}"
                           Content="{x:Static domain:UiStrings.LabelLibraryShowPlaylistMp4}"
-                          MinHeight="22"
-                          HorizontalAlignment="Left" />
+                          HorizontalAlignment="Left"
+                          Margin="0,0,0,6"
+                          VerticalContentAlignment="Center" />
+                <CheckBox x:Name="LibraryShowPlaylistAviBox"
+                          Style="{StaticResource DarkCheckBoxStyle}"
+                          Content="{x:Static domain:UiStrings.LabelLibraryShowPlaylistAvi}"
+                          HorizontalAlignment="Left"
+                          Margin="0,0,0,6"
+                          VerticalContentAlignment="Center" />
+                <CheckBox x:Name="LibraryShowPlaylistMkvBox"
+                          Style="{StaticResource DarkCheckBoxStyle}"
+                          Content="{x:Static domain:UiStrings.LabelLibraryShowPlaylistMkv}"
+                          HorizontalAlignment="Left"
+                          Margin="0,0,0,6"
+                          VerticalContentAlignment="Center" />
+                <CheckBox x:Name="LibraryShowPlaylistWebmBox"
+                          Style="{StaticResource DarkCheckBoxStyle}"
+                          Content="{x:Static domain:UiStrings.LabelLibraryShowPlaylistWebm}"
+                          HorizontalAlignment="Left"
+                          Margin="0,0,0,6"
+                          VerticalContentAlignment="Center" />
+                <CheckBox x:Name="LibraryShowPlaylistMpgBox"
+                          Style="{StaticResource DarkCheckBoxStyle}"
+                          Content="{x:Static domain:UiStrings.LabelLibraryShowPlaylistMpg}"
+                          HorizontalAlignment="Left"
+                          Margin="0,0,0,6"
+                          VerticalContentAlignment="Center" />
               </StackPanel>
 
               <TextBlock x:Name="LibraryColumnsHeader"
@@ -722,7 +753,8 @@
                        Style="{StaticResource DarkTextBoxStyle}"
                        Padding="6,1"
                        FontSize="11.333"
-                       VerticalContentAlignment="Center" />
+                       VerticalContentAlignment="Center"
+                       TextChanged="FfmpegPathBox_TextChanged" />
               <ui:RoundedButton x:Name="FfmpegBrowseButton"
                                 Grid.Column="1"
                                 Content="{x:Static domain:UiStrings.ButtonBrowse}"

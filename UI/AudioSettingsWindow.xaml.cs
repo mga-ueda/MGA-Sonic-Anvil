@@ -74,9 +74,17 @@ internal partial class AudioSettingsWindow : Window
 
     public bool SelectedLibraryShowPlaylistPdf { get; private set; } = true;
 
-    public bool SelectedLibraryShowPlaylistMov { get; private set; } = true;
+    public bool SelectedLibraryShowPlaylistMov { get; private set; }
 
-    public bool SelectedLibraryShowPlaylistMp4 { get; private set; } = true;
+    public bool SelectedLibraryShowPlaylistMp4 { get; private set; }
+
+    public bool SelectedLibraryShowPlaylistAvi { get; private set; }
+
+    public bool SelectedLibraryShowPlaylistMkv { get; private set; }
+
+    public bool SelectedLibraryShowPlaylistWebm { get; private set; }
+
+    public bool SelectedLibraryShowPlaylistMpg { get; private set; }
 
     public int SelectedVideoProxyRetentionDays { get; private set; } = VideoProxy.DefaultRetentionDays;
 
@@ -104,6 +112,8 @@ internal partial class AudioSettingsWindow : Window
     private readonly SettingsIoProbe _probe = new();
     private readonly DispatcherTimer _meterTimer;
     private bool _syncingAssociations;
+    private TextBlock? _videoAssociationHeader;
+    private readonly List<CheckBox> _videoAssociationBoxes = [];
     private bool _syncingSpeaker;
     private bool _syncingVisibility;
     private bool _speakerDirty;
@@ -148,8 +158,12 @@ internal partial class AudioSettingsWindow : Window
         LibraryPlaylistWaveformSize libraryPlaylistWaveformSizeMp3 = LibraryPlaylistWaveformSize.L,
         bool gaplessPlayback = true,
         bool libraryShowPlaylistPdf = true,
-        bool libraryShowPlaylistMov = true,
-        bool libraryShowPlaylistMp4 = true,
+        bool libraryShowPlaylistMov = false,
+        bool libraryShowPlaylistMp4 = false,
+        bool libraryShowPlaylistAvi = false,
+        bool libraryShowPlaylistMkv = false,
+        bool libraryShowPlaylistWebm = false,
+        bool libraryShowPlaylistMpg = false,
         int videoProxyRetentionDays = VideoProxy.DefaultRetentionDays,
         string? ffmpegExePath = null,
         bool videoProxyDisableAutoEncode = false)
@@ -190,6 +204,10 @@ internal partial class AudioSettingsWindow : Window
         SelectedLibraryShowPlaylistPdf = libraryShowPlaylistPdf;
         SelectedLibraryShowPlaylistMov = libraryShowPlaylistMov;
         SelectedLibraryShowPlaylistMp4 = libraryShowPlaylistMp4;
+        SelectedLibraryShowPlaylistAvi = libraryShowPlaylistAvi;
+        SelectedLibraryShowPlaylistMkv = libraryShowPlaylistMkv;
+        SelectedLibraryShowPlaylistWebm = libraryShowPlaylistWebm;
+        SelectedLibraryShowPlaylistMpg = libraryShowPlaylistMpg;
         SelectedVideoProxyRetentionDays = VideoProxy.ClampRetentionDays(videoProxyRetentionDays);
         SelectedFfmpegExePath = ffmpegExePath ?? string.Empty;
         SelectedVideoProxyDisableAutoEncode = videoProxyDisableAutoEncode;
@@ -309,6 +327,7 @@ internal partial class AudioSettingsWindow : Window
         RefreshVideoProxyUsage();
         FfmpegPathBox.Text = SelectedFfmpegExePath;
         VideoProxyDisableAutoEncodeBox.IsChecked = SelectedVideoProxyDisableAutoEncode;
+        SyncFfmpegDependentControls();
         FillDefaultAudioFormat();
         ApplyTips();
         ReflowSettingsWindow();
@@ -408,6 +427,10 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(LibraryShowPlaylistPdfBox, UiStrings.TipLibraryPlaylistDocuments);
         TipService.Set(LibraryShowPlaylistMovBox, UiStrings.TipLibraryPlaylistDocuments);
         TipService.Set(LibraryShowPlaylistMp4Box, UiStrings.TipLibraryPlaylistDocuments);
+        TipService.Set(LibraryShowPlaylistAviBox, UiStrings.TipLibraryPlaylistDocuments);
+        TipService.Set(LibraryShowPlaylistMkvBox, UiStrings.TipLibraryPlaylistDocuments);
+        TipService.Set(LibraryShowPlaylistWebmBox, UiStrings.TipLibraryPlaylistDocuments);
+        TipService.Set(LibraryShowPlaylistMpgBox, UiStrings.TipLibraryPlaylistDocuments);
         TipService.Set(ExportMovieHeader, UiStrings.TipFfmpegPath);
         TipService.Set(FfmpegPathLabel, UiStrings.TipFfmpegPath);
         TipService.Set(FfmpegPathBox, UiStrings.TipFfmpegPath);
@@ -496,6 +519,10 @@ internal partial class AudioSettingsWindow : Window
         LibraryShowPlaylistPdfBox.IsChecked = SelectedLibraryShowPlaylistPdf;
         LibraryShowPlaylistMovBox.IsChecked = SelectedLibraryShowPlaylistMov;
         LibraryShowPlaylistMp4Box.IsChecked = SelectedLibraryShowPlaylistMp4;
+        LibraryShowPlaylistAviBox.IsChecked = SelectedLibraryShowPlaylistAvi;
+        LibraryShowPlaylistMkvBox.IsChecked = SelectedLibraryShowPlaylistMkv;
+        LibraryShowPlaylistWebmBox.IsChecked = SelectedLibraryShowPlaylistWebm;
+        LibraryShowPlaylistMpgBox.IsChecked = SelectedLibraryShowPlaylistMpg;
         FillLibraryColumnHost(
             LibraryColumnsWaveHost,
             _libraryColumnChecksWave,
@@ -935,39 +962,95 @@ internal partial class AudioSettingsWindow : Window
     private void FillAssociations()
     {
         AssociationHost.Children.Clear();
+        _videoAssociationHeader = null;
+        _videoAssociationBoxes.Clear();
         var style = TryFindResource("DarkCheckBoxStyle") as Style;
         _syncingAssociations = true;
         try
         {
-            foreach (var ext in FileAssociations.Extensions)
-            {
-                var box = new CheckBox
-                {
-                    Content = new TextBlock { Text = FileAssociations.FormatLabel(ext) },
-                    IsChecked = FileAssociations.IsAssociated(ext),
-                    Margin = new Thickness(0, 0, 0, 6),
-                    Tag = ext,
-                    VerticalContentAlignment = VerticalAlignment.Center,
-                };
-                if (style is not null)
-                {
-                    box.Style = style;
-                }
-
-                box.Checked += Association_Changed;
-                box.Unchecked += Association_Changed;
-                TipService.Set(
-                    box,
-                    FileAssociations.IsPlayerOnlyExtension(ext)
-                        ? UiStrings.TipFileAssociationM4a
-                        : UiStrings.TipFileAssociations);
-                AssociationHost.Children.Add(box);
-            }
+            var audio = BuildAssociationCategory(
+                UiStrings.LabelFileAssociationsAudio,
+                FileAssociations.AudioExtensions,
+                style,
+                ffmpegRequired: false);
+            var video = BuildAssociationCategory(
+                UiStrings.LabelFileAssociationsVideo,
+                FileAssociations.VideoExtensions,
+                style,
+                ffmpegRequired: true);
+            Grid.SetColumn(audio, 0);
+            Grid.SetColumn(video, 2);
+            AssociationHost.Children.Add(audio);
+            AssociationHost.Children.Add(video);
         }
         finally
         {
             _syncingAssociations = false;
         }
+    }
+
+    private StackPanel BuildAssociationCategory(
+        string title,
+        IReadOnlyList<string> extensions,
+        Style? style,
+        bool ffmpegRequired)
+    {
+        var column = new StackPanel();
+        var header = new TextBlock
+        {
+            Text = title,
+            FontWeight = FontWeights.SemiBold,
+            FontSize = 11.333,
+            Margin = new Thickness(0, 0, 0, 6),
+        };
+        TipService.Set(
+            header,
+            ffmpegRequired ? UiStrings.TipFileAssociationVideo : UiStrings.TipFileAssociations);
+        column.Children.Add(header);
+        if (ffmpegRequired)
+        {
+            _videoAssociationHeader = header;
+        }
+
+        for (var i = 0; i < extensions.Count; i++)
+        {
+            var ext = extensions[i];
+            var last = i == extensions.Count - 1;
+            var box = new CheckBox
+            {
+                Content = new TextBlock
+                {
+                    Text = FileAssociations.FormatLabel(ext),
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                IsChecked = FileAssociations.IsAssociated(ext),
+                Margin = new Thickness(0, 0, 0, last ? 0 : 6),
+                Tag = ext,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left,
+            };
+            if (style is not null)
+            {
+                box.Style = style;
+            }
+
+            box.Checked += Association_Changed;
+            box.Unchecked += Association_Changed;
+            TipService.Set(
+                box,
+                FileAssociations.IsPlayerOnlyExtension(ext)
+                    ? (ext.Equals(".m4a", StringComparison.OrdinalIgnoreCase)
+                        ? UiStrings.TipFileAssociationM4a
+                        : UiStrings.TipFileAssociationVideo)
+                    : UiStrings.TipFileAssociations);
+            column.Children.Add(box);
+            if (ffmpegRequired)
+            {
+                _videoAssociationBoxes.Add(box);
+            }
+        }
+
+        return column;
     }
 
     private void Association_Changed(object sender, RoutedEventArgs e)
@@ -1150,6 +1233,10 @@ internal partial class AudioSettingsWindow : Window
         SelectedLibraryShowPlaylistPdf = LibraryShowPlaylistPdfBox.IsChecked != false;
         SelectedLibraryShowPlaylistMov = LibraryShowPlaylistMovBox.IsChecked != false;
         SelectedLibraryShowPlaylistMp4 = LibraryShowPlaylistMp4Box.IsChecked != false;
+        SelectedLibraryShowPlaylistAvi = LibraryShowPlaylistAviBox.IsChecked != false;
+        SelectedLibraryShowPlaylistMkv = LibraryShowPlaylistMkvBox.IsChecked != false;
+        SelectedLibraryShowPlaylistWebm = LibraryShowPlaylistWebmBox.IsChecked != false;
+        SelectedLibraryShowPlaylistMpg = LibraryShowPlaylistMpgBox.IsChecked != false;
         SelectedVideoProxyRetentionDays = ReadVideoProxyRetentionDays();
         SelectedFfmpegExePath = FfmpegPathBox.Text.Trim();
         SelectedVideoProxyDisableAutoEncode = VideoProxyDisableAutoEncodeBox.IsChecked == true;
@@ -1207,6 +1294,31 @@ internal partial class AudioSettingsWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             FfmpegPathBox.Text = dialog.FileName;
+        }
+    }
+
+    private void FfmpegPathBox_TextChanged(object sender, TextChangedEventArgs e) =>
+        SyncFfmpegDependentControls();
+
+    private void SyncFfmpegDependentControls()
+    {
+        var enabled = VideoProxy.TryResolveFfmpegExe(FfmpegPathBox.Text, out _);
+        LibraryShowPlaylistAviBox.IsEnabled = enabled;
+        LibraryShowPlaylistMkvBox.IsEnabled = enabled;
+        LibraryShowPlaylistWebmBox.IsEnabled = enabled;
+        LibraryShowPlaylistMpgBox.IsEnabled = enabled;
+        // 関連付けのビデオは操作できたまま、見た目だけ落とす（IsEnabled では触らせない）。
+        var associationOpacity = enabled ? 1 : 0.45;
+        if (_videoAssociationHeader is not null)
+        {
+            _videoAssociationHeader.Opacity = associationOpacity;
+        }
+
+        for (var i = 0; i < _videoAssociationBoxes.Count; i++)
+        {
+            var box = _videoAssociationBoxes[i];
+            box.IsEnabled = true;
+            box.Opacity = associationOpacity;
         }
     }
 

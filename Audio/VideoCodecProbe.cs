@@ -1,10 +1,11 @@
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.Audio;
 
-/// <summary>MOV / MP4 の映像 fourcc。MJPEG / Photo JPEG 以外はプロキシが必要。</summary>
+/// <summary>MOV / MP4 / AVI の映像 fourcc。MJPEG / Photo JPEG 以外はプロキシが必要。MKV / WebM / MPG は常にプロキシ。</summary>
 internal static class VideoCodecProbe
 {
     public static bool CanPlayWithoutProxy(string path)
@@ -69,6 +70,19 @@ internal static class VideoCodecProbe
             return false;
         }
 
+        var ext = Path.GetExtension(path);
+        if (ext.Equals(".avi", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryReadAvi(path, out fourccs, out durationSeconds);
+        }
+
+        if (ext.Equals(".mkv", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".webm", StringComparison.OrdinalIgnoreCase)
+            || LibraryPlaylistDocuments.IsMpgExtension(ext))
+        {
+            return false;
+        }
+
         try
         {
             using var stream = new FileStream(
@@ -103,6 +117,140 @@ internal static class VideoCodecProbe
         {
             return false;
         }
+    }
+
+    /// <summary>AVI の vids strh.fccHandler。尺は avih のフレーム数×μs/frame。</summary>
+    private static bool TryReadAvi(string path, out IReadOnlyList<string> fourccs, out double durationSeconds)
+    {
+        fourccs = [];
+        durationSeconds = 0;
+        try
+        {
+            using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            if (stream.Length < 12)
+            {
+                return false;
+            }
+
+            var header = new byte[12];
+            if (stream.Read(header, 0, 12) != 12)
+            {
+                return false;
+            }
+
+            if (!AsciiEquals(header, 0, "RIFF") || !AsciiEquals(header, 8, "AVI "))
+            {
+                return false;
+            }
+
+            var found = new List<string>();
+            var microSecPerFrame = 0u;
+            var totalFrames = 0u;
+            WalkAvi(stream, 12, stream.Length, found, ref microSecPerFrame, ref totalFrames);
+            if (microSecPerFrame > 0 && totalFrames > 0)
+            {
+                durationSeconds = totalFrames * (microSecPerFrame / 1_000_000d);
+            }
+
+            if (found.Count == 0 && durationSeconds <= 0)
+            {
+                return false;
+            }
+
+            fourccs = found;
+            return found.Count > 0 || durationSeconds > 0;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static void WalkAvi(
+        Stream stream,
+        long start,
+        long end,
+        List<string> found,
+        ref uint microSecPerFrame,
+        ref uint totalFrames)
+    {
+        var offset = start;
+        var header = new byte[8];
+        var payload = new byte[56];
+        while (offset + 8 <= end)
+        {
+            stream.Position = offset;
+            if (stream.Read(header, 0, 8) != 8)
+            {
+                return;
+            }
+
+            var type = Encoding.ASCII.GetString(header, 0, 4);
+            var size = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(4, 4));
+            var payloadStart = offset + 8;
+            var next = payloadStart + size;
+            if (next > end || next < payloadStart)
+            {
+                return;
+            }
+
+            if (type == "LIST" && size >= 4)
+            {
+                stream.Position = payloadStart;
+                if (stream.Read(payload, 0, 4) == 4)
+                {
+                    WalkAvi(stream, payloadStart + 4, next, found, ref microSecPerFrame, ref totalFrames);
+                }
+            }
+            else if (type == "avih" && size >= 20 && microSecPerFrame == 0)
+            {
+                stream.Position = payloadStart;
+                if (stream.Read(payload, 0, 20) == 20)
+                {
+                    microSecPerFrame = BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0, 4));
+                    totalFrames = BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(16, 4));
+                }
+            }
+            else if (type == "strh" && size >= 8)
+            {
+                var read = (int)Math.Min(size, (uint)payload.Length);
+                stream.Position = payloadStart;
+                if (stream.Read(payload, 0, read) == read
+                    && AsciiEquals(payload, 0, "vids"))
+                {
+                    var handler = Encoding.ASCII.GetString(payload, 4, 4);
+                    if (!string.IsNullOrWhiteSpace(handler) && !found.Contains(handler, StringComparer.OrdinalIgnoreCase))
+                    {
+                        found.Add(handler);
+                    }
+                }
+            }
+
+            // RIFF chunks are word-aligned.
+            offset = next + (size & 1);
+        }
+    }
+
+    private static bool AsciiEquals(byte[] buffer, int offset, string expected)
+    {
+        if (offset < 0 || offset + expected.Length > buffer.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < expected.Length; i++)
+        {
+            if (buffer[offset + i] != (byte)expected[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static void Walk(

@@ -10,7 +10,7 @@ using MgaSonicAnvil.Domain;
 namespace MgaSonicAnvil.Audio;
 
 /// <summary>
-/// MJPEG / Photo JPEG 以外の MOV / MP4 を、スクラブしやすい MJPEG AVI プロキシへ落とす。
+/// MJPEG / Photo JPEG 以外の動画（MOV / MP4 / AVI / MKV / WebM / MPG）を、スクラブしやすい MJPEG AVI プロキシへ落とす。
 /// ffmpeg は同梱せず、設定の ffmpeg.exe だけを呼ぶ。空欄または無効ならプロキシは作らない。
 /// </summary>
 internal static class VideoProxy
@@ -302,9 +302,19 @@ internal static class VideoProxy
         return EncodeProgressShare + (FinalizeProgressCap - EncodeProgressShare) * t;
     }
 
+    /// <summary>
+    /// 拡張子連動／引数起動のあいだは true。設定の自動生成がオンでもプロキシを作らない。
+    /// </summary>
+    public static bool SuppressAutoEncode { get; set; }
+
+    /// <summary>起動抑止と設定の「自動生成しない」を除いた可否（ffmpeg の有無は見ない）。</summary>
+    public static bool AllowsAutoEncodeProxy(bool suppressLaunchEncode, bool disableInSettings) =>
+        !suppressLaunchEncode && !disableInSettings;
+
     /// <summary>設定の ffmpeg.exe が実在し、自動生成を止めていないときだけプロキシを作る。</summary>
     public static bool CanEncodeProxy() =>
-        !AppStorage.Settings.VideoProxyDisableAutoEncode && FindFfmpeg() is not null;
+        AllowsAutoEncodeProxy(SuppressAutoEncode, AppStorage.Settings.VideoProxyDisableAutoEncode)
+        && FindFfmpeg() is not null;
 
     public static bool TryResolveFfmpegExe(string? path, out string exe)
     {

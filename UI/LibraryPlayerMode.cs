@@ -103,7 +103,7 @@ internal static class LibraryPlayerMode
             return true;
         }
 
-        if (key is Key.Escape or Key.F9 or Key.F10 or Key.F11 or Key.F12 or Key.Apps)
+        if (key is Key.Escape or Key.F8 or Key.F9 or Key.F10 or Key.F11 or Key.F12 or Key.Apps)
         {
             return true;
         }
@@ -180,6 +180,13 @@ internal static class LibraryPlayerMode
     /// </summary>
     public static bool PlaysLibrarySelectionOnSpace(bool explorerFocused, bool favoritesFocused) =>
         !explorerFocused && !favoritesFocused;
+
+    /// <summary>
+    /// 動画本再生の Space／Enter 停止。
+    /// F8 動画ミニは止めた位置で静止（暗いプレビューへ落とさない）。
+    /// F10 プレイリストは止めた位置から暗い 1/4 速＋格子へ戻す。
+    /// </summary>
+    public static bool VideoStopFreezesFrame(bool videoMiniPlayer) => videoMiniPlayer;
 
     /// <summary>
     /// ランダム再生の切替。プレイリストが空でも、ツリー／お気に入りフォーカスでも効く。
@@ -369,6 +376,27 @@ internal static class LibraryPlayerMode
         return [.. keep];
     }
 
+    /// <summary>
+    /// プレイヤー→エディタ引き継ぎのカレント。残件が無ければ null（動画の音声だけ残さない）。
+    /// </summary>
+    public static DocumentSession? ResolveLibraryHandoffCurrent(
+        IReadOnlyList<DocumentSession> remaining,
+        DocumentSession? preferred)
+    {
+        if (preferred is not null)
+        {
+            foreach (var session in remaining)
+            {
+                if (ReferenceEquals(session, preferred))
+                {
+                    return preferred;
+                }
+            }
+        }
+
+        return remaining.Count > 0 ? remaining[0] : null;
+    }
+
     public static DocumentSession[] SessionsToDrop(
         IReadOnlyList<DocumentSession> all,
         IReadOnlyCollection<DocumentSession> keep)
@@ -497,6 +525,23 @@ internal static class LibraryPlayerMode
     public const int MeterFadeFrameRate = 30;
 
     /// <summary>
+    /// 動画専用ミニプレイヤー（F8／拡張子連動起動）中は、前面 UI をすべて隠す。
+    /// </summary>
+    public static bool HidesChromeForVideoFileLaunch(bool videoMiniPlayer, bool player) =>
+        videoMiniPlayer && player;
+
+    /// <summary>
+    /// F8 で動画ミニへ入れるか。本再生中の動画がありプレイリストに再生対象があるとき、
+    /// またはすでに動画ミニ中（解除用）だけ。拡張子連動起動の自動突入は別経路。
+    /// </summary>
+    public static bool CanToggleVideoMiniPlayer(
+        bool alreadyActive,
+        bool videoRealPlayback,
+        bool hasPlayableSession) =>
+        alreadyActive || (videoRealPlayback && hasPlayableSession);
+
+
+    /// <summary>
     /// 動画再生中、または PDF 表示モード中は前面クロームを隠す。
     /// 選択プレビュー（暗表示）ではクロームを残す。
     /// 上下キーなどで次の本再生へつなぐあいだは <paramref name="bridgeHold"/> で隠したままにする。
@@ -538,32 +583,34 @@ internal static class LibraryPlayerMode
         currentVisualPlaying && nextIsVisual;
 
     /// <summary>
-    /// PDF の明るい表示に入った瞬間だけ HUD を閉じる。
-    /// 暗い選択プレビューでセッションを立てると、Space／Enter 後にアナライザが残る。
+    /// 明るい PDF 表示中は A／T オーバーレイを出さない（フラグは触らず、次の音声／動画で覚える）。
     /// </summary>
-    public static bool StartsPdfChromeHudSession(bool isPdf, bool chromeHidden, bool sessionActive) =>
-        isPdf && chromeHidden && !sessionActive;
-
-    /// <summary>明るい PDF 表示中だけセッションを維持（A トグルを覚える）。</summary>
-    public static bool HoldsPdfChromeHudSession(bool isPdf, bool chromeHidden) =>
+    public static bool HidesPlaylistVideoChromeOverlaysForPdf(bool isPdf, bool chromeHidden) =>
         isPdf && chromeHidden;
-
-    /// <summary>
-    /// PDF の HUD 閉じセッションを終えて動画本再生へ移ったとき、アナライザ HUD を戻す。
-    /// クロームをつないだまま移ると !hide の復帰経路に乗らない。
-    /// </summary>
-    public static bool RestoresVideoHudAfterPdfSession(
-        bool pdfSessionWasActive,
-        bool stillHoldsPdfSession,
-        bool chromeHidden,
-        bool isVideo) =>
-        pdfSessionWasActive && !stillHoldsPdfSession && chromeHidden && isVideo;
 
     /// <summary>再生中の映像へ合わせ直す最小ずれ。これ未満のシークは MediaElement を落とす。</summary>
     public const double VideoClockSeekSeconds = 1;
 
     /// <summary>1／3 早送り・巻き戻し中は、ほぼ毎フレーム映像を音声へ合わせる。</summary>
     public const double VideoShuttleSeekSeconds = 1.0 / 60;
+
+    /// <summary>
+    /// 本再生中に早送り・巻き戻しで映像クロックを止めているときは、Position スクラブだけにする。
+    /// （Play し直すと 1 倍に戻り、音声 3 倍と食い違う。1/4 速プレビューは _playing が false。）
+    /// </summary>
+    public static bool VideoSeekIsShuttleScrub(bool playing, bool visualClockRunning) =>
+        playing && !visualClockRunning;
+
+    /// <summary>
+    /// テンキー 1／3 中は映像クロックが止まっていても、音声ヘッドで映像とシークバーを進める。
+    /// </summary>
+    public static bool DrivesPlayheadWhileVideoShuttles(
+        bool playerMode,
+        bool isVideoFile,
+        bool visualShown,
+        bool shuttling,
+        bool audioPlaying) =>
+        playerMode && isVideoFile && visualShown && shuttling && audioPlaying;
 
     /// <summary>
     /// 動画ファイルは映像クロックでシークバーを進める（本再生・1/4 速プレビュー）。
@@ -679,6 +726,89 @@ internal static class LibraryPlayerMode
     public static bool IsVideoFullscreenToggle(Key key, ModifierKeys modifiers) =>
         key == Key.F && modifiers == ModifierKeys.None;
 
+    /// <summary>F 全画面中は動画ミニの原寸配置を当てない（解除後に反映）。</summary>
+    public static bool DefersVideoLaunchPlacementWhileFullscreen(bool fullscreen) =>
+        fullscreen;
+
+    /// <summary>
+    /// F 全画面中に F8 で動画ミニへ入るときは、先に全画面を抜ける。
+    /// （全画面のまま原寸配置を遅延すると、ミニに入ったように見えない。）
+    /// </summary>
+    public static bool ExitsVideoFullscreenBeforeEnterMini(
+        bool playlistVideoFullscreen,
+        bool alreadyVideoMini) =>
+        playlistVideoFullscreen && !alreadyVideoMini;
+
+    /// <summary>
+    /// 動画専用ミニプレイヤーだけで、アナライザ／タイムコードを窓に比例させる倍率。
+    /// F10（通常／F 全画面）は常に 1。ミニでも F 全画面中は 1。
+    /// ピーク／ゴニオ／下段スペアナが見切れないよう高さ・幅の上限もかける。
+    /// </summary>
+    public static double VideoMiniOverlayScale(
+        double windowWidth,
+        double windowHeight,
+        bool videoMini,
+        bool fullscreen)
+    {
+        if (!videoMini || fullscreen || windowWidth < 1 || windowHeight < 1)
+        {
+            return 1;
+        }
+
+        var byReference = Math.Min(
+            windowWidth / DesignMetrics.OverlayScaleReferenceWidth,
+            windowHeight / DesignMetrics.OverlayScaleReferenceHeight);
+        // 波形帯＋下段ゴニオ／スペアナ＋右メーター列が同時に拡縮して収まる上限。
+        var meterWidth = Math.Max(1, DesignMetrics.LevelMeterWidth);
+        var sideWidth = Math.Max(
+            1,
+            DesignMetrics.LoudnessMeterWidth + DesignMetrics.SpectrumWidth + meterWidth);
+        var stackHeight = Math.Max(
+            1,
+            DesignMetrics.LibraryWaveformHeight + DesignMetrics.VectorScopeHeight);
+        var contentHeight = Math.Max(1, windowHeight - DesignMetrics.WindowFramePad);
+        var fitWidth = Math.Min((windowWidth * 0.30) / meterWidth, windowWidth / sideWidth);
+        var fitHeight = contentHeight / stackHeight;
+        var scale = Math.Min(byReference, Math.Min(fitWidth, fitHeight));
+        if (double.IsNaN(scale) || double.IsInfinity(scale) || scale <= 0)
+        {
+            return 1;
+        }
+
+        return Math.Clamp(scale, DesignMetrics.OverlayScaleMin, DesignMetrics.OverlayScaleMax);
+    }
+
+    /// <summary>動画ミニの波形帯高さ（基準高 × 窓比例倍率）。</summary>
+    public static double VideoMiniWaveformHeight(double scale) =>
+        DesignMetrics.LibraryWaveformHeight * SanitizeOverlayScale(scale);
+
+    /// <summary>動画ミニの下段行高（スペアナ／ゴニオ帯）。未スケールの TransportChromeHeight は使わない。</summary>
+    public static double VideoMiniTransportRowHeight(double scale) =>
+        DesignMetrics.SpectrumHeight * SanitizeOverlayScale(scale);
+
+    /// <summary>メーター列幅（ピーク LayoutTransform と同じ倍率）。</summary>
+    public static (double Min, double Max, double Width) VideoMiniMeterColumnWidths(
+        double preferredWidth,
+        double maxWidth,
+        double scale)
+    {
+        var s = SanitizeOverlayScale(scale);
+        return (
+            DesignMetrics.LevelMeterWidth * s,
+            maxWidth * s,
+            preferredWidth * s);
+    }
+
+    private static double SanitizeOverlayScale(double scale)
+    {
+        if (double.IsNaN(scale) || double.IsInfinity(scale) || scale <= 0)
+        {
+            return 1;
+        }
+
+        return Math.Clamp(scale, DesignMetrics.OverlayScaleMin, DesignMetrics.OverlayScaleMax);
+    }
+
     /// <summary>波形・アナライザ・ファイル名の表示切替（タイムコードは含まない）。</summary>
     public static bool IsVideoHudToggle(Key key, ModifierKeys modifiers) =>
         key == Key.A && modifiers == ModifierKeys.None;
@@ -687,6 +817,44 @@ internal static class LibraryPlayerMode
     public static bool IsVideoTimecodeToggle(Key key, ModifierKeys modifiers) =>
         key == Key.T && modifiers == ModifierKeys.None;
 
+    /// <summary>
+    /// 動画ミニ（F8／引数起動）で使う A／T。未設定時はどちらもオフ。
+    /// </summary>
+    public static void ResolveVideoLaunchChrome(
+        bool storedHud,
+        bool storedTimecode,
+        out bool hud,
+        out bool timecode)
+    {
+        hud = storedHud;
+        timecode = storedTimecode;
+    }
+
+    /// <summary>
+    /// プレイリストからの動画本再生を始めた／別動画へ移ったときだけ A／T をオンに戻す。
+    /// 再生中のトグルは可。F8／引数起動ミニは対象外（記憶した状態を使う）。
+    /// </summary>
+    public static bool ResetsPlaylistVideoChromeOnPlay(
+        bool videoMiniPlacement,
+        bool isVideo,
+        bool playing,
+        bool wasPlaying,
+        string? sourcePath,
+        string? previousSourcePath)
+    {
+        if (videoMiniPlacement || !isVideo || !playing)
+        {
+            return false;
+        }
+
+        if (!wasPlaying)
+        {
+            return true;
+        }
+
+        return !string.Equals(sourcePath, previousSourcePath, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>前面クロームが消えている本再生中だけ、タイムコードを出せる。</summary>
     public static bool ShowsPlaylistVideoTimecode(bool chromeHidden, bool timecodeOn, bool isVideo) =>
         chromeHidden && timecodeOn && isVideo;
@@ -694,6 +862,37 @@ internal static class LibraryPlayerMode
     /// <summary>前面クロームが消えている動画本再生中、A で HUD が出ているときだけ左下のファイル名を出す。</summary>
     public static bool ShowsPlaylistVideoFileName(bool chromeHidden, bool hudOn, bool isVideo) =>
         chromeHidden && hudOn && isVideo;
+
+    /// <summary>
+    /// 中央のファイル名がラウドネスと重なる（または隙間未満）とき、左へずらす量。
+    /// 左端は <paramref name="minNameLeft"/> より左へ出さない。
+    /// </summary>
+    public static double PlaylistVideoFileNameLoudnessDodge(
+        Rect fileName,
+        Rect loudness,
+        double minNameLeft,
+        double gap = 0)
+    {
+        if (fileName.Width <= 0 || loudness.Width <= 0)
+        {
+            return 0;
+        }
+
+        // 縦に重ならなければ横の回避は不要。
+        if (fileName.Bottom <= loudness.Top || fileName.Top >= loudness.Bottom)
+        {
+            return 0;
+        }
+
+        var needed = fileName.Right + Math.Max(0, gap) - loudness.Left;
+        if (needed <= 0)
+        {
+            return 0;
+        }
+
+        var maxDodge = Math.Max(0, fileName.Left - minNameLeft);
+        return Math.Min(needed, maxDodge);
+    }
 
     /// <summary>PDF ページを静止背景レイヤーへ固定／解除（固定時は表示を閉じる）。</summary>
     public static bool IsPdfBackgroundPinToggle(Key key, ModifierKeys modifiers) =>
