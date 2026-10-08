@@ -56,9 +56,9 @@ internal static class ForegroundActivation
         }
 
         window.Activate();
-        var keepTop = window.Topmost;
-        window.Topmost = true;
-        window.Topmost = keepTop;
+        // Always On Top 済みだと Topmost=true→true は依存プロパティが no-op になり、
+        // クローク解除直後の SetWindowPos 再提示が飛ばず窓が消えたままになる。
+        PulseTopmost(window);
 
         if (GetForegroundWindow() != hwnd)
         {
@@ -70,6 +70,16 @@ internal static class ForegroundActivation
         {
             Flash(hwnd);
         }
+    }
+
+    /// <summary>
+    /// Topmost を一度反転して戻し、必ず SetWindowPos を発行する。
+    /// </summary>
+    internal static void PulseTopmost(Window window)
+    {
+        var keepTop = window.Topmost;
+        window.Topmost = !keepTop;
+        window.Topmost = keepTop;
     }
 
     private static void TryAttachAndForeground(IntPtr hwnd)
