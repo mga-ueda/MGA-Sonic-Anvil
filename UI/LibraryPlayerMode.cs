@@ -500,6 +500,7 @@ internal static class LibraryPlayerMode
     /// 動画再生中、または PDF 表示モード中は前面クロームを隠す。
     /// 選択プレビュー（暗表示）ではクロームを残す。
     /// 上下キーなどで次の本再生へつなぐあいだは <paramref name="bridgeHold"/> で隠したままにする。
+    /// テンキー 0 などで本再生から一時停止したあとは <paramref name="immersivePauseHold"/> で隠したままにする。
     /// </summary>
     public static bool HidesChromeForPlaylistVisual(
         bool player,
@@ -507,14 +508,15 @@ internal static class LibraryPlayerMode
         bool visualPlaying,
         bool isPdf,
         bool isVideo,
-        bool bridgeHold = false)
+        bool bridgeHold = false,
+        bool immersivePauseHold = false)
     {
         if (!player || !visualShown)
         {
             return false;
         }
 
-        if (bridgeHold && (isPdf || isVideo || visualPlaying))
+        if ((bridgeHold || immersivePauseHold) && (isPdf || isVideo || visualPlaying))
         {
             return true;
         }

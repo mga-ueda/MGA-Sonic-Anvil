@@ -58,6 +58,9 @@ public partial class MainWindow
     private bool _playlistPdfChromeSession;
     /// <summary>映像／PDF 本再生のつなぎでクロームを出さない。</summary>
     private bool _playlistVisualChromeBridge;
+
+    /// <summary>本再生からの一時停止（テンキー 0）中はクロームを出さない。</summary>
+    private bool _playlistVideoImmersivePause;
     private bool _playlistVideoFullscreen;
     private WindowState _windowStateBeforeVideoFullscreen;
     private WindowStyle _windowStyleBeforeVideoFullscreen;
@@ -320,7 +323,8 @@ public partial class MainWindow
             LibraryBrowser.PlaylistVisualPlaying,
             LibraryBrowser.PlaylistVisualIsPdf,
             LibraryBrowser.PlaylistVisualIsVideo,
-            _playlistVisualChromeBridge);
+            _playlistVisualChromeBridge,
+            _playlistVideoImmersivePause);
         ApplySilentSkipFromSettings();
         var heldPdfHudSession = _playlistPdfChromeSession;
         if (LibraryPlayerMode.StartsPdfChromeHudSession(
@@ -817,7 +821,8 @@ public partial class MainWindow
                 LibraryBrowser.PlaylistVisualPlaying,
                 LibraryBrowser.PlaylistVisualIsPdf,
                 LibraryBrowser.PlaylistVisualIsVideo,
-                _playlistVisualChromeBridge))
+                _playlistVisualChromeBridge,
+                _playlistVideoImmersivePause))
         {
             visible = false;
         }
@@ -1145,6 +1150,7 @@ public partial class MainWindow
         }
 
         _libraryPlayerHostActive = false;
+        ClearPlaylistVideoImmersivePause();
         LibraryBrowser.HidePlaylistVisual();
         // タイルは LeaveLibraryMaximizeAsync → RestoreLibrarySuspendedTileArrange で付け直す。
     }
@@ -1531,6 +1537,7 @@ public partial class MainWindow
         if (_sessions.Count == 0)
         {
             BindWorkspace(null);
+            EndLibraryBackgroundPlayback();
             LibraryBrowser.SetSessions(_sessions, null);
             LibraryBrowser.SetArtwork(null);
             RefreshStatus();
@@ -1743,6 +1750,7 @@ public partial class MainWindow
 
         if (_sessions.Count == 0)
         {
+            EndLibraryBackgroundPlayback();
             LibraryBrowser.SetSessions(_sessions, null);
             LibraryBrowser.SetArtwork(null);
             SyncPlayerMeterFade();
@@ -2251,7 +2259,8 @@ public partial class MainWindow
     {
         if (IsPlaybackActive())
         {
-            PausePlaybackHere();
+            // 本再生中の一時停止では暗いプレビューへ移ってもクロームを出さない。
+            PausePlaybackHere(immersiveVideoHold: IsPlaylistVideoPlaying());
             return;
         }
 
@@ -2264,6 +2273,20 @@ public partial class MainWindow
         }
 
         _ = PlayLibrarySessionAsync(LibraryBrowser.SelectedSession ?? _activeSession);
+    }
+
+    private void ClearPlaylistVideoImmersivePause(bool sync = true)
+    {
+        if (!_playlistVideoImmersivePause)
+        {
+            return;
+        }
+
+        _playlistVideoImmersivePause = false;
+        if (sync)
+        {
+            SyncPlaylistVideoChromeFade();
+        }
     }
 
     private void RestartLibraryTrack()
@@ -3555,6 +3578,26 @@ public partial class MainWindow
         LibraryBrowser.RequestExplorerFocus();
     }
 
+    /// <summary>
+    /// プレイリストが空になったとき、背面の動画プレビュー／PDF 静止背景も終わらせる。
+    /// StopPlayback は暗いプレビューへ残すので、空リストではここで隠す。
+    /// </summary>
+    private void EndLibraryBackgroundPlayback()
+    {
+        if (!IsLibraryMaximized)
+        {
+            return;
+        }
+
+        _libraryStopAfterTrack = false;
+        SetPlaylistVideoFullscreen(false);
+        LibraryBrowser.ClearPdfBackgroundPin();
+        ClearPlaylistVideoImmersivePause();
+        LibraryBrowser.HidePlaylistVisual();
+        EnsurePlaylistVideoWindowRestored();
+        SyncPlaylistVideoChromeFade();
+    }
+
     /// <summary>F10 突入／ミニマム解除。空ならツリー、曲があればプレイリスト。</summary>
     private void FocusLibraryPaneForPlaylist()
     {
@@ -3587,6 +3630,7 @@ public partial class MainWindow
 
         if (_sessions.Count == 0)
         {
+            EndLibraryBackgroundPlayback();
             if (IsLibraryMaximized)
             {
                 LibraryBrowser.SetSessions(_sessions, null);
@@ -3621,6 +3665,7 @@ public partial class MainWindow
             BindWorkspace(null);
             RebuildTabBar();
             NotifyWaveformSessionsChanged();
+            EndLibraryBackgroundPlayback();
             if (IsLibraryMaximized)
             {
                 LibraryBrowser.SetSessions(_sessions, null);
@@ -3655,6 +3700,11 @@ public partial class MainWindow
                 cancelled = true;
             }
         });
+
+        if (!cancelled && _sessions.Count == 0)
+        {
+            EndLibraryBackgroundPlayback();
+        }
 
         if (!cancelled && IsLibraryMaximized)
         {

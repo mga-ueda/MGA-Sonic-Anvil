@@ -685,6 +685,13 @@ internal sealed class LibraryBrowserView : UserControl
         PlaylistVisualStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>本再生をその場で一時停止（暗いプレビューへ落とさない）。</summary>
+    public void PausePlaylistVisualFrame()
+    {
+        _visualStage.PauseAtCurrentFrame();
+        PlaylistVisualStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     /// <summary>本再生停止後、指定位置の暗いプレビューへ移す。</summary>
     public void EnterPlaylistVisualDimPreview(TimeSpan position)
     {
@@ -1158,6 +1165,8 @@ internal sealed class LibraryBrowserView : UserControl
     {
         ClearExplorerTypeahead();
         CancelPlaylistFocusRestore();
+        // 遅延の RequestListFocus でプレイリストへ吸い戻されないようにする。
+        _listFocusTicket++;
         if (_favoritesList.SelectedItem is { } selected
             && _favoritesList.ItemContainerGenerator.ContainerFromItem(selected) is UIElement row)
         {
@@ -2643,6 +2652,7 @@ internal sealed class LibraryBrowserView : UserControl
         _folderTree.PreviewMouseRightButtonDown += FolderTree_PreviewMouseRightButtonDown;
         _folderTree.PreviewKeyDown += FolderTree_PreviewKeyDown;
         _folderTree.PreviewTextInput += FolderTree_PreviewTextInput;
+        // 上段 0–9 は割合ジャンプ。ツリーのインクリメンタル検索には使わない。
         _folderTree.IsTextSearchEnabled = false;
         BindLibraryCopyCommand(_folderTree, LibraryPane.Explorer);
         _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Cut, (_, e) => e.Handled = true));
@@ -2662,6 +2672,8 @@ internal sealed class LibraryBrowserView : UserControl
         _favoritesList.Padding = new Thickness(4, 2, 4, 6);
         _favoritesList.FontSize = 11;
         _favoritesList.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
+        // 上段 0–9 は割合ジャンプ。名前の先頭一致ジャンプはしない。
+        _favoritesList.IsTextSearchEnabled = false;
         _favoritesList.PreviewKeyDown += FavoritesList_PreviewKeyDown;
         _favoritesList.SelectionChanged += FavoritesList_SelectionChanged;
         _favoritesList.PreviewMouseLeftButtonDown += FavoritesList_PreviewMouseLeftButtonDown;
@@ -4810,6 +4822,8 @@ internal sealed class LibraryBrowserView : UserControl
         _grid.AutoGenerateColumns = false;
         _grid.IsReadOnly = true;
         ImeComposition.Disable(_grid);
+        // 上段 0–9 は波形の割合ジャンプ。行の TextSearch に吸われてフォーカスがリストへ戻るのを防ぐ。
+        _grid.IsTextSearchEnabled = false;
         _grid.CanUserAddRows = false;
         _grid.CanUserDeleteRows = false;
         _grid.CanUserReorderColumns = true;
