@@ -206,7 +206,12 @@ internal static class LibraryColumnFilter
 
     public static bool IsVideoFamilyKind(string kind) =>
         kind.Equals("MOV", StringComparison.OrdinalIgnoreCase)
-        || kind.Equals("MP4", StringComparison.OrdinalIgnoreCase);
+        || kind.Equals("MP4", StringComparison.OrdinalIgnoreCase)
+        || kind.Equals("AVI", StringComparison.OrdinalIgnoreCase)
+        || kind.Equals("MKV", StringComparison.OrdinalIgnoreCase)
+        || kind.Equals("WEBM", StringComparison.OrdinalIgnoreCase)
+        || kind.Equals("MPG", StringComparison.OrdinalIgnoreCase)
+        || kind.Equals("MPEG", StringComparison.OrdinalIgnoreCase);
 
     public static bool IsPdfFamilyKind(string kind) =>
         kind.Equals("PDF", StringComparison.OrdinalIgnoreCase);
@@ -267,6 +272,26 @@ internal static class LibraryColumnFilter
         if (ext.Equals(".mp4", StringComparison.OrdinalIgnoreCase))
         {
             return "MP4";
+        }
+
+        if (ext.Equals(".avi", StringComparison.OrdinalIgnoreCase))
+        {
+            return "AVI";
+        }
+
+        if (ext.Equals(".mkv", StringComparison.OrdinalIgnoreCase))
+        {
+            return "MKV";
+        }
+
+        if (ext.Equals(".webm", StringComparison.OrdinalIgnoreCase))
+        {
+            return "WEBM";
+        }
+
+        if (LibraryPlaylistDocuments.IsMpgExtension(ext))
+        {
+            return "MPG";
         }
 
         return null;

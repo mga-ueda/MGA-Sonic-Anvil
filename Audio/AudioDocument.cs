@@ -10,6 +10,10 @@ internal enum AudioFileKind
     M4a,
     Mp4,
     Mov,
+    Avi,
+    Mkv,
+    Webm,
+    Mpg,
     Pdf,
 }
 

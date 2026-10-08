@@ -1,5 +1,6 @@
 using System.IO;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 
 namespace MgaSonicAnvil.Domain;
 
@@ -10,21 +11,56 @@ internal static class LibraryPlaylistDocuments
 
     public static bool ShowPdf { get; set; } = true;
 
-    public static bool ShowMov { get; set; } = true;
+    public static bool ShowMov { get; set; }
 
-    public static bool ShowMp4 { get; set; } = true;
+    public static bool ShowMp4 { get; set; }
 
-    public static bool AnyEnabled => ShowPdf || ShowMov || ShowMp4;
+    public static bool ShowAvi { get; set; }
 
-    public static void Apply(bool pdf, bool mov, bool mp4)
+    public static bool ShowMkv { get; set; }
+
+    public static bool ShowWebm { get; set; }
+
+    public static bool ShowMpg { get; set; }
+
+    public static bool AnyEnabled =>
+        ShowPdf || ShowMov || ShowMp4 || ShowAvi || ShowMkv || ShowWebm || ShowMpg;
+
+    public static void Apply(
+        bool pdf,
+        bool mov,
+        bool mp4,
+        bool avi,
+        bool mkv,
+        bool webm,
+        bool mpg)
     {
         ShowPdf = pdf;
         ShowMov = mov;
         ShowMp4 = mp4;
+        ShowAvi = avi;
+        ShowMkv = mkv;
+        ShowWebm = webm;
+        ShowMpg = mpg;
     }
 
-    /// <summary>テスト用。3 種をまとめてオン／オフ。</summary>
-    public static void ApplyEnabled(bool enabled) => Apply(enabled, enabled, enabled);
+    /// <summary>AVI / MKV / WebM / MPG は ffmpeg.exe が使えるときだけ載せる。</summary>
+    public static void ApplyFromSettings(AppSettings settings)
+    {
+        var ffmpeg = VideoProxy.TryResolveFfmpegExe(settings.FfmpegExePath, out _);
+        Apply(
+            settings.LibraryShowPlaylistPdf,
+            settings.LibraryShowPlaylistMov,
+            settings.LibraryShowPlaylistMp4,
+            settings.LibraryShowPlaylistAvi && ffmpeg,
+            settings.LibraryShowPlaylistMkv && ffmpeg,
+            settings.LibraryShowPlaylistWebm && ffmpeg,
+            settings.LibraryShowPlaylistMpg && ffmpeg);
+    }
+
+    /// <summary>テスト用。全種をまとめてオン／オフ。</summary>
+    public static void ApplyEnabled(bool enabled) =>
+        Apply(enabled, enabled, enabled, enabled, enabled, enabled, enabled);
 
     public static bool IsDocument(string? path)
     {
@@ -33,10 +69,7 @@ internal static class LibraryPlaylistDocuments
             return false;
         }
 
-        var ext = Path.GetExtension(path);
-        return ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase)
-            || ext.Equals(".mov", StringComparison.OrdinalIgnoreCase)
-            || ext.Equals(".mp4", StringComparison.OrdinalIgnoreCase);
+        return IsPdfPath(path) || IsVideo(path);
     }
 
     public static bool ShouldList(string? path)
@@ -62,6 +95,26 @@ internal static class LibraryPlaylistDocuments
             return ShowMp4;
         }
 
+        if (ext.Equals(".avi", StringComparison.OrdinalIgnoreCase))
+        {
+            return ShowAvi;
+        }
+
+        if (ext.Equals(".mkv", StringComparison.OrdinalIgnoreCase))
+        {
+            return ShowMkv;
+        }
+
+        if (ext.Equals(".webm", StringComparison.OrdinalIgnoreCase))
+        {
+            return ShowWebm;
+        }
+
+        if (IsMpgExtension(ext))
+        {
+            return ShowMpg;
+        }
+
         return false;
     }
 
@@ -69,13 +122,32 @@ internal static class LibraryPlaylistDocuments
     {
         var ext = Path.GetExtension(path ?? string.Empty);
         return ext.Equals(".mov", StringComparison.OrdinalIgnoreCase)
-            || ext.Equals(".mp4", StringComparison.OrdinalIgnoreCase);
+            || ext.Equals(".mp4", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".avi", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".mkv", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".webm", StringComparison.OrdinalIgnoreCase)
+            || IsMpgExtension(ext);
+    }
+
+    public static bool IsPdfPath(string? path)
+    {
+        var ext = Path.GetExtension(path ?? string.Empty);
+        return ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool IsMpgExtension(string? extension)
+    {
+        var ext = extension ?? string.Empty;
+        return ext.Equals(".mpg", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".mpeg", StringComparison.OrdinalIgnoreCase);
     }
 
     public static bool IsPdf(AudioFileKind kind) => kind == AudioFileKind.Pdf;
 
     public static bool IsVideo(AudioFileKind kind) =>
-        kind is AudioFileKind.Mp4 or AudioFileKind.Mov;
+        kind is AudioFileKind.Mp4 or AudioFileKind.Mov
+            or AudioFileKind.Avi or AudioFileKind.Mkv or AudioFileKind.Webm
+            or AudioFileKind.Mpg;
 
     public static bool IsPdf(AudioDocument document) => IsPdf(document.SourceKind);
 

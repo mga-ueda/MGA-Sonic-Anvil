@@ -13,9 +13,17 @@ public sealed class LibraryArtworkScanTests
         var seen = new HashSet<string>(StringComparer.Ordinal);
         Assert.True(LibraryArtworkScan.ShouldLoad(grouped: true, AudioFileKind.Mov, isSelected: false, "folder", seen));
         Assert.True(LibraryArtworkScan.ShouldLoad(grouped: true, AudioFileKind.Mp4, isSelected: false, "folder", seen));
+        Assert.True(LibraryArtworkScan.ShouldLoad(grouped: true, AudioFileKind.Avi, isSelected: false, "folder", seen));
+        Assert.True(LibraryArtworkScan.ShouldLoad(grouped: true, AudioFileKind.Mkv, isSelected: false, "folder", seen));
+        Assert.True(LibraryArtworkScan.ShouldLoad(grouped: true, AudioFileKind.Webm, isSelected: false, "folder", seen));
         Assert.True(LibraryArtworkScan.ShouldLoad(grouped: false, AudioFileKind.Mov, isSelected: false, "folder", seen));
         Assert.True(LibraryArtworkScan.CanRead(AudioFileKind.Mov));
         Assert.True(LibraryArtworkScan.CanRead(AudioFileKind.Mp4));
+        Assert.True(LibraryArtworkScan.CanRead(AudioFileKind.Avi));
+        Assert.True(LibraryArtworkScan.CanRead(AudioFileKind.Mkv));
+        Assert.True(LibraryArtworkScan.CanRead(AudioFileKind.Webm));
+        Assert.True(LibraryArtworkScan.CanRead(AudioFileKind.Mpg));
+        Assert.True(LibraryArtworkScan.ShouldLoad(grouped: true, AudioFileKind.Mpg, isSelected: false, "folder", seen));
         Assert.True(LibraryArtworkScan.CanRead(AudioFileKind.Pdf));
         Assert.True(LibraryArtworkScan.IsPdfKind(AudioFileKind.Pdf));
         Assert.True(LibraryArtworkScan.ShouldLoad(grouped: true, AudioFileKind.Pdf, isSelected: false, "folder", seen));

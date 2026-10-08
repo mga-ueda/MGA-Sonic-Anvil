@@ -243,7 +243,7 @@ internal static class UiScaleService
     /// </summary>
     internal static Transform CreatePublishedTransform(double factor)
     {
-        if (factor <= 1.0001)
+        if (factor <= 0 || Math.Abs(factor - 1d) <= 0.0001)
         {
             return Transform.Identity;
         }

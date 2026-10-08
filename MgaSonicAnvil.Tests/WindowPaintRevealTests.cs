@@ -41,6 +41,25 @@ public sealed class WindowPaintRevealTests
     }
 
     [Fact]
+    public void Attach_AutoRevealFalse_KeepsPendingUntilManualReveal()
+    {
+        RunSta(() =>
+        {
+            var window = new Window { Opacity = 0 };
+            var painted = 0;
+            WindowPaintReveal.Attach(window, () => painted++, autoReveal: false);
+            Assert.True(WindowPaintReveal.IsPending(window));
+            // Loaded / ContentRendered 相当: コールバックだけ先に走る想定を手動で再現しないため、
+            // ここでは Reveal 前に pending のままであることと、Reveal で一度だけ出ることを見る。
+            Assert.Equal(0, painted);
+            WindowPaintReveal.Reveal(window);
+            Assert.Equal(1, window.Opacity);
+            Assert.False(WindowPaintReveal.IsPending(window));
+            Assert.Equal(1, painted);
+        });
+    }
+
+    [Fact]
     public void TabTimeCopy_HasNoAccessKeyMarker()
     {
         var previous = UiStrings.Language;

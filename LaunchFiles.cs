@@ -14,6 +14,8 @@ internal static class LaunchFiles
 
     public static bool HasStartup => _startup.Length > 0;
 
+    public static IReadOnlyList<string> PeekStartup() => _startup;
+
     public static string[] TakeStartup()
     {
         var taken = _startup;
@@ -38,7 +40,7 @@ internal static class LaunchFiles
             var ext = Path.GetExtension(path);
             if (ext.Equals(".mp3", StringComparison.OrdinalIgnoreCase)
                 || ext.Equals(".m4a", StringComparison.OrdinalIgnoreCase)
-                || LibraryPlaylistDocuments.ShouldList(path))
+                || LibraryPlaylistDocuments.IsDocument(path))
             {
                 return true;
             }
@@ -46,6 +48,21 @@ internal static class LaunchFiles
 
         return false;
     }
+
+    public static bool ContainsVideo(IEnumerable<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            if (LibraryPlaylistDocuments.IsVideo(path))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static bool StartupHasVideo() => ContainsVideo(_startup);
 
     public static string[] Collect(IEnumerable<string> args)
     {
@@ -70,8 +87,8 @@ internal static class LaunchFiles
             result.Add(full);
         }
 
-        // 起動引数はプレイヤーも想定し、M4A を含める。
-        return AudioCodec.CollectPlayerOpenable(result);
+        // 起動引数はプレイヤーも想定し、M4A／動画／PDF をトグルに依らず含める。
+        return AudioCodec.CollectLaunchOpenable(result);
     }
 
     private static bool IsFlag(string value) =>

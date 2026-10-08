@@ -89,6 +89,10 @@ public sealed class TransportToolTipTests
         Assert.DoesNotContain("No Image", UiStrings.TipLibraryList);
         Assert.Contains("行ごとには出さない", UiStrings.TipLibraryList);
         Assert.Contains("選択行のものを出す", UiStrings.TipLibraryList);
+        Assert.Contains("動画／PDF はサムネイルがあれば各行に出す", UiStrings.TipLibraryList);
+        Assert.Contains("画像が無いときのプレースホルダは出さない", UiStrings.TipLibraryList);
+        Assert.Contains("PDF / MOV / MP4 / AVI / MKV / WebM / MPG", UiStrings.TipLibraryPlaylistDocuments);
+        Assert.Contains("動画は既定オフ", UiStrings.TipLibraryPlaylistDocuments);
         Assert.Contains("1秒でフェードイン", UiStrings.TipLibraryList);
         Assert.Contains("即表示", UiStrings.TipLibraryList);
         Assert.Contains("最初から消す", UiStrings.TipLibraryList);
@@ -98,6 +102,12 @@ public sealed class TransportToolTipTests
         Assert.Contains("Space はその曲だけ", UiStrings.TipLibraryList);
         Assert.Contains("トランスポートの再生", UiStrings.TipLibraryList);
         Assert.Contains("終わったら次の曲へ進む", UiStrings.TipLibraryList);
+        Assert.Contains("F8 で動画専用ミニプレイヤー（前面 UI 無し。本再生中かつ再生対象があるときだけ", UiStrings.TipLibraryList);
+        Assert.Contains("Space／Enter で止めると止めた位置で静止", UiStrings.TipLibraryList);
+        Assert.Contains("F 全画面中でも可", UiStrings.TipLibraryList);
+        Assert.Contains("F11／F12 へ移るとき動画／PDF はファイルごと持ち込まない", UiStrings.TipLibraryList);
+        Assert.Contains("A／T の表示は F8 と引数起動で共通に覚え", UiStrings.TipLibraryList);
+        Assert.Contains("プレイリストからの本再生は開始時オン", UiStrings.TipLibraryList);
         Assert.Contains("F9 でプレイリストと波形だけを出す", UiStrings.TipLibraryList);
         Assert.Contains("ステータスバーは出さない", UiStrings.TipLibraryList);
         Assert.Contains("Alt+A（Always on Top）", UiStrings.TipLibraryList);

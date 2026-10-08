@@ -120,6 +120,53 @@ public sealed class VideoCodecProbeTests
     }
 
     [Fact]
+    public void AviMjpeg_IsDirectPlay_AndXvidNeedsProxy()
+    {
+        var mjpeg = WriteTempAvi(BuildAvi("MJPG", microSecPerFrame: 40_000, totalFrames: 25));
+        var xvid = WriteTempAvi(BuildAvi("XVID", microSecPerFrame: 40_000, totalFrames: 50));
+        try
+        {
+            Assert.True(VideoCodecProbe.TryReadVideoFourCcs(mjpeg, out var jpegTags));
+            Assert.Contains("MJPG", jpegTags, StringComparer.OrdinalIgnoreCase);
+            Assert.True(VideoCodecProbe.CanPlayWithoutProxy(mjpeg));
+            Assert.True(VideoCodecProbe.TryRead(mjpeg, out _, out var jpegSeconds));
+            Assert.Equal(1, jpegSeconds, 3);
+
+            Assert.True(VideoCodecProbe.TryReadVideoFourCcs(xvid, out var xvidTags));
+            Assert.Contains("XVID", xvidTags, StringComparer.OrdinalIgnoreCase);
+            Assert.False(VideoCodecProbe.CanPlayWithoutProxy(xvid));
+            Assert.True(VideoCodecProbe.TryRead(xvid, out _, out var xvidSeconds));
+            Assert.Equal(2, xvidSeconds, 3);
+        }
+        finally
+        {
+            File.Delete(mjpeg);
+            File.Delete(xvid);
+        }
+    }
+
+    [Fact]
+    public void MkvAndWebm_NeverDirectPlay()
+    {
+        var mkv = Path.Combine(Path.GetTempPath(), "mga-vcodec-" + Guid.NewGuid().ToString("N") + ".mkv");
+        var webm = Path.Combine(Path.GetTempPath(), "mga-vcodec-" + Guid.NewGuid().ToString("N") + ".webm");
+        File.WriteAllBytes(mkv, [1, 2, 3, 4]);
+        File.WriteAllBytes(webm, [1, 2, 3, 4]);
+        try
+        {
+            Assert.False(VideoCodecProbe.CanPlayWithoutProxy(mkv));
+            Assert.False(VideoCodecProbe.CanPlayWithoutProxy(webm));
+            Assert.False(VideoCodecProbe.TryRead(mkv, out _, out _));
+            Assert.False(VideoCodecProbe.TryRead(webm, out _, out _));
+        }
+        finally
+        {
+            File.Delete(mkv);
+            File.Delete(webm);
+        }
+    }
+
+    [Fact]
     public void ContestIpcmMp4_ReadsAudioWhenPresent()
     {
         var path = @"V:\共有ドライブ\HAL Internship\バイヤージョシュ\20261001\効果音\コンテスト\コンテスト作品 .mp4";
@@ -159,6 +206,46 @@ public sealed class VideoCodecProbeTests
         var path = Path.Combine(Path.GetTempPath(), "mga-vcodec-" + Guid.NewGuid().ToString("N") + ".mov");
         File.WriteAllBytes(path, bytes);
         return path;
+    }
+
+    private static string WriteTempAvi(byte[] bytes)
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-vcodec-" + Guid.NewGuid().ToString("N") + ".avi");
+        File.WriteAllBytes(path, bytes);
+        return path;
+    }
+
+    private static byte[] BuildAvi(string handler, uint microSecPerFrame, uint totalFrames)
+    {
+        var avihBody = new byte[56];
+        BinaryPrimitives.WriteUInt32LittleEndian(avihBody.AsSpan(0, 4), microSecPerFrame);
+        BinaryPrimitives.WriteUInt32LittleEndian(avihBody.AsSpan(16, 4), totalFrames);
+        var strhBody = new byte[56];
+        Encoding.ASCII.GetBytes("vids").CopyTo(strhBody, 0);
+        Encoding.ASCII.GetBytes(handler.PadRight(4)[..4]).CopyTo(strhBody, 4);
+        var strl = RiffList("strl", RiffChunk("strh", strhBody));
+        var hdrl = RiffList("hdrl", Concat(RiffChunk("avih", avihBody), strl));
+        var riffBody = Concat(Encoding.ASCII.GetBytes("AVI "), hdrl);
+        return Concat(Encoding.ASCII.GetBytes("RIFF"), U32Le(riffBody.Length), riffBody);
+    }
+
+    private static byte[] RiffList(string fourcc, byte[] payload)
+    {
+        var body = Concat(Encoding.ASCII.GetBytes(fourcc.PadRight(4)[..4]), payload);
+        return RiffChunk("LIST", body);
+    }
+
+    private static byte[] RiffChunk(string fourcc, byte[] payload)
+    {
+        var padded = (payload.Length & 1) == 0 ? payload : Concat(payload, [0]);
+        return Concat(Encoding.ASCII.GetBytes(fourcc.PadRight(4)[..4]), U32Le(payload.Length), padded);
+    }
+
+    private static byte[] U32Le(int value)
+    {
+        var buffer = new byte[4];
+        BinaryPrimitives.WriteUInt32LittleEndian(buffer, (uint)value);
+        return buffer;
     }
 
     private static byte[] BuildMovie(string videoFourcc, uint timescale = 0, uint duration = 0)

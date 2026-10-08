@@ -12,7 +12,9 @@ internal static class LibraryArtworkScan
         kind is AudioFileKind.Mp3 or AudioFileKind.M4a;
 
     public static bool IsVideoKind(AudioFileKind kind) =>
-        kind is AudioFileKind.Mp4 or AudioFileKind.Mov;
+        kind is AudioFileKind.Mp4 or AudioFileKind.Mov
+            or AudioFileKind.Avi or AudioFileKind.Mkv or AudioFileKind.Webm
+            or AudioFileKind.Mpg;
 
     public static bool IsPdfKind(AudioFileKind kind) => kind == AudioFileKind.Pdf;
 

@@ -216,14 +216,14 @@ internal static class DesignMetrics
 
     public static double StatusTimecodeFontSize => From96(13);
 
-    /// <summary>動画再生中、下中央に出す時刻。2 行分の枠を先に確保し、選択行は下へ伸ばす。</summary>
+    /// <summary>動画再生中、上中央に出す時刻。2 行分の枠を先に確保し、選択行は下へ伸ばす。</summary>
     public static double PlaylistVideoTimecodeFontSize => From96(32);
 
     public static double PlaylistVideoTimecodeLineHeight => From96(40);
 
     public static double PlaylistVideoTimecodeLineGap => From96(4);
 
-    public static Thickness PlaylistVideoTimecodeMargin => new(0, 0, 0, From96(24));
+    public static Thickness PlaylistVideoTimecodeMargin => new(0, From96(24), 0, 0);
 
     public static Thickness PlaylistVideoTimecodePadding => new(From96(14), From96(8), From96(14), From96(8));
 
@@ -234,15 +234,18 @@ internal static class DesignMetrics
         + PlaylistVideoTimecodeLineHeight
         + PlaylistVideoTimecodePadding.Bottom;
 
-    /// <summary>動画本再生中、左下に出すファイル名。</summary>
+    /// <summary>動画本再生中、下中央に出すファイル名。</summary>
     public static double PlaylistVideoFileNameFontSize => From96(18);
 
     public static double PlaylistVideoFileNameLineHeight => From96(24);
 
     public static Thickness PlaylistVideoFileNameMargin => new(From96(24), 0, From96(24), From96(24));
 
-    /// <summary>中央タイムコードと被らないよう、左寄りの最大幅。</summary>
-    public static double PlaylistVideoFileNameMaxWidth => From96(420);
+    /// <summary>下中央に出すときの最大幅。</summary>
+    public static double PlaylistVideoFileNameMaxWidth => From96(640);
+
+    /// <summary>ファイル名とラウドネスのあいだに残す隙間。</summary>
+    public static double PlaylistVideoFileNameLoudnessGap => From96(8);
 
     public static double StatusTimecodePadX => From96(4);
 
@@ -260,6 +263,18 @@ internal static class DesignMetrics
     /// DIP のまま掛けるので、OS の DPI とアプリの表示倍率は別途乗る。
     /// </summary>
     public const double AnalyzerMaximizeScale = 1.5;
+
+    /// <summary>動画ミニ専用。アナライザ／タイムコードの窓比例スケール基準（この大きさで倍率 1）。</summary>
+    public const double OverlayScaleReferenceWidth = 1280;
+
+    /// <summary>動画ミニ専用。アナライザ／タイムコードの窓比例スケール基準（この大きさで倍率 1）。</summary>
+    public const double OverlayScaleReferenceHeight = 720;
+
+    /// <summary>動画ミニ窓比例スケールの下限（小さすぎて読めなくなるのを防ぐ）。</summary>
+    public const double OverlayScaleMin = 0.45;
+
+    /// <summary>動画ミニ窓比例スケールの上限（巨大ウィンドウで膨らみすぎない）。</summary>
+    public const double OverlayScaleMax = 1.75;
 
     /// <summary>F10 プレイヤーのジャケット枠。以前のリスト高さ追従の約 1/4 の 1.2 倍。</summary>
     public static double LibraryJacketSize => From96(96) * 1.2;

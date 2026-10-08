@@ -9,6 +9,190 @@ namespace MgaSonicAnvil.Tests;
 public sealed class WindowPlacementTests
 {
     [Fact]
+    public void VideoLaunch_RemembersPositionOnly()
+    {
+        var settings = new AppSettings();
+        Assert.False(settings.VideoLaunchWindowHasPosition);
+        Assert.False(settings.VideoLaunchHud);
+        Assert.False(settings.VideoLaunchTimecode);
+        settings.VideoLaunchWindowX = 120;
+        settings.VideoLaunchWindowY = 80;
+        settings.VideoLaunchWindowHasPosition = true;
+        settings.VideoLaunchHud = false;
+        settings.VideoLaunchTimecode = true;
+        var json = System.Text.Json.JsonSerializer.Serialize(settings, AppSettingsJsonContext.Default.AppSettings);
+        var back = System.Text.Json.JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
+        Assert.True(back!.VideoLaunchWindowHasPosition);
+        Assert.Equal(120, back.VideoLaunchWindowX);
+        Assert.Equal(80, back.VideoLaunchWindowY);
+        Assert.False(back.VideoLaunchHud);
+        Assert.True(back.VideoLaunchTimecode);
+        LibraryPlayerMode.ResolveVideoLaunchChrome(
+            back.VideoLaunchHud,
+            back.VideoLaunchTimecode,
+            out var hud,
+            out var timecode);
+        Assert.False(hud);
+        Assert.True(timecode);
+    }
+
+    [Fact]
+    public void FitVideoLaunchOuterSize_PreservesAspectAndAddsNonClient()
+    {
+        var outer = WindowPlacement.FitVideoLaunchOuterSize(
+            clientWidth: 1920,
+            clientHeight: 1080,
+            nonClientWidth: 16,
+            nonClientHeight: 39,
+            minOuterWidth: 300,
+            minOuterHeight: 200,
+            maxOuterWidth: 4000,
+            maxOuterHeight: 3000);
+        Assert.Equal(1936, outer.Width, 3);
+        Assert.Equal(1119, outer.Height, 3);
+        var clientW = outer.Width - 16;
+        var clientH = outer.Height - 39;
+        Assert.Equal(1920 / 1080.0, clientW / clientH, 5);
+    }
+
+    [Fact]
+    public void FitVideoLaunchOuterSize_MinOuterPreservesAspect()
+    {
+        var outer = WindowPlacement.FitVideoLaunchOuterSize(
+            clientWidth: 100,
+            clientHeight: 100,
+            nonClientWidth: 0,
+            nonClientHeight: 0,
+            minOuterWidth: 400,
+            minOuterHeight: 200,
+            maxOuterWidth: 2000,
+            maxOuterHeight: 2000);
+        Assert.Equal(400, outer.Width, 3);
+        Assert.Equal(400, outer.Height, 3);
+    }
+
+    [Fact]
+    public void UsesVideoLaunchPlacementSlot_OnlyWhenVideoMiniFlag()
+    {
+        // プレイリスト（F10）再生中はフラグが立たない前提。立っているときだけ動画ミニ枠へ書く。
+        Assert.False(WindowPlacement.UsesVideoLaunchPlacementSlot(videoLaunchPlacement: false));
+        Assert.True(WindowPlacement.UsesVideoLaunchPlacementSlot(videoLaunchPlacement: true));
+    }
+
+    [Fact]
+    public void VideoLaunchBoundsFromCenter_KeepsCenterWhenSizeChanges()
+    {
+        var small = WindowPlacement.VideoLaunchBoundsFromCenter(500, 400, width: 200, height: 100);
+        Assert.Equal(400, small.X, 3);
+        Assert.Equal(350, small.Y, 3);
+        Assert.Equal(200, small.Width, 3);
+        Assert.Equal(100, small.Height, 3);
+
+        var large = WindowPlacement.VideoLaunchBoundsFromCenter(500, 400, width: 800, height: 450);
+        Assert.Equal(100, large.X, 3);
+        Assert.Equal(175, large.Y, 3);
+        Assert.Equal(500, large.X + large.Width * 0.5, 3);
+        Assert.Equal(400, large.Y + large.Height * 0.5, 3);
+    }
+
+    [Fact]
+    public void CaptureVideoLaunchCenter_StoresCenterNotTopLeft()
+    {
+        var settings = new AppSettings();
+        WindowPlacement.CaptureVideoLaunchCenter(960, 540, settings);
+        Assert.True(settings.VideoLaunchWindowHasPosition);
+        Assert.Equal(960, settings.VideoLaunchWindowX);
+        Assert.Equal(540, settings.VideoLaunchWindowY);
+
+        var placed = WindowPlacement.VideoLaunchBoundsFromCenter(
+            settings.VideoLaunchWindowX,
+            settings.VideoLaunchWindowY,
+            width: 640,
+            height: 360);
+        Assert.Equal(640, placed.Width, 3);
+        Assert.Equal(360, placed.Height, 3);
+        Assert.Equal(960, placed.X + placed.Width * 0.5, 3);
+        Assert.Equal(540, placed.Y + placed.Height * 0.5, 3);
+    }
+
+    [Fact]
+    public void ClampRectToWorkArea_PushesOverflowBackInside()
+    {
+        var work = new Rect(0, 0, 1000, 800);
+        var overflowRight = WindowPlacement.ClampRectToWorkArea(new Rect(900, 100, 200, 100), work);
+        Assert.Equal(800, overflowRight.X, 3);
+        Assert.Equal(100, overflowRight.Y, 3);
+        Assert.Equal(200, overflowRight.Width, 3);
+
+        var overflowBottomLeft = WindowPlacement.ClampRectToWorkArea(new Rect(-50, 750, 300, 200), work);
+        Assert.Equal(0, overflowBottomLeft.X, 3);
+        Assert.Equal(600, overflowBottomLeft.Y, 3);
+        Assert.Equal(300, overflowBottomLeft.Width, 3);
+        Assert.Equal(200, overflowBottomLeft.Height, 3);
+    }
+
+    [Fact]
+    public void ResolveVideoLaunchBounds_KeepsCenterThenClampsToDisplay()
+    {
+        var work = new Rect(0, 0, 1920, 1080);
+        var centered = WindowPlacement.ResolveVideoLaunchBounds(960, 540, 640, 360, work);
+        Assert.Equal(640, centered.Width, 3);
+        Assert.Equal(360, centered.Height, 3);
+        Assert.Equal(960, centered.X + centered.Width * 0.5, 3);
+        Assert.Equal(540, centered.Y + centered.Height * 0.5, 3);
+
+        var nearEdge = WindowPlacement.ResolveVideoLaunchBounds(1900, 50, 640, 360, work);
+        Assert.Equal(1920 - 640, nearEdge.X, 3);
+        Assert.Equal(0, nearEdge.Y, 3);
+        Assert.True(nearEdge.X >= work.X);
+        Assert.True(nearEdge.Y >= work.Y);
+        Assert.True(nearEdge.Right <= work.Right + 0.001);
+        Assert.True(nearEdge.Bottom <= work.Bottom + 0.001);
+    }
+
+    [Fact]
+    public void CaptureVideoLaunchPosition_DoesNotTouchEditorPlayerOrMinimalSlots()
+    {
+        var settings = new AppSettings
+        {
+            WindowX = 11,
+            WindowY = 22,
+            WindowWidth = 1920,
+            WindowHeight = 1080,
+            WindowState = nameof(WindowState.Normal),
+            PlayerWindowX = 33,
+            PlayerWindowY = 44,
+            PlayerWindowWidth = 1600,
+            PlayerWindowHeight = 900,
+            PlayerWindowState = nameof(WindowState.Maximized),
+            MinimalPlayerWindowX = 55,
+            MinimalPlayerWindowY = 66,
+            MinimalPlayerWindowWidth = 900,
+            MinimalPlayerWindowHeight = 500,
+            MinimalPlayerWindowState = nameof(WindowState.Normal),
+        };
+
+        WindowPlacement.CaptureVideoLaunchCenter(120, 80, settings);
+
+        Assert.True(settings.VideoLaunchWindowHasPosition);
+        Assert.Equal(120, settings.VideoLaunchWindowX);
+        Assert.Equal(80, settings.VideoLaunchWindowY);
+        Assert.Equal(11, settings.WindowX);
+        Assert.Equal(22, settings.WindowY);
+        Assert.Equal(1920, settings.WindowWidth);
+        Assert.Equal(1080, settings.WindowHeight);
+        Assert.Equal(nameof(WindowState.Normal), settings.WindowState);
+        Assert.Equal(33, settings.PlayerWindowX);
+        Assert.Equal(1600, settings.PlayerWindowWidth);
+        Assert.Equal(nameof(WindowState.Maximized), settings.PlayerWindowState);
+        Assert.Equal(55, settings.MinimalPlayerWindowX);
+        Assert.Equal(900, settings.MinimalPlayerWindowWidth);
+        Assert.Equal(nameof(WindowState.Normal), settings.MinimalPlayerWindowState);
+        Assert.True(WindowPlacement.UsesVideoLaunchPlacementSlot(videoLaunchPlacement: true));
+        Assert.False(WindowPlacement.UsesVideoLaunchPlacementSlot(videoLaunchPlacement: false));
+    }
+
+    [Fact]
     public void TryRead_RejectsUnsetSize()
     {
         var settings = new AppSettings();

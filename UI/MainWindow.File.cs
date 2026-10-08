@@ -89,18 +89,52 @@ public partial class MainWindow
             return;
         }
 
+        if (LaunchFiles.ContainsVideo(paths))
+        {
+            BeginVideoLaunchSession();
+        }
+
         EnterLibraryPlayerIfLaunchHasMp3(paths);
-        OpenPaths(paths);
+        _ = OpenLaunchPathsAsync(paths);
     }
+
+    private Task OpenLaunchPathsAsync(IReadOnlyList<string> paths) =>
+        OpenPathsAsync(paths, launchDocuments: true);
 
     private void EnterLibraryPlayerIfLaunchHasMp3(IReadOnlyList<string> paths)
     {
+        if (LaunchFiles.ContainsVideo(paths))
+        {
+            // 拡張子連動はプロキシ抑止つきの動画ミニ（F8 相当）で起動する。
+            EnterVideoMiniPlayer(suppressProxyEncode: true);
+            return;
+        }
+
         if (IsLibraryMaximized || !LaunchFiles.ContainsMp3(paths))
         {
             return;
         }
 
         SetWaveformMaximizeMode(WaveformMaximizeMode.Library);
+    }
+
+    /// <summary>
+    /// 拡張子連動／引数の動画起動フラグ。専用ウィンドウ配置・プロキシ抑止。
+    /// </summary>
+    private void BeginVideoLaunchSession() =>
+        BeginVideoMiniPlayerSession(suppressProxyEncode: true);
+
+    private void EndVideoLaunchSession()
+    {
+        if (!_videoLaunchPlacement && !VideoProxy.SuppressAutoEncode)
+        {
+            return;
+        }
+
+        RememberVideoLaunchChromeIfNeeded();
+        _videoLaunchPlacement = false;
+        _videoLaunchPlacementDeferred = false;
+        VideoProxy.SuppressAutoEncode = false;
     }
 
     private static string[] MergeLaunchPaths(params IReadOnlyList<string>[] groups)
@@ -160,10 +194,12 @@ public partial class MainWindow
         }
     }
 
-    private async Task OpenPathsAsync(IReadOnlyList<string> paths)
+    private async Task OpenPathsAsync(IReadOnlyList<string> paths, bool launchDocuments = false)
     {
         var targets = (IsLibraryMaximized
-                ? AudioCodec.CollectPlayerOpenable(paths)
+                ? (launchDocuments
+                    ? AudioCodec.CollectLaunchOpenable(paths)
+                    : AudioCodec.CollectPlayerOpenable(paths))
                 : AudioCodec.CollectOpenable(paths))
             .ToList();
 
@@ -1694,6 +1730,10 @@ public partial class MainWindow
             settings.LibraryShowPlaylistPdf,
             settings.LibraryShowPlaylistMov,
             settings.LibraryShowPlaylistMp4,
+            settings.LibraryShowPlaylistAvi,
+            settings.LibraryShowPlaylistMkv,
+            settings.LibraryShowPlaylistWebm,
+            settings.LibraryShowPlaylistMpg,
             settings.ResolvedVideoProxyRetentionDays(),
             settings.FfmpegExePath,
             settings.VideoProxyDisableAutoEncode)
@@ -1747,13 +1787,14 @@ public partial class MainWindow
         settings.LibraryShowPlaylistPdf = dialog.SelectedLibraryShowPlaylistPdf;
         settings.LibraryShowPlaylistMov = dialog.SelectedLibraryShowPlaylistMov;
         settings.LibraryShowPlaylistMp4 = dialog.SelectedLibraryShowPlaylistMp4;
+        settings.LibraryShowPlaylistAvi = dialog.SelectedLibraryShowPlaylistAvi;
+        settings.LibraryShowPlaylistMkv = dialog.SelectedLibraryShowPlaylistMkv;
+        settings.LibraryShowPlaylistWebm = dialog.SelectedLibraryShowPlaylistWebm;
+        settings.LibraryShowPlaylistMpg = dialog.SelectedLibraryShowPlaylistMpg;
         settings.VideoProxyRetentionDays = dialog.SelectedVideoProxyRetentionDays;
         settings.FfmpegExePath = dialog.SelectedFfmpegExePath;
         settings.VideoProxyDisableAutoEncode = dialog.SelectedVideoProxyDisableAutoEncode;
-        LibraryPlaylistDocuments.Apply(
-            settings.LibraryShowPlaylistPdf,
-            settings.LibraryShowPlaylistMov,
-            settings.LibraryShowPlaylistMp4);
+        LibraryPlaylistDocuments.ApplyFromSettings(settings);
         VideoProxy.PruneExpired(settings.ResolvedVideoProxyRetentionDays(), DateTime.UtcNow);
         DropPlaylistDocumentSessionsIfDisabled();
         LibraryBrowser.SetPlaylistWaveformOptions(

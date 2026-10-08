@@ -97,6 +97,40 @@ public sealed class VideoProxyRetentionTests
     }
 
     [Fact]
+    public void AllowsAutoEncodeProxy_LaunchSuppressOverridesSettings()
+    {
+        Assert.True(VideoProxy.AllowsAutoEncodeProxy(suppressLaunchEncode: false, disableInSettings: false));
+        Assert.False(VideoProxy.AllowsAutoEncodeProxy(suppressLaunchEncode: true, disableInSettings: false));
+        Assert.False(VideoProxy.AllowsAutoEncodeProxy(suppressLaunchEncode: false, disableInSettings: true));
+        Assert.False(VideoProxy.AllowsAutoEncodeProxy(suppressLaunchEncode: true, disableInSettings: true));
+    }
+
+    [Fact]
+    public void SuppressAutoEncode_BlocksCanEncodeProxyEvenWhenFfmpegSet()
+    {
+        var previous = AppStorage.Settings.FfmpegExePath;
+        var previousDisable = AppStorage.Settings.VideoProxyDisableAutoEncode;
+        var previousSuppress = VideoProxy.SuppressAutoEncode;
+        var path = Path.GetTempFileName();
+        try
+        {
+            AppStorage.Settings.FfmpegExePath = path;
+            AppStorage.Settings.VideoProxyDisableAutoEncode = false;
+            VideoProxy.SuppressAutoEncode = false;
+            Assert.True(VideoProxy.CanEncodeProxy());
+            VideoProxy.SuppressAutoEncode = true;
+            Assert.False(VideoProxy.CanEncodeProxy());
+        }
+        finally
+        {
+            VideoProxy.SuppressAutoEncode = previousSuppress;
+            AppStorage.Settings.FfmpegExePath = previous;
+            AppStorage.Settings.VideoProxyDisableAutoEncode = previousDisable;
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void PruneExpired_RemovesOldMp4AndStalePart()
     {
         var dir = Path.Combine(Path.GetTempPath(), "mga-proxy-" + Guid.NewGuid().ToString("N"));

@@ -250,6 +250,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.F8 && modifiers == ModifierKeys.None)
+        {
+            ToggleVideoMiniPlayer();
+            return true;
+        }
+
         if (key == Key.F9 && modifiers == ModifierKeys.None)
         {
             ToggleLibraryMinimalChrome();
@@ -263,7 +269,7 @@ public partial class MainWindow
             return true;
         }
 
-        // プレイヤーでも Silent Skip / Always on Top はステータスバー非表示の F9 中も効かせる。
+        // プレイヤーでも Silent Skip / Always on Top はステータスバー非表示の F8／F9 中も効かせる。
         if (key == Key.S && modifiers == ModifierKeys.Alt)
         {
             SilentSkipCheck.IsChecked = SilentSkipCheck.IsChecked != true;
@@ -588,7 +594,7 @@ public partial class MainWindow
             if (key == Key.Enter
                 && modifiers == ModifierKeys.None)
             {
-                // 再生中は止める（動画は暗いプレビューへ）。停止中だけ先頭から連続再生。
+                // 再生中は止める（動画は暗い 1/4 速プレビューへ）。停止中だけ先頭から連続再生。
                 // 常に Play すると本再生中に抜けられず即再生し直してしまう。
                 ToggleLibraryTransportPlayback();
                 return true;

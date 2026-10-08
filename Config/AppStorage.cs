@@ -103,10 +103,7 @@ internal static class AppStorage
             out var reset);
         SettingsReset = reset;
         Loaded = true;
-        LibraryPlaylistDocuments.Apply(
-            Settings.LibraryShowPlaylistPdf,
-            Settings.LibraryShowPlaylistMov,
-            Settings.LibraryShowPlaylistMp4);
+        LibraryPlaylistDocuments.ApplyFromSettings(Settings);
     }
 
     public static void Save()
