@@ -228,8 +228,10 @@ internal sealed class AudioPlayer : IDisposable
             return;
         }
 
-        _smoothRawFrame = _provider.CursorFrame;
-        _smoothStampTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+        // 正→逆など符号が変わると SmoothFrom の単調クランプが古い表示位置に引き戻す。
+        // Raw だけ更新して Shown を残すと、動画本再生（映像クロック）後の巻き戻しで
+        // シークバーが軌跡の始点へ飛ぶ。
+        ResetSmoothPlayhead(_provider.CursorFrame);
     }
 
     public void ReleaseOutput()
@@ -440,6 +442,7 @@ internal sealed class AudioPlayer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _provider.SeekFrame(frame);
+        ResetSmoothPlayhead(_provider.PendingSeekFrame ?? _provider.CursorFrame);
         if (!_playing)
         {
             _discardQueuedOutput = true;
@@ -456,9 +459,13 @@ internal sealed class AudioPlayer : IDisposable
         }
 
         _provider.SeekFrameCrossfade(frame, fadeMilliseconds);
-        var shown = _provider.PendingSeekFrame ?? _provider.CursorFrame;
-        _smoothRawFrame = shown;
-        _smoothShownFrame = shown;
+        ResetSmoothPlayhead(_provider.PendingSeekFrame ?? _provider.CursorFrame);
+    }
+
+    private void ResetSmoothPlayhead(long frame)
+    {
+        _smoothRawFrame = frame;
+        _smoothShownFrame = frame;
         _smoothStampTicks = System.Diagnostics.Stopwatch.GetTimestamp();
     }
 
