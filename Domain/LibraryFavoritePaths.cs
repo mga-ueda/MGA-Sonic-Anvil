@@ -24,15 +24,13 @@ internal static class LibraryFavoritePaths
             try
             {
                 var full = Path.GetFullPath(raw.Trim());
+                // 無いパスも登録として残す（UI で赤字表示）。
                 if (!seen.Add(full))
                 {
                     continue;
                 }
 
-                if (File.Exists(full) || Directory.Exists(full))
-                {
-                    result.Add(full);
-                }
+                result.Add(full);
             }
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
             {
@@ -48,4 +46,23 @@ internal static class LibraryFavoritePaths
         Serialize(current.Concat(add));
 
     public static string DisplayName(string path) => LibraryExplorerPaths.DisplayName(path);
+
+    /// <summary>登録パスがファイル／フォルダとして無いか。</summary>
+    public static bool IsMissing(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return true;
+        }
+
+        try
+        {
+            var full = Path.GetFullPath(path.Trim());
+            return !File.Exists(full) && !Directory.Exists(full);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return true;
+        }
+    }
 }

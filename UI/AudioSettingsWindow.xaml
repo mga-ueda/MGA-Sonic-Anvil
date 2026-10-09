@@ -444,7 +444,6 @@
             <Grid.RowDefinitions>
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
-              <RowDefinition Height="Auto" />
               <RowDefinition Height="*" MinHeight="220" />
               <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
@@ -460,22 +459,13 @@
                        FontSize="11.333"
                        Margin="0,0,0,4"
                        HorizontalAlignment="Left" />
-            <TextBlock x:Name="LibraryExplorerRootsHint"
-                       Grid.Row="2"
-                       Text="{x:Static domain:UiStrings.LabelLibraryExplorerRootsHint}"
-                       FontSize="11"
-                       TextWrapping="Wrap"
-                       Opacity="0.85"
-                       Margin="0,0,0,8"
-                       HorizontalAlignment="Stretch" />
             <ListBox x:Name="LibraryExplorerRootsList"
-                     Grid.Row="3"
+                     Grid.Row="2"
                      FontSize="11"
                      Padding="2"
                      HorizontalAlignment="Stretch"
                      HorizontalContentAlignment="Stretch"
                      VerticalAlignment="Stretch"
-                     DisplayMemberPath="Path"
                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
                      ScrollViewer.CanContentScroll="False"
                      SelectionMode="Extended"
@@ -485,7 +475,7 @@
                      DragOver="LibraryExplorerRootsList_DragOver"
                      Drop="LibraryExplorerRootsList_Drop"
                      SelectionChanged="LibraryExplorerRootsList_SelectionChanged" />
-            <StackPanel Grid.Row="4"
+            <StackPanel Grid.Row="3"
                         Orientation="Horizontal"
                         Margin="0,8,0,0"
                         HorizontalAlignment="Left">
