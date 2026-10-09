@@ -483,6 +483,33 @@ internal static class WindowPlacement
         return new Size(clientWidth + nonClientWidth, clientHeight + nonClientHeight);
     }
 
+    /// <summary>ウィンドウのクライアント領域（DIP）。</summary>
+    public static bool TryGetClientDipSize(Window window, out double width, out double height)
+    {
+        width = 0;
+        height = 0;
+        ArgumentNullException.ThrowIfNull(window);
+        TryGetNonClientDipSize(window, out var nonClientWidth, out var nonClientHeight);
+        // Width/Height は代入直後から正しい。Actual* はレイアウト待ちで古いことがある。
+        var outerWidth = window.WindowState == WindowState.Normal && window.Width > 1
+            ? window.Width
+            : (window.ActualWidth > 1 ? window.ActualWidth : window.Width);
+        var outerHeight = window.WindowState == WindowState.Normal && window.Height > 1
+            ? window.Height
+            : (window.ActualHeight > 1 ? window.ActualHeight : window.Height);
+        if (outerWidth <= 1 || outerHeight <= 1)
+        {
+            return false;
+        }
+
+        width = Math.Max(1, outerWidth - nonClientWidth);
+        height = Math.Max(1, outerHeight - nonClientHeight);
+        return true;
+    }
+
+    /// <summary>物理ピクセル → DIP の倍率（DPI / 96）。</summary>
+    public static double DipScale(Window window) => GetWindowDipScale(window);
+
     /// <summary>タイトルバー／枠の DIP 厚み。未表示時はシステム既定。</summary>
     public static bool TryGetNonClientDipSize(Window window, out double width, out double height)
     {

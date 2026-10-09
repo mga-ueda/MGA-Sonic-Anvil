@@ -27,6 +27,9 @@ public sealed class TransportLayoutTests
         Assert.True(DesignMetrics.MinimalPlayerWindowMinHeight < DesignMetrics.WindowMinHeight);
         Assert.True(DesignMetrics.MinimalPlayerWindowMinHeight
             >= DesignMetrics.LibraryPaneMinHeight + DesignMetrics.LibraryWaveformHeight);
+        Assert.True(DesignMetrics.VideoMiniWindowMinWidth < DesignMetrics.MinimalPlayerWindowMinWidth);
+        Assert.True(DesignMetrics.VideoMiniWindowMinHeight < DesignMetrics.MinimalPlayerWindowMinHeight);
+        Assert.True(DesignMetrics.VideoMiniWindowMinWidth >= DesignMetrics.From96(120));
     }
 
     [Fact]

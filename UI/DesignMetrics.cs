@@ -30,6 +30,15 @@ internal static class DesignMetrics
     public static double MinimalPlayerWindowMinHeight =>
         LibraryPaneMinHeight + LibraryWaveformHeight + WindowFramePad;
 
+    /// <summary>
+    /// F8 動画／PDF ミニ。原寸の 25% まで縮められるよう F9 より低い下限
+    /// （通常の WindowMinWidth だと 50% 前後で頭打ちになる）。
+    /// </summary>
+    public static double VideoMiniWindowMinWidth => From96(120) + WindowFramePad;
+
+    /// <summary>F8 動画／PDF ミニの高さ下限。</summary>
+    public static double VideoMiniWindowMinHeight => From96(90) + WindowFramePad;
+
     public static double WindowMinHeight => From96(420);
 
     public static double WindowDefaultWidth => WindowMinWidth;
@@ -264,11 +273,15 @@ internal static class DesignMetrics
     /// </summary>
     public const double AnalyzerMaximizeScale = 1.5;
 
-    /// <summary>動画ミニ専用。アナライザ／タイムコードの窓比例スケール基準（この大きさで倍率 1）。</summary>
-    public const double OverlayScaleReferenceWidth = 1280;
+    /// <summary>
+    /// 動画ミニ専用。アナライザ／タイムコードの窓比例スケール基準（この大きさで倍率 1）。
+    /// 最大化相当（フル HD）を 1 にし、F8 の小さい窓ではタイムコード等が明らかに小さくなる。
+    /// （旧 1280×720 基準だと 720p ミニでも倍率 1 になり、最大化と同じ大きさに見えた。）
+    /// </summary>
+    public const double OverlayScaleReferenceWidth = 1920;
 
     /// <summary>動画ミニ専用。アナライザ／タイムコードの窓比例スケール基準（この大きさで倍率 1）。</summary>
-    public const double OverlayScaleReferenceHeight = 720;
+    public const double OverlayScaleReferenceHeight = 1080;
 
     /// <summary>動画ミニ窓比例スケールの下限（小さすぎて読めなくなるのを防ぐ）。</summary>
     public const double OverlayScaleMin = 0.45;
