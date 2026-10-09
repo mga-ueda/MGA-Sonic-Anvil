@@ -64,7 +64,8 @@ internal static class LibraryExplorerPaths
                 {
                     var full = Path.GetFullPath(raw.Trim())
                         .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                    if (!Directory.Exists(full) || !seen.Add(full))
+                    // 無いフォルダも登録として残す（UI で赤字表示）。空の登録だけ既定ルートへ。
+                    if (!seen.Add(full))
                     {
                         continue;
                     }
@@ -87,6 +88,26 @@ internal static class LibraryExplorerPaths
         }
 
         return [.. result];
+    }
+
+    /// <summary>登録パスがディスク上に無いか。</summary>
+    public static bool IsMissing(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return true;
+        }
+
+        try
+        {
+            var full = Path.GetFullPath(path.Trim())
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return !Directory.Exists(full);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return true;
+        }
     }
 
     public static string[] SerializeRoots(IEnumerable<string> roots) => ResolveRoots(roots.ToArray());

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -723,6 +724,44 @@ internal partial class AudioSettingsWindow : Window
         itemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
         itemStyle.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
         LibraryExplorerRootsList.ItemContainerStyle = itemStyle;
+        // DisplayMemberPath と ItemTemplate は同時に使えない（欠落パス色付け用テンプレートを使う）
+        ApplyLibraryExplorerRootTemplate(LibraryExplorerRootsList);
+    }
+
+    /// <summary>設定のエクスプローラールート一覧へ、欠落パスを赤くする ItemTemplate を載せる。</summary>
+    internal static void ApplyLibraryExplorerRootTemplate(ListBox list)
+    {
+        list.DisplayMemberPath = null;
+        list.ItemTemplate = LibraryExplorerRootTemplate();
+    }
+
+    /// <summary>
+    /// パス文字に色を載せる。ListBoxItem.Foreground や選択色だと上書きされやすいので TextBlock 側で持つ。
+    /// </summary>
+    private static DataTemplate LibraryExplorerRootTemplate()
+    {
+        var text = new FrameworkElementFactory(typeof(TextBlock));
+        text.SetBinding(TextBlock.TextProperty, new Binding(nameof(LibraryExplorerRootItem.Path)));
+        text.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        text.SetValue(TextBlock.ToolTipProperty, new Binding(nameof(LibraryExplorerRootItem.Path)));
+
+        // TargetName 付き DataTemplate.Triggers より、TextBlock 自身の Style の方が確実。
+        var style = new Style(typeof(TextBlock));
+        style.Setters.Add(new Setter(
+            TextBlock.ForegroundProperty,
+            new DynamicResourceExtension("PrimaryForeBrush")));
+        var missing = new DataTrigger
+        {
+            Binding = new Binding(nameof(LibraryExplorerRootItem.IsMissing)),
+            Value = true,
+        };
+        missing.Setters.Add(new Setter(
+            TextBlock.ForegroundProperty,
+            new DynamicResourceExtension(LibraryBrowserView.MissingRegisteredPathForeBrushKey)));
+        style.Triggers.Add(missing);
+        text.SetValue(FrameworkElement.StyleProperty, style);
+
+        return new DataTemplate(typeof(LibraryExplorerRootItem)) { VisualTree = text };
     }
 
     private static Brush ResolveThemeBrush(string key) =>
@@ -2572,8 +2611,10 @@ internal partial class AudioSettingsWindow : Window
         public override string ToString() => Label;
     }
 
-    private sealed record LibraryExplorerRootItem(string Path)
+    internal sealed record LibraryExplorerRootItem(string Path)
     {
+        public bool IsMissing => LibraryExplorerPaths.IsMissing(Path);
+
         public override string ToString() => Path;
     }
 

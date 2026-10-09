@@ -69,6 +69,27 @@ public sealed class LibraryExplorerPathsTests
     }
 
     [Fact]
+    public void ResolveRoots_KeepsMissing_MarksIsMissing()
+    {
+        var existing = Path.Combine(Path.GetTempPath(), "mga-anvil-root-ok-" + Guid.NewGuid().ToString("N"));
+        var missing = Path.Combine(Path.GetTempPath(), "mga-anvil-root-missing-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(existing);
+        try
+        {
+            var roots = LibraryExplorerPaths.ResolveRoots([existing, missing, missing]);
+            Assert.Equal(2, roots.Length);
+            Assert.Contains(Path.GetFullPath(existing).TrimEnd('\\', '/'), roots);
+            Assert.Contains(Path.GetFullPath(missing).TrimEnd('\\', '/'), roots);
+            Assert.False(LibraryExplorerPaths.IsMissing(existing));
+            Assert.True(LibraryExplorerPaths.IsMissing(missing));
+        }
+        finally
+        {
+            Directory.Delete(existing);
+        }
+    }
+
+    [Fact]
     public void MoveSelected_Up_ShiftsBlockAndStopsAtTop()
     {
         var items = new List<string> { "a", "b", "c", "d" };
@@ -91,16 +112,20 @@ public sealed class LibraryExplorerPathsTests
     }
 
     [Fact]
-    public void FavoritePaths_Resolve_DropsMissing_KeepsNameOnlyDisplay()
+    public void FavoritePaths_Resolve_KeepsMissing_MarksIsMissing_NameOnlyDisplay()
     {
         var file = Path.Combine(Path.GetTempPath(), "mga-fav-" + Guid.NewGuid().ToString("N") + ".mp3");
+        var missing = Path.Combine(Path.GetTempPath(), "missing-fav-" + Guid.NewGuid().ToString("N") + ".mp3");
         File.WriteAllBytes(file, [0]);
         try
         {
-            var resolved = LibraryFavoritePaths.Resolve([file, file, Path.Combine(Path.GetTempPath(), "missing-fav.mp3")]);
-            Assert.Equal([Path.GetFullPath(file)], resolved);
+            var resolved = LibraryFavoritePaths.Resolve([file, file, missing]);
+            Assert.Equal([Path.GetFullPath(file), Path.GetFullPath(missing)], resolved);
+            Assert.False(LibraryFavoritePaths.IsMissing(file));
+            Assert.True(LibraryFavoritePaths.IsMissing(missing));
             Assert.Equal(Path.GetFileName(file), LibraryFavoritePaths.DisplayName(file));
             Assert.DoesNotContain('\\', LibraryFavoritePaths.DisplayName(file));
+            Assert.Equal(Path.GetFileName(missing), LibraryFavoritePaths.DisplayName(missing));
         }
         finally
         {
