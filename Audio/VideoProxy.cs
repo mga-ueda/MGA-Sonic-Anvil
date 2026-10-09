@@ -303,7 +303,7 @@ internal static class VideoProxy
     }
 
     /// <summary>
-    /// 拡張子連動／引数起動のあいだは true。設定の自動生成がオンでもプロキシを作らない。
+    /// F8／拡張子連動／引数起動のあいだは true。設定の自動生成がオンでもプロキシを作らない。
     /// </summary>
     public static bool SuppressAutoEncode { get; set; }
 
