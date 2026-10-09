@@ -182,9 +182,27 @@ internal static class LibraryPlayerMode
         !explorerFocused && !favoritesFocused;
 
     /// <summary>
+    /// Space で止めて暗いバックグラウンドへ戻す状態。
+    /// 本再生に加え、フレーム送り／テンキー 0 のイマーシブ一時停止中も含む（再開しない）。
+    /// </summary>
+    public static bool HaltsLibraryPlaybackOnSpace(bool playbackActive, bool immersiveVideoPause) =>
+        playbackActive || immersiveVideoPause;
+
+    /// <summary>
+    /// 同じ動画の暗いプレビュー（速度ランプ中含む）から本再生へ戻すとき、
+    /// プロキシ準備などの await より先に映像を 1 倍へ戻す。
+    /// </summary>
+    public static bool PromotesDimPreviewBeforePlayLoad(
+        bool visualShown,
+        bool visualPlaying,
+        bool sameSource,
+        bool isVideo) =>
+        visualShown && !visualPlaying && sameSource && isVideo;
+
+    /// <summary>
     /// 動画本再生の Space／Enter 停止。
     /// F8 動画ミニは止めた位置で静止（暗いプレビューへ落とさない）。
-    /// F10 プレイリストは止めた位置から暗い 1/4 速＋格子へ戻す。
+    /// F10 プレイリストは止めた位置から暗い 1/3 速＋格子へ戻す。
     /// </summary>
     public static bool VideoStopFreezesFrame(bool videoMiniPlayer) => videoMiniPlayer;
 
@@ -531,14 +549,15 @@ internal static class LibraryPlayerMode
         videoMiniPlayer && player;
 
     /// <summary>
-    /// F8 で動画ミニへ入れるか。本再生中の動画がありプレイリストに再生対象があるとき、
-    /// またはすでに動画ミニ中（解除用）だけ。拡張子連動起動の自動突入は別経路。
+    /// F8 で動画／PDF ミニへ入れるか。背面に動画または PDF が出ていてプレイリストに再生対象があるとき
+    /// （本再生中または暗いバックグラウンドプレビュー）、またはすでにミニ中（解除用）。
+    /// 拡張子連動起動の自動突入は別経路。
     /// </summary>
     public static bool CanToggleVideoMiniPlayer(
         bool alreadyActive,
-        bool videoRealPlayback,
+        bool visualShown,
         bool hasPlayableSession) =>
-        alreadyActive || (videoRealPlayback && hasPlayableSession);
+        alreadyActive || (visualShown && hasPlayableSession);
 
 
     /// <summary>
@@ -579,8 +598,9 @@ internal static class LibraryPlayerMode
     /// </summary>
     public static bool HoldsPlaylistVisualChromeBridge(
         bool currentVisualPlaying,
-        bool nextIsVisual) =>
-        currentVisualPlaying && nextIsVisual;
+        bool nextIsVisual,
+        bool immersivePauseHold = false) =>
+        (currentVisualPlaying || immersivePauseHold) && nextIsVisual;
 
     /// <summary>
     /// 明るい PDF 表示中は A／T オーバーレイを出さない（フラグは触らず、次の音声／動画で覚える）。
@@ -596,7 +616,7 @@ internal static class LibraryPlayerMode
 
     /// <summary>
     /// 本再生中に早送り・巻き戻しで映像クロックを止めているときは、Position スクラブだけにする。
-    /// （Play し直すと 1 倍に戻り、音声 3 倍と食い違う。1/4 速プレビューは _playing が false。）
+    /// （Play し直すと 1 倍に戻り、音声 3 倍と食い違う。1/3 速プレビューは _playing が false。）
     /// </summary>
     public static bool VideoSeekIsShuttleScrub(bool playing, bool visualClockRunning) =>
         playing && !visualClockRunning;
@@ -613,7 +633,7 @@ internal static class LibraryPlayerMode
         playerMode && isVideoFile && visualShown && shuttling && audioPlaying;
 
     /// <summary>
-    /// 動画ファイルは映像クロックでシークバーを進める（本再生・1/4 速プレビュー）。
+    /// 動画ファイルは映像クロックでシークバーを進める（本再生・1/3 速プレビュー）。
     /// wave / mp3 などは音声側（AudioPlayer）の再生ヘッドを使う。
     /// </summary>
     public static bool DrivesPlayheadWhileVideoPlays(
@@ -697,6 +717,20 @@ internal static class LibraryPlayerMode
         return pos;
     }
 
+    /// <summary>
+    /// 本再生→暗いプレビューの速度ランプ。progress 0→1 で from→to（SineEase EaseOut）。
+    /// </summary>
+    public static double PreviewSpeedAtRampProgress(
+        double progress01,
+        double from = 1,
+        double to = LibraryVisualStage.PreviewLoopSpeed)
+    {
+        var t = progress01 <= 0 ? 0 : progress01 >= 1 ? 1 : progress01;
+        // WPF SineEase EaseOut: 先に落として 1/3 へ収束する。
+        var eased = Math.Sin(Math.PI * 0.5 * t);
+        return from + ((to - from) * eased);
+    }
+
     /// <summary>選択範囲ループ。範囲が無ければそのまま。</summary>
     public static long WrapLoopFrame(long frame, long start, long end)
     {
@@ -742,22 +776,26 @@ internal static class LibraryPlayerMode
     /// <summary>
     /// 動画専用ミニプレイヤーだけで、アナライザ／タイムコードを窓に比例させる倍率。
     /// F10（通常／F 全画面）は常に 1。ミニでも F 全画面中は 1。
+    /// 基準は最大化相当（既定 1920×1080、または呼び出し側の作業領域）。
     /// ピーク／ゴニオ／下段スペアナが見切れないよう高さ・幅の上限もかける。
     /// </summary>
     public static double VideoMiniOverlayScale(
         double windowWidth,
         double windowHeight,
         bool videoMini,
-        bool fullscreen)
+        bool fullscreen,
+        double referenceWidth = DesignMetrics.OverlayScaleReferenceWidth,
+        double referenceHeight = DesignMetrics.OverlayScaleReferenceHeight)
     {
         if (!videoMini || fullscreen || windowWidth < 1 || windowHeight < 1)
         {
             return 1;
         }
 
-        var byReference = Math.Min(
-            windowWidth / DesignMetrics.OverlayScaleReferenceWidth,
-            windowHeight / DesignMetrics.OverlayScaleReferenceHeight);
+        var refW = referenceWidth > 1 ? referenceWidth : DesignMetrics.OverlayScaleReferenceWidth;
+        var refH = referenceHeight > 1 ? referenceHeight : DesignMetrics.OverlayScaleReferenceHeight;
+        // 最大化相当を 1 とし、F8 の原寸窓（例: 1280×720）はそれより小さくする。
+        var byReference = Math.Min(windowWidth / refW, windowHeight / refH);
         // 波形帯＋下段ゴニオ／スペアナ＋右メーター列が同時に拡縮して収まる上限。
         var meterWidth = Math.Max(1, DesignMetrics.LevelMeterWidth);
         var sideWidth = Math.Max(
@@ -813,7 +851,41 @@ internal static class LibraryPlayerMode
     public static bool IsVideoHudToggle(Key key, ModifierKeys modifiers) =>
         key == Key.A && modifiers == ModifierKeys.None;
 
-    /// <summary>動画本再生中の大きなタイムコード（選択範囲）の表示切替。</summary>
+    /// <summary>動画オーバーレイの小数点以下フレーム換算に使う fps（ソース fps が無いときの既定）。</summary>
+    public const double VideoTimecodeFramesPerSecond = 30;
+
+    /// <summary>←／→ コマ送りの最初のリピートまでの待ち。</summary>
+    public const int VideoFrameStepRepeatDelayMs = 400;
+
+    /// <summary>←／→ コマ送りのリピート間隔（約 30 fps）。</summary>
+    public const int VideoFrameStepRepeatIntervalMs = 33;
+
+    public static int VideoFrameStepTimerIntervalMs(bool repeatStarted) =>
+        repeatStarted ? VideoFrameStepRepeatIntervalMs : VideoFrameStepRepeatDelayMs;
+
+    /// <summary>本再生中、またはテンキー 0／←→ でフレーム一時停止中ならコマ送りできる。</summary>
+    public static bool CanStepPlaylistVideoFrame(
+        bool playerMaximized,
+        bool visualShown,
+        bool isVideo,
+        bool visualPlaying,
+        bool immersivePause) =>
+        playerMaximized && visualShown && isVideo && (visualPlaying || immersivePause);
+
+    public static bool IsVideoFrameStepKey(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None && key is Key.Left or Key.Right;
+
+    /// <summary>1 映像フレームぶんのサンプル数（最低 1）。</summary>
+    public static long VideoFrameStepSamples(int sampleRate, double framesPerSecond = VideoTimecodeFramesPerSecond)
+    {
+        var rate = Math.Max(1, sampleRate);
+        var fps = framesPerSecond > 0 && !double.IsNaN(framesPerSecond) && !double.IsInfinity(framesPerSecond)
+            ? framesPerSecond
+            : VideoTimecodeFramesPerSecond;
+        return Math.Max(1, (long)Math.Round(rate / fps));
+    }
+
+    /// <summary>動画本再生中の大きなタイムコード（MM:SS.ff。小数点以下は 30fps 換算のフレーム。選択範囲）の表示切替。</summary>
     public static bool IsVideoTimecodeToggle(Key key, ModifierKeys modifiers) =>
         key == Key.T && modifiers == ModifierKeys.None;
 
@@ -914,13 +986,13 @@ internal static class LibraryPlayerMode
         modifiers == ModifierKeys.None
         && key is Key.Left or Key.Right or Key.PageUp or Key.PageDown or Key.Home or Key.End;
 
-    /// <summary>キーボード／テンキーの +。</summary>
-    public static bool IsPdfZoomInKey(Key key, ModifierKeys modifiers) =>
+    /// <summary>キーボード／テンキーの +（PDF 拡縮・動画ミニ窓サイズ共通）。</summary>
+    public static bool IsZoomInKey(Key key, ModifierKeys modifiers) =>
         key == Key.Add && modifiers == ModifierKeys.None
         || key == Key.OemPlus && modifiers is ModifierKeys.None or ModifierKeys.Shift;
 
-    /// <summary>キーボード／テンキーの -。</summary>
-    public static bool IsPdfZoomOutKey(Key key, ModifierKeys modifiers) =>
+    /// <summary>キーボード／テンキーの -（PDF 拡縮・動画ミニ窓サイズ共通）。</summary>
+    public static bool IsZoomOutKey(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && key is Key.Subtract or Key.OemMinus;
 
     /// <summary>
@@ -962,11 +1034,7 @@ internal static class LibraryPlayerMode
             return true;
         }
 
-        // テンキーの前後曲・再生し直しはプレイリスト操作扱い。
-        if (modifiers == ModifierKeys.None && key is Key.NumPad4 or Key.NumPad5 or Key.NumPad6)
-        {
-            return true;
-        }
+        // テンキー 4／5／6（前後曲・再生し直し）は ↑↓ と同じくプレイリストへ通す。
 
         return IsPaneCycleKey(key, modifiers)
             || (modifiers == ModifierKeys.None && key is Key.F1 or Key.F2 or Key.F3)
@@ -1056,6 +1124,34 @@ internal static class LibraryPlayerMode
         };
     }
 
+    /// <summary>
+    /// 文字シルエット用の柔らかい影。白い本体文字には付けず、下層の黒文字だけに使う。
+    /// </summary>
+    public static void SetVideoTextShadow(UIElement target, bool on)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        if (!on)
+        {
+            target.Effect = null;
+            return;
+        }
+
+        if (target.Effect is DropShadowEffect)
+        {
+            return;
+        }
+
+        target.Effect = new DropShadowEffect
+        {
+            BlurRadius = 8,
+            ShadowDepth = 0,
+            Direction = 0,
+            Color = Colors.Black,
+            Opacity = 0.85,
+            RenderingBias = RenderingBias.Performance,
+        };
+    }
+
     public static int EdgeIndex(int count, int edge) =>
         count <= 0 ? -1 : edge < 0 ? 0 : count - 1;
 
@@ -1103,6 +1199,25 @@ internal static class LibraryPlayerMode
         }
 
         return current - 1;
+    }
+
+    /// <summary>
+    /// ↑↓／ページ送りの選択移動。端で反対側へ回る。今の行が見つからなければ送りは先頭・戻しは末尾。空なら -1。
+    /// </summary>
+    public static int StepLoopIndex(int count, int current, int delta)
+    {
+        if (count <= 0 || delta == 0)
+        {
+            return count <= 0 ? -1 : Math.Clamp(current, 0, count - 1);
+        }
+
+        if (current < 0 || current >= count)
+        {
+            return delta > 0 ? 0 : count - 1;
+        }
+
+        var next = (current + delta) % count;
+        return next < 0 ? next + count : next;
     }
 
     /// <summary>プレイヤーのスキップ秒。テンキー 7／9。</summary>
