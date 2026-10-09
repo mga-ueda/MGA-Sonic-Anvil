@@ -35,6 +35,17 @@ public sealed class DurationFormatTests
         Assert.Equal(125.5, seconds, 3);
     }
 
+    [Fact]
+    public void FormatDurationWithFrames_KeepsMinutesSeconds_UsesFramesAfterDecimal()
+    {
+        Assert.Equal("00:00.00", UiStrings.FormatDurationWithFrames(0, 30));
+        Assert.Equal("00:01.00", UiStrings.FormatDurationWithFrames(1.0, 30));
+        Assert.Equal("00:01.15", UiStrings.FormatDurationWithFrames(1.5, 30));
+        Assert.Equal("00:01.29", UiStrings.FormatDurationWithFrames(1.999, 30));
+        Assert.Equal("01:03.00", UiStrings.FormatDurationWithFrames(63, 30));
+        Assert.Equal("00:01.12", UiStrings.FormatTimecodeWithFrames(48000 + 48000 / 2, 48000, 24));
+    }
+
     [Theory]
     [InlineData("0", 0)]
     [InlineData("48000", 48000)]

@@ -91,6 +91,9 @@ public sealed class LibraryPlayerModeTests
         Assert.InRange(LibraryVisualStage.AmbientSpillScale, 1.08, 1.2);
         Assert.InRange(LibraryVisualStage.AmbientSpillOpacity, 0.2, 0.45);
         Assert.InRange(LibraryVisualStage.AmbientSpillAspectEpsilon, 0.005, 0.05);
+        // 格子線はデバイス 1px（pixelsPerDip=2 → DIP 0.5）。
+        Assert.Equal(0.5, WpfControlHelpers.DeviceHairline(2), 5);
+        Assert.NotNull(LibraryVisualStage.CreateMeshBrush(2));
 
         var portrait = LibraryVisualStage.UniformContentRect(1080, 1920, 1920, 1080);
         Assert.False(portrait.IsEmpty);
@@ -150,6 +153,13 @@ public sealed class LibraryPlayerModeTests
             elapsedSeconds: 4,
             speed: 0.25,
             TimeSpan.FromSeconds(10)));
+        Assert.Equal(1, LibraryPlayerMode.PreviewSpeedAtRampProgress(0), 5);
+        Assert.Equal(LibraryVisualStage.PreviewLoopSpeed, LibraryPlayerMode.PreviewSpeedAtRampProgress(1), 5);
+        Assert.Equal(1, LibraryVisualStage.PreviewSpeedRampSeconds);
+        // EaseOut: 中盤は線形より 1/3 に近い。
+        Assert.True(
+            LibraryPlayerMode.PreviewSpeedAtRampProgress(0.5)
+            < (1 + LibraryVisualStage.PreviewLoopSpeed) * 0.5);
         Assert.Equal(TimeSpan.FromSeconds(10), LibraryPlayerMode.VisualDurationOrFallback(
             TimeSpan.FromSeconds(10),
             TimeSpan.FromSeconds(3)));
@@ -280,6 +290,17 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.PlaysLibrarySelectionOnSpace(explorerFocused: true, favoritesFocused: false));
         Assert.False(LibraryPlayerMode.PlaysLibrarySelectionOnSpace(explorerFocused: false, favoritesFocused: true));
         Assert.True(LibraryPlayerMode.PlaysLibrarySelectionOnSpace(explorerFocused: false, favoritesFocused: false));
+        Assert.True(LibraryPlayerMode.HaltsLibraryPlaybackOnSpace(playbackActive: false, immersiveVideoPause: true));
+        Assert.True(LibraryPlayerMode.HaltsLibraryPlaybackOnSpace(playbackActive: true, immersiveVideoPause: false));
+        Assert.False(LibraryPlayerMode.HaltsLibraryPlaybackOnSpace(playbackActive: false, immersiveVideoPause: false));
+        Assert.True(LibraryPlayerMode.PromotesDimPreviewBeforePlayLoad(
+            visualShown: true, visualPlaying: false, sameSource: true, isVideo: true));
+        Assert.False(LibraryPlayerMode.PromotesDimPreviewBeforePlayLoad(
+            visualShown: true, visualPlaying: true, sameSource: true, isVideo: true));
+        Assert.False(LibraryPlayerMode.PromotesDimPreviewBeforePlayLoad(
+            visualShown: true, visualPlaying: false, sameSource: false, isVideo: true));
+        Assert.False(LibraryPlayerMode.PromotesDimPreviewBeforePlayLoad(
+            visualShown: true, visualPlaying: false, sameSource: true, isVideo: false));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F1, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F2, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F3, ModifierKeys.None));
@@ -470,14 +491,17 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.HidesChromeForVideoFileLaunch(
             videoMiniPlayer: false, player: true));
         Assert.True(LibraryPlayerMode.CanToggleVideoMiniPlayer(
-            alreadyActive: false, videoRealPlayback: true, hasPlayableSession: true));
+            alreadyActive: false, visualShown: true, hasPlayableSession: true));
         Assert.True(LibraryPlayerMode.CanToggleVideoMiniPlayer(
-            alreadyActive: true, videoRealPlayback: false, hasPlayableSession: false));
+            alreadyActive: true, visualShown: false, hasPlayableSession: false));
         Assert.False(LibraryPlayerMode.CanToggleVideoMiniPlayer(
-            alreadyActive: false, videoRealPlayback: true, hasPlayableSession: false));
+            alreadyActive: false, visualShown: true, hasPlayableSession: false));
         Assert.False(LibraryPlayerMode.CanToggleVideoMiniPlayer(
-            alreadyActive: false, videoRealPlayback: false, hasPlayableSession: true));
-        // F8 動画ミニの Space／Enter 停止は静止。F10 プレイリストは暗い 1/4 速へ。
+            alreadyActive: false, visualShown: false, hasPlayableSession: true));
+        // 暗いバックグラウンドプレビュー（表示中・非本再生）からも F8 可。
+        Assert.True(LibraryPlayerMode.CanToggleVideoMiniPlayer(
+            alreadyActive: false, visualShown: true, hasPlayableSession: true));
+        // F8 動画ミニの Space／Enter 停止は静止。F10 プレイリストは暗い 1/3 速へ。
         Assert.True(LibraryPlayerMode.VideoStopFreezesFrame(videoMiniPlayer: true));
         Assert.False(LibraryPlayerMode.VideoStopFreezesFrame(videoMiniPlayer: false));
         Assert.True(LibraryPlayerMode.HidesChromeForPlaylistVisual(
@@ -500,8 +524,15 @@ public sealed class LibraryPlayerModeTests
             currentVisualPlaying: true, nextIsVisual: false));
         Assert.False(LibraryPlayerMode.HoldsPlaylistVisualChromeBridge(
             currentVisualPlaying: false, nextIsVisual: true));
+        Assert.True(LibraryPlayerMode.HoldsPlaylistVisualChromeBridge(
+            currentVisualPlaying: false, nextIsVisual: true, immersivePauseHold: true));
+        Assert.False(LibraryPlayerMode.HoldsPlaylistVisualChromeBridge(
+            currentVisualPlaying: false, nextIsVisual: false, immersivePauseHold: true));
         Assert.False(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.Up, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.Down, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.NumPad4, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.NumPad5, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.NumPad6, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.PageUp, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.Home, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.HidesPlaylistVideoChromeOverlaysForPdf(
@@ -534,9 +565,20 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(
             1,
             LibraryPlayerMode.VideoMiniOverlayScale(640, 360, videoMini: true, fullscreen: true));
+        // 最大化相当（1920×1080）で倍率 1。1280×720 の F8 はそれより小さい（≈2/3）。
         Assert.Equal(
             1,
-            LibraryPlayerMode.VideoMiniOverlayScale(1280, 720, videoMini: true, fullscreen: false),
+            LibraryPlayerMode.VideoMiniOverlayScale(1920, 1080, videoMini: true, fullscreen: false),
+            3);
+        Assert.Equal(
+            1280 / 1920d,
+            LibraryPlayerMode.VideoMiniOverlayScale(
+                1280,
+                720,
+                videoMini: true,
+                fullscreen: false,
+                referenceWidth: 1920,
+                referenceHeight: 1080),
             3);
         Assert.Equal(
             DesignMetrics.OverlayScaleMin,
@@ -575,6 +617,18 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.IsVideoHudToggle(Key.A, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsVideoTimecodeToggle(Key.T, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsVideoTimecodeToggle(Key.T, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsVideoFrameStepKey(Key.Left, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsVideoFrameStepKey(Key.Right, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsVideoFrameStepKey(Key.Left, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.CanStepPlaylistVideoFrame(
+            playerMaximized: true, visualShown: true, isVideo: true, visualPlaying: true, immersivePause: false));
+        Assert.True(LibraryPlayerMode.CanStepPlaylistVideoFrame(
+            playerMaximized: true, visualShown: true, isVideo: true, visualPlaying: false, immersivePause: true));
+        Assert.False(LibraryPlayerMode.CanStepPlaylistVideoFrame(
+            playerMaximized: true, visualShown: true, isVideo: true, visualPlaying: false, immersivePause: false));
+        Assert.Equal(1600, LibraryPlayerMode.VideoFrameStepSamples(48000, 30));
+        Assert.Equal(LibraryPlayerMode.VideoFrameStepRepeatDelayMs, LibraryPlayerMode.VideoFrameStepTimerIntervalMs(false));
+        Assert.Equal(LibraryPlayerMode.VideoFrameStepRepeatIntervalMs, LibraryPlayerMode.VideoFrameStepTimerIntervalMs(true));
         Assert.True(LibraryPlayerMode.ResetsPlaylistVideoChromeOnPlay(
             videoMiniPlacement: false,
             isVideo: true,
@@ -731,6 +785,19 @@ public sealed class LibraryPlayerModeTests
     }
 
     [Fact]
+    public void SetVideoTextShadow_AddsAndClears()
+    {
+        RunSta(() =>
+        {
+            var box = new TextBlock();
+            LibraryPlayerMode.SetVideoTextShadow(box, on: true);
+            Assert.IsType<DropShadowEffect>(box.Effect);
+            LibraryPlayerMode.SetVideoTextShadow(box, on: false);
+            Assert.Null(box.Effect);
+        });
+    }
+
+    [Fact]
     public void FadeElementOpacity_InstantRestoreAfterHeldFadeOut()
     {
         RunSta(() =>
@@ -794,6 +861,14 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(2, LibraryPlayerMode.PreviousLoopIndex(3, -1));
         Assert.Equal(0, LibraryPlayerMode.PreviousLoopIndex(1, 0));
         Assert.Equal(-1, LibraryPlayerMode.PreviousLoopIndex(0, 0));
+        Assert.Equal(1, LibraryPlayerMode.StepLoopIndex(3, 0, 1));
+        Assert.Equal(0, LibraryPlayerMode.StepLoopIndex(3, 2, 1));
+        Assert.Equal(2, LibraryPlayerMode.StepLoopIndex(3, 0, -1));
+        Assert.Equal(1, LibraryPlayerMode.StepLoopIndex(3, 2, -1));
+        Assert.Equal(0, LibraryPlayerMode.StepLoopIndex(3, -1, 1));
+        Assert.Equal(2, LibraryPlayerMode.StepLoopIndex(3, -1, -1));
+        Assert.Equal(0, LibraryPlayerMode.StepLoopIndex(1, 0, 1));
+        Assert.Equal(-1, LibraryPlayerMode.StepLoopIndex(0, 0, 1));
     }
 
     [Fact]
