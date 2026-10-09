@@ -41,9 +41,12 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _placeRepeatTimer;
     private readonly DispatcherTimer _boostNudgeTimer;
     private readonly DispatcherTimer _seekNudgeTimer;
+    private readonly DispatcherTimer _videoFrameStepTimer;
     private int _seekNudgeDirection;
     private bool _seekNudgeRepeatStarted;
     private long _seekNudgeLastAt;
+    private int _videoFrameStepDirection;
+    private bool _videoFrameStepRepeatStarted;
     private PlaceRepeatKind _placeRepeatKind;
     private bool _placeRepeatStarted;
     private int _boostNudgeDirection;
@@ -104,9 +107,16 @@ public partial class MainWindow : Window
     private bool _bindingWorkspace;
     /// <summary>動画ファイルの引数／関連付け起動。専用サイズ（原寸）と位置記憶。</summary>
     private bool _videoLaunchPlacement;
+    /// <summary>動画ミニ窓の原寸に対する倍率（F8／引数起動中）。</summary>
+    private double _videoLaunchScale = LibraryVideoWindowScale.Native;
+    private bool _videoLaunchScaleLatched;
+    private DispatcherTimer? _videoLaunchScaleToastTimer;
+    private bool _videoLaunchScaleApplying;
     /// <summary>動画起動で映像が開くまでウィンドウを出さないための待ち。</summary>
     private TaskCompletionSource<bool>? _videoLaunchShowReady;
     private DispatcherTimer? _videoLaunchPlacementSaveTimer;
+    /// <summary>A でファイル名を出したあと、フェード完了後にラウドネス回避をやり直す。</summary>
+    private DispatcherTimer? _playlistVideoFileNamePlaceTimer;
     private int _autoSpeakerSeenChannels = int.MinValue;
     private ImageSource? _brandLogoDark;
     private ImageSource? _brandLogoLight;
@@ -136,6 +146,7 @@ public partial class MainWindow : Window
         LibraryBrowser.ExplorerWidthChanged += LibraryBrowser_ExplorerWidthChanged;
         LibraryBrowser.FavoritesSplitChanged += LibraryBrowser_FavoritesSplitChanged;
         LibraryBrowser.FavoritesChanged += LibraryBrowser_FavoritesChanged;
+        LibraryBrowser.ExplorerRootsChanged += LibraryBrowser_ExplorerRootsChanged;
         LibraryBrowser.FavoritesActivated += LibraryBrowser_FavoritesActivated;
         LibraryBrowser.ShuffleChanged += LibraryBrowser_ShuffleChanged;
         LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
@@ -323,6 +334,11 @@ public partial class MainWindow : Window
             Interval = TimeSpan.FromMilliseconds(LibraryPlayerMode.SeekNudgeRepeatDelayMs),
         };
         _seekNudgeTimer.Tick += (_, _) => OnSeekNudgeTick();
+        _videoFrameStepTimer = new DispatcherTimer(LibraryPlayerMode.SeekNudgeTimerPriority)
+        {
+            Interval = TimeSpan.FromMilliseconds(LibraryPlayerMode.VideoFrameStepRepeatDelayMs),
+        };
+        _videoFrameStepTimer.Tick += (_, _) => OnVideoFrameStepTick();
 
         Deactivated += (_, _) =>
         {
@@ -331,6 +347,7 @@ public partial class MainWindow : Window
             StopSpectrogramBoostNudge();
             StopPlaybackShuttle();
             StopSeekNudge();
+            StopVideoFrameStep();
             CloseEditHistory(commit: true);
         };
         PreviewKeyDown += MainWindow_PreviewKeyDown;
@@ -344,10 +361,12 @@ public partial class MainWindow : Window
         {
             SyncBusyGlassOverlayBounds();
             RememberVideoLaunchPlacementIfNeeded();
+            SyncVideoLaunchScaleAfterUserResize();
             SyncWindowProportionalOverlayScale();
             SchedulePlaylistVideoFileNamePlacement();
         };
         LocationChanged += (_, _) => RememberVideoLaunchPlacementIfNeeded();
+        VideoLaunchAspectResize.Attach(this, TryGetVideoLaunchAspectConstraints);
         Closed += (_, _) =>
         {
             StopMeterRendering();
@@ -361,6 +380,7 @@ public partial class MainWindow : Window
             StopSpectrogramBoostNudge();
             StopPlaybackShuttle();
             StopSeekNudge();
+            StopVideoFrameStep();
             ResetMarkerDigitEntry();
             // Closing で既に破棄済みでも安全（冪等）。
             DisposeAllWaveforms();
@@ -673,6 +693,7 @@ public partial class MainWindow : Window
         StopSpectrogramBoostNudge();
         StopPlaybackShuttle();
         StopSeekNudge();
+        StopVideoFrameStep();
         ResetMarkerDigitEntry();
         Waveform.UnlockCenter();
         ClearSeekTrails();
@@ -919,7 +940,7 @@ public partial class MainWindow : Window
         {
             // 遅延 ViewChanged が古い PlayheadFrame を sampleRate=0 で載せないよう、常に空表示へ戻す。
             StatusTimes.SetState(0, WaveSelection.Empty, 0, 0, hasDocument: false);
-            PlaylistVideoNowEndText.Text = "00:00.000 / 00:00.000";
+            PlaylistVideoNowEndText.Text = "00:00.00 / 00:00.00";
             PlaylistVideoSelText.Visibility = Visibility.Collapsed;
             return;
         }
@@ -943,23 +964,10 @@ public partial class MainWindow : Window
         long endFrame,
         int sampleRate)
     {
-        var samples = AppStorage.Settings.StatusShowSamples;
-        var now = StatusTimeStrip.FormatFieldText(
-            StatusTimeField.Current,
-            hasDocument: true,
-            nowFrame,
-            selection,
-            endFrame,
-            sampleRate,
-            samples);
-        var end = StatusTimeStrip.FormatFieldText(
-            StatusTimeField.Total,
-            hasDocument: true,
-            nowFrame,
-            selection,
-            endFrame,
-            sampleRate,
-            samples);
+        // 分：秒はそのまま、小数点以下だけフレーム（既定 30 fps。ステータスバーの ms 表示とは別）。
+        var fps = LibraryPlayerMode.VideoTimecodeFramesPerSecond;
+        var now = UiStrings.FormatTimecodeWithFrames(nowFrame, sampleRate, fps);
+        var end = UiStrings.FormatTimecodeWithFrames(endFrame, sampleRate, fps);
         PlaylistVideoNowEndText.Text = now + " / " + end;
         if (selection.IsEmpty)
         {
@@ -967,22 +975,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        var selStart = StatusTimeStrip.FormatFieldText(
-            StatusTimeField.SelStart,
-            hasDocument: true,
-            nowFrame,
-            selection,
-            endFrame,
-            sampleRate,
-            samples);
-        var selEnd = StatusTimeStrip.FormatFieldText(
-            StatusTimeField.SelEnd,
-            hasDocument: true,
-            nowFrame,
-            selection,
-            endFrame,
-            sampleRate,
-            samples);
+        var selStart = UiStrings.FormatTimecodeWithFrames(selection.StartFrame, sampleRate, fps);
+        var selEnd = UiStrings.FormatTimecodeWithFrames(selection.EndFrame, sampleRate, fps);
         PlaylistVideoSelText.Text = selStart + " / " + selEnd;
         PlaylistVideoSelText.Visibility = Visibility.Visible;
     }
@@ -1088,6 +1082,7 @@ public partial class MainWindow : Window
         StopSpectrogramBoostNudge();
         StopPlaybackShuttle();
         StopSeekNudge();
+        StopVideoFrameStep();
         _ = FinishExitAfterFlushAsync();
     }
 
