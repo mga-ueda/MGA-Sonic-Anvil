@@ -69,10 +69,13 @@ public sealed class TransportToolTipTests
         Assert.Contains("約3秒", UiStrings.TipLibraryExplorer);
         Assert.Contains("Ctrl+C", UiStrings.TipLibraryExplorer);
         Assert.Contains("エクスプローラーで開く", UiStrings.TipLibraryExplorer);
+        Assert.Contains("ツリーのルートに登録", UiStrings.TipLibraryExplorer);
+        Assert.Contains("赤字", UiStrings.TipLibraryExplorer);
         Assert.Contains("Shift+↑↓", UiStrings.TipLibraryExplorer);
         Assert.Contains("Shift+クリック", UiStrings.TipLibraryExplorer);
         Assert.Contains("Ctrl+C", UiStrings.TipLibraryFavorites);
         Assert.Contains("エクスプローラーで開く", UiStrings.TipLibraryFavorites);
+        Assert.Contains("赤字", UiStrings.TipLibraryFavorites);
         Assert.Contains("Shift+↑↓", UiStrings.TipLibraryFavorites);
         Assert.Contains("Shift+クリック", UiStrings.TipLibraryFavorites);
         Assert.Contains("ダブルクリック", UiStrings.TipLibraryFavorites);
@@ -102,9 +105,13 @@ public sealed class TransportToolTipTests
         Assert.Contains("Space はその曲だけ", UiStrings.TipLibraryList);
         Assert.Contains("トランスポートの再生", UiStrings.TipLibraryList);
         Assert.Contains("終わったら次の曲へ進む", UiStrings.TipLibraryList);
-        Assert.Contains("F8 で動画専用ミニプレイヤー（前面 UI 無し。本再生中かつ再生対象があるときだけ", UiStrings.TipLibraryList);
+        Assert.Contains("F8 で動画専用ミニプレイヤー（前面 UI 無し。背面に動画があるとき＝本再生または暗いバックグラウンドプレビュー、かつ再生対象があるとき", UiStrings.TipLibraryList);
         Assert.Contains("Space／Enter で止めると止めた位置で静止", UiStrings.TipLibraryList);
         Assert.Contains("F 全画面中でも可", UiStrings.TipLibraryList);
+        Assert.Contains("窓枠のドラッグは連続拡縮", UiStrings.TipLibraryList);
+        Assert.Contains("25% 刻みではない", UiStrings.TipLibraryList);
+        Assert.Contains("25% 刻み", UiStrings.TipLibraryList);
+        Assert.Contains("+／-", UiStrings.TipLibraryList);
         Assert.Contains("F11／F12 へ移るとき動画／PDF はファイルごと持ち込まない", UiStrings.TipLibraryList);
         Assert.Contains("A／T の表示は F8 と引数起動で共通に覚え", UiStrings.TipLibraryList);
         Assert.Contains("プレイリストからの本再生は開始時オン", UiStrings.TipLibraryList);
