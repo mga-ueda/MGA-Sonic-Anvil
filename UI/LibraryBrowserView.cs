@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -282,6 +283,8 @@ internal sealed class LibraryBrowserView : UserControl
     public event EventHandler<double>? FavoritesSplitChanged;
 
     public event EventHandler<IReadOnlyList<string>>? FavoritesChanged;
+
+    public event EventHandler<IReadOnlyList<string>>? ExplorerRootsChanged;
 
     /// <summary>お気に入りをプレイリストへ。true ならクリアして追加し再生。</summary>
     public event EventHandler<LibraryFavoritesActivateEventArgs>? FavoritesActivated;
@@ -699,6 +702,21 @@ internal sealed class LibraryBrowserView : UserControl
     public void EnterPlaylistVisualDimPreview(TimeSpan position)
     {
         _visualStage.EnterDimPreviewAt(position);
+        PlaylistVisualStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// 暗いプレビュー／速度ランプ中の同じ動画を、await を挟まず 1 倍・明るい映像へ戻す。
+    /// 本再生フラグは立てない（現在位置の引き継ぎ用。クロームは bridge 側で隠す）。
+    /// </summary>
+    public void PromotePlaylistVisualToMainPlay()
+    {
+        if (!PlaylistVisualShown || !PlaylistVisualIsVideo || PlaylistVisualPlaying)
+        {
+            return;
+        }
+
+        _visualStage.InterruptPreviewSpeedRampForMainPlay();
         PlaylistVisualStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -1126,7 +1144,7 @@ internal sealed class LibraryBrowserView : UserControl
         var selected = _folderTree.SelectedItem as TreeViewItem;
         for (var i = 0; i < items.Count; i++)
         {
-            names[i] = items[i].Header as string ?? "";
+            names[i] = FolderHeaderText(items[i]);
             if (ReferenceEquals(items[i], selected))
             {
                 current = i;
@@ -1379,9 +1397,20 @@ internal sealed class LibraryBrowserView : UserControl
         {
             index = delta > 0 ? 0 : count - 1;
         }
+        else if (extend)
+        {
+            // Shift 範囲選択は端で止める（反対側へ回ると範囲が崩れる）。
+            index = Math.Clamp(index + delta, 0, count - 1);
+        }
         else
         {
-            index = Math.Clamp(index + delta, 0, count - 1);
+            // 先頭の↑→末尾、末尾の↓→先頭（テンキー 4／6 と同じ）。
+            index = LibraryPlayerMode.StepLoopIndex(count, index, delta);
+        }
+
+        if (index < 0)
+        {
+            return;
         }
 
         ApplyMoveSelectionFile(index, extend);
@@ -2574,7 +2603,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void OpenSelectedFolder()
     {
-        var folders = SelectedExplorerFolders;
+        var folders = LibraryShellFiles.ExistingPaths(SelectedExplorerFolders);
         if (folders.Length == 0)
         {
             return;
@@ -2592,7 +2621,7 @@ internal sealed class LibraryBrowserView : UserControl
     /// <summary>右クリック「プレイリストをクリアして追加」。Enter と同じ。</summary>
     public void ReplacePlaylistFromSelection()
     {
-        if (SelectedExplorerFolders.Length == 0)
+        if (LibraryShellFiles.ExistingPaths(SelectedExplorerFolders).Length == 0)
         {
             return;
         }
@@ -2609,6 +2638,64 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         AddFavoritePaths(folders);
+    }
+
+    public void AddSelectedExplorerToRoots()
+    {
+        var folders = SelectedExplorerFolders;
+        if (folders.Length == 0)
+        {
+            return;
+        }
+
+        var merged = LibraryExplorerPaths.ResolveRoots([.. _explorerRoots, .. folders]);
+        if (merged.SequenceEqual(_explorerRoots, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        SetExplorerRoots(merged);
+        ExplorerRootsChanged?.Invoke(this, _explorerRoots);
+    }
+
+    public void RemoveSelectedExplorerRoots()
+    {
+        var selected = SelectedExplorerFolders;
+        if (selected.Length == 0)
+        {
+            return;
+        }
+
+        var drop = new HashSet<string>(
+            selected.Select(NormalizeFolderPath),
+            StringComparer.OrdinalIgnoreCase);
+        var kept = _explorerRoots
+            .Where(root => !drop.Contains(NormalizeFolderPath(root)))
+            .ToArray();
+        var next = LibraryExplorerPaths.ResolveRoots(kept);
+        if (next.SequenceEqual(_explorerRoots, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        SetExplorerRoots(next);
+        ExplorerRootsChanged?.Invoke(this, _explorerRoots);
+    }
+
+    internal bool SelectionContainsExplorerRoot()
+    {
+        var roots = new HashSet<string>(
+            _explorerRoots.Select(NormalizeFolderPath),
+            StringComparer.OrdinalIgnoreCase);
+        return SelectedExplorerFolders.Any(path => roots.Contains(NormalizeFolderPath(path)));
+    }
+
+    internal bool SelectionCanRegisterExplorerRoot()
+    {
+        var roots = new HashSet<string>(
+            _explorerRoots.Select(NormalizeFolderPath),
+            StringComparer.OrdinalIgnoreCase);
+        return SelectedExplorerFolders.Any(path => !roots.Contains(NormalizeFolderPath(path)));
     }
 
     public void RemoveSelectedFavorites()
@@ -2646,8 +2733,9 @@ internal sealed class LibraryBrowserView : UserControl
 
     public bool TryGetSelectedExplorerFolder(out string path)
     {
+        // 欠損ルートも選択対象（ルートから外す／赤字表示の確認用）。開く操作は ExistingPaths 側で弾く。
         if (_folderTree.SelectedItem is TreeViewItem { Tag: string folder }
-            && Directory.Exists(folder))
+            && folder.Length > 0)
         {
             path = folder;
             return true;
@@ -2695,7 +2783,7 @@ internal sealed class LibraryBrowserView : UserControl
         ApplyPaneTitleStyle(_favoritesLabel);
         ApplyPaneTitleStyle(_playlistLabel, new Thickness(0, 0, 8, 0));
         _favoritesList.ItemsSource = _favorites;
-        _favoritesList.DisplayMemberPath = nameof(LibraryFavoriteRow.Name);
+        _favoritesList.ItemTemplate = FavoriteRowTemplate();
         _favoritesList.SelectionMode = SelectionMode.Extended;
         _favoritesList.BorderThickness = new Thickness(0);
         _favoritesList.Background = Brushes.Transparent;
@@ -3116,7 +3204,7 @@ internal sealed class LibraryBrowserView : UserControl
             _folderTree.Items.Clear();
             foreach (var root in _explorerRoots)
             {
-                if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
+                if (string.IsNullOrEmpty(root))
                 {
                     continue;
                 }
@@ -3128,8 +3216,11 @@ internal sealed class LibraryBrowserView : UserControl
                 }
 
                 var item = AddFolderItem(_folderTree.Items, root, ExplorerRootHeader(root));
-                LoadFilteredChildren(item, visible);
-                item.IsExpanded = true;
+                if (!LibraryExplorerPaths.IsMissing(root))
+                {
+                    LoadFilteredChildren(item, visible);
+                    item.IsExpanded = true;
+                }
             }
         }
         finally
@@ -3222,6 +3313,7 @@ internal sealed class LibraryBrowserView : UserControl
         _folderTree.Resources[typeof(TreeViewItem)] = itemStyle;
         _folderTree.ItemContainerStyle = itemStyle;
         ApplyTreeItemStyle(_folderTree.Items, itemStyle);
+        RelabelExplorerRoots();
         ApplyTreeMultiSelectChrome();
     }
 
@@ -3364,6 +3456,32 @@ internal sealed class LibraryBrowserView : UserControl
         itemStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
         itemStyle.Setters.Add(new Setter(Control.TemplateProperty, ListNavTemplate(hover, selected)));
         _favoritesList.ItemContainerStyle = itemStyle;
+        _favoritesList.ItemTemplate = FavoriteRowTemplate();
+    }
+
+    /// <summary>
+    /// 名前の TextBlock に色を載せる。ListBoxItem.Foreground だと ContentPresenter 経由で上書きされやすい。
+    /// </summary>
+    private static DataTemplate FavoriteRowTemplate()
+    {
+        var text = new FrameworkElementFactory(typeof(TextBlock));
+        text.Name = "FavoriteName";
+        text.SetBinding(TextBlock.TextProperty, new Binding(nameof(LibraryFavoriteRow.Name)));
+        text.SetValue(TextBlock.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush"));
+        text.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+
+        var template = new DataTemplate(typeof(LibraryFavoriteRow)) { VisualTree = text };
+        var missing = new DataTrigger
+        {
+            Binding = new Binding(nameof(LibraryFavoriteRow.IsMissing)),
+            Value = true,
+        };
+        missing.Setters.Add(new Setter(
+            TextBlock.ForegroundProperty,
+            new DynamicResourceExtension(MissingRegisteredPathForeBrushKey),
+            "FavoriteName"));
+        template.Triggers.Add(missing);
+        return template;
     }
 
     private static void ApplyNavSelectionResources(FrameworkElement host, Brush selected, Brush fore)
@@ -3644,6 +3762,10 @@ internal sealed class LibraryBrowserView : UserControl
         header.SetValue(ContentPresenter.ContentSourceProperty, "Header");
         header.SetValue(FrameworkElement.HorizontalAlignmentProperty, new TemplateBindingExtension(Control.HorizontalContentAlignmentProperty));
         header.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        // 文字列 Header のときも TreeViewItem.Foreground を拾う（欠落ルートの赤字用）。
+        header.SetValue(
+            TextElement.ForegroundProperty,
+            new TemplateBindingExtension(Control.ForegroundProperty));
 
         var row = new FrameworkElementFactory(typeof(DockPanel));
         row.AppendChild(expander);
@@ -3761,7 +3883,7 @@ internal sealed class LibraryBrowserView : UserControl
         _folderTree.Items.Clear();
         foreach (var root in _explorerRoots)
         {
-            if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
+            if (string.IsNullOrEmpty(root))
             {
                 continue;
             }
@@ -3781,9 +3903,42 @@ internal sealed class LibraryBrowserView : UserControl
                 continue;
             }
 
-            item.Header = ExplorerRootHeader(path);
+            ApplyFolderHeader(item, ExplorerRootHeader(path), LibraryExplorerPaths.IsMissing(path));
         }
     }
+
+    /// <summary>登録パスが見つからないときの文字色（エラー文字）。</summary>
+    internal const string MissingRegisteredPathForeBrushKey = "StatusBarErrorDetailForeBrush";
+
+    /// <summary>
+    /// 見出し TextBlock に色を載せる。TreeViewItem.Foreground だけだと ContentPresenter 経由で
+    /// PrimaryFore に上書きされ、赤字にならないことがある。
+    /// </summary>
+    private static void ApplyFolderHeader(TreeViewItem item, string text, bool missing)
+    {
+        var brushKey = missing ? MissingRegisteredPathForeBrushKey : "PrimaryForeBrush";
+        if (item.Header is TextBlock block)
+        {
+            block.Text = text;
+            block.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+        }
+        else
+        {
+            block = new TextBlock { Text = text };
+            block.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+            item.Header = block;
+        }
+
+        item.SetResourceReference(Control.ForegroundProperty, brushKey);
+    }
+
+    private static string FolderHeaderText(TreeViewItem item) =>
+        item.Header switch
+        {
+            string text => text,
+            TextBlock block => block.Text ?? string.Empty,
+            _ => item.Header?.ToString() ?? string.Empty,
+        };
 
     private static string ExplorerRootHeader(string path)
     {
@@ -3866,11 +4021,9 @@ internal sealed class LibraryBrowserView : UserControl
 
     private TreeViewItem AddFolderItem(ItemCollection items, string path, string header)
     {
-        var item = new TreeViewItem
-        {
-            Header = header,
-            Tag = path,
-        };
+        var missing = LibraryExplorerPaths.IsMissing(path);
+        var item = new TreeViewItem { Tag = path };
+        ApplyFolderHeader(item, header, missing);
         var style = _folderTree.ItemContainerStyle;
         if (style is not null)
         {
@@ -3880,7 +4033,7 @@ internal sealed class LibraryBrowserView : UserControl
 
         item.Expanded += FolderItem_Expanded;
         item.Collapsed += FolderItem_Collapsed;
-        if (HasAnySubdir(path))
+        if (!missing && HasAnySubdir(path))
         {
             var dummy = new TreeViewItem();
             if (style is not null)
@@ -4240,26 +4393,32 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        if (e.NewValue is TreeViewItem { Tag: string path } item && Directory.Exists(path))
+        if (e.NewValue is not TreeViewItem { Tag: string path } item)
         {
-            if (!_treeRangeBusy)
-            {
-                var modifiers = Keyboard.Modifiers;
-                if ((modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0)
-                {
-                    _treeSelectionAnchor = item;
-                }
+            return;
+        }
 
-                if ((modifiers & ModifierKeys.Control) == 0
-                    && (modifiers & ModifierKeys.Shift) == 0
-                    && !_treeMultiSelected.Contains(item))
-                {
-                    ClearTreeMultiSelect();
-                    _treeMultiSelected.Add(item);
-                    ApplyTreeMultiSelectChrome();
-                }
+        if (!_treeRangeBusy)
+        {
+            var modifiers = Keyboard.Modifiers;
+            if ((modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0)
+            {
+                _treeSelectionAnchor = item;
             }
 
+            if ((modifiers & ModifierKeys.Control) == 0
+                && (modifiers & ModifierKeys.Shift) == 0
+                && !_treeMultiSelected.Contains(item))
+            {
+                ClearTreeMultiSelect();
+                _treeMultiSelected.Add(item);
+                ApplyTreeMultiSelectChrome();
+            }
+        }
+
+        // 欠損ルートは選択だけ残し、最後に開いた場所としては覚えない。
+        if (Directory.Exists(path))
+        {
             ExplorerFolderChanged?.Invoke(this, path);
         }
     }
@@ -7858,22 +8017,31 @@ internal sealed class LibraryBrowserView : UserControl
         append.Click += (_, _) => OpenSelectedFolder();
         var add = new MenuItem { Header = UiStrings.LibraryMenuAddToFavorites };
         add.Click += (_, _) => AddSelectedExplorerToFavorites();
+        var addRoot = new MenuItem { Header = UiStrings.LibraryMenuAddAsExplorerRoot };
+        addRoot.Click += (_, _) => AddSelectedExplorerToRoots();
+        var removeRoot = new MenuItem { Header = UiStrings.LibraryMenuRemoveExplorerRoot };
+        removeRoot.Click += (_, _) => RemoveSelectedExplorerRoots();
         menu.Items.Add(replace);
         menu.Items.Add(append);
         menu.Items.Add(add);
+        menu.Items.Add(addRoot);
+        menu.Items.Add(removeRoot);
         AddCopyAndExplorerMenuItems(menu, LibraryPane.Explorer, out var copy, out var copyNames, out var copyPaths, out var explorer);
         menu.Opened += (_, _) =>
         {
-            var enabled = SelectedExplorerFolders.Length > 0;
+            var selected = SelectedExplorerFolders.Length > 0;
             var transfer = SelectedExplorerTransferPaths();
-            var reveal = LibraryShellFiles.ExistingPaths(SelectedExplorerFolders);
-            replace.IsEnabled = enabled;
-            append.IsEnabled = enabled;
-            add.IsEnabled = enabled;
+            var existing = LibraryShellFiles.ExistingPaths(SelectedExplorerFolders);
+            // 欠損だけのときは追加／クリアして追加を無効（Enter と同様スルー）。
+            replace.IsEnabled = existing.Length > 0;
+            append.IsEnabled = existing.Length > 0;
+            add.IsEnabled = selected;
+            addRoot.IsEnabled = selected && SelectionCanRegisterExplorerRoot();
+            removeRoot.IsEnabled = selected && SelectionContainsExplorerRoot();
             copy.IsEnabled = transfer.Length > 0;
             copyNames.IsEnabled = transfer.Length > 0;
             copyPaths.IsEnabled = transfer.Length > 0;
-            explorer.IsEnabled = reveal.Length > 0;
+            explorer.IsEnabled = existing.Length > 0;
         };
         _folderTree.ContextMenu = menu;
     }
@@ -7903,8 +8071,8 @@ internal sealed class LibraryBrowserView : UserControl
         {
             var paths = LibraryShellFiles.ExistingPaths(SelectedFavoritePaths);
             var selected = SelectedFavoritePaths.Length > 0;
-            replace.IsEnabled = selected;
-            append.IsEnabled = selected;
+            replace.IsEnabled = paths.Length > 0;
+            append.IsEnabled = paths.Length > 0;
             remove.IsEnabled = selected;
             copy.IsEnabled = paths.Length > 0;
             copyNames.IsEnabled = paths.Length > 0;
@@ -8266,7 +8434,8 @@ internal sealed class LibraryBrowserView : UserControl
     /// <summary>ダブルクリックはツリーと同じ（クリアせず追加。再生しない）。</summary>
     internal void ActivateSelectedFavorites(bool clearPlaylist)
     {
-        var paths = SelectedFavoritePaths;
+        // 欠損だけのときはスルー（クリアだけ走らせない）。
+        var paths = LibraryShellFiles.ExistingPaths(SelectedFavoritePaths);
         if (paths.Length == 0)
         {
             return;
@@ -8458,11 +8627,14 @@ internal sealed class LibraryFavoriteRow
 
     public required string Name { get; init; }
 
+    public bool IsMissing { get; init; }
+
     public static LibraryFavoriteRow FromPath(string path) =>
         new()
         {
             Path = path,
             Name = LibraryFavoritePaths.DisplayName(path),
+            IsMissing = LibraryFavoritePaths.IsMissing(path),
         };
 }
 

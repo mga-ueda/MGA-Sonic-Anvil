@@ -776,6 +776,8 @@ public sealed class LibraryBrowserSelectionTests
                 UiStrings.LibraryMenuReplacePlaylist,
                 UiStrings.LibraryMenuAppendPlaylist,
                 UiStrings.LibraryMenuAddToFavorites,
+                UiStrings.LibraryMenuAddAsExplorerRoot,
+                UiStrings.LibraryMenuRemoveExplorerRoot,
                 UiStrings.LibraryMenuCopy,
                 UiStrings.LibraryMenuCopyFileName,
                 UiStrings.LibraryMenuCopyFilePath,
@@ -784,7 +786,7 @@ public sealed class LibraryBrowserSelectionTests
             items.Select(item => (string)item.Header).ToArray());
             Assert.Equal("Enter", items[0].InputGestureText);
             Assert.Equal("Shift+Enter", items[1].InputGestureText);
-            Assert.Equal("Ctrl+C", items[3].InputGestureText);
+            Assert.Equal("Ctrl+C", items[5].InputGestureText);
             items[0].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             items[1].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             Assert.Equal(1, replaced);
@@ -1034,6 +1036,113 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void MissingRegisteredFolders_ShowInTreeAndFavorites()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            Application.Current!.Resources[LibraryBrowserView.MissingRegisteredPathForeBrushKey] =
+                new SolidColorBrush(Color.FromRgb(0xFF, 0x6E, 0x6E));
+            var existing = Path.Combine(Path.GetTempPath(), "mga-missing-ok-" + Guid.NewGuid().ToString("N"));
+            var missing = Path.Combine(Path.GetTempPath(), "mga-missing-gone-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(existing);
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([existing, missing]);
+                view.SetFavorites([existing, missing]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+
+                var paths = view.ExplorerVisibleFolderPaths
+                    .Select(path => Path.GetFullPath(path).TrimEnd('\\', '/'))
+                    .ToArray();
+                Assert.Contains(Path.GetFullPath(existing).TrimEnd('\\', '/'), paths);
+                Assert.Contains(Path.GetFullPath(missing).TrimEnd('\\', '/'), paths);
+
+                var missingFull = Path.GetFullPath(missing).TrimEnd('\\', '/');
+                var missingItem = Assert.Single(
+                    FindDescendants<TreeViewItem>(view),
+                    item => item.Tag is string tag
+                        && Path.GetFullPath(tag).TrimEnd('\\', '/')
+                            .Equals(missingFull, StringComparison.OrdinalIgnoreCase));
+                var missingHeader = Assert.IsType<TextBlock>(missingItem.Header);
+                var missingFore = Assert.IsType<SolidColorBrush>(missingHeader.Foreground);
+                Assert.Equal(Color.FromRgb(0xFF, 0x6E, 0x6E), missingFore.Color);
+
+                Assert.Equal(
+                    [Path.GetFullPath(existing), Path.GetFullPath(missing)],
+                    view.FavoritePaths.Select(Path.GetFullPath).ToArray());
+                Assert.False(LibraryFavoriteRow.FromPath(existing).IsMissing);
+                Assert.True(LibraryFavoriteRow.FromPath(missing).IsMissing);
+
+                var nested = Path.Combine(existing, "Nested");
+                Directory.CreateDirectory(nested);
+                view.SetExplorerFolder(nested);
+                Flush();
+                var rootsChanged = 0;
+                IReadOnlyList<string>? savedRoots = null;
+                view.ExplorerRootsChanged += (_, paths) =>
+                {
+                    rootsChanged++;
+                    savedRoots = paths;
+                };
+                view.AddSelectedExplorerToRoots();
+                Assert.Equal(1, rootsChanged);
+                Assert.NotNull(savedRoots);
+                Assert.Contains(
+                    Path.GetFullPath(nested).TrimEnd('\\', '/'),
+                    savedRoots!.Select(path => Path.GetFullPath(path).TrimEnd('\\', '/')));
+
+                // 欠損ルートの Enter／追加はイベントを出さない（クリアだけ走らせない）。
+                view.SetExplorerRoots([existing, missing]);
+                Flush();
+                missingItem = Assert.Single(
+                    FindDescendants<TreeViewItem>(view),
+                    item => item.Tag is string tag
+                        && Path.GetFullPath(tag).TrimEnd('\\', '/')
+                            .Equals(missingFull, StringComparison.OrdinalIgnoreCase));
+                missingItem.IsSelected = true;
+                Flush();
+                var opened = 0;
+                var replaced = 0;
+                view.ExplorerFolderOpened += (_, _) => opened++;
+                view.ExplorerReplacePlaylistRequested += (_, _) => replaced++;
+                view.OpenSelectedFolder();
+                view.ReplacePlaylistFromSelection();
+                Assert.Equal(0, opened);
+                Assert.Equal(0, replaced);
+
+                view.SetFavorites([missing]);
+                Flush();
+                view.FocusFavorites();
+                Flush();
+                LibraryFavoritesActivateEventArgs? favArgs = null;
+                view.FavoritesActivated += (_, e) => favArgs = e;
+                view.ActivateSelectedFavorites(clearPlaylist: true);
+                Assert.Null(favArgs);
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(existing))
+                {
+                    Directory.Delete(existing, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void Favorites_DoubleClick_AppendsWithoutClearing()
     {
         RunSta(() =>
@@ -1264,6 +1373,51 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Same(third, view.PreviousPlaylistSession(null));
             view.SetSessions([first], first, [first]);
             Assert.Same(first, view.PreviousPlaylistSession(first));
+        });
+    }
+
+    [Fact]
+    public void MoveSelection_WrapsAtEnds()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.mp3");
+            var second = Session("02 b.mp3");
+            var third = Session("03 c.mp3");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 400,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions([first, second, third], first, [first]);
+            Flush();
+
+            view.MoveSelection(-1);
+            Flush();
+            Assert.Same(third, view.SelectedSession);
+
+            view.MoveSelection(1);
+            Flush();
+            Assert.Same(first, view.SelectedSession);
+
+            view.SetSessions([first, second, third], third, [third]);
+            Flush();
+            view.MoveSelection(1);
+            Flush();
+            Assert.Same(first, view.SelectedSession);
+
+            view.SetSessions([first, second, third], first, [first]);
+            Flush();
+            view.MoveSelection(-1, extend: true);
+            Flush();
+            Assert.Same(first, view.SelectedSession);
+            window.Close();
         });
     }
 
