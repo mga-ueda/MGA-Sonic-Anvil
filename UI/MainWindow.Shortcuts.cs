@@ -57,6 +57,13 @@ public partial class MainWindow
 
         if (key is Key.Left or Key.Right or Key.NumPad1 or Key.NumPad3)
         {
+            if (_videoFrameStepDirection != 0
+                && (key == Key.Left && _videoFrameStepDirection < 0
+                    || key == Key.Right && _videoFrameStepDirection > 0))
+            {
+                StopVideoFrameStep();
+            }
+
             if (_playbackShuttleDirection != 0
                 && (key is Key.Left or Key.NumPad1 && _playbackShuttleDirection < 0
                     || key is Key.Right or Key.NumPad3 && _playbackShuttleDirection > 0))
@@ -103,6 +110,7 @@ public partial class MainWindow
         if (key is Key.Add or Key.Subtract or Key.OemPlus or Key.OemMinus)
         {
             LibraryBrowser.ResetPlaylistPdfZoomLatch();
+            ResetVideoLaunchScaleLatch();
             return;
         }
 
@@ -133,15 +141,6 @@ public partial class MainWindow
             return;
         }
 
-        if (IsLibraryMaximized
-            && e.OriginalSource is System.Windows.DependencyObject wheelOrigin
-            && (IsDescendantOf(wheelOrigin, Overview)
-                || FindWaveformFromOrigin(wheelOrigin) is not null))
-        {
-            e.Handled = true;
-            return;
-        }
-
         if (_volumeMenu is { IsOpen: true })
         {
             VolumeGainPicker.TryNudge(_volumeMenu, Math.Sign(e.Delta));
@@ -159,6 +158,15 @@ public partial class MainWindow
         if (_timeStretchMenu is { IsOpen: true })
         {
             TimeStretchPicker.TryNudge(_timeStretchMenu, Math.Sign(e.Delta));
+            e.Handled = true;
+            return;
+        }
+
+        if (IsLibraryMaximized
+            && e.OriginalSource is System.Windows.DependencyObject wheelOrigin
+            && (IsDescendantOf(wheelOrigin, Overview)
+                || FindWaveformFromOrigin(wheelOrigin) is not null))
+        {
             e.Handled = true;
             return;
         }
@@ -230,6 +238,7 @@ public partial class MainWindow
         {
             StopPlaybackShuttle();
             StopSeekNudge();
+            StopVideoFrameStep();
             if (AppDialogKeys.IsEscape(key, modifiers))
             {
                 TryRequestOpenCancel();
@@ -265,6 +274,7 @@ public partial class MainWindow
         if (key == Key.F10 && modifiers == ModifierKeys.None)
         {
             StopSeekNudge();
+            StopVideoFrameStep();
             ToggleLibraryMaximize();
             return true;
         }
@@ -286,6 +296,7 @@ public partial class MainWindow
         {
             StopPlaybackShuttle();
             StopSeekNudge();
+            StopVideoFrameStep();
             return true;
         }
 
@@ -312,7 +323,16 @@ public partial class MainWindow
             return false;
         }
 
-        // PDF 表示中はページ／拡縮を優先し、プレイリスト操作キーは奪う。
+        // F8／引数起動の動画・PDF ミニ: +／- で窓サイズを拡縮（テンキー可）。
+        // PDF 内容ズームより先に窓拡縮へ回す。
+        if (IsVideoMiniPlayerActive()
+            && !_playlistVideoFullscreen
+            && TryHandleVideoLaunchScaleKey(key, modifiers, isRepeat))
+        {
+            return true;
+        }
+
+        // PDF 表示中はページ／内容拡縮を優先し、プレイリスト操作キーは奪う。
         if (IsLibraryMaximized
             && LibraryBrowser.PlaylistVisualIsPdf
             && TryHandlePlaylistPdfKey(key, modifiers, isRepeat))
@@ -387,6 +407,11 @@ public partial class MainWindow
         }
 
         if (IsLibraryMaximized && TryHandleLibraryPlayerNumpad(key, modifiers, isRepeat))
+        {
+            return true;
+        }
+
+        if (IsLibraryMaximized && TryHandlePlaylistVideoFrameStep(key, modifiers, isRepeat))
         {
             return true;
         }
@@ -594,7 +619,7 @@ public partial class MainWindow
             if (key == Key.Enter
                 && modifiers == ModifierKeys.None)
             {
-                // 再生中は止める（動画は暗い 1/4 速プレビューへ）。停止中だけ先頭から連続再生。
+                // 再生中は止める（動画は暗い 1/3 速プレビューへ）。停止中だけ先頭から連続再生。
                 // 常に Play すると本再生中に抜けられず即再生し直してしまう。
                 ToggleLibraryTransportPlayback();
                 return true;
@@ -1865,6 +1890,21 @@ public partial class MainWindow
         return true;
     }
 
+    private bool TryHandleVideoLaunchScaleKey(Key key, ModifierKeys modifiers, bool isRepeat)
+    {
+        if (LibraryPlayerMode.IsZoomInKey(key, modifiers))
+        {
+            return TryScaleVideoLaunchWindow(1, isRepeat);
+        }
+
+        if (LibraryPlayerMode.IsZoomOutKey(key, modifiers))
+        {
+            return TryScaleVideoLaunchWindow(-1, isRepeat);
+        }
+
+        return false;
+    }
+
     private bool TryHandlePlaylistPdfKey(Key key, ModifierKeys modifiers, bool isRepeat)
     {
         // 選択プレビュー（暗表示）ではプレイリスト操作のまま。表示モード中だけ奪う。
@@ -1873,12 +1913,12 @@ public partial class MainWindow
             return false;
         }
 
-        if (LibraryPlayerMode.IsPdfZoomInKey(key, modifiers))
+        if (LibraryPlayerMode.IsZoomInKey(key, modifiers))
         {
             return LibraryBrowser.TryZoomPlaylistPdf(1, isRepeat);
         }
 
-        if (LibraryPlayerMode.IsPdfZoomOutKey(key, modifiers))
+        if (LibraryPlayerMode.IsZoomOutKey(key, modifiers))
         {
             return LibraryBrowser.TryZoomPlaylistPdf(-1, isRepeat);
         }

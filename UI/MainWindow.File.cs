@@ -106,7 +106,7 @@ public partial class MainWindow
         if (LaunchFiles.ContainsVideo(paths))
         {
             // 拡張子連動はプロキシ抑止つきの動画ミニ（F8 相当）で起動する。
-            EnterVideoMiniPlayer(suppressProxyEncode: true);
+            EnterVideoMiniPlayer();
             return;
         }
 
@@ -122,7 +122,7 @@ public partial class MainWindow
     /// 拡張子連動／引数の動画起動フラグ。専用ウィンドウ配置・プロキシ抑止。
     /// </summary>
     private void BeginVideoLaunchSession() =>
-        BeginVideoMiniPlayerSession(suppressProxyEncode: true);
+        BeginVideoMiniPlayerSession();
 
     private void EndVideoLaunchSession()
     {
@@ -135,6 +135,14 @@ public partial class MainWindow
         _videoLaunchPlacement = false;
         _videoLaunchPlacementDeferred = false;
         VideoProxy.SuppressAutoEncode = false;
+        // 倍率はモード退出で忘れる（次回 F8 は原寸から）。
+        _videoLaunchScale = LibraryVideoWindowScale.Native;
+        _videoLaunchScaleLatched = false;
+        HideVideoLaunchScaleToast();
+        if (!_playlistVideoFullscreen && WindowStyle != WindowStyle.None)
+        {
+            ResizeMode = ResizeMode.CanResize;
+        }
     }
 
     private static string[] MergeLaunchPaths(params IReadOnlyList<string>[] groups)

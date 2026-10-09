@@ -117,6 +117,15 @@ public partial class MainWindow
             return;
         }
 
+        // ←→／テンキー 0 のフレーム一時停止中は前面 UI が消えている。
+        // F8 と同様、F10 はエディタへ落とさず、暗いバックグラウンド再生へ落としてクロームを出す。
+        if (IsLibraryMaximized && _playlistVideoImmersivePause)
+        {
+            StopVideoFrameStep();
+            HaltPlaybackToStart();
+            return;
+        }
+
         SetWaveformMaximizeMode(
             _waveformMaximizeMode == WaveformMaximizeMode.Library
                 ? WaveformMaximizeMode.Off
@@ -125,7 +134,8 @@ public partial class MainWindow
 
     /// <summary>
     /// F8 動画専用ミニプレイヤー。前面 UI 無し・映像原寸ウィンドウ枠。
-    /// 突入は動画の本再生中かつプレイリストに再生対象があるときのみ（拡張子連動は自動）。
+    /// 突入は背面に動画があるとき（本再生または暗いバックグラウンドプレビュー）かつ
+    /// プレイリストに再生対象があるとき（拡張子連動は自動）。暗いプレビューからは本再生を再開して入る。
     /// もう一度 F8 で通常プレイヤーへ（再生は続ける）。F9／F10 でプレイリストへ戻る。
     /// </summary>
     private void ToggleVideoMiniPlayer()
@@ -133,7 +143,7 @@ public partial class MainWindow
         var active = IsVideoMiniPlayerActive();
         if (!LibraryPlayerMode.CanToggleVideoMiniPlayer(
                 active,
-                IsVideoRealPlayback(),
+                IsVideoMiniEnterEligible(),
                 hasPlayableSession: _sessions.Count > 0))
         {
             return;
@@ -146,7 +156,21 @@ public partial class MainWindow
             return;
         }
 
-        EnterVideoMiniPlayer(suppressProxyEncode: false);
+        // F8 は設定にかかわらずプロキシを作らない（本再生再開より先に抑止する）。
+        VideoProxy.SuppressAutoEncode = true;
+
+        // 暗いバックグラウンド／フレーム一時停止からは、いまの位置で本再生してからミニへ。
+        if (LibraryBrowser.PlaylistVisualIsVideo && !IsVideoRealPlayback())
+        {
+            ResumeVideoPlaybackForMini();
+        }
+        else if (LibraryBrowser.PlaylistVisualIsPdf && !LibraryBrowser.PlaylistVisualPlaying)
+        {
+            // PDF の暗いプレビューからは明るい表示にしてからミニへ。
+            LibraryBrowser.SetPlaylistVisualPlaying(true);
+        }
+
+        EnterVideoMiniPlayer();
     }
 
     private bool IsVideoMiniPlayerActive() =>
@@ -157,6 +181,25 @@ public partial class MainWindow
         IsLibraryMaximized
         && LibraryBrowser.PlaylistVisualIsVideo
         && LibraryBrowser.PlaylistVisualPlaying;
+
+    /// <summary>F8 突入可。背面に動画または PDF が出ていれば本再生でなくても可。</summary>
+    private bool IsVideoMiniEnterEligible() =>
+        IsLibraryMaximized
+        && LibraryBrowser.PlaylistVisualShown
+        && (LibraryBrowser.PlaylistVisualIsVideo || LibraryBrowser.PlaylistVisualIsPdf);
+
+    /// <summary>暗いプレビュー等から F8 用に本再生を再開する。</summary>
+    private void ResumeVideoPlaybackForMini()
+    {
+        var session = LibraryBrowser.SelectedSession ?? _activeSession;
+        if (session is null || !LibraryPlaylistDocuments.IsVideo(session.Document))
+        {
+            return;
+        }
+
+        ClearPlaylistVideoImmersivePause(sync: false);
+        StartLibraryVisualPlayback(session, stopAfterTrack: false);
+    }
 
     /// <summary>
     /// F9 ミニマムプレイヤー。どのモードからでも入れる。
@@ -240,8 +283,8 @@ public partial class MainWindow
         LibraryBrowser.FocusList();
     }
 
-    /// <summary>動画ミニへ入る。拡張子連動はプロキシ抑止あり、F8 は抑止なし。</summary>
-    private void EnterVideoMiniPlayer(bool suppressProxyEncode)
+    /// <summary>動画ミニへ入る（F8／拡張子連動／引数）。プロキシは作らない。</summary>
+    private void EnterVideoMiniPlayer()
     {
         // F 全画面中の F8 は全画面を抜けてから原寸ミニへ（遅延配置のままだと変化が分からない）。
         if (LibraryPlayerMode.ExitsVideoFullscreenBeforeEnterMini(
@@ -256,7 +299,7 @@ public partial class MainWindow
             PersistCurrentWindowPlacement();
         }
 
-        BeginVideoMiniPlayerSession(suppressProxyEncode);
+        BeginVideoMiniPlayerSession();
         ApplyVideoMiniPlayerUi();
         if (!IsLibraryMaximized)
         {
@@ -276,12 +319,20 @@ public partial class MainWindow
         AppStorage.Save();
     }
 
-    private void BeginVideoMiniPlayerSession(bool suppressProxyEncode)
+    /// <summary>動画ミニセッション開始。F9／F10 本再生以外ではプロキシを作らない。</summary>
+    private void BeginVideoMiniPlayerSession()
     {
-        _videoLaunchPlacement = true;
-        if (suppressProxyEncode)
+        if (!_videoLaunchPlacement)
         {
-            VideoProxy.SuppressAutoEncode = true;
+            _videoLaunchScale = LibraryVideoWindowScale.Native;
+            _videoLaunchScaleLatched = false;
+        }
+
+        _videoLaunchPlacement = true;
+        VideoProxy.SuppressAutoEncode = true;
+        if (!_playlistVideoFullscreen)
+        {
+            ResizeMode = ResizeMode.CanResize;
         }
     }
 
@@ -294,6 +345,10 @@ public partial class MainWindow
             AppStorage.Settings.VideoLaunchTimecode,
             out _playlistVideoHud,
             out _playlistVideoTimecode);
+        if (!_playlistVideoFullscreen)
+        {
+            ResizeMode = ResizeMode.CanResize;
+        }
     }
 
     /// <summary>動画ミニ（F8／引数起動）中の A／T を次回用に覚える（両者共通）。</summary>
@@ -861,6 +916,12 @@ public partial class MainWindow
 
     private void ApplyPlaylistVideoTimecodeFade(bool show, bool instant)
     {
+        if (show)
+        {
+            // T で出した瞬間にも窓比例を当てる（リサイズ前に Identity のまま残るのを防ぐ）。
+            ApplyPlaylistVideoTimecodeOverlayScale(VideoMiniOverlayLayoutScale);
+        }
+
         LibraryPlayerMode.FadeElementOpacity(
             PlaylistVideoTimecode,
             show ? 1 : 0,
@@ -894,16 +955,34 @@ public partial class MainWindow
 
     private void RefreshPlaylistVideoFileName()
     {
-        PlaylistVideoFileName.Text = _activeSession?.DisplayName
+        var text = _activeSession?.DisplayName
             ?? (_document?.SourcePath is { Length: > 0 } path
                 ? System.IO.Path.GetFileName(path)
                 : string.Empty);
+        PlaylistVideoFileNameText.Text = text;
+        PlaylistVideoFileNameShadow.Text = text;
     }
 
     private void SchedulePlaylistVideoFileNamePlacement()
     {
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, SyncPlaylistVideoFileNamePlacement);
         Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, SyncPlaylistVideoFileNamePlacement);
+        Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, SyncPlaylistVideoFileNamePlacement);
+        // A で HUD／ファイル名をフェードインした直後は Idle 時点でレイアウトが未確定なことがある。
+        _playlistVideoFileNamePlaceTimer ??= new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromSeconds(LibraryPlayerMode.ChromeFadeSeconds + 0.05),
+        };
+        _playlistVideoFileNamePlaceTimer.Tick -= OnPlaylistVideoFileNamePlaceTimerTick;
+        _playlistVideoFileNamePlaceTimer.Tick += OnPlaylistVideoFileNamePlaceTimerTick;
+        _playlistVideoFileNamePlaceTimer.Stop();
+        _playlistVideoFileNamePlaceTimer.Start();
+    }
+
+    private void OnPlaylistVideoFileNamePlaceTimerTick(object? sender, EventArgs e)
+    {
+        _playlistVideoFileNamePlaceTimer?.Stop();
+        SyncPlaylistVideoFileNamePlacement();
     }
 
     /// <summary>中央配置のファイル名がラウドネスに被る分だけ左へずらす。</summary>
@@ -913,8 +992,11 @@ public partial class MainWindow
         PlaylistVideoFileName.Margin = margin;
         // 前回のずらしを外してから測らないと二重に避ける。
         PlaylistVideoFileName.RenderTransform = Transform.Identity;
-        if (PlaylistVideoFileName.Opacity < 0.05
-            || LoudnessMeter.Opacity < 0.05
+        // Opacity は見ない。A でフェードイン中は両方とも 0 近傍のまま測れず、初回だけ被る。
+        if (!LibraryPlayerMode.ShowsPlaylistVideoFileName(
+                !_playlistVideoChromeVisible,
+                _playlistVideoHud,
+                LibraryBrowser.PlaylistVisualIsVideo)
             || LoudnessMeter.Visibility != Visibility.Visible
             || RootChrome.ActualWidth < 8)
         {
@@ -923,6 +1005,12 @@ public partial class MainWindow
 
         PlaylistVideoFileName.UpdateLayout();
         LoudnessMeter.UpdateLayout();
+        if (PlaylistVideoFileName.RenderSize.Width < 1
+            || LoudnessMeter.RenderSize.Width < 1)
+        {
+            return;
+        }
+
         Rect nameBox;
         Rect loudBox;
         try
@@ -1012,6 +1100,13 @@ public partial class MainWindow
         && LibraryBrowser.PlaylistVisualIsVideo
         && LibraryBrowser.PlaylistVisualPlaying;
 
+    /// <summary>
+    /// 本再生中、または ←→／テンキー 0 のフレーム一時停止中。
+    /// 停止扱いにすると次曲選択が暗いプレビューになってしまうので、プレイリスト送りでは再生継続とみなす。
+    /// </summary>
+    private bool ContinuesLibraryPlaylistPlayback() =>
+        IsPlaybackActive() || _playlistVideoImmersivePause;
+
     private bool IsPlaylistVisualHudContext() =>
         IsLibraryMaximized
         && LibraryBrowser.PlaylistVisualShown
@@ -1055,6 +1150,11 @@ public partial class MainWindow
         ResizeMode = _resizeModeBeforeVideoFullscreen == ResizeMode.NoResize
             ? ResizeMode.CanResize
             : _resizeModeBeforeVideoFullscreen;
+        if (_videoLaunchPlacement)
+        {
+            ResizeMode = ResizeMode.CanResize;
+        }
+
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
         if (_videoLaunchPlacementDeferred)
         {
@@ -1102,8 +1202,17 @@ public partial class MainWindow
             LibraryPlayerMode.SetVideoUiShadow(target, video && !hideHud);
         }
 
-        LibraryPlayerMode.SetVideoUiShadow(PlaylistVideoFileName, video && !hideHud);
-        LibraryPlayerMode.SetVideoUiShadow(PlaylistVideoTimecode, video && !hideHud);
+        // ファイル名は XAML の文字シルエット影。ラベル全体への Effect は使わない。
+        PlaylistVideoFileName.Effect = null;
+        LibraryPlayerMode.SetVideoTextShadow(PlaylistVideoFileNameShadow, video && !hideHud);
+        // タイムコードは T の表示中だけ影（A の HUD とは独立）。
+        LibraryPlayerMode.SetVideoUiShadow(
+            PlaylistVideoTimecode,
+            video
+            && LibraryPlayerMode.ShowsPlaylistVideoTimecode(
+                !_playlistVideoChromeVisible,
+                _playlistVideoTimecode,
+                isVideo: true));
     }
 
     private void ApplyPlayerMeterFade(bool visible, bool instant)
@@ -1660,8 +1769,9 @@ public partial class MainWindow
             return;
         }
 
-        // 停止中のクリックや選択は再生しない。選択曲の波形だけ出す。再生中だけその曲へ切り替える。
-        if (!IsPlaybackActive())
+        // 停止中のクリックや選択は再生しない。選択曲の波形だけ出す。
+        // 本再生中／フレーム一時停止中だけその曲へ切り替える（一時停止を暗いプレビューに落とさない）。
+        if (!ContinuesLibraryPlaylistPlayback())
         {
             PreviewLibrarySession(session);
             return;
@@ -2210,11 +2320,11 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// 停止中だけ選択曲の暗いプレビュー／波形を出す。再生中は触らない。
+    /// 停止中だけ選択曲の暗いプレビュー／波形を出す。再生中／フレーム一時停止中は触らない。
     /// </summary>
     private void PreviewIdleLibrarySession(DocumentSession? session)
     {
-        if (session is null || IsPlaybackActive())
+        if (session is null || ContinuesLibraryPlaylistPlayback())
         {
             return;
         }
@@ -2311,7 +2421,7 @@ public partial class MainWindow
 
         _libraryPlayOnArrowRelease = false;
         var session = LibraryBrowser.SelectedSession ?? _activeSession;
-        if (!IsPlaybackActive())
+        if (!ContinuesLibraryPlaylistPlayback())
         {
             if (session is not null)
             {
@@ -2555,9 +2665,13 @@ public partial class MainWindow
 
     private bool TryStepLibraryPlaylist(int direction)
     {
+        // 再生中は今の曲、停止中は選択行を基準。先頭の前→末尾、末尾の次→先頭。
+        var cursor = IsPlaybackActive()
+            ? (_activeSession ?? LibraryBrowser.SelectedSession)
+            : (LibraryBrowser.SelectedSession ?? _activeSession);
         var session = direction < 0
-            ? LibraryBrowser.PreviousPlaylistSession(_activeSession)
-            : LibraryBrowser.NextPlaylistSession(_activeSession);
+            ? LibraryBrowser.PreviousPlaylistSession(cursor)
+            : LibraryBrowser.NextPlaylistSession(cursor);
         if (session is null)
         {
             return false;
@@ -2714,11 +2828,144 @@ public partial class MainWindow
             LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: false));
     }
 
+    private bool TryHandlePlaylistVideoFrameStep(Key key, ModifierKeys modifiers, bool isRepeat)
+    {
+        if (!LibraryPlayerMode.IsVideoFrameStepKey(key, modifiers)
+            || !LibraryPlayerMode.CanStepPlaylistVideoFrame(
+                IsLibraryMaximized,
+                LibraryBrowser.PlaylistVisualShown,
+                LibraryBrowser.PlaylistVisualIsVideo,
+                LibraryBrowser.PlaylistVisualPlaying,
+                _playlistVideoImmersivePause))
+        {
+            return false;
+        }
+
+        // OS のキーリピートはタイマー側で扱う（最初だけウェイト）。
+        if (isRepeat)
+        {
+            return true;
+        }
+
+        var direction = key == Key.Left ? -1 : 1;
+        return BeginOrContinueVideoFrameStep(direction);
+    }
+
+    private bool BeginOrContinueVideoFrameStep(int direction)
+    {
+        if (direction == 0 || _document is null || !LibraryPlaylistDocuments.IsVideo(_document))
+        {
+            return false;
+        }
+
+        if (_videoFrameStepDirection == direction && _videoFrameStepTimer.IsEnabled)
+        {
+            return true;
+        }
+
+        StopPlaybackShuttle();
+        StopSeekNudge();
+        StepPlaylistVideoFrame(direction);
+        _videoFrameStepDirection = direction;
+        _videoFrameStepRepeatStarted = false;
+        _videoFrameStepTimer.Stop();
+        _videoFrameStepTimer.Interval = TimeSpan.FromMilliseconds(
+            LibraryPlayerMode.VideoFrameStepTimerIntervalMs(repeatStarted: false));
+        _videoFrameStepTimer.Start();
+        return true;
+    }
+
+    private void OnVideoFrameStepTick()
+    {
+        if (_videoFrameStepDirection == 0 || !IsVideoFrameStepHeld(_videoFrameStepDirection))
+        {
+            StopVideoFrameStep();
+            return;
+        }
+
+        if (!LibraryPlayerMode.CanStepPlaylistVideoFrame(
+                IsLibraryMaximized,
+                LibraryBrowser.PlaylistVisualShown,
+                LibraryBrowser.PlaylistVisualIsVideo,
+                LibraryBrowser.PlaylistVisualPlaying,
+                _playlistVideoImmersivePause))
+        {
+            StopVideoFrameStep();
+            return;
+        }
+
+        StepPlaylistVideoFrame(_videoFrameStepDirection);
+        if (_videoFrameStepRepeatStarted)
+        {
+            return;
+        }
+
+        _videoFrameStepRepeatStarted = true;
+        _videoFrameStepTimer.Stop();
+        _videoFrameStepTimer.Interval = TimeSpan.FromMilliseconds(
+            LibraryPlayerMode.VideoFrameStepTimerIntervalMs(repeatStarted: true));
+        _videoFrameStepTimer.Start();
+    }
+
+    private void StepPlaylistVideoFrame(int direction)
+    {
+        if (_document is null || !LibraryPlaylistDocuments.IsVideo(_document))
+        {
+            return;
+        }
+
+        if (IsPlaybackActive())
+        {
+            PausePlaybackHere(immersiveVideoHold: true);
+        }
+        else if (LibraryBrowser.PlaylistVisualPlaying || !_playlistVideoImmersivePause)
+        {
+            _playlistVideoImmersivePause = true;
+            LibraryBrowser.PausePlaylistVisualFrame();
+            SyncPlaylistVideoChromeFade();
+        }
+
+        var step = LibraryPlayerMode.VideoFrameStepSamples(
+            _document.SampleRate,
+            LibraryPlayerMode.VideoTimecodeFramesPerSecond);
+        var current = _player.PendingSeekFrame
+            ?? (IsPlaybackActive() ? _player.CursorFrame : _document.CursorFrame);
+        // 一時停止直後は音声ヘッドが止まるので、映像位置を優先する。
+        if (!IsPlaybackActive() && LibraryBrowser.PlaylistVisualShown)
+        {
+            var rate = Math.Max(1, _document.SampleRate);
+            current = LibraryPlayerMode.FrameFromSeconds(
+                LibraryBrowser.PlaylistVisualPosition.TotalSeconds,
+                rate,
+                _document.FrameCount);
+        }
+
+        SeekFrame(current + direction * step);
+    }
+
+    private static bool IsVideoFrameStepHeld(int direction)
+    {
+        var keyDown = direction < 0
+            ? Keyboard.IsKeyDown(Key.Left)
+            : Keyboard.IsKeyDown(Key.Right);
+        return keyDown && Keyboard.Modifiers == ModifierKeys.None;
+    }
+
+    private void StopVideoFrameStep()
+    {
+        _videoFrameStepDirection = 0;
+        _videoFrameStepRepeatStarted = false;
+        _videoFrameStepTimer.Stop();
+        _videoFrameStepTimer.Interval = TimeSpan.FromMilliseconds(
+            LibraryPlayerMode.VideoFrameStepTimerIntervalMs(repeatStarted: false));
+    }
+
     private async Task PlayLibrarySessionAsync(
         DocumentSession? session,
         bool stopAfterTrack = false,
         bool keepAmbientGlow = false)
     {
+        StopVideoFrameStep();
         CancelLibraryGapless();
         _libraryPlayOnArrowRelease = false;
         _libraryStopAfterTrack = stopAfterTrack;
@@ -2733,9 +2980,25 @@ public partial class MainWindow
             return;
         }
 
+        // フレーム一時停止からの次曲は本再生へつなぐ（暗いプレビューに落とさない）。
+        var immersiveHold = _playlistVideoImmersivePause;
+        ClearPlaylistVideoImmersivePause(sync: false);
+        // 速度ランプ中にプロキシ準備などを await すると低速のまま待たされるので、
+        // 同じ動画の暗いプレビューなら先に 1 倍・明るい本再生映像へ戻す。
+        var promoteDimPreview = LibraryPlayerMode.PromotesDimPreviewBeforePlayLoad(
+            LibraryBrowser.PlaylistVisualShown,
+            LibraryBrowser.PlaylistVisualPlaying,
+            LibraryBrowser.IsPlaylistVisualSameSource(session.Document.SourcePath),
+            LibraryPlaylistDocuments.IsVideo(session.Document));
+        if (promoteDimPreview)
+        {
+            LibraryBrowser.PromotePlaylistVisualToMainPlay();
+        }
+
         var bridgeChrome = LibraryPlayerMode.HoldsPlaylistVisualChromeBridge(
             LibraryBrowser.PlaylistVisualPlaying,
-            LibraryPlaylistDocuments.IsVisual(session.Document));
+            LibraryPlaylistDocuments.IsVisual(session.Document),
+            immersiveHold || promoteDimPreview);
         if (bridgeChrome)
         {
             BeginPlaylistVisualChromeBridge();
@@ -2858,13 +3121,17 @@ public partial class MainWindow
 
     /// <summary>
     /// Space。選択曲を先頭から再生し、終わったら停止する。再生中なら止める。
-    /// 停止時は HaltPlaybackToStart（F8 動画ミニは静止、F10 は暗い 1/4 速＋格子）。
+    /// フレーム送り／テンキー 0 のイマーシブ一時停止中も再開せず、プレイリストの暗いバックグラウンドへ戻す。
+    /// 停止時は HaltPlaybackToStart（F8 動画ミニは静止、F10 は暗い 1/3 速＋格子）。
     /// </summary>
     private async void PlayLibrarySelectionOnceOrToggle()
     {
-        if (IsPlaybackActive())
+        if (LibraryPlayerMode.HaltsLibraryPlaybackOnSpace(
+                IsPlaybackActive(),
+                _playlistVideoImmersivePause))
         {
             // F8 動画ミニ中は暗いバックグラウンド再生へ落とさない（静止フレーム）。
+            StopVideoFrameStep();
             HaltPlaybackToStart();
             _libraryStopAfterTrack = false;
             return;
@@ -3463,12 +3730,25 @@ public partial class MainWindow
         AppStorage.Save();
     }
 
+    private void LibraryBrowser_ExplorerRootsChanged(object? sender, IReadOnlyList<string> paths)
+    {
+        AppStorage.Settings.ApplyLibraryExplorerRoots(paths);
+        AppStorage.Save();
+    }
+
     private void LibraryBrowser_ClearPlaylistRequested(object? sender, EventArgs e) =>
         RemoveLibrarySelectedFromList();
 
     private void LibraryBrowser_FavoritesActivated(object? sender, LibraryFavoritesActivateEventArgs e)
     {
         if (e.Paths.Count == 0 || _libraryFolderShowInProgress)
+        {
+            return;
+        }
+
+        // 欠損（赤字）だけの Enter はスルー。空クリアでメーターだけ出さない。
+        var paths = LibraryShellFiles.ExistingPaths(e.Paths);
+        if (paths.Length == 0)
         {
             return;
         }
@@ -3483,14 +3763,14 @@ public partial class MainWindow
             }
 
             _ = OpenLibraryFoldersRecursiveAsync(
-                e.Paths,
+                paths,
                 LibraryExplorerPlaylistWalk.Inactive,
                 playFirst: true);
             return;
         }
 
         _ = OpenLibraryFoldersRecursiveAsync(
-            e.Paths,
+            paths,
             LibraryExplorerPlaylistWalk.Inactive,
             playFirst: false);
     }
@@ -3502,7 +3782,13 @@ public partial class MainWindow
             return;
         }
 
-        _ = OpenLibraryFoldersRecursiveAsync(folders, playFirst: false);
+        var existing = LibraryShellFiles.ExistingPaths(folders);
+        if (existing.Length == 0)
+        {
+            return;
+        }
+
+        _ = OpenLibraryFoldersRecursiveAsync(existing, playFirst: false);
     }
 
     private async void LibraryBrowser_ExplorerFolderOpened(object? sender, string path)
@@ -3512,13 +3798,20 @@ public partial class MainWindow
             return;
         }
 
-        await OpenLibraryFoldersRecursiveAsync([path], playFirst: false).ConfigureAwait(true);
+        var existing = LibraryShellFiles.ExistingPaths([path]);
+        if (existing.Length == 0)
+        {
+            return;
+        }
+
+        await OpenLibraryFoldersRecursiveAsync(existing, playFirst: false).ConfigureAwait(true);
     }
 
     /// <summary>ツリーの Enter。プレイリストを空にしてから、選んだフォルダ配下を載せる。</summary>
     private void ReplaceLibraryFromExplorerFolder()
     {
-        var folders = LibraryBrowser.SelectedExplorerFolders;
+        // 欠損（赤字）ルートの Enter はスルー。クリアだけ走ると空リストなのにメーターが出る。
+        var folders = LibraryShellFiles.ExistingPaths(LibraryBrowser.SelectedExplorerFolders);
         if (folders.Length == 0)
         {
             return;
@@ -4123,6 +4416,7 @@ public partial class MainWindow
 
     private void StartLibraryVisualPlayback(DocumentSession session, bool stopAfterTrack)
     {
+        ClearPlaylistVideoImmersivePause(sync: false);
         if (LibraryPlaylistDocuments.IsPdf(session.Document))
         {
             // タイムラインが無いので表示モードで止める（連続再生でも次へは進まない）。
@@ -4306,7 +4600,7 @@ public partial class MainWindow
     {
         if (_videoLaunchPlacement
             && IsLibraryMaximized
-            && LibraryBrowser.PlaylistVisualIsVideo)
+            && (LibraryBrowser.PlaylistVisualIsVideo || LibraryBrowser.PlaylistVisualIsPdf))
         {
             TryApplyVideoLaunchPlacement();
             SignalVideoLaunchShowReady();

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -267,10 +268,11 @@ public partial class MainWindow
         }
 
         StopSeekNudge();
+        StopVideoFrameStep();
         if (LibraryBrowser.PlaylistVisualShown && LibraryBrowser.PlaylistVisualIsVideo)
         {
             // 映像は SpeedRatio±3 ではなく、一時停止＋音声ヘッドへの Position 追従。
-            // 暗い 1/4 速プレビューは PlaylistVisualPlaying=false なので、本再生中だけここに来る。
+            // 暗い 1/3 速プレビューは PlaylistVisualPlaying=false なので、本再生中だけここに来る。
             if (!_player.IsPlaying && !LibraryBrowser.PlaylistVisualPlaying)
             {
                 return false;
@@ -284,6 +286,9 @@ public partial class MainWindow
 
             if (_player.IsPlaying)
             {
+                // 本再生中の正は映像クロック。音声ヘッドが開始位置のままだと
+                // 追従シークで冒頭へ飛ぶので、速度切替の前に映像位置へ合わせる。
+                SyncPlayerCursorToPlaylistVisual();
                 _player.SetPlaybackSpeed(
                     direction < 0 ? -PlaybackSampleProvider.FastSpeed : PlaybackSampleProvider.FastSpeed);
                 if (!_playTimer.IsEnabled)
@@ -312,13 +317,32 @@ public partial class MainWindow
         }
 
         _playbackShuttleDirection = 0;
-        // 本再生中だけ 1 倍へ戻す。暗い 1/4 速プレビュー表示中に触ると通常速に化ける。
+        // 本再生中だけ 1 倍へ戻す。暗い 1/3 速プレビュー表示中に触ると通常速に化ける。
         if (LibraryBrowser.PlaylistVisualShown && LibraryBrowser.PlaylistVisualPlaying)
         {
             LibraryBrowser.SetPlaylistVisualSpeed(1);
         }
 
         _player.SetPlaybackSpeed(1);
+    }
+
+    /// <summary>映像クロックの位置へ音声ヘッドを合わせる（動画シャトル開始時）。</summary>
+    private void SyncPlayerCursorToPlaylistVisual()
+    {
+        if (_document is null
+            || !LibraryBrowser.PlaylistVisualShown
+            || !LibraryBrowser.PlaylistVisualIsVideo)
+        {
+            return;
+        }
+
+        var frame = LibraryPlayerMode.FrameFromSeconds(
+            LibraryBrowser.PlaylistVisualPosition.TotalSeconds,
+            _document.SampleRate,
+            _document.FrameCount);
+        _document.CursorFrame = frame;
+        Waveform.PlayheadFrame = frame;
+        _player.Seek(frame);
     }
 
     private void DetachOverviewScrubKeepPlayback()
@@ -566,13 +590,19 @@ public partial class MainWindow
         var stopPos = videoShown
             ? LibraryBrowser.PlaylistVisualPosition
             : (TimeSpan?)null;
-        // F8 動画ミニ: 静止。F10 プレイリスト: 暗い 1/4 速＋格子。
+        // F8 動画ミニ: 静止。F10 プレイリスト: 暗い 1/3 速＋格子。
         var freezeVideo = videoShown
             && LibraryPlayerMode.VideoStopFreezesFrame(IsVideoMiniPlayerActive());
 
         if (freezeVideo)
         {
             PausePlaybackSoft(freezePlaylistVisual: true);
+        }
+        else if (videoShown)
+        {
+            // SetPlaying(false) 経由で EnterDimPreview を二重に踏むとランプが積み重なる。
+            // 音声だけ止めてから、暗いプレビューへ一度だけ移す。
+            PausePlaybackSoft(keepPlaylistVisual: true);
         }
         else
         {
@@ -1281,6 +1311,7 @@ public partial class MainWindow
 
         StopPlaybackShuttle();
         StopSeekNudge();
+        StopVideoFrameStep();
         _resumeAfterScrub = _player.IsPlaying && !_player.IsScrubbing;
         if (_fadePreview.Previewing)
         {
@@ -1852,9 +1883,202 @@ public partial class MainWindow
         // ここで Capture すると、F10 プレイリスト寸法のまま F8 へ入った瞬間に
         // プレイリスト側の位置で動画ミニ枠を上書きしてしまう。
         _videoLaunchPlacementDeferred = false;
-        WindowPlacement.ApplyVideoLaunch(this, AppStorage.Settings, width, height);
+        var scale = LibraryVideoWindowScale.Clamp(_videoLaunchScale);
+        // 幅・高さとも同じ倍率。Fit も縦横比を保つのでアスペクトは変わらない。
+        var scaledWidth = Math.Max(1, (int)Math.Round(width * scale));
+        var scaledHeight = Math.Max(1, (int)Math.Round(height * scale));
+        _videoLaunchScaleApplying = true;
+        try
+        {
+            WindowPlacement.ApplyVideoLaunch(this, AppStorage.Settings, scaledWidth, scaledHeight);
+            // 作業領域で縮められたときだけ実効倍率へ合わせる（丸め差で 25% 格子を壊さない）。
+            SyncVideoLaunchScaleFromWindow(width, height, preferScale: scale);
+        }
+        finally
+        {
+            _videoLaunchScaleApplying = false;
+        }
+
         return true;
     }
+
+    /// <summary>
+    /// 動画ミニ窓のキー拡縮（+／-・テンキー）。常に 25% 刻みへ着地。原寸で一旦止まる。
+    /// 枠ドラッグ後も、今の大きさに近い 25% 倍率へ。倍率はモードを抜けるまで覚える。
+    /// </summary>
+    private bool TryScaleVideoLaunchWindow(int direction, bool isRepeat)
+    {
+        if (!CanScaleVideoLaunchWindow() || direction == 0)
+        {
+            return false;
+        }
+
+        // 枠ドラッグ後の実寸を拾ってから 25% 格子へ進む。
+        if (LibraryBrowser.TryGetPlaylistVideoNaturalPixels(out var naturalW, out var naturalH))
+        {
+            SyncVideoLaunchScaleFromWindow(naturalW, naturalH);
+        }
+
+        var next = LibraryVideoWindowScale.StepKey(
+            _videoLaunchScale,
+            direction,
+            isRepeat,
+            ref _videoLaunchScaleLatched);
+        return ApplyVideoLaunchScale(next, showKeyToast: true);
+    }
+
+    private bool CanScaleVideoLaunchWindow() =>
+        IsVideoMiniPlayerActive()
+        && !_playlistVideoFullscreen
+        && LibraryBrowser.TryGetPlaylistVideoNaturalPixels(out _, out _);
+
+    private bool ApplyVideoLaunchScale(double next, bool showKeyToast)
+    {
+        next = LibraryVideoWindowScale.Clamp(next);
+        if (Math.Abs(next - _videoLaunchScale) >= 1e-9)
+        {
+            // 拡縮しても中心を保つ。
+            WindowPlacement.CaptureVideoLaunchPosition(this, AppStorage.Settings);
+            _videoLaunchScale = next;
+            TryApplyVideoLaunchPlacement();
+        }
+
+        if (showKeyToast)
+        {
+            ShowVideoLaunchScaleToast();
+        }
+
+        return true;
+    }
+
+    /// <summary>枠ドラッグ後の実寸を倍率へ反映（+／- の 25% 着地の基準）。</summary>
+    private void SyncVideoLaunchScaleAfterUserResize()
+    {
+        if (_videoLaunchScaleApplying
+            || !IsVideoMiniPlayerActive()
+            || _playlistVideoFullscreen
+            || !LibraryBrowser.TryGetPlaylistVideoNaturalPixels(out var naturalW, out var naturalH))
+        {
+            return;
+        }
+
+        SyncVideoLaunchScaleFromWindow(naturalW, naturalH);
+    }
+
+    private VideoLaunchAspectResize.Constraints? TryGetVideoLaunchAspectConstraints()
+    {
+        if (!IsVideoMiniPlayerActive()
+            || _playlistVideoFullscreen
+            || !LibraryBrowser.TryGetPlaylistVideoNaturalPixels(out var naturalW, out var naturalH)
+            || naturalW < 1
+            || naturalH < 1)
+        {
+            return null;
+        }
+
+        var dip = WindowPlacement.DipScale(this);
+        if (dip <= 0)
+        {
+            return null;
+        }
+
+        WindowPlacement.TryGetNonClientDipSize(this, out var nonClientDipW, out var nonClientDipH);
+        var nonClientW = (int)Math.Round(nonClientDipW * dip);
+        var nonClientH = (int)Math.Round(nonClientDipH * dip);
+        var minClientW = Math.Max(1, (int)Math.Round(naturalW * LibraryVideoWindowScale.Min));
+        var minClientH = Math.Max(1, (int)Math.Round(naturalH * LibraryVideoWindowScale.Min));
+        var maxClientW = Math.Max(minClientW, (int)Math.Round(naturalW * LibraryVideoWindowScale.Max));
+        var maxClientH = Math.Max(minClientH, (int)Math.Round(naturalH * LibraryVideoWindowScale.Max));
+        // 作業領域より大きくしない。
+        var work = SystemParameters.WorkArea;
+        var maxOuterW = Math.Max(1, work.Width * dip);
+        var maxOuterH = Math.Max(1, work.Height * dip);
+        maxClientW = Math.Min(maxClientW, Math.Max(1, (int)Math.Round(maxOuterW) - nonClientW));
+        maxClientH = Math.Min(maxClientH, Math.Max(1, (int)Math.Round(maxOuterH) - nonClientH));
+
+        return new VideoLaunchAspectResize.Constraints(
+            clientAspect: naturalW / (double)naturalH,
+            nonClientWidthPx: nonClientW,
+            nonClientHeightPx: nonClientH,
+            minClientWidthPx: minClientW,
+            minClientHeightPx: minClientH,
+            maxClientWidthPx: Math.Max(minClientW, maxClientW),
+            maxClientHeightPx: Math.Max(minClientH, maxClientH));
+    }
+
+    /// <summary>+／- キー拡縮時だけ中央に拡大率を 1 秒出してフェードアウト。</summary>
+    private void ShowVideoLaunchScaleToast()
+    {
+        PlaylistVideoScaleToastText.Text =
+            LibraryVideoWindowScale.FormatPercent(_videoLaunchScale)
+                .ToString(CultureInfo.InvariantCulture) + "%";
+        LibraryPlayerMode.SetVideoUiShadow(PlaylistVideoScaleToast, on: true);
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistVideoScaleToast,
+            to: 1,
+            instant: true,
+            hitTestVisible: false);
+        _videoLaunchScaleToastTimer ??= new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1),
+        };
+        _videoLaunchScaleToastTimer.Tick -= OnVideoLaunchScaleToastTick;
+        _videoLaunchScaleToastTimer.Tick += OnVideoLaunchScaleToastTick;
+        _videoLaunchScaleToastTimer.Stop();
+        _videoLaunchScaleToastTimer.Start();
+    }
+
+    private void OnVideoLaunchScaleToastTick(object? sender, EventArgs e)
+    {
+        _videoLaunchScaleToastTimer?.Stop();
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistVideoScaleToast,
+            to: 0,
+            instant: false,
+            hitTestVisible: false,
+            seconds: LibraryPlayerMode.ChromeFadeSeconds);
+    }
+
+    private void HideVideoLaunchScaleToast()
+    {
+        _videoLaunchScaleToastTimer?.Stop();
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistVideoScaleToast,
+            to: 0,
+            instant: true,
+            hitTestVisible: false);
+        LibraryPlayerMode.SetVideoUiShadow(PlaylistVideoScaleToast, on: false);
+    }
+
+    private void SyncVideoLaunchScaleFromWindow(
+        int naturalPixelsWidth,
+        int naturalPixelsHeight,
+        double? preferScale = null)
+    {
+        if (naturalPixelsWidth < 1
+            || naturalPixelsHeight < 1
+            || !WindowPlacement.TryGetClientDipSize(this, out var clientW, out var clientH))
+        {
+            return;
+        }
+
+        var dip = WindowPlacement.DipScale(this);
+        if (dip <= 0)
+        {
+            return;
+        }
+
+        var effective = LibraryVideoWindowScale.FromClientSize(
+            clientW,
+            clientH,
+            naturalPixelsWidth / dip,
+            naturalPixelsHeight / dip);
+        _videoLaunchScale = preferScale is double requested
+            ? LibraryVideoWindowScale.RememberAfterApply(requested, effective)
+            : effective;
+    }
+
+    private void ResetVideoLaunchScaleLatch() => _videoLaunchScaleLatched = false;
 
     /// <summary>動画ミニ中に動かした位置をすぐ覚える（次の本再生／再起動用）。</summary>
     private void RememberVideoLaunchPlacementIfNeeded()
@@ -1950,13 +2174,21 @@ public partial class MainWindow
             ? DesignMetrics.AnalyzerMaximizeScale
             : 1d;
 
-    /// <summary>動画ミニ専用の窓比例倍率。F10 では常に 1。</summary>
-    private double VideoMiniOverlayLayoutScale =>
-        LibraryPlayerMode.VideoMiniOverlayScale(
-            ActualWidth,
-            ActualHeight,
-            videoMini: IsVideoMiniPlayerActive(),
-            fullscreen: _playlistVideoFullscreen);
+    /// <summary>動画ミニ専用の窓比例倍率。F10 では常に 1。基準は作業領域（最大化相当＝1）。</summary>
+    private double VideoMiniOverlayLayoutScale
+    {
+        get
+        {
+            var work = SystemParameters.WorkArea;
+            return LibraryPlayerMode.VideoMiniOverlayScale(
+                ActualWidth,
+                ActualHeight,
+                videoMini: IsVideoMiniPlayerActive(),
+                fullscreen: _playlistVideoFullscreen,
+                referenceWidth: work.Width > 1 ? work.Width : DesignMetrics.OverlayScaleReferenceWidth,
+                referenceHeight: work.Height > 1 ? work.Height : DesignMetrics.OverlayScaleReferenceHeight);
+        }
+    }
 
     /// <summary>メーター類に当てる倍率（動画ミニは窓比例、それ以外は F12 倍率のみ）。</summary>
     private double AnalyzerLayoutScale =>
@@ -1974,14 +2206,47 @@ public partial class MainWindow
         VectorScope.LayoutTransform = meterTransform;
         Spectrum.LayoutTransform = meterTransform;
 
-        // タイムコード／ファイル名の拡縮も動画ミニのときだけ。
+        // ファイル名／拡縮トーストは LayoutTransform。タイムコードは Viewbox 高さで比例させる。
         var overlayScale = VideoMiniOverlayLayoutScale;
         var overlayTransform = Math.Abs(overlayScale - 1d) > 0.0001
             ? UiScaleService.CreatePublishedTransform(overlayScale)
             : Transform.Identity;
-        PlaylistVideoTimecode.LayoutTransform = overlayTransform;
         PlaylistVideoFileName.LayoutTransform = overlayTransform;
+        PlaylistVideoScaleToast.LayoutTransform = overlayTransform;
+        ApplyPlaylistVideoTimecodeOverlayScale(overlayScale);
         SchedulePlaylistVideoFileNamePlacement();
+    }
+
+    /// <summary>動画ミニのタイムコードを窓比例で拡縮（高さ・余白）。F10／全画面は等倍。</summary>
+    private void ApplyPlaylistVideoTimecodeOverlayScale(double scale)
+    {
+        var designHeight = DesignMetrics.PlaylistVideoTimecodeHostHeight;
+        var designMargin = DesignMetrics.PlaylistVideoTimecodeMargin;
+        if (!IsVideoMiniPlayerActive() || _playlistVideoFullscreen)
+        {
+            PlaylistVideoTimecode.LayoutTransform = Transform.Identity;
+            PlaylistVideoTimecode.Height = designHeight;
+            PlaylistVideoTimecode.Margin = designMargin;
+            return;
+        }
+
+        var s = Math.Clamp(
+            scale,
+            DesignMetrics.OverlayScaleMin,
+            DesignMetrics.OverlayScaleMax);
+        if (double.IsNaN(s) || double.IsInfinity(s) || s <= 0)
+        {
+            s = 1;
+        }
+
+        // Viewbox の外寸だけ変える（中のデザイン寸法はそのまま → 確実に拡縮される）。
+        PlaylistVideoTimecode.LayoutTransform = Transform.Identity;
+        PlaylistVideoTimecode.Height = designHeight * s;
+        PlaylistVideoTimecode.Margin = new Thickness(
+            designMargin.Left * s,
+            designMargin.Top * s,
+            designMargin.Right * s,
+            designMargin.Bottom * s);
     }
 
     /// <summary>動画ミニのリサイズ／F 全画面に合わせてアナライザ倍率と列幅・行高を更新する。</summary>
@@ -2102,7 +2367,7 @@ public partial class MainWindow
             MeterTopSlot.Visibility = Visibility.Collapsed;
             ApplyAnalyzerMaximizeScale();
             ApplyVideoMiniOverlayLayout(VideoMiniOverlayLayoutScale);
-            SyncWindowMinSizeForMode(minimal: true);
+            SyncWindowMinSizeForMode(videoMini: true);
             return;
         }
 
@@ -2147,14 +2412,27 @@ public partial class MainWindow
         LoudnessMeter.VerticalAlignment = VerticalAlignment.Stretch;
     }
 
-    private void SyncWindowMinSizeForMode(bool minimal)
+    private void SyncWindowMinSizeForMode(bool minimal = false, bool videoMini = false)
     {
-        var unscaledWidth = minimal
-            ? DesignMetrics.MinimalPlayerWindowMinWidth
-            : DesignMetrics.WindowMinWidth;
-        var unscaledHeight = minimal
-            ? DesignMetrics.MinimalPlayerWindowMinHeight
-            : DesignMetrics.WindowMinHeight;
+        double unscaledWidth;
+        double unscaledHeight;
+        if (videoMini)
+        {
+            // F8: 原寸 25% まで縮める（F9 の 280 下限だと 47% 前後で止まる）。
+            unscaledWidth = DesignMetrics.VideoMiniWindowMinWidth;
+            unscaledHeight = DesignMetrics.VideoMiniWindowMinHeight;
+        }
+        else if (minimal)
+        {
+            unscaledWidth = DesignMetrics.MinimalPlayerWindowMinWidth;
+            unscaledHeight = DesignMetrics.MinimalPlayerWindowMinHeight;
+        }
+        else
+        {
+            unscaledWidth = DesignMetrics.WindowMinWidth;
+            unscaledHeight = DesignMetrics.WindowMinHeight;
+        }
+
         UiScaleService.SetUnscaledMinWidth(this, unscaledWidth);
         UiScaleService.SetUnscaledMinHeight(this, unscaledHeight);
         if (WindowState == WindowState.Normal)
