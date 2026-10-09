@@ -1121,7 +1121,7 @@ public partial class MainWindow
     /// 上下キーで次の本再生へつなぐとき用。
     /// </param>
     /// <param name="freezePlaylistVisual">
-    /// true なら映像を現在フレームで一時停止する（暗い 1/4 速プレビューへ落とさない）。
+    /// true なら映像を現在フレームで一時停止する（暗い 1/3 速プレビューへ落とさない）。
     /// テンキー 0 の一時停止用。
     /// </param>
     private void PausePlaybackSoft(bool keepPlaylistVisual = false, bool freezePlaylistVisual = false)

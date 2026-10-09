@@ -19,11 +19,14 @@ internal sealed class LibraryVisualStage : Grid
 {
     internal const double StoppedDimOpacity = 0.72;
 
-    /// <summary>選択時の暗いプレビューは 1/4 速でループ（無音）。</summary>
-    internal const double PreviewLoopSpeed = 0.25;
+    /// <summary>選択時の暗いプレビューは 1/3 速でループ（無音）。</summary>
+    internal const double PreviewLoopSpeed = 1.0 / 3.0;
 
     /// <summary>動画開始のフェードイン秒数（真っ黒から）。</summary>
     internal const double VideoFadeInSeconds = 0.2;
+
+    /// <summary>本再生停止 → 暗いプレビューへ戻るときの速度ランプ秒数（1 → 1/3）。</summary>
+    internal const double PreviewSpeedRampSeconds = 1;
 
     /// <summary>本再生停止 → 暗いプレビューへの暗転秒数（現状から）。</summary>
     internal const double PreviewDimFadeSeconds = 0.25;
@@ -40,10 +43,8 @@ internal sealed class LibraryVisualStage : Grid
     /// <summary>映像と描画エリアのアスペクト差。これ未満は黒帯なしとみなす。</summary>
     internal const double AmbientSpillAspectEpsilon = 0.02;
 
-    /// <summary>格子（少し荒め）。線 1px。</summary>
+    /// <summary>格子（少し荒め）。線はデバイス 1px（DPI 追従）。</summary>
     private const double MeshCell = 4;
-
-    private const double MeshLine = 1;
 
     private const byte MeshLineAlpha = 160;
 
@@ -119,10 +120,11 @@ internal sealed class LibraryVisualStage : Grid
     /// <summary>暗いプレビューの最前面格子。</summary>
     private readonly Border _mesh = new()
     {
-        Background = CreateMeshBrush(),
         IsHitTestVisible = false,
         Visibility = Visibility.Collapsed,
         Opacity = 0,
+        SnapsToDevicePixels = true,
+        UseLayoutRounding = true,
     };
 
     private TimeSpan _fallbackDuration;
@@ -142,6 +144,9 @@ internal sealed class LibraryVisualStage : Grid
     private BitmapSource? _pdfSharp;
     private int _previewSeekTicket;
     private int _dimFadeTicket;
+    private int _previewSpeedRampTicket;
+    private DispatcherTimer? _previewSpeedRampTimer;
+    private readonly Stopwatch _previewSpeedRampWatch = new();
     private TimeSpan _previewLoopStart;
     private readonly Stopwatch _visualClock = new();
     private TimeSpan _visualOrigin;
@@ -162,7 +167,10 @@ internal sealed class LibraryVisualStage : Grid
         Children.Add(_pdfHost);
         Children.Add(_dim);
         Children.Add(_mesh);
-        _mesh.CacheMode = new BitmapCache { EnableClearType = false, SnapsToDevicePixels = true };
+        // BitmapCache は HiDPI で 1px 線を太くぼかすので使わない。
+        RenderOptions.SetEdgeMode(_mesh, EdgeMode.Aliased);
+        RefreshMeshBrush();
+        Loaded += (_, _) => RefreshMeshBrush();
         SizeChanged += (_, _) =>
         {
             ApplyPdfLayout();
@@ -283,9 +291,17 @@ internal sealed class LibraryVisualStage : Grid
 
     public bool TryGetNaturalVideoPixels(out int width, out int height)
     {
-        width = _media.NaturalVideoWidth;
-        height = _media.NaturalVideoHeight;
-        return _video && width > 0 && height > 0;
+        if (_video)
+        {
+            width = _media.NaturalVideoWidth;
+            height = _media.NaturalVideoHeight;
+            return width > 0 && height > 0;
+        }
+
+        // PDF ページ画素（F8 ミニ窓の原寸）。まだ読み込み前なら不可。
+        width = (int)Math.Round(_pdfNaturalWidth);
+        height = (int)Math.Round(_pdfNaturalHeight);
+        return IsPdf && width > 0 && height > 0;
     }
 
     public bool IsPdf => !_video && IsShown;
@@ -344,6 +360,7 @@ internal sealed class LibraryVisualStage : Grid
     public void Hide()
     {
         CancelPreviewSeek();
+        CancelPreviewSpeedRamp();
         _dimFadeTicket++;
         StopMedia();
         LibraryPlayerMode.FadeElementOpacity(_dim, StoppedDimOpacity, instant: true);
@@ -408,7 +425,7 @@ internal sealed class LibraryVisualStage : Grid
 
         if (!play)
         {
-            // Space 一時停止の _framePaused が残ると StartPreviewLoop が即 return して暗い 1/4 速が始まらない。
+            // Space 一時停止の _framePaused が残ると StartPreviewLoop が即 return して暗い 1/3 速が始まらない。
             ApplyVideoDim(instant: true);
             _playing = false;
             _framePaused = false;
@@ -517,7 +534,7 @@ internal sealed class LibraryVisualStage : Grid
 
         if (alreadyPlaying)
         {
-            PlayMedia(speedRatio: 1);
+            PlayRealtime(CurrentVisualPosition(), restartClock: false);
             _media.BeginAnimation(OpacityProperty, null);
             _media.Opacity = 1;
             return;
@@ -532,18 +549,16 @@ internal sealed class LibraryVisualStage : Grid
             if (fromPreview || fromFramePause)
             {
                 var pos = CurrentVisualPosition();
-                PlayMedia(speedRatio: 1);
+                PlayRealtime(pos, restartClock: true);
                 _media.BeginAnimation(OpacityProperty, null);
                 _media.Opacity = 1;
-                BeginVisualClock(pos, speed: 1);
             }
             else
             {
                 // 新しいクリップの本再生は真っ黒から。
                 SnapMediaBlack();
                 SetMediaPosition(TimeSpan.Zero);
-                PlayMedia(speedRatio: 1);
-                BeginVisualClock(TimeSpan.Zero, speed: 1);
+                PlayRealtime(TimeSpan.Zero, restartClock: true);
                 BeginVideoFadeIn();
             }
         }
@@ -558,7 +573,7 @@ internal sealed class LibraryVisualStage : Grid
     }
 
     /// <summary>
-    /// 本再生をその場で一時停止する。暗いプレビュー（1/4 速ループ）へは落とさない。
+    /// 本再生をその場で一時停止する。暗いプレビュー（1/3 速ループ）へは落とさない。
     /// </summary>
     public void PauseAtCurrentFrame()
     {
@@ -568,6 +583,7 @@ internal sealed class LibraryVisualStage : Grid
         }
 
         CancelPreviewSeek();
+        CancelPreviewSpeedRamp();
         var pos = CurrentVisualPosition();
         StopVisualClock(pos);
         PauseMedia();
@@ -634,10 +650,10 @@ internal sealed class LibraryVisualStage : Grid
         _media.BeginAnimation(OpacityProperty, null);
         _media.Opacity = 1;
         SetMediaPosition(position);
-        PlayMedia(PreviewLoopSpeed);
         FadeDimToPreview();
         SyncPreviewFx(active: true);
-        BeginVisualClock(position, PreviewLoopSpeed);
+        // 本再生から戻るときはいきなり 1/3 にせず、1 秒かけて落とす。
+        BeginPreviewSpeedRamp(position);
     }
 
     private void FadeDimToPreview()
@@ -721,6 +737,128 @@ internal sealed class LibraryVisualStage : Grid
 
     private void CancelPreviewSeek() => _previewSeekTicket++;
 
+    private void CancelPreviewSpeedRamp()
+    {
+        _previewSpeedRampTicket++;
+        _previewSpeedRampWatch.Reset();
+        if (_previewSpeedRampTimer is null)
+        {
+            return;
+        }
+
+        _previewSpeedRampTimer.Stop();
+        _previewSpeedRampTimer = null;
+    }
+
+    /// <summary>
+    /// 速度ランプ／1/3 速を捨てて 1 倍・明るい映像にする。
+    /// <see cref="_playing"/> は false のまま残す（HoverResumeFrame が現在位置を拾えるようにする）。
+    /// </summary>
+    public void InterruptPreviewSpeedRampForMainPlay()
+    {
+        if (!_video || !IsShown || _playing || _framePaused)
+        {
+            return;
+        }
+
+        var pos = CurrentVisualPosition();
+        ApplyVideoDim(instant: true, playing: true);
+        SyncPreviewFx(active: false, instant: true);
+        PlayRealtime(pos, restartClock: true);
+        _media.BeginAnimation(OpacityProperty, null);
+        _media.Opacity = 1;
+    }
+
+    /// <summary>
+    /// 本再生の 1 倍へ戻す。速度ランプ中／1/3 速プレビュー中は MediaElement をいったん止め、
+    /// 低速指定を捨ててから 1 倍で Play し直す（SpeedRatio だけの書換は遅れて効く）。
+    /// </summary>
+    private void PlayRealtime(TimeSpan position, bool restartClock)
+    {
+        var ramping = _previewSpeedRampTimer is not null;
+        var previewSpeed = Math.Abs(_visualSpeed - 1) > 0.001;
+        CancelPreviewSpeedRamp();
+        var hardReset = ramping || previewSpeed;
+        if (hardReset)
+        {
+            PauseMedia();
+            ForceMediaSpeedRatio(1);
+            SetMediaPosition(position);
+        }
+
+        PlayMedia(speedRatio: 1);
+        if (restartClock || hardReset)
+        {
+            BeginVisualClock(position, speed: 1);
+        }
+    }
+
+    private void ForceMediaSpeedRatio(double speedRatio)
+    {
+        try
+        {
+            _media.SpeedRatio = speedRatio;
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            _spillMedia.SpeedRatio = speedRatio;
+        }
+        catch
+        {
+        }
+    }
+
+    /// <summary>本再生速度から 1/3 へ 1 秒で落とす。</summary>
+    private void BeginPreviewSpeedRamp(TimeSpan position)
+    {
+        CancelPreviewSpeedRamp();
+        var ticket = _previewSpeedRampTicket;
+        PlayMedia(speedRatio: 1);
+        BeginVisualClock(position, speed: 1);
+        _previewSpeedRampWatch.Restart();
+        var timer = new DispatcherTimer(DispatcherPriority.Render)
+        {
+            Interval = TimeSpan.FromMilliseconds(16),
+        };
+        timer.Tick += (_, _) =>
+        {
+            if (ticket != _previewSpeedRampTicket)
+            {
+                return;
+            }
+
+            if (_playing || _framePaused || !IsShown)
+            {
+                CancelPreviewSpeedRamp();
+                return;
+            }
+
+            var progress = _previewSpeedRampWatch.Elapsed.TotalSeconds / PreviewSpeedRampSeconds;
+            if (progress >= 1)
+            {
+                CancelPreviewSpeedRamp();
+                ApplyPreviewSpeed(PreviewLoopSpeed);
+                return;
+            }
+
+            ApplyPreviewSpeed(
+                LibraryPlayerMode.PreviewSpeedAtRampProgress(progress, from: 1, to: PreviewLoopSpeed));
+        };
+        _previewSpeedRampTimer = timer;
+        timer.Start();
+    }
+
+    private void ApplyPreviewSpeed(double speed)
+    {
+        var pos = CurrentVisualPosition();
+        PlayMedia(speed);
+        BeginVisualClock(pos, speed);
+    }
+
     /// <summary>ホバーは常に 0 秒から。暗転の自動スキップはしない。</summary>
     private void RestartHoverPreviewAtStart()
     {
@@ -753,10 +891,20 @@ internal sealed class LibraryVisualStage : Grid
         _pdf.Opacity = 1;
     }
 
-    private static Brush CreateMeshBrush()
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        RefreshMeshBrush();
+    }
+
+    private void RefreshMeshBrush() =>
+        _mesh.Background = CreateMeshBrush(UiDpi.PixelsPerDip(this));
+
+    /// <summary>線幅はデバイス 1px（<see cref="WpfControlHelpers.DeviceHairline"/>）。</summary>
+    internal static Brush CreateMeshBrush(double pixelsPerDip)
     {
         var cell = MeshCell;
-        var line = MeshLine;
+        var line = WpfControlHelpers.DeviceHairline(pixelsPerDip);
         var group = new DrawingGroup();
         var bar = new SolidColorBrush(Color.FromArgb(MeshLineAlpha, 0, 0, 0));
         bar.Freeze();
@@ -787,6 +935,7 @@ internal sealed class LibraryVisualStage : Grid
             return;
         }
 
+        CancelPreviewSpeedRamp();
         BeginVisualClock(_previewLoopStart, PreviewLoopSpeed);
         PlayMedia(PreviewLoopSpeed);
         if (fadeIn)
@@ -807,6 +956,7 @@ internal sealed class LibraryVisualStage : Grid
             return;
         }
 
+        CancelPreviewSpeedRamp();
         SetMediaPosition(_previewLoopStart);
         PlayMedia(PreviewLoopSpeed);
         BeginVisualClock(_previewLoopStart, PreviewLoopSpeed);
@@ -837,6 +987,7 @@ internal sealed class LibraryVisualStage : Grid
             SetMediaPosition(position);
             if (_playing)
             {
+                CancelPreviewSpeedRamp();
                 if (LibraryPlayerMode.VideoSeekIsShuttleScrub(_playing, _visualClock.IsRunning))
                 {
                     // テンキー 1／3: 一時停止のままコマ送り。Play すると 1 倍に戻る。
@@ -852,12 +1003,14 @@ internal sealed class LibraryVisualStage : Grid
             }
             else if (_framePaused)
             {
+                CancelPreviewSpeedRamp();
                 PauseMedia();
                 StopVisualClock(position);
             }
             else
             {
-                // 暗い選択プレビューの 1/4 速ループは維持する。
+                // 暗い選択プレビューの 1/3 速ループは維持する（シークでランプは切る）。
+                CancelPreviewSpeedRamp();
                 PlayMedia(PreviewLoopSpeed);
                 BeginVisualClock(position, PreviewLoopSpeed);
             }
@@ -941,7 +1094,9 @@ internal sealed class LibraryVisualStage : Grid
                 _visualClock.Elapsed.TotalSeconds,
                 _visualSpeed,
                 Duration);
+            // 速度ランプ中に RestartPreviewLoop するとランプが潰れ、本再生復帰の hardReset 判定も狂う。
             if (!_playing
+                && _previewSpeedRampTimer is null
                 && Duration > TimeSpan.Zero
                 && pos >= Duration
                 && _visualSpeed > 0)
@@ -1035,9 +1190,10 @@ internal sealed class LibraryVisualStage : Grid
             return;
         }
 
-        // シャトル解除などがプレビュー表示中に ratio=1 で来ても、暗い 1/4 速を維持する。
+        // シャトル解除などがプレビュー表示中に ratio=1 で来ても、暗い 1/3 速を維持する。
         if (!_framePaused)
         {
+            CancelPreviewSpeedRamp();
             PlayMedia(PreviewLoopSpeed);
             BeginVisualClock(CurrentVisualPosition(), PreviewLoopSpeed);
         }
@@ -1323,8 +1479,10 @@ internal sealed class LibraryVisualStage : Grid
         try
         {
             _spillMedia.Volume = 0;
-            // 暗いプレビュー中は本編 SpeedRatio が 1 のままでも 1/4 に揃える。
-            _spillMedia.SpeedRatio = _playing ? _media.SpeedRatio : PreviewLoopSpeed;
+            // 暗いプレビュー中は映像クロック速度（ランプ中も含む）に揃える。
+            _spillMedia.SpeedRatio = _playing
+                ? _media.SpeedRatio
+                : (_visualSpeed > 0 ? _visualSpeed : PreviewLoopSpeed);
             _spillMedia.Position = _media.Position;
             _spillMedia.Play();
         }
