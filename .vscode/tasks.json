@@ -43,6 +43,22 @@
         "reveal": "always"
       },
       "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "Excel: モード別能力表を開く",
+      "type": "shell",
+      "command": "Start-Process",
+      "args": [
+        "-FilePath",
+        "${workspaceFolder}/docs/mode-capabilities-markers.xlsx"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": true
+      }
     }
   ]
 }
