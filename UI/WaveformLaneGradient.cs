@@ -3,7 +3,7 @@ using MgaSonicAnvil.Domain;
 namespace MgaSonicAnvil.UI;
 
 /// <summary>
-/// プレイヤー波形。レーン中心が明るく、上下端へやや暗くなる。
+/// 波形レーン。中心が明るく、上下端へやや暗くなる。
 /// ライトでは描画色を白へ寄せて薄くする。
 /// </summary>
 internal static class WaveformLaneGradient

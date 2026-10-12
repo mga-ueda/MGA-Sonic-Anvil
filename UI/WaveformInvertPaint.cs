@@ -49,6 +49,7 @@ internal static class WaveformInvertPaint
         // 画素ごとのレーン判定は width×height 回で高くつくため、行の色を先に引く。
         var waveColorByY = BuildWaveColorRows(height, laneWaveColors, laneGapPx, fallbackWave);
         var shadeTheme = playerLight ? UiTheme.Light : UiThemeService.Painted;
+        var shadeChannels = laneWaveColors is { Count: > 0 } ? laneWaveColors.Count : 1;
         if (document is null || document.FrameCount <= 0 || viewSpan <= 0)
         {
             for (var y = 0; y < height; y++)
@@ -66,7 +67,9 @@ internal static class WaveformInvertPaint
                         y,
                         height,
                         shadeLanes,
-                        shadeTheme);
+                        shadeTheme,
+                        shadeChannels,
+                        laneGapPx);
                 }
             }
 
@@ -124,7 +127,9 @@ internal static class WaveformInvertPaint
                     y,
                     height,
                     shadeLanes,
-                    shadeTheme);
+                    shadeTheme,
+                    shadeChannels,
+                    laneGapPx);
             }
         }
     }
@@ -219,22 +224,48 @@ internal static class WaveformInvertPaint
         int y,
         int height,
         bool shadeLanes,
-        UiTheme theme)
+        UiTheme theme,
+        int channels = 1,
+        double laneGapPx = 0)
     {
         var inverted = InvertPixel(pixel, back, waveFill, playerLight, invertWave);
-        return shadeLanes ? ApplyLaneShade(inverted, y, height, theme) : inverted;
+        return shadeLanes
+            ? ApplyLaneShade(inverted, y, height, theme, channels, laneGapPx)
+            : inverted;
     }
 
-    /// <summary>プレイヤー波形と同じく、レーン中心が明るく端が沈む。</summary>
-    internal static int ApplyLaneShade(int bgra, int y, int height, UiTheme theme)
+    /// <summary>波形と同じく、レーン中心が明るく端が沈む。</summary>
+    internal static int ApplyLaneShade(
+        int bgra,
+        int y,
+        int height,
+        UiTheme theme,
+        int channels = 1,
+        double laneGapPx = 0)
     {
         if (height <= 1)
         {
             return bgra;
         }
 
-        var mid = height * 0.5;
-        return WaveformLaneGradient.Shade(bgra, y + 0.5, mid, mid, theme);
+        channels = Math.Max(1, channels);
+        if (channels == 1)
+        {
+            var mid = height * 0.5;
+            return WaveformLaneGradient.Shade(bgra, y + 0.5, mid, mid, theme);
+        }
+
+        var gap = Math.Max(0, laneGapPx);
+        var laneHeight = (height - gap * (channels - 1)) / channels;
+        if (laneHeight <= 1e-6)
+        {
+            return bgra;
+        }
+
+        var lane = ChannelWavePaint.LaneAt(y, height, channels, laneGapPx);
+        var top = lane * (laneHeight + gap);
+        var laneMid = top + laneHeight * 0.5;
+        return WaveformLaneGradient.Shade(bgra, y + 0.5, laneMid, laneHeight * 0.5, theme);
     }
 
     private static int WaveColorAt(

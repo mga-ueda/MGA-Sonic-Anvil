@@ -2946,7 +2946,7 @@ internal sealed class WaveformView : Grid
             LaneWaveColors(),
             LaneGapPx(dpi.DpiScaleY),
             playerLight: SeekAndSelectOnly && UiThemeService.Painted == UiTheme.Light,
-            shadeLanes: SeekAndSelectOnly,
+            shadeLanes: true,
             omitCueFills: !LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly),
             colStart: xStart,
             colEnd: xEnd);
@@ -3648,25 +3648,18 @@ internal sealed class WaveformView : Grid
                 lo = Math.Max(lo, _columnYLo[px + 1]);
             }
 
-            if (SeekAndSelectOnly)
-            {
-                FillVLineGradient(
-                    buffer,
-                    stride,
-                    width,
-                    clipTop,
-                    clipBottom,
-                    px,
-                    hi,
-                    lo,
-                    color,
-                    mid,
-                    laneHeight * 0.5);
-            }
-            else
-            {
-                FillVLine(buffer, stride, width, clipTop, clipBottom, px, hi, lo, color);
-            }
+            FillVLineGradient(
+                buffer,
+                stride,
+                width,
+                clipTop,
+                clipBottom,
+                px,
+                hi,
+                lo,
+                color,
+                mid,
+                laneHeight * 0.5);
         }
     }
 
