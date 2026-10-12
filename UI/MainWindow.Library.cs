@@ -4779,11 +4779,22 @@ public partial class MainWindow
         if (wasShown && session.Document.SampleRate > 0)
         {
             var seconds = LibraryBrowser.PlaylistVisualPosition.TotalSeconds;
-            if (seconds > 0 || wasPlaying || IsPlaybackActive())
+            if (seconds > 0 || wasPlaying || IsPlaybackActive() || _playlistVideoImmersivePause)
             {
                 session.Document.CursorFrame = (long)Math.Round(seconds * session.Document.SampleRate);
                 Waveform.PlayheadFrame = session.Document.CursorFrame;
             }
+        }
+
+        // 本再生中の差し替えは効かないので、生成前に止めて暗いプレビューへ。
+        // 次の Space／Enter でプロキシが使われる。
+        if (wasShown && (wasPlaying || IsPlaybackActive() || _playlistVideoImmersivePause))
+        {
+            DropPlaylistVideoToDimPreview();
+        }
+        else if (IsPlaybackActive())
+        {
+            StopPlayback();
         }
 
         if (!await TryPrepareVideoProxyAsync(session, forceEncode: true).ConfigureAwait(true))
@@ -4797,21 +4808,16 @@ public partial class MainWindow
         }
 
         // ActivateVisualLibraryMeta → ActivateStreamPlayback がピークを捨てる。
-        // プロキシができてから波形を作り直す（本再生中の差し替えでも同じ）。
+        // プロキシができたら暗いプレビューへ載せ替え（再開はしない）。
         if (wasShown && LibraryBrowser.IsPlaylistVisualSameSource(path))
         {
-            LibraryBrowser.ShowPlaylistVisual(session, play: wasPlaying);
-            if (wasPlaying
-                && !IsPlaybackActive()
-                && !LibraryPlaylistDocuments.IsPdf(session.Document))
-            {
-                StartPlayback(session.Document.CursorFrame, prerollSeconds: 0);
-            }
+            LibraryBrowser.ShowPlaylistVisual(session, play: false);
         }
 
         await RestartLibraryPeaksForSessionAsync(session).ConfigureAwait(true);
         RefreshPlaylistVideoFileName();
         SchedulePlaylistVideoFileNamePlacement();
+        LibraryBrowser.UpdateSessionRow(session);
     }
 
     /// <summary>
