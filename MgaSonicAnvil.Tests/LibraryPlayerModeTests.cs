@@ -661,8 +661,15 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.NumPad4, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.NumPad5, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.NumPad6, ModifierKeys.None));
-        Assert.True(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.PageUp, ModifierKeys.None));
-        Assert.True(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.Home, ModifierKeys.None));
+        // Home／End／Page は波形タイムラインへ通す（ページめくりは ←／→ のみ）。
+        Assert.False(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.PageUp, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.Home, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPdfPageKey(Key.Left, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPdfPageKey(Key.Right, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPdfPageKey(Key.PageUp, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPdfPageKey(Key.Home, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.UsesEditorTimelineNavKeys(chromeVisible: false));
+        Assert.False(LibraryPlayerMode.UsesEditorTimelineNavKeys(chromeVisible: true));
         Assert.True(LibraryPlayerMode.IsPdfPageDigitKey(Key.D3, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPdfPageDigitKey(Key.NumPad3, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPdfPageDigitKey(Key.D3, ModifierKeys.Shift));
