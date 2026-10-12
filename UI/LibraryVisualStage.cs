@@ -1093,6 +1093,9 @@ internal sealed class LibraryVisualStage : Grid
             else if (_framePaused)
             {
                 CancelPreviewSpeedRamp();
+                // MediaEnded 直後は Pause＋Position だけでは黒のまま残ることがある。
+                // 一度 Play→Pause して、止めた位置のフレームを描画させる。
+                PlayMedia(speedRatio: 1);
                 PauseMedia();
                 StopVisualClock(position);
             }
