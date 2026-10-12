@@ -384,6 +384,17 @@ public partial class MainWindow
             return true;
         }
 
+        // Ctrl+Shift+P は動画プロキシの強制生成（設定の自動生成オフ／F8 抑止を無視）。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && !isRepeat
+            && LibraryPlayerMode.IsForceVideoProxyEncode(key, modifiers))
+        {
+            RequestForceVideoProxyEncode();
+            return true;
+        }
+
         // P／N は前後曲（テンキー 4／6）。ツリーのタイプアヘッドより先に拾う。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused

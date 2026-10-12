@@ -189,6 +189,7 @@ internal static class LibraryPlayerMode
             (Key.L, ModifierKeys.None) => true,
             (Key.N, ModifierKeys.None) => true,
             (Key.P, ModifierKeys.None) => true,
+            (Key.P, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.R, ModifierKeys.None) => true,
             (Key.R, ModifierKeys.Alt) => true,
             (Key.J, ModifierKeys.None) => true,
@@ -290,6 +291,13 @@ internal static class LibraryPlayerMode
     /// <summary>前の曲／次の曲（テンキー 4／6 と同じ。ノートPC向け）。</summary>
     public static bool IsPlayerTrackStepKey(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && key is Key.P or Key.N;
+
+    /// <summary>
+    /// 動画プロキシの強制生成。設定の「自動生成しない」や F8 抑止を無視する。
+    /// プレイリスト／本再生／ミニプレイヤーで使う。
+    /// </summary>
+    public static bool IsForceVideoProxyEncode(Key key, ModifierKeys modifiers) =>
+        key == Key.P && modifiers == (ModifierKeys.Control | ModifierKeys.Shift);
 
     /// <summary>再生し直し（テンキー 5 と同じ。ノートPC向け）。</summary>
     public static bool IsPlayerRestartKey(Key key, ModifierKeys modifiers) =>

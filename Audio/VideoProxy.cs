@@ -157,7 +157,8 @@ internal static class VideoProxy
     public static async Task<string> EnsurePlayableAsync(
         string sourcePath,
         IProgress<double>? progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool forceEncode = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         if (!File.Exists(sourcePath))
@@ -178,7 +179,8 @@ internal static class VideoProxy
             return cached;
         }
 
-        if (!CanEncodeProxy())
+        // forceEncode は設定の「自動生成しない」と F8／引数起動の抑止を無視する（ffmpeg は必須）。
+        if (!(forceEncode ? CanForceEncodeProxy() : CanEncodeProxy()))
         {
             Remember(sourcePath, sourcePath);
             progress?.Report(1);
@@ -315,6 +317,11 @@ internal static class VideoProxy
     public static bool CanEncodeProxy() =>
         AllowsAutoEncodeProxy(SuppressAutoEncode, AppStorage.Settings.VideoProxyDisableAutoEncode)
         && FindFfmpeg() is not null;
+
+    /// <summary>
+    /// 手動の強制生成用。設定の「自動生成しない」と F8／引数起動の抑止は見ず、ffmpeg だけ見る。
+    /// </summary>
+    public static bool CanForceEncodeProxy() => FindFfmpeg() is not null;
 
     public static bool TryResolveFfmpegExe(string? path, out string exe)
     {

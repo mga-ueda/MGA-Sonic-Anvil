@@ -327,6 +327,10 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsPlayerShuttleKey(Key.OemPeriod, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.N, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.P, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.P, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsForceVideoProxyEncode(Key.P, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsForceVideoProxyEncode(Key.P, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsForceVideoProxyEncode(Key.P, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsPlayerTrackStepKey(Key.P, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsPlayerTrackStepKey(Key.N, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPlayerTrackStepKey(Key.P, ModifierKeys.Control));
