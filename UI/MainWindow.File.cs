@@ -1701,7 +1701,21 @@ public partial class MainWindow
         StopRecording();
         if (IsPlaybackActive())
         {
-            StopPlayback();
+            // 動画／PDF 本再生中は設定を開いても前面クローム（プレイリスト等）を出さない。
+            // 音声デバイス解放のため停止はするが、テンキー 0 と同じイマーシブ一時停止にする。
+            if (LibraryPlayerMode.KeepsChromeHiddenForSettingsWhileVisualPlaying(
+                    IsLibraryMaximized,
+                    LibraryBrowser.PlaylistVisualPlaying,
+                    LibraryBrowser.PlaylistVisualIsVideo,
+                    LibraryBrowser.PlaylistVisualIsPdf))
+            {
+                PausePlaybackHere(immersiveVideoHold: true);
+                SyncPlaylistVideoChromeFade();
+            }
+            else
+            {
+                StopPlayback();
+            }
         }
 
         _player.ReleaseOutput();

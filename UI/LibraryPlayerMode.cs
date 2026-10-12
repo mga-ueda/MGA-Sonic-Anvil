@@ -666,6 +666,17 @@ internal static class LibraryPlayerMode
 
 
     /// <summary>
+    /// 設定を開くとき、動画／PDF 本再生中なら前面クロームを出したままにしない
+    ///（停止はするがイマーシブ一時停止へ）。
+    /// </summary>
+    public static bool KeepsChromeHiddenForSettingsWhileVisualPlaying(
+        bool player,
+        bool visualPlaying,
+        bool isVideo,
+        bool isPdf) =>
+        player && visualPlaying && (isVideo || isPdf);
+
+    /// <summary>
     /// 動画再生中、または PDF 表示モード中は前面クロームを隠す。
     /// 選択プレビュー（暗表示）ではクロームを残す。
     /// 上下キーなどで次の本再生へつなぐあいだは <paramref name="bridgeHold"/> で隠したままにする。
