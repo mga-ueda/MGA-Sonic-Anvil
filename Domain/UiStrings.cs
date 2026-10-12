@@ -181,8 +181,8 @@ internal static partial class UiStrings
     public static string LabelLibraryShowPlaylistWebm => Get("WebM", "WebM");
     public static string LabelLibraryShowPlaylistMpg => Get("MPG", "MPG");
     public static string LabelVideoProxyRetention => Get(
-        "動画プロキシの保存期間",
-        "Video proxy retention");
+        "未使用プロキシの保存日数",
+        "Unused proxy retention");
     public static string LabelVideoProxyRetentionDays(int days) =>
         days == 1
             ? Get("1 日", "1 day")
@@ -196,8 +196,8 @@ internal static partial class UiStrings
         "Path to ffmpeg.exe (recommended). Empty or invalid skips the playback proxy for non-MJPEG / Photo JPEG video (tries the original file; no error). Also required to list AVI / MKV / WebM / MPG in the playlist. Not bundled with the app.");
     public static string TipFfmpegBrowse => Get("ffmpeg.exe を選びます。", "Choose ffmpeg.exe.");
     public static string TipVideoProxyRetention => Get(
-        "MJPEG / Photo JPEG 以外の動画を再生するとき作るプロキシを、最後に使ってから何日残すか。起動時と、この設定を変えたときに掃除する。1／7／14／30 日から選ぶ。既定は 7 日。FFmpeg のパスが空欄または無効ならプロキシは作らない。",
-        "How long to keep playback proxies for non-MJPEG / Photo JPEG video after last use. Cleaned at startup and when this setting changes. Choose 1, 7, 14, or 30 days. Default is 7. No proxy is built if the FFmpeg path is empty or invalid.");
+        "MJPEG / Photo JPEG 以外の動画用に作った再生プロキシを、動画ごと（ファイルごと）に、未使用のまま何日残すかです。このアプリがその動画のプロキシを使っていない日数が指定を超えると削除します（アプリの起動だけでは未使用はリセットされません。再生のほか、波形やサムネ用にプロキシを参照したときも「使用」とみなします）。起動時と、この設定を変えたときに掃除します。1／7／14／30 日から選ぶ。既定は 7 日。FFmpeg のパスが空欄または無効ならプロキシは作らない。",
+        "How many days to keep each unused playback proxy for non-MJPEG / Photo JPEG video (counted per file). A proxy is deleted when this app has not used it for longer than the chosen period (launching the app alone does not reset unused time. Use includes playback and other references such as waveform peaks or thumbnails). Cleaned at startup and when this setting changes. Choose 1, 7, 14, or 30 days. Default is 7. No proxy is built if the FFmpeg path is empty or invalid.");
     public static string LabelVideoProxyDisableAutoEncode => Get(
         "プロキシを自動生成しない",
         "Do not auto-build proxies");
@@ -272,8 +272,8 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeIn => Get("波形フェードイン", "Waveform Fade In");
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string TipAudioSettings => Get(
-        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／プレイヤー／編集／書き出し・パス／Wwise のタブ。表示言語、表示倍率（100〜200%。OS の DPI に加えて拡大）、複数ファイルの並べ方（タブのまま／左右／上下／上下左右）、関連付け、プレイヤー左ツリーのルート、ギャップレス再生（プレイヤータブ。既定オン）、既定 Wave フォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、自動スピーカー選択（オーディオタブ。既定オフ）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、プレイリストの列（波形幅は Wave / MP3 それぞれ S/M/L。どちらも既定 L）、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip / 無音削除）、プチノイズ防止フェード、フェードカーブ、MP3、LAME と FFmpeg のパス、動画プロキシの保存期間／容量／すべて削除／自動生成しない、同時書き出し本数、Wwise の Prefetch Length／Look-ahead Time。ダイアログのボタンは Tab で移動できます。",
-        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Player / Editing / Export · Paths / Wwise tabs. Language, UI scale (100–200%; extra enlargement on top of the OS DPI), multiple-file arrangement (keep tabs / side by side / stacked / grid), file associations, Player left-tree roots, gapless playback (Player tab; on by default), default Wave format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), auto speaker selection (Audio tab; off by default), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, playlist columns (waveform width S/M/L separately for WAVE and MP3; both default L), meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip / Delete Silence), click-prevention fade, fade curves, MP3, LAME and FFmpeg paths, video proxy retention / size / delete-all / do-not-auto-build, parallel export count, and Wwise Prefetch Length / Look-ahead Time. Tab also moves to dialog buttons.");
+        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／プレイヤー／編集／書き出し・パス／Wwise のタブ。表示言語、表示倍率（100〜200%。OS の DPI に加えて拡大）、複数ファイルの並べ方（タブのまま／左右／上下／上下左右）、関連付け、プレイヤー左ツリーのルート、ギャップレス再生（プレイヤータブ。既定オン）、既定 Wave フォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、自動スピーカー選択（オーディオタブ。既定オフ）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、プレイリストの列（波形幅は Wave / MP3 それぞれ S/M/L。どちらも既定 L）、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip / 無音削除）、プチノイズ防止フェード、フェードカーブ、MP3、LAME と FFmpeg のパス、未使用プロキシの保存日数／容量／すべて削除／自動生成しない、同時書き出し本数、Wwise の Prefetch Length／Look-ahead Time。ダイアログのボタンは Tab で移動できます。",
+        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Player / Editing / Export · Paths / Wwise tabs. Language, UI scale (100–200%; extra enlargement on top of the OS DPI), multiple-file arrangement (keep tabs / side by side / stacked / grid), file associations, Player left-tree roots, gapless playback (Player tab; on by default), default Wave format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), auto speaker selection (Audio tab; off by default), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, playlist columns (waveform width S/M/L separately for WAVE and MP3; both default L), meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip / Delete Silence), click-prevention fade, fade curves, MP3, LAME and FFmpeg paths, unused proxy retention / size / delete-all / do-not-auto-build, parallel export count, and Wwise Prefetch Length / Look-ahead Time. Tab also moves to dialog buttons.");
     public static string TipDefaultAudioFormat => Get(
         "新規ファイル（Ctrl+N）の初期フォーマットです。既定は 48kHz / 24bit / Stereo。チャンネルは表示項目で有効にしたスピーカーと、常に選べる Mono。",
         "Initial format for a new file (Ctrl+N). Default is 48 kHz / 24-bit / Stereo. Channels are the speakers enabled on Shown, plus Mono (always available).");

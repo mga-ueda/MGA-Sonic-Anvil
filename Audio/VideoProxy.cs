@@ -368,7 +368,7 @@ internal static class VideoProxy
         }
     }
 
-    /// <summary>起動時と設定変更時。最終更新から保存日数を超えたプロキシと、打ち捨てられた .part を消す。</summary>
+    /// <summary>起動時と設定変更時。未使用のまま保存日数を超えたプロキシ（mtime。キャッシュ参照で Touch）と、打ち捨てられた .part を消す。</summary>
     public static int PruneExpired(int retentionDays, DateTime utcNow) =>
         PruneExpired(retentionDays, utcNow, CacheDirectory);
 
