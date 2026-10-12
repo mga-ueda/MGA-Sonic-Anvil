@@ -1040,6 +1040,21 @@ internal static class LibraryPlayerMode
     public static bool ShowsPlaylistVideoFileName(bool chromeHidden, bool hudOn, bool isVideo) =>
         chromeHidden && hudOn && isVideo;
 
+    /// <summary>再生用プロキシを参照しているとき、ファイル名の後に付ける。</summary>
+    public const string PlaylistVideoProxySuffix = " (Proxy)";
+
+    /// <summary>下中央のファイル名。プロキシ参照中は <see cref="PlaylistVideoProxySuffix"/> を付ける。</summary>
+    public static string FormatPlaylistVideoFileName(string? displayName, bool usingProxy)
+    {
+        var name = displayName ?? string.Empty;
+        if (!usingProxy || name.Length == 0)
+        {
+            return name;
+        }
+
+        return name + PlaylistVideoProxySuffix;
+    }
+
     /// <summary>
     /// 中央のファイル名がラウドネスと重なる（または隙間未満）とき、左へずらす量。
     /// 左端は <paramref name="minNameLeft"/> より左へ出さない。
