@@ -253,6 +253,20 @@ internal static class DesignMetrics
     /// <summary>下中央に出すときの最大幅。</summary>
     public static double PlaylistVideoFileNameMaxWidth => From96(640);
 
+    /// <summary>PDF 本表示中、下中央に出すページ番号（例: 1 / 3）。</summary>
+    public static double PlaylistPdfPageNumberFontSize => From96(22);
+
+    public static double PlaylistPdfPageNumberLineHeight => From96(28);
+
+    public static Thickness PlaylistPdfPageNumberMargin => new(0, 0, 0, From96(24));
+
+    public static Thickness PlaylistPdfPageNumberPadding => new(From96(14), From96(6), From96(14), From96(6));
+
+    public static double PlaylistPdfPageNumberHostHeight =>
+        PlaylistPdfPageNumberPadding.Top
+        + PlaylistPdfPageNumberLineHeight
+        + PlaylistPdfPageNumberPadding.Bottom;
+
     /// <summary>ファイル名とラウドネスのあいだに残す隙間。</summary>
     public static double PlaylistVideoFileNameLoudnessGap => From96(8);
 

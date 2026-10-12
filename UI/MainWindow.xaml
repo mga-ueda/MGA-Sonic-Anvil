@@ -481,5 +481,30 @@
                    Text="100%" />
       </Border>
     </Grid>
+    <!-- PDF 本表示の下中央ページ番号（半透明黒背景。ページ切替時だけ出してフェードアウト）。 -->
+    <Viewbox x:Name="PlaylistPdfPageNumber"
+             HorizontalAlignment="Center"
+             VerticalAlignment="Bottom"
+             Height="{x:Static ui:DesignMetrics.PlaylistPdfPageNumberHostHeight}"
+             Margin="{x:Static ui:DesignMetrics.PlaylistPdfPageNumberMargin}"
+             Stretch="Uniform"
+             Opacity="0"
+             IsHitTestVisible="False">
+      <Border HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              Padding="{x:Static ui:DesignMetrics.PlaylistPdfPageNumberPadding}"
+              CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+              Background="#99000000">
+        <TextBlock x:Name="PlaylistPdfPageNumberText"
+                   Height="{x:Static ui:DesignMetrics.PlaylistPdfPageNumberLineHeight}"
+                   FontFamily="Consolas"
+                   FontSize="{x:Static ui:DesignMetrics.PlaylistPdfPageNumberFontSize}"
+                   FontWeight="Normal"
+                   TextAlignment="Center"
+                   TextWrapping="NoWrap"
+                   Foreground="#F5F5F5"
+                   Text="1 / 1" />
+      </Border>
+    </Viewbox>
   </Grid>
 </Window>

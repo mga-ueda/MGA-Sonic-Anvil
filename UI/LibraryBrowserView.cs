@@ -602,6 +602,9 @@ internal sealed class LibraryBrowserView : UserControl
 
     public bool PlaylistVisualPlaying => _visualStage.IsPlaying;
 
+    /// <summary>本再生を止めて静止している（暗い 1/3 速プレビューではない）。</summary>
+    public bool PlaylistVisualFramePaused => _visualStage.IsFramePaused;
+
     public bool PlaylistVisualClockRunning => _visualStage.VisualClockRunning;
 
     public bool PlaylistVisualShown => _visualStage.IsShown;
@@ -642,6 +645,8 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
+        // プロキシ差し替え判定用。代入前に同じ論理ソースかを見る。
+        var sameSourceClip = IsPlaylistVisualSameSource(path);
         _playlistVisualSourcePath = path;
 
         if (LibraryPlaylistDocuments.IsPdf(session.Document))
@@ -672,7 +677,7 @@ internal sealed class LibraryBrowserView : UserControl
             fallback = TimeSpan.FromSeconds(session.Document.FrameCount / (double)session.Document.SampleRate);
         }
 
-        _visualStage.ShowVideo(playPath, play, fallback);
+        _visualStage.ShowVideo(playPath, play, fallback, sameSourceClip: sameSourceClip);
         if (play
             && session.Document.SampleRate > 0
             && session.Document.CursorFrame > 0)
@@ -727,6 +732,15 @@ internal sealed class LibraryBrowserView : UserControl
     public bool TryStepPlaylistPdfPage(int delta) => _visualStage.TryStepPdfPage(delta);
 
     public bool TryGoPlaylistPdfPageEdge(int edge) => _visualStage.TryGoPdfPageEdge(edge);
+
+    public bool TryGoPlaylistPdfPageNumber(int pageNumber1Based) =>
+        _visualStage.TryGoPdfPageNumber(pageNumber1Based);
+
+    /// <summary>0 始まりの表示中 PDF ページ。PDF 以外は 0。</summary>
+    public int PlaylistPdfPageIndex => _visualStage.PdfPageIndex;
+
+    /// <summary>表示中 PDF の総ページ数。</summary>
+    public int PlaylistPdfPageCount => _visualStage.PdfPageCount;
 
     public bool TryZoomPlaylistPdf(int direction, bool isRepeat) =>
         _visualStage.TryZoomPdf(direction, isRepeat);
@@ -1379,7 +1393,7 @@ internal sealed class LibraryBrowserView : UserControl
         return true;
     }
 
-    public void MoveSelection(int delta, bool extend = false)
+    public void MoveSelection(int delta, bool extend = false, bool wrap = true)
     {
         if (delta == 0)
         {
@@ -1404,8 +1418,8 @@ internal sealed class LibraryBrowserView : UserControl
         }
         else
         {
-            // 先頭の↑→末尾、末尾の↓→先頭（テンキー 4／6 と同じ）。
-            index = LibraryPlayerMode.StepLoopIndex(count, index, delta);
+            // 単発は先頭の↑→末尾、末尾の↓→先頭。長押し連続は wrap=false で端に一旦止まる。
+            index = LibraryPlayerMode.StepLoopIndex(count, index, delta, wrap);
         }
 
         if (index < 0)
@@ -1427,7 +1441,7 @@ internal sealed class LibraryBrowserView : UserControl
         ApplyMoveSelectionFile(index, extend);
     }
 
-    public void MoveSelectionPage(int direction, bool extend = false)
+    public void MoveSelectionPage(int direction, bool extend = false, bool wrap = true)
     {
         if (direction == 0)
         {
@@ -1435,7 +1449,7 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         var step = LibraryPlayerMode.PageStep(VisibleRowCount());
-        MoveSelection(direction < 0 ? -step : step, extend);
+        MoveSelection(direction < 0 ? -step : step, extend, wrap);
     }
 
     private int CountPlaylistFiles()

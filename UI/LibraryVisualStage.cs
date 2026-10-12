@@ -28,6 +28,11 @@ internal sealed class LibraryVisualStage : Grid
     /// <summary>本再生停止 → 暗いプレビューへ戻るときの速度ランプ秒数（1 → 1/3）。</summary>
     internal const double PreviewSpeedRampSeconds = 1;
 
+    /// <summary>
+    /// 速度ランプの Tick 間隔。MediaElement へ毎フレーム SpeedRatio/Play するとコーデックがカクつく。
+    /// </summary>
+    internal const double PreviewSpeedRampTickMs = 50;
+
     /// <summary>本再生停止 → 暗いプレビューへの暗転秒数（現状から）。</summary>
     internal const double PreviewDimFadeSeconds = 0.25;
 
@@ -144,6 +149,7 @@ internal sealed class LibraryVisualStage : Grid
     private BitmapSource? _pdfSharp;
     private int _previewSeekTicket;
     private int _dimFadeTicket;
+    private int _videoFadeInTicket;
     private int _previewSpeedRampTicket;
     private DispatcherTimer? _previewSpeedRampTimer;
     private readonly Stopwatch _previewSpeedRampWatch = new();
@@ -285,6 +291,9 @@ internal sealed class LibraryVisualStage : Grid
 
     public bool IsPlaying => _playing && IsShown;
 
+    /// <summary>本再生を止めて静止している（暗い 1/3 速プレビューではない）。</summary>
+    public bool IsFramePaused => _video && IsShown && _framePaused;
+
     public bool VisualClockRunning => _video && IsShown && _visualClock.IsRunning;
 
     public bool IsVideo => _video && IsShown;
@@ -305,6 +314,12 @@ internal sealed class LibraryVisualStage : Grid
     }
 
     public bool IsPdf => !_video && IsShown;
+
+    /// <summary>0 始まりの表示中ページ。PDF 以外は 0。</summary>
+    public int PdfPageIndex => IsPdf ? _pdfPage : 0;
+
+    /// <summary>総ページ数。未読込や PDF 以外は 1。</summary>
+    public int PdfPageCount => IsPdf ? Math.Max(1, _pdfPages) : 1;
 
     /// <summary>B キー背景固定用。表示中ページのビットマップを複製する。</summary>
     public bool TryClonePdfBitmap(out BitmapSource? bitmap)
@@ -385,13 +400,21 @@ internal sealed class LibraryVisualStage : Grid
         ClearPdfSources();
         ClearAmbientSpill();
         SyncPreviewFx(active: false, instant: true);
+        CancelVideoFadeIn(restoreOpaque: true);
         _media.BeginAnimation(OpacityProperty, null);
         _media.Opacity = 1;
         _pdfHost.Visibility = Visibility.Collapsed;
         Visibility = Visibility.Collapsed;
     }
 
-    public void ShowVideo(string path, bool play, TimeSpan fallbackDuration = default)
+    /// <param name="sameSourceClip">
+    /// 論理ソースが同じ（プロキシ差し替え含む）。本再生の再開では黒フェードしない。
+    /// </param>
+    public void ShowVideo(
+        string path,
+        bool play,
+        TimeSpan fallbackDuration = default,
+        bool sameSourceClip = false)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -405,8 +428,10 @@ internal sealed class LibraryVisualStage : Grid
         ClearPdfSources();
         _video = true;
         var pathChanged = !string.Equals(_path, path, StringComparison.OrdinalIgnoreCase);
-        // 同じクリップのホバー→本再生では黒フラッシュしない（2回目の Show で Opacity=0 のまま固着する）。
-        if (pathChanged || !play)
+        var resumeSameClip = play && sameSourceClip;
+        // 同じクリップのホバー→本再生／本再生の再入では黒フラッシュしない
+        //（Opacity=0 のまま固着するのを防ぐ。プロキシ差し替えも同じ）。
+        if ((pathChanged && !resumeSameClip) || !play)
         {
             SnapMediaBlack();
         }
@@ -436,12 +461,23 @@ internal sealed class LibraryVisualStage : Grid
         if (pathChanged)
         {
             CancelPreviewSeek();
+            CancelVideoFadeIn(restoreOpaque: false);
+            var keepFramePause = resumeSameClip && _framePaused;
             StopMedia();
-            // 前クリップの再生位置／クロックを残さない（上下キーで別動画へ移ったとき用）。
-            StopVisualClock(TimeSpan.Zero);
-            _previewLoopStart = TimeSpan.Zero;
-            _playing = false;
-            _framePaused = false;
+            // 別クリップへ移るときだけ位置を捨てる。同じ本編のプロキシ差し替えは再開位置を残す。
+            if (!resumeSameClip)
+            {
+                StopVisualClock(TimeSpan.Zero);
+                _previewLoopStart = TimeSpan.Zero;
+                _playing = false;
+                _framePaused = false;
+            }
+            else
+            {
+                _playing = false;
+                _framePaused = keepFramePause;
+            }
+
             _path = path;
             try
             {
@@ -468,8 +504,8 @@ internal sealed class LibraryVisualStage : Grid
             return;
         }
 
-        // 別クリップへの本再生はプレビュー位置を引き継がない。
-        SetPlaying(true, fromPreviewAllowed: !pathChanged);
+        // 同じ本編の再開（プレビュー／フレーム一時停止／プロキシ差し替え）は位置を引き継ぐ。
+        SetPlaying(true, fromPreviewAllowed: !pathChanged || resumeSameClip);
     }
 
     public void ShowPdf(string path, bool play, TimeSpan position = default)
@@ -534,6 +570,7 @@ internal sealed class LibraryVisualStage : Grid
 
         if (alreadyPlaying)
         {
+            CancelVideoFadeIn(restoreOpaque: true);
             PlayRealtime(CurrentVisualPosition(), restartClock: false);
             _media.BeginAnimation(OpacityProperty, null);
             _media.Opacity = 1;
@@ -549,6 +586,7 @@ internal sealed class LibraryVisualStage : Grid
             if (fromPreview || fromFramePause)
             {
                 var pos = CurrentVisualPosition();
+                CancelVideoFadeIn(restoreOpaque: true);
                 PlayRealtime(pos, restartClock: true);
                 _media.BeginAnimation(OpacityProperty, null);
                 _media.Opacity = 1;
@@ -584,6 +622,7 @@ internal sealed class LibraryVisualStage : Grid
 
         CancelPreviewSeek();
         CancelPreviewSpeedRamp();
+        CancelVideoFadeIn(restoreOpaque: true);
         var pos = CurrentVisualPosition();
         StopVisualClock(pos);
         PauseMedia();
@@ -647,9 +686,11 @@ internal sealed class LibraryVisualStage : Grid
         }
 
         _previewLoopStart = position;
+        CancelVideoFadeIn(restoreOpaque: true);
         _media.BeginAnimation(OpacityProperty, null);
         _media.Opacity = 1;
-        SetMediaPosition(position);
+        // 本再生からの引き継ぎでは現在位置付近にいるので、無駄なシークで一発カクつかせない。
+        SeekMediaIfNeeded(position);
         FadeDimToPreview();
         SyncPreviewFx(active: true);
         // 本再生から戻るときはいきなり 1/3 にせず、1 秒かけて落とす。
@@ -691,13 +732,25 @@ internal sealed class LibraryVisualStage : Grid
 
     private void SnapMediaBlack()
     {
+        CancelVideoFadeIn(restoreOpaque: false);
         _media.BeginAnimation(OpacityProperty, null);
         _media.Opacity = 0;
+    }
+
+    private void CancelVideoFadeIn(bool restoreOpaque)
+    {
+        _videoFadeInTicket++;
+        _media.BeginAnimation(OpacityProperty, null);
+        if (restoreOpaque)
+        {
+            _media.Opacity = 1;
+        }
     }
 
     /// <summary>動画本再生は真っ黒からフェードイン。</summary>
     private void BeginVideoFadeIn()
     {
+        var ticket = ++_videoFadeInTicket;
         _media.BeginAnimation(OpacityProperty, null);
         _media.Opacity = 0;
         var seekTicket = _previewSeekTicket;
@@ -705,8 +758,25 @@ internal sealed class LibraryVisualStage : Grid
         Dispatcher.BeginInvoke(
             () =>
             {
-                if (!IsShown || _playing != wantPlaying)
+                if (ticket != _videoFadeInTicket)
                 {
+                    return;
+                }
+
+                if (!IsShown)
+                {
+                    return;
+                }
+
+                // フェード待ち中に停止／再開が変わったとき、Opacity=0 のまま固着させない。
+                if (_playing != wantPlaying)
+                {
+                    if (_playing || _framePaused)
+                    {
+                        _media.BeginAnimation(OpacityProperty, null);
+                        _media.Opacity = 1;
+                    }
+
                     return;
                 }
 
@@ -727,6 +797,11 @@ internal sealed class LibraryVisualStage : Grid
                 };
                 anim.Completed += (_, _) =>
                 {
+                    if (ticket != _videoFadeInTicket)
+                    {
+                        return;
+                    }
+
                     _media.BeginAnimation(OpacityProperty, null);
                     _media.Opacity = 1;
                 };
@@ -817,12 +892,13 @@ internal sealed class LibraryVisualStage : Grid
     {
         CancelPreviewSpeedRamp();
         var ticket = _previewSpeedRampTicket;
+        // Play は開始時だけ。Tick ごとに Play/SpeedRatio を叩き直すとデコーダが途切れる。
         PlayMedia(speedRatio: 1);
         BeginVisualClock(position, speed: 1);
         _previewSpeedRampWatch.Restart();
-        var timer = new DispatcherTimer(DispatcherPriority.Render)
+        var timer = new DispatcherTimer(DispatcherPriority.Background)
         {
-            Interval = TimeSpan.FromMilliseconds(16),
+            Interval = TimeSpan.FromMilliseconds(PreviewSpeedRampTickMs),
         };
         timer.Tick += (_, _) =>
         {
@@ -841,21 +917,34 @@ internal sealed class LibraryVisualStage : Grid
             if (progress >= 1)
             {
                 CancelPreviewSpeedRamp();
-                ApplyPreviewSpeed(PreviewLoopSpeed);
+                // 最終速度だけ Play で確定（SpeedRatio 単体の遅延対策）。
+                ApplyPreviewSpeed(PreviewLoopSpeed, restartPlayback: true);
                 return;
             }
 
             ApplyPreviewSpeed(
-                LibraryPlayerMode.PreviewSpeedAtRampProgress(progress, from: 1, to: PreviewLoopSpeed));
+                LibraryPlayerMode.PreviewSpeedAtRampProgress(progress, from: 1, to: PreviewLoopSpeed),
+                restartPlayback: false);
         };
         _previewSpeedRampTimer = timer;
         timer.Start();
     }
 
-    private void ApplyPreviewSpeed(double speed)
+    /// <summary>
+    /// プレビュー速度を反映する。ランプ中は SpeedRatio だけ更新し、Play し直さない。
+    /// </summary>
+    private void ApplyPreviewSpeed(double speed, bool restartPlayback)
     {
         var pos = CurrentVisualPosition();
-        PlayMedia(speed);
+        if (restartPlayback)
+        {
+            PlayMedia(speed);
+        }
+        else if (Math.Abs(speed - _visualSpeed) >= 0.01)
+        {
+            ForceMediaSpeedRatio(speed);
+        }
+
         BeginVisualClock(pos, speed);
     }
 
@@ -1054,6 +1143,25 @@ internal sealed class LibraryVisualStage : Grid
         }
 
         var page = edge < 0 ? 0 : Math.Max(0, _pdfPages - 1);
+        if (page == _pdfPage)
+        {
+            return true;
+        }
+
+        _pdfPage = page;
+        _ = LoadPdfPageAsync(_path, page);
+        return true;
+    }
+
+    /// <summary>1 始まりのページ番号へ移動。範囲外や PDF 以外は false。</summary>
+    public bool TryGoPdfPageNumber(int pageNumber1Based)
+    {
+        if (!IsPdf || _path is null || pageNumber1Based < 1)
+        {
+            return false;
+        }
+
+        var page = Math.Clamp(pageNumber1Based - 1, 0, Math.Max(0, _pdfPages - 1));
         if (page == _pdfPage)
         {
             return true;
@@ -1399,6 +1507,23 @@ internal sealed class LibraryVisualStage : Grid
         catch
         {
         }
+    }
+
+    /// <summary>すでに近い位置ならシークしない（本再生→プレビュー移行の一発ヒッチ対策）。</summary>
+    private void SeekMediaIfNeeded(TimeSpan position)
+    {
+        try
+        {
+            if (Math.Abs((_media.Position - position).TotalMilliseconds) < 80)
+            {
+                return;
+            }
+        }
+        catch
+        {
+        }
+
+        SetMediaPosition(position);
     }
 
     private void PlayMedia(double speedRatio)
