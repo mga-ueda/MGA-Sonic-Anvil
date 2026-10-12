@@ -1412,6 +1412,19 @@ public sealed class LibraryBrowserSelectionTests
             Flush();
             Assert.Same(first, view.SelectedSession);
 
+            // 長押し連続（wrap=false）は端で一旦止まる。
+            view.SetSessions([first, second, third], third, [third]);
+            Flush();
+            view.MoveSelection(1, wrap: false);
+            Flush();
+            Assert.Same(third, view.SelectedSession);
+
+            view.SetSessions([first, second, third], first, [first]);
+            Flush();
+            view.MoveSelection(-1, wrap: false);
+            Flush();
+            Assert.Same(first, view.SelectedSession);
+
             view.SetSessions([first, second, third], first, [first]);
             Flush();
             view.MoveSelection(-1, extend: true);
