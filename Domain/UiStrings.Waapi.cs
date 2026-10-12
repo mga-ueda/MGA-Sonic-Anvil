@@ -48,8 +48,8 @@ internal static partial class UiStrings
         + "In-app preview double-plays -E on a loop wrap so two playheads appear.\n"
         + "EXPORT writes this to the Music Playlist Container default transition rule (Any to Any).");
     public static string TipWaapiToggle => Get(
-        "WAAPI の接続とエリア表示を切り替えます (W)。オフのときは Wwise へ接続しません。Ctrl+Alt+Shift+W でプロジェクトを起動（バーも出します）。",
-        "Toggle WAAPI connection and the WAAPI area (W). Off means no connection to Wwise. Ctrl+Alt+Shift+W launches the project (and shows the bar).");
+        "WAAPI の接続とエリア表示を切り替えます (Alt+W)。オフのときは Wwise へ接続しません。Ctrl+Alt+Shift+W でプロジェクトを起動（バーも出します）。",
+        "Toggle WAAPI connection and the WAAPI area (Alt+W). Off means no connection to Wwise. Ctrl+Alt+Shift+W launches the project (and shows the bar).");
     public static string PreflightWaapiOff => Get(
         "WAAPI がオフです。レベルメーター上の WAAPI をオンにすると接続します。",
         "WAAPI is off. Turn on WAAPI above the level meter to connect.");

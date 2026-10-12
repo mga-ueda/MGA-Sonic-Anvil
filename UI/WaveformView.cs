@@ -86,7 +86,18 @@ internal sealed class WaveformView : Grid
     {
         get
         {
-            if (!LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly) || _document is null)
+            if (_document is null)
+            {
+                return 0;
+            }
+
+            // プレイリスト波形では出さない。キューは残し、本再生／F8 に戻ったときだけ描く。
+            if (UsesPlayerScratch)
+            {
+                return ScratchCues.HasMarkers || ScratchCues.HasAbPoint ? 1 : 0;
+            }
+
+            if (!LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly))
             {
                 return 0;
             }
@@ -208,7 +219,9 @@ internal sealed class WaveformView : Grid
     private readonly Dictionary<string, FormattedText> _markerLabelCache = new(StringComparer.Ordinal);
     private readonly Dictionary<(WaveSelection Range, long Frame), Rect> _regionFlagLayout = [];
     private readonly Dictionary<long, Rect> _markerFlagLayout = [];
+    private readonly Dictionary<bool, Rect> _playerAbFlagLayout = [];
     private readonly Dictionary<(string Text, bool Selected), FormattedText> _markerCommentLabelCache = new();
+    private readonly Dictionary<(string Text, string Brush), FormattedText> _abFlagLabelCache = new();
     private double _timeLabelPixelsPerDip;
     private float[] _columnMins = [];
     private float[] _columnMaxs = [];
@@ -530,14 +543,65 @@ internal sealed class WaveformView : Grid
 
     public bool CenterLocked { get; private set; }
 
-    /// <summary>F10 プレイヤー。シークと選択だけ。マーカー／ループ操作とキーボードフォーカスはしない。</summary>
+    /// <summary>プレイヤー用の捨て A-B／マーカー。ドキュメントにはその場では書かない。</summary>
+    public PlayerScratchCues ScratchCues { get; } = new();
+
+    public PlayerScratchHistory ScratchHistory { get; } = new();
+
+    private bool _playerScratchEnabled;
+
+    /// <summary>捨てキュー Undo 用。ドラッグ開始時のスナップショット。</summary>
+    private PlayerScratchSnapshot? _scratchDragBefore;
+
+    /// <summary>
+    /// 捨て A-B／マーカーを操作・描画するか。暗いプレビューではオフ。
+    /// </summary>
+    public bool PlayerScratchEnabled
+    {
+        get => _playerScratchEnabled;
+        set
+        {
+            if (_playerScratchEnabled == value)
+            {
+                return;
+            }
+
+            _playerScratchEnabled = value;
+            if (!value)
+            {
+                ClearMarkerSelection();
+            }
+
+            InvalidateStaticLayer();
+            InvalidatePlayheadOnly();
+        }
+    }
+
+    /// <summary>
+    /// F10 プレイヤー。シークと選択だけ（本編集のマーカー／ループは出さない）。
+    /// クリックでフォーカスを受け取り、捨てキュー操作中は Undo／Redo できる。
+    /// </summary>
     public bool SeekAndSelectOnly
     {
         get => _seekAndSelectOnly;
         set
         {
+            if (_seekAndSelectOnly == value)
+            {
+                return;
+            }
+
             _seekAndSelectOnly = value;
-            Focusable = !value;
+            // プレイヤーでもクリックでフォーカスを移せるよう Focusable は維持する。
+            Focusable = true;
+            if (!value)
+            {
+                ScratchCues.ClearAll();
+                ScratchHistory.Clear();
+                ClearMarkerSelection();
+                _playerScratchEnabled = false;
+            }
+
             // スクロール中の遅延ビットマップをプレイヤー描画に流用すると、全体表示へ戻した瞬間に画面外へずれる。
             _deferWaveReload = false;
             _waveDirty = true;
@@ -546,6 +610,17 @@ internal sealed class WaveformView : Grid
             InvalidatePlayheadOnly();
         }
     }
+
+    private bool UsesPlayerScratch =>
+        SeekAndSelectOnly && _playerScratchEnabled;
+
+    private bool HasEffectiveMarkerAt(long frame) =>
+        UsesPlayerScratch ? ScratchCues.HasMarkerAt(frame) : _document?.HasMarkerAt(frame) == true;
+
+    private IReadOnlyList<WaveMarker> EffectiveMarkers =>
+        UsesPlayerScratch
+            ? ScratchCues.ToWaveMarkers()
+            : _document?.Markers ?? Array.Empty<WaveMarker>();
 
     private bool ShowsSeekCursors =>
         LibraryPlayerMode.ShowsSeekCursors(
@@ -600,6 +675,185 @@ internal sealed class WaveformView : Grid
 
     public IReadOnlyCollection<long> SelectedMarkerFrames => _selectedMarkerFrames;
 
+    public bool HasPlayerScratchMarkers => UsesPlayerScratch && ScratchCues.HasMarkers;
+
+    public bool CanUndoPlayerScratch => ScratchHistory.CanUndo;
+
+    public bool CanRedoPlayerScratch => ScratchHistory.CanRedo;
+
+    public void ClearPlayerScratchAll()
+    {
+        ScratchHistory.Clear();
+        if (!ScratchCues.HasAny && _selectedMarkerFrames.Count == 0)
+        {
+            return;
+        }
+
+        ScratchCues.ClearAll();
+        ClearMarkerSelection();
+        InvalidateStaticLayer();
+        InvalidatePlayheadOnly();
+        MarkersChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void ClearPlayerAbRepeat()
+    {
+        if (!ScratchCues.HasAbPoint)
+        {
+            return;
+        }
+
+        ScratchHistory.PushBefore(ScratchCues);
+        ScratchCues.ClearAb();
+        InvalidatePlayheadOnly();
+        InvalidateStaticLayer();
+    }
+
+    public bool TrySetPlayerAbIn(long frame)
+    {
+        if (!UsesPlayerScratch || _document is null)
+        {
+            return false;
+        }
+
+        frame = ClampFrame(frame);
+        var before = PlayerScratchSnapshot.Capture(ScratchCues);
+        if (!ScratchCues.TrySetAbIn(frame))
+        {
+            return false;
+        }
+
+        ScratchHistory.Push(before, ScratchCues);
+        InvalidateStaticLayer();
+        InvalidatePlayheadOnly();
+        return true;
+    }
+
+    public bool TrySetPlayerAbOut(long frame)
+    {
+        if (!UsesPlayerScratch || _document is null)
+        {
+            return false;
+        }
+
+        frame = ClampFrame(frame);
+        var before = PlayerScratchSnapshot.Capture(ScratchCues);
+        if (!ScratchCues.TrySetAbOut(frame))
+        {
+            return false;
+        }
+
+        ScratchHistory.Push(before, ScratchCues);
+        InvalidateStaticLayer();
+        InvalidatePlayheadOnly();
+        return true;
+    }
+
+    public bool TryGetPlayerAbLoop(out WaveSelection range)
+    {
+        range = UsesPlayerScratch ? ScratchCues.LoopRange() : WaveSelection.Empty;
+        return !range.IsEmpty;
+    }
+
+    public bool TryAddPlayerScratchMarker(long frame)
+    {
+        if (!UsesPlayerScratch || _document is null)
+        {
+            return false;
+        }
+
+        frame = ClampFrame(frame);
+        if (ScratchCues.HasMarkerAt(frame))
+        {
+            return true;
+        }
+
+        var before = PlayerScratchSnapshot.Capture(ScratchCues);
+        if (!ScratchCues.TryAddMarker(frame, _document.FrameCount))
+        {
+            return false;
+        }
+
+        ScratchHistory.Push(before, ScratchCues);
+        InvalidateStaticLayer();
+        MarkersChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
+    public bool TryRemovePlayerScratchMarkers(IReadOnlyList<long> frames)
+    {
+        if (!UsesPlayerScratch || frames.Count == 0)
+        {
+            return false;
+        }
+
+        var before = PlayerScratchSnapshot.Capture(ScratchCues);
+        if (!ScratchCues.TryRemoveMarkers(frames))
+        {
+            return false;
+        }
+
+        ScratchHistory.Push(before, ScratchCues);
+        foreach (var frame in frames)
+        {
+            _selectedMarkerFrames.Remove(frame);
+        }
+
+        InvalidateStaticLayer();
+        MarkersChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
+    public bool TryClearPlayerScratchMarkers()
+    {
+        if (!UsesPlayerScratch || !ScratchCues.HasMarkers)
+        {
+            return false;
+        }
+
+        ScratchHistory.PushBefore(ScratchCues);
+        ScratchCues.ClearMarkers();
+        ClearMarkerSelection();
+        InvalidateStaticLayer();
+        MarkersChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
+    public bool TryUndoPlayerScratch()
+    {
+        if (!ScratchHistory.TryUndo(ScratchCues))
+        {
+            return false;
+        }
+
+        ClearMarkerSelection();
+        InvalidateStaticLayer();
+        InvalidatePlayheadOnly();
+        MarkersChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
+    public bool TryRedoPlayerScratch()
+    {
+        if (!ScratchHistory.TryRedo(ScratchCues))
+        {
+            return false;
+        }
+
+        ClearMarkerSelection();
+        InvalidateStaticLayer();
+        InvalidatePlayheadOnly();
+        MarkersChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
+    /// <summary>キーボード微調整など、外部で撮った変更前スナップショットを Undo に積む。</summary>
+    public void PushPlayerScratchUndo(PlayerScratchSnapshot before) =>
+        ScratchHistory.Push(before, ScratchCues);
+
+    public bool PlayerScratchHasMarkerAt(long frame) =>
+        UsesPlayerScratch && ScratchCues.HasMarkerAt(frame);
+
     public void RestoreSelectedMarkers(IEnumerable<long> frames)
     {
         _selectedMarkerFrames.Clear();
@@ -607,7 +861,9 @@ internal sealed class WaveformView : Grid
         {
             foreach (var frame in frames)
             {
-                if (_document.HasMarkerAt(frame))
+                if (UsesPlayerScratch
+                    ? ScratchCues.HasMarkerAt(frame)
+                    : _document.HasMarkerAt(frame))
                 {
                     _selectedMarkerFrames.Add(frame);
                 }
@@ -803,6 +1059,7 @@ internal sealed class WaveformView : Grid
         _dbLabelCache.Clear();
         _markerLabelCache.Clear();
         _markerCommentLabelCache.Clear();
+        _abFlagLabelCache.Clear();
         _waveBgra = 0;
         _waveOverlayBgra = 0;
         _loudnessWaveBgra = 0;
@@ -1114,7 +1371,9 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var target = ClampFrame(_document.AdjacentMarkerFrame(_playheadFrame, direction));
+        var target = UsesPlayerScratch
+            ? ClampFrame(ScratchCues.AdjacentMarkerFrame(_playheadFrame, direction))
+            : ClampFrame(_document.AdjacentMarkerFrame(_playheadFrame, direction));
         ClearSelection();
         _keyboardSelectAnchor = null;
         KeepPlayheadAtScreenOffset(target);
@@ -1123,12 +1382,15 @@ internal sealed class WaveformView : Grid
 
     public bool SeekToMarkerId(int id, bool extendSelection)
     {
-        if (_document is null || id < 1 || id > _document.Markers.Count)
+        var markerCount = UsesPlayerScratch ? ScratchCues.Markers.Count : _document?.Markers.Count ?? 0;
+        if (_document is null || id < 1 || id > markerCount)
         {
             return false;
         }
 
-        var frame = _document.Markers[id - 1].Frame;
+        var frame = UsesPlayerScratch
+            ? ScratchCues.Markers[id - 1].Frame
+            : _document.Markers[id - 1].Frame;
         if (extendSelection)
         {
             ExtendSelectionTo(frame);
@@ -1148,7 +1410,10 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        ExtendSelectionTo(_document.AdjacentMarkerFrame(_playheadFrame, direction));
+        ExtendSelectionTo(
+            UsesPlayerScratch
+                ? ScratchCues.AdjacentMarkerFrame(_playheadFrame, direction)
+                : _document.AdjacentMarkerFrame(_playheadFrame, direction));
     }
 
     public void SelectToDocumentEdge(int direction)
@@ -1401,7 +1666,9 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var range = _document.DoubleClickSpanAt(frame);
+        var range = UsesPlayerScratch
+            ? ScratchCues.DoubleClickSpanAt(frame, _document.FrameCount)
+            : _document.DoubleClickSpanAt(frame);
         if (range.IsEmpty)
         {
             return;
@@ -1418,12 +1685,12 @@ internal sealed class WaveformView : Grid
         }
 
         _pendingSelectionPrerollJump = true;
-        var loop = _document.SampleLoop;
-        var isSampleLoop = !loop.IsEmpty
+        var loop = UsesPlayerScratch ? ScratchCues.LoopRange() : _document.SampleLoop;
+        var isLoopSpan = !loop.IsEmpty
             && range.StartFrame == loop.StartFrame
             && range.EndFrame == loop.EndFrame;
         var cursor = range.StartFrame;
-        if (isSampleLoop)
+        if (isLoopSpan)
         {
             var preroll = _document.SampleRate * 3L;
             cursor = range.Length < preroll ? range.StartFrame : range.EndFrame - preroll;
@@ -1601,7 +1868,7 @@ internal sealed class WaveformView : Grid
         {
             foreach (var frame in frames)
             {
-                if (_document.HasMarkerAt(frame))
+                if (HasEffectiveMarkerAt(frame))
                 {
                     _selectedMarkerFrames.Add(frame);
                     if (!additive)
@@ -1628,16 +1895,26 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var changed = _selectedMarkerFrames.RemoveWhere(frame => !_document.HasMarkerAt(frame)) > 0;
-        if (_markerSelectAnchor is long anchor && !_document.HasMarkerAt(anchor)
+        var changed = _selectedMarkerFrames.RemoveWhere(frame => !HasEffectiveMarkerAt(frame)) > 0;
+        if (_markerSelectAnchor is long anchor && !HasEffectiveMarkerAt(anchor)
             && !IsSelectedRegionOrLoopFrame(anchor))
         {
             _markerSelectAnchor = null;
         }
 
-        changed |= _selectedRegionEdges.RemoveWhere(edge => !_document.Regions.Contains(edge.Range)) > 0;
-        if ((_loopStartSelected || _loopEndSelected) && _document.SampleLoop.IsEmpty)
+        if (!UsesPlayerScratch)
         {
+            changed |= _selectedRegionEdges.RemoveWhere(edge => !_document.Regions.Contains(edge.Range)) > 0;
+            if ((_loopStartSelected || _loopEndSelected) && _document.SampleLoop.IsEmpty)
+            {
+                _loopStartSelected = false;
+                _loopEndSelected = false;
+                changed = true;
+            }
+        }
+        else if (_selectedRegionEdges.Count > 0 || _loopStartSelected || _loopEndSelected)
+        {
+            _selectedRegionEdges.Clear();
             _loopStartSelected = false;
             _loopEndSelected = false;
             changed = true;
@@ -1652,7 +1929,7 @@ internal sealed class WaveformView : Grid
 
     public IReadOnlyList<long> MarkerNudgeFrames(bool includePrevious)
     {
-        if (_document is null || !_document.HasMarkerAt(_playheadFrame))
+        if (_document is null || !HasEffectiveMarkerAt(_playheadFrame))
         {
             return [];
         }
@@ -1742,7 +2019,7 @@ internal sealed class WaveformView : Grid
         }
 
         long? previous = null;
-        foreach (var marker in _document.Markers)
+        foreach (var marker in EffectiveMarkers)
         {
             if (marker.Frame >= frame)
             {
@@ -1766,10 +2043,8 @@ internal sealed class WaveformView : Grid
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
-        if (!SeekAndSelectOnly)
-        {
-            Focus();
-        }
+        // プレイヤーでもクリックでライブラリ等からフォーカスをこちらへ移す。
+        Focus();
 
         if (_document is null)
         {
@@ -1824,23 +2099,14 @@ internal sealed class WaveformView : Grid
                 e.Handled = true;
                 return;
             }
-            if (SeekAndSelectOnly)
-            {
-                ClearMarkerSelection();
-                SelectSpanAt(
-                    FrameAt(pos.X),
-                    extend: (Keyboard.Modifiers & ModifierKeys.Shift) != 0);
-                e.Handled = true;
-                return;
-            }
-
-            if (TryHitRegionFlag(pos, out var region, out var regionFrame))
+            // エディタ: 旗ダブルクリックは改名。捨てマーカーは改名しない（区間選択。トリプルは全選択）。
+            if (!SeekAndSelectOnly && TryHitRegionFlag(pos, out var region, out var regionFrame))
             {
                 SelectMarkerFrames([]);
                 _selectedRegionEdges.Add(ToRegionEdge(region, regionFrame));
                 BeginRegionNameEdit(region);
             }
-            else if (TryHitMarkerFlag(pos, out var marker))
+            else if (!SeekAndSelectOnly && TryHitMarkerFlag(pos, out var marker))
             {
                 SelectMarkerFrames([marker.Frame]);
                 BeginMarkerCommentEdit(marker);
@@ -1871,7 +2137,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        if (!SeekAndSelectOnly && TryHitMarkerFlag(start, out var hit))
+        if ((!SeekAndSelectOnly || UsesPlayerScratch) && TryHitMarkerFlag(start, out var hit))
         {
             BeginMarkerFlagInteraction(hit, start);
             e.Handled = true;
@@ -2315,7 +2581,7 @@ internal sealed class WaveformView : Grid
         {
             RefreshFlagStacks(bounds, start, span);
             DrawRegionFlags(dc, bounds, start, span);
-            DrawMarkers(dc, bounds, start, span);
+            DrawMarkers(dc, bounds, start, span, _document.Markers);
             return;
         }
 
@@ -2323,6 +2589,22 @@ internal sealed class WaveformView : Grid
         _regionFlags.Clear();
         _markerFlagLayout.Clear();
         _regionFlagLayout.Clear();
+        _playerAbFlagLayout.Clear();
+        // 捨てキューは本再生／F8／イマーシブ一時停止だけ描く（プレイリスト波形では隠す）。
+        if (UsesPlayerScratch)
+        {
+            if (ScratchCues.HasMarkers || ScratchCues.HasAbPoint)
+            {
+                RefreshPlayerScratchFlagStacks(bounds, start, span);
+            }
+
+            if (ScratchCues.HasMarkers)
+            {
+                DrawMarkers(dc, bounds, start, span, ScratchCues.ToWaveMarkers());
+            }
+
+            DrawPlayerAbCues(dc, bounds, start, span);
+        }
     }
 
     internal void PaintPlayhead(DrawingContext dc)
@@ -4487,6 +4769,7 @@ internal sealed class WaveformView : Grid
             _dbLabelCache.Clear();
             _markerLabelCache.Clear();
             _markerCommentLabelCache.Clear();
+            _abFlagLabelCache.Clear();
             _timeLabelPixelsPerDip = pixelsPerDip;
         }
 
@@ -4886,9 +5169,223 @@ internal sealed class WaveformView : Grid
         return false;
     }
 
-    private void DrawMarkers(DrawingContext dc, Rect bounds, double start, double span)
+    private void RefreshPlayerScratchFlagStacks(Rect bounds, double start, double span)
     {
-        if (_document is null || _document.Markers.Count == 0)
+        _regionFlagLayout.Clear();
+        _markerFlagLayout.Clear();
+        _playerAbFlagLayout.Clear();
+        if (_document is null || (!ScratchCues.HasMarkers && !ScratchCues.HasAbPoint))
+        {
+            return;
+        }
+
+        var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
+        var laneHeight = MarkerLaneBounds(bounds).Height;
+        var markers = ScratchCues.ToWaveMarkers();
+        var row = new List<(bool Region, WaveSelection Range, long Frame, PackedTimelineFlag Flag)>(
+            markers.Length + 2);
+        foreach (var marker in markers)
+        {
+            var x = FrameToViewX(marker.Frame, start, span, bounds);
+            if (x < ScaleLeft(bounds) || x > bounds.Width + 24)
+            {
+                continue;
+            }
+
+            row.Add((
+                false,
+                default,
+                marker.Frame,
+                new PackedTimelineFlag(
+                    x,
+                    MeasureFlagWidth(marker.Id.ToString(CultureInfo.InvariantCulture), pixelsPerDip),
+                    MarkerFlagGrowsLeft(marker.Frame, _document.FrameCount))));
+        }
+
+        // AB 旗はマーカーと重ならないよう同じ行で配置。Frame は負でマーカーと区別する。
+        const long abInLayoutKey = -1;
+        const long abOutLayoutKey = -2;
+        CollectPlayerAbFlag(row, bounds, start, span, ScratchCues.AbIn, "In", abInLayoutKey, pixelsPerDip);
+        CollectPlayerAbFlag(row, bounds, start, span, ScratchCues.AbOut, "Out", abOutLayoutKey, pixelsPerDip);
+
+        ApplyPackedRow(row, laneHeight, split: false, topRow: true, pack: row.Count > 1);
+        if (_markerFlagLayout.TryGetValue(abInLayoutKey, out var inBox))
+        {
+            _playerAbFlagLayout[true] = inBox;
+            _markerFlagLayout.Remove(abInLayoutKey);
+        }
+
+        if (_markerFlagLayout.TryGetValue(abOutLayoutKey, out var outBox))
+        {
+            _playerAbFlagLayout[false] = outBox;
+            _markerFlagLayout.Remove(abOutLayoutKey);
+        }
+    }
+
+    private void CollectPlayerAbFlag(
+        List<(bool Region, WaveSelection Range, long Frame, PackedTimelineFlag Flag)> row,
+        Rect bounds,
+        double start,
+        double span,
+        long? frame,
+        string label,
+        long layoutKey,
+        double pixelsPerDip)
+    {
+        if (frame is not long at || _document is null)
+        {
+            return;
+        }
+
+        var x = FrameToViewX(at, start, span, bounds);
+        if (x < ScaleLeft(bounds) || x > bounds.Width + 24)
+        {
+            return;
+        }
+
+        row.Add((
+            false,
+            default,
+            layoutKey,
+            new PackedTimelineFlag(
+                x,
+                MeasureFlagWidth(label, pixelsPerDip),
+                MarkerFlagGrowsLeft(at, _document.FrameCount))));
+    }
+
+    private void DrawPlayerAbCues(DrawingContext dc, Rect bounds, double start, double span)
+    {
+        if (!UsesPlayerScratch || _document is null)
+        {
+            return;
+        }
+
+        var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
+        var lane = MarkerLaneBounds(bounds);
+        DrawPlayerAbCue(
+            dc,
+            bounds,
+            start,
+            span,
+            ScratchCues.AbIn,
+            label: "In",
+            brushKey: "PlayerAbInBrush",
+            isIn: true,
+            pixelsPerDip,
+            lane);
+        DrawPlayerAbCue(
+            dc,
+            bounds,
+            start,
+            span,
+            ScratchCues.AbOut,
+            label: "Out",
+            brushKey: "PlayerAbOutBrush",
+            isIn: false,
+            pixelsPerDip,
+            lane);
+    }
+
+    private void DrawPlayerAbCue(
+        DrawingContext dc,
+        Rect bounds,
+        double start,
+        double span,
+        long? frame,
+        string label,
+        string brushKey,
+        bool isIn,
+        double pixelsPerDip,
+        Rect lane)
+    {
+        if (frame is not long at)
+        {
+            return;
+        }
+
+        var x = FrameToViewX(at, start, span, bounds);
+        if (x < ScaleLeft(bounds) - 24 || x > bounds.Width + 24)
+        {
+            return;
+        }
+
+        if (x < ScaleLeft(bounds))
+        {
+            return;
+        }
+
+        var color = Theme.Get(brushKey);
+        var line = WpfControlHelpers.FrozenHairline(color, pixelsPerDip);
+        var fill = WpfControlHelpers.FrozenBrush(color);
+        var growLeft = MarkerFlagGrowsLeft(at, _document!.FrameCount);
+        if (!_playerAbFlagLayout.TryGetValue(isIn, out var box))
+        {
+            var boxW = MeasureFlagWidth(label, pixelsPerDip);
+            var left = growLeft ? x - boxW : x;
+            box = LaneFlagRect(left, boxW, lane.Height, split: false, top: true);
+        }
+        else if (!growLeft && Math.Abs(box.Right - x) <= 0.51)
+        {
+            growLeft = true;
+        }
+
+        var xs = WpfControlHelpers.SnapDeviceCenter(x, pixelsPerDip);
+        if (lane.Height <= 2)
+        {
+            dc.DrawLine(line, new Point(xs, 0), new Point(xs, bounds.Height));
+            return;
+        }
+
+        var inset = WpfControlHelpers.DeviceHairline(pixelsPerDip) * 0.5;
+        box = AlignFlagToStem(box, xs, growLeft, inset);
+        var flag = WpfControlHelpers.FlagGeometry(
+            box,
+            DesignMetrics.ControlCornerRadius,
+            stemOnLeft: !growLeft);
+        dc.DrawGeometry(fill, null, flag);
+        var idText = GetAbFlagLabel(label, brushKey, pixelsPerDip);
+        const double padX = 3;
+        dc.PushClip(flag);
+        dc.DrawText(
+            idText,
+            new Point(box.X + padX, box.Y + Math.Max(0, (box.Height - idText.Height) * 0.5)));
+        dc.Pop();
+        dc.DrawLine(line, new Point(xs, box.Bottom), new Point(xs, bounds.Height));
+    }
+
+    private FormattedText GetAbFlagLabel(string text, string brushKey, double pixelsPerDip)
+    {
+        var key = (text, brushKey);
+        if (_abFlagLabelCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        // 旗の塗りが明るい／濃いに合わせて、ラベルは常にコントラストの高い色にする。
+        var fill = Theme.Get(brushKey);
+        var fore = fill.R * 0.299 + fill.G * 0.587 + fill.B * 0.114 >= 140
+            ? Color.FromRgb(0x1A, 0x12, 0x08)
+            : Colors.White;
+        var formatted = new FormattedText(
+            text,
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            WpfControlHelpers.MonoTypeface,
+            10,
+            WpfControlHelpers.FrozenBrush(fore),
+            pixelsPerDip);
+        _abFlagLabelCache[key] = formatted;
+        return formatted;
+    }
+
+    private void DrawMarkers(
+        DrawingContext dc,
+        Rect bounds,
+        double start,
+        double span,
+        IReadOnlyList<WaveMarker> markers)
+    {
+        if (_document is null || markers.Count == 0)
         {
             return;
         }
@@ -4906,7 +5403,7 @@ internal sealed class WaveformView : Grid
         var lane = MarkerLaneBounds(bounds);
         _markerFlags.Clear();
         var editing = IsEditingMarkerComment;
-        foreach (var marker in _document.Markers)
+        foreach (var marker in markers)
         {
             var x = FrameToViewX(marker.Frame, start, span, bounds);
             if (x < ScaleLeft(bounds) - 24 || x > bounds.Width + 24)
@@ -5026,13 +5523,15 @@ internal sealed class WaveformView : Grid
 
     public bool TryBeginRenameMarker()
     {
-        if (_document is null)
+        // プレイヤー捨てマーカーはコメント改名しない。
+        if (_document is null || UsesPlayerScratch)
         {
             return false;
         }
 
         long? frame = null;
-        if (_document.HasMarkerAt(_playheadFrame))
+        var hasAtPlayhead = _document.HasMarkerAt(_playheadFrame);
+        if (hasAtPlayhead)
         {
             frame = _playheadFrame;
         }
@@ -5226,7 +5725,8 @@ internal sealed class WaveformView : Grid
 
         var lo = Math.Min(startFrame, endFrame);
         var hi = Math.Max(startFrame, endFrame);
-        foreach (var item in _document.Markers)
+        var markers = UsesPlayerScratch ? ScratchCues.ToWaveMarkers() : _document.Markers;
+        foreach (var item in markers)
         {
             if (item.Frame >= lo && item.Frame <= hi)
             {
@@ -5234,30 +5734,33 @@ internal sealed class WaveformView : Grid
             }
         }
 
-        foreach (var region in _document.Regions)
+        if (!UsesPlayerScratch)
         {
-            if (region.StartFrame >= lo && region.StartFrame <= hi)
+            foreach (var region in _document.Regions)
             {
-                _selectedRegionEdges.Add(new RegionEdge(region, true));
+                if (region.StartFrame >= lo && region.StartFrame <= hi)
+                {
+                    _selectedRegionEdges.Add(new RegionEdge(region, true));
+                }
+
+                if (region.EndFrame >= lo && region.EndFrame <= hi)
+                {
+                    _selectedRegionEdges.Add(new RegionEdge(region, false));
+                }
             }
 
-            if (region.EndFrame >= lo && region.EndFrame <= hi)
+            var loop = _document.SampleLoop;
+            if (!loop.IsEmpty)
             {
-                _selectedRegionEdges.Add(new RegionEdge(region, false));
-            }
-        }
+                if (loop.StartFrame >= lo && loop.StartFrame <= hi)
+                {
+                    _loopStartSelected = true;
+                }
 
-        var loop = _document.SampleLoop;
-        if (!loop.IsEmpty)
-        {
-            if (loop.StartFrame >= lo && loop.StartFrame <= hi)
-            {
-                _loopStartSelected = true;
-            }
-
-            if (loop.EndFrame >= lo && loop.EndFrame <= hi)
-            {
-                _loopEndSelected = true;
+                if (loop.EndFrame >= lo && loop.EndFrame <= hi)
+                {
+                    _loopEndSelected = true;
+                }
             }
         }
 
@@ -5485,12 +5988,15 @@ internal sealed class WaveformView : Grid
         _markerDragSnapHold = null;
         _markerDragPrimaryOrigin = primaryFrame;
         _markerDragOrigins = _selectedMarkerFrames.OrderBy(frame => frame).ToArray();
-        _markerDragBefore = _document.SnapshotMarkers();
-        _regionDragOrigins = [.. _selectedRegionEdges];
-        _regionsDragBefore = _document.SnapshotRegions();
-        _loopDragStart = _loopStartSelected && !_document.SampleLoop.IsEmpty;
-        _loopDragEnd = _loopEndSelected && !_document.SampleLoop.IsEmpty;
-        _loopDragBefore = _document.SampleLoop;
+        _scratchDragBefore = UsesPlayerScratch ? PlayerScratchSnapshot.Capture(ScratchCues) : null;
+        _markerDragBefore = UsesPlayerScratch
+            ? ScratchCues.SnapshotMarkers()
+            : _document.SnapshotMarkers();
+        _regionDragOrigins = UsesPlayerScratch ? [] : [.. _selectedRegionEdges];
+        _regionsDragBefore = UsesPlayerScratch ? [] : _document.SnapshotRegions();
+        _loopDragStart = !UsesPlayerScratch && _loopStartSelected && !_document.SampleLoop.IsEmpty;
+        _loopDragEnd = !UsesPlayerScratch && _loopEndSelected && !_document.SampleLoop.IsEmpty;
+        _loopDragBefore = UsesPlayerScratch ? WaveSelection.Empty : _document.SampleLoop;
         _markerDragFollowOrigin = IsSelectedTimelineFrame(_playheadFrame) ? _playheadFrame : null;
         CaptureMouse();
         Cursor = Cursors.SizeWE;
@@ -5618,6 +6124,18 @@ internal sealed class WaveformView : Grid
             return 0;
         }
 
+        if (UsesPlayerScratch)
+        {
+            var sortedScratch = markerOrigins as long[] ?? [.. markerOrigins.OrderBy(frame => frame)];
+            if (sortedScratch.Length == 0
+                || !ScratchCues.TryMoveMarkers(sortedScratch, desiredDelta, _document.FrameCount, out var scratchApplied))
+            {
+                return 0;
+            }
+
+            return scratchApplied;
+        }
+
         var moves = ToRegionMoves(regionOrigins);
         if ((loopStart || loopEnd) && !loopOrigin.IsEmpty)
         {
@@ -5688,6 +6206,12 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        if (UsesPlayerScratch)
+        {
+            ScratchCues.ReplaceMarkers(_markerDragBefore);
+            return;
+        }
+
         _document.ReplaceMarkers(_markerDragBefore, markDirty: false);
         _document.SetRegions(_regionsDragBefore, markDirty: false);
         _document.SetSampleLoop(_loopDragBefore, markDirty: false);
@@ -5731,10 +6255,31 @@ internal sealed class WaveformView : Grid
                 _document.CursorFrame = origin;
             }
 
+            _scratchDragBefore = null;
             ResetMarkerDragState();
             InvalidateStaticLayer();
             InvalidatePlayheadLayer();
             MarkersChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        if (UsesPlayerScratch)
+        {
+            if (moved && _scratchDragBefore is PlayerScratchSnapshot scratchBefore)
+            {
+                ScratchHistory.Push(scratchBefore, ScratchCues);
+            }
+
+            _scratchDragBefore = null;
+            ResetMarkerDragState();
+            InvalidateStaticLayer();
+            InvalidatePlayheadLayer();
+            MarkersChanged?.Invoke(this, EventArgs.Empty);
+            if (follow is not null)
+            {
+                CursorCommitted?.Invoke(this, _playheadFrame);
+            }
+
             return;
         }
 
@@ -6354,7 +6899,9 @@ internal sealed class WaveformView : Grid
     private bool CanSnapPointerToMarkers =>
         !_markerDragging
         && _document is not null
-        && (_document.Markers.Count > 0 || !_document.SampleLoop.IsEmpty || _document.Regions.Count > 0);
+        && (UsesPlayerScratch
+            ? ScratchCues.HasMarkers || ScratchCues.HasAbPoint
+            : _document.Markers.Count > 0 || !_document.SampleLoop.IsEmpty || _document.Regions.Count > 0);
 
     private void SetMouseGuideFromX(double x) => _pointerX = x;
 
@@ -6473,36 +7020,51 @@ internal sealed class WaveformView : Grid
             dragBestX = x;
         }
 
-        foreach (var marker in _document.Markers)
+        foreach (var marker in EffectiveMarkers)
         {
             Consider(marker.Frame);
         }
 
-        var loop = _document.SampleLoop;
-        if (!loop.IsEmpty)
+        if (UsesPlayerScratch)
         {
-            // 動かしている端そのものは除外する。同じフレームの他マーカーは残す（吸着後の震え防止）。
-            if (!_loopDragStart)
+            if (ScratchCues.AbIn is long abIn)
             {
-                Consider(loop.StartFrame);
+                Consider(abIn);
             }
 
-            if (!_loopDragEnd)
+            if (ScratchCues.AbOut is long abOut)
             {
-                Consider(loop.EndFrame);
+                Consider(abOut);
             }
         }
-
-        foreach (var region in _document.Regions)
+        else
         {
-            if (!IsDraggingRegionEdge(region, isStart: true))
+            var loop = _document.SampleLoop;
+            if (!loop.IsEmpty)
             {
-                Consider(region.StartFrame);
+                // 動かしている端そのものは除外する。同じフレームの他マーカーは残す（吸着後の震え防止）。
+                if (!_loopDragStart)
+                {
+                    Consider(loop.StartFrame);
+                }
+
+                if (!_loopDragEnd)
+                {
+                    Consider(loop.EndFrame);
+                }
             }
 
-            if (!IsDraggingRegionEdge(region, isStart: false))
+            foreach (var region in _document.Regions)
             {
-                Consider(region.EndFrame);
+                if (!IsDraggingRegionEdge(region, isStart: true))
+                {
+                    Consider(region.StartFrame);
+                }
+
+                if (!IsDraggingRegionEdge(region, isStart: false))
+                {
+                    Consider(region.EndFrame);
+                }
             }
         }
 
@@ -6545,22 +7107,37 @@ internal sealed class WaveformView : Grid
             _snapPoints.Add((FrameToViewX(markerFrame, start, span, bounds), markerFrame));
         }
 
-        foreach (var marker in _document.Markers)
+        foreach (var marker in EffectiveMarkers)
         {
             Add(marker.Frame);
         }
 
-        var loop = _document.SampleLoop;
-        if (!loop.IsEmpty)
+        if (UsesPlayerScratch)
         {
-            Add(loop.StartFrame);
-            Add(loop.EndFrame);
-        }
+            if (ScratchCues.AbIn is long abIn)
+            {
+                Add(abIn);
+            }
 
-        foreach (var region in _document.Regions)
+            if (ScratchCues.AbOut is long abOut)
+            {
+                Add(abOut);
+            }
+        }
+        else
         {
-            Add(region.StartFrame);
-            Add(region.EndFrame);
+            var loop = _document.SampleLoop;
+            if (!loop.IsEmpty)
+            {
+                Add(loop.StartFrame);
+                Add(loop.EndFrame);
+            }
+
+            foreach (var region in _document.Regions)
+            {
+                Add(region.StartFrame);
+                Add(region.EndFrame);
+            }
         }
     }
 
