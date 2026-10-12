@@ -56,6 +56,14 @@ public partial class MainWindow
             return true;
         }
 
+        // 前面 UI 隠れ中でもツリー／お気に入りのメニューは出す。
+        // リストの「プレイリストからクリア」だけは、見えない選択を消す事故になるので出さない。
+        if (LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(_playlistVideoChromeVisible)
+            && LibraryBrowser.IsListKeyboardFocused)
+        {
+            return true;
+        }
+
         if (LibraryBrowser.TryOpenKeyboardContextMenu())
         {
             return true;
@@ -140,8 +148,12 @@ public partial class MainWindow
         var busy = IsUiBusy;
         var selectedTabs = SelectedTabsInOrder();
         var canEdit = hasDoc && !busy && !recording && !IsLibraryMaximized;
+        var canScratch = hasDoc && !busy && !recording && IsPlayerScratchContext();
         var canNavigate = hasDoc && !busy && !recording;
         var hasSelection = hasDoc && !document!.Selection.IsEmpty;
+        var hasScratchMarkers = canScratch && Waveform.HasPlayerScratchMarkers;
+        var scratchHasAtHit = canScratch && Waveform.PlayerScratchHasMarkerAt(hit.Frame);
+        var scratchHasAtPlayhead = canScratch && Waveform.PlayerScratchHasMarkerAt(Waveform.PlayheadFrame);
         return new WaveformContextMenuModel
         {
             HasDocument = hasDoc,
@@ -156,19 +168,25 @@ public partial class MainWindow
                 || Waveform.HasSelectedRegions
                 || Waveform.HasSelectedTimelineItems,
             CanCopySelectionTimes = SelectionClipboardText.CanCopy(CaptureSelectionClipboardItems()),
-            CanUndo = hasDoc && _history.CanUndo,
-            CanRedo = hasDoc && _history.CanRedo,
+            CanUndo = hasDoc && (canScratch ? Waveform.CanUndoPlayerScratch : _history.CanUndo),
+            CanRedo = hasDoc && (canScratch ? Waveform.CanRedoPlayerScratch : _history.CanRedo),
             CanPasteAudio = _clipboard is { IsEmpty: false },
             CanPasteHistory = _historyRecipeClipboard.Count > 0,
-            HasMarkers = hasDoc && document!.Markers.Count > 0,
-            HasRegions = hasDoc && document!.Regions.Count > 0,
+            HasMarkers = IsLibraryMaximized
+                ? hasScratchMarkers
+                : hasDoc && document!.Markers.Count > 0,
+            HasRegions = hasDoc && document!.Regions.Count > 0 && !IsLibraryMaximized,
             HasSelectedMarkers = Waveform.HasSelectedMarkers,
-            HasSelectedRegions = Waveform.HasSelectedRegions,
-            HasSampleLoop = hasDoc && !document!.SampleLoop.IsEmpty,
-            AllowsRegionsAndLoops = hasDoc && document!.AllowsRegionsAndLoops,
-            CanRenameMarker = hasDoc && (Waveform.HasSelectedMarkers || document!.HasMarkerAt(Waveform.PlayheadFrame)),
+            HasSelectedRegions = Waveform.HasSelectedRegions && !IsLibraryMaximized,
+            HasSampleLoop = hasDoc && !document!.SampleLoop.IsEmpty && !IsLibraryMaximized,
+            AllowsRegionsAndLoops = hasDoc && document!.AllowsRegionsAndLoops && !IsLibraryMaximized,
+            // プレイヤー捨てマーカーはコメント改名しない。
+            CanRenameMarker = !IsLibraryMaximized
+                && hasDoc
+                && (Waveform.HasSelectedMarkers || document!.HasMarkerAt(Waveform.PlayheadFrame)),
             CanRenameRegion = hasDoc
                 && document!.AllowsRegionsAndLoops
+                && !IsLibraryMaximized
                 && (Waveform.HasSelectedRegions || document.Regions.Count > 0),
             HasSolo = (_activeSession?.SoloMask ?? 0) != 0,
             CenterLocked = Waveform.CenterLocked,
@@ -205,7 +223,9 @@ public partial class MainWindow
                 && (hasSelection
                     || !document!.SampleLoop.IsEmpty
                     || document.TryGetRoleSpan(MarkerRole.Loop, Waveform.PlayheadFrame, out _)),
-            CanAddMarkerHere = canEdit && !document!.HasMarkerAt(hit.Frame),
+            CanAddMarkerHere = IsLibraryMaximized
+                ? canScratch && !scratchHasAtHit
+                : canEdit && !document!.HasMarkerAt(hit.Frame),
             AnalysisView = Waveform.AnalysisView,
             Hit = hit,
         };
@@ -221,7 +241,15 @@ public partial class MainWindow
         switch (command)
         {
             case WaveMenuCommand.ClearMarkers:
-                ClearMarkers(_waveMenuHit.MarkerFrames);
+                if (IsLibraryMaximized)
+                {
+                    Waveform.TryRemovePlayerScratchMarkers(_waveMenuHit.MarkerFrames);
+                }
+                else
+                {
+                    ClearMarkers(_waveMenuHit.MarkerFrames);
+                }
+
                 break;
             case WaveMenuCommand.ClearRegion:
                 ClearRegion(_waveMenuHit.Region);
@@ -237,7 +265,16 @@ public partial class MainWindow
                 SeekFrame(_waveMenuHit.Frame);
                 break;
             case WaveMenuCommand.AddMarkerHere:
-                AddMarkerAtFrame(_waveMenuHit.Frame);
+                if (IsLibraryMaximized)
+                {
+                    SyncPlayerScratchEnabled();
+                    Waveform.TryAddPlayerScratchMarker(_waveMenuHit.Frame);
+                }
+                else
+                {
+                    AddMarkerAtFrame(_waveMenuHit.Frame);
+                }
+
                 break;
             case WaveMenuCommand.SelectSpanHere:
                 Waveform.SelectSpanAt(_waveMenuHit.Frame);
@@ -333,17 +370,41 @@ public partial class MainWindow
                 PromptFormatConvert(FormatConvertKind.Channels);
                 break;
             case WaveMenuCommand.AddMarker:
-                TryAddMarkerAtPlayhead();
+                if (IsLibraryMaximized)
+                {
+                    TryAddPlayerScratchMarkerAtPlayhead();
+                }
+                else
+                {
+                    TryAddMarkerAtPlayhead();
+                }
+
                 break;
             case WaveMenuCommand.RenameMarker:
             case WaveMenuCommand.RenameRegion:
                 RenameMarkerAtPosition();
                 break;
             case WaveMenuCommand.DeleteMarkers:
-                ApplyDeleteMarkers();
+                if (IsLibraryMaximized)
+                {
+                    ApplyPlayerScratchMarkerDelete();
+                }
+                else
+                {
+                    ApplyDeleteMarkers();
+                }
+
                 break;
             case WaveMenuCommand.DeleteAllMarkers:
-                ApplyDeleteAllMarkers();
+                if (IsLibraryMaximized)
+                {
+                    Waveform.TryClearPlayerScratchMarkers();
+                }
+                else
+                {
+                    ApplyDeleteAllMarkers();
+                }
+
                 break;
             case WaveMenuCommand.SetRegion:
                 TrySetRegionFromSelection();
@@ -364,7 +425,15 @@ public partial class MainWindow
                 Waveform.SeekToMarker(1);
                 break;
             case WaveMenuCommand.TogglePlayback:
-                TogglePlayback();
+                if (IsLibraryMaximized)
+                {
+                    PlayLibrarySelectionOnceOrToggle();
+                }
+                else
+                {
+                    TogglePlayback();
+                }
+
                 break;
             case WaveMenuCommand.PauseHere:
                 PausePlaybackHere();

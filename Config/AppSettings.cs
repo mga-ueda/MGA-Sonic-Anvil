@@ -64,8 +64,6 @@ internal sealed class AppSettings
 
     public string DefaultFadeOutCurve { get; set; } = nameof(FadeShape.SCurve);
 
-    public int WaveformHeightScale { get; set; } = 1;
-
     /// <summary>レベルメーター／ゴニオ列の幅。0 以下は既定（最小幅）。</summary>
     public double MeterColumnWidth { get; set; }
 

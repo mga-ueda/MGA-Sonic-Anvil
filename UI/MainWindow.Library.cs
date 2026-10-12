@@ -117,12 +117,20 @@ public partial class MainWindow
             return;
         }
 
-        // ←→／テンキー 0 のフレーム一時停止中は前面 UI が消えている。
-        // F8 と同様、F10 はエディタへ落とさず、暗いバックグラウンド再生へ落としてクロームを出す。
-        if (IsLibraryMaximized && _playlistVideoImmersivePause)
+        // 動画／PDF の本再生中、または ←→／テンキー 0 のフレーム一時停止中は前面 UI が消えている。
+        // エディタへ落とさず、暗いバックグラウンド再生へ落としてクローム（プレイリスト）を出す。
+        if (LibraryPlayerMode.ReturnsToPlaylistChromeOnF10(
+                IsLibraryMaximized,
+                videoMini: false,
+                LibraryBrowser.PlaylistVisualShown,
+                LibraryBrowser.PlaylistVisualPlaying,
+                LibraryBrowser.PlaylistVisualIsPdf,
+                LibraryBrowser.PlaylistVisualIsVideo,
+                _playlistVisualChromeBridge,
+                _playlistVideoImmersivePause))
         {
             StopVideoFrameStep();
-            HaltPlaybackToStart();
+            DropPlaylistVideoToDimPreview();
             return;
         }
 
@@ -179,8 +187,53 @@ public partial class MainWindow
     /// <summary>動画の本再生中（暗いプレビューは含まない）。</summary>
     private bool IsVideoRealPlayback() =>
         IsLibraryMaximized
+        && LibraryBrowser.PlaylistVisualShown
         && LibraryBrowser.PlaylistVisualIsVideo
         && LibraryBrowser.PlaylistVisualPlaying;
+
+    /// <summary>
+    /// 捨てマーカー／InOut／番号ジャンプを使うか。
+    /// 音声のプレイリスト波形、動画本再生・F8・イマーシブ一時停止（暗いプレビューは不可）。
+    /// </summary>
+    private bool IsPlayerScratchContext() =>
+        LibraryPlayerMode.UsesPlayerMarkerShortcuts(
+            videoMiniPlayer: IsVideoMiniPlayerActive(),
+            videoRealPlayback: IsVideoRealPlayback(),
+            videoImmersivePause: IsLibraryMaximized
+                && LibraryBrowser.PlaylistVisualShown
+                && LibraryBrowser.PlaylistVisualIsVideo
+                && _playlistVideoImmersivePause,
+            audioWaveform: IsLibraryMaximized
+                && _document is not null
+                && !LibraryPlaylistDocuments.IsVisual(_document));
+
+    private void SyncPlayerScratchEnabled()
+    {
+        var enabled = IsPlayerScratchContext();
+        PrimaryWaveform.PlayerScratchEnabled = enabled;
+        ForEachWaveform(view => view.PlayerScratchEnabled = enabled);
+    }
+
+    /// <summary>
+    /// プレイヤー捨てキュー（I／O／M／Ins）。ツリータイプアヘッドより先に呼ぶこと。
+    /// </summary>
+    private bool TryHandlePlayerScratchCueKey(Key key, ModifierKeys modifiers)
+    {
+        if (!LibraryPlayerMode.IsPlayerScratchCueKey(key, modifiers)
+            || !IsPlayerScratchContext())
+        {
+            return false;
+        }
+
+        if (key is Key.I or Key.O)
+        {
+            TrySetPlayerAbPoint(key == Key.I);
+            return true;
+        }
+
+        TryAddPlayerScratchMarkerAtPlayhead();
+        return true;
+    }
 
     /// <summary>F8 突入可。背面に動画または PDF が出ていれば本再生でなくても可。</summary>
     private bool IsVideoMiniEnterEligible() =>
@@ -407,7 +460,7 @@ public partial class MainWindow
         _playlistVideoImmersivePause = false;
         if (IsPlaybackActive() || LibraryBrowser.PlaylistVisualPlaying)
         {
-            HaltPlaybackToStart();
+            DropPlaylistVideoToDimPreview();
         }
 
         _libraryMinimalChrome = minimalChrome;
@@ -484,11 +537,12 @@ public partial class MainWindow
             LibraryWaveformRowDef.MinHeight = 0;
             LibraryWaveformRowDef.MaxHeight = double.PositiveInfinity;
             LibraryWaveformRowDef.Height = new GridLength(1, GridUnitType.Star);
-            ApplyWaveformHeightScale();
+            WaveformHostBorder.MinHeight = DesignMetrics.WaveformHostMinHeight;
         }
 
         PrimaryWaveform.SeekAndSelectOnly = show;
         ForEachWaveform(view => view.SeekAndSelectOnly = show);
+        SyncPlayerScratchEnabled();
         SyncPlaylistVideoChromeFade();
         TimeScrollStrip.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
         HistoryStrip.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
@@ -588,6 +642,8 @@ public partial class MainWindow
 
     private void SyncPlaylistVideoChromeFade()
     {
+        SyncPlayerScratchEnabled();
+
         var hide = LibraryPlayerMode.HidesChromeForPlaylistVisual(
             IsLibraryMaximized,
             LibraryBrowser.PlaylistVisualShown,
@@ -680,6 +736,11 @@ public partial class MainWindow
                 _playlistVideoHud,
                 LibraryBrowser.PlaylistVisualIsVideo),
             instant);
+        // PDF ページ番号は常時出さない。本表示を抜けたら隠し、切替時だけトーストする。
+        if (!LibraryPlayerMode.ShowsPlaylistPdfPageNumber(hide, LibraryBrowser.PlaylistVisualIsPdf))
+        {
+            HidePlaylistPdfPageNumber(instant);
+        }
         if (!hide)
         {
             EnsurePlaylistVideoHudOpaque();
@@ -953,6 +1014,92 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>ページ切替成功時。番号を出してから一定時間でフェードアウト。</summary>
+    private void FlashPlaylistPdfPageNumber()
+    {
+        if (!LibraryPlayerMode.ShowsPlaylistPdfPageNumber(
+                !_playlistVideoChromeVisible,
+                LibraryBrowser.PlaylistVisualIsPdf))
+        {
+            return;
+        }
+
+        ApplyPlaylistPdfPageNumberOverlayScale(VideoMiniOverlayLayoutScale);
+        RefreshPlaylistPdfPageNumber();
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistPdfPageNumber,
+            to: 1,
+            instant: true,
+            hitTestVisible: false);
+        _playlistPdfPageNumberToastTimer ??= new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(LibraryPlayerMode.PdfPageNumberToastHoldSeconds),
+        };
+        _playlistPdfPageNumberToastTimer.Tick -= OnPlaylistPdfPageNumberToastTick;
+        _playlistPdfPageNumberToastTimer.Tick += OnPlaylistPdfPageNumberToastTick;
+        _playlistPdfPageNumberToastTimer.Stop();
+        _playlistPdfPageNumberToastTimer.Start();
+    }
+
+    private void OnPlaylistPdfPageNumberToastTick(object? sender, EventArgs e)
+    {
+        _playlistPdfPageNumberToastTimer?.Stop();
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistPdfPageNumber,
+            to: 0,
+            instant: false,
+            hitTestVisible: false,
+            seconds: LibraryPlayerMode.ChromeFadeSeconds);
+    }
+
+    private void HidePlaylistPdfPageNumber(bool instant)
+    {
+        _playlistPdfPageNumberToastTimer?.Stop();
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistPdfPageNumber,
+            to: 0,
+            instant,
+            hitTestVisible: false,
+            seconds: instant ? null : LibraryPlayerMode.ChromeFadeSeconds);
+    }
+
+    private void RefreshPlaylistPdfPageNumber()
+    {
+        PlaylistPdfPageNumberText.Text = LibraryPlayerMode.FormatPdfPageLabel(
+            LibraryBrowser.PlaylistPdfPageIndex,
+            LibraryBrowser.PlaylistPdfPageCount);
+    }
+
+    private void ApplyPlaylistPdfPageNumberOverlayScale(double scale)
+    {
+        var designHeight = DesignMetrics.PlaylistPdfPageNumberHostHeight;
+        var designMargin = DesignMetrics.PlaylistPdfPageNumberMargin;
+        if (!IsVideoMiniPlayerActive() || _playlistVideoFullscreen)
+        {
+            PlaylistPdfPageNumber.LayoutTransform = Transform.Identity;
+            PlaylistPdfPageNumber.Height = designHeight;
+            PlaylistPdfPageNumber.Margin = designMargin;
+            return;
+        }
+
+        var s = Math.Clamp(
+            scale,
+            DesignMetrics.OverlayScaleMin,
+            DesignMetrics.OverlayScaleMax);
+        if (double.IsNaN(s) || double.IsInfinity(s) || s <= 0)
+        {
+            s = 1;
+        }
+
+        PlaylistPdfPageNumber.LayoutTransform = Transform.Identity;
+        PlaylistPdfPageNumber.Height = designHeight * s;
+        PlaylistPdfPageNumber.Margin = new Thickness(
+            designMargin.Left * s,
+            designMargin.Top * s,
+            designMargin.Right * s,
+            designMargin.Bottom * s);
+    }
+
     private void RefreshPlaylistVideoFileName()
     {
         var text = _activeSession?.DisplayName
@@ -1066,8 +1213,8 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// PDF の明るい表示を閉じる（Enter／Space）。暗いプレビューへ戻す。
-    /// B 固定直後は <paramref name="restoreDimPreview"/> を false にし、静止背景だけ残す。
+    /// PDF の明るい表示を閉じる（Enter／Space／Escape）。暗いプレビューへ戻す。
+    /// W 固定直後は <paramref name="restoreDimPreview"/> を false にし、静止背景だけ残す。
     /// </summary>
     private void ExitPlaylistPdfView(bool restoreDimPreview = true)
     {
@@ -1094,11 +1241,64 @@ public partial class MainWindow
         EnsurePlaylistVideoWindowRestored();
     }
 
+    /// <summary>
+    /// Escape／Q で本再生／イマーシブ一時停止／PDF 明るい表示から抜ける。
+    /// F10 プレイリストは暗い 1/3 速へ。F8 ミニは静止のまま。
+    /// </summary>
+    private bool TryExitPlaylistRealPlayback()
+    {
+        if (LibraryBrowser.PlaylistVisualIsPdf && LibraryBrowser.PlaylistVisualPlaying)
+        {
+            ExitPlaylistPdfView();
+            return true;
+        }
+
+        if (!LibraryPlayerMode.HaltsLibraryPlaybackOnSpace(
+                IsPlaybackActive(),
+                _playlistVideoImmersivePause))
+        {
+            return false;
+        }
+
+        // 動画本再生・フレーム静止・イマーシブ一時停止以外（音声のみの再生）は Escape では止めない。
+        if (!IsPlaylistVideoPlaying()
+            && !_playlistVideoImmersivePause
+            && !LibraryBrowser.PlaylistVisualFramePaused
+            && !(IsVideoMiniPlayerActive() && IsPlaybackActive()))
+        {
+            return false;
+        }
+
+        StopVideoFrameStep();
+        if (IsVideoMiniPlayerActive())
+        {
+            // F8 はプレイリストが無いので暗いプレビューへは落とさず、止めた位置で静止。
+            PausePlaybackHere(immersiveVideoHold: true);
+        }
+        else
+        {
+            DropPlaylistVideoToDimPreview();
+        }
+
+        _libraryStopAfterTrack = false;
+        return true;
+    }
+
     private bool IsPlaylistVideoPlaying() =>
         IsLibraryMaximized
         && LibraryBrowser.PlaylistVisualShown
         && LibraryBrowser.PlaylistVisualIsVideo
         && LibraryBrowser.PlaylistVisualPlaying;
+
+    /// <summary>
+    /// 停止中の Enter を Space と同じ本再生／表示にする対象（動画／PDF）。
+    /// 本再生中の Enter はその場停止（immersive）で、ここは使わない。
+    /// </summary>
+    private bool IsLibraryVisualTransportTarget()
+    {
+        var session = LibraryBrowser.SelectedSession ?? _activeSession;
+        return session is not null && LibraryPlaylistDocuments.IsVisual(session.Document);
+    }
 
     /// <summary>
     /// 本再生中、または ←→／テンキー 0 のフレーム一時停止中。
@@ -1888,6 +2088,12 @@ public partial class MainWindow
     /// </summary>
     private void RemoveLibrarySelectedFromList()
     {
+        // 前面 UI 隠れ中は Delete／メニューの「プレイリストからクリア」も効かせない。
+        if (LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(_playlistVideoChromeVisible))
+        {
+            return;
+        }
+
         var selected = LibraryBrowser.SelectedSessions;
         if (selected.Length == 0)
         {
@@ -2814,8 +3020,8 @@ public partial class MainWindow
     private static bool IsSeekNudgeHeld(int direction)
     {
         var keyDown = direction < 0
-            ? Keyboard.IsKeyDown(Key.NumPad7)
-            : Keyboard.IsKeyDown(Key.NumPad9);
+            ? Keyboard.IsKeyDown(Key.NumPad7) || Keyboard.IsKeyDown(Key.J)
+            : Keyboard.IsKeyDown(Key.NumPad9) || Keyboard.IsKeyDown(Key.K);
         return keyDown && Keyboard.Modifiers == ModifierKeys.None;
     }
 
@@ -3120,19 +3326,24 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// Space。選択曲を先頭から再生し、終わったら停止する。再生中なら止める。
-    /// フレーム送り／テンキー 0 のイマーシブ一時停止中も再開せず、プレイリストの暗いバックグラウンドへ戻す。
-    /// 停止時は HaltPlaybackToStart（F8 動画ミニは静止、F10 は暗い 1/3 速＋格子）。
+    /// Space／トランスポート再生。エディタの TogglePlayback 相当。
+    /// 再生中は HaltPlaybackToStart。停止中はシーク位置（CursorFrame）から単独再生／再開（曲末で次へ進まない）。
+    /// 別曲へ切り替えるときだけ PlayLibrarySessionAsync（その曲は先頭から）。
     /// </summary>
     private async void PlayLibrarySelectionOnceOrToggle()
     {
-        if (LibraryPlayerMode.HaltsLibraryPlaybackOnSpace(
-                IsPlaybackActive(),
-                _playlistVideoImmersivePause))
+        if (IsRecording)
         {
-            // F8 動画ミニ中は暗いバックグラウンド再生へ落とさない（静止フレーム）。
+            StopRecording();
+            return;
+        }
+
+        // エディタと同じ：本再生中だけ止めて開始位置へ戻す（即再開しない）。
+        // 動画本再生中はプレイリストを出さず、開始位置で静止する。
+        if (IsPlaybackActive())
+        {
             StopVideoFrameStep();
-            HaltPlaybackToStart();
+            HaltPlaybackToStart(keepVideoChromeHidden: IsPlaylistVideoPlaying());
             _libraryStopAfterTrack = false;
             return;
         }
@@ -3143,28 +3354,21 @@ public partial class MainWindow
             return;
         }
 
+        // 同じ曲が既に載っているときは先頭へ戻さず、シークバー位置から始める／再開する。
+        if (ReferenceEquals(session, _activeSession) && _document is not null)
+        {
+            _libraryStopAfterTrack = true;
+            if (LibraryPlaylistDocuments.IsPdf(session.Document))
+            {
+                await PlayLibrarySessionAsync(session, stopAfterTrack: true).ConfigureAwait(true);
+                return;
+            }
+
+            StartPlayback(_document.CursorFrame, prerollSeconds: 0);
+            return;
+        }
+
         await PlayLibrarySessionAsync(session, stopAfterTrack: true).ConfigureAwait(true);
-    }
-
-    /// <summary>
-    /// トランスポートの再生ボタン。Enter と同じく連続再生（曲末で次へ）。
-    /// </summary>
-    private void ToggleLibraryTransportPlayback()
-    {
-        if (IsRecording)
-        {
-            StopRecording();
-            return;
-        }
-
-        if (!LibraryPlayerMode.StartsLibraryPlaybackOnEnter(IsPlaybackActive()))
-        {
-            HaltPlaybackToStart();
-            _libraryStopAfterTrack = false;
-            return;
-        }
-
-        _ = PlayLibrarySessionAsync(LibraryBrowser.SelectedSession ?? _activeSession);
     }
 
     private Task EnsureLibrarySessionLoadedAsync(DocumentSession session, bool bind = true)
@@ -4605,6 +4809,11 @@ public partial class MainWindow
             TryApplyVideoLaunchPlacement();
             SignalVideoLaunchShowReady();
             ScheduleLibraryWaveformPaint();
+        }
+
+        if (LibraryBrowser.PlaylistVisualIsPdf && LibraryBrowser.PlaylistVisualPlaying)
+        {
+            RefreshPlaylistPdfPageNumber();
         }
 
         if (_document is null
