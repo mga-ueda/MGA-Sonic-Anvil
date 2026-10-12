@@ -247,6 +247,13 @@ internal static class LibraryPlayerMode
         !chromeVisible;
 
     /// <summary>
+    /// 前面クローム隠れ中（動画本再生・ミニ・PDF 本表示など）は、
+    /// Home／End／PageUp／PageDown をプレイリスト移動ではなくエディタと同じ波形タイムライン操作にする。
+    /// </summary>
+    public static bool UsesEditorTimelineNavKeys(bool chromeVisible) =>
+        !chromeVisible;
+
+    /// <summary>
     /// F10 でエディタへ落とさず、暗いプレビューへ戻してプレイリスト（前面 UI）を出す。
     /// 動画／PDF の本再生中（クローム隠れ）とフレーム一時停止中。動画ミニ（F8）は別経路。
     /// </summary>
@@ -1196,10 +1203,10 @@ internal static class LibraryPlayerMode
     /// </summary>
     public static bool RestoresPdfDimPreviewOnExit(bool backgroundPinned) => !backgroundPinned;
 
-    /// <summary>PDF 表示中のページめくり・先頭／末尾。</summary>
+    /// <summary>PDF 表示中のページめくり（←／→のみ。Home／End／Page は波形タイムラインへ）。</summary>
     public static bool IsPdfPageKey(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None
-        && key is Key.Left or Key.Right or Key.PageUp or Key.PageDown or Key.Home or Key.End;
+        && key is Key.Left or Key.Right;
 
     /// <summary>PDF 本表示中、キーボード上段の数字でページ番号へ飛ぶ（テンキーは再生操作のまま）。</summary>
     public static bool IsPdfPageDigitKey(Key key, ModifierKeys modifiers) =>
@@ -1293,18 +1300,12 @@ internal static class LibraryPlayerMode
         modifiers == ModifierKeys.None && key is Key.Subtract or Key.OemMinus;
 
     /// <summary>
-    /// PDF 表示中はプレイリスト操作キーを奪う（除外・全選択・ページキーなど）。
-    /// ↑↓ は前後ファイルへ移すので奪わない。表示を抜けると通常どおり。
+    /// PDF 表示中はプレイリスト操作キーを奪う（除外・全選択など）。
+    /// ↑↓ は前後ファイルへ移すので奪わない。Home／End／Page は波形タイムラインへ通す。
+    /// 表示を抜けると通常どおり。
     /// </summary>
     public static bool BlocksPlaylistWhilePdf(Key key, ModifierKeys modifiers)
     {
-        // Home／End／Page はページ操作。↑↓ はプレイリスト移動として通す。
-        if (modifiers is ModifierKeys.None or ModifierKeys.Shift
-            && key is Key.Home or Key.End or Key.PageUp or Key.PageDown)
-        {
-            return true;
-        }
-
         if (key == Key.Delete && modifiers == ModifierKeys.None)
         {
             return true;

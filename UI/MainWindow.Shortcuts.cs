@@ -705,6 +705,14 @@ public partial class MainWindow
             if ((key is Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown)
                 && modifiers is ModifierKeys.None or ModifierKeys.Shift)
             {
+                // 動画本再生・ミニ・PDF 本表示では Home／End／Page をエディタと同じタイムライン操作へ。
+                if ((key is Key.Home or Key.End or Key.PageUp or Key.PageDown)
+                    && LibraryPlayerMode.UsesEditorTimelineNavKeys(_playlistVideoChromeVisible))
+                {
+                    _libraryPlayOnArrowRelease = false;
+                    return TryHandleWaveformTimelineNavKey(key, modifiers);
+                }
+
                 var extend = modifiers == ModifierKeys.Shift;
                 // 単発は端から反対側へ回る。長押し連続は端で一旦止まる（Ctrl+Tab と同じ）。
                 var wrap = !isRepeat;
@@ -1212,51 +1220,8 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.Home && modifiers == ModifierKeys.Shift)
+        if (TryHandleWaveformTimelineNavKey(key, modifiers))
         {
-            Waveform.ExtendSelectionToViewEdge(-1);
-            return true;
-        }
-
-        if (key == Key.End && modifiers == ModifierKeys.Shift)
-        {
-            Waveform.ExtendSelectionToViewEdge(1);
-            return true;
-        }
-
-        if (key == Key.Home && modifiers == ModifierKeys.None)
-        {
-            Waveform.SeekToViewEdge(-1);
-            return true;
-        }
-
-        if (key == Key.End && modifiers == ModifierKeys.None)
-        {
-            Waveform.SeekToViewEdge(1);
-            return true;
-        }
-
-        if (key == Key.PageUp && modifiers == ModifierKeys.Shift)
-        {
-            Waveform.ExtendSelectionByVisibleFraction(-0.05);
-            return true;
-        }
-
-        if (key == Key.PageDown && modifiers == ModifierKeys.Shift)
-        {
-            Waveform.ExtendSelectionByVisibleFraction(0.05);
-            return true;
-        }
-
-        if (key == Key.PageUp && modifiers == ModifierKeys.None)
-        {
-            Waveform.SeekByVisibleFraction(-0.05);
-            return true;
-        }
-
-        if (key == Key.PageDown && modifiers == ModifierKeys.None)
-        {
-            Waveform.SeekByVisibleFraction(0.05);
             return true;
         }
 
@@ -2233,6 +2198,63 @@ public partial class MainWindow
         return false;
     }
 
+    /// <summary>
+    /// エディタと同じ Home／End／PageUp／PageDown（無修飾・Shift）の波形タイムライン操作。
+    /// 動画本再生・ミニ・PDF 本表示でもプレイリスト移動の代わりに使う。
+    /// </summary>
+    private bool TryHandleWaveformTimelineNavKey(Key key, ModifierKeys modifiers)
+    {
+        if (key == Key.Home && modifiers == ModifierKeys.Shift)
+        {
+            Waveform.ExtendSelectionToViewEdge(-1);
+            return true;
+        }
+
+        if (key == Key.End && modifiers == ModifierKeys.Shift)
+        {
+            Waveform.ExtendSelectionToViewEdge(1);
+            return true;
+        }
+
+        if (key == Key.Home && modifiers == ModifierKeys.None)
+        {
+            Waveform.SeekToViewEdge(-1);
+            return true;
+        }
+
+        if (key == Key.End && modifiers == ModifierKeys.None)
+        {
+            Waveform.SeekToViewEdge(1);
+            return true;
+        }
+
+        if (key == Key.PageUp && modifiers == ModifierKeys.Shift)
+        {
+            Waveform.ExtendSelectionByVisibleFraction(-0.05);
+            return true;
+        }
+
+        if (key == Key.PageDown && modifiers == ModifierKeys.Shift)
+        {
+            Waveform.ExtendSelectionByVisibleFraction(0.05);
+            return true;
+        }
+
+        if (key == Key.PageUp && modifiers == ModifierKeys.None)
+        {
+            Waveform.SeekByVisibleFraction(-0.05);
+            return true;
+        }
+
+        if (key == Key.PageDown && modifiers == ModifierKeys.None)
+        {
+            Waveform.SeekByVisibleFraction(0.05);
+            return true;
+        }
+
+        return false;
+    }
+
     private bool TryHandlePlaylistPdfKey(Key key, ModifierKeys modifiers, bool isRepeat)
     {
         // 選択プレビュー（暗表示）ではプレイリスト操作のまま。表示モード中だけ奪う。
@@ -2286,7 +2308,6 @@ public partial class MainWindow
             switch (key)
             {
                 case Key.Left:
-                case Key.PageUp:
                     if (LibraryBrowser.TryStepPlaylistPdfPage(-1))
                     {
                         SyncPlaylistPdfCursorFromVisual(flashPageNumber: true);
@@ -2294,22 +2315,7 @@ public partial class MainWindow
 
                     return true;
                 case Key.Right:
-                case Key.PageDown:
                     if (LibraryBrowser.TryStepPlaylistPdfPage(1))
-                    {
-                        SyncPlaylistPdfCursorFromVisual(flashPageNumber: true);
-                    }
-
-                    return true;
-                case Key.Home:
-                    if (LibraryBrowser.TryGoPlaylistPdfPageEdge(-1))
-                    {
-                        SyncPlaylistPdfCursorFromVisual(flashPageNumber: true);
-                    }
-
-                    return true;
-                case Key.End:
-                    if (LibraryBrowser.TryGoPlaylistPdfPageEdge(1))
                     {
                         SyncPlaylistPdfCursorFromVisual(flashPageNumber: true);
                     }
