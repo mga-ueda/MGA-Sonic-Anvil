@@ -670,6 +670,14 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.IsPdfPageKey(Key.Home, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.UsesEditorTimelineNavKeys(chromeVisible: false));
         Assert.False(LibraryPlayerMode.UsesEditorTimelineNavKeys(chromeVisible: true));
+        Assert.True(LibraryPlayerMode.HaltsAtEndWithoutPlaylistAdvance(
+            chromeVisible: false, visualShown: true, isVideo: true, isPdf: false));
+        Assert.True(LibraryPlayerMode.HaltsAtEndWithoutPlaylistAdvance(
+            chromeVisible: false, visualShown: true, isVideo: false, isPdf: true));
+        Assert.False(LibraryPlayerMode.HaltsAtEndWithoutPlaylistAdvance(
+            chromeVisible: true, visualShown: true, isVideo: true, isPdf: false));
+        Assert.False(LibraryPlayerMode.HaltsAtEndWithoutPlaylistAdvance(
+            chromeVisible: false, visualShown: false, isVideo: false, isPdf: false));
         Assert.True(LibraryPlayerMode.IsPdfPageDigitKey(Key.D3, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPdfPageDigitKey(Key.NumPad3, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPdfPageDigitKey(Key.D3, ModifierKeys.Shift));
