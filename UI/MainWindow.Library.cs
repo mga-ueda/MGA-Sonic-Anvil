@@ -1106,6 +1106,11 @@ public partial class MainWindow
             ?? (_document?.SourcePath is { Length: > 0 } path
                 ? System.IO.Path.GetFileName(path)
                 : string.Empty);
+        var source = _activeSession?.Document.SourcePath ?? _document?.SourcePath;
+        var usingProxy = source is { Length: > 0 }
+            && LibraryPlaylistDocuments.IsVideo(source)
+            && VideoProxy.TryGetCached(source, out _);
+        text = LibraryPlayerMode.FormatPlaylistVideoFileName(text, usingProxy);
         PlaylistVideoFileNameText.Text = text;
         PlaylistVideoFileNameShadow.Text = text;
     }
@@ -4800,6 +4805,8 @@ public partial class MainWindow
         }
 
         await RestartLibraryPeaksForSessionAsync(session).ConfigureAwait(true);
+        RefreshPlaylistVideoFileName();
+        SchedulePlaylistVideoFileNamePlacement();
     }
 
     /// <summary>

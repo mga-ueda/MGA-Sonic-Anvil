@@ -823,6 +823,12 @@ public sealed class LibraryPlayerModeTests
             chromeHidden: false, hudOn: true, isVideo: true));
         Assert.False(LibraryPlayerMode.ShowsPlaylistVideoFileName(
             chromeHidden: true, hudOn: true, isVideo: false));
+        Assert.Equal("clip.mov", LibraryPlayerMode.FormatPlaylistVideoFileName("clip.mov", usingProxy: false));
+        Assert.Equal(
+            "clip.mov" + LibraryPlayerMode.PlaylistVideoProxySuffix,
+            LibraryPlayerMode.FormatPlaylistVideoFileName("clip.mov", usingProxy: true));
+        Assert.Equal(string.Empty, LibraryPlayerMode.FormatPlaylistVideoFileName(null, usingProxy: true));
+        Assert.Equal(string.Empty, LibraryPlayerMode.FormatPlaylistVideoFileName("", usingProxy: true));
         // ラウドネスに被る分だけ左へ（左端ははみ出さない）。
         Assert.Equal(
             40,
