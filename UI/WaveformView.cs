@@ -3914,15 +3914,39 @@ internal sealed class WaveformView : Grid
         var collectDots = ShouldDrawSamplePoints(count, width / scaleX);
         var dotRadius = Math.Max(1, (int)Math.Round(SamplePointRadius * scaleX));
         var color = WavePaintBgraFor(channel);
+        // mid = top + laneHeight/2 なので、レーン半高は mid - top。
+        var halfHeight = Math.Max(1e-6, mid - top);
 
         if (count == 1)
         {
             var x = (int)Math.Round(FrameToX(first, start, span, width));
             var y = SampleY(SampleAt(0));
-            FillVLine(buffer, stride, width, clipTop, clipBottom, x, y - 3, y + 3, color);
+            FillVLineGradient(
+                buffer,
+                stride,
+                width,
+                clipTop,
+                clipBottom,
+                x,
+                y - 3,
+                y + 3,
+                color,
+                mid,
+                halfHeight);
             if (collectDots)
             {
-                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, color);
+                FillDotGradient(
+                    buffer,
+                    stride,
+                    width,
+                    clipTop,
+                    clipBottom,
+                    x,
+                    y,
+                    dotRadius,
+                    color,
+                    mid,
+                    halfHeight);
             }
 
             return;
@@ -3937,7 +3961,19 @@ internal sealed class WaveformView : Grid
             var y = SampleY(SampleAt(i));
             if (havePrev)
             {
-                DrawThickLine(buffer, stride, width, clipTop, clipBottom, prevX, prevY, x, y, color);
+                DrawThickLineGradient(
+                    buffer,
+                    stride,
+                    width,
+                    clipTop,
+                    clipBottom,
+                    prevX,
+                    prevY,
+                    x,
+                    y,
+                    color,
+                    mid,
+                    halfHeight);
             }
 
             prevX = x;
@@ -3945,7 +3981,18 @@ internal sealed class WaveformView : Grid
             havePrev = true;
             if (collectDots)
             {
-                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, color);
+                FillDotGradient(
+                    buffer,
+                    stride,
+                    width,
+                    clipTop,
+                    clipBottom,
+                    x,
+                    y,
+                    dotRadius,
+                    color,
+                    mid,
+                    halfHeight);
             }
         }
     }
@@ -4040,7 +4087,7 @@ internal sealed class WaveformView : Grid
         }
     }
 
-    private static unsafe void FillDot(
+    private static unsafe void FillDotGradient(
         int* buffer,
         int stride,
         int width,
@@ -4049,23 +4096,30 @@ internal sealed class WaveformView : Grid
         int cx,
         int cy,
         int radius,
-        int color)
+        int color,
+        double mid,
+        double halfHeight)
     {
         var r2 = radius * radius;
         var y0 = Math.Max(clipTop, cy - radius);
         var y1 = Math.Min(clipBottom - 1, cy + radius);
         var x0 = Math.Max(0, cx - radius);
         var x1 = Math.Min(width - 1, cx + radius);
+        var shade = halfHeight > 1e-6;
+        var theme = UiThemeService.Painted;
         for (var y = y0; y <= y1; y++)
         {
             var dy = y - cy;
             var row = buffer + y * stride;
+            var shaded = shade
+                ? WaveformLaneGradient.Shade(color, y + 0.5, mid, halfHeight, theme)
+                : color;
             for (var x = x0; x <= x1; x++)
             {
                 var dx = x - cx;
                 if (dx * dx + dy * dy <= r2)
                 {
-                    row[x] = color;
+                    row[x] = shaded;
                 }
             }
         }
@@ -4082,7 +4136,7 @@ internal sealed class WaveformView : Grid
         }
     }
 
-    private static unsafe void DrawThickLine(
+    private static unsafe void DrawThickLineGradient(
         int* buffer,
         int stride,
         int width,
@@ -4092,10 +4146,24 @@ internal sealed class WaveformView : Grid
         int y0,
         int x1,
         int y1,
-        int color)
+        int color,
+        double mid,
+        double halfHeight)
     {
-        DrawLine(buffer, stride, width, clipTop, clipBottom, x0, y0, x1, y1, color);
-        DrawLine(buffer, stride, width, clipTop, clipBottom, x0, y0 + 1, x1, y1 + 1, color);
+        DrawLineGradient(buffer, stride, width, clipTop, clipBottom, x0, y0, x1, y1, color, mid, halfHeight);
+        DrawLineGradient(
+            buffer,
+            stride,
+            width,
+            clipTop,
+            clipBottom,
+            x0,
+            y0 + 1,
+            x1,
+            y1 + 1,
+            color,
+            mid,
+            halfHeight);
     }
 
     private static unsafe void DrawLine(
@@ -4110,16 +4178,49 @@ internal sealed class WaveformView : Grid
         int y1,
         int color)
     {
+        DrawLineGradient(
+            buffer,
+            stride,
+            width,
+            clipTop,
+            clipBottom,
+            x0,
+            y0,
+            x1,
+            y1,
+            color,
+            mid: 0,
+            halfHeight: 0);
+    }
+
+    private static unsafe void DrawLineGradient(
+        int* buffer,
+        int stride,
+        int width,
+        int clipTop,
+        int clipBottom,
+        int x0,
+        int y0,
+        int x1,
+        int y1,
+        int color,
+        double mid,
+        double halfHeight)
+    {
         var dx = Math.Abs(x1 - x0);
         var sx = x0 < x1 ? 1 : -1;
         var dy = -Math.Abs(y1 - y0);
         var sy = y0 < y1 ? 1 : -1;
         var err = dx + dy;
+        var shade = halfHeight > 1e-6;
+        var theme = UiThemeService.Painted;
         while (true)
         {
             if ((uint)x0 < (uint)width && y0 >= clipTop && y0 < clipBottom)
             {
-                buffer[y0 * stride + x0] = color;
+                buffer[y0 * stride + x0] = shade
+                    ? WaveformLaneGradient.Shade(color, y0 + 0.5, mid, halfHeight, theme)
+                    : color;
             }
 
             if (x0 == x1 && y0 == y1)
