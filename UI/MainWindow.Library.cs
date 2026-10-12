@@ -2904,12 +2904,38 @@ public partial class MainWindow
         _libraryStopAfterTrack = false;
         if (_document is not null)
         {
-            StartPlayback(_document.CursorFrame, prerollSeconds: 0);
-            ScheduleLibraryGaplessPrefetch();
+            _ = ResumeLibraryDocumentPlaybackAsync();
             return;
         }
 
         _ = PlayLibrarySessionAsync(LibraryBrowser.SelectedSession ?? _activeSession);
+    }
+
+    /// <summary>
+    /// 既に載っているドキュメントをシーク位置から再開する。
+    /// 動画でプロキシ未作成なら、自動生成設定に従って先に Ensure する。
+    /// </summary>
+    private async Task ResumeLibraryDocumentPlaybackAsync()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        var startFrame = _document.CursorFrame;
+        if (_activeSession is { } session
+            && !await EnsureVideoProxyBeforePlaybackAsync(session).ConfigureAwait(true))
+        {
+            return;
+        }
+
+        if (_document is null)
+        {
+            return;
+        }
+
+        StartPlayback(startFrame, prerollSeconds: 0);
+        ScheduleLibraryGaplessPrefetch();
     }
 
     private void ClearPlaylistVideoImmersivePause(bool sync = true)
@@ -2937,9 +2963,8 @@ public partial class MainWindow
             && LibraryBrowser.PlaylistVisualIsVideo)
         {
             // 止め直すとクローム（プレイリスト）が一瞬見える。本再生のまま 0 へシークする。
-            session.Document.CursorFrame = 0;
-            Waveform.PlayheadFrame = 0;
-            StartPlayback(0, prerollSeconds: 0);
+            // プロキシ未作成のまま頭出しした場合も、ここで自動生成する。
+            _ = RestartLibraryVideoFromStartAsync(session);
             return;
         }
 
@@ -2954,6 +2979,18 @@ public partial class MainWindow
             StartPlayback(0, prerollSeconds: 0);
             ScheduleLibraryGaplessPrefetch();
         }
+    }
+
+    private async Task RestartLibraryVideoFromStartAsync(DocumentSession session)
+    {
+        session.Document.CursorFrame = 0;
+        Waveform.PlayheadFrame = 0;
+        if (!await EnsureVideoProxyBeforePlaybackAsync(session).ConfigureAwait(true))
+        {
+            return;
+        }
+
+        StartPlayback(0, prerollSeconds: 0);
     }
 
     private void SeekLibraryBySeconds(double seconds)
@@ -3369,7 +3406,20 @@ public partial class MainWindow
                 return;
             }
 
-            StartPlayback(_document.CursorFrame, prerollSeconds: 0);
+            // 選択／ホバープレビューはプロキシを待たない。Space 本再生ではここで作る。
+            // （PlayLibrarySessionAsync だと暗いプレビュー中の HoverResumeFrame が 0 に戻る）
+            var startFrame = _document.CursorFrame;
+            if (!await EnsureVideoProxyBeforePlaybackAsync(session).ConfigureAwait(true))
+            {
+                return;
+            }
+
+            if (_document is null)
+            {
+                return;
+            }
+
+            StartPlayback(startFrame, prerollSeconds: 0);
             return;
         }
 
@@ -4673,6 +4723,20 @@ public partial class MainWindow
         }
 
         return VideoCodecProbe.CanPlayWithoutProxy(path) || VideoProxy.TryGetCached(path, out _);
+    }
+
+    /// <summary>
+    /// 本再生直前。プロキシ不要／作成不可なら true のまま通し、必要なら Ensure する。
+    /// </summary>
+    private async Task<bool> EnsureVideoProxyBeforePlaybackAsync(DocumentSession session)
+    {
+        if (!LibraryPlaylistDocuments.IsVideo(session.Document)
+            || CanShowPlaylistVideo(session.Document))
+        {
+            return true;
+        }
+
+        return await TryPrepareVideoProxyAsync(session).ConfigureAwait(true);
     }
 
     private async Task<bool> TryPrepareVideoProxyAsync(DocumentSession session, bool forceEncode = false)
