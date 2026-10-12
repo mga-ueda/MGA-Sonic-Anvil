@@ -1388,6 +1388,16 @@ public partial class MainWindow
             return;
         }
 
+        if (IsLibraryMaximized)
+        {
+            if (Waveform.ScratchCues.TrySetMarkerComment(frame, comment))
+            {
+                Waveform.Refresh();
+            }
+
+            return;
+        }
+
         var command = ProcessEdits.SetMarkerComment(_document, frame, comment);
         if (command is null)
         {
@@ -1423,7 +1433,7 @@ public partial class MainWindow
 
     private bool TryAddMarkerAtPlayhead()
     {
-        if (_document is null)
+        if (_document is null || LibraryPlayerMode.BlocksEditorMarkerPlacement(IsLibraryMaximized))
         {
             return false;
         }
@@ -1765,6 +1775,16 @@ public partial class MainWindow
         }
 
         _timelineNudgeOpen = true;
+        if (IsLibraryMaximized)
+        {
+            _timelineNudgeScratchBefore = PlayerScratchSnapshot.Capture(Waveform.ScratchCues);
+            _timelineNudgeMarkersBefore = Waveform.ScratchCues.SnapshotMarkers();
+            _timelineNudgeRegionsBefore = [];
+            _timelineNudgeLoopBefore = WaveSelection.Empty;
+            return;
+        }
+
+        _timelineNudgeScratchBefore = null;
         _timelineNudgeMarkersBefore = _document.SnapshotMarkers();
         _timelineNudgeRegionsBefore = _document.SnapshotRegions();
         _timelineNudgeLoopBefore = _document.SampleLoop;
@@ -1783,6 +1803,18 @@ public partial class MainWindow
             return;
         }
 
+        if (IsLibraryMaximized)
+        {
+            if (_timelineNudgeScratchBefore is PlayerScratchSnapshot scratchBefore)
+            {
+                Waveform.PushPlayerScratchUndo(scratchBefore);
+            }
+
+            _timelineNudgeScratchBefore = null;
+            SyncPlayWindowFromDocument();
+            return;
+        }
+
         CommitTimelineLayout(_timelineNudgeMarkersBefore, _timelineNudgeRegionsBefore, _timelineNudgeLoopBefore);
     }
 
@@ -1791,7 +1823,7 @@ public partial class MainWindow
         WaveRegion[] regionsBefore,
         WaveSelection loopBefore)
     {
-        if (_document is null)
+        if (_document is null || IsLibraryMaximized)
         {
             return;
         }
@@ -1809,6 +1841,152 @@ public partial class MainWindow
 
         _history.Do(_document, command);
         AfterMarkerEdit();
+    }
+
+    /// <summary>
+    /// プレイヤーの一時マーカーをアクティブ文書へマージ。履歴に載せ dirty のまま（即保存しない）。
+    /// </summary>
+    private void CommitPlayerScratchMarkersToEditor(MarkerSnapshot[] scratchMarkers)
+    {
+        if (_document is null || scratchMarkers.Length == 0)
+        {
+            return;
+        }
+
+        if (LibraryPlaylistDocuments.BlocksEditor(_document))
+        {
+            return;
+        }
+
+        var before = _document.SnapshotMarkers();
+        var after = PlayerScratchCues.MergeMarkers(before, scratchMarkers);
+        var command = ProcessEdits.ApplyMarkers(_document, before, after, "Merge Markers");
+        if (command is null)
+        {
+            return;
+        }
+
+        _history.Do(_document, command);
+        AfterMarkerEdit();
+    }
+
+    /// <summary>
+    /// 揃った捨て A-B をサンプルループへ。履歴に載せ dirty のまま（即保存しない）。
+    /// </summary>
+    private void CommitPlayerScratchAbToEditor(WaveSelection scratchAb)
+    {
+        if (_document is null
+            || scratchAb.IsEmpty
+            || LibraryPlaylistDocuments.BlocksEditor(_document)
+            || !_document.AllowsRegionsAndLoops)
+        {
+            return;
+        }
+
+        var command = ProcessEdits.ApplySampleLoop(_document, scratchAb);
+        if (command is null)
+        {
+            return;
+        }
+
+        _history.Do(_document, command);
+        AfterMarkerEdit();
+    }
+
+    private void RestorePlayerScratchIfCleared(
+        MarkerSnapshot[] scratchMarkers,
+        long? abIn,
+        long? abOut)
+    {
+        var restored = false;
+        if (scratchMarkers.Length > 0 && !Waveform.ScratchCues.HasMarkers)
+        {
+            Waveform.ScratchCues.ReplaceMarkers(scratchMarkers);
+            restored = true;
+        }
+
+        if ((abIn is not null || abOut is not null) && !Waveform.ScratchCues.HasAbPoint)
+        {
+            Waveform.ScratchCues.ReplaceAb(abIn, abOut);
+            restored = true;
+            SyncPlayWindowFromDocument();
+        }
+
+        if (restored)
+        {
+            Waveform.Refresh();
+        }
+    }
+
+    private bool TrySetPlayerAbPoint(bool isIn)
+    {
+        if (!EnsurePlayerScratchReady())
+        {
+            return false;
+        }
+
+        var frame = Waveform.PlayheadFrame;
+        var ok = isIn ? Waveform.TrySetPlayerAbIn(frame) : Waveform.TrySetPlayerAbOut(frame);
+        if (ok)
+        {
+            SyncPlayWindowFromDocument();
+        }
+
+        return true;
+    }
+
+    private bool TryAddPlayerScratchMarkerAtPlayhead()
+    {
+        if (!EnsurePlayerScratchReady())
+        {
+            return false;
+        }
+
+        return Waveform.TryAddPlayerScratchMarker(Waveform.PlayheadFrame);
+    }
+
+    /// <summary>
+    /// 捨てキュー操作前にコンテキスト・描画フラグ・波形ドキュメントを揃える。
+    /// </summary>
+    private bool EnsurePlayerScratchReady()
+    {
+        if (!IsPlayerScratchContext())
+        {
+            return false;
+        }
+
+        SyncPlayerScratchEnabled();
+        if (_document is not null && Waveform.Document is null)
+        {
+            Waveform.Document = _document;
+        }
+
+        if (_document is null || Waveform.Document is null || !Waveform.PlayerScratchEnabled)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private void ApplyPlayerScratchMarkerDelete()
+    {
+        if (!IsPlayerScratchContext() || _document is null)
+        {
+            return;
+        }
+
+        // エディタの Ctrl+Delete と同じ：選択が無ければ再生ヘッド上のマーカーを対象にする。
+        // どちらも無ければ何もしない（メニューの「すべて削除」とは別）。
+        if (!Waveform.HasSelectedMarkers && Waveform.PlayerScratchHasMarkerAt(Waveform.PlayheadFrame))
+        {
+            Waveform.SelectMarkerFrames([Waveform.PlayheadFrame]);
+        }
+
+        if (Waveform.HasSelectedMarkers)
+        {
+            Waveform.TryRemovePlayerScratchMarkers(Waveform.SelectedMarkerFrames.ToArray());
+        }
     }
 
     private const int TimelineNudgeRepeatDelayMs = 400;
@@ -2205,10 +2383,26 @@ public partial class MainWindow
         RefreshHistoryStrip();
     }
 
+    private void UndoOrRedoPlayerScratch(bool redo)
+    {
+        CommitTimelineNudgeSession();
+        var ok = redo ? Waveform.TryRedoPlayerScratch() : Waveform.TryUndoPlayerScratch();
+        if (ok)
+        {
+            SyncPlayWindowFromDocument();
+        }
+    }
+
     private void UndoEdit()
     {
         CommitTimelineNudgeSession();
         StopPlaceRepeat();
+        if (IsLibraryMaximized && IsPlayerScratchContext() && Waveform.TryUndoPlayerScratch())
+        {
+            SyncPlayWindowFromDocument();
+            return;
+        }
+
         if (_document is null || !_history.CanUndo)
         {
             return;
@@ -2223,6 +2417,12 @@ public partial class MainWindow
     {
         CommitTimelineNudgeSession();
         StopPlaceRepeat();
+        if (IsLibraryMaximized && IsPlayerScratchContext() && Waveform.TryRedoPlayerScratch())
+        {
+            SyncPlayWindowFromDocument();
+            return;
+        }
+
         if (_document is null || !_history.CanRedo)
         {
             return;

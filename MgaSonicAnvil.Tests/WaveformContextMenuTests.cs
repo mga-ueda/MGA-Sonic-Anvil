@@ -159,11 +159,12 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.ColorPanel, CommandsIn(tree, UiStrings.WaveMenuCatView));
             Assert.Equal("Ctrl+Shift+C", Find(tree, WaveMenuCommand.ColorPanel)?.Gesture);
             Assert.Contains(WaveMenuCommand.RangeClick, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
-            Assert.Equal("K", Find(tree, WaveMenuCommand.RangeClick)?.Gesture);
+            Assert.Equal("Q", Find(tree, WaveMenuCommand.RangeClick)?.Gesture);
             Assert.True(Find(tree, WaveMenuCommand.RangeClick)?.Checkable);
             Assert.Contains(WaveMenuCommand.Shuffle, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
-            Assert.Equal("R", Find(tree, WaveMenuCommand.Shuffle)?.Gesture);
+            Assert.Equal("Alt+R", Find(tree, WaveMenuCommand.Shuffle)?.Gesture);
             Assert.Contains(WaveMenuCommand.WaapiPanel, CommandsIn(tree, UiStrings.WaveMenuCatWwise));
+            Assert.Equal("Alt+W", Find(tree, WaveMenuCommand.WaapiPanel)?.Gesture);
             Assert.Contains(WaveMenuCommand.KeepTarget, CommandsIn(tree, UiStrings.WaveMenuCatWwise));
             Assert.Contains(WaveMenuCommand.AutoActive, CommandsIn(tree, UiStrings.WaveMenuCatWwise));
             Assert.Contains(WaveMenuCommand.PlayExit, CommandsIn(tree, UiStrings.WaveMenuCatWwise));
@@ -339,7 +340,9 @@ public sealed class WaveformContextMenuTests
         });
         Assert.False(Find(tree, WaveMenuCommand.Undo)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.FadeIn)?.Enabled);
-        Assert.False(Find(tree, WaveMenuCommand.AddMarker)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.AddMarker)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.DeleteMarkers)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.DeleteAllMarkers)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.TimeZoomIn)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.Record)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.NewDocument)?.Enabled);
@@ -369,6 +372,9 @@ public sealed class WaveformContextMenuTests
         Assert.False(Find(tree, WaveMenuCommand.CloseTab)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.CloseAll)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.CloseOthers)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.NextTab)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.PrevTab)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.ReopenTab)?.Enabled);
     }
 
     [Fact]
