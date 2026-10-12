@@ -63,7 +63,7 @@ internal static partial class ProcessEdits
                 document.Selection,
                 WaveSelection.Empty,
                 document.CursorFrame,
-                document.CursorFrame,
+                range.StartFrame,
                 UiStrings.EditHistoryRange(
                     UiStrings.EditHistoryName("Pitch Shift"),
                     document.SampleRate,
@@ -84,11 +84,6 @@ internal static partial class ProcessEdits
         var markersAfter = MapMarkersThroughRange(document.SnapshotMarkers(), range.StartFrame, oldFrames, newFrames);
         var regionsAfter = MapRegionsThroughRange(document.SnapshotRegions(), range.StartFrame, oldFrames, newFrames);
         var loopAfter = MapSelectionThroughRange(document.SampleLoop, range.StartFrame, oldFrames, newFrames);
-        var cursorAfter = AudioDocument.MapFrameThroughRangeStretch(
-            document.CursorFrame,
-            range.StartFrame,
-            oldFrames,
-            newFrames);
         var splice = new SpliceRangeCommand(
             "Pitch Shift",
             range.StartFrame,
@@ -97,7 +92,7 @@ internal static partial class ProcessEdits
             document.Selection,
             WaveSelection.Empty,
             document.CursorFrame,
-            cursorAfter,
+            range.StartFrame,
             document.SnapshotMarkers(),
             markersAfter,
             document.SampleLoop,
@@ -174,7 +169,7 @@ internal static partial class ProcessEdits
                 document.Selection,
                 WaveSelection.Empty,
                 document.CursorFrame,
-                document.CursorFrame,
+                range.StartFrame,
                 UiStrings.EditHistoryRange(
                     UiStrings.EditHistoryName("Time Stretch"),
                     document.SampleRate,
@@ -195,11 +190,6 @@ internal static partial class ProcessEdits
         var markersAfter = MapMarkersThroughRange(document.SnapshotMarkers(), range.StartFrame, oldFrames, newFrames);
         var regionsAfter = MapRegionsThroughRange(document.SnapshotRegions(), range.StartFrame, oldFrames, newFrames);
         var loopAfter = MapSelectionThroughRange(document.SampleLoop, range.StartFrame, oldFrames, newFrames);
-        var cursorAfter = AudioDocument.MapFrameThroughRangeStretch(
-            document.CursorFrame,
-            range.StartFrame,
-            oldFrames,
-            newFrames);
         var splice = new SpliceRangeCommand(
             "Time Stretch",
             range.StartFrame,
@@ -208,7 +198,7 @@ internal static partial class ProcessEdits
             document.Selection,
             WaveSelection.Empty,
             document.CursorFrame,
-            cursorAfter,
+            range.StartFrame,
             document.SnapshotMarkers(),
             markersAfter,
             document.SampleLoop,

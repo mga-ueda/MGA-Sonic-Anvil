@@ -25,7 +25,7 @@ internal static partial class ProcessEdits
                 document.Selection,
                 document.Selection,
                 document.CursorFrame,
-                document.CursorFrame,
+                range.StartFrame,
                 UiStrings.EditHistoryRange(
                     UiStrings.EditHistoryName("Delete"),
                     document.SampleRate,

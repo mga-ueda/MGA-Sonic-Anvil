@@ -72,7 +72,6 @@ internal static partial class ProcessEdits
         var regionsAfter = MapRegionsThroughDeletes(document.SnapshotRegions(), silents, document.FrameCount - (oldFrames - newFrames));
         var loopAfter = MapSelectionThroughDeletes(document.SampleLoop, silents, inclusiveEnd: true)
             .Clamp(document.FrameCount - (oldFrames - newFrames));
-        var cursorAfter = MapFrameThroughDeletes(document.CursorFrame, silents, inclusiveEnd: false);
         var command = new SpliceRangeCommand(
             "Delete Silence",
             range.StartFrame,
@@ -81,7 +80,7 @@ internal static partial class ProcessEdits
             document.Selection,
             WaveSelection.Empty,
             document.CursorFrame,
-            cursorAfter,
+            range.StartFrame,
             document.SnapshotMarkers(),
             markersAfter,
             document.SampleLoop,

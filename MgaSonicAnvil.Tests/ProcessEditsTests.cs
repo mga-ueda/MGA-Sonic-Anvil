@@ -244,6 +244,44 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void SelectionRangeEdits_SeekCursorToRangeStart()
+    {
+        var range = new WaveSelection(10, 40);
+        var document = MakeConstant(frames: 80, value: 0.5f);
+        document.Selection = range;
+        document.CursorFrame = range.EndFrame;
+        var history = new EditHistory();
+
+        history.Do(document, ProcessEdits.FadeIn(document, range, FadeShape.Linear));
+        Assert.Equal(range.StartFrame, document.CursorFrame);
+        Assert.True(history.Undo(document));
+        Assert.Equal(range.EndFrame, document.CursorFrame);
+
+        history.Do(document, ProcessEdits.FadeOut(document, range, FadeShape.Linear));
+        Assert.Equal(range.StartFrame, document.CursorFrame);
+        Assert.True(history.Undo(document));
+
+        history.Do(document, ProcessEdits.Gain(document, range, -3)!);
+        Assert.Equal(range.StartFrame, document.CursorFrame);
+        Assert.True(history.Undo(document));
+
+        history.Do(document, ProcessEdits.Normalize(document, range));
+        Assert.Equal(range.StartFrame, document.CursorFrame);
+        Assert.True(history.Undo(document));
+
+        history.Do(document, ProcessEdits.Reverse(document, range)!);
+        Assert.Equal(range.StartFrame, document.CursorFrame);
+        Assert.True(history.Undo(document));
+
+        history.Do(document, ProcessEdits.PitchShift(document, range, 1)!);
+        Assert.Equal(range.StartFrame, document.CursorFrame);
+        Assert.True(history.Undo(document));
+
+        history.Do(document, ProcessEdits.TimeStretch(document, range, (int)range.Length / 2)!);
+        Assert.Equal(range.StartFrame, document.CursorFrame);
+    }
+
+    [Fact]
     public void PitchShift_RaisesSineAndUndoRestores()
     {
         var document = MakeSine(frames: 48000);
@@ -430,7 +468,7 @@ public sealed class ProcessEditsTests
         Assert.Equal(new long[] { 10, afterHole - 20 }, document.Markers.Select(marker => marker.Frame));
         Assert.Equal(new WaveSelection(0, document.FrameCount), document.Region);
         Assert.Equal(new WaveSelection(15, afterHole - 20), document.SampleLoop);
-        Assert.Equal(afterHole - 20, document.CursorFrame);
+        Assert.Equal(0, document.CursorFrame);
         Assert.True(history.Undo(document));
         Assert.Equal(beforeCount, document.FrameCount);
         Assert.Equal(new long[] { 10, hole, afterHole }, document.Markers.Select(marker => marker.Frame));
