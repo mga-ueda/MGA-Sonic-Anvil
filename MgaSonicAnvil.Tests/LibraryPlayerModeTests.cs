@@ -636,6 +636,16 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.HidesChromeForPlaylistVisual(
             player: true, visualShown: true, visualPlaying: false, isPdf: false, isVideo: false,
             immersivePauseHold: true));
+        Assert.True(LibraryPlayerMode.KeepsChromeHiddenForSettingsWhileVisualPlaying(
+            player: true, visualPlaying: true, isVideo: true, isPdf: false));
+        Assert.True(LibraryPlayerMode.KeepsChromeHiddenForSettingsWhileVisualPlaying(
+            player: true, visualPlaying: true, isVideo: false, isPdf: true));
+        Assert.False(LibraryPlayerMode.KeepsChromeHiddenForSettingsWhileVisualPlaying(
+            player: true, visualPlaying: false, isVideo: true, isPdf: false));
+        Assert.False(LibraryPlayerMode.KeepsChromeHiddenForSettingsWhileVisualPlaying(
+            player: false, visualPlaying: true, isVideo: true, isPdf: false));
+        Assert.False(LibraryPlayerMode.KeepsChromeHiddenForSettingsWhileVisualPlaying(
+            player: true, visualPlaying: true, isVideo: false, isPdf: false));
         Assert.True(LibraryPlayerMode.HoldsPlaylistVisualChromeBridge(
             currentVisualPlaying: true, nextIsVisual: true));
         Assert.False(LibraryPlayerMode.HoldsPlaylistVisualChromeBridge(
