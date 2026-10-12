@@ -47,8 +47,6 @@ internal static class DesignMetrics
 
     public static double ProjectBarHeight => From96(30);
 
-    public static GridLength ProjectBarHeightGrid => new(ProjectBarHeight);
-
     public static double StatusBarHeight => From96(28);
 
     public static double WaapiBarHeight => From96(32);

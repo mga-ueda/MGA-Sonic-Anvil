@@ -766,6 +766,28 @@ public sealed class LibraryPlayerModeTests
             DesignMetrics.LevelMeterWidthMax,
             scale: 1.5);
         Assert.Equal(DesignMetrics.LevelMeterWidth * 1.5, grow.Width, 3);
+        // 動画ミニ：列実高 − 上段/ゴニオ。16:9 より高い窓は 16:9 相当で打ち切り、低い窓は列高で縮む。
+        var reserved = DesignMetrics.ProjectBarHeight + DesignMetrics.VectorScopeHeight;
+        var col16x9 = 1080 - DesignMetrics.StatusBarHeight;
+        Assert.Equal(
+            col16x9 - reserved,
+            LibraryPlayerMode.LevelMeterMaxLayoutHeight(col16x9, 1920, 1080, 1),
+            3);
+        Assert.Equal(
+            col16x9 / 1.5 - reserved,
+            LibraryPlayerMode.LevelMeterMaxLayoutHeight(col16x9, 1920, 1080, 1.5),
+            3);
+        var colShort = 600 - DesignMetrics.StatusBarHeight;
+        Assert.Equal(
+            colShort - reserved,
+            LibraryPlayerMode.LevelMeterMaxLayoutHeight(colShort, 1920, 600, 1),
+            3);
+        var colTall = 1920 - DesignMetrics.StatusBarHeight;
+        var aspectCol = colTall + 1080 * 9d / 16d - 1920;
+        Assert.Equal(
+            aspectCol - reserved,
+            LibraryPlayerMode.LevelMeterMaxLayoutHeight(colTall, 1080, 1920, 1),
+            3);
         Assert.True(LibraryPlayerMode.IsVideoHudToggle(Key.A, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsVideoHudToggle(Key.A, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsVideoTimecodeToggle(Key.T, ModifierKeys.None));

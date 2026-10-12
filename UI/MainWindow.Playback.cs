@@ -2279,6 +2279,18 @@ public partial class MainWindow
         LoudnessMeter.LayoutTransform = meterTransform;
         VectorScope.LayoutTransform = meterTransform;
         Spectrum.LayoutTransform = meterTransform;
+        // WAAPI トグルも同じ窓比例／F12 倍率。スロット高は変換後の見た目に合わせる。
+        if (_waapiToggle is not null)
+        {
+            _waapiToggle.LayoutTransform = meterTransform;
+        }
+
+        if (IsLibraryMaximized && MeterTopSlot.Visibility == Visibility.Visible)
+        {
+            MeterTopSlot.Height = DesignMetrics.ProjectBarHeight * meterScale;
+        }
+
+        ApplyLevelMeterHeightCap(meterScale);
 
         // ファイル名／拡縮トーストは LayoutTransform。タイムコードは Viewbox 高さで比例させる。
         var overlayScale = VideoMiniOverlayLayoutScale;
@@ -2356,7 +2368,53 @@ public partial class MainWindow
         Spectrum.VerticalAlignment = VerticalAlignment.Bottom;
         LoudnessMeter.VerticalAlignment = VerticalAlignment.Bottom;
         ApplyMeterColumnWidth(_meterColumnPreferred);
+        ApplyLevelMeterHeightCap(scale);
         ScheduleLibraryWaveformPaint();
+    }
+
+    /// <summary>
+    /// 動画ミニ専用：レベルメーターの縦伸び上限（列実高・16:9・ゴニオ／上段を考慮）。
+    /// F10 など通常プレイヤーは Stretch のまま。
+    /// 縦長ミニでは MeterPeakHost（WAAPI＋ピーク）を Bottom 揃えし、WAAPI がピーク直上に付く。
+    /// </summary>
+    private void ApplyLevelMeterHeightCap(double layoutScale)
+    {
+        if (!IsVideoMiniPlayerActive())
+        {
+            ClearLevelMeterHeightCap();
+            return;
+        }
+
+        var columnH = MeterColumn.ActualHeight;
+        if (columnH <= 1)
+        {
+            // 未レイアウト時は窓高からステータス分を引いた概算。
+            var windowH = ActualHeight > 1 ? ActualHeight : SystemParameters.WorkArea.Height;
+            columnH = Math.Max(0, windowH - DesignMetrics.StatusBarHeight);
+        }
+
+        var width = ActualWidth > 1 ? ActualWidth : SystemParameters.WorkArea.Width;
+        var height = ActualHeight > 1 ? ActualHeight : SystemParameters.WorkArea.Height;
+        var cap = LibraryPlayerMode.LevelMeterMaxLayoutHeight(columnH, width, height, layoutScale);
+        if (double.IsInfinity(cap) || double.IsNaN(cap) || cap <= 0)
+        {
+            ClearLevelMeterHeightCap();
+            return;
+        }
+
+        LevelMeter.MaxHeight = cap;
+        LevelMeter.Height = cap;
+        LevelMeter.VerticalAlignment = VerticalAlignment.Stretch;
+        // WAAPI とピークを一塊にしてゴニオ直上へ。
+        MeterPeakHost.VerticalAlignment = VerticalAlignment.Bottom;
+    }
+
+    private void ClearLevelMeterHeightCap()
+    {
+        LevelMeter.ClearValue(FrameworkElement.HeightProperty);
+        LevelMeter.ClearValue(FrameworkElement.MaxHeightProperty);
+        LevelMeter.VerticalAlignment = VerticalAlignment.Stretch;
+        MeterPeakHost.VerticalAlignment = VerticalAlignment.Stretch;
     }
 
     private void ApplyWaveformMaximizeChrome()
@@ -2426,20 +2484,20 @@ public partial class MainWindow
         StatusBarHost.Visibility = Visibility.Collapsed;
         if (_videoLaunchPlacement)
         {
-            // 動画ミニ: アナライザ類だけ残す（リスト／トランスポート／タブは隠す）。
+            // 動画ミニ: アナライザ類＋WAAPI トグルを残す（リスト／トランスポート／タブは隠す）。
+            // MeterTopSlot は F10 本再生と同じく出し、WAAPI ボタンだけ消えないようにする。
             TransportChromeHost.Visibility = Visibility.Visible;
             MeterColumn.Visibility = Visibility.Visible;
             MeterColumnSplitter.Visibility = Visibility.Collapsed;
             DocumentTabHost.Visibility = Visibility.Collapsed;
             HistoryStrip.Visibility = Visibility.Collapsed;
             TransportBarHost.Visibility = Visibility.Collapsed;
-            // 見切れ防止: 親のクリップを外し、Overview 相当の上端行を畳む（子だけ Height=0 では行が残る）。
             MeterColumn.ClipToBounds = false;
             TransportChromeHost.ClipToBounds = false;
             WorkGrid.ClipToBounds = false;
-            MeterColumn.RowDefinitions[0].Height = new GridLength(0);
-            MeterTopSlot.Height = 0;
-            MeterTopSlot.Visibility = Visibility.Collapsed;
+            MeterTopSlot.Height = double.NaN;
+            MeterTopSlot.Visibility = Visibility.Visible;
+            // 行高・LayoutTransform は ApplyAnalyzerMaximizeScale（AnalyzerLayoutScale）に任せる。
             ApplyAnalyzerMaximizeScale();
             ApplyVideoMiniOverlayLayout(VideoMiniOverlayLayoutScale);
             SyncWindowMinSizeForMode(videoMini: true);
@@ -2480,15 +2538,15 @@ public partial class MainWindow
         if (MeterTopSlot.Visibility != Visibility.Visible)
         {
             MeterTopSlot.Visibility = Visibility.Visible;
-            MeterTopSlot.Height = double.NaN;
         }
 
-        MeterColumn.RowDefinitions[0].Height = DesignMetrics.ProjectBarHeightGrid;
+        MeterTopSlot.Height = DesignMetrics.ProjectBarHeight;
         MeterColumn.ClearValue(UIElement.ClipToBoundsProperty);
         TransportChromeHost.ClearValue(UIElement.ClipToBoundsProperty);
         WorkGrid.ClearValue(UIElement.ClipToBoundsProperty);
         Spectrum.VerticalAlignment = VerticalAlignment.Top;
         LoudnessMeter.VerticalAlignment = VerticalAlignment.Stretch;
+        ClearLevelMeterHeightCap();
     }
 
     private void SyncWindowMinSizeForMode(bool minimal = false, bool videoMini = false)

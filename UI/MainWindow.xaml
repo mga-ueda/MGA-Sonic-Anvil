@@ -258,20 +258,24 @@
             Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
             Background="Transparent">
         <Grid.RowDefinitions>
-          <RowDefinition Height="{x:Static ui:DesignMetrics.ProjectBarHeightGrid}" />
           <RowDefinition Height="*" />
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <Border x:Name="MeterTopSlot"
-                Grid.Row="0"
-                Background="Transparent" />
-        <ui:LevelMeterView x:Name="LevelMeter"
-                           Grid.Row="1"
-                           VerticalAlignment="Stretch"
-                           Opacity="0"
-                           IsHitTestVisible="False" />
+        <!-- WAAPI + ピークをひとまとめ（動画ミニで高さ制限時もピーク直上に WAAPI が付く）。 -->
+        <DockPanel x:Name="MeterPeakHost"
+                   Grid.Row="0"
+                   LastChildFill="True">
+          <Border x:Name="MeterTopSlot"
+                  DockPanel.Dock="Top"
+                  Height="{x:Static ui:DesignMetrics.ProjectBarHeight}"
+                  Background="Transparent" />
+          <ui:LevelMeterView x:Name="LevelMeter"
+                             VerticalAlignment="Stretch"
+                             Opacity="0"
+                             IsHitTestVisible="False" />
+        </DockPanel>
         <ui:VectorScopeView x:Name="VectorScope"
-                            Grid.Row="2"
+                            Grid.Row="1"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Bottom"
                             Opacity="0"
@@ -409,7 +413,7 @@
                  TextAlignment="Center"
                  TextTrimming="CharacterEllipsis"
                  TextWrapping="NoWrap"
-                 Foreground="#E6000000" />
+                 Foreground="#FF000000" />
       <TextBlock x:Name="PlaylistVideoFileNameText"
                  Height="{x:Static ui:DesignMetrics.PlaylistVideoFileNameLineHeight}"
                  FontSize="{x:Static ui:DesignMetrics.PlaylistVideoFileNameFontSize}"
