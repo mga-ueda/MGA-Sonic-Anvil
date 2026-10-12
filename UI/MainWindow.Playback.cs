@@ -626,12 +626,16 @@ public partial class MainWindow
     private void HaltPlaybackToStart(bool keepVideoChromeHidden = false)
     {
         _editorPlayAfterPcmTicket++;
-        // Space の停止は開始位置へ戻す（即再開しない）。動画本再生中はプレイリストを出さない。
+        // Space の停止は開始位置へ戻す（即再開しない）。動画／PDF 本再生中はプレイリストを出さない。
         // 暗いプレビューへ落とすのは Escape。
         var videoShown = IsLibraryMaximized
             && LibraryBrowser.PlaylistVisualShown
             && LibraryBrowser.PlaylistVisualIsVideo;
-        if (keepVideoChromeHidden && videoShown)
+        var visualShown = videoShown
+            || (IsLibraryMaximized
+                && LibraryBrowser.PlaylistVisualShown
+                && LibraryBrowser.PlaylistVisualIsPdf);
+        if (keepVideoChromeHidden && visualShown)
         {
             _playlistVideoImmersivePause = true;
         }
@@ -1503,16 +1507,25 @@ public partial class MainWindow
             return;
         }
 
-        if (IsLibraryMaximized && _libraryStopAfterTrack)
+        if (IsLibraryMaximized)
         {
-            _libraryStopAfterTrack = false;
-            HaltPlaybackToStart();
-            return;
-        }
+            var haltVisual = LibraryPlayerMode.HaltsAtEndWithoutPlaylistAdvance(
+                _playlistVideoChromeVisible,
+                LibraryBrowser.PlaylistVisualShown,
+                LibraryBrowser.PlaylistVisualIsVideo,
+                LibraryBrowser.PlaylistVisualIsPdf);
+            // 一曲再生、または映像本再生／ミニ／PDF 本表示（プレイリスト非表示）では次へ進まない。
+            if (_libraryStopAfterTrack || haltVisual)
+            {
+                _libraryStopAfterTrack = false;
+                HaltPlaybackToStart(keepVideoChromeHidden: haltVisual);
+                return;
+            }
 
-        if (IsLibraryMaximized && TryAdvanceLibraryPlaylist())
-        {
-            return;
+            if (TryAdvanceLibraryPlaylist())
+            {
+                return;
+            }
         }
 
         HaltPlaybackToStart();

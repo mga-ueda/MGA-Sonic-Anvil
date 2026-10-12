@@ -254,6 +254,17 @@ internal static class LibraryPlayerMode
         !chromeVisible;
 
     /// <summary>
+    /// プレイリスト非表示の映像本再生／ミニ／PDF 本表示では、曲末で次へ進まず先頭で停止する。
+    /// プレイリストが見えているときは連続再生してよい。次へは明示の N／P・テンキー 4／6。
+    /// </summary>
+    public static bool HaltsAtEndWithoutPlaylistAdvance(
+        bool chromeVisible,
+        bool visualShown,
+        bool isVideo,
+        bool isPdf) =>
+        !chromeVisible && visualShown && (isVideo || isPdf);
+
+    /// <summary>
     /// F10 でエディタへ落とさず、暗いプレビューへ戻してプレイリスト（前面 UI）を出す。
     /// 動画／PDF の本再生中（クローム隠れ）とフレーム一時停止中。動画ミニ（F8）は別経路。
     /// </summary>
