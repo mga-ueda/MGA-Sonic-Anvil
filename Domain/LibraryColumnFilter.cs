@@ -5,13 +5,15 @@ internal enum LibraryPlaylistColumnKind
 {
     Wave,
     Mp3,
+    Video,
     Mixed,
 }
 
-/// <summary>Wave / MP3 / 混在それぞれの表示列。</summary>
+/// <summary>Wave / MP3 / Video / 混在それぞれの表示列。</summary>
 internal readonly record struct LibraryColumnPresets(
     IReadOnlyList<LibraryFileColumn> Wave,
     IReadOnlyList<LibraryFileColumn> Mp3,
+    IReadOnlyList<LibraryFileColumn> Video,
     IReadOnlyList<LibraryFileColumn> Mixed,
     bool PersistMixed = false);
 
@@ -43,6 +45,10 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.Size,
         LibraryFileColumn.Folder,
         LibraryFileColumn.Jacket,
+        LibraryFileColumn.VideoSize,
+        LibraryFileColumn.FrameRate,
+        LibraryFileColumn.VideoCodec,
+        LibraryFileColumn.AudioCodec,
     ];
 
     /// <summary>WAVE / AIFF 向け既定。</summary>
@@ -74,6 +80,24 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.Date,
         LibraryFileColumn.Comment,
         LibraryFileColumn.ParentFolder,
+    ];
+
+    /// <summary>動画向け既定（解像度〜波形。ジャケットはオフ）。</summary>
+    public static readonly LibraryFileColumn[] VideoDefaults =
+    [
+        LibraryFileColumn.Name,
+        LibraryFileColumn.VideoSize,
+        LibraryFileColumn.FrameRate,
+        LibraryFileColumn.BitRate,
+        LibraryFileColumn.VideoCodec,
+        LibraryFileColumn.SampleRate,
+        LibraryFileColumn.BitDepth,
+        LibraryFileColumn.Channels,
+        LibraryFileColumn.AudioCodec,
+        LibraryFileColumn.Duration,
+        LibraryFileColumn.Date,
+        LibraryFileColumn.ParentFolder,
+        LibraryFileColumn.Waveform,
     ];
 
     /// <summary>Wave 設定で選べる列（Name 以外）。タグ／ジャケット／ビットレートは出さない。</summary>
@@ -116,6 +140,28 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.Size,
         LibraryFileColumn.Folder,
         LibraryFileColumn.Jacket,
+    ];
+
+    /// <summary>動画設定で選べる列（Name 以外）。既定順のあと追加候補。</summary>
+    public static readonly LibraryFileColumn[] VideoSettingsColumns =
+    [
+        LibraryFileColumn.VideoSize,
+        LibraryFileColumn.FrameRate,
+        LibraryFileColumn.BitRate,
+        LibraryFileColumn.VideoCodec,
+        LibraryFileColumn.SampleRate,
+        LibraryFileColumn.BitDepth,
+        LibraryFileColumn.Channels,
+        LibraryFileColumn.AudioCodec,
+        LibraryFileColumn.Duration,
+        LibraryFileColumn.Date,
+        LibraryFileColumn.ParentFolder,
+        LibraryFileColumn.Waveform,
+        LibraryFileColumn.Kind,
+        LibraryFileColumn.Size,
+        LibraryFileColumn.Folder,
+        LibraryFileColumn.Jacket,
+        LibraryFileColumn.Comment,
     ];
 
     public static bool IsLocked(LibraryFileColumn column) => column == LibraryFileColumn.Name;
@@ -297,7 +343,7 @@ internal static class LibraryColumnFilter
         return null;
     }
 
-    /// <summary>空・混在は Mixed。WAVE/AIFF のみ Wave。MP3/M4A のみ Mp3。</summary>
+    /// <summary>空・混在は Mixed。WAVE/AIFF のみ Wave。MP3/M4A のみ Mp3。動画のみ Video。</summary>
     public static LibraryPlaylistColumnKind ClassifyPlaylistColumns(IReadOnlyList<LibraryFileRow> rows)
     {
         if (rows.Count == 0)
@@ -307,6 +353,7 @@ internal static class LibraryColumnFilter
 
         var pcm = true;
         var tag = true;
+        var video = true;
         foreach (var row in rows)
         {
             var kind = EffectiveKind(row);
@@ -320,7 +367,12 @@ internal static class LibraryColumnFilter
                 tag = false;
             }
 
-            if (!pcm && !tag)
+            if (!IsVideoFamilyKind(kind))
+            {
+                video = false;
+            }
+
+            if (!pcm && !tag && !video)
             {
                 return LibraryPlaylistColumnKind.Mixed;
             }
@@ -334,6 +386,11 @@ internal static class LibraryColumnFilter
         if (tag)
         {
             return LibraryPlaylistColumnKind.Mp3;
+        }
+
+        if (video)
+        {
+            return LibraryPlaylistColumnKind.Video;
         }
 
         return LibraryPlaylistColumnKind.Mixed;
@@ -362,8 +419,8 @@ internal static class LibraryColumnFilter
         return used is null || used.Contains(column);
     }
 
-    /// <summary>混在の初期並び。Wave 既定のあと MP3 側だけの列。</summary>
-    public static LibraryFileColumn[] MixedDefaults => Union(WaveDefaults, Mp3Defaults);
+    /// <summary>混在の初期並び。Video → Wave → MP3 の和集合。</summary>
+    public static LibraryFileColumn[] MixedDefaults => Union(WaveDefaults, Mp3Defaults, VideoDefaults);
 
     public static LibraryFileColumn[] ResolveWave(string[]? stored) =>
         Resolve(stored, WaveDefaults, migratePreviousDefaults: true);
@@ -371,18 +428,22 @@ internal static class LibraryColumnFilter
     public static LibraryFileColumn[] ResolveMp3(string[]? stored) =>
         Resolve(stored, Mp3Defaults, migratePreviousDefaults: true);
 
+    public static LibraryFileColumn[] ResolveVideo(string[]? stored) =>
+        Resolve(stored, VideoDefaults, migratePreviousDefaults: false);
+
     /// <summary>
-    /// 混在用。空ならいまの Wave / MP3 設定の和集合。
+    /// 混在用。空ならいまの Wave / MP3 / Video 設定の和集合。
     /// 一度でも保存されていればその並びを使う。
     /// </summary>
     public static LibraryFileColumn[] ResolveMixed(
         string[]? stored,
         IReadOnlyList<LibraryFileColumn> waveColumns,
-        IReadOnlyList<LibraryFileColumn> mp3Columns)
+        IReadOnlyList<LibraryFileColumn> mp3Columns,
+        IReadOnlyList<LibraryFileColumn>? videoColumns = null)
     {
         if (stored is not { Length: > 0 })
         {
-            return Union(waveColumns, mp3Columns);
+            return Union(waveColumns, mp3Columns, videoColumns ?? VideoDefaults);
         }
 
         return Resolve(stored, MixedDefaults, migratePreviousDefaults: false);
@@ -392,26 +453,31 @@ internal static class LibraryColumnFilter
         IReadOnlyList<LibraryFileRow> rows,
         IReadOnlyList<LibraryFileColumn> waveColumns,
         IReadOnlyList<LibraryFileColumn> mp3Columns,
-        IReadOnlyList<LibraryFileColumn>? mixedColumns = null)
+        IReadOnlyList<LibraryFileColumn>? mixedColumns = null,
+        IReadOnlyList<LibraryFileColumn>? videoColumns = null)
     {
         var wave = Normalize(waveColumns, WaveDefaults);
         var mp3 = Normalize(mp3Columns, Mp3Defaults);
+        var video = Normalize(videoColumns ?? VideoDefaults, VideoDefaults);
         return ClassifyPlaylistColumns(rows) switch
         {
             LibraryPlaylistColumnKind.Wave => wave,
             LibraryPlaylistColumnKind.Mp3 => mp3,
+            LibraryPlaylistColumnKind.Video => video,
             _ => mixedColumns is null || mixedColumns.Count == 0
-                ? Union(wave, mp3)
+                ? Union(wave, mp3, video)
                 : Normalize(mixedColumns, MixedDefaults),
         };
     }
 
-    /// <summary>Wave 順を先に、MP3 側だけの列を後ろへ。</summary>
+    /// <summary>Video 順を先に、続けて Wave、MP3 側だけの列を後ろへ。</summary>
     public static LibraryFileColumn[] Union(
         IReadOnlyList<LibraryFileColumn> waveColumns,
-        IReadOnlyList<LibraryFileColumn> mp3Columns)
+        IReadOnlyList<LibraryFileColumn> mp3Columns,
+        IReadOnlyList<LibraryFileColumn>? videoColumns = null)
     {
-        var result = new List<LibraryFileColumn>(waveColumns.Count + mp3Columns.Count);
+        var video = videoColumns ?? [];
+        var result = new List<LibraryFileColumn>(waveColumns.Count + mp3Columns.Count + video.Count);
         var seen = new HashSet<LibraryFileColumn>();
         void Add(LibraryFileColumn column)
         {
@@ -422,6 +488,11 @@ internal static class LibraryColumnFilter
         }
 
         Add(LibraryFileColumn.Name);
+        foreach (var column in video)
+        {
+            Add(column);
+        }
+
         foreach (var column in waveColumns)
         {
             Add(column);
@@ -437,36 +508,48 @@ internal static class LibraryColumnFilter
 
     /// <summary>
     /// ヘッダー変更をプリセットへ書き戻す。
-    /// Wave / Mp3 を変えたときは混在を和集合へ戻す。混在の操作は混在だけ更新する。
+    /// Wave / Mp3 / Video を変えたときは混在を和集合へ戻す。混在の操作は混在だけ更新する。
     /// </summary>
     public static void ApplyVisibleChange(
         LibraryPlaylistColumnKind kind,
         IReadOnlyList<LibraryFileColumn> previousWave,
         IReadOnlyList<LibraryFileColumn> previousMp3,
+        IReadOnlyList<LibraryFileColumn> previousVideo,
         IReadOnlyList<LibraryFileColumn> previousMixed,
         IReadOnlyList<LibraryFileColumn> nextVisible,
         out LibraryFileColumn[] wave,
         out LibraryFileColumn[] mp3,
+        out LibraryFileColumn[] video,
         out LibraryFileColumn[] mixed)
     {
         var prevWave = Normalize(previousWave, WaveDefaults);
         var prevMp3 = Normalize(previousMp3, Mp3Defaults);
+        var prevVideo = Normalize(previousVideo, VideoDefaults);
         _ = previousMixed;
         switch (kind)
         {
             case LibraryPlaylistColumnKind.Wave:
                 wave = Normalize(nextVisible, WaveDefaults);
                 mp3 = prevMp3;
-                mixed = Union(wave, mp3);
+                video = prevVideo;
+                mixed = Union(wave, mp3, video);
                 return;
             case LibraryPlaylistColumnKind.Mp3:
                 wave = prevWave;
                 mp3 = Normalize(nextVisible, Mp3Defaults);
-                mixed = Union(wave, mp3);
+                video = prevVideo;
+                mixed = Union(wave, mp3, video);
+                return;
+            case LibraryPlaylistColumnKind.Video:
+                wave = prevWave;
+                mp3 = prevMp3;
+                video = Normalize(nextVisible, VideoDefaults);
+                mixed = Union(wave, mp3, video);
                 return;
             default:
                 wave = prevWave;
                 mp3 = prevMp3;
+                video = prevVideo;
                 mixed = Normalize(nextVisible, MixedDefaults);
                 return;
         }

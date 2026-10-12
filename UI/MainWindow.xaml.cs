@@ -161,7 +161,8 @@ public partial class MainWindow : Window
             AppStorage.Settings.ResolvedLibraryListColumnsWave(),
             AppStorage.Settings.ResolvedLibraryListColumnsMp3(),
             AppStorage.Settings.ResolvedLibraryListColumnsMixed(),
-            mixedCustomized: AppStorage.Settings.LibraryListColumnsMixed.Length > 0);
+            mixedCustomized: AppStorage.Settings.LibraryListColumnsMixed.Length > 0,
+            videoColumns: AppStorage.Settings.ResolvedLibraryListColumnsVideo());
         LibraryBrowser.SetPlaylistWaveformOptions(
             AppStorage.Settings.ResolvedLibraryPlaylistWaveformSizeWave(),
             AppStorage.Settings.ResolvedLibraryPlaylistWaveformSizeMp3());

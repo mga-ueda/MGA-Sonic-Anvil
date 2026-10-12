@@ -248,9 +248,12 @@ internal sealed class AppSettings
     /// <summary>MP3 / M4A 向け列。空は既定（ファイル／タイトル／アルバム／…／親フォルダ。波形表示はオフ）。</summary>
     public string[] LibraryListColumnsMp3 { get; set; } = [];
 
+    /// <summary>動画向け列。空は既定（ファイル／解像度／fps／ビットレート／映像コーデック／レート／ビット／Ch／音声コーデック／時間／日付／親フォルダ／波形）。</summary>
+    public string[] LibraryListColumnsVideo { get; set; } = [];
+
     /// <summary>
-    /// 混在プレイリスト向け列。空は Wave / MP3 設定の和集合。
-    /// Wave / MP3 を変えるとクリアする。設定 UI には出さない。
+    /// 混在プレイリスト向け列。空は Wave / MP3 / Video 設定の和集合。
+    /// Wave / MP3 / Video を変えるとクリアする。設定 UI には出さない。
     /// </summary>
     public string[] LibraryListColumnsMixed { get; set; } = [];
 
@@ -524,13 +527,20 @@ internal sealed class AppSettings
         return LibraryColumnFilter.ResolveMp3(LibraryListColumnsMp3);
     }
 
+    public LibraryFileColumn[] ResolvedLibraryListColumnsVideo()
+    {
+        MigrateLegacyLibraryListColumns();
+        return LibraryColumnFilter.ResolveVideo(LibraryListColumnsVideo);
+    }
+
     public LibraryFileColumn[] ResolvedLibraryListColumnsMixed()
     {
         MigrateLegacyLibraryListColumns();
         return LibraryColumnFilter.ResolveMixed(
             LibraryListColumnsMixed,
             ResolvedLibraryListColumnsWave(),
-            ResolvedLibraryListColumnsMp3());
+            ResolvedLibraryListColumnsMp3(),
+            ResolvedLibraryListColumnsVideo());
     }
 
     public void ApplyLibraryListColumnsWave(IEnumerable<LibraryFileColumn> columns)
@@ -549,6 +559,14 @@ internal sealed class AppSettings
         LibraryListColumns = [];
     }
 
+    public void ApplyLibraryListColumnsVideo(IEnumerable<LibraryFileColumn> columns)
+    {
+        MigrateLegacyLibraryListColumns();
+        LibraryListColumnsVideo = LibraryColumnFilter.Serialize(columns, LibraryColumnFilter.VideoDefaults);
+        LibraryListColumnsMixed = [];
+        LibraryListColumns = [];
+    }
+
     public void ApplyLibraryListColumnsMixed(IEnumerable<LibraryFileColumn> columns)
     {
         MigrateLegacyLibraryListColumns();
@@ -558,13 +576,15 @@ internal sealed class AppSettings
         LibraryListColumns = [];
     }
 
-    /// <summary>Wave / MP3 を更新し、混在のユーザー記憶を捨てて和集合へ戻す。</summary>
+    /// <summary>Wave / MP3 / Video を更新し、混在のユーザー記憶を捨てて和集合へ戻す。</summary>
     public void ApplyLibraryListColumnPresets(
         IEnumerable<LibraryFileColumn> waveColumns,
-        IEnumerable<LibraryFileColumn> mp3Columns)
+        IEnumerable<LibraryFileColumn> mp3Columns,
+        IEnumerable<LibraryFileColumn> videoColumns)
     {
         LibraryListColumnsWave = LibraryColumnFilter.Serialize(waveColumns, LibraryColumnFilter.WaveDefaults);
         LibraryListColumnsMp3 = LibraryColumnFilter.Serialize(mp3Columns, LibraryColumnFilter.Mp3Defaults);
+        LibraryListColumnsVideo = LibraryColumnFilter.Serialize(videoColumns, LibraryColumnFilter.VideoDefaults);
         LibraryListColumnsMixed = [];
         LibraryListColumns = [];
     }
@@ -572,10 +592,12 @@ internal sealed class AppSettings
     public void ApplyLibraryListColumnPresets(
         IEnumerable<LibraryFileColumn> waveColumns,
         IEnumerable<LibraryFileColumn> mp3Columns,
+        IEnumerable<LibraryFileColumn> videoColumns,
         IEnumerable<LibraryFileColumn> mixedColumns)
     {
         LibraryListColumnsWave = LibraryColumnFilter.Serialize(waveColumns, LibraryColumnFilter.WaveDefaults);
         LibraryListColumnsMp3 = LibraryColumnFilter.Serialize(mp3Columns, LibraryColumnFilter.Mp3Defaults);
+        LibraryListColumnsVideo = LibraryColumnFilter.Serialize(videoColumns, LibraryColumnFilter.VideoDefaults);
         LibraryListColumnsMixed = LibraryColumnFilter.Serialize(
             mixedColumns,
             LibraryColumnFilter.MixedDefaults);
@@ -584,7 +606,9 @@ internal sealed class AppSettings
 
     private void MigrateLegacyLibraryListColumns()
     {
-        if (LibraryListColumnsWave.Length > 0 || LibraryListColumnsMp3.Length > 0)
+        if (LibraryListColumnsWave.Length > 0
+            || LibraryListColumnsMp3.Length > 0
+            || LibraryListColumnsVideo.Length > 0)
         {
             return;
         }

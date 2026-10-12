@@ -45,6 +45,10 @@ internal static class LibrarySearchQuery
         yield return row.BitDepthText;
         yield return row.ChannelsText;
         yield return row.BitRateText;
+        yield return row.VideoSizeText;
+        yield return row.FrameRateText;
+        yield return row.VideoCodec;
+        yield return row.AudioCodec;
         yield return row.SizeText;
         yield return row.DateText;
         yield return row.Folder;

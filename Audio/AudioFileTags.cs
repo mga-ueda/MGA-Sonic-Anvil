@@ -45,6 +45,21 @@ internal sealed class AudioFileTags
 
     public int BitRateKbps { get; init; }
 
+    /// <summary>映像の横ピクセル。音声のみは 0。</summary>
+    public int VideoWidth { get; init; }
+
+    /// <summary>映像の縦ピクセル。音声のみは 0。</summary>
+    public int VideoHeight { get; init; }
+
+    /// <summary>映像のフレームレート。取れなければ 0。</summary>
+    public double FrameRate { get; init; }
+
+    /// <summary>映像 fourcc（avc1 など）。無ければ空。</summary>
+    public string VideoCodec { get; init; } = string.Empty;
+
+    /// <summary>音声 fourcc（mp4a / ipcm など）。無ければ空。</summary>
+    public string AudioCodec { get; init; } = string.Empty;
+
     /// <summary>LAME Xing／Info または iTunSMPB／M4A elst の encoder delay（サンプル）。未記載は 0。</summary>
     public int EncoderDelayFrames { get; init; }
 
@@ -88,6 +103,11 @@ internal sealed class AudioFileTags
             BitsPerSample = bitsPerSample,
             Channels = channels,
             BitRateKbps = BitRateKbps,
+            VideoWidth = VideoWidth,
+            VideoHeight = VideoHeight,
+            FrameRate = FrameRate,
+            VideoCodec = VideoCodec,
+            AudioCodec = AudioCodec,
             EncoderDelayFrames = EncoderDelayFrames,
             EncoderPaddingFrames = EncoderPaddingFrames,
             EncoderOriginalFrames = EncoderOriginalFrames,
@@ -126,6 +146,16 @@ internal sealed class AudioFileTagsBuilder
     public int Channels { get; set; }
 
     public int BitRateKbps { get; set; }
+
+    public int VideoWidth { get; set; }
+
+    public int VideoHeight { get; set; }
+
+    public double FrameRate { get; set; }
+
+    public string VideoCodec { get; set; } = string.Empty;
+
+    public string AudioCodec { get; set; } = string.Empty;
 
     public int LengthMillis { get; set; }
 
@@ -173,6 +203,11 @@ internal sealed class AudioFileTagsBuilder
             BitsPerSample = BitsPerSample,
             Channels = Channels,
             BitRateKbps = BitRateKbps,
+            VideoWidth = VideoWidth,
+            VideoHeight = VideoHeight,
+            FrameRate = FrameRate,
+            VideoCodec = VideoCodec ?? string.Empty,
+            AudioCodec = AudioCodec ?? string.Empty,
             EncoderDelayFrames = EncoderDelayFrames,
             EncoderPaddingFrames = EncoderPaddingFrames,
             EncoderOriginalFrames = EncoderOriginalFrames,

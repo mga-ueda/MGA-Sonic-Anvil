@@ -25,6 +25,10 @@ internal enum LibraryFileColumn
     Date,
     Folder,
     Jacket,
+    VideoSize,
+    FrameRate,
+    VideoCodec,
+    AudioCodec,
 }
 
 internal enum LibraryFileGroup
@@ -128,6 +132,20 @@ internal sealed class LibraryFileRow
 
     public string JacketText { get; init; } = string.Empty;
 
+    public int VideoWidth { get; init; }
+
+    public int VideoHeight { get; init; }
+
+    public string VideoSizeText { get; init; } = string.Empty;
+
+    public double FrameRate { get; init; }
+
+    public string FrameRateText { get; init; } = string.Empty;
+
+    public string VideoCodec { get; init; } = string.Empty;
+
+    public string AudioCodec { get; init; } = string.Empty;
+
     public string GroupKey { get; set; } = string.Empty;
 }
 
@@ -220,6 +238,10 @@ internal static class LibraryFileList
         && left.Folder == right.Folder
         && left.ParentFolder == right.ParentFolder
         && left.JacketText == right.JacketText
+        && left.VideoSizeText == right.VideoSizeText
+        && left.FrameRateText == right.FrameRateText
+        && left.VideoCodec == right.VideoCodec
+        && left.AudioCodec == right.AudioCodec
         && left.GroupKey == right.GroupKey;
 
     public static string CellText(LibraryFileRow row, LibraryFileColumn column) =>
@@ -247,6 +269,10 @@ internal static class LibraryFileList
             LibraryFileColumn.ParentFolder => row.ParentFolder,
             LibraryFileColumn.Waveform => string.Empty,
             LibraryFileColumn.Jacket => row.JacketText,
+            LibraryFileColumn.VideoSize => row.VideoSizeText,
+            LibraryFileColumn.FrameRate => row.FrameRateText,
+            LibraryFileColumn.VideoCodec => row.VideoCodec,
+            LibraryFileColumn.AudioCodec => row.AudioCodec,
             _ => row.Name,
         };
 
@@ -311,6 +337,16 @@ internal static class LibraryFileList
                 StringComparison.CurrentCultureIgnoreCase),
             LibraryFileColumn.Waveform => 0,
             LibraryFileColumn.Jacket => left.HasArtwork.CompareTo(right.HasArtwork),
+            LibraryFileColumn.VideoSize => CompareVideoSize(left, right),
+            LibraryFileColumn.FrameRate => left.FrameRate.CompareTo(right.FrameRate),
+            LibraryFileColumn.VideoCodec => string.Compare(
+                left.VideoCodec,
+                right.VideoCodec,
+                StringComparison.OrdinalIgnoreCase),
+            LibraryFileColumn.AudioCodec => string.Compare(
+                left.AudioCodec,
+                right.AudioCodec,
+                StringComparison.OrdinalIgnoreCase),
             _ => string.Compare(left.Name, right.Name, StringComparison.CurrentCultureIgnoreCase),
         };
         if (compared != 0)
@@ -324,6 +360,19 @@ internal static class LibraryFileList
 
     private static int CompareText(string left, string right) =>
         string.Compare(left, right, StringComparison.CurrentCultureIgnoreCase);
+
+    private static int CompareVideoSize(LibraryFileRow left, LibraryFileRow right)
+    {
+        var pixels = ((long)left.VideoWidth * left.VideoHeight)
+            .CompareTo((long)right.VideoWidth * right.VideoHeight);
+        if (pixels != 0)
+        {
+            return pixels;
+        }
+
+        var width = left.VideoWidth.CompareTo(right.VideoWidth);
+        return width != 0 ? width : left.VideoHeight.CompareTo(right.VideoHeight);
+    }
 
     private static string Blank(string value) =>
         value.Length == 0 ? UiStrings.LibraryGroupBlank : value;

@@ -117,15 +117,32 @@ internal static class AudioTagProbe
         // MediaFoundation の音声プローブはフォルダ追加を止める。尺と音声フォーマットはボックスから。
         if (!VideoCodecProbe.TryRead(
                 path,
-                out _,
+                out var codecs,
                 out var duration,
                 out var rate,
                 out var channels,
-                out var bits)
-            || (duration <= 0 && rate <= 0))
+                out var bits,
+                out var width,
+                out var height,
+                out var frameRate,
+                out var audioCodec)
+            || (duration <= 0 && rate <= 0 && width <= 0))
         {
             tags = new AudioFileTags { Probed = true };
             return true;
+        }
+
+        var bitRate = 0;
+        if (duration > 0)
+        {
+            try
+            {
+                bitRate = (int)Math.Round(new FileInfo(path).Length * 8d / duration / 1000d);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                bitRate = 0;
+            }
         }
 
         tags = new AudioFileTags
@@ -135,6 +152,12 @@ internal static class AudioTagProbe
             SampleRate = rate,
             Channels = channels,
             BitsPerSample = bits,
+            BitRateKbps = bitRate,
+            VideoWidth = width,
+            VideoHeight = height,
+            FrameRate = frameRate,
+            VideoCodec = codecs.Count > 0 ? codecs[0] : string.Empty,
+            AudioCodec = audioCodec,
         };
         return true;
     }

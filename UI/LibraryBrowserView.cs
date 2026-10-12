@@ -198,8 +198,12 @@ internal sealed class LibraryBrowserView : UserControl
     private int _sortChromeTicket;
     private LibraryFileColumn[] _waveColumns = [.. LibraryColumnFilter.WaveDefaults];
     private LibraryFileColumn[] _mp3Columns = [.. LibraryColumnFilter.Mp3Defaults];
+    private LibraryFileColumn[] _videoColumns = [.. LibraryColumnFilter.VideoDefaults];
     private LibraryFileColumn[] _mixedColumns =
-        LibraryColumnFilter.Union(LibraryColumnFilter.WaveDefaults, LibraryColumnFilter.Mp3Defaults);
+        LibraryColumnFilter.Union(
+            LibraryColumnFilter.WaveDefaults,
+            LibraryColumnFilter.Mp3Defaults,
+            LibraryColumnFilter.VideoDefaults);
     private bool _mixedColumnsCustomized;
     private LibraryFileColumn[] _visibleColumns = [.. LibraryColumnFilter.WaveDefaults];
     private bool _columnOrderBusy;
@@ -405,6 +409,9 @@ internal sealed class LibraryBrowserView : UserControl
         headerStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
         headerStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
         headerStyle.Setters.Add(new Setter(Control.BorderBrushProperty, Brushes.Transparent));
+        headerStyle.Setters.Add(new Setter(TextOptions.TextRenderingModeProperty, TextRenderingMode.Grayscale));
+        headerStyle.Setters.Add(new Setter(TextOptions.TextFormattingModeProperty, TextFormattingMode.Display));
+        headerStyle.Setters.Add(new Setter(UIElement.SnapsToDevicePixelsProperty, true));
         headerStyle.Setters.Add(new Setter(Control.TemplateProperty, ColumnHeaderTemplate()));
         _columnHeaderMenu ??= CreateColumnHeaderContextMenu();
         headerStyle.Setters.Add(new Setter(FrameworkElement.ContextMenuProperty, _columnHeaderMenu));
@@ -5011,6 +5018,10 @@ internal sealed class LibraryBrowserView : UserControl
             right: true,
             nonDefaultBinding: nameof(LibraryFileRow.ChannelsNonDefault));
         AddColumn(LibraryFileColumn.BitRate, nameof(LibraryFileRow.BitRateText), right: true);
+        AddColumn(LibraryFileColumn.VideoSize, nameof(LibraryFileRow.VideoSizeText), right: true);
+        AddColumn(LibraryFileColumn.FrameRate, nameof(LibraryFileRow.FrameRateText), right: true);
+        AddColumn(LibraryFileColumn.VideoCodec, nameof(LibraryFileRow.VideoCodec));
+        AddColumn(LibraryFileColumn.AudioCodec, nameof(LibraryFileRow.AudioCodec));
         AddColumn(LibraryFileColumn.Size, nameof(LibraryFileRow.SizeText), right: true);
         AddColumn(LibraryFileColumn.Folder, nameof(LibraryFileRow.Folder));
         AddColumn(LibraryFileColumn.Jacket, nameof(LibraryFileRow.JacketText));
@@ -5286,33 +5297,41 @@ internal sealed class LibraryBrowserView : UserControl
         IEnumerable<LibraryFileColumn> waveColumns,
         IEnumerable<LibraryFileColumn> mp3Columns,
         IEnumerable<LibraryFileColumn>? mixedColumns = null,
-        bool mixedCustomized = false)
+        bool mixedCustomized = false,
+        IEnumerable<LibraryFileColumn>? videoColumns = null)
     {
         _waveColumns = LibraryColumnFilter.ResolveWave(
             LibraryColumnFilter.Serialize(waveColumns, LibraryColumnFilter.WaveDefaults));
         _mp3Columns = LibraryColumnFilter.ResolveMp3(
             LibraryColumnFilter.Serialize(mp3Columns, LibraryColumnFilter.Mp3Defaults));
+        _videoColumns = LibraryColumnFilter.ResolveVideo(
+            videoColumns is null
+                ? null
+                : LibraryColumnFilter.Serialize(videoColumns, LibraryColumnFilter.VideoDefaults));
         _mixedColumnsCustomized = mixedCustomized && mixedColumns is not null;
         _mixedColumns = _mixedColumnsCustomized
             ? LibraryColumnFilter.ResolveMixed(
                 LibraryColumnFilter.Serialize(mixedColumns!, LibraryColumnFilter.MixedDefaults),
                 _waveColumns,
-                _mp3Columns)
-            : LibraryColumnFilter.Union(_waveColumns, _mp3Columns);
+                _mp3Columns,
+                _videoColumns)
+            : LibraryColumnFilter.Union(_waveColumns, _mp3Columns, _videoColumns);
         ApplyActiveColumnVisibility(notify: false, forceLayout: true);
     }
 
-    /// <summary>テスト用。両方のプリセットへ同じ列を入れる。</summary>
+    /// <summary>テスト用。Wave / MP3 / Video プリセットへ同じ列を入れる。</summary>
     public void SetVisibleColumns(IEnumerable<LibraryFileColumn> columns)
     {
         var ordered = LibraryColumnFilter.ResolveWave(
             LibraryColumnFilter.Serialize(columns, LibraryColumnFilter.WaveDefaults));
-        SetVisibleColumnPresets(ordered, ordered);
+        SetVisibleColumnPresets(ordered, ordered, videoColumns: ordered);
     }
 
     internal IReadOnlyList<LibraryFileColumn> WaveColumnOrder => _waveColumns;
 
     internal IReadOnlyList<LibraryFileColumn> Mp3ColumnOrder => _mp3Columns;
+
+    internal IReadOnlyList<LibraryFileColumn> VideoColumnOrder => _videoColumns;
 
     internal IReadOnlyList<LibraryFileColumn> MixedColumnOrder => _mixedColumns;
 
@@ -5351,15 +5370,18 @@ internal sealed class LibraryBrowserView : UserControl
             kind,
             _waveColumns,
             _mp3Columns,
+            _videoColumns,
             _mixedColumns,
             visible,
             out var wave,
             out var mp3,
+            out var video,
             out var mixed);
         _waveColumns = wave;
         _mp3Columns = mp3;
+        _videoColumns = video;
         _mixedColumns = mixed;
-        // Wave / MP3 を変えたら混在は和集合へ戻す。混在を弄ったときだけユーザー設定になる。
+        // Wave / MP3 / Video を変えたら混在は和集合へ戻す。混在を弄ったときだけユーザー設定になる。
         _mixedColumnsCustomized = kind == LibraryPlaylistColumnKind.Mixed;
 
         ApplyActiveColumnVisibility(notify);
@@ -5373,7 +5395,8 @@ internal sealed class LibraryBrowserView : UserControl
                 _rows,
                 _waveColumns,
                 _mp3Columns,
-                _mixedColumns);
+                _mixedColumns,
+                _videoColumns);
             ApplyColumnDisplayOrder(_visibleColumns);
         }
 
@@ -5387,6 +5410,7 @@ internal sealed class LibraryBrowserView : UserControl
                 new LibraryColumnPresets(
                     _waveColumns,
                     _mp3Columns,
+                    _videoColumns,
                     _mixedColumns,
                     PersistMixed: _mixedColumnsCustomized));
         }
@@ -5414,7 +5438,8 @@ internal sealed class LibraryBrowserView : UserControl
                 _rows,
                 _waveColumns,
                 _mp3Columns,
-                _mixedColumns);
+                _mixedColumns,
+                _videoColumns);
             var enabled = new HashSet<LibraryFileColumn>(_visibleColumns);
             var used = CurrentUsedColumns();
             if (_sortColumn is { } sort
@@ -5671,7 +5696,8 @@ internal sealed class LibraryBrowserView : UserControl
                     _rows,
                     _waveColumns,
                     _mp3Columns,
-                    _mixedColumns);
+                    _mixedColumns,
+                    _videoColumns);
                 if (!next.SequenceEqual(_visibleColumns))
                 {
                     _visibleColumns = next;
@@ -5826,7 +5852,7 @@ internal sealed class LibraryBrowserView : UserControl
     }
 
     private static string ColumnHeader(LibraryFileColumn column) =>
-        UiStrings.LibraryColumnLabel(column);
+        UiStrings.LibraryColumnHeader(column);
 
     private void AddGroupSpacerColumn()
     {
@@ -6028,7 +6054,14 @@ internal sealed class LibraryBrowserView : UserControl
                 continue;
             }
 
-            var max = Measure(ColumnHeader(kind), headerFace) + headerPad;
+            // 見出しは改行あり。最も長い行の幅で列を決める。
+            var headerWidth = 0d;
+            foreach (var line in ColumnHeader(kind).Split('\n'))
+            {
+                headerWidth = Math.Max(headerWidth, Measure(line, headerFace));
+            }
+
+            var max = headerWidth + headerPad;
             if (kind == _sortColumn)
             {
                 max += LibraryColumnSortPad;
@@ -7788,7 +7821,9 @@ internal sealed class LibraryBrowserView : UserControl
             BitDepthNonDefault = LibraryPlayerMode.HighlightsFormatValue(bits, defaultBitsPerSample),
             ChannelsNonDefault = LibraryPlayerMode.HighlightsFormatValue(channels, defaultChannels),
             BitRateKbps = bitRate,
-            BitRateText = UiStrings.FormatBitRate(bitRate),
+            BitRateText = LibraryPlaylistDocuments.IsVideo(document)
+                ? UiStrings.FormatVideoBitRate(bitRate)
+                : UiStrings.FormatBitRate(bitRate),
             FileBytes = document.FileBytes,
             SizeText = UiStrings.FormatFileBytesCompact(document.FileBytes),
             FileDate = document.FileLastWriteTime ?? default,
@@ -7799,6 +7834,13 @@ internal sealed class LibraryBrowserView : UserControl
             ParentFolder = LibraryFileList.ParentFolderName(path),
             HasArtwork = hasArt,
             JacketText = hasArt ? UiStrings.LibraryJacketMark : string.Empty,
+            VideoWidth = tags.VideoWidth,
+            VideoHeight = tags.VideoHeight,
+            VideoSizeText = UiStrings.FormatVideoSize(tags.VideoWidth, tags.VideoHeight),
+            FrameRate = tags.FrameRate,
+            FrameRateText = UiStrings.FormatFrameRate(tags.FrameRate),
+            VideoCodec = tags.VideoCodec,
+            AudioCodec = tags.AudioCodec,
         };
     }
 
@@ -8576,11 +8618,20 @@ internal sealed class LibrarySortHeader : StackPanel
     {
         Orientation = Orientation.Horizontal;
         VerticalAlignment = VerticalAlignment.Center;
+        SnapsToDevicePixels = true;
+        UseLayoutRounding = true;
         _label = new TextBlock
         {
             Text = label,
+            TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
+            SnapsToDevicePixels = true,
         };
+        // 背面グロー／動画プレビューが動くと ClearType の色付きフリンジが
+        // 背景色に追従して約 1px 揺れて見える。グレースケールで止める。
+        TextOptions.SetTextRenderingMode(_label, TextRenderingMode.Grayscale);
+        TextOptions.SetTextFormattingMode(_label, TextFormattingMode.Display);
         _marks = new StackPanel
         {
             Orientation = Orientation.Horizontal,

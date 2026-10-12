@@ -65,6 +65,9 @@ internal partial class AudioSettingsWindow : Window
     public LibraryFileColumn[] SelectedLibraryListColumnsMp3 { get; private set; } =
         [.. LibraryColumnFilter.Mp3Defaults];
 
+    public LibraryFileColumn[] SelectedLibraryListColumnsVideo { get; private set; } =
+        [.. LibraryColumnFilter.VideoDefaults];
+
     public LibraryPlaylistWaveformSize SelectedLibraryPlaylistWaveformSizeWave { get; private set; } =
         LibraryPlaylistWaveformSize.L;
 
@@ -127,6 +130,7 @@ internal partial class AudioSettingsWindow : Window
     private readonly int _uiScaleOpenedAt;
     private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecksWave = [];
     private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecksMp3 = [];
+    private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecksVideo = [];
 
     public AudioSettingsWindow(
         AudioOutputSettings current,
@@ -155,6 +159,7 @@ internal partial class AudioSettingsWindow : Window
         IEnumerable<string>? libraryExplorerRoots = null,
         IEnumerable<LibraryFileColumn>? libraryListColumnsWave = null,
         IEnumerable<LibraryFileColumn>? libraryListColumnsMp3 = null,
+        IEnumerable<LibraryFileColumn>? libraryListColumnsVideo = null,
         LibraryPlaylistWaveformSize libraryPlaylistWaveformSizeWave = LibraryPlaylistWaveformSize.L,
         LibraryPlaylistWaveformSize libraryPlaylistWaveformSizeMp3 = LibraryPlaylistWaveformSize.L,
         bool gaplessPlayback = true,
@@ -197,6 +202,10 @@ internal partial class AudioSettingsWindow : Window
             libraryListColumnsMp3 is null
                 ? null
                 : LibraryColumnFilter.Serialize(libraryListColumnsMp3, LibraryColumnFilter.Mp3Defaults));
+        SelectedLibraryListColumnsVideo = LibraryColumnFilter.ResolveVideo(
+            libraryListColumnsVideo is null
+                ? null
+                : LibraryColumnFilter.Serialize(libraryListColumnsVideo, LibraryColumnFilter.VideoDefaults));
         SelectedLibraryPlaylistWaveformSizeWave =
             LibraryPlaylistWaveformSizes.Clamp(libraryPlaylistWaveformSizeWave);
         SelectedLibraryPlaylistWaveformSizeMp3 =
@@ -266,6 +275,7 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(VideoProxyClearAllButton);
         ActionButtonLooks.ApplyClear(LibraryColumnsWaveResetButton);
         ActionButtonLooks.ApplyClear(LibraryColumnsMp3ResetButton);
+        ActionButtonLooks.ApplyClear(LibraryColumnsVideoResetButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
         AppDialogKeys.PrepareActionButton(OkButton, isDefault: true);
@@ -275,6 +285,7 @@ internal partial class AudioSettingsWindow : Window
         AppDialogKeys.PrepareActionButton(VideoProxyClearAllButton);
         AppDialogKeys.PrepareActionButton(LibraryColumnsWaveResetButton);
         AppDialogKeys.PrepareActionButton(LibraryColumnsMp3ResetButton);
+        AppDialogKeys.PrepareActionButton(LibraryColumnsVideoResetButton);
         AppDialogKeys.PrepareActionButton(LibraryExplorerRootAddButton);
         AppDialogKeys.PrepareActionButton(LibraryExplorerRootRemoveButton);
         AppDialogKeys.PrepareActionButton(LibraryExplorerRootUpButton);
@@ -372,10 +383,13 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(LibraryColumnsHeader, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnsWaveHeader, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnsMp3Header, UiStrings.TipLibraryColumns);
+        TipService.Set(LibraryColumnsVideoHeader, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnsWaveHost, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnsMp3Host, UiStrings.TipLibraryColumns);
+        TipService.Set(LibraryColumnsVideoHost, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnsWaveResetButton, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryColumnsMp3ResetButton, UiStrings.TipLibraryColumns);
+        TipService.Set(LibraryColumnsVideoResetButton, UiStrings.TipLibraryColumns);
         TipService.Set(LibraryPlaylistWaveformSizeWaveHeader, UiStrings.TipLibraryPlaylistWaveformSize);
         TipService.Set(LibraryPlaylistWaveformSizeWaveCombo, UiStrings.TipLibraryPlaylistWaveformSize);
         TipService.Set(LibraryPlaylistWaveformSizeMp3Header, UiStrings.TipLibraryPlaylistWaveformSize);
@@ -536,6 +550,12 @@ internal partial class AudioSettingsWindow : Window
             SelectedLibraryListColumnsMp3,
             LibraryColumnFilter.Mp3Defaults,
             LibraryColumnFilter.Mp3SettingsColumns);
+        FillLibraryColumnHost(
+            LibraryColumnsVideoHost,
+            _libraryColumnChecksVideo,
+            SelectedLibraryListColumnsVideo,
+            LibraryColumnFilter.VideoDefaults,
+            LibraryColumnFilter.VideoSettingsColumns);
     }
 
     private void FillLibraryColumnHost(
@@ -618,6 +638,17 @@ internal partial class AudioSettingsWindow : Window
         SelectLibraryPlaylistWaveformSize(
             LibraryPlaylistWaveformSizeMp3Combo,
             SelectedLibraryPlaylistWaveformSizeMp3);
+    }
+
+    private void LibraryColumnsVideoResetButton_Click(object sender, RoutedEventArgs e)
+    {
+        SelectedLibraryListColumnsVideo = [.. LibraryColumnFilter.VideoDefaults];
+        FillLibraryColumnHost(
+            LibraryColumnsVideoHost,
+            _libraryColumnChecksVideo,
+            SelectedLibraryListColumnsVideo,
+            LibraryColumnFilter.VideoDefaults,
+            LibraryColumnFilter.VideoSettingsColumns);
     }
 
     private void FillLibraryPlaylistWaveformOptions()
@@ -1262,6 +1293,9 @@ internal partial class AudioSettingsWindow : Window
         SelectedLibraryListColumnsMp3 = ReadLibraryColumns(
             _libraryColumnChecksMp3,
             SelectedLibraryListColumnsMp3);
+        SelectedLibraryListColumnsVideo = ReadLibraryColumns(
+            _libraryColumnChecksVideo,
+            SelectedLibraryListColumnsVideo);
         SelectedLibraryPlaylistWaveformSizeWave = ReadLibraryPlaylistWaveformSize(
             LibraryPlaylistWaveformSizeWaveCombo,
             LibraryPlaylistWaveformSize.L);
@@ -2435,6 +2469,7 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(VideoProxyClearAllButton);
         ActionButtonLooks.ApplyClear(LibraryColumnsWaveResetButton);
         ActionButtonLooks.ApplyClear(LibraryColumnsMp3ResetButton);
+        ActionButtonLooks.ApplyClear(LibraryColumnsVideoResetButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
         RefreshTestButtons();
