@@ -24,7 +24,7 @@ internal static class LibraryExplorerTypeahead
             return false;
         }
 
-        // テンキーは再生操作、上段の数字は割合ジャンプのまま。文字だけフォルダ名に使う。
+        // テンキーは再生操作。上段数字はツリーではジャンプしない（Shift+8 は展開）。文字だけフォルダ名に使う。
         if (key is >= Key.NumPad0 and <= Key.NumPad9
             || key is >= Key.D0 and <= Key.D9)
         {

@@ -17,8 +17,25 @@ internal static class LibraryPlayerMode
     public static bool HidesWaveformContextMenu(bool playerMode) => false;
 #pragma warning restore IDE0060
 
-    /// <summary>プレイヤーではマーカー／リージョン／ループを波形に出さない。</summary>
+    /// <summary>プレイヤーではドキュメントのマーカー／リージョン／ループを波形に出さない。</summary>
     public static bool ShowsCueOverlays(bool playerMode) => !playerMode;
+
+    /// <summary>
+    /// 捨て A-B／マーカーを波形に出すか。
+    /// 音声のプレイリスト波形、動画本再生／F8 ミニ／イマーシブ一時停止。
+    /// 動画／PDF の暗いプレビューでは出さない（キューは保持してよい）。
+    /// </summary>
+    public static bool ShowsPlayerScratchOverlays(
+        bool playerMode,
+        bool videoMiniPlayer,
+        bool videoRealPlayback,
+        bool videoImmersivePause = false,
+        bool audioWaveform = false) =>
+        playerMode
+        && (audioWaveform
+            || videoMiniPlayer
+            || videoRealPlayback
+            || videoImmersivePause);
 
     /// <summary>
     /// 波形の再生ヘッド（シークバー）とマウス直下ガイド。
@@ -55,9 +72,7 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.Settings
             or WaveMenuCommand.ColorPanel
             or WaveMenuCommand.Quit
-            or WaveMenuCommand.ReopenTab
-            or WaveMenuCommand.NextTab
-            or WaveMenuCommand.PrevTab
+            // プレイヤーではタブ UI 無し。Reopen／次／前タブは無効（プレイリスト操作を使う）。
             or WaveMenuCommand.CopyAllTabTimes
             or WaveMenuCommand.CopySelectionTime
             or WaveMenuCommand.CopySelectionTimePath
@@ -66,6 +81,13 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.Tips
             or WaveMenuCommand.Manual
             or WaveMenuCommand.GitHub
+            or WaveMenuCommand.AddMarker
+            or WaveMenuCommand.AddMarkerHere
+            or WaveMenuCommand.ClearMarkers
+            or WaveMenuCommand.DeleteMarkers
+            or WaveMenuCommand.DeleteAllMarkers
+            or WaveMenuCommand.PrevMarker
+            or WaveMenuCommand.NextMarker
             => false,
         _ => true,
     };
@@ -129,7 +151,9 @@ internal static class LibraryPlayerMode
         }
 
         if ((key is Key.Left or Key.Right)
-            && modifiers is ModifierKeys.None or ModifierKeys.Control)
+            && modifiers is ModifierKeys.None
+                or ModifierKeys.Control
+                or (ModifierKeys.Control | ModifierKeys.Shift))
         {
             return true;
         }
@@ -151,12 +175,32 @@ internal static class LibraryPlayerMode
             return true;
         }
 
+        if ((key is Key.Left or Key.Right)
+            && (modifiers & ModifierKeys.Alt) != 0
+            && (modifiers & ~(ModifierKeys.Alt | ModifierKeys.Shift | ModifierKeys.Control)) == 0)
+        {
+            return true;
+        }
+
         return (key, modifiers) switch
         {
             (Key.Space, ModifierKeys.None or ModifierKeys.Control) => true,
             (Key.Enter, ModifierKeys.None or ModifierKeys.Alt) => true,
             (Key.L, ModifierKeys.None) => true,
+            (Key.N, ModifierKeys.None) => true,
+            (Key.P, ModifierKeys.None) => true,
             (Key.R, ModifierKeys.None) => true,
+            (Key.R, ModifierKeys.Alt) => true,
+            (Key.J, ModifierKeys.None) => true,
+            (Key.K, ModifierKeys.None) => true,
+            (Key.OemComma, ModifierKeys.None) => true,
+            (Key.OemPeriod, ModifierKeys.None) => true,
+            (Key.I, ModifierKeys.None) => true,
+            (Key.O, ModifierKeys.None) => true,
+            (Key.M, ModifierKeys.None) => true,
+            (Key.Insert, ModifierKeys.None) => true,
+            (Key.Delete, ModifierKeys.Control) => true,
+            (Key.R, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.A, ModifierKeys.Control) => true,
             (Key.F, ModifierKeys.Control) => true,
             (Key.S, ModifierKeys.Alt) => true,
@@ -167,12 +211,18 @@ internal static class LibraryPlayerMode
             (Key.C, ModifierKeys.Control) => true,
             (Key.C, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Z, ModifierKeys.Control) => true,
+            (Key.Z, ModifierKeys.Control | ModifierKeys.Shift) => true,
+            (Key.Y, ModifierKeys.Control) => true,
             (Key.T, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Tab, ModifierKeys.Control) => true,
             (Key.Tab, ModifierKeys.Control | ModifierKeys.Shift) => true,
             _ => false,
         };
     }
+
+    /// <summary>プレイヤーで選択中の捨てマーカーを Delete で消すとき。リスト除外より優先。</summary>
+    public static bool PrefersScratchMarkerDelete(bool playerMode, bool hasSelectedScratchMarkers) =>
+        playerMode && hasSelectedScratchMarkers;
 
     /// <summary>
     /// Space 単独再生はプレイリストがアクティブなときだけ。
@@ -182,11 +232,42 @@ internal static class LibraryPlayerMode
         !explorerFocused && !favoritesFocused;
 
     /// <summary>
-    /// Space で止めて暗いバックグラウンドへ戻す状態。
-    /// 本再生に加え、フレーム送り／テンキー 0 のイマーシブ一時停止中も含む（再開しない）。
+    /// Escape で本再生／フレーム一時停止から暗いバックグラウンドへ戻す状態。
+    /// Space 自体は開始位置へ静止（暗いプレビューへは落とさない）。
     /// </summary>
     public static bool HaltsLibraryPlaybackOnSpace(bool playbackActive, bool immersiveVideoPause) =>
         playbackActive || immersiveVideoPause;
+
+    /// <summary>
+    /// 動画本再生／PDF 明るい表示／イマーシブ一時停止など前面 UI が隠れているとき、
+    /// プレイリストの全選択・行除外（Ctrl+A／Delete）を受け付けない。
+    /// </summary>
+    public static bool BlocksPlaylistMutationWhileChromeHidden(bool chromeVisible) =>
+        !chromeVisible;
+
+    /// <summary>
+    /// F10 でエディタへ落とさず、暗いプレビューへ戻してプレイリスト（前面 UI）を出す。
+    /// 動画／PDF の本再生中（クローム隠れ）とフレーム一時停止中。動画ミニ（F8）は別経路。
+    /// </summary>
+    public static bool ReturnsToPlaylistChromeOnF10(
+        bool player,
+        bool videoMini,
+        bool visualShown,
+        bool visualPlaying,
+        bool isPdf,
+        bool isVideo,
+        bool bridgeHold = false,
+        bool immersivePauseHold = false) =>
+        player
+        && !videoMini
+        && HidesChromeForPlaylistVisual(
+            player,
+            visualShown,
+            visualPlaying,
+            isPdf,
+            isVideo,
+            bridgeHold,
+            immersivePauseHold);
 
     /// <summary>
     /// 同じ動画の暗いプレビュー（速度ランプ中含む）から本再生へ戻すとき、
@@ -200,18 +281,19 @@ internal static class LibraryPlayerMode
         visualShown && !visualPlaying && sameSource && isVideo;
 
     /// <summary>
-    /// 動画本再生の Space／Enter 停止。
-    /// F8 動画ミニは止めた位置で静止（暗いプレビューへ落とさない）。
-    /// F10 プレイリストは止めた位置から暗い 1/3 速＋格子へ戻す。
-    /// </summary>
-    public static bool VideoStopFreezesFrame(bool videoMiniPlayer) => videoMiniPlayer;
-
-    /// <summary>
     /// ランダム再生の切替。プレイリストが空でも、ツリー／お気に入りフォーカスでも効く。
     /// 検索欄では文字入力のまま。
     /// </summary>
     public static bool IsShuffleToggle(Key key, ModifierKeys modifiers) =>
-        key == Key.R && modifiers == ModifierKeys.None;
+        key == Key.R && modifiers == ModifierKeys.Alt;
+
+    /// <summary>前の曲／次の曲（テンキー 4／6 と同じ。ノートPC向け）。</summary>
+    public static bool IsPlayerTrackStepKey(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None && key is Key.P or Key.N;
+
+    /// <summary>再生し直し（テンキー 5 と同じ。ノートPC向け）。</summary>
+    public static bool IsPlayerRestartKey(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None && key == Key.R;
 
     /// <summary>
     /// フォルダツリーの更新とフォーカス移動。プレイリスト／お気に入り／波形フォーカスでも効く。
@@ -246,6 +328,12 @@ internal static class LibraryPlayerMode
     public static bool IsExplorerExpandAll(Key key, ModifierKeys modifiers) =>
         (key == Key.Multiply && modifiers == ModifierKeys.None)
         || (key == Key.D8 && modifiers == ModifierKeys.Shift);
+
+    /// <summary>
+    /// プレイヤーの上段数字ジャンプ（割合／マーカー）。
+    /// ツリーフォーカス中は使わず、Shift+8 の配下展開などを優先する。
+    /// </summary>
+    public static bool AllowsPlayerDigitJump(bool explorerFocused) => !explorerFocused;
 
     /// <summary>エクスプローラーの /。テンキーと Oem2（日本語キーボードの /）。</summary>
     public static bool IsExplorerCollapseSubtree(Key key, ModifierKeys modifiers) =>
@@ -325,8 +413,14 @@ internal static class LibraryPlayerMode
         }
 
         // 削除・バックスペース・切り取り／貼り付け・複製などファイル操作系は止める。Ctrl+C はコピーとして通す。
+        // Ctrl+Delete は捨てマーカー削除（エディタ同様）なのでツリーでは握らない。
         // F2 はプレイヤーでお気に入りフォーカスに使うので、ここでは止めない。
-        if (key is Key.Delete or Key.Back)
+        if (key == Key.Delete && modifiers == ModifierKeys.Control)
+        {
+            return false;
+        }
+
+        if ((key is Key.Delete or Key.Back) && modifiers == ModifierKeys.None)
         {
             return true;
         }
@@ -539,6 +633,9 @@ internal static class LibraryPlayerMode
 
     /// <summary>ホバー↔本再生／PDF 表示の前面クローム。メーター用の 1 秒より短く。</summary>
     public const double ChromeFadeSeconds = 0.2;
+
+    /// <summary>PDF ページ切替時、ページ番号を出してからフェードアウトするまでの表示時間。</summary>
+    public const double PdfPageNumberToastHoldSeconds = 1;
 
     public const int MeterFadeFrameRate = 30;
 
@@ -968,23 +1065,82 @@ internal static class LibraryPlayerMode
 
     /// <summary>PDF ページを静止背景レイヤーへ固定／解除（固定時は表示を閉じる）。</summary>
     public static bool IsPdfBackgroundPinToggle(Key key, ModifierKeys modifiers) =>
-        key == Key.B && modifiers == ModifierKeys.None;
+        key == Key.W && modifiers == ModifierKeys.None;
 
     /// <summary>
-    /// 明るい PDF 表示を Enter／Space で抜けるときは暗いプレビューへ戻す。
-    /// B で静止背景に固定したあとはプレビューを出さず、固定レイヤーだけ残す。
+    /// 明るい PDF 表示を Escape で抜けるときは暗いプレビューへ戻す。
+    /// W で静止背景に固定したあとはプレビューを出さず、固定レイヤーだけ残す。
     /// </summary>
     public static bool RestoresPdfDimPreviewOnExit(bool backgroundPinned) => !backgroundPinned;
-
-    /// <summary>
-    /// プレイリストの Enter。再生中は止め、停止中だけ先頭から連続再生を始める。
-    /// </summary>
-    public static bool StartsLibraryPlaybackOnEnter(bool playbackActive) => !playbackActive;
 
     /// <summary>PDF 表示中のページめくり・先頭／末尾。</summary>
     public static bool IsPdfPageKey(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None
         && key is Key.Left or Key.Right or Key.PageUp or Key.PageDown or Key.Home or Key.End;
+
+    /// <summary>PDF 本表示中、キーボード上段の数字でページ番号へ飛ぶ（テンキーは再生操作のまま）。</summary>
+    public static bool IsPdfPageDigitKey(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None && IsTopRowDigitKey(key);
+
+    /// <summary>
+    /// PDF 本表示中にページ番号トーストを出してよい状態（前面クローム隠れ）。
+    /// 常時表示ではなく、ページ切替の瞬間だけ Flash する。
+    /// </summary>
+    public static bool ShowsPlaylistPdfPageNumber(bool chromeHidden, bool isPdf) =>
+        chromeHidden && isPdf;
+
+    /// <summary>表示用の「現在 / 総ページ」（1 始まり）。</summary>
+    public static string FormatPdfPageLabel(int pageIndex0Based, int pageCount)
+    {
+        var total = Math.Max(1, pageCount);
+        var current = Math.Clamp(pageIndex0Based + 1, 1, total);
+        return $"{current} / {total}";
+    }
+
+    /// <summary>
+    /// PDF ページ番号の桁送り（キーボード上段のみ。1 始まり。二桁可）。
+    /// 0 単体は 1 と同じ（1 ページへ）。pending があるときの 0 は 10／20… 用。
+    /// テンキーは再生操作（4＝前／6＝次など）のため使わない。
+    /// seekPage があればその番号へ。無効な桁は握りつぶし（割合ジャンプには落とさない）。
+    /// </summary>
+    public static bool TryResolvePdfPageDigitJump(
+        int pending,
+        int digit,
+        int pageCount,
+        out int nextPending,
+        out int? seekPage1Based)
+    {
+        nextPending = 0;
+        seekPage1Based = null;
+        if (pageCount <= 0 || digit is < 0 or > 9)
+        {
+            return false;
+        }
+
+        // 0 単体は 1 ページと同じ扱い（続けて 0 なら 10 ページへ）。
+        if (pending == 0 && digit == 0)
+        {
+            digit = 1;
+        }
+
+        var next = pending * 10 + digit;
+        if (next > 0 && next <= pageCount)
+        {
+            nextPending = next;
+            seekPage1Based = next;
+            return true;
+        }
+
+        if (digit > 0 && digit <= pageCount)
+        {
+            nextPending = digit;
+            seekPage1Based = digit;
+            return true;
+        }
+
+        // 総ページを超える桁は消費だけ（再生操作／割合へ落とさない）。
+        return true;
+    }
 
     /// <summary>キーボード／テンキーの +（PDF 拡縮・動画ミニ窓サイズ共通）。</summary>
     public static bool IsZoomInKey(Key key, ModifierKeys modifiers) =>
@@ -1202,9 +1358,10 @@ internal static class LibraryPlayerMode
     }
 
     /// <summary>
-    /// ↑↓／ページ送りの選択移動。端で反対側へ回る。今の行が見つからなければ送りは先頭・戻しは末尾。空なら -1。
+    /// ↑↓／ページ送りの選択移動。wrap なら端で反対側へ回る。長押し連続では wrap=false で端に一旦止まる。
+    /// 今の行が見つからなければ送りは先頭・戻しは末尾。空なら -1。
     /// </summary>
-    public static int StepLoopIndex(int count, int current, int delta)
+    public static int StepLoopIndex(int count, int current, int delta, bool wrap = true)
     {
         if (count <= 0 || delta == 0)
         {
@@ -1214,6 +1371,11 @@ internal static class LibraryPlayerMode
         if (current < 0 || current >= count)
         {
             return delta > 0 ? 0 : count - 1;
+        }
+
+        if (!wrap)
+        {
+            return Math.Clamp(current + delta, 0, count - 1);
         }
 
         var next = (current + delta) % count;
@@ -1290,15 +1452,112 @@ internal static class LibraryPlayerMode
             or LibraryNumpadCommand.SeekBack
             or LibraryNumpadCommand.SeekForward;
 
+    /// <summary>
+    /// マーカー番号・Ctrl+←→ など捨てキュー操作を使うか。
+    /// 音声波形／動画本再生／F8／イマーシブ一時停止（暗いプレビューは不可）。
+    /// </summary>
+    public static bool UsesPlayerMarkerShortcuts(
+        bool videoMiniPlayer,
+        bool videoRealPlayback,
+        bool videoImmersivePause = false,
+        bool audioWaveform = false) =>
+        ShowsPlayerScratchOverlays(
+            playerMode: true,
+            videoMiniPlayer,
+            videoRealPlayback,
+            videoImmersivePause,
+            audioWaveform);
+
+    /// <summary>
+    /// プレイヤーではエディタのドキュメント・マーカー追加へ落とさない
+    /// （ShowsCueOverlays=false のため波形に出ず、捨てキューと二重管理になる）。
+    /// </summary>
+    public static bool BlocksEditorMarkerPlacement(bool playerMode) => playerMode;
+
+    /// <summary>捨て A-B／一時マーカーのキー（修飾なし）。ツリーのタイプアヘッドより優先する判定用。</summary>
+    public static bool IsPlayerScratchCueKey(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None && key is Key.I or Key.O or Key.M or Key.Insert;
+
+    /// <summary>
+    /// プレイヤーで一時マーカーがあるとき、Shift＋上段数字でマーカー番号ジャンプ（二桁可）。
+    /// Shift＋テンキーは使わない。無修飾の上段は常に割合ジャンプ。
+    /// テンキー再生操作は <see cref="UsesTransportNumpad"/>（プレイヤー／エディタ共通）。
+    /// </summary>
+    public static bool CanPlayerMarkerDigitJump(bool playerMarkerContext, bool hasScratchMarkers) =>
+        playerMarkerContext && hasScratchMarkers;
+
+    /// <summary>テンキー再生操作を使う（プレイヤー／エディタ共通。上段は割合ジャンプのまま）。</summary>
+    public static bool UsesTransportNumpad() => true;
+
+    /// <summary>上段 0–9（割合／マーカージャンプ用。テンキーは含めない）。</summary>
+    public static bool IsTopRowDigitKey(Key key) =>
+        key is >= Key.D0 and <= Key.D9;
+
+    /// <summary>無修飾＝割合（上段のみ）、Shift＝マーカー（上段のみ）。テンキーは再生操作。</summary>
+    public static bool IsDigitJumpChord(Key key, ModifierKeys modifiers) =>
+        IsPercentDigitJump(key, modifiers) || IsMarkerDigitJump(key, modifiers);
+
+    public static bool IsPercentDigitJump(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None && IsTopRowDigitKey(key);
+
+    public static bool IsMarkerDigitJump(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.Shift && IsTopRowDigitKey(key);
+
+    /// <summary>
+    /// マーカー番号の桁送り（Shift＋上段）。
+    /// seekId があればその番号へ。無効な桁は percentFallback（呼び出し側で無視可）。
+    /// </summary>
+    public static bool TryResolveMarkerDigitJump(
+        int pending,
+        int digit,
+        int markerCount,
+        out int nextPending,
+        out int? seekId,
+        out bool percentFallback)
+    {
+        nextPending = 0;
+        seekId = null;
+        percentFallback = false;
+        if (markerCount <= 0 || digit is < 0 or > 9)
+        {
+            return false;
+        }
+
+        var next = pending * 10 + digit;
+        if (next > 0 && next <= markerCount)
+        {
+            nextPending = next;
+            seekId = next;
+            return true;
+        }
+
+        if (digit > 0 && digit <= markerCount)
+        {
+            nextPending = digit;
+            seekId = digit;
+            return true;
+        }
+
+        percentFallback = true;
+        return true;
+    }
+
+    /// <summary>テンキー数字（無修飾）。プレイヤーではすべて再生操作側で消費（2／8 は未割り当て）。</summary>
     public static bool IsPlayerNumpadKey(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && key is >= Key.NumPad0 and <= Key.NumPad9;
 
+    /// <summary>英字／記号のシャトル（,．）。テンキー 1／3 は呼び出し側で別判定。</summary>
     public static bool IsPlayerShuttleKey(Key key, ModifierKeys modifiers) =>
-        modifiers == ModifierKeys.None && key is Key.NumPad1 or Key.NumPad3;
+        modifiers == ModifierKeys.None && key is Key.OemComma or Key.OemPeriod;
 
+    /// <summary>英字の 5 秒スキップ（J／K）。テンキー 7／9 は呼び出し側で別判定。</summary>
     public static bool IsPlayerSeekNudgeKey(Key key, ModifierKeys modifiers) =>
-        modifiers == ModifierKeys.None && key is Key.NumPad7 or Key.NumPad9;
+        modifiers == ModifierKeys.None && key is Key.J or Key.K;
 
+    /// <summary>
+    /// テンキー再生操作（プレイヤー／エディタ共通）。
+    /// 2／8 は割り当てなし（呼び出し側で握りつぶし。割合ジャンプにはしない）。
+    /// </summary>
     public static LibraryNumpadCommand PlayerNumpadCommand(Key key, ModifierKeys modifiers)
     {
         if (!IsPlayerNumpadKey(key, modifiers))
@@ -1320,6 +1579,24 @@ internal static class LibraryPlayerMode
         };
     }
 
+    /// <summary>英字／記号の再生操作（J／K／,／.。テンキーは <see cref="PlayerNumpadCommand"/>）。</summary>
+    public static LibraryNumpadCommand PlayerTransportCommand(Key key, ModifierKeys modifiers)
+    {
+        if (modifiers != ModifierKeys.None)
+        {
+            return LibraryNumpadCommand.None;
+        }
+
+        return key switch
+        {
+            Key.OemComma => LibraryNumpadCommand.Rewind,
+            Key.OemPeriod => LibraryNumpadCommand.FastForward,
+            Key.J => LibraryNumpadCommand.SeekBack,
+            Key.K => LibraryNumpadCommand.SeekForward,
+            _ => LibraryNumpadCommand.None,
+        };
+    }
+
     public static int PageStep(int visibleRows) =>
         Math.Max(1, visibleRows - 1);
 
@@ -1328,11 +1605,18 @@ internal static class LibraryPlayerMode
 
     /// <summary>
     /// Ctrl+←／↑ ライブラリ、Ctrl+→ プレイリスト、Ctrl+↓ お気に入り。
-    /// エディタのマーカー移動／ズームは引き継がない。
+    /// 動画ミニ（F8）では Ctrl+←／→ をマーカージャンプに使うため、呼び出し側で除外する。
     /// </summary>
     public static bool IsPaneFocusArrow(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.Control
         && key is Key.Left or Key.Right or Key.Up or Key.Down;
+
+    /// <summary>
+    /// プレイヤーで一時マーカーがあるとき Ctrl+←／→ をマーカージャンプに使う。
+    /// マーカーが無い／暗いプレビューではペインフォーカス（ライブラリ⇔プレイリスト）のまま。
+    /// </summary>
+    public static bool PrefersMarkerArrowJump(bool playerMarkerContext, bool hasScratchMarkers) =>
+        playerMarkerContext && hasScratchMarkers;
 
     /// <summary>
     /// Ctrl+F の行き先。プレイリストならリスト検索、ツリー／お気に入りはライブラリ検索。

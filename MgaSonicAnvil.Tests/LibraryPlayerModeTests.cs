@@ -24,6 +24,34 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.HidesWaveformContextMenu(playerMode: false));
         Assert.False(LibraryPlayerMode.ShowsCueOverlays(playerMode: true));
         Assert.True(LibraryPlayerMode.ShowsCueOverlays(playerMode: false));
+        Assert.True(LibraryPlayerMode.ShowsPlayerScratchOverlays(
+            playerMode: true,
+            videoMiniPlayer: true,
+            videoRealPlayback: false));
+        Assert.True(LibraryPlayerMode.ShowsPlayerScratchOverlays(
+            playerMode: true,
+            videoMiniPlayer: false,
+            videoRealPlayback: true));
+        Assert.False(LibraryPlayerMode.ShowsPlayerScratchOverlays(
+            playerMode: true,
+            videoMiniPlayer: false,
+            videoRealPlayback: false));
+        Assert.True(LibraryPlayerMode.ShowsPlayerScratchOverlays(
+            playerMode: true,
+            videoMiniPlayer: false,
+            videoRealPlayback: false,
+            audioWaveform: true));
+        // 本再生で打ったキューがあっても、暗いプレビューでは出さない。
+        Assert.False(LibraryPlayerMode.ShowsPlayerScratchOverlays(
+            playerMode: true,
+            videoMiniPlayer: false,
+            videoRealPlayback: false,
+            videoImmersivePause: false,
+            audioWaveform: false));
+        Assert.False(LibraryPlayerMode.ShowsPlayerScratchOverlays(
+            playerMode: false,
+            videoMiniPlayer: true,
+            videoRealPlayback: true));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.TogglePlayback));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SelectAll));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SeekHere));
@@ -51,7 +79,17 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.WwiseExport));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.PlayExit));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Cut));
-        Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AddMarker));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AddMarker));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AddMarkerHere));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ClearMarkers));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.DeleteMarkers));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.DeleteAllMarkers));
+        Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.RenameMarker));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.PrevMarker));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.NextMarker));
+        Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.NextTab));
+        Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.PrevTab));
+        Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ReopenTab));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Record));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.NewDocument));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.TimeZoomIn));
@@ -156,6 +194,7 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(1, LibraryPlayerMode.PreviewSpeedAtRampProgress(0), 5);
         Assert.Equal(LibraryVisualStage.PreviewLoopSpeed, LibraryPlayerMode.PreviewSpeedAtRampProgress(1), 5);
         Assert.Equal(1, LibraryVisualStage.PreviewSpeedRampSeconds);
+        Assert.Equal(50, LibraryVisualStage.PreviewSpeedRampTickMs);
         // EaseOut: 中盤は線形より 1/3 に近い。
         Assert.True(
             LibraryPlayerMode.PreviewSpeedAtRampProgress(0.5)
@@ -198,7 +237,6 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.FadeIn));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.TimeZoomIn));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.NewDocument));
-        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.CycleWaveformHeight));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleWaapi));
     }
 
@@ -215,12 +253,39 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Down, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Up, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Left, ModifierKeys.Shift));
-        Assert.False(LibraryPlayerMode.AllowsKey(Key.Left, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Left, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Right, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsPaneFocusArrow(Key.Left, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsPaneFocusArrow(Key.Right, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsPaneFocusArrow(Key.Down, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsPaneFocusArrow(Key.Up, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.IsPaneFocusArrow(Key.Left, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.UsesPlayerMarkerShortcuts(videoMiniPlayer: true, videoRealPlayback: false));
+        Assert.True(LibraryPlayerMode.UsesPlayerMarkerShortcuts(videoMiniPlayer: false, videoRealPlayback: true));
+        Assert.True(LibraryPlayerMode.UsesPlayerMarkerShortcuts(
+            videoMiniPlayer: false,
+            videoRealPlayback: false,
+            videoImmersivePause: true));
+        Assert.False(LibraryPlayerMode.UsesPlayerMarkerShortcuts(videoMiniPlayer: false, videoRealPlayback: false));
+        Assert.True(LibraryPlayerMode.UsesPlayerMarkerShortcuts(
+            videoMiniPlayer: false,
+            videoRealPlayback: false,
+            audioWaveform: true));
+        Assert.True(LibraryPlayerMode.BlocksEditorMarkerPlacement(playerMode: true));
+        Assert.False(LibraryPlayerMode.BlocksEditorMarkerPlacement(playerMode: false));
+        Assert.True(LibraryPlayerMode.IsPlayerScratchCueKey(Key.M, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerScratchCueKey(Key.Insert, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerScratchCueKey(Key.I, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerScratchCueKey(Key.O, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlayerScratchCueKey(Key.M, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.ShowsPlayerScratchOverlays(
+            playerMode: true,
+            videoMiniPlayer: false,
+            videoRealPlayback: false,
+            videoImmersivePause: true));
+        Assert.True(LibraryPlayerMode.PrefersMarkerArrowJump(playerMarkerContext: true, hasScratchMarkers: true));
+        Assert.False(LibraryPlayerMode.PrefersMarkerArrowJump(playerMarkerContext: true, hasScratchMarkers: false));
+        Assert.False(LibraryPlayerMode.PrefersMarkerArrowJump(playerMarkerContext: false, hasScratchMarkers: true));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Home, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.PageDown, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Home, ModifierKeys.None));
@@ -245,9 +310,35 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.AllowsKey(Key.S, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.A, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.R, ModifierKeys.None));
-        Assert.True(LibraryPlayerMode.IsShuffleToggle(Key.R, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.R, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.IsShuffleToggle(Key.R, ModifierKeys.Alt));
+        Assert.False(LibraryPlayerMode.IsShuffleToggle(Key.R, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsShuffleToggle(Key.R, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.R, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsPlayerRestartKey(Key.R, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlayerRestartKey(Key.R, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.J, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.K, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.OemComma, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.OemPeriod, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.J, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.K, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerShuttleKey(Key.OemComma, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerShuttleKey(Key.OemPeriod, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.N, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.P, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerTrackStepKey(Key.P, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerTrackStepKey(Key.N, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlayerTrackStepKey(Key.P, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.I, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.O, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.M, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Insert, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Delete, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.R, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Left, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.PrefersScratchMarkerDelete(playerMode: true, hasSelectedScratchMarkers: true));
+        Assert.False(LibraryPlayerMode.PrefersScratchMarkerDelete(playerMode: true, hasSelectedScratchMarkers: false));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.S, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.S, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.M, ModifierKeys.Control | ModifierKeys.Shift));
@@ -258,13 +349,13 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.E, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.F4, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Up, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.AllowsKey(Key.M, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Delete, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Z, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Z, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Y, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Z, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.AllowsKey(Key.Left, ModifierKeys.Alt));
-        Assert.False(LibraryPlayerMode.AllowsKey(Key.Right, ModifierKeys.Alt | ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Right, ModifierKeys.Alt | ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.G, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Tab, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Tab, ModifierKeys.Shift));
@@ -275,6 +366,7 @@ public sealed class LibraryPlayerModeTests
     {
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.Delete, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.Back, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Delete, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.C, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.X, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.V, ModifierKeys.Control));
@@ -293,6 +385,29 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.HaltsLibraryPlaybackOnSpace(playbackActive: false, immersiveVideoPause: true));
         Assert.True(LibraryPlayerMode.HaltsLibraryPlaybackOnSpace(playbackActive: true, immersiveVideoPause: false));
         Assert.False(LibraryPlayerMode.HaltsLibraryPlaybackOnSpace(playbackActive: false, immersiveVideoPause: false));
+        // 前面 UI 隠れ中はプレイリストの全選択・行除外を受け付けない。
+        Assert.True(LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(chromeVisible: false));
+        Assert.False(LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(chromeVisible: true));
+        // 本再生中／フレーム一時停止中の F10 はエディタへ落とさずプレイリスト（クローム）へ戻す。
+        Assert.True(LibraryPlayerMode.ReturnsToPlaylistChromeOnF10(
+            player: true, videoMini: false,
+            visualShown: true, visualPlaying: true, isPdf: false, isVideo: true));
+        Assert.True(LibraryPlayerMode.ReturnsToPlaylistChromeOnF10(
+            player: true, videoMini: false,
+            visualShown: true, visualPlaying: true, isPdf: true, isVideo: false));
+        Assert.True(LibraryPlayerMode.ReturnsToPlaylistChromeOnF10(
+            player: true, videoMini: false,
+            visualShown: true, visualPlaying: false, isPdf: false, isVideo: true,
+            immersivePauseHold: true));
+        Assert.False(LibraryPlayerMode.ReturnsToPlaylistChromeOnF10(
+            player: true, videoMini: true,
+            visualShown: true, visualPlaying: true, isPdf: false, isVideo: true));
+        Assert.False(LibraryPlayerMode.ReturnsToPlaylistChromeOnF10(
+            player: true, videoMini: false,
+            visualShown: true, visualPlaying: false, isPdf: false, isVideo: true));
+        Assert.False(LibraryPlayerMode.ReturnsToPlaylistChromeOnF10(
+            player: false, videoMini: false,
+            visualShown: true, visualPlaying: true, isPdf: false, isVideo: true));
         Assert.True(LibraryPlayerMode.PromotesDimPreviewBeforePlayLoad(
             visualShown: true, visualPlaying: false, sameSource: true, isVideo: true));
         Assert.False(LibraryPlayerMode.PromotesDimPreviewBeforePlayLoad(
@@ -319,6 +434,8 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsExplorerExpandAll(Key.Multiply, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsExplorerExpandAll(Key.D8, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.IsExplorerExpandAll(Key.D8, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.AllowsPlayerDigitJump(explorerFocused: true));
+        Assert.True(LibraryPlayerMode.AllowsPlayerDigitJump(explorerFocused: false));
         Assert.True(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Divide, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Oem2, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Oem2, ModifierKeys.Shift));
@@ -501,9 +618,6 @@ public sealed class LibraryPlayerModeTests
         // 暗いバックグラウンドプレビュー（表示中・非本再生）からも F8 可。
         Assert.True(LibraryPlayerMode.CanToggleVideoMiniPlayer(
             alreadyActive: false, visualShown: true, hasPlayableSession: true));
-        // F8 動画ミニの Space／Enter 停止は静止。F10 プレイリストは暗い 1/3 速へ。
-        Assert.True(LibraryPlayerMode.VideoStopFreezesFrame(videoMiniPlayer: true));
-        Assert.False(LibraryPlayerMode.VideoStopFreezesFrame(videoMiniPlayer: false));
         Assert.True(LibraryPlayerMode.HidesChromeForPlaylistVisual(
             player: true, visualShown: true, visualPlaying: true, isPdf: true, isVideo: false));
         Assert.False(LibraryPlayerMode.HidesChromeForPlaylistVisual(
@@ -535,6 +649,31 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.NumPad6, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.PageUp, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.BlocksPlaylistWhilePdf(Key.Home, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPdfPageDigitKey(Key.D3, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPdfPageDigitKey(Key.NumPad3, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPdfPageDigitKey(Key.D3, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.ShowsPlaylistPdfPageNumber(chromeHidden: true, isPdf: true));
+        Assert.False(LibraryPlayerMode.ShowsPlaylistPdfPageNumber(chromeHidden: false, isPdf: true));
+        Assert.False(LibraryPlayerMode.ShowsPlaylistPdfPageNumber(chromeHidden: true, isPdf: false));
+        Assert.Equal(1, LibraryPlayerMode.PdfPageNumberToastHoldSeconds);
+        Assert.Equal("1 / 3", LibraryPlayerMode.FormatPdfPageLabel(0, 3));
+        Assert.Equal("3 / 3", LibraryPlayerMode.FormatPdfPageLabel(2, 3));
+        Assert.True(LibraryPlayerMode.TryResolvePdfPageDigitJump(0, 1, 12, out var pdfP1, out var pdfS1));
+        Assert.Equal(1, pdfP1);
+        Assert.Equal(1, pdfS1);
+        Assert.True(LibraryPlayerMode.TryResolvePdfPageDigitJump(pdfP1, 2, 12, out var pdfP2, out var pdfS2));
+        Assert.Equal(12, pdfP2);
+        Assert.Equal(12, pdfS2);
+        Assert.True(LibraryPlayerMode.TryResolvePdfPageDigitJump(1, 0, 12, out var pdfP10, out var pdfS10));
+        Assert.Equal(10, pdfP10);
+        Assert.Equal(10, pdfS10);
+        // 0 単体は 1 と同じ。続けて 0 なら 10。
+        Assert.True(LibraryPlayerMode.TryResolvePdfPageDigitJump(0, 0, 12, out var pdfZeroPend, out var pdfZeroSeek));
+        Assert.Equal(1, pdfZeroPend);
+        Assert.Equal(1, pdfZeroSeek);
+        Assert.True(LibraryPlayerMode.TryResolvePdfPageDigitJump(pdfZeroPend, 0, 12, out var pdfP10FromZero, out var pdfS10FromZero));
+        Assert.Equal(10, pdfP10FromZero);
+        Assert.Equal(10, pdfS10FromZero);
         Assert.False(LibraryPlayerMode.HidesPlaylistVideoChromeOverlaysForPdf(
             isPdf: true, chromeHidden: false));
         Assert.True(LibraryPlayerMode.HidesPlaylistVideoChromeOverlaysForPdf(
@@ -721,12 +860,11 @@ public sealed class LibraryPlayerModeTests
                 minNameLeft: 24,
                 gap: 8),
             3);
-        Assert.True(LibraryPlayerMode.IsPdfBackgroundPinToggle(Key.B, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.IsPdfBackgroundPinToggle(Key.B, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsPdfBackgroundPinToggle(Key.W, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPdfBackgroundPinToggle(Key.W, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.IsPdfBackgroundPinToggle(Key.B, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.RestoresPdfDimPreviewOnExit(backgroundPinned: false));
         Assert.False(LibraryPlayerMode.RestoresPdfDimPreviewOnExit(backgroundPinned: true));
-        Assert.False(LibraryPlayerMode.StartsLibraryPlaybackOnEnter(playbackActive: true));
-        Assert.True(LibraryPlayerMode.StartsLibraryPlaybackOnEnter(playbackActive: false));
         Assert.True(LibraryPlayerMode.IgnoresSilentSkipForVideo(player: true, videoPlaying: true));
         Assert.False(LibraryPlayerMode.IgnoresSilentSkipForVideo(player: true, videoPlaying: false));
         Assert.False(LibraryPlayerMode.IgnoresSilentSkipForVideo(player: false, videoPlaying: true));
@@ -869,34 +1007,84 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(2, LibraryPlayerMode.StepLoopIndex(3, -1, -1));
         Assert.Equal(0, LibraryPlayerMode.StepLoopIndex(1, 0, 1));
         Assert.Equal(-1, LibraryPlayerMode.StepLoopIndex(0, 0, 1));
+        Assert.Equal(2, LibraryPlayerMode.StepLoopIndex(3, 2, 1, wrap: false));
+        Assert.Equal(0, LibraryPlayerMode.StepLoopIndex(3, 0, -1, wrap: false));
+        Assert.Equal(1, LibraryPlayerMode.StepLoopIndex(3, 0, 1, wrap: false));
+        Assert.Equal(0, LibraryPlayerMode.StepLoopIndex(3, 2, -10, wrap: false));
+        Assert.Equal(2, LibraryPlayerMode.StepLoopIndex(3, 0, 10, wrap: false));
     }
 
     [Fact]
-    public void PlayerNumpad_MapsTransport_NotPercent()
+    public void PlayerDigitJump_PercentPlain_MarkerWithShift()
     {
+        // プレイヤー／エディタ共通でテンキー再生操作。上段は割合／Shift＋マーカー。
+        Assert.True(LibraryPlayerMode.UsesTransportNumpad());
+
+        Assert.True(LibraryPlayerMode.IsPlayerNumpadKey(Key.NumPad7, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlayerNumpadKey(Key.D7, ModifierKeys.None));
         Assert.Equal(LibraryNumpadCommand.PlayPause, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad0, ModifierKeys.None));
         Assert.Equal(LibraryNumpadCommand.Rewind, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad1, ModifierKeys.None));
-        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad2, ModifierKeys.None));
         Assert.Equal(LibraryNumpadCommand.FastForward, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad3, ModifierKeys.None));
         Assert.Equal(LibraryNumpadCommand.PreviousTrack, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad4, ModifierKeys.None));
         Assert.Equal(LibraryNumpadCommand.Restart, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad5, ModifierKeys.None));
         Assert.Equal(LibraryNumpadCommand.NextTrack, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad6, ModifierKeys.None));
         Assert.Equal(LibraryNumpadCommand.SeekBack, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad7, ModifierKeys.None));
-        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad8, ModifierKeys.None));
         Assert.Equal(LibraryNumpadCommand.SeekForward, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad9, ModifierKeys.None));
-        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad5, ModifierKeys.Shift));
+        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad2, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad8, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerNumpadKey(Key.NumPad2, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerNumpadKey(Key.NumPad8, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad7, ModifierKeys.Shift));
         Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.D5, ModifierKeys.None));
-        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.Left, ModifierKeys.None));
-        Assert.True(LibraryPlayerMode.IsPlayerNumpadKey(Key.NumPad7, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.IsPlayerNumpadKey(Key.D7, ModifierKeys.None));
-        Assert.True(LibraryPlayerMode.IsPlayerShuttleKey(Key.NumPad1, ModifierKeys.None));
-        Assert.True(LibraryPlayerMode.IsPlayerShuttleKey(Key.NumPad3, ModifierKeys.None));
+
+        Assert.True(LibraryPlayerMode.IsTopRowDigitKey(Key.D5));
+        Assert.False(LibraryPlayerMode.IsTopRowDigitKey(Key.NumPad5));
+        Assert.True(LibraryPlayerMode.IsPercentDigitJump(Key.D5, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPercentDigitJump(Key.NumPad5, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsDigitJumpChord(Key.NumPad5, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsMarkerDigitJump(Key.D5, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsMarkerDigitJump(Key.NumPad5, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsDigitJumpChord(Key.NumPad5, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsDigitJumpChord(Key.D5, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: true, hasScratchMarkers: true));
+        Assert.False(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: true, hasScratchMarkers: false));
+        Assert.False(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: false, hasScratchMarkers: true));
+
+        // 上段の二桁: 1→2 で 12、1→0 で 10。
+        Assert.True(LibraryPlayerMode.TryResolveMarkerDigitJump(0, 1, 12, out var p1, out var s1, out var pct1));
+        Assert.Equal(1, p1);
+        Assert.Equal(1, s1);
+        Assert.False(pct1);
+        Assert.True(LibraryPlayerMode.TryResolveMarkerDigitJump(p1, 2, 12, out var p2, out var s2, out var pct2));
+        Assert.Equal(12, p2);
+        Assert.Equal(12, s2);
+        Assert.False(pct2);
+        Assert.True(LibraryPlayerMode.TryResolveMarkerDigitJump(1, 0, 12, out var p10, out var s10, out var pct10));
+        Assert.Equal(10, p10);
+        Assert.Equal(10, s10);
+        Assert.False(pct10);
+        Assert.True(LibraryPlayerMode.TryResolveMarkerDigitJump(1, 2, 3, out var pRestart, out var sRestart, out var pctRestart));
+        Assert.Equal(2, pRestart);
+        Assert.Equal(2, sRestart);
+        Assert.False(pctRestart);
+        Assert.True(LibraryPlayerMode.TryResolveMarkerDigitJump(1, 5, 3, out _, out var over, out var pctOver));
+        Assert.Null(over);
+        Assert.True(pctOver);
+
+        Assert.False(LibraryPlayerMode.IsPlayerShuttleKey(Key.NumPad1, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlayerShuttleKey(Key.NumPad3, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerShuttleKey(Key.OemComma, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerShuttleKey(Key.OemPeriod, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPlayerShuttleKey(Key.Left, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.IsPlayerShuttleKey(Key.Right, ModifierKeys.None));
-        Assert.True(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.NumPad7, ModifierKeys.None));
-        Assert.True(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.NumPad9, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.NumPad1, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.D7, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.NumPad7, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.NumPad9, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.J, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlayerSeekNudgeKey(Key.K, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.Rewind, LibraryPlayerMode.PlayerTransportCommand(Key.OemComma, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.FastForward, LibraryPlayerMode.PlayerTransportCommand(Key.OemPeriod, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.SeekBack, LibraryPlayerMode.PlayerTransportCommand(Key.J, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.SeekForward, LibraryPlayerMode.PlayerTransportCommand(Key.K, ModifierKeys.None));
+        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerTransportCommand(Key.NumPad1, ModifierKeys.None));
         Assert.Equal(Key.D5, LibraryPlayerMode.ResolveDigitKey(Key.ImeProcessed, Key.D5));
         Assert.Equal(Key.D0, LibraryPlayerMode.ResolveDigitKey(Key.ImeProcessed, Key.D0));
         Assert.Equal(Key.NumPad7, LibraryPlayerMode.ResolveDigitKey(Key.ImeProcessed, Key.NumPad7));
