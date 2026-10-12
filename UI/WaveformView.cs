@@ -82,6 +82,12 @@ internal sealed class WaveformView : Grid
         }
     }
 
+    /// <summary>
+    /// プレイヤーモードで確保するマーカーレーン行数。
+    /// 捨てキューが無くても1行にし、打刻や本再生／F8 切替で波形高さが縮まないようにする。
+    /// </summary>
+    internal const int PlayerModeFlagLaneRows = 1;
+
     private int FlagLaneCount
     {
         get
@@ -91,15 +97,11 @@ internal sealed class WaveformView : Grid
                 return 0;
             }
 
-            // プレイリスト波形では出さない。キューは残し、本再生／F8 に戻ったときだけ描く。
-            if (UsesPlayerScratch)
+            // エディタ以外（F10／F8／ミニ）専用: レーンを先に確保し、マーカー有無で描画高が変わらないようにする。
+            // 旗の描画自体は UsesPlayerScratch 時だけ（暗いプレビューでは出さない）。
+            if (SeekAndSelectOnly)
             {
-                return ScratchCues.HasMarkers || ScratchCues.HasAbPoint ? 1 : 0;
-            }
-
-            if (!LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly))
-            {
-                return 0;
+                return PlayerModeFlagLaneRows;
             }
 
             if (_forcedFlagLaneRows >= 0)
