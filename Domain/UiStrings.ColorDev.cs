@@ -141,6 +141,8 @@ internal static partial class UiStrings
             "PlayerComboDropFill" => Get("コンボ・リスト塗り", "Combo · list fill"),
             "PlayerComboDropBorder" => Get("コンボ・リスト枠", "Combo · list border"),
             "PlayerWaveFill" => Get("波形", "Waveform"),
+            "PlayerAbIn" => Get("A-B In（旗）", "A-B In · flag"),
+            "PlayerAbOut" => Get("A-B Out（旗）", "A-B Out · flag"),
             "PlayerFormatMismatchFore" => Get(
                 "既定 Wave フォーマットと違う文字",
                 "Text differing from default Wave format"),
