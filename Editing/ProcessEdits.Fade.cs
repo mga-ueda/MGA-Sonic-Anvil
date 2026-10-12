@@ -162,7 +162,7 @@ internal static partial class ProcessEdits
             document.Selection,
             WaveSelection.Empty,
             document.CursorFrame,
-            document.CursorFrame,
+            range.StartFrame,
             UiStrings.EditHistoryRange(
                 UiStrings.EditHistoryName(name),
                 document.SampleRate,
