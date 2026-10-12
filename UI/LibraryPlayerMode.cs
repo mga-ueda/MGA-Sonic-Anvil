@@ -643,7 +643,7 @@ internal static class LibraryPlayerMode
     public const double ChromeFadeSeconds = 0.2;
 
     /// <summary>PDF ページ切替時、ページ番号を出してからフェードアウトするまでの表示時間。</summary>
-    public const double PdfPageNumberToastHoldSeconds = 1;
+    public const double PdfPageNumberToastHoldSeconds = 3;
 
     public const int MeterFadeFrameRate = 30;
 
@@ -1212,13 +1212,31 @@ internal static class LibraryPlayerMode
     public static bool ShowsPlaylistPdfPageNumber(bool chromeHidden, bool isPdf) =>
         chromeHidden && isPdf;
 
-    /// <summary>表示用の「現在 / 総ページ」（1 始まり）。</summary>
-    public static string FormatPdfPageLabel(int pageIndex0Based, int pageCount)
+    /// <summary>
+    /// 動画／PDF の本再生またはミニプレイヤーで前面クロームが隠れ、プレイリストが 2 件以上のとき、
+    /// 左下に「現在 / 総数」トーストを出してよい（曲切替・突入時だけ Flash。しばらくしたらフェードアウト）。
+    /// </summary>
+    public static bool ShowsPlaylistTrackIndex(bool chromeHidden, bool isVisual, int trackCount) =>
+        chromeHidden && isVisual && trackCount >= 2;
+
+    /// <summary>プレイリスト位置トーストの表示ホールド（秒）。その後フェードアウト。</summary>
+    public const double PlaylistTrackIndexToastHoldSeconds = PdfPageNumberToastHoldSeconds;
+
+    /// <summary>表示用の「現在 / 総数」（1 始まり）。ページ番号・プレイリスト位置共用。</summary>
+    public static string FormatCurrentOfTotalLabel(int index0Based, int count)
     {
-        var total = Math.Max(1, pageCount);
-        var current = Math.Clamp(pageIndex0Based + 1, 1, total);
+        var total = Math.Max(1, count);
+        var current = Math.Clamp(index0Based + 1, 1, total);
         return $"{current} / {total}";
     }
+
+    /// <summary>表示用の「現在 / 総ページ」（1 始まり）。</summary>
+    public static string FormatPdfPageLabel(int pageIndex0Based, int pageCount) =>
+        FormatCurrentOfTotalLabel(pageIndex0Based, pageCount);
+
+    /// <summary>表示用の「いまいくつめ / 総ファイル」（1 始まり）。</summary>
+    public static string FormatPlaylistTrackLabel(int trackIndex0Based, int trackCount) =>
+        FormatCurrentOfTotalLabel(trackIndex0Based, trackCount);
 
     /// <summary>
     /// PDF ページ番号の桁送り（キーボード上段のみ。1 始まり。二桁可）。

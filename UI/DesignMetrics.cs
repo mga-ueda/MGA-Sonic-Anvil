@@ -265,6 +265,17 @@ internal static class DesignMetrics
         + PlaylistPdfPageNumberLineHeight
         + PlaylistPdfPageNumberPadding.Bottom;
 
+    /// <summary>動画／PDF 本再生・ミニで、左下に出すプレイリスト位置（例: 2 / 5）。</summary>
+    public static double PlaylistTrackIndexFontSize => PlaylistPdfPageNumberFontSize;
+
+    public static double PlaylistTrackIndexLineHeight => PlaylistPdfPageNumberLineHeight;
+
+    public static Thickness PlaylistTrackIndexMargin => new(From96(24), 0, 0, From96(24));
+
+    public static Thickness PlaylistTrackIndexPadding => PlaylistPdfPageNumberPadding;
+
+    public static double PlaylistTrackIndexHostHeight => PlaylistPdfPageNumberHostHeight;
+
     /// <summary>ファイル名とラウドネスのあいだに残す隙間。</summary>
     public static double PlaylistVideoFileNameLoudnessGap => From96(8);
 

@@ -123,6 +123,10 @@ public partial class MainWindow : Window
     private DispatcherTimer? _playlistVideoFileNamePlaceTimer;
     /// <summary>PDF ページ切替時のページ番号トースト（表示→フェードアウト）。</summary>
     private DispatcherTimer? _playlistPdfPageNumberToastTimer;
+    /// <summary>動画／PDF 複数再生時のプレイリスト位置トースト（表示→フェードアウト）。</summary>
+    private DispatcherTimer? _playlistTrackIndexToastTimer;
+    /// <summary>直前にトーストした位置キー（同じ曲では再フラッシュしない）。</summary>
+    private string? _playlistTrackIndexToastKey;
     private int _autoSpeakerSeenChannels = int.MinValue;
     private ImageSource? _brandLogoDark;
     private ImageSource? _brandLogoLight;
