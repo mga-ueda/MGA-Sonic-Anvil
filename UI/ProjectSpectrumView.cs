@@ -35,6 +35,24 @@ internal sealed class ProjectSpectrumView : FrameworkElement
     /// <summary>プレイヤー中はクロム塗りをせず、ジャケットウォッシュを透かす。</summary>
     internal bool WashThrough { get; set; }
 
+    /// <summary>動画本再生／ミニ限定。dB／Hz ラベルをファイル名と同じ白系にする。</summary>
+    internal bool VideoOverlayLabels
+    {
+        get => _videoOverlayLabels;
+        set
+        {
+            if (_videoOverlayLabels == value)
+            {
+                return;
+            }
+
+            _videoOverlayLabels = value;
+            InvalidateVisual();
+        }
+    }
+
+    private bool _videoOverlayLabels;
+
     public ProjectSpectrumView()
     {
         MinHeight = DesignMetrics.SpectrumHeight;
@@ -216,7 +234,10 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         return Math.Max(1, (int)Math.Ceiling((ft.Width + 3) * PixelsPerDip));
     }
 
-    private static Color LabelColor() => Theme.Get("MutedForeBrush");
+    private Color LabelColor() =>
+        VideoOverlayLabels
+            ? LibraryPlayerMode.VideoOverlayLabelColor
+            : Theme.Get("MutedForeBrush");
 
     private PlotGeometry ComputePlot(int wPx, int hPx)
     {

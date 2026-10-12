@@ -782,39 +782,71 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(1600, LibraryPlayerMode.VideoFrameStepSamples(48000, 30));
         Assert.Equal(LibraryPlayerMode.VideoFrameStepRepeatDelayMs, LibraryPlayerMode.VideoFrameStepTimerIntervalMs(false));
         Assert.Equal(LibraryPlayerMode.VideoFrameStepRepeatIntervalMs, LibraryPlayerMode.VideoFrameStepTimerIntervalMs(true));
+        Assert.True(LibraryPlayerMode.UsesVideoOverlayLabelFore(
+            playerMaximized: true, visualShown: true, isVideo: true,
+            chromeHidden: true, videoMini: false));
+        Assert.True(LibraryPlayerMode.UsesVideoOverlayLabelFore(
+            playerMaximized: true, visualShown: true, isVideo: true,
+            chromeHidden: false, videoMini: true));
+        Assert.False(LibraryPlayerMode.UsesVideoOverlayLabelFore(
+            playerMaximized: true, visualShown: true, isVideo: true,
+            chromeHidden: false, videoMini: false));
+        Assert.False(LibraryPlayerMode.UsesVideoOverlayLabelFore(
+            playerMaximized: true, visualShown: true, isVideo: false,
+            chromeHidden: true, videoMini: false));
+        Assert.Equal(0xF5, LibraryPlayerMode.VideoOverlayLabelColor.R);
+        Assert.True(LibraryPlayerMode.IsPlaylistVideoHudContext(
+            playerMaximized: true, visualShown: true, isVideo: true,
+            visualPlaying: true, immersivePause: false, framePaused: false));
+        Assert.True(LibraryPlayerMode.IsPlaylistVideoHudContext(
+            playerMaximized: true, visualShown: true, isVideo: true,
+            visualPlaying: false, immersivePause: true, framePaused: false));
+        Assert.True(LibraryPlayerMode.IsPlaylistVideoHudContext(
+            playerMaximized: true, visualShown: true, isVideo: true,
+            visualPlaying: false, immersivePause: false, framePaused: true));
+        Assert.False(LibraryPlayerMode.IsPlaylistVideoHudContext(
+            playerMaximized: true, visualShown: true, isVideo: true,
+            visualPlaying: false, immersivePause: false, framePaused: false));
+        Assert.True(LibraryPlayerMode.IsPlaylistVideoChromePlaySession(
+            videoMiniPlacement: false, isVideo: true,
+            visualPlaying: false, immersivePause: true, framePaused: false));
+        Assert.False(LibraryPlayerMode.IsPlaylistVideoChromePlaySession(
+            videoMiniPlacement: false, isVideo: true,
+            visualPlaying: false, immersivePause: false, framePaused: false));
         Assert.True(LibraryPlayerMode.ResetsPlaylistVideoChromeOnPlay(
             videoMiniPlacement: false,
             isVideo: true,
-            playing: true,
-            wasPlaying: false,
+            sessionActive: true,
+            wasSessionActive: false,
             sourcePath: @"C:\a.mp4",
             previousSourcePath: null));
         Assert.True(LibraryPlayerMode.ResetsPlaylistVideoChromeOnPlay(
             videoMiniPlacement: false,
             isVideo: true,
-            playing: true,
-            wasPlaying: true,
+            sessionActive: true,
+            wasSessionActive: true,
             sourcePath: @"C:\b.mp4",
             previousSourcePath: @"C:\a.mp4"));
+        // 一時停止→再開はセッション継続なのでリセットしない。
         Assert.False(LibraryPlayerMode.ResetsPlaylistVideoChromeOnPlay(
             videoMiniPlacement: false,
             isVideo: true,
-            playing: true,
-            wasPlaying: true,
+            sessionActive: true,
+            wasSessionActive: true,
             sourcePath: @"C:\a.mp4",
             previousSourcePath: @"C:\a.mp4"));
         Assert.False(LibraryPlayerMode.ResetsPlaylistVideoChromeOnPlay(
             videoMiniPlacement: true,
             isVideo: true,
-            playing: true,
-            wasPlaying: false,
+            sessionActive: true,
+            wasSessionActive: false,
             sourcePath: @"C:\a.mp4",
             previousSourcePath: null));
         Assert.False(LibraryPlayerMode.ResetsPlaylistVideoChromeOnPlay(
             videoMiniPlacement: false,
             isVideo: false,
-            playing: true,
-            wasPlaying: false,
+            sessionActive: true,
+            wasSessionActive: false,
             sourcePath: null,
             previousSourcePath: null));
         Assert.True(LibraryPlayerMode.ShowsPlaylistVideoTimecode(
