@@ -331,25 +331,6 @@ internal static class LibraryPlayerMode
     public static bool ExplorerOwnsHorizontal(Key key, ModifierKeys modifiers) =>
         key is Key.Left or Key.Right && modifiers == ModifierKeys.None;
 
-    /// <summary>
-    /// ツリー選択は横に追従しない。行の縦位置だけビューへ入れる量。
-    /// </summary>
-    public static double VerticalBringIntoViewDelta(double y, double height, double viewportHeight)
-    {
-        if (viewportHeight <= 0 || height <= 0 || double.IsNaN(y) || double.IsNaN(height))
-        {
-            return 0;
-        }
-
-        if (y < 0)
-        {
-            return y;
-        }
-
-        var overflow = y + height - viewportHeight;
-        return overflow > 0 ? overflow : 0;
-    }
-
     /// <summary>エクスプローラーの *。テンキーと Shift+8。</summary>
     public static bool IsExplorerExpandAll(Key key, ModifierKeys modifiers) =>
         (key == Key.Multiply && modifiers == ModifierKeys.None)
@@ -1701,10 +1682,6 @@ internal static class LibraryPlayerMode
     /// <summary>英字／記号のシャトル（,．）。テンキー 1／3 は呼び出し側で別判定。</summary>
     public static bool IsPlayerShuttleKey(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && key is Key.OemComma or Key.OemPeriod;
-
-    /// <summary>英字の 5 秒スキップ（J／K）。テンキー 7／9 は呼び出し側で別判定。</summary>
-    public static bool IsPlayerSeekNudgeKey(Key key, ModifierKeys modifiers) =>
-        modifiers == ModifierKeys.None && key is Key.J or Key.K;
 
     /// <summary>
     /// テンキー再生操作（プレイヤー／エディタ共通）。
