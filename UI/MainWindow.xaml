@@ -510,5 +510,30 @@
                    Text="1 / 1" />
       </Border>
     </Viewbox>
+    <!-- 動画／PDF 本再生・ミニで複数ファイルのとき左下に「現在 / 総数」（半透明黒背景。曲切替時だけ出してフェードアウト）。 -->
+    <Viewbox x:Name="PlaylistTrackIndex"
+             HorizontalAlignment="Left"
+             VerticalAlignment="Bottom"
+             Height="{x:Static ui:DesignMetrics.PlaylistTrackIndexHostHeight}"
+             Margin="{x:Static ui:DesignMetrics.PlaylistTrackIndexMargin}"
+             Stretch="Uniform"
+             Opacity="0"
+             IsHitTestVisible="False">
+      <Border HorizontalAlignment="Left"
+              VerticalAlignment="Center"
+              Padding="{x:Static ui:DesignMetrics.PlaylistTrackIndexPadding}"
+              CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+              Background="#99000000">
+        <TextBlock x:Name="PlaylistTrackIndexText"
+                   Height="{x:Static ui:DesignMetrics.PlaylistTrackIndexLineHeight}"
+                   FontFamily="Consolas"
+                   FontSize="{x:Static ui:DesignMetrics.PlaylistTrackIndexFontSize}"
+                   FontWeight="Normal"
+                   TextAlignment="Center"
+                   TextWrapping="NoWrap"
+                   Foreground="#F5F5F5"
+                   Text="1 / 1" />
+      </Border>
+    </Viewbox>
   </Grid>
 </Window>

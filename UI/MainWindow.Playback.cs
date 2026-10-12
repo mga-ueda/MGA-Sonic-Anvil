@@ -2301,6 +2301,7 @@ public partial class MainWindow
         PlaylistVideoScaleToast.LayoutTransform = overlayTransform;
         ApplyPlaylistVideoTimecodeOverlayScale(overlayScale);
         ApplyPlaylistPdfPageNumberOverlayScale(overlayScale);
+        ApplyPlaylistTrackIndexOverlayScale(overlayScale);
         SchedulePlaylistVideoFileNamePlacement();
     }
 

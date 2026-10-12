@@ -739,6 +739,12 @@ public partial class MainWindow
                 _playlistVideoHud,
                 LibraryBrowser.PlaylistVisualIsVideo),
             instant);
+        SyncPlaylistTrackIndexToast(
+            LibraryPlayerMode.ShowsPlaylistTrackIndex(
+                hide,
+                LibraryBrowser.PlaylistVisualIsVideo || LibraryBrowser.PlaylistVisualIsPdf,
+                _sessions.Count),
+            instant);
         // PDF ページ番号は常時出さない。本表示を抜けたら隠し、切替時だけトーストする。
         if (!LibraryPlayerMode.ShowsPlaylistPdfPageNumber(hide, LibraryBrowser.PlaylistVisualIsPdf))
         {
@@ -1010,6 +1016,114 @@ public partial class MainWindow
         {
             SchedulePlaylistVideoFileNamePlacement();
         }
+    }
+
+    /// <summary>
+    /// 複数再生の位置トースト。許可時は曲／件数が変わったときだけ出し、少ししたらフェードアウト。
+    /// </summary>
+    private void SyncPlaylistTrackIndexToast(bool allow, bool instant)
+    {
+        if (!allow)
+        {
+            _playlistTrackIndexToastKey = null;
+            HidePlaylistTrackIndex(instant);
+            return;
+        }
+
+        var key = BuildPlaylistTrackIndexToastKey();
+        if (string.Equals(_playlistTrackIndexToastKey, key, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _playlistTrackIndexToastKey = key;
+        FlashPlaylistTrackIndex();
+    }
+
+    private string BuildPlaylistTrackIndexToastKey()
+    {
+        var index = _activeSession is null ? -1 : _sessions.IndexOf(_activeSession);
+        return string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"{index}/{_sessions.Count}");
+    }
+
+    /// <summary>曲切替・本再生／ミニ突入時。番号を出してから一定時間でフェードアウト。</summary>
+    private void FlashPlaylistTrackIndex()
+    {
+        ApplyPlaylistTrackIndexOverlayScale(VideoMiniOverlayLayoutScale);
+        RefreshPlaylistTrackIndex();
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistTrackIndex,
+            to: 1,
+            instant: true,
+            hitTestVisible: false);
+        _playlistTrackIndexToastTimer ??= new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(LibraryPlayerMode.PlaylistTrackIndexToastHoldSeconds),
+        };
+        _playlistTrackIndexToastTimer.Tick -= OnPlaylistTrackIndexToastTick;
+        _playlistTrackIndexToastTimer.Tick += OnPlaylistTrackIndexToastTick;
+        _playlistTrackIndexToastTimer.Stop();
+        _playlistTrackIndexToastTimer.Start();
+    }
+
+    private void OnPlaylistTrackIndexToastTick(object? sender, EventArgs e)
+    {
+        _playlistTrackIndexToastTimer?.Stop();
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistTrackIndex,
+            to: 0,
+            instant: false,
+            hitTestVisible: false,
+            seconds: LibraryPlayerMode.ChromeFadeSeconds);
+    }
+
+    private void HidePlaylistTrackIndex(bool instant)
+    {
+        _playlistTrackIndexToastTimer?.Stop();
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistTrackIndex,
+            to: 0,
+            instant,
+            hitTestVisible: false,
+            seconds: instant ? null : LibraryPlayerMode.ChromeFadeSeconds);
+    }
+
+    private void RefreshPlaylistTrackIndex()
+    {
+        var index = _activeSession is null ? -1 : _sessions.IndexOf(_activeSession);
+        PlaylistTrackIndexText.Text = LibraryPlayerMode.FormatPlaylistTrackLabel(index, _sessions.Count);
+    }
+
+    private void ApplyPlaylistTrackIndexOverlayScale(double scale)
+    {
+        var designHeight = DesignMetrics.PlaylistTrackIndexHostHeight;
+        var designMargin = DesignMetrics.PlaylistTrackIndexMargin;
+        if (!IsVideoMiniPlayerActive() || _playlistVideoFullscreen)
+        {
+            PlaylistTrackIndex.LayoutTransform = Transform.Identity;
+            PlaylistTrackIndex.Height = designHeight;
+            PlaylistTrackIndex.Margin = designMargin;
+            return;
+        }
+
+        var s = Math.Clamp(
+            scale,
+            DesignMetrics.OverlayScaleMin,
+            DesignMetrics.OverlayScaleMax);
+        if (double.IsNaN(s) || double.IsInfinity(s) || s <= 0)
+        {
+            s = 1;
+        }
+
+        PlaylistTrackIndex.LayoutTransform = Transform.Identity;
+        PlaylistTrackIndex.Height = designHeight * s;
+        PlaylistTrackIndex.Margin = new Thickness(
+            designMargin.Left * s,
+            designMargin.Top * s,
+            designMargin.Right * s,
+            designMargin.Bottom * s);
     }
 
     /// <summary>ページ切替成功時。番号を出してから一定時間でフェードアウト。</summary>
@@ -4894,6 +5008,7 @@ public partial class MainWindow
         await RestartLibraryPeaksForSessionAsync(session).ConfigureAwait(true);
         RefreshPlaylistVideoFileName();
         SchedulePlaylistVideoFileNamePlacement();
+        RefreshPlaylistTrackIndex();
         LibraryBrowser.UpdateSessionRow(session);
     }
 

@@ -669,9 +669,22 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.ShowsPlaylistPdfPageNumber(chromeHidden: true, isPdf: true));
         Assert.False(LibraryPlayerMode.ShowsPlaylistPdfPageNumber(chromeHidden: false, isPdf: true));
         Assert.False(LibraryPlayerMode.ShowsPlaylistPdfPageNumber(chromeHidden: true, isPdf: false));
-        Assert.Equal(1, LibraryPlayerMode.PdfPageNumberToastHoldSeconds);
+        Assert.Equal(3, LibraryPlayerMode.PdfPageNumberToastHoldSeconds);
         Assert.Equal("1 / 3", LibraryPlayerMode.FormatPdfPageLabel(0, 3));
         Assert.Equal("3 / 3", LibraryPlayerMode.FormatPdfPageLabel(2, 3));
+        Assert.True(LibraryPlayerMode.ShowsPlaylistTrackIndex(
+            chromeHidden: true, isVisual: true, trackCount: 2));
+        Assert.False(LibraryPlayerMode.ShowsPlaylistTrackIndex(
+            chromeHidden: false, isVisual: true, trackCount: 2));
+        Assert.False(LibraryPlayerMode.ShowsPlaylistTrackIndex(
+            chromeHidden: true, isVisual: false, trackCount: 2));
+        Assert.False(LibraryPlayerMode.ShowsPlaylistTrackIndex(
+            chromeHidden: true, isVisual: true, trackCount: 1));
+        Assert.Equal("2 / 5", LibraryPlayerMode.FormatPlaylistTrackLabel(1, 5));
+        Assert.Equal("1 / 2", LibraryPlayerMode.FormatCurrentOfTotalLabel(0, 2));
+        Assert.Equal(
+            LibraryPlayerMode.PdfPageNumberToastHoldSeconds,
+            LibraryPlayerMode.PlaylistTrackIndexToastHoldSeconds);
         Assert.True(LibraryPlayerMode.TryResolvePdfPageDigitJump(0, 1, 12, out var pdfP1, out var pdfS1));
         Assert.Equal(1, pdfP1);
         Assert.Equal(1, pdfS1);
