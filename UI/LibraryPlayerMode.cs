@@ -953,6 +953,47 @@ internal static class LibraryPlayerMode
             preferredWidth * s);
     }
 
+    /// <summary>
+    /// 動画ミニ用：レベルメーターの LayoutTransform 前の高さ上限。
+    /// メーター列の実高を基準に、同じ幅の 16:9 相当までで打ち切り、
+    /// 上段（WAAPI）と下段ゴニオの見た目高を差し引く。低い窓は列高そのもので縮む。
+    /// </summary>
+    /// <param name="meterColumnHeight">MeterColumn の実高。</param>
+    /// <param name="windowWidth">窓幅（16:9 上限用）。</param>
+    /// <param name="windowHeight">窓高（16:9 上限用）。</param>
+    /// <param name="layoutScale">ピーク／ゴニオに当てる LayoutTransform 倍率。</param>
+    public static double LevelMeterMaxLayoutHeight(
+        double meterColumnHeight,
+        double windowWidth,
+        double windowHeight,
+        double layoutScale)
+    {
+        if (meterColumnHeight <= 0
+            || windowWidth <= 0
+            || windowHeight <= 0
+            || layoutScale <= 0
+            || double.IsNaN(meterColumnHeight)
+            || double.IsNaN(windowWidth)
+            || double.IsNaN(windowHeight)
+            || double.IsNaN(layoutScale)
+            || double.IsInfinity(meterColumnHeight)
+            || double.IsInfinity(windowWidth)
+            || double.IsInfinity(windowHeight)
+            || double.IsInfinity(layoutScale))
+        {
+            return double.PositiveInfinity;
+        }
+
+        var s = SanitizeOverlayScale(layoutScale);
+        // 現在の列高に、窓を 16:9 にしたときの差分を足す → 縦長では縮小、低い窓では列高のまま。
+        var aspectColumnH = meterColumnHeight + windowWidth * 9d / 16d - windowHeight;
+        var cappedColumn = Math.Min(meterColumnHeight, Math.Max(0, aspectColumnH));
+        var reservedVisual =
+            (DesignMetrics.ProjectBarHeight + DesignMetrics.VectorScopeHeight) * s;
+        var availableVisual = cappedColumn - reservedVisual;
+        return availableVisual > 0 ? availableVisual / s : 0;
+    }
+
     private static double SanitizeOverlayScale(double scale)
     {
         if (double.IsNaN(scale) || double.IsInfinity(scale) || scale <= 0)
