@@ -72,6 +72,24 @@ internal sealed class VectorScopeView : FrameworkElement
     /// <summary>プレイヤー中はクロム塗りをせず、ジャケットウォッシュを透かす。</summary>
     internal bool WashThrough { get; set; }
 
+    /// <summary>動画本再生／ミニ限定。相関ラベルをファイル名と同じ白系にする。</summary>
+    internal bool VideoOverlayLabels
+    {
+        get => _videoOverlayLabels;
+        set
+        {
+            if (_videoOverlayLabels == value)
+            {
+                return;
+            }
+
+            _videoOverlayLabels = value;
+            InvalidateVisual();
+        }
+    }
+
+    private bool _videoOverlayLabels;
+
     public VectorScopeView()
     {
         Width = DesignMetrics.LevelMeterWidth;
@@ -294,7 +312,7 @@ internal sealed class VectorScopeView : FrameworkElement
             area.Y + LayoutPad,
             Math.Max(8d, area.Width - CorrelationSidePad * 2),
             trackHeight);
-        var muted = Theme.Get("MutedForeBrush");
+        var muted = LabelColor();
         dc.DrawRoundedRectangle(
             WpfControlHelpers.FrozenBrush(Color.FromArgb(70, muted.R, muted.G, muted.B)),
             null,
@@ -316,7 +334,7 @@ internal sealed class VectorScopeView : FrameworkElement
             new Rect(needleX - 1.5, track.Y, 3, track.Height));
 
         var dpi = UiDpi.Get(this).PixelsPerDip;
-        var dim = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
+        var dim = WpfControlHelpers.FrozenBrush(LabelColor());
         var left = Measure("-1", 8, dim, dpi);
         var right = Measure("+1", 8, dim, dpi);
         var value = Measure(VectorScopeEngine.FormatCorrelation(_correlation), 8, dim, dpi);
@@ -325,6 +343,11 @@ internal sealed class VectorScopeView : FrameworkElement
         dc.DrawText(right, new Point(track.Right - right.Width, labelY));
         dc.DrawText(value, new Point(track.X + (track.Width - value.Width) * 0.5, labelY));
     }
+
+    private Color LabelColor() =>
+        VideoOverlayLabels
+            ? LibraryPlayerMode.VideoOverlayLabelColor
+            : Theme.Get("MutedForeBrush");
 
     private void UpdateCorrelation(AudioPlayer? player, bool active, bool resetWhenIdle)
     {

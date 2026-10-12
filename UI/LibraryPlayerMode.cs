@@ -1019,29 +1019,73 @@ internal static class LibraryPlayerMode
     }
 
     /// <summary>
+    /// 動画本再生の A／T を操作できるか。本再生・イマーシブ一時停止・フレーム一時停止。
+    /// </summary>
+    public static bool IsPlaylistVideoHudContext(
+        bool playerMaximized,
+        bool visualShown,
+        bool isVideo,
+        bool visualPlaying,
+        bool immersivePause,
+        bool framePaused) =>
+        playerMaximized
+        && visualShown
+        && isVideo
+        && (visualPlaying || immersivePause || framePaused);
+
+    /// <summary>
+    /// プレイリスト動画の本再生セッションが続いているか（一時停止中も含む）。
+    /// A／T の開始時リセット判定に使う。
+    /// </summary>
+    public static bool IsPlaylistVideoChromePlaySession(
+        bool videoMiniPlacement,
+        bool isVideo,
+        bool visualPlaying,
+        bool immersivePause,
+        bool framePaused) =>
+        !videoMiniPlacement
+        && isVideo
+        && (visualPlaying || immersivePause || framePaused);
+
+    /// <summary>
     /// プレイリストからの動画本再生を始めた／別動画へ移ったときだけ A／T をオンに戻す。
-    /// 再生中のトグルは可。F8／引数起動ミニは対象外（記憶した状態を使う）。
+    /// 一時停止からの再開では戻さない。F8／引数起動ミニは対象外（記憶した状態を使う）。
     /// </summary>
     public static bool ResetsPlaylistVideoChromeOnPlay(
         bool videoMiniPlacement,
         bool isVideo,
-        bool playing,
-        bool wasPlaying,
+        bool sessionActive,
+        bool wasSessionActive,
         string? sourcePath,
         string? previousSourcePath)
     {
-        if (videoMiniPlacement || !isVideo || !playing)
+        if (videoMiniPlacement || !isVideo || !sessionActive)
         {
             return false;
         }
 
-        if (!wasPlaying)
+        if (!wasSessionActive)
         {
             return true;
         }
 
         return !string.Equals(sourcePath, previousSourcePath, StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// 動画本再生／ミニ限定。メーター等の文字をファイル名と同じ白系にするか。
+    /// プレイヤー一般（音声＋ジャケット）では使わない。
+    /// </summary>
+    public static bool UsesVideoOverlayLabelFore(
+        bool playerMaximized,
+        bool visualShown,
+        bool isVideo,
+        bool chromeHidden,
+        bool videoMini) =>
+        playerMaximized && visualShown && isVideo && (chromeHidden || videoMini);
+
+    /// <summary>ファイル名オーバーレイと同じ文字色（#F5F5F5）。</summary>
+    public static Color VideoOverlayLabelColor { get; } = Color.FromRgb(0xF5, 0xF5, 0xF5);
 
     /// <summary>前面クロームが消えている本再生中だけ、タイムコードを出せる。</summary>
     public static bool ShowsPlaylistVideoTimecode(bool chromeHidden, bool timecodeOn, bool isVideo) =>
@@ -1298,20 +1342,8 @@ internal static class LibraryPlayerMode
             return;
         }
 
-        if (target.Effect is DropShadowEffect)
-        {
-            return;
-        }
-
-        target.Effect = new DropShadowEffect
-        {
-            BlurRadius = 22,
-            ShadowDepth = 0,
-            Direction = 0,
-            Color = Colors.Black,
-            Opacity = 0.95,
-            RenderingBias = RenderingBias.Performance,
-        };
+        // ぼかしを広げると薄く見えるので、狭く不透明にして縁を濃くする。
+        ApplyVideoDropShadow(target, blurRadius: 12, opacity: 1);
     }
 
     /// <summary>
@@ -1326,18 +1358,29 @@ internal static class LibraryPlayerMode
             return;
         }
 
-        if (target.Effect is DropShadowEffect)
+        ApplyVideoDropShadow(target, blurRadius: 5, opacity: 1);
+    }
+
+    private static void ApplyVideoDropShadow(UIElement target, double blurRadius, double opacity)
+    {
+        if (target.Effect is DropShadowEffect existing)
         {
+            existing.BlurRadius = blurRadius;
+            existing.ShadowDepth = 0;
+            existing.Direction = 0;
+            existing.Color = Colors.Black;
+            existing.Opacity = opacity;
+            existing.RenderingBias = RenderingBias.Performance;
             return;
         }
 
         target.Effect = new DropShadowEffect
         {
-            BlurRadius = 8,
+            BlurRadius = blurRadius,
             ShadowDepth = 0,
             Direction = 0,
             Color = Colors.Black,
-            Opacity = 0.85,
+            Opacity = opacity,
             RenderingBias = RenderingBias.Performance,
         };
     }

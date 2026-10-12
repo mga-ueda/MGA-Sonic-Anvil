@@ -27,6 +27,24 @@ internal sealed class LevelMeterView : FrameworkElement
     /// <summary>プレイヤー中はクロム塗りをせず、ジャケットウォッシュを透かす。</summary>
     internal bool WashThrough { get; set; }
 
+    /// <summary>動画本再生／ミニ限定。目盛・数値をファイル名と同じ白系にする。</summary>
+    internal bool VideoOverlayLabels
+    {
+        get => _videoOverlayLabels;
+        set
+        {
+            if (_videoOverlayLabels == value)
+            {
+                return;
+            }
+
+            _videoOverlayLabels = value;
+            InvalidateVisual();
+        }
+    }
+
+    private bool _videoOverlayLabels;
+
     public LevelMeterView()
     {
         MinWidth = DesignMetrics.LevelMeterWidth;
@@ -327,7 +345,7 @@ internal sealed class LevelMeterView : FrameworkElement
         }
     }
 
-    private static void DrawReadoutLabel(
+    private void DrawReadoutLabel(
         DrawingContext dc,
         string text,
         double x,
@@ -338,7 +356,7 @@ internal sealed class LevelMeterView : FrameworkElement
         dc.DrawText(MeasureReadout(text, pixels, brush), new Point(x, y));
     }
 
-    private static void DrawReadoutAligned(
+    private void DrawReadoutAligned(
         DrawingContext dc,
         string text,
         double dotX,
@@ -360,7 +378,7 @@ internal sealed class LevelMeterView : FrameworkElement
         dc.DrawText(fraction, new Point(dotX, y));
     }
 
-    private static FormattedText MeasureReadout(string text, double pixels, Brush? brush = null, double font = 8) =>
+    private FormattedText MeasureReadout(string text, double pixels, Brush? brush = null, double font = 8) =>
         WpfControlHelpers.MonoRegularText(text, font, brush ?? LabelBrush(), pixels);
 
     private void DrawScale(DrawingContext dc, Rect col, bool rightAlign)
@@ -371,7 +389,7 @@ internal sealed class LevelMeterView : FrameworkElement
         {
             var y = col.Y + (1 - LevelMeterEngine.DbToNorm(db)) * col.Height;
             var text = db == 0 ? "0" : db.ToString(CultureInfo.InvariantCulture);
-            var formatted = WpfControlHelpers.MonoRegularText(text, 8, ScaleBrush(), pixels);
+            var formatted = WpfControlHelpers.MonoRegularText(text, 8, LabelBrush(), pixels);
             var x = rightAlign ? col.Right - formatted.Width - 1 : col.X + 1;
             var ty = db <= LevelMeterEngine.DbMin
                 ? col.Bottom - formatted.Height
@@ -388,11 +406,13 @@ internal sealed class LevelMeterView : FrameworkElement
         }
     }
 
-    private static Brush LabelBrush() =>
-        WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
+    private Brush LabelBrush() =>
+        WpfControlHelpers.FrozenBrush(LabelColor());
 
-    private static Brush ScaleBrush() =>
-        WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
+    private Color LabelColor() =>
+        VideoOverlayLabels
+            ? LibraryPlayerMode.VideoOverlayLabelColor
+            : Theme.Get("MutedForeBrush");
 
     private Color TrackBorderColor() =>
         PlayerMeterChrome.Grid("LevelMeterTrackBorderBrush", WashThrough);

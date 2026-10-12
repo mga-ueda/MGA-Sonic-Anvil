@@ -611,6 +611,28 @@ internal sealed class WaveformView : Grid
         }
     }
 
+    /// <summary>動画本再生／ミニ限定。時間・dB 目盛りをファイル名と同じ白系にする。</summary>
+    public bool VideoOverlayLabels
+    {
+        get => _videoOverlayLabels;
+        set
+        {
+            if (_videoOverlayLabels == value)
+            {
+                return;
+            }
+
+            _videoOverlayLabels = value;
+            _timeLabelCache.Clear();
+            _dbLabelCache.Clear();
+            _waveDirty = true;
+            InvalidateStaticLayer();
+            InvalidateVisual();
+        }
+    }
+
+    private bool _videoOverlayLabels;
+
     private bool UsesPlayerScratch =>
         SeekAndSelectOnly && _playerScratchEnabled;
 
@@ -4175,7 +4197,12 @@ internal sealed class WaveformView : Grid
             var muted = IsLaneMuted(ch);
             var nameFore = tint
                 ? WpfControlHelpers.FrozenBrush(Theme.Get("ChannelLabelOnTintForeBrush"))
-                : WpfControlHelpers.FrozenBrush(Theme.Get(muted ? "MutedForeBrush" : "PrimaryForeBrush"));
+                : WpfControlHelpers.FrozenBrush(
+                    muted
+                        ? (VideoOverlayLabels
+                            ? LibraryPlayerMode.VideoOverlayLabelColor
+                            : Theme.Get("MutedForeBrush"))
+                        : Theme.Get("PrimaryForeBrush"));
             var top = wave.Y + ch * (laneHeight + laneGap);
             var name = layout.LabelAt(ch);
             var em = name.Length <= 2 ? largeEm : smallEm;
@@ -4222,7 +4249,7 @@ internal sealed class WaveformView : Grid
         }
 
         var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
-        var scale = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
+        var scale = WpfControlHelpers.FrozenBrush(MutedLabelColor());
         var half = laneHeight * 0.5;
         var amp = (ampHeight ?? laneHeight) * 0.5 * _ampZoom;
 
@@ -4420,7 +4447,11 @@ internal sealed class WaveformView : Grid
             return color;
         }
 
-        var fill = PlayerChrome.Get("PlayerWaveFillBrush");
+        // 動画本再生／ミニはファイル名と同じ白系。それ以外のプレイヤーは PlayerWaveFillBrush。
+        // 不透明度は描画側の PushOpacity(PlayerWaveOpacityFor) に任せる。
+        var fill = VideoOverlayLabels
+            ? LibraryPlayerMode.VideoOverlayLabelColor
+            : PlayerChrome.Get("PlayerWaveFillBrush");
         return fill.B | (fill.G << 8) | (fill.R << 16) | unchecked((int)0xFF000000);
     }
 
@@ -6618,6 +6649,11 @@ internal sealed class WaveformView : Grid
         return formatted;
     }
 
+    private Color MutedLabelColor() =>
+        VideoOverlayLabels
+            ? LibraryPlayerMode.VideoOverlayLabelColor
+            : Theme.Get("MutedForeBrush");
+
     private enum TimeLabelAccent
     {
         None,
@@ -6633,11 +6669,11 @@ internal sealed class WaveformView : Grid
             return cached;
         }
 
-        var brushKey = accent switch
+        var brush = accent switch
         {
-            TimeLabelAccent.Loop => "SampleLoopTimeLabelForeBrush",
-            TimeLabelAccent.Region => "RegionTimeLabelForeBrush",
-            _ => "MutedForeBrush",
+            TimeLabelAccent.Loop => WpfControlHelpers.FrozenBrush(Theme.Get("SampleLoopTimeLabelForeBrush")),
+            TimeLabelAccent.Region => WpfControlHelpers.FrozenBrush(Theme.Get("RegionTimeLabelForeBrush")),
+            _ => WpfControlHelpers.FrozenBrush(MutedLabelColor()),
         };
         var formatted = new FormattedText(
             text,
@@ -6645,7 +6681,7 @@ internal sealed class WaveformView : Grid
             FlowDirection.LeftToRight,
             new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
             10,
-            WpfControlHelpers.FrozenBrush(Theme.Get(brushKey)),
+            brush,
             pixelsPerDip);
         if (_timeLabelCache.Count >= TimeLabelCacheMax)
         {

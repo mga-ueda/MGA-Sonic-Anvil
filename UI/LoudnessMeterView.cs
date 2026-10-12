@@ -197,17 +197,40 @@ internal sealed class LoudnessMeterView : Grid
         PaintSnapshot(_lastSnap, _offlineMode);
     }
 
+    /// <summary>動画本再生／ミニ限定。キャプションをファイル名と同じ白系にする。</summary>
+    internal bool VideoOverlayLabels
+    {
+        get => _videoOverlayLabels;
+        set
+        {
+            if (_videoOverlayLabels == value)
+            {
+                return;
+            }
+
+            _videoOverlayLabels = value;
+            ApplyOverlayLabelColors();
+        }
+    }
+
+    private bool _videoOverlayLabels;
+
     public void ApplyValueColors()
     {
         _safeBrush = WpfControlHelpers.FrozenBrush(Theme.Get("LoudnessSafeBrush"));
         _cautionBrush = WpfControlHelpers.FrozenBrush(Theme.Get("LoudnessCautionBrush"));
         _dangerBrush = WpfControlHelpers.FrozenBrush(Theme.Get("LoudnessDangerBrush"));
-        _idleBrush = MutedFore();
         _chipFore = ChipFore();
         _safeChipBrush = ShadeBrush(_safeBrush);
         _cautionChipBrush = ShadeBrush(_cautionBrush);
         _dangerChipBrush = ShadeBrush(_dangerBrush);
-        var chrome = MutedFore();
+        ApplyOverlayLabelColors();
+    }
+
+    private void ApplyOverlayLabelColors()
+    {
+        _idleBrush = LabelFore();
+        var chrome = _idleBrush;
         foreach (var block in ChromeBlocks())
         {
             block.Foreground = chrome;
@@ -533,8 +556,11 @@ internal sealed class LoudnessMeterView : Grid
             (byte)Math.Round(from.B + (to.B - from.B) * amount));
     }
 
-    private static Brush MutedFore() =>
-        WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
+    private Brush LabelFore() =>
+        WpfControlHelpers.FrozenBrush(
+            VideoOverlayLabels
+                ? LibraryPlayerMode.VideoOverlayLabelColor
+                : Theme.Get("MutedForeBrush"));
 
     private static SolidColorBrush Freeze(Color color)
     {

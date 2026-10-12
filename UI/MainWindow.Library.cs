@@ -55,7 +55,7 @@ public partial class MainWindow
     private bool _playlistVideoChromeVisible = true;
     private bool _playlistVideoHud = true;
     private bool _playlistVideoTimecode = true;
-    /// <summary>プレイリスト動画本再生中だったか（開始／曲切替で A／T をオンに戻す判定用）。</summary>
+    /// <summary>プレイリスト動画の本再生セッション中だったか（一時停止含む。開始／曲切替で A／T をオンに戻す判定用）。</summary>
     private bool _playlistVideoChromePlayActive;
     private string? _playlistVideoChromePlayPath;
     /// <summary>映像／PDF 本再生のつなぎでクロームを出さない。</summary>
@@ -665,17 +665,20 @@ public partial class MainWindow
             EnsurePlaylistVideoWindowRestored();
         }
 
-        // プレイリスト動画の本再生開始／曲切替では A／T をオン（再生中はトグル可。ミニは記憶値）。
-        var playlistVideoPlaying = !_videoLaunchPlacement
-            && LibraryBrowser.PlaylistVisualIsVideo
-            && LibraryBrowser.PlaylistVisualPlaying;
-        var playlistVideoPath = playlistVideoPlaying
+        // プレイリスト動画の本再生開始／曲切替では A／T をオン（一時停止中も切替可。再開では戻さない。ミニは記憶値）。
+        var playlistVideoSession = LibraryPlayerMode.IsPlaylistVideoChromePlaySession(
+            _videoLaunchPlacement,
+            LibraryBrowser.PlaylistVisualIsVideo,
+            LibraryBrowser.PlaylistVisualPlaying,
+            _playlistVideoImmersivePause,
+            LibraryBrowser.PlaylistVisualFramePaused);
+        var playlistVideoPath = playlistVideoSession
             ? _activeSession?.Document.SourcePath
             : null;
         if (LibraryPlayerMode.ResetsPlaylistVideoChromeOnPlay(
                 _videoLaunchPlacement,
                 LibraryBrowser.PlaylistVisualIsVideo,
-                LibraryBrowser.PlaylistVisualPlaying,
+                playlistVideoSession,
                 _playlistVideoChromePlayActive,
                 playlistVideoPath,
                 _playlistVideoChromePlayPath))
@@ -684,7 +687,7 @@ public partial class MainWindow
             _playlistVideoTimecode = true;
         }
 
-        _playlistVideoChromePlayActive = playlistVideoPlaying;
+        _playlistVideoChromePlayActive = playlistVideoSession;
         _playlistVideoChromePlayPath = playlistVideoPath;
 
         // PDF 表示中は A／T を出さないだけ（フラグは触らない）。
@@ -947,19 +950,14 @@ public partial class MainWindow
             instant: false);
         SyncPlaylistVideoUiShadows(
             _playlistVideoChromeVisible,
-            LibraryBrowser.PlaylistVisualIsVideo
-                && LibraryBrowser.PlaylistVisualPlaying
-                && !_playlistVideoHud);
+            IsPlaylistVisualHudContext() && !_playlistVideoHud);
         RememberVideoLaunchChromeIfNeeded();
         return true;
     }
 
     private bool TryTogglePlaylistVideoTimecode()
     {
-        if (!IsLibraryMaximized
-            || !LibraryBrowser.PlaylistVisualShown
-            || !LibraryBrowser.PlaylistVisualIsVideo
-            || !LibraryBrowser.PlaylistVisualPlaying)
+        if (!IsPlaylistVisualHudContext())
         {
             return false;
         }
@@ -1313,10 +1311,13 @@ public partial class MainWindow
         IsPlaybackActive() || _playlistVideoImmersivePause;
 
     private bool IsPlaylistVisualHudContext() =>
-        IsLibraryMaximized
-        && LibraryBrowser.PlaylistVisualShown
-        && LibraryBrowser.PlaylistVisualPlaying
-        && LibraryBrowser.PlaylistVisualIsVideo;
+        LibraryPlayerMode.IsPlaylistVideoHudContext(
+            IsLibraryMaximized,
+            LibraryBrowser.PlaylistVisualShown,
+            LibraryBrowser.PlaylistVisualIsVideo,
+            LibraryBrowser.PlaylistVisualPlaying,
+            _playlistVideoImmersivePause,
+            LibraryBrowser.PlaylistVisualFramePaused);
 
     private void SetPlaylistVideoFullscreen(bool on)
     {
@@ -1418,6 +1419,23 @@ public partial class MainWindow
                 !_playlistVideoChromeVisible,
                 _playlistVideoTimecode,
                 isVideo: true));
+        SyncPlaylistVideoHudLabelColors();
+    }
+
+    /// <summary>動画本再生／ミニ限定。メーター文字をファイル名と同じ #F5F5F5 に。</summary>
+    private void SyncPlaylistVideoHudLabelColors()
+    {
+        var on = LibraryPlayerMode.UsesVideoOverlayLabelFore(
+            IsLibraryMaximized,
+            LibraryBrowser.PlaylistVisualShown,
+            LibraryBrowser.PlaylistVisualIsVideo,
+            !_playlistVideoChromeVisible,
+            IsVideoMiniPlayerActive());
+        LevelMeter.VideoOverlayLabels = on;
+        VectorScope.VideoOverlayLabels = on;
+        Spectrum.VideoOverlayLabels = on;
+        LoudnessMeter.VideoOverlayLabels = on;
+        ForEachWaveform(view => view.VideoOverlayLabels = on);
     }
 
     private void ApplyPlayerMeterFade(bool visible, bool instant)
@@ -1504,6 +1522,7 @@ public partial class MainWindow
         LevelMeter.InvalidateVisual();
         VectorScope.InvalidateVisual();
         Spectrum.InvalidateVisual();
+        SyncPlaylistVideoHudLabelColors();
     }
 
     /// <summary>
