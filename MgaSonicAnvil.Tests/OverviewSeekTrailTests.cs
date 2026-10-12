@@ -51,6 +51,50 @@ public sealed class OverviewSeekTrailTests
         });
     }
 
+    [Fact]
+    public void DrawReverse_PaintsAfterglowBandAheadOfPlayhead()
+    {
+        RunSta(() =>
+        {
+            var now = Environment.TickCount64;
+            var samples = new List<(long Frame, long TickMs)>
+            {
+                (8000, now - 200),
+                (4000, now - 100),
+                (2000, now),
+            };
+            var band = new Rect(0, 0, 200, 24);
+            var playheadX = 40d;
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                dc.DrawRectangle(Brushes.Black, null, band);
+                SeekPlaybackTrailPaint.DrawReverse(
+                    dc,
+                    band,
+                    playheadX,
+                    contentRight: band.Right,
+                    samples,
+                    frame => frame / 10000d * band.Width,
+                    fadeMs: 2000,
+                    Colors.Cyan);
+            }
+
+            var bmp = new RenderTargetBitmap(200, 24, 96, 96, PixelFormats.Pbgra32);
+            bmp.Render(visual);
+            var pixels = new byte[200 * 24 * 4];
+            bmp.CopyPixels(pixels, 200 * 4, 0);
+
+            var midY = 12;
+            var nearHead = CyanAt(pixels, 200, (int)playheadX + 6, midY);
+            var farRight = CyanAt(pixels, 200, 190, midY);
+            var leftOfHead = CyanAt(pixels, 200, 8, midY);
+            Assert.True(nearHead > 8, $"near playhead cyan={nearHead}");
+            Assert.True(nearHead > farRight, $"near={nearHead} farRight={farRight}");
+            Assert.True(leftOfHead == 0, $"left of playhead should be empty, cyan={leftOfHead}");
+        });
+    }
+
     private static int CyanAt(byte[] pixels, int width, int x, int y)
     {
         var i = ((y * width) + x) * 4;

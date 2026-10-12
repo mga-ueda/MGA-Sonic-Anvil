@@ -158,6 +158,7 @@ internal sealed class WaveformView : Grid
     private WaveSelection _commentEditRegion;
     private bool _endingCommentEdit;
     private readonly List<(long Frame, long TickMs)> _trailSamples = [];
+    private readonly List<(long Frame, long TickMs)> _reverseTrailSamples = [];
     private readonly List<(long Frame, long TickMs)> _exitTrailSamples = [];
     private bool _trailActive;
     private Func<long, float>? _previewGainAtFrame;
@@ -445,11 +446,10 @@ internal sealed class WaveformView : Grid
                 return;
             }
 
-            ResetTrailIfRewound(value, _trailSamples);
             _playheadFrame = value;
             if (_trailActive)
             {
-                RecordTrailSample(value, _trailSamples);
+                RecordDirectionalTrailSample(value);
             }
 
             InvalidatePlayheadOnlyIfDue();
@@ -469,11 +469,10 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        ResetTrailIfRewound(frame, _trailSamples);
         _playheadFrame = frame;
         if (_trailActive)
         {
-            RecordTrailSample(frame, _trailSamples);
+            RecordDirectionalTrailSample(frame);
         }
 
         InvalidatePlayheadOnlyIfDue();
@@ -519,6 +518,8 @@ internal sealed class WaveformView : Grid
 
     internal IReadOnlyList<(long Frame, long TickMs)> SeekTrailSamples => _trailSamples;
 
+    internal IReadOnlyList<(long Frame, long TickMs)> SeekReverseTrailSamples => _reverseTrailSamples;
+
     internal IReadOnlyList<(long Frame, long TickMs)> ExitSeekTrailSamples => _exitTrailSamples;
 
     public void SetTrailRecording(bool active)
@@ -527,12 +528,13 @@ internal sealed class WaveformView : Grid
         if (!active)
         {
             _trailSamples.Clear();
+            _reverseTrailSamples.Clear();
             _exitTrailSamples.Clear();
             InvalidatePlayheadOnly();
             return;
         }
 
-        RecordTrailSample(_playheadFrame, _trailSamples);
+        RecordDirectionalTrailSample(_playheadFrame);
         if (_exitPlayheadFrame >= 0)
         {
             RecordTrailSample(_exitPlayheadFrame, _exitTrailSamples);
@@ -7341,7 +7343,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        ResetTrailIfRewound(frame, _trailSamples);
+        ClearOppositeTrailIfDirectionChanged(frame);
         _document.CursorFrame = frame;
         _playheadFrame = frame;
         InvalidatePlayheadOnly();
@@ -7490,6 +7492,7 @@ internal sealed class WaveformView : Grid
             }
 
             DrawSeekPlaybackTrail(dc, bounds, playX, start, span, _trailSamples, Theme.Get("PlayheadBrush"));
+            DrawSeekPlaybackTrailReverse(dc, bounds, playX, start, span, _reverseTrailSamples, Theme.Get("PlayheadBrush"));
             EnsurePlayheadPens();
             var y0 = wave.Y;
             var y1 = wave.Y + wave.Height;
@@ -7580,6 +7583,29 @@ internal sealed class WaveformView : Grid
             color);
     }
 
+    private void DrawSeekPlaybackTrailReverse(
+        DrawingContext dc,
+        Rect bounds,
+        double playheadX,
+        double start,
+        double span,
+        List<(long Frame, long TickMs)> samples,
+        Color color)
+    {
+        PruneTrailSamplesByAge(Environment.TickCount64, samples);
+        var wave = WaveformBounds(bounds);
+        SeekPlaybackTrailPaint.DrawReverse(
+            dc,
+            wave,
+            playheadX,
+            wave.Right,
+            samples,
+            frame => FrameToViewX(frame, start, span, bounds),
+            TrailFadeMsForView(ScaleContentWidth(bounds)),
+            color);
+    }
+
+    /// <summary>出口ヘッド（前方のみ）。フレームが戻ったらそのリストを捨てる。</summary>
     private void ResetTrailIfRewound(long frame, List<(long Frame, long TickMs)> samples)
     {
         if (!_trailActive || samples.Count == 0)
@@ -7593,6 +7619,103 @@ internal sealed class WaveformView : Grid
         }
     }
 
+    /// <summary>
+    /// 逆方向ジャンプ時だけ、前方サンプルを右残光用へ移す（順方向の残し方はいじらない）。
+    /// 順方向へ戻るときは逆方向リストを捨てるだけ。
+    /// </summary>
+    private void ClearOppositeTrailIfDirectionChanged(long frame)
+    {
+        if (!_trailActive)
+        {
+            return;
+        }
+
+        if (_trailSamples.Count > 0 && frame < _trailSamples[^1].Frame)
+        {
+            _reverseTrailSamples.Clear();
+            foreach (var sample in _trailSamples)
+            {
+                if (sample.Frame > frame)
+                {
+                    _reverseTrailSamples.Add(sample);
+                }
+            }
+
+            _trailSamples.Clear();
+            return;
+        }
+
+        if (_reverseTrailSamples.Count > 0 && frame > _reverseTrailSamples[^1].Frame)
+        {
+            _reverseTrailSamples.Clear();
+        }
+    }
+
+    private List<(long Frame, long TickMs)> ActiveMainTrailSamples() =>
+        _reverseTrailSamples.Count > 0 ? _reverseTrailSamples : _trailSamples;
+
+    private void RecordDirectionalTrailSample(long frame)
+    {
+        if (!_trailActive)
+        {
+            return;
+        }
+
+        var active = ActiveMainTrailSamples();
+        if (active.Count == 0)
+        {
+            AppendTrailSample(frame, _trailSamples);
+            return;
+        }
+
+        var last = active[^1];
+        if (FramesToSec(Math.Abs(frame - last.Frame)) >= DiscontinuitySec(DurationSeconds()))
+        {
+            var from = last.Frame;
+            _trailSamples.Clear();
+            _reverseTrailSamples.Clear();
+            if (frame < from)
+            {
+                // 逆方向の不連続ジャンプだけ出発点を残す。順方向は従来どおり到着点のみ。
+                _reverseTrailSamples.Add((from, Environment.TickCount64));
+                AppendTrailSample(frame, _reverseTrailSamples);
+            }
+            else
+            {
+                AppendTrailSample(frame, _trailSamples);
+            }
+
+            return;
+        }
+
+        if (frame < last.Frame)
+        {
+            if (!ReferenceEquals(active, _reverseTrailSamples))
+            {
+                // 切替直前の位置を種にして、右側に履歴帯が残るようにする。
+                _reverseTrailSamples.Clear();
+                _reverseTrailSamples.Add(last);
+                _trailSamples.Clear();
+            }
+
+            AppendTrailSample(frame, _reverseTrailSamples);
+            return;
+        }
+
+        if (frame > last.Frame)
+        {
+            if (!ReferenceEquals(active, _trailSamples))
+            {
+                _reverseTrailSamples.Clear();
+            }
+
+            AppendTrailSample(frame, _trailSamples);
+            return;
+        }
+
+        AppendTrailSample(frame, active);
+    }
+
     private void RecordTrailSample(long frame, List<(long Frame, long TickMs)> samples)
     {
         if (!_trailActive)
@@ -7601,7 +7724,6 @@ internal sealed class WaveformView : Grid
         }
 
         ResetTrailIfRewound(frame, samples);
-        var now = Environment.TickCount64;
         var durationSec = DurationSeconds();
         if (samples.Count > 0)
         {
@@ -7612,6 +7734,12 @@ internal sealed class WaveformView : Grid
             }
         }
 
+        AppendTrailSample(frame, samples);
+    }
+
+    private void AppendTrailSample(long frame, List<(long Frame, long TickMs)> samples)
+    {
+        var now = Environment.TickCount64;
         if (samples.Count > 0)
         {
             var last = samples[^1];

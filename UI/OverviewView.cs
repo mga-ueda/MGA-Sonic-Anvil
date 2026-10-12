@@ -418,6 +418,7 @@ internal sealed class OverviewView : FrameworkElement
         }
 
         DrawSeekTrail(dc, bounds, playX, _seekTrailSource?.SeekTrailSamples, Theme.Get("PlayheadBrush"));
+        DrawSeekTrailReverse(dc, bounds, playX, _seekTrailSource?.SeekReverseTrailSamples, Theme.Get("PlayheadBrush"));
         if (_exitPlayheadFrame >= 0)
         {
             EnsureExitPlayheadPens();
@@ -449,6 +450,33 @@ internal sealed class OverviewView : FrameworkElement
             bounds,
             playheadX,
             contentLeft: 0,
+            samples,
+            frame => frame / frames * bounds.Width,
+            SeekPlaybackTrailPaint.FadeMs(bounds.Width, durationSec),
+            color);
+    }
+
+    private void DrawSeekTrailReverse(
+        DrawingContext dc,
+        Rect bounds,
+        double playheadX,
+        IReadOnlyList<(long Frame, long TickMs)>? samples,
+        Color color)
+    {
+        if (_document is null || samples is null || samples.Count < 2)
+        {
+            return;
+        }
+
+        var frames = (double)_document.FrameCount;
+        var durationSec = _document.SampleRate <= 0
+            ? 0
+            : _document.FrameCount / (double)_document.SampleRate;
+        SeekPlaybackTrailPaint.DrawReverse(
+            dc,
+            bounds,
+            playheadX,
+            contentRight: bounds.Right,
             samples,
             frame => frame / frames * bounds.Width,
             SeekPlaybackTrailPaint.FadeMs(bounds.Width, durationSec),
