@@ -788,6 +788,10 @@ public sealed class LibraryPlayerModeTests
             aspectCol - reserved,
             LibraryPlayerMode.LevelMeterMaxLayoutHeight(colTall, 1080, 1920, 1),
             3);
+        Assert.True(LibraryPlayerMode.QuitsAppFromVideoMini(Key.Q, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.QuitsAppFromVideoMini(Key.Escape, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.QuitsAppFromVideoMini(Key.Q, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.QuitsAppFromVideoMini(Key.Space, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsVideoHudToggle(Key.A, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsVideoHudToggle(Key.A, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsVideoTimecodeToggle(Key.T, ModifierKeys.None));
