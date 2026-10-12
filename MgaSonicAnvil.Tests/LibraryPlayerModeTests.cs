@@ -980,6 +980,23 @@ public sealed class LibraryPlayerModeTests
             playerMode: true, isVideoFile: true, visualShown: true, shuttling: true, audioPlaying: false));
         Assert.False(LibraryPlayerMode.DrivesPlayheadWhileVideoShuttles(
             playerMode: true, isVideoFile: true, visualShown: true, shuttling: false, audioPlaying: true));
+        Assert.True(LibraryPlayerMode.BlocksPlaybackShuttleInDimPreview(
+            playerMode: true, visualShown: true, isVideo: true, visualPlaying: false, audioPlaying: false));
+        Assert.False(LibraryPlayerMode.BlocksPlaybackShuttleInDimPreview(
+            playerMode: true, visualShown: true, isVideo: true, visualPlaying: true, audioPlaying: false));
+        Assert.False(LibraryPlayerMode.BlocksPlaybackShuttleInDimPreview(
+            playerMode: true, visualShown: true, isVideo: true, visualPlaying: false, audioPlaying: true));
+        Assert.False(LibraryPlayerMode.BlocksPlaybackShuttleInDimPreview(
+            playerMode: false, visualShown: true, isVideo: true, visualPlaying: false, audioPlaying: false));
+        Assert.False(LibraryPlayerMode.BlocksPlaybackShuttleInDimPreview(
+            playerMode: true, visualShown: true, isVideo: false, visualPlaying: false, audioPlaying: false));
+        Assert.False(LibraryPlayerMode.BlocksPlaybackShuttleInDimPreview(
+            playerMode: true,
+            visualShown: true,
+            isVideo: true,
+            visualPlaying: false,
+            audioPlaying: false,
+            frameOrImmersivePaused: true));
         Assert.True(LibraryPlayerMode.MeterFadeFrameRate >= 24);
         Assert.True(LibraryPlayerMode.MeterFadeFrameRate <= 60);
     }

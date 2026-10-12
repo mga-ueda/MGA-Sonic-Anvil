@@ -1398,7 +1398,7 @@ public partial class MainWindow
         && LibraryBrowser.PlaylistVisualPlaying;
 
     /// <summary>
-    /// 停止中の Enter を Space と同じ本再生／表示にする対象（動画／PDF）。
+    /// 停止中の Enter を本再生／表示にする対象（動画／PDF）。Enter は先頭から、Space は再開。
     /// 本再生中の Enter はその場停止（immersive）で、ここは使わない。
     /// </summary>
     private bool IsLibraryVisualTransportTarget()
@@ -3341,7 +3341,8 @@ public partial class MainWindow
     private async Task PlayLibrarySessionAsync(
         DocumentSession? session,
         bool stopAfterTrack = false,
-        bool keepAmbientGlow = false)
+        bool keepAmbientGlow = false,
+        bool fromStart = false)
     {
         StopVideoFrameStep();
         CancelLibraryGapless();
@@ -3444,7 +3445,7 @@ public partial class MainWindow
                     return;
                 }
 
-                StartLibraryVisualPlayback(session, stopAfterTrack);
+                StartLibraryVisualPlayback(session, stopAfterTrack, fromStart);
                 if (!keepAmbientGlow)
                 {
                     ShowLibraryArtwork(session);
@@ -3502,7 +3503,10 @@ public partial class MainWindow
     /// 再生中は HaltPlaybackToStart。停止中はシーク位置（CursorFrame）から単独再生／再開（曲末で次へ進まない）。
     /// 別曲へ切り替えるときだけ PlayLibrarySessionAsync（その曲は先頭から）。
     /// </summary>
-    private async void PlayLibrarySelectionOnceOrToggle()
+    /// <param name="fromStart">
+    /// true なら常に先頭から（プレイヤー Enter）。false なら同じ曲はシーク位置から再開（Space）。
+    /// </param>
+    private async void PlayLibrarySelectionOnceOrToggle(bool fromStart = false)
     {
         if (IsRecording)
         {
@@ -3526,19 +3530,20 @@ public partial class MainWindow
             return;
         }
 
-        // 同じ曲が既に載っているときは先頭へ戻さず、シークバー位置から始める／再開する。
+        // 同じ曲が既に載っているとき：Space はシークバー位置から、Enter は先頭から。
         if (ReferenceEquals(session, _activeSession) && _document is not null)
         {
             _libraryStopAfterTrack = true;
             if (LibraryPlaylistDocuments.IsPdf(session.Document))
             {
-                await PlayLibrarySessionAsync(session, stopAfterTrack: true).ConfigureAwait(true);
+                await PlayLibrarySessionAsync(session, stopAfterTrack: true, fromStart: fromStart)
+                    .ConfigureAwait(true);
                 return;
             }
 
             // 選択／ホバープレビューはプロキシを待たない。Space 本再生ではここで作る。
-            // （PlayLibrarySessionAsync だと暗いプレビュー中の HoverResumeFrame が 0 に戻る）
-            var startFrame = _document.CursorFrame;
+            // Enter（fromStart）は先頭固定。Space は暗いプレビュー中の位置を引き継ぐ。
+            var startFrame = fromStart ? 0L : _document.CursorFrame;
             if (!await EnsureVideoProxyBeforePlaybackAsync(session).ConfigureAwait(true))
             {
                 return;
@@ -3549,11 +3554,18 @@ public partial class MainWindow
                 return;
             }
 
+            if (fromStart)
+            {
+                session.Document.CursorFrame = 0;
+                Waveform.PlayheadFrame = 0;
+            }
+
             StartPlayback(startFrame, prerollSeconds: 0);
             return;
         }
 
-        await PlayLibrarySessionAsync(session, stopAfterTrack: true).ConfigureAwait(true);
+        await PlayLibrarySessionAsync(session, stopAfterTrack: true, fromStart: fromStart)
+            .ConfigureAwait(true);
     }
 
     private Task EnsureLibrarySessionLoadedAsync(DocumentSession session, bool bind = true)
@@ -4812,7 +4824,10 @@ public partial class MainWindow
         document.ActivateStreamPlayback(48000, 2, 16, frames);
     }
 
-    private void StartLibraryVisualPlayback(DocumentSession session, bool stopAfterTrack)
+    private void StartLibraryVisualPlayback(
+        DocumentSession session,
+        bool stopAfterTrack,
+        bool fromStart = false)
     {
         ClearPlaylistVideoImmersivePause(sync: false);
         if (LibraryPlaylistDocuments.IsPdf(session.Document))
@@ -4829,13 +4844,15 @@ public partial class MainWindow
         }
 
         _libraryStopAfterTrack = stopAfterTrack;
-        var startFrame = LibraryPlayerMode.HoverResumeFrame(
-            LibraryBrowser.PlaylistVisualShown && LibraryBrowser.PlaylistVisualIsVideo,
-            LibraryBrowser.PlaylistVisualPlaying,
-            LibraryBrowser.IsPlaylistVisualSameSource(session.Document.SourcePath),
-            LibraryBrowser.PlaylistVisualPosition.TotalSeconds,
-            session.Document.SampleRate,
-            session.Document.FrameCount);
+        var startFrame = fromStart
+            ? 0L
+            : LibraryPlayerMode.HoverResumeFrame(
+                LibraryBrowser.PlaylistVisualShown && LibraryBrowser.PlaylistVisualIsVideo,
+                LibraryBrowser.PlaylistVisualPlaying,
+                LibraryBrowser.IsPlaylistVisualSameSource(session.Document.SourcePath),
+                LibraryBrowser.PlaylistVisualPosition.TotalSeconds,
+                session.Document.SampleRate,
+                session.Document.FrameCount);
         session.Document.CursorFrame = startFrame;
         Waveform.PlayheadFrame = startFrame;
         LibraryBrowser.ShowPlaylistVisual(session, play: true);

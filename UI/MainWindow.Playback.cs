@@ -254,10 +254,22 @@ public partial class MainWindow
     /// <param name="allowWhileStopped">
     /// true なら停止中の ,／.／テンキー 1／3 を許可（離すとその位置で停止のまま）。
     /// ←→ の再生中シャトルは false のまま（停止中は 1 ステップシーク）。
+    /// 暗いバックグラウンド動画プレビュー中は allowWhileStopped でも不可。
     /// </param>
     private bool CanPlaybackShuttle(bool allowWhileStopped = false)
     {
         if (_document is null || _player.IsScrubbing || AnyEffectPreviewing)
+        {
+            return false;
+        }
+
+        if (LibraryPlayerMode.BlocksPlaybackShuttleInDimPreview(
+                IsLibraryMaximized,
+                LibraryBrowser.PlaylistVisualShown,
+                LibraryBrowser.PlaylistVisualIsVideo,
+                LibraryBrowser.PlaylistVisualPlaying,
+                _player.IsPlaying,
+                LibraryBrowser.PlaylistVisualFramePaused || _playlistVideoImmersivePause))
         {
             return false;
         }

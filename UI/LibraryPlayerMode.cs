@@ -300,6 +300,24 @@ internal static class LibraryPlayerMode
         visualShown && !visualPlaying && sameSource && isVideo;
 
     /// <summary>
+    /// プレイヤーの暗いバックグラウンド動画プレビュー中は早送り／巻き戻し不可。
+    /// （本再生・音声再生中・フレーム／イマーシブ一時停止は対象外。）
+    /// </summary>
+    public static bool BlocksPlaybackShuttleInDimPreview(
+        bool playerMode,
+        bool visualShown,
+        bool isVideo,
+        bool visualPlaying,
+        bool audioPlaying,
+        bool frameOrImmersivePaused = false) =>
+        playerMode
+        && visualShown
+        && isVideo
+        && !visualPlaying
+        && !audioPlaying
+        && !frameOrImmersivePaused;
+
+    /// <summary>
     /// ランダム再生の切替。プレイリストが空でも、ツリー／お気に入りフォーカスでも効く。
     /// 検索欄では文字入力のまま。
     /// </summary>

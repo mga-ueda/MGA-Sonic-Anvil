@@ -966,7 +966,7 @@ public partial class MainWindow
                 return PausePlaybackHere(immersiveVideoHold: true);
             }
 
-            // 停止中の動画／PDF：Space と同じく本再生／明るい表示へ。
+            // 停止中の動画／PDF：本再生／明るい表示へ（Enter は常に先頭から。Space は再開）。
             if (IsLibraryMaximized
                 && LibraryPlayerMode.PlaysLibrarySelectionOnSpace(
                     IsLibraryExplorerFocused,
@@ -974,7 +974,7 @@ public partial class MainWindow
                 && IsLibraryVisualTransportTarget()
                 && !IsPlaybackActive())
             {
-                PlayLibrarySelectionOnceOrToggle();
+                PlayLibrarySelectionOnceOrToggle(fromStart: true);
                 return true;
             }
 
