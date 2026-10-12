@@ -2916,6 +2916,13 @@ public partial class MainWindow
             return null;
         }
 
+        // 非圧縮はメモリ再生。ギャップレス先読みストリームには載せない。
+        if (AudioCodec.IsUncompressedPcm(document.SourceKind)
+            || (document.SourcePath is { Length: > 0 } nextPath && AudioCodec.IsUncompressedPcm(nextPath)))
+        {
+            return null;
+        }
+
         // ActivateStreamPlayback は PCM とピークを捨てる。
         // 1曲のときは次曲も同じ曲なので、エディタで見えていた波形がプレイヤーへ戻すと消える。
         if (!document.IsStreamPlayback
@@ -3573,15 +3580,15 @@ public partial class MainWindow
             return Task.CompletedTask;
         }
 
-        // プレイヤー中のストリーム再生はフル Load しない。
+        // プレイヤー中の圧縮／動画はフル Load しない。WAVE / AIFF はメモリ早戻し用に PCM 化する。
         if (IsLibraryMaximized
             && session.Document.SourcePath is { Length: > 0 }
-            && AudioCodec.CanStreamPlay(session.Document.SourcePath))
+            && AudioCodec.PrefersPlayerStream(session.Document.SourcePath))
         {
             return ActivateStreamLibrarySessionAsync(session, gen);
         }
 
-        // エディタ復帰時はストリームをフル PCM に昇格する。
+        // エディタ復帰、またはプレイヤーの非圧縮ストリーム残りはフル PCM に昇格する。
         if (session.Document.IsStreamPlayback)
         {
             return LoadDeferredLibrarySessionAsync(session, gen, bind);

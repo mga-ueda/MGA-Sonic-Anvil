@@ -167,6 +167,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private long _streamReverseNextStart = -1;
     private int _streamReverseNextFrames;
     private float[] _streamReverseLast = [];
+    private float[] _streamReversePrerollScratch = [];
     /// <summary>1 回の Read でリングから捨てる無音の上限。超えたら次のコールバックへ回す。</summary>
     private int _streamSkipBudget;
     private bool _streamSkipYield;
@@ -179,8 +180,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     internal static readonly float ShuttleGainLinear = (float)Math.Pow(10, ShuttleGainDb / 20.0);
     private const double ShuttleGrainSeconds = 0.03;
     private const double ShuttleTaperSeconds = 0.004;
-    private const double StreamReverseChunkSeconds = 0.16;
-    private const double StreamReverseOverlapSeconds = 0.02;
+    /// <summary>圧縮ストリーム早戻しの窓。Seek 回数を抑えつつ継ぎ目を滑らかにする。</summary>
+    private const double StreamReverseChunkSeconds = 0.24;
+    private const double StreamReverseOverlapSeconds = 0.04;
+    /// <summary>Seek 直後のプライミング汚れを捨てるための手前デコード量。</summary>
+    private const double StreamReversePrerollSeconds = 0.08;
 
     public WaveFormat WaveFormat { get; private set; } =
         WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
@@ -2032,6 +2036,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return;
         }
 
+        // 後ろ向きに進むので、チャンク先頭に近づいたら次を先に埋める。
+        // 早すぎる先読みは本チャンク充填中の Seek とぶつかるので overlap 付近に留める。
         if (frame - _streamReverseBufStart > overlapFrames * 2)
         {
             return;
@@ -2091,13 +2097,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             bufStart = start;
             bufFrames = 0;
             filledFrom = start;
-            if (_stream is not null && _stream.Frame != filledFrom)
-            {
-                _stream.SeekFrame(filledFrom, prebufferTimeoutMs: 0);
-                InvalidateStreamCursorCacheNoLock();
-            }
         }
 
+        // Seek / プリロールは FillStreamReverseRange 側。ここで Seek するとプライミング捨てが効かない。
         bufFrames += FillStreamReverseRange(buf, start, filledFrom, end, srcCh);
     }
 
@@ -2124,10 +2126,23 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return 0;
         }
 
+        // 連続読みならそのまま。Seek が要るときだけ手前をデコードしてプライミングを捨てる。
+        // 未着で return 0 したあと、同じ窓へ毎回流 Seek するとリングが毎回空になり永久に埋まらない。
         if (_stream.Frame != from)
         {
-            _stream.SeekFrame(from, prebufferTimeoutMs: 0);
-            InvalidateStreamCursorCacheNoLock();
+            var preroll = Math.Max(0, (int)Math.Round(_sourceRate * StreamReversePrerollSeconds));
+            var decodeFrom = Math.Max(0, from - preroll);
+            if (_stream.Frame < decodeFrom || _stream.Frame > from)
+            {
+                _stream.SeekFrame(decodeFrom, prebufferTimeoutMs: 0);
+                InvalidateStreamCursorCacheNoLock();
+            }
+
+            if (_stream.Frame < from
+                && !DiscardStreamReversePreroll(from - _stream.Frame, srcCh))
+            {
+                return 0;
+            }
         }
 
         var got = _stream.ReadFrames(buf, (int)(from - start) * srcCh, want, timeoutMs: 0);
@@ -2137,6 +2152,38 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
 
         return got;
+    }
+
+    /// <summary>早戻し Seek 後の手前フレームを捨てる。未着なら false（次コールで Seek せず続きを待つ）。</summary>
+    private bool DiscardStreamReversePreroll(long frames, int srcCh)
+    {
+        if (_stream is null || frames <= 0)
+        {
+            return true;
+        }
+
+        var remaining = (int)Math.Min(frames, int.MaxValue);
+        var chunk = Math.Min(remaining, 2048);
+        var need = chunk * srcCh;
+        if (_streamReversePrerollScratch.Length < need)
+        {
+            _streamReversePrerollScratch = new float[need];
+        }
+
+        while (remaining > 0)
+        {
+            var take = Math.Min(remaining, chunk);
+            var got = _stream.ReadFrames(_streamReversePrerollScratch, 0, take, timeoutMs: 0);
+            if (got <= 0)
+            {
+                return false;
+            }
+
+            InvalidateStreamCursorCacheNoLock();
+            remaining -= got;
+        }
+
+        return true;
     }
 
     private void EnsureReverseLast(int srcCh)
