@@ -62,10 +62,19 @@ internal static class VideoProxy
         @"^total_size=(\d+)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+    /// <summary>
+    /// 再生／表示に使うパス。キャッシュがあればそれを優先する
+    ///（Remember が原ファイルのままだとプロキシがあっても使われないため）。
+    /// </summary>
     public static bool TryGetDisplayPath(string sourcePath, out string displayPath)
     {
         lock (Gate)
         {
+            if (TryGetCachedCore(sourcePath, out displayPath))
+            {
+                return true;
+            }
+
             return TryGetRemembered(sourcePath, out displayPath);
         }
     }
