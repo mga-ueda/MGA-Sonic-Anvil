@@ -1746,6 +1746,7 @@ public partial class MainWindow
             settings.ResolvedLibraryExplorerRoots(),
             settings.ResolvedLibraryListColumnsWave(),
             settings.ResolvedLibraryListColumnsMp3(),
+            settings.ResolvedLibraryListColumnsVideo(),
             settings.ResolvedLibraryPlaylistWaveformSizeWave(),
             settings.ResolvedLibraryPlaylistWaveformSizeMp3(),
             settings.GaplessPlayback,
@@ -1796,12 +1797,14 @@ public partial class MainWindow
         LibraryBrowser.SetExplorerRoots(settings.ResolvedLibraryExplorerRoots());
         settings.ApplyLibraryListColumnPresets(
             dialog.SelectedLibraryListColumnsWave,
-            dialog.SelectedLibraryListColumnsMp3);
+            dialog.SelectedLibraryListColumnsMp3,
+            dialog.SelectedLibraryListColumnsVideo);
         LibraryBrowser.SetVisibleColumnPresets(
             settings.ResolvedLibraryListColumnsWave(),
             settings.ResolvedLibraryListColumnsMp3(),
             settings.ResolvedLibraryListColumnsMixed(),
-            mixedCustomized: settings.LibraryListColumnsMixed.Length > 0);
+            mixedCustomized: settings.LibraryListColumnsMixed.Length > 0,
+            videoColumns: settings.ResolvedLibraryListColumnsVideo());
         settings.ApplyLibraryPlaylistWaveformSizeWave(dialog.SelectedLibraryPlaylistWaveformSizeWave);
         settings.ApplyLibraryPlaylistWaveformSizeMp3(dialog.SelectedLibraryPlaylistWaveformSizeMp3);
         settings.GaplessPlayback = dialog.SelectedGaplessPlayback;

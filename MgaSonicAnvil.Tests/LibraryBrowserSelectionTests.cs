@@ -2379,7 +2379,7 @@ public sealed class LibraryBrowserSelectionTests
                 LibraryFileColumn.Title,
             };
             view.SetVisibleColumns(order);
-            var active = LibraryColumnFilter.ResolveActive([], order, order);
+            var active = LibraryColumnFilter.ResolveActive([], order, order, videoColumns: order);
             Assert.Equal(active, view.VisibleColumnOrder);
             Assert.Equal(0, view.GroupSpacerDisplayIndex);
             Assert.True(
@@ -2395,6 +2395,7 @@ public sealed class LibraryBrowserSelectionTests
             Assert.NotNull(saved);
             Assert.Equal(saved!.Value.Wave, view.WaveColumnOrder);
             Assert.Equal(saved.Value.Mp3, view.Mp3ColumnOrder);
+            Assert.Equal(saved.Value.Video, view.VideoColumnOrder);
             Assert.Equal(saved.Value.Mixed, view.MixedColumnOrder);
             Assert.True(saved.Value.PersistMixed);
             Assert.Equal(
@@ -2402,27 +2403,31 @@ public sealed class LibraryBrowserSelectionTests
                     [],
                     saved.Value.Wave,
                     saved.Value.Mp3,
-                    saved.Value.Mixed),
+                    saved.Value.Mixed,
+                    saved.Value.Video),
                 view.VisibleColumnOrder);
             Assert.Contains(LibraryFileColumn.Name, saved.Value.Mixed);
             Assert.Contains(LibraryFileColumn.Title, saved.Value.Mixed);
             Assert.Equal(LibraryFileColumn.Duration, saved.Value.Mixed[^1]);
-            // 空／混在の並べ替えは混在プリセットだけ。Wave / MP3 設定は触らない。
+            // 空／混在の並べ替えは混在プリセットだけ。Wave / MP3 / Video 設定は触らない。
             Assert.Equal(view.WaveColumnOrder, saved.Value.Wave);
             Assert.Equal(view.Mp3ColumnOrder, saved.Value.Mp3);
+            Assert.Equal(view.VideoColumnOrder, saved.Value.Video);
             Assert.NotEqual(saved.Value.Mixed, saved.Value.Wave);
 
             view.SetVisibleColumnPresets(
                 LibraryColumnFilter.WaveDefaults,
                 LibraryColumnFilter.Mp3Defaults,
                 saved.Value.Mixed,
-                mixedCustomized: true);
+                mixedCustomized: true,
+                videoColumns: LibraryColumnFilter.VideoDefaults);
             Assert.Equal(
                 LibraryColumnFilter.ResolveActive(
                     [],
                     LibraryColumnFilter.WaveDefaults,
                     LibraryColumnFilter.Mp3Defaults,
-                    saved.Value.Mixed),
+                    saved.Value.Mixed,
+                    LibraryColumnFilter.VideoDefaults),
                 view.VisibleColumnOrder);
             Assert.True(
                 view.ColumnDisplayIndex(LibraryFileColumn.Title)
@@ -2475,7 +2480,8 @@ public sealed class LibraryBrowserSelectionTests
                     [],
                     saved.Value.Wave,
                     saved.Value.Mp3,
-                    saved.Value.Mixed),
+                    saved.Value.Mixed,
+                    saved.Value.Video),
                 view.VisibleColumnOrder);
 
             var title = menu.Items.OfType<MenuItem>()

@@ -3885,11 +3885,15 @@ public partial class MainWindow
             AppStorage.Settings.ApplyLibraryListColumnPresets(
                 presets.Wave,
                 presets.Mp3,
+                presets.Video,
                 presets.Mixed);
         }
         else
         {
-            AppStorage.Settings.ApplyLibraryListColumnPresets(presets.Wave, presets.Mp3);
+            AppStorage.Settings.ApplyLibraryListColumnPresets(
+                presets.Wave,
+                presets.Mp3,
+                presets.Video);
         }
 
         AppStorage.Save();

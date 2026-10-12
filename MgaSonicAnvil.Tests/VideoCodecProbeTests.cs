@@ -122,15 +122,27 @@ public sealed class VideoCodecProbeTests
     [Fact]
     public void AviMjpeg_IsDirectPlay_AndXvidNeedsProxy()
     {
-        var mjpeg = WriteTempAvi(BuildAvi("MJPG", microSecPerFrame: 40_000, totalFrames: 25));
-        var xvid = WriteTempAvi(BuildAvi("XVID", microSecPerFrame: 40_000, totalFrames: 50));
+        var mjpeg = WriteTempAvi(BuildAvi("MJPG", microSecPerFrame: 40_000, totalFrames: 25, width: 1280, height: 720));
+        var xvid = WriteTempAvi(BuildAvi("XVID", microSecPerFrame: 40_000, totalFrames: 50, width: 640, height: 360));
         try
         {
             Assert.True(VideoCodecProbe.TryReadVideoFourCcs(mjpeg, out var jpegTags));
             Assert.Contains("MJPG", jpegTags, StringComparer.OrdinalIgnoreCase);
             Assert.True(VideoCodecProbe.CanPlayWithoutProxy(mjpeg));
-            Assert.True(VideoCodecProbe.TryRead(mjpeg, out _, out var jpegSeconds));
+            Assert.True(VideoCodecProbe.TryRead(
+                mjpeg,
+                out _,
+                out var jpegSeconds,
+                out _,
+                out _,
+                out _,
+                out var jpegWidth,
+                out var jpegHeight,
+                out var jpegFps));
             Assert.Equal(1, jpegSeconds, 3);
+            Assert.Equal(1280, jpegWidth);
+            Assert.Equal(720, jpegHeight);
+            Assert.Equal(25, jpegFps, 3);
 
             Assert.True(VideoCodecProbe.TryReadVideoFourCcs(xvid, out var xvidTags));
             Assert.Contains("XVID", xvidTags, StringComparer.OrdinalIgnoreCase);
@@ -142,6 +154,68 @@ public sealed class VideoCodecProbeTests
         {
             File.Delete(mjpeg);
             File.Delete(xvid);
+        }
+    }
+
+    [Fact]
+    public void ReadsVisualSizeAndFrameRate_FromStsdAndStts()
+    {
+        var path = WriteTemp(BuildMovieWithVisual("avc1", width: 1920, height: 1080, timescale: 30_000, sampleDelta: 1001));
+        try
+        {
+            Assert.True(VideoCodecProbe.TryRead(
+                path,
+                out var codecs,
+                out _,
+                out _,
+                out _,
+                out _,
+                out var width,
+                out var height,
+                out var fps));
+            Assert.Contains("avc1", codecs, StringComparer.Ordinal);
+            Assert.Equal(1920, width);
+            Assert.Equal(1080, height);
+            Assert.Equal(30_000 / 1001d, fps, 3);
+
+            Assert.True(AudioTagProbe.TryRead(path, out var tags));
+            Assert.Equal(1920, tags.VideoWidth);
+            Assert.Equal(1080, tags.VideoHeight);
+            Assert.Equal("avc1", tags.VideoCodec);
+            Assert.Equal(UiStrings.FormatVideoSize(1920, 1080), UiStrings.FormatVideoSize(tags.VideoWidth, tags.VideoHeight));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void JpegPlusIpcm_ExposesAudioCodecFourcc()
+    {
+        var path = WriteTemp(BuildMovieWithIpcm("jpeg", includePcmC: true));
+        try
+        {
+            Assert.True(VideoCodecProbe.TryRead(
+                path,
+                out _,
+                out _,
+                out _,
+                out _,
+                out _,
+                out _,
+                out _,
+                out _,
+                out var audioCodec));
+            Assert.Equal("ipcm", audioCodec);
+
+            Assert.True(AudioTagProbe.TryRead(path, out var tags));
+            Assert.Equal("ipcm", tags.AudioCodec);
+            Assert.Equal("jpeg", tags.VideoCodec);
+        }
+        finally
+        {
+            File.Delete(path);
         }
     }
 
@@ -215,11 +289,18 @@ public sealed class VideoCodecProbeTests
         return path;
     }
 
-    private static byte[] BuildAvi(string handler, uint microSecPerFrame, uint totalFrames)
+    private static byte[] BuildAvi(
+        string handler,
+        uint microSecPerFrame,
+        uint totalFrames,
+        uint width = 0,
+        uint height = 0)
     {
         var avihBody = new byte[56];
         BinaryPrimitives.WriteUInt32LittleEndian(avihBody.AsSpan(0, 4), microSecPerFrame);
         BinaryPrimitives.WriteUInt32LittleEndian(avihBody.AsSpan(16, 4), totalFrames);
+        BinaryPrimitives.WriteUInt32LittleEndian(avihBody.AsSpan(32, 4), width);
+        BinaryPrimitives.WriteUInt32LittleEndian(avihBody.AsSpan(36, 4), height);
         var strhBody = new byte[56];
         Encoding.ASCII.GetBytes("vids").CopyTo(strhBody, 0);
         Encoding.ASCII.GetBytes(handler.PadRight(4)[..4]).CopyTo(strhBody, 4);
@@ -227,6 +308,32 @@ public sealed class VideoCodecProbeTests
         var hdrl = RiffList("hdrl", Concat(RiffChunk("avih", avihBody), strl));
         var riffBody = Concat(Encoding.ASCII.GetBytes("AVI "), hdrl);
         return Concat(Encoding.ASCII.GetBytes("RIFF"), U32Le(riffBody.Length), riffBody);
+    }
+
+    private static byte[] BuildMovieWithVisual(
+        string videoFourcc,
+        ushort width,
+        ushort height,
+        uint timescale,
+        uint sampleDelta)
+    {
+        // VisualSampleEntry: size+type+24 bytes then width/height at offsets 32/34.
+        var entry = Concat(
+            U32(36),
+            Ascii(videoFourcc),
+            new byte[24],
+            U16(width),
+            U16(height));
+        var stsd = Concat(U32(0), U32(1), entry);
+        var stts = Concat(U32(0), U32(1), U32(1), U32((int)sampleDelta));
+        var stbl = Box("stbl", Concat(Box("stsd", stsd), Box("stts", stts)));
+        var mdhdBody = new byte[20];
+        BinaryPrimitives.WriteUInt32BigEndian(mdhdBody.AsSpan(12), timescale);
+        BinaryPrimitives.WriteUInt32BigEndian(mdhdBody.AsSpan(16), timescale * 2);
+        var mdia = Box("mdia", Concat(Box("mdhd", mdhdBody), Box("minf", stbl)));
+        var moov = Box("moov", Box("trak", mdia));
+        var mdat = Box("mdat", "payload"u8.ToArray());
+        return Concat(Box("ftyp", "qt  "u8.ToArray()), mdat, moov);
     }
 
     private static byte[] RiffList(string fourcc, byte[] payload)

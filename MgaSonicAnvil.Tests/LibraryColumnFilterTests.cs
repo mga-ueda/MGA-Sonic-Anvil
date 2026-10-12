@@ -390,6 +390,20 @@ public sealed class LibraryColumnFilterTests
                     new LibraryFileRow { Name = "a.wav", Kind = "WAVE" },
                     new LibraryFileRow { Name = "b.mp3", Kind = "MP3" },
                 ]));
+        Assert.Equal(
+            LibraryPlaylistColumnKind.Video,
+            LibraryColumnFilter.ClassifyPlaylistColumns(
+                [
+                    new LibraryFileRow { Name = "a.mp4", Kind = "MP4" },
+                    new LibraryFileRow { Name = "b.mov", Kind = "MOV" },
+                ]));
+        Assert.Equal(
+            LibraryPlaylistColumnKind.Mixed,
+            LibraryColumnFilter.ClassifyPlaylistColumns(
+                [
+                    new LibraryFileRow { Name = "a.mp4", Kind = "MP4" },
+                    new LibraryFileRow { Name = "b.wav", Kind = "WAVE" },
+                ]));
     }
 
     [Fact]
@@ -397,26 +411,40 @@ public sealed class LibraryColumnFilterTests
     {
         var wave = LibraryColumnFilter.WaveDefaults;
         var mp3 = LibraryColumnFilter.Mp3Defaults;
+        var video = LibraryColumnFilter.VideoDefaults;
         Assert.Equal(
             wave,
             LibraryColumnFilter.ResolveActive(
                 [new LibraryFileRow { Name = "a.wav", Kind = "WAVE" }],
                 wave,
-                mp3));
+                mp3,
+                videoColumns: video));
         Assert.Equal(
             mp3,
             LibraryColumnFilter.ResolveActive(
                 [new LibraryFileRow { Name = "a.mp3", Kind = "MP3" }],
                 wave,
-                mp3));
-        var mixed = LibraryColumnFilter.ResolveActive([], wave, mp3);
-        Assert.Equal(LibraryColumnFilter.Union(wave, mp3), mixed);
+                mp3,
+                videoColumns: video));
+        Assert.Equal(
+            video,
+            LibraryColumnFilter.ResolveActive(
+                [new LibraryFileRow { Name = "a.mp4", Kind = "MP4" }],
+                wave,
+                mp3,
+                videoColumns: video));
+        var mixed = LibraryColumnFilter.ResolveActive([], wave, mp3, videoColumns: video);
+        Assert.Equal(LibraryColumnFilter.Union(wave, mp3, video), mixed);
         Assert.Equal(LibraryFileColumn.Name, mixed[0]);
+        Assert.True(
+            Array.IndexOf(mixed, LibraryFileColumn.VideoSize)
+            < Array.IndexOf(mixed, LibraryFileColumn.SampleRate));
         Assert.True(
             Array.IndexOf(mixed, LibraryFileColumn.SampleRate)
             < Array.IndexOf(mixed, LibraryFileColumn.Title));
         Assert.Contains(LibraryFileColumn.Title, mixed);
         Assert.Contains(LibraryFileColumn.SampleRate, mixed);
+        Assert.Contains(LibraryFileColumn.VideoSize, mixed);
     }
 
     [Fact]
@@ -448,9 +476,14 @@ public sealed class LibraryColumnFilterTests
             LibraryFileColumn.Name,
             LibraryFileColumn.Title,
         ];
+        LibraryFileColumn[] video =
+        [
+            LibraryFileColumn.Name,
+            LibraryFileColumn.VideoSize,
+        ];
         Assert.Equal(
-            LibraryColumnFilter.Union(wave, mp3),
-            LibraryColumnFilter.ResolveMixed([], wave, mp3));
+            LibraryColumnFilter.Union(wave, mp3, video),
+            LibraryColumnFilter.ResolveMixed([], wave, mp3, video));
     }
 
     [Fact]
@@ -460,16 +493,19 @@ public sealed class LibraryColumnFilterTests
             LibraryPlaylistColumnKind.Wave,
             LibraryColumnFilter.WaveDefaults,
             LibraryColumnFilter.Mp3Defaults,
+            LibraryColumnFilter.VideoDefaults,
             LibraryColumnFilter.MixedDefaults,
             [LibraryFileColumn.Name, LibraryFileColumn.Duration, LibraryFileColumn.Title],
             out var wave,
             out var mp3,
+            out var video,
             out var mixed);
         Assert.Equal(
             [LibraryFileColumn.Name, LibraryFileColumn.Duration, LibraryFileColumn.Title],
             wave);
         Assert.Equal(LibraryColumnFilter.Mp3Defaults, mp3);
-        Assert.Equal(LibraryColumnFilter.Union(wave, mp3), mixed);
+        Assert.Equal(LibraryColumnFilter.VideoDefaults, video);
+        Assert.Equal(LibraryColumnFilter.Union(wave, mp3, video), mixed);
     }
 
     [Fact]
@@ -488,13 +524,16 @@ public sealed class LibraryColumnFilterTests
             LibraryPlaylistColumnKind.Mixed,
             LibraryColumnFilter.WaveDefaults,
             LibraryColumnFilter.Mp3Defaults,
+            LibraryColumnFilter.VideoDefaults,
             LibraryColumnFilter.MixedDefaults,
             next,
             out var wave,
             out var mp3,
+            out var video,
             out var mixed);
         Assert.Equal(LibraryColumnFilter.WaveDefaults, wave);
         Assert.Equal(LibraryColumnFilter.Mp3Defaults, mp3);
+        Assert.Equal(LibraryColumnFilter.VideoDefaults, video);
         Assert.Equal(next, mixed);
     }
 
@@ -509,7 +548,8 @@ public sealed class LibraryColumnFilterTests
         Assert.Equal(
             LibraryColumnFilter.Union(
                 settings.ResolvedLibraryListColumnsWave(),
-                settings.ResolvedLibraryListColumnsMp3()),
+                settings.ResolvedLibraryListColumnsMp3(),
+                settings.ResolvedLibraryListColumnsVideo()),
             settings.ResolvedLibraryListColumnsMixed());
         Assert.Empty(settings.LibraryListColumnsMixed);
     }
@@ -529,12 +569,14 @@ public sealed class LibraryColumnFilterTests
 
         settings.ApplyLibraryListColumnPresets(
             [LibraryFileColumn.Name, LibraryFileColumn.BitDepth],
-            [LibraryFileColumn.Name, LibraryFileColumn.Album]);
+            [LibraryFileColumn.Name, LibraryFileColumn.Album],
+            LibraryColumnFilter.VideoDefaults);
         Assert.Empty(settings.LibraryListColumnsMixed);
         Assert.Equal(
             LibraryColumnFilter.Union(
                 settings.ResolvedLibraryListColumnsWave(),
-                settings.ResolvedLibraryListColumnsMp3()),
+                settings.ResolvedLibraryListColumnsMp3(),
+                settings.ResolvedLibraryListColumnsVideo()),
             settings.ResolvedLibraryListColumnsMixed());
     }
 

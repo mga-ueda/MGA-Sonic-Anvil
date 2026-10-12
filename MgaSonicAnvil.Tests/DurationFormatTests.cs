@@ -96,6 +96,14 @@ public sealed class DurationFormatTests
         Assert.Equal("2ch", UiStrings.FormatChannels(2));
         Assert.Equal("192 kbps", UiStrings.FormatBitRate(192));
         Assert.Equal(string.Empty, UiStrings.FormatBitRate(0));
+        Assert.Equal("8 Mbps", UiStrings.FormatVideoBitRate(8000));
+        Assert.Equal("1.5 Mbps", UiStrings.FormatVideoBitRate(1500));
+        Assert.Equal(string.Empty, UiStrings.FormatVideoBitRate(0));
+        Assert.Equal("1920x1080", UiStrings.FormatVideoSize(1920, 1080));
+        Assert.Equal(string.Empty, UiStrings.FormatVideoSize(0, 1080));
+        Assert.Equal("30 fps", UiStrings.FormatFrameRate(30));
+        Assert.Equal("29.97 fps", UiStrings.FormatFrameRate(29.97));
+        Assert.Equal(string.Empty, UiStrings.FormatFrameRate(0));
     }
 
     [Fact]
