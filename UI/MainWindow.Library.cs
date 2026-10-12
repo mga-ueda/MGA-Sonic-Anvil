@@ -4573,16 +4573,21 @@ public partial class MainWindow
             return;
         }
 
-        if (document.IsStreamPlayback && document.FrameCount > 0 && document.SampleRate > 0
-            && !LibraryPlaylistDocuments.IsVideo(document))
+        // 動画も妥当なストリームメタがあれば再プローブしない。
+        // ホバーのたびに MediaFoundation が MOV で壊れたレートを返すと列表示が跳ねる。
+        if (document.IsStreamPlayback
+            && document.FrameCount > 0
+            && AudioCodec.IsPlausibleAudioSampleRate(document.SampleRate)
+            && document.Channels > 0)
         {
             return;
         }
 
+        // 未プローブ、または過去の壊れた MF メタ（0.001kHz 等）がタグに残っているときボックスから取り直す。
         if (LibraryPlaylistDocuments.IsVideo(document)
-            && document.Tags.SampleRate <= 0
+            && !AudioCodec.IsPlausibleAudioSampleRate(document.Tags.SampleRate)
             && AudioTagProbe.TryRead(path, out var fresh)
-            && fresh.SampleRate > 0)
+            && AudioCodec.IsPlausibleAudioSampleRate(fresh.SampleRate))
         {
             document.ApplyTags(fresh);
         }

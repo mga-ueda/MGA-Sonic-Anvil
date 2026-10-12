@@ -7731,11 +7731,26 @@ internal sealed class LibraryBrowserView : UserControl
             : tags.DurationSeconds > 0
                 ? tags.DurationSeconds
                 : deferred ? 0 : document.DurationSeconds;
-        var hideAudioFormat = LibraryPlaylistDocuments.IsVisual(document) && tags.SampleRate <= 0;
+        var tagRateOk = AudioCodec.IsPlausibleAudioSampleRate(tags.SampleRate);
+        var hideAudioFormat = LibraryPlaylistDocuments.IsVisual(document) && !tagRateOk;
         // PDF と音声の無い動画の 48kHz/16bit は再生時計用ダミー。列には出さない。
-        var sampleRate = hideAudioFormat ? 0 : deferred ? tags.SampleRate : document.SampleRate;
-        var bits = hideAudioFormat ? 0 : deferred ? tags.BitsPerSample : document.BitsPerSample;
-        var channels = hideAudioFormat ? 0 : deferred ? tags.Channels : document.Channels;
+        // 動画はタグの音声フォーマットを優先（ホバー時の MF プローブで列が 0.001kHz 等に跳ねない）。
+        var preferTagFormat = deferred || LibraryPlaylistDocuments.IsVideo(document);
+        var sampleRate = hideAudioFormat
+            ? 0
+            : preferTagFormat && tagRateOk
+                ? tags.SampleRate
+                : deferred ? 0 : document.SampleRate;
+        var bits = hideAudioFormat
+            ? 0
+            : preferTagFormat && tags.BitsPerSample > 0
+                ? tags.BitsPerSample
+                : deferred ? 0 : document.BitsPerSample;
+        var channels = hideAudioFormat
+            ? 0
+            : preferTagFormat && tags.Channels > 0
+                ? tags.Channels
+                : deferred ? 0 : document.Channels;
         var bitRate = tags.BitRateKbps;
         if (bitRate <= 0 && sampleRate > 0 && channels > 0 && bits > 0)
         {

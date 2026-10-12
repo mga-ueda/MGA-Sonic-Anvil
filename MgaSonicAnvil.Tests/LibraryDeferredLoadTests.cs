@@ -283,4 +283,43 @@ public sealed class LibraryDeferredLoadTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public void CreateRow_Video_KeepsTagFormatWhenStreamProbeIsGarbage()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mov");
+        var document = AudioDocument.CreateDeferred(path);
+        document.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 26,
+            SampleRate = 48000,
+            Channels = 2,
+            BitsPerSample = 16,
+        });
+        // ホバー時の MediaFoundation が 0→旧 1Hz / 3ch を返す想定。
+        document.ActivateStreamPlayback(1, 3, 16, 26);
+
+        var row = LibraryBrowserView.CreateRow(new DocumentSession(document));
+        Assert.Equal("MOV", row.Kind);
+        Assert.Equal(26, row.DurationSeconds, 3);
+        Assert.Equal(48000, row.SampleRate);
+        Assert.Equal("48kHz", row.SampleRateText);
+        Assert.Equal(16, row.BitDepth);
+        Assert.Equal(2, row.Channels);
+        Assert.Equal("2ch", row.ChannelsText);
+    }
+
+    [Fact]
+    public void IsPlausibleAudioSampleRate_RejectsOneHertzDisplayBug()
+    {
+        Assert.False(AudioCodec.IsPlausibleAudioSampleRate(0));
+        Assert.False(AudioCodec.IsPlausibleAudioSampleRate(1));
+        Assert.False(AudioCodec.IsPlausibleAudioSampleRate(7_999));
+        Assert.True(AudioCodec.IsPlausibleAudioSampleRate(8_000));
+        Assert.True(AudioCodec.IsPlausibleAudioSampleRate(48_000));
+        Assert.True(AudioCodec.IsPlausibleAudioSampleRate(384_000));
+        Assert.False(AudioCodec.IsPlausibleAudioSampleRate(384_001));
+        Assert.Equal("0.001kHz", UiStrings.FormatSampleRate(1));
+    }
 }

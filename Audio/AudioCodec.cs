@@ -456,6 +456,13 @@ internal static class AudioCodec
         return fromLength;
     }
 
+    /// <summary>
+    /// ストリーム再生メタとして妥当な音声サンプルレートか。
+    /// MediaFoundation が MOV などで 0 を返し、旧実装の Max(1,…) が 0.001kHz になるのを防ぐ。
+    /// </summary>
+    public static bool IsPlausibleAudioSampleRate(int sampleRate) =>
+        sampleRate >= 8_000 && sampleRate <= 384_000;
+
     /// <summary>ヘッダだけ読んで長さを取る。PCM は展開しない。</summary>
     public static bool TryProbeStreamFormat(
         string path,
@@ -473,12 +480,19 @@ internal static class AudioCodec
             EnsureMediaFoundation();
             using var reader = OpenReader(path);
             var format = reader.WaveFormat;
-            sampleRate = Math.Max(1, format.SampleRate);
-            channels = Math.Max(1, format.Channels);
+            sampleRate = format.SampleRate;
+            channels = format.Channels;
             bitsPerSample = format.BitsPerSample > 0 ? format.BitsPerSample : 16;
-            frameCount = EstimateStreamFrameCount(reader);
+            if (!IsPlausibleAudioSampleRate(sampleRate) || channels < 1)
+            {
+                sampleRate = 0;
+                channels = 0;
+                frameCount = 0;
+                return false;
+            }
 
-            return frameCount > 0 && sampleRate > 0 && channels > 0;
+            frameCount = EstimateStreamFrameCount(reader);
+            return frameCount > 0;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException
                                        or ArgumentException or NotSupportedException or FormatException
@@ -498,13 +512,18 @@ internal static class AudioCodec
             return false;
         }
 
-        if (TryProbeStreamFormat(path, out var rate, out var channels, out var bits, out var frames)
-            || (LibraryPlaylistDocuments.IsVideo(path)
+        // 動画はプロキシ／抽出 WAV を先に見る。原ファイルの MF プローブは成功扱いになりやすく、
+        // 変なレート（0→旧 1Hz）でタグの正しい 48kHz などを潰す。
+        var video = LibraryPlaylistDocuments.IsVideo(path);
+        var probed = (video
                 && VideoProxy.TryGetCached(path, out var proxy)
-                && TryProbeStreamFormat(proxy, out rate, out channels, out bits, out frames))
-            || (LibraryPlaylistDocuments.IsVideo(path)
+                && TryProbeStreamFormat(proxy, out var rate, out var channels, out var bits, out var frames))
+            || (video
                 && VideoProxy.TryGetCachedAudio(path, out var wav)
-                && TryProbeStreamFormat(wav, out rate, out channels, out bits, out frames)))
+                && TryProbeStreamFormat(wav, out rate, out channels, out bits, out frames))
+            || TryProbeStreamFormat(path, out rate, out channels, out bits, out frames);
+
+        if (probed)
         {
             document.ActivateStreamPlayback(rate, channels, bits, frames);
             RememberVideoAudioTags(document, rate, channels, bits, frames);
@@ -512,9 +531,12 @@ internal static class AudioCodec
         }
 
         // タグに長さがあればそれで足りる（開けるかは再生時に判明）。
+        // 動画はボックス由来のタグを優先（AudioTagProbe が MF を避けているのと同じ理由）。
         AudioTagProbe.Ensure(document);
         var tags = document.Tags;
-        if (tags.SampleRate > 0 && tags.Channels > 0 && tags.DurationSeconds > 0)
+        if (IsPlausibleAudioSampleRate(tags.SampleRate)
+            && tags.Channels > 0
+            && tags.DurationSeconds > 0)
         {
             var estimated = (long)Math.Round(tags.DurationSeconds * tags.SampleRate);
             if (estimated > 0)
@@ -538,12 +560,17 @@ internal static class AudioCodec
         int bits,
         long frames)
     {
-        if (!LibraryPlaylistDocuments.IsVideo(document))
+        if (!LibraryPlaylistDocuments.IsVideo(document)
+            || !IsPlausibleAudioSampleRate(sampleRate)
+            || channels < 1)
         {
             return;
         }
 
-        var duration = sampleRate > 0 ? frames / (double)sampleRate : 0;
+        // 尺は最初に出したタグを優先（ホバーでミリ秒が跳ねない。MP3 の CreateRow と同じ考え方）。
+        var duration = document.Tags.DurationSeconds > 0
+            ? document.Tags.DurationSeconds
+            : sampleRate > 0 ? frames / (double)sampleRate : 0;
         document.ApplyTags(document.Tags.WithAudioFormat(sampleRate, channels, bits, duration));
     }
 
