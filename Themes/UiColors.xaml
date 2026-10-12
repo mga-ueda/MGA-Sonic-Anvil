@@ -49,6 +49,8 @@
     <SolidColorBrush x:Key="MarkerSelectedBrush" Color="#FFFFC24A" />
     <SolidColorBrush x:Key="MarkerSelectedBorderBrush" Color="#FF00F5FF" />
     <SolidColorBrush x:Key="MarkerLabelForeBrush" Color="#FF1A1208" />
+    <SolidColorBrush x:Key="PlayerAbInBrush" Color="#FF32CD32" />
+    <SolidColorBrush x:Key="PlayerAbOutBrush" Color="#FFFF0000" />
     <SolidColorBrush x:Key="RegionWaveFillAnacrusisBrush" Color="#FF344620" />
     <SolidColorBrush x:Key="RegionWaveFillLoopBrush" Color="#FF1A3E5E" />
     <SolidColorBrush x:Key="RegionWaveFillExitBrush" Color="#FF441E1E" />
