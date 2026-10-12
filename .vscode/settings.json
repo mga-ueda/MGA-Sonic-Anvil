@@ -1,3 +1,8 @@
 {
-  "dotnet.defaultSolution": "MgaSonicAnvil.sln"
+  "dotnet.defaultSolution": "MgaSonicAnvil.sln",
+  "workbench.editorAssociations": {
+    "*.xlsx": "open-with-system",
+    "*.xlsm": "open-with-system",
+    "*.xls": "open-with-system"
+  }
 }
