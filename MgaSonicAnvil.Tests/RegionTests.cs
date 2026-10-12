@@ -461,6 +461,16 @@ public sealed class RegionTests
     }
 
     [Fact]
+    public void PlayerModeFlagLaneRows_ReservesOneEvenWithoutCues()
+    {
+        // プレイヤー: 捨てキュー無しでも1行。打刻で MarkerLaneHeight が跳ねない。
+        Assert.Equal(1, WaveformView.PlayerModeFlagLaneRows);
+        Assert.Equal(
+            DesignMetrics.MarkerLaneRowHeight,
+            WaveformView.MarkerLaneHeightForRows(WaveformView.PlayerModeFlagLaneRows));
+    }
+
+    [Fact]
     public void LaneFlagRect_UsesFullLaneWhenNotSplit()
     {
         var full = WaveformView.LaneFlagRect(8, 16, laneHeight: 32, split: false, top: true);
