@@ -110,7 +110,8 @@ public partial class MainWindow
 
     private void ActivateAdjacentTab(int delta, bool wrap = true)
     {
-        if (_sessions.Count <= 1 || _activeSession is null)
+        // プレイヤーではタブ UI も切替ショートカットも使わない（プレイリストの ↑↓／P／N を使う）。
+        if (IsLibraryMaximized || _sessions.Count <= 1 || _activeSession is null)
         {
             return;
         }

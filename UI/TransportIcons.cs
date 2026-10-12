@@ -69,7 +69,6 @@ internal enum TransportCommand
     AmpZoomOut,
     AmpZoomMax,
     AmpZoomReset,
-    CycleWaveformHeight,
     FadeIn,
     FadeOut,
     FadeAround,

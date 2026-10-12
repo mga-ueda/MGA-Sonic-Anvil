@@ -43,11 +43,11 @@ public partial class MainWindow
             return;
         }
 
-        if (key is Key.NumPad7 or Key.NumPad9)
+        if (key is Key.NumPad7 or Key.NumPad9 or Key.J or Key.K)
         {
             if (_seekNudgeDirection != 0
-                && (key == Key.NumPad7 && _seekNudgeDirection < 0
-                    || key == Key.NumPad9 && _seekNudgeDirection > 0))
+                && ((key is Key.NumPad7 or Key.J) && _seekNudgeDirection < 0
+                    || (key is Key.NumPad9 or Key.K) && _seekNudgeDirection > 0))
             {
                 StopSeekNudge();
             }
@@ -55,7 +55,7 @@ public partial class MainWindow
             return;
         }
 
-        if (key is Key.Left or Key.Right or Key.NumPad1 or Key.NumPad3)
+        if (key is Key.Left or Key.Right or Key.NumPad1 or Key.NumPad3 or Key.OemComma or Key.OemPeriod)
         {
             if (_videoFrameStepDirection != 0
                 && (key == Key.Left && _videoFrameStepDirection < 0
@@ -65,8 +65,8 @@ public partial class MainWindow
             }
 
             if (_playbackShuttleDirection != 0
-                && (key is Key.Left or Key.NumPad1 && _playbackShuttleDirection < 0
-                    || key is Key.Right or Key.NumPad3 && _playbackShuttleDirection > 0))
+                && ((key is Key.Left or Key.NumPad1 or Key.OemComma) && _playbackShuttleDirection < 0
+                    || (key is Key.Right or Key.NumPad3 or Key.OemPeriod) && _playbackShuttleDirection > 0))
             {
                 StopPlaybackShuttle();
             }
@@ -374,7 +374,7 @@ public partial class MainWindow
             return true;
         }
 
-        // 空リストでツリーにフォーカスがあっても R はランダム切替。タイプアヘッドより先に拾う。
+        // 空リストでツリーにフォーカスがあっても Alt+R はランダム切替。タイプアヘッドより先に拾う。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
             && !ImeComposition.IsComposing
@@ -384,7 +384,84 @@ public partial class MainWindow
             return true;
         }
 
-        // Ctrl+←／↑／→／↓ でペインフォーカス（エディタのマーカー移動／時間ズームは使わない）
+        // P／N は前後曲（テンキー 4／6）。ツリーのタイプアヘッドより先に拾う。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && !isRepeat
+            && LibraryPlayerMode.IsPlayerTrackStepKey(key, modifiers))
+        {
+            TryStepLibraryPlaylist(key == Key.P ? -1 : 1);
+            return true;
+        }
+
+        // R は再生し直し（テンキー 5）。Alt+R のランダムより後、タイプアヘッドより先。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && !isRepeat
+            && LibraryPlayerMode.IsPlayerRestartKey(key, modifiers))
+        {
+            RestartLibraryTrack();
+            return true;
+        }
+
+        // 一時マーカーがあるとき Ctrl+←／→ をマーカージャンプに。
+        if (IsLibraryMaximized
+            && LibraryPlayerMode.PrefersMarkerArrowJump(
+                IsPlayerScratchContext(),
+                Waveform.HasPlayerScratchMarkers)
+            && key is Key.Left or Key.Right
+            && modifiers == ModifierKeys.Control)
+        {
+            Waveform.SeekToMarker(key == Key.Left ? -1 : 1);
+            return true;
+        }
+
+        if (IsLibraryMaximized
+            && LibraryPlayerMode.PrefersMarkerArrowJump(
+                IsPlayerScratchContext(),
+                Waveform.HasPlayerScratchMarkers)
+            && key is Key.Left or Key.Right
+            && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            Waveform.ExtendSelectionToMarker(key == Key.Left ? -1 : 1);
+            return true;
+        }
+
+        // Ctrl+Delete／選択中 Delete は捨てマーカー削除。
+        if (IsLibraryMaximized
+            && IsPlayerScratchContext()
+            && key == Key.Delete
+            && modifiers == ModifierKeys.Control)
+        {
+            ApplyPlayerScratchMarkerDelete();
+            return true;
+        }
+
+        if (IsLibraryMaximized
+            && IsPlayerScratchContext()
+            && key == Key.Delete
+            && modifiers == ModifierKeys.None
+            && LibraryPlayerMode.PrefersScratchMarkerDelete(
+                playerMode: true,
+                Waveform.HasSelectedMarkers))
+        {
+            ApplyPlayerScratchMarkerDelete();
+            return true;
+        }
+
+        // I／O／M／Ins はツリーのタイプアヘッドより先（動画本再生中もフォーカスがツリーに残り得る）。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && TryHandlePlayerScratchCueKey(key, modifiers))
+        {
+            return true;
+        }
+
+        // Ctrl+←／↑ ライブラリ、Ctrl+→ プレイリスト、Ctrl+↓ お気に入り。
+        // プレイヤー中の Ctrl+←／→（マーカー）は上で回したのでここには来ない。暗いプレビューではペインへ。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
             && LibraryPlayerMode.IsPaneFocusArrow(key, modifiers))
@@ -406,7 +483,17 @@ public partial class MainWindow
             return true;
         }
 
-        if (IsLibraryMaximized && TryHandleLibraryPlayerNumpad(key, modifiers, isRepeat))
+        // テンキー再生操作（プレイヤー／エディタ共通）。上段数字の割合／マーカーは別経路。
+        if (!IsLibraryGroupComboFocused
+            && !StatusTimes.IsTimeFocused
+            && !IsEditingFileName
+            && !Waveform.IsEditingMarkerComment
+            && _volumeMenu is not { IsOpen: true }
+            && _pitchMenu is not { IsOpen: true }
+            && _timeStretchMenu is not { IsOpen: true }
+            && _fadeMenu is not { IsOpen: true }
+            && _formatMenu is not { IsOpen: true }
+            && TryHandleTransportNumpad(key, modifiers, isRepeat))
         {
             return true;
         }
@@ -445,8 +532,20 @@ public partial class MainWindow
             return true;
         }
 
-        // 上段 0–9 はどのペインからでも割合ジャンプ。検索欄・時刻欄・コンボには渡す。
+        // 本再生／イマーシブ一時停止／PDF 明るい表示から暗いプレビューへ（Escape と同じ。プレイヤーでは Q は未使用）。
         if (IsLibraryMaximized
+            && key == Key.Q
+            && modifiers == ModifierKeys.None
+            && !isRepeat
+            && TryExitPlaylistRealPlayback())
+        {
+            return true;
+        }
+
+        // 上段 0–9: 無修飾＝割合。Shift＋上段＝マーカー番号（二桁可。テンキーは上で再生操作済み）。
+        // ツリーフォーカス中は使わない（Shift+8＝配下展開を優先。割合／マーカーは他ペインから）。
+        if (IsLibraryMaximized
+            && LibraryPlayerMode.AllowsPlayerDigitJump(IsLibraryExplorerFocused)
             && !IsLibraryGroupComboFocused
             && !StatusTimes.IsTimeFocused
             && !IsEditingFileName
@@ -455,7 +554,7 @@ public partial class MainWindow
             && _timeStretchMenu is not { IsOpen: true }
             && _fadeMenu is not { IsOpen: true }
             && _formatMenu is not { IsOpen: true }
-            && TryHandleLibraryTopRowPercentJump(key, modifiers))
+            && TryHandleLibraryDigitJump(key, modifiers))
         {
             return true;
         }
@@ -587,17 +686,19 @@ public partial class MainWindow
                 && modifiers is ModifierKeys.None or ModifierKeys.Shift)
             {
                 var extend = modifiers == ModifierKeys.Shift;
+                // 単発は端から反対側へ回る。長押し連続は端で一旦止まる（Ctrl+Tab と同じ）。
+                var wrap = !isRepeat;
                 if (key is Key.Home or Key.End)
                 {
                     LibraryBrowser.MoveSelectionToEdge(key == Key.Home ? -1 : 1, extend);
                 }
                 else if (key is Key.PageUp or Key.PageDown)
                 {
-                    LibraryBrowser.MoveSelectionPage(key == Key.PageUp ? -1 : 1, extend);
+                    LibraryBrowser.MoveSelectionPage(key == Key.PageUp ? -1 : 1, extend, wrap);
                 }
                 else
                 {
-                    LibraryBrowser.MoveSelection(key == Key.Up ? -1 : 1, extend);
+                    LibraryBrowser.MoveSelection(key == Key.Up ? -1 : 1, extend, wrap);
                 }
 
                 _libraryPlayOnArrowRelease = !extend;
@@ -606,6 +707,13 @@ public partial class MainWindow
 
             if (key == Key.A && modifiers is ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift))
             {
+                // 動画本再生など前面 UI 隠れ中は全選択しない（続けて Delete で空にする事故を防ぐ）。
+                if (LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(
+                        _playlistVideoChromeVisible))
+                {
+                    return true;
+                }
+
                 LibraryBrowser.SelectAllRows();
                 return true;
             }
@@ -616,25 +724,57 @@ public partial class MainWindow
                 return true;
             }
 
-            if (key == Key.Enter
-                && modifiers == ModifierKeys.None)
+            // Enter はグローバル側（本再生中＝その場停止、停止中の動画／PDF＝Space と同じ）。
+
+            // リストから外すだけ（ディスクは消さない）。選択中マーカーの Delete は上で処理済み。
+            if (key == Key.Delete && modifiers == ModifierKeys.None)
             {
-                // 再生中は止める（動画は暗い 1/3 速プレビューへ）。停止中だけ先頭から連続再生。
-                // 常に Play すると本再生中に抜けられず即再生し直してしまう。
-                ToggleLibraryTransportPlayback();
+                if (LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(
+                        _playlistVideoChromeVisible))
+                {
+                    return true;
+                }
+
+                RemoveLibrarySelectedFromList();
                 return true;
             }
 
-            // リストから外すだけ。ディスク上のファイルは絶対に消さない。
-            // 波形にフォーカスが残っていても、選択行を外す。
-            if (key == Key.Delete && modifiers == ModifierKeys.None)
+            // 捨てキュー操作は上の TryHandlePlayerScratchCueKey 済み。
+            // 非コンテキスト時も I／O／M／Ins はここで消費し、エディタのフェード／AddMarker へ落とさない。
+            if (modifiers == ModifierKeys.None
+                && key is Key.I or Key.O or Key.M or Key.Insert)
             {
-                RemoveLibrarySelectedFromList();
+                return true;
+            }
+
+            if (IsPlayerScratchContext()
+                && key is Key.Left or Key.Right
+                && (modifiers & ModifierKeys.Alt) != 0
+                && (modifiers & ~(ModifierKeys.Alt | ModifierKeys.Shift | ModifierKeys.Control)) == 0)
+            {
+                return BeginOrContinueMarkerNudge(key == Key.Left ? -1 : 1);
+            }
+
+            // 捨てキュー Undo／Redo（打てる状態のとき）。無ければプレイリスト除外の Undo。
+            if (key == Key.Z && modifiers == (ModifierKeys.Control | ModifierKeys.Shift)
+                || key == Key.Y && modifiers == ModifierKeys.Control)
+            {
+                if (IsPlayerScratchContext())
+                {
+                    UndoOrRedoPlayerScratch(redo: true);
+                }
+
                 return true;
             }
 
             if (key == Key.Z && modifiers == ModifierKeys.Control)
             {
+                if (IsPlayerScratchContext() && Waveform.CanUndoPlayerScratch)
+                {
+                    UndoOrRedoPlayerScratch(redo: false);
+                    return true;
+                }
+
                 TryUndoLibraryPlaylistRemove();
                 return true;
             }
@@ -792,6 +932,24 @@ public partial class MainWindow
 
         if (key == Key.Enter && modifiers == ModifierKeys.None)
         {
+            // 動画本再生中：その場停止（プレイリストは出さない）。
+            if (IsPlaylistVideoPlaying())
+            {
+                return PausePlaybackHere(immersiveVideoHold: true);
+            }
+
+            // 停止中の動画／PDF：Space と同じく本再生／明るい表示へ。
+            if (IsLibraryMaximized
+                && LibraryPlayerMode.PlaysLibrarySelectionOnSpace(
+                    IsLibraryExplorerFocused,
+                    IsLibraryFavoritesFocused)
+                && IsLibraryVisualTransportTarget()
+                && !IsPlaybackActive())
+            {
+                PlayLibrarySelectionOnceOrToggle();
+                return true;
+            }
+
             return PausePlaybackHere();
         }
 
@@ -814,7 +972,8 @@ public partial class MainWindow
             return true;
         }
 
-        if ((key is Key.Z or Key.OemPeriod or Key.Decimal) && modifiers == ModifierKeys.None)
+        // .（OemPeriod）は早送り。中央寄せは Z とテンキー .（Decimal）。
+        if ((key is Key.Z or Key.Decimal) && modifiers == ModifierKeys.None)
         {
             if (IsPlaybackActive())
             {
@@ -859,18 +1018,18 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.H && modifiers == ModifierKeys.None)
-        {
-            CycleWaveformHeight();
-            return true;
-        }
-
         if (key is Key.M or Key.Insert && modifiers == ModifierKeys.None)
         {
+            // プレイヤーは上の IsLibraryMaximized 分岐で消費済み。ここへ来たらエディタのみ。
+            if (IsLibraryMaximized)
+            {
+                return true;
+            }
+
             return BeginOrContinuePlaceRepeat(PlaceRepeatKind.Marker);
         }
 
-        if (key == Key.K && modifiers == ModifierKeys.None)
+        if (key == Key.Q && modifiers == ModifierKeys.None)
         {
             ToggleRangeClick();
             return true;
@@ -882,7 +1041,7 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.W && modifiers == ModifierKeys.None)
+        if (key == Key.W && modifiers == ModifierKeys.Alt)
         {
             ToggleWaapiPanel();
             return true;
@@ -1193,16 +1352,9 @@ public partial class MainWindow
             return true;
         }
 
-        if (TryJumpToMarkerByNumpad(key, modifiers))
+        // エディタ: 上段 無修飾＝割合、Shift＝マーカー番号（テンキー再生操作は上で済み）。
+        if (!IsLibraryMaximized && TryHandleEditorDigitJump(key, modifiers))
         {
-            return true;
-        }
-
-        if (TryDigitPercent(key, out var percent)
-            && (modifiers == ModifierKeys.None || modifiers == ModifierKeys.Shift)
-            && !(IsLibraryMaximized && key is >= Key.NumPad0 and <= Key.NumPad9))
-        {
-            JumpByVisiblePercent(percent, extendSelection: modifiers == ModifierKeys.Shift);
             return true;
         }
 
@@ -1290,6 +1442,19 @@ public partial class MainWindow
         }
 
         if (Waveform.CancelMarkerInteraction())
+        {
+            return true;
+        }
+
+        if (IsPlayerScratchContext() && Waveform.ScratchCues.HasAbPoint)
+        {
+            Waveform.ClearPlayerAbRepeat();
+            SyncPlayWindowFromDocument();
+            return true;
+        }
+
+        // 本再生／イマーシブ一時停止／PDF 明るい表示から、暗いプレビュー（前面 UI）へ戻す（Q も同じ）。
+        if (IsLibraryMaximized && TryExitPlaylistRealPlayback())
         {
             return true;
         }
@@ -1428,25 +1593,41 @@ public partial class MainWindow
 
         if (key == Key.T && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            ReopenLastClosedTab();
+            if (!IsLibraryMaximized)
+            {
+                ReopenLastClosedTab();
+            }
+
             return true;
         }
 
         if (key == Key.T && modifiers == ModifierKeys.Control)
         {
-            CycleWaveformTile();
+            if (!IsLibraryMaximized)
+            {
+                CycleWaveformTile();
+            }
+
             return true;
         }
 
         if (key == Key.Tab && modifiers == ModifierKeys.Control)
         {
-            ActivateAdjacentTab(1, wrap: !isRepeat);
+            if (!IsLibraryMaximized)
+            {
+                ActivateAdjacentTab(1, wrap: !isRepeat);
+            }
+
             return true;
         }
 
         if (key == Key.Tab && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            ActivateAdjacentTab(-1, wrap: !isRepeat);
+            if (!IsLibraryMaximized)
+            {
+                ActivateAdjacentTab(-1, wrap: !isRepeat);
+            }
+
             return true;
         }
 
@@ -1474,13 +1655,21 @@ public partial class MainWindow
 
         if (key == Key.PageDown && modifiers == ModifierKeys.Control)
         {
-            ActivateAdjacentTab(1, wrap: !isRepeat);
+            if (!IsLibraryMaximized)
+            {
+                ActivateAdjacentTab(1, wrap: !isRepeat);
+            }
+
             return true;
         }
 
         if (key == Key.PageUp && modifiers == ModifierKeys.Control)
         {
-            ActivateAdjacentTab(-1, wrap: !isRepeat);
+            if (!IsLibraryMaximized)
+            {
+                ActivateAdjacentTab(-1, wrap: !isRepeat);
+            }
+
             return true;
         }
 
@@ -1660,42 +1849,66 @@ public partial class MainWindow
         return false;
     }
 
-    private bool TryJumpToMarkerByNumpad(Key key, ModifierKeys modifiers)
+    /// <summary>
+    /// エディタの上段数字ジャンプ。無修飾＝割合、Shift＝ドキュメントのマーカー番号。
+    /// </summary>
+    private bool TryHandleEditorDigitJump(Key key, ModifierKeys modifiers)
     {
-        if (IsLibraryMaximized
-            || _document is null
-            || _document.Markers.Count == 0)
+        if (!LibraryPlayerMode.IsDigitJumpChord(key, modifiers)
+            || !TryDigitKey(key, out var digit))
         {
             return false;
         }
 
-        if (!TryNumpadDigit(key, out var digit)
-            || (modifiers != ModifierKeys.None && modifiers != ModifierKeys.Shift))
+        if (LibraryPlayerMode.IsMarkerDigitJump(key, modifiers))
+        {
+            if (_document is null || _document.Markers.Count == 0)
+            {
+                return true;
+            }
+
+            return ApplyResolvedMarkerDigitJump(
+                digit,
+                _document.Markers.Count,
+                allowPercentFallback: false);
+        }
+
+        if (!TryDigitPercent(key, out var percent))
         {
             return false;
         }
 
-        var extend = modifiers == ModifierKeys.Shift;
-        var maxId = _document.Markers.Count;
-        var next = _markerNumber * 10 + digit;
-        if (next > 0 && next <= maxId)
+        JumpByVisiblePercent(percent, extendSelection: false);
+        return true;
+    }
+
+    private bool ApplyResolvedMarkerDigitJump(int digit, int markerCount, bool allowPercentFallback)
+    {
+        if (!LibraryPlayerMode.TryResolveMarkerDigitJump(
+                _markerNumber,
+                digit,
+                markerCount,
+                out var nextPending,
+                out var seekId,
+                out var percentFallback))
         {
-            _markerNumber = next;
-            Waveform.SeekToMarkerId(next, extendSelection: extend);
-            RestartMarkerDigitTimer();
-            return true;
+            return false;
         }
 
-        if (digit > 0 && digit <= maxId)
+        if (seekId is int id)
         {
-            _markerNumber = digit;
-            Waveform.SeekToMarkerId(digit, extendSelection: extend);
+            _markerNumber = nextPending;
+            Waveform.SeekToMarkerId(id, extendSelection: false);
             RestartMarkerDigitTimer();
             return true;
         }
 
         ResetMarkerDigitEntry();
-        JumpByVisiblePercent(digit / 10d, extend);
+        if (allowPercentFallback && percentFallback)
+        {
+            JumpByVisiblePercent(digit / 10d, extendSelection: false);
+        }
+
         return true;
     }
 
@@ -1720,6 +1933,7 @@ public partial class MainWindow
     {
         _markerDigitTimer.Stop();
         _markerNumber = 0;
+        ResetPdfPageDigitEntry();
     }
 
     private static bool TryNumpadDigit(Key key, out int digit)
@@ -1744,18 +1958,19 @@ public partial class MainWindow
     private static bool TryDigitPercent(Key key, out double percent)
     {
         percent = 0;
+        // 割合ジャンプは上段のみ（テンキーは再生操作）。
         var digit = key switch
         {
-            Key.D0 or Key.NumPad0 => 0,
-            Key.D1 or Key.NumPad1 => 1,
-            Key.D2 or Key.NumPad2 => 2,
-            Key.D3 or Key.NumPad3 => 3,
-            Key.D4 or Key.NumPad4 => 4,
-            Key.D5 or Key.NumPad5 => 5,
-            Key.D6 or Key.NumPad6 => 6,
-            Key.D7 or Key.NumPad7 => 7,
-            Key.D8 or Key.NumPad8 => 8,
-            Key.D9 or Key.NumPad9 => 9,
+            Key.D0 => 0,
+            Key.D1 => 1,
+            Key.D2 => 2,
+            Key.D3 => 3,
+            Key.D4 => 4,
+            Key.D5 => 5,
+            Key.D6 => 6,
+            Key.D7 => 7,
+            Key.D8 => 8,
+            Key.D9 => 9,
             _ => -1,
         };
         if (digit < 0)
@@ -1803,24 +2018,41 @@ public partial class MainWindow
         return false;
     }
 
-    private bool TryHandleLibraryPlayerNumpad(Key key, ModifierKeys modifiers, bool isRepeat)
+    private bool TryHandleTransportNumpad(Key key, ModifierKeys modifiers, bool isRepeat)
     {
-        if (!LibraryPlayerMode.IsPlayerNumpadKey(key, modifiers))
+        // テンキー＋ J／K／,／.（プレイヤー／エディタ共通。中央寄せは Z／テンキー .）。
+        var command = LibraryPlayerMode.PlayerTransportCommand(key, modifiers);
+        var numpad = LibraryPlayerMode.UsesTransportNumpad()
+            && LibraryPlayerMode.IsPlayerNumpadKey(key, modifiers);
+        if (command == LibraryNumpadCommand.None && numpad)
         {
+            command = LibraryPlayerMode.PlayerNumpadCommand(key, modifiers);
+        }
+
+        if (command == LibraryNumpadCommand.None)
+        {
+            // 2／8 など未割り当てテンキーは何もしない（割合ジャンプへ落とさない）。
+            if (numpad)
+            {
+                StopPlaybackShuttle();
+                StopSeekNudge();
+                return true;
+            }
+
             return false;
         }
 
-        if (!LibraryPlayerMode.IsPlayerShuttleKey(key, modifiers))
+        // キー種別ではなくコマンドで止める（テンキー 1／3／7／9 を押しっぱなしにするため）。
+        if (command is not (LibraryNumpadCommand.Rewind or LibraryNumpadCommand.FastForward))
         {
             StopPlaybackShuttle();
         }
 
-        if (!LibraryPlayerMode.IsPlayerSeekNudgeKey(key, modifiers))
+        if (command is not (LibraryNumpadCommand.SeekBack or LibraryNumpadCommand.SeekForward))
         {
             StopSeekNudge();
         }
 
-        var command = LibraryPlayerMode.PlayerNumpadCommand(key, modifiers);
         if (isRepeat && !LibraryPlayerMode.PlayerNumpadRepeatIsHold(command))
         {
             return true;
@@ -1829,16 +2061,54 @@ public partial class MainWindow
         switch (command)
         {
             case LibraryNumpadCommand.PlayPause:
-                ToggleLibraryPlayPause();
+                if (IsLibraryMaximized)
+                {
+                    ToggleLibraryPlayPause();
+                }
+                else if (IsPlaybackActive())
+                {
+                    // Space（停止で頭へ戻る）ではなく、プレイヤーの 0 と同じ一時停止／再開。
+                    PausePlaybackHere();
+                }
+                else if (_document is not null)
+                {
+                    StartPlayback(_document.CursorFrame, prerollSeconds: 0);
+                }
+
                 break;
             case LibraryNumpadCommand.Restart:
-                RestartLibraryTrack();
+                if (IsLibraryMaximized)
+                {
+                    RestartLibraryTrack();
+                }
+                else if (_document is not null)
+                {
+                    // プレイヤーの 5（頭から）に揃え、Alt+Enter（再生開始位置）とは別。
+                    StartPlayback(0, prerollSeconds: 0);
+                }
+
                 break;
             case LibraryNumpadCommand.PreviousTrack:
-                TryStepLibraryPlaylist(-1);
+                if (IsLibraryMaximized)
+                {
+                    TryStepLibraryPlaylist(-1);
+                }
+                else
+                {
+                    ActivateAdjacentTab(-1, wrap: !isRepeat);
+                }
+
                 break;
             case LibraryNumpadCommand.NextTrack:
-                TryStepLibraryPlaylist(1);
+                if (IsLibraryMaximized)
+                {
+                    TryStepLibraryPlaylist(1);
+                }
+                else
+                {
+                    ActivateAdjacentTab(1, wrap: !isRepeat);
+                }
+
                 break;
             case LibraryNumpadCommand.SeekBack:
                 BeginOrContinueSeekNudge(-1);
@@ -1847,14 +2117,14 @@ public partial class MainWindow
                 BeginOrContinueSeekNudge(1);
                 break;
             case LibraryNumpadCommand.Rewind:
-                if (CanPlaybackShuttle())
+                if (CanPlaybackShuttle(allowWhileStopped: true))
                 {
                     BeginOrContinuePlaybackShuttle(-1);
                 }
 
                 break;
             case LibraryNumpadCommand.FastForward:
-                if (CanPlaybackShuttle())
+                if (CanPlaybackShuttle(allowWhileStopped: true))
                 {
                     BeginOrContinuePlaybackShuttle(1);
                 }
@@ -1865,11 +2135,10 @@ public partial class MainWindow
         return true;
     }
 
-    private bool TryHandleLibraryTopRowPercentJump(Key key, ModifierKeys modifiers)
+    private bool TryHandleLibraryDigitJump(Key key, ModifierKeys modifiers)
     {
-        if (modifiers is not (ModifierKeys.None or ModifierKeys.Shift)
-            || key is < Key.D0 or > Key.D9
-            || !TryDigitPercent(key, out var percent))
+        if (!LibraryPlayerMode.IsDigitJumpChord(key, modifiers)
+            || !TryDigitKey(key, out var digit))
         {
             return false;
         }
@@ -1877,7 +2146,28 @@ public partial class MainWindow
         // シークや行更新のあとでプレイリストへフォーカスが吸い戻されないように残す。
         var keepExplorer = IsLibraryExplorerFocused;
         var keepFavorites = IsLibraryFavoritesFocused;
-        JumpByVisiblePercent(percent, extendSelection: modifiers == ModifierKeys.Shift);
+
+        if (LibraryPlayerMode.IsMarkerDigitJump(key, modifiers))
+        {
+            if (LibraryPlayerMode.CanPlayerMarkerDigitJump(
+                    playerMarkerContext: IsPlayerScratchContext(),
+                    Waveform.HasPlayerScratchMarkers))
+            {
+                ApplyResolvedMarkerDigitJump(
+                    digit,
+                    Waveform.ScratchCues.Markers.Count,
+                    allowPercentFallback: false);
+            }
+        }
+        else if (TryDigitPercent(key, out var percent))
+        {
+            JumpByVisiblePercent(percent, extendSelection: false);
+        }
+        else
+        {
+            return false;
+        }
+
         if (keepExplorer)
         {
             LibraryBrowser.RequestExplorerFocus();
@@ -1888,6 +2178,24 @@ public partial class MainWindow
         }
 
         return true;
+    }
+
+    private static bool TryDigitKey(Key key, out int digit)
+    {
+        if (key is >= Key.D0 and <= Key.D9)
+        {
+            digit = key - Key.D0;
+            return true;
+        }
+
+        if (key is >= Key.NumPad0 and <= Key.NumPad9)
+        {
+            digit = key - Key.NumPad0;
+            return true;
+        }
+
+        digit = -1;
+        return false;
     }
 
     private bool TryHandleVideoLaunchScaleKey(Key key, ModifierKeys modifiers, bool isRepeat)
@@ -1923,7 +2231,8 @@ public partial class MainWindow
             return LibraryBrowser.TryZoomPlaylistPdf(-1, isRepeat);
         }
 
-        if (modifiers == ModifierKeys.None && key is Key.Enter or Key.Space)
+        // 本再生（明るい表示）からの抜けは Escape／Q。Space／Enter は抜かない。
+        if (modifiers == ModifierKeys.None && key is Key.Escape or Key.Q)
         {
             if (!isRepeat)
             {
@@ -1933,16 +2242,34 @@ public partial class MainWindow
             return true;
         }
 
+        if (modifiers == ModifierKeys.None && key is Key.Enter or Key.Space)
+        {
+            return true;
+        }
+
+        // 上段数字だけページ番号へ（テンキーは再生操作＝4 前／6 次などへ通す。二桁可）。
+        if (LibraryPlayerMode.IsPdfPageDigitKey(key, modifiers)
+            && TryDigitKey(key, out var pageDigit))
+        {
+            if (!isRepeat)
+            {
+                ApplyResolvedPdfPageDigitJump(pageDigit);
+            }
+
+            return true;
+        }
+
         if (LibraryPlayerMode.IsPdfPageKey(key, modifiers))
         {
             _libraryPlayOnArrowRelease = false;
+            ResetPdfPageDigitEntry();
             switch (key)
             {
                 case Key.Left:
                 case Key.PageUp:
                     if (LibraryBrowser.TryStepPlaylistPdfPage(-1))
                     {
-                        SyncPlaylistPdfCursorFromVisual();
+                        SyncPlaylistPdfCursorFromVisual(flashPageNumber: true);
                     }
 
                     return true;
@@ -1950,21 +2277,21 @@ public partial class MainWindow
                 case Key.PageDown:
                     if (LibraryBrowser.TryStepPlaylistPdfPage(1))
                     {
-                        SyncPlaylistPdfCursorFromVisual();
+                        SyncPlaylistPdfCursorFromVisual(flashPageNumber: true);
                     }
 
                     return true;
                 case Key.Home:
                     if (LibraryBrowser.TryGoPlaylistPdfPageEdge(-1))
                     {
-                        SyncPlaylistPdfCursorFromVisual();
+                        SyncPlaylistPdfCursorFromVisual(flashPageNumber: true);
                     }
 
                     return true;
                 case Key.End:
                     if (LibraryBrowser.TryGoPlaylistPdfPageEdge(1))
                     {
-                        SyncPlaylistPdfCursorFromVisual();
+                        SyncPlaylistPdfCursorFromVisual(flashPageNumber: true);
                     }
 
                     return true;
@@ -1974,7 +2301,38 @@ public partial class MainWindow
         return LibraryPlayerMode.BlocksPlaylistWhilePdf(key, modifiers);
     }
 
-    private void SyncPlaylistPdfCursorFromVisual()
+    private bool ApplyResolvedPdfPageDigitJump(int digit)
+    {
+        if (!LibraryPlayerMode.TryResolvePdfPageDigitJump(
+                _pdfPageDigit,
+                digit,
+                LibraryBrowser.PlaylistPdfPageCount,
+                out var nextPending,
+                out var seekPage))
+        {
+            return false;
+        }
+
+        if (seekPage is int page)
+        {
+            _pdfPageDigit = nextPending;
+            if (LibraryBrowser.TryGoPlaylistPdfPageNumber(page))
+            {
+                SyncPlaylistPdfCursorFromVisual(flashPageNumber: true);
+            }
+
+            RestartMarkerDigitTimer();
+            return true;
+        }
+
+        // 無効桁は消費のみ。桁送りも切る。
+        _pdfPageDigit = 0;
+        return true;
+    }
+
+    private void ResetPdfPageDigitEntry() => _pdfPageDigit = 0;
+
+    private void SyncPlaylistPdfCursorFromVisual(bool flashPageNumber = false)
     {
         if (_document is null || !LibraryPlaylistDocuments.IsPdf(_document))
         {
@@ -1988,5 +2346,10 @@ public partial class MainWindow
         Waveform.PlayheadFrame = frame;
         SyncOverviewPlayhead();
         RefreshStatus();
+        RefreshPlaylistPdfPageNumber();
+        if (flashPageNumber)
+        {
+            FlashPlaylistPdfPageNumber();
+        }
     }
 }

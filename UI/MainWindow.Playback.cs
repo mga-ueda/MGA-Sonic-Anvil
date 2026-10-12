@@ -27,7 +27,8 @@ public partial class MainWindow
             case TransportCommand.TogglePlayback:
                 if (IsLibraryMaximized)
                 {
-                    ToggleLibraryTransportPlayback();
+                    // エディタの Space と同じ（単独再生／停止で開始位置へ）。連続再生はダブルクリック。
+                    PlayLibrarySelectionOnceOrToggle();
                 }
                 else
                 {
@@ -99,9 +100,6 @@ public partial class MainWindow
                 break;
             case TransportCommand.AmpZoomReset:
                 Waveform.ResetAmpZoom();
-                break;
-            case TransportCommand.CycleWaveformHeight:
-                CycleWaveformHeight();
                 break;
             case TransportCommand.FadeIn:
                 PromptFade(fadeIn: true, Transport.ButtonFor(TransportCommand.FadeIn));
@@ -247,17 +245,35 @@ public partial class MainWindow
     }
 
     private bool IsPlaybackShuttleKey(Key key, ModifierKeys modifiers) =>
-        IsLibraryMaximized
-            ? LibraryPlayerMode.IsPlayerShuttleKey(key, modifiers)
-            : modifiers == ModifierKeys.None && key is Key.Left or Key.Right;
+        LibraryPlayerMode.IsPlayerShuttleKey(key, modifiers)
+        || (modifiers == ModifierKeys.None && key is Key.NumPad1 or Key.NumPad3)
+        || (!IsLibraryMaximized
+            && modifiers == ModifierKeys.None
+            && key is Key.Left or Key.Right);
 
-    private bool CanPlaybackShuttle() =>
-        (LibraryBrowser.PlaylistVisualPlaying && LibraryBrowser.PlaylistVisualShown)
-        || (_player.IsPlaying && !_player.IsScrubbing && !AnyEffectPreviewing);
+    /// <param name="allowWhileStopped">
+    /// true なら停止中の ,／.／テンキー 1／3 を許可（離すとその位置で停止のまま）。
+    /// ←→ の再生中シャトルは false のまま（停止中は 1 ステップシーク）。
+    /// </param>
+    private bool CanPlaybackShuttle(bool allowWhileStopped = false)
+    {
+        if (_document is null || _player.IsScrubbing || AnyEffectPreviewing)
+        {
+            return false;
+        }
+
+        if ((_player.IsPlaying)
+            || (LibraryBrowser.PlaylistVisualPlaying && LibraryBrowser.PlaylistVisualShown))
+        {
+            return true;
+        }
+
+        return allowWhileStopped;
+    }
 
     private bool BeginOrContinuePlaybackShuttle(int direction)
     {
-        if (direction == 0)
+        if (direction == 0 || _document is null)
         {
             return false;
         }
@@ -269,15 +285,25 @@ public partial class MainWindow
 
         StopSeekNudge();
         StopVideoFrameStep();
+
+        // 停止中は一時的に再生を始め、キーを離したらその位置で止める。
+        if (!_player.IsPlaying && !LibraryBrowser.PlaylistVisualPlaying)
+        {
+            _shuttleStartedWhileStopped = true;
+            _shuttleRestoreImmersivePause =
+                _playlistVideoImmersivePause || LibraryBrowser.PlaylistVisualFramePaused;
+            StartPlayback(_document.CursorFrame, prerollSeconds: 0);
+            if (!_player.IsPlaying && !LibraryBrowser.PlaylistVisualPlaying)
+            {
+                _shuttleStartedWhileStopped = false;
+                _shuttleRestoreImmersivePause = false;
+                return false;
+            }
+        }
+
         if (LibraryBrowser.PlaylistVisualShown && LibraryBrowser.PlaylistVisualIsVideo)
         {
             // 映像は SpeedRatio±3 ではなく、一時停止＋音声ヘッドへの Position 追従。
-            // 暗い 1/3 速プレビューは PlaylistVisualPlaying=false なので、本再生中だけここに来る。
-            if (!_player.IsPlaying && !LibraryBrowser.PlaylistVisualPlaying)
-            {
-                return false;
-            }
-
             _playbackShuttleDirection = direction;
             if (LibraryBrowser.PlaylistVisualPlaying)
             {
@@ -311,7 +337,7 @@ public partial class MainWindow
 
     private void StopPlaybackShuttle()
     {
-        if (_playbackShuttleDirection == 0)
+        if (_playbackShuttleDirection == 0 && !_shuttleStartedWhileStopped)
         {
             return;
         }
@@ -324,6 +350,20 @@ public partial class MainWindow
         }
 
         _player.SetPlaybackSpeed(1);
+
+        if (!_shuttleStartedWhileStopped)
+        {
+            return;
+        }
+
+        // 停止中から始めたシャトル：離した位置で停止のまま（開始位置へは戻さない）。
+        var immersive = _shuttleRestoreImmersivePause;
+        _shuttleStartedWhileStopped = false;
+        _shuttleRestoreImmersivePause = false;
+        if (_player.IsPlaying || LibraryBrowser.PlaylistVisualPlaying)
+        {
+            PausePlaybackHere(immersiveVideoHold: immersive);
+        }
     }
 
     /// <summary>映像クロックの位置へ音声ヘッドを合わせる（動画シャトル開始時）。</summary>
@@ -417,7 +457,7 @@ public partial class MainWindow
             return;
         }
 
-        WaveSelection? playRange = _document.Selection.IsEmpty ? null : _document.Selection;
+        WaveSelection? playRange = ResolvePlayLoopRange();
         if (playRange is { } range && (startFrame < range.StartFrame || startFrame >= range.EndFrame))
         {
             startFrame = range.StartFrame;
@@ -502,7 +542,7 @@ public partial class MainWindow
             return;
         }
 
-        WaveSelection? playRange = _document.Selection.IsEmpty ? null : _document.Selection;
+        WaveSelection? playRange = ResolvePlayLoopRange();
         var frame = _player.SmoothCursorFrame;
         try
         {
@@ -561,7 +601,8 @@ public partial class MainWindow
         _volumePreview.Previewing = false;
         _pitchPreview.Previewing = false;
         _timeStretchPreview.Previewing = false;
-        // テンキー 0 はフレーム一時停止＋クローム維持。Enter などはその場停止でクロームを戻す。
+        // テンキー 0 はフレーム一時停止＋クローム維持。Enter はその場停止でクロームを戻す。
+        // 動画はどちらも静止（暗い 1/3 速へは落とさない。バックグラウンドへ戻すのは Escape）。
         if (immersiveVideoHold)
         {
             _playlistVideoImmersivePause = true;
@@ -570,7 +611,10 @@ public partial class MainWindow
         else
         {
             ClearPlaylistVideoImmersivePause(sync: false);
-            PausePlaybackSoft();
+            var freezeVideo = IsLibraryMaximized
+                && LibraryBrowser.PlaylistVisualShown
+                && LibraryBrowser.PlaylistVisualIsVideo;
+            PausePlaybackSoft(freezePlaylistVisual: freezeVideo);
         }
 
         SeekFrame(frame);
@@ -579,42 +623,55 @@ public partial class MainWindow
         return true;
     }
 
-    private void HaltPlaybackToStart()
+    private void HaltPlaybackToStart(bool keepVideoChromeHidden = false)
     {
         _editorPlayAfterPcmTicket++;
-        // Space の停止はクロームを戻す（テンキー 0 の一時停止ホールドは解除）。
-        ClearPlaylistVideoImmersivePause(sync: false);
+        // Space の停止は開始位置へ戻す（即再開しない）。動画本再生中はプレイリストを出さない。
+        // 暗いプレビューへ落とすのは Escape。
         var videoShown = IsLibraryMaximized
             && LibraryBrowser.PlaylistVisualShown
             && LibraryBrowser.PlaylistVisualIsVideo;
-        var stopPos = videoShown
-            ? LibraryBrowser.PlaylistVisualPosition
-            : (TimeSpan?)null;
-        // F8 動画ミニ: 静止。F10 プレイリスト: 暗い 1/3 速＋格子。
-        var freezeVideo = videoShown
-            && LibraryPlayerMode.VideoStopFreezesFrame(IsVideoMiniPlayerActive());
-
-        if (freezeVideo)
+        if (keepVideoChromeHidden && videoShown)
         {
-            PausePlaybackSoft(freezePlaylistVisual: true);
-        }
-        else if (videoShown)
-        {
-            // SetPlaying(false) 経由で EnterDimPreview を二重に踏むとランプが積み重なる。
-            // 音声だけ止めてから、暗いプレビューへ一度だけ移す。
-            PausePlaybackSoft(keepPlaylistVisual: true);
+            _playlistVideoImmersivePause = true;
         }
         else
         {
-            PausePlaybackSoft();
+            ClearPlaylistVideoImmersivePause(sync: false);
         }
+
+        // 動画本再生の Space／Enter 停止は常に静止（暗いプレビューへ落とさない）。
+        PausePlaybackSoft(freezePlaylistVisual: videoShown);
 
         if (_document is null)
         {
             return;
         }
 
-        if (stopPos is { } pos)
+        SeekFrame(_lastPlaybackStart);
+        SyncPlaylistVideoChromeFade();
+    }
+
+    /// <summary>
+    /// 動画本再生／フレーム一時停止から、止めた位置の暗い 1/3 速プレビューへ。
+    /// Escape／F10／F8 解除用。Space／Enter では呼ばない。
+    /// </summary>
+    private void DropPlaylistVideoToDimPreview()
+    {
+        _editorPlayAfterPcmTicket++;
+        ClearPlaylistVideoImmersivePause(sync: false);
+        var videoShown = IsLibraryMaximized
+            && LibraryBrowser.PlaylistVisualShown
+            && LibraryBrowser.PlaylistVisualIsVideo;
+        if (!videoShown)
+        {
+            HaltPlaybackToStart();
+            return;
+        }
+
+        var pos = LibraryBrowser.PlaylistVisualPosition;
+        PausePlaybackSoft(keepPlaylistVisual: true);
+        if (_document is not null)
         {
             var rate = Math.Max(1, _document.SampleRate);
             var frame = Math.Clamp(
@@ -623,20 +680,12 @@ public partial class MainWindow
                 _document.FrameCount);
             _document.CursorFrame = frame;
             Waveform.PlayheadFrame = frame;
-            if (!freezeVideo
-                && LibraryBrowser.PlaylistVisualShown
-                && LibraryBrowser.PlaylistVisualIsVideo)
-            {
-                LibraryBrowser.EnterPlaylistVisualDimPreview(pos);
-            }
-
-            SyncOverviewPlayhead();
-            SyncPlaylistVideoChromeFade();
-            RefreshStatus();
-            return;
         }
 
-        SeekFrame(_lastPlaybackStart);
+        LibraryBrowser.EnterPlaylistVisualDimPreview(pos);
+        SyncOverviewPlayhead();
+        SyncPlaylistVideoChromeFade();
+        RefreshStatus();
     }
 
     private void SeekFrame(long frame, int crossfadeMilliseconds = 0)
@@ -728,15 +777,34 @@ public partial class MainWindow
             return;
         }
 
-        if (_document.Selection.IsEmpty)
+        var playRange = ResolvePlayLoopRange();
+        if (playRange is null)
         {
             _player.SetPlayWindow(null, loop: false);
             _player.SetExitSpan(null);
             return;
         }
 
-        _player.SetPlayWindow(_document.Selection, loop: true);
-        _player.SetExitSpan(ComputeExitLayerSpan(_document.Selection));
+        _player.SetPlayWindow(playRange, loop: true);
+        _player.SetExitSpan(ComputeExitLayerSpan(playRange));
+    }
+
+    /// <summary>
+    /// プレイヤー A-B が揃っていればそれを優先。なければ選択範囲ループ。
+    /// </summary>
+    private WaveSelection? ResolvePlayLoopRange()
+    {
+        if (_document is null)
+        {
+            return null;
+        }
+
+        if (IsLibraryMaximized && Waveform.TryGetPlayerAbLoop(out var ab))
+        {
+            return ab;
+        }
+
+        return _document.Selection.IsEmpty ? null : _document.Selection;
     }
 
     /// <summary>
@@ -1044,7 +1112,7 @@ public partial class MainWindow
             return;
         }
 
-        var loop = _document.Selection;
+        var loop = ResolvePlayLoopRange() ?? WaveSelection.Empty;
         var rate = Math.Max(1, _document.SampleRate);
         if (!loop.IsEmpty && LibraryPlayerMode.NeedsLoopSeek(frame, loop.StartFrame, loop.EndFrame))
         {
@@ -1638,14 +1706,6 @@ public partial class MainWindow
         AfterMarkerEdit();
     }
 
-    private void CycleWaveformHeight()
-    {
-        _waveformHeightScale = _waveformHeightScale >= 3 ? 1 : _waveformHeightScale + 1;
-        ApplyWaveformHeightScale();
-        AppStorage.Settings.WaveformHeightScale = _waveformHeightScale;
-        AppStorage.Save();
-    }
-
     private void CenterPlayheadOrToggleLock()
     {
         if (IsPlaybackActive())
@@ -1664,11 +1724,6 @@ public partial class MainWindow
         }
 
         Waveform.CenterViewOnPlayhead();
-    }
-
-    private void ApplyWaveformHeightScale()
-    {
-        WaveformHostBorder.MinHeight = DesignMetrics.WaveformHostMinHeight * _waveformHeightScale;
     }
 
     private void ToggleAnalyzerMaximize()
@@ -1717,11 +1772,30 @@ public partial class MainWindow
             SetPlaylistVideoFullscreen(false);
             // 動画ミニ枠のまま F11／F12 寸法を覚えさせない。
             LeaveVideoMiniBeforeWaveformFullscreen();
+            // セッション切替で捨てキューが消える前にスナップショットする。
+            // 同じ音声ドキュメントが残るときだけエディタへマージ。動画／PDF は持ち込まないので捨てる。
+            var scratchDocument = _document;
+            var scratchMarkers = Waveform.ScratchCues.HasMarkers
+                ? Waveform.ScratchCues.SnapshotMarkers()
+                : [];
+            var scratchAbIn = Waveform.ScratchCues.AbIn;
+            var scratchAbOut = Waveform.ScratchCues.AbOut;
+            var scratchAb = Waveform.ScratchCues.LoopRange();
+            Waveform.ClearPlayerAbRepeat();
             // 選択の音声ファイルだけ残す。動画／PDF はファイルごと持ち込まない（音声トラックだけ残すこともない）。
             if (!KeepOnlyLibrarySelectedSessions())
             {
+                RestorePlayerScratchIfCleared(scratchMarkers, scratchAbIn, scratchAbOut);
                 return;
             }
+
+            if (ReferenceEquals(_document, scratchDocument))
+            {
+                CommitPlayerScratchMarkersToEditor(scratchMarkers);
+                CommitPlayerScratchAbToEditor(scratchAb);
+            }
+
+            Waveform.ClearPlayerScratchAll();
 
             LibraryBrowser.ShuffleEnabled = false;
 
@@ -2214,6 +2288,7 @@ public partial class MainWindow
         PlaylistVideoFileName.LayoutTransform = overlayTransform;
         PlaylistVideoScaleToast.LayoutTransform = overlayTransform;
         ApplyPlaylistVideoTimecodeOverlayScale(overlayScale);
+        ApplyPlaylistPdfPageNumberOverlayScale(overlayScale);
         SchedulePlaylistVideoFileNamePlacement();
     }
 
@@ -2383,14 +2458,18 @@ public partial class MainWindow
 
     private void RestoreMinimalChromeMeterHosts()
     {
-        if (DocumentTabHost.Visibility != Visibility.Visible)
+        // プレイヤー中はタブ／履歴ストリップを出さない（ApplyLibraryChrome の Collapsed を上書きしない）。
+        if (!IsLibraryMaximized)
         {
-            DocumentTabHost.Visibility = Visibility.Visible;
-        }
+            if (DocumentTabHost.Visibility != Visibility.Visible)
+            {
+                DocumentTabHost.Visibility = Visibility.Visible;
+            }
 
-        if (HistoryStrip.Visibility != Visibility.Visible)
-        {
-            HistoryStrip.Visibility = Visibility.Visible;
+            if (HistoryStrip.Visibility != Visibility.Visible)
+            {
+                HistoryStrip.Visibility = Visibility.Visible;
+            }
         }
 
         if (TransportBarHost.Visibility != Visibility.Visible)

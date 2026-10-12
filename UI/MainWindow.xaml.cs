@@ -56,13 +56,18 @@ public partial class MainWindow : Window
     private WaveRegion[] _placeRegionsBefore = [];
     private int _markerNudgeDirection;
     private int _playbackShuttleDirection;
+    /// <summary>停止中に早送り／早戻しを始めたとき。キーを離したらその位置で停止のままにする。</summary>
+    private bool _shuttleStartedWhileStopped;
+    private bool _shuttleRestoreImmersivePause;
     private bool _nudgeAtPlayhead;
     private bool _nudgeRepeatStarted;
     private bool _timelineNudgeOpen;
     private MarkerSnapshot[] _timelineNudgeMarkersBefore = [];
     private WaveRegion[] _timelineNudgeRegionsBefore = [];
     private WaveSelection _timelineNudgeLoopBefore;
+    private PlayerScratchSnapshot? _timelineNudgeScratchBefore;
     private int _markerNumber;
+    private int _pdfPageDigit;
     private AudioDocument? _document => _activeSession?.Document;
     private RangeDivideState? _markerDivide;
     private RangeDivideState? _regionDivide;
@@ -74,7 +79,6 @@ public partial class MainWindow : Window
     private bool _syncingScroll;
     private bool _syncingChrome;
     private bool _syncingSpeakers;
-    private int _waveformHeightScale;
     private WaveformMaximizeMode _waveformMaximizeMode;
     private WindowState _windowStateBeforeWaveformMax;
     private WindowStyle _windowStyleBeforeWaveformMax;
@@ -117,6 +121,8 @@ public partial class MainWindow : Window
     private DispatcherTimer? _videoLaunchPlacementSaveTimer;
     /// <summary>A でファイル名を出したあと、フェード完了後にラウドネス回避をやり直す。</summary>
     private DispatcherTimer? _playlistVideoFileNamePlaceTimer;
+    /// <summary>PDF ページ切替時のページ番号トースト（表示→フェードアウト）。</summary>
+    private DispatcherTimer? _playlistPdfPageNumberToastTimer;
     private int _autoSpeakerSeenChannels = int.MinValue;
     private ImageSource? _brandLogoDark;
     private ImageSource? _brandLogoLight;
@@ -191,7 +197,6 @@ public partial class MainWindow : Window
         RefreshTipsHeader();
         Transport.SetTipsVisible(AppStorage.Settings.ShowTips);
         _outputSettings = AppStorage.Settings.ToAudioOutputSettings();
-        _waveformHeightScale = Math.Clamp(AppStorage.Settings.WaveformHeightScale, 1, 3);
         ApplyMeterColumnWidth(AppStorage.Settings.MeterColumnWidth);
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
         // 動画の関連付け起動はミニプレイヤーへ切り替えてから出す（エディタが一瞬見えないように）。
@@ -387,7 +392,6 @@ public partial class MainWindow : Window
             _player.Dispose();
         };
 
-        ApplyWaveformHeightScale();
         BindWorkspace(null);
         PlaceWaapiToggle();
         ApplyLibraryWashChrome(true);
@@ -591,10 +595,20 @@ public partial class MainWindow : Window
         _bindingWorkspace = true;
         try
         {
+            var sessionChanged = !ReferenceEquals(_activeSession, session);
             ResetWorkspaceInteraction();
             _activeSession = session;
+            if (IsLibraryMaximized && sessionChanged)
+            {
+                Waveform.ClearPlayerScratchAll();
+            }
+
             Waveform.Document = _document;
             Overview.Document = _document;
+            if (IsLibraryMaximized)
+            {
+                SyncPlayerScratchEnabled();
+            }
             if (_recording && _recordSession is not null && ReferenceEquals(session, _recordSession))
             {
                 Waveform.SetLiveRecording(true);
@@ -1101,7 +1115,6 @@ public partial class MainWindow : Window
             await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Render);
             RememberDocumentState();
             AppStorage.Settings.ApplyAudioOutput(_outputSettings);
-            AppStorage.Settings.WaveformHeightScale = _waveformHeightScale;
             AppStorage.Settings.MeterColumnWidth = _meterColumnPreferred;
             PersistWaapiSettings();
             AppStorage.Save();
