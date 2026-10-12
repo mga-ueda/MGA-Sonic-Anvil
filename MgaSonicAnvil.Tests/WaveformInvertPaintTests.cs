@@ -96,6 +96,19 @@ public sealed class WaveformInvertPaintTests
     }
 
     [Fact]
+    public void ApplyLaneShade_MultiLane_UsesEachLaneMid()
+    {
+        var fill = unchecked((int)0xFFC6D9FF);
+        // 高さ 102・2ch・ギャップ無し → レーン0: 0..51（中心25.5）、レーン1: 51..102（中心76.5）
+        var lane0Center = WaveformInvertPaint.ApplyLaneShade(fill, 25, 102, UiTheme.Dark, channels: 2);
+        var lane0Edge = WaveformInvertPaint.ApplyLaneShade(fill, 0, 102, UiTheme.Dark, channels: 2);
+        var lane1Center = WaveformInvertPaint.ApplyLaneShade(fill, 76, 102, UiTheme.Dark, channels: 2);
+        Assert.Equal(fill, lane0Center);
+        Assert.Equal(fill, lane1Center);
+        Assert.True(((lane0Edge >> 16) & 0xFF) < ((lane0Center >> 16) & 0xFF));
+    }
+
+    [Fact]
     public void SelectionInvertOpacity_LetsOriginalShowThrough()
     {
         Assert.True(WaveformInvertPaint.SelectionInvertOpacity < 1);
