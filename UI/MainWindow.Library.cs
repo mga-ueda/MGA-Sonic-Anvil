@@ -4661,7 +4661,7 @@ public partial class MainWindow
         return VideoCodecProbe.CanPlayWithoutProxy(path) || VideoProxy.TryGetCached(path, out _);
     }
 
-    private async Task<bool> TryPrepareVideoProxyAsync(DocumentSession session)
+    private async Task<bool> TryPrepareVideoProxyAsync(DocumentSession session, bool forceEncode = false)
     {
         if (!LibraryPlaylistDocuments.IsVideo(session.Document)
             || session.Document.SourcePath is not { Length: > 0 } path)
@@ -4669,7 +4669,8 @@ public partial class MainWindow
             return false;
         }
 
-        var needsEncode = !CanShowPlaylistVideo(session.Document) && VideoProxy.CanEncodeProxy();
+        var needsEncode = !CanShowPlaylistVideo(session.Document)
+            && (forceEncode ? VideoProxy.CanForceEncodeProxy() : VideoProxy.CanEncodeProxy());
         if (needsEncode && IsUiBusy)
         {
             return false;
@@ -4691,7 +4692,7 @@ public partial class MainWindow
             IProgress<double>? progress = needsEncode
                 ? new Progress<double>(p => _busyGlass.SetProgress(p))
                 : null;
-            await VideoProxy.EnsurePlayableAsync(path, progress, token).ConfigureAwait(true);
+            await VideoProxy.EnsurePlayableAsync(path, progress, token, forceEncode).ConfigureAwait(true);
             if (!IsLoaded || !ReferenceEquals(_libraryLoadSession, session) || token.IsCancellationRequested)
             {
                 return false;
@@ -4737,6 +4738,116 @@ public partial class MainWindow
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Ctrl+Shift+P。設定の「自動生成しない」や F8／引数起動の抑止を無視してプロキシを作る。
+    /// プレイリスト選択・本再生・ミニプレイヤーの動画が対象。すでにある／不要／ffmpeg 無しは何もしない。
+    /// </summary>
+    private void RequestForceVideoProxyEncode() => _ = ForceVideoProxyEncodeAsync();
+
+    private async Task ForceVideoProxyEncodeAsync()
+    {
+        if (!IsLibraryMaximized || IsUiBusy)
+        {
+            return;
+        }
+
+        var session = ResolveForceVideoProxySession();
+        if (session is null
+            || !LibraryPlaylistDocuments.IsVideo(session.Document)
+            || session.Document.SourcePath is not { Length: > 0 } path
+            || CanShowPlaylistVideo(session.Document)
+            || !VideoProxy.CanForceEncodeProxy())
+        {
+            return;
+        }
+
+        var sameSource = LibraryBrowser.IsPlaylistVisualSameSource(path);
+        var wasShown = sameSource && LibraryBrowser.PlaylistVisualShown;
+        var wasPlaying = sameSource && LibraryBrowser.PlaylistVisualPlaying;
+        if (wasShown && session.Document.SampleRate > 0)
+        {
+            var seconds = LibraryBrowser.PlaylistVisualPosition.TotalSeconds;
+            if (seconds > 0 || wasPlaying || IsPlaybackActive())
+            {
+                session.Document.CursorFrame = (long)Math.Round(seconds * session.Document.SampleRate);
+                Waveform.PlayheadFrame = session.Document.CursorFrame;
+            }
+        }
+
+        if (!await TryPrepareVideoProxyAsync(session, forceEncode: true).ConfigureAwait(true))
+        {
+            return;
+        }
+
+        if (!IsLoaded || !LibraryPlaylistDocuments.IsVideo(session.Document))
+        {
+            return;
+        }
+
+        // ActivateVisualLibraryMeta → ActivateStreamPlayback がピークを捨てる。
+        // プロキシができてから波形を作り直す（本再生中の差し替えでも同じ）。
+        if (wasShown && LibraryBrowser.IsPlaylistVisualSameSource(path))
+        {
+            LibraryBrowser.ShowPlaylistVisual(session, play: wasPlaying);
+            if (wasPlaying
+                && !IsPlaybackActive()
+                && !LibraryPlaylistDocuments.IsPdf(session.Document))
+            {
+                StartPlayback(session.Document.CursorFrame, prerollSeconds: 0);
+            }
+        }
+
+        await RestartLibraryPeaksForSessionAsync(session).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// 走査中なら止めてからやり直す。プロキシ差し替え後に原ファイル走査が残ると波形が空のままになる。
+    /// </summary>
+    private async Task RestartLibraryPeaksForSessionAsync(DocumentSession session)
+    {
+        var document = session.Document;
+        if (_libraryPeakJobCts.TryGetValue(document, out var job))
+        {
+            try
+            {
+                job.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
+        if (_libraryPeakTasks.TryGetValue(document, out var running))
+        {
+            try
+            {
+                await running.ConfigureAwait(true);
+            }
+            catch
+            {
+                // ピーク失敗は再生を止めない（FillLibraryPeaksCoreAsync 内でも握る）。
+            }
+        }
+
+        await FillLibraryPeaksAsync(session).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// 本再生／ミニプレイヤー中は再生中の動画、それ以外は選択（無ければアクティブ）。
+    /// </summary>
+    private DocumentSession? ResolveForceVideoProxySession()
+    {
+        if (IsVideoMiniPlayerActive()
+            || (LibraryBrowser.PlaylistVisualShown
+                && LibraryBrowser.PlaylistVisualIsVideo
+                && (LibraryBrowser.PlaylistVisualPlaying || _playlistVideoImmersivePause)))
+        {
+            return _activeSession ?? LibraryBrowser.SelectedSession;
+        }
+
+        return LibraryBrowser.SelectedSession ?? _activeSession;
     }
 
     private void DropPlaylistDocumentSessionsIfDisabled()
