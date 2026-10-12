@@ -1004,6 +1004,10 @@ internal static class LibraryPlayerMode
         return Math.Clamp(scale, DesignMetrics.OverlayScaleMin, DesignMetrics.OverlayScaleMax);
     }
 
+    /// <summary>動画ミニで Q／Escape（無修飾）→ アプリ終了。</summary>
+    public static bool QuitsAppFromVideoMini(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.None && key is Key.Escape or Key.Q;
+
     /// <summary>波形・アナライザ・ファイル名の表示切替（タイムコードは含まない）。</summary>
     public static bool IsVideoHudToggle(Key key, ModifierKeys modifiers) =>
         key == Key.A && modifiers == ModifierKeys.None;

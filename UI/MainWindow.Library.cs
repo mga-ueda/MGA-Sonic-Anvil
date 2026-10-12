@@ -1245,8 +1245,8 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// Escape／Q で本再生／イマーシブ一時停止／PDF 明るい表示から抜ける。
-    /// F10 プレイリストは暗い 1/3 速へ。F8 ミニは静止のまま。
+    /// Escape／Q で本再生／イマーシブ一時停止／PDF 明るい表示から暗いプレビューへ戻す（F10）。
+    /// 動画ミニの Escape／Q は Shortcut 側でアプリ終了する。
     /// </summary>
     private bool TryExitPlaylistRealPlayback()
     {
@@ -1266,23 +1266,13 @@ public partial class MainWindow
         // 動画本再生・フレーム静止・イマーシブ一時停止以外（音声のみの再生）は Escape では止めない。
         if (!IsPlaylistVideoPlaying()
             && !_playlistVideoImmersivePause
-            && !LibraryBrowser.PlaylistVisualFramePaused
-            && !(IsVideoMiniPlayerActive() && IsPlaybackActive()))
+            && !LibraryBrowser.PlaylistVisualFramePaused)
         {
             return false;
         }
 
         StopVideoFrameStep();
-        if (IsVideoMiniPlayerActive())
-        {
-            // F8 はプレイリストが無いので暗いプレビューへは落とさず、止めた位置で静止。
-            PausePlaybackHere(immersiveVideoHold: true);
-        }
-        else
-        {
-            DropPlaylistVideoToDimPreview();
-        }
-
+        DropPlaylistVideoToDimPreview();
         _libraryStopAfterTrack = false;
         return true;
     }
