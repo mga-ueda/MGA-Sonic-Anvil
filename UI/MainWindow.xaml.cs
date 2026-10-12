@@ -649,6 +649,9 @@ public partial class MainWindow : Window
             {
                 Overview.SetSelectedMarkerFrames(null);
                 Waveform.LoopEnabled = true;
+                // 表示対象が無いのにスペクトログラム／ラウドネスだけ残ると空の解析モードになる。
+                Waveform.ExitAnalysisView();
+                Transport.SetAnalysisView(WaveformAnalysisView.Waveform);
                 SyncOverviewPlayhead();
             }
 

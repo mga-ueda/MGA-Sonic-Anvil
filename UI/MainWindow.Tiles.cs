@@ -592,6 +592,7 @@ public partial class MainWindow
         else
         {
             PrimaryWaveform.Document = null;
+            PrimaryWaveform.ExitAnalysisView();
         }
 
         Transport.SetAnalysisView(PrimaryWaveform.AnalysisView);
