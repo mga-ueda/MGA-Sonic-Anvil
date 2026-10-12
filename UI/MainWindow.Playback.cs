@@ -457,6 +457,16 @@ public partial class MainWindow
             return;
         }
 
+        // プレイヤーの WAVE / AIFF はメモリ早戻しのため、ストリームのまま再生しない。
+        if (IsLibraryMaximized
+            && _activeSession is { } playerSession
+            && AudioCodec.IsUncompressedPcm(playerSession.Document.SourceKind)
+            && (playerSession.Document.IsDeferredLoad || playerSession.Document.IsStreamPlayback))
+        {
+            _ = StartPlaybackAfterPlayerPcmAsync(playerSession, startFrame, prerollSeconds);
+            return;
+        }
+
         WaveSelection? playRange = ResolvePlayLoopRange();
         if (playRange is { } range && (startFrame < range.StartFrame || startFrame >= range.EndFrame))
         {
@@ -524,9 +534,29 @@ public partial class MainWindow
         StartPlayback(startFrame, prerollSeconds);
     }
 
+    private async Task StartPlaybackAfterPlayerPcmAsync(
+        DocumentSession session,
+        long startFrame,
+        double prerollSeconds)
+    {
+        var ticket = ++_editorPlayAfterPcmTicket;
+        await EnsureLibrarySessionLoadedAsync(session).ConfigureAwait(true);
+        if (ticket != _editorPlayAfterPcmTicket
+            || !IsLibraryMaximized
+            || !ReferenceEquals(_activeSession, session)
+            || _document is null
+            || session.Document.IsDeferredLoad
+            || session.Document.IsStreamPlayback)
+        {
+            return;
+        }
+
+        StartPlayback(startFrame, prerollSeconds);
+    }
+
     /// <summary>
-    /// エディタで PCM のまま再生している曲を、プレイヤーへ戻したときに可変速へ戻す。
-    /// 波形用の PCM とピークは捨てない。
+    /// エディタで PCM のまま再生している圧縮曲を、プレイヤーへ戻したときにストリーム可変速へ戻す。
+    /// WAVE / AIFF はメモリ早戻しのまま。波形用の PCM とピークは捨てない。
     /// </summary>
     private void ResumePlayerVariableRate()
     {
@@ -535,9 +565,7 @@ public partial class MainWindow
             return;
         }
 
-        if (_document.SourcePath is not { Length: > 0 } path
-            || !File.Exists(path)
-            || !AudioCodec.CanStreamPlay(path))
+        if (!AudioPlayer.ShouldBindPlaybackStream(_document, preferStream: true))
         {
             return;
         }

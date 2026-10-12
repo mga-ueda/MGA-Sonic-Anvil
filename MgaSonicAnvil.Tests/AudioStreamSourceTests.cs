@@ -398,21 +398,22 @@ public sealed class AudioStreamSourceTests
             Assert.False(document.Peaks.IsEmpty);
             var samples = document.Interleaved.Length;
 
+            // WAVE はプレイヤーでもメモリ再生（可変速ストリームに載せない）。
             Assert.False(AudioPlayer.ShouldBindPlaybackStream(document, preferStream: false));
-            Assert.True(AudioPlayer.ShouldBindPlaybackStream(document, preferStream: true));
+            Assert.False(AudioPlayer.ShouldBindPlaybackStream(document, preferStream: true));
 
-            using var source = AudioStreamSource.Open(path);
             var provider = new PlaybackSampleProvider();
             provider.SetDeviceSampleRate(48000);
-            provider.BindStream(source, document, startFrame: 0, playRange: null, loop: false);
+            provider.Bind(document, startFrame: 0, playRange: null, loop: false);
             provider.SetPlaybackSpeed(PlaybackSampleProvider.FastSpeed);
 
             var frames = 200;
             var buffer = new float[frames * 2];
             Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+            // メモリ早送りはピッチ据え置きグレイン（先頭サンプルは原点付近）。
             Assert.Equal(0f, buffer[0], 3);
-            Assert.Equal(3f * PlaybackSampleProvider.ShuttleGainLinear, buffer[2], 3);
-            Assert.Equal(6f * PlaybackSampleProvider.ShuttleGainLinear, buffer[4], 3);
+            Assert.Equal(1f * PlaybackSampleProvider.ShuttleGainLinear, buffer[2], 3);
+            Assert.Equal(2f * PlaybackSampleProvider.ShuttleGainLinear, buffer[4], 3);
             Assert.Equal(samples, document.Interleaved.Length);
             Assert.False(document.Peaks.IsEmpty);
             Assert.False(document.IsStreamPlayback);
@@ -434,11 +435,38 @@ public sealed class AudioStreamSourceTests
             Assert.True(AudioCodec.TryActivateStreamPlayback(document));
             Assert.True(document.IsStreamPlayback);
             Assert.False(AudioPlayer.ShouldBindPlaybackStream(document, preferStream: false));
-            Assert.True(AudioPlayer.ShouldBindPlaybackStream(document, preferStream: true));
+            // WAVE は preferStream でもストリームに載せない。
+            Assert.False(AudioPlayer.ShouldBindPlaybackStream(document, preferStream: true));
+            Assert.False(AudioCodec.PrefersPlayerStream(path));
+            Assert.True(AudioCodec.IsUncompressedPcm(document.SourceKind));
         }
         finally
         {
             File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ShouldBindPlaybackStream_CompressedPrefersStreamInPlayer()
+    {
+        var wav = Path.Combine(Path.GetTempPath(), "mga-bind-mp3-" + Guid.NewGuid().ToString("N") + ".wav");
+        var mp3 = Path.ChangeExtension(wav, ".mp3");
+        try
+        {
+            WriteToneWave(wav, sampleRate: 44100, frames: 4410, frequency: 440);
+            EncodeMp3(wav, mp3);
+            var document = AudioDocument.CreateDeferred(mp3);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+            Assert.True(document.IsStreamPlayback);
+            Assert.False(AudioPlayer.ShouldBindPlaybackStream(document, preferStream: false));
+            Assert.True(AudioPlayer.ShouldBindPlaybackStream(document, preferStream: true));
+            Assert.True(AudioCodec.PrefersPlayerStream(mp3));
+            Assert.False(AudioCodec.IsUncompressedPcm(document.SourceKind));
+        }
+        finally
+        {
+            TryDelete(wav);
+            TryDelete(mp3);
         }
     }
 
@@ -456,6 +484,7 @@ public sealed class AudioStreamSourceTests
             var loaded = AudioCodec.Load(path, buildPeaks: false);
             Assert.False(loaded.IsStreamPlayback);
             Assert.False(AudioPlayer.ShouldBindPlaybackStream(loaded, preferStream: false));
+            Assert.False(AudioPlayer.ShouldBindPlaybackStream(loaded, preferStream: true));
 
             var provider = new PlaybackSampleProvider();
             provider.SetDeviceSampleRate(48000);
@@ -777,6 +806,58 @@ public sealed class AudioStreamSourceTests
             }
 
             Assert.True(peak > 0.01f, $"peak={peak}");
+        }
+        finally
+        {
+            TryDelete(wav);
+            TryDelete(mp3);
+        }
+    }
+
+    [Fact]
+    public void BindStream_RewindSpeed_Mp3KeepsEmitting()
+    {
+        var wav = Path.Combine(Path.GetTempPath(), "mga-stream-rw-mp3-" + Guid.NewGuid().ToString("N") + ".wav");
+        var mp3 = Path.ChangeExtension(wav, ".mp3");
+        try
+        {
+            WriteToneWave(wav, sampleRate: 44100, frames: 44100 * 3, frequency: 440);
+            EncodeMp3(wav, mp3);
+
+            var document = AudioDocument.CreateDeferred(mp3);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+            Assert.True(AudioPlayer.ShouldBindPlaybackStream(document, preferStream: true));
+
+            using var source = AudioStreamSource.Open(mp3);
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(48000);
+            var origin = Math.Min(document.FrameCount - 1, 44100L * 2);
+            provider.BindStream(source, document, startFrame: origin, playRange: null, loop: false);
+            provider.SetPlaybackSpeed(-PlaybackSampleProvider.FastSpeed);
+
+            var buffer = new float[2048 * 2];
+            var audibleReads = 0;
+            var peak = 0f;
+            var until = Environment.TickCount64 + 3000;
+            while (Environment.TickCount64 < until && audibleReads < 8)
+            {
+                Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+                Assert.False(provider.Ended);
+                var readPeak = 0f;
+                for (var i = 0; i < buffer.Length; i++)
+                {
+                    readPeak = Math.Max(readPeak, Math.Abs(buffer[i]));
+                }
+
+                peak = Math.Max(peak, readPeak);
+                if (readPeak > 0.01f)
+                {
+                    audibleReads++;
+                }
+            }
+
+            Assert.True(audibleReads >= 8, $"audibleReads={audibleReads} peak={peak} cursor={provider.CursorFrame}");
+            Assert.True(provider.CursorFrame < origin - 1000, $"cursor={provider.CursorFrame} origin={origin}");
         }
         finally
         {

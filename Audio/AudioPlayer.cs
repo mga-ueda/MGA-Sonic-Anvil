@@ -339,14 +339,20 @@ internal sealed class AudioPlayer : IDisposable
     }
 
     /// <summary>
-    /// プレイヤー（preferStream）は PCM 展開後も可変速（ピッチが変わる）で再生する。
-    /// エディタはストリーム文書でもここを false にし、メモリ再生のピッチ据え置きグレインにする。
+    /// プレイヤー（preferStream）の圧縮／動画はストリーム可変速。
+    /// WAVE / AIFF はメモリ再生のピッチ据え置きグレイン（エディタと同じ早戻し）。
+    /// エディタは preferStream を false にする。
     /// </summary>
     internal static bool ShouldBindPlaybackStream(AudioDocument document, bool preferStream)
     {
         if (!preferStream
             || document.SourcePath is not { Length: > 0 } path
             || !File.Exists(path))
+        {
+            return false;
+        }
+
+        if (AudioCodec.IsUncompressedPcm(document.SourceKind) || AudioCodec.IsUncompressedPcm(path))
         {
             return false;
         }

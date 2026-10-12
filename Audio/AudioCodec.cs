@@ -44,6 +44,37 @@ internal static class AudioCodec
             or AudioFileKind.Wave or AudioFileKind.Aiff;
     }
 
+    /// <summary>WAVE / AIFF。プレイヤーでもメモリ再生してエディタと同じ早戻しにする。</summary>
+    public static bool IsUncompressedPcm(AudioFileKind kind) =>
+        kind is AudioFileKind.Wave or AudioFileKind.Aiff;
+
+    public static bool IsUncompressedPcm(string path) => IsUncompressedPcm(DetectKind(path));
+
+    /// <summary>
+    /// プレイヤーでストリーム再生を選ぶか。圧縮／動画のみ。
+    /// 非圧縮はフル Load してピッチ据え置きグレイン早戻しにする。
+    /// </summary>
+    public static bool PrefersPlayerStream(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !CanStreamPlay(path))
+        {
+            return false;
+        }
+
+        return !IsUncompressedPcm(path);
+    }
+
+    public static bool PrefersPlayerStream(AudioDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (IsUncompressedPcm(document.SourceKind))
+        {
+            return false;
+        }
+
+        return document.SourcePath is { Length: > 0 } path && PrefersPlayerStream(path);
+    }
+
     private static bool MatchesExtension(string path, IReadOnlyList<string> extensions)
     {
         var ext = Path.GetExtension(path);
