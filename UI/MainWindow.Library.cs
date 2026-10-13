@@ -4245,7 +4245,7 @@ public partial class MainWindow
     /// <summary>
     /// フォルダ配下（と単体ファイル）を再帰収集し、1 曲ずつ載せる。
     /// 再生するのは Enter（クリア後）だけ。Shift+Enter・ダブルクリック・追加メニューは再生も停止もしない。
-    /// Enter 再生は全件追加が終わってから先頭を再生し、プレイリストへフォーカスする。
+    /// Enter 再生は先頭が音声なら見つけ次第、動画／PDF は全件追加後に再生し、プレイリストへフォーカスする。
     /// 検索中のツリーは見えているフォルダだけ。ファイル名ヒットはそのファイル、フォルダ名ヒットは配下すべて。
     /// お気に入りは検索フィルタを掛けない。
     /// </summary>
@@ -4286,6 +4286,7 @@ public partial class MainWindow
 
         _libraryPlayFirstPending = false;
         var firstHandled = false;
+        var folderPlayStarted = false;
         var loaded = 0;
         var planned = 0;
         var showProgress = false;
@@ -4334,6 +4335,22 @@ public partial class MainWindow
             if (first && playFirst)
             {
                 _libraryFolderPlaySession = FindSessionByPath(path);
+                // 音声は見つけ次第再生。動画／PDF は Open と後続追加の競合を避けるため全件後。
+                if (_libraryFolderPlaySession is { } head
+                    && ShouldPlayFolderFirstImmediately(path))
+                {
+                    folderPlayStarted = true;
+                    _ = PlayLibrarySessionAsync(head);
+                    if (generation == _libraryFolderShowGeneration && IsLibraryMaximized)
+                    {
+                        LibraryBrowser.RequestListFocus();
+                    }
+                }
+            }
+            else if (playFirst && folderPlayStarted && IsPlaybackActive())
+            {
+                // 先頭再生後に次曲が載ったらギャップレス先読みを付ける。
+                ScheduleLibraryGaplessPrefetch();
             }
 
             firstHandled = true;
@@ -4471,10 +4488,19 @@ public partial class MainWindow
                             LibraryBrowser.SelectSessionQuiet(first);
                         }
 
-                        await PlayLibrarySessionAsync(first).ConfigureAwait(true);
-                        if (generation == _libraryFolderShowGeneration && IsLibraryMaximized)
+                        if (!folderPlayStarted)
                         {
-                            LibraryBrowser.RequestListFocus();
+                            // 先頭が動画／PDF。全件載せてから再生（Open と追加の競合回避）。
+                            await PlayLibrarySessionAsync(first).ConfigureAwait(true);
+                            if (generation == _libraryFolderShowGeneration && IsLibraryMaximized)
+                            {
+                                LibraryBrowser.RequestListFocus();
+                            }
+                        }
+                        else if (IsPlaybackActive())
+                        {
+                            // 音声は追加中に再生済み。終了時はギャップレスだけ拾う（二重再生しない）。
+                            ScheduleLibraryGaplessPrefetch();
                         }
                     }
                     else if (!playFirst)
@@ -4517,6 +4543,13 @@ public partial class MainWindow
         DocumentSession? selected,
         DocumentSession first) =>
         selected is null || ReferenceEquals(selected, first);
+
+    /// <summary>
+    /// Enter の先頭再生を全件追加前に始めてよいか。
+    /// 動画／PDF は Open と後続追加が競合するので待つ。
+    /// </summary>
+    internal static bool ShouldPlayFolderFirstImmediately(string? path) =>
+        !string.IsNullOrWhiteSpace(path) && !LibraryPlaylistDocuments.IsDocument(path);
 
     /// <summary>
     /// 追加した曲をリストで選ぶか。Enter 再生は先頭のみ。Shift+Enter は空リストへ足したときだけ 1 行目を選ぶ。
