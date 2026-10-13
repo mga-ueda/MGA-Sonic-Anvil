@@ -635,10 +635,17 @@ internal static class LibraryPlayerMode
     public const string FormatMismatchForeBrushKey = "PlayerFormatMismatchForeBrush";
 
     /// <summary>
-    /// 開いている波形が無いとき、レベルメーター／スペアナ／ラウドネス／ゴニオを出さない。
+    /// 開いている波形が無いとき、レベルメーター／スペアナ／ラウドネス／ゴニオ／WAAPI 表記を出さない。
     /// プレイヤーもエディタも同じ。
     /// </summary>
     public static bool ShowsPlayerMeters(int playlistCount) => playlistCount > 0;
+
+    /// <summary>
+    /// 動画 HUD（A）でも、空プレイリストのメーター／WAAPI は出さない。
+    /// 波形ホストは isMeterChrome=false のまま HUD に従う。
+    /// </summary>
+    public static bool HidesPlayerMeterHud(bool hideHud, bool showMeters, bool isMeterChrome) =>
+        hideHud || (isMeterChrome && !showMeters);
 
     /// <summary>
     /// 音声信号で動くメーターはフェードせず即出す。停止中の追加だけ 1 秒フェード。

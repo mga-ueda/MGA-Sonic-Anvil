@@ -591,6 +591,15 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.ShowsPlayerMeters(playlistCount: 0));
         Assert.True(LibraryPlayerMode.ShowsPlayerMeters(playlistCount: 1));
         Assert.True(LibraryPlayerMode.ShowsPlayerMeters(playlistCount: 2));
+        // 空リスト: HUD オンでも WAAPI／アナライザは隠す。波形ホストは HUD に従う。
+        Assert.True(LibraryPlayerMode.HidesPlayerMeterHud(
+            hideHud: false, showMeters: false, isMeterChrome: true));
+        Assert.False(LibraryPlayerMode.HidesPlayerMeterHud(
+            hideHud: false, showMeters: false, isMeterChrome: false));
+        Assert.False(LibraryPlayerMode.HidesPlayerMeterHud(
+            hideHud: false, showMeters: true, isMeterChrome: true));
+        Assert.True(LibraryPlayerMode.HidesPlayerMeterHud(
+            hideHud: true, showMeters: true, isMeterChrome: true));
         Assert.False(LibraryPlayerMode.InstantPlayerMeterReveal(show: false, signalMoving: true));
         Assert.False(LibraryPlayerMode.InstantPlayerMeterReveal(show: true, signalMoving: false));
         Assert.True(LibraryPlayerMode.InstantPlayerMeterReveal(show: true, signalMoving: true));

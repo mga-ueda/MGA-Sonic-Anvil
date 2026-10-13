@@ -598,7 +598,7 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// レベルメーター／スペアナ／ラウドネス／ゴニオと、エディタの波形スクロール。
+    /// レベルメーター／スペアナ／ラウドネス／ゴニオ／WAAPI 表記と、エディタの波形スクロール。
     /// 波形が無いときは出さない。読み込みは 1 秒フェードイン、閉じたら 1 秒フェードアウト。
     /// プレイヤーは音声で動き始めたら即表示。突入は消えた状態から。
     /// </summary>
@@ -892,9 +892,8 @@ public partial class MainWindow
     {
         foreach (var target in PlaylistVideoHudTargets())
         {
-            // 波形／WAAPI 表記はメーター非表示条件でも HUD オンなら出す。
+            // 波形はメーター非表示条件でも HUD オンなら出す。WAAPI／アナライザは空リストでは出さない。
             if (ReferenceEquals(target, WaveformHostBorder)
-                || ReferenceEquals(target, MeterTopSlot)
                 || LibraryPlayerMode.ShowsPlayerMeters(_sessions.Count))
             {
                 if (LibraryPlayerMode.NeedsForcedOpaque(target))
@@ -907,16 +906,29 @@ public partial class MainWindow
 
     private void ApplyPlaylistVideoHudFade(bool hideHud, bool instant)
     {
+        var showMeters = LibraryPlayerMode.ShowsPlayerMeters(_sessions.Count);
         foreach (var target in PlaylistVideoHudTargets())
         {
+            // 空プレイリストでは A トグル HUD でも WAAPI／アナライザを出さない。
+            var hide = LibraryPlayerMode.HidesPlayerMeterHud(
+                hideHud,
+                showMeters,
+                isMeterChrome: IsPlayerMeterHudTarget(target));
             LibraryPlayerMode.FadeElementOpacity(
                 target,
-                hideHud ? 0 : 1,
+                hide ? 0 : 1,
                 instant,
-                hitTestVisible: !hideHud,
+                hitTestVisible: !hide,
                 seconds: LibraryPlayerMode.ChromeFadeSeconds);
         }
     }
+
+    private bool IsPlayerMeterHudTarget(UIElement target) =>
+        ReferenceEquals(target, MeterTopSlot)
+        || ReferenceEquals(target, LevelMeter)
+        || ReferenceEquals(target, VectorScope)
+        || ReferenceEquals(target, Spectrum)
+        || ReferenceEquals(target, LoudnessMeter);
 
     private bool TryTogglePlaylistVideoFullscreen()
     {
@@ -1577,8 +1589,8 @@ public partial class MainWindow
 
     private UIElement[] PlayerMeterFadeTargets() =>
         _playlistVideoChromeVisible
-            ? [LevelMeter, VectorScope, Spectrum, LoudnessMeter, TimeScrollStrip]
-            : [LevelMeter, VectorScope, Spectrum, LoudnessMeter];
+            ? [MeterTopSlot, LevelMeter, VectorScope, Spectrum, LoudnessMeter, TimeScrollStrip]
+            : [MeterTopSlot, LevelMeter, VectorScope, Spectrum, LoudnessMeter];
 
     /// <summary>
     /// プレイヤー中はクロムの塗りを外し、ウィンドウ全体のジャケットウォッシュを透かす。

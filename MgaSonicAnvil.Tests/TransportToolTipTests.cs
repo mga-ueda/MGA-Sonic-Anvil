@@ -114,6 +114,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("1秒でフェードアウト", UiStrings.TipLibraryList);
         Assert.Contains("停止中の選択は波形だけ", UiStrings.TipLibraryList);
         Assert.Contains("空のときはライブラリ", UiStrings.TipLibraryList);
+        Assert.Contains("ゴニオ／サラウンドメーター・WAAPI 表記を出さない", UiStrings.TipLibraryList);
         Assert.Contains("Space またはトランスポートの再生はその曲だけ", UiStrings.TipLibraryList);
         Assert.Contains("シークバー位置から開始／再開", UiStrings.TipLibraryList);
         Assert.Contains("バックグラウンドへ戻すのは Escape／Q", UiStrings.TipLibraryList);
