@@ -4190,7 +4190,7 @@ public partial class MainWindow
 
     private void LibraryBrowser_FavoritesActivated(object? sender, LibraryFavoritesActivateEventArgs e)
     {
-        if (e.Paths.Count == 0 || _libraryFolderShowInProgress)
+        if (e.Paths.Count == 0)
         {
             return;
         }
@@ -4204,6 +4204,7 @@ public partial class MainWindow
 
         if (e.ClearPlaylist)
         {
+            // Enter。読み込み中でも中断して差し替える（TryClear → CancelLibraryFolderShow）。
             _libraryHoldJacketWash = true;
             if (!TryClearLibrarySessions())
             {
@@ -4215,6 +4216,12 @@ public partial class MainWindow
                 paths,
                 LibraryExplorerPlaylistWalk.Inactive,
                 playFirst: true);
+            return;
+        }
+
+        // Shift+Enter の追加は進行中の再帰追加に重ねない。
+        if (_libraryFolderShowInProgress)
+        {
             return;
         }
 
@@ -4256,7 +4263,10 @@ public partial class MainWindow
         await OpenLibraryFoldersRecursiveAsync(existing, playFirst: false).ConfigureAwait(true);
     }
 
-    /// <summary>ツリーの Enter。プレイリストを空にしてから、選んだフォルダ配下を載せる。</summary>
+    /// <summary>
+    /// ツリーの Enter。プレイリストを空にしてから、選んだフォルダ配下を載せる。
+    /// 再帰追加の最中でも、別フォルダへの Enter で進行中の追加を中断して差し替える。
+    /// </summary>
     private void ReplaceLibraryFromExplorerFolder()
     {
         // 欠損（赤字）ルートの Enter はスルー。クリアだけ走ると空リストなのにメーターが出る。
@@ -4266,12 +4276,7 @@ public partial class MainWindow
             return;
         }
 
-        // 読み込み中の Enter 連打は無視（都度クリア＋世代更新で 1 曲しか残らない）。
-        if (_libraryFolderShowInProgress)
-        {
-            return;
-        }
-
+        // TryClear → CancelLibraryFolderShow で世代を進め、進行中の追加を破棄する。
         _libraryHoldJacketWash = true;
         if (!TryClearLibrarySessions())
         {
