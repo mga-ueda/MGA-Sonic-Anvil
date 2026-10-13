@@ -56,9 +56,9 @@ public sealed class TransportToolTipTests
         Assert.Contains("Enter でその場停止", UiStrings.TipPlay);
         Assert.Contains("停止中の動画／PDF は本再生／明るい表示", UiStrings.TipPlay);
         Assert.Contains("暗いプレビューへは Escape／Q", UiStrings.TipPlay);
-        Assert.Contains("F8／引数起動ミニでは Escape／Q でアプリ終了", UiStrings.TipPlay);
+        Assert.Contains("F8／引数起動ミニでは Escape／Q でプレイリストへ戻る", UiStrings.TipPlay);
         Assert.Contains("暗いプレビューへ戻す", UiStrings.TipRangeClick);
-        Assert.Contains("F8／引数起動ミニでは Escape／Q でアプリ終了", UiStrings.TipRangeClick);
+        Assert.Contains("F8／引数起動ミニでは Escape／Q でプレイリストへ戻る", UiStrings.TipRangeClick);
         Assert.Contains("範囲メトロノームはプレイヤーでは効かない", UiStrings.TipRangeClick);
         Assert.Contains("動画／PDF の本再生中やフレーム一時停止中", UiStrings.TipLibraryMaximizeOff);
         Assert.Contains("動画／PDF の本再生中やフレーム一時停止中の F10", UiStrings.TipWaveform);
@@ -124,7 +124,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("ダブルクリックで再生し、終わったら次の曲へ進む", UiStrings.TipLibraryList);
         Assert.Contains("F8 で動画／PDF ミニプレイヤー（前面 UI 無し。背面に動画または PDF があるとき＝本再生または暗いバックグラウンドプレビュー、かつ再生対象があるとき", UiStrings.TipLibraryList);
         Assert.Contains("開始位置へ戻して静止する（即再開しない）", UiStrings.TipLibraryList);
-        Assert.Contains("Escape／Q でアプリを終了する", UiStrings.TipLibraryList);
+        Assert.Contains("Escape／Q でプレイリストへ戻る", UiStrings.TipLibraryList);
         Assert.DoesNotContain("抜けは Escape／Q", UiStrings.TipLibraryList);
         Assert.Contains("F 全画面中でも可", UiStrings.TipLibraryList);
         Assert.Contains("窓枠のドラッグは連続拡縮", UiStrings.TipLibraryList);

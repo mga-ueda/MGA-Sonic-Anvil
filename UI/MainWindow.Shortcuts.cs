@@ -323,12 +323,12 @@ public partial class MainWindow
             return false;
         }
 
-        // 動画ミニ: Q／Escape で終了（一時停止や暗いプレビューへは落とさない）。
+        // 動画ミニ: Q／Escape でプレイリストへ戻る（本再生中は暗いプレビューへ。F10 と同じ）。
         if (IsVideoMiniPlayerActive()
             && !isRepeat
-            && LibraryPlayerMode.QuitsAppFromVideoMini(key, modifiers))
+            && LibraryPlayerMode.LeavesVideoMiniToPlaylist(key, modifiers))
         {
-            Close();
+            LeaveVideoMiniToPlaylist(minimalChrome: false);
             return true;
         }
 
@@ -552,7 +552,7 @@ public partial class MainWindow
             return true;
         }
 
-        // F10: 本再生／イマーシブ一時停止／PDF 明るい表示から暗いプレビューへ（Escape と同じ。動画ミニの Q は上で終了済み）。
+        // F10: 本再生／イマーシブ一時停止／PDF 明るい表示から暗いプレビューへ（Escape と同じ。動画ミニの Q は上でプレイリストへ戻済み）。
         if (IsLibraryMaximized
             && key == Key.Q
             && modifiers == ModifierKeys.None
