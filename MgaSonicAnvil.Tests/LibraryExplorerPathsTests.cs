@@ -90,6 +90,25 @@ public sealed class LibraryExplorerPathsTests
     }
 
     [Fact]
+    public void ExistingFolders_KeepsDirectories_DropsFilesAndMissing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "mga-anvil-exist-folders-" + Guid.NewGuid().ToString("N"));
+        var file = Path.Combine(root, "a.wav");
+        var missing = Path.Combine(Path.GetTempPath(), "mga-anvil-missing-folder-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        File.WriteAllBytes(file, [0]);
+        try
+        {
+            var folders = LibraryExplorerPaths.ExistingFolders([root, file, missing, root]);
+            Assert.Equal([Path.GetFullPath(root).TrimEnd('\\', '/')], folders);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void MoveSelected_Up_ShiftsBlockAndStopsAtTop()
     {
         var items = new List<string> { "a", "b", "c", "d" };
@@ -109,6 +128,20 @@ public sealed class LibraryExplorerPathsTests
 
         LibraryExplorerPaths.MoveSelected(items, new HashSet<string> { "c" }, 1);
         Assert.Equal(["a", "d", "b", "c"], items);
+    }
+
+    [Fact]
+    public void MoveSelectedToIndex_MovesBlockPreservingOrder()
+    {
+        var items = new List<string> { "a", "b", "c", "d" };
+        LibraryExplorerPaths.MoveSelectedToIndex(items, new HashSet<string> { "b", "c" }, 4);
+        Assert.Equal(["a", "d", "b", "c"], items);
+
+        LibraryExplorerPaths.MoveSelectedToIndex(items, new HashSet<string> { "b", "c" }, 0);
+        Assert.Equal(["b", "c", "a", "d"], items);
+
+        LibraryExplorerPaths.MoveSelectedToIndex(items, new HashSet<string> { "b", "c" }, 1);
+        Assert.Equal(["b", "c", "a", "d"], items);
     }
 
     [Fact]

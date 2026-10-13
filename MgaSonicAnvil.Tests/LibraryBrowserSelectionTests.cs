@@ -1143,6 +1143,87 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void ExplorerRoots_MoveAndDropRegister()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Path.Combine(Path.GetTempPath(), "mga-roots-a-" + Guid.NewGuid().ToString("N"));
+            var second = Path.Combine(Path.GetTempPath(), "mga-roots-b-" + Guid.NewGuid().ToString("N"));
+            var third = Path.Combine(Path.GetTempPath(), "mga-roots-c-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(first);
+            Directory.CreateDirectory(second);
+            Directory.CreateDirectory(third);
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([first, second]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+
+                var secondFull = Path.GetFullPath(second).TrimEnd('\\', '/');
+                var secondItem = Assert.Single(
+                    FindDescendants<TreeViewItem>(view),
+                    item => item.Tag is string tag
+                        && Path.GetFullPath(tag).TrimEnd('\\', '/')
+                            .Equals(secondFull, StringComparison.OrdinalIgnoreCase));
+                secondItem.IsSelected = true;
+                Flush();
+
+                var moved = 0;
+                view.ExplorerRootsChanged += (_, _) => moved++;
+                Assert.True(view.TryMoveSelectedExplorerRoots(-1));
+                Assert.Equal(1, moved);
+                Assert.Equal(
+                    [
+                        Path.GetFullPath(second).TrimEnd('\\', '/'),
+                        Path.GetFullPath(first).TrimEnd('\\', '/'),
+                    ],
+                    view.ExplorerRoots.Select(path => Path.GetFullPath(path).TrimEnd('\\', '/')).ToArray());
+
+                Assert.False(view.TryMoveSelectedExplorerRoots(-1));
+
+                Assert.True(view.TryReorderExplorerRoots([second], 2));
+                Assert.Equal(
+                    [
+                        Path.GetFullPath(first).TrimEnd('\\', '/'),
+                        Path.GetFullPath(second).TrimEnd('\\', '/'),
+                    ],
+                    view.ExplorerRoots.Select(path => Path.GetFullPath(path).TrimEnd('\\', '/')).ToArray());
+
+                var file = Path.Combine(third, "skip.wav");
+                File.WriteAllBytes(file, [0]);
+                moved = 0;
+                view.AddExplorerRootPaths([third, file]);
+                Assert.Equal(1, moved);
+                Assert.Contains(
+                    Path.GetFullPath(third).TrimEnd('\\', '/'),
+                    view.ExplorerRoots.Select(path => Path.GetFullPath(path).TrimEnd('\\', '/')));
+            }
+            finally
+            {
+                window?.Close();
+                foreach (var path in new[] { first, second, third })
+                {
+                    if (Directory.Exists(path))
+                    {
+                        Directory.Delete(path, recursive: true);
+                    }
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void Favorites_DoubleClick_AppendsWithoutClearing()
     {
         RunSta(() =>

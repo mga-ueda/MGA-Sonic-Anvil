@@ -188,6 +188,7 @@ internal static class LibraryPlayerMode
             (Key.Enter, ModifierKeys.None or ModifierKeys.Alt) => true,
             (Key.L, ModifierKeys.None) => true,
             (Key.N, ModifierKeys.None) => true,
+            (Key.N, ModifierKeys.Alt) => true,
             (Key.P, ModifierKeys.None) => true,
             (Key.P, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.R, ModifierKeys.None) => true,
@@ -255,7 +256,7 @@ internal static class LibraryPlayerMode
 
     /// <summary>
     /// プレイリスト非表示の映像本再生／ミニ／PDF 本表示では、曲末で次へ進まず先頭で停止する。
-    /// プレイリストが見えているときは連続再生してよい。次へは明示の N／P・テンキー 4／6。
+    /// プレイリストが見えていて次の曲を自動再生がオンなら連続再生してよい。次へは明示の N／P・テンキー 4／6。
     /// </summary>
     public static bool HaltsAtEndWithoutPlaylistAdvance(
         bool chromeVisible,
@@ -364,6 +365,10 @@ internal static class LibraryPlayerMode
     public static bool IsExplorerCollapseSubtree(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && key is Key.Divide or Key.Oem2;
 
+    /// <summary>ツリーのルート並び替え。設定の「上へ／下へ」と同じ。Alt+↑／↓。</summary>
+    public static bool IsExplorerRootReorder(Key key, ModifierKeys modifiers) =>
+        key is Key.Up or Key.Down && modifiers == ModifierKeys.Alt;
+
     /// <summary>
     /// フォルダツリーで拒否するキー（切り取り／貼り付け／削除／リネーム等）。コピーとナビと Enter 以外はここで止める。
     /// </summary>
@@ -390,6 +395,11 @@ internal static class LibraryPlayerMode
         }
 
         if (IsExplorerExpandAll(key, modifiers) || IsExplorerCollapseSubtree(key, modifiers))
+        {
+            return false;
+        }
+
+        if (IsExplorerRootReorder(key, modifiers))
         {
             return false;
         }

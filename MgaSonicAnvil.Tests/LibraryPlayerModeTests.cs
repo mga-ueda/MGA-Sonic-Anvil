@@ -324,6 +324,7 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsPlayerShuttleKey(Key.OemComma, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsPlayerShuttleKey(Key.OemPeriod, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.N, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.N, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.P, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.P, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsForceVideoProxyEncode(Key.P, ModifierKeys.Control | ModifierKeys.Shift));
@@ -379,6 +380,11 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Left, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Enter, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Enter, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsExplorerRootReorder(Key.Up, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.IsExplorerRootReorder(Key.Down, ModifierKeys.Alt));
+        Assert.False(LibraryPlayerMode.IsExplorerRootReorder(Key.Up, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Up, ModifierKeys.Alt));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Down, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.Space, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Space, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.PlaysLibrarySelectionOnSpace(explorerFocused: true, favoritesFocused: false));

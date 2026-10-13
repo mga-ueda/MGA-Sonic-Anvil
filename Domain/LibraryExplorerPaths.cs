@@ -112,6 +112,42 @@ internal static class LibraryExplorerPaths
 
     public static string[] SerializeRoots(IEnumerable<string> roots) => ResolveRoots(roots.ToArray());
 
+    /// <summary>ドロップなどから存在するフォルダだけを取る（ファイルは無視）。</summary>
+    public static string[] ExistingFolders(IEnumerable<string>? paths)
+    {
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (paths is null)
+        {
+            return [];
+        }
+
+        foreach (var raw in paths)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                continue;
+            }
+
+            try
+            {
+                var full = Path.GetFullPath(raw.Trim())
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (!Directory.Exists(full) || !seen.Add(full))
+                {
+                    continue;
+                }
+
+                result.Add(full);
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+            }
+        }
+
+        return [.. result];
+    }
+
     /// <summary>展開していたフォルダ。無いパスは落とす。並びはフルパス。</summary>
     public static string[] ResolveExpanded(IEnumerable<string>? saved)
     {
@@ -178,6 +214,56 @@ internal static class LibraryExplorerPaths
             {
                 (items[i], items[i + 1]) = (items[i + 1], items[i]);
             }
+        }
+    }
+
+    /// <summary>
+    /// 選択を insertIndex（移動前の「この位置の前へ」）へまとめて移す。相対順は保つ。
+    /// </summary>
+    public static void MoveSelectedToIndex<T>(IList<T> items, IReadOnlySet<T> selected, int insertIndex)
+        where T : notnull
+    {
+        if (items.Count < 2 || selected.Count == 0)
+        {
+            return;
+        }
+
+        var moved = new List<T>();
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (selected.Contains(items[i]))
+            {
+                moved.Add(items[i]);
+            }
+        }
+
+        if (moved.Count == 0 || moved.Count == items.Count)
+        {
+            return;
+        }
+
+        var removedBefore = 0;
+        var limit = Math.Clamp(insertIndex, 0, items.Count);
+        for (var i = 0; i < limit; i++)
+        {
+            if (selected.Contains(items[i]))
+            {
+                removedBefore++;
+            }
+        }
+
+        for (var i = items.Count - 1; i >= 0; i--)
+        {
+            if (selected.Contains(items[i]))
+            {
+                items.RemoveAt(i);
+            }
+        }
+
+        var to = Math.Clamp(limit - removedBefore, 0, items.Count);
+        for (var i = 0; i < moved.Count; i++)
+        {
+            items.Insert(to + i, moved[i]);
         }
     }
 

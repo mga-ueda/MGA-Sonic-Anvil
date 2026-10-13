@@ -77,6 +77,9 @@ public sealed class TransportToolTipTests
         Assert.Contains("Ctrl+C", UiStrings.TipLibraryExplorer);
         Assert.Contains("エクスプローラーで開く", UiStrings.TipLibraryExplorer);
         Assert.Contains("ツリーのルートに登録", UiStrings.TipLibraryExplorer);
+        Assert.Contains("ツリーへドロップ", UiStrings.TipLibraryExplorer);
+        Assert.Contains("Alt+↑／↓", UiStrings.TipLibraryExplorer);
+        Assert.Contains("ドラッグして並び替え", UiStrings.TipLibraryExplorer);
         Assert.Contains("赤字", UiStrings.TipLibraryExplorer);
         Assert.Contains("Shift+↑↓", UiStrings.TipLibraryExplorer);
         Assert.Contains("Shift+クリック", UiStrings.TipLibraryExplorer);

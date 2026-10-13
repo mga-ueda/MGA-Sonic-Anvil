@@ -186,6 +186,7 @@ public partial class MainWindow : Window
         };
         LoadBrandLogo();
         Loaded += (_, _) => AlignBrandLicense();
+        UipiFileDrop.Attach(this, OnUipiFilesDropped);
         if (LaunchFiles.StartupHasVideo())
         {
             BeginVideoLaunchSession();
@@ -1150,6 +1151,60 @@ public partial class MainWindow : Window
     /// <summary>
     /// ファイル／フォルダのドロップ。F10 / F11 / F12 / 通常表示を問わず同じ。
     /// </summary>
+    /// <summary>
+    /// 管理者起動時など OLE が拒否されても、WM_DROPFILES 経由で来るドロップ。
+    /// </summary>
+    private void OnUipiFilesDropped(string[] paths)
+    {
+        if (paths.Length == 0 || IsUiBusy)
+        {
+            return;
+        }
+
+        // WndProc からでも UI スレッドで処理する。
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (IsUiBusy)
+            {
+                return;
+            }
+
+            var screen = GetCursorScreenPoint();
+            if (IsLibraryMaximized)
+            {
+                if (LibraryBrowser.IsScreenPointOverExplorer(screen))
+                {
+                    LibraryBrowser.AddExplorerRootPaths(paths);
+                    return;
+                }
+
+                if (LibraryBrowser.IsScreenPointOverFavorites(screen))
+                {
+                    LibraryBrowser.AddFavoritePaths(paths);
+                    return;
+                }
+            }
+
+            OpenPaths(paths);
+        });
+    }
+
+    private static Point GetCursorScreenPoint()
+    {
+        GetCursorPos(out var p);
+        return new Point(p.X, p.Y);
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out NativePoint lpPoint);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
     private void MainWindow_DragOver(object sender, DragEventArgs e)
     {
         if (IsUiBusy)
@@ -1159,11 +1214,19 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (IsLibraryMaximized
-            && e.OriginalSource is System.Windows.DependencyObject treeOrigin
-            && LibraryBrowser.IsExplorerOrigin(treeOrigin))
+        // ツリー: ルート並び替え／エクスプローラーからのフォルダ登録。
+        // Preview で Effects を付けないと禁止カーソルのままになる。
+        // Explorer は同ドライブ等で Move のみ許可することがあり、Copy 固定だと禁止になる。
+        if (IsLibraryMaximized && LibraryBrowser.IsPointerOverExplorer(e))
         {
-            e.Effects = DragDropEffects.None;
+            if (LibraryBrowser.TryAcceptExplorerRootReorder(e))
+            {
+                return;
+            }
+
+            e.Effects = CanAcceptDroppedFolders(e)
+                ? PickDropEffect(e.AllowedEffects)
+                : DragDropEffects.None;
             e.Handled = true;
             return;
         }
@@ -1189,11 +1252,20 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (IsLibraryMaximized
-            && e.OriginalSource is System.Windows.DependencyObject treeOrigin
-            && LibraryBrowser.IsExplorerOrigin(treeOrigin))
+        // ツリー: 並び替え、または外部フォルダのルート登録。プレイリストへは足さない。
+        if (IsLibraryMaximized && LibraryBrowser.IsPointerOverExplorer(e))
         {
+            if (LibraryBrowser.TryDropExplorerRootReorder(e))
+            {
+                return;
+            }
+
             e.Handled = true;
+            if (TryGetDroppedFolders(e, out var folders))
+            {
+                LibraryBrowser.AddExplorerRootPaths(folders);
+            }
+
             return;
         }
 
@@ -1221,6 +1293,70 @@ public partial class MainWindow : Window
         return IsLibraryMaximized
             ? AudioCodec.CanAcceptPlayerDrop(files)
             : AudioCodec.CanAcceptDrop(files);
+    }
+
+    /// <summary>
+    /// 登録は複製ではないが、DnD 効果は Copy / Move / Link のどれかがあれば受ける。
+    /// </summary>
+    private static DragDropEffects PickDropEffect(DragDropEffects allowed)
+    {
+        if ((allowed & DragDropEffects.Copy) != 0)
+        {
+            return DragDropEffects.Copy;
+        }
+
+        if ((allowed & DragDropEffects.Move) != 0)
+        {
+            return DragDropEffects.Move;
+        }
+
+        if ((allowed & DragDropEffects.Link) != 0)
+        {
+            return DragDropEffects.Link;
+        }
+
+        return DragDropEffects.None;
+    }
+
+    private static bool CanAcceptDroppedFolders(DragEventArgs e)
+    {
+        // DragOver 中の GetData は失敗することがある。FileDrop があれば一旦許可し、Drop でフォルダだけ取る。
+        try
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                return true;
+            }
+
+            // シェルが FileDrop 以外で渡す場合。
+            foreach (var format in e.Data.GetFormats(autoConvert: true))
+            {
+                if (format.Contains("FileName", StringComparison.OrdinalIgnoreCase)
+                    || format.Contains("FileDrop", StringComparison.OrdinalIgnoreCase)
+                    || format.Contains("FileGroupDescriptor", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryGetDroppedFolders(DragEventArgs e, out string[] folders)
+    {
+        folders = [];
+        if (!TryReadDroppedPaths(e, out var files))
+        {
+            return false;
+        }
+
+        folders = LibraryExplorerPaths.ExistingFolders(files);
+        return folders.Length > 0;
     }
 
     private bool TryGetDroppedAudio(DragEventArgs e, out string[] paths)

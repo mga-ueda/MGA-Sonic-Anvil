@@ -125,6 +125,8 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly Border _treeFocusLine = CreatePaneFocusLine();
     private readonly Border _favoritesFocusLine = CreatePaneFocusLine();
     private readonly Border _listFocusLine = CreatePaneFocusLine();
+    /// <summary>フォルダツリー＋見出し。ルート登録ドロップの当たり判定用。</summary>
+    private FrameworkElement? _explorerDropHost;
     private readonly ObservableCollection<LibraryFavoriteRow> _favorites = [];
     private readonly HashSet<TreeViewItem> _treeMultiSelected = [];
     private TreeViewItem? _treeSelectionAnchor;
@@ -245,6 +247,8 @@ internal sealed class LibraryBrowserView : UserControl
     private Point? _treeDragStart;
     private TreeViewItem? _treeDragItem;
     private string[] _treeDragPaths = [];
+    /// <summary>DoDragDrop 中だけ。OLE 経由だとカスタム形式が消えるのでフィールドで持つ。</summary>
+    private string[] _explorerRootReorderDrag = [];
     private TreeViewItem? _treePendingSingleSelect;
     private bool _treeRangeBusy;
     private Point? _favoritesDragStart;
@@ -488,6 +492,55 @@ internal sealed class LibraryBrowserView : UserControl
 
         return false;
     }
+
+    /// <summary>
+    /// ドラッグ中の OriginalSource がツリー外扱いになることがあるので、座標でも見る。
+    /// </summary>
+    public bool IsPointerOverExplorer(DragEventArgs e)
+    {
+        if (e.OriginalSource is System.Windows.DependencyObject origin
+            && IsExplorerOrigin(origin))
+        {
+            return true;
+        }
+
+        var host = _explorerDropHost ?? (FrameworkElement)_folderTree;
+        try
+        {
+            var p = e.GetPosition(host);
+            return IsInside(host, p);
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>WM_DROPFILES 用。スクリーン座標がフォルダツリー帯か。</summary>
+    public bool IsScreenPointOverExplorer(Point screenPoint) =>
+        IsScreenPointOver(_explorerDropHost ?? (FrameworkElement)_folderTree, screenPoint);
+
+    /// <summary>WM_DROPFILES 用。スクリーン座標がお気に入り帯か。</summary>
+    public bool IsScreenPointOverFavorites(Point screenPoint) =>
+        IsScreenPointOver(_favoritesList, screenPoint);
+
+    private static bool IsScreenPointOver(FrameworkElement host, Point screenPoint)
+    {
+        try
+        {
+            return IsInside(host, host.PointFromScreen(screenPoint));
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsInside(FrameworkElement host, Point local) =>
+        local.X >= 0
+        && local.Y >= 0
+        && local.X <= host.ActualWidth
+        && local.Y <= host.ActualHeight;
 
     public bool IsFavoritesOrigin(System.Windows.DependencyObject? origin)
     {
@@ -2661,9 +2714,13 @@ internal sealed class LibraryBrowserView : UserControl
         AddFavoritePaths(folders);
     }
 
-    public void AddSelectedExplorerToRoots()
+    public void AddSelectedExplorerToRoots() =>
+        AddExplorerRootPaths(SelectedExplorerFolders);
+
+    /// <summary>エクスプローラーからのドロップなどでツリーのルートへ追加。</summary>
+    public void AddExplorerRootPaths(IEnumerable<string> paths)
     {
-        var folders = SelectedExplorerFolders;
+        var folders = LibraryExplorerPaths.ExistingFolders(paths);
         if (folders.Length == 0)
         {
             return;
@@ -2702,6 +2759,208 @@ internal sealed class LibraryBrowserView : UserControl
         SetExplorerRoots(next);
         ExplorerRootsChanged?.Invoke(this, _explorerRoots);
     }
+
+    /// <summary>
+    /// 選択中のルートを設定の「上へ／下へ」と同じく1段動かす。ルート以外の選択は無視。端では動かない。
+    /// </summary>
+    public bool TryMoveSelectedExplorerRoots(int direction)
+    {
+        if (direction == 0 || _explorerRoots.Length < 2)
+        {
+            return false;
+        }
+
+        var selected = SelectedExplorerRootSet();
+        if (selected.Count == 0)
+        {
+            return false;
+        }
+
+        var items = _explorerRoots.ToList();
+        var before = items.ToArray();
+        LibraryExplorerPaths.MoveSelected(items, selected, direction);
+        return ApplyExplorerRootsOrder(items, before, selected);
+    }
+
+    /// <summary>ドラッグドロップでルートを insertIndex（移動前の位置）へ移す。</summary>
+    public bool TryReorderExplorerRoots(IEnumerable<string> draggedPaths, int insertIndex)
+    {
+        if (_explorerRoots.Length < 2)
+        {
+            return false;
+        }
+
+        var want = new HashSet<string>(
+            draggedPaths.Select(NormalizeFolderPath),
+            StringComparer.OrdinalIgnoreCase);
+        var selected = _explorerRoots
+            .Where(root => want.Contains(NormalizeFolderPath(root)))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (selected.Count == 0)
+        {
+            return false;
+        }
+
+        var items = _explorerRoots.ToList();
+        var before = items.ToArray();
+        LibraryExplorerPaths.MoveSelectedToIndex(items, selected, insertIndex);
+        return ApplyExplorerRootsOrder(items, before, selected);
+    }
+
+    /// <summary>設定のルートリストと同じ。plain DataObject 用（OLE 経由だと消える）。</summary>
+    internal const string ExplorerRootReorderFormat = "Mga.LibraryExplorerRootReorder";
+
+    internal bool IsExplorerRootReorderActive =>
+        _explorerRootReorderDrag.Length > 0;
+
+    internal bool IsExplorerRootReorderData(System.Windows.IDataObject data) =>
+        IsExplorerRootReorderActive
+        || data.GetDataPresent(ExplorerRootReorderFormat);
+
+    internal bool TryAcceptExplorerRootReorder(DragEventArgs e)
+    {
+        if (!IsExplorerRootReorderData(e.Data))
+        {
+            return false;
+        }
+
+        // 設定と同じ Move 優先。無ければ Allowed にある効果で受ける（禁止カーソル回避）。
+        if ((e.AllowedEffects & DragDropEffects.Move) != 0)
+        {
+            e.Effects = DragDropEffects.Move;
+        }
+        else if ((e.AllowedEffects & DragDropEffects.Copy) != 0)
+        {
+            e.Effects = DragDropEffects.Copy;
+        }
+        else
+        {
+            e.Effects = DragDropEffects.None;
+        }
+
+        e.Handled = true;
+        return e.Effects != DragDropEffects.None;
+    }
+
+    internal bool TryDropExplorerRootReorder(DragEventArgs e)
+    {
+        if (!IsExplorerRootReorderData(e.Data))
+        {
+            return false;
+        }
+
+        e.Handled = true;
+        var dragged = _explorerRootReorderDrag;
+        if (dragged.Length == 0
+            && e.Data.GetData(ExplorerRootReorderFormat) is string[] fromData)
+        {
+            dragged = fromData;
+        }
+
+        if (dragged.Length == 0)
+        {
+            return false;
+        }
+
+        var insert = ExplorerRootDropIndex(e.GetPosition(_folderTree));
+        return TryReorderExplorerRoots(dragged, insert);
+    }
+
+    private bool ApplyExplorerRootsOrder(
+        IList<string> items,
+        IReadOnlyList<string> before,
+        IReadOnlyCollection<string> selectAfter)
+    {
+        if (before.SequenceEqual(items, StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var next = LibraryExplorerPaths.ResolveRoots(items.ToArray());
+        if (next.SequenceEqual(_explorerRoots, StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        _explorerRoots = next;
+        if (_explorerSearchGroups.Count > 0)
+        {
+            ApplyExplorerSearchSync(_explorerSearchCommitted);
+        }
+        else
+        {
+            BuildExplorerRoots();
+        }
+
+        SelectExplorerRootPaths(selectAfter);
+        ExplorerRootsChanged?.Invoke(this, _explorerRoots);
+        return true;
+    }
+
+    private HashSet<string> SelectedExplorerRootSet()
+    {
+        var selectedPaths = new HashSet<string>(
+            SelectedExplorerFolders.Select(NormalizeFolderPath),
+            StringComparer.OrdinalIgnoreCase);
+        return _explorerRoots
+            .Where(root => selectedPaths.Contains(NormalizeFolderPath(root)))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private int ExplorerRootDropIndex(Point point)
+    {
+        TreeViewItem? over = null;
+        foreach (var item in _folderTree.Items.OfType<TreeViewItem>())
+        {
+            if (item.Tag is not string)
+            {
+                continue;
+            }
+
+            try
+            {
+                var topLeft = item.TranslatePoint(new Point(0, 0), _folderTree);
+                var height = item.ActualHeight > 0 ? item.ActualHeight : item.RenderSize.Height;
+                if (height <= 0)
+                {
+                    continue;
+                }
+
+                if (point.Y >= topLeft.Y && point.Y < topLeft.Y + height)
+                {
+                    over = item;
+                    break;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        if (over is null)
+        {
+            return _folderTree.Items.Count;
+        }
+
+        var index = _folderTree.Items.IndexOf(over);
+        if (index < 0)
+        {
+            return _folderTree.Items.Count;
+        }
+
+        try
+        {
+            var top = over.TranslatePoint(new Point(0, 0), _folderTree).Y;
+            var height = over.ActualHeight > 0 ? over.ActualHeight : over.RenderSize.Height;
+            return point.Y > top + (height / 2d) ? index + 1 : index;
+        }
+        catch (InvalidOperationException)
+        {
+            return index;
+        }
+    }
+
+    internal IReadOnlyList<string> ExplorerRoots => _explorerRoots;
 
     internal bool SelectionContainsExplorerRoot()
     {
@@ -2782,7 +3041,10 @@ internal sealed class LibraryBrowserView : UserControl
         ApplyFavoritesStyle();
         ImeComposition.Disable(_folderTree);
         ImeComposition.Disable(_favoritesList);
-        _folderTree.AllowDrop = false;
+        // ルート並び替え／外部フォルダ登録。ツリー本体に AllowDrop。
+        _folderTree.AllowDrop = true;
+        _folderTree.DragOver += FolderTree_DragOver;
+        _folderTree.Drop += FolderTree_Drop;
         _folderTree.SelectedItemChanged += FolderTree_SelectedItemChanged;
         _folderTree.MouseDoubleClick += FolderTree_MouseDoubleClick;
         _folderTree.PreviewMouseLeftButtonDown += FolderTree_PreviewMouseLeftButtonDown;
@@ -2852,6 +3114,11 @@ internal sealed class LibraryBrowserView : UserControl
         explorerPane.Children.Add(explorerHeader);
         explorerPane.Children.Add(_folderTree);
         var treeHost = new Grid { Background = Brushes.Transparent };
+        // 見出し上へのドロップもルート登録として受け取る。
+        treeHost.AllowDrop = true;
+        treeHost.DragOver += FolderTree_DragOver;
+        treeHost.Drop += FolderTree_Drop;
+        _explorerDropHost = treeHost;
         treeHost.Children.Add(explorerPane);
         treeHost.Children.Add(_treeFocusLine);
         Grid.SetRow(treeHost, 0);
@@ -4186,6 +4453,45 @@ internal sealed class LibraryBrowserView : UserControl
         ApplyTreeMultiSelectChrome();
     }
 
+    /// <summary>トップレベルのルート項目だけを選び直す（欠損ルートも可）。</summary>
+    private void SelectExplorerRootPaths(IReadOnlyCollection<string> paths)
+    {
+        var want = new HashSet<string>(
+            paths.Select(NormalizeFolderPath),
+            StringComparer.OrdinalIgnoreCase);
+        _treeMultiSelected.Clear();
+        _treeSelectionAnchor = null;
+        _treeSyncing = true;
+        try
+        {
+            TreeViewItem? last = null;
+            foreach (var item in _folderTree.Items.OfType<TreeViewItem>())
+            {
+                if (item.Tag is not string path
+                    || !want.Contains(NormalizeFolderPath(path)))
+                {
+                    continue;
+                }
+
+                item.IsSelected = true;
+                _treeMultiSelected.Add(item);
+                last = item;
+            }
+
+            if (last is not null)
+            {
+                _treeSelectionAnchor = last;
+                last.BringIntoView();
+            }
+        }
+        finally
+        {
+            _treeSyncing = false;
+        }
+
+        ApplyTreeMultiSelectChrome();
+    }
+
     private void SelectFolderPath(string target)
     {
         var full = NormalizeFolderPath(target);
@@ -4515,6 +4821,14 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
+        if (key is Key.Up or Key.Down && modifiers == ModifierKeys.Alt)
+        {
+            ClearExplorerTypeahead();
+            TryMoveSelectedExplorerRoots(key == Key.Up ? -1 : 1);
+            e.Handled = true;
+            return;
+        }
+
         if (key is Key.Up or Key.Down
             && modifiers is ModifierKeys.None or ModifierKeys.Shift)
         {
@@ -4599,6 +4913,71 @@ internal sealed class LibraryBrowserView : UserControl
         Walk(_folderTree.Items);
     }
 
+    private void FolderTree_DragOver(object sender, DragEventArgs e)
+    {
+        if (TryAcceptExplorerRootReorder(e))
+        {
+            return;
+        }
+
+        // 外部からのフォルダ登録。中身は Drop で選別。効果は AllowedEffects と交差させる。
+        try
+        {
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effects = DragDropEffects.None;
+            }
+            else if ((e.AllowedEffects & DragDropEffects.Copy) != 0)
+            {
+                e.Effects = DragDropEffects.Copy;
+            }
+            else if ((e.AllowedEffects & DragDropEffects.Move) != 0)
+            {
+                e.Effects = DragDropEffects.Move;
+            }
+            else if ((e.AllowedEffects & DragDropEffects.Link) != 0)
+            {
+                e.Effects = DragDropEffects.Link;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+        }
+        catch (Exception)
+        {
+            e.Effects = DragDropEffects.None;
+        }
+
+        e.Handled = true;
+    }
+
+    private void FolderTree_Drop(object sender, DragEventArgs e)
+    {
+        if (TryDropExplorerRootReorder(e))
+        {
+            return;
+        }
+
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            return;
+        }
+
+        try
+        {
+            if (e.Data.GetData(DataFormats.FileDrop) is string[] dropped)
+            {
+                e.Handled = true;
+                AddExplorerRootPaths(dropped);
+            }
+        }
+        catch (Exception)
+        {
+            e.Handled = true;
+        }
+    }
+
     private void FolderTree_PreviewMouseMove(object sender, MouseEventArgs e)
     {
         if (_treeDragStart is null
@@ -4611,7 +4990,12 @@ internal sealed class LibraryBrowserView : UserControl
         var paths = _treeDragPaths.Length > 0
             ? _treeDragPaths
             : SelectedExplorerTransferPaths();
-        if (paths.Length == 0)
+        var item = _treeDragItem;
+        var reorderRoots = IsExplorerRootItem(item)
+            ? ExplorerRootPathsForDrag(item)
+            : [];
+        // コピー先が無くても、ルート並び替えドラッグは始める（欠損ルートなど）。
+        if (paths.Length == 0 && reorderRoots.Length == 0)
         {
             return;
         }
@@ -4623,9 +5007,69 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        var item = _treeDragItem;
         ClearTreeDrag();
-        BeginFileCopyDrag(item, paths);
+        BeginExplorerDrag(item, paths, reorderRoots);
+    }
+
+    /// <summary>トップレベル（_folderTree.Items）の項目か。</summary>
+    private bool IsExplorerRootItem(TreeViewItem item)
+    {
+        foreach (var root in _folderTree.Items.OfType<TreeViewItem>())
+        {
+            if (ReferenceEquals(root, item))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private string[] ExplorerRootPathsForDrag(TreeViewItem item)
+    {
+        var selected = SelectedExplorerRootSet();
+        if (item.Tag is string path)
+        {
+            var full = _explorerRoots.FirstOrDefault(root =>
+                string.Equals(
+                    NormalizeFolderPath(root),
+                    NormalizeFolderPath(path),
+                    StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(full))
+            {
+                selected.Add(full);
+            }
+        }
+
+        // ルート配列の並びを保つ。
+        return [.. _explorerRoots.Where(selected.Contains)];
+    }
+
+    private void BeginExplorerDrag(
+        DependencyObject source,
+        string[] copyPaths,
+        string[] reorderRoots)
+    {
+        if (reorderRoots.Length == 0)
+        {
+            BeginFileCopyDrag(source, copyPaths);
+            return;
+        }
+
+        // 設定のルートリストと同じ: plain DataObject + Move のみ。
+        // OLE コピー用オブジェクトに載せると形式が消え、禁止カーソルになる。
+        _explorerRootReorderDrag = reorderRoots;
+        try
+        {
+            DragDrop.DoDragDrop(
+                _folderTree,
+                new DataObject(ExplorerRootReorderFormat, reorderRoots),
+                DragDropEffects.Move);
+        }
+        finally
+        {
+            _explorerRootReorderDrag = [];
+        }
     }
 
     private void FolderTree_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e) =>
