@@ -643,15 +643,23 @@ internal static class LibraryPlayerMode
     /// <summary>
     /// 動画 HUD（A）でも、空プレイリストのメーター／WAAPI は出さない。
     /// 波形ホストは isMeterChrome=false のまま HUD に従う。
+    /// 空リスト時の出し入れアニメは <see cref="MeterFadeSeconds"/>（アウト 1 秒）。
     /// </summary>
     public static bool HidesPlayerMeterHud(bool hideHud, bool showMeters, bool isMeterChrome) =>
         hideHud || (isMeterChrome && !showMeters);
 
     /// <summary>
     /// 音声信号で動くメーターはフェードせず即出す。停止中の追加だけ 1 秒フェード。
+    /// 消すときは常にフェード（即消しは Snap／モード切替側）。
     /// </summary>
     public static bool InstantPlayerMeterReveal(bool show, bool signalMoving) =>
         show && signalMoving;
+
+    /// <summary>
+    /// メーター表示切替の instant。インだけ信号即出しを許し、アウトは常にアニメ。
+    /// </summary>
+    public static bool InstantPlayerMeterFade(bool show, bool instantReveal) =>
+        show && instantReveal;
 
     /// <summary>
     /// プレイヤー突入は消えた状態から。空リストで一度出してフェードアウトしない。
