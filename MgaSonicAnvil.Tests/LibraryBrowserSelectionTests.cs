@@ -1627,6 +1627,66 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void AutoPlayNextEnabled_ToggleWorksWhenPlaylistEmpty()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            Assert.Equal(0, view.BoundRowCount);
+            view.ToggleAutoPlayNext();
+            Assert.True(view.AutoPlayNextEnabled);
+            view.ToggleAutoPlayNext();
+            Assert.False(view.AutoPlayNextEnabled);
+        });
+    }
+
+    [Fact]
+    public void AutoPlayNextEnabled_DefaultsOff()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            Assert.False(view.AutoPlayNextEnabled);
+        });
+    }
+
+    [Fact]
+    public void LabelLibraryAutoPlayNext_IsEnglishWithoutShortcut()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Equal("Auto next", UiStrings.LabelLibraryAutoPlayNext);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlayNext));
+            Assert.DoesNotContain("Alt+", UiStrings.LabelLibraryAutoPlayNext, StringComparison.OrdinalIgnoreCase);
+            UiStrings.SetLanguage(UiLanguage.English);
+            Assert.Equal("Auto next", UiStrings.LabelLibraryAutoPlayNext);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlayNext));
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
+    public void ResetAutoPlayNext_TurnsOffAfterEnable()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            view.AutoPlayNextEnabled = true;
+            Assert.True(view.AutoPlayNextEnabled);
+            view.ResetAutoPlayNext();
+            Assert.False(view.AutoPlayNextEnabled);
+        });
+    }
+
+    [Fact]
     public void ColumnHeader_MarksSortedColumn()
     {
         RunSta(() =>

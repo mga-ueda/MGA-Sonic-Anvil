@@ -44,7 +44,10 @@ public partial class MainWindow
     private int _libraryWavePaintTicket;
     private CancellationTokenSource _libraryPeakCts = new();
     private int _libraryFolderShowGeneration;
-    /// <summary>フォルダ再帰追加の実行中。Enter 連打で置換が重なり 1 曲で打ち切られるのを防ぐ。</summary>
+    /// <summary>
+    /// フォルダ再帰追加の実行中。
+    /// Shift+Enter／ドロップ追加は重ねない。Enter（クリアして追加）は Cancel して差し替える。
+    /// </summary>
     private bool _libraryFolderShowInProgress;
     private int _gaplessToken;
     private DocumentSession? _gaplessTarget;
@@ -516,6 +519,7 @@ public partial class MainWindow
         {
             LibraryBrowser.ClearPdfBackgroundPin();
             LibraryBrowser.ResetShuffle();
+            LibraryBrowser.ResetAutoPlayNext();
             LibraryBrowser.UseWindowFallbackWash();
             ApplyLibraryWashChrome(true);
         }
@@ -2802,6 +2806,7 @@ public partial class MainWindow
             || !IsPlaybackActive()
             || _activeSession is null
             || _libraryStopAfterTrack
+            || !LibraryBrowser.AutoPlayNextEnabled
             || LibraryPlaylistDocuments.IsVisual(_activeSession.Document))
         {
             return;
@@ -2958,7 +2963,10 @@ public partial class MainWindow
 
     private bool AdoptLibraryGaplessAdvance()
     {
-        if (!IsLibraryMaximized || _libraryStopAfterTrack || !_player.HasGaplessAdvancePending)
+        if (!IsLibraryMaximized
+            || _libraryStopAfterTrack
+            || !LibraryBrowser.AutoPlayNextEnabled
+            || !_player.HasGaplessAdvancePending)
         {
             return false;
         }
@@ -3008,7 +3016,7 @@ public partial class MainWindow
 
     private bool TryAdvanceLibraryPlaylist()
     {
-        if (_libraryStopAfterTrack)
+        if (_libraryStopAfterTrack || !LibraryBrowser.AutoPlayNextEnabled)
         {
             return false;
         }
@@ -4145,6 +4153,23 @@ public partial class MainWindow
         if (IsLibraryMaximized && IsPlaybackActive())
         {
             ScheduleLibraryGaplessPrefetch();
+        }
+    }
+
+    private void LibraryBrowser_AutoPlayNextChanged(object? sender, EventArgs e)
+    {
+        if (!IsLibraryMaximized || !IsPlaybackActive())
+        {
+            return;
+        }
+
+        if (LibraryBrowser.AutoPlayNextEnabled)
+        {
+            ScheduleLibraryGaplessPrefetch();
+        }
+        else
+        {
+            CancelLibraryGapless();
         }
     }
 

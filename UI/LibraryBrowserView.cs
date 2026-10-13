@@ -142,9 +142,12 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly TextBox _playlistSearchBox = new();
     private readonly TextBlock _playlistSearchHint = new();
     private readonly CheckBox _shuffleCheck = new();
+    private readonly CheckBox _autoPlayNextCheck = new();
     private readonly LibraryPlaylistShuffle _shuffle = new();
     private bool _shuffleEnabled;
     private bool _shuffleBusy;
+    private bool _autoPlayNextEnabled;
+    private bool _autoPlayNextBusy;
     private readonly List<string[]> _playlistSearchGroups = [];
     private readonly List<string[]> _explorerSearchGroups = [];
     private string _explorerSearchCommitted = string.Empty;
@@ -849,6 +852,18 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void ResetShuffle() => SetShuffleEnabled(false, raise: false);
 
+    public bool AutoPlayNextEnabled
+    {
+        get => _autoPlayNextEnabled;
+        set => SetAutoPlayNextEnabled(value, raise: true);
+    }
+
+    public event EventHandler? AutoPlayNextChanged;
+
+    public void ToggleAutoPlayNext() => AutoPlayNextEnabled = !AutoPlayNextEnabled;
+
+    public void ResetAutoPlayNext() => SetAutoPlayNextEnabled(false, raise: false);
+
     private void SetShuffleEnabled(bool enabled, bool raise)
     {
         var changed = _shuffleEnabled != enabled;
@@ -879,6 +894,35 @@ internal sealed class LibraryBrowserView : UserControl
         if (changed && raise)
         {
             ShuffleChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void SetAutoPlayNextEnabled(bool enabled, bool raise)
+    {
+        var changed = _autoPlayNextEnabled != enabled;
+        if (!changed && _autoPlayNextCheck.IsChecked == enabled)
+        {
+            return;
+        }
+
+        _autoPlayNextEnabled = enabled;
+
+        if (_autoPlayNextCheck.IsChecked != enabled)
+        {
+            _autoPlayNextBusy = true;
+            try
+            {
+                _autoPlayNextCheck.IsChecked = enabled;
+            }
+            finally
+            {
+                _autoPlayNextBusy = false;
+            }
+        }
+
+        if (changed && raise)
+        {
+            AutoPlayNextChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -1873,10 +1917,12 @@ internal sealed class LibraryBrowserView : UserControl
         TipService.Set(_explorerSearchBox, UiStrings.TipLibraryExplorerSearch);
         TipService.Set(_playlistSearchBox, UiStrings.TipLibraryPlaylistSearch);
         TipService.Set(_shuffleCheck, UiStrings.TipLibraryShuffle);
+        TipService.Set(_autoPlayNextCheck, UiStrings.TipLibraryAutoPlayNext);
         _explorerLabel.Text = UiStrings.LibraryExplorerLabel;
         _favoritesLabel.Text = UiStrings.LibraryFavoritesLabel;
         _playlistLabel.Text = UiStrings.LibraryPlaylistLabel;
         _shuffleCheck.Content = UiStrings.LabelLibraryShuffle;
+        _autoPlayNextCheck.Content = UiStrings.LabelLibraryAutoPlayNext;
         _explorerSearchHint.Text = UiStrings.LibrarySearchHint;
         _playlistSearchHint.Text = UiStrings.LibrarySearchHint;
         RebuildExplorerContextMenu();
@@ -3189,6 +3235,19 @@ internal sealed class LibraryBrowserView : UserControl
         _shuffleCheck.Unchecked += ShuffleCheck_Changed;
         DockPanel.SetDock(_shuffleCheck, Dock.Right);
         bar.Children.Add(_shuffleCheck);
+
+        _autoPlayNextCheck.Style = TryFindResource("DarkCheckBoxStyle") as Style;
+        _autoPlayNextCheck.Content = UiStrings.LabelLibraryAutoPlayNext;
+        _autoPlayNextCheck.IsChecked = false;
+        _autoPlayNextCheck.Focusable = false;
+        _autoPlayNextCheck.VerticalAlignment = VerticalAlignment.Center;
+        _autoPlayNextCheck.FontSize = 11;
+        _autoPlayNextCheck.Margin = new Thickness(8, 0, 0, 0);
+        _autoPlayNextCheck.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
+        _autoPlayNextCheck.Checked += AutoPlayNextCheck_Changed;
+        _autoPlayNextCheck.Unchecked += AutoPlayNextCheck_Changed;
+        DockPanel.SetDock(_autoPlayNextCheck, Dock.Right);
+        bar.Children.Add(_autoPlayNextCheck);
 
         _playlistLabel.VerticalAlignment = VerticalAlignment.Center;
         _playlistLabel.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -7182,6 +7241,16 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         SetShuffleEnabled(_shuffleCheck.IsChecked == true, raise: true);
+    }
+
+    private void AutoPlayNextCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_autoPlayNextBusy)
+        {
+            return;
+        }
+
+        SetAutoPlayNextEnabled(_autoPlayNextCheck.IsChecked == true, raise: true);
     }
 
     private bool TryPatchBoundRows(IReadOnlyList<LibraryFileRow> rows)

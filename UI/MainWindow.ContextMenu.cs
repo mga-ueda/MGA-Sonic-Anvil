@@ -197,6 +197,7 @@ public partial class MainWindow
             PlayExit = WaapiBar.PlayPostExitChecked,
             RangeClick = _rangeClickEnabled,
             Shuffle = LibraryBrowser.ShuffleEnabled,
+            AutoPlayNext = LibraryBrowser.AutoPlayNextEnabled,
             KeepTarget = WaapiBar.KeepTargetChecked,
             AutoActive = WaapiBar.AutoActiveChecked,
             CanKeepTarget = WaapiBar.KeepTargetToggleEnabled,
@@ -452,6 +453,9 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.Shuffle:
                 LibraryBrowser.ToggleShuffle();
+                break;
+            case WaveMenuCommand.AutoPlayNext:
+                LibraryBrowser.ToggleAutoPlayNext();
                 break;
             case WaveMenuCommand.RangeClick:
                 ToggleRangeClick();

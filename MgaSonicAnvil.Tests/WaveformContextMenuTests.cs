@@ -163,6 +163,8 @@ public sealed class WaveformContextMenuTests
             Assert.True(Find(tree, WaveMenuCommand.RangeClick)?.Checkable);
             Assert.Contains(WaveMenuCommand.Shuffle, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
             Assert.Equal("Alt+R", Find(tree, WaveMenuCommand.Shuffle)?.Gesture);
+            Assert.Contains(WaveMenuCommand.AutoPlayNext, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
+            Assert.Equal("Alt+N", Find(tree, WaveMenuCommand.AutoPlayNext)?.Gesture);
             Assert.Contains(WaveMenuCommand.WaapiPanel, CommandsIn(tree, UiStrings.WaveMenuCatWwise));
             Assert.Equal("Alt+W", Find(tree, WaveMenuCommand.WaapiPanel)?.Gesture);
             Assert.Contains(WaveMenuCommand.KeepTarget, CommandsIn(tree, UiStrings.WaveMenuCatWwise));

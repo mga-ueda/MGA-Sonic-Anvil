@@ -58,6 +58,7 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.Restart
             or WaveMenuCommand.LoopPlay
             or WaveMenuCommand.Shuffle
+            or WaveMenuCommand.AutoPlayNext
             or WaveMenuCommand.GoStart
             or WaveMenuCommand.GoEnd
             or WaveMenuCommand.ViewLeft
@@ -324,6 +325,13 @@ internal static class LibraryPlayerMode
     /// </summary>
     public static bool IsShuffleToggle(Key key, ModifierKeys modifiers) =>
         key == Key.R && modifiers == ModifierKeys.Alt;
+
+    /// <summary>
+    /// 次の曲を自動再生の切替。プレイリストが空でも、ツリー／お気に入りフォーカスでも効く。
+    /// 検索欄では文字入力のまま。素の N は次の曲のまま。
+    /// </summary>
+    public static bool IsAutoPlayNextToggle(Key key, ModifierKeys modifiers) =>
+        key == Key.N && modifiers == ModifierKeys.Alt;
 
     /// <summary>前の曲／次の曲（テンキー 4／6 と同じ。ノートPC向け）。</summary>
     public static bool IsPlayerTrackStepKey(Key key, ModifierKeys modifiers) =>
@@ -1347,7 +1355,7 @@ internal static class LibraryPlayerMode
         }
 
         // Enter／Space は表示解除として別処理する。
-        if (IsShuffleToggle(key, modifiers))
+        if (IsShuffleToggle(key, modifiers) || IsAutoPlayNextToggle(key, modifiers))
         {
             return true;
         }

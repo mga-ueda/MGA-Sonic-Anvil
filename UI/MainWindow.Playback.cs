@@ -27,7 +27,7 @@ public partial class MainWindow
             case TransportCommand.TogglePlayback:
                 if (IsLibraryMaximized)
                 {
-                    // エディタの Space と同じ（単独再生／停止で開始位置へ）。連続再生はダブルクリック。
+                    // エディタの Space と同じ（単独再生／停止で開始位置へ）。曲末の次送りは自動再生チェック。
                     PlayLibrarySelectionOnceOrToggle();
                 }
                 else
@@ -1851,6 +1851,7 @@ public partial class MainWindow
             Waveform.ClearPlayerScratchAll();
 
             LibraryBrowser.ShuffleEnabled = false;
+            LibraryBrowser.AutoPlayNextEnabled = false;
 
             if (IsPlaybackActive())
             {

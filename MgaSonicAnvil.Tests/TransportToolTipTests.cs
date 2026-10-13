@@ -126,7 +126,8 @@ public sealed class TransportToolTipTests
         Assert.Contains("Enter はその場停止", UiStrings.TipLibraryList);
         Assert.Contains("停止中の動画／PDF は Space と同じく本再生／明るい表示へ", UiStrings.TipLibraryList);
         Assert.Contains("本再生中の動画はその場停止", UiStrings.TipLibraryList);
-        Assert.Contains("ダブルクリックで再生し、終わったら次の曲へ進む", UiStrings.TipLibraryList);
+        Assert.Contains("ダブルクリックで再生する（次の曲を自動再生がオンなら終わったら次へ進む", UiStrings.TipLibraryList);
+        Assert.Contains("Alt+N で次の曲を自動再生", UiStrings.TipLibraryList);
         Assert.Contains("F8 で動画／PDF ミニプレイヤー（前面 UI 無し。背面に動画または PDF があるとき＝本再生または暗いバックグラウンドプレビュー、かつ再生対象があるとき", UiStrings.TipLibraryList);
         Assert.Contains("開始位置へ戻して静止する（即再開しない）", UiStrings.TipLibraryList);
         Assert.Contains("Escape／Q でプレイリストへ戻る", UiStrings.TipLibraryList);

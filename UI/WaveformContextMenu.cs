@@ -68,6 +68,7 @@ internal enum WaveMenuCommand
     LoopPlay,
     PlayExit,
     Shuffle,
+    AutoPlayNext,
     Record,
     RangeClick,
     GoStart,
@@ -186,6 +187,7 @@ internal sealed class WaveformContextMenuModel
     public bool PlayExit { get; init; }
     public bool RangeClick { get; init; }
     public bool Shuffle { get; init; }
+    public bool AutoPlayNext { get; init; }
     public bool KeepTarget { get; init; }
     public bool AutoActive { get; init; }
     public bool CanKeepTarget { get; init; }
@@ -256,6 +258,7 @@ internal sealed class WaveformContextMenuModel
         PlayExit = true,
         RangeClick = true,
         Shuffle = true,
+        AutoPlayNext = true,
         KeepTarget = true,
         AutoActive = true,
         CanKeepTarget = true,
@@ -540,6 +543,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuLoopPlay, WaveMenuCommand.LoopPlay, "L", m.CanLoopPlay),
         Check(UiStrings.WaveMenuRangeClick, WaveMenuCommand.RangeClick, "Q", m.RangeClick, m.CanEdit),
         Check(UiStrings.WaveMenuShuffle, WaveMenuCommand.Shuffle, "Alt+R", m.Shuffle, m.LibraryMaximized && !m.IsBusy),
+        Check(UiStrings.WaveMenuAutoPlayNext, WaveMenuCommand.AutoPlayNext, "Alt+N", m.AutoPlayNext, m.LibraryMaximized && !m.IsBusy),
         WaveMenuSeparatorEntry.Instance,
         Check(UiStrings.WaveMenuRecord, WaveMenuCommand.Record, "Ctrl+R", m.IsRecording, m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
