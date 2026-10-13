@@ -1572,15 +1572,39 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
-    public void LabelLibraryShuffle_HasNoAccessKey()
+    public void LabelLibraryShuffle_IsEnglishWithoutShortcut()
     {
         var previous = UiStrings.Language;
         try
         {
             UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Equal("Random", UiStrings.LabelLibraryShuffle);
             Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryShuffle));
+            Assert.DoesNotContain("Alt+", UiStrings.LabelLibraryShuffle, StringComparison.OrdinalIgnoreCase);
             UiStrings.SetLanguage(UiLanguage.English);
+            Assert.Equal("Random", UiStrings.LabelLibraryShuffle);
             Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryShuffle));
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
+    public void LibraryGroupChrome_IsEnglishRegardlessOfLanguage()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Equal("Group", UiStrings.LibraryGroupLabel);
+            Assert.Equal("Parent folder", UiStrings.LibraryGroupFolder);
+            Assert.Equal("None", UiStrings.LibraryGroupNone);
+            UiStrings.SetLanguage(UiLanguage.English);
+            Assert.Equal("Group", UiStrings.LibraryGroupLabel);
+            Assert.Equal("Parent folder", UiStrings.LibraryGroupFolder);
+            Assert.Equal("None", UiStrings.LibraryGroupNone);
         }
         finally
         {
