@@ -310,11 +310,11 @@
         <h4>Library</h4>
         <ul>
           <li>Opened files are listed without loading every waveform at once. Names, times, and similar info are read when files are added. Playlist columns are chosen separately for WAVE, MP3, and video in Settings → Shown. Empty columns hide automatically; waveform width is on the same Shown tab.</li>
-          <li>The tree on the left starts at Music and remembers the last folder, which folders were expanded, and the split with Favorites. Missing tree roots and missing Favorites entries show in red. Drop files or folders from Explorer onto Favorites to register them.</li>
+          <li>The tree on the left starts at Music and remembers the last folder, which folders were expanded, and the split with Favorites. Missing tree roots and missing Favorites entries show in red. Drop folders from Explorer onto the tree to register roots; drop files or folders onto Favorites to register them. Reorder roots with <kbd>Alt</kbd>+↑ / ↓ or by dragging a root within the tree.</li>
           <li>Splitters and scrollbars appear when the pointer nears them, then fade out after about 3 s of no movement. Selecting a folder does not add it to the list.</li>
           <li><kbd>*</kbd> expands all under the selection. <kbd>/</kbd> collapses it.</li>
           <li>With the tree focused, type the start of a folder name to jump to it. Keep typing to narrow. About 1 s idle starts over. This does not add to the playlist.</li>
-          <li>Enter on the tree clears the playlist, then adds that folder recursively. While searching, only visible folders: matching files when the hit is a file name, or everything in a folder whose name matched. Depth-first. Playback starts with the first file registered.</li>
+          <li>Enter on the tree clears the playlist, then adds that folder recursively. Enter on another folder while a large load is in progress cancels it and replaces the playlist. While searching, only visible folders: matching files when the hit is a file name, or everything in a folder whose name matched. Depth-first. Playback starts with the first file registered.</li>
           <li>Shift+Enter, double-click, or dropping a folder onto the list adds them recursively.</li>
         </ul>
         <h4>Waveform</h4>
@@ -979,7 +979,7 @@
           <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same as right-click on the tree, Favorites, and playlist. On the waveform the menu opens, but edit commands stay disabled</td></tr>
           <tr><td><kbd>Delete</kbd></td><td>Remove selected rows from the list (files are never deleted; Ctrl+Z undoes it; leaving the player forgets undo; when the list has keyboard focus. <kbd>Ctrl</kbd>+<kbd>W</kbd> does not close. Disabled during real video playback / bright PDF view and other chrome-hidden states). When Favorites has focus, removes the registration only</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Select every row in the list (disabled during real video playback / bright PDF view and other chrome-hidden states)</td></tr>
-          <tr><td>Favorites <kbd>Enter</kbd></td><td>Clear the playlist, add the selected favorites, and play (focuses the playlist when playback starts)</td></tr>
+          <tr><td>Favorites <kbd>Enter</kbd></td><td>Clear the playlist, add the selected favorites, and play (cancels and replaces if a load is already in progress; focuses the playlist when playback starts)</td></tr>
           <tr><td>Favorites <kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>Append selected favorites to the playlist only</td></tr>
         </tbody>
       </table>
