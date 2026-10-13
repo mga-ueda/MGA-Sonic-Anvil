@@ -636,6 +636,14 @@ public partial class MainWindow
                 return true;
             }
 
+            // 設定のルート「上へ／下へ」と同じ並び替え。
+            if (LibraryPlayerMode.IsExplorerRootReorder(key, modifiers))
+            {
+                LibraryBrowser.ClearExplorerTypeahead();
+                LibraryBrowser.TryMoveSelectedExplorerRoots(key == Key.Up ? -1 : 1);
+                return true;
+            }
+
             if (LibraryPlayerMode.ExplorerOwnsHorizontal(key, modifiers))
             {
                 StopPlaybackShuttle();
