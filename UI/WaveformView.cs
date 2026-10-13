@@ -2950,7 +2950,7 @@ internal sealed class WaveformView : Grid
             LaneWaveColors(),
             LaneGapPx(dpi.DpiScaleY),
             playerLight: SeekAndSelectOnly && UiThemeService.Painted == UiTheme.Light,
-            shadeLanes: SeekAndSelectOnly,
+            shadeLanes: false,
             omitCueFills: !LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly),
             colStart: xStart,
             colEnd: xEnd);
