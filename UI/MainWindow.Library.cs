@@ -628,7 +628,7 @@ public partial class MainWindow
 
         if (_playerMetersShown == show)
         {
-            if (show && instantReveal)
+            if (LibraryPlayerMode.InstantPlayerMeterFade(show, instantReveal))
             {
                 ApplyPlayerMeterFade(visible: true, instant: true);
             }
@@ -636,7 +636,8 @@ public partial class MainWindow
             return;
         }
 
-        ApplyPlayerMeterFade(show, instantReveal);
+        // インは再生中即表示／停止中 1 秒。アウトは常に 1 秒（突入スナップは上で処理済み）。
+        ApplyPlayerMeterFade(show, LibraryPlayerMode.InstantPlayerMeterFade(show, instantReveal));
         _playerMetersShown = show;
     }
 
@@ -909,16 +910,18 @@ public partial class MainWindow
         var showMeters = LibraryPlayerMode.ShowsPlayerMeters(_sessions.Count);
         foreach (var target in PlaylistVideoHudTargets())
         {
-            // 空プレイリストでは A トグル HUD でも WAAPI／アナライザを出さない。
-            var hide = LibraryPlayerMode.HidesPlayerMeterHud(
-                hideHud,
-                showMeters,
-                isMeterChrome: IsPlayerMeterHudTarget(target));
+            // 空リストの WAAPI／アナライザは SyncPlayerMeterFade（アウト 1 秒）に任せる。
+            // ここで 0.2 秒フェードすると、先に始まった 1 秒アウトを潰す。
+            if (IsPlayerMeterHudTarget(target) && !showMeters)
+            {
+                continue;
+            }
+
             LibraryPlayerMode.FadeElementOpacity(
                 target,
-                hide ? 0 : 1,
+                hideHud ? 0 : 1,
                 instant,
-                hitTestVisible: !hide,
+                hitTestVisible: !hideHud,
                 seconds: LibraryPlayerMode.ChromeFadeSeconds);
         }
     }

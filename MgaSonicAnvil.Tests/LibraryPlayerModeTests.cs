@@ -603,6 +603,11 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.InstantPlayerMeterReveal(show: false, signalMoving: true));
         Assert.False(LibraryPlayerMode.InstantPlayerMeterReveal(show: true, signalMoving: false));
         Assert.True(LibraryPlayerMode.InstantPlayerMeterReveal(show: true, signalMoving: true));
+        // アウトは常に 1 秒フェード（instantReveal が残っていても即消ししない）。
+        Assert.False(LibraryPlayerMode.InstantPlayerMeterFade(show: false, instantReveal: true));
+        Assert.False(LibraryPlayerMode.InstantPlayerMeterFade(show: false, instantReveal: false));
+        Assert.True(LibraryPlayerMode.InstantPlayerMeterFade(show: true, instantReveal: true));
+        Assert.False(LibraryPlayerMode.InstantPlayerMeterFade(show: true, instantReveal: false));
         Assert.True(LibraryPlayerMode.SnapPlayerMetersHiddenOnEnter(enteringPlayer: true, instantReveal: false));
         Assert.False(LibraryPlayerMode.SnapPlayerMetersHiddenOnEnter(enteringPlayer: true, instantReveal: true));
         Assert.False(LibraryPlayerMode.SnapPlayerMetersHiddenOnEnter(enteringPlayer: false, instantReveal: false));
