@@ -1778,6 +1778,20 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void ShouldPlayFolderFirstImmediately_AudioYes_VisualNo()
+    {
+        Assert.True(MainWindow.ShouldPlayFolderFirstImmediately(@"C:\music\a.wav"));
+        Assert.True(MainWindow.ShouldPlayFolderFirstImmediately(@"C:\music\a.mp3"));
+        Assert.True(MainWindow.ShouldPlayFolderFirstImmediately(@"C:\music\a.m4a"));
+        Assert.False(MainWindow.ShouldPlayFolderFirstImmediately(@"C:\music\a.mp4"));
+        Assert.False(MainWindow.ShouldPlayFolderFirstImmediately(@"C:\music\a.mov"));
+        Assert.False(MainWindow.ShouldPlayFolderFirstImmediately(@"C:\music\a.pdf"));
+        Assert.False(MainWindow.ShouldPlayFolderFirstImmediately(null));
+        Assert.False(MainWindow.ShouldPlayFolderFirstImmediately(""));
+        Assert.False(MainWindow.ShouldPlayFolderFirstImmediately("   "));
+    }
+
+    [Fact]
     public void SetSessions_PinsCollectionViewCurrentToSelection_NotFirstRow()
     {
         RunSta(() =>

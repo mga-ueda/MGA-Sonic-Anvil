@@ -93,6 +93,10 @@ public sealed class TransportToolTipTests
         Assert.Contains("Space ではプレイリストの再生を始めない", UiStrings.TipLibraryFavorites);
         Assert.Contains("プレイリストをアクティブにする", UiStrings.TipLibraryExplorer);
         Assert.Contains("プレイリストをアクティブにする", UiStrings.TipLibraryFavorites);
+        Assert.Contains("見つけ次第再生", UiStrings.TipLibraryExplorer);
+        Assert.Contains("動画／PDF は全件追加後", UiStrings.TipLibraryExplorer);
+        Assert.Contains("先頭が音声なら見つけ次第", UiStrings.TipLibraryFavorites);
+        Assert.Contains("動画／PDF は全件追加後", UiStrings.TipLibraryFavorites);
         Assert.Contains("Ctrl+C", UiStrings.TipLibraryList);
         Assert.Contains("エクスプローラーで開く", UiStrings.TipLibraryList);
         Assert.Contains("枠ごと隠す", UiStrings.TipLibraryList);
