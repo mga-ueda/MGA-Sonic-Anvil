@@ -1106,11 +1106,13 @@ internal static partial class UiStrings
         LibraryFileColumn.AlbumArtist => Get("アルバム\nアーティスト", "Album\nartist"),
         _ => LibraryColumnLabel(column),
     };
-    public static string LibraryGroupLabel => Get("グループ", "Group");
+    /// <summary>プレイリスト上段のグループラベル。UI 言語に関わらず英語（Auto next / Random と同じ）。</summary>
+    public static string LibraryGroupLabel => "Group";
     public static string LibraryExplorerLabel => Get("ライブラリ", "Library");
     public static string LibraryPlaylistLabel => Get("プレイリスト", "Playlist");
     public static string LibrarySearchHint => Get("検索", "Find");
-    public static string LabelLibraryShuffle => Get("ランダム再生 (Alt+R)", "Shuffle (Alt+R)");
+    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（Tips 側）。Alt+R 連想のため Random。</summary>
+    public static string LabelLibraryShuffle => "Random";
     public static string TipLibraryShuffle => Get(
         "ランダム再生 (Alt+R)\nプレイリストを一通り再生し終わるまで同じ曲を繰り返さない。すべて再生したら再度抽選する。既定はオフ。プレイリストが空でも切替できる。プレイヤーを抜けるとオフに戻す。設定には記憶しない。",
         "Shuffle (Alt+R)\nDoes not repeat a track until the whole playlist has played once. After that, the order is reshuffled. Off by default. Works when the playlist is empty. Leaving player turns it off. Not saved in settings.");
@@ -1137,17 +1139,18 @@ internal static partial class UiStrings
     public static string LibraryMenuCopyFileName => Get("ファイル名をコピー", "Copy File Name");
     public static string LibraryMenuCopyFilePath => Get("フルパスをコピー", "Copy Full Path");
     public static string LibraryMenuOpenInExplorer => Get("エクスプローラーで開く", "Open in Explorer");
-    public static string LibraryGroupNone => Get("なし", "None");
-    public static string LibraryGroupTitle => Get("タイトル", "Title");
-    public static string LibraryGroupArtist => Get("アーティスト", "Artist");
-    public static string LibraryGroupAlbum => Get("アルバム", "Album");
-    public static string LibraryGroupGenre => Get("ジャンル", "Genre");
-    public static string LibraryGroupYear => Get("年", "Year");
-    public static string LibraryGroupKind => Get("種類", "Kind");
-    public static string LibraryGroupSampleRate => Get("レート", "Sample rate");
-    public static string LibraryGroupBitDepth => Get("ビット深度", "Bit depth");
-    public static string LibraryGroupChannels => Get("チャンネル", "Channels");
-    public static string LibraryGroupFolder => Get("親フォルダ", "Parent folder");
+    /// <summary>プレイリスト上段のグループコンボ。UI 言語に関わらず英語。</summary>
+    public static string LibraryGroupNone => "None";
+    public static string LibraryGroupTitle => "Title";
+    public static string LibraryGroupArtist => "Artist";
+    public static string LibraryGroupAlbum => "Album";
+    public static string LibraryGroupGenre => "Genre";
+    public static string LibraryGroupYear => "Year";
+    public static string LibraryGroupKind => "Kind";
+    public static string LibraryGroupSampleRate => "Sample rate";
+    public static string LibraryGroupBitDepth => "Bit depth";
+    public static string LibraryGroupChannels => "Channels";
+    public static string LibraryGroupFolder => "Parent folder";
     public static string LibraryGroupUntitled => Get("(未保存)", "(Untitled)");
     public static string LibraryGroupBlank => Get("(なし)", "(None)");
     public static string LibraryJacketMark => "✓";
