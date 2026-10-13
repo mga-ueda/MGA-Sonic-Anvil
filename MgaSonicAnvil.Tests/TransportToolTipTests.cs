@@ -107,6 +107,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("画像が無いときのプレースホルダは出さない", UiStrings.TipLibraryList);
         Assert.Contains("PDF / MOV / MP4 / AVI / MKV / WebM / MPG", UiStrings.TipLibraryPlaylistDocuments);
         Assert.Contains("動画は既定オフ", UiStrings.TipLibraryPlaylistDocuments);
+        Assert.Contains("波形・アナライザ・WAAPI 表記・ファイル名", UiStrings.TipLibraryPlaylistDocuments);
         Assert.Contains("1秒でフェードイン", UiStrings.TipLibraryList);
         Assert.Contains("即表示", UiStrings.TipLibraryList);
         Assert.Contains("最初から消す", UiStrings.TipLibraryList);
@@ -133,6 +134,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("+／-", UiStrings.TipLibraryList);
         Assert.Contains("F11／F12 へ移るとき動画／PDF はファイルごと持ち込まない", UiStrings.TipLibraryList);
         Assert.Contains("A／T の表示は F8 と引数起動で共通に覚え", UiStrings.TipLibraryList);
+        Assert.Contains("A で波形とアナライザと WAAPI 表記をフェード", UiStrings.TipLibraryList);
         Assert.Contains("プレイリストからの本再生は開始時オン", UiStrings.TipLibraryList);
         Assert.Contains("F9 でプレイリストと波形だけを出す", UiStrings.TipLibraryList);
         Assert.Contains("ステータスバーは出さない", UiStrings.TipLibraryList);

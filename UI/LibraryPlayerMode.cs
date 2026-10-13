@@ -1025,7 +1025,7 @@ internal static class LibraryPlayerMode
     public static bool LeavesVideoMiniToPlaylist(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && key is Key.Escape or Key.Q;
 
-    /// <summary>波形・アナライザ・ファイル名の表示切替（タイムコードは含まない）。</summary>
+    /// <summary>波形・アナライザ・WAAPI 表記・ファイル名の表示切替（タイムコードは含まない）。</summary>
     public static bool IsVideoHudToggle(Key key, ModifierKeys modifiers) =>
         key == Key.A && modifiers == ModifierKeys.None;
 

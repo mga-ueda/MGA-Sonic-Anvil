@@ -892,8 +892,9 @@ public partial class MainWindow
     {
         foreach (var target in PlaylistVideoHudTargets())
         {
-            // 波形はメーター非表示条件でも HUD オンなら出す。
+            // 波形／WAAPI 表記はメーター非表示条件でも HUD オンなら出す。
             if (ReferenceEquals(target, WaveformHostBorder)
+                || ReferenceEquals(target, MeterTopSlot)
                 || LibraryPlayerMode.ShowsPlayerMeters(_sessions.Count))
             {
                 if (LibraryPlayerMode.NeedsForcedOpaque(target))
@@ -1496,8 +1497,9 @@ public partial class MainWindow
             HistoryStrip,
         ];
 
+    /// <summary>A トグルで出す／消す HUD。波形・アナライザに加え WAAPI 表記（MeterTopSlot）も含む。</summary>
     private UIElement[] PlaylistVideoHudTargets() =>
-        [WaveformHostBorder, LevelMeter, VectorScope, Spectrum, LoudnessMeter];
+        [WaveformHostBorder, MeterTopSlot, LevelMeter, VectorScope, Spectrum, LoudnessMeter];
 
     private void SyncPlaylistVideoUiShadows(bool chromeVisible, bool hideHud)
     {
