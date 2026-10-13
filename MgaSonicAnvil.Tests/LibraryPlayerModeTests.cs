@@ -66,6 +66,7 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Manual));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ViewWaveform));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Shuffle));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AutoPlayNext));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ViewSpectrogram));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ViewOverlay));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ViewLoudness));
@@ -314,6 +315,10 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsShuffleToggle(Key.R, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.IsShuffleToggle(Key.R, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsShuffleToggle(Key.R, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsAutoPlayNextToggle(Key.N, ModifierKeys.Alt));
+        Assert.False(LibraryPlayerMode.IsAutoPlayNextToggle(Key.N, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsAutoPlayNextToggle(Key.N, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AutoPlayNext));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.R, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsPlayerRestartKey(Key.R, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPlayerRestartKey(Key.R, ModifierKeys.Alt));

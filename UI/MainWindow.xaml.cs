@@ -159,6 +159,7 @@ public partial class MainWindow : Window
         LibraryBrowser.ExplorerRootsChanged += LibraryBrowser_ExplorerRootsChanged;
         LibraryBrowser.FavoritesActivated += LibraryBrowser_FavoritesActivated;
         LibraryBrowser.ShuffleChanged += LibraryBrowser_ShuffleChanged;
+        LibraryBrowser.AutoPlayNextChanged += LibraryBrowser_AutoPlayNextChanged;
         LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
         LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;
         LibraryBrowser.SetVisibleColumnPresets(

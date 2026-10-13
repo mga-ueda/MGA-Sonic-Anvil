@@ -94,8 +94,10 @@ internal static partial class UiStrings
     public static string WaveMenuRestart => Get("やり直し再生(_A)", "Rest_art Playback");
     public static string WaveMenuLoopPlay => Get("ループ再生(_L)", "_Loop Play");
     public static string WaveMenuPlayExit => Get("Play -E(_X)", "Play -E (_X)");
-    /// <summary>再生カテゴリ内で Preroll(R) と重ならないよう U。ショートカット表示は R。</summary>
+    /// <summary>再生カテゴリ内で Preroll(R) と重ならないよう U。ショートカット表示は Alt+R。</summary>
     public static string WaveMenuShuffle => Get("ランダム再生(_U)", "Sh_uffle");
+    /// <summary>再生カテゴリ内で Restart(A)／GoEnd(N) と重ならないよう M。ショートカット表示は Alt+N。</summary>
+    public static string WaveMenuAutoPlayNext => Get("次の曲を自動再生(_M)", "Auto ne_xt");
     public static string WaveMenuRecord => Get("録音(_C)", "Re_cord");
     public static string WaveMenuGoStart => Get("先頭へ(_H)", "Go to Start (_H)");
     public static string WaveMenuGoEnd => Get("末尾へ(_N)", "Go to E_nd");

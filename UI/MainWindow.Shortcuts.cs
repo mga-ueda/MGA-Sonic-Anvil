@@ -393,6 +393,16 @@ public partial class MainWindow
             return true;
         }
 
+        // Alt+N は次の曲を自動再生。素の N（次の曲）より先、タイプアヘッドより先。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && LibraryPlayerMode.IsAutoPlayNextToggle(key, modifiers))
+        {
+            LibraryBrowser.ToggleAutoPlayNext();
+            return true;
+        }
+
         // Ctrl+Shift+P は動画プロキシの強制生成（設定の自動生成オフ／F8 抑止を無視）。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
