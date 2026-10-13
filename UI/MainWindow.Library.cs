@@ -715,7 +715,8 @@ public partial class MainWindow
         }
         else if (visible)
         {
-            // 状態フラグは見えるのに Opacity アニメで消えたまま、を起こさない。
+            // 状態フラグは見えるのに Opacity が固まったまま、を起こさない。
+            // フェードイン中の再 Sync（DimPreview の StateChanged ＋直後の Sync など）では触らない。
             EnsurePlaylistVideoChromeOpaque();
         }
 
@@ -874,7 +875,8 @@ public partial class MainWindow
         LibraryPlayerMode.FadeElementOpacity(RootDock, 1, instant: true, hitTestVisible: true);
         foreach (var target in PlaylistVideoChromeTargets())
         {
-            if (target.Opacity < 0.999 || !target.IsHitTestVisible)
+            // フェードイン中は NeedsForcedOpaque が false（本再生→暗いプレビュー復帰の 0.2s を守る）。
+            if (LibraryPlayerMode.NeedsForcedOpaque(target))
             {
                 LibraryPlayerMode.FadeElementOpacity(target, 1, instant: true, hitTestVisible: true);
             }
@@ -894,7 +896,7 @@ public partial class MainWindow
             if (ReferenceEquals(target, WaveformHostBorder)
                 || LibraryPlayerMode.ShowsPlayerMeters(_sessions.Count))
             {
-                if (target.Opacity < 0.999 || !target.IsHitTestVisible)
+                if (LibraryPlayerMode.NeedsForcedOpaque(target))
                 {
                     LibraryPlayerMode.FadeElementOpacity(target, 1, instant: true, hitTestVisible: true);
                 }

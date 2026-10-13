@@ -1080,6 +1080,26 @@ public sealed class LibraryPlayerModeTests
     }
 
     [Fact]
+    public void NeedsForcedOpaque_SkipsInFlightFadeIn()
+    {
+        RunSta(() =>
+        {
+            var box = new Rectangle { Opacity = 0 };
+            Assert.True(LibraryPlayerMode.NeedsForcedOpaque(box));
+            LibraryPlayerMode.FadeElementOpacity(box, 1, instant: false);
+            Assert.True(box.HasAnimatedProperties);
+            Assert.False(LibraryPlayerMode.NeedsForcedOpaque(box));
+            box.BeginAnimation(UIElement.OpacityProperty, null);
+            box.Opacity = 0;
+            box.IsHitTestVisible = false;
+            Assert.True(LibraryPlayerMode.NeedsForcedOpaque(box));
+            box.Opacity = 1;
+            box.IsHitTestVisible = true;
+            Assert.False(LibraryPlayerMode.NeedsForcedOpaque(box));
+        });
+    }
+
+    [Fact]
     public void HighlightsFormatValue_OnlyKnownNonDefaults()
     {
         Assert.Equal("PlayerFormatMismatchForeBrush", LibraryPlayerMode.FormatMismatchForeBrushKey);

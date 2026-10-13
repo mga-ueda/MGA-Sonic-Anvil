@@ -1406,6 +1406,21 @@ internal static class LibraryPlayerMode
         target.BeginAnimation(UIElement.OpacityProperty, anim);
     }
 
+    /// <summary>
+    /// フラグは見えるのに Opacity が 0 のまま固まったときだけ強制表示する。
+    /// フェードイン中（HasAnimatedProperties）は再 Sync で潰さない。
+    /// </summary>
+    public static bool NeedsForcedOpaque(UIElement target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        if (target.HasAnimatedProperties)
+        {
+            return false;
+        }
+
+        return target.Opacity < 0.999 || !target.IsHitTestVisible;
+    }
+
     /// <summary>映像の上に乗っているときだけ、読みやすいドロップシャドウ。</summary>
     public static void SetVideoUiShadow(UIElement target, bool on)
     {
