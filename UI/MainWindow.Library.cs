@@ -1362,7 +1362,7 @@ public partial class MainWindow
 
     /// <summary>
     /// Escape／Q で本再生／イマーシブ一時停止／PDF 明るい表示から暗いプレビューへ戻す（F10）。
-    /// 動画ミニの Escape／Q は Shortcut 側でアプリ終了する。
+    /// 動画ミニの Escape／Q は Shortcut 側でプレイリストへ戻す。
     /// </summary>
     private bool TryExitPlaylistRealPlayback()
     {
