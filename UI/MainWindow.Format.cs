@@ -20,6 +20,9 @@ public partial class MainWindow
     private bool _historyPasteBusy;
     private bool _tabMergeBusy;
     private bool _videoProxyBusy;
+    private bool _libraryCatalogWarmupBusy;
+    private CancellationTokenSource? _libraryCatalogWarmupCts;
+    private int _libraryCatalogWarmupGeneration;
 
     private bool IsUiBusy =>
         _formatConvertBusy
@@ -31,7 +34,8 @@ public partial class MainWindow
         || _historyPasteBusy
         || _tabBatchEditBusy
         || _tabMergeBusy
-        || _videoProxyBusy;
+        || _videoProxyBusy
+        || _libraryCatalogWarmupBusy;
 
     private void PromptFormatConvert(FormatConvertKind kind)
     {

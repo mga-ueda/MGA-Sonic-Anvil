@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Globalization;
 using System.Text;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.Audio;
@@ -15,12 +16,20 @@ internal static class AudioTagProbe
             return;
         }
 
-        if (document.SourcePath is { Length: > 0 } path
-            && File.Exists(path)
-            && TryRead(path, out var tags))
+        if (document.SourcePath is { Length: > 0 } path && File.Exists(path))
         {
-            document.ApplyTags(tags);
-            return;
+            if (LibraryCatalog.TryGetFreshTags(path, out var cached))
+            {
+                document.ApplyTags(cached);
+                return;
+            }
+
+            if (TryRead(path, out var tags))
+            {
+                document.ApplyTags(tags);
+                LibraryCatalog.UpsertTags(path, tags);
+                return;
+            }
         }
 
         document.ApplyTags(AudioFileTags.Empty);

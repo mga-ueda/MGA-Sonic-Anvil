@@ -482,6 +482,12 @@ public partial class MainWindow
 
     private bool TryRequestOpenCancel()
     {
+        if (_libraryCatalogWarmupBusy)
+        {
+            _libraryCatalogWarmupCts?.Cancel();
+            return true;
+        }
+
         if (_videoProxyBusy)
         {
             _videoProxyCts?.Cancel();

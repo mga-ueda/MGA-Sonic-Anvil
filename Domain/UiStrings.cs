@@ -600,6 +600,9 @@ internal static partial class UiStrings
     public static string OverlayExportWave => Get("Wave を書き出しています", "Exporting Wave");
     public static string OverlayExportMp3 => Get("MP3 を書き出しています", "Exporting MP3");
     public static string OverlaySave => Get("保存しています", "Saving");
+    public static string OverlayLibraryCatalog => Get(
+        "ライブラリ索引を更新しています（Esc で中断）",
+        "Updating library cache (Esc to stop)");
     public static string OverlayVideoProxy => Get(
         "動画プロキシを生成しています（Esc で中断）",
         "Creating video proxy (Esc to stop)");

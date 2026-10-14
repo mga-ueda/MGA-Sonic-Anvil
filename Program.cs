@@ -25,6 +25,7 @@ static class Program
         {
             LaunchFiles.SetStartup(files);
             AppStorage.Initialize();
+            LibraryCatalog.Initialize();
             SpectrogramCache.DeleteLeftoverTempFiles();
             LameEncoder.DeleteLeftoverTemps();
             VideoProxy.PruneExpired(
