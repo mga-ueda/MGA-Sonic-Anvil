@@ -3261,6 +3261,8 @@ internal sealed class LibraryBrowserView : UserControl
             return false;
         }
 
+        // ルート並べ替えは TreeViewItem を作り直すので、事前にフォーカス有無を覚える。
+        var keepFocus = _folderTree.IsKeyboardFocusWithin;
         _explorerRoots = next;
         if (_explorerSearchGroups.Count > 0)
         {
@@ -3272,6 +3274,12 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         SelectExplorerRootPaths(selectAfter);
+        if (keepFocus)
+        {
+            // Loaded／Input で再試行。作り直し直後の Focus 取りこぼしを防ぐ。
+            RequestExplorerFocus();
+        }
+
         ExplorerRootsChanged?.Invoke(this, _explorerRoots);
         return true;
     }
