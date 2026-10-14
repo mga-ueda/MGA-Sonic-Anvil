@@ -2102,14 +2102,11 @@ internal sealed class LibraryBrowserView : UserControl
             {
                 var bounds = element.TransformToAncestor(_grid)
                     .TransformBounds(new Rect(element.RenderSize));
-                var header = _grid.ColumnHeaderHeight;
-                if (double.IsNaN(header) || header <= 0)
+                var top = RowsViewportTop();
+                if (bounds.Top >= top && bounds.Bottom <= _grid.ActualHeight)
                 {
-                    header = 28;
-                }
-
-                if (bounds.Top >= header && bounds.Bottom <= _grid.ActualHeight)
-                {
+                    // ScrollIntoView は行だけをビューへ寄せ、先頭グループ名を列見出しの裏へ隠すことがある。
+                    RevealGroupHeaderIfNearlyClipped(item);
                     return;
                 }
             }
@@ -2119,6 +2116,67 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         _grid.ScrollIntoView(item);
+        var generation = _syncGeneration;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (generation == _syncGeneration)
+                {
+                    RevealGroupHeaderIfNearlyClipped(item);
+                }
+            },
+            DispatcherPriority.Loaded);
+    }
+
+    /// <summary>
+    /// グループ先頭行を <see cref="DataGrid.ScrollIntoView"/> したとき、
+    /// <see cref="ScrollUnit.Item"/> だと VerticalOffset=1 になり、グループ名だけが
+    /// 列見出し（ZIndex 付き）の裏へ隠れる。深い位置の選択では動かさない。
+    /// </summary>
+    private void RevealGroupHeaderIfNearlyClipped(object item)
+    {
+        if (_group == LibraryFileGroup.None
+            || FindDataGridScrollViewer() is not { } scroll
+            || _grid.ItemContainerGenerator.ContainerFromItem(item) is not DependencyObject row)
+        {
+            return;
+        }
+
+        var groupItem = FindAncestor<GroupItem>(row);
+        if (groupItem is null || FindDescendant<LibraryGroupHeader>(groupItem) is not { } header)
+        {
+            return;
+        }
+
+        try
+        {
+            var viewportTop = RowsViewportTop();
+            var headerTop = header.TransformToAncestor(_grid).Transform(new Point(0, 0)).Y;
+            var clipped = viewportTop - headerTop;
+            if (clipped <= 0.5)
+            {
+                return;
+            }
+
+            // グループ名の高さ＋余白ぶんだけ隠れているときだけ戻す（途中スクロールは触らない）。
+            var slack = Math.Max(header.ActualHeight, 1) + header.Margin.Top + header.Margin.Bottom + 2;
+            if (clipped > slack)
+            {
+                return;
+            }
+
+            // CanContentScroll（ScrollUnit.Item）のオフセットは項目単位。ピクセル減算はしない。
+            var next = scroll.CanContentScroll
+                ? Math.Max(0, scroll.VerticalOffset - 1)
+                : Math.Max(0, scroll.VerticalOffset - clipped);
+            if (Math.Abs(scroll.VerticalOffset - next) > 0.01)
+            {
+                scroll.ScrollToVerticalOffset(next);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
     }
 
     public void SelectAllRows()
@@ -2731,7 +2789,7 @@ internal sealed class LibraryBrowserView : UserControl
 
             _anchorIndex = _grid.SelectedIndex;
             PinSelectionCurrent();
-            _grid.ScrollIntoView(current);
+            EnsureRowVisible(current);
         }
         else
         {
