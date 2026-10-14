@@ -1612,58 +1612,130 @@ public partial class MainWindow
         AfterEdit();
     }
 
-    private void ApplyDeleteSilence()
+    private void ApplyDetectSilence()
     {
         if (_document is null)
         {
             return;
         }
 
-        // タブ選択中は選択ファイル全体の無音部分を一括削除する。無音の無いファイルはスキップ。
+        var savedAction = ClampSilenceDetectAction(AppStorage.Settings.SilenceDetectAction);
+        var savedOptions = AppStorage.Settings.ResolvedSilenceDetectOptions(
+            AppStorage.Settings.SilenceDetectEdgesOnly);
+
+        // タブ複数選択時はしきい値 UI を出さず、保存済み設定で一括適用するか確認だけする。
         if (HasTabSelection)
         {
-            var batchThresholdDb = AppStorage.Settings.ResolvedSilentSkipThresholdDb();
-            var batchFadeMs = AppStorage.Settings.ResolvedClickGuardFadeMs();
+            var targets = SelectedTabsInOrder();
+            if (targets.Length == 0)
+            {
+                return;
+            }
+
+            var answer = OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ConfirmSilenceDetectSelectedFiles(targets.Length),
+                UiStrings.DialogSilenceDetectTitle,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question,
+                MessageBoxResult.Yes);
+            if (answer != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
             TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
-                session.Document.FrameCount == 0
-                    ? null
-                    : ProcessEdits.DeleteSilence(
-                        session.Document,
-                        TabBatchRange(session.Document),
-                        batchThresholdDb,
-                        channelMask: TabBatchEditMask(session),
-                        fadeMs: batchFadeMs));
+            {
+                if (session.Document.FrameCount == 0)
+                {
+                    return null;
+                }
+
+                var action = savedAction;
+                if (action == SilenceDetectAction.CreateRegions
+                    && !session.Document.AllowsRegionsAndLoops)
+                {
+                    return null;
+                }
+
+                return BuildSilenceDetectCommand(
+                    session.Document,
+                    TabBatchRange(session.Document),
+                    savedOptions,
+                    TabBatchEditMask(session),
+                    action);
+            });
             return;
         }
 
+        // 波形選択があればその範囲、なければファイル全体（他の編集コマンドと同じ ActiveRange）。
         var range = ActiveRange();
         if (range.IsEmpty)
         {
-            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        var thresholdDb = AppStorage.Settings.ResolvedSilentSkipThresholdDb();
-        var command = ProcessEdits.DeleteSilence(
+        var dialog = SilenceDetectDialog.Show(
+            this,
             _document,
             range,
-            thresholdDb,
-            channelMask: EditMask(),
-            fadeMs: AppStorage.Settings.ResolvedClickGuardFadeMs());
-        if (command is null)
+            EditMask(),
+            savedOptions,
+            savedAction,
+            allowsRegions: _document.AllowsRegionsAndLoops,
+            selectionScoped: !_document.Selection.IsEmpty);
+        if (!dialog.Accepted)
         {
-            var remaining = SilentSkip.CopyAudibleRange(
-                _document.Interleaved,
-                _document.Channels,
-                range.StartFrame,
-                range.EndFrame,
-                SilentSkip.LinearFromDb(thresholdDb),
-                EditMask(),
-                SilentSkip.PeakWindowRadiusFrames(_document.SampleRate));
-            var remainingFrames = remaining.Length / Math.Max(1, _document.Channels);
+            return;
+        }
+
+        var options = dialog.Options.Normalized();
+        var action = dialog.Action;
+        AppStorage.Settings.RememberSilenceDetectOptions(options);
+        AppStorage.Settings.SilenceDetectAction = (int)action;
+        AppStorage.Save();
+
+        // ダイアログ表示中に選択が変わっても、開いたときの範囲で実行する。
+        if (action == SilenceDetectAction.CreateRegions && !_document.AllowsRegionsAndLoops)
+        {
             OwnerCenteredMessageBox.Show(
                 this,
-                remainingFrames == 0 && DeletesWholeFile(range)
+                UiStrings.ErrorMp3NoRegionLoop,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var command = BuildSilenceDetectCommand(
+            _document,
+            range,
+            options,
+            EditMask(),
+            action);
+        if (command is null)
+        {
+            if (action is SilenceDetectAction.CreateRegions or SilenceDetectAction.CreateMarkers)
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    UiStrings.ErrorNoSilenceDetectSpans,
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var keeps = ProcessEdits.CollectDeleteSilenceKeepSpans(
+                _document,
+                range,
+                EditMask(),
+                options);
+            var wouldEmpty = keeps.Count == 0 && DeletesWholeFile(range);
+            OwnerCenteredMessageBox.Show(
+                this,
+                wouldEmpty
                     ? UiStrings.ErrorEmptyAfterDelete
                     : UiStrings.ErrorNoSilenceToDelete,
                 UiStrings.AppName,
@@ -1676,6 +1748,39 @@ public partial class MainWindow
         _history.Do(_document, command);
         AfterEdit();
     }
+
+    private static SilenceDetectAction ClampSilenceDetectAction(int value) =>
+        value switch
+        {
+            (int)SilenceDetectAction.CreateRegions => SilenceDetectAction.CreateRegions,
+            (int)SilenceDetectAction.CreateMarkers => SilenceDetectAction.CreateMarkers,
+            _ => SilenceDetectAction.DeleteSilence,
+        };
+
+    private static IEditCommand? BuildSilenceDetectCommand(
+        AudioDocument document,
+        WaveSelection range,
+        SilenceDetectOptions options,
+        int channelMask,
+        SilenceDetectAction action) =>
+        action switch
+        {
+            SilenceDetectAction.CreateRegions => ProcessEdits.CreateRegionsFromSilenceDetection(
+                document,
+                range,
+                options,
+                channelMask: channelMask),
+            SilenceDetectAction.CreateMarkers => ProcessEdits.CreateMarkersFromSilenceDetection(
+                document,
+                range,
+                options,
+                channelMask: channelMask),
+            _ => ProcessEdits.DeleteSilence(
+                document,
+                range,
+                options,
+                channelMask: channelMask),
+        };
 
     private void ApplyDeleteSelectedMarkers()
     {

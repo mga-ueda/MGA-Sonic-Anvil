@@ -310,8 +310,8 @@ public partial class MainWindow
             case WaveMenuCommand.Delete:
                 ApplyDelete();
                 break;
-            case WaveMenuCommand.DeleteSilence:
-                ApplyDeleteSilence();
+            case WaveMenuCommand.DetectSilence:
+                ApplyDetectSilence();
                 break;
             case WaveMenuCommand.SelectAll:
                 Waveform.SelectAll();

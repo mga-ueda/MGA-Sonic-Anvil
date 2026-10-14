@@ -118,8 +118,8 @@ internal static partial class UiStrings
     public static string LabelAlwaysOnTop => Get("Always on Top", "Always on Top");
     public static string LabelSilentSkip => Get("Silent Skip", "Silent Skip");
     public static string LabelSilentSkipThreshold => Get(
-        "無音しきい値（Silent Skip / 無音削除）",
-        "Silence threshold (Silent Skip / Delete Silence)");
+        "無音しきい値（Silent Skip）",
+        "Silence threshold (Silent Skip)");
     public static string ErrorSilentSkipThresholdRange => Get(
         "無音しきい値は -120 から 0 の dB で入力してください。",
         "Enter a silence threshold between -120 and 0 dB.");
@@ -273,12 +273,43 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeIn => Get("波形フェードイン", "Waveform Fade In");
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string TipAudioSettings => Get(
-        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／プレイヤー／編集／書き出し・パス／Wwise のタブ。表示言語、表示倍率（100〜200%。OS の DPI に加えて拡大）、複数ファイルの並べ方（タブのまま／左右／上下／上下左右）、関連付け、プレイヤー左ツリーのルート、ギャップレス再生（プレイヤータブ。既定オン）、既定 Wave フォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、自動スピーカー選択（オーディオタブ。既定オフ）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、プレイリストの列（Wave／MP3／動画。波形幅は Wave / MP3 それぞれ S/M/L。どちらも既定 L）、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip / 無音削除）、プチノイズ防止フェード、フェードカーブ、MP3、LAME と FFmpeg のパス、未使用プロキシの保存日数／容量／すべて削除／自動生成しない、同時書き出し本数、Wwise の Prefetch Length／Look-ahead Time。ダイアログのボタンは Tab で移動できます。",
-        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Player / Editing / Export · Paths / Wwise tabs. Language, UI scale (100–200%; extra enlargement on top of the OS DPI), multiple-file arrangement (keep tabs / side by side / stacked / grid), file associations, Player left-tree roots, gapless playback (Player tab; on by default), default Wave format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), auto speaker selection (Audio tab; off by default), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, playlist columns (WAVE / MP3 / video; waveform width S/M/L separately for WAVE and MP3; both default L), meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip / Delete Silence), click-prevention fade, fade curves, MP3, LAME and FFmpeg paths, unused proxy retention / size / delete-all / do-not-auto-build, parallel export count, and Wwise Prefetch Length / Look-ahead Time. Tab also moves to dialog buttons.");
+        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／プレイヤー／編集／書き出し・パス／Wwise のタブ。表示言語、表示倍率（100〜200%。OS の DPI に加えて拡大）、複数ファイルの並べ方（タブのまま／左右／上下／上下左右）、関連付け、プレイヤー左ツリーのルート、ギャップレス再生（プレイヤータブ。既定オン）、既定 Wave フォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、自動スピーカー選択（オーディオタブ。既定オフ）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、プレイリストの列（Wave／MP3／動画。波形幅は Wave / MP3 それぞれ S/M/L。どちらも既定 L）、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip。無音検出とは独立）、プチノイズ防止フェード、フェードカーブ、MP3、LAME と FFmpeg のパス、未使用プロキシの保存日数／容量／すべて削除／自動生成しない、同時書き出し本数、Wwise の Prefetch Length／Look-ahead Time。ダイアログのボタンは Tab で移動できます。",
+        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Player / Editing / Export · Paths / Wwise tabs. Language, UI scale (100–200%; extra enlargement on top of the OS DPI), multiple-file arrangement (keep tabs / side by side / stacked / grid), file associations, Player left-tree roots, gapless playback (Player tab; on by default), default Wave format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), auto speaker selection (Audio tab; off by default), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, playlist columns (WAVE / MP3 / video; waveform width S/M/L separately for WAVE and MP3; both default L), meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip; independent of Detect Silence), click-prevention fade, fade curves, MP3, LAME and FFmpeg paths, unused proxy retention / size / delete-all / do-not-auto-build, parallel export count, and Wwise Prefetch Length / Look-ahead Time. Tab also moves to dialog buttons.");
     public static string TipDefaultAudioFormat => Get(
         "新規ファイル（Ctrl+N）の初期フォーマットです。既定は 48kHz / 24bit / Stereo。チャンネルは表示項目で有効にしたスピーカーと、常に選べる Mono。",
         "Initial format for a new file (Ctrl+N). Default is 48 kHz / 24-bit / Stereo. Channels are the speakers enabled on Shown, plus Mono (always available).");
     public static string DialogNewDocumentTitle => Get("新規", "New");
+    public static string DialogSilenceDetectTitle => Get("無音検出", "Detect Silence");
+    public static string LabelSilenceDetectOpenThreshold => Get("オープンスレッショルド", "Open Threshold");
+    public static string LabelSilenceDetectCloseThreshold => Get("クローズスレッショルド", "Close Threshold");
+    public static string LabelSilenceDetectLink => Get("リンク", "Link");
+    public static string LabelSilenceDetectMinGate => Get("次のゲートまでの最小時間", "Minimum Time to Next Gate");
+    public static string LabelSilenceDetectMinClose => Get("クローズまでの最小時間", "Minimum Time to Close");
+    public static string LabelSilenceDetectPreRoll => Get("プリロール", "Pre-Roll");
+    public static string LabelSilenceDetectPostRoll => Get("ポストロール", "Post-Roll");
+    public static string LabelSilenceDetectFadeIn => Get("カット時フェードイン", "Cut Fade In");
+    public static string LabelSilenceDetectFadeOut => Get("カット時フェードアウト", "Cut Fade Out");
+    public static string LabelSilenceDetectTargetSelection => Get("対象: 選択範囲", "Target: selection");
+    public static string LabelSilenceDetectTargetEntire => Get("対象: ファイル全体", "Target: entire file");
+    public static string LabelSilenceDetectEdgesOnly => Get("冒頭＆末尾のみ", "Start & end only");
+    public static string LabelSilenceDetectEntire => Get("全体", "Entire");
+    public static string LabelSilenceDetectDelete => Get("無音を削除", "Delete silence");
+    public static string LabelSilenceDetectCreateRegions => Get("音があるところへリージョン付加", "Add regions to audio");
+    public static string LabelSilenceDetectCreateMarkers => Get("音があるところへマーカー付与", "Add markers to audio");
+    public static string ButtonSilenceDetectDelete => Get("削除", "Delete");
+    public static string ButtonSilenceDetectCreateRegions => Get("付加", "Add");
+    public static string ButtonSilenceDetectCreateMarkers => Get("付与", "Add");
+    public static string ConfirmSilenceDetectSelectedFiles(int count) => Format(
+        "選択した {0} 個のファイルに、現在の無音検出設定を適用しますか？",
+        "Apply the current Detect Silence settings to the {0} selected files?",
+        count);
+    public static string SilenceDetectDetectedSpans(int count) => Format(
+        "{0}のリージョンを検出",
+        "{0} region(s) detected",
+        count);
+    public static string ErrorNoSilenceDetectSpans => Get(
+        "検出できる区間がありません。",
+        "No spans were detected.");
     public static string TipNewDocument => Get(
         "新規 (Ctrl+N)\n空のタブを作ります。フォーマットは都度選べます。候補のチャンネルは、表示項目で有効にしたスピーカーと Mono（常に選べる）。前回の指定を覚えます。",
         "New (Ctrl+N)\nOpens an empty tab. Choose the format each time. Channels are the speakers enabled on Shown, plus Mono (always available). The last choice is remembered.");
@@ -817,8 +848,11 @@ internal static partial class UiStrings
         "ピッチ (P)\n↑↓／ホイールで半音（Shift または Ctrl で1オクターブ）。Space で試聴、Enter で実行。未選択なら全体。±2オクターブ。長さを保つ（既定オン。Tab でチェックへ）。オフは長さも変わる。長さだけなら T。",
         "Pitch (P)\n↑↓ / wheel by a semitone (Shift or Ctrl for an octave). Space previews, Enter applies. Uses the whole file if nothing is selected. Range is ±2 octaves. Keep length (on by default. Tab moves to the checkbox). Off also changes length. T stretches time only.");
     public static string TipDelete => Get(
-        "部分削除 (Delete)\n選択範囲を詰めて削除\n選択中のマーカー / リージョンはまとめて削除\nCtrl+Del でマーカー削除\n右クリックの「無音部分を削除」は Silent Skip と同じしきい値。継ぎ目にプチノイズ防止フェード",
-        "Ripple delete (Delete)\nRemove the selection and close the gap\nSelected markers / regions are deleted together\nCtrl+Del deletes markers\nDelete Silence on the right-click menu uses the Silent Skip threshold. Splices get the click-prevention fade");
+        "部分削除 (Delete)\n選択範囲を詰めて削除\n選択中のマーカー / リージョンはまとめて削除\nCtrl+Del でマーカー削除\n右クリック／Ctrl+D の「無音検出」は同じ UI で無音削除／リージョン付加／マーカー付与。選択があればその範囲、なければ全体。冒頭＆末尾のみ／全体。削除時のカットフェードはダイアログで指定（設定のプチノイズ防止とは独立）。タブ複数選択時は確認のみで現在設定を一括適用",
+        "Ripple delete (Delete)\nRemove the selection and close the gap\nSelected markers / regions are deleted together\nCtrl+Del deletes markers\nDetect Silence (right-click / Ctrl+D) uses one UI to delete silence, add regions, or add markers. Uses the selection if any, otherwise the whole file. Start & end only or entire. Cut fades for delete are set in the dialog (independent of the click-prevention fade in Settings). With several tabs selected, only confirms then applies the current settings");
+    public static string TipSilenceDetectDialog => Get(
+        "無音検出 (Ctrl+D)\n選択範囲があればその範囲だけ、なければファイル全体。波形の赤い ±しきい値線をドラッグ、または波形／数値欄でホイール（0.1 dB、Shift で 1 dB。↑↓も同じ）。ハイライトは表示波形の目安（ゲート時間はプレビューに反映しない。実行時は厳密に検出）。オープン／クローズ（リンク可。既定 -5 dB。以後は前回の値）、次のゲートまでの最小時間、クローズまでの最小時間、プリ／ポストロール、カット時フェードイン／アウト（無音削除時。Silent Skip や設定のプチノイズ防止とは独立）。無音を削除／リージョン付加／マーカー付与、冒頭＆末尾のみ／全体。タブを複数選択しているときは設定 UI を出さず、現在の設定で一括適用するか確認だけする",
+        "Detect Silence (Ctrl+D)\nUses the selection if any, otherwise the whole file. Drag the red ±threshold lines, or use the mouse wheel on the waveform / number fields (0.1 dB, Shift for 1 dB; ↑↓ same). The highlight is a display-waveform guide (gate timing is not previewed; apply runs full detection). Open / close (linkable; default −5 dB, then remembers your last values), minimum time to next gate, minimum time to close, pre / post-roll, cut fade in / out (for delete silence; independent of Silent Skip and the click-prevention fade in Settings). Delete silence, add regions, or add markers; start & end only or entire. With several tabs selected, skips the settings UI and only asks whether to apply the current settings to all of them");
     public static string TipSave => Get(
         "保存 (Ctrl+S)\nCtrl+Shift+S で別名保存\nタブを複数選択しているときは選択ファイル全部。パスがあるものは上書き。未保存や AIFF は保存先フォルダを選んで Wave で保存\nCtrl+Shift+M で MP3 保存（今のタブは開いたまま。書き出した MP3 は読み込まない）\nCtrl+Shift+Alt+M で全タブを MP3 で保存\nMP3 は PCM 16bit から再エンコード。LAME のパスが有効ならそれを使い、空欄または無効なら Windows（既定 192 kbps）。成功時に LAME / Windows を表示。失敗はダイアログ。マーカー／リージョン／ループは MP3 に書きません",
         "Save (Ctrl+S)\nCtrl+Shift+S to save as\nWith several tabs selected, every selected file. Files with a path are overwritten. Untitled or AIFF files ask for a folder and write Wave\nCtrl+Shift+M to save as MP3 (keeps the current tab; does not open the written MP3)\nCtrl+Shift+Alt+M saves every tab as MP3\nMP3 is re-encoded from 16-bit PCM. A valid LAME path is used; empty or invalid falls back to Windows (default 192 kbps). Success shows LAME / Windows. Failures open a dialog. Markers / regions / loops are not written to MP3");
@@ -961,11 +995,11 @@ internal static partial class UiStrings
         "ウィンドウを常に最前面へ表示します (Alt+A)。",
         "Keep the window always on top (Alt+A).");
     public static string TipSilentSkip => Get(
-        "無音区間を飛ばして再生し、録音中はしきい値を超えたときだけ書き込みます (Alt+S)。再生中の ←→ 早送り／巻き戻し中は飛ばしません（プレイヤーでは ,／.）。録音開始時にオンにするか毎回確認する。しきい値（無音削除にも使う）、スキップ時の無音挿入時間、プチノイズ防止フェードは設定の編集タブ。リージョン付加は録音開始時に指定。",
-        "Skip silent stretches during playback, and while recording write only audio above the threshold (Alt+S). Hold ←→ during playback to shuttle without skipping (, / . in player mode). Recording always asks whether to turn it on. The threshold (also used by Delete Silence), the silence insert duration on skip, and the click-prevention fade are on the Editing tab in Settings. Adding regions is chosen when you start recording.");
+        "無音区間を飛ばして再生し、録音中はしきい値を超えたときだけ書き込みます (Alt+S)。再生中の ←→ 早送り／巻き戻し中は飛ばしません（プレイヤーでは ,／.）。録音開始時にオンにするか毎回確認する。しきい値、スキップ時の無音挿入時間、プチノイズ防止フェードは設定の編集タブ（無音検出とは独立）。リージョン付加は録音開始時に指定。",
+        "Skip silent stretches during playback, and while recording write only audio above the threshold (Alt+S). Hold ←→ during playback to shuttle without skipping (, / . in player mode). Recording always asks whether to turn it on. The threshold, the silence insert duration on skip, and the click-prevention fade are on the Editing tab in Settings (independent of Detect Silence). Adding regions is chosen when you start recording.");
     public static string TipSilentSkipThreshold => Get(
-        "Silent Skip で無音とみなすピーク（dBFS）。-120 から 0。既定 -60。再生ではこの値未満なら次の音まで飛ばし、録音では書き込みません。判定は約 50ms の窓内ピークです。しきい値付近の周期音の谷だけが抜けて、ピッチが微妙に変わってしまう不具合を直しています。右クリックの「無音部分を削除」も同じしきい値です。右のバーは割り当てた録音をモノラル化したピーク。赤線と数字は短区間ピークの最小の平均です。",
-        "Peak level treated as silence for Silent Skip (dBFS), from −120 to 0. Default −60. Playback jumps from below this level to the next sound. Recording does not write those frames. The check uses a peak in a ~50 ms window. That fixes a bug where troughs of a near-threshold tone were stripped and the pitch drifted slightly. Delete Silence on the right-click menu uses the same threshold. The bar is the assigned record ports mixed to mono. The red line and number are the average of short-block peak minima.");
+        "Silent Skip で無音とみなすピーク（dBFS）。-120 から 0。既定 -60。再生ではこの値未満なら次の音まで飛ばし、録音では書き込みません。判定は約 50ms の窓内ピークです。しきい値付近の周期音の谷だけが抜けて、ピッチが微妙に変わってしまう不具合を直しています。無音検出（Ctrl+D）のしきい値とは共有しません。右のバーは割り当てた録音をモノラル化したピーク。赤線と数字は短区間ピークの最小の平均です。",
+        "Peak level treated as silence for Silent Skip (dBFS), from −120 to 0. Default −60. Playback jumps from below this level to the next sound. Recording does not write those frames. The check uses a peak in a ~50 ms window. That fixes a bug where troughs of a near-threshold tone were stripped and the pitch drifted slightly. Not shared with Detect Silence (Ctrl+D). The bar is the assigned record ports mixed to mono. The red line and number are the average of short-block peak minima.");
     public static string TipSilentSkipThresholdMeter => Get(
         "バーはピーク。赤線と右の数値はピークではなく、短い区間のピークのうち小さい方をならした値（谷の平均）。しきい値の目安にします。",
         "The bar is peak. The red line and number are not peak; they average the quieter short-block peaks (avg. floor). Use them as a guide for the threshold.");
@@ -973,8 +1007,8 @@ internal static partial class UiStrings
         "録音の Silent Skip 専用。スキップ時に挿入する無音の長さ。しきい値を下回った時点から無音を書き、この長さまで書いたら止めます。音が戻ったときにまとめて挟みません。先頭の無音と、末尾の長い無音は残しません。0 なら無音は全部捨てます。0 から 10000。既定 500。",
         "Recording Silent Skip only. How much silence is inserted when skipping. Silence is written as soon as the level falls, then stops at this length. It is not dumped when sound returns. Leading silence and a long tail are discarded. 0 drops every silent frame. From 0 to 10000. Default 500.");
     public static string TipClickGuardFade => Get(
-        "継ぎ目のプチノイズだけを消す短いフェード。先頭は 0 から、終端は 0 へ。リージョン毎のノーマライズ、無音部分を削除、Silent Skip 録音で使う。長い音楽用フェードにはしない。1 から 100。既定 20。",
-        "A short fade that only removes a click at a splice. Starts at 0 and ends at 0. Used by normalize per region, Delete Silence, and Silent Skip recording. Not a musical fade. From 1 to 100. Default 20.");
+        "継ぎ目のプチノイズだけを消す短いフェード。先頭は 0 から、終端は 0 へ。リージョン毎のノーマライズと Silent Skip 録音で使う。無音検出のカット時フェードとは独立。長い音楽用フェードにはしない。1 から 100。既定 20。",
+        "A short fade that only removes a click at a splice. Starts at 0 and ends at 0. Used by normalize per region and Silent Skip recording. Independent of Detect Silence cut fades. Not a musical fade. From 1 to 100. Default 20.");
     public static string TipConfirmRecordSilentSkip => Get(
         "この録音で Silent Skip を使うか。オンならしきい値を超えたときだけ録り、下回った時点から無音を挟んで挿入時間で止めます。オフならすべて書きます。OK するとステータスバーにも反映します。",
         "Whether to use Silent Skip for this recording. When on, only audio above the threshold is recorded, and silence is inserted when the level falls (up to the insert duration in Settings). When off, everything is written. OK also updates the status-bar switch.");
@@ -1323,7 +1357,9 @@ internal static partial class UiStrings
         "Time Stretch" => Get("タイムストレッチ", "Time Stretch"),
         "Reverse" => Get("リバース", "Reverse"),
         "Delete" => Get("削除", "Delete"),
-        "Delete Silence" => Get("無音部分を削除", "Delete Silence"),
+        "Delete Silence" => Get("無音検出（削除）", "Detect Silence (Delete)"),
+        "Detect Silence" => Get("無音検出（リージョン付加）", "Detect Silence (Add Regions)"),
+        "Detect Silence Markers" => Get("無音検出（マーカー付与）", "Detect Silence (Add Markers)"),
         "Paste" => Get("ペースト", "Paste"),
         "Record" => Get("録音", "Record"),
         "Add Marker" => Get("マーカー追加", "Add Marker"),

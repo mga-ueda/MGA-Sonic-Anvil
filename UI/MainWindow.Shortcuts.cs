@@ -1185,6 +1185,17 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.D && modifiers == ModifierKeys.Control)
+        {
+            // Ctrl+T はタイル巡回済み。無音検出は Ctrl+D。
+            if (!IsLibraryMaximized && !IsRecording && _document is not null)
+            {
+                ApplyDetectSilence();
+            }
+
+            return true;
+        }
+
         if (key is Key.Delete or Key.Back && modifiers == ModifierKeys.None)
         {
             ApplyDelete();
