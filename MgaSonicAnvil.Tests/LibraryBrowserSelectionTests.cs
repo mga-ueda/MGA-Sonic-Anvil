@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -2469,6 +2469,152 @@ public sealed class LibraryBrowserSelectionTests
             Assert.True(
                 jacket!.StickyOffsetY > 24,
                 $"jacket should follow scroll, offset was {jacket.StickyOffsetY}");
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void Grouped_FirstGroupHeader_StaysVisible_AfterScrollIntoViewFromBottom()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            // ScrollIntoView(first row) with ScrollUnit.Item sets VerticalOffset=1 and
+            // hides only the first group name under the column headers. Short lists do not reproduce.
+            var sessions = new DocumentSession[60];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                var folder = i < 8 ? "kagutsuchi" : $"folder{i / 3:D2}";
+                var document = AudioDocument.CreateDeferred(
+                    Path.Combine(Path.GetTempPath(), folder, $"t{i:D2}.mp4"));
+                document.ApplyTags(new AudioFileTags
+                {
+                    Probed = true,
+                    Title = $"T{i:D2}",
+                    VideoWidth = 1920,
+                    VideoHeight = 1080,
+                    FrameRate = 30,
+                    BitRateKbps = 8000,
+                    VideoCodec = "H.264",
+                    AudioCodec = "AAC",
+                });
+                sessions[i] = new DocumentSession(document);
+            }
+
+            var videoColumns = new[]
+            {
+                LibraryFileColumn.Name,
+                LibraryFileColumn.VideoSize,
+                LibraryFileColumn.FrameRate,
+                LibraryFileColumn.BitRate,
+                LibraryFileColumn.VideoCodec,
+                LibraryFileColumn.AudioCodec,
+                LibraryFileColumn.ParentFolder,
+            };
+            var view = new LibraryBrowserView();
+            view.SetVisibleColumnPresets(videoColumns, videoColumns, videoColumns: videoColumns);
+            view.SetGroup(LibraryFileGroup.Folder);
+            var window = new Window
+            {
+                Content = view,
+                Width = 1100,
+                Height = 420,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions(sessions, sessions[^1], [sessions[^1]]);
+            Flush();
+            view.UpdateLayout();
+            window.UpdateLayout();
+            Flush();
+
+            var scroll = FindScroll(view.FileGrid);
+            Assert.NotNull(scroll);
+            scroll!.ScrollToVerticalOffset(scroll.ExtentHeight);
+            Flush();
+            Flush();
+            Assert.True(scroll.VerticalOffset > 1, "precondition: list must be scrolled away from top");
+
+            view.MoveSelectionToEdge(-1);
+            Flush();
+            Flush();
+            Flush();
+            view.UpdateLayout();
+
+            var headers = FindDescendants<DataGridColumnHeadersPresenter>(view.FileGrid).First();
+            Assert.True(
+                headers.ActualHeight > 28,
+                $"expected multi-line column headers, ActualHeight={headers.ActualHeight}");
+
+            var header = FindDescendants<LibraryGroupHeader>(view.FileGrid)
+                .FirstOrDefault(block => block.Text == "kagutsuchi");
+            Assert.NotNull(header);
+            Assert.True(header!.ActualHeight > 0, "first group header should be laid out");
+            var headerTop = header.TransformToAncestor(view.FileGrid).Transform(new Point(0, 0)).Y;
+            var viewportTop = view.RowsViewportTop();
+            Assert.True(
+                headerTop >= viewportTop - 1,
+                $"first group header clipped under column headers: top={headerTop}, viewport={viewportTop}, offset={scroll.VerticalOffset}, headerHeight={header.ActualHeight}");
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void Grouped_ScrollIntoView_Alone_HidesFirstGroupHeader()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new DocumentSession[60];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                var folder = i < 8 ? "kagutsuchi" : $"folder{i / 3:D2}";
+                var document = AudioDocument.CreateDeferred(
+                    Path.Combine(Path.GetTempPath(), folder, $"t{i:D2}.wav"));
+                document.ApplyTags(new AudioFileTags { Probed = true, Title = $"T{i:D2}" });
+                sessions[i] = new DocumentSession(document);
+            }
+
+            var view = new LibraryBrowserView();
+            view.SetGroup(LibraryFileGroup.Folder);
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 420,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions(sessions, sessions[^1], [sessions[^1]]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            var grid = (DataGrid)view.FileGrid;
+            var scroll = FindScroll(view.FileGrid)!;
+            scroll.ScrollToVerticalOffset(scroll.ExtentHeight);
+            Flush();
+            Flush();
+
+            var firstRow = grid.Items[0];
+            grid.ScrollIntoView(firstRow);
+            Flush();
+            Flush();
+            Flush();
+            view.UpdateLayout();
+
+            var header = FindDescendants<LibraryGroupHeader>(view.FileGrid)
+                .FirstOrDefault(block => block.Text == "kagutsuchi");
+            Assert.NotNull(header);
+            var headerTop = header!.TransformToAncestor(view.FileGrid).Transform(new Point(0, 0)).Y;
+            var viewportTop = view.RowsViewportTop();
+            Assert.True(
+                headerTop < viewportTop - 1,
+                $"precondition: raw ScrollIntoView should hide first group header (top={headerTop}, viewport={viewportTop}, offset={scroll.VerticalOffset})");
+            Assert.True(scroll.CanContentScroll);
+            Assert.Equal(1, scroll.VerticalOffset, 3);
             window.Close();
         });
     }
