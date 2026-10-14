@@ -30,9 +30,27 @@ internal sealed class HistoryRecipe
 
     public double Amount { get; set; }
 
+    /// <summary>無音検出のクローズスレッショルドなど、第2の dB。</summary>
+    public double Amount2 { get; set; }
+
     public string Text { get; set; } = "";
 
     public bool Flag { get; set; }
+
+    /// <summary>無音検出のリンク。true なら Amount2 を無視して Amount を使う。</summary>
+    public bool Flag2 { get; set; }
+
+    /// <summary>無音検出: 次のゲートまでの最小時間 (ms)。</summary>
+    public int Timing0 { get; set; }
+
+    /// <summary>無音検出: クローズまでの最小時間 (ms)。</summary>
+    public int Timing1 { get; set; }
+
+    /// <summary>無音検出: プリロール (ms)。</summary>
+    public int Timing2 { get; set; }
+
+    /// <summary>無音検出: ポストロール (ms)。</summary>
+    public int Timing3 { get; set; }
 
     public long[] Frames { get; set; } = [];
 
@@ -238,19 +256,44 @@ internal static class HistoryRecipes
         double thresholdDb,
         int channel = ChannelSolo.Off,
         int channelMask = 0,
-        int fadeMs = ClickGuard.DefaultFadeMilliseconds) =>
-        WithChannel(
+        int fadeMs = ClickGuard.DefaultFadeMilliseconds,
+        bool edgesOnly = false) =>
+        FromDeleteSilence(
+            sourceRate,
+            range,
+            SilenceDetectOptions.FromThreshold(thresholdDb, edgesOnly, fadeMs),
+            channel,
+            channelMask);
+
+    public static HistoryRecipe FromDeleteSilence(
+        int sourceRate,
+        WaveSelection range,
+        SilenceDetectOptions options,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
+    {
+        options = options.Normalized();
+        return WithChannel(
             new HistoryRecipe
             {
                 Kind = DeleteSilence,
                 SourceRate = sourceRate,
                 Start = range.StartFrame,
                 End = range.EndFrame,
-                Amount = SilentSkip.ClampThresholdDb(thresholdDb),
-                Value = ClickGuard.ClampFadeMs(fadeMs),
+                Amount = options.OpenThresholdDb,
+                Amount2 = options.CloseThresholdDb,
+                Value = options.FadeInMs,
+                Delta = options.FadeOutMs,
+                Flag = options.EdgesOnly,
+                Flag2 = options.LinkThresholds,
+                Timing0 = options.MinGateMs,
+                Timing1 = options.MinCloseMs,
+                Timing2 = options.PreRollMs,
+                Timing3 = options.PostRollMs,
             },
             channel,
             channelMask);
+    }
 
     public static HistoryRecipe FromTimeStretch(
         int sourceRate,
@@ -304,9 +347,8 @@ internal static class HistoryRecipes
             DeleteSilence => ProcessEdits.DeleteSilence(
                 document,
                 RangeOf(recipe),
-                recipe.Amount,
-                channelMask: MaskOf(recipe),
-                fadeMs: FadeMsOf(recipe)),
+                OptionsOf(recipe),
+                channelMask: MaskOf(recipe)),
             Paste => TryPaste(document, recipe),
             Record => TryRecord(document, recipe),
             SetSampleLoop => TrySetSampleLoop(document, recipe),
@@ -589,6 +631,36 @@ internal static class HistoryRecipes
         recipe.Value > 0
             ? ClickGuard.ClampFadeMs(recipe.Value)
             : ClickGuard.DefaultFadeMilliseconds;
+
+    internal static SilenceDetectOptions OptionsOf(HistoryRecipe recipe)
+    {
+        var open = SilentSkip.ClampThresholdDb(recipe.Amount);
+        var linked = recipe.Flag2 || recipe.Amount2 == 0;
+        var close = linked
+            ? open
+            : SilentSkip.ClampThresholdDb(recipe.Amount2);
+        // 旧レシピは Timing / Amount2 / Flag2 未保存。ピークカバー境界互換で再現する。
+        var hasTiming = recipe.Timing0 != 0 || recipe.Timing1 != 0 || recipe.Timing2 != 0 || recipe.Timing3 != 0
+            || recipe.Amount2 != 0 || recipe.Flag2;
+        var isNewDetect = recipe.Amount2 != 0 || recipe.Flag2;
+        var fadeIn = isNewDetect || recipe.Value > 0
+            ? SilenceDetectOptions.ClampFadeMs(recipe.Value)
+            : SilenceDetectOptions.DefaultFadeMs;
+        var fadeOut = isNewDetect
+            ? SilenceDetectOptions.ClampFadeMs((int)recipe.Delta)
+            : fadeIn;
+        return new SilenceDetectOptions(
+            open,
+            close,
+            LinkThresholds: linked,
+            hasTiming ? recipe.Timing0 : 0,
+            hasTiming ? recipe.Timing1 : 0,
+            recipe.Timing2,
+            recipe.Timing3,
+            recipe.Flag,
+            fadeIn,
+            fadeOut).Normalized();
+    }
 
     public static HistoryRecipe FromTimeline(
         int sourceRate,

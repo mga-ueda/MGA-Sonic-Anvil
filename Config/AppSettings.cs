@@ -140,8 +140,73 @@ internal sealed class AppSettings
     /// <summary>再生で無音区間を飛ばす。既定オフ。</summary>
     public bool SilentSkip { get; set; }
 
-    /// <summary>Silent Skip と無音削除の無音しきい値（dBFS）。既定 -60。</summary>
+    /// <summary>Silent Skip の無音しきい値（dBFS）。無音検出とは独立。既定 -60。</summary>
     public double SilentSkipThresholdDb { get; set; } = global::MgaSonicAnvil.Audio.SilentSkip.DefaultThresholdDb;
+
+    /// <summary>無音検出ダイアログで冒頭＆末尾のみを選ぶ。既定オフ（全体）。</summary>
+    public bool SilenceDetectEdgesOnly { get; set; }
+
+    /// <summary>
+    /// 無音検出の動作。0=無音削除、1=リージョン付加、2=マーカー付与。既定 0。
+    /// </summary>
+    public int SilenceDetectAction { get; set; }
+
+    /// <summary>無音検出のオープンスレッショルド（Silent Skip とは独立）。既定 -5。以降はユーザー設定を引き継ぐ。</summary>
+    public double SilenceDetectOpenThresholdDb { get; set; } =
+        global::MgaSonicAnvil.Audio.SilenceDetectOptions.DefaultOpenThresholdDb;
+
+    /// <summary>無音検出のクローズスレッショルド（Silent Skip とは独立）。既定 -5。以降はユーザー設定を引き継ぐ。</summary>
+    public double SilenceDetectCloseThresholdDb { get; set; } =
+        global::MgaSonicAnvil.Audio.SilenceDetectOptions.DefaultOpenThresholdDb;
+
+    /// <summary>オープン／クローズをリンク。既定オン。</summary>
+    public bool SilenceDetectLinkThresholds { get; set; } = true;
+
+    /// <summary>次のゲートまでの最小時間 (ms)。既定 1000。</summary>
+    public int SilenceDetectMinGateMs { get; set; } = global::MgaSonicAnvil.Audio.SilenceDetectOptions.DefaultMinGateMs;
+
+    /// <summary>クローズまでの最小時間 (ms)。既定 100。</summary>
+    public int SilenceDetectMinCloseMs { get; set; } = global::MgaSonicAnvil.Audio.SilenceDetectOptions.DefaultMinCloseMs;
+
+    /// <summary>プリロール (ms)。既定 0。</summary>
+    public int SilenceDetectPreRollMs { get; set; }
+
+    /// <summary>ポストロール (ms)。既定 0。</summary>
+    public int SilenceDetectPostRollMs { get; set; }
+
+    /// <summary>無音削除時のフェードイン (ms)。設定のプチノイズ防止とは独立。既定 20。</summary>
+    public int SilenceDetectFadeInMs { get; set; } = global::MgaSonicAnvil.Audio.SilenceDetectOptions.DefaultFadeMs;
+
+    /// <summary>無音削除時のフェードアウト (ms)。設定のプチノイズ防止とは独立。既定 20。</summary>
+    public int SilenceDetectFadeOutMs { get; set; } = global::MgaSonicAnvil.Audio.SilenceDetectOptions.DefaultFadeMs;
+
+    public global::MgaSonicAnvil.Audio.SilenceDetectOptions ResolvedSilenceDetectOptions(bool edgesOnly) =>
+        new global::MgaSonicAnvil.Audio.SilenceDetectOptions(
+            SilenceDetectOpenThresholdDb,
+            SilenceDetectCloseThresholdDb,
+            SilenceDetectLinkThresholds,
+            SilenceDetectMinGateMs,
+            SilenceDetectMinCloseMs,
+            SilenceDetectPreRollMs,
+            SilenceDetectPostRollMs,
+            edgesOnly,
+            SilenceDetectFadeInMs,
+            SilenceDetectFadeOutMs).Normalized();
+
+    public void RememberSilenceDetectOptions(global::MgaSonicAnvil.Audio.SilenceDetectOptions options)
+    {
+        options = options.Normalized();
+        SilenceDetectOpenThresholdDb = options.OpenThresholdDb;
+        SilenceDetectCloseThresholdDb = options.CloseThresholdDb;
+        SilenceDetectLinkThresholds = options.LinkThresholds;
+        SilenceDetectMinGateMs = options.MinGateMs;
+        SilenceDetectMinCloseMs = options.MinCloseMs;
+        SilenceDetectPreRollMs = options.PreRollMs;
+        SilenceDetectPostRollMs = options.PostRollMs;
+        SilenceDetectEdgesOnly = options.EdgesOnly;
+        SilenceDetectFadeInMs = options.FadeInMs;
+        SilenceDetectFadeOutMs = options.FadeOutMs;
+    }
 
     /// <summary>録音 Silent Skip で、しきい値を下回った時点から挿入する無音の時間（ms）。再生には使わない。既定 500。</summary>
     public int SilentSkipRecordPadMs { get; set; } = global::MgaSonicAnvil.Audio.SilentSkip.DefaultRecordPadMs;

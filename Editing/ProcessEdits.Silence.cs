@@ -11,7 +11,23 @@ internal static partial class ProcessEdits
         double thresholdDb,
         int channel = ChannelSolo.Off,
         int channelMask = 0,
-        int fadeMs = ClickGuard.DefaultFadeMilliseconds)
+        int fadeMs = ClickGuard.DefaultFadeMilliseconds,
+        bool edgesOnly = false) =>
+        DeleteSilence(
+            document,
+            range,
+            SilenceDetectOptions.FromThreshold(thresholdDb, edgesOnly),
+            channel,
+            channelMask,
+            fadeMs);
+
+    public static IEditCommand? DeleteSilence(
+        AudioDocument document,
+        WaveSelection range,
+        SilenceDetectOptions options,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0,
+        int fadeMs = -1)
     {
         range = range.Clamp(document.FrameCount);
         if (range.IsEmpty)
@@ -19,32 +35,34 @@ internal static partial class ProcessEdits
             return null;
         }
 
+        options = options.Normalized();
+        if (fadeMs >= 0)
+        {
+            var clamped = SilenceDetectOptions.ClampFadeMs(fadeMs);
+            options = options with { FadeInMs = clamped, FadeOutMs = clamped };
+        }
+
         var mask = EditMask(document, channel, channelMask);
-        fadeMs = ClickGuard.ClampFadeMs(fadeMs);
-        var threshold = SilentSkip.LinearFromDb(thresholdDb);
-        var holdFrames = SilentSkip.PeakWindowRadiusFrames(document.SampleRate);
-        var after = SilentSkip.CopyAudibleRange(
-            document.Interleaved,
-            document.Channels,
-            range.StartFrame,
-            range.EndFrame,
-            threshold,
-            mask,
-            holdFrames);
-        ClickGuard.FadePackedRuns(
-            after,
-            document.Channels,
-            SilentSkip.CollectAudibleSpans(
-                document.Interleaved,
+        var keeps = CollectDeleteSilenceKeepSpans(document, range, mask, options);
+        var silents = CollectDeleteSilenceSpans(document, range, mask, options);
+        if (silents.Count == 0)
+        {
+            return null;
+        }
+
+        var after = SilenceDetect.CopyKeepRanges(document.Interleaved, document.Channels, keeps);
+        if (keeps.Count > 0)
+        {
+            ClickGuard.FadePackedRuns(
+                after,
                 document.Channels,
+                keeps,
                 range.StartFrame,
                 range.EndFrame,
-                threshold,
-                mask,
-                holdFrames),
-            range.StartFrame,
-            range.EndFrame,
-            ClickGuard.FadeFrames(document.SampleRate, fadeMs));
+                SilenceDetectOptions.FadeFrames(document.SampleRate, options.FadeInMs),
+                SilenceDetectOptions.FadeFrames(document.SampleRate, options.FadeOutMs));
+        }
+
         var oldFrames = range.Length;
         var newFrames = after.Length / Math.Max(1, document.Channels);
         if (newFrames == oldFrames)
@@ -60,14 +78,6 @@ internal static partial class ProcessEdits
         }
 
         var before = document.CopyRange(range.StartFrame, oldFrames);
-        var silents = SilentSkip.CollectSilentSpans(
-            document.Interleaved,
-            document.Channels,
-            range.StartFrame,
-            range.EndFrame,
-            threshold,
-            mask,
-            holdFrames);
         var markersAfter = MapMarkersThroughDeletes(document.SnapshotMarkers(), silents);
         var regionsAfter = MapRegionsThroughDeletes(document.SnapshotRegions(), silents, document.FrameCount - (oldFrames - newFrames));
         var loopAfter = MapSelectionThroughDeletes(document.SampleLoop, silents, inclusiveEnd: true)
@@ -96,15 +106,234 @@ internal static partial class ProcessEdits
             command,
             document.SampleRate,
             range,
-            (target, mapped) => DeleteSilence(target, mapped, thresholdDb, channelMask: mask, fadeMs: fadeMs));
+            (target, mapped) => DeleteSilence(
+                target,
+                mapped,
+                options,
+                channelMask: mask));
         command.Persist = HistoryRecipes.FromDeleteSilence(
             document.SampleRate,
             range,
-            thresholdDb,
-            channelMask: mask,
-            fadeMs: fadeMs);
+            options,
+            channelMask: mask);
         return command;
     }
+
+    /// <summary>削除対象の無音区間。</summary>
+    private static List<WaveSelection> CollectDeleteSilenceSpans(
+        AudioDocument document,
+        WaveSelection range,
+        int soloMask,
+        SilenceDetectOptions options)
+    {
+        range = range.Clamp(document.FrameCount);
+        if (range.IsEmpty)
+        {
+            return [];
+        }
+
+        return SilenceDetect.CollectSilentSpans(
+            document.Interleaved,
+            document.Channels,
+            range.StartFrame,
+            range.EndFrame,
+            document.SampleRate,
+            soloMask,
+            options);
+    }
+
+    /// <summary>残す区間（プレビュー／削除／リージョン／マーカー用）。</summary>
+    public static List<WaveSelection> CollectDeleteSilenceKeepSpans(
+        AudioDocument document,
+        WaveSelection range,
+        int soloMask,
+        SilenceDetectOptions options)
+    {
+        range = range.Clamp(document.FrameCount);
+        if (range.IsEmpty)
+        {
+            return [];
+        }
+
+        return SilenceDetect.CollectKeepSpans(
+            document.Interleaved,
+            document.Channels,
+            range.StartFrame,
+            range.EndFrame,
+            document.SampleRate,
+            soloMask,
+            options);
+    }
+
+    /// <summary>
+    /// しきい値で検出した可聴区間をリージョンにする。
+    /// 解析範囲と重なる既存リージョンは外し、検出結果で置き換える。
+    /// </summary>
+    public static IEditCommand? CreateRegionsFromSilenceDetection(
+        AudioDocument document,
+        WaveSelection range,
+        double thresholdDb,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0,
+        bool edgesOnly = false) =>
+        CreateRegionsFromSilenceDetection(
+            document,
+            range,
+            SilenceDetectOptions.FromThreshold(thresholdDb, edgesOnly),
+            channel,
+            channelMask);
+
+    public static IEditCommand? CreateRegionsFromSilenceDetection(
+        AudioDocument document,
+        WaveSelection range,
+        SilenceDetectOptions options,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
+    {
+        if (!document.AllowsRegionsAndLoops)
+        {
+            return null;
+        }
+
+        range = range.Clamp(document.FrameCount);
+        if (range.IsEmpty)
+        {
+            return null;
+        }
+
+        options = options.Normalized();
+        var mask = EditMask(document, channel, channelMask);
+        var keeps = CollectDeleteSilenceKeepSpans(document, range, mask, options);
+        if (keeps.Count == 0)
+        {
+            return null;
+        }
+
+        var before = document.SnapshotRegions();
+        var after = new List<WaveRegion>(before.Length + keeps.Count);
+        foreach (var region in before)
+        {
+            if (RangesOverlap(region.Range, range))
+            {
+                continue;
+            }
+
+            after.Add(region);
+        }
+
+        foreach (var keep in keeps)
+        {
+            after.Add(new WaveRegion(keep, string.Empty));
+        }
+
+        after.Sort((left, right) => left.StartFrame.CompareTo(right.StartFrame));
+        var next = after.ToArray();
+        if (RegionsEqual(before, next))
+        {
+            return null;
+        }
+
+        var summary = UiStrings.EditHistoryRange(
+            UiStrings.EditHistoryName("Detect Silence"),
+            document.SampleRate,
+            range.StartFrame,
+            range.EndFrame);
+        var command = new SetRegionCommand(before, next, summary);
+        var sourceRate = document.SampleRate;
+        command.Replay = target => CreateRegionsFromSilenceDetection(
+            target,
+            EditReplay.MapRange(range, sourceRate, target),
+            options,
+            channelMask: mask);
+        command.Persist = HistoryRecipes.FromRegionSnapshots(HistoryRecipes.ReplaceRegions, sourceRate, next);
+        return command;
+    }
+
+    /// <summary>
+    /// しきい値で検出した可聴区間の先頭にマーカーを付ける。
+    /// 解析範囲内の既存マーカーは外し、検出結果で置き換える。
+    /// </summary>
+    public static IEditCommand? CreateMarkersFromSilenceDetection(
+        AudioDocument document,
+        WaveSelection range,
+        double thresholdDb,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0,
+        bool edgesOnly = false) =>
+        CreateMarkersFromSilenceDetection(
+            document,
+            range,
+            SilenceDetectOptions.FromThreshold(thresholdDb, edgesOnly),
+            channel,
+            channelMask);
+
+    public static IEditCommand? CreateMarkersFromSilenceDetection(
+        AudioDocument document,
+        WaveSelection range,
+        SilenceDetectOptions options,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0)
+    {
+        range = range.Clamp(document.FrameCount);
+        if (range.IsEmpty)
+        {
+            return null;
+        }
+
+        options = options.Normalized();
+        var mask = EditMask(document, channel, channelMask);
+        var keeps = CollectDeleteSilenceKeepSpans(document, range, mask, options);
+        if (keeps.Count == 0)
+        {
+            return null;
+        }
+
+        var before = document.SnapshotMarkers();
+        var after = new List<MarkerSnapshot>(before.Length + keeps.Count);
+        foreach (var marker in before)
+        {
+            if (marker.Frame >= range.StartFrame && marker.Frame < range.EndFrame)
+            {
+                continue;
+            }
+
+            after.Add(marker);
+        }
+
+        foreach (var keep in keeps)
+        {
+            var frame = keep.StartFrame;
+            if (after.Exists(marker => marker.Frame == frame))
+            {
+                continue;
+            }
+
+            after.Add(new MarkerSnapshot(frame, string.Empty));
+        }
+
+        after.Sort((left, right) => left.Frame.CompareTo(right.Frame));
+        var next = after.ToArray();
+        var command = ApplyMarkers(
+            document,
+            before,
+            next,
+            "Detect Silence Markers");
+        if (command is null)
+        {
+            return null;
+        }
+
+        var sourceRate = document.SampleRate;
+        command.Replay = target => CreateMarkersFromSilenceDetection(
+            target,
+            EditReplay.MapRange(range, sourceRate, target),
+            options,
+            channelMask: mask);
+        return command;
+    }
+
+    private static bool RangesOverlap(WaveSelection a, WaveSelection b) =>
+        !a.IsEmpty && !b.IsEmpty && a.StartFrame < b.EndFrame && b.StartFrame < a.EndFrame;
 
     private static MarkerSnapshot[] MapMarkersThroughDeletes(
         IReadOnlyList<MarkerSnapshot> markers,

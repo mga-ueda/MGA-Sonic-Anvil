@@ -26,7 +26,8 @@ public sealed class SilentSkipTests
             Assert.DoesNotContain("無音部分", UiStrings.LabelSilentSkipRecordAddRegion);
             Assert.Contains("谷の平均", UiStrings.LabelSilentSkipFloorNote);
             Assert.DoesNotContain("ピーク", UiStrings.LabelSilentSkipFloorNote);
-            Assert.Contains("無音削除", UiStrings.LabelSilentSkipThreshold);
+            Assert.Contains("Silent Skip", UiStrings.LabelSilentSkipThreshold);
+            Assert.DoesNotContain("無音検出", UiStrings.LabelSilentSkipThreshold);
             Assert.Contains("無音挿入時間", UiStrings.LabelSilentSkipRecordPad);
             Assert.DoesNotContain("上限", UiStrings.LabelSilentSkipRecordPad);
             UiStrings.SetLanguage(UiLanguage.English);
@@ -38,7 +39,8 @@ public sealed class SilentSkipTests
             Assert.DoesNotContain("silent", UiStrings.LabelSilentSkipRecordAddRegion, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("floor", UiStrings.LabelSilentSkipFloorNote, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("peak", UiStrings.LabelSilentSkipFloorNote, StringComparison.OrdinalIgnoreCase);
-            Assert.Contains("Delete Silence", UiStrings.LabelSilentSkipThreshold);
+            Assert.Contains("Silent Skip", UiStrings.LabelSilentSkipThreshold);
+            Assert.DoesNotContain("Detect Silence", UiStrings.LabelSilentSkipThreshold);
             Assert.Contains("insert duration", UiStrings.LabelSilentSkipRecordPad, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Max silence", UiStrings.LabelSilentSkipRecordPad);
         }
@@ -204,6 +206,30 @@ public sealed class SilentSkipTests
         Assert.False(SilentSkip.TryParseThresholdDb("x", out _));
         Assert.False(SilentSkip.TryParseThresholdDb("1", out _));
         Assert.False(SilentSkip.TryParseThresholdDb("-130", out _));
+    }
+
+    [Fact]
+    public void BuildPeakCoverFromAbsPeaks_MatchesBuildPeakCover()
+    {
+        const int rate = 1000;
+        var hold = SilentSkip.PeakWindowRadiusFrames(rate);
+        var tone = SilentSkip.LinearFromDb(-40);
+        var samples = new float[200];
+        for (var i = 40; i < 80; i++)
+        {
+            samples[i] = tone;
+        }
+
+        for (var i = 120; i < 160; i++)
+        {
+            samples[i] = tone;
+        }
+
+        const float threshold = 0.001f;
+        var direct = SilentSkip.BuildPeakCover(samples, 1, 0, 200, threshold, soloMask: 0, hold);
+        var peaks = SilentSkip.BuildAbsPeaks(samples, 1, 0, 200, soloMask: 0);
+        var fromPeaks = SilentSkip.BuildPeakCoverFromAbsPeaks(peaks, 0, 0, 200, threshold, hold);
+        Assert.Equal(direct, fromPeaks);
     }
 
     [Fact]
