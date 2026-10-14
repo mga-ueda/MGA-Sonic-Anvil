@@ -112,7 +112,17 @@ internal static class ClickGuard
         IReadOnlyList<WaveSelection> runs,
         long rangeStart,
         long rangeEnd,
-        int fadeFrames)
+        int fadeFrames) =>
+        FadePackedRuns(packed, channels, runs, rangeStart, rangeEnd, fadeFrames, fadeFrames);
+
+    public static void FadePackedRuns(
+        float[] packed,
+        int channels,
+        IReadOnlyList<WaveSelection> runs,
+        long rangeStart,
+        long rangeEnd,
+        int fadeInFrames,
+        int fadeOutFrames)
     {
         var dest = 0L;
         foreach (var run in runs)
@@ -122,15 +132,33 @@ internal static class ClickGuard
                 continue;
             }
 
-            FadeRangeEdges(
-                packed,
-                channels,
-                bufferStartFrame: 0,
-                new WaveSelection(dest, dest + run.Length),
-                mask: 0,
-                fadeIn: run.StartFrame > rangeStart,
-                fadeOut: run.EndFrame < rangeEnd,
-                fadeFrames);
+            var packedRange = new WaveSelection(dest, dest + run.Length);
+            if (run.StartFrame > rangeStart && fadeInFrames > 0)
+            {
+                FadeRangeEdges(
+                    packed,
+                    channels,
+                    bufferStartFrame: 0,
+                    packedRange,
+                    mask: 0,
+                    fadeIn: true,
+                    fadeOut: false,
+                    fadeInFrames);
+            }
+
+            if (run.EndFrame < rangeEnd && fadeOutFrames > 0)
+            {
+                FadeRangeEdges(
+                    packed,
+                    channels,
+                    bufferStartFrame: 0,
+                    packedRange,
+                    mask: 0,
+                    fadeIn: false,
+                    fadeOut: true,
+                    fadeOutFrames);
+            }
+
             dest += run.Length;
         }
     }

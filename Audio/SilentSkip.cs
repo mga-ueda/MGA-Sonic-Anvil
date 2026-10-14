@@ -452,7 +452,107 @@ internal static class SilentSkip
         return endFrame;
     }
 
-    private static byte[] BuildPeakCover(
+    /// <summary>1 フレームのソロ対象チャンネル絶対値ピーク。</summary>
+    internal static float FrameAbsPeak(
+        float[] interleaved,
+        int channels,
+        long frame,
+        int soloMask)
+    {
+        channels = Math.Max(1, channels);
+        var start = frame * channels;
+        if (interleaved.Length == 0 || start < 0 || start + channels > interleaved.Length)
+        {
+            return 0f;
+        }
+
+        var peak = 0f;
+        for (var ch = 0; ch < channels; ch++)
+        {
+            if (!ChannelSolo.Contains(soloMask, ch))
+            {
+                continue;
+            }
+
+            var abs = Math.Abs(interleaved[start + ch]);
+            if (abs > peak)
+            {
+                peak = abs;
+            }
+        }
+
+        return peak;
+    }
+
+    /// <summary>[startFrame, endFrame) のフレーム絶対値ピーク列。BuildPeakCover の前段。</summary>
+    internal static float[] BuildAbsPeaks(
+        float[] interleaved,
+        int channels,
+        long startFrame,
+        long endFrame,
+        int soloMask)
+    {
+        channels = Math.Max(1, channels);
+        var frameCount = interleaved.Length / channels;
+        startFrame = Math.Clamp(startFrame, 0, frameCount);
+        endFrame = Math.Clamp(endFrame, startFrame, frameCount);
+        var length = checked((int)(endFrame - startFrame));
+        var peaks = new float[length];
+        for (var i = 0; i < length; i++)
+        {
+            peaks[i] = FrameAbsPeak(interleaved, channels, startFrame + i, soloMask);
+        }
+
+        return peaks;
+    }
+
+    /// <summary>
+    /// 事前計算した絶対値ピーク列から窓付き可聴カバーを作る。
+    /// peaks は [lookStart, lookStart+peaks.Length)、cover は [startFrame, endFrame)。
+    /// </summary>
+    internal static byte[] BuildPeakCoverFromAbsPeaks(
+        float[] peaks,
+        long lookStart,
+        long startFrame,
+        long endFrame,
+        float thresholdLinear,
+        int holdFrames)
+    {
+        var length = checked((int)(endFrame - startFrame));
+        var cover = new byte[length];
+        if (length == 0 || peaks.Length == 0)
+        {
+            return cover;
+        }
+
+        holdFrames = Math.Max(0, holdFrames);
+        var floor = Math.Max(0f, thresholdLinear);
+        var lookLen = peaks.Length;
+        var lookEnd = lookStart + lookLen;
+
+        // しきい値超えの累積。cover[i] は [frame-hold, frame+hold] に可聴があるか。
+        var prefix = new int[lookLen + 1];
+        for (var i = 0; i < lookLen; i++)
+        {
+            prefix[i + 1] = prefix[i] + (peaks[i] >= floor ? 1 : 0);
+        }
+
+        for (var i = 0; i < length; i++)
+        {
+            var frame = startFrame + i;
+            var a = (int)(Math.Max(lookStart, frame - holdFrames) - lookStart);
+            var b = (int)(Math.Min(lookEnd, frame + holdFrames + 1) - lookStart);
+            if (a < b && prefix[b] - prefix[a] > 0)
+            {
+                cover[i] = 1;
+            }
+        }
+
+        return cover;
+    }
+
+    /// <summary>窓内ピークで可聴カバーを付ける。無音検出のオープン／クローズ判定でも使う。</summary>
+    internal static byte[] BuildPeakCover(
         float[] interleaved,
         int channels,
         long startFrame,
@@ -461,45 +561,21 @@ internal static class SilentSkip
         int soloMask,
         int holdFrames)
     {
-        var length = checked((int)(endFrame - startFrame));
-        var cover = new byte[length];
-        if (length == 0)
-        {
-            return cover;
-        }
-
         holdFrames = Math.Max(0, holdFrames);
-        var frameCount = interleaved.Length / Math.Max(1, channels);
+        channels = Math.Max(1, channels);
+        var frameCount = interleaved.Length / channels;
+        startFrame = Math.Clamp(startFrame, 0, frameCount);
+        endFrame = Math.Clamp(endFrame, startFrame, frameCount);
         var lookStart = Math.Max(0, startFrame - holdFrames);
         var lookEnd = Math.Min(frameCount, endFrame + holdFrames);
-        var delta = new int[length + 1];
-        for (var frame = lookStart; frame < lookEnd; frame++)
-        {
-            if (IsFrameInstantSilent(interleaved, channels, frame, thresholdLinear, soloMask))
-            {
-                continue;
-            }
-
-            var a = (int)(Math.Max(startFrame, frame - holdFrames) - startFrame);
-            var b = (int)(Math.Min(endFrame, frame + holdFrames + 1) - startFrame);
-            if (a < b)
-            {
-                delta[a]++;
-                delta[b]--;
-            }
-        }
-
-        var run = 0;
-        for (var i = 0; i < length; i++)
-        {
-            run += delta[i];
-            if (run > 0)
-            {
-                cover[i] = 1;
-            }
-        }
-
-        return cover;
+        var peaks = BuildAbsPeaks(interleaved, channels, lookStart, lookEnd, soloMask);
+        return BuildPeakCoverFromAbsPeaks(
+            peaks,
+            lookStart,
+            startFrame,
+            endFrame,
+            thresholdLinear,
+            holdFrames);
     }
 
     /// <summary>Silent Skip 録音で、今回書いた区間。無ければ null。</summary>

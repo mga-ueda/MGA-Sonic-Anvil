@@ -202,6 +202,54 @@ public sealed class HistorySessionTests
     }
 
     [Fact]
+    public void TryExportImport_RestoresDeleteSilenceEdgesOnly()
+    {
+        const int rate = 1000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        const int lead = 40;
+        const int audible = 30;
+        const int midSilent = 40;
+        const int tail = 40;
+        var frames = lead + audible + midSilent + audible + tail;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            if (i < lead
+                || (i >= lead + audible && i < lead + audible + midSilent)
+                || i >= frames - tail)
+            {
+                continue;
+            }
+
+            samples[i * 2] = 0.5f;
+            samples[i * 2 + 1] = 0.5f;
+        }
+
+        var document = new AudioDocument(samples, rate, 2, 24, AudioFileKind.Wave, null);
+        var history = new EditHistory();
+        var command = ProcessEdits.DeleteSilence(
+            document,
+            new WaveSelection(0, frames),
+            -60,
+            edgesOnly: true);
+        Assert.NotNull(command);
+        history.Do(document, command);
+        var afterCount = document.FrameCount;
+        Assert.True(afterCount < frames);
+        Assert.True(afterCount > audible * 2);
+
+        var exported = history.TryExport();
+        Assert.NotNull(exported);
+        Assert.True(exported!.Recipes[0].Flag);
+
+        var restoredSamples = (float[])samples.Clone();
+        var restored = new AudioDocument(restoredSamples, rate, 2, 24, AudioFileKind.Wave, null);
+        Assert.True(EditHistory.TryImport(restored, exported, out _));
+        Assert.Equal(afterCount, restored.FrameCount);
+        Assert.True(radius > 0);
+    }
+
+    [Fact]
     public void HistoryJson_RoundTripsRecipes()
     {
         var document = MakeConstant(8, 1f);

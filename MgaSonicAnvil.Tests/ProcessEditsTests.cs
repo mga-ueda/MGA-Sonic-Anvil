@@ -569,6 +569,149 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void DeleteSilence_EdgesOnly_KeepsMiddleSilence()
+    {
+        const int rate = 1000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var middleSilent = radius * 2 + 20;
+        const int lead = 40;
+        const int audible = 20;
+        const int tail = 40;
+        var frames = lead + audible + middleSilent + audible + tail;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            if (i < lead || (i >= lead + audible && i < lead + audible + middleSilent) || i >= frames - tail)
+            {
+                continue;
+            }
+
+            samples[i * 2] = 0.5f;
+            samples[i * 2 + 1] = 0.5f;
+        }
+
+        var document = new AudioDocument(samples, rate, 2, 24, AudioFileKind.Wave, null);
+        var entire = ProcessEdits.DeleteSilence(document, new WaveSelection(0, frames), -60);
+        Assert.NotNull(entire);
+
+        var edges = ProcessEdits.DeleteSilence(
+            document,
+            new WaveSelection(0, frames),
+            -60,
+            edgesOnly: true);
+        Assert.NotNull(edges);
+        new EditHistory().Do(document, edges);
+
+        // 先頭・末尾の無音だけ削る（ピーク窓ぶんは可聴側に残る）。中央の無音は残す。
+        var edgeTrim = Math.Max(0, lead - radius) + Math.Max(0, tail - radius);
+        Assert.Equal(frames - edgeTrim, document.FrameCount);
+        Assert.True(document.FrameCount > audible * 2);
+        var mid = SilentSkip.CollectSilentSpans(
+            document.Interleaved,
+            document.Channels,
+            0,
+            document.FrameCount,
+            SilentSkip.LinearFromDb(-60),
+            0,
+            radius);
+        Assert.NotEmpty(mid);
+    }
+
+    [Fact]
+    public void DeleteSilence_EdgesOnly_ReturnsNullWhenNoEdgeSilence()
+    {
+        var document = MakeConstant(frames: 8, value: 0.5f);
+        Assert.Null(ProcessEdits.DeleteSilence(document, new WaveSelection(0, 8), -60, edgesOnly: true));
+    }
+
+    [Fact]
+    public void CollectDeleteSilenceKeepSpans_EdgesOnly_MergesAudible()
+    {
+        const int rate = 1000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var silent = radius * 2 + 20;
+        var document = MakeToneWithSilence(20, silent, 20, rate);
+        var keeps = ProcessEdits.CollectDeleteSilenceKeepSpans(
+            document,
+            new WaveSelection(0, document.FrameCount),
+            soloMask: 0,
+            SilenceDetectOptions.FromThreshold(-60, edgesOnly: true));
+        Assert.Single(keeps);
+        Assert.True(keeps[0].Length > 20);
+    }
+
+    [Fact]
+    public void CreateRegionsFromSilenceDetection_AddsAudibleRegions()
+    {
+        const int rate = 1000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var silent = radius * 2 + 20;
+        var document = MakeToneWithSilence(20, silent, 20, rate);
+        document.SetRegion(new WaveSelection(0, 5));
+        var command = ProcessEdits.CreateRegionsFromSilenceDetection(
+            document,
+            new WaveSelection(0, document.FrameCount),
+            -60);
+        Assert.NotNull(command);
+        new EditHistory().Do(document, command);
+        Assert.Equal(2, document.Regions.Count);
+        Assert.DoesNotContain(document.Regions, region => region == new WaveSelection(0, 5));
+    }
+
+    [Fact]
+    public void CreateRegionsFromSilenceDetection_EdgesOnly_CreatesSingleRegion()
+    {
+        const int rate = 1000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var silent = radius * 2 + 20;
+        var document = MakeToneWithSilence(20, silent, 20, rate);
+        var command = ProcessEdits.CreateRegionsFromSilenceDetection(
+            document,
+            new WaveSelection(0, document.FrameCount),
+            -60,
+            edgesOnly: true);
+        Assert.NotNull(command);
+        new EditHistory().Do(document, command);
+        Assert.Single(document.Regions);
+        Assert.True(document.Regions[0].Length > 20);
+    }
+
+    [Fact]
+    public void CreateMarkersFromSilenceDetection_AddsMarkersAtAudibleStarts()
+    {
+        const int rate = 1000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var silent = radius * 2 + 20;
+        var document = MakeToneWithSilence(20, silent, 20, rate);
+        document.TryAddMarker(5);
+        var command = ProcessEdits.CreateMarkersFromSilenceDetection(
+            document,
+            new WaveSelection(0, document.FrameCount),
+            -60);
+        Assert.NotNull(command);
+        new EditHistory().Do(document, command);
+        Assert.Equal(2, document.Markers.Count);
+        Assert.DoesNotContain(document.Markers, marker => marker.Frame == 5);
+    }
+
+    [Fact]
+    public void CreateMarkersFromSilenceDetection_EdgesOnly_AddsSingleMarker()
+    {
+        const int rate = 1000;
+        var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+        var silent = radius * 2 + 20;
+        var document = MakeToneWithSilence(20, silent, 20, rate);
+        var command = ProcessEdits.CreateMarkersFromSilenceDetection(
+            document,
+            new WaveSelection(0, document.FrameCount),
+            -60,
+            edgesOnly: true);
+        Assert.NotNull(command);
+        new EditHistory().Do(document, command);
+        Assert.Single(document.Markers);
+    }
+
+    [Fact]
     public void Delete_RemovesRangeAndUndoRestores()
     {
         var document = MakeSine(frames: 50);
