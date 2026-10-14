@@ -236,7 +236,8 @@ public sealed class LibraryBrowserSelectionTests
         RunSta(() =>
         {
             EnsureTheme();
-            var root = Path.Combine(Path.GetTempPath(), "mga-tree-type-" + Guid.NewGuid().ToString("N"));
+            // ルート名に t を入れない（部分一致でルート自身がヒットしないように）。
+            var root = Path.Combine(Path.GetTempPath(), "mga-lib-" + Guid.NewGuid().ToString("N"));
             var test = Path.Combine(root, "Test");
             var task = Path.Combine(root, "Task");
             Directory.CreateDirectory(test);

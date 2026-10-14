@@ -449,6 +449,8 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.IsExplorerExpandAll(Key.D8, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsPlayerDigitJump(explorerFocused: true));
         Assert.True(LibraryPlayerMode.AllowsPlayerDigitJump(explorerFocused: false));
+        Assert.False(LibraryPlayerMode.AllowsPlayerLetterTransport(explorerFocused: true));
+        Assert.True(LibraryPlayerMode.AllowsPlayerLetterTransport(explorerFocused: false));
         Assert.True(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Divide, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Oem2, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Oem2, ModifierKeys.Shift));
@@ -1268,6 +1270,8 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.PlaybackVisualMinIntervalMs <= 20);
         Assert.Equal(DispatcherPriority.Background, LibraryPlayerMode.AnalyzerTickPriority);
         Assert.True(LibraryPlayerMode.AnalyzerTickPriority < DispatcherPriority.Input);
+        Assert.Equal(16, LibraryPlayerMode.PlaylistLoadUiFlushCount);
+        Assert.Equal(33, LibraryPlayerMode.PlaylistLoadUiFlushMs);
         Assert.Equal(50, LibraryPlayerMode.PlayheadIdleInvalidateMs);
         Assert.True(LibraryPlayerMode.ShouldRefreshPlayheadPaint(double.NaN, 0, 10, 0));
         Assert.False(LibraryPlayerMode.ShouldRefreshPlayheadPaint(10, 100, 10.2, 120));

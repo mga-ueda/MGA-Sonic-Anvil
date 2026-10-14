@@ -414,8 +414,9 @@ public partial class MainWindow
             return true;
         }
 
-        // P／N は前後曲（テンキー 4／6）。ツリーのタイプアヘッドより先に拾う。
+        // P／N は前後曲（テンキー 4／6）。ツリー／検索フォーカス中はタイプアヘッド（検索入力）を優先。
         if (IsLibraryMaximized
+            && LibraryPlayerMode.AllowsPlayerLetterTransport(IsLibraryExplorerFocused)
             && !IsLibraryGroupComboFocused
             && !ImeComposition.IsComposing
             && !isRepeat
@@ -425,8 +426,9 @@ public partial class MainWindow
             return true;
         }
 
-        // R は再生し直し（テンキー 5）。Alt+R のランダムより後、タイプアヘッドより先。
+        // R は再生し直し（テンキー 5）。Alt+R のランダムより後。ツリー／検索中はタイプアヘッド優先。
         if (IsLibraryMaximized
+            && LibraryPlayerMode.AllowsPlayerLetterTransport(IsLibraryExplorerFocused)
             && !IsLibraryGroupComboFocused
             && !ImeComposition.IsComposing
             && !isRepeat
@@ -1399,6 +1401,14 @@ public partial class MainWindow
             return false;
         }
 
+        // ツリーのタイプアヘッド打ち込みを先に捨てる（1秒待ちの代わりに即クリア）。
+        if (IsLibraryMaximized
+            && LibraryBrowser.IsExplorerTreeFocused
+            && LibraryBrowser.ClearExplorerTypeahead())
+        {
+            return true;
+        }
+
         if (_recording)
         {
             StopRecording();
@@ -2025,6 +2035,13 @@ public partial class MainWindow
     {
         // テンキー＋ J／K／,／.（プレイヤー／エディタ共通。中央寄せは Z／テンキー .）。
         var command = LibraryPlayerMode.PlayerTransportCommand(key, modifiers);
+        // ツリー／検索フォーカス中は J／K をタイプアヘッド（検索入力）に譲る。,／.／テンキーはそのまま。
+        if (command is LibraryNumpadCommand.SeekBack or LibraryNumpadCommand.SeekForward
+            && !LibraryPlayerMode.AllowsPlayerLetterTransport(IsLibraryExplorerFocused))
+        {
+            command = LibraryNumpadCommand.None;
+        }
+
         var numpad = LibraryPlayerMode.UsesTransportNumpad()
             && LibraryPlayerMode.IsPlayerNumpadKey(key, modifiers);
         if (command == LibraryNumpadCommand.None && numpad)

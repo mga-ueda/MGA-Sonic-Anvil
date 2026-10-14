@@ -13,6 +13,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -155,9 +156,23 @@ internal sealed class LibraryBrowserView : UserControl
     private int _explorerFocusTicket;
     private int _listFocusTicket;
     private HashSet<string>? _explorerVisibleFolders;
+    /// <summary>トーストに出す打ち込み中の文字。トースト消去と同時に捨てる。</summary>
     private string _explorerTypeahead = "";
-    private DateTimeOffset _explorerTypeaheadAt = DateTimeOffset.MinValue;
+    /// <summary>黄背景と ↑↓ 渡り歩き用。Esc まで残す。</summary>
+    private string _explorerTypeaheadWalk = "";
     private string _explorerTypeaheadIgnoreText = "";
+    private readonly Grid _explorerTypeaheadToast = new()
+    {
+        Opacity = 0,
+        IsHitTestVisible = false,
+        HorizontalAlignment = HorizontalAlignment.Center,
+        VerticalAlignment = VerticalAlignment.Center,
+    };
+    private readonly TextBlock _explorerTypeaheadToastText = new();
+    private readonly HashSet<TreeViewItem> _explorerTypeaheadHighlighted = [];
+    private DispatcherTimer? _explorerTypeaheadToastIdleTimer;
+    private static readonly SolidColorBrush ExplorerTypeaheadHitBack = CreateExplorerTypeaheadHitBack();
+    private static readonly SolidColorBrush ExplorerTypeaheadHitFore = CreateExplorerTypeaheadHitFore();
     private readonly StackPanel _playlistGroupHost = new() { Orientation = Orientation.Horizontal };
     private readonly DataGrid _grid = new();
     private readonly LibraryVisualStage _visualStage = new();
@@ -326,7 +341,15 @@ internal sealed class LibraryBrowserView : UserControl
         ApplyGridStyles();
         KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.None);
         KeyboardNavigation.SetDirectionalNavigation(this, KeyboardNavigationMode.None);
-        _folderTree.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
+        _folderTree.IsKeyboardFocusWithinChanged += (_, _) =>
+        {
+            SyncPaneFocusChrome();
+            // ツリー以外へフォーカスが移ったら打ち込みを捨てる。
+            if (!_folderTree.IsKeyboardFocusWithin)
+            {
+                ClearExplorerTypeahead();
+            }
+        };
         _favoritesList.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _grid.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         PreviewMouseMove += PlaylistHost_PreviewMouseMove;
@@ -1205,17 +1228,23 @@ internal sealed class LibraryBrowserView : UserControl
 
     internal string ExplorerTypeaheadQuery => _explorerTypeahead;
 
-    /// <summary>矢印・ペイン移動などで打ち込みを捨てる。1秒の打ち直しとは別。</summary>
-    public bool ClearExplorerTypeahead()
-    {
-        _explorerTypeaheadIgnoreText = "";
-        if (_explorerTypeahead.Length == 0)
-        {
-            return false;
-        }
+    /// <summary>黄背景／↑↓が有効なセッション中か（トースト用バッファが空でも true）。</summary>
+    internal bool IsExplorerTypeaheadActive => _explorerTypeaheadWalk.Length > 0;
 
+    /// <summary>
+    /// 打ち込みセッションを終わらせる（Esc・プレイリスト登録／再生・他 UI へのフォーカス）。
+    /// 黄背景・渡り歩き・トーストをすべて消す。入力アイドルでのトースト消しとは別。
+    /// </summary>
+    public bool ClearExplorerTypeahead(bool hideToastInstant = true)
+    {
+        StopExplorerTypeaheadToastIdleTimer();
+        ClearExplorerTypeaheadHighlights();
+        _explorerTypeaheadIgnoreText = "";
+        var had = _explorerTypeahead.Length > 0 || _explorerTypeaheadWalk.Length > 0;
         _explorerTypeahead = "";
-        return true;
+        _explorerTypeaheadWalk = "";
+        HideExplorerTypeaheadToast(hideToastInstant);
+        return had;
     }
 
     public bool TryExplorerTypeahead(Key key, ModifierKeys modifiers)
@@ -1229,6 +1258,17 @@ internal sealed class LibraryBrowserView : UserControl
         return TryAppendExplorerTypeahead(character);
     }
 
+    /// <summary>黄背景セッション中の ↑↓。ヒット行だけを渡り歩く（トースト非表示中も可）。</summary>
+    public bool TryStepExplorerTypeahead(int direction)
+    {
+        if (!IsExplorerTypeaheadActive || direction == 0)
+        {
+            return false;
+        }
+
+        return ActivateExplorerTypeaheadStep(direction);
+    }
+
     private bool TryAppendExplorerTypeahead(string next)
     {
         if (!LibraryExplorerTypeahead.IsTypeaheadText(next))
@@ -1236,29 +1276,214 @@ internal sealed class LibraryBrowserView : UserControl
             return false;
         }
 
-        var now = DateTimeOffset.UtcNow;
-        _explorerTypeahead = LibraryExplorerTypeahead.Append(
-            _explorerTypeahead,
-            next,
-            now,
-            _explorerTypeaheadAt,
-            LibraryExplorerTypeahead.IdleReset);
-        _explorerTypeaheadAt = now;
+        _explorerTypeahead = LibraryExplorerTypeahead.Append(_explorerTypeahead, next);
+        _explorerTypeaheadWalk = _explorerTypeahead;
         ActivateExplorerTypeaheadMatch();
+        ShowExplorerTypeaheadToast();
+        SyncExplorerTypeaheadHighlights();
         return true;
+    }
+
+    private void ShowExplorerTypeaheadToast()
+    {
+        if (_explorerTypeahead.Length == 0)
+        {
+            HideExplorerTypeaheadToast(instant: true);
+            return;
+        }
+
+        _explorerTypeaheadToastText.Text = _explorerTypeahead;
+        LibraryPlayerMode.FadeElementOpacity(
+            _explorerTypeaheadToast,
+            to: 1,
+            instant: true,
+            hitTestVisible: false);
+        _explorerTypeaheadToastIdleTimer ??= new DispatcherTimer
+        {
+            Interval = LibraryExplorerTypeahead.ToastIdleClear,
+        };
+        _explorerTypeaheadToastIdleTimer.Tick -= OnExplorerTypeaheadToastIdleTick;
+        _explorerTypeaheadToastIdleTimer.Tick += OnExplorerTypeaheadToastIdleTick;
+        _explorerTypeaheadToastIdleTimer.Stop();
+        _explorerTypeaheadToastIdleTimer.Start();
+    }
+
+    /// <summary>
+    /// 入力が落ち着いて1秒後。トーストを消し、積み上がった打ち込み文字も捨てる。
+    /// 黄背景と渡り歩き用クエリは残す。
+    /// </summary>
+    private void OnExplorerTypeaheadToastIdleTick(object? sender, EventArgs e)
+    {
+        StopExplorerTypeaheadToastIdleTimer();
+        _explorerTypeahead = "";
+        _explorerTypeaheadIgnoreText = "";
+        HideExplorerTypeaheadToast(instant: false);
+    }
+
+    private void StopExplorerTypeaheadToastIdleTimer()
+    {
+        _explorerTypeaheadToastIdleTimer?.Stop();
+    }
+
+    private void HideExplorerTypeaheadToast(bool instant)
+    {
+        StopExplorerTypeaheadToastIdleTimer();
+        LibraryPlayerMode.FadeElementOpacity(
+            _explorerTypeaheadToast,
+            to: 0,
+            instant,
+            hitTestVisible: false,
+            seconds: instant ? null : LibraryPlayerMode.ChromeFadeSeconds);
     }
 
     private void ActivateExplorerTypeaheadMatch()
     {
-        var items = new List<TreeViewItem>();
-        CollectExplorerTypeaheadItems(_folderTree.Items, items);
-        if (items.Count == 0)
+        if (!TryCollectExplorerTypeahead(out var items, out var names, out var current))
         {
             return;
         }
 
-        var names = new string[items.Count];
-        var current = -1;
+        var match = LibraryExplorerTypeahead.FindMatchIndex(names, _explorerTypeaheadWalk, current);
+        SelectExplorerTypeaheadItem(items, match);
+    }
+
+    private bool ActivateExplorerTypeaheadStep(int direction)
+    {
+        if (!TryCollectExplorerTypeahead(out var items, out var names, out var current))
+        {
+            return false;
+        }
+
+        var match = LibraryExplorerTypeahead.FindStepMatchIndex(
+            names,
+            _explorerTypeaheadWalk,
+            current,
+            direction);
+        if (match < 0)
+        {
+            return false;
+        }
+
+        SelectExplorerTypeaheadItem(items, match);
+        SyncExplorerTypeaheadHighlights();
+        return true;
+    }
+
+    private void SyncExplorerTypeaheadHighlights()
+    {
+        ClearExplorerTypeaheadHighlights();
+        if (!IsExplorerTypeaheadActive
+            || !TryCollectExplorerTypeahead(out var items, out var names, out _))
+        {
+            return;
+        }
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (!LibraryExplorerTypeahead.Matches(names[i], _explorerTypeaheadWalk))
+            {
+                continue;
+            }
+
+            if (ApplyExplorerTypeaheadHighlight(items[i], names[i], _explorerTypeaheadWalk))
+            {
+                _explorerTypeaheadHighlighted.Add(items[i]);
+            }
+        }
+    }
+
+    private void ClearExplorerTypeaheadHighlights()
+    {
+        if (_explorerTypeaheadHighlighted.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var item in _explorerTypeaheadHighlighted)
+        {
+            RestoreExplorerTypeaheadHeader(item);
+        }
+
+        _explorerTypeaheadHighlighted.Clear();
+    }
+
+    private static bool ApplyExplorerTypeaheadHighlight(TreeViewItem item, string name, string query)
+    {
+        if (!LibraryExplorerTypeahead.TryFindMatchRange(name, query, out var start, out var length)
+            || length <= 0
+            || (uint)start >= (uint)name.Length
+            || start + length > name.Length)
+        {
+            return false;
+        }
+
+        if (item.Header is not TextBlock block)
+        {
+            block = new TextBlock();
+            item.Header = block;
+        }
+
+        var missing = item.Tag is string path && LibraryExplorerPaths.IsMissing(path);
+        var brushKey = missing ? MissingRegisteredPathForeBrushKey : "PrimaryForeBrush";
+        block.Inlines.Clear();
+        block.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+        if (start > 0)
+        {
+            block.Inlines.Add(new Run(name[..start]));
+        }
+
+        block.Inlines.Add(new Run(name.Substring(start, length))
+        {
+            Background = ExplorerTypeaheadHitBack,
+            Foreground = ExplorerTypeaheadHitFore,
+        });
+        if (start + length < name.Length)
+        {
+            block.Inlines.Add(new Run(name[(start + length)..]));
+        }
+
+        item.SetResourceReference(Control.ForegroundProperty, brushKey);
+        return true;
+    }
+
+    private static void RestoreExplorerTypeaheadHeader(TreeViewItem item)
+    {
+        if (item.Tag is not string path)
+        {
+            return;
+        }
+
+        ApplyFolderHeader(item, FolderHeaderText(item), LibraryExplorerPaths.IsMissing(path));
+    }
+
+    private static SolidColorBrush CreateExplorerTypeaheadHitBack()
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(0xFF, 0xE0, 0x4C));
+        brush.Freeze();
+        return brush;
+    }
+
+    private static SolidColorBrush CreateExplorerTypeaheadHitFore()
+    {
+        var brush = new SolidColorBrush(Colors.Black);
+        brush.Freeze();
+        return brush;
+    }
+
+    private bool TryCollectExplorerTypeahead(
+        out List<TreeViewItem> items,
+        out string[] names,
+        out int current)
+    {
+        items = [];
+        CollectExplorerTypeaheadItems(_folderTree.Items, items);
+        names = new string[items.Count];
+        current = -1;
+        if (items.Count == 0)
+        {
+            return false;
+        }
+
         var selected = _folderTree.SelectedItem as TreeViewItem;
         for (var i = 0; i < items.Count; i++)
         {
@@ -1269,8 +1494,12 @@ internal sealed class LibraryBrowserView : UserControl
             }
         }
 
-        var match = LibraryExplorerTypeahead.FindMatchIndex(names, _explorerTypeahead, current);
-        if (match < 0)
+        return true;
+    }
+
+    private void SelectExplorerTypeaheadItem(List<TreeViewItem> items, int match)
+    {
+        if ((uint)match >= (uint)items.Count)
         {
             return;
         }
@@ -1278,11 +1507,15 @@ internal sealed class LibraryBrowserView : UserControl
         var item = items[match];
         ClearTreeMultiSelect();
         _treeSelectionAnchor = item;
+        EnsureExplorerAncestorsExpanded(item);
         item.IsSelected = true;
         item.BringIntoView();
         item.Focus();
     }
 
+    /// <summary>
+    /// 画面上に見えている行だけ（祖先がすべて展開済み）。未展開の子はまだ読まれていないので対象外。
+    /// </summary>
     private static void CollectExplorerTypeaheadItems(ItemCollection items, List<TreeViewItem> dest)
     {
         foreach (var raw in items)
@@ -1293,10 +1526,20 @@ internal sealed class LibraryBrowserView : UserControl
             }
 
             dest.Add(item);
-            if (item.Items.Count > 0)
+            if (item.IsExpanded && item.Items.Count > 0)
             {
                 CollectExplorerTypeaheadItems(item.Items, dest);
             }
+        }
+    }
+
+    private static void EnsureExplorerAncestorsExpanded(TreeViewItem item)
+    {
+        for (var parent = ItemsControl.ItemsControlFromItemContainer(item) as TreeViewItem;
+             parent is not null;
+             parent = ItemsControl.ItemsControlFromItemContainer(parent) as TreeViewItem)
+        {
+            parent.IsExpanded = true;
         }
     }
 
@@ -2060,7 +2303,28 @@ internal sealed class LibraryBrowserView : UserControl
     /// <summary>
     /// フォルダ読み込み用。1 件追加して現在の並べ替え位置へ挿入する。全件 SetSessions より軽い。
     /// </summary>
-    public void AppendSession(DocumentSession session, bool select)
+    public void AppendSession(DocumentSession session, bool select) =>
+        AppendSessionCore(session, select, refreshColumns: true);
+
+    /// <summary>
+    /// 複数曲を一度に挿入する。列再計算は最後の1回だけ。
+    /// </summary>
+    public void AppendSessions(IReadOnlyList<DocumentSession> sessions, DocumentSession? select)
+    {
+        if (sessions.Count == 0)
+        {
+            return;
+        }
+
+        for (var i = 0; i < sessions.Count; i++)
+        {
+            var session = sessions[i];
+            var pick = select is not null && ReferenceEquals(select, session);
+            AppendSessionCore(session, pick, refreshColumns: i + 1 == sessions.Count);
+        }
+    }
+
+    private void AppendSessionCore(DocumentSession session, bool select, bool refreshColumns)
     {
         var row = CreateRowWithDefaults(session);
         row.GroupKey = LibraryFileList.GroupLabel(row, _group);
@@ -2090,7 +2354,10 @@ internal sealed class LibraryBrowserView : UserControl
                         EndRowSync();
                     }
 
-                    RefreshEffectiveColumns();
+                    if (refreshColumns)
+                    {
+                        RefreshEffectiveColumns();
+                    }
                 }
                 finally
                 {
@@ -2161,7 +2428,10 @@ internal sealed class LibraryBrowserView : UserControl
                     EndRowSync();
                 }
 
-                RefreshEffectiveColumns();
+                if (refreshColumns)
+                {
+                    RefreshEffectiveColumns();
+                }
             }
             finally
             {
@@ -2201,10 +2471,38 @@ internal sealed class LibraryBrowserView : UserControl
             document is { } d && AllowsJacketReplace(d.SourceKind),
             keepCurrentIfEmpty);
 
-    private void ApplyArtwork(byte[]? bytes, bool allowReplace, bool keepCurrentIfEmpty = false)
+    /// <summary>
+    /// デコードとウォッシュ生成（重い）。UI スレッド以外で呼ぶ。結果はすべて Freeze 済み。
+    /// </summary>
+    internal static PreparedArtworkPresentation PrepareArtworkPresentation(byte[]? bytes)
+    {
+        var next = bytes is { Length: > 0 } ? bytes : null;
+        if (next is null)
+        {
+            return new PreparedArtworkPresentation(null, null, CreateFallbackWashTurns(), decodedOk: false);
+        }
+
+        var decoded = TryCreateBitmap(next, ArtworkDecodeMaxEdge);
+        if (decoded is null)
+        {
+            return new PreparedArtworkPresentation(next, null, CreateFallbackWashTurns(), decodedOk: false);
+        }
+
+        return new PreparedArtworkPresentation(
+            next,
+            decoded,
+            CreateAmbientWashTurns(decoded),
+            decodedOk: true);
+    }
+
+    /// <summary>裏で作ったウォッシュを載せるだけ。デコードしない。</summary>
+    internal void ApplyPreparedArtwork(
+        PreparedArtworkPresentation prepared,
+        bool allowReplace,
+        bool keepCurrentIfEmpty = false)
     {
         JacketReplaceEnabled = allowReplace;
-        var next = bytes is { Length: > 0 } ? bytes : null;
+        var next = prepared.Bytes;
         if (ArtworkEquals(_artworkBytes, next) && _jacketBitmap is not null)
         {
             return;
@@ -2215,16 +2513,8 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        if (next is not null)
+        if (next is not null && !prepared.DecodedOk)
         {
-            var decoded = TryCreateBitmap(next, ArtworkDecodeMaxEdge);
-            if (decoded is not null)
-            {
-                _artworkBytes = next;
-                ShowJacketDisplay(decoded, realArt: true);
-                return;
-            }
-
             // 次の画像が読めないときは、今の実ジャケットを外してフォールバックへ落とさない。
             if (_artworkBytes is not null)
             {
@@ -2232,8 +2522,22 @@ internal sealed class LibraryBrowserView : UserControl
             }
         }
 
+        if (next is not null && prepared.DecodedOk && prepared.Bitmap is not null)
+        {
+            _artworkBytes = next;
+            _jacketBitmap = prepared.Bitmap;
+            ApplyArtworkGlow(prepared.Bitmap, prepared.Turns);
+            return;
+        }
+
         _artworkBytes = next;
-        ShowJacketDisplay(null, realArt: false);
+        _jacketBitmap = null;
+        ApplyArtworkGlow(null, prepared.Turns);
+    }
+
+    private void ApplyArtwork(byte[]? bytes, bool allowReplace, bool keepCurrentIfEmpty = false)
+    {
+        ApplyPreparedArtwork(PrepareArtworkPresentation(bytes), allowReplace, keepCurrentIfEmpty);
     }
 
     private void ShowJacketDisplay(BitmapSource? decoded, bool realArt)
@@ -2241,6 +2545,29 @@ internal sealed class LibraryBrowserView : UserControl
         var bitmap = decoded;
         _jacketBitmap = bitmap;
         ApplyArtworkGlow(realArt && bitmap is not null ? bitmap : null);
+    }
+
+    internal readonly struct PreparedArtworkPresentation
+    {
+        public PreparedArtworkPresentation(
+            byte[]? bytes,
+            BitmapSource? bitmap,
+            Brush[] turns,
+            bool decodedOk)
+        {
+            Bytes = bytes;
+            Bitmap = bitmap;
+            Turns = turns;
+            DecodedOk = decodedOk;
+        }
+
+        public byte[]? Bytes { get; }
+
+        public BitmapSource? Bitmap { get; }
+
+        public Brush[] Turns { get; }
+
+        public bool DecodedOk { get; }
     }
 
     private void BindRows(DocumentSession? active, IReadOnlyList<DocumentSession>? selected)
@@ -2504,7 +2831,9 @@ internal sealed class LibraryBrowserView : UserControl
     public void SetExplorerFolder(string path) => RevealFolder(path);
 
     /// <summary>
-    /// ディスク上のフォルダ一覧を取り込み直す。展開状態は残し、選択もできるだけ戻す。
+    /// ディスク上のフォルダ一覧を取り込み直す。展開状態は残し、選択もできるだけ戻す。F5。
+    /// ファイル発見は常にディスクが正なので F5 は必須ではない。
+    /// キャッシュ温めは MainWindow 側ですりガラス付きで行う。
     /// </summary>
     public void RefreshExplorer()
     {
@@ -2530,6 +2859,8 @@ internal sealed class LibraryBrowserView : UserControl
             RestoreExplorerMultiSelect(selected);
         }
     }
+
+    internal string[] ExplorerRootPaths => _explorerRoots.ToArray();
 
     public void SetExplorerExpanded(IEnumerable<string> paths)
     {
@@ -2729,6 +3060,7 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
+        ClearExplorerTypeahead();
         if (folders.Length == 1)
         {
             ExplorerFolderOpened?.Invoke(this, folders[0]);
@@ -2746,6 +3078,7 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
+        ClearExplorerTypeahead();
         ExplorerReplacePlaylistRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -3158,7 +3491,12 @@ internal sealed class LibraryBrowserView : UserControl
         explorerHeader.Children.Add(_explorerLabel);
         DockPanel.SetDock(explorerHeader, Dock.Top);
         explorerPane.Children.Add(explorerHeader);
-        explorerPane.Children.Add(_folderTree);
+        var treeBody = new Grid { Background = Brushes.Transparent };
+        treeBody.Children.Add(_folderTree);
+        BuildExplorerTypeaheadToast();
+        treeBody.Children.Add(_explorerTypeaheadToast);
+        Panel.SetZIndex(_explorerTypeaheadToast, 20);
+        explorerPane.Children.Add(treeBody);
         var treeHost = new Grid { Background = Brushes.Transparent };
         // 見出し上へのドロップもルート登録として受け取る。
         treeHost.AllowDrop = true;
@@ -3312,6 +3650,30 @@ internal sealed class LibraryBrowserView : UserControl
         LibraryScrollReveal.Attach(_favoritesList);
         LibraryScrollReveal.Attach(_grid);
         LibrarySplitterReveal.Attach(_root, _explorerSplitter, _favoritesSplitter, _treeColumn, _explorerTreeRow);
+    }
+
+    private void BuildExplorerTypeaheadToast()
+    {
+        _explorerTypeaheadToastText.FontFamily = new FontFamily("Consolas");
+        _explorerTypeaheadToastText.FontSize = DesignMetrics.From96(22);
+        _explorerTypeaheadToastText.FontWeight = FontWeights.Normal;
+        _explorerTypeaheadToastText.Foreground = Brushes.White;
+        _explorerTypeaheadToastText.TextAlignment = TextAlignment.Center;
+        _explorerTypeaheadToastText.TextWrapping = TextWrapping.NoWrap;
+        var border = new Border
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Padding = new Thickness(
+                DesignMetrics.From96(14),
+                DesignMetrics.From96(8),
+                DesignMetrics.From96(14),
+                DesignMetrics.From96(8)),
+            CornerRadius = DesignMetrics.ControlCorner,
+            Background = new SolidColorBrush(Color.FromArgb(0x99, 0x00, 0x00, 0x00)),
+            Child = _explorerTypeaheadToastText,
+        };
+        _explorerTypeaheadToast.Children.Add(border);
     }
 
     private static void ApplyPaneTitleStyle(TextBlock label, Thickness? margin = null)
@@ -3519,6 +3881,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     private static string[] CollectExplorerFiles(IReadOnlyList<string> roots)
     {
+        // 検索のファイル発見は毎回ディスク。索引に頼ると F5 無しで新規ファイルが欠ける。
         var files = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var root in roots)
@@ -4888,20 +5251,25 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        if (key is Key.Up or Key.Down
-            && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        if (key is Key.Up or Key.Down && modifiers == ModifierKeys.None)
         {
-            ClearExplorerTypeahead();
-            MoveExplorerSelection(key == Key.Up ? -1 : 1, extend: modifiers == ModifierKeys.Shift);
+            if (IsExplorerTypeaheadActive)
+            {
+                TryStepExplorerTypeahead(key == Key.Up ? -1 : 1);
+                e.Handled = true;
+                return;
+            }
+
+            MoveExplorerSelection(key == Key.Up ? -1 : 1, extend: false);
             e.Handled = true;
             return;
         }
 
-        if (key is Key.Left or Key.Right
-            or Key.Home or Key.End or Key.PageUp or Key.PageDown
-            or Key.Enter or Key.Tab)
+        if (key is Key.Up or Key.Down && modifiers == ModifierKeys.Shift)
         {
             ClearExplorerTypeahead();
+            MoveExplorerSelection(key == Key.Up ? -1 : 1, extend: true);
+            e.Handled = true;
         }
     }
 
@@ -7399,11 +7767,10 @@ internal sealed class LibraryBrowserView : UserControl
 
     private bool UseUnifiedGlow => _artworkGlow && _extendGlow && _waveGlowHost is not null;
 
-    private void ApplyArtworkGlow(BitmapSource? bitmap)
+    private void ApplyArtworkGlow(BitmapSource? bitmap, Brush[]? preparedTurns = null)
     {
-        var turns = bitmap is null
-            ? CreateFallbackWashTurns()
-            : CreateAmbientWashTurns(bitmap);
+        var turns = preparedTurns
+            ?? (bitmap is null ? CreateFallbackWashTurns() : CreateAmbientWashTurns(bitmap));
         GlowUsesFallback = bitmap is null;
         var glowChanged = !_artworkGlow;
         _artworkGlow = true;
@@ -8543,9 +8910,28 @@ internal sealed class LibraryBrowserView : UserControl
         byte[] bytes;
         try
         {
-            bytes = LibraryArtworkScan.IsPdfKind(kind)
-                ? await LibraryPdfPages.RenderPngAsync(path, 0, VideoArtwork.Edge).ConfigureAwait(true) ?? []
-                : await Task.Run(() => ReadEmbeddedArtwork(kind, path)).ConfigureAwait(true);
+            if (LibraryMediaCache.TryGetArtworkProbe(path, out var hasCached))
+            {
+                bytes = hasCached && LibraryMediaCache.TryGetArtwork(path, out var cached)
+                    ? cached
+                    : [];
+            }
+            else
+            {
+                bytes = LibraryArtworkScan.IsPdfKind(kind)
+                    ? await LibraryPdfPages.RenderPngAsync(path, 0, VideoArtwork.Edge).ConfigureAwait(true) ?? []
+                    : await Task.Run(() => ReadEmbeddedArtwork(kind, path)).ConfigureAwait(true);
+                var artPath = path;
+                if (bytes.Length > 0)
+                {
+                    var copy = bytes;
+                    _ = Task.Run(() => LibraryMediaCache.PutArtwork(artPath, copy));
+                }
+                else
+                {
+                    _ = Task.Run(() => LibraryMediaCache.PutNoArtwork(artPath));
+                }
+            }
         }
         catch (Exception)
         {

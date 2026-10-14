@@ -16,11 +16,55 @@ public sealed class LibraryExplorerTypeaheadTests
     }
 
     [Fact]
-    public void FindMatchIndex_KeepsCurrentWhenStillMatching()
+    public void FindMatchIndex_KeepsCurrentWhenStillMatches()
+    {
+        string[] names =
+        [
+            "Devil May Cry 2 Original Soundtrack",
+            "Devil May Cry 3 Original Soundtrack",
+            "Devil May Cry 4 Original Soundtrack",
+        ];
+        // 同文字連打でクエリは積むが、ヒットする限り現在行を維持（渡り歩きは ↑↓）。
+        Assert.Equal(0, LibraryExplorerTypeahead.FindMatchIndex(names, "d", currentIndex: 0));
+        Assert.Equal(0, LibraryExplorerTypeahead.FindMatchIndex(names, "de", currentIndex: 0));
+        Assert.Equal(-1, LibraryExplorerTypeahead.FindMatchIndex(names, "dd", currentIndex: 0));
+    }
+
+    [Fact]
+    public void FindStepMatchIndex_WalksHitsWithWrap()
+    {
+        string[] names =
+        [
+            "Devil May Cry 2 Original Soundtrack",
+            "Devil May Cry 3 Original Soundtrack",
+            "Devil May Cry 4 Original Soundtrack",
+            "SEGA",
+        ];
+        Assert.Equal(1, LibraryExplorerTypeahead.FindStepMatchIndex(names, "d", currentIndex: 0, direction: 1));
+        Assert.Equal(2, LibraryExplorerTypeahead.FindStepMatchIndex(names, "d", currentIndex: 1, direction: 1));
+        Assert.Equal(0, LibraryExplorerTypeahead.FindStepMatchIndex(names, "d", currentIndex: 2, direction: 1));
+        Assert.Equal(2, LibraryExplorerTypeahead.FindStepMatchIndex(names, "d", currentIndex: 0, direction: -1));
+        Assert.Equal(0, LibraryExplorerTypeahead.FindStepMatchIndex(names, "d", currentIndex: 1, direction: -1));
+    }
+
+    [Fact]
+    public void FindMatchIndex_KeepsCurrentWhenRefiningMultiChar()
     {
         string[] names = ["Test", "Tiny"];
-        Assert.Equal(0, LibraryExplorerTypeahead.FindMatchIndex(names, "t", currentIndex: 0));
         Assert.Equal(0, LibraryExplorerTypeahead.FindMatchIndex(names, "te", currentIndex: 0));
+        Assert.Equal(0, LibraryExplorerTypeahead.FindMatchIndex(names, "tes", currentIndex: 0));
+    }
+
+    [Fact]
+    public void FindMatchIndex_BelowFirst_ThenWrapsFromTop()
+    {
+        // Busy / Gnome は途中に a が無い。
+        string[] names = ["Alpha", "Busy", "Gnome"];
+        Assert.Equal(0, LibraryExplorerTypeahead.FindMatchIndex(names, "a", currentIndex: 1));
+        Assert.Equal(0, LibraryExplorerTypeahead.FindMatchIndex(names, "a", currentIndex: -1));
+        string[] lower = ["Music", "Gnome", "Apple"];
+        Assert.Equal(2, LibraryExplorerTypeahead.FindMatchIndex(lower, "a", currentIndex: 0));
+        Assert.Equal(-1, LibraryExplorerTypeahead.FindMatchIndex(lower, "z", currentIndex: 1));
     }
 
     [Fact]
@@ -32,13 +76,12 @@ public sealed class LibraryExplorerTypeaheadTests
     }
 
     [Fact]
-    public void Append_IdleGap_StartsNewQuery()
+    public void Append_AlwaysStacksIncludingSameChar()
     {
-        var t0 = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
-        var t1 = t0 + TimeSpan.FromMilliseconds(200);
-        var t2 = t0 + TimeSpan.FromSeconds(2);
-        Assert.Equal("te", LibraryExplorerTypeahead.Append("t", "e", t1, t0, LibraryExplorerTypeahead.IdleReset));
-        Assert.Equal("e", LibraryExplorerTypeahead.Append("te", "e", t2, t1, LibraryExplorerTypeahead.IdleReset));
+        Assert.Equal("d", LibraryExplorerTypeahead.Append("", "d"));
+        Assert.Equal("dd", LibraryExplorerTypeahead.Append("d", "d"));
+        Assert.Equal("ddd", LibraryExplorerTypeahead.Append("dd", "D"));
+        Assert.Equal("de", LibraryExplorerTypeahead.Append("d", "e"));
     }
 
     [Fact]
@@ -66,5 +109,67 @@ public sealed class LibraryExplorerTypeaheadTests
         Assert.False(LibraryExplorerTypeahead.IsTypeaheadText("５"));
         Assert.False(LibraryExplorerTypeahead.IsTypeaheadText(""));
         Assert.False(LibraryExplorerTypeahead.IsTypeaheadText(" "));
+    }
+
+    [Fact]
+    public void Matches_IgnoresCaseAndFullwidth()
+    {
+        Assert.True(LibraryExplorerTypeahead.Matches("Devil May Cry", "d"));
+        Assert.True(LibraryExplorerTypeahead.Matches("devil may cry", "D"));
+        Assert.True(LibraryExplorerTypeahead.Matches("Ｄevil", "d"));
+        Assert.True(LibraryExplorerTypeahead.Matches("Devil", "Ｄ"));
+        Assert.False(LibraryExplorerTypeahead.Matches("Alpha", "d"));
+    }
+
+    [Fact]
+    public void Matches_MidNameSubstring()
+    {
+        Assert.True(LibraryExplorerTypeahead.Matches("Devil May Cry", "may"));
+        Assert.True(LibraryExplorerTypeahead.Matches("Prince of Persia Trilogy Soundtrack", "persia"));
+        Assert.True(LibraryExplorerTypeahead.Matches("SQUARE ENIX", "enix"));
+        Assert.False(LibraryExplorerTypeahead.Matches("SEGA", "enix"));
+    }
+
+    [Fact]
+    public void Matches_DriveLetterInParentheses()
+    {
+        Assert.True(LibraryExplorerTypeahead.Matches("SSD (D:)", "d"));
+        Assert.True(LibraryExplorerTypeahead.Matches("SSD (D:)", "d:"));
+        Assert.True(LibraryExplorerTypeahead.Matches("ローカル ディスク (C:)", "c"));
+        Assert.False(LibraryExplorerTypeahead.Matches("SSD (D:)", "c"));
+    }
+
+    [Fact]
+    public void FindMatchIndex_MidName_FindsBelowCursor()
+    {
+        string[] names = ["Game", "CAPCOM", "Devil May Cry other BGM", "SEGA"];
+        Assert.Equal(2, LibraryExplorerTypeahead.FindMatchIndex(names, "may", currentIndex: 0));
+    }
+
+    [Fact]
+    public void Append_NormalizesUppercaseAndFullwidth()
+    {
+        Assert.Equal("d", LibraryExplorerTypeahead.Append("", "D"));
+        Assert.Equal("dd", LibraryExplorerTypeahead.Append("d", "Ｄ"));
+    }
+
+    [Fact]
+    public void TryFindMatchRange_FindsMidNameSpan()
+    {
+        Assert.True(LibraryExplorerTypeahead.TryFindMatchRange("Devil May Cry", "may", out var start, out var length));
+        Assert.Equal(6, start);
+        Assert.Equal(3, length);
+        Assert.True(LibraryExplorerTypeahead.TryFindMatchRange("SQUARE ENIX", "enix", out start, out length));
+        Assert.Equal(7, start);
+        Assert.Equal(4, length);
+        Assert.False(LibraryExplorerTypeahead.TryFindMatchRange("SEGA", "enix", out _, out _));
+    }
+
+    [Fact]
+    public void TryFindMatchRange_FullwidthMapsToOriginal()
+    {
+        Assert.True(LibraryExplorerTypeahead.TryFindMatchRange("Ｄevil", "d", out var start, out var length));
+        Assert.Equal(0, start);
+        Assert.Equal(1, length);
     }
 }
