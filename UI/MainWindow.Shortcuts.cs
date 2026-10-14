@@ -375,11 +375,12 @@ public partial class MainWindow
             return true;
         }
 
-        // F5 はツリー更新。ライブラリが非アクティブでも効き、フォーカスもツリーへ移す。
+        // F5 はツリー再読込＋索引温め（すりガラスでロック。発見はディスクが正なので必須ではない）。
         if (IsLibraryMaximized && LibraryPlayerMode.IsExplorerRefresh(key, modifiers))
         {
             LibraryBrowser.RefreshExplorer();
             LibraryBrowser.FocusExplorer();
+            _ = WarmupLibraryCatalogAsync();
             return true;
         }
 

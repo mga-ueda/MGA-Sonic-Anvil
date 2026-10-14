@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -10,6 +11,7 @@ namespace MgaSonicAnvil.UI;
 /// <summary>
 /// プレイリスト「波形表示」列。細長い縦棒を横に並べるだけ。曲ごとの見た目は揃える。
 /// 幅は S / M / L（S 基準の 1 / 2 / 3 倍）。処理の間引き方針は共通。
+/// 一度表示した棒はディスクにも残し、次回は再デコードしない。
 /// </summary>
 internal static class LibraryPlaylistWaveform
 {
@@ -44,15 +46,43 @@ internal static class LibraryPlaylistWaveform
         EffectiveSizeChanged?.Invoke();
     }
 
-    public static bool TryGet(string path, int barCount, out float[] bars) =>
-        Cache.TryGetValue(CacheKey(path, barCount), out bars!);
+    public static bool TryGet(string path, int barCount, out float[] bars)
+    {
+        if (Cache.TryGetValue(CacheKey(path, barCount), out bars!))
+        {
+            return true;
+        }
 
-    public static bool HasEntry(string path, int barCount) =>
-        Cache.ContainsKey(CacheKey(path, barCount));
+        if (!LibraryMediaCache.TryGetWaveform(path, barCount, out bars))
+        {
+            return false;
+        }
+
+        Cache[CacheKey(path, barCount)] = bars;
+        return true;
+    }
+
+    public static bool HasEntry(string path, int barCount)
+    {
+        var key = CacheKey(path, barCount);
+        if (Cache.ContainsKey(key))
+        {
+            return true;
+        }
+
+        if (!LibraryMediaCache.TryGetWaveform(path, barCount, out var bars))
+        {
+            return false;
+        }
+
+        Cache[key] = bars;
+        return true;
+    }
 
     public static void Set(string path, int barCount, float[] bars)
     {
         Cache[CacheKey(path, barCount)] = bars;
+        PersistWaveform(path, barCount, bars);
         BarsUpdated?.Invoke(path);
     }
 
@@ -64,8 +94,15 @@ internal static class LibraryPlaylistWaveform
             return false;
         }
 
+        PersistWaveform(path, barCount, bars);
         BarsUpdated?.Invoke(path);
         return true;
+    }
+
+    private static void PersistWaveform(string path, int barCount, float[] bars)
+    {
+        // 表示完了時だけ残す。UI を止めない。
+        _ = Task.Run(() => LibraryMediaCache.PutWaveform(path, barCount, bars));
     }
 
     public static void SetFromCompletedPeaks(string path, PeakPyramid peaks)
