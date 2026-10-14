@@ -203,8 +203,8 @@ internal static partial class UiStrings
         "プロキシを自動生成しない",
         "Do not auto-build proxies");
     public static string TipVideoProxyDisableAutoEncode => Get(
-        "オンなら、F9／F10 の本再生でも新しいプロキシを作らない。すでにあるものは使う。原ファイルの再生を試みる。既定オフ。F8／関連付け／引数起動では、オフでもプロキシは作らない。プレイリスト／本再生／ミニプレイヤーでは Ctrl+Shift+P で、この設定や F8 抑止にかかわらず強制生成できる。",
-        "When on, F9 / F10 real playback does not build a new proxy. An existing proxy is still used. Tries the original file. Off by default. F8 / association / argument launch never builds a proxy even when this is off. In the playlist, during real playback, or in the mini player, Ctrl+Shift+P force-builds a proxy even when this is on or F8 would suppress auto-build.");
+        "オンなら、F9／F10 の本再生でも新しいプロキシを作らない。すでにあるものは使う。原ファイルの再生を試みる。既定オフ。F8／関連付け／引数起動では、オフでもプロキシは作らない。プレイリスト／本再生／ミニプレイヤーでは Ctrl+Shift+P で、この設定や F8 抑止にかかわらず強制生成できる（すでにあるプロキシもその動画の内容で作り直す。同名同サイズの別フォルダ動画を共有しているときのおかしさを直すときもこれ）。",
+        "When on, F9 / F10 real playback does not build a new proxy. An existing proxy is still used. Tries the original file. Off by default. F8 / association / argument launch never builds a proxy even when this is off. In the playlist, during real playback, or in the mini player, Ctrl+Shift+P force-builds a proxy even when this is on or F8 would suppress auto-build (rebuilds from that video even if a proxy already exists — also the fix when a same-name/same-size copy in another folder shared the wrong proxy).");
     public static string LabelVideoProxyUsage(long bytes) =>
         Format("現在の容量: {0}", "Current size: {0}", FormatFileBytesCompact(bytes));
     public static string TipVideoProxyUsage => Get(
