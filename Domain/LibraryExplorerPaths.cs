@@ -24,9 +24,6 @@ internal static class LibraryExplorerPaths
         return string.IsNullOrWhiteSpace(profile) ? string.Empty : Path.GetFullPath(profile);
     }
 
-    /// <summary>最後に開いたフォルダが空／欠損のときの退避先（マイミュージック → ドキュメント → プロファイル）。</summary>
-    public static string DefaultFolder() => DefaultRootFolder();
-
     public static string Resolve(string? saved)
     {
         if (!string.IsNullOrWhiteSpace(saved))

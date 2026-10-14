@@ -240,12 +240,6 @@ internal static class LibraryCatalog
     }
 
     /// <summary>
-    /// 走査で得たファイル一覧をルートの索引として覚える（検索フォールバック用）。
-    /// </summary>
-    public static void RememberRootFiles(string root, IReadOnlyList<string> files) =>
-        ReplaceInventory(root, files);
-
-    /// <summary>
     /// 索引上のフォルダ配下一覧（保守／テスト用）。UI の発見経路では使わない。
     /// </summary>
     public static bool TryListFilesUnderPath(string folder, out string[] files)

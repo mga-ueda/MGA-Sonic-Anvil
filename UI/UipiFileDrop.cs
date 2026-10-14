@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Security.Principal;
 using System.Text;
 using System.Windows;
 using System.Windows.Interop;
@@ -25,20 +24,6 @@ internal static class UipiFileDrop
         ChangeWindowMessageFilter(WmDropFiles, MsgfltAdd);
         ChangeWindowMessageFilter(WmCopyData, MsgfltAdd);
         ChangeWindowMessageFilter(WmCopyGlobalData, MsgfltAdd);
-    }
-
-    /// <summary>管理者／昇格プロセスか（エクスプローラーからの OLE が UIPI で落ちる）。</summary>
-    public static bool IsProcessElevated()
-    {
-        try
-        {
-            using var identity = WindowsIdentity.GetCurrent();
-            return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     public static void Attach(Window window, Action<string[]> onFilesDropped)
