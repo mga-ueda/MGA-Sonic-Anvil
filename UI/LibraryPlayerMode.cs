@@ -349,7 +349,8 @@ internal static class LibraryPlayerMode
         modifiers == ModifierKeys.None && key == Key.R;
 
     /// <summary>
-    /// フォルダツリーの更新とフォーカス移動。プレイリスト／お気に入り／波形フォーカスでも効く。
+    /// フォルダツリー再読込とライブラリ索引温め（すりガラス）、フォーカス移動。
+    /// 任意。発見経路はディスクが正。プレイリスト／お気に入り／波形フォーカスでも効く。
     /// </summary>
     public static bool IsExplorerRefresh(Key key, ModifierKeys modifiers) =>
         key == Key.F5 && modifiers == ModifierKeys.None;
@@ -368,6 +369,12 @@ internal static class LibraryPlayerMode
     /// ツリーフォーカス中は使わず、Shift+8 の配下展開などを優先する。
     /// </summary>
     public static bool AllowsPlayerDigitJump(bool explorerFocused) => !explorerFocused;
+
+    /// <summary>
+    /// ツリー／検索フォーカス中は N／P／R／J／K をタイプアヘッド（または検索入力）に譲る。
+    /// テンキーの前後曲・再生し直しは別経路のまま。
+    /// </summary>
+    public static bool AllowsPlayerLetterTransport(bool explorerFocused) => !explorerFocused;
 
     /// <summary>エクスプローラーの /。テンキーと Oem2（日本語キーボードの /）。</summary>
     public static bool IsExplorerCollapseSubtree(Key key, ModifierKeys modifiers) =>
@@ -1629,6 +1636,12 @@ internal static class LibraryPlayerMode
     /// Render は Input より先なので、重いとマウスとキーがワンテンポ遅れる。
     /// </summary>
     public const DispatcherPriority AnalyzerTickPriority = DispatcherPriority.Background;
+
+    /// <summary>裏スレッドから届いた曲を UI に載せるまとまり（件数）。</summary>
+    public const int PlaylistLoadUiFlushCount = 16;
+
+    /// <summary>裏スレッドから届いた曲を UI に載せる間隔。メーター描画の間に乗せる。</summary>
+    public const int PlaylistLoadUiFlushMs = 33;
 
     /// <summary>再生ヘッドが同じピクセルに居るときの再描画間隔。残光の減衰用。</summary>
     public const int PlayheadIdleInvalidateMs = 50;
