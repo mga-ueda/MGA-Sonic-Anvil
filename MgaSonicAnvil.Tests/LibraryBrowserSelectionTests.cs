@@ -1178,7 +1178,9 @@ public sealed class LibraryBrowserSelectionTests
                         && Path.GetFullPath(tag).TrimEnd('\\', '/')
                             .Equals(secondFull, StringComparison.OrdinalIgnoreCase));
                 secondItem.IsSelected = true;
+                Assert.True(secondItem.Focus());
                 Flush();
+                Assert.True(view.IsExplorerTreeFocused);
 
                 var moved = 0;
                 view.ExplorerRootsChanged += (_, _) => moved++;
@@ -1190,6 +1192,8 @@ public sealed class LibraryBrowserSelectionTests
                         Path.GetFullPath(first).TrimEnd('\\', '/'),
                     ],
                     view.ExplorerRoots.Select(path => Path.GetFullPath(path).TrimEnd('\\', '/')).ToArray());
+                Flush();
+                Assert.True(view.IsExplorerTreeFocused);
 
                 Assert.False(view.TryMoveSelectedExplorerRoots(-1));
 
