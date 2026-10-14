@@ -77,24 +77,6 @@ internal static class LibraryPlaylistCache
     public static bool RequiresJacket(string kindKey) =>
         ContainsColumn(ColumnsForKind(kindKey), LibraryFileColumn.Jacket);
 
-    public static bool WaveformColumnEnabledInSettings()
-    {
-        var settings = AppStorage.Settings;
-        return ContainsColumn(settings.ResolvedLibraryListColumnsWave(), LibraryFileColumn.Waveform)
-            || ContainsColumn(settings.ResolvedLibraryListColumnsMp3(), LibraryFileColumn.Waveform)
-            || ContainsColumn(settings.ResolvedLibraryListColumnsVideo(), LibraryFileColumn.Waveform)
-            || ContainsColumn(settings.ResolvedLibraryListColumnsMixed(), LibraryFileColumn.Waveform);
-    }
-
-    public static bool JacketColumnEnabledInSettings()
-    {
-        var settings = AppStorage.Settings;
-        return ContainsColumn(settings.ResolvedLibraryListColumnsWave(), LibraryFileColumn.Jacket)
-            || ContainsColumn(settings.ResolvedLibraryListColumnsMp3(), LibraryFileColumn.Jacket)
-            || ContainsColumn(settings.ResolvedLibraryListColumnsVideo(), LibraryFileColumn.Jacket)
-            || ContainsColumn(settings.ResolvedLibraryListColumnsMixed(), LibraryFileColumn.Jacket);
-    }
-
     private static bool IsJacketSatisfied(string path, AudioFileTags tags, string kindKey)
     {
         if (LibraryMediaCache.TryGetArtworkProbe(path, out _))
