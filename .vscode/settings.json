@@ -3,6 +3,8 @@
   "workbench.editorAssociations": {
     "*.xlsx": "open-with-system",
     "*.xlsm": "open-with-system",
-    "*.xls": "open-with-system"
+    "*.xls": "open-with-system",
+    "*.html": "open-with-system",
+    "*.htm": "open-with-system"
   }
 }
