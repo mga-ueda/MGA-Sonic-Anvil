@@ -8,6 +8,7 @@
     :root {
       --bg: #1a1c1e; --panel: #22262a; --text: #e8eaed; --muted: #9aa3ad;
       --accent: #6cb6ff; --border: #3a424a; --code: #c9d1d9; --code-bg: #121416; --toc-w: 15.5rem;
+      --subhead: #9ecbff;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
@@ -33,11 +34,13 @@
     .hero strong { color: #b3d4ff; }
     h2 { margin: 2.4rem 0 0.85rem; padding-top: 0.65rem; border-top: 1px solid var(--border); font-size: 1.35rem; scroll-margin-top: 0.75rem; }
     h2:first-of-type { border-top: none; padding-top: 0; }
-    h3 { margin: 1.5rem 0 0.55rem; font-size: 1.08rem; color: #d7dde3; scroll-margin-top: 0.75rem; }
+    h3 { margin: 1.75rem 0 0.55rem; font-size: 1.12rem; color: #f0f3f6; font-weight: 650; scroll-margin-top: 0.75rem; }
+    h4 { margin: 1.25rem 0 0.4rem; font-size: 1rem; color: var(--subhead); font-weight: 650; scroll-margin-top: 0.75rem; }
     p { margin: 0.65rem 0; }
     ul, ol { margin: 0.45rem 0 0.9rem; padding-left: 1.35rem; }
-    li { margin: 0.4rem 0; }
-    li > p { margin: 0.3rem 0 0.45rem; }
+    li { margin: 0.45rem 0; }
+    li > p { margin: 0.3rem 0 0.4rem; }
+    li > p:first-child { margin-top: 0; }
     li > p:last-child { margin-bottom: 0; }
     li > ul, li > ol { margin: 0.3rem 0 0.45rem; padding-left: 1.15rem; }
     code, kbd { font-family: Consolas, "Cascadia Mono", "Courier New", monospace; font-size: 0.88em; background: var(--code-bg); color: var(--code); border-radius: 4px; padding: 0.08em 0.35em; }
@@ -55,14 +58,15 @@
     .jump { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.15rem 0 1.1rem; }
     .jump a { display: inline-block; padding: 0.16rem 0.62rem; border: 1px solid var(--border); border-radius: 999px; background: #22282e; color: #c5d0da; font-size: 0.82rem; line-height: 1.45; }
     .jump a:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
-    .parts { display: flex; flex-direction: column; gap: 0.85rem; margin: 0.2rem 0 0.4rem; }
-    .part { background: linear-gradient(180deg, #262c32 0%, #1e2328 100%); border: 1px solid var(--border); border-radius: 12px; padding: 0.95rem 1.15rem 0.85rem; margin: 0; scroll-margin-top: 0.75rem; }
-    .part > h3 { margin: 0; padding: 0; border: 0; font-size: 1.14rem; color: #f4f7fa; scroll-margin-top: 0.85rem; }
-    .part .where { margin: 0.15rem 0 0.7rem; color: var(--muted); font-size: 0.9rem; }
-    .part h4 { margin: 1.05rem 0 0.35rem; font-size: 0.95rem; color: #9ecbff; font-weight: 650; }
-    .part p { margin: 0.4rem 0; }
-    .part ul, .part ol { margin: 0.2rem 0 0.55rem; }
-    .part li > ul { margin: 0.25rem 0 0.4rem; padding: 0.1rem 0 0.1rem 0.95rem; border-left: 2px solid #33404c; }
+    /* 画面の見方も他章と同じ見出し階層。カード枠は使わない。 */
+    .parts { display: block; margin: 0; }
+    .part { background: none; border: none; border-radius: 0; padding: 0; margin: 0 0 0.35rem; scroll-margin-top: 0.75rem; }
+    .part > h3 { margin: 1.75rem 0 0.55rem; padding: 0; border: 0; font-size: 1.12rem; color: #f0f3f6; font-weight: 650; scroll-margin-top: 0.75rem; }
+    .part .where { margin: 0.1rem 0 0.65rem; color: var(--muted); font-size: 0.9rem; }
+    .part h4 { margin: 1.25rem 0 0.4rem; font-size: 1rem; color: var(--subhead); font-weight: 650; }
+    .part p { margin: 0.55rem 0; }
+    .part ul, .part ol { margin: 0.4rem 0 0.85rem; }
+    .part li > ul { margin: 0.3rem 0 0.45rem; padding-left: 1.15rem; }
     ol.steps > li { margin: 0.9rem 0; }
     ol.steps > li > p:first-child { margin-top: 0; }
     footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; text-align: center; }
@@ -70,7 +74,6 @@
       .layout { grid-template-columns: 1fr; }
       nav.toc { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
       main { padding: 1.25rem 1rem 3rem; }
-      .part { padding: 0.85rem 0.9rem 0.75rem; }
     }
   </style>
 </head>
@@ -154,6 +157,7 @@
         <a href="#layout-overview">Overview</a>
         <a href="#layout-wave">Waveform</a>
         <a href="#layout-player">Player</a>
+        <a href="#layout-typeahead">Folder-name jump</a>
         <a href="#layout-loading">Loading</a>
         <a href="#layout-scroll">Scrollbar</a>
         <a href="#layout-tabs">Tabs</a>
@@ -188,13 +192,41 @@
           <li><strong>UI language</strong> — Auto / Japanese / English. Auto is Japanese if the OS is Japanese, otherwise English.</li>
           <li><strong>UI scale</strong> — 100–200%. Extra enlargement on top of Windows display scaling; you cannot shrink. Affects the main window only. Menus, Settings, and edit history stay at 100%. Applies as soon as you change it. Cancel restores it.</li>
           <li><strong>Multiple files</strong> — how to arrange two or more files after opening them: keep tabs / side by side / stacked / grid. Default is keep tabs.</li>
-          <li><strong>File associations</strong> — Audio: Wave / AIFF / MP3 / M4A (M4A is player-only). Video: MP4 / MOV / AVI / MKV / WebM / MPG / MPEG (player-only; dimmed when ffmpeg is missing, but still checkable). Check to open that type with this app; uncheck to remove. Types already using this app start checked. The change applies immediately. Opening video via association or command-line arguments, and the F8 video mini, never build a playback proxy, even when auto-build proxies is on. The player starts without the playlist and other front chrome; <kbd>A</kbd> / <kbd>T</kbd> visibility is shared with F8 and remembered (both off by default; playlist playback starts on, can turn off during play, next play turns on again).</li>
+          <li>
+            <p><strong>File associations</strong> — Choose which types open with this app. Changes apply immediately.</p>
+            <ul>
+              <li>Audio: Wave / AIFF / MP3 / M4A (M4A is player-only)</li>
+              <li>Video: MP4 / MOV / AVI / MKV / WebM / MPG / MPEG (player-only; dimmed when ffmpeg is missing, but still checkable)</li>
+              <li>Types already using this app start checked. Uncheck to remove.</li>
+              <li>Association / argument video launch and the F8 video mini never build a proxy, even when auto-build is on.</li>
+              <li>Those launches start without front chrome. <kbd>A</kbd> / <kbd>T</kbd> visibility is shared with F8 (both off by default; playlist playback starts on, can turn off during play, next play turns on again).</li>
+            </ul>
+          </li>
         </ul>
         <h4>Shown</h4>
         <ul>
           <li><strong>Speaker definitions</strong> — checklist of definitions to enable. Stereo only by default. The definition in use stays listed until you switch away. At least one must stay enabled. The status-bar SPEAKER menu uses the same list.</li>
-          <li><strong>Documents and video in the playlist</strong> — PDF / MOV / MP4 / AVI / MKV / WebM / MPG as separate checks. PDF on by default; video types off by default. AVI / MKV / WebM / MPG are listed only when ffmpeg is available (still checkable when dimmed). Unchecked types are skipped on folder add and drop. Player-only; they are never handed to the editor.</li>
-          <li><strong>Playlist columns</strong> — choose WAVE, MP3, and video sets separately (each list shows only columns that make sense for that format; the file name is always shown; an empty playlist hides every column). WAVE / AIFF-only lists use the WAVE set, MP3 / M4A-only lists use the MP3 set, video-only lists use the video set, and mixed lists use the union until you customize them while mixed. While mixed, dragging a header to reorder or right-clicking to show/hide is remembered only for the mixed layout and does not change the WAVE / MP3 / video settings. Changing the WAVE / MP3 / video settings clears the mixed memory and returns to the union. Each set can be reset. WAVE starts as file / rate / bits / Ch / time / date / parent folder / waveform. MP3 starts as file / title / album / artist / composer / time / track / disc / year / genre / date / comment / parent folder (waveform off). Video starts as file / resolution / frame rate / bit rate / video codec / rate / bits / Ch / audio codec / time / date / parent folder / waveform. Empty columns hide and come back when a value appears. Jacket appears only when a row actually has art. Drag a header to reorder; right-click to turn columns on or off.</li>
+          <li>
+            <p><strong>Documents and video in the playlist</strong> — PDF / MOV / MP4 / AVI / MKV / WebM / MPG as separate checks.</p>
+            <ul>
+              <li>PDF on by default; video types off by default.</li>
+              <li>AVI / MKV / WebM / MPG are listed only when ffmpeg is available (still checkable when dimmed).</li>
+              <li>Unchecked types are skipped on folder add and drop.</li>
+              <li>Player-only; they are never handed to the editor.</li>
+            </ul>
+          </li>
+          <li>
+            <p><strong>Playlist columns</strong> — Choose WAVE, MP3, and video sets separately (only columns that make sense for that format; the file name is always shown; an empty playlist hides every column).</p>
+            <ul>
+              <li>WAVE / AIFF-only → WAVE set; MP3 / M4A-only → MP3 set; video-only → video set; mixed lists use the union until customized while mixed.</li>
+              <li>While mixed, header drag / right-click show-hide is remembered only for the mixed layout.</li>
+              <li>Changing a WAVE / MP3 / video setting clears mixed memory and returns to the union. Each set can be reset.</li>
+              <li>WAVE defaults: file / rate / bits / Ch / time / date / parent folder / waveform</li>
+              <li>MP3 defaults: file / title / album / artist / composer / time / track / disc / year / genre / date / comment / parent folder (waveform off)</li>
+              <li>Video defaults: file / resolution / frame rate / bit rate / video codec / rate / bits / Ch / audio codec / time / date / parent folder / waveform</li>
+              <li>Empty columns hide until a value appears. Jacket only when art exists. Drag headers to reorder; right-click to toggle.</li>
+            </ul>
+          </li>
           <li><strong>Waveform width</strong> — choose separately for WAVE and MP3 at the bottom of each column checklist. S (short) / M (medium) / L (long). WAVE and MP3 both default to L. M is 2× S, L is 3× S. WAVE / AIFF-only lists use the WAVE width, MP3 / M4A-only lists use the MP3 width, and mixed lists use the wider of the two. Reset to defaults also restores that side's width. Waveforms fill in after the list paints, as rough bars.</li>
         </ul>
         <h4>Audio</h4>
@@ -222,7 +254,16 @@
         <h4>Export · Paths</h4>
         <ul>
           <li><strong>Audio</strong> — LAME path / LAME options / Windows bit rate when not using LAME / parallel export count (default Auto = a quarter of the CPU cores; dropdown max is half the cores).</li>
-          <li><strong>Movie</strong> — FFmpeg path (recommended; used mainly for proxy builds) / Do not auto-build proxies (off by default; F8 / association / argument video launch still skips proxies even when this is off; auto-build happens only on F9 / F10 real playback; in the playlist, during real playback, or in the mini player, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> force-builds a proxy even when this is on or F8 would suppress auto-build) / unused proxy retention (per video; how long to keep a proxy while this app has not used it — launching the app alone does not reset unused time; playback and other references such as waveform peaks or thumbnails count as use) / current size / Delete all (clears every stored proxy now, ignoring retention; asks first).</li>
+          <li>
+            <p><strong>Movie</strong> — Playback proxies and ffmpeg.</p>
+            <ul>
+              <li>FFmpeg path (recommended; used for proxy builds)</li>
+              <li>Do not auto-build proxies (off by default; F8 / association / argument launch still skip auto-build; auto-build is only on F9 / F10 real playback)</li>
+              <li>In the playlist, during real playback, or in the mini player, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> force-builds even when auto-build is off or F8 would suppress it</li>
+              <li>Unused proxy retention (per video; launching alone does not reset unused time; playback, waveform, and thumbnails count as use)</li>
+              <li>Current size / Delete all (clears every stored proxy now; asks first)</li>
+            </ul>
+          </li>
         </ul>
         <h4>Wwise</h4>
         <p>Music Track timing for EXPORT. Streaming is always on. Prefetch Length and Look-ahead Time both start at 500 ms (0 to 10000). Prefetch is on the first track; look-ahead is on later tracks. The first track’s look-ahead stays 50 ms.</p>
@@ -259,14 +300,17 @@
           <li>Tabs are hidden. File list on top (folder tree left, list center) and a short fixed-height waveform below. The overview is hidden.</li>
           <li>Groups default to parent folder, with a jacket beside each group. Video / PDF show a per-row thumbnail when available (no placeholder when art is missing). Playback and skip do not rebuild the list.</li>
           <li>While the playlist is empty, every list column stays hidden (clearing a visible list fades the headers in 1 second), and the level meter, spectrum, loudness, gonio, and surround meter stay hidden (they start hidden when you enter player). An empty playlist focuses the library (folder tree).</li>
-          <li><kbd>F8</kbd> is the video / PDF mini player (no playlist / transport chrome; window uses the video / PDF page’s native size; <kbd>+</kbd> / <kbd>-</kbd> (keyboard and numpad only) always land on 25% steps (after a free border drag, the next key snaps to the nearest 25%; keys pause at native size; 25–300%; aspect locked; scale remembered until you leave F8); drag the window border for continuous resize (not 25% steps; aspect locked; no mouse-wheel resize); enter when a video or PDF is on the back stage (real playback or the dim background preview) and the playlist has something to play. Opening video via association or arguments enters it automatically).
+          <li>
+            <p><kbd>F8</kbd> — video / PDF mini player (no playlist / transport chrome).</p>
             <ul>
-              <li><kbd>Space</kbd> stop freezes at the playback start, <kbd>Enter</kbd> freezes in place (does not drop into the dim 1/3-speed mesh background loop; same on the playlist). <kbd>Escape</kbd> / <kbd>Q</kbd> quits the app.</li>
-              <li><kbd>A</kbd> (waveform / analyzers / file name) / <kbd>T</kbd> (timecode) visibility is shared with argument launch and remembered (both off by default; playlist playback starts on, can turn off during play, next play turns on again).</li>
-              <li><kbd>F</kbd> fullscreen still allows <kbd>F8</kbd> (exits fullscreen, then sizes to the video’s native frame).</li>
-              <li>F8 again returns to the normal player and keeps playback going.</li>
+              <li>Window uses the video / PDF page’s native size. <kbd>+</kbd> / <kbd>-</kbd> (keyboard and numpad) always land on 25% steps (after a free border drag, the next key snaps to the nearest 25%; pause at native size; 25–300%; aspect locked; scale remembered until you leave F8).</li>
+              <li>Drag the window border for continuous resize (not 25% steps; aspect locked; no mouse-wheel resize).</li>
+              <li>Enter when a video or PDF is on the back stage (real playback or dim preview) and the playlist has something to play. Association / argument video launch enters automatically.</li>
+              <li><kbd>Space</kbd> freezes at the playback start; <kbd>Enter</kbd> freezes in place (does not drop into the dim 1/3-speed mesh loop). <kbd>Escape</kbd> / <kbd>Q</kbd> quit the app.</li>
+              <li><kbd>A</kbd> (waveform / analyzers / file name) / <kbd>T</kbd> (timecode) are shared with argument launch (off by default; playlist playback starts on, can turn off during play, next play turns on again).</li>
+              <li><kbd>F</kbd> fullscreen still allows <kbd>F8</kbd> (exits fullscreen, then native frame). F8 again returns to the normal player and keeps playback going.</li>
               <li>F9 / F10 return to the player with the playlist visible (real playback stops; dim preview).</li>
-              <li>Moving to F11 / F12 does not take video / PDF at all (including as audio-only); only selected audio files are kept.</li>
+              <li>Moving to F11 / F12 does not take video / PDF; only selected audio files are kept.</li>
             </ul>
           </li>
           <li><kbd>F9</kbd> shows only the playlist and waveform (to save desktop space; from any mode).
@@ -281,13 +325,60 @@
         <h4>Playback</h4>
         <ul>
           <li>Entering selects and plays the first track (the same when you start the app with files).</li>
-          <li><kbd>Space</kbd> or transport Play plays that track only and stops when it ends (from the seek bar / playhead, or the same video’s dim preview position; while playing, returns to the start — during real video playback, seeks to the start and stops (does not resume) without showing the playlist; Enter also keeps chrome hidden; Escape / Q returns to background playback; during bright PDF view, Escape / Q returns to the dim preview). <kbd>Enter</kbd> pauses in place. While stopped, video / PDF match <kbd>Space</kbd> (real playback / bright view). During real video playback it pauses in place without showing the playlist. Whether playback advances at the end is controlled by the playlist’s <strong>Auto next</strong> checkbox (<kbd>Alt</kbd>+<kbd>N</kbd>; off by default). Double-click starts playback and advances only when Auto next is on.</li>
+          <li>
+            <p><kbd>Space</kbd> or transport Play plays that track only and stops when it ends.</p>
+            <ul>
+              <li>Starts from the seek bar / playhead, or the same video’s dim preview position.</li>
+              <li>While playing, returns to the start. During real video playback, seeks to the start and stops without showing the playlist (does not resume).</li>
+              <li><kbd>Enter</kbd> pauses in place (chrome stays hidden). While stopped, video / PDF match <kbd>Space</kbd> (real playback / bright view).</li>
+              <li><kbd>Escape</kbd> / <kbd>Q</kbd> return to background playback (same to leave bright PDF view).</li>
+              <li>Whether playback advances at the end is controlled by <strong>Auto next</strong> (<kbd>Alt</kbd>+<kbd>N</kbd>; off by default). Double-click starts playback and advances only when Auto next is on.</li>
+            </ul>
+          </li>
           <li>While stopped, selecting a track shows its waveform without playing. Selecting PDF / video also shows a dim back-stage preview (video: dim + mesh + silent 1/3-speed loop; PDF: dim only, no mesh and no frosted glass). Adding tracks fades them in over 1 second; when they start moving with the audio they appear immediately. Clearing the list fades them out over 1 second.</li>
           <li><kbd>Alt</kbd>+<kbd>R</kbd> toggles shuffle. No repeats until the playlist has played once. Works on an empty list. Off by default. Leaving player turns it off. Not saved. <kbd>R</kbd> restarts the current track from the beginning.</li>
           <li><kbd>Alt</kbd>+<kbd>N</kbd> toggles auto next. When on, advances to the next track at the end and gapless-prefetches. When off, stops on that track. Works on an empty list. Off by default. Leaving player turns it off. Not saved. Plain <kbd>N</kbd> still steps to the next track manually.</li>
           <li>Playback starts as soon as sound can play. It does not wait for the waveform to finish drawing.</li>
           <li>With auto next on, continuous playback prepares the next track and joins without stopping. Tiny extra silence at the start and end of MP3 / M4A is reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
-          <li>Types checked under <strong>Documents and video in the playlist</strong> (PDF / MOV / MP4 / AVI / MKV / WebM / MPG; PDF on by default, video types off by default; AVI / MKV / WebM / MPG only when ffmpeg is available) appear in the list. Video plays like audio (continuous or single track) behind the whole window, in front of the artwork wash and behind the list and waveform. Its audio feeds the meters, spectrum, and live loudness, and the waveform is drawn. MOV / MP4 / AVI codecs are inspected: MJPEG / Photo JPEG play as-is; anything else (such as ProRes) and MKV / WebM / MPG are transcoded to an MJPEG AVI playback proxy at the source frame rate with ffmpeg first (for smooth scrubbing) (frosted-glass progress; Esc cancels; ffmpeg is not bundled; set ffmpeg.exe under Settings → Export · Paths. Empty or invalid skips the proxy and tries the original file (no error)). Opening video via association or arguments, and the F8 video mini, never auto-build a proxy even when auto-build is on (auto-build is only on F9 / F10 real playback; <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> can force-build in the playlist, during real playback, or in the mini player). Association / argument launch also starts the player with no front UI. Each unused proxy is removed after the unused retention in Settings (default 7 days without this app using that video's proxy; launching the app alone does not reset unused time; playback and other references such as waveform peaks or thumbnails count as use). Real playback goes bright and clears dim / mesh. Front chrome fades out over 0.2 s only during real video playback or bright PDF view—not during the dim selection preview. During real video playback the waveform, level meter, spectrum, goniometer, surround meter, and loudness stay; large current and end times sit centered at the top (MM:SS.ff; the fractional part is always frame numbers at 30 fps — not source fps, not milliseconds; selection start and end appear on a second reserved line while a range is selected); the playing file name sits centered at the bottom (appends (Proxy) when a playback proxy is in use); when the playlist has two or more tracks and front chrome is hidden (real playback, F8 mini, and similar), the bottom-left briefly flashes current / total (e.g. 2 / 5) like PDF page numbers, then fades out (not shown continuously); when front chrome is hidden (real playback, mini, or bright PDF view), reaching the end seeks to the start and stops without advancing (use N / P or numpad 4 / 6 for the next track); with the playlist visible and Auto next on, continuous playback still advances; playlist video playback starts with <kbd>A</kbd> / <kbd>T</kbd> on and can turn them off during play (next play or another video turns them on again; separate from F8 / argument-launch memory); in the <kbd>F8</kbd> / argument-launch video mini, <kbd>A</kbd> fades the waveform, analyzers, and file name on or off (not the timecode) and <kbd>T</kbd> toggles the timecode (MM:SS.ff; fractional part is frames at 30 fps; selection range), both remembered (off by default); during PDF view, <kbd>A</kbd> / <kbd>T</kbd> overlays are hidden without changing their state (the next audio / video uses the remembered state); <kbd>F</kbd> is the same as browser F11 fullscreen for video / PDF while shown (including the dim preview; F again restores; stopping playback does not exit it). Bright PDF view also hides front chrome (Escape leaves; Space / Enter do not). <kbd>W</kbd> dims the current page, pins it as a still background, and leaves immediately (works from the dim preview too; stays behind music or video; no drift; B again restores the normal wash; leaving for the editor discards it). Silent Skip is ignored while video plays (the checkbox is unchanged). Stop / pause keeps the frame (no jump to start, no blackout): it fades to dim+mesh and ramps speed from 1× to 1/3 over about 1 second (resuming during the ramp continues from the current position); front UI fades back in over 0.2 s. Playing another track hides this layer so the wash shows. Seek and 5 s skip match the waveform. PDF is included in continuous play: when reached it opens in bright view and playback stops (no timeline). In bright PDF view, on page change only, a page number flashes centered at the bottom then fades out (e.g. 1 / 3 on a semi-transparent black background; not shown continuously); top-row digits jump to that page (two-digit entry; 0 alone is the same as 1; the numpad stays transport — 4 previous / 6 next; top-row percent jump is not used while bright); <kbd>←</kbd> / <kbd>→</kbd> and <kbd>PageUp</kbd> / <kbd>PageDown</kbd> turn pages, <kbd>Home</kbd> / <kbd>End</kbd> go to the first / last page, and <kbd>+</kbd> / <kbd>-</kbd> (including the numpad) zoom (100% fits the whole page in the window, up to 300%; pauses once at fit-width or fit-height; release and press again to go further; zoom is forgotten when another file is shown). Playlist shortcuts are disabled until the PDF view is left. Video and PDF stay in player mode and are never handed to the editor.</li>
+          <li>
+            <p>Types checked under <span class="ui">Documents and video in the playlist</span> appear in the list (PDF / MOV / MP4 / AVI / MKV / WebM / MPG; PDF on by default, video off by default; AVI / MKV / WebM / MPG only when ffmpeg is available).</p>
+            <ul>
+              <li>Video plays like audio (continuous or single track). Audio feeds the meters, spectrum, and loudness; the waveform is drawn.</li>
+              <li><strong>Proxy</strong> — MOV / MP4 / AVI: MJPEG / Photo JPEG play as-is; anything else (e.g. ProRes) and MKV / WebM / MPG become an MJPEG AVI proxy at the source frame rate via ffmpeg (frosted-glass progress; Esc cancels). ffmpeg is not bundled — set it under Settings → Export · Paths. Empty / invalid skips the proxy and tries the original (no error).</li>
+              <li><strong>When proxies build</strong> — Auto-build only on F9 / F10 real playback. Association / argument launch and the F8 mini never auto-build. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> can force-build in the playlist, during real playback, or in the mini. Association / argument launch starts with no front UI.</li>
+              <li><strong>Retention</strong> — Unused proxies are removed after the unused days in Settings (default 7; launching alone does not reset unused time; playback, waveform, and thumbs count as use).</li>
+              <li>
+                <p><strong>Display</strong></p>
+                <ul>
+                  <li>Behind the whole window (in front of the artwork wash, behind list and waveform). Real playback goes bright and clears dim / mesh.</li>
+                  <li>Front chrome fades out over 0.2 s only during real video playback or bright PDF view. During real playback the waveform and meters stay.</li>
+                  <li>Large NOW / END at the top center (MM:SS.ff; fractional part is always 30 fps frames); file name at the bottom center ((Proxy) when a proxy is used).</li>
+                  <li>With 2+ tracks and chrome hidden, bottom-left briefly flashes current / total.</li>
+                </ul>
+              </li>
+              <li><strong>End of track</strong> — With chrome hidden, seeks to the start and stops without advancing (use <kbd>N</kbd> / <kbd>P</kbd> or numpad <kbd>4</kbd> / <kbd>6</kbd>). With the playlist visible and Auto next on, continuous playback advances.</li>
+              <li>
+                <p><strong><kbd>A</kbd> / <kbd>T</kbd> / <kbd>F</kbd> / <kbd>W</kbd></strong></p>
+                <ul>
+                  <li>Playlist real playback starts with <kbd>A</kbd> / <kbd>T</kbd> on (can turn off during play; next play turns on again; separate from F8 / argument memory).</li>
+                  <li>In the F8 / argument mini, <kbd>A</kbd> toggles waveform / analyzers / file name and <kbd>T</kbd> toggles timecode (off by default).</li>
+                  <li>During PDF view, <kbd>A</kbd> / <kbd>T</kbd> overlays stay hidden without changing state.</li>
+                  <li><kbd>F</kbd> is browser-style fullscreen. <kbd>W</kbd> pins the current PDF page as a still background and leaves the view (W again restores the wash; leaving for the editor discards it).</li>
+                </ul>
+              </li>
+              <li><strong>Stop</strong> — Silent Skip is ignored while video plays. Stop keeps the frame: fades to dim+mesh and ramps 1× → 1/3 over about 1 s. Front UI fades back in over 0.2 s. Playing another track hides this layer. Seek and 5 s skip match the waveform.</li>
+              <li>
+                <p><strong>PDF</strong></p>
+                <ul>
+                  <li>Included in continuous play; opens in bright view and stops.</li>
+                  <li>Page numbers toast on page change. Top-row digits jump to a page (two digits OK; 0 alone = 1; numpad stays transport).</li>
+                  <li>← / → and PageUp / PageDown turn pages; Home / End go to first / last; +/- zoom (100% = fit, up to 300%).</li>
+                  <li>↑ / ↓ move to neighboring files while bright. Other playlist shortcuts wait until you leave the view.</li>
+                </ul>
+              </li>
+              <li>Video and PDF stay player-only and are never handed to the editor.</li>
+            </ul>
+          </li>
           <li>Arrow keys do not shuttle. During real video playback or frame pause, ← / → pause and step one frame (hold repeats after an initial wait). Transport works from any pane.
             <ul>
               <li><kbd>Space</kbd> — play / stop (stop returns to the start; during real video playback, seeks to the start and stops without resuming; playlist chrome stays hidden; Escape / Q returns to the dim preview), <kbd>Enter</kbd> — pause in place (while stopped, video / PDF go to real playback / bright view; during real video playback, chrome stays hidden)</li>
@@ -313,12 +404,40 @@
           <li>The tree on the left starts at Music and remembers the last folder, which folders were expanded, and the split with Favorites. Missing tree roots and missing Favorites entries show in red. Drop folders from Explorer onto the tree to register roots; drop files or folders onto Favorites to register them. Reorder roots with <kbd>Alt</kbd>+↑ / ↓ or by dragging a root within the tree.</li>
           <li>Splitters and scrollbars appear when the pointer nears them, then fade out after about 3 s of no movement. Selecting a folder does not add it to the list.</li>
           <li><kbd>*</kbd> expands all under the selection. <kbd>/</kbd> collapses it.</li>
-          <li>With the tree focused, type the start of a folder name to jump to it. Keep typing to narrow. About 1 s idle starts over. This does not add to the playlist.</li>
+          <li>With the tree focused, letter keys jump to folders by name (see <a href="#layout-typeahead">Folder-name jump</a>). This does not add to the playlist. It is separate from <kbd>Ctrl</kbd>+<kbd>F</kbd> filter search.</li>
           <li>Enter on the tree clears the playlist, then adds that folder recursively. Enter on another folder while a large load is in progress cancels it and replaces the playlist. While searching, only visible folders: matching files when the hit is a file name, or everything in a folder whose name matched. Depth-first. Playback starts with the first file registered.</li>
           <li>Shift+Enter, double-click, or dropping a folder onto the list adds them recursively.</li>
         </ul>
+        <h4 id="layout-typeahead">Folder-name jump (incremental search)</h4>
+        <p>This is the “type to find” pattern used in Explorer and similar trees. Unlike <kbd>Ctrl</kbd>+<kbd>F</kbd>, it only moves the tree selection — it does not add anything to the playlist.</p>
+        <ol class="steps">
+          <li>
+            <p>Focus the folder tree (<kbd>F1</kbd>, etc.).</p>
+          </li>
+          <li>
+            <p>Type letter keys to jump to a folder whose display name contains what you typed (prefix or mid-name; case and fullwidth/halfwidth are ignored).</p>
+            <ul>
+              <li>Example: <kbd>N</kbd> reaches <span class="ui">namco</span> or <span class="ui">NINTENDO</span>; <kbd>M</kbd><kbd>A</kbd><kbd>Y</kbd> reaches a folder with <span class="ui">May</span> in the middle of the name.</li>
+              <li>Keep typing to accumulate characters and narrow the match (repeating <kbd>D</kbd> builds <code>dddd</code>).</li>
+              <li>A toast in the center of the tree shows what you typed. About 1 s after you stop typing, the toast disappears and the typed buffer is forgotten.</li>
+              <li>Matching characters get a yellow highlight. After the toast goes away, the highlight stays so you can walk hits with <kbd>↑</kbd> / <kbd>↓</kbd>.</li>
+            </ul>
+          </li>
+          <li>
+            <p><kbd>Esc</kbd> clears the yellow highlight and ends the walk. Adding to the playlist / starting playback, or moving focus out of the tree, also ends it.</p>
+          </li>
+        </ol>
+        <div class="note">
+          <p>While the tree has focus, <kbd>N</kbd> / <kbd>P</kbd> / <kbd>R</kbd> / <kbd>J</kbd> / <kbd>K</kbd> are used for this folder-name jump, not previous/next track or other letter transport (the numpad still controls playback). Shuffle is <kbd>Alt</kbd>+<kbd>R</kbd>; auto next is <kbd>Alt</kbd>+<kbd>N</kbd>.</p>
+        </div>
         <h4>Waveform</h4>
-        <p>The waveform only seeks and selects. Document markers / regions / loops stay hidden. On the audio playlist waveform and during real video playback / F8, <kbd>I</kbd> / <kbd>O</kbd> set a disposable A-B loop and <kbd>M</kbd> / <kbd>Ins</kbd> place temporary markers (forgotten when another file plays; for audio, markers merge with existing ones and a complete A-B becomes the sample loop as an unsaved edit on return to the editor; video / PDF are not taken into the editor so those cues are discarded). Not used on the dim video / PDF preview. Selection is inverted and translucent. No zoom. Display-resolution peaks only. Short files stay dense. Spectrogram / loudness-curve views stay off. Edit commands are blocked. Right-click / the menu key / <kbd>Shift</kbd>+<kbd>F10</kbd> can open the menu, but edit commands stay disabled.</p>
+        <ul>
+          <li>The waveform only seeks and selects. Document markers / regions / loops stay hidden.</li>
+          <li>On the audio playlist waveform and during real video playback / F8, <kbd>I</kbd> / <kbd>O</kbd> set a disposable A-B loop and <kbd>M</kbd> / <kbd>Ins</kbd> place temporary markers (forgotten when another file plays; for audio, markers merge with existing ones and a complete A-B becomes the sample loop as an unsaved edit on return to the editor; video / PDF are not taken into the editor so those cues are discarded).</li>
+          <li>Not used on the dim video / PDF preview. Selection is inverted and translucent. No zoom.</li>
+          <li>Display-resolution peaks only. Short files stay dense. Spectrogram / loudness-curve views stay off. Edit commands are blocked.</li>
+          <li>Right-click / the menu key / <kbd>Shift</kbd>+<kbd>F10</kbd> can open the menu, but edit commands stay disabled.</li>
+        </ul>
         <h4>Jacket and background</h4>
         <ul>
           <li>Jacket / thumbnail images appear only when a file actually has art (including video and PDF thumbs). Rows without art stay blank with no placeholder. If the playlist has none, the jacket area is hidden.</li>
@@ -964,7 +1083,7 @@
           <tr><td>Tree <kbd>*</kbd></td><td>Expand all folders under the selection (same as Explorer; numpad <kbd>*</kbd> or Shift+8; expansion is remembered)</td></tr>
           <tr><td>Tree <kbd>/</kbd></td><td>Collapse the selection and everything under it (numpad <kbd>/</kbd> or the <kbd>/</kbd> key)</td></tr>
           <tr><td>Tree <kbd>Alt</kbd>+↑ / ↓</td><td>Move the selected root up / down one step (same as Settings → Player Up / Down; no-op when the selection is not a root)</td></tr>
-          <tr><td>Type on the tree</td><td>Select the folder whose display name starts with what you type (incremental search; case-insensitive. With Test and Task, <kbd>T</kbd> goes to Test, then <kbd>A</kbd> goes to Task. About 1 s idle starts over. <kbd>Alt</kbd>+<kbd>R</kbd> toggles shuffle; <kbd>Alt</kbd>+<kbd>N</kbd> toggles auto next; <kbd>R</kbd> restarts the track (not used for folder-name jump). While the tree has focus, top-row digits / <kbd>Shift</kbd>+top-row are unused (<kbd>Shift</kbd>+8 expands the subtree; the numpad stays transport). Percent / marker-number jumps work from the playlist and other panes. Does not add to the playlist. Separate from <kbd>Ctrl</kbd>+<kbd>F</kbd> filter search)</td></tr>
+          <tr><td>Type on the tree</td><td>Folder-name jump (incremental search). Moves selection by partial match on the display name. Details under <a href="#layout-typeahead">Layout → Folder-name jump</a>. Separate from <kbd>Ctrl</kbd>+<kbd>F</kbd> filter search. Does not add to the playlist</td></tr>
           <tr><td><kbd>Space</kbd> / <kbd>Enter</kbd> (from any pane)</td><td><kbd>Space</kbd> — play / stop (stop returns to the start; during real video playback, seeks to the start and stops without resuming; playlist chrome stays hidden; Escape / Q returns to the dim preview), <kbd>Enter</kbd> — pause in place (while stopped, video / PDF go to real playback / bright view; during real video playback, chrome stays hidden)</td></tr>
           <tr><td><kbd>R</kbd></td><td>Restart the current track from the beginning</td></tr>
           <tr><td><kbd>P</kbd> / <kbd>N</kbd></td><td>Previous / next track (after the last wraps to the first; before the first wraps to the last)</td></tr>
