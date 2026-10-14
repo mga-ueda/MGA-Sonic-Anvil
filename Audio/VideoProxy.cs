@@ -182,7 +182,9 @@ internal static class VideoProxy
             return sourcePath;
         }
 
-        if (TryGetCached(sourcePath, out var cached))
+        // forceEncode は既存キャッシュも捨てて作り直す（同名同サイズの誤共有の直し用）。
+        // 自動生成時だけヒットを返す。
+        if (!forceEncode && TryGetCached(sourcePath, out var cached))
         {
             progress?.Report(1);
             return cached;
@@ -200,13 +202,20 @@ internal static class VideoProxy
         Task<string> pending;
         lock (Gate)
         {
-            if (TryGetCachedCore(sourcePath, out cached))
+            if (!forceEncode && TryGetCachedCore(sourcePath, out cached))
             {
                 pending = Task.FromResult(cached);
             }
             else if (InFlight.TryGetValue(key, out var running))
             {
-                pending = running;
+                // 強制時は先行完了を待ってからこのソースで上書き生成する。
+                pending = forceEncode
+                    ? EncodeAfterAsync(running, sourcePath, progress, cancellationToken)
+                    : running;
+                if (forceEncode)
+                {
+                    InFlight[key] = pending;
+                }
             }
             else
             {
@@ -231,6 +240,24 @@ internal static class VideoProxy
                 }
             }
         }
+    }
+
+    private static async Task<string> EncodeAfterAsync(
+        Task<string> previous,
+        string sourcePath,
+        IProgress<double>? progress,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await previous.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // 先行失敗でもこのソースで作り直す。
+        }
+
+        return await EncodeProxyAsync(sourcePath, progress, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<string> EncodeProxyAsync(
@@ -355,33 +382,45 @@ internal static class VideoProxy
 
     internal static string CachePath(string sourcePath)
     {
-        var info = new FileInfo(sourcePath);
-        var length = info.Exists ? info.Length.ToString(CultureInfo.InvariantCulture) : "0";
-        var stamp = SourceKey(sourcePath) + "|" + length + "|" + EncodeVersion;
+        var stamp = SourceKey(sourcePath) + "|" + EncodeVersion;
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(stamp)))[..16].ToLowerInvariant();
         return Path.Combine(CacheDirectory, hash + ".avi");
     }
 
     internal static string AudioCachePath(string sourcePath)
     {
-        var info = new FileInfo(sourcePath);
-        var length = info.Exists ? info.Length.ToString(CultureInfo.InvariantCulture) : "0";
-        var stamp = SourceKey(sourcePath) + "|" + length + "|" + AudioExtractVersion;
+        var stamp = SourceKey(sourcePath) + "|" + AudioExtractVersion;
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(stamp)))[..16].ToLowerInvariant();
         return Path.Combine(CacheDirectory, hash + ".wav");
     }
 
-    /// <summary>パス表記のゆれで別キャッシュにしない。更新日時はキーに入れない（再生のたびに変わるファイルがある）。</summary>
+    /// <summary>
+    /// ファイル名（大小無視）＋サイズで同一視する。フォルダが違っても同じプロキシを共有する。
+    /// 更新日時はキーに入れない（再生のたびに変わるファイルがある）。
+    /// </summary>
     internal static string SourceKey(string sourcePath)
     {
+        var name = Path.GetFileName(sourcePath);
+        if (string.IsNullOrEmpty(name))
+        {
+            name = sourcePath;
+        }
+
+        long length = 0;
         try
         {
-            return Path.GetFullPath(sourcePath).ToUpperInvariant();
+            var info = new FileInfo(sourcePath);
+            if (info.Exists)
+            {
+                length = info.Length;
+            }
         }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException
+            or IOException or UnauthorizedAccessException)
         {
-            return sourcePath.ToUpperInvariant();
         }
+
+        return name.ToUpperInvariant() + "|" + length.ToString(CultureInfo.InvariantCulture);
     }
 
     /// <summary>起動時と設定変更時。未使用のまま保存日数を超えたプロキシ（mtime。キャッシュ参照で Touch）と、打ち捨てられた .part を消す。</summary>

@@ -291,27 +291,32 @@ public sealed class VideoProxyRetentionTests
     }
 
     [Fact]
-    public void CachePath_IgnoresCasingAndWriteTime()
+    public void CachePath_SharesByFileNameAndSize_IgnoresFolderAndWriteTime()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "mga-proxy-src-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
+        var root = Path.Combine(Path.GetTempPath(), "mga-proxy-src-" + Guid.NewGuid().ToString("N"));
+        var dirA = Path.Combine(root, "a");
+        var dirB = Path.Combine(root, "b");
+        Directory.CreateDirectory(dirA);
+        Directory.CreateDirectory(dirB);
         try
         {
-            var path = Path.Combine(dir, "Clip.MOV");
-            File.WriteAllBytes(path, [1, 2, 3, 4]);
-            var first = VideoProxy.CachePath(path);
-            File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddDays(-3));
-            var lower = Path.Combine(dir, "clip.mov");
-            Assert.Equal(first, VideoProxy.CachePath(path));
-            Assert.Equal(first, VideoProxy.CachePath(lower));
-            Assert.Equal(VideoProxy.SourceKey(path), VideoProxy.SourceKey(lower));
+            var pathA = Path.Combine(dirA, "Clip.MOV");
+            var pathB = Path.Combine(dirB, "clip.mov");
+            File.WriteAllBytes(pathA, [1, 2, 3, 4]);
+            File.WriteAllBytes(pathB, [1, 2, 3, 4]);
+            var first = VideoProxy.CachePath(pathA);
+            File.SetLastWriteTimeUtc(pathA, DateTime.UtcNow.AddDays(-3));
+            Assert.Equal(first, VideoProxy.CachePath(pathA));
+            Assert.Equal(first, VideoProxy.CachePath(pathB));
+            Assert.Equal(VideoProxy.SourceKey(pathA), VideoProxy.SourceKey(pathB));
 
-            File.WriteAllBytes(path, [1, 2, 3, 4, 5]);
-            Assert.NotEqual(first, VideoProxy.CachePath(path));
+            File.WriteAllBytes(pathA, [1, 2, 3, 4, 5]);
+            Assert.NotEqual(first, VideoProxy.CachePath(pathA));
+            Assert.Equal(first, VideoProxy.CachePath(pathB));
         }
         finally
         {
-            Directory.Delete(dir, recursive: true);
+            Directory.Delete(root, recursive: true);
         }
     }
 
