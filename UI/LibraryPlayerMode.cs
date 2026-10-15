@@ -320,25 +320,35 @@ internal static class LibraryPlayerMode
         && !frameOrImmersivePaused;
 
     /// <summary>
-    /// ランダム再生の切替。プレイリストが空でも、ツリー／お気に入りフォーカスでも効く。
-    /// 検索欄では文字入力のまま。
+    /// ランダム再生の切替。プレイリストが空でも、ツリー／お気に入り／検索フォーカスでも効く。
+    /// 素の R は検索入力または再生し直しのまま。
     /// </summary>
     public static bool IsShuffleToggle(Key key, ModifierKeys modifiers) =>
         key == Key.R && modifiers == ModifierKeys.Alt;
 
     /// <summary>
-    /// 次の曲を自動再生の切替。プレイリストが空でも、ツリー／お気に入りフォーカスでも効く。
-    /// 検索欄では文字入力のまま。素の N は次の曲のまま。
+    /// 次の曲を自動再生の切替。プレイリストが空でも、ツリー／お気に入り／検索フォーカスでも効く。
+    /// 素の N は検索入力または次の曲のまま。
     /// </summary>
     public static bool IsAutoPlayNextToggle(Key key, ModifierKeys modifiers) =>
         key == Key.N && modifiers == ModifierKeys.Alt;
 
     /// <summary>
-    /// Enter 追加時の自動再生の切替。プレイリストが空でも、ツリー／お気に入りフォーカスでも効く。
-    /// 検索欄では文字入力のまま。素の P は前の曲のまま。
+    /// Enter 追加時の自動再生の切替。プレイリストが空でも、ツリー／お気に入り／検索フォーカスでも効く。
+    /// 素の P は検索入力または前の曲のまま。
     /// </summary>
     public static bool IsAutoPlayToggle(Key key, ModifierKeys modifiers) =>
         key == Key.P && modifiers == ModifierKeys.Alt;
+
+    /// <summary>
+    /// 検索欄フォーカス中でもショートカット側で先に拾うキー。
+    /// 文字入力（素の N／P／R など）は検索へ残し、Alt＋トグルと Ctrl+Shift+P だけ通す。
+    /// </summary>
+    public static bool BypassesSearchFocus(Key key, ModifierKeys modifiers) =>
+        IsShuffleToggle(key, modifiers)
+        || IsAutoPlayNextToggle(key, modifiers)
+        || IsAutoPlayToggle(key, modifiers)
+        || IsForceVideoProxyEncode(key, modifiers);
 
     /// <summary>
     /// ツリー／お気に入りの Enter 追加コード。

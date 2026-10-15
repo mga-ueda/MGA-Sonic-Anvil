@@ -14,7 +14,7 @@ internal static class DesignMetrics
     public static double From96(double value96) => value96;
 
     /// <summary>
-    /// 固定2行（上段 TRANS/EDIT/FILE、下段 MARK/VIEW/HELP）と右の履歴・ラウドネス・スペアナ・メーターが
+    /// 固定2行（上段 TRANS/EDIT/FILE、下段 MARK/VIEW/OTHER）と右の履歴・ラウドネス・スペアナ・メーターが
     /// 折り返さず並ぶ下限。枠のぶんを足す。
     /// </summary>
     public static double WindowMinWidth =>
@@ -127,7 +127,7 @@ internal static class DesignMetrics
     public static double TransportBarHeight =>
         From96(2) + TransportButtonSide * 2 + TransportRowGap;
 
-    /// <summary>上段と下段（MARK / VIEW / HELP）のあいだ。</summary>
+    /// <summary>上段と下段（MARK / VIEW / OTHER）のあいだ。</summary>
     public static double TransportRowGap => 0;
 
     public static Thickness TransportBottomRowMargin => new(0, TransportRowGap, 0, 0);
@@ -151,7 +151,7 @@ internal static class DesignMetrics
         + TransportGroupWidth(9)
         + TransportGroupWidth(4);
 
-    /// <summary>下段: MARK(3) VIEW(8) HELP(3)。</summary>
+    /// <summary>下段: MARK(3) VIEW(8) OTHER(3)。</summary>
     public static double TransportBottomRowWidth =>
         TransportHostPaddingX
         + TransportGroupWidth(3)

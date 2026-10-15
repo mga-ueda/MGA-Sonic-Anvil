@@ -330,6 +330,15 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsAutoPlayToggle(Key.P, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.IsAutoPlayToggle(Key.P, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsAutoPlayToggle(Key.P, ModifierKeys.Control));
+        // 検索フォーカス中でも Alt+R／N／P と Ctrl+Shift+P は通す（素の文字キーは検索へ）。
+        Assert.True(LibraryPlayerMode.BypassesSearchFocus(Key.R, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.BypassesSearchFocus(Key.N, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.BypassesSearchFocus(Key.P, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.BypassesSearchFocus(
+            Key.P, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.BypassesSearchFocus(Key.N, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BypassesSearchFocus(Key.R, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BypassesSearchFocus(Key.A, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsPlaylistFolderAddKey(Key.Enter, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsPlaylistFolderAddKey(Key.Enter, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsPlaylistFolderAddKey(Key.Enter, ModifierKeys.Shift));
