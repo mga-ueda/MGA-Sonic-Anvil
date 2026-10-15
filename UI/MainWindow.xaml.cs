@@ -163,6 +163,10 @@ public partial class MainWindow : Window
         LibraryBrowser.AutoPlayNextChanged += LibraryBrowser_AutoPlayNextChanged;
         LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
         LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;
+        LibraryBrowser.MatchLoudnessRequested += (_, _) => PromptVolume();
+        LibraryBrowser.ExportMp3Requested += (_, _) => ExportPlaylistSelectionMp3();
+        LibraryBrowser.ListContextMenuOpened += LibraryBrowser_ListContextMenuOpened;
+        LibraryBrowser.ListContextMenuClosed += LibraryBrowser_ListContextMenuClosed;
         LibraryBrowser.SetVisibleColumnPresets(
             AppStorage.Settings.ResolvedLibraryListColumnsWave(),
             AppStorage.Settings.ResolvedLibraryListColumnsMp3(),
@@ -670,7 +674,8 @@ public partial class MainWindow : Window
             }
             else
             {
-                RebuildTabBar();
+                // 4／6 連打ではタブを作り直さずヘッダだけ更新（RefreshTitle → RefreshTabHeaders）。
+                SyncTabBar();
             }
 
             RefreshTitle();

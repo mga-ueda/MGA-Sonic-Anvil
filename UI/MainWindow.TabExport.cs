@@ -14,10 +14,83 @@ public partial class MainWindow
 {
     private void ExportAllTabsWave() => _ = ExportTabsAsync(_sessions.ToArray(), AudioFileKind.Wave);
 
-    private void ExportAllTabsMp3() => _ = ExportTabsAsync(_sessions.ToArray(), AudioFileKind.Mp3);
+    private void ExportAllTabsMp3()
+    {
+        if (IsLibraryMaximized)
+        {
+            ExportPlaylistSessionsMp3(_sessions);
+            return;
+        }
+
+        _ = ExportTabsAsync(_sessions.ToArray(), AudioFileKind.Mp3);
+    }
 
     private void ExportTabs(IReadOnlyList<DocumentSession> sessions, AudioFileKind kind) =>
         _ = ExportTabsAsync(sessions, kind);
+
+    /// <summary>プレイヤー：選択（なければアクティブ）を MP3 へ。Ctrl+Shift+M と同じ。</summary>
+    private void ExportPlaylistSelectionMp3() =>
+        ExportPlaylistSessionsMp3(ResolvePlaylistLoudnessMatchTargets());
+
+    private void ExportPlaylistSessionsMp3(IReadOnlyList<DocumentSession> sessions) =>
+        _ = ExportPlaylistSessionsMp3Async(sessions);
+
+    private async Task ExportPlaylistSessionsMp3Async(IReadOnlyList<DocumentSession> sessions)
+    {
+        if (IsUiBusy)
+        {
+            return;
+        }
+
+        if (sessions.Count == 0)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorNoDocument,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var candidates = LibraryPlayerMode.FilterMp3ExportCandidates(sessions);
+        if (candidates.Length == 0)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                LibraryPlayerMode.AllSessionsAreMp3(sessions)
+                    ? UiStrings.ErrorAllSelectedAlreadyMp3
+                    : UiStrings.ErrorNoAudioForMp3Export,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var ready = new List<DocumentSession>(candidates.Length);
+        foreach (var session in candidates)
+        {
+            if (!await EnsureSessionLoadedForExportAsync(session).ConfigureAwait(true))
+            {
+                continue;
+            }
+
+            ready.Add(session);
+        }
+
+        if (ready.Count == 0)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorNoAudioForMp3Export,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        await ExportTabsAsync(ready, AudioFileKind.Mp3).ConfigureAwait(true);
+    }
 
     private void ExportTabsSeparated(IReadOnlyList<DocumentSession> sessions, TabExportSplit split) =>
         _ = ExportTabsAsync(sessions, AudioFileKind.Wave, split);

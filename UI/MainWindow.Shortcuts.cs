@@ -684,6 +684,12 @@ public partial class MainWindow
                 return true;
             }
 
+            if (key == Key.Space && modifiers == ModifierKeys.Shift)
+            {
+                LibraryBrowser.TryExplorerShiftSpaceCollapseOrMoveUp();
+                return true;
+            }
+
             if (LibraryPlayerMode.ExplorerOwnsHorizontal(key, modifiers))
             {
                 LibraryBrowser.ClearExplorerTypeahead();
@@ -1768,7 +1774,15 @@ public partial class MainWindow
 
         if (key == Key.M && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            SaveAsMp3();
+            if (IsLibraryMaximized)
+            {
+                ExportPlaylistSelectionMp3();
+            }
+            else
+            {
+                SaveAsMp3();
+            }
+
             return true;
         }
 

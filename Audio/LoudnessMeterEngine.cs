@@ -201,6 +201,123 @@ internal sealed class LoudnessMeterEngine
         return snap with { ShortTermLufs = engine.MaxShortTermLufs };
     }
 
+    /// <summary>
+    /// 非圧縮 PCM（WAVE / AIFF）の Integrated LUFS。
+    /// メモリ上の PCM があればそれを使い、無ければパスからストリーム計測。
+    /// </summary>
+    public static bool TryMeasureIntegratedLufs(
+        AudioDocument document,
+        out float integratedLufs,
+        CancellationToken cancellationToken = default)
+    {
+        integratedLufs = float.NaN;
+        if (!AudioCodec.IsUncompressedPcm(document.SourceKind))
+        {
+            return false;
+        }
+
+        if (document.Interleaved is { Length: > 0 } pcm
+            && document.Channels > 0
+            && document.SampleRate > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var snap = MeasureFile(pcm, document.Channels, document.SampleRate);
+            integratedLufs = snap.IntegratedLufs;
+            return true;
+        }
+
+        if (document.SourcePath is not { Length: > 0 } path || !File.Exists(path))
+        {
+            return false;
+        }
+
+        return TryMeasureIntegratedFromPath(path, out integratedLufs, cancellationToken);
+    }
+
+    /// <summary>パスから PCM を流し Integrated LUFS を測る（全サンプル。重い）。</summary>
+    public static bool TryMeasureIntegratedFromPath(
+        string path,
+        out float integratedLufs,
+        CancellationToken cancellationToken = default)
+    {
+        integratedLufs = float.NaN;
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var gate = PeakPyramid.DecodeGateFor(path);
+        gate.Wait(cancellationToken);
+        try
+        {
+            using var stream = AudioCodec.OpenPlaybackStream(path);
+            var format = stream.WaveFormat;
+            var channels = Math.Max(1, format.Channels);
+            var sampleRate = Math.Max(1000, format.SampleRate);
+            var frames = AudioCodec.EstimateStreamFrameCount(stream);
+            if (frames <= 0)
+            {
+                integratedLufs = LoudnessSnapshot.Idle.IntegratedLufs;
+                return true;
+            }
+
+            var engine = new LoudnessMeterEngine { TargetLufs = DefaultTargetLufs };
+            const int chunkFrames = 8192;
+            var chunk = new float[chunkFrames * channels];
+            var left = new float[chunkFrames];
+            var right = new float[chunkFrames];
+            var provider = AudioCodec.AsSampleProvider(stream);
+            long frame = 0;
+            var emptyReads = 0;
+            while (frame < frames)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var wantFrames = (int)Math.Min(chunkFrames, frames - frame);
+                var wantSamples = wantFrames * channels;
+                var gotSamples = provider.Read(chunk, 0, wantSamples);
+                if (gotSamples <= 0)
+                {
+                    emptyReads++;
+                    if (emptyReads > 8)
+                    {
+                        break;
+                    }
+
+                    continue;
+                }
+
+                emptyReads = 0;
+                gotSamples -= gotSamples % channels;
+                var n = gotSamples / channels;
+                if (n <= 0)
+                {
+                    break;
+                }
+
+                for (var i = 0; i < n; i++)
+                {
+                    var origin = i * channels;
+                    left[i] = chunk[origin];
+                    right[i] = channels > 1 ? chunk[origin + 1] : left[i];
+                }
+
+                engine.Process(left.AsSpan(0, n), right.AsSpan(0, n), n, sampleRate);
+                frame += n;
+            }
+
+            integratedLufs = engine.Snapshot.IntegratedLufs;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException
+                                       or UnauthorizedAccessException
+                                       or InvalidDataException
+                                       or NotSupportedException
+                                       or FormatException)
+        {
+            return false;
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
     private void Configure(int sampleRate)
     {
         _sampleRate = sampleRate;
@@ -499,6 +616,45 @@ internal sealed class LoudnessMeterEngine
 
     public static double LufsToMeanSquare(double lufs) =>
         Math.Pow(10d, (lufs + 0.691) / 10d);
+
+    /// <summary>
+    /// Integrated をターゲット LKFS に揃えるゲイン（dB）。測れない／無音／実質 0 dB なら false。
+    /// </summary>
+    public static bool TryGainDbToMatchTarget(
+        float integratedLufs,
+        double targetLufs,
+        out double gainDb)
+    {
+        gainDb = 0;
+        if (!float.IsFinite(integratedLufs))
+        {
+            return false;
+        }
+
+        gainDb = WaveformGainAnalyzer.SnapGainDb(
+            ClampTargetLufs(targetLufs) - integratedLufs);
+        return !WaveformGainAnalyzer.IsNoOp(gainDb);
+    }
+
+    /// <summary>
+    /// 非圧縮 PCM の Integrated を測り、ターゲットへ揃えるゲインを返す。
+    /// </summary>
+    public static bool TryGainDbToMatchTarget(
+        AudioDocument document,
+        double targetLufs,
+        out double gainDb,
+        out float integratedLufs,
+        CancellationToken cancellationToken = default)
+    {
+        gainDb = 0;
+        integratedLufs = float.NaN;
+        if (!TryMeasureIntegratedLufs(document, out integratedLufs, cancellationToken))
+        {
+            return false;
+        }
+
+        return TryGainDbToMatchTarget(integratedLufs, targetLufs, out gainDb);
+    }
 
     /// <summary>一定線形ゲインを掛けたあとの LKFS。無音は無音のまま。</summary>
     public static float ApplyLinearGainToLufs(float lufs, float linearGain)

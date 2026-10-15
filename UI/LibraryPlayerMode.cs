@@ -88,6 +88,11 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.DeleteAllMarkers
             or WaveMenuCommand.PrevMarker
             or WaveMenuCommand.NextMarker
+            // プレイリスト選択のラウドネス揃え（V）と MP3 書き出し。
+            or WaveMenuCommand.Volume
+            or WaveMenuCommand.SaveMp3
+            or WaveMenuCommand.ExportMp3
+            or WaveMenuCommand.ExportAllMp3
             => false,
         _ => true,
     };
@@ -109,6 +114,7 @@ internal static class LibraryPlayerMode
             or TransportCommand.OpenManual
             or TransportCommand.ToggleLibraryMaximize
             or TransportCommand.ToggleAnalyzerMaximize
+            or TransportCommand.SaveMp3
             => false,
         _ => true,
     };
@@ -183,7 +189,7 @@ internal static class LibraryPlayerMode
 
         return (key, modifiers) switch
         {
-            (Key.Space, ModifierKeys.None or ModifierKeys.Control) => true,
+            (Key.Space, ModifierKeys.None or ModifierKeys.Control or ModifierKeys.Shift) => true,
             (Key.Enter, ModifierKeys.None or ModifierKeys.Alt or ModifierKeys.Shift
                 or ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift)) => true,
             (Key.L, ModifierKeys.None) => true,
@@ -194,6 +200,7 @@ internal static class LibraryPlayerMode
             (Key.P, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.R, ModifierKeys.None) => true,
             (Key.R, ModifierKeys.Alt) => true,
+            (Key.V, ModifierKeys.None) => true,
             (Key.J, ModifierKeys.None) => true,
             (Key.K, ModifierKeys.None) => true,
             (Key.OemComma, ModifierKeys.None) => true,
@@ -217,6 +224,8 @@ internal static class LibraryPlayerMode
             (Key.Z, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Y, ModifierKeys.Control) => true,
             (Key.T, ModifierKeys.Control | ModifierKeys.Shift) => true,
+            (Key.M, ModifierKeys.Control | ModifierKeys.Shift) => true,
+            (Key.M, ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Alt) => true,
             (Key.Tab, ModifierKeys.Control) => true,
             (Key.Tab, ModifierKeys.Control | ModifierKeys.Shift) => true,
             _ => false,
@@ -526,8 +535,8 @@ internal static class LibraryPlayerMode
             return false;
         }
 
-        // Space 単独再生はプレイリストだけ。ツリーではアイコン選択などにも使わせない。
-        if (key == Key.Space && modifiers == ModifierKeys.None)
+        // Space / Shift+Space はツリー専用（展開・閉じ）。再生はプレイリストの Space だけ。
+        if (key == Key.Space && modifiers is ModifierKeys.None or ModifierKeys.Shift)
         {
             return true;
         }
@@ -720,6 +729,57 @@ internal static class LibraryPlayerMode
     /// </summary>
     public static bool NeedsEditorPeakUpgrade(AudioDocument document) =>
         !NeedsEditorPcmUpgrade(document) && !CanReusePeaks(playerMode: false, document);
+
+    /// <summary>
+    /// ピーク更新を Primary 波形へ出してよいか。タイル構築中は Primary が Clear 済みなので不可。
+    /// </summary>
+    /// <summary>プレイヤーの MP3 書き出し対象。既存 MP3／PDF／動画は除く（混在選択では非 MP3 だけ残す）。</summary>
+    public static bool IsMp3ExportCandidate(AudioDocument document) =>
+        document.SourceKind != AudioFileKind.Mp3
+        && !LibraryPlaylistDocuments.IsPdf(document)
+        && !LibraryPlaylistDocuments.IsVideo(document)
+        && (document.SourcePath is { Length: > 0 } || document.FrameCount > 0);
+
+    public static DocumentSession[] FilterMp3ExportCandidates(IReadOnlyList<DocumentSession> sessions)
+    {
+        var list = new List<DocumentSession>(sessions.Count);
+        foreach (var session in sessions)
+        {
+            if (IsMp3ExportCandidate(session.Document))
+            {
+                list.Add(session);
+            }
+        }
+
+        return list.ToArray();
+    }
+
+    /// <summary>選択に MP3 以外の書き出し候補があるか。単体／全部が既存 MP3 なら false（メニューをグレーアウト）。</summary>
+    public static bool HasMp3ExportCandidate(IReadOnlyList<DocumentSession> sessions) =>
+        FilterMp3ExportCandidates(sessions).Length > 0;
+
+    public static bool AllSessionsAreMp3(IReadOnlyList<DocumentSession> sessions)
+    {
+        if (sessions.Count == 0)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < sessions.Count; i++)
+        {
+            if (sessions[i].Document.SourceKind != AudioFileKind.Mp3)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static bool RefreshesPrimaryForLibraryPeaks(bool tileMode, bool sessionHasTilePane) =>
+        sessionHasTilePane
+            ? false
+            : !tileMode;
 
     /// <summary>プレイヤーに入ったときに選んで再生する先頭のファイル。</summary>
     public static DocumentSession? FirstSession(IReadOnlyList<DocumentSession> sessions) =>

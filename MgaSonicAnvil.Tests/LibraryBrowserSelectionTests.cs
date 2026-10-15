@@ -403,6 +403,75 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void ExplorerShiftSpace_CollapsesThenMovesUp()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var root = Path.Combine(Path.GetTempPath(), "xqt-lib-ss-" + Guid.NewGuid().ToString("N"));
+            var alpha = Path.Combine(root, "Alpha");
+            var beta = Path.Combine(root, "Beta");
+            Directory.CreateDirectory(alpha);
+            Directory.CreateDirectory(beta);
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                var folder = view.ExplorerFirstFolder;
+                Assert.NotNull(folder);
+                folder.IsSelected = true;
+                Flush();
+
+                Assert.True(view.TryExplorerSpaceExpandOrMoveDown());
+                Flush();
+                Assert.True(folder.IsExpanded);
+
+                // 展開済みで Shift+Space → 1段階閉じる。
+                Assert.True(view.TryExplorerShiftSpaceCollapseOrMoveUp());
+                Flush();
+                Assert.False(folder.IsExpanded);
+                Assert.True(view.TryGetSelectedExplorerFolder(out var stillRoot));
+                Assert.Equal(Path.GetFullPath(root), Path.GetFullPath(stillRoot));
+
+                // 閉じた状態で再度 Shift+Space → 上へ（ルートなのでそのまま）。
+                Assert.True(view.TryExplorerShiftSpaceCollapseOrMoveUp());
+                Assert.True(view.TryGetSelectedExplorerFolder(out var stillRoot2));
+                Assert.Equal(Path.GetFullPath(root), Path.GetFullPath(stillRoot2));
+
+                Assert.True(view.TryExplorerSpaceExpandOrMoveDown());
+                Flush();
+                Assert.True(view.TryExplorerSpaceExpandOrMoveDown());
+                Assert.True(view.TryGetSelectedExplorerFolder(out var onAlpha));
+                Assert.Equal(Path.GetFullPath(alpha), Path.GetFullPath(onAlpha));
+
+                // 葉（閉じた子）で Shift+Space → 一つ上（ルート）。
+                Assert.True(view.TryExplorerShiftSpaceCollapseOrMoveUp());
+                Assert.True(view.TryGetSelectedExplorerFolder(out var backOnRoot));
+                Assert.Equal(Path.GetFullPath(root), Path.GetFullPath(backOnRoot));
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void RefreshExplorer_PicksUpNewFolder_KeepsSelection()
     {
         RunSta(() =>
@@ -943,6 +1012,8 @@ public sealed class LibraryBrowserSelectionTests
             Assert.True(view.TryOpenKeyboardContextMenu());
             Assert.Equal(
             [
+                UiStrings.LibraryMenuMatchLoudness,
+                UiStrings.LibraryMenuSaveMp3,
                 UiStrings.LibraryMenuClearFromPlaylist,
                 UiStrings.LibraryMenuCopy,
                 UiStrings.LibraryMenuCopyFileName,
@@ -950,9 +1021,96 @@ public sealed class LibraryBrowserSelectionTests
                 UiStrings.LibraryMenuOpenInExplorer,
             ],
             view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());
-            Assert.Equal("Ctrl+C", view.OpenContextMenuItems[1].InputGestureText);
+            Assert.Equal("V", view.OpenContextMenuItems[0].InputGestureText);
+            Assert.Equal("Ctrl+Shift+M", view.OpenContextMenuItems[1].InputGestureText);
+            Assert.Equal("Ctrl+C", view.OpenContextMenuItems[3].InputGestureText);
             Assert.True(view.HasOpenContextMenu);
             view.CloseKeyboardContextMenu();
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void ListContextMenu_DismissDoesNotCompletePendingSingleSelect()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.wav");
+            var second = Session("02 b.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions([first, second], first, [first, second]);
+            Flush();
+            view.FocusList();
+            Flush();
+            var clicked = ((System.Collections.IEnumerable)view.BoundItemsSource!)
+                .OfType<LibraryFileRow>()
+                .First(row => ReferenceEquals(row.Tag, second));
+            view.BeginPlaylistPlainPress(clicked, clickCount: 1);
+            Assert.True(view.TryOpenKeyboardContextMenu());
+            Assert.Equal(2, view.SelectedSessions.Length);
+            // Opened で pending を捨てる。この時点で Complete しても複数選択のまま。
+            view.CompletePlaylistPlainPress();
+            Flush();
+            Assert.Equal(2, view.SelectedSessions.Length);
+            view.CloseKeyboardContextMenu();
+            Flush();
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void ListContextMenu_DismissGuard_StaysActiveThroughCloseUntilIdle()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.wav");
+            var second = Session("02 b.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions([first, second], first, [first, second]);
+            Flush();
+            view.FocusList();
+            Flush();
+
+            Assert.False(view.IsContextMenuDismissGuardActive);
+
+            Assert.True(view.TryOpenKeyboardContextMenu());
+            Assert.True(view.HasOpenContextMenu);
+            Assert.True(view.IsContextMenuDismissGuardActive);
+
+            // 外側クリックで閉じると、メニューを閉じたのと同じ入力の中で、下にある
+            // トランスポートの「プレイヤー(F10)」ボタンへクリックが貫通する。閉じた直後は
+            // HasOpenContextMenu が既に false なので、ガードが立っていないと貫通クリックで
+            // ToggleLibraryMaximize → KeepOnlyLibrarySelectedSessions が走り、選択以外の
+            // トラックが消える（報告されたバグ）。閉じてからアイドルまではガードを維持する。
+            view.CloseKeyboardContextMenu();
+            // 閉じた直後は HasOpenContextMenu が false。旧コードはこれだけを見ていたので、
+            // 貫通クリックを弾けずにプレイヤーを抜けていた（＝バグ）。
+            Assert.False(view.HasOpenContextMenu);
+            // 貫通クリックは閉じたのと同じ入力の中（アイドル前）で届くので、ガードはまだ立っている。
+            Assert.True(view.IsContextMenuDismissGuardActive);
+
             window.Close();
         });
     }
@@ -1712,19 +1870,29 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
-    public void LibraryGroupChrome_IsEnglishRegardlessOfLanguage()
+    public void LibraryGroupChrome_LabelAndNoneStayEnglish_OptionsMatchColumnLabels()
     {
         var previous = UiStrings.Language;
         try
         {
             UiStrings.SetLanguage(UiLanguage.Japanese);
             Assert.Equal("Group", UiStrings.LibraryGroupLabel);
-            Assert.Equal("Parent folder", UiStrings.LibraryGroupFolder);
             Assert.Equal("None", UiStrings.LibraryGroupNone);
+            Assert.Equal(UiStrings.LibraryColumnParentFolder, UiStrings.LibraryGroupFolder);
+            Assert.Equal(UiStrings.LibraryColumnSampleRate, UiStrings.LibraryGroupSampleRate);
+            Assert.Equal(UiStrings.LibraryColumnBitDepth, UiStrings.LibraryGroupBitDepth);
+            Assert.Equal(UiStrings.LibraryColumnChannels, UiStrings.LibraryGroupChannels);
+            Assert.Equal("親フォルダ", UiStrings.LibraryGroupFolder);
+            Assert.Equal("レート", UiStrings.LibraryGroupSampleRate);
+            Assert.Equal("ビット", UiStrings.LibraryGroupBitDepth);
+            Assert.Equal("Ch", UiStrings.LibraryGroupChannels);
             UiStrings.SetLanguage(UiLanguage.English);
             Assert.Equal("Group", UiStrings.LibraryGroupLabel);
-            Assert.Equal("Parent folder", UiStrings.LibraryGroupFolder);
             Assert.Equal("None", UiStrings.LibraryGroupNone);
+            Assert.Equal("Parent folder", UiStrings.LibraryGroupFolder);
+            Assert.Equal("Rate", UiStrings.LibraryGroupSampleRate);
+            Assert.Equal("Bits", UiStrings.LibraryGroupBitDepth);
+            Assert.Equal("Ch", UiStrings.LibraryGroupChannels);
         }
         finally
         {

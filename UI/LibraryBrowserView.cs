@@ -212,6 +212,8 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly Dictionary<LibraryFileColumn, LibrarySortHeader> _sortHeaders = [];
     private CancellationTokenSource? _playlistWaveCts;
     private int _playlistWaveGeneration;
+    private CancellationTokenSource? _playlistLoudnessCts;
+    private int _playlistLoudnessGeneration;
     private LibraryPlaylistWaveformSize _playlistWaveSizeWave = LibraryPlaylistWaveformSize.L;
     private LibraryPlaylistWaveformSize _playlistWaveSizeMp3 = LibraryPlaylistWaveformSize.L;
     private int _defaultSampleRate = DefaultAudioFormat.SampleRate;
@@ -280,6 +282,14 @@ internal sealed class LibraryBrowserView : UserControl
     private string[] _playlistDragPaths = [];
     private bool _playlistDragBusy;
     private LibraryFileRow? _playlistPendingSingleSelect;
+    /// <summary>コンテキストメニュー閉鎖直後の MouseUp で plain-press 確定しない。</summary>
+    private bool _suppressPlaylistPlainPressComplete;
+    /// <summary>
+    /// 右クリックメニューの外側クリック dismiss は、下にあるコントロール（例: トランスポートの
+    /// プレイヤー切替ボタン）へクリックが貫通する。メニューが開いてから閉じた直後のアイドルまで
+    /// 立てておき、その貫通クリックでプレイヤーを抜けて（＝選択以外のトラックが消えて）しまうのを防ぐ。
+    /// </summary>
+    private bool _contextMenuDismissGuard;
 
     public event EventHandler<DocumentSession>? SessionActivated;
 
@@ -325,6 +335,15 @@ internal sealed class LibraryBrowserView : UserControl
     public event EventHandler? ExplorerReplacePlaylistRequested;
 
     public event EventHandler? ClearPlaylistRequested;
+
+    public event EventHandler? MatchLoudnessRequested;
+
+    public event EventHandler? ExportMp3Requested;
+
+    /// <summary>リストの右クリックメニューを開いた／閉じた。F10 誤解除や plain-press 確定を抑止する。</summary>
+    public event EventHandler? ListContextMenuOpened;
+
+    public event EventHandler? ListContextMenuClosed;
 
     internal event Action? GroupArtworkChanged;
 
@@ -612,6 +631,13 @@ internal sealed class LibraryBrowserView : UserControl
         || _favoritesList.ContextMenu is { IsOpen: true }
         || _grid.ContextMenu is { IsOpen: true }
         || _columnHeaderMenu is { IsOpen: true };
+
+    /// <summary>
+    /// 右クリックメニューが開いている間と、外側クリックで閉じた同じ入力中（アイドルまで）は true。
+    /// 外側クリックが下のコントロールへ貫通してプレイヤーを抜けてしまうのを呼び出し側で弾くために使う。
+    /// </summary>
+    public bool IsContextMenuDismissGuardActive =>
+        _contextMenuDismissGuard || HasOpenContextMenu;
 
     internal object? BoundItemsSource => _grid.ItemsSource;
 
@@ -2343,6 +2369,7 @@ internal sealed class LibraryBrowserView : UserControl
         if (!_columnChromeFadingOut)
         {
             RefreshPlaylistWaveformSize(reschedule: true);
+            SchedulePlaylistLoudness();
         }
     }
 
@@ -2557,6 +2584,7 @@ internal sealed class LibraryBrowserView : UserControl
         InvalidateGroupJackets();
         _ = EnsureGroupArtworkAsync();
         RefreshPlaylistWaveformSize(reschedule: true);
+        SchedulePlaylistLoudness();
     }
 
     public void SetArtwork(AudioDocument? document, bool keepCurrentIfEmpty = false) =>
@@ -5374,6 +5402,13 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
+        if (key == Key.Space && modifiers == ModifierKeys.Shift)
+        {
+            TryExplorerShiftSpaceCollapseOrMoveUp();
+            e.Handled = true;
+            return;
+        }
+
         if (key is Key.Up or Key.Down && modifiers == ModifierKeys.None)
         {
             if (IsExplorerTypeaheadActive)
@@ -5709,6 +5744,28 @@ internal sealed class LibraryBrowserView : UserControl
         return true;
     }
 
+    /// <summary>
+    /// Shift+Space: 黄色ハイライトを消し、展開中なら1段階閉じる。既に閉じている（または葉）なら一つ上へ。
+    /// </summary>
+    internal bool TryExplorerShiftSpaceCollapseOrMoveUp()
+    {
+        ClearExplorerTypeahead();
+        var item = CurrentExplorerItem();
+        if (item is null)
+        {
+            return false;
+        }
+
+        if (item.HasItems && item.IsExpanded)
+        {
+            item.IsExpanded = false;
+            return true;
+        }
+
+        MoveExplorerSelection(-1, extend: false);
+        return true;
+    }
+
     internal void MoveExplorerSelection(int delta, bool extend = false)
     {
         if (delta == 0)
@@ -6038,6 +6095,7 @@ internal sealed class LibraryBrowserView : UserControl
         AddColumn(LibraryFileColumn.FrameRate, nameof(LibraryFileRow.FrameRateText), right: true);
         AddColumn(LibraryFileColumn.VideoCodec, nameof(LibraryFileRow.VideoCodec));
         AddColumn(LibraryFileColumn.AudioCodec, nameof(LibraryFileRow.AudioCodec));
+        AddColumn(LibraryFileColumn.Loudness, nameof(LibraryFileRow.LoudnessText), right: true);
         AddColumn(LibraryFileColumn.Size, nameof(LibraryFileRow.SizeText), right: true);
         AddColumn(LibraryFileColumn.Folder, nameof(LibraryFileRow.Folder));
         AddColumn(LibraryFileColumn.Jacket, nameof(LibraryFileRow.JacketText));
@@ -6436,6 +6494,7 @@ internal sealed class LibraryBrowserView : UserControl
         if (!_columnChromeFadingOut)
         {
             RefreshPlaylistWaveformSize(reschedule: true);
+            SchedulePlaylistLoudness();
         }
     }
 
@@ -7317,6 +7376,252 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
+    private void SchedulePlaylistLoudness()
+    {
+        CancelPlaylistLoudness();
+        if (!IsLoudnessColumnEffectivelyVisible() || _items.Count == 0)
+        {
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _playlistLoudnessCts = cts;
+        var generation = ++_playlistLoudnessGeneration;
+        var token = cts.Token;
+        _ = RunPlaylistLoudnessAsync(generation, token);
+    }
+
+    private void CancelPlaylistLoudness()
+    {
+        _playlistLoudnessGeneration++;
+        if (_playlistLoudnessCts is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _playlistLoudnessCts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
+        _playlistLoudnessCts.Dispose();
+        _playlistLoudnessCts = null;
+    }
+
+    private bool IsLoudnessColumnEffectivelyVisible()
+    {
+        if (!_columns.TryGetValue(LibraryFileColumn.Loudness, out var column)
+            || column.Visibility != Visibility.Visible)
+        {
+            return false;
+        }
+
+        return LibraryColumnFilter.IsEffectivelyVisible(
+            LibraryFileColumn.Loudness,
+            _visibleColumns,
+            CurrentUsedColumns());
+    }
+
+    private async Task RunPlaylistLoudnessAsync(int generation, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.ApplicationIdle);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        if (generation != _playlistLoudnessGeneration || cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        // CreateRow でキャッシュ済みは既に Tags へ載っている。ここは未計測の本計測だけ。
+        var sessions = new List<DocumentSession>(_items.Count);
+        foreach (var row in _items)
+        {
+            if (row.Tag is not DocumentSession session)
+            {
+                continue;
+            }
+
+            var document = session.Document;
+            if (!AudioCodec.IsUncompressedPcm(document.SourceKind)
+                || document.Tags.IntegratedLufs is not null
+                || document.SourcePath is not { Length: > 0 })
+            {
+                continue;
+            }
+
+            sessions.Add(session);
+        }
+
+        var pending = new List<DocumentSession>(16);
+        foreach (var session in sessions)
+        {
+            if (generation != _playlistLoudnessGeneration || cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (!IsLoudnessColumnEffectivelyVisible())
+            {
+                return;
+            }
+
+            var document = session.Document;
+            if (document.Tags.IntegratedLufs is not null
+                || document.SourcePath is not { Length: > 0 } path)
+            {
+                continue;
+            }
+
+            float? measured;
+            try
+            {
+                measured = await Task.Run(
+                    () =>
+                    {
+                        // 行作成後にキャッシュが載った／他経路で埋まった場合。
+                        if (LibraryMediaCache.TryGetLoudness(path, out var cached))
+                        {
+                            return (float?)cached;
+                        }
+
+                        if (!LoudnessMeterEngine.TryMeasureIntegratedLufs(
+                                document,
+                                out var value,
+                                cancellationToken))
+                        {
+                            return null;
+                        }
+
+                        LibraryMediaCache.PutLoudness(path, value);
+                        return value;
+                    },
+                    cancellationToken).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (generation != _playlistLoudnessGeneration || cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (measured is null)
+            {
+                continue;
+            }
+
+            document.ApplyTags(document.Tags.WithIntegratedLufs(measured.Value));
+            pending.Add(session);
+
+            // まとめて行を差し替え、選択の再適用・フォーカス奪取を毎回やらない。
+            if (pending.Count < 16)
+            {
+                continue;
+            }
+
+            RefreshLoudnessRows(pending);
+            pending.Clear();
+            try
+            {
+                await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Background);
+            }
+            catch (TaskCanceledException)
+            {
+                return;
+            }
+        }
+
+        if (pending.Count > 0
+            && generation == _playlistLoudnessGeneration
+            && !cancellationToken.IsCancellationRequested)
+        {
+            RefreshLoudnessRows(pending);
+        }
+    }
+
+    /// <summary>
+    /// ラウドネス列だけ更新。列再計算や EnsureListFocused はしない（Shift+上下の選択を壊さない）。
+    /// </summary>
+    private void RefreshLoudnessRows(IReadOnlyList<DocumentSession> sessions)
+    {
+        if (sessions.Count == 0)
+        {
+            return;
+        }
+
+        var touch = new HashSet<DocumentSession>(sessions);
+        var preserve = SelectedSessions;
+        var active = SelectedSession;
+        var keepFocus = _grid.IsKeyboardFocusWithin;
+        var changed = false;
+        var nextRows = _rows.ToArray();
+        BeginRowSync();
+        try
+        {
+            for (var i = 0; i < _items.Count; i++)
+            {
+                if (_items[i].Tag is not DocumentSession session || !touch.Contains(session))
+                {
+                    continue;
+                }
+
+                var next = CreateRowWithDefaults(session);
+                next.GroupKey = LibraryFileList.GroupLabel(next, _group);
+                if (LibraryFileList.SameContent(_items[i], next))
+                {
+                    continue;
+                }
+
+                for (var r = 0; r < nextRows.Length; r++)
+                {
+                    if (ReferenceEquals(nextRows[r].Tag, session))
+                    {
+                        nextRows[r] = next;
+                        break;
+                    }
+                }
+
+                _items[i] = next;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                _rows = nextRows;
+            }
+
+            if (preserve.Length > 0)
+            {
+                ApplyRowSelectionCore(active ?? preserve[0], preserve);
+            }
+        }
+        finally
+        {
+            EndRowSync();
+        }
+
+        // フォーカスが外れたときだけ戻す。毎回 Ensure するとキー選択が阻害される。
+        if (keepFocus && !_grid.IsKeyboardFocusWithin)
+        {
+            EnsureListFocused();
+        }
+    }
+
     private static string CellText(LibraryFileRow row, LibraryFileColumn column) =>
         LibraryFileList.CellText(row, column);
 
@@ -7446,8 +7751,26 @@ internal sealed class LibraryBrowserView : UserControl
     private void Grid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left
-            || e.OriginalSource is not DependencyObject origin
-            || IsPlaylistSelectionChrome(origin)
+            || e.OriginalSource is not DependencyObject origin)
+        {
+            return;
+        }
+
+        // 右クリックメニューを外側クリックで閉じる dismiss は「閉じるだけ」。
+        // この貫通クリックが DataGrid の既定選択 → SessionActivated（＝別トラックへ切替・再生）や
+        // DnD を起こすと、プレイヤーで選択以外のトラックが消える不具合になる。
+        // dismiss クリックはメニューが閉じた直後に届くので _grid.ContextMenu.IsOpen だけでは拾えない。
+        // 閉じてからアイドルまで立つ dismiss ガードも見て、確実に握りつぶす（e.Handled で既定選択を止める）。
+        if (_grid.ContextMenu is { IsOpen: true } || IsContextMenuDismissGuardActive)
+        {
+            AbandonPlaylistPendingClick();
+            ReleasePlaylistMouseCapture();
+            _suppressPlaylistPlainPressComplete = true;
+            e.Handled = true;
+            return;
+        }
+
+        if (IsPlaylistSelectionChrome(origin)
             || FindPlaylistRow(origin) is not { } row)
         {
             return;
@@ -7543,8 +7866,18 @@ internal sealed class LibraryBrowserView : UserControl
             DispatcherPriority.Input);
     }
 
-    private void PlaylistHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e) =>
+    private void PlaylistHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        // メニュー外クリックで閉じた直後の MouseUp で、保留中の単一選択確定が走らないようにする。
+        if (HasOpenContextMenu || _suppressPlaylistPlainPressComplete)
+        {
+            AbandonPlaylistPendingClick();
+            ReleasePlaylistMouseCapture();
+            return;
+        }
+
         CompletePlaylistPlainPress();
+    }
 
     private void ClearPlaylistDrag()
     {
@@ -8789,7 +9122,8 @@ internal sealed class LibraryBrowserView : UserControl
     {
         var document = session.Document;
         var path = document.SourcePath;
-        var tags = document.Tags;
+        // ディスクキャッシュがあれば行生成時に載せる（非同期1件ずつ差し替えで選択を壊さない）。
+        var tags = HydrateIntegratedLufsFromCache(document);
         var deferred = document.IsDeferredLoad;
         // MP3 は Xing と Media Foundation／実デコードがエンコーダ遅延ぶん（数十 ms）ずれる。
         // リストは最初に出したタグ尺のままにする（ホバーやピーク確定でミリ秒が跳ねない）。
@@ -8883,7 +9217,34 @@ internal sealed class LibraryBrowserView : UserControl
             FrameRateText = UiStrings.FormatFrameRate(tags.FrameRate),
             VideoCodec = tags.VideoCodec,
             AudioCodec = tags.AudioCodec,
+            IntegratedLufs = AudioCodec.IsUncompressedPcm(document.SourceKind)
+                ? tags.IntegratedLufs
+                : null,
+            LoudnessText = AudioCodec.IsUncompressedPcm(document.SourceKind)
+                ? UiStrings.FormatIntegratedLufs(tags.IntegratedLufs)
+                : string.Empty,
         };
+    }
+
+    /// <summary>
+    /// library-media-cache の .lufs を Tags へ載せる。既にあればそのまま。
+    /// </summary>
+    internal static AudioFileTags HydrateIntegratedLufsFromCache(AudioDocument document)
+    {
+        var tags = document.Tags;
+        if (!AudioCodec.IsUncompressedPcm(document.SourceKind) || tags.IntegratedLufs is not null)
+        {
+            return tags;
+        }
+
+        if (document.SourcePath is not { Length: > 0 } path
+            || !LibraryMediaCache.TryGetLoudness(path, out var lufs))
+        {
+            return tags;
+        }
+
+        document.ApplyTags(tags.WithIntegratedLufs(lufs));
+        return document.Tags;
     }
 
     internal static string FormatKind(AudioFileKind kind) => kind switch
@@ -9175,6 +9536,7 @@ internal sealed class LibraryBrowserView : UserControl
             copyPaths.IsEnabled = transfer.Length > 0;
             explorer.IsEnabled = existing.Length > 0;
         };
+        ArmContextMenuDismissGuard(menu);
         _folderTree.ContextMenu = menu;
     }
 
@@ -9211,26 +9573,111 @@ internal sealed class LibraryBrowserView : UserControl
             copyPaths.IsEnabled = paths.Length > 0;
             explorer.IsEnabled = paths.Length > 0;
         };
+        ArmContextMenuDismissGuard(menu);
         _favoritesList.ContextMenu = menu;
     }
 
     private void RebuildListContextMenu()
     {
         var menu = new ContextMenu();
+        var loudness = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuMatchLoudness,
+            InputGestureText = "V",
+        };
+        ArmMenuItemClick(loudness, () => MatchLoudnessRequested?.Invoke(this, EventArgs.Empty));
+        var mp3 = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuSaveMp3,
+            InputGestureText = "Ctrl+Shift+M",
+        };
+        ArmMenuItemClick(mp3, () => ExportMp3Requested?.Invoke(this, EventArgs.Empty));
         var clear = new MenuItem { Header = UiStrings.LibraryMenuClearFromPlaylist };
-        clear.Click += (_, _) => ClearPlaylistRequested?.Invoke(this, EventArgs.Empty);
+        ArmMenuItemClick(clear, () => ClearPlaylistRequested?.Invoke(this, EventArgs.Empty));
+        menu.Items.Add(loudness);
+        menu.Items.Add(mp3);
+        menu.Items.Add(new Separator());
         menu.Items.Add(clear);
         AddCopyAndExplorerMenuItems(menu, LibraryPane.List, out var copy, out var copyNames, out var copyPaths, out var explorer);
         menu.Opened += (_, _) =>
         {
+            // メニュー表示中に残った plain-press を捨て、閉じたあとの MouseUp で単一選択確定しない。
+            AbandonPlaylistPendingClick();
+            ReleasePlaylistMouseCapture();
+            _suppressPlaylistPlainPressComplete = true;
+            _contextMenuDismissGuard = true;
+            ListContextMenuOpened?.Invoke(this, EventArgs.Empty);
             var paths = SelectedPlaylistCopyPaths();
-            clear.IsEnabled = SelectedSessions.Length > 0;
+            var selected = SelectedSessions;
+            var hasSelection = selected.Length > 0;
+            loudness.IsEnabled = hasSelection;
+            mp3.IsEnabled = LibraryPlayerMode.HasMp3ExportCandidate(selected);
+            clear.IsEnabled = hasSelection;
             copy.IsEnabled = paths.Length > 0;
             copyNames.IsEnabled = paths.Length > 0;
             copyPaths.IsEnabled = paths.Length > 0;
             explorer.IsEnabled = paths.Length > 0;
         };
+        menu.Closed += (_, _) =>
+        {
+            AbandonPlaylistPendingClick();
+            ReleasePlaylistMouseCapture();
+            _suppressPlaylistPlainPressComplete = true;
+            ListContextMenuClosed?.Invoke(this, EventArgs.Empty);
+            // 外側クリックの dismiss は、閉じたのと同じ入力の中で下のコントロールへ貫通する。
+            // ガードはこの入力が終わってアイドルへ落ちるまで維持する（貫通クリックより後に解除）。
+            Dispatcher.BeginInvoke(
+                () =>
+                {
+                    _suppressPlaylistPlainPressComplete = false;
+                    _contextMenuDismissGuard = false;
+                },
+                DispatcherPriority.ApplicationIdle);
+        };
         _grid.ContextMenu = menu;
+    }
+
+    /// <summary>
+    /// メニューの外側クリック dismiss が下のコントロールへ貫通するぶんのガードを張る。
+    /// 開いてから、閉じた同じ入力が終わってアイドルへ落ちるまで true を維持する。
+    /// </summary>
+    private void ArmContextMenuDismissGuard(ContextMenu menu)
+    {
+        menu.Opened += (_, _) => _contextMenuDismissGuard = true;
+        menu.Closed += (_, _) =>
+        {
+            _contextMenuDismissGuard = true;
+            Dispatcher.BeginInvoke(
+                () => _contextMenuDismissGuard = false,
+                DispatcherPriority.ApplicationIdle);
+        };
+    }
+
+    /// <summary>
+    /// メニュー外クリックの dismiss と MenuItem.Click が競合しないよう、
+    /// 項目上でのマウス／Enter／Space だけをコマンド実行とみなす。
+    /// </summary>
+    private static void ArmMenuItemClick(MenuItem item, Action action)
+    {
+        var armed = false;
+        item.PreviewMouseLeftButtonDown += (_, _) => armed = true;
+        item.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key is Key.Enter or Key.Space)
+            {
+                armed = true;
+            }
+        };
+        item.Click += (_, _) =>
+        {
+            if (!armed)
+            {
+                return;
+            }
+
+            armed = false;
+            action();
+        };
     }
 
     private void RebuildColumnHeaderContextMenu()
@@ -9252,7 +9699,8 @@ internal sealed class LibraryBrowserView : UserControl
 
             var item = new MenuItem
             {
-                Header = ColumnHeader(column),
+                // 列見出しの改行（ビット\nレート等）はメニューでは使わない。
+                Header = UiStrings.LibraryColumnLabel(column),
                 IsCheckable = true,
                 IsChecked = enabled.Contains(column),
                 StaysOpenOnClick = true,
@@ -9263,6 +9711,7 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         menu.Opened += (_, _) => SyncColumnHeaderMenuChecks();
+        ArmContextMenuDismissGuard(menu);
         return menu;
     }
 

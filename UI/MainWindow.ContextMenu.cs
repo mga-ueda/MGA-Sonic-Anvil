@@ -219,6 +219,10 @@ public partial class MainWindow
             WaveformMaximized = _waveformMaximizeMode == WaveformMaximizeMode.Waveform,
             AnalyzersMaximized = _waveformMaximizeMode == WaveformMaximizeMode.Analyzers,
             LibraryMaximized = _waveformMaximizeMode == WaveformMaximizeMode.Library,
+            CanExportMp3 = !IsLibraryMaximized
+                || LibraryPlayerMode.HasMp3ExportCandidate(ResolvePlaylistLoudnessMatchTargets()),
+            CanExportAllMp3 = !IsLibraryMaximized
+                || LibraryPlayerMode.HasMp3ExportCandidate(_sessions),
             CanLoopPlay = canNavigate
                 && (hasSelection
                     || !document!.SampleLoop.IsEmpty
@@ -576,7 +580,15 @@ public partial class MainWindow
                 Save(saveAs: true);
                 break;
             case WaveMenuCommand.SaveMp3:
-                SaveAsMp3();
+                if (IsLibraryMaximized)
+                {
+                    ExportPlaylistSelectionMp3();
+                }
+                else
+                {
+                    SaveAsMp3();
+                }
+
                 break;
             case WaveMenuCommand.RenameFile:
                 if (_activeSession is not null)
@@ -700,7 +712,11 @@ public partial class MainWindow
 
                 break;
             case WaveMenuCommand.ExportMp3:
-                if (HasTabSelection)
+                if (IsLibraryMaximized)
+                {
+                    ExportPlaylistSelectionMp3();
+                }
+                else if (HasTabSelection)
                 {
                     ExportTabs(SelectedTabsInOrder(), AudioFileKind.Mp3);
                 }

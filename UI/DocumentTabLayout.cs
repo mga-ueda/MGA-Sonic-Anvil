@@ -196,4 +196,25 @@ internal static class DocumentTabLayout
 
         return -1;
     }
+
+    /// <summary>タブバーの Tag 順がセッション順と一致するか（再利用可否）。</summary>
+    public static bool SameSessionOrder(
+        IReadOnlyList<object?> tabTags,
+        IReadOnlyList<object?> sessions)
+    {
+        if (tabTags.Count != sessions.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < tabTags.Count; i++)
+        {
+            if (!ReferenceEquals(tabTags[i], sessions[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

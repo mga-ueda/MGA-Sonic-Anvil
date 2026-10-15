@@ -218,6 +218,10 @@ internal sealed class WaveformContextMenuModel
     public bool WaveformMaximized { get; init; }
     public bool AnalyzersMaximized { get; init; }
     public bool LibraryMaximized { get; init; }
+    /// <summary>プレイヤーで選択に MP3 以外の書き出し候補があるか。無いときは MP3 変換をグレーアウト。</summary>
+    public bool CanExportMp3 { get; init; } = true;
+    /// <summary>プレイヤーでプレイリスト全体に MP3 以外の書き出し候補があるか。</summary>
+    public bool CanExportAllMp3 { get; init; } = true;
     public bool CanLoopPlay { get; init; }
     public bool CanAddMarkerHere { get; init; }
     public WaveformAnalysisView AnalysisView { get; init; }
@@ -489,7 +493,13 @@ internal static class WaveformContextMenuBuilder
             m.HasSelectedTabs ? UiStrings.WaveMenuNormalizePerRegionSelected : UiStrings.WaveMenuNormalizePerRegion,
             WaveMenuCommand.NormalizePerRegion,
             enabled: m.CanEdit && (m.HasSelectedTabs || (m.HasRegions && m.AllowsRegionsAndLoops))),
-        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuVolumeSelected : UiStrings.WaveMenuVolume, WaveMenuCommand.Volume, "V", m.CanEdit),
+        Cmd(
+            m.LibraryMaximized
+                ? UiStrings.LibraryMenuMatchLoudness
+                : (m.HasSelectedTabs ? UiStrings.WaveMenuVolumeSelected : UiStrings.WaveMenuVolume),
+            WaveMenuCommand.Volume,
+            "V",
+            m.CanEdit || m.LibraryMaximized),
         Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuPitchSelected : UiStrings.WaveMenuPitch, WaveMenuCommand.Pitch, "P", m.CanEdit),
         Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuTimeStretchSelected : UiStrings.WaveMenuTimeStretch, WaveMenuCommand.TimeStretch, "T", m.CanEdit),
         Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuReverseSelected : UiStrings.WaveMenuReverse, WaveMenuCommand.Reverse, "R", m.CanEdit),
@@ -584,7 +594,11 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuOpen, WaveMenuCommand.Open, "Ctrl+O", !m.IsBusy),
         Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuSaveSelected : UiStrings.WaveMenuSave, WaveMenuCommand.Save, "Ctrl+S", m.HasDocument && !m.IsBusy && !m.IsRecording),
         Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuSaveAsSelected : UiStrings.WaveMenuSaveAs, WaveMenuCommand.SaveAs, "Ctrl+Shift+S", m.HasDocument && !m.IsBusy && !m.IsRecording),
-        Cmd(UiStrings.WaveMenuSaveMp3, WaveMenuCommand.SaveMp3, "Ctrl+Shift+M", m.HasDocument && !m.IsBusy && !m.IsRecording),
+        Cmd(
+            UiStrings.WaveMenuSaveMp3,
+            WaveMenuCommand.SaveMp3,
+            "Ctrl+Shift+M",
+            m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuRenameFile, WaveMenuCommand.RenameFile, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
         Cmd(
@@ -639,7 +653,13 @@ internal static class WaveformContextMenuBuilder
     private static IReadOnlyList<WaveMenuEntry> ExportItems(WaveformContextMenuModel m) =>
     [
         Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuExportWaveSelected : UiStrings.WaveMenuExportWave, WaveMenuCommand.ExportWave, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
-        Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuExportMp3Selected : UiStrings.WaveMenuExportMp3, WaveMenuCommand.ExportMp3, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
+        Cmd(
+            m.LibraryMaximized
+                ? UiStrings.LibraryMenuSaveMp3
+                : (m.HasSelectedTabs ? UiStrings.WaveMenuExportMp3Selected : UiStrings.WaveMenuExportMp3),
+            WaveMenuCommand.ExportMp3,
+            m.LibraryMaximized ? "Ctrl+Shift+M" : null,
+            m.HasDocument && !m.IsBusy && !m.IsRecording && (!m.LibraryMaximized || m.CanExportMp3)),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuExportByMarkersSelected : UiStrings.WaveMenuExportByMarkers,
@@ -653,7 +673,11 @@ internal static class WaveformContextMenuBuilder
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuMergeTabs, WaveMenuCommand.MergeTabs, "Ctrl+Shift+B", m.CanMergeTabs),
         Cmd(UiStrings.WaveMenuExportAllWave, WaveMenuCommand.ExportAllWave, enabled: m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
-        Cmd(UiStrings.WaveMenuExportAllMp3, WaveMenuCommand.ExportAllMp3, "Ctrl+Shift+Alt+M", m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
+        Cmd(
+            UiStrings.WaveMenuExportAllMp3,
+            WaveMenuCommand.ExportAllMp3,
+            "Ctrl+Shift+Alt+M",
+            m.HasDocument && !m.IsBusy && !m.IsRecording && (!m.LibraryMaximized || m.CanExportAllMp3)),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> HelpItems(WaveformContextMenuModel m) =>

@@ -59,7 +59,7 @@ public sealed class LibraryFileListTests
             Assert.Equal("sfx", LibraryFileList.GroupLabel(withFolder, LibraryFileGroup.Folder));
             Assert.Equal("(Untitled)", LibraryFileList.GroupLabel(untitled, LibraryFileGroup.Folder));
             Assert.Equal(string.Empty, LibraryFileList.GroupLabel(withFolder, LibraryFileGroup.None));
-            Assert.Equal("Parent folder", UiStrings.LibraryGroupFolder);
+            Assert.Equal(UiStrings.LibraryColumnParentFolder, UiStrings.LibraryGroupFolder);
         }
         finally
         {

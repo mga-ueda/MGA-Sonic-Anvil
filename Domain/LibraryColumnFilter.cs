@@ -29,6 +29,7 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.Duration,
         LibraryFileColumn.Date,
         LibraryFileColumn.ParentFolder,
+        LibraryFileColumn.Loudness,
         LibraryFileColumn.Waveform,
         LibraryFileColumn.Title,
         LibraryFileColumn.Album,
@@ -51,7 +52,7 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.AudioCodec,
     ];
 
-    /// <summary>WAVE / AIFF 向け既定。</summary>
+    /// <summary>WAVE / AIFF 向け既定（ラウドネス列は既定オフ。設定でオン）。</summary>
     public static readonly LibraryFileColumn[] WaveDefaults =
     [
         LibraryFileColumn.Name,
@@ -107,6 +108,7 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.BitDepth,
         LibraryFileColumn.Channels,
         LibraryFileColumn.Duration,
+        LibraryFileColumn.Loudness,
         LibraryFileColumn.Date,
         LibraryFileColumn.ParentFolder,
         LibraryFileColumn.Waveform,
@@ -196,6 +198,7 @@ internal static class LibraryColumnFilter
     /// ジャケットは実際に画像がある行が1件でもあれば出す。
     /// 無いときは列も枠も出さない。
     /// 波形は曲が1件でもあれば出す（中身は後から埋める）。
+    /// ラウドネスは WAVE / AIFF が1件でもあれば出す（計測は後から埋める）。
     /// 親フォルダ／波形を出すかは Wave / MP3 の列プリセット側。
     /// </summary>
     public static HashSet<LibraryFileColumn>? UsedColumns(IReadOnlyList<LibraryFileRow> rows)
@@ -211,6 +214,7 @@ internal static class LibraryColumnFilter
             LibraryFileColumn.Waveform,
         };
         var jacketEligible = false;
+        var loudnessEligible = false;
         foreach (var row in rows)
         {
             if (!jacketEligible && row.HasArtwork)
@@ -219,9 +223,17 @@ internal static class LibraryColumnFilter
                 used.Add(LibraryFileColumn.Jacket);
             }
 
+            if (!loudnessEligible && IsPcmFamilyKind(EffectiveKind(row)))
+            {
+                loudnessEligible = true;
+                used.Add(LibraryFileColumn.Loudness);
+            }
+
             foreach (var column in All)
             {
-                if (column is LibraryFileColumn.Jacket or LibraryFileColumn.Waveform
+                if (column is LibraryFileColumn.Jacket
+                        or LibraryFileColumn.Waveform
+                        or LibraryFileColumn.Loudness
                     || used.Contains(column))
                 {
                     continue;
@@ -836,6 +848,29 @@ internal static class LibraryColumnFilter
             LibraryFileColumn.ParentFolder,
             LibraryFileColumn.Waveform,
         ],
+        // 旧 Wave 既定（現行と同じ。列挙の互換用）
+        [
+            LibraryFileColumn.Name,
+            LibraryFileColumn.SampleRate,
+            LibraryFileColumn.BitDepth,
+            LibraryFileColumn.Channels,
+            LibraryFileColumn.Duration,
+            LibraryFileColumn.Date,
+            LibraryFileColumn.ParentFolder,
+            LibraryFileColumn.Waveform,
+        ],
+        // 一時的にラウドネスを既定に含めていた並び → 現行既定へ戻す
+        [
+            LibraryFileColumn.Name,
+            LibraryFileColumn.SampleRate,
+            LibraryFileColumn.BitDepth,
+            LibraryFileColumn.Channels,
+            LibraryFileColumn.Duration,
+            LibraryFileColumn.Date,
+            LibraryFileColumn.ParentFolder,
+            LibraryFileColumn.Loudness,
+            LibraryFileColumn.Waveform,
+        ],
     ];
 
     private static bool IsLegacyDefaultWithoutParentFolder(
@@ -944,6 +979,13 @@ internal static class LibraryColumnFilter
 
     private static void InsertWaveformAtDefaultPlace(List<LibraryFileColumn> result)
     {
+        var loudness = result.IndexOf(LibraryFileColumn.Loudness);
+        if (loudness >= 0)
+        {
+            result.Insert(loudness + 1, LibraryFileColumn.Waveform);
+            return;
+        }
+
         var parent = result.IndexOf(LibraryFileColumn.ParentFolder);
         if (parent >= 0)
         {

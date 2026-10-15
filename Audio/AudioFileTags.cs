@@ -60,6 +60,9 @@ internal sealed class AudioFileTags
     /// <summary>音声 fourcc（mp4a / ipcm など）。無ければ空。</summary>
     public string AudioCodec { get; init; } = string.Empty;
 
+    /// <summary>Integrated LUFS。未計測は null（カタログ／遅延計測で埋める）。</summary>
+    public float? IntegratedLufs { get; init; }
+
     /// <summary>LAME Xing／Info または iTunSMPB／M4A elst の encoder delay（サンプル）。未記載は 0。</summary>
     public int EncoderDelayFrames { get; init; }
 
@@ -108,6 +111,41 @@ internal sealed class AudioFileTags
             FrameRate = FrameRate,
             VideoCodec = VideoCodec,
             AudioCodec = AudioCodec,
+            IntegratedLufs = IntegratedLufs,
+            EncoderDelayFrames = EncoderDelayFrames,
+            EncoderPaddingFrames = EncoderPaddingFrames,
+            EncoderOriginalFrames = EncoderOriginalFrames,
+            HasArtwork = HasArtwork,
+        };
+
+    public AudioFileTags WithIntegratedLufs(float? integratedLufs) =>
+        new()
+        {
+            Probed = Probed,
+            Title = Title,
+            Artist = Artist,
+            Album = Album,
+            AlbumArtist = AlbumArtist,
+            Track = Track,
+            TrackNumber = TrackNumber,
+            Disc = Disc,
+            DiscNumber = DiscNumber,
+            Year = Year,
+            YearNumber = YearNumber,
+            Genre = Genre,
+            Comment = Comment,
+            Composer = Composer,
+            DurationSeconds = DurationSeconds,
+            SampleRate = SampleRate,
+            BitsPerSample = BitsPerSample,
+            Channels = Channels,
+            BitRateKbps = BitRateKbps,
+            VideoWidth = VideoWidth,
+            VideoHeight = VideoHeight,
+            FrameRate = FrameRate,
+            VideoCodec = VideoCodec,
+            AudioCodec = AudioCodec,
+            IntegratedLufs = integratedLufs,
             EncoderDelayFrames = EncoderDelayFrames,
             EncoderPaddingFrames = EncoderPaddingFrames,
             EncoderOriginalFrames = EncoderOriginalFrames,
@@ -208,6 +246,7 @@ internal sealed class AudioFileTagsBuilder
             FrameRate = FrameRate,
             VideoCodec = VideoCodec ?? string.Empty,
             AudioCodec = AudioCodec ?? string.Empty,
+            IntegratedLufs = null,
             EncoderDelayFrames = EncoderDelayFrames,
             EncoderPaddingFrames = EncoderPaddingFrames,
             EncoderOriginalFrames = EncoderOriginalFrames,

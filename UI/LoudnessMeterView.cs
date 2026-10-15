@@ -45,6 +45,7 @@ internal sealed class LoudnessMeterView : Grid
     private int _offlineRevision = int.MinValue;
     private int _offlineSampleCount = -1;
     private int _offlineGen;
+    private bool _offlinePending;
     private bool _offlineMode = true;
     private float _previewLinear = 1f;
     private AudioDocument? _displayDocument;
@@ -333,6 +334,7 @@ internal sealed class LoudnessMeterView : Grid
         {
             _offlineGen++;
             _offline = null;
+            _offlinePending = false;
             _offlineSamples = null;
             _offlineRevision = int.MinValue;
             _offlineSampleCount = -1;
@@ -358,13 +360,16 @@ internal sealed class LoudnessMeterView : Grid
         {
             samples = document.Interleaved;
             used = Math.Clamp(document.SampleCount, 0, samples.Length);
-            if (CanReuseOffline(
-                    _offlineSamples,
-                    _offlineRevision,
-                    _offlineSampleCount,
-                    samples,
-                    document.SampleRevision,
-                    used))
+            var sameInput = CanReuseOffline(
+                _offlineSamples,
+                _offlineRevision,
+                _offlineSampleCount,
+                samples,
+                document.SampleRevision,
+                used);
+            // 結果済み、または同じ入力で計測中なら何もしない。
+            // 結果が無く計測も走っていない（失敗・打ち切り）ときは測り直す。
+            if (sameInput && (_offline is not null || _offlinePending))
             {
                 return;
             }
@@ -377,11 +382,23 @@ internal sealed class LoudnessMeterView : Grid
             _offlineRevision = document.SampleRevision;
             _offlineSampleCount = used;
             _offline = null;
+            _offlinePending = true;
         }
 
         Task.Run(() =>
         {
-            var snap = LoudnessMeterEngine.MeasureFile(samples, channels, rate, target, used);
+            LoudnessSnapshot snap;
+            try
+            {
+                snap = LoudnessMeterEngine.MeasureFile(samples, channels, rate, target, used);
+            }
+            catch (Exception ex) when (ex is ArgumentException
+                                           or InvalidOperationException
+                                           or IndexOutOfRangeException)
+            {
+                snap = LoudnessSnapshot.Idle with { TargetLufs = target };
+            }
+
             Dispatcher.BeginInvoke(
                 () =>
                 {
@@ -393,6 +410,7 @@ internal sealed class LoudnessMeterView : Grid
                         }
 
                         _offline = snap;
+                        _offlinePending = false;
                     }
 
                     if (!IsLivePlayback())

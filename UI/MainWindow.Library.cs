@@ -71,6 +71,10 @@ public partial class MainWindow
 
     /// <summary>本再生からの一時停止（テンキー 0）中はクロームを出さない。</summary>
     private bool _playlistVideoImmersivePause;
+    /// <summary>
+    /// リスト右クリック表示中。
+    /// </summary>
+    private bool _listContextMenuOpen;
     private bool _playlistVideoFullscreen;
     /// <summary>F 全画面中に動画寸法の適用を先送りしたか。解除時に Apply する。</summary>
     private bool _videoLaunchPlacementDeferred;
@@ -111,6 +115,17 @@ public partial class MainWindow
 
     private void ToggleLibraryMaximize()
     {
+        // メニュー表示中、および外側クリック dismiss がプレイヤー切替ボタンへ貫通したときの解除は捨てる。
+        // （右クリックメニューを閉じるクリックが下のトランスポートボタンに当たると、
+        //   ここが走って選択以外のトラックが消えてしまう。）
+        if (IsLibraryMaximized
+            && (_listContextMenuOpen
+                || LibraryBrowser.HasOpenContextMenu
+                || LibraryBrowser.IsContextMenuDismissGuardActive))
+        {
+            return;
+        }
+
         // 動画ミニ（F8）中の F10 はプレイリストが見える通常プレイヤーへ戻す。
         if (IsVideoMiniPlayerActive())
         {
@@ -146,6 +161,16 @@ public partial class MainWindow
             _waveformMaximizeMode == WaveformMaximizeMode.Library
                 ? WaveformMaximizeMode.Off
                 : WaveformMaximizeMode.Library);
+    }
+
+    private void LibraryBrowser_ListContextMenuOpened(object? sender, EventArgs e)
+    {
+        _listContextMenuOpen = true;
+    }
+
+    private void LibraryBrowser_ListContextMenuClosed(object? sender, EventArgs e)
+    {
+        _listContextMenuOpen = false;
     }
 
     /// <summary>
@@ -1723,7 +1748,103 @@ public partial class MainWindow
         }
 
         UpgradeLibraryPeaksForEditor();
+        // タイル構築やウィンドウ寸法の復元よりピーク完了が先だと、空の Primary へ描いて終わることがある。
+        // アクティブを載せ直してから、レイアウト確定後にもう一度描く。
+        RebindActiveWaveformAfterLibraryLeave();
         ForEachWaveform(view => view.Refresh());
+        Overview.Refresh();
+        ScheduleEditorWaveformPaint();
+    }
+
+    /// <summary>
+    /// プレイヤー退出直後。タイル未作成時に Primary へ描いてしまわないよう、表示中ビューへ載せ直す。
+    /// </summary>
+    private void RebindActiveWaveformAfterLibraryLeave()
+    {
+        if (IsLibraryMaximized || _activeSession is null)
+        {
+            return;
+        }
+
+        if (_tileMode)
+        {
+            if (FindTilePane(_activeSession) is { } pane)
+            {
+                if (!ReferenceEquals(pane.View.Document, _activeSession.Document))
+                {
+                    ApplySessionToView(pane.View, _activeSession, applyAnalysis: false);
+                }
+
+                _tileActiveView = pane.View;
+                Overview.SeekTrailSource = pane.View;
+                Overview.Document = _activeSession.Document;
+                return;
+            }
+
+            // タイルがまだ無いときは Primary を触らない（ClearSingle 済みの空描画を避ける）。
+            return;
+        }
+
+        if (!ReferenceEquals(Waveform.Document, _activeSession.Document))
+        {
+            BindSingleWorkspace(_activeSession);
+        }
+    }
+
+    /// <summary>
+    /// エディタへ戻したあと、ウィンドウ／タイルのレイアウトが決まってから波形を描き直す。
+    /// プレイヤー帯のまま描くと空に見え、タブを行き来するまで直らないことがある。
+    /// </summary>
+    private void ScheduleEditorWaveformPaint()
+    {
+        var ticket = ++_libraryWavePaintTicket;
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => PaintEditorWaveform(ticket));
+        Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () => PaintEditorWaveform(ticket));
+    }
+
+    private void PaintEditorWaveform(int ticket)
+    {
+        if (ticket != _libraryWavePaintTicket || IsLibraryMaximized)
+        {
+            return;
+        }
+
+        if (_tileMode)
+        {
+            foreach (var pane in _tilePanes)
+            {
+                if (!_sessions.Contains(pane.Session))
+                {
+                    continue;
+                }
+
+                if (!ReferenceEquals(pane.View.Document, pane.Session.Document))
+                {
+                    ApplySessionToView(pane.View, pane.Session, applyAnalysis: false);
+                }
+
+                pane.View.UpdateLayout();
+                if (pane.View.ActualWidth >= 8 && pane.View.ActualHeight >= 8)
+                {
+                    pane.View.Refresh();
+                }
+            }
+
+            Overview.Refresh();
+            return;
+        }
+
+        if (Waveform.Document is null && _activeSession is not null)
+        {
+            BindSingleWorkspace(_activeSession);
+        }
+
+        Waveform.UpdateLayout();
+        if (Waveform.ActualWidth >= 8 && Waveform.ActualHeight >= 8)
+        {
+            Waveform.Refresh();
+        }
+
         Overview.Refresh();
     }
 
@@ -1951,6 +2072,7 @@ public partial class MainWindow
 
     /// <summary>
     /// プレイヤーを抜けるとき、リストで選んだファイルだけ残す。保存確認でキャンセルしたら false。
+    /// dirty の確認を先に行い、キャンセル時は未編集セッションを消さない（途中破壊を防ぐ）。
     /// </summary>
     private bool KeepOnlyLibrarySelectedSessions()
     {
@@ -1983,12 +2105,7 @@ public partial class MainWindow
             }
         }
 
-        // 未編集は 1 件ずつ CloseSession しない。タブ再構築の繰り返しが再生中に重い。
-        if (clean.Count > 0)
-        {
-            DropLibrarySessionsFast(clean);
-        }
-
+        // 保存確認を先に。キャンセルなら clean も触らない。
         if (dirty.Count > 0)
         {
             var cancelled = false;
@@ -2020,6 +2137,12 @@ public partial class MainWindow
             {
                 return false;
             }
+        }
+
+        // 抜けが確定してから未編集をまとめて外す。
+        if (clean.Count > 0)
+        {
+            DropLibrarySessionsFast(clean);
         }
 
         ApplyLibraryHandoffSelection(keep, current);
@@ -3703,6 +3826,82 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>
+    /// 破壊編集用に Wave / AIFF の PCM をメモリへ載せる。遅延／ストリームならフル Load。
+    /// </summary>
+    private Task<bool> EnsureSessionPcmForEditAsync(DocumentSession session)
+    {
+        if (!AudioCodec.IsUncompressedPcm(session.Document.SourceKind))
+        {
+            return Task.FromResult(false);
+        }
+
+        return EnsureSessionLoadedForExportAsync(session);
+    }
+
+    /// <summary>
+    /// MP3 書き出し用に PCM をメモリへ載せる。遅延／ストリームならフル Load（圧縮音源含む）。
+    /// </summary>
+    private async Task<bool> EnsureSessionLoadedForExportAsync(DocumentSession session)
+    {
+        var document = session.Document;
+        if (LibraryPlaylistDocuments.IsPdf(document)
+            || LibraryPlaylistDocuments.IsVideo(document))
+        {
+            return false;
+        }
+
+        if (!document.IsDeferredLoad
+            && !document.IsStreamPlayback
+            && document.Interleaved.Length > 0
+            && document.FrameCount > 0)
+        {
+            return true;
+        }
+
+        if (document.SourcePath is not { Length: > 0 } path || !File.Exists(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            var playhead = session.PlayheadFrame;
+            var tags = document.Tags;
+            var previousArt = document.Artwork;
+            var loaded = await Task.Run(() =>
+            {
+                var next = AudioCodec.Load(path, buildPeaks: false);
+                next.ReplacePeaks(
+                    PeakPyramid.BuildDisplay(next.Interleaved, next.Channels, next.SampleCount));
+                return next;
+            }).ConfigureAwait(true);
+
+            if (!session.Document.IsDeferredLoad
+                && !session.Document.IsStreamPlayback
+                && session.Document.Interleaved.Length > 0)
+            {
+                return session.Document.FrameCount > 0;
+            }
+
+            loaded.CursorFrame = Math.Clamp(playhead, 0, loaded.FrameCount);
+            session.ReplaceDocument(loaded);
+            loaded.ApplyTags(tags);
+            if (!loaded.HasArtwork && previousArt is { Length: > 0 })
+            {
+                loaded.SetArtwork(previousArt);
+            }
+
+            session.PlayheadFrame = Math.Clamp(playhead, 0, loaded.FrameCount);
+            ApplyLoadedLibrarySession(session, bind: ReferenceEquals(session, _activeSession));
+            return loaded.FrameCount > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private async Task LoadDeferredLibrarySessionAsync(DocumentSession session, int generation, bool bind = true)
     {
         var path = session.Document.SourcePath;
@@ -3978,12 +4177,16 @@ public partial class MainWindow
     private void RefreshLibrarySessionWaveform(DocumentSession session, bool throttlePaint)
     {
         WaveformView? view = null;
-        if (FindTilePane(session) is { } pane)
+        var tilePane = FindTilePane(session);
+        if (tilePane is not null)
         {
-            view = pane.View;
+            view = tilePane.View;
         }
-        else if (ReferenceEquals(_activeSession, session))
+        else if (ReferenceEquals(_activeSession, session)
+            && LibraryPlayerMode.RefreshesPrimaryForLibraryPeaks(_tileMode, sessionHasTilePane: false))
         {
+            // タイル構築中は Primary が Clear 済み。ここに描くと空ビットマップが残り、
+            // タブ切替まで波形が出ないことがある。
             view = Waveform;
         }
 

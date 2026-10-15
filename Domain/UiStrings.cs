@@ -153,7 +153,7 @@ internal static partial class UiStrings
     public static string LabelSettingsTabWwise => Get("Wwise", "Wwise");
     public static string LabelLibraryExplorerRoots => Get("ツリーのルート", "Tree roots");
     public static string LabelLibraryListColumns => Get("プレイリストの列", "Playlist columns");
-    public static string LabelLibraryListColumnsWave => Get("Wave のとき", "For WAVE");
+    public static string LabelLibraryListColumnsWave => Get("WAVE / AIFF のとき", "For WAVE / AIFF");
     public static string LabelLibraryListColumnsMp3 => Get("MP3 のとき", "For MP3");
     public static string LabelLibraryListColumnsVideo => Get("動画のとき", "For video");
     public static string LabelLibraryListColumnsReset => Get("既定に戻す", "Reset to defaults");
@@ -557,6 +557,31 @@ internal static partial class UiStrings
     public static string ErrorLoudnessTargetRange => Get(
         "ラウドネスターゲットは -70 から 0 の LKFS で入力してください。",
         "Enter a loudness target between -70 and 0 LKFS.");
+    public static string ConfirmMatchLoudnessTarget(int count, bool saveAfter = false)
+    {
+        if (saveAfter)
+        {
+            return Format(
+                "選択した {0} 個の Wave / AIFF を、次のラウドネスターゲットに揃えて保存しますか？{1}この編集は元に戻せません。",
+                "Match the {0} selected Wave / AIFF file(s) to the loudness target below and save?{1}This edit cannot be undone.",
+                count,
+                Environment.NewLine);
+        }
+
+        return Format(
+            "選択した {0} 個の Wave / AIFF を、次のラウドネスターゲットに揃えますか？",
+            "Match the {0} selected Wave / AIFF file(s) to the loudness target below?",
+            count);
+    }
+    public static string ErrorNoWaveAiffForLoudnessMatch => Get(
+        "ラウドネス揃えは Wave / AIFF のみ対応です。",
+        "Loudness matching is only available for Wave / AIFF.");
+    public static string ErrorNoAudioForMp3Export => Get(
+        "MP3 に変換できる音声ファイルがありません。",
+        "No audio files are available to convert to MP3.");
+    public static string ErrorAllSelectedAlreadyMp3 => Get(
+        "選択中のファイルはすべて MP3 です。",
+        "All selected files are already MP3.");
     public static string OverlaySampleRateConvert => Get("サンプリングレート変換", "Sample rate conversion");
     public static string OverlayPitchShift => Get("ピッチシフト", "Pitch shift");
     public static string OverlayPasteHistory => Get("編集履歴を貼り付けています", "Pasting edit history");
@@ -737,6 +762,7 @@ internal static partial class UiStrings
     public static string LibraryColumnFrameRate => Get("フレームレート", "Frame rate");
     public static string LibraryColumnVideoCodec => Get("映像コーデック", "Video codec");
     public static string LibraryColumnAudioCodec => Get("音声コーデック", "Audio codec");
+    public static string LibraryColumnLoudness => Get("ラウドネス", "Loudness");
     public static string LibraryColumnLabel(LibraryFileColumn column) => column switch
     {
         LibraryFileColumn.Title => LibraryColumnTitle,
@@ -765,6 +791,7 @@ internal static partial class UiStrings
         LibraryFileColumn.FrameRate => LibraryColumnFrameRate,
         LibraryFileColumn.VideoCodec => LibraryColumnVideoCodec,
         LibraryFileColumn.AudioCodec => LibraryColumnAudioCodec,
+        LibraryFileColumn.Loudness => LibraryColumnLoudness,
         _ => LibraryColumnName,
     };
 
@@ -802,27 +829,49 @@ internal static partial class UiStrings
     public static string LibraryMenuAppendPlaylist => Get("プレイリストへ追加", "Add to Playlist");
     public static string LibraryMenuRemoveFromFavorites => Get("お気に入りから削除", "Remove from Favorites");
     public static string LibraryMenuClearFromPlaylist => Get("プレイリストからクリア", "Clear from Playlist");
+    // アクセスキーは付けない（メニュー外クリック時の誤発火を避ける）。ショートカットは InputGestureText。
+    public static string LibraryMenuMatchLoudness => Get("ラウドネスを揃える", "Match Loudness");
+    public static string LibraryMenuSaveMp3 => Get("MP3 として保存", "Save as MP3");
     public static string LibraryMenuCopy => Get("コピー", "Copy");
     public static string LibraryMenuCopyFileName => Get("ファイル名をコピー", "Copy File Name");
     public static string LibraryMenuCopyFilePath => Get("フルパスをコピー", "Copy Full Path");
     public static string LibraryMenuOpenInExplorer => Get("エクスプローラーで開く", "Open in Explorer");
-    /// <summary>プレイリスト上段のグループコンボ。UI 言語に関わらず英語。</summary>
+    /// <summary>グループなし。ラベル "Group" と同様、UI 言語に関わらず英語。</summary>
     public static string LibraryGroupNone => "None";
-    public static string LibraryGroupTitle => "Title";
-    public static string LibraryGroupArtist => "Artist";
-    public static string LibraryGroupAlbum => "Album";
-    public static string LibraryGroupGenre => "Genre";
-    public static string LibraryGroupYear => "Year";
-    public static string LibraryGroupKind => "Kind";
-    public static string LibraryGroupSampleRate => "Sample rate";
-    public static string LibraryGroupBitDepth => "Bit depth";
-    public static string LibraryGroupChannels => "Channels";
-    public static string LibraryGroupFolder => "Parent folder";
+    /// <summary>グループ項目は列名と同じ表記（<see cref="LibraryColumnLabel"/>）。</summary>
+    public static string LibraryGroupTitle => LibraryColumnTitle;
+    public static string LibraryGroupArtist => LibraryColumnArtist;
+    public static string LibraryGroupAlbum => LibraryColumnAlbum;
+    public static string LibraryGroupGenre => LibraryColumnGenre;
+    public static string LibraryGroupYear => LibraryColumnYear;
+    public static string LibraryGroupKind => LibraryColumnKind;
+    public static string LibraryGroupSampleRate => LibraryColumnSampleRate;
+    public static string LibraryGroupBitDepth => LibraryColumnBitDepth;
+    public static string LibraryGroupChannels => LibraryColumnChannels;
+    public static string LibraryGroupFolder => LibraryColumnParentFolder;
     public static string LibraryGroupUntitled => Get("(未保存)", "(Untitled)");
     public static string LibraryGroupBlank => Get("(なし)", "(None)");
     public static string LibraryJacketMark => "✓";
     public static string FormatBitRate(int kbps) =>
         kbps <= 0 ? string.Empty : $"{kbps} kbps";
+
+    /// <summary>Integrated（表示は LKFS。LUFS と同値）。未計測は空。</summary>
+    public static string FormatIntegratedLufs(float? lufs)
+    {
+        if (lufs is not float value)
+        {
+            return string.Empty;
+        }
+
+        if (!float.IsFinite(value))
+        {
+            return "--.- " + LabelLufs;
+        }
+
+        return value.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
+            + " "
+            + LabelLufs;
+    }
 
     /// <summary>動画の総ビットレート。内部は kbps のまま、表示は Mbps。</summary>
     public static string FormatVideoBitRate(int kbps)

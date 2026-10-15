@@ -306,6 +306,9 @@ public partial class MainWindow
             TryBindTiledWorkspace(session, resetInteraction: reset);
             _tileNeedsInitialBind = false;
             AttachPlaybackToActiveWaveform();
+            // レイアウト前の Invalidate だけだと空のまま確定することがある。
+            pane.View.UpdateLayout();
+            pane.View.Refresh();
         }
 
         Dispatcher.Invoke(static () => { }, DispatcherPriority.Input);
@@ -444,6 +447,22 @@ public partial class MainWindow
 
         ApplyWaveformTileBackground(_tileGrid);
         ClearSingleWaveformForTiles();
+        foreach (var pane in _tilePanes)
+        {
+            if (!_sessions.Contains(pane.Session))
+            {
+                continue;
+            }
+
+            if (!ReferenceEquals(pane.View.Document, pane.Session.Document))
+            {
+                ApplySessionToView(pane.View, pane.Session, applyAnalysis: false);
+            }
+
+            pane.View.Refresh();
+        }
+
+        Overview.Refresh();
     }
 
     private Grid CreateTileGrid(int rows, int cols)
@@ -799,7 +818,7 @@ public partial class MainWindow
             {
                 LoudnessMeter.ResetLive();
             }
-            RebuildTabBar();
+            SyncTabBar();
             RefreshTileChrome();
             RefreshTitle();
             SyncViewChrome();

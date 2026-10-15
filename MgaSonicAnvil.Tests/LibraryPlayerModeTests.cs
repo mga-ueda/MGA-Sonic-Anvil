@@ -58,7 +58,10 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Open));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Save));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SaveAs));
-        Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SaveMp3));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SaveMp3));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ExportMp3));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ExportAllMp3));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Volume));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.CenterPlayhead));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.CenterLock));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.MaximizeLibrary));
@@ -229,7 +232,7 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleAnalyzerMaximize));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.Save));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.SaveAs));
-        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.SaveMp3));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.SaveMp3));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.CenterPlayhead));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleSpectrogram));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleLoudnessView));
@@ -308,6 +311,7 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.AllowsKey(Key.A, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.F, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.F, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.V, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.V, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.LeftShift, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.F4, ModifierKeys.Alt));
@@ -405,7 +409,8 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.PrefersScratchMarkerDelete(playerMode: true, hasSelectedScratchMarkers: false));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.S, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.S, ModifierKeys.Control | ModifierKeys.Shift));
-        Assert.False(LibraryPlayerMode.AllowsKey(Key.M, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.M, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.M, ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Z, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.W, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.W, ModifierKeys.Control | ModifierKeys.Shift));
@@ -423,6 +428,23 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.G, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Tab, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Tab, ModifierKeys.Shift));
+    }
+
+    [Fact]
+    public void FilterMp3ExportCandidates_SkipsExistingMp3KeepsOthers()
+    {
+        var wave = new DocumentSession(AudioDocument.CreateDeferred(@"C:\tmp\a.wav"));
+        var mp3 = new DocumentSession(AudioDocument.CreateDeferred(@"C:\tmp\b.mp3"));
+        var aiff = new DocumentSession(AudioDocument.CreateDeferred(@"C:\tmp\c.aiff"));
+        var filtered = LibraryPlayerMode.FilterMp3ExportCandidates([wave, mp3, aiff]);
+        Assert.Equal([wave, aiff], filtered);
+        Assert.False(LibraryPlayerMode.AllSessionsAreMp3([wave, mp3, aiff]));
+        Assert.True(LibraryPlayerMode.AllSessionsAreMp3([mp3]));
+        Assert.False(LibraryPlayerMode.IsMp3ExportCandidate(mp3.Document));
+        Assert.True(LibraryPlayerMode.IsMp3ExportCandidate(wave.Document));
+        Assert.True(LibraryPlayerMode.HasMp3ExportCandidate([wave, mp3]));
+        Assert.False(LibraryPlayerMode.HasMp3ExportCandidate([mp3]));
+        Assert.False(LibraryPlayerMode.HasMp3ExportCandidate([]));
     }
 
     [Fact]
@@ -449,6 +471,8 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Up, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Down, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.Space, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.Space, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Space, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Space, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.PlaysLibrarySelectionOnSpace(explorerFocused: true, favoritesFocused: false));
         Assert.False(LibraryPlayerMode.PlaysLibrarySelectionOnSpace(explorerFocused: false, favoritesFocused: true));
@@ -613,6 +637,23 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.NeedsEditorPeakUpgrade(pcm));
         Assert.True(LibraryPlayerMode.CanReusePeaks(playerMode: true, pcm));
         Assert.False(LibraryPlayerMode.CanReusePeaks(playerMode: false, pcm));
+    }
+
+    [Fact]
+    public void RefreshesPrimaryForLibraryPeaks_SkipsClearedPrimaryDuringTileHandoff()
+    {
+        Assert.True(LibraryPlayerMode.RefreshesPrimaryForLibraryPeaks(
+            tileMode: false,
+            sessionHasTilePane: false));
+        Assert.False(LibraryPlayerMode.RefreshesPrimaryForLibraryPeaks(
+            tileMode: true,
+            sessionHasTilePane: false));
+        Assert.False(LibraryPlayerMode.RefreshesPrimaryForLibraryPeaks(
+            tileMode: true,
+            sessionHasTilePane: true));
+        Assert.False(LibraryPlayerMode.RefreshesPrimaryForLibraryPeaks(
+            tileMode: false,
+            sessionHasTilePane: true));
     }
 
     [Fact]

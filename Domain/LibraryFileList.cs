@@ -29,6 +29,7 @@ internal enum LibraryFileColumn
     FrameRate,
     VideoCodec,
     AudioCodec,
+    Loudness,
 }
 
 internal enum LibraryFileGroup
@@ -146,6 +147,11 @@ internal sealed class LibraryFileRow
 
     public string AudioCodec { get; init; } = string.Empty;
 
+    /// <summary>Integrated LUFS。未計測は null。</summary>
+    public float? IntegratedLufs { get; init; }
+
+    public string LoudnessText { get; init; } = string.Empty;
+
     public string GroupKey { get; set; } = string.Empty;
 }
 
@@ -242,6 +248,7 @@ internal static class LibraryFileList
         && left.FrameRateText == right.FrameRateText
         && left.VideoCodec == right.VideoCodec
         && left.AudioCodec == right.AudioCodec
+        && left.LoudnessText == right.LoudnessText
         && left.GroupKey == right.GroupKey;
 
     public static string CellText(LibraryFileRow row, LibraryFileColumn column) =>
@@ -273,6 +280,7 @@ internal static class LibraryFileList
             LibraryFileColumn.FrameRate => row.FrameRateText,
             LibraryFileColumn.VideoCodec => row.VideoCodec,
             LibraryFileColumn.AudioCodec => row.AudioCodec,
+            LibraryFileColumn.Loudness => row.LoudnessText,
             _ => row.Name,
         };
 
@@ -347,6 +355,7 @@ internal static class LibraryFileList
                 left.AudioCodec,
                 right.AudioCodec,
                 StringComparison.OrdinalIgnoreCase),
+            LibraryFileColumn.Loudness => CompareNullableFloat(left.IntegratedLufs, right.IntegratedLufs),
             _ => string.Compare(left.Name, right.Name, StringComparison.CurrentCultureIgnoreCase),
         };
         if (compared != 0)
@@ -372,6 +381,26 @@ internal static class LibraryFileList
 
         var width = left.VideoWidth.CompareTo(right.VideoWidth);
         return width != 0 ? width : left.VideoHeight.CompareTo(right.VideoHeight);
+    }
+
+    private static int CompareNullableFloat(float? left, float? right)
+    {
+        if (left is null && right is null)
+        {
+            return 0;
+        }
+
+        if (left is null)
+        {
+            return -1;
+        }
+
+        if (right is null)
+        {
+            return 1;
+        }
+
+        return left.Value.CompareTo(right.Value);
     }
 
     private static string Blank(string value) =>

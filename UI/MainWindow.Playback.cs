@@ -159,7 +159,14 @@ public partial class MainWindow
                 Save(saveAs: true);
                 break;
             case TransportCommand.SaveMp3:
-                SaveAsMp3();
+                if (IsLibraryMaximized)
+                {
+                    ExportPlaylistSelectionMp3();
+                }
+                else
+                {
+                    SaveAsMp3();
+                }
                 break;
             case TransportCommand.ToggleAnalysis:
             case TransportCommand.ToggleSpectrogram:
@@ -1819,6 +1826,14 @@ public partial class MainWindow
         if (_waveformMaximizeMode == WaveformMaximizeMode.Library
             && mode != WaveformMaximizeMode.Library)
         {
+            // メニュー表示中、および外側クリック dismiss が下のコントロールへ貫通したときの解除は捨てる。
+            if (_listContextMenuOpen
+                || LibraryBrowser.HasOpenContextMenu
+                || LibraryBrowser.IsContextMenuDismissGuardActive)
+            {
+                return;
+            }
+
             SetPlaylistVideoFullscreen(false);
             // 動画ミニ枠のまま F11／F12 寸法を覚えさせない。
             LeaveVideoMiniBeforeWaveformFullscreen();

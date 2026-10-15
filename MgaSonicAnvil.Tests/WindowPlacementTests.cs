@@ -132,6 +132,30 @@ public sealed class WindowPlacementTests
     }
 
     [Fact]
+    public void ClampRectToWorkArea_KeepsWindowOnSecondaryMonitor()
+    {
+        // 右セカンダリ（プライマリは 0..1920）。当該モニタ基準なら飛ばない。
+        var secondary = new Rect(1920, 0, 1600, 900);
+        var onSecondary = new Rect(2100, 120, 480, 720);
+        var kept = WindowPlacement.ClampRectToWorkArea(onSecondary, secondary);
+        Assert.Equal(2100, kept.X, 3);
+        Assert.Equal(120, kept.Y, 3);
+
+        // 左セカンダリ（負座標）。
+        var leftSecondary = new Rect(-1680, 0, 1680, 1050);
+        var onLeft = new Rect(-1400, 80, 500, 700);
+        var keptLeft = WindowPlacement.ClampRectToWorkArea(onLeft, leftSecondary);
+        Assert.Equal(-1400, keptLeft.X, 3);
+        Assert.Equal(80, keptLeft.Y, 3);
+
+        // 誤ってプライマリ作業領域でクランプすると右へ飛ぶ（回帰検知）。
+        var primary = new Rect(0, 0, 1920, 1080);
+        var wronglyClamped = WindowPlacement.ClampRectToWorkArea(onSecondary, primary);
+        Assert.True(wronglyClamped.X < 1920);
+        Assert.NotEqual(onSecondary.X, wronglyClamped.X);
+    }
+
+    [Fact]
     public void ResolveVideoLaunchBounds_KeepsCenterThenClampsToDisplay()
     {
         var work = new Rect(0, 0, 1920, 1080);

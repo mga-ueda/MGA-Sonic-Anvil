@@ -356,6 +356,19 @@ public sealed class WaveformContextMenuTests
         Assert.False(Find(tree, WaveMenuCommand.TileGrid)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.SoloNext)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.ExportWave)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.Volume)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.ExportMp3)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.ExportAllMp3)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.SaveMp3)?.Enabled);
+        var mp3Only = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasDocument = true,
+            LibraryMaximized = true,
+            CanExportMp3 = false,
+            CanExportAllMp3 = false,
+        });
+        Assert.False(Find(mp3Only, WaveMenuCommand.ExportMp3)?.Enabled);
+        Assert.False(Find(mp3Only, WaveMenuCommand.ExportAllMp3)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.FocusTime)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.TogglePlayback)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.SelectAll)?.Enabled);
