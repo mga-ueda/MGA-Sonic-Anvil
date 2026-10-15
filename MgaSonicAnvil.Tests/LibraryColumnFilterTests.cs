@@ -18,8 +18,8 @@ public sealed class LibraryColumnFilterTests
         Assert.Contains(LibraryFileColumn.Duration, resolved);
         Assert.Contains(LibraryFileColumn.Date, resolved);
         Assert.Contains(LibraryFileColumn.ParentFolder, resolved);
+        Assert.Contains(LibraryFileColumn.Loudness, resolved);
         Assert.Contains(LibraryFileColumn.Waveform, resolved);
-        Assert.DoesNotContain(LibraryFileColumn.Loudness, resolved);
         Assert.DoesNotContain(LibraryFileColumn.Title, resolved);
         Assert.DoesNotContain(LibraryFileColumn.Artist, resolved);
         Assert.DoesNotContain(LibraryFileColumn.Album, resolved);
@@ -48,20 +48,22 @@ public sealed class LibraryColumnFilterTests
                 LibraryFileColumn.Duration,
                 LibraryFileColumn.Date,
                 LibraryFileColumn.ParentFolder,
+                LibraryFileColumn.Loudness,
                 LibraryFileColumn.Waveform,
             },
             LibraryColumnFilter.WaveDefaults);
-        Assert.DoesNotContain(LibraryFileColumn.Loudness, LibraryColumnFilter.WaveDefaults);
-        Assert.Contains(LibraryFileColumn.Loudness, LibraryColumnFilter.WaveSettingsColumns);
+        Assert.Equal(
+            LibraryColumnFilter.WaveDefaults,
+            LibraryColumnFilter.All[..LibraryColumnFilter.WaveDefaults.Length]);
         Assert.Equal(
             [
                 "Name", "SampleRate", "BitDepth", "Channels", "Duration", "Date", "ParentFolder",
-                "Waveform",
+                "Loudness", "Waveform",
             ],
             LibraryColumnFilter.Serialize(LibraryColumnFilter.WaveDefaults));
         Assert.True(Array.IndexOf(LibraryColumnFilter.WaveDefaults, LibraryFileColumn.SampleRate)
             < Array.IndexOf(LibraryColumnFilter.WaveDefaults, LibraryFileColumn.BitDepth));
-        Assert.True(Array.IndexOf(LibraryColumnFilter.WaveDefaults, LibraryFileColumn.ParentFolder)
+        Assert.True(Array.IndexOf(LibraryColumnFilter.WaveDefaults, LibraryFileColumn.Loudness)
             < Array.IndexOf(LibraryColumnFilter.WaveDefaults, LibraryFileColumn.Waveform));
     }
 
@@ -80,8 +82,8 @@ public sealed class LibraryColumnFilterTests
         Assert.DoesNotContain(LibraryFileColumn.Jacket, wave);
         Assert.DoesNotContain(LibraryFileColumn.BitRate, wave);
         Assert.Contains(LibraryFileColumn.Loudness, wave);
-        Assert.True(Array.IndexOf(wave, LibraryFileColumn.Waveform)
-            < Array.IndexOf(wave, LibraryFileColumn.Loudness));
+        Assert.True(Array.IndexOf(wave, LibraryFileColumn.Loudness)
+            < Array.IndexOf(wave, LibraryFileColumn.Waveform));
 
         var mp3 = LibraryColumnFilter.SettingsCheckOrder(
             LibraryColumnFilter.Mp3Defaults,
@@ -143,8 +145,8 @@ public sealed class LibraryColumnFilterTests
             ]);
         Assert.Equal(LibraryColumnFilter.WaveDefaults, resolved);
         Assert.Equal(LibraryFileColumn.Waveform, resolved[^1]);
-        Assert.Equal(LibraryFileColumn.ParentFolder, resolved[^2]);
-        Assert.DoesNotContain(LibraryFileColumn.Loudness, resolved);
+        Assert.Equal(LibraryFileColumn.Loudness, resolved[^2]);
+        Assert.Equal(LibraryFileColumn.ParentFolder, resolved[^3]);
         Assert.Equal(LibraryFileColumn.SampleRate, resolved[1]);
         Assert.Equal(LibraryFileColumn.BitDepth, resolved[2]);
         Assert.Equal(LibraryFileColumn.Channels, resolved[3]);
@@ -160,8 +162,8 @@ public sealed class LibraryColumnFilterTests
             ]);
         Assert.Equal(LibraryColumnFilter.WaveDefaults, resolved);
         Assert.Equal(LibraryFileColumn.Waveform, resolved[^1]);
-        Assert.Equal(LibraryFileColumn.ParentFolder, resolved[^2]);
-        Assert.DoesNotContain(LibraryFileColumn.Loudness, resolved);
+        Assert.Equal(LibraryFileColumn.Loudness, resolved[^2]);
+        Assert.Equal(LibraryFileColumn.ParentFolder, resolved[^3]);
     }
 
     [Fact]
@@ -174,8 +176,7 @@ public sealed class LibraryColumnFilterTests
             ]);
         Assert.Equal(LibraryColumnFilter.WaveDefaults, resolved);
         Assert.Equal(LibraryFileColumn.Waveform, resolved[^1]);
-        Assert.Equal(LibraryFileColumn.ParentFolder, resolved[^2]);
-        Assert.DoesNotContain(LibraryFileColumn.Loudness, resolved);
+        Assert.Equal(LibraryFileColumn.Loudness, resolved[^2]);
     }
 
     [Fact]
@@ -188,24 +189,11 @@ public sealed class LibraryColumnFilterTests
             ]);
         Assert.Equal(LibraryColumnFilter.WaveDefaults, resolved);
         Assert.Equal(LibraryFileColumn.Waveform, resolved[^1]);
-        Assert.Equal(LibraryFileColumn.ParentFolder, resolved[^2]);
-        Assert.DoesNotContain(LibraryFileColumn.Loudness, resolved);
+        Assert.Equal(LibraryFileColumn.Loudness, resolved[^2]);
     }
 
     [Fact]
-    public void Resolve_PreviousWaveDefaultsWithLoudness_MovesToCurrentDefaultsWithoutLoudness()
-    {
-        var resolved = LibraryColumnFilter.ResolveWave(
-            [
-                "Name", "SampleRate", "BitDepth", "Channels", "Duration", "Date", "ParentFolder",
-                "Loudness", "Waveform",
-            ]);
-        Assert.Equal(LibraryColumnFilter.WaveDefaults, resolved);
-        Assert.DoesNotContain(LibraryFileColumn.Loudness, resolved);
-    }
-
-    [Fact]
-    public void Resolve_WaveDefaultsWithoutLoudness_KeepsWithoutLoudness()
+    public void Resolve_PreviousWaveDefaultsWithoutLoudness_InsertsLoudnessBeforeWaveform()
     {
         var resolved = LibraryColumnFilter.ResolveWave(
             [
@@ -213,7 +201,8 @@ public sealed class LibraryColumnFilterTests
                 "Waveform",
             ]);
         Assert.Equal(LibraryColumnFilter.WaveDefaults, resolved);
-        Assert.DoesNotContain(LibraryFileColumn.Loudness, resolved);
+        Assert.True(Array.IndexOf(resolved, LibraryFileColumn.Loudness)
+            < Array.IndexOf(resolved, LibraryFileColumn.Waveform));
     }
 
     [Fact]
@@ -377,13 +366,9 @@ public sealed class LibraryColumnFilterTests
         Assert.DoesNotContain(LibraryFileColumn.Album, used);
         Assert.DoesNotContain(LibraryFileColumn.Track, used);
         Assert.DoesNotContain(LibraryFileColumn.Jacket, used);
-        Assert.False(LibraryColumnFilter.IsEffectivelyVisible(
-            LibraryFileColumn.Loudness,
-            LibraryColumnFilter.WaveDefaults,
-            used));
         Assert.True(LibraryColumnFilter.IsEffectivelyVisible(
             LibraryFileColumn.Loudness,
-            [.. LibraryColumnFilter.WaveDefaults, LibraryFileColumn.Loudness],
+            LibraryColumnFilter.WaveDefaults,
             used));
 
         foreach (var column in LibraryColumnFilter.WaveDefaults)
