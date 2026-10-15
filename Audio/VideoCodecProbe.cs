@@ -773,15 +773,7 @@ internal static class VideoCodecProbe
 
     internal static bool IsAudioSample(string fourcc) =>
         fourcc.Equals("mp4a", StringComparison.OrdinalIgnoreCase)
-        || fourcc.Equals("ipcm", StringComparison.OrdinalIgnoreCase)
-        || fourcc.Equals("lpcm", StringComparison.OrdinalIgnoreCase)
-        || fourcc.Equals("sowt", StringComparison.OrdinalIgnoreCase)
-        || fourcc.Equals("twos", StringComparison.OrdinalIgnoreCase)
-        || fourcc.Equals("in24", StringComparison.OrdinalIgnoreCase)
-        || fourcc.Equals("in32", StringComparison.OrdinalIgnoreCase)
-        || fourcc.Equals("fl32", StringComparison.OrdinalIgnoreCase)
-        || fourcc.Equals("fl64", StringComparison.OrdinalIgnoreCase)
-        || fourcc.Equals("raw ", StringComparison.OrdinalIgnoreCase)
+        || IsUncompressedAudio(fourcc)
         || fourcc.Equals("ulaw", StringComparison.OrdinalIgnoreCase)
         || fourcc.Equals("alaw", StringComparison.OrdinalIgnoreCase)
         || fourcc.Equals("aac ", StringComparison.OrdinalIgnoreCase)
@@ -790,6 +782,34 @@ internal static class VideoCodecProbe
         || fourcc.Equals("ac-3", StringComparison.OrdinalIgnoreCase)
         || fourcc.Equals("ec-3", StringComparison.OrdinalIgnoreCase)
         || fourcc.Equals("samr", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// MOV/MP4 等の非圧縮 PCM 音声 fourcc。不明・圧縮系は false（ビット深度列は出さない）。
+    /// </summary>
+    internal static bool IsUncompressedAudio(string? fourcc)
+    {
+        if (string.IsNullOrWhiteSpace(fourcc))
+        {
+            return false;
+        }
+
+        var tag = fourcc.Trim();
+        if (tag.Length >= 4)
+        {
+            tag = tag[..4];
+        }
+
+        return tag.Equals("ipcm", StringComparison.OrdinalIgnoreCase)
+            || tag.Equals("lpcm", StringComparison.OrdinalIgnoreCase)
+            || tag.Equals("sowt", StringComparison.OrdinalIgnoreCase)
+            || tag.Equals("twos", StringComparison.OrdinalIgnoreCase)
+            || tag.Equals("in24", StringComparison.OrdinalIgnoreCase)
+            || tag.Equals("in32", StringComparison.OrdinalIgnoreCase)
+            || tag.Equals("fl32", StringComparison.OrdinalIgnoreCase)
+            || tag.Equals("fl64", StringComparison.OrdinalIgnoreCase)
+            || tag.Equals("raw", StringComparison.OrdinalIgnoreCase)
+            || tag.Equals("pcm", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static void TryParseAudioSample(
         Stream stream,
