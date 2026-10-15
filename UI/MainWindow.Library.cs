@@ -50,8 +50,8 @@ public partial class MainWindow
     private int _libraryFolderShowGeneration;
     private int _libraryArtworkShowGeneration;
     /// <summary>
-    /// フォルダ再帰追加の実行中。
-    /// Shift+Enter／ドロップ追加は重ねない。Enter（クリアして追加）は Cancel して差し替える。
+    /// フォルダ追加の実行中。
+    /// Shift 付き追加／追加ドロップは重ねない。クリアして追加は Cancel して差し替える。
     /// </summary>
     private bool _libraryFolderShowInProgress;
     private int _gaplessToken;
@@ -1512,7 +1512,6 @@ public partial class MainWindow
         [
             StatusBarHost,
             WaapiBar,
-            TipsPanel,
             LibraryBrowser,
             LibrarySplitter,
             MeterColumnSplitter,
@@ -1613,7 +1612,6 @@ public partial class MainWindow
         if (show)
         {
             StatusBarHost.Background = Brushes.Transparent;
-            TipsPanel.Background = Brushes.Transparent;
             WaveformHostBorder.Background = Brushes.Transparent;
             WaveformTileHost.Background = null;
             MeterColumn.Background = Brushes.Transparent;
@@ -1629,7 +1627,6 @@ public partial class MainWindow
         else
         {
             StatusBarHost.SetResourceReference(Border.BackgroundProperty, "StatusBarBackBrush");
-            TipsPanel.SetResourceReference(Border.BackgroundProperty, "WaapiBarBackBrush");
             WaveformHostBorder.SetResourceReference(Border.BackgroundProperty, "WaveformBackBrush");
             WaveformTileHost.SetResourceReference(Panel.BackgroundProperty, "WaveformBackBrush");
             MeterColumn.SetResourceReference(Panel.BackgroundProperty, "TransportBackBrush");
@@ -4256,6 +4253,12 @@ public partial class MainWindow
         }
     }
 
+    private void LibraryBrowser_AutoPlayChanged(object? sender, EventArgs e)
+    {
+        AppStorage.Settings.LibraryAutoPlay = LibraryBrowser.AutoPlayEnabled;
+        AppStorage.Save();
+    }
+
     private void LibraryBrowser_AutoPlayNextChanged(object? sender, EventArgs e)
     {
         if (!IsLibraryMaximized || !IsPlaybackActive())
@@ -4315,7 +4318,8 @@ public partial class MainWindow
             _ = OpenLibraryFoldersRecursiveAsync(
                 paths,
                 LibraryExplorerPlaylistWalk.Inactive,
-                playFirst: true);
+                playFirst: LibraryBrowser.AutoPlayEnabled,
+                recursive: e.Recursive);
             return;
         }
 
@@ -4328,7 +4332,8 @@ public partial class MainWindow
         _ = OpenLibraryFoldersRecursiveAsync(
             paths,
             LibraryExplorerPlaylistWalk.Inactive,
-            playFirst: false);
+            playFirst: false,
+            recursive: e.Recursive);
     }
 
     private void LibraryBrowser_ExplorerFoldersOpened(object? sender, IReadOnlyList<string> folders)
@@ -4344,7 +4349,10 @@ public partial class MainWindow
             return;
         }
 
-        _ = OpenLibraryFoldersRecursiveAsync(existing, playFirst: false);
+        _ = OpenLibraryFoldersRecursiveAsync(
+            existing,
+            playFirst: false,
+            recursive: LibraryBrowser.ExplorerOpenRecursive);
     }
 
     private async void LibraryBrowser_ExplorerFolderOpened(object? sender, string path)
@@ -4360,12 +4368,16 @@ public partial class MainWindow
             return;
         }
 
-        await OpenLibraryFoldersRecursiveAsync(existing, playFirst: false).ConfigureAwait(true);
+        await OpenLibraryFoldersRecursiveAsync(
+            existing,
+            playFirst: false,
+            recursive: LibraryBrowser.ExplorerOpenRecursive).ConfigureAwait(true);
     }
 
     /// <summary>
-    /// ツリーの Enter。プレイリストを空にしてから、選んだフォルダ配下を載せる。
-    /// 再帰追加の最中でも、別フォルダへの Enter で進行中の追加を中断して差し替える。
+    /// ツリーの Enter／Ctrl+Enter（クリア系）。
+    /// プレイリストを空にしてから載せる。再帰は <see cref="LibraryBrowserView.ExplorerOpenRecursive"/>。
+    /// 追加の最中でも、別フォルダへのクリア追加で進行中を中断して差し替える。
     /// </summary>
     private void ReplaceLibraryFromExplorerFolder()
     {
@@ -4388,20 +4400,23 @@ public partial class MainWindow
         _ = OpenLibraryFoldersRecursiveAsync(
             folders,
             LibraryBrowser.SnapshotExplorerPlaylistWalk(),
-            playFirst: true);
+            playFirst: LibraryBrowser.AutoPlayEnabled,
+            recursive: LibraryBrowser.ExplorerOpenRecursive);
     }
 
     /// <summary>
-    /// フォルダ配下（と単体ファイル）を再帰収集し、1 曲ずつ載せる。
-    /// 再生するのは Enter（クリア後）だけ。Shift+Enter・ダブルクリック・追加メニューは再生も停止もしない。
-    /// Enter 再生は先頭が音声なら見つけ次第、動画／PDF は全件追加後に再生し、プレイリストへフォーカスする。
+    /// フォルダ配下（と単体ファイル）を収集し、1 曲ずつ載せる。
+    /// 再生するのはクリアして追加かつ Auto Play オンのときだけ。
+    /// Shift 付き追加は再生も停止もしない。
+    /// クリア追加の再生は先頭が音声なら見つけ次第、動画／PDF は全件追加後に再生し、プレイリストへフォーカスする。
     /// 検索中のツリーは見えているフォルダだけ。ファイル名ヒットはそのファイル、フォルダ名ヒットは配下すべて。
     /// お気に入りは検索フィルタを掛けない。
     /// </summary>
     private async Task OpenLibraryFoldersRecursiveAsync(
         IReadOnlyList<string> folders,
         LibraryExplorerPlaylistWalk? walk = null,
-        bool playFirst = false)
+        bool playFirst = false,
+        bool recursive = true)
     {
         LibraryPlaylistDocuments.ApplyFromSettings(AppStorage.Settings);
         var generation = ++_libraryFolderShowGeneration;
@@ -4458,7 +4473,8 @@ public partial class MainWindow
                     filter,
                     known,
                     channel.Writer,
-                    () => generation != _libraryFolderShowGeneration);
+                    () => generation != _libraryFolderShowGeneration,
+                    recursive);
             }
             finally
             {
@@ -4730,7 +4746,8 @@ public partial class MainWindow
         LibraryExplorerPlaylistWalk filter,
         HashSet<string> knownPaths,
         ChannelWriter<LibraryFolderProduceItem> writer,
-        Func<bool> cancelled)
+        Func<bool> cancelled,
+        bool recursive = true)
     {
         var remaining = new Stack<(string Path, bool AncestorHit)>(roots.Count);
         for (var i = roots.Count - 1; i >= 0; i--)
@@ -4843,6 +4860,11 @@ public partial class MainWindow
                     {
                     }
                 }
+            }
+
+            if (!recursive)
+            {
+                continue;
             }
 
             for (var i = children.Length - 1; i >= 0; i--)

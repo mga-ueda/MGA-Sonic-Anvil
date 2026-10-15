@@ -192,7 +192,6 @@ public partial class MainWindow
             CenterLocked = Waveform.CenterLocked,
             SilentSkip = SilentSkipCheck.IsChecked == true,
             AlwaysOnTop = AlwaysOnTopCheck.IsChecked == true,
-            TipsVisible = AppStorage.Settings.ShowTips,
             WaapiVisible = _waapiPanelVisible,
             PlayExit = WaapiBar.PlayPostExitChecked,
             RangeClick = _rangeClickEnabled,
@@ -749,9 +748,6 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.ExportAllMp3:
                 ExportAllTabsMp3();
-                break;
-            case WaveMenuCommand.Tips:
-                ToggleTips();
                 break;
             case WaveMenuCommand.Manual:
                 ManualViewer.Open(this);

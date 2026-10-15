@@ -642,8 +642,7 @@ public partial class MainWindow
         }
 
         item.Click += (_, _) => action();
-        TipService.Set(item, gesture is null ? header : $"{header}\n{gesture}");
-        return item;
+                return item;
     }
 
     private void AddSelectionTimeMenuItems(ContextMenu menu, IReadOnlyList<DocumentSession> sessions)
@@ -1072,9 +1071,7 @@ public partial class MainWindow
             TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(0, 0, 6, 0),
         };
-        TipService.Set(title, (session.Document.SourcePath ?? UiStrings.UntitledDocument)
-            + Environment.NewLine + UiStrings.TipRenameFile);
-        title.MouseLeftButtonDown += (_, e) =>
+                title.MouseLeftButtonDown += (_, e) =>
         {
             if (TryBeginFileNameEditFromClick(session, title, e))
             {
@@ -1092,8 +1089,7 @@ public partial class MainWindow
             Foreground = (Brush)FindResource("MutedForeBrush"),
             Cursor = Cursors.Hand,
         };
-        TipService.Set(close, UiStrings.TipCloseTab);
-        close.MouseLeftButtonUp += (_, e) =>
+                close.MouseLeftButtonUp += (_, e) =>
         {
             e.Handled = true;
             CloseSession(session);
@@ -1126,33 +1122,6 @@ public partial class MainWindow
             OpenTabContextMenu(border, session);
         };
         return border;
-    }
-
-    private void RefreshTabLocalizedTips()
-    {
-        foreach (var border in DocumentTabs.Children.OfType<Border>())
-        {
-            if (border.Child is not DockPanel dock)
-            {
-                continue;
-            }
-
-            var session = border.Tag as DocumentSession;
-            foreach (var block in dock.Children.OfType<Grid>().SelectMany(grid => grid.Children.OfType<TextBlock>()))
-            {
-                if (block.Text == "×")
-                {
-                    TipService.Set(block, UiStrings.TipCloseTab);
-                }
-                else if (session is not null)
-                {
-                    TipService.Set(
-                        block,
-                        (session.Document.SourcePath ?? UiStrings.UntitledDocument)
-                        + Environment.NewLine + UiStrings.TipRenameFile);
-                }
-            }
-        }
     }
 
     private void ApplyTabChrome(DocumentSession session, DockPanel dock)

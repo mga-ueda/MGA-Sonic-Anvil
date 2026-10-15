@@ -89,9 +89,7 @@ internal sealed class ConfirmRecordSilentSkipWindow : Window
             addRegionBox.Style = style;
         }
 
-        TipService.Set(silentSkipBox, UiStrings.TipConfirmRecordSilentSkip);
-        TipService.Set(addRegionBox, UiStrings.TipSilentSkipRecordAddRegion);
-
+                
         void SyncAddRegionEnabled()
         {
             var on = silentSkipBox.IsChecked == true;

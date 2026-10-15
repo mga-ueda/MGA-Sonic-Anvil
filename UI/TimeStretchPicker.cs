@@ -81,11 +81,7 @@ internal static class TimeStretchPicker
                 labelWidth));
         var item = PickerChrome.FormHost(root);
         menu.Items.Add(item);
-        TipService.Set(menu, UiStrings.TipTimeStretch);
-        TipService.Set(item, UiStrings.TipTimeStretch);
-        TipService.Set(state.TimeBox, UiStrings.TipTimeStretchTime);
-        TipService.Set(state.PercentBox, UiStrings.TipTimeStretchPercent);
-
+                                
         menu.PreviewKeyDown += (_, e) =>
         {
             var key = e.Key == Key.System ? e.SystemKey : e.Key;

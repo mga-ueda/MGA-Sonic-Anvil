@@ -37,7 +37,6 @@ internal enum TransportIcon
     Center,
     History,
     ColorPalette,
-    Tips,
     Settings,
     Help,
     Lock,
@@ -95,7 +94,6 @@ internal enum TransportCommand
     CenterPlayhead,
     History,
     OpenColorPanel,
-    ToggleTips,
     OpenSettings,
     OpenManual,
     ToggleWaapi,
@@ -197,19 +195,6 @@ internal sealed class TransportIconButton : Button
                 ? TransportIconDrawing.FolderHoverBounds(bounds)
                 : null);
         var fore = IconForeOverride ?? TransportChrome.Fore(IsEnabled);
-        if (Icon == TransportIcon.Tips)
-        {
-            var balloonFore = IsLatched ? fore : TransportChrome.Fore(false);
-            var hole = ChromeHole(backKey);
-            TransportIconDrawing.DrawTipsBalloon(
-                dc,
-                bounds,
-                balloonFore,
-                hole,
-                outline: true);
-            return;
-        }
-
         if (Icon == TransportIcon.Help)
         {
             DrawHelpQuestion(dc, bounds, fore);
@@ -759,80 +744,6 @@ internal static class TransportIconDrawing
 
     private static Point GearPolar(double cx, double cy, double radius, double angle) =>
         new(cx + Math.Cos(angle) * radius, cy + Math.Sin(angle) * radius);
-
-    /// <summary>MGA Wwise IM Importer の TipsToggleButton.DrawBalloon と同じ吹き出し＋3点。</summary>
-    public static void DrawTipsBalloon(
-        DrawingContext dc,
-        Rect bounds,
-        Color color,
-        Color holeColor,
-        bool outline = true)
-    {
-        var side = Math.Min(bounds.Width, bounds.Height);
-        if (side <= 0)
-        {
-            return;
-        }
-
-        var originX = bounds.X + (bounds.Width - side) * 0.5;
-        var originY = bounds.Y + (bounds.Height - side) * 0.5;
-        var w = side * 0.62;
-        var h = side * 0.42;
-        var x = originX + (side - w) / 2d;
-        var y = originY + side * 0.24;
-        var r = Math.Max(1.2, h * 0.36);
-        var bottom = y + h;
-        var tailLeft = x + w * 0.22;
-        var tailRight = x + w * 0.40;
-        var tailTip = new Point(x + w * 0.14, bottom + side * 0.11);
-        var geometry = new StreamGeometry();
-        using (var ctx = geometry.Open())
-        {
-            ctx.BeginFigure(new Point(x + r, y), isFilled: true, isClosed: true);
-            ctx.LineTo(new Point(x + w - r, y), true, false);
-            ctx.ArcTo(new Point(x + w, y + r), new Size(r, r), 0, false, SweepDirection.Clockwise, true, true);
-            ctx.LineTo(new Point(x + w, bottom - r), true, false);
-            ctx.ArcTo(new Point(x + w - r, bottom), new Size(r, r), 0, false, SweepDirection.Clockwise, true, true);
-            ctx.LineTo(new Point(tailRight, bottom), true, false);
-            ctx.LineTo(tailTip, true, false);
-            ctx.LineTo(new Point(tailLeft, bottom), true, false);
-            ctx.LineTo(new Point(x + r, bottom), true, false);
-            ctx.ArcTo(new Point(x, bottom - r), new Size(r, r), 0, false, SweepDirection.Clockwise, true, true);
-            ctx.LineTo(new Point(x, y + r), true, false);
-            ctx.ArcTo(new Point(x + r, y), new Size(r, r), 0, false, SweepDirection.Clockwise, true, true);
-        }
-
-        geometry.Freeze();
-        if (outline)
-        {
-            var pen = new Pen(WpfControlHelpers.FrozenBrush(color), Math.Max(1.2, side * 0.045))
-            {
-                LineJoin = PenLineJoin.Round,
-                StartLineCap = PenLineCap.Round,
-                EndLineCap = PenLineCap.Round,
-            };
-            pen.Freeze();
-            dc.DrawGeometry(null, pen, geometry);
-        }
-        else
-        {
-            dc.DrawGeometry(WpfControlHelpers.FrozenBrush(color), null, geometry);
-        }
-
-        var dot = Math.Max(1.5, side * 0.06);
-        var dotY = y + h / 2d - dot / 2d;
-        var dotBrush = WpfControlHelpers.FrozenBrush(outline ? color : holeColor);
-        for (var i = 0; i < 3; i++)
-        {
-            var dotX = x + w * (0.26 + 0.24 * i) - dot / 2d;
-            dc.DrawEllipse(
-                dotBrush,
-                null,
-                new Point(dotX + dot / 2d, dotY + dot / 2d),
-                dot / 2d,
-                dot / 2d);
-        }
-    }
 
     private static void DrawPadlock(DrawingContext dc, Pen pen, Brush brush, bool open, double cx, double cy)
     {

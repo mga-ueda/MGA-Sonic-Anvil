@@ -404,6 +404,16 @@ public partial class MainWindow
             return true;
         }
 
+        // Alt+P は Enter 追加時の自動再生。素の P（前の曲）より先、タイプアヘッドより先。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && LibraryPlayerMode.IsAutoPlayToggle(key, modifiers))
+        {
+            LibraryBrowser.ToggleAutoPlay();
+            return true;
+        }
+
         // Ctrl+Shift+P は動画プロキシの強制生成（設定の自動生成オフ／F8 抑止を無視）。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
@@ -624,18 +634,21 @@ public partial class MainWindow
                 }
             }
 
-            if (key == Key.Enter && modifiers == ModifierKeys.None)
+            if (LibraryPlayerMode.IsPlaylistFolderAddKey(key, modifiers))
             {
+                // Enter＝クリア直下／Ctrl+Enter＝クリア再帰／Shift＋＝追加（Ctrl で再帰）。
                 LibraryBrowser.ClearExplorerTypeahead();
-                ReplaceLibraryFromExplorerFolder();
-                return true;
-            }
+                var clear = LibraryPlayerMode.ClearsPlaylistOnFolderAdd(modifiers);
+                var recursive = LibraryPlayerMode.RecursesPlaylistFolderAdd(modifiers);
+                if (clear)
+                {
+                    LibraryBrowser.ReplacePlaylistFromSelection(recursive);
+                }
+                else
+                {
+                    LibraryBrowser.OpenSelectedFolder(recursive);
+                }
 
-            if (key == Key.Enter && modifiers == ModifierKeys.Shift)
-            {
-                // プレイリストへ足すだけ。再生は始めず、再生中も止めない。
-                LibraryBrowser.ClearExplorerTypeahead();
-                LibraryBrowser.OpenSelectedFolder();
                 return true;
             }
 
@@ -688,9 +701,9 @@ public partial class MainWindow
 
         if (IsLibraryFavoritesFocused)
         {
-            // Enter / Shift+Enter / Delete はお気に入りリスト側で処理。
+            // Enter 系追加／Delete はお気に入りリスト側で処理。
             // ここで握るとプレイリストの Enter（再生）に吸われ、追加されない。
-            if (key == Key.Enter && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+            if (LibraryPlayerMode.IsPlaylistFolderAddKey(key, modifiers))
             {
                 return false;
             }

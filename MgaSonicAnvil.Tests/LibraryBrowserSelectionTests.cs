@@ -1747,6 +1747,52 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void AutoPlayEnabled_DefaultsOn()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            Assert.True(view.AutoPlayEnabled);
+        });
+    }
+
+    [Fact]
+    public void AutoPlayEnabled_ToggleWorksWhenPlaylistEmpty()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            Assert.Equal(0, view.BoundRowCount);
+            view.ToggleAutoPlay();
+            Assert.False(view.AutoPlayEnabled);
+            view.ToggleAutoPlay();
+            Assert.True(view.AutoPlayEnabled);
+        });
+    }
+
+    [Fact]
+    public void LabelLibraryAutoPlay_IsEnglishWithoutShortcut()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Equal("Auto Play", UiStrings.LabelLibraryAutoPlay);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlay));
+            Assert.DoesNotContain("Alt+", UiStrings.LabelLibraryAutoPlay, StringComparison.OrdinalIgnoreCase);
+            UiStrings.SetLanguage(UiLanguage.English);
+            Assert.Equal("Auto Play", UiStrings.LabelLibraryAutoPlay);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlay));
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
     public void AutoPlayNextEnabled_ToggleWorksWhenPlaylistEmpty()
     {
         RunSta(() =>

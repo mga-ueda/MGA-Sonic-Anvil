@@ -177,9 +177,6 @@ public partial class MainWindow
             case TransportCommand.OpenColorPanel:
                 ShowColorDevPanel();
                 break;
-            case TransportCommand.ToggleTips:
-                ToggleTips();
-                break;
             case TransportCommand.OpenSettings:
                 OpenSettings();
                 break;
@@ -2487,7 +2484,6 @@ public partial class MainWindow
         MeterColumn.Visibility = visibility;
         MeterColumnSplitter.Visibility = visibility;
         ApplyAnalyzerMaximizeScale();
-        TipService.SetHostSuppressed(_waveformMaximizeMode == WaveformMaximizeMode.Waveform);
         ApplyWaapiPanelVisible();
         ApplyLibraryChrome();
         Transport.SetMaximizeMode(_waveformMaximizeMode);

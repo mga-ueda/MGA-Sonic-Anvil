@@ -143,10 +143,13 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly TextBox _playlistSearchBox = new();
     private readonly TextBlock _playlistSearchHint = new();
     private readonly CheckBox _shuffleCheck = new();
+    private readonly CheckBox _autoPlayCheck = new();
     private readonly CheckBox _autoPlayNextCheck = new();
     private readonly LibraryPlaylistShuffle _shuffle = new();
     private bool _shuffleEnabled;
     private bool _shuffleBusy;
+    private bool _autoPlayEnabled = true;
+    private bool _autoPlayBusy;
     private bool _autoPlayNextEnabled;
     private bool _autoPlayNextBusy;
     private readonly List<string[]> _playlistSearchGroups = [];
@@ -300,8 +303,11 @@ internal sealed class LibraryBrowserView : UserControl
 
     public event EventHandler<string>? ExplorerFolderOpened;
 
-    /// <summary>複数フォルダを再帰追加。引数はフォルダパス。</summary>
+    /// <summary>複数フォルダを追加。引数はフォルダパス。再帰は <see cref="ExplorerOpenRecursive"/>。</summary>
     public event EventHandler<IReadOnlyList<string>>? ExplorerFoldersOpened;
+
+    /// <summary>直近の <see cref="OpenSelectedFolder"/> が再帰追加か。</summary>
+    public bool ExplorerOpenRecursive { get; private set; }
 
     public event EventHandler<double>? ExplorerWidthChanged;
 
@@ -312,10 +318,10 @@ internal sealed class LibraryBrowserView : UserControl
 
     public event EventHandler<IReadOnlyList<string>>? ExplorerRootsChanged;
 
-    /// <summary>お気に入りをプレイリストへ。true ならクリアして追加し再生。</summary>
+    /// <summary>お気に入りをプレイリストへ。ClearPlaylist ならクリアして追加（再生は Auto Play）。</summary>
     public event EventHandler<LibraryFavoritesActivateEventArgs>? FavoritesActivated;
 
-    /// <summary>ツリーの Enter と同じ。プレイリストを空にしてから選んだフォルダを載せる。</summary>
+    /// <summary>ツリーの Enter と同じ。プレイリストを空にしてから選んだフォルダ直下を載せる。</summary>
     public event EventHandler? ExplorerReplacePlaylistRequested;
 
     public event EventHandler? ClearPlaylistRequested;
@@ -887,6 +893,17 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void ResetAutoPlayNext() => SetAutoPlayNextEnabled(false, raise: false);
 
+    /// <summary>Enter（クリアして追加）で先頭を再生するか。既定オン。設定に覚える。</summary>
+    public bool AutoPlayEnabled
+    {
+        get => _autoPlayEnabled;
+        set => SetAutoPlayEnabled(value, raise: true);
+    }
+
+    public event EventHandler? AutoPlayChanged;
+
+    public void ToggleAutoPlay() => AutoPlayEnabled = !AutoPlayEnabled;
+
     private void SetShuffleEnabled(bool enabled, bool raise)
     {
         var changed = _shuffleEnabled != enabled;
@@ -917,6 +934,35 @@ internal sealed class LibraryBrowserView : UserControl
         if (changed && raise)
         {
             ShuffleChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void SetAutoPlayEnabled(bool enabled, bool raise)
+    {
+        var changed = _autoPlayEnabled != enabled;
+        if (!changed && _autoPlayCheck.IsChecked == enabled)
+        {
+            return;
+        }
+
+        _autoPlayEnabled = enabled;
+
+        if (_autoPlayCheck.IsChecked != enabled)
+        {
+            _autoPlayBusy = true;
+            try
+            {
+                _autoPlayCheck.IsChecked = enabled;
+            }
+            finally
+            {
+                _autoPlayBusy = false;
+            }
+        }
+
+        if (changed && raise)
+        {
+            AutoPlayChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -2208,21 +2254,11 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         FillGroupOptions();
-        TipService.Set(_grid, UiStrings.TipLibraryList);
-        TipService.Set(_groupCombo, UiStrings.TipLibraryList);
-        TipService.Set(_playlistLabel, UiStrings.TipLibraryJacket);
-        TipService.Set(_folderTree, UiStrings.TipLibraryExplorer);
-        TipService.Set(_explorerLabel, UiStrings.TipLibraryExplorer);
-        TipService.Set(_favoritesList, UiStrings.TipLibraryFavorites);
-        TipService.Set(_favoritesLabel, UiStrings.TipLibraryFavorites);
-        TipService.Set(_explorerSearchBox, UiStrings.TipLibraryExplorerSearch);
-        TipService.Set(_playlistSearchBox, UiStrings.TipLibraryPlaylistSearch);
-        TipService.Set(_shuffleCheck, UiStrings.TipLibraryShuffle);
-        TipService.Set(_autoPlayNextCheck, UiStrings.TipLibraryAutoPlayNext);
-        _explorerLabel.Text = UiStrings.LibraryExplorerLabel;
+                                                                                                        _explorerLabel.Text = UiStrings.LibraryExplorerLabel;
         _favoritesLabel.Text = UiStrings.LibraryFavoritesLabel;
         _playlistLabel.Text = UiStrings.LibraryPlaylistLabel;
         _shuffleCheck.Content = UiStrings.LabelLibraryShuffle;
+        _autoPlayCheck.Content = UiStrings.LabelLibraryAutoPlay;
         _autoPlayNextCheck.Content = UiStrings.LabelLibraryAutoPlayNext;
         _explorerSearchHint.Text = UiStrings.LibrarySearchHint;
         _playlistSearchHint.Text = UiStrings.LibrarySearchHint;
@@ -3110,7 +3146,7 @@ internal sealed class LibraryBrowserView : UserControl
         return DesignMetrics.ClampLibraryFavoritesSplit(favorites / total);
     }
 
-    public void OpenSelectedFolder()
+    public void OpenSelectedFolder(bool recursive = false)
     {
         var folders = LibraryShellFiles.ExistingPaths(SelectedExplorerFolders);
         if (folders.Length == 0)
@@ -3119,6 +3155,7 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         ClearExplorerTypeahead();
+        ExplorerOpenRecursive = recursive;
         if (folders.Length == 1)
         {
             ExplorerFolderOpened?.Invoke(this, folders[0]);
@@ -3128,8 +3165,8 @@ internal sealed class LibraryBrowserView : UserControl
         ExplorerFoldersOpened?.Invoke(this, folders);
     }
 
-    /// <summary>右クリック「プレイリストをクリアして追加」。Enter と同じ。</summary>
-    public void ReplacePlaylistFromSelection()
+    /// <summary>右クリック「プレイリストをクリアして追加」。Enter／Ctrl+Enter と同じ。</summary>
+    public void ReplacePlaylistFromSelection(bool recursive = false)
     {
         if (LibraryShellFiles.ExistingPaths(SelectedExplorerFolders).Length == 0)
         {
@@ -3137,6 +3174,7 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         ClearExplorerTypeahead();
+        ExplorerOpenRecursive = recursive;
         ExplorerReplacePlaylistRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -3491,7 +3529,6 @@ internal sealed class LibraryBrowserView : UserControl
         _folderTree.DragOver += FolderTree_DragOver;
         _folderTree.Drop += FolderTree_Drop;
         _folderTree.SelectedItemChanged += FolderTree_SelectedItemChanged;
-        _folderTree.MouseDoubleClick += FolderTree_MouseDoubleClick;
         _folderTree.PreviewMouseLeftButtonDown += FolderTree_PreviewMouseLeftButtonDown;
         _folderTree.PreviewMouseMove += FolderTree_PreviewMouseMove;
         _folderTree.PreviewMouseLeftButtonUp += FolderTree_PreviewMouseLeftButtonUp;
@@ -3525,7 +3562,6 @@ internal sealed class LibraryBrowserView : UserControl
         _favoritesList.PreviewMouseLeftButtonDown += FavoritesList_PreviewMouseLeftButtonDown;
         _favoritesList.PreviewMouseMove += FavoritesList_PreviewMouseMove;
         _favoritesList.PreviewMouseLeftButtonUp += (_, _) => _favoritesDragStart = null;
-        _favoritesList.MouseDoubleClick += FavoritesList_MouseDoubleClick;
         BindLibraryCopyCommand(_favoritesList, LibraryPane.Favorites);
         _favoritesList.AllowDrop = true;
         _favoritesList.PreviewDragOver += FavoritesList_PreviewDragOver;
@@ -3652,6 +3688,19 @@ internal sealed class LibraryBrowserView : UserControl
         _autoPlayNextCheck.Unchecked += AutoPlayNextCheck_Changed;
         DockPanel.SetDock(_autoPlayNextCheck, Dock.Right);
         bar.Children.Add(_autoPlayNextCheck);
+
+        _autoPlayCheck.Style = TryFindResource("DarkCheckBoxStyle") as Style;
+        _autoPlayCheck.Content = UiStrings.LabelLibraryAutoPlay;
+        _autoPlayCheck.IsChecked = true;
+        _autoPlayCheck.Focusable = false;
+        _autoPlayCheck.VerticalAlignment = VerticalAlignment.Center;
+        _autoPlayCheck.FontSize = 11;
+        _autoPlayCheck.Margin = new Thickness(8, 0, 0, 0);
+        _autoPlayCheck.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
+        _autoPlayCheck.Checked += AutoPlayCheck_Changed;
+        _autoPlayCheck.Unchecked += AutoPlayCheck_Changed;
+        DockPanel.SetDock(_autoPlayCheck, Dock.Right);
+        bar.Children.Add(_autoPlayCheck);
 
         _playlistLabel.VerticalAlignment = VerticalAlignment.Center;
         _playlistLabel.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -5236,11 +5285,6 @@ internal sealed class LibraryBrowserView : UserControl
         {
             ExplorerFolderChanged?.Invoke(this, path);
         }
-    }
-
-    private void FolderTree_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-    {
-        OpenSelectedFolder();
     }
 
     private void FolderTree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -7712,6 +7756,16 @@ internal sealed class LibraryBrowserView : UserControl
         SetShuffleEnabled(_shuffleCheck.IsChecked == true, raise: true);
     }
 
+    private void AutoPlayCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_autoPlayBusy)
+        {
+            return;
+        }
+
+        SetAutoPlayEnabled(_autoPlayCheck.IsChecked == true, raise: true);
+    }
+
     private void AutoPlayNextCheck_Changed(object sender, RoutedEventArgs e)
     {
         if (_autoPlayNextBusy)
@@ -9085,7 +9139,7 @@ internal sealed class LibraryBrowserView : UserControl
             Header = UiStrings.LibraryMenuAppendPlaylist,
             InputGestureText = "Shift+Enter",
         };
-        append.Click += (_, _) => OpenSelectedFolder();
+        append.Click += (_, _) => OpenSelectedFolder(recursive: false);
         var add = new MenuItem { Header = UiStrings.LibraryMenuAddToFavorites };
         add.Click += (_, _) => AddSelectedExplorerToFavorites();
         var addRoot = new MenuItem { Header = UiStrings.LibraryMenuAddAsExplorerRoot };
@@ -9125,13 +9179,13 @@ internal sealed class LibraryBrowserView : UserControl
             Header = UiStrings.LibraryMenuReplacePlaylist,
             InputGestureText = "Enter",
         };
-        replace.Click += (_, _) => ActivateSelectedFavorites(clearPlaylist: true);
+        replace.Click += (_, _) => ActivateSelectedFavorites(clearPlaylist: true, recursive: false);
         var append = new MenuItem
         {
             Header = UiStrings.LibraryMenuAppendPlaylist,
             InputGestureText = "Shift+Enter",
         };
-        append.Click += (_, _) => ActivateSelectedFavorites(clearPlaylist: false);
+        append.Click += (_, _) => ActivateSelectedFavorites(clearPlaylist: false, recursive: false);
         var remove = new MenuItem { Header = UiStrings.LibraryMenuRemoveFromFavorites };
         remove.Click += (_, _) => RemoveSelectedFavorites();
         menu.Items.Add(replace);
@@ -9358,10 +9412,11 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        if (key == Key.Enter
-            && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        if (LibraryPlayerMode.IsPlaylistFolderAddKey(key, modifiers))
         {
-            ActivateSelectedFavorites(clearPlaylist: modifiers == ModifierKeys.None);
+            ActivateSelectedFavorites(
+                clearPlaylist: LibraryPlayerMode.ClearsPlaylistOnFolderAdd(modifiers),
+                recursive: LibraryPlayerMode.RecursesPlaylistFolderAdd(modifiers));
             e.Handled = true;
             return;
         }
@@ -9499,11 +9554,8 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
-    private void FavoritesList_MouseDoubleClick(object sender, MouseButtonEventArgs e) =>
-        ActivateSelectedFavorites(clearPlaylist: false);
-
-    /// <summary>ダブルクリックはツリーと同じ（クリアせず追加。再生しない）。</summary>
-    internal void ActivateSelectedFavorites(bool clearPlaylist)
+    /// <summary>Enter 系は修飾でクリア／再帰を決める。追加のみのときは再生しない。</summary>
+    internal void ActivateSelectedFavorites(bool clearPlaylist, bool recursive = false)
     {
         // 欠損だけのときはスルー（クリアだけ走らせない）。
         var paths = LibraryShellFiles.ExistingPaths(SelectedFavoritePaths);
@@ -9512,7 +9564,9 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        FavoritesActivated?.Invoke(this, new LibraryFavoritesActivateEventArgs(paths, clearPlaylist));
+        FavoritesActivated?.Invoke(
+            this,
+            new LibraryFavoritesActivateEventArgs(paths, clearPlaylist, recursive));
     }
 
     private void FavoritesList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -9690,15 +9744,21 @@ internal sealed class LibrarySortHeader : StackPanel
 
 internal sealed class LibraryFavoritesActivateEventArgs : EventArgs
 {
-    public LibraryFavoritesActivateEventArgs(IReadOnlyList<string> paths, bool clearPlaylist)
+    public LibraryFavoritesActivateEventArgs(
+        IReadOnlyList<string> paths,
+        bool clearPlaylist,
+        bool recursive = true)
     {
         Paths = paths;
         ClearPlaylist = clearPlaylist;
+        Recursive = recursive;
     }
 
     public IReadOnlyList<string> Paths { get; }
 
     public bool ClearPlaylist { get; }
+
+    public bool Recursive { get; }
 }
 
 internal sealed class LibraryFavoriteRow

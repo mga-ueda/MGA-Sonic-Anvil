@@ -145,8 +145,7 @@ internal static class FadeCurveIcons
                     },
                 },
             };
-            TipService.Set(item, UiStrings.TipFadeShape((int)shape));
-            item.Click += (_, _) => onSelected(captured);
+                        item.Click += (_, _) => onSelected(captured);
             items.Add(item);
         }
     }

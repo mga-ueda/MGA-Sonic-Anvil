@@ -32,30 +32,6 @@ public sealed class BrandLicenseNoticeTests
     }
 
     [Fact]
-    public void TipCopyright_CoversMitLameAndWaapi()
-    {
-        var previous = UiStrings.Language;
-        try
-        {
-            UiStrings.SetLanguage(UiLanguage.English);
-            Assert.Contains("MIT License", UiStrings.TipCopyright, StringComparison.Ordinal);
-            Assert.Contains("LAME", UiStrings.TipCopyright, StringComparison.Ordinal);
-            Assert.Contains("FFmpeg", UiStrings.TipCopyright, StringComparison.Ordinal);
-            Assert.Contains("WAAPI", UiStrings.TipCopyright, StringComparison.Ordinal);
-            Assert.Contains("Wwise", UiStrings.TipCopyright, StringComparison.Ordinal);
-            UiStrings.SetLanguage(UiLanguage.Japanese);
-            Assert.Contains("MIT License", UiStrings.TipCopyright, StringComparison.Ordinal);
-            Assert.Contains("LAME", UiStrings.TipCopyright, StringComparison.Ordinal);
-            Assert.Contains("FFmpeg", UiStrings.TipCopyright, StringComparison.Ordinal);
-            Assert.Contains("WAAPI", UiStrings.TipCopyright, StringComparison.Ordinal);
-        }
-        finally
-        {
-            UiStrings.SetLanguage(previous);
-        }
-    }
-
-    [Fact]
     public void LicenseUrls_PointAtMitAndLame()
     {
         Assert.Equal(AppVersion.RepositoryUrl + "/blob/main/LICENSE", AppVersion.LicenseUrl);

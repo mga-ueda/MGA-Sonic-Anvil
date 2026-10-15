@@ -19,103 +19,100 @@ internal partial class TransportBar : UserControl
         _play = AddGroup(
             bottomRow: false,
             () => UiStrings.LabelTransportGroup,
-            (TransportCommand.TogglePlayback, TransportIcon.PlayPause, UiStrings.TipPlay, UiStrings.TooltipPlay),
-            (TransportCommand.Record, TransportIcon.Record, UiStrings.TipRecord, UiStrings.TooltipRecord));
+            (TransportCommand.TogglePlayback, TransportIcon.PlayPause, UiStrings.TooltipPlay),
+            (TransportCommand.Record, TransportIcon.Record, UiStrings.TooltipRecord));
 
         AddGroup(
             bottomRow: false,
             () => UiStrings.LabelEditGroup,
-            (TransportCommand.FadeIn, TransportIcon.FadeIn, UiStrings.TipFadeIn, UiStrings.TooltipFadeIn),
-            (TransportCommand.FadeOut, TransportIcon.FadeOut, UiStrings.TipFadeOut, UiStrings.TooltipFadeOut),
-            (TransportCommand.FadeAround, TransportIcon.FadeAround, UiStrings.TipFadeAround, UiStrings.TooltipFadeAround),
-            (TransportCommand.Normalize, TransportIcon.Normalize, UiStrings.TipNormalize, UiStrings.TooltipNormalize),
-            (TransportCommand.Volume, TransportIcon.Volume, UiStrings.TipVolume, UiStrings.TooltipVolume),
-            (TransportCommand.Pitch, TransportIcon.Pitch, UiStrings.TipPitch, UiStrings.TooltipPitch),
-            (TransportCommand.TimeStretch, TransportIcon.TimeStretch, UiStrings.TipTimeStretch, UiStrings.TooltipTimeStretch),
-            (TransportCommand.Reverse, TransportIcon.Reverse, UiStrings.TipReverse, UiStrings.TooltipReverse),
-            (TransportCommand.Delete, TransportIcon.Delete, UiStrings.TipDelete, UiStrings.TooltipDelete));
+            (TransportCommand.FadeIn, TransportIcon.FadeIn, UiStrings.TooltipFadeIn),
+            (TransportCommand.FadeOut, TransportIcon.FadeOut, UiStrings.TooltipFadeOut),
+            (TransportCommand.FadeAround, TransportIcon.FadeAround, UiStrings.TooltipFadeAround),
+            (TransportCommand.Normalize, TransportIcon.Normalize, UiStrings.TooltipNormalize),
+            (TransportCommand.Volume, TransportIcon.Volume, UiStrings.TooltipVolume),
+            (TransportCommand.Pitch, TransportIcon.Pitch, UiStrings.TooltipPitch),
+            (TransportCommand.TimeStretch, TransportIcon.TimeStretch, UiStrings.TooltipTimeStretch),
+            (TransportCommand.Reverse, TransportIcon.Reverse, UiStrings.TooltipReverse),
+            (TransportCommand.Delete, TransportIcon.Delete, UiStrings.TooltipDelete));
 
         AddGroup(
             bottomRow: false,
             () => UiStrings.LabelFileGroup,
-            (TransportCommand.NewDocument, TransportIcon.NewDocument, UiStrings.TipNewDocument, UiStrings.TooltipNew),
-            (TransportCommand.Open, TransportIcon.Folder, UiStrings.TipOpen, UiStrings.TooltipOpen),
-            (TransportCommand.Save, TransportIcon.Save, UiStrings.TipSave, UiStrings.TooltipSave),
-            (TransportCommand.SaveAs, TransportIcon.SaveAs, UiStrings.TipSaveAs, UiStrings.TooltipSaveAs),
-            (TransportCommand.SaveMp3, TransportIcon.SaveMp3, UiStrings.TipSaveMp3, UiStrings.TooltipSaveMp3));
+            (TransportCommand.NewDocument, TransportIcon.NewDocument, UiStrings.TooltipNew),
+            (TransportCommand.Open, TransportIcon.Folder, UiStrings.TooltipOpen),
+            (TransportCommand.Save, TransportIcon.Save, UiStrings.TooltipSave),
+            (TransportCommand.SaveAs, TransportIcon.SaveAs, UiStrings.TooltipSaveAs),
+            (TransportCommand.SaveMp3, TransportIcon.SaveMp3, UiStrings.TooltipSaveMp3));
 
         AddGroup(
             bottomRow: true,
             () => UiStrings.LabelMarkerGroup,
-            (TransportCommand.AddMarker, TransportIcon.AddMarker, UiStrings.TipAddMarker, UiStrings.TooltipAddMarker),
-            (TransportCommand.SetLoop, TransportIcon.SetLoop, UiStrings.TipSetLoop, UiStrings.TooltipSetLoop),
-            (TransportCommand.SetRegion, TransportIcon.SetRegion, UiStrings.TipSetRegion, UiStrings.TooltipSetRegion),
-            (TransportCommand.ToggleRangeClick, TransportIcon.RangeClick, UiStrings.TipRangeClick, UiStrings.TooltipRangeClick));
+            (TransportCommand.AddMarker, TransportIcon.AddMarker, UiStrings.TooltipAddMarker),
+            (TransportCommand.SetLoop, TransportIcon.SetLoop, UiStrings.TooltipSetLoop),
+            (TransportCommand.SetRegion, TransportIcon.SetRegion, UiStrings.TooltipSetRegion),
+            (TransportCommand.ToggleRangeClick, TransportIcon.RangeClick, UiStrings.TooltipRangeClick));
 
         AddGroup(
             bottomRow: true,
             () => UiStrings.LabelViewGroup,
-            (TransportCommand.ToggleSpectrogram, TransportIcon.Analysis, UiStrings.TipSpectrogramView, UiStrings.TooltipSpectrogramView),
-            (TransportCommand.ToggleLoudnessView, TransportIcon.Loudness, UiStrings.TipLoudnessView, UiStrings.TooltipLoudnessView),
-            (TransportCommand.CenterPlayhead, TransportIcon.Center, UiStrings.TipCenterPlayhead, UiStrings.TooltipCenterPlayhead),
-            (TransportCommand.History, TransportIcon.History, UiStrings.TipEditHistory, UiStrings.TooltipHistory),
-            (TransportCommand.ToggleLibraryMaximize, TransportIcon.PlayerMode, UiStrings.TipLibraryMaximize, UiStrings.TooltipLibraryMaximize),
-            (TransportCommand.ToggleAnalyzerMaximize, TransportIcon.AnalyzerMaximize, UiStrings.TipAnalyzerMaximize, UiStrings.TooltipAnalyzerMaximize),
-            (TransportCommand.OpenColorPanel, TransportIcon.ColorPalette, UiStrings.TipColorPanel, UiStrings.TooltipColorPanel));
+            (TransportCommand.ToggleSpectrogram, TransportIcon.Analysis, UiStrings.TooltipSpectrogramView),
+            (TransportCommand.ToggleLoudnessView, TransportIcon.Loudness, UiStrings.TooltipLoudnessView),
+            (TransportCommand.CenterPlayhead, TransportIcon.Center, UiStrings.TooltipCenterPlayhead),
+            (TransportCommand.History, TransportIcon.History, UiStrings.TooltipHistory),
+            (TransportCommand.ToggleLibraryMaximize, TransportIcon.PlayerMode, UiStrings.TooltipLibraryMaximize),
+            (TransportCommand.ToggleAnalyzerMaximize, TransportIcon.AnalyzerMaximize, UiStrings.TooltipAnalyzerMaximize),
+            (TransportCommand.OpenColorPanel, TransportIcon.ColorPalette, UiStrings.TooltipColorPanel));
 
         AddGroup(
             bottomRow: true,
             () => UiStrings.LabelHelpGroup,
-            (TransportCommand.OpenSettings, TransportIcon.Settings, UiStrings.TipAudioSettings, UiStrings.TooltipSettings),
-            (TransportCommand.ToggleTips, TransportIcon.Tips, UiStrings.TipTipsToggle, UiStrings.TooltipTipsToggle),
-            (TransportCommand.OpenManual, TransportIcon.Help, UiStrings.TipManualHelp, UiStrings.TooltipManualHelp));
+            (TransportCommand.OpenSettings, TransportIcon.Settings, UiStrings.TooltipSettings),
+            (TransportCommand.OpenManual, TransportIcon.Help, UiStrings.TooltipManualHelp));
 
-        ApplyLocalizedTips();
+        ApplyLocalizedText();
     }
 
-    public void ApplyLocalizedTips()
+    public void ApplyLocalizedText()
     {
-        SetTip(TransportCommand.TogglePlayback, UiStrings.TipPlay, UiStrings.TooltipPlay);
-        SetTip(TransportCommand.Record, UiStrings.TipRecord, UiStrings.TooltipRecord);
-        SetTip(TransportCommand.FadeIn, UiStrings.TipFadeIn, UiStrings.TooltipFadeIn);
-        SetTip(TransportCommand.FadeOut, UiStrings.TipFadeOut, UiStrings.TooltipFadeOut);
-        SetTip(TransportCommand.FadeAround, UiStrings.TipFadeAround, UiStrings.TooltipFadeAround);
-        SetTip(TransportCommand.Normalize, UiStrings.TipNormalize, UiStrings.TooltipNormalize);
-        SetTip(TransportCommand.Volume, UiStrings.TipVolume, UiStrings.TooltipVolume);
-        SetTip(TransportCommand.Pitch, UiStrings.TipPitch, UiStrings.TooltipPitch);
-        SetTip(TransportCommand.TimeStretch, UiStrings.TipTimeStretch, UiStrings.TooltipTimeStretch);
-        SetTip(TransportCommand.Reverse, UiStrings.TipReverse, UiStrings.TooltipReverse);
-        SetTip(TransportCommand.Delete, UiStrings.TipDelete, UiStrings.TooltipDelete);
-        SetTip(TransportCommand.AddMarker, UiStrings.TipAddMarker, UiStrings.TooltipAddMarker);
-        SetTip(TransportCommand.SetLoop, UiStrings.TipSetLoop, UiStrings.TooltipSetLoop);
-        SetTip(TransportCommand.SetRegion, UiStrings.TipSetRegion, UiStrings.TooltipSetRegion);
-        SetTip(TransportCommand.ToggleRangeClick, UiStrings.TipRangeClick, UiStrings.TooltipRangeClick);
-        SetTip(TransportCommand.NewDocument, UiStrings.TipNewDocument, UiStrings.TooltipNew);
-        SetTip(TransportCommand.Open, UiStrings.TipOpen, UiStrings.TooltipOpen);
-        SetTip(TransportCommand.Save, UiStrings.TipSave, UiStrings.TooltipSave);
-        SetTip(TransportCommand.SaveAs, UiStrings.TipSaveAs, UiStrings.TooltipSaveAs);
-        SetTip(TransportCommand.SaveMp3, UiStrings.TipSaveMp3, UiStrings.TooltipSaveMp3);
-        SetTip(TransportCommand.ToggleSpectrogram, UiStrings.TipSpectrogramView, UiStrings.TooltipSpectrogramView);
-        SetTip(TransportCommand.ToggleLoudnessView, UiStrings.TipLoudnessView, UiStrings.TooltipLoudnessView);
-        SetTip(TransportCommand.CenterPlayhead, UiStrings.TipCenterPlayhead, UiStrings.TooltipCenterPlayhead);
-        SetTip(TransportCommand.History, UiStrings.TipEditHistory, UiStrings.TooltipHistory);
-        SetTip(TransportCommand.ToggleLibraryMaximize, UiStrings.TipLibraryMaximize, UiStrings.TooltipLibraryMaximize, respectsEnabled: false);
-        SetTip(TransportCommand.ToggleAnalyzerMaximize, UiStrings.TipAnalyzerMaximize, UiStrings.TooltipAnalyzerMaximize, respectsEnabled: false);
-        SetTip(TransportCommand.OpenColorPanel, UiStrings.TipColorPanel, UiStrings.TooltipColorPanel, respectsEnabled: false);
-        SetTip(TransportCommand.OpenSettings, UiStrings.TipAudioSettings, UiStrings.TooltipSettings, respectsEnabled: false);
-        SetTip(TransportCommand.ToggleTips, UiStrings.TipTipsToggle, UiStrings.TooltipTipsToggle, respectsEnabled: false);
-        SetTip(TransportCommand.OpenManual, UiStrings.TipManualHelp, UiStrings.TooltipManualHelp, respectsEnabled: false);
+        SetTooltip(TransportCommand.TogglePlayback, UiStrings.TooltipPlay);
+        SetTooltip(TransportCommand.Record, UiStrings.TooltipRecord);
+        SetTooltip(TransportCommand.FadeIn, UiStrings.TooltipFadeIn);
+        SetTooltip(TransportCommand.FadeOut, UiStrings.TooltipFadeOut);
+        SetTooltip(TransportCommand.FadeAround, UiStrings.TooltipFadeAround);
+        SetTooltip(TransportCommand.Normalize, UiStrings.TooltipNormalize);
+        SetTooltip(TransportCommand.Volume, UiStrings.TooltipVolume);
+        SetTooltip(TransportCommand.Pitch, UiStrings.TooltipPitch);
+        SetTooltip(TransportCommand.TimeStretch, UiStrings.TooltipTimeStretch);
+        SetTooltip(TransportCommand.Reverse, UiStrings.TooltipReverse);
+        SetTooltip(TransportCommand.Delete, UiStrings.TooltipDelete);
+        SetTooltip(TransportCommand.AddMarker, UiStrings.TooltipAddMarker);
+        SetTooltip(TransportCommand.SetLoop, UiStrings.TooltipSetLoop);
+        SetTooltip(TransportCommand.SetRegion, UiStrings.TooltipSetRegion);
+        SetTooltip(TransportCommand.ToggleRangeClick, UiStrings.TooltipRangeClick);
+        SetTooltip(TransportCommand.NewDocument, UiStrings.TooltipNew);
+        SetTooltip(TransportCommand.Open, UiStrings.TooltipOpen);
+        SetTooltip(TransportCommand.Save, UiStrings.TooltipSave);
+        SetTooltip(TransportCommand.SaveAs, UiStrings.TooltipSaveAs);
+        SetTooltip(TransportCommand.SaveMp3, UiStrings.TooltipSaveMp3);
+        SetTooltip(TransportCommand.ToggleSpectrogram, UiStrings.TooltipSpectrogramView);
+        SetTooltip(TransportCommand.ToggleLoudnessView, UiStrings.TooltipLoudnessView);
+        SetTooltip(TransportCommand.CenterPlayhead, UiStrings.TooltipCenterPlayhead);
+        SetTooltip(TransportCommand.History, UiStrings.TooltipHistory);
+        SetTooltip(TransportCommand.ToggleLibraryMaximize, UiStrings.TooltipLibraryMaximize);
+        SetTooltip(TransportCommand.ToggleAnalyzerMaximize, UiStrings.TooltipAnalyzerMaximize);
+        SetTooltip(TransportCommand.OpenColorPanel, UiStrings.TooltipColorPanel);
+        SetTooltip(TransportCommand.OpenSettings, UiStrings.TooltipSettings);
+        SetTooltip(TransportCommand.OpenManual, UiStrings.TooltipManualHelp);
         foreach (var (label, title) in _groupLabels)
         {
             label.Text = title();
         }
     }
 
-    private void SetTip(TransportCommand command, string tip, string tooltip, bool respectsEnabled = true)
+    private void SetTooltip(TransportCommand command, string tooltip)
     {
         if (_buttons.TryGetValue(command, out var button))
         {
-            TipService.Set(button, tip, respectsEnabled);
             TransportToolTip.Attach(button, tooltip);
         }
     }
@@ -131,15 +128,6 @@ internal partial class TransportBar : UserControl
         if (_buttons.TryGetValue(TransportCommand.Record, out var button))
         {
             button.IsLatched = recording;
-            button.InvalidateVisual();
-        }
-    }
-
-    public void SetTipsVisible(bool visible)
-    {
-        if (_buttons.TryGetValue(TransportCommand.ToggleTips, out var button))
-        {
-            button.IsLatched = visible;
             button.InvalidateVisual();
         }
     }
@@ -176,10 +164,6 @@ internal partial class TransportBar : UserControl
             var player = mode == WaveformMaximizeMode.Library;
             library.Icon = player ? TransportIcon.EditorMode : TransportIcon.PlayerMode;
             library.IsLatched = player;
-            TipService.Set(
-                library,
-                player ? UiStrings.TipLibraryMaximizeOff : UiStrings.TipLibraryMaximize,
-                respectsEnabled: false);
             TransportToolTip.Attach(
                 library,
                 player ? UiStrings.TooltipLibraryMaximizeOff : UiStrings.TooltipLibraryMaximize);
@@ -190,10 +174,6 @@ internal partial class TransportBar : UserControl
             var on = mode == WaveformMaximizeMode.Analyzers;
             analyzers.Icon = on ? TransportIcon.AnalyzerRestore : TransportIcon.AnalyzerMaximize;
             analyzers.IsLatched = on;
-            TipService.Set(
-                analyzers,
-                on ? UiStrings.TipAnalyzerMaximizeOff : UiStrings.TipAnalyzerMaximize,
-                respectsEnabled: false);
             TransportToolTip.Attach(
                 analyzers,
                 on ? UiStrings.TooltipAnalyzerMaximizeOff : UiStrings.TooltipAnalyzerMaximize);
@@ -242,7 +222,6 @@ internal partial class TransportBar : UserControl
             if (command is TransportCommand.Open
                 or TransportCommand.OpenSettings
                 or TransportCommand.OpenColorPanel
-                or TransportCommand.ToggleTips
                 or TransportCommand.OpenManual
                 or TransportCommand.ToggleLibraryMaximize
                 or TransportCommand.ToggleAnalyzerMaximize)
@@ -264,7 +243,7 @@ internal partial class TransportBar : UserControl
     private TransportIconButton AddGroup(
         bool bottomRow,
         Func<string> title,
-        params (TransportCommand Command, TransportIcon Icon, string Tip, string Tooltip)[] items)
+        params (TransportCommand Command, TransportIcon Icon, string Tooltip)[] items)
     {
         var created = CreateGroupPanel(title);
         TransportIconButton? first = null;
@@ -276,7 +255,6 @@ internal partial class TransportBar : UserControl
                 Icon = item.Icon,
                 Margin = new Thickness(0, 0, DesignMetrics.TransportButtonGap, 0),
             };
-            TipService.Set(button, item.Tip);
             TransportToolTip.Attach(button, item.Tooltip);
             button.Click += (_, _) => CommandInvoked?.Invoke(this, item.Command);
             _buttons[item.Command] = button;

@@ -14,12 +14,6 @@ internal static partial class UiStrings
     public static string ErrorWwiseLookAheadTimeRange => Get(
         "Look-ahead Time は 0 から 10000 の ms で入力してください。",
         "Enter a Look-ahead Time between 0 and 10000 ms.");
-    public static string TipWwisePrefetchLength => Get(
-        "EXPORT で先頭 Music Track に書く Prefetch Length。先頭は Zero Latency。Stream は常にオン（設定しない）。0 から 10000。既定 500。",
-        "Prefetch Length written on the first Music Track at EXPORT. The first track is Zero Latency. Stream is always on (not a setting). From 0 to 10000. Default 500.");
-    public static string TipWwiseLookAheadTime => Get(
-        "EXPORT で 2 本目以降の Music Track に書く Look-ahead Time。先頭は Zero Latency のため 50 ms 固定。0 から 10000。既定 500。",
-        "Look-ahead Time written on later Music Tracks at EXPORT. The first track stays at 50 ms because it is Zero Latency. From 0 to 10000. Default 500.");
     public static string LabelUnnamedProject => Get("(無名)", "(unnamed)");
     public static string LabelAutoActive => Get("Auto Active", "Auto Active");
     public static string LabelPlayMinusE => Get("Play -E", "Play -E");
@@ -33,50 +27,9 @@ internal static partial class UiStrings
     public static string KeepTargetOnLabel => Get("- Keep Target -", "- Keep Target -");
     public static string KeepTargetOffLabel => Get("- Not Keep Target -", "- Not Keep Target -");
 
-    public static string TipKeepTargetUnlock => Get(
-        "いまの作成先パスを固定します。その後 Wwise 上で選択を変えても、表示と EXPORT 先はこの固定パスのままです。",
-        "Pin the current destination path. Later Wwise selection changes will not move the display or EXPORT target.");
-    public static string TipKeepTargetLock => Get("作成先の固定を解除します。", "Unpin the destination path.");
-    public static string TipAutoActive => Get(
-        "EXPORT 後に Wwise を前面へ出します。",
-        "Bring Wwise to the front after EXPORT.");
-    public static string TipPlayMinusE => Get(
-        "オンのとき、-E 部分（Exit Cue 以降）を再生します（Play post-exit）(Alt+E)。WAAPI オンのときだけ切り替わります。\n"
-        + "アプリ内プレビューではループ折り返し時に -E を二重再生し、シークバーが 2 本になります。\n"
-        + "EXPORT 時は Music Playlist Container の既定トランジションルール（Any to Any）へ反映します。",
-        "When on, plays the -E section (after the Exit Cue) (Play post-exit) (Alt+E). The key works only while WAAPI is on.\n"
-        + "In-app preview double-plays -E on a loop wrap so two playheads appear.\n"
-        + "EXPORT writes this to the Music Playlist Container default transition rule (Any to Any).");
-    public static string TipWaapiToggle => Get(
-        "WAAPI の接続とエリア表示を切り替えます (Alt+W)。オフのときは Wwise へ接続しません。Ctrl+Alt+Shift+W でプロジェクトを起動（バーも出します）。",
-        "Toggle WAAPI connection and the WAAPI area (Alt+W). Off means no connection to Wwise. Ctrl+Alt+Shift+W launches the project (and shows the bar).");
     public static string PreflightWaapiOff => Get(
         "WAAPI がオフです。レベルメーター上の WAAPI をオンにすると接続します。",
         "WAAPI is off. Turn on WAAPI above the level meter to connect.");
-    public static string TipExport => Get(
-        "現在の波形を Wwise Originals へ書き、Music Playlist Container としてインポートします (Ctrl+Shift+E)。\nWAAPI 接続中だけ有効。Wave 単体モード（-A / -L / -E とサンプルループ。Custom Cue にはしない）。",
-        "Write the current wave into Wwise Originals and import it as a Music Playlist Container (Ctrl+Shift+E).\nEnabled only while WAAPI is connected. Wave-only mode (-A / -L / -E and the sample loop. Markers are not Custom Cues).");
-    public static string TipWwiseProjectName => Get(
-        "接続中の Wwise プロジェクトです。",
-        "The connected Wwise project.");
-    public static string TipWwiseProjectNameOpen => Get(
-        "この Wwise プロジェクトを開きます（既に開いていれば前面）。クリック、または Ctrl+Alt+Shift+W。WAAPI がオフでもバーを出して起動します。覚えた .wproj が無ければ起動せず、その旨を出します。関連付けが Launcher でも、版に合う Wwise.exe を直接起動します。",
-        "Open this Wwise project (or bring it to the front if it is already open). Click, or Ctrl+Alt+Shift+W. Works with WAAPI off: the bar is shown, then the project launches. If no .wproj is remembered, it stays on the bar and reports that it cannot launch. Even if the association is the Launcher, the matching Wwise.exe is started directly.");
-    public static string TipOutputFolder => Get(
-        "波形の書き出し先フォルダを選択します（接続中 Wwise プロジェクトの Originals 配下）。",
-        "Choose the wave export folder (under Originals of the connected Wwise project).");
-    public static string TipOutputPath => Get(
-        "元 WAV のコピー先フォルダです。横のフォルダボタンで変更できます。",
-        "Folder where the source WAV is copied. Change it with the folder button.");
-    public static string TipWaapiConnection => Get(
-        "Wwise Authoring との接続状態です。CONNECT なら接続中、DISCONNECT なら未接続。",
-        "Connection to Wwise Authoring. CONNECT is linked, DISCONNECT is not.");
-    public static string TipWwiseVersion => Get(
-        "接続中の Wwise のバージョンです。",
-        "Version of the connected Wwise.");
-    public static string TipWaapiTargetPath => Get(
-        "Wwise の作成先オブジェクトです。Wwise で選択すると更新されます。Keep Target で固定できます。",
-        "Wwise destination object. Updates when you select in Wwise. Keep Target can pin it.");
     public static string SelectOutputFolderTitle => Get("書き出し先フォルダを選択", "Select export folder");
     public static string ErrSelectFolderFailed(string message) => Format(
         "フォルダを選べませんでした: {0}",

@@ -171,26 +171,52 @@ public partial class MainWindow
     private DispatcherTimer? _waveformLoadingHint;
     private const int WaveformLoadingHintMs = 300;
 
-    private void OpenPaths(IReadOnlyList<string> paths)
+    private void OpenPaths(
+        IReadOnlyList<string> paths,
+        bool folderRecursive = true,
+        bool clearLibraryPlaylist = false,
+        bool? libraryPlay = null)
     {
+        if (IsLibraryMaximized && clearLibraryPlaylist)
+        {
+            _libraryHoldJacketWash = true;
+            if (!TryClearLibrarySessions())
+            {
+                _libraryHoldJacketWash = false;
+                return;
+            }
+        }
+        else if (IsLibraryMaximized && !clearLibraryPlaylist && _libraryFolderShowInProgress)
+        {
+            // Shift+ドロップ追加は進行中の再帰追加に重ねない。
+            return;
+        }
+
         if (_openBusy)
         {
-            QueueOpenPaths(paths);
+            QueueOpenPaths(paths, folderRecursive);
             return;
         }
 
         if (IsUiBusy)
         {
+            if (clearLibraryPlaylist)
+            {
+                ReleaseHeldLibraryJacket();
+            }
+
             return;
         }
 
-        _ = OpenPathsAsync(paths);
+        var play = libraryPlay
+            ?? (clearLibraryPlaylist ? LibraryBrowser.AutoPlayEnabled : true);
+        _ = OpenPathsAsync(paths, folderRecursive: folderRecursive, libraryPlay: play);
     }
 
-    private void QueueOpenPaths(IReadOnlyList<string> paths)
+    private void QueueOpenPaths(IReadOnlyList<string> paths, bool folderRecursive = true)
     {
         foreach (var path in (IsLibraryMaximized
-                     ? AudioCodec.CollectPlayerOpenable(paths)
+                     ? AudioCodec.CollectPlayerOpenable(paths, folderRecursive)
                      : AudioCodec.CollectOpenable(paths)))
         {
             if (_queuedOpenPaths.Contains(path, StringComparer.OrdinalIgnoreCase))
@@ -202,28 +228,38 @@ public partial class MainWindow
         }
     }
 
-    private async Task OpenPathsAsync(IReadOnlyList<string> paths, bool launchDocuments = false)
+    private async Task OpenPathsAsync(
+        IReadOnlyList<string> paths,
+        bool launchDocuments = false,
+        bool folderRecursive = true,
+        bool libraryPlay = true)
     {
         var targets = (IsLibraryMaximized
                 ? (launchDocuments
                     ? AudioCodec.CollectLaunchOpenable(paths)
-                    : AudioCodec.CollectPlayerOpenable(paths))
+                    : AudioCodec.CollectPlayerOpenable(paths, folderRecursive))
                 : AudioCodec.CollectOpenable(paths))
             .ToList();
 
         if (targets.Count == 0)
         {
+            if (IsLibraryMaximized)
+            {
+                ReleaseHeldLibraryJacket();
+            }
+
             return;
         }
 
         if (IsLibraryMaximized)
         {
-            await RegisterLibraryPathsAsync(targets).ConfigureAwait(true);
+            await RegisterLibraryPathsAsync(targets, play: libraryPlay).ConfigureAwait(true);
+            ReleaseHeldLibraryJacket();
             if (_queuedOpenPaths.Count > 0)
             {
                 var queued = _queuedOpenPaths.ToArray();
                 _queuedOpenPaths.Clear();
-                await OpenPathsAsync(queued).ConfigureAwait(true);
+                await OpenPathsAsync(queued, libraryPlay: false).ConfigureAwait(true);
             }
 
             return;
@@ -1770,16 +1806,14 @@ public partial class MainWindow
             Owner = this,
         };
 
-        TipService.Suspend();
-        bool? accepted;
+                bool? accepted;
         try
         {
             accepted = WindowPaintReveal.ShowDialogWhenPainted(dialog);
         }
         finally
         {
-            TipService.Resume();
-        }
+                    }
 
         if (accepted != true)
         {

@@ -94,42 +94,6 @@
 
     <ui:WaapiStatusBar x:Name="WaapiBar" DockPanel.Dock="Bottom" />
 
-    <Border x:Name="TipsPanel"
-            DockPanel.Dock="Bottom"
-            Height="{x:Static ui:DesignMetrics.TipsPanelHeight}"
-            Visibility="Collapsed"
-            Background="Transparent"
-            BorderBrush="{DynamicResource ChromeBorderBrush}"
-            BorderThickness="1">
-      <DockPanel LastChildFill="True">
-        <TextBlock x:Name="TipsHeader"
-                   DockPanel.Dock="Top"
-                   Height="{x:Static ui:DesignMetrics.TipsHeaderHeight}"
-                   Padding="8,0"
-                   VerticalAlignment="Center"
-                   FontWeight="Bold"
-                   FontSize="11"
-                   Cursor="Hand"
-                   Foreground="{DynamicResource StatusBarTitleForeBrush}"
-                   Text="{x:Static domain:UiStrings.LabelTips}"
-                   MouseLeftButtonDown="TipsPin_MouseLeftButtonDown" />
-        <ScrollViewer x:Name="TipsScroll"
-                      HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto"
-                      Focusable="False"
-                      PanningMode="VerticalOnly">
-          <TextBlock x:Name="TipsLabel"
-                     Padding="8,4,8,5"
-                     FontSize="11"
-                     TextWrapping="Wrap"
-                     TextTrimming="None"
-                     Cursor="Hand"
-                     Foreground="{DynamicResource StatusBarDetailForeBrush}"
-                     MouseLeftButtonDown="TipsPin_MouseLeftButtonDown" />
-        </ScrollViewer>
-      </DockPanel>
-    </Border>
-
     <Grid x:Name="WorkGrid">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />

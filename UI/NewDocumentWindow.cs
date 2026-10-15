@@ -38,10 +38,7 @@ internal sealed class NewDocumentWindow : Window
         Background = (Brush)FindResource("WindowBackBrush");
         Foreground = (Brush)FindResource("PrimaryForeBrush");
         AudioFormatComboFill.Fill(_rateCombo, _bitsCombo, _layoutCombo, current, _visibleIds);
-        TipService.Set(_rateCombo, UiStrings.TipNewDocument);
-        TipService.Set(_bitsCombo, UiStrings.TipNewDocument);
-        TipService.Set(_layoutCombo, UiStrings.TipNewDocument);
-
+                        
         var ok = CreateButton(UiStrings.ButtonOk, accept: true, accent: true, isDefault: true);
         var cancel = CreateButton(UiStrings.ButtonCancel, accept: false, isCancel: true);
         var buttons = new StackPanel
@@ -141,8 +138,7 @@ internal sealed class NewDocumentWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(left, 0, 8, 0),
         };
-        TipService.Set(text, UiStrings.TipNewDocument);
-        Grid.SetColumn(text, column);
+                Grid.SetColumn(text, column);
         Grid.SetColumn(combo, column + 1);
         grid.Children.Add(text);
         grid.Children.Add(combo);

@@ -61,7 +61,7 @@ internal sealed class WaveformScrollStrip : Grid
         _timeOut.Click += (_, _) => TimeZoomOut?.Invoke(this, EventArgs.Empty);
         Bar.IsEnabledChanged += (_, _) => SyncButtonEnabled();
         SyncButtonEnabled();
-        ApplyLocalizedTips();
+        ApplyLocalizedText();
     }
 
     public TimeScrollBar Bar { get; }
@@ -87,19 +87,10 @@ internal sealed class WaveformScrollStrip : Grid
         }
     }
 
-    public void ApplyLocalizedTips()
+    public void ApplyLocalizedText()
     {
-        TipService.Set(_ampIn, UiStrings.TipTimeScrollAmpZoomIn);
-        TipService.Set(_ampOut, UiStrings.TipTimeScrollAmpZoomOut);
-        TipService.Set(_scrollLeft, UiStrings.TipTimeScrollLeft);
-        TipService.Set(Bar, UiStrings.TipTimeScroll);
-        TipService.Set(_scrollRight, UiStrings.TipTimeScrollRight);
-        TipService.Set(_timeIn, UiStrings.TipTimeScrollTimeZoomIn);
-        TipService.Set(_timeOut, UiStrings.TipTimeScrollTimeZoomOut);
         _ampIn.SetValue(AutomationProperties.NameProperty, UiStrings.TooltipAmpZoomIn);
         _ampOut.SetValue(AutomationProperties.NameProperty, UiStrings.TooltipAmpZoomOut);
-        _scrollLeft.SetValue(AutomationProperties.NameProperty, UiStrings.TipTimeScrollLeft);
-        _scrollRight.SetValue(AutomationProperties.NameProperty, UiStrings.TipTimeScrollRight);
         _timeIn.SetValue(AutomationProperties.NameProperty, UiStrings.TooltipTimeZoomIn);
         _timeOut.SetValue(AutomationProperties.NameProperty, UiStrings.TooltipTimeZoomOut);
     }

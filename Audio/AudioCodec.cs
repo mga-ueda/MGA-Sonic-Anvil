@@ -96,7 +96,13 @@ internal static class AudioCodec
         CollectOpenable(paths, player: false);
 
     public static string[] CollectPlayerOpenable(IEnumerable<string> paths) =>
-        CollectOpenable(paths, player: true);
+        CollectPlayerOpenable(paths, recursive: true);
+
+    /// <summary>
+    /// プレイヤー用。フォルダは <paramref name="recursive"/> で直下のみ／再帰を選ぶ。
+    /// </summary>
+    public static string[] CollectPlayerOpenable(IEnumerable<string> paths, bool recursive) =>
+        CollectOpenable(paths, player: true, recursive: recursive);
 
     /// <summary>引数起動用。設定の動画トグルがオフでも PDF／動画を含める。</summary>
     public static string[] CollectLaunchOpenable(IEnumerable<string> paths) =>
@@ -105,7 +111,8 @@ internal static class AudioCodec
     private static string[] CollectOpenable(
         IEnumerable<string> paths,
         bool player,
-        bool launchDocuments = false)
+        bool launchDocuments = false,
+        bool recursive = true)
     {
         var result = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -128,7 +135,7 @@ internal static class AudioCodec
 
             if (Directory.Exists(full))
             {
-                AddOpenableFromDirectory(full, result, seen, recursive: true, player, launchDocuments);
+                AddOpenableFromDirectory(full, result, seen, recursive, player, launchDocuments);
                 continue;
             }
 

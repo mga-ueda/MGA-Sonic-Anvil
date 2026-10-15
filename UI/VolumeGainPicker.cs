@@ -77,10 +77,7 @@ internal static class VolumeGainPicker
         PickerChrome.PrependClose(root, menu);
         var item = PickerChrome.FormHost(root);
         menu.Items.Add(item);
-        TipService.Set(menu, UiStrings.TipVolume);
-        TipService.Set(item, UiStrings.TipVolume);
-        TipService.Set(state.GainBox, UiStrings.TipVolume);
-
+                        
         menu.PreviewKeyDown += (_, e) =>
         {
             var key = e.Key == Key.System ? e.SystemKey : e.Key;

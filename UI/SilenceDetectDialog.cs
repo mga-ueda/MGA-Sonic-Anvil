@@ -276,9 +276,7 @@ internal sealed class SilenceDetectDialog : Window
         Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
         WindowPaintReveal.Attach(this);
         AppDialogKeys.Attach(this, () => Close());
-        TipService.Set(this, UiStrings.TipSilenceDetectDialog);
-        TipService.Set(_preview, UiStrings.TipSilenceDetectDialog);
-        SyncDependentEnabled();
+                        SyncDependentEnabled();
         Loaded += (_, _) =>
         {
             RefreshStatusFromPreview();
@@ -602,15 +600,13 @@ internal sealed class SilenceDetectDialog : Window
     private TextBox CreateDbBox(double db)
     {
         var box = CreateSettingsStyleNumberBox(FormatDb(db));
-        TipService.Set(box, UiStrings.TipSilenceDetectDialog);
-        return box;
+                return box;
     }
 
     private TextBox CreateMsBox(int ms)
     {
         var box = CreateSettingsStyleNumberBox(ms.ToString(CultureInfo.InvariantCulture));
-        TipService.Set(box, UiStrings.TipSilenceDetectDialog);
-        return box;
+                return box;
     }
 
     private TextBox CreateSettingsStyleNumberBox(string text)

@@ -167,7 +167,6 @@
         <a href="#layout-gapless">Gapless</a>
         <a href="#layout-top">On top</a>
         <a href="#layout-meters">Meters</a>
-        <a href="#layout-tips">Tips</a>
         <a href="#layout-waapi">WAAPI</a>
         <a href="#layout-status">Status bar</a>
       </nav>
@@ -287,8 +286,8 @@
         </ul>
         <h4>Fullscreen</h4>
         <ul>
-          <li><kbd>F11</kbd> — waveform area fullscreen, like a browser. Hides tabs, transport, meters, Tips, WAAPI, channel names, the dB scale, the window frame, and the taskbar. Keeps the overview and status bar. Works while tiled. <kbd>F11</kbd> again restores. Leaving the player keeps only selected audio files; video / PDF are not taken at all, including as audio-only.</li>
-          <li><kbd>F12</kbd> — fullscreen with only the title bar hidden. Tabs, transport, meters, Tips, WAAPI, channel names, and the dB scale stay. Spectrum, loudness, level meter, and vector scope are 1.5× on top of Windows display scaling and UI scale. Works while tiled. <kbd>F12</kbd> again restores. Leaving the player keeps only selected audio files; video / PDF are not taken at all, including as audio-only.</li>
+          <li><kbd>F11</kbd> — waveform area fullscreen, like a browser. Hides tabs, transport, meters, WAAPI, channel names, the dB scale, the window frame, and the taskbar. Keeps the overview and status bar. Works while tiled. <kbd>F11</kbd> again restores. Leaving the player keeps only selected audio files; video / PDF are not taken at all, including as audio-only.</li>
+          <li><kbd>F12</kbd> — fullscreen with only the title bar hidden. Tabs, transport, meters, WAAPI, channel names, and the dB scale stay. Spectrum, loudness, level meter, and vector scope are 1.5× on top of Windows display scaling and UI scale. Works while tiled. <kbd>F12</kbd> again restores. Leaving the player keeps only selected audio files; video / PDF are not taken at all, including as audio-only.</li>
         </ul>
       </article>
 
@@ -336,8 +335,9 @@
             </ul>
           </li>
           <li>While stopped, selecting a track shows its waveform without playing. Selecting PDF / video also shows a dim back-stage preview (video: dim + mesh + silent 1/3-speed loop; PDF: dim only, no mesh and no frosted glass). Adding tracks fades them in over 1 second; when they start moving with the audio they appear immediately. Clearing the list fades them out over 1 second.</li>
-          <li><kbd>Alt</kbd>+<kbd>R</kbd> toggles shuffle. No repeats until the playlist has played once. Works on an empty list. Off by default. Leaving player turns it off. Not saved. <kbd>R</kbd> restarts the current track from the beginning.</li>
-          <li><kbd>Alt</kbd>+<kbd>N</kbd> toggles auto next. When on, advances to the next track at the end and gapless-prefetches. When off, stops on that track. Works on an empty list. Off by default. Leaving player turns it off. Not saved. Plain <kbd>N</kbd> still steps to the next track manually.</li>
+          <li><kbd>Alt</kbd>+<kbd>R</kbd> toggles shuffle (playlist <span class="ui">Random</span>). No repeats until the playlist has played once. Works on an empty list. Off by default. Leaving player turns it off. Not saved. <kbd>R</kbd> restarts the current track from the beginning.</li>
+          <li><kbd>Alt</kbd>+<kbd>P</kbd> toggles <span class="ui">Auto Play</span>. When on, clearing and adding (Enter / drop) plays the first track. When off, it only adds (does not start or stop playback). Shift-add never plays. On by default. Remembers the last state in settings.</li>
+          <li><kbd>Alt</kbd>+<kbd>N</kbd> toggles auto next (playlist <span class="ui">Auto next</span>). When on, advances to the next track at the end and gapless-prefetches. When off, stops on that track. Works on an empty list. Off by default. Leaving player turns it off. Not saved. Plain <kbd>N</kbd> still steps to the next track manually.</li>
           <li>Playback starts as soon as sound can play. It does not wait for the waveform to finish drawing.</li>
           <li>With auto next on, continuous playback prepares the next track and joins without stopping. Tiny extra silence at the start and end of MP3 / M4A is reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
           <li>
@@ -405,8 +405,16 @@
           <li>Splitters and scrollbars appear when the pointer nears them, then fade out after about 3 s of no movement. Selecting a folder does not add it to the list.</li>
           <li><kbd>*</kbd> expands all under the selection. <kbd>/</kbd> collapses it.</li>
           <li>With the tree focused, letter keys jump to folders by name (see <a href="#layout-typeahead">Folder-name jump</a>). This does not add to the playlist. It is separate from <kbd>Ctrl</kbd>+<kbd>F</kbd> filter search.</li>
-          <li>Enter on the tree clears the playlist, then adds that folder recursively. Enter on another folder while a large load is in progress cancels it and replaces the playlist. While searching, only visible folders: matching files when the hit is a file name, or everything in a folder whose name matched. Depth-first. Playback starts with the first file registered.</li>
-          <li>Shift+Enter, double-click, or dropping a folder onto the list adds them recursively.</li>
+          <li>
+            <p>Enter and dropping a folder onto the list (tree or Favorites) share the same modifiers for clear vs append and shallow vs recursive. Double-click on the tree only expands or collapses a folder (it does not add to the playlist).</p>
+            <ul>
+              <li>(none) — clear the playlist and add only immediate files</li>
+              <li><kbd>Ctrl</kbd> — clear and add recursively</li>
+              <li><kbd>Shift</kbd> — append immediate files only</li>
+              <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd> — append recursively</li>
+            </ul>
+            <p>Clear cancels and replaces while a large load is in progress. With <span class="ui">Auto Play</span> (<kbd>Alt</kbd>+<kbd>P</kbd>; on by default) on, clear-add plays the first track; when off, it only adds. Shift-add never plays. While searching, only visible folders (matching files when the hit is a file name, or everything in a folder whose name matched).</p>
+          </li>
         </ul>
         <h4 id="layout-typeahead">Folder-name jump (incremental search)</h4>
         <p>This is the “type to find” pattern used in Explorer and similar trees. Unlike <kbd>Ctrl</kbd>+<kbd>F</kbd>, it only moves the tree selection — it does not add anything to the playlist.</p>
@@ -550,7 +558,7 @@
       <article class="part" id="layout-transport">
         <h3>Transport</h3>
         <ul>
-          <li>Top row is playback and zoom. Second row is fade / normalize / delete / new / save / MP3 output, <span class="ui">Tips</span> on/off, and manual <span class="ui">?</span>.</li>
+          <li>Top row is playback and zoom. Second row is fade / normalize / delete / new / save / MP3 output, and manual <span class="ui">?</span>. Transport buttons show a short tooltip (with the shortcut). For full details, see this manual.</li>
           <li><span class="ui">Range metronome</span> (<kbd>Q</kbd>) — metronome clicks at equal-divide markers/regions. Toggle with the button or <kbd>Q</kbd> (off by default; never auto-on). Also available from waveform right-click → Playback. In the player during real video playback / frame pause / bright PDF view, same as <kbd>Escape</kbd> — returns to the dim preview (in the F8 / argument-launch mini, Escape / Q quits the app; range metronome does not run in the player).</li>
           <li>The company logo and license sit under the buttons (license to the right of the logo). The logo opens the company site. GitHub opens the repository, MIT License the full text, LAME the project site. The Wwise® / Audiokinetic® trademark line is included.</li>
         </ul>
@@ -618,16 +626,6 @@
         <ul>
           <li>Drag the left edge of the column to widen it. The default is the minimum. It stops when the bars reach full thickness. The width is remembered on the next launch.</li>
           <li>After stop, the display slowly fades. <span class="ui">WAAPI</span> above the level meter (<kbd>Alt</kbd>+<kbd>W</kbd>) toggles the bar.</li>
-        </ul>
-      </article>
-
-      <article class="part" id="layout-tips">
-        <h3>Tips</h3>
-        <p class="where">Above the WAAPI bar. Fixed height.</p>
-        <ul>
-          <li>Hover a control to see its description; overflow scrolls. Tips appear right away. Moving to another control waits a moment before switching.</li>
-          <li>Click the heading or body to lock (cyan frame, <span class="ui">Tips (Locked)</span>). Click again to unlock. The text does not change while locked or while the pointer is on the panel.</li>
-          <li>Transport buttons also show a short tooltip (with the shortcut; wraps, no ellipsis). Other controls have no floating tooltip.</li>
         </ul>
       </article>
 
@@ -777,7 +775,7 @@
       </div>
 
       <h2 id="shortcuts">10. Shortcuts</h2>
-      <p>This section lists the keyboard shortcuts, including ones already described earlier. Keys in the later tables apply only while that screen is open. Hover Tips show the same operations.</p>
+      <p>This section lists the keyboard shortcuts, including ones already described earlier. Keys in the later tables apply only while that screen is open. See the earlier sections of this manual for full details.</p>
 
       <h3 id="shortcuts-file">File / tabs</h3>
       <table>
@@ -843,7 +841,7 @@
           <tr><td><kbd>Ctrl</kbd>+wheel</td><td>Amplitude zoom (on the waveform)</td></tr>
           <tr><td><kbd>F10</kbd></td><td>Player mode / exit. Not fullscreen. <kbd>F10</kbd> again restores (during video / PDF real playback or video frame pause, stays in the player, drops to the dim background preview, and restores front chrome = the playlist). Screen, playback, library, and jacket are under <a href="#layout-player">Layout</a>.</td></tr>
           <tr><td><kbd>F11</kbd></td><td>Fullscreen / restore the waveform area (hides the taskbar, like a browser; also hides channel names and the dB scale; keeps the overview and status bar; works while tiled; <kbd>F11</kbd> again restores)</td></tr>
-          <tr><td><kbd>F12</kbd></td><td>Fullscreen / restore with only the title bar hidden (tabs, transport, meters, Tips, WAAPI, channel names, and the dB scale stay; spectrum, loudness, level meter, and vector scope are 1.5× on top of Windows display scaling and UI scale; works while tiled; <kbd>F12</kbd> again restores)</td></tr>
+          <tr><td><kbd>F12</kbd></td><td>Fullscreen / restore with only the title bar hidden (tabs, transport, meters, WAAPI, channel names, and the dB scale stay; spectrum, loudness, level meter, and vector scope are 1.5× on top of Windows display scaling and UI scale; works while tiled; <kbd>F12</kbd> again restores)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Cycle the tile arrangement (side by side → stacked → grid → off; identical-looking or too-cramped arrangements are skipped; if side-by-side or stacked would not fit, grid is tried; if grid would not fit either, it does nothing; two or more tabs)</td></tr>
           <tr><td><kbd>A</kbd></td><td>Cycle spectrogram / overlay</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>A</kbd></td><td>Return to the waveform (from any view)</td></tr>
@@ -1073,12 +1071,16 @@
           <tr><td>PDF <kbd>+</kbd> / <kbd>-</kbd></td><td>Zoom in / out (100% fits the whole page in the window, up to 300%; pauses at fit-width or fit-height; numpad works; forgotten when another file is shown)</td></tr>
           <tr><td>F8 <kbd>+</kbd> / <kbd>-</kbd> / border drag</td><td>Resize the video / PDF mini window (keys only: always 25% steps, pause at native size; border drag is continuous, not 25% steps; after a border drag, the next key snaps to the nearest 25%; 25–300%; aspect locked; no mouse-wheel resize; scale remembered until you leave F8; only during F8 / argument launch)</td></tr>
           <tr><td>Video / PDF <kbd>Escape</kbd> / <kbd>Q</kbd></td><td>In the normal F10 player, leave real video playback / frame pause, or bright PDF view, for the dim preview (keeps a still PDF background pinned with W; Space / Enter do not leave). In the F8 / argument-launch mini, quit the app</td></tr>
-          <tr><td><kbd>Enter</kbd></td><td>On the list, pause in place (while stopped, video / PDF go to real playback / bright view; during real video playback, chrome stays hidden). On the tree, clear the playlist, then add supported files from that folder and its subfolders (Enter on another folder while loading cancels and replaces; while searching, only visible folders: matching files when the hit is a file name, or everything in a folder whose name matched; inner folders first; playback starts with the first file added and does not jump when grouping reorders the list; focuses the playlist when playback starts)</td></tr>
-          <tr><td>Tree <kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>Append that folder and its subfolders to the playlist without clearing it (same search scope as Enter)</td></tr>
-          <tr><td>Tree / Favorites double-click</td><td>Append only (does not play; one track at a time as found)</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>On the list, pause in place (while stopped, video / PDF go to real playback / bright view; during real video playback, chrome stays hidden). On the tree / Favorites, clear the playlist and add immediate files only (cancels and replaces while loading; while searching, only visible folders: matching files when the hit is a file name, or everything in a folder whose name matched; with <span class="ui">Auto Play</span> on, plays the first track and focuses the playlist when playback starts)</td></tr>
+          <tr><td>Tree / Favorites <kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>Clear the playlist and add recursively (same search scope as Enter; playback follows <span class="ui">Auto Play</span>)</td></tr>
+          <tr><td>Tree / Favorites <kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>Append immediate files only without clearing (does not play; same search scope as Enter)</td></tr>
+          <tr><td>Tree / Favorites <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>Append recursively without clearing (does not play)</td></tr>
+          <tr><td>Tree double-click</td><td>Expand / collapse only (does not add to the playlist; use Enter to add)</td></tr>
+          <tr><td>Drop folder onto list</td><td>Same modifiers as Enter (none = clear + shallow, Ctrl = clear + recursive, Shift = append + shallow, Ctrl+Shift = append + recursive)</td></tr>
           <tr><td><kbd>Space</kbd></td><td>Play only the selected track and stop when it ends (does not advance; from the same video’s dim preview, resumes at the current position; while playing, returns to the start; during real video playback, seeks to the start and stops (does not resume) without showing the playlist and does not drop to the dim preview; Escape / Q returns to background playback; during bright PDF view, Escape / Q returns to the dim preview; transport Play is the same; whether playback advances at the end is Auto next / <kbd>Alt</kbd>+<kbd>N</kbd>)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>R</kbd></td><td>Toggle shuffle (works on an empty playlist; off by default; does not repeat a track until the playlist has played once; leaving player turns it off; not saved in settings)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td>Toggle auto next (works on an empty playlist; off by default; when on, advances at the end and gapless-prefetches; leaving player turns it off; not saved in settings; plain <kbd>N</kbd> still steps to the next track)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>R</kbd></td><td>Toggle shuffle (<span class="ui">Random</span>; works on an empty playlist; off by default; does not repeat a track until the playlist has played once; leaving player turns it off; not saved in settings)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td>Toggle <span class="ui">Auto Play</span> (on by default; whether clear-and-add plays the first track; remembers the last state in settings; plain <kbd>P</kbd> is previous track)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td>Toggle auto next (<span class="ui">Auto next</span>; works on an empty playlist; off by default; when on, advances at the end and gapless-prefetches; leaving player turns it off; not saved in settings; plain <kbd>N</kbd> still steps to the next track)</td></tr>
           <tr><td>← / →</td><td>During real video playback (or frame pause), pause and step one frame back / forward (hold repeats after an initial wait; <kbd>F10</kbd> during real playback or frame pause drops to the dim background preview, restores the front UI = playlist, and stays in the player). On the tree, expand / collapse folders. Otherwise do not shuttle</td></tr>
           <tr><td>Tree <kbd>*</kbd></td><td>Expand all folders under the selection (same as Explorer; numpad <kbd>*</kbd> or Shift+8; expansion is remembered)</td></tr>
           <tr><td>Tree <kbd>/</kbd></td><td>Collapse the selection and everything under it (numpad <kbd>/</kbd> or the <kbd>/</kbd> key)</td></tr>
@@ -1098,8 +1100,6 @@
           <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same as right-click on the tree, Favorites, and playlist. On the waveform the menu opens, but edit commands stay disabled</td></tr>
           <tr><td><kbd>Delete</kbd></td><td>Remove selected rows from the list (files are never deleted; Ctrl+Z undoes it; leaving the player forgets undo; when the list has keyboard focus. <kbd>Ctrl</kbd>+<kbd>W</kbd> does not close. Disabled during real video playback / bright PDF view and other chrome-hidden states). When Favorites has focus, removes the registration only</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Select every row in the list (disabled during real video playback / bright PDF view and other chrome-hidden states)</td></tr>
-          <tr><td>Favorites <kbd>Enter</kbd></td><td>Clear the playlist, add the selected favorites, and play (cancels and replaces if a load is already in progress; focuses the playlist when playback starts)</td></tr>
-          <tr><td>Favorites <kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>Append selected favorites to the playlist only</td></tr>
         </tbody>
       </table>
       <p>While a player library / playlist search box has focus (activated with <kbd>Ctrl</kbd>+<kbd>F</kbd> in player mode)</p>

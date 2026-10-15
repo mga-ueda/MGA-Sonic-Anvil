@@ -195,4 +195,30 @@ public sealed class AudioCodecCollectOpenableTests
             Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public void CollectPlayerOpenable_NonRecursive_SkipsNested()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "mga-anvil-player-shallow-" + Guid.NewGuid().ToString("N"));
+        var nested = Path.Combine(root, "nested");
+        Directory.CreateDirectory(nested);
+        var top = Path.Combine(root, "top.wav");
+        var child = Path.Combine(nested, "child.mp3");
+        File.WriteAllText(top, "wav");
+        File.WriteAllText(child, "mp3");
+        try
+        {
+            var shallow = AudioCodec.CollectPlayerOpenable([root], recursive: false);
+            Assert.Equal([top], shallow);
+
+            var deep = AudioCodec.CollectPlayerOpenable([root], recursive: true);
+            Assert.Equal(2, deep.Length);
+            Assert.Contains(top, deep, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains(child, deep, StringComparer.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }

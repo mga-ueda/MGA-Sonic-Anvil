@@ -138,7 +138,6 @@ internal enum WaveMenuCommand
     ExportByChannels,
     ExportAllWave,
     ExportAllMp3,
-    Tips,
     Manual,
     GitHub,
 }
@@ -182,7 +181,6 @@ internal sealed class WaveformContextMenuModel
     public bool CenterLocked { get; init; }
     public bool SilentSkip { get; init; }
     public bool AlwaysOnTop { get; init; }
-    public bool TipsVisible { get; init; }
     public bool WaapiVisible { get; init; }
     public bool PlayExit { get; init; }
     public bool RangeClick { get; init; }
@@ -253,7 +251,6 @@ internal sealed class WaveformContextMenuModel
         CenterLocked = true,
         SilentSkip = true,
         AlwaysOnTop = true,
-        TipsVisible = true,
         WaapiVisible = true,
         PlayExit = true,
         RangeClick = true,
@@ -661,7 +658,6 @@ internal static class WaveformContextMenuBuilder
 
     private static IReadOnlyList<WaveMenuEntry> HelpItems(WaveformContextMenuModel m) =>
     [
-        Check(UiStrings.WaveMenuTips, WaveMenuCommand.Tips, checkedState: m.TipsVisible, enabled: true),
         Cmd(UiStrings.WaveMenuManual, WaveMenuCommand.Manual),
         Cmd(UiStrings.WaveMenuGitHub, WaveMenuCommand.GitHub),
     ];
@@ -759,8 +755,7 @@ internal static class WaveformContextMenuBuilder
                 menuItem.Click += (_, _) => onCommand(command);
             }
 
-            TipService.Set(menuItem, item.Gesture is null ? item.Header : $"{item.Header}\n{item.Gesture}");
-            items.Add(menuItem);
+                        items.Add(menuItem);
         }
     }
 }

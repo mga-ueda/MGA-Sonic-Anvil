@@ -161,19 +161,10 @@ internal static partial class UiStrings
     public static string LabelLibraryPlaylistWaveformSizeS => Get("S（短）", "S (short)");
     public static string LabelLibraryPlaylistWaveformSizeM => Get("M（中）", "M (medium)");
     public static string LabelLibraryPlaylistWaveformSizeL => Get("L（長）", "L (long)");
-    public static string TipLibraryPlaylistWaveformSize => Get(
-        "プレイリストの波形表示列の幅。Wave / MP3 とも既定は L。M は S の 2 倍、L は 3 倍。棒の間引きは同じで、長さだけ変える。WAVE / AIFF だけのリストは Wave 側、MP3 / M4A だけは MP3 側、混在は広い方。",
-        "Width of the playlist waveform column. WAVE and MP3 both default to L. M is 2× S, L is 3× S. Bar thinning stays the same; only the length changes. WAVE / AIFF-only lists use the WAVE width, MP3 / M4A-only lists use the MP3 width, and mixed lists use the wider of the two.");
     public static string LabelGaplessPlayback => Get("ギャップレス再生", "Gapless playback");
-    public static string TipGaplessPlayback => Get(
-        "MP3 の LAME タグ、iTunes の iTunSMPB、AAC（M4A）の encoder delay／padding を再生から外す。CD で繋がっていた曲の継ぎ目の無音を減らす。ヘッダが無いファイルはそのまま。デコーダが既に削っているときは二重に切らない。既定オン。",
-        "Skip encoder delay and padding from MP3 LAME tags, iTunes iTunSMPB, and AAC (M4A) during playback. Reduces the silence between tracks that were continuous on CD. Files without the tag are unchanged. If the decoder already stripped them, they are not cut twice. On by default.");
     public static string LabelLibraryPlaylistDocuments => Get(
         "プレイリストに載せる書類・動画",
         "Documents and video in the playlist");
-    public static string TipLibraryPlaylistDocuments => Get(
-        "オンの種類（PDF / MOV / MP4 / AVI / MKV / WebM / MPG）だけ、フォルダ追加やドロップでプレイリストに載せる。PDF は既定オン、動画は既定オフ。AVI / MKV / WebM / MPG は ffmpeg があるときだけ載る。停止中に選ぶと暗いプレビューを出す（動画は暗転＋格子＋無音 1/3 速ループ。PDF は暗転だけ。すりガラスは無し）。動画は音楽と同じく連続再生と単独再生ができ、アプリウィンドウ全体の背面（動的背景より前、リストや波形より後ろ）で再生する。ただし本再生・ミニ・PDF 本表示など前面 UI（プレイリスト）が隠れているときは曲末で次へ進まず頭へ戻して停止する（次へは N／P・テンキー 4／6）。プレイリストが見えていて次の曲を自動再生がオンのときは連続再生する。前面 UI を 0.2 秒で消すのは本再生中と PDF の明るい表示モードのときだけ。動画の本再生中は波形とレベルメーター／スペアナ／ゴニオ／サラウンド／ラウドネスのリアルタイム値は出したまま（PDF 表示中は A／T 相当は出さない）。上中央に NOW POS / END POS を大きく出す（MM:SS.ff。小数点以下は常に 30fps 換算のフレーム番号で、ソース fps でもミリ秒でもない）。下中央に再生中のファイル名を出す（再生用プロキシを参照しているときは末尾に (Proxy)）。プレイリストが 2 件以上のときは左下にいまいくつめ／総数を出してフェードアウトする（例: 2 / 5。半透明の黒い背景。本再生・ミニプレイヤー共通。常時は出さない）。プレイリストからの動画本再生では A／T は開始時オン（再生中はオフにできる。次の再生や別動画へ移ると再びオン）。F8／引数起動の動画ミニでは A で波形・アナライザ・WAAPI 表記・ファイル名をフェードで出す／消す（タイムコードは含まない）。T でタイムコード（MM:SS.ff。小数点以下は 30fps 換算のフレーム。選択範囲）の表示をトグルし、オンオフを覚える（既定オフ）。PDF 表示中は A／T の表示は出さない（状態は変えず、次の音声／動画で覚える）。F でブラウザの F11 と同じ全画面（動画／PDF。もう一度 F で戻す。再生停止などでは勝手に解除しない）。PDF の明るい表示モードでは前面 UI を隠す（Escape／Q で暗いプレビューへ戻る）。ページ切替時だけ下中央にページ番号を出してフェードアウトする（例: 1 / 3。半透明の黒い背景。常時は出さない）。キーボード上段の数字でそのページへ飛ぶ（二桁可。0 単体は 1 と同じ。テンキーは再生操作のまま＝4 前／6 次。上段の割合ジャンプには使わない）。←／→ でページめくり。Home／End／PageUp／PageDown はエディタと同じ波形タイムライン操作（プレイリスト移動には使わない）。W で今のページを暗くして静止背景へ固定し表示を抜ける（音楽・動画の背面に残す。再 W で解除。エディタへ移ると破棄）。Silent Skip がオンでも再生中は無視する（チェックは変えない）。Escape／Q で本再生を抜けると先頭へ戻さず、止めた位置のまま暗転＋格子へ移し、速度は約 1 秒かけて 1 倍→1/3 に落とす（UI を 0.2 秒で戻す。途中で Space／Enter 等で本再生へ戻すと今の位置から続ける）。テンキー 0 は本再生をその場で一時停止する（暗い 1/3 速プレビューへは落とさず、前面 UI も出さない。抜けは Escape／Q。Space は開始位置へ戻して静止する（即再開しない）（プレイリストは出さない）、Enter はその場停止で前面 UI も出さない。暗いプレビューへ戻すのは Escape／Q）。ほかの曲を再生すると隠して動的背景を出す。シークは波形と同じ（背面再生中も再生ヘッドは追従。範囲選択があればその範囲をループ）。PDF も連続再生の対象で、当たったら明るい表示にして停止する（タイムライン無し）。明るい表示モード中はページ切替時だけ下中央にページ番号を出してフェードアウト（例: 1 / 3。半透明黒背景。常時は出さない）、キーボード上段の数字でそのページへ（二桁可。0 単体は 1 と同じ。テンキーは再生操作のまま＝4 前／6 次。上段の割合ジャンプは使わない）、←→ でページめくり、Home／End／PageUp／PageDown はエディタと同じ波形タイムライン操作（プレイリスト移動には使わない）、↑↓ で前後のファイルへ（本再生のつなぎではプレイリストを出さない）、+／- で拡縮（100% は画面に全体が収まる倍率から 300% まで。幅または高さいっぱいで一旦停止。ほかのプレイリスト操作は不可。ほかのファイルへ移ると拡大率は忘れる）。プレイヤー専用で、エディタには持っていけない。動画の既定はオフ。PDF の既定はオン。MOV / MP4 / AVI はコーデックを調べ、MJPEG / Photo JPEG ならそのまま、それ以外と MKV / WebM / MPG は、F9／F10 の本再生で「プロキシを自動生成しない」がオフのときだけ設定の ffmpeg.exe で再生用プロキシを作る（空欄や無効なら作らず、原ファイルの再生を試みる。エラーは出さない。F8／関連付け／引数起動では作らない）。",
-        "Only checked types (PDF / MOV / MP4 / AVI / MKV / WebM / MPG) are added on folder add and drop. PDF on by default; video types off by default; AVI / MKV / WebM / MPG only when ffmpeg is available. Selecting while stopped shows a dim preview (video: dim + mesh + silent 1/3-speed loop; PDF: dim only, no frost). Video plays like audio (continuous or single track) behind the whole window (in front of the artwork wash, behind the list and waveform). During real playback, the mini player, or bright PDF view (playlist chrome hidden), reaching the end seeks to the start and stops without advancing (use N / P or numpad 4 / 6 for the next item). Continuous advance applies when the playlist is visible and Auto next is on. Front chrome fades out over 0.2 s only during real playback or bright PDF view. During real video playback the waveform, level meter, spectrum, goniometer, surround meter, and live loudness stay (PDF view hides A / T overlays). Large NOW POS / END POS sit centered at the top (MM:SS.ff; the fractional part is always frame numbers at 30 fps — not source fps, not milliseconds). The playing file name sits centered at the bottom (appends (Proxy) when a playback proxy is in use). When the playlist has two or more files, the current / total index flashes at the bottom left then fades out (e.g. 2 / 5 on a semi-transparent black background; same for real playback and the mini player; not shown continuously). Playlist video playback starts with A / T on (can turn off during play; next play or another video turns them on again). In the F8 / argument-launch video mini, A fades the waveform, analyzers, WAAPI label, and file name on or off (not the timecode), and T toggles the timecode (MM:SS.ff; fractional part is frames at 30 fps; selection range); both are remembered (off by default). During PDF view, A / T overlays are hidden (state is unchanged and applied again for the next audio / video). F is the same as browser F11 fullscreen for video / PDF (F again restores; stopping playback does not exit it). Bright PDF view hides front UI (Escape / Q returns to the dim preview). On page change only, a page number flashes at the bottom then fades out (e.g. 1 / 3 on a semi-transparent black background; not shown continuously). Top-row digits jump to that page (two-digit entry; 0 alone is the same as 1; the numpad stays transport — 4 previous / 6 next; top-row percent jump is not used while bright). ← / → turn pages. Home / End / Page Up / Page Down are the same waveform timeline ops as in the editor (not playlist navigation). W dims the current page, pins it as a still background, and leaves the view (stays behind music or video; W again clears; discarded when leaving for the editor). Silent Skip is ignored while video plays (the checkbox is unchanged). Escape / Q leaves real playback without jumping to the start, fades to dim+mesh, and ramps speed from 1× to 1/3 over about 1 second; UI fades back in over 0.2 s. Interrupting with Space / Enter (or similar) during that ramp resumes main play from the current position. Numpad 0 pauses real playback on the current frame (no dim 1/3-speed preview, no front chrome; Escape / Q leaves. Space seeks to the start and stops (does not resume) without showing the playlist; Enter pauses in place with chrome hidden; Escape / Q returns to the dim preview). Playing another track hides it so the wash shows. Seek matches the waveform (the playhead follows during background playback; a selection range loops). PDF is included in continuous play: when reached it opens in bright view and playback stops (no timeline). In bright PDF view, on page change only, a page number flashes at the bottom center then fades out (e.g. 1 / 3 on a semi-transparent black background; not shown continuously); top-row digits jump to that page (two-digit entry; 0 alone is the same as 1; the numpad stays transport — 4 previous / 6 next; no top-row percent jump); ←→ turn pages; Home / End / PageUp / PageDown are the same waveform timeline ops as in the editor (not playlist navigation); +/- zoom (100% fits the whole page, up to 300%; pauses at fit-width or fit-height; Up/Down previous/next file without showing the playlist chrome while bridging; other playlist shortcuts disabled; zoom forgotten on another file). Player-only; they are never handed to the editor. Video types default off; PDF defaults on. MOV / MP4 / AVI codecs are inspected: MJPEG / Photo JPEG play as-is; anything else and MKV / WebM / MPG build a playback proxy with the ffmpeg.exe set in Settings only during F9 / F10 real playback when Do not auto-build proxies is off (empty or invalid skips the proxy and tries the original file; no error. F8 / association / argument launch never builds one).");
     public static string LabelLibraryShowPlaylistPdf => Get("PDF", "PDF");
     public static string LabelLibraryShowPlaylistMov => Get("MOV", "MOV");
     public static string LabelLibraryShowPlaylistMp4 => Get("MP4", "MP4");
@@ -192,28 +183,12 @@ internal static partial class UiStrings
     public static string FilterFfmpegExe => Get(
         "FFmpeg|ffmpeg.exe|実行ファイル|*.exe|すべて|*.*",
         "FFmpeg|ffmpeg.exe|Executable|*.exe|All|*.*");
-    public static string TipFfmpegPath => Get(
-        "ffmpeg.exe の場所（利用推奨）。空欄または無効なら、MJPEG / Photo JPEG 以外の再生用プロキシは作らない（原ファイルの再生を試みる。エラーは出さない）。AVI / MKV / WebM / MPG をプレイリストに載せるときにも使う。アプリには同梱しません。",
-        "Path to ffmpeg.exe (recommended). Empty or invalid skips the playback proxy for non-MJPEG / Photo JPEG video (tries the original file; no error). Also required to list AVI / MKV / WebM / MPG in the playlist. Not bundled with the app.");
-    public static string TipFfmpegBrowse => Get("ffmpeg.exe を選びます。", "Choose ffmpeg.exe.");
-    public static string TipVideoProxyRetention => Get(
-        "MJPEG / Photo JPEG 以外の動画用に作った再生プロキシを、動画ごと（ファイルごと）に、未使用のまま何日残すかです。このアプリがその動画のプロキシを使っていない日数が指定を超えると削除します（アプリの起動だけでは未使用はリセットされません。再生のほか、波形やサムネ用にプロキシを参照したときも「使用」とみなします）。起動時と、この設定を変えたときに掃除します。1／7／14／30 日から選ぶ。既定は 7 日。FFmpeg のパスが空欄または無効ならプロキシは作らない。",
-        "How many days to keep each unused playback proxy for non-MJPEG / Photo JPEG video (counted per file). A proxy is deleted when this app has not used it for longer than the chosen period (launching the app alone does not reset unused time. Use includes playback and other references such as waveform peaks or thumbnails). Cleaned at startup and when this setting changes. Choose 1, 7, 14, or 30 days. Default is 7. No proxy is built if the FFmpeg path is empty or invalid.");
     public static string LabelVideoProxyDisableAutoEncode => Get(
         "プロキシを自動生成しない",
         "Do not auto-build proxies");
-    public static string TipVideoProxyDisableAutoEncode => Get(
-        "オンなら、F9／F10 の本再生でも新しいプロキシを作らない。すでにあるものは使う。原ファイルの再生を試みる。既定オフ。F8／関連付け／引数起動では、オフでもプロキシは作らない。プレイリスト／本再生／ミニプレイヤーでは Ctrl+Shift+P で、この設定や F8 抑止にかかわらず強制生成できる（すでにあるプロキシもその動画の内容で作り直す。同名同サイズの別フォルダ動画を共有しているときのおかしさを直すときもこれ）。",
-        "When on, F9 / F10 real playback does not build a new proxy. An existing proxy is still used. Tries the original file. Off by default. F8 / association / argument launch never builds a proxy even when this is off. In the playlist, during real playback, or in the mini player, Ctrl+Shift+P force-builds a proxy even when this is on or F8 would suppress auto-build (rebuilds from that video even if a proxy already exists — also the fix when a same-name/same-size copy in another folder shared the wrong proxy).");
     public static string LabelVideoProxyUsage(long bytes) =>
         Format("現在の容量: {0}", "Current size: {0}", FormatFileBytesCompact(bytes));
-    public static string TipVideoProxyUsage => Get(
-        "保存してある再生用プロキシの合計サイズ。",
-        "Total size of stored playback proxies.");
     public static string ButtonVideoProxyClearAll => Get("すべて削除", "Delete all");
-    public static string TipVideoProxyClearAll => Get(
-        "保存してある再生用プロキシを、期限に関係なく今すぐ全部消す。確認する。使っているファイルは消えないことがある。次に開くとき、FFmpeg があれば作り直す。",
-        "Delete every stored playback proxy now, ignoring retention. Asks first. A file in use may remain. The next open rebuilds it if FFmpeg is set.");
     public static string ConfirmVideoProxyClearAll => Get(
         "保存中の動画プロキシをすべて削除しますか？ 期限は問いません。",
         "Delete every stored video proxy now, ignoring retention?");
@@ -272,12 +247,6 @@ internal static partial class UiStrings
     public static string LabelFadeCurveDefaults => Get("フェードカーブ既定", "Default Fade Curves");
     public static string LabelDefaultFadeIn => Get("波形フェードイン", "Waveform Fade In");
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
-    public static string TipAudioSettings => Get(
-        "設定 (Ctrl+Shift+O)\n一般／表示項目／オーディオ／プレイヤー／編集／書き出し・パス／Wwise のタブ。表示言語、表示倍率（100〜200%。OS の DPI に加えて拡大）、複数ファイルの並べ方（タブのまま／左右／上下／上下左右）、関連付け、プレイヤー左ツリーのルート、ギャップレス再生（プレイヤータブ。既定オン）、既定 Wave フォーマット（オーディオタブ。既定 48kHz / 24bit / Stereo。新規ファイル。チャンネルは有効にしたスピーカーと Mono）、自動スピーカー選択（オーディオタブ。既定オフ）、スピーカー配置（モノラル〜Atmos。デバイスとポート割り当て）、有効にするスピーカー定義、プレイリストの列（Wave／MP3／動画。波形幅は Wave / MP3 それぞれ S/M/L。どちらも既定 L）、確認用メーター／Sine −20 dB／Voice、ラウドネス、無音しきい値（Silent Skip。無音検出とは独立）、プチノイズ防止フェード、フェードカーブ、MP3、LAME と FFmpeg のパス、未使用プロキシの保存日数／容量／すべて削除／自動生成しない、同時書き出し本数、Wwise の Prefetch Length／Look-ahead Time。ダイアログのボタンは Tab で移動できます。",
-        "Settings (Ctrl+Shift+O)\nGeneral / Shown / Audio / Player / Editing / Export · Paths / Wwise tabs. Language, UI scale (100–200%; extra enlargement on top of the OS DPI), multiple-file arrangement (keep tabs / side by side / stacked / grid), file associations, Player left-tree roots, gapless playback (Player tab; on by default), default Wave format (Audio tab; 48 kHz / 24-bit / Stereo by default; used for new files; channels are enabled speakers plus Mono), auto speaker selection (Audio tab; off by default), speaker layouts (mono through Atmos; device and port assignments), which speaker definitions are enabled, playlist columns (WAVE / MP3 / video; waveform width S/M/L separately for WAVE and MP3; both default L), meters, per-port Sine −20 dB, and English channel-name Voice, loudness, silence threshold (Silent Skip; independent of Detect Silence), click-prevention fade, fade curves, MP3, LAME and FFmpeg paths, unused proxy retention / size / delete-all / do-not-auto-build, parallel export count, and Wwise Prefetch Length / Look-ahead Time. Tab also moves to dialog buttons.");
-    public static string TipDefaultAudioFormat => Get(
-        "新規ファイル（Ctrl+N）の初期フォーマットです。既定は 48kHz / 24bit / Stereo。チャンネルは表示項目で有効にしたスピーカーと、常に選べる Mono。",
-        "Initial format for a new file (Ctrl+N). Default is 48 kHz / 24-bit / Stereo. Channels are the speakers enabled on Shown, plus Mono (always available).");
     public static string DialogNewDocumentTitle => Get("新規", "New");
     public static string DialogSilenceDetectTitle => Get("無音検出", "Detect Silence");
     public static string LabelSilenceDetectOpenThreshold => Get("オープンスレッショルド", "Open Threshold");
@@ -310,14 +279,8 @@ internal static partial class UiStrings
     public static string ErrorNoSilenceDetectSpans => Get(
         "検出できる区間がありません。",
         "No spans were detected.");
-    public static string TipNewDocument => Get(
-        "新規 (Ctrl+N)\n空のタブを作ります。フォーマットは都度選べます。候補のチャンネルは、表示項目で有効にしたスピーカーと Mono（常に選べる）。前回の指定を覚えます。",
-        "New (Ctrl+N)\nOpens an empty tab. Choose the format each time. Channels are the speakers enabled on Shown, plus Mono (always available). The last choice is remembered.");
     public static string LabelSettingsExportAudio => Get("オーディオ", "Audio");
     public static string LabelSettingsExportMovie => Get("ムービー", "Movie");
-    public static string TipMp3Encode => Get(
-        "MP3 保存の経路です。LAME のパスが有効なら lame.exe、空欄または無効なら Windows です。",
-        "MP3 save path. A valid LAME path uses lame.exe; empty or invalid uses Windows.");
     public static string LabelWindowsMp3BitRate => Get(
         "Windows ビットレート（LAME を使わないとき）",
         "Windows Bit Rate (when not using LAME)");
@@ -390,19 +353,6 @@ internal static partial class UiStrings
         skipped,
         failed,
         string.IsNullOrWhiteSpace(errors) ? string.Empty : Environment.NewLine + errors);
-    public static string TipWindowsMp3BitRate => Get(
-        "LAME のパスが空欄、または無効なときの Windows（Media Foundation）出力ビットレート。既定 192 kbps。CBR。",
-        "Windows (Media Foundation) CBR bit rate when the LAME path is empty or invalid. Default 192 kbps.");
-    public static string TipLamePath => Get(
-        "lame.exe の場所。空欄または無効なら Windows で出力します。アプリには同梱しません。",
-        "Path to lame.exe. Empty or invalid uses Windows output. Not bundled with the app.");
-    public static string TipLameBrowse => Get("lame.exe を選びます。", "Choose lame.exe.");
-    public static string TipLameOptions => Get(
-        "lame に渡すオプション。入出力ファイルは自動で末尾に付けます。空欄は既定の -V2 --noreplaygain です。",
-        "Flags passed to lame. Input and output files are appended automatically. Empty falls back to -V2 --noreplaygain.");
-    public static string TipExportParallel => Get(
-        "全タブの Wave / MP3 を同時に書く本数。Auto は CPU コア数の 1/4（最低 1）。プルダウンの上限はコア数の 1/2。Windows の MP3 は常に 1 本。",
-        "How many Wave / MP3 tab exports run at once. Auto is a quarter of the CPU cores (at least 1). The dropdown max is half the cores. Windows MP3 is always one at a time.");
 
     public static string LabelMono => Get("Mono", "Mono");
     public static string LabelStereo => Get("Stereo", "Stereo");
@@ -413,9 +363,6 @@ internal static partial class UiStrings
     public static string LabelPitch => Get("ピッチ", "Pitch");
     public static string LabelSemitone => Get("半音", "st");
     public static string LabelPitchTimeStretch => Get("長さを保つ", "Keep length");
-    public static string TipPitchTimeStretch => Get(
-        "オン（既定）は長さを保ちます。オフは再生速度と同じく長さも変わります。Tab で移動。",
-        "On (default) keeps the length. Off also changes length, like playback speed. Tab moves here.");
     public static string ErrorPitchShiftFailed => Get(
         "ピッチシフトに失敗しました。",
         "Pitch shift failed.");
@@ -428,15 +375,6 @@ internal static partial class UiStrings
         "タイムストレッチに失敗しました。",
         "Time stretch failed.");
     public static string OverlayTimeStretch => Get("タイムストレッチ", "Time stretch");
-    public static string TipTimeStretch => Get(
-        "タイムストレッチ (T)\n選択があればその時間、無ければ全体。時間を指定すると割合が、割合を指定すると時間が連動。↑↓／ホイール（時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分。割合は0.1／Shift 1／Ctrl 10／Ctrl+Shift 25％）。Tab で時間と割合。Space で試聴、Enter で実行。10–1000％。",
-        "Time stretch (T)\nUses the selection, or the whole file. Editing time updates the ratio; editing the ratio updates time. ↑↓ / wheel (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; ratio: 0.1 / Shift 1 / Ctrl 10 / Ctrl+Shift 25%). Tab switches fields. Space previews, Enter applies. Range is 10–1000%.");
-    public static string TipTimeStretchTime => Get(
-        "伸ばしたあとの時間。↑↓／ホイールで調整（1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分。サンプル表示時は1／10／100／1000）。",
-        "Duration after stretch. ↑↓ / wheel (1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / 10 / 100 / 1000).");
-    public static string TipTimeStretchPercent => Get(
-        "元の時間に対する割合。↑↓／ホイールで 0.1％（Shift 1／Ctrl 10／Ctrl+Shift 25）。",
-        "Ratio versus the original duration. ↑↓ / wheel by 0.1% (Shift 1 / Ctrl 10 / Ctrl+Shift 25).");
 
     public static string FormatTimeStretchExtra(int sampleRate, int sourceFrames, int destFrames)
     {
@@ -584,9 +522,6 @@ internal static partial class UiStrings
         "Delete the {0} selected files from disk? This cannot be undone.{1}(Unsaved files just close and discard their changes.)",
         count,
         Environment.NewLine);
-    public static string TipRenameFile => Get(
-        "ダブルクリックでファイル名を変更します。",
-        "Double-click to rename the file.");
     public static string ErrorAiffExport => Get(
         "AIFF の書き出しには対応していません。Wave または MP3 を選んでください。",
         "AIFF export is not supported. Choose Wave or MP3.");
@@ -687,7 +622,6 @@ internal static partial class UiStrings
     public static string TooltipDelete => Get("部分削除 (Delete)", "Ripple delete (Delete)");
     public static string TooltipSave => Get("保存 (Ctrl+S)  複数選択時は選択ファイル全部", "Save (Ctrl+S)  all selected files when several tabs are selected");
     public static string TooltipSaveMp3 => Get("MP3 として保存 (Ctrl+Shift+M)", "Save as MP3 (Ctrl+Shift+M)");
-    public static string TooltipTipsToggle => Get("Tips の表示", "Show Tips");
     public static string TooltipSettings => Get("設定 (Ctrl+Shift+O)", "Settings (Ctrl+Shift+O)");
     public static string TooltipManualHelp => Get("マニュアル", "Manual");
     public static string TooltipFadeAround => Get(
@@ -714,99 +648,12 @@ internal static partial class UiStrings
     public static string TooltipAnalyzerMaximizeOff => Get("アナライザー最大化を解除 (F12)", "Leave analyzer fullscreen (F12)");
     public static string TooltipColorPanel => Get("色設定 (Ctrl+Shift+C)", "Color settings (Ctrl+Shift+C)");
 
-    public static string TipFadeAround => Get(
-        "シークバー前後をフェード (X)\nシークバーを境に、今見えている前だけアウト／後ろだけイン（リニア）",
-        "Fade around seek bar (X)\nFrom the seek bar, fade out only the visible part before / fade in only the visible part after (linear)");
-    public static string TipReverse => Get("リバース (R)\n選択範囲を時間方向に反転。未選択なら全体", "Reverse (R)\nReverse the selection in time. Uses the whole file if nothing is selected");
-    public static string TipAddMarker => Get("マーカーを追加 (M / Ins)\n選択中は両端。同じ範囲で繰り返すと分割", "Add marker (M / Ins)\nPlaces both ends of a selection; repeat to split");
-    public static string TipSetLoop => Get(
-        "選択をサンプルループに (Shift+L)\n同じ範囲でもう一度で解除。EXPORT ではループ前が Intro、ループが -L。後ろに余りがあれば -E（波形は赤くしない）",
-        "Set selection as sample loop (Shift+L)\nSame range again clears it. EXPORT treats the part before as Intro and the loop as -L. A remainder after the loop becomes -E (the waveform is not painted red)");
-    public static string TipSetRegion => Get("選択をリージョンに (Shift+R)\n同じ範囲で繰り返すと分割", "Set selection as region (Shift+R)\nRepeat on the same range to split");
-    public static string TipRangeClick => Get(
-        "範囲メトロノーム (Q)\n等分マーカー／リージョン位置でメトロノームを鳴らす。ボタンまたは Q でオン／オフ（既定オフ・自動ではオンにならない）。プレイヤーの動画本再生／フレーム一時停止／PDF 明るい表示では Escape と同じく暗いプレビューへ戻す（F8／引数起動ミニでは Escape／Q でプレイリストへ戻る。範囲メトロノームはプレイヤーでは効かない）",
-        "Range metronome (Q)\nMetronome clicks at equal-divide markers/regions. Toggle with the button or Q (off by default; never auto-on). In the player during real video playback / frame pause / bright PDF view, Q matches Escape and returns to the dim preview (in the F8 / argument-launch mini, Escape / Q return to the playlist; range metronome does not run in the player)");
-    public static string TipSaveAs => Get(
-        "名前を付けて保存 (Ctrl+Shift+S)\n単体は保存ダイアログ。複数選択時は保存先フォルダを選び、各ファイルを Wave で保存してタブのパスを付け替える（書き出しとは違い、保存後のファイルが今のタブになる）",
-        "Save As (Ctrl+Shift+S)\nOne file opens a Save dialog. Several selected tabs ask for a folder, write each as Wave, and point the tabs at those files (unlike Export, the tab follows the new file)");
-    public static string TipSpectrogramView => Get(
-        "スペクトログラム / 重ね (A)\nスペクトログラム → 波形上乗せ。抜けるのは Esc、Shift+A、Shift+V（今の表示にかかわらず波形へ）。ボタンは 3 回で波形に戻る。暗部持ち上げは左端のバーまたは Alt+↑／↓",
-        "Spectrogram / overlay (A)\nSpectrogram → waveform overlay. Esc, Shift+A, or Shift+V returns to the waveform from any view. The button returns to the waveform on the third click. Lift dark energy with the left bar or Alt+↑ / ↓");
-    public static string TipLoudnessView => Get(
-        "ラウドネス表示 (V)\nV で曲線と音量入力を開く。抜けるのは Esc、Shift+A、Shift+V（今の表示にかかわらず波形へ）。ボタンは表示のオン／オフ",
-        "Loudness view (V)\nV shows the curve and opens volume input. Esc, Shift+A, or Shift+V returns to the waveform from any view. The button toggles the view only");
-    public static string TipCenterPlayhead => Get(
-        "中央寄せ (Z／テンキー .)\n再生中はセンターロックの切替。. キーは早送り",
-        "Center (Z / numpad .)\nToggles center-lock while playing. The . key is fast-forward");
-    public static string TipLibraryMaximize => Get(
-        "プレイヤー (F10)\nリストと短い波形の再生モードへ。編集はできない",
-        "Player (F10)\nList and short-waveform playback mode. Edits are blocked");
-    public static string TipLibraryMaximizeOff => Get(
-        "エディタ (F10)\n再生を止めてから選択ファイルだけ残し、波形編集へ。タブの複数選択は解除。動画／PDF の本再生中やフレーム一時停止中はエディタへ落とさず、暗いバックグラウンド再生へ戻して前面 UI を出す。",
-        "Editor (F10)\nStops playback, keeps only the selected files, returns to editing. Clears tab multi-selection. During video / PDF real playback or video frame pause, stays in the player, drops to the dim background preview, and restores front chrome.");
-    public static string TipAnalyzerMaximize => Get(
-        "フルスクリーン（アナライザー） (F12)\nタイトルバーだけ隠し、メーター類を 1.5 倍にする",
-        "Fullscreen with analyzers (F12)\nHides only the title bar and scales meters 1.5×");
-    public static string TipAnalyzerMaximizeOff => Get(
-        "アナライザー最大化を解除 (F12)\n通常のウィンドウ表示へ戻す",
-        "Leave analyzer fullscreen (F12)\nRestore the normal window chrome");
-    public static string TipColorPanel => Get(
-        "色設定 (Ctrl+Shift+C)\nアプリの配色を調整します（ダーク固定）。",
-        "Color settings (Ctrl+Shift+C)\nTune the app colors (dark UI; no light/dark switch).");
 
     public static string LabelWaveformLane(int number) =>
         Get($"Ch{number}", $"Ch{number}");
-    public static string TipSettingsInput => Get(
-        "各スピーカーの録音ポートと、書き込む Ch。右のバーで信号が入っているか確認できます。",
-        "Record port and file channel (Ch) for each speaker. The bars show whether a signal is arriving.");
-    public static string TipSettingsOutput => Get(
-        "各スピーカーの再生ポートと、読む Ch。行の Sine −20 dB と Voice で確認できます。LFE に Voice はありません。",
-        "Playback port and file channel (Ch) for each speaker. Sine −20 dB and Voice on each row check the route. LFE has no Voice.");
-    public static string TipSpeakerPreset => Get(
-        "アプリ用意のスピーカー配置。先にこれを選び、その中でデバイスとポート割り当てを決めます。一覧は表示項目タブのチェックで絞れます。変更したあと OK せずに別の配置へ切り替えると、保存するか聞きます。",
-        "Built-in speaker layout. Pick this first, then set the device and port assignments inside it. The list is filtered by the Shown tab. Switching layouts without OK asks whether to save the current one.");
-    public static string TipSpeakerVisibility => Get(
-        "チェックしたスピーカー定義だけ、設定とステータスバー（NOW POS の左）の一覧に出します。既定は Stereo だけです。今使っている定義は、外しても切り替えるまで残ります。全部外すことはできません。自動スピーカー選択の候補もこの一覧です。",
-        "Only enabled speaker definitions appear in Settings and the status-bar menu (left of NOW POS). Stereo is on by default. The definition in use stays listed until you switch away. At least one must stay enabled. Auto speaker selection uses this list.");
-    public static string TipAutoSpeakerSelect => Get(
-        "オンにすると、アクティブなファイルのチャンネル数に合わせて、有効にしたスピーカー定義へ切り替えます。1〜2ch は Stereo。同じ本数が複数あるときはいちばん普通の配置（6ch なら 5.1）。今の配置がすでに同じ本数なら維持します（5.1 Side を 5.1 へ戻しません）。候補が無いか、複数あって既定が無効なら切り替えません。既定はオフ。ファイルの正体は当てません。切替は再生と録音を止め、定義ごとのデバイスとポート割り当てに載せ替えます。Stereo と 5.1 で別デバイスなら、タブを変えるたびに出力先が変わります。",
-        "When on, switches to an enabled speaker definition that matches the active file's channel count. 1–2 ch uses Stereo. If several layouts share that count, the usual one is used (5.1 for 6 ch). If the current layout already has the same count, it stays (5.1 Side is not reset to 5.1). No change if nothing matches, or if several match and the usual one is not enabled. Off by default. The file itself is not labeled. Switching stops playback and recording, and applies that definition's device and port map. If Stereo and 5.1 use different devices, the output jumps when you change tabs.");
-    public static string TipSpeakerSwitch => Get(
-        "使うスピーカー配置を切り替えます。デバイスとポート割り当てが一緒に変わります。一覧は設定の表示項目タブで絞れます。",
-        "Switch speaker layout. The device and port assignments change with it. The list is filtered in Settings → Shown.");
-    public static string TipRecord => Get(
-        "録音 (Ctrl+R)\n開始前に毎回、Silent Skip をオンにするか確認する。今開いているファイルのフォーマットで、シークバーの位置から録る。それ以降の波形は上書き（Undo で戻せる）。ファイルが無いときは始まらない（先に Ctrl+N で作るか、ファイルを開く）。波形はすぐ出して、あとから整える。Silent Skip がオンならしきい値を超えたときだけ録り、下回った時点から無音を挟んで挿入時間で止める。可聴の前後にはプチノイズ防止フェード（設定の編集タブ。既定 20 ms）をかける。もう一度で停止。スピーカー配置・録音ポート・Ch の割り当てを使う。Space / Enter / Esc でも停止。",
-        "Record (Ctrl+R)\nAsks every time whether to turn Silent Skip on. Records in the current file format from the seek bar, overwriting audio after that point (Undo restores it). Does nothing if no file is open; create one with Ctrl+N or open a file first. The waveform appears immediately and is refined after. With Silent Skip on, only audio above the threshold is recorded, and silence is inserted when the level falls (up to the insert duration in Settings). Each recorded burst gets the click-prevention fade from the Editing tab (default 20 ms) at both ends. Press again to stop. Uses the speaker layout, record ports, and Ch map. Space / Enter / Esc also stop.");
-    public static string TipRecordInputMap => Get(
-        "各スピーカーがどのポートから入り、どの Ch へ書くか。なしは無音。右のバーは今のレベルです。Ch は再生と共通です。",
-        "Which port feeds each speaker, and which file channel (Ch) it writes. Off is silence. The bar is the live level. Ch is shared with playback.");
-    public static string TipFileChannelMap => Get(
-        "このスピーカーがファイルのどの Ch か。録音と再生で同じ割り当てです。なしはそのスピーカーを使いません。一覧は今のスピーカー配置の本数まで。初期値は 1 から順です。",
-        "Which file channel (Ch) this speaker uses. Shared by record and playback. Off leaves the speaker unused. The list matches the current speaker count. The default is 1, 2, 3…");
-    public static string TipInputLevel => Get(
-        "割り当てた録音ポートのピーク。信号が入っているか確認できます。",
-        "Peak of the assigned record port. Use it to confirm a signal is arriving.");
-    public static string TipSineMinusTwenty => Get(
-        "このスピーカーだけに −20 dBFS の正弦波を出します。通常は 1 kHz、LFE は 80 Hz。もう一度押すと停止。",
-        "Plays a −20 dBFS sine on this speaker only. 1 kHz normally, 80 Hz for LFE. Press again to stop.");
-    public static string TipChannelVoice => Get(
-        "このスピーカーのチャンネル名を英語で読み上げ、同じポートへ繰り返し出します。LFE にはありません。もう一度押すと停止。",
-        "Speaks this speaker's channel name in English and loops it on the same port. Not used for LFE. Press again to stop.");
     public static string StatusInputMonitorFailed => Get(
         "録音を開けません。デバイスと API を確認してください。",
         "Could not open recording. Check the device and API.");
-    public static string TipPlaybackOutputMap => Get(
-        "各スピーカーをどのポートへ出し、どの Ch から読むか。Ch は録音と共通。2ch 再生でポート未設定なら、スピーカー分をダウンミックス。",
-        "Which port each speaker uses, and which file channel (Ch) it reads. Ch is shared with record. Stereo playback with no port map still downmixes the speakers.");
-    public static string TipPlay => Get(
-        "再生 / 停止 (Space)\n停止で開始位置へ戻る\nEnter でその場停止（停止中の動画／PDF は本再生／明るい表示）\n動画本再生中は開始位置へ静止し、暗いプレビューへは Escape／Q（F8／引数起動ミニでは Escape／Q でプレイリストへ戻る）\nCtrl+Space 3秒前から\nAlt+Enter 再生開始位置からやり直し",
-        "Play / stop (Space)\nStop returns to the start position\nEnter pauses in place (while stopped, video / PDF go to real playback / bright view)\nDuring real video playback, Space freezes at the start; Escape / Q returns to the dim preview (in the F8 / argument-launch mini, Escape / Q return to the playlist)\nCtrl+Space from 3 seconds earlier\nAlt+Enter restarts from the playback start");
-    public static string TipFadeIn => Get(
-        "フェードイン (I)\nカーブを選び Space で試聴、Enter で実行。1–9 でカーブを選択。未選択なら全体",
-        "Fade in (I)\nPick a curve, Space to preview, Enter to apply. 1–9 select a curve. Uses the whole file if nothing is selected");
-    public static string TipFadeOut => Get(
-        "フェードアウト (O)\nカーブを選び Space で試聴、Enter で実行。1–9 でカーブを選択。未選択なら全体",
-        "Fade out (O)\nPick a curve, Space to preview, Enter to apply. 1–9 select a curve. Uses the whole file if nothing is selected");
 
     public static string LabelFadeCurve(int shapeId) => shapeId switch
     {
@@ -823,213 +670,10 @@ internal static partial class UiStrings
         _ => Get("S-Curve", "S-Curve"),
     };
 
-    public static string TipFadeShape(int shapeId) => shapeId switch
-    {
-        0 => Get("対数（Base 3）。立ち上がりが早く、終わりがなだらかです。", "Logarithmic (Base 3). Rises quickly and eases out."),
-        1 => Get("定電力フェードイン（Sine）。", "Constant-power fade in (Sine)."),
-        2 => Get("対数（Base 1.41）。", "Logarithmic (Base 1.41)."),
-        3 => Get("逆 S 字。", "Inverted S-curve."),
-        4 => Get("直線。", "Linear."),
-        5 => Get("一定（終端まで値を保ち、最後で切り替わります）。", "Constant (holds the value, then switches at the end)."),
-        6 => Get("S 字。", "S-curve."),
-        7 => Get("指数（Base 1.41）。立ち上がりが遅く、終わりが急です。", "Exponential (Base 1.41). Rises slowly and finishes steeply."),
-        8 => Get("定電力フェードアウト（Sine）。", "Constant-power fade out (Sine)."),
-        9 => Get("指数（Base 3）。立ち上がりが遅く、終わりが急です。", "Exponential (Base 3). Rises slowly and finishes steeply."),
-        _ => Get("S 字。", "S-curve."),
-    };
 
-    public static string TipNormalize => Get(
-        "ノーマライズ (N)\nピークを -0.1 dB に合わせる",
-        "Normalize (N)\nFit the peak to -0.1 dB");
-    public static string TipVolume => Get(
-        "音量 (V)\nラウドネス曲線を表示して dB を入力。↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。数字キーで直接入力。Space で試聴、Enter で実行。未選択なら全体。波形全体の Integrated LKFS / RMS / Peak の変化を先に表示。曲線と停止中メーターも同じ dB で追従。Shift+V で曲線を閉じる。",
-        "Volume (V)\nShows the loudness curve and accepts a dB value. ↑↓ / wheel by 0.1 dB (Shift 1 / Ctrl 3 / Ctrl+Shift 6). Type digits to enter a value. Space previews, Enter applies. Uses the whole file if nothing is selected. Shows how whole-file Integrated LKFS / RMS / Peak will change. The curve and the stopped meter follow the same dB. Shift+V closes the curve.");
-    public static string TipPitch => Get(
-        "ピッチ (P)\n↑↓／ホイールで半音（Shift または Ctrl で1オクターブ）。Space で試聴、Enter で実行。未選択なら全体。±2オクターブ。長さを保つ（既定オン。Tab でチェックへ）。オフは長さも変わる。長さだけなら T。",
-        "Pitch (P)\n↑↓ / wheel by a semitone (Shift or Ctrl for an octave). Space previews, Enter applies. Uses the whole file if nothing is selected. Range is ±2 octaves. Keep length (on by default. Tab moves to the checkbox). Off also changes length. T stretches time only.");
-    public static string TipDelete => Get(
-        "部分削除 (Delete)\n選択範囲を詰めて削除\n選択中のマーカー / リージョンはまとめて削除\nCtrl+Del でマーカー削除\n右クリック／Ctrl+D の「無音検出」は同じ UI で無音削除／リージョン付加／マーカー付与。選択があればその範囲、なければ全体。冒頭＆末尾のみ／全体。削除時のカットフェードはダイアログで指定（設定のプチノイズ防止とは独立）。タブ複数選択時は確認のみで現在設定を一括適用",
-        "Ripple delete (Delete)\nRemove the selection and close the gap\nSelected markers / regions are deleted together\nCtrl+Del deletes markers\nDetect Silence (right-click / Ctrl+D) uses one UI to delete silence, add regions, or add markers. Uses the selection if any, otherwise the whole file. Start & end only or entire. Cut fades for delete are set in the dialog (independent of the click-prevention fade in Settings). With several tabs selected, only confirms then applies the current settings");
-    public static string TipSilenceDetectDialog => Get(
-        "無音検出 (Ctrl+D)\n選択範囲があればその範囲だけ、なければファイル全体。波形の赤い ±しきい値線をドラッグ、または波形／数値欄でホイール（0.1 dB、Shift で 1 dB。↑↓も同じ）。ハイライトは表示波形の目安（ゲート時間はプレビューに反映しない。実行時は厳密に検出）。オープン／クローズ（リンク可。既定 -5 dB。以後は前回の値）、次のゲートまでの最小時間、クローズまでの最小時間、プリ／ポストロール、カット時フェードイン／アウト（無音削除時。Silent Skip や設定のプチノイズ防止とは独立）。無音を削除／リージョン付加／マーカー付与、冒頭＆末尾のみ／全体。タブを複数選択しているときは設定 UI を出さず、現在の設定で一括適用するか確認だけする",
-        "Detect Silence (Ctrl+D)\nUses the selection if any, otherwise the whole file. Drag the red ±threshold lines, or use the mouse wheel on the waveform / number fields (0.1 dB, Shift for 1 dB; ↑↓ same). The highlight is a display-waveform guide (gate timing is not previewed; apply runs full detection). Open / close (linkable; default −5 dB, then remembers your last values), minimum time to next gate, minimum time to close, pre / post-roll, cut fade in / out (for delete silence; independent of Silent Skip and the click-prevention fade in Settings). Delete silence, add regions, or add markers; start & end only or entire. With several tabs selected, skips the settings UI and only asks whether to apply the current settings to all of them");
-    public static string TipSave => Get(
-        "保存 (Ctrl+S)\nCtrl+Shift+S で別名保存\nタブを複数選択しているときは選択ファイル全部。パスがあるものは上書き。未保存や AIFF は保存先フォルダを選んで Wave で保存\nCtrl+Shift+M で MP3 保存（今のタブは開いたまま。書き出した MP3 は読み込まない）\nCtrl+Shift+Alt+M で全タブを MP3 で保存\nMP3 は PCM 16bit から再エンコード。LAME のパスが有効ならそれを使い、空欄または無効なら Windows（既定 192 kbps）。成功時に LAME / Windows を表示。失敗はダイアログ。マーカー／リージョン／ループは MP3 に書きません",
-        "Save (Ctrl+S)\nCtrl+Shift+S to save as\nWith several tabs selected, every selected file. Files with a path are overwritten. Untitled or AIFF files ask for a folder and write Wave\nCtrl+Shift+M to save as MP3 (keeps the current tab; does not open the written MP3)\nCtrl+Shift+Alt+M saves every tab as MP3\nMP3 is re-encoded from 16-bit PCM. A valid LAME path is used; empty or invalid falls back to Windows (default 192 kbps). Success shows LAME / Windows. Failures open a dialog. Markers / regions / loops are not written to MP3");
-    public static string TipSaveMp3 => Get(
-        "MP3 として保存 (Ctrl+Shift+M)\n別名保存と同じく書き出すだけ。今のタブは開いたまま、書き出した MP3 は読み込まない。Ctrl+Shift+Alt+M で全タブを MP3 で保存。設定の LAME があればそれを使い、空欄または無効なら Windows（既定 192 kbps）。成功時にどちらで書いたかを表示。失敗はダイアログ。マーカー／リージョン／ループは書きません",
-        "Save as MP3 (Ctrl+Shift+M)\nWrites a file like Save As; keeps the current tab and does not open the written MP3. Ctrl+Shift+Alt+M saves every tab as MP3. Uses LAME when the path is valid; otherwise Windows (default 192 kbps). Success shows which encoder ran. Failures open a dialog. Markers / regions / loops are not written");
-    public static string TipOpen => Get(
-        "開く (Ctrl+O)\nドロップでも可。フォルダは中の Wave / AIFF / MP3 を再帰的に追加（非対応は無視）。複数ファイルはタブで追加。複数読み込み中は Esc で中断（読み込み済みは残す）。\nWave / AIFF / MP3\nCtrl+N で新規（フォーマットは都度指定）\nCtrl+W でタブを閉じる（未保存なら保存確認）\nCtrl+Shift+D でファイルを複製（隣のタブで開く）\nCtrl+Shift+B で選択ファイルをバウンス（先に保存先を指定。重ねて合成した Wave を右側のタブで開く。既定名 Bounce.wav。フォーマットは左端の選択タブ）\nCtrl+Q でアプリを終了（開いていたタブと未保存の作業コピーは次回起動時に戻す）\nCtrl+Shift+T で閉じたタブを開き直す（今の起動で閉じたもの。終了すると忘れる）\nCtrl+Tab で次のタブ（端から反対側へ。長押し連続は端で一旦止まり、離して押し直すと再び回る）\nCtrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置、波形エリアに収まらない配置は飛ばす。左右・上下が収まらなければ格子を試し、格子も無理なら動かない。今見ている表示モードで全タブを並べる）\n右クリックで、すべてのファイルの時間を表示（表。コピー／範囲コピー／CSV／PDF。複数タブ選択中は選択ファイルのみ）など\nタブが増えると先にアクティブ以外を縮める。6文字を切るまで縮めても収まらなければ左右ボタンで送る",
-        "Open (Ctrl+O)\nDrop also works. A folder adds every Wave / AIFF / MP3 inside it (unsupported types are skipped). Multiple files open as extra tabs. Esc stops a multi-file load and keeps files already opened.\nWave / AIFF / MP3\nCtrl+N for a new file (choose the format each time)\nCtrl+W closes the tab (asks to save if dirty)\nCtrl+Shift+D duplicates the file (opens in the next tab)\nCtrl+Shift+B bounces selected tabs (choose where to save first; the mixed Wave opens in the tab to the right; default name Bounce.wav; format follows the leftmost selected tab)\nCtrl+Q quits (tabs left open and unsaved working copies come back on the next launch)\nCtrl+Shift+T reopens tabs closed in this launch (forgotten after quit)\nCtrl+Tab goes to the next tab (wraps from end to start; key-repeat pauses at the ends; wrap again only after release and repress)\nCtrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same or would not fit the waveform area. If side-by-side or stacked would not fit, it tries grid; if grid would not fit either, it does nothing. Every tab uses the current view mode)\nRight-click for all file times (table with copy / range copy / CSV / PDF; only the selected files while multiple tabs are selected) and more\nExtra tabs shrink (inactive first) before scroll arrows. Arrows appear only if a title would fall below 6 characters");
-    public static string TipCloseTab => Get(
-        "タブを閉じる (Ctrl+W)。今の起動のうちなら Ctrl+Shift+T で開き直せる",
-        "Close tab (Ctrl+W). Ctrl+Shift+T reopens it in this launch");
-    public static string TipTabScrollLeft => Get("左のタブを表示", "Show tabs to the left");
-    public static string TipTabScrollRight => Get("右のタブを表示", "Show tabs to the right");
-    public static string TipOverview => Get(
-        "波形全体。明るい部分が表示中の範囲。ドラッグで移動（中央をスクラブ）　ホイールで拡縮（再生ヘッド基準）",
-        "Whole file. The bright area is the current view. Drag to move (scrubs the center). Wheel zooms around the playhead");
-    public static string TipSpectrum => Get(
-        "再生中の全チャンネルを畳んだ LED スペクトラムです。1/3oct 相当の帯域とピークホールド。Layer Music Checker と同じ検波です。",
-        "LED spectrum of every playback channel mixed together. Third-octave-style bands and peak hold, same detection as Layer Music Checker.");
-    public static string TipLoudness => Get(
-        "ラウドネス（ITU-R BS.1770 / EBU R128）。Short Term・Integrated・Momentary Max、Loudness Range、True Peak。ターゲット LKFS は設定で変更。青＝余裕、橙＝接近、赤＝超過（LKFS はターゲット、True Peak は 0 dBTP、Loudness Range は 20/25 LU）。再生中は出力のリアルタイム計測（数値が色）。停止中は波形全体のオフライン解析（Short Term はファイル内の最大。色が塗り、文字は通常色）。音量などの編集後は測り直します。音声は変えません。",
-        "Loudness (ITU-R BS.1770 / EBU R128): Short Term, Integrated, Momentary Max, Loudness Range, True Peak. Target LKFS is in Settings. Blue = headroom, orange = approaching, red = over (LKFS vs target, True Peak vs 0 dBTP, Loudness Range vs 20/25 LU). While playing, values are live from the output (colored text). While stopped, they are an offline read of the whole file (max Short Term; the color fills the value, text uses the default color). Re-measures after edits such as volume. Does not change the audio.");
-    public static string TipVectorScope => Get(
-        "再生出力の位相相関とベクターオーディオスコープです。正方形は縦が Mid、横が Side。下の数値は 1/2 の相関（+1 同相 / 0 無相関 / -1 逆相）です。3ch 以上ではサラウンドビューに切り替わり、今のスピーカー配置の位置を使います（ファイルのチャンネル名は当てません）。エネルギーは波形と同じチャンネル色で、大きさはチャンネルのレベル、輪郭の凹凸はそのチャンネルの直近の波形です（先端が今、裾が少し前）。全体の広がりをひとつのダークグレーの細線で囲みます。枠はピークを少し持ってからゆっくり戻ります。停止後は表示がゆっくり消えます。",
-        "Phase correlation and a vector audio scope of the playback output. The square is Mid (vertical) and Side (horizontal). The number below is channel 1/2 correlation (+1 in phase / 0 uncorrelated / -1 inverted). Three or more channels switch to a surround view using the active speaker layout (file channel names are not inferred). Energy uses the same channel colors as the waveform. Size is channel level; the outline texture is that channel's recent waveform (the tip is now, the flanks are a few milliseconds earlier). One thin dark-gray outline wraps the overall spread. The outline holds peaks briefly, then falls slowly. After stop, the display slowly fades.");
-    public static string TipAudioApi => Get(
-        "再生／録音 API（WaveOut / WASAPI / ASIO）",
-        "Playback / record API (WaveOut / WASAPI / ASIO)");
-    public static string TipAudioDevice => Get(
-        "録音と再生に使うデバイス。WaveOut / WASAPI は名前の近い録音側を使います。ASIO は同じドライバです。",
-        "Device for record and playback. WaveOut / WASAPI pick a matching capture name. ASIO uses the same driver.");
-    public static string TipUiLanguage => Get(
-        "表示言語。Auto は OS が日本語なら Japanese、それ以外は English。",
-        "UI language. Auto is Japanese if the OS is Japanese, otherwise English.");
-    public static string TipMultiFileArrange => Get(
-        "2つ以上のファイルを開いたあとの並べ方です。既定はタブのまま（Ctrl+T でタイル）。左右・上下・上下左右を選ぶと、読み込み後にその配置で並べます。左右・上下が波形エリアに収まらなければ格子を試し、格子も無理なら並べません。",
-        "How to arrange two or more files after opening them. Default is keep tabs (Ctrl+T to tile). Side by side, stacked, or grid arranges them after a load. If side-by-side or stacked would not fit the waveform area, grid is tried; if grid would not fit either, they stay as tabs.");
-    public static string TipUiScale => Get(
-        "アプリの表示サイズ。OS の DPI に加えて拡大します。100〜200%。縮小はありません。作用するのはメインウィンドウのみで、メニューや設定などの別ウィンドウ、編集履歴は等倍のままです。コンボを変えた瞬間に反映します。キャンセルすると元に戻します。",
-        "App display size. Extra enlargement on top of the OS DPI. 100–200%. No shrinking. Affects the main window only; menus, separate windows such as Settings, and the edit history stay at 100%. Applies as soon as you change the combo. Cancel restores the previous value.");
-    public static string TipFileAssociations => Get(
-        "チェックすると、その拡張子をこのアプリで開く（既定）。外すと関連付けを外す。すでにこのアプリが既定ならチェック済み。OK を待たず、今の exe へすぐ書き込みます。M4A と動画はプレイヤーモード専用（ダブルクリックすると F10 プレイヤーで開く。波形編集では開けません）。",
-        "Check to make this app the default for that extension. Uncheck to remove the association. Types already using this app are checked. Writes to this exe immediately, without waiting for OK. M4A and video are player-mode only (double-click opens the F10 player; they cannot be opened for waveform editing).");
-    public static string TipFileAssociationM4a => Get(
-        "M4A はプレイヤーモード専用です。関連付けるとダブルクリックで F10 プレイヤーが起動します。波形編集の Open では選べません。",
-        "M4A is player-mode only. Associating it opens the F10 player on double-click. It is not available in the editor Open dialog.");
-    public static string TipFileAssociationVideo => Get(
-        "動画はプレイヤーモード専用です。関連付けるとダブルクリックで F10 プレイヤーが起動し、動画の原寸サイズで窓を開きます（位置は初回メインディスプレイ中央、以後は窓の中心を覚え、次の動画でも中心を合わせます）。波形編集の Open では選べません。設定の ffmpeg.exe が未設定または無効なときは薄く表示します（チェック自体はできます）。",
-        "Video is player-mode only. Associating it opens the F10 player on double-click at the video’s native size (first launch centered on the main display; later launches remember the window center and align to it). It is not available in the editor Open dialog. When ffmpeg.exe in Settings is empty or invalid, the options appear dimmed (you can still check them).");
     public static string LabelFileAssociationPlayerOnly => Get(
         "プレイヤーモードのみ",
         "Player mode only");
-    public static string TipLoudnessTarget => Get(
-        "ラウドネスメーターのターゲット（LKFS）。-70 から 0。色分けの基準です。音声は変えません。",
-        "Loudness meter target (LKFS), from -70 to 0. Used for the color scale. Does not change the audio.");
-    public static string TipFadeCurveDefaults => Get(
-        "I / O で開くフェードカーブの初期選択です。",
-        "Initial curve shown when you open fade in / fade out (I / O).");
-    public static string TipSettingsOk => Get(
-        "設定を保存して閉じます。",
-        "Save settings and close.");
-    public static string TipSettingsCancel => Get(
-        "変更を破棄して閉じます。",
-        "Discard changes and close.");
-    public static string TipStatusFormat => Get(
-        "サンプリングレート / ビット深度 / チャンネル / 形式 / 容量。MP3／M4A はビットレートも出す。S / B / C で変換。変換や範囲削除で長さが変わると容量は推測サイズになり赤。確定項目は保存まで赤。",
-        "Sample rate / bit depth / channels / format / size. MP3 / M4A also show bit rate. S / B / C convert. Size turns red as an estimate after conversion or a range delete that changes length. Confirmed fields stay red until you save.");
-    public static string TipLevelMeter => Get(
-        "再生出力の Peak / RMS。内側 2 本が Peak（上の赤ランプは 0 dBFS を超えたサンプルピークで2秒点灯）、外側 2 本が RMS。どちらもホールド線が付きます。下の数値は Peak 行／RMS 行（超過は +）。3ch 以上はチャンネルごとの Peak バーに、Peak ホールドと緩やかな RMS ホールドを載せます。バーの色は波形左端のチャンネル名の角丸バッジと同じ登場順（Atmos 9.1.6 の 16 色）。2ch 以下はシアングラデです。メーターにチャンネル名は出しません。左端をドラッグすると列を広げられます（既定が最小。バーが最大の太さになるところで止まります。次の起動まで覚えます）。",
-        "Playback Peak / RMS. Inner two bars are Peak (red lamps light for 2 seconds when a sample peak exceeds 0 dBFS), outer two are RMS. Both have hold lines. Numbers below are Peak then RMS (overs show +). Three or more channels show one Peak bar per channel, with Peak hold and a slower RMS hold. Bar colors match the rounded color badges on the waveform channel names (16 colors for Atmos 9.1.6). Stereo and mono use the cyan gradient. The meter does not show channel names. Drag the left edge to widen the column (the default is the minimum; it stops when the bars reach full thickness; the width is remembered).");
-    public static string TipSpectrogramBoost => Get(
-        "小さい音を目立たせます。つまみを上へ動かすほど暗い成分が明るくなります（既定は下端でオフ）。スペクトログラム／重ねでは Alt+↑／↓（押しっぱなしで連続）。",
-        "Lift quiet energy. Drag the thumb up to brighten darker bins (default is off at the bottom). In spectrogram / overlay, Alt+↑ / ↓ (hold to repeat).");
-    public static string TipTimeScroll => Get(
-        "表示範囲を左右に動かします。つまみ中央をドラッグ、またはトラックをクリック。両端をドラッグすると時間拡縮。",
-        "Pan the view. Drag the thumb, or click the track. Drag either end to zoom time.");
-    public static string TipTimeScrollLeft => Get(
-        "表示を左へ動かします。",
-        "Pan the view left.");
-    public static string TipTimeScrollRight => Get(
-        "表示を右へ動かします。",
-        "Pan the view right.");
-    public static string TipTimeScrollAmpZoomIn => Get(
-        "振幅拡大 (Shift+↑)",
-        "Zoom in amplitude (Shift+↑)");
-    public static string TipTimeScrollAmpZoomOut => Get(
-        "振幅縮小 (Shift+↓)",
-        "Zoom out amplitude (Shift+↓)");
-    public static string TipTimeScrollTimeZoomIn => Get(
-        "時間拡大 (↑)",
-        "Zoom in time (↑)");
-    public static string TipTimeScrollTimeZoomOut => Get(
-        "時間縮小 (↓)",
-        "Zoom out time (↓)");
-    public static string TipCopyright => Get(
-        "© MIYABI GAME AUDIO INC. MIT License で公開。GitHub はリポジトリ、MIT License は全文、LAME は公式サイト、FFmpeg は公式サイト。LAME と FFmpeg は同梱せず、設定の lame.exe と ffmpeg.exe だけを呼びます（LGPL／ビルドによっては GPL。入手と遵守は利用者側）。PDF 表示は Windows の API、動画表示は OS の Media Foundation です（追加のサードパーティ許諾は不要）。Wwise®／Audiokinetic® は Audiokinetic Inc. の商標。非公式。WAAPI には有効な Wwise ライセンスが必要です。",
-        "© MIYABI GAME AUDIO INC. Released under the MIT License. GitHub opens the repository, MIT License the full text, LAME and FFmpeg the project sites. LAME and FFmpeg are not bundled; only a user-supplied lame.exe and ffmpeg.exe from Settings are run (LGPL, or GPL depending on the FFmpeg build; obtaining them and complying is the user’s responsibility). PDF uses Windows APIs and video uses OS Media Foundation (no extra third-party notice). Wwise® / Audiokinetic® are trademarks of Audiokinetic Inc. This tool is unofficial. WAAPI requires a valid Wwise license.");
-    public static string TipBrandLogo => Get(
-        "MIYABI GAME AUDIO のウェブサイトを開きます。",
-        "Open the MIYABI GAME AUDIO website.");
-    public static string TipEditHistory => Get(
-        "編集履歴 (U)。↑↓ で移動、Enter／X／外側クリックで確定、Esc でキャンセル。履歴エリアのクリックでも閉じる。Ctrl+クリック／Shift+↑↓ で選択、Ctrl+C でコピー、別ファイルで Ctrl+V。背景はサンプルレート変換の候補リストと同じ塗り。セーブせず終了しても、戻せる操作は次回起動時に履歴へ戻す。",
-        "Edit history (U). ↑↓ move, Enter / X / click outside apply, Esc cancel. Click the history strip to close. Ctrl+click / Shift+↑↓ select, Ctrl+C copy, Ctrl+V in another file. Uses the same fill as the sample-rate convert picker list. Replayable edits also come back after a restart without saving.");
-    public static string TipHistoryStrip => Get(
-        "編集履歴の一覧（収まる分だけ。古いものは切れる）。クリックで開く／閉じる。ここからは選べません。",
-        "Edit-history list (as many as fit; older rows clip). Click to open or close. This strip is display-only.");
-    public static string TipFormatSampleRate => Get(
-        "サンプリングレートを変換します (S)。Space で試聴、Enter で確定。1–9 で項目。",
-        "Convert sample rate (S). Space previews, Enter applies. 1–9 pick a row.");
-    public static string TipFormatBitDepth => Get(
-        "ビット深度を変換します (B)。Space で試聴、Enter で確定。1–9 で項目。",
-        "Convert bit depth (B). Space previews, Enter applies. 1–9 pick a row.");
-    public static string TipFormatChannels => Get(
-        "チャンネル数を変換します (C)。Enter で確定。1–2 で項目。",
-        "Convert channel count (C). Enter applies. 1–2 pick a row.");
-    public static string TipFormatCustomRate => Get(
-        "任意 Hz。↑↓／ホイールで 1（Shift 10／Ctrl 100／Ctrl+Shift 1000）。Enter で確定。Tab で抜けて 1–9 で項目。範囲 1000–384000。",
-        "Custom Hz. ↑↓ / wheel by 1 (Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Tab leaves the box so 1–9 pick a row. Range 1000–384000.");
-    public static string TipWaveform => Get(
-        "クリックで再生位置。←→ でシーク（再生中は押しっぱなしで 3 倍早送り／巻き戻し（推移中は-4dB））。ドラッグで選択。Ctrl+ドラッグでスクラブ（全chを L/R に畳む）。\n"
-        + "Esc または Shift なし移動で解除。Shift＋ドラッグ／←→ で伸長。ダブルクリックで区間（マーカー間）。Shift＋ダブルクリックでその区間を追加。トリプルクリックで全選択。ガイドはマーカー／ループ端に吸着。\n"
-        + "左端のチャンネル名：クリックでソロ（再クリックで解除。Ctrl で追加。Shift でミュート）。Tab／Shift+Tab で順にソロ。\n"
-        + "ホイール＝時間ズーム（再生ヘッド基準）。Shift+ホイール＝パン。Ctrl+ホイール＝振幅。\n"
-        + "フラッグ／ループ端：クリックで選択、ドラッグまたは ←→ で移動。Alt+←→ は微調整。ダブルクリックで名前。右クリックまたはメニューキー／Shift+F10 でメニュー。\n"
-        + "Ctrl+T でタイル表示を巡回（横並び → 縦並び → 格子 → 解除。見た目が同じ配置、波形エリアに収まらない配置は飛ばす。左右・上下が収まらなければ格子を試し、格子も無理なら動かない）。今見ている表示モード（波形 / スペクトログラム / 重ね / ラウドネス）で全タブを並べる。並び替え中でももう一度押すと次へ進む。\n"
-        + "F11 で波形エリアをフルスクリーン（タスクバーは隠す。チャンネル名と dB 目盛りも出さない。全体波形とステータスバーは残す。タイルでも可。もう一度 F11 で戻す）。\n"
-        + "F12 はタイトルバーだけ隠すフルスクリーン。タブ・トランスポート・メーター・Tips・WAAPIは残す。単一表示ではチャンネル名・dB 目盛りも残し、タイル中は畳んで縦仕切りに代える。スペクトラム／ラウドネス／レベルメーター／ベクタースコープは 1.5 倍（OS の DPI と表示倍率のうえ）。もう一度 F12 で戻す。\n"
-        + "F10 はプレイヤー（リスト＋短い波形。操作の詳細はプレイリスト／ツリーの Tips。F9（プレイリストと波形だけ。デスクトップの占有面積を節約するとき）／F8（動画／PDF ミニ。前面 UI 無し。本再生／暗いバックグラウンドプレビューまたは動画ファイル起動時）も同様）。プレイヤー中の波形はシークと選択だけ（右クリック／メニューキー／Shift+F10 のメニューは出せるが編集系は無効。ドキュメントのマーカー／リージョン／ループは出さない。音声のプレイリスト波形と動画本再生／F8 では I／O で捨て A-B リピート（In／Out の旗。Esc で解除。別ファイル再生で忘れる）、M／Ins で一時マーカー（別ファイル再生で忘れる。音声はエディタへ戻すとき既存マーカーとマージし、揃った A-B はサンプルループにして編集状態のまま持ち越す。動画／PDF はエディタへ持ち込まないので捨てる。即保存はしない。ドラッグ・削除・ダブルクリック区間／Shift 追加／トリプル全選択はエディタ同様。コメント改名はしない）。動画／PDF の暗いプレビューでは使わない。範囲選択は反転＋半透明。拡大しない。表示用のピークだけ作る。短いファイルは粗くしない。スペクトラム／ラウドネス曲線ビューには切り替えない）。PDF はタイムラインが無いのでシークバーとマウス直下のガイドを出さない。編集コマンドは使えない。他モードのファイルはリストへ引き継ぐ。抜けるときは再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除する。動画／PDF の本再生中やフレーム一時停止中の F10 はエディタへ落とさず、暗いバックグラウンド再生へ戻して前面 UI を出す。プレイヤーのまま終了したときは、読み込んだファイルは覚えない。ウィンドウの位置とサイズは通常モードと別々に覚え、切り替えで戻す。引数に mp3／m4a が1つでも混ざるとプレイヤーで起動し、それらのファイルをリストへ載せる。もう一度 F10 で戻す。",
-        "Click to set the playhead. ←→ seek (hold during playback for 3× shuttle (−4 dB while held)). Drag to select. Ctrl+drag scrubs (every channel downmixed to L/R).\n"
-        + "Esc or a move without Shift clears the selection. Shift+drag / ←→ extends it. Double-click a span (between markers). Shift+double-click adds that span. Triple-click selects all. The guide snaps to markers / loop edges.\n"
-        + "Channel names on the left: click to solo (again to clear; Ctrl adds; Shift mutes). Tab / Shift+Tab cycle solo.\n"
-        + "Wheel = time zoom (around the playhead). Shift+wheel = pan. Ctrl+wheel = amplitude.\n"
-        + "Flags / loop edges: click to select, drag or ←→ to move. Alt+←→ nudges. Double-click to name. Right-click or the menu key / Shift+F10 for the menu.\n"
-        + "Ctrl+T cycles tile layout (side by side → stack → grid → restore; skip a layout that looks the same or would not fit the waveform area. If side-by-side or stacked would not fit, it tries grid; if grid would not fit either, it does nothing). Every tab uses the current view mode (waveform / spectrogram / overlay / loudness). Press again during arrange to skip ahead.\n"
-        + "F11 makes the waveform area fullscreen like a browser (hides the taskbar; also hides channel names and the dB scale; keeps the overview and status bar; works while tiled; F11 again restores).\n"
-        + "F12 is fullscreen with only the title bar hidden. Tabs, transport, meters, Tips, and WAAPI stay. In a single view, channel names and the dB scale stay; while tiled they are hidden and a vertical divider is used instead. Spectrum, loudness, level meter, and vector scope are 1.5× (on top of OS DPI and UI scale). F12 again restores.\n"
-        + "F10 is the player (list + short waveform; see the playlist / tree Tips for details, including F9, which shows only the playlist and waveform to save desktop space, and F8, the video / PDF mini player with no front UI (real playback, dim background preview, or video file launch)). In player mode the waveform only seeks and selects (right-click / menu key / Shift+F10 can open the menu, but edit commands stay disabled; document markers / regions / loops stay hidden. On the audio playlist waveform and during real video playback / F8, I / O set a disposable A-B loop (In / Out flags; Esc clears; forgotten when another file plays), and M / Ins place temporary markers (forgotten when another file plays; for audio, on return to the editor markers merge with existing ones and a complete A-B becomes the sample loop as an unsaved edit — not saved immediately; video / PDF are not taken into the editor so those cues are discarded; drag / delete / double-click spans / Shift-add / triple-click select-all work like the editor; comment rename is not available). Not used on the dim video / PDF preview. Inverted translucent selection; no zoom; display-resolution peaks only; short files stay dense; spectrogram / loudness-curve views stay off). PDF has no timeline, so the seek bar and mouse guide stay off. Edit commands are blocked. Files from other modes are listed. Leaving stops playback first, then keeps only the selected files and clears tab multi-selection. During video / PDF real playback or video frame pause, F10 stays in the player, drops to the dim background preview, and restores front chrome. Quitting while still in player mode does not remember the loaded files. Window position and size are remembered separately from editor mode and restored when you switch. If any launch argument is an MP3 or M4A, the app starts in player mode with those files listed. F10 again restores.");
-    public static string TipAlwaysOnTop => Get(
-        "ウィンドウを常に最前面へ表示します (Alt+A)。",
-        "Keep the window always on top (Alt+A).");
-    public static string TipSilentSkip => Get(
-        "無音区間を飛ばして再生し、録音中はしきい値を超えたときだけ書き込みます (Alt+S)。再生中の ←→ 早送り／巻き戻し中は飛ばしません（プレイヤーでは ,／.）。録音開始時にオンにするか毎回確認する。しきい値、スキップ時の無音挿入時間、プチノイズ防止フェードは設定の編集タブ（無音検出とは独立）。リージョン付加は録音開始時に指定。",
-        "Skip silent stretches during playback, and while recording write only audio above the threshold (Alt+S). Hold ←→ during playback to shuttle without skipping (, / . in player mode). Recording always asks whether to turn it on. The threshold, the silence insert duration on skip, and the click-prevention fade are on the Editing tab in Settings (independent of Detect Silence). Adding regions is chosen when you start recording.");
-    public static string TipSilentSkipThreshold => Get(
-        "Silent Skip で無音とみなすピーク（dBFS）。-120 から 0。既定 -60。再生ではこの値未満なら次の音まで飛ばし、録音では書き込みません。判定は約 50ms の窓内ピークです。しきい値付近の周期音の谷だけが抜けて、ピッチが微妙に変わってしまう不具合を直しています。無音検出（Ctrl+D）のしきい値とは共有しません。右のバーは割り当てた録音をモノラル化したピーク。赤線と数字は短区間ピークの最小の平均です。",
-        "Peak level treated as silence for Silent Skip (dBFS), from −120 to 0. Default −60. Playback jumps from below this level to the next sound. Recording does not write those frames. The check uses a peak in a ~50 ms window. That fixes a bug where troughs of a near-threshold tone were stripped and the pitch drifted slightly. Not shared with Detect Silence (Ctrl+D). The bar is the assigned record ports mixed to mono. The red line and number are the average of short-block peak minima.");
-    public static string TipSilentSkipThresholdMeter => Get(
-        "バーはピーク。赤線と右の数値はピークではなく、短い区間のピークのうち小さい方をならした値（谷の平均）。しきい値の目安にします。",
-        "The bar is peak. The red line and number are not peak; they average the quieter short-block peaks (avg. floor). Use them as a guide for the threshold.");
-    public static string TipSilentSkipRecordPad => Get(
-        "録音の Silent Skip 専用。スキップ時に挿入する無音の長さ。しきい値を下回った時点から無音を書き、この長さまで書いたら止めます。音が戻ったときにまとめて挟みません。先頭の無音と、末尾の長い無音は残しません。0 なら無音は全部捨てます。0 から 10000。既定 500。",
-        "Recording Silent Skip only. How much silence is inserted when skipping. Silence is written as soon as the level falls, then stops at this length. It is not dumped when sound returns. Leading silence and a long tail are discarded. 0 drops every silent frame. From 0 to 10000. Default 500.");
-    public static string TipClickGuardFade => Get(
-        "継ぎ目のプチノイズだけを消す短いフェード。先頭は 0 から、終端は 0 へ。リージョン毎のノーマライズと Silent Skip 録音で使う。無音検出のカット時フェードとは独立。長い音楽用フェードにはしない。1 から 100。既定 20。",
-        "A short fade that only removes a click at a splice. Starts at 0 and ends at 0. Used by normalize per region and Silent Skip recording. Independent of Detect Silence cut fades. Not a musical fade. From 1 to 100. Default 20.");
-    public static string TipConfirmRecordSilentSkip => Get(
-        "この録音で Silent Skip を使うか。オンならしきい値を超えたときだけ録り、下回った時点から無音を挟んで挿入時間で止めます。オフならすべて書きます。OK するとステータスバーにも反映します。",
-        "Whether to use Silent Skip for this recording. When on, only audio above the threshold is recorded, and silence is inserted when the level falls (up to the insert duration in Settings). When off, everything is written. OK also updates the status-bar switch.");
-    public static string TipSilentSkipRecordAddRegion => Get(
-        "Silent Skip 録音のときだけ。無音を pad まで挟んだとき、前後の録音それぞれにリージョンを付けます。無音には付けません。波形の短い谷では分けません。続きの録音は新しい区間だけ。録音のたびに指定。前回の指定を初期値にする。",
-        "Only when recording with Silent Skip. A region is added to each recorded stretch separated by a pad. Silence does not get a region. Brief dips in the waveform are not split. A continued take gets regions for the new audio only. Chosen each time you record. The last choice is the default.");
-    public static string TipTimecode => Get(
-        "現在時間 (G)。入力、ホイール／↑↓で調整（時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分、サンプルは1／Shift10／Ctrl100／Ctrl+Shift1000）。Enter で移動。右クリックで時間／サンプル数",
-        "Current time (G). Type, or wheel / ↑↓ (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter jumps. Right-click switches time / samples");
-    public static string TipSelectionStartTime => Get(
-        "選択開始。入力、ホイール／↑↓で調整（時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分、サンプルは1／Shift10／Ctrl100／Ctrl+Shift1000）。Enter で反映。右クリックで時間／サンプル数",
-        "Selection start. Type, or wheel / ↑↓ (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Right-click switches time / samples");
-    public static string TipSelectionLengthTime => Get(
-        "選択範囲の長さ。入力、ホイール／↑↓で調整（時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分、サンプルは1／Shift10／Ctrl100／Ctrl+Shift1000）。Enter で反映。右クリックで時間／サンプル数",
-        "Selection length. Type, or wheel / ↑↓ (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Right-click switches time / samples");
-    public static string TipSelectionEndTime => Get(
-        "選択終了。入力、ホイール／↑↓で調整（時間は1秒／Shift10秒／Ctrl1分／Ctrl+Shift10分、サンプルは1／Shift10／Ctrl100／Ctrl+Shift1000）。Enter で反映。右クリックで時間／サンプル数",
-        "Selection end. Type, or wheel / ↑↓ (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Enter applies. Right-click switches time / samples");
-    public static string TipTotalTime => Get(
-        "トータル時間。右クリックで時間／サンプル数を切り替えます。",
-        "Total time. Right-click to switch time / samples.");
     public static string LabelStatusSpeaker => "SPEAKER";
     public static string LabelStatusNowPos => "NOW\nPOS";
     public static string LabelStatusSelStart => "SEL\nST";
@@ -1055,17 +699,8 @@ internal static partial class UiStrings
     public static string TabMenuSelectAll => Get("全部のタブを選択する(_A)", "Select _All Tabs");
     public static string TileSearchLabel => Get("検索", "Find");
     public static string TileSearchSyntaxHint => Get(
-        "空白区切り = AND、| = OR（例: bgm loop|se）\nEnter で確定。Alt+Enter でヒット以外を閉じる（未保存は残す。確認なし。フィルターは解除）。",
-        "Space = AND, | = OR (e.g. bgm loop|se)\nEnter confirms. Alt+Enter closes tiles that did not match (keeps unsaved; no prompt; clears the filter).");
-    public static string TipTileSearch => Get(
-        "タブ名で絞り込みます。空白区切りで AND、| で OR。"
-        + "絞り込むとヒットした先頭の波形をアクティブにします（ヒットが無いときは変えません）。"
-        + "Enter で確定、Alt+Enter でヒット以外を閉じる（未保存は残す。確認は出さない。フィルターは解除）。"
-        + "Esc でキャンセル、空欄にすると解除します。",
-        "Filter tiles by tab name. Space-separated terms = AND, | = OR."
-        + " Narrowing makes the first matching waveform active (unchanged when nothing matches)."
-        + " Enter confirms. Alt+Enter closes tiles that did not match (keeps unsaved; no prompt; clears the filter)."
-        + " Esc cancels, clear the text to remove the filter.");
+        "空白区切り = AND、| = OR（例: bgm loop|se）\nEnter で確定。Alt+Enter でヒット以外を閉じる（未保存は残す。確認なし。フィルターは解除）。 Esc で取消、クリアで解除。",
+        "Space = AND, | = OR (e.g. bgm loop|se)\nEnter confirms. Alt+Enter closes tiles that did not match (keeps unsaved; no prompt; clears the filter). Esc cancels, clear the text to remove the filter.");
     public static string TabMenuTileOff => WaveMenuTileOff;
     public static string TabMenuTileHorizontal => WaveMenuTileHorizontal;
     public static string TabMenuTileVertical => WaveMenuTileVertical;
@@ -1148,22 +783,12 @@ internal static partial class UiStrings
     public static string LibraryExplorerLabel => Get("ライブラリ", "Library");
     public static string LibraryPlaylistLabel => Get("プレイリスト", "Playlist");
     public static string LibrarySearchHint => Get("検索", "Find");
-    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（Tips 側）。Alt+R 連想のため Random。</summary>
+    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（マニュアル側）。Alt+R 連想のため Random。</summary>
     public static string LabelLibraryShuffle => "Random";
-    public static string TipLibraryShuffle => Get(
-        "ランダム再生 (Alt+R)\nプレイリストを一通り再生し終わるまで同じ曲を繰り返さない。すべて再生したら再度抽選する。既定はオフ。プレイリストが空でも切替できる。プレイヤーを抜けるとオフに戻す。設定には記憶しない。",
-        "Shuffle (Alt+R)\nDoes not repeat a track until the whole playlist has played once. After that, the order is reshuffled. Off by default. Works when the playlist is empty. Leaving player turns it off. Not saved in settings.");
-    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（Tips 側）。</summary>
+    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（マニュアル側）。</summary>
+    public static string LabelLibraryAutoPlay => "Auto Play";
+    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（マニュアル側）。</summary>
     public static string LabelLibraryAutoPlayNext => "Auto next";
-    public static string TipLibraryAutoPlayNext => Get(
-        "次の曲を自動再生 (Alt+N)\nオンのとき、曲末で次の曲へ進む（ギャップレス先読みもする）。オフのときはその曲で止まる。Space／トランスポート一曲再生は常に一曲で止まる。既定はオフ。プレイリストが空でも切替できる。プレイヤーを抜けるとオフに戻す。設定には記憶しない。",
-        "Auto next (Alt+N)\nWhen on, advances to the next track at the end (and gapless-prefetches). When off, stops on that track. Space / transport single-track play always stops after one. Off by default. Works when the playlist is empty. Leaving player turns it off. Not saved in settings.");
-    public static string TipLibraryExplorerSearch => Get(
-        "ファイル名とフォルダ名で絞り込みます。ヒットしたファイル／フォルダと、ルートまでの祖先だけ出します。空白区切りで AND、| で OR。Ctrl+F でここへ。Enter で決定してツリーへ戻ります。Esc は入力を破棄します。ツリーで Enter すると見えているフォルダだけをプレイリストへ載せます。ファイル名がヒットしたフォルダはそのファイルだけ、フォルダ名がヒットしたフォルダは中身すべてです。",
-        "Filter by file name and folder name. Only hits and their ancestors up to the root stay in the tree. Space-separated terms = AND, | = OR. Ctrl+F focuses here. Enter applies and returns to the tree. Esc discards the typed text. Enter on the tree adds only visible folders: matching files when the hit is a file name, or everything in a folder whose name matched.");
-    public static string TipLibraryPlaylistSearch => Get(
-        "プレイリストのすべての列が対象です。ヒットした行だけ残します。空白区切りで AND、| で OR。Ctrl+F でここへ。Enter で決定してリストへ戻ります。Esc は入力を破棄します。",
-        "Searches every playlist column and keeps matching rows. Space-separated terms = AND, | = OR. Ctrl+F focuses here. Enter applies and returns to the list. Esc discards the typed text.");
     public static string LibraryExplorerDesktop => Get("デスクトップ", "Desktop");
     public static string LibraryExplorerDocuments => Get("ドキュメント", "Documents");
     public static string LibraryExplorerMusic => Get("ミュージック", "Music");
@@ -1235,21 +860,6 @@ internal static partial class UiStrings
 
         return $"{rounded.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)} fps";
     }
-    public static string TipLibraryList => Get(
-        "プレイヤーのファイル一覧。左のツリーでフォルダを選んでもリストへは自動で載せない。フォルダをリストへドロップすると配下ごと追加する。Delete または右クリック／メニューキー「プレイリストからクリア」で選択行をリストから外す（ファイルは消さない。Ctrl+Z で戻せる。プレイヤーを抜けると忘れる。Ctrl+W では閉じない。動画本再生／PDF 明るい表示など前面 UI が隠れているときは Ctrl+A／Delete、およびリストにフォーカスがあるときのメニュー「プレイリストからクリア」では外さない）。外へドラッグ、または Ctrl+C／右クリックのコピーで、選択ファイルをコピーできる。右クリックまたはメニューキーでエクスプローラーで開く。ソート中の列は見出しに小さい ▼▲ を出し、有効な方向だけシアン。列の見出しをドラッグで並べ替え、右クリックすると表示する列をオンオフでき、設定に覚える。既定は親フォルダでグループし、グループごとにジャケットを出す（音楽は行ごとには出さない。同じグループで曲のジャケットが違うときは選択行のものを出す。動画／PDF はサムネイルがあれば各行に出す。画像が無いときのプレースホルダは出さない）。グループでタイトル／アーティスト／アルバムなどでもまとめる。入ると1曲めを選んで再生する（引数起動も同じ）。プレイリストが空のときは列をすべて隠し（表示中から空にしたときは1秒でフェードアウト）、レベルメーター・スペアナ・ラウドネス・ゴニオ／サラウンドメーター・WAAPI 表記を出さない（入ったときは最初から消す）。空のときはライブラリ（フォルダツリー）にフォーカス。Alt+R でランダム再生（一巡まで同じ曲を繰り返さない。空でも切替可。既定オフ。プレイヤーを抜けるとオフ。設定には残さない）。Alt+N で次の曲を自動再生（オンのとき曲末で次へ進みギャップレス先読みもする。空でも切替可。既定オフ。プレイヤーを抜けるとオフ。設定には残さない）。停止中の選択は波形だけ出し、再生はしない。PDF／動画を選ぶと暗いプレビューも出す（動画は暗転＋格子＋無音 1/3 速ループ。PDF は暗転だけ）。曲を追加したときは1秒でフェードインし、音声信号で動き始めたら即表示する。リストが空になったら1秒でフェードアウトする。次の曲を自動再生がオンのとき、再生開始と同時に次の曲を先読みし、終わったら隙間なく次を再生する（オフのときはその曲で止まる。動画本再生・ミニ・PDF 本表示など前面 UI 隠れ中は曲末で次へ進まず頭へ戻して停止。次へは N／P・テンキー 4／6）。頭尻のエンコーダ無音は設定のギャップレス再生（既定オン）で減らす。自動再生オンのとき、最後の次は先頭に戻って再生を続ける。↑↓ でファイル選択（先頭の前は末尾、末尾の次は先頭）。Home／End でリストの先頭／末尾。PageUp／PageDown でページ送り（再生中はキーを離すとその曲へ。停止中は選択だけ。動画本再生・ミニ・PDF 本表示など前面 UI 隠れ中はエディタと同じ波形タイムライン操作。Shift で範囲、Ctrl+クリックで追加、Ctrl+A で全選択。動画本再生／PDF 明るい表示など前面 UI 隠れ中は Ctrl+A／Delete、およびリストフォーカス時のメニュー「プレイリストからクリア」無効）。F1 または Ctrl+←／↑ でツリー、F2 または Ctrl+↓ でお気に入り、F3 または Ctrl+→ でこのリストにフォーカス。一時マーカーがあるとき Ctrl+←／→ は前／次のマーカーへ（プレイリスト波形ではペインフォーカスのまま）。Ctrl+Delete で選択または再生ヘッドのマーカーを削除（選択中は Delete でも可）。F5 でツリーを更新しフォーカスもツリーへ移す（ライブラリが非アクティブでも効く）。Tab でツリー→お気に入り→プレイリスト（Shift+Tab は逆。フォーカス中は上端に明るいグラデーション）。F8 で動画／PDF ミニプレイヤー（前面 UI 無し。背面に動画または PDF があるとき＝本再生または暗いバックグラウンドプレビュー、かつ再生対象があるとき。動画ファイル起動時は自動。A／T の表示は F8 と引数起動で共通に覚え、既定はどちらもオフ。プレイリストからの本再生は開始時オン（再生中はオフ可。次の再生で再びオン）。F 全画面中でも可（全画面を解除して原寸枠へ）。+／-（キーボード・テンキー）だけ常に 25% 刻み（枠ドラッグで中途半端な大きさでも、次のキーは近い 25% へ着地。原寸で一旦停止。25〜300%。縦横比は維持。倍率は F8 を抜けるまで覚え、抜けると忘れる）。窓枠のドラッグは連続拡縮（25% 刻みではない。縦横比固定。ホイールは使わない）。Space は開始位置へ戻して静止する（即再開しない）、Enter はその場で一時停止し、どちらもプレイリストを出さない。暗い 1/3 速プレビューへは落とさない。Escape／Q でプレイリストへ戻る。F9／F10 も同じ。F11／F12 へ移るとき動画／PDF はファイルごと持ち込まない（音声だけ残すこともない）。F9 でプレイリストと波形だけを出す（デスクトップの占有面積を節約したいとき。どのモードからでも。ライブラリ／お気に入り／メーター／アナライザ／トランスポート／ステータスバーは出さない。Alt+S（Silent Skip）と Alt+A（Always on Top）は効く。F8 中にもう一度 F8 で通常プレイヤーへ。F9 中にもう一度 F9 で通常のエディタへ戻す（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除する）。F10 で通常のプレイヤー＝F10 表示に戻す（再生は続ける））。再生中にクリックした行はその曲へ切り替える。ダブルクリックで再生する（次の曲を自動再生がオンなら終わったら次へ進む。同じ動画の暗いプレビューから戻すときは今の位置から続け、それ以外は先頭から）。Space またはトランスポートの再生はその曲だけ再生し、終わったら停止する（シークバー位置から開始／再開。同じ動画の暗いプレビューから戻すときも今の位置から。再生中は止めて開始位置へ戻す。動画本再生中はプレイリストを出さず開始位置へ戻して静止する（即再開しない）。Enter もプレイリストへは戻さない。バックグラウンドへ戻すのは Escape／Q。PDF の明るい表示モード中の抜けも Escape／Q）。Enter はその場停止（停止中の動画／PDF は Space と同じく本再生／明るい表示へ。本再生中の動画はその場停止でプレイリストを出さない）。再生操作はどのペインからでも使える。Space……再生／停止（停止で開始位置へ。動画本再生中は開始位置へ戻して静止する（即再開しない）。プレイリストは出さない。暗いプレビューへは Escape／Q）、Enter……その場停止（停止中の動画／PDF は本再生／明るい表示へ。本再生中の動画はプレイリストを出さない）、,……早戻し、.……早送り（±3倍・ピッチ据え置き。推移中は-4dB。停止中でも可。離すとその位置で停止のまま。動画は映像を音声ヘッドに追従）、P……前の曲（先頭の前は末尾）、R……再生し直し、N……次の曲（末尾の次は先頭）、J……5秒戻し、K……5秒送り（0.75秒クロスフェード。押しっぱなしは少し待ってから繰り返す）。テンキーも同じ（0＝一時停止・再開、1／3＝早戻し／早送り、4／6＝前／次、5＝最初から、7／9＝±5秒。エディタでも同じで、4／6 は前後のタブ。J／K／,／. もエディタで同じ）。動画の本再生中（またはフレーム一時停止中）の ←→ は一時停止して 1 フレーム戻し／送り（押しっぱなしは最初だけ待ってから繰り返す。一時停止中の F10 はエディタへ落とさず暗いバックグラウンド再生へ戻す）。それ以外では左右キーの早送り／巻き戻しはしない。テンキーは再生操作（0＝一時停止・再開、1／3＝±3倍早戻し／早送り、4／6＝前／次、5＝最初から、7／9＝±5秒。2／8は未使用。エディタでも同じ。エディタの 4／6 は前後のタブ。J／K／,／. もエディタで同じ）。上段 0–9 は割合ジャンプ。Shift＋上段数字は、一時マーカーがあるときマーカー番号へ（二桁入力可。テンキーは使わない。暗いプレビューでは割合ジャンプのまま）。編集はできない。タグと時間は登録時に読む。MP3／M4A／WAVE／AIFF はフル PCM 展開せずストリーム再生（M4A はプレイヤー専用）。設定がオンなら PDF / MOV / MP4 もリストに載る（既定オン。動画は連続／単独再生でウィンドウ全体の背面に出す。波形とラウドネスのリアルタイム値も出す。上中央に NOW POS / END POS（MM:SS.ff。小数点以下は 30fps 換算のフレーム）。A で波形とアナライザと WAAPI 表記をフェード。F で全画面。再生中は Silent Skip を無視。止めると先頭へ戻さず暗転＋格子へ移し、速度は約 1 秒かけて 1/3 に落とす（途中で本再生へ戻すと今の位置から続ける）。ほかの曲では隠す。PDF も連続再生の対象で、当たったら明るい表示にして停止する（ページ切替時だけ下中央にページ番号を出してフェードアウト。上段数字でページへ飛ぶ。テンキーは 4 前／6 次など再生操作のまま）。どちらもエディタには持っていけない）。ジャケットは実画像があるときだけ出す。無い行は空白。プレイリストに1枚も無ければ枠ごと隠す。本物のジャケットがあるときはウィンドウ全体の背面を大きくぼかして90度ずつ揺らぐ。WAVE 等は差し替え不可。WAAPI は無効（入る前にオンなら、抜けたときに戻す）。プレイヤーを抜けると再生を止めてから、選択したファイルだけ残り、タブの複数選択は解除される。プレイヤーのまま終了したときは、読み込んだファイルは覚えない。",
-        "Player file list. Selecting a folder in the tree on the left does not add it to the list. Drop a folder onto the list to add recursively. Delete, right-click, or the menu key Clear from Playlist removes selected rows from the list (files are never deleted. Ctrl+Z undoes it; leaving the player forgets undo. Ctrl+W does not close. During real video playback / bright PDF view and other chrome-hidden states, Ctrl+A / Delete, and the list context-menu Clear from Playlist when the list has focus, do not clear the playlist). Drag outside the app, or Ctrl+C / right-click Copy, copies the selected files. Right-click or the menu key can open the location in Explorer. The sorted column shows small ▼▲ in the header, and only the active direction is cyan. Right-click a column header to turn columns on or off (saved to settings). Drag a header to reorder. Groups default to parent folder, with a jacket beside each group (audio is not per row; if tracks in the group have different jackets, the selected row's jacket is shown. Video / PDF show a per-row thumbnail when available; rows without art stay blank with no placeholder). Group by title, artist, album, and so on. Entering selects and plays the first track (the same on launch with arguments). While the playlist is empty, every list column stays hidden (clearing a visible list fades the headers in 1 second), and the level meter, spectrum, loudness, gonio, surround meter, and WAAPI label stay hidden (they start hidden when you enter player). An empty playlist focuses the library (folder tree). Alt+R toggles shuffle (no repeats until the playlist has played once; works on an empty list; off by default; leaving player turns it off; not saved). Alt+N toggles auto next (when on, advances at the end and gapless-prefetches; works on an empty list; off by default; leaving player turns it off; not saved). While stopped, selecting a track shows its waveform without playing. Selecting PDF / video also shows a dim preview (video: dim + mesh + silent 1/3-speed loop; PDF: dim only). Adding tracks fades them in over 1 second; when they start moving with the audio they appear immediately. Clearing the list fades them out over 1 second. With auto next on, the next track is read ahead as soon as playback starts, then plays without a gap (when off, playback stops on that track; during real video playback, the mini player, or bright PDF view with chrome hidden, reaching the end seeks to the start and stops without advancing — use N / P or numpad 4 / 6). Encoder delay and padding at the start and end are reduced by gapless playback in Settings (on by default). With auto next on, after the last, playback returns to the first and keeps going. ↑↓ select files (before the first wraps to the last; after the last wraps to the first). Home / End jump to the first / last track. Page Up / Page Down page the list (while playing, releasing the key switches to that track; while stopped, selection only. During real video playback, the mini player, or bright PDF view and other chrome-hidden states, these are the same waveform timeline ops as in the editor. Shift for a range, Ctrl+click to add, Ctrl+A for all. During real video playback / bright PDF view and other chrome-hidden states, Ctrl+A / Delete and list Clear-from-Playlist menu (when the list has focus) are ignored). F1 or Ctrl+← / ↑ focuses the tree, F2 or Ctrl+↓ Favorites, F3 or Ctrl+→ this list. With temporary markers, Ctrl+← / → jump to the previous / next marker (on the playlist waveform they keep pane focus). Ctrl+Delete removes the selected marker or the one at the playhead (Delete also works when markers are selected). F5 refreshes the tree and moves focus there (works even when the library is not focused). Tab cycles tree → Favorites → playlist (Shift+Tab reverse; the active pane shows a brighter fade at the top). F8 is the video / PDF mini player (no front UI; when a video or PDF is on the back stage — real playback or dim background preview — and the playlist has something to play; automatic on video file launch; A / T visibility is shared with argument launch and remembered (both off by default). Playlist playback starts with them on (can turn off during play; next play turns them on again); also from F fullscreen, which exits fullscreen then sizes to the native frame; + / - (keyboard and numpad only) always land on 25% steps (after a free border drag, the next key snaps to the nearest 25%; keys pause at native size; 25–300%; aspect locked; scale remembered until you leave F8); drag the window border for continuous resize (not 25% steps; aspect locked; no mouse-wheel resize); Space seeks to the playback start and stops (does not resume), Enter pauses in place, and neither shows the playlist nor enters the dim 1/3-speed preview; Escape / Q return to the playlist); F9/F10 likewise; F11/F12 do not take video / PDF at all, including as audio-only). F9 shows only the playlist and waveform (to save desktop space; from any mode; library, Favorites, meters, analyzers, transport, and status bar stay hidden; Alt+S Silent Skip and Alt+A Always on Top still work; F8 again returns to the normal player; F9 again returns to the editor (stops playback, then keeps only the selected files and clears tab multi-selection); F10 returns to the normal F10 player and keeps playback going). While playing, a click switches to that track. Double-click starts playback (and advances to the next track when it ends if auto next is on; from the same video’s dim preview, resumes at the current position; otherwise from the beginning). Space or the transport Play button plays only that track and stops when it ends (from the seek bar / playhead, or the same video’s dim preview position; while playing, returns to the start — during real video playback, seeks to the start and stops without resuming (playlist chrome stays hidden); Enter also keeps chrome hidden; Escape / Q returns to background playback; during bright PDF view, Escape / Q returns to the dim preview). Enter pauses in place (while stopped, video / PDF match Space — real playback / bright view; during real video playback, pauses in place without showing the playlist). Transport from any pane: Space play / stop (stop returns to the start; during real video playback, seeks to the start and stops without resuming; playlist chrome stays hidden; Escape / Q returns to the dim preview), Enter pause in place (while stopped, video / PDF go to real playback / bright view; during real video playback, chrome stays hidden), , rewind, . fast-forward (±3× at original pitch; −4 dB while held; works while stopped and leaves you stopped at the new position; for video the picture follows the audio playhead), P previous track (before the first wraps to the last), R restart, N next track (after the last wraps to the first), J skip 5 s back, K skip 5 s forward with a 0.75 s crossfade (hold repeats after a short wait). The numpad matches (0 pause/resume, 1/3 rewind/FF, 4/6 previous/next, 5 restart, 7/9 ±5 s; same in the editor, where 4/6 switch tabs; J/K/,/. match too). During real video playback (or frame pause), ← → pause and step one frame back / forward (hold repeats after an initial wait; F10 while frame-paused stays in the player and drops to the dim background preview). Otherwise arrow keys do not shuttle. The numpad is transport (0 pause/resume, 1/3 ±3× rewind/FF, 4/6 previous/next, 5 restart, 7/9 ±5 s; 2/8 unused; same in the editor, where 4/6 switch tabs; J/K/,/. match too). Top-row 0–9 jump by view percent. Shift+top-row digits jump to marker numbers when temporary markers exist (two-digit entry; numpad is not used for markers; dim video / PDF preview keeps percent). Editing is blocked. Tags and duration are read when files are listed. MP3 / M4A / WAVE / AIFF stream without a full PCM decode (M4A is player-only). With the setting on (the default), PDF / MOV / MP4 are listed too. Video plays like audio behind the whole window, shows the waveform, live loudness, and large NOW POS / END POS centered at the top (MM:SS.ff; fractional part is frames at 30 fps); A fades the waveform, analyzers, and WAAPI label; F is fullscreen like browser F11; Silent Skip is ignored while it plays; stop keeps the frame, fades to dim+mesh, and ramps to 1/3 over about 1 second (resuming during the ramp continues from the current position); playing another track hides it. PDF is included in continuous play and opens in bright view then stops (on page change only, the page number flashes at the bottom then fades out; top-row digits jump to a page; numpad stays transport such as 4 previous / 6 next). Neither is handed to the editor. Jacket images appear only when a file has art. Rows without art stay blank. If the playlist has none, the jacket area is hidden. A real jacket is also stretched and blurred as a slowly turning background across the whole player window. WAVE and similar cannot replace art. WAAPI is off (if it was on, leaving player turns it back on). Leaving player mode stops playback first, then keeps only the selected files and clears tab multi-selection. Quitting while still in player mode does not remember the loaded files.");
-    public static string TipLibraryJacket => Get(
-        "本物のジャケットがあるときは、ウィンドウ全体の背面に縦横比を崩して置き、大きくぼかして90度ずつ4向きをゆっくりクロスフェードしながら揺らぐ（リスト・波形・トランスポート・メーター・ステータスバーまで一枚）。ジャケットが変わったときは1秒でクロスフェードする。同じ画像のまま曲を変えても、フェードも向きの切り替えもやり直さない。無いときは空白（プレイリストに1枚も無ければ枠自体を出さない）。背面は既定の背景色。",
-        "When a real jacket is set, it is stretched across the whole player window (aspect may change) and used as a heavily blurred background that slowly crossfades through four 90-degree turns while drifting — list, waveform, transport, meters, and the status bar as one wash. A new jacket crossfades in 1 second. Skipping tracks that keep the same jacket does not restart the fade or the turn cycle. No jacket stays blank (the frame is hidden if the playlist has none). The wash falls back to the default color.");
-    public static string TipLibraryColumns => Get(
-        "設定の表示項目で、リストに出す列を Wave／MP3／動画用で別々に選ぶ（それぞれその形式で意味のある列だけ）。チェックした列だけ表示（ファイル名の列は常に出す。プレイリストが空のときは列をすべて隠す）。プレイリストが WAVE / AIFF だけなら Wave 側、MP3 / M4A だけなら MP3 側、動画だけなら動画側、混在なら（未調整時は）三つの和集合。混在中に見出しをドラッグして並べ替え／右クリックでオンオフすると、混在用の表示と並びだけを内部で覚え、Wave／MP3／動画の設定は変えない。Wave／MP3／動画の設定（または単一形式での見出し変更）を変えると混在の記憶は捨てて、再び和集合になる。値が無い列は自動で隠し、値が付いたら出す（ジャケットは実画像がある行があるときだけ出し、1枚も無ければ隠す）。Wave 既定はファイル／レート／ビット／Ch／時間／日付／親フォルダ／波形。MP3 既定はファイル／タイトル／アルバム／アーティスト／作曲／時間／トラック／ディスク／年／ジャンル／日付／コメント／親フォルダ（波形表示はオフ）。動画既定はファイル／解像度／フレームレート／ビットレート／映像コーデック／レート／ビット／Ch／音声コーデック／時間／日付／親フォルダ／波形。それぞれ既定に戻せる。波形はリストを出し切ってから粗い棒で後追い描画する。幅は Wave / MP3 それぞれ S / M / L（どちらも既定 L）。混在リストは広い方。",
-        "Choose list columns separately for WAVE, MP3, and video in Settings → Shown (each list shows only columns that make sense for that format). Only checked columns appear (the file name column is always shown; an empty playlist hides every column). WAVE / AIFF-only lists use the WAVE set, MP3 / M4A-only lists use the MP3 set, video-only lists use the video set, and mixed lists use the union until you customize them while mixed. While mixed, dragging a header to reorder / right-click on-off is remembered only for the mixed layout and does not change the WAVE / MP3 / video settings. Changing the WAVE / MP3 / video settings (or header changes in a single-format list) clears the mixed memory and returns to the union. Columns with no values stay hidden and reappear when a value shows up (Jacket appears only when a row actually has art). WAVE defaults are file / rate / bits / Ch / time / date / parent folder / waveform. MP3 defaults are file / title / album / artist / composer / time / track / disc / year / genre / date / comment / parent folder (waveform off). Video defaults are file / resolution / frame rate / bit rate / video codec / rate / bits / Ch / audio codec / time / date / parent folder / waveform. Each set can be reset. Waveforms fill in after the list paints, as rough bars. Width is S / M / L separately for WAVE and MP3 (both default L). Mixed lists use the wider of the two.");
-    public static string TipLibraryExplorer => Get(
-        "フォルダツリー。ルートは設定のプレイヤーでも、ツリーの右クリック／メニューキー「ツリーのルートに登録」でも、エクスプローラーからフォルダをツリーへドロップしても追加できる（既定はマイミュージック。上から順。設定の上へ／下へ、ルート選択時の Alt+↑／↓、またはルートをツリー内でドラッグして並び替え。既にルートなら「ツリーのルートから外す」。見つからない登録は赤字）。選んだ場所・展開状況と、お気に入りとの仕切り位置は覚える。区切りとスクロールバーは近づけると出し、マウスが約3秒止まると消す。Ctrl+クリック／Shift+クリック／Shift+↑↓で複数フォルダを選択。右クリックまたはメニューキーで、プレイリストをクリアして追加、プレイリストへ追加、お気に入りへ追加、ツリーのルートに登録／外す、コピー、エクスプローラーで開く。フォルダを選んでもリストへは自動で載せない。フォルダをリストへドロップすると配下ごと追加する。ダブルクリックは配下を再帰的に追加する。Enter はプレイリストをクリアしてから、そのフォルダ配下を再帰的に載せる（読み込み中に別フォルダで Enter すると中断して差し替える。検索中は見えているフォルダだけ。ファイル名ヒットはそのファイルだけ、フォルダ名ヒットはそのフォルダ内すべて。深さ優先で最初に登録した曲が音声なら見つけ次第再生（動画／PDF は全件追加後）。再生が始まるとプレイリストをアクティブにする）。Shift+Enter はクリアせず追加する（フォルダを見つけ次第、1曲ずつ。裏で集める）。文字キーは表示名の部分一致（先頭でも途中でも可）でフォルダへジャンプする（いまの行がヒットなら維持。そうでなければ下を先に見て、無ければ先頭から再度探す。続けて打つと文字が積み上がり絞り込む。打ち込み中はフォルダツリー中央に文字を出し、入力が止まって約1秒でトーストを消し積み上がった文字も忘れる。黄背景のヒットは残し↑↓で渡り歩ける。Escで黄背景と渡り歩きを終わらせる（プレイリストへの登録／再生開始、他 UI へのフォーカスでも終わる）。Alt+R はランダム再生の切替。Alt+N は次の曲を自動再生の切替。ツリーにフォーカスがあるとき上段数字／Shift＋上段は使わない（Shift+8 は配下展開。テンキーは再生操作のまま）。割合／マーカー番号ジャンプはプレイリストなど他ペインから。プレイリストには載せない。Ctrl+F の検索とは別）。* は選択フォルダ以下をすべて展開、/ は選択フォルダ以下を閉じる（エクスプローラーと同じ）。F5 でツリーを更新しフォーカスもツリーへ移す（ディスク上の追加・削除を取り込み直す。展開と選択はできるだけ残す。プレイリスト／お気に入り／波形フォーカスでも効く）。F1 または Ctrl+↑ でこのツリーにフォーカス。Tab でお気に入りへ（Shift+Tab はプレイリスト。フォーカス中は上端に明るいグラデーション）。←→ はフォルダの展開と折りたたみ（早送り／巻き戻しにはならない）。Space ではプレイリストの再生を始めない（プレイリストがアクティブなときだけ）。上段数字は割合／Shift＋マーカー用（テンキーは再生操作。マーカーには使わない。英字／記号の再生操作は Space／Enter／P／N／R／J／K／,／.）。外へドラッグ、または Ctrl+C／右クリックのコピーで、選択フォルダをコピーできる。複製・削除・リネームはできない。",
-        "Folder tree. Roots can be added in Settings → Player, via the tree’s right-click / menu key Register as Tree Root, or by dropping folders from Explorer onto the tree (default Music, top to bottom; reorder with Settings Up / Down, Alt+↑ / ↓ on a root, or by dragging a root within the tree; Remove Tree Root when already a root; missing registrations show in red). The last place, which folders were expanded, and the split with Favorites, are remembered. Splitters and scrollbars appear when the pointer nears them, then fade out after about 3 s of no movement. Ctrl+click, Shift+click, or Shift+↑↓ selects multiple folders. Right-click or the menu key can clear the playlist and add, add to the playlist, add to Favorites, register or remove a tree root, copy, or open in Explorer. Selecting a folder does not add it to the list. Drop a folder onto the list to add recursively. Double-click appends files from that folder and its subfolders. Enter clears the playlist, then adds that folder recursively (Enter on another folder while loading cancels and replaces; while searching, only visible folders: matching files when the hit is a file name, or everything in a folder whose name matched; depth-first; if the first registered file is audio it plays as soon as found — video / PDF wait until the batch finishes — and focuses the playlist). Shift+Enter appends only (as each folder is found, tracks are added one by one in the background). Letter keys jump to a folder whose display name contains what you type (prefix or mid-name; keep the current row when it still matches, otherwise search below then wrap from the top; typed letters always accumulate; the query toast appears centered on the folder tree and hides about 1 s after typing stops (forgetting the typed buffer), while yellow hit highlights stay for Up/Down walking; Esc ends the highlight walk (also playlist add/play or focus leaving the tree); Alt+R toggles shuffle; Alt+N toggles auto next; while the tree has focus, top-row digits / Shift+top-row are unused (Shift+8 expands the subtree; the numpad stays transport); percent / marker-number jumps work from the playlist and other panes; does not add to the playlist; separate from Ctrl+F search). * expands all under the selection, / collapses it (same as Explorer). F5 refreshes the tree and moves focus there (re-reads folders from disk; keeps expansion and selection when possible; works from the playlist, Favorites, or waveform too). F1 or Ctrl+↑ focuses this tree. Tab moves to Favorites (Shift+Tab to the playlist; the active pane shows a brighter fade at the top). ←→ expands or collapses folders (not shuttle). Space does not start playlist playback (only when the playlist is active). Top-row digits are for percent / Shift+marker jumps (numpad is transport, not markers; letter/symbol transport uses Space / Enter / P / N / R / J / K / , / .). Drag outside the app, or Ctrl+C / right-click Copy, copies the selected folders. Duplicate, delete, and rename are not available.");
-    public static string TipLibraryFavorites => Get(
-        "お気に入り。名前だけ表示（フルパスは出さない）。見つからない登録は赤字。エクスプローラーからファイル／フォルダをドロップして登録できる。複数選択可（Shift+クリック、Shift+↑↓、Ctrl+クリック）。プレイリストへドラッグで追加。外へドラッグ、または Ctrl+C／右クリックのコピーで、実ファイルをコピーできる。Enter でプレイリストをクリアして追加し即再生（読み込み中なら中断して差し替える。先頭が音声なら見つけ次第。動画／PDF は全件追加後。ツリーと同じ。再生が始まるとプレイリストをアクティブにする）。Shift+Enter とダブルクリックは追加のみ（再生しない。見つけ次第、1曲ずつ）。右クリックまたはメニューキーで、プレイリストをクリアして追加、プレイリストへ追加、お気に入りから削除、コピー、エクスプローラーで開く（登録を外してもファイルは消さない。Delete でも外せる）。F2 または Ctrl+↓ でここへフォーカス。Tab でプレイリストへ（Shift+Tab はツリー。フォーカス中は上端に明るいグラデーション）。Space ではプレイリストの再生を始めない。上段数字は割合／Shift＋マーカー用（テンキーは再生操作。マーカーには使わない。英字／記号の再生操作は Space／Enter／P／N／R／J／K／,／.）。",
-        "Favorites. Names only (no full path). Missing registrations show in red. Drop files or folders from Explorer to register them. Multi-select (Shift+click, Shift+↑↓, Ctrl+click). Drag onto the playlist to add. Drag outside the app, or Ctrl+C / right-click Copy, copies the real files. Enter clears the playlist, adds, and plays (cancels and replaces if a load is already in progress; audio as soon as the first track is found; video / PDF after the batch finishes; same as the tree; focuses the playlist when playback starts). Shift+Enter and double-click append only (do not play; one track at a time as found). Right-click or the menu key can clear the playlist and add, add to the playlist, remove from Favorites, copy, or open in Explorer (removing a favorite never deletes the file; Delete also unregisters it). F2 or Ctrl+↓ focuses here. Tab moves to the playlist (Shift+Tab to the tree; the active pane shows a brighter fade at the top). Space does not start playlist playback. Top-row digits are for percent / Shift+marker jumps (numpad is transport, not markers; letter/symbol transport uses Space / Enter / P / N / R / J / K / , / .).");
     public static string TabTimeCopy => Get("コピー", "Copy");
     public static string TabTimeSaveCsv => Get("CSV", "CSV");
     public static string TabTimeSavePdf => Get("PDF", "PDF");
@@ -1257,15 +867,6 @@ internal static partial class UiStrings
     public static string TabTimeSavePdfTitle => Get("PDF として保存", "Save PDF");
     public static string TabTimeFileNameCsv => Get("ファイルの時間.csv", "FileTimes.csv");
     public static string TabTimeFileNamePdf => Get("ファイルの時間.pdf", "FileTimes.pdf");
-    public static string TipTabTimeCopy => Get(
-        "選択したセルをコピーします。未選択なら表全体（見出し付き）。Ctrl+C でもコピー。ドラッグで範囲選択。",
-        "Copy selected cells. Copies the whole table with headers if nothing is selected. Ctrl+C also copies. Drag to select a range.");
-    public static string TipTabTimeCsv => Get(
-        "表全体を CSV（UTF-8、Excel 向け BOM 付き）で保存します。",
-        "Save the whole table as CSV (UTF-8 with BOM for Excel).");
-    public static string TipTabTimePdf => Get(
-        "表全体を PDF で保存します。",
-        "Save the whole table as PDF.");
     public static string TabMenuCloseAll => Get("すべてのタブを閉じる(_A)", "Close _All Tabs");
 
     /// <summary>通常メニュー用。「全部のタブを選択する(_A)」とアクセスキーが重ならないよう W。</summary>

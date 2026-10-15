@@ -91,8 +91,7 @@ internal static class FormatConvertPicker
                 Icon = AccentMark(value == currentValue, cyan),
             };
             item.Click += (_, _) => onCommit(value);
-            TipService.Set(item, KindTip(kind));
-            menu.Items.Add(item);
+                        menu.Items.Add(item);
         }
 
         if (allowCustom)
@@ -128,9 +127,7 @@ internal static class FormatConvertPicker
                     e.Handled = true;
                 }
             };
-            TipService.Set(custom, UiStrings.TipFormatCustomRate);
-            TipService.Set(box, UiStrings.TipFormatCustomRate);
-            box.PreviewKeyDown += (_, e) =>
+                                    box.PreviewKeyDown += (_, e) =>
             {
                 var key = e.Key == Key.System ? e.SystemKey : e.Key;
                 if (key == Key.Tab)
@@ -176,8 +173,7 @@ internal static class FormatConvertPicker
             menu.Items.Add(custom);
         }
 
-        TipService.Set(menu, KindTip(kind));
-        WireHighlightTracking(menu);
+                WireHighlightTracking(menu);
         menu.PreviewKeyDown += (_, e) =>
         {
             var key = e.Key == Key.System ? e.SystemKey : e.Key;
@@ -350,13 +346,6 @@ internal static class FormatConvertPicker
         FormatConvertKind.BitDepth => FormatConvert.BitDepths,
         FormatConvertKind.Channels => FormatConvert.ChannelCounts,
         _ => FormatConvert.SampleRates,
-    };
-
-    private static string KindTip(FormatConvertKind kind) => kind switch
-    {
-        FormatConvertKind.BitDepth => UiStrings.TipFormatBitDepth,
-        FormatConvertKind.Channels => UiStrings.TipFormatChannels,
-        _ => UiStrings.TipFormatSampleRate,
     };
 
     private static string FormatLabel(FormatConvertKind kind, int value) => kind switch

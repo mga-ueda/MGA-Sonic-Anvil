@@ -4,7 +4,7 @@ using System.Windows.Controls.Primitives;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>トランスポートボタン専用。Tips 枠とは別に、短いツールチップを出す。</summary>
+/// <summary>トランスポートボタン専用の短いツールチップ。</summary>
 internal static class TransportToolTip
 {
     public static void Attach(FrameworkElement target, string text)

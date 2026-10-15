@@ -678,9 +678,7 @@ public partial class MainWindow
             TextTrimming = TextTrimming.CharacterEllipsis,
             Cursor = Cursors.Hand,
         };
-        TipService.Set(title, (session.Document.SourcePath ?? UiStrings.UntitledDocument)
-            + Environment.NewLine + UiStrings.TipRenameFile);
-        title.MouseLeftButtonDown += (_, e) =>
+                title.MouseLeftButtonDown += (_, e) =>
         {
             if (TryBeginFileNameEditFromClick(session, title, e))
             {
@@ -916,8 +914,7 @@ public partial class MainWindow
             pane.Title.Foreground = (Brush)FindResource(
                 dirty ? "DirtyAccentBrush" : highlighted ? "PrimaryForeBrush" : "MutedForeBrush");
             var path = pane.Session.Document.SourcePath ?? UiStrings.UntitledDocument;
-            TipService.Set(pane.Title, path + Environment.NewLine + UiStrings.TipRenameFile);
-            ApplyWaveformTileBackground(pane.Host);
+                        ApplyWaveformTileBackground(pane.Host);
             pane.Header.Background = highlighted
                 ? (Brush)FindResource("WaveformTileActiveHeaderBrush")
                 : Brushes.Transparent;

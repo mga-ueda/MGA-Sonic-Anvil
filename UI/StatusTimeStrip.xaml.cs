@@ -77,17 +77,7 @@ internal partial class StatusTimeStrip : UserControl
         SelLengthLabel.Text = UiStrings.LabelStatusSelWidth;
         SelEndLabel.Text = UiStrings.LabelStatusSelEnd;
         TotalLabel.Text = UiStrings.LabelStatusEndPos;
-        TipService.Set(CurrentLabel, UiStrings.TipTimecode, respectsEnabled: false);
-        TipService.Set(CurrentBox, UiStrings.TipTimecode);
-        TipService.Set(SelStartLabel, UiStrings.TipSelectionStartTime, respectsEnabled: false);
-        TipService.Set(SelStartBox, UiStrings.TipSelectionStartTime);
-        TipService.Set(SelLengthLabel, UiStrings.TipSelectionLengthTime, respectsEnabled: false);
-        TipService.Set(SelLengthBox, UiStrings.TipSelectionLengthTime);
-        TipService.Set(SelEndLabel, UiStrings.TipSelectionEndTime, respectsEnabled: false);
-        TipService.Set(SelEndBox, UiStrings.TipSelectionEndTime);
-        TipService.Set(TotalLabel, UiStrings.TipTotalTime, respectsEnabled: false);
-        TipService.Set(TotalText, UiStrings.TipTotalTime, respectsEnabled: false);
-    }
+                                                                                    }
 
     public void SetState(long currentFrame, WaveSelection selection, long totalFrames, int sampleRate, bool hasDocument)
     {
@@ -254,13 +244,7 @@ internal partial class StatusTimeStrip : UserControl
                 : UiStrings.MenuCopySelectionTimePath;
             copyTimeItem.IsEnabled = canCopySelection;
             copyTimePathItem.IsEnabled = canCopySelection;
-            TipService.Set(timeItem, UiStrings.MenuShowTime);
-            TipService.Set(sampleItem, UiStrings.MenuShowSamples);
-            TipService.Set(copyItem, UiStrings.MenuCopy);
-            TipService.Set(pasteItem, UiStrings.MenuPaste);
-            TipService.Set(copyTimeItem, (string)copyTimeItem.Header);
-            TipService.Set(copyTimePathItem, (string)copyTimePathItem.Header);
-        };
+                                                                                };
         return menu;
     }
 
