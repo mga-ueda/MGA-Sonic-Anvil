@@ -65,7 +65,7 @@ internal partial class TransportBar : UserControl
 
         AddGroup(
             bottomRow: true,
-            () => UiStrings.LabelHelpGroup,
+            () => UiStrings.LabelOtherGroup,
             (TransportCommand.OpenSettings, TransportIcon.Settings, UiStrings.TooltipSettings),
             (TransportCommand.OpenManual, TransportIcon.Help, UiStrings.TooltipManualHelp));
 

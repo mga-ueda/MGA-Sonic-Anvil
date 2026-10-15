@@ -61,7 +61,7 @@ public sealed class TransportToolTipTests
         Assert.Equal("MARK", UiStrings.LabelMarkerGroup);
         Assert.Equal("FILE", UiStrings.LabelFileGroup);
         Assert.Equal("VIEW", UiStrings.LabelViewGroup);
-        Assert.Equal("HELP", UiStrings.LabelHelpGroup);
+        Assert.Equal("OTHER", UiStrings.LabelOtherGroup);
         foreach (var label in new[]
         {
             UiStrings.LabelTransportGroup,
@@ -69,7 +69,7 @@ public sealed class TransportToolTipTests
             UiStrings.LabelMarkerGroup,
             UiStrings.LabelFileGroup,
             UiStrings.LabelViewGroup,
-            UiStrings.LabelHelpGroup,
+            UiStrings.LabelOtherGroup,
         })
         {
             Assert.InRange(label.Length, 3, 5);

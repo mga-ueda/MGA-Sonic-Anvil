@@ -608,7 +608,7 @@ internal static partial class UiStrings
     public static string LabelMarkerGroup => Get("MARK", "MARK");
     public static string LabelFileGroup => Get("FILE", "FILE");
     public static string LabelViewGroup => Get("VIEW", "VIEW");
-    public static string LabelHelpGroup => Get("HELP", "HELP");
+    public static string LabelOtherGroup => Get("OTHER", "OTHER");
 
     public static string TooltipRecord => Get("録音 (Ctrl+R)", "Record (Ctrl+R)");
     public static string TooltipPlay => Get("再生 / 停止 (Space)", "Play / stop (Space)");

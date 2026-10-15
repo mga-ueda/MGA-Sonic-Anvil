@@ -318,7 +318,11 @@ public partial class MainWindow
             return false;
         }
 
-        if (IsLibraryMaximized && LibraryBrowser.IsSearchFocused)
+        // ライブラリ／プレイリスト検索フォーカス中は文字入力を優先。
+        // Alt+R／N／P（と Ctrl+Shift+P）だけは下のトグルへ通す（Alt は検索に文字を入れない）。
+        if (IsLibraryMaximized
+            && LibraryBrowser.IsSearchFocused
+            && !LibraryPlayerMode.BypassesSearchFocus(key, modifiers))
         {
             return false;
         }
@@ -384,7 +388,7 @@ public partial class MainWindow
             return true;
         }
 
-        // 空リストでツリーにフォーカスがあっても Alt+R はランダム切替。タイプアヘッドより先に拾う。
+        // 空リスト／ツリー／検索フォーカスでも Alt+R はランダム切替。タイプアヘッドより先に拾う。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
             && !ImeComposition.IsComposing
@@ -394,7 +398,7 @@ public partial class MainWindow
             return true;
         }
 
-        // Alt+N は次の曲を自動再生。素の N（次の曲）より先、タイプアヘッドより先。
+        // Alt+N は次の曲を自動再生。素の N（次の曲）より先、タイプアヘッド／検索入力より先。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
             && !ImeComposition.IsComposing
@@ -404,7 +408,7 @@ public partial class MainWindow
             return true;
         }
 
-        // Alt+P は Enter 追加時の自動再生。素の P（前の曲）より先、タイプアヘッドより先。
+        // Alt+P は Enter 追加時の自動再生。素の P（前の曲）より先、タイプアヘッド／検索入力より先。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
             && !ImeComposition.IsComposing
