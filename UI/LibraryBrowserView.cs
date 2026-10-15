@@ -1023,7 +1023,8 @@ internal sealed class LibraryBrowserView : UserControl
 
     /// <summary>
     /// 再生中の 60fps からも呼ばれる。DataGrid.Items はグループ化ビューを歩いて
-    /// コンテナ生成まで起こすので使わない。並べ済みの _items を直接見る。
+    /// コンテナ生成まで起こすので使わない。グループ時は CollectionView.Groups を
+    /// フラット化した表示順、未グループ時は並べ済みの _items を見る。
     /// </summary>
     private DocumentSession? PlaylistSessionByLoop(DocumentSession? current, bool previous)
     {
@@ -1104,8 +1105,49 @@ internal sealed class LibraryBrowserView : UserControl
         return null;
     }
 
-    private IEnumerable<LibraryFileRow> PlaylistRows() =>
-        _items.Count > 0 ? _items : _rows;
+    /// <summary>
+    /// 画面上の再生・選択移動順。グループ化時は ListCollectionView.Groups の並び
+    /// （DataGrid と同じ）を使い、ソースの _items 順には戻さない。
+    /// </summary>
+    private IReadOnlyList<LibraryFileRow> PlaylistRows()
+    {
+        if (_items.Count == 0)
+        {
+            return _rows;
+        }
+
+        if (_group == LibraryFileGroup.None
+            || _grid.ItemsSource is not ListCollectionView { Groups.Count: > 0 } view)
+        {
+            return _items;
+        }
+
+        var ordered = new List<LibraryFileRow>(_items.Count);
+        foreach (var entry in view.Groups)
+        {
+            if (entry is CollectionViewGroup group)
+            {
+                AppendGroupedPlaylistRows(group, ordered);
+            }
+        }
+
+        return ordered.Count == _items.Count ? ordered : _items;
+    }
+
+    private static void AppendGroupedPlaylistRows(CollectionViewGroup group, List<LibraryFileRow> dest)
+    {
+        foreach (var item in group.Items)
+        {
+            if (item is CollectionViewGroup child)
+            {
+                AppendGroupedPlaylistRows(child, dest);
+            }
+            else if (item is LibraryFileRow row)
+            {
+                dest.Add(row);
+            }
+        }
+    }
 
     /// <summary>再生追従で行を選ぶ。クリック再生は起こさない。複数選択は今の曲が含まれていれば残す。</summary>
     public void SelectSessionQuiet(DocumentSession session)
