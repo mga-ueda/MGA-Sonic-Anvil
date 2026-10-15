@@ -52,7 +52,7 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.AudioCodec,
     ];
 
-    /// <summary>WAVE / AIFF 向け既定（ラウドネス列は既定オフ。設定でオン）。</summary>
+    /// <summary>WAVE / AIFF 向け既定（ラウドネス列は既定オン）。</summary>
     public static readonly LibraryFileColumn[] WaveDefaults =
     [
         LibraryFileColumn.Name,
@@ -62,6 +62,7 @@ internal static class LibraryColumnFilter
         LibraryFileColumn.Duration,
         LibraryFileColumn.Date,
         LibraryFileColumn.ParentFolder,
+        LibraryFileColumn.Loudness,
         LibraryFileColumn.Waveform,
     ];
 
@@ -711,6 +712,13 @@ internal static class LibraryColumnFilter
             {
                 InsertWaveformAtDefaultPlace(result);
             }
+
+            if (!seen.Contains(LibraryFileColumn.Loudness)
+                && IsLegacyWaveDefaultWithoutLoudness(seen))
+            {
+                InsertLoudnessBeforeWaveform(result);
+                seen.Add(LibraryFileColumn.Loudness);
+            }
         }
 
         return [.. result];
@@ -848,7 +856,7 @@ internal static class LibraryColumnFilter
             LibraryFileColumn.ParentFolder,
             LibraryFileColumn.Waveform,
         ],
-        // 旧 Wave 既定（現行と同じ。列挙の互換用）
+        // 旧 Wave 既定（ラウドネス列追加前）
         [
             LibraryFileColumn.Name,
             LibraryFileColumn.SampleRate,
@@ -857,18 +865,6 @@ internal static class LibraryColumnFilter
             LibraryFileColumn.Duration,
             LibraryFileColumn.Date,
             LibraryFileColumn.ParentFolder,
-            LibraryFileColumn.Waveform,
-        ],
-        // 一時的にラウドネスを既定に含めていた並び → 現行既定へ戻す
-        [
-            LibraryFileColumn.Name,
-            LibraryFileColumn.SampleRate,
-            LibraryFileColumn.BitDepth,
-            LibraryFileColumn.Channels,
-            LibraryFileColumn.Duration,
-            LibraryFileColumn.Date,
-            LibraryFileColumn.ParentFolder,
-            LibraryFileColumn.Loudness,
             LibraryFileColumn.Waveform,
         ],
     ];
@@ -994,6 +990,47 @@ internal static class LibraryColumnFilter
         }
 
         result.Add(LibraryFileColumn.Waveform);
+    }
+
+    private static bool IsLegacyWaveDefaultWithoutLoudness(HashSet<LibraryFileColumn> seen)
+    {
+        LibraryFileColumn[] legacy =
+        [
+            LibraryFileColumn.Name,
+            LibraryFileColumn.SampleRate,
+            LibraryFileColumn.BitDepth,
+            LibraryFileColumn.Channels,
+            LibraryFileColumn.Duration,
+            LibraryFileColumn.Date,
+            LibraryFileColumn.ParentFolder,
+            LibraryFileColumn.Waveform,
+        ];
+        if (seen.Count != legacy.Length)
+        {
+            return false;
+        }
+
+        foreach (var column in legacy)
+        {
+            if (!seen.Contains(column))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static void InsertLoudnessBeforeWaveform(List<LibraryFileColumn> result)
+    {
+        var waveform = result.IndexOf(LibraryFileColumn.Waveform);
+        if (waveform >= 0)
+        {
+            result.Insert(waveform, LibraryFileColumn.Loudness);
+            return;
+        }
+
+        result.Add(LibraryFileColumn.Loudness);
     }
 
     private static void InsertDateAtDefaultPlace(List<LibraryFileColumn> result)
