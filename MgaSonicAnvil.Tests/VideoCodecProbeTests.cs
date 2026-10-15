@@ -190,6 +190,25 @@ public sealed class VideoCodecProbeTests
         }
     }
 
+    [Theory]
+    [InlineData("ipcm", true)]
+    [InlineData("lpcm", true)]
+    [InlineData("sowt", true)]
+    [InlineData("twos", true)]
+    [InlineData("in24", true)]
+    [InlineData("fl32", true)]
+    [InlineData("raw ", true)]
+    [InlineData("pcm", true)]
+    [InlineData("mp4a", false)]
+    [InlineData("aac ", false)]
+    [InlineData("opus", false)]
+    [InlineData("fLaC", false)]
+    [InlineData("ulaw", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsUncompressedAudio_RecognizesPcmFourccs(string? fourcc, bool expected) =>
+        Assert.Equal(expected, VideoCodecProbe.IsUncompressedAudio(fourcc));
+
     [Fact]
     public void JpegPlusIpcm_ExposesAudioCodecFourcc()
     {

@@ -218,6 +218,108 @@ public sealed class LibraryDeferredLoadTests
     }
 
     [Fact]
+    public void CreateRow_Mp3_BlanksBitDepthKeepsBitRate()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mp3");
+        var document = AudioDocument.CreateDeferred(path);
+        document.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 12,
+            SampleRate = 44100,
+            Channels = 2,
+            BitsPerSample = 16,
+            BitRateKbps = 320,
+        });
+
+        var row = LibraryBrowserView.CreateRow(new DocumentSession(document));
+        Assert.Equal("MP3", row.Kind);
+        Assert.Equal(0, row.BitDepth);
+        Assert.Equal(string.Empty, row.BitDepthText);
+        Assert.False(row.BitDepthNonDefault);
+        Assert.Equal(320, row.BitRateKbps);
+        Assert.Equal(UiStrings.FormatBitRate(320), row.BitRateText);
+        Assert.Equal("44.1kHz", row.SampleRateText);
+        Assert.Equal("2ch", row.ChannelsText);
+    }
+
+    [Fact]
+    public void CreateRow_Wave_BlanksBitRateKeepsBitDepth()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".wav");
+        var document = AudioDocument.CreateDeferred(path);
+        document.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 1,
+            SampleRate = 48000,
+            Channels = 2,
+            BitsPerSample = 24,
+            BitRateKbps = 2304,
+        });
+
+        var row = LibraryBrowserView.CreateRow(new DocumentSession(document));
+        Assert.Equal("WAVE", row.Kind);
+        Assert.Equal(24, row.BitDepth);
+        Assert.Equal("24bit", row.BitDepthText);
+        Assert.Equal(0, row.BitRateKbps);
+        Assert.Equal(string.Empty, row.BitRateText);
+        Assert.Equal("48kHz", row.SampleRateText);
+        Assert.Equal("2ch", row.ChannelsText);
+    }
+
+    [Fact]
+    public void CreateRow_M4a_BlanksBitDepthKeepsBitRate()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".m4a");
+        var document = AudioDocument.CreateDeferred(path);
+        document.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 8,
+            SampleRate = 48000,
+            Channels = 2,
+            BitsPerSample = 16,
+            BitRateKbps = 256,
+        });
+
+        var row = LibraryBrowserView.CreateRow(new DocumentSession(document));
+        Assert.Equal("M4A", row.Kind);
+        Assert.Equal(0, row.BitDepth);
+        Assert.Equal(string.Empty, row.BitDepthText);
+        Assert.False(row.BitDepthNonDefault);
+        Assert.Equal(256, row.BitRateKbps);
+        Assert.Equal(UiStrings.FormatBitRate(256), row.BitRateText);
+        Assert.Equal("48kHz", row.SampleRateText);
+        Assert.Equal("2ch", row.ChannelsText);
+    }
+
+    [Fact]
+    public void CreateRow_Aiff_BlanksBitRateKeepsBitDepth()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".aiff");
+        var document = AudioDocument.CreateDeferred(path);
+        document.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 0.5,
+            SampleRate = 48000,
+            Channels = 1,
+            BitsPerSample = 16,
+            BitRateKbps = 768,
+        });
+
+        var row = LibraryBrowserView.CreateRow(new DocumentSession(document));
+        Assert.Equal("AIFF", row.Kind);
+        Assert.Equal(16, row.BitDepth);
+        Assert.Equal("16bit", row.BitDepthText);
+        Assert.Equal(0, row.BitRateKbps);
+        Assert.Equal(string.Empty, row.BitRateText);
+        Assert.Equal("48kHz", row.SampleRateText);
+        Assert.Equal("1ch", row.ChannelsText);
+    }
+
+    [Fact]
     public void CreateRow_Deferred_BlanksFormatColumnsKeepsSizeAndKind()
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".wav");
@@ -296,6 +398,7 @@ public sealed class LibraryDeferredLoadTests
             SampleRate = 48000,
             Channels = 2,
             BitsPerSample = 16,
+            AudioCodec = "mp4a",
         });
         // ホバー時の MediaFoundation が 0→旧 1Hz / 3ch を返す想定。
         document.ActivateStreamPlayback(1, 3, 16, 26);
@@ -305,9 +408,57 @@ public sealed class LibraryDeferredLoadTests
         Assert.Equal(26, row.DurationSeconds, 3);
         Assert.Equal(48000, row.SampleRate);
         Assert.Equal("48kHz", row.SampleRateText);
-        Assert.Equal(16, row.BitDepth);
+        Assert.Equal(0, row.BitDepth);
+        Assert.Equal(string.Empty, row.BitDepthText);
         Assert.Equal(2, row.Channels);
         Assert.Equal("2ch", row.ChannelsText);
+    }
+
+    [Fact]
+    public void CreateRow_Video_ShowsBitDepthOnlyForUncompressedPcmAudio()
+    {
+        var pcmPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mov");
+        var pcm = AudioDocument.CreateDeferred(pcmPath);
+        pcm.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 10,
+            SampleRate = 48000,
+            Channels = 2,
+            BitsPerSample = 24,
+            AudioCodec = "ipcm",
+        });
+        var pcmRow = LibraryBrowserView.CreateRow(new DocumentSession(pcm));
+        Assert.Equal(24, pcmRow.BitDepth);
+        Assert.Equal("24bit", pcmRow.BitDepthText);
+
+        var aacPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mp4");
+        var aac = AudioDocument.CreateDeferred(aacPath);
+        aac.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 10,
+            SampleRate = 48000,
+            Channels = 2,
+            BitsPerSample = 16,
+            AudioCodec = "mp4a",
+        });
+        var aacRow = LibraryBrowserView.CreateRow(new DocumentSession(aac));
+        Assert.Equal(0, aacRow.BitDepth);
+        Assert.Equal(string.Empty, aacRow.BitDepthText);
+
+        var unknown = AudioDocument.CreateDeferred(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mov"));
+        unknown.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 10,
+            SampleRate = 48000,
+            Channels = 2,
+            BitsPerSample = 16,
+        });
+        var unknownRow = LibraryBrowserView.CreateRow(new DocumentSession(unknown));
+        Assert.Equal(0, unknownRow.BitDepth);
+        Assert.Equal(string.Empty, unknownRow.BitDepthText);
     }
 
     [Fact]
