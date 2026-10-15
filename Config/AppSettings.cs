@@ -92,6 +92,11 @@ internal sealed class AppSettings
     /// <summary>再生で MP3／M4A の encoder delay／padding を飛ばす。既定オン。</summary>
     public bool GaplessPlayback { get; set; } = true;
 
+    /// <summary>
+    /// プレイヤーで Enter（クリアして追加）したとき先頭を再生するか。既定オン。
+    /// </summary>
+    public bool LibraryAutoPlay { get; set; } = true;
+
     /// <summary>プレイリストに PDF を載せる。既定オン。プレイヤー専用。</summary>
     public bool LibraryShowPlaylistPdf { get; set; } = true;
 
@@ -283,9 +288,6 @@ internal sealed class AppSettings
 
     /// <summary>アプリ表示の追加拡大（％）。100 未満は 100。上限 200。</summary>
     public int UiScalePercent { get; set; } = UiScale.DefaultPercent;
-
-    /// <summary>Tips 枠の表示。既定オン。</summary>
-    public bool ShowTips { get; set; } = true;
 
     /// <summary>ステータスバーの時間をサンプル数で表示。</summary>
     public bool StatusShowSamples { get; set; }

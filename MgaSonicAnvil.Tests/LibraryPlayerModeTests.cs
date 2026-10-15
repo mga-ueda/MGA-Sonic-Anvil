@@ -327,6 +327,41 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.IsAutoPlayNextToggle(Key.N, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsAutoPlayNextToggle(Key.N, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AutoPlayNext));
+        Assert.True(LibraryPlayerMode.IsAutoPlayToggle(Key.P, ModifierKeys.Alt));
+        Assert.False(LibraryPlayerMode.IsAutoPlayToggle(Key.P, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsAutoPlayToggle(Key.P, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsPlaylistFolderAddKey(Key.Enter, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlaylistFolderAddKey(Key.Enter, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsPlaylistFolderAddKey(Key.Enter, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsPlaylistFolderAddKey(Key.Enter, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsPlaylistFolderAddKey(Key.Enter, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.ClearsPlaylistOnFolderAdd(ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.ClearsPlaylistOnFolderAdd(ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.ClearsPlaylistOnFolderAdd(ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.ClearsPlaylistOnFolderAdd(ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.RecursesPlaylistFolderAdd(ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.RecursesPlaylistFolderAdd(ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.RecursesPlaylistFolderAdd(ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.RecursesPlaylistFolderAdd(ModifierKeys.Control | ModifierKeys.Shift));
+        LibraryPlayerMode.ResolvePlaylistFolderDrop(
+            DragDropKeyStates.None, ModifierKeys.None, out var clearDrop, out var recursiveDrop);
+        Assert.True(clearDrop);
+        Assert.False(recursiveDrop);
+        LibraryPlayerMode.ResolvePlaylistFolderDrop(
+            DragDropKeyStates.ControlKey, ModifierKeys.None, out clearDrop, out recursiveDrop);
+        Assert.True(clearDrop);
+        Assert.True(recursiveDrop);
+        LibraryPlayerMode.ResolvePlaylistFolderDrop(
+            DragDropKeyStates.ShiftKey, ModifierKeys.None, out clearDrop, out recursiveDrop);
+        Assert.False(clearDrop);
+        Assert.False(recursiveDrop);
+        LibraryPlayerMode.ResolvePlaylistFolderDrop(
+            DragDropKeyStates.ShiftKey | DragDropKeyStates.ControlKey,
+            ModifierKeys.None,
+            out clearDrop,
+            out recursiveDrop);
+        Assert.False(clearDrop);
+        Assert.True(recursiveDrop);
         Assert.False(LibraryPlayerMode.AllowsKey(Key.R, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsPlayerRestartKey(Key.R, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPlayerRestartKey(Key.R, ModifierKeys.Alt));
@@ -339,7 +374,11 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.AllowsKey(Key.N, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.N, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.P, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.P, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.P, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Enter, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Enter, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Enter, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsForceVideoProxyEncode(Key.P, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.IsForceVideoProxyEncode(Key.P, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsForceVideoProxyEncode(Key.P, ModifierKeys.Control));
@@ -393,6 +432,8 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Left, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Enter, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Enter, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Enter, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Enter, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsExplorerRootReorder(Key.Up, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.IsExplorerRootReorder(Key.Down, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.IsExplorerRootReorder(Key.Up, ModifierKeys.None));

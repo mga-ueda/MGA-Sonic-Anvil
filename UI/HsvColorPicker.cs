@@ -101,10 +101,7 @@ internal sealed class HsvColorPicker : Grid
         _hexCaption.Text = UiStrings.ColorDevHex;
         _brightnessCaption.Text = UiStrings.ColorDevBrightness;
         _alphaCaption.Text = UiStrings.ColorDevAlpha;
-        TipService.Set(this, UiStrings.ColorDevPickHint);
-        TipService.Set(_alphaRow ?? _aBox, UiStrings.ColorDevPickHint);
-        TipService.Set(_hexBox, UiStrings.ColorDevPickHint);
-    }
+                            }
 
     public void RefreshChrome()
     {

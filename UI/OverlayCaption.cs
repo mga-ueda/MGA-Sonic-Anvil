@@ -44,8 +44,7 @@ internal static class OverlayCaption
             e.Handled = true;
             onClose();
         };
-        TipService.Set(hit, UiStrings.OverlayClose);
-        return hit;
+                return hit;
     }
 
     private static Style CloseStyle(bool clearRest)

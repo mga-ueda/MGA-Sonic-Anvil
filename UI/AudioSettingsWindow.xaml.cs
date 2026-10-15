@@ -341,7 +341,7 @@ internal partial class AudioSettingsWindow : Window
         VideoProxyDisableAutoEncodeBox.IsChecked = SelectedVideoProxyDisableAutoEncode;
         SyncFfmpegDependentControls();
         FillDefaultAudioFormat();
-        ApplyTips();
+        RefreshSilentSkipThresholdFloorText();
         ReflowSettingsWindow();
         WindowPlacement.TryApplySettings(this, AppStorage.Settings);
         Loaded += (_, _) =>
@@ -357,106 +357,6 @@ internal partial class AudioSettingsWindow : Window
                 StartProbe();
             }
         };
-    }
-
-    private void ApplyTips()
-    {
-        TipService.Set(LanguageLabel, UiStrings.TipUiLanguage);
-        TipService.Set(LanguageCombo, UiStrings.TipUiLanguage);
-        TipService.Set(UiScaleLabel, UiStrings.TipUiScale);
-        TipService.Set(UiScaleCombo, UiStrings.TipUiScale);
-        TipService.Set(MultiFileArrangeLabel, UiStrings.TipMultiFileArrange);
-        TipService.Set(MultiFileArrangeCombo, UiStrings.TipMultiFileArrange);
-        TipService.Set(DefaultFormatHeader, UiStrings.TipDefaultAudioFormat);
-        TipService.Set(DefaultSampleRateLabel, UiStrings.TipDefaultAudioFormat);
-        TipService.Set(DefaultSampleRateCombo, UiStrings.TipDefaultAudioFormat);
-        TipService.Set(DefaultBitDepthLabel, UiStrings.TipDefaultAudioFormat);
-        TipService.Set(DefaultBitDepthCombo, UiStrings.TipDefaultAudioFormat);
-        TipService.Set(DefaultChannelLayoutLabel, UiStrings.TipDefaultAudioFormat);
-        TipService.Set(DefaultChannelLayoutCombo, UiStrings.TipDefaultAudioFormat);
-        TipService.Set(AssociationHeader, UiStrings.TipFileAssociations);
-        TipService.Set(SpeakerIoHeader, UiStrings.TipSpeakerPreset);
-        TipService.Set(SpeakerLabel, UiStrings.TipSpeakerPreset);
-        TipService.Set(SpeakerCombo, UiStrings.TipSpeakerPreset);
-        TipService.Set(SpeakerVisibilityHeader, UiStrings.TipSpeakerVisibility);
-        TipService.Set(SpeakerVisibilityHost, UiStrings.TipSpeakerVisibility);
-        TipService.Set(LibraryColumnsHeader, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryColumnsWaveHeader, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryColumnsMp3Header, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryColumnsVideoHeader, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryColumnsWaveHost, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryColumnsMp3Host, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryColumnsVideoHost, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryColumnsWaveResetButton, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryColumnsMp3ResetButton, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryColumnsVideoResetButton, UiStrings.TipLibraryColumns);
-        TipService.Set(LibraryPlaylistWaveformSizeWaveHeader, UiStrings.TipLibraryPlaylistWaveformSize);
-        TipService.Set(LibraryPlaylistWaveformSizeWaveCombo, UiStrings.TipLibraryPlaylistWaveformSize);
-        TipService.Set(LibraryPlaylistWaveformSizeMp3Header, UiStrings.TipLibraryPlaylistWaveformSize);
-        TipService.Set(LibraryPlaylistWaveformSizeMp3Combo, UiStrings.TipLibraryPlaylistWaveformSize);
-        TipService.Set(AutoSpeakerSelectBox, UiStrings.TipAutoSpeakerSelect);
-        TipService.Set(ApiLabel, UiStrings.TipAudioApi);
-        TipService.Set(ApiCombo, UiStrings.TipAudioApi);
-        TipService.Set(DeviceLabel, UiStrings.TipAudioDevice);
-        TipService.Set(DeviceCombo, UiStrings.TipAudioDevice);
-        TipService.Set(InputHeader, UiStrings.TipSettingsInput);
-        TipService.Set(OutputHeader, UiStrings.TipSettingsOutput);
-        TipService.Set(RecordInputHost, UiStrings.TipRecordInputMap);
-        TipService.Set(InputStatus, UiStrings.TipInputLevel);
-        TipService.Set(PlaybackOutputHost, UiStrings.TipPlaybackOutputMap);
-        TipService.Set(LoudnessTargetLabel, UiStrings.TipLoudnessTarget);
-        TipService.Set(LoudnessTargetBox, UiStrings.TipLoudnessTarget);
-        TipService.Set(LoudnessTargetUnit, UiStrings.TipLoudnessTarget);
-        TipService.Set(SilentSkipThresholdLabel, UiStrings.TipSilentSkipThreshold);
-        TipService.Set(SilentSkipThresholdBox, UiStrings.TipSilentSkipThreshold);
-        TipService.Set(SilentSkipThresholdUnit, UiStrings.TipSilentSkipThreshold);
-        TipService.Set(SilentSkipThresholdMeter, UiStrings.TipSilentSkipThresholdMeter);
-        TipService.Set(SilentSkipThresholdFloorText, UiStrings.TipSilentSkipThresholdMeter);
-        TipService.Set(SilentSkipThresholdFloorNote, UiStrings.TipSilentSkipThresholdMeter);
-        RefreshSilentSkipThresholdFloorText();
-        TipService.Set(SilentSkipRecordPadLabel, UiStrings.TipSilentSkipRecordPad);
-        TipService.Set(SilentSkipRecordPadBox, UiStrings.TipSilentSkipRecordPad);
-        TipService.Set(SilentSkipRecordPadUnit, UiStrings.TipSilentSkipRecordPad);
-        TipService.Set(ClickGuardFadeLabel, UiStrings.TipClickGuardFade);
-        TipService.Set(ClickGuardFadeBox, UiStrings.TipClickGuardFade);
-        TipService.Set(ClickGuardFadeUnit, UiStrings.TipClickGuardFade);
-        TipService.Set(WwisePrefetchLengthLabel, UiStrings.TipWwisePrefetchLength);
-        TipService.Set(WwisePrefetchLengthBox, UiStrings.TipWwisePrefetchLength);
-        TipService.Set(WwisePrefetchLengthUnit, UiStrings.TipWwisePrefetchLength);
-        TipService.Set(WwiseLookAheadTimeLabel, UiStrings.TipWwiseLookAheadTime);
-        TipService.Set(WwiseLookAheadTimeBox, UiStrings.TipWwiseLookAheadTime);
-        TipService.Set(WwiseLookAheadTimeUnit, UiStrings.TipWwiseLookAheadTime);
-        TipService.Set(FadeDefaultsHeader, UiStrings.TipFadeCurveDefaults);
-        TipService.Set(ExportAudioHeader, UiStrings.TipMp3Encode);
-        TipService.Set(WindowsBitRateLabel, UiStrings.TipWindowsMp3BitRate);
-        TipService.Set(WindowsBitRateCombo, UiStrings.TipWindowsMp3BitRate);
-        TipService.Set(LamePathLabel, UiStrings.TipLamePath);
-        TipService.Set(LamePathBox, UiStrings.TipLamePath);
-        TipService.Set(LameBrowseButton, UiStrings.TipLameBrowse);
-        TipService.Set(LameOptionsLabel, UiStrings.TipLameOptions);
-        TipService.Set(LameOptionsBox, UiStrings.TipLameOptions);
-        TipService.Set(ExportParallelLabel, UiStrings.TipExportParallel);
-        TipService.Set(ExportParallelCombo, UiStrings.TipExportParallel);
-        TipService.Set(GaplessPlaybackBox, UiStrings.TipGaplessPlayback);
-        TipService.Set(LibraryPlaylistDocumentsHeader, UiStrings.TipLibraryPlaylistDocuments);
-        TipService.Set(LibraryShowPlaylistPdfBox, UiStrings.TipLibraryPlaylistDocuments);
-        TipService.Set(LibraryShowPlaylistMovBox, UiStrings.TipLibraryPlaylistDocuments);
-        TipService.Set(LibraryShowPlaylistMp4Box, UiStrings.TipLibraryPlaylistDocuments);
-        TipService.Set(LibraryShowPlaylistAviBox, UiStrings.TipLibraryPlaylistDocuments);
-        TipService.Set(LibraryShowPlaylistMkvBox, UiStrings.TipLibraryPlaylistDocuments);
-        TipService.Set(LibraryShowPlaylistWebmBox, UiStrings.TipLibraryPlaylistDocuments);
-        TipService.Set(LibraryShowPlaylistMpgBox, UiStrings.TipLibraryPlaylistDocuments);
-        TipService.Set(ExportMovieHeader, UiStrings.TipFfmpegPath);
-        TipService.Set(FfmpegPathLabel, UiStrings.TipFfmpegPath);
-        TipService.Set(FfmpegPathBox, UiStrings.TipFfmpegPath);
-        TipService.Set(FfmpegBrowseButton, UiStrings.TipFfmpegBrowse);
-        TipService.Set(VideoProxyDisableAutoEncodeBox, UiStrings.TipVideoProxyDisableAutoEncode);
-        TipService.Set(VideoProxyRetentionHeader, UiStrings.TipVideoProxyRetention);
-        TipService.Set(VideoProxyRetentionCombo, UiStrings.TipVideoProxyRetention);
-        TipService.Set(VideoProxyUsageText, UiStrings.TipVideoProxyUsage);
-        TipService.Set(VideoProxyClearAllButton, UiStrings.TipVideoProxyClearAll);
-        TipService.Set(OkButton, UiStrings.TipSettingsOk);
-        TipService.Set(CancelButton, UiStrings.TipSettingsCancel);
     }
 
     private void ApiCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -588,8 +488,7 @@ internal partial class AudioSettingsWindow : Window
                 box.Style = style;
             }
 
-            TipService.Set(box, UiStrings.TipLibraryColumns);
-            checks[column] = box;
+                        checks[column] = box;
             host.Children.Add(box);
         }
     }
@@ -1073,10 +972,7 @@ internal partial class AudioSettingsWindow : Window
             FontSize = 11.333,
             Margin = new Thickness(0, 0, 0, 6),
         };
-        TipService.Set(
-            header,
-            ffmpegRequired ? UiStrings.TipFileAssociationVideo : UiStrings.TipFileAssociations);
-        column.Children.Add(header);
+                column.Children.Add(header);
         if (ffmpegRequired)
         {
             _videoAssociationHeader = header;
@@ -1106,14 +1002,7 @@ internal partial class AudioSettingsWindow : Window
 
             box.Checked += Association_Changed;
             box.Unchecked += Association_Changed;
-            TipService.Set(
-                box,
-                FileAssociations.IsPlayerOnlyExtension(ext)
-                    ? (ext.Equals(".m4a", StringComparison.OrdinalIgnoreCase)
-                        ? UiStrings.TipFileAssociationM4a
-                        : UiStrings.TipFileAssociationVideo)
-                    : UiStrings.TipFileAssociations);
-            column.Children.Add(box);
+                        column.Children.Add(box);
             if (ffmpegRequired)
             {
                 _videoAssociationBoxes.Add(box);
@@ -2291,8 +2180,7 @@ internal partial class AudioSettingsWindow : Window
 
                 box.Checked += SpeakerVisibility_Changed;
                 box.Unchecked += SpeakerVisibility_Changed;
-                TipService.Set(box, UiStrings.TipSpeakerVisibility);
-                SpeakerVisibilityHost.Children.Add(box);
+                                SpeakerVisibilityHost.Children.Add(box);
             }
         }
         finally
@@ -2477,7 +2365,7 @@ internal partial class AudioSettingsWindow : Window
 
     /// <summary>
     /// 設定タブは DynamicResource を使わず固定ブラシにする。
-    /// Tips 更新などでアプリ全体が再評価されると下線がちらつくため。
+    /// DynamicResource の再評価などで下線がちらつくため。
     /// </summary>
     private void ApplySettingsTabChrome()
     {
@@ -2604,9 +2492,7 @@ internal partial class AudioSettingsWindow : Window
     private static void RefreshFadeRowIcon(FadeCurveRow row)
     {
         row.Icon.Source = FadeCurveIcons.Create(row.Curve, row.IsFadeIn);
-        TipService.Set(row.IconHost, UiStrings.LabelFadeCurve((int)row.Curve));
-        TipService.Set(row.Label, UiStrings.LabelFadeCurve((int)row.Curve));
-    }
+                    }
 
     protected override void OnClosed(EventArgs e)
     {

@@ -43,8 +43,7 @@ public partial class MainWindow
             HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
             VerticalAlignment = System.Windows.VerticalAlignment.Center,
         };
-        TipService.Set(button, UiStrings.TipWaapiToggle);
-        button.Click += (_, _) => ToggleWaapiPanel();
+                button.Click += (_, _) => ToggleWaapiPanel();
         MeterTopSlot.Child = button;
         _waapiToggle = button;
         button.WashThrough = IsLibraryMaximized;

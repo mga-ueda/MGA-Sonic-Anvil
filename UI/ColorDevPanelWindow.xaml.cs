@@ -45,7 +45,6 @@ internal partial class ColorDevPanelWindow : Window
         ApplyFilter();
         SelectFirstVisible();
         ApplyButtonLooks();
-        ApplyTips();
         UpdateSearchHint();
         AppDialogKeys.PrepareActionButton(ImportButton);
         AppDialogKeys.PrepareActionButton(ExportButton);
@@ -97,7 +96,6 @@ internal partial class ColorDevPanelWindow : Window
         BuildRows();
         RefreshRows();
         ApplyButtonLooks();
-        ApplyTips();
         ApplyFilter();
         if (selected is not null && _rows.ContainsKey(selected))
         {
@@ -134,22 +132,6 @@ internal partial class ColorDevPanelWindow : Window
         ActionButtonLooks.ApplyClear(ExportButton);
         ActionButtonLooks.ApplyClear(ResetButton);
         ActionButtonLooks.ApplyAccent(CloseButton);
-    }
-
-    private void ApplyTips()
-    {
-        TipService.Set(ResetThisButton, UiStrings.ColorDevResetThis);
-        TipService.Set(ImportButton, UiStrings.ColorDevImport);
-        TipService.Set(ExportButton, UiStrings.ColorDevExport);
-        TipService.Set(ResetButton, UiStrings.ColorDevResetToDefaults);
-        TipService.Set(CloseButton, UiStrings.ColorDevClose);
-        foreach (var row in _rows.Values)
-        {
-            var tip = ColorDevCatalog.Caption(row.GroupTitle, row.Label);
-            TipService.Set(row.Host, tip);
-            TipService.Set(row.Name, tip);
-            TipService.Set(row.Swatch, tip);
-        }
     }
 
     private void BuildRows()

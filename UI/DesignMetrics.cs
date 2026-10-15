@@ -51,14 +51,6 @@ internal static class DesignMetrics
 
     public static double WaapiBarHeight => From96(32);
 
-    public static double TipsHeaderHeight => From96(20);
-
-    /// <summary>本文約 5 行。はみ出しはスクロール。</summary>
-    public static double TipsBodyHeight => From96(88);
-
-    /// <summary>Tips 枠の固定高さ（見出し + 本文）。</summary>
-    public static double TipsPanelHeight => TipsHeaderHeight + TipsBodyHeight;
-
     public static double StatusExportButtonWidth => From96(80);
 
     public static double StatusExportButtonHeight => From96(24);

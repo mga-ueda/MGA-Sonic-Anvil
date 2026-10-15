@@ -79,7 +79,6 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.CopySelectionTimePath
             or WaveMenuCommand.CopyFileName
             or WaveMenuCommand.CopyFilePath
-            or WaveMenuCommand.Tips
             or WaveMenuCommand.Manual
             or WaveMenuCommand.GitHub
             or WaveMenuCommand.AddMarker
@@ -106,7 +105,6 @@ internal static class LibraryPlayerMode
             or TransportCommand.GoToEnd
             or TransportCommand.Open
             or TransportCommand.OpenColorPanel
-            or TransportCommand.ToggleTips
             or TransportCommand.OpenSettings
             or TransportCommand.OpenManual
             or TransportCommand.ToggleLibraryMaximize
@@ -186,11 +184,13 @@ internal static class LibraryPlayerMode
         return (key, modifiers) switch
         {
             (Key.Space, ModifierKeys.None or ModifierKeys.Control) => true,
-            (Key.Enter, ModifierKeys.None or ModifierKeys.Alt) => true,
+            (Key.Enter, ModifierKeys.None or ModifierKeys.Alt or ModifierKeys.Shift
+                or ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift)) => true,
             (Key.L, ModifierKeys.None) => true,
             (Key.N, ModifierKeys.None) => true,
             (Key.N, ModifierKeys.Alt) => true,
             (Key.P, ModifierKeys.None) => true,
+            (Key.P, ModifierKeys.Alt) => true,
             (Key.P, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.R, ModifierKeys.None) => true,
             (Key.R, ModifierKeys.Alt) => true,
@@ -333,6 +333,54 @@ internal static class LibraryPlayerMode
     public static bool IsAutoPlayNextToggle(Key key, ModifierKeys modifiers) =>
         key == Key.N && modifiers == ModifierKeys.Alt;
 
+    /// <summary>
+    /// Enter 追加時の自動再生の切替。プレイリストが空でも、ツリー／お気に入りフォーカスでも効く。
+    /// 検索欄では文字入力のまま。素の P は前の曲のまま。
+    /// </summary>
+    public static bool IsAutoPlayToggle(Key key, ModifierKeys modifiers) =>
+        key == Key.P && modifiers == ModifierKeys.Alt;
+
+    /// <summary>
+    /// ツリー／お気に入りの Enter 追加コード。
+    /// Enter／Ctrl+Enter／Shift+Enter／Ctrl+Shift+Enter（Alt なし）。
+    /// </summary>
+    public static bool IsPlaylistFolderAddKey(Key key, ModifierKeys modifiers)
+    {
+        if (key != Key.Enter)
+        {
+            return false;
+        }
+
+        var chord = modifiers & (ModifierKeys.Shift | ModifierKeys.Control | ModifierKeys.Alt);
+        return chord is ModifierKeys.None
+            or ModifierKeys.Control
+            or ModifierKeys.Shift
+            or (ModifierKeys.Control | ModifierKeys.Shift);
+    }
+
+    /// <summary>Shift なし＝クリアして追加。Shift＝既存へ足す。</summary>
+    public static bool ClearsPlaylistOnFolderAdd(ModifierKeys modifiers) =>
+        (modifiers & ModifierKeys.Shift) == 0;
+
+    /// <summary>Ctrl＝再帰。なし＝直下のみ。</summary>
+    public static bool RecursesPlaylistFolderAdd(ModifierKeys modifiers) =>
+        (modifiers & ModifierKeys.Control) != 0;
+
+    /// <summary>ドロップのクリア／再帰。KeyStates が欠けるときは <paramref name="modifiers"/> を併用。</summary>
+    public static void ResolvePlaylistFolderDrop(
+        DragDropKeyStates keyStates,
+        ModifierKeys modifiers,
+        out bool clearPlaylist,
+        out bool recursive)
+    {
+        var shift = (keyStates & DragDropKeyStates.ShiftKey) != 0
+            || (modifiers & ModifierKeys.Shift) != 0;
+        var control = (keyStates & DragDropKeyStates.ControlKey) != 0
+            || (modifiers & ModifierKeys.Control) != 0;
+        clearPlaylist = !shift;
+        recursive = control;
+    }
+
     /// <summary>前の曲／次の曲（テンキー 4／6 と同じ。ノートPC向け）。</summary>
     public static bool IsPlayerTrackStepKey(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && key is Key.P or Key.N;
@@ -437,7 +485,7 @@ internal static class LibraryPlayerMode
             return false;
         }
 
-        if (key == Key.Enter && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        if (IsPlaylistFolderAddKey(key, modifiers))
         {
             return false;
         }
@@ -1380,7 +1428,9 @@ internal static class LibraryPlayerMode
         }
 
         // Enter／Space は表示解除として別処理する。
-        if (IsShuffleToggle(key, modifiers) || IsAutoPlayNextToggle(key, modifiers))
+        if (IsShuffleToggle(key, modifiers)
+            || IsAutoPlayNextToggle(key, modifiers)
+            || IsAutoPlayToggle(key, modifiers))
         {
             return true;
         }

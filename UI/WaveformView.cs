@@ -293,7 +293,7 @@ internal sealed class WaveformView : Grid
         Clip = new RectangleGeometry(new Rect(RenderSize));
         Focusable = true;
         FocusVisualStyle = null;
-        RefreshLocalizedTips();
+        ApplyLocalizedText();
         SnapsToDevicePixels = false;
         UseLayoutRounding = false;
         Cursor = Cursors.IBeam;
@@ -372,11 +372,8 @@ internal sealed class WaveformView : Grid
         }
     }
 
-    public void RefreshLocalizedTips()
+    public void ApplyLocalizedText()
     {
-        TipService.Set(this, UiStrings.TipWaveform);
-        TipService.Set(_boostBar, UiStrings.TipSpectrogramBoost);
-        _boostBar.SetValue(AutomationProperties.NameProperty, UiStrings.TipSpectrogramBoost);
         _loadingLabel.Text = UiStrings.LabelWaveformLoading;
     }
 

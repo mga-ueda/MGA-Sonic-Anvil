@@ -62,11 +62,7 @@ internal static class PitchShiftPicker
         PickerChrome.PrependClose(root, menu);
         var item = PickerChrome.FormHost(root);
         menu.Items.Add(item);
-        TipService.Set(menu, UiStrings.TipPitch);
-        TipService.Set(item, UiStrings.TipPitch);
-        TipService.Set(state.SemitoneBox, UiStrings.TipPitch);
-        TipService.Set(state.TimeStretchBox, UiStrings.TipPitchTimeStretch);
-
+                                
         menu.PreviewKeyDown += (_, e) =>
         {
             var key = e.Key == Key.System ? e.SystemKey : e.Key;

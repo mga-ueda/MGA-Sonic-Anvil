@@ -95,8 +95,7 @@ public partial class MainWindow
     {
         TileSearchLabel.Text = UiStrings.TileSearchLabel;
         TileSearchHint.Text = UiStrings.TileSearchSyntaxHint;
-        TipService.Set(TileSearchBox, UiStrings.TipTileSearch);
-        _tileSearchTextAtOpen = TileSearchBox.Text;
+                _tileSearchTextAtOpen = TileSearchBox.Text;
         TileSearchHost.Visibility = Visibility.Visible;
         TileSearchBox.Focus();
         TileSearchBox.SelectAll();

@@ -73,11 +73,7 @@ internal sealed class TabTimeTableWindow : Window
         _pdfButton.Content = UiStrings.TabTimeSavePdf;
         _closeButton.Content = UiStrings.ButtonClose;
         _copyMenuItem.Header = UiStrings.MenuCopy;
-        TipService.Set(_copyButton, UiStrings.TipTabTimeCopy);
-        TipService.Set(_csvButton, UiStrings.TipTabTimeCsv);
-        TipService.Set(_pdfButton, UiStrings.TipTabTimePdf);
-        TipService.Set(_grid, UiStrings.TipTabTimeCopy);
-    }
+                                    }
 
     public void RefreshAppearance()
     {

@@ -184,7 +184,6 @@ internal static partial class UiStrings
     /// <summary>書き出しカテゴリへ移動したため、MP3 で書き出す(M) と重なる M をやめて A。</summary>
     public static string WaveMenuExportAllMp3 => Get("すべてのタブを MP3 で保存(_A)", "Save All Tabs as MP3 (_A)");
 
-    public static string WaveMenuTips => Get("Tips を表示(_T)", "Show _Tips");
     public static string WaveMenuManual => Get("マニュアル(_M)", "_Manual");
     public static string WaveMenuGitHub => Get("GitHub(_G)", "_GitHub");
 }

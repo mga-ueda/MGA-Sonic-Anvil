@@ -159,6 +159,7 @@ public partial class MainWindow : Window
         LibraryBrowser.ExplorerRootsChanged += LibraryBrowser_ExplorerRootsChanged;
         LibraryBrowser.FavoritesActivated += LibraryBrowser_FavoritesActivated;
         LibraryBrowser.ShuffleChanged += LibraryBrowser_ShuffleChanged;
+        LibraryBrowser.AutoPlayChanged += LibraryBrowser_AutoPlayChanged;
         LibraryBrowser.AutoPlayNextChanged += LibraryBrowser_AutoPlayNextChanged;
         LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
         LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;
@@ -179,6 +180,7 @@ public partial class MainWindow : Window
         LibraryBrowser.SetExplorerWidth(AppStorage.Settings.LibraryExplorerWidth);
         LibraryBrowser.SetFavoritesSplit(AppStorage.Settings.LibraryFavoritesSplit);
         LibraryBrowser.SetFavorites(AppStorage.Settings.ResolvedLibraryFavoritePaths());
+        LibraryBrowser.AutoPlayEnabled = AppStorage.Settings.LibraryAutoPlay;
         DpiChanged += (_, _) =>
         {
             _brandLogoDark = null;
@@ -198,11 +200,6 @@ public partial class MainWindow : Window
         {
             WindowPlacement.ApplyFirstLaunch(this);
         }
-        TipService.Enabled = AppStorage.Settings.ShowTips;
-        TipService.BindDisplay(TipsLabel, TipsPanel, TipsScroll);
-        TipService.PinChanged += (_, _) => RefreshTipsHeader();
-        RefreshTipsHeader();
-        Transport.SetTipsVisible(AppStorage.Settings.ShowTips);
         _outputSettings = AppStorage.Settings.ToAudioOutputSettings();
         ApplyMeterColumnWidth(AppStorage.Settings.MeterColumnWidth);
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
@@ -733,69 +730,24 @@ public partial class MainWindow : Window
         Overview.InvalidateVisual();
     }
 
-    private void ToggleTips()
-    {
-        var enabled = !AppStorage.Settings.ShowTips;
-        AppStorage.Settings.ShowTips = enabled;
-        AppStorage.Save();
-        TipService.Enabled = enabled;
-        Transport.SetTipsVisible(enabled);
-        Waveform.Focus();
-    }
-
-    private void TipsPin_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        e.Handled = true;
-        TipService.TogglePinned();
-    }
-
-    private void RefreshTipsHeader()
-    {
-        TipsHeader.Text = TipService.Pinned ? UiStrings.LabelTipsPinned : UiStrings.LabelTips;
-    }
-
     private void RefreshLocalizedText()
     {
         BrandLicenseHost.LinkText = UiStrings.CopyrightText;
         QueueAlignBrandLicense();
-        RefreshTipsHeader();
-        TipService.Set(BrandLicenseHost, UiStrings.TipCopyright);
-        TipService.Set(BrandLogo, UiStrings.TipBrandLogo, respectsEnabled: false);
         AlwaysOnTopCheck.Content = UiStrings.LabelAlwaysOnTop;
-        TipService.Set(AlwaysOnTopCheck, UiStrings.TipAlwaysOnTop);
         SilentSkipCheck.Content = UiStrings.LabelSilentSkip;
-        TipService.Set(SilentSkipCheck, UiStrings.TipSilentSkip);
         StatusTimes.ApplyLocalizedText();
-        TipService.Set(StatusMeta, UiStrings.TipStatusFormat);
-        TipService.Set(Overview, UiStrings.TipOverview);
-        TipService.Set(VectorScope, UiStrings.TipVectorScope);
-        TipService.Set(Spectrum, UiStrings.TipSpectrum);
-        TipService.Set(HistoryStrip, UiStrings.TipHistoryStrip);
-        TipService.Set(LoudnessMeter, UiStrings.TipLoudness);
-        TipService.Set(LevelMeter, UiStrings.TipLevelMeter);
-        TimeScrollStrip.ApplyLocalizedTips();
-        TipService.Set(DocumentTabHost, UiStrings.TipOpen);
-        TipService.Set(DocumentTabScroll, UiStrings.TipOpen);
-        TipService.Set(DocumentTabs, UiStrings.TipOpen);
-        TipService.Set(TipsHeader, UiStrings.TipTips, respectsEnabled: false);
-        TipService.Set(TipsScroll, UiStrings.TipTips, respectsEnabled: false);
-        TipService.Set(TipsLabel, UiStrings.TipTips, respectsEnabled: false);
-        TipService.Set(HistoryOverlay, UiStrings.TipEditHistory);
-        TipService.Set(TabScrollLeft, UiStrings.TipTabScrollLeft);
-        TipService.Set(TabScrollRight, UiStrings.TipTabScrollRight);
-        Transport.ApplyLocalizedTips();
+        TimeScrollStrip.ApplyLocalizedText();
+        Transport.ApplyLocalizedText();
         Transport.SetMaximizeMode(_waveformMaximizeMode);
         SpeakerMenuLabel.Text = UiStrings.LabelStatusSpeaker;
-        TipService.Set(SpeakerMenuLabel, UiStrings.TipSpeakerSwitch, respectsEnabled: false);
-        TipService.Set(SpeakerMenu, UiStrings.TipSpeakerSwitch);
         RefreshSpeakerMenu();
         if (_waapiToggle is not null)
         {
-            TipService.Set(_waapiToggle, UiStrings.TipWaapiToggle);
             _waapiToggle.InvalidateVisual();
         }
 
-        ForEachWaveform(view => view.RefreshLocalizedTips());
+        ForEachWaveform(view => view.ApplyLocalizedText());
         WaapiBar.ApplyLocalizedText();
         RefreshWaapiStatusDisplay();
         HistoryOverlay.ApplyLocalizedText();
@@ -808,7 +760,6 @@ public partial class MainWindow : Window
             RefreshHistoryStrip();
         }
 
-        RefreshTabLocalizedTips();
         RefreshStatus();
         LevelMeter.InvalidateVisual();
         LoudnessMeter.ApplyLocalizedText();
@@ -1186,7 +1137,22 @@ public partial class MainWindow : Window
                 }
             }
 
-            OpenPaths(paths);
+            if (!IsLibraryMaximized)
+            {
+                OpenPaths(paths);
+                return;
+            }
+
+            LibraryPlayerMode.ResolvePlaylistFolderDrop(
+                DragDropKeyStates.None,
+                Keyboard.Modifiers,
+                out var clearPlaylist,
+                out var recursive);
+            OpenPaths(
+                paths,
+                folderRecursive: recursive,
+                clearLibraryPlaylist: clearPlaylist,
+                libraryPlay: clearPlaylist && LibraryBrowser.AutoPlayEnabled);
         });
     }
 
@@ -1278,9 +1244,20 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (TryGetDroppedAudio(e, out var paths))
+        if (TryGetDroppedAudio(e, out var paths, out var clearPlaylist, out var recursive))
         {
-            OpenPaths(paths);
+            if (IsLibraryMaximized)
+            {
+                OpenPaths(
+                    paths,
+                    folderRecursive: false,
+                    clearLibraryPlaylist: clearPlaylist,
+                    libraryPlay: clearPlaylist && LibraryBrowser.AutoPlayEnabled);
+            }
+            else
+            {
+                OpenPaths(paths);
+            }
         }
     }
 
@@ -1360,17 +1337,35 @@ public partial class MainWindow : Window
         return folders.Length > 0;
     }
 
-    private bool TryGetDroppedAudio(DragEventArgs e, out string[] paths)
+    private bool TryGetDroppedAudio(
+        DragEventArgs e,
+        out string[] paths,
+        out bool clearPlaylist,
+        out bool recursive)
     {
         paths = [];
+        clearPlaylist = true;
+        recursive = false;
         if (!TryReadDroppedPaths(e, out var files))
         {
             return false;
         }
 
-        paths = IsLibraryMaximized
-            ? AudioCodec.CollectPlayerOpenable(files)
-            : AudioCodec.CollectOpenable(files);
+        if (IsLibraryMaximized)
+        {
+            LibraryPlayerMode.ResolvePlaylistFolderDrop(
+                e.KeyStates,
+                Keyboard.Modifiers,
+                out clearPlaylist,
+                out recursive);
+            // 展開済みパスを返すので、OpenPaths 側の再帰は不要。
+            paths = AudioCodec.CollectPlayerOpenable(files, recursive);
+        }
+        else
+        {
+            paths = AudioCodec.CollectOpenable(files);
+        }
+
         return paths.Length > 0;
     }
 

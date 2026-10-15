@@ -91,8 +91,7 @@ internal sealed class ChannelRoutingEditor
                         Channel = i,
                         Channels = channelNames.Length,
                     };
-                    TipService.Set(meter, UiStrings.TipInputLevel);
-                    row.Children.Add(meter);
+                                        row.Children.Add(meter);
                     Grid.SetColumn(meter, next);
                     _meters.Add(meter);
                     next++;
@@ -108,8 +107,7 @@ internal sealed class ChannelRoutingEditor
 
                 SelectPort(fileBox, lanes.Length > i ? lanes[i] : i);
                 fileBox.SelectionChanged += OnComboChanged;
-                TipService.Set(fileBox, UiStrings.TipFileChannelMap);
-                row.Children.Add(fileBox);
+                                row.Children.Add(fileBox);
                 Grid.SetColumn(fileBox, next);
                 next++;
                 _fileBoxes.Add(fileBox);
@@ -117,7 +115,7 @@ internal sealed class ChannelRoutingEditor
                 if (_showTestButtons)
                 {
                     var channel = i;
-                    var sine = CreateTestButton(UiStrings.ButtonSineMinusTwenty, UiStrings.TipSineMinusTwenty);
+                    var sine = CreateTestButton(UiStrings.ButtonSineMinusTwenty);
                     sine.Click += (_, _) => TestClicked?.Invoke(channel, SettingsProbeKind.Sine);
                     row.Children.Add(sine);
                     Grid.SetColumn(sine, next);
@@ -128,7 +126,7 @@ internal sealed class ChannelRoutingEditor
                     }
                     else
                     {
-                        var voice = CreateTestButton(UiStrings.ButtonChannelVoice, UiStrings.TipChannelVoice);
+                        var voice = CreateTestButton(UiStrings.ButtonChannelVoice);
                         voice.Click += (_, _) => TestClicked?.Invoke(channel, SettingsProbeKind.Voice);
                         row.Children.Add(voice);
                         Grid.SetColumn(voice, next + 1);
@@ -287,7 +285,7 @@ internal sealed class ChannelRoutingEditor
             Margin = new Thickness(DesignMetrics.SettingsLabelComboGap, 0, 0, 0),
         };
 
-    private RoundedButton CreateTestButton(string label, string tip)
+    private RoundedButton CreateTestButton(string label)
     {
         var button = new RoundedButton
         {
@@ -299,8 +297,7 @@ internal sealed class ChannelRoutingEditor
             Padding = new Thickness(8, 1, 8, 1),
         };
         ActionButtonLooks.ApplyClear(button);
-        TipService.Set(button, tip);
-        return button;
+                return button;
     }
 
     private void FitTestButtons()
