@@ -156,6 +156,30 @@ public sealed class LibraryFileListTests
     }
 
     [Fact]
+    public void GroupLabel_BlankBitDepth_UsesPlaceholder()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.English);
+            var mp3 = Row("a.mp3", bitDepthText: "");
+            var wave = Row("b.wav", bitDepthText: "16bit");
+            Assert.Equal("(None)", LibraryFileList.GroupLabel(mp3, LibraryFileGroup.BitDepth));
+            Assert.Equal("16bit", LibraryFileList.GroupLabel(wave, LibraryFileGroup.BitDepth));
+            Assert.Equal("(None)", LibraryFileList.GroupLabel(
+                Row("c.mp3", sampleRateText: "", channelsText: ""),
+                LibraryFileGroup.SampleRate));
+            Assert.Equal("(None)", LibraryFileList.GroupLabel(
+                Row("d.mp3", sampleRateText: "", channelsText: ""),
+                LibraryFileGroup.Channels));
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
     public void SameContent_IgnoresTagAndKeepsDisplayFields()
     {
         var left = Row("a.wav", title: "Song", artwork: true);
@@ -186,7 +210,10 @@ public sealed class LibraryFileListTests
         bool artwork = false,
         string title = "",
         DateTime date = default,
-        bool rateNonDefault = false) =>
+        bool rateNonDefault = false,
+        string? sampleRateText = null,
+        string? bitDepthText = null,
+        string? channelsText = null) =>
         new()
         {
             Name = name,
@@ -195,11 +222,11 @@ public sealed class LibraryFileListTests
             DurationSeconds = duration,
             DurationText = duration.ToString("0"),
             SampleRate = rate,
-            SampleRateText = UiStrings.FormatSampleRate(rate),
+            SampleRateText = sampleRateText ?? UiStrings.FormatSampleRate(rate),
             BitDepth = 24,
-            BitDepthText = UiStrings.FormatBitDepth(24),
+            BitDepthText = bitDepthText ?? UiStrings.FormatBitDepth(24),
             Channels = 2,
-            ChannelsText = UiStrings.FormatChannels(2),
+            ChannelsText = channelsText ?? UiStrings.FormatChannels(2),
             SampleRateNonDefault = rateNonDefault,
             FileBytes = 1000,
             SizeText = "1.0 KB",

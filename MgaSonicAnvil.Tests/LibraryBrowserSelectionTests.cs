@@ -1736,6 +1736,68 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void NextPlaylistSession_FollowsGroupedDisplayOrder()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            // Album ソートだと zebra / alpha / zebra の順。Artist グループだと
+            // Alpha → Zebra の表示順になり、_items 順とは食い違う。
+            var alphaOnZebra = Session("01.mp3");
+            alphaOnZebra.Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                Artist = "Alpha",
+                Album = "Zebra",
+                Title = "A",
+            });
+            var zebraOnAlpha = Session("02.mp3");
+            zebraOnAlpha.Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                Artist = "Zebra",
+                Album = "Alpha",
+                Title = "B",
+            });
+            var zebraOnZebra = Session("03.mp3");
+            zebraOnZebra.Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                Artist = "Zebra",
+                Album = "Zebra",
+                Title = "C",
+            });
+
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 400,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions(
+                [alphaOnZebra, zebraOnAlpha, zebraOnZebra],
+                alphaOnZebra,
+                [alphaOnZebra]);
+            view.SetGroup(LibraryFileGroup.Artist);
+            Flush();
+
+            Assert.Same(zebraOnAlpha, view.NextPlaylistSession(alphaOnZebra));
+            Assert.Same(zebraOnZebra, view.NextPlaylistSession(zebraOnAlpha));
+            Assert.Same(alphaOnZebra, view.NextPlaylistSession(zebraOnZebra));
+            Assert.Same(zebraOnZebra, view.PreviousPlaylistSession(alphaOnZebra));
+
+            view.MoveSelection(1);
+            Flush();
+            Assert.Same(zebraOnAlpha, view.SelectedSession);
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void MoveSelection_WrapsAtEnds()
     {
         RunSta(() =>

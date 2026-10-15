@@ -166,10 +166,10 @@ internal static class LibraryFileList
             LibraryFileGroup.Album => Blank(row.Album),
             LibraryFileGroup.Genre => Blank(row.Genre),
             LibraryFileGroup.Year => Blank(row.Year),
-            LibraryFileGroup.Kind => row.Kind,
-            LibraryFileGroup.SampleRate => row.SampleRateText,
-            LibraryFileGroup.BitDepth => row.BitDepthText,
-            LibraryFileGroup.Channels => row.ChannelsText,
+            LibraryFileGroup.Kind => Blank(row.Kind),
+            LibraryFileGroup.SampleRate => Blank(row.SampleRateText),
+            LibraryFileGroup.BitDepth => Blank(row.BitDepthText),
+            LibraryFileGroup.Channels => Blank(row.ChannelsText),
             LibraryFileGroup.Folder => row.ParentFolder.Length == 0
                 ? UiStrings.LibraryGroupUntitled
                 : row.ParentFolder,
