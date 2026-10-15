@@ -5,7 +5,7 @@ using System.Text;
 namespace MgaSonicAnvil.Config;
 
 /// <summary>
-/// プレイリストで一度表示した波形棒・ジャケットをディスクに残す。
+/// プレイリストで一度表示した波形棒・ジャケット・ラウドネスをディスクに残す。
 /// 先読みはしない。size/mtime が変わったら無効。
 /// </summary>
 internal static class LibraryMediaCache
@@ -13,8 +13,10 @@ internal static class LibraryMediaCache
     public const string CacheFolderName = "library-media-cache";
     private const uint WaveMagic = 0x57415631; // WAV1
     private const uint ArtMagic = 0x41525431; // ART1
+    private const uint LoudnessMagic = 0x4C554631; // LUF1
     private const int WaveVersion = 1;
     private const int ArtVersion = 1;
+    private const int LoudnessVersion = 1;
 
     private static readonly object Gate = new();
     private static string? _directoryOverride;
@@ -162,6 +164,78 @@ internal static class LibraryMediaCache
     /// <summary>ジャケット列向け。画像が無いことも探査済みとして残す。</summary>
     public static void PutNoArtwork(string path) => WriteArtRecord(path, []);
 
+    /// <summary>Integrated LUFS。無音など非有限値も保存する。</summary>
+    public static bool TryGetLoudness(string path, out float integratedLufs)
+    {
+        integratedLufs = float.NaN;
+        if (!TryStat(path, out var full, out var size, out var mtime))
+        {
+            return false;
+        }
+
+        var file = LoudnessPath(full);
+        try
+        {
+            if (!File.Exists(file))
+            {
+                return false;
+            }
+
+            var bytes = File.ReadAllBytes(file);
+            if (bytes.Length < 32)
+            {
+                return false;
+            }
+
+            var magic = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(0));
+            var version = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(4));
+            var storedSize = BinaryPrimitives.ReadInt64LittleEndian(bytes.AsSpan(12));
+            var storedMtime = BinaryPrimitives.ReadInt64LittleEndian(bytes.AsSpan(20));
+            if (magic != LoudnessMagic
+                || version != LoudnessVersion
+                || storedSize != size
+                || storedMtime != mtime)
+            {
+                return false;
+            }
+
+            integratedLufs = BinaryPrimitives.ReadSingleLittleEndian(bytes.AsSpan(28));
+            return !float.IsNaN(integratedLufs);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    public static void PutLoudness(string path, float integratedLufs)
+    {
+        if (float.IsNaN(integratedLufs)
+            || !TryStat(path, out var full, out var size, out var mtime))
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(RootDirectory);
+            var file = LoudnessPath(full);
+            var bytes = new byte[32];
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(0), LoudnessMagic);
+            BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(4), LoudnessVersion);
+            BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(8), 0);
+            BinaryPrimitives.WriteInt64LittleEndian(bytes.AsSpan(12), size);
+            BinaryPrimitives.WriteInt64LittleEndian(bytes.AsSpan(20), mtime);
+            BinaryPrimitives.WriteSingleLittleEndian(bytes.AsSpan(28), integratedLufs);
+            var tmp = file + ".tmp";
+            File.WriteAllBytes(tmp, bytes);
+            File.Move(tmp, file, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+        }
+    }
+
     private static bool TryReadArtRecord(string path, out int payload, out byte[]? bytes)
     {
         payload = 0;
@@ -250,6 +324,12 @@ internal static class LibraryMediaCache
     {
         var hash = HashKey(fullPath + "\u0001a");
         return Path.Combine(RootDirectory, hash + ".art");
+    }
+
+    private static string LoudnessPath(string fullPath)
+    {
+        var hash = HashKey(fullPath + "\u0001l");
+        return Path.Combine(RootDirectory, hash + ".lufs");
     }
 
     private static string HashKey(string value)

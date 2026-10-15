@@ -1269,7 +1269,7 @@ internal partial class AudioSettingsWindow : Window
         LibraryShowPlaylistMkvBox.IsEnabled = enabled;
         LibraryShowPlaylistWebmBox.IsEnabled = enabled;
         LibraryShowPlaylistMpgBox.IsEnabled = enabled;
-        // 関連付けのビデオは操作できたまま、見た目だけ落とす（IsEnabled では触らせない）。
+        // 関連付けのビデオも FFmpeg 未設定時は操作不可（見た目＋チェック不可）。
         var associationOpacity = enabled ? 1 : 0.45;
         if (_videoAssociationHeader is not null)
         {
@@ -1279,7 +1279,7 @@ internal partial class AudioSettingsWindow : Window
         for (var i = 0; i < _videoAssociationBoxes.Count; i++)
         {
             var box = _videoAssociationBoxes[i];
-            box.IsEnabled = true;
+            box.IsEnabled = enabled;
             box.Opacity = associationOpacity;
         }
     }
@@ -1644,8 +1644,10 @@ internal partial class AudioSettingsWindow : Window
 
     private void ClampToWorkArea()
     {
-        var work = SystemParameters.WorkArea;
-        var maxH = Math.Max(MinHeight, Math.Min(MaxHeight, work.Height - 32));
+        // プライマリ固定だとサブモニタ上でタブ切替（reflow）時に窓が飛ぶ。
+        var work = ResolveSettingsWorkArea();
+        var designMax = DesignMetrics.SettingsWindowMaxHeight;
+        var maxH = Math.Max(MinHeight, Math.Min(designMax, work.Height - 32));
         MaxHeight = maxH;
         if (Height > maxH)
         {
@@ -1656,10 +1658,28 @@ internal partial class AudioSettingsWindow : Window
             Height = Math.Min(DesignMetrics.SettingsWindowHeight, maxH);
         }
 
-        if (Left + Width > work.Right)
+        // 幅は FitWindowToAudio 済み。位置だけ当該モニタ内へ押し込む。
+        var placed = WindowPlacement.ClampRectToWorkArea(new Rect(Left, Top, Width, Height), work);
+        Left = placed.X;
+        Top = placed.Y;
+    }
+
+    /// <summary>今の窓がある（または最寄りの）モニタの作業領域。取れなければプライマリ。</summary>
+    private Rect ResolveSettingsWorkArea()
+    {
+        if (WindowPlacement.TryGetContainingMonitorWorkDip(this, out var containing))
         {
-            Left = Math.Max(work.X, work.Right - Width);
+            return containing;
         }
+
+        var cx = Left + (Width > 1 ? Width * 0.5 : 0);
+        var cy = Top + (Height > 1 ? Height * 0.5 : 0);
+        if (WindowPlacement.TryGetWorkAreaDipForPoint(cx, cy, out var nearest))
+        {
+            return nearest;
+        }
+
+        return SystemParameters.WorkArea;
     }
 
     private bool IsAudioTabSelected() =>
@@ -1933,7 +1953,7 @@ internal partial class AudioSettingsWindow : Window
 
     private void FitSettingCombos()
     {
-        var deviceMax = Math.Max(80, SystemParameters.WorkArea.Width - 200);
+        var deviceMax = Math.Max(80, ResolveSettingsWorkArea().Width - 200);
         ComboBoxFit.Apply(LanguageCombo);
         ComboBoxFit.Apply(UiScaleCombo);
         ComboBoxFit.Apply(MultiFileArrangeCombo);
@@ -1973,7 +1993,7 @@ internal partial class AudioSettingsWindow : Window
         var inner = content + pad + DesignMetrics.SettingsWindowContentMargin;
         var width = Math.Ceiling(inner + chrome);
         var min = DesignMetrics.SettingsWindowMinWidth;
-        var max = Math.Max(min, SystemParameters.WorkArea.Width - 32);
+        var max = Math.Max(min, ResolveSettingsWorkArea().Width - 32);
         width = Math.Clamp(width, min, max);
         MinWidth = width;
         MaxWidth = width;

@@ -14,6 +14,18 @@ public sealed class DocumentTabLayoutTests
     }
 
     [Fact]
+    public void SameSessionOrder_RequiresMatchingReferences()
+    {
+        var a = new object();
+        var b = new object();
+        var c = new object();
+        Assert.True(DocumentTabLayout.SameSessionOrder([a, b], [a, b]));
+        Assert.False(DocumentTabLayout.SameSessionOrder([a, b], [a, c]));
+        Assert.False(DocumentTabLayout.SameSessionOrder([a], [a, b]));
+        Assert.False(DocumentTabLayout.SameSessionOrder([a, b], [b, a]));
+    }
+
+    [Fact]
     public void FitsWithoutArrows_WhenInactiveMinsStillOverflow_IsFalse()
     {
         DocumentTabSlot[] tabs =

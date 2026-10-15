@@ -72,6 +72,39 @@ public sealed class LibraryMediaCacheTests : IDisposable
     }
 
     [Fact]
+    public void Loudness_RoundTrip()
+    {
+        var path = Path.Combine(_dir, "tone.wav");
+        File.WriteAllBytes(path, new byte[64]);
+
+        LibraryMediaCache.PutLoudness(path, -23.5f);
+        Assert.True(LibraryMediaCache.TryGetLoudness(path, out var loaded));
+        Assert.Equal(-23.5f, loaded);
+    }
+
+    [Fact]
+    public void Loudness_MissesWhenFileChanges()
+    {
+        var path = Path.Combine(_dir, "tone.wav");
+        File.WriteAllBytes(path, new byte[64]);
+        LibraryMediaCache.PutLoudness(path, -18f);
+
+        File.WriteAllBytes(path, new byte[80]);
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(1));
+        Assert.False(LibraryMediaCache.TryGetLoudness(path, out _));
+    }
+
+    [Fact]
+    public void Loudness_StoresNegativeInfinity()
+    {
+        var path = Path.Combine(_dir, "silence.wav");
+        File.WriteAllBytes(path, new byte[32]);
+        LibraryMediaCache.PutLoudness(path, float.NegativeInfinity);
+        Assert.True(LibraryMediaCache.TryGetLoudness(path, out var loaded));
+        Assert.True(float.IsNegativeInfinity(loaded));
+    }
+
+    [Fact]
     public void PlaylistWaveform_PersistsOnTrySet()
     {
         var path = Path.Combine(_dir, "persist.wav");

@@ -990,6 +990,9 @@ internal sealed class PeakPyramid
         return new PeakPyramid([.. minLevels], [.. maxLevels], channels, frameCount, baseBucket, filledFrames);
     }
 
+    /// <summary>同一パスのデコードを直列化する（波形／ラウドネス計測など）。</summary>
+    internal static SemaphoreSlim DecodeGateFor(string path) => PathDecodeGate(path);
+
     private static SemaphoreSlim PathDecodeGate(string path) =>
         DecodeGates.GetOrAdd(path, static _ => new SemaphoreSlim(1, 1));
 

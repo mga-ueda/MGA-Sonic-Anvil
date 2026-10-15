@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 using Xunit;
@@ -266,6 +267,86 @@ public sealed class LibraryDeferredLoadTests
         Assert.Equal(string.Empty, row.BitRateText);
         Assert.Equal("48kHz", row.SampleRateText);
         Assert.Equal("2ch", row.ChannelsText);
+        Assert.Null(row.IntegratedLufs);
+        Assert.Equal(string.Empty, row.LoudnessText);
+    }
+
+    [Fact]
+    public void CreateRow_Wave_ShowsIntegratedLufsWhenTagged()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".wav");
+        var document = AudioDocument.CreateDeferred(path);
+        document.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 1,
+            SampleRate = 48000,
+            Channels = 2,
+            BitsPerSample = 24,
+            IntegratedLufs = -23.5f,
+        });
+
+        var row = LibraryBrowserView.CreateRow(new DocumentSession(document));
+        Assert.Equal(-23.5f, row.IntegratedLufs);
+        Assert.Equal("-23.5 LKFS", row.LoudnessText);
+    }
+
+    [Fact]
+    public void CreateRow_Wave_HydratesIntegratedLufsFromMediaCache()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "mga-lufs-row-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        LibraryMediaCache.UseDirectoryForTests(dir);
+        try
+        {
+            var path = Path.Combine(dir, "tone.wav");
+            File.WriteAllBytes(path, new byte[64]);
+            LibraryMediaCache.PutLoudness(path, -21.2f);
+
+            var document = AudioDocument.CreateDeferred(path);
+            document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                DurationSeconds = 1,
+                SampleRate = 48000,
+                Channels = 2,
+                BitsPerSample = 16,
+            });
+            Assert.Null(document.Tags.IntegratedLufs);
+
+            var row = LibraryBrowserView.CreateRow(new DocumentSession(document));
+            Assert.Equal(-21.2f, row.IntegratedLufs);
+            Assert.Equal("-21.2 LKFS", row.LoudnessText);
+            Assert.Equal(-21.2f, document.Tags.IntegratedLufs);
+        }
+        finally
+        {
+            LibraryMediaCache.ResetForTests();
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void CreateRow_Mp3_BlanksLoudnessEvenIfTagged()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mp3");
+        var document = AudioDocument.CreateDeferred(path);
+        document.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 1,
+            SampleRate = 44100,
+            Channels = 2,
+            BitRateKbps = 320,
+            IntegratedLufs = -18f,
+        });
+
+        var row = LibraryBrowserView.CreateRow(new DocumentSession(document));
+        Assert.Null(row.IntegratedLufs);
+        Assert.Equal(string.Empty, row.LoudnessText);
     }
 
     [Fact]
@@ -317,6 +398,30 @@ public sealed class LibraryDeferredLoadTests
         Assert.Equal(string.Empty, row.BitRateText);
         Assert.Equal("48kHz", row.SampleRateText);
         Assert.Equal("1ch", row.ChannelsText);
+        Assert.Null(row.IntegratedLufs);
+        Assert.Equal(string.Empty, row.LoudnessText);
+    }
+
+    [Fact]
+    public void CreateRow_Aiff_ShowsIntegratedLufsWhenTagged()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".aif");
+        var document = AudioDocument.CreateDeferred(path);
+        Assert.Equal(AudioFileKind.Aiff, document.SourceKind);
+        document.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 1,
+            SampleRate = 48000,
+            Channels = 2,
+            BitsPerSample = 24,
+            IntegratedLufs = -20.1f,
+        });
+
+        var row = LibraryBrowserView.CreateRow(new DocumentSession(document));
+        Assert.Equal("AIFF", row.Kind);
+        Assert.Equal(-20.1f, row.IntegratedLufs);
+        Assert.Equal("-20.1 LKFS", row.LoudnessText);
     }
 
     [Fact]

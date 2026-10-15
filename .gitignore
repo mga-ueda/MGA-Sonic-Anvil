@@ -11,6 +11,11 @@ obj/
 *.log
 publish/
 artifacts/
+testrun-loudness-v/
+tmp-video-frames/
 
 # Office 一時ロック（本体の docs/*.xlsx は残す）
 ~$*
+
+[Tt]est[Rr]esults/
+*.dmp

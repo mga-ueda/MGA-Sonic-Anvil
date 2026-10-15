@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
@@ -55,6 +56,109 @@ public sealed class LoudnessMeterEngineTests
         Assert.InRange(measured.IntegratedLufs, -22.5f, -19.5f);
         Assert.InRange(measured.ShortTermLufs, -22.5f, -19.5f);
         Assert.InRange(measured.TruePeakDb, -22.5f, -19f);
+    }
+
+    [Fact]
+    public void TryMeasureIntegratedLufs_UsesInMemoryPcmForWave()
+    {
+        const int rate = 48000;
+        var frames = rate * 4;
+        var interleaved = new float[frames * 2];
+        var amp = (float)Math.Pow(10, -20d / 20d);
+        for (var i = 0; i < frames; i++)
+        {
+            var s = amp * (float)Math.Sin(2 * Math.PI * 1000 * i / rate);
+            interleaved[i * 2] = s;
+            interleaved[i * 2 + 1] = s;
+        }
+
+        var document = new AudioDocument(interleaved, rate, 2, 16, AudioFileKind.Wave, null, buildPeaks: false);
+        Assert.True(LoudnessMeterEngine.TryMeasureIntegratedLufs(document, out var lufs));
+        Assert.InRange(lufs, -22.5f, -19.5f);
+    }
+
+    [Fact]
+    public void TryMeasureIntegratedFromPath_ReadsAiff()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"mga-aiff-lufs-{Guid.NewGuid():N}.aiff");
+        try
+        {
+            WriteMonoToneAiff(path, sampleRate: 48000, frames: 48000 * 2, frequency: 1000, amp: 0.1f);
+            Assert.Equal(AudioFileKind.Aiff, AudioCodec.DetectKind(path));
+            Assert.True(LoudnessMeterEngine.TryMeasureIntegratedFromPath(path, out var lufs));
+            Assert.True(float.IsFinite(lufs));
+
+            var deferred = AudioDocument.CreateDeferred(path);
+            Assert.Equal(AudioFileKind.Aiff, deferred.SourceKind);
+            Assert.True(LoudnessMeterEngine.TryMeasureIntegratedLufs(deferred, out var deferredLufs));
+            Assert.Equal(lufs, deferredLufs, precision: 2);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    private static void WriteMonoToneAiff(
+        string path,
+        int sampleRate,
+        int frames,
+        double frequency,
+        float amp)
+    {
+        using var stream = File.Create(path);
+        using var writer = new BinaryWriter(stream, System.Text.Encoding.ASCII, leaveOpen: false);
+        writer.Write(System.Text.Encoding.ASCII.GetBytes("FORM"));
+        var sizePos = stream.Position;
+        WriteU32Be(writer, 0);
+        writer.Write(System.Text.Encoding.ASCII.GetBytes("AIFF"));
+        writer.Write(System.Text.Encoding.ASCII.GetBytes("COMM"));
+        WriteU32Be(writer, 18);
+        WriteU16Be(writer, 1);
+        WriteU32Be(writer, (uint)frames);
+        WriteU16Be(writer, 16);
+        // 48000 Hz as 80-bit IEEE extended
+        writer.Write(new byte[] { 0x40, 0x0E, 0xBB, 0x80, 0, 0, 0, 0, 0, 0 });
+        writer.Write(System.Text.Encoding.ASCII.GetBytes("SSND"));
+        WriteU32Be(writer, (uint)(8 + (frames * 2)));
+        WriteU32Be(writer, 0);
+        WriteU32Be(writer, 0);
+        for (var i = 0; i < frames; i++)
+        {
+            var sample = (short)Math.Clamp(
+                Math.Round(amp * short.MaxValue * Math.Sin(2 * Math.PI * frequency * i / sampleRate)),
+                short.MinValue,
+                short.MaxValue);
+            writer.Write((byte)(sample >> 8));
+            writer.Write((byte)sample);
+        }
+
+        var end = stream.Position;
+        stream.Position = sizePos;
+        WriteU32Be(writer, (uint)(end - 8));
+    }
+
+    private static void WriteU16Be(BinaryWriter writer, int value)
+    {
+        writer.Write((byte)(value >> 8));
+        writer.Write((byte)value);
+    }
+
+    private static void WriteU32Be(BinaryWriter writer, uint value)
+    {
+        writer.Write((byte)(value >> 24));
+        writer.Write((byte)(value >> 16));
+        writer.Write((byte)(value >> 8));
+        writer.Write((byte)value);
     }
 
     [Fact]
@@ -138,6 +242,43 @@ public sealed class LoudnessMeterEngineTests
     }
 
     [Fact]
+    public void TryGainDbToMatchTarget_UsesTargetMinusIntegrated()
+    {
+        Assert.True(LoudnessMeterEngine.TryGainDbToMatchTarget(-18f, -24, out var gainDb));
+        Assert.Equal(-6, gainDb, 5);
+        Assert.True(LoudnessMeterEngine.TryGainDbToMatchTarget(-30f, -24, out gainDb));
+        Assert.Equal(6, gainDb, 5);
+        Assert.False(LoudnessMeterEngine.TryGainDbToMatchTarget(-24f, -24, out _));
+        Assert.False(LoudnessMeterEngine.TryGainDbToMatchTarget(float.NegativeInfinity, -24, out _));
+        Assert.False(LoudnessMeterEngine.TryGainDbToMatchTarget(float.NaN, -24, out _));
+    }
+
+    [Fact]
+    public void TryGainDbToMatchTarget_Document_MeasuresAndReturnsGain()
+    {
+        // 短いトーンでも Integrated が有限ならゲインが求まる。
+        var rate = 48000;
+        var frames = rate; // 1 秒
+        var samples = new float[frames];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i] = 0.25f * MathF.Sin(2f * MathF.PI * 440f * i / rate);
+        }
+
+        var document = new AudioDocument(samples, rate, 1, 16, AudioFileKind.Wave, null);
+        Assert.True(LoudnessMeterEngine.TryMeasureIntegratedLufs(document, out var integrated));
+        Assert.True(float.IsFinite(integrated));
+        var target = integrated - 3f;
+        Assert.True(LoudnessMeterEngine.TryGainDbToMatchTarget(
+            document,
+            target,
+            out var gainDb,
+            out var measured));
+        Assert.Equal(integrated, measured, 3);
+        Assert.Equal(-3, gainDb, 1);
+    }
+
+    [Fact]
     public void ApplyLinearGain_ShiftsLufsAndTruePeakButNotLra()
     {
         var snap = new LoudnessSnapshot(-20f, -18f, -19f, -16f, 7.5f, -3f, -24);
@@ -211,6 +352,9 @@ public sealed class LoudnessMeterEngineTests
         Assert.False(LoudnessMeterView.CanReuseOffline(samples, 1, 8, samples, 2, 8));
         Assert.False(LoudnessMeterView.CanReuseOffline(samples, 1, 8, samples, 1, 4));
         Assert.False(LoudnessMeterView.CanReuseOffline(samples, 1, 8, new float[8], 1, 8));
+        Assert.Equal("-23.5 LKFS", UiStrings.FormatIntegratedLufs(-23.5f));
+        Assert.Equal("--.- LKFS", UiStrings.FormatIntegratedLufs(float.NegativeInfinity));
+        Assert.Equal(string.Empty, UiStrings.FormatIntegratedLufs(null));
     }
 
     [Fact]

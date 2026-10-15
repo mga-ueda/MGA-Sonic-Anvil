@@ -20,6 +20,7 @@ public partial class MainWindow
     private bool _documentTabAccentPlaced;
     private int _documentTabAccentTicket;
     private bool _documentTabAccentAnimatePending;
+    private long _documentTabAccentLastMoveAt;
 
     /// <summary>
     /// 複数選択されたタブ。Ctrl+クリックで個別追加、Shift+クリックで範囲、
@@ -93,7 +94,8 @@ public partial class MainWindow
         {
             if (!IsEditingFileName)
             {
-                RebuildTabBar();
+                // 同じタブの再アクティブでは全作り直ししない（4／6 連打の引っかかり防止）。
+                RefreshTabHeaders();
                 RefreshTileChrome();
             }
 
@@ -722,9 +724,43 @@ public partial class MainWindow
     private DocumentSession? FindSessionByPath(string path) =>
         _workspace.FindByPath(path);
 
+    /// <summary>
+    /// セッション順が同じならタブ DOM を再利用。違うときだけ Rebuild。
+    /// 見た目の更新は呼び出し側の RefreshTabHeaders／RefreshTitle に任せる。
+    /// </summary>
+    private void SyncTabBar()
+    {
+        if (TabBarMatchesSessions())
+        {
+            return;
+        }
+
+        RebuildTabBar();
+    }
+
+    private bool TabBarMatchesSessions()
+    {
+        var tabs = DocumentTabs.Children.OfType<Border>().ToArray();
+        var tags = new object?[tabs.Length];
+        for (var i = 0; i < tabs.Length; i++)
+        {
+            tags[i] = tabs[i].Tag;
+        }
+
+        var sessions = new object?[_sessions.Count];
+        for (var i = 0; i < _sessions.Count; i++)
+        {
+            sessions[i] = _sessions[i];
+        }
+
+        return DocumentTabLayout.SameSessionOrder(tags, sessions);
+    }
+
     private void RebuildTabBar()
     {
         CancelFileNameEdit();
+        // 作り直し前に下線アニメを止め、古い Completed が位置を書き戻さないようにする。
+        CancelDocumentTabAccentAnimation();
         DocumentTabs.Children.Clear();
         foreach (var session in _sessions)
         {
@@ -891,11 +927,12 @@ public partial class MainWindow
     {
         EnsureDocumentTabAccent();
         var previous = _documentTabAccentSession;
+        // アニメ中は実効値（見た目の位置）を取る。Base だと毎回スタート地点へ戻って引っかかる。
         var fromLeft = _documentTabAccentPlaced && _documentTabAccent is not null
-            ? Canvas.GetLeft(_documentTabAccent)
+            ? (double)_documentTabAccent.GetValue(Canvas.LeftProperty)
             : double.NaN;
         var fromWidth = _documentTabAccentPlaced && _documentTabAccent is not null
-            ? _documentTabAccent.Width
+            ? (double)_documentTabAccent.GetValue(FrameworkElement.WidthProperty)
             : double.NaN;
 
         foreach (var border in DocumentTabs.Children.OfType<Border>())
@@ -931,6 +968,40 @@ public partial class MainWindow
             DispatcherPriority.Loaded);
     }
 
+    /// <summary>進行中の下線スライドを見た目の位置で止め、古い Completed を無効化する。</summary>
+    private void CancelDocumentTabAccentAnimation()
+    {
+        _documentTabAccentAnimatePending = false;
+        FreezeDocumentTabAccentVisual();
+    }
+
+    /// <summary>
+    /// アニメを止め、見た目の位置をローカル値へ確定する。チケットを進めて古い Completed を無効化。
+    /// </summary>
+    private void FreezeDocumentTabAccentVisual()
+    {
+        _documentTabAccentTicket++;
+        if (_documentTabAccent is null)
+        {
+            return;
+        }
+
+        var accent = _documentTabAccent;
+        var left = (double)accent.GetValue(Canvas.LeftProperty);
+        var width = (double)accent.GetValue(FrameworkElement.WidthProperty);
+        accent.BeginAnimation(Canvas.LeftProperty, null);
+        accent.BeginAnimation(FrameworkElement.WidthProperty, null);
+        if (!double.IsNaN(left))
+        {
+            Canvas.SetLeft(accent, left);
+        }
+
+        if (!double.IsNaN(width) && width >= 0)
+        {
+            accent.Width = width;
+        }
+    }
+
     private void EnsureDocumentTabAccent()
     {
         if (_documentTabAccent is not null)
@@ -962,8 +1033,7 @@ public partial class MainWindow
                 .FirstOrDefault(b => ReferenceEquals(b.Tag, _activeSession)) is not { } item
             || item.ActualWidth <= 0)
         {
-            accent.BeginAnimation(Canvas.LeftProperty, null);
-            accent.BeginAnimation(FrameworkElement.WidthProperty, null);
+            FreezeDocumentTabAccentVisual();
             accent.Width = 0;
             _documentTabAccentPlaced = false;
             _documentTabAccentSession = null;
@@ -998,10 +1068,28 @@ public partial class MainWindow
         var top = bottom.Y - accent.Height;
         Canvas.SetTop(accent, top);
 
+        // 4／6 連打ではスライドを重ねずスナップ（古い Completed がバーを戻すのも防ぐ）。
+        var now = Environment.TickCount64;
+        var rapid = _documentTabAccentLastMoveAt != 0
+            && now - _documentTabAccentLastMoveAt < DocumentTabAccentSlide.TotalMilliseconds;
+        _documentTabAccentLastMoveAt = now;
+        if (animate && rapid)
+        {
+            animate = false;
+        }
+
+        // 先に止めてチケットを進め、この移動用の Completed だけが有効になるようにする。
+        var startWidth = double.IsNaN(fromWidth)
+            ? (double)accent.GetValue(FrameworkElement.WidthProperty)
+            : fromWidth;
+        var startLeft = double.IsNaN(fromLeft)
+            ? (double)accent.GetValue(Canvas.LeftProperty)
+            : fromLeft;
+        FreezeDocumentTabAccentVisual();
+        var ticket = _documentTabAccentTicket;
+
         if (!animate || !_documentTabAccentPlaced || double.IsNaN(fromLeft))
         {
-            accent.BeginAnimation(Canvas.LeftProperty, null);
-            accent.BeginAnimation(FrameworkElement.WidthProperty, null);
             Canvas.SetLeft(accent, left);
             accent.Width = width;
             _documentTabAccentPlaced = true;
@@ -1010,18 +1098,19 @@ public partial class MainWindow
         }
 
         // SizeChanged 等で先にスナップされていても、クリック前の位置からスライドする。
-        var startWidth = double.IsNaN(fromWidth) ? accent.Width : fromWidth;
-        accent.BeginAnimation(Canvas.LeftProperty, null);
-        accent.BeginAnimation(FrameworkElement.WidthProperty, null);
-        Canvas.SetLeft(accent, fromLeft);
+        Canvas.SetLeft(accent, startLeft);
         accent.Width = startWidth;
-        AnimateDocumentTabAccent(Canvas.LeftProperty, fromLeft, left);
-        AnimateDocumentTabAccent(FrameworkElement.WidthProperty, startWidth, width);
+        AnimateDocumentTabAccent(Canvas.LeftProperty, startLeft, left, ticket);
+        AnimateDocumentTabAccent(FrameworkElement.WidthProperty, startWidth, width, ticket);
         _documentTabAccentPlaced = true;
         _documentTabAccentSession = _activeSession;
     }
 
-    private void AnimateDocumentTabAccent(DependencyProperty property, double from, double to)
+    private void AnimateDocumentTabAccent(
+        DependencyProperty property,
+        double from,
+        double to,
+        int ticket)
     {
         var accent = _documentTabAccent;
         if (accent is null)
@@ -1043,6 +1132,12 @@ public partial class MainWindow
         };
         anim.Completed += (_, _) =>
         {
+            // 新しい切替のアニメが進んでいるときは触らない（バーが旧タブで止まる原因）。
+            if (ticket != _documentTabAccentTicket)
+            {
+                return;
+            }
+
             accent.BeginAnimation(property, null);
             accent.SetValue(property, to);
         };

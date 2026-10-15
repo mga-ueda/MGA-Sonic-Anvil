@@ -81,6 +81,20 @@ public partial class MainWindow
 
     private void PromptVolume()
     {
+        // プレイヤー：プレイリスト選択の Wave / AIFF をターゲットへ揃える（確認のみ）。
+        if (IsLibraryMaximized)
+        {
+            PromptMatchLoudnessTarget(ResolvePlaylistLoudnessMatchTargets());
+            return;
+        }
+
+        // エディタのタブ複数選択：無音検出と同じく確認ダイアログのあと即適用。
+        if (HasTabSelection)
+        {
+            PromptMatchLoudnessTarget(SelectedTabsInOrder());
+            return;
+        }
+
         if (_document is null)
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
@@ -154,6 +168,260 @@ public partial class MainWindow
                     });
                 },
                 TaskScheduler.Default);
+    }
+
+    private DocumentSession[] ResolvePlaylistLoudnessMatchTargets()
+    {
+        var selected = LibraryBrowser.SelectedSessions;
+        if (selected.Length > 0)
+        {
+            return selected;
+        }
+
+        return _activeSession is { } active ? [active] : [];
+    }
+
+    private void PromptMatchLoudnessTarget(IReadOnlyList<DocumentSession> sessions)
+    {
+        if (IsUiBusy)
+        {
+            return;
+        }
+
+        CloseVolumeGainPicker();
+        var eligible = new List<DocumentSession>(sessions.Count);
+        foreach (var session in sessions)
+        {
+            if (AudioCodec.IsUncompressedPcm(session.Document.SourceKind))
+            {
+                eligible.Add(session);
+            }
+        }
+
+        if (eligible.Count == 0)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorNoWaveAiffForLoudnessMatch,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var saveAfter = IsLibraryMaximized;
+        var result = MatchLoudnessTargetWindow.Show(
+            this,
+            eligible.Count,
+            AppStorage.Settings.ResolvedLoudnessTargetLufs(),
+            saveAfter);
+        if (!result.Accepted)
+        {
+            return;
+        }
+
+        _ = MatchLoudnessTargetAsync(eligible, result.TargetLufs, saveAfter);
+    }
+
+    /// <summary>
+    /// Wave / AIFF の Integrated を設定のラウドネスターゲットへ揃える（ファイル全体の破壊ゲイン）。
+    /// プレイヤー（saveAfter）では続けて既存パスへ確認なし保存する。
+    /// </summary>
+    private async Task MatchLoudnessTargetAsync(
+        IReadOnlyList<DocumentSession> targets,
+        double targetLufs,
+        bool saveAfter)
+    {
+        if (targets.Count == 0 || IsUiBusy)
+        {
+            return;
+        }
+
+        var sessions = targets.ToArray();
+        _tabBatchEditBusy = true;
+        RefreshExportEnabled();
+        var names = sessions.Select(session => session.DisplayName).ToArray();
+        var weights = sessions.Select(session => Math.Max(1L, session.Document.FrameCount)).ToArray();
+        var progress = new double[sessions.Length];
+        var applied = new int[sessions.Length];
+        Exception? error = null;
+        try
+        {
+            StopPlaybackForEdit();
+            foreach (var session in sessions)
+            {
+                PrepareSessionForHistoryPaste(session);
+            }
+
+            ShowBusyGlass(UiStrings.OverlayApplySelected);
+            ReportHistoryPasteBusy(names, progress, weights);
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                if (!IsLoaded)
+                {
+                    break;
+                }
+
+                var session = sessions[i];
+                progress[i] = Math.Max(progress[i], 0.02);
+                ReportHistoryPasteBusy(names, progress, weights);
+
+                if (!await EnsureSessionPcmForEditAsync(session).ConfigureAwait(true))
+                {
+                    progress[i] = 1;
+                    ReportHistoryPasteBusy(names, progress, weights);
+                    continue;
+                }
+
+                weights[i] = Math.Max(1L, session.Document.FrameCount);
+                IEditCommand? command = null;
+                float integratedBefore = float.NaN;
+                double gainDb = 0;
+                try
+                {
+                    var document = session.Document;
+                    var mask = TabBatchEditMask(session);
+                    var measured = await Task.Run(() =>
+                    {
+                        if (!LoudnessMeterEngine.TryGainDbToMatchTarget(
+                                document,
+                                targetLufs,
+                                out var db,
+                                out var integrated))
+                        {
+                            return (Command: (IEditCommand?)null, Integrated: integrated, GainDb: 0d);
+                        }
+
+                        var edit = ProcessEdits.Gain(
+                            document,
+                            TabBatchRange(document),
+                            db,
+                            channelMask: mask);
+                        return (Command: edit, Integrated: integrated, GainDb: db);
+                    }).ConfigureAwait(true);
+                    command = measured.Command;
+                    integratedBefore = measured.Integrated;
+                    gainDb = measured.GainDb;
+                }
+                catch (Exception ex)
+                {
+                    error = ex;
+                    progress[i] = 1;
+                    ReportHistoryPasteBusy(names, progress, weights);
+                    break;
+                }
+
+                if (!IsLoaded)
+                {
+                    break;
+                }
+
+                if (command is not null)
+                {
+                    session.History.Do(session.Document, command);
+                    if (float.IsFinite(integratedBefore))
+                    {
+                        var after = LoudnessMeterEngine.ApplyLinearGainToLufs(
+                            integratedBefore,
+                            (float)WaveformGainAnalyzer.LinearFromDb(gainDb));
+                        session.Document.ApplyTags(session.Document.Tags.WithIntegratedLufs(after));
+                    }
+
+                    if (IsLibraryMaximized)
+                    {
+                        LibraryBrowser.UpdateSessionRow(session);
+                    }
+
+                    applied[i]++;
+                }
+
+                progress[i] = 1;
+                ReportHistoryPasteBusy(names, progress, weights);
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex;
+        }
+
+        var saveTargets = new List<DocumentSession>();
+        if (saveAfter && error is null && IsLoaded)
+        {
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                if (applied[i] > 0)
+                {
+                    saveTargets.Add(sessions[i]);
+                }
+            }
+        }
+
+        var willSave = saveTargets.Count > 0;
+        if (!willSave)
+        {
+            _tabBatchEditBusy = false;
+            RefreshExportEnabled();
+            if (error is not null || !IsLoaded)
+            {
+                _busyGlass.HideOverlay();
+            }
+            else
+            {
+                _busyGlass.BeginFadeOut();
+            }
+        }
+
+        if (!IsLoaded)
+        {
+            if (willSave)
+            {
+                _tabBatchEditBusy = false;
+                RefreshExportEnabled();
+                _busyGlass.HideOverlay();
+            }
+
+            return;
+        }
+
+        RefreshViewsAfterHistoryPaste(sessions, applied);
+        if (error is not null)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                error.Message,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        if (applied.All(count => count == 0))
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.TabBatchEditSkippedAll,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        if (!willSave)
+        {
+            return;
+        }
+
+        try
+        {
+            // 保存中は Export 側のビジーに切り替え（すりガラスは Save が張り替える）。
+            _tabBatchEditBusy = false;
+            RefreshExportEnabled();
+            await SaveSessionsInPlaceQuietAsync(saveTargets).ConfigureAwait(true);
+        }
+        finally
+        {
+            RefreshExportEnabled();
+        }
     }
 
     private bool CloseVolumeGainPicker()
@@ -1152,7 +1420,8 @@ public partial class MainWindow
         Waveform.SetTrailRecording(false);
         Transport.SetPlaying(false);
         ExtinguishMeter();
-        LoudnessMeter.Tick();
+        // 再生中 Tick は止まっているので、停止時に波形全体のオフライン計測へ戻す。
+        LoudnessMeter.RefreshOffline();
         Waveform.UnlockCenter();
     }
 
