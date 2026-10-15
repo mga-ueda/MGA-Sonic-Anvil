@@ -288,6 +288,58 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void ExplorerTypeahead_M_SelectsMusicFolder()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            // ルート名に m を入れない（部分一致でルート自身がヒットしないように）。
+            var root = Path.Combine(Path.GetTempPath(), "xqa-lib-" + Guid.NewGuid().ToString("N"));
+            var music = Path.Combine(root, "Music");
+            var other = Path.Combine(root, "Other");
+            Directory.CreateDirectory(music);
+            Directory.CreateDirectory(other);
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                var folder = view.ExplorerFirstFolder;
+                Assert.NotNull(folder);
+                folder.IsExpanded = true;
+                Flush();
+
+                Assert.True(view.TryExplorerTypeahead(Key.M, ModifierKeys.None));
+                Assert.Equal("m", view.ExplorerTypeaheadQuery);
+                Assert.True(view.IsExplorerTypeaheadActive);
+                Assert.True(view.TryGetSelectedExplorerFolder(out var selected));
+                Assert.Equal(Path.GetFullPath(music), Path.GetFullPath(selected));
+
+                Assert.True(view.ClearExplorerTypeahead());
+                Assert.False(view.IsExplorerTypeaheadActive);
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void RefreshExplorer_PicksUpNewFolder_KeepsSelection()
     {
         RunSta(() =>

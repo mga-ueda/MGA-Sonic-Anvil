@@ -223,7 +223,7 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// プレイヤー捨てキュー（I／O／M／Ins）。ツリータイプアヘッドより先に呼ぶこと。
+    /// プレイヤー捨てキュー（I／O／M／Ins）。呼び出し前に <see cref="LibraryPlayerMode.AllowsPlayerScratchCueKey"/> でゲートすること。
     /// </summary>
     private bool TryHandlePlayerScratchCueKey(Key key, ModifierKeys modifiers)
     {

@@ -376,6 +376,24 @@ internal static class LibraryPlayerMode
     /// </summary>
     public static bool AllowsPlayerLetterTransport(bool explorerFocused) => !explorerFocused;
 
+    /// <summary>
+    /// ツリーフォーカス中は I／O／M をタイプアヘッドに譲る。Ins は捨てマーカーのまま。
+    /// </summary>
+    public static bool AllowsPlayerScratchCueKey(Key key, ModifierKeys modifiers, bool explorerTreeFocused)
+    {
+        if (!IsPlayerScratchCueKey(key, modifiers))
+        {
+            return false;
+        }
+
+        if (explorerTreeFocused && key is Key.I or Key.O or Key.M)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
     /// <summary>エクスプローラーの /。テンキーと Oem2（日本語キーボードの /）。</summary>
     public static bool IsExplorerCollapseSubtree(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && key is Key.Divide or Key.Oem2;
@@ -1686,7 +1704,7 @@ internal static class LibraryPlayerMode
     /// </summary>
     public static bool BlocksEditorMarkerPlacement(bool playerMode) => playerMode;
 
-    /// <summary>捨て A-B／一時マーカーのキー（修飾なし）。ツリーのタイプアヘッドより優先する判定用。</summary>
+    /// <summary>捨て A-B／一時マーカーのキー（修飾なし）。ツリーフォーカス時の優先は <see cref="AllowsPlayerScratchCueKey"/>。</summary>
     public static bool IsPlayerScratchCueKey(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && key is Key.I or Key.O or Key.M or Key.Insert;
 

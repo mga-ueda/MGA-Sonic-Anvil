@@ -484,10 +484,14 @@ public partial class MainWindow
             return true;
         }
 
-        // I／O／M／Ins はツリーのタイプアヘッドより先（動画本再生中もフォーカスがツリーに残り得る）。
+        // I／O／M／Ins。ツリーフォーカス中は I／O／M をタイプアヘッドへ譲る（Ins はマーカーのまま）。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
             && !ImeComposition.IsComposing
+            && LibraryPlayerMode.AllowsPlayerScratchCueKey(
+                key,
+                modifiers,
+                LibraryBrowser.IsExplorerTreeFocused)
             && TryHandlePlayerScratchCueKey(key, modifiers))
         {
             return true;

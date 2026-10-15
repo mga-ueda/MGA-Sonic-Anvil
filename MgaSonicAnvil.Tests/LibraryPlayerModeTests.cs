@@ -279,6 +279,14 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsPlayerScratchCueKey(Key.I, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsPlayerScratchCueKey(Key.O, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPlayerScratchCueKey(Key.M, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.AllowsPlayerScratchCueKey(Key.M, ModifierKeys.None, explorerTreeFocused: true));
+        Assert.False(LibraryPlayerMode.AllowsPlayerScratchCueKey(Key.I, ModifierKeys.None, explorerTreeFocused: true));
+        Assert.False(LibraryPlayerMode.AllowsPlayerScratchCueKey(Key.O, ModifierKeys.None, explorerTreeFocused: true));
+        Assert.True(LibraryPlayerMode.AllowsPlayerScratchCueKey(Key.Insert, ModifierKeys.None, explorerTreeFocused: true));
+        Assert.True(LibraryPlayerMode.AllowsPlayerScratchCueKey(Key.M, ModifierKeys.None, explorerTreeFocused: false));
+        Assert.True(LibraryPlayerMode.AllowsPlayerScratchCueKey(Key.I, ModifierKeys.None, explorerTreeFocused: false));
+        Assert.True(LibraryPlayerMode.AllowsPlayerScratchCueKey(Key.O, ModifierKeys.None, explorerTreeFocused: false));
+        Assert.False(LibraryPlayerMode.AllowsPlayerScratchCueKey(Key.T, ModifierKeys.None, explorerTreeFocused: false));
         Assert.True(LibraryPlayerMode.ShowsPlayerScratchOverlays(
             playerMode: true,
             videoMiniPlayer: false,
