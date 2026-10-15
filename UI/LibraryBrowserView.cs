@@ -5317,6 +5317,19 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
+        if (key is Key.Left or Key.Right && modifiers == ModifierKeys.None)
+        {
+            ClearExplorerTypeahead();
+            return;
+        }
+
+        if (key == Key.Space && modifiers == ModifierKeys.None)
+        {
+            TryExplorerSpaceExpandOrMoveDown();
+            e.Handled = true;
+            return;
+        }
+
         if (key is Key.Up or Key.Down && modifiers == ModifierKeys.None)
         {
             if (IsExplorerTypeaheadActive)
@@ -5629,6 +5642,28 @@ internal sealed class LibraryBrowserView : UserControl
 
     internal bool ShouldHoldExplorerMultiSelect(TreeViewItem item) =>
         _treeMultiSelected.Count > 1 && _treeMultiSelected.Contains(item);
+
+    /// <summary>
+    /// Space: 黄色ハイライトを消し、未展開で子があれば展開。展開済み（または葉）なら一つ下へ。
+    /// </summary>
+    internal bool TryExplorerSpaceExpandOrMoveDown()
+    {
+        ClearExplorerTypeahead();
+        var item = CurrentExplorerItem();
+        if (item is null)
+        {
+            return false;
+        }
+
+        if (item.HasItems && !item.IsExpanded)
+        {
+            item.IsExpanded = true;
+            return true;
+        }
+
+        MoveExplorerSelection(1, extend: false);
+        return true;
+    }
 
     internal void MoveExplorerSelection(int delta, bool extend = false)
     {

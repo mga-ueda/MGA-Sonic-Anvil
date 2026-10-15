@@ -661,8 +661,15 @@ public partial class MainWindow
                 return true;
             }
 
+            if (key == Key.Space && modifiers == ModifierKeys.None)
+            {
+                LibraryBrowser.TryExplorerSpaceExpandOrMoveDown();
+                return true;
+            }
+
             if (LibraryPlayerMode.ExplorerOwnsHorizontal(key, modifiers))
             {
+                LibraryBrowser.ClearExplorerTypeahead();
                 StopPlaybackShuttle();
                 return false;
             }

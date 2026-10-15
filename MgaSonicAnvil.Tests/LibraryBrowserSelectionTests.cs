@@ -340,6 +340,69 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void ExplorerSpace_ExpandsThenMovesDown_AndClearsTypeahead()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            // ルート名に a／b を入れない。
+            var root = Path.Combine(Path.GetTempPath(), "xqt-lib-" + Guid.NewGuid().ToString("N"));
+            var alpha = Path.Combine(root, "Alpha");
+            var beta = Path.Combine(root, "Beta");
+            Directory.CreateDirectory(alpha);
+            Directory.CreateDirectory(beta);
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                var folder = view.ExplorerFirstFolder;
+                Assert.NotNull(folder);
+                folder.IsSelected = true;
+                Flush();
+                Assert.False(folder.IsExpanded);
+
+                Assert.True(view.TryExplorerSpaceExpandOrMoveDown());
+                Flush();
+                Assert.True(folder.IsExpanded);
+                Assert.True(view.TryGetSelectedExplorerFolder(out var stillRoot));
+                Assert.Equal(Path.GetFullPath(root), Path.GetFullPath(stillRoot));
+
+                // 展開済みルートで Space → 一つ下（Alpha）。
+                Assert.True(view.TryExplorerSpaceExpandOrMoveDown());
+                Assert.True(view.TryGetSelectedExplorerFolder(out var onAlpha));
+                Assert.Equal(Path.GetFullPath(alpha), Path.GetFullPath(onAlpha));
+
+                Assert.True(view.TryExplorerTypeahead(Key.B, ModifierKeys.None));
+                Assert.True(view.IsExplorerTypeaheadActive);
+                Assert.True(view.TryGetSelectedExplorerFolder(out var onBeta));
+                Assert.Equal(Path.GetFullPath(beta), Path.GetFullPath(onBeta));
+
+                Assert.True(view.TryExplorerSpaceExpandOrMoveDown());
+                Assert.False(view.IsExplorerTypeaheadActive);
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void RefreshExplorer_PicksUpNewFolder_KeepsSelection()
     {
         RunSta(() =>
