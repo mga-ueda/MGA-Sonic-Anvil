@@ -8,17 +8,19 @@ namespace MgaSonicAnvil.Tests;
 public sealed class ConfirmChoiceWindowTests
 {
     [Fact]
-    public void UsesAppButtons_OnlyYesNoVariants()
+    public void UsesAppButtons_CoversChoiceSets()
     {
+        Assert.True(ConfirmChoiceWindow.UsesAppButtons(MessageBoxButton.OK));
+        Assert.True(ConfirmChoiceWindow.UsesAppButtons(MessageBoxButton.OKCancel));
         Assert.True(ConfirmChoiceWindow.UsesAppButtons(MessageBoxButton.YesNo));
         Assert.True(ConfirmChoiceWindow.UsesAppButtons(MessageBoxButton.YesNoCancel));
-        Assert.False(ConfirmChoiceWindow.UsesAppButtons(MessageBoxButton.OK));
-        Assert.False(ConfirmChoiceWindow.UsesAppButtons(MessageBoxButton.OKCancel));
     }
 
     [Fact]
     public void DismissResult_MatchesButtonSet()
     {
+        Assert.Equal(MessageBoxResult.OK, ConfirmChoiceWindow.DismissResult(MessageBoxButton.OK));
+        Assert.Equal(MessageBoxResult.Cancel, ConfirmChoiceWindow.DismissResult(MessageBoxButton.OKCancel));
         Assert.Equal(MessageBoxResult.Cancel, ConfirmChoiceWindow.DismissResult(MessageBoxButton.YesNoCancel));
         Assert.Equal(MessageBoxResult.No, ConfirmChoiceWindow.DismissResult(MessageBoxButton.YesNo));
     }
@@ -69,15 +71,18 @@ public sealed class ConfirmChoiceWindowTests
     }
 
     [Fact]
-    public void YesNoCancelLabels_StayLocalized()
+    public void ChoiceButtons_StayEnglish()
     {
         var previous = UiStrings.Language;
         try
         {
             UiStrings.SetLanguage(UiLanguage.Japanese);
-            Assert.Equal("はい", UiStrings.ButtonYes);
-            Assert.Equal("いいえ", UiStrings.ButtonNo);
-            Assert.Equal("キャンセル", UiStrings.ButtonYesNoCancel);
+            Assert.Equal("OK", UiStrings.ButtonOk);
+            Assert.Equal("Cancel", UiStrings.ButtonCancel);
+            Assert.Equal("Yes", UiStrings.ButtonYes);
+            Assert.Equal("No", UiStrings.ButtonNo);
+            Assert.Equal("Cancel", UiStrings.ButtonYesNoCancel);
+            Assert.Equal("Close", UiStrings.ButtonClose);
             UiStrings.SetLanguage(UiLanguage.English);
             Assert.Equal("Yes", UiStrings.ButtonYes);
             Assert.Equal("No", UiStrings.ButtonNo);

@@ -214,10 +214,10 @@ internal static partial class UiStrings
     public static string LabelAudioApiAsio => Get("ASIO", "ASIO");
     public static string ButtonOk => Get("OK", "OK");
     public static string ButtonCancel => Get("Cancel", "Cancel");
-    public static string ButtonClose => Get("閉じる", "Close");
-    public static string ButtonYes => Get("はい", "Yes");
-    public static string ButtonNo => Get("いいえ", "No");
-    public static string ButtonYesNoCancel => Get("キャンセル", "Cancel");
+    public static string ButtonClose => Get("Close", "Close");
+    public static string ButtonYes => Get("Yes", "Yes");
+    public static string ButtonNo => Get("No", "No");
+    public static string ButtonYesNoCancel => Get("Cancel", "Cancel");
     public static string ButtonSaveAllAndClose => Get("すべて保存して閉じる", "Save all and close");
     public static string ButtonDiscardAllAndClose => Get("すべて保存せずに閉じる", "Close without saving any");
     public static string ConfirmRecord => Get("録音を開始します。", "Start recording.");
@@ -317,7 +317,7 @@ internal static partial class UiStrings
     public static string ExportFolderTitle => Get("書き出し先フォルダ", "Export folder");
     public static string SaveFolderTitle => Get("保存先フォルダ", "Save folder");
     public static string ConfirmOverwriteFiles(int count, string list) => Format(
-        "既にあるファイルが {0} 件あります。上書きしますか？{1}{1}{2}{1}{1}はい＝上書き、いいえ＝それらをスキップ、キャンセル＝中止",
+        "既にあるファイルが {0} 件あります。上書きしますか？{1}{1}{2}{1}{1}Yes = 上書き、No = それらをスキップ、Cancel = 中止",
         "{0} existing file(s). Overwrite them?{1}{1}{2}{1}{1}Yes = overwrite, No = skip them, Cancel = stop",
         count,
         Environment.NewLine,
@@ -959,7 +959,7 @@ internal static partial class UiStrings
 
     public static string EditHistoryTitle => Get("編集履歴", "Edit history");
     public static string EditHistoryOrigin => Get("初期状態", "Original");
-    public static string OverlayClose => Get("閉じる", "Close");
+    public static string OverlayClose => Get("Close", "Close");
     public static string EditHistoryHint => Get(
         "↑↓ 移動　Enter／X／外側クリック 確定　Esc キャンセル\nCtrl+クリック／Shift+↑↓ 選択　Ctrl+C コピー　Ctrl+V 別ファイルへ適用",
         "↑↓ move   Enter / X / click outside apply   Esc cancel\nCtrl+click / Shift+↑↓ select   Ctrl+C copy   Ctrl+V apply to file");
