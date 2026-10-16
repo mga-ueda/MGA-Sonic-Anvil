@@ -14,6 +14,22 @@ public sealed class VectorScopeEngineTests
     }
 
     [Fact]
+    public void ScopeNormal_LeftOnlyGoesLeftAndUp()
+    {
+        VectorScopeEngine.ScopeNormal(1f, 0f, out var x, out var y);
+        Assert.True(x < 0);
+        Assert.True(y > 0);
+    }
+
+    [Fact]
+    public void ScopeNormal_RightOnlyGoesRightAndUp()
+    {
+        VectorScopeEngine.ScopeNormal(0f, 1f, out var x, out var y);
+        Assert.True(x > 0);
+        Assert.True(y > 0);
+    }
+
+    [Fact]
     public void MidSide_AntiPhaseStaysHorizontal()
     {
         VectorScopeEngine.MidSide(0.6f, -0.6f, out var mid, out var side);
