@@ -2787,9 +2787,15 @@ public partial class MainWindow
     {
         CommitTimelineNudgeSession();
         StopPlaceRepeat();
-        if (IsLibraryMaximized && IsPlayerScratchContext() && Waveform.TryUndoPlayerScratch())
+        if (IsLibraryMaximized)
         {
-            SyncPlayWindowFromDocument();
+            if (IsPlayerScratchContext() && Waveform.CanUndoPlayerScratch)
+            {
+                UndoOrRedoPlayerScratch(redo: false);
+                return;
+            }
+
+            TryUndoLibraryPlaylistRemove();
             return;
         }
 
@@ -2807,9 +2813,13 @@ public partial class MainWindow
     {
         CommitTimelineNudgeSession();
         StopPlaceRepeat();
-        if (IsLibraryMaximized && IsPlayerScratchContext() && Waveform.TryRedoPlayerScratch())
+        if (IsLibraryMaximized)
         {
-            SyncPlayWindowFromDocument();
+            if (IsPlayerScratchContext())
+            {
+                UndoOrRedoPlayerScratch(redo: true);
+            }
+
             return;
         }
 

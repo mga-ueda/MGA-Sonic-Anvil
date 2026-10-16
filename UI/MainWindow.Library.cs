@@ -625,6 +625,7 @@ public partial class MainWindow
             _libraryStopAfterTrack = false;
             _libraryHoldJacketWash = false;
             _libraryPlaylistUndo.Clear();
+            SyncPlaylistRemoveUndoAvailability();
             _ = LeaveLibraryMaximizeAsync();
             if (_videoLaunchPlacement)
             {
@@ -1445,6 +1446,41 @@ public partial class MainWindow
         DropPlaylistVideoToDimPreview();
         _libraryStopAfterTrack = false;
         return true;
+    }
+
+    private bool CanOfferExitRealPlayback()
+    {
+        if (IsVideoMiniPlayerActive())
+        {
+            return true;
+        }
+
+        if (LibraryBrowser.PlaylistVisualIsPdf && LibraryBrowser.PlaylistVisualPlaying)
+        {
+            return true;
+        }
+
+        if (!LibraryPlayerMode.HaltsLibraryPlaybackOnSpace(
+                IsPlaybackActive(),
+                _playlistVideoImmersivePause))
+        {
+            return false;
+        }
+
+        return IsPlaylistVideoPlaying()
+            || _playlistVideoImmersivePause
+            || LibraryBrowser.PlaylistVisualFramePaused;
+    }
+
+    private bool CanOfferForceVideoProxy()
+    {
+        if (!IsLibraryMaximized || IsUiBusy)
+        {
+            return false;
+        }
+
+        var session = ResolveForceVideoProxySession();
+        return session is not null && LibraryPlaylistDocuments.IsVideo(session.Document);
     }
 
     private bool IsPlaylistVideoPlaying() =>
@@ -2608,6 +2644,7 @@ public partial class MainWindow
         }
 
         _libraryPlaylistUndo.Push(removedSessions, removedIndices);
+        SyncPlaylistRemoveUndoAvailability();
         _sessions.RemoveAll(dropSet.Contains);
         DetachTabItems(dropSet);
 
@@ -2724,6 +2761,8 @@ public partial class MainWindow
             return false;
         }
 
+        SyncPlaylistRemoveUndoAvailability();
+
         LibraryPlaylistRemoveUndo.RestoreInto(_sessions, sessions, indices);
         LibraryBrowser.SetSessions(_sessions, sessions[0], sessions);
         RefreshStatus();
@@ -2738,6 +2777,9 @@ public partial class MainWindow
         LibraryBrowser.RequestListFocus();
         return true;
     }
+
+    private void SyncPlaylistRemoveUndoAvailability() =>
+        LibraryBrowser.SetPlaylistRemoveUndoAvailable(_libraryPlaylistUndo.CanUndo);
 
     private DocumentSession? NextLibrarySessionAfter(HashSet<DocumentSession> dropSet)
     {

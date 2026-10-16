@@ -168,8 +168,12 @@ public partial class MainWindow
                 || Waveform.HasSelectedRegions
                 || Waveform.HasSelectedTimelineItems,
             CanCopySelectionTimes = SelectionClipboardText.CanCopy(CaptureSelectionClipboardItems()),
-            CanUndo = hasDoc && (canScratch ? Waveform.CanUndoPlayerScratch : _history.CanUndo),
-            CanRedo = hasDoc && (canScratch ? Waveform.CanRedoPlayerScratch : _history.CanRedo),
+            CanUndo = IsLibraryMaximized
+                ? ((canScratch && Waveform.CanUndoPlayerScratch) || _libraryPlaylistUndo.CanUndo)
+                : hasDoc && _history.CanUndo,
+            CanRedo = IsLibraryMaximized
+                ? canScratch && Waveform.CanRedoPlayerScratch
+                : hasDoc && _history.CanRedo,
             CanPasteAudio = _clipboard is { IsEmpty: false },
             CanPasteHistory = _historyRecipeClipboard.Count > 0,
             HasMarkers = IsLibraryMaximized
@@ -197,6 +201,32 @@ public partial class MainWindow
             RangeClick = _rangeClickEnabled,
             Shuffle = LibraryBrowser.ShuffleEnabled,
             AutoPlayNext = LibraryBrowser.AutoPlayNextEnabled,
+            AutoPlay = LibraryBrowser.AutoPlayEnabled,
+            CanStepPlaylist = _sessions.Count > 0,
+            CanRestartTrack = _sessions.Count > 0,
+            VideoMini = IsVideoMiniPlayerActive(),
+            MinimalChrome = IsLibraryMaximized && _libraryMinimalChrome && !IsVideoMiniPlayerActive(),
+            CanToggleVideoMini = LibraryPlayerMode.CanToggleVideoMiniPlayer(
+                IsVideoMiniPlayerActive(),
+                IsVideoMiniEnterEligible(),
+                hasPlayableSession: _sessions.Count > 0),
+            VideoFullscreen = _playlistVideoFullscreen,
+            CanToggleVideoFullscreen = IsLibraryMaximized
+                && (_playlistVideoFullscreen
+                    || (LibraryBrowser.PlaylistVisualShown
+                        && (LibraryBrowser.PlaylistVisualIsVideo || LibraryBrowser.PlaylistVisualIsPdf))),
+            CanScaleVideoMini = CanScaleVideoLaunchWindow(),
+            VideoHud = _playlistVideoHud,
+            CanToggleVideoHud = IsPlaylistVisualHudContext(),
+            VideoTimecode = _playlistVideoTimecode,
+            CanToggleVideoTimecode = IsPlaylistVisualHudContext(),
+            PdfBackgroundPinned = LibraryBrowser.PdfBackgroundPinned,
+            CanTogglePdfBackground = IsLibraryMaximized
+                && (LibraryBrowser.PlaylistVisualIsPdf || LibraryBrowser.PdfBackgroundPinned),
+            CanExitRealPlayback = CanOfferExitRealPlayback(),
+            CanForceVideoProxy = CanOfferForceVideoProxy(),
+            TileMode = _tileMode,
+            TileSearchActive = TileSearchBox.Text.Length > 0,
             KeepTarget = WaapiBar.KeepTargetChecked,
             AutoActive = WaapiBar.AutoActiveChecked,
             CanKeepTarget = WaapiBar.KeepTargetToggleEnabled,
@@ -457,6 +487,18 @@ public partial class MainWindow
             case WaveMenuCommand.Shuffle:
                 LibraryBrowser.ToggleShuffle();
                 break;
+            case WaveMenuCommand.AutoPlay:
+                LibraryBrowser.ToggleAutoPlay();
+                break;
+            case WaveMenuCommand.PreviousTrack:
+                TryStepLibraryPlaylist(-1);
+                break;
+            case WaveMenuCommand.NextTrack:
+                TryStepLibraryPlaylist(1);
+                break;
+            case WaveMenuCommand.RestartTrack:
+                RestartLibraryTrack();
+                break;
             case WaveMenuCommand.AutoPlayNext:
                 LibraryBrowser.ToggleAutoPlayNext();
                 break;
@@ -548,6 +590,44 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.MaximizeLibrary:
                 ToggleLibraryMaximize();
+                break;
+            case WaveMenuCommand.VideoMini:
+                ToggleVideoMiniPlayer();
+                break;
+            case WaveMenuCommand.MinimalChrome:
+                ToggleLibraryMinimalChrome();
+                break;
+            case WaveMenuCommand.VideoFullscreen:
+                TryTogglePlaylistVideoFullscreen();
+                break;
+            case WaveMenuCommand.VideoMiniZoomIn:
+                TryScaleVideoLaunchWindow(1, isRepeat: false);
+                break;
+            case WaveMenuCommand.VideoMiniZoomOut:
+                TryScaleVideoLaunchWindow(-1, isRepeat: false);
+                break;
+            case WaveMenuCommand.VideoHud:
+                TryTogglePlaylistVideoHud();
+                break;
+            case WaveMenuCommand.VideoTimecode:
+                TryTogglePlaylistVideoTimecode();
+                break;
+            case WaveMenuCommand.PdfBackgroundPin:
+                TryTogglePdfBackgroundPin();
+                break;
+            case WaveMenuCommand.ExitRealPlayback:
+                if (IsVideoMiniPlayerActive())
+                {
+                    LeaveVideoMiniToPlaylist(minimalChrome: false);
+                }
+                else
+                {
+                    TryExitPlaylistRealPlayback();
+                }
+
+                break;
+            case WaveMenuCommand.ForceVideoProxy:
+                RequestForceVideoProxyEncode();
                 break;
             case WaveMenuCommand.SoloNext:
                 CycleChannelSolo(1);
@@ -670,6 +750,12 @@ public partial class MainWindow
             case WaveMenuCommand.PrevTab:
                 ActivateAdjacentTab(-1);
                 break;
+            case WaveMenuCommand.FindTabs:
+                OpenTileSearch();
+                break;
+            case WaveMenuCommand.ClearTileSearch:
+                CloseTileSearch();
+                break;
             case WaveMenuCommand.Settings:
                 OpenSettings();
                 break;
@@ -688,6 +774,9 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.OutputFolder:
                 BrowseExportOutputFolder();
+                break;
+            case WaveMenuCommand.LaunchWwise:
+                LaunchWwiseProjectFromShortcut();
                 break;
             case WaveMenuCommand.WwiseExport:
                 if (WaapiBar.ExportEnabled)

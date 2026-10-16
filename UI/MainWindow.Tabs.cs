@@ -456,6 +456,7 @@ public partial class MainWindow
                 enabled: _sessions.Count > 0));
             AddSelectionTimeMenuItems(menu, targets);
             AddTileArrangeMenuItems(menu, canMutate);
+            AddTileSearchMenuItems(menu, canMutate);
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 AllTabsSelected ? UiStrings.TabMenuExportWaveAll : UiStrings.TabMenuExportWaveSelected,
@@ -505,6 +506,7 @@ public partial class MainWindow
                 enabled: _sessions.Count > 0));
             AddSelectionTimeMenuItems(menu, [session]);
             AddTileArrangeMenuItems(menu, canMutate);
+            AddTileSearchMenuItems(menu, canMutate);
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.TabMenuExportWave,
@@ -628,6 +630,20 @@ public partial class MainWindow
             enabled: canMutate && CanOfferTileArrange(WaveformTileArrange.Grid),
             checkable: true,
             isChecked: _tileArrange == WaveformTileArrange.Grid));
+    }
+
+    private void AddTileSearchMenuItems(ContextMenu menu, bool canMutate)
+    {
+        menu.Items.Add(CreateTabMenuItem(
+            UiStrings.WaveMenuFindTabs,
+            OpenTileSearch,
+            "Ctrl+F",
+            enabled: canMutate && _tileMode));
+        menu.Items.Add(CreateTabMenuItem(
+            UiStrings.WaveMenuClearTileSearch,
+            CloseTileSearch,
+            "Ctrl+Shift+F",
+            enabled: canMutate && _tileMode && TileSearchBox.Text.Length > 0));
     }
 
     private static MenuItem CreateTabMenuItem(

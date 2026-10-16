@@ -59,6 +59,12 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.LoopPlay
             or WaveMenuCommand.Shuffle
             or WaveMenuCommand.AutoPlayNext
+            or WaveMenuCommand.AutoPlay
+            or WaveMenuCommand.PreviousTrack
+            or WaveMenuCommand.NextTrack
+            or WaveMenuCommand.RestartTrack
+            or WaveMenuCommand.Undo
+            or WaveMenuCommand.Redo
             or WaveMenuCommand.GoStart
             or WaveMenuCommand.GoEnd
             or WaveMenuCommand.ViewLeft
@@ -66,6 +72,16 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.MaximizeWaveform
             or WaveMenuCommand.MaximizeAnalyzers
             or WaveMenuCommand.MaximizeLibrary
+            or WaveMenuCommand.VideoMini
+            or WaveMenuCommand.MinimalChrome
+            or WaveMenuCommand.VideoFullscreen
+            or WaveMenuCommand.VideoMiniZoomIn
+            or WaveMenuCommand.VideoMiniZoomOut
+            or WaveMenuCommand.VideoHud
+            or WaveMenuCommand.VideoTimecode
+            or WaveMenuCommand.PdfBackgroundPin
+            or WaveMenuCommand.ExitRealPlayback
+            or WaveMenuCommand.ForceVideoProxy
             or WaveMenuCommand.ViewWaveform
             or WaveMenuCommand.SilentSkip
             or WaveMenuCommand.AlwaysOnTop

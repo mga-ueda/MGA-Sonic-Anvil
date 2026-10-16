@@ -346,6 +346,18 @@ internal sealed class LibraryBrowserView : UserControl
 
     public event EventHandler? ExportMp3Requested;
 
+    public event EventHandler? PlaylistPreviousRequested;
+
+    public event EventHandler? PlaylistNextRequested;
+
+    public event EventHandler? PlaylistRestartRequested;
+
+    public event EventHandler? PlaylistUndoRemoveRequested;
+
+    public bool CanUndoPlaylistRemove { get; private set; }
+
+    public void SetPlaylistRemoveUndoAvailable(bool available) => CanUndoPlaylistRemove = available;
+
     /// <summary>Ctrl+F5 と同じ索引の再構築。</summary>
     public event EventHandler? LibraryCatalogRebuildRequested;
 
@@ -9654,12 +9666,48 @@ internal sealed class LibraryBrowserView : UserControl
             InputGestureText = "Shift+Enter",
         };
         append.Click += (_, _) => OpenSelectedFolder(recursive: false);
+        var replaceRecursive = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuReplacePlaylistRecursive,
+            InputGestureText = "Ctrl+Enter",
+        };
+        replaceRecursive.Click += (_, _) => ReplacePlaylistFromSelection(recursive: true);
+        var appendRecursive = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuAppendPlaylistRecursive,
+            InputGestureText = "Ctrl+Shift+Enter",
+        };
+        appendRecursive.Click += (_, _) => OpenSelectedFolder(recursive: true);
         var add = new MenuItem { Header = UiStrings.LibraryMenuAddToFavorites };
         add.Click += (_, _) => AddSelectedExplorerToFavorites();
         var addRoot = new MenuItem { Header = UiStrings.LibraryMenuAddAsExplorerRoot };
         addRoot.Click += (_, _) => AddSelectedExplorerToRoots();
         var removeRoot = new MenuItem { Header = UiStrings.LibraryMenuRemoveExplorerRoot };
         removeRoot.Click += (_, _) => RemoveSelectedExplorerRoots();
+        var expand = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuExpandSubtree,
+            InputGestureText = "Shift+8",
+        };
+        expand.Click += (_, _) => ExpandSelectedExplorerSubtree();
+        var collapse = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuCollapseSubtree,
+            InputGestureText = "/",
+        };
+        collapse.Click += (_, _) => CollapseSelectedExplorerSubtree();
+        var moveUp = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuMoveRootUp,
+            InputGestureText = "Alt+Up",
+        };
+        moveUp.Click += (_, _) => TryMoveSelectedExplorerRoots(-1);
+        var moveDown = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuMoveRootDown,
+            InputGestureText = "Alt+Down",
+        };
+        moveDown.Click += (_, _) => TryMoveSelectedExplorerRoots(1);
         var refresh = new MenuItem
         {
             Header = UiStrings.LibraryMenuRefreshExplorer,
@@ -9678,9 +9726,15 @@ internal sealed class LibraryBrowserView : UserControl
         rebuild.Click += (_, _) => LibraryCatalogRebuildRequested?.Invoke(this, EventArgs.Empty);
         menu.Items.Add(replace);
         menu.Items.Add(append);
+        menu.Items.Add(replaceRecursive);
+        menu.Items.Add(appendRecursive);
         menu.Items.Add(add);
         menu.Items.Add(addRoot);
         menu.Items.Add(removeRoot);
+        menu.Items.Add(expand);
+        menu.Items.Add(collapse);
+        menu.Items.Add(moveUp);
+        menu.Items.Add(moveDown);
         menu.Items.Add(new Separator());
         menu.Items.Add(refresh);
         menu.Items.Add(rebuild);
@@ -9693,7 +9747,14 @@ internal sealed class LibraryBrowserView : UserControl
             // 欠損だけのときは追加／クリアして追加を無効（Enter と同様スルー）。
             replace.IsEnabled = existing.Length > 0;
             append.IsEnabled = existing.Length > 0;
+            replaceRecursive.IsEnabled = existing.Length > 0;
+            appendRecursive.IsEnabled = existing.Length > 0;
             add.IsEnabled = selected;
+            expand.IsEnabled = selected;
+            collapse.IsEnabled = selected;
+            var canMoveRoot = selected && SelectionContainsExplorerRoot() && _explorerRoots.Length >= 2;
+            moveUp.IsEnabled = canMoveRoot;
+            moveDown.IsEnabled = canMoveRoot;
             addRoot.IsEnabled = selected && SelectionCanRegisterExplorerRoot();
             removeRoot.IsEnabled = selected && SelectionContainsExplorerRoot();
             copy.IsEnabled = transfer.Length > 0;
@@ -9720,10 +9781,24 @@ internal sealed class LibraryBrowserView : UserControl
             InputGestureText = "Shift+Enter",
         };
         append.Click += (_, _) => ActivateSelectedFavorites(clearPlaylist: false, recursive: false);
+        var replaceRecursive = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuReplacePlaylistRecursive,
+            InputGestureText = "Ctrl+Enter",
+        };
+        replaceRecursive.Click += (_, _) => ActivateSelectedFavorites(clearPlaylist: true, recursive: true);
+        var appendRecursive = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuAppendPlaylistRecursive,
+            InputGestureText = "Ctrl+Shift+Enter",
+        };
+        appendRecursive.Click += (_, _) => ActivateSelectedFavorites(clearPlaylist: false, recursive: true);
         var remove = new MenuItem { Header = UiStrings.LibraryMenuRemoveFromFavorites };
         remove.Click += (_, _) => RemoveSelectedFavorites();
         menu.Items.Add(replace);
         menu.Items.Add(append);
+        menu.Items.Add(replaceRecursive);
+        menu.Items.Add(appendRecursive);
         menu.Items.Add(remove);
         AddCopyAndExplorerMenuItems(menu, LibraryPane.Favorites, out var copy, out var copyNames, out var copyPaths, out var explorer);
         menu.Opened += (_, _) =>
@@ -9732,6 +9807,8 @@ internal sealed class LibraryBrowserView : UserControl
             var selected = SelectedFavoritePaths.Length > 0;
             replace.IsEnabled = paths.Length > 0;
             append.IsEnabled = paths.Length > 0;
+            replaceRecursive.IsEnabled = paths.Length > 0;
+            appendRecursive.IsEnabled = paths.Length > 0;
             remove.IsEnabled = selected;
             copy.IsEnabled = paths.Length > 0;
             copyNames.IsEnabled = paths.Length > 0;
@@ -9757,10 +9834,47 @@ internal sealed class LibraryBrowserView : UserControl
             InputGestureText = "Ctrl+Shift+M",
         };
         ArmMenuItemClick(mp3, () => ExportMp3Requested?.Invoke(this, EventArgs.Empty));
+        var previous = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuPreviousTrack,
+            InputGestureText = "P",
+        };
+        ArmMenuItemClick(previous, () => PlaylistPreviousRequested?.Invoke(this, EventArgs.Empty));
+        var next = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuNextTrack,
+            InputGestureText = "N",
+        };
+        ArmMenuItemClick(next, () => PlaylistNextRequested?.Invoke(this, EventArgs.Empty));
+        var restart = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuRestartTrack,
+            InputGestureText = "R",
+        };
+        ArmMenuItemClick(restart, () => PlaylistRestartRequested?.Invoke(this, EventArgs.Empty));
+        var autoPlay = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuAutoPlay,
+            InputGestureText = "Alt+P",
+            IsCheckable = true,
+        };
+        ArmMenuItemClick(autoPlay, () => AutoPlayEnabled = autoPlay.IsChecked == true);
+        var undoRemove = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuUndoRemove,
+            InputGestureText = "Ctrl+Z",
+        };
+        ArmMenuItemClick(undoRemove, () => PlaylistUndoRemoveRequested?.Invoke(this, EventArgs.Empty));
         var clear = new MenuItem { Header = UiStrings.LibraryMenuClearFromPlaylist };
         ArmMenuItemClick(clear, () => ClearPlaylistRequested?.Invoke(this, EventArgs.Empty));
         menu.Items.Add(loudness);
         menu.Items.Add(mp3);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(previous);
+        menu.Items.Add(next);
+        menu.Items.Add(restart);
+        menu.Items.Add(autoPlay);
+        menu.Items.Add(undoRemove);
         menu.Items.Add(new Separator());
         menu.Items.Add(clear);
         AddCopyAndExplorerMenuItems(menu, LibraryPane.List, out var copy, out var copyNames, out var copyPaths, out var explorer);
@@ -9777,6 +9891,13 @@ internal sealed class LibraryBrowserView : UserControl
             var hasSelection = selected.Length > 0;
             loudness.IsEnabled = hasSelection;
             mp3.IsEnabled = LibraryPlayerMode.HasMp3ExportCandidate(selected);
+            var hasRows = _rows.Count > 0;
+            previous.IsEnabled = hasRows;
+            next.IsEnabled = hasRows;
+            restart.IsEnabled = hasRows;
+            autoPlay.IsChecked = AutoPlayEnabled;
+            autoPlay.IsEnabled = true;
+            undoRemove.IsEnabled = CanUndoPlaylistRemove;
             clear.IsEnabled = hasSelection;
             copy.IsEnabled = paths.Length > 0;
             copyNames.IsEnabled = paths.Length > 0;

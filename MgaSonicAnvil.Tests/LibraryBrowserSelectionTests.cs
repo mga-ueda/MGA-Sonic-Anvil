@@ -960,9 +960,15 @@ public sealed class LibraryBrowserSelectionTests
             [
                 UiStrings.LibraryMenuReplacePlaylist,
                 UiStrings.LibraryMenuAppendPlaylist,
+                UiStrings.LibraryMenuReplacePlaylistRecursive,
+                UiStrings.LibraryMenuAppendPlaylistRecursive,
                 UiStrings.LibraryMenuAddToFavorites,
                 UiStrings.LibraryMenuAddAsExplorerRoot,
                 UiStrings.LibraryMenuRemoveExplorerRoot,
+                UiStrings.LibraryMenuExpandSubtree,
+                UiStrings.LibraryMenuCollapseSubtree,
+                UiStrings.LibraryMenuMoveRootUp,
+                UiStrings.LibraryMenuMoveRootDown,
                 UiStrings.LibraryMenuRefreshExplorer,
                 UiStrings.LibraryMenuRebuildCatalog,
                 UiStrings.LibraryMenuCopy,
@@ -973,12 +979,18 @@ public sealed class LibraryBrowserSelectionTests
             items.Select(item => (string)item.Header).ToArray());
             Assert.Equal("Enter", items[0].InputGestureText);
             Assert.Equal("Shift+Enter", items[1].InputGestureText);
-            Assert.Equal("F5", items[5].InputGestureText);
-            Assert.Equal("Ctrl+F5", items[6].InputGestureText);
-            Assert.Equal("Ctrl+C", items[7].InputGestureText);
+            Assert.Equal("Ctrl+Enter", items[2].InputGestureText);
+            Assert.Equal("Ctrl+Shift+Enter", items[3].InputGestureText);
+            Assert.Equal("Shift+8", items[7].InputGestureText);
+            Assert.Equal("/", items[8].InputGestureText);
+            Assert.Equal("Alt+Up", items[9].InputGestureText);
+            Assert.Equal("Alt+Down", items[10].InputGestureText);
+            Assert.Equal("F5", items[11].InputGestureText);
+            Assert.Equal("Ctrl+F5", items[12].InputGestureText);
+            Assert.Equal("Ctrl+C", items[13].InputGestureText);
             var rebuilt = 0;
             view.LibraryCatalogRebuildRequested += (_, _) => rebuilt++;
-            items[6].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            items[12].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             Assert.Equal(1, rebuilt);
             items[0].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             items[1].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
@@ -995,6 +1007,8 @@ public sealed class LibraryBrowserSelectionTests
             [
                 UiStrings.LibraryMenuReplacePlaylist,
                 UiStrings.LibraryMenuAppendPlaylist,
+                UiStrings.LibraryMenuReplacePlaylistRecursive,
+                UiStrings.LibraryMenuAppendPlaylistRecursive,
                 UiStrings.LibraryMenuRemoveFromFavorites,
                 UiStrings.LibraryMenuCopy,
                 UiStrings.LibraryMenuCopyFileName,
@@ -1004,7 +1018,9 @@ public sealed class LibraryBrowserSelectionTests
             view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());
             Assert.Equal("Enter", view.OpenContextMenuItems[0].InputGestureText);
             Assert.Equal("Shift+Enter", view.OpenContextMenuItems[1].InputGestureText);
-            Assert.Equal("Ctrl+C", view.OpenContextMenuItems[3].InputGestureText);
+            Assert.Equal("Ctrl+Enter", view.OpenContextMenuItems[2].InputGestureText);
+            Assert.Equal("Ctrl+Shift+Enter", view.OpenContextMenuItems[3].InputGestureText);
+            Assert.Equal("Ctrl+C", view.OpenContextMenuItems[5].InputGestureText);
             view.OpenContextMenuItems[0].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             Assert.True(favoritesArgs is { ClearPlaylist: true });
             favoritesArgs = null;
@@ -1022,6 +1038,11 @@ public sealed class LibraryBrowserSelectionTests
             [
                 UiStrings.LibraryMenuMatchLoudness,
                 UiStrings.LibraryMenuSaveMp3,
+                UiStrings.LibraryMenuPreviousTrack,
+                UiStrings.LibraryMenuNextTrack,
+                UiStrings.LibraryMenuRestartTrack,
+                UiStrings.LibraryMenuAutoPlay,
+                UiStrings.LibraryMenuUndoRemove,
                 UiStrings.LibraryMenuClearFromPlaylist,
                 UiStrings.LibraryMenuCopy,
                 UiStrings.LibraryMenuCopyFileName,
@@ -1031,7 +1052,12 @@ public sealed class LibraryBrowserSelectionTests
             view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());
             Assert.Equal("V", view.OpenContextMenuItems[0].InputGestureText);
             Assert.Equal("Ctrl+Shift+M", view.OpenContextMenuItems[1].InputGestureText);
-            Assert.Equal("Ctrl+C", view.OpenContextMenuItems[3].InputGestureText);
+            Assert.Equal("P", view.OpenContextMenuItems[2].InputGestureText);
+            Assert.Equal("N", view.OpenContextMenuItems[3].InputGestureText);
+            Assert.Equal("R", view.OpenContextMenuItems[4].InputGestureText);
+            Assert.Equal("Alt+P", view.OpenContextMenuItems[5].InputGestureText);
+            Assert.Equal("Ctrl+Z", view.OpenContextMenuItems[6].InputGestureText);
+            Assert.Equal("Ctrl+C", view.OpenContextMenuItems[8].InputGestureText);
             Assert.True(view.HasOpenContextMenu);
             view.CloseKeyboardContextMenu();
             window.Close();
