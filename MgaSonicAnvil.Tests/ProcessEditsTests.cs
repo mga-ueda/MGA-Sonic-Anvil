@@ -1,4 +1,6 @@
 using System.IO;
+using System.Runtime.ExceptionServices;
+using System.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Editing;
 using NAudio.Wave;
@@ -625,6 +627,63 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void SilencePreview_DisplayGainFillsPeak()
+    {
+        Assert.Equal(1f, MgaSonicAnvil.UI.SilenceDetectWavePreview.DisplayGain([], []));
+        Assert.Equal(4f, MgaSonicAnvil.UI.SilenceDetectWavePreview.DisplayGain([-0.25f, 0.1f], [0.2f, 0.05f]));
+    }
+
+    [Fact]
+    public void SilencePreview_UsesSameSpansAsApplyIncludingMinimumTimes()
+    {
+        RunSta(() =>
+        {
+            const int rate = 1000;
+            var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+            var document = MakeToneWithSilence(40, radius * 2 + 80, 40, rate);
+            var range = new WaveSelection(0, document.FrameCount);
+            var options = SilenceDetectOptions.FromThreshold(-60) with
+            {
+                MinGateMs = 0,
+                MinCloseMs = 30,
+                PreRollMs = 15,
+                PostRollMs = 25,
+            };
+            var expected = SilenceDetect.CollectKeepSpans(
+                document.Interleaved,
+                document.Channels,
+                range.StartFrame,
+                range.EndFrame,
+                document.SampleRate,
+                soloMask: 0,
+                options);
+            Assert.Equal(2, expected.Count);
+
+            var preview = new MgaSonicAnvil.UI.SilenceDetectWavePreview
+            {
+                Document = document,
+                Range = range,
+                Options = options,
+            };
+            Assert.Equal(expected, preview.Keeps);
+
+            var bridged = options with { MinGateMs = radius * 2 + 80 };
+            preview.Options = bridged;
+            Assert.Equal(
+                SilenceDetect.CollectKeepSpans(
+                    document.Interleaved,
+                    document.Channels,
+                    range.StartFrame,
+                    range.EndFrame,
+                    document.SampleRate,
+                    soloMask: 0,
+                    bridged),
+                preview.Keeps);
+            Assert.Single(preview.Keeps);
+        });
+    }
+
+    [Fact]
     public void CollectDeleteSilenceKeepSpans_EdgesOnly_MergesAudible()
     {
         const int rate = 1000;
@@ -1109,6 +1168,60 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void SilenceSelection_ZerosRangeKeepsLengthAndRestores()
+    {
+        var document = MakeConstant(frames: 40, value: 0.5f);
+        document.TryAddMarker(10);
+        document.TryAddMarker(30);
+        document.Selection = new WaveSelection(10, 20);
+        document.CursorFrame = 15;
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.SilenceSelection(document, document.Selection)!);
+
+        Assert.Equal(40, document.FrameCount);
+        Assert.Equal(0.5f, document.Interleaved[9 * 2], 5);
+        Assert.Equal(0f, document.Interleaved[10 * 2], 5);
+        Assert.Equal(0f, document.Interleaved[19 * 2 + 1], 5);
+        Assert.Equal(0.5f, document.Interleaved[20 * 2], 5);
+        Assert.Equal(10, document.SnapshotMarkers()[0].Frame);
+        Assert.Equal(30, document.SnapshotMarkers()[1].Frame);
+        Assert.Equal(new WaveSelection(10, 20), document.Selection);
+        Assert.Equal(10, document.CursorFrame);
+        Assert.Null(ProcessEdits.SilenceSelection(document, document.Selection));
+
+        Assert.True(history.Undo(document));
+        Assert.Equal(0.5f, document.Interleaved[10 * 2], 5);
+        Assert.Equal(0.5f, document.Interleaved[19 * 2 + 1], 5);
+        Assert.Equal(30, document.SnapshotMarkers()[1].Frame);
+    }
+
+    [Fact]
+    public void SilenceSelection_EdgeFadeRampsOutsideTheRangeAndRestores()
+    {
+        var document = MakeConstant(frames: 200, value: 1f);
+        document.Selection = new WaveSelection(100, 110);
+        var history = new EditHistory();
+        history.Do(document, ProcessEdits.SilenceSelection(document, document.Selection, edgeFade: true, fadeMs: 1)!);
+
+        var fade = ClickGuard.FadeFrames(document.SampleRate, 1);
+        Assert.Equal(48, fade);
+        Assert.Equal(200, document.FrameCount);
+        Assert.Equal(1f, document.Interleaved[(100 - fade - 1) * 2], 5);
+        Assert.Equal(0f, document.Interleaved[(100 - 1) * 2], 5);
+        Assert.Equal(0f, document.Interleaved[100 * 2], 5);
+        Assert.Equal(0f, document.Interleaved[109 * 2], 5);
+        Assert.Equal(0f, document.Interleaved[110 * 2], 5);
+        Assert.Equal(1f, document.Interleaved[(110 + fade - 1) * 2], 5);
+        Assert.Equal(1f, document.Interleaved[(110 + fade) * 2], 5);
+        Assert.Equal(new WaveSelection(100, 110), document.Selection);
+
+        Assert.True(history.Undo(document));
+        Assert.Equal(1f, document.Interleaved[(100 - 1) * 2], 5);
+        Assert.Equal(1f, document.Interleaved[100 * 2], 5);
+        Assert.Equal(1f, document.Interleaved[110 * 2], 5);
+    }
+
+    [Fact]
     public void InsertSilence_InsertsZerosAndShiftsLaterAudioAndMarkers()
     {
         var document = MakeConstant(frames: 20, value: 1f);
@@ -1132,6 +1245,30 @@ public sealed class ProcessEditsTests
         Assert.Equal(1f, document.Interleaved[8 * 2], 5);
         Assert.Equal(12, document.SnapshotMarkers()[1].Frame);
         Assert.True(document.Selection.IsEmpty);
+    }
+
+    [Fact]
+    public void InsertSilence_EdgeFadeRampsToSilenceAndRestores()
+    {
+        var document = MakeConstant(frames: 200, value: 1f);
+        var history = new EditHistory();
+        var silence = 10;
+        var seconds = silence / (double)document.SampleRate;
+        history.Do(document, ProcessEdits.InsertSilence(document, 100, seconds, edgeFade: true, fadeMs: 1)!);
+
+        var fade = ClickGuard.FadeFrames(document.SampleRate, 1);
+        Assert.Equal(48, fade);
+        Assert.Equal(1f, document.Interleaved[(100 - fade - 1) * 2], 5);
+        Assert.Equal(0f, document.Interleaved[(100 - 1) * 2], 5);
+        Assert.Equal(0f, document.Interleaved[100 * 2], 5);
+        Assert.Equal(0f, document.Interleaved[(100 + silence) * 2], 5);
+        Assert.Equal(1f, document.Interleaved[(100 + silence + fade - 1) * 2], 5);
+        Assert.Equal(1f, document.Interleaved[(100 + silence + fade) * 2], 5);
+
+        Assert.True(history.Undo(document));
+        Assert.Equal(200, document.FrameCount);
+        Assert.Equal(1f, document.Interleaved[(100 - 1) * 2], 5);
+        Assert.Equal(1f, document.Interleaved[100 * 2], 5);
     }
 
     [Fact]
@@ -1178,6 +1315,29 @@ public sealed class ProcessEditsTests
         }
 
         return new AudioDocument(samples, rate, 2, 24, AudioFileKind.Wave, null);
+    }
+
+    private static void RunSta(Action action)
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null)
+        {
+            ExceptionDispatchInfo.Capture(error).Throw();
+        }
     }
 
     private static AudioDocument MakeToneWithSilence(int audible, int silent, int tail, int sampleRate = 1000)

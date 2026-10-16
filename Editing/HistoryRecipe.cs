@@ -109,6 +109,7 @@ internal static class HistoryRecipes
     public const string Delete = "Delete";
     public const string DeleteSilence = "DeleteSilence";
     public const string InsertSilence = "InsertSilence";
+    public const string SilenceSelection = "SilenceSelection";
     public const string Paste = "Paste";
     public const string Record = "Record";
     public const string SetSampleLoop = "SetSampleLoop";
@@ -142,6 +143,7 @@ internal static class HistoryRecipes
         Delete,
         DeleteSilence,
         InsertSilence,
+        SilenceSelection,
         Paste,
         Record,
         SetSampleLoop,
@@ -176,6 +178,7 @@ internal static class HistoryRecipes
         Delete,
         DeleteSilence,
         InsertSilence,
+        SilenceSelection,
         Paste,
         Record,
         ConvertRate,
@@ -298,13 +301,20 @@ internal static class HistoryRecipes
             channelMask);
     }
 
-    public static HistoryRecipe FromInsertSilence(int sourceRate, long insertFrame, double seconds) =>
+    public static HistoryRecipe FromInsertSilence(
+        int sourceRate,
+        long insertFrame,
+        double seconds,
+        bool edgeFade = false,
+        int fadeMs = 0) =>
         new()
         {
             Kind = InsertSilence,
             SourceRate = sourceRate,
             Frame = insertFrame,
             Amount = seconds,
+            Flag = edgeFade,
+            Value = edgeFade ? fadeMs : 0,
         };
 
     public static HistoryRecipe FromTimeStretch(
@@ -361,7 +371,18 @@ internal static class HistoryRecipes
                 RangeOf(recipe),
                 OptionsOf(recipe),
                 channelMask: MaskOf(recipe)),
-            InsertSilence => ProcessEdits.InsertSilence(document, recipe.Frame, recipe.Amount),
+            SilenceSelection => ProcessEdits.SilenceSelection(
+                document,
+                RangeOf(recipe),
+                channelMask: MaskOf(recipe),
+                edgeFade: recipe.Flag,
+                fadeMs: recipe.Value),
+            InsertSilence => ProcessEdits.InsertSilence(
+                document,
+                recipe.Frame,
+                recipe.Amount,
+                recipe.Flag,
+                recipe.Value),
             Paste => TryPaste(document, recipe),
             Record => TryRecord(document, recipe),
             SetSampleLoop => TrySetSampleLoop(document, recipe),

@@ -217,6 +217,7 @@ public sealed class EditReplayCoverageTests
                 Ends = [40],
             },
             HistoryRecipes.Delete => Range(kind, 10, 20),
+            HistoryRecipes.SilenceSelection => Range(kind, 10, 30),
             HistoryRecipes.InsertSilence => new HistoryRecipe
             {
                 Kind = kind,

@@ -50,6 +50,7 @@ internal static partial class UiStrings
     public static string WaveMenuPasteHistorySelected => Get("選択したタブにペーストする(_H)", "Paste Copied Edits to Selected Tabs (_H)");
     public static string WaveMenuPasteHistoryAll => Get("編集データを全てにペーストする(_H)", "Paste Copied Edits to All Tabs (_H)");
     public static string WaveMenuDelete => Get("削除(_D)", "_Delete");
+    public static string WaveMenuSilenceSelection => Get("選択範囲を無音化(_M)", "_Mute Selection");
     public static string WaveMenuInsertSilence => Get("無音を挿入(_I)", "_Insert Silence");
     public static string WaveMenuInsertSilenceSelected => Get("選択ファイルに無音を挿入(_I)", "_Insert Silence in Selected Files");
     public static string WaveMenuDetectSilence => Get("無音・ヒット検出(_S)", "_Silence & Hit Detection");

@@ -795,7 +795,10 @@ public partial class MainWindow
         return true;
     }
 
-    private void PromptInsertSilence()
+    private void PromptInsertSilence() =>
+        PromptInsertSilenceAt(_waveMenuHit.Frame);
+
+    private void PromptInsertSilenceAt(long frame)
     {
         if (IsUiBusy)
         {
@@ -818,12 +821,13 @@ public partial class MainWindow
         CloseVolumeGainPicker();
         ClosePitchShiftPicker();
         CloseTimeStretchPicker();
+        CloseSilenceSelectionPicker();
         if (_player.IsPlaying)
         {
             PausePlaybackSoft();
         }
 
-        _silenceInsertFrame = Math.Clamp(_waveMenuHit.Frame, 0, _document.FrameCount);
+        _silenceInsertFrame = Math.Clamp(frame, 0, _document.FrameCount);
         var menu = SilenceInsertPicker.Show(this, ApplyInsertSilence);
         _silenceMenu = menu;
         menu.Closed += (_, _) =>
@@ -853,6 +857,8 @@ public partial class MainWindow
             return;
         }
 
+        var edgeFade = _silenceMenu is { } menu && SilenceInsertPicker.ReadEdgeFade(menu);
+        var fadeMs = edgeFade ? AppStorage.Settings.ResolvedClickGuardFadeMs() : 0;
         CloseInsertSilencePicker();
         var insertFrame = _silenceInsertFrame;
         if (HasTabSelection)
@@ -863,12 +869,12 @@ public partial class MainWindow
                 var at = ReferenceEquals(session, active)
                     ? insertFrame
                     : session.Document.CursorFrame;
-                return ProcessEdits.InsertSilence(session.Document, at, seconds);
+                return ProcessEdits.InsertSilence(session.Document, at, seconds, edgeFade, fadeMs);
             });
             return;
         }
 
-        var command = ProcessEdits.InsertSilence(_document, insertFrame, seconds);
+        var command = ProcessEdits.InsertSilence(_document, insertFrame, seconds, edgeFade, fadeMs);
         if (command is null)
         {
             return;
@@ -1973,6 +1979,87 @@ public partial class MainWindow
 
         StopPlaybackForEdit();
         _history.Do(_document, ProcessEdits.Delete(_document, range, channelMask: EditMask()));
+        AfterEdit();
+    }
+
+    private void PromptSilenceSelection()
+    {
+        if (IsUiBusy || _document is null)
+        {
+            return;
+        }
+
+        if (_silenceSelectionMenu is { IsOpen: true })
+        {
+            return;
+        }
+
+        var range = _document.Selection;
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        CloseFadeCurvePicker();
+        CloseFormatConvertPicker();
+        CloseVolumeGainPicker();
+        ClosePitchShiftPicker();
+        CloseTimeStretchPicker();
+        CloseInsertSilencePicker();
+        if (_player.IsPlaying)
+        {
+            PausePlaybackSoft();
+        }
+
+        var seconds = _document.SampleRate > 0 ? range.Length / (double)_document.SampleRate : 0;
+        var menu = SilenceSelectionPicker.Show(this, seconds, ApplySilenceSelection);
+        _silenceSelectionMenu = menu;
+        menu.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_silenceSelectionMenu, menu))
+            {
+                _silenceSelectionMenu = null;
+            }
+        };
+    }
+
+    private bool CloseSilenceSelectionPicker()
+    {
+        if (_silenceSelectionMenu is not { IsOpen: true })
+        {
+            return false;
+        }
+
+        _silenceSelectionMenu.IsOpen = false;
+        return true;
+    }
+
+    private void ApplySilenceSelection()
+    {
+        if (_document is null || IsUiBusy)
+        {
+            return;
+        }
+
+        var edgeFade = _silenceSelectionMenu is { } menu && SilenceSelectionPicker.ReadEdgeFade(menu);
+        var fadeMs = edgeFade ? AppStorage.Settings.ResolvedClickGuardFadeMs() : 0;
+        CloseSilenceSelectionPicker();
+        var range = _document.Selection;
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var command = ProcessEdits.SilenceSelection(_document, range, channelMask: EditMask(), edgeFade: edgeFade, fadeMs: fadeMs);
+        if (command is null)
+        {
+            return;
+        }
+
+        StopPlaybackForEdit();
+        _history.Do(_document, command);
         AfterEdit();
     }
 

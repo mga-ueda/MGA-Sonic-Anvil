@@ -464,7 +464,12 @@ internal static partial class ProcessEdits
     public const double InsertSilenceMaxSeconds = 600;
 
     /// <summary>指定秒の無音を挿入する。長さは全チャンネル分伸び、以降のマーカー等は後ろへずれる。</summary>
-    public static IEditCommand? InsertSilence(AudioDocument document, long insertFrame, double seconds)
+    public static IEditCommand? InsertSilence(
+        AudioDocument document,
+        long insertFrame,
+        double seconds,
+        bool edgeFade = false,
+        int fadeMs = 0)
     {
         var frames = SilenceFrames(document.SampleRate, document.Channels, seconds);
         if (frames <= 0)
@@ -474,6 +479,29 @@ internal static partial class ProcessEdits
 
         insertFrame = Math.Clamp(insertFrame, 0, document.FrameCount);
         var samples = new float[frames * document.Channels];
+        float[]? before = null;
+        float[]? after = null;
+        var resolvedFade = edgeFade;
+        var resolvedMs = 0;
+        if (resolvedFade)
+        {
+            resolvedMs = ClickGuard.ClampFadeMs(fadeMs);
+            var fadeFrames = ClickGuard.FadeFrames(document.SampleRate, resolvedMs);
+            var beforeFrames = (int)Math.Min(fadeFrames, insertFrame);
+            var afterFrames = (int)Math.Min(fadeFrames, document.FrameCount - insertFrame);
+            if (beforeFrames > 0)
+            {
+                before = document.CopyRange(insertFrame - beforeFrames, beforeFrames);
+            }
+
+            if (afterFrames > 0)
+            {
+                after = document.CopyRange(insertFrame, afterFrames);
+            }
+
+            resolvedFade = before is not null || after is not null;
+        }
+
         var command = new InsertSilenceCommand(
             insertFrame,
             samples,
@@ -486,15 +514,24 @@ internal static partial class ProcessEdits
                 UiStrings.EditHistoryName("Insert Silence"),
                 document.SampleRate,
                 insertFrame,
-                insertFrame + frames));
+                insertFrame + frames),
+            before,
+            after);
         var sourceRate = document.SampleRate;
         var resolvedFrame = insertFrame;
         var resolvedSeconds = Math.Clamp(seconds, InsertSilenceMinSeconds, InsertSilenceMaxSeconds);
         command.Replay = target => InsertSilence(
             target,
             EditReplay.MapFrame(resolvedFrame, sourceRate, target),
-            resolvedSeconds);
-        command.Persist = HistoryRecipes.FromInsertSilence(sourceRate, resolvedFrame, resolvedSeconds);
+            resolvedSeconds,
+            resolvedFade,
+            resolvedMs);
+        command.Persist = HistoryRecipes.FromInsertSilence(
+            sourceRate,
+            resolvedFrame,
+            resolvedSeconds,
+            resolvedFade,
+            resolvedMs);
         return command;
     }
 
@@ -516,5 +553,132 @@ internal static partial class ProcessEdits
         }
 
         return frames;
+    }
+
+    /// <summary>
+    /// 選択範囲のサンプルを 0 にする。長さとマーカーは動かさない。
+    /// edgeFade のときは範囲の直前を 0 へ、直後を 0 から掛ける。変化が無ければ null。
+    /// </summary>
+    public static IEditCommand? SilenceSelection(
+        AudioDocument document,
+        WaveSelection range,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0,
+        bool edgeFade = false,
+        int fadeMs = 0)
+    {
+        range = range.Clamp(document.FrameCount);
+        if (range.IsEmpty)
+        {
+            return null;
+        }
+
+        var mask = EditMask(document, channel, channelMask);
+        var channels = document.Channels;
+        var beforeFrames = 0;
+        var afterFrames = 0;
+        var resolvedMs = 0;
+        if (edgeFade)
+        {
+            resolvedMs = ClickGuard.ClampFadeMs(fadeMs);
+            var fadeFrames = ClickGuard.FadeFrames(document.SampleRate, resolvedMs);
+            beforeFrames = (int)Math.Min(fadeFrames, range.StartFrame);
+            afterFrames = (int)Math.Min(fadeFrames, document.FrameCount - range.EndFrame);
+        }
+
+        var start = range.StartFrame - beforeFrames;
+        var length = beforeFrames + range.Length + afterFrames;
+        var before = document.CopyRange(start, length);
+        var after = (float[])before.Clone();
+        SilenceFramesInBuffer(after, channels, beforeFrames, range.Length, mask);
+        if (beforeFrames > 0)
+        {
+            ClickGuard.FadeRangeEdges(
+                after,
+                channels,
+                bufferStartFrame: 0,
+                new WaveSelection(0, beforeFrames),
+                mask,
+                fadeIn: false,
+                fadeOut: true,
+                beforeFrames);
+        }
+
+        if (afterFrames > 0)
+        {
+            var afterStart = beforeFrames + range.Length;
+            ClickGuard.FadeRangeEdges(
+                after,
+                channels,
+                bufferStartFrame: 0,
+                new WaveSelection(afterStart, afterStart + afterFrames),
+                mask,
+                fadeIn: true,
+                fadeOut: false,
+                afterFrames);
+        }
+
+        var changed = false;
+        for (var i = 0; i < after.Length; i++)
+        {
+            if (after[i] != before[i])
+            {
+                changed = true;
+                break;
+            }
+        }
+
+        if (!changed)
+        {
+            return null;
+        }
+
+        var resolvedFade = beforeFrames > 0 || afterFrames > 0;
+        var command = new ReplaceRangeCommand(
+            "Silence",
+            start,
+            before,
+            after,
+            document.Selection,
+            document.Selection,
+            document.CursorFrame,
+            range.StartFrame,
+            UiStrings.EditHistoryRange(
+                UiStrings.EditHistoryName("Silence"),
+                document.SampleRate,
+                range.StartFrame,
+                range.EndFrame));
+        var capturedFade = resolvedFade;
+        var capturedMs = resolvedFade ? resolvedMs : 0;
+        AttachRangeReplay(
+            command,
+            document.SampleRate,
+            range,
+            (target, mapped) => SilenceSelection(target, mapped, channelMask: mask, edgeFade: capturedFade, fadeMs: capturedMs));
+        var persist = HistoryRecipes.Range(
+            HistoryRecipes.SilenceSelection,
+            document.SampleRate,
+            range,
+            value: capturedMs,
+            channelMask: mask);
+        persist.Flag = capturedFade;
+        command.Persist = persist;
+        return command;
+    }
+
+    private static void SilenceFramesInBuffer(float[] interleaved, int channels, int startFrame, long frameCount, int mask)
+    {
+        var end = startFrame + frameCount;
+        for (var frame = (long)startFrame; frame < end; frame++)
+        {
+            var index = frame * channels;
+            for (var ch = 0; ch < channels; ch++)
+            {
+                if (ChannelSolo.Contains(mask, ch))
+                {
+                    interleaved[index + ch] = 0;
+                }
+            }
+        }
     }
 }

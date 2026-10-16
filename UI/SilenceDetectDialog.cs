@@ -805,6 +805,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
     public int KeepCount => _keeps.Count;
 
+    internal IReadOnlyList<WaveSelection> Keeps => _keeps;
+
     public int CueCount => _hitPointMode ? _hitFrames.Count : _keeps.Count;
 
     public bool HitPointMode
@@ -968,6 +970,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             RebuildEnvelope();
         }
 
+        var gain = DisplayGain(_mins, _maxs);
+
         var bins = Math.Min(_mins.Length, _maxs.Length);
         if (_document is not null && !_range.IsEmpty && bins > 0)
         {
@@ -992,8 +996,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             for (var i = 0; i < bins; i++)
             {
                 var x = (i + 0.5) / bins * width;
-                var y0 = mid - _maxs[i] * amp;
-                var y1 = mid - _mins[i] * amp;
+                var y0 = mid - _maxs[i] * gain * amp;
+                var y1 = mid - _mins[i] * gain * amp;
                 if (y1 < y0)
                 {
                     (y0, y1) = (y1, y0);
@@ -1024,13 +1028,27 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         zeroPen.Freeze();
         dc.DrawLine(zeroPen, new Point(0, mid), new Point(width, mid));
 
-        DrawThresholdPair(dc, thresholdBrush, mid, amp, width, SilentSkip.LinearFromDb(_options.OpenThresholdDb), thick: true);
+        DrawThresholdPair(dc, thresholdBrush, mid, amp, width, SilentSkip.LinearFromDb(_options.OpenThresholdDb) * gain, thick: true);
         if (!_hitPointMode
             && !_options.LinkThresholds
             && Math.Abs(_options.OpenThresholdDb - _options.CloseThresholdDb) > 1e-3)
         {
-            DrawThresholdPair(dc, thresholdBrush, mid, amp, width, SilentSkip.LinearFromDb(_options.CloseThresholdDb), thick: false);
+            DrawThresholdPair(dc, thresholdBrush, mid, amp, width, SilentSkip.LinearFromDb(_options.CloseThresholdDb) * gain, thick: false);
         }
+    }
+
+    /// <summary>表示範囲のピークが上下いっぱいに見える倍率。スレッショルド線も同じ倍率。</summary>
+    internal static float DisplayGain(float[] mins, float[] maxs)
+    {
+        float peak = 0;
+        var count = Math.Min(mins.Length, maxs.Length);
+        for (var i = 0; i < count; i++)
+        {
+            peak = Math.Max(peak, Math.Abs(mins[i]));
+            peak = Math.Max(peak, Math.Abs(maxs[i]));
+        }
+
+        return peak > 1e-6f ? 1f / peak : 1f;
     }
 
     private static void DrawThresholdPair(
@@ -1074,8 +1092,9 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         var mid = ActualHeight * 0.5;
         var amp = ActualHeight * 0.5;
-        var openY = mid - SilentSkip.LinearFromDb(_options.OpenThresholdDb) * amp;
-        var closeY = mid - SilentSkip.LinearFromDb(_options.CloseThresholdDb) * amp;
+        var gain = DisplayGain(_mins, _maxs);
+        var openY = mid - SilentSkip.LinearFromDb(_options.OpenThresholdDb) * gain * amp;
+        var closeY = mid - SilentSkip.LinearFromDb(_options.CloseThresholdDb) * gain * amp;
         var dOpen = Math.Min(Math.Abs(y - openY), Math.Abs(y - (mid * 2 - openY)));
         var dClose = Math.Min(Math.Abs(y - closeY), Math.Abs(y - (mid * 2 - closeY)));
         return dOpen <= dClose;
@@ -1091,7 +1110,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         var mid = height * 0.5;
         var amp = height * 0.5;
-        var linear = Math.Clamp(Math.Abs(y - mid) / amp, 1e-6, 1.0);
+        var gain = DisplayGain(_mins, _maxs);
+        var linear = Math.Clamp(Math.Abs(y - mid) / amp / gain, 1e-6, 1.0);
         var db = 20.0 * Math.Log10(linear);
         ThresholdChanged?.Invoke(SilentSkip.ClampThresholdDb(db), _dragOpen);
     }
@@ -1170,9 +1190,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         }
     }
 
-    /// <summary>
-    /// 表示ビンのピークで可聴区間、またはヒットポイントを近似する（適用時は厳密検出）。
-    /// </summary>
+    /// <summary>塗りの区間は適用と同じ検出。最小ゲート、クローズ時間、プリ／ポストロールを含む。</summary>
     private void RefreshKeepsFromEnvelope()
     {
         if (_hitPointMode)
@@ -1182,58 +1200,21 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         }
 
         _hitFrames = [];
-        if (_document is null || _range.IsEmpty || _mins.Length == 0 || _maxs.Length != _mins.Length)
+        if (_document is null || _range.IsEmpty)
         {
             _keeps = [];
             KeepsChanged?.Invoke();
             return;
         }
 
-        var bins = _mins.Length;
-        var thr = SilentSkip.LinearFromDb(_options.OpenThresholdDb);
-        if (!_options.LinkThresholds)
-        {
-            // クローズが低いほどゲートが開きやすいので、プレビューは低い方で残す見込みを見せる。
-            thr = Math.Min(thr, SilentSkip.LinearFromDb(_options.CloseThresholdDb));
-        }
-
-        var start = _range.StartFrame;
-        var length = Math.Max(1L, _range.Length);
-        var keeps = new List<WaveSelection>();
-        long? runStart = null;
-        for (var i = 0; i < bins; i++)
-        {
-            var peak = Math.Max(Math.Abs(_mins[i]), Math.Abs(_maxs[i]));
-            var audible = peak >= thr;
-            if (audible)
-            {
-                runStart ??= start + i * length / bins;
-                continue;
-            }
-
-            if (runStart is long run)
-            {
-                var runEnd = start + i * length / bins;
-                if (runEnd > run)
-                {
-                    keeps.Add(new WaveSelection(run, runEnd));
-                }
-
-                runStart = null;
-            }
-        }
-
-        if (runStart is long lastStart)
-        {
-            keeps.Add(new WaveSelection(lastStart, _range.EndFrame));
-        }
-
-        if (_options.EdgesOnly && keeps.Count > 0)
-        {
-            keeps = [new WaveSelection(keeps[0].StartFrame, keeps[^1].EndFrame)];
-        }
-
-        _keeps = keeps;
+        _keeps = SilenceDetect.CollectKeepSpans(
+            _document.Interleaved,
+            _document.Channels,
+            _range.StartFrame,
+            _range.EndFrame,
+            _document.SampleRate,
+            _channelMask,
+            _options);
         KeepsChanged?.Invoke();
     }
 

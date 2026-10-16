@@ -97,6 +97,7 @@ public partial class MainWindow : Window
     private System.Windows.Controls.ContextMenu? _pitchMenu;
     private System.Windows.Controls.ContextMenu? _timeStretchMenu;
     private System.Windows.Controls.ContextMenu? _silenceMenu;
+    private System.Windows.Controls.ContextMenu? _silenceSelectionMenu;
     private long _silenceInsertFrame;
     private System.Windows.Controls.ContextMenu? _waveMenu;
     private FormatConvertKind _formatKind;
