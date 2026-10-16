@@ -68,6 +68,29 @@ public sealed class LibraryPlaylistShuffleTests
     }
 
     [Fact]
+    public void Next_WithoutWrap_StaysOnLastOfCycle()
+    {
+        var shuffle = new LibraryPlaylistShuffle();
+        var current = 0;
+        for (var i = 1; i < 4; i++)
+        {
+            current = shuffle.Next(4, current, max => 0);
+        }
+
+        Assert.Equal(current, shuffle.Next(4, current, max => 0, wrap: false));
+        Assert.NotEqual(current, shuffle.Next(4, current, max => 0));
+    }
+
+    [Fact]
+    public void Previous_WithoutWrap_StaysOnFirstOfCycle()
+    {
+        var shuffle = new LibraryPlaylistShuffle();
+        var first = shuffle.First(4, max => 0);
+        Assert.Equal(first, shuffle.Previous(4, first, max => 0, wrap: false));
+        Assert.NotEqual(first, shuffle.Previous(4, first, max => 0));
+    }
+
+    [Fact]
     public void Previous_WalksBackWithinCycle()
     {
         var shuffle = new LibraryPlaylistShuffle();

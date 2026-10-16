@@ -1803,6 +1803,13 @@ internal static class LibraryPlayerMode
             or LibraryNumpadCommand.SeekForward;
 
     /// <summary>
+    /// テンキー 4／6 の曲移動は ↑↓ と同じく OS のキーリピートで送る。
+    /// 単発は端で回り、長押し連続は端で一旦止まる。
+    /// </summary>
+    public static bool PlayerNumpadTrackStepRepeats(LibraryNumpadCommand command) =>
+        command is LibraryNumpadCommand.PreviousTrack or LibraryNumpadCommand.NextTrack;
+
+    /// <summary>
     /// マーカー番号・Ctrl+←→ など捨てキュー操作を使うか。
     /// 音声波形／動画本再生／F8／イマーシブ一時停止（暗いプレビューは不可）。
     /// </summary>

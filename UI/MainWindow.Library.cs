@@ -32,6 +32,7 @@ public partial class MainWindow
     /// <summary>プレイリスト置換中は空セッションで既定ウォッシュへ落とさない。</summary>
     private bool _libraryHoldJacketWash;
     private bool _libraryPlayOnArrowRelease;
+    private bool _libraryPlayOnTrackKeyRelease;
     /// <summary>Space 再生。true のあいだは曲末で次へ進まず停止する。</summary>
     private bool _libraryStopAfterTrack;
     /// <summary>F9（および F8 動画ミニ）。サイド／トランスポート／ステータスを隠す。F8 はアナライザを残す。再生は止めない。</summary>
@@ -620,6 +621,7 @@ public partial class MainWindow
             _libraryEnterPlayGeneration++;
             _libraryPlayFirstPending = false;
             _libraryPlayOnArrowRelease = false;
+            _libraryPlayOnTrackKeyRelease = false;
             _libraryStopAfterTrack = false;
             _libraryHoldJacketWash = false;
             _libraryPlaylistUndo.Clear();
@@ -3087,6 +3089,37 @@ public partial class MainWindow
         _ = PlayLibrarySessionAsync(session);
     }
 
+    private void TryPlayLibraryAfterTrackKeyRelease()
+    {
+        if (!_libraryPlayOnTrackKeyRelease || !IsLibraryMaximized)
+        {
+            _libraryPlayOnTrackKeyRelease = false;
+            return;
+        }
+
+        if (Keyboard.IsKeyDown(Key.NumPad4) || Keyboard.IsKeyDown(Key.NumPad6))
+        {
+            return;
+        }
+
+        _libraryPlayOnTrackKeyRelease = false;
+        var session = LibraryBrowser.SelectedSession ?? _activeSession;
+        if (session is not null)
+        {
+            _ = PlayLibrarySessionAsync(session);
+        }
+    }
+
+    private void StepLibraryTrackSelection(int direction, bool wrap)
+    {
+        // 単発は再生中の曲から（端で回る）。長押しの続きは動いた選択から（端で止まる）。
+        var cursor = wrap && IsPlaybackActive()
+            ? (_activeSession ?? LibraryBrowser.SelectedSession)
+            : (LibraryBrowser.SelectedSession ?? _activeSession);
+        LibraryBrowser.SelectPlaylistStep(cursor, direction, wrap);
+        _libraryPlayOnTrackKeyRelease = true;
+    }
+
     private void CancelLibraryGapless()
     {
         _gaplessToken++;
@@ -3670,6 +3703,7 @@ public partial class MainWindow
         StopVideoFrameStep();
         CancelLibraryGapless();
         _libraryPlayOnArrowRelease = false;
+        _libraryPlayOnTrackKeyRelease = false;
         _libraryStopAfterTrack = stopAfterTrack;
         var playTicket = ++_libraryPlayTicket;
         if (session is null)

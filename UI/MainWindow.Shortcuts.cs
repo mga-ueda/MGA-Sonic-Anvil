@@ -97,6 +97,11 @@ public partial class MainWindow
             return;
         }
 
+        if (key is Key.NumPad4 or Key.NumPad6)
+        {
+            TryPlayLibraryAfterTrackKeyRelease();
+        }
+
         if (key is Key.Home or Key.End or Key.PageUp or Key.PageDown)
         {
             if (!LibraryBrowser.PlaylistVisualIsPdf)
@@ -2127,7 +2132,9 @@ public partial class MainWindow
             StopSeekNudge();
         }
 
-        if (isRepeat && !LibraryPlayerMode.PlayerNumpadRepeatIsHold(command))
+        if (isRepeat
+            && !LibraryPlayerMode.PlayerNumpadRepeatIsHold(command)
+            && !LibraryPlayerMode.PlayerNumpadTrackStepRepeats(command))
         {
             return true;
         }
@@ -2165,7 +2172,8 @@ public partial class MainWindow
             case LibraryNumpadCommand.PreviousTrack:
                 if (IsLibraryMaximized)
                 {
-                    TryStepLibraryPlaylist(-1);
+                    // ↑↓ と同様、長押しは選択だけ送り、離したときに再生する。
+                    StepLibraryTrackSelection(-1, wrap: !isRepeat);
                 }
                 else
                 {
@@ -2176,7 +2184,7 @@ public partial class MainWindow
             case LibraryNumpadCommand.NextTrack:
                 if (IsLibraryMaximized)
                 {
-                    TryStepLibraryPlaylist(1);
+                    StepLibraryTrackSelection(1, wrap: !isRepeat);
                 }
                 else
                 {
