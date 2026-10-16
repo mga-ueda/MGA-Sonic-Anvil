@@ -245,6 +245,24 @@ internal sealed class AppSettings
     /// <summary>Normal / Maximized。空または不明なら通常表示。</summary>
     public string PlayerWindowState { get; set; } = string.Empty;
 
+    /// <summary>F11 全画面にしたモニター枠。未保存なら幅 0。</summary>
+    public int WaveformFullscreenX { get; set; }
+
+    public int WaveformFullscreenY { get; set; }
+
+    public int WaveformFullscreenWidth { get; set; }
+
+    public int WaveformFullscreenHeight { get; set; }
+
+    /// <summary>F12 全画面にしたモニター枠。未保存なら幅 0。</summary>
+    public int AnalyzerFullscreenX { get; set; }
+
+    public int AnalyzerFullscreenY { get; set; }
+
+    public int AnalyzerFullscreenWidth { get; set; }
+
+    public int AnalyzerFullscreenHeight { get; set; }
+
     /// <summary>F9 ミニマムプレイヤーのウィンドウ。未保存なら幅 0。</summary>
     public int MinimalPlayerWindowX { get; set; }
 
