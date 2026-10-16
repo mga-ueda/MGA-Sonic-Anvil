@@ -207,6 +207,65 @@ public sealed class LibraryCatalogTests : IDisposable
     }
 
     [Fact]
+    public void Clear_DropsProbedTags()
+    {
+        var root = Path.Combine(_dir, "clear");
+        Directory.CreateDirectory(root);
+        var path = Path.Combine(root, "song.wav");
+        File.WriteAllBytes(path, MinimalWav());
+        LibraryCatalog.UpsertTags(path, new AudioFileTags { Probed = true, Artist = "Tester" });
+        Assert.NotEmpty(LibraryCatalog.LoadProbedTagTexts([root]));
+        Assert.True(LibraryCatalog.GetUsageBytes() > 0);
+
+        LibraryCatalog.Clear();
+        Assert.Equal(0, LibraryCatalog.GetUsageBytes());
+
+        Assert.Empty(LibraryCatalog.LoadProbedTagTexts([root]));
+    }
+
+    [Fact]
+    public void PruneUnreferenced_DropsRemovedRootAndMissingFile()
+    {
+        var keepRoot = Path.Combine(_dir, "keep");
+        var dropRoot = Path.Combine(_dir, "drop");
+        Directory.CreateDirectory(keepRoot);
+        Directory.CreateDirectory(dropRoot);
+        var keep = Path.Combine(keepRoot, "keep.wav");
+        var gone = Path.Combine(keepRoot, "gone.wav");
+        var outside = Path.Combine(dropRoot, "outside.wav");
+        File.WriteAllBytes(keep, MinimalWav());
+        File.WriteAllBytes(gone, MinimalWav());
+        File.WriteAllBytes(outside, MinimalWav());
+        LibraryCatalog.UpsertTags(keep, new AudioFileTags { Probed = true, Artist = "Keep" });
+        LibraryCatalog.UpsertTags(gone, new AudioFileTags { Probed = true, Artist = "Gone" });
+        LibraryCatalog.UpsertTags(outside, new AudioFileTags { Probed = true, Artist = "Out" });
+        File.Delete(gone);
+
+        LibraryCatalog.PruneUnreferenced([keepRoot]);
+
+        var texts = LibraryCatalog.LoadProbedTagTexts([keepRoot, dropRoot]);
+        Assert.Contains(keep, texts.Keys, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain(gone, texts.Keys, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain(outside, texts.Keys, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void PruneUnreferenced_KeepsRowsWhenRootDirectoryIsAbsent()
+    {
+        var root = Path.Combine(_dir, "volume");
+        Directory.CreateDirectory(root);
+        var file = Path.Combine(root, "song.wav");
+        File.WriteAllBytes(file, MinimalWav());
+        LibraryCatalog.UpsertTags(file, new AudioFileTags { Probed = true, Title = "Stay" });
+        Directory.Move(root, root + "-away");
+
+        LibraryCatalog.PruneUnreferenced([root]);
+
+        var texts = LibraryCatalog.LoadProbedTagTexts([root]);
+        Assert.Contains(file, texts.Keys, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Ensure_UsesCatalogCache()
     {
         var root = Path.Combine(_dir, "probe");

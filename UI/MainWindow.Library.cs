@@ -4694,6 +4694,23 @@ public partial class MainWindow
     {
         AppStorage.Settings.ApplyLibraryExplorerRoots(paths);
         AppStorage.Save();
+        ScheduleLibraryCatalogPrune();
+    }
+
+    /// <summary>今のルートから外れた索引と、消えたファイルの行を裏で捨てる。</summary>
+    private void ScheduleLibraryCatalogPrune()
+    {
+        var roots = LibraryBrowser.ExplorerRootPaths;
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                LibraryCatalog.PruneUnreferenced(roots);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+            }
+        });
     }
 
     private void LibraryBrowser_ClearPlaylistRequested(object? sender, EventArgs e) =>

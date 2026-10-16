@@ -200,6 +200,16 @@ internal static partial class UiStrings
     public static string ButtonLibraryExplorerRootRemove => Get("削除", "Remove");
     public static string ButtonLibraryExplorerRootUp => Get("上へ", "Up");
     public static string ButtonLibraryExplorerRootDown => Get("下へ", "Down");
+    public static string LabelLibraryCatalog => Get("ライブラリ索引", "Library catalog");
+    public static string LabelLibraryCatalogUsage(long bytes) =>
+        Format("現在の容量: {0}", "Current size: {0}", FormatFileBytesCompact(bytes));
+    public static string ButtonLibraryCatalogClear => Get("Clear", "Clear");
+    public static string ConfirmLibraryCatalogClear => Get(
+        "ライブラリ索引を消去しますか？ タグやビットレートなどの検索は、次に Ctrl+F5 で構築するまで当たりません。",
+        "Clear the library catalog? Searches for tags, bit rate, and the other playlist columns will miss files until the next Ctrl+F5 build.");
+    public static string InfoLibraryCatalogCleared => Get(
+        "ライブラリ索引を消去しました。",
+        "Cleared the library catalog.");
     public static string LabelSettingsInput => Get("録音", "Recording");
     public static string LabelSettingsOutput => Get("再生", "Playback");
     public static string LabelSpeaker => Get("スピーカー", "Speakers");

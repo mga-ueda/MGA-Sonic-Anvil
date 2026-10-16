@@ -290,6 +290,7 @@ internal partial class AudioSettingsWindow : Window
         AppDialogKeys.PrepareActionButton(LibraryExplorerRootRemoveButton);
         AppDialogKeys.PrepareActionButton(LibraryExplorerRootUpButton);
         AppDialogKeys.PrepareActionButton(LibraryExplorerRootDownButton);
+        AppDialogKeys.PrepareActionButton(LibraryCatalogClearButton);
         AppDialogKeys.AllowTabToLeave(SettingsTabs);
         AppDialogKeys.Attach(
             this,
@@ -337,6 +338,7 @@ internal partial class AudioSettingsWindow : Window
         FillLibraryPlaylistWaveformOptions();
         FillVideoProxyRetention();
         RefreshVideoProxyUsage();
+        RefreshLibraryCatalogUsage();
         FfmpegPathBox.Text = SelectedFfmpegExePath;
         VideoProxyDisableAutoEncodeBox.IsChecked = SelectedVideoProxyDisableAutoEncode;
         SyncFfmpegDependentControls();
@@ -605,6 +607,9 @@ internal partial class AudioSettingsWindow : Window
     private void RefreshVideoProxyUsage() =>
         VideoProxyUsageText.Text = UiStrings.LabelVideoProxyUsage(VideoProxy.GetUsageBytes());
 
+    private void RefreshLibraryCatalogUsage() =>
+        LibraryCatalogUsageText.Text = UiStrings.LabelLibraryCatalogUsage(LibraryCatalog.GetUsageBytes());
+
     private static void SelectLibraryPlaylistWaveformSize(
         ComboBox combo,
         LibraryPlaylistWaveformSize selected)
@@ -630,6 +635,7 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(LibraryExplorerRootRemoveButton);
         ActionButtonLooks.ApplyClear(LibraryExplorerRootUpButton);
         ActionButtonLooks.ApplyClear(LibraryExplorerRootDownButton);
+        ActionButtonLooks.ApplyClear(LibraryCatalogClearButton);
     }
 
     private void ApplyLibraryExplorerRootsChrome()
@@ -1282,6 +1288,30 @@ internal partial class AudioSettingsWindow : Window
             box.IsEnabled = enabled;
             box.Opacity = associationOpacity;
         }
+    }
+
+    private void LibraryCatalogClearButton_Click(object sender, RoutedEventArgs e)
+    {
+        var answer = OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.ConfirmLibraryCatalogClear,
+            UiStrings.DialogSettingsTitle,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        LibraryCatalog.Clear();
+        RefreshLibraryCatalogUsage();
+        OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.InfoLibraryCatalogCleared,
+            UiStrings.DialogSettingsTitle,
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     private void VideoProxyClearAllButton_Click(object sender, RoutedEventArgs e)
