@@ -90,6 +90,7 @@ public partial class MainWindow
 
         _selectedTabs.Clear();
         _tabSelectionAnchor = session;
+        SyncPlaylistSelectionLoudness();
         if (ReferenceEquals(_activeSession, session) && ReferenceEquals(_document, session.Document))
         {
             if (!IsEditingFileName)
@@ -161,6 +162,8 @@ public partial class MainWindow
         {
             _tabSelectionAnchor = null;
         }
+
+        SyncPlaylistSelectionLoudness();
 
         var closingActive = ReferenceEquals(session, _activeSession);
         if (closingActive)
@@ -287,6 +290,7 @@ public partial class MainWindow
 
         RebuildTabBar();
         RefreshTileChrome();
+        SyncPlaylistSelectionLoudness();
     }
 
     /// <summary>タブまたはタイルの帯。Ctrl で個別、Shift で範囲、通常クリックで前面。</summary>
@@ -326,6 +330,7 @@ public partial class MainWindow
         _tabSelectionAnchor = session;
         RebuildTabBar();
         RefreshTileChrome();
+        SyncPlaylistSelectionLoudness();
     }
 
     /// <summary>Shift+クリック。起点（前回操作したタブ、無ければアクティブ）から範囲選択。</summary>
@@ -353,6 +358,7 @@ public partial class MainWindow
 
         RebuildTabBar();
         RefreshTileChrome();
+        SyncPlaylistSelectionLoudness();
     }
 
     /// <summary>Esc から呼ぶ。解除したら true。</summary>
@@ -366,6 +372,7 @@ public partial class MainWindow
         _selectedTabs.Clear();
         RebuildTabBar();
         RefreshTileChrome();
+        SyncPlaylistSelectionLoudness();
         return true;
     }
 

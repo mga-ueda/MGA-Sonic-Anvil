@@ -63,6 +63,33 @@ internal sealed class AudioFileTags
     /// <summary>Integrated LUFS。未計測は null（カタログ／遅延計測で埋める）。</summary>
     public float? IntegratedLufs { get; init; }
 
+    /// <summary>ファイル内の Short Term 最大。未計測は null。</summary>
+    public float? ShortTermMaxLufs { get; init; }
+
+    /// <summary>ファイル内の Momentary 最大。未計測は null。</summary>
+    public float? MomentaryMaxLufs { get; init; }
+
+    /// <summary>ファイル全体の Loudness Range。未計測は null。測ったが出せないときは NaN。</summary>
+    public float? LoudnessRangeLu { get; init; }
+
+    /// <summary>ファイル全体の True Peak。未計測は null。</summary>
+    public float? TruePeakDb { get; init; }
+
+    public bool HasFileLoudness =>
+        IntegratedLufs is not null
+        && ShortTermMaxLufs is not null
+        && MomentaryMaxLufs is not null
+        && LoudnessRangeLu is not null
+        && TruePeakDb is not null;
+
+    public FileLoudness ToFileLoudness() =>
+        new(
+            ShortTermMaxLufs ?? float.NaN,
+            IntegratedLufs ?? float.NaN,
+            MomentaryMaxLufs ?? float.NaN,
+            LoudnessRangeLu ?? float.NaN,
+            TruePeakDb ?? float.NaN);
+
     /// <summary>LAME Xing／Info または iTunSMPB／M4A elst の encoder delay（サンプル）。未記載は 0。</summary>
     public int EncoderDelayFrames { get; init; }
 
@@ -112,6 +139,10 @@ internal sealed class AudioFileTags
             VideoCodec = VideoCodec,
             AudioCodec = AudioCodec,
             IntegratedLufs = IntegratedLufs,
+            ShortTermMaxLufs = ShortTermMaxLufs,
+            MomentaryMaxLufs = MomentaryMaxLufs,
+            LoudnessRangeLu = LoudnessRangeLu,
+            TruePeakDb = TruePeakDb,
             EncoderDelayFrames = EncoderDelayFrames,
             EncoderPaddingFrames = EncoderPaddingFrames,
             EncoderOriginalFrames = EncoderOriginalFrames,
@@ -146,6 +177,48 @@ internal sealed class AudioFileTags
             VideoCodec = VideoCodec,
             AudioCodec = AudioCodec,
             IntegratedLufs = integratedLufs,
+            ShortTermMaxLufs = ShortTermMaxLufs,
+            MomentaryMaxLufs = MomentaryMaxLufs,
+            LoudnessRangeLu = LoudnessRangeLu,
+            TruePeakDb = TruePeakDb,
+            EncoderDelayFrames = EncoderDelayFrames,
+            EncoderPaddingFrames = EncoderPaddingFrames,
+            EncoderOriginalFrames = EncoderOriginalFrames,
+            HasArtwork = HasArtwork,
+        };
+
+    public AudioFileTags WithFileLoudness(FileLoudness loudness) =>
+        new()
+        {
+            Probed = Probed,
+            Title = Title,
+            Artist = Artist,
+            Album = Album,
+            AlbumArtist = AlbumArtist,
+            Track = Track,
+            TrackNumber = TrackNumber,
+            Disc = Disc,
+            DiscNumber = DiscNumber,
+            Year = Year,
+            YearNumber = YearNumber,
+            Genre = Genre,
+            Comment = Comment,
+            Composer = Composer,
+            DurationSeconds = DurationSeconds,
+            SampleRate = SampleRate,
+            BitsPerSample = BitsPerSample,
+            Channels = Channels,
+            BitRateKbps = BitRateKbps,
+            VideoWidth = VideoWidth,
+            VideoHeight = VideoHeight,
+            FrameRate = FrameRate,
+            VideoCodec = VideoCodec,
+            AudioCodec = AudioCodec,
+            IntegratedLufs = loudness.IntegratedLufs,
+            ShortTermMaxLufs = loudness.ShortTermMaxLufs,
+            MomentaryMaxLufs = loudness.MomentaryMaxLufs,
+            LoudnessRangeLu = loudness.LoudnessRangeLu,
+            TruePeakDb = loudness.TruePeakDb,
             EncoderDelayFrames = EncoderDelayFrames,
             EncoderPaddingFrames = EncoderPaddingFrames,
             EncoderOriginalFrames = EncoderOriginalFrames,

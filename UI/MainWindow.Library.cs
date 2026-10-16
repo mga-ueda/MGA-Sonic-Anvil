@@ -19,6 +19,8 @@ namespace MgaSonicAnvil.UI;
 public partial class MainWindow
 {
     private int _libraryLoadGeneration;
+    private int _selectionLoudnessGeneration;
+    private CancellationTokenSource? _selectionLoudnessCts;
     private DocumentSession? _libraryLoadSession;
     private bool _libraryPlayFirstPending;
     private int _libraryEnterPlayGeneration;
@@ -2217,6 +2219,175 @@ public partial class MainWindow
         _tabSelectionAnchor = current;
         RebuildTabBar();
         RefreshTileChrome();
+    }
+
+    private void SyncPlaylistSelectionLoudness() =>
+        SyncSelectionLoudness(measureMissing: true);
+
+    /// <summary>
+    /// プレイヤーはプレイリスト、エディタはタブの複数選択。停止中は5項目の平均をメーターへ出す。
+    /// </summary>
+    private void SyncSelectionLoudness(bool measureMissing)
+    {
+        var selected = SelectionForLoudnessAverage();
+        if (selected.Length < 2)
+        {
+            CancelSelectionLoudness();
+            LoudnessMeter.SetSelectionLoudness(null);
+            return;
+        }
+
+        var readings = new List<FileLoudness>(selected.Length);
+        var missing = measureMissing ? new List<DocumentSession>() : null;
+        foreach (var session in selected)
+        {
+            if (StoredFileLoudness(session) is FileLoudness loudness)
+            {
+                readings.Add(loudness);
+                continue;
+            }
+
+            if (measureMissing)
+            {
+                missing!.Add(session);
+            }
+        }
+
+        LoudnessMeter.SetSelectionLoudness(
+            readings.Count > 0
+                ? FileLoudness.Average(readings)
+                : new FileLoudness(
+                    float.NegativeInfinity,
+                    float.NegativeInfinity,
+                    float.NegativeInfinity,
+                    float.NegativeInfinity,
+                    float.NegativeInfinity));
+        if (missing is { Count: > 0 })
+        {
+            ScheduleSelectionLoudness(missing);
+        }
+    }
+
+    private DocumentSession[] SelectionForLoudnessAverage()
+    {
+        if (IsLibraryMaximized)
+        {
+            return LibraryBrowser.SelectedSessions;
+        }
+
+        return HasMultipleTabSelection ? SelectedTabsInOrder() : [];
+    }
+
+    private static FileLoudness? StoredFileLoudness(DocumentSession session)
+    {
+        var document = session.Document;
+        if (document.Tags.HasFileLoudness)
+        {
+            return document.Tags.ToFileLoudness();
+        }
+
+        var path = document.SourcePath;
+        if (string.IsNullOrWhiteSpace(path)
+            || !LibraryMediaCache.TryGetFileLoudness(path, out var cached))
+        {
+            return null;
+        }
+
+        document.ApplyTags(document.Tags.WithFileLoudness(cached));
+        return cached;
+    }
+
+    private void CancelSelectionLoudness()
+    {
+        _selectionLoudnessGeneration++;
+        if (_selectionLoudnessCts is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _selectionLoudnessCts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
+        _selectionLoudnessCts.Dispose();
+        _selectionLoudnessCts = null;
+    }
+
+    private void ScheduleSelectionLoudness(List<DocumentSession> missing)
+    {
+        CancelSelectionLoudness();
+        var cts = new CancellationTokenSource();
+        _selectionLoudnessCts = cts;
+        var generation = _selectionLoudnessGeneration;
+        _ = MeasureSelectionLoudnessAsync(missing, generation, cts.Token);
+    }
+
+    private async Task MeasureSelectionLoudnessAsync(
+        List<DocumentSession> missing,
+        int generation,
+        CancellationToken cancellationToken)
+    {
+        foreach (var session in missing)
+        {
+            if (generation != _selectionLoudnessGeneration || cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            var document = session.Document;
+            if (document.Tags.HasFileLoudness)
+            {
+                continue;
+            }
+
+            FileLoudness? measured;
+            try
+            {
+                measured = await Task.Run(
+                    () =>
+                    {
+                        if (!LoudnessMeterEngine.TryMeasureFileLoudness(
+                                document,
+                                out var value,
+                                cancellationToken))
+                        {
+                            return (FileLoudness?)null;
+                        }
+
+                        if (document.SourcePath is { Length: > 0 } path)
+                        {
+                            LibraryMediaCache.PutFileLoudness(path, value);
+                        }
+
+                        return value;
+                    },
+                    cancellationToken).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (generation != _selectionLoudnessGeneration || measured is null)
+            {
+                continue;
+            }
+
+            document.ApplyTags(document.Tags.WithFileLoudness(measured.Value));
+        }
+
+        if (generation == _selectionLoudnessGeneration && !cancellationToken.IsCancellationRequested)
+        {
+            SyncSelectionLoudness(measureMissing: false);
+        }
     }
 
     private void LibraryBrowser_SessionActivated(object? sender, DocumentSession session)

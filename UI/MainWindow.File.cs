@@ -882,7 +882,11 @@ public partial class MainWindow
                 RememberOpenedPath(job.Path);
             }
 
-            if (job.Document.Tags.IntegratedLufs is float lufs)
+            if (job.Document.Tags.HasFileLoudness)
+            {
+                LibraryMediaCache.PutFileLoudness(job.Path, job.Document.Tags.ToFileLoudness());
+            }
+            else if (job.Document.Tags.IntegratedLufs is float lufs)
             {
                 LibraryMediaCache.PutLoudness(job.Path, lufs);
             }

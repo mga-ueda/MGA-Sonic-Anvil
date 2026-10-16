@@ -1935,6 +1935,14 @@ public partial class MainWindow
             ScheduleLibraryWaveformPaint();
             ScheduleLibraryEnterPlayback();
         }
+        else
+        {
+            // プレイヤー離脱の Bind は、まだライブラリ中なのでメーターの文書を外す。
+            // エディタの停止中表示は、モードが戻ってから付け直す。
+            LoudnessMeter.Document = _document;
+        }
+
+        SyncPlaylistSelectionLoudness();
 
         if (!wasFullscreen || wasLibrary || wantLibrary)
         {
