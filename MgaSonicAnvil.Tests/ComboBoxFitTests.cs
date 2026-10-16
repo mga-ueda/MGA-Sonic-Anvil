@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using MgaSonicAnvil.UI;
 using Xunit;
 
@@ -37,6 +38,23 @@ public sealed class ComboBoxFitTests
         Assert.Equal(0, AudioSettingsWindow.StepTabIndex(0, 4, -1, wrap: false));
         Assert.Equal(2, AudioSettingsWindow.StepTabIndex(3, 4, -1, wrap: false));
         Assert.Equal(0, AudioSettingsWindow.StepTabIndex(0, 1, 1));
+    }
+
+    [Fact]
+    public void TrySettingsTabDelta_PageKeysMatchCtrlTab()
+    {
+        Assert.True(AudioSettingsWindow.TrySettingsTabDelta(Key.Tab, ModifierKeys.Control, out var next));
+        Assert.Equal(1, next);
+        Assert.True(AudioSettingsWindow.TrySettingsTabDelta(
+            Key.Tab, ModifierKeys.Control | ModifierKeys.Shift, out var prev));
+        Assert.Equal(-1, prev);
+        Assert.True(AudioSettingsWindow.TrySettingsTabDelta(Key.PageDown, ModifierKeys.Control, out next));
+        Assert.Equal(1, next);
+        Assert.True(AudioSettingsWindow.TrySettingsTabDelta(Key.PageUp, ModifierKeys.Control, out prev));
+        Assert.Equal(-1, prev);
+        Assert.False(AudioSettingsWindow.TrySettingsTabDelta(Key.PageDown, ModifierKeys.None, out _));
+        Assert.False(AudioSettingsWindow.TrySettingsTabDelta(
+            Key.PageUp, ModifierKeys.Control | ModifierKeys.Shift, out _));
     }
 
     [Fact]
