@@ -249,6 +249,8 @@ internal static partial class UiStrings
     public static string LabelDefaultBitDepth => Get("ビット深度", "Bit depth");
     public static string LabelDefaultChannelLayout => Get("チャンネル", "Channels");
     public static string LabelFileAssociations => Get("関連付け", "File associations");
+    public static string ButtonFileAssociationsAllOn => Get("すべてオン", "All on");
+    public static string ButtonFileAssociationsAllOff => Get("すべてオフ", "All off");
     public static string LabelFileAssociationsAudio => Get("オーディオ", "Audio");
     public static string LabelFileAssociationsVideo => Get("ビデオ", "Video");
     public static string LabelLanguageAuto => Get("Auto", "Auto");

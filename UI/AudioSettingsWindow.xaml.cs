@@ -117,6 +117,7 @@ internal partial class AudioSettingsWindow : Window
     private readonly DispatcherTimer _meterTimer;
     private bool _syncingAssociations;
     private TextBlock? _videoAssociationHeader;
+    private readonly List<CheckBox> _associationBoxes = [];
     private readonly List<CheckBox> _videoAssociationBoxes = [];
     private bool _syncingSpeaker;
     private bool _syncingVisibility;
@@ -276,6 +277,8 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(LibraryColumnsWaveResetButton);
         ActionButtonLooks.ApplyClear(LibraryColumnsMp3ResetButton);
         ActionButtonLooks.ApplyClear(LibraryColumnsVideoResetButton);
+        ActionButtonLooks.ApplyClear(AssociationAllOnButton);
+        ActionButtonLooks.ApplyClear(AssociationAllOffButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
         AppDialogKeys.PrepareActionButton(OkButton, isDefault: true);
@@ -938,6 +941,7 @@ internal partial class AudioSettingsWindow : Window
     {
         AssociationHost.Children.Clear();
         _videoAssociationHeader = null;
+        _associationBoxes.Clear();
         _videoAssociationBoxes.Clear();
         var style = TryFindResource("DarkCheckBoxStyle") as Style;
         _syncingAssociations = true;
@@ -1008,7 +1012,8 @@ internal partial class AudioSettingsWindow : Window
 
             box.Checked += Association_Changed;
             box.Unchecked += Association_Changed;
-                        column.Children.Add(box);
+            column.Children.Add(box);
+            _associationBoxes.Add(box);
             if (ffmpegRequired)
             {
                 _videoAssociationBoxes.Add(box);
@@ -1018,46 +1023,101 @@ internal partial class AudioSettingsWindow : Window
         return column;
     }
 
-    private void Association_Changed(object sender, RoutedEventArgs e)
+    private void AssociationAllOnButton_Click(object sender, RoutedEventArgs e) =>
+        SetEnabledAssociations(want: true);
+
+    private void AssociationAllOffButton_Click(object sender, RoutedEventArgs e) =>
+        SetEnabledAssociations(want: false);
+
+    /// <summary>
+    /// 操作できる関連付けだけをまとめて付ける／外す。灰色（FFmpeg 未設定の動画）は触らない。
+    /// </summary>
+    private void SetEnabledAssociations(bool want)
     {
-        if (_syncingAssociations || sender is not CheckBox box || box.Tag is not string ext)
+        string? error = null;
+        for (var i = 0; i < _associationBoxes.Count; i++)
+        {
+            var box = _associationBoxes[i];
+            if (!ShouldBulkSetAssociation(box.IsEnabled, box.IsChecked == true, want))
+            {
+                continue;
+            }
+
+            if (!TryCommitAssociation(box, want, out var message) && error is null)
+            {
+                error = message;
+            }
+        }
+
+        if (error is null)
         {
             return;
         }
 
-        var want = box.IsChecked == true;
+        OwnerCenteredMessageBox.Show(
+            this,
+            error,
+            UiStrings.DialogSettingsTitle,
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+    }
+
+    /// <summary>一括ボタンがこのチェックを変えるか。無効な行と、すでに希望どおりの行は飛ばす。</summary>
+    internal static bool ShouldBulkSetAssociation(bool enabled, bool isChecked, bool want) =>
+        enabled && isChecked != want;
+
+    private void Association_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_syncingAssociations || sender is not CheckBox box || box.Tag is not string)
+        {
+            return;
+        }
+
+        if (!TryCommitAssociation(box, box.IsChecked == true, out var message) && message is not null)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                message,
+                UiStrings.DialogSettingsTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private bool TryCommitAssociation(CheckBox box, bool want, out string? error)
+    {
+        error = null;
+        if (box.Tag is not string ext)
+        {
+            return false;
+        }
+
         try
         {
             FileAssociations.SetAssociated(ext, want);
         }
         catch (Exception ex)
         {
-            var text = ex is InvalidOperationException
+            error = ex is InvalidOperationException
                 ? ex.Message
                 : UiStrings.ErrFileAssociationFailed(ex.Message);
-            OwnerCenteredMessageBox.Show(
-                this,
-                text,
-                UiStrings.DialogSettingsTitle,
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
         }
 
         var actual = FileAssociations.IsAssociated(ext);
-        if (box.IsChecked == actual)
+        if (box.IsChecked != actual)
         {
-            return;
+            _syncingAssociations = true;
+            try
+            {
+                box.IsChecked = actual;
+            }
+            finally
+            {
+                _syncingAssociations = false;
+            }
         }
 
-        _syncingAssociations = true;
-        try
-        {
-            box.IsChecked = actual;
-        }
-        finally
-        {
-            _syncingAssociations = false;
-        }
+        return error is null && actual == want;
     }
 
     private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -2429,6 +2489,8 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(LibraryColumnsWaveResetButton);
         ActionButtonLooks.ApplyClear(LibraryColumnsMp3ResetButton);
         ActionButtonLooks.ApplyClear(LibraryColumnsVideoResetButton);
+        ActionButtonLooks.ApplyClear(AssociationAllOnButton);
+        ActionButtonLooks.ApplyClear(AssociationAllOffButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
         RefreshTestButtons();
