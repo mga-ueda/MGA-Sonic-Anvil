@@ -140,6 +140,11 @@ internal static class LibraryPlayerMode
             return true;
         }
 
+        if (IsLibraryCatalogRebuild(key, modifiers))
+        {
+            return true;
+        }
+
         if (key == Key.Tab && modifiers is ModifierKeys.None or ModifierKeys.Shift)
         {
             return true;
@@ -416,11 +421,18 @@ internal static class LibraryPlayerMode
         modifiers == ModifierKeys.None && key == Key.R;
 
     /// <summary>
-    /// フォルダツリー再読込とライブラリ索引温め（すりガラス）、フォーカス移動。
-    /// 任意。発見経路はディスクが正。プレイリスト／お気に入り／波形フォーカスでも効く。
+    /// フォルダツリーの再読込。新しいフォルダとリネームだけを反映する。
+    /// プレイリスト／お気に入り／波形フォーカスでも効く。
     /// </summary>
     public static bool IsExplorerRefresh(Key key, ModifierKeys modifiers) =>
         key == Key.F5 && modifiers == ModifierKeys.None;
+
+    /// <summary>
+    /// ライブラリ索引の再構築（タグ／波形／ジャケット）。すりガラスで操作を止める。
+    /// ツリーも読み直す。
+    /// </summary>
+    public static bool IsLibraryCatalogRebuild(Key key, ModifierKeys modifiers) =>
+        key == Key.F5 && modifiers == ModifierKeys.Control;
 
     /// <summary>ツリーが左右を使う。再生中の早送り／巻き戻しにはしない。</summary>
     public static bool ExplorerOwnsHorizontal(Key key, ModifierKeys modifiers) =>
@@ -516,6 +528,11 @@ internal static class LibraryPlayerMode
         }
 
         if (modifiers == ModifierKeys.None && key is Key.F1 or Key.F2 or Key.F3 or Key.F5)
+        {
+            return false;
+        }
+
+        if (IsLibraryCatalogRebuild(key, modifiers))
         {
             return false;
         }

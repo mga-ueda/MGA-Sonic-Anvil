@@ -825,6 +825,8 @@ internal static partial class UiStrings
     public static string LibraryMenuAddToFavorites => Get("お気に入りへ追加", "Add to Favorites");
     public static string LibraryMenuAddAsExplorerRoot => Get("ツリーのルートに登録", "Register as Tree Root");
     public static string LibraryMenuRemoveExplorerRoot => Get("ツリーのルートから外す", "Remove Tree Root");
+    public static string LibraryMenuRefreshExplorer => Get("ツリーを再読み込み", "Refresh Tree");
+    public static string LibraryMenuRebuildCatalog => Get("ライブラリを再構築", "Rebuild Library");
     public static string LibraryMenuReplacePlaylist => Get("プレイリストをクリアして追加", "Clear Playlist and Add");
     public static string LibraryMenuAppendPlaylist => Get("プレイリストへ追加", "Add to Playlist");
     public static string LibraryMenuRemoveFromFavorites => Get("お気に入りから削除", "Remove from Favorites");

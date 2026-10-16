@@ -4,7 +4,7 @@ using MgaSonicAnvil.Domain;
 namespace MgaSonicAnvil.Config;
 
 /// <summary>
-/// F5 用。Explorer ルート配下を、プレイリストに一度載せたのと同じ内容でキャッシュする。
+/// Ctrl+F5 用。Explorer ルート配下を、プレイリストに一度載せたのと同じ内容でキャッシュする。
 /// タグ・波形棒・ジャケット。プレイリスト UI には載せない。重いので UI はすりガラスで止める。
 /// </summary>
 internal static class LibraryCatalogWarmup
