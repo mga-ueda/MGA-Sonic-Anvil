@@ -277,6 +277,15 @@ internal static class FileAssociations
         WriteApplication(exe, ext, add: true);
         WriteCapabilities(ext, progId, add: true);
         WriteUserChoice(ext, progId);
+        if (UserChoiceLatestHash.IsInEffect())
+        {
+            WriteUserChoiceLatest(ext, progId);
+        }
+        else
+        {
+            TryDeleteUserChoiceLatest(ext);
+        }
+
         NotifyShell();
         if (!IsAssociated(ext))
         {
@@ -302,10 +311,30 @@ internal static class FileAssociations
         }
 
         WriteCapabilities(ext, progId, add: false);
+        var latest = ReadUserChoiceLatestProgId(ext);
         var userChoice = ReadUserChoiceProgId(ext);
         if (IsOurProgId(userChoice, ext) || IsApplicationsProgIdName(userChoice, CurrentExeFileName()))
         {
             TryDeleteUserChoice(ext);
+        }
+
+        if (UserChoiceLatestHash.IsInEffect())
+        {
+            if (IsOurProgId(latest, ext) || IsApplicationsProgIdName(latest, CurrentExeFileName()))
+            {
+                if (!string.IsNullOrWhiteSpace(previous) && !IsOurProgId(previous))
+                {
+                    WriteUserChoiceLatest(ext, previous);
+                }
+                else
+                {
+                    TryDeleteUserChoiceLatest(ext);
+                }
+            }
+        }
+        else
+        {
+            TryDeleteUserChoiceLatest(ext);
         }
 
         TryDeleteKey($@"{PreviousRoot}\{ext}");
@@ -318,6 +347,15 @@ internal static class FileAssociations
 
     private static string? ReadEffectiveProgId(string ext)
     {
+        if (UserChoiceLatestHash.IsInEffect())
+        {
+            var latest = ReadUserChoiceLatestProgId(ext);
+            if (!string.IsNullOrWhiteSpace(latest))
+            {
+                return latest;
+            }
+        }
+
         var userChoice = ReadUserChoiceProgId(ext);
         if (!string.IsNullOrWhiteSpace(userChoice))
         {
@@ -325,6 +363,12 @@ internal static class FileAssociations
         }
 
         return ReadClassesProgId(ext, userOnly: false);
+    }
+
+    private static string? ReadUserChoiceLatestProgId(string ext)
+    {
+        using var key = Registry.CurrentUser.OpenSubKey($@"{FileExtsRoot}\{ext}\UserChoiceLatest\ProgId");
+        return TrimValue(key?.GetValue("ProgId")?.ToString());
     }
 
     private static string? ReadUserChoiceProgId(string ext)
@@ -548,8 +592,6 @@ internal static class FileAssociations
     {
         using var parent = Registry.CurrentUser.CreateSubKey($@"{FileExtsRoot}\{ext}");
         UnlockDeniedUserChoice(parent, "UserChoice");
-        UnlockDeniedUserChoice(parent, "UserChoiceLatest");
-        parent.DeleteSubKeyTree("UserChoiceLatest", throwOnMissingSubKey: false);
 
         var key = parent.OpenSubKey("UserChoice", writable: true);
         if (key is null)
@@ -598,6 +640,63 @@ internal static class FileAssociations
         }
     }
 
+    private static void WriteUserChoiceLatest(string ext, string progId)
+    {
+        using var parent = Registry.CurrentUser.CreateSubKey($@"{FileExtsRoot}\{ext}");
+        UnlockDeniedUserChoice(parent, "UserChoiceLatest");
+        using var latest = parent.CreateSubKey("UserChoiceLatest");
+        using var prog = latest.CreateSubKey("ProgId");
+        prog.SetValue("ProgId", progId);
+        var written = QueryKeyWriteTime(prog);
+        var sid = WindowsIdentity.GetCurrent().User?.Value
+            ?? throw new InvalidOperationException(UiStrings.ErrFileAssociationNotDefault);
+        var machineId = UserChoiceLatestHash.ReadMachineId()
+            ?? throw new InvalidOperationException(UiStrings.ErrFileAssociationNotDefault);
+        latest.SetValue("Hash", UserChoiceLatestHash.Compute(ext, sid, progId, machineId, written));
+    }
+
+    private static long QueryKeyWriteTime(RegistryKey key)
+    {
+        uint classLength = 0;
+        var rc = RegQueryInfoKeyW(
+            key.Handle.DangerousGetHandle(),
+            null,
+            ref classLength,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            out var fileTime);
+        if (rc != 0)
+        {
+            throw new InvalidOperationException(UiStrings.ErrFileAssociationNotDefault);
+        }
+
+        return fileTime;
+    }
+
+    private static void TryDeleteUserChoiceLatest(string ext)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey($@"{FileExtsRoot}\{ext}", writable: true);
+            if (key is null)
+            {
+                return;
+            }
+
+            UnlockDeniedUserChoice(key, "UserChoiceLatest");
+            key.DeleteSubKeyTree("UserChoiceLatest", throwOnMissingSubKey: false);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException)
+        {
+        }
+    }
+
     private static void TryDeleteUserChoice(string ext)
     {
         try
@@ -608,11 +707,8 @@ internal static class FileAssociations
                 return;
             }
 
-            foreach (var name in new[] { "UserChoice", "UserChoiceLatest" })
-            {
-                UnlockDeniedUserChoice(key, name);
-                key.DeleteSubKeyTree(name, throwOnMissingSubKey: false);
-            }
+            UnlockDeniedUserChoice(key, "UserChoice");
+            key.DeleteSubKeyTree("UserChoice", throwOnMissingSubKey: false);
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException)
         {
@@ -757,6 +853,21 @@ internal static class FileAssociations
         int keySetInformationClass,
         ref long lastWriteTime,
         int dataLength);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern int RegQueryInfoKeyW(
+        IntPtr hKey,
+        StringBuilder? lpClass,
+        ref uint lpcbClass,
+        IntPtr lpReserved,
+        IntPtr lpcSubKeys,
+        IntPtr lpcbMaxSubKeyLen,
+        IntPtr lpcbMaxClassLen,
+        IntPtr lpcValues,
+        IntPtr lpcbMaxValueNameLen,
+        IntPtr lpcbMaxValueLen,
+        IntPtr lpcbSecurityDescriptor,
+        out long lpftLastWriteTime);
 
     [DllImport("shlwapi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern int AssocQueryStringW(

@@ -162,6 +162,16 @@ public sealed class FileAssociationTests
     }
 
     [Fact]
+    public void UserChoiceLatestHash_MatchesLiveWavVector()
+    {
+        const string canonical =
+            "Copyright (C) Microsoft. All rights reserved {D185E0A1-E265-4724-AA21-3A17B038D72E}"
+            + "01dd5d8cb98b6d70.wavS-1-5-21-3306847675-144223080-1115002813-1001"
+            + "B0F6C10E-1003-47E0-93CA-B719AF64DBF7AppXqj98qxeaynz6dv4459ayz6bnqxbyaqcs";
+        Assert.Equal("Nx1WC5l1+/0=", UserChoiceLatestHash.ComputeCanonical(canonical));
+    }
+
+    [Fact]
     public void UserChoiceHash_MatchesPublishedVector()
     {
         const long fileTime = 0x01d4d98267246000;
