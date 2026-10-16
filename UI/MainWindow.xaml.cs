@@ -67,6 +67,7 @@ public partial class MainWindow : Window
     private WaveSelection _timelineNudgeLoopBefore;
     private PlayerScratchSnapshot? _timelineNudgeScratchBefore;
     private int _markerNumber;
+    private int _regionNumber;
     private int _pdfPageDigit;
     private AudioDocument? _document => _activeSession?.Document;
     private RangeDivideState? _markerDivide;

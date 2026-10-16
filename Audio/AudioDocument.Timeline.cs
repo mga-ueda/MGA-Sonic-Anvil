@@ -235,14 +235,14 @@ internal sealed partial class AudioDocument
         return false;
     }
 
-    /// <summary>開始時刻順。マーカー番号の続きから振る。無い範囲は 0。</summary>
+    /// <summary>開始時刻順の 1 始まり。マーカー番号とは別。無い範囲は 0。</summary>
     public int RegionNumber(WaveSelection range)
     {
         for (var i = 0; i < _regions.Count; i++)
         {
             if (_regions[i].Range == range)
             {
-                return _markers.Length + i + 1;
+                return i + 1;
             }
         }
 

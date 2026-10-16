@@ -89,7 +89,7 @@ public sealed class RegionTests
     }
 
     [Fact]
-    public void Regions_AreNumberedAfterMarkers()
+    public void Regions_AreNumberedFromOneApartFromMarkers()
     {
         var document = MakeDocument(frames: 100);
         document.SetRegions([new WaveSelection(50, 80), new WaveSelection(10, 30)]);
@@ -101,8 +101,8 @@ public sealed class RegionTests
         document.TryAddMarker(40);
         Assert.Equal(1, document.Markers[0].Id);
         Assert.Equal(2, document.Markers[1].Id);
-        Assert.Equal(3, document.RegionNumber(document.Regions[0]));
-        Assert.Equal(4, document.RegionNumber(document.Regions[1]));
+        Assert.Equal(1, document.RegionNumber(document.Regions[0]));
+        Assert.Equal(2, document.RegionNumber(document.Regions[1]));
         Assert.Equal(0, document.RegionNumber(new WaveSelection(0, 5)));
     }
 

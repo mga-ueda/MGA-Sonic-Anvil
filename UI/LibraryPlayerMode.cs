@@ -1867,15 +1867,21 @@ internal static class LibraryPlayerMode
     public static bool IsTopRowDigitKey(Key key) =>
         key is >= Key.D0 and <= Key.D9;
 
-    /// <summary>無修飾＝割合（上段のみ）、Shift＝マーカー（上段のみ）。テンキーは再生操作。</summary>
+    /// <summary>無修飾＝割合、Shift＝マーカー、Ctrl＝リージョン（いずれも上段のみ）。テンキーは再生操作。</summary>
     public static bool IsDigitJumpChord(Key key, ModifierKeys modifiers) =>
-        IsPercentDigitJump(key, modifiers) || IsMarkerDigitJump(key, modifiers);
+        IsPercentDigitJump(key, modifiers)
+        || IsMarkerDigitJump(key, modifiers)
+        || IsRegionDigitJump(key, modifiers);
 
     public static bool IsPercentDigitJump(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && IsTopRowDigitKey(key);
 
     public static bool IsMarkerDigitJump(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.Shift && IsTopRowDigitKey(key);
+
+    /// <summary>Ctrl＋上段数字でリージョン番号へ（テンキーは使わない）。</summary>
+    public static bool IsRegionDigitJump(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.Control && IsTopRowDigitKey(key);
 
     /// <summary>
     /// マーカー番号の桁送り（Shift＋上段）。
@@ -1913,6 +1919,42 @@ internal static class LibraryPlayerMode
         }
 
         percentFallback = true;
+        return true;
+    }
+
+    /// <summary>
+    /// リージョン番号の桁送り（Ctrl＋上段。1 始まり。マーカー番号とは別）。
+    /// seekId があればその番号の先頭へ。どの番号にもならない桁は seek せず消費する。
+    /// </summary>
+    public static bool TryResolveRegionDigitJump(
+        int pending,
+        int digit,
+        int regionCount,
+        out int nextPending,
+        out int? seekId)
+    {
+        nextPending = 0;
+        seekId = null;
+        if (regionCount <= 0 || digit is < 0 or > 9)
+        {
+            return false;
+        }
+
+        var next = pending * 10 + digit;
+        if (next > 0 && next <= regionCount)
+        {
+            nextPending = next;
+            seekId = next;
+            return true;
+        }
+
+        if (digit > 0 && digit <= regionCount)
+        {
+            nextPending = digit;
+            seekId = digit;
+            return true;
+        }
+
         return true;
     }
 

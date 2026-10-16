@@ -1412,7 +1412,7 @@ public partial class MainWindow
             return true;
         }
 
-        // エディタ: 上段 無修飾＝割合、Shift＝マーカー番号（テンキー再生操作は上で済み）。
+        // エディタ: 上段 無修飾＝割合、Shift＝マーカー番号、Ctrl＝リージョン番号（テンキー再生操作は上で済み）。
         if (!IsLibraryMaximized && TryHandleEditorDigitJump(key, modifiers))
         {
             return true;
@@ -1926,7 +1926,7 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// エディタの上段数字ジャンプ。無修飾＝割合、Shift＝ドキュメントのマーカー番号。
+    /// エディタの上段数字ジャンプ。無修飾＝割合、Shift＝マーカー番号、Ctrl＝リージョン番号。
     /// </summary>
     private bool TryHandleEditorDigitJump(Key key, ModifierKeys modifiers)
     {
@@ -1934,6 +1934,16 @@ public partial class MainWindow
             || !TryDigitKey(key, out var digit))
         {
             return false;
+        }
+
+        if (LibraryPlayerMode.IsRegionDigitJump(key, modifiers))
+        {
+            if (_document is null || _document.Regions.Count == 0)
+            {
+                return true;
+            }
+
+            return ApplyResolvedRegionDigitJump(digit, _document.Regions.Count);
         }
 
         if (LibraryPlayerMode.IsMarkerDigitJump(key, modifiers))
@@ -1974,6 +1984,7 @@ public partial class MainWindow
         if (seekId is int id)
         {
             _markerNumber = nextPending;
+            _regionNumber = 0;
             Waveform.SeekToMarkerId(id, extendSelection: false);
             RestartMarkerDigitTimer();
             return true;
@@ -1985,6 +1996,38 @@ public partial class MainWindow
             JumpByVisiblePercent(digit / 10d, extendSelection: false);
         }
 
+        return true;
+    }
+
+    private bool ApplyResolvedRegionDigitJump(int digit, int regionCount)
+    {
+        if (!LibraryPlayerMode.TryResolveRegionDigitJump(
+                _regionNumber,
+                digit,
+                regionCount,
+                out var nextPending,
+                out var seekId))
+        {
+            return false;
+        }
+
+        _markerNumber = 0;
+        if (seekId is int id)
+        {
+            _regionNumber = nextPending;
+            Waveform.SeekToRegionNumber(id);
+            RestartMarkerDigitTimer();
+            return true;
+        }
+
+        if (nextPending > 0)
+        {
+            _regionNumber = nextPending;
+            RestartMarkerDigitTimer();
+            return true;
+        }
+
+        ResetMarkerDigitEntry();
         return true;
     }
 
@@ -2009,6 +2052,7 @@ public partial class MainWindow
     {
         _markerDigitTimer.Stop();
         _markerNumber = 0;
+        _regionNumber = 0;
         ResetPdfPageDigitEntry();
     }
 

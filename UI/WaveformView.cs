@@ -1426,6 +1426,24 @@ internal sealed class WaveformView : Grid
         return true;
     }
 
+    /// <summary>リージョン番号（1 始まり）の先頭へ。選択は外す。</summary>
+    public bool SeekToRegionNumber(int number)
+    {
+        if (_document is null || number < 1)
+        {
+            return false;
+        }
+
+        var index = number - 1;
+        if ((uint)index >= (uint)_document.Regions.Count)
+        {
+            return false;
+        }
+
+        MovePlayhead(_document.Regions[index].StartFrame);
+        return true;
+    }
+
     public void ExtendSelectionToMarker(int direction)
     {
         if (_document is null)
