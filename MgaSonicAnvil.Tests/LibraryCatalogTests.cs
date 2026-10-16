@@ -140,6 +140,73 @@ public sealed class LibraryCatalogTests : IDisposable
     }
 
     [Fact]
+    public void LoadProbedTagTexts_ReturnsBuiltTagsUnderRoot()
+    {
+        var root = Path.Combine(_dir, "search");
+        var nested = Path.Combine(root, "nested");
+        var outside = Path.Combine(_dir, "outside");
+        Directory.CreateDirectory(nested);
+        Directory.CreateDirectory(outside);
+        var hit = Path.Combine(nested, "hit.wav");
+        var bare = Path.Combine(nested, "bare.wav");
+        var other = Path.Combine(outside, "other.wav");
+        File.WriteAllBytes(hit, MinimalWav());
+        File.WriteAllBytes(bare, MinimalWav());
+        File.WriteAllBytes(other, MinimalWav());
+        LibraryCatalog.ReconcileRoots([root, outside]);
+        LibraryCatalog.UpsertTags(
+            hit,
+            new AudioFileTags
+            {
+                Probed = true,
+                Title = "Yesterday",
+                Artist = "The Beatles",
+                Album = "Help!",
+                Genre = "Rock",
+            });
+        LibraryCatalog.UpsertTags(
+            other,
+            new AudioFileTags { Probed = true, Artist = "Elsewhere" });
+
+        var texts = LibraryCatalog.LoadProbedTagTexts([root]);
+        Assert.True(texts.TryGetValue(hit, out var hitTexts));
+        Assert.Contains("The Beatles", hitTexts);
+        Assert.Contains("Yesterday", hitTexts);
+        Assert.Contains("Help!", hitTexts);
+        Assert.Contains("Rock", hitTexts);
+        Assert.False(texts.ContainsKey(bare));
+        Assert.False(texts.ContainsKey(other));
+    }
+
+    [Fact]
+    public void LoadProbedTagTexts_IncludesPlaylistColumns()
+    {
+        var root = Path.Combine(_dir, "columns");
+        Directory.CreateDirectory(root);
+        var path = Path.Combine(root, "song.mp3");
+        File.WriteAllBytes(path, MinimalWav());
+        LibraryCatalog.UpsertTags(
+            path,
+            new AudioFileTags
+            {
+                Probed = true,
+                Comment = "take two",
+                SampleRate = 44100,
+                BitRateKbps = 192,
+                Channels = 2,
+                DurationSeconds = 65.5,
+            });
+
+        var texts = LibraryCatalog.LoadProbedTagTexts([root]);
+        Assert.True(texts.TryGetValue(path, out var row));
+        Assert.Contains("take two", row);
+        Assert.Contains("44.1kHz", row);
+        Assert.Contains("192 kbps", row);
+        Assert.Contains("2ch", row);
+        Assert.Contains("01:05.500", row);
+    }
+
+    [Fact]
     public void Ensure_UsesCatalogCache()
     {
         var root = Path.Combine(_dir, "probe");

@@ -112,6 +112,117 @@ public sealed class LibrarySearchQueryTests
     }
 
     [Fact]
+    public void VisibleFolders_TagHit_KeepsAncestorsOnly()
+    {
+        var root = @"C:\Music";
+        var tagged = @"C:\Music\AlbumA\song.wav";
+        var tags = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            [tagged] = ["Yesterday", "The Beatles", "Help!"],
+        };
+        var visible = LibrarySearchQuery.VisibleFolders(
+            [root],
+            [tagged, @"C:\Music\AlbumB\other.wav"],
+            LibrarySearchQuery.Parse("beatles"));
+        Assert.DoesNotContain(LibrarySearchQuery.NormalizeFolder(@"C:\Music\AlbumA"), visible);
+
+        visible = LibrarySearchQuery.VisibleFolders(
+            [root],
+            [tagged, @"C:\Music\AlbumB\other.wav"],
+            folderPaths: null,
+            LibrarySearchQuery.Parse("beatles"),
+            tags);
+        Assert.Contains(LibrarySearchQuery.NormalizeFolder(root), visible);
+        Assert.Contains(LibrarySearchQuery.NormalizeFolder(@"C:\Music\AlbumA"), visible);
+        Assert.DoesNotContain(LibrarySearchQuery.NormalizeFolder(@"C:\Music\AlbumB"), visible);
+    }
+
+    [Fact]
+    public void VisibleFolders_TagAndFolder_AndOr()
+    {
+        var root = @"C:\Music";
+        var beatles = @"C:\Music\AlbumB\song.wav";
+        var other = @"C:\Music\AlbumA\bgm_loop.wav";
+        var tags = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            [beatles] = ["The Beatles"],
+            [other] = ["Radiohead"],
+        };
+        var files = new[] { beatles, other, @"C:\Music\AlbumB\miss.wav" };
+
+        var and = LibrarySearchQuery.VisibleFolders(
+            [root],
+            files,
+            folderPaths: null,
+            LibrarySearchQuery.Parse("AlbumB beatles"),
+            tags);
+        Assert.Contains(LibrarySearchQuery.NormalizeFolder(@"C:\Music\AlbumB"), and);
+        Assert.DoesNotContain(LibrarySearchQuery.NormalizeFolder(@"C:\Music\AlbumA"), and);
+
+        var or = LibrarySearchQuery.VisibleFolders(
+            [root],
+            files,
+            folderPaths: null,
+            LibrarySearchQuery.Parse("beatles|loop"),
+            tags);
+        Assert.Contains(LibrarySearchQuery.NormalizeFolder(@"C:\Music\AlbumB"), or);
+        Assert.Contains(LibrarySearchQuery.NormalizeFolder(@"C:\Music\AlbumA"), or);
+    }
+
+    [Fact]
+    public void CollectPlaylistFiles_TagHit_IncludesOnlyThatFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "mga-lib-tag-" + Guid.NewGuid().ToString("N"));
+        var album = Path.Combine(root, "Album");
+        Directory.CreateDirectory(album);
+        var hit = Path.Combine(album, "song.wav");
+        var miss = Path.Combine(album, "other.wav");
+        WriteWav(hit);
+        WriteWav(miss);
+        try
+        {
+            var tags = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+            {
+                [hit] = ["The Beatles"],
+            };
+            var groups = LibrarySearchQuery.Parse("beatles|se");
+            var files = new[] { hit, miss };
+            var visible = LibrarySearchQuery.VisibleFolders(
+                [root],
+                files,
+                folderPaths: null,
+                groups,
+                tags);
+            var names = Names(LibrarySearchQuery.CollectPlaylistFiles(
+                [root],
+                groups,
+                visible,
+                [root],
+                tags));
+            Assert.Contains("song.wav", names);
+            Assert.DoesNotContain("other.wav", names);
+
+            WriteWav(Path.Combine(album, "se_hit.wav"));
+            names = Names(LibrarySearchQuery.CollectPlaylistFiles(
+                [album],
+                groups,
+                visible,
+                [root],
+                tags));
+            Assert.Contains("song.wav", names);
+            Assert.Contains("se_hit.wav", names);
+            Assert.DoesNotContain("other.wav", names);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void VisibleFolders_EmptyQuery_IsEmptySet()
     {
         var visible = LibrarySearchQuery.VisibleFolders(

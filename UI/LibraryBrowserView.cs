@@ -159,6 +159,7 @@ internal sealed class LibraryBrowserView : UserControl
     private int _explorerFocusTicket;
     private int _listFocusTicket;
     private HashSet<string>? _explorerVisibleFolders;
+    private Dictionary<string, string[]>? _explorerTagTexts;
     /// <summary>トーストに出す打ち込み中の文字。トースト消去と同時に捨てる。</summary>
     private string _explorerTypeahead = "";
     /// <summary>黄背景と ↑↓ 渡り歩き用。Esc まで残す。</summary>
@@ -4002,12 +4003,14 @@ internal sealed class LibraryBrowserView : UserControl
         if (groups.Count == 0)
         {
             _explorerVisibleFolders = null;
+            _explorerTagTexts = null;
             RebuildExplorerTree();
             return;
         }
 
+        _explorerTagTexts = LibraryCatalog.LoadProbedTagTexts(_explorerRoots);
         var index = CollectExplorerIndex(_explorerRoots);
-        ApplyExplorerFilter(index.Files, index.Folders, groups);
+        ApplyExplorerFilter(index.Files, index.Folders, groups, _explorerTagTexts);
     }
 
     internal void ApplyPlaylistSearchSync(string text)
@@ -4048,7 +4051,17 @@ internal sealed class LibraryBrowserView : UserControl
         var visible = _explorerVisibleFolders is { } set
             ? new HashSet<string>(set, StringComparer.OrdinalIgnoreCase)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        return new LibraryExplorerPlaylistWalk(groups, visible);
+        var roots = new List<string>(_explorerRoots.Length);
+        foreach (var root in _explorerRoots)
+        {
+            var full = LibrarySearchQuery.NormalizeFolder(root);
+            if (full.Length > 0)
+            {
+                roots.Add(full);
+            }
+        }
+
+        return new LibraryExplorerPlaylistWalk(groups, visible, roots, _explorerTagTexts);
     }
 
     private static void CollectExplorerFolderPaths(ItemCollection items, List<string> paths)
@@ -4071,9 +4084,10 @@ internal sealed class LibraryBrowserView : UserControl
     private void ApplyExplorerFilter(
         IReadOnlyList<string> files,
         IReadOnlyList<string> folders,
-        IReadOnlyList<string[]> groups)
+        IReadOnlyList<string[]> groups,
+        IReadOnlyDictionary<string, string[]>? tagTexts)
     {
-        var visible = LibrarySearchQuery.VisibleFolders(_explorerRoots, files, folders, groups);
+        var visible = LibrarySearchQuery.VisibleFolders(_explorerRoots, files, folders, groups, tagTexts);
         _explorerVisibleFolders = visible;
         RebuildExplorerTree();
     }
@@ -9390,20 +9404,7 @@ internal sealed class LibraryBrowserView : UserControl
         return document.Tags;
     }
 
-    internal static string FormatKind(AudioFileKind kind) => kind switch
-    {
-        AudioFileKind.Mp3 => "MP3",
-        AudioFileKind.M4a => "M4A",
-        AudioFileKind.Aiff => "AIFF",
-        AudioFileKind.Mp4 => "MP4",
-        AudioFileKind.Mov => "MOV",
-        AudioFileKind.Avi => "AVI",
-        AudioFileKind.Mkv => "MKV",
-        AudioFileKind.Webm => "WEBM",
-        AudioFileKind.Mpg => "MPG",
-        AudioFileKind.Pdf => "PDF",
-        _ => "WAVE",
-    };
+    internal static string FormatKind(AudioFileKind kind) => LibraryPlaylistSearchTexts.FormatKind(kind);
 
     internal BitmapSource? ArtworkForGroup(CollectionViewGroup? group)
     {
@@ -9966,7 +9967,12 @@ internal sealed class LibraryBrowserView : UserControl
         var walk = SnapshotExplorerPlaylistWalk();
         if (walk.Active)
         {
-            paths = LibrarySearchQuery.CollectPlaylistFiles(paths, walk.Groups, walk.Visible);
+            paths = LibrarySearchQuery.CollectPlaylistFiles(
+                paths,
+                walk.Groups,
+                walk.Visible,
+                walk.Roots,
+                walk.TagTexts);
         }
 
         return LibraryShellFiles.ExistingPaths(paths);

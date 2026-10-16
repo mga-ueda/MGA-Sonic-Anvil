@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.Config;
 
@@ -115,6 +116,65 @@ internal static class LibraryCatalog
                 return false;
             }
         }
+    }
+
+    /// <summary>
+    /// ライブラリ検索用。プローブ済みのタグ文字列だけを返す。未構築のファイルは含めない。
+    /// </summary>
+    public static Dictionary<string, string[]> LoadProbedTagTexts(IReadOnlyList<string> roots)
+    {
+        var result = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        var normalized = NormalizeRoots(roots);
+        if (normalized.Count == 0)
+        {
+            return result;
+        }
+
+        lock (Gate)
+        {
+            if (!TryEnsureOpen_NoLock())
+            {
+                return result;
+            }
+
+            try
+            {
+                foreach (var root in normalized)
+                {
+                    using var cmd = _connection!.CreateCommand();
+                    cmd.CommandText =
+                        """
+                        SELECT path, size, mtime_utc,
+                               title, artist, album, album_artist, track, disc, year, genre, comment, composer,
+                               duration_seconds, sample_rate, bits_per_sample, channels, bit_rate_kbps,
+                               video_width, video_height, frame_rate, video_codec, audio_codec, has_artwork
+                        FROM files
+                        WHERE probed != 0
+                          AND (path = $root OR path LIKE $prefix ESCAPE '\');
+                        """;
+                    cmd.Parameters.AddWithValue("$root", root);
+                    cmd.Parameters.AddWithValue("$prefix", LikePrefix(root));
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        var path = reader.GetString(0);
+                        var texts = ReadSearchTagTexts(reader);
+                        if (texts.Length == 0)
+                        {
+                            continue;
+                        }
+
+                        result[path] = texts;
+                    }
+                }
+            }
+            catch (SqliteException)
+            {
+            }
+        }
+
+        AppendCachedLoudness(result);
+        return result;
     }
 
     /// <summary>プローブ結果を保存。ファイルが消えていれば何もしない。</summary>
@@ -615,6 +675,68 @@ internal static class LibraryCatalog
         cmd.Parameters.AddWithValue("$original", tags.EncoderOriginalFrames);
         cmd.Parameters.AddWithValue("$art", tags.HasArtwork ? 1 : 0);
         cmd.ExecuteNonQuery();
+    }
+
+    private static string[] ReadSearchTagTexts(SqliteDataReader reader)
+    {
+        var i = 1;
+        var size = reader.GetInt64(i++);
+        var mtime = reader.GetInt64(i++);
+        var tags = new AudioFileTags
+        {
+            Probed = true,
+            Title = TagText(reader, ref i),
+            Artist = TagText(reader, ref i),
+            Album = TagText(reader, ref i),
+            AlbumArtist = TagText(reader, ref i),
+            Track = TagText(reader, ref i),
+            Disc = TagText(reader, ref i),
+            Year = TagText(reader, ref i),
+            Genre = TagText(reader, ref i),
+            Comment = TagText(reader, ref i),
+            Composer = TagText(reader, ref i),
+            DurationSeconds = reader.GetDouble(i++),
+            SampleRate = reader.GetInt32(i++),
+            BitsPerSample = reader.GetInt32(i++),
+            Channels = reader.GetInt32(i++),
+            BitRateKbps = reader.GetInt32(i++),
+            VideoWidth = reader.GetInt32(i++),
+            VideoHeight = reader.GetInt32(i++),
+            FrameRate = reader.GetDouble(i++),
+            VideoCodec = reader.GetString(i++),
+            AudioCodec = reader.GetString(i++),
+            HasArtwork = reader.GetInt64(i) != 0,
+        };
+        return LibraryPlaylistSearchTexts.Build(reader.GetString(0), size, mtime, tags);
+    }
+
+    private static void AppendCachedLoudness(Dictionary<string, string[]> texts)
+    {
+        if (texts.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var path in texts.Keys.ToArray())
+        {
+            if (!AudioCodec.IsUncompressedPcm(path)
+                || !LibraryMediaCache.TryGetLoudness(path, out var lufs))
+            {
+                continue;
+            }
+
+            var loudness = UiStrings.FormatIntegratedLufs(lufs);
+            if (loudness.Length == 0)
+            {
+                continue;
+            }
+
+            var row = texts[path];
+            var next = new string[row.Length + 1];
+            row.CopyTo(next, 0);
+            next[^1] = loudness;
+            texts[path] = next;
+        }
     }
 
     private static string TagText(SqliteDataReader reader, ref int ordinal)
