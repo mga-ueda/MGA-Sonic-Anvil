@@ -181,6 +181,7 @@ public partial class MainWindow : Window
         LibraryBrowser.SetDefaultAudioFormat(AppStorage.Settings.ResolvedDefaultAudioFormat());
         LibraryBrowser.SetGroup(AppStorage.Settings.ResolvedLibraryListGroup());
         LibraryBrowser.SetExplorerRoots(AppStorage.Settings.ResolvedLibraryExplorerRoots());
+        ScheduleLibraryCatalogPrune();
         LibraryBrowser.SetExplorerExpanded(AppStorage.Settings.ResolvedLibraryExplorerExpanded());
         LibraryBrowser.SetExplorerFolder(AppStorage.Settings.ResolvedLibraryExplorerPath());
         LibraryBrowser.SetExplorerWidth(AppStorage.Settings.LibraryExplorerWidth);

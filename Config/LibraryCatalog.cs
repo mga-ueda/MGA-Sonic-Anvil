@@ -177,6 +177,27 @@ internal static class LibraryCatalog
         return result;
     }
 
+    /// <summary>本体と WAL／SHM を合わせたディスク上の容量。無いファイルは 0。</summary>
+    public static long GetUsageBytes()
+    {
+        return FileLength(DatabasePath)
+            + FileLength(DatabasePath + "-wal")
+            + FileLength(DatabasePath + "-shm");
+    }
+
+    /// <summary>索引を捨てる。次の参照で空のデータベースを作り直す。</summary>
+    public static void Clear()
+    {
+        lock (Gate)
+        {
+            Close_NoLock();
+            SqliteConnection.ClearAllPools();
+            TryDeleteFile(DatabasePath);
+            TryDeleteFile(DatabasePath + "-wal");
+            TryDeleteFile(DatabasePath + "-shm");
+        }
+    }
+
     /// <summary>プローブ結果を保存。ファイルが消えていれば何もしない。</summary>
     public static void UpsertTags(string path, AudioFileTags tags)
     {
@@ -297,6 +318,53 @@ internal static class LibraryCatalog
 
             ReplaceInventory(root, diskFiles);
         }
+
+        PruneUnreferenced(normalized);
+    }
+
+    /// <summary>
+    /// 今のルートから外れた行と、ルートが存在するのにファイルが無い行を消す。
+    /// ルート自体が無い（取り外したドライブなど）ときは、その配下は残す。
+    /// </summary>
+    public static void PruneUnreferenced(IReadOnlyList<string> roots)
+    {
+        var normalized = NormalizeRoots(roots);
+        var paths = ListIndexedPaths();
+        if (paths.Count == 0 && normalized.Count == 0)
+        {
+            DropRootsExcept(normalized);
+            return;
+        }
+
+        var rootPresent = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        var drop = new List<string>();
+        foreach (var path in paths)
+        {
+            var covering = CoveringRoot(path, normalized);
+            if (covering is null)
+            {
+                drop.Add(path);
+                continue;
+            }
+
+            if (!rootPresent.TryGetValue(covering, out var present))
+            {
+                present = Directory.Exists(covering);
+                rootPresent[covering] = present;
+            }
+
+            if (present && IsConfirmedMissing(path))
+            {
+                drop.Add(path);
+            }
+        }
+
+        if (drop.Count > 0)
+        {
+            DeleteFiles(drop);
+        }
+
+        DropRootsExcept(normalized);
     }
 
     /// <summary>
@@ -347,6 +415,134 @@ internal static class LibraryCatalog
             catch (SqliteException)
             {
                 return false;
+            }
+        }
+    }
+
+    private static List<string> ListIndexedPaths()
+    {
+        var paths = new List<string>();
+        lock (Gate)
+        {
+            if (!TryEnsureOpen_NoLock())
+            {
+                return paths;
+            }
+
+            try
+            {
+                using var cmd = _connection!.CreateCommand();
+                cmd.CommandText = "SELECT path FROM files;";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    paths.Add(reader.GetString(0));
+                }
+            }
+            catch (SqliteException)
+            {
+            }
+        }
+
+        return paths;
+    }
+
+    private static string? CoveringRoot(string path, IReadOnlyList<string> roots)
+    {
+        foreach (var root in roots)
+        {
+            if (IsUnderRoot(path, root))
+            {
+                return root;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsConfirmedMissing(string path)
+    {
+        try
+        {
+            return !File.Exists(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static void DeleteFiles(IReadOnlyList<string> paths)
+    {
+        lock (Gate)
+        {
+            if (!TryEnsureOpen_NoLock())
+            {
+                return;
+            }
+
+            try
+            {
+                using var tx = _connection!.BeginTransaction();
+                foreach (var path in paths)
+                {
+                    using var del = _connection.CreateCommand();
+                    del.Transaction = tx;
+                    del.CommandText = "DELETE FROM files WHERE path = $path;";
+                    del.Parameters.AddWithValue("$path", path);
+                    del.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+            catch (SqliteException)
+            {
+            }
+        }
+    }
+
+    private static void DropRootsExcept(IReadOnlyList<string> roots)
+    {
+        var keep = new HashSet<string>(roots, StringComparer.OrdinalIgnoreCase);
+        lock (Gate)
+        {
+            if (!TryEnsureOpen_NoLock())
+            {
+                return;
+            }
+
+            try
+            {
+                var stale = new List<string>();
+                using (var list = _connection!.CreateCommand())
+                {
+                    list.CommandText = "SELECT path FROM roots;";
+                    using var reader = list.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        var path = reader.GetString(0);
+                        if (!keep.Contains(path))
+                        {
+                            stale.Add(path);
+                        }
+                    }
+                }
+
+                if (stale.Count == 0)
+                {
+                    return;
+                }
+
+                foreach (var path in stale)
+                {
+                    using var del = _connection.CreateCommand();
+                    del.CommandText = "DELETE FROM roots WHERE path = $path;";
+                    del.Parameters.AddWithValue("$path", path);
+                    del.ExecuteNonQuery();
+                }
+            }
+            catch (SqliteException)
+            {
             }
         }
     }
@@ -736,6 +932,33 @@ internal static class LibraryCatalog
             row.CopyTo(next, 0);
             next[^1] = loudness;
             texts[path] = next;
+        }
+    }
+
+    private static long FileLength(string path)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            return info.Exists ? info.Length : 0;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return 0;
+        }
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
         }
     }
 

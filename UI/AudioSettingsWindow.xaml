@@ -469,6 +469,7 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="*" MinHeight="220" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <CheckBox x:Name="GaplessPlaybackBox"
                       Style="{StaticResource DarkCheckBoxStyle}"
@@ -529,6 +530,30 @@
                                 MinWidth="72"
                                 Padding="12,0"
                                 Click="LibraryExplorerRootDownButton_Click" />
+            </StackPanel>
+            <StackPanel Grid.Row="4" Margin="0,16,0,0" HorizontalAlignment="Left">
+              <TextBlock x:Name="LibraryCatalogHeader"
+                         Text="{x:Static domain:UiStrings.LabelLibraryCatalog}"
+                         FontWeight="Bold"
+                         FontSize="11.333"
+                         Margin="0,0,0,6" />
+              <Grid HorizontalAlignment="Left">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="LibraryCatalogUsageText"
+                           FontSize="11.333"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <ui:RoundedButton x:Name="LibraryCatalogClearButton"
+                                  Grid.Column="1"
+                                  Content="{x:Static domain:UiStrings.ButtonLibraryCatalogClear}"
+                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                  MinWidth="96"
+                                  Padding="12,0"
+                                  Click="LibraryCatalogClearButton_Click" />
+              </Grid>
             </StackPanel>
           </Grid>
         </TabItem>
