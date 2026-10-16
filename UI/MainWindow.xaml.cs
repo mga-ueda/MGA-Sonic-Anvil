@@ -378,8 +378,19 @@ public partial class MainWindow : Window
             SyncVideoLaunchScaleAfterUserResize();
             SyncWindowProportionalOverlayScale();
             SchedulePlaylistVideoFileNamePlacement();
+            if (IsFullscreenMaximizeMode(_waveformMaximizeMode))
+            {
+                PersistCurrentWindowPlacement();
+            }
         };
-        LocationChanged += (_, _) => RememberVideoLaunchPlacementIfNeeded();
+        LocationChanged += (_, _) =>
+        {
+            RememberVideoLaunchPlacementIfNeeded();
+            if (IsFullscreenMaximizeMode(_waveformMaximizeMode))
+            {
+                PersistCurrentWindowPlacement();
+            }
+        };
         VideoLaunchAspectResize.Attach(this, TryGetVideoLaunchAspectConstraints);
         Closed += (_, _) =>
         {
@@ -1044,6 +1055,7 @@ public partial class MainWindow : Window
         }
         else if (IsWaveformMaximized)
         {
+            WindowPlacement.Capture(this, AppStorage.Settings, CurrentPlacementKind());
             WindowPlacement.Capture(
                 _boundsBeforeWaveformMax,
                 _windowStateBeforeWaveformMax == WindowState.Maximized,

@@ -6,7 +6,7 @@ using MgaSonicAnvil.Config;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>通常／F10 プレイヤー／F9 ミニマムの位置・サイズ・最大化を settings.json に残し、切替と次回起動で戻す。</summary>
+/// <summary>通常／F10／F9／F11／F12 の位置・サイズを settings.json に残し、切替と次回起動で戻す。</summary>
 internal static class WindowPlacement
 {
     public static void Capture(Window window, AppSettings settings) =>
@@ -14,6 +14,9 @@ internal static class WindowPlacement
 
     public static void Capture(Rect bounds, bool maximized, AppSettings settings) =>
         WriteMain(bounds, maximized, settings, MainWindowPlacementKind.Editor);
+
+    public static void Capture(Rect bounds, bool maximized, AppSettings settings, MainWindowPlacementKind kind) =>
+        WriteMain(bounds, maximized, settings, kind);
 
     public static void CapturePlayer(Rect bounds, bool maximized, AppSettings settings) =>
         WriteMain(bounds, maximized, settings, MainWindowPlacementKind.Player);
@@ -53,6 +56,18 @@ internal static class WindowPlacement
                 settings.MinimalPlayerWindowWidth = width;
                 settings.MinimalPlayerWindowHeight = height;
                 settings.MinimalPlayerWindowState = state;
+                return;
+            case MainWindowPlacementKind.WaveformFullscreen:
+                settings.WaveformFullscreenX = x;
+                settings.WaveformFullscreenY = y;
+                settings.WaveformFullscreenWidth = width;
+                settings.WaveformFullscreenHeight = height;
+                return;
+            case MainWindowPlacementKind.AnalyzerFullscreen:
+                settings.AnalyzerFullscreenX = x;
+                settings.AnalyzerFullscreenY = y;
+                settings.AnalyzerFullscreenWidth = width;
+                settings.AnalyzerFullscreenHeight = height;
                 return;
             default:
                 settings.WindowX = x;
@@ -618,6 +633,7 @@ internal static class WindowPlacement
         {
             MainWindowPlacementKind.Player => settings.PlayerWindowState,
             MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowState,
+            MainWindowPlacementKind.WaveformFullscreen or MainWindowPlacementKind.AnalyzerFullscreen => nameof(WindowState.Normal),
             _ => settings.WindowState,
         };
         maximized = string.Equals(
@@ -628,12 +644,16 @@ internal static class WindowPlacement
         {
             MainWindowPlacementKind.Player => settings.PlayerWindowWidth,
             MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowWidth,
+            MainWindowPlacementKind.WaveformFullscreen => settings.WaveformFullscreenWidth,
+            MainWindowPlacementKind.AnalyzerFullscreen => settings.AnalyzerFullscreenWidth,
             _ => settings.WindowWidth,
         };
         var height = kind switch
         {
             MainWindowPlacementKind.Player => settings.PlayerWindowHeight,
             MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowHeight,
+            MainWindowPlacementKind.WaveformFullscreen => settings.WaveformFullscreenHeight,
+            MainWindowPlacementKind.AnalyzerFullscreen => settings.AnalyzerFullscreenHeight,
             _ => settings.WindowHeight,
         };
         if (width <= 0 || height <= 0)
@@ -641,7 +661,8 @@ internal static class WindowPlacement
             return false;
         }
 
-        if (width < minWidth || height < minHeight)
+        // 保存値は表示倍率で割った数。下限は今の DIP と比べる。
+        if (FromStoredExtent(width) < minWidth || FromStoredExtent(height) < minHeight)
         {
             return false;
         }
@@ -650,12 +671,16 @@ internal static class WindowPlacement
         {
             MainWindowPlacementKind.Player => settings.PlayerWindowX,
             MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowX,
+            MainWindowPlacementKind.WaveformFullscreen => settings.WaveformFullscreenX,
+            MainWindowPlacementKind.AnalyzerFullscreen => settings.AnalyzerFullscreenX,
             _ => settings.WindowX,
         };
         var y = kind switch
         {
             MainWindowPlacementKind.Player => settings.PlayerWindowY,
             MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowY,
+            MainWindowPlacementKind.WaveformFullscreen => settings.WaveformFullscreenY,
+            MainWindowPlacementKind.AnalyzerFullscreen => settings.AnalyzerFullscreenY,
             _ => settings.WindowY,
         };
         bounds = new Rect(x, y, width, height);
@@ -883,10 +908,12 @@ internal static class WindowPlacement
     private static extern int GetSystemMetrics(int index);
 }
 
-/// <summary>メインウィンドウの配置スロット。エディタ／F10／F9 で別々に覚える。</summary>
+/// <summary>メインウィンドウの配置スロット。エディタ／F10／F9／F11／F12 で別々に覚える。</summary>
 internal enum MainWindowPlacementKind
 {
     Editor,
     Player,
     MinimalPlayer,
+    WaveformFullscreen,
+    AnalyzerFullscreen,
 }

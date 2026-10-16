@@ -454,6 +454,23 @@ public sealed class WindowPlacementTests
     }
 
     [Fact]
+    public void CaptureFullscreen_KeepsPlayerAndEditorSlots()
+    {
+        var settings = new AppSettings();
+        WindowPlacement.Capture(new Rect(10, 20, 1600, 900), maximized: false, settings);
+        WindowPlacement.CapturePlayer(new Rect(80, 40, 1100, 700), maximized: false, settings);
+        WindowPlacement.Capture(new Rect(0, 0, 1920, 1080), maximized: false, settings, MainWindowPlacementKind.WaveformFullscreen);
+        WindowPlacement.Capture(new Rect(1920, 0, 2560, 1440), maximized: false, settings, MainWindowPlacementKind.AnalyzerFullscreen);
+        Assert.Equal(WindowPlacement.ToStoredExtent(1600), settings.WindowWidth);
+        Assert.Equal(WindowPlacement.ToStoredExtent(1100), settings.PlayerWindowWidth);
+        Assert.Equal(0, settings.WaveformFullscreenX);
+        Assert.Equal(WindowPlacement.ToStoredExtent(1920), settings.WaveformFullscreenWidth);
+        Assert.Equal(1920, settings.AnalyzerFullscreenX);
+        Assert.Equal(WindowPlacement.ToStoredExtent(2560), settings.AnalyzerFullscreenWidth);
+        Assert.Equal(WindowPlacement.ToStoredExtent(1440), settings.AnalyzerFullscreenHeight);
+    }
+
+    [Fact]
     public void TryReadMinimalPlayer_AcceptsSavedBounds()
     {
         var width = DesignMetrics.MinimalPlayerWindowMinWidth + 40;

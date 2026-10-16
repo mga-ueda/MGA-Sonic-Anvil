@@ -1885,10 +1885,7 @@ public partial class MainWindow
         var wantLibrary = mode == WaveformMaximizeMode.Library;
         var wasFullscreen = IsFullscreenMaximizeMode(_waveformMaximizeMode);
         var wantFullscreen = IsFullscreenMaximizeMode(mode);
-        if (!wasFullscreen)
-        {
-            PersistCurrentWindowPlacement();
-        }
+        PersistCurrentWindowPlacement();
 
         if (wantFullscreen && !wasFullscreen)
         {
@@ -1924,7 +1921,11 @@ public partial class MainWindow
         {
             _waveformMaximizeMode = mode;
             ApplyWaveformMaximizeChrome();
-            if (wantLibrary || wasLibrary)
+            if (wantFullscreen)
+            {
+                ApplyWaveformFullscreenFrame();
+            }
+            else if (wantLibrary || wasLibrary)
             {
                 TryApplyCurrentModePlacement();
             }
@@ -1968,6 +1969,21 @@ public partial class MainWindow
             WindowState = WindowState.Normal;
         }
 
+        if (WindowPlacement.TryGetDipBounds(
+                AppStorage.Settings,
+                1,
+                1,
+                CurrentPlacementKind(),
+                out var saved,
+                out _))
+        {
+            Left = saved.X;
+            Top = saved.Y;
+            Width = saved.Width;
+            Height = saved.Height;
+            return;
+        }
+
         if (!WindowPlacement.TryGetContainingMonitorDip(this, out var monitor))
         {
             return;
@@ -1977,13 +1993,23 @@ public partial class MainWindow
         Top = monitor.Y;
         Width = monitor.Width;
         Height = monitor.Height;
+        PersistCurrentWindowPlacement();
     }
 
     private void PersistCurrentWindowPlacement()
     {
-        if (IsFullscreenMaximizeMode(_waveformMaximizeMode)
-            || _playlistVideoFullscreen
-            || WindowStyle == WindowStyle.None)
+        if (_playlistVideoFullscreen)
+        {
+            return;
+        }
+
+        if (IsFullscreenMaximizeMode(_waveformMaximizeMode))
+        {
+            WindowPlacement.Capture(this, AppStorage.Settings, CurrentPlacementKind());
+            return;
+        }
+
+        if (WindowStyle == WindowStyle.None)
         {
             return;
         }
@@ -2258,6 +2284,16 @@ public partial class MainWindow
 
     private MainWindowPlacementKind CurrentPlacementKind()
     {
+        if (_waveformMaximizeMode == WaveformMaximizeMode.Waveform)
+        {
+            return MainWindowPlacementKind.WaveformFullscreen;
+        }
+
+        if (_waveformMaximizeMode == WaveformMaximizeMode.Analyzers)
+        {
+            return MainWindowPlacementKind.AnalyzerFullscreen;
+        }
+
         if (IsLibraryMaximized && _libraryMinimalChrome)
         {
             return MainWindowPlacementKind.MinimalPlayer;
