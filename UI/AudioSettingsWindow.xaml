@@ -87,6 +87,21 @@
                        FontWeight="Bold"
                        FontSize="11.333"
                        Margin="0,16,0,6" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+              <ui:RoundedButton x:Name="AssociationAllOnButton"
+                                Content="{x:Static domain:UiStrings.ButtonFileAssociationsAllOn}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="72"
+                                Padding="12,0"
+                                Margin="0,0,8,0"
+                                Click="AssociationAllOnButton_Click" />
+              <ui:RoundedButton x:Name="AssociationAllOffButton"
+                                Content="{x:Static domain:UiStrings.ButtonFileAssociationsAllOff}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="72"
+                                Padding="12,0"
+                                Click="AssociationAllOffButton_Click" />
+            </StackPanel>
             <Grid x:Name="AssociationHost">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" MinWidth="140" />

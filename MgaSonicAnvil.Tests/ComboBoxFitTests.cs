@@ -58,6 +58,16 @@ public sealed class ComboBoxFitTests
     }
 
     [Fact]
+    public void ShouldBulkSetAssociation_SkipsDisabledAndUnchanged()
+    {
+        Assert.True(AudioSettingsWindow.ShouldBulkSetAssociation(enabled: true, isChecked: false, want: true));
+        Assert.True(AudioSettingsWindow.ShouldBulkSetAssociation(enabled: true, isChecked: true, want: false));
+        Assert.False(AudioSettingsWindow.ShouldBulkSetAssociation(enabled: true, isChecked: true, want: true));
+        Assert.False(AudioSettingsWindow.ShouldBulkSetAssociation(enabled: false, isChecked: false, want: true));
+        Assert.False(AudioSettingsWindow.ShouldBulkSetAssociation(enabled: false, isChecked: true, want: false));
+    }
+
+    [Fact]
     public void SettingsWindowChromeWidth_IsStableFrameOnly()
     {
         var chrome = AudioSettingsWindow.SettingsWindowChromeWidth();
