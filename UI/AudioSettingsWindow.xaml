@@ -590,6 +590,7 @@
                        Style="{StaticResource DarkTextBoxStyle}"
                        Padding="6,1"
                        FontSize="11.333"
+                       TextAlignment="Center"
                        VerticalContentAlignment="Center"
                        InputMethod.IsInputMethodEnabled="False" />
               <TextBlock x:Name="LoudnessTargetUnit"
@@ -615,6 +616,7 @@
                        Style="{StaticResource DarkTextBoxStyle}"
                        Padding="6,1"
                        FontSize="11.333"
+                       TextAlignment="Center"
                        VerticalContentAlignment="Center"
                        InputMethod.IsInputMethodEnabled="False" />
               <TextBlock x:Name="SilentSkipThresholdUnit"
@@ -657,6 +659,7 @@
                        Style="{StaticResource DarkTextBoxStyle}"
                        Padding="6,1"
                        FontSize="11.333"
+                       TextAlignment="Center"
                        VerticalContentAlignment="Center"
                        InputMethod.IsInputMethodEnabled="False" />
               <TextBlock x:Name="SilentSkipRecordPadUnit"
@@ -680,6 +683,7 @@
                        Style="{StaticResource DarkTextBoxStyle}"
                        Padding="6,1"
                        FontSize="11.333"
+                       TextAlignment="Center"
                        VerticalContentAlignment="Center"
                        InputMethod.IsInputMethodEnabled="False" />
               <TextBlock x:Name="ClickGuardFadeUnit"
@@ -877,6 +881,7 @@
                        Style="{StaticResource DarkTextBoxStyle}"
                        Padding="6,1"
                        FontSize="11.333"
+                       TextAlignment="Center"
                        VerticalContentAlignment="Center"
                        InputMethod.IsInputMethodEnabled="False" />
               <TextBlock x:Name="WwisePrefetchLengthUnit"
@@ -900,6 +905,7 @@
                        Style="{StaticResource DarkTextBoxStyle}"
                        Padding="6,1"
                        FontSize="11.333"
+                       TextAlignment="Center"
                        VerticalContentAlignment="Center"
                        InputMethod.IsInputMethodEnabled="False" />
               <TextBlock x:Name="WwiseLookAheadTimeUnit"

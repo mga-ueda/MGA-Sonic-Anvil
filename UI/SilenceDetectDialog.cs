@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
@@ -13,6 +14,7 @@ internal enum SilenceDetectAction
     DeleteSilence = 0,
     CreateRegions = 1,
     CreateMarkers = 2,
+    CreateHitPointMarkers = 3,
 }
 
 internal readonly record struct SilenceDetectDialogResult(
@@ -21,7 +23,7 @@ internal readonly record struct SilenceDetectDialogResult(
     SilenceDetectAction Action);
 
 /// <summary>
-/// Cubase 風の無音検出。オープン／クローズしきい値とゲート時間を決め、削除／リージョン／マーカーを実行する。
+/// 無音・ヒット検出。オープン／クローズしきい値とゲート時間を決め、削除／リージョン／マーカー／ヒットポイントを実行する。
 /// </summary>
 internal sealed class SilenceDetectDialog : Window
 {
@@ -48,6 +50,12 @@ internal sealed class SilenceDetectDialog : Window
     private readonly RadioButton _deleteRadio;
     private readonly RadioButton _regionsRadio;
     private readonly RadioButton _markersRadio;
+    private readonly RadioButton _hitPointsRadio;
+    private readonly StackPanel _openRow;
+    private readonly StackPanel _closeRow;
+    private readonly StackPanel _minCloseRow;
+    private readonly StackPanel _preRollRow;
+    private readonly StackPanel _postRollRow;
     private readonly RoundedButton _applyButton;
     private SilenceDetectOptions _options;
     private bool _updatingText;
@@ -171,6 +179,10 @@ internal sealed class SilenceDetectDialog : Window
             UiStrings.LabelSilenceDetectCreateMarkers,
             action == SilenceDetectAction.CreateMarkers,
             "SilenceDetectAction");
+        _hitPointsRadio = CreateRadio(
+            UiStrings.LabelSilenceDetectHitPoints,
+            action == SilenceDetectAction.CreateHitPointMarkers,
+            "SilenceDetectAction");
         _regionsRadio.IsEnabled = allowsRegions;
         if (!allowsRegions)
         {
@@ -188,6 +200,7 @@ internal sealed class SilenceDetectDialog : Window
         _deleteRadio.Checked += (_, _) => SyncActionUi();
         _regionsRadio.Checked += (_, _) => SyncActionUi();
         _markersRadio.Checked += (_, _) => SyncActionUi();
+        _hitPointsRadio.Checked += (_, _) => SyncActionUi();
         _edgesRadio.Checked += (_, _) =>
         {
             OnOptionsChanged();
@@ -212,19 +225,25 @@ internal sealed class SilenceDetectDialog : Window
         _fadeOutRow = LabeledMsRow(UiStrings.LabelSilenceDetectFadeOut, _fadeOutBox);
         _minGateRow = LabeledMsRow(UiStrings.LabelSilenceDetectMinGate, _minGateBox);
 
+        _openRow = LabeledDbRow(UiStrings.LabelSilenceDetectOpenThreshold, _openBox);
+        _closeRow = LabeledDbRow(UiStrings.LabelSilenceDetectCloseThreshold, _closeBox);
+        _minCloseRow = LabeledMsRow(UiStrings.LabelSilenceDetectMinClose, _minCloseBox);
+        _preRollRow = LabeledMsRow(UiStrings.LabelSilenceDetectPreRoll, _preRollBox);
+        _postRollRow = LabeledMsRow(UiStrings.LabelSilenceDetectPostRoll, _postRollBox);
+
         var leftCol = new StackPanel { Margin = new Thickness(0, 0, 16, 0) };
         leftCol.Children.Add(_statusText);
-        leftCol.Children.Add(LabeledDbRow(UiStrings.LabelSilenceDetectOpenThreshold, _openBox));
+        leftCol.Children.Add(_openRow);
         leftCol.Children.Add(_linkBox);
-        leftCol.Children.Add(LabeledDbRow(UiStrings.LabelSilenceDetectCloseThreshold, _closeBox));
+        leftCol.Children.Add(_closeRow);
         leftCol.Children.Add(_fadeInRow);
         leftCol.Children.Add(_fadeOutRow);
 
         var rightCol = new StackPanel();
         rightCol.Children.Add(_minGateRow);
-        rightCol.Children.Add(LabeledMsRow(UiStrings.LabelSilenceDetectMinClose, _minCloseBox));
-        rightCol.Children.Add(LabeledMsRow(UiStrings.LabelSilenceDetectPreRoll, _preRollBox));
-        rightCol.Children.Add(LabeledMsRow(UiStrings.LabelSilenceDetectPostRoll, _postRollBox));
+        rightCol.Children.Add(_minCloseRow);
+        rightCol.Children.Add(_preRollRow);
+        rightCol.Children.Add(_postRollRow);
 
         var paramGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
         paramGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -234,14 +253,14 @@ internal sealed class SilenceDetectDialog : Window
         paramGrid.Children.Add(leftCol);
         paramGrid.Children.Add(rightCol);
 
-        var actionRow = new StackPanel
+        var actionRow = new WrapPanel
         {
-            Orientation = Orientation.Horizontal,
             Margin = new Thickness(0, 0, 0, 6),
         };
         actionRow.Children.Add(_deleteRadio);
         actionRow.Children.Add(_regionsRadio);
         actionRow.Children.Add(_markersRadio);
+        actionRow.Children.Add(_hitPointsRadio);
 
         var scopeRow = new StackPanel
         {
@@ -251,7 +270,7 @@ internal sealed class SilenceDetectDialog : Window
         scopeRow.Children.Add(_edgesRadio);
         scopeRow.Children.Add(_entireRadio);
 
-        _applyButton = CreateButton(UiStrings.ButtonSilenceDetectDelete, accept: true, accent: true, isDefault: true);
+        _applyButton = CreateButton(UiStrings.ButtonOk, accept: true, accent: true, isDefault: true);
         var cancel = CreateButton(UiStrings.ButtonCancel, accept: false, isCancel: true);
         var buttons = new StackPanel
         {
@@ -339,21 +358,7 @@ internal sealed class SilenceDetectDialog : Window
         _preview.Options = _options;
     }
 
-    private void SyncActionUi()
-    {
-        SyncApplyButton();
-        SyncDependentEnabled();
-    }
-
-    private void SyncApplyButton()
-    {
-        _applyButton.Content = SelectedAction switch
-        {
-            SilenceDetectAction.CreateRegions => UiStrings.ButtonSilenceDetectCreateRegions,
-            SilenceDetectAction.CreateMarkers => UiStrings.ButtonSilenceDetectCreateMarkers,
-            _ => UiStrings.ButtonSilenceDetectDelete,
-        };
-    }
+    private void SyncActionUi() => SyncDependentEnabled();
 
     /// <summary>
     /// ラジオ選択に応じて意味のない項目を無効化。
@@ -361,16 +366,39 @@ internal sealed class SilenceDetectDialog : Window
     /// </summary>
     private void SyncDependentEnabled()
     {
+        var hitPoints = SelectedAction == SilenceDetectAction.CreateHitPointMarkers;
         var delete = SelectedAction == SilenceDetectAction.DeleteSilence;
-        SetParamEnabled(_fadeInRow, _fadeInBox, delete);
-        SetParamEnabled(_fadeOutRow, _fadeOutBox, delete);
+        SetParamEnabled(_fadeInRow, _fadeInBox, delete && !hitPoints);
+        SetParamEnabled(_fadeOutRow, _fadeOutBox, delete && !hitPoints);
 
         var entire = _entireRadio.IsChecked == true;
-        SetParamEnabled(_minGateRow, _minGateBox, entire);
+        SetParamEnabled(_minGateRow, _minGateBox, hitPoints || entire);
+        SetParamEnabled(_minCloseRow, _minCloseBox, !hitPoints);
+        SetParamEnabled(_preRollRow, _preRollBox, !hitPoints);
+        SetParamEnabled(_postRollRow, _postRollBox, !hitPoints);
+        SetParamEnabled(_closeRow, _closeBox, !hitPoints);
+        _linkBox.IsEnabled = !hitPoints;
+        _linkBox.Opacity = hitPoints ? 0.55 : 1;
+        _edgesRadio.IsEnabled = !hitPoints;
+        _entireRadio.IsEnabled = !hitPoints;
+        _edgesRadio.Opacity = hitPoints ? 0.55 : 1;
+        _entireRadio.Opacity = hitPoints ? 0.55 : 1;
+        RowLabel(_openRow).Text = hitPoints
+            ? UiStrings.LabelHitPointThreshold
+            : UiStrings.LabelSilenceDetectOpenThreshold;
+        RowLabel(_minGateRow).Text = hitPoints
+            ? UiStrings.LabelHitPointMinGap
+            : UiStrings.LabelSilenceDetectMinGate;
 
         var linked = _linkBox.IsChecked == true;
-        _closeBox.IsEnabled = !linked;
-        _closeBox.Opacity = linked ? 0.55 : 1;
+        if (!hitPoints)
+        {
+            _closeBox.IsEnabled = !linked;
+            _closeRow.Opacity = linked ? 0.55 : 1;
+            _closeBox.Opacity = 1;
+        }
+
+        _preview.HitPointMode = hitPoints;
     }
 
     private static void SetParamEnabled(StackPanel row, TextBox box, bool enabled)
@@ -379,6 +407,8 @@ internal sealed class SilenceDetectDialog : Window
         row.Opacity = enabled ? 1 : 0.55;
         box.IsEnabled = enabled;
     }
+
+    private static TextBlock RowLabel(StackPanel row) => (TextBlock)row.Children[0];
 
     private SilenceDetectAction SelectedAction
     {
@@ -394,12 +424,19 @@ internal sealed class SilenceDetectDialog : Window
                 return SilenceDetectAction.CreateMarkers;
             }
 
+            if (_hitPointsRadio.IsChecked == true)
+            {
+                return SilenceDetectAction.CreateHitPointMarkers;
+            }
+
             return SilenceDetectAction.DeleteSilence;
         }
     }
 
     private void RefreshStatusFromPreview() =>
-        _statusText.Text = UiStrings.SilenceDetectDetectedSpans(_preview.KeepCount);
+        _statusText.Text = _preview.HitPointMode
+            ? UiStrings.HitPointDetectedCount(_preview.CueCount)
+            : UiStrings.SilenceDetectDetectedSpans(_preview.KeepCount);
 
     private SilenceDetectOptions CurrentOptions()
     {
@@ -694,15 +731,23 @@ internal sealed class SilenceDetectDialog : Window
         return button;
     }
 
-    private static RadioButton CreateRadio(string content, bool isChecked, string group) =>
-        new()
+    private static RadioButton CreateRadio(string content, bool isChecked, string group)
+    {
+        var radio = new RadioButton
         {
             Content = content,
             IsChecked = isChecked,
-            Margin = new Thickness(0, 0, 12, 0),
+            Margin = new Thickness(0, 0, 12, 4),
             VerticalContentAlignment = VerticalAlignment.Center,
             GroupName = group,
         };
+        // 下線付き文字は AccessText になる。TextBlock 用の明るい色が当たらず黒のままになる。
+        radio.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
+        var access = new Style(typeof(AccessText));
+        access.Setters.Add(new Setter(TextElement.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
+        radio.Resources.Add(typeof(AccessText), access);
+        return radio;
+    }
 
     private static string FormatDb(double db) =>
         SilentSkip.ClampThresholdDb(db).ToString("0.#", CultureInfo.InvariantCulture);
@@ -746,6 +791,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
     private float[] _mins = [];
     private float[] _maxs = [];
     private List<WaveSelection> _keeps = [];
+    private List<long> _hitFrames = [];
+    private bool _hitPointMode;
     private SilenceDetectOptions _options = SilenceDetectOptions.FromThreshold(SilentSkip.DefaultThresholdDb);
     private bool _dragging;
     private bool _dragOpen = true;
@@ -757,6 +804,24 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
     public event Action? KeepsChanged;
 
     public int KeepCount => _keeps.Count;
+
+    public int CueCount => _hitPointMode ? _hitFrames.Count : _keeps.Count;
+
+    public bool HitPointMode
+    {
+        get => _hitPointMode;
+        set
+        {
+            if (_hitPointMode == value)
+            {
+                return;
+            }
+
+            _hitPointMode = value;
+            RefreshKeepsFromEnvelope();
+            InvalidateVisual();
+        }
+    }
 
     public AudioDocument? Document
     {
@@ -831,7 +896,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         CaptureMouse();
         _dragging = true;
         var y = e.GetPosition(this).Y;
-        _dragOpen = PickOpenLine(y);
+        _dragOpen = _hitPointMode || PickOpenLine(y);
         ApplyMouseY(y);
         e.Handled = true;
     }
@@ -873,7 +938,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             return;
         }
 
-        var openLine = _options.LinkThresholds || PickOpenLine(e.GetPosition(this).Y);
+        var openLine = _hitPointMode || _options.LinkThresholds || PickOpenLine(e.GetPosition(this).Y);
         var current = openLine ? _options.OpenThresholdDb : _options.CloseThresholdDb;
         var next = SilenceDetectDialog.NudgeThresholdDb(current, direction, Keyboard.Modifiers);
         ThresholdChanged?.Invoke(next, openLine);
@@ -907,16 +972,19 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         if (_document is not null && !_range.IsEmpty && bins > 0)
         {
             var rangeLen = Math.Max(1.0, _range.Length);
-            foreach (var span in _keeps)
+            if (!_hitPointMode)
             {
-                var x0 = (span.StartFrame - _range.StartFrame) / rangeLen * width;
-                var x1 = (span.EndFrame - _range.StartFrame) / rangeLen * width;
-                if (x1 <= x0)
+                foreach (var span in _keeps)
                 {
-                    continue;
-                }
+                    var x0 = (span.StartFrame - _range.StartFrame) / rangeLen * width;
+                    var x1 = (span.EndFrame - _range.StartFrame) / rangeLen * width;
+                    if (x1 <= x0)
+                    {
+                        continue;
+                    }
 
-                dc.DrawRectangle(keep, null, new Rect(x0, 0, x1 - x0, height));
+                    dc.DrawRectangle(keep, null, new Rect(x0, 0, x1 - x0, height));
+                }
             }
 
             var pen = new Pen(fill, 1);
@@ -938,6 +1006,18 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
                 dc.DrawLine(pen, new Point(x, y0), new Point(x, y1));
             }
+
+            if (_hitPointMode && _hitFrames.Count > 0)
+            {
+                var marker = WpfControlHelpers.FrozenBrush(Theme.Get("MarkerBrush"));
+                var markerPen = new Pen(marker, 1.5);
+                markerPen.Freeze();
+                foreach (var frame in _hitFrames)
+                {
+                    var x = (frame - _range.StartFrame) / rangeLen * width;
+                    dc.DrawLine(markerPen, new Point(x, 0), new Point(x, height));
+                }
+            }
         }
 
         var zeroPen = new Pen(zero, 1);
@@ -945,7 +1025,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         dc.DrawLine(zeroPen, new Point(0, mid), new Point(width, mid));
 
         DrawThresholdPair(dc, thresholdBrush, mid, amp, width, SilentSkip.LinearFromDb(_options.OpenThresholdDb), thick: true);
-        if (!_options.LinkThresholds
+        if (!_hitPointMode
+            && !_options.LinkThresholds
             && Math.Abs(_options.OpenThresholdDb - _options.CloseThresholdDb) > 1e-3)
         {
             DrawThresholdPair(dc, thresholdBrush, mid, amp, width, SilentSkip.LinearFromDb(_options.CloseThresholdDb), thick: false);
@@ -986,7 +1067,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
     private bool PickOpenLine(double y)
     {
-        if (_options.LinkThresholds)
+        if (_hitPointMode || _options.LinkThresholds)
         {
             return true;
         }
@@ -1090,10 +1171,17 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
     }
 
     /// <summary>
-    /// 表示ビンのピークとオープンスレッショルドで可聴区間を近似する（ゲート時間は見ない）。
+    /// 表示ビンのピークで可聴区間、またはヒットポイントを近似する（適用時は厳密検出）。
     /// </summary>
     private void RefreshKeepsFromEnvelope()
     {
+        if (_hitPointMode)
+        {
+            RefreshHitPoints();
+            return;
+        }
+
+        _hitFrames = [];
         if (_document is null || _range.IsEmpty || _mins.Length == 0 || _maxs.Length != _mins.Length)
         {
             _keeps = [];
@@ -1146,6 +1234,28 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         }
 
         _keeps = keeps;
+        KeepsChanged?.Invoke();
+    }
+
+    /// <summary>プレビューの縦線は適用時と同じ検出結果。</summary>
+    private void RefreshHitPoints()
+    {
+        _keeps = [];
+        if (_document is null || _range.IsEmpty)
+        {
+            _hitFrames = [];
+            KeepsChanged?.Invoke();
+            return;
+        }
+
+        _hitFrames = HitPointDetect.CollectFrames(
+            _document.Interleaved,
+            _document.Channels,
+            _range.StartFrame,
+            _range.EndFrame,
+            _document.SampleRate,
+            _channelMask,
+            _options);
         KeepsChanged?.Invoke();
     }
 }

@@ -216,7 +216,7 @@ internal static partial class UiStrings
     public static string LabelSpeakerIo => Get("スピーカーと入出力", "Speakers and I/O");
     public static string LabelSpeakerVisibility => Get("有効にするスピーカー定義", "Speaker definitions to enable");
     public static string LabelAutoSpeakerSelect => Get("自動スピーカー選択", "Auto speaker selection");
-    public static string ButtonSineMinusTwenty => Get("Sine −20 dB", "Sine −20 dB");
+    public static string ButtonSineMinusTwenty => Get("Sine -20 dB", "Sine -20 dB");
     public static string ButtonChannelVoice => Get("Voice", "Voice");
     public static string LabelPortOff => Get("なし", "Off");
     public static string LabelAudioApiWaveOut => Get("WaveOut", "WaveOut");
@@ -260,10 +260,10 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeIn => Get("波形フェードイン", "Waveform Fade In");
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string DialogNewDocumentTitle => Get("新規", "New");
-    public static string DialogSilenceDetectTitle => Get("無音検出", "Detect Silence");
+    public static string DialogSilenceDetectTitle => Get("無音・ヒット検出", "Silence & Hit Detection");
     public static string LabelSilenceDetectOpenThreshold => Get("オープンスレッショルド", "Open Threshold");
     public static string LabelSilenceDetectCloseThreshold => Get("クローズスレッショルド", "Close Threshold");
-    public static string LabelSilenceDetectLink => Get("リンク", "Link");
+    public static string LabelSilenceDetectLink => Get("リンク(_L)", "_Link");
     public static string LabelSilenceDetectMinGate => Get("次のゲートまでの最小時間", "Minimum Time to Next Gate");
     public static string LabelSilenceDetectMinClose => Get("クローズまでの最小時間", "Minimum Time to Close");
     public static string LabelSilenceDetectPreRoll => Get("プリロール", "Pre-Roll");
@@ -272,17 +272,17 @@ internal static partial class UiStrings
     public static string LabelSilenceDetectFadeOut => Get("カット時フェードアウト", "Cut Fade Out");
     public static string LabelSilenceDetectTargetSelection => Get("対象: 選択範囲", "Target: selection");
     public static string LabelSilenceDetectTargetEntire => Get("対象: ファイル全体", "Target: entire file");
-    public static string LabelSilenceDetectEdgesOnly => Get("冒頭＆末尾のみ", "Start & end only");
-    public static string LabelSilenceDetectEntire => Get("全体", "Entire");
-    public static string LabelSilenceDetectDelete => Get("無音を削除", "Delete silence");
-    public static string LabelSilenceDetectCreateRegions => Get("音があるところへリージョン付加", "Add regions to audio");
-    public static string LabelSilenceDetectCreateMarkers => Get("音があるところへマーカー付与", "Add markers to audio");
-    public static string ButtonSilenceDetectDelete => Get("削除", "Delete");
-    public static string ButtonSilenceDetectCreateRegions => Get("付加", "Add");
-    public static string ButtonSilenceDetectCreateMarkers => Get("付与", "Add");
+    public static string LabelSilenceDetectEdgesOnly => Get("冒頭＆末尾のみ(_S)", "_Start & end only");
+    public static string LabelSilenceDetectEntire => Get("全体(_A)", "Entire (_A)");
+    public static string LabelSilenceDetectDelete => Get("無音を削除(_D)", "_Delete silence");
+    public static string LabelSilenceDetectCreateRegions => Get("音があるところへリージョン付加(_R)", "Add _regions to audio");
+    public static string LabelSilenceDetectCreateMarkers => Get("音があるところへマーカー付与(_M)", "Add _markers to audio");
+    public static string LabelSilenceDetectHitPoints => Get("ヒットポイントにマーカー(_H)", "Mark _hit points");
+    public static string LabelHitPointThreshold => Get("ヒットのスレッショルド", "Hit Threshold");
+    public static string LabelHitPointMinGap => Get("ヒット間隔の最小時間", "Minimum Time Between Hits");
     public static string ConfirmSilenceDetectSelectedFiles(int count) => Format(
-        "選択した {0} 個のファイルに、現在の無音検出設定を適用しますか？",
-        "Apply the current Detect Silence settings to the {0} selected files?",
+        "選択した {0} 個のファイルに、現在の無音・ヒット検出設定を適用しますか？",
+        "Apply the current Silence & Hit Detection settings to the {0} selected files?",
         count);
     public static string SilenceDetectDetectedSpans(int count) => Format(
         "{0}のリージョンを検出",
@@ -291,6 +291,13 @@ internal static partial class UiStrings
     public static string ErrorNoSilenceDetectSpans => Get(
         "検出できる区間がありません。",
         "No spans were detected.");
+    public static string HitPointDetectedCount(int count) => Format(
+        "{0} のヒットポイントを検出",
+        "{0} hit point(s) detected",
+        count);
+    public static string ErrorNoHitPoints => Get(
+        "検出できるヒットポイントがありません。",
+        "No hit points were detected.");
     public static string LabelSettingsExportAudio => Get("オーディオ", "Audio");
     public static string LabelSettingsExportMovie => Get("ムービー", "Movie");
     public static string LabelWindowsMp3BitRate => Get(
@@ -1024,6 +1031,7 @@ internal static partial class UiStrings
         "Delete Silence" => Get("無音検出（削除）", "Detect Silence (Delete)"),
         "Detect Silence" => Get("無音検出（リージョン付加）", "Detect Silence (Add Regions)"),
         "Detect Silence Markers" => Get("無音検出（マーカー付与）", "Detect Silence (Add Markers)"),
+        "Detect Hit Points" => Get("無音検出（ヒットポイント）", "Detect Silence (Hit Points)"),
         "Paste" => Get("ペースト", "Paste"),
         "Record" => Get("録音", "Record"),
         "Add Marker" => Get("マーカー追加", "Add Marker"),
