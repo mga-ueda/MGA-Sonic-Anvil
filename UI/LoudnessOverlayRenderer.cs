@@ -11,7 +11,6 @@ internal sealed class LoudnessOverlayRenderer
 {
     public const double TopLufs = 0;
     public const double FloorLu = 21;
-    public const double BandLu = 6;
 
     private static readonly double[] MarkOffsets = [6, 0, -3, -12, -21];
 
@@ -153,12 +152,14 @@ internal sealed class LoudnessOverlayRenderer
     private static void DrawBands(DrawingContext dc, Rect wave, double target)
     {
         var yTop = LufsToY(TopLufs, wave, target);
+        var yCautionTop = LufsToY(target + LoudnessTrafficLight.LufsCautionAboveLu, wave, target);
         var yTarget = LufsToY(target, wave, target);
-        var yNear = LufsToY(target - BandLu, wave, target);
         var yFloor = LufsToY(target - FloorLu, wave, target);
-        FillBand(dc, wave, yTop, yTarget, BandBrush(LoudnessTraffic.Danger));
-        FillBand(dc, wave, yTarget, yNear, BandBrush(LoudnessTraffic.Caution));
-        FillBand(dc, wave, yNear, yFloor, BandBrush(LoudnessTraffic.Safe));
+        // ターゲット線の太さ分は青に含める。線ジャストが黄に掛からないようにする。
+        var ySafeTop = Math.Max(yCautionTop, yTarget - 1);
+        FillBand(dc, wave, yTop, yCautionTop, BandBrush(LoudnessTraffic.Danger));
+        FillBand(dc, wave, yCautionTop, ySafeTop, BandBrush(LoudnessTraffic.Caution));
+        FillBand(dc, wave, ySafeTop, yFloor, BandBrush(LoudnessTraffic.Safe));
     }
 
     private static void FillBand(DrawingContext dc, Rect wave, double y0, double y1, Brush brush)

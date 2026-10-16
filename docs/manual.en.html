@@ -605,7 +605,7 @@
         <h3>Spectrum / loudness / meters / vector scope</h3>
         <p>A view of the playback output.</p>
         <h4>Loudness</h4>
-        <p>Sits left of the spectrum. Short Term / Integrated / Momentary Max, Loudness Range, True Peak. Target LKFS is in Settings. Blue = headroom, orange = approaching, red = over.</p>
+        <p>Sits left of the spectrum. Short Term / Integrated / Momentary Max, Loudness Range, True Peak. Target LKFS is in Settings. Blue = at or below the target, orange = up to +3 LU above it, red = above that.</p>
         <ul>
           <li>While playing, values are live from the output and the numbers are colored.</li>
           <li>While stopped, they are an offline read of the whole file. Short Term is the file maximum. The color is the value fill and the text stays the default color. Edits such as volume re-measure.</li>
@@ -718,7 +718,7 @@
 
       <h2 id="spectrogram">7. Spectrogram / loudness analysis</h2>
       <p><kbd>A</kbd> cycles spectrogram / overlay. <kbd>V</kbd> shows the loudness curve and opens volume. <kbd>Esc</kbd>, <kbd>Shift</kbd>+<kbd>A</kbd>, or <kbd>Shift</kbd>+<kbd>V</kbd> returns to the waveform. The VIEW loudness button toggles the view only. <kbd>L</kbd> loops from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</p>
-      <p>The loudness view draws how loud the sound is over time (Short Term). The white band around the curve is a small “getting close to the limit” zone, like the meter. Peak level is drawn on the same height so you can compare. Blue / orange / red match the meter. The left numbers are loudness (LKFS); the white line is the target in Settings.</p>
+      <p>The loudness view draws how loud the sound is over time (Short Term). A faint band sits ±1 LU around the curve. Peak level is drawn on the same height so you can compare. Background colors match the meter: blue through the target, orange for the next 3 LU, red above that. The left numbers are loudness (LKFS); the white line is the target in Settings.</p>
       <p>Overlay draws the waveform shape on top of the spectrogram. Dark areas can be lifted with the bar on the left or <kbd>Alt</kbd>+↑ / ↓ so they stay readable. Low frequencies take more vertical space (below 100 Hz is barely visible). The top of the scale is 24 kHz. When the whole file fits on screen, the picture is sharp. When zoomed in, it stays smooth so scrolling does not feel heavy.</p>
 
       <h2 id="format">8. Format conversion</h2>

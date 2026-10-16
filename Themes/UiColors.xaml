@@ -98,7 +98,7 @@
     <SolidColorBrush x:Key="LoudnessSafeBrush" Color="#FF00FFFF" />
     <SolidColorBrush x:Key="LoudnessCautionBrush" Color="#FFD89820" />
     <SolidColorBrush x:Key="LoudnessDangerBrush" Color="#FFB83840" />
-    <SolidColorBrush x:Key="LoudnessWaveFillBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="LoudnessWaveFillBrush" Color="#FF4A4A50" />
     <SolidColorBrush x:Key="LoudnessChipForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="LoudnessGridBrush" Color="#24FFFFFF" />
     <SolidColorBrush x:Key="LoudnessTargetLineBrush" Color="#C8FFFFFF" />

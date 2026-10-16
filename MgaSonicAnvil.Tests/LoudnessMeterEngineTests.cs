@@ -197,13 +197,14 @@ public sealed class LoudnessMeterEngineTests
     }
 
     [Fact]
-    public void Traffic_Lufs_SafeOnOrBelowTargetMinusOne()
+    public void Traffic_Lufs_SafeThroughTarget_CautionForThreeLu_DangerAbove()
     {
         Assert.Equal(LoudnessTraffic.Safe, LoudnessTrafficLight.ForLufs(-26f, -24));
-        Assert.Equal(LoudnessTraffic.Safe, LoudnessTrafficLight.ForLufs(-25f, -24));
         Assert.Equal(LoudnessTraffic.Safe, LoudnessTrafficLight.ForLufs(-24f, -24));
-        Assert.Equal(LoudnessTraffic.Caution, LoudnessTrafficLight.ForLufs(-24.5f, -24));
-        Assert.Equal(LoudnessTraffic.Danger, LoudnessTrafficLight.ForLufs(-23.9f, -24));
+        Assert.Equal(LoudnessTraffic.Safe, LoudnessTrafficLight.ForLufs(-23.96f, -24));
+        Assert.Equal(LoudnessTraffic.Caution, LoudnessTrafficLight.ForLufs(-23.9f, -24));
+        Assert.Equal(LoudnessTraffic.Caution, LoudnessTrafficLight.ForLufs(-21f, -24));
+        Assert.Equal(LoudnessTraffic.Danger, LoudnessTrafficLight.ForLufs(-20.9f, -24));
         Assert.Equal(LoudnessTraffic.Idle, LoudnessTrafficLight.ForLufs(float.NegativeInfinity, -24));
     }
 
