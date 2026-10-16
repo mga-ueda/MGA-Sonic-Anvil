@@ -16,11 +16,14 @@ internal static class SilenceInsertPicker
     {
         public required Action<double> OnCommit { get; init; }
         public TextBox SecondsBox { get; set; } = null!;
+        public CheckBox EdgeFadeBox { get; set; } = null!;
         public double Seconds { get; set; }
+        public bool EdgeFade { get; set; }
         public bool UpdatingText { get; set; }
     }
 
     private static double _lastSeconds = 1;
+    private static bool _lastEdgeFade = true;
 
     public static ContextMenu Show(FrameworkElement placementTarget, Action<double> onCommit)
     {
@@ -28,6 +31,7 @@ internal static class SilenceInsertPicker
         {
             OnCommit = onCommit,
             Seconds = Snap(_lastSeconds),
+            EdgeFade = _lastEdgeFade,
         };
         var menu = new ContextMenu
         {
@@ -49,6 +53,7 @@ internal static class SilenceInsertPicker
         root.Children.Add(PickerChrome.TitleBar(UiStrings.LabelInsertSilence, menu));
         root.Children.Add(
             PickerChrome.FieldRow(UiStrings.LabelSilenceSeconds, state.SecondsBox, UiStrings.LabelSecondsUnit, labelWidth));
+        root.Children.Add(state.EdgeFadeBox);
         var item = PickerChrome.FormHost(root);
         menu.Items.Add(item);
 
@@ -106,6 +111,9 @@ internal static class SilenceInsertPicker
 
     public static double ReadSeconds(ContextMenu menu) =>
         menu.Tag is MenuState state ? state.Seconds : _lastSeconds;
+
+    public static bool ReadEdgeFade(ContextMenu menu) =>
+        menu.Tag is not MenuState state || state.EdgeFade;
 
     public static double NudgeStep(ModifierKeys modifiers)
     {
@@ -176,6 +184,18 @@ internal static class SilenceInsertPicker
                 ApplySeconds(state, Snap(parsed), rewrite: false);
             }
         };
+
+        var edge = PickerChrome.Option(UiStrings.LabelInsertSilenceEdgeFade);
+        edge.IsChecked = state.EdgeFade;
+        state.EdgeFadeBox = edge;
+        edge.Checked += (_, _) => SetEdgeFade(state, true);
+        edge.Unchecked += (_, _) => SetEdgeFade(state, false);
+    }
+
+    private static void SetEdgeFade(MenuState state, bool edgeFade)
+    {
+        state.EdgeFade = edgeFade;
+        _lastEdgeFade = edgeFade;
     }
 
     private static void SetSeconds(MenuState state, double seconds) =>

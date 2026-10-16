@@ -100,6 +100,8 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.Undo, commands);
             Assert.Contains(WaveMenuCommand.DetectSilence, commands);
             Assert.Contains(WaveMenuCommand.InsertSilence, commands);
+            Assert.Equal("Ctrl+Ins", Find(tree, WaveMenuCommand.InsertSilence)?.Gesture);
+            Assert.Equal("Shift+Delete", Find(tree, WaveMenuCommand.SilenceSelection)?.Gesture);
             Assert.Contains(WaveMenuCommand.FadeIn, commands);
             Assert.Contains(WaveMenuCommand.AddMarker, commands);
             Assert.Contains(WaveMenuCommand.DeleteAllMarkers, commands);

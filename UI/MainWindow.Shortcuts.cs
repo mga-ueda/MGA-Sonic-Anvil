@@ -174,6 +174,12 @@ public partial class MainWindow
             return;
         }
 
+        if (_silenceSelectionMenu is { IsOpen: true })
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (IsLibraryMaximized
             && e.OriginalSource is System.Windows.DependencyObject wheelOrigin
             && (IsDescendantOf(wheelOrigin, Overview)
@@ -959,6 +965,16 @@ public partial class MainWindow
             return false;
         }
 
+        if (TryHandleSilenceSelectionMenuShortcut(key, modifiers))
+        {
+            return true;
+        }
+
+        if (_silenceSelectionMenu is { IsOpen: true })
+        {
+            return false;
+        }
+
         if (TryProcessDocumentShortcut(key, modifiers, isRepeat))
         {
             return true;
@@ -1256,6 +1272,26 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.Insert && modifiers == ModifierKeys.Control)
+        {
+            if (!IsLibraryMaximized && !IsRecording && _document is not null)
+            {
+                PromptInsertSilenceAt(Waveform.PlayheadFrame);
+            }
+
+            return true;
+        }
+
+        if (key == Key.Delete && modifiers == ModifierKeys.Shift)
+        {
+            if (!IsLibraryMaximized && !IsRecording && _document is not null)
+            {
+                PromptSilenceSelection();
+            }
+
+            return true;
+        }
+
         if (key is Key.Delete or Key.Back && modifiers == ModifierKeys.None)
         {
             ApplyDelete();
@@ -1514,7 +1550,7 @@ public partial class MainWindow
             return true;
         }
 
-        if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker() || ClosePitchShiftPicker() || CloseTimeStretchPicker() || CloseInsertSilencePicker())
+        if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker() || ClosePitchShiftPicker() || CloseTimeStretchPicker() || CloseInsertSilencePicker() || CloseSilenceSelectionPicker())
         {
             return true;
         }
@@ -1958,6 +1994,22 @@ public partial class MainWindow
         if (key == Key.Enter && modifiers == ModifierKeys.None)
         {
             ApplyInsertSilence(SilenceInsertPicker.ReadSeconds(_silenceMenu));
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryHandleSilenceSelectionMenuShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (_silenceSelectionMenu is not { IsOpen: true })
+        {
+            return false;
+        }
+
+        if (key == Key.Enter && modifiers == ModifierKeys.None)
+        {
+            ApplySilenceSelection();
             return true;
         }
 
