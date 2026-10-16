@@ -108,6 +108,7 @@ internal static class HistoryRecipes
     public const string NormalizePerRegion = "NormalizePerRegion";
     public const string Delete = "Delete";
     public const string DeleteSilence = "DeleteSilence";
+    public const string InsertSilence = "InsertSilence";
     public const string Paste = "Paste";
     public const string Record = "Record";
     public const string SetSampleLoop = "SetSampleLoop";
@@ -140,6 +141,7 @@ internal static class HistoryRecipes
         NormalizePerRegion,
         Delete,
         DeleteSilence,
+        InsertSilence,
         Paste,
         Record,
         SetSampleLoop,
@@ -173,6 +175,7 @@ internal static class HistoryRecipes
         NormalizePerRegion,
         Delete,
         DeleteSilence,
+        InsertSilence,
         Paste,
         Record,
         ConvertRate,
@@ -295,6 +298,15 @@ internal static class HistoryRecipes
             channelMask);
     }
 
+    public static HistoryRecipe FromInsertSilence(int sourceRate, long insertFrame, double seconds) =>
+        new()
+        {
+            Kind = InsertSilence,
+            SourceRate = sourceRate,
+            Frame = insertFrame,
+            Amount = seconds,
+        };
+
     public static HistoryRecipe FromTimeStretch(
         int sourceRate,
         WaveSelection range,
@@ -349,6 +361,7 @@ internal static class HistoryRecipes
                 RangeOf(recipe),
                 OptionsOf(recipe),
                 channelMask: MaskOf(recipe)),
+            InsertSilence => ProcessEdits.InsertSilence(document, recipe.Frame, recipe.Amount),
             Paste => TryPaste(document, recipe),
             Record => TryRecord(document, recipe),
             SetSampleLoop => TrySetSampleLoop(document, recipe),

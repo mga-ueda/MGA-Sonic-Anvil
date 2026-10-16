@@ -99,6 +99,7 @@ public sealed class WaveformContextMenuTests
             var commands = WaveformContextMenuBuilder.Commands(tree).ToHashSet();
             Assert.Contains(WaveMenuCommand.Undo, commands);
             Assert.Contains(WaveMenuCommand.DetectSilence, commands);
+            Assert.Contains(WaveMenuCommand.InsertSilence, commands);
             Assert.Contains(WaveMenuCommand.FadeIn, commands);
             Assert.Contains(WaveMenuCommand.AddMarker, commands);
             Assert.Contains(WaveMenuCommand.DeleteAllMarkers, commands);

@@ -29,6 +29,7 @@ internal enum WaveMenuCommand
     Paste,
     PasteHistory,
     Delete,
+    InsertSilence,
     DetectSilence,
     SelectAll,
     ClearSelection,
@@ -525,6 +526,10 @@ internal static class WaveformContextMenuBuilder
             WaveMenuCommand.PasteHistory,
             enabled: m.CanEdit && m.CanPasteHistory),
         Cmd(UiStrings.WaveMenuDelete, WaveMenuCommand.Delete, "Delete", m.CanEdit && (m.HasSelection || m.HasSelectedMarkers || m.HasSelectedRegions)),
+        Cmd(
+            m.HasSelectedTabs ? UiStrings.WaveMenuInsertSilenceSelected : UiStrings.WaveMenuInsertSilence,
+            WaveMenuCommand.InsertSilence,
+            enabled: m.CanEdit),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuSelectAll, WaveMenuCommand.SelectAll, "Ctrl+A", m.CanNavigate),
         Cmd(UiStrings.WaveMenuClearSelection, WaveMenuCommand.ClearSelection, "Esc", m.CanNavigate && m.HasAnySelection),

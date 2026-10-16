@@ -385,6 +385,9 @@ internal static partial class UiStrings
     public static string ErrorPitchShiftFailed => Get(
         "ピッチシフトに失敗しました。",
         "Pitch shift failed.");
+    public static string LabelInsertSilence => Get("無音を挿入", "Insert silence");
+    public static string LabelSilenceSeconds => Get("秒数", "Seconds");
+    public static string LabelSecondsUnit => Get("秒", "s");
     public static string LabelTimeStretch => Get("タイムストレッチ", "Time stretch");
     public static string LabelTimeStretchSource => Get("元の時間", "Original");
     public static string LabelTimeStretchDest => Get("時間", "Time");
@@ -1040,6 +1043,7 @@ internal static partial class UiStrings
         "Reverse" => Get("リバース", "Reverse"),
         "Delete" => Get("削除", "Delete"),
         "Delete Silence" => Get("無音検出（削除）", "Detect Silence (Delete)"),
+        "Insert Silence" => Get("無音を挿入", "Insert Silence"),
         "Detect Silence" => Get("無音検出（リージョン付加）", "Detect Silence (Add Regions)"),
         "Detect Silence Markers" => Get("無音検出（マーカー付与）", "Detect Silence (Add Markers)"),
         "Detect Hit Points" => Get("無音検出（ヒットポイント）", "Detect Silence (Hit Points)"),

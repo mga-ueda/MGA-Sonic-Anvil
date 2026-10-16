@@ -458,4 +458,63 @@ internal static partial class ProcessEdits
 
         return frame < deleteEnd ? deleteStart : frame - deletedCount;
     }
+
+    public const double InsertSilenceMinSeconds = 0.001;
+
+    public const double InsertSilenceMaxSeconds = 600;
+
+    /// <summary>指定秒の無音を挿入する。長さは全チャンネル分伸び、以降のマーカー等は後ろへずれる。</summary>
+    public static IEditCommand? InsertSilence(AudioDocument document, long insertFrame, double seconds)
+    {
+        var frames = SilenceFrames(document.SampleRate, document.Channels, seconds);
+        if (frames <= 0)
+        {
+            return null;
+        }
+
+        insertFrame = Math.Clamp(insertFrame, 0, document.FrameCount);
+        var samples = new float[frames * document.Channels];
+        var command = new InsertSilenceCommand(
+            insertFrame,
+            samples,
+            document.Selection,
+            document.CursorFrame,
+            document.SnapshotMarkers(),
+            document.SampleLoop,
+            document.SnapshotRegions(),
+            UiStrings.EditHistoryRange(
+                UiStrings.EditHistoryName("Insert Silence"),
+                document.SampleRate,
+                insertFrame,
+                insertFrame + frames));
+        var sourceRate = document.SampleRate;
+        var resolvedFrame = insertFrame;
+        var resolvedSeconds = Math.Clamp(seconds, InsertSilenceMinSeconds, InsertSilenceMaxSeconds);
+        command.Replay = target => InsertSilence(
+            target,
+            EditReplay.MapFrame(resolvedFrame, sourceRate, target),
+            resolvedSeconds);
+        command.Persist = HistoryRecipes.FromInsertSilence(sourceRate, resolvedFrame, resolvedSeconds);
+        return command;
+    }
+
+    public static long SilenceFrames(int sampleRate, int channels, double seconds)
+    {
+        if (sampleRate < 1 || channels < 1 || !double.IsFinite(seconds) || seconds <= 0)
+        {
+            return 0;
+        }
+
+        seconds = Math.Min(seconds, InsertSilenceMaxSeconds);
+        var frames = (long)Math.Round(seconds * sampleRate, MidpointRounding.AwayFromZero);
+        var maxFrames = (long)sampleRate * (long)InsertSilenceMaxSeconds;
+        frames = Math.Clamp(frames, 1, Math.Max(1, maxFrames));
+        var channelLimit = int.MaxValue / channels;
+        if (frames > channelLimit)
+        {
+            frames = channelLimit;
+        }
+
+        return frames;
+    }
 }
