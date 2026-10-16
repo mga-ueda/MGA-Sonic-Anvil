@@ -168,10 +168,23 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private int _streamReverseNextFrames;
     private float[] _streamReverseLast = [];
     private float[] _streamReversePrerollScratch = [];
+    /// <summary>順再生で読んだ直近フレーム。早戻しシークの着地をここに合わせる。</summary>
+    private float[] _streamRecentPcm = [];
+    private int _streamRecentWrite;
+    private int _streamRecentCount;
+    private int _streamRecentChannels;
+    private long _streamRecentNext = -1;
+    private bool _streamRecentValid;
+    private const int StreamRecentMaxFrames = 4096;
+    private const int StreamReverseAlignFrames = 256;
     /// <summary>1 回の Read でリングから捨てる無音の上限。超えたら次のコールバックへ回す。</summary>
     private int _streamSkipBudget;
     private bool _streamSkipYield;
-    private const int StreamSilentSkipMaxFrames = 8192;
+    /// <summary>
+    /// リングに溜まっている分まで。時刻シークは使わない。
+    /// MP3 の CurrentTime はフレーム境界で、飛んだあとの音とシークバーがずれる。
+    /// </summary>
+    private const int StreamSilentSkipMaxFrames = AudioStreamSource.RingFrames;
 
     /// <summary>早送りはピッチ据え置きグレイン、巻き戻しは逆再生。</summary>
     internal const double FastSpeed = 3;
@@ -510,6 +523,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             source.SeekFrame(start, prebufferTimeoutMs: 200);
             _sourceFrame = start;
             _cursor = checked((int)start * _channels);
+            InvalidateStreamRecentNoLock();
             _frameGain = frameGain;
             _silenceOnly = false;
             _flushFadeRemaining = 0;
@@ -718,6 +732,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
 
         InvalidateStreamCursorCacheNoLock();
+        InvalidateStreamRecentNoLock();
         ClearStreamReverseBuf();
         var window = Mp3Gapless.ResolveWindow(document, frames, playRange: null);
         var start = Mp3Gapless.ClampStart(0, window, frames);
@@ -1062,6 +1077,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         // 音声スレッドも UI も _gate を握ったまま来る。先読み待ちで数秒止めない。
         _stream?.SeekFrame(next, prebufferTimeoutMs: 0);
         InvalidateStreamCursorCacheNoLock();
+        InvalidateStreamRecentNoLock();
         ClearStreamReverseBuf();
         // シークでジャンプしたら進行中の Exit 二重再生は直ちに止める（IM Importer と同じ）。
         _exitPlaying = false;
@@ -2002,6 +2018,10 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             end = Math.Min(frameCount - 1, frame + FormatConvert.ResampleEdgePad);
         }
 
+        // 時刻シークが手前に着地しても、再生ヘッドのサンプルが窓に残るようにする。
+        var alignSlack = Math.Max(0, (int)Math.Round(_sourceRate * 0.08));
+        end = Math.Min(frameCount - 1, end + alignSlack);
+
         var start = Math.Max((long)Math.Floor(loopStartFrame), frame - chunkFrames + 1);
         start = Math.Clamp(start, 0, Math.Max(0, frameCount - 1));
         end = Math.Clamp(end, start, Math.Max(0, frameCount - 1));
@@ -2011,6 +2031,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             ref _streamReverseBufFrames,
             start,
             end,
+            frame,
             srcCh);
         var index = (int)(frame - _streamReverseBufStart);
         if (_streamReverseBufFrames <= 0 || (uint)index >= (uint)_streamReverseBufFrames)
@@ -2058,6 +2079,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             ref _streamReverseNextFrames,
             nextStart,
             nextEnd,
+            nextEnd,
             srcCh);
     }
 
@@ -2067,6 +2089,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         ref int bufFrames,
         long start,
         long end,
+        long mustContain,
         int srcCh)
     {
         var len = (int)(end - start + 1);
@@ -2075,7 +2098,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return;
         }
 
-        if (bufStart == start && bufFrames >= len)
+        if (bufFrames >= len && mustContain >= bufStart && mustContain < bufStart + bufFrames)
         {
             return;
         }
@@ -2101,6 +2124,10 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
         // Seek / プリロールは FillStreamReverseRange 側。ここで Seek するとプライミング捨てが効かない。
         bufFrames += FillStreamReverseRange(buf, start, filledFrom, end, srcCh);
+        if (bufFrames >= len && bufStart == start)
+        {
+            TryAlignReverseBuf(buf, ref bufStart, bufFrames, mustContain, srcCh);
+        }
     }
 
     private void PromoteReverseNext()
@@ -2200,6 +2227,243 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _streamReverseBufFrames = 0;
         _streamReverseNextStart = -1;
         _streamReverseNextFrames = 0;
+    }
+
+    private void InvalidateStreamRecentNoLock()
+    {
+        _streamRecentValid = false;
+        _streamRecentCount = 0;
+        _streamRecentWrite = 0;
+        _streamRecentNext = -1;
+    }
+
+    private void NoteStreamRecentFrame(long frame, ReadOnlySpan<float> pcm)
+    {
+        if (_playbackSpeed < 0 || pcm.Length <= 0)
+        {
+            return;
+        }
+
+        var srcCh = pcm.Length;
+        if (!_streamRecentValid || frame != _streamRecentNext || _streamRecentChannels != srcCh)
+        {
+            _streamRecentValid = true;
+            _streamRecentChannels = srcCh;
+            _streamRecentNext = frame;
+            _streamRecentCount = 0;
+            _streamRecentWrite = 0;
+        }
+
+        var need = StreamRecentMaxFrames * srcCh;
+        if (_streamRecentPcm.Length < need)
+        {
+            _streamRecentPcm = new float[need];
+        }
+
+        pcm.CopyTo(_streamRecentPcm.AsSpan(_streamRecentWrite * srcCh, srcCh));
+        _streamRecentWrite++;
+        if (_streamRecentWrite >= StreamRecentMaxFrames)
+        {
+            _streamRecentWrite = 0;
+        }
+
+        if (_streamRecentCount < StreamRecentMaxFrames)
+        {
+            _streamRecentCount++;
+        }
+
+        _streamRecentNext = frame + 1;
+    }
+
+    private bool CopyStreamRecentTail(int frames, float[] dest)
+    {
+        if (!_streamRecentValid || frames <= 0 || _streamRecentCount < frames)
+        {
+            return false;
+        }
+
+        var srcCh = Math.Max(1, _streamRecentChannels);
+        var start = _streamRecentWrite - frames;
+        if (start < 0)
+        {
+            start += StreamRecentMaxFrames;
+        }
+
+        var first = Math.Min(frames, StreamRecentMaxFrames - start);
+        _streamRecentPcm.AsSpan(start * srcCh, first * srcCh).CopyTo(dest);
+        if (first < frames)
+        {
+            _streamRecentPcm.AsSpan(0, (frames - first) * srcCh).CopyTo(dest.AsSpan(first * srcCh));
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 早戻し窓の中から、順再生で読んだ末尾を探す。
+    /// 見つかったら bufStart をそのフレーム番号へずらす。
+    /// </summary>
+    private void TryAlignReverseBuf(float[] buf, ref long bufStart, int bufFrames, long endFrame, int srcCh)
+    {
+        if (bufFrames < StreamReverseAlignFrames || srcCh <= 0 || !_streamRecentValid)
+        {
+            return;
+        }
+
+        var needleFrames = Math.Min(StreamReverseAlignFrames, _streamRecentCount);
+        if (needleFrames < 64)
+        {
+            return;
+        }
+
+        var needleStart = _streamRecentNext - needleFrames;
+        var maxLag = Math.Min(bufFrames - needleFrames, Math.Max(256, _sourceRate / 8));
+        if (maxLag <= 0)
+        {
+            return;
+        }
+
+        var needle = _streamReversePrerollScratch;
+        var needleSamples = needleFrames * srcCh;
+        if (needle.Length < needleSamples)
+        {
+            needle = new float[needleSamples];
+            _streamReversePrerollScratch = needle;
+        }
+
+        if (!CopyStreamRecentTail(needleFrames, needle))
+        {
+            return;
+        }
+
+        if (!TryFindAlignDelta(
+                buf,
+                bufFrames,
+                bufStart,
+                needle,
+                needleFrames,
+                needleStart,
+                srcCh,
+                maxLag,
+                out var delta))
+        {
+            return;
+        }
+
+        var aligned = bufStart + delta;
+        if (endFrame < aligned || endFrame >= aligned + bufFrames)
+        {
+            return;
+        }
+
+        bufStart = aligned;
+    }
+
+    /// <summary>
+    /// haystack の中で needle が最も合う位置を探し、haystackStart に足す差分を返す。
+    /// 正の差分は、サンプルがラベルより後ろの音である（シークが遅れた）。
+    /// </summary>
+    internal static bool TryFindAlignDelta(
+        ReadOnlySpan<float> haystack,
+        int haystackFrames,
+        long haystackStart,
+        ReadOnlySpan<float> needle,
+        int needleFrames,
+        long needleStart,
+        int channels,
+        int maxLag,
+        out int deltaFrames)
+    {
+        deltaFrames = 0;
+        channels = Math.Max(1, channels);
+        if (needleFrames < 64
+            || haystackFrames < needleFrames
+            || haystack.Length < haystackFrames * channels
+            || needle.Length < needleFrames * channels)
+        {
+            return false;
+        }
+
+        var peak = 0f;
+        for (var i = 0; i < needleFrames * channels; i++)
+        {
+            peak = Math.Max(peak, Math.Abs(needle[i]));
+        }
+
+        if (peak < 1e-4f)
+        {
+            return false;
+        }
+
+        var claimed = (int)(needleStart - haystackStart);
+        maxLag = Math.Max(0, maxLag);
+        var bestLag = 0;
+        var best = float.MaxValue;
+        var second = float.MaxValue;
+        ScoreAlignLags(haystack, needle, needleFrames, channels, claimed, haystackFrames, -maxLag, maxLag, 4, ref bestLag, ref best, ref second);
+        ScoreAlignLags(haystack, needle, needleFrames, channels, claimed, haystackFrames, bestLag - 4, bestLag + 4, 1, ref bestLag, ref best, ref second);
+
+        if (best > 0.05f)
+        {
+            return false;
+        }
+
+        // 谷が広いときは無音や周期音の誤認なので、ずらさない。
+        if (best > 0.003f && second < float.MaxValue && second - best < 0.004f)
+        {
+            return false;
+        }
+
+        deltaFrames = -bestLag;
+        return true;
+    }
+
+    private static void ScoreAlignLags(
+        ReadOnlySpan<float> haystack,
+        ReadOnlySpan<float> needle,
+        int needleFrames,
+        int channels,
+        int claimed,
+        int haystackFrames,
+        int lagFrom,
+        int lagTo,
+        int step,
+        ref int bestLag,
+        ref float best,
+        ref float second)
+    {
+        step = Math.Max(1, step);
+        for (var lag = lagFrom; lag <= lagTo; lag += step)
+        {
+            var index = claimed + lag;
+            if (index < 0 || index + needleFrames > haystackFrames)
+            {
+                continue;
+            }
+
+            var mae = MeanAbsDiff(haystack, index * channels, needle, needleFrames * channels);
+            if (mae < best)
+            {
+                second = best;
+                best = mae;
+                bestLag = lag;
+            }
+            else if (mae < second)
+            {
+                second = mae;
+            }
+        }
+    }
+
+    private static float MeanAbsDiff(ReadOnlySpan<float> haystack, int haystackOffset, ReadOnlySpan<float> needle, int samples)
+    {
+        var sum = 0d;
+        for (var i = 0; i < samples; i++)
+        {
+            sum += Math.Abs(haystack[haystackOffset + i] - needle[i]);
+        }
+
+        return (float)(sum / Math.Max(1, samples));
     }
 
     private long FrameCountOrStreamEnd(int srcCh) =>
@@ -2406,20 +2670,25 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
             while (_stream.Frame < frame)
             {
+                var skipped = _stream.Frame;
                 if (!_stream.TryReadFrame(_streamCached.AsSpan(0, _channels), timeoutMs: 0))
                 {
                     dest.Clear();
                     return false;
                 }
+
+                NoteStreamRecentFrame(skipped, _streamCached.AsSpan(0, _channels));
             }
         }
 
+        var readAt = _stream.Frame;
         if (!_stream.TryReadFrame(dest, timeoutMs: 0))
         {
             dest.Clear();
             return false;
         }
 
+        NoteStreamRecentFrame(readAt, dest);
         return true;
     }
 
@@ -2480,45 +2749,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return false;
         }
 
-        var hold = SilentSkip.PeakWindowRadiusFrames(_sourceRate);
-        var peaks = _boundDocument?.Peaks;
-        if (peaks is not null && peaks.TryIsSilent(start, _silentSkipLinear, hold, out var silent))
-        {
-            if (!silent)
-            {
-                return TrySkipStreamSilenceFromRingNoLock(start, end);
-            }
-
-            var next = peaks.FindNextAudibleFrame(start, end, _silentSkipLinear);
-            if (next < end)
-            {
-                next = Math.Max(start, next - hold);
-                if (next <= start)
-                {
-                    return TrySkipStreamSilenceFromRingNoLock(start, end);
-                }
-
-                ApplyStreamSilentSkipJump(next);
-                return true;
-            }
-
-            if (_loop && playEndFrame > _loopStart / (double)Math.Max(1, _channels))
-            {
-                var loopStart = (long)Math.Floor(_loopStart / (double)Math.Max(1, _channels));
-                var wrap = peaks.FindNextAudibleFrame(loopStart, end, _silentSkipLinear);
-                if (wrap < end)
-                {
-                    ApplyStreamSilentSkipJump(Math.Max(loopStart, wrap - hold));
-                    return true;
-                }
-
-                return false;
-            }
-
-            ApplyStreamSilentSkipJump(end);
-            return true;
-        }
-
+        // ピークのバケットへ CurrentTime で飛ばすと、MP3 はデコード位置がバーより先に出る。
+        // リングの実サンプルを捨てて進むと、波形と同じ順デコードの位置のままになる。
         return TrySkipStreamSilenceFromRingNoLock(start, end);
     }
 
@@ -2582,38 +2814,6 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
 
         return true;
-    }
-
-    private void ApplyStreamSilentSkipJump(long frame)
-    {
-        _sourceFrame = frame;
-        _cursor = CursorSampleFromFrame(frame);
-        InvalidateStreamCursorCacheNoLock();
-        if (_stream is null)
-        {
-            return;
-        }
-
-        var current = _stream.Frame;
-        if (frame == current)
-        {
-            return;
-        }
-
-        if (frame < current || frame - current > 64)
-        {
-            _stream.SeekFrame(frame, prebufferTimeoutMs: 0);
-            return;
-        }
-
-        var scratch = _streamCached.AsSpan(0, _channels);
-        while (_stream.Frame < frame)
-        {
-            if (!_stream.TryReadFrame(scratch, timeoutMs: 0))
-            {
-                return;
-            }
-        }
     }
 
     private int CursorSampleFromFrame(long frame)

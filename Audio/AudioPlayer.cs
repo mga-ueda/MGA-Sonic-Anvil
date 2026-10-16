@@ -32,6 +32,7 @@ internal sealed class AudioPlayer : IDisposable
     private long _smoothRawFrame = -1;
     private long _smoothShownFrame = -1;
     private long _smoothStampTicks;
+    private double _smoothSpeed = 1;
 
     public event EventHandler<int>? PlaybackEnded;
 
@@ -84,6 +85,17 @@ internal sealed class AudioPlayer : IDisposable
             _smoothRawFrame = raw;
             _smoothShownFrame = raw;
             _smoothStampTicks = now;
+            _smoothSpeed = speed;
+            return raw;
+        }
+
+        if (Math.Abs(speed - _smoothSpeed) > 1e-9)
+        {
+            // 早戻しへ切り替えた瞬間に、直前の外挿を逆方向へ伸ばさない。
+            _smoothSpeed = speed;
+            _smoothRawFrame = raw;
+            _smoothShownFrame = raw;
+            _smoothStampTicks = now;
             return raw;
         }
 
@@ -107,9 +119,11 @@ internal sealed class AudioPlayer : IDisposable
             }
         }
 
-        // 外挿は 1 バッファ相当（80ms）まで。出力停止時の暴走を防ぐ。
+        // 外挿は曲の時間で 80ms まで。3 倍の早戻しで壁時計 80ms のまま伸ばすと、
+        // シーク待ちのあいだバーだけ先に進んで音とずれたままになる。
+        var maxWallSec = 0.08 / Math.Max(1d, Math.Abs(speed));
         var elapsedSec = Math.Min(
-            0.08,
+            maxWallSec,
             (now - _smoothStampTicks) / (double)System.Diagnostics.Stopwatch.Frequency);
         var value = _smoothRawFrame
             + (long)(elapsedSec * sourceRate * speed);

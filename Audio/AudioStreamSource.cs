@@ -11,7 +11,7 @@ namespace MgaSonicAnvil.Audio;
 internal sealed class AudioStreamSource : IDisposable
 {
     private const int ChunkFrames = 4096;
-    private const int RingFrames = ChunkFrames * 8;
+    internal const int RingFrames = ChunkFrames * 8;
     private const int PrebufferFrames = ChunkFrames * 2;
 
     private WaveStream? _reader;
