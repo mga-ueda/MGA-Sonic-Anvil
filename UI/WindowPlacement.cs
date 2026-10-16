@@ -778,11 +778,161 @@ internal static class WindowPlacement
         return work.Width > 1 && work.Height > 1;
     }
 
+    /// <summary>
+    /// ウィンドウがあるモニター全面（タスクバー含む）に合わせる。
+    /// 物理ピクセルで置くので、最大化の作業領域に引き戻されない。
+    /// </summary>
+    public static bool TryCoverContainingMonitor(Window window)
+    {
+        if (!TryGetMonitorInfoForWindow(window, out var info, out var fromDevice))
+        {
+            return false;
+        }
+
+        var dip = MonitorDip(info.Monitor, fromDevice);
+        if (dip.Width <= 1 || dip.Height <= 1)
+        {
+            return false;
+        }
+
+        window.WindowState = WindowState.Normal;
+        window.Left = dip.X;
+        window.Top = dip.Y;
+        window.Width = dip.Width;
+        window.Height = dip.Height;
+
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd != IntPtr.Zero)
+        {
+            // Windows 11 のタスクバーは最前面。HWND_TOP のままでは窓がその裏に入る。
+            SetWindowPos(
+                hwnd,
+                HwndTopMost,
+                info.Monitor.Left,
+                info.Monitor.Top,
+                Math.Max(1, info.Monitor.Right - info.Monitor.Left),
+                Math.Max(1, info.Monitor.Bottom - info.Monitor.Top),
+                SwpNoActivate | SwpFrameChanged);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// シェルにフルスクリーンだと伝える。伝えないと Windows 11 ではタスクバーが最前面のまま、窓がその裏に入る。
+    /// </summary>
+    public static void SetShellFullscreen(Window window, bool fullscreen)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_taskbar is null)
+            {
+                var type = Type.GetTypeFromCLSID(TaskbarListClsid);
+                if (type is null || Activator.CreateInstance(type) is not ITaskbarList2 created)
+                {
+                    return;
+                }
+
+                if (created.HrInit() != 0)
+                {
+                    return;
+                }
+
+                _taskbar = created;
+            }
+
+            _taskbar.MarkFullscreenWindow(hwnd, fullscreen);
+        }
+        catch (COMException)
+        {
+            _taskbar = null;
+        }
+        catch (InvalidCastException)
+        {
+            _taskbar = null;
+        }
+    }
+
+    private static ITaskbarList2? _taskbar;
+
+    private static readonly Guid TaskbarListClsid = new("56FDF344-FD6D-11d0-958A-006097C9A090");
+
+    [ComImport]
+    [Guid("602D4995-B13A-429b-A66E-1935E44F4317")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface ITaskbarList2
+    {
+        [PreserveSig]
+        int HrInit();
+
+        [PreserveSig]
+        int AddTab(IntPtr hwnd);
+
+        [PreserveSig]
+        int DeleteTab(IntPtr hwnd);
+
+        [PreserveSig]
+        int ActivateTab(IntPtr hwnd);
+
+        [PreserveSig]
+        int SetActiveAlt(IntPtr hwnd);
+
+        [PreserveSig]
+        int MarkFullscreenWindow(IntPtr hwnd, [MarshalAs(UnmanagedType.Bool)] bool fullscreen);
+    }
+
+    private static Rect MonitorDip(NativeRect pixels, Matrix fromDevice)
+    {
+        if (HasDeviceTransform(fromDevice) || Math.Abs(GetPrimaryScreenScale() - 1) < 0.02)
+        {
+            return DeviceRectToDip(pixels.Left, pixels.Top, pixels.Right, pixels.Bottom, fromDevice);
+        }
+
+        var scale = GetPrimaryScreenScale();
+        return new Rect(
+            pixels.Left / scale,
+            pixels.Top / scale,
+            Math.Max(1, (pixels.Right - pixels.Left) / scale),
+            Math.Max(1, (pixels.Bottom - pixels.Top) / scale));
+    }
+
+    private static bool HasDeviceTransform(Matrix fromDevice) =>
+        Math.Abs(fromDevice.M11 - 1) > 0.01
+        || Math.Abs(fromDevice.M22 - 1) > 0.01
+        || Math.Abs(fromDevice.OffsetX) > 0.01
+        || Math.Abs(fromDevice.OffsetY) > 0.01;
+
     /// <summary>DIP 点を含む（または最寄りの）モニターの作業領域。</summary>
     public static bool TryGetWorkAreaDipForPoint(double dipX, double dipY, out Rect work)
     {
         work = default;
-        var scale = GetPrimaryScreenScale();
+        if (!TryGetMonitorInfoForDipPoint(dipX, dipY, out var info, out var scale))
+        {
+            return false;
+        }
+
+        work = new Rect(
+            info.Work.Left / scale,
+            info.Work.Top / scale,
+            Math.Max(1, (info.Work.Right - info.Work.Left) / scale),
+            Math.Max(1, (info.Work.Bottom - info.Work.Top) / scale));
+        return work.Width > 1 && work.Height > 1;
+    }
+
+    private static bool TryGetMonitorInfoForDipPoint(
+        double dipX,
+        double dipY,
+        out MonitorInfo info,
+        out double scale)
+    {
+        info = default;
+        scale = GetPrimaryScreenScale();
         if (scale <= 0)
         {
             return false;
@@ -799,18 +949,8 @@ internal static class WindowPlacement
             return false;
         }
 
-        var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
-        if (!GetMonitorInfo(handle, ref info))
-        {
-            return false;
-        }
-
-        work = new Rect(
-            info.Work.Left / scale,
-            info.Work.Top / scale,
-            Math.Max(1, (info.Work.Right - info.Work.Left) / scale),
-            Math.Max(1, (info.Work.Bottom - info.Work.Top) / scale));
-        return work.Width > 1 && work.Height > 1;
+        info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        return GetMonitorInfo(handle, ref info);
     }
 
     private static bool TryGetMonitorInfoForWindow(Window window, out MonitorInfo info, out Matrix fromDevice)
@@ -864,6 +1004,9 @@ internal static class WindowPlacement
     }
 
     private const uint MonitorDefaultToNearest = 2;
+    private const uint SwpNoActivate = 0x0010;
+    private const uint SwpFrameChanged = 0x0020;
+    private static readonly IntPtr HwndTopMost = new(-1);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint
@@ -906,6 +1049,16 @@ internal static class WindowPlacement
 
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int index);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(
+        IntPtr hwnd,
+        IntPtr hwndInsertAfter,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        uint flags);
 }
 
 /// <summary>メインウィンドウの配置スロット。エディタ／F10／F9／F11／F12 で別々に覚える。</summary>

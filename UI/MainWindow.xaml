@@ -14,6 +14,7 @@
         ToolTipService.IsEnabled="False"
         Background="Transparent">
   <Grid x:Name="RootChrome">
+    <Grid x:Name="PlaybackScene">
     <Grid x:Name="PlayerWaveGlowHost"
           IsHitTestVisible="False"
           Visibility="Collapsed"
@@ -355,6 +356,7 @@
       </Grid>
     </Grid>
   </DockPanel>
+    </Grid>
     <ui:EditHistoryOverlay x:Name="HistoryOverlay"
                            Visibility="Collapsed"
                            HorizontalAlignment="Center"
@@ -397,11 +399,12 @@
              Opacity="0"
              IsHitTestVisible="False">
       <Grid Height="{x:Static ui:DesignMetrics.PlaylistVideoTimecodeHostHeight}">
-        <Border VerticalAlignment="Top"
-                HorizontalAlignment="Center"
-                Padding="{x:Static ui:DesignMetrics.PlaylistVideoTimecodePadding}"
-                CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
-                Background="#99000000">
+        <ui:FrostedPlate VerticalAlignment="Top"
+                         HorizontalAlignment="Center"
+                         Source="{Binding ElementName=PlaybackScene}"
+                         CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}">
+          <Border Padding="{x:Static ui:DesignMetrics.PlaylistVideoTimecodePadding}"
+                  Background="Transparent">
           <StackPanel>
             <TextBlock x:Name="PlaylistVideoNowEndText"
                        Height="{x:Static ui:DesignMetrics.PlaylistVideoTimecodeLineHeight}"
@@ -410,7 +413,7 @@
                        FontWeight="Normal"
                        TextAlignment="Center"
                        TextWrapping="NoWrap"
-                       Foreground="#F5F5F5"
+                       Foreground="{DynamicResource PrimaryForeBrush}"
                        Text="00:00.00 / 00:00.00" />
             <TextBlock x:Name="PlaylistVideoSelText"
                        Height="{x:Static ui:DesignMetrics.PlaylistVideoTimecodeLineHeight}"
@@ -421,10 +424,11 @@
                        TextAlignment="Center"
                        TextWrapping="NoWrap"
                        Visibility="Collapsed"
-                       Foreground="#F5F5F5"
+                       Foreground="{DynamicResource PrimaryForeBrush}"
                        Text="00:00.00 / 00:00.00" />
           </StackPanel>
-        </Border>
+          </Border>
+        </ui:FrostedPlate>
       </Grid>
     </Viewbox>
     <!-- F8 +／- キー拡縮時だけ中央に拡大率を出す（枠ドラッグでは出さない）。 -->
@@ -433,11 +437,12 @@
           VerticalAlignment="Center"
           Opacity="0"
           IsHitTestVisible="False">
-      <Border HorizontalAlignment="Center"
-              VerticalAlignment="Center"
-              Padding="{x:Static ui:DesignMetrics.PlaylistVideoTimecodePadding}"
-              CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
-              Background="#99000000">
+      <ui:FrostedPlate HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Source="{Binding ElementName=PlaybackScene}"
+                       CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}">
+        <Border Padding="{x:Static ui:DesignMetrics.PlaylistVideoTimecodePadding}"
+                Background="Transparent">
         <TextBlock x:Name="PlaylistVideoScaleToastText"
                    Height="{x:Static ui:DesignMetrics.PlaylistVideoTimecodeLineHeight}"
                    FontFamily="Consolas"
@@ -445,11 +450,12 @@
                    FontWeight="Normal"
                    TextAlignment="Center"
                    TextWrapping="NoWrap"
-                   Foreground="#F5F5F5"
+                   Foreground="{DynamicResource PrimaryForeBrush}"
                    Text="100%" />
-      </Border>
+        </Border>
+      </ui:FrostedPlate>
     </Grid>
-    <!-- PDF 本表示の下中央ページ番号（半透明黒背景。ページ切替時だけ出してフェードアウト）。 -->
+    <!-- PDF 本表示の下中央ページ番号（すりガラス。ページ切替時だけ出してフェードアウト）。 -->
     <Viewbox x:Name="PlaylistPdfPageNumber"
              HorizontalAlignment="Center"
              VerticalAlignment="Bottom"
@@ -458,11 +464,12 @@
              Stretch="Uniform"
              Opacity="0"
              IsHitTestVisible="False">
-      <Border HorizontalAlignment="Center"
-              VerticalAlignment="Center"
-              Padding="{x:Static ui:DesignMetrics.PlaylistPdfPageNumberPadding}"
-              CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
-              Background="#99000000">
+      <ui:FrostedPlate HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Source="{Binding ElementName=PlaybackScene}"
+                       CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}">
+        <Border Padding="{x:Static ui:DesignMetrics.PlaylistPdfPageNumberPadding}"
+                Background="Transparent">
         <TextBlock x:Name="PlaylistPdfPageNumberText"
                    Height="{x:Static ui:DesignMetrics.PlaylistPdfPageNumberLineHeight}"
                    FontFamily="Consolas"
@@ -470,11 +477,12 @@
                    FontWeight="Normal"
                    TextAlignment="Center"
                    TextWrapping="NoWrap"
-                   Foreground="#F5F5F5"
+                   Foreground="{DynamicResource PrimaryForeBrush}"
                    Text="1 / 1" />
-      </Border>
+        </Border>
+      </ui:FrostedPlate>
     </Viewbox>
-    <!-- 動画／PDF 本再生・ミニで複数ファイルのとき左下に「現在 / 総数」（半透明黒背景。曲切替時だけ出してフェードアウト）。 -->
+    <!-- 動画／PDF 本再生・ミニで複数ファイルのとき左下に「現在 / 総数」（すりガラス。曲切替時だけ出してフェードアウト）。 -->
     <Viewbox x:Name="PlaylistTrackIndex"
              HorizontalAlignment="Left"
              VerticalAlignment="Bottom"
@@ -483,11 +491,12 @@
              Stretch="Uniform"
              Opacity="0"
              IsHitTestVisible="False">
-      <Border HorizontalAlignment="Left"
-              VerticalAlignment="Center"
-              Padding="{x:Static ui:DesignMetrics.PlaylistTrackIndexPadding}"
-              CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
-              Background="#99000000">
+      <ui:FrostedPlate HorizontalAlignment="Left"
+                       VerticalAlignment="Center"
+                       Source="{Binding ElementName=PlaybackScene}"
+                       CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}">
+        <Border Padding="{x:Static ui:DesignMetrics.PlaylistTrackIndexPadding}"
+                Background="Transparent">
         <TextBlock x:Name="PlaylistTrackIndexText"
                    Height="{x:Static ui:DesignMetrics.PlaylistTrackIndexLineHeight}"
                    FontFamily="Consolas"
@@ -495,9 +504,10 @@
                    FontWeight="Normal"
                    TextAlignment="Center"
                    TextWrapping="NoWrap"
-                   Foreground="#F5F5F5"
+                   Foreground="{DynamicResource PrimaryForeBrush}"
                    Text="1 / 1" />
-      </Border>
+        </Border>
+      </ui:FrostedPlate>
     </Viewbox>
   </Grid>
 </Window>

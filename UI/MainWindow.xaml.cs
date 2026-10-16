@@ -219,10 +219,11 @@ public partial class MainWindow : Window
         ApplyMeterColumnWidth(AppStorage.Settings.MeterColumnWidth);
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
         // 動画の関連付け起動はミニプレイヤーへ切り替えてから出す（エディタが一瞬見えないように）。
+        // ファイル無しのプレイヤー起動も、出す前にプレイヤーへ切り替える。
         WindowPaintReveal.Attach(
             this,
             OnStartupRevealed,
-            autoReveal: !_videoLaunchPlacement);
+            autoReveal: !_videoLaunchPlacement && !HoldsRevealForStartupMode());
         // 編集履歴はその他ウィンドウと同じ扱いで等倍にする（ルートの表示倍率を打ち消す）。
         HistoryOverlay.LayoutTransform = UiScaleService.CreateCounterTransform();
         ApplyStatusFieldChrome();
@@ -381,6 +382,7 @@ public partial class MainWindow : Window
         PreviewDrop += MainWindow_Drop;
         PreviewDragOver += MainWindow_DragOver;
         Closing += MainWindow_Closing;
+        Activated += (_, _) => SyncShellFullscreen();
         SizeChanged += (_, _) =>
         {
             SyncBusyGlassOverlayBounds();
@@ -427,6 +429,11 @@ public partial class MainWindow : Window
         ApplyLibraryWashChrome(true);
         InitializeWaapi();
         RefreshLocalizedText();
+        // 表示前にフルスクリーンへ入れる。出したあとに最大化を外すと作業領域のままタスクバーが残る。
+        if (!LaunchFiles.StartupHasVideo())
+        {
+            EnterStartupMode();
+        }
         MgaSonicAnvil.SingleInstance.StartWatch(() =>
             Dispatcher.BeginInvoke(ActivateFromOtherInstance, DispatcherPriority.Send));
     }
@@ -479,6 +486,16 @@ public partial class MainWindow : Window
                 EnterLibraryPlayerIfLaunchHasMp3(peek);
                 UpdateLayout();
             }
+        }
+        else if (HoldsRevealForStartupMode())
+        {
+            // クローク中に選んだ画面へ入れてから出す。表示後に切り替えるとエディタが一瞬見える。
+            EnterStartupMode();
+            UpdateLayout();
+            // 配置をクローク中に描いてから出す。
+            Dispatcher.BeginInvoke(
+                () => Dispatcher.BeginInvoke(RevealStartupMode, DispatcherPriority.ContextIdle),
+                DispatcherPriority.Render);
         }
 
         // 表示を先に出し、前回ドキュメントの読み込みは次のアイドルへ回す。
@@ -535,6 +552,10 @@ public partial class MainWindow : Window
         if (launch.Length > 0)
         {
             await OpenLaunchPathsAsync(launch).ConfigureAwait(true);
+        }
+        else
+        {
+            EnterStartupMode();
         }
 
         NotifySettingsRecreatedIfNeeded();
@@ -1057,6 +1078,7 @@ public partial class MainWindow : Window
 
         e.Cancel = true;
         _closing = true;
+        WindowPlacement.SetShellFullscreen(this, false);
         SingleInstance.MarkExiting();
         // 未保存の録音 WAV 書き出しより先に実音を止める。保存を先にすると長く鳴り続ける。
         _player.BeginShutdownFlush();
@@ -1483,7 +1505,7 @@ public partial class MainWindow : Window
     private void AlwaysOnTopCheck_Changed(object sender, RoutedEventArgs e)
     {
         var enabled = AlwaysOnTopCheck.IsChecked == true;
-        Topmost = enabled;
+        ApplyWindowTopmost();
         if (!IsLoaded)
         {
             return;

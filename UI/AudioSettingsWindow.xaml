@@ -35,8 +35,10 @@
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -80,6 +82,28 @@
                         Padding="6,1"
                         FontSize="11.333"
                         VerticalContentAlignment="Center" />
+              <TextBlock x:Name="LaunchModeLabel"
+                         Grid.Row="3"
+                         Text="{x:Static domain:UiStrings.LabelAppLaunchMode}"
+                         VerticalAlignment="Center"
+                         Margin="0,8,8,0" />
+              <ComboBox x:Name="LaunchModeCombo"
+                        Grid.Row="3"
+                        Grid.Column="1"
+                        HorizontalAlignment="Left"
+                        Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                        Margin="0,8,0,0"
+                        Padding="6,1"
+                        FontSize="11.333"
+                        VerticalContentAlignment="Center" />
+              <TextBlock x:Name="LaunchModeHint"
+                         Grid.Row="3"
+                         Grid.Column="2"
+                         Text="{x:Static domain:UiStrings.LabelAppLaunchModeHint}"
+                         FontSize="11.333"
+                         Foreground="{DynamicResource MutedForeBrush}"
+                         VerticalAlignment="Center"
+                         Margin="8,8,0,0" />
             </Grid>
 
             <TextBlock x:Name="AssociationHeader"
