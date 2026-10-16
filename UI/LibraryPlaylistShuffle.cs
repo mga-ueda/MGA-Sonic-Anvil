@@ -41,7 +41,7 @@ internal sealed class LibraryPlaylistShuffle
         return _order[_at];
     }
 
-    public int Next(int count, int current, Func<int, int>? nextRandom = null)
+    public int Next(int count, int current, Func<int, int>? nextRandom = null, bool wrap = true)
     {
         if (count <= 0)
         {
@@ -59,13 +59,18 @@ internal sealed class LibraryPlaylistShuffle
         }
 
         SyncToCurrent(current, nextRandom);
+        if (!wrap && AtCycleEdge(end: true))
+        {
+            return IndexOrCurrent(current);
+        }
+
         EnsureBuffered(nextRandom);
         _at++;
         TrimConsumed();
         return _order[_at];
     }
 
-    public int Previous(int count, int current, Func<int, int>? nextRandom = null)
+    public int Previous(int count, int current, Func<int, int>? nextRandom = null, bool wrap = true)
     {
         if (count <= 0)
         {
@@ -83,6 +88,11 @@ internal sealed class LibraryPlaylistShuffle
         }
 
         SyncToCurrent(current, nextRandom);
+        if (!wrap && AtCycleEdge(end: false))
+        {
+            return IndexOrCurrent(current);
+        }
+
         if (_at <= 0)
         {
             _at = count - 1;
@@ -93,6 +103,28 @@ internal sealed class LibraryPlaylistShuffle
         }
 
         return _order[_at];
+    }
+
+    /// <summary>一周の端。長押し連続（wrap=false）ではここから先へ回さない。</summary>
+    private bool AtCycleEdge(bool end)
+    {
+        if (_at < 0 || _trackCount <= 0)
+        {
+            return false;
+        }
+
+        var slot = _at % _trackCount;
+        return end ? slot == _trackCount - 1 : slot == 0;
+    }
+
+    private int IndexOrCurrent(int current)
+    {
+        if (_at >= 0 && _at < _order.Count)
+        {
+            return _order[_at];
+        }
+
+        return current >= 0 && current < _trackCount ? current : -1;
     }
 
     private void SyncToCurrent(int current, Func<int, int>? nextRandom)

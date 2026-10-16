@@ -1027,11 +1027,46 @@ internal sealed class LibraryBrowserView : UserControl
     }
 
     /// <summary>
+    /// テンキー 4／6 の曲移動。選択だけ進め、再生はキーを離してから行う（↑↓ と同じ）。
+    /// wrap なら端で反対側へ回る。長押し連続は wrap=false で端に一旦止まる。
+    /// </summary>
+    public void SelectPlaylistStep(DocumentSession? current, int direction, bool wrap)
+    {
+        if (direction == 0)
+        {
+            return;
+        }
+
+        var session = PlaylistSessionByLoop(current, previous: direction < 0, wrap);
+        if (session is null)
+        {
+            return;
+        }
+
+        var index = 0;
+        foreach (var row in PlaylistRows())
+        {
+            if (row.Tag is not DocumentSession item)
+            {
+                continue;
+            }
+
+            if (ReferenceEquals(item, session))
+            {
+                ApplyMoveSelectionFile(index, extend: false);
+                return;
+            }
+
+            index++;
+        }
+    }
+
+    /// <summary>
     /// 再生中の 60fps からも呼ばれる。DataGrid.Items はグループ化ビューを歩いて
     /// コンテナ生成まで起こすので使わない。グループ時は CollectionView.Groups を
     /// フラット化した表示順、未グループ時は並べ済みの _items を見る。
     /// </summary>
-    private DocumentSession? PlaylistSessionByLoop(DocumentSession? current, bool previous)
+    private DocumentSession? PlaylistSessionByLoop(DocumentSession? current, bool previous, bool wrap = true)
     {
         var rows = PlaylistRows();
         var count = 0;
@@ -1077,13 +1112,12 @@ internal sealed class LibraryBrowserView : UserControl
         }
         else
         {
-            at = previous
-                ? (_shuffleEnabled
-                    ? _shuffle.Previous(count, index)
-                    : LibraryPlayerMode.PreviousLoopIndex(count, index))
-                : (_shuffleEnabled
-                    ? _shuffle.Next(count, index)
-                    : LibraryPlayerMode.NextLoopIndex(count, index));
+            var delta = previous ? -1 : 1;
+            at = _shuffleEnabled
+                ? (previous
+                    ? _shuffle.Previous(count, index, wrap: wrap)
+                    : _shuffle.Next(count, index, wrap: wrap))
+                : LibraryPlayerMode.StepLoopIndex(count, index, delta, wrap);
         }
 
         if (at < 0)

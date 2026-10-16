@@ -1380,6 +1380,10 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.PlayerNumpadRepeatIsHold(LibraryNumpadCommand.SeekBack));
         Assert.True(LibraryPlayerMode.PlayerNumpadRepeatIsHold(LibraryNumpadCommand.Rewind));
         Assert.False(LibraryPlayerMode.PlayerNumpadRepeatIsHold(LibraryNumpadCommand.NextTrack));
+        Assert.True(LibraryPlayerMode.PlayerNumpadTrackStepRepeats(LibraryNumpadCommand.PreviousTrack));
+        Assert.True(LibraryPlayerMode.PlayerNumpadTrackStepRepeats(LibraryNumpadCommand.NextTrack));
+        Assert.False(LibraryPlayerMode.PlayerNumpadTrackStepRepeats(LibraryNumpadCommand.PlayPause));
+        Assert.False(LibraryPlayerMode.PlayerNumpadTrackStepRepeats(LibraryNumpadCommand.Restart));
     }
 
     [Fact]
