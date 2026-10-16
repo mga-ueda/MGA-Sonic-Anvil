@@ -37,6 +37,52 @@ public sealed class Id3ArtworkTests
     }
 
     [Fact]
+    public void FillTags_CollapsesIdenticalNullSeparatedValues()
+    {
+        var builder = new AudioFileTagsBuilder();
+        Id3Artwork.FillTags(
+            3,
+            [
+                new Id3Artwork.Id3Frame("TALB", TextFrame("BIOHAZARD ORCHESTRA ALBUM\0BIOHAZARD ORCHESTRA ALBUM")),
+                new Id3Artwork.Id3Frame("TRCK", TextFrame("3/12\03/12")),
+                new Id3Artwork.Id3Frame("TPOS", TextFrame("1/1\01/1")),
+                new Id3Artwork.Id3Frame("TPE1", TextFrame("CAPCOM\0Other")),
+            ],
+            builder);
+        Assert.Equal("BIOHAZARD ORCHESTRA ALBUM", builder.Album);
+        Assert.Equal("3/12", builder.Track);
+        Assert.Equal("1/1", builder.Disc);
+        Assert.Equal("CAPCOM; Other", builder.Artist);
+    }
+
+    [Fact]
+    public void FillTags_CollapsesUtf16ValueThatRepeatsWithASecondBom()
+    {
+        var album = "BIOHAZARD ORCHESTRA ALBUM";
+        var body = new List<byte> { 0x01, 0xFF, 0xFE };
+        body.AddRange(System.Text.Encoding.Unicode.GetBytes(album));
+        body.Add(0x00);
+        body.Add(0x00);
+        body.Add(0xFF);
+        body.Add(0xFE);
+        body.AddRange(System.Text.Encoding.Unicode.GetBytes(album));
+        var builder = new AudioFileTagsBuilder();
+        Id3Artwork.FillTags(3, [new Id3Artwork.Id3Frame("TALB", body.ToArray())], builder);
+        Assert.Equal(album, builder.Album);
+        Assert.Equal(
+            album,
+            AudioTagText.CollapseIdentical(album + "; \uFEFF" + album));
+    }
+
+    private static byte[] TextFrame(string text)
+    {
+        var encoded = System.Text.Encoding.Latin1.GetBytes(text);
+        var data = new byte[encoded.Length + 1];
+        encoded.CopyTo(data, 1);
+        return data;
+    }
+
+    [Fact]
     public void WriteThenRead_RoundtripsPngOnBareMpegBytes()
     {
         var path = Path.Combine(Path.GetTempPath(), "mga-id3-" + Guid.NewGuid().ToString("N") + ".mp3");

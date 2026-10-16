@@ -617,25 +617,32 @@ internal static class LibraryCatalog
         cmd.ExecuteNonQuery();
     }
 
+    private static string TagText(SqliteDataReader reader, ref int ordinal)
+    {
+        var text = reader.GetString(ordinal);
+        ordinal++;
+        return AudioTagText.CollapseIdentical(text);
+    }
+
     private static AudioFileTags ReadTags(SqliteDataReader reader, int startOrdinal)
     {
         var i = startOrdinal;
         return new AudioFileTags
         {
             Probed = true,
-            Title = reader.GetString(i++),
-            Artist = reader.GetString(i++),
-            Album = reader.GetString(i++),
-            AlbumArtist = reader.GetString(i++),
-            Track = reader.GetString(i++),
+            Title = TagText(reader, ref i),
+            Artist = TagText(reader, ref i),
+            Album = TagText(reader, ref i),
+            AlbumArtist = TagText(reader, ref i),
+            Track = TagText(reader, ref i),
             TrackNumber = reader.GetInt32(i++),
-            Disc = reader.GetString(i++),
+            Disc = TagText(reader, ref i),
             DiscNumber = reader.GetInt32(i++),
-            Year = reader.GetString(i++),
+            Year = TagText(reader, ref i),
             YearNumber = reader.GetInt32(i++),
-            Genre = reader.GetString(i++),
-            Comment = reader.GetString(i++),
-            Composer = reader.GetString(i++),
+            Genre = TagText(reader, ref i),
+            Comment = TagText(reader, ref i),
+            Composer = TagText(reader, ref i),
             DurationSeconds = reader.GetDouble(i++),
             SampleRate = reader.GetInt32(i++),
             BitsPerSample = reader.GetInt32(i++),
