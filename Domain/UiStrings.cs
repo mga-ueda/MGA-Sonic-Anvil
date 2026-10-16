@@ -244,6 +244,19 @@ internal static partial class UiStrings
     public static string LabelMultiFileArrangeHorizontal => Get("左右", "Side by side");
     public static string LabelMultiFileArrangeVertical => Get("上下", "Stacked");
     public static string LabelMultiFileArrangeGrid => Get("上下左右", "Grid");
+    public static string LabelAppLaunchMode => Get("起動モード", "Startup mode");
+    public static string LabelAppLaunchModeEditor => Get("エディタ（通常）", "Editor (normal)");
+    public static string LabelAppLaunchModeAnalyzers => Get(
+        "エディタ（フルスクリーン：アナライザー有り）",
+        "Editor (fullscreen: with analyzers)");
+    public static string LabelAppLaunchModeWaveform => Get(
+        "エディタ（フルスクリーン：アナライザー無し）",
+        "Editor (fullscreen: without analyzers)");
+    public static string LabelAppLaunchModePlayer => Get("プレイヤー（通常）", "Player (normal)");
+    public static string LabelAppLaunchModePlayerCompact => Get("プレイヤー（コンパクト）", "Player (compact)");
+    public static string LabelAppLaunchModeHint => Get(
+        "ファイルを渡さずに起動したときだけ",
+        "Only when no file is passed");
     public static string LabelDefaultAudioFormat => Get("既定 Wave フォーマット", "Default Wave format");
     public static string LabelDefaultSampleRate => Get("サンプルレート", "Sample rate");
     public static string LabelDefaultBitDepth => Get("ビット深度", "Bit depth");

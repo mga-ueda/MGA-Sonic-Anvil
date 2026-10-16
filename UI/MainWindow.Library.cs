@@ -1546,6 +1546,7 @@ public partial class MainWindow
         // settings ではなく入る直前の寸法へ戻す（全画面中にモニター寸法が保存されるとステータスバーが隠れる）。
         // 全画面中に次の動画へ移っていたら、抜けたタイミングで原寸配置を反映する。
         _playlistVideoFullscreen = false;
+        SyncShellFullscreen();
         WindowStyle = _windowStyleBeforeVideoFullscreen == WindowStyle.None
             ? WindowStyle.SingleBorderWindow
             : _windowStyleBeforeVideoFullscreen;

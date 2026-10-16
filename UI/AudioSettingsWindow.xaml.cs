@@ -32,6 +32,8 @@ internal partial class AudioSettingsWindow : Window
 
     public WaveformTileArrange SelectedMultiFileArrange { get; private set; }
 
+    public AppLaunchMode SelectedLaunchMode { get; private set; } = AppLaunchMode.Editor;
+
     public int SelectedUiScalePercent { get; private set; } = UiScale.DefaultPercent;
 
     public double SelectedLoudnessTargetLufs { get; private set; }
@@ -173,11 +175,13 @@ internal partial class AudioSettingsWindow : Window
         bool libraryShowPlaylistMpg = false,
         int videoProxyRetentionDays = VideoProxy.DefaultRetentionDays,
         string? ffmpegExePath = null,
-        bool videoProxyDisableAutoEncode = false)
+        bool videoProxyDisableAutoEncode = false,
+        AppLaunchMode launchMode = AppLaunchMode.Editor)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
         SelectedMultiFileArrange = WaveformTileLayout.Parse(multiFileArrange);
+        SelectedLaunchMode = launchMode;
         SelectedUiScalePercent = UiScale.ClampPercent(uiScalePercent);
         _uiScaleOpenedAt = SelectedUiScalePercent;
         SelectedLoudnessTargetLufs = LoudnessMeterEngine.ClampTargetLufs(loudnessTargetLufs);
@@ -262,6 +266,7 @@ internal partial class AudioSettingsWindow : Window
         LanguageCombo.Items.Add(new LanguageItem(UiLanguageChoice.English, UiStrings.LabelLanguageEnglish));
         SelectLanguage(language);
         FillMultiFileArrange(SelectedMultiFileArrange);
+        FillLaunchMode(SelectedLaunchMode);
         FillUiScale(SelectedUiScalePercent);
         UiScaleCombo.SelectionChanged += UiScaleCombo_SelectionChanged;
 
@@ -1138,6 +1143,9 @@ internal partial class AudioSettingsWindow : Window
         SelectedMultiFileArrange = MultiFileArrangeCombo.SelectedItem is MultiFileArrangeItem arrangeItem
             ? arrangeItem.Arrange
             : WaveformTileArrange.Off;
+        SelectedLaunchMode = LaunchModeCombo.SelectedItem is LaunchModeItem launchItem
+            ? launchItem.Mode
+            : AppLaunchMode.Editor;
         SelectedUiScalePercent = UiScaleCombo.SelectedItem is ScaleItem scaleItem
             ? scaleItem.Percent
             : UiScale.DefaultPercent;
@@ -1968,6 +1976,25 @@ internal partial class AudioSettingsWindow : Window
         MultiFileArrangeCombo.SelectedIndex = 0;
     }
 
+    private void FillLaunchMode(AppLaunchMode mode)
+    {
+        LaunchModeCombo.Items.Add(new LaunchModeItem(AppLaunchMode.Editor, UiStrings.LabelAppLaunchModeEditor));
+        LaunchModeCombo.Items.Add(new LaunchModeItem(AppLaunchMode.Analyzers, UiStrings.LabelAppLaunchModeAnalyzers));
+        LaunchModeCombo.Items.Add(new LaunchModeItem(AppLaunchMode.Waveform, UiStrings.LabelAppLaunchModeWaveform));
+        LaunchModeCombo.Items.Add(new LaunchModeItem(AppLaunchMode.Player, UiStrings.LabelAppLaunchModePlayer));
+        LaunchModeCombo.Items.Add(new LaunchModeItem(AppLaunchMode.PlayerCompact, UiStrings.LabelAppLaunchModePlayerCompact));
+        foreach (LaunchModeItem item in LaunchModeCombo.Items)
+        {
+            if (item.Mode == mode)
+            {
+                LaunchModeCombo.SelectedItem = item;
+                return;
+            }
+        }
+
+        LaunchModeCombo.SelectedIndex = 0;
+    }
+
     private void FillUiScale(int percent)
     {
         var current = UiScale.ClampPercent(percent);
@@ -2068,6 +2095,7 @@ internal partial class AudioSettingsWindow : Window
         ComboBoxFit.Apply(LanguageCombo);
         ComboBoxFit.Apply(UiScaleCombo);
         ComboBoxFit.Apply(MultiFileArrangeCombo);
+        ComboBoxFit.Apply(LaunchModeCombo);
         ComboBoxFit.Apply(LibraryPlaylistWaveformSizeWaveCombo);
         ComboBoxFit.Apply(LibraryPlaylistWaveformSizeMp3Combo);
         ComboBoxFit.Apply(VideoProxyRetentionCombo);
@@ -2678,6 +2706,11 @@ internal partial class AudioSettingsWindow : Window
         combo.SelectedItem is LibraryPlaylistWaveformSizeItem sizeItem
             ? sizeItem.Size
             : fallback;
+
+    private sealed record LaunchModeItem(AppLaunchMode Mode, string Label)
+    {
+        public override string ToString() => Label;
+    }
 
     private sealed record MultiFileArrangeItem(WaveformTileArrange Arrange, string Label)
     {

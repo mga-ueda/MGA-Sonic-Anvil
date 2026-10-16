@@ -118,6 +118,59 @@ public partial class MainWindow
         SetWaveformMaximizeMode(WaveformMaximizeMode.Library);
     }
 
+    /// <summary>ファイル無しで、エディタ以外の起動モードのとき。出すまでクロークする。</summary>
+    private bool HoldsRevealForStartupMode() =>
+        !LaunchFiles.HasStartup
+        && AppLaunchModes.HoldsReveal(AppStorage.Settings.ResolvedLaunchMode());
+
+    /// <summary>ファイルを渡していない起動だけ、設定の起動モードを適用する。</summary>
+    private void EnterStartupMode()
+    {
+        if (LaunchFiles.HasStartup)
+        {
+            return;
+        }
+
+        switch (AppStorage.Settings.ResolvedLaunchMode())
+        {
+            case AppLaunchMode.Player when !IsLibraryMaximized:
+                SetWaveformMaximizeMode(
+                    WaveformMaximizeMode.Library,
+                    playFirstOnLibrary: false);
+                break;
+            case AppLaunchMode.PlayerCompact when !IsLibraryMaximized:
+                _libraryMinimalChrome = true;
+                SetWaveformMaximizeMode(
+                    WaveformMaximizeMode.Library,
+                    playFirstOnLibrary: false,
+                    retainMinimalChrome: true);
+                break;
+            case AppLaunchMode.Waveform when _waveformMaximizeMode != WaveformMaximizeMode.Waveform:
+                SetWaveformMaximizeMode(WaveformMaximizeMode.Waveform);
+                break;
+            case AppLaunchMode.Analyzers when _waveformMaximizeMode != WaveformMaximizeMode.Analyzers:
+                SetWaveformMaximizeMode(WaveformMaximizeMode.Analyzers);
+                break;
+        }
+    }
+
+    private void RevealStartupMode()
+    {
+        if (!HoldsRevealForStartupMode() || !WindowPaintReveal.IsPending(this))
+        {
+            return;
+        }
+
+        if (IsWaveformMaximized)
+        {
+            RefreshWaveformFullscreenFrame();
+        }
+
+        WindowPaintReveal.Reveal(this);
+        ForegroundActivation.BringToFront(this);
+        SyncShellFullscreen();
+    }
+
     /// <summary>
     /// 拡張子連動／引数の動画起動フラグ。専用ウィンドウ配置・プロキシ抑止。
     /// </summary>
@@ -1958,7 +2011,8 @@ public partial class MainWindow
             settings.LibraryShowPlaylistMpg,
             settings.ResolvedVideoProxyRetentionDays(),
             settings.FfmpegExePath,
-            settings.VideoProxyDisableAutoEncode)
+            settings.VideoProxyDisableAutoEncode,
+            settings.ResolvedLaunchMode())
         {
             Owner = this,
         };
@@ -1990,6 +2044,7 @@ public partial class MainWindow
         UiStrings.SetLanguage(UiStrings.ResolveLanguage(dialog.SelectedLanguage));
         settings.UiTheme = UiThemes.ToStoredValue(UiThemeChoice.Dark);
         settings.MultiFileArrange = WaveformTileLayout.Format(dialog.SelectedMultiFileArrange);
+        settings.LaunchMode = AppLaunchModes.Format(dialog.SelectedLaunchMode);
         settings.ApplyLibraryExplorerRoots(dialog.SelectedLibraryExplorerRoots);
         LibraryBrowser.SetExplorerRoots(settings.ResolvedLibraryExplorerRoots());
         settings.ApplyLibraryListColumnPresets(

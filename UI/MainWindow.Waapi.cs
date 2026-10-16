@@ -603,13 +603,13 @@ public partial class MainWindow
 
     private void RestoreAlwaysOnTopAfterWwiseFocus()
     {
-        if (!_yieldedAlwaysOnTopToWwise || !AppStorage.Settings.AlwaysOnTop)
+        if (!_yieldedAlwaysOnTopToWwise)
         {
             return;
         }
 
         _yieldedAlwaysOnTopToWwise = false;
-        Topmost = true;
+        ApplyWindowTopmost();
     }
 
     private async Task OpenOrFocusWwiseProjectAsync(string? projectFilePath = null)

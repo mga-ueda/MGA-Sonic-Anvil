@@ -378,6 +378,9 @@ internal sealed class AppSettings
     /// </summary>
     public string MultiFileArrange { get; set; } = string.Empty;
 
+    /// <summary>ファイル無しで起動したときの画面。空／editor はエディタ。player／compact／waveform／analyzers。引数起動には使わない。</summary>
+    public string LaunchMode { get; set; } = string.Empty;
+
     public bool WaapiKeepTarget { get; set; }
 
     public string WaapiKeptTargetPath { get; set; } = string.Empty;
@@ -579,6 +582,8 @@ internal sealed class AppSettings
         LastNewBitsPerSample = format.BitsPerSample;
         LastNewChannelLayout = format.Layout.Id;
     }
+
+    public AppLaunchMode ResolvedLaunchMode() => AppLaunchModes.Parse(LaunchMode);
 
     public int ResolvedUiScalePercent() => UiScale.ClampPercent(UiScalePercent);
 

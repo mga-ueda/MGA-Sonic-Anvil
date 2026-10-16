@@ -1962,38 +1962,69 @@ public partial class MainWindow
 
     private void ApplyWaveformFullscreenFrame()
     {
-        WindowStyle = WindowStyle.None;
-        ResizeMode = ResizeMode.NoResize;
+        // 最大化のまま枠だけ消すと作業領域で止まり、タスクバーが残る。
         if (WindowState != WindowState.Normal)
         {
             WindowState = WindowState.Normal;
         }
 
-        if (WindowPlacement.TryGetDipBounds(
-                AppStorage.Settings,
-                1,
-                1,
-                CurrentPlacementKind(),
-                out var saved,
-                out _))
+        WindowStyle = WindowStyle.None;
+        ResizeMode = ResizeMode.NoResize;
+        if (TryGetSavedFullscreenBounds(out var saved))
         {
             Left = saved.X;
             Top = saved.Y;
             Width = saved.Width;
             Height = saved.Height;
-            return;
         }
 
-        if (!WindowPlacement.TryGetContainingMonitorDip(this, out var monitor))
+        if (WindowPlacement.TryCoverContainingMonitor(this) || saved.Width > 1)
         {
-            return;
+            PersistCurrentWindowPlacement();
         }
 
-        Left = monitor.X;
-        Top = monitor.Y;
-        Width = monitor.Width;
-        Height = monitor.Height;
-        PersistCurrentWindowPlacement();
+        SyncShellFullscreen();
+    }
+
+    private void SyncShellFullscreen()
+    {
+        var fullscreen = IsWaveformMaximized || _playlistVideoFullscreen;
+        WindowPlacement.SetShellFullscreen(this, fullscreen);
+        ApplyWindowTopmost();
+        if (fullscreen)
+        {
+            WindowPlacement.TryCoverContainingMonitor(this);
+        }
+    }
+
+    /// <summary>フルスクリーン中はタスクバーより前に出す。抜けたら「常に最前面」の設定に戻す。</summary>
+    private void ApplyWindowTopmost()
+    {
+        var want = AlwaysOnTopCheck.IsChecked == true
+            || IsWaveformMaximized
+            || _playlistVideoFullscreen;
+        if (Topmost != want)
+        {
+            Topmost = want;
+        }
+    }
+
+    private bool TryGetSavedFullscreenBounds(out Rect saved)
+    {
+        saved = default;
+        var kind = CurrentPlacementKind();
+        if (kind is not (MainWindowPlacementKind.WaveformFullscreen or MainWindowPlacementKind.AnalyzerFullscreen))
+        {
+            return false;
+        }
+
+        return WindowPlacement.TryGetDipBounds(
+            AppStorage.Settings,
+            1,
+            1,
+            kind,
+            out saved,
+            out _);
     }
 
     private void PersistCurrentWindowPlacement()
@@ -2005,6 +2036,13 @@ public partial class MainWindow
 
         if (IsFullscreenMaximizeMode(_waveformMaximizeMode))
         {
+            // 最大化解除の途中寸法を F11／F12 として残すと、次回は作業領域のままタスクバーが出る。
+            if (WindowPlacement.TryGetContainingMonitorDip(this, out var monitor)
+                && (Width < monitor.Width - 4 || Height < monitor.Height - 4))
+            {
+                return;
+            }
+
             WindowPlacement.Capture(this, AppStorage.Settings, CurrentPlacementKind());
             return;
         }
@@ -2337,6 +2375,7 @@ public partial class MainWindow
         WindowStyle = _windowStyleBeforeWaveformMax;
         ResizeMode = _resizeModeBeforeWaveformMax;
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        SyncShellFullscreen();
     }
 
     private void ApplyRememberedWindowFrameBounds()

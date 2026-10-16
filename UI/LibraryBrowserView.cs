@@ -3738,10 +3738,18 @@ internal sealed class LibraryBrowserView : UserControl
         explorerPane.Children.Add(explorerHeader);
         var treeBody = new Grid { Background = Brushes.Transparent };
         treeBody.Children.Add(_folderTree);
-        BuildExplorerTypeaheadToast();
-        treeBody.Children.Add(_explorerTypeaheadToast);
+        var treeOverlay = new Grid
+        {
+            Background = Brushes.Transparent,
+            IsHitTestVisible = false,
+        };
+        BuildExplorerTypeaheadToast(treeBody);
+        treeOverlay.Children.Add(_explorerTypeaheadToast);
         Panel.SetZIndex(_explorerTypeaheadToast, 20);
-        explorerPane.Children.Add(treeBody);
+        var treeStack = new Grid { Background = Brushes.Transparent };
+        treeStack.Children.Add(treeBody);
+        treeStack.Children.Add(treeOverlay);
+        explorerPane.Children.Add(treeStack);
         var treeHost = new Grid { Background = Brushes.Transparent };
         // 見出し上へのドロップもルート登録として受け取る。
         treeHost.AllowDrop = true;
@@ -3910,28 +3918,32 @@ internal sealed class LibraryBrowserView : UserControl
         LibrarySplitterReveal.Attach(_root, _explorerSplitter, _favoritesSplitter, _treeColumn, _explorerTreeRow);
     }
 
-    private void BuildExplorerTypeaheadToast()
+    private void BuildExplorerTypeaheadToast(FrameworkElement captureSource)
     {
         _explorerTypeaheadToastText.FontFamily = new FontFamily("Consolas");
         _explorerTypeaheadToastText.FontSize = DesignMetrics.From96(22);
         _explorerTypeaheadToastText.FontWeight = FontWeights.Normal;
-        _explorerTypeaheadToastText.Foreground = Brushes.White;
+        _explorerTypeaheadToastText.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
         _explorerTypeaheadToastText.TextAlignment = TextAlignment.Center;
         _explorerTypeaheadToastText.TextWrapping = TextWrapping.NoWrap;
-        var border = new Border
+        var plate = new FrostedPlate
         {
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
+            Source = captureSource,
+            CornerRadius = DesignMetrics.ControlCorner,
+        };
+        plate.Children.Add(new Border
+        {
             Padding = new Thickness(
                 DesignMetrics.From96(14),
                 DesignMetrics.From96(8),
                 DesignMetrics.From96(14),
                 DesignMetrics.From96(8)),
-            CornerRadius = DesignMetrics.ControlCorner,
-            Background = new SolidColorBrush(Color.FromArgb(0x99, 0x00, 0x00, 0x00)),
+            Background = Brushes.Transparent,
             Child = _explorerTypeaheadToastText,
-        };
-        _explorerTypeaheadToast.Children.Add(border);
+        });
+        _explorerTypeaheadToast.Children.Add(plate);
     }
 
     private static void ApplyPaneTitleStyle(TextBlock label, Thickness? margin = null)
