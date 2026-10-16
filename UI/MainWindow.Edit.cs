@@ -30,6 +30,7 @@ public partial class MainWindow
         CloseVolumeGainPicker();
         ClosePitchShiftPicker();
         CloseTimeStretchPicker();
+        CloseInsertSilencePicker();
         if (_fadeMenu is { IsOpen: true })
         {
             _fadeMenu.IsOpen = false;
@@ -122,6 +123,7 @@ public partial class MainWindow
         CloseFormatConvertPicker();
         ClosePitchShiftPicker();
         CloseTimeStretchPicker();
+        CloseInsertSilencePicker();
         if (_player.IsPlaying)
         {
             PausePlaybackSoft();
@@ -470,6 +472,7 @@ public partial class MainWindow
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
         CloseTimeStretchPicker();
+        CloseInsertSilencePicker();
         if (_player.IsPlaying)
         {
             PausePlaybackSoft();
@@ -792,6 +795,90 @@ public partial class MainWindow
         return true;
     }
 
+    private void PromptInsertSilence()
+    {
+        if (IsUiBusy)
+        {
+            return;
+        }
+
+        if (_document is null)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (_silenceMenu is { IsOpen: true })
+        {
+            return;
+        }
+
+        CloseFadeCurvePicker();
+        CloseFormatConvertPicker();
+        CloseVolumeGainPicker();
+        ClosePitchShiftPicker();
+        CloseTimeStretchPicker();
+        if (_player.IsPlaying)
+        {
+            PausePlaybackSoft();
+        }
+
+        _silenceInsertFrame = Math.Clamp(_waveMenuHit.Frame, 0, _document.FrameCount);
+        var menu = SilenceInsertPicker.Show(this, ApplyInsertSilence);
+        _silenceMenu = menu;
+        menu.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_silenceMenu, menu))
+            {
+                _silenceMenu = null;
+            }
+        };
+    }
+
+    private bool CloseInsertSilencePicker()
+    {
+        if (_silenceMenu is not { IsOpen: true })
+        {
+            return false;
+        }
+
+        _silenceMenu.IsOpen = false;
+        return true;
+    }
+
+    private void ApplyInsertSilence(double seconds)
+    {
+        if (_document is null || IsUiBusy)
+        {
+            return;
+        }
+
+        CloseInsertSilencePicker();
+        var insertFrame = _silenceInsertFrame;
+        if (HasTabSelection)
+        {
+            var active = _activeSession;
+            TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
+            {
+                var at = ReferenceEquals(session, active)
+                    ? insertFrame
+                    : session.Document.CursorFrame;
+                return ProcessEdits.InsertSilence(session.Document, at, seconds);
+            });
+            return;
+        }
+
+        var command = ProcessEdits.InsertSilence(_document, insertFrame, seconds);
+        if (command is null)
+        {
+            return;
+        }
+
+        StopPlaybackForEdit();
+        _history.Do(_document, command);
+        AfterEdit();
+    }
+
     private void OnTimeStretchChanged(int destFrames)
     {
         if (!_timeStretchPreview.Previewing || _document is null || _timeStretchPreview.Toggling)
@@ -945,6 +1032,7 @@ public partial class MainWindow
         {
             _timeStretchPreview.Previewing = false;
             CloseTimeStretchPicker();
+            CloseInsertSilencePicker();
             var sourceFrames = (int)range.Length;
             var clamped = Audio.TimeStretch.ClampDestFrames(sourceFrames, destFrames);
             if (Audio.TimeStretch.IsNoOp(sourceFrames, clamped))
@@ -985,6 +1073,7 @@ public partial class MainWindow
 
         _timeStretchPreview.Previewing = false;
         CloseTimeStretchPicker();
+        CloseInsertSilencePicker();
         destFrames = Audio.TimeStretch.ClampDestFrames((int)range.Length, destFrames);
         if (Audio.TimeStretch.IsNoOp((int)range.Length, destFrames))
         {

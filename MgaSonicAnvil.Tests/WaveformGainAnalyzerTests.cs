@@ -66,6 +66,10 @@ public sealed class WaveformGainAnalyzerTests
     [Fact]
     public void NudgeStep_UsesModifiers()
     {
+        Assert.Equal(0.1, SilenceInsertPicker.NudgeStep(System.Windows.Input.ModifierKeys.None));
+        Assert.Equal(1, SilenceInsertPicker.NudgeStep(System.Windows.Input.ModifierKeys.Shift));
+        Assert.Equal(10, SilenceInsertPicker.NudgeStep(System.Windows.Input.ModifierKeys.Control));
+        Assert.Equal(60, SilenceInsertPicker.NudgeStep(System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Shift));
         Assert.Equal(0.1, VolumeGainPicker.NudgeStep(System.Windows.Input.ModifierKeys.None));
         Assert.Equal(1, VolumeGainPicker.NudgeStep(System.Windows.Input.ModifierKeys.Shift));
         Assert.Equal(3, VolumeGainPicker.NudgeStep(System.Windows.Input.ModifierKeys.Control));

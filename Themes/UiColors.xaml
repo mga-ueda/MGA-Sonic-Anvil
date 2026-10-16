@@ -9,7 +9,6 @@
     <SolidColorBrush x:Key="WindowBackBrush" Color="#FF1E1E1E" />
     <SolidColorBrush x:Key="ChromeBackBrush" Color="#FF1A1B26" />
     <SolidColorBrush x:Key="ChromeBorderBrush" Color="#FF37373A" />
-    <SolidColorBrush x:Key="LibraryExplorerSplitterBrush" Color="#4037373A" />
     <SolidColorBrush x:Key="ChromeMidBrush" Color="#FF484848" />
     <SolidColorBrush x:Key="ChromeDimBrush" Color="#FF5B5B5B" />
     <SolidColorBrush x:Key="ScrollThumbBackBrush" Color="#FF484848" />
@@ -161,14 +160,14 @@
     <SolidColorBrush x:Key="ColorPanelBackBrush" Color="#FF28282A" />
 
     <SolidColorBrush x:Key="ExportButtonFillBrush" Color="#FF0F1B2D" />
-    <SolidColorBrush x:Key="ExportButtonFocusFillBrush" Color="#FF1E4E96" />
+    <SolidColorBrush x:Key="ExportButtonFocusFillBrush" Color="#FF1A3F77" />
     <SolidColorBrush x:Key="ExportButtonHoverFillBrush" Color="#FF122843" />
     <SolidColorBrush x:Key="ExportButtonBackBrush" Color="#FF1E6ED2" />
     <SolidColorBrush x:Key="ExportButtonHoverBackBrush" Color="#FF2D82E6" />
     <SolidColorBrush x:Key="ExportButtonPressedBackBrush" Color="#FF145AB4" />
     <SolidColorBrush x:Key="ExportButtonForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="ClearButtonFillBrush" Color="#FF2F1414" />
-    <SolidColorBrush x:Key="ClearButtonFocusFillBrush" Color="#FF8A3838" />
+    <SolidColorBrush x:Key="ClearButtonFocusFillBrush" Color="#FF6F2D2D" />
     <SolidColorBrush x:Key="ClearButtonHoverFillBrush" Color="#FF522323" />
     <SolidColorBrush x:Key="ClearButtonBackBrush" Color="#FFBE3232" />
     <SolidColorBrush x:Key="ClearButtonHoverBackBrush" Color="#FFDC4646" />

@@ -1108,6 +1108,41 @@ public sealed class ProcessEditsTests
         Assert.Equal(1f, document.Interleaved[14], 5);
     }
 
+    [Fact]
+    public void InsertSilence_InsertsZerosAndShiftsLaterAudioAndMarkers()
+    {
+        var document = MakeConstant(frames: 20, value: 1f);
+        document.TryAddMarker(5);
+        document.TryAddMarker(12);
+        var history = new EditHistory();
+        var frames = 48;
+        var seconds = frames / (double)document.SampleRate;
+        history.Do(document, ProcessEdits.InsertSilence(document, 8, seconds)!);
+
+        Assert.Equal(20 + frames, document.FrameCount);
+        Assert.Equal(0f, document.Interleaved[8 * 2], 5);
+        Assert.Equal(0f, document.Interleaved[(8 + frames - 1) * 2 + 1], 5);
+        Assert.Equal(1f, document.Interleaved[(8 + frames) * 2], 5);
+        Assert.Equal(5, document.SnapshotMarkers()[0].Frame);
+        Assert.Equal(12 + frames, document.SnapshotMarkers()[1].Frame);
+        Assert.Equal(new WaveSelection(8, 8 + frames), document.Selection);
+
+        Assert.True(history.Undo(document));
+        Assert.Equal(20, document.FrameCount);
+        Assert.Equal(1f, document.Interleaved[8 * 2], 5);
+        Assert.Equal(12, document.SnapshotMarkers()[1].Frame);
+        Assert.True(document.Selection.IsEmpty);
+    }
+
+    [Fact]
+    public void InsertSilence_RejectsNonPositiveDuration()
+    {
+        var document = MakeConstant(frames: 8, value: 0.5f);
+        Assert.Null(ProcessEdits.InsertSilence(document, 0, 0));
+        Assert.Null(ProcessEdits.InsertSilence(document, 0, double.NaN));
+        Assert.Equal(8, document.FrameCount);
+    }
+
     private static AudioDocument MakeConstant(int frames, float value)
     {
         var samples = new float[frames * 2];

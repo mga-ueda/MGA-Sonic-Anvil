@@ -167,6 +167,13 @@ public partial class MainWindow
             return;
         }
 
+        if (_silenceMenu is { IsOpen: true })
+        {
+            SilenceInsertPicker.TryNudge(_silenceMenu, Math.Sign(e.Delta));
+            e.Handled = true;
+            return;
+        }
+
         if (IsLibraryMaximized
             && e.OriginalSource is System.Windows.DependencyObject wheelOrigin
             && (IsDescendantOf(wheelOrigin, Overview)
@@ -942,6 +949,16 @@ public partial class MainWindow
             return true;
         }
 
+        if (TryHandleSilenceMenuShortcut(key, modifiers))
+        {
+            return true;
+        }
+
+        if (_silenceMenu is { IsOpen: true })
+        {
+            return false;
+        }
+
         if (TryProcessDocumentShortcut(key, modifiers, isRepeat))
         {
             return true;
@@ -1497,7 +1514,7 @@ public partial class MainWindow
             return true;
         }
 
-        if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker() || ClosePitchShiftPicker() || CloseTimeStretchPicker())
+        if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker() || ClosePitchShiftPicker() || CloseTimeStretchPicker() || CloseInsertSilencePicker())
         {
             return true;
         }
@@ -1919,6 +1936,28 @@ public partial class MainWindow
 
         if (key == Key.T && modifiers == ModifierKeys.None)
         {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryHandleSilenceMenuShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (_silenceMenu is not { IsOpen: true })
+        {
+            return false;
+        }
+
+        if (key is Key.Up or Key.Down)
+        {
+            SilenceInsertPicker.TryNudge(_silenceMenu, key == Key.Up ? 1 : -1);
+            return true;
+        }
+
+        if (key == Key.Enter && modifiers == ModifierKeys.None)
+        {
+            ApplyInsertSilence(SilenceInsertPicker.ReadSeconds(_silenceMenu));
             return true;
         }
 

@@ -42,6 +42,7 @@ public partial class MainWindow
         CloseVolumeGainPicker();
         ClosePitchShiftPicker();
         CloseTimeStretchPicker();
+        CloseInsertSilencePicker();
         CommitTimelineNudgeSession();
         StopPlaceRepeat();
         StopPlaybackForEdit();
@@ -93,7 +94,8 @@ public partial class MainWindow
             || CloseFormatConvertPicker()
             || CloseVolumeGainPicker()
             || ClosePitchShiftPicker()
-            || CloseTimeStretchPicker())
+            || CloseTimeStretchPicker()
+            || CloseInsertSilencePicker())
         {
             e.Handled = true;
         }

@@ -96,6 +96,8 @@ public partial class MainWindow : Window
     private System.Windows.Controls.ContextMenu? _volumeMenu;
     private System.Windows.Controls.ContextMenu? _pitchMenu;
     private System.Windows.Controls.ContextMenu? _timeStretchMenu;
+    private System.Windows.Controls.ContextMenu? _silenceMenu;
+    private long _silenceInsertFrame;
     private System.Windows.Controls.ContextMenu? _waveMenu;
     private FormatConvertKind _formatKind;
     private FormatSizePreview? _formatSizePreview;
@@ -732,6 +734,7 @@ public partial class MainWindow : Window
         CloseVolumeGainPicker();
         ClosePitchShiftPicker();
         CloseTimeStretchPicker();
+        CloseInsertSilencePicker();
         CloseEditHistory(commit: true);
         _resumeAfterScrub = false;
         StopMarkerNudge();

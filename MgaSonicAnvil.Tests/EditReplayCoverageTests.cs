@@ -133,6 +133,7 @@ public sealed class EditReplayCoverageTests
         yield return ("ConvertRate", ProcessEdits.ConvertSampleRate(document, 24000));
         yield return ("ConvertBits", ProcessEdits.ConvertBitDepth(document, 16));
         yield return ("ConvertChannels", ProcessEdits.ConvertChannels(document, 1));
+        yield return ("InsertSilence", ProcessEdits.InsertSilence(document, 10, 0.01));
         yield return ("Paste", ProcessEdits.Paste(
             document,
             new AudioClip([0.1f, 0.1f, 0.2f, 0.2f], 2, 48000),
@@ -216,6 +217,13 @@ public sealed class EditReplayCoverageTests
                 Ends = [40],
             },
             HistoryRecipes.Delete => Range(kind, 10, 20),
+            HistoryRecipes.InsertSilence => new HistoryRecipe
+            {
+                Kind = kind,
+                SourceRate = 48000,
+                Frame = 10,
+                Amount = 0.01,
+            },
             HistoryRecipes.Paste => new HistoryRecipe
             {
                 Kind = kind,

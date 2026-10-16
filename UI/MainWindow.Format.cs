@@ -54,6 +54,7 @@ public partial class MainWindow
         CloseVolumeGainPicker();
         ClosePitchShiftPicker();
         CloseTimeStretchPicker();
+        CloseInsertSilencePicker();
         if (_formatMenu is { IsOpen: true })
         {
             _formatMenu.IsOpen = false;

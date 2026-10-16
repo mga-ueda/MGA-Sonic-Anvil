@@ -37,7 +37,6 @@ internal static class ColorDevCatalog
             ("SurfaceBackBrush", ColorDevGroup.Shared),
             ("ChromeBackBrush", ColorDevGroup.Shared),
             ("ChromeBorderBrush", ColorDevGroup.Shared),
-            ("LibraryExplorerSplitterBrush", ColorDevGroup.Shared),
             ("ChromeMidBrush", ColorDevGroup.Shared),
             ("ChromeDimBrush", ColorDevGroup.Shared),
             ("PrimaryForeBrush", ColorDevGroup.Shared),
