@@ -22,7 +22,7 @@ internal static partial class UiStrings
     public static string WaveMenuCatTabs => Get("タブ(_B)", "Ta_bs");
     public static string WaveMenuCatExport => Get("書き出し(_X)", "E_xport");
     public static string WaveMenuCatWwise => Get("Wwise(_W)", "_Wwise");
-    public static string WaveMenuCatHelp => Get("ヘルプ(_H)", "_Help");
+    public static string WaveMenuCatOther => Get("その他(_O)", "_Other");
 
     public static string WaveMenuUndo => Get("元に戻す(_U)", "_Undo");
     public static string WaveMenuRedo => Get("やり直し(_R)", "_Redo");

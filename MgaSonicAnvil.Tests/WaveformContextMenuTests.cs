@@ -93,7 +93,7 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(UiStrings.WaveMenuCatTabs, headers);
             Assert.Contains(UiStrings.WaveMenuCatExport, headers);
             Assert.Contains(UiStrings.WaveMenuCatWwise, headers);
-            Assert.Contains(UiStrings.WaveMenuCatHelp, headers);
+            Assert.Contains(UiStrings.WaveMenuCatOther, headers);
 
             var commands = WaveformContextMenuBuilder.Commands(tree).ToHashSet();
             Assert.Contains(WaveMenuCommand.Undo, commands);
@@ -421,6 +421,43 @@ public sealed class WaveformContextMenuTests
     }
 
     [Fact]
+    public void Build_DisablesCategoryWhenNoChildCanRun()
+    {
+        var idle = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel());
+        Assert.False(Category(idle, UiStrings.WaveMenuCatEdit).Enabled);
+        Assert.False(Category(idle, UiStrings.WaveMenuCatAudio).Enabled);
+        Assert.False(Category(idle, UiStrings.WaveMenuCatFormat).Enabled);
+        Assert.False(Category(idle, UiStrings.WaveMenuCatTimeline).Enabled);
+        Assert.False(Category(idle, UiStrings.WaveMenuCatPlayback).Enabled);
+        Assert.False(Category(idle, UiStrings.WaveMenuCatTabs).Enabled);
+        Assert.False(Category(idle, UiStrings.WaveMenuCatExport).Enabled);
+        Assert.True(Category(idle, UiStrings.WaveMenuCatFile).Enabled);
+        Assert.True(Category(idle, UiStrings.WaveMenuCatView).Enabled);
+        Assert.True(Category(idle, UiStrings.WaveMenuCatWwise).Enabled);
+        Assert.True(Category(idle, UiStrings.WaveMenuCatOther).Enabled);
+
+        var ready = WaveformContextMenuBuilder.Build(WaveformContextMenuModel.AllEnabledForTests());
+        Assert.All(
+            ready.OfType<WaveMenuItemEntry>().Where(item => item.Children is { Count: > 0 }),
+            item => Assert.True(item.Enabled));
+
+        var player = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasDocument = true,
+            CanNavigate = true,
+            LibraryMaximized = true,
+            HasMarkers = true,
+            CanExportMp3 = true,
+        });
+        Assert.False(Category(player, UiStrings.WaveMenuCatFormat).Enabled);
+        Assert.False(Category(player, UiStrings.WaveMenuCatWwise).Enabled);
+        Assert.False(Category(player, UiStrings.WaveMenuCatTabs).Enabled);
+        Assert.True(Category(player, UiStrings.WaveMenuCatAudio).Enabled);
+        Assert.True(Category(player, UiStrings.WaveMenuCatTimeline).Enabled);
+        Assert.True(Category(player, UiStrings.WaveMenuCatExport).Enabled);
+    }
+
+    [Fact]
     public void Create_KeepsSubmenuOpenOnHeaderClick()
     {
         RunSta(() =>
@@ -455,6 +492,9 @@ public sealed class WaveformContextMenuTests
         Assert.Equal('P', MenuAccessKeys.Read("Stop to Start (_P)"));
         Assert.Null(MenuAccessKeys.Read("No key"));
     }
+
+    private static WaveMenuItemEntry Category(IReadOnlyList<WaveMenuEntry> entries, string header) =>
+        entries.OfType<WaveMenuItemEntry>().First(item => item.Header == header);
 
     private static HashSet<WaveMenuCommand> CommandsIn(IReadOnlyList<WaveMenuEntry> entries, string category)
     {

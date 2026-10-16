@@ -359,7 +359,7 @@ internal static class WaveformContextMenuBuilder
         items.Add(Sub(UiStrings.WaveMenuCatTabs, TabItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatExport, ExportItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatWwise, WwiseItems(m)));
-        items.Add(Sub(UiStrings.WaveMenuCatHelp, HelpItems(m)));
+        items.Add(Sub(UiStrings.WaveMenuCatOther, OtherItems(m)));
         return items;
     }
 
@@ -680,14 +680,43 @@ internal static class WaveformContextMenuBuilder
             m.HasDocument && !m.IsBusy && !m.IsRecording && (!m.LibraryMaximized || m.CanExportAllMp3)),
     ];
 
-    private static IReadOnlyList<WaveMenuEntry> HelpItems(WaveformContextMenuModel m) =>
+    private static IReadOnlyList<WaveMenuEntry> OtherItems(WaveformContextMenuModel m) =>
     [
         Cmd(UiStrings.WaveMenuManual, WaveMenuCommand.Manual),
         Cmd(UiStrings.WaveMenuGitHub, WaveMenuCommand.GitHub),
     ];
 
     private static WaveMenuItemEntry Sub(string header, IReadOnlyList<WaveMenuEntry> children) =>
-        new(header, Command: null, Children: children);
+        new(header, Command: null, Enabled: HasExecutableItem(children), Children: children);
+
+    /// <summary>葉で有効なコマンド、またはその子孫が一つでもあれば true。区切りは数えない。</summary>
+    private static bool HasExecutableItem(IReadOnlyList<WaveMenuEntry> entries)
+    {
+        foreach (var entry in entries)
+        {
+            if (entry is not WaveMenuItemEntry item)
+            {
+                continue;
+            }
+
+            if (item.Children is { Count: > 0 })
+            {
+                if (item.Enabled && HasExecutableItem(item.Children))
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (item.Enabled)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static bool CanPickTile(WaveformContextMenuModel m, WaveformTileArrange arrange)
     {
