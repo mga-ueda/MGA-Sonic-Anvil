@@ -1991,11 +1991,15 @@ public partial class MainWindow
             action);
         if (command is null)
         {
-            if (action is SilenceDetectAction.CreateRegions or SilenceDetectAction.CreateMarkers)
+            if (action is SilenceDetectAction.CreateRegions
+                or SilenceDetectAction.CreateMarkers
+                or SilenceDetectAction.CreateHitPointMarkers)
             {
                 OwnerCenteredMessageBox.Show(
                     this,
-                    UiStrings.ErrorNoSilenceDetectSpans,
+                    action == SilenceDetectAction.CreateHitPointMarkers
+                        ? UiStrings.ErrorNoHitPoints
+                        : UiStrings.ErrorNoSilenceDetectSpans,
                     UiStrings.AppName,
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -2029,6 +2033,7 @@ public partial class MainWindow
         {
             (int)SilenceDetectAction.CreateRegions => SilenceDetectAction.CreateRegions,
             (int)SilenceDetectAction.CreateMarkers => SilenceDetectAction.CreateMarkers,
+            (int)SilenceDetectAction.CreateHitPointMarkers => SilenceDetectAction.CreateHitPointMarkers,
             _ => SilenceDetectAction.DeleteSilence,
         };
 
@@ -2046,6 +2051,11 @@ public partial class MainWindow
                 options,
                 channelMask: channelMask),
             SilenceDetectAction.CreateMarkers => ProcessEdits.CreateMarkersFromSilenceDetection(
+                document,
+                range,
+                options,
+                channelMask: channelMask),
+            SilenceDetectAction.CreateHitPointMarkers => ProcessEdits.CreateMarkersFromHitPointDetection(
                 document,
                 range,
                 options,

@@ -712,6 +712,75 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void CreateMarkersFromHitPointDetection_MarksRisesInsideASustainedTone()
+    {
+        const int rate = 8000;
+        var frames = rate;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 2] = 0.4f;
+            samples[i * 2 + 1] = 0.4f;
+        }
+
+        StampHit(samples, 2, 1000, 0.95f);
+        StampHit(samples, 2, 4000, 0.95f);
+        StampHit(samples, 2, 6500, 0.95f);
+        var document = new AudioDocument(samples, rate, 2, 24, AudioFileKind.Wave, null);
+        document.TryAddMarker(10);
+        var options = SilenceDetectOptions.FromThreshold(-20) with { MinGateMs = 50 };
+        var silence = ProcessEdits.CreateMarkersFromSilenceDetection(
+            document,
+            new WaveSelection(0, document.FrameCount),
+            options);
+        Assert.NotNull(silence);
+        var hit = ProcessEdits.CreateMarkersFromHitPointDetection(
+            document,
+            new WaveSelection(0, document.FrameCount),
+            options);
+        Assert.NotNull(hit);
+        new EditHistory().Do(document, hit);
+        Assert.Equal(3, document.Markers.Count);
+        Assert.DoesNotContain(document.Markers, marker => marker.Frame == 10);
+        Assert.Contains(document.Markers, marker => Math.Abs(marker.Frame - 1000) <= 8);
+        Assert.Contains(document.Markers, marker => Math.Abs(marker.Frame - 4000) <= 8);
+        Assert.Contains(document.Markers, marker => Math.Abs(marker.Frame - 6500) <= 8);
+    }
+
+    [Fact]
+    public void CreateMarkersFromHitPointDetection_IgnoresFlatAudio()
+    {
+        const int rate = 8000;
+        var samples = new float[rate * 2];
+        Array.Fill(samples, 0.4f);
+        var document = new AudioDocument(samples, rate, 2, 24, AudioFileKind.Wave, null);
+        var command = ProcessEdits.CreateMarkersFromHitPointDetection(
+            document,
+            new WaveSelection(0, document.FrameCount),
+            SilenceDetectOptions.FromThreshold(-20) with { MinGateMs = 50 });
+        Assert.Null(command);
+    }
+
+    [Fact]
+    public void CreateMarkersFromHitPointDetection_HonorsMinimumGap()
+    {
+        const int rate = 8000;
+        var frames = rate;
+        var samples = new float[frames * 2];
+        StampHit(samples, 2, 1000, 0.95f);
+        StampHit(samples, 2, 1200, 0.95f);
+        StampHit(samples, 2, 4000, 0.95f);
+        var document = new AudioDocument(samples, rate, 2, 24, AudioFileKind.Wave, null);
+        var command = ProcessEdits.CreateMarkersFromHitPointDetection(
+            document,
+            new WaveSelection(0, document.FrameCount),
+            SilenceDetectOptions.FromThreshold(-20) with { MinGateMs = 200 });
+        Assert.NotNull(command);
+        new EditHistory().Do(document, command);
+        Assert.Equal(2, document.Markers.Count);
+    }
+
+    [Fact]
     public void Delete_RemovesRangeAndUndoRestores()
     {
         var document = MakeSine(frames: 50);
@@ -1092,5 +1161,17 @@ public sealed class ProcessEditsTests
         }
 
         return new AudioDocument(samples, sampleRate, 2, 24, AudioFileKind.Wave, null);
+    }
+
+    private static void StampHit(float[] interleaved, int channels, int frame, float level)
+    {
+        for (var i = 0; i < 8; i++)
+        {
+            var index = (frame + i) * channels;
+            for (var ch = 0; ch < channels; ch++)
+            {
+                interleaved[index + ch] = level;
+            }
+        }
     }
 }
