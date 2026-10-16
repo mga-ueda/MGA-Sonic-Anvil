@@ -717,13 +717,16 @@ internal static class AudioCodec
 
     private static WaveStream OpenMp3Reader(string path)
     {
+        // Media Foundation の SetCurrentPosition は VBR MP3 で要求より数秒後ろを返す。
+        // 早戻しがその分だけ無音側へずれて聞こえる。フレームシークできる方を先に使う。
         try
         {
-            return OpenMediaFoundationReader(path);
-        }
-        catch
-        {
             return new Mp3FileReader(path);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or FormatException
+                                       or NotSupportedException or ArgumentException)
+        {
+            return OpenMediaFoundationReader(path);
         }
     }
 

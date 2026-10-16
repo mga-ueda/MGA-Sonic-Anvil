@@ -206,7 +206,8 @@ public sealed class AudioStreamSourceTests
             provider.BindStream(source, document, startFrame: 0, playRange: null, loop: false);
             provider.SetSilentSkip(true, -60);
 
-            Assert.True(ReadUntilAudible(provider, minPeak: 0.05f, maxReads: 12));
+            // 順デコードで無音を捨てる。長い無音はリング再充填の分だけ Read が増える。
+            Assert.True(ReadUntilAudible(provider, minPeak: 0.05f, maxReads: 80));
             var hold = SilentSkip.PeakWindowRadiusFrames(rate);
             Assert.InRange(
                 provider.CursorFrame,
@@ -275,6 +276,108 @@ public sealed class AudioStreamSourceTests
             }
 
             Assert.True(peak > 0.1f, $"peak={peak}");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void BindStream_SilentSkip_IgnoresFalseSilentPeaksOverTone()
+    {
+        // プレイリスト MP3 の表示用ピークが可聴を無音と誤ると、終端へ一跳びしていた。
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-skip-false-peaks-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            const int rate = 48000;
+            const int frames = rate;
+            WriteToneWave(path, rate, frames, frequency: 440);
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+
+            var buckets = 64;
+            var mins = new float[buckets];
+            var maxs = new float[buckets];
+            document.ReplacePeaks(PeakPyramid.CreateMonoForTests(
+                mins,
+                maxs,
+                frameCount: frames,
+                baseBucket: frames / buckets,
+                filledFrames: frames));
+            Assert.False(document.Peaks.IsBuilding);
+            Assert.True(document.Peaks.TryIsSilent(0, SilentSkip.LinearFromDb(-60), holdFrames: 0, out var silent));
+            Assert.True(silent);
+
+            using var source = AudioStreamSource.Open(path);
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(rate);
+            provider.BindStream(source, document, startFrame: 0, playRange: null, loop: false);
+            provider.SetSilentSkip(true, -60);
+
+            var buffer = new float[2400 * 2];
+            Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+            Assert.InRange(provider.CursorFrame, 1, 2400);
+            var peak = 0f;
+            for (var i = 0; i < buffer.Length; i++)
+            {
+                peak = Math.Max(peak, Math.Abs(buffer[i]));
+            }
+
+            Assert.True(peak > 0.1f, $"peak={peak} cursor={provider.CursorFrame}");
+            Assert.False(provider.Ended);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void BindStream_SilentSkip_DoesNotJumpOverSoftToneMissedByPeaks()
+    {
+        // 無音のあとの弱いトーンをピークが取りこぼしても、実サンプルがあれば飛ばさない。
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-skip-soft-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            const int rate = 48000;
+            const int lead = rate / 5;
+            const int softFrames = rate / 5;
+            const int loudAt = lead + softFrames;
+            WriteSilenceSoftThenLoudWave(path, rate, lead, softFrames, loudFrames: rate / 5, softPeak: 0.05f);
+
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+            var total = lead + softFrames + rate / 5;
+            var buckets = 64;
+            var baseBucket = Math.Max(1, total / buckets);
+            var bucketCount = (total + baseBucket - 1) / baseBucket;
+            var mins = new float[bucketCount];
+            var maxs = new float[bucketCount];
+            // 弱いトーン区間はピーク上で無音のまま。大きい音だけ載せる。
+            for (var b = loudAt / baseBucket; b < bucketCount; b++)
+            {
+                mins[b] = -0.5f;
+                maxs[b] = 0.5f;
+            }
+
+            document.ReplacePeaks(PeakPyramid.CreateMonoForTests(
+                mins,
+                maxs,
+                frameCount: total,
+                baseBucket,
+                filledFrames: total));
+
+            using var source = AudioStreamSource.Open(path);
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(rate);
+            provider.BindStream(source, document, startFrame: 0, playRange: null, loop: false);
+            provider.SetSilentSkip(true, -60);
+
+            Assert.True(ReadUntilAudible(provider, minPeak: 0.02f, maxReads: 24));
+            Assert.True(
+                provider.CursorFrame < loudAt,
+                $"soft tone skipped: cursor={provider.CursorFrame} softEnds={loudAt}");
         }
         finally
         {
@@ -547,6 +650,95 @@ public sealed class AudioStreamSourceTests
         {
             File.Delete(path);
         }
+    }
+
+    [Fact]
+    public void BindStream_SilentSkipThenRewind_StaysOnRamp()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-stream-skip-rw-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            const int rate = 48000;
+            const int lead = 12000;
+            WriteSilenceThenRamp(path, rate, lead, rampFrames: rate);
+            var document = AudioDocument.CreateDeferred(path);
+            Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+
+            using var source = AudioStreamSource.Open(path);
+            var provider = new PlaybackSampleProvider();
+            provider.SetDeviceSampleRate(rate);
+            provider.BindStream(source, document, startFrame: 0, playRange: null, loop: false);
+            provider.SetSilentSkip(true, -60);
+
+            Assert.True(ReadUntilAudible(provider, minPeak: 100f, maxReads: 40));
+            Assert.InRange(provider.CursorFrame, lead, lead + 4000);
+
+            provider.SetPlaybackSpeed(-PlaybackSampleProvider.FastSpeed);
+            var frames = 120;
+            var buffer = new float[frames * 2];
+            var gain = PlaybackSampleProvider.ShuttleGainLinear;
+            var matched = false;
+            var until = Environment.TickCount64 + 1500;
+            while (!matched && Environment.TickCount64 < until)
+            {
+                var before = provider.CursorFrame;
+                Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+                for (var i = 0; i < frames; i++)
+                {
+                    var sample = buffer[i * 2] / gain;
+                    if (sample < 500f)
+                    {
+                        continue;
+                    }
+
+                    var at = before - (i * 3);
+                    Assert.InRange(sample, at - 600, at + 200);
+                    matched = true;
+                    break;
+                }
+            }
+
+            Assert.True(matched, "早戻しのランプが再生位置と合っていない");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TryFindAlignDelta_ShiftsLateSeekBackOntoNeedle()
+    {
+        const int channels = 2;
+        const int frames = 2000;
+        const int needleFrames = 256;
+        const int shift = 180;
+        var haystack = new float[frames * channels];
+        for (var i = 0; i < frames; i++)
+        {
+            haystack[i * 2] = i + shift;
+            haystack[i * 2 + 1] = i + shift;
+        }
+
+        var needleStart = 1000L;
+        var needle = new float[needleFrames * channels];
+        for (var i = 0; i < needleFrames; i++)
+        {
+            needle[i * 2] = needleStart + i;
+            needle[i * 2 + 1] = needleStart + i;
+        }
+
+        Assert.True(PlaybackSampleProvider.TryFindAlignDelta(
+            haystack,
+            frames,
+            haystackStart: 0,
+            needle,
+            needleFrames,
+            needleStart,
+            channels,
+            maxLag: 400,
+            out var delta));
+        Assert.Equal(shift, delta);
     }
 
     [Fact]
@@ -979,6 +1171,54 @@ public sealed class AudioStreamSourceTests
         writer.Write(buffer, 0, buffer.Length);
     }
 
+    private static void WriteSilenceSoftThenLoudWave(
+        string path,
+        int sampleRate,
+        int silenceFrames,
+        int softFrames,
+        int loudFrames,
+        float softPeak)
+    {
+        using var writer = new WaveFileWriter(path, WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, 2));
+        var frames = silenceFrames + softFrames + loudFrames;
+        var buffer = new float[frames * 2];
+        for (var i = 0; i < softFrames; i++)
+        {
+            var t = i / (double)sampleRate;
+            var sample = (float)(Math.Sin(2 * Math.PI * 440 * t) * softPeak);
+            var at = (silenceFrames + i) * 2;
+            buffer[at] = sample;
+            buffer[at + 1] = sample;
+        }
+
+        for (var i = 0; i < loudFrames; i++)
+        {
+            var t = i / (double)sampleRate;
+            var sample = (float)(Math.Sin(2 * Math.PI * 440 * t) * 0.5);
+            var at = (silenceFrames + softFrames + i) * 2;
+            buffer[at] = sample;
+            buffer[at + 1] = sample;
+        }
+
+        writer.WriteSamples(buffer, 0, buffer.Length);
+    }
+
+    private static void WriteSilenceThenRamp(string path, int sampleRate, int silenceFrames, int rampFrames)
+    {
+        using var writer = new WaveFileWriter(path, WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, 2));
+        var frames = silenceFrames + rampFrames;
+        var buffer = new float[frames * 2];
+        for (var i = 0; i < rampFrames; i++)
+        {
+            var value = silenceFrames + i;
+            var at = (silenceFrames + i) * 2;
+            buffer[at] = value;
+            buffer[at + 1] = value;
+        }
+
+        writer.WriteSamples(buffer, 0, buffer.Length);
+    }
+
     [Fact]
     public void CreateSilence_ReadsZerosAndGrowsLength()
     {
@@ -1029,6 +1269,115 @@ public sealed class AudioStreamSourceTests
         {
             File.Delete(path);
         }
+    }
+
+    [Fact]
+    public void Mp3Seek_AfterSilence_LandsOnTheTone()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-mp3-seek-" + Guid.NewGuid().ToString("N") + ".mp3");
+        try
+        {
+            const int rate = 48000;
+            var wav = Path.ChangeExtension(path, ".wav");
+            WriteSilenceThenRamp(wav, rate, silenceFrames: rate * 3, rampFrames: rate);
+            var encode = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "ffmpeg",
+                Arguments = $"-y -i \"{wav}\" -codec:a libmp3lame -q:a 2 \"{path}\"",
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            if (encode is null)
+            {
+                return;
+            }
+
+            encode.WaitForExit(20000);
+            File.Delete(wav);
+            if (encode.ExitCode != 0 || !File.Exists(path))
+            {
+                return;
+            }
+
+            using var source = AudioStreamSource.Open(path);
+            var ch = source.Channels;
+            var toneAt = (long)(source.SampleRate * 3.2);
+            source.SeekFrame(toneAt, prebufferTimeoutMs: 3000);
+            var buf = new float[source.SampleRate / 5 * ch];
+            var read = source.ReadFrames(buf, 0, buf.Length / ch, timeoutMs: 3000);
+            var rms = 0d;
+            for (var i = 0; i < read; i++)
+            {
+                rms += buf[i * ch] * buf[i * ch];
+            }
+
+            rms = Math.Sqrt(rms / Math.Max(1, read));
+            Assert.True(rms > 0.02, $"3.2s は音のはず rms={rms:0.000}");
+
+            source.SeekFrame(source.SampleRate, prebufferTimeoutMs: 3000);
+            read = source.ReadFrames(buf, 0, buf.Length / ch, timeoutMs: 3000);
+            rms = 0;
+            for (var i = 0; i < read; i++)
+            {
+                rms += buf[i * ch] * buf[i * ch];
+            }
+
+            rms = Math.Sqrt(rms / Math.Max(1, read));
+            Assert.True(rms < 0.01, $"1.0s は無音のはず rms={rms:0.000}");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void BgmMp3_RewindIntoLeadingSilence_StaysSilent()
+    {
+        var path = @"D:\Downloads\BGM\bgm_cse100.mp3";
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        var document = AudioDocument.CreateDeferred(path);
+        Assert.True(AudioCodec.TryActivateStreamPlayback(document));
+        using var source = AudioStreamSource.Open(path);
+        var rate = source.SampleRate;
+        var provider = new PlaybackSampleProvider();
+        provider.SetDeviceSampleRate(rate);
+        provider.BindStream(source, document, startFrame: 0, playRange: null, loop: false);
+        provider.SetSilentSkip(true, -60);
+        Assert.True(ReadUntilAudible(provider, minPeak: 0.02f, maxReads: 80));
+        Assert.InRange(provider.CursorFrame, rate * 4L, rate * 6L);
+
+        provider.SetPlaybackSpeed(-PlaybackSampleProvider.FastSpeed);
+        var frames = 256;
+        var buffer = new float[frames * 2];
+        var until = Environment.TickCount64 + 4000;
+        var checkedSilence = false;
+        while (provider.CursorFrame > rate * 3L && Environment.TickCount64 < until)
+        {
+            var before = provider.CursorFrame;
+            Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+            if (before >= rate * 4L)
+            {
+                continue;
+            }
+
+            double sum = 0;
+            for (var i = 0; i < buffer.Length; i++)
+            {
+                sum += buffer[i] * buffer[i];
+            }
+
+            var rms = Math.Sqrt(sum / buffer.Length);
+            Assert.True(rms < 0.01, $"先頭無音なのに音が出ている cursor={before} rms={rms:0.000}");
+            checkedSilence = true;
+        }
+
+        Assert.True(checkedSilence, $"無音まで戻っていない cursor={provider.CursorFrame}");
     }
 
     private static void WriteToneWave(string path, int sampleRate, int frames, double frequency)
