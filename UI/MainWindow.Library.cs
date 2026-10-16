@@ -5389,6 +5389,11 @@ public partial class MainWindow
         _libraryCatalogWarmupCts = cts;
         var token = cts.Token;
         _libraryCatalogWarmupBusy = true;
+        if (IsPlaybackActive())
+        {
+            StopPlayback();
+        }
+
         ShowBusyGlass(UiStrings.OverlayLibraryCatalog);
         var progress = new Progress<double>(p =>
         {
