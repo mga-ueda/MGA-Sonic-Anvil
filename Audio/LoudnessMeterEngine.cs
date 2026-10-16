@@ -905,9 +905,10 @@ internal enum LoudnessTraffic
     Danger,
 }
 
-/// <summary>表示色用。安全＝余裕、注意＝接近、危険＝超過。</summary>
+/// <summary>表示色用。青＝ターゲットまで、黄＝そこから +3 LU、赤＝それより上。</summary>
 internal static class LoudnessTrafficLight
 {
+    public const double LufsCautionAboveLu = 3;
     public const double LufsApproachLu = 1;
     public const double TruePeakCautionDb = -1;
     public const double TruePeakLimitDb = 0;
@@ -953,12 +954,15 @@ internal static class LoudnessTrafficLight
             return LoudnessTraffic.Idle;
         }
 
-        if (value > target)
+        // メーターは小数1桁。ジャストに見える値は、その表示の側に入れる。
+        var shown = Math.Round(value, 1, MidpointRounding.AwayFromZero);
+        var gate = Math.Round(target, 1, MidpointRounding.AwayFromZero);
+        if (shown > gate + LufsCautionAboveLu)
         {
             return LoudnessTraffic.Danger;
         }
 
-        if (value > target - LufsApproachLu && value < target)
+        if (shown > gate)
         {
             return LoudnessTraffic.Caution;
         }

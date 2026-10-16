@@ -233,6 +233,7 @@ internal sealed class WaveformView : Grid
     private int _waveBgra;
     private int _waveOverlayBgra;
     private int _loudnessWaveBgra;
+    private int _loudnessWaveBodyBgra;
     private int _zeroBgra;
     private double _viewStart;
     private double _timeZoom = 1d;
@@ -1086,6 +1087,7 @@ internal sealed class WaveformView : Grid
         _waveBgra = 0;
         _waveOverlayBgra = 0;
         _loudnessWaveBgra = 0;
+        _loudnessWaveBodyBgra = 0;
         _zeroBgra = 0;
         _playheadCore = null;
         _exitPlayheadCore = null;
@@ -3457,10 +3459,12 @@ internal sealed class WaveformView : Grid
         }
 
         var color = _loudnessWaveBgra;
+        var fill = _loudnessWaveBodyBgra;
         if (count == 1)
         {
             var x = (int)Math.Round(FrameToX(first, start, span, width));
             var y = LoudnessPeakToY(AbsAt(0), height);
+            FillBelowLine(buffer, stride, width, 0, height, x, y, x + 1, y, fill);
             DrawLine(buffer, stride, width, 0, height, x, y, x + 1, y, color);
             return;
         }
@@ -3474,6 +3478,7 @@ internal sealed class WaveformView : Grid
             var y = LoudnessPeakToY(AbsAt(i), height);
             if (havePrev)
             {
+                FillBelowLine(buffer, stride, width, 0, height, prevX, prevY, x, y, fill);
                 DrawLine(buffer, stride, width, 0, height, prevX, prevY, x, y, color);
             }
 
@@ -3492,12 +3497,15 @@ internal sealed class WaveformView : Grid
         int px1)
     {
         var color = _loudnessWaveBgra;
+        var fill = _loudnessWaveBodyBgra;
         if (px1 - x0 < 2)
         {
             if (px1 > x0 && (uint)x0 < (uint)width)
             {
                 var y = _columnYHi[x0];
-                DrawLine(buffer, stride, width, 0, height, x0, y, Math.Min(width - 1, x0 + 1), y, color);
+                var x1 = Math.Min(width - 1, x0 + 1);
+                FillBelowLine(buffer, stride, width, 0, height, x0, y, x1, y, fill);
+                DrawLine(buffer, stride, width, 0, height, x0, y, x1, y, color);
             }
 
             return;
@@ -3505,6 +3513,17 @@ internal sealed class WaveformView : Grid
 
         for (var px = x0; px + 1 < px1; px++)
         {
+            FillBelowLine(
+                buffer,
+                stride,
+                width,
+                0,
+                height,
+                px,
+                _columnYHi[px],
+                px + 1,
+                _columnYHi[px + 1],
+                fill);
             DrawLine(
                 buffer,
                 stride,
@@ -4125,6 +4144,66 @@ internal sealed class WaveformView : Grid
         DrawLine(buffer, stride, width, clipTop, clipBottom, x0, y0 + 1, x1, y1 + 1, color);
     }
 
+    /// <summary>ラウドネス波形の輪郭からビュー下端までを塗る。急斜線は列ごとの最上点だけ塗る。</summary>
+    private static unsafe void FillBelowLine(
+        int* buffer,
+        int stride,
+        int width,
+        int clipTop,
+        int clipBottom,
+        int x0,
+        int y0,
+        int x1,
+        int y1,
+        int color)
+    {
+        if (clipBottom <= clipTop || (color >>> 24) == 0)
+        {
+            return;
+        }
+
+        var dx = Math.Abs(x1 - x0);
+        var sx = x0 < x1 ? 1 : -1;
+        var dy = -Math.Abs(y1 - y0);
+        var sy = y0 < y1 ? 1 : -1;
+        var err = dx + dy;
+        var colX = x0;
+        var colTop = y0;
+        while (true)
+        {
+            if (x0 != colX)
+            {
+                FillVLine(buffer, stride, width, clipTop, clipBottom, colX, colTop, clipBottom - 1, color);
+                colX = x0;
+                colTop = y0;
+            }
+            else if (y0 < colTop)
+            {
+                colTop = y0;
+            }
+
+            if (x0 == x1 && y0 == y1)
+            {
+                break;
+            }
+
+            var e2 = 2 * err;
+            if (e2 >= dy)
+            {
+                err += dy;
+                x0 += sx;
+            }
+
+            if (e2 <= dx)
+            {
+                err += dx;
+                y0 += sy;
+            }
+        }
+
+        FillVLine(buffer, stride, width, clipTop, clipBottom, colX, colTop, clipBottom - 1, color);
+    }
+
     private static unsafe void DrawLine(
         int* buffer,
         int stride,
@@ -4419,7 +4498,7 @@ internal sealed class WaveformView : Grid
 
     private void EnsureWavePens()
     {
-        if (_waveBgra != 0 && _waveOverlayBgra != 0 && _loudnessWaveBgra != 0)
+        if (_waveBgra != 0 && _waveOverlayBgra != 0 && _loudnessWaveBgra != 0 && _loudnessWaveBodyBgra != 0)
         {
             return;
         }
@@ -4427,6 +4506,7 @@ internal sealed class WaveformView : Grid
         _waveBgra = ToBgra(Theme.Get("WaveFillBrush"));
         _waveOverlayBgra = ToBgra(Theme.Get("WaveFillOverlayBrush"));
         _loudnessWaveBgra = ToBgra(Theme.Get("LoudnessWaveFillBrush"));
+        _loudnessWaveBodyBgra = _loudnessWaveBgra;
         _zeroBgra = ToBgra(Theme.Get("WaveZeroLineBrush"));
     }
 
