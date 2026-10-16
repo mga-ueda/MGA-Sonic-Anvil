@@ -1761,14 +1761,35 @@ internal partial class AudioSettingsWindow : Window
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (key != Key.Tab || (Keyboard.Modifiers & ModifierKeys.Control) != ModifierKeys.Control)
+        if (!TrySettingsTabDelta(key, Keyboard.Modifiers, out var delta))
         {
             return;
         }
 
-        var delta = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift ? -1 : 1;
         CycleSettingsTab(delta, wrap: !e.IsRepeat);
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// 設定タブの送り。Ctrl+Tab は次、Ctrl+Shift+Tab は前。
+    /// Ctrl+PageDown／Ctrl+PageUp も同じ（エディタのタブ切替と同じ）。
+    /// </summary>
+    internal static bool TrySettingsTabDelta(Key key, ModifierKeys modifiers, out int delta)
+    {
+        delta = 0;
+        if (key == Key.Tab && (modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        {
+            delta = (modifiers & ModifierKeys.Shift) == ModifierKeys.Shift ? -1 : 1;
+            return true;
+        }
+
+        if (modifiers == ModifierKeys.Control && key is Key.PageDown or Key.PageUp)
+        {
+            delta = key == Key.PageDown ? 1 : -1;
+            return true;
+        }
+
+        return false;
     }
 
     private void CycleSettingsTab(int delta, bool wrap = true)
