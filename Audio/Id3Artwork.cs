@@ -577,13 +577,14 @@ internal static class Id3Artwork
             return string.Empty;
         }
 
-        text = text.Replace('\0', ';').Trim().Trim(';').Trim();
+        text = text.Replace('\0', ';').Replace("\uFEFF", string.Empty, StringComparison.Ordinal).Trim().Trim(';').Trim();
         while (text.Contains(";;", StringComparison.Ordinal))
         {
             text = text.Replace(";;", ";", StringComparison.Ordinal);
         }
 
-        return text.Replace("; ", ";", StringComparison.Ordinal).Replace(";", "; ", StringComparison.Ordinal);
+        text = text.Replace("; ", ";", StringComparison.Ordinal).Replace(";", "; ", StringComparison.Ordinal);
+        return AudioTagText.CollapseIdentical(text);
     }
 
     private static string StripGenreNumber(string text)

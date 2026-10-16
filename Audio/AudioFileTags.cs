@@ -1,5 +1,40 @@
 namespace MgaSonicAnvil.Audio;
 
+/// <summary>ヌル区切りで同じ値が繰り返されたタグを一つに戻す。</summary>
+internal static class AudioTagText
+{
+    public static string CollapseIdentical(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        text = text.Replace("\uFEFF", string.Empty, StringComparison.Ordinal);
+        if (!text.Contains("; ", StringComparison.Ordinal))
+        {
+            return text.Trim();
+        }
+
+        var parts = text.Split("; ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length <= 1)
+        {
+            return parts.Length == 0 ? string.Empty : parts[0];
+        }
+
+        var first = parts[0];
+        for (var i = 1; i < parts.Length; i++)
+        {
+            if (!string.Equals(parts[i], first, StringComparison.Ordinal))
+            {
+                return string.Join("; ", parts);
+            }
+        }
+
+        return first;
+    }
+}
+
 /// <summary>ヘッダ／タグだけから取った音楽情報。PCM は含まない。</summary>
 internal sealed class AudioFileTags
 {
