@@ -1312,7 +1312,10 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsMarkerDigitJump(Key.D5, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.IsMarkerDigitJump(Key.NumPad5, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.IsDigitJumpChord(Key.NumPad5, ModifierKeys.Shift));
-        Assert.False(LibraryPlayerMode.IsDigitJumpChord(Key.D5, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsRegionDigitJump(Key.D5, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.IsRegionDigitJump(Key.NumPad5, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.IsRegionDigitJump(Key.D5, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsDigitJumpChord(Key.D5, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: true, hasScratchMarkers: true));
         Assert.False(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: true, hasScratchMarkers: false));
         Assert.False(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: false, hasScratchMarkers: true));
@@ -1388,6 +1391,30 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.PlayerNumpadTrackStepRepeats(LibraryNumpadCommand.NextTrack));
         Assert.False(LibraryPlayerMode.PlayerNumpadTrackStepRepeats(LibraryNumpadCommand.PlayPause));
         Assert.False(LibraryPlayerMode.PlayerNumpadTrackStepRepeats(LibraryNumpadCommand.Restart));
+    }
+
+    [Fact]
+    public void RegionDigitJump_CtrlTopRow_TwoDigitsFromOne()
+    {
+        Assert.True(LibraryPlayerMode.TryResolveRegionDigitJump(0, 1, 12, out var p1, out var s1));
+        Assert.Equal(1, p1);
+        Assert.Equal(1, s1);
+        Assert.True(LibraryPlayerMode.TryResolveRegionDigitJump(p1, 2, 12, out var p12, out var s12));
+        Assert.Equal(12, p12);
+        Assert.Equal(12, s12);
+        Assert.True(LibraryPlayerMode.TryResolveRegionDigitJump(1, 0, 12, out var p10, out var s10));
+        Assert.Equal(10, p10);
+        Assert.Equal(10, s10);
+
+        Assert.True(LibraryPlayerMode.TryResolveRegionDigitJump(1, 6, 15, out var restart, out var seekRestart));
+        Assert.Equal(6, restart);
+        Assert.Equal(6, seekRestart);
+
+        Assert.True(LibraryPlayerMode.TryResolveRegionDigitJump(1, 5, 3, out var dropped, out var noSeek));
+        Assert.Equal(0, dropped);
+        Assert.Null(noSeek);
+        Assert.False(LibraryPlayerMode.TryResolveRegionDigitJump(0, 1, 0, out _, out _));
+        Assert.False(LibraryPlayerMode.IsRegionDigitJump(Key.D1, ModifierKeys.Control | ModifierKeys.Shift));
     }
 
     [Fact]
