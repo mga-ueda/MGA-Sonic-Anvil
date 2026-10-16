@@ -83,6 +83,7 @@ public sealed class WaveformContextMenuTests
             UiStrings.SetLanguage(UiLanguage.Japanese);
             var tree = WaveformContextMenuBuilder.Build(WaveformContextMenuModel.AllEnabledForTests());
             var headers = tree.OfType<WaveMenuItemEntry>().Select(item => item.Header).ToArray();
+            Assert.Contains(UiStrings.WaveMenuCatHere, headers);
             Assert.Contains(UiStrings.WaveMenuCatEdit, headers);
             Assert.Contains(UiStrings.WaveMenuCatAudio, headers);
             Assert.Contains(UiStrings.WaveMenuCatFormat, headers);
@@ -154,9 +155,12 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.CloseTab, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
             Assert.Contains(WaveMenuCommand.CloseOthers, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
             Assert.Contains(WaveMenuCommand.SelectAllTabs, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
-            Assert.Contains(WaveMenuCommand.CopyAllTabTimes, CommandsIn(tree, UiStrings.WaveMenuCatView));
-            Assert.Contains(WaveMenuCommand.Settings, CommandsIn(tree, UiStrings.WaveMenuCatView));
-            Assert.Contains(WaveMenuCommand.ColorPanel, CommandsIn(tree, UiStrings.WaveMenuCatView));
+            Assert.Contains(WaveMenuCommand.CopyAllTabTimes, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
+            Assert.Contains(WaveMenuCommand.Settings, CommandsIn(tree, UiStrings.WaveMenuCatOther));
+            Assert.Contains(WaveMenuCommand.ColorPanel, CommandsIn(tree, UiStrings.WaveMenuCatOther));
+            Assert.Contains(WaveMenuCommand.TimeZoomIn, CommandsIn(tree, UiStrings.WaveMenuCatView));
+            Assert.Contains(WaveMenuCommand.SilentSkip, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
+            Assert.Contains(WaveMenuCommand.AlwaysOnTop, CommandsIn(tree, UiStrings.WaveMenuCatView));
             Assert.Equal("Ctrl+Shift+C", Find(tree, WaveMenuCommand.ColorPanel)?.Gesture);
             Assert.Contains(WaveMenuCommand.RangeClick, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
             Assert.Equal("Q", Find(tree, WaveMenuCommand.RangeClick)?.Gesture);
@@ -165,6 +169,21 @@ public sealed class WaveformContextMenuTests
             Assert.Equal("Alt+R", Find(tree, WaveMenuCommand.Shuffle)?.Gesture);
             Assert.Contains(WaveMenuCommand.AutoPlayNext, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
             Assert.Equal("Alt+N", Find(tree, WaveMenuCommand.AutoPlayNext)?.Gesture);
+            Assert.Contains(WaveMenuCommand.AutoPlay, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
+            Assert.Equal("Alt+P", Find(tree, WaveMenuCommand.AutoPlay)?.Gesture);
+            var view = Category(tree, UiStrings.WaveMenuCatView).Children!;
+            Assert.Contains(UiStrings.WaveMenuCatAnalysis, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
+            Assert.Contains(UiStrings.WaveMenuCatScreen, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
+            Assert.Contains(UiStrings.WaveMenuCatVideo, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
+            Assert.Contains(UiStrings.WaveMenuCatSolo, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
+            Assert.Contains(WaveMenuCommand.ViewSpectrogram, CommandsIn(view, UiStrings.WaveMenuCatAnalysis));
+            Assert.Contains(WaveMenuCommand.VideoMini, CommandsIn(tree, UiStrings.WaveMenuCatView));
+            Assert.Equal("F8", Find(tree, WaveMenuCommand.VideoMini)?.Gesture);
+            Assert.Contains(WaveMenuCommand.MinimalChrome, CommandsIn(tree, UiStrings.WaveMenuCatView));
+            Assert.Equal("F9", Find(tree, WaveMenuCommand.MinimalChrome)?.Gesture);
+            Assert.Contains(WaveMenuCommand.FindTabs, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
+            Assert.Contains(WaveMenuCommand.LaunchWwise, CommandsIn(tree, UiStrings.WaveMenuCatWwise));
+            Assert.Equal("Ctrl+Alt+Shift+W", Find(tree, WaveMenuCommand.LaunchWwise)?.Gesture);
             Assert.Contains(WaveMenuCommand.WaapiPanel, CommandsIn(tree, UiStrings.WaveMenuCatWwise));
             Assert.Equal("Alt+W", Find(tree, WaveMenuCommand.WaapiPanel)?.Gesture);
             Assert.Contains(WaveMenuCommand.KeepTarget, CommandsIn(tree, UiStrings.WaveMenuCatWwise));
@@ -180,7 +199,9 @@ public sealed class WaveformContextMenuTests
             Assert.DoesNotContain(WaveMenuCommand.WaapiPanel, CommandsIn(tree, UiStrings.WaveMenuCatView));
             Assert.DoesNotContain(WaveMenuCommand.PlayExit, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
             Assert.DoesNotContain(WaveMenuCommand.WwiseExport, CommandsIn(tree, UiStrings.WaveMenuCatFile));
-            Assert.DoesNotContain(WaveMenuCommand.CopyAllTabTimes, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
+            Assert.DoesNotContain(WaveMenuCommand.CopyAllTabTimes, CommandsIn(tree, UiStrings.WaveMenuCatView));
+            Assert.DoesNotContain(WaveMenuCommand.Settings, CommandsIn(tree, UiStrings.WaveMenuCatView));
+            Assert.DoesNotContain(WaveMenuCommand.TimeZoomIn, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
             Assert.True(Find(tree, WaveMenuCommand.CloseOthers)?.Enabled);
             Assert.True(Find(tree, WaveMenuCommand.CloseTabsRight)?.Enabled);
             Assert.True(Find(tree, WaveMenuCommand.CloseTabsLeft)?.Enabled);
@@ -196,14 +217,12 @@ public sealed class WaveformContextMenuTests
             Assert.DoesNotContain(WaveMenuCommand.ExportAllWave, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
             Assert.Contains(WaveMenuCommand.TileOff, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
             Assert.DoesNotContain(WaveMenuCommand.TileOff, CommandsIn(tree, UiStrings.WaveMenuCatView));
-            Assert.Contains(WaveMenuCommand.ClearMarkers, commands);
-            Assert.Contains(WaveMenuCommand.PlayFromHere, commands);
-            Assert.Contains(WaveMenuCommand.CopySelectionTime, commands);
-            Assert.Contains(WaveMenuCommand.CopySelectionTimePath, commands);
+            Assert.Contains(WaveMenuCommand.ClearMarkers, CommandsIn(tree, UiStrings.WaveMenuCatHere));
+            Assert.Contains(WaveMenuCommand.PlayFromHere, CommandsIn(tree, UiStrings.WaveMenuCatHere));
+            Assert.Contains(WaveMenuCommand.CopySelectionTime, CommandsIn(tree, UiStrings.WaveMenuCatHere));
+            Assert.Contains(WaveMenuCommand.CopySelectionTimePath, CommandsIn(tree, UiStrings.WaveMenuCatHere));
             var root = tree.OfType<WaveMenuItemEntry>().Select(item => item.Command).ToArray();
-            Assert.Contains(WaveMenuCommand.ClearMarkers, root);
-            Assert.Contains(WaveMenuCommand.CopySelectionTime, root);
-            Assert.Contains(WaveMenuCommand.CopySelectionTimePath, root);
+            Assert.All(root, command => Assert.Null(command));
             Assert.DoesNotContain(WaveMenuCommand.CopySelectionTime, CommandsIn(tree, UiStrings.WaveMenuCatEdit));
             Assert.DoesNotContain(WaveMenuCommand.DeleteAllMarkers, root);
             Assert.Contains(WaveMenuCommand.DeleteAllMarkers, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
@@ -222,6 +241,7 @@ public sealed class WaveformContextMenuTests
         var commands = WaveformContextMenuBuilder.Commands(tree).ToHashSet();
         Assert.Contains(WaveMenuCommand.Open, commands);
         Assert.Contains(WaveMenuCommand.Manual, commands);
+        Assert.DoesNotContain(UiStrings.WaveMenuCatHere, tree.OfType<WaveMenuItemEntry>().Select(item => item.Header));
         Assert.DoesNotContain(WaveMenuCommand.PlayFromHere, commands);
         Assert.DoesNotContain(WaveMenuCommand.ClearMarkers, commands);
         Assert.False(Find(tree, WaveMenuCommand.DeleteAllMarkers)?.Enabled);
@@ -428,7 +448,7 @@ public sealed class WaveformContextMenuTests
         Assert.False(Category(idle, UiStrings.WaveMenuCatAudio).Enabled);
         Assert.False(Category(idle, UiStrings.WaveMenuCatFormat).Enabled);
         Assert.False(Category(idle, UiStrings.WaveMenuCatTimeline).Enabled);
-        Assert.False(Category(idle, UiStrings.WaveMenuCatPlayback).Enabled);
+        Assert.True(Category(idle, UiStrings.WaveMenuCatPlayback).Enabled);
         Assert.False(Category(idle, UiStrings.WaveMenuCatTabs).Enabled);
         Assert.False(Category(idle, UiStrings.WaveMenuCatExport).Enabled);
         Assert.True(Category(idle, UiStrings.WaveMenuCatFile).Enabled);
@@ -451,7 +471,7 @@ public sealed class WaveformContextMenuTests
         });
         Assert.False(Category(player, UiStrings.WaveMenuCatFormat).Enabled);
         Assert.False(Category(player, UiStrings.WaveMenuCatWwise).Enabled);
-        Assert.False(Category(player, UiStrings.WaveMenuCatTabs).Enabled);
+        Assert.True(Category(player, UiStrings.WaveMenuCatTabs).Enabled);
         Assert.True(Category(player, UiStrings.WaveMenuCatAudio).Enabled);
         Assert.True(Category(player, UiStrings.WaveMenuCatTimeline).Enabled);
         Assert.True(Category(player, UiStrings.WaveMenuCatExport).Enabled);
@@ -469,7 +489,9 @@ public sealed class WaveformContextMenuTests
             var headers = menu.Items.OfType<MenuItem>().Where(item => item.HasItems).ToArray();
             Assert.NotEmpty(headers);
             Assert.All(headers, item => Assert.True(item.StaysOpenOnClick));
-            var leaf = menu.Items.OfType<MenuItem>().First(item => !item.HasItems);
+            var leaf = headers
+                .SelectMany(item => item.Items.OfType<MenuItem>())
+                .First(item => !item.HasItems);
             Assert.False(leaf.StaysOpenOnClick);
         });
     }

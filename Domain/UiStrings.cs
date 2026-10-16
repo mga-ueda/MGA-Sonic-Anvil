@@ -847,7 +847,18 @@ internal static partial class UiStrings
     public static string LibraryMenuRefreshExplorer => Get("ツリーを再読み込み", "Refresh Tree");
     public static string LibraryMenuRebuildCatalog => Get("ライブラリを再構築", "Rebuild Library");
     public static string LibraryMenuReplacePlaylist => Get("プレイリストをクリアして追加", "Clear Playlist and Add");
+    public static string LibraryMenuReplacePlaylistRecursive => Get("配下を含めてクリアして追加", "Clear Playlist and Add Subfolders");
     public static string LibraryMenuAppendPlaylist => Get("プレイリストへ追加", "Add to Playlist");
+    public static string LibraryMenuAppendPlaylistRecursive => Get("配下を含めて追加", "Add Subfolders to Playlist");
+    public static string LibraryMenuExpandSubtree => Get("配下をすべて展開", "Expand All Subfolders");
+    public static string LibraryMenuCollapseSubtree => Get("配下を折りたたむ", "Collapse Subfolders");
+    public static string LibraryMenuMoveRootUp => Get("ルートを上へ", "Move Root Up");
+    public static string LibraryMenuMoveRootDown => Get("ルートを下へ", "Move Root Down");
+    public static string LibraryMenuPreviousTrack => Get("前の曲", "Previous Track");
+    public static string LibraryMenuNextTrack => Get("次の曲", "Next Track");
+    public static string LibraryMenuRestartTrack => Get("頭から再生", "Restart Track");
+    public static string LibraryMenuAutoPlay => Get("追加時に自動再生", "Auto Play on Add");
+    public static string LibraryMenuUndoRemove => Get("クリアを元に戻す", "Undo Clear");
     public static string LibraryMenuRemoveFromFavorites => Get("お気に入りから削除", "Remove from Favorites");
     public static string LibraryMenuClearFromPlaylist => Get("プレイリストからクリア", "Clear from Playlist");
     // アクセスキーは付けない（メニュー外クリック時の誤発火を避ける）。ショートカットは InputGestureText。

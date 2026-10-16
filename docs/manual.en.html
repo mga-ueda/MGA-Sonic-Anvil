@@ -240,7 +240,7 @@
           <li>Stereo playback with no ports chosen still mixes the speakers to left and right.</li>
         </ul>
         <h4>Player</h4>
-        <p><strong>Gapless playback</strong> is first (on by default; see <a href="#layout-gapless">Gapless playback</a>). Then the left tree roots. Default is Music. Add, remove, and reorder top to bottom. Missing registrations show in red. You can also add a root from the tree’s right-click / menu key <strong>Register as Tree Root</strong>, or by dropping folders from Explorer onto the tree (<strong>Remove Tree Root</strong> when it is already a root). Reorder with Settings Up / Down, <kbd>Alt</kbd>+↑ / ↓ on a selected root, or by dragging a root within the tree.</p>
+        <p><strong>Gapless playback</strong> is first (on by default; see <a href="#layout-gapless">Gapless playback</a>). Then the left tree roots. Default is Music. Add, remove, and reorder top to bottom. Missing registrations show in red. You can also add a root from the tree’s right-click / menu key <strong>Register as Tree Root</strong>, or by dropping folders from Explorer onto the tree (<strong>Remove Tree Root</strong> when it is already a root). Reorder with Settings Up / Down, <kbd>Alt</kbd>+↑ / ↓ on a selected root, the tree’s right-click <strong>Move Root Up / Down</strong>, or by dragging a root within the tree.</p>
         <h4>Editing</h4>
         <ul>
           <li><strong>Loudness target</strong> — LKFS.</li>
@@ -404,18 +404,18 @@
         <h4>Library</h4>
         <ul>
           <li>Opened files are listed without loading every waveform at once. Names, times, and similar info are read when files are added. Playlist columns are chosen separately for WAVE, MP3, and video in Settings → Shown. Empty columns hide automatically; waveform width is on the same Shown tab.</li>
-          <li>The tree on the left starts at Music and remembers the last folder, which folders were expanded, and the split with Favorites. Missing tree roots and missing Favorites entries show in red. Drop folders from Explorer onto the tree to register roots; drop files or folders onto Favorites to register them. Reorder roots with <kbd>Alt</kbd>+↑ / ↓ or by dragging a root within the tree.</li>
+          <li>The tree on the left starts at Music and remembers the last folder, which folders were expanded, and the split with Favorites. Missing tree roots and missing Favorites entries show in red. Drop folders from Explorer onto the tree to register roots; drop files or folders onto Favorites to register them. Reorder roots with <kbd>Alt</kbd>+↑ / ↓, the tree’s right-click <strong>Move Root Up / Down</strong>, or by dragging a root within the tree.</li>
           <li>Splitters and scrollbars appear when the pointer nears them, then fade out after about 3 s of no movement. Selecting a folder does not add it to the list.</li>
-          <li><kbd>*</kbd> expands all under the selection. <kbd>/</kbd> collapses it.</li>
+          <li><kbd>*</kbd> (<kbd>Shift</kbd>+<kbd>8</kbd>) expands all under the selection. <kbd>/</kbd> collapses it. The tree’s right-click <strong>Expand All Subfolders</strong> and <strong>Collapse Subfolders</strong> do the same.</li>
           <li>With the tree focused: <kbd>Space</kbd> expands one level (same as →; or moves down if already expanded / a leaf); <kbd>Shift</kbd>+<kbd>Space</kbd> collapses one level (or moves up). Both clear typeahead highlight. Transport <kbd>Space</kbd> applies when focus is not on the tree.</li>
           <li>With the tree focused, letter keys jump to folders by name (see <a href="#layout-typeahead">Folder-name jump</a>). This does not add to the playlist. It is separate from <kbd>Ctrl</kbd>+<kbd>F</kbd> filter search.</li>
           <li>
             <p>Enter and dropping a folder onto the list (tree or Favorites) share the same modifiers for clear vs append and shallow vs recursive. Double-click on the tree only expands or collapses a folder (it does not add to the playlist).</p>
             <ul>
               <li>(none) — clear the playlist and add only immediate files</li>
-              <li><kbd>Ctrl</kbd> — clear and add recursively</li>
+              <li><kbd>Ctrl</kbd> — clear and add recursively (right-click <strong>Clear Playlist and Add Subfolders</strong>)</li>
               <li><kbd>Shift</kbd> — append immediate files only</li>
-              <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd> — append recursively</li>
+              <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd> — append recursively (right-click <strong>Add Subfolders to Playlist</strong>)</li>
             </ul>
             <p>Clear cancels and replaces while a large load is in progress. With <span class="ui">Auto Play</span> (<kbd>Alt</kbd>+<kbd>P</kbd>; on by default) on, clear-add plays the first track; when off, it only adds. Shift-add never plays. While searching, only visible folders (matching files when the hit is a file name, or everything in a folder whose name matched).</p>
           </li>
@@ -448,7 +448,7 @@
           <li>On the audio playlist waveform and during real video playback / F8, <kbd>I</kbd> / <kbd>O</kbd> set a disposable A-B loop and <kbd>M</kbd> / <kbd>Ins</kbd> place temporary markers (forgotten when another file plays; for audio, markers merge with existing ones and a complete A-B becomes the sample loop as an unsaved edit on return to the editor; video / PDF are not taken into the editor so those cues are discarded).</li>
           <li>Not used on the dim video / PDF preview. Selection is inverted and translucent. No zoom.</li>
           <li>Display-resolution peaks only. Short files stay dense. Spectrogram / loudness-curve views stay off. Edit commands are blocked.</li>
-          <li>Right-click / the menu key / <kbd>Shift</kbd>+<kbd>F10</kbd> can open the menu, but edit commands stay disabled.</li>
+          <li>Right-click / the menu key / <kbd>Shift</kbd>+<kbd>F10</kbd> can open the menu, but edit commands stay disabled. View leads with Zoom, Analysis, and Screen (<kbd>F8</kbd>–<kbd>F12</kbd> and Always on Top), then the playhead, Solo, and Video (full screen <kbd>F</kbd>, mini-window size, overlay <kbd>A</kbd>, timecode <kbd>T</kbd>, pin PDF <kbd>W</kbd>, back to preview <kbd>Q</kbd>, proxy <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>). Timeline is markers, regions, and loops. Playback splits into transport, Playlist, and Seek, and holds Silent Skip. File times are under Tabs. Settings and color are under Other. Play, seek, marker, span, and selection-time copy at the click are under Here. Playback includes auto play on add (<kbd>Alt</kbd>+<kbd>P</kbd>), previous track (<kbd>P</kbd>), next track (<kbd>N</kbd>), and restart track (<kbd>R</kbd>). Undo restores disposable markers, or rows removed from the playlist. The playlist right-click has the same track step, restart, Auto Play, and undo-clear commands.</li>
         </ul>
         <h4>Jacket and background</h4>
         <ul>
@@ -545,7 +545,7 @@
           <li>Right-click the file-name strip for the same menu as a tab.</li>
         </ul>
         <h4>Search</h4>
-        <p>While tiled, <kbd>Ctrl</kbd>+<kbd>F</kbd> opens a tab-name search. A search box appears in the center of the waveform area (it shows how to match all words or any word). The list updates as you type. Tiles that do not match are darkened and covered with a dim overlay.</p>
+        <p>While tiled, <kbd>Ctrl</kbd>+<kbd>F</kbd> opens a tab-name search (also tab right-click, or waveform right-click → Tabs → Find Tabs). A search box appears in the center of the waveform area (it shows how to match all words or any word). The list updates as you type. Tiles that do not match are darkened and covered with a dim overlay.</p>
         <ul>
           <li>Words separated by spaces must all match, and <code>|</code> means any group may match (for example <code>bgm loop|se</code> = contains both bgm and loop, or contains se; capital letters do not matter).</li>
           <li><kbd>Enter</kbd> confirms the condition and closes the box. The filter stays. <kbd>Ctrl</kbd>+<kbd>F</kbd> again reopens it with the same condition.</li>
@@ -636,7 +636,7 @@
       <article class="part" id="layout-waapi">
         <h3>WAAPI bar</h3>
         <p>Connection, destination, <span class="ui">Play -E</span>, <span class="ui">Auto Active</span>, <span class="ui">EXPORT</span>.</p>
-        <p>Click the project name, or press <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>, to open or bring Wwise to the front. Shows the bar first even if WAAPI is off. If no project is remembered, it only shows the bar and reports that it cannot launch.</p>
+        <p>Click the project name, use waveform right-click → Wwise → Launch Project, or press <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>, to open or bring Wwise to the front. Shows the bar first even if WAAPI is off. If no project is remembered, it only shows the bar and reports that it cannot launch.</p>
       </article>
 
       <article class="part" id="layout-status">
@@ -742,7 +742,7 @@
       <ul>
         <li><span class="ui">Play -E</span> (<kbd>Alt</kbd>+<kbd>E</kbd>, while WAAPI is on) — keep playing after the exit. Preview in this app plays that tail twice on a loop wrap, so two playheads appear. EXPORT keeps playing after the exit on a transition.</li>
         <li><span class="ui">Auto Active</span> — bring Wwise to the front after EXPORT.</li>
-        <li>Project name — click, or press <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>, to open or bring Wwise to the front. Works with WAAPI off: the bar is shown, then the project launches. If no project is remembered, it stays on the bar and reports that it cannot launch.</li>
+        <li>Project name — click, use waveform right-click → Wwise → Launch Project, or press <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>, to open or bring Wwise to the front. Works with WAAPI off: the bar is shown, then the project launches. If no project is remembered, it stays on the bar and reports that it cannot launch.</li>
       </ul>
 
       <h3 id="export-plan">9-2. How ranges are built</h3>
@@ -935,7 +935,7 @@
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td><kbd>Alt</kbd>+<kbd>W</kbd></td><td>Toggle the WAAPI bar</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Launch or bring the Wwise project to the front (shows the WAAPI bar even if it was off; if no project is remembered, notify and do not launch)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Launch or bring the Wwise project to the front (waveform right-click → Wwise → Launch Project; shows the WAAPI bar even if it was off; if no project is remembered, notify and do not launch)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>E</kbd></td><td>Toggle Play -E (while WAAPI is on)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Wwise EXPORT (Wave-only)</td></tr>
         </tbody>

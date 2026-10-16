@@ -167,6 +167,10 @@ public partial class MainWindow : Window
         LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;
         LibraryBrowser.MatchLoudnessRequested += (_, _) => PromptVolume();
         LibraryBrowser.ExportMp3Requested += (_, _) => ExportPlaylistSelectionMp3();
+        LibraryBrowser.PlaylistPreviousRequested += (_, _) => TryStepLibraryPlaylist(-1);
+        LibraryBrowser.PlaylistNextRequested += (_, _) => TryStepLibraryPlaylist(1);
+        LibraryBrowser.PlaylistRestartRequested += (_, _) => RestartLibraryTrack();
+        LibraryBrowser.PlaylistUndoRemoveRequested += (_, _) => TryUndoLibraryPlaylistRemove();
         LibraryBrowser.LibraryCatalogRebuildRequested += (_, _) => RebuildLibraryCatalog();
         LibraryBrowser.ListContextMenuOpened += LibraryBrowser_ListContextMenuOpened;
         LibraryBrowser.ListContextMenuClosed += LibraryBrowser_ListContextMenuClosed;
