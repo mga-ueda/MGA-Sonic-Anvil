@@ -25,7 +25,10 @@ internal sealed class VectorScopeView : FrameworkElement
     private const float BeamHome = 0.07f;
     private const double BeamRadius = 1.4;
     private const double ScopeInset = 4;
-    private const float StereoMaxGain = 3.5f;
+    /// <summary>軌跡のピークを円半径のこの割合まで伸ばす。絶対音量は読ませない。</summary>
+    private const float StereoFill = 0.88f;
+    /// <summary>無音に近い信号まで形が見えるよう持ち上げる上限（約 +34 dB）。</summary>
+    private const float StereoMaxGain = 48f;
     private const float SurroundMaxGain = 1.7f;
     private Color SurroundHullStroke =>
         PlayerMeterChrome.Grid("SurroundHullStrokeBrush", WashThrough);
@@ -685,10 +688,10 @@ internal sealed class VectorScopeView : FrameworkElement
         }
     }
 
-    private void SnapBeam(float mid, float side, float scale)
+    private void SnapBeam(float x, float y)
     {
-        _beamNx = Math.Clamp(side * scale, -1f, 1f);
-        _beamNy = Math.Clamp(mid * scale, -1f, 1f);
+        _beamNx = Math.Clamp(x, -1f, 1f);
+        _beamNy = Math.Clamp(y, -1f, 1f);
         _beamFade = 1f;
     }
 
@@ -703,13 +706,13 @@ internal sealed class VectorScopeView : FrameworkElement
             return;
         }
 
-        var targetGain = Math.Clamp(0.88f / peak, 1f, StereoMaxGain);
-        var follow = targetGain > _displayGain ? 0.28f : 0.06f;
+        var targetGain = Math.Clamp(StereoFill / peak, 1f, StereoMaxGain);
+        var follow = targetGain > _displayGain ? 0.45f : 0.06f;
         _displayGain += (targetGain - _displayGain) * follow;
 
         var layout = MeasureLayout(new Rect(RenderSize));
         ScopeGeometry(layout.Scope, out var cx, out var cy, out var radius);
-        var scale = Math.Min(_displayGain, 0.88f / peak);
+        var scale = Math.Min(_displayGain, StereoFill / peak);
 
         var available = LevelMeterEngine.WindowFrames;
         var stride = Math.Max(1, available / MaxPoints);
@@ -721,16 +724,16 @@ internal sealed class VectorScopeView : FrameworkElement
         var maxY = layout.Scope.Bottom - ScopeInset;
         for (var i = 0; i < available && count < MaxPoints; i += stride)
         {
-            VectorScopeEngine.MidSide(_left[i], _right[i], out var mid, out var side);
+            VectorScopeEngine.ScopeNormal(_left[i], _right[i], out var x, out var y);
             dest[count] = new Point(
-                Math.Clamp(cx + side * radius * scale, minX, maxX),
-                Math.Clamp(cy - mid * radius * scale, minY, maxY));
+                Math.Clamp(cx + x * radius * scale, minX, maxX),
+                Math.Clamp(cy - y * radius * scale, minY, maxY));
             count++;
         }
 
         _trailCount = count;
-        VectorScopeEngine.MidSide(_left[available - 1], _right[available - 1], out var nowMid, out var nowSide);
-        SnapBeam(nowMid, nowSide, scale);
+        VectorScopeEngine.ScopeNormal(_left[available - 1], _right[available - 1], out var nowX, out var nowY);
+        SnapBeam(nowX * scale, nowY * scale);
     }
 
     private void UpdateSurround(AudioPlayer? player, bool active)

@@ -9,6 +9,16 @@ internal static class VectorScopeEngine
         side = (left - right) * 0.5f;
     }
 
+    /// <summary>
+    /// 画面正規座標。x 正が右、y 正が上。正の L は左上、正の R は右上。
+    /// </summary>
+    public static void ScopeNormal(float left, float right, out float x, out float y)
+    {
+        MidSide(left, right, out var mid, out var side);
+        x = -side;
+        y = mid;
+    }
+
     public static double Correlation(ReadOnlySpan<float> left, ReadOnlySpan<float> right)
     {
         var count = Math.Min(left.Length, right.Length);
