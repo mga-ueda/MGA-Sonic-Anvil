@@ -69,8 +69,8 @@ public sealed class TransportLayoutTests
         var rows = new[]
         {
             (UiStrings.LabelLoudnessShortTerm, UiStrings.LabelLufs),
-            (UiStrings.LabelLoudnessIntegrated, UiStrings.LabelLufs),
-            (UiStrings.LabelLoudnessMomentary, UiStrings.LabelMaxLufs),
+            (UiStrings.LabelLoudnessIntegrated, UiStrings.LabelLufs + " Avg"),
+            (UiStrings.LabelLoudnessMomentary, UiStrings.LabelMaxLufs + " Avg"),
             (UiStrings.LabelLra, UiStrings.LabelLu),
             (UiStrings.LabelTruePeak, UiStrings.LabelDb),
         };

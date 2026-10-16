@@ -321,10 +321,16 @@ public partial class MainWindow
                     session.History.Do(session.Document, command);
                     if (float.IsFinite(integratedBefore))
                     {
-                        var after = LoudnessMeterEngine.ApplyLinearGainToLufs(
-                            integratedBefore,
-                            (float)WaveformGainAnalyzer.LinearFromDb(gainDb));
-                        session.Document.ApplyTags(session.Document.Tags.WithIntegratedLufs(after));
+                        var linear = (float)WaveformGainAnalyzer.LinearFromDb(gainDb);
+                        var after = LoudnessMeterEngine.ApplyLinearGainToLufs(integratedBefore, linear);
+                        var tags = session.Document.Tags;
+                        session.Document.ApplyTags(
+                            tags.HasFileLoudness
+                                ? tags.WithFileLoudness(tags.ToFileLoudness().WithLinearGain(linear) with
+                                {
+                                    IntegratedLufs = after,
+                                })
+                                : tags.WithIntegratedLufs(after));
                     }
 
                     if (IsLibraryMaximized)

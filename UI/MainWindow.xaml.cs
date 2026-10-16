@@ -143,6 +143,7 @@ public partial class MainWindow : Window
         // エディタもプレイヤーと同じウォッシュ。モード切替（F11／F12）を待たない。
         LibraryBrowser.UseWindowFallbackWash();
         LibraryBrowser.SessionActivated += LibraryBrowser_SessionActivated;
+        LibraryBrowser.PlaylistSelectionChanged += (_, _) => SyncPlaylistSelectionLoudness();
         LibraryBrowser.SessionPlayRequested += LibraryBrowser_SessionPlayRequested;
         LibraryBrowser.PlaylistVisualEnded += LibraryBrowser_PlaylistVisualEnded;
         LibraryBrowser.PlaylistVisualOpened += LibraryBrowser_PlaylistVisualOpened;

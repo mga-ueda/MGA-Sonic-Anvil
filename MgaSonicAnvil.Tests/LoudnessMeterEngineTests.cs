@@ -345,6 +345,26 @@ public sealed class LoudnessMeterEngineTests
     }
 
     [Fact]
+    public void TryAverageIntegratedLufs_MeansFiniteReadingsOnly()
+    {
+        Assert.False(LoudnessMeterEngine.TryAverageIntegratedLufs([null, float.NaN], out _));
+        Assert.True(LoudnessMeterEngine.TryAverageIntegratedLufs(
+            [-14f, null, -20f, float.NegativeInfinity],
+            out var average));
+        Assert.Equal(-17f, average, 3);
+        var averaged = FileLoudness.Average(
+        [
+            new FileLoudness(-10f, -14f, -8f, 6f, -1f),
+            new FileLoudness(-12f, -18f, -10f, 8f, -3f),
+        ]);
+        Assert.Equal(-11f, averaged.ShortTermMaxLufs, 3);
+        Assert.Equal(-16f, averaged.IntegratedLufs, 3);
+        Assert.Equal(-9f, averaged.MomentaryMaxLufs, 3);
+        Assert.Equal(7f, averaged.LoudnessRangeLu, 3);
+        Assert.Equal(-2f, averaged.TruePeakDb, 3);
+    }
+
+    [Fact]
     public void OfflineCache_InvalidatesWhenRevisionChangesOnSameBuffer()
     {
         var samples = new float[8];

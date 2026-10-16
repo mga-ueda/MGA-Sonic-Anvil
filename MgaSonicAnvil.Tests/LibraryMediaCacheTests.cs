@@ -1,4 +1,5 @@
 using System.IO;
+using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.UI;
 using Xunit;
@@ -102,6 +103,20 @@ public sealed class LibraryMediaCacheTests : IDisposable
         LibraryMediaCache.PutLoudness(path, float.NegativeInfinity);
         Assert.True(LibraryMediaCache.TryGetLoudness(path, out var loaded));
         Assert.True(float.IsNegativeInfinity(loaded));
+    }
+
+    [Fact]
+    public void FileLoudness_RoundTripKeepsFiveReadings()
+    {
+        var path = Path.Combine(_dir, "full.wav");
+        File.WriteAllBytes(path, new byte[40]);
+        var stored = new FileLoudness(-12.5f, -16f, -9f, 7.5f, -1.2f);
+        LibraryMediaCache.PutFileLoudness(path, stored);
+        Assert.True(LibraryMediaCache.TryGetFileLoudness(path, out var loaded));
+        Assert.Equal(stored, loaded);
+        Assert.True(LibraryMediaCache.TryGetLoudness(path, out var integrated));
+        Assert.Equal(-16f, integrated);
+        Assert.False(LibraryMediaCache.TryGetFileLoudness(Path.Combine(_dir, "missing.wav"), out _));
     }
 
     [Fact]

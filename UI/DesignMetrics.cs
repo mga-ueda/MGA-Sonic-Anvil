@@ -395,7 +395,7 @@ internal static class DesignMetrics
     public static double LoudnessMeterCharWidth => From96(7);
 
     /// <summary>スペアナ左のラウドネスメーター幅。列はキャプション／値／単位の最大幅の合計。</summary>
-    public static double LoudnessMeterWidth => From96(208);
+    public static double LoudnessMeterWidth => From96(240);
 
     /// <summary>正方形ゴニオ直下の位相バー高さ。</summary>
     public static double VectorScopeCorrelationHeight => From96(18);

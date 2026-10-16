@@ -48,6 +48,9 @@ internal sealed class LoudnessMeterView : Grid
     private bool _offlinePending;
     private bool _offlineMode = true;
     private float _previewLinear = 1f;
+    private bool _hasSelectionLoudness;
+    private FileLoudness _selectionLoudness;
+    private bool _paintedSelectionAverage;
     private AudioDocument? _displayDocument;
     private AudioDocument? _document;
     private Brush _safeBrush = Brushes.Transparent;
@@ -139,6 +142,33 @@ internal sealed class LoudnessMeterView : Grid
         }
 
         RefreshStopped();
+    }
+
+    /// <summary>
+    /// 複数選択の5項目平均。停止中だけ表示する。null で文書の計測値に戻す。
+    /// </summary>
+    public void SetSelectionLoudness(FileLoudness? loudness)
+    {
+        if (loudness is not FileLoudness next)
+        {
+            if (!_hasSelectionLoudness)
+            {
+                return;
+            }
+
+            _hasSelectionLoudness = false;
+            PaintSnapshot(_lastSnap, _offlineMode);
+            return;
+        }
+
+        if (_hasSelectionLoudness && _selectionLoudness.SameAs(next))
+        {
+            return;
+        }
+
+        _hasSelectionLoudness = true;
+        _selectionLoudness = next;
+        PaintSnapshot(_lastSnap, _offlineMode);
     }
 
     /// <summary>V プレビュー用。再生中は出力側がゲイン済みなので、停止中の塗りだけ動かす。</summary>
@@ -261,6 +291,10 @@ internal sealed class LoudnessMeterView : Grid
             if (frames > 0)
             {
                 ApplySnapshot(_engine.Process(_left, _right, frames, Player.OutputSampleRate), offline: false);
+            }
+            else if (_paintedSelectionAverage)
+            {
+                PaintSnapshot(_lastSnap, _offlineMode);
             }
 
             return;
@@ -433,11 +467,32 @@ internal sealed class LoudnessMeterView : Grid
     private void PaintSnapshot(LoudnessSnapshot snap, bool offline)
     {
         var shown = offline ? LoudnessMeterEngine.ApplyLinearGain(snap, _previewLinear) : snap;
+        var showSelection = false;
+        if (!IsLivePlayback() && _hasSelectionLoudness)
+        {
+            showSelection = true;
+            var selected = _selectionLoudness;
+            shown = shown with
+            {
+                ShortTermLufs = selected.ShortTermMaxLufs,
+                IntegratedLufs = selected.IntegratedLufs,
+                MomentaryMaxLufs = selected.MomentaryMaxLufs,
+                LoudnessRangeLu = selected.LoudnessRangeLu,
+                TruePeakDb = selected.TruePeakDb,
+            };
+        }
+
+        _paintedSelectionAverage = showSelection;
         _shortValue.Text = FormatLufs(shown.ShortTermLufs);
         _integratedValue.Text = FormatLufs(shown.IntegratedLufs);
         _momentaryValue.Text = FormatLufs(shown.MomentaryMaxLufs);
         _lraValue.Text = FormatLu(shown.LoudnessRangeLu);
         _truePeakValue.Text = FormatLufs(shown.TruePeakDb);
+        _shortUnit.Text = AverageUnit(UiStrings.LabelLufs, showSelection);
+        _integratedUnit.Text = AverageUnit(UiStrings.LabelLufs, showSelection);
+        _momentaryUnit.Text = AverageUnit(UiStrings.LabelMaxLufs, showSelection);
+        _lraUnit.Text = AverageUnit(UiStrings.LabelLu, showSelection);
+        _truePeakUnit.Text = AverageUnit(UiStrings.LabelDb, showSelection);
         PaintValues(shown);
     }
 
@@ -494,6 +549,9 @@ internal sealed class LoudnessMeterView : Grid
         _lraUnit,
         _truePeakUnit,
     ];
+
+    private static string AverageUnit(string unit, bool average) =>
+        average ? unit + " Avg" : unit;
 
     private static string FormatLufs(float value) => FormatReading(value);
 

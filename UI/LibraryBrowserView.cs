@@ -239,6 +239,8 @@ internal sealed class LibraryBrowserView : UserControl
     private LibraryPlaylistColumnKind _playlistColumnKind = LibraryPlaylistColumnKind.Mixed;
     private bool _syncing;
     private int _syncGeneration;
+    private int _playlistSelectionNotifyDepth;
+    private bool _playlistSelectionNotifyPending;
     private bool _deferActivate;
     private bool _restoreListFocus;
     private int _restoreListFocusGeneration;
@@ -292,6 +294,9 @@ internal sealed class LibraryBrowserView : UserControl
     private bool _contextMenuDismissGuard;
 
     public event EventHandler<DocumentSession>? SessionActivated;
+
+    /// <summary>プレイリストの選択集合が変わった。複数選択の平均ラウドネス用。</summary>
+    public event EventHandler? PlaylistSelectionChanged;
 
     /// <summary>ダブルクリック。停止中でも再生する。</summary>
     public event EventHandler<DocumentSession>? SessionPlayRequested;
@@ -2023,6 +2028,7 @@ internal sealed class LibraryBrowserView : UserControl
         var lo = Math.Min(from, to);
         var hi = Math.Max(from, to);
         _syncing = true;
+        SuspendPlaylistSelectionNotify();
         try
         {
             _grid.SelectedItems.Clear();
@@ -2072,6 +2078,7 @@ internal sealed class LibraryBrowserView : UserControl
         finally
         {
             _syncing = false;
+            ResumePlaylistSelectionNotify();
         }
     }
 
@@ -2301,6 +2308,7 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         _syncing = true;
+        SuspendPlaylistSelectionNotify();
         try
         {
             _grid.SelectAll();
@@ -2308,6 +2316,7 @@ internal sealed class LibraryBrowserView : UserControl
         finally
         {
             _syncing = false;
+            ResumePlaylistSelectionNotify();
         }
 
         FocusList();
@@ -2825,6 +2834,19 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void ApplyRowSelectionCore(DocumentSession? active, IReadOnlyList<DocumentSession>? selected)
     {
+        SuspendPlaylistSelectionNotify();
+        try
+        {
+            ApplyRowSelectionCoreCore(active, selected);
+        }
+        finally
+        {
+            ResumePlaylistSelectionNotify();
+        }
+    }
+
+    private void ApplyRowSelectionCoreCore(DocumentSession? active, IReadOnlyList<DocumentSession>? selected)
+    {
         var keep = selected is { Count: > 0 }
             ? selected
             : active is null ? [] : (IReadOnlyList<DocumentSession>)[active];
@@ -2965,6 +2987,7 @@ internal sealed class LibraryBrowserView : UserControl
         var lo = Math.Min(from, to);
         var hi = Math.Max(from, to);
         _syncing = true;
+        SuspendPlaylistSelectionNotify();
         try
         {
             _grid.SelectedItems.Clear();
@@ -2989,6 +3012,7 @@ internal sealed class LibraryBrowserView : UserControl
         finally
         {
             _syncing = false;
+            ResumePlaylistSelectionNotify();
         }
     }
 
@@ -7494,7 +7518,7 @@ internal sealed class LibraryBrowserView : UserControl
 
             var document = session.Document;
             if (!AudioCodec.IsUncompressedPcm(document.SourceKind)
-                || document.Tags.IntegratedLufs is not null
+                || document.Tags.HasFileLoudness
                 || document.SourcePath is not { Length: > 0 })
             {
                 continue;
@@ -7517,25 +7541,25 @@ internal sealed class LibraryBrowserView : UserControl
             }
 
             var document = session.Document;
-            if (document.Tags.IntegratedLufs is not null
+            if (document.Tags.HasFileLoudness
                 || document.SourcePath is not { Length: > 0 } path)
             {
                 continue;
             }
 
-            float? measured;
+            FileLoudness? measured;
             try
             {
                 measured = await Task.Run(
                     () =>
                     {
-                        // 行作成後にキャッシュが載った／他経路で埋まった場合。
-                        if (LibraryMediaCache.TryGetLoudness(path, out var cached))
+                        // 行作成後に5項目キャッシュが載った／他経路で埋まった場合。
+                        if (LibraryMediaCache.TryGetFileLoudness(path, out var cached))
                         {
-                            return (float?)cached;
+                            return (FileLoudness?)cached;
                         }
 
-                        if (!LoudnessMeterEngine.TryMeasureIntegratedLufs(
+                        if (!LoudnessMeterEngine.TryMeasureFileLoudness(
                                 document,
                                 out var value,
                                 cancellationToken))
@@ -7543,7 +7567,7 @@ internal sealed class LibraryBrowserView : UserControl
                             return null;
                         }
 
-                        LibraryMediaCache.PutLoudness(path, value);
+                        LibraryMediaCache.PutFileLoudness(path, value);
                         return value;
                     },
                     cancellationToken).ConfigureAwait(true);
@@ -7567,7 +7591,7 @@ internal sealed class LibraryBrowserView : UserControl
                 continue;
             }
 
-            document.ApplyTags(document.Tags.WithIntegratedLufs(measured.Value));
+            document.ApplyTags(document.Tags.WithFileLoudness(measured.Value));
             pending.Add(session);
 
             // まとめて行を差し替え、選択の再適用・フォーカス奪取を毎回やらない。
@@ -7662,6 +7686,8 @@ internal sealed class LibraryBrowserView : UserControl
         {
             EnsureListFocused();
         }
+
+        NotePlaylistSelectionChanged();
     }
 
     private static string CellText(LibraryFileRow row, LibraryFileColumn column) =>
@@ -7776,6 +7802,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void Grid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        NotePlaylistSelectionChanged();
         if (_syncing || _deferActivate || SelectedSession is not { } session)
         {
             return;
@@ -8032,6 +8059,7 @@ internal sealed class LibraryBrowserView : UserControl
 
         var item = _grid.Items[index];
         _syncing = true;
+        SuspendPlaylistSelectionNotify();
         try
         {
             if (_grid.SelectedItems.Contains(item))
@@ -8052,7 +8080,35 @@ internal sealed class LibraryBrowserView : UserControl
         finally
         {
             _syncing = false;
+            ResumePlaylistSelectionNotify();
         }
+    }
+
+    private void SuspendPlaylistSelectionNotify() => _playlistSelectionNotifyDepth++;
+
+    private void ResumePlaylistSelectionNotify()
+    {
+        if (_playlistSelectionNotifyDepth > 0)
+        {
+            _playlistSelectionNotifyDepth--;
+        }
+
+        if (_playlistSelectionNotifyDepth == 0 && _playlistSelectionNotifyPending)
+        {
+            _playlistSelectionNotifyPending = false;
+            PlaylistSelectionChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void NotePlaylistSelectionChanged()
+    {
+        if (_playlistSelectionNotifyDepth > 0)
+        {
+            _playlistSelectionNotifyPending = true;
+            return;
+        }
+
+        PlaylistSelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private static LibraryFileRow? FindPlaylistRow(DependencyObject origin)
@@ -9274,12 +9330,23 @@ internal sealed class LibraryBrowserView : UserControl
     internal static AudioFileTags HydrateIntegratedLufsFromCache(AudioDocument document)
     {
         var tags = document.Tags;
-        if (!AudioCodec.IsUncompressedPcm(document.SourceKind) || tags.IntegratedLufs is not null)
+        if (!AudioCodec.IsUncompressedPcm(document.SourceKind) || tags.HasFileLoudness)
         {
             return tags;
         }
 
-        if (document.SourcePath is not { Length: > 0 } path
+        if (document.SourcePath is not { Length: > 0 } path)
+        {
+            return tags;
+        }
+
+        if (LibraryMediaCache.TryGetFileLoudness(path, out var loudness))
+        {
+            document.ApplyTags(tags.WithFileLoudness(loudness));
+            return document.Tags;
+        }
+
+        if (tags.IntegratedLufs is not null
             || !LibraryMediaCache.TryGetLoudness(path, out var lufs))
         {
             return tags;

@@ -216,13 +216,33 @@ internal sealed class LoudnessMeterEngine
             return false;
         }
 
+        if (!TryMeasureFileLoudness(document, out var loudness, cancellationToken))
+        {
+            return false;
+        }
+
+        integratedLufs = loudness.IntegratedLufs;
+        return true;
+    }
+
+    /// <summary>非圧縮 PCM の5項目。メモリ上の PCM があればそれを使い、無ければパスから測る。</summary>
+    public static bool TryMeasureFileLoudness(
+        AudioDocument document,
+        out FileLoudness loudness,
+        CancellationToken cancellationToken = default)
+    {
+        loudness = default;
+        if (!AudioCodec.IsUncompressedPcm(document.SourceKind))
+        {
+            return false;
+        }
+
         if (document.Interleaved is { Length: > 0 } pcm
             && document.Channels > 0
             && document.SampleRate > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var snap = MeasureFile(pcm, document.Channels, document.SampleRate);
-            integratedLufs = snap.IntegratedLufs;
+            loudness = FileLoudness.FromSnapshot(MeasureFile(pcm, document.Channels, document.SampleRate));
             return true;
         }
 
@@ -231,7 +251,7 @@ internal sealed class LoudnessMeterEngine
             return false;
         }
 
-        return TryMeasureIntegratedFromPath(path, out integratedLufs, cancellationToken);
+        return TryMeasureFileLoudnessFromPath(path, out loudness, cancellationToken);
     }
 
     /// <summary>パスから PCM を流し Integrated LUFS を測る（全サンプル。重い）。</summary>
@@ -241,6 +261,21 @@ internal sealed class LoudnessMeterEngine
         CancellationToken cancellationToken = default)
     {
         integratedLufs = float.NaN;
+        if (!TryMeasureFileLoudnessFromPath(path, out var loudness, cancellationToken))
+        {
+            return false;
+        }
+
+        integratedLufs = loudness.IntegratedLufs;
+        return true;
+    }
+
+    private static bool TryMeasureFileLoudnessFromPath(
+        string path,
+        out FileLoudness loudness,
+        CancellationToken cancellationToken = default)
+    {
+        loudness = default;
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var gate = PeakPyramid.DecodeGateFor(path);
         gate.Wait(cancellationToken);
@@ -253,7 +288,7 @@ internal sealed class LoudnessMeterEngine
             var frames = AudioCodec.EstimateStreamFrameCount(stream);
             if (frames <= 0)
             {
-                integratedLufs = LoudnessSnapshot.Idle.IntegratedLufs;
+                loudness = FileLoudness.FromSnapshot(LoudnessSnapshot.Idle);
                 return true;
             }
 
@@ -301,7 +336,8 @@ internal sealed class LoudnessMeterEngine
                 frame += n;
             }
 
-            integratedLufs = engine.Snapshot.IntegratedLufs;
+            loudness = FileLoudness.FromSnapshot(
+                engine.Snapshot with { ShortTermLufs = engine.MaxShortTermLufs });
             return true;
         }
         catch (Exception ex) when (ex is IOException
@@ -618,6 +654,34 @@ internal sealed class LoudnessMeterEngine
         Math.Pow(10d, (lufs + 0.691) / 10d);
 
     /// <summary>
+    /// 有限な Integrated の算術平均。未計測・非有限は除く。1 件も無ければ false。
+    /// </summary>
+    internal static bool TryAverageIntegratedLufs(IEnumerable<float?> values, out float average)
+    {
+        double sum = 0;
+        var count = 0;
+        foreach (var value in values)
+        {
+            if (value is not float lufs || !float.IsFinite(lufs))
+            {
+                continue;
+            }
+
+            sum += lufs;
+            count++;
+        }
+
+        if (count == 0)
+        {
+            average = float.NegativeInfinity;
+            return false;
+        }
+
+        average = (float)(sum / count);
+        return true;
+    }
+
+    /// <summary>
     /// Integrated をターゲット LKFS に揃えるゲイン（dB）。測れない／無音／実質 0 dB なら false。
     /// </summary>
     public static bool TryGainDbToMatchTarget(
@@ -755,6 +819,62 @@ internal sealed class LoudnessMeterEngine
             _z2 = _b2 * x - _a2 * y;
             return (float)y;
         }
+    }
+}
+
+/// <summary>1曲を通した5項目。Short Term と Momentary はファイル内の最大。</summary>
+internal readonly record struct FileLoudness(
+    float ShortTermMaxLufs,
+    float IntegratedLufs,
+    float MomentaryMaxLufs,
+    float LoudnessRangeLu,
+    float TruePeakDb)
+{
+    public static FileLoudness FromSnapshot(LoudnessSnapshot snap) =>
+        new(snap.ShortTermLufs, snap.IntegratedLufs, snap.MomentaryMaxLufs, snap.LoudnessRangeLu, snap.TruePeakDb);
+
+    public FileLoudness WithLinearGain(float linearGain) =>
+        new(
+            LoudnessMeterEngine.ApplyLinearGainToLufs(ShortTermMaxLufs, linearGain),
+            LoudnessMeterEngine.ApplyLinearGainToLufs(IntegratedLufs, linearGain),
+            LoudnessMeterEngine.ApplyLinearGainToLufs(MomentaryMaxLufs, linearGain),
+            LoudnessRangeLu,
+            LoudnessMeterEngine.ApplyLinearGainToLufs(TruePeakDb, linearGain));
+
+    public static FileLoudness Average(IReadOnlyList<FileLoudness> items)
+    {
+        return new(
+            Mean(items, static item => item.ShortTermMaxLufs),
+            Mean(items, static item => item.IntegratedLufs),
+            Mean(items, static item => item.MomentaryMaxLufs),
+            Mean(items, static item => item.LoudnessRangeLu),
+            Mean(items, static item => item.TruePeakDb));
+    }
+
+    public bool SameAs(FileLoudness other) =>
+        ShortTermMaxLufs.Equals(other.ShortTermMaxLufs)
+        && IntegratedLufs.Equals(other.IntegratedLufs)
+        && MomentaryMaxLufs.Equals(other.MomentaryMaxLufs)
+        && LoudnessRangeLu.Equals(other.LoudnessRangeLu)
+        && TruePeakDb.Equals(other.TruePeakDb);
+
+    private static float Mean(IReadOnlyList<FileLoudness> items, Func<FileLoudness, float> pick)
+    {
+        double sum = 0;
+        var count = 0;
+        foreach (var item in items)
+        {
+            var value = pick(item);
+            if (!float.IsFinite(value))
+            {
+                continue;
+            }
+
+            sum += value;
+            count++;
+        }
+
+        return count == 0 ? float.NegativeInfinity : (float)(sum / count);
     }
 }
 

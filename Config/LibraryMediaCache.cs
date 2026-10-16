@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
+using MgaSonicAnvil.Audio;
 
 namespace MgaSonicAnvil.Config;
 
@@ -14,9 +15,11 @@ internal static class LibraryMediaCache
     private const uint WaveMagic = 0x57415631; // WAV1
     private const uint ArtMagic = 0x41525431; // ART1
     private const uint LoudnessMagic = 0x4C554631; // LUF1
+    private const uint FileLoudnessMagic = 0x4C554632; // LUF2
     private const int WaveVersion = 1;
     private const int ArtVersion = 1;
     private const int LoudnessVersion = 1;
+    private const int FileLoudnessVersion = 1;
 
     private static readonly object Gate = new();
     private static string? _directoryOverride;
@@ -191,7 +194,7 @@ internal static class LibraryMediaCache
             var version = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(4));
             var storedSize = BinaryPrimitives.ReadInt64LittleEndian(bytes.AsSpan(12));
             var storedMtime = BinaryPrimitives.ReadInt64LittleEndian(bytes.AsSpan(20));
-            if (magic != LoudnessMagic
+            if ((magic != LoudnessMagic && magic != FileLoudnessMagic)
                 || version != LoudnessVersion
                 || storedSize != size
                 || storedMtime != mtime)
@@ -205,6 +208,92 @@ internal static class LibraryMediaCache
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
             return false;
+        }
+    }
+
+    /// <summary>5項目。LUF1（Integrated だけ）は false。</summary>
+    public static bool TryGetFileLoudness(string path, out FileLoudness loudness)
+    {
+        loudness = default;
+        if (!TryStat(path, out var full, out var size, out var mtime))
+        {
+            return false;
+        }
+
+        var file = LoudnessPath(full);
+        try
+        {
+            if (!File.Exists(file))
+            {
+                return false;
+            }
+
+            var bytes = File.ReadAllBytes(file);
+            if (bytes.Length < 48)
+            {
+                return false;
+            }
+
+            var magic = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(0));
+            var version = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(4));
+            var storedSize = BinaryPrimitives.ReadInt64LittleEndian(bytes.AsSpan(12));
+            var storedMtime = BinaryPrimitives.ReadInt64LittleEndian(bytes.AsSpan(20));
+            if (magic != FileLoudnessMagic
+                || version != FileLoudnessVersion
+                || storedSize != size
+                || storedMtime != mtime)
+            {
+                return false;
+            }
+
+            var integrated = BinaryPrimitives.ReadSingleLittleEndian(bytes.AsSpan(28));
+            if (float.IsNaN(integrated))
+            {
+                return false;
+            }
+
+            loudness = new FileLoudness(
+                BinaryPrimitives.ReadSingleLittleEndian(bytes.AsSpan(32)),
+                integrated,
+                BinaryPrimitives.ReadSingleLittleEndian(bytes.AsSpan(36)),
+                BinaryPrimitives.ReadSingleLittleEndian(bytes.AsSpan(40)),
+                BinaryPrimitives.ReadSingleLittleEndian(bytes.AsSpan(44)));
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    public static void PutFileLoudness(string path, FileLoudness loudness)
+    {
+        if (float.IsNaN(loudness.IntegratedLufs)
+            || !TryStat(path, out var full, out var size, out var mtime))
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(RootDirectory);
+            var file = LoudnessPath(full);
+            var bytes = new byte[48];
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(0), FileLoudnessMagic);
+            BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(4), FileLoudnessVersion);
+            BinaryPrimitives.WriteInt64LittleEndian(bytes.AsSpan(12), size);
+            BinaryPrimitives.WriteInt64LittleEndian(bytes.AsSpan(20), mtime);
+            BinaryPrimitives.WriteSingleLittleEndian(bytes.AsSpan(28), loudness.IntegratedLufs);
+            BinaryPrimitives.WriteSingleLittleEndian(bytes.AsSpan(32), loudness.ShortTermMaxLufs);
+            BinaryPrimitives.WriteSingleLittleEndian(bytes.AsSpan(36), loudness.MomentaryMaxLufs);
+            BinaryPrimitives.WriteSingleLittleEndian(bytes.AsSpan(40), loudness.LoudnessRangeLu);
+            BinaryPrimitives.WriteSingleLittleEndian(bytes.AsSpan(44), loudness.TruePeakDb);
+            var tmp = file + ".tmp";
+            File.WriteAllBytes(tmp, bytes);
+            File.Move(tmp, file, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
         }
     }
 
