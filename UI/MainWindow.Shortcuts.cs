@@ -384,12 +384,16 @@ public partial class MainWindow
             return true;
         }
 
-        // F5 はツリー再読込＋索引温め（すりガラスでロック。発見はディスクが正なので必須ではない）。
+        // F5 はツリー再読込だけ。Ctrl+F5 は索引の再構築（すりガラスでロック）。
         if (IsLibraryMaximized && LibraryPlayerMode.IsExplorerRefresh(key, modifiers))
         {
-            LibraryBrowser.RefreshExplorer();
-            LibraryBrowser.FocusExplorer();
-            _ = WarmupLibraryCatalogAsync();
+            RefreshLibraryTree();
+            return true;
+        }
+
+        if (IsLibraryMaximized && LibraryPlayerMode.IsLibraryCatalogRebuild(key, modifiers))
+        {
+            RebuildLibraryCatalog();
             return true;
         }
 

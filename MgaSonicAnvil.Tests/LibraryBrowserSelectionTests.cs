@@ -963,6 +963,8 @@ public sealed class LibraryBrowserSelectionTests
                 UiStrings.LibraryMenuAddToFavorites,
                 UiStrings.LibraryMenuAddAsExplorerRoot,
                 UiStrings.LibraryMenuRemoveExplorerRoot,
+                UiStrings.LibraryMenuRefreshExplorer,
+                UiStrings.LibraryMenuRebuildCatalog,
                 UiStrings.LibraryMenuCopy,
                 UiStrings.LibraryMenuCopyFileName,
                 UiStrings.LibraryMenuCopyFilePath,
@@ -971,7 +973,13 @@ public sealed class LibraryBrowserSelectionTests
             items.Select(item => (string)item.Header).ToArray());
             Assert.Equal("Enter", items[0].InputGestureText);
             Assert.Equal("Shift+Enter", items[1].InputGestureText);
-            Assert.Equal("Ctrl+C", items[5].InputGestureText);
+            Assert.Equal("F5", items[5].InputGestureText);
+            Assert.Equal("Ctrl+F5", items[6].InputGestureText);
+            Assert.Equal("Ctrl+C", items[7].InputGestureText);
+            var rebuilt = 0;
+            view.LibraryCatalogRebuildRequested += (_, _) => rebuilt++;
+            items[6].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.Equal(1, rebuilt);
             items[0].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             items[1].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             Assert.Equal(1, replaced);

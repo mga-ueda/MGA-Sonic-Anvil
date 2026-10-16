@@ -5328,8 +5328,22 @@ public partial class MainWindow
         bool playlistWasEmpty) =>
         firstInBatch && (playFirst || playlistWasEmpty);
 
+    /// <summary>F5。フォルダツリーだけ読み直す。</summary>
+    private void RefreshLibraryTree()
+    {
+        LibraryBrowser.RefreshExplorer();
+        LibraryBrowser.FocusExplorer();
+    }
+
+    /// <summary>Ctrl+F5。ツリーを読み直し、索引を再構築する。</summary>
+    private void RebuildLibraryCatalog()
+    {
+        RefreshLibraryTree();
+        _ = WarmupLibraryCatalogAsync();
+    }
+
     /// <summary>
-    /// F5。Explorer ルート配下をタグ／波形／ジャケットまで温める。すりガラスで操作を止める。
+    /// Ctrl+F5。Explorer ルート配下をタグ／波形／ジャケットまで温める。すりガラスで操作を止める。
     /// </summary>
     private async Task WarmupLibraryCatalogAsync()
     {

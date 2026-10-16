@@ -346,6 +346,9 @@ internal sealed class LibraryBrowserView : UserControl
 
     public event EventHandler? ExportMp3Requested;
 
+    /// <summary>Ctrl+F5 と同じ索引の再構築。</summary>
+    public event EventHandler? LibraryCatalogRebuildRequested;
+
     /// <summary>リストの右クリックメニューを開いた／閉じた。F10 誤解除や plain-press 確定を抑止する。</summary>
     public event EventHandler? ListContextMenuOpened;
 
@@ -3055,8 +3058,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     /// <summary>
     /// ディスク上のフォルダ一覧を取り込み直す。展開状態は残し、選択もできるだけ戻す。F5。
-    /// ファイル発見は常にディスクが正なので F5 は必須ではない。
-    /// キャッシュ温めは MainWindow 側ですりガラス付きで行う。
+    /// 索引の再構築は Ctrl+F5。
     /// </summary>
     public void RefreshExplorer()
     {
@@ -9658,11 +9660,30 @@ internal sealed class LibraryBrowserView : UserControl
         addRoot.Click += (_, _) => AddSelectedExplorerToRoots();
         var removeRoot = new MenuItem { Header = UiStrings.LibraryMenuRemoveExplorerRoot };
         removeRoot.Click += (_, _) => RemoveSelectedExplorerRoots();
+        var refresh = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuRefreshExplorer,
+            InputGestureText = "F5",
+        };
+        refresh.Click += (_, _) =>
+        {
+            RefreshExplorer();
+            FocusExplorer();
+        };
+        var rebuild = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuRebuildCatalog,
+            InputGestureText = "Ctrl+F5",
+        };
+        rebuild.Click += (_, _) => LibraryCatalogRebuildRequested?.Invoke(this, EventArgs.Empty);
         menu.Items.Add(replace);
         menu.Items.Add(append);
         menu.Items.Add(add);
         menu.Items.Add(addRoot);
         menu.Items.Add(removeRoot);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(refresh);
+        menu.Items.Add(rebuild);
         AddCopyAndExplorerMenuItems(menu, LibraryPane.Explorer, out var copy, out var copyNames, out var copyPaths, out var explorer);
         menu.Opened += (_, _) =>
         {

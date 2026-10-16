@@ -515,6 +515,7 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F2, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F3, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F5, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F5, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Tab, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Tab, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.F10, ModifierKeys.None));
@@ -550,8 +551,11 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.IsExplorerRefresh(Key.F5, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.IsExplorerRefresh(Key.F5, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.IsExplorerRefresh(Key.F1, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsLibraryCatalogRebuild(Key.F5, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.IsLibraryCatalogRebuild(Key.F5, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsLibraryCatalogRebuild(Key.F5, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.F5, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.AllowsKey(Key.F5, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.F5, ModifierKeys.Control));
     }
 
     [Fact]
