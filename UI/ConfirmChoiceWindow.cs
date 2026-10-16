@@ -5,7 +5,7 @@ using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>はい／いいえ（／キャンセル）をアプリの文言で出す確認。OS の MessageBox にはしない。</summary>
+/// <summary>OK／Cancel、Yes／No をアプリの文言で出す確認。OS の MessageBox にはしない。</summary>
 internal sealed class ConfirmChoiceWindow : Window
 {
     public MessageBoxResult Result { get; private set; }
@@ -33,10 +33,18 @@ internal sealed class ConfirmChoiceWindow : Window
     }
 
     internal static bool UsesAppButtons(MessageBoxButton buttons) =>
-        buttons is MessageBoxButton.YesNo or MessageBoxButton.YesNoCancel;
+        buttons is MessageBoxButton.OK
+            or MessageBoxButton.OKCancel
+            or MessageBoxButton.YesNo
+            or MessageBoxButton.YesNoCancel;
 
     internal static MessageBoxResult DismissResult(MessageBoxButton buttons) =>
-        buttons == MessageBoxButton.YesNoCancel ? MessageBoxResult.Cancel : MessageBoxResult.No;
+        buttons switch
+        {
+            MessageBoxButton.OK => MessageBoxResult.OK,
+            MessageBoxButton.YesNo => MessageBoxResult.No,
+            _ => MessageBoxResult.Cancel,
+        };
 
     internal static bool IsDefaultChoice(
         MessageBoxResult choice,
@@ -79,23 +87,44 @@ internal sealed class ConfirmChoiceWindow : Window
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
         };
-        row.Children.Add(CreateButton(
-            UiStrings.ButtonYes,
-            MessageBoxResult.Yes,
-            accent: true,
-            isDefault: IsDefaultChoice(MessageBoxResult.Yes, defaultResult, buttons)));
-        row.Children.Add(CreateButton(
-            UiStrings.ButtonNo,
-            MessageBoxResult.No,
-            isDefault: IsDefaultChoice(MessageBoxResult.No, defaultResult, buttons),
-            isCancel: buttons == MessageBoxButton.YesNo));
-        if (buttons == MessageBoxButton.YesNoCancel)
+        if (buttons is MessageBoxButton.OK or MessageBoxButton.OKCancel)
+        {
+            var okDefault = defaultResult != MessageBoxResult.Cancel;
+            row.Children.Add(CreateButton(
+                UiStrings.ButtonOk,
+                MessageBoxResult.OK,
+                accent: true,
+                isDefault: okDefault,
+                isCancel: buttons == MessageBoxButton.OK));
+            if (buttons == MessageBoxButton.OKCancel)
+            {
+                row.Children.Add(CreateButton(
+                    UiStrings.ButtonCancel,
+                    MessageBoxResult.Cancel,
+                    isDefault: !okDefault,
+                    isCancel: true));
+            }
+        }
+        else
         {
             row.Children.Add(CreateButton(
-                UiStrings.ButtonYesNoCancel,
-                MessageBoxResult.Cancel,
-                isDefault: IsDefaultChoice(MessageBoxResult.Cancel, defaultResult, buttons),
-                isCancel: true));
+                UiStrings.ButtonYes,
+                MessageBoxResult.Yes,
+                accent: true,
+                isDefault: IsDefaultChoice(MessageBoxResult.Yes, defaultResult, buttons)));
+            row.Children.Add(CreateButton(
+                UiStrings.ButtonNo,
+                MessageBoxResult.No,
+                isDefault: IsDefaultChoice(MessageBoxResult.No, defaultResult, buttons),
+                isCancel: buttons == MessageBoxButton.YesNo));
+            if (buttons == MessageBoxButton.YesNoCancel)
+            {
+                row.Children.Add(CreateButton(
+                    UiStrings.ButtonYesNoCancel,
+                    MessageBoxResult.Cancel,
+                    isDefault: IsDefaultChoice(MessageBoxResult.Cancel, defaultResult, buttons),
+                    isCancel: true));
+            }
         }
 
         var root = new StackPanel();

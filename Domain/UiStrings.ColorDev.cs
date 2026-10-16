@@ -5,7 +5,7 @@ internal static partial class UiStrings
     /// <summary>実行時の配色はダーク固定。テーマ引数は呼び出し互換のため残す。</summary>
     public static string ColorDevTitleFor(UiTheme _) =>
         Get("色設定", "Color settings");
-    public static string ColorDevClose => Get("閉じる", "Close");
+    public static string ColorDevClose => Get("Close", "Close");
     public static string ColorDevResetToDefaults => Get("既定に戻す", "Reset to defaults");
     public static string ColorDevResetThis => Get("この色を既定に戻す", "Reset this color");
     public static string ColorDevExport => Get("エクスポート", "Export");
@@ -211,17 +211,19 @@ internal static partial class UiStrings
             "WindowBack" => Get("ウィンドウ背景", "Window background"),
             "ColorPanelBack" => Get("色パネル背景", "Color panel background"),
             "ExportButtonFill" => Get("OK・塗り", "OK · fill"),
+            "ExportButtonFocusFill" => Get("OK・フォーカス塗り", "OK · focus fill"),
             "ExportButtonHoverFill" => Get("OK・ホバー塗り", "OK · hover fill"),
             "ExportButtonBack" => Get("OK・枠", "OK · border"),
             "ExportButtonHoverBack" => Get("OK・ホバー枠", "OK · hover border"),
             "ExportButtonPressedBack" => Get("OK・押下枠", "OK · pressed border"),
             "ExportButtonFore" => Get("OK・文字", "OK · text"),
-            "ClearButtonFill" => Get("キャンセル・塗り", "Cancel · fill"),
-            "ClearButtonHoverFill" => Get("キャンセル・ホバー塗り", "Cancel · hover fill"),
-            "ClearButtonBack" => Get("キャンセル・枠", "Cancel · border"),
-            "ClearButtonHoverBack" => Get("キャンセル・ホバー枠", "Cancel · hover border"),
-            "ClearButtonPressedBack" => Get("キャンセル・押下枠", "Cancel · pressed border"),
-            "ClearButtonFore" => Get("キャンセル・文字", "Cancel · text"),
+            "ClearButtonFill" => Get("Cancel・塗り", "Cancel · fill"),
+            "ClearButtonFocusFill" => Get("Cancel・フォーカス塗り", "Cancel · focus fill"),
+            "ClearButtonHoverFill" => Get("Cancel・ホバー塗り", "Cancel · hover fill"),
+            "ClearButtonBack" => Get("Cancel・枠", "Cancel · border"),
+            "ClearButtonHoverBack" => Get("Cancel・ホバー枠", "Cancel · hover border"),
+            "ClearButtonPressedBack" => Get("Cancel・押下枠", "Cancel · pressed border"),
+            "ClearButtonFore" => Get("Cancel・文字", "Cancel · text"),
             _ => token,
         };
     }

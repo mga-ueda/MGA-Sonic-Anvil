@@ -19,6 +19,10 @@ internal sealed class RoundedButton : Button
         DependencyProperty.Register(nameof(HoverBackColor), typeof(Color?), typeof(RoundedButton),
             new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
+    public static readonly DependencyProperty FocusBackColorProperty =
+        DependencyProperty.Register(nameof(FocusBackColor), typeof(Color?), typeof(RoundedButton),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
     public static readonly DependencyProperty PressedBackColorProperty =
         DependencyProperty.Register(nameof(PressedBackColor), typeof(Color?), typeof(RoundedButton),
             new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
@@ -87,6 +91,12 @@ internal sealed class RoundedButton : Button
     {
         get => (Color?)GetValue(HoverBackColorProperty);
         set => SetValue(HoverBackColorProperty, value);
+    }
+
+    public Color? FocusBackColor
+    {
+        get => (Color?)GetValue(FocusBackColorProperty);
+        set => SetValue(FocusBackColorProperty, value);
     }
 
     public Color? PressedBackColor
@@ -296,7 +306,12 @@ internal sealed class RoundedButton : Button
             return pressed;
         }
 
-        if ((_hover || IsKeyboardFocused) && HoverBackColor is Color hover)
+        if (IsKeyboardFocused && FocusBackColor is Color focus)
+        {
+            return focus;
+        }
+
+        if (_hover && HoverBackColor is Color hover)
         {
             return hover;
         }
@@ -336,6 +351,7 @@ internal static class ActionButtonLooks
         Apply(
             button,
             Theme.Get("ClearButtonFillBrush"),
+            Theme.Get("ClearButtonFocusFillBrush"),
             Theme.Get("ClearButtonHoverFillBrush"),
             Theme.Get("ClearButtonBackBrush"),
             Theme.Get("ClearButtonHoverBackBrush"),
@@ -346,6 +362,7 @@ internal static class ActionButtonLooks
         Apply(
             button,
             Theme.Get("ExportButtonFillBrush"),
+            Theme.Get("ExportButtonFocusFillBrush"),
             Theme.Get("ExportButtonHoverFillBrush"),
             Theme.Get("ExportButtonBackBrush"),
             Theme.Get("ExportButtonHoverBackBrush"),
@@ -357,6 +374,7 @@ internal static class ActionButtonLooks
         Apply(
             button,
             Theme.Get("StatusExportButtonFillBrush"),
+            Theme.Get("StatusExportButtonHoverFillBrush"),
             Theme.Get("StatusExportButtonHoverFillBrush"),
             Theme.Get("StatusExportButtonBackBrush"),
             Theme.Get("StatusExportButtonHoverBackBrush"),
@@ -371,6 +389,7 @@ internal static class ActionButtonLooks
     private static void Apply(
         RoundedButton button,
         Color fill,
+        Color focusFill,
         Color hoverFill,
         Color border,
         Color hoverBorder,
@@ -379,6 +398,7 @@ internal static class ActionButtonLooks
         double borderSize = 2)
     {
         button.Background = WpfControlHelpers.FrozenBrush(fill);
+        button.FocusBackColor = focusFill;
         button.HoverBackColor = hoverFill;
         button.PressedBackColor = fill;
         button.DisabledBackColor = Theme.Get("ChromeBackBrush");
