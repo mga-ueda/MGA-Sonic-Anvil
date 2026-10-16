@@ -6,7 +6,8 @@ namespace MgaSonicAnvil.UI;
 
 /// <summary>
 /// プレイヤーのライブラリ／プレイリスト検索。空白は AND、<c>|</c> は OR。
-/// ライブラリはファイル名とフォルダ名、プレイリストはすべての列。
+/// ライブラリはファイル名、祖先フォルダ名、索引済みタグ。プレイリストはすべての列。
+/// タグが未構築のファイルは、タグではヒットしない。
 /// </summary>
 internal static class LibrarySearchQuery
 {
@@ -54,11 +55,12 @@ internal static class LibrarySearchQuery
         yield return row.Folder;
         yield return row.ParentFolder;
         yield return row.JacketText;
+        yield return row.LoudnessText;
     }
 
     /// <summary>
     /// ヒットしたファイルの親、名前がヒットしたフォルダ、ルートまでの祖先だけ。ヒットの無い枝は含めない。
-    /// ファイルはファイル名と祖先フォルダ名を横断して AND／OR する。
+    /// ファイルはファイル名、祖先フォルダ名、索引済みタグを横断して AND／OR する。
     /// </summary>
     public static HashSet<string> VisibleFolders(
         IReadOnlyList<string> roots,
@@ -70,7 +72,8 @@ internal static class LibrarySearchQuery
         IReadOnlyList<string> roots,
         IEnumerable<string> filePaths,
         IEnumerable<string>? folderPaths,
-        IReadOnlyList<string[]> groups)
+        IReadOnlyList<string[]> groups,
+        IReadOnlyDictionary<string, string[]>? tagTexts = null)
     {
         var visible = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (groups.Count == 0)
@@ -96,7 +99,7 @@ internal static class LibrarySearchQuery
         foreach (var path in filePaths)
         {
             if (string.IsNullOrEmpty(path)
-                || !TileSearchQuery.MatchesAny(FileAndFolderNames(path, normalizedRoots), groups))
+                || !MatchesLibraryFile(path, groups, normalizedRoots, tagTexts))
             {
                 continue;
             }
@@ -124,6 +127,39 @@ internal static class LibrarySearchQuery
         }
 
         return visible;
+    }
+
+    private static IEnumerable<string> LibraryFileTexts(
+        string filePath,
+        IReadOnlyList<string> roots,
+        IReadOnlyDictionary<string, string[]>? tagTexts)
+    {
+        foreach (var name in FileAndFolderNames(filePath, roots))
+        {
+            yield return name;
+        }
+
+        if (tagTexts is null || tagTexts.Count == 0)
+        {
+            yield break;
+        }
+
+        if (!tagTexts.TryGetValue(filePath, out var texts))
+        {
+            var full = NormalizeFolder(filePath);
+            if (full.Length == 0 || !tagTexts.TryGetValue(full, out texts))
+            {
+                yield break;
+            }
+        }
+
+        foreach (var text in texts)
+        {
+            if (!string.IsNullOrEmpty(text))
+            {
+                yield return text;
+            }
+        }
     }
 
     private static IEnumerable<string> FileAndFolderNames(string filePath, IReadOnlyList<string> roots)
@@ -238,17 +274,26 @@ internal static class LibrarySearchQuery
     /// 検索中のプレイリスト登録。見えているフォルダだけ降りる。
     /// ファイル名ヒットはそのファイルだけ。フォルダ名ヒットはそのフォルダ配下すべて。
     /// </summary>
+    public static bool MatchesLibraryFile(
+        string path,
+        IReadOnlyList<string[]> groups,
+        IReadOnlyList<string> roots,
+        IReadOnlyDictionary<string, string[]>? tagTexts) =>
+        TileSearchQuery.MatchesAny(LibraryFileTexts(path, roots, tagTexts), groups);
+
     public static string[] CollectPlaylistFiles(
         IReadOnlyList<string> folders,
         IReadOnlyList<string[]> groups,
-        IEnumerable<string>? visibleFolders)
+        IEnumerable<string>? visibleFolders,
+        IReadOnlyList<string>? roots = null,
+        IReadOnlyDictionary<string, string[]>? tagTexts = null)
     {
         var visible = visibleFolders is null
             ? null
             : new HashSet<string>(
                 visibleFolders.Select(NormalizeFolder).Where(path => path.Length > 0),
                 StringComparer.OrdinalIgnoreCase);
-        var walk = new LibraryExplorerPlaylistWalk(groups, visible);
+        var walk = new LibraryExplorerPlaylistWalk(groups, visible, roots, tagTexts);
         var result = new List<string>();
         var remaining = new Stack<(string Path, bool AncestorHit)>();
         for (var i = folders.Count - 1; i >= 0; i--)
@@ -314,15 +359,25 @@ internal sealed class LibraryExplorerPlaylistWalk
 {
     public static LibraryExplorerPlaylistWalk Inactive { get; } = new([], visible: null);
 
-    public LibraryExplorerPlaylistWalk(IReadOnlyList<string[]> groups, HashSet<string>? visible)
+    public LibraryExplorerPlaylistWalk(
+        IReadOnlyList<string[]> groups,
+        HashSet<string>? visible,
+        IReadOnlyList<string>? roots = null,
+        IReadOnlyDictionary<string, string[]>? tagTexts = null)
     {
         Groups = groups;
         Visible = visible;
+        Roots = roots ?? [];
+        TagTexts = tagTexts;
     }
 
     public IReadOnlyList<string[]> Groups { get; }
 
     public HashSet<string>? Visible { get; }
+
+    public IReadOnlyList<string> Roots { get; }
+
+    public IReadOnlyDictionary<string, string[]>? TagTexts { get; }
 
     public bool Active => Groups.Count > 0;
 
@@ -330,7 +385,7 @@ internal sealed class LibraryExplorerPlaylistWalk
         ancestorHit || (Active && LibrarySearchQuery.MatchesFolderName(directory, Groups));
 
     public bool IncludeFile(string file, bool folderHit) =>
-        !Active || folderHit || LibrarySearchQuery.MatchesFileName(file, Groups);
+        !Active || folderHit || LibrarySearchQuery.MatchesLibraryFile(file, Groups, Roots, TagTexts);
 
     public bool IncludeChild(string child, bool folderHit)
     {
