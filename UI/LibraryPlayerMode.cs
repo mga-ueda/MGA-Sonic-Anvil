@@ -1926,6 +1926,25 @@ internal static class LibraryPlayerMode
         altDown && !shiftDown && !ctrlDown && virtualKey is >= 0x60 and <= 0x69;
 
     /// <summary>
+    /// Alt 解放後の猶予中、または物理的に Alt が上がっているときは修飾が残留している。
+    /// 新しい Alt 押下で猶予を終えるときは altReleasedAt を負にする。
+    /// </summary>
+    public static bool IsStaleAltModifier(bool physicalAltDown, long altReleasedAt, long now, int graceMs) =>
+        (graceMs > 0 && altReleasedAt >= 0 && now >= altReleasedAt && now - altReleasedAt < graceMs)
+        || !physicalAltDown;
+
+    /// <summary>
+    /// Alt 解放後に残ったシステムキーのテンキー。割合ではなく無修飾の再生操作にし、
+    /// DefWindowProc へ渡すとメニュー不一致のシステム音になる。
+    /// </summary>
+    public static bool IsStaleSysNumpad(int virtualKey, bool systemKey, bool altModifierActive, bool shiftDown, bool ctrlDown) =>
+        systemKey
+        && !altModifierActive
+        && !shiftDown
+        && !ctrlDown
+        && virtualKey is >= 0x60 and <= 0x69;
+
+    /// <summary>
     /// マーカー番号の桁送り（Shift＋上段）。
     /// seekId があればその番号へ。無効な桁は percentFallback（呼び出し側で無視可）。
     /// </summary>
