@@ -181,6 +181,7 @@ public sealed class AppSettingsFileTests
             original.LastDocumentPath = @"D:\keep.wav";
             original.LastOpenFolder = @"D:\opens";
             original.LastExportFolder = @"D:\exports";
+            original.LastBouncePath = @"D:\exports\Bounce.wav";
             original.AlwaysOnTop = true;
             AppSettingsFile.Write(path, original);
 
@@ -190,6 +191,7 @@ public sealed class AppSettingsFileTests
             Assert.Equal(@"D:\keep.wav", settings.LastDocumentPath);
             Assert.Equal(@"D:\opens", settings.LastOpenFolder);
             Assert.Equal(@"D:\exports", settings.LastExportFolder);
+            Assert.Equal(@"D:\exports\Bounce.wav", settings.LastBouncePath);
             Assert.True(settings.AlwaysOnTop);
             Assert.Equal(AppSettings.CurrentGeneration, settings.SettingsGeneration);
         }

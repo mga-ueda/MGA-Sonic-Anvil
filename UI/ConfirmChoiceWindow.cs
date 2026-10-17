@@ -15,9 +15,11 @@ internal sealed class ConfirmChoiceWindow : Window
         string text,
         string caption,
         MessageBoxButton buttons,
-        MessageBoxResult defaultResult)
+        MessageBoxResult defaultResult,
+        string? yesText = null,
+        string? noText = null)
     {
-        var dialog = new ConfirmChoiceWindow(text, caption, buttons, defaultResult);
+        var dialog = new ConfirmChoiceWindow(text, caption, buttons, defaultResult, yesText, noText);
         if (owner is not null)
         {
             dialog.Owner = owner;
@@ -64,7 +66,9 @@ internal sealed class ConfirmChoiceWindow : Window
         string text,
         string caption,
         MessageBoxButton buttons,
-        MessageBoxResult defaultResult)
+        MessageBoxResult defaultResult,
+        string? yesText = null,
+        string? noText = null)
     {
         Result = DismissResult(buttons);
         Title = caption;
@@ -108,12 +112,12 @@ internal sealed class ConfirmChoiceWindow : Window
         else
         {
             row.Children.Add(CreateButton(
-                UiStrings.ButtonYes,
+                string.IsNullOrEmpty(yesText) ? UiStrings.ButtonYes : yesText,
                 MessageBoxResult.Yes,
                 accent: true,
                 isDefault: IsDefaultChoice(MessageBoxResult.Yes, defaultResult, buttons)));
             row.Children.Add(CreateButton(
-                UiStrings.ButtonNo,
+                string.IsNullOrEmpty(noText) ? UiStrings.ButtonNo : noText,
                 MessageBoxResult.No,
                 isDefault: IsDefaultChoice(MessageBoxResult.No, defaultResult, buttons),
                 isCancel: buttons == MessageBoxButton.YesNo));

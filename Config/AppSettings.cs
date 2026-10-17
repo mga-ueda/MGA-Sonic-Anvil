@@ -84,6 +84,9 @@ internal sealed class AppSettings
     /// <summary>保存／書き出しで最後に選んだフォルダ。開くとは別。</summary>
     public string LastExportFolder { get; set; } = string.Empty;
 
+    /// <summary>バウンスの保存ダイアログで最後に選んだファイル。フォルダが残っていれば次回の初期位置。</summary>
+    public string LastBouncePath { get; set; } = string.Empty;
+
     /// <summary>ラウドネスメーターのターゲット（LKFS）。既定 -24。</summary>
     public double LoudnessTargetLufs { get; set; } = LoudnessMeterEngine.DefaultTargetLufs;
 

@@ -89,34 +89,118 @@ public sealed class TabMergeTests
     }
 
     [Fact]
-    public void Mix_ResamplesLaterTabsToFirstRate()
+    public void Mix_RejectsDifferentSampleRateAndNamesTheFile()
     {
         var first = new AudioDocument(new float[8], 48000, 2, 24, AudioFileKind.Wave, null);
-        var second = new AudioDocument(new float[4], 24000, 2, 16, AudioFileKind.Wave, null);
-        second.ReplaceMarkers([new MarkerSnapshot(1, "join")], markDirty: false);
+        var second = new AudioDocument(new float[4], 24000, 2, 24, AudioFileKind.Wave, null);
 
-        var merged = TabMerge.Mix([first, second]);
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            TabMerge.Mix([first, second], out _, names: ["keep.wav", "other.wav"]));
 
-        Assert.Equal(48000, merged.SampleRate);
-        Assert.Equal(24, merged.BitsPerSample);
-        Assert.Equal(4, merged.FrameCount);
-        Assert.Equal(new[] { 2L }, merged.Markers.Select(marker => marker.Frame).ToArray());
+        Assert.Contains("other.wav", ex.Message);
+        Assert.Contains("24000", ex.Message);
+        Assert.DoesNotContain("keep.wav", ex.Message.Split('\n').Last());
     }
 
     [Fact]
-    public void Mix_RemixesMonoOntoFirstStereo()
+    public void Mix_RejectsDifferentChannelCount()
     {
-        var stereo = Document([1f, 0f, 1f, 0f], channels: 2);
-        var mono = new AudioDocument([0.5f, -0.25f], 48000, 1, 24, AudioFileKind.Wave, null);
+        var stereo = Document([1f, 0f], channels: 2);
+        var mono = new AudioDocument([0.5f], 48000, 1, 24, AudioFileKind.Wave, null);
 
-        var merged = TabMerge.Mix([stereo, mono]);
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            TabMerge.Mix([stereo, mono], out _, names: ["stereo.wav", "mono.wav"]));
 
-        Assert.Equal(2, merged.Channels);
-        Assert.Equal(2, merged.FrameCount);
-        Assert.Equal(1.5f, merged.Interleaved[0], 3);
-        Assert.Equal(0.5f, merged.Interleaved[1], 3);
-        Assert.Equal(0.75f, merged.Interleaved[2], 3);
-        Assert.Equal(-0.25f, merged.Interleaved[3], 3);
+        Assert.Contains("mono.wav", ex.Message);
+    }
+
+    [Fact]
+    public void Mix_RejectsDifferentBitDepth()
+    {
+        var wide = new AudioDocument(new float[2], 48000, 2, 24, AudioFileKind.Wave, null);
+        var narrow = new AudioDocument(new float[2], 48000, 2, 16, AudioFileKind.Wave, null);
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            TabMerge.Mix([wide, narrow], out _, names: ["wide.wav", "narrow.wav"]));
+
+        Assert.Contains("narrow.wav", ex.Message);
+        Assert.Contains("16", ex.Message);
+    }
+
+    [Fact]
+    public void Mix_ReportsOverageWithoutChangingSamples()
+    {
+        var first = Document([0.8f, -0.2f], channels: 1);
+        var second = new AudioDocument([0.5f, -1.0f], 48000, 1, 24, AudioFileKind.Wave, null);
+
+        var merged = TabMerge.Mix([first, second], out var clip);
+
+        Assert.True(clip.ExceedsFullScale);
+        Assert.Equal(1.3f, clip.Peak, 5);
+        Assert.Equal(1.3f, merged.Interleaved[0], 5);
+        Assert.Equal(-1.2f, merged.Interleaved[1], 5);
+        Assert.Equal("2.3", TabMerge.FormatOverDb(clip.OverDb));
+    }
+
+    [Fact]
+    public void WarnMergeClip_LeavesABlankLineAndUsesYesNoWords()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            var japanese = UiStrings.WarnMergeClip("1");
+            Assert.Contains("切り詰められます。\n\nYes:", japanese);
+            Assert.Contains("\nNo:", japanese);
+            Assert.DoesNotContain("イエス", japanese);
+            Assert.DoesNotContain("ノー", japanese);
+            Assert.Equal("OK", UiStrings.ButtonOk);
+            Assert.Equal("Cancel", UiStrings.ButtonCancel);
+
+            UiStrings.SetLanguage(UiLanguage.English);
+            var english = UiStrings.WarnMergeClip("1");
+            Assert.Contains("excess.\n\nYes:", english);
+            Assert.Contains("\nNo:", english);
+            Assert.Equal("OK", UiStrings.ButtonOk);
+            Assert.Equal("Cancel", UiStrings.ButtonCancel);
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
+    public void FormatOverDb_RoundsOneDecibelToOne()
+    {
+        var peak = Math.Pow(10d, 1d / 20d);
+        Assert.Equal("1", TabMerge.FormatOverDb(LevelMeterEngine.ToDb(peak)));
+    }
+
+    [Fact]
+    public void LowerByOverage_ScalesTheWholeMixToFullScale()
+    {
+        var samples = new[] { 1.3f, -0.65f, 0.2f };
+        TabMerge.LowerByOverage(samples, 1.3f);
+
+        Assert.InRange(Math.Abs(samples[0]), 0.999f, 1f);
+        Assert.Equal(samples[0] * -0.5f, samples[1], 4);
+        Assert.Equal(samples[0] * (0.2f / 1.3f), samples[2], 4);
+        Assert.False(TabMerge.MeasureClip(samples).ExceedsFullScale);
+    }
+
+    [Fact]
+    public void Mix_SameFormat32BitSumsWithoutClip()
+    {
+        var first = new AudioDocument([0.25f, 0.25f], 48000, 2, 32, AudioFileKind.Wave, null);
+        var second = new AudioDocument([0.25f, -0.25f], 48000, 2, 32, AudioFileKind.Wave, null);
+
+        var merged = TabMerge.Mix([first, second], out var clip);
+
+        Assert.False(clip.ExceedsFullScale);
+        Assert.Equal(32, merged.BitsPerSample);
+        Assert.Equal(0.5f, merged.Interleaved[0], 5);
+        Assert.Equal(0f, merged.Interleaved[1], 5);
     }
 
     [Fact]

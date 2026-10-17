@@ -1621,20 +1621,42 @@ public partial class MainWindow
             return;
         }
 
+        var documents = sources.Select(session => session.Document).ToArray();
+        var names = sources.Select(session => session.DisplayName).ToArray();
+        try
+        {
+            TabMerge.EnsureSameFormat(documents, names);
+        }
+        catch (InvalidOperationException ex)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                $"{UiStrings.ErrorMergeFailed}\n{ex.Message}",
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return;
+        }
+
         var dialog = new SaveFileDialog
         {
             Filter = UiStrings.FilterSaveWave,
             Title = UiStrings.TitleMergeTabs,
-            FileName = TabMerge.MergedBaseName + ".wav",
+            FileName = ResolveMergeInitialFileName(),
             OverwritePrompt = true,
             InitialDirectory = ResolveMergeInitialDirectory(sources),
         };
+        if (ExportFolderMemory.TryNormalize(dialog.InitialDirectory, out var bounceDirectory))
+        {
+            dialog.FileName = Path.Combine(bounceDirectory, dialog.FileName);
+        }
         if (dialog.ShowDialog(this) != true)
         {
             return;
         }
 
         var destPath = dialog.FileName;
+        RememberBouncePath(destPath);
         RememberExportFolder(Path.GetDirectoryName(destPath));
         if (IsPlaybackActive())
         {
@@ -1646,10 +1668,34 @@ public partial class MainWindow
         try
         {
             ShowBusyGlass(UiStrings.OverlayMerge);
-            var documents = sources.Select(session => session.Document).ToArray();
             var progress = new Progress<double>(value => _busyGlass.SetProgress(value));
-            var merged = await Task.Run(() => TabMerge.Mix(documents, progress))
+            TabMerge.BounceClipInfo clip = default;
+            var merged = await Task.Run(() =>
+                {
+                    var mix = TabMerge.Mix(documents, out var measured, progress, names);
+                    clip = measured;
+                    return mix;
+                })
                 .ConfigureAwait(true);
+            if (clip.ExceedsFullScale)
+            {
+                _busyGlass.HideOverlay();
+                var answer = OwnerCenteredMessageBox.Show(
+                    this,
+                    UiStrings.WarnMergeClip(TabMerge.FormatOverDb(clip.OverDb)),
+                    UiStrings.TitleMergeTabs,
+                    MessageBoxButton.OKCancel,
+                    MessageBoxImage.Warning,
+                    MessageBoxResult.Cancel);
+                if (answer != MessageBoxResult.OK)
+                {
+                    return;
+                }
+
+                TabMerge.LowerByOverage(merged.Interleaved, clip.Peak);
+                ShowBusyGlass(UiStrings.OverlayMerge);
+            }
+
             await Task.Run(() => AudioCodec.SaveWave(merged, destPath, progress))
                 .ConfigureAwait(true);
             merged.MarkSaved(destPath, AudioFileKind.Wave);
@@ -1682,9 +1728,14 @@ public partial class MainWindow
         }
     }
 
-    /// <summary>保存ダイアログの初期フォルダ。ファイルを持つ最初の選択タブ、無ければ前回の書き出し先。</summary>
+    /// <summary>前回バウンスしたフォルダ。無ければファイルを持つ最初の選択タブ、それも無ければ前回の書き出し先。</summary>
     private static string ResolveMergeInitialDirectory(IReadOnlyList<DocumentSession> sources)
     {
+        if (ExportFolderMemory.TryResolveBounceStart(AppStorage.Settings.LastBouncePath, out var bounceDirectory, out _))
+        {
+            return bounceDirectory;
+        }
+
         foreach (var session in sources)
         {
             if (session.Document.SourcePath is { } path
@@ -1696,6 +1747,31 @@ public partial class MainWindow
         }
 
         return ResolveExportInitialDirectory((string?)null);
+    }
+
+    private static string ResolveMergeInitialFileName()
+    {
+        return ExportFolderMemory.TryResolveBounceStart(AppStorage.Settings.LastBouncePath, out _, out var fileName)
+            ? fileName
+            : TabMerge.MergedBaseName + ".wav";
+    }
+
+    private static void RememberBouncePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)
+            || !ExportFolderMemory.TryNormalize(Path.GetDirectoryName(path), out var directory))
+        {
+            return;
+        }
+
+        var name = Path.GetFileName(path);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        AppStorage.Settings.LastBouncePath = Path.Combine(directory, name);
+        AppStorage.Save();
     }
 
     private void TryDeleteAbandonedMergeFile(string? path)
