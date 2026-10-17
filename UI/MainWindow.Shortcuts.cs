@@ -24,6 +24,10 @@ public partial class MainWindow
     /// <summary>Alt を離した直後、非同期状態や SYSKEY が残っても修飾なしとして扱う時間。</summary>
     private const int AltReleaseGraceMs = 250;
 
+    private static readonly MethodInfo? LeaveMenuModeMethod = typeof(HwndSource).GetMethod(
+        "OnLeaveMenuMode",
+        BindingFlags.Instance | BindingFlags.NonPublic);
+
     private static readonly FieldInfo? KeyScanCodeField = typeof(KeyEventArgs).GetField(
         "_scanCode",
         BindingFlags.Instance | BindingFlags.NonPublic);
@@ -271,14 +275,37 @@ public partial class MainWindow
             return;
         }
 
-        _altDownMask &= ~bit;
-        if (_altDownMask != 0)
+        // 左右どちらか一方のキーアップでも全部落とす。
+        // ビットが残ると、単独の Alt をもう一度押すまで次のテンキーがメニュー扱いになり、
+        // Win32 がシステム音を鳴らしてショートカットまで届かない。
+        ClearLatchedAlt();
+    }
+
+    private void ClearLatchedAlt()
+    {
+        _altDownMask = 0;
+        _altReleasedAt = Environment.TickCount64;
+        _altNumpadDown.Clear();
+        _staleSysNumpadDown.Clear();
+        _numpadPercentJumpDigit = -1;
+        Dispatcher.BeginInvoke(LeaveWin32MenuMode, System.Windows.Threading.DispatcherPriority.Send);
+    }
+
+    private void LeaveWin32MenuMode()
+    {
+        if (PresentationSource.FromVisual(this) is not HwndSource source)
         {
             return;
         }
 
-        _altReleasedAt = Environment.TickCount64;
-        _altNumpadDown.Clear();
+        try
+        {
+            LeaveMenuModeMethod?.Invoke(source, null);
+        }
+        catch (TargetInvocationException)
+        {
+            // メニューモードでなければ何もしない。
+        }
     }
 
     private bool ConsumeAltNumpadPercent(int virtualKey, bool up, bool repeat = false)
@@ -640,6 +667,10 @@ public partial class MainWindow
 
         if (key is Key.LeftAlt or Key.RightAlt)
         {
+            // 単独 Alt のキーアップと同じく、修飾と Win32 メニュー状態をここで終わらせる。
+            // Handled にしないと DefWindowProc がメニュー不一致のシステム音を鳴らす。
+            ClearLatchedAlt();
+            LeaveWin32MenuMode();
             if (_markerNudgeDirection != 0)
             {
                 StopMarkerNudge();
@@ -649,12 +680,27 @@ public partial class MainWindow
             {
                 StopSpectrogramBoostNudge();
             }
+
+            e.Handled = true;
         }
 
         if (_placeRepeatKind != PlaceRepeatKind.None && !IsPlaceHeld(_placeRepeatKind))
         {
             StopPlaceRepeat();
         }
+    }
+
+    private void MainWindow_AltMenuKeyUp(object sender, KeyEventArgs e)
+    {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key is not (Key.LeftAlt or Key.RightAlt))
+        {
+            return;
+        }
+
+        ClearLatchedAlt();
+        LeaveWin32MenuMode();
+        e.Handled = true;
     }
 
     private void MainWindow_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
