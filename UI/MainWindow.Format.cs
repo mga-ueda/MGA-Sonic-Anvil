@@ -320,7 +320,7 @@ public partial class MainWindow
 
             if (value < source.FormatOriginBitsPerSample)
             {
-                samples = FormatConvert.Quantize(samples, value);
+                samples = FormatConvert.Quantize(samples, value, channels);
             }
 
             bits = value;

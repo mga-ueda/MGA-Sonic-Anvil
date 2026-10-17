@@ -479,7 +479,40 @@ public sealed class FormatConvertTests
         new EditHistory().Do(document, command);
         Assert.Equal(4, document.BitsPerSample);
         Assert.Equal(FormatConvert.Quantize([0.37f], 4)[0], document.Interleaved[0]);
-        Assert.Equal(3f / 7f, document.Interleaved[0], 5);
+        var levels = 7d;
+        var nearest = Math.Round(0.37 * levels) / levels;
+        Assert.True(Math.Abs(document.Interleaved[0] - nearest) <= (1d / levels) + 1e-6);
+        var steps = Math.Round(document.Interleaved[0] * levels);
+        Assert.Equal(document.Interleaved[0], (float)(steps / levels));
+    }
+
+    [Fact]
+    public void Quantize_UsesPowr1NyquistDitherPerChannel()
+    {
+        var silence = new float[4096];
+        var once = FormatConvert.Quantize(silence, 16, channels: 2);
+        var twice = FormatConvert.Quantize(silence, 16, channels: 2);
+        Assert.Equal(once, twice);
+
+        var left = new float[2048];
+        var right = new float[2048];
+        for (var frame = 0; frame < left.Length; frame++)
+        {
+            left[frame] = once[frame * 2];
+            right[frame] = once[frame * 2 + 1];
+        }
+
+        Assert.NotEqual(left, right);
+        Assert.True(left.Any(sample => sample != 0f));
+        Assert.True(MeanAdjacentProduct(left) < 0d, "ディザがナイキストに寄っていない");
+
+        var levels = 32767d;
+        foreach (var sample in once)
+        {
+            var steps = Math.Round(sample * levels);
+            Assert.Equal(sample, (float)(steps / levels));
+            Assert.InRange(Math.Abs(sample), 0d, 4d / levels);
+        }
     }
 
     [Fact]
@@ -709,6 +742,17 @@ public sealed class FormatConvertTests
         }
 
         throw new InvalidDataException("smpl chunk missing");
+    }
+
+    private static double MeanAdjacentProduct(float[] samples)
+    {
+        double sum = 0;
+        for (var i = 1; i < samples.Length; i++)
+        {
+            sum += samples[i] * samples[i - 1];
+        }
+
+        return sum / (samples.Length - 1);
     }
 
     private static AudioDocument MakeDocument(int frames, int sampleRate, int bits = 16)
