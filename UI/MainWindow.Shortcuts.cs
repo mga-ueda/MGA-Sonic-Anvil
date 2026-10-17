@@ -1,12 +1,248 @@
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
 public partial class MainWindow
 {
+    private const int WmKeyDown = 0x0100;
+    private const int WmKeyUp = 0x0101;
+    private const int WmSysKeyDown = 0x0104;
+    private const int WmSysKeyUp = 0x0105;
+    private const int WhKeyboardLl = 13;
+    private const int LlkhfExtended = 0x01;
+    private const int LlkhfUp = 0x80;
+
+    private static readonly FieldInfo? KeyScanCodeField = typeof(KeyEventArgs).GetField(
+        "_scanCode",
+        BindingFlags.Instance | BindingFlags.NonPublic);
+
+    private static readonly FieldInfo? KeyExtendedField = typeof(KeyEventArgs).GetField(
+        "_isExtendedKey",
+        BindingFlags.Instance | BindingFlags.NonPublic);
+
+    private readonly HashSet<int> _numpadShiftScansDown = new();
+    private IntPtr _numpadShiftHook;
+    private LowLevelKeyboardProc? _numpadShiftHookProc;
+    private long _numpadShiftJumpMs = -1000;
+    private int _numpadShiftJumpDigit = -1;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KbdLlHook
+    {
+        public uint vkCode;
+        public uint scanCode;
+        public uint flags;
+        public uint time;
+        public UIntPtr dwExtraInfo;
+    }
+
+    private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern short GetKeyState(int nVirtKey);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+
+    [DllImport("user32.dll")]
+    private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr GetModuleHandle(string? lpModuleName);
+
+    private static bool IsNumLockToggled() => (GetKeyState(0x90) & 1) != 0;
+
+    private void AttachNumpadShiftHook()
+    {
+        // 低レベルフックはキューに入る前。ここで捨てないと WPF は Home／End として処理する。
+        _numpadShiftHookProc = OnNumpadShiftLowLevel;
+        _numpadShiftHook = SetWindowsHookEx(WhKeyboardLl, _numpadShiftHookProc, GetModuleHandle(null), 0);
+        ComponentDispatcher.ThreadFilterMessage += OnNumpadShiftFilter;
+        Closed += (_, _) =>
+        {
+            ComponentDispatcher.ThreadFilterMessage -= OnNumpadShiftFilter;
+            if (_numpadShiftHook != IntPtr.Zero)
+            {
+                UnhookWindowsHookEx(_numpadShiftHook);
+                _numpadShiftHook = IntPtr.Zero;
+            }
+        };
+    }
+
+    private bool IsOurWindowForeground()
+    {
+        var root = new WindowInteropHelper(this).Handle;
+        return root != IntPtr.Zero && GetForegroundWindow() == root;
+    }
+
+    private IntPtr OnNumpadShiftLowLevel(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        if (nCode >= 0 && lParam != IntPtr.Zero)
+        {
+            try
+            {
+                var info = Marshal.PtrToStructure<KbdLlHook>(lParam);
+                var message = (int)wParam;
+                var up = (info.flags & LlkhfUp) != 0 || message is WmKeyUp or WmSysKeyUp;
+                if (IsOurWindowForeground()
+                    && ConsumeTranslatedNumpad(
+                        (int)info.vkCode,
+                        (int)info.scanCode,
+                        extended: (info.flags & LlkhfExtended) != 0,
+                        up,
+                        repeat: false))
+                {
+                    return (IntPtr)1;
+                }
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                // フック内の失敗でキーを潰さない。
+            }
+        }
+
+        return CallNextHookEx(_numpadShiftHook, nCode, wParam, lParam);
+    }
+
+    private void OnNumpadShiftFilter(ref MSG msg, ref bool handled)
+    {
+        if (handled || !IsActive)
+        {
+            if (!IsActive)
+            {
+                _numpadShiftScansDown.Clear();
+            }
+
+            return;
+        }
+
+        var down = msg.message is WmKeyDown or WmSysKeyDown;
+        var up = msg.message is WmKeyUp or WmSysKeyUp;
+        if (!down && !up)
+        {
+            return;
+        }
+
+        var virtualKey = unchecked((int)(msg.wParam.ToInt64() & 0xFFFF));
+        var native = msg.lParam.ToInt64();
+        if (ConsumeTranslatedNumpad(
+                virtualKey,
+                scanCode: (int)(native >> 16) & 0xFF,
+                extended: (native & 0x01000000) != 0,
+                up,
+                repeat: LibraryPlayerMode.IsKeyRepeat(native)))
+        {
+            handled = true;
+        }
+    }
+
+    /// <summary>
+    /// 変換済みテンキーなら true。キーダウンの初回だけ番号ジャンプを予約する。
+    /// </summary>
+    private bool ConsumeTranslatedNumpad(int virtualKey, int scanCode, bool extended, bool up, bool repeat)
+    {
+        var scan = scanCode & 0xFF;
+        if (up)
+        {
+            return _numpadShiftScansDown.Remove(scan);
+        }
+
+        if (NumpadShiftPassesToText())
+        {
+            return false;
+        }
+
+        if (!LibraryPlayerMode.TryTranslatedNumpadDigit(virtualKey, scan, extended, IsNumLockToggled(), out var digit))
+        {
+            return false;
+        }
+
+        var first = _numpadShiftScansDown.Add(scan);
+        if (first && !repeat)
+        {
+            PostNumpadShiftJump(digit);
+        }
+
+        return true;
+    }
+
+    private void PostNumpadShiftJump(int digit)
+    {
+        var now = Environment.TickCount64;
+        if (digit == _numpadShiftJumpDigit && now - _numpadShiftJumpMs < 40)
+        {
+            return;
+        }
+
+        _numpadShiftJumpDigit = digit;
+        _numpadShiftJumpMs = now;
+        Dispatcher.BeginInvoke(() =>
+            TryHandleNumpadCueDigitJump((Key)((int)Key.NumPad0 + digit), ModifierKeys.Shift));
+    }
+
+    private bool TryConsumeTranslatedNumpadEvent(KeyEventArgs e)
+    {
+        if (KeyExtendedField?.GetValue(e) is not bool extended
+            || KeyScanCodeField?.GetValue(e) is not int scan)
+        {
+            return false;
+        }
+
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        var virtualKey = key switch
+        {
+            Key.Home => 0x24,
+            Key.End => 0x23,
+            Key.PageUp => 0x21,
+            Key.PageDown => 0x22,
+            Key.Left => 0x25,
+            Key.Up => 0x26,
+            Key.Right => 0x27,
+            Key.Down => 0x28,
+            Key.Insert => 0x2D,
+            Key.Clear => 0x0C,
+            _ => 0,
+        };
+        if (virtualKey == 0)
+        {
+            return false;
+        }
+
+        return ConsumeTranslatedNumpad(virtualKey, scan, extended, up: false, repeat: e.IsRepeat);
+    }
+
+    private bool NumpadShiftPassesToText() =>
+        IsLibraryGroupComboFocused
+        || StatusTimes.IsTimeFocused
+        || IsEditingFileName
+        || Waveform.IsEditingMarkerComment
+        || IsTileSearchFocused
+        || (IsLibraryMaximized && LibraryBrowser.IsSearchFocused)
+        || _volumeMenu is { IsOpen: true }
+        || _pitchMenu is { IsOpen: true }
+        || _timeStretchMenu is { IsOpen: true }
+        || _fadeMenu is { IsOpen: true }
+        || _formatMenu is { IsOpen: true };
+
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (TryConsumeTranslatedNumpadEvent(e))
+        {
+            e.Handled = true;
+            return;
+        }
+
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         key = LibraryPlayerMode.ResolveDigitKey(key, e.ImeProcessedKey);
         var modifiers = Keyboard.Modifiers;
@@ -29,6 +265,12 @@ public partial class MainWindow
 
     private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)
     {
+        if (KeyScanCodeField?.GetValue(e) is int scan && _numpadShiftScansDown.Remove(scan & 0xFF))
+        {
+            e.Handled = true;
+            return;
+        }
+
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         key = LibraryPlayerMode.ResolveDigitKey(key, e.ImeProcessedKey);
         if (key is Key.Apps or Key.F10)
@@ -628,7 +870,15 @@ public partial class MainWindow
             return true;
         }
 
-        // 上段 0–9: 無修飾＝割合。Shift＋上段＝マーカー番号（二桁可。テンキーは上で再生操作済み）。
+        // Shift／Ctrl＋テンキーは番号ジャンプ。Alt＋テンキーは割合。無修飾は再生のまま。
+        // ツリーの Shift+8（上段）は配下展開のまま。文字入力中はテンキーを渡す。
+        if (!NumpadShiftPassesToText()
+            && TryHandleNumpadCueDigitJump(key, modifiers))
+        {
+            return true;
+        }
+
+        // 上段 0–9: 無修飾＝割合。Shift＋上段＝マーカー番号（二桁可。無修飾テンキーは上で再生操作済み）。
         // ツリーフォーカス中は使わない（Shift+8＝配下展開を優先。割合／マーカーは他ペインから）。
         if (IsLibraryMaximized
             && LibraryPlayerMode.AllowsPlayerDigitJump(IsLibraryExplorerFocused)
@@ -1485,7 +1735,8 @@ public partial class MainWindow
             return true;
         }
 
-        // エディタ: 上段 無修飾＝割合、Shift＝マーカー番号、Ctrl＝リージョン番号（テンキー再生操作は上で済み）。
+        // エディタ: 上段 無修飾＝割合、Shift＝マーカー番号、Ctrl＝リージョン番号。
+        // Shift／Ctrl＋テンキーは上で同じジャンプ済み。無修飾テンキーは再生。
         if (!IsLibraryMaximized && TryHandleEditorDigitJump(key, modifiers))
         {
             return true;
@@ -2374,6 +2625,66 @@ public partial class MainWindow
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Shift／Ctrl＋テンキーの番号ジャンプ。
+    /// エディタはドキュメントのマーカー／リージョン。
+    /// プレイヤーの Shift は一時マーカー（音声波形／動画本再生／F8／フレーム一時停止）。
+    /// プレイヤーの Ctrl はファイルにリージョンがあるときその先頭へ。
+    /// 上段の Ctrl もプレイヤーでは同じ（ツリーの Shift+8 とは別キー）。
+    /// </summary>
+    private bool TryHandleNumpadCueDigitJump(Key key, ModifierKeys modifiers)
+    {
+        var numpadMarker = LibraryPlayerMode.IsNumpadMarkerDigitJump(key, modifiers);
+        var numpadRegion = LibraryPlayerMode.IsNumpadRegionDigitJump(key, modifiers);
+        var playerTopRegion = IsLibraryMaximized && LibraryPlayerMode.IsRegionDigitJump(key, modifiers);
+        if (!numpadMarker && !numpadRegion && !playerTopRegion)
+        {
+            return false;
+        }
+
+        if (!TryDigitKey(key, out var digit))
+        {
+            return false;
+        }
+
+        if (numpadMarker)
+        {
+            if (IsLibraryMaximized)
+            {
+                if (!LibraryPlayerMode.CanPlayerMarkerDigitJump(
+                        playerMarkerContext: IsPlayerScratchContext(),
+                        Waveform.HasPlayerScratchMarkers))
+                {
+                    return false;
+                }
+
+                ApplyResolvedMarkerDigitJump(
+                    digit,
+                    Waveform.ScratchCues.Markers.Count,
+                    allowPercentFallback: false);
+                return true;
+            }
+
+            if (_document is null || _document.Markers.Count == 0)
+            {
+                return true;
+            }
+
+            return ApplyResolvedMarkerDigitJump(
+                digit,
+                _document.Markers.Count,
+                allowPercentFallback: false);
+        }
+
+        var regionCount = _document?.Regions.Count ?? 0;
+        if (regionCount == 0)
+        {
+            return true;
+        }
+
+        return ApplyResolvedRegionDigitJump(digit, regionCount);
     }
 
     private bool TryHandleLibraryDigitJump(Key key, ModifierKeys modifiers)

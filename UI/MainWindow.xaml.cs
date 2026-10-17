@@ -377,6 +377,7 @@ public partial class MainWindow : Window
         };
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         PreviewKeyUp += MainWindow_PreviewKeyUp;
+        AttachNumpadShiftHook();
         PreviewMouseDown += MainWindow_PreviewMouseDown;
         PreviewMouseWheel += MainWindow_PreviewMouseWheel;
         PreviewDrop += MainWindow_Drop;
