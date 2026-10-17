@@ -4081,6 +4081,22 @@ public partial class MainWindow
                 session.Document.CursorFrame = 0;
                 Waveform.PlayheadFrame = 0;
             }
+            else if (LibraryBrowser.PlaylistVisualShown
+                && LibraryBrowser.PlaylistVisualIsVideo
+                && !LibraryBrowser.PlaylistVisualPlaying
+                && LibraryBrowser.IsPlaylistVisualSameSource(session.Document.SourcePath))
+            {
+                // プロキシ待ちのあいだに進んだプレビュー位置を使う。待ち始めの値へ戻さない。
+                startFrame = LibraryPlayerMode.HoverResumeFrame(
+                    hoverVideoShown: true,
+                    visualPlaying: false,
+                    sameClip: true,
+                    LibraryBrowser.PlaylistVisualPosition.TotalSeconds,
+                    session.Document.SampleRate,
+                    session.Document.FrameCount);
+                session.Document.CursorFrame = startFrame;
+                Waveform.PlayheadFrame = startFrame;
+            }
 
             StartPlayback(startFrame, prerollSeconds: 0);
             return;

@@ -624,10 +624,18 @@ internal sealed class LibraryVisualStage : Grid
         if (playing)
         {
             CancelPreviewSeek();
-            // 本再生へ戻すときは dim／格子を即消す（つなぎ中のプレビュー・アニメ残留を防ぐ）。
-            ApplyVideoDim(instant: true, playing: true);
-            SyncPreviewFx(active: false, instant: true);
-            if (fromPreview || fromFramePause)
+            var resume = fromPreview || fromFramePause;
+            // 昇格側で始めた暗転フェードを、ここで打ち切らない。
+            if (!(fromPreview && _dim.HasAnimatedProperties))
+            {
+                ApplyVideoDim(instant: !fromPreview, playing: true);
+            }
+
+            if (!(fromPreview && _mesh.HasAnimatedProperties))
+            {
+                SyncPreviewFx(active: false, instant: !fromPreview);
+            }
+            if (resume)
             {
                 var pos = CurrentVisualPosition();
                 CancelVideoFadeIn(restoreOpaque: true);
@@ -680,13 +688,43 @@ internal sealed class LibraryVisualStage : Grid
 
     private void ApplyVideoDim(bool instant, bool playing = false)
     {
-        if (playing)
+        FadeDimOpacity(playing ? 0 : StoppedDimOpacity, instant, playing ? LibraryPlayerMode.ChromeFadeSeconds : PreviewDimFadeSeconds);
+    }
+
+    /// <summary>暗転のフェード。後から来た操作はチケットで完了処理を捨てる。</summary>
+    private void FadeDimOpacity(double to, bool instant, double seconds)
+    {
+        var ticket = ++_dimFadeTicket;
+        _dim.BeginAnimation(OpacityProperty, null);
+        var from = _dim.Opacity;
+        if (instant || Math.Abs(from - to) < 0.001)
         {
-            // 進行中の暗転フェード完了でまた暗くならないようチケットを進める。
-            _dimFadeTicket++;
+            _dim.Opacity = to;
+            return;
         }
 
-        LibraryPlayerMode.FadeElementOpacity(_dim, playing ? 0 : StoppedDimOpacity, instant);
+        var anim = new DoubleAnimation
+        {
+            From = from,
+            To = to,
+            Duration = TimeSpan.FromSeconds(seconds),
+            FillBehavior = FillBehavior.HoldEnd,
+            EasingFunction = new SineEase
+            {
+                EasingMode = to > from ? EasingMode.EaseIn : EasingMode.EaseOut,
+            },
+        };
+        anim.Completed += (_, _) =>
+        {
+            if (ticket != _dimFadeTicket)
+            {
+                return;
+            }
+
+            _dim.BeginAnimation(OpacityProperty, null);
+            _dim.Opacity = to;
+        };
+        _dim.BeginAnimation(OpacityProperty, anim);
     }
 
     private void SyncPreviewFx(bool active, bool instant = false)
@@ -735,43 +773,10 @@ internal sealed class LibraryVisualStage : Grid
         _media.Opacity = 1;
         // 本再生からの引き継ぎでは現在位置付近にいるので、無駄なシークで一発カクつかせない。
         SeekMediaIfNeeded(position);
-        FadeDimToPreview();
+        FadeDimOpacity(StoppedDimOpacity, instant: false, PreviewDimFadeSeconds);
         SyncPreviewFx(active: true);
         // 本再生から戻るときはいきなり 1/3 にせず、1 秒かけて落とす。
         BeginPreviewSpeedRamp(position);
-    }
-
-    private void FadeDimToPreview()
-    {
-        var ticket = ++_dimFadeTicket;
-        _dim.BeginAnimation(OpacityProperty, null);
-        var from = _dim.Opacity;
-        var to = StoppedDimOpacity;
-        if (Math.Abs(from - to) < 0.001)
-        {
-            _dim.Opacity = to;
-            return;
-        }
-
-        var anim = new DoubleAnimation
-        {
-            From = from,
-            To = to,
-            Duration = TimeSpan.FromSeconds(PreviewDimFadeSeconds),
-            FillBehavior = FillBehavior.HoldEnd,
-            EasingFunction = new SineEase { EasingMode = EasingMode.EaseIn },
-        };
-        anim.Completed += (_, _) =>
-        {
-            if (ticket != _dimFadeTicket)
-            {
-                return;
-            }
-
-            _dim.BeginAnimation(OpacityProperty, null);
-            _dim.Opacity = to;
-        };
-        _dim.BeginAnimation(OpacityProperty, anim);
     }
 
     private void SnapMediaBlack()
@@ -881,8 +886,8 @@ internal sealed class LibraryVisualStage : Grid
         }
 
         var pos = CurrentVisualPosition();
-        ApplyVideoDim(instant: true, playing: true);
-        SyncPreviewFx(active: false, instant: true);
+        FadeDimOpacity(0, instant: false, LibraryPlayerMode.ChromeFadeSeconds);
+        SyncPreviewFx(active: false, instant: false);
         PlayRealtime(pos, restartClock: true);
         _media.BeginAnimation(OpacityProperty, null);
         _media.Opacity = 1;

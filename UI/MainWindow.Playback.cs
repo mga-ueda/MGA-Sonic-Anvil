@@ -456,10 +456,28 @@ public partial class MainWindow
         if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVisual(_document))
         {
             _lastPlaybackStart = startFrame;
-            LibraryBrowser.ShowPlaylistVisual(_activeSession!, play: true);
-            LibraryBrowser.SeekPlaylistVisual(
-                TimeSpan.FromSeconds(startFrame / (double)Math.Max(1, _document.SampleRate)));
-            if (!LibraryPlaylistDocuments.IsVideo(_document))
+            var rate = Math.Max(1, _document.SampleRate);
+            var target = TimeSpan.FromSeconds(startFrame / (double)rate);
+            var video = LibraryPlaylistDocuments.IsVideo(_document);
+            var sameVideo = video
+                && LibraryBrowser.PlaylistVisualShown
+                && LibraryBrowser.PlaylistVisualIsVideo
+                && _activeSession is not null
+                && LibraryBrowser.IsPlaylistVisualSameSource(_activeSession.Document.SourcePath);
+            if (!(sameVideo && LibraryBrowser.PlaylistVisualPlaying))
+            {
+                LibraryBrowser.ShowPlaylistVisual(_activeSession!, play: true);
+            }
+
+            // プレビューから本再生へ戻した直後の再シークは、時間軸を一度戻してから進める。
+            var drifted = !sameVideo
+                || Math.Abs((LibraryBrowser.PlaylistVisualPosition - target).TotalMilliseconds) > 200;
+            if (drifted)
+            {
+                LibraryBrowser.SeekPlaylistVisual(target);
+            }
+
+            if (!video)
             {
                 Transport.SetPlaying(true);
                 return;
