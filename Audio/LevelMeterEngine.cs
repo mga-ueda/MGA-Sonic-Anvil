@@ -24,6 +24,27 @@ internal sealed class LevelMeterEngine
     public const double ClipHoldSec = 2.0;
     /// <summary>0 dBFS。内部は float なので、ちょうど 1.0 はフルスケール到達であり超過ではない。</summary>
     public const float ClipLinear = 1f;
+    /// <summary>
+    /// DigiCheck の RMS。AC の真値に √2（+3.01 dB）を掛け、フルスケール正弦の RMS をピークと同じ 0 dB にする。
+    /// </summary>
+    public const double RmsSineReferenceGain = 1.41421356237;
+
+    public static float SineReferencedAcRms(double sum, double sumSq, int frames)
+    {
+        if (frames <= 0)
+        {
+            return 0f;
+        }
+
+        var mean = sum / frames;
+        var ac = sumSq / frames - mean * mean;
+        if (ac < 0)
+        {
+            ac = 0;
+        }
+
+        return (float)(Math.Sqrt(ac) * RmsSineReferenceGain);
+    }
 
     private ChannelState[] _states = [new(), new()];
     private double[] _clipUntilSec = new double[2];
@@ -39,6 +60,37 @@ internal sealed class LevelMeterEngine
 
         ClearClipHold();
         Snapshot = LevelMeterSnapshot.IdleFor(_states.Length);
+    }
+
+    /// <summary>
+    /// 再生停止後の表示。バーは無音へ、スペクトラムのライブバーと同じ速度で落とす。
+    /// まだ床より上なら true。
+    /// </summary>
+    public bool DecayAfterStop(double nowSeconds)
+    {
+        var n = Math.Max(1, _states.Length);
+        EnsureStates(n);
+        var meters = new ChannelMeter[n];
+        var clips = new bool[n];
+        for (var i = 0; i < n; i++)
+        {
+            meters[i] = Measure(_states[i], peak: 0f, rms: 0f, nowSeconds, linearRelease: true);
+            clips[i] = nowSeconds < _clipUntilSec[i];
+        }
+
+        Snapshot = new LevelMeterSnapshot(meters, clips, ShowRms: n <= 2);
+        foreach (var meter in meters)
+        {
+            if (meter.PeakPct > 0.4
+                || meter.RmsPct > 0.4
+                || meter.PeakHeldDb > DbMin + 0.25
+                || meter.RmsHoldLineDb > DbMin + 0.25)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public void Extinguish()
@@ -105,7 +157,7 @@ internal sealed class LevelMeterEngine
         {
             var peak = hasSamples && i < peaks.Length ? peaks[i] : _states[i].LastPeak;
             var rmsVal = hasSamples && i < rms.Length ? rms[i] : _states[i].LastRms;
-            var meter = Measure(_states[i], peak, rmsVal, nowSeconds);
+            var meter = Measure(_states[i], peak, rmsVal, nowSeconds, linearRelease: false);
             if (hasSamples && i < peaks.Length && IsClipPeak(peaks[i]))
             {
                 _clipUntilSec[i] = nowSeconds + ClipHoldSec;
@@ -224,23 +276,25 @@ internal sealed class LevelMeterEngine
     private static void MeasureSpan(ReadOnlySpan<float> samples, out float peak, out float rms)
     {
         peak = 0f;
+        var sum = 0d;
         var sumSquares = 0d;
-        var n = Math.Max(1, samples.Length);
         for (var i = 0; i < samples.Length; i++)
         {
-            var val = Math.Abs(samples[i]);
+            var sample = samples[i];
+            var val = Math.Abs(sample);
             if (val > peak)
             {
                 peak = val;
             }
 
-            sumSquares += val * (double)val;
+            sum += sample;
+            sumSquares += sample * (double)sample;
         }
 
-        rms = (float)Math.Sqrt(sumSquares / n);
+        rms = SineReferencedAcRms(sum, sumSquares, samples.Length);
     }
 
-    private static ChannelMeter Measure(ChannelState st, float peak, float rms, double now)
+    private static ChannelMeter Measure(ChannelState st, float peak, float rms, double now, bool linearRelease)
     {
         var dt = st.LastT > 0 ? Math.Min(0.12, Math.Max(0, now - st.LastT)) : 1d / 60d;
         st.LastT = now;
@@ -249,8 +303,8 @@ internal sealed class LevelMeterEngine
 
         var instPeakDb = ToDb(peak);
         var instRmsDb = ToDb(rms);
-        TrackBar(ref st.VisPeakDb, instPeakDb, dt);
-        TrackBar(ref st.VisRmsDb, instRmsDb, dt);
+        TrackBar(ref st.VisPeakDb, instPeakDb, dt, linearRelease);
+        TrackBar(ref st.VisRmsDb, instRmsDb, dt, linearRelease);
 
         var peakHeldDb = st.PeakHeldDb;
         if (instPeakDb > peakHeldDb)
@@ -295,11 +349,19 @@ internal sealed class LevelMeterEngine
             st.RmsHoldLineDb > DbMin + HoldLineEpsilonDb);
     }
 
-    private static void TrackBar(ref double visDb, double instDb, double dt)
+    private static void TrackBar(ref double visDb, double instDb, double dt, bool linearRelease)
     {
-        var tau = instDb >= visDb ? BarAttackSec : BarReleaseSec;
-        var coeff = 1d - Math.Exp(-dt / Math.Max(1e-4, tau));
-        visDb += (instDb - visDb) * coeff;
+        if (linearRelease && instDb < visDb)
+        {
+            visDb = Math.Max(instDb, visDb - SpectrumAnalyzer.LiveReleaseDbPerSec * dt);
+        }
+        else
+        {
+            var tau = instDb >= visDb ? BarAttackSec : BarReleaseSec;
+            var coeff = 1d - Math.Exp(-dt / Math.Max(1e-4, tau));
+            visDb += (instDb - visDb) * coeff;
+        }
+
         visDb = Math.Clamp(visDb, DbMin, DbMax);
     }
 

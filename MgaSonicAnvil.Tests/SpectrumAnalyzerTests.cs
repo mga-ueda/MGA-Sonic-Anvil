@@ -105,6 +105,92 @@ public sealed class SpectrumAnalyzerTests
     }
 
     [Fact]
+    public void Process_OneKHzAtMinus20_CenterMatchesPeakAndNeighborIs14Down()
+    {
+        var analyzer = new SpectrumAnalyzer();
+        var samples = new float[SpectrumAnalyzer.FftSize];
+        const int rate = 48000;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            samples[i] = 0.1f * MathF.Sin(2f * MathF.PI * 1000f * i / rate);
+        }
+
+        for (var i = 0; i < 30; i++)
+        {
+            analyzer.Process(samples, rate, 1d / 60d, active: true);
+        }
+
+        var bands = analyzer.CurrentBands;
+        var env = analyzer.EnvelopeDb;
+        var at1k = Array.IndexOf(bands.Centers, 1000d);
+        Assert.InRange(env[at1k], -20.4f, -19.6f);
+        Assert.InRange(env[at1k - 1] - env[at1k], -15.5f, -12.5f);
+        Assert.InRange(env[at1k + 1] - env[at1k], -15.5f, -12.5f);
+    }
+
+    [Fact]
+    public void Process_DcOffset_Raises20HzBand()
+    {
+        var analyzer = new SpectrumAnalyzer();
+        var samples = new float[SpectrumAnalyzer.FftSize];
+        Array.Fill(samples, 0.1f);
+        for (var i = 0; i < 30; i++)
+        {
+            analyzer.Process(samples, 48000, 1d / 60d, active: true);
+        }
+
+        Assert.True(analyzer.EnvelopeDb[0] > SpectrumAnalyzer.FloorDb + 15f);
+    }
+
+    [Fact]
+    public void Process_25Hz_PeaksOn25Above20()
+    {
+        var analyzer = new SpectrumAnalyzer();
+        var samples = new float[SpectrumAnalyzer.FftSize];
+        const int rate = 48000;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            samples[i] = 0.1f * MathF.Sin(2f * MathF.PI * 25f * i / rate);
+        }
+
+        for (var i = 0; i < 40; i++)
+        {
+            analyzer.Process(samples, rate, 1d / 60d, active: true);
+        }
+
+        var bands = analyzer.CurrentBands;
+        var env = analyzer.EnvelopeDb;
+        var i20 = Array.IndexOf(bands.Centers, 20d);
+        var i25 = Array.IndexOf(bands.Centers, 25d);
+        Assert.InRange(env[i25], -24f, -16f);
+        Assert.True(env[i25] > env[i20] + 6f);
+    }
+
+    [Fact]
+    public void Process_4kHz_NeighborIsAbout14Down()
+    {
+        var analyzer = new SpectrumAnalyzer();
+        var samples = new float[SpectrumAnalyzer.FftSize];
+        const int rate = 48000;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            samples[i] = 0.1f * MathF.Sin(2f * MathF.PI * 4000f * i / rate);
+        }
+
+        for (var i = 0; i < 30; i++)
+        {
+            analyzer.Process(samples, rate, 1d / 60d, active: true);
+        }
+
+        var bands = analyzer.CurrentBands;
+        var env = analyzer.EnvelopeDb;
+        var at = Array.IndexOf(bands.Centers, 4000d);
+        Assert.InRange(env[at], -20.4f, -19.6f);
+        Assert.InRange(env[at - 1] - env[at], -16f, -12f);
+        Assert.InRange(env[at + 1] - env[at], -16f, -12f);
+    }
+
+    [Fact]
     public void Process_Idle_DropsPeakHoldToFloor()
     {
         var analyzer = new SpectrumAnalyzer();
@@ -115,7 +201,8 @@ public sealed class SpectrumAnalyzerTests
             samples[i] = (float)Math.Sin(2 * Math.PI * 1000 * i / rate);
         }
 
-        for (var i = 0; i < 8; i++)
+        var steadyFrames = (int)Math.Ceiling((SpectrumAnalyzer.PeakHoldCenterSec + 0.5) * 60);
+        for (var i = 0; i < steadyFrames; i++)
         {
             analyzer.Process(samples, rate, 1 / 60d, active: true);
         }

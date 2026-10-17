@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private readonly LevelMeterEngine _meter = new();
     private readonly Stopwatch _meterClock = Stopwatch.StartNew();
     private bool _meterRendering;
+    private DispatcherTimer? _meterReleaseTimer;
     private TimeSpan _lastRenderingTime;
     private long _lastPlaybackVisualStamp;
     private bool _analyzerTickQueued;
@@ -410,6 +411,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             StopMeterRendering();
+            _meterReleaseTimer?.Stop();
             _playTimer.Stop();
             _visualPlayheadTimer.Stop();
             _recordTimer.Stop();
