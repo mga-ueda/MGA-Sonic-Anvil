@@ -17,7 +17,8 @@ internal static class LibraryExplorerTypeahead
     {
         character = "";
         if (LibraryPlayerMode.IsExplorerExpandAll(key, modifiers)
-            || LibraryPlayerMode.IsExplorerCollapseSubtree(key, modifiers))
+            || LibraryPlayerMode.IsExplorerCollapseSubtree(key, modifiers)
+            || LibraryPlayerMode.IsExplorerCollapseAllRoots(key, modifiers))
         {
             return false;
         }
