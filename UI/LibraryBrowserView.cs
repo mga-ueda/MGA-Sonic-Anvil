@@ -8435,6 +8435,11 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
+    internal FrameworkElement VideoHudFrostTarget => _visualStage;
+
+    /// <summary>動画本再生／ミニのメーター・波形・ファイル名の背後を少し暗くする。</summary>
+    internal void SetVideoHudFrost(bool on, Geometry? clip) => _visualStage.SetHudFrost(on, clip);
+
     /// <summary>エディタの背景。プレイヤーのフォールバックウォッシュをウィンドウ全体に出す。</summary>
     internal void UseWindowFallbackWash()
     {

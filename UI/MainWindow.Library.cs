@@ -1355,6 +1355,8 @@ public partial class MainWindow
         {
             PlaylistVideoFileName.RenderTransform = new TranslateTransform(-dodge, 0);
         }
+
+        QueueVideoHudFrostLayout();
     }
 
     private bool TryTogglePdfBackgroundPin()
@@ -1633,7 +1635,123 @@ public partial class MainWindow
         Spectrum.VideoOverlayLabels = on;
         LoudnessMeter.VideoOverlayLabels = on;
         ForEachWaveform(view => view.VideoOverlayLabels = on);
+        SyncVideoHudFrost(on);
     }
+
+    private DispatcherTimer? _videoHudFrostTimer;
+
+    /// <summary>
+    /// 動画本再生／ミニの波形・ピーク・ゴニオ・スペアナ・ラウドネス・ファイル名の背後だけ、
+    /// 少し暗くする。縁は映像へ溶かす。
+    /// </summary>
+    private void SyncVideoHudFrost(bool on)
+    {
+        if (!on)
+        {
+            _videoHudFrostTimer?.Stop();
+            _videoHudFrostLayoutQueued = false;
+            LibraryBrowser.SetVideoHudFrost(false, null);
+            return;
+        }
+
+        _videoHudFrostTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        _videoHudFrostTimer.Tick -= OnVideoHudFrostTick;
+        _videoHudFrostTimer.Tick += OnVideoHudFrostTick;
+        if (!_videoHudFrostTimer.IsEnabled)
+        {
+            _videoHudFrostTimer.Start();
+        }
+
+        OnVideoHudFrostTick(null, EventArgs.Empty);
+    }
+
+    private bool _videoHudFrostLayoutQueued;
+
+    /// <summary>レイアウト直後のすりガラス位置合わせ。連打は1フレームにまとめる。</summary>
+    private void QueueVideoHudFrostLayout()
+    {
+        if (_videoHudFrostTimer is not { IsEnabled: true } || _videoHudFrostLayoutQueued)
+        {
+            return;
+        }
+
+        _videoHudFrostLayoutQueued = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+        {
+            _videoHudFrostLayoutQueued = false;
+            if (_videoHudFrostTimer is { IsEnabled: true })
+            {
+                OnVideoHudFrostTick(null, EventArgs.Empty);
+            }
+        });
+    }
+
+    private void OnVideoHudFrostTick(object? sender, EventArgs e) =>
+        LibraryBrowser.SetVideoHudFrost(true, BuildVideoHudFrostClip());
+
+    private Geometry? BuildVideoHudFrostClip()
+    {
+        var stage = LibraryBrowser.VideoHudFrostTarget;
+        if (stage is null || stage.ActualWidth < 1 || stage.ActualHeight < 1)
+        {
+            return null;
+        }
+
+        var group = new GeometryGroup();
+        foreach (var element in VideoHudFrostElements)
+        {
+            if (!IsVideoHudFrostElementShown(element))
+            {
+                continue;
+            }
+
+            try
+            {
+                var transform = element.TransformToVisual(stage);
+                var rect = transform.TransformBounds(new Rect(0, 0, element.ActualWidth, element.ActualHeight));
+                if (rect.Width < 1 || rect.Height < 1)
+                {
+                    continue;
+                }
+
+                group.Children.Add(new RectangleGeometry(rect));
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        return group.Children.Count == 0 ? null : group;
+    }
+
+    private static bool IsVideoHudFrostElementShown(FrameworkElement element)
+    {
+        if (!element.IsVisible || element.ActualWidth < 2 || element.ActualHeight < 2)
+        {
+            return false;
+        }
+
+        var opacity = 1d;
+        DependencyObject? current = element;
+        while (current is UIElement visual)
+        {
+            opacity *= visual.Opacity;
+            if (opacity <= 0.05)
+            {
+                return false;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return true;
+    }
+
+    private FrameworkElement[]? _videoHudFrostElements;
+
+    private FrameworkElement[] VideoHudFrostElements =>
+        _videoHudFrostElements ??=
+            [WaveformTileHost, LevelMeter, VectorScope, Spectrum, LoudnessMeter, PlaylistVideoFileName];
 
     private void ApplyPlayerMeterFade(bool visible, bool instant)
     {

@@ -39,6 +39,12 @@ internal sealed class LibraryVisualStage : Grid
     /// <summary>映像枠まわりへにじませるぼかし。フル塗りつぶしには使わない。</summary>
     internal const double AmbientSpillBlurRadius = 72;
 
+    /// <summary>メーター・波形・ファイル名の背後を、縁を溶かしながら少し暗くする。</summary>
+    private const double HudFrostFeather = 32;
+
+    /// <summary>暗幕の濃さ。映像は透けたまま、文字が読める程度。</summary>
+    private const byte HudDimAlpha = 0x66;
+
     /// <summary>映像と同じ枠を広げ、縁から光をこぼす。</summary>
     internal const double AmbientSpillScale = 1.12;
 
@@ -83,6 +89,40 @@ internal sealed class LibraryVisualStage : Grid
         IsHitTestVisible = false,
         Volume = 0,
     };
+
+    /// <summary>波形・メーター・ファイル名の背後。映像はぼかさず、少し暗くするだけ。</summary>
+    private readonly Grid _glassHost = new()
+    {
+        IsHitTestVisible = false,
+        Visibility = Visibility.Collapsed,
+        UseLayoutRounding = false,
+        SnapsToDevicePixels = false,
+    };
+
+    private readonly VisualBrush _hudDimBrush = new()
+    {
+        Stretch = Stretch.None,
+        AlignmentX = AlignmentX.Left,
+        AlignmentY = AlignmentY.Top,
+        TileMode = TileMode.None,
+        ViewboxUnits = BrushMappingMode.Absolute,
+        ViewportUnits = BrushMappingMode.Absolute,
+    };
+
+    private readonly Grid _hudDimFeather = new()
+    {
+        IsHitTestVisible = false,
+        UseLayoutRounding = false,
+        SnapsToDevicePixels = false,
+        Effect = new BlurEffect
+        {
+            Radius = HudFrostFeather,
+            KernelType = KernelType.Gaussian,
+            RenderingBias = RenderingBias.Performance,
+        },
+    };
+
+    private Size _hudFrostMaskSize;
 
     private readonly Border _spill = new()
     {
@@ -166,10 +206,14 @@ internal sealed class LibraryVisualStage : Grid
         SnapsToDevicePixels = true;
         _spill.Child = _spillMedia;
         _spillHost.Children.Add(_spill);
+        _glassHost.Background = WpfControlHelpers.FrozenBrush(Color.FromArgb(HudDimAlpha, 0, 0, 0));
+        _hudDimBrush.Visual = _hudDimFeather;
+        _glassHost.OpacityMask = _hudDimBrush;
         _pdfHost.Children.Add(_pdf);
-        // 光漏れ → Media / PDF → dim で暗く → 格子。
+        // 光漏れ → Media → HUD の薄い暗幕 → PDF → dim で暗く → 格子。
         Children.Add(_spillHost);
         Children.Add(_media);
+        Children.Add(_glassHost);
         Children.Add(_pdfHost);
         Children.Add(_dim);
         Children.Add(_mesh);
@@ -1409,6 +1453,139 @@ internal sealed class LibraryVisualStage : Grid
     private void StopMedia() => ClearMediaSource();
 
     /// <summary>
+    /// 波形・メーター・ファイル名の矩形だけ少し暗くする。clip はステージ座標。
+    /// 縁はぼかして、四角の切り口が映像に残らないようにする。
+    /// </summary>
+    internal void SetHudFrost(bool on, Geometry? clip)
+    {
+        if (!on || clip is null || !_video || !IsShown)
+        {
+            HideHudFrost();
+            return;
+        }
+
+        var stageSize = new Size(ActualWidth, ActualHeight);
+        var signature = HudFrostFeatherSignature(clip);
+        if (_glassHost.Visibility == Visibility.Visible
+            && signature == _hudFrostFeatherSignature
+            && NearlySameSize(stageSize, _hudFrostMaskSize))
+        {
+            return;
+        }
+
+        _glassHost.Visibility = Visibility.Visible;
+        _glassHost.Opacity = 1;
+        ApplyHudFrostMask(clip, stageSize, signature);
+    }
+
+    private void HideHudFrost()
+    {
+        if (_glassHost.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        _glassHost.Visibility = Visibility.Collapsed;
+        _hudFrostFeatherSignature = null;
+        _hudFrostMaskSize = default;
+        _hudDimFeather.Children.Clear();
+    }
+
+    /// <summary>縁のなじませ。ビットマップへ焼かず、合成側でぼかす。</summary>
+    private void ApplyHudFrostMask(Geometry clip, Size stageSize, string signature)
+    {
+        var pad = HudFrostFeather;
+        var bounds = Rect.Inflate(clip.Bounds, pad, pad);
+        bounds.Intersect(new Rect(0, 0, stageSize.Width, stageSize.Height));
+        if (bounds.Width < 1 || bounds.Height < 1)
+        {
+            return;
+        }
+
+        _hudFrostFeatherSignature = signature;
+        _hudFrostMaskSize = stageSize;
+        _hudDimFeather.Children.Clear();
+        _hudDimFeather.Width = bounds.Width;
+        _hudDimFeather.Height = bounds.Height;
+        AddHudFrostFeatherRects(_hudDimFeather, clip, bounds.Location);
+        _hudDimFeather.Measure(new Size(bounds.Width, bounds.Height));
+        _hudDimFeather.Arrange(new Rect(0, 0, bounds.Width, bounds.Height));
+        _hudDimBrush.Viewbox = new Rect(0, 0, bounds.Width, bounds.Height);
+        _hudDimBrush.Viewport = bounds;
+    }
+
+    private static bool NearlySameSize(Size a, Size b) =>
+        Math.Abs(a.Width - b.Width) < 0.5 && Math.Abs(a.Height - b.Height) < 0.5;
+
+    private string? _hudFrostFeatherSignature;
+
+    private static string HudFrostFeatherSignature(Geometry clip)
+    {
+        var text = new System.Text.StringBuilder();
+        AppendHudFrostFeatherSignature(text, clip);
+        return text.ToString();
+    }
+
+    private static void AppendHudFrostFeatherSignature(System.Text.StringBuilder text, Geometry clip)
+    {
+        if (clip is GeometryGroup group)
+        {
+            foreach (var child in group.Children)
+            {
+                AppendHudFrostFeatherSignature(text, child);
+            }
+
+            return;
+        }
+
+        if (clip is not RectangleGeometry rect)
+        {
+            return;
+        }
+
+        var bounds = rect.Rect;
+        // 1 DIP 単位に丸めて、微小なレイアウト揺れでマスクを焼き直さない。
+        text.Append((int)Math.Round(bounds.X));
+        text.Append(',');
+        text.Append((int)Math.Round(bounds.Y));
+        text.Append(',');
+        text.Append((int)Math.Round(bounds.Width));
+        text.Append(',');
+        text.Append((int)Math.Round(bounds.Height));
+        text.Append(';');
+    }
+
+    private static void AddHudFrostFeatherRects(Panel mask, Geometry clip, Point origin)
+    {
+        if (clip is GeometryGroup group)
+        {
+            foreach (var child in group.Children)
+            {
+                AddHudFrostFeatherRects(mask, child, origin);
+            }
+
+            return;
+        }
+
+        if (clip is not RectangleGeometry rect || rect.Rect.Width < 1 || rect.Rect.Height < 1)
+        {
+            return;
+        }
+
+        var bounds = rect.Rect;
+        mask.Children.Add(new Border
+        {
+            Background = Brushes.White,
+            Width = bounds.Width,
+            Height = bounds.Height,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(bounds.X - origin.X, bounds.Y - origin.Y, 0, 0),
+            IsHitTestVisible = false,
+        });
+    }
+
+    /// <summary>
     /// 映像とステージのアスペクトがずれて黒帯が出るときだけ、再生中フレームの光漏れを出す。
     /// </summary>
     private void SyncAmbientSpill()
@@ -1491,6 +1668,8 @@ internal sealed class LibraryVisualStage : Grid
         catch
         {
         }
+
+        HideHudFrost();
     }
 
     private void SetMediaPosition(TimeSpan position)
@@ -1541,19 +1720,17 @@ internal sealed class LibraryVisualStage : Grid
         {
         }
 
-        if (_spillHost.Visibility != Visibility.Visible)
+        if (_spillHost.Visibility == Visibility.Visible)
         {
-            return;
-        }
-
-        try
-        {
-            _spillMedia.Volume = 0;
-            _spillMedia.SpeedRatio = speedRatio;
-            _spillMedia.Play();
-        }
-        catch
-        {
+            try
+            {
+                _spillMedia.Volume = 0;
+                _spillMedia.SpeedRatio = speedRatio;
+                _spillMedia.Play();
+            }
+            catch
+            {
+            }
         }
     }
 
