@@ -49,6 +49,46 @@ internal sealed class WaveformView : Grid
     private const double MouseGuideMoveEpsilonPx = 0.5;
     private static double TimeLaneHeight => DesignMetrics.RulerHeight;
 
+    private double _overlayChromeScale = 1;
+    private double _timeLabelChromeScale = 1;
+
+    /// <summary>
+    /// 動画ミニの窓比例。タイムラインの時刻とマーカー旗に掛ける。1 はエディタ／通常プレイヤー。
+    /// </summary>
+    public double OverlayChromeScale
+    {
+        get => _overlayChromeScale;
+        set
+        {
+            var next = value > 0 && !double.IsNaN(value) && !double.IsInfinity(value)
+                ? Math.Clamp(value, DesignMetrics.OverlayScaleMin, DesignMetrics.OverlayScaleMax)
+                : 1;
+            if (Math.Abs(_overlayChromeScale - next) < 0.0001)
+            {
+                return;
+            }
+
+            _overlayChromeScale = next;
+            _timeLabelChromeScale = -1;
+            _appliedMarkerLaneHeight = -1;
+            _waveDirty = true;
+            _staticHost.InvalidateVisual();
+            _overlayHost.InvalidateVisual();
+        }
+    }
+
+    private double ChromeScale => _overlayChromeScale;
+
+    private double ScaledTimeLaneHeight => TimeLaneHeight * ChromeScale;
+
+    private double ChromeFontSize => Math.Max(1, 10 * ChromeScale);
+
+    private double FlagPadX => 3 * ChromeScale;
+
+    private double FlagMaxWidth => 48 * ChromeScale;
+
+    private double FlagCornerRadius => DesignMetrics.ControlCornerRadius * ChromeScale;
+
     internal static int CountFlagLaneRows(bool hasMarkers, bool hasRegions)
     {
         if (!hasMarkers && !hasRegions)
@@ -124,9 +164,9 @@ internal sealed class WaveformView : Grid
     internal static double ChannelLabelTextX(double badgeX, double badgeW, double textW) =>
         badgeX + Math.Max(0, (badgeW - textW) * 0.5);
 
-    private double MarkerLaneHeight => MarkerLaneHeightForRows(FlagLaneCount);
+    private double MarkerLaneHeight => MarkerLaneHeightForRows(FlagLaneCount) * ChromeScale;
 
-    private double ChromeTopHeight => MarkerLaneHeight + TimeLaneHeight;
+    private double ChromeTopHeight => MarkerLaneHeight + ScaledTimeLaneHeight;
 
     private readonly DrawingHost _staticHost;
     private readonly DrawingHost _overlayHost;
@@ -2479,6 +2519,7 @@ internal sealed class WaveformView : Grid
 
     private void PaintStaticCore(DrawingContext dc)
     {
+        SyncChromeLabelCache(UiDpi.Get(this).PixelsPerDip);
         var bounds = new Rect(_staticHost.RenderSize);
         if (!SeekAndSelectOnly && _liveRecording)
         {
@@ -4864,7 +4905,7 @@ internal sealed class WaveformView : Grid
     private Rect TimeLaneBounds(Rect bounds)
     {
         var top = Math.Min(MarkerLaneHeight, bounds.Height);
-        var height = Math.Min(TimeLaneHeight, Math.Max(0, bounds.Height - top));
+        var height = Math.Min(ScaledTimeLaneHeight, Math.Max(0, bounds.Height - top));
         return new Rect(ScaleLeft(bounds), top, ScaleContentWidth(bounds), height);
     }
 
@@ -4894,21 +4935,13 @@ internal sealed class WaveformView : Grid
         var startSec = start / _document.SampleRate;
         var first = Math.Floor(startSec / step) * step;
         var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
-        if (Math.Abs(pixelsPerDip - _timeLabelPixelsPerDip) > 0.01)
-        {
-            _timeLabelCache.Clear();
-            _dbLabelCache.Clear();
-            _markerLabelCache.Clear();
-            _markerCommentLabelCache.Clear();
-            _abFlagLabelCache.Clear();
-            _timeLabelPixelsPerDip = pixelsPerDip;
-        }
+        SyncChromeLabelCache(pixelsPerDip);
 
         var loop = _document.SampleLoop;
         var hasLoop = LibraryPlayerMode.ShowsCueOverlays(SeekAndSelectOnly) && !loop.IsEmpty;
         var tick = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("DbScaleForeBrush")), 1);
         tick.Freeze();
-        const double minGap = 72;
+        var minGap = 72 * ChromeScale;
         var loopX0 = hasLoop ? FrameToViewX(loop.StartFrame, start, span, bounds) : 0;
         var loopX1 = hasLoop ? FrameToViewX(loop.EndFrame, start, span, bounds) : 0;
 
@@ -4951,7 +4984,8 @@ internal sealed class WaveformView : Grid
 
                 if (x >= lane.X && x <= lane.Right)
                 {
-                    dc.DrawLine(tick, new Point(x, lane.Bottom - 5), new Point(x, lane.Bottom - 1));
+                    var tickInset = 5 * ChromeScale;
+                    dc.DrawLine(tick, new Point(x, lane.Bottom - tickInset), new Point(x, lane.Bottom - Math.Min(1, tickInset)));
                 }
 
                 if (hasLoop)
@@ -5174,9 +5208,7 @@ internal sealed class WaveformView : Grid
 
     private double MeasureFlagWidth(string id, double pixelsPerDip)
     {
-        const double padX = 3;
-        const double maxFlagWidth = 48;
-        return Math.Min(maxFlagWidth, GetMarkerLabel(id, pixelsPerDip).Width + padX * 2);
+        return Math.Min(FlagMaxWidth, GetMarkerLabel(id, pixelsPerDip).Width + FlagPadX * 2);
     }
 
     private void DrawRegionFlags(DrawingContext dc, Rect bounds, double start, double span)
@@ -5235,7 +5267,7 @@ internal sealed class WaveformView : Grid
         }
 
         var idText = GetMarkerLabel(id.ToString(CultureInfo.InvariantCulture), pixelsPerDip);
-        const double padX = 3;
+        var padX = FlagPadX;
         var growLeft = frame != region.StartFrame;
         if (!_regionFlagLayout.TryGetValue((region, frame), out var box))
         {
@@ -5247,7 +5279,7 @@ internal sealed class WaveformView : Grid
         var inset = WpfControlHelpers.DeviceHairline(pixelsPerDip) * 0.5;
         box = AlignFlagToStem(box, xs, growLeft, inset);
         _regionFlags.Add((region, frame, box));
-        var flag = WpfControlHelpers.FlagGeometry(box, DesignMetrics.ControlCornerRadius, stemOnLeft: !growLeft);
+        var flag = WpfControlHelpers.FlagGeometry(box, FlagCornerRadius, stemOnLeft: !growLeft);
         dc.DrawGeometry(fill, selected ? selectedPen : null, flag);
         dc.PushClip(flag);
         dc.DrawText(
@@ -5269,7 +5301,7 @@ internal sealed class WaveformView : Grid
         }
 
         var nameText = GetMarkerCommentLabel(TruncateMarkerComment(name), pixelsPerDip, selected);
-        const double nameGap = 2;
+        var nameGap = 2 * ChromeScale;
         var nameX = box.Right + nameGap;
         var nameY = box.Y + Math.Max(0, (box.Height - nameText.Height) * 0.5);
         if (nameX + nameText.Width <= bounds.Width
@@ -5471,11 +5503,11 @@ internal sealed class WaveformView : Grid
         box = AlignFlagToStem(box, xs, growLeft, inset);
         var flag = WpfControlHelpers.FlagGeometry(
             box,
-            DesignMetrics.ControlCornerRadius,
+            FlagCornerRadius,
             stemOnLeft: !growLeft);
         dc.DrawGeometry(fill, null, flag);
         var idText = GetAbFlagLabel(label, brushKey, pixelsPerDip);
-        const double padX = 3;
+        var padX = FlagPadX;
         dc.PushClip(flag);
         dc.DrawText(
             idText,
@@ -5502,7 +5534,7 @@ internal sealed class WaveformView : Grid
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
             WpfControlHelpers.MonoTypeface,
-            10,
+            ChromeFontSize,
             WpfControlHelpers.FrozenBrush(fore),
             pixelsPerDip);
         _abFlagLabelCache[key] = formatted;
@@ -5549,7 +5581,7 @@ internal sealed class WaveformView : Grid
 
             var selected = _selectedMarkerFrames.Contains(marker.Frame);
             var idText = GetMarkerLabel(marker.Id.ToString(CultureInfo.InvariantCulture), pixelsPerDip);
-            const double padX = 3;
+            var padX = FlagPadX;
             var growLeft = MarkerFlagGrowsLeft(marker.Frame, _document.FrameCount);
             if (!_markerFlagLayout.TryGetValue(marker.Frame, out var box))
             {
@@ -5583,7 +5615,7 @@ internal sealed class WaveformView : Grid
 
             var flag = WpfControlHelpers.FlagGeometry(
                 box,
-                DesignMetrics.ControlCornerRadius,
+                FlagCornerRadius,
                 stemOnLeft: !growLeft);
             dc.DrawGeometry(selected ? selectedFill : fill, selected ? selectedPen : null, flag);
             dc.PushClip(flag);
@@ -5597,7 +5629,7 @@ internal sealed class WaveformView : Grid
             if (!string.IsNullOrEmpty(marker.Comment))
             {
                 var commentText = GetMarkerCommentLabel(TruncateMarkerComment(marker.Comment), pixelsPerDip, selected);
-                const double commentGap = 2;
+                var commentGap = 2 * ChromeScale;
                 // 末端（左向き旗）は旗の左、通常は旗の右。
                 var commentX = growLeft
                     ? box.X - commentGap - commentText.Width
@@ -5991,7 +6023,7 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var radius = DesignMetrics.ControlCornerRadius;
+        var radius = FlagCornerRadius;
         dc.DrawRoundedRectangle(
             WpfControlHelpers.FrozenBrush(Theme.Get("SampleLoopTimelineBrush")),
             null,
@@ -6722,7 +6754,7 @@ internal sealed class WaveformView : Grid
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
             WpfControlHelpers.MonoTypeface,
-            10,
+            ChromeFontSize,
             WpfControlHelpers.FrozenBrush(Theme.Get("MarkerLabelForeBrush")),
             pixelsPerDip);
         _markerLabelCache[text] = formatted;
@@ -6742,7 +6774,7 @@ internal sealed class WaveformView : Grid
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
             new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
-            10,
+            ChromeFontSize,
             WpfControlHelpers.FrozenBrush(Theme.Get(selected ? "AccentCyanBrush" : "PrimaryForeBrush")),
             pixelsPerDip);
         _markerCommentLabelCache[key] = formatted;
@@ -6759,6 +6791,23 @@ internal sealed class WaveformView : Grid
         None,
         Loop,
         Region,
+    }
+
+    private void SyncChromeLabelCache(double pixelsPerDip)
+    {
+        if (Math.Abs(pixelsPerDip - _timeLabelPixelsPerDip) <= 0.01
+            && Math.Abs(ChromeScale - _timeLabelChromeScale) <= 0.001)
+        {
+            return;
+        }
+
+        _timeLabelCache.Clear();
+        _dbLabelCache.Clear();
+        _markerLabelCache.Clear();
+        _markerCommentLabelCache.Clear();
+        _abFlagLabelCache.Clear();
+        _timeLabelPixelsPerDip = pixelsPerDip;
+        _timeLabelChromeScale = ChromeScale;
     }
 
     private FormattedText GetTimeLabel(string text, double pixelsPerDip, TimeLabelAccent accent)
@@ -6780,7 +6829,7 @@ internal sealed class WaveformView : Grid
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
             new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
-            10,
+            ChromeFontSize,
             brush,
             pixelsPerDip);
         if (_timeLabelCache.Count >= TimeLabelCacheMax)

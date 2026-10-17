@@ -2522,6 +2522,7 @@ public partial class MainWindow
     /// </summary>
     private void ApplyVideoMiniOverlayLayout(double scale)
     {
+        PrimaryWaveform.OverlayChromeScale = scale;
         var waveH = LibraryPlayerMode.VideoMiniWaveformHeight(scale);
         LibraryRowDef.MinHeight = 0;
         LibraryRowDef.Height = new GridLength(1, GridUnitType.Star);
