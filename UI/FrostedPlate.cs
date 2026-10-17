@@ -1,27 +1,22 @@
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
-using System.Windows.Media.Imaging;
-using System.Windows.Threading;
 
 namespace MgaSonicAnvil.UI;
 
 /// <summary>
-/// 背後の見た目をぼかして載せるすりガラス。ライブブラシのソースに自分を含めないこと（取り込みが循環する）。
-/// 合成取り込みは祖先を撮るので、その間だけ自分を隠す。
+/// 背後の見た目をぼかして載せるすりガラス。ソースに自分を含めないこと（取り込みが循環する）。
 /// </summary>
 internal sealed class FrostedPlate : System.Windows.Controls.Grid
 {
     /// <summary>明るい背面でも文字が残るよう、BusyGlass より濃いテーマ色のヴェール。</summary>
     internal const byte TintAlpha = 0xB0;
 
-    /// <summary>合成ぼかしの上に載せる薄いヴェール。背面の色が残る濃さ。</summary>
+    /// <summary>動画メーター背後など、背面の色を残す薄いヴェール。</summary>
     internal const byte GlassScrimAlpha = 0x48;
 
-    internal const double BlurRadiusDip = 18;
-
-    /// <summary>合成ぼかし。縮小して引き伸ばす。BusyGlass と同じ考え方。</summary>
-    private const int CompositedDivisor = 6;
+    /// <summary>背面の文字が読めなくなる強さ。トーストはすべてこの半径を共有する。</summary>
+    internal const double BlurRadiusDip = 56;
 
     public static readonly DependencyProperty SourceProperty = DependencyProperty.Register(
         nameof(Source),
@@ -35,12 +30,6 @@ internal sealed class FrostedPlate : System.Windows.Controls.Grid
         typeof(FrostedPlate),
         new PropertyMetadata(default(CornerRadius), OnChromeChanged));
 
-    public static readonly DependencyProperty SampleCompositedProperty = DependencyProperty.Register(
-        nameof(SampleComposited),
-        typeof(bool),
-        typeof(FrostedPlate),
-        new PropertyMetadata(false, OnSampleChanged));
-
     public static readonly DependencyProperty ScrimAlphaProperty = DependencyProperty.Register(
         nameof(ScrimAlpha),
         typeof(byte),
@@ -52,9 +41,6 @@ internal sealed class FrostedPlate : System.Windows.Controls.Grid
     private FrameworkElement? _hookedSource;
     private Rect _mapped = Rect.Empty;
     private bool _rendering;
-    private bool _capturing;
-    private int _captureTicket;
-    private ImageBrush? _snapshot;
 
     public FrostedPlate()
     {
@@ -64,9 +50,13 @@ internal sealed class FrostedPlate : System.Windows.Controls.Grid
             IsHitTestVisible = false,
             Margin = new Thickness(-BlurRadiusDip),
             Visibility = Visibility.Collapsed,
-            Effect = CreateBlur(),
+            Effect = new BlurEffect
+            {
+                Radius = BlurRadiusDip,
+                KernelType = KernelType.Gaussian,
+                RenderingBias = RenderingBias.Quality,
+            },
         };
-        RenderOptions.SetBitmapScalingMode(_backdrop, BitmapScalingMode.HighQuality);
         _tint = new System.Windows.Controls.Border
         {
             IsHitTestVisible = false,
@@ -76,14 +66,7 @@ internal sealed class FrostedPlate : System.Windows.Controls.Grid
         Children.Add(_tint);
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
-        SizeChanged += (_, _) =>
-        {
-            UpdateClip();
-            if (SampleComposited && _backdrop.Visibility == Visibility.Visible)
-            {
-                RequestCapture();
-            }
-        };
+        SizeChanged += (_, _) => UpdateClip();
         ApplyTint();
     }
 
@@ -99,22 +82,11 @@ internal sealed class FrostedPlate : System.Windows.Controls.Grid
         set => SetValue(CornerRadiusProperty, value);
     }
 
-    /// <summary>
-    /// 祖先ごと撮って縮小ぼかしする。透明なソースの向こうに塗られた色もガラスに入る。
-    /// </summary>
-    public bool SampleComposited
-    {
-        get => (bool)GetValue(SampleCompositedProperty);
-        set => SetValue(SampleCompositedProperty, value);
-    }
-
     public byte ScrimAlpha
     {
         get => (byte)GetValue(ScrimAlphaProperty);
         set => SetValue(ScrimAlphaProperty, value);
     }
-
-    internal ImageBrush? Snapshot => _snapshot;
 
     private static void OnSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -132,26 +104,6 @@ internal sealed class FrostedPlate : System.Windows.Controls.Grid
             plate.UpdateClip();
         }
     }
-
-    private static void OnSampleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is not FrostedPlate plate)
-        {
-            return;
-        }
-
-        // 縮小ぼかしの上に BlurEffect を足すと、描画ごと消えることがある。
-        plate._backdrop.Effect = plate.SampleComposited ? null : CreateBlur();
-        plate.ApplyTint();
-        plate.RequestCapture();
-    }
-
-    private static BlurEffect CreateBlur() => new()
-    {
-        Radius = BlurRadiusDip,
-        KernelType = KernelType.Gaussian,
-        RenderingBias = RenderingBias.Quality,
-    };
 
     private static void OnScrimChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -223,21 +175,11 @@ internal sealed class FrostedPlate : System.Windows.Controls.Grid
         }
 
         _mapped = mapped;
-        if (SampleComposited)
-        {
-            RequestCapture();
-            return;
-        }
-
         _backdrop.InvalidateVisual();
     }
 
     private void OnRendering(object? sender, EventArgs e)
     {
-        if (_capturing)
-        {
-            return;
-        }
         var show = IsVisible && EffectiveOpacity(this) > 0.02 && ActualWidth > 1 && ActualHeight > 1 && Source is not null;
         var visibility = show ? Visibility.Visible : Visibility.Collapsed;
         if (_backdrop.Visibility == visibility)
@@ -247,18 +189,10 @@ internal sealed class FrostedPlate : System.Windows.Controls.Grid
 
         _backdrop.Visibility = visibility;
         _mapped = Rect.Empty;
-        if (!show)
+        if (show)
         {
-            return;
+            _backdrop.InvalidateVisual();
         }
-
-        if (SampleComposited)
-        {
-            RequestCapture();
-            return;
-        }
-
-        _backdrop.InvalidateVisual();
     }
 
     private void ApplyTint()
@@ -277,191 +211,8 @@ internal sealed class FrostedPlate : System.Windows.Controls.Grid
         }
 
         _tint.Background = WpfControlHelpers.FrozenBrush(Color.FromArgb(ScrimAlpha, surface.R, surface.G, surface.B));
-        var border = SampleComposited
-            ? Color.FromArgb(0x99, 0xFF, 0xFF, 0xFF)
-            : Color.FromArgb(0x88, edge.R, edge.G, edge.B);
-        _tint.BorderBrush = WpfControlHelpers.FrozenBrush(border);
+        _tint.BorderBrush = WpfControlHelpers.FrozenBrush(Color.FromArgb(0x88, edge.R, edge.G, edge.B));
         _tint.CornerRadius = CornerRadius;
-    }
-
-    private void RequestCapture()
-    {
-        if (_capturing || !SampleComposited || !IsLoaded)
-        {
-            return;
-        }
-
-        var ticket = ++_captureTicket;
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
-        {
-            if (ticket != _captureTicket || _capturing || !SampleComposited)
-            {
-                return;
-            }
-
-            CaptureComposited();
-        });
-    }
-
-    /// <summary>
-    /// 見えている祖先を、自分を消した状態で撮る。縮小がぼかしになる。
-    /// </summary>
-    private void CaptureComposited()
-    {
-        var root = FindCaptureRoot();
-        if (root is null)
-        {
-            return;
-        }
-
-        _capturing = true;
-        var opacity = Opacity;
-        Opacity = 0;
-        try
-        {
-            UpdateLayout();
-            root.UpdateLayout();
-            if (_backdrop.ActualWidth <= 1 || _backdrop.ActualHeight <= 1 || !TryMapTo(root, out var viewbox))
-            {
-                return;
-            }
-
-            viewbox.Intersect(new Rect(0, 0, root.ActualWidth, root.ActualHeight));
-            if (viewbox.Width < 1 || viewbox.Height < 1 || viewbox.Width > 4000 || viewbox.Height > 4000)
-            {
-                return;
-            }
-
-            var suspended = SuspendBitmapCache(root);
-            ImageSource? bitmap;
-            try
-            {
-                bitmap = RenderFrost(root, viewbox, Underpaint());
-            }
-            finally
-            {
-                RestoreBitmapCache(suspended);
-            }
-            if (bitmap is null)
-            {
-                return;
-            }
-
-            var brush = new ImageBrush(bitmap)
-            {
-                Stretch = Stretch.Fill,
-                AlignmentX = AlignmentX.Left,
-                AlignmentY = AlignmentY.Top,
-            };
-            brush.Freeze();
-            _snapshot = brush;
-            _backdrop.InvalidateVisual();
-        }
-        finally
-        {
-            Opacity = opacity;
-            _capturing = false;
-        }
-    }
-
-    /// <summary>
-    /// ウィンドウ内容の一番上。ライブラリの後ろに敷いたウォッシュも入る。
-    /// </summary>
-    private FrameworkElement? FindCaptureRoot()
-    {
-        FrameworkElement? top = Source;
-        for (DependencyObject? current = Source; current is not null; current = VisualTreeHelper.GetParent(current))
-        {
-            if (current is Window)
-            {
-                break;
-            }
-
-            if (current is FrameworkElement element)
-            {
-                top = element;
-            }
-        }
-
-        return top;
-    }
-
-    private Brush Underpaint()
-    {
-        Color surface;
-        try
-        {
-            surface = Theme.Get("SurfaceBackBrush");
-        }
-        catch (InvalidOperationException)
-        {
-            surface = Color.FromRgb(0x1E, 0x1E, 0x1E);
-        }
-
-        return WpfControlHelpers.FrozenBrush(surface);
-    }
-
-    private static List<(UIElement Element, CacheMode Mode)> SuspendBitmapCache(DependencyObject root)
-    {
-        var suspended = new List<(UIElement, CacheMode)>();
-        SuspendBitmapCache(root, suspended);
-        return suspended;
-    }
-
-    private static void SuspendBitmapCache(DependencyObject node, List<(UIElement Element, CacheMode Mode)> suspended)
-    {
-        if (node is UIElement element && element.CacheMode is CacheMode mode)
-        {
-            suspended.Add((element, mode));
-            element.CacheMode = null;
-        }
-
-        var count = VisualTreeHelper.GetChildrenCount(node);
-        for (var i = 0; i < count; i++)
-        {
-            SuspendBitmapCache(VisualTreeHelper.GetChild(node, i), suspended);
-        }
-    }
-
-    private static void RestoreBitmapCache(List<(UIElement Element, CacheMode Mode)> suspended)
-    {
-        foreach (var (element, mode) in suspended)
-        {
-            element.CacheMode = mode;
-        }
-    }
-
-    private static ImageSource? RenderFrost(FrameworkElement root, Rect viewbox, Brush underpaint)
-    {
-        try
-        {
-            var width = Math.Max(1, (int)Math.Ceiling(viewbox.Width / CompositedDivisor));
-            var height = Math.Max(1, (int)Math.Ceiling(viewbox.Height / CompositedDivisor));
-            var visual = new DrawingVisual();
-            using (var dc = visual.RenderOpen())
-            {
-                var bounds = new Rect(0, 0, width, height);
-                dc.DrawRectangle(underpaint, null, bounds);
-                var brush = new VisualBrush(root)
-                {
-                    Stretch = Stretch.Fill,
-                    ViewboxUnits = BrushMappingMode.Absolute,
-                    Viewbox = viewbox,
-                    AlignmentX = AlignmentX.Left,
-                    AlignmentY = AlignmentY.Top,
-                };
-                dc.DrawRectangle(brush, null, bounds);
-            }
-
-            var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-            bitmap.Render(visual);
-            bitmap.Freeze();
-            return bitmap;
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
     }
 
     private void UpdateClip()
@@ -477,19 +228,18 @@ internal sealed class FrostedPlate : System.Windows.Controls.Grid
         _tint.CornerRadius = CornerRadius;
     }
 
-    private bool TryMapBackdrop(out Rect mapped) => TryMapTo(Source, out mapped);
-
-    private bool TryMapTo(Visual? target, out Rect mapped)
+    private bool TryMapBackdrop(out Rect mapped)
     {
         mapped = Rect.Empty;
-        if (target is null || _backdrop.ActualWidth <= 1 || _backdrop.ActualHeight <= 1)
+        var source = Source;
+        if (source is null || _backdrop.ActualWidth <= 1 || _backdrop.ActualHeight <= 1)
         {
             return false;
         }
 
         try
         {
-            var transform = _backdrop.TransformToVisual(target);
+            var transform = _backdrop.TransformToVisual(source);
             var a = transform.Transform(new Point(0, 0));
             var b = transform.Transform(new Point(_backdrop.ActualWidth, _backdrop.ActualHeight));
             mapped = new Rect(a, b);
@@ -558,16 +308,6 @@ internal sealed class FrostedPlate : System.Windows.Controls.Grid
             }
 
             var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
-            if (_plate.SampleComposited)
-            {
-                if (_plate.Snapshot is ImageBrush snapshot)
-                {
-                    dc.DrawRectangle(snapshot, null, bounds);
-                }
-
-                return;
-            }
-
             // 透明なソースをぼかすと、空の画素が黒に寄って半透明の黒板になる。
             // 見えている面色を先に敷いてから、ソースの中身を載せる。
             if (TryFindOpaqueFill(source) is Brush fill)
