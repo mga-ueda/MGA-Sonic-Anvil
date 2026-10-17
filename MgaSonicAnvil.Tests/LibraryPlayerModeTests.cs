@@ -1332,6 +1332,15 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsNumpadRegionDigitJump(Key.NumPad5, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.IsNumpadRegionDigitJump(Key.D5, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.IsNumpadRegionDigitJump(Key.NumPad5, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsNumpadPercentDigitJump(Key.NumPad1, ModifierKeys.Alt));
+        Assert.False(LibraryPlayerMode.IsNumpadPercentDigitJump(Key.D1, ModifierKeys.Alt));
+        Assert.False(LibraryPlayerMode.IsNumpadPercentDigitJump(Key.NumPad1, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsNumpadPercentDigitJump(Key.NumPad1, ModifierKeys.Alt | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsAltNumpadPercentVirtualKey(0x61, altDown: true, shiftDown: false, ctrlDown: false));
+        Assert.False(LibraryPlayerMode.IsAltNumpadPercentVirtualKey(0x61, altDown: false, shiftDown: false, ctrlDown: false));
+        Assert.False(LibraryPlayerMode.IsAltNumpadPercentVirtualKey(0x61, altDown: true, shiftDown: true, ctrlDown: false));
+        Assert.False(LibraryPlayerMode.IsAltNumpadPercentVirtualKey(0x31, altDown: true, shiftDown: false, ctrlDown: false));
+        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad1, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.IsRegionDigitJump(Key.D5, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsDigitJumpChord(Key.D5, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: true, hasScratchMarkers: true));

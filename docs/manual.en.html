@@ -390,7 +390,7 @@
               <li>Numpad — <kbd>0</kbd> pause/resume, <kbd>1</kbd>/<kbd>3</kbd> ±3× rewind/FF, <kbd>4</kbd>/<kbd>6</kbd> previous/next, <kbd>5</kbd> restart, <kbd>7</kbd>/<kbd>9</kbd> ±5 s (<kbd>2</kbd>/<kbd>8</kbd> unused)</li>
             </ul>
           </li>
-          <li>The numpad is transport (<kbd>0</kbd> pause/resume, <kbd>1</kbd>/<kbd>3</kbd> ±3× rewind/FF, <kbd>4</kbd>/<kbd>6</kbd> previous/next, <kbd>5</kbd> restart, <kbd>7</kbd>/<kbd>9</kbd> ±5 s; <kbd>2</kbd>/<kbd>8</kbd> unused; same in the editor, where <kbd>4</kbd>/<kbd>6</kbd> switch tabs; <kbd>J</kbd>/<kbd>K</kbd>/<kbd>,</kbd>/<kbd>.</kbd> match too). Top-row <kbd>0</kbd>–<kbd>9</kbd> jump by view percent. <kbd>Shift</kbd>+top-row digits jump to marker numbers when temporary markers exist (audio waveform / real video playback / F8; two digits OK; numpad is not used for markers).</li>
+          <li>The numpad is transport (<kbd>0</kbd> pause/resume, <kbd>1</kbd>/<kbd>3</kbd> ±3× rewind/FF, <kbd>4</kbd>/<kbd>6</kbd> previous/next, <kbd>5</kbd> restart, <kbd>7</kbd>/<kbd>9</kbd> ±5 s; <kbd>2</kbd>/<kbd>8</kbd> unused; same in the editor, where <kbd>4</kbd>/<kbd>6</kbd> switch tabs; <kbd>J</kbd>/<kbd>K</kbd>/<kbd>,</kbd>/<kbd>.</kbd> match too). Top-row <kbd>0</kbd>–<kbd>9</kbd> and <kbd>Alt</kbd>+numpad digits jump by view percent (0 = start, 9 = 90%). <kbd>Shift</kbd>+top-row digits and <kbd>Shift</kbd>+numpad digits jump to marker numbers when temporary markers exist (audio waveform / real video playback / F8 / frame pause; two digits OK; the dim preview does not show temporary markers, so it does not jump; with Num Lock on, Shift+numpad stays a marker number instead of Home/End). <kbd>Ctrl</kbd>+top-row digits and <kbd>Ctrl</kbd>+numpad digits jump to the start of a region number when the file has regions (from 1; two digits OK; same in the editor). Unmodified numpad stays transport. Tree <kbd>Shift</kbd>+<kbd>8</kbd> on the top row still expands the subtree.</li>
         </ul>
         <h4>List and focus</h4>
         <ul>
@@ -707,7 +707,7 @@
         <li><kbd>M</kbd> / <kbd>Ins</kbd> — marker at the playhead when there is no selection. The same frame cannot take another. With a selection, the first press places start and end (or the midpoint if both ends already have markers); further presses replace them with thirds, then fourths, and so on (hold uses the same repeat timing as marker nudge; one history entry until you release).</li>
         <li><kbd>Shift</kbd>+<kbd>L</kbd> — set the selection as the sample loop (same range again clears it).</li>
         <li><kbd>Shift</kbd>+<kbd>R</kbd> — set the selection as a region. If both ends already have a region, the first press divides it in two; the same range again divides it in three, and so on (clear with right-click / <kbd>Delete</kbd>; hold uses the same repeat timing, one history entry until you release).</li>
-        <li><kbd>Ctrl</kbd>+top-row digits — jump to the start of that region number (regions count from 1, separate from marker numbers; two digits OK; numpad is not used).</li>
+        <li><kbd>Ctrl</kbd>+top-row digits, or <kbd>Ctrl</kbd>+numpad digits — jump to the start of that region number (regions count from 1, separate from marker numbers; two digits OK; the player does the same when the file has regions. Unmodified numpad stays transport).</li>
         <li>Click a flag to select an edge. Shift+click for a range, Ctrl+click to add. Drag or ←/→ to move (Shift ×3).</li>
         <li>Double-click a comment / region name. <code>-A</code> lime, <code>-L</code> blue, <code>-E</code> red (only when you write it; the span after a loop or sample loop is not painted red automatically). <code>-R</code> is gray. See <a href="#export-suffix">9-3</a> for what EXPORT does with them.</li>
         <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> — rename.</li>
@@ -879,8 +879,9 @@
           <tr><td><kbd>Shift</kbd>+<kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Extend the selection by 5% of the view</td></tr>
           <tr><td>Top-row <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to 0%–90% of the view</td></tr>
           <tr><td>Numpad</td><td><kbd>0</kbd> pause/resume, <kbd>1</kbd>/<kbd>3</kbd> ±3× rewind/FF, <kbd>4</kbd>/<kbd>6</kbd> previous/next tab, <kbd>5</kbd> restart from the beginning, <kbd>7</kbd>/<kbd>9</kbd> ±5 s (<kbd>2</kbd>/<kbd>8</kbd> unused)</td></tr>
-          <tr><td><kbd>Shift</kbd>+top-row <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to a marker number (digits can be chained; numpad is not used)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+top-row <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to the start of a region number (from 1, separate from marker numbers; two digits OK; numpad is not used)</td></tr>
+          <tr><td><kbd>Shift</kbd>+top-row / numpad <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to a marker number (digits can be chained; unmodified numpad stays transport)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+top-row / numpad <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to the start of a region number (from 1, separate from marker numbers; two digits OK)</td></tr>
+          <tr><td><kbd>Alt</kbd>+numpad <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump by view percent (same as unmodified top-row digits; 0 = start, 9 = 90%; unmodified numpad stays transport)</td></tr>
         </tbody>
       </table>
 
@@ -1109,7 +1110,9 @@
           <tr><td><kbd>,</kbd> / <kbd>.</kbd></td><td>Hold for 3× rewind / fast-forward (original pitch; −4 dB while held; release restores speed and volume; for video the picture follows the audio playhead)</td></tr>
           <tr><td>Top-row <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to 0%–90% of the view (from any pane)</td></tr>
           <tr><td>Numpad</td><td><kbd>0</kbd> pause/resume, <kbd>1</kbd>/<kbd>3</kbd> ±3× rewind/FF, <kbd>4</kbd>/<kbd>6</kbd> previous/next (<kbd>4</kbd> at the first wraps to the last, <kbd>6</kbd> at the last wraps to the first; same as P / N), <kbd>5</kbd> restart, <kbd>7</kbd>/<kbd>9</kbd> ±5 s (<kbd>2</kbd>/<kbd>8</kbd> unused)</td></tr>
-          <tr><td><kbd>Shift</kbd>+top-row <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to a marker number (when temporary markers exist; audio waveform / real video playback / F8; two digits OK; numpad is not used)</td></tr>
+          <tr><td><kbd>Shift</kbd>+top-row / numpad <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to a marker number when temporary markers exist (audio waveform / real video playback / F8 / frame pause; two digits OK; the dim preview does not jump; with Num Lock on, Shift+numpad stays a marker number instead of Home/End). Tree <kbd>Shift</kbd>+<kbd>8</kbd> on the top row still expands the subtree</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+top-row / numpad <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to the start of a region number when the file has regions (from 1, separate from marker numbers; two digits OK; same in the editor)</td></tr>
+          <tr><td><kbd>Alt</kbd>+numpad <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump by view percent (same as unmodified top-row digits; 0 = start, 9 = 90%; unmodified numpad stays transport)</td></tr>
           <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same as right-click on the tree, Favorites, and playlist. On the waveform the menu opens, but edit commands stay disabled</td></tr>
           <tr><td><kbd>Delete</kbd></td><td>Remove selected rows from the list (files are never deleted; Ctrl+Z undoes it; leaving the player forgets undo; when the list has keyboard focus. <kbd>Ctrl</kbd>+<kbd>W</kbd> does not close. Disabled during real video playback / bright PDF view and other chrome-hidden states). When Favorites has focus, removes the registration only</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Select every row in the list (disabled during real video playback / bright PDF view and other chrome-hidden states)</td></tr>

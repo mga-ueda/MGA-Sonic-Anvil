@@ -15,6 +15,7 @@ public partial class MainWindow
     private const int WmSysKeyUp = 0x0105;
     private const int WhKeyboardLl = 13;
     private const int LlkhfExtended = 0x01;
+    private const int LlkhfAltDown = 0x20;
     private const int LlkhfUp = 0x80;
 
     private static readonly FieldInfo? KeyScanCodeField = typeof(KeyEventArgs).GetField(
@@ -30,6 +31,9 @@ public partial class MainWindow
     private LowLevelKeyboardProc? _numpadShiftHookProc;
     private long _numpadShiftJumpMs = -1000;
     private int _numpadShiftJumpDigit = -1;
+    private long _numpadPercentJumpMs = -1000;
+    private int _numpadPercentJumpDigit = -1;
+    private readonly HashSet<int> _altNumpadDown = new();
 
     [StructLayout(LayoutKind.Sequential)]
     private struct KbdLlHook
@@ -45,6 +49,11 @@ public partial class MainWindow
 
     [DllImport("user32.dll")]
     private static extern short GetKeyState(int nVirtKey);
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    private static bool IsVkDown(int vKey) => (GetAsyncKeyState(vKey) & 0x8000) != 0;
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
@@ -96,12 +105,17 @@ public partial class MainWindow
                 var message = (int)wParam;
                 var up = (info.flags & LlkhfUp) != 0 || message is WmKeyUp or WmSysKeyUp;
                 if (IsOurWindowForeground()
-                    && ConsumeTranslatedNumpad(
-                        (int)info.vkCode,
-                        (int)info.scanCode,
-                        extended: (info.flags & LlkhfExtended) != 0,
-                        up,
-                        repeat: false))
+                    && (ConsumeTranslatedNumpad(
+                            (int)info.vkCode,
+                            (int)info.scanCode,
+                            extended: (info.flags & LlkhfExtended) != 0,
+                            up,
+                            repeat: false)
+                        || ConsumeAltNumpadPercent(
+                            (int)info.vkCode,
+                            altDown: (info.flags & LlkhfAltDown) != 0
+                                || message is WmSysKeyDown or WmSysKeyUp,
+                            up)))
                 {
                     return (IntPtr)1;
                 }
@@ -122,6 +136,7 @@ public partial class MainWindow
             if (!IsActive)
             {
                 _numpadShiftScansDown.Clear();
+                _altNumpadDown.Clear();
             }
 
             return;
@@ -140,6 +155,11 @@ public partial class MainWindow
                 virtualKey,
                 scanCode: (int)(native >> 16) & 0xFF,
                 extended: (native & 0x01000000) != 0,
+                up,
+                repeat: LibraryPlayerMode.IsKeyRepeat(native))
+            || ConsumeAltNumpadPercent(
+                virtualKey,
+                altDown: msg.message is WmSysKeyDown or WmSysKeyUp || IsVkDown(0x12),
                 up,
                 repeat: LibraryPlayerMode.IsKeyRepeat(native)))
         {
@@ -175,6 +195,49 @@ public partial class MainWindow
         }
 
         return true;
+    }
+
+    private bool ConsumeAltNumpadPercent(int virtualKey, bool altDown, bool up, bool repeat = false)
+    {
+        var shiftDown = IsVkDown(0x10) || IsVkDown(0xA0) || IsVkDown(0xA1);
+        var ctrlDown = IsVkDown(0x11) || IsVkDown(0xA2) || IsVkDown(0xA3);
+        if (!LibraryPlayerMode.IsAltNumpadPercentVirtualKey(virtualKey, altDown, shiftDown, ctrlDown))
+        {
+            return false;
+        }
+
+        if (NumpadShiftPassesToText())
+        {
+            return false;
+        }
+
+        if (up)
+        {
+            _altNumpadDown.Remove(virtualKey);
+            return true;
+        }
+
+        var first = _altNumpadDown.Add(virtualKey);
+        if (first && !repeat)
+        {
+            PostNumpadPercentJump(virtualKey - 0x60);
+        }
+
+        return true;
+    }
+
+    private void PostNumpadPercentJump(int digit)
+    {
+        var now = Environment.TickCount64;
+        if (digit == _numpadPercentJumpDigit && now - _numpadPercentJumpMs < 40)
+        {
+            return;
+        }
+
+        _numpadPercentJumpDigit = digit;
+        _numpadPercentJumpMs = now;
+        var percent = digit / 10d;
+        Dispatcher.BeginInvoke(() => JumpByVisiblePercent(percent, extendSelection: false));
     }
 
     private void PostNumpadShiftJump(int digit)
@@ -2628,7 +2691,7 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// Shift／Ctrl＋テンキーの番号ジャンプ。
+    /// Shift／Ctrl＋テンキーの番号ジャンプ。Alt＋テンキーは表示範囲の割合（上段の無修飾と同じ）。
     /// エディタはドキュメントのマーカー／リージョン。
     /// プレイヤーの Shift は一時マーカー（音声波形／動画本再生／F8／フレーム一時停止）。
     /// プレイヤーの Ctrl はファイルにリージョンがあるときその先頭へ。
@@ -2636,6 +2699,19 @@ public partial class MainWindow
     /// </summary>
     private bool TryHandleNumpadCueDigitJump(Key key, ModifierKeys modifiers)
     {
+        if (LibraryPlayerMode.IsNumpadPercentDigitJump(key, modifiers) && TryDigitKey(key, out var percentDigit))
+        {
+            var now = Environment.TickCount64;
+            if (percentDigit != _numpadPercentJumpDigit || now - _numpadPercentJumpMs >= 40)
+            {
+                _numpadPercentJumpDigit = percentDigit;
+                _numpadPercentJumpMs = now;
+                JumpByVisiblePercent(percentDigit / 10d, extendSelection: false);
+            }
+
+            return true;
+        }
+
         var numpadMarker = LibraryPlayerMode.IsNumpadMarkerDigitJump(key, modifiers);
         var numpadRegion = LibraryPlayerMode.IsNumpadRegionDigitJump(key, modifiers);
         var playerTopRegion = IsLibraryMaximized && LibraryPlayerMode.IsRegionDigitJump(key, modifiers);
