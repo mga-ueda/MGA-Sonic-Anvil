@@ -244,10 +244,23 @@ public partial class MainWindow
                 return true;
             }
 
-            origin = System.Windows.Media.VisualTreeHelper.GetParent(origin);
+            origin = NextAncestor(origin);
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Run など Visual ではない要素は VisualTreeHelper が例外を投げる。論理親へ渡してからビジュアルを辿る。
+    /// </summary>
+    private static System.Windows.DependencyObject? NextAncestor(System.Windows.DependencyObject current)
+    {
+        if (current is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D)
+        {
+            return System.Windows.Media.VisualTreeHelper.GetParent(current);
+        }
+
+        return System.Windows.LogicalTreeHelper.GetParent(current);
     }
 
     private bool TryProcessShortcut(Key key, ModifierKeys modifiers, bool isRepeat = false)
