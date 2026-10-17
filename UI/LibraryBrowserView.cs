@@ -3932,16 +3932,10 @@ internal sealed class LibraryBrowserView : UserControl
             VerticalAlignment = VerticalAlignment.Center,
             Source = captureSource,
             CornerRadius = DesignMetrics.ControlCorner,
-            SampleComposited = true,
-            ScrimAlpha = FrostedPlate.GlassScrimAlpha,
         };
         plate.Children.Add(new Border
         {
-            Padding = new Thickness(
-                DesignMetrics.From96(14),
-                DesignMetrics.From96(8),
-                DesignMetrics.From96(14),
-                DesignMetrics.From96(8)),
+            Padding = DesignMetrics.PlaylistVideoTimecodePadding,
             Background = Brushes.Transparent,
             Child = _explorerTypeaheadToastText,
         });
