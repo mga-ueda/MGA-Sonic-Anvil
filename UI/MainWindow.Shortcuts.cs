@@ -705,6 +705,13 @@ public partial class MainWindow
                 return true;
             }
 
+            if (LibraryPlayerMode.IsExplorerCollapseAllRoots(key, modifiers))
+            {
+                LibraryBrowser.ClearExplorerTypeahead();
+                LibraryBrowser.CollapseAllExplorerRoots();
+                return true;
+            }
+
             // 設定のルート「上へ／下へ」と同じ並び替え。
             if (LibraryPlayerMode.IsExplorerRootReorder(key, modifiers))
             {

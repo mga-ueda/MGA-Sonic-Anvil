@@ -96,6 +96,7 @@ public sealed class LibraryExplorerTypeaheadTests
         Assert.False(LibraryExplorerTypeahead.TryMapChar(Key.NumPad2, ModifierKeys.None, out _));
         Assert.False(LibraryExplorerTypeahead.TryMapChar(Key.D8, ModifierKeys.Shift, out _));
         Assert.False(LibraryExplorerTypeahead.TryMapChar(Key.Oem2, ModifierKeys.None, out _));
+        Assert.False(LibraryExplorerTypeahead.TryMapChar(Key.Oem2, ModifierKeys.Shift, out _));
         Assert.False(LibraryExplorerTypeahead.TryMapChar(Key.Space, ModifierKeys.None, out _));
     }
 

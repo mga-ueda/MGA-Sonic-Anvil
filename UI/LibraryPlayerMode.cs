@@ -493,6 +493,10 @@ internal static class LibraryPlayerMode
     public static bool IsExplorerCollapseSubtree(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && key is Key.Divide or Key.Oem2;
 
+    /// <summary>エクスプローラーの Shift+/。ルートの各フォルダを / と同じく配下ごと閉じる。</summary>
+    public static bool IsExplorerCollapseAllRoots(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.Shift && key is Key.Divide or Key.Oem2;
+
     /// <summary>ツリーのルート並び替え。設定の「上へ／下へ」と同じ。Alt+↑／↓。</summary>
     public static bool IsExplorerRootReorder(Key key, ModifierKeys modifiers) =>
         key is Key.Up or Key.Down && modifiers == ModifierKeys.Alt;
@@ -522,7 +526,9 @@ internal static class LibraryPlayerMode
             return false;
         }
 
-        if (IsExplorerExpandAll(key, modifiers) || IsExplorerCollapseSubtree(key, modifiers))
+        if (IsExplorerExpandAll(key, modifiers)
+            || IsExplorerCollapseSubtree(key, modifiers)
+            || IsExplorerCollapseAllRoots(key, modifiers))
         {
             return false;
         }

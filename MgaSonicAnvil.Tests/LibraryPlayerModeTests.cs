@@ -531,6 +531,8 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.D8, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Divide, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Oem2, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Divide, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Oem2, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsExplorerExpandAll(Key.Multiply, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsExplorerExpandAll(Key.D8, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.IsExplorerExpandAll(Key.D8, ModifierKeys.None));
@@ -541,6 +543,10 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Divide, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Oem2, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Oem2, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsExplorerCollapseAllRoots(Key.Oem2, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsExplorerCollapseAllRoots(Key.Divide, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsExplorerCollapseAllRoots(Key.Oem2, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsExplorerCollapseAllRoots(Key.Oem2, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Left, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Right, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.ExplorerOwnsHorizontal(Key.Left, ModifierKeys.Shift));

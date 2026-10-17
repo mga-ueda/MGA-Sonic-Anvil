@@ -5308,6 +5308,34 @@ internal sealed class LibraryBrowserView : UserControl
         return true;
     }
 
+    /// <summary>ルートの各フォルダを、選択中の / と同じく配下ごと閉じる。</summary>
+    internal bool CollapseAllExplorerRoots()
+    {
+        var roots = _folderTree.Items.OfType<TreeViewItem>()
+            .Where(item => item.Tag is string)
+            .ToList();
+        if (roots.Count == 0)
+        {
+            return false;
+        }
+
+        _treeExpansionBusy = true;
+        try
+        {
+            foreach (var item in roots)
+            {
+                CollapseExplorerSubtree(item);
+            }
+        }
+        finally
+        {
+            _treeExpansionBusy = false;
+        }
+
+        NotifyExplorerExpanded();
+        return true;
+    }
+
     private List<TreeViewItem> SelectedExplorerTreeItems()
     {
         if (_treeMultiSelected.Count > 0)
@@ -5519,6 +5547,14 @@ internal sealed class LibraryBrowserView : UserControl
         {
             ClearExplorerTypeahead();
             CollapseSelectedExplorerSubtree();
+            e.Handled = true;
+            return;
+        }
+
+        if (LibraryPlayerMode.IsExplorerCollapseAllRoots(key, modifiers))
+        {
+            ClearExplorerTypeahead();
+            CollapseAllExplorerRoots();
             e.Handled = true;
             return;
         }
