@@ -501,10 +501,15 @@
         <h4>Bounce</h4>
         <p>With two or more tabs selected, “Bounce Selected Files (J)” mixes their waveforms together into a new Wave and opens it in the tab to the right of the selection. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> does the same.</p>
         <ul>
-          <li>The length is the longest tab. Format follows the leftmost selected tab.</li>
+          <li>The length is the longest tab. Bounce runs only when every file matches the leftmost selected tab’s sample rate, channel count, and bit depth. A different file cancels the bounce with no conversion, and the dialog names the files that do not match.</li>
           <li>Markers and regions are carried over in place. A marker at the same position with the same comment is kept only once.</li>
-          <li>It asks where to save first. Default name <code>Bounce.wav</code>. The dialog starts in the folder of the first selected tab that has a file, else the last export folder.</li>
+          <li>It asks where to save first. Default name <code>Bounce.wav</code>. The dialog starts in the last bounce folder. If there is none yet, it uses the folder of the first selected tab that has a file, else the last export folder. The chosen location is kept for the next bounce.</li>
         </ul>
+        <div class="note">
+          <p>16-bit bounce is not recommended. Use 24-bit or higher. 16-bit bounce is still allowed.</p>
+          <p>The bounce path does not dither. At 16-bit, fades and reverb tails are plain rounding.</p>
+          <p>Before the bounce is written, the summed float32 samples are scanned for values beyond ±1. If any exceed full scale, a warning states how far over they are (for example, 1 dB over). There are two choices: cancel the bounce, or lower the entire mix by the detected overage and then bounce.</p>
+        </div>
         <h4>Export</h4>
         <ul>
           <li>Export writes the current edits to another file (unsaved tabs stay unsaved). One tab opens a Save dialog; several tabs ask for a folder.</li>
@@ -797,7 +802,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Save as (with several tabs selected, pick a folder, write each as Wave, and point the tabs at those files)</td></tr>
           <tr><td><kbd>F2</kbd></td><td>Rename the file (double-clicking the file name on a tab / tile strip, tab right-click → Rename File (N), or waveform right-click → File → Rename File (F) does the same)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td><td>Duplicate the file (opens in the next tab)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce two or more selected tabs — choose where to save first, then the mixed Wave opens to the right of the selection (default name <code>Bounce.wav</code>; length is the longest tab; format follows the leftmost selected tab)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce two or more selected tabs — choose where to save first, then the mixed Wave opens to the right of the selection (default name <code>Bounce.wav</code>; length is the longest tab; only when formats match; if the sum exceeds ±1, cancel or lower the mix before writing)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Save as MP3 (keeps the current tab)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd></td><td>Save all tabs as MP3 (waveform right-click → Tabs; the same gesture appears on the tab menu when every tab is selected)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>Quit (tabs left open and unsaved working copies come back on the next launch)</td></tr>

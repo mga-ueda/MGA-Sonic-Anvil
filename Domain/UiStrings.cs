@@ -526,6 +526,22 @@ internal static partial class UiStrings
     public static string ErrorMergeFailed => Get(
         "タブのバウンスに失敗しました。",
         "Failed to bounce the tabs.");
+    public static string ErrorMergeFormatMismatch(string firstFile, string mismatches) => Format(
+        "フォーマットが違うファイルがあるため、バウンスを中止しました。サンプルレート、チャンネル数、ビット深度は変換しません。\n先頭: {0}\n一致しないファイル:\n{1}",
+        "Bounce was cancelled because some files do not match the first file. Sample rate, channel count, and bit depth were not converted.\nFirst file: {0}\nFiles that do not match:\n{1}",
+        firstFile,
+        mismatches);
+    public static string MergeFormatFile(string name, int sampleRate, int channels, int bits) => Format(
+        "{0}（{1} Hz, {2} ch, {3} bit）",
+        "{0} ({1} Hz, {2} ch, {3} bit)",
+        name,
+        sampleRate,
+        channels,
+        bits);
+    public static string WarnMergeClip(string overDb) => Format(
+        "加算結果が 0 dBFS を {0} dB 超えています。このまま 16bit / 24bit で書くと、超えた分は切り詰められます。\n\nYes: ミックス全体を {0} dB 下げてバウンスする\nNo: バウンスを中止する",
+        "The summed mix is {0} dB over 0 dBFS. Writing 16-bit or 24-bit would truncate the excess.\n\nYes: lower the entire mix by {0} dB and bounce\nNo: cancel the bounce",
+        overDb);
     /// <summary>バウンスの保存ダイアログのタイトル。</summary>
     public static string TitleMergeTabs => Get("選択ファイルをバウンス", "Bounce Selected Files");
     public static string ErrorFileNameEmpty => Get("ファイル名を入力してください。", "Enter a file name.");

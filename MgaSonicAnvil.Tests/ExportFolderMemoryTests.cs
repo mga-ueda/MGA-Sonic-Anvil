@@ -67,6 +67,25 @@ public sealed class ExportFolderMemoryTests
     }
 
     [Fact]
+    public void TryResolveBounceStart_UsesLastPathWhenFolderRemains()
+    {
+        var dir = NewTempDir("bounce");
+        try
+        {
+            var last = Path.Combine(dir, "Mix.wav");
+            Assert.True(ExportFolderMemory.TryResolveBounceStart(last, out var directory, out var fileName));
+            Assert.Equal(Path.GetFullPath(dir), directory);
+            Assert.Equal("Mix.wav", fileName);
+            Assert.False(ExportFolderMemory.TryResolveBounceStart(@"C:\missing-bounce\Mix.wav", out _, out _));
+            Assert.False(ExportFolderMemory.TryResolveBounceStart(null, out _, out _));
+        }
+        finally
+        {
+            TryDeleteDir(dir);
+        }
+    }
+
+    [Fact]
     public void TryNormalize_RejectsMissingFolder()
     {
         Assert.False(ExportFolderMemory.TryNormalize(@"C:\mga-no-such-export-folder", out _));

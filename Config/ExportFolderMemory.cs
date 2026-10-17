@@ -17,6 +17,26 @@ internal static class ExportFolderMemory
             : string.Empty;
     }
 
+    /// <summary>前回のバウンス保存先。フォルダが残っているときだけディレクトリとファイル名を返す。</summary>
+    public static bool TryResolveBounceStart(string? lastBouncePath, out string directory, out string fileName)
+    {
+        directory = string.Empty;
+        fileName = string.Empty;
+        if (!TryNormalize(Path.GetDirectoryName(lastBouncePath), out directory))
+        {
+            return false;
+        }
+
+        fileName = Path.GetFileName(lastBouncePath ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            directory = string.Empty;
+            return false;
+        }
+
+        return true;
+    }
+
     public static bool TryNormalize(string? folder, out string path)
     {
         path = string.Empty;
