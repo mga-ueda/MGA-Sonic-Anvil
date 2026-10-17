@@ -376,7 +376,9 @@ public partial class MainWindow : Window
             CloseEditHistory(commit: true);
         };
         PreviewKeyDown += MainWindow_PreviewKeyDown;
-        PreviewKeyUp += MainWindow_PreviewKeyUp;
+        // クラスハンドラが先に Handled にしても、Alt 解放直後のテンキーを見る。
+        AddHandler(PreviewKeyUpEvent, new KeyEventHandler(MainWindow_PreviewKeyUp), handledEventsToo: true);
+        AddHandler(KeyUpEvent, new KeyEventHandler(MainWindow_AltMenuKeyUp), handledEventsToo: true);
         AttachNumpadShiftHook();
         PreviewMouseDown += MainWindow_PreviewMouseDown;
         PreviewMouseWheel += MainWindow_PreviewMouseWheel;
