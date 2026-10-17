@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using MgaSonicAnvil.Domain;
@@ -13,10 +14,15 @@ public partial class MainWindow
     private const int WmKeyUp = 0x0101;
     private const int WmSysKeyDown = 0x0104;
     private const int WmSysKeyUp = 0x0105;
+    private const int WmSysChar = 0x0106;
     private const int WhKeyboardLl = 13;
     private const int LlkhfExtended = 0x01;
     private const int LlkhfAltDown = 0x20;
     private const int LlkhfUp = 0x80;
+    private const int KfAltDown = 0x20000000;
+
+    /// <summary>Alt を離した直後、非同期状態や SYSKEY が残っても修飾なしとして扱う時間。</summary>
+    private const int AltReleaseGraceMs = 250;
 
     private static readonly FieldInfo? KeyScanCodeField = typeof(KeyEventArgs).GetField(
         "_scanCode",
@@ -34,6 +40,9 @@ public partial class MainWindow
     private long _numpadPercentJumpMs = -1000;
     private int _numpadPercentJumpDigit = -1;
     private readonly HashSet<int> _altNumpadDown = new();
+    private readonly HashSet<int> _staleSysNumpadDown = new();
+    private int _altDownMask;
+    private long _altReleasedAt = -1;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct KbdLlHook
@@ -104,18 +113,22 @@ public partial class MainWindow
                 var info = Marshal.PtrToStructure<KbdLlHook>(lParam);
                 var message = (int)wParam;
                 var up = (info.flags & LlkhfUp) != 0 || message is WmKeyUp or WmSysKeyUp;
-                if (IsOurWindowForeground()
-                    && (ConsumeTranslatedNumpad(
-                            (int)info.vkCode,
-                            (int)info.scanCode,
-                            extended: (info.flags & LlkhfExtended) != 0,
-                            up,
-                            repeat: false)
-                        || ConsumeAltNumpadPercent(
-                            (int)info.vkCode,
-                            altDown: (info.flags & LlkhfAltDown) != 0
-                                || message is WmSysKeyDown or WmSysKeyUp,
-                            up)))
+                if (!IsOurWindowForeground())
+                {
+                    return CallNextHookEx(_numpadShiftHook, nCode, wParam, lParam);
+                }
+
+                NoteAltTransition((int)info.vkCode, up);
+                var systemKey = message is WmSysKeyDown or WmSysKeyUp
+                    || (info.flags & LlkhfAltDown) != 0;
+                if (ConsumeTranslatedNumpad(
+                        (int)info.vkCode,
+                        (int)info.scanCode,
+                        extended: (info.flags & LlkhfExtended) != 0,
+                        up,
+                        repeat: false)
+                    || ConsumeAltNumpadPercent((int)info.vkCode, up)
+                    || ConsumeStaleSysNumpad((int)info.vkCode, systemKey, up, repeat: false))
                 {
                     return (IntPtr)1;
                 }
@@ -137,6 +150,19 @@ public partial class MainWindow
             {
                 _numpadShiftScansDown.Clear();
                 _altNumpadDown.Clear();
+                _staleSysNumpadDown.Clear();
+                _altDownMask = 0;
+                _altReleasedAt = -1;
+            }
+
+            return;
+        }
+
+        if (msg.message == WmSysChar)
+        {
+            if (ConsumeStaleSysChar(unchecked((int)(msg.wParam.ToInt64() & 0xFFFF))))
+            {
+                handled = true;
             }
 
             return;
@@ -151,6 +177,7 @@ public partial class MainWindow
 
         var virtualKey = unchecked((int)(msg.wParam.ToInt64() & 0xFFFF));
         var native = msg.lParam.ToInt64();
+        NoteAltTransition(virtualKey, up);
         if (ConsumeTranslatedNumpad(
                 virtualKey,
                 scanCode: (int)(native >> 16) & 0xFF,
@@ -159,7 +186,11 @@ public partial class MainWindow
                 repeat: LibraryPlayerMode.IsKeyRepeat(native))
             || ConsumeAltNumpadPercent(
                 virtualKey,
-                altDown: msg.message is WmSysKeyDown or WmSysKeyUp || IsVkDown(0x12),
+                up,
+                repeat: LibraryPlayerMode.IsKeyRepeat(native))
+            || ConsumeStaleSysNumpad(
+                virtualKey,
+                systemKey: msg.message is WmSysKeyDown or WmSysKeyUp || (native & KfAltDown) != 0,
                 up,
                 repeat: LibraryPlayerMode.IsKeyRepeat(native)))
         {
@@ -197,11 +228,79 @@ public partial class MainWindow
         return true;
     }
 
-    private bool ConsumeAltNumpadPercent(int virtualKey, bool altDown, bool up, bool repeat = false)
+    private bool IsPhysicalAltDown() => IsVkDown(0x12) || IsVkDown(0xA4) || IsVkDown(0xA5);
+
+    /// <summary>
+    /// キー処理の先頭で呼ぶ。猶予中と、Alt が物理的に上がっているときは修飾なし。
+    /// </summary>
+    private bool IsAltModifierActive() =>
+        !LibraryPlayerMode.IsStaleAltModifier(
+            IsPhysicalAltDown(),
+            _altReleasedAt,
+            Environment.TickCount64,
+            AltReleaseGraceMs);
+
+    private ModifierKeys EffectiveShortcutModifiers(ModifierKeys modifiers)
     {
+        if ((modifiers & ModifierKeys.Alt) == 0 || IsAltModifierActive())
+        {
+            return modifiers;
+        }
+
+        return modifiers & ~ModifierKeys.Alt;
+    }
+
+    private void NoteAltTransition(int virtualKey, bool up)
+    {
+        var bit = virtualKey switch
+        {
+            0xA4 => 1,
+            0xA5 => 2,
+            0x12 => 4,
+            _ => 0,
+        };
+        if (bit == 0)
+        {
+            return;
+        }
+
+        if (!up)
+        {
+            _altDownMask |= bit;
+            _altReleasedAt = -1;
+            return;
+        }
+
+        _altDownMask &= ~bit;
+        if (_altDownMask != 0)
+        {
+            return;
+        }
+
+        _altReleasedAt = Environment.TickCount64;
+        _altNumpadDown.Clear();
+    }
+
+    private bool ConsumeAltNumpadPercent(int virtualKey, bool up, bool repeat = false)
+    {
+        if (virtualKey is < 0x60 or > 0x69)
+        {
+            return false;
+        }
+
+        if (up)
+        {
+            return _altNumpadDown.Remove(virtualKey);
+        }
+
+        if (!IsAltModifierActive())
+        {
+            return false;
+        }
+
         var shiftDown = IsVkDown(0x10) || IsVkDown(0xA0) || IsVkDown(0xA1);
         var ctrlDown = IsVkDown(0x11) || IsVkDown(0xA2) || IsVkDown(0xA3);
-        if (!LibraryPlayerMode.IsAltNumpadPercentVirtualKey(virtualKey, altDown, shiftDown, ctrlDown))
+        if (!LibraryPlayerMode.IsAltNumpadPercentVirtualKey(virtualKey, altDown: true, shiftDown, ctrlDown))
         {
             return false;
         }
@@ -211,12 +310,6 @@ public partial class MainWindow
             return false;
         }
 
-        if (up)
-        {
-            _altNumpadDown.Remove(virtualKey);
-            return true;
-        }
-
         var first = _altNumpadDown.Add(virtualKey);
         if (first && !repeat)
         {
@@ -224,6 +317,134 @@ public partial class MainWindow
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Alt を離したあとの WM_SYSKEY。ここで握らないと TranslateMessage が WM_SYSCHAR を作り、
+    /// DefWindowProc がメニュー不一致としてシステム音を鳴らす。再生操作はここで直接始める。
+    /// </summary>
+    private bool ConsumeStaleSysNumpad(int virtualKey, bool systemKey, bool up, bool repeat)
+    {
+        var shiftDown = IsVkDown(0x10) || IsVkDown(0xA0) || IsVkDown(0xA1);
+        var ctrlDown = IsVkDown(0x11) || IsVkDown(0xA2) || IsVkDown(0xA3);
+        if (!LibraryPlayerMode.IsStaleSysNumpad(
+                virtualKey,
+                systemKey,
+                IsAltModifierActive(),
+                shiftDown,
+                ctrlDown))
+        {
+            return false;
+        }
+
+        if (IsMenuTakingNumpadKeys())
+        {
+            return false;
+        }
+
+        var digit = virtualKey - 0x60;
+        if (up)
+        {
+            if (!_staleSysNumpadDown.Remove(virtualKey))
+            {
+                return false;
+            }
+
+            if (!IsNumpadTextInputFocused())
+            {
+                Dispatcher.BeginInvoke(() => ReleasePlainNumpadKey((Key)((int)Key.NumPad0 + digit)));
+            }
+
+            return true;
+        }
+
+        var first = _staleSysNumpadDown.Add(virtualKey);
+        if (IsNumpadTextInputFocused())
+        {
+            var textDigit = digit;
+            Dispatcher.BeginInvoke(() => InsertFocusedNumpadDigit(textDigit));
+            return true;
+        }
+
+        var transportRepeat = repeat || !first;
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (IsNumpadTextInputFocused() || IsMenuTakingNumpadKeys())
+            {
+                return;
+            }
+
+            TryHandleTransportNumpad((Key)((int)Key.NumPad0 + digit), ModifierKeys.None, transportRepeat);
+        });
+        return true;
+    }
+
+    private bool ConsumeStaleSysChar(int character)
+    {
+        if (IsNumpadTextInputFocused() || IsMenuTakingNumpadKeys() || IsAltModifierActive())
+        {
+            return false;
+        }
+
+        return character is >= '0' and <= '9';
+    }
+
+    private bool IsNumpadTextInputFocused() =>
+        IsLibraryGroupComboFocused
+        || StatusTimes.IsTimeFocused
+        || IsEditingFileName
+        || Waveform.IsEditingMarkerComment
+        || IsTileSearchFocused
+        || (IsLibraryMaximized && LibraryBrowser.IsSearchFocused);
+
+    private bool IsMenuTakingNumpadKeys() =>
+        _volumeMenu is { IsOpen: true }
+        || _pitchMenu is { IsOpen: true }
+        || _timeStretchMenu is { IsOpen: true }
+        || _fadeMenu is { IsOpen: true }
+        || _formatMenu is { IsOpen: true };
+
+    private static void InsertFocusedNumpadDigit(int digit)
+    {
+        if (digit is < 0 or > 9 || Keyboard.FocusedElement is not TextBox box || box.IsReadOnly)
+        {
+            return;
+        }
+
+        TextCompositionManager.StartComposition(
+            new TextComposition(InputManager.Current, box, ((char)('0' + digit)).ToString()));
+    }
+
+    private void ReleasePlainNumpadKey(Key key)
+    {
+        if (key is Key.NumPad7 or Key.NumPad9)
+        {
+            if (_seekNudgeDirection != 0
+                && ((key == Key.NumPad7 && _seekNudgeDirection < 0)
+                    || (key == Key.NumPad9 && _seekNudgeDirection > 0)))
+            {
+                StopSeekNudge();
+            }
+
+            return;
+        }
+
+        if (key is Key.NumPad1 or Key.NumPad3)
+        {
+            if (_playbackShuttleDirection != 0
+                && ((key == Key.NumPad1 && _playbackShuttleDirection < 0)
+                    || (key == Key.NumPad3 && _playbackShuttleDirection > 0)))
+            {
+                StopPlaybackShuttle();
+            }
+
+            return;
+        }
+
+        if (key is Key.NumPad4 or Key.NumPad6)
+        {
+            TryPlayLibraryAfterTrackKeyRelease();
+        }
     }
 
     private void PostNumpadPercentJump(int digit)
@@ -286,17 +507,7 @@ public partial class MainWindow
     }
 
     private bool NumpadShiftPassesToText() =>
-        IsLibraryGroupComboFocused
-        || StatusTimes.IsTimeFocused
-        || IsEditingFileName
-        || Waveform.IsEditingMarkerComment
-        || IsTileSearchFocused
-        || (IsLibraryMaximized && LibraryBrowser.IsSearchFocused)
-        || _volumeMenu is { IsOpen: true }
-        || _pitchMenu is { IsOpen: true }
-        || _timeStretchMenu is { IsOpen: true }
-        || _fadeMenu is { IsOpen: true }
-        || _formatMenu is { IsOpen: true };
+        IsNumpadTextInputFocused() || IsMenuTakingNumpadKeys();
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -308,7 +519,10 @@ public partial class MainWindow
 
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         key = LibraryPlayerMode.ResolveDigitKey(key, e.ImeProcessedKey);
-        var modifiers = Keyboard.Modifiers;
+        // 文字入力中は修飾を残し、テンキーを入力へ渡す。それ以外は残留した Alt を外す。
+        var modifiers = NumpadShiftPassesToText()
+            ? Keyboard.Modifiers
+            : EffectiveShortcutModifiers(Keyboard.Modifiers);
         if (MenuAccessKeys.IsContextMenuKey(key, modifiers))
         {
             if (!e.IsRepeat)

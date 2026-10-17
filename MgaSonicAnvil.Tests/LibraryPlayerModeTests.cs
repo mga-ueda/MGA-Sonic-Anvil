@@ -1341,6 +1341,29 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.IsAltNumpadPercentVirtualKey(0x61, altDown: true, shiftDown: true, ctrlDown: false));
         Assert.False(LibraryPlayerMode.IsAltNumpadPercentVirtualKey(0x31, altDown: true, shiftDown: false, ctrlDown: false));
         Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad1, ModifierKeys.Alt));
+
+        // Alt を離した直後（物理状態が残っていても）は修飾なし。テンキー 1 は巻き戻し。
+        const int graceMs = 250;
+        const long releasedAt = 1_000;
+        static ModifierKeys StripStaleAlt(ModifierKeys modifiers, bool stale) =>
+            stale ? modifiers & ~ModifierKeys.Alt : modifiers;
+        Assert.False(LibraryPlayerMode.IsStaleAltModifier(physicalAltDown: true, altReleasedAt: -1, now: releasedAt, graceMs));
+        var held = StripStaleAlt(ModifierKeys.Alt, stale: false);
+        Assert.True(LibraryPlayerMode.IsNumpadPercentDigitJump(Key.NumPad1, held));
+        var justReleased = StripStaleAlt(
+            ModifierKeys.Alt,
+            LibraryPlayerMode.IsStaleAltModifier(physicalAltDown: true, altReleasedAt: releasedAt, now: releasedAt + 1, graceMs));
+        Assert.False(LibraryPlayerMode.IsNumpadPercentDigitJump(Key.NumPad1, justReleased));
+        Assert.Equal(LibraryNumpadCommand.Rewind, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad1, justReleased));
+        Assert.True(LibraryPlayerMode.IsStaleAltModifier(physicalAltDown: false, altReleasedAt: -1, now: releasedAt + graceMs + 1, graceMs));
+        Assert.False(LibraryPlayerMode.IsStaleAltModifier(physicalAltDown: true, altReleasedAt: releasedAt, now: releasedAt + graceMs, graceMs));
+        Assert.True(LibraryPlayerMode.IsStaleSysNumpad(0x61, systemKey: true, altModifierActive: false, shiftDown: false, ctrlDown: false));
+        Assert.False(LibraryPlayerMode.IsStaleSysNumpad(0x61, systemKey: true, altModifierActive: true, shiftDown: false, ctrlDown: false));
+        Assert.False(LibraryPlayerMode.IsStaleSysNumpad(0x61, systemKey: false, altModifierActive: false, shiftDown: false, ctrlDown: false));
+        var afterAlt = LibraryPlayerMode.IsStaleSysNumpad(0x61, systemKey: true, altModifierActive: false, shiftDown: false, ctrlDown: false)
+            ? ModifierKeys.None
+            : ModifierKeys.Alt;
+        Assert.Equal(LibraryNumpadCommand.Rewind, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad1, afterAlt));
         Assert.False(LibraryPlayerMode.IsRegionDigitJump(Key.D5, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsDigitJumpChord(Key.D5, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: true, hasScratchMarkers: true));
