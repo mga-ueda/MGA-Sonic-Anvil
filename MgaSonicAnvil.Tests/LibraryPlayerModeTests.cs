@@ -1312,6 +1312,7 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsPlayerNumpadKey(Key.NumPad2, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsPlayerNumpadKey(Key.NumPad8, ModifierKeys.None));
         Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad7, ModifierKeys.Shift));
+        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad7, ModifierKeys.Control));
         Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.D5, ModifierKeys.None));
 
         Assert.True(LibraryPlayerMode.IsTopRowDigitKey(Key.D5));
@@ -1322,8 +1323,15 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsMarkerDigitJump(Key.D5, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.IsMarkerDigitJump(Key.NumPad5, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.IsDigitJumpChord(Key.NumPad5, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsNumpadMarkerDigitJump(Key.NumPad5, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsNumpadMarkerDigitJump(Key.D5, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsNumpadMarkerDigitJump(Key.NumPad5, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsNumpadMarkerDigitJump(Key.NumPad5, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsRegionDigitJump(Key.D5, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.IsRegionDigitJump(Key.NumPad5, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsNumpadRegionDigitJump(Key.NumPad5, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.IsNumpadRegionDigitJump(Key.D5, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.IsNumpadRegionDigitJump(Key.NumPad5, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.IsRegionDigitJump(Key.D5, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsDigitJumpChord(Key.D5, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: true, hasScratchMarkers: true));
@@ -1366,6 +1374,27 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(Key.NumPad7, LibraryPlayerMode.ResolveDigitKey(Key.ImeProcessed, Key.NumPad7));
         Assert.Equal(Key.ImeProcessed, LibraryPlayerMode.ResolveDigitKey(Key.ImeProcessed, Key.A));
         Assert.Equal(Key.D3, LibraryPlayerMode.ResolveDigitKey(Key.D3, Key.D5));
+        Assert.True(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x4F), shiftDown: true, ctrlDown: false, altDown: false, out var one));
+        Assert.Equal(1, one);
+        Assert.True(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x47), shiftDown: true, ctrlDown: false, altDown: false, out var seven));
+        Assert.Equal(7, seven);
+        Assert.True(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x52), shiftDown: true, ctrlDown: false, altDown: false, out var zero));
+        Assert.Equal(0, zero);
+        Assert.True(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x49), shiftDown: true, ctrlDown: false, altDown: false, out var nine));
+        Assert.Equal(9, nine);
+        Assert.False(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x47, extended: true), shiftDown: true, ctrlDown: false, altDown: false, out _));
+        Assert.False(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x4F), shiftDown: false, ctrlDown: false, altDown: false, out _));
+        Assert.False(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x4F), shiftDown: true, ctrlDown: true, altDown: false, out _));
+        Assert.False(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x4F), shiftDown: true, ctrlDown: false, altDown: true, out _));
+        Assert.True(LibraryPlayerMode.TryTranslatedNumpadDigit(0x23, 0x4F, extended: false, numLockOn: true, out var translatedOne));
+        Assert.Equal(1, translatedOne);
+        Assert.True(LibraryPlayerMode.TryTranslatedNumpadDigit(0x24, 0x47, extended: false, numLockOn: true, out var translatedSeven));
+        Assert.Equal(7, translatedSeven);
+        Assert.False(LibraryPlayerMode.TryTranslatedNumpadDigit(0x24, 0x47, extended: true, numLockOn: true, out _));
+        Assert.False(LibraryPlayerMode.TryTranslatedNumpadDigit(0x67, 0x47, extended: false, numLockOn: true, out _));
+        Assert.False(LibraryPlayerMode.TryTranslatedNumpadDigit(0x24, 0x47, extended: false, numLockOn: false, out _));
+        Assert.True(LibraryPlayerMode.IsKeyRepeat(Scan(0x47, repeat: true)));
+        Assert.False(LibraryPlayerMode.IsKeyRepeat(Scan(0x47)));
         Assert.Equal(5, LibraryPlayerMode.SeekNudgeSeconds);
         Assert.Equal(750, LibraryPlayerMode.SeekNudgeFadeMilliseconds);
         Assert.Equal(250, LibraryPlayerMode.SeekNudgeRepeatDelayMs);
@@ -1443,6 +1472,22 @@ public sealed class LibraryPlayerModeTests
 
     private static DocumentSession Session(string name) =>
         new(new AudioDocument([], 48000, 1, 16, AudioFileKind.Wave, name));
+
+    private static long Scan(int code, bool extended = false, bool repeat = false)
+    {
+        long value = (long)code << 16;
+        if (extended)
+        {
+            value |= 0x01000000;
+        }
+
+        if (repeat)
+        {
+            value |= 0x40000000;
+        }
+
+        return value;
+    }
 
     private static void RunSta(Action action)
     {

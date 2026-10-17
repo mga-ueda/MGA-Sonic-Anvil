@@ -1876,8 +1876,8 @@ internal static class LibraryPlayerMode
 
     /// <summary>
     /// プレイヤーで一時マーカーがあるとき、Shift＋上段数字でマーカー番号ジャンプ（二桁可）。
-    /// Shift＋テンキーは使わない。無修飾の上段は常に割合ジャンプ。
-    /// テンキー再生操作は <see cref="UsesTransportNumpad"/>（プレイヤー／エディタ共通）。
+    /// 無修飾の上段は常に割合ジャンプ。無修飾テンキーは再生操作。
+    /// Shift／Ctrl＋テンキーは上段と同じ番号ジャンプ（表示モードに限らない）。
     /// </summary>
     public static bool CanPlayerMarkerDigitJump(bool playerMarkerContext, bool hasScratchMarkers) =>
         playerMarkerContext && hasScratchMarkers;
@@ -1889,7 +1889,7 @@ internal static class LibraryPlayerMode
     public static bool IsTopRowDigitKey(Key key) =>
         key is >= Key.D0 and <= Key.D9;
 
-    /// <summary>無修飾＝割合、Shift＝マーカー、Ctrl＝リージョン（いずれも上段のみ）。テンキーは再生操作。</summary>
+    /// <summary>無修飾＝割合、Shift＝マーカー、Ctrl＝リージョン（いずれも上段のみ）。テンキー再生は別。</summary>
     public static bool IsDigitJumpChord(Key key, ModifierKeys modifiers) =>
         IsPercentDigitJump(key, modifiers)
         || IsMarkerDigitJump(key, modifiers)
@@ -1901,9 +1901,21 @@ internal static class LibraryPlayerMode
     public static bool IsMarkerDigitJump(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.Shift && IsTopRowDigitKey(key);
 
-    /// <summary>Ctrl＋上段数字でリージョン番号へ（テンキーは使わない）。</summary>
+    /// <summary>Ctrl＋上段数字でリージョン番号へ。Ctrl＋テンキーは <see cref="IsNumpadRegionDigitJump"/>。</summary>
     public static bool IsRegionDigitJump(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.Control && IsTopRowDigitKey(key);
+
+    /// <summary>テンキー 0–9。</summary>
+    public static bool IsNumpadDigitKey(Key key) =>
+        key is >= Key.NumPad0 and <= Key.NumPad9;
+
+    /// <summary>Shift＋テンキー数字。一時マーカーまたはドキュメントのマーカーがあるとき番号へ。</summary>
+    public static bool IsNumpadMarkerDigitJump(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.Shift && IsNumpadDigitKey(key);
+
+    /// <summary>Ctrl＋テンキー数字。リージョンがあるとき番号の先頭へ。</summary>
+    public static bool IsNumpadRegionDigitJump(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.Control && IsNumpadDigitKey(key);
 
     /// <summary>
     /// マーカー番号の桁送り（Shift＋上段）。
@@ -2085,6 +2097,85 @@ internal static class LibraryPlayerMode
     /// IME が上段／テンキーの数字を ImeProcessed にした場合、割合ジャンプとテンキー操作へ戻す。
     /// かな入力の文字キーはそのまま（A などのショートカットにしない）。
     /// </summary>
+    /// <summary>
+    /// NumLock オンの Shift＋テンキーは、届く時点で Home／End／矢印になっている。
+    /// そのとき Shift 自体は下りとして報告されないことがある。
+    /// 拡張ビットが無く、仮想キーが対応する移動キーであるスキャンだけ数字に戻す。
+    /// 専用の Home／End は拡張ビットが立つ。NumLock オフのテンキーと、無修飾のテンキー数字は対象外。
+    /// </summary>
+    public static bool TryTranslatedNumpadDigit(int virtualKey, int scanCode, bool extended, bool numLockOn, out int digit)
+    {
+        digit = -1;
+        if (!numLockOn || extended)
+        {
+            return false;
+        }
+
+        var (expectedDigit, navigationKey) = (scanCode & 0xFF) switch
+        {
+            0x52 => (0, 0x2D),
+            0x4F => (1, 0x23),
+            0x50 => (2, 0x28),
+            0x51 => (3, 0x22),
+            0x4B => (4, 0x25),
+            0x4C => (5, 0x0C),
+            0x4D => (6, 0x27),
+            0x47 => (7, 0x24),
+            0x48 => (8, 0x26),
+            0x49 => (9, 0x21),
+            _ => (-1, 0),
+        };
+        if (expectedDigit < 0 || virtualKey != navigationKey)
+        {
+            return false;
+        }
+
+        digit = expectedDigit;
+        return true;
+    }
+
+    /// <summary>
+    /// NumLock オンの Shift＋テンキーは、WM_KEYDOWN の時点で Home／End／矢印になる。
+    /// 拡張ビットの無いテンキーのスキャンコードだけ数字へ戻す。専用キーは拡張ビットが立つ。
+    /// Ctrl／Alt が付いているときは触らない。
+    /// </summary>
+    public static bool TryShiftedNumpadDigit(
+        long lParam,
+        bool shiftDown,
+        bool ctrlDown,
+        bool altDown,
+        out int digit)
+    {
+        digit = -1;
+        if (!shiftDown || ctrlDown || altDown)
+        {
+            return false;
+        }
+
+        if ((lParam & 0x01000000) != 0)
+        {
+            return false;
+        }
+
+        digit = ((int)(lParam >> 16) & 0xFF) switch
+        {
+            0x52 => 0,
+            0x4F => 1,
+            0x50 => 2,
+            0x51 => 3,
+            0x4B => 4,
+            0x4C => 5,
+            0x4D => 6,
+            0x47 => 7,
+            0x48 => 8,
+            0x49 => 9,
+            _ => -1,
+        };
+        return digit >= 0;
+    }
+
+    public static bool IsKeyRepeat(long lParam) => (lParam & 0x40000000) != 0;
+
     public static Key ResolveDigitKey(Key key, Key imeProcessedKey) =>
         key == Key.ImeProcessed && IsDigitKey(imeProcessedKey) ? imeProcessedKey : key;
 
