@@ -577,6 +577,7 @@ public partial class MainWindow
             WaveformHostBorder.MinHeight = DesignMetrics.WaveformHostMinHeight;
         }
 
+        PrimaryWaveform.OverlayChromeScale = 1;
         PrimaryWaveform.SeekAndSelectOnly = show;
         ForEachWaveform(view => view.SeekAndSelectOnly = show);
         SyncPlayerScratchEnabled();
