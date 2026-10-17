@@ -123,7 +123,7 @@ internal sealed partial class AudioDocument
 
         if (destBits < _formatOriginBits)
         {
-            samples = FormatConvert.Quantize(samples, destBits);
+            samples = FormatConvert.Quantize(samples, destBits, destChannels);
         }
 
         return samples;

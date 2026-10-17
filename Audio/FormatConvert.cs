@@ -222,20 +222,51 @@ internal static class FormatConvert
         return dest;
     }
 
-    public static float[] Quantize(float[] samples, int bits)
+    /// <summary>
+    /// ビットを落とす。POW-r #1（Dithering）と同じ構成。
+    /// 1 LSB の三角ディザをチャンネルごとにナイキストへ変調し、量子化誤差は可聴帯ではほぼ平坦でナイキスト付近だけ持ち上がる FIR で戻す。
+    /// 種は固定なので、同じ入力はいつも同じ結果になる。
+    /// </summary>
+    public static float[] Quantize(float[] samples, int bits, int channels = 1)
     {
-        if (bits >= 24)
+        if (bits >= 24 || samples.Length == 0)
         {
             return samples;
         }
 
         bits = Math.Clamp(bits, 4, 24);
-        var levels = Math.Max(1, (1 << (bits - 1)) - 1);
+        channels = Math.Max(1, channels);
+        var levels = (double)Math.Max(1, (1 << (bits - 1)) - 1);
+        // 直流利得 0。可聴域は ±2 dB 以内、ナイキストで約 +2 dB。
+        const double feedback1 = 0.15;
+        const double feedback2 = -0.15;
+        var error1 = new double[channels];
+        var error2 = new double[channels];
+        var nyquistSign = new int[channels];
+        var random = new Random[channels];
+        for (var ch = 0; ch < channels; ch++)
+        {
+            nyquistSign[ch] = 1;
+            random[ch] = new Random(0x504F5752 + ch);
+        }
+
         var dest = new float[samples.Length];
         for (var i = 0; i < samples.Length; i++)
         {
-            var quantized = Math.Clamp(Math.Round(samples[i] * levels), -levels, levels);
-            dest[i] = (float)(quantized / levels);
+            var ch = i % channels;
+            var rng = random[ch];
+            var triangular = (rng.NextDouble() - 0.5) + (rng.NextDouble() - 0.5);
+            var dither = triangular * nyquistSign[ch] / levels;
+            nyquistSign[ch] = -nyquistSign[ch];
+
+            var feedback = (feedback1 * error1[ch]) + (feedback2 * error2[ch]);
+            var shaped = samples[i] + dither - feedback;
+            var quantized = Math.Clamp(Math.Round(shaped * levels), -levels, levels);
+            var y = quantized / levels;
+            var roundingError = y - shaped;
+            error2[ch] = error1[ch];
+            error1[ch] = roundingError;
+            dest[i] = (float)y;
         }
 
         return dest;
