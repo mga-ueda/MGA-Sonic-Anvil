@@ -1006,7 +1006,7 @@ public partial class MainWindow
                 return view;
             }
 
-            origin = VisualTreeHelper.GetParent(origin);
+            origin = NextAncestor(origin);
         }
 
         return null;
