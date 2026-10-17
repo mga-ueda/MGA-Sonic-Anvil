@@ -1229,6 +1229,7 @@ public partial class MainWindow
 
     private void StartMeterRendering()
     {
+        _meterReleaseTimer?.Stop();
         if (IsLibraryMaximized)
         {
             SyncPlayerMeterFade();
@@ -1369,8 +1370,41 @@ public partial class MainWindow
 
     private void ExtinguishMeter()
     {
+        _meterReleaseTimer?.Stop();
         _meter.Extinguish();
         LevelMeter.Apply(_meter.Snapshot);
+    }
+
+    private void BeginMeterRelease()
+    {
+        if (!_meter.DecayAfterStop(_meterClock.Elapsed.TotalSeconds))
+        {
+            ExtinguishMeter();
+            return;
+        }
+
+        LevelMeter.Apply(_meter.Snapshot);
+        _meterReleaseTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
+        _meterReleaseTimer.Tick -= OnMeterReleaseTick;
+        _meterReleaseTimer.Tick += OnMeterReleaseTick;
+        _meterReleaseTimer.Start();
+    }
+
+    private void OnMeterReleaseTick(object? sender, EventArgs e)
+    {
+        if (_player.IsPlaying)
+        {
+            _meterReleaseTimer?.Stop();
+            return;
+        }
+
+        if (_meter.DecayAfterStop(_meterClock.Elapsed.TotalSeconds))
+        {
+            LevelMeter.Apply(_meter.Snapshot);
+            return;
+        }
+
+        ExtinguishMeter();
     }
 
     private void ApplyPlayerRoute()

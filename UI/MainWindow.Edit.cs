@@ -1520,7 +1520,7 @@ public partial class MainWindow
         Waveform.ExitPlayheadFrame = -1;
         Waveform.SetTrailRecording(false);
         Transport.SetPlaying(false);
-        ExtinguishMeter();
+        BeginMeterRelease();
         // 再生中 Tick は止まっているので、停止時に波形全体のオフライン計測へ戻す。
         LoudnessMeter.RefreshOffline();
         Waveform.UnlockCenter();

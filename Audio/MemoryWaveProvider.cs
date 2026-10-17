@@ -96,6 +96,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private readonly float[] _meterR = new float[LevelMeterEngine.WindowFrames];
     private readonly float[] _meterPlanar = new float[LevelMeterEngine.WindowFrames * ChannelLayout.MaxChannels];
     private readonly float[] _intervalPeak = new float[ChannelLayout.MaxChannels];
+    private readonly double[] _intervalSum = new double[ChannelLayout.MaxChannels];
     private readonly double[] _intervalSumSq = new double[ChannelLayout.MaxChannels];
     private int _meterWrite;
     private int _meterCount;
@@ -105,7 +106,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private float[] _speakerScratch = [];
     private int _sourceMeterScratchFrames;
     private int _sourceMeterScratchChannels = 1;
-    private readonly float[] _monitorRing = new float[8192];
+    private readonly float[] _monitorRing = new float[SpectrumAnalyzer.FftSize];
     private long _monitorWriteCount;
     private readonly object _monitorGate = new();
     private readonly MemoryScrubVoice _scrub = new();
@@ -905,7 +906,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             for (var ch = 0; ch < n; ch++)
             {
                 peaks[ch] = _intervalPeak[ch];
-                rms[ch] = (float)Math.Sqrt(_intervalSumSq[ch] / _intervalFrames);
+                rms[ch] = LevelMeterEngine.SineReferencedAcRms(
+                    _intervalSum[ch], _intervalSumSq[ch], _intervalFrames);
             }
 
             ResetMeterIntervalNoLock();
@@ -995,6 +997,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private void ResetMeterIntervalNoLock()
     {
         Array.Clear(_intervalPeak);
+        Array.Clear(_intervalSum);
         Array.Clear(_intervalSumSq);
         _intervalFrames = 0;
     }
@@ -3530,7 +3533,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 _intervalPeak[ch] = abs;
             }
 
-            _intervalSumSq[ch] += abs * (double)abs;
+            _intervalSum[ch] += sample;
+            _intervalSumSq[ch] += sample * (double)sample;
             _meterPlanar[dest + ch] = sample;
         }
 

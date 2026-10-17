@@ -47,7 +47,7 @@ public sealed class LevelMeterEngineTests
     }
 
     [Fact]
-    public void Update_ComputesRmsOfConstantWindow()
+    public void Update_DcWindow_RmsIsAcCoupledSilence()
     {
         var left = new float[LevelMeterEngine.WindowFrames];
         var right = new float[LevelMeterEngine.WindowFrames];
@@ -58,9 +58,27 @@ public sealed class LevelMeterEngineTests
         var snap = engine.Update(left, right, nowSeconds: 1);
 
         Assert.Equal(LevelMeterEngine.ToDb(0.5), snap.Left.InstPeakDb, 6);
-        Assert.Equal(LevelMeterEngine.ToDb(0.5), snap.Left.InstRmsDb, 6);
         Assert.Equal(LevelMeterEngine.ToDb(0.25), snap.Right.InstPeakDb, 6);
-        Assert.Equal(LevelMeterEngine.ToDb(0.25), snap.Right.InstRmsDb, 6);
+        Assert.True(snap.Left.InstRmsDb < -80);
+        Assert.True(snap.Right.InstRmsDb < -80);
+    }
+
+    [Fact]
+    public void Update_SineWindow_RmsMatchesPeak()
+    {
+        var left = new float[LevelMeterEngine.WindowFrames];
+        var right = new float[LevelMeterEngine.WindowFrames];
+        for (var i = 0; i < left.Length; i++)
+        {
+            var s = 0.1f * MathF.Sin(2f * MathF.PI * 1000f * i / 48000f);
+            left[i] = s;
+            right[i] = s;
+        }
+
+        var engine = new LevelMeterEngine();
+        var snap = engine.Update(left, right, nowSeconds: 1);
+        Assert.InRange(snap.Left.InstPeakDb, -20.05, -19.9);
+        Assert.InRange(Math.Abs(snap.Left.InstRmsDb - snap.Left.InstPeakDb), 0, 0.2);
     }
 
     [Fact]
@@ -157,8 +175,8 @@ public sealed class LevelMeterEngineTests
         Assert.True(provider.TakeMeterInterval(out var peakL, out var rmsL, out var peakR, out var rmsR));
         Assert.Equal(0.5f, peakL, 5);
         Assert.Equal(0.5f, peakR, 5);
-        Assert.Equal(Math.Sqrt((0.25 + 0.0625) / 2), rmsL, 5);
-        Assert.Equal(Math.Sqrt((0.0625 + 0.25) / 2), rmsR, 5);
+        Assert.Equal(LevelMeterEngine.SineReferencedAcRms(0.5 + 0.25, 0.25 + 0.0625, 2), rmsL, 5);
+        Assert.Equal(LevelMeterEngine.SineReferencedAcRms(-0.25 + 0.5, 0.0625 + 0.25, 2), rmsR, 5);
         Assert.False(provider.TakeMeterInterval(out _, out _, out _, out _));
     }
 
