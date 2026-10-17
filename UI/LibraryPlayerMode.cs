@@ -1917,6 +1917,14 @@ internal static class LibraryPlayerMode
     public static bool IsNumpadRegionDigitJump(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.Control && IsNumpadDigitKey(key);
 
+    /// <summary>Alt＋テンキー数字。上段の無修飾と同じ表示範囲の割合（0＝先頭、9＝90%）。</summary>
+    public static bool IsNumpadPercentDigitJump(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.Alt && IsNumpadDigitKey(key);
+
+    /// <summary>Alt＋テンキーの仮想キー（VK_NUMPAD0＝0x60）。Shift／Ctrl 付きは対象外。</summary>
+    public static bool IsAltNumpadPercentVirtualKey(int virtualKey, bool altDown, bool shiftDown, bool ctrlDown) =>
+        altDown && !shiftDown && !ctrlDown && virtualKey is >= 0x60 and <= 0x69;
+
     /// <summary>
     /// マーカー番号の桁送り（Shift＋上段）。
     /// seekId があればその番号へ。無効な桁は percentFallback（呼び出し側で無視可）。

@@ -421,7 +421,7 @@
               <li>テンキー …… <kbd>0</kbd> 一時停止・再開、<kbd>1</kbd>／<kbd>3</kbd> ±3 倍早戻し／早送り、<kbd>4</kbd>／<kbd>6</kbd> 前／次、<kbd>5</kbd> 最初から、<kbd>7</kbd>／<kbd>9</kbd> ±5 秒（<kbd>2</kbd>／<kbd>8</kbd>は未使用）</li>
             </ul>
           </li>
-          <li>テンキーは再生操作（<kbd>0</kbd>＝一時停止・再開、<kbd>1</kbd>／<kbd>3</kbd>＝±3 倍早戻し／早送り、<kbd>4</kbd>／<kbd>6</kbd>＝前／次、<kbd>5</kbd>＝最初から、<kbd>7</kbd>／<kbd>9</kbd>＝±5 秒。<kbd>2</kbd>／<kbd>8</kbd>は未使用。エディタでも同じで、エディタの <kbd>4</kbd>／<kbd>6</kbd> は前後のタブ。<kbd>J</kbd>／<kbd>K</kbd>／<kbd>,</kbd>／<kbd>.</kbd> もエディタで同じ）。上段の <kbd>0</kbd>–<kbd>9</kbd> は表示範囲の割合ジャンプ。<kbd>Shift</kbd>＋上段数字は、一時マーカーがあるときマーカー番号へ（音声波形／動画本再生／F8。二桁可。テンキーは使わない）。</li>
+          <li>テンキーは再生操作（<kbd>0</kbd>＝一時停止・再開、<kbd>1</kbd>／<kbd>3</kbd>＝±3 倍早戻し／早送り、<kbd>4</kbd>／<kbd>6</kbd>＝前／次、<kbd>5</kbd>＝最初から、<kbd>7</kbd>／<kbd>9</kbd>＝±5 秒。<kbd>2</kbd>／<kbd>8</kbd>は未使用。エディタでも同じで、エディタの <kbd>4</kbd>／<kbd>6</kbd> は前後のタブ。<kbd>J</kbd>／<kbd>K</kbd>／<kbd>,</kbd>／<kbd>.</kbd> もエディタで同じ）。上段の <kbd>0</kbd>–<kbd>9</kbd> と <kbd>Alt</kbd>＋テンキー数字は表示範囲の割合ジャンプ（0＝先頭、9＝90%）。<kbd>Shift</kbd>＋上段数字と <kbd>Shift</kbd>＋テンキー数字は、一時マーカーがあるときマーカー番号へ（音声波形／動画本再生／F8／フレーム一時停止。二桁可。暗いプレビューは一時マーカーを出さないので飛ばない。NumLock オンでもテンキーの Shift は Home／End にせずマーカー番号）。<kbd>Ctrl</kbd>＋上段数字と <kbd>Ctrl</kbd>＋テンキー数字は、ファイルにリージョンがあるときその番号の先頭へ（1 から。二桁可。エディタでも同じ）。無修飾のテンキーは再生のまま。ツリーの <kbd>Shift</kbd>+<kbd>8</kbd>（上段）は配下展開のまま。</li>
         </ul>
 
         <h4>リストとフォーカス</h4>
@@ -797,7 +797,7 @@
         <li><kbd>M</kbd>／<kbd>Ins</kbd> …… 選択が無ければ再生位置にマーカー。同じフレームには打てない。選択中は開始と終了を置き、両端にマーカーがあればすぐ中央→3 等分→4…と打ち直す（押しっぱなしはマーカー移動と同じ間隔。離すまで 1 つの履歴）。</li>
         <li><kbd>Shift</kbd>+<kbd>L</kbd> …… 選択をサンプルループに（同じ範囲でもう一度で解除）。</li>
         <li><kbd>Shift</kbd>+<kbd>R</kbd> …… 選択をリージョンに。両端にリージョンがあればすぐ 2 等分。同じ範囲で続けて打つと 3…と打ち直す（解除は右クリック／<kbd>Delete</kbd>。押しっぱなしは同じ間隔で、離すまで 1 つの履歴）。</li>
-        <li><kbd>Ctrl</kbd>+上段数字 …… フラッグのリージョン番号の先頭へ（リージョンは 1 から。マーカー番号とは別。二桁可。テンキーは使わない）。</li>
+        <li><kbd>Ctrl</kbd>+上段数字、または <kbd>Ctrl</kbd>＋テンキー数字 …… フラッグのリージョン番号の先頭へ（リージョンは 1 から。マーカー番号とは別。二桁可。プレイヤーでもファイルにリージョンがあれば同じ。無修飾のテンキーは再生のまま）。</li>
         <li>フラッグをクリックで端を選択。Shift+クリックで範囲、Ctrl+クリックで追加。ドラッグまたは ←→ で移動（Shift で 3 倍）。</li>
         <li>ダブルクリックでコメント／リージョン名。<code>-A</code> ライム、<code>-L</code> ブルー、<code>-E</code> 赤（書いたときだけ。ループやサンプルループの後ろは自動では赤くしません）。<code>-R</code> はグレー。EXPORT での意味は <a href="#export-suffix">9-3</a>。</li>
         <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> …… リネーム。</li>
@@ -1008,8 +1008,9 @@
           <tr><td><kbd>Shift</kbd>+<kbd>PageUp</kbd>／<kbd>PageDown</kbd></td><td>表示幅の 5% だけ選択を伸長</td></tr>
           <tr><td>上段 <kbd>0</kbd>–<kbd>9</kbd></td><td>表示範囲の 0%〜90% へジャンプ</td></tr>
           <tr><td>テンキー</td><td><kbd>0</kbd> 一時停止・再開、<kbd>1</kbd>／<kbd>3</kbd> ±3 倍早戻し／早送り、<kbd>4</kbd>／<kbd>6</kbd> 前／次のタブ、<kbd>5</kbd> 頭から再生し直し、<kbd>7</kbd>／<kbd>9</kbd> ±5 秒（<kbd>2</kbd>／<kbd>8</kbd>は未使用）</td></tr>
-          <tr><td><kbd>Shift</kbd>+上段 <kbd>0</kbd>–<kbd>9</kbd></td><td>マーカー番号へ（連続入力可。テンキーは使わない）</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+上段 <kbd>0</kbd>–<kbd>9</kbd></td><td>リージョン番号の先頭へ（1 から。マーカー番号とは別。二桁可。テンキーは使わない）</td></tr>
+          <tr><td><kbd>Shift</kbd>+上段／テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>マーカー番号へ（連続入力可。無修飾のテンキーは再生のまま）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+上段／テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>リージョン番号の先頭へ（1 から。マーカー番号とは別。二桁可）</td></tr>
+          <tr><td><kbd>Alt</kbd>＋テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>表示範囲の割合へ（上段の無修飾と同じ。0＝先頭、9＝90%。無修飾のテンキーは再生のまま）</td></tr>
         </tbody>
       </table>
 
@@ -1248,7 +1249,9 @@
           <tr><td><kbd>,</kbd>／<kbd>.</kbd></td><td>押しっぱなしで 3 倍早戻し／早送り（ピッチ据え置き。推移中は -4 dB。離すと元の速さと音量。動画は映像を音声ヘッドに追従）</td></tr>
           <tr><td>上段 <kbd>0</kbd>–<kbd>9</kbd></td><td>表示範囲の 0%〜90% へジャンプ（どのペインからでも）</td></tr>
           <tr><td>テンキー</td><td><kbd>0</kbd> 一時停止・再開、<kbd>1</kbd>／<kbd>3</kbd> ±3 倍早戻し／早送り、<kbd>4</kbd>／<kbd>6</kbd> 前／次（先頭の <kbd>4</kbd> は末尾へ、末尾の <kbd>6</kbd> は先頭へ。<kbd>P</kbd>／<kbd>N</kbd> と同じ）、<kbd>5</kbd> 最初から、<kbd>7</kbd>／<kbd>9</kbd> ±5 秒（<kbd>2</kbd>／<kbd>8</kbd>は未使用）</td></tr>
-          <tr><td><kbd>Shift</kbd>＋上段 <kbd>0</kbd>–<kbd>9</kbd></td><td>マーカー番号へ（一時マーカーがあるとき。音声波形／動画本再生／F8。二桁可。テンキーは使わない）</td></tr>
+          <tr><td><kbd>Shift</kbd>＋上段／テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>マーカー番号へ（一時マーカーがあるとき。音声波形／動画本再生／F8／フレーム一時停止。二桁可。暗いプレビューは飛ばない。NumLock オンでもテンキーの Shift は Home／End にせずマーカー番号。ツリーの <kbd>Shift</kbd>+<kbd>8</kbd> は上段だけ配下展開）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>＋上段／テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>リージョン番号の先頭へ（ファイルにリージョンがあるとき。1 から。マーカー番号とは別。二桁可。エディタでも同じ）</td></tr>
+          <tr><td><kbd>Alt</kbd>＋テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>表示範囲の割合へ（上段の無修飾と同じ。0＝先頭、9＝90%。無修飾のテンキーは再生のまま）</td></tr>
           <tr><td>メニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd></td><td>ツリー／お気に入り／プレイリストでは右クリックと同じ。波形では開けるが編集系は無効</td></tr>
           <tr><td><kbd>Delete</kbd></td><td>選択行をリストから外す（ファイルは消さない。Ctrl+Z で戻せる。プレイヤーを抜けると忘れる。リストにフォーカスがあるとき。<kbd>Ctrl</kbd>+<kbd>W</kbd> では閉じない。動画本再生／PDF 明るい表示など前面 UI 隠れ中は無効）。お気に入りにフォーカスがあるときは登録を外すだけ</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>リストの全行選択（動画本再生／PDF 明るい表示など前面 UI 隠れ中は無効）</td></tr>
