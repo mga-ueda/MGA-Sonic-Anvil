@@ -271,7 +271,7 @@ public partial class MainWindow
                 return false;
             }
 
-            var pad = FormatConvert.ResampleEdgePad;
+            var pad = FormatConvert.ResampleMargin(originRate, value);
             var extractStart = Math.Max(0, originStart - pad);
             var extractEnd = Math.Min(originFrames, originEnd + pad);
             var samples = FormatConvert.CopyFrameRange(
@@ -293,7 +293,7 @@ public partial class MainWindow
                 return false;
             }
 
-            var pad = FormatConvert.ResampleEdgePad;
+            var pad = FormatConvert.ResampleMargin(originRate, source.SampleRate);
             var extractStart = Math.Max(0, originStart - pad);
             var extractEnd = Math.Min(originFrames, originEnd + pad);
             var samples = FormatConvert.CopyFrameRange(

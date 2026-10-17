@@ -1160,7 +1160,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             fadeFrames * (_sourceRate / (double)Math.Max(1, _deviceRate))));
         if (UsesStreamRateConvert())
         {
-            sourceNeed += FormatConvert.ResampleEdgePad;
+            sourceNeed += FormatConvert.ResampleMargin(_sourceRate, _deviceRate);
         }
         var need = sourceNeed * srcCh;
         if (_seekFadeOutPcm.Length < need)
@@ -2015,7 +2015,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         var end = frame;
         if (UsesStreamRateConvert())
         {
-            end = Math.Min(frameCount - 1, frame + FormatConvert.ResampleEdgePad);
+            end = Math.Min(frameCount - 1, frame + FormatConvert.ResampleMargin(_sourceRate, _deviceRate));
         }
 
         // 時刻シークが手前に着地しても、再生ヘッドのサンプルが窓に残るようにする。
@@ -2585,7 +2585,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             var winEnd = _streamSrcWinStart + _streamSrcWinFrames;
             if (from < _streamSrcWinStart)
             {
-                // 左側が足りなくても巻き戻しシークしない。sinc が端を繰り返す。
+                // 左側が足りなくても巻き戻しシークしない。範囲外は sinc が 0 として畳む。
                 from = _streamSrcWinStart;
                 if (to < from)
                 {
@@ -2622,7 +2622,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return EnsureStreamFrameNoLock((long)Math.Floor(_sourceFrame), dest);
         }
 
-        var pad = FormatConvert.ResampleEdgePad;
+        var pad = FormatConvert.ResampleMargin(_sourceRate, _deviceRate);
         var center = (long)Math.Floor(_sourceFrame);
         EnsureStreamSrcWinNoLock(center - pad, center + pad, srcCh);
         if (_streamSrcWinFrames <= 0 || _streamSrcWinStart < 0)

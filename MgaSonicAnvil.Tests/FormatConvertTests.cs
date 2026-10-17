@@ -49,6 +49,24 @@ public sealed class FormatConvertTests
     }
 
     [Fact]
+    public void Resample_PassbandStaysWithinOneDecibel()
+    {
+        var source = MakeSine(frames: 48000, sampleRate: 96000, frequency: 1000);
+        var dest = FormatConvert.Resample(source, channels: 2, sourceRate: 96000, destRate: 44100);
+        var ratio = MidRms(dest) / MidRms(source);
+        Assert.InRange(ratio, 0.89, 1.12);
+    }
+
+    [Fact]
+    public void Resample_StopbandAttenuatesByAtLeastEightyDb()
+    {
+        var source = MakeSine(frames: 48000, sampleRate: 96000, frequency: 30000);
+        var dest = FormatConvert.Resample(source, channels: 2, sourceRate: 96000, destRate: 44100);
+        var ratio = MidRms(dest) / MidRms(source);
+        Assert.True(ratio < 1e-4, $"阻止域の残留比 {ratio:E3} が -80 dB を超えている");
+    }
+
+    [Fact]
     public void ConvertSampleRate_RemapsMarkersAndMarksDirty()
     {
         var document = MakeDocument(frames: 480, sampleRate: 48000);
@@ -747,6 +765,21 @@ public sealed class FormatConvertTests
         }
 
         return Math.Sqrt(sum / Math.Max(1, samples.Length));
+    }
+
+    private static double MidRms(float[] samples)
+    {
+        var start = samples.Length / 4;
+        var end = samples.Length - start;
+        var sum = 0d;
+        var count = Math.Max(1, end - start);
+        for (var i = start; i < end; i++)
+        {
+            var value = samples[i];
+            sum += value * (double)value;
+        }
+
+        return Math.Sqrt(sum / count);
     }
 
     private sealed class CollectProgress(List<double> values) : IProgress<double>

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using MgaSonicAnvil.Domain;
 
@@ -46,21 +47,36 @@ internal static class FormatConvert
     public static bool IsValidBitDepth(int bits) =>
         Array.IndexOf(BitDepths, bits) >= 0;
 
-    private const int SincHalfWidth = 24;
-    private const int SincTapCount = SincHalfWidth * 2 + 1;
     private const int SincFracBins = 1024;
     private const int ParallelFrameThreshold = 4096;
-    private const double SincTransition = 0.91;
 
-    /// <summary>Resample の端でカーネルが参照する余白（プレビュー切り出し用）。</summary>
-    public static int ResampleEdgePad => SincHalfWidth;
+    /// <summary>
+    /// 通過帯域は低い方のナイキストの 90% まで平坦、阻止域は 100 dB。
+    /// Sound Forge の既定（補間精度 2 ＋アンチエイリアス）が「ハイエンド」としている帯に合わせる。
+    /// 精度 4 の最長カーネルまでは伸ばさない。
+    /// </summary>
+    private const double PassbandFraction = 0.90;
+
+    private const double StopbandAttenuationDb = 100;
+    private const int MinHalfWidth = 16;
+    private const int MaxHalfWidth = 512;
+    private const double KaiserBeta = 0.1102 * (StopbandAttenuationDb - 8.7);
+    private static readonly double KaiserI0Beta = BesselI0(KaiserBeta);
+    private static readonly ConcurrentDictionary<(int Source, int Dest), double[]> KernelCache = new();
+
+    /// <summary>どのレート比でも足りる、カーネルが参照する最大余白。</summary>
+    public static int ResampleEdgePad => MaxHalfWidth;
+
+    /// <summary>そのレート比のカーネルが端で参照する余白。</summary>
+    public static int ResampleMargin(int sourceRate, int destRate) =>
+        HalfWidth(Math.Max(1, sourceRate), Math.Max(1, destRate));
 
     public static bool ShouldResampleForDevice(int sourceRate, int deviceRate) =>
         sourceRate > 0 && deviceRate > 0 && sourceRate != deviceRate;
 
     /// <summary>
-    /// 新しいナイキストで帯域制限してから間引く／補間する。
-    /// ホールドだと階段波の高調波が出て、8 kHz がキンキンする。
+    /// 低い方のナイキストで帯域制限してから間引く／補間する。
+    /// アンチエイリアスは常に入る。ホールドだと階段波の高調波が出て、8 kHz がキンキンする。
     /// </summary>
     public static float[] Resample(
         float[] interleaved,
@@ -85,7 +101,7 @@ internal static class FormatConvert
         var destFrames = Math.Max(1, (int)Math.Round(srcFrames * (double)destRate / sourceRate));
         var dest = new float[destFrames * channels];
         var step = sourceRate / (double)destRate;
-        var table = BuildSincKernelTable(LowpassCutoff(sourceRate, destRate));
+        var table = KernelTable(sourceRate, destRate);
         var reportEvery = Math.Max(1, destFrames / 100);
         progress?.Report(0);
 
@@ -148,7 +164,7 @@ internal static class FormatConvert
         var destRate = Math.Max(1, (int)Math.Round(sampleRate * (double)destFrames / srcFrames));
         var dest = new float[destFrames * channels];
         var step = srcFrames / (double)destFrames;
-        var table = BuildSincKernelTable(LowpassCutoff(sampleRate, destRate));
+        var table = KernelTable(sampleRate, destRate);
         var reportEvery = Math.Max(1, destFrames / 100);
         progress?.Report(0);
         if (destFrames < ParallelFrameThreshold)
@@ -317,23 +333,33 @@ internal static class FormatConvert
             return;
         }
 
-        var cutoff = LowpassCutoff(sourceRate, destRate);
+        var table = KernelTable(sourceRate, destRate);
+        var tapCount = TapCount(table);
+        var half = tapCount / 2;
         var center = (int)Math.Floor(frame);
+        var leftIndex = center - half;
         var sumL = 0d;
         var sumR = 0d;
         var wsum = 0d;
-        for (var tap = -SincHalfWidth; tap <= SincHalfWidth; tap++)
+        KernelRows(frame - center, tapCount, out var row0, out var row1, out var blend);
+        for (var t = 0; t < tapCount; t++)
         {
-            var kernel = SincKernel(center + tap - frame, cutoff, tap);
+            var kernel = table[row0 + t] + (table[row1 + t] - table[row0 + t]) * blend;
+            wsum += kernel;
+            var index = leftIndex + t;
+            if (unchecked((uint)index) >= (uint)frameCount)
+            {
+                continue;
+            }
+
             ChannelMix.Downmix(
                 interleaved,
-                ClampIndex(center + tap, frameCount) * channels,
+                index * channels,
                 channels,
                 out var tapL,
                 out var tapR);
             sumL += tapL * kernel;
             sumR += tapR * kernel;
-            wsum += kernel;
         }
 
         if (Math.Abs(wsum) > 1e-8)
@@ -367,33 +393,36 @@ internal static class FormatConvert
             return;
         }
 
-        var cutoff = LowpassCutoff(sourceRate, destRate);
-        var center = (int)Math.Floor(frame);
-        Span<double> sums = stackalloc double[ChannelLayout.MaxChannels];
-        sums = sums[..n];
-        sums.Clear();
-        var wsum = 0d;
-        for (var tap = -SincHalfWidth; tap <= SincHalfWidth; tap++)
-        {
-            var kernel = SincKernel(center + tap - frame, cutoff, tap);
-            var index = ClampIndex(center + tap, frameCount) * channels;
-            for (var ch = 0; ch < n; ch++)
-            {
-                sums[ch] += interleaved[index + ch] * kernel;
-            }
-
-            wsum += kernel;
-        }
-
-        var scale = Math.Abs(wsum) > 1e-8 ? 1d / wsum : 1d;
+        var table = KernelTable(sourceRate, destRate);
         for (var ch = 0; ch < n; ch++)
         {
-            dest[ch] = (float)(sums[ch] * scale);
+            dest[ch] = SampleSincTable(interleaved, channels, ch, frame, frameCount, table);
         }
     }
 
-    private static double LowpassCutoff(int sourceRate, int destRate) =>
-        0.5 * Math.Min(1d, destRate / (double)Math.Max(1, sourceRate)) * SincTransition;
+    /// <summary>遷移帯の中央。通過域の端から、低い方のナイキストまでを阻止域にする。</summary>
+    private static double LowpassCutoff(int sourceRate, int destRate)
+    {
+        var nyquist = 0.5 * Math.Min(1d, destRate / (double)Math.Max(1, sourceRate));
+        return nyquist * (PassbandFraction + 1d) * 0.5;
+    }
+
+    private static int HalfWidth(int sourceRate, int destRate)
+    {
+        var ratio = Math.Min(1d, destRate / (double)Math.Max(1, sourceRate));
+        var transition = Math.Max(1e-4, (1d - PassbandFraction) * 0.5 * ratio);
+        var length = (int)Math.Ceiling((StopbandAttenuationDb - 8d) / (2.285 * 2d * Math.PI * transition)) + 1;
+        if ((length & 1) == 0)
+        {
+            length++;
+        }
+
+        return Math.Clamp(length / 2, MinHalfWidth, MaxHalfWidth);
+    }
+
+    private static double[] KernelTable(int sourceRate, int destRate) =>
+        KernelCache.GetOrAdd((sourceRate, destRate), static key =>
+            BuildSincKernelTable(LowpassCutoff(key.Source, key.Dest), HalfWidth(key.Source, key.Dest)));
 
     private static void WriteResampledFrame(
         float[] dest,
@@ -412,22 +441,24 @@ internal static class FormatConvert
         }
     }
 
-    private static double[] BuildSincKernelTable(double cutoff)
+    private static double[] BuildSincKernelTable(double cutoff, int halfWidth)
     {
-        var table = new double[(SincFracBins + 1) * SincTapCount];
+        var tapCount = halfWidth * 2 + 1;
+        var table = new double[(SincFracBins + 1) * tapCount];
         for (var bin = 0; bin <= SincFracBins; bin++)
         {
             var frac = bin / (double)SincFracBins;
-            var row = bin * SincTapCount;
-            for (var t = 0; t < SincTapCount; t++)
+            var row = bin * tapCount;
+            for (var t = 0; t < tapCount; t++)
             {
-                var tap = t - SincHalfWidth;
-                table[row + t] = SincKernel(tap - frac, cutoff, tap);
+                table[row + t] = SincKernel((t - halfWidth) - frac, cutoff, halfWidth);
             }
         }
 
         return table;
     }
+
+    private static int TapCount(double[] table) => table.Length / (SincFracBins + 1);
 
     private static float SampleSincTable(
         float[] src,
@@ -442,26 +473,17 @@ internal static class FormatConvert
             return src[channel];
         }
 
+        var tapCount = TapCount(table);
+        var half = tapCount / 2;
         var center = (int)Math.Floor(frame);
-        var frac = frame - center;
-        var scaled = frac * SincFracBins;
-        var bin = (int)scaled;
-        if (bin >= SincFracBins)
-        {
-            bin = SincFracBins - 1;
-            scaled = SincFracBins;
-        }
-
-        var blend = scaled - bin;
-        var row0 = bin * SincTapCount;
-        var row1 = row0 + SincTapCount;
-        var left = center - SincHalfWidth;
+        KernelRows(frame - center, tapCount, out var row0, out var row1, out var blend);
+        var left = center - half;
         var sum = 0d;
         var wsum = 0d;
-        if (unchecked((uint)left) <= (uint)(frameCount - SincTapCount))
+        if (left >= 0 && tapCount <= frameCount && left <= frameCount - tapCount)
         {
             var index = left * channels + channel;
-            for (var t = 0; t < SincTapCount; t++)
+            for (var t = 0; t < tapCount; t++)
             {
                 var kernel = table[row0 + t] + (table[row1 + t] - table[row0 + t]) * blend;
                 sum += src[index] * kernel;
@@ -471,20 +493,51 @@ internal static class FormatConvert
         }
         else
         {
-            for (var t = 0; t < SincTapCount; t++)
+            for (var t = 0; t < tapCount; t++)
             {
                 var kernel = table[row0 + t] + (table[row1 + t] - table[row0 + t]) * blend;
-                sum += src[ClampIndex(left + t, frameCount) * channels + channel] * kernel;
                 wsum += kernel;
+                var index = left + t;
+                if (unchecked((uint)index) < (uint)frameCount)
+                {
+                    sum += src[index * channels + channel] * kernel;
+                }
             }
         }
 
         return (float)(Math.Abs(wsum) > 1e-8 ? sum / wsum : sum);
     }
 
-    private static double SincKernel(double offset, double cutoff, int tap)
+    private static void KernelRows(double frac, int tapCount, out int row0, out int row1, out double blend)
     {
-        var window = 0.5 * (1d + Math.Cos(Math.PI * tap / SincHalfWidth));
+        var scaled = frac * SincFracBins;
+        var bin = (int)scaled;
+        if (bin >= SincFracBins)
+        {
+            bin = SincFracBins - 1;
+            scaled = SincFracBins;
+        }
+
+        if (bin < 0)
+        {
+            bin = 0;
+            scaled = 0;
+        }
+
+        blend = scaled - bin;
+        row0 = bin * tapCount;
+        row1 = row0 + tapCount;
+    }
+
+    private static double SincKernel(double offset, double cutoff, int halfWidth)
+    {
+        if (halfWidth < 1 || Math.Abs(offset) > halfWidth)
+        {
+            return 0;
+        }
+
+        var radial = offset / halfWidth;
+        var window = BesselI0(KaiserBeta * Math.Sqrt(1d - radial * radial)) / KaiserI0Beta;
         return 2d * cutoff * Sinc(2d * cutoff * offset) * window;
     }
 
@@ -499,6 +552,22 @@ internal static class FormatConvert
         return Math.Sin(pix) / pix;
     }
 
-    private static int ClampIndex(int index, int frameCount) =>
-        Math.Clamp(index, 0, frameCount - 1);
+    private static double BesselI0(double x)
+    {
+        var sum = 1d;
+        var term = 1d;
+        var half = x * 0.5;
+        for (var k = 1; k < 40; k++)
+        {
+            term *= half / k;
+            term *= half / k;
+            sum += term;
+            if (term < 1e-16 * sum)
+            {
+                break;
+            }
+        }
+
+        return sum;
+    }
 }
