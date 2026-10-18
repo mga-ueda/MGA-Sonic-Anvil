@@ -56,6 +56,9 @@ internal enum LibrarySortDirection
     Descending,
 }
 
+/// <summary>プレイリストの列ソート。列が null のときはソート無し。</summary>
+internal readonly record struct LibraryPlaylistSort(LibraryFileColumn? Column, LibrarySortDirection Direction);
+
 /// <summary>F10 ファイルリストの 1 行。並べ替えとグルーピング用。</summary>
 internal sealed class LibraryFileRow : INotifyPropertyChanged
 {

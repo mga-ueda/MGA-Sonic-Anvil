@@ -330,6 +330,8 @@ internal sealed class LibraryBrowserView : UserControl
 
     public event EventHandler<LibraryFileGroup>? GroupChanged;
 
+    public event EventHandler<LibraryPlaylistSort>? SortChanged;
+
     public event EventHandler<string>? ExplorerFolderChanged;
 
     /// <summary>ツリーの展開セットが変わった（パスはフルパス）。</summary>
@@ -7209,6 +7211,7 @@ internal sealed class LibraryBrowserView : UserControl
                 && !LibraryColumnFilter.IsEffectivelyVisible(sort, enabled, used))
             {
                 ClearSort(resort: false);
+                NotifySortChanged();
             }
 
             CancelColumnChromeFade(resetOpacity: true);
@@ -8423,6 +8426,22 @@ internal sealed class LibraryBrowserView : UserControl
                 : LibrarySortDirection.Ascending;
         }
 
+        ApplySortDirectionToColumns();
+
+        RefreshSortChrome();
+        var active = SelectedSession;
+        var selected = SelectedSessions;
+        _rows = SortRows(_rows);
+        LibraryFileList.ApplyGroupKeys(_rows, _group);
+        BindRows(active, selected);
+        NotifySortChanged();
+    }
+
+    private void NotifySortChanged() =>
+        SortChanged?.Invoke(this, new LibraryPlaylistSort(_sortColumn, _sortDirection));
+
+    private void ApplySortDirectionToColumns()
+    {
         foreach (var item in _columns)
         {
             item.Value.SortDirection = item.Key == _sortColumn
@@ -8431,13 +8450,6 @@ internal sealed class LibraryBrowserView : UserControl
                     : System.ComponentModel.ListSortDirection.Descending
                 : null;
         }
-
-        RefreshSortChrome();
-        var active = SelectedSession;
-        var selected = SelectedSessions;
-        _rows = SortRows(_rows);
-        LibraryFileList.ApplyGroupKeys(_rows, _group);
-        BindRows(active, selected);
     }
 
     private LibraryFileColumn ColumnFromGrid(DataGridColumn column)
@@ -8828,6 +8840,35 @@ internal sealed class LibraryBrowserView : UserControl
         InvalidateGroupJackets();
         _ = EnsureGroupArtworkAsync();
         GroupChanged?.Invoke(this, group);
+    }
+
+    /// <summary>保存済みの列ソート。起動時に使い、変更は通知しない。</summary>
+    public void SetSort(LibraryPlaylistSort sort)
+    {
+        if (_sortColumn == sort.Column
+            && (sort.Column is null || _sortDirection == sort.Direction))
+        {
+            return;
+        }
+
+        _sortColumn = sort.Column;
+        if (sort.Column is not null)
+        {
+            _sortDirection = sort.Direction;
+        }
+
+        ApplySortDirectionToColumns();
+        RefreshSortChrome();
+        if (_rows.Count == 0)
+        {
+            return;
+        }
+
+        var active = SelectedSession;
+        var selected = SelectedSessions;
+        _rows = SortRows(_rows);
+        LibraryFileList.ApplyGroupKeys(_rows, _group);
+        BindRows(active, selected);
     }
 
     private void ShuffleCheck_Changed(object sender, RoutedEventArgs e)

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using MgaSonicAnvil.Config;
+using MgaSonicAnvil.Domain;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
@@ -13,6 +14,30 @@ public sealed class AppSettingsFileTests
         var json = JsonSerializer.Serialize(AppSettings.CreateDefault(), AppSettingsJsonContext.Default.AppSettings);
         Assert.DoesNotContain("LibraryShuffle", json, StringComparison.Ordinal);
         Assert.False(AppSettingsFile.ContainsLegacyLibraryShuffle(json));
+    }
+
+    [Fact]
+    public void LibraryListSort_EmptyIsAlbumAscending_NoneClears()
+    {
+        var settings = AppSettings.CreateDefault();
+        Assert.Equal(
+            new LibraryPlaylistSort(LibraryFileColumn.Album, LibrarySortDirection.Ascending),
+            settings.ResolvedLibraryListSort());
+
+        settings.ApplyLibraryListSort(new LibraryPlaylistSort(LibraryFileColumn.Name, LibrarySortDirection.Descending));
+        Assert.Equal("Name", settings.LibraryListSortColumn);
+        Assert.Equal("Descending", settings.LibraryListSortDirection);
+        Assert.Equal(
+            new LibraryPlaylistSort(LibraryFileColumn.Name, LibrarySortDirection.Descending),
+            settings.ResolvedLibraryListSort());
+
+        settings.ApplyLibraryListSort(new LibraryPlaylistSort(LibraryFileColumn.Album, LibrarySortDirection.Ascending));
+        Assert.Equal(string.Empty, settings.LibraryListSortColumn);
+        Assert.Equal(string.Empty, settings.LibraryListSortDirection);
+
+        settings.ApplyLibraryListSort(new LibraryPlaylistSort(null, LibrarySortDirection.Ascending));
+        Assert.Equal("None", settings.LibraryListSortColumn);
+        Assert.Null(settings.ResolvedLibraryListSort().Column);
     }
 
     [Fact]
