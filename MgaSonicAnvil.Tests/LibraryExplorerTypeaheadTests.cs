@@ -85,29 +85,33 @@ public sealed class LibraryExplorerTypeaheadTests
     }
 
     [Fact]
-    public void TryMapChar_LettersOnly_NotDigitsNumpadOrStar()
+    public void TryMapChar_LettersAndDigits_NotShiftDigitOrStar()
     {
         Assert.True(LibraryExplorerTypeahead.TryMapChar(Key.T, ModifierKeys.None, out var t));
         Assert.Equal("t", t);
         Assert.True(LibraryExplorerTypeahead.TryMapChar(Key.A, ModifierKeys.Shift, out var a));
         Assert.Equal("a", a);
-        Assert.False(LibraryExplorerTypeahead.TryMapChar(Key.D2, ModifierKeys.None, out _));
-        Assert.False(LibraryExplorerTypeahead.TryMapChar(Key.D0, ModifierKeys.None, out _));
-        Assert.False(LibraryExplorerTypeahead.TryMapChar(Key.NumPad2, ModifierKeys.None, out _));
+        Assert.True(LibraryExplorerTypeahead.TryMapChar(Key.D2, ModifierKeys.None, out var d2));
+        Assert.Equal("2", d2);
+        Assert.True(LibraryExplorerTypeahead.TryMapChar(Key.D0, ModifierKeys.None, out var d0));
+        Assert.Equal("0", d0);
+        Assert.True(LibraryExplorerTypeahead.TryMapChar(Key.NumPad2, ModifierKeys.None, out var n2));
+        Assert.Equal("2", n2);
         Assert.False(LibraryExplorerTypeahead.TryMapChar(Key.D8, ModifierKeys.Shift, out _));
+        Assert.False(LibraryExplorerTypeahead.TryMapChar(Key.NumPad2, ModifierKeys.Shift, out _));
         Assert.False(LibraryExplorerTypeahead.TryMapChar(Key.Oem2, ModifierKeys.None, out _));
         Assert.False(LibraryExplorerTypeahead.TryMapChar(Key.Oem2, ModifierKeys.Shift, out _));
         Assert.False(LibraryExplorerTypeahead.TryMapChar(Key.Space, ModifierKeys.None, out _));
     }
 
     [Fact]
-    public void IsTypeaheadText_RejectsDigits()
+    public void IsTypeaheadText_AcceptsDigits()
     {
         Assert.True(LibraryExplorerTypeahead.IsTypeaheadText("t"));
         Assert.True(LibraryExplorerTypeahead.IsTypeaheadText("a2"));
-        Assert.False(LibraryExplorerTypeahead.IsTypeaheadText("2"));
-        Assert.False(LibraryExplorerTypeahead.IsTypeaheadText("90"));
-        Assert.False(LibraryExplorerTypeahead.IsTypeaheadText("５"));
+        Assert.True(LibraryExplorerTypeahead.IsTypeaheadText("2"));
+        Assert.True(LibraryExplorerTypeahead.IsTypeaheadText("90"));
+        Assert.True(LibraryExplorerTypeahead.IsTypeaheadText("５"));
         Assert.False(LibraryExplorerTypeahead.IsTypeaheadText(""));
         Assert.False(LibraryExplorerTypeahead.IsTypeaheadText(" "));
     }

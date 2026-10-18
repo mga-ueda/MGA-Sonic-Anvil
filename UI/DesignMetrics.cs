@@ -250,7 +250,7 @@ internal static class DesignMetrics
 
     public static Thickness PlaylistPdfPageNumberMargin => new(0, 0, 0, From96(24));
 
-    public static Thickness PlaylistPdfPageNumberPadding => new(From96(14), From96(6), From96(14), From96(6));
+    public static Thickness PlaylistPdfPageNumberPadding => PlaylistVideoTimecodePadding;
 
     public static double PlaylistPdfPageNumberHostHeight =>
         PlaylistPdfPageNumberPadding.Top

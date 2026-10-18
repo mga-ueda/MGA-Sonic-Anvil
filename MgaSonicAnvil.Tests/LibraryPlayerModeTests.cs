@@ -818,7 +818,7 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.ShowsPlaylistPdfPageNumber(chromeHidden: true, isPdf: true));
         Assert.False(LibraryPlayerMode.ShowsPlaylistPdfPageNumber(chromeHidden: false, isPdf: true));
         Assert.False(LibraryPlayerMode.ShowsPlaylistPdfPageNumber(chromeHidden: true, isPdf: false));
-        Assert.Equal(3, LibraryPlayerMode.PdfPageNumberToastHoldSeconds);
+        Assert.Equal(1, LibraryPlayerMode.PdfPageNumberToastHoldSeconds);
         Assert.Equal("1 / 3", LibraryPlayerMode.FormatPdfPageLabel(0, 3));
         Assert.Equal("3 / 3", LibraryPlayerMode.FormatPdfPageLabel(2, 3));
         Assert.True(LibraryPlayerMode.ShowsPlaylistTrackIndex(

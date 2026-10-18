@@ -28,11 +28,15 @@ internal static class LibraryExplorerTypeahead
             return false;
         }
 
-        // テンキーは再生操作。上段数字はツリーではジャンプしない（Shift+8 は展開）。文字だけフォルダ名に使う。
-        if (key is >= Key.NumPad0 and <= Key.NumPad9
-            || key is >= Key.D0 and <= Key.D9)
+        // Shift+8 は配下展開。無修飾の上段 0–9 とテンキーはフォルダ名の検索に使う。
+        if (modifiers == ModifierKeys.None
+            && (key is >= Key.D0 and <= Key.D9 || key is >= Key.NumPad0 and <= Key.NumPad9))
         {
-            return false;
+            var digit = key is >= Key.NumPad0 and <= Key.NumPad9
+                ? key - Key.NumPad0
+                : key - Key.D0;
+            character = ((char)('0' + digit)).ToString();
+            return true;
         }
 
         if (key is >= Key.A and <= Key.Z)
@@ -52,18 +56,15 @@ internal static class LibraryExplorerTypeahead
             return false;
         }
 
-        var digitsOnly = true;
         foreach (var c in text)
         {
             if (char.IsControl(c) || char.IsWhiteSpace(c))
             {
                 return false;
             }
-
-            digitsOnly &= char.IsDigit(c);
         }
 
-        return !digitsOnly;
+        return true;
     }
 
     /// <summary>打った文字を常に末尾へ足す（同文字連打も積む。アイドル打ち直しはしない）。</summary>

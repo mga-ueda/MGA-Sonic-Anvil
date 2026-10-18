@@ -874,8 +874,8 @@ internal static class LibraryPlayerMode
     /// <summary>ホバー↔本再生／PDF 表示の前面クローム。メーター用の 1 秒より短く。</summary>
     public const double ChromeFadeSeconds = 0.2;
 
-    /// <summary>PDF ページ切替時、ページ番号を出してからフェードアウトするまでの表示時間。</summary>
-    public const double PdfPageNumberToastHoldSeconds = 3;
+    /// <summary>PDF ページ切替時、ページ番号を出してからフェードアウトするまでの表示時間。フォルダ名ジャンプと同じ。</summary>
+    public const double PdfPageNumberToastHoldSeconds = 1;
 
     public const int MeterFadeFrameRate = 30;
 
