@@ -289,6 +289,19 @@ public sealed class LibraryDeferredLoadTests
         var row = LibraryBrowserView.CreateRow(new DocumentSession(document));
         Assert.Equal(-23.5f, row.IntegratedLufs);
         Assert.Equal("-23.5 LKFS", row.LoudnessText);
+        Assert.Equal(LoudnessTraffic.Caution, row.LoudnessTone);
+    }
+
+    [Fact]
+    public void PlaylistLoudnessTone_UsesSettingsTargetBands()
+    {
+        const double target = -24;
+        Assert.Equal(LoudnessTraffic.Idle, LibraryFileRow.ToneFor(null, target));
+        Assert.Equal(LoudnessTraffic.Safe, LibraryFileRow.ToneFor(-26f, target));
+        Assert.Equal(LoudnessTraffic.Safe, LibraryFileRow.ToneFor(-24f, target));
+        Assert.Equal(LoudnessTraffic.Caution, LibraryFileRow.ToneFor(-23.5f, target));
+        Assert.Equal(LoudnessTraffic.Caution, LibraryFileRow.ToneFor(-21f, target));
+        Assert.Equal(LoudnessTraffic.Danger, LibraryFileRow.ToneFor(-20.9f, target));
     }
 
     [Fact]

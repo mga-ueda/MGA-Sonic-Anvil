@@ -6785,7 +6785,11 @@ internal sealed class LibraryBrowserView : UserControl
         AddColumn(LibraryFileColumn.FrameRate, nameof(LibraryFileRow.FrameRateText), right: true);
         AddColumn(LibraryFileColumn.VideoCodec, nameof(LibraryFileRow.VideoCodec));
         AddColumn(LibraryFileColumn.AudioCodec, nameof(LibraryFileRow.AudioCodec));
-        AddColumn(LibraryFileColumn.Loudness, nameof(LibraryFileRow.LoudnessText), right: true);
+        AddColumn(
+            LibraryFileColumn.Loudness,
+            nameof(LibraryFileRow.LoudnessText),
+            right: true,
+            loudnessTone: true);
         AddColumn(LibraryFileColumn.Size, nameof(LibraryFileRow.SizeText), right: true);
         AddColumn(LibraryFileColumn.Folder, nameof(LibraryFileRow.Folder));
         AddColumn(LibraryFileColumn.Jacket, nameof(LibraryFileRow.JacketText));
@@ -7656,7 +7660,8 @@ internal sealed class LibraryBrowserView : UserControl
         string binding,
         bool right = false,
         string? nonDefaultBinding = null,
-        bool trim = true)
+        bool trim = true,
+        bool loudnessTone = false)
     {
         var text = new Style(typeof(TextBlock));
         text.Setters.Add(new Setter(
@@ -7693,6 +7698,14 @@ internal sealed class LibraryBrowserView : UserControl
             text.Triggers.Add(mismatch);
         }
 
+        if (loudnessTone)
+        {
+            // メーターと同じ3色。ターゲット以下が青、+3 LU までが黄、それより上が赤。
+            AddLoudnessToneTrigger(text, LoudnessTraffic.Safe, "LoudnessSafeBrush");
+            AddLoudnessToneTrigger(text, LoudnessTraffic.Caution, "LoudnessCautionBrush");
+            AddLoudnessToneTrigger(text, LoudnessTraffic.Danger, "LoudnessDangerBrush");
+        }
+
         var gridColumn = new DataGridTextColumn
         {
             Binding = new Binding(binding),
@@ -7708,6 +7721,19 @@ internal sealed class LibraryBrowserView : UserControl
         gridColumn.Header = sortHeader;
         _columns[column] = gridColumn;
         _grid.Columns.Add(gridColumn);
+    }
+
+    private static void AddLoudnessToneTrigger(Style text, LoudnessTraffic tone, string brushKey)
+    {
+        var trigger = new DataTrigger
+        {
+            Binding = new Binding(nameof(LibraryFileRow.LoudnessTone)),
+            Value = tone,
+        };
+        trigger.Setters.Add(new Setter(
+            TextBlock.ForegroundProperty,
+            new DynamicResourceExtension(brushKey)));
+        text.Triggers.Add(trigger);
     }
 
     private void AddWaveformColumn()
@@ -9804,6 +9830,31 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
+    /// <summary>設定のラウドネスターゲット。列の青／黄／赤をやり直す。</summary>
+    public void ApplyLoudnessTarget(double targetLufs)
+    {
+        var target = LoudnessMeterEngine.ClampTargetLufs(targetLufs);
+        var seen = new HashSet<LibraryFileRow>();
+        PaintLoudnessTones(_rows, target, seen);
+        PaintLoudnessTones(_items, target, seen);
+    }
+
+    private static void PaintLoudnessTones(
+        IEnumerable<LibraryFileRow> rows,
+        double target,
+        HashSet<LibraryFileRow> seen)
+    {
+        foreach (var row in rows)
+        {
+            if (!seen.Add(row))
+            {
+                continue;
+            }
+
+            row.LoudnessTone = LibraryFileRow.ToneFor(row.IntegratedLufs, target);
+        }
+    }
+
     /// <summary>設定の既定 Wave フォーマット。違うレート／ビット／Ch をオレンジにする基準。</summary>
     public void SetDefaultAudioFormat(DefaultAudioFormat.Spec format)
     {
@@ -9907,7 +9958,7 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         var hasArt = document.HasArtwork || tags.HasArtwork;
-        return new LibraryFileRow
+        var row = new LibraryFileRow
         {
             Tag = session,
             Name = session.DisplayName,
@@ -9964,6 +10015,10 @@ internal sealed class LibraryBrowserView : UserControl
                 ? UiStrings.FormatIntegratedLufs(tags.IntegratedLufs)
                 : string.Empty,
         };
+        row.LoudnessTone = LibraryFileRow.ToneFor(
+            row.IntegratedLufs,
+            AppStorage.Settings.ResolvedLoudnessTargetLufs());
+        return row;
     }
 
     /// <summary>

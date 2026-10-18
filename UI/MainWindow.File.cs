@@ -2177,6 +2177,7 @@ public partial class MainWindow
         LibraryBrowser.SetDefaultAudioFormat(settings.ResolvedDefaultAudioFormat());
         ApplyPlayerRoute();
         LoudnessMeter.ApplyTargetFromSettings();
+        LibraryBrowser.ApplyLoudnessTarget(settings.ResolvedLoudnessTargetLufs());
         ForEachWaveform(view => view.LoudnessTargetLufs = settings.ResolvedLoudnessTargetLufs());
         ApplySilentSkipFromSettings();
         RefreshSpeakerMenu();
