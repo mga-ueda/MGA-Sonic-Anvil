@@ -178,6 +178,12 @@ public partial class MainWindow : Window
         LibraryBrowser.PlaylistRestartRequested += (_, _) => RestartLibraryTrack();
         LibraryBrowser.PlaylistUndoRemoveRequested += (_, _) => TryUndoLibraryPlaylistRemove();
         LibraryBrowser.LibraryCatalogRebuildRequested += (_, _) => RebuildLibraryCatalog();
+        LibraryBrowser.LibraryPasteRequested += (_, pane) => PasteLibraryFromMenu(pane);
+        LibraryBrowser.LibraryRenameRequested += (_, pane) => RenameLibraryFromMenu(pane);
+        LibraryBrowser.LibraryDeleteRequested += (_, pane) => DeleteLibraryFromMenu(pane);
+        LibraryBrowser.PlaybackPitchUpRequested += (_, _) => ApplyPlaybackPitchStep(1);
+        LibraryBrowser.PlaybackPitchDownRequested += (_, _) => ApplyPlaybackPitchStep(-1);
+        LibraryBrowser.PlaybackPitchResetRequested += (_, _) => ApplyPlaybackPitchStep(0);
         LibraryBrowser.ListContextMenuOpened += LibraryBrowser_ListContextMenuOpened;
         LibraryBrowser.ListContextMenuClosed += LibraryBrowser_ListContextMenuClosed;
         LibraryBrowser.SetVisibleColumnPresets(

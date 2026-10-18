@@ -141,6 +141,53 @@ public partial class MainWindow
         return false;
     }
 
+    private void PasteLibraryFromMenu(LibraryPane pane)
+    {
+        if (pane == LibraryPane.Favorites || IsUiBusy)
+        {
+            return;
+        }
+
+        PasteLibraryClipboard(pane == LibraryPane.Explorer);
+    }
+
+    private void RenameLibraryFromMenu(LibraryPane pane)
+    {
+        if (IsUiBusy || IsEditingFileName)
+        {
+            return;
+        }
+
+        switch (pane)
+        {
+            case LibraryPane.Explorer:
+                RenameExplorerSelection();
+                break;
+            case LibraryPane.Favorites:
+                RenameFavoriteSelection();
+                break;
+            case LibraryPane.List:
+                RenamePlaylistSelection();
+                break;
+        }
+    }
+
+    private void DeleteLibraryFromMenu(LibraryPane pane)
+    {
+        if (pane == LibraryPane.Favorites || IsUiBusy)
+        {
+            return;
+        }
+
+        if (pane == LibraryPane.Explorer)
+        {
+            DeleteExplorerSelection();
+            return;
+        }
+
+        DeletePlaylistFiles();
+    }
+
     private void PasteLibraryClipboard(bool ontoTree)
     {
         var pane = ontoTree ? LibraryPane.Explorer : LibraryPane.List;

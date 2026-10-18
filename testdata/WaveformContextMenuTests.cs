@@ -134,6 +134,12 @@ public sealed class WaveformContextMenuTests
             var tileOff = Find(tree, WaveMenuCommand.TileOff);
             Assert.True(tileOff?.Checkable);
             Assert.False(tileOff?.Checked);
+            Assert.Contains(WaveMenuCommand.PlaybackPitchUp, commands);
+            Assert.Contains(WaveMenuCommand.PlaybackPitchDown, commands);
+            Assert.Contains(WaveMenuCommand.PlaybackPitchReset, commands);
+            Assert.Equal("Ctrl++", Find(tree, WaveMenuCommand.PlaybackPitchUp)?.Gesture);
+            Assert.Equal("Ctrl+-", Find(tree, WaveMenuCommand.PlaybackPitchDown)?.Gesture);
+            Assert.Equal("Ctrl+0", Find(tree, WaveMenuCommand.PlaybackPitchReset)?.Gesture);
             Assert.Contains(WaveMenuCommand.SilentSkip, commands);
             var silentSkip = Find(tree, WaveMenuCommand.SilentSkip);
             Assert.Equal("Alt+S", silentSkip?.Gesture);

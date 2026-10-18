@@ -904,9 +904,21 @@ internal static partial class UiStrings
     public static string LibraryMenuRemoveFromFavorites => Get("お気に入りから削除", "Remove from Favorites");
     public static string LibraryMenuClearFromPlaylist => Get("プレイリストからクリア", "Clear from Playlist");
     // アクセスキーは付けない（メニュー外クリック時の誤発火を避ける）。ショートカットは InputGestureText。
+    public static string LibraryMenuCatPlaylist => Get("プレイリスト", "Playlist");
+    public static string LibraryMenuCatEdit => Get("編集", "Edit");
+    public static string LibraryMenuCatPitch => Get("再生・ピッチ", "Playback & Pitch");
+    public static string LibraryMenuCatTree => Get("ツリー", "Tree");
+    public static string LibraryMenuCatOther => Get("その他", "Other");
     public static string LibraryMenuMatchLoudness => Get("ラウドネスを揃える", "Match Loudness");
     public static string LibraryMenuSaveMp3 => Get("MP3 として保存", "Save as MP3");
     public static string LibraryMenuCopy => Get("コピー", "Copy");
+    public static string LibraryMenuCut => Get("切り取り", "Cut");
+    public static string LibraryMenuPaste => Get("貼り付け", "Paste");
+    public static string LibraryMenuRename => Get("名前の変更", "Rename");
+    public static string LibraryMenuDelete => Get("削除", "Delete");
+    public static string LibraryMenuPitchUp => Get("ピッチシフトしてプレビュー（半音上げる）", "Pitch Shift Preview (Semitone Up)");
+    public static string LibraryMenuPitchDown => Get("ピッチシフトしてプレビュー（半音下げる）", "Pitch Shift Preview (Semitone Down)");
+    public static string LibraryMenuPitchReset => Get("ピッチシフトをリセット", "Reset Pitch Shift");
     public static string LibraryMenuCopyFileName => Get("ファイル名をコピー", "Copy File Name");
     public static string LibraryMenuCopyFilePath => Get("フルパスをコピー", "Copy Full Path");
     public static string LibraryMenuOpenInExplorer => Get("エクスプローラーで開く", "Open in Explorer");
