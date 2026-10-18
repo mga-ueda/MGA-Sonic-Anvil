@@ -208,7 +208,9 @@ public sealed class SpectrumAnalyzerTests
         }
 
         Assert.True(analyzer.HasVisibleLevel);
-        for (var i = 0; i < 20; i++)
+        // ライブバーは 20 dB を 1.5 秒で落とす。20 フレーム（約 4.4 dB）ではホールドとの差が 5 dB に届かない。
+        var separateFrames = (int)Math.Ceiling(5.0 * 60 / SpectrumAnalyzer.LiveReleaseDbPerSec) + 1;
+        for (var i = 0; i < separateFrames; i++)
         {
             analyzer.Process(samples, rate, 1 / 60d, active: false);
         }
