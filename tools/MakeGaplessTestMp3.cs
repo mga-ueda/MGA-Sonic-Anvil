@@ -15,7 +15,10 @@ const int LameFieldMax = 4095;
 
 var repo = FindRepoRoot();
 var outDir = Path.Combine(repo, "testdata", "gapless");
-Directory.CreateDirectory(outDir);
+var playlistDir = Path.Combine(outDir, "playlist");
+var compareDir = Path.Combine(outDir, "compare");
+Directory.CreateDirectory(playlistDir);
+Directory.CreateDirectory(compareDir);
 
 var ffmpeg = ResolveFfmpeg();
 if (ffmpeg is null)
@@ -56,8 +59,8 @@ var wavB = Path.Combine(outDir, "_src-b.wav");
 WriteWav(wavA, WithSilence(pcm, 0, split, lead: 0, tail: extraEnd), 0, split + extraEnd);
 WriteWav(wavB, WithSilence(pcm, split, totalFrames - split, lead: extraStart, tail: 0), 0, extraStart + totalFrames - split);
 
-var mp3A = Path.Combine(outDir, "01-tone-a.mp3");
-var mp3B = Path.Combine(outDir, "02-tone-b.mp3");
+var mp3A = Path.Combine(playlistDir, "01-tone-a.mp3");
+var mp3B = Path.Combine(playlistDir, "02-tone-b.mp3");
 EncodeMp3(ffmpeg, wavA, mp3A, "01 tone A (first half)");
 EncodeMp3(ffmpeg, wavB, mp3B, "02 tone B (second half)");
 if (!TryReadLame(mp3A, out var encDelayA, out var encPadA, out var lamePosA)
@@ -80,8 +83,8 @@ var decodedB = DecodePcm(mp3B);
 
 var off = Concat(decodedA.Samples, decodedB.Samples);
 var on = Concat(Trim(decodedA, delayA, padA), Trim(decodedB, delayB, padB));
-WritePcm16Wav(Path.Combine(outDir, "listen-gapless-off.wav"), off, off.Length / Channels);
-WritePcm16Wav(Path.Combine(outDir, "listen-gapless-on.wav"), on, on.Length / Channels);
+WritePcm16Wav(Path.Combine(compareDir, "listen-gapless-off.wav"), off, off.Length / Channels);
+WritePcm16Wav(Path.Combine(compareDir, "listen-gapless-on.wav"), on, on.Length / Channels);
 
 var joinOff = JoinSilenceMs(decodedA, decodedB, trim: false, delayA, padA, delayB, padB);
 var joinOn = JoinSilenceMs(decodedA, decodedB, trim: true, delayA, padA, delayB, padB);
@@ -393,13 +396,13 @@ static string BuildHowTo(
     本物の CD リップでは数十 ms 程度なので、普段はここまで大きく途切れません。
 
     【いちばん分かりやすい】WAV を直接聞く（アプリ不要）
-      listen-gapless-off.wav … デコード結果をそのままつなぐ（設定オフ相当）
-      listen-gapless-on.wav  … LAME の delay/padding を外してつなぐ（設定オン相当）
+      compare/listen-gapless-off.wav … デコード結果をそのままつなぐ（設定オフ相当）
+      compare/listen-gapless-on.wav  … LAME の delay/padding を外してつなぐ（設定オン相当）
     オフは継ぎ目で 440 Hz が落ち、クリックの間隔も乱れます。オンはほぼ一本の音です。
     オンでもごく短い切れ目は残ることがあります。
 
     【アプリで確認】
-    1. 01-tone-a.mp3 → 02-tone-b.mp3 の順でプレイリストへ。
+    1. playlist/01-tone-a.mp3 → playlist/02-tone-b.mp3 の順でプレイリストへ。
     2. 設定 → プレイヤー → ギャップレス再生をオフ。1 曲目から連続再生。2 秒付近で無音がはっきり入る。
     3. ギャップレス再生をオンにして同じ場所をもう一度。切れ目が小さくなる。
     4. 再生はストリーム開始から。波形の完成は待たない。

@@ -12,6 +12,7 @@ obj/
 publish/
 artifacts/
 MgaSonicAnvil.Tests/reference_signals/
+testdata/gapless/
 testrun-loudness-v/
 tmp-video-frames/
 
