@@ -2276,7 +2276,6 @@ public partial class MainWindow
         PlaylistVideoScaleToastText.Text =
             LibraryVideoWindowScale.FormatPercent(_videoLaunchScale)
                 .ToString(CultureInfo.InvariantCulture) + "%";
-        LibraryPlayerMode.SetVideoUiShadow(PlaylistVideoScaleToast, on: true);
         LibraryPlayerMode.FadeElementOpacity(
             PlaylistVideoScaleToast,
             to: 1,
@@ -2284,7 +2283,7 @@ public partial class MainWindow
             hitTestVisible: false);
         _videoLaunchScaleToastTimer ??= new DispatcherTimer
         {
-            Interval = TimeSpan.FromSeconds(1),
+            Interval = LibraryExplorerTypeahead.ToastIdleClear,
         };
         _videoLaunchScaleToastTimer.Tick -= OnVideoLaunchScaleToastTick;
         _videoLaunchScaleToastTimer.Tick += OnVideoLaunchScaleToastTick;
@@ -2311,7 +2310,6 @@ public partial class MainWindow
             to: 0,
             instant: true,
             hitTestVisible: false);
-        LibraryPlayerMode.SetVideoUiShadow(PlaylistVideoScaleToast, on: false);
     }
 
     private void SyncVideoLaunchScaleFromWindow(

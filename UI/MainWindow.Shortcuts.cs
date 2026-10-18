@@ -1138,6 +1138,7 @@ public partial class MainWindow
         }
 
         // テンキー再生操作（プレイヤー／エディタ共通）。上段数字の割合／マーカーは別経路。
+        // ツリーのインクリメントサーチ中はテンキー数字を検索へ譲る。
         if (!IsLibraryGroupComboFocused
             && !StatusTimes.IsTimeFocused
             && !IsEditingFileName
@@ -1147,6 +1148,9 @@ public partial class MainWindow
             && _timeStretchMenu is not { IsOpen: true }
             && _fadeMenu is not { IsOpen: true }
             && _formatMenu is not { IsOpen: true }
+            && !(IsLibraryExplorerFocused
+                && !LibraryBrowser.IsExplorerSearchFocused
+                && LibraryPlayerMode.IsPlayerNumpadKey(key, modifiers))
             && TryHandleTransportNumpad(key, modifiers, isRepeat))
         {
             return true;

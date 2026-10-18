@@ -444,9 +444,8 @@
         <Border Padding="{x:Static ui:DesignMetrics.PlaylistVideoTimecodePadding}"
                 Background="Transparent">
         <TextBlock x:Name="PlaylistVideoScaleToastText"
-                   Height="{x:Static ui:DesignMetrics.PlaylistVideoTimecodeLineHeight}"
                    FontFamily="Consolas"
-                   FontSize="{x:Static ui:DesignMetrics.PlaylistVideoTimecodeFontSize}"
+                   FontSize="{x:Static ui:DesignMetrics.PlaylistPdfPageNumberFontSize}"
                    FontWeight="Normal"
                    TextAlignment="Center"
                    TextWrapping="NoWrap"
