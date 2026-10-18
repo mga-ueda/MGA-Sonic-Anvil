@@ -3123,10 +3123,8 @@ public partial class MainWindow
             if (IsPlayerScratchContext() && Waveform.CanUndoPlayerScratch)
             {
                 UndoOrRedoPlayerScratch(redo: false);
-                return;
             }
 
-            TryUndoLibraryPlaylistRemove();
             return;
         }
 

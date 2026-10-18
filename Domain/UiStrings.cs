@@ -900,7 +900,6 @@ internal static partial class UiStrings
     public static string LibraryMenuNextTrack => Get("次の曲", "Next Track");
     public static string LibraryMenuRestartTrack => Get("頭から再生", "Restart Track");
     public static string LibraryMenuAutoPlay => Get("追加時に自動再生", "Auto Play on Add");
-    public static string LibraryMenuUndoRemove => Get("クリアを元に戻す", "Undo Clear");
     public static string LibraryMenuRemoveFromFavorites => Get("お気に入りから削除", "Remove from Favorites");
     public static string LibraryMenuClearFromPlaylist => Get("プレイリストからクリア", "Clear from Playlist");
     // アクセスキーは付けない（メニュー外クリック時の誤発火を避ける）。ショートカットは InputGestureText。

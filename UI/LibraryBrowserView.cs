@@ -370,12 +370,6 @@ internal sealed class LibraryBrowserView : UserControl
 
     public event EventHandler? PlaylistRestartRequested;
 
-    public event EventHandler? PlaylistUndoRemoveRequested;
-
-    public bool CanUndoPlaylistRemove { get; private set; }
-
-    public void SetPlaylistRemoveUndoAvailable(bool available) => CanUndoPlaylistRemove = available;
-
     /// <summary>Ctrl+F5 と同じ索引の再構築。</summary>
     public event EventHandler? LibraryCatalogRebuildRequested;
 
@@ -10557,12 +10551,6 @@ internal sealed class LibraryBrowserView : UserControl
             IsCheckable = true,
         };
         ArmMenuItemClick(autoPlay, () => AutoPlayEnabled = autoPlay.IsChecked == true);
-        var undoRemove = new MenuItem
-        {
-            Header = UiStrings.LibraryMenuUndoRemove,
-            InputGestureText = "Ctrl+Z",
-        };
-        ArmMenuItemClick(undoRemove, () => PlaylistUndoRemoveRequested?.Invoke(this, EventArgs.Empty));
         var clear = new MenuItem { Header = UiStrings.LibraryMenuClearFromPlaylist };
         ArmMenuItemClick(clear, () => ClearPlaylistRequested?.Invoke(this, EventArgs.Empty));
         AddCopyAndExplorerMenuItems(
@@ -10596,7 +10584,6 @@ internal sealed class LibraryBrowserView : UserControl
             rename,
             delete,
             new Separator(),
-            undoRemove,
             clear);
         var other = Submenu(
             UiStrings.LibraryMenuCatOther,
@@ -10628,7 +10615,6 @@ internal sealed class LibraryBrowserView : UserControl
             restart.IsEnabled = hasRows;
             autoPlay.IsChecked = AutoPlayEnabled;
             autoPlay.IsEnabled = true;
-            undoRemove.IsEnabled = CanUndoPlaylistRemove;
             clear.IsEnabled = hasSelection;
             copy.IsEnabled = paths.Length > 0;
             cut.IsEnabled = paths.Length > 0;

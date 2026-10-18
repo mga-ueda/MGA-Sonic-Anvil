@@ -176,7 +176,6 @@ public partial class MainWindow : Window
         LibraryBrowser.PlaylistPreviousRequested += (_, _) => TryStepLibraryPlaylist(-1);
         LibraryBrowser.PlaylistNextRequested += (_, _) => TryStepLibraryPlaylist(1);
         LibraryBrowser.PlaylistRestartRequested += (_, _) => RestartLibraryTrack();
-        LibraryBrowser.PlaylistUndoRemoveRequested += (_, _) => TryUndoLibraryPlaylistRemove();
         LibraryBrowser.LibraryCatalogRebuildRequested += (_, _) => RebuildLibraryCatalog();
         LibraryBrowser.LibraryPasteRequested += (_, pane) => PasteLibraryFromMenu(pane);
         LibraryBrowser.LibraryRenameRequested += (_, pane) => RenameLibraryFromMenu(pane);

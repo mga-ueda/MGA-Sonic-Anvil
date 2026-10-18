@@ -40,7 +40,6 @@ public partial class MainWindow
     private bool _libraryPlayerHostActive;
     /// <summary>F10 突入前のタイル配置。退出後に付け直す。</summary>
     private WaveformTileArrange _librarySuspendedTileArrange;
-    private readonly LibraryPlaylistRemoveUndo _libraryPlaylistUndo = new();
     private bool _libraryWaapiSuspended;
     private bool _restoreWaapiAfterLibrary;
     private CancellationTokenSource? _videoProxyCts;
@@ -625,8 +624,6 @@ public partial class MainWindow
             _libraryPlayOnTrackKeyRelease = false;
             _libraryStopAfterTrack = false;
             _libraryHoldJacketWash = false;
-            _libraryPlaylistUndo.Clear();
-            SyncPlaylistRemoveUndoAvailability();
             _ = LeaveLibraryMaximizeAsync();
             if (_videoLaunchPlacement)
             {
@@ -2715,31 +2712,19 @@ public partial class MainWindow
         }
 
         var dropSet = new HashSet<DocumentSession>(selected);
-        var removedSessions = new DocumentSession[selected.Length];
-        var removedIndices = new int[selected.Length];
-        var removedCount = 0;
+        var willRemove = false;
         foreach (var session in selected)
         {
-            var index = _sessions.IndexOf(session);
-            if (index < 0)
+            if (_sessions.Contains(session))
             {
-                continue;
+                willRemove = true;
+                break;
             }
-
-            removedSessions[removedCount] = session;
-            removedIndices[removedCount] = index;
-            removedCount++;
         }
 
-        if (removedCount == 0)
+        if (!willRemove)
         {
             return;
-        }
-
-        if (removedCount != removedSessions.Length)
-        {
-            Array.Resize(ref removedSessions, removedCount);
-            Array.Resize(ref removedIndices, removedCount);
         }
 
         var next = NextLibrarySessionAfter(dropSet);
@@ -2763,8 +2748,6 @@ public partial class MainWindow
             }
         }
 
-        _libraryPlaylistUndo.Push(removedSessions, removedIndices);
-        SyncPlaylistRemoveUndoAvailability();
         _sessions.RemoveAll(dropSet.Contains);
         DetachTabItems(dropSet);
 
@@ -2872,34 +2855,6 @@ public partial class MainWindow
             }
         }
     }
-
-    /// <summary>プレイヤー中の Ctrl+Z。Delete で外した曲を戻す。</summary>
-    private bool TryUndoLibraryPlaylistRemove()
-    {
-        if (!IsLibraryMaximized || !_libraryPlaylistUndo.TryPop(out var sessions, out var indices))
-        {
-            return false;
-        }
-
-        SyncPlaylistRemoveUndoAvailability();
-
-        LibraryPlaylistRemoveUndo.RestoreInto(_sessions, sessions, indices);
-        LibraryBrowser.SetSessions(_sessions, sessions[0], sessions);
-        RefreshStatus();
-        SyncPlayerMeterFade();
-        if (IsPlaybackActive())
-        {
-            LibraryBrowser.RequestListFocus();
-            return true;
-        }
-
-        PreviewLibrarySession(sessions[0]);
-        LibraryBrowser.RequestListFocus();
-        return true;
-    }
-
-    private void SyncPlaylistRemoveUndoAvailability() =>
-        LibraryBrowser.SetPlaylistRemoveUndoAvailable(_libraryPlaylistUndo.CanUndo);
 
     private DocumentSession? NextLibrarySessionAfter(HashSet<DocumentSession> dropSet)
     {

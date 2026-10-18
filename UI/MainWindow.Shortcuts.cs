@@ -1460,7 +1460,7 @@ public partial class MainWindow
                 return BeginOrContinueMarkerNudge(key == Key.Left ? -1 : 1);
             }
 
-            // 捨てキュー Undo／Redo（打てる状態のとき）。無ければプレイリスト除外の Undo。
+            // 捨てキューの Undo／Redo。戻せない Ctrl+Z は何もしない（エディタの履歴へ落とさない）。
             if (key == Key.Z && modifiers == (ModifierKeys.Control | ModifierKeys.Shift)
                 || key == Key.Y && modifiers == ModifierKeys.Control)
             {
@@ -1477,10 +1477,8 @@ public partial class MainWindow
                 if (IsPlayerScratchContext() && Waveform.CanUndoPlayerScratch)
                 {
                     UndoOrRedoPlayerScratch(redo: false);
-                    return true;
                 }
 
-                TryUndoLibraryPlaylistRemove();
                 return true;
             }
 

@@ -1038,7 +1038,8 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Equal("R", ((MenuItem)listPitch.Items[2]).InputGestureText);
             Assert.Equal("Alt+P", ((MenuItem)listPitch.Items[3]).InputGestureText);
             Assert.Equal("Ctrl+C", ((MenuItem)listEdit.Items[0]).InputGestureText);
-            Assert.Equal("Ctrl+Z", ((MenuItem)listEdit.Items[6]).InputGestureText);
+            Assert.Equal(UiStrings.LibraryMenuClearFromPlaylist, (string)((MenuItem)listEdit.Items[6]).Header);
+            Assert.True(string.IsNullOrEmpty(((MenuItem)listEdit.Items[6]).InputGestureText));
             Assert.Equal("V", ((MenuItem)listOther.Items[0]).InputGestureText);
             Assert.Equal("Ctrl+Shift+M", ((MenuItem)listOther.Items[1]).InputGestureText);
             Assert.True(view.HasOpenContextMenu);

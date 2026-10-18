@@ -172,7 +172,7 @@ public partial class MainWindow
                 || Waveform.HasSelectedTimelineItems,
             CanCopySelectionTimes = SelectionClipboardText.CanCopy(CaptureSelectionClipboardItems()),
             CanUndo = IsLibraryMaximized
-                ? ((canScratch && Waveform.CanUndoPlayerScratch) || _libraryPlaylistUndo.CanUndo)
+                ? canScratch && Waveform.CanUndoPlayerScratch
                 : hasDoc && _history.CanUndo,
             CanRedo = IsLibraryMaximized
                 ? canScratch && Waveform.CanRedoPlayerScratch
