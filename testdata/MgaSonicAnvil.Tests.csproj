@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <UseWPF>true</UseWPF>
+    <RootNamespace>MgaSonicAnvil.Tests</RootNamespace>
+    <AssemblyName>MgaSonicAnvil.Tests</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
