@@ -221,11 +221,12 @@
               <li>WAVE / AIFF-only → WAVE set; MP3 / M4A-only → MP3 set; video-only → video set; mixed lists use the union until customized while mixed.</li>
               <li>While mixed, header drag / right-click show-hide is remembered only for the mixed layout.</li>
               <li>Changing a WAVE / MP3 / video setting clears mixed memory and returns to the union. Each set can be reset.</li>
-              <li>WAVE defaults: file / rate / bits / Ch / time / date / parent folder / loudness / waveform (Loudness is Integrated LKFS for WAVE / AIFF only; not for MP3 / M4A / video. Blank until measured or cached. Toggle under WAVE column checks)</li>
+              <li>WAVE defaults: file / rate / bits / Ch / time / date / parent folder / loudness / waveform (Loudness is Integrated LKFS only, for WAVE / AIFF; the other four readings are not in this column. Not shown for MP3 / M4A / video. Blank until measured or cached. The number uses the same colors as the meter: blue through the target, orange for the next 3 LU, red above that. Toggle under WAVE column checks)</li>
               <li>MP3 defaults: file / title / album / artist / composer / time / track / disc / year / genre / date / comment / parent folder (waveform off)</li>
               <li>Video defaults: file / resolution / frame rate / bit rate / video codec / rate / bits / Ch / audio codec / time / date / parent folder / waveform</li>
               <li>Blank cells (by design): bit depth is blank for MP3 / M4A; bit rate is blank for WAVE / AIFF; video bit depth only when the audio is uncompressed PCM.</li>
               <li>Empty columns hide until a value appears. Jacket only when art exists. Drag headers to reorder; right-click to toggle.</li>
+              <li>A header click’s sort (which column, and ascending or descending) is kept in the settings file. With nothing saved, the list sorts by album name, ascending. If the sorted column is hidden, the sort turns off and that is kept too.</li>
             </ul>
           </li>
           <li><strong>Waveform width</strong> — choose separately for WAVE and MP3 at the bottom of each column checklist. S (short) / M (medium) / L (long). WAVE and MP3 both default to L. M is 2× S, L is 3× S. WAVE / AIFF-only lists use the WAVE width, MP3 / M4A-only lists use the MP3 width, and mixed lists use the wider of the two. Reset to defaults also restores that side's width. Waveforms fill in after the list paints, as rough bars.</li>
@@ -415,7 +416,7 @@
         </ul>
         <h4>Library</h4>
         <ul>
-          <li>Opened files are listed without loading every waveform at once. Names, times, and similar info are read when files are added. Playlist columns are chosen separately for WAVE, MP3, and video in Settings → Shown. Empty columns hide automatically; waveform width is on the same Shown tab.</li>
+          <li>Opened files are listed without loading every waveform at once. Names, times, and similar info are read when files are added. Playlist columns are chosen separately for WAVE, MP3, and video in Settings → Shown, and the header order is remembered. A header click’s sort (column and direction) is remembered in the same settings; with nothing saved, the list sorts by album name, ascending. Empty columns hide automatically; waveform width is on the same Shown tab.</li>
           <li>The tree on the left starts at Music and remembers the last folder, which folders were expanded, and the split with Favorites. Missing tree roots and missing Favorites entries show in red. Drop folders from Explorer onto the tree to register roots; drop files or folders onto Favorites to register them. Reorder roots with <kbd>Alt</kbd>+↑ / ↓, the tree’s right-click <strong>Move Root Up / Down</strong>, or by dragging a root within the tree.</li>
           <li>Splitters and scrollbars appear when the pointer nears them, then fade out after about 3 s of no movement. Selecting a folder does not add it to the list.</li>
           <li><kbd>*</kbd> (<kbd>Shift</kbd>+<kbd>8</kbd>) expands all under the selection. <kbd>/</kbd> collapses it. The tree’s right-click <strong>Expand All Subfolders</strong> and <strong>Collapse Subfolders</strong> do the same.</li>
@@ -625,8 +626,9 @@
         <p>Sits left of the spectrum. Short Term / Integrated / Momentary Max, Loudness Range, True Peak. Target LKFS is in Settings. Blue = at or below the target, orange = up to +3 LU above it, red = above that.</p>
         <ul>
           <li>While playing, values are live from the output and the numbers are colored.</li>
-          <li>While stopped, they are an offline read of the whole file. Short Term is the file maximum. The color is the value fill and the text stays the default color. Edits such as volume re-measure.</li>
-          <li>Left of loudness is the edit-history list. As many rows as fit; older rows clip. Click opens edit history with <kbd>U</kbd>. The strip itself does not select.</li>
+          <li>While stopped in the editor, all five readings are an offline measure of the whole file. Short Term is the file maximum. The color is the value fill and the text stays the default color. Edits such as volume re-measure.</li>
+          <li>While stopped in the player, one selected file does not show these five readings. Two or more selected files show the average of each file’s five readings (Short Term is that file’s maximum; the unit says Avg).</li>
+          <li>In the editor, the edit-history list sits left of loudness. As many rows as fit; older rows clip. Click opens edit history with <kbd>U</kbd>. The strip itself does not select. The player does not show this list.</li>
         </ul>
         <h4>Spectrum and channel color</h4>
         <ul>
