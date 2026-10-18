@@ -12,9 +12,6 @@ internal sealed class FrostedPlate : System.Windows.Controls.Grid
     /// <summary>明るい背面でも文字が残るよう、BusyGlass より濃いテーマ色のヴェール。</summary>
     internal const byte TintAlpha = 0xB0;
 
-    /// <summary>動画メーター背後など、背面の色を残す薄いヴェール。</summary>
-    internal const byte GlassScrimAlpha = 0x48;
-
     /// <summary>背面の文字が読めなくなる強さ。トーストはすべてこの半径を共有する。</summary>
     internal const double BlurRadiusDip = 56;
 
