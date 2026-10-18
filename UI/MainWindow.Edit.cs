@@ -1879,7 +1879,30 @@ public partial class MainWindow
         _historyClipboardIsLatest = false;
     }
 
+    private static void RestoreKeyboardFocus(UIElement? focus)
+    {
+        if (focus is null || !focus.IsVisible || focus.IsKeyboardFocusWithin)
+        {
+            return;
+        }
+
+        focus.Focus();
+    }
+
     private void ApplyCut()
+    {
+        var focus = Keyboard.FocusedElement as UIElement;
+        try
+        {
+            ApplyCutCore();
+        }
+        finally
+        {
+            RestoreKeyboardFocus(focus);
+        }
+    }
+
+    private void ApplyCutCore()
     {
         if (_document is null)
         {
@@ -1913,6 +1936,19 @@ public partial class MainWindow
     }
 
     private void ApplyPaste()
+    {
+        var focus = Keyboard.FocusedElement as UIElement;
+        try
+        {
+            ApplyPasteCore();
+        }
+        finally
+        {
+            RestoreKeyboardFocus(focus);
+        }
+    }
+
+    private void ApplyPasteCore()
     {
         if (_document is null)
         {

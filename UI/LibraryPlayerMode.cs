@@ -587,8 +587,8 @@ internal static class LibraryPlayerMode
         }
 
         // 削除・バックスペース・切り取り／貼り付け・複製などファイル操作系は止める。Ctrl+C はコピーとして通す。
-        // Ctrl+Delete は捨てマーカー削除（エディタ同様）なのでツリーでは握らない。
-        // F2 はプレイヤーでお気に入りフォーカスに使うので、ここでは止めない。
+        // ツリーとプレイリストの Ctrl+Delete、および F2 は、ウィンドウ側で実ファイルの削除／名前変更にする。
+        // 波形フォーカスの Ctrl+Delete は捨てマーカーのままなので、ここでは握らない。
         if (key == Key.Delete && modifiers == ModifierKeys.Control)
         {
             return false;

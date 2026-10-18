@@ -26,25 +26,30 @@ internal sealed class LibraryCopyDropDataObject : WpfIDataObject, ComIDataObject
 
     private readonly DataObject _data;
     private readonly ushort _preferredFormat;
+    private readonly int _dropEffect;
 
     private ComIDataObject Inner => _data;
 
-    public LibraryCopyDropDataObject(DataObject inner)
+    public LibraryCopyDropDataObject(DataObject inner, int dropEffect)
     {
         ArgumentNullException.ThrowIfNull(inner);
         _data = inner;
+        _dropEffect = dropEffect;
         _preferredFormat = Native.RegisterClipboardFormat(LibraryShellFiles.PreferredDropEffectFormat);
     }
 
-    public static WpfIDataObject? FromPaths(IEnumerable<string?> paths)
+    public static WpfIDataObject? FromPaths(IEnumerable<string?> paths) =>
+        FromPaths(paths, LibraryShellFiles.DropEffectCopy, origin: null);
+
+    public static WpfIDataObject? FromPaths(IEnumerable<string?> paths, int dropEffect, string? origin)
     {
-        var data = LibraryShellFiles.CreateCopyData(paths);
-        return data is null ? null : new LibraryCopyDropDataObject(data);
+        var data = LibraryShellFiles.CreateTransferData(paths, dropEffect, origin);
+        return data is null ? null : new LibraryCopyDropDataObject(data, dropEffect);
     }
 
     object WpfIDataObject.GetData(string format, bool autoConvert) =>
         IsPreferredName(format)
-            ? LibraryShellFiles.CreateCopyEffectStream()
+            ? LibraryShellFiles.CreateEffectStream(_dropEffect)
             : _data.GetData(format, autoConvert);
 
     object WpfIDataObject.GetData(string format) =>
@@ -223,7 +228,7 @@ internal sealed class LibraryCopyDropDataObject : WpfIDataObject, ComIDataObject
             ptd = IntPtr.Zero,
         };
 
-    private static STGMEDIUM AllocPreferred()
+    private STGMEDIUM AllocPreferred()
     {
         var handle = Native.GlobalAlloc(GmemMoveable | GmemZeroInit, (UIntPtr)4);
         if (handle == IntPtr.Zero)
@@ -240,7 +245,7 @@ internal sealed class LibraryCopyDropDataObject : WpfIDataObject, ComIDataObject
         };
     }
 
-    private static void WritePreferred(IntPtr handle)
+    private void WritePreferred(IntPtr handle)
     {
         var ptr = Native.GlobalLock(handle);
         if (ptr == IntPtr.Zero)
@@ -250,7 +255,7 @@ internal sealed class LibraryCopyDropDataObject : WpfIDataObject, ComIDataObject
 
         try
         {
-            Marshal.WriteInt32(ptr, LibraryShellFiles.DropEffectCopy);
+            Marshal.WriteInt32(ptr, _dropEffect);
         }
         finally
         {

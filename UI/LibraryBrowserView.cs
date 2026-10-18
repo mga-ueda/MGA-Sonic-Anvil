@@ -130,6 +130,7 @@ internal sealed class LibraryBrowserView : UserControl
     private FrameworkElement? _explorerDropHost;
     private readonly ObservableCollection<LibraryFavoriteRow> _favorites = [];
     private readonly HashSet<TreeViewItem> _treeMultiSelected = [];
+    private readonly HashSet<string> _cutPaths = new(StringComparer.OrdinalIgnoreCase);
     private TreeViewItem? _treeSelectionAnchor;
     private string[] _explorerRoots = LibraryExplorerPaths.ResolveRoots(null);
     private readonly HashSet<string> _explorerExpanded = new(StringComparer.OrdinalIgnoreCase);
@@ -165,6 +166,19 @@ internal sealed class LibraryBrowserView : UserControl
     /// <summary>黄背景と ↑↓ 渡り歩き用。Esc まで残す。</summary>
     private string _explorerTypeaheadWalk = "";
     private string _explorerTypeaheadIgnoreText = "";
+    private readonly Grid _transferToast = new()
+    {
+        IsHitTestVisible = false,
+        Opacity = 0,
+        Visibility = Visibility.Collapsed,
+        HorizontalAlignment = HorizontalAlignment.Stretch,
+        VerticalAlignment = VerticalAlignment.Stretch,
+    };
+
+    private readonly TextBlock _transferToastText = new();
+    private readonly FrostedPlate _transferToastPlate = new();
+    private DispatcherTimer? _transferToastTimer;
+
     private readonly Grid _explorerTypeaheadToast = new()
     {
         Opacity = 0,
@@ -246,6 +260,9 @@ internal sealed class LibraryBrowserView : UserControl
     private bool _restoreListFocus;
     private int _restoreListFocusGeneration;
     private LibraryFileColumn? _sortColumn = LibraryFileColumn.Album;
+
+    /// <summary>列見出しのソートが付いているときだけ true。</summary>
+    public bool PlaylistSortActive => _sortColumn is not null;
     private LibrarySortDirection _sortDirection = LibrarySortDirection.Ascending;
     private LibraryFileGroup _group = LibraryFileGroup.Folder;
     private IReadOnlyList<LibraryFileRow> _rows = [];
@@ -1369,6 +1386,67 @@ internal sealed class LibraryBrowserView : UserControl
             DispatcherPriority.Input);
     }
 
+    /// <summary>
+    /// 画面上で removed のいちばん上の行の、1行上。その行も消えるならさらに上。無ければ null。
+    /// </summary>
+    public string? ExplorerRowAbove(IReadOnlyList<string> removed)
+    {
+        if (removed.Count == 0)
+        {
+            return null;
+        }
+
+        var drop = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in removed)
+        {
+            drop.Add(NormalizeFolderPath(path));
+        }
+
+        var visible = new List<string>();
+        CollectVisibleExplorerPaths(_folderTree.Items, visible);
+        var top = -1;
+        for (var i = 0; i < visible.Count; i++)
+        {
+            if (drop.Contains(visible[i]))
+            {
+                top = i;
+                break;
+            }
+        }
+
+        if (top <= 0)
+        {
+            return null;
+        }
+
+        for (var i = top - 1; i >= 0; i--)
+        {
+            if (!drop.Contains(visible[i]))
+            {
+                return visible[i];
+            }
+        }
+
+        return null;
+    }
+
+    private static void CollectVisibleExplorerPaths(ItemCollection items, List<string> dest)
+    {
+        foreach (var raw in items)
+        {
+            if (raw is not TreeViewItem item || item.Tag is not string path)
+            {
+                continue;
+            }
+
+            dest.Add(NormalizeFolderPath(path));
+            if (item.IsExpanded && item.Items.Count > 0)
+            {
+                CollectVisibleExplorerPaths(item.Items, dest);
+            }
+        }
+    }
+
     public void FocusExplorer()
     {
         CancelPlaylistFocusRestore();
@@ -1393,6 +1471,23 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         _folderTree.Focus();
+    }
+
+    /// <summary>切り取り・貼り付けのあと、操作を始めたペインへフォーカスを戻す。</summary>
+    public void FocusPane(LibraryPane pane)
+    {
+        switch (pane)
+        {
+            case LibraryPane.Explorer:
+                FocusExplorer();
+                break;
+            case LibraryPane.Favorites:
+                FocusFavorites();
+                break;
+            default:
+                FocusList();
+                break;
+        }
     }
 
     internal string ExplorerTypeaheadQuery => _explorerTypeahead;
@@ -1615,7 +1710,7 @@ internal sealed class LibraryBrowserView : UserControl
         return true;
     }
 
-    private static void RestoreExplorerTypeaheadHeader(TreeViewItem item)
+    private void RestoreExplorerTypeaheadHeader(TreeViewItem item)
     {
         if (item.Tag is not string path)
         {
@@ -1853,7 +1948,15 @@ internal sealed class LibraryBrowserView : UserControl
     internal ContextMenu? ColumnHeaderContextMenuForTests => _columnHeaderMenu;
 
     /// <summary>選択中の実ファイル／フォルダをクリップボードへコピー（移動ではない）。</summary>
-    public void CopySelected() => CopyPaths(SelectedCopyPaths());
+    public void CopySelected()
+    {
+        if (ActivePane == LibraryPane.Favorites)
+        {
+            return;
+        }
+
+        CopyPaths(SelectedCopyPaths());
+    }
 
     /// <summary>選択中の場所をエクスプローラーで開く。</summary>
     public void ShowSelectedInExplorer() =>
@@ -1870,7 +1973,297 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        SystemClipboard.TrySetFileDropCopy(paths, Window.GetWindow(this));
+        ClearCutGhost();
+        var origin = ActivePane == LibraryPane.Explorer
+            ? LibraryShellFiles.OriginTree
+            : LibraryShellFiles.OriginPlaylist;
+        SystemClipboard.TrySetLibraryTransfer(paths, move: false, origin, Window.GetWindow(this));
+        ShowTransferToast("Copy", paths);
+    }
+
+    public void CutSelected()
+    {
+        if (ActivePane == LibraryPane.Favorites)
+        {
+            return;
+        }
+
+        var paths = SelectedCopyPaths();
+        if (paths.Length == 0)
+        {
+            return;
+        }
+
+        var pane = ActivePane;
+        var origin = pane == LibraryPane.Explorer
+            ? LibraryShellFiles.OriginTree
+            : LibraryShellFiles.OriginPlaylist;
+        MarkCutGhost(paths);
+        FocusPane(pane);
+        SystemClipboard.TrySetLibraryTransfer(
+            paths,
+            move: true,
+            origin,
+            Window.GetWindow(this),
+            () => FocusPane(pane));
+        ShowTransferToast("Cut", paths);
+    }
+
+    /// <summary>10件までは表示名を1行ずつ、11件以上は件数だけ。</summary>
+    public void ShowTransferToast(string action, IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0)
+        {
+            return;
+        }
+
+        var detail = paths.Count <= 10
+            ? string.Join(Environment.NewLine, paths.Select(TransferDisplayName))
+            : $"{paths.Count} items";
+        _transferToastText.Text = paths.Count is > 1 and <= 10
+            ? action + Environment.NewLine + detail
+            : $"{action}: {detail}";
+        _transferToast.Visibility = Visibility.Visible;
+        AlignTransferToastToWindowCenter();
+        LibraryPlayerMode.FadeElementOpacity(_transferToast, to: 1, instant: true, hitTestVisible: false);
+        Dispatcher.BeginInvoke(AlignTransferToastToWindowCenter, DispatcherPriority.Loaded);
+        _transferToastTimer ??= new DispatcherTimer { Interval = LibraryExplorerTypeahead.ToastIdleClear };
+        _transferToastTimer.Stop();
+        _transferToastTimer.Tick -= OnTransferToastTick;
+        _transferToastTimer.Tick += OnTransferToastTick;
+        _transferToastTimer.Start();
+    }
+
+    private void OnTransferToastTick(object? sender, EventArgs e)
+    {
+        _transferToastTimer?.Stop();
+        LibraryPlayerMode.FadeElementOpacity(
+            _transferToast,
+            to: 0,
+            instant: false,
+            hitTestVisible: false,
+            seconds: LibraryPlayerMode.ChromeFadeSeconds);
+    }
+
+    private void BuildTransferToast()
+    {
+        _transferToastText.FontFamily = new FontFamily("Consolas");
+        _transferToastText.FontSize = DesignMetrics.From96(22);
+        _transferToastText.FontWeight = FontWeights.Normal;
+        _transferToastText.TextWrapping = TextWrapping.NoWrap;
+        _transferToastText.TextAlignment = TextAlignment.Center;
+        _transferToastText.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
+        _transferToastPlate.HorizontalAlignment = HorizontalAlignment.Center;
+        _transferToastPlate.VerticalAlignment = VerticalAlignment.Center;
+        _transferToastPlate.Margin = new Thickness(16);
+        _transferToastPlate.Source = _root;
+        _transferToastPlate.CornerRadius = DesignMetrics.ControlCorner;
+        _transferToastPlate.Children.Add(new Border
+        {
+            Padding = DesignMetrics.PlaylistVideoTimecodePadding,
+            Background = Brushes.Transparent,
+            Child = _transferToastText,
+        });
+        _transferToast.Children.Add(_transferToastPlate);
+        SizeChanged += (_, _) =>
+        {
+            if (_transferToast.Visibility == Visibility.Visible)
+            {
+                AlignTransferToastToWindowCenter();
+            }
+        };
+        Grid.SetColumnSpan(_transferToast, _root.ColumnDefinitions.Count);
+        Panel.SetZIndex(_transferToast, 40);
+        _root.Children.Add(_transferToast);
+    }
+
+    /// <summary>
+    /// トーストの親はライブラリ領域なので、その中央はウィンドウ中央より上になる。
+    /// ウィンドウ内容の縦中央へずらす。
+    /// </summary>
+    private void AlignTransferToastToWindowCenter()
+    {
+        var window = Window.GetWindow(this);
+        if (window?.Content is not FrameworkElement root
+            || _transferToast.ActualHeight <= 0
+            || root.ActualHeight <= 0)
+        {
+            _transferToastPlate.RenderTransform = Transform.Identity;
+            return;
+        }
+
+        var origin = _transferToast.TranslatePoint(new Point(0, 0), root);
+        var dy = root.ActualHeight / 2 - (origin.Y + _transferToast.ActualHeight / 2);
+        _transferToastPlate.RenderTransform = Math.Abs(dy) < 0.5
+            ? Transform.Identity
+            : new TranslateTransform(0, dy);
+    }
+
+    private static string TransferDisplayName(string path)
+    {
+        var trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var name = Path.GetFileName(trimmed);
+        return string.IsNullOrEmpty(name) ? trimmed : name;
+    }
+
+    public bool HasCutGhost => _cutPaths.Count > 0;
+
+    /// <summary>切り取り中のパスを暗くする。前の切り取り表示は消す。</summary>
+    public void MarkCutGhost(IReadOnlyList<string> paths)
+    {
+        _cutPaths.Clear();
+        foreach (var path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            try
+            {
+                _cutPaths.Add(LibraryFileTransfer.NormalizePrefix(path));
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+            }
+        }
+
+        RefreshCutChrome();
+    }
+
+    /// <summary>切り取りの暗転を消す。表示が変わったら true。</summary>
+    public bool ClearCutGhost()
+    {
+        if (_cutPaths.Count == 0)
+        {
+            return false;
+        }
+
+        _cutPaths.Clear();
+        RefreshCutChrome();
+        return true;
+    }
+
+    private bool IsCutPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || _cutPaths.Count == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            return _cutPaths.Contains(LibraryFileTransfer.NormalizePrefix(path));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
+    }
+
+    private void RefreshCutChrome()
+    {
+        ApplyCutChromeToTree(_folderTree.Items);
+        foreach (var row in _rows)
+        {
+            row.CutPending = row.Tag is DocumentSession session && IsCutPath(session.Document.SourcePath);
+        }
+    }
+
+    private void ApplyCutChromeToTree(ItemCollection items)
+    {
+        foreach (var raw in items)
+        {
+            if (raw is not TreeViewItem item)
+            {
+                continue;
+            }
+
+            if (item.Tag is string path)
+            {
+                ApplyFolderHeader(item, FolderHeaderText(item), LibraryExplorerPaths.IsMissing(path));
+            }
+
+            if (item.Items.Count > 0)
+            {
+                ApplyCutChromeToTree(item.Items);
+            }
+        }
+    }
+
+    public void RemapFilesystemPaths(string oldPrefix, string newPrefix, bool refreshTree, string? selectFolder)
+    {
+        var favorites = FavoritePaths;
+        var nextFavorites = new string[favorites.Length];
+        var favoritesChanged = false;
+        for (var i = 0; i < favorites.Length; i++)
+        {
+            if (LibraryFileTransfer.TryMapPath(favorites[i], oldPrefix, newPrefix, out var mapped)
+                && !string.Equals(mapped, favorites[i], StringComparison.Ordinal))
+            {
+                nextFavorites[i] = mapped;
+                favoritesChanged = true;
+            }
+            else
+            {
+                nextFavorites[i] = favorites[i];
+            }
+        }
+
+        if (favoritesChanged)
+        {
+            SetFavorites(nextFavorites);
+            FavoritesChanged?.Invoke(this, FavoritePaths);
+        }
+
+        var expanded = _explorerExpanded.ToArray();
+        _explorerExpanded.Clear();
+        foreach (var path in expanded)
+        {
+            _explorerExpanded.Add(
+                LibraryFileTransfer.TryMapPath(path, oldPrefix, newPrefix, out var mapped)
+                    ? NormalizeFolderPath(mapped)
+                    : path);
+        }
+
+        var rootsChanged = false;
+        var nextRoots = new string[_explorerRoots.Length];
+        for (var i = 0; i < _explorerRoots.Length; i++)
+        {
+            if (LibraryFileTransfer.TryMapPath(_explorerRoots[i], oldPrefix, newPrefix, out var mapped)
+                && !string.Equals(mapped, _explorerRoots[i], StringComparison.Ordinal))
+            {
+                nextRoots[i] = mapped;
+                rootsChanged = true;
+            }
+            else
+            {
+                nextRoots[i] = _explorerRoots[i];
+            }
+        }
+
+        if (rootsChanged)
+        {
+            SetExplorerRoots(nextRoots);
+            ExplorerRootsChanged?.Invoke(this, _explorerRoots);
+        }
+        else if (refreshTree)
+        {
+            RefreshExplorer();
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectFolder))
+        {
+            RevealFolder(selectFolder);
+        }
+    }
+
+    public void FocusExplorerFolder(string path)
+    {
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            RevealFolder(path);
+        }
     }
 
     private string[] CopyPathsFor(LibraryPane pane) =>
@@ -2529,7 +2922,7 @@ internal sealed class LibraryBrowserView : UserControl
         AppendSessionCore(session, select, refreshColumns: true);
 
     /// <summary>
-    /// 複数曲を一度に挿入する。列再計算は最後の1回だけ。
+    /// 複数曲を一度に挿入する。列があるときはその位置、無いときは末尾。列再計算は最後の1回だけ。
     /// </summary>
     public void AppendSessions(IReadOnlyList<DocumentSession> sessions, DocumentSession? select)
     {
@@ -2546,7 +2939,93 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
-    private void AppendSessionCore(DocumentSession session, bool select, bool refreshColumns)
+    /// <summary>
+    /// 現行の列ソート位置へ1件入れる。ソート見出しが無いときは末尾。入れた行の番号を返す。
+    /// </summary>
+    public int InsertSessionByCurrentSort(DocumentSession session, bool select) =>
+        AppendSessionCore(session, select, refreshColumns: false);
+
+    /// <summary>表示から外す。内部の曲リストは触らない。</summary>
+    public void RemovePlaylistSession(DocumentSession session)
+    {
+        var rowIndex = -1;
+        for (var i = 0; i < _rows.Count; i++)
+        {
+            if (ReferenceEquals(_rows[i].Tag, session))
+            {
+                rowIndex = i;
+                break;
+            }
+        }
+
+        if (rowIndex < 0)
+        {
+            return;
+        }
+
+        var nextRows = new LibraryFileRow[_rows.Count - 1];
+        for (var i = 0; i < rowIndex; i++)
+        {
+            nextRows[i] = _rows[i];
+        }
+
+        for (var i = rowIndex + 1; i < _rows.Count; i++)
+        {
+            nextRows[i - 1] = _rows[i];
+        }
+
+        BeginRowSync();
+        try
+        {
+            _rows = nextRows;
+            for (var i = _items.Count - 1; i >= 0; i--)
+            {
+                if (ReferenceEquals(_items[i].Tag, session))
+                {
+                    _items.RemoveAt(i);
+                }
+            }
+        }
+        finally
+        {
+            EndRowSync();
+        }
+    }
+
+    /// <summary>
+    /// すでに載っている曲を、現行ソートの位置へ入れ直す。見出しが無いときは末尾。
+    /// 返る番号は、曲を全部外したあとに入れた順の行番号。
+    /// </summary>
+    public int[] RepositionByCurrentSort(IReadOnlyList<DocumentSession> sessions)
+    {
+        if (sessions.Count == 0)
+        {
+            return [];
+        }
+
+        var selected = SelectedSessions;
+        var active = SelectedSession;
+        foreach (var session in sessions)
+        {
+            RemovePlaylistSession(session);
+        }
+
+        var indices = new int[sessions.Count];
+        for (var i = 0; i < sessions.Count; i++)
+        {
+            indices[i] = AppendSessionCore(sessions[i], select: false, refreshColumns: false);
+        }
+
+        if (selected.Length > 0)
+        {
+            var keep = active is not null && selected.Contains(active) ? active : selected[0];
+            ApplyRowSelectionCore(keep, selected);
+        }
+
+        return indices;
+    }
+
+    private int AppendSessionCore(DocumentSession session, bool select, bool refreshColumns)
     {
         var row = CreateRowWithDefaults(session);
         row.GroupKey = LibraryFileList.GroupLabel(row, _group);
@@ -2586,35 +3065,29 @@ internal sealed class LibraryBrowserView : UserControl
                     EndColumnOrderCommitGate();
                 }
 
-                return;
+                return 0;
             }
 
-            var insertAt = 0;
+            var insertAt = _items.Count;
             if (_sortColumn is { } sortColumn)
             {
+                insertAt = 0;
                 while (insertAt < _items.Count
                     && LibraryFileList.Compare(_items[insertAt], row, sortColumn, _sortDirection) <= 0)
                 {
                     insertAt++;
                 }
             }
-            else
-            {
-                insertAt = _items.Count;
-            }
 
-            var rowIndex = 0;
+            var rowIndex = _rows.Count;
             if (_sortColumn is { } sortForRows)
             {
+                rowIndex = 0;
                 while (rowIndex < _rows.Count
                     && LibraryFileList.Compare(_rows[rowIndex], row, sortForRows, _sortDirection) <= 0)
                 {
                     rowIndex++;
                 }
-            }
-            else
-            {
-                rowIndex = _rows.Count;
             }
 
             BeginColumnOrderCommitGate();
@@ -2659,6 +3132,8 @@ internal sealed class LibraryBrowserView : UserControl
             {
                 EndColumnOrderCommitGate();
             }
+
+            return rowIndex;
         }
         finally
         {
@@ -3612,6 +4087,21 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
+        var text = selected.Length == 1
+            ? UiStrings.ConfirmRemoveFavorite(FavoriteDisplayName(selected[0]))
+            : UiStrings.ConfirmRemoveFavorites(selected.Length);
+        var answer = ConfirmChoiceWindow.Show(
+            Window.GetWindow(this),
+            text,
+            UiStrings.AppName,
+            MessageBoxButton.OKCancel,
+            MessageBoxResult.OK);
+        FocusFavorites();
+        if (answer != MessageBoxResult.OK)
+        {
+            return;
+        }
+
         var drop = new HashSet<string>(selected, StringComparer.OrdinalIgnoreCase);
         for (var i = _favorites.Count - 1; i >= 0; i--)
         {
@@ -3622,6 +4112,13 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         FavoritesChanged?.Invoke(this, FavoritePaths);
+        FocusFavorites();
+    }
+
+    private static string FavoriteDisplayName(string path)
+    {
+        var name = LibraryFavoritePaths.DisplayName(path);
+        return string.IsNullOrEmpty(name) ? path : name;
     }
 
     public void AddFavoritePaths(IEnumerable<string> paths)
@@ -3681,8 +4178,6 @@ internal sealed class LibraryBrowserView : UserControl
         // 上段 0–9 は割合ジャンプ。ツリーのインクリメンタル検索には使わない。
         _folderTree.IsTextSearchEnabled = false;
         BindLibraryCopyCommand(_folderTree, LibraryPane.Explorer);
-        _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Cut, (_, e) => e.Handled = true));
-        _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Paste, (_, e) => e.Handled = true));
         _folderTree.CommandBindings.Add(new CommandBinding(ApplicationCommands.Delete, (_, e) => e.Handled = true));
         BuildExplorerRoots();
         RebuildExplorerContextMenu();
@@ -3899,6 +4394,7 @@ internal sealed class LibraryBrowserView : UserControl
         Grid.SetColumn(splitter, 1);
         Panel.SetZIndex(splitter, 8);
         _root.Children.Add(splitter);
+        BuildTransferToast();
 
         Grid.SetColumnSpan(_glowHost, _root.ColumnDefinitions.Count);
         Grid.SetColumnSpan(_veil, _root.ColumnDefinitions.Count);
@@ -4903,9 +5399,14 @@ internal sealed class LibraryBrowserView : UserControl
     /// 見出し TextBlock に色を載せる。TreeViewItem.Foreground だけだと ContentPresenter 経由で
     /// PrimaryFore に上書きされ、赤字にならないことがある。
     /// </summary>
-    private static void ApplyFolderHeader(TreeViewItem item, string text, bool missing)
+    private void ApplyFolderHeader(TreeViewItem item, string text, bool missing)
     {
-        var brushKey = missing ? MissingRegisteredPathForeBrushKey : "PrimaryForeBrush";
+        var cut = item.Tag is string path && IsCutPath(path);
+        var brushKey = missing
+            ? MissingRegisteredPathForeBrushKey
+            : cut
+                ? "MutedForeBrush"
+                : "PrimaryForeBrush";
         if (item.Header is TextBlock block)
         {
             block.Text = text;
@@ -5583,14 +6084,20 @@ internal sealed class LibraryBrowserView : UserControl
 
         if (key is Key.Up or Key.Down && modifiers == ModifierKeys.None)
         {
-            if (IsExplorerTypeaheadActive)
+            var direction = key == Key.Up ? -1 : 1;
+            if (IsExplorerTypeaheadActive && TryStepExplorerTypeahead(direction))
             {
-                TryStepExplorerTypeahead(key == Key.Up ? -1 : 1);
                 e.Handled = true;
                 return;
             }
 
-            MoveExplorerSelection(key == Key.Up ? -1 : 1, extend: false);
+            // ヒットが無い ↑↓ は Esc と同じく検索を閉じ、続けて通常の行移動をする。
+            if (IsExplorerTypeaheadActive)
+            {
+                ClearExplorerTypeahead();
+            }
+
+            MoveExplorerSelection(direction, extend: false);
             e.Handled = true;
             return;
         }
@@ -7147,6 +7654,15 @@ internal sealed class LibraryBrowserView : UserControl
         text.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(LibraryColumnCellPadX, 0, LibraryColumnCellPadX, 0)));
         text.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
         text.Setters.Add(new Setter(TextBlock.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
+        var cutDim = new DataTrigger
+        {
+            Binding = new Binding(nameof(LibraryFileRow.CutPending)),
+            Value = true,
+        };
+        cutDim.Setters.Add(new Setter(
+            TextBlock.ForegroundProperty,
+            new DynamicResourceExtension("MutedForeBrush")));
+        text.Triggers.Add(cutDim);
         if (right)
         {
             text.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right));
@@ -9320,8 +9836,12 @@ internal sealed class LibraryBrowserView : UserControl
             DefaultAudioFormat.BitsPerSample,
             ChannelLayout.Stereo.Channels);
 
-    private LibraryFileRow CreateRowWithDefaults(DocumentSession session) =>
-        CreateRow(session, _defaultSampleRate, _defaultBitsPerSample, _defaultChannels);
+    private LibraryFileRow CreateRowWithDefaults(DocumentSession session)
+    {
+        var row = CreateRow(session, _defaultSampleRate, _defaultBitsPerSample, _defaultChannels);
+        row.CutPending = IsCutPath(session.Document.SourcePath);
+        return row;
+    }
 
     internal static LibraryFileRow CreateRow(
         DocumentSession session,
@@ -9859,7 +10379,7 @@ internal sealed class LibraryBrowserView : UserControl
             replaceRecursive.IsEnabled = paths.Length > 0;
             appendRecursive.IsEnabled = paths.Length > 0;
             remove.IsEnabled = selected;
-            copy.IsEnabled = paths.Length > 0;
+            copy.IsEnabled = false;
             copyNames.IsEnabled = paths.Length > 0;
             copyPaths.IsEnabled = paths.Length > 0;
             explorer.IsEnabled = paths.Length > 0;
@@ -10142,7 +10662,7 @@ internal sealed class LibraryBrowserView : UserControl
             },
             (_, e) =>
             {
-                e.CanExecute = CopyPathsFor(pane).Length > 0;
+                e.CanExecute = pane != LibraryPane.Favorites && CopyPathsFor(pane).Length > 0;
                 e.Handled = true;
             }));
     }

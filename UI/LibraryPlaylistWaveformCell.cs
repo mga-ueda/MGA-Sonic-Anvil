@@ -130,6 +130,25 @@ internal static class LibraryPlaylistWaveform
         return PeakPyramid.BuildPlaylistBarsFromPath(path, barCount, cancellationToken);
     }
 
+    public static void Retarget(string oldPath, string newPath)
+    {
+        foreach (var count in new[] { 48, 96, 144 })
+        {
+            if (Cache.TryRemove(CacheKey(oldPath, count), out var bars))
+            {
+                Cache[CacheKey(newPath, count)] = bars;
+            }
+        }
+    }
+
+    public static void Forget(string path)
+    {
+        foreach (var count in new[] { 48, 96, 144 })
+        {
+            Cache.TryRemove(CacheKey(path, count), out _);
+        }
+    }
+
     private static string CacheKey(string path, int barCount) => path + "\u0001" + barCount;
 }
 

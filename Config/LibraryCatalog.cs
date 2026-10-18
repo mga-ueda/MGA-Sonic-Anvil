@@ -472,6 +472,287 @@ internal static class LibraryCatalog
         }
     }
 
+    /// <summary>索引にある path とその配下。ルート外でも返す。ディスク走査はしない。</summary>
+    public static string[] ListIndexedFiles(string path)
+    {
+        if (!TryNormalizePath(path, out var full))
+        {
+            return [];
+        }
+
+        full = TrimTrailingSeparators(full);
+        lock (Gate)
+        {
+            if (!TryEnsureOpen_NoLock())
+            {
+                return [];
+            }
+
+            try
+            {
+                return ListPrefix_NoLock(full).ToArray();
+            }
+            catch (SqliteException)
+            {
+                return [];
+            }
+        }
+    }
+
+    /// <summary>ファイルの行を新しいパスへ複製する。元の行が無ければ何もしない。</summary>
+    public static void CloneEntry(string from, string to)
+    {
+        if (!TryNormalizePath(from, out var source) || !TryNormalizePath(to, out var dest))
+        {
+            return;
+        }
+
+        if (!TryStat(dest, out var size, out var mtime))
+        {
+            return;
+        }
+
+        lock (Gate)
+        {
+            if (!TryEnsureOpen_NoLock())
+            {
+                return;
+            }
+
+            try
+            {
+                CloneRow_NoLock(source, dest, size, mtime);
+            }
+            catch (SqliteException)
+            {
+            }
+        }
+    }
+
+    /// <summary>ファイルまたはフォルダ配下の path を新しい場所へ付け替える。</summary>
+    public static void RetargetPrefix(string from, string to)
+    {
+        if (!TryNormalizePath(from, out var source) || !TryNormalizePath(to, out var dest))
+        {
+            return;
+        }
+
+        source = TrimTrailingSeparators(source);
+        dest = TrimTrailingSeparators(dest);
+        lock (Gate)
+        {
+            if (!TryEnsureOpen_NoLock())
+            {
+                return;
+            }
+
+            try
+            {
+                var paths = ListPrefix_NoLock(source);
+                paths.Sort((a, b) => b.Length.CompareTo(a.Length));
+                using var tx = _connection!.BeginTransaction();
+                foreach (var path in paths)
+                {
+                    if (!LibraryFileTransfer.TryMapPath(path, source, dest, out var mapped))
+                    {
+                        continue;
+                    }
+
+                    if (!TryStat(mapped, out var size, out var mtime))
+                    {
+                        size = 0;
+                        mtime = 0;
+                    }
+
+                    RewritePath_NoLock(path, mapped, size, mtime, tx);
+                }
+
+                RewriteRoot_NoLock(source, dest, tx);
+                tx.Commit();
+            }
+            catch (SqliteException)
+            {
+            }
+        }
+    }
+
+    /// <summary>ファイルまたはフォルダ配下の行を消す。</summary>
+    public static void RemovePrefix(string path)
+    {
+        if (!TryNormalizePath(path, out var full))
+        {
+            return;
+        }
+
+        full = TrimTrailingSeparators(full);
+        lock (Gate)
+        {
+            if (!TryEnsureOpen_NoLock())
+            {
+                return;
+            }
+
+            try
+            {
+                using var tx = _connection!.BeginTransaction();
+                using var del = _connection.CreateCommand();
+                del.Transaction = tx;
+                del.CommandText =
+                    """
+                    DELETE FROM files
+                    WHERE path = $root OR path LIKE $prefix ESCAPE '\';
+                    """;
+                del.Parameters.AddWithValue("$root", full);
+                del.Parameters.AddWithValue("$prefix", LikePrefix(full));
+                del.ExecuteNonQuery();
+                using var root = _connection.CreateCommand();
+                root.Transaction = tx;
+                root.CommandText = "DELETE FROM roots WHERE path = $root;";
+                root.Parameters.AddWithValue("$root", full);
+                root.ExecuteNonQuery();
+                tx.Commit();
+            }
+            catch (SqliteException)
+            {
+            }
+        }
+    }
+
+    private static List<string> ListPrefix_NoLock(string full)
+    {
+        var found = new List<string>();
+        using var cmd = _connection!.CreateCommand();
+        cmd.CommandText =
+            """
+            SELECT path FROM files
+            WHERE path = $root OR path LIKE $prefix ESCAPE '\'
+            ORDER BY path COLLATE NOCASE;
+            """;
+        cmd.Parameters.AddWithValue("$root", full);
+        cmd.Parameters.AddWithValue("$prefix", LikePrefix(full));
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            found.Add(reader.GetString(0));
+        }
+
+        return found;
+    }
+
+    private static void RewritePath_NoLock(
+        string from,
+        string to,
+        long size,
+        long mtime,
+        SqliteTransaction tx)
+    {
+        if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(from, to, StringComparison.Ordinal))
+        {
+            var hop = from + "\u0001mga";
+            RewritePath_NoLock(from, hop, size, mtime, tx);
+            from = hop;
+        }
+
+        using var cmd = _connection!.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText =
+            """
+            UPDATE files SET
+                path = $path,
+                size = CASE WHEN $size > 0 THEN $size ELSE size END,
+                mtime_utc = CASE WHEN $mtime > 0 THEN $mtime ELSE mtime_utc END,
+                file_name = $name,
+                parent_dir = $parent
+            WHERE path = $from;
+            """;
+        cmd.Parameters.AddWithValue("$path", to);
+        cmd.Parameters.AddWithValue("$size", size);
+        cmd.Parameters.AddWithValue("$mtime", mtime);
+        cmd.Parameters.AddWithValue("$name", Path.GetFileName(to));
+        cmd.Parameters.AddWithValue("$parent", Path.GetDirectoryName(to) ?? string.Empty);
+        cmd.Parameters.AddWithValue("$from", from);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void RewriteRoot_NoLock(string from, string to, SqliteTransaction tx)
+    {
+        if (string.Equals(from, to, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var cmd = _connection!.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = "UPDATE roots SET path = $to WHERE path = $from;";
+        cmd.Parameters.AddWithValue("$to", to);
+        cmd.Parameters.AddWithValue("$from", from);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void CloneRow_NoLock(string from, string to, long size, long mtime)
+    {
+        using var cmd = _connection!.CreateCommand();
+        cmd.CommandText =
+            """
+            INSERT INTO files(
+                path, size, mtime_utc, file_name, parent_dir, probed,
+                title, artist, album, album_artist, track, track_number,
+                disc, disc_number, year, year_number, genre, comment, composer,
+                duration_seconds, sample_rate, bits_per_sample, channels, bit_rate_kbps,
+                video_width, video_height, frame_rate, video_codec, audio_codec,
+                encoder_delay, encoder_padding, encoder_original, has_artwork)
+            SELECT
+                $path, $size, $mtime, $name, $parent, probed,
+                title, artist, album, album_artist, track, track_number,
+                disc, disc_number, year, year_number, genre, comment, composer,
+                duration_seconds, sample_rate, bits_per_sample, channels, bit_rate_kbps,
+                video_width, video_height, frame_rate, video_codec, audio_codec,
+                encoder_delay, encoder_padding, encoder_original, has_artwork
+            FROM files WHERE path = $from
+            ON CONFLICT(path) DO UPDATE SET
+                size = excluded.size,
+                mtime_utc = excluded.mtime_utc,
+                file_name = excluded.file_name,
+                parent_dir = excluded.parent_dir,
+                probed = excluded.probed,
+                title = excluded.title,
+                artist = excluded.artist,
+                album = excluded.album,
+                album_artist = excluded.album_artist,
+                track = excluded.track,
+                track_number = excluded.track_number,
+                disc = excluded.disc,
+                disc_number = excluded.disc_number,
+                year = excluded.year,
+                year_number = excluded.year_number,
+                genre = excluded.genre,
+                comment = excluded.comment,
+                composer = excluded.composer,
+                duration_seconds = excluded.duration_seconds,
+                sample_rate = excluded.sample_rate,
+                bits_per_sample = excluded.bits_per_sample,
+                channels = excluded.channels,
+                bit_rate_kbps = excluded.bit_rate_kbps,
+                video_width = excluded.video_width,
+                video_height = excluded.video_height,
+                frame_rate = excluded.frame_rate,
+                video_codec = excluded.video_codec,
+                audio_codec = excluded.audio_codec,
+                encoder_delay = excluded.encoder_delay,
+                encoder_padding = excluded.encoder_padding,
+                encoder_original = excluded.encoder_original,
+                has_artwork = excluded.has_artwork;
+            """;
+        cmd.Parameters.AddWithValue("$path", to);
+        cmd.Parameters.AddWithValue("$size", size);
+        cmd.Parameters.AddWithValue("$mtime", mtime);
+        cmd.Parameters.AddWithValue("$name", Path.GetFileName(to));
+        cmd.Parameters.AddWithValue("$parent", Path.GetDirectoryName(to) ?? string.Empty);
+        cmd.Parameters.AddWithValue("$from", from);
+        cmd.ExecuteNonQuery();
+    }
+
     private static void DeleteFiles(IReadOnlyList<string> paths)
     {
         lock (Gate)
