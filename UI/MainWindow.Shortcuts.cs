@@ -1,9 +1,11 @@
+using System.Windows.Threading;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -921,6 +923,13 @@ public partial class MainWindow
             && !LibraryPlayerMode.BypassesSearchFocus(key, modifiers))
         {
             return false;
+        }
+
+        if (!IsNumpadTextInputFocused()
+            && !IsMenuTakingNumpadKeys()
+            && TryNudgePlaybackPitch(key, modifiers))
+        {
+            return true;
         }
 
         // 動画ミニ: Q／Escape でプレイリストへ戻る（本再生中は暗いプレビューへ。F10 と同じ）。
@@ -3094,6 +3103,82 @@ public partial class MainWindow
 
         digit = -1;
         return false;
+    }
+
+    /// <summary>再生中の音を半音上げ下げする。プレイヤーとエディタで同じ。</summary>
+    private bool TryNudgePlaybackPitch(Key key, ModifierKeys modifiers)
+    {
+        if (_document is null)
+        {
+            return false;
+        }
+
+        if (LibraryPlayerMode.IsPlaybackPitchReset(key, modifiers))
+        {
+            // リージョン番号の二桁目（10 など）は従来どおり番号ジャンプへ渡す。
+            if (_regionNumber != 0)
+            {
+                return false;
+            }
+
+            _player.SetPlaybackSemitones(0);
+            ShowPlaybackPitchToast(returnedToOriginal: true);
+            return true;
+        }
+
+        if (!LibraryPlayerMode.TryPlaybackPitchStep(key, modifiers, out var step))
+        {
+            return false;
+        }
+
+        var next = PitchShift.Snap(_player.PlaybackSemitones + step);
+        if (!_player.SetPlaybackSemitones(next))
+        {
+            return true;
+        }
+
+        ShowPlaybackPitchToast(returnedToOriginal: false);
+        return true;
+    }
+
+    /// <summary>ショートカットでピッチが変わったとき、中央に現在の半音を出してフェードアウト。</summary>
+    private void ShowPlaybackPitchToast(bool returnedToOriginal)
+    {
+        PlaybackPitchToastText.Text = returnedToOriginal
+            ? "Pitch Reset"
+            : FormatPlaybackPitchToast(_player.PlaybackSemitones);
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaybackPitchToast,
+            to: 1,
+            instant: true,
+            hitTestVisible: false);
+        _playbackPitchToastTimer ??= new DispatcherTimer
+        {
+            Interval = LibraryExplorerTypeahead.ToastIdleClear,
+        };
+        _playbackPitchToastTimer.Tick -= OnPlaybackPitchToastTick;
+        _playbackPitchToastTimer.Tick += OnPlaybackPitchToastTick;
+        _playbackPitchToastTimer.Stop();
+        _playbackPitchToastTimer.Start();
+    }
+
+    private void OnPlaybackPitchToastTick(object? sender, EventArgs e)
+    {
+        _playbackPitchToastTimer?.Stop();
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaybackPitchToast,
+            to: 0,
+            instant: false,
+            hitTestVisible: false,
+            seconds: LibraryPlayerMode.ChromeFadeSeconds);
+    }
+
+    private static string FormatPlaybackPitchToast(int semitones)
+    {
+        var value = PitchShift.Snap(semitones);
+        var number = value.ToString("+0;-0;0", System.Globalization.CultureInfo.InvariantCulture);
+        var unit = Math.Abs(value) == 1 ? "Semitone" : "Semitones";
+        return number + " " + unit;
     }
 
     private bool TryHandleVideoLaunchScaleKey(Key key, ModifierKeys modifiers, bool isRepeat)

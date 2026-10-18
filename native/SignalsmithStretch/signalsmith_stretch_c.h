@@ -26,6 +26,20 @@ SS_API int ss_pitch_exact_interleaved(
     ss_progress_fn progress,
     void *user);
 
+/// Streaming, time-preserving pitch. One instance per playback voice.
+SS_API void *ss_rt_create(void);
+SS_API void ss_rt_destroy(void *handle);
+SS_API void ss_rt_set_semitones(void *handle, float semitones);
+SS_API void ss_rt_reset(void *handle);
+/// In-place interleaved float PCM. frame_offset is in frames. Returns 1 on success.
+SS_API int ss_rt_process(
+    void *handle,
+    float *interleaved,
+    int frame_offset,
+    int frames,
+    int channels,
+    int sample_rate);
+
 #ifdef __cplusplus
 }
 #endif

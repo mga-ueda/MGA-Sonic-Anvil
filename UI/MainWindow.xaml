@@ -455,6 +455,29 @@
         </Border>
       </ui:FrostedPlate>
     </Grid>
+    <!-- 再生ピッチのショートカット時だけ中央に半音を出す。 -->
+    <Grid x:Name="PlaybackPitchToast"
+          HorizontalAlignment="Center"
+          VerticalAlignment="Center"
+          Opacity="0"
+          IsHitTestVisible="False">
+      <ui:FrostedPlate HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Source="{Binding ElementName=PlaybackScene}"
+                       CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}">
+        <Border Padding="{x:Static ui:DesignMetrics.PlaylistPdfPageNumberPadding}"
+                Background="Transparent">
+        <TextBlock x:Name="PlaybackPitchToastText"
+                   FontFamily="Consolas"
+                   FontSize="{x:Static ui:DesignMetrics.PlaylistPdfPageNumberFontSize}"
+                   FontWeight="Normal"
+                   TextAlignment="Center"
+                   TextWrapping="NoWrap"
+                   Foreground="{DynamicResource PrimaryForeBrush}"
+                   Text="0 Semitones" />
+        </Border>
+      </ui:FrostedPlate>
+    </Grid>
     <!-- PDF 本表示の下中央ページ番号（すりガラス。ページ切替時だけ出してフェードアウト）。 -->
     <Viewbox x:Name="PlaylistPdfPageNumber"
              HorizontalAlignment="Center"
