@@ -85,4 +85,72 @@ internal static partial class ProcessEdits
         return command;
     }
 
+    public static IEditCommand? PenGain(
+        AudioDocument document,
+        long startFrame,
+        float[] gains,
+        int channelMask = 0)
+    {
+        if (gains is not { Length: > 0 } || document.FrameCount <= 0)
+        {
+            return null;
+        }
+
+        startFrame = Math.Clamp(startFrame, 0, document.FrameCount - 1);
+        var length = Math.Min(gains.Length, (int)(document.FrameCount - startFrame));
+        if (length <= 0)
+        {
+            return null;
+        }
+
+        var mask = EditMask(document, ChannelSolo.Off, channelMask);
+        var before = document.CopyRange(startFrame, length);
+        var after = (float[])before.Clone();
+        var channels = Math.Max(1, document.Channels);
+        var changed = false;
+        for (var frame = 0; frame < length; frame++)
+        {
+            var gain = gains[frame];
+            if (Math.Abs(gain - 1f) < 1e-6f)
+            {
+                continue;
+            }
+
+            changed = true;
+            var index = frame * channels;
+            for (var ch = 0; ch < channels; ch++)
+            {
+                if (ChannelSolo.Contains(mask, ch))
+                {
+                    after[index + ch] *= gain;
+                }
+            }
+        }
+
+        if (!changed)
+        {
+            return null;
+        }
+
+        var stored = gains.Length == length ? gains : gains.AsSpan(0, length).ToArray();
+        var end = startFrame + length;
+        var command = new ReplaceRangeCommand(
+            "Pen",
+            startFrame,
+            before,
+            after,
+            document.Selection,
+            document.Selection,
+            document.CursorFrame,
+            document.CursorFrame,
+            UiStrings.EditHistoryRange(
+                UiStrings.EditHistoryName("Pen"),
+                document.SampleRate,
+                startFrame,
+                end));
+        command.Replay = target => PenGain(target, startFrame, stored, mask);
+        command.Persist = HistoryRecipes.FromPenGain(document.SampleRate, startFrame, end, stored, mask);
+        return command;
+    }
+
 }

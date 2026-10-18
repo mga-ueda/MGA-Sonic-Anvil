@@ -10,6 +10,7 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
+using MgaSonicAnvil.Editing;
 
 namespace MgaSonicAnvil.UI;
 
@@ -244,6 +245,10 @@ internal sealed class WaveformView : Grid
     private SpectrogramViewMode _spectrogramMode;
     private readonly SpectrogramRenderer _spectrogram = new();
     private readonly SpectrogramBoostBar _boostBar = new();
+    private readonly LoudnessPenButton _penButton = new();
+    private readonly List<PenInk> _penInks = new();
+    private bool _penDrawing;
+    private long _penLoudnessTick;
     private readonly LoudnessOverlayRenderer _loudness = new();
     private double _loudnessTargetLufs = LoudnessMeterEngine.DefaultTargetLufs;
     private double _appliedMarkerLaneHeight = -1;
@@ -379,6 +384,10 @@ internal sealed class WaveformView : Grid
         _boostBar.ValueChanged += OnSpectrogramBoostChanged;
         Panel.SetZIndex(_boostBar, 5);
         Children.Add(_boostBar);
+        _penButton.ApplyLocalizedText();
+        _penButton.Checked += (_, _) => RestoreIdleCursor();
+        _penButton.Unchecked += (_, _) => RestoreIdleCursor();
+        Children.Add(_penButton);
         SizeChanged += (_, _) =>
         {
             EndMarkerCommentEdit(commit: true);
@@ -416,6 +425,7 @@ internal sealed class WaveformView : Grid
     public void ApplyLocalizedText()
     {
         _loadingLabel.Text = UiStrings.LabelWaveformLoading;
+        _penButton.ApplyLocalizedText();
     }
 
     public void SetLoadingVisible(bool visible) =>
@@ -431,6 +441,7 @@ internal sealed class WaveformView : Grid
                 return;
             }
 
+            CommitOpenPenStroke();
             _document = value;
             _timeZoom = 1d;
             _ampZoom = 1d;
@@ -455,6 +466,9 @@ internal sealed class WaveformView : Grid
             _loudness.Invalidate();
             InvalidateWaveform();
             SyncSpectrogramBoostBar();
+            ClearLoudnessPen();
+            ClearPenInk();
+            SyncLoudnessPenButton();
             Cursor = ShowsSeekCursors ? Cursors.IBeam : Cursors.Arrow;
             // Document が null になっても MouseLeave は起きないため、ガイドを明示的に更新する。
             ApplyMouseGuideOverlay();
@@ -1241,8 +1255,279 @@ internal sealed class WaveformView : Grid
         DiscardInvertBitmap();
         _waveDirty = true;
         SyncSpectrogramBoostBar();
+        SyncLoudnessPenButton();
         InvalidateStaticLayer();
         AnalysisViewChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public bool LoudnessPenActive => LoudnessVisible && _penButton.IsChecked == true;
+
+    public bool HasOpenPenStroke => _penDrawing;
+
+    public event EventHandler<PenStrokeEventArgs>? PenStrokeUpdated;
+
+    public event EventHandler<PenStrokeEventArgs>? PenStrokeCompleted;
+
+    /// <summary>サンプルを書き換えた直後。波形は毎回、ラウドネス曲線は間引いて更新する。</summary>
+    public void RefreshAfterPenEdit(bool forceLoudness = false)
+    {
+        InvalidateWaveform();
+        var now = Environment.TickCount64;
+        if (!forceLoudness && now - _penLoudnessTick < 80)
+        {
+            return;
+        }
+
+        _penLoudnessTick = now;
+        _loudness.Invalidate();
+        if (LoudnessVisible && _document is not null)
+        {
+            _loudness.Ensure(_document, () => Dispatcher.BeginInvoke(InvalidateStaticLayerForLoudness));
+        }
+    }
+
+    public bool TryToggleLoudnessPen()
+    {
+        if (!LoudnessVisible || _document is null || !ShowsSeekCursors)
+        {
+            return false;
+        }
+
+        _penButton.IsChecked = _penButton.IsChecked != true;
+        return true;
+    }
+
+    public bool TryCancelLoudnessPen()
+    {
+        if (!LoudnessPenActive)
+        {
+            return false;
+        }
+
+        _penButton.IsChecked = false;
+        return true;
+    }
+
+    private void ClearLoudnessPen()
+    {
+        if (_penButton.IsChecked == true)
+        {
+            _penButton.IsChecked = false;
+        }
+    }
+
+    private void SyncLoudnessPenButton()
+    {
+        var show = LoudnessVisible && _document is not null && ShowsSeekCursors;
+        _penButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        var scale = _showScaleLane ? ScaleLeft(new Rect(RenderSize)) : 0;
+        _penButton.Margin = new Thickness(scale + 6, 0, 0, 6);
+        if (!show)
+        {
+            ClearLoudnessPen();
+            ClearPenInk();
+        }
+    }
+
+    private bool TryBeginLoudnessPenStroke(Point pos)
+    {
+        if (!LoudnessPenActive || _document is null || _penDrawing)
+        {
+            return false;
+        }
+
+        var wave = WaveformBounds(new Rect(RenderSize));
+        if (wave.Width <= 1 || wave.Height <= 1 || !wave.Contains(pos))
+        {
+            return false;
+        }
+
+        var ink = new PenInk();
+        _penDrawing = true;
+        ink.Points.Add(ToPenPoint(pos, wave));
+        _penInks.Add(ink);
+        CaptureMouse();
+        Cursor = Cursors.Pen;
+        InvalidatePlayheadLayer();
+        PenStrokeUpdated?.Invoke(this, new PenStrokeEventArgs(CopyPenPoints(ink)));
+        return true;
+    }
+
+    private void AppendPenPoint(Point pos)
+    {
+        if (!_penDrawing || _penInks.Count == 0)
+        {
+            return;
+        }
+
+        var wave = WaveformBounds(new Rect(RenderSize));
+        if (wave.Width <= 1 || wave.Height <= 1)
+        {
+            return;
+        }
+
+        var next = ToPenPoint(pos, wave);
+        var ink = _penInks[^1];
+        var last = ink.Points[^1];
+        if (!LoudnessPenGain.MovesBackward(ink.Points, next))
+        {
+            var bounds = new Rect(RenderSize);
+            var from = PenPointToView(last, wave, bounds);
+            var to = PenPointToView(next, wave, bounds);
+            var dx = to.X - from.X;
+            var dy = to.Y - from.Y;
+            if (dx * dx + dy * dy < 2.25)
+            {
+                return;
+            }
+        }
+
+        if (!LoudnessPenGain.Place(ink.Points, next))
+        {
+            return;
+        }
+
+        InvalidatePlayheadLayer();
+    }
+
+    public void AbortOpenPenStroke()
+    {
+        if (!_penDrawing)
+        {
+            return;
+        }
+
+        _penDrawing = false;
+        if (IsMouseCaptured)
+        {
+            ReleaseMouseCapture();
+        }
+
+        if (_penInks.Count > 0)
+        {
+            _penInks.RemoveAt(_penInks.Count - 1);
+        }
+
+        RestoreIdleCursor();
+        InvalidatePlayheadLayer();
+    }
+
+    private void FinishPenStroke() => CommitOpenPenStroke();
+
+    private void CommitOpenPenStroke()
+    {
+        if (!_penDrawing || _penInks.Count == 0)
+        {
+            return;
+        }
+
+        var points = CopyPenPoints(_penInks[^1]);
+        _penDrawing = false;
+        if (IsMouseCaptured)
+        {
+            ReleaseMouseCapture();
+        }
+
+        _penInks.RemoveAt(_penInks.Count - 1);
+        RestoreIdleCursor();
+        InvalidatePlayheadLayer();
+        if (points.Length >= 2)
+        {
+            PenStrokeCompleted?.Invoke(this, new PenStrokeEventArgs(points));
+        }
+    }
+
+    private static LoudnessPenGain.Point[] CopyPenPoints(PenInk ink) => ink.Points.ToArray();
+
+    internal sealed class PenStrokeEventArgs : EventArgs
+    {
+        public PenStrokeEventArgs(IReadOnlyList<LoudnessPenGain.Point> points) => Points = points;
+
+        public IReadOnlyList<LoudnessPenGain.Point> Points { get; }
+    }
+
+    private void ClearPenInk()
+    {
+        FinishPenStroke();
+        if (_penInks.Count == 0)
+        {
+            return;
+        }
+
+        _penInks.Clear();
+        InvalidatePlayheadLayer();
+    }
+
+    private LoudnessPenGain.Point ToPenPoint(Point pos, Rect wave)
+    {
+        var yNorm = wave.Height <= 0 ? 0 : (pos.Y - wave.Y) / wave.Height;
+        return new LoudnessPenGain.Point(FrameAt(pos.X), Math.Clamp(yNorm, 0, 1));
+    }
+
+    private Point PenPointToView(LoudnessPenGain.Point point, Rect wave, Rect bounds) =>
+        new(
+            FrameToViewX(point.Frame, _viewStart, ViewSpanFrames, bounds),
+            wave.Y + point.YNorm * wave.Height);
+
+    private void DrawPenInk(DrawingContext dc, Rect bounds, double start, double span)
+    {
+        if (_penInks.Count == 0)
+        {
+            return;
+        }
+
+        var wave = WaveformBounds(bounds);
+        if (wave.Width <= 1 || wave.Height <= 1 || span <= 0)
+        {
+            return;
+        }
+
+        var color = Theme.Get("PrimaryForeBrush");
+        var stroke = new Pen(WpfControlHelpers.FrozenBrush(color), 2.2)
+        {
+            StartLineCap = PenLineCap.Round,
+            EndLineCap = PenLineCap.Round,
+            LineJoin = PenLineJoin.Round,
+        };
+        stroke.Freeze();
+        var dot = WpfControlHelpers.FrozenBrush(color);
+        foreach (var ink in _penInks)
+        {
+            if (ink.Points.Count == 1)
+            {
+                var at = PenPointToView(ink.Points[0], wave, bounds, start, span);
+                dc.DrawEllipse(dot, null, at, 1.4, 1.4);
+                continue;
+            }
+
+            for (var i = 1; i < ink.Points.Count; i++)
+            {
+                dc.DrawLine(
+                    stroke,
+                    PenPointToView(ink.Points[i - 1], wave, bounds, start, span),
+                    PenPointToView(ink.Points[i], wave, bounds, start, span));
+            }
+        }
+    }
+
+    private Point PenPointToView(LoudnessPenGain.Point point, Rect wave, Rect bounds, double start, double span) =>
+        new(
+            FrameToViewX(point.Frame, start, span, bounds),
+            wave.Y + point.YNorm * wave.Height);
+
+    private sealed class PenInk
+    {
+        public List<LoudnessPenGain.Point> Points { get; } = new();
+    }
+
+    private void RestoreIdleCursor()
+    {
+        if (_dragging || _markerDragging || _scrubbing)
+        {
+            return;
+        }
+
+        UpdateHoverCursor(Mouse.GetPosition(this));
     }
 
     public bool NudgeSpectrogramBoost(int direction)
@@ -1853,19 +2138,38 @@ internal sealed class WaveformView : Grid
 
     public void EndScrubAtFrame(long frame, bool commit) => FinishScrub(commit, frame);
 
-    public void AbandonScrub() => CancelPointerInteraction();
+    public void AbandonScrub()
+    {
+        _scrubbing = false;
+        _dragging = false;
+        _selecting = false;
+        // ペンの一筆はマウスを離すまで開いたままにする。再生停止からここへ来ると
+        // キャプチャ解除がストロークを確定し、呼び出し元が破棄済みの基準波形を触る。
+        if (_penDrawing)
+        {
+            return;
+        }
+
+        if (IsMouseCaptured)
+        {
+            ReleaseMouseCapture();
+        }
+
+        RestoreIdleCursor();
+    }
 
     private void CancelPointerInteraction()
     {
         _scrubbing = false;
         _dragging = false;
         _selecting = false;
+        FinishPenStroke();
         if (IsMouseCaptured)
         {
             ReleaseMouseCapture();
         }
 
-        Cursor = Cursors.IBeam;
+        RestoreIdleCursor();
     }
 
     public bool CancelScrub()
@@ -2146,6 +2450,12 @@ internal sealed class WaveformView : Grid
         }
 
         var clickPos = e.GetPosition(this);
+        if (TryBeginLoudnessPenStroke(clickPos))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (!SeekAndSelectOnly && TryHitChannelLabel(clickPos, out var labelChannel))
         {
             ChannelLabelClicked?.Invoke(
@@ -2282,6 +2592,13 @@ internal sealed class WaveformView : Grid
         SetMouseGuideFromX(pos.X);
         ApplyMouseGuideOverlay();
 
+        if (_penDrawing)
+        {
+            Cursor = Cursors.Pen;
+            AppendPenPoint(pos);
+            return;
+        }
+
         if (_dragging && _scrubbing && _document is not null)
         {
             Cursor = Cursors.ScrollWE;
@@ -2341,6 +2658,14 @@ internal sealed class WaveformView : Grid
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
+        if (_penDrawing)
+        {
+            AppendPenPoint(e.GetPosition(this));
+            FinishPenStroke();
+            e.Handled = true;
+            return;
+        }
+
         if (_markerDragging)
         {
             FinishMarkerDrag(commit: true);
@@ -2364,7 +2689,7 @@ internal sealed class WaveformView : Grid
         ReleaseMouseCapture();
         _dragging = false;
         _selecting = false;
-        Cursor = Cursors.IBeam;
+        RestoreIdleCursor();
         if (_document is null)
         {
             return;
@@ -2385,6 +2710,11 @@ internal sealed class WaveformView : Grid
     protected override void OnLostMouseCapture(MouseEventArgs e)
     {
         base.OnLostMouseCapture(e);
+        if (_penDrawing)
+        {
+            FinishPenStroke();
+        }
+
         if (_markerDragging)
         {
             FinishMarkerDrag(commit: true);
@@ -2413,10 +2743,47 @@ internal sealed class WaveformView : Grid
 
     protected override void OnMouseRightButtonDown(MouseButtonEventArgs e)
     {
-        if (TryRaiseContextMenu(e.GetPosition(this)))
+        var pos = e.GetPosition(this);
+        if (TryToggleLoudnessPenFromCurve(pos))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (TryRaiseContextMenu(pos))
         {
             e.Handled = true;
         }
+    }
+
+    private bool TryToggleLoudnessPenFromCurve(Point pos)
+    {
+        if (!LoudnessVisible || _document is null || _loudness.Current is not { } profile)
+        {
+            return false;
+        }
+
+        if (TryHitMarkerFlag(pos, out _)
+            || TryHitRegionFlag(pos, out _, out _)
+            || TryHitSampleLoopBar(pos))
+        {
+            return false;
+        }
+
+        var wave = WaveformBounds(new Rect(RenderSize));
+        if (!LoudnessOverlayRenderer.IsNearCurve(
+                pos,
+                wave,
+                profile,
+                _loudnessTargetLufs,
+                _viewStart,
+                ViewSpanFrames,
+                _previewGainAtFrame))
+        {
+            return false;
+        }
+
+        return TryToggleLoudnessPen();
     }
 
     /// <summary>メニューキー／Shift+F10。ポインタが波形上ならその位置、なければ再生位置。</summary>
@@ -2433,7 +2800,7 @@ internal sealed class WaveformView : Grid
 
     private bool TryRaiseContextMenu(Point pos, long? frameOverride = null)
     {
-        if (IsEditingMarkerComment || _dragging || _markerDragging || _scrubbing)
+        if (IsEditingMarkerComment || _dragging || _penDrawing || _markerDragging || _scrubbing)
         {
             return false;
         }
@@ -2580,7 +2947,7 @@ internal sealed class WaveformView : Grid
             EnsureWaveformBitmap(wave);
             if (loudness)
             {
-                dc.PushOpacity(0.75);
+                dc.PushOpacity(0.85);
                 DrawWaveformImage(dc, wave);
                 dc.Pop();
             }
@@ -2666,6 +3033,7 @@ internal sealed class WaveformView : Grid
             RefreshFlagStacks(bounds, start, span);
             DrawRegionFlags(dc, bounds, start, span);
             DrawMarkers(dc, bounds, start, span, _document.Markers);
+            DrawPenInk(dc, bounds, start, span);
             return;
         }
 
@@ -2689,6 +3057,8 @@ internal sealed class WaveformView : Grid
 
             DrawPlayerAbCues(dc, bounds, start, span);
         }
+
+        DrawPenInk(dc, bounds, start, span);
     }
 
     internal void PaintPlayhead(DrawingContext dc)
@@ -5814,7 +6184,7 @@ internal sealed class WaveformView : Grid
             ReleaseMouseCapture();
         }
 
-        Cursor = Cursors.IBeam;
+        RestoreIdleCursor();
         frame = ClampFrame(frame);
         if (_document is not null)
         {
@@ -6398,7 +6768,7 @@ internal sealed class WaveformView : Grid
             ReleaseMouseCapture();
         }
 
-        Cursor = Cursors.IBeam;
+        RestoreIdleCursor();
         if (_document is null)
         {
             ResetMarkerDragState();
@@ -7077,7 +7447,7 @@ internal sealed class WaveformView : Grid
     private long RawFrameAt(double x) => ClampFrame(XToFrame(x));
 
     private long PointerFrame(double x) =>
-        CanSnapPointerToMarkers && TrySnapXToMarker(x, null, out _, out var frame)
+        !_penDrawing && CanSnapPointerToMarkers && TrySnapXToMarker(x, null, out _, out var frame)
             ? frame
             : RawFrameAt(x);
 
@@ -7955,7 +8325,7 @@ internal sealed class WaveformView : Grid
         }
         else
         {
-            next = Cursors.IBeam;
+            next = LoudnessPenActive ? Cursors.Pen : Cursors.IBeam;
         }
 
         if (!ReferenceEquals(Cursor, next))

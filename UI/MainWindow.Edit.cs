@@ -2959,8 +2959,127 @@ public partial class MainWindow
         }
     }
 
+    private WaveformView? _penSource;
+
+    private void OnPenStrokeUpdated(object? sender, WaveformView.PenStrokeEventArgs e)
+    {
+        if (sender is not WaveformView view || _document is null || !ReferenceEquals(view.Document, _document))
+        {
+            return;
+        }
+
+        if (ReferenceEquals(_penSource, view))
+        {
+            return;
+        }
+
+        // 音量と曲線の更新はマウスを離してから。描いているあいだは再生だけ止める。
+        _penSource = view;
+        PausePlaybackSoft();
+    }
+
+    private void OnPenStrokeCompleted(object? sender, WaveformView.PenStrokeEventArgs e)
+    {
+        _penSource = null;
+        if (sender is not WaveformView view || _document is null || !ReferenceEquals(view.Document, _document))
+        {
+            return;
+        }
+
+        var baseline = (float[])_document.Interleaved.Clone();
+        if (!TryRenderPen(baseline, e.Points, out var rendered))
+        {
+            return;
+        }
+
+        if (LoudnessPenGain.WouldClip(rendered.Peak))
+        {
+            var answer = OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ConfirmPenClip,
+                UiStrings.AppName,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (answer != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            LoudnessPenGain.LowerToHeadroom(rendered, _document.Channels, EditMask(), out rendered);
+        }
+
+        _document.ReplaceRange(rendered.StartFrame, rendered.Samples);
+        var channels = Math.Max(1, _document.Channels);
+        var before = new float[rendered.Samples.Length];
+        Array.Copy(baseline, (int)rendered.StartFrame * channels, before, 0, before.Length);
+        var command = new ReplaceRangeCommand(
+            "Pen",
+            rendered.StartFrame,
+            before,
+            rendered.Samples,
+            _document.Selection,
+            _document.Selection,
+            _document.CursorFrame,
+            _document.CursorFrame,
+            UiStrings.EditHistoryRange(
+                UiStrings.EditHistoryName("Pen"),
+                _document.SampleRate,
+                rendered.StartFrame,
+                rendered.StartFrame + rendered.Gains.Length));
+        var gains = rendered.Gains;
+        var start = rendered.StartFrame;
+        var mask = EditMask();
+        command.Replay = target => ProcessEdits.PenGain(target, start, gains, mask);
+        command.Persist = HistoryRecipes.FromPenGain(
+            _document.SampleRate,
+            start,
+            start + gains.Length,
+            gains,
+            mask);
+        _history.AcceptApplied(_document, command);
+        view.RefreshAfterPenEdit(forceLoudness: true);
+        LoudnessMeter.RefreshOffline();
+        RefreshStatus();
+        RefreshHistoryStrip();
+    }
+
+    private bool TryRenderPen(
+        float[] baseline,
+        IReadOnlyList<LoudnessPenGain.Point> points,
+        out LoudnessPenGain.Rendered rendered)
+    {
+        rendered = default;
+        return _document is not null
+        && LoudnessPenGain.TryRender(
+            baseline,
+            _document.Channels,
+            EditMask(),
+            points,
+            Waveform.LoudnessTargetLufs,
+            ClickGuard.FadeFrames(_document.SampleRate, AppStorage.Settings.ResolvedClickGuardFadeMs()),
+            out rendered,
+            _document.SampleRate);
+    }
+
+    private bool TryRevertOpenPenStroke()
+    {
+        if (_penSource is not { HasOpenPenStroke: true } view)
+        {
+            return false;
+        }
+
+        _penSource = null;
+        view.AbortOpenPenStroke();
+        return true;
+    }
+
     private void UndoEdit()
     {
+        if (TryRevertOpenPenStroke())
+        {
+            return;
+        }
+
         CommitTimelineNudgeSession();
         StopPlaceRepeat();
         if (IsLibraryMaximized)

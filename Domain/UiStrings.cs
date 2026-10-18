@@ -538,6 +538,10 @@ internal static partial class UiStrings
         sampleRate,
         channels,
         bits);
+    public static string ConfirmPenClip => Get(
+        "描いた音量が 0 dBFS を超えています。このままでは歪む可能性があります。\n\nYes: 描いた範囲全体を下げて 0 dBFS 以内に収める\nNo: この一筆を取り消して描き直す",
+        "The stroke goes above 0 dBFS and may distort.\n\nYes: lower the whole stroke to stay within 0 dBFS\nNo: discard this stroke and draw it again");
+
     public static string WarnMergeClip(string overDb) => Format(
         "加算結果が 0 dBFS を {0} dB 超えています。このまま 16bit / 24bit で書くと、超えた分は切り詰められます。\n\nYes: ミックス全体を {0} dB 下げてバウンスする\nNo: バウンスを中止する",
         "The summed mix is {0} dB over 0 dBFS. Writing 16-bit or 24-bit would truncate the excess.\n\nYes: lower the entire mix by {0} dB and bounce\nNo: cancel the bounce",
@@ -718,6 +722,10 @@ internal static partial class UiStrings
     public static string TooltipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)  複数選択時は保存先フォルダ", "Save As (Ctrl+Shift+S)  pick a folder when several tabs are selected");
     public static string TooltipSpectrogramView => Get("スペクトログラム / 重ね (A)  解除 (Esc / Shift+A / Shift+V)", "Spectrogram / overlay (A)  leave (Esc / Shift+A / Shift+V)");
     public static string TooltipLoudnessView => Get("ラウドネス (V)  解除 (Esc / Shift+A / Shift+V)", "Loudness (V)  leave (Esc / Shift+A / Shift+V)");
+    public static string LabelLoudnessPenToggle => Get("Eキーで切替", "Press E to toggle");
+    public static string TooltipLoudnessPen => Get(
+        "ペンで描く (E)  離すと音量になる。描いているあいだ元の曲線は残る。取り消しは Ctrl+Z。曲線の右クリックでも切り替え",
+        "Draw with the pen (E)  volume changes when you release. The curve stays while you draw. Undo with Ctrl+Z. Also right-click the curve");
     public static string TooltipCenterPlayhead => Get("中央寄せ / センターロック (Z)", "Center / center-lock (Z)");
     public static string TooltipHistory => Get("編集履歴 (U)", "Edit history (U)");
     public static string TooltipLibraryMaximize => Get("プレイヤー (F10)", "Player (F10)");
@@ -1069,6 +1077,7 @@ internal static partial class UiStrings
         "Normalize" => Get("ノーマライズ", "Normalize"),
         "Normalize Per Region" => Get("リージョン毎にノーマライズ", "Normalize per Region"),
         "Volume" => Get("音量", "Volume"),
+        "Pen" => Get("ペン", "Pen"),
         "Pitch Shift" => Get("ピッチ", "Pitch Shift"),
         "Time Stretch" => Get("タイムストレッチ", "Time Stretch"),
         "Reverse" => Get("リバース", "Reverse"),
