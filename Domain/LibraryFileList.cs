@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using MgaSonicAnvil.Audio;
 
 namespace MgaSonicAnvil.Domain;
 
@@ -174,6 +175,30 @@ internal sealed class LibraryFileRow : INotifyPropertyChanged
 
     public string LoudnessText { get; init; } = string.Empty;
 
+    private LoudnessTraffic _loudnessTone = LoudnessTraffic.Idle;
+
+    /// <summary>ラウドネス列の文字色。青／黄／赤はメーターと同じ閾値。</summary>
+    public LoudnessTraffic LoudnessTone
+    {
+        get => _loudnessTone;
+        set
+        {
+            if (_loudnessTone == value)
+            {
+                return;
+            }
+
+            _loudnessTone = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LoudnessTone)));
+        }
+    }
+
+    /// <summary>設定ターゲットに対する表示色。未計測は Idle（通常色）。</summary>
+    public static LoudnessTraffic ToneFor(float? lufs, double targetLufs) =>
+        lufs is float value
+            ? LoudnessTrafficLight.ForLufs(value, targetLufs)
+            : LoudnessTraffic.Idle;
+
     public string GroupKey { get; set; } = string.Empty;
 }
 
@@ -271,6 +296,7 @@ internal static class LibraryFileList
         && left.VideoCodec == right.VideoCodec
         && left.AudioCodec == right.AudioCodec
         && left.LoudnessText == right.LoudnessText
+        && left.LoudnessTone == right.LoudnessTone
         && left.GroupKey == right.GroupKey;
 
     public static string CellText(LibraryFileRow row, LibraryFileColumn column) =>
