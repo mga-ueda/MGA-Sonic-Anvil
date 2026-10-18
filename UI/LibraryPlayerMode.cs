@@ -1515,6 +1515,37 @@ internal static class LibraryPlayerMode
         return true;
     }
 
+    /// <summary>
+    /// 再生ピッチを 1 半音動かすか。Ctrl＋テンキー ± と Ctrl＋キーボード ±。
+    /// キーボードの + は Shift 付きでも受け付ける。
+    /// </summary>
+    public static bool TryPlaybackPitchStep(Key key, ModifierKeys modifiers, out int step)
+    {
+        step = 0;
+        if ((modifiers & (ModifierKeys.Alt | ModifierKeys.Control | ModifierKeys.Windows)) != ModifierKeys.Control)
+        {
+            return false;
+        }
+
+        if (key is Key.Add or Key.OemPlus)
+        {
+            step = 1;
+            return true;
+        }
+
+        if (key is Key.Subtract or Key.OemMinus)
+        {
+            step = -1;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Ctrl＋上段 0 または Ctrl＋テンキー 0。再生ピッチを 0 に戻す。</summary>
+    public static bool IsPlaybackPitchReset(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.Control && key is Key.D0 or Key.NumPad0;
+
     /// <summary>キーボード／テンキーの +（PDF 拡縮・動画ミニ窓サイズ共通）。</summary>
     public static bool IsZoomInKey(Key key, ModifierKeys modifiers) =>
         key == Key.Add && modifiers == ModifierKeys.None

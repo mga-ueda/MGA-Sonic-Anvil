@@ -3133,6 +3133,15 @@ public partial class MainWindow
         PausePlaybackSoft();
     }
 
+    /// <summary>編集コマンドの直前。再生ピッチはどの編集でも 0 に戻し、変わったときだけリセットのトーストを出す。</summary>
+    private void ResetPlaybackPitchForEdit()
+    {
+        if (_player.SetPlaybackSemitones(0))
+        {
+            ShowPlaybackPitchToast(returnedToOriginal: true);
+        }
+    }
+
     private void AfterTransform()
     {
         Waveform.ClearSelection();

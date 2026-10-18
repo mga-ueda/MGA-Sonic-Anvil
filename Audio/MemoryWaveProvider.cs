@@ -123,6 +123,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private float _silentSkipLinear = SilentSkip.LinearFromDb(SilentSkip.DefaultThresholdDb);
     /// <summary>再生ヘッドの進行倍率。1 / <see cref="FastSpeed"/> / -<see cref="FastSpeed"/>。</summary>
     private double _playbackSpeed = 1;
+    private int _playbackSemitones;
+    private readonly PlaybackPitchShift _pitch = new();
     private float _shuttleOutputGain = 1f;
     private bool _shuttlePrimed;
     private bool _shuttleFadeIn;
@@ -443,10 +445,12 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     {
         lock (_gate)
         {
+            var previous = _boundDocument;
             DisposeStreamNoLock();
             ClearGaplessNoLock();
             NoteGaplessAdvancedNoLock(null);
             _boundDocument = document;
+            NotePlaybackDocumentNoLock(previous, document);
             _samples = document.Interleaved;
             _usedSamples = Math.Clamp(document.SampleCount, 0, _samples.Length);
             _channels = Math.Max(1, document.Channels);
@@ -494,9 +498,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         ArgumentNullException.ThrowIfNull(source);
         lock (_gate)
         {
+            var previous = _boundDocument;
             DisposeStreamNoLock();
             _stream = source;
             _boundDocument = document;
+            NotePlaybackDocumentNoLock(previous, document);
             _samples = [];
             _channels = Math.Max(1, source.Channels);
             _sourceRate = Math.Max(1, source.SampleRate);
@@ -772,6 +778,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
 
         NoteGaplessAdvancedNoLock(document);
+        ForgetPlaybackPitchNoLock();
         return true;
     }
 
@@ -1299,6 +1306,70 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
+    public int PlaybackSemitones
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _playbackSemitones;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 再生中のピッチ（半音）。長さは変えず、次の出力バッファから聞こえる。
+    /// ±<see cref="PitchShift.MaxSemitones"/>。0 でバイパス。
+    /// </summary>
+    /// <returns>値が変わったとき true。</returns>
+    public bool SetPlaybackSemitones(int semitones)
+    {
+        semitones = PitchShift.Snap(semitones);
+        lock (_gate)
+        {
+            if (_playbackSemitones == semitones)
+            {
+                return false;
+            }
+
+            _playbackSemitones = semitones;
+            _pitch.SetSemitones(semitones);
+            if (semitones == 0)
+            {
+                _pitch.ResetEngine();
+            }
+
+            return true;
+        }
+    }
+
+    public void DisposePlaybackPitch()
+    {
+        lock (_gate)
+        {
+            _playbackSemitones = 0;
+            _pitch.Dispose();
+        }
+    }
+
+    /// <summary>別トラックへ切り替わったときだけ半音を忘れる。同じ文書の再バインドは残す。</summary>
+    private void NotePlaybackDocumentNoLock(AudioDocument? previous, AudioDocument document)
+    {
+        if (ReferenceEquals(previous, document))
+        {
+            _pitch.ResetEngine();
+            return;
+        }
+
+        ForgetPlaybackPitchNoLock();
+    }
+
+    private void ForgetPlaybackPitchNoLock()
+    {
+        _playbackSemitones = 0;
+        _pitch.ClearSemitones();
+    }
+
     public void CaptureScrub(AudioDocument document, long frame)
     {
         _scrub.Bind(document);
@@ -1410,6 +1481,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             {
                 ApplySeekCrossfade(buffer, offset, ref written);
             }
+
+            ApplyPlaybackPitch(buffer, offset, written);
             pushedSource = _sourceMeterThisRead > 0;
         }
 
@@ -1495,6 +1568,22 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
     private double PlaybackStep(bool resampled) =>
         (resampled ? _sourceRate / (double)_deviceRate : 1d) * _playbackSpeed;
+
+    private void ApplyPlaybackPitch(float[] buffer, int offset, int written)
+    {
+        if (_playbackSemitones == 0 || written <= 0 || _paused || _silenceOnly)
+        {
+            return;
+        }
+
+        var channels = Math.Max(1, _outputChannels);
+        if (written < channels || offset % channels != 0 || written % channels != 0)
+        {
+            return;
+        }
+
+        _pitch.Process(buffer, offset / channels, written / channels, channels, _deviceRate, _playbackSemitones);
+    }
 
     private void ApplyFlushFade(float[] buffer, int offset, int count)
     {

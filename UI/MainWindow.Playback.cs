@@ -2500,6 +2500,7 @@ public partial class MainWindow
             : Transform.Identity;
         PlaylistVideoFileName.LayoutTransform = overlayTransform;
         PlaylistVideoScaleToast.LayoutTransform = overlayTransform;
+        PlaybackPitchToast.LayoutTransform = overlayTransform;
         ApplyPlaylistVideoTimecodeOverlayScale(overlayScale);
         ApplyPlaylistPdfPageNumberOverlayScale(overlayScale);
         ApplyPlaylistTrackIndexOverlayScale(overlayScale);

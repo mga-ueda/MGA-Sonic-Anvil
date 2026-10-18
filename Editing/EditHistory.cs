@@ -48,6 +48,14 @@ internal sealed class EditHistory
 
     public bool IsClean => _cleanValid && _undo.Count == _cleanIndex;
 
+    /// <summary>
+    /// 編集コマンドが波形へ入る直前。正規化・フェード・音量・リバースなど、
+    /// Do／Undo／Redo／録音の確定がここを通る。
+    /// </summary>
+    internal static event Action? CommandApplying;
+
+    private static void NotifyCommandApplying() => CommandApplying?.Invoke();
+
     public void MarkClean()
     {
         _cleanIndex = _undo.Count;
@@ -202,6 +210,7 @@ internal sealed class EditHistory
 
     public void Do(AudioDocument document, IEditCommand command)
     {
+        NotifyCommandApplying();
         var origin = OriginSnapshot.Capture(document);
         command.Apply(document);
         PushApplied(document, command, origin);
@@ -210,6 +219,7 @@ internal sealed class EditHistory
     /// <summary>すでに波形へ適用済みのコマンドを履歴へ載せる。録音のライブ上書き用。</summary>
     public void AcceptApplied(AudioDocument document, IEditCommand command)
     {
+        NotifyCommandApplying();
         PushApplied(document, command, OriginSnapshot.Capture(document));
     }
 
@@ -234,6 +244,7 @@ internal sealed class EditHistory
             return false;
         }
 
+        NotifyCommandApplying();
         var command = _undo.Pop();
         var origin = _undoOrigins.Pop();
         command.Revert(document);
@@ -251,6 +262,7 @@ internal sealed class EditHistory
             return false;
         }
 
+        NotifyCommandApplying();
         var command = _redo.Pop();
         var origin = _redoOrigins.Pop();
         command.Apply(document);

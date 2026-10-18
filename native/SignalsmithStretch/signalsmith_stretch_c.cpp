@@ -161,3 +161,133 @@ int ss_pitch_exact_interleaved(
     ReportProgress(progress, user, 1.f, lastPercent);
     return 1;
 }
+
+struct SsRealtime
+{
+    Stretch stretch{1};
+    int channels = 0;
+    int sampleRate = 0;
+    float semitones = 0;
+    std::vector<std::vector<float>> in;
+    std::vector<std::vector<float>> out;
+    std::vector<float *> inPtr;
+    std::vector<float *> outPtr;
+};
+
+void SsRealtimeConfigure(SsRealtime *state)
+{
+    state->stretch.presetCheaper(state->channels, static_cast<float>(state->sampleRate), false);
+    state->stretch.setTransposeSemitones(
+        state->semitones,
+        8000.f / static_cast<float>(state->sampleRate));
+}
+
+extern "C" {
+
+void *ss_rt_create(void)
+{
+    return new SsRealtime();
+}
+
+void ss_rt_destroy(void *handle)
+{
+    delete static_cast<SsRealtime *>(handle);
+}
+
+void ss_rt_set_semitones(void *handle, float semitones)
+{
+    auto *state = static_cast<SsRealtime *>(handle);
+    if (state == nullptr)
+    {
+        return;
+    }
+
+    state->semitones = semitones;
+    if (state->channels > 0)
+    {
+        state->stretch.setTransposeSemitones(
+            semitones,
+            8000.f / static_cast<float>(state->sampleRate));
+    }
+}
+
+void ss_rt_reset(void *handle)
+{
+    auto *state = static_cast<SsRealtime *>(handle);
+    if (state == nullptr || state->channels <= 0)
+    {
+        return;
+    }
+
+    state->stretch.reset();
+}
+
+int ss_rt_process(
+    void *handle,
+    float *interleaved,
+    int frame_offset,
+    int frames,
+    int channels,
+    int sample_rate)
+{
+    auto *state = static_cast<SsRealtime *>(handle);
+    if (state == nullptr || interleaved == nullptr
+        || frame_offset < 0 || frames < 1
+        || channels < 1 || sample_rate < 1)
+    {
+        return 0;
+    }
+
+    if (state->channels != channels || state->sampleRate != sample_rate)
+    {
+        state->channels = channels;
+        state->sampleRate = sample_rate;
+        SsRealtimeConfigure(state);
+    }
+
+    if (state->semitones == 0.f)
+    {
+        return 1;
+    }
+
+    state->in.resize(static_cast<size_t>(channels));
+    state->out.resize(static_cast<size_t>(channels));
+    state->inPtr.resize(static_cast<size_t>(channels));
+    state->outPtr.resize(static_cast<size_t>(channels));
+    float *src = interleaved + static_cast<size_t>(frame_offset) * static_cast<size_t>(channels);
+    for (int c = 0; c < channels; c++)
+    {
+        auto &input = state->in[static_cast<size_t>(c)];
+        auto &output = state->out[static_cast<size_t>(c)];
+        if (static_cast<int>(input.size()) < frames)
+        {
+            input.resize(static_cast<size_t>(frames));
+        }
+
+        if (static_cast<int>(output.size()) < frames)
+        {
+            output.resize(static_cast<size_t>(frames));
+        }
+
+        for (int i = 0; i < frames; i++)
+        {
+            input[static_cast<size_t>(i)] = src[i * channels + c];
+        }
+
+        state->inPtr[static_cast<size_t>(c)] = input.data();
+        state->outPtr[static_cast<size_t>(c)] = output.data();
+    }
+
+    state->stretch.process(state->inPtr.data(), frames, state->outPtr.data(), frames);
+    for (int i = 0; i < frames; i++)
+    {
+        for (int c = 0; c < channels; c++)
+        {
+            src[i * channels + c] = state->out[static_cast<size_t>(c)][static_cast<size_t>(i)];
+        }
+    }
+
+    return 1;
+}
+
+} // extern "C"

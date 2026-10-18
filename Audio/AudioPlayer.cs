@@ -218,6 +218,12 @@ internal sealed class AudioPlayer : IDisposable
 
     public double PlaybackSpeed => _provider.PlaybackSpeed;
 
+    public int PlaybackSemitones => _provider.PlaybackSemitones;
+
+    /// <summary>再生中のピッチを半音単位で切り替える。出力は止めない。</summary>
+    /// <returns>値が変わったとき true。</returns>
+    public bool SetPlaybackSemitones(int semitones) => _provider.SetPlaybackSemitones(semitones);
+
     public bool IsStreamBound => _provider.IsStreamBound;
 
     public bool IsBoundTo(AudioDocument document) => _provider.IsBoundTo(document);
@@ -840,6 +846,7 @@ internal sealed class AudioPlayer : IDisposable
         {
             FlushStopOutput();
             _provider.ClearGaplessNext();
+            _provider.DisposePlaybackPitch();
         }
         finally
         {

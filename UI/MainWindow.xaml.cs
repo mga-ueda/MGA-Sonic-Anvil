@@ -120,6 +120,7 @@ public partial class MainWindow : Window
     private double _videoLaunchScale = LibraryVideoWindowScale.Native;
     private bool _videoLaunchScaleLatched;
     private DispatcherTimer? _videoLaunchScaleToastTimer;
+    private DispatcherTimer? _playbackPitchToastTimer;
     private bool _videoLaunchScaleApplying;
     /// <summary>動画起動で映像が開くまでウィンドウを出さないための待ち。</summary>
     private TaskCompletionSource<bool>? _videoLaunchShowReady;
@@ -143,6 +144,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        EditHistory.CommandApplying += ResetPlaybackPitchForEdit;
         LibraryBrowser.BindWaveformGlow(PlayerWaveGlowHost);
         LibraryBrowser.BindWindowVisual(PlayerVisualHost);
         // エディタもプレイヤーと同じウォッシュ。モード切替（F11／F12）を待たない。
@@ -410,6 +412,7 @@ public partial class MainWindow : Window
         VideoLaunchAspectResize.Attach(this, TryGetVideoLaunchAspectConstraints);
         Closed += (_, _) =>
         {
+            EditHistory.CommandApplying -= ResetPlaybackPitchForEdit;
             StopMeterRendering();
             _meterReleaseTimer?.Stop();
             _playTimer.Stop();

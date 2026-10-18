@@ -115,4 +115,103 @@ internal static class SignalsmithStretchNative
         float semitones,
         ProgressCallback? progress,
         IntPtr user);
+
+    [DefaultDllImportSearchPaths(DllImportSearchPath.AssemblyDirectory | DllImportSearchPath.SafeDirectories)]
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ss_rt_create")]
+    public static extern IntPtr RtCreate();
+
+    [DefaultDllImportSearchPaths(DllImportSearchPath.AssemblyDirectory | DllImportSearchPath.SafeDirectories)]
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ss_rt_destroy")]
+    public static extern void RtDestroy(IntPtr handle);
+
+    [DefaultDllImportSearchPaths(DllImportSearchPath.AssemblyDirectory | DllImportSearchPath.SafeDirectories)]
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ss_rt_set_semitones")]
+    public static extern void RtSetSemitones(IntPtr handle, float semitones);
+
+    [DefaultDllImportSearchPaths(DllImportSearchPath.AssemblyDirectory | DllImportSearchPath.SafeDirectories)]
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ss_rt_reset")]
+    public static extern void RtReset(IntPtr handle);
+
+    [DefaultDllImportSearchPaths(DllImportSearchPath.AssemblyDirectory | DllImportSearchPath.SafeDirectories)]
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ss_rt_process")]
+    public static extern int RtProcess(
+        IntPtr handle,
+        float[] interleaved,
+        int frameOffset,
+        int frames,
+        int channels,
+        int sampleRate);
+}
+
+/// <summary>
+/// 再生出力に掛ける時間長据え置きのピッチ。半音 0 のときはバッファを触らない。
+/// </summary>
+internal sealed class PlaybackPitchShift : IDisposable
+{
+    private IntPtr _handle;
+    private bool _disposed;
+
+    public void SetSemitones(int semitones)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        Ensure();
+        SignalsmithStretchNative.RtSetSemitones(_handle, semitones);
+    }
+
+    /// <summary>未使用ならネイティブを作らない。トラック切替の 0 戻し用。</summary>
+    public void ClearSemitones()
+    {
+        if (_disposed || _handle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        SignalsmithStretchNative.RtSetSemitones(_handle, 0);
+        SignalsmithStretchNative.RtReset(_handle);
+    }
+
+    public void ResetEngine()
+    {
+        if (_disposed || _handle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        SignalsmithStretchNative.RtReset(_handle);
+    }
+
+    public void Process(float[] interleaved, int frameOffset, int frames, int channels, int sampleRate, int semitones)
+    {
+        if (_disposed || semitones == 0 || frames < 1 || channels < 1)
+        {
+            return;
+        }
+
+        Ensure();
+        SignalsmithStretchNative.RtSetSemitones(_handle, semitones);
+        SignalsmithStretchNative.RtProcess(_handle, interleaved, frameOffset, frames, channels, sampleRate);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        if (_handle != IntPtr.Zero)
+        {
+            SignalsmithStretchNative.RtDestroy(_handle);
+            _handle = IntPtr.Zero;
+        }
+    }
+
+    private void Ensure()
+    {
+        if (_handle == IntPtr.Zero)
+        {
+            _handle = SignalsmithStretchNative.RtCreate();
+        }
+    }
 }

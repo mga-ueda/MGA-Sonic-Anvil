@@ -13,7 +13,7 @@ if not exist "%OUT%" mkdir "%OUT%"
 set SRC=%ROOT%signalsmith_stretch_c.cpp
 set INC_STRETCH=%ROOT%..\signalsmith-stretch
 set INC_LINEAR=%ROOT%..\signalsmith-linear\include
-cl /nologo /O2 /EHsc /std:c++17 /W3 /wd4244 /wd4305 /DSIGNALSMITH_STRETCH_EXPORTS /LD /I "%ROOT%" /I "%INC_STRETCH%" /I "%INC_LINEAR%" "%SRC%" /Fe:"%OUT%\SignalsmithStretch.dll" /Fo:"%OUT%\signalsmith_stretch_c.obj"
+cl /nologo /O2 /EHsc /std:c++17 /W3 /wd4244 /wd4305 /DSIGNALSMITH_STRETCH_EXPORTS /LD /I "%ROOT%." /I "%INC_STRETCH%" /I "%INC_LINEAR%" "%SRC%" /Fe:"%OUT%\SignalsmithStretch.dll" /Fo:"%OUT%\signalsmith_stretch_c.obj"
 if errorlevel 1 exit /b 1
 del /q "%OUT%\signalsmith_stretch_c.obj" "%OUT%\SignalsmithStretch.exp" "%OUT%\SignalsmithStretch.lib" 2>nul
 echo Built %OUT%\SignalsmithStretch.dll
