@@ -2106,8 +2106,6 @@ internal sealed class LibraryBrowserView : UserControl
         return string.IsNullOrEmpty(name) ? trimmed : name;
     }
 
-    public bool HasCutGhost => _cutPaths.Count > 0;
-
     /// <summary>切り取り中のパスを暗くする。前の切り取り表示は消す。</summary>
     public void MarkCutGhost(IReadOnlyList<string> paths)
     {

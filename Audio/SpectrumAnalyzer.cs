@@ -53,8 +53,6 @@ internal sealed class SpectrumAnalyzer
         OriginalOuterWidthPx / (double)OriginalOuterHeightPx;
     /// <summary>1/3oct フィルタの隣帯。中心から約 14 dB 下（DigiCheck の裾）。</summary>
     public const double AdjacentBandDropDb = 14;
-    /// <summary>さらに一つ外側。20 Hz 正弦で約 −42 dB になる量。</summary>
-    public const double SecondBandDropDb = 24;
     public const double SkirtMinPeakLin = 1e-14;
     /// <summary>DigiCheck の Peak Hold Time。ピークを離れてからこの秒数は保持する。</summary>
     public const double PeakHoldCenterSec = 2.07;
@@ -77,8 +75,6 @@ internal sealed class SpectrumAnalyzer
     /// </summary>
     public const double BroadbandCrestDb = 6.5;
     public const double BroadbandCrestStartHz = 40;
-    /// <summary>主ローブが帯幅より広い低域だけ、隣への漏れを DigiCheck の間隔まで下げる。</summary>
-    public const double LowLeakCapHz = 80;
     /// <summary>最も高い帯からこの dB 以内に 8 帯以上あるとき、ピンクのような広帯域とみなす。</summary>
     public const double BroadbandClusterDb = 8;
     public const int BroadbandClusterCount = 8;
