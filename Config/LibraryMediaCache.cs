@@ -427,6 +427,112 @@ internal static class LibraryMediaCache
         return Convert.ToHexString(bytes.AsSpan(0, 16)).ToLowerInvariant();
     }
 
+    private static readonly int[] CachedBarCounts = [48, 96, 144];
+
+    public static void CopyEntry(string from, string to) =>
+        TransferEntry(from, to, move: false);
+
+    public static void MoveEntry(string from, string to) =>
+        TransferEntry(from, to, move: true);
+
+    public static void DeleteEntry(string path)
+    {
+        if (!TryFull(path, out var full))
+        {
+            return;
+        }
+
+        foreach (var file in CacheFiles(full))
+        {
+            TryDelete(file);
+        }
+    }
+
+    private static void TransferEntry(string from, string to, bool move)
+    {
+        if (!TryFull(from, out var source) || !TryFull(to, out var dest))
+        {
+            return;
+        }
+
+        var sources = CacheFiles(source);
+        var targets = CacheFiles(dest);
+        for (var i = 0; i < sources.Length; i++)
+        {
+            try
+            {
+                if (!File.Exists(sources[i]))
+                {
+                    continue;
+                }
+
+                var parent = Path.GetDirectoryName(targets[i]);
+                if (!string.IsNullOrEmpty(parent))
+                {
+                    Directory.CreateDirectory(parent);
+                }
+
+                if (move)
+                {
+                    if (File.Exists(targets[i]))
+                    {
+                        File.Delete(targets[i]);
+                    }
+
+                    File.Move(sources[i], targets[i]);
+                }
+                else
+                {
+                    File.Copy(sources[i], targets[i], overwrite: true);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+            }
+        }
+    }
+
+    private static string[] CacheFiles(string full)
+    {
+        var files = new string[CachedBarCounts.Length + 2];
+        for (var i = 0; i < CachedBarCounts.Length; i++)
+        {
+            files[i] = WavePath(full, CachedBarCounts[i]);
+        }
+
+        files[^2] = ArtPath(full);
+        files[^1] = LoudnessPath(full);
+        return files;
+    }
+
+    private static bool TryFull(string path, out string full)
+    {
+        full = string.Empty;
+        try
+        {
+            full = Path.GetFullPath(path.Trim());
+            return full.Length > 0;
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
+    }
+
+    private static void TryDelete(string file)
+    {
+        try
+        {
+            if (File.Exists(file))
+            {
+                File.Delete(file);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
     private static bool TryStat(string path, out string full, out long size, out long mtime)
     {
         full = string.Empty;

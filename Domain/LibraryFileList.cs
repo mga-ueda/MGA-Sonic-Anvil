@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace MgaSonicAnvil.Domain;
 
 internal enum LibraryFileColumn
@@ -54,8 +56,28 @@ internal enum LibrarySortDirection
 }
 
 /// <summary>F10 ファイルリストの 1 行。並べ替えとグルーピング用。</summary>
-internal sealed class LibraryFileRow
+internal sealed class LibraryFileRow : INotifyPropertyChanged
 {
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private bool _cutPending;
+
+    /// <summary>切り取り中。名前を暗い色で出す。</summary>
+    public bool CutPending
+    {
+        get => _cutPending;
+        set
+        {
+            if (_cutPending == value)
+            {
+                return;
+            }
+
+            _cutPending = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CutPending)));
+        }
+    }
+
     public object? Tag { get; init; }
 
     public string Name { get; init; } = string.Empty;

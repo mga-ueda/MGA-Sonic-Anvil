@@ -958,29 +958,23 @@ public partial class MainWindow
             return true;
         }
 
-        // プレイヤー専用: Tab 循環 / F1 ツリー / F2 お気に入り / F3 プレイリスト
+        // プレイヤーのコピー／貼り付け／移動／削除／名前変更。F1／F3 はペイン移動に使わない。
+        if (IsLibraryMaximized
+            && !isRepeat
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && TryHandleLibraryFileShortcut(key, modifiers))
+        {
+            return true;
+        }
+
+        // プレイヤー専用: Tab でツリー→お気に入り→プレイリスト。
         if (IsLibraryMaximized && IsLibraryPaneCycleShortcut(key, modifiers))
         {
             if (key == Key.Tab)
             {
                 LibraryBrowser.CyclePaneFocus(reverse: modifiers == ModifierKeys.Shift);
             }
-            else
-            {
-                switch (key)
-                {
-                    case Key.F1:
-                        LibraryBrowser.FocusExplorer();
-                        break;
-                    case Key.F2:
-                        LibraryBrowser.FocusFavorites();
-                        break;
-                    default:
-                        LibraryBrowser.FocusList();
-                        break;
-                }
-            }
-
             return true;
         }
 
@@ -2125,6 +2119,23 @@ public partial class MainWindow
             return true;
         }
 
+        if (IsLibraryMaximized
+            && (LibraryBrowser.IsExplorerTreeFocused || LibraryBrowser.IsListKeyboardFocused)
+            && !LibraryBrowser.IsSearchFocused
+            && LibraryBrowser.ClearCutGhost())
+        {
+            try
+            {
+                Clipboard.Clear();
+            }
+            catch (System.Runtime.InteropServices.ExternalException)
+            {
+            }
+
+            LibraryBrowser.FocusPane(LibraryBrowser.ActivePane);
+            return true;
+        }
+
         if (_recording)
         {
             StopRecording();
@@ -2807,8 +2818,7 @@ public partial class MainWindow
     }
 
     private static bool IsLibraryPaneCycleShortcut(Key key, ModifierKeys modifiers) =>
-        LibraryPlayerMode.IsPaneCycleKey(key, modifiers)
-        || (modifiers == ModifierKeys.None && key is Key.F1 or Key.F2 or Key.F3);
+        LibraryPlayerMode.IsPaneCycleKey(key, modifiers);
 
     /// <summary>
     /// プレイヤーのライブラリ／プレイリスト検索。Ctrl+F でフォーカス中のペインの検索へ。

@@ -13,8 +13,16 @@ internal static class LibraryShellFiles
 {
     internal const string PreferredDropEffectFormat = "Preferred DropEffect";
 
-    /// <summary>DROPEFFECT_COPY = 1。移動（2）は使わない（FO_COPY と取り違えない）。</summary>
+    /// <summary>DROPEFFECT_COPY = 1。切り取りは DROPEFFECT_MOVE = 2。</summary>
     internal const int DropEffectCopy = 1;
+
+    internal const int DropEffectMove = 2;
+
+    internal const string OriginFormat = "MgaSonicAnvil.LibraryOrigin";
+
+    internal const string OriginTree = "tree";
+
+    internal const string OriginPlaylist = "playlist";
 
     public static string[] ExistingPaths(IEnumerable<string?> paths)
     {
@@ -53,7 +61,10 @@ internal static class LibraryShellFiles
         return [.. result];
     }
 
-    public static DataObject? CreateCopyData(IEnumerable<string?> paths)
+    public static DataObject? CreateCopyData(IEnumerable<string?> paths) =>
+        CreateTransferData(paths, DropEffectCopy, origin: null);
+
+    public static DataObject? CreateTransferData(IEnumerable<string?> paths, int dropEffect, string? origin)
     {
         var existing = ExistingPaths(paths);
         if (existing.Length == 0)
@@ -65,21 +76,29 @@ internal static class LibraryShellFiles
         files.AddRange(existing);
         var data = new DataObject();
         data.SetFileDropList(files);
-        data.SetData(PreferredDropEffectFormat, CreateCopyEffectStream(), autoConvert: false);
+        data.SetData(PreferredDropEffectFormat, CreateEffectStream(dropEffect), autoConvert: false);
+        if (!string.IsNullOrEmpty(origin))
+        {
+            data.SetData(OriginFormat, origin);
+        }
+
         return data;
     }
 
     /// <summary>ドラッグ／クリップボード用。OLE が Preferred DropEffect を読める。</summary>
     public static object? CreateOleCopyData(IEnumerable<string?> paths) =>
-        LibraryCopyDropDataObject.FromPaths(paths);
+        CreateOleTransferData(paths, DropEffectCopy, origin: null);
 
-    internal static MemoryStream CreateCopyEffectStream()
+    public static object? CreateOleTransferData(IEnumerable<string?> paths, int dropEffect, string? origin) =>
+        LibraryCopyDropDataObject.FromPaths(paths, dropEffect, origin);
+
+    internal static MemoryStream CreateCopyEffectStream() => CreateEffectStream(DropEffectCopy);
+
+    internal static MemoryStream CreateEffectStream(int dropEffect)
     {
         var stream = new MemoryStream(4);
-        stream.WriteByte(DropEffectCopy);
-        stream.WriteByte(0);
-        stream.WriteByte(0);
-        stream.WriteByte(0);
+        var bytes = BitConverter.GetBytes(dropEffect);
+        stream.Write(bytes, 0, 4);
         stream.Position = 0;
         return stream;
     }

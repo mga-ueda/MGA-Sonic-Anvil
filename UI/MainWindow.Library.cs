@@ -5019,7 +5019,8 @@ public partial class MainWindow
         IReadOnlyList<string> folders,
         LibraryExplorerPlaylistWalk? walk = null,
         bool playFirst = false,
-        bool recursive = true)
+        bool recursive = true,
+        bool placeByCurrentSort = false)
     {
         LibraryPlaylistDocuments.ApplyFromSettings(AppStorage.Settings);
         var generation = ++_libraryFolderShowGeneration;
@@ -5129,9 +5130,19 @@ public partial class MainWindow
                     firstInBatch: true,
                     playlistWasEmpty);
             var head = pending[0];
-            foreach (var session in pending)
+            if (placeByCurrentSort)
             {
-                _sessions.Add(session);
+                foreach (var session in pending)
+                {
+                    PlacePlaylistSession(session, selectFirst && ReferenceEquals(session, head));
+                }
+            }
+            else
+            {
+                foreach (var session in pending)
+                {
+                    _sessions.Add(session);
+                }
             }
 
             if (selectFirst)
@@ -5139,7 +5150,10 @@ public partial class MainWindow
                 ScanLibraryArtwork(head);
             }
 
-            LibraryBrowser.AppendSessions(pending, selectFirst ? head : null);
+            if (!placeByCurrentSort)
+            {
+                LibraryBrowser.AppendSessions(pending, selectFirst ? head : null);
+            }
             SyncPlayerMeterFade();
             loaded += pending.Count;
             if (showProgress)
