@@ -4762,6 +4762,12 @@ public partial class MainWindow
         AppStorage.Save();
     }
 
+    private void LibraryBrowser_SortChanged(object? sender, LibraryPlaylistSort sort)
+    {
+        AppStorage.Settings.ApplyLibraryListSort(sort);
+        AppStorage.Save();
+    }
+
     private void LibraryBrowser_ExplorerFolderChanged(object? sender, string path)
     {
         AppStorage.Settings.ApplyLibraryExplorerPath(path);

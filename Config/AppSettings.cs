@@ -354,6 +354,12 @@ internal sealed class AppSettings
     /// <summary>F10 リストのグループ。空は親フォルダ。</summary>
     public string LibraryListGroup { get; set; } = string.Empty;
 
+    /// <summary>プレイリストのソート列。空はアルバム。None はソート無し。</summary>
+    public string LibraryListSortColumn { get; set; } = string.Empty;
+
+    /// <summary>プレイリストのソート方向。空は昇順。列が空のときも昇順。</summary>
+    public string LibraryListSortDirection { get; set; } = string.Empty;
+
     /// <summary>F10 左のフォルダツリー。空はマイミュージック（ルート解決後）。</summary>
     public string LibraryExplorerPath { get; set; } = string.Empty;
 
@@ -739,6 +745,50 @@ internal sealed class AppSettings
 
     public void ApplyLibraryListGroup(LibraryFileGroup group) =>
         LibraryListGroup = LibraryFileList.SerializeGroup(group);
+
+    public LibraryPlaylistSort ResolvedLibraryListSort()
+    {
+        if (string.IsNullOrWhiteSpace(LibraryListSortColumn))
+        {
+            return new LibraryPlaylistSort(LibraryFileColumn.Album, LibrarySortDirection.Ascending);
+        }
+
+        if (string.Equals(LibraryListSortColumn, "None", StringComparison.OrdinalIgnoreCase))
+        {
+            return new LibraryPlaylistSort(null, LibrarySortDirection.Ascending);
+        }
+
+        var column = Enum.TryParse(LibraryListSortColumn, ignoreCase: true, out LibraryFileColumn parsed)
+            ? parsed
+            : LibraryFileColumn.Album;
+        var direction = string.Equals(
+            LibraryListSortDirection,
+            nameof(LibrarySortDirection.Descending),
+            StringComparison.OrdinalIgnoreCase)
+            ? LibrarySortDirection.Descending
+            : LibrarySortDirection.Ascending;
+        return new LibraryPlaylistSort(column, direction);
+    }
+
+    public void ApplyLibraryListSort(LibraryPlaylistSort sort)
+    {
+        if (sort.Column is not LibraryFileColumn column)
+        {
+            LibraryListSortColumn = "None";
+            LibraryListSortDirection = string.Empty;
+            return;
+        }
+
+        if (column == LibraryFileColumn.Album && sort.Direction == LibrarySortDirection.Ascending)
+        {
+            LibraryListSortColumn = string.Empty;
+            LibraryListSortDirection = string.Empty;
+            return;
+        }
+
+        LibraryListSortColumn = column.ToString();
+        LibraryListSortDirection = sort.Direction.ToString();
+    }
 
     public string ResolvedLibraryExplorerPath() =>
         LibraryExplorerPaths.Resolve(LibraryExplorerPath);

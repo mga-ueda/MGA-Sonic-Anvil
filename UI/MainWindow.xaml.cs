@@ -157,6 +157,7 @@ public partial class MainWindow : Window
         LibraryBrowser.PlaylistVisualStateChanged += (_, _) => SyncPlaylistVideoChromeFade();
         LibraryBrowser.VisibleColumnPresetsChanged += LibraryBrowser_VisibleColumnPresetsChanged;
         LibraryBrowser.GroupChanged += LibraryBrowser_GroupChanged;
+        LibraryBrowser.SortChanged += LibraryBrowser_SortChanged;
         LibraryBrowser.ExplorerFolderChanged += LibraryBrowser_ExplorerFolderChanged;
         LibraryBrowser.ExplorerExpandedChanged += LibraryBrowser_ExplorerExpandedChanged;
         LibraryBrowser.ExplorerFolderOpened += LibraryBrowser_ExplorerFolderOpened;
@@ -196,6 +197,7 @@ public partial class MainWindow : Window
             AppStorage.Settings.ResolvedLibraryPlaylistWaveformSizeMp3());
         LibraryBrowser.SetDefaultAudioFormat(AppStorage.Settings.ResolvedDefaultAudioFormat());
         LibraryBrowser.SetGroup(AppStorage.Settings.ResolvedLibraryListGroup());
+        LibraryBrowser.SetSort(AppStorage.Settings.ResolvedLibraryListSort());
         LibraryBrowser.SetExplorerRoots(AppStorage.Settings.ResolvedLibraryExplorerRoots());
         ScheduleLibraryCatalogPrune();
         LibraryBrowser.SetExplorerExpanded(AppStorage.Settings.ResolvedLibraryExplorerExpanded());
