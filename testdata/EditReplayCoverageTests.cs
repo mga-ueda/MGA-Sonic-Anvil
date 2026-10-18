@@ -208,6 +208,16 @@ public sealed class EditReplayCoverageTests
                 End = 40,
                 Amount = -3,
             },
+            HistoryRecipes.PenGain => new HistoryRecipe
+            {
+                Kind = kind,
+                SourceRate = 48000,
+                Start = 0,
+                End = 4,
+                ClipSamples = [0.5f, 0.5f, 0.25f, 0.25f],
+                ClipChannels = 1,
+                ClipRate = 48000,
+            },
             HistoryRecipes.Reverse => Range(kind, 0, 40),
             HistoryRecipes.NormalizePerRegion => new HistoryRecipe
             {
