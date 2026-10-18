@@ -11,6 +11,7 @@ obj/
 *.log
 publish/
 artifacts/
+MgaSonicAnvil.Tests/reference_signals/
 testrun-loudness-v/
 tmp-video-frames/
 
