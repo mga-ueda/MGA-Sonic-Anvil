@@ -1836,6 +1836,11 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.E && modifiers == ModifierKeys.None && Waveform.TryToggleLoudnessPen())
+        {
+            return true;
+        }
+
         if (key == Key.P && modifiers == ModifierKeys.None)
         {
             PromptPitch();
@@ -2180,6 +2185,11 @@ public partial class MainWindow
         }
 
         if (Waveform.ClearSelection())
+        {
+            return true;
+        }
+
+        if (Waveform.TryCancelLoudnessPen())
         {
             return true;
         }

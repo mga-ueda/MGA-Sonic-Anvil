@@ -1028,6 +1028,8 @@ public partial class MainWindow
         view.SelectionChanged += OnWaveformSelectionChangedFromView;
         view.ChannelLabelClicked += OnWaveformChannelLabelClicked;
         view.ViewChanged += OnWaveformViewChanged;
+        view.PenStrokeUpdated += OnPenStrokeUpdated;
+        view.PenStrokeCompleted += OnPenStrokeCompleted;
     }
 
     private void UnhookWaveformEvents(WaveformView view)
@@ -1046,6 +1048,8 @@ public partial class MainWindow
         view.SelectionChanged -= OnWaveformSelectionChangedFromView;
         view.ChannelLabelClicked -= OnWaveformChannelLabelClicked;
         view.ViewChanged -= OnWaveformViewChanged;
+        view.PenStrokeUpdated -= OnPenStrokeUpdated;
+        view.PenStrokeCompleted -= OnPenStrokeCompleted;
     }
 
     private bool IsLiveWaveform(object? sender) =>

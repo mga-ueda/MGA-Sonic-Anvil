@@ -25,6 +25,19 @@ public sealed class TransportToolTipTests
         Assert.Contains("Ctrl+R", UiStrings.TooltipRecord);
         Assert.Contains("(X)", UiStrings.TooltipFadeAround);
         Assert.Contains("(V)", UiStrings.TooltipVolume);
+        Assert.Contains("(E)", UiStrings.TooltipLoudnessPen);
+        var language = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Equal("Eキーで切替", UiStrings.LabelLoudnessPenToggle);
+            UiStrings.SetLanguage(UiLanguage.English);
+            Assert.Equal("Press E to toggle", UiStrings.LabelLoudnessPenToggle);
+        }
+        finally
+        {
+            UiStrings.SetLanguage(language);
+        }
         Assert.Contains("(V)", UiStrings.TooltipLoudnessView);
         Assert.Contains("Esc", UiStrings.TooltipLoudnessView);
         Assert.Contains("Shift+A", UiStrings.TooltipLoudnessView);

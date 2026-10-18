@@ -102,6 +102,7 @@ internal static class HistoryRecipes
     public const string FadeAround = "FadeAround";
     public const string Normalize = "Normalize";
     public const string Gain = "Gain";
+    public const string PenGain = "PenGain";
     public const string PitchShift = "PitchShift";
     public const string TimeStretch = "TimeStretch";
     public const string Reverse = "Reverse";
@@ -136,6 +137,7 @@ internal static class HistoryRecipes
         FadeAround,
         Normalize,
         Gain,
+        PenGain,
         PitchShift,
         TimeStretch,
         Reverse,
@@ -171,6 +173,7 @@ internal static class HistoryRecipes
         FadeAround,
         Normalize,
         Gain,
+        PenGain,
         PitchShift,
         TimeStretch,
         Reverse,
@@ -317,6 +320,26 @@ internal static class HistoryRecipes
             Value = edgeFade ? fadeMs : 0,
         };
 
+    public static HistoryRecipe FromPenGain(
+        int sourceRate,
+        long startFrame,
+        long endFrame,
+        float[] gains,
+        int channelMask = 0) =>
+        WithChannel(
+            new HistoryRecipe
+            {
+                Kind = PenGain,
+                SourceRate = sourceRate,
+                Start = startFrame,
+                End = endFrame,
+                ClipSamples = gains,
+                ClipChannels = 1,
+                ClipRate = sourceRate,
+            },
+            ChannelSolo.Off,
+            channelMask);
+
     public static HistoryRecipe FromTimeStretch(
         int sourceRate,
         WaveSelection range,
@@ -348,6 +371,7 @@ internal static class HistoryRecipes
                 channelMask: MaskOf(recipe)),
             Normalize => ProcessEdits.Normalize(document, RangeOf(recipe), channelMask: MaskOf(recipe)),
             Gain => ProcessEdits.Gain(document, RangeOf(recipe), recipe.Amount, channelMask: MaskOf(recipe)),
+            PenGain => ProcessEdits.PenGain(document, recipe.Start, recipe.ClipSamples, channelMask: MaskOf(recipe)),
             PitchShift => ProcessEdits.PitchShift(
                 document,
                 RangeOf(recipe),

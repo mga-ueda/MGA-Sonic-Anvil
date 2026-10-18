@@ -136,6 +136,36 @@ internal sealed class LoudnessOverlayRenderer
         dc.Pop();
     }
 
+    public const double PenHitSlopPx = 8;
+
+    /// <summary>ポインタが Short Term 曲線（±1 LU の帯を含む）の上か。</summary>
+    public static bool IsNearCurve(
+        Point pos,
+        Rect wave,
+        LoudnessProfile profile,
+        double target,
+        double viewStart,
+        double viewSpan,
+        Func<long, float>? previewGain = null)
+    {
+        if (wave.Width <= 1 || wave.Height <= 1 || viewSpan <= 0 || !wave.Contains(pos))
+        {
+            return false;
+        }
+
+        var t = (pos.X - wave.X) / wave.Width;
+        var frame = viewStart + viewSpan * t;
+        var lufs = profile.AtFrame(frame, previewGain);
+        if (float.IsInfinity(lufs) || float.IsNaN(lufs))
+        {
+            return false;
+        }
+
+        var y = LufsToY(lufs, wave, target);
+        var band = Math.Abs(y - LufsToY(lufs + 1, wave, target));
+        return Math.Abs(pos.Y - y) <= Math.Max(PenHitSlopPx, band);
+    }
+
     public static double LufsToY(double lufs, Rect wave, double target)
     {
         var top = TopLufs;
