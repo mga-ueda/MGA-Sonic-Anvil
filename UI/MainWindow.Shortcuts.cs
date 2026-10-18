@@ -3135,8 +3135,7 @@ public partial class MainWindow
                 return false;
             }
 
-            _player.SetPlaybackSemitones(0);
-            ShowPlaybackPitchToast(returnedToOriginal: true);
+            ApplyPlaybackPitchStep(0);
             return true;
         }
 
@@ -3145,14 +3144,32 @@ public partial class MainWindow
             return false;
         }
 
+        ApplyPlaybackPitchStep(step);
+        return true;
+    }
+
+    /// <summary>再生中の音を半音動かす。0 で元の高さへ戻す。</summary>
+    private void ApplyPlaybackPitchStep(int step)
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        if (step == 0)
+        {
+            _player.SetPlaybackSemitones(0);
+            ShowPlaybackPitchToast(returnedToOriginal: true);
+            return;
+        }
+
         var next = PitchShift.Snap(_player.PlaybackSemitones + step);
         if (!_player.SetPlaybackSemitones(next))
         {
-            return true;
+            return;
         }
 
         ShowPlaybackPitchToast(returnedToOriginal: false);
-        return true;
     }
 
     /// <summary>ショートカットでピッチが変わったとき、中央に現在の半音を出してフェードアウト。</summary>

@@ -27,6 +27,9 @@ public partial class MainWindow
             WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(hit)),
             ExecuteWaveMenu,
             Waveform);
+        // プレイリスト側と同じ。外側クリックでメニューを閉じた貫通が、空領域の選択解除や
+        // プレイヤー解除へ落ちてリストが消えるのを、閉じた直後のアイドルまで握りつぶす。
+        LibraryBrowser.ArmContextMenuDismissGuard(menu);
         _waveMenu = menu;
         menu.Closed += (_, _) =>
         {
@@ -463,6 +466,15 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.NextMarker:
                 Waveform.SeekToMarker(1);
+                break;
+            case WaveMenuCommand.PlaybackPitchUp:
+                ApplyPlaybackPitchStep(1);
+                break;
+            case WaveMenuCommand.PlaybackPitchDown:
+                ApplyPlaybackPitchStep(-1);
+                break;
+            case WaveMenuCommand.PlaybackPitchReset:
+                ApplyPlaybackPitchStep(0);
                 break;
             case WaveMenuCommand.TogglePlayback:
                 if (IsLibraryMaximized)

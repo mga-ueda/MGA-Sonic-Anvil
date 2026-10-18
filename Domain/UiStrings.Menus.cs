@@ -77,6 +77,9 @@ internal static partial class UiStrings
     public static string WaveMenuNormalizePerRegionSelected => Get("選択ファイルをリージョン毎にノーマライズ(_G)", "Normalize Selected Files per Re_gion");
     public static string WaveMenuVolume => Get("音量(_U)", "Vol_ume");
     public static string WaveMenuVolumeSelected => Get("選択ファイルの音量(_U)", "Vol_ume of Selected Files");
+    public static string WaveMenuPitchPreviewUp => Get("ピッチシフトしてプレビュー（半音上げる）(_U)", "Pitch Shift Preview (Semitone _Up)");
+    public static string WaveMenuPitchPreviewDown => Get("ピッチシフトしてプレビュー（半音下げる）(_D)", "Pitch Shift Preview (Semitone _Down)");
+    public static string WaveMenuPitchPreviewReset => Get("ピッチシフトをリセット(_0)", "Reset Pitch Shift (_0)");
     public static string WaveMenuPitch => Get("ピッチ(_P)", "_Pitch");
     public static string WaveMenuPitchSelected => Get("選択ファイルのピッチ(_P)", "_Pitch of Selected Files");
     public static string WaveMenuTimeStretch => Get("タイムストレッチ(_T)", "_Time Stretch");

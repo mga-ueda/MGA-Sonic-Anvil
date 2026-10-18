@@ -310,6 +310,7 @@ internal sealed class LibraryBrowserView : UserControl
     /// 立てておき、その貫通クリックでプレイヤーを抜けて（＝選択以外のトラックが消えて）しまうのを防ぐ。
     /// </summary>
     private bool _contextMenuDismissGuard;
+    private int _contextMenuDismissDepth;
 
     public event EventHandler<DocumentSession>? SessionActivated;
 
@@ -377,6 +378,18 @@ internal sealed class LibraryBrowserView : UserControl
 
     /// <summary>Ctrl+F5 と同じ索引の再構築。</summary>
     public event EventHandler? LibraryCatalogRebuildRequested;
+
+    public event EventHandler<LibraryPane>? LibraryPasteRequested;
+
+    public event EventHandler<LibraryPane>? LibraryRenameRequested;
+
+    public event EventHandler<LibraryPane>? LibraryDeleteRequested;
+
+    public event EventHandler? PlaybackPitchUpRequested;
+
+    public event EventHandler? PlaybackPitchDownRequested;
+
+    public event EventHandler? PlaybackPitchResetRequested;
 
     /// <summary>リストの右クリックメニューを開いた／閉じた。F10 誤解除や plain-press 確定を抑止する。</summary>
     public event EventHandler? ListContextMenuOpened;
@@ -1981,20 +1994,20 @@ internal sealed class LibraryBrowserView : UserControl
         ShowTransferToast("Copy", paths);
     }
 
-    public void CutSelected()
+    public void CutSelected() => CutPaths(ActivePane);
+
+    private void CutPaths(LibraryPane pane)
     {
-        if (ActivePane == LibraryPane.Favorites)
+        if (pane == LibraryPane.Favorites)
         {
             return;
         }
 
-        var paths = SelectedCopyPaths();
+        var paths = CopyPathsFor(pane);
         if (paths.Length == 0)
         {
             return;
         }
-
-        var pane = ActivePane;
         var origin = pane == LibraryPane.Explorer
             ? LibraryShellFiles.OriginTree
             : LibraryShellFiles.OriginPlaylist;
@@ -10291,21 +10304,45 @@ internal sealed class LibraryBrowserView : UserControl
             InputGestureText = "Ctrl+F5",
         };
         rebuild.Click += (_, _) => LibraryCatalogRebuildRequested?.Invoke(this, EventArgs.Empty);
-        menu.Items.Add(replace);
-        menu.Items.Add(append);
-        menu.Items.Add(replaceRecursive);
-        menu.Items.Add(appendRecursive);
-        menu.Items.Add(add);
-        menu.Items.Add(addRoot);
-        menu.Items.Add(removeRoot);
-        menu.Items.Add(expand);
-        menu.Items.Add(collapse);
-        menu.Items.Add(moveUp);
-        menu.Items.Add(moveDown);
-        menu.Items.Add(new Separator());
-        menu.Items.Add(refresh);
-        menu.Items.Add(rebuild);
-        AddCopyAndExplorerMenuItems(menu, LibraryPane.Explorer, out var copy, out var copyNames, out var copyPaths, out var explorer);
+        AddCopyAndExplorerMenuItems(
+            LibraryPane.Explorer,
+            out var copy,
+            out var cut,
+            out var paste,
+            out var rename,
+            out var delete,
+            out var pitchUp,
+            out var pitchDown,
+            out var pitchReset,
+            out var copyNames,
+            out var copyPaths,
+            out var explorer);
+        var playlist = Submenu(UiStrings.LibraryMenuCatPlaylist, replace, append, replaceRecursive, appendRecursive);
+        var edit = Submenu(UiStrings.LibraryMenuCatEdit, copy, cut, paste, rename, delete);
+        var pitch = Submenu(UiStrings.LibraryMenuCatPitch, pitchUp, pitchDown, pitchReset);
+        var tree = Submenu(
+            UiStrings.LibraryMenuCatTree,
+            expand,
+            collapse,
+            add,
+            new Separator(),
+            moveUp,
+            moveDown,
+            addRoot,
+            removeRoot);
+        var other = Submenu(
+            UiStrings.LibraryMenuCatOther,
+            refresh,
+            rebuild,
+            new Separator(),
+            copyNames,
+            copyPaths,
+            explorer);
+        menu.Items.Add(playlist);
+        menu.Items.Add(edit);
+        menu.Items.Add(pitch);
+        menu.Items.Add(tree);
+        menu.Items.Add(other);
         menu.Opened += (_, _) =>
         {
             var selected = SelectedExplorerFolders.Length > 0;
@@ -10325,9 +10362,17 @@ internal sealed class LibraryBrowserView : UserControl
             addRoot.IsEnabled = selected && SelectionCanRegisterExplorerRoot();
             removeRoot.IsEnabled = selected && SelectionContainsExplorerRoot();
             copy.IsEnabled = transfer.Length > 0;
+            cut.IsEnabled = transfer.Length > 0;
+            paste.IsEnabled = true;
+            rename.IsEnabled = selected;
+            delete.IsEnabled = SelectionCanRegisterExplorerRoot();
+            pitchUp.IsEnabled = true;
+            pitchDown.IsEnabled = true;
+            pitchReset.IsEnabled = true;
             copyNames.IsEnabled = transfer.Length > 0;
             copyPaths.IsEnabled = transfer.Length > 0;
             explorer.IsEnabled = existing.Length > 0;
+            SyncSubmenuEnabled(playlist, edit, pitch, tree, other);
         };
         ArmContextMenuDismissGuard(menu);
         _folderTree.ContextMenu = menu;
@@ -10362,12 +10407,35 @@ internal sealed class LibraryBrowserView : UserControl
         appendRecursive.Click += (_, _) => ActivateSelectedFavorites(clearPlaylist: false, recursive: true);
         var remove = new MenuItem { Header = UiStrings.LibraryMenuRemoveFromFavorites };
         remove.Click += (_, _) => RemoveSelectedFavorites();
-        menu.Items.Add(replace);
-        menu.Items.Add(append);
-        menu.Items.Add(replaceRecursive);
-        menu.Items.Add(appendRecursive);
-        menu.Items.Add(remove);
-        AddCopyAndExplorerMenuItems(menu, LibraryPane.Favorites, out var copy, out var copyNames, out var copyPaths, out var explorer);
+        AddCopyAndExplorerMenuItems(
+            LibraryPane.Favorites,
+            out var copy,
+            out var cut,
+            out var paste,
+            out var rename,
+            out var delete,
+            out var pitchUp,
+            out var pitchDown,
+            out var pitchReset,
+            out var copyNames,
+            out var copyPaths,
+            out var explorer);
+        var playlist = Submenu(UiStrings.LibraryMenuCatPlaylist, replace, append, replaceRecursive, appendRecursive);
+        var edit = Submenu(
+            UiStrings.LibraryMenuCatEdit,
+            rename,
+            remove,
+            new Separator(),
+            copy,
+            cut,
+            paste,
+            delete);
+        var pitch = Submenu(UiStrings.LibraryMenuCatPitch, pitchUp, pitchDown, pitchReset);
+        var other = Submenu(UiStrings.LibraryMenuCatOther, copyNames, copyPaths, explorer);
+        menu.Items.Add(playlist);
+        menu.Items.Add(edit);
+        menu.Items.Add(pitch);
+        menu.Items.Add(other);
         menu.Opened += (_, _) =>
         {
             var paths = LibraryShellFiles.ExistingPaths(SelectedFavoritePaths);
@@ -10378,9 +10446,17 @@ internal sealed class LibraryBrowserView : UserControl
             appendRecursive.IsEnabled = paths.Length > 0;
             remove.IsEnabled = selected;
             copy.IsEnabled = false;
+            cut.IsEnabled = false;
+            paste.IsEnabled = false;
+            rename.IsEnabled = selected;
+            delete.IsEnabled = false;
+            pitchUp.IsEnabled = true;
+            pitchDown.IsEnabled = true;
+            pitchReset.IsEnabled = true;
             copyNames.IsEnabled = paths.Length > 0;
             copyPaths.IsEnabled = paths.Length > 0;
             explorer.IsEnabled = paths.Length > 0;
+            SyncSubmenuEnabled(playlist, edit, pitch, other);
         };
         ArmContextMenuDismissGuard(menu);
         _favoritesList.ContextMenu = menu;
@@ -10434,17 +10510,50 @@ internal sealed class LibraryBrowserView : UserControl
         ArmMenuItemClick(undoRemove, () => PlaylistUndoRemoveRequested?.Invoke(this, EventArgs.Empty));
         var clear = new MenuItem { Header = UiStrings.LibraryMenuClearFromPlaylist };
         ArmMenuItemClick(clear, () => ClearPlaylistRequested?.Invoke(this, EventArgs.Empty));
-        menu.Items.Add(loudness);
-        menu.Items.Add(mp3);
-        menu.Items.Add(new Separator());
-        menu.Items.Add(previous);
-        menu.Items.Add(next);
-        menu.Items.Add(restart);
-        menu.Items.Add(autoPlay);
-        menu.Items.Add(undoRemove);
-        menu.Items.Add(new Separator());
-        menu.Items.Add(clear);
-        AddCopyAndExplorerMenuItems(menu, LibraryPane.List, out var copy, out var copyNames, out var copyPaths, out var explorer);
+        AddCopyAndExplorerMenuItems(
+            LibraryPane.List,
+            out var copy,
+            out var cut,
+            out var paste,
+            out var rename,
+            out var delete,
+            out var pitchUp,
+            out var pitchDown,
+            out var pitchReset,
+            out var copyNames,
+            out var copyPaths,
+            out var explorer);
+        var pitch = Submenu(
+            UiStrings.LibraryMenuCatPitch,
+            previous,
+            next,
+            restart,
+            autoPlay,
+            new Separator(),
+            pitchUp,
+            pitchDown,
+            pitchReset);
+        var edit = Submenu(
+            UiStrings.LibraryMenuCatEdit,
+            copy,
+            cut,
+            paste,
+            rename,
+            delete,
+            new Separator(),
+            undoRemove,
+            clear);
+        var other = Submenu(
+            UiStrings.LibraryMenuCatOther,
+            loudness,
+            mp3,
+            new Separator(),
+            copyNames,
+            copyPaths,
+            explorer);
+        menu.Items.Add(pitch);
+        menu.Items.Add(edit);
+        menu.Items.Add(other);
         menu.Opened += (_, _) =>
         {
             // メニュー表示中に残った plain-press を捨て、閉じたあとの MouseUp で単一選択確定しない。
@@ -10467,9 +10576,17 @@ internal sealed class LibraryBrowserView : UserControl
             undoRemove.IsEnabled = CanUndoPlaylistRemove;
             clear.IsEnabled = hasSelection;
             copy.IsEnabled = paths.Length > 0;
+            cut.IsEnabled = paths.Length > 0;
+            paste.IsEnabled = true;
+            rename.IsEnabled = hasSelection;
+            delete.IsEnabled = hasSelection;
+            pitchUp.IsEnabled = true;
+            pitchDown.IsEnabled = true;
+            pitchReset.IsEnabled = true;
             copyNames.IsEnabled = paths.Length > 0;
             copyPaths.IsEnabled = paths.Length > 0;
             explorer.IsEnabled = paths.Length > 0;
+            SyncSubmenuEnabled(pitch, edit, other);
         };
         menu.Closed += (_, _) =>
         {
@@ -10493,15 +10610,31 @@ internal sealed class LibraryBrowserView : UserControl
     /// <summary>
     /// メニューの外側クリック dismiss が下のコントロールへ貫通するぶんのガードを張る。
     /// 開いてから、閉じた同じ入力が終わってアイドルへ落ちるまで true を維持する。
+    /// 波形メニューなど、このビューの外で作ったメニューも同じ貫通を止めるために使う。
     /// </summary>
-    private void ArmContextMenuDismissGuard(ContextMenu menu)
+    internal void ArmContextMenuDismissGuard(ContextMenu menu)
     {
-        menu.Opened += (_, _) => _contextMenuDismissGuard = true;
+        menu.Opened += (_, _) =>
+        {
+            _contextMenuDismissDepth++;
+            _contextMenuDismissGuard = true;
+        };
         menu.Closed += (_, _) =>
         {
             _contextMenuDismissGuard = true;
             Dispatcher.BeginInvoke(
-                () => _contextMenuDismissGuard = false,
+                () =>
+                {
+                    if (_contextMenuDismissDepth > 0)
+                    {
+                        _contextMenuDismissDepth--;
+                    }
+
+                    if (_contextMenuDismissDepth == 0)
+                    {
+                        _contextMenuDismissGuard = false;
+                    }
+                },
                 DispatcherPriority.ApplicationIdle);
         };
     }
@@ -10609,10 +10742,46 @@ internal sealed class LibraryBrowserView : UserControl
         SyncColumnHeaderMenuChecks();
     }
 
+    private static MenuItem Submenu(string header, params object[] children)
+    {
+        var item = new MenuItem { Header = header };
+        foreach (var child in children)
+        {
+            item.Items.Add(child);
+        }
+
+        return item;
+    }
+
+    /// <summary>実行できる子が一つもないカテゴリはグレーアウトする。</summary>
+    private static void SyncSubmenuEnabled(params MenuItem[] submenus)
+    {
+        foreach (var submenu in submenus)
+        {
+            var any = false;
+            foreach (var child in submenu.Items)
+            {
+                if (child is MenuItem { IsEnabled: true })
+                {
+                    any = true;
+                    break;
+                }
+            }
+
+            submenu.IsEnabled = any;
+        }
+    }
+
     private void AddCopyAndExplorerMenuItems(
-        ContextMenu menu,
         LibraryPane pane,
         out MenuItem copy,
+        out MenuItem cut,
+        out MenuItem paste,
+        out MenuItem rename,
+        out MenuItem delete,
+        out MenuItem pitchUp,
+        out MenuItem pitchDown,
+        out MenuItem pitchReset,
         out MenuItem copyNames,
         out MenuItem copyPaths,
         out MenuItem explorer)
@@ -10623,17 +10792,54 @@ internal sealed class LibraryBrowserView : UserControl
             InputGestureText = "Ctrl+C",
         };
         copy.Click += (_, _) => CopyPaths(CopyPathsFor(pane));
+        cut = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuCut,
+            InputGestureText = "Ctrl+X",
+        };
+        cut.Click += (_, _) => CutPaths(pane);
+        paste = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuPaste,
+            InputGestureText = "Ctrl+V",
+        };
+        paste.Click += (_, _) => LibraryPasteRequested?.Invoke(this, pane);
+        rename = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuRename,
+            InputGestureText = "F2",
+        };
+        rename.Click += (_, _) => LibraryRenameRequested?.Invoke(this, pane);
+        delete = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuDelete,
+            InputGestureText = "Ctrl+Delete",
+        };
+        delete.Click += (_, _) => LibraryDeleteRequested?.Invoke(this, pane);
+        pitchUp = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuPitchUp,
+            InputGestureText = "Ctrl++",
+        };
+        pitchUp.Click += (_, _) => PlaybackPitchUpRequested?.Invoke(this, EventArgs.Empty);
+        pitchDown = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuPitchDown,
+            InputGestureText = "Ctrl+-",
+        };
+        pitchDown.Click += (_, _) => PlaybackPitchDownRequested?.Invoke(this, EventArgs.Empty);
+        pitchReset = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuPitchReset,
+            InputGestureText = "Ctrl+0",
+        };
+        pitchReset.Click += (_, _) => PlaybackPitchResetRequested?.Invoke(this, EventArgs.Empty);
         copyNames = new MenuItem { Header = UiStrings.LibraryMenuCopyFileName };
         copyNames.Click += (_, _) => CopyPathTexts(CopyPathsFor(pane), fullPath: false);
         copyPaths = new MenuItem { Header = UiStrings.LibraryMenuCopyFilePath };
         copyPaths.Click += (_, _) => CopyPathTexts(CopyPathsFor(pane), fullPath: true);
         explorer = new MenuItem { Header = UiStrings.LibraryMenuOpenInExplorer };
         explorer.Click += (_, _) => LibraryShellFiles.TryOpenInExplorer(RevealPathsFor(pane));
-        menu.Items.Add(new Separator());
-        menu.Items.Add(copy);
-        menu.Items.Add(copyNames);
-        menu.Items.Add(copyPaths);
-        menu.Items.Add(explorer);
     }
 
     private void CopyPathTexts(string[] paths, bool fullPath)
