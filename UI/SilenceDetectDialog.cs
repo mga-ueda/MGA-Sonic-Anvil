@@ -359,9 +359,15 @@ internal sealed class SilenceDetectDialog : Window
             settings.Width = settings.ActualWidth;
             settings.HorizontalAlignment = HorizontalAlignment.Left;
             _preview.ClearValue(FrameworkElement.HeightProperty);
-            if (!WindowPlacement.TryApplySilenceDetect(this, AppStorage.Settings) && contentHeight > 0)
+            if (!WindowPlacement.TryApplySilenceDetect(this, AppStorage.Settings))
             {
-                Height = contentHeight * 2;
+                if (contentHeight > 0)
+                {
+                    Height = contentHeight * 2;
+                }
+
+                UpdateLayout();
+                WindowPlacement.CenterOnContainingMonitor(this, Owner);
             }
 
             _openBox.Focus();
