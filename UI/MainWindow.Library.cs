@@ -556,8 +556,6 @@ public partial class MainWindow
         else
         {
             LibraryBrowser.ClearPdfBackgroundPin();
-            LibraryBrowser.ResetShuffle();
-            LibraryBrowser.ResetAutoPlayNext();
             LibraryBrowser.UseWindowFallbackWash();
             ApplyLibraryWashChrome(true);
         }
@@ -4886,6 +4884,8 @@ public partial class MainWindow
 
     private void LibraryBrowser_ShuffleChanged(object? sender, EventArgs e)
     {
+        AppStorage.Settings.LibraryShuffle = LibraryBrowser.ShuffleEnabled;
+        AppStorage.Save();
         if (IsLibraryMaximized && IsPlaybackActive())
         {
             ScheduleLibraryGaplessPrefetch();
@@ -4900,6 +4900,8 @@ public partial class MainWindow
 
     private void LibraryBrowser_AutoPlayNextChanged(object? sender, EventArgs e)
     {
+        AppStorage.Settings.LibraryAutoPlayNext = LibraryBrowser.AutoPlayNextEnabled;
+        AppStorage.Save();
         if (!IsLibraryMaximized || !IsPlaybackActive())
         {
             return;

@@ -206,6 +206,8 @@ public partial class MainWindow : Window
         LibraryBrowser.SetFavoritesSplit(AppStorage.Settings.LibraryFavoritesSplit);
         LibraryBrowser.SetFavorites(AppStorage.Settings.ResolvedLibraryFavoritePaths());
         LibraryBrowser.AutoPlayEnabled = AppStorage.Settings.LibraryAutoPlay;
+        LibraryBrowser.ShuffleEnabled = AppStorage.Settings.LibraryShuffle;
+        LibraryBrowser.AutoPlayNextEnabled = AppStorage.Settings.LibraryAutoPlayNext;
         DpiChanged += (_, _) =>
         {
             _brandLogoDark = null;

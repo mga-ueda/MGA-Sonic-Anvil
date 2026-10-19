@@ -100,6 +100,12 @@ internal sealed class AppSettings
     /// </summary>
     public bool LibraryAutoPlay { get; set; } = true;
 
+    /// <summary>プレイリストの Random。既定オフ。モードを行き来しても設定に残す。</summary>
+    public bool LibraryShuffle { get; set; }
+
+    /// <summary>プレイリストの Auto Next。既定オフ。モードを行き来しても設定に残す。</summary>
+    public bool LibraryAutoPlayNext { get; set; }
+
     /// <summary>プレイリストに PDF を載せる。既定オン。プレイヤー専用。</summary>
     public bool LibraryShowPlaylistPdf { get; set; } = true;
 

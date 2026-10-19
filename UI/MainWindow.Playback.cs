@@ -1918,9 +1918,6 @@ public partial class MainWindow
 
             Waveform.ClearPlayerScratchAll();
 
-            LibraryBrowser.ShuffleEnabled = false;
-            LibraryBrowser.AutoPlayNextEnabled = false;
-
             if (IsPlaybackActive())
             {
                 StopPlayback();

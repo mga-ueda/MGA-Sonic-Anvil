@@ -962,26 +962,22 @@ internal sealed class LibraryBrowserView : UserControl
     public bool ShuffleEnabled
     {
         get => _shuffleEnabled;
-        set => SetShuffleEnabled(value, raise: true);
+        set => SetShuffleEnabled(value);
     }
 
     public event EventHandler? ShuffleChanged;
 
     public void ToggleShuffle() => ShuffleEnabled = !ShuffleEnabled;
 
-    public void ResetShuffle() => SetShuffleEnabled(false, raise: false);
-
     public bool AutoPlayNextEnabled
     {
         get => _autoPlayNextEnabled;
-        set => SetAutoPlayNextEnabled(value, raise: true);
+        set => SetAutoPlayNextEnabled(value);
     }
 
     public event EventHandler? AutoPlayNextChanged;
 
     public void ToggleAutoPlayNext() => AutoPlayNextEnabled = !AutoPlayNextEnabled;
-
-    public void ResetAutoPlayNext() => SetAutoPlayNextEnabled(false, raise: false);
 
     /// <summary>Enter（クリアして追加）で先頭を再生するか。既定オン。設定に覚える。</summary>
     public bool AutoPlayEnabled
@@ -994,7 +990,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void ToggleAutoPlay() => AutoPlayEnabled = !AutoPlayEnabled;
 
-    private void SetShuffleEnabled(bool enabled, bool raise)
+    private void SetShuffleEnabled(bool enabled)
     {
         var changed = _shuffleEnabled != enabled;
         if (!changed && _shuffleCheck.IsChecked == enabled)
@@ -1021,7 +1017,7 @@ internal sealed class LibraryBrowserView : UserControl
             }
         }
 
-        if (changed && raise)
+        if (changed)
         {
             ShuffleChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -1056,7 +1052,7 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
-    private void SetAutoPlayNextEnabled(bool enabled, bool raise)
+    private void SetAutoPlayNextEnabled(bool enabled)
     {
         var changed = _autoPlayNextEnabled != enabled;
         if (!changed && _autoPlayNextCheck.IsChecked == enabled)
@@ -1079,7 +1075,7 @@ internal sealed class LibraryBrowserView : UserControl
             }
         }
 
-        if (changed && raise)
+        if (changed)
         {
             AutoPlayNextChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -3089,13 +3085,17 @@ internal sealed class LibraryBrowserView : UserControl
                 PrepareEmptyPlaylistColumnFade();
             }
 
+            var sameSessions = SameSessionSet(_rows, sessions);
             _rows = SortRows(rows);
             LibraryFileList.ApplyGroupKeys(_rows, _group);
-            _shuffle.Clear();
+            if (!sameSessions)
+            {
+                _shuffle.Clear();
+            }
             BeginRowSync();
             try
             {
-                if (TryPatchBoundRows(_rows))
+                if (!rebuild && TryPatchBoundRows(_rows))
                 {
                     ApplyRowSelectionCore(active, preserve);
                 }
@@ -9146,7 +9146,7 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        SetShuffleEnabled(_shuffleCheck.IsChecked == true, raise: true);
+        SetShuffleEnabled(_shuffleCheck.IsChecked == true);
     }
 
     private void AutoPlayCheck_Changed(object sender, RoutedEventArgs e)
@@ -9166,7 +9166,7 @@ internal sealed class LibraryBrowserView : UserControl
             return;
         }
 
-        SetAutoPlayNextEnabled(_autoPlayNextCheck.IsChecked == true, raise: true);
+        SetAutoPlayNextEnabled(_autoPlayNextCheck.IsChecked == true);
     }
 
     private bool TryPatchBoundRows(IReadOnlyList<LibraryFileRow> rows)
