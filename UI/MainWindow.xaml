@@ -363,6 +363,14 @@
                            VerticalAlignment="Center"
                            CloseRequested="HistoryOverlay_CloseRequested"
                            ItemClicked="HistoryOverlay_ItemClicked" />
+    <!-- A でアナライザを隠しているときだけ。T は無関係。波形は描かず、ファイル名より上。 -->
+    <ui:PlaylistVideoSeekBar x:Name="PlaylistVideoSimpleSeek"
+                             HorizontalAlignment="Stretch"
+                             VerticalAlignment="Bottom"
+                             Height="{x:Static ui:DesignMetrics.PlaylistVideoSimpleSeekHitHeight}"
+                             Opacity="0"
+                             IsHitTestVisible="False"
+                             RatioSeeked="PlaylistVideoSimpleSeek_RatioSeeked" />
     <!-- 影は下層の文字シルエットだけ。要素 Effect だと帯状のラベル影になる。 -->
     <Grid x:Name="PlaylistVideoFileName"
           HorizontalAlignment="Center"

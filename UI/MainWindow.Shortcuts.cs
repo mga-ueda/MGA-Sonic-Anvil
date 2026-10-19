@@ -932,11 +932,22 @@ public partial class MainWindow
             return true;
         }
 
-        // 動画ミニ: Q／Escape でプレイリストへ戻る（本再生中は暗いプレビューへ。F10 と同じ）。
+        // 動画ミニ: In／Out がある Escape は解除だけ。無ければ Q と同じくプレイリストへ戻る。
         if (IsVideoMiniPlayerActive()
             && !isRepeat
             && LibraryPlayerMode.LeavesVideoMiniToPlaylist(key, modifiers))
         {
+            if (LibraryPlayerMode.ClearsVideoMiniInOutInsteadOfLeaving(
+                    key,
+                    modifiers,
+                    LibraryBrowser.PlaylistVisualIsVideo,
+                    Waveform.ScratchCues.HasAbPoint))
+            {
+                Waveform.ClearPlayerAbRepeat();
+                SyncPlayWindowFromDocument();
+                return true;
+            }
+
             LeaveVideoMiniToPlaylist(minimalChrome: false);
             return true;
         }

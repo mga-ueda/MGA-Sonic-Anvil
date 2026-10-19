@@ -71,9 +71,6 @@ public partial class MainWindow
     private bool _playlistVideoChromeVisible = true;
     private bool _playlistVideoHud = true;
     private bool _playlistVideoTimecode = true;
-    /// <summary>プレイリスト動画の本再生セッション中だったか（一時停止含む。開始／曲切替で A／T をオンに戻す判定用）。</summary>
-    private bool _playlistVideoChromePlayActive;
-    private string? _playlistVideoChromePlayPath;
     /// <summary>映像／PDF 本再生のつなぎでクロームを出さない。</summary>
     private bool _playlistVisualChromeBridge;
 
@@ -433,33 +430,37 @@ public partial class MainWindow
     private void ApplyVideoMiniPlayerUi()
     {
         _libraryMinimalChrome = true;
-        // F8／引数起動共通。前回の A／T を復元（既定はどちらもオフ）。
-        LibraryPlayerMode.ResolveVideoLaunchChrome(
-            AppStorage.Settings.VideoLaunchHud,
-            AppStorage.Settings.VideoLaunchTimecode,
-            out _playlistVideoHud,
-            out _playlistVideoTimecode);
+        ApplyRememberedVideoChrome();
         if (!_playlistVideoFullscreen)
         {
             ResizeMode = ResizeMode.CanResize;
         }
     }
 
-    /// <summary>動画ミニ（F8／引数起動）中の A／T を次回用に覚える（両者共通）。</summary>
-    private void RememberVideoLaunchChromeIfNeeded()
+    /// <summary>動画本再生と動画ミニで共通の A／T。未変更なら両方オン。</summary>
+    private void ApplyRememberedVideoChrome()
     {
-        if (!_videoLaunchPlacement)
-        {
-            return;
-        }
-
         var settings = AppStorage.Settings;
-        if (settings.VideoLaunchHud == _playlistVideoHud
+        LibraryPlayerMode.ResolveVideoLaunchChrome(
+            settings.VideoChromeChosen,
+            settings.VideoLaunchHud,
+            settings.VideoLaunchTimecode,
+            out _playlistVideoHud,
+            out _playlistVideoTimecode);
+    }
+
+    /// <summary>動画本再生／ミニで変えた A／T を以後ずっと使う。</summary>
+    private void RememberVideoChrome()
+    {
+        var settings = AppStorage.Settings;
+        if (settings.VideoChromeChosen
+            && settings.VideoLaunchHud == _playlistVideoHud
             && settings.VideoLaunchTimecode == _playlistVideoTimecode)
         {
             return;
         }
 
+        settings.VideoChromeChosen = true;
         settings.VideoLaunchHud = _playlistVideoHud;
         settings.VideoLaunchTimecode = _playlistVideoTimecode;
         AppStorage.Save();
@@ -476,8 +477,6 @@ public partial class MainWindow
         PersistCurrentWindowPlacement();
         EndVideoLaunchSession();
         _libraryMinimalChrome = false;
-        _playlistVideoHud = true;
-        _playlistVideoTimecode = true;
         ApplyWaveformMaximizeChrome();
         TryApplyCurrentModePlacement();
         SyncPlaylistVideoChromeFade();
@@ -505,8 +504,6 @@ public partial class MainWindow
         }
 
         _libraryMinimalChrome = minimalChrome;
-        _playlistVideoHud = true;
-        _playlistVideoTimecode = true;
         ApplyWaveformMaximizeChrome();
         TryApplyCurrentModePlacement();
         SyncPlaylistVideoChromeFade();
@@ -713,32 +710,7 @@ public partial class MainWindow
             EnsurePlaylistVideoWindowRestored();
         }
 
-        // プレイリスト動画の本再生開始／曲切替では A／T をオン（一時停止中も切替可。再開では戻さない。ミニは記憶値）。
-        var playlistVideoSession = LibraryPlayerMode.IsPlaylistVideoChromePlaySession(
-            _videoLaunchPlacement,
-            LibraryBrowser.PlaylistVisualIsVideo,
-            LibraryBrowser.PlaylistVisualPlaying,
-            _playlistVideoImmersivePause,
-            LibraryBrowser.PlaylistVisualFramePaused);
-        var playlistVideoPath = playlistVideoSession
-            ? _activeSession?.Document.SourcePath
-            : null;
-        if (LibraryPlayerMode.ResetsPlaylistVideoChromeOnPlay(
-                _videoLaunchPlacement,
-                LibraryBrowser.PlaylistVisualIsVideo,
-                playlistVideoSession,
-                _playlistVideoChromePlayActive,
-                playlistVideoPath,
-                _playlistVideoChromePlayPath))
-        {
-            _playlistVideoHud = true;
-            _playlistVideoTimecode = true;
-        }
-
-        _playlistVideoChromePlayActive = playlistVideoSession;
-        _playlistVideoChromePlayPath = playlistVideoPath;
-
-        // PDF 表示中は A／T を出さないだけ（フラグは触らない）。
+        // PDF 表示中は A／T を出さないだけ（フラグは触らない。本再生もミニも保存した A／T を使う）。
         var hideAtOverlays = LibraryPlayerMode.HidesPlaylistVideoChromeOverlaysForPdf(
                 LibraryBrowser.PlaylistVisualIsPdf,
                 hide)
@@ -776,18 +748,7 @@ public partial class MainWindow
             EnsureLibraryVisualPlayheadTicker();
         }
 
-        ApplyPlaylistVideoTimecodeFade(
-            LibraryPlayerMode.ShowsPlaylistVideoTimecode(
-                hide,
-                _playlistVideoTimecode,
-                LibraryBrowser.PlaylistVisualIsVideo),
-            instant);
-        ApplyPlaylistVideoFileNameFade(
-            LibraryPlayerMode.ShowsPlaylistVideoFileName(
-                hide,
-                _playlistVideoHud,
-                LibraryBrowser.PlaylistVisualIsVideo),
-            instant);
+        ApplyPlaylistVideoTimecodeChrome(instant);
         SyncPlaylistTrackIndexToast(
             LibraryPlayerMode.ShowsPlaylistTrackIndex(
                 hide,
@@ -1013,16 +974,11 @@ public partial class MainWindow
 
         _playlistVideoHud = !_playlistVideoHud;
         ApplyPlaylistVideoHudFade(!_playlistVideoHud, instant: false);
-        ApplyPlaylistVideoFileNameFade(
-            LibraryPlayerMode.ShowsPlaylistVideoFileName(
-                !_playlistVideoChromeVisible,
-                _playlistVideoHud,
-                LibraryBrowser.PlaylistVisualIsVideo),
-            instant: false);
+        ApplyPlaylistVideoTimecodeChrome(instant: false);
         SyncPlaylistVideoUiShadows(
             _playlistVideoChromeVisible,
             IsPlaylistVisualHudContext() && !_playlistVideoHud);
-        RememberVideoLaunchChromeIfNeeded();
+        RememberVideoChrome();
         return true;
     }
 
@@ -1034,14 +990,172 @@ public partial class MainWindow
         }
 
         _playlistVideoTimecode = !_playlistVideoTimecode;
+        ApplyPlaylistVideoTimecodeChrome(instant: false);
+        RememberVideoChrome();
+        return true;
+    }
+
+    /// <summary>T でまとめて出すもの。タイムコードとファイル名。簡易シークバーは A オフで別判定。</summary>
+    private void ApplyPlaylistVideoTimecodeChrome(bool instant)
+    {
+        var chromeHidden = !_playlistVideoChromeVisible;
+        var video = LibraryBrowser.PlaylistVisualIsVideo;
         ApplyPlaylistVideoTimecodeFade(
             LibraryPlayerMode.ShowsPlaylistVideoTimecode(
-                !_playlistVideoChromeVisible,
+                chromeHidden,
                 _playlistVideoTimecode,
-                isVideo: true),
-            instant: false);
-        RememberVideoLaunchChromeIfNeeded();
-        return true;
+                video),
+            instant);
+        ApplyPlaylistVideoFileNameFade(
+            LibraryPlayerMode.ShowsPlaylistVideoFileName(
+                chromeHidden,
+                _playlistVideoTimecode,
+                video),
+            instant);
+        ApplyPlaylistVideoSimpleSeekFade(
+            LibraryPlayerMode.ShowsPlaylistVideoSimpleSeek(
+                chromeHidden,
+                _playlistVideoHud,
+                video),
+            instant);
+    }
+
+    private bool IsPlaylistVideoSimpleSeekArmed() =>
+        LibraryPlayerMode.ShowsPlaylistVideoSimpleSeek(
+            !_playlistVideoChromeVisible,
+            _playlistVideoHud,
+            LibraryBrowser.PlaylistVisualIsVideo);
+
+    private bool _playlistVideoSimpleSeekWantVisible;
+    private bool _playlistVideoSimpleSeekWasArmed;
+    private long _playlistVideoSimpleSeekKeyboardUntil;
+    private DispatcherTimer? _playlistVideoSimpleSeekKeyboardTimer;
+
+    private void ApplyPlaylistVideoSimpleSeekFade(bool show, bool instant)
+    {
+        if (!show)
+        {
+            _playlistVideoSimpleSeekWasArmed = false;
+            _playlistVideoSimpleSeekKeyboardUntil = 0;
+            _playlistVideoSimpleSeekKeyboardTimer?.Stop();
+            SetPlaylistVideoSimpleSeekVisible(false, instant);
+            return;
+        }
+
+        PlaylistVideoSimpleSeek.Margin = DesignMetrics.PlaylistVideoSimpleSeekMargin(VideoMiniOverlayLayoutScale);
+        SyncPlaylistVideoSimpleSeekRatio();
+        var revealNow = !_playlistVideoSimpleSeekWasArmed;
+        _playlistVideoSimpleSeekWasArmed = true;
+        if (revealNow)
+        {
+            // A でアナライザを隠した瞬間は、マウスを待たずすぐ出す。
+            NotePlaylistVideoSimpleSeekKeyboard(instant: true);
+            return;
+        }
+
+        RefreshPlaylistVideoSimpleSeekPresence(instant);
+    }
+
+    /// <summary>マウス移動かキーボードの時間移動から 3 秒以内、またはドラッグ中なら出す。</summary>
+    private void RefreshPlaylistVideoSimpleSeekPresence(bool instant = false)
+    {
+        if (!IsPlaylistVideoSimpleSeekArmed())
+        {
+            _playlistVideoSimpleSeekWasArmed = false;
+            _playlistVideoSimpleSeekKeyboardUntil = 0;
+            _playlistVideoSimpleSeekKeyboardTimer?.Stop();
+            SetPlaylistVideoSimpleSeekVisible(false, instant);
+            return;
+        }
+
+        var active = Environment.TickCount64 < _playlistVideoSimpleSeekKeyboardUntil;
+        SetPlaylistVideoSimpleSeekVisible(
+            active || PlaylistVideoSimpleSeek.IsDragging,
+            instant);
+    }
+
+    private void SetPlaylistVideoSimpleSeekVisible(bool visible, bool instant)
+    {
+        if (_playlistVideoSimpleSeekWantVisible == visible && !instant)
+        {
+            return;
+        }
+
+        _playlistVideoSimpleSeekWantVisible = visible;
+        if (visible)
+        {
+            SyncPlaylistVideoSimpleSeekRatio();
+        }
+
+        LibraryPlayerMode.FadeElementOpacity(
+            PlaylistVideoSimpleSeek,
+            visible ? 1 : 0,
+            instant,
+            hitTestVisible: visible,
+            seconds: visible
+                ? LibraryPlayerMode.ChromeFadeSeconds
+                : LibraryPlayerMode.PlaylistVideoSimpleSeekFadeOutSeconds);
+    }
+
+    private void NotePlaylistVideoSimpleSeekKeyboard(bool instant = false)
+    {
+        if (!IsPlaylistVideoSimpleSeekArmed())
+        {
+            return;
+        }
+
+        _playlistVideoSimpleSeekKeyboardUntil = Environment.TickCount64
+            + (long)(LibraryPlayerMode.PlaylistVideoSimpleSeekKeyboardHoldSeconds * 1000);
+        _playlistVideoSimpleSeekKeyboardTimer ??= new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(LibraryPlayerMode.PlaylistVideoSimpleSeekKeyboardHoldSeconds),
+        };
+        _playlistVideoSimpleSeekKeyboardTimer.Stop();
+        _playlistVideoSimpleSeekKeyboardTimer.Tick -= OnPlaylistVideoSimpleSeekKeyboardTick;
+        _playlistVideoSimpleSeekKeyboardTimer.Tick += OnPlaylistVideoSimpleSeekKeyboardTick;
+        _playlistVideoSimpleSeekKeyboardTimer.Start();
+        RefreshPlaylistVideoSimpleSeekPresence(instant);
+    }
+
+    private void OnPlaylistVideoSimpleSeekKeyboardTick(object? sender, EventArgs e)
+    {
+        _playlistVideoSimpleSeekKeyboardTimer?.Stop();
+        var remain = _playlistVideoSimpleSeekKeyboardUntil - Environment.TickCount64;
+        if (remain > 0 && _playlistVideoSimpleSeekKeyboardTimer is not null)
+        {
+            _playlistVideoSimpleSeekKeyboardTimer.Interval = TimeSpan.FromMilliseconds(remain);
+            _playlistVideoSimpleSeekKeyboardTimer.Start();
+            return;
+        }
+
+        RefreshPlaylistVideoSimpleSeekPresence();
+    }
+
+    private void OnPlaylistVideoSimpleSeekPointerMove(object sender, MouseEventArgs e)
+    {
+        NotePlaylistVideoSimpleSeekKeyboard();
+    }
+
+    private void SyncPlaylistVideoSimpleSeekRatio()
+    {
+        if (PlaylistVideoSimpleSeek.IsDragging || _document is null)
+        {
+            return;
+        }
+
+        PlaylistVideoSimpleSeek.Ratio = LibraryPlayerMode.SeekRatioAtFrame(
+            Waveform.PlayheadFrame,
+            _document.FrameCount);
+    }
+
+    private void PlaylistVideoSimpleSeek_RatioSeeked(object sender, double ratio)
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        SeekFrame(LibraryPlayerMode.FrameAtSeekRatio(ratio, _document.FrameCount));
     }
 
     private void ApplyPlaylistVideoTimecodeFade(bool show, bool instant)
@@ -1324,10 +1438,12 @@ public partial class MainWindow
         // 前回のずらしを外してから測らないと二重に避ける。
         PlaylistVideoFileName.RenderTransform = Transform.Identity;
         // Opacity は見ない。A でフェードイン中は両方とも 0 近傍のまま測れず、初回だけ被る。
+        // 簡易シーク（A オフ）のあいだはラウドネスへ避けず、画面中央に置く。
         if (!LibraryPlayerMode.ShowsPlaylistVideoFileName(
                 !_playlistVideoChromeVisible,
-                _playlistVideoHud,
+                _playlistVideoTimecode,
                 LibraryBrowser.PlaylistVisualIsVideo)
+            || IsPlaylistVideoSimpleSeekArmed()
             || LoudnessMeter.Visibility != Visibility.Visible
             || RootChrome.ActualWidth < 8)
         {
@@ -1617,9 +1733,15 @@ public partial class MainWindow
             LibraryPlayerMode.SetVideoUiShadow(target, video && !hideHud);
         }
 
-        // ファイル名は XAML の文字シルエット影。ラベル全体への Effect は使わない。
+        // ファイル名は XAML の文字シルエット影。ラベル全体への Effect は使わない。T と一緒に出す。
         PlaylistVideoFileName.Effect = null;
-        LibraryPlayerMode.SetVideoTextShadow(PlaylistVideoFileNameShadow, video && !hideHud);
+        LibraryPlayerMode.SetVideoTextShadow(
+            PlaylistVideoFileNameShadow,
+            video
+            && LibraryPlayerMode.ShowsPlaylistVideoFileName(
+                !_playlistVideoChromeVisible,
+                _playlistVideoTimecode,
+                isVideo: true));
         // タイムコードは T の表示中だけ影（A の HUD とは独立）。
         LibraryPlayerMode.SetVideoUiShadow(
             PlaylistVideoTimecode,
@@ -3691,6 +3813,8 @@ public partial class MainWindow
             return;
         }
 
+        NotePlaylistVideoSimpleSeekKeyboard();
+
         var frames = (long)Math.Round(_document.SampleRate * seconds);
         var current = _player.PendingSeekFrame
             ?? (IsPlaybackActive() ? _player.CursorFrame : _document.CursorFrame);
@@ -3880,6 +4004,7 @@ public partial class MainWindow
         }
 
         SeekFrame(current + direction * step);
+        NotePlaylistVideoSimpleSeekKeyboard();
     }
 
     private static bool IsVideoFrameStepHeld(int direction)

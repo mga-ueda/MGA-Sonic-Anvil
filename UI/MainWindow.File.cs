@@ -184,7 +184,6 @@ public partial class MainWindow
             return;
         }
 
-        RememberVideoLaunchChromeIfNeeded();
         _videoLaunchPlacement = false;
         _videoLaunchPlacementDeferred = false;
         VideoProxy.SuppressAutoEncode = false;
