@@ -363,6 +363,31 @@ public sealed class WindowPlacementTests
     }
 
     [Fact]
+    public void TryReadSilenceDetect_RejectsUnset()
+    {
+        Assert.False(WindowPlacement.TryReadSilenceDetect(new AppSettings(), out _, out _));
+    }
+
+    [Fact]
+    public void TryReadSilenceDetect_ReturnsSavedBounds()
+    {
+        var settings = new AppSettings
+        {
+            SilenceDetectHasPlacement = true,
+            SilenceDetectX = 30,
+            SilenceDetectY = 40,
+            SilenceDetectWidth = 1440,
+            SilenceDetectHeight = 800,
+        };
+        Assert.True(WindowPlacement.TryReadSilenceDetect(settings, out var bounds, out var hasSize));
+        Assert.True(hasSize);
+        Assert.Equal(30, bounds.X);
+        Assert.Equal(40, bounds.Y);
+        Assert.Equal(1440, bounds.Width);
+        Assert.Equal(800, bounds.Height);
+    }
+
+    [Fact]
     public void StoredExtent_IsUnchangedAtDefaultScale()
     {
         Assert.Equal(1000, WindowPlacement.FromStoredExtent(1000));

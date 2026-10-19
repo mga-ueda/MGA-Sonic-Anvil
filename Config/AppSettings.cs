@@ -203,6 +203,17 @@ internal sealed class AppSettings
     /// <summary>無音削除時のフェードアウト (ms)。設定のプチノイズ防止とは独立。既定 20。</summary>
     public int SilenceDetectFadeOutMs { get; set; } = global::MgaSonicAnvil.Audio.SilenceDetectOptions.DefaultFadeMs;
 
+    /// <summary>無音・ヒット検出ウィンドウの位置。未保存なら false。</summary>
+    public bool SilenceDetectHasPlacement { get; set; }
+
+    public int SilenceDetectX { get; set; }
+
+    public int SilenceDetectY { get; set; }
+
+    public int SilenceDetectWidth { get; set; }
+
+    public int SilenceDetectHeight { get; set; }
+
     public global::MgaSonicAnvil.Audio.SilenceDetectOptions ResolvedSilenceDetectOptions(bool edgesOnly) =>
         new global::MgaSonicAnvil.Audio.SilenceDetectOptions(
             SilenceDetectOpenThresholdDb,

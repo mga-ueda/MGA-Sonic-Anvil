@@ -250,6 +250,13 @@ internal static class TimeStretchPicker
                 SetDestFrames(state, TimeStretch.ClampDestFrames(state.SourceFrames, (int)Math.Min(int.MaxValue, frames)), rewriteTime: false);
             }
         };
+        box.LostKeyboardFocus += (_, _) =>
+        {
+            if (!state.UpdatingText)
+            {
+                WriteBoxes(state, rewriteTime: true, rewritePercent: true);
+            }
+        };
     }
 
     private static void SetDestFrames(MenuState state, int destFrames, bool rewriteTime = true, bool rewritePercent = true)

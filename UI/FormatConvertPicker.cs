@@ -113,6 +113,17 @@ internal static class FormatConvertPicker
                 box.SelectAll();
             };
             box.TextChanged += (_, _) => NotifyHighlight(menu);
+            box.LostKeyboardFocus += (_, _) =>
+            {
+                if (TryReadCustom(box, out var customRate))
+                {
+                    var text = customRate.ToString(CultureInfo.InvariantCulture);
+                    if (!string.Equals(box.Text, text, StringComparison.Ordinal))
+                    {
+                        box.Text = text;
+                    }
+                }
+            };
             box.PreviewMouseWheel += (_, e) =>
             {
                 if (NudgeCustomBox(box, currentValue, Math.Sign(e.Delta)))

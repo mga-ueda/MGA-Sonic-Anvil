@@ -1,10 +1,15 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
+using System.Windows.Media.Imaging;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -32,6 +37,7 @@ internal sealed class SilenceDetectDialog : Window
     private readonly int _channelMask;
     private readonly bool _allowsRegions;
     private readonly SilenceDetectWavePreview _preview;
+    private readonly DispatcherTimer _openWheelPreviewTimer;
     private readonly TextBox _openBox;
     private readonly TextBox _closeBox;
     private readonly CheckBox _linkBox;
@@ -110,8 +116,9 @@ internal sealed class SilenceDetectDialog : Window
         WindowStyle = WindowStyle.SingleBorderWindow;
         ResizeMode = ResizeMode.CanResize;
         ShowInTaskbar = false;
+        SourceInitialized += (_, _) => DisableMinimizeBox(this);
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Width = DesignMetrics.From96(720);
+        Width = DesignMetrics.From96(720) * 2;
         MinWidth = DesignMetrics.From96(560);
         SizeToContent = SizeToContent.Height;
         Background = (Brush)FindResource("WindowBackBrush");
@@ -130,6 +137,12 @@ internal sealed class SilenceDetectDialog : Window
         };
         _preview.ThresholdChanged += OnPreviewThresholdChanged;
         _preview.KeepsChanged += OnPreviewKeepsChanged;
+        _openWheelPreviewTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _openWheelPreviewTimer.Tick += (_, _) =>
+        {
+            _openWheelPreviewTimer.Stop();
+            _preview.Options = _options;
+        };
 
         _openBox = CreateDbBox(_options.OpenThresholdDb);
         _closeBox = CreateDbBox(_options.CloseThresholdDb);
@@ -247,9 +260,14 @@ internal sealed class SilenceDetectDialog : Window
         rightCol.Children.Add(_preRollRow);
         rightCol.Children.Add(_postRollRow);
 
-        var paramGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
-        paramGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        paramGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var paramGrid = new Grid
+        {
+            Margin = new Thickness(0, 0, 0, 8),
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        paramGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        paramGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        rightCol.HorizontalAlignment = HorizontalAlignment.Left;
         Grid.SetColumn(leftCol, 0);
         Grid.SetColumn(rightCol, 1);
         paramGrid.Children.Add(leftCol);
@@ -282,11 +300,18 @@ internal sealed class SilenceDetectDialog : Window
         buttons.Children.Add(_applyButton);
         buttons.Children.Add(cancel);
 
-        var bottom = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
-        bottom.Children.Add(targetText);
-        bottom.Children.Add(paramGrid);
-        bottom.Children.Add(actionRow);
-        bottom.Children.Add(scopeRow);
+        var settings = new StackPanel();
+        settings.Children.Add(targetText);
+        settings.Children.Add(paramGrid);
+        settings.Children.Add(actionRow);
+        settings.Children.Add(scopeRow);
+
+        var bottom = new Grid { Margin = new Thickness(0, 4, 0, 0) };
+        bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(settings, 0);
+        Grid.SetRow(buttons, 1);
+        bottom.Children.Add(settings);
         bottom.Children.Add(buttons);
 
         var root = new DockPanel { LastChildFill = true };
@@ -295,22 +320,35 @@ internal sealed class SilenceDetectDialog : Window
         root.Children.Add(_preview);
 
         Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
+        PreviewMouseLeftButtonDown += OnBlankClickReleaseFieldFocus;
         WindowPaintReveal.Attach(this);
         AppDialogKeys.Attach(this, () => Close());
+        Closing += (_, _) =>
+        {
+            _openWheelPreviewTimer.Stop();
+            AppStorage.Settings.RememberSilenceDetectOptions(CurrentOptions());
+            AppStorage.Settings.SilenceDetectAction = (int)SelectedAction;
+            if (ActualWidth > 1 && ActualHeight > 1)
+            {
+                WindowPlacement.CaptureSilenceDetect(this, AppStorage.Settings);
+            }
+
+            AppStorage.Save();
+        };
                         SyncDependentEnabled();
         Loaded += (_, _) =>
         {
             RefreshStatusFromPreview();
             SyncActionUi();
-            // 初回の高さは内容どおり。以後は波形エリアだけが縦横に伸び、下の設定は開いたときの幅のまま。
+            // 初回の高さは内容どおり。以後は波形エリアだけが縦横に伸び、下の設定は開いたときの幅のまま。OK／キャンセルだけ右端に付く。
             SizeToContent = SizeToContent.Manual;
-            if (ActualHeight > 0)
+            var contentHeight = ActualHeight;
+            if (contentHeight > 0)
             {
                 var previewHeight = _preview.ActualHeight;
-                Height = ActualHeight;
                 MinHeight = Math.Max(
                     _preview.MinHeight,
-                    ActualHeight - previewHeight + _preview.MinHeight);
+                    contentHeight - previewHeight + _preview.MinHeight);
             }
 
             if (ActualWidth > 0)
@@ -318,13 +356,48 @@ internal sealed class SilenceDetectDialog : Window
                 MinWidth = ActualWidth;
             }
 
-            bottom.Width = bottom.ActualWidth;
-            bottom.HorizontalAlignment = HorizontalAlignment.Left;
+            settings.Width = settings.ActualWidth;
+            settings.HorizontalAlignment = HorizontalAlignment.Left;
             _preview.ClearValue(FrameworkElement.HeightProperty);
+            if (!WindowPlacement.TryApplySilenceDetect(this, AppStorage.Settings) && contentHeight > 0)
+            {
+                Height = contentHeight * 2;
+            }
 
             _openBox.Focus();
             _openBox.SelectAll();
         };
+    }
+
+    private void OnBlankClickReleaseFieldFocus(object sender, MouseButtonEventArgs e)
+    {
+        if (Keyboard.FocusedElement is not TextBox box)
+        {
+            return;
+        }
+
+        if (e.OriginalSource is DependencyObject source && IsInsideTextBox(source))
+        {
+            return;
+        }
+
+        box.Focusable = false;
+        _preview.Focus();
+        Keyboard.Focus(_preview);
+        box.Focusable = true;
+    }
+
+    private static bool IsInsideTextBox(DependencyObject source)
+    {
+        for (DependencyObject? node = source; node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is TextBox)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void OnPreviewThresholdChanged(double db, bool openLine)
@@ -345,7 +418,7 @@ internal sealed class SilenceDetectDialog : Window
 
         _options = _options.Normalized();
         PaintThresholdBoxesFromOptions();
-        _preview.Options = _options;
+        ApplyPreviewOptionsNow();
     }
 
     private void OnPreviewKeepsChanged() => RefreshStatusFromPreview();
@@ -361,14 +434,14 @@ internal sealed class SilenceDetectDialog : Window
         _options = _options.Normalized();
         PaintBoxesFromOptions();
         SyncDependentEnabled();
-        _preview.Options = _options;
+        ApplyPreviewOptionsNow();
     }
 
     private void OnOptionsChanged()
     {
         CommitAllFields();
         _options = CurrentOptions();
-        _preview.Options = _options;
+        ApplyPreviewOptionsNow();
     }
 
     private void SyncActionUi() => SyncDependentEnabled();
@@ -566,7 +639,7 @@ internal sealed class SilenceDetectDialog : Window
             if (key is Key.Up or Key.Down)
             {
                 e.Handled = true;
-                NudgeDb(open, key == Key.Up ? 1 : -1);
+                NudgeDb(open, key == Key.Up ? 1 : -1, deferPreview: open);
                 return;
             }
 
@@ -579,7 +652,7 @@ internal sealed class SilenceDetectDialog : Window
         box.PreviewMouseWheel += (_, e) =>
         {
             e.Handled = true;
-            NudgeDb(open, Math.Sign(e.Delta));
+            NudgeDb(open, Math.Sign(e.Delta), deferPreview: open);
         };
     }
 
@@ -603,7 +676,7 @@ internal sealed class SilenceDetectDialog : Window
         };
     }
 
-    private void NudgeDb(bool open, int direction)
+    private void NudgeDb(bool open, int direction, bool deferPreview = false)
     {
         if (direction == 0)
         {
@@ -629,6 +702,21 @@ internal sealed class SilenceDetectDialog : Window
 
         _options = _options.Normalized();
         PaintThresholdBoxesFromOptions();
+        if (deferPreview)
+        {
+            _preview.ShowThreshold(_options);
+            _openWheelPreviewTimer.Stop();
+            _openWheelPreviewTimer.Start();
+            return;
+        }
+
+        ApplyPreviewOptionsNow();
+    }
+
+    /// <summary>保留中のホイール反映を取り消し、今の設定で範囲を一度描く。</summary>
+    private void ApplyPreviewOptionsNow()
+    {
+        _openWheelPreviewTimer.Stop();
         _preview.Options = _options;
     }
 
@@ -670,6 +758,7 @@ internal sealed class SilenceDetectDialog : Window
             VerticalContentAlignment = VerticalAlignment.Center,
             TextAlignment = TextAlignment.Center,
             Text = text,
+            FocusVisualStyle = null,
         };
         InputMethod.SetIsInputMethodEnabled(box, false);
         if (TryFindResource("DarkTextBoxStyle") is Style style)
@@ -779,6 +868,51 @@ internal sealed class SilenceDetectDialog : Window
         return true;
     }
 
+    private const int GwlStyle = -16;
+    private const int WsMinimizeBox = 0x00020000;
+    private const int SwpFrameChanged = 0x0020;
+    private const int SwpNoMove = 0x0002;
+    private const int SwpNoSize = 0x0001;
+    private const int SwpNoZOrder = 0x0004;
+    private const int SwpNoActivate = 0x0010;
+
+    /// <summary>最小化ボタンだけ外す。最大化とリサイズは残す。</summary>
+    private static void DisableMinimizeBox(Window window)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var style = GetWindowLongPtr(hwnd, GwlStyle).ToInt64();
+        _ = SetWindowLongPtr(hwnd, GwlStyle, new IntPtr(style & ~WsMinimizeBox));
+        _ = SetWindowPos(
+            hwnd,
+            IntPtr.Zero,
+            0,
+            0,
+            0,
+            0,
+            SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
+    }
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", CharSet = CharSet.Auto)]
+    private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", CharSet = CharSet.Auto)]
+    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        int uFlags);
+
     private static bool TryParseFadeMs(string? text, out int ms)
     {
         text = text?.Trim() ?? string.Empty;
@@ -796,15 +930,22 @@ internal sealed class SilenceDetectDialog : Window
 
 /// <summary>
 /// 選択範囲の波形と ±しきい値線。残す区間とヒットは適用時と同じ検出。
-/// 波形の線は表示幅へ間引いた min/max。ホイールはカーソル位置を基準に時間方向へ拡縮する。
+/// 波形はピークピラミッド（深く寄ると生サンプル）からビットマップにする。ホイールはカーソル位置を基準に時間方向へ拡縮する。
 /// </summary>
 internal sealed class SilenceDetectWavePreview : FrameworkElement
 {
-    private const int MaxBins = 1200;
-    private const double ZoomStep = 1.25;
+    private const int RawColumnMaxSamplesPerPixel = 96;
+    private const int RawColumnMaxFrames = 1 << 18;
 
-    private float[] _mins = [];
-    private float[] _maxs = [];
+    private float[] _columnMins = [];
+    private float[] _columnMaxs = [];
+    private WriteableBitmap? _bitmap;
+    private int _bitmapWidth;
+    private int _bitmapHeight;
+    private double _bitmapViewStart;
+    private double _bitmapViewSpan;
+    private float _bitmapGain;
+    private bool _waveDirty = true;
     private List<WaveSelection> _keeps = [];
     private List<long> _hitFrames = [];
     private bool _hitPointMode;
@@ -816,7 +957,20 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
     private int _channelMask;
     private double _viewStart;
     private double _viewSpan = 1;
+    private long _seekFrame = -1;
+    private DispatcherTimer? _seekNudgeTimer;
+    private int _seekNudgeDirection;
+    private bool _seekNudgeRepeatStarted;
+    private long _seekNudgeLastAt;
+    private double _hoverX = double.NaN;
+    private static readonly Pen HoverBarPen = CreateHoverBarPen();
+    private Pen? _seekGlowOuter;
+    private Pen? _seekGlowInner;
+    private Pen? _seekCore;
+    private Color _seekPenColor;
     private float _displayGain = 1;
+    private double _ampZoom = 1;
+    private float DrawnGain => _displayGain * (float)_ampZoom;
 
     public event Action<double, bool>? ThresholdChanged;
     public event Action? KeepsChanged;
@@ -850,7 +1004,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         {
             _document = value;
             ResetView();
-            RebuildEnvelope();
+            RefreshDisplayGain();
+            MarkWaveDirty();
             RefreshKeepsFromEnvelope();
             InvalidateVisual();
         }
@@ -863,7 +1018,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         {
             _range = value;
             ResetView();
-            RebuildEnvelope();
+            RefreshDisplayGain();
+            MarkWaveDirty();
             RefreshKeepsFromEnvelope();
             InvalidateVisual();
         }
@@ -875,7 +1031,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         set
         {
             _channelMask = value;
-            RebuildEnvelope();
+            RefreshDisplayGain();
+            MarkWaveDirty();
             RefreshKeepsFromEnvelope();
             InvalidateVisual();
         }
@@ -887,9 +1044,22 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         set
         {
             _options = value.Normalized();
+            if (_dragging)
+            {
+                InvalidateVisual();
+                return;
+            }
+
             RefreshKeepsFromEnvelope();
             InvalidateVisual();
         }
+    }
+
+    /// <summary>しきい値線だけ描き直す。検出範囲は変えない。</summary>
+    public void ShowThreshold(SilenceDetectOptions options)
+    {
+        _options = options.Normalized();
+        InvalidateVisual();
     }
 
     public SilenceDetectWavePreview()
@@ -898,30 +1068,367 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         UseLayoutRounding = true;
         Focusable = true;
         ClipToBounds = true;
-        Cursor = Cursors.SizeNS;
+        Cursor = Cursors.Arrow;
         // Preview で確実に拾う（親やフォーカスに奪われない）。
         PreviewMouseWheel += OnPreviewMouseWheel;
+        PreviewKeyUp += (_, e) =>
+        {
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (key == Key.NumPad7 && _seekNudgeDirection < 0
+                || key == Key.NumPad9 && _seekNudgeDirection > 0)
+            {
+                StopSeekNudge();
+            }
+        };
+        Unloaded += (_, _) => StopSeekNudge();
+        LostKeyboardFocus += (_, _) => StopSeekNudge();
     }
 
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
     {
         base.OnRenderSizeChanged(sizeInfo);
-        if (sizeInfo.WidthChanged)
+        MarkWaveDirty();
+        InvalidateVisual();
+    }
+
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+        if (e.Handled || _range.IsEmpty)
         {
-            RebuildEnvelope();
+            return;
+        }
+
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (TryHandleWaveKey(key, Keyboard.Modifiers))
+        {
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// エディタ波形の時間ズーム、振幅ズーム、シーク移動。選択・マーカー・リージョンはここには無い。
+    /// </summary>
+    private bool TryHandleWaveKey(Key key, ModifierKeys modifiers)
+    {
+        if (modifiers == ModifierKeys.None && key is >= Key.D0 and <= Key.D9)
+        {
+            JumpSeekPercent((key - Key.D0) / 10d);
+            return true;
+        }
+
+        if (modifiers == ModifierKeys.None && key is Key.NumPad7 or Key.NumPad9)
+        {
+            BeginSeekNudge(key == Key.NumPad7 ? -1 : 1);
+            return true;
+        }
+
+        if (key == Key.Up && modifiers == ModifierKeys.Control)
+        {
+            var zoom = CurrentTimeZoom;
+            var next = zoom + 1e-9 < WaveformView.TimeZoomStepMax
+                ? WaveformView.TimeZoomStepMax
+                : WaveformView.TimeZoomMax;
+            ZoomTimeTo(next);
+            return true;
+        }
+
+        if (key == Key.Down && modifiers == ModifierKeys.Control)
+        {
+            ZoomTimeTo(1d);
+            return true;
+        }
+
+        if (key == Key.Up && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            SetAmpZoom(WaveformView.AmpZoomMax);
+            return true;
+        }
+
+        if (key == Key.Down && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            SetAmpZoom(1d);
+            return true;
+        }
+
+        if (key == Key.Up && modifiers == ModifierKeys.Shift)
+        {
+            SetAmpZoom(_ampZoom * WaveformView.TimeZoomStep);
+            return true;
+        }
+
+        if (key == Key.Down && modifiers == ModifierKeys.Shift)
+        {
+            SetAmpZoom(_ampZoom / WaveformView.TimeZoomStep);
+            return true;
+        }
+
+        if (key == Key.Up && modifiers == ModifierKeys.None)
+        {
+            ZoomTimeBy(WaveformView.TimeZoomStep);
+            return true;
+        }
+
+        if (key == Key.Down && modifiers == ModifierKeys.None)
+        {
+            ZoomTimeBy(1d / WaveformView.TimeZoomStep);
+            return true;
+        }
+
+        if (key is Key.Left or Key.Right && modifiers == ModifierKeys.Shift)
+        {
+            return true;
+        }
+
+        if (key == Key.Left && modifiers == ModifierKeys.None)
+        {
+            NudgeSeek(-1);
+            return true;
+        }
+
+        if (key == Key.Right && modifiers == ModifierKeys.None)
+        {
+            NudgeSeek(1);
+            return true;
+        }
+
+        if (key == Key.Home && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        {
+            MoveSeek(ViewEdgeFrame(-1), ensureVisible: false);
+            return true;
+        }
+
+        if (key == Key.End && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        {
+            MoveSeek(ViewEdgeFrame(1), ensureVisible: false);
+            return true;
+        }
+
+        if (key == Key.PageUp && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        {
+            MoveSeek(SeekFrame + (long)Math.Round(_viewSpan * -0.05), ensureVisible: true);
+            return true;
+        }
+
+        if (key == Key.PageDown && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        {
+            MoveSeek(SeekFrame + (long)Math.Round(_viewSpan * 0.05), ensureVisible: true);
+            return true;
+        }
+
+        if (key == Key.Home && modifiers is ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            MoveSeek(_range.StartFrame, ensureVisible: true);
+            return true;
+        }
+
+        if (key == Key.End && modifiers is ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            MoveSeek(Math.Max(_range.StartFrame, _range.EndFrame - 1), ensureVisible: true);
+            return true;
+        }
+
+        return false;
+    }
+
+    private void SetAmpZoom(double zoom)
+    {
+        var next = Math.Clamp(zoom, 1d, WaveformView.AmpZoomMax);
+        if (Math.Abs(next - _ampZoom) < 1e-12)
+        {
+            return;
+        }
+
+        _ampZoom = next;
+        MarkWaveDirty();
+        InvalidateVisual();
+    }
+
+    private double CurrentTimeZoom =>
+        _viewSpan <= 0 ? 1d : Math.Max(1d, _range.Length / _viewSpan);
+
+    private long SeekFrame => _seekFrame >= 0 ? _seekFrame : ViewEdgeFrame(0);
+
+    private void ZoomTimeBy(double factor) =>
+        ZoomTimeTo(Math.Clamp(CurrentTimeZoom * factor, 1d, WaveformView.TimeZoomMax));
+
+    private void ZoomTimeTo(double zoom)
+    {
+        zoom = Math.Clamp(zoom, 1d, WaveformView.TimeZoomMax);
+        var span = Math.Max(1d, _range.Length / zoom);
+        var seek = SeekFrame;
+        if (_seekFrame < 0)
+        {
+            _seekFrame = seek;
+        }
+
+        _viewSpan = span;
+        var maxStart = Math.Max((double)_range.StartFrame, _range.EndFrame - span);
+        _viewStart = Math.Clamp(seek - span * 0.5, _range.StartFrame, maxStart);
+        MarkWaveDirty();
+        InvalidateVisual();
+    }
+
+    private void BeginSeekNudge(int direction)
+    {
+        if (direction == 0 || _document is null)
+        {
+            return;
+        }
+
+        if (_seekNudgeDirection == direction && _seekNudgeTimer is { IsEnabled: true })
+        {
+            return;
+        }
+
+        NudgeSeekBySeconds(direction * LibraryPlayerMode.SeekNudgeSeconds);
+        _seekNudgeDirection = direction;
+        _seekNudgeRepeatStarted = false;
+        _seekNudgeLastAt = Environment.TickCount64;
+        _seekNudgeTimer ??= new DispatcherTimer();
+        _seekNudgeTimer.Tick -= OnSeekNudgeTick;
+        _seekNudgeTimer.Tick += OnSeekNudgeTick;
+        _seekNudgeTimer.Interval = TimeSpan.FromMilliseconds(
+            LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: false));
+        _seekNudgeTimer.Start();
+    }
+
+    private void OnSeekNudgeTick(object? sender, EventArgs e)
+    {
+        var held = _seekNudgeDirection < 0
+            ? Keyboard.IsKeyDown(Key.NumPad7)
+            : Keyboard.IsKeyDown(Key.NumPad9);
+        if (_seekNudgeDirection == 0 || !held || Keyboard.Modifiers != ModifierKeys.None)
+        {
+            StopSeekNudge();
+            return;
+        }
+
+        var now = Environment.TickCount64;
+        var seconds = LibraryPlayerMode.SeekNudgeCatchUpSeconds(
+            now - _seekNudgeLastAt,
+            _seekNudgeRepeatStarted);
+        NudgeSeekBySeconds(_seekNudgeDirection * seconds);
+        _seekNudgeLastAt = now;
+        if (_seekNudgeRepeatStarted || _seekNudgeTimer is null)
+        {
+            return;
+        }
+
+        _seekNudgeRepeatStarted = true;
+        _seekNudgeTimer.Interval = TimeSpan.FromMilliseconds(
+            LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: true));
+    }
+
+    private void StopSeekNudge()
+    {
+        _seekNudgeDirection = 0;
+        _seekNudgeRepeatStarted = false;
+        _seekNudgeTimer?.Stop();
+    }
+
+    private void NudgeSeekBySeconds(double seconds)
+    {
+        var rate = _document?.SampleRate ?? 0;
+        if (rate <= 0 || seconds == 0)
+        {
+            return;
+        }
+
+        var frames = (long)Math.Round(rate * seconds);
+        MoveSeek(SeekFrame + frames, ensureVisible: true);
+    }
+
+    private void NudgeSeek(int direction)
+    {
+        var width = Math.Max(1d, ActualWidth);
+        var step = _viewSpan <= Math.Min(WaveformView.SamplePointMaxVisibleFrames, width)
+            ? 1L
+            : Math.Max(1L, (long)Math.Round(_viewSpan / width));
+        MoveSeek(SeekFrame + direction * step, ensureVisible: true);
+    }
+
+    private void JumpSeekPercent(double percent) =>
+        MoveSeek((long)Math.Round(_viewStart + _viewSpan * percent), ensureVisible: true);
+
+    private long ViewEdgeFrame(int direction)
+    {
+        var frame = direction < 0
+            ? (long)Math.Round(_viewStart)
+            : direction > 0
+                ? (long)Math.Round(_viewStart + _viewSpan)
+                : (long)Math.Round(_viewStart + _viewSpan * 0.5);
+        return ClampSeek(frame);
+    }
+
+    private void MoveSeek(long frame, bool ensureVisible)
+    {
+        _seekFrame = ClampSeek(frame);
+        if (ensureVisible)
+        {
+            EnsureSeekVisible(_seekFrame);
         }
 
         InvalidateVisual();
     }
 
+    private long ClampSeek(long frame)
+    {
+        var last = Math.Max(_range.StartFrame, _range.EndFrame - 1);
+        return Math.Clamp(frame, _range.StartFrame, last);
+    }
+
+    private void EnsureSeekVisible(long frame)
+    {
+        if (_viewSpan <= 1)
+        {
+            return;
+        }
+
+        var margin = Math.Max(1d, _viewSpan * 0.02);
+        double? next = null;
+        if (frame < _viewStart + margin)
+        {
+            next = frame - margin;
+        }
+        else if (frame > _viewStart + _viewSpan - margin)
+        {
+            next = frame - _viewSpan + margin;
+        }
+
+        if (next is not double start)
+        {
+            return;
+        }
+
+        var maxStart = Math.Max((double)_range.StartFrame, _range.EndFrame - _viewSpan);
+        var clamped = Math.Clamp(start, _range.StartFrame, maxStart);
+        if (Math.Abs(clamped - _viewStart) < 0.0001)
+        {
+            return;
+        }
+
+        _viewStart = clamped;
+        MarkWaveDirty();
+    }
+
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(e);
+        var pos = e.GetPosition(this);
+        var y = pos.Y;
+        if (!IsOverThresholdLine(y))
+        {
+            PlaceSeek(pos.X);
+            e.Handled = true;
+            return;
+        }
+
         Focus();
         CaptureMouse();
         _dragging = true;
-        var y = e.GetPosition(this).Y;
         _dragOpen = _hitPointMode || PickOpenLine(y);
+        Cursor = Cursors.SizeNS;
         ApplyMouseY(y);
         e.Handled = true;
     }
@@ -929,13 +1436,28 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        if (!_dragging || e.LeftButton != MouseButtonState.Pressed)
+        var pos = e.GetPosition(this);
+        UpdateHoverBar(pos.X);
+        var y = pos.Y;
+        if (_dragging && e.LeftButton == MouseButtonState.Pressed)
         {
+            Cursor = Cursors.SizeNS;
+            ApplyMouseY(y);
+            e.Handled = true;
             return;
         }
 
-        ApplyMouseY(e.GetPosition(this).Y);
-        e.Handled = true;
+        Cursor = IsOverThresholdLine(y) ? Cursors.SizeNS : Cursors.Arrow;
+    }
+
+    protected override void OnMouseLeave(MouseEventArgs e)
+    {
+        base.OnMouseLeave(e);
+        ClearHoverBar();
+        if (!_dragging)
+        {
+            Cursor = Cursors.Arrow;
+        }
     }
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
@@ -943,8 +1465,9 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         base.OnMouseLeftButtonUp(e);
         if (_dragging)
         {
-            _dragging = false;
+            FinishThresholdDrag();
             ReleaseMouseCapture();
+            Cursor = IsOverThresholdLine(e.GetPosition(this).Y) ? Cursors.SizeNS : Cursors.Arrow;
             e.Handled = true;
         }
     }
@@ -952,7 +1475,20 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
     protected override void OnLostMouseCapture(MouseEventArgs e)
     {
         base.OnLostMouseCapture(e);
+        FinishThresholdDrag();
+    }
+
+    /// <summary>ドラッグ中は線だけ動かす。範囲の再計算は離したときに一度。</summary>
+    private void FinishThresholdDrag()
+    {
+        if (!_dragging)
+        {
+            return;
+        }
+
         _dragging = false;
+        RefreshKeepsFromEnvelope();
+        InvalidateVisual();
     }
 
     private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -962,9 +1498,11 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             return;
         }
 
-        var fraction = e.GetPosition(this).X / ActualWidth;
-        var factor = e.Delta > 0 ? ZoomStep : 1d / ZoomStep;
-        var minSpan = Math.Min(_range.Length, Math.Max(1d, ActualWidth));
+        var fraction = _seekFrame >= 0
+            ? (_seekFrame - _viewStart) / Math.Max(1.0, _viewSpan)
+            : e.GetPosition(this).X / ActualWidth;
+        var factor = e.Delta > 0 ? WaveformView.WheelTimeStep : 1d / WaveformView.WheelTimeStep;
+        var minSpan = Math.Max(1d, _range.Length / WaveformView.TimeZoomMax);
         (_viewStart, _viewSpan) = ZoomAround(
             _viewStart,
             _viewSpan,
@@ -973,7 +1511,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             fraction,
             factor,
             minSpan);
-        RebuildEnvelope();
+        MarkWaveDirty();
         InvalidateVisual();
         e.Handled = true;
     }
@@ -1020,7 +1558,6 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         }
 
         var back = WpfControlHelpers.FrozenBrush(Theme.Get("WaveformBackBrush"));
-        var fill = WpfControlHelpers.FrozenBrush(Theme.Get("WaveFillBrush"));
         var zero = WpfControlHelpers.FrozenBrush(Theme.Get("WaveZeroLineBrush"));
         var keep = WpfControlHelpers.FrozenBrush(Theme.Get("WaveSelectionFillBrush"));
         var thresholdBrush = WpfControlHelpers.FrozenBrush(Theme.Get("LevelMeterClipOnBrush"));
@@ -1028,15 +1565,10 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         var mid = height * 0.5;
         var amp = height * 0.5;
-        if (_mins.Length == 0 || _maxs.Length != _mins.Length)
-        {
-            RebuildEnvelope();
-        }
+        var gain = DrawnGain;
 
-        var gain = _displayGain;
-
-        var bins = Math.Min(_mins.Length, _maxs.Length);
-        if (_document is not null && !_range.IsEmpty && bins > 0)
+        EnsureWaveBitmap(width, height);
+        if (_document is not null && !_range.IsEmpty)
         {
             var viewStart = _viewStart;
             var viewSpan = Math.Max(1.0, _viewSpan);
@@ -1055,24 +1587,9 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
                 }
             }
 
-            var pen = new Pen(fill, 1);
-            pen.Freeze();
-            for (var i = 0; i < bins; i++)
+            if (_bitmap is not null)
             {
-                var x = (i + 0.5) / bins * width;
-                var y0 = mid - _maxs[i] * gain * amp;
-                var y1 = mid - _mins[i] * gain * amp;
-                if (y1 < y0)
-                {
-                    (y0, y1) = (y1, y0);
-                }
-
-                if (y1 - y0 < 1)
-                {
-                    y1 = y0 + 1;
-                }
-
-                dc.DrawLine(pen, new Point(x, y0), new Point(x, y1));
+                dc.DrawImage(_bitmap, new Rect(0, 0, width, height));
             }
 
             if (_hitPointMode && _hitFrames.Count > 0)
@@ -1099,6 +1616,100 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         {
             DrawThresholdPair(dc, thresholdBrush, mid, amp, width, SilentSkip.LinearFromDb(_options.CloseThresholdDb) * gain, thick: false);
         }
+
+        DrawHoverBar(dc, width, height);
+        DrawSeekBar(dc, width, height);
+    }
+
+    private void UpdateHoverBar(double x)
+    {
+        if (!double.IsNaN(_hoverX) && Math.Abs(_hoverX - x) < 0.5)
+        {
+            return;
+        }
+
+        _hoverX = x;
+        InvalidateVisual();
+    }
+
+    private void ClearHoverBar()
+    {
+        if (double.IsNaN(_hoverX))
+        {
+            return;
+        }
+
+        _hoverX = double.NaN;
+        InvalidateVisual();
+    }
+
+    private static Pen CreateHoverBarPen()
+    {
+        var pen = new Pen(Brushes.White, 1);
+        pen.Freeze();
+        return pen;
+    }
+
+    private void DrawHoverBar(DrawingContext dc, double width, double height)
+    {
+        if (double.IsNaN(_hoverX) || width <= 1 || height <= 1)
+        {
+            return;
+        }
+
+        var x = Math.Clamp(_hoverX, 0, width);
+        dc.DrawLine(HoverBarPen, new Point(x, 0), new Point(x, height));
+    }
+
+    private void PlaceSeek(double x)
+    {
+        if (_range.IsEmpty || ActualWidth <= 1 || _viewSpan <= 0)
+        {
+            return;
+        }
+
+        var fraction = Math.Clamp(x / ActualWidth, 0, 1);
+        var frame = (long)Math.Round(_viewStart + fraction * _viewSpan);
+        var last = Math.Max(_range.StartFrame, _range.EndFrame - 1);
+        _seekFrame = Math.Clamp(frame, _range.StartFrame, last);
+        InvalidateVisual();
+    }
+
+    private void DrawSeekBar(DrawingContext dc, double width, double height)
+    {
+        if (_seekFrame < 0 || _viewSpan <= 0)
+        {
+            return;
+        }
+
+        var x = (_seekFrame - _viewStart) / _viewSpan * width;
+        if (x < -1 || x > width + 1)
+        {
+            return;
+        }
+
+        EnsureSeekPens();
+        dc.DrawLine(_seekGlowOuter!, new Point(x, 0), new Point(x, height));
+        dc.DrawLine(_seekGlowInner!, new Point(x, 0), new Point(x, height));
+        dc.DrawLine(_seekCore!, new Point(x, 0), new Point(x, height));
+    }
+
+    /// <summary>エディタの再生ヘッドと同じ PlayheadBrush（シアン）とグロー。</summary>
+    private void EnsureSeekPens()
+    {
+        var color = Theme.Get("PlayheadBrush");
+        if (_seekCore is not null && _seekPenColor == color)
+        {
+            return;
+        }
+
+        _seekPenColor = color;
+        _seekGlowOuter = new Pen(WpfControlHelpers.FrozenBrush(Color.FromArgb(40, color.R, color.G, color.B)), 3);
+        _seekGlowInner = new Pen(WpfControlHelpers.FrozenBrush(Color.FromArgb(90, color.R, color.G, color.B)), 1.5);
+        _seekCore = new Pen(WpfControlHelpers.FrozenBrush(color), 1);
+        _seekGlowOuter.Freeze();
+        _seekGlowInner.Freeze();
+        _seekCore.Freeze();
     }
 
     /// <summary>表示範囲のピークが上下いっぱいに見える倍率。スレッショルド線も同じ倍率。</summary>
@@ -1147,6 +1758,57 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         dc.DrawRectangle(brush, null, new Rect(width - handle, yNeg - handle * 0.5, handle, handle));
     }
 
+    private const double ThresholdHitSlop = 6;
+
+    /// <summary>描いている赤線（上下）の近くだけ。ハンドルの一辺と同じ 6px。</summary>
+    private bool IsOverThresholdLine(double y)
+    {
+        foreach (var lineY in ThresholdLineYs())
+        {
+            if (Math.Abs(y - lineY) <= ThresholdHitSlop)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private IEnumerable<double> ThresholdLineYs()
+    {
+        var height = ActualHeight;
+        if (height <= 1)
+        {
+            yield break;
+        }
+
+        var mid = height * 0.5;
+        var amp = height * 0.5;
+        var gain = DrawnGain;
+        foreach (var y in PairYs(mid, amp, SilentSkip.LinearFromDb(_options.OpenThresholdDb) * gain))
+        {
+            yield return y;
+        }
+
+        if (_hitPointMode
+            || _options.LinkThresholds
+            || Math.Abs(_options.OpenThresholdDb - _options.CloseThresholdDb) <= 1e-3)
+        {
+            yield break;
+        }
+
+        foreach (var y in PairYs(mid, amp, SilentSkip.LinearFromDb(_options.CloseThresholdDb) * gain))
+        {
+            yield return y;
+        }
+    }
+
+    private static IEnumerable<double> PairYs(double mid, double amp, float linear)
+    {
+        yield return mid - linear * amp;
+        yield return mid + linear * amp;
+    }
+
     private bool PickOpenLine(double y)
     {
         if (_hitPointMode || _options.LinkThresholds)
@@ -1156,7 +1818,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         var mid = ActualHeight * 0.5;
         var amp = ActualHeight * 0.5;
-        var gain = _displayGain;
+        var gain = DrawnGain;
         var openY = mid - SilentSkip.LinearFromDb(_options.OpenThresholdDb) * gain * amp;
         var closeY = mid - SilentSkip.LinearFromDb(_options.CloseThresholdDb) * gain * amp;
         var dOpen = Math.Min(Math.Abs(y - openY), Math.Abs(y - (mid * 2 - openY)));
@@ -1174,40 +1836,382 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         var mid = height * 0.5;
         var amp = height * 0.5;
-        var gain = _displayGain;
+        var gain = DrawnGain;
         var linear = Math.Clamp(Math.Abs(y - mid) / amp / gain, 1e-6, 1.0);
         var db = 20.0 * Math.Log10(linear);
         ThresholdChanged?.Invoke(SilentSkip.ClampThresholdDb(db), _dragOpen);
     }
 
-    private void RebuildEnvelope()
+    private void ResetView()
     {
-        if (_document is null || _range.IsEmpty || ActualWidth <= 1)
+        _viewStart = _range.StartFrame;
+        _viewSpan = Math.Max(1, _range.Length);
+    }
+
+    private void MarkWaveDirty() => _waveDirty = true;
+
+    private static long RawColumnBudget(int width) =>
+        Math.Min(RawColumnMaxFrames, (long)Math.Max(1, width) * RawColumnMaxSamplesPerPixel);
+
+    private void RefreshDisplayGain()
+    {
+        if (_document is null || _range.IsEmpty)
         {
-            _mins = [];
-            _maxs = [];
+            _displayGain = 1;
             return;
         }
 
-        var bins = Math.Clamp((int)Math.Round(ActualWidth), 1, MaxBins);
-        _mins = new float[bins];
-        _maxs = new float[bins];
-        Array.Fill(_mins, 0f);
-        Array.Fill(_maxs, 0f);
+        var count = FillVisibleColumns(512, _range.StartFrame, _range.EndFrame);
+        float peak = 0;
+        for (var i = 0; i < count; i++)
+        {
+            peak = Math.Max(peak, Math.Abs(_columnMins[i]));
+            peak = Math.Max(peak, Math.Abs(_columnMaxs[i]));
+        }
 
-        var interleaved = _document.Interleaved;
-        var channels = Math.Max(1, _document.Channels);
+        _displayGain = peak > 1e-6f ? 1f / peak : 1f;
+        MarkWaveDirty();
+    }
+
+    private void EnsureWaveBitmap(double width, double height)
+    {
+        if (_document is null || _range.IsEmpty)
+        {
+            _bitmap = null;
+            return;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var pxW = Math.Max(1, (int)Math.Round(width * dpi.DpiScaleX));
+        var pxH = Math.Max(1, (int)Math.Round(height * dpi.DpiScaleY));
+        if (!_waveDirty
+            && _bitmap is not null
+            && _bitmapWidth == pxW
+            && _bitmapHeight == pxH
+            && Math.Abs(_bitmapViewStart - _viewStart) < 0.5
+            && Math.Abs(_bitmapViewSpan - _viewSpan) < 0.5
+            && Math.Abs(_bitmapGain - DrawnGain) < 1e-6f)
+        {
+            return;
+        }
+
         var start = (long)Math.Floor(_viewStart);
         var end = (long)Math.Ceiling(_viewStart + _viewSpan);
         var lastFrame = Math.Max(_range.StartFrame, _range.EndFrame - 1);
         start = Math.Clamp(start, _range.StartFrame, lastFrame);
         end = Math.Clamp(end, start + 1, _range.EndFrame);
-        var length = Math.Max(1L, end - start);
-        var frameCount = interleaved.Length / channels;
-        for (var i = 0; i < bins; i++)
+        var count = FillVisibleColumns(pxW, start, end);
+        var bitmap = new WriteableBitmap(pxW, pxH, dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32, null);
+        var wave = ToPbgra(Theme.Get("WaveFillBrush"));
+        var sampleFrames = end - start;
+        var traceSamples = sampleFrames > 0 && sampleFrames <= pxW;
+        bitmap.Lock();
+        unsafe
         {
-            var frame0 = start + i * length / bins;
-            var frame1 = start + (i + 1) * length / bins;
+            var buffer = (uint*)bitmap.BackBuffer;
+            var stride = bitmap.BackBufferStride / 4;
+            var pixels = stride * pxH;
+            for (var i = 0; i < pixels; i++)
+            {
+                buffer[i] = 0;
+            }
+
+            var mid = pxH * 0.5;
+            var amp = pxH * 0.5 * DrawnGain;
+            if (traceSamples)
+            {
+                PaintSampleTrace(buffer, stride, pxW, pxH, start, end, mid, amp, wave, dpi.DpiScaleX, width);
+            }
+
+            if (!traceSamples)
+            for (var i = 0; i < count; i++)
+            {
+                var y0 = mid - _columnMaxs[i] * amp;
+                var y1 = mid - _columnMins[i] * amp;
+                if (y1 < y0)
+                {
+                    (y0, y1) = (y1, y0);
+                }
+
+                var top = (int)Math.Floor(y0);
+                var bottom = (int)Math.Ceiling(y1);
+                if (bottom <= top)
+                {
+                    bottom = top + 1;
+                }
+
+                top = Math.Clamp(top, 0, pxH - 1);
+                bottom = Math.Clamp(bottom, top + 1, pxH);
+                var x0 = i * pxW / count;
+                var x1 = (i + 1) * pxW / count;
+                if (x1 <= x0)
+                {
+                    x1 = Math.Min(pxW, x0 + 1);
+                }
+
+                for (var x = x0; x < x1; x++)
+                {
+                    var column = buffer + x;
+                    for (var y = top; y < bottom; y++)
+                    {
+                        column[y * stride] = wave;
+                    }
+                }
+            }
+        }
+
+        bitmap.AddDirtyRect(new Int32Rect(0, 0, pxW, pxH));
+        bitmap.Unlock();
+        bitmap.Freeze();
+        _bitmap = bitmap;
+        _bitmapWidth = pxW;
+        _bitmapHeight = pxH;
+        _bitmapViewStart = _viewStart;
+        _bitmapViewSpan = _viewSpan;
+        _bitmapGain = DrawnGain;
+        _waveDirty = false;
+    }
+
+    /// <summary>表示フレームが画素幅以下のとき、エディタと同じくサンプルを結ぶ線と点を描く。</summary>
+    private unsafe void PaintSampleTrace(
+        uint* buffer,
+        int stride,
+        int pxW,
+        int pxH,
+        long start,
+        long end,
+        double mid,
+        double amp,
+        uint color,
+        double dpiScaleX,
+        double dipWidth)
+    {
+        var document = _document;
+        if (document is null || _viewSpan <= 0)
+        {
+            return;
+        }
+
+        var channels = Math.Max(1, document.Channels);
+        var samples = document.Interleaved;
+        var frameCount = samples.Length / channels;
+        var count = (int)(end - start);
+        var dots = count > 0 && count <= Math.Min(WaveformView.SamplePointMaxVisibleFrames, dipWidth);
+        var radius = Math.Max(1, (int)Math.Round(WaveformView.SamplePointRadius * dpiScaleX));
+        var havePrev = false;
+        var prevX = 0;
+        var prevY = 0;
+        for (var i = 0; i < count; i++)
+        {
+            var frame = start + i;
+            if (frame < 0 || frame >= frameCount)
+            {
+                continue;
+            }
+
+            var x = (int)Math.Round((frame - _viewStart) / _viewSpan * pxW);
+            var y = (int)Math.Round(mid - SampleAt(samples, channels, frame, frameCount) * amp);
+            y = Math.Clamp(y, 0, pxH - 1);
+            if (count == 1)
+            {
+                FillVertical(buffer, stride, pxW, pxH, x, y - 3, y + 3, color);
+            }
+            else if (havePrev)
+            {
+                DrawTraceLine(buffer, stride, pxW, pxH, prevX, prevY, x, y, color);
+                DrawTraceLine(buffer, stride, pxW, pxH, prevX, prevY + 1, x, y + 1, color);
+            }
+
+            if (dots)
+            {
+                FillTraceDot(buffer, stride, pxW, pxH, x, y, radius, color);
+            }
+
+            prevX = x;
+            prevY = y;
+            havePrev = true;
+        }
+    }
+
+    private float SampleAt(float[] samples, int channels, long frame, int frameCount)
+    {
+        if (frame < 0 || frame >= frameCount)
+        {
+            return 0;
+        }
+
+        var chosen = 0f;
+        var peak = -1f;
+        var any = false;
+        var origin = (int)frame * channels;
+        for (var ch = 0; ch < channels; ch++)
+        {
+            if (!ChannelSolo.Contains(_channelMask, ch))
+            {
+                continue;
+            }
+
+            var sample = samples[origin + ch];
+            var abs = Math.Abs(sample);
+            if (!any || abs > peak)
+            {
+                chosen = sample;
+                peak = abs;
+                any = true;
+            }
+        }
+
+        return chosen;
+    }
+
+    private static unsafe void FillVertical(uint* buffer, int stride, int width, int height, int x, int y0, int y1, uint color)
+    {
+        if ((uint)x >= (uint)width)
+        {
+            return;
+        }
+
+        if (y0 > y1)
+        {
+            (y0, y1) = (y1, y0);
+        }
+
+        y0 = Math.Clamp(y0, 0, height - 1);
+        y1 = Math.Clamp(y1, 0, height - 1);
+        for (var y = y0; y <= y1; y++)
+        {
+            buffer[y * stride + x] = color;
+        }
+    }
+
+    private static unsafe void DrawTraceLine(
+        uint* buffer,
+        int stride,
+        int width,
+        int height,
+        int x0,
+        int y0,
+        int x1,
+        int y1,
+        uint color)
+    {
+        var dx = Math.Abs(x1 - x0);
+        var dy = Math.Abs(y1 - y0);
+        var sx = x0 < x1 ? 1 : -1;
+        var sy = y0 < y1 ? 1 : -1;
+        var err = dx - dy;
+        while (true)
+        {
+            if ((uint)x0 < (uint)width && (uint)y0 < (uint)height)
+            {
+                buffer[y0 * stride + x0] = color;
+            }
+
+            if (x0 == x1 && y0 == y1)
+            {
+                break;
+            }
+
+            var e2 = err * 2;
+            if (e2 > -dy)
+            {
+                err -= dy;
+                x0 += sx;
+            }
+
+            if (e2 < dx)
+            {
+                err += dx;
+                y0 += sy;
+            }
+        }
+    }
+
+    private static unsafe void FillTraceDot(
+        uint* buffer,
+        int stride,
+        int width,
+        int height,
+        int cx,
+        int cy,
+        int radius,
+        uint color)
+    {
+        var r2 = radius * radius;
+        var y0 = Math.Max(0, cy - radius);
+        var y1 = Math.Min(height - 1, cy + radius);
+        var x0 = Math.Max(0, cx - radius);
+        var x1 = Math.Min(width - 1, cx + radius);
+        for (var y = y0; y <= y1; y++)
+        {
+            var dy = y - cy;
+            var row = buffer + y * stride;
+            for (var x = x0; x <= x1; x++)
+            {
+                var dx = x - cx;
+                if (dx * dx + dy * dy <= r2)
+                {
+                    row[x] = color;
+                }
+            }
+        }
+    }
+
+    private int FillVisibleColumns(int columns, long start, long end)
+    {
+        if (_document is null || columns <= 0 || end <= start)
+        {
+            return 0;
+        }
+
+        var frames = end - start;
+        var useRaw = frames <= RawColumnBudget(columns);
+        if (!useRaw)
+        {
+            if (_document.Peaks is { IsEmpty: false } peaks)
+            {
+                var peakChannels = Math.Max(1, peaks.Channels);
+                EnsureColumns(columns * peakChannels);
+                var count = peaks.ReadRangePacked(start, end, columns, _columnMins, _columnMaxs);
+                if (count > 0)
+                {
+                    FoldSolo(_columnMins, _columnMaxs, count, peakChannels, _channelMask);
+                    return count;
+                }
+            }
+        }
+
+        if (frames > RawColumnBudget(columns))
+        {
+            return 0;
+        }
+
+        return FillRawColumns(columns, start, end);
+    }
+
+    private int FillRawColumns(int columns, long start, long end)
+    {
+        var document = _document;
+        if (document is null)
+        {
+            return 0;
+        }
+
+        var channels = Math.Max(1, document.Channels);
+        var frames = end - start;
+        var buckets = (int)Math.Min(columns, Math.Max(1, frames));
+        if (buckets <= 0)
+        {
+            return 0;
+        }
+
+        EnsureColumns(buckets);
+        var samples = document.Interleaved;
+        var frameCount = samples.Length / channels;
+        for (var i = 0; i < buckets; i++)
+        {
+            var frame0 = start + i * frames / buckets;
+            var frame1 = start + (i + 1) * frames / buckets;
             if (frame1 <= frame0)
             {
                 frame1 = frame0 + 1;
@@ -1219,7 +2223,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             for (var frame = frame0; frame < frame1 && frame < end && frame < frameCount; frame++)
             {
                 var baseIndex = (int)(frame * channels);
-                if (baseIndex < 0 || baseIndex + channels > interleaved.Length)
+                if (baseIndex < 0 || baseIndex + channels > samples.Length)
                 {
                     break;
                 }
@@ -1231,7 +2235,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
                         continue;
                     }
 
-                    var sample = interleaved[baseIndex + ch];
+                    var sample = samples[baseIndex + ch];
                     if (first)
                     {
                         min = max = sample;
@@ -1252,31 +2256,73 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
                 }
             }
 
-            _mins[i] = min;
-            _maxs[i] = max;
+            _columnMins[i] = min;
+            _columnMaxs[i] = max;
         }
 
-        if (ViewCoversRange())
+        return buckets;
+    }
+
+    private void EnsureColumns(int count)
+    {
+        if (_columnMins.Length >= count)
         {
-            _displayGain = DisplayGain(_mins, _maxs);
+            return;
+        }
+
+        _columnMins = new float[count];
+        _columnMaxs = new float[count];
+    }
+
+    private static void FoldSolo(float[] mins, float[] maxs, int count, int channels, int mask)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            var src = i * channels;
+            float min = 0;
+            float max = 0;
+            var first = true;
+            for (var ch = 0; ch < channels; ch++)
+            {
+                if (!ChannelSolo.Contains(mask, ch))
+                {
+                    continue;
+                }
+
+                var lo = mins[src + ch];
+                var hi = maxs[src + ch];
+                if (first)
+                {
+                    min = lo;
+                    max = hi;
+                    first = false;
+                }
+                else
+                {
+                    if (lo < min)
+                    {
+                        min = lo;
+                    }
+
+                    if (hi > max)
+                    {
+                        max = hi;
+                    }
+                }
+            }
+
+            mins[i] = min;
+            maxs[i] = max;
         }
     }
 
-    private void ResetView()
+    private static uint ToPbgra(Color color)
     {
-        _viewStart = _range.StartFrame;
-        _viewSpan = Math.Max(1, _range.Length);
-    }
-
-    private bool ViewCoversRange()
-    {
-        if (_range.IsEmpty)
-        {
-            return false;
-        }
-
-        return _viewStart <= _range.StartFrame + 0.5
-            && _viewStart + _viewSpan >= _range.EndFrame - 0.5;
+        var a = color.A;
+        var r = color.R * a / 255;
+        var g = color.G * a / 255;
+        var b = color.B * a / 255;
+        return (uint)(b | (g << 8) | (r << 16) | (a << 24));
     }
 
     /// <summary>塗りの区間は適用と同じ検出。最小ゲート、クローズ時間、プリ／ポストロールを含む。</summary>

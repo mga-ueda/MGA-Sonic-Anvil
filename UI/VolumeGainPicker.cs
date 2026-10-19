@@ -213,6 +213,7 @@ internal static class VolumeGainPicker
                 ApplyGain(state, WaveformGainAnalyzer.SnapGainDb(parsed), rewrite: false);
             }
         };
+        box.LostKeyboardFocus += (_, _) => RewriteGain(state);
 
         var readingWidth = PickerChrome.CharBoxWidth(5);
         state.LkfsBefore = ReadingValue(readingWidth);
@@ -233,6 +234,29 @@ internal static class VolumeGainPicker
 
     private static void SetGain(MenuState state, double gainDb) =>
         ApplyGain(state, WaveformGainAnalyzer.SnapGainDb(gainDb), rewrite: true);
+
+    private static void RewriteGain(MenuState state)
+    {
+        if (state.UpdatingText)
+        {
+            return;
+        }
+
+        state.UpdatingText = true;
+        try
+        {
+            var text = FormatGainBox(state.GainDb);
+            if (!string.Equals(state.GainBox.Text, text, StringComparison.Ordinal))
+            {
+                state.GainBox.Text = text;
+                state.GainBox.CaretIndex = text.Length;
+            }
+        }
+        finally
+        {
+            state.UpdatingText = false;
+        }
+    }
 
     private static void ApplyGain(MenuState state, double gainDb, bool rewrite)
     {
