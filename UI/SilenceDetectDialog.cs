@@ -124,7 +124,9 @@ internal sealed class SilenceDetectDialog : Window
             ChannelMask = channelMask,
             Options = _options,
             Height = DesignMetrics.From96(160),
+            MinHeight = DesignMetrics.From96(80),
             Margin = new Thickness(0, 0, 0, 10),
+            VerticalAlignment = VerticalAlignment.Stretch,
         };
         _preview.ThresholdChanged += OnPreviewThresholdChanged;
         _preview.KeepsChanged += OnPreviewKeepsChanged;
@@ -300,13 +302,25 @@ internal sealed class SilenceDetectDialog : Window
         {
             RefreshStatusFromPreview();
             SyncActionUi();
-            // 高さは内容に合わせたあと固定。横幅だけ変えられる。
-            var h = ActualHeight;
-            if (h > 0)
+            // 初回の高さは内容どおり。以後は波形エリアだけが縦横に伸び、下の設定は開いたときの幅のまま。
+            SizeToContent = SizeToContent.Manual;
+            if (ActualHeight > 0)
             {
-                MinHeight = h;
-                MaxHeight = h;
+                var previewHeight = _preview.ActualHeight;
+                Height = ActualHeight;
+                MinHeight = Math.Max(
+                    _preview.MinHeight,
+                    ActualHeight - previewHeight + _preview.MinHeight);
             }
+
+            if (ActualWidth > 0)
+            {
+                MinWidth = ActualWidth;
+            }
+
+            bottom.Width = bottom.ActualWidth;
+            bottom.HorizontalAlignment = HorizontalAlignment.Left;
+            _preview.ClearValue(FrameworkElement.HeightProperty);
 
             _openBox.Focus();
             _openBox.SelectAll();
@@ -330,7 +344,6 @@ internal sealed class SilenceDetectDialog : Window
         }
 
         _options = _options.Normalized();
-        // プレビューは表示波形ベースの近似。厳密検出は適用時のみ。
         PaintThresholdBoxesFromOptions();
         _preview.Options = _options;
     }
@@ -782,11 +795,13 @@ internal sealed class SilenceDetectDialog : Window
 }
 
 /// <summary>
-/// 選択範囲の波形と ±しきい値線。ハイライトは表示用エンベロープの近似（適用時は厳密検出）。
+/// 選択範囲の波形と ±しきい値線。残す区間とヒットは適用時と同じ検出。
+/// 波形の線は表示幅へ間引いた min/max。ホイールはカーソル位置を基準に時間方向へ拡縮する。
 /// </summary>
 internal sealed class SilenceDetectWavePreview : FrameworkElement
 {
     private const int MaxBins = 1200;
+    private const double ZoomStep = 1.25;
 
     private float[] _mins = [];
     private float[] _maxs = [];
@@ -799,6 +814,9 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
     private AudioDocument? _document;
     private WaveSelection _range;
     private int _channelMask;
+    private double _viewStart;
+    private double _viewSpan = 1;
+    private float _displayGain = 1;
 
     public event Action<double, bool>? ThresholdChanged;
     public event Action? KeepsChanged;
@@ -831,6 +849,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         set
         {
             _document = value;
+            ResetView();
             RebuildEnvelope();
             RefreshKeepsFromEnvelope();
             InvalidateVisual();
@@ -843,6 +862,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         set
         {
             _range = value;
+            ResetView();
             RebuildEnvelope();
             RefreshKeepsFromEnvelope();
             InvalidateVisual();
@@ -886,8 +906,11 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
     {
         base.OnRenderSizeChanged(sizeInfo);
-        RebuildEnvelope();
-        RefreshKeepsFromEnvelope();
+        if (sizeInfo.WidthChanged)
+        {
+            RebuildEnvelope();
+        }
+
         InvalidateVisual();
     }
 
@@ -934,17 +957,57 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
     private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        var direction = Math.Sign(e.Delta);
-        if (direction == 0)
+        if (e.Delta == 0 || _range.IsEmpty || ActualWidth <= 1)
         {
             return;
         }
 
-        var openLine = _hitPointMode || _options.LinkThresholds || PickOpenLine(e.GetPosition(this).Y);
-        var current = openLine ? _options.OpenThresholdDb : _options.CloseThresholdDb;
-        var next = SilenceDetectDialog.NudgeThresholdDb(current, direction, Keyboard.Modifiers);
-        ThresholdChanged?.Invoke(next, openLine);
+        var fraction = e.GetPosition(this).X / ActualWidth;
+        var factor = e.Delta > 0 ? ZoomStep : 1d / ZoomStep;
+        var minSpan = Math.Min(_range.Length, Math.Max(1d, ActualWidth));
+        (_viewStart, _viewSpan) = ZoomAround(
+            _viewStart,
+            _viewSpan,
+            _range.StartFrame,
+            _range.Length,
+            fraction,
+            factor,
+            minSpan);
+        RebuildEnvelope();
+        InvalidateVisual();
         e.Handled = true;
+    }
+
+    /// <summary>factor が 1 より大きいと span が縮む。アンカー割合のフレームは動かさない。</summary>
+    internal static (double Start, double Span) ZoomAround(
+        double start,
+        double span,
+        double fullStart,
+        double fullLength,
+        double anchorFraction,
+        double factor,
+        double minSpan)
+    {
+        fullLength = Math.Max(1, fullLength);
+        minSpan = Math.Clamp(minSpan, 1, fullLength);
+        span = Math.Clamp(span, minSpan, fullLength);
+        factor = Math.Max(1e-6, factor);
+        anchorFraction = Math.Clamp(anchorFraction, 0, 1);
+        var anchor = start + anchorFraction * span;
+        var nextSpan = Math.Clamp(span / factor, minSpan, fullLength);
+        var nextStart = anchor - anchorFraction * nextSpan;
+        var fullEnd = fullStart + fullLength;
+        if (nextStart < fullStart)
+        {
+            nextStart = fullStart;
+        }
+
+        if (nextStart + nextSpan > fullEnd)
+        {
+            nextStart = fullEnd - nextSpan;
+        }
+
+        return (nextStart, nextSpan);
     }
 
     protected override void OnRender(DrawingContext dc)
@@ -970,18 +1033,19 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             RebuildEnvelope();
         }
 
-        var gain = DisplayGain(_mins, _maxs);
+        var gain = _displayGain;
 
         var bins = Math.Min(_mins.Length, _maxs.Length);
         if (_document is not null && !_range.IsEmpty && bins > 0)
         {
-            var rangeLen = Math.Max(1.0, _range.Length);
+            var viewStart = _viewStart;
+            var viewSpan = Math.Max(1.0, _viewSpan);
             if (!_hitPointMode)
             {
                 foreach (var span in _keeps)
                 {
-                    var x0 = (span.StartFrame - _range.StartFrame) / rangeLen * width;
-                    var x1 = (span.EndFrame - _range.StartFrame) / rangeLen * width;
+                    var x0 = (span.StartFrame - viewStart) / viewSpan * width;
+                    var x1 = (span.EndFrame - viewStart) / viewSpan * width;
                     if (x1 <= x0)
                     {
                         continue;
@@ -1018,7 +1082,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
                 markerPen.Freeze();
                 foreach (var frame in _hitFrames)
                 {
-                    var x = (frame - _range.StartFrame) / rangeLen * width;
+                    var x = (frame - viewStart) / viewSpan * width;
                     dc.DrawLine(markerPen, new Point(x, 0), new Point(x, height));
                 }
             }
@@ -1092,7 +1156,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         var mid = ActualHeight * 0.5;
         var amp = ActualHeight * 0.5;
-        var gain = DisplayGain(_mins, _maxs);
+        var gain = _displayGain;
         var openY = mid - SilentSkip.LinearFromDb(_options.OpenThresholdDb) * gain * amp;
         var closeY = mid - SilentSkip.LinearFromDb(_options.CloseThresholdDb) * gain * amp;
         var dOpen = Math.Min(Math.Abs(y - openY), Math.Abs(y - (mid * 2 - openY)));
@@ -1110,7 +1174,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         var mid = height * 0.5;
         var amp = height * 0.5;
-        var gain = DisplayGain(_mins, _maxs);
+        var gain = _displayGain;
         var linear = Math.Clamp(Math.Abs(y - mid) / amp / gain, 1e-6, 1.0);
         var db = 20.0 * Math.Log10(linear);
         ThresholdChanged?.Invoke(SilentSkip.ClampThresholdDb(db), _dragOpen);
@@ -1133,8 +1197,11 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         var interleaved = _document.Interleaved;
         var channels = Math.Max(1, _document.Channels);
-        var start = _range.StartFrame;
-        var end = _range.EndFrame;
+        var start = (long)Math.Floor(_viewStart);
+        var end = (long)Math.Ceiling(_viewStart + _viewSpan);
+        var lastFrame = Math.Max(_range.StartFrame, _range.EndFrame - 1);
+        start = Math.Clamp(start, _range.StartFrame, lastFrame);
+        end = Math.Clamp(end, start + 1, _range.EndFrame);
         var length = Math.Max(1L, end - start);
         var frameCount = interleaved.Length / channels;
         for (var i = 0; i < bins; i++)
@@ -1188,6 +1255,28 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             _mins[i] = min;
             _maxs[i] = max;
         }
+
+        if (ViewCoversRange())
+        {
+            _displayGain = DisplayGain(_mins, _maxs);
+        }
+    }
+
+    private void ResetView()
+    {
+        _viewStart = _range.StartFrame;
+        _viewSpan = Math.Max(1, _range.Length);
+    }
+
+    private bool ViewCoversRange()
+    {
+        if (_range.IsEmpty)
+        {
+            return false;
+        }
+
+        return _viewStart <= _range.StartFrame + 0.5
+            && _viewStart + _viewSpan >= _range.EndFrame - 0.5;
     }
 
     /// <summary>塗りの区間は適用と同じ検出。最小ゲート、クローズ時間、プリ／ポストロールを含む。</summary>
