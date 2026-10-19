@@ -102,6 +102,10 @@ internal partial class AudioSettingsWindow : Window
 
     public bool SelectedVideoProxyDisableAutoEncode { get; private set; }
 
+    public string SelectedWallpaperPath { get; private set; } = string.Empty;
+
+    public double SelectedWallpaperOpacity { get; private set; } = AppSettings.WallpaperOpacityDefault;
+
     public bool SelectedAutoSpeakerSelect { get; private set; }
 
     public string SelectedActiveSpeakerId { get; private set; } = string.Empty;
@@ -135,6 +139,8 @@ internal partial class AudioSettingsWindow : Window
     private string[] _outputPortNames = [];
     private float[] _meterPeaks = [];
     private readonly int _uiScaleOpenedAt;
+    private readonly string _wallpaperPathOpenedAt;
+    private readonly double _wallpaperOpacityOpenedAt;
     private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecksWave = [];
     private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecksMp3 = [];
     private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecksVideo = [];
@@ -180,7 +186,9 @@ internal partial class AudioSettingsWindow : Window
         int videoProxyRetentionDays = VideoProxy.DefaultRetentionDays,
         string? ffmpegExePath = null,
         bool videoProxyDisableAutoEncode = false,
-        AppLaunchMode launchMode = AppLaunchMode.Editor)
+        AppLaunchMode launchMode = AppLaunchMode.Editor,
+        string? wallpaperPath = null,
+        double wallpaperOpacity = AppSettings.WallpaperOpacityDefault)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
@@ -230,6 +238,10 @@ internal partial class AudioSettingsWindow : Window
         SelectedVideoProxyRetentionDays = VideoProxy.ClampRetentionDays(videoProxyRetentionDays);
         SelectedFfmpegExePath = ffmpegExePath ?? string.Empty;
         SelectedVideoProxyDisableAutoEncode = videoProxyDisableAutoEncode;
+        SelectedWallpaperPath = string.IsNullOrWhiteSpace(wallpaperPath) ? string.Empty : wallpaperPath.Trim();
+        SelectedWallpaperOpacity = AppSettings.ClampWallpaperOpacity(wallpaperOpacity);
+        _wallpaperPathOpenedAt = SelectedWallpaperPath;
+        _wallpaperOpacityOpenedAt = SelectedWallpaperOpacity;
         SelectedAutoSpeakerSelect = autoSpeakerSelect;
         SelectedActiveSpeakerId = string.IsNullOrWhiteSpace(activeSpeakerId)
             ? _presets[0].Id
@@ -288,6 +300,8 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(LibraryColumnsVideoResetButton);
         ActionButtonLooks.ApplyClear(AssociationAllOnButton);
         ActionButtonLooks.ApplyClear(AssociationAllOffButton);
+        ActionButtonLooks.ApplyClear(WallpaperBrowseButton);
+        ActionButtonLooks.ApplyClear(WallpaperClearButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
         AppDialogKeys.PrepareActionButton(OkButton, isDefault: true);
@@ -303,6 +317,8 @@ internal partial class AudioSettingsWindow : Window
         AppDialogKeys.PrepareActionButton(LibraryExplorerRootUpButton);
         AppDialogKeys.PrepareActionButton(LibraryExplorerRootDownButton);
         AppDialogKeys.PrepareActionButton(LibraryCatalogClearButton);
+        AppDialogKeys.PrepareActionButton(WallpaperBrowseButton);
+        AppDialogKeys.PrepareActionButton(WallpaperClearButton);
         AppDialogKeys.AllowTabToLeave(SettingsTabs);
         AppDialogKeys.Attach(
             this,
@@ -350,6 +366,31 @@ internal partial class AudioSettingsWindow : Window
         LamePathBox.Text = SelectedLameExePath;
         LameOptionsBox.Text = Mp3Encode.ResolveLameOptions(SelectedLameOptions);
         FillExportParallelism(SelectedExportParallelism);
+        WallpaperPathBox.Text = SelectedWallpaperPath;
+        WallpaperOpacityBox.Text = AppSettings.FormatWallpaperOpacityPercent(SelectedWallpaperOpacity);
+        WallpaperPathBox.TextChanged += (_, _) => PreviewWallpaperPath();
+        WallpaperOpacityBox.TextChanged += (_, _) => PreviewWallpaperOpacity();
+        WallpaperOpacityBox.PreviewMouseWheel += (_, e) =>
+        {
+            if (e.Delta == 0)
+            {
+                return;
+            }
+
+            NudgeWallpaperOpacity(Math.Sign(e.Delta));
+            e.Handled = true;
+        };
+        WallpaperOpacityBox.PreviewKeyDown += (_, e) =>
+        {
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (key is not (Key.Up or Key.Down))
+            {
+                return;
+            }
+
+            NudgeWallpaperOpacity(key == Key.Up ? 1 : -1);
+            e.Handled = true;
+        };
         FillAssociations();
         FillLibraryExplorerRoots();
         FillLibraryColumns();
@@ -1156,6 +1197,21 @@ internal partial class AudioSettingsWindow : Window
         SelectedLaunchMode = LaunchModeCombo.SelectedItem is LaunchModeItem launchItem
             ? launchItem.Mode
             : AppLaunchMode.Editor;
+        if (!AppSettings.TryParseWallpaperOpacityPercent(WallpaperOpacityBox.Text, out var wallpaperOpacity))
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorWallpaperOpacityRange,
+                UiStrings.DialogSettingsTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            WallpaperOpacityBox.Focus();
+            WallpaperOpacityBox.SelectAll();
+            return;
+        }
+
+        SelectedWallpaperPath = WallpaperPathBox.Text.Trim().Trim('"');
+        SelectedWallpaperOpacity = wallpaperOpacity;
         SelectedUiScalePercent = UiScaleCombo.SelectedItem is ScaleItem scaleItem
             ? scaleItem.Percent
             : UiScale.DefaultPercent;
@@ -1301,6 +1357,74 @@ internal partial class AudioSettingsWindow : Window
         StopProbeUi();
         DialogResult = true;
     }
+
+    private void PreviewWallpaperOpacity()
+    {
+        if (!AppSettings.TryParseWallpaperOpacityPercent(WallpaperOpacityBox.Text, out _))
+        {
+            return;
+        }
+
+        PreviewWallpaperPath();
+    }
+
+    private void NudgeWallpaperOpacity(int direction)
+    {
+        var current = AppSettings.TryParseWallpaperOpacityPercent(WallpaperOpacityBox.Text, out var opacity)
+            ? (int)Math.Round(opacity * 100d)
+            : (int)Math.Round(_wallpaperOpacityOpenedAt * 100d);
+        WallpaperOpacityBox.Text = AppSettings.NudgeWallpaperOpacityPercent(current, direction)
+            .ToString(CultureInfo.InvariantCulture);
+        WallpaperOpacityBox.SelectAll();
+    }
+
+    private void PreviewWallpaperPath()
+    {
+        if (Owner is not MainWindow window
+            || !WallpaperBitmap.TryPreviewPath(WallpaperPathBox.Text, out var path))
+        {
+            return;
+        }
+
+        var opacity = AppSettings.TryParseWallpaperOpacityPercent(WallpaperOpacityBox.Text, out var parsed)
+            ? parsed
+            : _wallpaperOpacityOpenedAt;
+        window.LibraryBrowser.ApplyWallpaper(path, opacity);
+    }
+
+    private void RevertWallpaperPreview()
+    {
+        if (Owner is not MainWindow window)
+        {
+            return;
+        }
+
+        window.LibraryBrowser.ApplyWallpaper(_wallpaperPathOpenedAt, _wallpaperOpacityOpenedAt);
+    }
+
+    private void WallpaperBrowseButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = UiStrings.FilterWallpaperImage,
+            Title = UiStrings.LabelWallpaper,
+            CheckFileExists = true,
+        };
+        var current = WallpaperPathBox.Text.Trim().Trim('"');
+        var dir = Path.GetDirectoryName(current);
+        if (!string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir))
+        {
+            dialog.InitialDirectory = dir;
+        }
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            WallpaperPathBox.Text = dialog.FileName;
+        }
+    }
+
+    private void WallpaperClearButton_Click(object sender, RoutedEventArgs e) =>
+        WallpaperPathBox.Text = string.Empty;
 
     private void LameBrowseButton_Click(object sender, RoutedEventArgs e)
     {
@@ -2530,6 +2654,8 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(LibraryColumnsVideoResetButton);
         ActionButtonLooks.ApplyClear(AssociationAllOnButton);
         ActionButtonLooks.ApplyClear(AssociationAllOffButton);
+        ActionButtonLooks.ApplyClear(WallpaperBrowseButton);
+        ActionButtonLooks.ApplyClear(WallpaperClearButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
         RefreshTestButtons();
@@ -2674,6 +2800,7 @@ internal partial class AudioSettingsWindow : Window
         if (DialogResult != true)
         {
             RevertUiScalePreview();
+            RevertWallpaperPreview();
         }
 
         WindowPlacement.CaptureSettings(this, AppStorage.Settings);

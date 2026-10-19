@@ -2,12 +2,66 @@ using System.IO;
 using System.Text.Json;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
+using MgaSonicAnvil.UI;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
 
 public sealed class AppSettingsFileTests
 {
+    [Fact]
+    public void WallpaperPreviewPath_AppliesWhenEmptyOrExisting()
+    {
+        Assert.True(WallpaperBitmap.TryPreviewPath("  ", out var empty));
+        Assert.Equal(string.Empty, empty);
+        Assert.False(WallpaperBitmap.TryPreviewPath(@"D:\missing\wallpaper.jpg", out _));
+        var path = Path.Combine(Path.GetTempPath(), "mga-wallpaper-preview-" + Guid.NewGuid().ToString("N") + ".txt");
+        try
+        {
+            File.WriteAllText(path, "x");
+            Assert.True(WallpaperBitmap.TryPreviewPath("\"" + path + "\"", out var found));
+            Assert.Equal(path, found);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
+    public void Wallpaper_DefaultsToNoneAtTenPercent()
+    {
+        var settings = AppSettings.CreateDefault();
+        Assert.Equal(string.Empty, settings.ResolvedWallpaperPath());
+        Assert.Equal(0.10, settings.ResolvedWallpaperOpacity());
+        Assert.Equal("10", AppSettings.FormatWallpaperOpacityPercent(settings.WallpaperOpacity));
+        Assert.True(AppSettings.TryParseWallpaperOpacityPercent("10", out var opacity));
+        Assert.Equal(0.10, opacity);
+        Assert.False(AppSettings.TryParseWallpaperOpacityPercent("101", out _));
+        Assert.Equal(1, AppSettings.ClampWallpaperOpacity(2));
+        Assert.Equal(11, AppSettings.NudgeWallpaperOpacityPercent(10, 1));
+        Assert.Equal(9, AppSettings.NudgeWallpaperOpacityPercent(10, -1));
+        Assert.Equal(0, AppSettings.NudgeWallpaperOpacityPercent(0, -1));
+        Assert.Equal(100, AppSettings.NudgeWallpaperOpacityPercent(100, 1));
+        Assert.Equal(AppSettings.WallpaperOpacityDefault, AppSettings.ClampWallpaperOpacity(double.NaN));
+    }
+
+    [Fact]
+    public void Write_PersistsWallpaperPathAndOpacity()
+    {
+        var settings = AppSettings.CreateDefault();
+        settings.WallpaperPath = @"D:\Pictures\lake.jpg";
+        settings.WallpaperOpacity = 0.10;
+        var json = JsonSerializer.Serialize(settings, AppSettingsJsonContext.Default.AppSettings);
+        var back = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
+        Assert.NotNull(back);
+        Assert.Equal(@"D:\Pictures\lake.jpg", back!.ResolvedWallpaperPath());
+        Assert.Equal(0.10, back.ResolvedWallpaperOpacity());
+    }
+
     [Fact]
     public void Write_PersistsLibraryShuffleAndAutoPlayNext()
     {

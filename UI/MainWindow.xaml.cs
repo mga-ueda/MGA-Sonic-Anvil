@@ -150,6 +150,9 @@ public partial class MainWindow : Window
         LibraryBrowser.BindWindowVisual(PlayerVisualHost);
         // エディタもプレイヤーと同じウォッシュ。モード切替（F11／F12）を待たない。
         LibraryBrowser.UseWindowFallbackWash();
+        LibraryBrowser.ApplyWallpaper(
+            AppStorage.Settings.ResolvedWallpaperPath(),
+            AppStorage.Settings.ResolvedWallpaperOpacity());
         LibraryBrowser.SessionActivated += LibraryBrowser_SessionActivated;
         LibraryBrowser.PlaylistSelectionChanged += (_, _) => SyncPlaylistSelectionLoudness();
         LibraryBrowser.SessionPlayRequested += LibraryBrowser_SessionPlayRequested;
