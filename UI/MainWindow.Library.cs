@@ -4965,14 +4965,16 @@ public partial class MainWindow
             folders,
             LibraryBrowser.SnapshotExplorerPlaylistWalk(),
             playFirst: LibraryBrowser.AutoPlayEnabled,
-            recursive: LibraryBrowser.ExplorerOpenRecursive);
+            recursive: LibraryBrowser.ExplorerOpenRecursive,
+            focusPlaylist: true);
     }
 
     /// <summary>
     /// フォルダ配下（と単体ファイル）を収集し、1 曲ずつ載せる。
     /// 再生するのはクリアして追加かつ Auto Play オンのときだけ。
     /// Shift 付き追加は再生も停止もしない。
-    /// クリア追加の再生は先頭が音声なら見つけ次第、動画／PDF は全件追加後に再生し、プレイリストへフォーカスする。
+    /// ツリーの Enter（クリア追加）は Auto Play のオン／オフに関わらず、載せ終わったあとプレイリストへフォーカスする。
+    /// クリア追加の再生は先頭が音声なら見つけ次第、動画／PDF は全件追加後。
     /// 検索中のツリーは見えているフォルダだけ。ファイル名ヒットはそのファイル、フォルダ名ヒットは配下すべて。
     /// お気に入りは検索フィルタを掛けない。
     /// </summary>
@@ -4981,7 +4983,8 @@ public partial class MainWindow
         LibraryExplorerPlaylistWalk? walk = null,
         bool playFirst = false,
         bool recursive = true,
-        bool placeByCurrentSort = false)
+        bool placeByCurrentSort = false,
+        bool focusPlaylist = false)
     {
         LibraryPlaylistDocuments.ApplyFromSettings(AppStorage.Settings);
         var generation = ++_libraryFolderShowGeneration;
@@ -5049,6 +5052,7 @@ public partial class MainWindow
 
         var firstHandled = false;
         var folderPlayStarted = false;
+        var playlistFocusTicket = 0;
         var playlistWasEmpty = _sessions.Count == 0;
         var loaded = 0;
         var planned = 0;
@@ -5133,7 +5137,7 @@ public partial class MainWindow
                     _ = PlayLibrarySessionAsync(head, keepAmbientGlow: true);
                     if (Alive())
                     {
-                        LibraryBrowser.RequestListFocus();
+                        playlistFocusTicket = LibraryBrowser.RequestListFocus();
                     }
                 }
             }
@@ -5264,6 +5268,13 @@ public partial class MainWindow
                             {
                                 ScheduleLibraryGaplessPrefetch();
                             }
+
+                            // 再生開始直後に移しても、続きの行追加でツリーへ戻る。
+                            // 仕上げのあと、そのあいだにツリーへ残す操作が無ければもう一度移す。
+                            if (generation == _libraryFolderShowGeneration && IsLibraryMaximized)
+                            {
+                                LibraryBrowser.RequestListFocusIfCurrent(playlistFocusTicket);
+                            }
                         }
                     }
                     else if (!playFirst)
@@ -5277,6 +5288,14 @@ public partial class MainWindow
                         else
                         {
                             PreviewIdleLibrarySession(LibraryBrowser.SelectedSession);
+                        }
+
+                        // 再生は Auto Play オンのときだけ。フォーカスはツリーの Enter なら常にプレイリストへ。
+                        if (focusPlaylist
+                            && generation == _libraryFolderShowGeneration
+                            && IsLibraryMaximized)
+                        {
+                            LibraryBrowser.RequestListFocus();
                         }
                     }
                 }
