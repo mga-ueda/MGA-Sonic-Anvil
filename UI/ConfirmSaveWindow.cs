@@ -19,14 +19,17 @@ internal sealed class ConfirmSaveWindow : Window
 {
     public ConfirmSaveChoice Choice { get; private set; } = ConfirmSaveChoice.Cancel;
 
-    public static ConfirmSaveChoice Show(Window owner, string displayName, int remainingDirty)
+    public static ConfirmSaveChoice Show(Window owner, string displayName, int remainingDirty) =>
+        Show(owner, displayName, remainingDirty, closing: true);
+
+    public static ConfirmSaveChoice Show(Window owner, string displayName, int remainingDirty, bool closing)
     {
-        var dialog = new ConfirmSaveWindow(displayName, remainingDirty) { Owner = owner };
+        var dialog = new ConfirmSaveWindow(displayName, remainingDirty, closing) { Owner = owner };
         WindowPaintReveal.ShowDialogWhenPainted(dialog);
         return dialog.Choice;
     }
 
-    private ConfirmSaveWindow(string displayName, int remainingDirty)
+    private ConfirmSaveWindow(string displayName, int remainingDirty, bool closing)
     {
         Title = UiStrings.AppName;
         WindowStyle = WindowStyle.SingleBorderWindow;
@@ -39,7 +42,9 @@ internal sealed class ConfirmSaveWindow : Window
         var message = new TextBlock
         {
             Text = remainingDirty >= 2
-                ? UiStrings.ConfirmSaveFor(displayName) + Environment.NewLine + UiStrings.ConfirmSaveBatchHint(remainingDirty)
+                ? UiStrings.ConfirmSaveFor(displayName) + Environment.NewLine + (closing
+                    ? UiStrings.ConfirmSaveBatchHint(remainingDirty)
+                    : UiStrings.ConfirmSaveBeforePlayerHint(remainingDirty))
                 : UiStrings.ConfirmSaveFor(displayName),
             TextWrapping = TextWrapping.Wrap,
             MaxWidth = 420,
@@ -48,8 +53,12 @@ internal sealed class ConfirmSaveWindow : Window
 
         var yes = CreateButton(UiStrings.ButtonYes, ConfirmSaveChoice.Save, accent: true, isDefault: true);
         var no = CreateButton(UiStrings.ButtonNo, ConfirmSaveChoice.Discard);
-        var saveAll = CreateButton(UiStrings.ButtonSaveAllAndClose, ConfirmSaveChoice.SaveAll);
-        var discardAll = CreateButton(UiStrings.ButtonDiscardAllAndClose, ConfirmSaveChoice.DiscardAll);
+        var saveAll = CreateButton(
+            closing ? UiStrings.ButtonSaveAllAndClose : UiStrings.ButtonSaveAll,
+            ConfirmSaveChoice.SaveAll);
+        var discardAll = CreateButton(
+            closing ? UiStrings.ButtonDiscardAllAndClose : UiStrings.ButtonDiscardAll,
+            ConfirmSaveChoice.DiscardAll);
         var cancel = CreateButton(UiStrings.ButtonYesNoCancel, ConfirmSaveChoice.Cancel, isCancel: true);
 
         var first = new StackPanel

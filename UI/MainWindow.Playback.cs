@@ -1930,6 +1930,12 @@ public partial class MainWindow
 
         if (mode == WaveformMaximizeMode.Library)
         {
+            if (_waveformMaximizeMode != WaveformMaximizeMode.Library
+                && !ConfirmDirtySessionsBeforePlayer())
+            {
+                return;
+            }
+
             _libraryPlayFirstPending = playFirstOnLibrary ?? true;
             SyncRangeClicks();
         }
