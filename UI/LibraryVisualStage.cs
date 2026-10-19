@@ -631,10 +631,10 @@ internal sealed class LibraryVisualStage : Grid
                 ApplyVideoDim(instant: !fromPreview, playing: true);
             }
 
-            if (!(fromPreview && _mesh.HasAnimatedProperties))
-            {
-                SyncPreviewFx(active: false, instant: !fromPreview);
-            }
+            // プレビュー開始直後は格子がフェードイン中。HasAnimatedProperties だけでは
+            // 昇格側のフェードアウトと区別できず、引数起動だと格子だけ本再生に残る。
+            // 本再生へ入るときは、進行中でも必ず消す（プレビューからは現状の濃さからフェードアウト）。
+            SyncPreviewFx(active: false, instant: !fromPreview);
             if (resume)
             {
                 var pos = CurrentVisualPosition();
