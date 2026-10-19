@@ -307,6 +307,30 @@ internal static class WindowPlacement
         window.Top = bounds.Y;
     }
 
+    /// <summary>アンカーがあるディスプレイの中央へ置く。位置の保存があるときは呼ばない。</summary>
+    public static void CenterOnContainingMonitor(Window window, Window? anchor)
+    {
+        var width = window.ActualWidth > 1 ? window.ActualWidth : window.Width;
+        var height = window.ActualHeight > 1 ? window.ActualHeight : window.Height;
+        if (width <= 1)
+        {
+            width = Math.Max(window.MinWidth, 1);
+        }
+
+        if (height <= 1)
+        {
+            height = Math.Max(window.MinHeight, 1);
+        }
+
+        var screen = anchor is not null && TryGetContainingMonitorDip(anchor, out var monitor)
+            ? monitor
+            : new Rect(0, 0, SystemParameters.PrimaryScreenWidth, SystemParameters.PrimaryScreenHeight);
+        var bounds = CenteredOn(screen, width, height);
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = bounds.X;
+        window.Top = bounds.Y;
+    }
+
     public static bool TryReadSettings(AppSettings settings, out Rect bounds, out bool hasSize)
     {
         bounds = default;
