@@ -1899,12 +1899,16 @@ public partial class MainWindow
             var scratchAbOut = Waveform.ScratchCues.AbOut;
             var scratchAb = Waveform.ScratchCues.LoopRange();
             Waveform.ClearPlayerAbRepeat();
-            // 選択の音声ファイルだけ残す。動画／PDF はファイルごと持ち込まない（音声トラックだけ残すこともない）。
+            // 選択の音声ファイルだけエディタのタブに残す。プレイリスト自体は戻りで消さない。
+            var parked = _sessions.ToArray();
             if (!KeepOnlyLibrarySelectedSessions())
             {
                 RestorePlayerScratchIfCleared(scratchMarkers, scratchAbIn, scratchAbOut);
                 return;
             }
+
+            _playlistParked = parked;
+            _playlistParkedKept = [.. _sessions];
 
             if (ReferenceEquals(_document, scratchDocument))
             {

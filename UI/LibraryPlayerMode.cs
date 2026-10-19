@@ -643,6 +643,61 @@ internal static class LibraryPlayerMode
         return active is null ? [] : [active];
     }
 
+    /// <summary>
+    /// エディタからプレイヤーへ戻すとき、抜ける前のプレイリストは消さない。
+    /// エディタに残したタブをユーザーが閉じた分だけ戻さない。
+    /// 同じパスを開き直していればそのセッションを使い、エディタで新しく開いたファイルは末尾へ足す。
+    /// </summary>
+    public static List<DocumentSession> MergeParkedPlaylist(
+        IReadOnlyList<DocumentSession> parked,
+        IReadOnlyCollection<DocumentSession> keptInEditor,
+        IReadOnlyList<DocumentSession> editorNow)
+    {
+        var kept = keptInEditor as HashSet<DocumentSession> ?? [.. keptInEditor];
+        var now = new HashSet<DocumentSession>(editorNow);
+        var liveByPath = new Dictionary<string, DocumentSession>(StringComparer.OrdinalIgnoreCase);
+        foreach (var session in editorNow)
+        {
+            var path = session.Document.SourcePath;
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                liveByPath[path] = session;
+            }
+        }
+
+        var result = new List<DocumentSession>(parked.Count + editorNow.Count);
+        var used = new HashSet<DocumentSession>();
+        foreach (var session in parked)
+        {
+            if (kept.Contains(session) && !now.Contains(session))
+            {
+                continue;
+            }
+
+            var use = session;
+            var path = session.Document.SourcePath;
+            if (!string.IsNullOrWhiteSpace(path) && liveByPath.TryGetValue(path, out var live))
+            {
+                use = live;
+            }
+
+            if (used.Add(use))
+            {
+                result.Add(use);
+            }
+        }
+
+        foreach (var session in editorNow)
+        {
+            if (used.Add(session))
+            {
+                result.Add(session);
+            }
+        }
+
+        return result;
+    }
+
     public static DocumentSession[] ExcludeEditorBlocked(IReadOnlyList<DocumentSession> sessions)
     {
         if (sessions.Count == 0)
