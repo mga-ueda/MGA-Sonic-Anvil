@@ -184,6 +184,13 @@ internal static class SilenceInsertPicker
                 ApplySeconds(state, Snap(parsed), rewrite: false);
             }
         };
+        box.LostKeyboardFocus += (_, _) =>
+        {
+            if (!state.UpdatingText)
+            {
+                SetSeconds(state, state.Seconds);
+            }
+        };
 
         var edge = PickerChrome.Option(UiStrings.LabelInsertSilenceEdgeFade);
         edge.IsChecked = state.EdgeFade;

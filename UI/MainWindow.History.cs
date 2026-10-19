@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
@@ -86,6 +87,23 @@ public partial class MainWindow
             }
 
             CloseEditHistory(commit: true);
+            e.Handled = true;
+            return;
+        }
+
+        if (Keyboard.FocusedElement is TextBoxBase editorField
+            && (CloseFadeCurvePicker()
+                || CloseFormatConvertPicker()
+                || CloseVolumeGainPicker()
+                || ClosePitchShiftPicker()
+                || CloseTimeStretchPicker()
+                || CloseInsertSilencePicker()))
+        {
+            editorField.Focusable = false;
+            FocusManager.SetFocusedElement(this, Waveform);
+            Waveform.Focus();
+            Keyboard.Focus(Waveform);
+            editorField.Focusable = true;
             e.Handled = true;
             return;
         }

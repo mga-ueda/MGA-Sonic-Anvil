@@ -27,9 +27,9 @@ internal sealed class WaveformView : Grid
     private const double OverlayWaveHeightFraction = 0.5;
     private const int RawColumnMaxSamplesPerPixel = 96;
     private const int RawColumnMaxFrames = 1 << 18;
-    private const int SamplePointMaxVisibleFrames = 500;
+    internal const int SamplePointMaxVisibleFrames = 500;
     private const int TimeLabelCacheMax = 512;
-    private const double SamplePointRadius = 8d / 3d;
+    internal const double SamplePointRadius = 8d / 3d;
     private static readonly double[] DbRequiredMarks = [-3, -6, -12];
     private static readonly double[] DbOptionalMarks = [-9, -18, -24, -36, -48, -60];
     private const double DbOptionalMinGapPx = 11;

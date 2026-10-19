@@ -77,6 +77,13 @@ internal sealed class MatchLoudnessTargetWindow : Window
                 TargetLufs = SnapTargetLufs(parsed);
             }
         };
+        _targetBox.LostKeyboardFocus += (_, _) =>
+        {
+            if (!_updatingText)
+            {
+                SetTarget(TargetLufs);
+            }
+        };
 
         var unit = new TextBlock
         {
@@ -108,6 +115,7 @@ internal sealed class MatchLoudnessTargetWindow : Window
         root.Children.Add(buttons);
 
         Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
+        PickerChrome.ReleaseInputOnBlankClick(this);
         WindowPaintReveal.Attach(this);
         AppDialogKeys.Attach(this, CancelAndClose);
         PreviewKeyDown += OnWindowPreviewKeyDown;

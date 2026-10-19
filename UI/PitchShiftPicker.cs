@@ -217,6 +217,7 @@ internal static class PitchShiftPicker
                 ApplySemitones(state, PitchShift.Snap(parsed), rewrite: false);
             }
         };
+        box.LostKeyboardFocus += (_, _) => RewriteSemitones(state);
 
         var stretch = PickerChrome.Option(UiStrings.LabelPitchTimeStretch);
         stretch.IsChecked = state.TimeStretch;
@@ -228,6 +229,29 @@ internal static class PitchShiftPicker
 
     private static void SetSemitones(MenuState state, int semitones) =>
         ApplySemitones(state, PitchShift.Snap(semitones), rewrite: true);
+
+    private static void RewriteSemitones(MenuState state)
+    {
+        if (state.UpdatingText)
+        {
+            return;
+        }
+
+        state.UpdatingText = true;
+        try
+        {
+            var text = FormatBox(state.Semitones);
+            if (!string.Equals(state.SemitoneBox.Text, text, StringComparison.Ordinal))
+            {
+                state.SemitoneBox.Text = text;
+                state.SemitoneBox.CaretIndex = text.Length;
+            }
+        }
+        finally
+        {
+            state.UpdatingText = false;
+        }
+    }
 
     private static void ApplySemitones(MenuState state, int semitones, bool rewrite)
     {

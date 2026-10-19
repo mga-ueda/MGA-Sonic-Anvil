@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 
@@ -326,6 +327,7 @@ internal static class PickerChrome
         menu.Width = width;
         menu.MinWidth = width;
         menu.MaxWidth = width;
+        ReleaseInputOnBlankClick(menu);
     }
 
     public static double MeasureFormRow(MenuItem item) =>
@@ -356,6 +358,79 @@ internal static class PickerChrome
         menu.Width = width;
         menu.MinWidth = width;
         menu.MaxWidth = width;
+        ReleaseInputOnBlankClick(menu);
+    }
+
+    /// <summary>
+    /// 数値欄にフォーカスがあるとき、欄以外をクリックしたらフォーカスを外す。
+    /// LostKeyboardFocus 側で表示値を確定する。
+    /// </summary>
+    public static void ReleaseInputOnBlankClick(UIElement host)
+    {
+        host.Focusable = true;
+        host.PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            if (Keyboard.FocusedElement is not TextBoxBase box)
+            {
+                return;
+            }
+
+            if (e.OriginalSource is not DependencyObject source || IsInsideTextInput(source) || IsButton(source))
+            {
+                return;
+            }
+
+            if (host is ContextMenu menu && menu.PlacementTarget is UIElement anchor)
+            {
+                MoveFocusOffField(box, anchor);
+            }
+            else if (host is UIElement element)
+            {
+                MoveFocusOffField(box, element);
+            }
+
+            e.Handled = true;
+        };
+    }
+
+    private static void MoveFocusOffField(TextBoxBase box, UIElement next)
+    {
+        var window = Window.GetWindow(next);
+        box.Focusable = false;
+        if (window is not null)
+        {
+            FocusManager.SetFocusedElement(window, next);
+        }
+
+        next.Focus();
+        Keyboard.Focus(next);
+        box.Focusable = true;
+    }
+
+    private static bool IsButton(DependencyObject source)
+    {
+        for (DependencyObject? node = source; node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is ButtonBase)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsInsideTextInput(DependencyObject source)
+    {
+        for (DependencyObject? node = source; node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is TextBoxBase)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static double MeasureMenuRow(MenuItem item)
