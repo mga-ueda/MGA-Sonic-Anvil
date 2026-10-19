@@ -866,7 +866,7 @@ internal static partial class UiStrings
         LibraryFileColumn.AlbumArtist => Get("アルバム\nアーティスト", "Album\nartist"),
         _ => LibraryColumnLabel(column),
     };
-    /// <summary>プレイリスト上段のグループラベル。UI 言語に関わらず英語（Auto next / Random と同じ）。</summary>
+    /// <summary>プレイリスト上段のグループラベル。UI 言語に関わらず英語（Auto Next / Random と同じ）。</summary>
     public static string LibraryGroupLabel => "Group";
     public static string LibraryExplorerLabel => Get("ライブラリ", "Library");
     public static string LibraryPlaylistLabel => Get("プレイリスト", "Playlist");
@@ -876,7 +876,7 @@ internal static partial class UiStrings
     /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（マニュアル側）。</summary>
     public static string LabelLibraryAutoPlay => "Auto Play";
     /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（マニュアル側）。</summary>
-    public static string LabelLibraryAutoPlayNext => "Auto next";
+    public static string LabelLibraryAutoPlayNext => "Auto Next";
     public static string LibraryExplorerDesktop => Get("デスクトップ", "Desktop");
     public static string LibraryExplorerDocuments => Get("ドキュメント", "Documents");
     public static string LibraryExplorerMusic => Get("ミュージック", "Music");

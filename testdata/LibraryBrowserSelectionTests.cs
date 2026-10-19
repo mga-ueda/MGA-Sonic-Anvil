@@ -2184,20 +2184,6 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
-    public void ResetShuffle_TurnsOffAfterEnable()
-    {
-        RunSta(() =>
-        {
-            EnsureTheme();
-            var view = new LibraryBrowserView();
-            view.ShuffleEnabled = true;
-            Assert.True(view.ShuffleEnabled);
-            view.ResetShuffle();
-            Assert.False(view.ShuffleEnabled);
-        });
-    }
-
-    [Fact]
     public void AutoPlayEnabled_DefaultsOn()
     {
         RunSta(() =>
@@ -2276,31 +2262,17 @@ public sealed class LibraryBrowserSelectionTests
         try
         {
             UiStrings.SetLanguage(UiLanguage.Japanese);
-            Assert.Equal("Auto next", UiStrings.LabelLibraryAutoPlayNext);
+            Assert.Equal("Auto Next", UiStrings.LabelLibraryAutoPlayNext);
             Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlayNext));
             Assert.DoesNotContain("Alt+", UiStrings.LabelLibraryAutoPlayNext, StringComparison.OrdinalIgnoreCase);
             UiStrings.SetLanguage(UiLanguage.English);
-            Assert.Equal("Auto next", UiStrings.LabelLibraryAutoPlayNext);
+            Assert.Equal("Auto Next", UiStrings.LabelLibraryAutoPlayNext);
             Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlayNext));
         }
         finally
         {
             UiStrings.SetLanguage(previous);
         }
-    }
-
-    [Fact]
-    public void ResetAutoPlayNext_TurnsOffAfterEnable()
-    {
-        RunSta(() =>
-        {
-            EnsureTheme();
-            var view = new LibraryBrowserView();
-            view.AutoPlayNextEnabled = true;
-            Assert.True(view.AutoPlayNextEnabled);
-            view.ResetAutoPlayNext();
-            Assert.False(view.AutoPlayNextEnabled);
-        });
     }
 
     [Fact]

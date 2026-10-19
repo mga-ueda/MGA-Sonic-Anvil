@@ -9,11 +9,16 @@ namespace MgaSonicAnvil.Tests;
 public sealed class AppSettingsFileTests
 {
     [Fact]
-    public void Write_OmitsLibraryShuffle()
+    public void Write_PersistsLibraryShuffleAndAutoPlayNext()
     {
-        var json = JsonSerializer.Serialize(AppSettings.CreateDefault(), AppSettingsJsonContext.Default.AppSettings);
-        Assert.DoesNotContain("LibraryShuffle", json, StringComparison.Ordinal);
-        Assert.False(AppSettingsFile.ContainsLegacyLibraryShuffle(json));
+        var settings = AppSettings.CreateDefault();
+        settings.LibraryShuffle = true;
+        settings.LibraryAutoPlayNext = true;
+        var json = JsonSerializer.Serialize(settings, AppSettingsJsonContext.Default.AppSettings);
+        var back = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
+        Assert.NotNull(back);
+        Assert.True(back!.LibraryShuffle);
+        Assert.True(back.LibraryAutoPlayNext);
     }
 
     [Fact]
@@ -41,24 +46,21 @@ public sealed class AppSettingsFileTests
     }
 
     [Fact]
-    public void Load_RewritesLegacyLibraryShuffleOut()
+    public void Load_KeepsLibraryShuffle()
     {
         var root = NewTempDir("shuffle");
         try
         {
             var path = Path.Combine(root, "settings.json");
-            AppSettingsFile.Write(path, AppSettings.CreateDefault());
-            var json = File.ReadAllText(path).Replace(
-                "\"SettingsGeneration\": 1,",
-                "\"SettingsGeneration\": 1,\n  \"LibraryShuffle\": true,",
-                StringComparison.Ordinal);
-            File.WriteAllText(path, json);
-            Assert.True(AppSettingsFile.ContainsLegacyLibraryShuffle(json));
+            var settings = AppSettings.CreateDefault();
+            settings.LibraryShuffle = true;
+            settings.LibraryAutoPlayNext = true;
+            AppSettingsFile.Write(path, settings);
 
-            var settings = AppSettingsFile.Load(path, leftoverSessionDocumentPath: null, sessionDirectory: null, out var reset);
+            var loaded = AppSettingsFile.Load(path, leftoverSessionDocumentPath: null, sessionDirectory: null, out var reset);
             Assert.Equal(SettingsFileReset.None, reset);
-            Assert.Equal(AppSettings.CurrentGeneration, settings.SettingsGeneration);
-            Assert.False(AppSettingsFile.ContainsLegacyLibraryShuffle(File.ReadAllText(path)));
+            Assert.True(loaded.LibraryShuffle);
+            Assert.True(loaded.LibraryAutoPlayNext);
         }
         finally
         {
@@ -135,7 +137,7 @@ public sealed class AppSettingsFileTests
             var written = JsonSerializer.Deserialize(File.ReadAllText(path), AppSettingsJsonContext.Default.AppSettings);
             Assert.NotNull(written);
             Assert.Equal(AppSettings.CurrentGeneration, written!.SettingsGeneration);
-            Assert.DoesNotContain("LibraryShuffle", File.ReadAllText(path), StringComparison.Ordinal);
+            Assert.Contains("\"LibraryShuffle\": false", File.ReadAllText(path), StringComparison.Ordinal);
         }
         finally
         {
