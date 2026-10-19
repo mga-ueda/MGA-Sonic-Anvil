@@ -3862,6 +3862,51 @@ internal sealed class LibraryBrowserView : UserControl
         }
     }
 
+    public event EventHandler? FileNameColorsChanged;
+
+    /// <summary>選択ファイルへ手動の色を付ける。null はファイル名ルールへ戻す。</summary>
+    public void SetManualFileNameColor(IEnumerable<string> paths, int? colorIndex)
+    {
+        var list = paths as IReadOnlyList<string> ?? paths.ToArray();
+        AppStorage.Settings.FileNameColorAssignments = colorIndex is int index
+            ? FileNameColorAssignments.With(AppStorage.Settings.FileNameColorAssignments, list, index)
+            : FileNameColorAssignments.Without(AppStorage.Settings.FileNameColorAssignments, list);
+        AppStorage.Save();
+        RefreshFileNameMarkers();
+        FileNameColorsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static void ApplyFileNameMarker(LibraryFileRow row)
+    {
+        var path = row.Tag is DocumentSession session ? session.Document.SourcePath : null;
+        if (FileNameColorResolve.TryResolve(row.Name, path, out var index, out var pattern))
+        {
+            row.SetFileNameMarker(index, pattern);
+            return;
+        }
+
+        row.SetFileNameMarker(-1, string.Empty);
+    }
+
+    public void RefreshFileNameMarkers()
+    {
+        foreach (var row in _rows)
+        {
+            ApplyFileNameMarker(row);
+        }
+
+        if (_group == LibraryFileGroup.Color && _grid.ItemsSource is not null)
+        {
+            var active = SelectedSession;
+            var selected = SelectedSessions;
+            LibraryFileList.ApplyGroupKeys(_rows, _group);
+            BindRows(active, selected);
+            return;
+        }
+
+        RequestFitColumns();
+    }
+
     public void SetExplorerRoots(IEnumerable<string> roots)
     {
         var next = LibraryExplorerPaths.ResolveRoots(roots.ToArray());
@@ -5454,6 +5499,24 @@ internal sealed class LibraryBrowserView : UserControl
             [];
     }
 
+    private sealed class FileNameMarkerBrushConverter : IValueConverter
+    {
+        internal static readonly FileNameMarkerBrushConverter Instance = new();
+
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            if (value is int index && FileNameColorMarkerVisual.TryBrush(index, out var brush))
+            {
+                return brush;
+            }
+
+            return Brushes.Transparent;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture) =>
+            Binding.DoNothing;
+    }
+
     private sealed class PlaylistBandLeftConverter : IValueConverter
     {
         internal static readonly PlaylistBandLeftConverter Instance = new();
@@ -7000,7 +7063,7 @@ internal sealed class LibraryBrowserView : UserControl
     private void ConfigureGrid()
     {
         AddGroupSpacerColumn();
-        AddColumn(LibraryFileColumn.Name, nameof(LibraryFileRow.Name));
+        AddNameColumn();
         AddColumn(LibraryFileColumn.Title, nameof(LibraryFileRow.Title));
         AddColumn(LibraryFileColumn.Album, nameof(LibraryFileRow.Album));
         AddColumn(LibraryFileColumn.Artist, nameof(LibraryFileRow.Artist));
@@ -7312,6 +7375,7 @@ internal sealed class LibraryBrowserView : UserControl
             new(LibraryFileGroup.BitDepth, UiStrings.LibraryGroupBitDepth),
             new(LibraryFileGroup.Channels, UiStrings.LibraryGroupChannels),
             new(LibraryFileGroup.Folder, UiStrings.LibraryGroupFolder),
+            new(LibraryFileGroup.Color, UiStrings.LibraryGroupColor),
         };
         _groupCombo.SelectedValue = selected;
     }
@@ -7911,6 +7975,74 @@ internal sealed class LibraryBrowserView : UserControl
         _groupSpacer.CellStyle = CreatePlaylistCellStyle();
     }
 
+    private void AddNameColumn()
+    {
+        var marker = new FrameworkElementFactory(typeof(Border));
+        marker.Name = "NameMarker";
+        marker.SetValue(FrameworkElement.WidthProperty, FileNameColorMarkerVisual.Width);
+        marker.SetValue(FrameworkElement.HeightProperty, FileNameColorMarkerVisual.Height);
+        marker.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        marker.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, FileNameColorMarkerVisual.Gap, 0));
+        marker.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+        marker.SetValue(DockPanel.DockProperty, Dock.Left);
+        marker.SetValue(UIElement.VisibilityProperty, Visibility.Collapsed);
+        marker.SetBinding(
+            Border.BackgroundProperty,
+            new Binding(nameof(LibraryFileRow.FileNameMarkerIndex))
+            {
+                Converter = FileNameMarkerBrushConverter.Instance,
+            });
+
+        var text = new FrameworkElementFactory(typeof(TextBlock));
+        text.Name = "NameText";
+        text.SetBinding(TextBlock.TextProperty, new Binding(nameof(LibraryFileRow.Name)));
+        text.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        text.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+        text.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
+        text.SetValue(TextBlock.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush"));
+
+        var panel = new FrameworkElementFactory(typeof(DockPanel));
+        panel.SetValue(
+            FrameworkElement.MarginProperty,
+            new Thickness(LibraryColumnCellPadX, 0, LibraryColumnCellPadX, 0));
+        panel.AppendChild(marker);
+        panel.AppendChild(text);
+
+        var cellTemplate = new DataTemplate(typeof(LibraryFileRow)) { VisualTree = panel };
+        var showMarker = new DataTrigger
+        {
+            Binding = new Binding(nameof(LibraryFileRow.HasFileNameMarker)),
+            Value = true,
+        };
+        showMarker.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Visible, "NameMarker"));
+        cellTemplate.Triggers.Add(showMarker);
+        var cutDim = new DataTrigger
+        {
+            Binding = new Binding(nameof(LibraryFileRow.CutPending)),
+            Value = true,
+        };
+        cutDim.Setters.Add(new Setter(
+            TextBlock.ForegroundProperty,
+            new DynamicResourceExtension("MutedForeBrush"),
+            "NameText"));
+        cellTemplate.Triggers.Add(cutDim);
+
+        var gridColumn = new DataGridTemplateColumn
+        {
+            CellTemplate = cellTemplate,
+            MinWidth = 0,
+            Width = DataGridLength.SizeToCells,
+            IsReadOnly = true,
+            CanUserSort = true,
+            SortMemberPath = nameof(LibraryFileRow.Name),
+        };
+        var sortHeader = new LibrarySortHeader(ColumnHeader(LibraryFileColumn.Name));
+        _sortHeaders[LibraryFileColumn.Name] = sortHeader;
+        gridColumn.Header = sortHeader;
+        _columns[LibraryFileColumn.Name] = gridColumn;
+        _grid.Columns.Add(gridColumn);
+    }
+
     private void AddColumn(
         LibraryFileColumn column,
         string binding,
@@ -8132,6 +8264,13 @@ internal sealed class LibraryBrowserView : UserControl
                 }
 
                 var width = Measure(text, typeface) + cellPad;
+                if (kind == LibraryFileColumn.Name && row.HasFileNameMarker)
+                {
+                    // マーカーはデバイスピクセルへスナップする。幅ぴったりだと末尾が「...」に置き換わる。
+                    var slot = FileNameColorMarkerVisual.SlotWidth * dpi;
+                    width += (Math.Ceiling(slot - 1e-6) / dpi) + 2;
+                }
+
                 if (kind == LibraryFileColumn.Duration)
                 {
                     // 列幅ぴったりだとホバー再スナップで末尾ミリ秒が欠けて、時間が変わったように見える。
@@ -10327,6 +10466,7 @@ internal sealed class LibraryBrowserView : UserControl
         row.LoudnessTone = LibraryFileRow.ToneFor(
             row.IntegratedLufs,
             AppStorage.Settings.ResolvedLoudnessTargetLufs());
+        ApplyFileNameMarker(row);
         return row;
     }
 
@@ -10920,6 +11060,10 @@ internal sealed class LibraryBrowserView : UserControl
             copyNames,
             copyPaths,
             explorer);
+        var color = FileNameColorMarkerMenu.Create(
+            SelectedColorPaths,
+            chosen => SetManualFileNameColor(SelectedColorPaths(), chosen));
+        menu.Items.Add(color);
         menu.Items.Add(pitch);
         menu.Items.Add(edit);
         menu.Items.Add(other);
@@ -10954,6 +11098,7 @@ internal sealed class LibraryBrowserView : UserControl
             copyNames.IsEnabled = paths.Length > 0;
             copyPaths.IsEnabled = paths.Length > 0;
             explorer.IsEnabled = paths.Length > 0;
+            color.IsEnabled = SelectedColorPaths().Length > 0;
             SyncSubmenuEnabled(pitch, edit, other);
         };
         menu.Closed += (_, _) =>
@@ -11259,6 +11404,26 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         return LibraryShellFiles.ExistingPaths(paths);
+    }
+
+    private string[] SelectedColorPaths()
+    {
+        var sessions = SelectedSessions;
+        if (sessions.Length == 0)
+        {
+            return [];
+        }
+
+        var paths = new List<string>(sessions.Length);
+        foreach (var session in sessions)
+        {
+            if (session.Document.SourcePath is { Length: > 0 } path)
+            {
+                paths.Add(path);
+            }
+        }
+
+        return [.. paths];
     }
 
     private string[] SelectedPlaylistCopyPaths()

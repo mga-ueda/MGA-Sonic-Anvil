@@ -26,6 +26,7 @@ public partial class MainWindow
         Border Host,
         Border Header,
         TextBlock Title,
+        Border Marker,
         DockPanel Body,
         Grid Layers);
 
@@ -691,12 +692,17 @@ public partial class MainWindow
             Text = session.TabTitle,
             FontSize = 11,
             FontFamily = new FontFamily("Consolas"),
-            Margin = new Thickness(10, 0, 10, 0),
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
             Cursor = Cursors.Hand,
         };
+        var marker = FileNameColorMarkerVisual.Create();
+        FileNameColorMarkerVisual.Apply(marker, session.DisplayName, session.Document.SourcePath);
+        var titleRow = new DockPanel { Margin = new Thickness(10, 0, 10, 0) };
+        DockPanel.SetDock(marker, Dock.Left);
+        titleRow.Children.Add(marker);
+        titleRow.Children.Add(title);
                 title.MouseLeftButtonDown += (_, e) =>
         {
             if (TryBeginFileNameEditFromClick(session, title, e))
@@ -705,17 +711,14 @@ public partial class MainWindow
             }
         };
         var headerBody = new DockPanel();
-        headerBody.Children.Add(title);
+        headerBody.Children.Add(titleRow);
         var header = new Border
         {
             Height = DesignMetrics.DocumentTabBarHeight,
             Child = headerBody,
             Cursor = Cursors.Hand,
         };
-        header.SizeChanged += (_, _) =>
-        {
-            title.MaxWidth = Math.Max(0, header.ActualWidth - title.Margin.Left - title.Margin.Right);
-        };
+        header.SizeChanged += (_, _) => FitTileTitleWidth(header, title, marker);
         header.MouseLeftButtonUp += (_, e) => HandleTabOrTileChromeClick(session, e);
         header.MouseRightButtonUp += (_, e) =>
         {
@@ -760,7 +763,7 @@ public partial class MainWindow
             ActivateSession(session);
         };
 
-        return new WaveformTilePane(session, view, host, header, title, body, layers);
+        return new WaveformTilePane(session, view, host, header, title, marker, body, layers);
     }
 
     private void TearDownWaveformTiles()
@@ -909,6 +912,14 @@ public partial class MainWindow
         return null;
     }
 
+    private static void FitTileTitleWidth(FrameworkElement header, FrameworkElement title, UIElement marker)
+    {
+        var markerWidth = marker.Visibility == Visibility.Visible
+            ? FileNameColorMarkerVisual.SlotWidth
+            : 0;
+        title.MaxWidth = Math.Max(0, header.ActualWidth - 20 - markerWidth);
+    }
+
     private void RefreshTileChrome()
     {
         if (!_tileMode)
@@ -930,6 +941,9 @@ public partial class MainWindow
             {
                 pane.Title.Text = pane.Session.TabTitle;
             }
+
+            FileNameColorMarkerVisual.Apply(pane.Marker, pane.Session.DisplayName, pane.Session.Document.SourcePath);
+            FitTileTitleWidth(pane.Header, pane.Title, pane.Marker);
             pane.Title.Foreground = (Brush)FindResource(
                 dirty ? "DirtyAccentBrush" : highlighted ? "PrimaryForeBrush" : "MutedForeBrush");
             var path = pane.Session.Document.SourcePath ?? UiStrings.UntitledDocument;

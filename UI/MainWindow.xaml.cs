@@ -158,6 +158,11 @@ public partial class MainWindow : Window
         LibraryBrowser.PlaylistVisualStateChanged += (_, _) => SyncPlaylistVideoChromeFade();
         LibraryBrowser.VisibleColumnPresetsChanged += LibraryBrowser_VisibleColumnPresetsChanged;
         LibraryBrowser.GroupChanged += LibraryBrowser_GroupChanged;
+        LibraryBrowser.FileNameColorsChanged += (_, _) =>
+        {
+            RefreshTabHeaders();
+            RefreshPlaylistVideoFileName();
+        };
         LibraryBrowser.SortChanged += LibraryBrowser_SortChanged;
         LibraryBrowser.ExplorerFolderChanged += LibraryBrowser_ExplorerFolderChanged;
         LibraryBrowser.ExplorerExpandedChanged += LibraryBrowser_ExplorerExpandedChanged;

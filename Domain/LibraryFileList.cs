@@ -48,6 +48,7 @@ internal enum LibraryFileGroup
     BitDepth,
     Channels,
     Folder,
+    Color,
 }
 
 internal enum LibrarySortDirection
@@ -85,6 +86,41 @@ internal sealed class LibraryFileRow : INotifyPropertyChanged
     public object? Tag { get; init; }
 
     public string Name { get; init; } = string.Empty;
+
+    private int _fileNameMarkerIndex = -1;
+
+    /// <summary>ファイル名色定義の番号。マーカーなしは -1。</summary>
+    public int FileNameMarkerIndex => _fileNameMarkerIndex;
+
+    public bool HasFileNameMarker => _fileNameMarkerIndex >= 0;
+
+    /// <summary>一致した色定義の文字列。未一致は空。</summary>
+    public string FileNameMarkerPattern { get; private set; } = string.Empty;
+
+    public void SetFileNameMarker(int index, string? pattern)
+    {
+        if (index < 0)
+        {
+            index = -1;
+            pattern = string.Empty;
+        }
+
+        pattern ??= string.Empty;
+        var indexChanged = _fileNameMarkerIndex != index;
+        var patternChanged = !string.Equals(FileNameMarkerPattern, pattern, StringComparison.Ordinal);
+        if (!indexChanged && !patternChanged)
+        {
+            return;
+        }
+
+        _fileNameMarkerIndex = index;
+        FileNameMarkerPattern = pattern;
+        if (indexChanged)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FileNameMarkerIndex)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasFileNameMarker)));
+        }
+    }
 
     public string Title { get; init; } = string.Empty;
 
@@ -223,6 +259,7 @@ internal static class LibraryFileList
             LibraryFileGroup.Folder => row.ParentFolder.Length == 0
                 ? UiStrings.LibraryGroupUntitled
                 : row.ParentFolder,
+            LibraryFileGroup.Color => Blank(row.FileNameMarkerPattern),
             _ => string.Empty,
         };
 

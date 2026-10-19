@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -728,6 +729,9 @@ public partial class MainWindow
                 canMutate));
         }
 
+        menu.Items.Add(FileNameColorMarkerMenu.Create(
+            () => ColorPaths(pathTargets),
+            color => LibraryBrowser.SetManualFileNameColor(ColorPaths(pathTargets), color)));
         menu.Items.Add(CreateTabMenuItem(
             selected is null ? UiStrings.TabMenuDeleteFile : UiStrings.WaveMenuDeleteFileSelected,
             () =>
@@ -742,6 +746,20 @@ public partial class MainWindow
                 }
             },
             enabled: canMutate));
+    }
+
+    private static string[] ColorPaths(IReadOnlyList<DocumentSession> sessions)
+    {
+        var paths = new List<string>(sessions.Count);
+        foreach (var session in sessions)
+        {
+            if (session.Document.SourcePath is { Length: > 0 } path)
+            {
+                paths.Add(path);
+            }
+        }
+
+        return [.. paths];
     }
 
     private DocumentSession? FindSessionByPath(string path) =>
@@ -874,8 +892,12 @@ public partial class MainWindow
         for (var i = 0; i < tabs.Length; i++)
         {
             var title = tabs[i].Tag is DocumentSession session ? session.TabTitle : "";
-            var preferred = DocumentTabLayout.PreferredWidth(title, dpi);
-            var min = Math.Min(preferred, DocumentTabLayout.MinWidth(title, dpi));
+            var markerExtra = tabs[i].Tag is DocumentSession named
+                && FileNameColorResolve.TryResolve(named.DisplayName, named.Document.SourcePath, out _, out _)
+                ? FileNameColorMarkerVisual.SlotWidth
+                : 0;
+            var preferred = DocumentTabLayout.PreferredWidth(title, dpi, markerExtra);
+            var min = Math.Min(preferred, DocumentTabLayout.MinWidth(title, dpi, markerExtra));
             var keepWide = tabs[i].Tag is DocumentSession tab
                 && ReferenceEquals(tab, _activeSession);
             slots[i] = new DocumentTabSlot(preferred, min, keepWide);
@@ -1189,6 +1211,11 @@ public partial class MainWindow
             TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(0, 0, 6, 0),
         };
+        var marker = FileNameColorMarkerVisual.Create();
+        var titleHost = new DockPanel();
+        DockPanel.SetDock(marker, Dock.Left);
+        titleHost.Children.Add(marker);
+        titleHost.Children.Add(title);
                 title.MouseLeftButtonDown += (_, e) =>
         {
             if (TryBeginFileNameEditFromClick(session, title, e))
@@ -1216,9 +1243,9 @@ public partial class MainWindow
         var grid = new Grid { Margin = new Thickness(10, 0, 4, 0) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        Grid.SetColumn(title, 0);
+        Grid.SetColumn(titleHost, 0);
         Grid.SetColumn(close, 1);
-        grid.Children.Add(title);
+        grid.Children.Add(titleHost);
         grid.Children.Add(close);
 
         var body = new DockPanel();
@@ -1261,7 +1288,7 @@ public partial class MainWindow
         {
             if (child is Grid grid)
             {
-                foreach (var block in grid.Children.OfType<TextBlock>())
+                foreach (var block in TabChromeTextBlocks(grid))
                 {
                     if (block.Text == "×")
                     {
@@ -1275,6 +1302,11 @@ public partial class MainWindow
                     }
 
                     block.Foreground = titleBrush;
+                }
+
+                foreach (var marker in TabChromeMarkers(grid))
+                {
+                    FileNameColorMarkerVisual.Apply(marker, session.DisplayName, session.Document.SourcePath);
                 }
             }
         }
@@ -1349,6 +1381,33 @@ public partial class MainWindow
         return FindTabTitle(session);
     }
 
+    private static IEnumerable<TextBlock> TabChromeTextBlocks(Grid grid)
+    {
+        foreach (var block in grid.Children.OfType<TextBlock>())
+        {
+            yield return block;
+        }
+
+        foreach (var host in grid.Children.OfType<DockPanel>())
+        {
+            foreach (var block in host.Children.OfType<TextBlock>())
+            {
+                yield return block;
+            }
+        }
+    }
+
+    private static IEnumerable<Border> TabChromeMarkers(Grid grid)
+    {
+        foreach (var host in grid.Children.OfType<DockPanel>())
+        {
+            foreach (var marker in host.Children.OfType<Border>())
+            {
+                yield return marker;
+            }
+        }
+    }
+
     private TextBlock? FindTabTitle(DocumentSession session)
     {
         foreach (var border in DocumentTabs.Children.OfType<Border>())
@@ -1359,7 +1418,7 @@ public partial class MainWindow
                 continue;
             }
 
-            foreach (var block in dock.Children.OfType<Grid>().SelectMany(grid => grid.Children.OfType<TextBlock>()))
+            foreach (var block in dock.Children.OfType<Grid>().SelectMany(TabChromeTextBlocks))
             {
                 if (block.Text != "×")
                 {

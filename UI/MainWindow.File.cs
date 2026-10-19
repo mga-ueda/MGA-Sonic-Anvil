@@ -1260,6 +1260,16 @@ public partial class MainWindow
                 }
 
                 MoveDocumentFile(path, destination);
+                if (FileNameColorAssignments.TryRetarget(
+                    AppStorage.Settings.FileNameColorAssignments,
+                    path,
+                    destination,
+                    out var colors))
+                {
+                    AppStorage.Settings.FileNameColorAssignments = colors;
+                    AppStorage.Save();
+                }
+
                 document.SourcePath = destination;
                 document.RefreshFileBytes();
             }
@@ -2252,6 +2262,10 @@ public partial class MainWindow
         settings.ClickGuardFadeMs = dialog.SelectedClickGuardFadeMs;
         settings.WwisePrefetchLengthMs = dialog.SelectedWwisePrefetchLengthMs;
         settings.WwiseLookAheadTimeMs = dialog.SelectedWwiseLookAheadTimeMs;
+        settings.ApplyFileNameColorRules(dialog.SelectedFileNameColorRules);
+        LibraryBrowser.RefreshFileNameMarkers();
+        RefreshTabHeaders();
+        RefreshPlaylistVideoFileName();
         settings.Mp3BitRate = dialog.SelectedMp3BitRate;
         settings.LameExePath = dialog.SelectedLameExePath;
         settings.LameOptions = dialog.SelectedLameOptions;

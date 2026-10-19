@@ -48,6 +48,10 @@ internal partial class AudioSettingsWindow : Window
 
     public int SelectedWwiseLookAheadTimeMs { get; private set; }
 
+    public FileNameColorRule[] SelectedFileNameColorRules { get; private set; } = [];
+
+    private FileNameColorMarkerSettingsEditor? _fileNameColorMarkers;
+
     public int SelectedMp3BitRate { get; private set; }
 
     public string SelectedLameExePath { get; private set; } = string.Empty;
@@ -336,6 +340,12 @@ internal partial class AudioSettingsWindow : Window
         ClickGuardFadeBox.Text = SelectedClickGuardFadeMs.ToString(CultureInfo.InvariantCulture);
         WwisePrefetchLengthBox.Text = SelectedWwisePrefetchLengthMs.ToString(CultureInfo.InvariantCulture);
         WwiseLookAheadTimeBox.Text = SelectedWwiseLookAheadTimeMs.ToString(CultureInfo.InvariantCulture);
+        _fileNameColorMarkers = new FileNameColorMarkerSettingsEditor(
+            FileNameColorMarkerHost,
+            FileNameColorMarkerAddButton);
+        _fileNameColorMarkers.Load(AppStorage.Settings.FileNameColorRules);
+        ActionButtonLooks.ApplyClear(FileNameColorMarkerAddButton);
+        AppDialogKeys.PrepareActionButton(FileNameColorMarkerAddButton);
         FillWindowsBitRates(SelectedMp3BitRate);
         LamePathBox.Text = SelectedLameExePath;
         LameOptionsBox.Text = Mp3Encode.ResolveLameOptions(SelectedLameOptions);
@@ -1233,6 +1243,7 @@ internal partial class AudioSettingsWindow : Window
         }
 
         SelectedWwiseLookAheadTimeMs = lookAheadMs;
+        SelectedFileNameColorRules = _fileNameColorMarkers?.Read() ?? [];
         SelectedMp3BitRate = WindowsBitRateCombo.SelectedItem is BitRateItem bitRate
             ? bitRate.Kbps
             : Mp3Encode.DefaultWindowsBitRateKbps;

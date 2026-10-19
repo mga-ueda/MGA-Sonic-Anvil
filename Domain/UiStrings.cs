@@ -925,6 +925,8 @@ internal static partial class UiStrings
     public static string LibraryMenuPitchUp => Get("ピッチシフトしてプレビュー（半音上げる）", "Pitch Shift Preview (Semitone Up)");
     public static string LibraryMenuPitchDown => Get("ピッチシフトしてプレビュー（半音下げる）", "Pitch Shift Preview (Semitone Down)");
     public static string LibraryMenuPitchReset => Get("ピッチシフトをリセット", "Reset Pitch Shift");
+    public static string LibraryMenuColor => Get("カラー", "Color");
+    public static string LibraryMenuColorAutomatic => Get("自動に戻す", "Use automatic");
     public static string LibraryMenuCopyFileName => Get("ファイル名をコピー", "Copy File Name");
     public static string LibraryMenuCopyFilePath => Get("フルパスをコピー", "Copy Full Path");
     public static string LibraryMenuOpenInExplorer => Get("エクスプローラーで開く", "Open in Explorer");
@@ -941,6 +943,7 @@ internal static partial class UiStrings
     public static string LibraryGroupBitDepth => LibraryColumnBitDepth;
     public static string LibraryGroupChannels => LibraryColumnChannels;
     public static string LibraryGroupFolder => LibraryColumnParentFolder;
+    public static string LibraryGroupColor => Get("カラー", "Color");
     public static string LibraryGroupUntitled => Get("(未保存)", "(Untitled)");
     public static string LibraryGroupBlank => Get("(なし)", "(None)");
     public static string LibraryJacketMark => "✓";

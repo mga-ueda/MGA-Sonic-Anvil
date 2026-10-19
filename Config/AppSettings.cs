@@ -431,6 +431,12 @@ internal sealed class AppSettings
     /// <summary>Wwise EXPORT の Look-ahead Time（ms）。2 本目以降に書く。既定 500。</summary>
     public int WwiseLookAheadTimeMs { get; set; } = WwiseTrackTiming.DefaultLookAheadTimeMs;
 
+    /// <summary>ファイル名の頭に付ける色。空はマーカーなし。件数の上限は無い。</summary>
+    public FileNameColorRule[] FileNameColorRules { get; set; } = [];
+
+    /// <summary>右クリックでファイルに直接付けた色。ファイル名ルールより優先する。</summary>
+    public FileNameColorAssignment[] FileNameColorAssignments { get; set; } = [];
+
     /// <summary>旧版の一括色。テーマ別へ移したあと使わない。</summary>
     public Dictionary<string, string>? Colors { get; set; }
 
@@ -470,6 +476,9 @@ internal sealed class AppSettings
 
     public int ResolvedWwiseLookAheadTimeMs() =>
         WwiseTrackTiming.ClampLookAheadTimeMs(WwiseLookAheadTimeMs);
+
+    public void ApplyFileNameColorRules(IEnumerable<FileNameColorRule>? rules) =>
+        FileNameColorRules = global::MgaSonicAnvil.Config.FileNameColorRules.Normalize(rules);
 
     public SpeakerPreset ResolvedSpeaker()
     {
@@ -833,6 +842,10 @@ internal sealed class AppSettings
 [JsonSerializable(typeof(AppSettings))]
 [JsonSerializable(typeof(SpeakerPreset))]
 [JsonSerializable(typeof(SpeakerPreset[]))]
+[JsonSerializable(typeof(FileNameColorRule))]
+[JsonSerializable(typeof(FileNameColorRule[]))]
+[JsonSerializable(typeof(FileNameColorAssignment))]
+[JsonSerializable(typeof(FileNameColorAssignment[]))]
 [JsonSerializable(typeof(OpenDocumentSnapshot))]
 [JsonSerializable(typeof(OpenDocumentSnapshot[]))]
 [JsonSourceGenerationOptions(WriteIndented = true)]

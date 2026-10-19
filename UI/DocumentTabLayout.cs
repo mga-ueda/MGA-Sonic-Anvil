@@ -49,11 +49,11 @@ internal static class DocumentTabLayout
     public static double WidthFor(double titleWidth) =>
         Math.Clamp(ChromeWidth + Math.Max(0, titleWidth), ChromeWidth, MaxTabWidth);
 
-    public static double PreferredWidth(string? title, double pixelsPerDip) =>
-        WidthFor(MeasureTitle(title ?? "", pixelsPerDip));
+    public static double PreferredWidth(string? title, double pixelsPerDip, double extra = 0) =>
+        WidthFor(MeasureTitle(title ?? "", pixelsPerDip) + Math.Max(0, extra));
 
-    public static double MinWidth(string? title, double pixelsPerDip) =>
-        WidthFor(MeasureTitle(MinVisibleText(title), pixelsPerDip));
+    public static double MinWidth(string? title, double pixelsPerDip, double extra = 0) =>
+        WidthFor(MeasureTitle(MinVisibleText(title), pixelsPerDip) + Math.Max(0, extra));
 
     public static bool FitsWithoutArrows(ReadOnlySpan<DocumentTabSlot> tabs, double hostWidth)
     {

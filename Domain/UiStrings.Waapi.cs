@@ -8,6 +8,14 @@ internal static partial class UiStrings
     public static string LabelWwise => Get("Wwise", "Wwise");
     public static string LabelWwisePrefetchLength => Get("Prefetch Length", "Prefetch Length");
     public static string LabelWwiseLookAheadTime => Get("Look-ahead Time", "Look-ahead Time");
+    public static string LabelFileNameColorMarkers => Get("ファイル名の色", "Filename colors");
+    public static string HintFileNameColorMarkers => Get(
+        "ファイル名に文字列が含まれると、先頭に縦の色マーカーを付けます。上から見て最初に一致した色を使います。色は Wwise と同じ 28 色です。",
+        "A vertical color marker is shown at the start of a filename when it contains the text. The first match from the top wins. The 28 colors match Wwise.");
+    public static string ButtonFileNameColorMarkerAdd => Get("追加", "Add");
+    public static string ButtonFileNameColorMarkerRemove => Get("削除", "Remove");
+    public static string ButtonFileNameColorMarkerUp => Get("▲", "▲");
+    public static string ButtonFileNameColorMarkerDown => Get("▼", "▼");
     public static string ErrorWwisePrefetchLengthRange => Get(
         "Prefetch Length は 0 から 10000 の ms で入力してください。",
         "Enter a Prefetch Length between 0 and 10000 ms.");
