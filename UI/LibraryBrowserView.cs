@@ -1232,6 +1232,126 @@ internal sealed class LibraryBrowserView : UserControl
         return ordered.Count == _items.Count ? ordered : _items;
     }
 
+    /// <summary>
+    /// 画面上の並び（列ソートとグループ）での位置。検索で隠れている行も含む。
+    /// </summary>
+    public bool TryGetDisplayedTrackPosition(DocumentSession session, out int index0Based, out int count)
+    {
+        index0Based = -1;
+        count = 0;
+        foreach (var row in PlaylistDisplayRows())
+        {
+            if (row.Tag is not DocumentSession item)
+            {
+                continue;
+            }
+
+            if (index0Based < 0 && ReferenceEquals(item, session))
+            {
+                index0Based = count;
+            }
+
+            count++;
+        }
+
+        return index0Based >= 0 && count > 0;
+    }
+
+    /// <summary>番号表示用。検索中でも登録全件の表示順を使う。</summary>
+    private IReadOnlyList<LibraryFileRow> PlaylistDisplayRows()
+    {
+        if (_rows.Count == 0)
+        {
+            return _rows;
+        }
+
+        if (_playlistSearchGroups.Count == 0)
+        {
+            return PlaylistRows();
+        }
+
+        if (_group == LibraryFileGroup.None)
+        {
+            return _rows;
+        }
+
+        return GroupRowsInDisplayOrder(_rows);
+    }
+
+    private static List<LibraryFileRow> GroupRowsInDisplayOrder(IReadOnlyList<LibraryFileRow> rows)
+    {
+        var order = new List<string>();
+        var buckets = new Dictionary<string, List<LibraryFileRow>>(StringComparer.Ordinal);
+        foreach (var row in rows)
+        {
+            var key = row.GroupKey ?? string.Empty;
+            if (!buckets.TryGetValue(key, out var list))
+            {
+                list = [];
+                buckets[key] = list;
+                order.Add(key);
+            }
+
+            list.Add(row);
+        }
+
+        var result = new List<LibraryFileRow>(rows.Count);
+        foreach (var key in order)
+        {
+            result.AddRange(buckets[key]);
+        }
+
+        return result;
+    }
+
+    private static bool SameSessionSet(
+        IReadOnlyList<LibraryFileRow> rows,
+        IReadOnlyList<DocumentSession> sessions)
+    {
+        if (rows.Count != sessions.Count)
+        {
+            return false;
+        }
+
+        var seen = new HashSet<DocumentSession>();
+        foreach (var row in rows)
+        {
+            if (row.Tag is not DocumentSession session || !seen.Add(session))
+            {
+                return false;
+            }
+        }
+
+        foreach (var session in sessions)
+        {
+            if (!seen.Contains(session))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static void SyncPlaylistWaveformsFromDocuments(IReadOnlyList<DocumentSession> sessions)
+    {
+        var barCount = LibraryPlaylistWaveform.BarCount;
+        foreach (var session in sessions)
+        {
+            var path = session.Document.SourcePath;
+            if (string.IsNullOrWhiteSpace(path)
+                || !PeakPyramid.CanBuildPlaylistBarsFromPeaks(session.Document.Peaks))
+            {
+                continue;
+            }
+
+            LibraryPlaylistWaveform.Replace(
+                path,
+                barCount,
+                PeakPyramid.BuildPlaylistBarsFromPeaks(session.Document.Peaks, barCount));
+        }
+    }
+
     private static void AppendGroupedPlaylistRows(CollectionViewGroup group, List<LibraryFileRow> dest)
     {
         foreach (var item in group.Items)

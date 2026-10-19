@@ -614,6 +614,26 @@ public sealed class LibraryPlayerModeTests
     }
 
     [Fact]
+    public void MergeParkedPlaylist_KeepsPreviousTracksAndEditorOpens()
+    {
+        var first = Session("a.wav");
+        var second = Session("b.wav");
+        var third = Session("c.wav");
+        var opened = Session("d.wav");
+        var merged = LibraryPlayerMode.MergeParkedPlaylist(
+            [first, second, third],
+            [second],
+            [second, opened]);
+        Assert.Equal(new[] { first, second, third, opened }, merged);
+
+        var closed = LibraryPlayerMode.MergeParkedPlaylist(
+            [first, second],
+            [second],
+            [opened]);
+        Assert.Equal(new[] { first, opened }, closed);
+    }
+
+    [Fact]
     public void NeedsEditorPcmUpgrade_IsStreamOrDeferred()
     {
         var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid() + ".mp3");

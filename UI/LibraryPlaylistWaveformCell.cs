@@ -86,6 +86,10 @@ internal static class LibraryPlaylistWaveform
         BarsUpdated?.Invoke(path);
     }
 
+    /// <summary>編集後のピークで棒を差し替える。TrySet は先勝ちのため使わない。</summary>
+    public static void Replace(string path, int barCount, float[] bars) =>
+        Set(path, barCount, bars);
+
     /// <summary>先に埋まった棒は差し替えない（先読みピークで2曲目が跳ねるのを防ぐ）。</summary>
     public static bool TrySet(string path, int barCount, float[] bars)
     {

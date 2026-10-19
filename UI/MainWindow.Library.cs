@@ -38,6 +38,12 @@ public partial class MainWindow
     /// <summary>F9（および F8 動画ミニ）。サイド／トランスポート／ステータスを隠す。F8 はアナライザを残す。再生は止めない。</summary>
     private bool _libraryMinimalChrome;
     private bool _libraryPlayerHostActive;
+
+    /// <summary>プレイヤーを抜ける直前の全曲。エディタでは選択分だけタブに残し、戻りでは消さない。</summary>
+    private DocumentSession[]? _playlistParked;
+
+    /// <summary>退避時にエディタへ残したセッション。タブを閉じたらプレイリストへ戻さない。</summary>
+    private HashSet<DocumentSession>? _playlistParkedKept;
     /// <summary>F10 突入前のタイル配置。退出後に付け直す。</summary>
     private WaveformTileArrange _librarySuspendedTileArrange;
     private bool _libraryWaapiSuspended;
@@ -590,6 +596,11 @@ public partial class MainWindow
 
         RefreshTransportCommandsEnabled();
         ApplyLibraryWaapi(show);
+        if (show)
+        {
+            RestoreParkedPlaylist();
+        }
+
         ApplyLibraryPlayerHost(show);
         if (show)
         {
@@ -2225,6 +2236,77 @@ public partial class MainWindow
 
         LibraryBrowser.SetSessions(_sessions, _activeSession);
         ShowLibraryArtworkOrClear(_activeSession);
+    }
+
+    /// <summary>抜ける前のプレイリストを戻す。エディタで開いているファイルも残す。</summary>
+    private void RestoreParkedPlaylist()
+    {
+        var parked = _playlistParked;
+        var kept = _playlistParkedKept;
+        _playlistParked = null;
+        _playlistParkedKept = null;
+        if (parked is null || parked.Length == 0)
+        {
+            return;
+        }
+
+        var merged = LibraryPlayerMode.MergeParkedPlaylist(parked, kept ?? [], _sessions);
+        if (merged.Count == _sessions.Count)
+        {
+            var same = true;
+            for (var i = 0; i < merged.Count; i++)
+            {
+                if (!ReferenceEquals(merged[i], _sessions[i]))
+                {
+                    same = false;
+                    break;
+                }
+            }
+
+            if (same)
+            {
+                return;
+            }
+        }
+
+        var active = _activeSession;
+        _sessions.Clear();
+        _sessions.AddRange(merged);
+        if (active is not null && !_sessions.Contains(active))
+        {
+            active = _sessions.Count > 0 ? _sessions[0] : null;
+        }
+
+        if (!ReferenceEquals(_activeSession, active))
+        {
+            BindWorkspace(active);
+        }
+        else
+        {
+            RebuildTabBar();
+        }
+    }
+
+    private int DisplayedPlaylistIndex(DocumentSession? session)
+    {
+        if (session is not null
+            && LibraryBrowser.TryGetDisplayedTrackPosition(session, out var index, out _))
+        {
+            return index;
+        }
+
+        return session is null ? -1 : _sessions.IndexOf(session);
+    }
+
+    private int DisplayedPlaylistCount()
+    {
+        if (_activeSession is not null
+            && LibraryBrowser.TryGetDisplayedTrackPosition(_activeSession, out _, out var count))
+        {
+            return count;
+        }
+
+        return _sessions.Count;
     }
 
     /// <summary>
