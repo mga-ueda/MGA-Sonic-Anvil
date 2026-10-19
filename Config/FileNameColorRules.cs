@@ -1,3 +1,5 @@
+using MgaSonicAnvil.Domain;
+
 namespace MgaSonicAnvil.Config;
 
 /// <summary>
@@ -215,14 +217,181 @@ internal static class FileNameColorAssignments
         string? destination,
         out FileNameColorAssignment[] next)
     {
-        next = Normalize(current);
-        if (!TryGet(current, source, out var colorIndex) || !TryKey(destination, out _))
+        if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(destination))
         {
+            next = Normalize(current);
             return false;
         }
 
-        next = With(Without(current, [source!]), [destination!], colorIndex);
-        return true;
+        var moved = MoveTree(current, source, destination);
+        next = moved ?? Normalize(current);
+        return moved is not null && TryGet(next, destination, out _);
+    }
+
+    /// <summary>
+    /// 移動・名前変更。操作したパスの先にファイルがあるときだけ色を移す。
+    /// 操作したパスが既に無い記録は孤立なので捨てる。操作外のパスは存在を見ない。
+    /// </summary>
+    public static FileNameColorAssignment[]? MoveTree(
+        IReadOnlyList<FileNameColorAssignment>? current,
+        string source,
+        string destination)
+    {
+        if (current is null || current.Count == 0 || !TryKey(source, out _) || !TryKey(destination, out _))
+        {
+            return null;
+        }
+
+        var kept = new Dictionary<string, (string Path, int Color)>(StringComparer.OrdinalIgnoreCase);
+        var changed = false;
+        foreach (var item in current)
+        {
+            if (!TryRead(item, out var path, out var color) || !TryKey(path, out var key))
+            {
+                continue;
+            }
+
+            if (!LibraryFileTransfer.IsSameOrUnder(path, source))
+            {
+                kept.Remove(key);
+                kept[key] = (path, color);
+                continue;
+            }
+
+            if (LibraryFileTransfer.TryMapPath(path, source, destination, out var mapped)
+                && TryKey(mapped, out var mappedKey)
+                && PathExists(mapped))
+            {
+                if (!string.Equals(path, mapped, StringComparison.Ordinal))
+                {
+                    changed = true;
+                }
+
+                kept.Remove(mappedKey);
+                kept[mappedKey] = (mapped, color);
+                continue;
+            }
+
+            if (PathExists(path))
+            {
+                kept.Remove(key);
+                kept[key] = (path, color);
+                continue;
+            }
+
+            changed = true;
+        }
+
+        return changed ? ToArray(kept) : null;
+    }
+
+    /// <summary>
+    /// コピー。元のファイルがある記録だけ新しいパスへ写す。
+    /// 操作したパスが既に無い記録は孤立なので捨てる。操作外のパスは存在を見ない。
+    /// </summary>
+    public static FileNameColorAssignment[]? CopyTree(
+        IReadOnlyList<FileNameColorAssignment>? current,
+        string source,
+        string destination)
+    {
+        if (current is null || current.Count == 0 || !TryKey(source, out _) || !TryKey(destination, out _))
+        {
+            return null;
+        }
+
+        var kept = Snapshot(current, out var changed);
+        foreach (var item in current)
+        {
+            if (!TryRead(item, out var path, out var color)
+                || !TryKey(path, out var key)
+                || !LibraryFileTransfer.IsSameOrUnder(path, source))
+            {
+                continue;
+            }
+
+            if (!PathExists(path))
+            {
+                kept.Remove(key);
+                changed = true;
+                continue;
+            }
+
+            if (!LibraryFileTransfer.TryMapPath(path, source, destination, out var mapped)
+                || !TryKey(mapped, out var mappedKey))
+            {
+                continue;
+            }
+
+            if (kept.TryGetValue(mappedKey, out var existing)
+                && existing.Color == color
+                && string.Equals(existing.Path, mapped, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            kept.Remove(mappedKey);
+            kept[mappedKey] = (mapped, color);
+            changed = true;
+        }
+
+        return changed ? ToArray(kept) : null;
+    }
+
+    /// <summary>
+    /// 削除の対象パス。そのパスがもう無い記録だけ捨てる。
+    /// ファイルが残っている記録と、操作外のパスは残す。
+    /// </summary>
+    public static FileNameColorAssignment[]? ForgetTree(
+        IReadOnlyList<FileNameColorAssignment>? current,
+        string path)
+    {
+        if (current is null || current.Count == 0 || !TryKey(path, out _))
+        {
+            return null;
+        }
+
+        var kept = new Dictionary<string, (string Path, int Color)>(StringComparer.OrdinalIgnoreCase);
+        var changed = false;
+        foreach (var item in current)
+        {
+            if (!TryRead(item, out var itemPath, out var color) || !TryKey(itemPath, out var key))
+            {
+                continue;
+            }
+
+            if (LibraryFileTransfer.IsSameOrUnder(itemPath, path) && !PathExists(itemPath))
+            {
+                changed = true;
+                continue;
+            }
+
+            kept.Remove(key);
+            kept[key] = (itemPath, color);
+        }
+
+        return changed ? ToArray(kept) : null;
+    }
+
+    /// <summary>複数パスを一度に捨てる。一つも無ければ null。</summary>
+    public static FileNameColorAssignment[]? ForgetTree(
+        IReadOnlyList<FileNameColorAssignment>? current,
+        IEnumerable<string> paths)
+    {
+        FileNameColorAssignment[]? latest = null;
+        var working = current;
+        foreach (var path in paths)
+        {
+            var next = ForgetTree(working, path);
+            if (next is null)
+            {
+                continue;
+            }
+
+            latest = next;
+            working = next;
+        }
+
+        return latest;
     }
 
     private static Dictionary<string, int> ToMap(IReadOnlyList<FileNameColorAssignment>? current)
@@ -260,6 +429,54 @@ internal static class FileNameColorAssignments
         return items;
     }
 
+    private static bool TryRead(FileNameColorAssignment? item, out string path, out int color)
+    {
+        path = string.Empty;
+        color = -1;
+        if (item is null
+            || (uint)item.ColorIndex >= FileNameColorPalette.Count
+            || !TryKey(item.Path, out path))
+        {
+            return false;
+        }
+
+        color = item.ColorIndex;
+        return true;
+    }
+
+    private static Dictionary<string, (string Path, int Color)> Snapshot(
+        IReadOnlyList<FileNameColorAssignment> current,
+        out bool droppedInvalid)
+    {
+        var kept = new Dictionary<string, (string Path, int Color)>(StringComparer.OrdinalIgnoreCase);
+        droppedInvalid = false;
+        foreach (var item in current)
+        {
+            if (!TryRead(item, out var path, out var color) || !TryKey(path, out var key))
+            {
+                droppedInvalid = true;
+                continue;
+            }
+
+            kept.Remove(key);
+            kept[key] = (path, color);
+        }
+
+        return kept;
+    }
+
+    private static FileNameColorAssignment[] ToArray(Dictionary<string, (string Path, int Color)> kept)
+    {
+        var items = new FileNameColorAssignment[kept.Count];
+        var i = 0;
+        foreach (var pair in kept)
+        {
+            items[i++] = new FileNameColorAssignment { Path = pair.Value.Path, ColorIndex = pair.Value.Color };
+        }
+
+        return items;
+    }
+
     private static FileNameColorAssignment[] Normalize(IReadOnlyList<FileNameColorAssignment>? current) =>
         FromMap(ToMap(current));
 
@@ -281,6 +498,18 @@ internal static class FileNameColorAssignments
         }
 
         return key.Length > 0;
+    }
+
+    private static bool PathExists(string path)
+    {
+        try
+        {
+            return File.Exists(path) || Directory.Exists(path);
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 }
 
@@ -311,5 +540,33 @@ internal static class FileNameColorResolve
         }
 
         return FileNameColorRules.TryMatch(fileName, rules, out colorIndex, out pattern);
+    }
+}
+
+/// <summary>アプリ内の移動・コピー・削除を、手動色の保存へ反映する。</summary>
+internal static class FileNameColorAssignmentSync
+{
+    public static bool Move(string source, string destination) =>
+        Apply(FileNameColorAssignments.MoveTree(AppStorage.Settings.FileNameColorAssignments, source, destination));
+
+    public static bool Copy(string source, string destination) =>
+        Apply(FileNameColorAssignments.CopyTree(AppStorage.Settings.FileNameColorAssignments, source, destination));
+
+    public static bool Forget(string path) =>
+        Apply(FileNameColorAssignments.ForgetTree(AppStorage.Settings.FileNameColorAssignments, path));
+
+    public static bool Forget(IEnumerable<string> paths) =>
+        Apply(FileNameColorAssignments.ForgetTree(AppStorage.Settings.FileNameColorAssignments, paths));
+
+    private static bool Apply(FileNameColorAssignment[]? next)
+    {
+        if (next is null)
+        {
+            return false;
+        }
+
+        AppStorage.Settings.FileNameColorAssignments = next;
+        AppStorage.Save();
+        return true;
     }
 }
