@@ -118,7 +118,7 @@ internal sealed class SilenceDetectDialog : Window
         ShowInTaskbar = false;
         SourceInitialized += (_, _) => DisableMinimizeBox(this);
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Width = DesignMetrics.From96(720) * 2;
+        Width = DesignMetrics.From96(1080);
         MinWidth = DesignMetrics.From96(560);
         SizeToContent = SizeToContent.Height;
         Background = (Brush)FindResource("WindowBackBrush");
@@ -296,23 +296,20 @@ internal sealed class SilenceDetectDialog : Window
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 4, 0, 0),
         };
         buttons.Children.Add(_applyButton);
         buttons.Children.Add(cancel);
 
-        var settings = new StackPanel();
+        var settings = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
         settings.Children.Add(targetText);
         settings.Children.Add(paramGrid);
         settings.Children.Add(actionRow);
         settings.Children.Add(scopeRow);
+        settings.Children.Add(buttons);
 
         var bottom = new Grid { Margin = new Thickness(0, 4, 0, 0) };
-        bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        Grid.SetRow(settings, 0);
-        Grid.SetRow(buttons, 1);
         bottom.Children.Add(settings);
-        bottom.Children.Add(buttons);
 
         var root = new DockPanel { LastChildFill = true };
         DockPanel.SetDock(bottom, Dock.Bottom);
@@ -340,7 +337,7 @@ internal sealed class SilenceDetectDialog : Window
         {
             RefreshStatusFromPreview();
             SyncActionUi();
-            // 初回の高さは内容どおり。以後は波形エリアだけが縦横に伸び、下の設定は開いたときの幅のまま。OK／キャンセルだけ右端に付く。
+            // 未保存のときは 1080×543。保存済みのサイズがあればそれを使い、ここでは上書きしない。
             SizeToContent = SizeToContent.Manual;
             var contentHeight = ActualHeight;
             if (contentHeight > 0)
@@ -351,21 +348,11 @@ internal sealed class SilenceDetectDialog : Window
                     contentHeight - previewHeight + _preview.MinHeight);
             }
 
-            if (ActualWidth > 0)
-            {
-                MinWidth = ActualWidth;
-            }
-
-            settings.Width = settings.ActualWidth;
-            settings.HorizontalAlignment = HorizontalAlignment.Left;
             _preview.ClearValue(FrameworkElement.HeightProperty);
             if (!WindowPlacement.TryApplySilenceDetect(this, AppStorage.Settings))
             {
-                if (contentHeight > 0)
-                {
-                    Height = contentHeight * 2;
-                }
-
+                Width = DesignMetrics.From96(1080);
+                Height = DesignMetrics.From96(543);
                 UpdateLayout();
                 WindowPlacement.CenterOnContainingMonitor(this, Owner);
             }
@@ -1237,6 +1224,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         return false;
     }
 
+    internal double AmpZoom => _ampZoom;
+
     private void SetAmpZoom(double zoom)
     {
         var next = Math.Clamp(zoom, 1d, WaveformView.AmpZoomMax);
@@ -1499,15 +1488,39 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
     private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (e.Delta == 0 || _range.IsEmpty || ActualWidth <= 1)
+        if (ApplyPointerWheel(e.Delta, Keyboard.Modifiers, e.GetPosition(this).X))
         {
-            return;
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Ctrl はエディタと同じ振幅ズーム。それ以外は時間ズーム。
+    /// </summary>
+    internal bool ApplyPointerWheel(int delta, ModifierKeys modifiers, double pointerX)
+    {
+        if (delta == 0 || _range.IsEmpty)
+        {
+            return false;
+        }
+
+        if (modifiers == ModifierKeys.Control)
+        {
+            SetAmpZoom(delta > 0
+                ? _ampZoom * WaveformView.TimeZoomStep
+                : _ampZoom / WaveformView.TimeZoomStep);
+            return true;
+        }
+
+        if (ActualWidth <= 1)
+        {
+            return false;
         }
 
         var fraction = _seekFrame >= 0
             ? (_seekFrame - _viewStart) / Math.Max(1.0, _viewSpan)
-            : e.GetPosition(this).X / ActualWidth;
-        var factor = e.Delta > 0 ? WaveformView.WheelTimeStep : 1d / WaveformView.WheelTimeStep;
+            : pointerX / ActualWidth;
+        var factor = delta > 0 ? WaveformView.WheelTimeStep : 1d / WaveformView.WheelTimeStep;
         var minSpan = Math.Max(1d, _range.Length / WaveformView.TimeZoomMax);
         (_viewStart, _viewSpan) = ZoomAround(
             _viewStart,
@@ -1519,7 +1532,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             minSpan);
         MarkWaveDirty();
         InvalidateVisual();
-        e.Handled = true;
+        return true;
     }
 
     /// <summary>factor が 1 より大きいと span が縮む。アンカー割合のフレームは動かさない。</summary>
