@@ -106,6 +106,70 @@
                          Margin="8,8,0,0" />
             </Grid>
 
+            <TextBlock Text="{x:Static domain:UiStrings.LabelWallpaper}"
+                       FontWeight="Bold"
+                       FontSize="11.333"
+                       Margin="0,16,0,6" />
+            <TextBlock Text="{x:Static domain:UiStrings.LabelWallpaperPath}"
+                       Margin="0,0,0,3" />
+            <Grid Margin="0,0,0,8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <ui:StretchSlot>
+                <TextBox x:Name="WallpaperPathBox"
+                         Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                         Style="{StaticResource DarkTextBoxStyle}"
+                         Padding="6,1"
+                         FontSize="11.333"
+                         VerticalContentAlignment="Center" />
+              </ui:StretchSlot>
+              <ui:RoundedButton x:Name="WallpaperBrowseButton"
+                                Grid.Column="1"
+                                Content="{x:Static domain:UiStrings.ButtonBrowse}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="64"
+                                Margin="8,0,0,0"
+                                Click="WallpaperBrowseButton_Click" />
+              <ui:RoundedButton x:Name="WallpaperClearButton"
+                                Grid.Column="2"
+                                Content="{x:Static domain:UiStrings.ButtonWallpaperClear}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="64"
+                                Margin="8,0,0,0"
+                                Click="WallpaperClearButton_Click" />
+            </Grid>
+            <Grid Margin="0,0,0,4">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="{x:Static domain:UiStrings.LabelWallpaperOpacity}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,8,0" />
+              <TextBox x:Name="WallpaperOpacityBox"
+                       Grid.Column="1"
+                       Width="56"
+                       Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                       Style="{StaticResource DarkTextBoxStyle}"
+                       Padding="6,1"
+                       FontSize="11.333"
+                       VerticalContentAlignment="Center"
+                       HorizontalContentAlignment="Right" />
+              <TextBlock Grid.Column="2"
+                         Text="%"
+                         VerticalAlignment="Center"
+                         Margin="6,0,0,0" />
+            </Grid>
+            <TextBlock Text="{x:Static domain:UiStrings.LabelWallpaperHint}"
+                       FontSize="11.333"
+                       Foreground="{DynamicResource MutedForeBrush}"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,4" />
+
             <TextBlock x:Name="AssociationHeader"
                        Text="{x:Static domain:UiStrings.LabelFileAssociations}"
                        FontWeight="Bold"

@@ -2216,7 +2216,9 @@ public partial class MainWindow
             settings.ResolvedVideoProxyRetentionDays(),
             settings.FfmpegExePath,
             settings.VideoProxyDisableAutoEncode,
-            settings.ResolvedLaunchMode())
+            settings.ResolvedLaunchMode(),
+            settings.ResolvedWallpaperPath(),
+            settings.ResolvedWallpaperOpacity())
         {
             Owner = this,
         };
@@ -2263,6 +2265,9 @@ public partial class MainWindow
             videoColumns: settings.ResolvedLibraryListColumnsVideo());
         settings.ApplyLibraryPlaylistWaveformSizeWave(dialog.SelectedLibraryPlaylistWaveformSizeWave);
         settings.ApplyLibraryPlaylistWaveformSizeMp3(dialog.SelectedLibraryPlaylistWaveformSizeMp3);
+        settings.WallpaperPath = dialog.SelectedWallpaperPath;
+        settings.WallpaperOpacity = dialog.SelectedWallpaperOpacity;
+        LibraryBrowser.ApplyWallpaper(settings.ResolvedWallpaperPath(), settings.ResolvedWallpaperOpacity());
         settings.GaplessPlayback = dialog.SelectedGaplessPlayback;
         Mp3Gapless.Enabled = settings.GaplessPlayback;
         settings.LibraryShowPlaylistPdf = dialog.SelectedLibraryShowPlaylistPdf;

@@ -104,6 +104,20 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly Border _waveGlowFrom = CreateGlowWashLayer();
     private readonly Border _waveGlowTo = CreateGlowWashLayer();
     private readonly Border _waveVeil = new();
+    /// <summary>
+    /// ドリフトするウォッシュの上。比率を保って中央で画面を覆う。タイルにはしない。
+    /// </summary>
+    private readonly Image _wallpaper = new()
+    {
+        Stretch = Stretch.UniformToFill,
+        HorizontalAlignment = HorizontalAlignment.Stretch,
+        VerticalAlignment = VerticalAlignment.Stretch,
+        IsHitTestVisible = false,
+        Opacity = 0,
+        Visibility = Visibility.Collapsed,
+        SnapsToDevicePixels = false,
+        UseLayoutRounding = false,
+    };
     private Brush? _glowWash;
     private readonly ScaleTransform _waveGlowScale = new(GlowDriftScaleFrom, GlowDriftScaleFrom);
     private readonly TranslateTransform _waveGlowTranslate = new();
@@ -9399,6 +9413,7 @@ internal sealed class LibraryBrowserView : UserControl
 
         _waveGlowCanvas.Children.Add(_waveGlow);
         host.Children.Add(_waveGlowCanvas);
+        host.Children.Add(_wallpaper);
         host.Children.Add(_waveVeil);
         ApplyGlowVeil();
         CopyGlowWash(_glowFrom, _glowTo, _waveGlowFrom, _waveGlowTo);
@@ -9406,6 +9421,24 @@ internal sealed class LibraryBrowserView : UserControl
         PlaceArtworkGlow();
         SyncWaveGlowCover();
         ContinueGlowDrift();
+    }
+
+    /// <summary>
+    /// 動的背景の上に壁紙を乗せる。パスが空、または読めないときは出さない。
+    /// </summary>
+    internal void ApplyWallpaper(string? path, double opacity)
+    {
+        var bitmap = WallpaperBitmap.TryLoad(path);
+        _wallpaper.Source = bitmap;
+        if (bitmap is null)
+        {
+            _wallpaper.Opacity = 0;
+            _wallpaper.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        _wallpaper.Opacity = AppSettings.ClampWallpaperOpacity(opacity);
+        _wallpaper.Visibility = Visibility.Visible;
     }
 
     /// <summary>動画／PDF を窓全体の背面（ウォッシュより前、クロームより後ろ）に置く。</summary>

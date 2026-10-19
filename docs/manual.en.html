@@ -192,6 +192,7 @@
           <li><strong>UI scale</strong> — 100–200%. Extra enlargement on top of Windows display scaling; you cannot shrink. Affects the main window only. Menus, Settings, and edit history stay at 100%. Applies as soon as you change it. Cancel restores it.</li>
           <li><strong>Multiple files</strong> — how to arrange two or more files after opening them: keep tabs / side by side / stacked / grid. Default is keep tabs.</li>
           <li><strong>Startup mode</strong> — Editor (normal) / Editor (fullscreen: with analyzers) / Editor (fullscreen: without analyzers) / Player (normal) / Player (compact). Default is Editor (normal). Compact shows only the playlist and waveform. Used only when the app starts with no file arguments. Opening a file from an argument or a file association still follows the file type, as before. Applies on the next launch.</li>
+          <li><strong>Wallpaper</strong> — An image laid over the animated background. None by default. Browse for a JPEG, PNG, BMP, GIF, or TIFF, or clear the path to remove it. A path that cannot be read shows nothing. The window updates as soon as you set a path or change the opacity. Cancel restores what was showing when Settings opened. Opacity is 0–100% (default 10%). ↑ / ↓ and the mouse wheel over the box change it by 1%. The image keeps its aspect ratio, stays centered, and covers the window (overflow is cropped; it is not tiled). Video or PDF on the back sits in front of it.</li>
           <li>
             <p><strong>File associations</strong> — Choose which types open with this app. Changes apply immediately. <span class="ui">All on</span> and <span class="ui">All off</span> set every type you can currently change (video types dimmed because FFmpeg is missing are left as they are).</p>
             <ul>
@@ -1205,6 +1206,7 @@
       <p>Settings are the gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. Tabs are General / Shown / Audio / Player / Editing / Export · Paths / Wwise. Details for each item are under <a href="#layout-settings">Layout → Settings</a>. <kbd>Esc</kbd> closes the window.</p>
       <ul>
         <li>Language is on General. The default is <span class="ui">Auto</span> (Japanese if the PC is Japanese, otherwise English). The Japanese UI may still show some English labels.</li>
+        <li>Wallpaper is also on General. None by default. It covers the window over the animated background while keeping its aspect ratio. Details are under <a href="#layout-settings">Layout → Settings</a>.</li>
         <li>The manual is <span class="ui">?</span>, or in the browser. It follows the UI language.</li>
         <li>Settings and open tabs are stored in this PC’s user folder (<code>%LocalAppData%\MGA\MGA Sonic Anvil\</code>). Nothing is written next to the app.</li>
         <li>MP3 uses LAME when the path in Settings is valid; otherwise Windows writes it (128–320 kbps, default 192). It writes the stereo mix you hear now (see <a href="#mp3-downmix">details</a>). The written MP3 is not opened in the current tab. LAME is not included with this app.</li>

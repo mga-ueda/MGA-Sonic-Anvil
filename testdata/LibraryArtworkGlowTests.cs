@@ -8,6 +8,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 using Xunit;
@@ -395,6 +396,49 @@ public sealed class LibraryArtworkGlowTests
             finally
             {
                 window?.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void WaveformGlowHost_PlacesWallpaperOverWash()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var host = new Grid();
+            var view = new LibraryBrowserView();
+            view.BindWaveformGlow(host);
+            Assert.IsType<Canvas>(host.Children[0]);
+            var image = Assert.IsType<Image>(host.Children[1]);
+            Assert.IsType<Border>(host.Children[2]);
+            Assert.Equal(Stretch.UniformToFill, image.Stretch);
+            Assert.Equal(HorizontalAlignment.Stretch, image.HorizontalAlignment);
+            Assert.Equal(VerticalAlignment.Stretch, image.VerticalAlignment);
+            Assert.False(image.IsHitTestVisible);
+            Assert.Null(image.Source);
+            Assert.Equal(Visibility.Collapsed, image.Visibility);
+
+            var path = Path.Combine(Path.GetTempPath(), "mga-wallpaper-" + Guid.NewGuid().ToString("N") + ".png");
+            try
+            {
+                File.WriteAllBytes(path, PngPixel(20, 80, 140));
+                view.ApplyWallpaper(path, AppSettings.WallpaperOpacityDefault);
+                var bitmap = Assert.IsAssignableFrom<BitmapSource>(image.Source);
+                Assert.True(bitmap.PixelWidth >= 1);
+                Assert.Equal(AppSettings.WallpaperOpacityDefault, image.Opacity);
+                Assert.Equal(Visibility.Visible, image.Visibility);
+
+                view.ApplyWallpaper(null, 1);
+                Assert.Null(image.Source);
+                Assert.Equal(Visibility.Collapsed, image.Visibility);
+            }
+            finally
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
             }
         });
     }

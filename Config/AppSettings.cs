@@ -90,6 +90,14 @@ internal sealed class AppSettings
     /// <summary>ラウドネスメーターのターゲット（LKFS）。既定 -24。</summary>
     public double LoudnessTargetLufs { get; set; } = LoudnessMeterEngine.DefaultTargetLufs;
 
+    /// <summary>壁紙画像のフルパス。空は壁紙なし。</summary>
+    public string WallpaperPath { get; set; } = string.Empty;
+
+    /// <summary>壁紙の不透明度。0 で透明、1 で不透明。既定は 10%。</summary>
+    public const double WallpaperOpacityDefault = 0.10;
+
+    public double WallpaperOpacity { get; set; } = WallpaperOpacityDefault;
+
     public bool AlwaysOnTop { get; set; }
 
     /// <summary>再生で MP3／M4A の encoder delay／padding を飛ばす。既定オン。</summary>
@@ -628,6 +636,53 @@ internal sealed class AppSettings
     }
 
     public AppLaunchMode ResolvedLaunchMode() => AppLaunchModes.Parse(LaunchMode);
+
+    public string ResolvedWallpaperPath() =>
+        string.IsNullOrWhiteSpace(WallpaperPath) ? string.Empty : WallpaperPath.Trim();
+
+    public double ResolvedWallpaperOpacity() => ClampWallpaperOpacity(WallpaperOpacity);
+
+    public static double ClampWallpaperOpacity(double opacity) =>
+        double.IsFinite(opacity) ? Math.Clamp(opacity, 0, 1) : WallpaperOpacityDefault;
+
+    public static bool TryParseWallpaperOpacityPercent(string? text, out double opacity)
+    {
+        opacity = WallpaperOpacityDefault;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        var trimmed = text.Trim().TrimEnd('%').Trim();
+        if (!double.TryParse(trimmed, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var percent)
+            && !double.TryParse(trimmed, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.CurrentCulture, out percent))
+        {
+            return false;
+        }
+
+        if (!double.IsFinite(percent) || percent is < 0 or > 100)
+        {
+            return false;
+        }
+
+        opacity = percent / 100d;
+        return true;
+    }
+
+    public static string FormatWallpaperOpacityPercent(double opacity) =>
+        Math.Round(ClampWallpaperOpacity(opacity) * 100d).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>不透明度（%）を 1 刻みで動かし、0〜100 に収める。</summary>
+    public static int NudgeWallpaperOpacityPercent(int currentPercent, int direction)
+    {
+        var current = Math.Clamp(currentPercent, 0, 100);
+        if (direction == 0)
+        {
+            return current;
+        }
+
+        return Math.Clamp(current + (direction > 0 ? 1 : -1), 0, 100);
+    }
 
     public int ResolvedUiScalePercent() => UiScale.ClampPercent(UiScalePercent);
 
