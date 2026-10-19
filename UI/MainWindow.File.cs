@@ -652,12 +652,14 @@ public partial class MainWindow
                 return ExportMp3WithoutReloading(document, path);
             }
 
+            var previousPath = document.SourcePath;
             var encoder = AudioCodec.Save(
                 document,
                 path,
                 AppStorage.Settings.ToMp3EncodeOptions(),
                 AppStorage.Settings.ToMp3SpeakerMix());
             document.MarkSaved(path, AudioCodec.DetectKind(path));
+            ApplyFileNameColorEdit(FollowFileNameColor(previousPath, path));
             var history = _sessions.FirstOrDefault(item => ReferenceEquals(item.Document, document))?.History
                 ?? (ReferenceEquals(document, _document) ? _history : null);
             history?.MarkClean();
@@ -787,11 +789,14 @@ public partial class MainWindow
             var destKind = AudioCodec.DetectKind(job.Path);
             if (destKind == AudioFileKind.Mp3 && !SameDocumentPath(job.Document.SourcePath, job.Path))
             {
+                ApplyFileNameColorEdit(FollowFileNameColor(job.Document.SourcePath, job.Path));
                 encoder ??= outcome.Encoder;
                 continue;
             }
 
+            var previousPath = job.Document.SourcePath;
             job.Document.MarkSaved(job.Path, destKind);
+            ApplyFileNameColorEdit(FollowFileNameColor(previousPath, job.Path));
             var session = _sessions.FirstOrDefault(item => ReferenceEquals(item.Document, job.Document));
             session?.History.MarkClean();
             if (ReferenceEquals(job.Document, _document))
@@ -926,7 +931,9 @@ public partial class MainWindow
 
             var job = jobs[i];
             var destKind = AudioCodec.DetectKind(job.Path);
+            var previousPath = job.Document.SourcePath;
             job.Document.MarkSaved(job.Path, destKind);
+            ApplyFileNameColorEdit(FollowFileNameColor(previousPath, job.Path));
             var session = _sessions.FirstOrDefault(item => ReferenceEquals(item.Document, job.Document));
             session?.History.MarkClean();
             if (ReferenceEquals(job.Document, _document))
@@ -1153,6 +1160,7 @@ public partial class MainWindow
             }).ConfigureAwait(true);
 
             _busyGlass.HideOverlay();
+            ApplyFileNameColorEdit(FollowFileNameColor(document.SourcePath, path));
             ShowMp3EncoderResult(encoder);
         }
         catch (Exception ex)
@@ -1260,16 +1268,7 @@ public partial class MainWindow
                 }
 
                 MoveDocumentFile(path, destination);
-                if (FileNameColorAssignments.TryRetarget(
-                    AppStorage.Settings.FileNameColorAssignments,
-                    path,
-                    destination,
-                    out var colors))
-                {
-                    AppStorage.Settings.FileNameColorAssignments = colors;
-                    AppStorage.Save();
-                }
-
+                ApplyFileNameColorEdit(FileNameColorAssignmentSync.Move(path, destination));
                 document.SourcePath = destination;
                 document.RefreshFileBytes();
             }
@@ -1334,6 +1333,31 @@ public partial class MainWindow
         }
 
         return false;
+    }
+
+    private void ApplyFileNameColorEdit(bool changed)
+    {
+        if (!changed)
+        {
+            return;
+        }
+
+        LibraryBrowser.RefreshFileNameMarkers();
+        RefreshTabHeaders();
+        RefreshPlaylistVideoFileName();
+    }
+
+    /// <summary>別名保存や書き出し。元に手動色があればコピー先へ写す。コピー先が残っている記録は消さない。</summary>
+    private static bool FollowFileNameColor(string? source, string? destination)
+    {
+        if (string.IsNullOrWhiteSpace(destination)
+            || string.IsNullOrWhiteSpace(source)
+            || DocumentFileNames.IsSamePath(source, destination))
+        {
+            return false;
+        }
+
+        return FileNameColorAssignmentSync.Copy(source, destination);
     }
 
     private static void MoveDocumentFile(string source, string destination)
@@ -1510,6 +1534,7 @@ public partial class MainWindow
             if (!document.IsDirty)
             {
                 File.Copy(path, dest);
+                ApplyFileNameColorEdit(FileNameColorAssignmentSync.Copy(path, dest));
             }
             else if (AudioCodec.DetectKind(path) == AudioFileKind.Aiff)
             {
@@ -1522,6 +1547,7 @@ public partial class MainWindow
                     dest,
                     AppStorage.Settings.ToMp3EncodeOptions(),
                     AppStorage.Settings.ToMp3SpeakerMix());
+                ApplyFileNameColorEdit(FileNameColorAssignmentSync.Copy(path, dest));
             }
 
             return new DocumentSession(AudioCodec.Load(dest));
@@ -1796,6 +1822,7 @@ public partial class MainWindow
         try
         {
             File.Delete(path);
+            ApplyFileNameColorEdit(FileNameColorAssignmentSync.Forget(path));
         }
         catch (IOException)
         {
@@ -1842,6 +1869,7 @@ public partial class MainWindow
         try
         {
             File.Delete(path!);
+            ApplyFileNameColorEdit(FileNameColorAssignmentSync.Forget(path!));
         }
         catch (Exception ex)
         {
@@ -1900,6 +1928,7 @@ public partial class MainWindow
                 try
                 {
                     File.Delete(path);
+                    ApplyFileNameColorEdit(FileNameColorAssignmentSync.Forget(path));
                 }
                 catch (Exception)
                 {

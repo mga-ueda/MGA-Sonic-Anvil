@@ -405,12 +405,14 @@ public partial class MainWindow
             else if (isDirectory)
             {
                 CopyLibraryDirectory(full, dest, cloneCatalog: true);
+                ApplyFileNameColorEdit(FileNameColorAssignmentSync.Copy(full, dest));
             }
             else
             {
                 File.Copy(full, dest, overwrite: false);
                 LibraryCatalog.CloneEntry(full, dest);
                 LibraryMediaCache.CopyEntry(full, dest);
+                ApplyFileNameColorEdit(FileNameColorAssignmentSync.Copy(full, dest));
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
@@ -480,7 +482,7 @@ public partial class MainWindow
         }
     }
 
-    private static void DeleteDestination(string path)
+    private void DeleteDestination(string path)
     {
         if (Directory.Exists(path))
         {
@@ -492,6 +494,7 @@ public partial class MainWindow
 
             LibraryCatalog.RemovePrefix(path);
             Directory.Delete(path, recursive: true);
+            ApplyFileNameColorEdit(FileNameColorAssignmentSync.Forget(path));
             return;
         }
 
@@ -501,6 +504,7 @@ public partial class MainWindow
             LibraryPlaylistWaveform.Forget(path);
             LibraryCatalog.RemovePrefix(path);
             File.Delete(path);
+            ApplyFileNameColorEdit(FileNameColorAssignmentSync.Forget(path));
         }
     }
 
@@ -517,6 +521,7 @@ public partial class MainWindow
             LibraryPlaylistWaveform.Retarget(indexed, mapped);
         }
 
+        ApplyFileNameColorEdit(FileNameColorAssignmentSync.Move(source, destination));
         LibraryCatalog.RetargetPrefix(source, destination);
         RetargetOpenSessions(source, destination);
         LibraryBrowser.RemapFilesystemPaths(source, destination, refreshTree: directory, selectFolder: directory ? destination : null);
@@ -798,6 +803,7 @@ public partial class MainWindow
                     Path.GetFileName(LibraryFileTransfer.NormalizePrefix(source)),
                     directoryName: true);
                 CopyLibraryDirectory(source, dest, cloneCatalog: true);
+                ApplyFileNameColorEdit(FileNameColorAssignmentSync.Copy(source, dest));
                 select = dest;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
@@ -838,6 +844,7 @@ public partial class MainWindow
                 File.Copy(source, dest, overwrite: false);
                 LibraryCatalog.CloneEntry(source, dest);
                 LibraryMediaCache.CopyEntry(source, dest);
+                ApplyFileNameColorEdit(FileNameColorAssignmentSync.Copy(source, dest));
                 copies.Add(CreateLibrarySession(dest));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
@@ -911,6 +918,7 @@ public partial class MainWindow
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {
                 ShowLibraryFailure(ex);
+                ApplyFileNameColorEdit(FileNameColorAssignmentSync.Forget(deleted));
                 DropLibrarySessionsWithoutUndo(SessionsUnder(deleted));
                 return;
             }
@@ -921,6 +929,7 @@ public partial class MainWindow
             deleted.Add(path);
         }
 
+        ApplyFileNameColorEdit(FileNameColorAssignmentSync.Forget(deleted));
         DropLibrarySessionsWithoutUndo(sessions);
     }
 
@@ -988,6 +997,7 @@ public partial class MainWindow
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {
                 ShowLibraryFailure(ex);
+                ApplyFileNameColorEdit(FileNameColorAssignmentSync.Forget(deleted));
                 DropLibrarySessionsWithoutUndo(SessionsUnder(deleted));
                 LibraryBrowser.RefreshExplorer();
                 return above;
@@ -1003,6 +1013,7 @@ public partial class MainWindow
             deleted.Add(path);
         }
 
+        ApplyFileNameColorEdit(FileNameColorAssignmentSync.Forget(deleted));
         DropLibrarySessionsWithoutUndo(SessionsUnder(targets));
         LibraryBrowser.RefreshExplorer();
         return above;
