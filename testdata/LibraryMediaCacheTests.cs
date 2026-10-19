@@ -120,6 +120,24 @@ public sealed class LibraryMediaCacheTests : IDisposable
     }
 
     [Fact]
+    public void Hydrate_DropsLoudnessWhenFileDateChanges()
+    {
+        var path = Path.Combine(_dir, "edited.wav");
+        File.WriteAllBytes(path, new byte[64]);
+        var stored = new FileLoudness(-12f, -16f, -9f, 4f, -1f);
+        LibraryMediaCache.PutFileLoudness(path, stored);
+
+        var document = AudioDocument.CreateDeferred(path);
+        document.ApplyTags(document.Tags.WithFileLoudness(stored));
+        Assert.Equal(stored, LibraryBrowserView.HydrateIntegratedLufsFromCache(document).ToFileLoudness());
+
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(2));
+        var tags = LibraryBrowserView.HydrateIntegratedLufsFromCache(document);
+        Assert.False(tags.HasFileLoudness);
+        Assert.False(document.Tags.HasFileLoudness);
+    }
+
+    [Fact]
     public void PlaylistWaveform_PersistsOnTrySet()
     {
         var path = Path.Combine(_dir, "persist.wav");

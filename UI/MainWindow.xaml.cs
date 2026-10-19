@@ -927,11 +927,16 @@ public partial class MainWindow : Window
         var sizeEdited = estimatedBytes != _document.CommittedFileBytes;
 
         // 複数ファイルを開いているときだけ、冒頭に「n / m Files」を出す。
-        if (_sessions.Count >= 2)
+        // プレイヤーは列ソートとグループの表示順。セッション配列の順ではない。
+        var fileCount = IsLibraryMaximized ? DisplayedPlaylistCount() : _sessions.Count;
+        if (fileCount >= 2)
         {
-            var number = _activeSession is null ? 0 : _sessions.IndexOf(_activeSession) + 1;
+            var index = IsLibraryMaximized
+                ? DisplayedPlaylistIndex(_activeSession)
+                : _activeSession is null ? -1 : _sessions.IndexOf(_activeSession);
+            var number = index < 0 ? 0 : index + 1;
             AppendStatusRun(
-                string.Create(CultureInfo.InvariantCulture, $"{number} / {_sessions.Count} Files"),
+                string.Create(CultureInfo.InvariantCulture, $"{number} / {fileCount} Files"),
                 edited: false,
                 normal,
                 edited);

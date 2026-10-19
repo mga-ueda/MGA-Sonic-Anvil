@@ -612,12 +612,13 @@ public partial class MainWindow
             }
             else
             {
-                LibraryBrowser.SetSessions(_sessions, _activeSession);
+                LibraryBrowser.SetSessions(_sessions, _activeSession, rebuild: true);
                 ShowLibraryArtworkOrClear(_activeSession);
             }
 
             // 行高が 133px に落ちたあとの描画でないと、エディタサイズのビットマップが画面外へずれたまま残る。
             ScheduleLibraryWaveformPaint();
+            RefreshDisplayedPlaylistPosition();
         }
         else
         {
@@ -1108,10 +1109,11 @@ public partial class MainWindow
 
     private string BuildPlaylistTrackIndexToastKey()
     {
-        var index = _activeSession is null ? -1 : _sessions.IndexOf(_activeSession);
+        var index = DisplayedPlaylistIndex(_activeSession);
+        var count = DisplayedPlaylistCount();
         return string.Create(
             System.Globalization.CultureInfo.InvariantCulture,
-            $"{index}/{_sessions.Count}");
+            $"{index}/{count}");
     }
 
     /// <summary>曲切替・本再生／ミニ突入時。番号を出してから一定時間でフェードアウト。</summary>
@@ -1158,8 +1160,9 @@ public partial class MainWindow
 
     private void RefreshPlaylistTrackIndex()
     {
-        var index = _activeSession is null ? -1 : _sessions.IndexOf(_activeSession);
-        PlaylistTrackIndexText.Text = LibraryPlayerMode.FormatPlaylistTrackLabel(index, _sessions.Count);
+        var index = DisplayedPlaylistIndex(_activeSession);
+        var count = DisplayedPlaylistCount();
+        PlaylistTrackIndexText.Text = LibraryPlayerMode.FormatPlaylistTrackLabel(index, count);
     }
 
     private void ApplyPlaylistTrackIndexOverlayScale(double scale)
@@ -2518,20 +2521,25 @@ public partial class MainWindow
     private static FileLoudness? StoredFileLoudness(DocumentSession session)
     {
         var document = session.Document;
-        if (document.Tags.HasFileLoudness)
+        var path = document.SourcePath;
+        if (!string.IsNullOrWhiteSpace(path)
+            && LibraryMediaCache.TryGetFileLoudness(path, out var cached))
         {
-            return document.Tags.ToFileLoudness();
+            if (!document.Tags.HasFileLoudness)
+            {
+                document.ApplyTags(document.Tags.WithFileLoudness(cached));
+            }
+
+            return cached;
         }
 
-        var path = document.SourcePath;
-        if (string.IsNullOrWhiteSpace(path)
-            || !LibraryMediaCache.TryGetFileLoudness(path, out var cached))
+        if (document.Tags.HasFileLoudness && !string.IsNullOrWhiteSpace(path))
         {
+            document.ApplyTags(document.Tags.WithoutFileLoudness());
             return null;
         }
 
-        document.ApplyTags(document.Tags.WithFileLoudness(cached));
-        return cached;
+        return document.Tags.HasFileLoudness ? document.Tags.ToFileLoudness() : null;
     }
 
     private void CancelSelectionLoudness()
@@ -3056,7 +3064,7 @@ public partial class MainWindow
     {
         var first = LibraryPlayerMode.FirstSession(_sessions);
         IReadOnlyList<DocumentSession> selected = first is null ? [] : [first];
-        LibraryBrowser.SetSessions(_sessions, first, selected);
+        LibraryBrowser.SetSessions(_sessions, first, selected, rebuild: true);
         if (first is not null)
         {
             _libraryHoldJacketWash = false;
@@ -4842,12 +4850,14 @@ public partial class MainWindow
     {
         AppStorage.Settings.ApplyLibraryListGroup(group);
         AppStorage.Save();
+        RefreshDisplayedPlaylistPosition();
     }
 
     private void LibraryBrowser_SortChanged(object? sender, LibraryPlaylistSort sort)
     {
         AppStorage.Settings.ApplyLibraryListSort(sort);
         AppStorage.Save();
+        RefreshDisplayedPlaylistPosition();
     }
 
     private void LibraryBrowser_ExplorerFolderChanged(object? sender, string path)
@@ -5599,11 +5609,42 @@ public partial class MainWindow
         bool playlistWasEmpty) =>
         firstInBatch && (playFirst || playlistWasEmpty);
 
-    /// <summary>F5。フォルダツリーだけ読み直す。</summary>
+    /// <summary>F5。フォルダツリーとプレイリスト行を読み直す。索引の再構築はしない。</summary>
     private void RefreshLibraryTree()
     {
+        var playlistFocused = LibraryBrowser.IsListKeyboardFocused;
         LibraryBrowser.RefreshExplorer();
+        RefreshPlaylistList();
+        if (playlistFocused)
+        {
+            LibraryBrowser.FocusList();
+            return;
+        }
+
         LibraryBrowser.FocusExplorer();
+    }
+
+    /// <summary>開いているセッションからプレイリスト行と波形棒を作り直す。</summary>
+    private void RefreshPlaylistList()
+    {
+        if (!IsLibraryMaximized)
+        {
+            return;
+        }
+
+        ProbeLibraryTags();
+        LibraryBrowser.SetSessions(
+            _sessions,
+            _activeSession,
+            LibraryBrowser.SelectedSessions,
+            rebuild: true);
+        RefreshDisplayedPlaylistPosition();
+    }
+
+    private void RefreshDisplayedPlaylistPosition()
+    {
+        RefreshPlaylistTrackIndex();
+        RefreshStatus();
     }
 
     /// <summary>Ctrl+F5。ツリーを読み直し、索引を再構築する。</summary>
