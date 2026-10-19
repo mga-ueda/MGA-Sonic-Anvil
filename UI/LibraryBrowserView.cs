@@ -159,6 +159,23 @@ internal sealed class LibraryBrowserView : UserControl
     private string _playlistSearchCommitted = string.Empty;
     private int _explorerFocusTicket;
     private int _listFocusTicket;
+
+    /// <summary>
+    /// Enter 登録でプレイリストへ移したあと。ツリーの選択項目がフォーカスを取り戻しても戻さない。
+    /// 名前変更・削除・F5 の <see cref="FocusExplorer"/> と、ツリーのクリックで外す。
+    /// </summary>
+    private bool _holdPlaylistFocus;
+
+    private bool _playlistFocusReclaimQueued;
+
+    private bool _playlistFocusReclaiming;
+
+    private int _playlistFocusReclaimCount;
+
+    private DispatcherTimer? _playlistFocusHoldTimer;
+
+    /// <summary>行の組み直しでツリーへ戻されても、この回数まではプレイリストへ戻す。</summary>
+    private const int PlaylistFocusReclaimLimit = 48;
     private HashSet<string>? _explorerVisibleFolders;
     private Dictionary<string, string[]>? _explorerTagTexts;
     /// <summary>トーストに出す打ち込み中の文字。トースト消去と同時に捨てる。</summary>
@@ -423,7 +440,7 @@ internal sealed class LibraryBrowserView : UserControl
             }
         };
         _favoritesList.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
-        _grid.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
+        _grid.IsKeyboardFocusWithinChanged += Grid_IsKeyboardFocusWithinChanged;
         PreviewMouseMove += PlaylistHost_PreviewMouseMove;
         PreviewMouseLeftButtonUp += PlaylistHost_PreviewMouseLeftButtonUp;
         _groupCombo.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
@@ -1277,6 +1294,7 @@ internal sealed class LibraryBrowserView : UserControl
     {
         ClearExplorerTypeahead();
         CancelPlaylistFocusRestore();
+        ReleasePlaylistFocusHold();
         _explorerSearchBox.Focus();
         _explorerSearchBox.SelectAll();
     }
@@ -1335,6 +1353,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     internal void RequestExplorerFocus()
     {
+        ReleasePlaylistFocusHold();
         _listFocusTicket++;
         var ticket = ++_explorerFocusTicket;
         Dispatcher.BeginInvoke(
@@ -1364,10 +1383,14 @@ internal sealed class LibraryBrowserView : UserControl
             DispatcherPriority.Input);
     }
 
-    internal void RequestListFocus()
+    /// <summary>発行したフォーカスチケット。後から <see cref="RequestListFocusIfCurrent"/> で再試行する。</summary>
+    internal int RequestListFocus()
     {
         _explorerFocusTicket++;
         var ticket = ++_listFocusTicket;
+        // フォルダ Enter は自動再生のオン／オフに関わらずここを通る。
+        // 行の組み直しでプレイリストから外れても、短いあいだだけ戻す。
+        ArmPlaylistFocusHold();
         Dispatcher.BeginInvoke(
             () =>
             {
@@ -1393,6 +1416,34 @@ internal sealed class LibraryBrowserView : UserControl
                 }
             },
             DispatcherPriority.Input);
+        // 行追加や列幅の組み直しは Background で、Loaded／Input のフォーカスをツリーへ戻す。
+        // それらが終わったあとに移す。名前変更・削除の FocusExplorer はチケットを進めて止める。
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (ticket != _listFocusTicket)
+                {
+                    return;
+                }
+
+                FocusList();
+            },
+            DispatcherPriority.ApplicationIdle);
+        return ticket;
+    }
+
+    /// <summary>
+    /// <paramref name="ticket"/> がまだ最新なら、プレイリストへもう一度フォーカスする。
+    /// あいだにツリーへ戻す操作（名前変更・削除・F5）があれば何もしない。
+    /// </summary>
+    internal void RequestListFocusIfCurrent(int ticket)
+    {
+        if (ticket != _listFocusTicket)
+        {
+            return;
+        }
+
+        RequestListFocus();
     }
 
     /// <summary>
@@ -1459,6 +1510,10 @@ internal sealed class LibraryBrowserView : UserControl
     public void FocusExplorer()
     {
         CancelPlaylistFocusRestore();
+        // 名前変更・フォルダ削除・F5 はツリーに残す。
+        // 遅延の RequestListFocus でプレイリストへ吸い戻されないようにする。
+        ReleasePlaylistFocusHold();
+        _listFocusTicket++;
         _folderTree.UpdateLayout();
         if (_folderTree.SelectedItem is TreeViewItem selected)
         {
@@ -1480,6 +1535,81 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         _folderTree.Focus();
+    }
+
+    private void ArmPlaylistFocusHold()
+    {
+        _holdPlaylistFocus = true;
+        _playlistFocusReclaimCount = 0;
+        _playlistFocusHoldTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _playlistFocusHoldTimer.Stop();
+        _playlistFocusHoldTimer.Tick -= PlaylistFocusHoldTimer_Tick;
+        _playlistFocusHoldTimer.Tick += PlaylistFocusHoldTimer_Tick;
+        _playlistFocusHoldTimer.Start();
+    }
+
+    private void PlaylistFocusHoldTimer_Tick(object? sender, EventArgs e)
+    {
+        ReleasePlaylistFocusHold();
+    }
+
+    private void ReleasePlaylistFocusHold()
+    {
+        _holdPlaylistFocus = false;
+        _playlistFocusHoldTimer?.Stop();
+    }
+
+    private void Grid_IsKeyboardFocusWithinChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        SyncPaneFocusChrome();
+        if (_holdPlaylistFocus && e.NewValue is false)
+        {
+            QueuePlaylistFocusReclaim();
+        }
+    }
+
+    /// <summary>
+    /// フォーカス変更の途中では呼ばない。戻す予約は一つに重ねない。
+    /// </summary>
+    private void QueuePlaylistFocusReclaim()
+    {
+        if (!_holdPlaylistFocus || _playlistFocusReclaimQueued)
+        {
+            return;
+        }
+
+        _playlistFocusReclaimQueued = true;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                _playlistFocusReclaimQueued = false;
+                TryReclaimPlaylistFocus();
+            },
+            DispatcherPriority.Input);
+    }
+
+    private void TryReclaimPlaylistFocus()
+    {
+        if (_playlistFocusReclaiming || !_holdPlaylistFocus || IsPlaylistGridFocused)
+        {
+            return;
+        }
+
+        if (_playlistFocusReclaimCount >= PlaylistFocusReclaimLimit)
+        {
+            return;
+        }
+
+        _playlistFocusReclaimCount++;
+        _playlistFocusReclaiming = true;
+        try
+        {
+            FocusList();
+        }
+        finally
+        {
+            _playlistFocusReclaiming = false;
+        }
     }
 
     /// <summary>切り取り・貼り付けのあと、操作を始めたペインへフォーカスを戻す。</summary>
@@ -1821,6 +1951,7 @@ internal sealed class LibraryBrowserView : UserControl
         ClearExplorerTypeahead();
         CancelPlaylistFocusRestore();
         // 遅延の RequestListFocus でプレイリストへ吸い戻されないようにする。
+        ReleasePlaylistFocusHold();
         _listFocusTicket++;
         if (_favoritesList.SelectedItem is { } selected
             && _favoritesList.ItemContainerGenerator.ContainerFromItem(selected) is UIElement row)
@@ -5990,6 +6121,7 @@ internal sealed class LibraryBrowserView : UserControl
     private void FolderTree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         CancelPlaylistFocusRestore();
+        ReleasePlaylistFocusHold();
         ClearTreeDrag();
         if (e.OriginalSource is not DependencyObject origin
             || FindTreeViewItem(origin) is not { Tag: string } item
@@ -6019,6 +6151,7 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void FolderTree_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
+        ReleasePlaylistFocusHold();
         if (e.OriginalSource is DependencyObject origin
             && FindTreeViewItem(origin) is { Tag: string } item)
         {

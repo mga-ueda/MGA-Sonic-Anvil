@@ -1595,6 +1595,209 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void RequestListFocus_SurvivesBackgroundTreeRefocus()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var root = Path.Combine(Path.GetTempPath(), "mga-focus-idle-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            Window? window = null;
+            try
+            {
+                var first = Session("01 a.mp3");
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                view.SetSessions([first], first, [first]);
+                Flush();
+                view.UpdateLayout();
+                Flush();
+
+                view.FocusExplorer();
+                Flush();
+                Assert.True(view.IsExplorerTreeFocused);
+                var treeItem = view.ExplorerFirstFolder;
+                Assert.NotNull(treeItem);
+
+                view.RequestListFocus();
+                // フォルダ登録の続き（列幅・行の組み直し）が、一度移したフォーカスをツリーへ戻す。
+                view.Dispatcher.BeginInvoke(
+                    () => treeItem!.Focus(),
+                    DispatcherPriority.Background);
+                Flush();
+                Assert.True(view.IsListKeyboardFocused);
+                Assert.False(view.IsExplorerTreeFocused);
+
+                // ApplicationIdle よりあとでも、選択中のツリー項目がフォーカスを取りに来る。
+                treeItem!.Focus();
+                Flush();
+                Assert.True(view.IsListKeyboardFocused);
+                Assert.False(view.IsExplorerTreeFocused);
+
+                // 名前変更・フォルダ削除は FocusExplorer でツリーに戻し、そこへ留まる。
+                view.FocusExplorer();
+                Flush();
+                Assert.True(view.IsExplorerTreeFocused);
+                treeItem.Focus();
+                Flush();
+                Assert.True(view.IsExplorerTreeFocused);
+                Assert.False(view.IsListKeyboardFocused);
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void RequestListFocus_ReclaimsAfterPlaylistLosesFocus()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var root = Path.Combine(Path.GetTempPath(), "mga-focus-reclaim-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            Window? window = null;
+            try
+            {
+                var first = Session("01 a.mp3");
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                var other = new Button { Content = "other", Width = 80, Height = 24 };
+                var host = new DockPanel();
+                DockPanel.SetDock(other, Dock.Top);
+                host.Children.Add(other);
+                host.Children.Add(view);
+                window = new Window
+                {
+                    Content = host,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                view.SetSessions([first], first, [first]);
+                Flush();
+                view.UpdateLayout();
+                Flush();
+
+                view.FocusExplorer();
+                Flush();
+                Assert.True(view.IsExplorerTreeFocused);
+
+                // フォルダ Enter と同じ順。先頭の再生で RequestListFocus、その後に列の組み直し。
+                view.RequestListFocus();
+                view.FinishIncrementalSessionLoad();
+                Flush();
+                Assert.True(view.IsListKeyboardFocused);
+
+                other.Focus();
+                Flush();
+                Assert.True(view.IsListKeyboardFocused);
+                Assert.False(other.IsKeyboardFocusWithin);
+
+                // F5・名前変更・フォルダ削除はホールドを外すので、ツリーから引き戻さない。
+                view.FocusExplorer();
+                Flush();
+                Assert.True(view.IsExplorerTreeFocused);
+                other.Focus();
+                Flush();
+                Assert.True(other.IsKeyboardFocusWithin);
+                Assert.False(view.IsListKeyboardFocused);
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void FocusExplorer_CancelsPendingPlaylistFocus()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.mp3");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions([first], first, [first]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            view.FocusExplorer();
+            Flush();
+            var ticket = view.RequestListFocus();
+            view.FocusExplorer();
+            view.RequestListFocusIfCurrent(ticket);
+            Flush();
+            Assert.True(view.IsExplorerTreeFocused);
+            Assert.False(view.IsPlaylistGridFocused);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void RequestListFocusIfCurrent_RepeatsWhileTicketHolds()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.mp3");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions([first], first, [first]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            view.FocusExplorer();
+            Flush();
+            var ticket = view.RequestListFocus();
+            view.RequestListFocusIfCurrent(ticket);
+            Flush();
+            Assert.True(view.IsListKeyboardFocused);
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void Favorites_ShiftArrow_SelectsRange()
     {
         RunSta(() =>
