@@ -271,6 +271,33 @@ internal static class DesignMetrics
     /// <summary>ファイル名とラウドネスのあいだに残す隙間。</summary>
     public static double PlaylistVideoFileNameLoudnessGap => From96(8);
 
+    /// <summary>簡易シークバーの当たり高さ。線はその中で細く描く。</summary>
+    public static double PlaylistVideoSimpleSeekHitHeight => From96(18);
+
+    /// <summary>簡易シークバーの線の太さ。</summary>
+    public static double PlaylistVideoSimpleSeekTrackHeight => From96(4);
+
+    /// <summary>簡易シークバーとファイル名のあいだ。</summary>
+    public static double PlaylistVideoSimpleSeekGap => From96(8);
+
+    /// <summary>
+    /// 簡易シークバーをファイル名の上に置く下余白。
+    /// ファイル名の高さは窓比例で伸びるので、その分を足す。
+    /// </summary>
+    public static Thickness PlaylistVideoSimpleSeekMargin(double overlayScale)
+    {
+        var s = overlayScale;
+        if (double.IsNaN(s) || double.IsInfinity(s) || s <= 0)
+        {
+            s = 1;
+        }
+
+        var bottom = PlaylistVideoFileNameMargin.Bottom
+            + (PlaylistVideoFileNameLineHeight * s)
+            + (PlaylistVideoSimpleSeekGap * s);
+        return new Thickness(PlaylistVideoFileNameMargin.Left, 0, PlaylistVideoFileNameMargin.Right, bottom);
+    }
+
     public static double StatusTimecodePadX => From96(4);
 
     public static Thickness StatusTimecodePadding => new(StatusTimecodePadX, 0, StatusTimecodePadX, 0);

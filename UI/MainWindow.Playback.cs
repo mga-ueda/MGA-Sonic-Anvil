@@ -809,6 +809,7 @@ public partial class MainWindow
             return;
         }
 
+        NotePlaylistVideoSimpleSeekKeyboard();
         _document.CursorFrame = frame;
         Waveform.PlayheadFrame = frame;
         if (IsLibraryMaximized && LibraryPlaylistDocuments.IsPdf(_document))
@@ -1191,6 +1192,7 @@ public partial class MainWindow
             _player.ReadPlayheadVisuals(out var audioFrame, out _);
             LibraryBrowser.SeekPlaylistVisual(TimeSpan.FromSeconds(audioFrame / (double)rate));
             frame = audioFrame;
+            NotePlaylistVideoSimpleSeekKeyboard();
         }
     }
 
@@ -2504,6 +2506,9 @@ public partial class MainWindow
             ? UiScaleService.CreatePublishedTransform(overlayScale)
             : Transform.Identity;
         PlaylistVideoFileName.LayoutTransform = overlayTransform;
+        PlaylistVideoSimpleSeek.LayoutTransform = Transform.Identity;
+        PlaylistVideoSimpleSeek.Height = DesignMetrics.PlaylistVideoSimpleSeekHitHeight * overlayScale;
+        PlaylistVideoSimpleSeek.Margin = DesignMetrics.PlaylistVideoSimpleSeekMargin(overlayScale);
         PlaylistVideoScaleToast.LayoutTransform = overlayTransform;
         PlaybackPitchToast.LayoutTransform = overlayTransform;
         ApplyPlaylistVideoTimecodeOverlayScale(overlayScale);

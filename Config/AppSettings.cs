@@ -136,11 +136,20 @@ internal sealed class AppSettings
     /// <summary>動画引数起動の中心位置を覚えたか。サイズは都度動画の原寸。</summary>
     public bool VideoLaunchWindowHasPosition { get; set; }
 
-    /// <summary>動画ミニ（F8／引数起動）の A（波形・アナライザ・ファイル名）。既定オフ。</summary>
-    public bool VideoLaunchHud { get; set; }
+    /// <summary>
+    /// 動画本再生と動画ミニ（F8／引数起動）で共通の A（波形・アナライザ。オフで簡易シークバー）。
+    /// 既定オン。ユーザーが変えたあとは <see cref="VideoChromeChosen"/> とともにこの値を使う。
+    /// </summary>
+    public bool VideoLaunchHud { get; set; } = true;
 
-    /// <summary>動画ミニ（F8／引数起動）の T（タイムコード）。既定オフ。</summary>
-    public bool VideoLaunchTimecode { get; set; }
+    /// <summary>
+    /// 動画本再生と動画ミニ（F8／引数起動）で共通の T（タイムコード・ファイル名）。
+    /// 既定オン。ユーザーが変えたあとは <see cref="VideoChromeChosen"/> とともにこの値を使う。
+    /// </summary>
+    public bool VideoLaunchTimecode { get; set; } = true;
+
+    /// <summary>ユーザーが A／T を変えたことがある。無いときは既定（両方オン）を使う。</summary>
+    public bool VideoChromeChosen { get; set; }
 
     /// <summary>ユーザー用意の ffmpeg.exe。空または無効ならプロキシは作らない。</summary>
     public string FfmpegExePath { get; set; } = string.Empty;

@@ -125,7 +125,7 @@ public partial class MainWindow : Window
     /// <summary>動画起動で映像が開くまでウィンドウを出さないための待ち。</summary>
     private TaskCompletionSource<bool>? _videoLaunchShowReady;
     private DispatcherTimer? _videoLaunchPlacementSaveTimer;
-    /// <summary>A でファイル名を出したあと、フェード完了後にラウドネス回避をやり直す。</summary>
+    /// <summary>T でファイル名を出したあと、フェード完了後にラウドネス回避をやり直す。</summary>
     private DispatcherTimer? _playlistVideoFileNamePlaceTimer;
     /// <summary>PDF ページ切替時のページ番号トースト（表示→フェードアウト）。</summary>
     private DispatcherTimer? _playlistPdfPageNumberToastTimer;
@@ -144,6 +144,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ApplyRememberedVideoChrome();
         EditHistory.CommandApplying += ResetPlaybackPitchForEdit;
         LibraryBrowser.BindWaveformGlow(PlayerWaveGlowHost);
         LibraryBrowser.BindWindowVisual(PlayerVisualHost);
@@ -398,6 +399,8 @@ public partial class MainWindow : Window
         PreviewDragOver += MainWindow_DragOver;
         Closing += MainWindow_Closing;
         Activated += (_, _) => SyncShellFullscreen();
+        PreviewMouseMove += OnPlaylistVideoSimpleSeekPointerMove;
+        PlaylistVideoSimpleSeek.InteractionEnded += (_, _) => RefreshPlaylistVideoSimpleSeekPresence();
         SizeChanged += (_, _) =>
         {
             SyncBusyGlassOverlayBounds();
@@ -1017,6 +1020,10 @@ public partial class MainWindow : Window
         var now = UiStrings.FormatTimecodeWithFrames(nowFrame, sampleRate, fps);
         var end = UiStrings.FormatTimecodeWithFrames(endFrame, sampleRate, fps);
         PlaylistVideoNowEndText.Text = now + " / " + end;
+        if (!PlaylistVideoSimpleSeek.IsDragging)
+        {
+            PlaylistVideoSimpleSeek.Ratio = LibraryPlayerMode.SeekRatioAtFrame(nowFrame, endFrame);
+        }
         if (selection.IsEmpty)
         {
             PlaylistVideoSelText.Visibility = Visibility.Collapsed;

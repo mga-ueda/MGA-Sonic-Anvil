@@ -1295,7 +1295,21 @@ internal static class LibraryPlayerMode
     public static bool LeavesVideoMiniToPlaylist(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && key is Key.Escape or Key.Q;
 
-    /// <summary>波形・アナライザ・WAAPI 表記・ファイル名の表示切替（タイムコードは含まない）。</summary>
+    /// <summary>
+    /// 動画ミニの Escape は、In／Out があるとき解除だけしてプレイリストへ戻さない。
+    /// Q は In／Out があってもプレイリストへ戻る。
+    /// </summary>
+    public static bool ClearsVideoMiniInOutInsteadOfLeaving(
+        Key key,
+        ModifierKeys modifiers,
+        bool video,
+        bool hasAbPoint) =>
+        video
+        && hasAbPoint
+        && key == Key.Escape
+        && modifiers == ModifierKeys.None;
+
+    /// <summary>波形・アナライザ・WAAPI 表記の表示切替。オフのとき簡易シークバーを使える（タイムコード・ファイル名は含まない）。</summary>
     public static bool IsVideoHudToggle(Key key, ModifierKeys modifiers) =>
         key == Key.A && modifiers == ModifierKeys.None;
 
@@ -1333,19 +1347,31 @@ internal static class LibraryPlayerMode
         return Math.Max(1, (long)Math.Round(rate / fps));
     }
 
-    /// <summary>動画本再生中の大きなタイムコード（MM:SS.ff。小数点以下は 30fps 換算のフレーム。選択範囲）の表示切替。</summary>
+    /// <summary>
+    /// 動画本再生中のタイムコード（MM:SS.ff。小数点以下は 30fps 換算のフレーム。選択範囲）と
+    /// ファイル名の表示切替。簡易シークバーは含まない。
+    /// </summary>
     public static bool IsVideoTimecodeToggle(Key key, ModifierKeys modifiers) =>
         key == Key.T && modifiers == ModifierKeys.None;
 
     /// <summary>
-    /// 動画ミニ（F8／引数起動）で使う A／T。未設定時はどちらもオフ。
+    /// 動画本再生と動画ミニで使う A／T。ユーザーが変えていなければ両方オン。
+    /// 変えたあとは保存値を以後ずっと使う。
     /// </summary>
     public static void ResolveVideoLaunchChrome(
+        bool userChosen,
         bool storedHud,
         bool storedTimecode,
         out bool hud,
         out bool timecode)
     {
+        if (!userChosen)
+        {
+            hud = true;
+            timecode = true;
+            return;
+        }
+
         hud = storedHud;
         timecode = storedTimecode;
     }
@@ -1366,45 +1392,6 @@ internal static class LibraryPlayerMode
         && (visualPlaying || immersivePause || framePaused);
 
     /// <summary>
-    /// プレイリスト動画の本再生セッションが続いているか（一時停止中も含む）。
-    /// A／T の開始時リセット判定に使う。
-    /// </summary>
-    public static bool IsPlaylistVideoChromePlaySession(
-        bool videoMiniPlacement,
-        bool isVideo,
-        bool visualPlaying,
-        bool immersivePause,
-        bool framePaused) =>
-        !videoMiniPlacement
-        && isVideo
-        && (visualPlaying || immersivePause || framePaused);
-
-    /// <summary>
-    /// プレイリストからの動画本再生を始めた／別動画へ移ったときだけ A／T をオンに戻す。
-    /// 一時停止からの再開では戻さない。F8／引数起動ミニは対象外（記憶した状態を使う）。
-    /// </summary>
-    public static bool ResetsPlaylistVideoChromeOnPlay(
-        bool videoMiniPlacement,
-        bool isVideo,
-        bool sessionActive,
-        bool wasSessionActive,
-        string? sourcePath,
-        string? previousSourcePath)
-    {
-        if (videoMiniPlacement || !isVideo || !sessionActive)
-        {
-            return false;
-        }
-
-        if (!wasSessionActive)
-        {
-            return true;
-        }
-
-        return !string.Equals(sourcePath, previousSourcePath, StringComparison.OrdinalIgnoreCase);
-    }
-
-    /// <summary>
     /// 動画本再生／ミニ限定。メーター等の文字をファイル名と同じ白系にするか。
     /// プレイヤー一般（音声＋ジャケット）では使わない。
     /// </summary>
@@ -1423,9 +1410,49 @@ internal static class LibraryPlayerMode
     public static bool ShowsPlaylistVideoTimecode(bool chromeHidden, bool timecodeOn, bool isVideo) =>
         chromeHidden && timecodeOn && isVideo;
 
-    /// <summary>前面クロームが消えている動画本再生中、A で HUD が出ているときだけ左下のファイル名を出す。</summary>
-    public static bool ShowsPlaylistVideoFileName(bool chromeHidden, bool hudOn, bool isVideo) =>
-        chromeHidden && hudOn && isVideo;
+    /// <summary>前面クロームが消えている動画本再生中、T がオンのとき下中央のファイル名を出す。</summary>
+    public static bool ShowsPlaylistVideoFileName(bool chromeHidden, bool timecodeOn, bool isVideo) =>
+        chromeHidden && timecodeOn && isVideo;
+
+    /// <summary>マウスを動かしたあと、またはキーボードで時間を動かしたあと、簡易シークバーを出しておく秒数。</summary>
+    public const double PlaylistVideoSimpleSeekKeyboardHoldSeconds = 3;
+
+    /// <summary>簡易シークバーを消し始めるときのフェード秒数。表示中のフェードインとは別。</summary>
+    public const double PlaylistVideoSimpleSeekFadeOutSeconds = 1;
+
+    /// <summary>
+    /// 前面クロームが消えている動画本再生で、A がアナライザを隠しているとき簡易シークバーを使える。
+    /// T は無関係。A で隠した瞬間に出し、その後はマウスが動いたときとキーボードの時間移動のときに出す。
+    /// 波形は描かない。A がオンのときは波形側がシークを受け持つ。
+    /// </summary>
+    public static bool ShowsPlaylistVideoSimpleSeek(
+        bool chromeHidden,
+        bool hudOn,
+        bool isVideo) =>
+        chromeHidden && !hudOn && isVideo;
+
+    /// <summary>簡易シークバーの比率（0〜1）から再生フレームへ。尺が無ければ 0。</summary>
+    public static long FrameAtSeekRatio(double ratio, long frameCount)
+    {
+        if (frameCount <= 0 || double.IsNaN(ratio) || double.IsInfinity(ratio))
+        {
+            return 0;
+        }
+
+        var t = Math.Clamp(ratio, 0, 1);
+        return t >= 1 ? frameCount : (long)Math.Round(t * frameCount);
+    }
+
+    /// <summary>再生フレームから簡易シークバーの比率（0〜1）。尺が無ければ 0。</summary>
+    public static double SeekRatioAtFrame(long frame, long frameCount)
+    {
+        if (frameCount <= 0)
+        {
+            return 0;
+        }
+
+        return Math.Clamp(frame / (double)frameCount, 0, 1);
+    }
 
     /// <summary>再生用プロキシを参照しているとき、ファイル名の後に付ける。</summary>
     public const string PlaylistVideoProxySuffix = " (Proxy)";

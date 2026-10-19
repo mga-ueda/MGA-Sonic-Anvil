@@ -974,6 +974,16 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.LeavesVideoMiniToPlaylist(Key.Escape, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.LeavesVideoMiniToPlaylist(Key.Q, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.LeavesVideoMiniToPlaylist(Key.Space, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.ClearsVideoMiniInOutInsteadOfLeaving(
+            Key.Escape, ModifierKeys.None, video: true, hasAbPoint: true));
+        Assert.False(LibraryPlayerMode.ClearsVideoMiniInOutInsteadOfLeaving(
+            Key.Escape, ModifierKeys.None, video: true, hasAbPoint: false));
+        Assert.False(LibraryPlayerMode.ClearsVideoMiniInOutInsteadOfLeaving(
+            Key.Q, ModifierKeys.None, video: true, hasAbPoint: true));
+        Assert.False(LibraryPlayerMode.ClearsVideoMiniInOutInsteadOfLeaving(
+            Key.Escape, ModifierKeys.None, video: false, hasAbPoint: true));
+        Assert.False(LibraryPlayerMode.ClearsVideoMiniInOutInsteadOfLeaving(
+            Key.Escape, ModifierKeys.Shift, video: true, hasAbPoint: true));
         Assert.True(LibraryPlayerMode.IsVideoHudToggle(Key.A, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsVideoHudToggle(Key.A, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsVideoTimecodeToggle(Key.T, ModifierKeys.None));
@@ -1015,48 +1025,16 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.IsPlaylistVideoHudContext(
             playerMaximized: true, visualShown: true, isVideo: true,
             visualPlaying: false, immersivePause: false, framePaused: false));
-        Assert.True(LibraryPlayerMode.IsPlaylistVideoChromePlaySession(
-            videoMiniPlacement: false, isVideo: true,
-            visualPlaying: false, immersivePause: true, framePaused: false));
-        Assert.False(LibraryPlayerMode.IsPlaylistVideoChromePlaySession(
-            videoMiniPlacement: false, isVideo: true,
-            visualPlaying: false, immersivePause: false, framePaused: false));
-        Assert.True(LibraryPlayerMode.ResetsPlaylistVideoChromeOnPlay(
-            videoMiniPlacement: false,
-            isVideo: true,
-            sessionActive: true,
-            wasSessionActive: false,
-            sourcePath: @"C:\a.mp4",
-            previousSourcePath: null));
-        Assert.True(LibraryPlayerMode.ResetsPlaylistVideoChromeOnPlay(
-            videoMiniPlacement: false,
-            isVideo: true,
-            sessionActive: true,
-            wasSessionActive: true,
-            sourcePath: @"C:\b.mp4",
-            previousSourcePath: @"C:\a.mp4"));
-        // 一時停止→再開はセッション継続なのでリセットしない。
-        Assert.False(LibraryPlayerMode.ResetsPlaylistVideoChromeOnPlay(
-            videoMiniPlacement: false,
-            isVideo: true,
-            sessionActive: true,
-            wasSessionActive: true,
-            sourcePath: @"C:\a.mp4",
-            previousSourcePath: @"C:\a.mp4"));
-        Assert.False(LibraryPlayerMode.ResetsPlaylistVideoChromeOnPlay(
-            videoMiniPlacement: true,
-            isVideo: true,
-            sessionActive: true,
-            wasSessionActive: false,
-            sourcePath: @"C:\a.mp4",
-            previousSourcePath: null));
-        Assert.False(LibraryPlayerMode.ResetsPlaylistVideoChromeOnPlay(
-            videoMiniPlacement: false,
-            isVideo: false,
-            sessionActive: true,
-            wasSessionActive: false,
-            sourcePath: null,
-            previousSourcePath: null));
+        LibraryPlayerMode.ResolveVideoLaunchChrome(
+            userChosen: false, storedHud: false, storedTimecode: false,
+            out var defaultHud, out var defaultTimecode);
+        Assert.True(defaultHud);
+        Assert.True(defaultTimecode);
+        LibraryPlayerMode.ResolveVideoLaunchChrome(
+            userChosen: true, storedHud: false, storedTimecode: true,
+            out var chosenHud, out var chosenTimecode);
+        Assert.False(chosenHud);
+        Assert.True(chosenTimecode);
         Assert.True(LibraryPlayerMode.ShowsPlaylistVideoTimecode(
             chromeHidden: true, timecodeOn: true, isVideo: true));
         Assert.False(LibraryPlayerMode.ShowsPlaylistVideoTimecode(
@@ -1066,13 +1044,29 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.ShowsPlaylistVideoTimecode(
             chromeHidden: true, timecodeOn: true, isVideo: false));
         Assert.True(LibraryPlayerMode.ShowsPlaylistVideoFileName(
-            chromeHidden: true, hudOn: true, isVideo: true));
+            chromeHidden: true, timecodeOn: true, isVideo: true));
         Assert.False(LibraryPlayerMode.ShowsPlaylistVideoFileName(
+            chromeHidden: true, timecodeOn: false, isVideo: true));
+        Assert.False(LibraryPlayerMode.ShowsPlaylistVideoFileName(
+            chromeHidden: false, timecodeOn: true, isVideo: true));
+        Assert.False(LibraryPlayerMode.ShowsPlaylistVideoFileName(
+            chromeHidden: true, timecodeOn: true, isVideo: false));
+        Assert.True(LibraryPlayerMode.ShowsPlaylistVideoSimpleSeek(
             chromeHidden: true, hudOn: false, isVideo: true));
-        Assert.False(LibraryPlayerMode.ShowsPlaylistVideoFileName(
-            chromeHidden: false, hudOn: true, isVideo: true));
-        Assert.False(LibraryPlayerMode.ShowsPlaylistVideoFileName(
-            chromeHidden: true, hudOn: true, isVideo: false));
+        Assert.False(LibraryPlayerMode.ShowsPlaylistVideoSimpleSeek(
+            chromeHidden: true, hudOn: true, isVideo: true));
+        Assert.False(LibraryPlayerMode.ShowsPlaylistVideoSimpleSeek(
+            chromeHidden: false, hudOn: false, isVideo: true));
+        Assert.False(LibraryPlayerMode.ShowsPlaylistVideoSimpleSeek(
+            chromeHidden: true, hudOn: false, isVideo: false));
+        Assert.Equal(0, LibraryPlayerMode.FrameAtSeekRatio(0, 1000));
+        Assert.Equal(500, LibraryPlayerMode.FrameAtSeekRatio(0.5, 1000));
+        Assert.Equal(1000, LibraryPlayerMode.FrameAtSeekRatio(1, 1000));
+        Assert.Equal(0, LibraryPlayerMode.FrameAtSeekRatio(0.5, 0));
+        Assert.Equal(0.25, LibraryPlayerMode.SeekRatioAtFrame(250, 1000), 5);
+        Assert.Equal(0, LibraryPlayerMode.SeekRatioAtFrame(10, 0));
+        Assert.Equal(3, LibraryPlayerMode.PlaylistVideoSimpleSeekKeyboardHoldSeconds);
+        Assert.Equal(1, LibraryPlayerMode.PlaylistVideoSimpleSeekFadeOutSeconds);
         Assert.Equal("clip.mov", LibraryPlayerMode.FormatPlaylistVideoFileName("clip.mov", usingProxy: false));
         Assert.Equal(
             "clip.mov" + LibraryPlayerMode.PlaylistVideoProxySuffix,

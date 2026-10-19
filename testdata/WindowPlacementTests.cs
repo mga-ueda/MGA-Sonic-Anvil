@@ -13,13 +13,23 @@ public sealed class WindowPlacementTests
     {
         var settings = new AppSettings();
         Assert.False(settings.VideoLaunchWindowHasPosition);
-        Assert.False(settings.VideoLaunchHud);
-        Assert.False(settings.VideoLaunchTimecode);
+        Assert.True(settings.VideoLaunchHud);
+        Assert.True(settings.VideoLaunchTimecode);
+        Assert.False(settings.VideoChromeChosen);
         settings.VideoLaunchWindowX = 120;
         settings.VideoLaunchWindowY = 80;
         settings.VideoLaunchWindowHasPosition = true;
         settings.VideoLaunchHud = false;
         settings.VideoLaunchTimecode = true;
+        LibraryPlayerMode.ResolveVideoLaunchChrome(
+            settings.VideoChromeChosen,
+            settings.VideoLaunchHud,
+            settings.VideoLaunchTimecode,
+            out var defaultHud,
+            out var defaultTimecode);
+        Assert.True(defaultHud);
+        Assert.True(defaultTimecode);
+        settings.VideoChromeChosen = true;
         var json = System.Text.Json.JsonSerializer.Serialize(settings, AppSettingsJsonContext.Default.AppSettings);
         var back = System.Text.Json.JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
         Assert.True(back!.VideoLaunchWindowHasPosition);
@@ -27,7 +37,9 @@ public sealed class WindowPlacementTests
         Assert.Equal(80, back.VideoLaunchWindowY);
         Assert.False(back.VideoLaunchHud);
         Assert.True(back.VideoLaunchTimecode);
+        Assert.True(back.VideoChromeChosen);
         LibraryPlayerMode.ResolveVideoLaunchChrome(
+            back.VideoChromeChosen,
             back.VideoLaunchHud,
             back.VideoLaunchTimecode,
             out var hud,
