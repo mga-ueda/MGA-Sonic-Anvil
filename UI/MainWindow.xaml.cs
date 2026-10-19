@@ -834,7 +834,9 @@ public partial class MainWindow : Window
 
     private void RefreshTitle()
     {
-        Title = AppVersion.FormTitleWithFile(_document?.SourcePath);
+        Title = AppVersion.WithDebuggerPrefix(
+            AppVersion.FormTitleWithFile(_document?.SourcePath),
+            Debugger.IsAttached);
         RefreshTabHeaders();
     }
 
