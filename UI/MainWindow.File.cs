@@ -1928,7 +1928,97 @@ public partial class MainWindow
 
     private bool OfferSaveIfDirty() => OfferSaveIfDirty(_activeSession);
 
-    private bool OfferSaveIfDirty(DocumentSession? session)
+    /// <summary>
+    /// エディタからプレイヤーへ移る前。未保存があれば保存／破棄／キャンセルを聞く。
+    /// 破棄はディスクの内容へ戻す。保存先が無いタブはプレイリストに残さない。
+    /// </summary>
+    private bool ConfirmDirtySessionsBeforePlayer()
+    {
+        var dirty = new List<DocumentSession>();
+        foreach (var session in _sessions)
+        {
+            if (session.Document.IsDirty)
+            {
+                dirty.Add(session);
+            }
+        }
+
+        if (dirty.Count == 0)
+        {
+            return true;
+        }
+
+        var proceed = true;
+        RunCloseBatch(dirty, () =>
+        {
+            foreach (var session in dirty)
+            {
+                if (!_sessions.Contains(session) || !session.Document.IsDirty)
+                {
+                    continue;
+                }
+
+                if (!OfferSaveIfDirty(session, closing: false))
+                {
+                    proceed = false;
+                    return;
+                }
+
+                if (session.Document.IsDirty && !TryDiscardSessionEdits(session))
+                {
+                    proceed = false;
+                    return;
+                }
+            }
+        });
+        return proceed;
+    }
+
+    private bool TryDiscardSessionEdits(DocumentSession session)
+    {
+        var path = session.Document.SourcePath;
+        if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+        {
+            try
+            {
+                var loaded = Task.Run(() => AudioCodec.Load(path)).GetAwaiter().GetResult();
+                session.ReplaceDocument(loaded);
+                ApplyLoadedLibrarySession(session, bind: ReferenceEquals(session, _activeSession));
+                RefreshTabHeaders();
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or NotSupportedException)
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    UiStrings.ErrorOpenFailed,
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return false;
+            }
+        }
+
+        var restore = _dirtyClosePolicy;
+        if (restore != DirtyClosePolicy.DiscardAll)
+        {
+            _dirtyClosePolicy = DirtyClosePolicy.DiscardAll;
+        }
+
+        try
+        {
+            return CloseSession(session, rememberClosed: false);
+        }
+        finally
+        {
+            if (restore != DirtyClosePolicy.DiscardAll)
+            {
+                _dirtyClosePolicy = restore;
+            }
+        }
+    }
+
+    private bool OfferSaveIfDirty(DocumentSession? session, bool closing = true)
     {
         if (session?.Document is not { IsDirty: true } document)
         {
@@ -1947,7 +2037,7 @@ public partial class MainWindow
 
         var remaining = CountRemainingDirtyInCloseBatch();
         var choice = remaining >= 2
-            ? ConfirmSaveWindow.Show(this, session.DisplayName, remaining)
+            ? ConfirmSaveWindow.Show(this, session.DisplayName, remaining, closing)
             : MapSaveMessageBox(session.DisplayName);
         switch (choice)
         {

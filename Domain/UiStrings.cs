@@ -230,6 +230,8 @@ internal static partial class UiStrings
     public static string ButtonYesNoCancel => Get("Cancel", "Cancel");
     public static string ButtonSaveAllAndClose => Get("すべて保存して閉じる", "Save all and close");
     public static string ButtonDiscardAllAndClose => Get("すべて保存せずに閉じる", "Close without saving any");
+    public static string ButtonSaveAll => Get("すべて保存", "Save all");
+    public static string ButtonDiscardAll => Get("すべて破棄", "Discard all");
     public static string ConfirmRecord => Get("録音を開始します。", "Start recording.");
     public static string ConfirmRecordSilentSkip(double thresholdDb, int padMs) => Format(
         "Silent Skip をオンにすると、ピークが {0} dB を超えたときだけ録音します。しきい値を下回るとすぐ無音を挟み、{1} ms で止めます。しきい値と無音の尺は設定から変えられます。",
@@ -509,6 +511,11 @@ internal static partial class UiStrings
     public static string ConfirmSaveBatchHint(int remaining) => Format(
         "未保存のタブが {0} 件あります。まとめて閉じることもできます。",
         "{0} tab(s) have unsaved changes. You can close them all at once.",
+        remaining);
+
+    public static string ConfirmSaveBeforePlayerHint(int remaining) => Format(
+        "未保存のタブが {0} 件あります。残りもまとめて保存、または破棄できます。",
+        "{0} tab(s) have unsaved changes. You can save or discard the rest at once.",
         remaining);
 
     public static string LabelWaveformLoading => Get("Now Loading ...", "Now Loading ...");
