@@ -130,7 +130,16 @@ internal static class SilenceDetect
 
         var raw = GateSpans(openCover, closeCover, startFrame, minCloseFrames);
         var merged = MergeByMinGate(raw, minGateFrames);
-        var padded = ApplyRoll(merged, startFrame, endFrame, preFrames, postFrames);
+        // ピーク窓は谷をまたぐためだけに使い、解析範囲の外縁へは広げない。
+        // 余白はプリロール／ポストロールだけが足す。
+        var snapped = SnapOuterEdgesToSampleThreshold(
+            merged,
+            interleaved,
+            channels,
+            soloMask,
+            openLinear,
+            closeLinear);
+        var padded = ApplyRoll(snapped, startFrame, endFrame, preFrames, postFrames);
         if (padded.Count == 0)
         {
             return [];
@@ -310,6 +319,122 @@ internal static class SilenceDetect
         }
 
         return merged;
+    }
+
+    /// <summary>
+    /// 最初の区間の先頭を、そのフレーム自身がオープン以上の位置まで進める。
+    /// 最後の区間の末尾を、そのフレーム自身がクローズ以上の位置まで戻す。
+    /// 中間の区間境界はピーク窓のまま残す。
+    /// </summary>
+    private static List<WaveSelection> SnapOuterEdgesToSampleThreshold(
+        List<WaveSelection> spans,
+        float[] interleaved,
+        int channels,
+        int soloMask,
+        float openLinear,
+        float closeLinear)
+    {
+        if (spans.Count == 0)
+        {
+            return spans;
+        }
+
+        var next = new List<WaveSelection>(spans);
+        while (next.Count > 0)
+        {
+            var first = next[0];
+            var start = FirstFrameAtOrAbove(
+                interleaved, channels, soloMask, first.StartFrame, first.EndFrame, openLinear);
+            if (start < 0)
+            {
+                next.RemoveAt(0);
+                continue;
+            }
+
+            if (next.Count == 1)
+            {
+                var end = LastExclusiveAbove(
+                    interleaved, channels, soloMask, start, first.EndFrame, closeLinear);
+                if (end <= start)
+                {
+                    return [];
+                }
+
+                next[0] = new WaveSelection(start, end);
+                return next;
+            }
+
+            next[0] = new WaveSelection(start, first.EndFrame);
+            break;
+        }
+
+        while (next.Count > 1)
+        {
+            var last = next[^1];
+            var end = LastExclusiveAbove(
+                interleaved, channels, soloMask, last.StartFrame, last.EndFrame, closeLinear);
+            if (end <= last.StartFrame)
+            {
+                next.RemoveAt(next.Count - 1);
+                continue;
+            }
+
+            next[^1] = new WaveSelection(last.StartFrame, end);
+            break;
+        }
+
+        if (next.Count == 1)
+        {
+            var only = next[0];
+            var end = LastExclusiveAbove(
+                interleaved, channels, soloMask, only.StartFrame, only.EndFrame, closeLinear);
+            if (end <= only.StartFrame)
+            {
+                return [];
+            }
+
+            next[0] = new WaveSelection(only.StartFrame, end);
+        }
+
+        return next;
+    }
+
+    private static long FirstFrameAtOrAbove(
+        float[] interleaved,
+        int channels,
+        int soloMask,
+        long start,
+        long end,
+        float threshold)
+    {
+        for (var frame = start; frame < end; frame++)
+        {
+            if (SilentSkip.FrameAbsPeak(interleaved, channels, frame, soloMask) >= threshold)
+            {
+                return frame;
+            }
+        }
+
+        return -1;
+    }
+
+    private static long LastExclusiveAbove(
+        float[] interleaved,
+        int channels,
+        int soloMask,
+        long start,
+        long end,
+        float threshold)
+    {
+        for (var frame = end - 1; frame >= start; frame--)
+        {
+            if (SilentSkip.FrameAbsPeak(interleaved, channels, frame, soloMask) >= threshold)
+            {
+                return frame + 1;
+            }
+        }
+
+        return start;
     }
 
     private static List<WaveSelection> ApplyRoll(

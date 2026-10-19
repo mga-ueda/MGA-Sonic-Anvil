@@ -509,8 +509,27 @@ public sealed class ProcessEditsTests
     public void DeleteSilence_KeepsNearThresholdTone()
     {
         var document = MakeNearThresholdSine(cycles: 8);
-        Assert.Null(ProcessEdits.DeleteSilence(document, new WaveSelection(0, document.FrameCount), -60));
-        Assert.Equal(document.FrameCount, document.Interleaved.Length / 2);
+        var threshold = SilentSkip.LinearFromDb(-60);
+        var frames = document.FrameCount;
+        long start = 0;
+        while (start < frames && Math.Abs(document.Interleaved[start * 2]) < threshold)
+        {
+            start++;
+        }
+
+        long end = frames;
+        while (end > start && Math.Abs(document.Interleaved[(end - 1) * 2]) < threshold)
+        {
+            end--;
+        }
+
+        // 端の谷だけを外し、内側の周期は残す（フレーム数は外縁のしきい値交差まで）。
+        Assert.True(start > 0 && end < frames);
+        var command = ProcessEdits.DeleteSilence(document, new WaveSelection(0, frames), -60);
+        Assert.NotNull(command);
+        new EditHistory().Do(document, command);
+        Assert.Equal(end - start, document.FrameCount);
+        Assert.True(document.FrameCount > frames / 2);
     }
 
     [Fact]
@@ -604,8 +623,8 @@ public sealed class ProcessEditsTests
         Assert.NotNull(edges);
         new EditHistory().Do(document, edges);
 
-        // 先頭・末尾の無音だけ削る（ピーク窓ぶんは可聴側に残る）。中央の無音は残す。
-        var edgeTrim = Math.Max(0, lead - radius) + Math.Max(0, tail - radius);
+        // 先頭・末尾のデジタルゼロはすべて削る。中央の無音は残す。
+        var edgeTrim = lead + tail;
         Assert.Equal(frames - edgeTrim, document.FrameCount);
         Assert.True(document.FrameCount > audible * 2);
         var mid = SilentSkip.CollectSilentSpans(
@@ -631,6 +650,25 @@ public sealed class ProcessEditsTests
     {
         Assert.Equal(1f, MgaSonicAnvil.UI.SilenceDetectWavePreview.DisplayGain([], []));
         Assert.Equal(4f, MgaSonicAnvil.UI.SilenceDetectWavePreview.DisplayGain([-0.25f, 0.1f], [0.2f, 0.05f]));
+    }
+
+    [Fact]
+    public void SilencePreview_ZoomAroundKeepsAnchorInsideRange()
+    {
+        var (start, span) = MgaSonicAnvil.UI.SilenceDetectWavePreview.ZoomAround(
+            0, 1000, 0, 1000, 0.25, 2, 10);
+        Assert.Equal(500, span, 6);
+        Assert.Equal(250, start + 0.25 * span, 6);
+
+        var full = MgaSonicAnvil.UI.SilenceDetectWavePreview.ZoomAround(
+            start, span, 0, 1000, 0, 0.1, 10);
+        Assert.Equal(0, full.Start, 6);
+        Assert.Equal(1000, full.Span, 6);
+
+        var tight = MgaSonicAnvil.UI.SilenceDetectWavePreview.ZoomAround(
+            0, 1000, 0, 1000, 1, 1000, 40);
+        Assert.Equal(40, tight.Span, 6);
+        Assert.Equal(960, tight.Start, 6);
     }
 
     [Fact]
