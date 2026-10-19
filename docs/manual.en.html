@@ -269,7 +269,7 @@
         </ul>
         <h4>Wwise</h4>
         <p>Music Track timing for EXPORT. Streaming is always on. Prefetch Length and Look-ahead Time both start at 500 ms (0 to 10000). Prefetch is on the first track; look-ahead is on later tracks. The first track’s look-ahead stays 50 ms.</p>
-        <p><strong>Filename colors</strong> — a vertical marker is drawn at the start of a filename when the name contains the text. The first match from the top wins. Matching ignores letter case. Empty text and out-of-range colors are dropped when settings load. The same color may be used more than once. The 28 colors match Wwise. ▲ / ▼ reorder a row, and Add stays directly under the list. A color set by hand on a file wins over these rules. Where the marker appears, and how a manual color is kept, is under <a href="#layout-filename-color">Filename colors</a>.</p>
+        <p><strong>Filename colors</strong> — a vertical marker is drawn at the start of a filename when the name contains the text. The first match from the top wins. Matching ignores letter case. Empty text and out-of-range colors are dropped when settings are saved. The same color may be used more than once. The 28 colors match Wwise. ▲ / ▼ reorder a row, and Add stays directly under the list. A color set by hand on a file wins over these rules. Where the marker appears, and how a manual color is kept, is under <a href="#layout-filename-color">Filename colors</a>.</p>
       </article>
 
       <article class="part" id="layout-overview">
@@ -435,7 +435,7 @@
           </li>
         </ul>
         <h4 id="layout-filename-color">Filename colors</h4>
-        <p>A short vertical color is drawn at the start of a filename. It appears on a playlist filename, an editor tab, a tile header, and the filename during video playback. The 28 colors match Wwise: 14 across the top row, then 14 across the bottom, left to right. Settings and the right-click menu use that same board. Pointing at a swatch highlights that one color.</p>
+        <p>A short vertical color is drawn at the start of a filename. It appears on a playlist filename, an editor tab, a tile header, and the filename that <kbd>T</kbd> shows during real video playback and in F8. The 28 colors match Wwise: 14 across the top row, then 14 across the bottom, left to right. Settings and the right-click menu use that same board. Pointing at a swatch highlights that one color.</p>
         <ul>
           <li>
             <p><strong>Rules</strong> — Settings (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>), Wwise tab, <span class="ui">Filename colors</span>. Each row is text contained in the filename, plus a color. They apply when you press OK.</p>
@@ -443,19 +443,19 @@
               <li>Only the filename is tested. The text may sit anywhere in the name (for example <code>_bt_</code> matches <code>gun_bt_fire.wav</code>). Letter case does not matter.</li>
               <li>The first matching row from the top wins. The same color may be used on more than one row. There is no row limit.</li>
               <li>▲ / ▼ reorder a row. Remove deletes that row. Add stays directly under the list. Click the color chip to pick one of the 28 colors.</li>
-              <li>Empty text and out-of-range colors are dropped when settings are saved. Renaming a file so the text is gone drops the rule color.</li>
+              <li>Spaces at the ends of the text are removed. Empty text and out-of-range colors are dropped when settings are saved. Renaming a file so the text is gone drops the rule color.</li>
             </ul>
           </li>
           <li>
-            <p><strong>Manual</strong> — a color for that file alone. It wins over the rules, and it stays when the filename changes.</p>
+            <p><strong>Manual</strong> — a color for that file alone. It wins over the rules. After a rename inside the app, it stays on the new path even when the new name no longer matches a rule.</p>
             <ul>
               <li>Open <span class="ui">Color</span> from the playlist right-click, a tab right-click, or a right-click on a tile’s filename strip. With several files selected, the chosen color is applied to every selected file that has a path.</li>
-              <li>The submenu is <span class="ui">Use automatic</span>, then the 28-color board. The chosen color is marked only when every selected file shares that manual color. When none of them has a manual color, <span class="ui">Use automatic</span> is checked.</li>
+              <li>The submenu is <span class="ui">Use automatic</span>, then the 28-color board. The chosen color is marked only when every selected file shares that manual color. When none of them has a manual color, <span class="ui">Use automatic</span> is checked. A mix of manual colors leaves both the mark and the check clear.</li>
               <li>A file that has not been saved, and so has no path, cannot take a manual color. <span class="ui">Color</span> stays disabled when there is no target.</li>
             </ul>
           </li>
           <li>Choosing <span class="ui">Color</span> in the playlist <span class="ui">Group</span> menu groups manual colors by their hex name, such as <code>#A92D2D</code>, rule matches by the matched text, and files with neither under <span class="ui">(None)</span>.</li>
-          <li>The playlist filename column grows by the marker width, so the end of the name stays visible.</li>
+          <li>The playlist filename column width is the visible name plus the marker width.</li>
           <li>A manual color is stored in settings by full path and comes back on the next launch. A move or rename inside the app retargets it to the new path. Copy, duplicate, Save As, and export write the same color on the new path only when the source has a manual color, and they keep the source record. When the source has no manual color, a manual color already on the destination stays.</li>
           <li>A file moved or renamed outside the app, such as in Explorer, keeps its manual color on the old path. When the app later acts on that old path and the file is gone, the record is deleted.</li>
           <li>A record for a path the app has not touched stays, even when the file is missing or the drive is disconnected. The app does not look to see whether it is there. When that path becomes the subject of a move, copy, delete, rename, or similar action, and neither a file nor a folder exists there at that moment, the orphaned record is deleted then.</li>
