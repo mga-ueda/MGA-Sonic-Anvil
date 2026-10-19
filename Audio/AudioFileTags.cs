@@ -259,6 +259,40 @@ internal sealed class AudioFileTags
             EncoderOriginalFrames = EncoderOriginalFrames,
             HasArtwork = HasArtwork,
         };
+
+    /// <summary>ファイルの更新日時が変わったとき、測り直すまで列に出さない。</summary>
+    public AudioFileTags WithoutFileLoudness() =>
+        new()
+        {
+            Probed = Probed,
+            Title = Title,
+            Artist = Artist,
+            Album = Album,
+            AlbumArtist = AlbumArtist,
+            Track = Track,
+            TrackNumber = TrackNumber,
+            Disc = Disc,
+            DiscNumber = DiscNumber,
+            Year = Year,
+            YearNumber = YearNumber,
+            Genre = Genre,
+            Comment = Comment,
+            Composer = Composer,
+            DurationSeconds = DurationSeconds,
+            SampleRate = SampleRate,
+            BitsPerSample = BitsPerSample,
+            Channels = Channels,
+            BitRateKbps = BitRateKbps,
+            VideoWidth = VideoWidth,
+            VideoHeight = VideoHeight,
+            FrameRate = FrameRate,
+            VideoCodec = VideoCodec,
+            AudioCodec = AudioCodec,
+            EncoderDelayFrames = EncoderDelayFrames,
+            EncoderPaddingFrames = EncoderPaddingFrames,
+            EncoderOriginalFrames = EncoderOriginalFrames,
+            HasArtwork = HasArtwork,
+        };
 }
 
 internal sealed class AudioFileTagsBuilder
