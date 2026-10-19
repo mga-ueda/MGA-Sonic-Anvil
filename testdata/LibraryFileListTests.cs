@@ -59,6 +59,14 @@ public sealed class LibraryFileListTests
             Assert.Equal("sfx", LibraryFileList.GroupLabel(withFolder, LibraryFileGroup.Folder));
             Assert.Equal("(Untitled)", LibraryFileList.GroupLabel(untitled, LibraryFileGroup.Folder));
             Assert.Equal(string.Empty, LibraryFileList.GroupLabel(withFolder, LibraryFileGroup.None));
+            var colored = Row("gun_bt_fire.wav");
+            colored.SetFileNameMarker(10, "_bt_");
+            var plain = Row("ambience.wav");
+            Assert.Equal("_bt_", LibraryFileList.GroupLabel(colored, LibraryFileGroup.Color));
+            Assert.Equal("(None)", LibraryFileList.GroupLabel(plain, LibraryFileGroup.Color));
+            Assert.Equal("Color", UiStrings.LibraryGroupColor);
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Equal("カラー", UiStrings.LibraryGroupColor);
             Assert.Equal(UiStrings.LibraryColumnParentFolder, UiStrings.LibraryGroupFolder);
         }
         finally

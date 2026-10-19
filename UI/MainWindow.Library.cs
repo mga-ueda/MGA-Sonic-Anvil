@@ -1403,9 +1403,11 @@ public partial class MainWindow
         var usingProxy = source is { Length: > 0 }
             && LibraryPlaylistDocuments.IsVideo(source)
             && VideoProxy.TryGetCached(source, out _);
+        var rawName = text;
         text = LibraryPlayerMode.FormatPlaylistVideoFileName(text, usingProxy);
         PlaylistVideoFileNameText.Text = text;
         PlaylistVideoFileNameShadow.Text = text;
+        FileNameColorMarkerVisual.Apply(PlaylistVideoFileNameMarker, rawName, source);
     }
 
     private void SchedulePlaylistVideoFileNamePlacement()

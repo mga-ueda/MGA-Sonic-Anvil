@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 using Xunit;
@@ -2640,6 +2641,53 @@ public sealed class LibraryBrowserSelectionTests
                 LibraryBrowserView.LibraryColumnHeaderPadX * 2 + LibraryBrowserView.LibraryColumnSortPad < 48,
                 "header chrome must stay tight so short columns do not pick up extra width");
             window.Close();
+        });
+    }
+
+    [Fact]
+    public void FitColumns_ReservesFileNameMarker()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var previous = AppStorage.Settings.FileNameColorRules;
+            try
+            {
+                AppStorage.Settings.ApplyFileNameColorRules([]);
+                var session = Session("bgm_bt_0000.wav");
+                var view = new LibraryBrowserView();
+                view.SetVisibleColumns([LibraryFileColumn.Name]);
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 800,
+                    Height = 320,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                view.SetSessions([session], session, [session]);
+                Flush();
+                view.UpdateLayout();
+                view.RecalculateColumnWidths();
+                var plain = view.ColumnPixelWidth(LibraryFileColumn.Name);
+
+                AppStorage.Settings.ApplyFileNameColorRules(
+                [
+                    new FileNameColorRule { Pattern = "_bt_", ColorIndex = 10 },
+                ]);
+                view.RefreshFileNameMarkers();
+                view.RecalculateColumnWidths();
+                var marked = view.ColumnPixelWidth(LibraryFileColumn.Name);
+                Assert.True(
+                    marked >= plain + FileNameColorMarkerVisual.SlotWidth + 1,
+                    $"marked {marked} should clear the marker beyond plain {plain}");
+                window.Close();
+            }
+            finally
+            {
+                AppStorage.Settings.ApplyFileNameColorRules(previous);
+            }
         });
     }
 
