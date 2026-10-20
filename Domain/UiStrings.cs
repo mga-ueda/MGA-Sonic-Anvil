@@ -736,7 +736,7 @@ internal static partial class UiStrings
     public static string TooltipAddMarker => Get("マーカーを追加 (M)", "Add marker (M)");
     public static string TooltipSetLoop => Get("選択をループに (Shift+L)", "Set selection as loop (Shift+L)");
     public static string TooltipSetRegion => Get("選択をリージョンに (Shift+R)", "Set selection as region (Shift+R)");
-    public static string TooltipRangeClick => Get("範囲メトロノーム (Q)", "Range metronome (Q)");
+    public static string TooltipRangeClick => Get("マーカークリック (Q)", "Marker click (Q)");
     public static string TooltipOpen => Get("開く (Ctrl+O)", "Open (Ctrl+O)");
     public static string TooltipNew => Get("新規 (Ctrl+N)", "New (Ctrl+N)");
     public static string TooltipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)  複数選択時は保存先フォルダ", "Save As (Ctrl+Shift+S)  pick a folder when several tabs are selected");
