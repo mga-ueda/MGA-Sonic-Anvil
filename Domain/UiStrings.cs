@@ -563,8 +563,8 @@ internal static partial class UiStrings
         "The stroke goes above 0 dBFS and may distort.\n\nYes: lower the whole stroke to stay within 0 dBFS\nNo: discard this stroke and draw it again");
 
     public static string WarnMergeClip(string overDb) => Format(
-        "加算結果が 0 dBFS を {0} dB 超えています。このまま 16bit / 24bit で書くと、超えた分は切り詰められます。\n\nYes: ミックス全体を {0} dB 下げてバウンスする\nNo: バウンスを中止する",
-        "The summed mix is {0} dB over 0 dBFS. Writing 16-bit or 24-bit would truncate the excess.\n\nYes: lower the entire mix by {0} dB and bounce\nNo: cancel the bounce",
+        "加算結果が 0 dBFS を {0} dB 超えています。このまま 16bit / 24bit で書くと、超えた分は切り詰められます。\n\nOK: ミックス全体を {0} dB 下げてバウンスする\nCancel: バウンスを中止する",
+        "The summed mix is {0} dB over 0 dBFS. Writing 16-bit or 24-bit would truncate the excess.\n\nOK: lower the entire mix by {0} dB and bounce\nCancel: cancel the bounce",
         overDb);
     /// <summary>バウンスの保存ダイアログのタイトル。</summary>
     public static string TitleMergeTabs => Get("選択ファイルをバウンス", "Bounce Selected Files");

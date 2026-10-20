@@ -143,24 +143,24 @@ public sealed class TabMergeTests
     }
 
     [Fact]
-    public void WarnMergeClip_LeavesABlankLineAndUsesYesNoWords()
+    public void WarnMergeClip_LeavesABlankLineAndUsesOkCancelWords()
     {
         var previous = UiStrings.Language;
         try
         {
             UiStrings.SetLanguage(UiLanguage.Japanese);
             var japanese = UiStrings.WarnMergeClip("1");
-            Assert.Contains("切り詰められます。\n\nYes:", japanese);
-            Assert.Contains("\nNo:", japanese);
-            Assert.DoesNotContain("イエス", japanese);
-            Assert.DoesNotContain("ノー", japanese);
+            Assert.Contains("切り詰められます。\n\nOK:", japanese);
+            Assert.Contains("\nCancel:", japanese);
+            Assert.DoesNotContain("\nYes:", japanese);
+            Assert.DoesNotContain("\nNo:", japanese);
             Assert.Equal("OK", UiStrings.ButtonOk);
             Assert.Equal("Cancel", UiStrings.ButtonCancel);
 
             UiStrings.SetLanguage(UiLanguage.English);
             var english = UiStrings.WarnMergeClip("1");
-            Assert.Contains("excess.\n\nYes:", english);
-            Assert.Contains("\nNo:", english);
+            Assert.Contains("excess.\n\nOK:", english);
+            Assert.Contains("\nCancel:", english);
             Assert.Equal("OK", UiStrings.ButtonOk);
             Assert.Equal("Cancel", UiStrings.ButtonCancel);
         }
