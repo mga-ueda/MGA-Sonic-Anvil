@@ -1910,7 +1910,6 @@ public partial class MainWindow
             }
 
             _playlistParked = parked;
-            _playlistParkedKept = [.. _sessions];
 
             if (ReferenceEquals(_document, scratchDocument))
             {
