@@ -1100,7 +1100,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
     }
 
     /// <summary>
-    /// エディタ波形の時間ズーム、振幅ズーム、シーク移動。選択・マーカー・リージョンはここには無い。
+    /// エディタ波形の時間ズーム、振幅ズーム、シーク移動。Ctrl+←／→ は検出キューへのマーカージャンプ。
+    /// 選択の伸長やリージョン編集キーはここには無い。
     /// </summary>
     private bool TryHandleWaveKey(Key key, ModifierKeys modifiers)
     {
@@ -1113,6 +1114,12 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         if (modifiers == ModifierKeys.None && key is Key.NumPad7 or Key.NumPad9)
         {
             BeginSeekNudge(key == Key.NumPad7 ? -1 : 1);
+            return true;
+        }
+
+        if (key is Key.Left or Key.Right && modifiers == ModifierKeys.Control)
+        {
+            SeekToMarker(key == Key.Left ? -1 : 1);
             return true;
         }
 
@@ -1345,6 +1352,103 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
     private void JumpSeekPercent(double percent) =>
         MoveSeek((long)Math.Round(_viewStart + _viewSpan * percent), ensureVisible: true);
+
+    /// <summary>前後の検出キュー（ヒット点、またはキープ区間の端）へシーク。</summary>
+    internal void SeekToMarker(int direction)
+    {
+        if (direction == 0 || _range.IsEmpty)
+        {
+            return;
+        }
+
+        MoveSeek(AdjacentCueFrame(SeekFrame, direction), ensureVisible: true);
+    }
+
+    internal long AdjacentCueFrame(long from, int direction)
+    {
+        var frames = CueJumpFrames();
+        var rangeStart = _range.StartFrame;
+        var rangeEnd = Math.Max(rangeStart, _range.EndFrame);
+        if (frames.Count == 0)
+        {
+            return direction < 0 ? rangeStart : Math.Max(rangeStart, rangeEnd - 1);
+        }
+
+        var index = frames.BinarySearch(from);
+        if (direction < 0)
+        {
+            if (index >= 0)
+            {
+                return index > 0 ? frames[index - 1] : rangeStart;
+            }
+
+            var insert = ~index;
+            return insert > 0 ? frames[insert - 1] : rangeStart;
+        }
+
+        if (index >= 0)
+        {
+            return index + 1 < frames.Count
+                ? frames[index + 1]
+                : Math.Max(rangeStart, rangeEnd - 1);
+        }
+
+        var next = ~index;
+        return next < frames.Count
+            ? frames[next]
+            : Math.Max(rangeStart, rangeEnd - 1);
+    }
+
+    private List<long> CueJumpFrames()
+    {
+        if (_hitPointMode)
+        {
+            return _hitFrames;
+        }
+
+        if (_keeps.Count == 0)
+        {
+            return [];
+        }
+
+        var frames = new List<long>(_keeps.Count * 2);
+        foreach (var keep in _keeps)
+        {
+            if (keep.IsEmpty)
+            {
+                continue;
+            }
+
+            frames.Add(keep.StartFrame);
+            var end = Math.Max(keep.StartFrame, keep.EndFrame - 1);
+            if (end != keep.StartFrame)
+            {
+                frames.Add(end);
+            }
+        }
+
+        if (frames.Count > 1)
+        {
+            frames.Sort();
+            var write = 1;
+            for (var i = 1; i < frames.Count; i++)
+            {
+                if (frames[i] == frames[write - 1])
+                {
+                    continue;
+                }
+
+                frames[write++] = frames[i];
+            }
+
+            if (write < frames.Count)
+            {
+                frames.RemoveRange(write, frames.Count - write);
+            }
+        }
+
+        return frames;
+    }
 
     private long ViewEdgeFrame(int direction)
     {

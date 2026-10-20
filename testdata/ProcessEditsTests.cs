@@ -722,6 +722,55 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void SilencePreview_AdjacentCueFrame_JumpsKeepBounds()
+    {
+        RunSta(() =>
+        {
+            const int rate = 1000;
+            var radius = SilentSkip.PeakWindowRadiusFrames(rate);
+            var document = MakeToneWithSilence(40, radius * 2 + 80, 40, rate);
+            var range = new WaveSelection(0, document.FrameCount);
+            var options = SilenceDetectOptions.FromThreshold(-60) with
+            {
+                MinGateMs = 0,
+                MinCloseMs = 30,
+                PreRollMs = 0,
+                PostRollMs = 0,
+            };
+            var preview = new MgaSonicAnvil.UI.SilenceDetectWavePreview
+            {
+                Document = document,
+                Range = range,
+                Options = options,
+            };
+            Assert.Equal(2, preview.Keeps.Count);
+            var first = preview.Keeps[0];
+            var second = preview.Keeps[1];
+            var firstEnd = Math.Max(first.StartFrame, first.EndFrame - 1);
+            var secondEnd = Math.Max(second.StartFrame, second.EndFrame - 1);
+
+            // キュー上では次／前へ。先頭キューより前からは最初のキューへ。
+            if (first.StartFrame > 0)
+            {
+                Assert.Equal(first.StartFrame, preview.AdjacentCueFrame(0, 1));
+            }
+            else
+            {
+                Assert.Equal(firstEnd, preview.AdjacentCueFrame(0, 1));
+            }
+
+            Assert.Equal(firstEnd, preview.AdjacentCueFrame(first.StartFrame, 1));
+            Assert.Equal(second.StartFrame, preview.AdjacentCueFrame(firstEnd, 1));
+            Assert.Equal(secondEnd, preview.AdjacentCueFrame(second.StartFrame, 1));
+            Assert.Equal(range.EndFrame - 1, preview.AdjacentCueFrame(secondEnd, 1));
+            Assert.Equal(second.StartFrame, preview.AdjacentCueFrame(secondEnd, -1));
+            Assert.Equal(first.StartFrame > 0 ? first.StartFrame : 0,
+                preview.AdjacentCueFrame(firstEnd, -1));
+            Assert.Equal(0, preview.AdjacentCueFrame(first.StartFrame, -1));
+        });
+    }
+
+    [Fact]
     public void CollectDeleteSilenceKeepSpans_EdgesOnly_MergesAudible()
     {
         const int rate = 1000;
