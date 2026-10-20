@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
@@ -8218,25 +8219,8 @@ internal sealed class LibraryBrowserView : UserControl
             var key = ReferenceEquals(face, headerFace) ? text + "\u0001" : text;
             if (!cache.TryGetValue(key, out var width))
             {
-                var formatted = new FormattedText(
-                    text,
-                    System.Globalization.CultureInfo.CurrentUICulture,
-                    FlowDirection.LeftToRight,
-                    face,
-                    fontSize,
-                    Brushes.Black,
-                    dpi);
-                width = formatted.WidthIncludingTrailingWhitespace;
-                if (formatted.OverhangLeading < 0)
-                {
-                    width -= formatted.OverhangLeading;
-                }
-
-                if (formatted.OverhangAfter > 0)
-                {
-                    width += formatted.OverhangAfter;
-                }
-
+                // TextBlock は App 既定の Display。Ideal だと日本語グリフが狭く出て CharacterEllipsis する。
+                width = MeasurePlaylistText(text, face, fontSize, dpi);
                 cache[key] = width;
             }
 
@@ -8277,17 +8261,17 @@ internal sealed class LibraryBrowserView : UserControl
                     continue;
                 }
 
-                var width = Measure(text, typeface) + cellPad;
-                if (kind == LibraryFileColumn.Name && row.HasFileNameMarker)
+                var width = kind == LibraryFileColumn.Name
+                    ? FileNameColorMarkerVisual.NameColumnRowWidth(
+                        Measure(text, typeface),
+                        row.HasFileNameMarker,
+                        dpi,
+                        cellPad)
+                    : Measure(text, typeface) + cellPad;
+                if (kind is LibraryFileColumn.Duration or LibraryFileColumn.Loudness)
                 {
-                    // マーカーはデバイスピクセルへスナップする。幅ぴったりだと末尾が「...」に置き換わる。
-                    var slot = FileNameColorMarkerVisual.SlotWidth * dpi;
-                    width += (Math.Ceiling(slot - 1e-6) / dpi) + 2;
-                }
-
-                if (kind == LibraryFileColumn.Duration)
-                {
-                    // 列幅ぴったりだとホバー再スナップで末尾ミリ秒が欠けて、時間が変わったように見える。
+                    // Duration: ホバー再スナップで末尾ミリ秒が欠けないよう余裕を残す。
+                    // Loudness: CharacterEllipsis で実測値が見切れないよう同様に 2px。
                     width += 2;
                 }
 
@@ -8297,12 +8281,62 @@ internal sealed class LibraryBrowserView : UserControl
                 }
             }
 
+            if (kind == LibraryFileColumn.Loudness)
+            {
+                // 未計測は LoudnessText が空。RefreshLoudnessRows は選択を壊さないよう
+                // FitColumns を呼ばないので、ここで計測後の表示幅を予約する。
+                foreach (var sample in UiStrings.LoudnessColumnWidthSamples())
+                {
+                    max = Math.Max(max, Measure(sample, typeface) + cellPad + 2);
+                }
+            }
+
             var fitted = Math.Clamp(
                 Math.Ceiling(max),
                 1,
                 DesignMetrics.LibraryColumnMaxWidth);
             SetColumnPixelWidth(column, fitted);
         }
+    }
+
+    /// <summary>
+    /// プレイリストセルと同じ TextFormattingMode.Display で文字幅を測る。
+    /// Ideal（FormattedText 既定）だと CJK が狭く出ることがある。
+    /// </summary>
+    internal static double MeasurePlaylistText(
+        string text,
+        Typeface typeface,
+        double fontSize,
+        double pixelsPerDip)
+    {
+        if (text.Length == 0 || fontSize <= 0)
+        {
+            return 0;
+        }
+
+        var dpi = Math.Max(1e-6, pixelsPerDip);
+        var formatted = new FormattedText(
+            text,
+            CultureInfo.CurrentUICulture,
+            FlowDirection.LeftToRight,
+            typeface,
+            fontSize,
+            Brushes.Black,
+            numberSubstitution: null,
+            TextFormattingMode.Display,
+            dpi);
+        var width = formatted.WidthIncludingTrailingWhitespace;
+        if (formatted.OverhangLeading < 0)
+        {
+            width -= formatted.OverhangLeading;
+        }
+
+        if (formatted.OverhangAfter > 0)
+        {
+            width += formatted.OverhangAfter;
+        }
+
+        return width;
     }
 
     /// <summary>

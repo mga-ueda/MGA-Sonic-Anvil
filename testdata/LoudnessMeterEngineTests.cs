@@ -379,6 +379,19 @@ public sealed class LoudnessMeterEngineTests
     }
 
     [Fact]
+    public void LoudnessColumnWidthSamples_CoverMeasuredAndNonFinite()
+    {
+        Assert.Equal(
+            ["-99.9 LKFS", "--.- LKFS"],
+            UiStrings.LoudnessColumnWidthSamples().ToArray());
+        foreach (var sample in UiStrings.LoudnessColumnWidthSamples())
+        {
+            Assert.False(string.IsNullOrEmpty(sample));
+            Assert.Contains("LKFS", sample, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void Profile_AtFrame_AppliesPreviewGain()
     {
         var values = new float[] { -20f, -18f };
