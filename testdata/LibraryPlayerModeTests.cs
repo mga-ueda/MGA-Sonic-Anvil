@@ -622,15 +622,14 @@ public sealed class LibraryPlayerModeTests
         var opened = Session("d.wav");
         var merged = LibraryPlayerMode.MergeParkedPlaylist(
             [first, second, third],
-            [second],
             [second, opened]);
         Assert.Equal(new[] { first, second, third, opened }, merged);
 
+        // エディタへ持ち込んで閉じても、プレイリスト会員はそのまま戻す。
         var closed = LibraryPlayerMode.MergeParkedPlaylist(
             [first, second],
-            [second],
             [opened]);
-        Assert.Equal(new[] { first, opened }, closed);
+        Assert.Equal(new[] { first, second, opened }, closed);
     }
 
     [Fact]

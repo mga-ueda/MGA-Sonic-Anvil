@@ -41,9 +41,6 @@ public partial class MainWindow
 
     /// <summary>プレイヤーを抜ける直前の全曲。エディタでは選択分だけタブに残し、戻りでは消さない。</summary>
     private DocumentSession[]? _playlistParked;
-
-    /// <summary>退避時にエディタへ残したセッション。タブを閉じたらプレイリストへ戻さない。</summary>
-    private HashSet<DocumentSession>? _playlistParkedKept;
     /// <summary>F10 突入前のタイル配置。退出後に付け直す。</summary>
     private WaveformTileArrange _librarySuspendedTileArrange;
     private bool _libraryWaapiSuspended;
@@ -2367,15 +2364,13 @@ public partial class MainWindow
     private void RestoreParkedPlaylist()
     {
         var parked = _playlistParked;
-        var kept = _playlistParkedKept;
         _playlistParked = null;
-        _playlistParkedKept = null;
         if (parked is null || parked.Length == 0)
         {
             return;
         }
 
-        var merged = LibraryPlayerMode.MergeParkedPlaylist(parked, kept ?? [], _sessions);
+        var merged = LibraryPlayerMode.MergeParkedPlaylist(parked, _sessions);
         if (merged.Count == _sessions.Count)
         {
             var same = true;
