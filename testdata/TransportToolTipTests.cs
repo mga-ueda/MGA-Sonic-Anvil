@@ -48,7 +48,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("(M)", UiStrings.TooltipAddMarker);
         Assert.Contains("Shift+L", UiStrings.TooltipSetLoop);
         Assert.Contains("Shift+R", UiStrings.TooltipSetRegion);
-        Assert.Contains("範囲メトロノーム (Q)", UiStrings.TooltipRangeClick);
+        Assert.Contains("マーカークリック (Q)", UiStrings.TooltipRangeClick);
         Assert.Contains("Ctrl+N", UiStrings.TooltipNew);
         Assert.Contains("Ctrl+O", UiStrings.TooltipOpen);
         Assert.Contains("Ctrl+Shift+O", UiStrings.TooltipSettings);

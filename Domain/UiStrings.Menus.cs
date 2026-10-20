@@ -105,7 +105,7 @@ internal static partial class UiStrings
     public static string WaveMenuSetLoop => Get("選択範囲をループに(_O)", "Set Sample L_oop from Selection");
     public static string WaveMenuClearLoopItem => Get("ループを削除(_C)", "_Clear Loop");
     /// <summary>再生カテゴリへ移動。ショートカット表示は Q。</summary>
-    public static string WaveMenuRangeClick => Get("範囲メトロノーム(_Q)", "Range Metronome (_Q)");
+    public static string WaveMenuRangeClick => Get("マーカークリック(_Q)", "Marker Click (_Q)");
     public static string WaveMenuPrevMarker => Get("前のマーカーへ(_P)", "_Previous Marker");
     public static string WaveMenuNextMarker => Get("次のマーカーへ(_X)", "Ne_xt Marker");
 
