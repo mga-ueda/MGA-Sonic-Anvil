@@ -858,6 +858,7 @@ public partial class MainWindow
 
     /// <summary>
     /// プレイヤー A-B が揃っていればそれを優先。なければ選択範囲ループ。
+    /// どちらも無く Auto Loop オンなら全長ループ（Auto Next より優先）。
     /// </summary>
     private WaveSelection? ResolvePlayLoopRange()
     {
@@ -871,7 +872,19 @@ public partial class MainWindow
             return ab;
         }
 
-        return _document.Selection.IsEmpty ? null : _document.Selection;
+        if (!_document.Selection.IsEmpty)
+        {
+            return _document.Selection;
+        }
+
+        if (IsLibraryMaximized
+            && LibraryBrowser.AutoLoopEnabled
+            && _document.FrameCount > 0)
+        {
+            return new WaveSelection(0, _document.FrameCount);
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -1621,6 +1634,12 @@ public partial class MainWindow
                 return;
             }
 
+            // 再生ウィンドウのループが効かなかったときの保険。Auto Next より優先。
+            if (TryRestartLibraryAutoLoop())
+            {
+                return;
+            }
+
             if (TryAdvanceLibraryPlaylist())
             {
                 return;
@@ -1628,6 +1647,24 @@ public partial class MainWindow
         }
 
         HaltPlaybackToStart();
+    }
+
+    /// <summary>Auto Loop オンかつ範囲なしのとき、先頭から再生し直す。</summary>
+    private bool TryRestartLibraryAutoLoop()
+    {
+        if (!LibraryBrowser.AutoLoopEnabled || _document is null || _document.FrameCount <= 0)
+        {
+            return false;
+        }
+
+        // A-B／選択があるときは ResolvePlayLoopRange 側のループに任せる。
+        if (Waveform.TryGetPlayerAbLoop(out _) || !_document.Selection.IsEmpty)
+        {
+            return false;
+        }
+
+        StartPlayback(0, prerollSeconds: 0);
+        return true;
     }
 
     private bool AnyEffectPreviewing =>

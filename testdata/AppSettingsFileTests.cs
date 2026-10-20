@@ -68,11 +68,13 @@ public sealed class AppSettingsFileTests
         var settings = AppSettings.CreateDefault();
         settings.LibraryShuffle = true;
         settings.LibraryAutoPlayNext = true;
+        settings.LibraryAutoLoop = true;
         var json = JsonSerializer.Serialize(settings, AppSettingsJsonContext.Default.AppSettings);
         var back = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
         Assert.NotNull(back);
         Assert.True(back!.LibraryShuffle);
         Assert.True(back.LibraryAutoPlayNext);
+        Assert.True(back.LibraryAutoLoop);
     }
 
     [Fact]
@@ -109,12 +111,14 @@ public sealed class AppSettingsFileTests
             var settings = AppSettings.CreateDefault();
             settings.LibraryShuffle = true;
             settings.LibraryAutoPlayNext = true;
+            settings.LibraryAutoLoop = true;
             AppSettingsFile.Write(path, settings);
 
             var loaded = AppSettingsFile.Load(path, leftoverSessionDocumentPath: null, sessionDirectory: null, out var reset);
             Assert.Equal(SettingsFileReset.None, reset);
             Assert.True(loaded.LibraryShuffle);
             Assert.True(loaded.LibraryAutoPlayNext);
+            Assert.True(loaded.LibraryAutoLoop);
         }
         finally
         {

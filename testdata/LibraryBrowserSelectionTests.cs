@@ -2278,6 +2278,52 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void AutoLoopEnabled_ToggleWorksWhenPlaylistEmpty()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            Assert.Equal(0, view.BoundRowCount);
+            view.ToggleAutoLoop();
+            Assert.True(view.AutoLoopEnabled);
+            view.ToggleAutoLoop();
+            Assert.False(view.AutoLoopEnabled);
+        });
+    }
+
+    [Fact]
+    public void AutoLoopEnabled_DefaultsOff()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            Assert.False(view.AutoLoopEnabled);
+        });
+    }
+
+    [Fact]
+    public void LabelLibraryAutoLoop_IsEnglishWithoutShortcut()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Equal("Auto Loop", UiStrings.LabelLibraryAutoLoop);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoLoop));
+            Assert.DoesNotContain("Alt+", UiStrings.LabelLibraryAutoLoop, StringComparison.OrdinalIgnoreCase);
+            UiStrings.SetLanguage(UiLanguage.English);
+            Assert.Equal("Auto Loop", UiStrings.LabelLibraryAutoLoop);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoLoop));
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
     public void ColumnHeader_MarksSortedColumn()
     {
         RunSta(() =>
