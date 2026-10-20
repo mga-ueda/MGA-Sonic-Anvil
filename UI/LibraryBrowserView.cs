@@ -161,6 +161,7 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly CheckBox _shuffleCheck = new();
     private readonly CheckBox _autoPlayCheck = new();
     private readonly CheckBox _autoPlayNextCheck = new();
+    private readonly CheckBox _autoLoopCheck = new();
     private readonly LibraryPlaylistShuffle _shuffle = new();
     private bool _shuffleEnabled;
     private bool _shuffleBusy;
@@ -168,6 +169,8 @@ internal sealed class LibraryBrowserView : UserControl
     private bool _autoPlayBusy;
     private bool _autoPlayNextEnabled;
     private bool _autoPlayNextBusy;
+    private bool _autoLoopEnabled;
+    private bool _autoLoopBusy;
     private readonly List<string[]> _playlistSearchGroups = [];
     private readonly List<string[]> _explorerSearchGroups = [];
     private string _explorerSearchCommitted = string.Empty;
@@ -994,6 +997,17 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void ToggleAutoPlayNext() => AutoPlayNextEnabled = !AutoPlayNextEnabled;
 
+    /// <summary>曲末で先頭へ戻してループするか。既定オフ。設定に覚える。Auto Next より優先。</summary>
+    public bool AutoLoopEnabled
+    {
+        get => _autoLoopEnabled;
+        set => SetAutoLoopEnabled(value);
+    }
+
+    public event EventHandler? AutoLoopChanged;
+
+    public void ToggleAutoLoop() => AutoLoopEnabled = !AutoLoopEnabled;
+
     /// <summary>Enter（クリアして追加）で先頭を再生するか。既定オン。設定に覚える。</summary>
     public bool AutoPlayEnabled
     {
@@ -1093,6 +1107,35 @@ internal sealed class LibraryBrowserView : UserControl
         if (changed)
         {
             AutoPlayNextChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void SetAutoLoopEnabled(bool enabled)
+    {
+        var changed = _autoLoopEnabled != enabled;
+        if (!changed && _autoLoopCheck.IsChecked == enabled)
+        {
+            return;
+        }
+
+        _autoLoopEnabled = enabled;
+
+        if (_autoLoopCheck.IsChecked != enabled)
+        {
+            _autoLoopBusy = true;
+            try
+            {
+                _autoLoopCheck.IsChecked = enabled;
+            }
+            finally
+            {
+                _autoLoopBusy = false;
+            }
+        }
+
+        if (changed)
+        {
+            AutoLoopChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -3049,6 +3092,7 @@ internal sealed class LibraryBrowserView : UserControl
         _shuffleCheck.Content = UiStrings.LabelLibraryShuffle;
         _autoPlayCheck.Content = UiStrings.LabelLibraryAutoPlay;
         _autoPlayNextCheck.Content = UiStrings.LabelLibraryAutoPlayNext;
+        _autoLoopCheck.Content = UiStrings.LabelLibraryAutoLoop;
         _explorerSearchHint.Text = UiStrings.LibrarySearchHint;
         _playlistSearchHint.Text = UiStrings.LibrarySearchHint;
         RebuildExplorerContextMenu();
@@ -4645,6 +4689,21 @@ internal sealed class LibraryBrowserView : UserControl
         _shuffleCheck.Unchecked += ShuffleCheck_Changed;
         DockPanel.SetDock(_shuffleCheck, Dock.Right);
         bar.Children.Add(_shuffleCheck);
+
+        // Dock.Right は先に足したものが右。Shuffle → AutoLoop → AutoNext → AutoPlay で
+        // 見た目は Auto Play | Auto Next | Auto Loop | Random。
+        _autoLoopCheck.Style = TryFindResource("DarkCheckBoxStyle") as Style;
+        _autoLoopCheck.Content = UiStrings.LabelLibraryAutoLoop;
+        _autoLoopCheck.IsChecked = false;
+        _autoLoopCheck.Focusable = false;
+        _autoLoopCheck.VerticalAlignment = VerticalAlignment.Center;
+        _autoLoopCheck.FontSize = 11;
+        _autoLoopCheck.Margin = new Thickness(8, 0, 0, 0);
+        _autoLoopCheck.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
+        _autoLoopCheck.Checked += AutoLoopCheck_Changed;
+        _autoLoopCheck.Unchecked += AutoLoopCheck_Changed;
+        DockPanel.SetDock(_autoLoopCheck, Dock.Right);
+        bar.Children.Add(_autoLoopCheck);
 
         _autoPlayNextCheck.Style = TryFindResource("DarkCheckBoxStyle") as Style;
         _autoPlayNextCheck.Content = UiStrings.LabelLibraryAutoPlayNext;
@@ -9354,6 +9413,16 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         SetAutoPlayNextEnabled(_autoPlayNextCheck.IsChecked == true);
+    }
+
+    private void AutoLoopCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_autoLoopBusy)
+        {
+            return;
+        }
+
+        SetAutoLoopEnabled(_autoLoopCheck.IsChecked == true);
     }
 
     private bool TryPatchBoundRows(IReadOnlyList<LibraryFileRow> rows)

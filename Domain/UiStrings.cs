@@ -897,6 +897,8 @@ internal static partial class UiStrings
     public static string LabelLibraryAutoPlay => "Auto Play";
     /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（マニュアル側）。</summary>
     public static string LabelLibraryAutoPlayNext => "Auto Next";
+    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（マニュアル側）。Alt+L。</summary>
+    public static string LabelLibraryAutoLoop => "Auto Loop";
     public static string LibraryExplorerDesktop => Get("デスクトップ", "Desktop");
     public static string LibraryExplorerDocuments => Get("ドキュメント", "Documents");
     public static string LibraryExplorerMusic => Get("ミュージック", "Music");

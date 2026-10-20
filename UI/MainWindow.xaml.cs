@@ -179,6 +179,7 @@ public partial class MainWindow : Window
         LibraryBrowser.ShuffleChanged += LibraryBrowser_ShuffleChanged;
         LibraryBrowser.AutoPlayChanged += LibraryBrowser_AutoPlayChanged;
         LibraryBrowser.AutoPlayNextChanged += LibraryBrowser_AutoPlayNextChanged;
+        LibraryBrowser.AutoLoopChanged += LibraryBrowser_AutoLoopChanged;
         LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
         LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;
         LibraryBrowser.MatchLoudnessRequested += (_, _) => PromptVolume();
@@ -217,6 +218,7 @@ public partial class MainWindow : Window
         LibraryBrowser.AutoPlayEnabled = AppStorage.Settings.LibraryAutoPlay;
         LibraryBrowser.ShuffleEnabled = AppStorage.Settings.LibraryShuffle;
         LibraryBrowser.AutoPlayNextEnabled = AppStorage.Settings.LibraryAutoPlayNext;
+        LibraryBrowser.AutoLoopEnabled = AppStorage.Settings.LibraryAutoLoop;
         DpiChanged += (_, _) =>
         {
             _brandLogoDark = null;

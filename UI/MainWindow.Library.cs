@@ -3459,6 +3459,7 @@ public partial class MainWindow
             || !IsPlaybackActive()
             || _activeSession is null
             || _libraryStopAfterTrack
+            || LibraryBrowser.AutoLoopEnabled
             || !LibraryBrowser.AutoPlayNextEnabled
             || LibraryPlaylistDocuments.IsVisual(_activeSession.Document))
         {
@@ -3618,6 +3619,7 @@ public partial class MainWindow
     {
         if (!IsLibraryMaximized
             || _libraryStopAfterTrack
+            || LibraryBrowser.AutoLoopEnabled
             || !LibraryBrowser.AutoPlayNextEnabled
             || !_player.HasGaplessAdvancePending)
         {
@@ -3669,7 +3671,9 @@ public partial class MainWindow
 
     private bool TryAdvanceLibraryPlaylist()
     {
-        if (_libraryStopAfterTrack || !LibraryBrowser.AutoPlayNextEnabled)
+        if (_libraryStopAfterTrack
+            || LibraryBrowser.AutoLoopEnabled
+            || !LibraryBrowser.AutoPlayNextEnabled)
         {
             return false;
         }
@@ -5029,13 +5033,38 @@ public partial class MainWindow
             return;
         }
 
-        if (LibraryBrowser.AutoPlayNextEnabled)
+        if (LibraryBrowser.AutoPlayNextEnabled && !LibraryBrowser.AutoLoopEnabled)
         {
             ScheduleLibraryGaplessPrefetch();
         }
         else
         {
             CancelLibraryGapless();
+        }
+    }
+
+    private void LibraryBrowser_AutoLoopChanged(object? sender, EventArgs e)
+    {
+        AppStorage.Settings.LibraryAutoLoop = LibraryBrowser.AutoLoopEnabled;
+        AppStorage.Save();
+        if (!IsLibraryMaximized)
+        {
+            return;
+        }
+
+        SyncPlayWindowFromDocument();
+        if (!IsPlaybackActive())
+        {
+            return;
+        }
+
+        if (LibraryBrowser.AutoLoopEnabled)
+        {
+            CancelLibraryGapless();
+        }
+        else if (LibraryBrowser.AutoPlayNextEnabled)
+        {
+            ScheduleLibraryGaplessPrefetch();
         }
     }
 
@@ -6416,7 +6445,6 @@ public partial class MainWindow
     private bool TryRestartPlaylistVisualLoop()
     {
         if (_document is null
-            || _document.Selection.IsEmpty
             || !IsLibraryMaximized
             || !LibraryBrowser.PlaylistVisualPlaying
             || !LibraryBrowser.PlaylistVisualIsVideo)
@@ -6424,9 +6452,22 @@ public partial class MainWindow
             return false;
         }
 
+        long startFrame;
+        if (!_document.Selection.IsEmpty)
+        {
+            startFrame = _document.Selection.StartFrame;
+        }
+        else if (LibraryBrowser.AutoLoopEnabled)
+        {
+            startFrame = 0;
+        }
+        else
+        {
+            return false;
+        }
+
         LibraryBrowser.SeekPlaylistVisual(
-            TimeSpan.FromSeconds(
-                _document.Selection.StartFrame / (double)Math.Max(1, _document.SampleRate)));
+            TimeSpan.FromSeconds(startFrame / (double)Math.Max(1, _document.SampleRate)));
         EnsureLibraryVisualPlaybackClock();
         return true;
     }

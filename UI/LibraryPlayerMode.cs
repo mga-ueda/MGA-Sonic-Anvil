@@ -214,6 +214,7 @@ internal static class LibraryPlayerMode
             (Key.Enter, ModifierKeys.None or ModifierKeys.Alt or ModifierKeys.Shift
                 or ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift)) => true,
             (Key.L, ModifierKeys.None) => true,
+            (Key.L, ModifierKeys.Alt) => true,
             (Key.N, ModifierKeys.None) => true,
             (Key.N, ModifierKeys.Alt) => true,
             (Key.P, ModifierKeys.None) => true,
@@ -364,6 +365,13 @@ internal static class LibraryPlayerMode
         key == Key.N && modifiers == ModifierKeys.Alt;
 
     /// <summary>
+    /// 曲末で先頭へ戻す Auto Loop の切替。プレイリストが空でも、ツリー／お気に入り／検索フォーカスでも効く。
+    /// 素の L はループ再生のまま。
+    /// </summary>
+    public static bool IsAutoLoopToggle(Key key, ModifierKeys modifiers) =>
+        key == Key.L && modifiers == ModifierKeys.Alt;
+
+    /// <summary>
     /// Enter 追加時の自動再生の切替。プレイリストが空でも、ツリー／お気に入り／検索フォーカスでも効く。
     /// 素の P は検索入力または前の曲のまま。
     /// </summary>
@@ -377,6 +385,7 @@ internal static class LibraryPlayerMode
     public static bool BypassesSearchFocus(Key key, ModifierKeys modifiers) =>
         IsShuffleToggle(key, modifiers)
         || IsAutoPlayNextToggle(key, modifiers)
+        || IsAutoLoopToggle(key, modifiers)
         || IsAutoPlayToggle(key, modifiers)
         || IsForceVideoProxyEncode(key, modifiers);
 
@@ -1644,6 +1653,7 @@ internal static class LibraryPlayerMode
         // Enter／Space は表示解除として別処理する。
         if (IsShuffleToggle(key, modifiers)
             || IsAutoPlayNextToggle(key, modifiers)
+            || IsAutoLoopToggle(key, modifiers)
             || IsAutoPlayToggle(key, modifiers))
         {
             return true;

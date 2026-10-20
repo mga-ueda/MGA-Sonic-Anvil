@@ -1022,6 +1022,16 @@ public partial class MainWindow
             return true;
         }
 
+        // Alt+L は曲末ループ。素の L（ループ再生）より先、タイプアヘッド／検索入力より先。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && LibraryPlayerMode.IsAutoLoopToggle(key, modifiers))
+        {
+            LibraryBrowser.ToggleAutoLoop();
+            return true;
+        }
+
         // Alt+P は Enter 追加時の自動再生。素の P（前の曲）より先、タイプアヘッド／検索入力より先。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
