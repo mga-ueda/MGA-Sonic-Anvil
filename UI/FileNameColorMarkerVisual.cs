@@ -15,6 +15,34 @@ internal static class FileNameColorMarkerVisual
     /// <summary>マーカーと、その右の隙間。タブ幅と列幅に足す。</summary>
     public static double SlotWidth => Width + Gap;
 
+    /// <summary>
+    /// SnapsToDevicePixels 時、Width と Gap は別々にデバイスピクセルへ切り上げられる。
+    /// 合算してから切り上げると狭い DPI で足りなくなる。
+    /// </summary>
+    public static double SnappedSlotWidth(double pixelsPerDip)
+    {
+        var dpi = Math.Max(1e-6, pixelsPerDip);
+        var widthPx = Math.Ceiling((Width * dpi) - 1e-6);
+        var gapPx = Math.Ceiling((Gap * dpi) - 1e-6);
+        return (widthPx + gapPx) / dpi;
+    }
+
+    /// <summary>プレイリスト Name 列の1行分。マーカー無しでも末尾省略を避ける 2px を含む。</summary>
+    public static double NameColumnRowWidth(
+        double textWidth,
+        bool hasMarker,
+        double pixelsPerDip,
+        double cellPad)
+    {
+        var width = Math.Max(0, textWidth) + Math.Max(0, cellPad) + 2;
+        if (hasMarker)
+        {
+            width += SnappedSlotWidth(pixelsPerDip);
+        }
+
+        return width;
+    }
+
     private static readonly Brush[] Brushes = CreateBrushes();
 
     public static IReadOnlyList<FileNameColorChoice> Choices { get; } = CreateChoices();

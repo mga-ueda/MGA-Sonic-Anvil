@@ -981,6 +981,15 @@ internal static partial class UiStrings
             + LabelLufs;
     }
 
+    /// <summary>
+    /// プレイリスト Loudness 列の幅予約用。未計測行は空文字のため、計測後の実測値より狭くならない代表。
+    /// </summary>
+    public static IEnumerable<string> LoudnessColumnWidthSamples()
+    {
+        yield return FormatIntegratedLufs(-99.9f);
+        yield return FormatIntegratedLufs(float.NegativeInfinity);
+    }
+
     /// <summary>動画の総ビットレート。内部は kbps のまま、表示は Mbps。</summary>
     public static string FormatVideoBitRate(int kbps)
     {

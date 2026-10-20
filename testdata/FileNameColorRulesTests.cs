@@ -1,12 +1,45 @@
 using System.IO;
 using System.Text.Json;
 using MgaSonicAnvil.Config;
+using MgaSonicAnvil.UI;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
 
 public sealed class FileNameColorRulesTests
 {
+    [Theory]
+    [InlineData(1.0, 10.0)]
+    [InlineData(1.25, 10.4)]
+    [InlineData(1.5, 10.0)]
+    [InlineData(2.0, 10.0)]
+    public void SnappedSlotWidth_MatchesLayoutAtCommonDpi(double dpi, double expected)
+    {
+        Assert.Equal(expected, FileNameColorMarkerVisual.SnappedSlotWidth(dpi), 3);
+    }
+
+    [Fact]
+    public void SnappedSlotWidth_CeilingsWidthAndGapSeparately()
+    {
+        // 1.1x では合算切り上げ (11px) より、Width/Gap 別切り上げ (5+7=12px) の方が広い。
+        var snapped = FileNameColorMarkerVisual.SnappedSlotWidth(1.1);
+        var combined = Math.Ceiling((FileNameColorMarkerVisual.SlotWidth * 1.1) - 1e-6) / 1.1;
+        Assert.True(snapped > combined + 0.5, $"separate {snapped} should beat combined {combined}");
+        Assert.Equal(12 / 1.1, snapped, 3);
+    }
+
+    [Fact]
+    public void NameColumnRowWidth_AddsMarkerOnlyWhenPresent()
+    {
+        const double text = 80;
+        const double pad = 16;
+        const double dpi = 1.1;
+        var plain = FileNameColorMarkerVisual.NameColumnRowWidth(text, hasMarker: false, dpi, pad);
+        var marked = FileNameColorMarkerVisual.NameColumnRowWidth(text, hasMarker: true, dpi, pad);
+        Assert.Equal(text + pad + 2, plain, 3);
+        Assert.Equal(plain + FileNameColorMarkerVisual.SnappedSlotWidth(dpi), marked, 3);
+    }
+
     [Fact]
     public void Palette_HasTwentyEightFlatWwiseColors()
     {

@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Globalization;
+using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -2680,14 +2681,312 @@ public sealed class LibraryBrowserSelectionTests
                 view.RecalculateColumnWidths();
                 var marked = view.ColumnPixelWidth(LibraryFileColumn.Name);
                 Assert.True(
-                    marked >= plain + FileNameColorMarkerVisual.SlotWidth + 1,
+                    marked >= plain + FileNameColorMarkerVisual.SnappedSlotWidth(1),
                     $"marked {marked} should clear the marker beyond plain {plain}");
+
+                AppStorage.Settings.ApplyFileNameColorRules([]);
+                view.RefreshFileNameMarkers();
+                view.RecalculateColumnWidths();
+                var cleared = view.ColumnPixelWidth(LibraryFileColumn.Name);
+                Assert.True(
+                    cleared <= plain + 0.5,
+                    $"clearing markers should shrink back, plain {plain} cleared {cleared}");
                 window.Close();
             }
             finally
             {
                 AppStorage.Settings.ApplyFileNameColorRules(previous);
             }
+        });
+    }
+
+    [Fact]
+    public void FitColumns_MixedMarkers_UsesPerRowNeed()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var previous = AppStorage.Settings.FileNameColorRules;
+            try
+            {
+                AppStorage.Settings.ApplyFileNameColorRules(
+                [
+                    new FileNameColorRule { Pattern = "_bt_", ColorIndex = 10 },
+                ]);
+                // 長い方はマーカー無し、短い方だけマーカー。列は「長い方」か「短い方+slot」の大きい方。
+                var longPlain = Session("soundtrack_long_title_theme.wav");
+                var shortMarked = Session("bgm_bt_00.wav");
+                var view = new LibraryBrowserView();
+                view.SetVisibleColumns([LibraryFileColumn.Name]);
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 320,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+
+                view.SetSessions([longPlain], longPlain, [longPlain]);
+                Flush();
+                view.UpdateLayout();
+                view.RecalculateColumnWidths();
+                var longOnly = view.ColumnPixelWidth(LibraryFileColumn.Name);
+
+                view.SetSessions([shortMarked], shortMarked, [shortMarked]);
+                Flush();
+                view.UpdateLayout();
+                view.RecalculateColumnWidths();
+                var shortOnly = view.ColumnPixelWidth(LibraryFileColumn.Name);
+
+                view.SetSessions([longPlain, shortMarked], longPlain, [longPlain]);
+                Flush();
+                view.UpdateLayout();
+                view.RecalculateColumnWidths();
+                var mixed = view.ColumnPixelWidth(LibraryFileColumn.Name);
+
+                Assert.True(longOnly > shortOnly, $"long {longOnly} should exceed short+marker {shortOnly}");
+                Assert.True(
+                    mixed >= longOnly - 0.5 && mixed <= longOnly + 0.5,
+                    $"mixed {mixed} should follow the longer unmarked row ({longOnly}), not add a spare slot");
+                window.Close();
+            }
+            finally
+            {
+                AppStorage.Settings.ApplyFileNameColorRules(previous);
+            }
+        });
+    }
+
+    [Fact]
+    public void MeasurePlaylistText_DisplayNotNarrowerThanIdeal_ForJapanese()
+    {
+        RunSta(() =>
+        {
+            var face = new Typeface(
+                new FontFamily("Yu Gothic UI"),
+                FontStyles.Normal,
+                FontWeights.Normal,
+                FontStretches.Normal);
+            const double size = LibraryBrowserView.LibraryListFontSize;
+            const double dpi = 1;
+            foreach (var text in new[]
+                     {
+                         "効果音_爆発ループ_01.wav",
+                         "ＢＧＭ＿タイトルテーマ.wav",
+                         "背景音楽_戦闘.aiff",
+                     })
+            {
+                var ideal = new FormattedText(
+                    text,
+                    CultureInfo.CurrentUICulture,
+                    FlowDirection.LeftToRight,
+                    face,
+                    size,
+                    Brushes.Black,
+                    dpi);
+                var idealWidth = ideal.WidthIncludingTrailingWhitespace;
+                if (ideal.OverhangLeading < 0)
+                {
+                    idealWidth -= ideal.OverhangLeading;
+                }
+
+                if (ideal.OverhangAfter > 0)
+                {
+                    idealWidth += ideal.OverhangAfter;
+                }
+
+                var display = LibraryBrowserView.MeasurePlaylistText(text, face, size, dpi);
+                Assert.True(
+                    display + 0.01 >= idealWidth,
+                    $"Display ({display}) must not undercut Ideal ({idealWidth}) for '{text}'");
+            }
+        });
+    }
+
+    [Fact]
+    public void FitColumns_JapaneseFileName_ClearsTextBlockNaturalWidth()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var previous = AppStorage.Settings.FileNameColorRules;
+            try
+            {
+                AppStorage.Settings.ApplyFileNameColorRules([]);
+                var session = Session("効果音_爆発ループ_01.wav");
+                var view = new LibraryBrowserView();
+                view.SetVisibleColumns([LibraryFileColumn.Name]);
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 320,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                view.SetSessions([session], session, [session]);
+                Flush();
+                view.UpdateLayout();
+                view.RecalculateColumnWidths();
+                Flush();
+                view.UpdateLayout();
+
+                var nameText = FindDescendants<TextBlock>(view.FileGrid)
+                    .FirstOrDefault(block => block.Text == "効果音_爆発ループ_01.wav");
+                Assert.NotNull(nameText);
+
+                nameText!.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                var natural = nameText.DesiredSize.Width;
+                var column = view.ColumnPixelWidth(LibraryFileColumn.Name);
+                var available = column - (LibraryBrowserView.LibraryColumnCellPadX * 2);
+                Assert.True(
+                    available + 0.5 >= natural,
+                    $"Name column available {available} (col {column}) must clear Japanese text natural {natural}");
+
+                // NameColumnRowWidth の計算とも一致すること（計測が Ideal に戻っていないか）。
+                var face = new Typeface(
+                    new FontFamily("Yu Gothic UI"),
+                    FontStyles.Normal,
+                    FontWeights.Normal,
+                    FontStretches.Normal);
+                var measured = LibraryBrowserView.MeasurePlaylistText(
+                    "効果音_爆発ループ_01.wav",
+                    face,
+                    LibraryBrowserView.LibraryListFontSize,
+                    1);
+                var expected = FileNameColorMarkerVisual.NameColumnRowWidth(
+                    measured,
+                    hasMarker: false,
+                    pixelsPerDip: 1,
+                    LibraryBrowserView.LibraryColumnCellPadX * 2);
+                Assert.True(
+                    column + 0.5 >= Math.Ceiling(expected),
+                    $"fitted {column} should cover NameColumnRowWidth {expected}");
+                window.Close();
+            }
+            finally
+            {
+                AppStorage.Settings.ApplyFileNameColorRules(previous);
+            }
+        });
+    }
+
+    [Fact]
+    public void FitColumns_JapaneseFileNameWithMarker_ClearsSlotAndGlyphs()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var previous = AppStorage.Settings.FileNameColorRules;
+            try
+            {
+                AppStorage.Settings.ApplyFileNameColorRules(
+                [
+                    new FileNameColorRule { Pattern = "効果音", ColorIndex = 10 },
+                ]);
+                var session = Session("効果音_爆発ループ_01.wav");
+                var view = new LibraryBrowserView();
+                view.SetVisibleColumns([LibraryFileColumn.Name]);
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 320,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                view.SetSessions([session], session, [session]);
+                Flush();
+                view.UpdateLayout();
+                view.RecalculateColumnWidths();
+                Flush();
+                view.UpdateLayout();
+
+                var nameText = FindDescendants<TextBlock>(view.FileGrid)
+                    .FirstOrDefault(block => block.Text == "効果音_爆発ループ_01.wav");
+                Assert.NotNull(nameText);
+                nameText!.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                var natural = nameText.DesiredSize.Width;
+                var column = view.ColumnPixelWidth(LibraryFileColumn.Name);
+                var available = column
+                    - (LibraryBrowserView.LibraryColumnCellPadX * 2)
+                    - FileNameColorMarkerVisual.SnappedSlotWidth(1);
+                Assert.True(
+                    available + 0.5 >= natural,
+                    $"marked Name available {available} (col {column}) must clear Japanese natural {natural}");
+                window.Close();
+            }
+            finally
+            {
+                AppStorage.Settings.ApplyFileNameColorRules(previous);
+            }
+        });
+    }
+
+    [Fact]
+    public void FitColumns_ReservesLoudnessWhenUnmeasured()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var empty = Session("unmeasured.wav");
+            empty.Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                DurationSeconds = 1,
+                SampleRate = 48000,
+                Channels = 2,
+                BitsPerSample = 24,
+            });
+            var measured = Session("measured.wav");
+            measured.Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                DurationSeconds = 1,
+                SampleRate = 48000,
+                Channels = 2,
+                BitsPerSample = 24,
+                IntegratedLufs = -23.5f,
+            });
+
+            var view = new LibraryBrowserView();
+            view.SetVisibleColumns([LibraryFileColumn.Name, LibraryFileColumn.Loudness]);
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 320,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+
+            view.SetSessions([empty], empty, [empty]);
+            Flush();
+            view.UpdateLayout();
+            view.RecalculateColumnWidths();
+            var reserved = view.ColumnPixelWidth(LibraryFileColumn.Loudness);
+
+            view.SetSessions([measured], measured, [measured]);
+            Flush();
+            view.UpdateLayout();
+            view.RecalculateColumnWidths();
+            var filled = view.ColumnPixelWidth(LibraryFileColumn.Loudness);
+
+            Assert.True(
+                reserved >= filled - 0.5,
+                $"unmeasured reserve {reserved} should already clear measured {filled}");
+            Assert.True(reserved > 40, $"loudness column should not stay header-only, was {reserved}");
+
+            // Name 列はマーカー無しでも ellipsis 回避の 2px を含む（詰め込み過ぎない範囲）。
+            var nameWidth = view.ColumnPixelWidth(LibraryFileColumn.Name);
+            Assert.True(nameWidth > 24, $"name column should clear short file names, was {nameWidth}");
+            Assert.True(nameWidth < 160, $"name column should stay packed, was {nameWidth}");
+            window.Close();
         });
     }
 
