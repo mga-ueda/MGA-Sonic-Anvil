@@ -32,12 +32,27 @@ internal static class DocumentRangeDivide
         RangeDivide.HasRegionsAtEnds(range, document.Regions);
 
     /// <summary>
-    /// いまの選択内のマーカー位置と、選択内にあるリージョン端。
-    /// 選択が空なら空。セッションの等分状態には依存しない。
+    /// クリック範囲。選択があればそれ、空ならファイル全体。
+    /// </summary>
+    public static WaveSelection ClickRange(AudioDocument document)
+    {
+        if (!document.Selection.IsEmpty)
+        {
+            return document.Selection;
+        }
+
+        return document.FrameCount <= 0
+            ? WaveSelection.Empty
+            : new WaveSelection(0, document.FrameCount);
+    }
+
+    /// <summary>
+    /// クリック範囲内のマーカー位置とリージョン端。
+    /// 選択が空ならファイル全体。セッションの等分状態には依存しない。
     /// </summary>
     public static long[] ClickFrames(AudioDocument document)
     {
-        var range = document.Selection;
+        var range = ClickRange(document);
         if (range.IsEmpty)
         {
             return [];

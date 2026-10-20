@@ -321,7 +321,7 @@ public sealed class RangeDivideTests
     }
 
     [Fact]
-    public void ClickFrames_EmptyWithoutMarkersOrWhenSelectionEmpty()
+    public void ClickFrames_EmptyWithoutMarkers_UsesWholeFileWhenSelectionEmpty()
     {
         var document = MakeDocument(100);
         document.Selection = new WaveSelection(10, 90);
@@ -333,7 +333,8 @@ public sealed class RangeDivideTests
         Assert.Equal(new long[] { 10, 50, 90 }, DocumentRangeDivide.ClickFrames(document));
 
         document.Selection = WaveSelection.Empty;
-        Assert.Empty(DocumentRangeDivide.ClickFrames(document));
+        Assert.Equal(new WaveSelection(0, 100), DocumentRangeDivide.ClickRange(document));
+        Assert.Equal(new long[] { 10, 50, 90 }, DocumentRangeDivide.ClickFrames(document));
     }
 
     [Fact]

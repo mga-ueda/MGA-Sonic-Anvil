@@ -930,15 +930,16 @@ public partial class MainWindow
 
     private void SyncRangeClicks()
     {
-        if (!_rangeClickEnabled || IsLibraryMaximized || _document is null || _document.Selection.IsEmpty)
+        if (!_rangeClickEnabled || IsLibraryMaximized || _document is null)
         {
             _player.SetRangeClickFrames([]);
             return;
         }
 
         var frames = DocumentRangeDivide.ClickFrames(_document);
+        var range = DocumentRangeDivide.ClickRange(_document);
         var group = RangeClickMeter.GroupSize(
-            RangeClickMeter.BeatCount(frames, _document.Selection));
+            RangeClickMeter.BeatCount(frames, range));
         _player.SetRangeClickFrames(frames, group);
     }
 
