@@ -61,6 +61,7 @@ internal static class HitPointDetect
         }
 
         var open = SilentSkip.LinearFromDb(options.OpenThresholdDb);
+        var riseRatio = options.HitRiseRatio;
         var lookback = Math.Max(1, (sampleRate / 25) / hop);
         var minGap = Math.Max(
             SilenceDetectOptions.TimingFrames(sampleRate, options.MinGateMs),
@@ -69,7 +70,7 @@ internal static class HitPointDetect
         long last = long.MinValue / 4;
         for (var i = 0; i < hops; i++)
         {
-            if (env[i] < open || !IsLocalPeak(env, i) || !RisesFromDip(env, i, lookback))
+            if (env[i] < open || !IsLocalPeak(env, i) || !RisesFromDip(env, i, lookback, riseRatio))
             {
                 continue;
             }
@@ -125,7 +126,7 @@ internal static class HitPointDetect
     }
 
     /// <summary>平坦な持続音は谷と山がほぼ同じなので捨て、打点らしい立ち上がりだけ残す。</summary>
-    private static bool RisesFromDip(float[] env, int i, int lookback)
+    private static bool RisesFromDip(float[] env, int i, int lookback, float riseRatio)
     {
         var from = Math.Max(0, i - lookback);
         var dip = env[i];
@@ -142,6 +143,6 @@ internal static class HitPointDetect
             dip = 0;
         }
 
-        return env[i] - dip >= env[i] * 0.2f;
+        return env[i] - dip >= env[i] * riseRatio;
     }
 }

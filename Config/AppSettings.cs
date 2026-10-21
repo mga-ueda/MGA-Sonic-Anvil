@@ -214,6 +214,10 @@ internal sealed class AppSettings
     /// <summary>無音削除時のフェードアウト (ms)。設定のプチノイズ防止とは独立。既定 20。</summary>
     public int SilenceDetectFadeOutMs { get; set; } = global::MgaSonicAnvil.Audio.SilenceDetectOptions.DefaultFadeMs;
 
+    /// <summary>ヒット検出の立ち上がり比率（%）。谷→ピークの最小上昇。既定 20。</summary>
+    public int SilenceDetectHitRisePercent { get; set; } =
+        global::MgaSonicAnvil.Audio.SilenceDetectOptions.DefaultHitRisePercent;
+
     /// <summary>無音・ヒット検出ウィンドウの位置。未保存なら false。</summary>
     public bool SilenceDetectHasPlacement { get; set; }
 
@@ -236,7 +240,8 @@ internal sealed class AppSettings
             SilenceDetectPostRollMs,
             edgesOnly,
             SilenceDetectFadeInMs,
-            SilenceDetectFadeOutMs).Normalized();
+            SilenceDetectFadeOutMs,
+            SilenceDetectHitRisePercent).Normalized();
 
     public void RememberSilenceDetectOptions(global::MgaSonicAnvil.Audio.SilenceDetectOptions options)
     {
@@ -251,6 +256,7 @@ internal sealed class AppSettings
         SilenceDetectEdgesOnly = options.EdgesOnly;
         SilenceDetectFadeInMs = options.FadeInMs;
         SilenceDetectFadeOutMs = options.FadeOutMs;
+        SilenceDetectHitRisePercent = options.HitRisePercent;
     }
 
     /// <summary>録音 Silent Skip で、しきい値を下回った時点から挿入する無音の時間（ms）。再生には使わない。既定 500。</summary>

@@ -316,6 +316,11 @@ internal static partial class UiStrings
     public static string LabelSilenceDetectHitPoints => Get("ヒットポイントにマーカー(_H)", "Mark _hit points");
     public static string LabelHitPointThreshold => Get("ヒットのスレッショルド", "Hit Threshold");
     public static string LabelHitPointMinGap => Get("ヒット間隔の最小時間", "Minimum Time Between Hits");
+    public static string LabelHitPointRise => Get("立ち上がり比率", "Rise Ratio");
+    public static string LabelHitPointRiseDefault(int percent) => Format(
+        "既定{0}",
+        "Default {0}",
+        percent.ToString(System.Globalization.CultureInfo.InvariantCulture) + LabelPercent);
     public static string ConfirmSilenceDetectSelectedFiles(int count) => Format(
         "選択した {0} 個のファイルに、現在の無音・ヒット検出設定を適用しますか？",
         "Apply the current Silence & Hit Detection settings to the {0} selected files?",

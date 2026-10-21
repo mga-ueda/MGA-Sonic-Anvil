@@ -885,6 +885,135 @@
         </Setter>
     </Style>
 
+    <!-- 無音・ヒット検出: 立ち上がり比率。入力欄／Chrome 系のニュートラル進捗と丸つまみ（シアンなし）。 -->
+    <Style x:Key="SilenceDetectRiseSliderFillStyle" TargetType="RepeatButton">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border Background="{DynamicResource ScrollThumbBackBrush}"
+                            Height="{x:Static ui:DesignMetrics.SilenceDetectRiseSliderTrackHeight}"
+                            CornerRadius="2"
+                            VerticalAlignment="Center"
+                            Opacity="0.95"
+                            SnapsToDevicePixels="True" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SilenceDetectRiseSliderGapStyle" TargetType="RepeatButton">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border Background="Transparent"
+                            Height="{x:Static ui:DesignMetrics.SilenceDetectRiseSliderTrackHeight}"
+                            VerticalAlignment="Center" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SilenceDetectRiseSliderThumbStyle" TargetType="Thumb">
+        <Setter Property="Width" Value="{x:Static ui:DesignMetrics.SilenceDetectRiseSliderThumbSize}" />
+        <Setter Property="Height" Value="{x:Static ui:DesignMetrics.SilenceDetectRiseSliderThumbSize}" />
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Grid Width="{x:Static ui:DesignMetrics.SilenceDetectRiseSliderThumbSize}"
+                          Height="{x:Static ui:DesignMetrics.SilenceDetectRiseSliderThumbSize}">
+                        <Ellipse x:Name="Halo"
+                                 Margin="-2"
+                                 Fill="{DynamicResource PrimaryForeBrush}"
+                                 Opacity="0"
+                                 IsHitTestVisible="False" />
+                        <Ellipse x:Name="Dot"
+                                 Margin="1"
+                                 Fill="{DynamicResource SpectrogramBoostThumbFillBrush}"
+                                 Stroke="{DynamicResource ChromeBorderBrush}"
+                                 StrokeThickness="1.5"
+                                 SnapsToDevicePixels="True" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Halo" Property="Opacity" Value="0.18" />
+                            <Setter TargetName="Dot" Property="Fill" Value="{DynamicResource SpectrogramBoostThumbHoverFillBrush}" />
+                            <Setter TargetName="Dot" Property="Stroke" Value="{DynamicResource ControlHoverBorderBrush}" />
+                            <Setter TargetName="Dot" Property="StrokeThickness" Value="1.8" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="Halo" Property="Opacity" Value="0.28" />
+                            <Setter TargetName="Dot" Property="Fill" Value="{DynamicResource SpectrogramBoostThumbHoverFillBrush}" />
+                            <Setter TargetName="Dot" Property="Stroke" Value="{DynamicResource ScrollThumbGripBrush}" />
+                            <Setter TargetName="Dot" Property="StrokeThickness" Value="2" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SilenceDetectRiseSliderStyle" TargetType="Slider">
+        <Setter Property="Orientation" Value="Horizontal" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="IsMoveToPointEnabled" Value="True" />
+        <Setter Property="IsDirectionReversed" Value="False" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Width" Value="{x:Static ui:DesignMetrics.SilenceDetectRiseSliderWidth}" />
+        <Setter Property="MinWidth" Value="{x:Static ui:DesignMetrics.SilenceDetectRiseSliderWidth}" />
+        <Setter Property="Height" Value="{x:Static ui:DesignMetrics.AudioInputHeight}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid Background="Transparent"
+                          SnapsToDevicePixels="True"
+                          UseLayoutRounding="True">
+                        <Border x:Name="TrackBack"
+                                Height="{x:Static ui:DesignMetrics.SilenceDetectRiseSliderTrackHeight}"
+                                Margin="7,0"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource TimelineWellBackBrush}"
+                                BorderBrush="{DynamicResource ChromeBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="2"
+                                SnapsToDevicePixels="True" />
+                        <Track x:Name="PART_Track">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource SilenceDetectRiseSliderFillStyle}"
+                                              Command="{x:Static Slider.DecreaseLarge}" />
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource SilenceDetectRiseSliderGapStyle}"
+                                              Command="{x:Static Slider.IncreaseLarge}" />
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource SilenceDetectRiseSliderThumbStyle}"
+                                       Cursor="Hand" />
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="TrackBack" Property="BorderBrush" Value="{DynamicResource ControlHoverBorderBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="TimeScrollBarStyle" TargetType="ScrollBar">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Orientation" Value="Horizontal" />
