@@ -265,8 +265,8 @@ internal static partial class UiStrings
     public static string LabelAppLaunchModePlayer => Get("プレイヤー（通常）", "Player (normal)");
     public static string LabelAppLaunchModePlayerCompact => Get("プレイヤー（コンパクト）", "Player (compact)");
     public static string LabelAppLaunchModeHint => Get(
-        "ファイルを渡さず、前回の編集も復元しないときだけ",
-        "Only when no file is passed and nothing is restored");
+        "ファイルを渡さず、前回の編集も復元しない時だけ有効",
+        "Only effective when no file is passed and nothing is restored");
     public static string LabelDefaultAudioFormat => Get("既定 Wave フォーマット", "Default Wave format");
     public static string LabelDefaultSampleRate => Get("サンプルレート", "Sample rate");
     public static string LabelDefaultBitDepth => Get("ビット深度", "Bit depth");
@@ -342,7 +342,10 @@ internal static partial class UiStrings
     public static string LabelKbps => Get("kbps", "kbps");
     public static string LabelLamePath => Get("LAME のパス", "LAME Path");
     public static string LabelLameOptions => Get("LAME オプション", "LAME Options");
-    public static string LabelExportParallel => Get("同時書き出し本数", "Parallel export count");
+    public static string LabelExportParallel => Get("同時処理数", "Parallel job count");
+    public static string LabelExportParallelHint => Get(
+        "Auto を推奨。手動の場合、CPU コア数の 1/2 までを推奨",
+        "Auto recommended. For manual, up to ½ of CPU cores");
     public static string LabelExportParallelAuto(int workers) => Format(
         "Auto（{0}）",
         "Auto ({0})",

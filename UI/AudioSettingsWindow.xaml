@@ -31,13 +31,14 @@
         <TabItem Header="{x:Static domain:UiStrings.LabelSettingsTabGeneral}">
           <StackPanel MaxWidth="{x:Static ui:DesignMetrics.SettingsPanelWidth}"
                       HorizontalAlignment="Left">
-            <Grid HorizontalAlignment="Left">
+            <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" MinWidth="120" />
               </Grid.ColumnDefinitions>
               <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -104,6 +105,35 @@
                          Foreground="{DynamicResource MutedForeBrush}"
                          VerticalAlignment="Center"
                          Margin="8,8,0,0" />
+              <TextBlock x:Name="ExportParallelLabel"
+                         Grid.Row="4"
+                         Text="{x:Static domain:UiStrings.LabelExportParallel}"
+                         VerticalAlignment="Center"
+                         Margin="0,8,8,0" />
+              <Grid Grid.Row="4"
+                    Grid.Column="1"
+                    Grid.ColumnSpan="2"
+                    Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ComboBox x:Name="ExportParallelCombo"
+                          HorizontalAlignment="Left"
+                          Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                          Padding="6,1"
+                          FontSize="11.333"
+                          VerticalContentAlignment="Center"
+                          SelectionChanged="ExportParallelCombo_SelectionChanged" />
+                <TextBlock x:Name="ExportParallelHint"
+                           Grid.Column="1"
+                           Text="{x:Static domain:UiStrings.LabelExportParallelHint}"
+                           FontSize="11.333"
+                           Foreground="{DynamicResource MutedForeBrush}"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="8,0,0,0" />
+              </Grid>
             </Grid>
 
             <TextBlock Text="{x:Static domain:UiStrings.LabelWallpaper}"
@@ -892,7 +922,7 @@
                      VerticalContentAlignment="Center"
                      Margin="0,0,0,12" />
 
-            <Grid HorizontalAlignment="Left" Margin="0,0,0,12">
+            <Grid HorizontalAlignment="Left" Margin="0,0,0,20">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
@@ -908,25 +938,6 @@
                         Padding="6,1"
                         FontSize="11.333"
                         VerticalContentAlignment="Center" />
-            </Grid>
-
-            <Grid HorizontalAlignment="Left" Margin="0,0,0,20">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <TextBlock x:Name="ExportParallelLabel"
-                         Text="{x:Static domain:UiStrings.LabelExportParallel}"
-                         VerticalAlignment="Center"
-                         Margin="0,0,8,0" />
-              <ComboBox x:Name="ExportParallelCombo"
-                        Grid.Column="1"
-                        HorizontalAlignment="Left"
-                        Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                        Padding="6,1"
-                        FontSize="11.333"
-                        VerticalContentAlignment="Center"
-                        SelectionChanged="ExportParallelCombo_SelectionChanged" />
             </Grid>
 
             <TextBlock x:Name="ExportMovieHeader"
