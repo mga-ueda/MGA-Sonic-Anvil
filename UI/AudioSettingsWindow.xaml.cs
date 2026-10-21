@@ -50,6 +50,9 @@ internal partial class AudioSettingsWindow : Window
 
     public FileNameColorRule[] SelectedFileNameColorRules { get; private set; } = [];
 
+    /// <summary>色設定パネル（Ctrl+Shift+C）を開く。メインウィンドウ側で接続する。</summary>
+    public Action? OpenColorSettings { get; set; }
+
     private FileNameColorMarkerSettingsEditor? _fileNameColorMarkers;
 
     public int SelectedMp3BitRate { get; private set; }
@@ -360,7 +363,9 @@ internal partial class AudioSettingsWindow : Window
             FileNameColorMarkerHost,
             FileNameColorMarkerAddButton);
         _fileNameColorMarkers.Load(AppStorage.Settings.FileNameColorRules);
+        ActionButtonLooks.ApplyClear(OpenColorSettingsButton);
         ActionButtonLooks.ApplyClear(FileNameColorMarkerAddButton);
+        AppDialogKeys.PrepareActionButton(OpenColorSettingsButton);
         AppDialogKeys.PrepareActionButton(FileNameColorMarkerAddButton);
         FillWindowsBitRates(SelectedMp3BitRate);
         LamePathBox.Text = SelectedLameExePath;
@@ -1402,6 +1407,9 @@ internal partial class AudioSettingsWindow : Window
         window.LibraryBrowser.ApplyWallpaper(_wallpaperPathOpenedAt, _wallpaperOpacityOpenedAt);
     }
 
+    private void OpenColorSettingsButton_Click(object sender, RoutedEventArgs e) =>
+        OpenColorSettings?.Invoke();
+
     private void WallpaperBrowseButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog
@@ -2392,6 +2400,7 @@ internal partial class AudioSettingsWindow : Window
         {
             UiStrings.LabelSettingsTabGeneral,
             UiStrings.LabelSettingsTabLayouts,
+            UiStrings.LabelSettingsTabColor,
             UiStrings.LabelSettingsTabAudio,
             UiStrings.LabelSettingsTabPlayer,
             UiStrings.LabelSettingsTabEditing,
@@ -2656,6 +2665,8 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(AssociationAllOffButton);
         ActionButtonLooks.ApplyClear(WallpaperBrowseButton);
         ActionButtonLooks.ApplyClear(WallpaperClearButton);
+        ActionButtonLooks.ApplyClear(OpenColorSettingsButton);
+        ActionButtonLooks.ApplyClear(FileNameColorMarkerAddButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
         RefreshTestButtons();

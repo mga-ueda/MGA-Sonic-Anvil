@@ -2221,6 +2221,7 @@ public partial class MainWindow
             settings.ResolvedWallpaperOpacity())
         {
             Owner = this,
+            OpenColorSettings = ShowColorDevPanel,
         };
 
                 bool? accepted;

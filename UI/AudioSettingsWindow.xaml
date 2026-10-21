@@ -399,6 +399,56 @@
           </Grid>
         </TabItem>
 
+        <TabItem x:Name="ColorTab" Header="{x:Static domain:UiStrings.LabelSettingsTabColor}">
+          <Grid MaxWidth="{x:Static ui:DesignMetrics.SettingsPanelWidth}"
+                HorizontalAlignment="Left">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <StackPanel>
+              <TextBlock Text="{x:Static domain:UiStrings.LabelUiColorSettings}"
+                         FontWeight="Bold"
+                         FontSize="11.333"
+                         Margin="0,0,0,6" />
+              <TextBlock Text="{x:Static domain:UiStrings.HintUiColorSettings}"
+                         FontSize="11.333"
+                         Foreground="{DynamicResource MutedForeBrush}"
+                         TextWrapping="Wrap"
+                         Margin="0,0,0,8" />
+              <ui:RoundedButton x:Name="OpenColorSettingsButton"
+                                Content="{x:Static domain:UiStrings.ButtonOpenColorSettings}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="72"
+                                Padding="12,0"
+                                HorizontalAlignment="Left"
+                                Margin="0,0,0,20"
+                                Click="OpenColorSettingsButton_Click" />
+
+              <TextBlock Text="{x:Static domain:UiStrings.LabelFileNameColorMarkers}"
+                         FontWeight="Bold"
+                         FontSize="11.333"
+                         Margin="0,0,0,6" />
+              <TextBlock Text="{x:Static domain:UiStrings.HintFileNameColorMarkers}"
+                         FontSize="11.333"
+                         Foreground="{DynamicResource MutedForeBrush}"
+                         TextWrapping="Wrap"
+                         Margin="0,0,0,8" />
+            </StackPanel>
+            <ScrollViewer Grid.Row="1"
+                          Style="{StaticResource SettingsColumnScrollViewerStyle}">
+              <StackPanel x:Name="FileNameColorMarkerHost">
+                <ui:RoundedButton x:Name="FileNameColorMarkerAddButton"
+                                  Content="{x:Static domain:UiStrings.ButtonFileNameColorMarkerAdd}"
+                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                  MinWidth="72"
+                                  Padding="12,0"
+                                  HorizontalAlignment="Left" />
+              </StackPanel>
+            </ScrollViewer>
+          </Grid>
+        </TabItem>
+
         <TabItem x:Name="AudioTab" Header="{x:Static domain:UiStrings.LabelSettingsTabAudio}">
           <Grid x:Name="AudioTabBody">
             <Grid.RowDefinitions>
@@ -953,13 +1003,8 @@
         </TabItem>
 
         <TabItem Header="{x:Static domain:UiStrings.LabelSettingsTabWwise}">
-          <Grid MaxWidth="{x:Static ui:DesignMetrics.SettingsPanelWidth}"
-                HorizontalAlignment="Stretch">
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-            <StackPanel>
+          <StackPanel MaxWidth="{x:Static ui:DesignMetrics.SettingsPanelWidth}"
+                      HorizontalAlignment="Left">
             <TextBlock x:Name="WwisePrefetchLengthLabel"
                        Text="{x:Static domain:UiStrings.LabelWwisePrefetchLength}"
                        Margin="0,0,0,3" />
@@ -1007,29 +1052,7 @@
                          VerticalAlignment="Center"
                          Margin="8,0,0,0" />
             </Grid>
-
-            <TextBlock Text="{x:Static domain:UiStrings.LabelFileNameColorMarkers}"
-                       FontWeight="Bold"
-                       FontSize="11.333"
-                       Margin="0,16,0,6" />
-            <TextBlock Text="{x:Static domain:UiStrings.HintFileNameColorMarkers}"
-                       FontSize="11.333"
-                       Foreground="{DynamicResource MutedForeBrush}"
-                       TextWrapping="Wrap"
-                       Margin="0,0,0,8" />
-            </StackPanel>
-            <ScrollViewer Grid.Row="1"
-                          Style="{StaticResource SettingsColumnScrollViewerStyle}">
-              <StackPanel x:Name="FileNameColorMarkerHost">
-                <ui:RoundedButton x:Name="FileNameColorMarkerAddButton"
-                                  Content="{x:Static domain:UiStrings.ButtonFileNameColorMarkerAdd}"
-                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                                  MinWidth="72"
-                                  Padding="12,0"
-                                  HorizontalAlignment="Left" />
-              </StackPanel>
-            </ScrollViewer>
-          </Grid>
+          </StackPanel>
         </TabItem>
       </TabControl>
 
