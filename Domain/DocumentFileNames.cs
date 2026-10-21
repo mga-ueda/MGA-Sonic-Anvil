@@ -126,7 +126,7 @@ internal static class DocumentFileNames
             Path.GetFileName(destination),
             StringComparison.Ordinal);
 
-    /// <summary>クリップボード用。複数は CRLF 区切り。無題は表示名。</summary>
+    /// <summary>クリップボード用。複数は CRLF 区切り・名前順。無題は表示名。</summary>
     public static string ClipboardFileNames(IReadOnlyList<(string? SourcePath, string DisplayName)> items)
     {
         if (items.Count == 0)
@@ -144,10 +144,10 @@ internal static class DocumentFileNames
             }
         }
 
-        return lines.Count == 0 ? string.Empty : string.Join("\r\n", lines);
+        return JoinClipboardLines(lines);
     }
 
-    /// <summary>パス一覧からファイル名／フォルダ名だけ。複数は CRLF。</summary>
+    /// <summary>パス一覧からファイル名／フォルダ名だけ。複数は CRLF・名前順。</summary>
     public static string ClipboardFileNames(IEnumerable<string?> paths)
     {
         ArgumentNullException.ThrowIfNull(paths);
@@ -161,10 +161,10 @@ internal static class DocumentFileNames
             }
         }
 
-        return lines.Count == 0 ? string.Empty : string.Join("\r\n", lines);
+        return JoinClipboardLines(lines);
     }
 
-    /// <summary>フルパス。無い／無効なパスは落とす。複数は CRLF。</summary>
+    /// <summary>フルパス。無い／無効なパスは落とす。複数は CRLF・パス順。</summary>
     public static string ClipboardFullPaths(IEnumerable<string?> paths)
     {
         ArgumentNullException.ThrowIfNull(paths);
@@ -186,7 +186,18 @@ internal static class DocumentFileNames
             }
         }
 
-        return lines.Count == 0 ? string.Empty : string.Join("\r\n", lines);
+        return JoinClipboardLines(lines);
+    }
+
+    private static string JoinClipboardLines(List<string> lines)
+    {
+        if (lines.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        lines.Sort(StringComparer.OrdinalIgnoreCase);
+        return string.Join("\r\n", lines);
     }
 
     public static string FileNameForClipboard(string? path)
