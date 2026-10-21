@@ -78,16 +78,16 @@ public sealed class DocumentFileNamesTests
     }
 
     [Fact]
-    public void ClipboardFileNames_JoinsNamesAndKeepsUntitledDisplay()
+    public void ClipboardFileNames_JoinsNamesSortedAndKeepsUntitledDisplay()
     {
         var text = DocumentFileNames.ClipboardFileNames(
         [
-            (@"D:\src\a.wav", "a.wav"),
-            (null, "無題"),
             (@"D:\src\b.wav", "b.wav"),
+            (null, "無題"),
+            (@"D:\src\a.wav", "a.wav"),
         ]);
-        Assert.Equal("a.wav\r\n無題\r\nb.wav", text);
-        Assert.Equal("tone.wav\r\nfolder", DocumentFileNames.ClipboardFileNames(
+        Assert.Equal("a.wav\r\nb.wav\r\n無題", text);
+        Assert.Equal("folder\r\ntone.wav", DocumentFileNames.ClipboardFileNames(
         [
             @"D:\src\tone.wav",
             @"D:\src\folder\",
@@ -95,11 +95,11 @@ public sealed class DocumentFileNamesTests
     }
 
     [Fact]
-    public void ClipboardFullPaths_JoinsResolvedPathsAndSkipsEmpty()
+    public void ClipboardFullPaths_JoinsResolvedPathsSortedAndSkipsEmpty()
     {
         var a = Path.Combine(Path.GetTempPath(), "a.wav");
         var b = Path.Combine(Path.GetTempPath(), "b.wav");
-        var text = DocumentFileNames.ClipboardFullPaths([a, null, "  ", b]);
+        var text = DocumentFileNames.ClipboardFullPaths([b, null, "  ", a]);
         Assert.Equal(Path.GetFullPath(a) + "\r\n" + Path.GetFullPath(b), text);
         Assert.Equal(string.Empty, DocumentFileNames.ClipboardFullPaths([null, ""]));
     }
