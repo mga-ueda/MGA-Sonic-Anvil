@@ -665,9 +665,11 @@ public partial class MainWindow : Window
                 return;
             }
 
+            // タイル表示中に新規タブなどを足した直後はペインがまだ無い。
+            // タブバーだけ更新して return するとタイルに載らないので、欠けているペインを組み立てる。
             _activeSession = session;
             RebuildTabBar();
-            RefreshTileChrome();
+            NotifyWaveformSessionsChanged();
             TryApplyAutoSpeaker();
             return;
         }
