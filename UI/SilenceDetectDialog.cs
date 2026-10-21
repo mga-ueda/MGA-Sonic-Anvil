@@ -62,6 +62,9 @@ internal sealed class SilenceDetectDialog : Window
     private readonly StackPanel _minCloseRow;
     private readonly StackPanel _preRollRow;
     private readonly StackPanel _postRollRow;
+    private readonly StackPanel _riseRow;
+    private readonly Slider _riseSlider;
+    private readonly TextBlock _riseValueText;
     private readonly RoundedButton _applyButton;
     private SilenceDetectOptions _options;
     private bool _updatingText;
@@ -164,6 +167,23 @@ internal sealed class SilenceDetectDialog : Window
         _postRollBox = CreateMsBox(_options.PostRollMs);
         _fadeInBox = CreateMsBox(_options.FadeInMs);
         _fadeOutBox = CreateMsBox(_options.FadeOutMs);
+        _riseSlider = CreateRiseSlider(_options.HitRisePercent);
+        _riseValueText = new TextBlock
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0),
+            MinWidth = DesignMetrics.From96(36),
+            Text = FormatRisePercent(_options.HitRisePercent),
+        };
+        var riseDefaultText = new TextBlock
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0),
+            Opacity = 0.55,
+            // 既定値の目安。スライダー値には追従しない。
+            Text = UiStrings.LabelHitPointRiseDefault(SilenceDetectOptions.DefaultHitRisePercent),
+        };
+        riseDefaultText.SetResourceReference(TextBlock.ForegroundProperty, "ChromeDimBrush");
 
         WireDbBox(_openBox, open: true);
         WireDbBox(_closeBox, open: false);
@@ -173,6 +193,7 @@ internal sealed class SilenceDetectDialog : Window
         WireMsBox(_postRollBox);
         WireMsBox(_fadeInBox);
         WireMsBox(_fadeOutBox);
+        WireRiseSlider(_riseSlider);
         _linkBox.Checked += (_, _) => OnLinkChanged(linked: true);
         _linkBox.Unchecked += (_, _) => OnLinkChanged(linked: false);
 
@@ -245,6 +266,7 @@ internal sealed class SilenceDetectDialog : Window
         _minCloseRow = LabeledMsRow(UiStrings.LabelSilenceDetectMinClose, _minCloseBox);
         _preRollRow = LabeledMsRow(UiStrings.LabelSilenceDetectPreRoll, _preRollBox);
         _postRollRow = LabeledMsRow(UiStrings.LabelSilenceDetectPostRoll, _postRollBox);
+        _riseRow = LabeledRiseRow(UiStrings.LabelHitPointRise, _riseSlider, _riseValueText, riseDefaultText);
 
         var leftCol = new StackPanel { Margin = new Thickness(0, 0, 16, 0) };
         leftCol.Children.Add(_statusText);
@@ -257,6 +279,7 @@ internal sealed class SilenceDetectDialog : Window
         var rightCol = new StackPanel();
         rightCol.Children.Add(_minGateRow);
         rightCol.Children.Add(_minCloseRow);
+        rightCol.Children.Add(_riseRow);
         rightCol.Children.Add(_preRollRow);
         rightCol.Children.Add(_postRollRow);
 
@@ -452,6 +475,7 @@ internal sealed class SilenceDetectDialog : Window
 
         var entire = _entireRadio.IsChecked == true;
         SetParamEnabled(_minGateRow, _minGateBox, hitPoints || entire);
+        SetParamEnabled(_riseRow, _riseSlider, hitPoints);
         SetParamEnabled(_minCloseRow, _minCloseBox, !hitPoints);
         SetParamEnabled(_preRollRow, _preRollBox, !hitPoints);
         SetParamEnabled(_postRollRow, _postRollBox, !hitPoints);
@@ -480,11 +504,11 @@ internal sealed class SilenceDetectDialog : Window
         _preview.HitPointMode = hitPoints;
     }
 
-    private static void SetParamEnabled(StackPanel row, TextBox box, bool enabled)
+    private static void SetParamEnabled(StackPanel row, UIElement control, bool enabled)
     {
         row.IsEnabled = enabled;
         row.Opacity = enabled ? 1 : 0.55;
-        box.IsEnabled = enabled;
+        control.IsEnabled = enabled;
     }
 
     private static TextBlock RowLabel(StackPanel row) => (TextBlock)row.Children[0];
@@ -577,6 +601,11 @@ internal sealed class SilenceDetectDialog : Window
             _options = _options with { FadeOutMs = fadeOut };
         }
 
+        _options = _options with
+        {
+            HitRisePercent = SilenceDetectOptions.ClampHitRisePercent((int)Math.Round(_riseSlider.Value)),
+        };
+
         _options = _options.Normalized();
         PaintBoxesFromOptions();
     }
@@ -591,6 +620,8 @@ internal sealed class SilenceDetectDialog : Window
         _postRollBox.Text = _options.PostRollMs.ToString(CultureInfo.InvariantCulture);
         _fadeInBox.Text = _options.FadeInMs.ToString(CultureInfo.InvariantCulture);
         _fadeOutBox.Text = _options.FadeOutMs.ToString(CultureInfo.InvariantCulture);
+        _riseSlider.Value = _options.HitRisePercent;
+        _riseValueText.Text = FormatRisePercent(_options.HitRisePercent);
         _updatingText = false;
     }
 
@@ -738,6 +769,89 @@ internal sealed class SilenceDetectDialog : Window
     {
         var box = CreateSettingsStyleNumberBox(ms.ToString(CultureInfo.InvariantCulture));
                 return box;
+    }
+
+    private Slider CreateRiseSlider(int percent)
+    {
+        percent = SilenceDetectOptions.ClampHitRisePercent(percent);
+        var slider = new Slider
+        {
+            Minimum = SilenceDetectOptions.MinHitRisePercent,
+            Maximum = SilenceDetectOptions.MaxHitRisePercent,
+            Value = percent,
+            SmallChange = 1,
+            LargeChange = 5,
+            TickFrequency = 1,
+            IsSnapToTickEnabled = true,
+            IsMoveToPointEnabled = true,
+            FocusVisualStyle = null,
+            Cursor = Cursors.Hand,
+        };
+        slider.SetResourceReference(StyleProperty, "SilenceDetectRiseSliderStyle");
+        return slider;
+    }
+
+    private void WireRiseSlider(Slider slider)
+    {
+        slider.ValueChanged += (_, _) =>
+        {
+            if (_updatingText)
+            {
+                return;
+            }
+
+            // 表示％は即時。再検出はオープンスレッショルドのホイールと同じ 1 秒デバウンス。
+            var percent = SilenceDetectOptions.ClampHitRisePercent((int)Math.Round(slider.Value));
+            _riseValueText.Text = FormatRisePercent(percent);
+            _options = _options.Normalized() with { HitRisePercent = percent };
+            _openWheelPreviewTimer.Stop();
+            _openWheelPreviewTimer.Start();
+        };
+        slider.PreviewMouseWheel += (_, e) =>
+        {
+            e.Handled = true;
+            var next = SilenceDetectOptions.ClampHitRisePercent(
+                (int)Math.Round(slider.Value) + Math.Sign(e.Delta));
+            if ((int)Math.Round(slider.Value) == next)
+            {
+                return;
+            }
+
+            slider.Value = next;
+        };
+    }
+
+    private static string FormatRisePercent(int percent) =>
+        SilenceDetectOptions.ClampHitRisePercent(percent).ToString(CultureInfo.InvariantCulture)
+        + UiStrings.LabelPercent;
+
+    private static StackPanel LabeledRiseRow(
+        string label,
+        Slider slider,
+        TextBlock valueText,
+        TextBlock defaultText)
+    {
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 0, 0, 4),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        row.Children.Add(new TextBlock
+        {
+            Text = label,
+            Width = DesignMetrics.From96(180),
+            VerticalAlignment = VerticalAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 4, 0),
+        });
+        row.Children.Add(slider);
+        valueText.Margin = new Thickness(10, 0, 0, 0);
+        valueText.MinWidth = DesignMetrics.From96(40);
+        valueText.VerticalAlignment = VerticalAlignment.Center;
+        row.Children.Add(valueText);
+        row.Children.Add(defaultText);
+        return row;
     }
 
     private TextBox CreateSettingsStyleNumberBox(string text)

@@ -114,6 +114,15 @@ internal static class DesignMetrics
     /// <summary>ブーストバーの上下余白。</summary>
     public static double SpectrogramBoostBarPad => From96(8);
 
+    /// <summary>無音・ヒット検出の立ち上がり比率スライダー幅。</summary>
+    public static double SilenceDetectRiseSliderWidth => From96(160);
+
+    /// <summary>立ち上がり比率スライダーのトラック太さ。</summary>
+    public static double SilenceDetectRiseSliderTrackHeight => From96(4);
+
+    /// <summary>立ち上がり比率スライダーの丸つまみ。</summary>
+    public static double SilenceDetectRiseSliderThumbSize => From96(14);
+
     /// <summary>右寄せ dB 目盛の幅（数字＋隙間）。重ね表示のとき、バーはこの左側で中央。</summary>
     public static double SpectrogramBoostLabelReserve(double labelWidth) =>
         7 + Math.Max(0, labelWidth);

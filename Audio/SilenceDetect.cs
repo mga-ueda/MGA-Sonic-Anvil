@@ -13,7 +13,9 @@ internal readonly record struct SilenceDetectOptions(
     int PostRollMs,
     bool EdgesOnly,
     int FadeInMs = ClickGuard.DefaultFadeMilliseconds,
-    int FadeOutMs = ClickGuard.DefaultFadeMilliseconds)
+    int FadeOutMs = ClickGuard.DefaultFadeMilliseconds,
+    // 既定は DefaultHitRisePercent（20）。プライマリ ctor 既定値からは型内 const を参照できない。
+    int HitRisePercent = 20)
 {
     /// <summary>無音検出のオープンスレッショルド既定（dBFS）。Silent Skip の -60 とは別。</summary>
     public const double DefaultOpenThresholdDb = -5;
@@ -24,6 +26,10 @@ internal readonly record struct SilenceDetectOptions(
     public const int MinFadeMs = 0;
     public const int MaxFadeMs = ClickGuard.MaxFadeMilliseconds;
     public const int DefaultFadeMs = ClickGuard.DefaultFadeMilliseconds;
+    /// <summary>ヒット検出: 谷からピークへの最小上昇比率（%）。既定 20（旧ハードコード相当）。</summary>
+    public const int DefaultHitRisePercent = 20;
+    public const int MinHitRisePercent = 5;
+    public const int MaxHitRisePercent = 100;
 
     /// <summary>旧来の無音削除互換。ピークカバー境界そのまま（ゲート結合なし、クローズ即時）。</summary>
     public static SilenceDetectOptions FromThreshold(
@@ -67,6 +73,7 @@ internal readonly record struct SilenceDetectOptions(
             PostRollMs = ClampTimingMs(PostRollMs),
             FadeInMs = ClampFadeMs(FadeInMs),
             FadeOutMs = ClampFadeMs(FadeOutMs),
+            HitRisePercent = ClampHitRisePercent(HitRisePercent),
         };
     }
 
@@ -75,6 +82,12 @@ internal readonly record struct SilenceDetectOptions(
 
     public static int ClampFadeMs(int value) =>
         Math.Clamp(value, MinFadeMs, MaxFadeMs);
+
+    public static int ClampHitRisePercent(int value) =>
+        Math.Clamp(value, MinHitRisePercent, MaxHitRisePercent);
+
+    /// <summary>ヒット検出に渡す線形比率（0.05〜1.00）。</summary>
+    public float HitRiseRatio => ClampHitRisePercent(HitRisePercent) / 100f;
 
     public static int TimingFrames(int sampleRate, int ms) =>
         (int)((long)Math.Max(1, sampleRate) * ClampTimingMs(ms) / 1000);
