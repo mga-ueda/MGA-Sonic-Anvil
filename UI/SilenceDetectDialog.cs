@@ -114,7 +114,7 @@ internal sealed class SilenceDetectDialog : Window
 
         Title = UiStrings.DialogSilenceDetectTitle;
         WindowStyle = WindowStyle.SingleBorderWindow;
-        ResizeMode = ResizeMode.CanResize;
+        ResizeMode = ResizeMode.CanResizeWithGrip;
         ShowInTaskbar = false;
         SourceInitialized += (_, _) => DisableMinimizeBox(this);
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
