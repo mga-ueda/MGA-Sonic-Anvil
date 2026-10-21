@@ -165,7 +165,8 @@ internal static class UiThemePalette
         ["WaveZeroLineBrush"] = Argb(0x99, 0x2A, 0x2A, 0x2A),
         ["TimelineWellBackBrush"] = Rgb(0xEE, 0xEF, 0xF2),
         ["WaveformTileActiveHeaderBrush"] = Rgb(0xB8, 0xD0, 0xE8),
-        ["WaveformTileDividerBrush"] = Argb(0x00, 0x00, 0x00, 0x00),
+        // ライトでも約 2% の黒。境がやっと分かる敷居。
+        ["WaveformTileDividerBrush"] = Argb(0x06, 0x00, 0x00, 0x00),
         ["TileSearchVeilBrush"] = Argb(0x8C, 0x00, 0x00, 0x00),
         ["ChannelLabelOnTintForeBrush"] = Rgb(0xFF, 0xFF, 0xFF),
         ["MouseGuideBrush"] = Argb(0x8C, 0x5E, 0x5E, 0x62),

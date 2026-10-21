@@ -44,12 +44,18 @@ public partial class MainWindow
         AfterEdit();
     }
 
+    /// <summary>新規ファイルの初期長さ。0 秒だとタイルに波形が出ないので、約 10 秒の無音で始める。</summary>
+    private const double NewDocumentSilenceSeconds = 10;
+
     private DocumentSession CreateEmptyDocument(DefaultAudioFormat.Spec format)
     {
+        var channels = Math.Max(1, format.Channels);
+        var frames = Math.Max(1, (int)Math.Round(format.SampleRate * NewDocumentSilenceSeconds));
+        var samples = new float[checked(frames * channels)];
         var document = new AudioDocument(
-            [],
+            samples,
             format.SampleRate,
-            Math.Max(1, format.Channels),
+            channels,
             format.BitsPerSample,
             AudioFileKind.Wave,
             null);
