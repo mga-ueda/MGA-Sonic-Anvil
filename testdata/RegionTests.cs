@@ -323,19 +323,19 @@ public sealed class RegionTests
     }
 
     [Fact]
-    public void PackFlagRow_ShortRegionKeepsBothStemsVisible()
+    public void PackFlagRow_InOutOverlap_KeepsFullWidths()
     {
+        // イン／アウトは縮めず重ねる。手前表示は描画順側の責務。
         var packed = WaveformView.PackFlagRow(
         [
             new WaveformView.PackedTimelineFlag(10, 20, GrowLeft: false),
-            new WaveformView.PackedTimelineFlag(18, 20, GrowLeft: true),
+            new WaveformView.PackedTimelineFlag(16, 20, GrowLeft: true),
         ]);
-        Assert.Equal(2, packed.Length);
-        Assert.True(packed[0].Right <= packed[1].Left + 0.001);
-        Assert.True(packed[0].Width >= 1);
-        Assert.True(packed[1].Width >= 1);
-        Assert.Equal(10, packed[0].StemX);
-        Assert.Equal(18, packed[1].StemX);
+        Assert.Equal(20, packed[0].Width);
+        Assert.Equal(20, packed[1].Width);
+        Assert.False(packed[0].GrowLeft);
+        Assert.True(packed[1].GrowLeft);
+        Assert.True(packed[0].Right > packed[1].Left);
     }
 
     [Fact]

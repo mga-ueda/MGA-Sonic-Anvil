@@ -5198,15 +5198,7 @@ internal sealed class WaveformView : Grid
 
             if (!a.GrowLeft && b.GrowLeft)
             {
-                var gap = b.StemX - a.StemX;
-                if (gap <= 0)
-                {
-                    continue;
-                }
-
-                var mid = a.StemX + gap * 0.5;
-                packed[i] = a with { Width = Math.Min(a.Width, Math.Max(1, mid - a.StemX)) };
-                packed[j] = b with { Width = Math.Min(b.Width, Math.Max(1, b.StemX - mid)) };
+                // イン／アウトは幅を変えず重ねる。表示優先は描画順（イン手前）だけ。
                 continue;
             }
 
@@ -5599,12 +5591,19 @@ internal sealed class WaveformView : Grid
         var selectedPen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("MarkerSelectedBorderBrush")), 1);
         selectedPen.Freeze();
         var lane = MarkerLaneBounds(bounds);
+        // 終了旗を先に描き、重なり時も開始旗が手前に来るようにする。
+        for (var i = 0; i < _document.Regions.Count; i++)
+        {
+            var region = _document.Regions[i];
+            var id = _document.RegionNumber(region);
+            DrawRegionFlag(dc, bounds, lane, start, span, region, region.EndFrame, id, _selectedRegionEdges.Contains(new RegionEdge(region, false)), line, selectedLine, fill, selectedPen, pixelsPerDip);
+        }
+
         for (var i = 0; i < _document.Regions.Count; i++)
         {
             var region = _document.Regions[i];
             var id = _document.RegionNumber(region);
             DrawRegionFlag(dc, bounds, lane, start, span, region, region.StartFrame, id, _selectedRegionEdges.Contains(new RegionEdge(region, true)), line, selectedLine, fill, selectedPen, pixelsPerDip);
-            DrawRegionFlag(dc, bounds, lane, start, span, region, region.EndFrame, id, _selectedRegionEdges.Contains(new RegionEdge(region, false)), line, selectedLine, fill, selectedPen, pixelsPerDip);
         }
     }
 
