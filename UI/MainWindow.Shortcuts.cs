@@ -1400,6 +1400,14 @@ public partial class MainWindow
 
         if (IsLibraryMaximized)
         {
+            // 選択は据え置きで表示だけ1行動かす。ツリーフォーカス時はルート並び替えが先。
+            if (LibraryPlayerMode.IsPlaylistScroll(key, modifiers)
+                && !IsLibraryExplorerFocused)
+            {
+                LibraryBrowser.ScrollPlaylistByRows(key == Key.Up ? -1 : 1);
+                return true;
+            }
+
             if ((key is Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown)
                 && modifiers is ModifierKeys.None or ModifierKeys.Shift)
             {
@@ -1916,7 +1924,7 @@ public partial class MainWindow
             return true;
         }
 
-        if (key is Key.Delete or Key.Back && modifiers == ModifierKeys.None)
+        if (key == Key.Delete && modifiers == ModifierKeys.None)
         {
             ApplyDelete();
             return true;

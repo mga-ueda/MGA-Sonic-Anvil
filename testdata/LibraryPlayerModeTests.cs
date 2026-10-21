@@ -478,6 +478,10 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsExplorerRootReorder(Key.Up, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.IsExplorerRootReorder(Key.Down, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.IsExplorerRootReorder(Key.Up, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlaylistScroll(Key.Up, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.IsPlaylistScroll(Key.Down, ModifierKeys.Alt));
+        Assert.False(LibraryPlayerMode.IsPlaylistScroll(Key.Up, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlaylistScroll(Key.Up, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Up, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Down, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.Space, ModifierKeys.None));
