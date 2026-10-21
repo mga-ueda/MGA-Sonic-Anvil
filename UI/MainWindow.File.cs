@@ -41,21 +41,17 @@ public partial class MainWindow
         AppStorage.Save();
         var session = CreateEmptyDocument(format.Value);
         ActivateSession(session);
+        // ファイルを開いたとき／閉じたタブを戻したときと同じく、タイルへ組み込む（または既定の複数ファイル配置を適用）。
+        ApplyPreferredMultiFileArrange(1);
         AfterEdit();
     }
 
-    /// <summary>新規ファイルの初期長さ。0 秒だとタイルに波形が出ないので、約 10 秒の無音で始める。</summary>
-    private const double NewDocumentSilenceSeconds = 10;
-
     private DocumentSession CreateEmptyDocument(DefaultAudioFormat.Spec format)
     {
-        var channels = Math.Max(1, format.Channels);
-        var frames = Math.Max(1, (int)Math.Round(format.SampleRate * NewDocumentSilenceSeconds));
-        var samples = new float[checked(frames * channels)];
         var document = new AudioDocument(
-            samples,
+            [],
             format.SampleRate,
-            channels,
+            Math.Max(1, format.Channels),
             format.BitsPerSample,
             AudioFileKind.Wave,
             null);
