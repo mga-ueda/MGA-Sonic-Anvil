@@ -98,12 +98,19 @@ public sealed class WaveformContextMenuTests
 
             var commands = WaveformContextMenuBuilder.Commands(tree).ToHashSet();
             Assert.Contains(WaveMenuCommand.Undo, commands);
+            Assert.Equal(MenuGestures.Redo, Find(tree, WaveMenuCommand.Redo)?.Gesture);
+            Assert.Equal(MenuGestures.Delete, Find(tree, WaveMenuCommand.Delete)?.Gesture);
             Assert.Contains(WaveMenuCommand.DetectSilence, commands);
             Assert.Contains(WaveMenuCommand.InsertSilence, commands);
             Assert.Equal("Ctrl+Ins", Find(tree, WaveMenuCommand.InsertSilence)?.Gesture);
             Assert.Equal("Shift+Delete", Find(tree, WaveMenuCommand.SilenceSelection)?.Gesture);
             Assert.Contains(WaveMenuCommand.FadeIn, commands);
             Assert.Contains(WaveMenuCommand.AddMarker, commands);
+            Assert.Equal(MenuGestures.AddMarker, Find(tree, WaveMenuCommand.AddMarker)?.Gesture);
+            Assert.Equal(MenuGestures.CenterPlayhead, Find(tree, WaveMenuCommand.CenterPlayhead)?.Gesture);
+            Assert.Equal(MenuGestures.NextTab, Find(tree, WaveMenuCommand.NextTab)?.Gesture);
+            Assert.Equal(MenuGestures.PrevTab, Find(tree, WaveMenuCommand.PrevTab)?.Gesture);
+            Assert.Equal(MenuGestures.ViewWaveform, Find(tree, WaveMenuCommand.ViewWaveform)?.Gesture);
             Assert.Contains(WaveMenuCommand.DeleteAllMarkers, commands);
             Assert.Contains(WaveMenuCommand.DeleteAllRegions, commands);
             Assert.Contains(WaveMenuCommand.TogglePlayback, commands);
@@ -137,9 +144,9 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.PlaybackPitchUp, commands);
             Assert.Contains(WaveMenuCommand.PlaybackPitchDown, commands);
             Assert.Contains(WaveMenuCommand.PlaybackPitchReset, commands);
-            Assert.Equal("Ctrl++", Find(tree, WaveMenuCommand.PlaybackPitchUp)?.Gesture);
-            Assert.Equal("Ctrl+-", Find(tree, WaveMenuCommand.PlaybackPitchDown)?.Gesture);
-            Assert.Equal("Ctrl+0", Find(tree, WaveMenuCommand.PlaybackPitchReset)?.Gesture);
+            Assert.Equal(MenuGestures.PitchUp, Find(tree, WaveMenuCommand.PlaybackPitchUp)?.Gesture);
+            Assert.Equal(MenuGestures.PitchDown, Find(tree, WaveMenuCommand.PlaybackPitchDown)?.Gesture);
+            Assert.Equal(MenuGestures.PitchReset, Find(tree, WaveMenuCommand.PlaybackPitchReset)?.Gesture);
             Assert.Contains(WaveMenuCommand.SilentSkip, commands);
             var silentSkip = Find(tree, WaveMenuCommand.SilentSkip);
             Assert.Equal("Alt+S", silentSkip?.Gesture);

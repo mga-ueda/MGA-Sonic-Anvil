@@ -721,6 +721,9 @@ internal sealed class LibraryBrowserView : UserControl
     public bool IsContextMenuDismissGuardActive =>
         _contextMenuDismissGuard || HasOpenContextMenu;
 
+    /// <summary>メニュー閉鎖直後〜アイドルまで。MouseUp での単一選択確定を抑止中か。</summary>
+    internal bool IsPlaylistPlainPressSuppressedAfterMenu => _suppressPlaylistPlainPressComplete;
+
     internal object? BoundItemsSource => _grid.ItemsSource;
 
     internal int BoundRowCount => _items.Count;
@@ -2857,6 +2860,26 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         return 1;
+    }
+
+    /// <summary>選択は変えず、表示だけ1行単位で縦スクロールする。ScrollUnit.Item 前提。</summary>
+    public void ScrollPlaylistByRows(int delta)
+    {
+        if (delta == 0 || FindDataGridScrollViewer() is not { } scroll)
+        {
+            return;
+        }
+
+        var next = Math.Clamp(
+            scroll.VerticalOffset + delta,
+            0,
+            Math.Max(0, scroll.ScrollableHeight));
+        if (Math.Abs(scroll.VerticalOffset - next) < 0.01)
+        {
+            return;
+        }
+
+        scroll.ScrollToVerticalOffset(next);
     }
 
     private double RowHeightHint()
@@ -9117,7 +9140,10 @@ internal sealed class LibraryBrowserView : UserControl
     private void PlaylistHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         // メニュー外クリックで閉じた直後の MouseUp で、保留中の単一選択確定が走らないようにする。
-        if (HasOpenContextMenu || _suppressPlaylistPlainPressComplete)
+        // HasOpenContextMenu だけでは閉じた直後を拾えないので dismiss ガードも見る。
+        if (HasOpenContextMenu
+            || IsContextMenuDismissGuardActive
+            || _suppressPlaylistPlainPressComplete)
         {
             AbandonPlaylistPendingClick();
             ReleasePlaylistMouseCapture();
@@ -10919,13 +10945,13 @@ internal sealed class LibraryBrowserView : UserControl
         var expand = new MenuItem
         {
             Header = UiStrings.LibraryMenuExpandSubtree,
-            InputGestureText = "Shift+8",
+            InputGestureText = MenuGestures.ExplorerExpand,
         };
         expand.Click += (_, _) => ExpandSelectedExplorerSubtree();
         var collapse = new MenuItem
         {
             Header = UiStrings.LibraryMenuCollapseSubtree,
-            InputGestureText = "/",
+            InputGestureText = MenuGestures.ExplorerCollapse,
         };
         collapse.Click += (_, _) => CollapseSelectedExplorerSubtree();
         var moveUp = new MenuItem
@@ -11132,19 +11158,19 @@ internal sealed class LibraryBrowserView : UserControl
         var previous = new MenuItem
         {
             Header = UiStrings.LibraryMenuPreviousTrack,
-            InputGestureText = "P",
+            InputGestureText = MenuGestures.PreviousTrack,
         };
         ArmMenuItemClick(previous, () => PlaylistPreviousRequested?.Invoke(this, EventArgs.Empty));
         var next = new MenuItem
         {
             Header = UiStrings.LibraryMenuNextTrack,
-            InputGestureText = "N",
+            InputGestureText = MenuGestures.NextTrack,
         };
         ArmMenuItemClick(next, () => PlaylistNextRequested?.Invoke(this, EventArgs.Empty));
         var restart = new MenuItem
         {
             Header = UiStrings.LibraryMenuRestartTrack,
-            InputGestureText = "R",
+            InputGestureText = MenuGestures.RestartTrack,
         };
         ArmMenuItemClick(restart, () => PlaylistRestartRequested?.Invoke(this, EventArgs.Empty));
         var autoPlay = new MenuItem
@@ -11209,7 +11235,6 @@ internal sealed class LibraryBrowserView : UserControl
             AbandonPlaylistPendingClick();
             ReleasePlaylistMouseCapture();
             _suppressPlaylistPlainPressComplete = true;
-            _contextMenuDismissGuard = true;
             ListContextMenuOpened?.Invoke(this, EventArgs.Empty);
             var paths = SelectedPlaylistCopyPaths();
             var selected = SelectedSessions;
@@ -11242,17 +11267,19 @@ internal sealed class LibraryBrowserView : UserControl
             AbandonPlaylistPendingClick();
             ReleasePlaylistMouseCapture();
             _suppressPlaylistPlainPressComplete = true;
-            ListContextMenuClosed?.Invoke(this, EventArgs.Empty);
-            // 外側クリックの dismiss は、閉じたのと同じ入力の中で下のコントロールへ貫通する。
-            // ガードはこの入力が終わってアイドルへ落ちるまで維持する（貫通クリックより後に解除）。
+            // ListContextMenuClosed（＝_listContextMenuOpen 解除）と plain-press 抑制解除は
+            // アイドルまで遅らせる。外側クリック dismiss の貫通が F10／行選択へ届くあいだ、
+            // メニュー「表示中」扱いにしてプレイヤー抜け・単一選択確定を防ぐ。
+            // dismiss ガード本体は ArmContextMenuDismissGuard（Closed で再セット＋アイドル解除）。
             Dispatcher.BeginInvoke(
                 () =>
                 {
                     _suppressPlaylistPlainPressComplete = false;
-                    _contextMenuDismissGuard = false;
+                    ListContextMenuClosed?.Invoke(this, EventArgs.Empty);
                 },
                 DispatcherPriority.ApplicationIdle);
         };
+        ArmContextMenuDismissGuard(menu);
         _grid.ContextMenu = menu;
     }
 
@@ -11468,19 +11495,19 @@ internal sealed class LibraryBrowserView : UserControl
         pitchUp = new MenuItem
         {
             Header = UiStrings.LibraryMenuPitchUp,
-            InputGestureText = "Ctrl++",
+            InputGestureText = MenuGestures.PitchUp,
         };
         pitchUp.Click += (_, _) => PlaybackPitchUpRequested?.Invoke(this, EventArgs.Empty);
         pitchDown = new MenuItem
         {
             Header = UiStrings.LibraryMenuPitchDown,
-            InputGestureText = "Ctrl+-",
+            InputGestureText = MenuGestures.PitchDown,
         };
         pitchDown.Click += (_, _) => PlaybackPitchDownRequested?.Invoke(this, EventArgs.Empty);
         pitchReset = new MenuItem
         {
             Header = UiStrings.LibraryMenuPitchReset,
-            InputGestureText = "Ctrl+0",
+            InputGestureText = MenuGestures.PitchReset,
         };
         pitchReset.Click += (_, _) => PlaybackPitchResetRequested?.Invoke(this, EventArgs.Empty);
         copyNames = new MenuItem { Header = UiStrings.LibraryMenuCopyFileName };
