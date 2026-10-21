@@ -147,10 +147,18 @@ internal static partial class UiStrings
     public static string LabelSettingsTabGeneral => Get("一般", "General");
     public static string LabelSettingsTabAudio => Get("オーディオ", "Audio");
     public static string LabelSettingsTabLayouts => Get("表示項目", "Shown");
+    public static string LabelSettingsTabColor => Get("カラー", "Color");
     public static string LabelSettingsTabPlayer => Get("プレイヤー", "Player");
     public static string LabelSettingsTabEditing => Get("編集", "Editing");
     public static string LabelSettingsTabExport => Get("書き出し・パス", "Export · Paths");
     public static string LabelSettingsTabWwise => Get("Wwise", "Wwise");
+    public static string LabelUiColorSettings => Get("色設定", "Color settings");
+    public static string HintUiColorSettings => Get(
+        "波形や UI の配色を編集します。開いたままメイン画面を見ながら変更できます。",
+        "Edit waveform and UI colors. Keep the panel open to preview changes on the main window.");
+    public static string ButtonOpenColorSettings => Get(
+        "色設定を開く (Ctrl+Shift+C)",
+        "Open color settings (Ctrl+Shift+C)");
     public static string LabelLibraryExplorerRoots => Get("ツリーのルート", "Tree roots");
     public static string LabelLibraryListColumns => Get("プレイリストの列", "Playlist columns");
     public static string LabelLibraryListColumnsWave => Get("WAVE / AIFF のとき", "For WAVE / AIFF");
