@@ -1,5 +1,6 @@
 using System.Windows;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
 
@@ -7,10 +8,12 @@ namespace MgaSonicAnvil.UI;
 
 public partial class MainWindow
 {
-    /// <summary>選択タブへの一括編集中。IsUiBusy に含める。</summary>
+    /// <summary>選択タブ／プレイリスト一括編集中。IsUiBusy に含める。</summary>
     private bool _tabBatchEditBusy;
 
-    /// <summary>一括編集の対象範囲。ファイル単位の操作なので常に全体。</summary>
+    /// <summary>
+    /// 一括編集の対象範囲。複数ファイルへのコマンドは選択があっても常にファイル全体。
+    /// </summary>
     private static WaveSelection TabBatchRange(AudioDocument document) => new(0, document.FrameCount);
 
     /// <summary>各ファイル自身のソロ設定を尊重した編集マスク。</summary>
@@ -18,31 +21,105 @@ public partial class MainWindow
         ChannelSolo.ClampMask(session.SoloMask, Math.Max(1, session.Document.Channels));
 
     /// <summary>
+    /// プレイヤーはプレイリスト選択（無ければアクティブ）、エディタはタブ選択。
+    /// どちらも無いときは空（単体パスへ落とす呼び出し側用）。
+    /// </summary>
+    private DocumentSession[] ResolveBatchEditTargets()
+    {
+        if (IsLibraryMaximized)
+        {
+            return ResolvePlaylistLoudnessMatchTargets();
+        }
+
+        if (HasTabSelection)
+        {
+            return SelectedTabsInOrder();
+        }
+
+        return [];
+    }
+
+    /// <summary>タブ選択またはプレイヤーで一括対象があるか。</summary>
+    private bool HasBatchEditTargets =>
+        IsLibraryMaximized
+            ? ResolvePlaylistLoudnessMatchTargets().Length > 0
+            : HasTabSelection;
+
+    /// <summary>
     /// タブ選択があれば、編集コマンドを選択タブ全部に対して実行する。実行に入ったら true。
     /// 履歴レシピ貼り付けと同じすりガラス（タブ別進捗）を重ねて操作を抑制する。
-    /// タイル検索フィルターのすりガラスはそのまま維持され、上に重なる。
     /// </summary>
     private bool TryRunEditOnSelectedTabs(
         string overlayMessage,
-        Func<DocumentSession, IProgress<double>?, IEditCommand?> build)
+        Func<DocumentSession, IProgress<double>?, IEditCommand?> build) =>
+        TryRunBatchEdit(overlayMessage, build, requireTabSelection: true);
+
+    /// <summary>
+    /// タブ選択またはプレイヤー選択へ一括編集。実行に入ったら true。
+    /// </summary>
+    private bool TryRunBatchEdit(
+        string overlayMessage,
+        Func<DocumentSession, IProgress<double>?, IEditCommand?> build,
+        bool requireTabSelection = false)
     {
-        if (!HasTabSelection)
+        if (requireTabSelection)
+        {
+            if (!HasTabSelection)
+            {
+                return false;
+            }
+
+            _ = RunBatchEditAsync(
+                SelectedTabsInOrder(),
+                overlayMessage,
+                build,
+                saveAfter: false,
+                ensurePcm: false,
+                warnIfSkipped: true);
+            return true;
+        }
+
+        if (!HasBatchEditTargets)
         {
             return false;
         }
 
-        _ = RunSelectedTabsEditAsync(SelectedTabsInOrder(), overlayMessage, build);
+        var targets = ResolveBatchEditTargets();
+        if (targets.Length == 0)
+        {
+            return false;
+        }
+
+        _ = RunBatchEditAsync(
+            targets,
+            overlayMessage,
+            build,
+            saveAfter: IsLibraryMaximized,
+            ensurePcm: IsLibraryMaximized,
+            warnIfSkipped: true);
         return true;
     }
 
     /// <summary>
-    /// 選択タブへの一括編集。コマンド生成はバックグラウンド、適用（履歴登録）は UI スレッド。
-    /// build が null を返したタブはスキップする（適用できないものは飛ばす）。
+    /// 選択タブへの一括編集（後方互換）。コマンド生成はバックグラウンド、適用は UI スレッド。
     /// </summary>
-    private async Task RunSelectedTabsEditAsync(
+    private Task RunSelectedTabsEditAsync(
         IReadOnlyList<DocumentSession> targets,
         string overlayMessage,
-        Func<DocumentSession, IProgress<double>?, IEditCommand?> build)
+        Func<DocumentSession, IProgress<double>?, IEditCommand?> build) =>
+        RunBatchEditAsync(targets, overlayMessage, build, saveAfter: false, ensurePcm: false, warnIfSkipped: true);
+
+    /// <summary>
+    /// 一括編集。PCM 確保（任意）→ コマンド生成を ExportParallelism で並列 → 履歴適用は UI 直列 → 任意で保存。
+    /// build が null を返した対象はスキップする。
+    /// </summary>
+    private async Task RunBatchEditAsync(
+        IReadOnlyList<DocumentSession> targets,
+        string overlayMessage,
+        Func<DocumentSession, IProgress<double>?, IEditCommand?> build,
+        bool saveAfter,
+        bool ensurePcm,
+        bool warnIfSkipped = true)
     {
         if (targets.Count == 0 || IsUiBusy)
         {
@@ -56,70 +133,178 @@ public partial class MainWindow
         var weights = sessions.Select(session => Math.Max(1L, session.Document.FrameCount)).ToArray();
         var progress = new double[sessions.Length];
         var applied = new int[sessions.Length];
+        var commands = new IEditCommand?[sessions.Length];
+        var ready = new bool[sessions.Length];
         Exception? error = null;
+        var errorLock = new object();
         try
         {
             StopPlaybackForEdit();
-            foreach (var session in sessions)
-            {
-                PrepareSessionForHistoryPaste(session);
-            }
+            // 選択クリアの Prepare はコマンド生成のあと（適用直前）に回す。
 
             ShowBusyGlass(overlayMessage);
             ReportHistoryPasteBusy(names, progress, weights);
+
+            if (ensurePcm)
+            {
+                for (var i = 0; i < sessions.Length; i++)
+                {
+                    if (!IsLoaded)
+                    {
+                        return;
+                    }
+
+                    progress[i] = Math.Max(progress[i], 0.02);
+                    ReportHistoryPasteBusy(names, progress, weights);
+                    ready[i] = await EnsureSessionPcmForEditAsync(sessions[i]).ConfigureAwait(true);
+                    if (!ready[i])
+                    {
+                        progress[i] = 1;
+                        ReportHistoryPasteBusy(names, progress, weights);
+                        continue;
+                    }
+
+                    weights[i] = Math.Max(1L, sessions[i].Document.FrameCount);
+                }
+            }
+            else
+            {
+                Array.Fill(ready, true);
+            }
+
+            if (!IsLoaded)
+            {
+                return;
+            }
+
+            var buildIndices = new List<int>(sessions.Length);
             for (var i = 0; i < sessions.Length; i++)
             {
-                if (!IsLoaded)
+                if (ready[i])
                 {
-                    return;
+                    buildIndices.Add(i);
+                }
+            }
+
+            if (buildIndices.Count > 0)
+            {
+                var parallelism = AudioExport.WorkerCount(
+                    buildIndices.Count,
+                    AppStorage.Settings.ExportParallelism);
+                var progressLock = new object();
+                // Dispatcher / IsLoaded は UI スレッド専用。並列本体では触らない。
+                var dispatcher = Dispatcher;
+                var perTabProgress = new IProgress<double>?[sessions.Length];
+                foreach (var i in buildIndices)
+                {
+                    var index = i;
+                    perTabProgress[index] = new Progress<double>(p =>
+                    {
+                        lock (progressLock)
+                        {
+                            progress[index] = Math.Clamp(Math.Max(0.02, p), 0d, 0.99d);
+                        }
+
+                        dispatcher.BeginInvoke(() =>
+                            ReportHistoryPasteBusy(names, progress, weights));
+                    });
                 }
 
-                var session = sessions[i];
-                var index = i;
-                progress[i] = Math.Max(progress[i], 0.02);
-                ReportHistoryPasteBusy(names, progress, weights);
-                var perTab = new Progress<double>(p =>
+                await Task.Run(() =>
                 {
-                    progress[index] = Math.Clamp(p, 0d, 1d);
-                    ReportHistoryPasteBusy(names, progress, weights);
-                });
-                IEditCommand? command;
-                try
+                    Parallel.For(
+                        0,
+                        buildIndices.Count,
+                        new ParallelOptions { MaxDegreeOfParallelism = parallelism },
+                        bi =>
+                        {
+                            var i = buildIndices[bi];
+                            var session = sessions[i];
+                            try
+                            {
+                                commands[i] = build(session, perTabProgress[i]);
+                            }
+                            catch (Exception ex)
+                            {
+                                lock (errorLock)
+                                {
+                                    error ??= ex;
+                                }
+                            }
+                        });
+                }).ConfigureAwait(true);
+            }
+
+            if (!IsLoaded)
+            {
+                return;
+            }
+
+            Exception? buildError;
+            lock (errorLock)
+            {
+                buildError = error;
+            }
+
+            if (buildError is not null)
+            {
+                error = buildError;
+                for (var i = 0; i < sessions.Length; i++)
                 {
-                    command = await Task.Run(() => build(session, perTab)).ConfigureAwait(true);
+                    progress[i] = 1;
                 }
-                catch (Exception ex)
+
+                ReportHistoryPasteBusy(names, progress, weights);
+            }
+            else
+            {
+                for (var i = 0; i < sessions.Length; i++)
                 {
-                    error = ex;
+                    if (!ready[i])
+                    {
+                        continue;
+                    }
+
+                    if (commands[i] is { } command)
+                    {
+                        PrepareSessionForHistoryPaste(sessions[i]);
+                        sessions[i].History.Do(sessions[i].Document, command);
+                        if (IsLibraryMaximized)
+                        {
+                            LibraryBrowser.UpdateSessionRow(sessions[i]);
+                        }
+
+                        applied[i]++;
+                    }
+
                     progress[i] = 1;
                     ReportHistoryPasteBusy(names, progress, weights);
-                    break;
                 }
-
-                if (!IsLoaded)
-                {
-                    return;
-                }
-
-                if (command is not null)
-                {
-                    session.History.Do(session.Document, command);
-                    applied[i]++;
-                }
-
-                progress[i] = 1;
-                ReportHistoryPasteBusy(names, progress, weights);
             }
         }
         catch (Exception ex)
         {
             error = ex;
         }
-        finally
+
+        var saveTargets = new List<DocumentSession>();
+        if (saveAfter && error is null && IsLoaded)
+        {
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                if (applied[i] > 0)
+                {
+                    saveTargets.Add(sessions[i]);
+                }
+            }
+        }
+
+        var willSave = saveTargets.Count > 0;
+        if (!willSave)
         {
             _tabBatchEditBusy = false;
             RefreshExportEnabled();
-            if (error is not null)
+            if (error is not null || !IsLoaded)
             {
                 _busyGlass.HideOverlay();
             }
@@ -131,6 +316,13 @@ public partial class MainWindow
 
         if (!IsLoaded)
         {
+            if (willSave)
+            {
+                _tabBatchEditBusy = false;
+                RefreshExportEnabled();
+                _busyGlass.HideOverlay();
+            }
+
             return;
         }
 
@@ -148,12 +340,33 @@ public partial class MainWindow
 
         if (applied.All(count => count == 0))
         {
-            OwnerCenteredMessageBox.Show(
-                this,
-                UiStrings.TabBatchEditSkippedAll,
-                UiStrings.AppName,
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            if (warnIfSkipped)
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    UiStrings.TabBatchEditSkippedAll,
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
+            return;
+        }
+
+        if (!willSave)
+        {
+            return;
+        }
+
+        try
+        {
+            _tabBatchEditBusy = false;
+            RefreshExportEnabled();
+            await SaveSessionsInPlaceQuietAsync(saveTargets).ConfigureAwait(true);
+        }
+        finally
+        {
+            RefreshExportEnabled();
         }
     }
 }

@@ -341,11 +341,21 @@ internal sealed class LibraryBrowserView : UserControl
     private bool _suppressPlaylistPlainPressComplete;
     /// <summary>
     /// 右クリックメニューの外側クリック dismiss は、下にあるコントロール（例: トランスポートの
-    /// プレイヤー切替ボタン）へクリックが貫通する。メニューが開いてから閉じた直後のアイドルまで
-    /// 立てておき、その貫通クリックでプレイヤーを抜けて（＝選択以外のトラックが消えて）しまうのを防ぐ。
+    /// プレイヤー切替ボタン）へクリックが貫通する。メニューが開いてから、閉じた同じ左クリックが
+    /// 上がるまで立てておき、その貫通でプレイヤーを抜けて（＝選択以外のトラックが消えて）しまうのを防ぐ。
     /// </summary>
     private bool _contextMenuDismissGuard;
-    private int _contextMenuDismissDepth;
+    /// <summary>Closed のたびに進め、古い Idle コールバックが後からガードを外さないようにする。</summary>
+    private int _contextMenuDismissReleaseEpoch;
+    /// <summary>左ボタン待ちタイマーが再評価する epoch。</summary>
+    private int _contextMenuDismissWatchEpoch;
+    private bool _contextMenuDismissLeftUpWatching;
+    private readonly DispatcherTimer _contextMenuDismissLeftUpTimer = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(16),
+    };
+    /// <summary>リストメニュー Closed 後、ガード解除と同時に ListContextMenuClosed を飛ばす。</summary>
+    private bool _listContextMenuDismissPending;
 
     public event EventHandler<DocumentSession>? SessionActivated;
 
@@ -399,7 +409,8 @@ internal sealed class LibraryBrowserView : UserControl
 
     public event EventHandler? MatchLoudnessRequested;
 
-    public event EventHandler? ExportMp3Requested;
+    /// <summary>プレイリスト右クリックから波形メニュー相当の編集・書き出しを依頼する。</summary>
+    public event EventHandler<WaveMenuCommand>? PlaylistWaveMenuRequested;
 
     public event EventHandler? PlaylistPreviousRequested;
 
@@ -460,6 +471,7 @@ internal sealed class LibraryBrowserView : UserControl
         _favoritesList.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _grid.IsKeyboardFocusWithinChanged += Grid_IsKeyboardFocusWithinChanged;
         PreviewMouseMove += PlaylistHost_PreviewMouseMove;
+        PreviewMouseLeftButtonDown += LibraryBrowser_PreviewMouseLeftButtonDownForDismissGuard;
         PreviewMouseLeftButtonUp += PlaylistHost_PreviewMouseLeftButtonUp;
         _groupCombo.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _explorerSearchBox.IsKeyboardFocusWithinChanged += (_, _) =>
@@ -483,6 +495,8 @@ internal sealed class LibraryBrowserView : UserControl
             SyncSearchHint(_playlistSearchBox, _playlistSearchHint);
         };
         _washTurnTimer.Tick += (_, _) => AdvanceWashTurn();
+        _contextMenuDismissLeftUpTimer.Tick += (_, _) =>
+            ContinueContextMenuDismissGuardRelease(_contextMenuDismissWatchEpoch);
         Loaded += (_, _) =>
         {
             FitColumns();
@@ -501,6 +515,7 @@ internal sealed class LibraryBrowserView : UserControl
         };
         Unloaded += (_, _) =>
         {
+            StopContextMenuDismissLeftUpWatcher();
             StopGlowDrift();
             StopWashTurns();
             CancelColumnChromeFade(resetOpacity: true);
@@ -715,14 +730,20 @@ internal sealed class LibraryBrowserView : UserControl
         || _columnHeaderMenu is { IsOpen: true };
 
     /// <summary>
-    /// 右クリックメニューが開いている間と、外側クリックで閉じた同じ入力中（アイドルまで）は true。
+    /// 右クリックメニューが開いている間と、外側クリックで閉じた同じ左クリックが上がるまでは true。
     /// 外側クリックが下のコントロールへ貫通してプレイヤーを抜けてしまうのを呼び出し側で弾くために使う。
     /// </summary>
     public bool IsContextMenuDismissGuardActive =>
         _contextMenuDismissGuard || HasOpenContextMenu;
 
-    /// <summary>メニュー閉鎖直後〜アイドルまで。MouseUp での単一選択確定を抑止中か。</summary>
+    /// <summary>メニュー閉鎖直後〜 dismiss 左クリック解放まで。MouseUp での単一選択確定を抑止中か。</summary>
     internal bool IsPlaylistPlainPressSuppressedAfterMenu => _suppressPlaylistPlainPressComplete;
+
+    /// <summary>
+    /// テスト専用。null 以外なら <see cref="Mouse.LeftButton"/> の代わりに dismiss ガードの
+    /// 「左ボタン押下中」判定へ使う（Idle 後も押下中ならガードが残ることを検証する）。
+    /// </summary>
+    internal Func<bool>? DismissGuardLeftHeldForTests { get; set; }
 
     internal object? BoundItemsSource => _grid.ItemsSource;
 
@@ -2241,22 +2262,22 @@ internal sealed class LibraryBrowserView : UserControl
 
     internal void CloseKeyboardContextMenu()
     {
-        if (_folderTree.ContextMenu is { } explorer)
+        if (_folderTree.ContextMenu is { IsOpen: true } explorer)
         {
             explorer.IsOpen = false;
         }
 
-        if (_favoritesList.ContextMenu is { } favorites)
+        if (_favoritesList.ContextMenu is { IsOpen: true } favorites)
         {
             favorites.IsOpen = false;
         }
 
-        if (_grid.ContextMenu is { } list)
+        if (_grid.ContextMenu is { IsOpen: true } list)
         {
             list.IsOpen = false;
         }
 
-        if (_columnHeaderMenu is { } columns)
+        if (_columnHeaderMenu is { IsOpen: true } columns)
         {
             columns.IsOpen = false;
         }
@@ -9019,6 +9040,26 @@ internal sealed class LibraryBrowserView : UserControl
         SessionActivated?.Invoke(this, session);
     }
 
+    /// <summary>
+    /// メニュー閉鎖直後の dismiss 貫通を、グリッド以外（検索・ツリー境界など）でも握りつぶす。
+    /// メニュー本体が開いているあいだは触らない（ポップアップ外のこのビューへの Down はグリッド側で処理）。
+    /// </summary>
+    private void LibraryBrowser_PreviewMouseLeftButtonDownForDismissGuard(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left
+            || HasOpenContextMenu
+            || !_contextMenuDismissGuard)
+        {
+            return;
+        }
+
+        AbandonPlaylistPendingClick();
+        _suppressPlaylistPlainPressComplete = true;
+        e.Handled = true;
+    }
+
     private void Grid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left
@@ -9031,7 +9072,7 @@ internal sealed class LibraryBrowserView : UserControl
         // この貫通クリックが DataGrid の既定選択 → SessionActivated（＝別トラックへ切替・再生）や
         // DnD を起こすと、プレイヤーで選択以外のトラックが消える不具合になる。
         // dismiss クリックはメニューが閉じた直後に届くので _grid.ContextMenu.IsOpen だけでは拾えない。
-        // 閉じてからアイドルまで立つ dismiss ガードも見て、確実に握りつぶす（e.Handled で既定選択を止める）。
+        // 閉じた同じ左クリックが上がるまで立つ dismiss ガードも見て握りつぶす。
         if (_grid.ContextMenu is { IsOpen: true } || IsContextMenuDismissGuardActive)
         {
             AbandonPlaylistPendingClick();
@@ -11149,12 +11190,6 @@ internal sealed class LibraryBrowserView : UserControl
             InputGestureText = "V",
         };
         ArmMenuItemClick(loudness, () => MatchLoudnessRequested?.Invoke(this, EventArgs.Empty));
-        var mp3 = new MenuItem
-        {
-            Header = UiStrings.LibraryMenuSaveMp3,
-            InputGestureText = "Ctrl+Shift+M",
-        };
-        ArmMenuItemClick(mp3, () => ExportMp3Requested?.Invoke(this, EventArgs.Empty));
         var previous = new MenuItem
         {
             Header = UiStrings.LibraryMenuPreviousTrack,
@@ -11214,11 +11249,45 @@ internal sealed class LibraryBrowserView : UserControl
             delete,
             new Separator(),
             clear);
+        var audioItems = CreatePlaylistWaveMenuItems(
+            (WaveMenuCommand.Undo, "Ctrl+Z"),
+            (WaveMenuCommand.Redo, "Ctrl+Y"),
+            default,
+            (WaveMenuCommand.FadeIn, "I"),
+            (WaveMenuCommand.FadeOut, "O"),
+            default,
+            (WaveMenuCommand.Normalize, "N"),
+            (WaveMenuCommand.NormalizePerRegion, null),
+            default,
+            (WaveMenuCommand.Pitch, "P"),
+            (WaveMenuCommand.TimeStretch, "T"),
+            (WaveMenuCommand.Reverse, "R"),
+            default,
+            (WaveMenuCommand.InsertSilence, "Ctrl+Ins"),
+            (WaveMenuCommand.DetectSilence, "Ctrl+D"),
+            default,
+            (WaveMenuCommand.DeleteAllMarkers, null),
+            (WaveMenuCommand.DeleteAllRegions, null),
+            (WaveMenuCommand.ClearLoopItem, null));
+        var formatItems = CreatePlaylistWaveMenuItems(
+            (WaveMenuCommand.SampleRate, "S"),
+            (WaveMenuCommand.BitDepth, "B"),
+            (WaveMenuCommand.Channels, "C"));
+        var exportItems = CreatePlaylistWaveMenuItems(
+            (WaveMenuCommand.ExportWave, null),
+            (WaveMenuCommand.ExportMp3, "Ctrl+Shift+M"),
+            (WaveMenuCommand.MergeTabs, "Ctrl+Shift+B"),
+            default,
+            (WaveMenuCommand.ExportByMarkers, null),
+            (WaveMenuCommand.ExportByRegions, null),
+            (WaveMenuCommand.ExportByChannels, null));
+        var audio = Submenu(UiStrings.LibraryMenuCatAudio, audioItems);
+        var format = Submenu(UiStrings.LibraryMenuCatFormat, formatItems);
+        var exportChildren = new List<object> { loudness, new Separator() };
+        exportChildren.AddRange(exportItems);
+        var export = Submenu(UiStrings.LibraryMenuCatExport, exportChildren.ToArray());
         var other = Submenu(
             UiStrings.LibraryMenuCatOther,
-            loudness,
-            mp3,
-            new Separator(),
             copyNames,
             copyPaths,
             explorer);
@@ -11228,6 +11297,9 @@ internal sealed class LibraryBrowserView : UserControl
         menu.Items.Add(color);
         menu.Items.Add(pitch);
         menu.Items.Add(edit);
+        menu.Items.Add(audio);
+        menu.Items.Add(format);
+        menu.Items.Add(export);
         menu.Items.Add(other);
         menu.Opened += (_, _) =>
         {
@@ -11235,12 +11307,14 @@ internal sealed class LibraryBrowserView : UserControl
             AbandonPlaylistPendingClick();
             ReleasePlaylistMouseCapture();
             _suppressPlaylistPlainPressComplete = true;
+            // Closed より前に Idle が回っても、解除時に ListContextMenuClosed を必ず飛ばす。
+            _listContextMenuDismissPending = true;
             ListContextMenuOpened?.Invoke(this, EventArgs.Empty);
             var paths = SelectedPlaylistCopyPaths();
             var selected = SelectedSessions;
             var hasSelection = selected.Length > 0;
+            var many = selected.Length >= 2;
             loudness.IsEnabled = hasSelection;
-            mp3.IsEnabled = LibraryPlayerMode.HasMp3ExportCandidate(selected);
             var hasRows = _rows.Count > 0;
             previous.IsEnabled = hasRows;
             next.IsEnabled = hasRows;
@@ -11260,24 +11334,23 @@ internal sealed class LibraryBrowserView : UserControl
             copyPaths.IsEnabled = paths.Length > 0;
             explorer.IsEnabled = paths.Length > 0;
             color.IsEnabled = SelectedColorPaths().Length > 0;
-            SyncSubmenuEnabled(pitch, edit, other);
+            SyncPlaylistWaveMenuHeaders(audioItems, many);
+            SyncPlaylistWaveMenuHeaders(formatItems, many);
+            SyncPlaylistWaveMenuHeaders(exportItems, many);
+            SyncPlaylistWaveMenuEnabled(audioItems, selected);
+            SyncPlaylistWaveMenuEnabled(formatItems, selected);
+            SyncPlaylistWaveMenuEnabled(exportItems, selected);
+            SyncSubmenuEnabled(pitch, edit, audio, format, export, other);
         };
         menu.Closed += (_, _) =>
         {
             AbandonPlaylistPendingClick();
-            ReleasePlaylistMouseCapture();
             _suppressPlaylistPlainPressComplete = true;
             // ListContextMenuClosed（＝_listContextMenuOpen 解除）と plain-press 抑制解除は
-            // アイドルまで遅らせる。外側クリック dismiss の貫通が F10／行選択へ届くあいだ、
-            // メニュー「表示中」扱いにしてプレイヤー抜け・単一選択確定を防ぐ。
-            // dismiss ガード本体は ArmContextMenuDismissGuard（Closed で再セット＋アイドル解除）。
-            Dispatcher.BeginInvoke(
-                () =>
-                {
-                    _suppressPlaylistPlainPressComplete = false;
-                    ListContextMenuClosed?.Invoke(this, EventArgs.Empty);
-                },
-                DispatcherPriority.ApplicationIdle);
+            // dismiss ガード解除と同じタイミング（Idle かつ左ボタン解放）まで遅らせる。
+            _listContextMenuDismissPending = true;
+            // Closed 同期パスでのキャプチャ解放は Dispatcher 再入の原因になるので遅延する。
+            Dispatcher.BeginInvoke(ReleasePlaylistMouseCapture, DispatcherPriority.Input);
         };
         ArmContextMenuDismissGuard(menu);
         _grid.ContextMenu = menu;
@@ -11285,40 +11358,214 @@ internal sealed class LibraryBrowserView : UserControl
 
     /// <summary>
     /// メニューの外側クリック dismiss が下のコントロールへ貫通するぶんのガードを張る。
-    /// 開いてから、閉じた同じ入力が終わってアイドルへ落ちるまで true を維持する。
-    /// 波形メニューなど、このビューの外で作ったメニューも同じ貫通を止めるために使う。
+    /// 開いてから、閉じた同じ左クリックが上がるまで（少なくとも一度 ApplicationIdle を経てから）
+    /// true を維持する。波形メニューなど、このビューの外で作ったメニューも同じ貫通を止める。
     /// </summary>
     internal void ArmContextMenuDismissGuard(ContextMenu menu)
     {
         menu.Opened += (_, _) =>
         {
-            _contextMenuDismissDepth++;
             _contextMenuDismissGuard = true;
         };
         menu.Closed += (_, _) =>
         {
             _contextMenuDismissGuard = true;
+            var epoch = ++_contextMenuDismissReleaseEpoch;
             Dispatcher.BeginInvoke(
-                () =>
-                {
-                    if (_contextMenuDismissDepth > 0)
-                    {
-                        _contextMenuDismissDepth--;
-                    }
-
-                    if (_contextMenuDismissDepth == 0)
-                    {
-                        _contextMenuDismissGuard = false;
-                    }
-                },
+                () => ContinueContextMenuDismissGuardRelease(epoch),
                 DispatcherPriority.ApplicationIdle);
         };
     }
 
     /// <summary>
+    /// Closed 後のガード解除。ほかのメニューが開いているあいだ、および同じ dismiss の
+    /// 左ボタンが押されているあいだは残す（Idle だけでは外さない）。
+    /// </summary>
+    private void ContinueContextMenuDismissGuardRelease(int epoch)
+    {
+        if (epoch != _contextMenuDismissReleaseEpoch)
+        {
+            return;
+        }
+
+        if (HasOpenContextMenu || IsDismissGuardLeftHeld())
+        {
+            EnsureContextMenuDismissLeftUpWatcher(epoch);
+            return;
+        }
+
+        StopContextMenuDismissLeftUpWatcher();
+        _contextMenuDismissGuard = false;
+        // plain-press 抑制はガードと同じ寿命。pending の有無に関わらずここで下ろす。
+        _suppressPlaylistPlainPressComplete = false;
+
+        if (!_listContextMenuDismissPending)
+        {
+            return;
+        }
+
+        _listContextMenuDismissPending = false;
+        ListContextMenuClosed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private bool IsDismissGuardLeftHeld() =>
+        DismissGuardLeftHeldForTests?.Invoke() ?? Mouse.LeftButton == MouseButtonState.Pressed;
+
+    private void EnsureContextMenuDismissLeftUpWatcher(int epoch)
+    {
+        _contextMenuDismissWatchEpoch = epoch;
+        if (_contextMenuDismissLeftUpWatching)
+        {
+            return;
+        }
+
+        _contextMenuDismissLeftUpWatching = true;
+        _contextMenuDismissLeftUpTimer.Start();
+    }
+
+    private void StopContextMenuDismissLeftUpWatcher()
+    {
+        if (!_contextMenuDismissLeftUpWatching)
+        {
+            return;
+        }
+
+        _contextMenuDismissLeftUpWatching = false;
+        _contextMenuDismissLeftUpTimer.Stop();
+    }
+
+    /// <summary>テスト専用。保留中の dismiss ガード解除をいまの左ボタン状態で再評価する。</summary>
+    internal void FlushContextMenuDismissGuardForTests() =>
+        ContinueContextMenuDismissGuardRelease(_contextMenuDismissReleaseEpoch);
+
+    /// <summary>
     /// メニュー外クリックの dismiss と MenuItem.Click が競合しないよう、
     /// 項目上でのマウス／Enter／Space だけをコマンド実行とみなす。
     /// </summary>
+    private object[] CreatePlaylistWaveMenuItems(params (WaveMenuCommand? Command, string? Gesture)[] entries)
+    {
+        var items = new List<object>(entries.Length);
+        foreach (var (command, gesture) in entries)
+        {
+            if (command is null)
+            {
+                items.Add(new Separator());
+                continue;
+            }
+
+            var cmd = command.Value;
+            var item = new MenuItem
+            {
+                Tag = cmd,
+                Header = PlaylistWaveMenuHeader(cmd, many: false),
+                InputGestureText = gesture ?? string.Empty,
+            };
+            ArmMenuItemClick(item, () => PlaylistWaveMenuRequested?.Invoke(this, cmd));
+            items.Add(item);
+        }
+
+        return items.ToArray();
+    }
+
+    private static void SyncPlaylistWaveMenuHeaders(object[] items, bool many)
+    {
+        foreach (var entry in items)
+        {
+            if (entry is MenuItem { Tag: WaveMenuCommand command } item)
+            {
+                item.Header = PlaylistWaveMenuHeader(command, many);
+            }
+        }
+    }
+
+    private static void SyncPlaylistWaveMenuEnabled(object[] items, DocumentSession[] selected)
+    {
+        var hasSelection = selected.Length > 0;
+        var many = selected.Length >= 2;
+        var hasMarkers = false;
+        var hasRegions = false;
+        var hasLoop = false;
+        foreach (var session in selected)
+        {
+            var document = session.Document;
+            if (document.Markers.Count > 0)
+            {
+                hasMarkers = true;
+            }
+
+            if (document.AllowsRegionsAndLoops && document.Regions.Count > 0)
+            {
+                hasRegions = true;
+            }
+
+            if (!document.SampleLoop.IsEmpty)
+            {
+                hasLoop = true;
+            }
+        }
+
+        foreach (var entry in items)
+        {
+            if (entry is not MenuItem { Tag: WaveMenuCommand command } item)
+            {
+                continue;
+            }
+
+            item.IsEnabled = command switch
+            {
+                WaveMenuCommand.ExportMp3 => LibraryPlayerMode.HasMp3ExportCandidate(selected),
+                WaveMenuCommand.MergeTabs => many,
+                WaveMenuCommand.ExportByMarkers => hasSelection && hasMarkers,
+                WaveMenuCommand.ExportByRegions => hasSelection && hasRegions,
+                WaveMenuCommand.NormalizePerRegion => hasSelection && hasRegions,
+                WaveMenuCommand.DeleteAllRegions => hasSelection && hasRegions,
+                WaveMenuCommand.ClearLoopItem => hasSelection && hasLoop,
+                WaveMenuCommand.DeleteAllMarkers => hasSelection && hasMarkers,
+                _ => hasSelection,
+            };
+        }
+    }
+
+    private static string PlaylistWaveMenuHeader(WaveMenuCommand command, bool many) => command switch
+    {
+        WaveMenuCommand.Undo => many ? UiStrings.WaveMenuUndoSelected : UiStrings.WaveMenuUndo,
+        WaveMenuCommand.Redo => many ? UiStrings.WaveMenuRedoSelected : UiStrings.WaveMenuRedo,
+        WaveMenuCommand.FadeIn => many ? UiStrings.WaveMenuFadeInSelected : UiStrings.WaveMenuFadeIn,
+        WaveMenuCommand.FadeOut => many ? UiStrings.WaveMenuFadeOutSelected : UiStrings.WaveMenuFadeOut,
+        WaveMenuCommand.Normalize => many ? UiStrings.WaveMenuNormalizeSelected : UiStrings.WaveMenuNormalize,
+        WaveMenuCommand.NormalizePerRegion => many
+            ? UiStrings.WaveMenuNormalizePerRegionSelected
+            : UiStrings.WaveMenuNormalizePerRegion,
+        WaveMenuCommand.Pitch => many ? UiStrings.WaveMenuPitchSelected : UiStrings.WaveMenuPitch,
+        WaveMenuCommand.TimeStretch => many ? UiStrings.WaveMenuTimeStretchSelected : UiStrings.WaveMenuTimeStretch,
+        WaveMenuCommand.Reverse => many ? UiStrings.WaveMenuReverseSelected : UiStrings.WaveMenuReverse,
+        WaveMenuCommand.InsertSilence => many
+            ? UiStrings.WaveMenuInsertSilenceSelected
+            : UiStrings.WaveMenuInsertSilence,
+        WaveMenuCommand.DetectSilence => many
+            ? UiStrings.WaveMenuDetectSilenceSelected
+            : UiStrings.WaveMenuDetectSilence,
+        WaveMenuCommand.SampleRate => many ? UiStrings.WaveMenuSampleRateSelected : UiStrings.WaveMenuSampleRate,
+        WaveMenuCommand.BitDepth => many ? UiStrings.WaveMenuBitDepthSelected : UiStrings.WaveMenuBitDepth,
+        WaveMenuCommand.Channels => many ? UiStrings.WaveMenuChannelsSelected : UiStrings.WaveMenuChannels,
+        WaveMenuCommand.ExportWave => many ? UiStrings.WaveMenuExportWaveSelected : UiStrings.WaveMenuExportWave,
+        WaveMenuCommand.ExportMp3 => many ? UiStrings.WaveMenuExportMp3Selected : UiStrings.WaveMenuExportMp3,
+        WaveMenuCommand.MergeTabs => UiStrings.WaveMenuMergeTabs,
+        WaveMenuCommand.ExportByMarkers => many
+            ? UiStrings.WaveMenuExportByMarkersSelected
+            : UiStrings.WaveMenuExportByMarkers,
+        WaveMenuCommand.ExportByRegions => many
+            ? UiStrings.WaveMenuExportByRegionsSelected
+            : UiStrings.WaveMenuExportByRegions,
+        WaveMenuCommand.ExportByChannels => many
+            ? UiStrings.WaveMenuExportByChannelsSelected
+            : UiStrings.WaveMenuExportByChannels,
+        WaveMenuCommand.DeleteAllMarkers => UiStrings.WaveMenuDeleteAllMarkers,
+        WaveMenuCommand.DeleteAllRegions => UiStrings.WaveMenuDeleteAllRegions,
+        WaveMenuCommand.ClearLoopItem => UiStrings.WaveMenuClearLoopItem,
+        _ => command.ToString(),
+    };
+
     private static void ArmMenuItemClick(MenuItem item, Action action)
     {
         var armed = false;

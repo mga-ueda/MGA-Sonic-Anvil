@@ -12,19 +12,6 @@ namespace MgaSonicAnvil.UI;
 
 public partial class MainWindow
 {
-    private void ExportAllTabsWave() => _ = ExportTabsAsync(_sessions.ToArray(), AudioFileKind.Wave);
-
-    private void ExportAllTabsMp3()
-    {
-        if (IsLibraryMaximized)
-        {
-            ExportPlaylistSessionsMp3(_sessions);
-            return;
-        }
-
-        _ = ExportTabsAsync(_sessions.ToArray(), AudioFileKind.Mp3);
-    }
-
     private void ExportTabs(IReadOnlyList<DocumentSession> sessions, AudioFileKind kind) =>
         _ = ExportTabsAsync(sessions, kind);
 
@@ -94,6 +81,83 @@ public partial class MainWindow
 
     private void ExportTabsSeparated(IReadOnlyList<DocumentSession> sessions, TabExportSplit split) =>
         _ = ExportTabsAsync(sessions, AudioFileKind.Wave, split);
+
+    /// <summary>タブ／プレイリスト選択を Wave 一括書き出し。プレイヤーでは PCM を載せてから実行。</summary>
+    private void ExportBatchWave() => _ = ExportBatchWaveAsync();
+
+    private async Task ExportBatchWaveAsync()
+    {
+        var targets = ResolveBatchEditTargets();
+        if (targets.Length == 0)
+        {
+            return;
+        }
+
+        if (IsLibraryMaximized)
+        {
+            var ready = await EnsureBatchExportSessionsAsync(targets).ConfigureAwait(true);
+            if (ready.Length == 0)
+            {
+                return;
+            }
+
+            ExportTabs(ready, AudioFileKind.Wave);
+            return;
+        }
+
+        ExportTabs(targets, AudioFileKind.Wave);
+    }
+
+    /// <summary>タブ／プレイリスト選択をセパレート書き出し。プレイヤーでは PCM を載せてから実行。</summary>
+    private void ExportBatchSeparated(TabExportSplit split) =>
+        _ = ExportBatchSeparatedAsync(split);
+
+    private async Task ExportBatchSeparatedAsync(TabExportSplit split)
+    {
+        var targets = ResolveBatchEditTargets();
+        if (targets.Length == 0)
+        {
+            return;
+        }
+
+        if (IsLibraryMaximized)
+        {
+            var ready = await EnsureBatchExportSessionsAsync(targets).ConfigureAwait(true);
+            if (ready.Length == 0)
+            {
+                return;
+            }
+
+            ExportTabsSeparated(ready, split);
+            return;
+        }
+
+        ExportTabsSeparated(targets, split);
+    }
+
+    private async Task<DocumentSession[]> EnsureBatchExportSessionsAsync(IReadOnlyList<DocumentSession> targets)
+    {
+        var ready = new List<DocumentSession>(targets.Count);
+        foreach (var session in targets)
+        {
+            if (await EnsureSessionLoadedForExportAsync(session).ConfigureAwait(true))
+            {
+                ready.Add(session);
+            }
+        }
+
+        if (ready.Count == 0)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorNoAudioForMp3Export,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        return ready.ToArray();
+    }
 
     private async Task ExportTabsAsync(
         IReadOnlyList<DocumentSession> sessions,

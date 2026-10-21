@@ -171,12 +171,8 @@ public partial class MainWindow
                 || Waveform.HasSelectedRegions
                 || Waveform.HasSelectedTimelineItems,
             CanCopySelectionTimes = SelectionClipboardText.CanCopy(CaptureSelectionClipboardItems()),
-            CanUndo = IsLibraryMaximized
-                ? canScratch && Waveform.CanUndoPlayerScratch
-                : hasDoc && _history.CanUndo,
-            CanRedo = IsLibraryMaximized
-                ? canScratch && Waveform.CanRedoPlayerScratch
-                : hasDoc && _history.CanRedo,
+            CanUndo = ResolveMenuCanUndo(canScratch),
+            CanRedo = ResolveMenuCanRedo(canScratch),
             CanPasteAudio = _clipboard is { IsEmpty: false },
             CanPasteHistory = _historyRecipeClipboard.Count > 0,
             HasMarkers = IsLibraryMaximized
@@ -239,12 +235,20 @@ public partial class MainWindow
             CanCloseOtherTabs = hasDoc && !busy && !recording && _sessions.Count > 1,
             CanCloseTabsToRight = CanCloseTabsFromActive(rightSide: true, hasDoc, busy, recording),
             CanCloseTabsToLeft = CanCloseTabsFromActive(rightSide: false, hasDoc, busy, recording),
-            CanMergeTabs = !busy && !recording && _selectedTabs.Count >= 2 && !IsLibraryMaximized,
-            HasSelectedTabs = selectedTabs.Length > 0,
-            HasMultipleSelectedTabs = selectedTabs.Length >= 2,
+            CanMergeTabs = !busy && !recording && ResolveBatchEditTargets().Length >= 2,
+            HasSelectedTabs = IsLibraryMaximized
+                ? LibraryBrowser.SelectedSessions.Length > 0
+                : selectedTabs.Length > 0,
+            HasMultipleSelectedTabs = IsLibraryMaximized
+                ? LibraryBrowser.SelectedSessions.Length >= 2
+                : selectedTabs.Length >= 2,
             AllTabsSelected = AllTabsSelected,
-            SelectedTabsHaveMarkers = AnyTabHasMarkers(selectedTabs),
-            SelectedTabsHaveRegions = AnyTabHasRegions(selectedTabs),
+            SelectedTabsHaveMarkers = AnyTabHasMarkers(
+                IsLibraryMaximized ? ResolvePlaylistLoudnessMatchTargets() : selectedTabs),
+            SelectedTabsHaveRegions = AnyTabHasRegions(
+                IsLibraryMaximized ? ResolvePlaylistLoudnessMatchTargets() : selectedTabs),
+            SelectedTabsHaveSampleLoop = AnyTabHasSampleLoop(
+                IsLibraryMaximized ? ResolvePlaylistLoudnessMatchTargets() : selectedTabs),
             WaveTileArrange = _tileArrange,
             CanTileHorizontal = CanOfferTileArrange(WaveformTileArrange.Horizontal),
             CanTileVertical = CanOfferTileArrange(WaveformTileArrange.Vertical),
@@ -254,8 +258,6 @@ public partial class MainWindow
             LibraryMaximized = _waveformMaximizeMode == WaveformMaximizeMode.Library,
             CanExportMp3 = !IsLibraryMaximized
                 || LibraryPlayerMode.HasMp3ExportCandidate(ResolvePlaylistLoudnessMatchTargets()),
-            CanExportAllMp3 = !IsLibraryMaximized
-                || LibraryPlayerMode.HasMp3ExportCandidate(_sessions),
             CanLoopPlay = canNavigate
                 && (hasSelection
                     || !document!.SampleLoop.IsEmpty
@@ -439,15 +441,7 @@ public partial class MainWindow
 
                 break;
             case WaveMenuCommand.DeleteAllMarkers:
-                if (IsLibraryMaximized)
-                {
-                    Waveform.TryClearPlayerScratchMarkers();
-                }
-                else
-                {
-                    ApplyDeleteAllMarkers();
-                }
-
+                ApplyDeleteAllMarkers();
                 break;
             case WaveMenuCommand.SetRegion:
                 TrySetRegionFromSelection();
@@ -677,17 +671,6 @@ public partial class MainWindow
             case WaveMenuCommand.SaveAs:
                 Save(saveAs: true);
                 break;
-            case WaveMenuCommand.SaveMp3:
-                if (IsLibraryMaximized)
-                {
-                    ExportPlaylistSelectionMp3();
-                }
-                else
-                {
-                    SaveAsMp3();
-                }
-
-                break;
             case WaveMenuCommand.RenameFile:
                 if (_activeSession is not null)
                 {
@@ -807,10 +790,10 @@ public partial class MainWindow
                 Close();
                 break;
             case WaveMenuCommand.ExportWave:
-                // タブ選択中は選択タブを一括書き出し（タブメニューと同じ挙動）。
-                if (HasTabSelection)
+                // タブ／プレイリスト選択中は一括書き出し。
+                if (HasBatchEditTargets)
                 {
-                    ExportTabs(SelectedTabsInOrder(), AudioFileKind.Wave);
+                    ExportBatchWave();
                 }
                 else
                 {
@@ -819,24 +802,12 @@ public partial class MainWindow
 
                 break;
             case WaveMenuCommand.ExportMp3:
-                if (IsLibraryMaximized)
-                {
-                    ExportPlaylistSelectionMp3();
-                }
-                else if (HasTabSelection)
-                {
-                    ExportTabs(SelectedTabsInOrder(), AudioFileKind.Mp3);
-                }
-                else
-                {
-                    ExportActiveTab(AudioFileKind.Mp3);
-                }
-
+                ExportMp3FromUi();
                 break;
             case WaveMenuCommand.ExportByMarkers:
-                if (HasTabSelection)
+                if (HasBatchEditTargets)
                 {
-                    ExportTabsSeparated(SelectedTabsInOrder(), TabExportSplit.Markers);
+                    ExportBatchSeparated(TabExportSplit.Markers);
                 }
                 else
                 {
@@ -845,9 +816,9 @@ public partial class MainWindow
 
                 break;
             case WaveMenuCommand.ExportByRegions:
-                if (HasTabSelection)
+                if (HasBatchEditTargets)
                 {
-                    ExportTabsSeparated(SelectedTabsInOrder(), TabExportSplit.Regions);
+                    ExportBatchSeparated(TabExportSplit.Regions);
                 }
                 else
                 {
@@ -856,21 +827,15 @@ public partial class MainWindow
 
                 break;
             case WaveMenuCommand.ExportByChannels:
-                if (HasTabSelection)
+                if (HasBatchEditTargets)
                 {
-                    ExportTabsSeparated(SelectedTabsInOrder(), TabExportSplit.Channels);
+                    ExportBatchSeparated(TabExportSplit.Channels);
                 }
                 else
                 {
                     ExportActiveTabSeparated(TabExportSplit.Channels);
                 }
 
-                break;
-            case WaveMenuCommand.ExportAllWave:
-                ExportAllTabsWave();
-                break;
-            case WaveMenuCommand.ExportAllMp3:
-                ExportAllTabsMp3();
                 break;
             case WaveMenuCommand.Manual:
                 ManualViewer.Open(this);
@@ -1005,6 +970,23 @@ public partial class MainWindow
 
         _activeSession.SoloMask = 0;
         ApplyChannelSolo();
+    }
+
+    /// <summary>メニュー／ショートカット／トランスポート共通。選択があれば選択、なければアクティブ（プレイヤーはプレイリスト選択）。</summary>
+    private void ExportMp3FromUi()
+    {
+        if (IsLibraryMaximized)
+        {
+            ExportPlaylistSelectionMp3();
+        }
+        else if (HasTabSelection)
+        {
+            ExportTabs(SelectedTabsInOrder(), AudioFileKind.Mp3);
+        }
+        else
+        {
+            ExportActiveTab(AudioFileKind.Mp3);
+        }
     }
 
     private void ExportActiveTab(AudioFileKind kind)

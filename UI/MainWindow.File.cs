@@ -118,12 +118,23 @@ public partial class MainWindow
         SetWaveformMaximizeMode(WaveformMaximizeMode.Library);
     }
 
-    /// <summary>ファイル無しで、エディタ以外の起動モードのとき。出すまでクロークする。</summary>
+    /// <summary>
+    /// ファイル無し・復元無しで、エディタ以外の起動モードのとき。出すまでクロークする。
+    /// </summary>
     private bool HoldsRevealForStartupMode() =>
         !LaunchFiles.HasStartup
+        && !HasRestorableOpenDocuments()
         && AppLaunchModes.HoldsReveal(AppStorage.Settings.ResolvedLaunchMode());
 
-    /// <summary>ファイルを渡していない起動だけ、設定の起動モードを適用する。</summary>
+    /// <summary>前回エディタで開いていたファイルを次起動で戻せるか。</summary>
+    private bool HasRestorableOpenDocuments() =>
+        DocumentSessionStore.HasRestorableOpenDocuments(
+            AppStorage.RootDirectory,
+            AppStorage.Settings);
+
+    /// <summary>
+    /// ファイルを渡さず、復元するドキュメントも無い起動だけ、設定の起動モードを適用する。
+    /// </summary>
     private void EnterStartupMode()
     {
         if (LaunchFiles.HasStartup)
@@ -1078,102 +1089,6 @@ public partial class MainWindow
             UiStrings.OverlaySave);
     }
 
-    private bool SaveAsMp3(AudioDocument? target = null)
-    {
-        _ = SaveAsMp3Async(target);
-        return true;
-    }
-
-    private async Task SaveAsMp3Async(AudioDocument? target)
-    {
-        var document = target ?? _document;
-        if (document is null)
-        {
-            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        if (IsUiBusy)
-        {
-            return;
-        }
-
-        var path = document.SourcePath;
-        var dialog = new SaveFileDialog
-        {
-            Filter = UiStrings.FilterSaveMp3,
-            Title = UiStrings.MenuSaveMp3,
-            FileName = string.IsNullOrEmpty(path)
-                ? "untitled.mp3"
-                : Path.GetFileNameWithoutExtension(path) + ".mp3",
-            InitialDirectory = ResolveExportInitialDirectory(path),
-        };
-
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        RememberExportFolder(Path.GetDirectoryName(dialog.FileName));
-        await ExportSingleMp3WithGlassAsync(document, dialog.FileName);
-    }
-
-    private async Task ExportSingleMp3WithGlassAsync(AudioDocument document, string path)
-    {
-        if (IsUiBusy)
-        {
-            return;
-        }
-
-        StopPlaybackForExport();
-        var options = AppStorage.Settings.ToMp3EncodeOptions();
-        var name = Path.GetFileName(path);
-        var tracker = new ExportProgressTracker(
-            [name],
-            [document.FrameCount],
-            new Progress<ExportProgressSnapshot>(ApplyExportProgress));
-
-        _tabExportBusy = true;
-        try
-        {
-            ShowExportBusyGlass(AudioFileKind.Mp3);
-            ApplyExportProgress(tracker.Capture());
-            var encoder = await Task.Run(() =>
-            {
-                tracker.Report(0, 0, ExportJobState.Running);
-                try
-                {
-                    var used = AudioCodec.SaveMp3(
-                        document,
-                        path,
-                        options,
-                        new Progress<double>(p => tracker.Report(0, p, ExportJobState.Running)),
-                        AppStorage.Settings.ToMp3SpeakerMix());
-                    tracker.Report(0, 1, ExportJobState.Done);
-                    return used;
-                }
-                catch
-                {
-                    tracker.Report(0, 1, ExportJobState.Failed);
-                    throw;
-                }
-            }).ConfigureAwait(true);
-
-            _busyGlass.HideOverlay();
-            ApplyFileNameColorEdit(FollowFileNameColor(document.SourcePath, path));
-            ShowMp3EncoderResult(encoder);
-        }
-        catch (Exception ex)
-        {
-            _busyGlass.HideOverlay();
-            OwnerCenteredMessageBox.Show(this, $"{UiStrings.ErrorSaveFailed}\n{ex.Message}", UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            _tabExportBusy = false;
-        }
-    }
-
     private bool ExportMp3WithoutReloading(AudioDocument document, string path)
     {
         var encoder = AudioCodec.SaveMp3(
@@ -1650,10 +1565,34 @@ public partial class MainWindow
             return;
         }
 
-        var sources = SelectedTabsInOrder();
+        var sources = ResolveBatchEditTargets();
         if (sources.Length < 2)
         {
             return;
+        }
+
+        if (IsLibraryMaximized)
+        {
+            var ready = new List<DocumentSession>(sources.Length);
+            foreach (var session in sources)
+            {
+                if (await EnsureSessionPcmForEditAsync(session).ConfigureAwait(true))
+                {
+                    ready.Add(session);
+                }
+            }
+
+            sources = ready.ToArray();
+            if (sources.Length < 2)
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    UiStrings.ErrorNoWaveAiffForLoudnessMatch,
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
         }
 
         var documents = sources.Select(session => session.Document).ToArray();

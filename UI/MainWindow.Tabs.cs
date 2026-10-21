@@ -466,7 +466,7 @@ public partial class MainWindow
             menu.Items.Add(CreateTabMenuItem(
                 AllTabsSelected ? UiStrings.TabMenuExportMp3All : UiStrings.TabMenuExportMp3Selected,
                 () => ExportTabs(targets, AudioFileKind.Mp3),
-                AllTabsSelected ? "Ctrl+Shift+Alt+M" : null,
+                "Ctrl+Shift+M",
                 enabled: !IsUiBusy));
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateTabMenuItem(
@@ -553,6 +553,19 @@ public partial class MainWindow
         foreach (var session in sessions)
         {
             if (session.Document.AllowsRegionsAndLoops && session.Document.Regions.Count > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool AnyTabHasSampleLoop(IEnumerable<DocumentSession> sessions)
+    {
+        foreach (var session in sessions)
+        {
+            if (session.Document.AllowsRegionsAndLoops && !session.Document.SampleLoop.IsEmpty)
             {
                 return true;
             }

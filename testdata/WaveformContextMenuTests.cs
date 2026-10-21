@@ -75,6 +75,71 @@ public sealed class WaveformContextMenuTests
     }
 
     [Fact]
+    public void Build_MultipleSelection_GraysSingleFileOnlyCommands()
+    {
+        var multi = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasDocument = true,
+            CanEdit = true,
+            CanNavigate = true,
+            IsPlaying = true,
+            HasSelection = true,
+            HasAnySelection = true,
+            CanUndo = true,
+            CanRedo = true,
+            CanPasteAudio = true,
+            CanPasteHistory = true,
+            HasMarkers = true,
+            HasRegions = true,
+            HasSelectedMarkers = true,
+            HasSelectedRegions = true,
+            HasSampleLoop = true,
+            AllowsRegionsAndLoops = true,
+            CanRenameMarker = true,
+            CanRenameRegion = true,
+            CanAddMarkerHere = true,
+            CanLoopPlay = true,
+            HasSolo = true,
+            CanCloseOtherTabs = true,
+            CanCloseTabsToRight = true,
+            CanCloseTabsToLeft = true,
+            HasSelectedTabs = true,
+            HasMultipleSelectedTabs = true,
+            CanCopySelectionTimes = true,
+            Hit = new WaveformContextHit
+            {
+                MarkerFrames = [0],
+                Region = new WaveSelection(0, 10),
+                HitLoop = true,
+            },
+        });
+
+        Assert.False(Find(multi, WaveMenuCommand.PlayFromHere)?.Enabled);
+        Assert.False(Find(multi, WaveMenuCommand.SeekHere)?.Enabled);
+        Assert.False(Find(multi, WaveMenuCommand.AddMarkerHere)?.Enabled);
+        Assert.False(Find(multi, WaveMenuCommand.SelectSpanHere)?.Enabled);
+        Assert.False(Find(multi, WaveMenuCommand.FadeAround)?.Enabled);
+        Assert.False(Find(multi, WaveMenuCommand.Cut)?.Enabled);
+        Assert.True(Find(multi, WaveMenuCommand.Undo)?.Enabled);
+        Assert.True(Find(multi, WaveMenuCommand.Redo)?.Enabled);
+        Assert.Equal(UiStrings.WaveMenuUndoSelected, Find(multi, WaveMenuCommand.Undo)?.Header);
+        Assert.False(Find(multi, WaveMenuCommand.AddMarker)?.Enabled);
+        Assert.False(Find(multi, WaveMenuCommand.SetRegion)?.Enabled);
+        Assert.False(Find(multi, WaveMenuCommand.SetLoop)?.Enabled);
+        Assert.False(Find(multi, WaveMenuCommand.PauseHere)?.Enabled);
+        Assert.False(Find(multi, WaveMenuCommand.LoopPlay)?.Enabled);
+        Assert.False(Find(multi, WaveMenuCommand.RenameFile)?.Enabled);
+        Assert.False(Find(multi, WaveMenuCommand.CloseTab)?.Enabled);
+        Assert.False(Find(multi, WaveMenuCommand.ClearMarkers)?.Enabled);
+
+        Assert.True(Find(multi, WaveMenuCommand.Normalize)?.Enabled);
+        Assert.True(Find(multi, WaveMenuCommand.PasteHistory)?.Enabled);
+        Assert.True(Find(multi, WaveMenuCommand.DeleteAllMarkers)?.Enabled);
+        Assert.True(Find(multi, WaveMenuCommand.CopySelectionTime)?.Enabled);
+        Assert.True(Find(multi, WaveMenuCommand.TogglePlayback)?.Enabled);
+    }
+
+    [Fact]
     public void Build_IncludesCategoriesAndCoreCommands()
     {
         var previous = UiStrings.Language;
@@ -161,7 +226,7 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.ExportWave, commands);
             Assert.Contains(WaveMenuCommand.ExportByChannels, CommandsIn(tree, UiStrings.WaveMenuCatExport));
             Assert.Contains(WaveMenuCommand.Channels, CommandsIn(tree, UiStrings.WaveMenuCatFormat));
-            Assert.Contains(WaveMenuCommand.SaveMp3, CommandsIn(tree, UiStrings.WaveMenuCatFile));
+            Assert.DoesNotContain(WaveMenuCommand.ExportMp3, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Contains(WaveMenuCommand.RenameFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Contains(WaveMenuCommand.DuplicateFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Equal("Ctrl+Shift+D", Find(tree, WaveMenuCommand.DuplicateFile)?.Gesture);
@@ -228,9 +293,8 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.CloseTabsRight, commands);
             Assert.Contains(WaveMenuCommand.CloseTabsLeft, commands);
             Assert.Contains(WaveMenuCommand.CopyAllTabTimes, commands);
-            Assert.Contains(WaveMenuCommand.ExportAllWave, CommandsIn(tree, UiStrings.WaveMenuCatExport));
-            Assert.Contains(WaveMenuCommand.ExportAllMp3, CommandsIn(tree, UiStrings.WaveMenuCatExport));
-            Assert.DoesNotContain(WaveMenuCommand.ExportAllWave, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
+            Assert.Contains(WaveMenuCommand.ExportMp3, CommandsIn(tree, UiStrings.WaveMenuCatExport));
+            Assert.Equal("Ctrl+Shift+M", Find(tree, WaveMenuCommand.ExportMp3)?.Gesture);
             Assert.Contains(WaveMenuCommand.TileOff, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
             Assert.DoesNotContain(WaveMenuCommand.TileOff, CommandsIn(tree, UiStrings.WaveMenuCatView));
             Assert.Contains(WaveMenuCommand.ClearMarkers, CommandsIn(tree, UiStrings.WaveMenuCatHere));
@@ -281,7 +345,7 @@ public sealed class WaveformContextMenuTests
         Assert.False(Find(idle, WaveMenuCommand.CloseOthers)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.CloseTabsRight)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.CloseTabsLeft)?.Enabled);
-        Assert.False(Find(idle, WaveMenuCommand.ExportAllWave)?.Enabled);
+        Assert.False(Find(idle, WaveMenuCommand.ExportMp3)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.LoopPlay)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.TileHorizontal)?.Enabled);
         Assert.False(Find(idle, WaveMenuCommand.TileGrid)?.Enabled);
@@ -377,7 +441,11 @@ public sealed class WaveformContextMenuTests
             AllowsRegionsAndLoops = true,
         });
         Assert.False(Find(tree, WaveMenuCommand.Undo)?.Enabled);
-        Assert.False(Find(tree, WaveMenuCommand.FadeIn)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.FadeIn)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.FadeOut)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.InsertSilence)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.DetectSilence)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.FadeAround)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.AddMarker)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.DeleteMarkers)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.DeleteAllMarkers)?.Enabled);
@@ -391,20 +459,27 @@ public sealed class WaveformContextMenuTests
         Assert.False(Find(tree, WaveMenuCommand.DeleteFile)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.TileGrid)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.SoloNext)?.Enabled);
-        Assert.False(Find(tree, WaveMenuCommand.ExportWave)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.ExportWave)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.Volume)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.Normalize)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.Pitch)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.TimeStretch)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.Reverse)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.SampleRate)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.BitDepth)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.Channels)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.ExportByChannels)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.DeleteAllRegions)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.ClearLoopItem)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.ExportMp3)?.Enabled);
-        Assert.True(Find(tree, WaveMenuCommand.ExportAllMp3)?.Enabled);
-        Assert.False(Find(tree, WaveMenuCommand.SaveMp3)?.Enabled);
+        Assert.Equal("Ctrl+Shift+M", Find(tree, WaveMenuCommand.ExportMp3)?.Gesture);
         var mp3Only = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
         {
             HasDocument = true,
             LibraryMaximized = true,
             CanExportMp3 = false,
-            CanExportAllMp3 = false,
         });
         Assert.False(Find(mp3Only, WaveMenuCommand.ExportMp3)?.Enabled);
-        Assert.False(Find(mp3Only, WaveMenuCommand.ExportAllMp3)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.FocusTime)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.TogglePlayback)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.SelectAll)?.Enabled);
@@ -485,7 +560,7 @@ public sealed class WaveformContextMenuTests
             HasMarkers = true,
             CanExportMp3 = true,
         });
-        Assert.False(Category(player, UiStrings.WaveMenuCatFormat).Enabled);
+        Assert.True(Category(player, UiStrings.WaveMenuCatFormat).Enabled);
         Assert.False(Category(player, UiStrings.WaveMenuCatWwise).Enabled);
         Assert.True(Category(player, UiStrings.WaveMenuCatTabs).Enabled);
         Assert.True(Category(player, UiStrings.WaveMenuCatAudio).Enabled);

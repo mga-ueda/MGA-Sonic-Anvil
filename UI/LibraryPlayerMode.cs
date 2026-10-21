@@ -102,13 +102,34 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.ClearMarkers
             or WaveMenuCommand.DeleteMarkers
             or WaveMenuCommand.DeleteAllMarkers
+            or WaveMenuCommand.DeleteAllRegions
+            or WaveMenuCommand.ClearLoop
+            or WaveMenuCommand.ClearLoopItem
             or WaveMenuCommand.PrevMarker
             or WaveMenuCommand.NextMarker
-            // プレイリスト選択のラウドネス揃え（V）と MP3 書き出し。
+            // プレイリスト選択への破壊編集・書き出し（キーは不可。右クリックメニューのみ）。
             or WaveMenuCommand.Volume
-            or WaveMenuCommand.SaveMp3
+            or WaveMenuCommand.Normalize
+            or WaveMenuCommand.NormalizePerRegion
+            or WaveMenuCommand.Pitch
+            or WaveMenuCommand.TimeStretch
+            or WaveMenuCommand.Reverse
+            or WaveMenuCommand.SampleRate
+            or WaveMenuCommand.BitDepth
+            or WaveMenuCommand.Channels
+            or WaveMenuCommand.FadeIn
+            or WaveMenuCommand.FadeOut
+            or WaveMenuCommand.InsertSilence
+            or WaveMenuCommand.DetectSilence
+            or WaveMenuCommand.MergeTabs
+            or WaveMenuCommand.ExportByChannels
             or WaveMenuCommand.ExportMp3
-            or WaveMenuCommand.ExportAllMp3
+            or WaveMenuCommand.ExportWave
+            or WaveMenuCommand.ExportByMarkers
+            or WaveMenuCommand.ExportByRegions
+            or WaveMenuCommand.PlaybackPitchUp
+            or WaveMenuCommand.PlaybackPitchDown
+            or WaveMenuCommand.PlaybackPitchReset
             => false,
         _ => true,
     };
@@ -215,20 +236,16 @@ internal static class LibraryPlayerMode
                 or ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift)) => true,
             (Key.L, ModifierKeys.None) => true,
             (Key.L, ModifierKeys.Alt) => true,
-            (Key.N, ModifierKeys.None) => true,
+            // N／P／R 素押しは曲送り・頭出し専用（AllowsKey より前で処理）。破壊編集ショートカットには通さない。
             (Key.N, ModifierKeys.Alt) => true,
-            (Key.P, ModifierKeys.None) => true,
             (Key.P, ModifierKeys.Alt) => true,
             (Key.P, ModifierKeys.Control | ModifierKeys.Shift) => true,
-            (Key.R, ModifierKeys.None) => true,
             (Key.R, ModifierKeys.Alt) => true,
-            (Key.V, ModifierKeys.None) => true,
             (Key.J, ModifierKeys.None) => true,
             (Key.K, ModifierKeys.None) => true,
             (Key.OemComma, ModifierKeys.None) => true,
             (Key.OemPeriod, ModifierKeys.None) => true,
-            (Key.I, ModifierKeys.None) => true,
-            (Key.O, ModifierKeys.None) => true,
+            // I／O／M／Ins 素押しは捨てキュー専用（AllowsKey より前）。フェード／無音挿入へは通さない。
             (Key.M, ModifierKeys.None) => true,
             (Key.Insert, ModifierKeys.None) => true,
             (Key.Delete, ModifierKeys.Control) => true,
@@ -247,12 +264,26 @@ internal static class LibraryPlayerMode
             (Key.Y, ModifierKeys.Control) => true,
             (Key.T, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.M, ModifierKeys.Control | ModifierKeys.Shift) => true,
-            (Key.M, ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Alt) => true,
             (Key.Tab, ModifierKeys.Control) => true,
             (Key.Tab, ModifierKeys.Control | ModifierKeys.Shift) => true,
             _ => false,
         };
     }
+
+    /// <summary>
+    /// プレイヤーでキーから起こすとまずい破壊編集ショートカット。
+    /// 右クリックメニューからは <see cref="BlocksWaveMenu"/> 経由で実行する。
+    /// </summary>
+    public static bool IsDestructiveEditShortcut(Key key, ModifierKeys modifiers) =>
+        (key, modifiers) switch
+        {
+            (Key.N or Key.P or Key.R or Key.T or Key.S or Key.B or Key.C or Key.V
+                or Key.I or Key.O, ModifierKeys.None) => true,
+            (Key.D, ModifierKeys.Control) => true,
+            (Key.Insert, ModifierKeys.Control) => true,
+            (Key.B, ModifierKeys.Control | ModifierKeys.Shift) => true,
+            _ => false,
+        };
 
     /// <summary>プレイヤーで選択中の捨てマーカーを Delete で消すとき。リスト除外より優先。</summary>
     public static bool PrefersScratchMarkerDelete(bool playerMode, bool hasSelectedScratchMarkers) =>

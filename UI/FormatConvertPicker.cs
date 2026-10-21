@@ -55,7 +55,8 @@ internal static class FormatConvertPicker
         Action<int>? onHighlight = null)
     {
         var allowCustom = kind == FormatConvertKind.SampleRate;
-        var allowPreview = kind is FormatConvertKind.SampleRate or FormatConvertKind.BitDepth;
+        // 呼び出し側が onPreview を渡したときだけ Space 試聴を受け付ける（複数編集では null）。
+        var allowPreview = onPreview is not null;
         var menu = new ContextMenu
         {
             MinWidth = 0,

@@ -265,8 +265,8 @@ internal static partial class UiStrings
     public static string LabelAppLaunchModePlayer => Get("プレイヤー（通常）", "Player (normal)");
     public static string LabelAppLaunchModePlayerCompact => Get("プレイヤー（コンパクト）", "Player (compact)");
     public static string LabelAppLaunchModeHint => Get(
-        "ファイルを渡さずに起動したときだけ",
-        "Only when no file is passed");
+        "ファイルを渡さず、前回の編集も復元しないときだけ",
+        "Only when no file is passed and nothing is restored");
     public static string LabelDefaultAudioFormat => Get("既定 Wave フォーマット", "Default Wave format");
     public static string LabelDefaultSampleRate => Get("サンプルレート", "Sample rate");
     public static string LabelDefaultBitDepth => Get("ビット深度", "Bit depth");
@@ -932,12 +932,15 @@ internal static partial class UiStrings
     public static string LibraryMenuAutoPlay => Get("追加時に自動再生", "Auto Play on Add");
     public static string LibraryMenuRemoveFromFavorites => Get("お気に入りから削除", "Remove from Favorites");
     public static string LibraryMenuClearFromPlaylist => Get("プレイリストからクリア", "Clear from Playlist");
-    // アクセスキーは付けない（メニュー外クリック時の誤発火を避ける）。ショートカットは InputGestureText。
-    public static string LibraryMenuCatPlaylist => Get("プレイリスト", "Playlist");
-    public static string LibraryMenuCatEdit => Get("編集", "Edit");
-    public static string LibraryMenuCatPitch => Get("再生・ピッチ", "Playback & Pitch");
-    public static string LibraryMenuCatTree => Get("ツリー", "Tree");
-    public static string LibraryMenuCatOther => Get("その他", "Other");
+    // トップカテゴリのアクセスキーは波形メニュー（WaveMenuCat*）と揃える。子項目は InputGestureText。
+    public static string LibraryMenuCatPlaylist => Get("プレイリスト(_Y)", "Playlist (_Y)");
+    public static string LibraryMenuCatEdit => Get("編集(_E)", "_Edit");
+    public static string LibraryMenuCatAudio => Get("オーディオ(_A)", "_Audio");
+    public static string LibraryMenuCatFormat => Get("変換(_N)", "Co_nvert");
+    public static string LibraryMenuCatExport => Get("書き出し(_X)", "E_xport");
+    public static string LibraryMenuCatPitch => Get("再生・ピッチ(_P)", "_Playback & Pitch");
+    public static string LibraryMenuCatTree => Get("ツリー(_T)", "_Tree");
+    public static string LibraryMenuCatOther => Get("その他(_O)", "_Other");
     public static string LibraryMenuMatchLoudness => Get("ラウドネスを揃える", "Match Loudness");
     public static string LibraryMenuSaveMp3 => Get("MP3 として保存", "Save as MP3");
     public static string LibraryMenuCopy => Get("コピー", "Copy");
@@ -948,7 +951,7 @@ internal static partial class UiStrings
     public static string LibraryMenuPitchUp => Get("ピッチシフトしてプレビュー（半音上げる）", "Pitch Shift Preview (Semitone Up)");
     public static string LibraryMenuPitchDown => Get("ピッチシフトしてプレビュー（半音下げる）", "Pitch Shift Preview (Semitone Down)");
     public static string LibraryMenuPitchReset => Get("ピッチシフトをリセット", "Reset Pitch Shift");
-    public static string LibraryMenuColor => Get("カラー", "Color");
+    public static string LibraryMenuColor => Get("カラー(_C)", "_Color");
     public static string LibraryMenuColorAutomatic => Get("自動に戻す", "Use automatic");
     public static string LibraryMenuCopyFileName => Get("ファイル名をコピー", "Copy File Name");
     public static string LibraryMenuCopyFilePath => Get("フルパスをコピー", "Copy Full Path");

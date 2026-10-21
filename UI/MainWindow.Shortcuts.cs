@@ -1522,6 +1522,12 @@ public partial class MainWindow
             {
                 return true;
             }
+
+            // 破壊編集は右クリックメニューのみ。ショートカットは握りつぶす（誤操作防止）。
+            if (LibraryPlayerMode.IsDestructiveEditShortcut(key, modifiers))
+            {
+                return true;
+            }
         }
 
         if (TryProcessHistoryShortcut(key, modifiers))
@@ -1895,8 +1901,8 @@ public partial class MainWindow
 
         if (key == Key.D && modifiers == ModifierKeys.Control)
         {
-            // Ctrl+T はタイル巡回済み。無音検出は Ctrl+D。
-            if (!IsLibraryMaximized && !IsRecording && _document is not null)
+            // Ctrl+T はタイル巡回済み。無音検出は Ctrl+D（プレイリスト複数選択も可）。
+            if (!IsRecording && (_document is not null || HasBatchEditTargets))
             {
                 ApplyDetectSilence();
             }
@@ -1906,7 +1912,7 @@ public partial class MainWindow
 
         if (key == Key.Insert && modifiers == ModifierKeys.Control)
         {
-            if (!IsLibraryMaximized && !IsRecording && _document is not null)
+            if (!IsRecording && (_document is not null || HasBatchEditTargets))
             {
                 PromptInsertSilenceAt(Waveform.PlayheadFrame);
             }
@@ -2329,7 +2335,7 @@ public partial class MainWindow
 
         if (key == Key.B && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            if (!IsRecording && _selectedTabs.Count >= 2)
+            if (!IsRecording && ResolveBatchEditTargets().Length >= 2)
             {
                 MergeSelectedTabs();
             }
@@ -2483,23 +2489,9 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.M && modifiers == (ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Alt))
-        {
-            ExportAllTabsMp3();
-            return true;
-        }
-
         if (key == Key.M && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            if (IsLibraryMaximized)
-            {
-                ExportPlaylistSelectionMp3();
-            }
-            else
-            {
-                SaveAsMp3();
-            }
-
+            ExportMp3FromUi();
             return true;
         }
 

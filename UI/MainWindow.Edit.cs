@@ -14,16 +14,21 @@ public partial class MainWindow
 {
     private void PromptFade(bool fadeIn, FrameworkElement? placementTarget = null)
     {
-        if (_document is null)
+        var batch = HasBatchEditTargets;
+        var document = _document ?? ResolveBatchEditTargets().FirstOrDefault()?.Document;
+        if (document is null)
         {
             return;
         }
 
-        var range = ActiveRange();
-        if (range.IsEmpty)
+        if (!batch)
         {
-            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
+            var range = ActiveRange();
+            if (range.IsEmpty)
+            {
+                OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
         }
 
         CloseFormatConvertPicker();
@@ -42,18 +47,19 @@ public partial class MainWindow
         }
 
         _fadePromptIsIn = fadeIn;
-        _fadePreview.ResumeFrame = _document.CursorFrame;
+        _fadePreview.ResumeFrame = document.CursorFrame;
         _fadeReplayOnHighlight = false;
         var initial = fadeIn
             ? AppStorage.Settings.ResolvedFadeInCurve()
             : AppStorage.Settings.ResolvedFadeOutCurve();
+        // 複数ファイル編集ではお試し視聴しない（単体のみ）。
         var menu = FadeCurvePicker.Show(
             this,
             PlacementMode.Center,
             fadeIn,
             shape => ApplyFade(fadeIn, shape),
-            shape => PreviewFade(fadeIn, shape),
-            shape => OnFadeCurveHighlighted(fadeIn, shape),
+            batch ? static _ => { } : shape => PreviewFade(fadeIn, shape),
+            batch ? static _ => { } : shape => OnFadeCurveHighlighted(fadeIn, shape),
             initial);
         _fadeMenu = menu;
         menu.Closed += (_, _) =>
@@ -246,7 +252,12 @@ public partial class MainWindow
         var weights = sessions.Select(session => Math.Max(1L, session.Document.FrameCount)).ToArray();
         var progress = new double[sessions.Length];
         var applied = new int[sessions.Length];
+        var ready = new bool[sessions.Length];
+        var commands = new IEditCommand?[sessions.Length];
+        var integratedBefore = new float[sessions.Length];
+        var gainDb = new double[sessions.Length];
         Exception? error = null;
+        var errorLock = new object();
         try
         {
             StopPlaybackForEdit();
@@ -264,87 +275,124 @@ public partial class MainWindow
                     break;
                 }
 
-                var session = sessions[i];
                 progress[i] = Math.Max(progress[i], 0.02);
                 ReportHistoryPasteBusy(names, progress, weights);
-
-                if (!await EnsureSessionPcmForEditAsync(session).ConfigureAwait(true))
+                ready[i] = await EnsureSessionPcmForEditAsync(sessions[i]).ConfigureAwait(true);
+                if (!ready[i])
                 {
                     progress[i] = 1;
                     ReportHistoryPasteBusy(names, progress, weights);
                     continue;
                 }
 
-                weights[i] = Math.Max(1L, session.Document.FrameCount);
-                IEditCommand? command = null;
-                float integratedBefore = float.NaN;
-                double gainDb = 0;
-                try
+                weights[i] = Math.Max(1L, sessions[i].Document.FrameCount);
+                integratedBefore[i] = float.NaN;
+            }
+
+            var buildIndices = new List<int>(sessions.Length);
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                if (ready[i])
                 {
-                    var document = session.Document;
-                    var mask = TabBatchEditMask(session);
-                    var measured = await Task.Run(() =>
-                    {
-                        if (!LoudnessMeterEngine.TryGainDbToMatchTarget(
-                                document,
-                                targetLufs,
-                                out var db,
-                                out var integrated))
+                    buildIndices.Add(i);
+                }
+            }
+
+            if (buildIndices.Count > 0 && IsLoaded)
+            {
+                var parallelism = AudioExport.WorkerCount(
+                    buildIndices.Count,
+                    AppStorage.Settings.ExportParallelism);
+                await Task.Run(() =>
+                {
+                    Parallel.For(
+                        0,
+                        buildIndices.Count,
+                        new ParallelOptions { MaxDegreeOfParallelism = parallelism },
+                        bi =>
                         {
-                            return (Command: (IEditCommand?)null, Integrated: integrated, GainDb: 0d);
+                            var i = buildIndices[bi];
+                            var session = sessions[i];
+                            try
+                            {
+                                var document = session.Document;
+                                var mask = TabBatchEditMask(session);
+                                if (!LoudnessMeterEngine.TryGainDbToMatchTarget(
+                                        document,
+                                        targetLufs,
+                                        out var db,
+                                        out var integrated))
+                                {
+                                    return;
+                                }
+
+                                commands[i] = ProcessEdits.Gain(
+                                    document,
+                                    TabBatchRange(document),
+                                    db,
+                                    channelMask: mask);
+                                integratedBefore[i] = integrated;
+                                gainDb[i] = db;
+                            }
+                            catch (Exception ex)
+                            {
+                                lock (errorLock)
+                                {
+                                    error ??= ex;
+                                }
+                            }
+                        });
+                }).ConfigureAwait(true);
+            }
+
+            Exception? buildError;
+            lock (errorLock)
+            {
+                buildError = error;
+            }
+
+            if (buildError is not null)
+            {
+                error = buildError;
+            }
+            else if (IsLoaded)
+            {
+                for (var i = 0; i < sessions.Length; i++)
+                {
+                    if (!ready[i])
+                    {
+                        continue;
+                    }
+
+                    if (commands[i] is { } command)
+                    {
+                        var session = sessions[i];
+                        session.History.Do(session.Document, command);
+                        if (float.IsFinite(integratedBefore[i]))
+                        {
+                            var linear = (float)WaveformGainAnalyzer.LinearFromDb(gainDb[i]);
+                            var after = LoudnessMeterEngine.ApplyLinearGainToLufs(integratedBefore[i], linear);
+                            var tags = session.Document.Tags;
+                            session.Document.ApplyTags(
+                                tags.HasFileLoudness
+                                    ? tags.WithFileLoudness(tags.ToFileLoudness().WithLinearGain(linear) with
+                                    {
+                                        IntegratedLufs = after,
+                                    })
+                                    : tags.WithIntegratedLufs(after));
                         }
 
-                        var edit = ProcessEdits.Gain(
-                            document,
-                            TabBatchRange(document),
-                            db,
-                            channelMask: mask);
-                        return (Command: edit, Integrated: integrated, GainDb: db);
-                    }).ConfigureAwait(true);
-                    command = measured.Command;
-                    integratedBefore = measured.Integrated;
-                    gainDb = measured.GainDb;
-                }
-                catch (Exception ex)
-                {
-                    error = ex;
+                        if (IsLibraryMaximized)
+                        {
+                            LibraryBrowser.UpdateSessionRow(session);
+                        }
+
+                        applied[i]++;
+                    }
+
                     progress[i] = 1;
                     ReportHistoryPasteBusy(names, progress, weights);
-                    break;
                 }
-
-                if (!IsLoaded)
-                {
-                    break;
-                }
-
-                if (command is not null)
-                {
-                    session.History.Do(session.Document, command);
-                    if (float.IsFinite(integratedBefore))
-                    {
-                        var linear = (float)WaveformGainAnalyzer.LinearFromDb(gainDb);
-                        var after = LoudnessMeterEngine.ApplyLinearGainToLufs(integratedBefore, linear);
-                        var tags = session.Document.Tags;
-                        session.Document.ApplyTags(
-                            tags.HasFileLoudness
-                                ? tags.WithFileLoudness(tags.ToFileLoudness().WithLinearGain(linear) with
-                                {
-                                    IntegratedLufs = after,
-                                })
-                                : tags.WithIntegratedLufs(after));
-                    }
-
-                    if (IsLibraryMaximized)
-                    {
-                        LibraryBrowser.UpdateSessionRow(session);
-                    }
-
-                    applied[i]++;
-                }
-
-                progress[i] = 1;
-                ReportHistoryPasteBusy(names, progress, weights);
             }
         }
         catch (Exception ex)
@@ -450,17 +498,21 @@ public partial class MainWindow
             return;
         }
 
-        if (_document is null)
+        var batch = HasBatchEditTargets;
+        if (_document is null && !batch)
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        var range = ActiveRange();
-        if (range.IsEmpty)
+        if (!batch)
         {
-            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
+            var range = ActiveRange();
+            if (range.IsEmpty)
+            {
+                OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
         }
 
         if (_pitchMenu is { IsOpen: true })
@@ -478,8 +530,19 @@ public partial class MainWindow
             PausePlaybackSoft();
         }
 
-        _pitchPreview.ResumeFrame = _document.CursorFrame;
-        var menu = PitchShiftPicker.Show(this, ApplyPitch, PreviewPitch, OnPitchChanged);
+        var document = _document ?? ResolveBatchEditTargets().FirstOrDefault()?.Document;
+        if (document is null)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        _pitchPreview.ResumeFrame = document.CursorFrame;
+        var menu = PitchShiftPicker.Show(
+            this,
+            ApplyPitch,
+            batch ? static (_, _) => { } : PreviewPitch,
+            batch ? static (_, _) => { } : OnPitchChanged);
         _pitchMenu = menu;
         menu.Closed += (_, _) =>
         {
@@ -520,7 +583,8 @@ public partial class MainWindow
 
     private void PreviewPitch(int semitones, bool timeStretch)
     {
-        if (_document is null || _pitchPreview.Toggling)
+        // 複数ファイル編集ではお試し視聴しない（単体のみ）。
+        if (HasBatchEditTargets || _document is null || _pitchPreview.Toggling)
         {
             return;
         }
@@ -639,13 +703,13 @@ public partial class MainWindow
 
     private async Task ApplyPitchAsync(int semitones, bool timeStretch)
     {
-        if (_document is null || IsUiBusy)
+        if (IsUiBusy)
         {
             return;
         }
 
-        // タブ選択中は選択ファイル全体へ同じピッチシフトを一括適用する。
-        if (HasTabSelection)
+        // タブ／プレイリスト選択中はファイル全体へ同じピッチシフトを一括適用する。
+        if (HasBatchEditTargets)
         {
             _pitchPreview.Previewing = false;
             ClosePitchShiftPicker();
@@ -654,8 +718,9 @@ public partial class MainWindow
                 return;
             }
 
-            await RunSelectedTabsEditAsync(
-                SelectedTabsInOrder(),
+            var targets = ResolveBatchEditTargets();
+            await RunBatchEditAsync(
+                targets,
                 UiStrings.OverlayPitchShift,
                 (session, progress) => session.Document.FrameCount == 0
                     ? null
@@ -665,7 +730,14 @@ public partial class MainWindow
                         semitones,
                         timeStretch,
                         progress,
-                        channelMask: TabBatchEditMask(session))).ConfigureAwait(true);
+                        channelMask: TabBatchEditMask(session)),
+                saveAfter: IsLibraryMaximized,
+                ensurePcm: IsLibraryMaximized).ConfigureAwait(true);
+            return;
+        }
+
+        if (_document is null)
+        {
             return;
         }
 
@@ -738,17 +810,35 @@ public partial class MainWindow
             return;
         }
 
-        if (_document is null)
+        var batch = HasBatchEditTargets;
+        if (_document is null && !batch)
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        var range = ActiveRange();
-        if (range.IsEmpty)
+        WaveSelection range;
+        AudioDocument document;
+        if (batch)
         {
-            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
+            document = _document ?? ResolveBatchEditTargets().FirstOrDefault()?.Document!;
+            if (document is null)
+            {
+                OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            range = TabBatchRange(document);
+        }
+        else
+        {
+            document = _document!;
+            range = ActiveRange();
+            if (range.IsEmpty)
+            {
+                OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
         }
 
         if (_timeStretchMenu is { IsOpen: true })
@@ -765,14 +855,14 @@ public partial class MainWindow
             PausePlaybackSoft();
         }
 
-        _timeStretchPreview.ResumeFrame = _document.CursorFrame;
+        _timeStretchPreview.ResumeFrame = document.CursorFrame;
         var menu = TimeStretchPicker.Show(
             this,
             (int)Math.Min(int.MaxValue, range.Length),
-            _document.SampleRate,
+            document.SampleRate,
             ApplyTimeStretch,
-            PreviewTimeStretch,
-            OnTimeStretchChanged);
+            batch ? static _ => { } : PreviewTimeStretch,
+            batch ? static _ => { } : OnTimeStretchChanged);
         _timeStretchMenu = menu;
         menu.Closed += (_, _) =>
         {
@@ -805,7 +895,8 @@ public partial class MainWindow
             return;
         }
 
-        if (_document is null)
+        var document = _document ?? ResolveBatchEditTargets().FirstOrDefault()?.Document;
+        if (document is null)
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -827,7 +918,7 @@ public partial class MainWindow
             PausePlaybackSoft();
         }
 
-        _silenceInsertFrame = Math.Clamp(frame, 0, _document.FrameCount);
+        _silenceInsertFrame = Math.Clamp(frame, 0, document.FrameCount);
         var menu = SilenceInsertPicker.Show(this, ApplyInsertSilence);
         _silenceMenu = menu;
         menu.Closed += (_, _) =>
@@ -852,7 +943,7 @@ public partial class MainWindow
 
     private void ApplyInsertSilence(double seconds)
     {
-        if (_document is null || IsUiBusy)
+        if (IsUiBusy)
         {
             return;
         }
@@ -861,16 +952,22 @@ public partial class MainWindow
         var fadeMs = edgeFade ? AppStorage.Settings.ResolvedClickGuardFadeMs() : 0;
         CloseInsertSilencePicker();
         var insertFrame = _silenceInsertFrame;
-        if (HasTabSelection)
+        var active = _activeSession;
+        if (TryRunBatchEdit(
+                UiStrings.OverlayApplySelected,
+                (session, _) =>
+                {
+                    var at = ReferenceEquals(session, active)
+                        ? insertFrame
+                        : session.Document.CursorFrame;
+                    return ProcessEdits.InsertSilence(session.Document, at, seconds, edgeFade, fadeMs);
+                }))
         {
-            var active = _activeSession;
-            TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
-            {
-                var at = ReferenceEquals(session, active)
-                    ? insertFrame
-                    : session.Document.CursorFrame;
-                return ProcessEdits.InsertSilence(session.Document, at, seconds, edgeFade, fadeMs);
-            });
+            return;
+        }
+
+        if (_document is null)
+        {
             return;
         }
 
@@ -903,7 +1000,8 @@ public partial class MainWindow
 
     private void PreviewTimeStretch(int destFrames)
     {
-        if (_document is null || _timeStretchPreview.Toggling)
+        // 複数ファイル編集ではお試し視聴しない（単体のみ）。
+        if (HasBatchEditTargets || _document is null || _timeStretchPreview.Toggling)
         {
             return;
         }
@@ -1021,25 +1119,24 @@ public partial class MainWindow
 
     private async Task ApplyTimeStretchAsync(int destFrames)
     {
-        if (_document is null || IsUiBusy)
+        if (IsUiBusy)
         {
             return;
         }
 
-        var range = ActiveRange();
-        if (range.IsEmpty)
-        {
-            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        // タブ選択中は、アクティブに対する倍率へ換算して選択ファイル全体を一括ストレッチする。
-        if (HasTabSelection)
+        // タブ／プレイリスト選択中は、基準長に対する倍率へ換算してファイル全体を一括ストレッチする。
+        if (HasBatchEditTargets)
         {
             _timeStretchPreview.Previewing = false;
             CloseTimeStretchPicker();
             CloseInsertSilencePicker();
-            var sourceFrames = (int)range.Length;
+            var reference = _document ?? ResolveBatchEditTargets().FirstOrDefault()?.Document;
+            if (reference is null || reference.FrameCount == 0)
+            {
+                return;
+            }
+
+            var sourceFrames = (int)Math.Min(int.MaxValue, reference.FrameCount);
             var clamped = Audio.TimeStretch.ClampDestFrames(sourceFrames, destFrames);
             if (Audio.TimeStretch.IsNoOp(sourceFrames, clamped))
             {
@@ -1047,8 +1144,8 @@ public partial class MainWindow
             }
 
             var ratio = clamped / (double)sourceFrames;
-            await RunSelectedTabsEditAsync(
-                SelectedTabsInOrder(),
+            await RunBatchEditAsync(
+                ResolveBatchEditTargets(),
                 UiStrings.OverlayTimeStretch,
                 (session, progress) =>
                 {
@@ -1073,7 +1170,21 @@ public partial class MainWindow
                         dest,
                         progress,
                         channelMask: TabBatchEditMask(session));
-                }).ConfigureAwait(true);
+                },
+                saveAfter: IsLibraryMaximized,
+                ensurePcm: IsLibraryMaximized).ConfigureAwait(true);
+            return;
+        }
+
+        if (_document is null)
+        {
+            return;
+        }
+
+        var range = ActiveRange();
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -1209,7 +1320,8 @@ public partial class MainWindow
 
     private void PreviewVolume(double gainDb)
     {
-        if (_document is null || _volumePreview.Toggling)
+        // 複数ファイル編集ではお試し視聴しない（単体のみ）。
+        if (HasBatchEditTargets || _document is null || _volumePreview.Toggling)
         {
             return;
         }
@@ -1367,7 +1479,8 @@ public partial class MainWindow
 
     private void PreviewFade(bool fadeIn, FadeShape shape)
     {
-        if (_document is null || _fadePreview.Toggling)
+        // 複数ファイル編集ではお試し視聴しない（単体のみ）。
+        if (HasBatchEditTargets || _document is null || _fadePreview.Toggling)
         {
             return;
         }
@@ -1528,29 +1641,31 @@ public partial class MainWindow
 
     private void ApplyFade(bool fadeIn, FadeShape shape)
     {
-        if (_document is null)
+        _fadePreview.Previewing = false;
+        ClearFadeCurveVisualPreview();
+        CloseFadeCurvePicker();
+
+        // タブ／プレイリスト選択中は、同じカーブで選択ファイル全体を一括フェードする。
+        if (TryRunBatchEdit(
+                UiStrings.OverlayApplySelected,
+                (session, _) =>
+                {
+                    var document = session.Document;
+                    if (document.FrameCount == 0)
+                    {
+                        return null;
+                    }
+
+                    return fadeIn
+                        ? ProcessEdits.FadeIn(document, TabBatchRange(document), shape, channelMask: TabBatchEditMask(session))
+                        : ProcessEdits.FadeOut(document, TabBatchRange(document), shape, channelMask: TabBatchEditMask(session));
+                }))
         {
             return;
         }
 
-        // タブ選択中は、同じカーブで選択ファイル全体を一括フェードする。
-        if (HasTabSelection)
+        if (_document is null)
         {
-            _fadePreview.Previewing = false;
-            ClearFadeCurveVisualPreview();
-            CloseFadeCurvePicker();
-            TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
-            {
-                var document = session.Document;
-                if (document.FrameCount == 0)
-                {
-                    return null;
-                }
-
-                return fadeIn
-                    ? ProcessEdits.FadeIn(document, TabBatchRange(document), shape, channelMask: TabBatchEditMask(session))
-                    : ProcessEdits.FadeOut(document, TabBatchRange(document), shape, channelMask: TabBatchEditMask(session));
-            });
             return;
         }
 
@@ -1561,8 +1676,6 @@ public partial class MainWindow
             return;
         }
 
-        _fadePreview.Previewing = false;
-        ClearFadeCurveVisualPreview();
         PausePlaybackSoft();
         var command = fadeIn
             ? ProcessEdits.FadeIn(_document, range, shape, channelMask: EditMask())
@@ -1592,18 +1705,21 @@ public partial class MainWindow
 
     private void ApplyNormalize()
     {
-        if (_document is null)
+        // タブ／プレイリスト選択中はファイル全体を一括ノーマライズする（選択範囲は見ない）。
+        if (TryRunBatchEdit(
+                UiStrings.OverlayApplySelected,
+                (session, _) => session.Document.FrameCount == 0
+                    ? null
+                    : ProcessEdits.Normalize(
+                        session.Document,
+                        TabBatchRange(session.Document),
+                        channelMask: TabBatchEditMask(session))))
         {
             return;
         }
 
-        // タブ選択中は選択ファイル全体を一括ノーマライズする。
-        if (HasTabSelection)
+        if (_document is null)
         {
-            TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
-                session.Document.FrameCount == 0
-                    ? null
-                    : ProcessEdits.Normalize(session.Document, TabBatchRange(session.Document), channelMask: TabBatchEditMask(session)));
             return;
         }
 
@@ -1621,18 +1737,21 @@ public partial class MainWindow
 
     private void ApplyReverse()
     {
-        if (_document is null)
+        // タブ／プレイリスト選択中はファイル全体を一括リバースする。
+        if (TryRunBatchEdit(
+                UiStrings.OverlayApplySelected,
+                (session, _) => session.Document.FrameCount == 0
+                    ? null
+                    : ProcessEdits.Reverse(
+                        session.Document,
+                        TabBatchRange(session.Document),
+                        channelMask: TabBatchEditMask(session))))
         {
             return;
         }
 
-        // タブ選択中は選択ファイル全体を一括リバースする。
-        if (HasTabSelection)
+        if (_document is null)
         {
-            TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
-                session.Document.FrameCount == 0
-                    ? null
-                    : ProcessEdits.Reverse(session.Document, TabBatchRange(session.Document), channelMask: TabBatchEditMask(session)));
             return;
         }
 
@@ -1656,25 +1775,29 @@ public partial class MainWindow
 
     private void ApplyNormalizePerRegion()
     {
-        if (_document is null)
+        // タブ／プレイリスト選択中は一括適用。リージョンの無いファイルはスキップする。
+        var fadeMs = AppStorage.Settings.ResolvedClickGuardFadeMs();
+        if (TryRunBatchEdit(
+                UiStrings.OverlayApplySelected,
+                (session, _) =>
+                {
+                    var document = session.Document;
+                    if (!document.AllowsRegionsAndLoops || document.Regions.Count == 0)
+                    {
+                        return null;
+                    }
+
+                    return ProcessEdits.NormalizePerRegion(
+                        document,
+                        channelMask: TabBatchEditMask(session),
+                        fadeMs: fadeMs);
+                }))
         {
             return;
         }
 
-        // タブ選択中は選択ファイルへ一括適用。リージョンの無いファイルはスキップする。
-        if (HasTabSelection)
+        if (_document is null)
         {
-            var fadeMs = AppStorage.Settings.ResolvedClickGuardFadeMs();
-            TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
-            {
-                var document = session.Document;
-                if (!document.AllowsRegionsAndLoops || document.Regions.Count == 0)
-                {
-                    return null;
-                }
-
-                return ProcessEdits.NormalizePerRegion(document, channelMask: TabBatchEditMask(session), fadeMs: fadeMs);
-            });
             return;
         }
 
@@ -1687,7 +1810,7 @@ public partial class MainWindow
         var command = ProcessEdits.NormalizePerRegion(
             _document,
             channelMask: EditMask(),
-            fadeMs: AppStorage.Settings.ResolvedClickGuardFadeMs());
+            fadeMs: fadeMs);
         if (command is null)
         {
             return;
@@ -2101,19 +2224,14 @@ public partial class MainWindow
 
     private void ApplyDetectSilence()
     {
-        if (_document is null)
-        {
-            return;
-        }
-
         var savedAction = ClampSilenceDetectAction(AppStorage.Settings.SilenceDetectAction);
         var savedOptions = AppStorage.Settings.ResolvedSilenceDetectOptions(
             AppStorage.Settings.SilenceDetectEdgesOnly);
 
-        // タブ複数選択時はしきい値 UI を出さず、保存済み設定で一括適用するか確認だけする。
-        if (HasTabSelection)
+        // タブ／プレイリスト複数選択時はしきい値 UI を出さず、保存済み設定で一括適用するか確認だけする。
+        if (HasBatchEditTargets)
         {
-            var targets = SelectedTabsInOrder();
+            var targets = ResolveBatchEditTargets();
             if (targets.Length == 0)
             {
                 return;
@@ -2131,7 +2249,7 @@ public partial class MainWindow
                 return;
             }
 
-            TryRunEditOnSelectedTabs(UiStrings.OverlayApplySelected, (session, _) =>
+            TryRunBatchEdit(UiStrings.OverlayApplySelected, (session, _) =>
             {
                 if (session.Document.FrameCount == 0)
                 {
@@ -2152,6 +2270,11 @@ public partial class MainWindow
                     TabBatchEditMask(session),
                     action);
             });
+            return;
+        }
+
+        if (_document is null)
+        {
             return;
         }
 
@@ -2317,6 +2440,23 @@ public partial class MainWindow
 
     private void ApplyDeleteAllMarkers()
     {
+        if (IsLibraryMaximized)
+        {
+            Waveform.TryClearPlayerScratchMarkers();
+        }
+
+        if (HasBatchEditTargets)
+        {
+            _ = RunBatchEditAsync(
+                ResolveBatchEditTargets(),
+                UiStrings.OverlayApplySelected,
+                (session, _) => ProcessEdits.ClearAllMarkers(session.Document),
+                saveAfter: IsLibraryMaximized,
+                ensurePcm: IsLibraryMaximized,
+                warnIfSkipped: !IsLibraryMaximized);
+            return;
+        }
+
         if (_document is null || _document.Markers.Count == 0)
         {
             return;
@@ -2335,6 +2475,22 @@ public partial class MainWindow
 
     private void ApplyDeleteAllRegions()
     {
+        if (TryRunBatchEdit(
+                UiStrings.OverlayApplySelected,
+                (session, _) =>
+                {
+                    var document = session.Document;
+                    if (!document.AllowsRegionsAndLoops || document.Regions.Count == 0)
+                    {
+                        return null;
+                    }
+
+                    return ProcessEdits.ClearAllRegions(document);
+                }))
+        {
+            return;
+        }
+
         if (_document is null || !_document.AllowsRegionsAndLoops || _document.Regions.Count == 0)
         {
             return;
@@ -3118,6 +3274,18 @@ public partial class MainWindow
 
         CommitTimelineNudgeSession();
         StopPlaceRepeat();
+
+        // 選択タブ／プレイリスト：各ファイルの履歴を等しく 1 段戻す（一括編集の対）。
+        if (HasBatchEditTargets)
+        {
+            var targets = ResolveBatchEditTargets();
+            if (AnySessionCanUndo(targets))
+            {
+                UndoOrRedoSelectedSessions(targets, redo: false);
+                return;
+            }
+        }
+
         if (IsLibraryMaximized)
         {
             if (IsPlayerScratchContext() && Waveform.CanUndoPlayerScratch)
@@ -3142,6 +3310,17 @@ public partial class MainWindow
     {
         CommitTimelineNudgeSession();
         StopPlaceRepeat();
+
+        if (HasBatchEditTargets)
+        {
+            var targets = ResolveBatchEditTargets();
+            if (AnySessionCanRedo(targets))
+            {
+                UndoOrRedoSelectedSessions(targets, redo: true);
+                return;
+            }
+        }
+
         if (IsLibraryMaximized)
         {
             if (IsPlayerScratchContext())
@@ -3160,6 +3339,105 @@ public partial class MainWindow
         StopPlaybackForEdit();
         _history.Redo(_document);
         AfterEdit();
+    }
+
+    private bool ResolveMenuCanUndo(bool canScratch)
+    {
+        if (HasBatchEditTargets && AnySessionCanUndo(ResolveBatchEditTargets()))
+        {
+            return true;
+        }
+
+        return IsLibraryMaximized
+            ? canScratch && Waveform.CanUndoPlayerScratch
+            : _document is not null && _history.CanUndo;
+    }
+
+    private bool ResolveMenuCanRedo(bool canScratch)
+    {
+        if (HasBatchEditTargets && AnySessionCanRedo(ResolveBatchEditTargets()))
+        {
+            return true;
+        }
+
+        return IsLibraryMaximized
+            ? canScratch && Waveform.CanRedoPlayerScratch
+            : _document is not null && _history.CanRedo;
+    }
+
+    private static bool AnySessionCanUndo(IReadOnlyList<DocumentSession> sessions)
+    {
+        foreach (var session in sessions)
+        {
+            if (session.History.CanUndo)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool AnySessionCanRedo(IReadOnlyList<DocumentSession> sessions)
+    {
+        foreach (var session in sessions)
+        {
+            if (session.History.CanRedo)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void UndoOrRedoSelectedSessions(IReadOnlyList<DocumentSession> sessions, bool redo)
+    {
+        if (sessions.Count == 0)
+        {
+            return;
+        }
+
+        StopPlaybackForEdit();
+        var applied = new int[sessions.Count];
+        var any = false;
+        for (var i = 0; i < sessions.Count; i++)
+        {
+            var session = sessions[i];
+            var history = session.History;
+            if (redo)
+            {
+                if (!history.CanRedo)
+                {
+                    continue;
+                }
+
+                history.Redo(session.Document);
+            }
+            else
+            {
+                if (!history.CanUndo)
+                {
+                    continue;
+                }
+
+                history.Undo(session.Document);
+            }
+
+            applied[i] = 1;
+            any = true;
+            if (IsLibraryMaximized)
+            {
+                LibraryBrowser.UpdateSessionRow(session);
+            }
+        }
+
+        if (!any)
+        {
+            return;
+        }
+
+        RefreshViewsAfterHistoryPaste(sessions, applied);
     }
 
     private void StopPlaybackForEdit()

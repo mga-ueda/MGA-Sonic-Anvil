@@ -159,14 +159,7 @@ public partial class MainWindow
                 Save(saveAs: true);
                 break;
             case TransportCommand.SaveMp3:
-                if (IsLibraryMaximized)
-                {
-                    ExportPlaylistSelectionMp3();
-                }
-                else
-                {
-                    SaveAsMp3();
-                }
+                ExportMp3FromUi();
                 break;
             case TransportCommand.ToggleAnalysis:
             case TransportCommand.ToggleSpectrogram:
@@ -1776,6 +1769,22 @@ public partial class MainWindow
 
     private void ClearSampleLoop()
     {
+        if (TryRunBatchEdit(
+                UiStrings.OverlayApplySelected,
+                (session, _) =>
+                {
+                    var document = session.Document;
+                    if (!document.AllowsRegionsAndLoops || document.SampleLoop.IsEmpty)
+                    {
+                        return null;
+                    }
+
+                    return ProcessEdits.SetSampleLoop(document, WaveSelection.Empty);
+                }))
+        {
+            return;
+        }
+
         if (_document is null || _document.SampleLoop.IsEmpty)
         {
             return;
@@ -2031,7 +2040,7 @@ public partial class MainWindow
 
         if (wantLibrary)
         {
-            ScheduleLibraryWaveformPaint();
+            // 波形の再描画予約は ApplyLibraryChrome 側。ここでは再生開始だけ。
             ScheduleLibraryEnterPlayback();
         }
         else
