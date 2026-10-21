@@ -19,8 +19,8 @@ namespace MgaSonicAnvil.Tests;
 /// 閉じたとき、その dismiss クリックが DataGrid の既定選択へ貫通して別トラックを選択・再生して
 /// しまう不具合の回帰テスト。貫通すると MainWindow 側で選択以外のトラックが落ちる
 /// （71 曲 → 1 曲）。dismiss クリックはメニューが閉じた直後に届くので
-/// <see cref="LibraryBrowserView.HasOpenContextMenu"/> だけでは拾えず、閉じてからアイドルまで立つ
-/// dismiss ガード中は、プレイリストの左クリックを握りつぶす必要がある。
+/// <see cref="LibraryBrowserView.HasOpenContextMenu"/> だけでは拾えず、閉じた同じ左クリックが
+/// 上がるまで立つ dismiss ガード中は、プレイリストの左クリックを握りつぶす必要がある。
 /// </summary>
 public sealed class MenuDismissPlaylistClickTests
 {
@@ -85,6 +85,64 @@ public sealed class MenuDismissPlaylistClickTests
             Assert.Equal(0, activations);
             Assert.Same(sessions[0], view.SelectedSession);
             Assert.Equal(sessions.Count, view.BoundRowCount);
+
+            window.Close();
+        });
+    }
+
+    /// <summary>
+    /// Idle が先に回っても左ボタン押下中はガードが残り、行クリックを握りつぶす。
+    /// </summary>
+    [Fact]
+    public void DismissGuard_SwallowsPlaylistRowClick_AfterIdleWhileLeftHeld()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new List<DocumentSession>();
+            for (var i = 0; i < 6; i++)
+            {
+                sessions.Add(Session($"{i:00} track.wav"));
+            }
+
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions(sessions, sessions[0], [sessions[0]]);
+            Flush();
+            view.FocusList();
+            Flush();
+
+            var activations = 0;
+            view.SessionActivated += (_, _) => activations++;
+
+            view.DismissGuardLeftHeldForTests = () => true;
+            Assert.True(view.TryOpenKeyboardContextMenu());
+            view.CloseKeyboardContextMenu();
+            Flush();
+            Assert.True(view.IsContextMenuDismissGuardActive);
+
+            var grid = view.FileGrid;
+            var args = new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+            {
+                RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent,
+            };
+            grid.RaiseEvent(args);
+            Assert.True(args.Handled);
+            Assert.Equal(0, activations);
+            Assert.Equal(sessions.Count, view.BoundRowCount);
+
+            view.DismissGuardLeftHeldForTests = () => false;
+            view.FlushContextMenuDismissGuardForTests();
+            Assert.False(view.IsContextMenuDismissGuardActive);
 
             window.Close();
         });

@@ -41,6 +41,8 @@ internal static partial class UiStrings
     public static string WaveMenuCatOther => Get("その他(_O)", "_Other");
 
     public static string WaveMenuUndo => Get("元に戻す(_U)", "_Undo");
+    public static string WaveMenuUndoSelected => Get("選択ファイルを元に戻す(_U)", "_Undo Selected Files");
+    public static string WaveMenuRedoSelected => Get("選択ファイルをやり直す(_R)", "_Redo Selected Files");
     public static string WaveMenuRedo => Get("やり直し(_R)", "_Redo");
     public static string WaveMenuCut => Get("切り取り(_T)", "Cu_t");
     public static string WaveMenuCopy => Get("コピー(_C)", "_Copy");
@@ -180,7 +182,6 @@ internal static partial class UiStrings
     public static string WaveMenuSaveSelected => Get("選択ファイルを保存(_S)", "_Save Selected Files");
     public static string WaveMenuSaveAs => Get("名前を付けて保存(_A)", "Save _As");
     public static string WaveMenuSaveAsSelected => Get("選択ファイルを名前を付けて保存(_A)", "Save Selected Files _As");
-    public static string WaveMenuSaveMp3 => Get("MP3 として保存(_M)", "Save as _MP3");
     public static string WaveMenuRenameFile => Get("ファイル名を変更(_F)", "Rename _File");
     /// <summary>ファイルカテゴリ内。Rename(F)／Duplicate(U)／Delete(D) と重ならない E／P。</summary>
     public static string WaveMenuCopyFileName => Get("ファイル名をコピー(_E)", "Copy File Nam_e");
@@ -221,9 +222,6 @@ internal static partial class UiStrings
     public static string WaveMenuExportByRegionsSelected => Get("選択したタブをリージョンでセパレート(_G)", "Separate Selected Tabs by Re_gions");
     public static string WaveMenuExportByChannels => Get("チャンネルごとに書き出す(_C)", "Export by _Channel");
     public static string WaveMenuExportByChannelsSelected => Get("選択したタブをチャンネルごとに書き出す(_C)", "Export Selected Tabs by _Channel");
-    public static string WaveMenuExportAllWave => Get("すべてのタブを Wave で保存(_E)", "Save All Tabs as Wav_e");
-    /// <summary>書き出しカテゴリへ移動したため、MP3 で書き出す(M) と重なる M をやめて A。</summary>
-    public static string WaveMenuExportAllMp3 => Get("すべてのタブを MP3 で保存(_A)", "Save All Tabs as MP3 (_A)");
 
     public static string WaveMenuManual => Get("マニュアル(_M)", "_Manual");
     public static string WaveMenuGitHub => Get("GitHub(_G)", "_GitHub");

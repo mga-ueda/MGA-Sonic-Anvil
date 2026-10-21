@@ -183,7 +183,7 @@ public partial class MainWindow : Window
         LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
         LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;
         LibraryBrowser.MatchLoudnessRequested += (_, _) => PromptVolume();
-        LibraryBrowser.ExportMp3Requested += (_, _) => ExportPlaylistSelectionMp3();
+        LibraryBrowser.PlaylistWaveMenuRequested += (_, command) => ExecuteWaveMenu(command);
         LibraryBrowser.PlaylistPreviousRequested += (_, _) => TryStepLibraryPlaylist(-1);
         LibraryBrowser.PlaylistNextRequested += (_, _) => TryStepLibraryPlaylist(1);
         LibraryBrowser.PlaylistRestartRequested += (_, _) => RestartLibraryTrack();
@@ -460,7 +460,8 @@ public partial class MainWindow : Window
         InitializeWaapi();
         RefreshLocalizedText();
         // 表示前にフルスクリーンへ入れる。出したあとに最大化を外すと作業領域のままタスクバーが残る。
-        if (!LaunchFiles.StartupHasVideo())
+        // 前回ドキュメントを復元するときはエディタのままにし、起動モードは復元後の空のときだけ。
+        if (!LaunchFiles.StartupHasVideo() && !HasRestorableOpenDocuments())
         {
             EnterStartupMode();
         }
@@ -532,6 +533,8 @@ public partial class MainWindow : Window
         // 動画起動は映像が開くまでクロークを維持する。
         Dispatcher.BeginInvoke(RestoreLastDocumentAfterReveal, DispatcherPriority.ApplicationIdle);
         Dispatcher.BeginInvoke(() => _ = StartWaapiAsync(), DispatcherPriority.ApplicationIdle);
+        // 初回右クリックの ContextMenu テンプレ展開をアイドル中に済ませる。
+        Dispatcher.BeginInvoke(() => ContextMenuWarmup.Run(this), DispatcherPriority.ApplicationIdle);
         _ = CheckForAppUpdateAsync();
     }
 
@@ -583,8 +586,9 @@ public partial class MainWindow : Window
         {
             await OpenLaunchPathsAsync(launch).ConfigureAwait(true);
         }
-        else
+        else if (_sessions.Count == 0)
         {
+            // 起動モードは「何も読み込まないとき」だけ。復元できたタブがあるときはエディタのまま。
             EnterStartupMode();
         }
 

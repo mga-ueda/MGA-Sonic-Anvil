@@ -1030,12 +1030,18 @@ public sealed class LibraryBrowserSelectionTests
                 UiStrings.LibraryMenuColor,
                 UiStrings.LibraryMenuCatPitch,
                 UiStrings.LibraryMenuCatEdit,
+                UiStrings.LibraryMenuCatAudio,
+                UiStrings.LibraryMenuCatFormat,
+                UiStrings.LibraryMenuCatExport,
                 UiStrings.LibraryMenuCatOther,
             ],
             view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());
             var listPitch = view.OpenContextMenuItems[1];
             var listEdit = view.OpenContextMenuItems[2];
-            var listOther = view.OpenContextMenuItems[3];
+            var listAudio = view.OpenContextMenuItems[3];
+            var listFormat = view.OpenContextMenuItems[4];
+            var listExport = view.OpenContextMenuItems[5];
+            var listOther = view.OpenContextMenuItems[6];
             Assert.Equal(MenuGestures.PreviousTrack, ((MenuItem)listPitch.Items[0]).InputGestureText);
             Assert.Equal(MenuGestures.NextTrack, ((MenuItem)listPitch.Items[1]).InputGestureText);
             Assert.Equal(MenuGestures.RestartTrack, ((MenuItem)listPitch.Items[2]).InputGestureText);
@@ -1046,8 +1052,22 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Equal("Ctrl+C", ((MenuItem)listEdit.Items[0]).InputGestureText);
             Assert.Equal(UiStrings.LibraryMenuClearFromPlaylist, (string)((MenuItem)listEdit.Items[6]).Header);
             Assert.True(string.IsNullOrEmpty(((MenuItem)listEdit.Items[6]).InputGestureText));
-            Assert.Equal("V", ((MenuItem)listOther.Items[0]).InputGestureText);
-            Assert.Equal("Ctrl+Shift+M", ((MenuItem)listOther.Items[1]).InputGestureText);
+            Assert.Equal("N", ((MenuItem)listAudio.Items[6]).InputGestureText);
+            Assert.Equal("S", ((MenuItem)listFormat.Items[0]).InputGestureText);
+            Assert.Equal("B", ((MenuItem)listFormat.Items[1]).InputGestureText);
+            Assert.Equal("C", ((MenuItem)listFormat.Items[2]).InputGestureText);
+            Assert.Equal("V", ((MenuItem)listExport.Items[0]).InputGestureText);
+            Assert.Equal("Ctrl+Shift+M", ((MenuItem)listExport.Items[3]).InputGestureText);
+            Assert.Equal(UiStrings.LibraryMenuCopyFileName, (string)((MenuItem)listOther.Items[0]).Header);
+            WaveMenuCommand? waveCommand = null;
+            view.PlaylistWaveMenuRequested += (_, command) => waveCommand = command;
+            var sampleRateItem = (MenuItem)listFormat.Items[0];
+            sampleRateItem.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
+            {
+                RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent,
+            });
+            sampleRateItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.Equal(WaveMenuCommand.SampleRate, waveCommand);
             Assert.True(view.HasOpenContextMenu);
             view.CloseKeyboardContextMenu();
             window.Close();
@@ -1127,15 +1147,58 @@ public sealed class LibraryBrowserSelectionTests
             // トランスポートの「プレイヤー(F10)」ボタンへクリックが貫通する。閉じた直後は
             // HasOpenContextMenu が既に false なので、ガードが立っていないと貫通クリックで
             // ToggleLibraryMaximize → KeepOnlyLibrarySelectedSessions が走り、選択以外の
-            // トラックが消える（報告されたバグ）。閉じてからアイドルまではガードを維持する。
+            // トラックが消える（報告されたバグ）。閉じてから左ボタン解放まではガードを維持する。
             view.CloseKeyboardContextMenu();
             // 閉じた直後は HasOpenContextMenu が false。旧コードはこれだけを見ていたので、
             // 貫通クリックを弾けずにプレイヤーを抜けていた（＝バグ）。
             Assert.False(view.HasOpenContextMenu);
             // 貫通クリックは閉じたのと同じ入力の中（アイドル前）で届くので、ガードはまだ立っている。
             Assert.True(view.IsContextMenuDismissGuardActive);
-            // plain-press 抑制もアイドルまで残す（閉じた直後の MouseUp で単一選択確定しない）。
+            // plain-press 抑制も dismiss 左クリック解放まで残す。
             Assert.True(view.IsPlaylistPlainPressSuppressedAfterMenu);
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void ListContextMenu_DismissGuard_StaysActiveAfterIdleWhileLeftHeld()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.wav");
+            var second = Session("02 b.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions([first, second], first, [first, second]);
+            Flush();
+            view.FocusList();
+            Flush();
+
+            // Idle が先に回っても、同じ dismiss の左ボタンが押されているあいだはガードを残す。
+            // （キャプチャ解放の再入で Idle が MouseUp/Click より先に来る稀な経路の回帰。）
+            view.DismissGuardLeftHeldForTests = () => true;
+            Assert.True(view.TryOpenKeyboardContextMenu());
+            view.CloseKeyboardContextMenu();
+            Assert.False(view.HasOpenContextMenu);
+            Flush();
+            Assert.True(view.IsContextMenuDismissGuardActive);
+            Assert.True(view.IsPlaylistPlainPressSuppressedAfterMenu);
+
+            view.DismissGuardLeftHeldForTests = () => false;
+            view.FlushContextMenuDismissGuardForTests();
+            Assert.False(view.IsContextMenuDismissGuardActive);
+            Assert.False(view.IsPlaylistPlainPressSuppressedAfterMenu);
 
             window.Close();
         });

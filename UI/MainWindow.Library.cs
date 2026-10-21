@@ -119,7 +119,7 @@ public partial class MainWindow
     {
         // メニュー表示中、および外側クリック dismiss がプレイヤー切替ボタンへ貫通したときの解除は捨てる。
         // （右クリックメニューを閉じるクリックが下のトランスポートボタンに当たると、
-        //   ここが走って選択以外のトラックが消えてしまう。）
+        //   ここが走って選択以外のトラックが消えてしまう。ガードは左ボタン解放まで残る。）
         if (IsLibraryMaximized
             && (_listContextMenuOpen
                 || LibraryBrowser.HasOpenContextMenu
@@ -159,10 +159,13 @@ public partial class MainWindow
             return;
         }
 
+        // エディタ↔プレイヤーの往復では先頭曲への寄せ直し・自動再生をしない。
+        // （既定の playFirst だと SetSessions(rebuild) と PCM ロードが毎回乗り、戻りが重い。）
         SetWaveformMaximizeMode(
             _waveformMaximizeMode == WaveformMaximizeMode.Library
                 ? WaveformMaximizeMode.Off
-                : WaveformMaximizeMode.Library);
+                : WaveformMaximizeMode.Library,
+            playFirstOnLibrary: false);
     }
 
     private void LibraryBrowser_ListContextMenuOpened(object? sender, EventArgs e)
@@ -604,7 +607,8 @@ public partial class MainWindow
             }
             else
             {
-                LibraryBrowser.SetSessions(_sessions, _activeSession, rebuild: true);
+                // 離脱中もブラウザの行は残っているので rebuild しない（同一集合なら patch）。
+                LibraryBrowser.SetSessions(_sessions, _activeSession, rebuild: false);
                 ShowLibraryArtworkOrClear(_activeSession);
             }
 
@@ -3181,7 +3185,8 @@ public partial class MainWindow
     {
         var first = LibraryPlayerMode.FirstSession(_sessions);
         IReadOnlyList<DocumentSession> selected = first is null ? [] : [first];
-        LibraryBrowser.SetSessions(_sessions, first, selected, rebuild: true);
+        // 同一集合なら DataGrid を張り直さず選択だけ先頭へ（起動・明示的な playFirst 用）。
+        LibraryBrowser.SetSessions(_sessions, first, selected, rebuild: false);
         if (first is not null)
         {
             _libraryHoldJacketWash = false;

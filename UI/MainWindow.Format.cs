@@ -44,7 +44,10 @@ public partial class MainWindow
             return;
         }
 
-        if (_document is null)
+        // 複数ファイル編集ではお試し視聴のみオミット（適用は一括、サイズ見積もりはアクティブのまま）。
+        var batch = HasBatchEditTargets;
+        var document = _document ?? ResolveBatchEditTargets().FirstOrDefault()?.Document;
+        if (document is null)
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -66,19 +69,19 @@ public partial class MainWindow
         }
 
         _formatKind = kind;
-        _formatPreview.ResumeFrame = _document.CursorFrame;
+        _formatPreview.ResumeFrame = document.CursorFrame;
         var current = kind switch
         {
-            FormatConvertKind.BitDepth => _document.BitsPerSample,
-            FormatConvertKind.Channels => _document.Channels,
-            _ => _document.SampleRate,
+            FormatConvertKind.BitDepth => document.BitsPerSample,
+            FormatConvertKind.Channels => document.Channels,
+            _ => document.SampleRate,
         };
         var menu = FormatConvertPicker.Show(
             this,
             kind,
             current,
             value => ApplyFormatConvert(kind, value),
-            kind is FormatConvertKind.SampleRate or FormatConvertKind.BitDepth
+            !batch && kind is FormatConvertKind.SampleRate or FormatConvertKind.BitDepth
                 ? value => PreviewFormatConvert(kind, value)
                 : null,
             value => PreviewFormatConvertSize(kind, value));
@@ -197,7 +200,8 @@ public partial class MainWindow
 
     private void PreviewFormatConvert(FormatConvertKind kind, int value)
     {
-        if (_document is null || _formatPreview.Toggling)
+        // 複数ファイル編集ではお試し視聴しない（単体のみ）。
+        if (HasBatchEditTargets || _document is null || _formatPreview.Toggling)
         {
             return;
         }
@@ -418,7 +422,7 @@ public partial class MainWindow
 
     private void ApplyFormatConvert(FormatConvertKind kind, int value)
     {
-        if (_document is null || IsUiBusy)
+        if (IsUiBusy)
         {
             return;
         }
@@ -427,19 +431,25 @@ public partial class MainWindow
         StopFormatPreview();
         PausePlaybackSoft();
 
-        // タブ選択中は選択ファイル全部を同じフォーマットへ一括変換する（既に同じものはスキップ）。
-        if (HasTabSelection)
+        // タブ／プレイリスト選択中は同じフォーマットへ一括変換する（既に同じものはスキップ）。
+        var overlay = kind == FormatConvertKind.SampleRate
+            ? UiStrings.OverlaySampleRateConvert
+            : UiStrings.OverlayApplySelected;
+        if (TryRunBatchEdit(
+                overlay,
+                (session, progress) => kind switch
+                {
+                    FormatConvertKind.SampleRate => ProcessEdits.ConvertSampleRate(session.Document, value, progress),
+                    FormatConvertKind.BitDepth => ProcessEdits.ConvertBitDepth(session.Document, value),
+                    FormatConvertKind.Channels => ProcessEdits.ConvertChannels(session.Document, value),
+                    _ => null,
+                }))
         {
-            var overlay = kind == FormatConvertKind.SampleRate
-                ? UiStrings.OverlaySampleRateConvert
-                : UiStrings.OverlayApplySelected;
-            TryRunEditOnSelectedTabs(overlay, (session, progress) => kind switch
-            {
-                FormatConvertKind.SampleRate => ProcessEdits.ConvertSampleRate(session.Document, value, progress),
-                FormatConvertKind.BitDepth => ProcessEdits.ConvertBitDepth(session.Document, value),
-                FormatConvertKind.Channels => ProcessEdits.ConvertChannels(session.Document, value),
-                _ => null,
-            });
+            return;
+        }
+
+        if (_document is null)
+        {
             return;
         }
 
