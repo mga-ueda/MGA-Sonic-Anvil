@@ -976,8 +976,8 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Equal("Ctrl+Enter", ((MenuItem)playlist.Items[2]).InputGestureText);
             Assert.Equal("Ctrl+Shift+Enter", ((MenuItem)playlist.Items[3]).InputGestureText);
             Assert.Equal("Ctrl+C", ((MenuItem)edit.Items[0]).InputGestureText);
-            Assert.Equal("Shift+8", ((MenuItem)tree.Items[0]).InputGestureText);
-            Assert.Equal("/", ((MenuItem)tree.Items[1]).InputGestureText);
+            Assert.Equal(MenuGestures.ExplorerExpand, ((MenuItem)tree.Items[0]).InputGestureText);
+            Assert.Equal(MenuGestures.ExplorerCollapse, ((MenuItem)tree.Items[1]).InputGestureText);
             Assert.Equal("Alt+Up", ((MenuItem)tree.Items[4]).InputGestureText);
             Assert.Equal("Alt+Down", ((MenuItem)tree.Items[5]).InputGestureText);
             Assert.Equal("F5", ((MenuItem)other.Items[0]).InputGestureText);
@@ -1027,18 +1027,22 @@ public sealed class LibraryBrowserSelectionTests
             Assert.True(view.TryOpenKeyboardContextMenu());
             Assert.Equal(
             [
+                UiStrings.LibraryMenuColor,
                 UiStrings.LibraryMenuCatPitch,
                 UiStrings.LibraryMenuCatEdit,
                 UiStrings.LibraryMenuCatOther,
             ],
             view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());
-            var listPitch = view.OpenContextMenuItems[0];
-            var listEdit = view.OpenContextMenuItems[1];
-            var listOther = view.OpenContextMenuItems[2];
-            Assert.Equal("P", ((MenuItem)listPitch.Items[0]).InputGestureText);
-            Assert.Equal("N", ((MenuItem)listPitch.Items[1]).InputGestureText);
-            Assert.Equal("R", ((MenuItem)listPitch.Items[2]).InputGestureText);
+            var listPitch = view.OpenContextMenuItems[1];
+            var listEdit = view.OpenContextMenuItems[2];
+            var listOther = view.OpenContextMenuItems[3];
+            Assert.Equal(MenuGestures.PreviousTrack, ((MenuItem)listPitch.Items[0]).InputGestureText);
+            Assert.Equal(MenuGestures.NextTrack, ((MenuItem)listPitch.Items[1]).InputGestureText);
+            Assert.Equal(MenuGestures.RestartTrack, ((MenuItem)listPitch.Items[2]).InputGestureText);
             Assert.Equal("Alt+P", ((MenuItem)listPitch.Items[3]).InputGestureText);
+            Assert.Equal(MenuGestures.PitchUp, ((MenuItem)listPitch.Items[5]).InputGestureText);
+            Assert.Equal(MenuGestures.PitchDown, ((MenuItem)listPitch.Items[6]).InputGestureText);
+            Assert.Equal(MenuGestures.PitchReset, ((MenuItem)listPitch.Items[7]).InputGestureText);
             Assert.Equal("Ctrl+C", ((MenuItem)listEdit.Items[0]).InputGestureText);
             Assert.Equal(UiStrings.LibraryMenuClearFromPlaylist, (string)((MenuItem)listEdit.Items[6]).Header);
             Assert.True(string.IsNullOrEmpty(((MenuItem)listEdit.Items[6]).InputGestureText));
@@ -1130,6 +1134,8 @@ public sealed class LibraryBrowserSelectionTests
             Assert.False(view.HasOpenContextMenu);
             // 貫通クリックは閉じたのと同じ入力の中（アイドル前）で届くので、ガードはまだ立っている。
             Assert.True(view.IsContextMenuDismissGuardActive);
+            // plain-press 抑制もアイドルまで残す（閉じた直後の MouseUp で単一選択確定しない）。
+            Assert.True(view.IsPlaylistPlainPressSuppressedAfterMenu);
 
             window.Close();
         });
