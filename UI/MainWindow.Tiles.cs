@@ -502,7 +502,7 @@ public partial class MainWindow
         {
             var fill = new Border { IsHitTestVisible = false };
             ApplyWaveformTileBackground(fill);
-            ApplyTileDivider(fill, cell, cols);
+            ApplyTileDivider(fill, cell, rows, cols);
             Grid.SetRow(fill, cell.Row);
             Grid.SetColumn(fill, cell.Column);
             Grid.SetRowSpan(fill, cell.RowSpan);
@@ -518,7 +518,7 @@ public partial class MainWindow
         Grid.SetColumn(host, cell.Column);
         Grid.SetRowSpan(host, cell.RowSpan);
         Grid.SetColumnSpan(host, cell.ColumnSpan);
-        ApplyTileDivider(host, cell, cols);
+        ApplyTileDivider(host, cell, rows, cols);
     }
 
     /// <summary>
@@ -526,24 +526,31 @@ public partial class MainWindow
     /// </summary>
     private const double TileDividerWidth = 4;
 
-    /// <summary>F11 と F12 では dB 列を畳む代わりに縦仕切りを出す。</summary>
-    private bool ShowTileDividers =>
+    /// <summary>隣タイルとの敷居（1 px）。レイアウトをほぼ変えず、境だけほのかに示す。</summary>
+    private const double TileSillWidth = 1;
+
+    /// <summary>F11 と F12 では dB 列を畳む代わりに、右端を広めの縦仕切りにする。</summary>
+    private bool ShowWideTileDividers =>
         _waveformMaximizeMode is WaveformMaximizeMode.Waveform or WaveformMaximizeMode.Analyzers;
 
     /// <summary>
-    /// F11 / F12 中だけ、隣の波形と地続きに見えないよう右端に隙間を空ける。
-    /// 既定の仕切り色は透明で、背後の動的背景が見える。不透明色を指定すれば帯にもできる。
-    /// 横の境目はファイル名帯が仕切りになるので入れない。
-    /// 通常表示ではラベル列が残るため仕切りは不要。
+    /// 隣り合うタイルの境に敷居色を付ける（右・下。外側の縁は付けない）。
+    /// F11 / F12 の縦境だけ従来どおり 4 px。それ以外と横境は 1 px。
+    /// 色は <c>WaveformTileDividerBrush</c>（ごく薄いアルファ）。
     /// </summary>
-    private void ApplyTileDivider(Border host, WaveformTileCell cell, int cols)
+    private void ApplyTileDivider(Border host, WaveformTileCell cell, int rows, int cols)
     {
-        var divider = ShowTileDividers && cell.Column + cell.ColumnSpan < cols;
-        host.BorderThickness = new Thickness(0, 0, divider ? TileDividerWidth : 0, 0);
+        var hasRight = cell.Column + cell.ColumnSpan < cols;
+        var hasBottom = cell.Row + cell.RowSpan < rows;
+        var right = hasRight
+            ? (ShowWideTileDividers ? TileDividerWidth : TileSillWidth)
+            : 0;
+        var bottom = hasBottom ? TileSillWidth : 0;
+        host.BorderThickness = new Thickness(0, 0, right, bottom);
         host.SetResourceReference(Border.BorderBrushProperty, "WaveformTileDividerBrush");
     }
 
-    /// <summary>F11 / F12 の出入りで既存タイル（埋め草含む）の縦仕切りを付け外しする。</summary>
+    /// <summary>F11 / F12 の出入りや再配置で、既存タイル（埋め草含む）の敷居を付け直す。</summary>
     private void RefreshTileDividers()
     {
         if (!_tileMode || _tileGrid is null)
@@ -551,6 +558,7 @@ public partial class MainWindow
             return;
         }
 
+        var rows = _tileGrid.RowDefinitions.Count;
         var cols = _tileGrid.ColumnDefinitions.Count;
         foreach (var child in _tileGrid.Children.OfType<Border>())
         {
@@ -564,7 +572,7 @@ public partial class MainWindow
                 Grid.GetColumn(child),
                 Grid.GetRowSpan(child),
                 Grid.GetColumnSpan(child));
-            ApplyTileDivider(child, cell, cols);
+            ApplyTileDivider(child, cell, rows, cols);
         }
     }
 
