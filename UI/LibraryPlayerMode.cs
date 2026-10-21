@@ -1760,12 +1760,21 @@ internal static class LibraryPlayerMode
         ArgumentNullException.ThrowIfNull(target);
         // 表示中の値を残してからアニメを外す。先に外すと HoldEnd の 0 がローカル 1 に飛び、フェードインが省略される。
         var from = target.Opacity;
-        target.BeginAnimation(UIElement.OpacityProperty, null);
-        target.Opacity = from;
+        var animating = target.HasAnimatedProperties;
         if (hitTestVisible is { } hit)
         {
             target.IsHitTestVisible = hit;
         }
+
+        // 既に目標値で静止しているのに BeginAnimation(null) すると、ジャケットウォッシュと
+        // 同じ合成ツリーを毎フレーム汚して色反映がカクつく。
+        if (!animating && Math.Abs(from - to) < 0.001)
+        {
+            return;
+        }
+
+        target.BeginAnimation(UIElement.OpacityProperty, null);
+        target.Opacity = from;
 
         if (instant || Math.Abs(from - to) < 0.001)
         {
@@ -1795,6 +1804,16 @@ internal static class LibraryPlayerMode
         }
 
         return target.Opacity < 0.999 || !target.IsHitTestVisible;
+    }
+
+    /// <summary>
+    /// 信号即出しでメーターを 1 にスナップし直す必要があるか。
+    /// フェード途中／未到達のときだけ true（再生中の StartMeterRendering 連打で再 Apply しない）。
+    /// </summary>
+    public static bool NeedsInstantOpaqueSnap(UIElement target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return target.HasAnimatedProperties || target.Opacity < 0.999;
     }
 
     /// <summary>映像の上に乗っているときだけ、読みやすいドロップシャドウ。</summary>
@@ -1978,6 +1997,25 @@ internal static class LibraryPlayerMode
 
     /// <summary>裏スレッドから届いた曲を UI に載せる間隔。メーター描画の間に乗せる。</summary>
     public const int PlaylistLoadUiFlushMs = 33;
+
+    /// <summary>
+    /// プレイリスト追加バッチ中は背景ウォッシュ（動的背景の色替え）を Apply しない。
+    /// 完了後に保留分を 1 回だけ載せる。
+    /// </summary>
+    public static bool DefersAmbientWashApply(bool playlistBatchInProgress) =>
+        playlistBatchInProgress;
+
+    /// <summary>追加バッチの完了／フラッシュを、この世代がまだ所有者のときだけ行う。</summary>
+    public static bool OwnsPlaylistBatchCompletion(int batchGeneration, int currentGeneration) =>
+        batchGeneration == currentGeneration;
+
+    /// <summary>遅延中の色替え要求は最新のセッション 1 件に畳む。</summary>
+    public static T? MergePendingWashSession<T>(T? pending, T requested)
+        where T : class
+    {
+        ArgumentNullException.ThrowIfNull(requested);
+        return requested;
+    }
 
     /// <summary>再生ヘッドが同じピクセルに居るときの再描画間隔。残光の減衰用。</summary>
     public const int PlayheadIdleInvalidateMs = 50;

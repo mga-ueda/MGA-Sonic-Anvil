@@ -31,6 +31,10 @@ public partial class MainWindow
     private DocumentSession? _libraryFolderPlaySession;
     /// <summary>プレイリスト置換中は空セッションで既定ウォッシュへ落とさない。</summary>
     private bool _libraryHoldJacketWash;
+    /// <summary>追加バッチ中に要求された背景色替え。完了時に 1 回だけ Apply する。</summary>
+    private DocumentSession? _pendingLibraryWashSession;
+    private Task<LibraryBrowserView.PreparedArtworkPresentation>? _pendingLibraryWashPrepare;
+    private bool? _pendingLibraryWashHadArt;
     private bool _libraryPlayOnArrowRelease;
     private bool _libraryPlayOnTrackKeyRelease;
     /// <summary>Space 再生。true のあいだは曲末で次へ進まず停止する。</summary>
@@ -685,7 +689,10 @@ public partial class MainWindow
 
         if (_playerMetersShown == show)
         {
-            if (LibraryPlayerMode.InstantPlayerMeterFade(show, instantReveal))
+            // 再生中は StartMeterRendering が何度もここに来る。既に不透明なら触らない
+            // （FadeElementOpacity の BeginAnimation 解除がジャケット色のカクつきになる）。
+            if (LibraryPlayerMode.InstantPlayerMeterFade(show, instantReveal)
+                && PlayerMeterTargetsNeedInstantSnap())
             {
                 ApplyPlayerMeterFade(visible: true, instant: true);
             }
@@ -1929,6 +1936,19 @@ public partial class MainWindow
         }
     }
 
+    private bool PlayerMeterTargetsNeedInstantSnap()
+    {
+        foreach (var target in PlayerMeterFadeTargets())
+        {
+            if (LibraryPlayerMode.NeedsInstantOpaqueSnap(target))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private UIElement[] PlayerMeterFadeTargets() =>
         _playlistVideoChromeVisible
             ? [MeterTopSlot, LevelMeter, VectorScope, Spectrum, LoudnessMeter, TimeScrollStrip]
@@ -2821,6 +2841,14 @@ public partial class MainWindow
         DocumentSession? opened = null;
         DocumentSession? existingFirst = null;
         var showProgress = paths.Count > 1;
+        // フォルダ再帰追加と同じく、追加完了まで背景色替えを遅延する。
+        var batchGeneration = _libraryFolderShowGeneration;
+        var deferWash = IsLibraryMaximized;
+        if (deferWash)
+        {
+            _libraryFolderShowInProgress = true;
+        }
+
         try
         {
             for (var i = 0; i < paths.Count; i++)
@@ -2870,7 +2898,11 @@ public partial class MainWindow
                     }
 
                     LibraryBrowser.SetSessions(_sessions, keep, keepMany);
-                    PreviewIdleLibrarySession(keep);
+                    if (keep is not null)
+                    {
+                        QueuePendingLibraryWash(keep);
+                        PreviewIdleLibrarySessionWithoutArtwork(keep);
+                    }
                 }
 
                 SyncPlayerMeterFade();
@@ -2879,7 +2911,7 @@ public partial class MainWindow
 
             if (playFirst)
             {
-                SelectAndPlayFirstLibraryTrack();
+                SelectAndPlayFirstLibraryTrack(deferAmbientWash: deferWash);
                 _libraryPlayFirstPending = false;
                 SyncPlayerMeterFade();
                 return;
@@ -2893,7 +2925,15 @@ public partial class MainWindow
 
             if (active is not null)
             {
-                _ = PlayLibrarySessionAsync(active);
+                if (deferWash)
+                {
+                    QueuePendingLibraryWash(active);
+                    _ = PlayLibrarySessionAsync(active, keepAmbientGlow: true);
+                }
+                else
+                {
+                    _ = PlayLibrarySessionAsync(active);
+                }
             }
 
             SyncPlayerMeterFade();
@@ -2903,6 +2943,15 @@ public partial class MainWindow
             if (showProgress)
             {
                 ClearOpenStatus();
+            }
+
+            if (deferWash
+                && LibraryPlayerMode.OwnsPlaylistBatchCompletion(
+                    batchGeneration,
+                    _libraryFolderShowGeneration))
+            {
+                _libraryFolderShowInProgress = false;
+                await FlushPendingLibraryWashAsync().ConfigureAwait(true);
             }
         }
     }
@@ -3280,7 +3329,7 @@ public partial class MainWindow
         return done.Task;
     }
 
-    private void SelectAndPlayFirstLibraryTrack()
+    private void SelectAndPlayFirstLibraryTrack(bool deferAmbientWash = false)
     {
         var first = LibraryPlayerMode.FirstSession(_sessions);
         var selected = first is null
@@ -3292,6 +3341,19 @@ public partial class MainWindow
         }
 
         LibraryBrowser.SetSessions(_sessions, first, selected);
+        if (deferAmbientWash)
+        {
+            if (first is not null)
+            {
+                QueuePendingLibraryWash(first);
+                LibraryBrowser.RequestListFocus();
+                PreviewLibrarySession(first);
+                _ = PlayLibrarySessionAsync(first, keepAmbientGlow: true);
+            }
+
+            return;
+        }
+
         LibraryBrowser.SetArtwork(first?.Document, keepCurrentIfEmpty: first is null && _libraryHoldJacketWash);
         if (first is not null)
         {
@@ -4829,11 +4891,18 @@ public partial class MainWindow
 
     /// <summary>
     /// ジャケット走査・デコード・ウォッシュ生成は裏スレッド。UI は差し替えだけ。
+    /// プレイリスト追加バッチ中は拒否し、完了時の 1 回 Apply に回す。
     /// </summary>
     private async Task ShowLibraryArtworkAsync(DocumentSession session)
     {
         if (!IsLibraryMaximized)
         {
+            return;
+        }
+
+        if (LibraryPlayerMode.DefersAmbientWashApply(_libraryFolderShowInProgress))
+        {
+            QueuePendingLibraryWash(session);
             return;
         }
 
@@ -4862,6 +4931,12 @@ public partial class MainWindow
     {
         if (!IsLibraryMaximized)
         {
+            return;
+        }
+
+        if (LibraryPlayerMode.DefersAmbientWashApply(_libraryFolderShowInProgress))
+        {
+            QueuePendingLibraryWash(session, prepare, hadArtBefore);
             return;
         }
 
@@ -4901,6 +4976,82 @@ public partial class MainWindow
         {
             LibraryBrowser.UpdateSessionRow(session);
         }
+    }
+
+    private void QueuePendingLibraryWash(
+        DocumentSession session,
+        Task<LibraryBrowserView.PreparedArtworkPresentation>? prepare = null,
+        bool? hadArtBefore = null)
+    {
+        _pendingLibraryWashSession = LibraryPlayerMode.MergePendingWashSession(
+            _pendingLibraryWashSession,
+            session);
+        _pendingLibraryWashPrepare = prepare;
+        _pendingLibraryWashHadArt = hadArtBefore;
+    }
+
+    private void ClearPendingLibraryWash()
+    {
+        _pendingLibraryWashSession = null;
+        _pendingLibraryWashPrepare = null;
+        _pendingLibraryWashHadArt = null;
+    }
+
+    /// <summary>
+    /// バッチ中断時も、載っている曲があれば完了時 Apply に乗せる。
+    /// </summary>
+    private void EnsurePendingLibraryWashFromPlaylist()
+    {
+        if (_pendingLibraryWashSession is not null)
+        {
+            return;
+        }
+
+        var session = _libraryFolderPlaySession
+            ?? LibraryBrowser.SelectedSession
+            ?? LibraryPlayerMode.FirstSession(_sessions);
+        if (session is not null)
+        {
+            QueuePendingLibraryWash(session);
+        }
+    }
+
+    /// <summary>
+    /// 追加バッチ終了後に保留していた背景色替えを 1 回だけ載せる。
+    /// リスト仕上げ（FinishIncremental）より後の Idle で走らせ、行追加とクロスフェードを重ねない。
+    /// </summary>
+    private async Task FlushPendingLibraryWashAsync()
+    {
+        var session = _pendingLibraryWashSession;
+        var prepare = _pendingLibraryWashPrepare;
+        var hadArt = _pendingLibraryWashHadArt;
+        ClearPendingLibraryWash();
+
+        if (!IsLibraryMaximized)
+        {
+            return;
+        }
+
+        if (session is null)
+        {
+            ReleaseHeldLibraryJacket();
+            return;
+        }
+
+        await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.ContextIdle);
+        if (!IsLibraryMaximized
+            || LibraryPlayerMode.DefersAmbientWashApply(_libraryFolderShowInProgress))
+        {
+            // 別バッチが始まっていたら、そちらの完了フラッシュに任せる。
+            if (LibraryPlayerMode.DefersAmbientWashApply(_libraryFolderShowInProgress))
+            {
+                QueuePendingLibraryWash(session, prepare, hadArt);
+            }
+
+            return;
+        }
+
+        await ApplyPreparedLibraryArtworkAsync(session, prepare, hadArt).ConfigureAwait(true);
     }
 
     /// <summary>動的背景は呼び出し側で済ませたあとの、停止中プレビュー（波形など）。</summary>
@@ -5252,6 +5403,7 @@ public partial class MainWindow
         var generation = ++_libraryFolderShowGeneration;
         _libraryFolderPlaySession = null;
         _libraryFolderShowInProgress = true;
+        ClearPendingLibraryWash();
         // 前の追加が残した進捗表示を消す（世代不一致の finally では消さないため）。
         ClearOpenStatus();
         var filter = walk ?? LibraryBrowser.SnapshotExplorerPlaylistWalk();
@@ -5269,12 +5421,12 @@ public partial class MainWindow
 
         if (roots.Count == 0)
         {
-            if (generation == _libraryFolderShowGeneration)
+            if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(generation, _libraryFolderShowGeneration))
             {
                 _libraryFolderShowInProgress = false;
+                await FlushPendingLibraryWashAsync().ConfigureAwait(true);
             }
 
-            ReleaseHeldLibraryJacket();
             return;
         }
 
@@ -5420,10 +5572,12 @@ public partial class MainWindow
             {
                 if (!Alive())
                 {
-                    if (generation == _libraryFolderShowGeneration)
+                    if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(
+                            generation,
+                            _libraryFolderShowGeneration))
                     {
                         LibraryBrowser.FinishIncrementalSessionLoad();
-                        _libraryHoldJacketWash = false;
+                        EnsurePendingLibraryWashFromPlaylist();
                     }
 
                     return;
@@ -5452,9 +5606,12 @@ public partial class MainWindow
 
                 if (!FlushPending())
                 {
-                    if (generation == _libraryFolderShowGeneration)
+                    if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(
+                            generation,
+                            _libraryFolderShowGeneration))
                     {
                         LibraryBrowser.FinishIncrementalSessionLoad();
+                        EnsurePendingLibraryWashFromPlaylist();
                     }
 
                     return;
@@ -5463,17 +5620,21 @@ public partial class MainWindow
 
             if (!FlushPending())
             {
-                if (generation == _libraryFolderShowGeneration)
+                if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(
+                        generation,
+                        _libraryFolderShowGeneration))
                 {
                     LibraryBrowser.FinishIncrementalSessionLoad();
+                    EnsurePendingLibraryWashFromPlaylist();
                 }
 
                 return;
             }
 
-            if (generation == _libraryFolderShowGeneration && IsLibraryMaximized)
+            if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(generation, _libraryFolderShowGeneration)
+                && IsLibraryMaximized)
             {
-                // 列・波形の仕上げと並行してウォッシュを裏で作り、UI では差し替えだけにする。
+                // 列・波形の仕上げと並行してウォッシュを裏で作り、バッチ終了後に 1 回だけ Apply。
                 Task<LibraryBrowserView.PreparedArtworkPresentation>? artPrepare = null;
                 DocumentSession? artSession = null;
                 var artHadArt = false;
@@ -5501,7 +5662,6 @@ public partial class MainWindow
                 LibraryBrowser.FinishIncrementalSessionLoad();
                 if (firstHandled)
                 {
-                    _libraryHoldJacketWash = false;
                     if (playFirst && _libraryFolderPlaySession is { } first)
                     {
                         var selected = LibraryBrowser.SelectedSession;
@@ -5510,22 +5670,22 @@ public partial class MainWindow
                             LibraryBrowser.SelectSessionQuiet(first);
                         }
 
+                        QueuePendingLibraryWash(first, artPrepare, artHadArt);
                         if (!folderPlayStarted)
                         {
-                            // 再生開始はウォッシュ準備と並行。色替えは後で Apply。
+                            // 再生開始はウォッシュ準備と並行。色替えはバッチ終了 Flush で Apply。
                             var playTask = PlayLibrarySessionAsync(first, keepAmbientGlow: true);
-                            await ApplyPreparedLibraryArtworkAsync(first, artPrepare, artHadArt)
-                                .ConfigureAwait(true);
                             await playTask.ConfigureAwait(true);
-                            if (generation == _libraryFolderShowGeneration && IsLibraryMaximized)
+                            if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(
+                                    generation,
+                                    _libraryFolderShowGeneration)
+                                && IsLibraryMaximized)
                             {
                                 LibraryBrowser.RequestListFocus();
                             }
                         }
                         else
                         {
-                            await ApplyPreparedLibraryArtworkAsync(first, artPrepare, artHadArt)
-                                .ConfigureAwait(true);
                             if (IsPlaybackActive())
                             {
                                 ScheduleLibraryGaplessPrefetch();
@@ -5533,7 +5693,10 @@ public partial class MainWindow
 
                             // 再生開始直後に移しても、続きの行追加でツリーへ戻る。
                             // 仕上げのあと、そのあいだにツリーへ残す操作が無ければもう一度移す。
-                            if (generation == _libraryFolderShowGeneration && IsLibraryMaximized)
+                            if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(
+                                    generation,
+                                    _libraryFolderShowGeneration)
+                                && IsLibraryMaximized)
                             {
                                 LibraryBrowser.RequestListFocusIfCurrent(playlistFocusTicket);
                             }
@@ -5543,8 +5706,7 @@ public partial class MainWindow
                     {
                         if (artSession is not null)
                         {
-                            await ApplyPreparedLibraryArtworkAsync(artSession, artPrepare, artHadArt)
-                                .ConfigureAwait(true);
+                            QueuePendingLibraryWash(artSession, artPrepare, artHadArt);
                             PreviewIdleLibrarySessionWithoutArtwork(artSession);
                         }
                         else
@@ -5554,7 +5716,9 @@ public partial class MainWindow
 
                         // 再生は Auto Play オンのときだけ。フォーカスはツリーの Enter なら常にプレイリストへ。
                         if (focusPlaylist
-                            && generation == _libraryFolderShowGeneration
+                            && LibraryPlayerMode.OwnsPlaylistBatchCompletion(
+                                generation,
+                                _libraryFolderShowGeneration)
                             && IsLibraryMaximized)
                         {
                             LibraryBrowser.RequestListFocus();
@@ -5563,15 +5727,15 @@ public partial class MainWindow
                 }
                 else
                 {
-                    ReleaseHeldLibraryJacket();
+                    EnsurePendingLibraryWashFromPlaylist();
                 }
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            if (generation == _libraryFolderShowGeneration)
+            if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(generation, _libraryFolderShowGeneration))
             {
-                ReleaseHeldLibraryJacket();
+                EnsurePendingLibraryWashFromPlaylist();
             }
         }
         finally
@@ -5585,7 +5749,7 @@ public partial class MainWindow
             {
             }
 
-            if (generation == _libraryFolderShowGeneration)
+            if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(generation, _libraryFolderShowGeneration))
             {
                 _libraryFolderPlaySession = null;
                 _libraryFolderShowInProgress = false;
@@ -5593,6 +5757,9 @@ public partial class MainWindow
                 {
                     ClearOpenStatus();
                 }
+
+                // キャンセルで途中終了しても、載っている曲があればここで 1 回 Apply に乗る。
+                await FlushPendingLibraryWashAsync().ConfigureAwait(true);
             }
         }
     }
@@ -5983,6 +6150,8 @@ public partial class MainWindow
         _libraryArtworkShowGeneration++;
         _libraryFolderPlaySession = null;
         _libraryFolderShowInProgress = false;
+        // 差し替え側のバッチが新しい保留を積む。旧バッチの Flush は世代不一致で走らない。
+        ClearPendingLibraryWash();
         ClearOpenStatus();
     }
 
