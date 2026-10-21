@@ -75,7 +75,7 @@ internal sealed class AppSettings
     /// <summary>lame に渡すオプション。入出力パスは含めない。空欄は既定（-V2）。</summary>
     public string LameOptions { get; set; } = Mp3Encode.DefaultLameOptions;
 
-    /// <summary>全タブ同時書き出し数。0 は Auto（コア数の 1/4）。上限はコア数の 1/2。</summary>
+    /// <summary>同時処理数（書き出し・破壊編集の並列）。0 は Auto（コア数の 1/4）。上限はコア数の 1/2。</summary>
     public int ExportParallelism { get; set; }
 
     /// <summary>「開く」で最後に選んだフォルダ。書き出し先とは別。</summary>

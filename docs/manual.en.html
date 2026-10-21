@@ -192,6 +192,7 @@
           <li><strong>UI scale</strong> — 100–200%. Extra enlargement on top of Windows display scaling; you cannot shrink. Affects the main window only. Menus, Settings, and edit history stay at 100%. Applies as soon as you change it. Cancel restores it.</li>
           <li><strong>Multiple files</strong> — how to arrange two or more files after opening them: keep tabs / side by side / stacked / grid. Default is keep tabs.</li>
           <li><strong>Startup mode</strong> — Editor (normal) / Editor (fullscreen: with analyzers) / Editor (fullscreen: without analyzers) / Player (normal) / Player (compact). Default is Editor (normal). Compact shows only the playlist and waveform. Used only when the app starts with no file arguments. Opening a file from an argument or a file association still follows the file type, as before. Applies on the next launch.</li>
+          <li><strong>Parallel job count</strong> — parallelism for export and destructive edits (default Auto = a quarter of the CPU cores; dropdown max is half the cores).</li>
           <li><strong>Wallpaper</strong> — An image laid over the animated background. None by default. Browse for a JPEG, PNG, BMP, GIF, or TIFF, or clear the path to remove it. A path that cannot be read shows nothing. The window updates as soon as you set a path or change the opacity. Cancel restores what was showing when Settings opened. Opacity is 0–100% (default 10%). ↑ / ↓ and the mouse wheel over the box change it by 1%. The image keeps its aspect ratio, stays centered, and covers the window (overflow is cropped; it is not tiled). Video or PDF on the back sits in front of it.</li>
           <li>
             <p><strong>File associations</strong> — Choose which types open with this app. Changes apply immediately. <span class="ui">All on</span> and <span class="ui">All off</span> set every type you can currently change (video types dimmed because FFmpeg is missing are left as they are).</p>
@@ -256,7 +257,7 @@
         </ul>
         <h4>Export · Paths</h4>
         <ul>
-          <li><strong>Audio</strong> — LAME path / LAME options / Windows bit rate when not using LAME / parallel export count (default Auto = a quarter of the CPU cores; dropdown max is half the cores).</li>
+          <li><strong>Audio</strong> — LAME path / LAME options / Windows bit rate when not using LAME.</li>
           <li>
             <p><strong>Movie</strong> — Playback proxies and ffmpeg.</p>
             <ul>
