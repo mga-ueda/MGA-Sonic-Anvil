@@ -1305,6 +1305,59 @@ public sealed class LibraryPlayerModeTests
     }
 
     [Fact]
+    public void NeedsInstantOpaqueSnap_OnlyWhenFadingOrBelowOne()
+    {
+        RunSta(() =>
+        {
+            var box = new Rectangle { Opacity = 1 };
+            Assert.False(LibraryPlayerMode.NeedsInstantOpaqueSnap(box));
+            box.Opacity = 0.5;
+            Assert.True(LibraryPlayerMode.NeedsInstantOpaqueSnap(box));
+            LibraryPlayerMode.FadeElementOpacity(box, 1, instant: false);
+            Assert.True(LibraryPlayerMode.NeedsInstantOpaqueSnap(box));
+        });
+    }
+
+    [Fact]
+    public void FadeElementOpacity_SettledTarget_DoesNotClearAnimationSlot()
+    {
+        RunSta(() =>
+        {
+            var box = new Rectangle { Opacity = 1, IsHitTestVisible = true };
+            // 同じ値への instant 連打は no-op（ジャケットウォッシュ再合成の防止）。
+            LibraryPlayerMode.FadeElementOpacity(box, 1, instant: true, hitTestVisible: true);
+            Assert.Equal(1, box.Opacity);
+            Assert.False(box.HasAnimatedProperties);
+            LibraryPlayerMode.FadeElementOpacity(box, 1, instant: true, hitTestVisible: true);
+            Assert.Equal(1, box.Opacity);
+            Assert.False(box.HasAnimatedProperties);
+        });
+    }
+
+    [Fact]
+    public void DefersAmbientWashApply_OnlyWhilePlaylistBatchInProgress()
+    {
+        Assert.True(LibraryPlayerMode.DefersAmbientWashApply(playlistBatchInProgress: true));
+        Assert.False(LibraryPlayerMode.DefersAmbientWashApply(playlistBatchInProgress: false));
+    }
+
+    [Fact]
+    public void OwnsPlaylistBatchCompletion_MatchesGeneration()
+    {
+        Assert.True(LibraryPlayerMode.OwnsPlaylistBatchCompletion(3, 3));
+        Assert.False(LibraryPlayerMode.OwnsPlaylistBatchCompletion(3, 4));
+    }
+
+    [Fact]
+    public void MergePendingWashSession_KeepsLatestRequest()
+    {
+        var first = new object();
+        var second = new object();
+        Assert.Same(first, LibraryPlayerMode.MergePendingWashSession<object>(null, first));
+        Assert.Same(second, LibraryPlayerMode.MergePendingWashSession(first, second));
+    }
+
+    [Fact]
     public void HighlightsFormatValue_OnlyKnownNonDefaults()
     {
         Assert.Equal("PlayerFormatMismatchForeBrush", LibraryPlayerMode.FormatMismatchForeBrushKey);

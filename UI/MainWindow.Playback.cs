@@ -1245,14 +1245,20 @@ public partial class MainWindow
             _meterReleaseTimer?.Stop();
         }
 
+        if (_meterRendering)
+        {
+            // 既に駆動中はメーター即表示の再評価だけ（Sync 側で不要な再 Apply は抑止）。
+            if (IsLibraryMaximized)
+            {
+                SyncPlayerMeterFade();
+            }
+
+            return;
+        }
+
         if (IsLibraryMaximized)
         {
             SyncPlayerMeterFade();
-        }
-
-        if (_meterRendering)
-        {
-            return;
         }
 
         _meterRendering = true;
