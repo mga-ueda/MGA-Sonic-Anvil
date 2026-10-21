@@ -1408,6 +1408,19 @@ public partial class MainWindow
                 return true;
             }
 
+            // Shift+Space: プレイリストのチェックモード（ツリーは上で折りたたみ処理済み）。
+            if (LibraryPlayerMode.IsCheckSelectModeToggle(key, modifiers)
+                && !IsLibraryExplorerFocused
+                && !IsLibraryFavoritesFocused)
+            {
+                if (!isRepeat)
+                {
+                    LibraryBrowser.ToggleCheckSelectMode();
+                }
+
+                return true;
+            }
+
             if ((key is Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown)
                 && modifiers is ModifierKeys.None or ModifierKeys.Shift)
             {
@@ -1678,7 +1691,12 @@ public partial class MainWindow
 
         if (key == Key.Space && modifiers == ModifierKeys.Control)
         {
-            StartPrerollPlayback();
+            // プリロールは波形エリアにフォーカスがあるときだけ。
+            if (LibraryPlayerMode.PrefersPrerollOnCtrlSpace(IsWaveformAreaFocused))
+            {
+                StartPrerollPlayback();
+            }
+
             return true;
         }
 
@@ -1715,6 +1733,20 @@ public partial class MainWindow
         {
             if (IsLibraryMaximized)
             {
+                // チェックモード中は再生ではなくチェック操作（ツリーは上で処理済み）。
+                if (LibraryBrowser.CheckSelectMode
+                    && !IsLibraryExplorerFocused
+                    && !IsLibraryFavoritesFocused
+                    && LibraryBrowser.IsListKeyboardFocused)
+                {
+                    if (!isRepeat)
+                    {
+                        LibraryBrowser.ApplyPlaylistSpaceCheck();
+                    }
+
+                    return true;
+                }
+
                 if (!LibraryPlayerMode.PlaysLibrarySelectionOnSpace(
                         IsLibraryExplorerFocused,
                         IsLibraryFavoritesFocused))

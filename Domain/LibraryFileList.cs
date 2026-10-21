@@ -66,6 +66,7 @@ internal sealed class LibraryFileRow : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private bool _cutPending;
+    private bool _isChecked;
 
     /// <summary>切り取り中。名前を暗い色で出す。</summary>
     public bool CutPending
@@ -80,6 +81,22 @@ internal sealed class LibraryFileRow : INotifyPropertyChanged
 
             _cutPending = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CutPending)));
+        }
+    }
+
+    /// <summary>F4 チェック選択モードの行チェック。</summary>
+    public bool IsChecked
+    {
+        get => _isChecked;
+        set
+        {
+            if (_isChecked == value)
+            {
+                return;
+            }
+
+            _isChecked = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsChecked)));
         }
     }
 

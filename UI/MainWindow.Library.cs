@@ -115,6 +115,18 @@ public partial class MainWindow
     internal bool IsLibraryFavoritesFocused =>
         IsLibraryMaximized && LibraryBrowser.IsFavoritesFocused;
 
+    /// <summary>
+    /// 波形ホストまたはアクティブ波形にキーボードフォーカスがある。
+    /// ライブラリ最大化中のツリー／お気に入り／プレイリストは波形ホスト配下にあり
+    /// <see cref="WaveformHostBorder"/>.IsKeyboardFocusWithin が真になるため、
+    /// それらにフォーカスがあるときは波形エリア扱いにしない（Ctrl+Space プリロールの誤発火防止）。
+    /// </summary>
+    internal bool IsWaveformAreaFocused =>
+        !IsLibraryExplorerFocused
+        && !IsLibraryFavoritesFocused
+        && !(IsLibraryMaximized && LibraryBrowser.IsListKeyboardFocused)
+        && (WaveformHostBorder.IsKeyboardFocusWithin || Waveform.IsKeyboardFocusWithin);
+
     private void ToggleLibraryMaximize()
     {
         // メニュー表示中、および外側クリック dismiss がプレイヤー切替ボタンへ貫通したときの解除は捨てる。

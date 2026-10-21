@@ -232,6 +232,8 @@ internal static class LibraryPlayerMode
         return (key, modifiers) switch
         {
             (Key.Space, ModifierKeys.None or ModifierKeys.Control or ModifierKeys.Shift) => true,
+            // 振幅ズーム（エディタ／プレイヤー波形）。旧キャレット移動用ではない。
+            (Key.Up or Key.Down, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Enter, ModifierKeys.None or ModifierKeys.Alt or ModifierKeys.Shift
                 or ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift)) => true,
             (Key.L, ModifierKeys.None) => true,
@@ -545,6 +547,13 @@ internal static class LibraryPlayerMode
     public static bool IsPlaylistScroll(Key key, ModifierKeys modifiers) =>
         key is Key.Up or Key.Down && modifiers == ModifierKeys.Alt;
 
+    /// <summary>Shift+Space。プレイリストのチェック選択モードをトグル（ツリーは折りたたみのまま）。</summary>
+    public static bool IsCheckSelectModeToggle(Key key, ModifierKeys modifiers) =>
+        key == Key.Space && modifiers == ModifierKeys.Shift;
+
+    /// <summary>Ctrl+Space のプリロールは波形フォーカス時だけ。</summary>
+    public static bool PrefersPrerollOnCtrlSpace(bool waveformFocused) => waveformFocused;
+
     /// <summary>
     /// フォルダツリーで拒否するキー（切り取り／貼り付け／削除／リネーム等）。コピーとナビと Enter 以外はここで止める。
     /// </summary>
@@ -618,7 +627,7 @@ internal static class LibraryPlayerMode
             return false;
         }
 
-        // Space / Shift+Space はツリー専用（展開・閉じ）。再生はプレイリストの Space だけ。
+        // Space / Shift+Space はツリーで展開・閉じ。再生はプレイリストの Space だけ。
         if (key == Key.Space && modifiers is ModifierKeys.None or ModifierKeys.Shift)
         {
             return true;

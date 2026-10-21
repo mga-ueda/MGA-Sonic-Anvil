@@ -464,7 +464,9 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.W, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.W, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.E, ModifierKeys.Alt));
-        Assert.False(LibraryPlayerMode.AllowsKey(Key.F4, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.F4, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsCheckSelectModeToggle(Key.F4, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsCheckSelectModeToggle(Key.F4, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Up, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Delete, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.Control));
@@ -520,6 +522,8 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsPlaylistScroll(Key.Down, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.IsPlaylistScroll(Key.Up, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPlaylistScroll(Key.Up, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.PrefersPrerollOnCtrlSpace(waveformFocused: true));
+        Assert.False(LibraryPlayerMode.PrefersPrerollOnCtrlSpace(waveformFocused: false));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Up, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Down, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.Space, ModifierKeys.None));
