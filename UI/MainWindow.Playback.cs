@@ -1238,7 +1238,13 @@ public partial class MainWindow
 
     private void StartMeterRendering()
     {
-        _meterReleaseTimer?.Stop();
+        // 再生中だけ release を打ち切る。停止中に playhead 用で再入場すると
+        // BeginMeterRelease が止まり、レベルメーターが最後のバーで固まる。
+        if (_player.IsPlaying)
+        {
+            _meterReleaseTimer?.Stop();
+        }
+
         if (IsLibraryMaximized)
         {
             SyncPlayerMeterFade();
@@ -1337,6 +1343,17 @@ public partial class MainWindow
         _analyzerTickQueued = false;
         if (!_player.IsPlaying)
         {
+            // スペアナ／ゴニオは独自タイマーで無音へ落ちる。レベルメーターも同様に減衰させる。
+            // 動画本再生→暗いプレビューで StartMeterRendering が再開したあともここで落とす。
+            if (_meter.DecayAfterStop(_meterClock.Elapsed.TotalSeconds))
+            {
+                LevelMeter.Apply(_meter.Snapshot);
+            }
+            else if (_meterReleaseTimer is { IsEnabled: true })
+            {
+                ExtinguishMeter();
+            }
+
             return;
         }
 
