@@ -653,6 +653,23 @@ internal static class DocumentSessionStore
     public static OpenDocumentSnapshot[] ResolveOpenDocuments(AppSettings settings) =>
         settings.OpenDocuments ?? [];
 
+    /// <summary>
+    /// 前回エディタで開いていたファイルを次起動で戻せるか。
+    /// 戻せるときは起動モード設定より復元（エディタ）を優先する。
+    /// </summary>
+    public static bool HasRestorableOpenDocuments(string rootDirectory, AppSettings settings)
+    {
+        foreach (var snap in ResolveOpenDocuments(settings))
+        {
+            if (CanRestoreDocument(rootDirectory, snap))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>プレイヤーのまま終了したときは開いていたファイルを残さない。</summary>
     public static bool ShouldPersistOpenDocuments(bool libraryPlayer, int sessionCount) =>
         !libraryPlayer && sessionCount > 0;
