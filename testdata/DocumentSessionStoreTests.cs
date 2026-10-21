@@ -454,6 +454,51 @@ public sealed class DocumentSessionStoreTests
     }
 
     [Fact]
+    public void HasRestorableOpenDocuments_TrueWhenSourceExists()
+    {
+        var root = NewTempDir("has-restorable");
+        try
+        {
+            var sourcePath = Path.Combine(root, "a.wav");
+            File.WriteAllText(sourcePath, "pcm");
+            var settings = new AppSettings
+            {
+                OpenDocuments =
+                [
+                    new OpenDocumentSnapshot { SourcePath = sourcePath },
+                    new OpenDocumentSnapshot { SourcePath = Path.Combine(root, "missing.wav") },
+                ],
+            };
+
+            Assert.True(DocumentSessionStore.HasRestorableOpenDocuments(root, settings));
+        }
+        finally
+        {
+            TryDeleteDir(root);
+        }
+    }
+
+    [Fact]
+    public void HasRestorableOpenDocuments_FalseWhenEmptyOrUnreadable()
+    {
+        var root = NewTempDir("no-restorable");
+        try
+        {
+            Assert.False(DocumentSessionStore.HasRestorableOpenDocuments(root, new AppSettings()));
+            Assert.False(DocumentSessionStore.HasRestorableOpenDocuments(
+                root,
+                new AppSettings
+                {
+                    OpenDocuments = [new OpenDocumentSnapshot { SourcePath = Path.Combine(root, "gone.wav") }],
+                }));
+        }
+        finally
+        {
+            TryDeleteDir(root);
+        }
+    }
+
+    [Fact]
     public void SanitizeSessionFileName_KeepsFileNameOnly()
     {
         Assert.Equal("doc-0.wav", DocumentSessionStore.SanitizeSessionFileName(@"..\session\doc-0.wav"));

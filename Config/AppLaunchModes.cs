@@ -1,6 +1,9 @@
 namespace MgaSonicAnvil.Config;
 
-/// <summary>ファイルを渡さずに起動したときに入る画面。空文字はエディタ。</summary>
+/// <summary>
+/// ファイルを渡さず、前回ドキュメントも復元しない起動で入る画面。空文字はエディタ。
+/// エディタで開いていたファイルを復元するときは使わない。
+/// </summary>
 internal enum AppLaunchMode
 {
     Editor,
