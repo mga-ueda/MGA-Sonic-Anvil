@@ -87,8 +87,8 @@
         <li><a href="#layout">Layout</a></li>
         <li><a href="#playback">Playback</a></li>
         <li><a href="#edit">Selection and editing</a></li>
+        <li><a href="#silence-hit">Silence &amp; Hit Detection</a></li>
         <li><a href="#markers">Markers / regions / loops</a></li>
-        <li><a href="#spectrogram">Spectrogram / loudness</a></li>
         <li><a href="#format">Format conversion</a></li>
         <li><a href="#export">WAAPI EXPORT (Wave-only)</a>
           <ol>
@@ -98,6 +98,13 @@
             <li><a href="#export-wwise">What Wwise gets</a></li>
           </ol>
         </li>
+        <li><a href="#settings">Settings and language</a>
+          <ol>
+            <li><a href="#auto-speaker">Auto speaker selection</a></li>
+            <li><a href="#mp3-downmix">MP3 downmix</a></li>
+          </ol>
+        </li>
+        <li><a href="#spectrogram">Spectrogram / loudness</a></li>
         <li><a href="#shortcuts">Shortcuts</a>
           <ol>
             <li><a href="#shortcuts-file">File / tabs</a></li>
@@ -110,12 +117,6 @@
             <li><a href="#shortcuts-waapi">WAAPI</a></li>
             <li><a href="#shortcuts-mouse">Mouse / pointer</a></li>
             <li><a href="#shortcuts-context">Per screen</a></li>
-          </ol>
-        </li>
-        <li><a href="#settings">Settings and language</a>
-          <ol>
-            <li><a href="#auto-speaker">Auto speaker selection</a></li>
-            <li><a href="#mp3-downmix">MP3 downmix</a></li>
           </ol>
         </li>
         <li><a href="#disclaimer">Scope</a></li>
@@ -248,7 +249,7 @@
         <h4>Editing</h4>
         <ul>
           <li><strong>Loudness target</strong> — LKFS.</li>
-          <li><strong>Silence threshold</strong> (Silent Skip) — default −60 dB, from −120 to 0. Used for playback skip and the record gate when on. Not shared with <a href="#edit">Silence &amp; Hit Detection</a> (<kbd>Ctrl</kbd>+<kbd>D</kbd>).</li>
+          <li><strong>Silence threshold</strong> (Silent Skip) — default −60 dB, from −120 to 0. Used for playback skip and the record gate when on. Not shared with <a href="#silence-hit">Silence &amp; Hit Detection</a> (<kbd>Ctrl</kbd>+<kbd>D</kbd>).</li>
           <li>A mono level meter of the assigned record ports sits beside it. The bar is peak. The red line and number are avg. floor, not peak. The Editing tab also monitors input.</li>
           <li><strong>Silence insert duration on skip</strong> — default 500 ms. Longer gaps are shortened. 0 drops all silence. 0 to 10000. Unused on playback.</li>
           <li><strong>Click-prevention fade</strong> — default 20 ms, from 1 to 100. Used by normalize per region and Silent Skip recording splices. Independent of Silence &amp; Hit Detection cut fades.</li>
@@ -746,18 +747,140 @@
         <li><kbd>R</kbd> — reverse. Uses the selection, or the whole file. Audio only; markers / regions / loops stay put.</li>
         <li>Waveform right-click → Audio → Normalize Waveform per Region — fit each region's peak to −0.1 dB. A short fade from the Editing tab in Settings (default 20 ms, to zero) is applied at each region's start and end to avoid a click.</li>
         <li><span class="ui">DELETE</span> — delete the selection and close the gap. Selected markers / regions go with it.</li>
-        <li><kbd>Shift</kbd>+<kbd>Delete</kbd> — replace the selection with silence. Length stays the same, and markers / regions / loops do not move. The dialog matches Insert Silence: it shows the selection length in seconds and asks whether to apply the default fade on both sides (on by default; the click-prevention fade from Settings). The audio just before the selection fades to zero, and the audio just after fades up from zero. <kbd>Enter</kbd> applies, <kbd>Esc</kbd> cancels. Also on right-click → Edit → Mute Selection. With no selection, a notice appears. Already-silent audio is left as is. While a channel is soloed, only the audible lanes are silenced.</li>
-        <li>Waveform right-click → Edit → Insert Silence (<kbd>Ctrl</kbd>+<kbd>Ins</kbd>) — inserts the given number of seconds at the click, or at the playhead when opened from the key, pushing later audio, markers, regions, and loops back. Type the seconds, or use ↑↓ / wheel (0.1 s, Shift 1 s, Ctrl 10 s, Ctrl+Shift 60 s). Enter inserts. Range is 0.001–600 s. “Default fade on both sides” is on by default and applies the Settings click-prevention fade (default 20 ms): out to zero just before the insert, in from zero just after. With several tabs selected, the clicked file uses that position (the playhead for the key) and the other selected files use each playhead, for the same duration.</li>
-        <li>Waveform right-click → Edit → Silence &amp; Hit Detection (<kbd>Ctrl</kbd>+<kbd>D</kbd>) — uses the selection if any, otherwise the whole file. The dialog sets open / close thresholds (linkable; default −5 dB, then remembers your last values; independent of Silent Skip), minimum time to next gate, minimum time to close, pre / post-roll, and cut fade in / out. Actions: delete silence, add regions to audio, add markers to audio, or mark hit points. Link is Alt+L, actions are Alt+D / R / M / H, scope is Alt+S / A. The apply button is OK. “Add regions / markers to audio” places cues on gated audible spans. “Mark hit points” places a marker on each rise that clears the threshold and comes up from the dip before it (a flat sustain gets none). Only the hit threshold and the minimum time between hits apply in that mode (spacing never goes below 10 ms; existing markers inside the analyzed range are replaced). Scope: start &amp; end only, or entire (scope is disabled for hit points). Drag the red ±threshold lines on the waveform, or use the mouse wheel on the number fields (0.1 dB, Shift for 1 dB; ↑↓ same). The wheel on the waveform zooms time around the cursor. With the waveform area focused, movement works the same as in the editor. The window resizes in both directions; only the waveform area follows, and the settings below stay put. Cut fades apply only when deleting silence (independent of the click-prevention fade in Settings; default 20 ms). Fades are disabled for regions / markers / hit points. Minimum time to next gate is disabled for start &amp; end only (for hit points that field is the spacing and stays enabled). With several tabs selected, skips the settings UI and only asks whether to apply the current settings to every selected file (whole file each). Does not empty a file that is entirely silence. Region add is unavailable on formats that do not allow regions (e.g. MP3).</li>
+        <li><kbd>Shift</kbd>+<kbd>Delete</kbd> — replace the selection with silence
+          <ul>
+            <li>Length stays the same. Markers / regions / loops do not move</li>
+            <li>The dialog matches Insert Silence (selection length and “default fade on both sides”)</li>
+            <li>Fade is on by default (Settings click-prevention fade; out to zero just before, in from zero just after)</li>
+            <li><kbd>Enter</kbd> applies, <kbd>Esc</kbd> cancels. Also on right-click → Edit → Mute Selection</li>
+            <li>With no selection, a notice appears. Already-silent audio is left as is</li>
+            <li>While a channel is soloed, only the audible lanes are silenced</li>
+          </ul>
+        </li>
+        <li>Waveform right-click → Edit → Insert Silence (<kbd>Ctrl</kbd>+<kbd>Ins</kbd>)
+          <ul>
+            <li>Inserts the given seconds at the click, or at the playhead when opened from the key</li>
+            <li>Later audio, markers, regions, and loops move back together</li>
+            <li>Type the seconds, or use ↑↓ / wheel (0.1 s; Shift 1 s / Ctrl 10 s / Ctrl+Shift 60 s)</li>
+            <li>Enter inserts. Range is 0.001–600 s</li>
+            <li>“Default fade on both sides” is on by default (Settings click-prevention fade, default 20 ms; out to zero just before, in from zero just after)</li>
+            <li>With several tabs selected: the clicked file uses that position (playhead for the key); other selected files use each playhead, same duration</li>
+          </ul>
+        </li>
+        
         <li><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd> — cut / copy / paste (markers in range included; a matching region is included too).</li>
         <li><kbd>U</kbd> — edit history. ↑↓ move, Enter apply, Esc cancel. Uses the same fill as the sample-rate convert picker list. Clicking the list left of loudness also opens it.</li>
-        <li>History copy &amp; paste — inside the history, <kbd>Ctrl</kbd>+click to select steps (Shift+click or <kbd>Shift</kbd>+<kbd>↑↓</kbd> for a range, <kbd>Ctrl</kbd>+<kbd>A</kbd> for all), then <kbd>Ctrl</kbd>+<kbd>C</kbd>. Press <kbd>Ctrl</kbd>+<kbd>V</kbd> in another file to apply the same edits (its history window does not need to be open). The copy stays until you copy something else, so you can switch tabs and press <kbd>Ctrl</kbd>+<kbd>V</kbd> on each file. Pasting onto several selected tabs, or a slow step such as pitch, shows a dim overlay with progress. <kbd>Ctrl</kbd>+<kbd>C</kbd> with no selection copies every step up to the current position. Ranges line up by playback time, and matching loudness is done again on the target. The only step you cannot copy is Original (it is not an edit; <kbd>Ctrl</kbd>+<kbd>A</kbd> leaves it uncolored).</li>
-        <li>History paste skips or surprises — each step is tried on the target; ones that do not fit are skipped (“Applied 3 of 5”). Examples that skip: adding a marker at a time that already has one, a delete / fade whose range falls off a shorter file, Delete Silence when the target has no silence, converting to the rate / bit depth / channel count the target already has, a marker comment where that marker is missing, and regions / loops onto an MP3. Dragging or nudging markers / regions / loops, and hold-to-subdivide, copy the layout at that moment. Pasting only the move onto another take replaces that take’s markers (include the adds through the moves if you want the same sequence). Times clamp to the end of a shorter file. An edit made with a channel soloed applies to the same channel index. Record / waveform-paste history carries the audio that was inserted. After <kbd>Ctrl</kbd>+<kbd>C</kbd> on the waveform, <kbd>Ctrl</kbd>+<kbd>V</kbd> pastes audio, not history.</li>
-        <li>Applying to the selected files — with two or more tabs selected (<kbd>Ctrl</kbd>+click / <kbd>Shift</kbd>+click / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>), fade in / fade out, normalize, normalize per region, volume (curve picker for one file; Match Loudness simple adjust when several tabs are selected), pitch, time stretch, reverse, insert silence, Silence &amp; Hit Detection, sample-rate / bit-depth / channel conversion, Save (<kbd>Ctrl</kbd>+<kbd>S</kbd>), and Save As (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) run on every selected file (each whole file, using that file’s own solo). Silence &amp; Hit Detection only confirms, then applies the saved settings. Insert silence uses the click on the active file (<kbd>Ctrl</kbd>+<kbd>Ins</kbd> uses the playhead) and each other file’s playhead. The right-click menu names change accordingly, e.g. “Normalize Selected Files (N)” and “Save Selected Files (S) / Save Selected Files As (A)”. Save overwrites files that already have a path; untitled or AIFF files ask for a folder and write Wave. Save As asks for a folder, writes each as Wave, and points the tabs at those files (unlike Export, the tab follows the new file). Curve and dB previews play on the active file; Enter applies to all selected files. Time stretch converts the target into a ratio and applies it per file. Files the edit cannot apply to (no regions, no silence, already in that format, and so on) are skipped; if everything is skipped you get a note. While running, a dim overlay shows overall and per-file progress and blocks input (the tile-search overlay stays and this stacks on top). Export and history paste follow the same rule: with tabs selected, waveform right-click → Export's “Export Wave / MP3”, “Separate by Markers / Regions” and “Export by Channel” become “… Selected Tabs” and export the selected tabs in one go, and Edit → “Paste Copied Edits” becomes “Paste Copied Edits to Selected Tabs” (or “Paste Copied Edits to All Tabs” when everything is selected), same as <kbd>Ctrl</kbd>+<kbd>V</kbd>. Duplicate and Delete File also switch to “Duplicate Selected Files (U)” (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> too) and “Delete Selected Files (D)” and run on every selected file (one confirmation; each copy opens next to its own tab; files that could not be deleted are listed at the end). Waveform right-click → Tabs also has “Select All Tabs (A)” (same as <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>). Fade around seek bar (<kbd>X</kbd>) and cut / copy / paste / delete stay on the active file only.</li>
+        <li>History copy &amp; paste
+          <ul>
+            <li>In the history, select steps with <kbd>Ctrl</kbd>+click (<kbd>Shift</kbd>+click or <kbd>Shift</kbd>+<kbd>↑↓</kbd> for a range, <kbd>Ctrl</kbd>+<kbd>A</kbd> for all), then <kbd>Ctrl</kbd>+<kbd>C</kbd>.</li>
+            <li>In another file, <kbd>Ctrl</kbd>+<kbd>V</kbd> reapplies those edits (that file’s history window does not need to be open).</li>
+            <li>The copy stays until you copy something else, so you can switch tabs and press <kbd>Ctrl</kbd>+<kbd>V</kbd> on each file.</li>
+            <li>Pasting onto several selected tabs, or a slow step such as pitch, shows a dim overlay with progress.</li>
+            <li><kbd>Ctrl</kbd>+<kbd>C</kbd> with no selection copies every step up to the current position.</li>
+            <li>Ranges line up by playback time. Matching loudness is done again on the target.</li>
+            <li>The only step you cannot copy is Original (it is not an edit; <kbd>Ctrl</kbd>+<kbd>A</kbd> leaves it uncolored).</li>
+          </ul>
+        </li>
+        <li>History paste skips or surprises
+          <ul>
+            <li>Each step is tried on the target. Ones that do not fit are skipped (“Applied 3 of 5”).</li>
+            <li>Examples that skip: a marker time that already has one; a delete / fade that falls off a shorter file; Delete Silence when there is no silence; converting to the rate / bit depth / channel count the target already has; a marker comment where that marker is missing; regions / loops onto an MP3.</li>
+            <li>Dragging or nudging markers / regions / loops, and hold-to-subdivide, copy the layout at that moment.</li>
+            <li>Pasting only the move onto another take replaces that take’s markers. Include the adds through the moves if you want the same sequence.</li>
+            <li>Times clamp to the end of a shorter file.</li>
+            <li>An edit made with a channel soloed applies to the same channel index.</li>
+            <li>Record / waveform-paste history carries the audio that was inserted.</li>
+            <li>After <kbd>Ctrl</kbd>+<kbd>C</kbd> on the waveform, <kbd>Ctrl</kbd>+<kbd>V</kbd> pastes audio, not history.</li>
+          </ul>
+        </li>
+        <li>Applying to the selected files — with two or more tabs selected (<kbd>Ctrl</kbd>+click / <kbd>Shift</kbd>+click / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>), the following run on every selected file (each whole file, using that file’s own solo).
+          <ul>
+            <li><strong>Covered edits</strong> — fade in / out, normalize, normalize per region, volume (curve for one file; Match Loudness simple adjust when several tabs are selected), pitch, time stretch, reverse, insert silence, Silence &amp; Hit Detection, sample-rate / bit-depth / channel conversion, Save (<kbd>Ctrl</kbd>+<kbd>S</kbd>), Save As (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>).</li>
+            <li>Silence &amp; Hit Detection only confirms, then applies the saved settings.</li>
+            <li>Insert silence uses the click on the active file (<kbd>Ctrl</kbd>+<kbd>Ins</kbd> uses the playhead) and each other file’s playhead.</li>
+            <li>Right-click names change, e.g. “Normalize Selected Files (N)” and “Save Selected Files (S) / Save Selected Files As (A)”.</li>
+            <li>Save overwrites files that already have a path. Untitled or AIFF files ask for a folder and write Wave.</li>
+            <li>Save As asks for a folder, writes each as Wave, and points the tabs at those files (unlike Export, the tab follows the new file).</li>
+            <li>Curve and dB previews play on the active file; Enter applies to all selected files.</li>
+            <li>Time stretch converts the target into a ratio and applies it per file.</li>
+            <li>Files the edit cannot apply to (no regions, no silence, already in that format, and so on) are skipped. If everything is skipped, you get a note.</li>
+            <li>While running, a dim overlay shows overall and per-file progress and blocks input (the tile-search overlay stays; this stacks on top).</li>
+            <li>Export and history paste follow the same rule: with tabs selected, waveform right-click → Export becomes “… Selected Tabs”, and Edit → “Paste Copied Edits” becomes “Paste Copied Edits to Selected Tabs” (or “… to All Tabs” when everything is selected), same as <kbd>Ctrl</kbd>+<kbd>V</kbd>.</li>
+            <li>Duplicate and Delete File become “Duplicate Selected Files (U)” (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> too) and “Delete Selected Files (D)” — one confirmation; each copy opens next to its own tab; files that could not be deleted are listed at the end.</li>
+            <li>Waveform right-click → Tabs also has “Select All Tabs (A)” (same as <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>).</li>
+            <li>Fade around seek bar (<kbd>X</kbd>) and cut / copy / paste / delete stay on the active file only.</li>
+          </ul>
+        </li>
         <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> also redo) — undo / redo an edit. In the player, disposable A-B and temporary markers only.</li>
       </ul>
 
-      <h2 id="markers">6. Markers / regions / loops</h2>
+      <h2 id="silence-hit">6. Silence &amp; Hit Detection</h2>
+      <p>Find silence gaps or hit points automatically, then delete silence, add regions / markers, or mark hit points.</p>
+      <p>This is not Silent Skip (skip silent stretches during playback). Silent Skip is under <a href="#layout-silent">Layout → Silent Skip</a>.</p>
+      <p>Open with Waveform right-click → Edit → Silence &amp; Hit Detection (<kbd>Ctrl</kbd>+<kbd>D</kbd>).</p>
+      <ul>
+        <li>Uses the selection, or the whole file if nothing is selected.</li>
+        <li>Closing the dialog remembers the settings for next time.</li>
+        <li>Independent of Silent Skip and the click-prevention fade in Settings.</li>
+        <li><strong>Actions</strong>
+          <ul>
+            <li>Delete silence</li>
+            <li>Add regions to audio</li>
+            <li>Add markers to audio</li>
+            <li>Mark hit points</li>
+          </ul>
+        </li>
+        <li><strong>Shortcuts</strong> — link Alt+L; actions Alt+D / R / M / H; scope Alt+S / A; apply with OK.</li>
+        <li><strong>Silence gate</strong> (delete / regions / markers)
+          <ul>
+            <li>Open / close thresholds (linkable; first default −5 dB)</li>
+            <li>Minimum time to next gate, and minimum time to close</li>
+            <li>Pre-roll / post-roll</li>
+            <li>Cut fades (delete only; default 20 ms)</li>
+            <li>Regions and markers land on gated audible spans</li>
+            <li>Scope is start &amp; end only, or entire (minimum time to next gate is unused for start &amp; end only)</li>
+          </ul>
+        </li>
+        <li><strong>Hit points</strong>
+          <ul>
+            <li>Places a marker on each rise that clears the threshold and comes up from the dip before it</li>
+            <li>A flat sustain gets none</li>
+            <li>Existing markers inside the analyzed range are replaced</li>
+            <li>Only these three controls apply
+              <ul>
+                <li>Hit threshold</li>
+                <li>Minimum time between hits (same field as “minimum time to next gate”; never below 10 ms)</li>
+                <li>Rise ratio (slider)
+                  <ul>
+                    <li>Range 5–100%. Default 20%. A static “Default 20%” hint sits beside it</li>
+                    <li>Higher keeps only strong rises. Lower catches weaker ones</li>
+                    <li>The percent text updates while you drag. Preview re-detection waits about one second after you stop (same debounce as the open-threshold wheel)</li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
+            <li>Disabled here: close threshold, pre / post-roll, start &amp; end / entire, cut fades</li>
+          </ul>
+        </li>
+        <li><strong>Waveform preview</strong>
+          <ul>
+            <li>Drag the red ±threshold lines</li>
+            <li>Wheel / ↑↓ on number fields: 0.1 dB (Shift for 1 dB)</li>
+            <li>Wheel on the waveform zooms time around the cursor</li>
+            <li>With the waveform focused, movement matches the editor</li>
+            <li>The window resizes in both directions; only the waveform area grows</li>
+          </ul>
+        </li>
+        <li><strong>Notes</strong>
+          <ul>
+            <li>With several tabs selected, the dialog is skipped; you only confirm applying the saved settings to each whole file</li>
+            <li>Does not empty a file that is entirely silence</li>
+            <li>Region add is unavailable on formats that do not allow regions (e.g. MP3)</li>
+          </ul>
+        </li>
+      </ul>
+
+      <h2 id="markers">7. Markers / regions / loops</h2>
       <ul>
         <li><kbd>M</kbd> / <kbd>Ins</kbd> — marker at the playhead when there is no selection. The same frame cannot take another. With a selection, the first press places start and end (or the midpoint if both ends already have markers); further presses replace them with thirds, then fourths, and so on (hold uses the same repeat timing as marker nudge; one history entry until you release).</li>
         <li><kbd>Shift</kbd>+<kbd>L</kbd> — set the selection as the sample loop (same range again clears it).</li>
@@ -771,11 +894,6 @@
       <div class="note">
         <p>Markers, regions, and loops are stored in the Wave file when you save. MP3 cannot take regions or a loop. Markers are allowed, but they are not written when you save as MP3.</p>
       </div>
-
-      <h2 id="spectrogram">7. Spectrogram / loudness analysis</h2>
-      <p><kbd>A</kbd> cycles spectrogram / overlay. <kbd>V</kbd> shows the loudness curve and opens volume. Closing that volume popup leaves the curve up. <kbd>Esc</kbd>, <kbd>Shift</kbd>+<kbd>A</kbd>, or <kbd>Shift</kbd>+<kbd>V</kbd> returns to the waveform. <kbd>Esc</kbd> clears the pen cursor, open prompts, and the selection first. The VIEW loudness button toggles the view only. <kbd>L</kbd> loops from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</p>
-      <p>The loudness view draws how loud the sound is over time (Short Term). A faint band sits ±1 LU around the curve. Peak level is drawn on the same height so you can compare. Background colors match the meter: blue through the target, orange for the next 3 LU, red above that. The left numbers are loudness (LKFS); the white line is the target in Settings. The pen button at the top right of the curve, <kbd>E</kbd>, or a right-click on the curve switches to the pen (again to leave it). While the pen is on, dragging does not change the time selection. Releasing the mouse applies the stroke as the change you meant, with a short fade back to the previous level at both ends. The line is not a command to force the loudness onto that exact height. Matching every peak and dip to the stroke would push the sound too hard and often feel unnatural. The pen reads how the audio already sounds, then reflects the lift or ease you drew. For an exact level, select a range and set it with the volume command (<kbd>V</kbd>). Even then, an extreme dB value is only lightly smoothed and can still sound unnatural. If the stroke goes above 0 dBFS, you can lower the whole stroke or discard it and draw again. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the stroke in progress and each finished stroke. That still works after the volume popup is cancelled. A right-click on a marker, region, or loop still opens the menu.</p>
-      <p>Overlay draws the waveform shape on top of the spectrogram. Dark areas can be lifted with the bar on the left or <kbd>Alt</kbd>+↑ / ↓ so they stay readable. Low frequencies take more vertical space (below 100 Hz is barely visible). The top of the scale is 24 kHz. When the whole file fits on screen, the picture is sharp. When zoomed in, it stays smooth so scrolling does not feel heavy.</p>
 
       <h2 id="format">8. Format conversion</h2>
       <ul>
@@ -838,7 +956,47 @@
         <p>An existing container of the same name is replaced. A WAV of the same name under Originals is overwritten without asking. Always verify the result in Wwise.</p>
       </div>
 
-      <h2 id="shortcuts">10. Shortcuts</h2>
+      <h2 id="settings">10. Settings and language</h2>
+      <p>Settings are the gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. Tabs are General / Shown / Audio / Player / Editing / Export · Paths / Wwise. Details for each item are under <a href="#layout-settings">Layout → Settings</a>. <kbd>Esc</kbd> closes the window.</p>
+      <ul>
+        <li>Language is on General. The default is <span class="ui">Auto</span> (Japanese if the PC is Japanese, otherwise English). The Japanese UI may still show some English labels.</li>
+        <li>Wallpaper is also on General. None by default. It covers the window over the animated background while keeping its aspect ratio. Details are under <a href="#layout-settings">Layout → Settings</a>.</li>
+        <li>The manual is <span class="ui">?</span>, or in the browser. It follows the UI language.</li>
+        <li>Settings and open tabs are stored in this PC’s user folder (<code>%LocalAppData%\MGA\MGA Sonic Anvil\</code>). Nothing is written next to the app.</li>
+        <li>MP3 uses LAME when the path in Settings is valid; otherwise Windows writes it (128–320 kbps, default 192). It writes the stereo mix you hear now (see <a href="#mp3-downmix">details</a>). The written MP3 is not opened in the current tab. LAME is not included with this app.</li>
+        <li>Closing the app remembers open tabs and window position. Player and editor sizes are separate. Unsaved edits come back on the next launch. Quitting in player mode does not remember the playlist.</li>
+        <li>Only one copy of the app runs. A second start brings the existing window forward and opens the files you passed (mp3 / m4a start the player).</li>
+        <li>On startup, you are told if a newer version exists. Yes opens the download page (nothing is downloaded automatically). No skips that version. Offline, it continues quietly.</li>
+      </ul>
+
+      <h3 id="auto-speaker">10-1. Auto speaker selection</h3>
+      <p>A checkbox on Settings → Audio, under Default Wave format. It is off by default. When on, the app switches to an enabled layout that matches the number of channels in the current file. It runs when you open a file, bring a tab to the front, create a new file, or convert the channel count. It looks at the count only; it does not guess 5.1 from the file type.</p>
+      <ul>
+        <li><strong>When it helps</strong> — 1–2 channels use Stereo. 6 channels pick 5.1 when that layout is enabled. If only one enabled layout has that count, it is used. With only Stereo enabled, a 6-channel file is left as-is.</li>
+        <li><strong>Watch out</strong> — If the current layout already has the same count, it stays. Switching stops playback and recording, and uses that layout’s device. If Stereo is headphones and 5.1 is another interface, the output jumps when you change tabs. Leave this off if you want to keep hearing a 6-channel file mixed down to Stereo.</li>
+      </ul>
+
+      <h3 id="mp3-downmix">10-2. MP3 downmix</h3>
+      <p>Saving or exporting MP3 writes the stereo mix you hear with the current speaker layout. It does not follow raw file channel order. Wave export keeps the channel count. There is no prompt.</p>
+      <table>
+        <thead><tr><th>Speaker order</th><th>Goes to</th><th>How it is mixed</th></tr></thead>
+        <tbody>
+          <tr><td>1st</td><td>L</td><td>Full</td></tr>
+          <tr><td>2nd</td><td>R</td><td>Full</td></tr>
+          <tr><td>3rd</td><td>L and R</td><td>A little quieter (center)</td></tr>
+          <tr><td>4th</td><td>L and R</td><td>A little quieter (includes LFE)</td></tr>
+          <tr><td>5th–8th</td><td>Odd to L, even to R</td><td>A little quieter</td></tr>
+          <tr><td>9th and up</td><td>Odd to L, even to R</td><td>Quieter still</td></tr>
+        </tbody>
+      </table>
+      <p>This matches 5.1 (L / R / C / LFE / Ls / Rs). Atmos height speakers or unusual layouts can come out unbalanced.</p>
+
+      <h2 id="spectrogram">11. Spectrogram / loudness analysis</h2>
+      <p><kbd>A</kbd> cycles spectrogram / overlay. <kbd>V</kbd> shows the loudness curve and opens volume. Closing that volume popup leaves the curve up. <kbd>Esc</kbd>, <kbd>Shift</kbd>+<kbd>A</kbd>, or <kbd>Shift</kbd>+<kbd>V</kbd> returns to the waveform. <kbd>Esc</kbd> clears the pen cursor, open prompts, and the selection first. The VIEW loudness button toggles the view only. <kbd>L</kbd> loops from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</p>
+      <p>The loudness view draws how loud the sound is over time (Short Term). A faint band sits ±1 LU around the curve. Peak level is drawn on the same height so you can compare. Background colors match the meter: blue through the target, orange for the next 3 LU, red above that. The left numbers are loudness (LKFS); the white line is the target in Settings. The pen button at the top right of the curve, <kbd>E</kbd>, or a right-click on the curve switches to the pen (again to leave it). While the pen is on, dragging does not change the time selection. Releasing the mouse applies the stroke as the change you meant, with a short fade back to the previous level at both ends. The line is not a command to force the loudness onto that exact height. Matching every peak and dip to the stroke would push the sound too hard and often feel unnatural. The pen reads how the audio already sounds, then reflects the lift or ease you drew. For an exact level, select a range and set it with the volume command (<kbd>V</kbd>). Even then, an extreme dB value is only lightly smoothed and can still sound unnatural. If the stroke goes above 0 dBFS, you can lower the whole stroke or discard it and draw again. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the stroke in progress and each finished stroke. That still works after the volume popup is cancelled. A right-click on a marker, region, or loop still opens the menu.</p>
+      <p>Overlay draws the waveform shape on top of the spectrogram. Dark areas can be lifted with the bar on the left or <kbd>Alt</kbd>+↑ / ↓ so they stay readable. Low frequencies take more vertical space (below 100 Hz is barely visible). The top of the scale is 24 kHz. When the whole file fits on screen, the picture is sharp. When zoomed in, it stays smooth so scrolling does not feel heavy.</p>
+
+      <h2 id="shortcuts">12. Shortcuts</h2>
       <p>This section lists the keyboard shortcuts, including ones already described earlier. Keys in the later tables apply only while that screen is open. See the earlier sections of this manual for full details.</p>
 
       <h3 id="shortcuts-file">File / tabs</h3>
@@ -959,7 +1117,7 @@
           <tr><td>Right-click → Audio → Normalize Waveform per Region</td><td>Fit each region's peak to −0.1 dB; short fades from Settings (default 20 ms) at the edges</td></tr>
           <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Ripple-delete the selection. Selected markers / regions go with it (does nothing in the player. Removing rows from the list is <kbd>Delete</kbd> only; files are never deleted. <kbd>Ctrl</kbd>+<kbd>W</kbd> does not close)</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>Delete</kbd></td><td>Silence the selection. The dialog chooses the default edge fade (on by default; Enter applies, Esc cancels. Length and markers stay. Also on right-click → Edit. Does nothing in the player)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd> / right-click → Edit → Silence &amp; Hit Detection</td><td>Delete silence / add regions / add markers / hit points (selection, or the whole file). Dialog for thresholds, gate timing, and cut fades. Independent of Silent Skip and the click-prevention fade in Settings. Default threshold −5 dB. With several tabs selected, confirmation only</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd> / right-click → Edit → Silence &amp; Hit Detection</td><td>Delete silence / add regions / add markers / hit points (selection, or the whole file). Dialog for thresholds, gate timing, and cut fades; hit mode also has rise ratio 5–100% (default 20%). Settings are remembered. Independent of Silent Skip and the click-prevention fade. Default threshold −5 dB. With several tabs selected, confirmation only</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Ins</kbd> / right-click → Edit → Insert Silence</td><td>Insert the given seconds at the playhead (right-click uses the click; ↑↓ / wheel: 0.1 s, Shift 1 s, Ctrl 10 s, Ctrl+Shift 60 s; Enter inserts; 0.001–600 s). Default fade on both sides is on and uses the Settings click-prevention fade. Other selected tabs use each playhead</td></tr>
           <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same menu as right-click (in the player, destructive edits are available from the playlist; keyboard shortcuts stay off)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd></td><td>Cut / copy / paste (markers in range included; a matching region is included too). With tabs selected, <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to those tabs (a dim overlay and progress when it takes time)</td></tr>
@@ -1023,7 +1181,7 @@
           <tr><td>Drag a flag / loop bar</td><td>Move (the guide snaps to markers / loop edges)</td></tr>
           <tr><td>Double-click a comment / region name</td><td>Edit (<code>-A</code> lime / <code>-L</code> blue / <code>-E</code> red)</td></tr>
           <tr><td>Right-click a flag / loop bar</td><td>Delete</td></tr>
-          <tr><td>Right-click (waveform) → Edit → Silence &amp; Hit Detection</td><td>Same as <kbd>Ctrl</kbd>+<kbd>D</kbd> (delete silence / regions / markers / hit points; independent of Silent Skip)</td></tr>
+          <tr><td>Right-click (waveform) → Edit → Silence &amp; Hit Detection</td><td>Same as <kbd>Ctrl</kbd>+<kbd>D</kbd> (delete silence / regions / markers / hit points; rise ratio in hit mode; independent of Silent Skip)</td></tr>
           <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same menu as right-click (pointer position on the waveform, or the playhead; in the player, destructive edits are available from the playlist; keyboard shortcuts stay off)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+click a tab / tile strip</td><td>Toggle that tab in the selection</td></tr>
           <tr><td><kbd>Shift</kbd>+click a tab / tile strip</td><td>Range-select tabs</td></tr>
@@ -1214,42 +1372,7 @@
       </table>
       <p>In Settings, <kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageDown</kbd> goes to the next tab, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageUp</kbd> to the previous, and <kbd>Esc</kbd> closes the window. The UI ignores input while a format conversion, tab export, or multi-file open is running.</p>
 
-      <h2 id="settings">11. Settings and language</h2>
-      <p>Settings are the gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. Tabs are General / Shown / Audio / Player / Editing / Export · Paths / Wwise. Details for each item are under <a href="#layout-settings">Layout → Settings</a>. <kbd>Esc</kbd> closes the window.</p>
-      <ul>
-        <li>Language is on General. The default is <span class="ui">Auto</span> (Japanese if the PC is Japanese, otherwise English). The Japanese UI may still show some English labels.</li>
-        <li>Wallpaper is also on General. None by default. It covers the window over the animated background while keeping its aspect ratio. Details are under <a href="#layout-settings">Layout → Settings</a>.</li>
-        <li>The manual is <span class="ui">?</span>, or in the browser. It follows the UI language.</li>
-        <li>Settings and open tabs are stored in this PC’s user folder (<code>%LocalAppData%\MGA\MGA Sonic Anvil\</code>). Nothing is written next to the app.</li>
-        <li>MP3 uses LAME when the path in Settings is valid; otherwise Windows writes it (128–320 kbps, default 192). It writes the stereo mix you hear now (see <a href="#mp3-downmix">details</a>). The written MP3 is not opened in the current tab. LAME is not included with this app.</li>
-        <li>Closing the app remembers open tabs and window position. Player and editor sizes are separate. Unsaved edits come back on the next launch. Quitting in player mode does not remember the playlist.</li>
-        <li>Only one copy of the app runs. A second start brings the existing window forward and opens the files you passed (mp3 / m4a start the player).</li>
-        <li>On startup, you are told if a newer version exists. Yes opens the download page (nothing is downloaded automatically). No skips that version. Offline, it continues quietly.</li>
-      </ul>
-
-      <h3 id="auto-speaker">11-1. Auto speaker selection</h3>
-      <p>A checkbox on Settings → Audio, under Default Wave format. It is off by default. When on, the app switches to an enabled layout that matches the number of channels in the current file. It runs when you open a file, bring a tab to the front, create a new file, or convert the channel count. It looks at the count only; it does not guess 5.1 from the file type.</p>
-      <ul>
-        <li><strong>When it helps</strong> — 1–2 channels use Stereo. 6 channels pick 5.1 when that layout is enabled. If only one enabled layout has that count, it is used. With only Stereo enabled, a 6-channel file is left as-is.</li>
-        <li><strong>Watch out</strong> — If the current layout already has the same count, it stays. Switching stops playback and recording, and uses that layout’s device. If Stereo is headphones and 5.1 is another interface, the output jumps when you change tabs. Leave this off if you want to keep hearing a 6-channel file mixed down to Stereo.</li>
-      </ul>
-
-      <h3 id="mp3-downmix">11-2. MP3 downmix</h3>
-      <p>Saving or exporting MP3 writes the stereo mix you hear with the current speaker layout. It does not follow raw file channel order. Wave export keeps the channel count. There is no prompt.</p>
-      <table>
-        <thead><tr><th>Speaker order</th><th>Goes to</th><th>How it is mixed</th></tr></thead>
-        <tbody>
-          <tr><td>1st</td><td>L</td><td>Full</td></tr>
-          <tr><td>2nd</td><td>R</td><td>Full</td></tr>
-          <tr><td>3rd</td><td>L and R</td><td>A little quieter (center)</td></tr>
-          <tr><td>4th</td><td>L and R</td><td>A little quieter (includes LFE)</td></tr>
-          <tr><td>5th–8th</td><td>Odd to L, even to R</td><td>A little quieter</td></tr>
-          <tr><td>9th and up</td><td>Odd to L, even to R</td><td>Quieter still</td></tr>
-        </tbody>
-      </table>
-      <p>This matches 5.1 (L / R / C / LFE / Ls / Rs). Atmos height speakers or unusual layouts can come out unbalanced.</p>
-
-      <h2 id="disclaimer">12. Scope</h2>
+      <h2 id="disclaimer">13. Scope</h2>
       <ul>
         <li>This does not cover everything Interactive Music can do. EXPORT is a single Wave (markers / sample loop).</li>
         <li>In-app preview is a guide. Always check the result in Wwise after EXPORT.</li>
@@ -1258,7 +1381,7 @@
         <li>EXPORT changes the Wwise project. Back up first.</li>
       </ul>
 
-      <h2 id="trademarks">13. Trademarks and license</h2>
+      <h2 id="trademarks">14. Trademarks and license</h2>
       <ul>
         <li><strong>Wwise®</strong> / <strong>Audiokinetic®</strong> are trademarks of Audiokinetic Inc. This tool is unofficial. WAAPI requires a valid Wwise license.</li>
         <li>This app is released under the <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/LICENSE">MIT License</a>.</li>

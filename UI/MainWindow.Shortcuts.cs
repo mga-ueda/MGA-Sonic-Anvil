@@ -2826,25 +2826,6 @@ public partial class MainWindow
         ResetPdfPageDigitEntry();
     }
 
-    private static bool TryNumpadDigit(Key key, out int digit)
-    {
-        digit = key switch
-        {
-            Key.NumPad0 => 0,
-            Key.NumPad1 => 1,
-            Key.NumPad2 => 2,
-            Key.NumPad3 => 3,
-            Key.NumPad4 => 4,
-            Key.NumPad5 => 5,
-            Key.NumPad6 => 6,
-            Key.NumPad7 => 7,
-            Key.NumPad8 => 8,
-            Key.NumPad9 => 9,
-            _ => -1,
-        };
-        return digit >= 0;
-    }
-
     private static bool TryDigitPercent(Key key, out double percent)
     {
         percent = 0;
