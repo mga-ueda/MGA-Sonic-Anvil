@@ -5263,9 +5263,6 @@ internal sealed class WaveformView : Grid
             : new Rect(stemX + inset, box.Y, box.Width, box.Height);
     }
 
-    private static Rect TimelineFlagRect(double x, double width, double laneHeight, bool top) =>
-        SplitFlagRect(x, width, laneHeight, top);
-
     private Rect TimeLaneBounds(Rect bounds)
     {
         var top = Math.Min(MarkerLaneHeight, bounds.Height);
