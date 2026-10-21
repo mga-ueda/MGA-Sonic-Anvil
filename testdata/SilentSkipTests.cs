@@ -700,6 +700,37 @@ public sealed class SilentSkipTests
     }
 
     [Fact]
+    public void Provider_AllSilentLoop_PlaysWithoutRescanningWhenSilentSkipOn()
+    {
+        // Auto Loop + Silent Skip + 全域無音で、1 サンプルごとに全文走査して固まらないこと。
+        const int rate = 48_000;
+        var frames = rate; // 1 秒の無音（走査コストが効く長さ）
+        var document = new AudioDocument(new float[frames * 2], rate, 2, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.SetDeviceSampleRate(rate);
+        provider.Bind(document, 0, new WaveSelection(0, frames), loop: true);
+        provider.SetSilentSkip(true, -60);
+
+        var buffer = new float[512 * 2];
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        long readFrames = 0;
+        for (var i = 0; i < 48; i++)
+        {
+            var n = provider.Read(buffer, 0, buffer.Length);
+            Assert.Equal(buffer.Length, n);
+            readFrames += n / 2;
+            Assert.All(buffer, value => Assert.Equal(0f, value, 5));
+        }
+
+        sw.Stop();
+        Assert.False(provider.Ended);
+        Assert.True(readFrames >= 512 * 40);
+        Assert.True(provider.CursorFrame > 512);
+        // リアルタイム相当（約 0.5 s）より十分短く終わること。固まる経路は数秒〜数十秒かかる。
+        Assert.True(sw.ElapsedMilliseconds < 1500, $"took {sw.ElapsedMilliseconds}ms");
+    }
+
+    [Fact]
     public void Provider_ShuttleDoesNotSkipSilence()
     {
         var samples = new float[200];
