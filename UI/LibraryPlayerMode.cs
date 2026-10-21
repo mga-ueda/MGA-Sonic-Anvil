@@ -510,6 +510,10 @@ internal static class LibraryPlayerMode
     public static bool IsExplorerRootReorder(Key key, ModifierKeys modifiers) =>
         key is Key.Up or Key.Down && modifiers == ModifierKeys.Alt;
 
+    /// <summary>プレイリストを1行スクロール。Alt+↑／↓。ツリーではルート並び替え。</summary>
+    public static bool IsPlaylistScroll(Key key, ModifierKeys modifiers) =>
+        key is Key.Up or Key.Down && modifiers == ModifierKeys.Alt;
+
     /// <summary>
     /// フォルダツリーで拒否するキー（切り取り／貼り付け／削除／リネーム等）。コピーとナビと Enter 以外はここで止める。
     /// </summary>
