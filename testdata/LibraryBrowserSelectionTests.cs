@@ -1991,6 +1991,88 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void Playlist_CheckSelectMode_SpaceTogglesAndRangeChecks()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.mp3");
+            var second = Session("02 b.mp3");
+            var third = Session("03 c.mp3");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions([first, second, third], first, [first]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            Assert.False(view.CheckSelectMode);
+            view.ToggleCheckSelectMode();
+            Flush();
+            Assert.True(view.CheckSelectMode);
+
+            // Space でカーソル行をチェック。操作対象（SelectedSessions）はチェック行。
+            view.ApplyPlaylistSpaceCheck();
+            Flush();
+            Assert.Equal([first], view.SelectedSessions);
+
+            // もう一度 Space でチェックを外す（トグル）。
+            view.ApplyPlaylistSpaceCheck();
+            Flush();
+            Assert.Empty(view.SelectedSessions);
+
+            view.ApplyPlaylistSpaceCheck();
+            Flush();
+            Assert.Equal([first], view.SelectedSessions);
+
+            // Shift 範囲で 1〜3 を選び、Space ですべてチェック。
+            view.MoveSelection(2, extend: true);
+            Flush();
+            view.ApplyPlaylistSpaceCheck();
+            Flush();
+            Assert.Equal(3, view.SelectedSessions.Length);
+
+            // 範囲がすべてチェック済みのとき Space でまとめて外す。
+            view.ApplyPlaylistSpaceCheck();
+            Flush();
+            Assert.Empty(view.SelectedSessions);
+
+            view.ApplyPlaylistSpaceCheck();
+            Flush();
+            Assert.Equal(3, view.SelectedSessions.Length);
+            Assert.Contains(first, view.SelectedSessions);
+            Assert.Contains(second, view.SelectedSessions);
+            Assert.Contains(third, view.SelectedSessions);
+
+            // モードを切るとチェックは忘れ、チェック行は選択として残る。
+            view.ToggleCheckSelectMode();
+            Flush();
+            Assert.False(view.CheckSelectMode);
+            Assert.Equal(3, view.SelectedSessions.Length);
+            Assert.Contains(first, view.SelectedSessions);
+            Assert.Contains(second, view.SelectedSessions);
+            Assert.Contains(third, view.SelectedSessions);
+
+            // オンに戻すとチェックは空（操作対象も空）。選択のシアンは残るがチェックモード対象外。
+            view.ToggleCheckSelectMode();
+            Flush();
+            Assert.True(view.CheckSelectMode);
+            Assert.Empty(view.SelectedSessions);
+
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void NextPlaylistSession_WrapsToFirst()
     {
         RunSta(() =>

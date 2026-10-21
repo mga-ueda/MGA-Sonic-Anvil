@@ -147,6 +147,11 @@ internal sealed class LibraryBrowserView : UserControl
     private readonly HashSet<TreeViewItem> _treeMultiSelected = [];
     private readonly HashSet<string> _cutPaths = new(StringComparer.OrdinalIgnoreCase);
     private TreeViewItem? _treeSelectionAnchor;
+    private TreeViewItem? _explorerCaret;
+    private LibraryFileRow? _playlistCaretRow;
+    /// <summary>F4。プレイリストのみ。オンのとき行頭にチェックボックスを出し、操作対象はチェック行。ツリーには出さない。</summary>
+    private bool _checkSelectMode;
+    private DataGridTemplateColumn? _checkColumn;
     private string[] _explorerRoots = LibraryExplorerPaths.ResolveRoots(null);
     private readonly HashSet<string> _explorerExpanded = new(StringComparer.OrdinalIgnoreCase);
     private bool _treeExpansionBusy;
@@ -794,10 +799,19 @@ internal sealed class LibraryBrowserView : UserControl
     public DocumentSession? SelectedSession =>
         _grid.SelectedItem is LibraryFileRow { Tag: DocumentSession session } ? session : null;
 
+    /// <summary>F4 チェック選択モード。初期はオフ（再起動で戻る）。</summary>
+    public bool CheckSelectMode => _checkSelectMode;
+
     public DocumentSession[] SelectedSessions
     {
         get
         {
+            // チェックモード中は右クリック／一括操作の対象をチェック行にする。
+            if (_checkSelectMode)
+            {
+                return CheckedPlaylistSessions();
+            }
+
             if (_grid.SelectedItems.Count == 0)
             {
                 return [];
@@ -813,6 +827,147 @@ internal sealed class LibraryBrowserView : UserControl
             }
 
             return [.. result];
+        }
+    }
+
+    /// <summary>チェック選択モードのトグル（F4）。</summary>
+    public void ToggleCheckSelectMode()
+    {
+        SetCheckSelectMode(!_checkSelectMode);
+    }
+
+    public void SetCheckSelectMode(bool on)
+    {
+        if (_checkSelectMode == on)
+        {
+            return;
+        }
+
+        _checkSelectMode = on;
+        if (_checkColumn is not null)
+        {
+            _checkColumn.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        if (!on)
+        {
+            // チェック行を選択として残してから、チェック状態は忘れる。
+            // オンに戻したときは空のチェックから始まる。ツリーは対象外。
+            ApplyPlaylistSelectionFromChecks();
+            ClearAllPlaylistChecks();
+        }
+    }
+
+    /// <summary>チェック済みプレイリスト行を DataGrid 選択へ載せる（F4 オフ時）。</summary>
+    private void ApplyPlaylistSelectionFromChecks()
+    {
+        var checkedRows = new List<LibraryFileRow>();
+        foreach (var row in PlaylistRows())
+        {
+            if (row.IsChecked)
+            {
+                checkedRows.Add(row);
+            }
+        }
+
+        if (checkedRows.Count == 0)
+        {
+            return;
+        }
+
+        _syncing = true;
+        SuspendPlaylistSelectionNotify();
+        try
+        {
+            _grid.SelectedItems.Clear();
+            foreach (var row in checkedRows)
+            {
+                _grid.SelectedItems.Add(row);
+            }
+
+            _playlistCaretRow = checkedRows[^1];
+            _anchorIndex = _grid.Items.IndexOf(checkedRows[^1]);
+            PinSelectionCurrent();
+        }
+        finally
+        {
+            _syncing = false;
+            ResumePlaylistSelectionNotify();
+        }
+    }
+
+    /// <summary>
+    /// Space。複数選択中ならその範囲をすべてチェック、単一ならカーソル行をトグル。
+    /// プレイリスト専用（ツリーでは呼ばない）。
+    /// </summary>
+    public void ApplyPlaylistSpaceCheck()
+    {
+        if (!_checkSelectMode)
+        {
+            return;
+        }
+
+        if (_grid.SelectedItems.Count > 1)
+        {
+            // 範囲がすべてチェック済みなら外す。そうでなければすべて入れる。
+            var allChecked = true;
+            foreach (var selected in _grid.SelectedItems)
+            {
+                if (selected is LibraryFileRow row && !row.IsChecked)
+                {
+                    allChecked = false;
+                    break;
+                }
+            }
+
+            var next = !allChecked;
+            foreach (var selected in _grid.SelectedItems)
+            {
+                if (selected is LibraryFileRow selectedRow)
+                {
+                    selectedRow.IsChecked = next;
+                }
+            }
+
+            return;
+        }
+
+        // 単一／カーソル行はトグル（チェック済みなら外す）。
+        var caret = ResolvePlaylistCaretRow();
+        if (caret is null)
+        {
+            return;
+        }
+
+        caret.IsChecked = !caret.IsChecked;
+        _playlistCaretRow = caret;
+        if (!ReferenceEquals(_grid.CurrentItem, caret))
+        {
+            _grid.CurrentItem = caret;
+        }
+
+        EnsureRowVisible(caret);
+    }
+
+    private DocumentSession[] CheckedPlaylistSessions()
+    {
+        var result = new List<DocumentSession>();
+        foreach (var row in PlaylistRows())
+        {
+            if (row.IsChecked && row.Tag is DocumentSession session)
+            {
+                result.Add(session);
+            }
+        }
+
+        return [.. result];
+    }
+
+    private void ClearAllPlaylistChecks()
+    {
+        foreach (var row in _items)
+        {
+            row.IsChecked = false;
         }
     }
 
@@ -2389,7 +2544,8 @@ internal sealed class LibraryBrowserView : UserControl
         _transferToastText.FontSize = DesignMetrics.From96(22);
         _transferToastText.FontWeight = FontWeights.Normal;
         _transferToastText.TextWrapping = TextWrapping.NoWrap;
-        _transferToastText.TextAlignment = TextAlignment.Center;
+        // コピー／切り取り等のファイル一覧は左寄せ（他トーストは別 TextBlock）。
+        _transferToastText.TextAlignment = TextAlignment.Left;
         _transferToastText.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
         _transferToastPlate.HorizontalAlignment = HorizontalAlignment.Center;
         _transferToastPlate.VerticalAlignment = VerticalAlignment.Center;
@@ -2773,10 +2929,12 @@ internal sealed class LibraryBrowserView : UserControl
             if (!extend)
             {
                 _anchorIndex = index;
+                _playlistCaretRow = row;
                 _grid.SelectedItem = row;
             }
             else
             {
+                _playlistCaretRow = row;
                 SelectPlaylistFileRange(_anchorIndex, index);
             }
 
@@ -2792,6 +2950,128 @@ internal sealed class LibraryBrowserView : UserControl
 
         EnsureListFocused();
         EnsureRowVisible(row);
+    }
+
+    /// <summary>
+    /// 選択を変えずにキャレットだけ上下する（Ctrl+Shift+↑↓）。
+    /// 続けて Shift+Space で Ctrl+クリックと同じ飛び飛び選択ができる。
+    /// </summary>
+    public void MovePlaylistCaret(int delta, bool wrap = true)
+    {
+        if (delta == 0)
+        {
+            return;
+        }
+
+        var count = CountPlaylistFiles();
+        if (count <= 0)
+        {
+            return;
+        }
+
+        var index = PlaylistFileIndexOfCaret();
+        if (index < 0)
+        {
+            index = delta > 0 ? 0 : count - 1;
+        }
+        else
+        {
+            index = LibraryPlayerMode.StepLoopIndex(count, index, delta, wrap);
+        }
+
+        if (index < 0)
+        {
+            return;
+        }
+
+        var row = PlaylistFileAt(index);
+        if (row is null)
+        {
+            return;
+        }
+
+        _playlistCaretRow = row;
+        _syncing = true;
+        try
+        {
+            if (!ReferenceEquals(_grid.CurrentItem, row))
+            {
+                _grid.CurrentItem = row;
+            }
+        }
+        finally
+        {
+            _syncing = false;
+        }
+
+        EnsureListFocused();
+        EnsureRowVisible(row);
+    }
+
+    /// <summary>キャレット行を Ctrl+クリックと同じく選択へ足す／外す（Shift+Space）。</summary>
+    public void ToggleCurrentPlaylistRow()
+    {
+        var row = ResolvePlaylistCaretRow();
+        if (row is null || row.Tag is not DocumentSession)
+        {
+            return;
+        }
+
+        var gridIndex = _grid.Items.IndexOf(row);
+        if (gridIndex < 0)
+        {
+            return;
+        }
+
+        _playlistCaretRow = row;
+        ApplyPlaylistModifierClick(gridIndex, shift: false, control: true);
+        // EnsureListFocused→PinSelectionCurrent は呼ばない。
+        // 未選択キャレットへ CollectionView.MoveCurrentTo するとシアンが1行目へ飛ぶ。
+        EnsureRowVisible(row);
+    }
+
+    private LibraryFileRow? ResolvePlaylistCaretRow()
+    {
+        if (_playlistCaretRow is not null
+            && _playlistCaretRow.Tag is DocumentSession
+            && _grid.Items.Contains(_playlistCaretRow))
+        {
+            return _playlistCaretRow;
+        }
+
+        if (_grid.CurrentItem is LibraryFileRow { Tag: DocumentSession } current)
+        {
+            return current;
+        }
+
+        return _grid.SelectedItem as LibraryFileRow;
+    }
+
+    private int PlaylistFileIndexOfCaret()
+    {
+        var caret = ResolvePlaylistCaretRow();
+        if (caret is null)
+        {
+            return PlaylistFileIndexOfSelected();
+        }
+
+        var index = 0;
+        foreach (var row in PlaylistRows())
+        {
+            if (row.Tag is not DocumentSession)
+            {
+                continue;
+            }
+
+            if (ReferenceEquals(row, caret))
+            {
+                return index;
+            }
+
+            index++;
+        }
+
+        return PlaylistFileIndexOfSelected();
     }
 
     private void SelectPlaylistFileRange(int from, int to)
@@ -3819,23 +4099,33 @@ internal sealed class LibraryBrowserView : UserControl
     }
 
     /// <summary>
-    /// DataGrid / CollectionView の CurrentItem を選択行へ揃える。
-    /// 未選択なら外す。再生追従や強制復帰はしない。
+    /// DataGrid の CurrentItem はキャレット（なければ選択行）へ揃える。
+    /// CollectionView の currency は<strong>選択行だけ</strong>に載せる。
+    /// 未選択キャレットへ MoveCurrentTo すると WPF が IsSelected を先頭へ寄せ、
+    /// シアンが1行目へ飛ぶ（Ctrl+Shift+↑↓ → Shift+Space の飛び飛び選択で再現していた）。
     /// </summary>
     private void PinSelectionCurrent()
     {
-        if (_grid.SelectedItem is { } item)
+        var caret = ResolvePlaylistCaretRow();
+        var selected = _grid.SelectedItem;
+        var gridCurrent = caret ?? selected;
+        if (gridCurrent is not null && !ReferenceEquals(_grid.CurrentItem, gridCurrent))
         {
-            if (!ReferenceEquals(_grid.CurrentItem, item))
-            {
-                _grid.CurrentItem = item;
-            }
-
-            PinCollectionViewCurrent(item);
-            return;
+            _grid.CurrentItem = gridCurrent;
         }
 
-        PinCollectionViewCurrent(null);
+        // CollectionView は選択中の行のみ。キャレットが未選択なら SelectedItem へ。
+        object? currency = null;
+        if (caret is not null && _grid.SelectedItems.Contains(caret))
+        {
+            currency = caret;
+        }
+        else if (selected is not null)
+        {
+            currency = selected;
+        }
+
+        PinCollectionViewCurrent(currency);
     }
 
     /// <summary>
@@ -6432,7 +6722,8 @@ internal sealed class LibraryBrowserView : UserControl
         ClearTreeDrag();
         if (e.OriginalSource is not DependencyObject origin
             || FindTreeViewItem(origin) is not { Tag: string } item
-            || FindTreeExpandToggle(origin) is not null)
+            || FindTreeExpandToggle(origin) is not null
+            || FindAncestor<CheckBox>(origin) is not null)
         {
             return;
         }
@@ -6586,6 +6877,68 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         ApplyTreeMultiSelectChrome();
+    }
+
+    /// <summary>今の行を Ctrl+クリックと同じく選択へ足す／外す（Ctrl+Shift+Space）。</summary>
+    internal void ToggleCurrentExplorerRow()
+    {
+        var item = _explorerCaret ?? CurrentExplorerItem();
+        if (item is null)
+        {
+            return;
+        }
+
+        _explorerCaret = item;
+        ToggleTreeMultiSelect(item);
+        if (_treeMultiSelected.Contains(item))
+        {
+            item.IsSelected = true;
+            _treeSelectionAnchor = item;
+        }
+        else if (_treeMultiSelected.Count > 0)
+        {
+            foreach (var marked in _treeMultiSelected)
+            {
+                if (marked.Tag is string)
+                {
+                    marked.IsSelected = true;
+                    break;
+                }
+            }
+        }
+
+        item.BringIntoView();
+        item.Focus();
+    }
+
+    /// <summary>選択を変えずにキャレットだけ上下する（Ctrl+Shift+↑↓）。</summary>
+    internal void MoveExplorerCaret(int delta)
+    {
+        if (delta == 0)
+        {
+            return;
+        }
+
+        var items = VisibleExplorerItems();
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        var caret = _explorerCaret ?? CurrentExplorerItem();
+        var index = caret is null ? -1 : items.IndexOf(caret);
+        if (index < 0)
+        {
+            index = delta > 0 ? 0 : items.Count - 1;
+        }
+        else
+        {
+            index = Math.Clamp(index + delta, 0, items.Count - 1);
+        }
+
+        _explorerCaret = items[index];
+        _explorerCaret.BringIntoView();
+        _explorerCaret.Focus();
     }
 
     private void ClearTreeMultiSelect()
@@ -6932,6 +7285,7 @@ internal sealed class LibraryBrowserView : UserControl
             if (!extend)
             {
                 _treeSelectionAnchor = current;
+                _explorerCaret = current;
                 ClearTreeMultiSelect();
                 _treeMultiSelected.Add(current);
                 ApplyTreeMultiSelectChrome();
@@ -6942,6 +7296,7 @@ internal sealed class LibraryBrowserView : UserControl
             }
 
             _treeSelectionAnchor ??= caret ?? current;
+            _explorerCaret = current;
             SelectExplorerVisibleRange(_treeSelectionAnchor, current);
             current.IsSelected = true;
             current.BringIntoView();
@@ -7181,6 +7536,7 @@ internal sealed class LibraryBrowserView : UserControl
     private void ConfigureGrid()
     {
         AddGroupSpacerColumn();
+        AddCheckColumn();
         AddNameColumn();
         AddColumn(LibraryFileColumn.Title, nameof(LibraryFileRow.Title));
         AddColumn(LibraryFileColumn.Album, nameof(LibraryFileRow.Album));
@@ -7940,6 +8296,11 @@ internal sealed class LibraryBrowserView : UserControl
                 ordered.Add(_groupSpacer);
             }
 
+            if (_checkColumn is not null)
+            {
+                ordered.Add(_checkColumn);
+            }
+
             var seen = new HashSet<LibraryFileColumn>();
             foreach (var column in visible)
             {
@@ -8081,6 +8442,34 @@ internal sealed class LibraryBrowserView : UserControl
         };
         ApplyGroupSpacerCellStyle();
         _grid.Columns.Add(_groupSpacer);
+    }
+
+    private void AddCheckColumn()
+    {
+        var box = new FrameworkElementFactory(typeof(CheckBox));
+        box.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        box.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        box.SetValue(UIElement.FocusableProperty, false);
+        box.SetValue(FrameworkElement.StyleProperty, new DynamicResourceExtension("DarkCheckBoxStyle"));
+        box.SetBinding(
+            ToggleButton.IsCheckedProperty,
+            new Binding(nameof(LibraryFileRow.IsChecked)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
+        var cell = new DataTemplate(typeof(LibraryFileRow)) { VisualTree = box };
+        _checkColumn = new DataGridTemplateColumn
+        {
+            Header = string.Empty,
+            CellTemplate = cell,
+            Width = new DataGridLength(28),
+            MinWidth = 28,
+            MaxWidth = 28,
+            IsReadOnly = false,
+            CanUserSort = false,
+            CanUserResize = false,
+            CanUserReorder = false,
+            Visibility = Visibility.Collapsed,
+        };
+        _checkColumn.CellStyle = CreatePlaylistCellStyle();
+        _grid.Columns.Add(_checkColumn);
     }
 
     private void ApplyGroupSpacerCellStyle()
@@ -9025,6 +9414,13 @@ internal sealed class LibraryBrowserView : UserControl
 
     private void Grid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        // マウスや通常キーの選択にキャレットを追従。
+        // Ctrl+Shift+↑↓／Shift+Space 中は _syncing なので上書きしない。
+        if (!_syncing && _grid.SelectedItem is LibraryFileRow selected)
+        {
+            _playlistCaretRow = selected;
+        }
+
         NotePlaylistSelectionChanged();
         if (_syncing || _deferActivate || SelectedSession is not { } session)
         {
@@ -9079,6 +9475,12 @@ internal sealed class LibraryBrowserView : UserControl
             ReleasePlaylistMouseCapture();
             _suppressPlaylistPlainPressComplete = true;
             e.Handled = true;
+            return;
+        }
+
+        // チェックボックスは選択ハンドラに吸わせず、そのままトグルさせる。
+        if (FindAncestor<CheckBox>(origin) is not null)
+        {
             return;
         }
 
@@ -9318,7 +9720,14 @@ internal sealed class LibraryBrowserView : UserControl
             }
 
             _anchorIndex = index;
-            if (_grid.SelectedItems.Contains(item))
+            if (item is LibraryFileRow fileRow)
+            {
+                _playlistCaretRow = fileRow;
+            }
+
+            // DataGrid の CurrentItem だけキャレットへ。CollectionView.MoveCurrentTo はしない
+            // （未選択行へ載せるとシアンが1行目へ飛ぶ）。
+            if (!ReferenceEquals(_grid.CurrentItem, item))
             {
                 _grid.CurrentItem = item;
             }
