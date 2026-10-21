@@ -121,6 +121,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private bool _paused;
     private bool _silentSkip;
     private float _silentSkipLinear = SilentSkip.LinearFromDb(SilentSkip.DefaultThresholdDb);
+    /// <summary>
+    /// ループ区間に可聴が無く飛ばす先が無いとき true。
+    /// UI の Silent Skip は触らず、この Bind 中だけ走査を止める（全文再走査で固まらないようにする）。
+    /// </summary>
+    private bool _silentSkipIdleLoop;
     /// <summary>再生ヘッドの進行倍率。1 / <see cref="FastSpeed"/> / -<see cref="FastSpeed"/>。</summary>
     private double _playbackSpeed = 1;
     private int _playbackSemitones;
@@ -463,6 +468,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _cursor = checked((int)start * _channels);
             _frameGain = frameGain;
             _silenceOnly = false;
+            _silentSkipIdleLoop = false;
             _flushFadeRemaining = 0;
             _flushFadeTotal = 0;
             ClearSeekFadeNoLock();
@@ -533,6 +539,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             InvalidateStreamRecentNoLock();
             _frameGain = frameGain;
             _silenceOnly = false;
+            _silentSkipIdleLoop = false;
             _flushFadeRemaining = 0;
             _flushFadeTotal = 0;
             ClearSeekFadeNoLock();
@@ -1245,6 +1252,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         {
             _silentSkip = enabled;
             _silentSkipLinear = SilentSkip.LinearFromDb(thresholdDb);
+            // しきい値やオン／オフが変わったら、全域無音判定をやり直す。
+            _silentSkipIdleLoop = false;
         }
     }
 
@@ -2970,10 +2979,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 break;
             }
 
+            var skipArmed = SilentSkipArmedNoLock();
             for (var i = 0; i < frames; i++)
             {
                 if (i > 0
-                    && _silentSkip
+                    && skipArmed
                     && SilentSkip.IsFrameSilent(
                         _samples,
                         srcCh,
@@ -3204,7 +3214,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     /// <returns>カーソルを動かした（続きの判定が必要）。</returns>
     private bool TrySkipSilenceNoLock(int srcCh, long start)
     {
-        if (!_silentSkip || _usedSamples <= 0 || UsesShuttleRead() || _playbackSpeed < 0)
+        if (!SilentSkipArmedNoLock() || _usedSamples <= 0 || UsesShuttleRead() || _playbackSpeed < 0)
         {
             return false;
         }
@@ -3252,6 +3262,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 return true;
             }
 
+            // ループ全域が無音。return false のまま毎回走査すると固まるので、この再生では休止する。
+            _silentSkipIdleLoop = true;
             return false;
         }
 
@@ -3259,6 +3271,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         Ended = true;
         return true;
     }
+
+    private bool SilentSkipArmedNoLock() => _silentSkip && !_silentSkipIdleLoop;
 
     private void ApplySilentSkipJump(long frame, int srcCh, bool wrapped)
     {
