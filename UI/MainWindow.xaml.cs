@@ -434,6 +434,7 @@ public partial class MainWindow : Window
         VideoLaunchAspectResize.Attach(this, TryGetVideoLaunchAspectConstraints);
         Closed += (_, _) =>
         {
+            ActivationClassBeacon.Stop();
             EditHistory.CommandApplying -= ResetPlaybackPitchForEdit;
             StopMeterRendering();
             _meterReleaseTimer?.Stop();
@@ -467,6 +468,7 @@ public partial class MainWindow : Window
         }
         MgaSonicAnvil.SingleInstance.StartWatch(() =>
             Dispatcher.BeginInvoke(ActivateFromOtherInstance, DispatcherPriority.Send));
+        ActivationClassBeacon.Start(this);
     }
 
     private void ActivateFromOtherInstance()
