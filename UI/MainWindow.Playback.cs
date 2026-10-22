@@ -1159,11 +1159,17 @@ public partial class MainWindow
     /// <summary>ホバー／プレビュー用。本再生の _playTimer とは別にし、Space の再生判定を汚さない。</summary>
     private void OnVisualPlayheadTick()
     {
-        if (IsLibraryVideoPlayheadClock() && !_player.IsScrubbing && !Waveform.IsScrubbing)
+        if (IsLibraryVideoPlayheadClock() && !IsPlaybackVisualSyncBlocked())
         {
             SyncPlaybackVisuals();
         }
     }
+
+    /// <summary>波形／簡易シークのドラッグ中は映像クロック同期で位置を上書きしない。</summary>
+    private bool IsPlaybackVisualSyncBlocked() =>
+        _player.IsScrubbing
+        || Waveform.IsScrubbing
+        || PlaylistVideoSimpleSeek.IsDragging;
 
     /// <summary>音声が出ていなくても、映像クロックでシークバーを動かす（本再生判定には使わない）。</summary>
     private void EnsureLibraryVisualPlayheadTicker()
@@ -1317,15 +1323,8 @@ public partial class MainWindow
 
         // 再生ヘッドだけ vsync 側。スペアナ／ゴニオは Render より低い優先度へ回し、
         // マウスとキー（Input）が描画の後ろに並ばないようにする。
-        if (_playTimer.IsEnabled && !_player.IsScrubbing)
-        {
-            SyncPlaybackVisuals();
-        }
-        else if (IsLibraryVideoPlayheadClock() && !_player.IsScrubbing)
-        {
-            SyncPlaybackVisuals();
-        }
-        else if (videoShuttle && !_player.IsScrubbing)
+        if (!IsPlaybackVisualSyncBlocked()
+            && (_playTimer.IsEnabled || IsLibraryVideoPlayheadClock() || videoShuttle))
         {
             SyncPlaybackVisuals();
         }
@@ -1512,7 +1511,12 @@ public partial class MainWindow
         StopPlaybackShuttle();
         StopSeekNudge();
         StopVideoFrameStep();
-        _resumeAfterScrub = _player.IsPlaying && !_player.IsScrubbing;
+        // 無音動画は音声が止まっていても映像だけ再生中であることがある。
+        _resumeAfterScrub = (_player.IsPlaying
+                || (IsLibraryMaximized
+                    && LibraryPlaylistDocuments.IsVideo(_document)
+                    && LibraryBrowser.PlaylistVisualPlaying))
+            && !_player.IsScrubbing;
         if (_fadePreview.Previewing)
         {
             _fadePreview.Previewing = false;
@@ -1546,6 +1550,12 @@ public partial class MainWindow
         {
             _player.BeginScrub(_document, frame);
             _playbackGeneration = _player.Generation;
+            if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVideo(_document))
+            {
+                // 再生中の通常 Seek 連打を避け、スクラブ用の軽量シークへ切り替える。
+                RequestPlaylistVideoScrub(frame, force: true);
+            }
+
             StartMeterRendering();
             Transport.SetPlaying(true);
             SyncTransportPosition(frame);
@@ -1553,6 +1563,7 @@ public partial class MainWindow
         catch (Exception ex)
         {
             _resumeAfterScrub = false;
+            CancelPlaylistVideoScrub();
             PausePlaybackSoft();
             if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVideo(_document))
             {
@@ -1572,6 +1583,11 @@ public partial class MainWindow
 
         _document.CursorFrame = frame;
         _player.CaptureScrub(_document, frame);
+        if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVideo(_document))
+        {
+            RequestPlaylistVideoScrub(frame);
+        }
+
         SyncOverviewPlayhead();
         SyncTransportPosition(frame);
         RefreshStatus();
@@ -1586,6 +1602,7 @@ public partial class MainWindow
 
         var resume = commit && _resumeAfterScrub;
         _resumeAfterScrub = false;
+        FlushPlaylistVideoScrub();
         if (_player.IsScrubbing)
         {
             _player.EndScrub();

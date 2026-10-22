@@ -686,6 +686,52 @@ internal sealed class LibraryVisualStage : Grid
         _media.Opacity = 1;
     }
 
+    /// <summary>
+    /// スクラブ用シーク。再生中なら一度だけ止め、あとは Position だけ更新する。
+    /// 通常の Seek は再生中に Play＋クロック再始動、フレーム停止中は Play→Pause を毎回やるため、
+    /// ドラッグ連打だとデコードが積み上がって離したあとに追いつく。
+    /// </summary>
+    public void ScrubTo(TimeSpan position)
+    {
+        if (!_video || !IsShown)
+        {
+            return;
+        }
+
+        if (position < TimeSpan.Zero)
+        {
+            position = TimeSpan.Zero;
+        }
+
+        var duration = _media.NaturalDuration.HasTimeSpan
+            ? _media.NaturalDuration.TimeSpan
+            : TimeSpan.MaxValue;
+        if (position > duration)
+        {
+            position = duration;
+        }
+
+        CancelPreviewSeek();
+        CancelPreviewSpeedRamp();
+        if (_playing)
+        {
+            PauseMedia();
+            _playing = false;
+            _framePaused = true;
+            ApplyVideoDim(instant: true, playing: true);
+            SyncPreviewFx(active: false, instant: true);
+            _media.BeginAnimation(OpacityProperty, null);
+            _media.Opacity = 1;
+        }
+        else
+        {
+            _framePaused = true;
+        }
+
+        SetMediaPosition(position);
+        StopVisualClock(position);
+    }
+
     private void ApplyVideoDim(bool instant, bool playing = false)
     {
         FadeDimOpacity(playing ? 0 : StoppedDimOpacity, instant, playing ? LibraryPlayerMode.ChromeFadeSeconds : PreviewDimFadeSeconds);

@@ -1106,6 +1106,9 @@ internal sealed class LibraryBrowserView : UserControl
 
     public void SeekPlaylistVisual(TimeSpan position) => _visualStage.Seek(position);
 
+    /// <summary>ドラッグスクラブ用。再生中シークの蓄積を避ける。</summary>
+    public void ScrubPlaylistVisual(TimeSpan position) => _visualStage.ScrubTo(position);
+
     public void SetPlaylistVisualSpeed(double ratio) => _visualStage.SetSpeedRatio(ratio);
 
     public bool TryStepPlaylistPdfPage(int delta) => _visualStage.TryStepPdfPage(delta);

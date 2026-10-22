@@ -1063,6 +1063,12 @@ internal static class LibraryPlayerMode
     public const double VideoShuttleSeekSeconds = 1.0 / 60;
 
     /// <summary>
+    /// 動画スクラブ中に MediaElement.Position へ渡す最短間隔。
+    /// これより短い連打は最新位置へ畳む（再生中シークの蓄積を防ぐ）。
+    /// </summary>
+    public const int VideoScrubSeekMinIntervalMs = 50;
+
+    /// <summary>
     /// 本再生中に早送り・巻き戻しで映像クロックを止めているときは、Position スクラブだけにする。
     /// （Play し直すと 1 倍に戻り、音声 3 倍と食い違う。1/3 速プレビューは _playing が false。）
     /// </summary>

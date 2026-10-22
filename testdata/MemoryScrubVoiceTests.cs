@@ -34,6 +34,26 @@ public sealed class MemoryScrubVoiceTests
     }
 
     [Fact]
+    public void CaptureInterleaved_EmitsCopiedGrain()
+    {
+        var rate = 48000;
+        var frames = Math.Max(64, (int)Math.Round(MemoryScrubVoice.GrainSeconds * rate));
+        var interleaved = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            interleaved[i * 2] = 0.5f;
+            interleaved[i * 2 + 1] = -0.5f;
+        }
+
+        var voice = new MemoryScrubVoice();
+        voice.CaptureInterleaved(interleaved, channels: 2, sampleRate: rate, frameCount: frames, timelineFrame: 24000);
+        Array.Clear(interleaved); // 呼び出し元バッファを潰してもグレインは残る
+        var dest = new float[2048];
+        voice.Read(dest, 0, 1024, 1f);
+        Assert.Contains(dest, sample => Math.Abs(sample) > 0.05f);
+    }
+
+    [Fact]
     public void HoldThenRelease_FadesWhenCaptureStops()
     {
         var document = MakeSine(frames: 48000, rate: 48000);

@@ -1176,6 +1176,8 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(1, LibraryPlayerMode.VideoClockSeekSeconds);
         Assert.True(LibraryPlayerMode.VideoShuttleSeekSeconds > 0);
         Assert.True(LibraryPlayerMode.VideoShuttleSeekSeconds < LibraryPlayerMode.VideoClockSeekSeconds);
+        Assert.True(LibraryPlayerMode.VideoScrubSeekMinIntervalMs >= 30);
+        Assert.True(LibraryPlayerMode.VideoScrubSeekMinIntervalMs <= 100);
         Assert.True(LibraryPlayerMode.VideoSeekIsShuttleScrub(playing: true, visualClockRunning: false));
         Assert.False(LibraryPlayerMode.VideoSeekIsShuttleScrub(playing: true, visualClockRunning: true));
         Assert.False(LibraryPlayerMode.VideoSeekIsShuttleScrub(playing: false, visualClockRunning: false));
