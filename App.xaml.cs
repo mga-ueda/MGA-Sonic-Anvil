@@ -22,6 +22,12 @@ public partial class App : Application
         base.OnStartup(e);
     }
 
+    protected override void OnExit(ExitEventArgs e)
+    {
+        ActivationClassBeacon.Stop();
+        base.OnExit(e);
+    }
+
     /// <summary>
     /// 右クリックメニューをプレイヤーのプルダウンと同じ透かしにする。
     /// ポップアップが不透明だと背面合成が黒になり、暗い半透明塗りが濁る。
