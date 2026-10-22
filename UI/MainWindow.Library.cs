@@ -1050,6 +1050,7 @@ public partial class MainWindow
     private bool _playlistVideoSimpleSeekWasArmed;
     private long _playlistVideoSimpleSeekKeyboardUntil;
     private DispatcherTimer? _playlistVideoSimpleSeekKeyboardTimer;
+    private DispatcherTimer? _playlistVideoSimpleSeekHitTestOffTimer;
 
     private void ApplyPlaylistVideoSimpleSeekFade(bool show, bool instant)
     {
@@ -1098,12 +1099,19 @@ public partial class MainWindow
     {
         if (_playlistVideoSimpleSeekWantVisible == visible && !instant)
         {
+            // 表示意図が同じでも、フェードアウト開始時に落としたヒットが戻らないことがある。
+            if (PlaylistVideoSimpleSeek.IsHitTestVisible != visible)
+            {
+                PlaylistVideoSimpleSeek.IsHitTestVisible = visible;
+            }
+
             return;
         }
 
         _playlistVideoSimpleSeekWantVisible = visible;
         if (visible)
         {
+            _playlistVideoSimpleSeekHitTestOffTimer?.Stop();
             SyncPlaylistVideoSimpleSeekRatio();
         }
 
@@ -1111,10 +1119,46 @@ public partial class MainWindow
             PlaylistVideoSimpleSeek,
             visible ? 1 : 0,
             instant,
-            hitTestVisible: visible,
+            // フェードアウト中もドラッグできるように、消えるまでヒットを残す。
+            hitTestVisible: visible || instant ? visible : null,
             seconds: visible
                 ? LibraryPlayerMode.ChromeFadeSeconds
                 : LibraryPlayerMode.PlaylistVideoSimpleSeekFadeOutSeconds);
+        if (!visible && !instant)
+        {
+            SchedulePlaylistVideoSimpleSeekHitTestOff();
+        }
+        else if (!visible)
+        {
+            _playlistVideoSimpleSeekHitTestOffTimer?.Stop();
+        }
+    }
+
+    private void SchedulePlaylistVideoSimpleSeekHitTestOff()
+    {
+        if (_playlistVideoSimpleSeekWantVisible)
+        {
+            return;
+        }
+
+        _playlistVideoSimpleSeekHitTestOffTimer ??= new DispatcherTimer();
+        _playlistVideoSimpleSeekHitTestOffTimer.Stop();
+        _playlistVideoSimpleSeekHitTestOffTimer.Interval = TimeSpan.FromSeconds(
+            LibraryPlayerMode.PlaylistVideoSimpleSeekFadeOutSeconds);
+        _playlistVideoSimpleSeekHitTestOffTimer.Tick -= OnPlaylistVideoSimpleSeekHitTestOffTick;
+        _playlistVideoSimpleSeekHitTestOffTimer.Tick += OnPlaylistVideoSimpleSeekHitTestOffTick;
+        _playlistVideoSimpleSeekHitTestOffTimer.Start();
+    }
+
+    private void OnPlaylistVideoSimpleSeekHitTestOffTick(object? sender, EventArgs e)
+    {
+        _playlistVideoSimpleSeekHitTestOffTimer?.Stop();
+        if (_playlistVideoSimpleSeekWantVisible || PlaylistVideoSimpleSeek.IsDragging)
+        {
+            return;
+        }
+
+        PlaylistVideoSimpleSeek.IsHitTestVisible = false;
     }
 
     private void NotePlaylistVideoSimpleSeekKeyboard(bool instant = false)
@@ -1175,7 +1219,163 @@ public partial class MainWindow
             return;
         }
 
-        SeekFrame(LibraryPlayerMode.FrameAtSeekRatio(ratio, _document.FrameCount));
+        var frame = LibraryPlayerMode.FrameAtSeekRatio(ratio, _document.FrameCount);
+        if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVideo(_document))
+        {
+            // 再生中はセッションで止め、停止中も通常 Seek の Play→Pause 連打を避ける。
+            if (_player.IsPlaying || LibraryBrowser.PlaylistVisualPlaying || _simpleSeekScrubActive)
+            {
+                BeginSimpleSeekScrubSession(frame);
+                if (!_player.IsScrubbing)
+                {
+                    SeekFrame(frame);
+                    return;
+                }
+
+                _document.CursorFrame = frame;
+                Waveform.PlayheadFrame = frame;
+                _player.CaptureScrub(_document, frame);
+                RequestPlaylistVideoScrub(frame);
+                SyncOverviewPlayhead();
+                SyncTransportPosition(frame);
+                RefreshStatus();
+                return;
+            }
+
+            _document.CursorFrame = frame;
+            Waveform.PlayheadFrame = frame;
+            _player.Seek(frame);
+            RequestPlaylistVideoScrub(frame);
+            SyncOverviewPlayhead();
+            SyncTransportPosition(frame);
+            RefreshStatus();
+            return;
+        }
+
+        SeekFrame(frame);
+    }
+
+    private void BeginSimpleSeekScrubSession(long frame)
+    {
+        if (_simpleSeekScrubActive || _document is null)
+        {
+            return;
+        }
+
+        _simpleSeekScrubActive = true;
+        _resumeAfterSimpleSeek = _player.IsPlaying || LibraryBrowser.PlaylistVisualPlaying;
+        StopPlaybackShuttle();
+        StopSeekNudge();
+        StopVideoFrameStep();
+        _playTimer.Stop();
+        Waveform.SetTrailRecording(false);
+        try
+        {
+            // グレインスクラブへ切り替え（再生デコーダの Seek 連打を避ける）。
+            _player.BeginScrub(_document, frame);
+            _playbackGeneration = _player.Generation;
+            RequestPlaylistVideoScrub(frame, force: true);
+            StartMeterRendering();
+            Transport.SetPlaying(true);
+        }
+        catch
+        {
+            _resumeAfterSimpleSeek = false;
+            _simpleSeekScrubActive = false;
+            CancelPlaylistVideoScrub();
+        }
+    }
+
+    private void OnPlaylistVideoSimpleSeekInteractionEnded()
+    {
+        if (_simpleSeekScrubActive && _document is not null)
+        {
+            var frame = Waveform.PlayheadFrame;
+            var resume = _resumeAfterSimpleSeek;
+            _resumeAfterSimpleSeek = false;
+            _simpleSeekScrubActive = false;
+            FlushPlaylistVideoScrub();
+            if (_player.IsScrubbing)
+            {
+                _player.EndScrub();
+            }
+
+            if (resume)
+            {
+                StartPlayback(frame, prerollSeconds: 0);
+            }
+            else
+            {
+                PausePlaybackSoft();
+                SeekFrame(frame);
+            }
+        }
+        else
+        {
+            FlushPlaylistVideoScrub();
+        }
+
+        RefreshPlaylistVideoSimpleSeekPresence();
+    }
+
+    /// <summary>
+    /// 動画スクラブの Position 更新を間引く。UI ヘッドは呼び出し側が即時更新する。
+    /// </summary>
+    private void RequestPlaylistVideoScrub(long frame, bool force = false)
+    {
+        if (_document is null || !LibraryPlaylistDocuments.IsVideo(_document))
+        {
+            return;
+        }
+
+        _playlistVideoScrubFrame = frame;
+        var now = Environment.TickCount64;
+        if (force
+            || now - _playlistVideoScrubLastMs >= LibraryPlayerMode.VideoScrubSeekMinIntervalMs)
+        {
+            FlushPlaylistVideoScrub();
+            return;
+        }
+
+        _playlistVideoScrubTimer ??= new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(LibraryPlayerMode.VideoScrubSeekMinIntervalMs),
+        };
+        _playlistVideoScrubTimer.Tick -= OnPlaylistVideoScrubTimerTick;
+        _playlistVideoScrubTimer.Tick += OnPlaylistVideoScrubTimerTick;
+        if (!_playlistVideoScrubTimer.IsEnabled)
+        {
+            var remain = LibraryPlayerMode.VideoScrubSeekMinIntervalMs - (now - _playlistVideoScrubLastMs);
+            _playlistVideoScrubTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(1, remain));
+            _playlistVideoScrubTimer.Start();
+        }
+    }
+
+    private void OnPlaylistVideoScrubTimerTick(object? sender, EventArgs e)
+    {
+        _playlistVideoScrubTimer?.Stop();
+        FlushPlaylistVideoScrub();
+    }
+
+    private void FlushPlaylistVideoScrub()
+    {
+        _playlistVideoScrubTimer?.Stop();
+        if (_document is null || _playlistVideoScrubFrame < 0)
+        {
+            return;
+        }
+
+        var frame = _playlistVideoScrubFrame;
+        _playlistVideoScrubFrame = -1;
+        _playlistVideoScrubLastMs = Environment.TickCount64;
+        LibraryBrowser.ScrubPlaylistVisual(
+            TimeSpan.FromSeconds(frame / (double)Math.Max(1, _document.SampleRate)));
+    }
+
+    private void CancelPlaylistVideoScrub()
+    {
+        _playlistVideoScrubTimer?.Stop();
+        _playlistVideoScrubFrame = -1;
     }
 
     private void ApplyPlaylistVideoTimecodeFade(bool show, bool instant)

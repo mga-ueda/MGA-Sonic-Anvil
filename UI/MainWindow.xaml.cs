@@ -111,6 +111,11 @@ public partial class MainWindow : Window
     private readonly EffectPreviewState _pitchPreview = new();
     private readonly EffectPreviewState _timeStretchPreview = new();
     private bool _resumeAfterScrub;
+    private bool _simpleSeekScrubActive;
+    private bool _resumeAfterSimpleSeek;
+    private long _playlistVideoScrubFrame = -1;
+    private long _playlistVideoScrubLastMs;
+    private DispatcherTimer? _playlistVideoScrubTimer;
     private bool _closing;
     private bool _exitAfterFlush;
     private bool _bindingWorkspace;
@@ -410,7 +415,7 @@ public partial class MainWindow : Window
         Closing += MainWindow_Closing;
         Activated += (_, _) => SyncShellFullscreen();
         PreviewMouseMove += OnPlaylistVideoSimpleSeekPointerMove;
-        PlaylistVideoSimpleSeek.InteractionEnded += (_, _) => RefreshPlaylistVideoSimpleSeekPresence();
+        PlaylistVideoSimpleSeek.InteractionEnded += (_, _) => OnPlaylistVideoSimpleSeekInteractionEnded();
         SizeChanged += (_, _) =>
         {
             SyncBusyGlassOverlayBounds();

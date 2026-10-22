@@ -87,24 +87,63 @@ internal sealed class MemoryScrubVoice
                 return;
             }
 
-            var seconds = frame / (double)_sampleRate;
-            if (!double.IsNaN(_lastCaptureSeconds)
-                && Math.Abs(seconds - _lastCaptureSeconds) < MinMoveSeconds)
-            {
-                return;
-            }
-
-            _lastCaptureSeconds = seconds;
-            var rate = _sampleRate;
-            var frames = Math.Max(64, (int)Math.Round(GrainSeconds * rate));
-            var taper = Math.Clamp((int)Math.Round(EdgeTaperSeconds * rate), 1, frames / 2);
-            var local = new float[frames * 2];
-            FillGrain(local, frames, frame);
-            ApplyEdgeTaper(local, frames, taper);
-            _pending = local;
-            _pendingSeconds = seconds;
-            _taperFrames = taper;
+            CaptureNoLock(frame, sourceStartFrame: frame);
         }
+    }
+
+    /// <summary>
+    /// ストリームなど、タイムライン位置と別バッファからグレインを取る。
+    /// <paramref name="interleaved"/> は Capture 中だけ読めればよく、戻り後に再利用してよい
+    ///（グレインは内部へコピーする）。
+    /// </summary>
+    public void CaptureInterleaved(
+        float[] interleaved,
+        int channels,
+        int sampleRate,
+        int frameCount,
+        long timelineFrame)
+    {
+        ArgumentNullException.ThrowIfNull(interleaved);
+        lock (_gate)
+        {
+            _samples = interleaved;
+            _channels = Math.Max(1, channels);
+            _sampleRate = Math.Max(1, sampleRate);
+            _frameCount = Math.Max(0, frameCount);
+            _opened = true;
+            CaptureNoLock(0, sourceStartFrame: timelineFrame);
+        }
+    }
+
+    private void CaptureNoLock(long bufferStartFrame, long sourceStartFrame)
+    {
+        var seconds = sourceStartFrame / (double)_sampleRate;
+        if (!double.IsNaN(_lastCaptureSeconds)
+            && Math.Abs(seconds - _lastCaptureSeconds) < MinMoveSeconds)
+        {
+            return;
+        }
+
+        _lastCaptureSeconds = seconds;
+        var rate = _sampleRate;
+        var frames = Math.Max(64, (int)Math.Round(GrainSeconds * rate));
+        if (_frameCount > 0)
+        {
+            frames = (int)Math.Min(frames, _frameCount);
+        }
+
+        if (frames < 1)
+        {
+            return;
+        }
+
+        var taper = Math.Clamp((int)Math.Round(EdgeTaperSeconds * rate), 1, Math.Max(1, frames / 2));
+        var local = new float[frames * 2];
+        FillGrain(local, frames, bufferStartFrame);
+        ApplyEdgeTaper(local, frames, taper);
+        _pending = local;
+        _pendingSeconds = seconds;
+        _taperFrames = taper;
     }
 
     public void Read(float[] dest, int offset, int frames, float volume)

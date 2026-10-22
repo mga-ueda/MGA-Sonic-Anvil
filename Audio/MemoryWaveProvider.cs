@@ -112,6 +112,10 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private readonly MemoryScrubVoice _scrub = new();
     private bool _scrubbing;
     private float[] _scrubScratch = [];
+    private float[] _streamScrubBuf = [];
+    private long _lastStreamScrubCaptureMs;
+    /// <summary>ストリームスクラブのグレイン採取間隔。UI スレッドを塞ぎすぎない。</summary>
+    internal const int StreamScrubCaptureMinIntervalMs = 50;
     private int _intervalFrames;
     private readonly float[] _loudL = new float[8192];
     private readonly float[] _loudR = new float[8192];
@@ -1223,6 +1227,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             if (scrubbing)
             {
                 _exitPlaying = false;
+                _lastStreamScrubCaptureMs = 0;
             }
 
             Ended = false;
@@ -1381,8 +1386,99 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
 
     public void CaptureScrub(AudioDocument document, long frame)
     {
-        _scrub.Bind(document);
-        _scrub.Capture(frame);
+        var kind = BeginStreamScrubCapture(
+            frame,
+            out var stream,
+            out var buf,
+            out var rate,
+            out var channels,
+            out var grainFrames,
+            out var start);
+        if (kind == StreamScrubCaptureBegin.MemoryDocument)
+        {
+            _scrub.Bind(document);
+            _scrub.Capture(frame);
+            return;
+        }
+
+        if (kind == StreamScrubCaptureBegin.Throttled)
+        {
+            return;
+        }
+
+        // _gate 外で待つ。音声スレッドの Read と食い合わないようにする。
+        var got = stream!.ReadFrames(buf!, 0, grainFrames, timeoutMs: 40);
+        if (got <= 0)
+        {
+            return;
+        }
+
+        if (got < grainFrames)
+        {
+            Array.Clear(buf!, got * channels, (grainFrames - got) * channels);
+        }
+
+        _scrub.CaptureInterleaved(buf!, channels, rate, grainFrames, start);
+    }
+
+    private enum StreamScrubCaptureBegin
+    {
+        MemoryDocument,
+        Throttled,
+        Ready,
+    }
+
+    /// <summary>ストリームスクラブ用に Seek まで済ませる。</summary>
+    private StreamScrubCaptureBegin BeginStreamScrubCapture(
+        long frame,
+        out AudioStreamSource? stream,
+        out float[]? buf,
+        out int rate,
+        out int channels,
+        out int grainFrames,
+        out long start)
+    {
+        lock (_gate)
+        {
+            stream = _stream;
+            buf = null;
+            rate = 0;
+            channels = 0;
+            grainFrames = 0;
+            start = 0;
+            if (stream is null)
+            {
+                return StreamScrubCaptureBegin.MemoryDocument;
+            }
+
+            rate = Math.Max(1, _sourceRate);
+            channels = Math.Max(1, _channels);
+            grainFrames = Math.Max(64, (int)Math.Round(MemoryScrubVoice.GrainSeconds * rate));
+            var max = UsedFrameCountNoLock(channels);
+            start = Math.Clamp(frame, 0, max);
+            _sourceFrame = start;
+            _cursor = checked((int)start * channels);
+            var now = Environment.TickCount64;
+            if (now - _lastStreamScrubCaptureMs < StreamScrubCaptureMinIntervalMs)
+            {
+                // ヘッドは合わせつつ、デコード待ちの連打は間引く。
+                return StreamScrubCaptureBegin.Throttled;
+            }
+
+            InvalidateStreamCursorCacheNoLock();
+            ClearStreamReverseBuf();
+            Ended = false;
+            var need = grainFrames * channels;
+            if (_streamScrubBuf.Length < need)
+            {
+                _streamScrubBuf = new float[need];
+            }
+
+            buf = _streamScrubBuf;
+            stream.SeekFrame(start, prebufferTimeoutMs: 0);
+            _lastStreamScrubCaptureMs = now;
+            return StreamScrubCaptureBegin.Ready;
+        }
     }
 
     public void SetPlayWindow(WaveSelection? playRange, bool loop)

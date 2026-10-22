@@ -529,13 +529,8 @@ internal sealed class AudioPlayer : IDisposable
     public void BeginScrub(AudioDocument document, long frame)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (document.IsStreamPlayback || _provider.IsStreamBound)
-        {
-            // ストリーム再生ではグレインスクラブせずシークだけする。
-            EnsureBound(document, frame);
-            return;
-        }
-
+        // ストリーム（動画）もメモリと同じくグレインスクラブする。
+        // 再生デコーダを進めたまま Seek 連打すると蓄積するので、出力はスクラブ声に切り替える。
         var refillQueued = _playing && !_scrubbing && _output is not AsioOut;
         EnsureBound(document, frame);
         _provider.SetScrubbing(true);
@@ -587,12 +582,6 @@ internal sealed class AudioPlayer : IDisposable
     public void CaptureScrub(AudioDocument document, long frame)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (document.IsStreamPlayback || _provider.IsStreamBound)
-        {
-            _provider.SeekFrame(frame);
-            return;
-        }
-
         _provider.CaptureScrub(document, frame);
     }
 
