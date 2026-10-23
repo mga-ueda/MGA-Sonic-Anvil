@@ -6,7 +6,7 @@
         xmlns:domain="clr-namespace:MgaSonicAnvil.Domain"
         WindowStyle="SingleBorderWindow"
         SizeToContent="Manual"
-        ResizeMode="CanResize"
+        ResizeMode="CanResizeWithGrip"
         Width="{x:Static ui:DesignMetrics.SettingsWindowMinWidth}"
         MinWidth="{x:Static ui:DesignMetrics.SettingsWindowMinWidth}"
         Height="{x:Static ui:DesignMetrics.SettingsWindowHeight}"
@@ -187,8 +187,9 @@
                        Style="{StaticResource DarkTextBoxStyle}"
                        Padding="6,1"
                        FontSize="11.333"
+                       TextAlignment="Center"
                        VerticalContentAlignment="Center"
-                       HorizontalContentAlignment="Right" />
+                       HorizontalContentAlignment="Center" />
               <TextBlock Grid.Column="2"
                          Text="%"
                          VerticalAlignment="Center"
