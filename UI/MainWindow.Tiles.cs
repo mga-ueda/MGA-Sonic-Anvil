@@ -82,6 +82,11 @@ public partial class MainWindow
 
     private void CycleWaveformTile()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         if (_sessions.Count < 2 || _activeSession is null)
         {
             if (_tileMode)
@@ -1052,6 +1057,7 @@ public partial class MainWindow
         view.ViewChanged += OnWaveformViewChanged;
         view.PenStrokeUpdated += OnPenStrokeUpdated;
         view.PenStrokeCompleted += OnPenStrokeCompleted;
+        view.CrossfadeDraftChanged += OnWaveformCrossfadeDraftChanged;
     }
 
     private void UnhookWaveformEvents(WaveformView view)
@@ -1072,6 +1078,7 @@ public partial class MainWindow
         view.ViewChanged -= OnWaveformViewChanged;
         view.PenStrokeUpdated -= OnPenStrokeUpdated;
         view.PenStrokeCompleted -= OnPenStrokeCompleted;
+        view.CrossfadeDraftChanged -= OnWaveformCrossfadeDraftChanged;
     }
 
     private bool IsLiveWaveform(object? sender) =>

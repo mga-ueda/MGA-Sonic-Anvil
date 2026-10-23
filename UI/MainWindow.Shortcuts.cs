@@ -847,33 +847,53 @@ public partial class MainWindow
 
         if (key == Key.F11 && modifiers == ModifierKeys.None)
         {
-            ToggleWaveformMaximize();
+            if (!BlocksOutsideFadeToolActions)
+            {
+                ToggleWaveformMaximize();
+            }
+
             return true;
         }
 
         if (key == Key.F12 && modifiers == ModifierKeys.None)
         {
-            ToggleAnalyzerMaximize();
+            if (!BlocksOutsideFadeToolActions)
+            {
+                ToggleAnalyzerMaximize();
+            }
+
             return true;
         }
 
         if (key == Key.F8 && modifiers == ModifierKeys.None)
         {
-            ToggleVideoMiniPlayer();
+            if (!BlocksOutsideFadeToolActions)
+            {
+                ToggleVideoMiniPlayer();
+            }
+
             return true;
         }
 
         if (key == Key.F9 && modifiers == ModifierKeys.None)
         {
-            ToggleLibraryMinimalChrome();
+            if (!BlocksOutsideFadeToolActions)
+            {
+                ToggleLibraryMinimalChrome();
+            }
+
             return true;
         }
 
         if (key == Key.F10 && modifiers == ModifierKeys.None)
         {
-            StopSeekNudge();
-            StopVideoFrameStep();
-            ToggleLibraryMaximize();
+            if (!BlocksOutsideFadeToolActions)
+            {
+                StopSeekNudge();
+                StopVideoFrameStep();
+                ToggleLibraryMaximize();
+            }
+
             return true;
         }
 
@@ -1548,6 +1568,11 @@ public partial class MainWindow
             return true;
         }
 
+        if (TryProcessCrossfadeShortcut(key, modifiers))
+        {
+            return true;
+        }
+
         if (TryProcessEscapeShortcut(key, modifiers))
         {
             return true;
@@ -1804,7 +1829,12 @@ public partial class MainWindow
 
         if (key == Key.A && modifiers == ModifierKeys.None)
         {
-            Waveform.ToggleSpectrogramView();
+            // スペクトログラム／重ね。フェード調整中はロック。
+            if (!BlocksOutsideFadeToolActions)
+            {
+                Waveform.ToggleSpectrogramView();
+            }
+
             return true;
         }
 
@@ -1904,7 +1934,12 @@ public partial class MainWindow
 
         if (key == Key.V && modifiers == ModifierKeys.None)
         {
-            PromptVolume();
+            // 音量。フェード調整中はロック（PromptVolume 側でも拒否）。
+            if (!BlocksOutsideFadeToolActions)
+            {
+                PromptVolume();
+            }
+
             return true;
         }
 
@@ -2178,6 +2213,12 @@ public partial class MainWindow
         if (key != Key.Escape)
         {
             return false;
+        }
+
+        if (IsCrossfadeEditMode)
+        {
+            ExitCrossfadeEditMode(apply: false);
+            return true;
         }
 
         // ツリーのタイプアヘッド打ち込みを先に捨てる（1秒待ちの代わりに即クリア）。

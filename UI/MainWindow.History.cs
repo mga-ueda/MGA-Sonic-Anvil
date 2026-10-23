@@ -33,7 +33,7 @@ public partial class MainWindow
 
     private void OpenEditHistory()
     {
-        if (_document is null || IsLibraryMaximized)
+        if (RejectOutsideFadeToolAction() || _document is null || IsLibraryMaximized)
         {
             return;
         }

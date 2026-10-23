@@ -24,6 +24,11 @@ public partial class MainWindow
 
     private void ToggleRecording()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         if (_recording)
         {
             StopRecording();
@@ -35,7 +40,7 @@ public partial class MainWindow
 
     private void StartRecording()
     {
-        if (IsUiBusy || _recording || _activeSession is not { } session)
+        if (RejectOutsideFadeToolAction() || IsUiBusy || _recording || _activeSession is not { } session)
         {
             return;
         }

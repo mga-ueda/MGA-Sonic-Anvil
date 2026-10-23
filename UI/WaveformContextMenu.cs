@@ -42,6 +42,7 @@ internal enum WaveMenuCommand
     FadeIn,
     FadeOut,
     FadeAround,
+    CrossfadeEdit,
     Normalize,
     NormalizePerRegion,
     Volume,
@@ -616,6 +617,11 @@ internal static class WaveformContextMenuBuilder
             "O",
             m.CanEdit || m.LibraryMaximized),
         Cmd(UiStrings.WaveMenuFadeAround, WaveMenuCommand.FadeAround, "X", SingleFileOnly(m) && m.CanEdit),
+        Cmd(
+            UiStrings.WaveMenuCrossfadeEdit,
+            WaveMenuCommand.CrossfadeEdit,
+            MenuGestures.CrossfadeEdit,
+            SingleFileOnly(m) && m.CanEdit && m.AllowsRegionsAndLoops && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             m.LibraryMaximized

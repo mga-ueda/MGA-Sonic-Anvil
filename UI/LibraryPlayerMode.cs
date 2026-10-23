@@ -398,8 +398,9 @@ internal static class LibraryPlayerMode
         key == Key.N && modifiers == ModifierKeys.Alt;
 
     /// <summary>
-    /// 曲末で先頭へ戻す Auto Loop の切替。プレイリストが空でも、ツリー／お気に入り／検索フォーカスでも効く。
+    /// Auto Loop の切替（Alt+L）。プレイリストが空でも、ツリー／お気に入り／検索フォーカスでも効く。
     /// 素の L はループ再生のまま。
+    /// 仕様は <see cref="AutoLoopPlayback"/>（サンプルループあり＝頭→S 通し後に S–E 無限、無し＝曲末→先頭）。
     /// </summary>
     public static bool IsAutoLoopToggle(Key key, ModifierKeys modifiers) =>
         key == Key.L && modifiers == ModifierKeys.Alt;

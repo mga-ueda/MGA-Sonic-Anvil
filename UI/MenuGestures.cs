@@ -24,4 +24,5 @@ internal static class MenuGestures
     public const string ViewWaveform = "Esc / Shift+A / Shift+V";
     public const string ExplorerExpand = "Shift+8 / *";
     public const string ExplorerCollapse = "/ / Num/";
+    public const string CrossfadeEdit = "Shift+X";
 }
