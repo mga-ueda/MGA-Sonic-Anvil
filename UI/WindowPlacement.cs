@@ -206,6 +206,60 @@ internal static class WindowPlacement
         return true;
     }
 
+    public static void CaptureFadeTool(Window window, AppSettings settings)
+    {
+        var bounds = window.WindowState == WindowState.Normal
+            ? new Rect(window.Left, window.Top, window.Width, window.Height)
+            : window.RestoreBounds;
+        settings.FadeToolWindowX = (int)Math.Round(bounds.X);
+        settings.FadeToolWindowY = (int)Math.Round(bounds.Y);
+        settings.FadeToolWindowWidth = (int)Math.Round(bounds.Width);
+        settings.FadeToolWindowHeight = (int)Math.Round(bounds.Height);
+        settings.FadeToolWindowHasPosition = true;
+    }
+
+    public static bool TryApplyFadeTool(Window window, AppSettings settings)
+    {
+        if (!TryReadFadeTool(settings, out var bounds, out var hasSize))
+        {
+            return false;
+        }
+
+        var width = hasSize ? Math.Max(bounds.Width, window.MinWidth) : window.Width;
+        var height = hasSize ? Math.Max(bounds.Height, window.MinHeight) : window.Height;
+        var placed = new Rect(bounds.X, bounds.Y, width, height);
+        if (!IsVisibleOnAnyScreen(placed))
+        {
+            return false;
+        }
+
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = placed.X;
+        window.Top = placed.Y;
+        if (hasSize)
+        {
+            window.Width = placed.Width;
+            window.Height = placed.Height;
+        }
+
+        return true;
+    }
+
+    public static bool TryReadFadeTool(AppSettings settings, out Rect bounds, out bool hasSize)
+    {
+        bounds = default;
+        hasSize = settings.FadeToolWindowWidth > 0 && settings.FadeToolWindowHeight > 0;
+        if (!settings.FadeToolWindowHasPosition)
+        {
+            return false;
+        }
+
+        var width = hasSize ? settings.FadeToolWindowWidth : 1;
+        var height = hasSize ? settings.FadeToolWindowHeight : 1;
+        bounds = new Rect(settings.FadeToolWindowX, settings.FadeToolWindowY, width, height);
+        return true;
+    }
+
     public static bool TryReadColorPanel(AppSettings settings, out Rect bounds, out bool hasSize)
     {
         bounds = default;
