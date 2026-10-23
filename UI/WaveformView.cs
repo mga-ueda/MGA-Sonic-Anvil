@@ -150,14 +150,8 @@ internal sealed class WaveformView : Grid
                 return _forcedFlagLaneRows;
             }
 
-            var rows = CountFlagLaneRows(_document.Markers.Count > 0, _document.Regions.Count > 0);
-            // クロスフェード編集中は Pre/Post 旗用に最低1行確保する。
-            if (_crossfadeDraft is { IsActive: true })
-            {
-                return Math.Max(1, rows);
-            }
-
-            return rows;
+            // Pre/Post 旗はタイムレーン（サンプルループ側）に描くので、マーカー行は増やさない。
+            return CountFlagLaneRows(_document.Markers.Count > 0, _document.Regions.Count > 0);
         }
     }
 
@@ -202,6 +196,8 @@ internal sealed class WaveformView : Grid
     private bool _loopDragStart;
     private bool _loopDragEnd;
     private WaveSelection _loopDragBefore;
+    /// <summary>タイムライン項目ドラッグ開始時の波形選択（端の追従とキャンセル復元用）。</summary>
+    private WaveSelection _selectionDragBefore;
     private CrossfadeDragPart _crossfadeDrag;
     private bool _crossfadeDragMoved;
     private long? _crossfadeDragSnapHold;
@@ -1070,6 +1066,7 @@ internal sealed class WaveformView : Grid
         var loopStart = _loopStartSelected;
         var loopEnd = _loopEndSelected;
         var loopOrigin = _document.SampleLoop;
+        var selectionBefore = _document.Selection;
         var follow = IsSelectedTimelineFrame(_playheadFrame);
         applied = ApplyTimelineDelta(markerOrigins, regionOrigins, loopStart, loopEnd, loopOrigin, desiredDelta);
         if (applied == 0)
@@ -1088,6 +1085,15 @@ internal sealed class WaveformView : Grid
             _document.CursorFrame = next;
         }
 
+        // 選択端が動いたマーカー／リージョン／ループ端と一致していれば同じ delta で追従。
+        SyncSelectionEdgesWithTimelineMove(
+            selectionBefore,
+            markerOrigins,
+            regionOrigins,
+            loopOrigin,
+            loopStart,
+            loopEnd,
+            applied);
         // Alt ヌッジ等でもドラフト S/E とプリ／ポスト旗をサンプルループに追従させる
         SyncCrossfadeDraftFromSampleLoop();
         InvalidateStaticLayer();
@@ -1127,7 +1133,7 @@ internal sealed class WaveformView : Grid
         set
         {
             _crossfadeDraft = value;
-            // Pre/Post 旗用レーン行数が変わるので行高を取り直す。
+            // マーカー行高は Pre/Post と無関係だが、ドラフト出入でクロームを取り直す。
             _appliedMarkerLaneHeight = -1;
             if (value is null)
             {
@@ -3406,7 +3412,7 @@ internal sealed class WaveformView : Grid
         StemOnly(draft.EndFrame);
     }
 
-    /// <summary>Pre/Post 旗を最前面に描き、マーカーと同じ旗矩形で当たり判定用に覚える。</summary>
+    /// <summary>Pre/Post 旗をタイムレーン（サンプルループ／タイムコード側）に描き、当たり判定用に覚える。</summary>
     private void DrawCrossfadeFlags(DrawingContext dc, Rect bounds, double start, double span)
     {
         _crossfadeFlags.Clear();
@@ -3418,8 +3424,13 @@ internal sealed class WaveformView : Grid
 
         var dip = UiDpi.Get(this).PixelsPerDip;
         var typeface = new Typeface("Segoe UI");
-        var lane = MarkerLaneBounds(bounds);
-        var flagLaneH = Math.Max(lane.Height, DesignMetrics.MarkerLaneRowHeight * ChromeScale);
+        // マーカー／リージョンレーンではなく、サンプルループがあるタイムレーンに置く。
+        var lane = TimeLaneBounds(bounds);
+        if (lane.Height <= 1)
+        {
+            return;
+        }
+
         var whiteText = WpfControlHelpers.FrozenBrush(Colors.White);
 
         void Flag(long frame, string label, bool growLeft, Color flagColor, CrossfadeDragPart part)
@@ -3432,7 +3443,12 @@ internal sealed class WaveformView : Grid
 
             var boxW = MeasureFlagWidth(label, dip);
             var left = growLeft ? x - boxW : x;
-            var box = LaneFlagRect(left, boxW, flagLaneH, split: false, top: true);
+            // FullFlagRect は Y=1 固定（マーカーレーン用）なので、タイムレーン上端に合わせて置く。
+            var box = new Rect(
+                left,
+                lane.Y + 1,
+                boxW,
+                Math.Max(2, lane.Height - 2));
             var xs = WpfControlHelpers.SnapDeviceCenter(x, dip);
             var inset = WpfControlHelpers.DeviceHairline(dip) * 0.5;
             box = AlignFlagToStem(box, xs, growLeft, inset);
@@ -8458,6 +8474,7 @@ internal sealed class WaveformView : Grid
         _loopDragStart = !UsesPlayerScratch && _loopStartSelected && !_document.SampleLoop.IsEmpty;
         _loopDragEnd = !UsesPlayerScratch && _loopEndSelected && !_document.SampleLoop.IsEmpty;
         _loopDragBefore = UsesPlayerScratch ? WaveSelection.Empty : _document.SampleLoop;
+        _selectionDragBefore = _document.Selection;
         _markerDragFollowOrigin = IsSelectedTimelineFrame(_playheadFrame) ? _playheadFrame : null;
         CaptureMouse();
         Cursor = Cursors.SizeWE;
@@ -8567,10 +8584,197 @@ internal sealed class WaveformView : Grid
             _document.CursorFrame = next;
         }
 
+        // ドラッグは毎回 origin から再適用するので、選択も開始時スナップから applied で再計算する。
+        SyncSelectionEdgesWithTimelineMove(
+            _selectionDragBefore,
+            _markerDragOrigins,
+            _regionDragOrigins,
+            _loopDragBefore,
+            _loopDragStart,
+            _loopDragEnd,
+            applied);
         SyncCrossfadeDraftFromSampleLoop();
         InvalidateStaticLayer();
         InvalidatePlayheadLayer();
         MarkersChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// 波形選択の端が、動かしたマーカー／リージョン端／サンプルループ端と一致していたら同じ量だけ追従する。
+    /// フェード調整の有無は問わない。
+    /// </summary>
+    private void SyncSelectionEdgesWithTimelineMove(
+        WaveSelection selectionBefore,
+        IReadOnlyList<long> markerOrigins,
+        IReadOnlyList<RegionEdge> regionOrigins,
+        WaveSelection loopOrigin,
+        bool loopStart,
+        bool loopEnd,
+        long applied)
+    {
+        if (_document is null || selectionBefore.IsEmpty || applied == 0)
+        {
+            return;
+        }
+
+        var moveStart = IsSelectionEdgePinnedToMovedBoundary(
+            selectionBefore.StartFrame,
+            markerOrigins,
+            regionOrigins,
+            loopOrigin,
+            loopStart,
+            loopEnd);
+        var moveEnd = IsSelectionEdgePinnedToMovedBoundary(
+            selectionBefore.EndFrame,
+            markerOrigins,
+            regionOrigins,
+            loopOrigin,
+            loopStart,
+            loopEnd);
+        if (!moveStart && !moveEnd)
+        {
+            return;
+        }
+
+        var start = moveStart ? selectionBefore.StartFrame + applied : selectionBefore.StartFrame;
+        var end = moveEnd ? selectionBefore.EndFrame + applied : selectionBefore.EndFrame;
+
+        // 28 倍数スナップ等でループ端が applied とずれた場合は実ループ位置を優先。
+        if (!loopOrigin.IsEmpty && (loopStart || loopEnd) && !_document.SampleLoop.IsEmpty)
+        {
+            var loop = _document.SampleLoop;
+            if (loopStart && selectionBefore.StartFrame == loopOrigin.StartFrame)
+            {
+                start = loop.StartFrame;
+            }
+
+            if (loopEnd && selectionBefore.EndFrame == loopOrigin.EndFrame)
+            {
+                end = loop.EndFrame;
+            }
+
+            if (loopStart && selectionBefore.EndFrame == loopOrigin.StartFrame)
+            {
+                end = loop.StartFrame;
+            }
+
+            if (loopEnd && selectionBefore.StartFrame == loopOrigin.EndFrame)
+            {
+                start = loop.EndFrame;
+            }
+        }
+
+        var next = WaveSelection.FromPoints(start, end).Clamp(_document.FrameCount);
+        if (next == _document.Selection)
+        {
+            return;
+        }
+
+        _document.Selection = next;
+        _keyboardSelectAnchor = next.IsEmpty ? null : next.StartFrame;
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static bool IsSelectionEdgePinnedToMovedBoundary(
+        long edge,
+        IReadOnlyList<long> markerOrigins,
+        IReadOnlyList<RegionEdge> regionOrigins,
+        WaveSelection loopOrigin,
+        bool loopStart,
+        bool loopEnd)
+    {
+        foreach (var frame in markerOrigins)
+        {
+            if (frame == edge)
+            {
+                return true;
+            }
+        }
+
+        foreach (var regionEdge in regionOrigins)
+        {
+            var frame = regionEdge.IsStart ? regionEdge.Range.StartFrame : regionEdge.Range.EndFrame;
+            if (frame == edge)
+            {
+                return true;
+            }
+        }
+
+        if (!loopOrigin.IsEmpty)
+        {
+            if (loopStart && loopOrigin.StartFrame == edge)
+            {
+                return true;
+            }
+
+            if (loopEnd && loopOrigin.EndFrame == edge)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// サンプルループ端が差し替わったとき、一致していた選択端を新しいループ端へ合わせる。
+    /// </summary>
+    public void FollowSelectionToSampleLoopChange(WaveSelection loopBefore, WaveSelection loopAfter)
+    {
+        if (_document is null
+            || loopBefore.IsEmpty
+            || loopAfter.IsEmpty
+            || loopBefore == loopAfter)
+        {
+            return;
+        }
+
+        var sel = _document.Selection;
+        if (sel.IsEmpty)
+        {
+            return;
+        }
+
+        var start = sel.StartFrame;
+        var end = sel.EndFrame;
+        var changed = false;
+        if (sel.StartFrame == loopBefore.StartFrame)
+        {
+            start = loopAfter.StartFrame;
+            changed = true;
+        }
+        else if (sel.StartFrame == loopBefore.EndFrame)
+        {
+            start = loopAfter.EndFrame;
+            changed = true;
+        }
+
+        if (sel.EndFrame == loopBefore.EndFrame)
+        {
+            end = loopAfter.EndFrame;
+            changed = true;
+        }
+        else if (sel.EndFrame == loopBefore.StartFrame)
+        {
+            end = loopAfter.StartFrame;
+            changed = true;
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
+        var next = WaveSelection.FromPoints(start, end).Clamp(_document.FrameCount);
+        if (next == sel)
+        {
+            return;
+        }
+
+        _document.Selection = next;
+        _keyboardSelectAnchor = next.IsEmpty ? null : next.StartFrame;
+        InvalidatePlayheadLayer();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -8810,6 +9014,15 @@ internal sealed class WaveformView : Grid
             RemapSelectedRegionEdges(_regionDragOrigins, 0);
             _loopStartSelected = _loopDragStart;
             _loopEndSelected = _loopDragEnd;
+            if (_document.Selection != _selectionDragBefore)
+            {
+                _document.Selection = _selectionDragBefore;
+                _keyboardSelectAnchor = _selectionDragBefore.IsEmpty
+                    ? null
+                    : _selectionDragBefore.StartFrame;
+                SelectionChanged?.Invoke(this, EventArgs.Empty);
+            }
+
             if (follow is long origin)
             {
                 _playheadFrame = origin;
@@ -8934,6 +9147,7 @@ internal sealed class WaveformView : Grid
         _loopDragStart = false;
         _loopDragEnd = false;
         _loopDragBefore = WaveSelection.Empty;
+        _selectionDragBefore = WaveSelection.Empty;
     }
 
     private void BeginRegionNameEdit(WaveSelection region)

@@ -145,7 +145,10 @@ public partial class MainWindow
             return;
         }
 
+        var loopBefore = _document.SampleLoop;
         _document.SetSampleLoop(range, markDirty: false);
+        // S/E でループ端が動いたとき、一致していた波形選択端も追従させる。
+        Waveform.FollowSelectionToSampleLoopChange(loopBefore, range);
         if (refreshWaveform)
         {
             Waveform.Refresh();
@@ -477,11 +480,6 @@ public partial class MainWindow
                     _crossfadeEdit.Focus = CrossfadeEditState.FocusField.PreCrossfade;
                     JumpCrossfade(CrossfadeEditJump.StartPlusX);
                     return true;
-                case Key.C:
-                    _crossfadeEdit.TruncateOutside = !_crossfadeEdit.TruncateOutside;
-                    _crossfadeWindow?.SyncFromHost();
-                    OnCrossfadeStateChanged();
-                    return true;
                 case Key.F:
                     _crossfadeEdit.Focus = CrossfadeEditState.FocusField.PreCrossfade;
                     JumpCrossfade(CrossfadeEditJump.StartPlusX);
@@ -516,6 +514,7 @@ public partial class MainWindow
         }
 
         if (modifiers == ModifierKeys.None
+            // C はチャンネル変換へ落ちないよう握るだけ（切り落としトグルは廃止）。
             && key is Key.S or Key.E or Key.C or Key.X or Key.I or Key.O or Key.N or Key.R or Key.V or Key.P or Key.T or Key.B)
         {
             return true;

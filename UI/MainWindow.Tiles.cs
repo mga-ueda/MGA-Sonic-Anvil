@@ -1063,6 +1063,8 @@ public partial class MainWindow
             if (IsCrossfadeEditMode)
             {
                 Overview.Refresh();
+                // 波形 0.5 秒デバウンス完了時に再生プレビュー（プリ／ポスト等）も揃える。
+                SyncPlayWindowFromDocument();
                 _crossfadeWindow?.SyncFromHost(updateSplice: true);
                 _crossfadeWindow?.NotifyDocumentChanged();
             }

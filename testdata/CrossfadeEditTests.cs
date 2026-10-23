@@ -453,6 +453,27 @@ public sealed class CrossfadeEditTests
     }
 
     [Fact]
+    public void LoopMix_DeleteAfterLoop_KeepsBeforeStart()
+    {
+        var document = MakeDocument(500);
+        FillRamp(document);
+        var state = new CrossfadeEditState
+        {
+            StartFrame = 100,
+            EndFrame = 300,
+            PreCrossfadeFrames = 0,
+            PostCrossfadeFrames = 20,
+            DeleteAfterLoop = true,
+        };
+
+        var command = ProcessEdits.ApplyLoopMix(document, state);
+        Assert.NotNull(command);
+        command!.Apply(document);
+        Assert.Equal(300, document.FrameCount);
+        Assert.Equal(new WaveSelection(100, 300), document.SampleLoop);
+    }
+
+    [Fact]
     public void LoopMix_UndoRestoresSamplesAndLoop()
     {
         var document = MakeDocument(200);

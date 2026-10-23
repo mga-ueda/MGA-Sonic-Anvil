@@ -62,7 +62,7 @@ internal static partial class ProcessEdits
 
         if (state.TruncateOutside)
         {
-            // 焼き込みは [S,E) 内。E 以降を切り落す。
+            // 焼き込みは [S,E) 内。前後を切り落す。
             var keepStart = state.StartFrame;
             var keepEnd = Math.Min(frameCount, state.EndFrame);
             if (keepEnd <= keepStart)
@@ -79,6 +79,26 @@ internal static partial class ProcessEdits
             regionsAfter = ShiftRegions(document.SnapshotRegions(), keepStart, keepEnd);
             selectionAfter = ShiftSelection(document.Selection, keepStart, keepEnd);
             cursorAfter = Math.Clamp(document.CursorFrame - keepStart, 0, keepLen);
+        }
+        else if (state.DeleteAfterLoop)
+        {
+            // 終点より後ろだけ削除。始点より前は残す。
+            var keepStart = 0L;
+            var keepEnd = Math.Min(frameCount, state.EndFrame);
+            if (keepEnd <= keepStart)
+            {
+                return null;
+            }
+
+            var keepLen = keepEnd - keepStart;
+            after = new float[checked((int)keepLen * channels)];
+            Array.Copy(work, 0, after, 0, after.Length);
+
+            loopAfter = state.LoopRange.Clamp(keepLen);
+            markersAfter = ShiftMarkers(document.SnapshotMarkers(), keepStart, keepEnd);
+            regionsAfter = ShiftRegions(document.SnapshotRegions(), keepStart, keepEnd);
+            selectionAfter = ShiftSelection(document.Selection, keepStart, keepEnd);
+            cursorAfter = Math.Clamp(document.CursorFrame, 0, keepLen);
         }
         else
         {
@@ -125,6 +145,7 @@ internal static partial class ProcessEdits
             Timing0 = (int)source.PreInShape + 1,
             Timing1 = (int)source.PostInShape + 1,
             Flag = source.TruncateOutside,
+            Flag2 = source.DeleteAfterLoop,
         };
         return command;
     }
