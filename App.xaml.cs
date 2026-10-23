@@ -13,6 +13,11 @@ public partial class App : Application
             typeof(ContextMenu),
             FrameworkElement.LoadedEvent,
             new RoutedEventHandler(RevealContextMenuWash));
+        // 設定ウィンドウと同じタイトルバー色を、アプリ内の全 Window に適用する。
+        EventManager.RegisterClassHandler(
+            typeof(Window),
+            FrameworkElement.LoadedEvent,
+            new RoutedEventHandler(ApplyDarkTitleBarOnWindowLoaded));
         EditorContextMenuTheme.Apply(Resources);
         SlidingTabAccent.Install();
         ImeComposition.Install(this);
@@ -20,6 +25,14 @@ public partial class App : Application
         UiThemeService.Start();
         UiScaleService.Start();
         base.OnStartup(e);
+    }
+
+    private static void ApplyDarkTitleBarOnWindowLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is Window window)
+        {
+            DarkWindowChrome.ApplyImmersiveDarkTitleBar(window);
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
