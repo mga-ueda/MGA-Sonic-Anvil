@@ -88,7 +88,11 @@
         <li><a href="#playback">Playback</a></li>
         <li><a href="#edit">Selection and editing</a></li>
         <li><a href="#silence-hit">Silence &amp; Hit Detection</a></li>
-        <li><a href="#markers">Markers / regions / loops</a></li>
+        <li><a href="#markers">Markers / regions / loops</a>
+          <ol>
+            <li><a href="#fade-adjust">Fade Adjust Tool</a></li>
+          </ol>
+        </li>
         <li><a href="#format">Format conversion</a></li>
         <li><a href="#export">WAAPI EXPORT (Wave-only)</a>
           <ol>
@@ -345,6 +349,7 @@
           <li><kbd>Alt</kbd>+<kbd>R</kbd> toggles shuffle (playlist <span class="ui">Random</span>). No repeats until the playlist has played once. Works on an empty list. Off by default. The last state is saved and kept when switching between the editor and the player. <kbd>R</kbd> restarts the current track from the beginning.</li>
           <li><kbd>Alt</kbd>+<kbd>P</kbd> toggles <span class="ui">Auto Play</span>. When on, clearing and adding (Enter / drop) plays the first track. When off, it only adds (does not start or stop playback). Shift-add never plays. On by default. Remembers the last state in settings.</li>
           <li><kbd>Alt</kbd>+<kbd>N</kbd> toggles auto next (playlist <span class="ui">Auto Next</span>). When on, advances to the next track at the end and gapless-prefetches. When off, stops on that track. Works on an empty list. Off by default. The last state is saved and kept when switching between the editor and the player. Plain <kbd>N</kbd> still steps to the next track manually.</li>
+          <li><kbd>Alt</kbd>+<kbd>L</kbd> toggles <span class="ui">Auto Loop</span> (playlist toolbar). When on, with a sample loop it plays from the head (or playhead) through the intro, then loops S–E forever. Without a sample loop, it restarts from the start at the end. A selection or player A-B becomes the play window instead (no intro passthrough). Works on an empty list. Remembers the last state in settings. Plain <kbd>L</kbd> still loops from 3 seconds before the end of the selection / sample loop.</li>
           <li>Playback starts as soon as sound can play. It does not wait for the waveform to finish drawing.</li>
           <li>With auto next on, continuous playback prepares the next track and joins without stopping. Tiny extra silence at the start and end of MP3 / M4A is reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
           <li>
@@ -483,7 +488,7 @@
           </li>
         </ol>
         <div class="note">
-          <p>While the tree has focus, <kbd>N</kbd> / <kbd>P</kbd> / <kbd>R</kbd> / <kbd>J</kbd> / <kbd>K</kbd> / <kbd>M</kbd> / <kbd>I</kbd> / <kbd>O</kbd> feed folder-name jump (not previous/next track, transport letters, or temp markers / A-B; the numpad still controls playback). Shuffle is <kbd>Alt</kbd>+<kbd>R</kbd>; auto next is <kbd>Alt</kbd>+<kbd>N</kbd>; Auto Play is <kbd>Alt</kbd>+<kbd>P</kbd>.</p>
+          <p>While the tree has focus, <kbd>N</kbd> / <kbd>P</kbd> / <kbd>R</kbd> / <kbd>J</kbd> / <kbd>K</kbd> / <kbd>M</kbd> / <kbd>I</kbd> / <kbd>O</kbd> feed folder-name jump (not previous/next track, transport letters, or temp markers / A-B; the numpad still controls playback). Shuffle is <kbd>Alt</kbd>+<kbd>R</kbd>; auto next is <kbd>Alt</kbd>+<kbd>N</kbd>; Auto Play is <kbd>Alt</kbd>+<kbd>P</kbd>; Auto Loop is <kbd>Alt</kbd>+<kbd>L</kbd>.</p>
         </div>
         <h4>Waveform</h4>
         <ul>
@@ -726,6 +731,7 @@
         <li><kbd>,</kbd> — rewind, <kbd>.</kbd> — fast-forward (±3× at original pitch; −4 dB while held; works while stopped and leaves you stopped at the new position)</li>
         <li><kbd>Z</kbd> or numpad <kbd>.</kbd> — center. Toggles center-lock while playing; clears it when stopped (the <kbd>.</kbd> key is fast-forward).</li>
         <li><kbd>L</kbd> — loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</li>
+        <li><kbd>Alt</kbd>+<kbd>L</kbd> — toggle <span class="ui">Auto Loop</span> (same as the playlist toolbar; with a sample loop: play through the intro then S–E forever; without: restart at end; selection / A-B take priority; see <a href="#layout-player">Player mode → Playback</a>).</li>
         <li><kbd>Q</kbd> — in the editor, marker click. Plays clicks at marker / region edges (selection when present, otherwise the whole file). Toggle with the button or <kbd>Q</kbd> (off by default; never auto-on). Also available from waveform right-click → Playback. In the player during real video playback / frame pause / bright PDF view, same as <kbd>Escape</kbd> — returns to the dim preview (in the F8 / argument-launch mini, Escape / Q return to the playlist (Escape clears In/Out and stays when In/Out is set); marker click does not run in the player).</li>
         <li><kbd>Tab</kbd> — solo a channel. Other lanes go gray and stay muted. Again moves to the next channel; <kbd>Shift</kbd>+<kbd>Tab</kbd> goes backward. Past the last clears solo. Click a channel name on the left to solo (click the same name again to clear; <kbd>Ctrl</kbd>+click adds; <kbd>Shift</kbd>+click mutes / unmutes). The time selection does not change. Waveform edits apply only to that channel. Works while playing or stopped.</li>
         <li><kbd>Ctrl</kbd>+<kbd>N</kbd> — new file. Opens an empty tab. Choose the format each time (the last choice is remembered). Channels are the speakers enabled on Shown, plus Mono (always available).</li>
@@ -737,7 +743,7 @@
       <p>Drag to select. Double-click selects a span (between markers). Triple-click always selects all. <kbd>Esc</kbd> or a move without Shift clears it. Fade / volume / pitch / normalize / reverse / time stretch with nothing selected uses the whole file in time. While a channel is soloed, those edits apply only to the audible lanes. You can also type the selection start / length / end in the status bar. After a selection edit (fade, normalize, delete, and so on), the playhead returns to the start of the selection.</p>
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd> / <span class="ui">FADE OUT</span> <kbd>O</kbd> — pick a curve, Space to preview, Enter to apply. 1–9 select a curve.</li>
-        <li><kbd>X</kbd> — fade around seek bar: from the playhead, fade out only the visible part before / fade in only the visible part after (linear).</li>
+        <li><kbd>X</kbd> — fade around seek bar: from the playhead, fade out only the visible part before / fade in only the visible part after (linear). For sample-loop seam fades, use <kbd>Shift</kbd>+<kbd>X</kbd> (<a href="#fade-adjust">Fade Adjust Tool</a>).</li>
         <li><kbd>V</kbd> — on a single tab, shows the loudness curve and opens volume. Type a dB value, or use ↑↓ / wheel by 0.1 dB (Shift 1 / Ctrl 3 / Ctrl+Shift 6). Space previews, Enter applies. The menu shows how whole-file Integrated LKFS / RMS / Peak will change. The Short Term curve and the stopped meter follow the same dB. Closing the volume popup leaves the curve. <kbd>Shift</kbd>+<kbd>V</kbd> closes the curve.</li>
         <li><kbd>E</kbd> — while the loudness curve is up, switch to the pen (again to leave it). The button at the top right of the curve and a right-click on the curve do the same. Dragging does not change the time selection, and the original curve stays visible. Releasing the mouse sets the volume to the drawn height. Moving back in time erases the later part of the stroke, so each time has one level. A short fade joins both ends. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes that stroke. <kbd>Esc</kbd> clears the pen before leaving the curve.</li>
         <li><strong>Match Loudness</strong> (playlist right-click in the player, or <kbd>V</kbd> with multiple editor tabs) — simple whole-file gain to a target LKFS (defaults to Settings). Not the curve-based volume picker used for a single editor file. In the player, files are saved in place afterward and cannot be undone; the <kbd>V</kbd> shortcut is disabled there. Non–Wave/AIFF files are skipped; if none qualify, a notice is shown.</li>
@@ -891,6 +897,21 @@
         <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> — rename.</li>
         <li>Right-click, or <kbd>Ctrl</kbd>+<kbd>Del</kbd>, deletes markers. Delete all markers and delete all regions are on Timeline.</li>
       </ul>
+
+      <h3 id="fade-adjust">Fade Adjust Tool</h3>
+      <p>A helper window to put pre/post crossfades on a sample-loop seam and bake them into the wave. Separate from normal <kbd>I</kbd> / <kbd>O</kbd> fades and from seek-around <kbd>X</kbd>.</p>
+      <ul>
+        <li><strong>Open</strong> — <kbd>Shift</kbd>+<kbd>X</kbd>, or waveform right-click → Audio → Fade Adjust Tool. Not available while the player is maximized.</li>
+        <li><strong>Defaults</strong> — uses the selection when present, otherwise the existing sample loop for Start / End. Pre-crossfade starts at 0; Post remembers the last value from the tool.</li>
+        <li><strong>Preview</strong> — use the main transport (sample loop as the play window, including playback from before Start). The left seam preview is left=End side / right=Start side. “Show crossfade” below toggles the baked blend in that view (off by default).</li>
+        <li><strong>Values</strong> — Start (S) / End (E) / Pre / Post. ↑↓ / wheel nudge by 1 sample (Shift 10 / Ctrl+Shift 100). Each field’s button snaps to a nearby zero-crossing.</li>
+        <li><strong>Auto-search</strong> — Find Start, Find End, Shift Start and End. Keeps searching toward a better-matching seam.</li>
+        <li><strong>Multiples of 28</strong> — when on, Start and End move only on 28-sample steps.</li>
+        <li><strong>Truncate outside (C)</strong> — on OK, deletes audio before Start and after End (End-side is used as material, then trimmed).</li>
+        <li><strong>OK / Cancel</strong> — OK (Enter) bakes, commits the sample loop, and closes (undo with <kbd>Ctrl</kbd>+<kbd>Z</kbd>). Cancel (Esc) discards changes and clears overlays. Destructive edits outside are blocked while the tool is open.</li>
+        <li>Position and size are remembered. The default size is also the minimum.</li>
+      </ul>
+
       <div class="note">
         <p>Markers, regions, and loops are stored in the Wave file when you save. MP3 cannot take regions or a loop. Markers are allowed, but they are not written when you save as MP3.</p>
       </div>
@@ -1038,6 +1059,7 @@
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from the playback start (while the tile search box has focus, closes tiles that did not match instead)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>S</kbd></td><td>Silent Skip (skip silent stretches on playback; record only above the threshold)</td></tr>
           <tr><td><kbd>L</kbd></td><td>Loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Auto Loop</span> (with a sample loop: intro passthrough then S–E forever; without: restart at end; selection / A-B take priority; separate from plain <kbd>L</kbd>)</td></tr>
           <tr><td><kbd>J</kbd> / <kbd>K</kbd></td><td>Skip 5 s back / forward (0.75 s crossfade; hold repeats after a short wait)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>Playback pitch up / down by one semitone, or back to zero (<kbd>Ctrl</kbd>+<kbd>0</kbd> on the main keyboard or numpad). A center toast shows the semitones. ±2 octaves; length stays; heard immediately; forgotten when another track starts</td></tr>
           <tr><td><kbd>,</kbd> / <kbd>.</kbd></td><td>Rewind / fast-forward (±3× at original pitch; −4 dB while held; works while stopped and leaves you stopped at the new position)</td></tr>
@@ -1133,6 +1155,7 @@
         <tbody>
           <tr><td><kbd>M</kbd> / <kbd>Ins</kbd></td><td>Marker at the playhead, or divide the selection (a hold is one history entry)</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>L</kbd></td><td>Set the selection as the sample loop (same range again clears it)</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>X</kbd></td><td>Fade Adjust Tool (sample-loop seam; see <a href="#fade-adjust">7 → Fade Adjust Tool</a>)</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>R</kbd></td><td>Set the selection as a region; same range again divides it (clear with right-click / Delete)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></td><td>Rename</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Delete</kbd></td><td>Delete selected markers</td></tr>
@@ -1214,6 +1237,18 @@
           <tr><td><kbd>Enter</kbd></td><td>Apply</td></tr>
           <tr><td><kbd>I</kbd> / <kbd>O</kbd></td><td>Switch fade in / out</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Close</td></tr>
+        </tbody>
+      </table>
+      <p>While the Fade Adjust Tool is open (see <a href="#fade-adjust">Fade Adjust Tool</a>)</p>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Enter</kbd></td><td>OK (bake and close)</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Cancel (discard and close)</td></tr>
+          <tr><td><kbd>S</kbd> / <kbd>E</kbd> / <kbd>X</kbd> / <kbd>P</kbd></td><td>Focus Start / End / Pre / Post and jump the view there</td></tr>
+          <tr><td><kbd>C</kbd></td><td>Toggle Truncate outside</td></tr>
+          <tr><td>← / →</td><td>Nudge the focused value by 1 sample</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Main transport play / stop (sample-loop infinite playback)</td></tr>
         </tbody>
       </table>
       <p>While the volume menu is open</p>
@@ -1315,6 +1350,7 @@
           <tr><td><kbd>Alt</kbd>+<kbd>R</kbd></td><td>Toggle shuffle (<span class="ui">Random</span>; works on an empty playlist; off by default; does not repeat a track until the playlist has played once; the last state is saved across mode switches and the next launch)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td>Toggle <span class="ui">Auto Play</span> (on by default; whether clear-and-add plays the first track; remembers the last state in settings; plain <kbd>P</kbd> is previous track)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td>Toggle auto next (<span class="ui">Auto Next</span>; works on an empty playlist; off by default; when on, advances at the end and gapless-prefetches; the last state is saved across mode switches and the next launch; plain <kbd>N</kbd> still steps to the next track)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td>Toggle <span class="ui">Auto Loop</span> (works on an empty playlist; with a sample loop: intro passthrough then S–E forever; without: restart at end; selection / A-B take priority; plain <kbd>L</kbd> still loops from 3 seconds before the end)</td></tr>
           <tr><td>← / →</td><td>During real video playback (or frame pause), pause and step one frame back / forward (hold repeats after an initial wait; <kbd>F10</kbd> during real playback or frame pause drops to the dim background preview, restores the front UI = playlist, and stays in the player). On the tree, expand / collapse folders. Otherwise do not shuttle</td></tr>
           <tr><td>Tree <kbd>*</kbd></td><td>Expand all folders under the selection (same as Explorer; numpad <kbd>*</kbd> or Shift+8; expansion is remembered)</td></tr>
           <tr><td>Tree <kbd>/</kbd></td><td>Collapse the selection and everything under it (numpad <kbd>/</kbd> or the <kbd>/</kbd> key)</td></tr>
@@ -1356,7 +1392,7 @@
           <tr><td>Playlist search</td><td>Every column is searched, visible or not. Words separated by spaces may hit different columns (e.g. artist + title) and all must match. Only matching rows stay. Next / previous track also walk only the visible rows</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>Apply the typed condition and return focus to the tree (library) or the list (playlist). An empty box removes the filter</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Discard the typed text and return focus (the current filter stays)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>R</kbd> / <kbd>N</kbd> / <kbd>P</kbd></td><td>With search focused, still toggle shuffle / Auto Next / Auto Play (they do not type into the box)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>R</kbd> / <kbd>N</kbd> / <kbd>P</kbd> / <kbd>L</kbd></td><td>With search focused, still toggle shuffle / Auto Next / Auto Play / Auto Loop (they do not type into the box)</td></tr>
         </tbody>
       </table>
       <p>While editing a status-bar time field</p>

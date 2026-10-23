@@ -66,7 +66,8 @@ public partial class MainWindow
         }
 
         var window = new CrossfadeEditWindow(this);
-        window.DraftChanged += OnCrossfadeStateChanged;
+        window.DraftChanged += debounceWave =>
+            OnCrossfadeStateChanged(debounceWaveRedraw: debounceWave, prePostLight: debounceWave);
         window.LoopMixRequested += () => ExitCrossfadeEditMode(apply: true);
         window.ExitRequested += () => ExitCrossfadeEditMode(apply: false);
         window.AutoSearchRequested += RunCrossfadeAutoSearch;
@@ -113,6 +114,8 @@ public partial class MainWindow
         window.SetDocument(_document);
         window.State = _crossfadeEdit;
         window.RefreshUiStrings();
+        // 前ファイルの重ね／プレビューキャッシュを捨ててからドラフトを載せる。
+        Waveform.ClearCrossfadeCaches();
         Waveform.CrossfadeDraft = _crossfadeEdit;
         Waveform.SetPreviewGain(null);
         Waveform.InvalidateVisual();
@@ -121,7 +124,10 @@ public partial class MainWindow
     }
 
     /// <summary>ドラフトの S–E をサンプルループへ仮反映（履歴なし。キャンセル時に戻す）。</summary>
-    private void ApplySampleLoopFromDraft()
+    /// <param name="refreshWaveform">
+    /// false のとき波形ビットマップは汚さず旗／ループ表示だけ更新（0.5 秒デバウンス中用）。
+    /// </param>
+    private void ApplySampleLoopFromDraft(bool refreshWaveform = true)
     {
         if (_document is null || _crossfadeEdit is null)
         {
@@ -140,8 +146,16 @@ public partial class MainWindow
         }
 
         _document.SetSampleLoop(range, markDirty: false);
-        Waveform.Refresh();
-        Overview.Refresh();
+        if (refreshWaveform)
+        {
+            Waveform.Refresh();
+            Overview.Refresh();
+        }
+        else
+        {
+            Waveform.InvalidateCrossfadeChrome();
+        }
+
         SyncViewChrome();
     }
 
@@ -202,6 +216,7 @@ public partial class MainWindow
             Waveform.InvalidateVisual();
         }
 
+        Waveform.ClearCrossfadeCaches();
         Waveform.SetPreviewGain(null);
         _player.SetLoopFadePreview(null);
         _player.PlayExitLayer = WaapiBar.PlayPostExitChecked;
@@ -217,7 +232,12 @@ public partial class MainWindow
         }
     }
 
-    private void OnCrossfadeStateChanged()
+    /// <param name="debounceWaveRedraw">本体ピークを 0.5 秒デバウンス。</param>
+    /// <param name="prePostLight">
+    /// Pre/Post のみの変更。オーバーレイ＋数値だけ更新し、
+    /// サンプルループ／再生窓／継ぎ目は触らない（デバウンス後や S/E 変更時に Full）。
+    /// </param>
+    private void OnCrossfadeStateChanged(bool debounceWaveRedraw = false, bool prePostLight = false)
     {
         if (_crossfadeEdit is null || _document is null)
         {
@@ -225,11 +245,27 @@ public partial class MainWindow
         }
 
         _crossfadeEdit.Clamp(_document.FrameCount);
-        ApplySampleLoopFromDraft();
         Waveform.CrossfadeDraft = _crossfadeEdit;
         Waveform.SetPreviewGain(null);
-        Waveform.InvalidateVisual();
+        Waveform.RequestCrossfadeWaveRedraw(immediate: !debounceWaveRedraw);
+
+        if (prePostLight)
+        {
+            // 数値だけ。継ぎ目は本体デバウンスに合わせて後で更新。
+            _crossfadeWindow?.SyncFromHost(updateSplice: false);
+            return;
+        }
+
+        // デバウンス中はサンプルループ位置だけ仮反映し、本体 raw/全ラスタは起こさない。
+        ApplySampleLoopFromDraft(refreshWaveform: !debounceWaveRedraw);
         SyncPlayWindowFromDocument();
+        if (debounceWaveRedraw)
+        {
+            _crossfadeWindow?.SyncFromHost(updateSplice: false);
+            return;
+        }
+
+        _crossfadeWindow?.SyncFromHost(updateSplice: true);
         _crossfadeWindow?.NotifyDocumentChanged();
     }
 
@@ -497,7 +533,9 @@ public partial class MainWindow
             return;
         }
 
-        OnCrossfadeStateChanged();
-        _crossfadeWindow?.SyncFromHost();
+        var debounce = Waveform.ConsumeCrossfadeDraftChangeDebounce();
+        // Pre/Post のみ light（サンプルループ非更新）。S/E は debounce でもループは仮反映する。
+        var light = Waveform.IsCrossfadePrePostFlagDragging;
+        OnCrossfadeStateChanged(debounceWaveRedraw: debounce || light, prePostLight: light);
     }
 }

@@ -1058,6 +1058,15 @@ public partial class MainWindow
         view.PenStrokeUpdated += OnPenStrokeUpdated;
         view.PenStrokeCompleted += OnPenStrokeCompleted;
         view.CrossfadeDraftChanged += OnWaveformCrossfadeDraftChanged;
+        view.CrossfadeWavePreviewRebuilt += (_, _) =>
+        {
+            if (IsCrossfadeEditMode)
+            {
+                Overview.Refresh();
+                _crossfadeWindow?.SyncFromHost(updateSplice: true);
+                _crossfadeWindow?.NotifyDocumentChanged();
+            }
+        };
     }
 
     private void UnhookWaveformEvents(WaveformView view)

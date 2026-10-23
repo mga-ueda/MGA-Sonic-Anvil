@@ -61,7 +61,8 @@ internal sealed class CrossfadeEditWindow : Window
     private const int ValueNudgeRepeatDelayMs = 400;
     private const int ValueNudgeRepeatIntervalMs = 50;
 
-    public event Action? DraftChanged;
+    /// <summary>??? true ??????????????? 0.5 ???????????</summary>
+    public event Action<bool>? DraftChanged;
     public event Action? LoopMixRequested;
     public event Action? ExitRequested;
     public event Action<CrossfadeAutoSearchKind>? AutoSearchRequested;
@@ -116,7 +117,7 @@ internal sealed class CrossfadeEditWindow : Window
         _splice.LoopEndsChanged += () =>
         {
             SyncFromState();
-            DraftChanged?.Invoke();
+            DraftChanged?.Invoke(false);
         };
 
         _valueNudgeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ValueNudgeRepeatDelayMs) };
@@ -259,7 +260,7 @@ internal sealed class CrossfadeEditWindow : Window
 
     public void NotifyDocumentChanged() => _splice.InvalidateVisual();
 
-    public void SyncFromHost() => SyncFromState();
+    public void SyncFromHost(bool updateSplice = true) => SyncFromState(updateSplice);
 
     public void SetDocument(AudioDocument? document)
     {
@@ -641,7 +642,7 @@ internal sealed class CrossfadeEditWindow : Window
 
                 _state.PreOutShape = shape;
                 RefreshCurveIcons();
-                DraftChanged?.Invoke();
+                DraftChanged?.Invoke(false);
             });
         _preInCurve = CreateCurveIconRow(
             UiStrings.CrossfadeLabelCurveLegIn,
@@ -655,7 +656,7 @@ internal sealed class CrossfadeEditWindow : Window
 
                 _state.PreInShape = shape;
                 RefreshCurveIcons();
-                DraftChanged?.Invoke();
+                DraftChanged?.Invoke(false);
             });
         _postOutCurve = CreateCurveIconRow(
             UiStrings.CrossfadeLabelCurveLegOut,
@@ -669,7 +670,7 @@ internal sealed class CrossfadeEditWindow : Window
 
                 _state.PostOutShape = shape;
                 RefreshCurveIcons();
-                DraftChanged?.Invoke();
+                DraftChanged?.Invoke(false);
             });
         _postInCurve = CreateCurveIconRow(
             UiStrings.CrossfadeLabelCurveLegIn,
@@ -683,7 +684,7 @@ internal sealed class CrossfadeEditWindow : Window
 
                 _state.PostInShape = shape;
                 RefreshCurveIcons();
-                DraftChanged?.Invoke();
+                DraftChanged?.Invoke(false);
             });
 
         rows.Children.Add(CurveSideRow(
@@ -1033,7 +1034,8 @@ internal sealed class CrossfadeEditWindow : Window
         _state!.Focus = focus;
         _state.Nudge(focus, direction * step, _splice.Document!.FrameCount);
         SyncFromState();
-        DraftChanged?.Invoke();
+        // ?????????: ????????? 0.5 ?????????????
+        DraftChanged?.Invoke(true);
         return true;
     }
 
@@ -1059,7 +1061,7 @@ internal sealed class CrossfadeEditWindow : Window
             _state.Clamp(_splice.Document.FrameCount);
         }
 
-        DraftChanged?.Invoke();
+        DraftChanged?.Invoke(false);
     }
 
     private void SetAlignTwentyEight(bool value)
@@ -1078,7 +1080,7 @@ internal sealed class CrossfadeEditWindow : Window
         }
 
         SyncFromState();
-        DraftChanged?.Invoke();
+        DraftChanged?.Invoke(false);
     }
 
     private void SetXfadePreview(bool value)
@@ -1090,7 +1092,7 @@ internal sealed class CrossfadeEditWindow : Window
 
         _state.ShowXfadePreview = value;
         _splice.InvalidateVisual();
-        DraftChanged?.Invoke();
+        DraftChanged?.Invoke(false);
     }
 
     private void CommitBox(TextBox box, CrossfadeEditState.FocusField focus)
@@ -1136,10 +1138,10 @@ internal sealed class CrossfadeEditWindow : Window
         }
 
         SyncFromState();
-        DraftChanged?.Invoke();
+        DraftChanged?.Invoke(false);
     }
 
-    private void SyncFromState()
+    private void SyncFromState(bool updateSplice = true)
     {
         if (_state is null)
         {
@@ -1158,7 +1160,11 @@ internal sealed class CrossfadeEditWindow : Window
             _xfadeCheck.IsChecked = _state.ShowXfadePreview;
             RefreshCurveIcons();
             _splice.State = _state;
-            _splice.InvalidateVisual();
+            // ???????????????????????????????? S/E ??????
+            if (updateSplice)
+            {
+                _splice.InvalidateVisual();
+            }
         }
         finally
         {
