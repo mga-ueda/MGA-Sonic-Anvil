@@ -53,7 +53,9 @@ internal sealed class RoundedButton : Button
 
     public static readonly DependencyProperty BorderSizeProperty =
         DependencyProperty.Register(nameof(BorderSize), typeof(double), typeof(RoundedButton),
-            new FrameworkPropertyMetadata(0d, FrameworkPropertyMetadataOptions.AffectsRender));
+            new FrameworkPropertyMetadata(
+                0d,
+                FrameworkPropertyMetadataOptions.AffectsMeasure | FrameworkPropertyMetadataOptions.AffectsRender));
 
     static RoundedButton()
     {
@@ -204,11 +206,20 @@ internal sealed class RoundedButton : Button
         base.OnIsPressedChanged(e);
     }
 
+    protected override void OnContentChanged(object oldContent, object newContent)
+    {
+        base.OnContentChanged(oldContent, newContent);
+        InvalidateMeasure();
+        InvalidateVisual();
+    }
+
     protected override Size MeasureOverride(Size constraint)
     {
         var text = Content as string ?? Content?.ToString() ?? string.Empty;
-        var width = Padding.Left + Padding.Right;
-        var height = Padding.Top + Padding.Bottom;
+        var stroke = Math.Max(0d, BorderSize);
+        // 枠線＋日本語 Bold のはみ出し余裕
+        var width = Padding.Left + Padding.Right + stroke * 2d + 2d;
+        var height = Padding.Top + Padding.Bottom + stroke * 2d;
         if (!string.IsNullOrEmpty(text))
         {
             var formatted = new FormattedText(
@@ -219,18 +230,31 @@ internal sealed class RoundedButton : Button
                 FontSize,
                 Brushes.Black,
                 UiDpi.Get(this).PixelsPerDip);
-            width += formatted.Width;
+            width += formatted.WidthIncludingTrailingWhitespace;
             height += formatted.Height;
         }
 
-        if (!double.IsInfinity(constraint.Width))
+        width = Math.Max(width, MinWidth);
+        height = Math.Max(height, MinHeight);
+        if (!double.IsNaN(Width) && !double.IsInfinity(Width))
         {
-            width = Math.Min(width, constraint.Width);
+            width = Width;
         }
 
-        if (!double.IsInfinity(constraint.Height))
+        if (!double.IsNaN(Height) && !double.IsInfinity(Height))
         {
-            height = Math.Min(height, constraint.Height);
+            height = Height;
+        }
+
+        // 明示 Max のみで縮める。親制約で Desired を切ると文字が見切れる。
+        if (!double.IsInfinity(MaxWidth) && MaxWidth > 0d)
+        {
+            width = Math.Min(width, MaxWidth);
+        }
+
+        if (!double.IsInfinity(MaxHeight) && MaxHeight > 0d)
+        {
+            height = Math.Min(height, MaxHeight);
         }
 
         return new Size(Math.Max(0d, width), Math.Max(0d, height));
@@ -277,19 +301,36 @@ internal sealed class RoundedButton : Button
         var textColor = IsEnabled
             ? Foreground is SolidColorBrush solid ? solid.Color : Theme.Get("PrimaryForeBrush")
             : DisabledForeColor;
-        var formatted = new FormattedText(
+        var innerW = Math.Max(1d, ActualWidth - Padding.Left - Padding.Right - stroke * 2d);
+        var typeface = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch);
+        var dip = UiDpi.Get(this).PixelsPerDip;
+        var natural = new FormattedText(
             text,
             CultureInfo.CurrentUICulture,
             FlowDirection,
-            new Typeface(FontFamily, FontStyle, FontWeight, FontStretch),
+            typeface,
             FontSize,
             WpfControlHelpers.FrozenBrush(textColor),
-            UiDpi.Get(this).PixelsPerDip)
+            dip);
+        var formatted = natural;
+        if (natural.WidthIncludingTrailingWhitespace > innerW + 0.5d)
         {
-            MaxTextWidth = Math.Max(1d, ActualWidth - Padding.Left - Padding.Right),
-            Trimming = TextTrimming.CharacterEllipsis,
-        };
-        var textX = Padding.Left + Math.Max(0d, (ActualWidth - Padding.Left - Padding.Right - formatted.Width) / 2d);
+            formatted = new FormattedText(
+                text,
+                CultureInfo.CurrentUICulture,
+                FlowDirection,
+                typeface,
+                FontSize,
+                WpfControlHelpers.FrozenBrush(textColor),
+                dip)
+            {
+                MaxTextWidth = innerW,
+                Trimming = TextTrimming.CharacterEllipsis,
+            };
+        }
+
+        var textX = Padding.Left + stroke
+            + Math.Max(0d, (innerW - formatted.Width) / 2d);
         var textY = (ActualHeight - formatted.Height) / 2d;
         dc.DrawText(formatted, new Point(textX, textY));
     }

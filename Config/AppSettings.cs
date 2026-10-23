@@ -345,6 +345,20 @@ internal sealed class AppSettings
 
     public int ColorPanelHeight { get; set; }
 
+    /// <summary>フェード調整ツールウィンドウの位置。未保存なら false。</summary>
+    public bool FadeToolWindowHasPosition { get; set; }
+
+    public int FadeToolWindowX { get; set; }
+
+    public int FadeToolWindowY { get; set; }
+
+    public int FadeToolWindowWidth { get; set; }
+
+    public int FadeToolWindowHeight { get; set; }
+
+    /// <summary>フェード調整ツールで始点／終点を 28 サンプル格子に揃える。既定はオフ。</summary>
+    public bool FadeToolAlignLoopEndsToTwentyEight { get; set; }
+
     public string UiLanguage { get; set; } = "auto";
 
     /// <summary>配色。auto / dark / light。既定は OS に従う。</summary>
