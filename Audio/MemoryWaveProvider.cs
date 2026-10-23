@@ -1,5 +1,6 @@
 using System.Threading;
 using MgaSonicAnvil.Domain;
+using MgaSonicAnvil.Editing;
 using NAudio.Wave;
 
 namespace MgaSonicAnvil.Audio;
@@ -84,6 +85,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private int _playEnd;
     private bool _loop;
     private Func<long, float>? _frameGain;
+    private LoopFadePreview? _loopFadePreview;
+    private float[] _fadeMixScratch = [];
     /// <summary>Play -E：ループ折り返しで -E 区間を二重再生するか。</summary>
     private bool _playExitLayer;
     /// <summary>再生ウィンドウ終端に続く -E 区間（ソースフレーム）。負値で未設定。</summary>
@@ -450,7 +453,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         long startFrame,
         WaveSelection? playRange,
         bool loop,
-        Func<long, float>? frameGain = null)
+        Func<long, float>? frameGain = null,
+        bool allowBeforePlayWindowStart = false)
     {
         lock (_gate)
         {
@@ -467,10 +471,15 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             ApplyOutputConfig();
             var window = Mp3Gapless.ResolveWindow(document, document.FrameCount, playRange);
             playRange = window;
-            var start = Mp3Gapless.ClampStart(startFrame, window, document.FrameCount);
+            var start = Mp3Gapless.ClampStart(
+                startFrame,
+                window,
+                document.FrameCount,
+                allowBeforePlayWindowStart);
             _sourceFrame = start;
             _cursor = checked((int)start * _channels);
             _frameGain = frameGain;
+            _loopFadePreview = null;
             _silenceOnly = false;
             _silentSkipIdleLoop = false;
             _flushFadeRemaining = 0;
@@ -503,7 +512,8 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         long startFrame,
         WaveSelection? playRange,
         bool loop,
-        Func<long, float>? frameGain = null)
+        Func<long, float>? frameGain = null,
+        bool allowBeforePlayWindowStart = false)
     {
         ArgumentNullException.ThrowIfNull(source);
         lock (_gate)
@@ -536,12 +546,13 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             ApplyOutputConfig();
             var window = Mp3Gapless.ResolveWindow(document, frames, playRange);
             playRange = window;
-            var start = Mp3Gapless.ClampStart(startFrame, window, frames);
+            var start = Mp3Gapless.ClampStart(startFrame, window, frames, allowBeforePlayWindowStart);
             source.SeekFrame(start, prebufferTimeoutMs: 200);
             _sourceFrame = start;
             _cursor = checked((int)start * _channels);
             InvalidateStreamRecentNoLock();
             _frameGain = frameGain;
+            _loopFadePreview = null;
             _silenceOnly = false;
             _silentSkipIdleLoop = false;
             _flushFadeRemaining = 0;
@@ -762,6 +773,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _sourceFrame = start;
         _cursor = checked((int)start * Math.Max(1, _channels));
         _frameGain = null;
+        _loopFadePreview = null;
         _silenceOnly = false;
         _flushFadeRemaining = 0;
         _flushFadeTotal = 0;
@@ -842,6 +854,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _scrub.Stop();
             _exitPlaying = false;
             _frameGain = null;
+            _loopFadePreview = null;
             Ended = false;
             // フェードで実音を足すと、終了時に先読みへまた音が入る。
             _flushFadeTotal = 0;
@@ -1553,6 +1566,23 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 _exitSpanEndFrame = -1;
                 _exitPlaying = false;
             }
+        }
+    }
+
+    /// <summary>フェード調整ツールの非破壊プレビュー（ゲイン＋クロスフェード合成）。null で解除。</summary>
+    public void SetLoopFadePreview(LoopFadePreview? preview)
+    {
+        lock (_gate)
+        {
+            _loopFadePreview = preview;
+        }
+    }
+
+    public void SetFrameGain(Func<long, float>? frameGain)
+    {
+        lock (_gate)
+        {
+            _frameGain = frameGain;
         }
     }
 
@@ -3159,15 +3189,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             }
 
             // ホールドだと折り返しイメージ（ジャリつく偽の高域）が乗る。帯域制限補間で再構成する。
-            FormatConvert.ResampleFrameBandlimited(
-                _samples,
-                srcCh,
-                _sourceFrame,
-                frameCount,
-                _sourceRate,
-                _deviceRate,
-                source);
-            var gain = _frameGain is { } gainAt ? gainAt((long)Math.Floor(_sourceFrame)) : 1f;
+            // フェード調整のプリ／ポストはネイティブ経路と同じくここで合成する（44100→48000 等でも効かせる）。
+            FillResampledSourceWithLoopFade(source, srcCh, _sourceFrame, frameCount);
+            var gain = ResolveFrameGain((long)Math.Floor(_sourceFrame));
             EmitFrame(buffer, offset, writtenFrames, outCh, source, gain);
 
             _sourceFrame += step;
@@ -3177,6 +3201,67 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _cursor = checked((int)Math.Clamp(_sourceFrame, 0, frameCount) * srcCh);
         MixExitLayer(buffer, offset, exitMixedFrames, writtenFrames, srcCh, outCh, resampled: true);
         return writtenFrames;
+    }
+
+    /// <summary>
+    /// リサンプル 1 フレーム。LoopFadePreview があればアウト／イン側を別々に補間してからミックス。
+    /// </summary>
+    private void FillResampledSourceWithLoopFade(
+        Span<float> dest,
+        int srcCh,
+        double sourceFrame,
+        int frameCount)
+    {
+        var frame = (long)Math.Floor(sourceFrame);
+        if (_loopFadePreview is { } preview
+            && preview.TryCrossfadeMix(
+                frame,
+                out var outSideFrame,
+                out var inSideFrame,
+                out var outGain,
+                out var inGain)
+            && outSideFrame >= 0
+            && inSideFrame >= 0
+            && outSideFrame < frameCount
+            && inSideFrame < frameCount)
+        {
+            var frac = sourceFrame - frame;
+            Span<float> outSide = stackalloc float[ChannelLayout.MaxChannels];
+            Span<float> inSide = stackalloc float[ChannelLayout.MaxChannels];
+            var outDest = outSide[..Math.Min(srcCh, ChannelLayout.MaxChannels)];
+            var inDest = inSide[..Math.Min(srcCh, ChannelLayout.MaxChannels)];
+            FormatConvert.ResampleFrameBandlimited(
+                _samples,
+                srcCh,
+                outSideFrame + frac,
+                frameCount,
+                _sourceRate,
+                _deviceRate,
+                outDest);
+            FormatConvert.ResampleFrameBandlimited(
+                _samples,
+                srcCh,
+                inSideFrame + frac,
+                frameCount,
+                _sourceRate,
+                _deviceRate,
+                inDest);
+            for (var ch = 0; ch < srcCh; ch++)
+            {
+                dest[ch] = outDest[ch] * outGain + inDest[ch] * inGain;
+            }
+
+            return;
+        }
+
+        FormatConvert.ResampleFrameBandlimited(
+            _samples,
+            srcCh,
+            sourceFrame,
+            frameCount,
+            _sourceRate,
+            _deviceRate,
+            dest);
     }
 
     /// <summary>
@@ -3450,11 +3535,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                 ChannelMix.Downmix(_samples, checked((int)_exitFrame * srcCh), srcCh, out left, out right);
             }
 
-            if (_frameGain is { } gainAt)
+            var exitGain = ResolveFrameGain((long)Math.Floor(_exitFrame));
+            if (exitGain != 1f)
             {
-                var gain = gainAt((long)Math.Floor(_exitFrame));
-                left *= gain;
-                right *= gain;
+                left *= exitGain;
+                right *= exitGain;
             }
 
             AddFrame(buffer, offset, i, outCh, left, right);
@@ -3471,9 +3556,54 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         int sourceIndex,
         long sourceFrame)
     {
+        var gain = ResolveFrameGain(sourceFrame);
+        if (_loopFadePreview is { } preview
+            && preview.TryCrossfadeMix(
+                sourceFrame,
+                out var endSideFrame,
+                out var startSideFrame,
+                out var outGain,
+                out var inGain)
+            && endSideFrame >= 0
+            && startSideFrame >= 0
+            && endSideFrame < UsedFrameCountNoLock(srcCh)
+            && startSideFrame < UsedFrameCountNoLock(srcCh))
+        {
+            EnsureFadeMixScratch(srcCh);
+            var dest = _fadeMixScratch.AsSpan(0, srcCh);
+            var endSide = _samples.AsSpan(checked((int)endSideFrame * srcCh), srcCh);
+            var startSide = _samples.AsSpan(checked((int)startSideFrame * srcCh), srcCh);
+            for (var ch = 0; ch < srcCh; ch++)
+            {
+                dest[ch] = endSide[ch] * outGain + startSide[ch] * inGain;
+            }
+
+            EmitFrame(buffer, offset, writtenFrames, outCh, dest, gain, sourceFrame);
+            return;
+        }
+
         var source = _samples.AsSpan(sourceIndex, srcCh);
-        var gain = _frameGain is { } gainAt ? gainAt(sourceFrame) : 1f;
         EmitFrame(buffer, offset, writtenFrames, outCh, source, gain, sourceFrame);
+    }
+
+    private float ResolveFrameGain(long sourceFrame)
+    {
+        if (_frameGain is { } gainAt)
+        {
+            return gainAt(sourceFrame);
+        }
+
+        return _loopFadePreview is { } preview ? preview.GainAt(sourceFrame) : 1f;
+    }
+
+    private void EnsureFadeMixScratch(int channels)
+    {
+        if (_fadeMixScratch.Length >= channels)
+        {
+            return;
+        }
+
+        _fadeMixScratch = new float[channels];
     }
 
     /// <summary>1 フレーム分のソース信号をメーターへ流し、ルーティングして出力へ書く。</summary>
