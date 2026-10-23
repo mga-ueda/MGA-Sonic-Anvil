@@ -16,7 +16,7 @@ public partial class MainWindow
 {
     private void NewDocument()
     {
-        if (IsUiBusy)
+        if (RejectOutsideFadeToolAction() || IsUiBusy)
         {
             return;
         }
@@ -62,6 +62,11 @@ public partial class MainWindow
 
     private void OpenFromDialog()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         var dialog = new OpenFileDialog
         {
             Filter = IsLibraryMaximized && LibraryPlaylistDocuments.AnyEnabled
@@ -1121,7 +1126,7 @@ public partial class MainWindow
 
     private void CloseDocument()
     {
-        if (_activeSession is null)
+        if (RejectOutsideFadeToolAction() || _activeSession is null)
         {
             return;
         }

@@ -98,7 +98,7 @@ public partial class MainWindow
 
     private void ToggleWaapiPanel()
     {
-        if (IsLibraryMaximized)
+        if (RejectOutsideFadeToolAction() || IsLibraryMaximized)
         {
             return;
         }

@@ -22,6 +22,11 @@ public partial class MainWindow
             return;
         }
 
+        if (BlocksOutsideFadeToolActions && !IsAllowedTransportDuringFadeTool(command))
+        {
+            return;
+        }
+
         switch (command)
         {
             case TransportCommand.TogglePlayback:
@@ -495,13 +500,25 @@ public partial class MainWindow
         }
 
         WaveSelection? playRange = ResolvePlayLoopRange();
-        if (playRange is { } range && (startFrame < range.StartFrame || startFrame >= range.EndFrame))
+        // フェード調整／Auto Loop＋サンプルループ: イントロ（S より前）は通し、E 以降だけ S へ。
+        // Bind/Mp3Gapless 側にも同じフラグを渡し、再生窓始点への再吸い寄せを防ぐ。
+        var allowBeforePlayWindowStart =
+            IsCrossfadeEditMode || IsAutoLoopSampleLoopWindow();
+        if (playRange is { } range)
         {
-            startFrame = range.StartFrame;
+            // 選択／A-B ループは窓外開始を始点へスナップする。
+            startFrame = AutoLoopPlayback.ClampStartFrame(
+                startFrame,
+                range,
+                allowBeforeStart: allowBeforePlayWindowStart);
         }
 
         var gapless = Mp3Gapless.ResolveWindow(_document, _document.FrameCount, playRange);
-        startFrame = Mp3Gapless.ClampStart(startFrame, gapless, _document.FrameCount);
+        startFrame = Mp3Gapless.ClampStart(
+            startFrame,
+            gapless,
+            _document.FrameCount,
+            allowBeforePlayWindowStart);
 
         _lastPlaybackStart = startFrame;
 
@@ -516,8 +533,9 @@ public partial class MainWindow
                 startFrame,
                 playRange,
                 loop: playRange is not null,
-                preferStream: IsLibraryMaximized);
-            _player.SetExitSpan(ComputeExitLayerSpan(playRange));
+                preferStream: IsLibraryMaximized,
+                allowBeforePlayWindowStart: allowBeforePlayWindowStart);
+            ApplyFadeToolPlaybackLayers(playRange);
             SyncRangeClicks();
             _player.Play();
             _playbackGeneration = _player.Generation;
@@ -607,7 +625,7 @@ public partial class MainWindow
                 playRange,
                 loop: playRange is not null,
                 preferStream: true);
-            _player.SetExitSpan(ComputeExitLayerSpan(playRange));
+            ApplyFadeToolPlaybackLayers(playRange);
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
@@ -846,18 +864,26 @@ public partial class MainWindow
         }
 
         _player.SetPlayWindow(playRange, loop: true);
-        _player.SetExitSpan(ComputeExitLayerSpan(playRange));
+        ApplyFadeToolPlaybackLayers(playRange);
     }
 
     /// <summary>
-    /// プレイヤー A-B が揃っていればそれを優先。なければ選択範囲ループ。
-    /// どちらも無く Auto Loop オンなら全長ループ（Auto Next より優先）。
+    /// 再生のループ窓（半開区間）。null ならループなし（一通）。
+    /// 優先順位: フェード調整のサンプルループ → プレイヤー A-B → 選択 →
+    /// Auto Loop のサンプルループ →（プレイヤーのみ）Auto Loop 全長。
+    /// Auto Loop＋サンプルループ時の開始位置は <see cref="AutoLoopPlayback"/> を参照
+    /// （頭〜S は通し、E で S へ無限ループ）。
     /// </summary>
     private WaveSelection? ResolvePlayLoopRange()
     {
         if (_document is null)
         {
             return null;
+        }
+
+        if (IsCrossfadeEditMode && !_document.SampleLoop.IsEmpty)
+        {
+            return _document.SampleLoop.Clamp(_document.FrameCount);
         }
 
         if (IsLibraryMaximized && Waveform.TryGetPlayerAbLoop(out var ab))
@@ -870,20 +896,52 @@ public partial class MainWindow
             return _document.Selection;
         }
 
+        if (IsAutoLoopSampleLoopWindow())
+        {
+            return _document.SampleLoop.Clamp(_document.FrameCount);
+        }
+
         if (IsLibraryMaximized
             && LibraryBrowser.AutoLoopEnabled
             && _document.FrameCount > 0)
         {
+            // サンプルループ無し: 曲末→先頭の無限ループ。
             return new WaveSelection(0, _document.FrameCount);
         }
 
         return null;
     }
 
+    /// <summary>Auto Loop がサンプルループを再生窓にしているか（選択／A-B より下位）。</summary>
+    private bool IsAutoLoopSampleLoopWindow() =>
+        _document is not null
+        && AutoLoopPlayback.UsesSampleLoopWindow(
+            LibraryBrowser.AutoLoopEnabled,
+            _document.SampleLoop.IsEmpty,
+            hasSelection: !_document.Selection.IsEmpty,
+            hasPlayerAbLoop: IsLibraryMaximized && Waveform.TryGetPlayerAbLoop(out _));
+
     /// <summary>
     /// 再生ウィンドウ終端に接する -E（Exit）区間。Play -E のループ折り返し二重再生対象。
     /// 連続する Exit リージョンは 1 区間へつなげる。該当がなければ null。
     /// </summary>
+    private void ApplyFadeToolPlaybackLayers(WaveSelection? playRange)
+    {
+        if (IsCrossfadeEditMode && _crossfadeEdit is not null && _document is not null)
+        {
+            _crossfadeEdit.Clamp(_document.FrameCount);
+            // プリ／ポストクロスはループ内ミックス。Exit 二重再生は使わない。
+            _player.SetLoopFadePreview(LoopFadePreview.From(_crossfadeEdit));
+            _player.SetExitSpan(null);
+            _player.PlayExitLayer = false;
+            return;
+        }
+
+        _player.SetLoopFadePreview(null);
+        _player.SetExitSpan(ComputeExitLayerSpan(playRange));
+        _player.PlayExitLayer = WaapiBar.PlayPostExitChecked;
+    }
+
     private WaveSelection? ComputeExitLayerSpan(WaveSelection? window)
     {
         if (_document is null || window is not { IsEmpty: false } range)
@@ -1668,7 +1726,7 @@ public partial class MainWindow
             }
 
             // 再生ウィンドウのループが効かなかったときの保険。Auto Next より優先。
-            if (TryRestartLibraryAutoLoop())
+            if (TryRestartAutoLoop())
             {
                 return;
             }
@@ -1678,12 +1736,19 @@ public partial class MainWindow
                 return;
             }
         }
+        else if (TryRestartAutoLoop())
+        {
+            return;
+        }
 
         HaltPlaybackToStart();
     }
 
-    /// <summary>Auto Loop オンかつ範囲なしのとき、先頭から再生し直す。</summary>
-    private bool TryRestartLibraryAutoLoop()
+    /// <summary>
+    /// 再生窓ループが効かなかったときの保険。
+    /// サンプルループあり → S から（イントロは既に通した後の周回）。無し（プレイヤー）→ 先頭。
+    /// </summary>
+    private bool TryRestartAutoLoop()
     {
         if (!LibraryBrowser.AutoLoopEnabled || _document is null || _document.FrameCount <= 0)
         {
@@ -1692,6 +1757,17 @@ public partial class MainWindow
 
         // A-B／選択があるときは ResolvePlayLoopRange 側のループに任せる。
         if (Waveform.TryGetPlayerAbLoop(out _) || !_document.Selection.IsEmpty)
+        {
+            return false;
+        }
+
+        if (!_document.SampleLoop.IsEmpty)
+        {
+            StartPlayback(_document.SampleLoop.StartFrame, prerollSeconds: 0);
+            return true;
+        }
+
+        if (!IsLibraryMaximized)
         {
             return false;
         }
@@ -1774,7 +1850,7 @@ public partial class MainWindow
 
     private void SetSampleLoopFromSelection()
     {
-        if (_document is null)
+        if (RejectOutsideFadeToolAction() || _document is null)
         {
             return;
         }
@@ -1809,6 +1885,11 @@ public partial class MainWindow
 
     private void ClearSampleLoop()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         if (TryRunBatchEdit(
                 UiStrings.OverlayApplySelected,
                 (session, _) =>
@@ -1842,7 +1923,7 @@ public partial class MainWindow
 
     private bool TrySetRegionFromSelection(bool quiet = false)
     {
-        if (_document is null)
+        if (RejectOutsideFadeToolAction() || _document is null)
         {
             return false;
         }
@@ -1926,6 +2007,11 @@ public partial class MainWindow
 
     private void ToggleAnalyzerMaximize()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         SetWaveformMaximizeMode(
             _waveformMaximizeMode == WaveformMaximizeMode.Analyzers
                 ? WaveformMaximizeMode.Off
@@ -1934,6 +2020,11 @@ public partial class MainWindow
 
     private void ToggleWaveformMaximize()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         SetWaveformMaximizeMode(
             _waveformMaximizeMode == WaveformMaximizeMode.Waveform
                 ? WaveformMaximizeMode.Off
@@ -1962,6 +2053,11 @@ public partial class MainWindow
         if (_waveformMaximizeMode == mode)
         {
             return;
+        }
+
+        if (mode == WaveformMaximizeMode.Library)
+        {
+            CancelCrossfadeEditMode();
         }
 
         if (_waveformMaximizeMode == WaveformMaximizeMode.Library

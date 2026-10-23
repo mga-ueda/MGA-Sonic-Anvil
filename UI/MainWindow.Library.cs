@@ -133,6 +133,11 @@ public partial class MainWindow
 
     private void ToggleLibraryMaximize()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         // メニュー表示中、および外側クリック dismiss がプレイヤー切替ボタンへ貫通したときの解除は捨てる。
         // （右クリックメニューを閉じるクリックが下のトランスポートボタンに当たると、
         //   ここが走って選択以外のトラックが消えてしまう。ガードは左ボタン解放まで残る。）
@@ -202,6 +207,11 @@ public partial class MainWindow
     /// </summary>
     private void ToggleVideoMiniPlayer()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         var active = IsVideoMiniPlayerActive();
         if (!LibraryPlayerMode.CanToggleVideoMiniPlayer(
                 active,
@@ -315,6 +325,11 @@ public partial class MainWindow
     /// </summary>
     private void ToggleLibraryMinimalChrome()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         if (IsVideoMiniPlayerActive())
         {
             LeaveVideoMiniToPlaylist(minimalChrome: true);
@@ -5415,13 +5430,14 @@ public partial class MainWindow
     {
         AppStorage.Settings.LibraryAutoLoop = LibraryBrowser.AutoLoopEnabled;
         AppStorage.Save();
-        if (!IsLibraryMaximized)
+        if (AutoLoopCheck.IsChecked != LibraryBrowser.AutoLoopEnabled)
         {
-            return;
+            AutoLoopCheck.IsChecked = LibraryBrowser.AutoLoopEnabled;
         }
 
+        // エディタでもサンプルループ再生ウィンドウを Autoloop に追従させる。
         SyncPlayWindowFromDocument();
-        if (!IsPlaybackActive())
+        if (!IsLibraryMaximized || !IsPlaybackActive())
         {
             return;
         }

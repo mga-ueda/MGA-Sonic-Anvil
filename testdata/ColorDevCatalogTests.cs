@@ -12,22 +12,28 @@ public sealed class ColorDevCatalogTests
     [InlineData("SurfaceBackBrush", "Shared")]
     [InlineData("MenuHighlightBackBrush", "Shared")]
     [InlineData("MenuDisabledForeBrush", "Shared")]
-    [InlineData("ProjectBarBackBrush", "Overview")]
+    [InlineData("PlayerFallbackWashNavyBrush", "AmbientWash")]
+    [InlineData("PlayerGlowVeilBrush", "AmbientWash")]
+    [InlineData("OverviewOutsideFillBrush", "Overview")]
     [InlineData("WaveFillBrush", "Waveform")]
     [InlineData("PlayheadBrush", "Guides")]
     [InlineData("WaveSelectionFillBrush", "Selection")]
     [InlineData("LoopRangeFillBrush", "Selection")]
     [InlineData("SampleLoopTimelineBrush", "SampleLoop")]
+    [InlineData("CrossfadePreBrush", "Crossfade")]
+    [InlineData("CrossfadePostBrush", "Crossfade")]
     [InlineData("RegionTimelineBrush", "Region")]
     [InlineData("MarkerBrush", "Marker")]
     [InlineData("PlayerFormatMismatchForeBrush", "Player")]
+    [InlineData("PlayerJacketReflectionBrush", "Player")]
     [InlineData("LoudnessSafeBrush", "Loudness")]
     [InlineData("LevelMeterClipOnBrush", "Meter")]
-    [InlineData("LevelGradFloorBrush", "Spectrum")]
-    [InlineData("LevelGradCeilBrush", "Spectrum")]
+    [InlineData("LevelGradFloorBrush", "Meter")]
+    [InlineData("LevelGradCeilBrush", "Meter")]
     [InlineData("VectorScopeBackBrush", "VectorScope")]
     [InlineData("PlayerLevelMeterTickBrush", "Player")]
     [InlineData("TransportBackBrush", "Transport")]
+    [InlineData("ProjectBarBackBrush", "Transport")]
     [InlineData("HistoryStripBackBrush", "Transport")]
     [InlineData("ActionCopyrightForeBrush", "Transport")]
     [InlineData("WaapiToggleOnBackBrush", "Transport")]
@@ -35,6 +41,7 @@ public sealed class ColorDevCatalogTests
     [InlineData("WaapiBarBackBrush", "StatusBar")]
     [InlineData("WindowBackBrush", "Dialog")]
     [InlineData("ColorPanelBackBrush", "Dialog")]
+    [InlineData("DialogInputBackBrush", "Dialog")]
     [InlineData("UnknownBrush", "Other")]
     public void GroupOf_UsesKeyNotLabelPrefix(string key, string group)
     {
@@ -42,30 +49,45 @@ public sealed class ColorDevCatalogTests
     }
 
     [Fact]
-    public void Order_SharedThenScreenTopToBottom()
+    public void Order_ImportanceThenAreaThenScreenDetail()
     {
-        Assert.True(ColorDevCatalog.Rank("SurfaceBackBrush") < ColorDevCatalog.Rank("ProjectBarBackBrush"));
-        Assert.True(ColorDevCatalog.Rank("ProjectBarBackBrush") < ColorDevCatalog.Rank("WaveFillBrush"));
-        Assert.True(ColorDevCatalog.Rank("WaveFillBrush") < ColorDevCatalog.Rank("PlayheadBrush"));
+        Assert.True(ColorDevCatalog.Rank("SurfaceBackBrush") < ColorDevCatalog.Rank("PlayerFallbackWashNavyBrush"));
+        Assert.True(ColorDevCatalog.Rank("PlayerFallbackWashNavyBrush") < ColorDevCatalog.Rank("PlayerGlowVeilBrush"));
+        Assert.True(ColorDevCatalog.Rank("PlayerGlowVeilBrush") < ColorDevCatalog.Rank("WaveFillBrush"));
+        Assert.True(ColorDevCatalog.Rank("WaveFillBrush") < ColorDevCatalog.Rank("OverviewOutsideFillBrush"));
+        Assert.True(ColorDevCatalog.Rank("OverviewOutsideFillBrush") < ColorDevCatalog.Rank("PlayheadBrush"));
         Assert.True(ColorDevCatalog.Rank("PlayheadBrush") < ColorDevCatalog.Rank("WaveSelectionFillBrush"));
         Assert.True(ColorDevCatalog.Rank("WaveSelectionFillBrush") < ColorDevCatalog.Rank("LoopRangeFillBrush"));
         Assert.True(ColorDevCatalog.Rank("LoopRangeFillBrush") < ColorDevCatalog.Rank("SampleLoopTimelineBrush"));
-        Assert.True(ColorDevCatalog.Rank("SampleLoopTimelineBrush") < ColorDevCatalog.Rank("RegionTimelineBrush"));
+        Assert.True(ColorDevCatalog.Rank("SampleLoopTimelineBrush") < ColorDevCatalog.Rank("CrossfadePreBrush"));
+        Assert.True(ColorDevCatalog.Rank("CrossfadePreBrush") < ColorDevCatalog.Rank("CrossfadePostBrush"));
+        Assert.True(ColorDevCatalog.Rank("CrossfadePostBrush") < ColorDevCatalog.Rank("RegionTimelineBrush"));
         Assert.True(ColorDevCatalog.Rank("RegionTimelineBrush") < ColorDevCatalog.Rank("MarkerBrush"));
         Assert.True(ColorDevCatalog.Rank("MarkerBrush") < ColorDevCatalog.Rank("LoudnessWaveFillBrush"));
-        Assert.True(ColorDevCatalog.Rank("LoudnessWaveFillBrush") < ColorDevCatalog.Rank("LevelMeterTrackBackBrush"));
-        Assert.True(ColorDevCatalog.Rank("LevelMeterTrackBackBrush") < ColorDevCatalog.Rank("LevelGradFloorBrush"));
-        Assert.True(ColorDevCatalog.Rank("LevelGradFloorBrush") < ColorDevCatalog.Rank("VectorScopeBackBrush"));
-        Assert.True(ColorDevCatalog.Rank("VectorScopeBackBrush") < ColorDevCatalog.Rank("PlayerLevelMeterTickBrush"));
+        Assert.True(ColorDevCatalog.Rank("LoudnessWaveFillBrush") < ColorDevCatalog.Rank("LevelGradFloorBrush"));
+        Assert.True(ColorDevCatalog.Rank("LevelGradFloorBrush") < ColorDevCatalog.Rank("LevelMeterTrackBackBrush"));
+        Assert.True(ColorDevCatalog.Rank("LevelMeterTrackBackBrush") < ColorDevCatalog.Rank("VectorScopeBackBrush"));
+        Assert.True(ColorDevCatalog.Rank("VectorScopeBackBrush") < ColorDevCatalog.Rank("PlayerJacketReflectionBrush"));
+        Assert.True(ColorDevCatalog.Rank("PlayerJacketReflectionBrush") < ColorDevCatalog.Rank("PlayerLevelMeterTickBrush"));
         Assert.True(ColorDevCatalog.Rank("PlayerLevelMeterTickBrush") < ColorDevCatalog.Rank("TransportBackBrush"));
-        Assert.True(ColorDevCatalog.Rank("TransportBackBrush") < ColorDevCatalog.Rank("StatusBarBackBrush"));
+        Assert.True(ColorDevCatalog.Rank("TransportBackBrush") < ColorDevCatalog.Rank("ProjectBarBackBrush"));
+        Assert.True(ColorDevCatalog.Rank("ProjectBarBackBrush") < ColorDevCatalog.Rank("StatusBarBackBrush"));
         Assert.True(ColorDevCatalog.Rank("StatusBarBackBrush") < ColorDevCatalog.Rank("WindowBackBrush"));
         Assert.True(ColorDevCatalog.Rank("SampleLoopTimelineBrush") < ColorDevCatalog.Rank("SampleLoopGripBrush"));
         Assert.True(ColorDevCatalog.Rank("SampleLoopGripBrush") < ColorDevCatalog.Rank("SampleLoopWaveFillBrush"));
         Assert.True(ColorDevCatalog.Rank("SpectrogramGridBrush") < ColorDevCatalog.Rank("SpectrogramScaleForeBrush"));
         Assert.True(ColorDevCatalog.Rank("SpectrogramScaleForeBrush") < ColorDevCatalog.Rank("SpectrogramScaleEdgeBrush"));
-        Assert.True(ColorDevCatalog.Rank("PlayerJacketReflectionBrush") < ColorDevCatalog.Rank("PlayerFallbackWashNavyBrush"));
         Assert.True(ColorDevCatalog.Rank("TransportPressedBackBrush") < ColorDevCatalog.Rank("RecordLatchForeBrush"));
+    }
+
+    [Fact]
+    public void IsPlayerShared_IncludesAmbientWashAndPlayerUi()
+    {
+        Assert.True(ColorDevCatalog.IsPlayerShared("PlayerFallbackWashNavyBrush"));
+        Assert.True(ColorDevCatalog.IsPlayerShared("PlayerGlowVeilBrush"));
+        Assert.True(ColorDevCatalog.IsPlayerShared("PlayerWaveFillBrush"));
+        Assert.False(ColorDevCatalog.IsPlayerShared("SurfaceBackBrush"));
+        Assert.False(ColorDevCatalog.IsPlayerShared("WaveFillBrush"));
     }
 
     [Fact]
@@ -76,17 +98,21 @@ public sealed class ColorDevCatalogTests
         {
             UiStrings.SetLanguage(UiLanguage.Japanese);
             Assert.Equal("共通", ColorDevCatalog.GroupTitle(ColorDevGroup.Shared));
+            Assert.Equal("環境ウォッシュ", ColorDevCatalog.GroupTitle(ColorDevGroup.AmbientWash));
             Assert.Equal("波形", ColorDevCatalog.GroupTitle(ColorDevGroup.Waveform));
             Assert.Equal("ガイド", ColorDevCatalog.GroupTitle(ColorDevGroup.Guides));
+            Assert.Equal("レベル（メーター／スペアナ）", ColorDevCatalog.GroupTitle(ColorDevGroup.Meter));
             Assert.Equal("トランスポート", ColorDevCatalog.GroupTitle(ColorDevGroup.Transport));
-            Assert.Equal("プレイヤー", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
+            Assert.Equal("プレイヤー UI", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
 
             UiStrings.SetLanguage(UiLanguage.English);
             Assert.Equal("Shared", ColorDevCatalog.GroupTitle(ColorDevGroup.Shared));
+            Assert.Equal("Ambient wash", ColorDevCatalog.GroupTitle(ColorDevGroup.AmbientWash));
             Assert.Equal("Waveform", ColorDevCatalog.GroupTitle(ColorDevGroup.Waveform));
             Assert.Equal("Guides", ColorDevCatalog.GroupTitle(ColorDevGroup.Guides));
+            Assert.Equal("Level (meter · spectrum)", ColorDevCatalog.GroupTitle(ColorDevGroup.Meter));
             Assert.Equal("Transport", ColorDevCatalog.GroupTitle(ColorDevGroup.Transport));
-            Assert.Equal("Player", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
+            Assert.Equal("Player UI", ColorDevCatalog.GroupTitle(ColorDevGroup.Player));
         }
         finally
         {
@@ -136,15 +162,37 @@ public sealed class ColorDevCatalogTests
     }
 
     [Fact]
+    public void Labels_DescribeActualUse()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Equal("アプリ基本背景", UiStrings.ColorLabel("SurfaceBackBrush"));
+            Assert.Equal("ネイビー（ジャケットなし）", UiStrings.ColorLabel("PlayerFallbackWashNavyBrush"));
+            Assert.Equal("ベール（暗幕）", UiStrings.ColorLabel("PlayerGlowVeilBrush"));
+            Assert.Equal("エリア背景", UiStrings.ColorLabel("WaveformBackBrush"));
+            Assert.Equal("控えめクロームのボタン枠", UiStrings.ColorLabel("ProjectBarBackBrush"));
+            Assert.Equal("バー色・暗い端", UiStrings.ColorLabel("LevelGradFloorBrush"));
+            Assert.Equal("パネル面（見出しなど）", UiStrings.ColorLabel("ColorPanelBackBrush"));
+            Assert.Equal("ジャケット下の映り込み", UiStrings.ColorLabel("PlayerJacketReflectionBrush"));
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
     public void Matches_LabelKeyHexAndGroup()
     {
-        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#C6D9FF", "波形"));
-        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#C6D9FF", "wave"));
-        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#C6D9FF", "C6"));
-        Assert.False(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#C6D9FF", "playhead"));
-        Assert.True(ColorDevCatalog.Matches("波形", "WaveFillBrush", "#C6D9FF", " "));
-        Assert.True(ColorDevCatalog.Matches("エリア背景（固定）", "WaveformBackBrush", "#262626", "波形", "波形"));
-        Assert.False(ColorDevCatalog.Matches("エリア背景（固定）", "WaveformBackBrush", "#262626", "波形", "playhead"));
+        Assert.True(ColorDevCatalog.Matches("波形塗り", "WaveFillBrush", "#C6D9FF", "波形"));
+        Assert.True(ColorDevCatalog.Matches("波形塗り", "WaveFillBrush", "#C6D9FF", "wave"));
+        Assert.True(ColorDevCatalog.Matches("波形塗り", "WaveFillBrush", "#C6D9FF", "C6"));
+        Assert.False(ColorDevCatalog.Matches("波形塗り", "WaveFillBrush", "#C6D9FF", "playhead"));
+        Assert.True(ColorDevCatalog.Matches("波形塗り", "WaveFillBrush", "#C6D9FF", " "));
+        Assert.True(ColorDevCatalog.Matches("エリア背景", "WaveformBackBrush", "#262626", "波形", "波形"));
+        Assert.False(ColorDevCatalog.Matches("エリア背景", "WaveformBackBrush", "#262626", "波形", "playhead"));
         Assert.True(ColorDevCatalog.Matches(
             "マーカー編集欄",
             "TimelineWellBackBrush",
@@ -157,6 +205,12 @@ public sealed class ColorDevCatalogTests
             "#00000000",
             "波形",
             "仕切り"));
+        Assert.True(ColorDevCatalog.Matches(
+            "ネイビー（ジャケットなし）",
+            "PlayerFallbackWashNavyBrush",
+            "#0B1B49",
+            "環境ウォッシュ",
+            "ウォッシュ"));
     }
 
     [Fact]

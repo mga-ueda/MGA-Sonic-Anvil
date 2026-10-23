@@ -42,6 +42,8 @@
     <SolidColorBrush x:Key="SampleLoopWaveFillBrush" Color="#334A7FA0" />
     <SolidColorBrush x:Key="SampleLoopTimeLabelForeBrush" Color="#FF000000" />
     <SolidColorBrush x:Key="SampleLoopGripBrush" Color="#FF8EC4DC" />
+    <SolidColorBrush x:Key="CrossfadePreBrush" Color="#FF007D00" />
+    <SolidColorBrush x:Key="CrossfadePostBrush" Color="#FF7D0000" />
     <SolidColorBrush x:Key="RegionTimelineBrush" Color="#FF4A9A52" />
     <SolidColorBrush x:Key="RegionWaveFillBrush" Color="#334A9A52" />
     <SolidColorBrush x:Key="RegionTimeLabelForeBrush" Color="#FF000000" />

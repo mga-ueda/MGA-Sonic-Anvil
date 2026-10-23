@@ -150,7 +150,12 @@ public partial class MainWindow
         var recording = IsRecording;
         var busy = IsUiBusy;
         var selectedTabs = SelectedTabsInOrder();
-        var canEdit = hasDoc && !busy && !recording && !IsLibraryMaximized;
+        // フェード調整中は破壊編集メニューを無効化（再生・シーク系の CanNavigate は残す）。
+        var canEdit = hasDoc
+            && !busy
+            && !recording
+            && !IsLibraryMaximized
+            && !BlocksOutsideFadeToolActions;
         var canScratch = hasDoc && !busy && !recording && IsPlayerScratchContext();
         var canNavigate = hasDoc && !busy && !recording;
         var hasSelection = hasDoc && !document!.Selection.IsEmpty;
@@ -386,6 +391,9 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.FadeAround:
                 ApplyFadeAroundPlayhead();
+                break;
+            case WaveMenuCommand.CrossfadeEdit:
+                TryEnterCrossfadeEditMode();
                 break;
             case WaveMenuCommand.Normalize:
                 ApplyNormalize();

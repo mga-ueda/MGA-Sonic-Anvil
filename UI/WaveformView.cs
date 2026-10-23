@@ -150,7 +150,14 @@ internal sealed class WaveformView : Grid
                 return _forcedFlagLaneRows;
             }
 
-            return CountFlagLaneRows(_document.Markers.Count > 0, _document.Regions.Count > 0);
+            var rows = CountFlagLaneRows(_document.Markers.Count > 0, _document.Regions.Count > 0);
+            // クロスフェード編集中は Pre/Post 旗用に最低1行確保する。
+            if (_crossfadeDraft is { IsActive: true })
+            {
+                return Math.Max(1, rows);
+            }
+
+            return rows;
         }
     }
 
@@ -195,6 +202,15 @@ internal sealed class WaveformView : Grid
     private bool _loopDragStart;
     private bool _loopDragEnd;
     private WaveSelection _loopDragBefore;
+    private CrossfadeDragPart _crossfadeDrag;
+    private bool _crossfadeDragMoved;
+    private long? _crossfadeDragSnapHold;
+    private readonly List<(CrossfadeDragPart Part, Rect Flag)> _crossfadeFlags = [];
+    private CrossfadeEditState? _crossfadeDraft;
+    private readonly DispatcherTimer _crossfadeWavePreviewTimer = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(100),
+    };
     private bool _pendingSelectionPrerollJump;
     private TextBox? _commentEditor;
     private long _commentEditFrame = -1;
@@ -351,6 +367,11 @@ internal sealed class WaveformView : Grid
         Children.Add(_staticHost);
         Children.Add(_overlayHost);
         Children.Add(_playheadHost);
+        _crossfadeWavePreviewTimer.Tick += (_, _) =>
+        {
+            _crossfadeWavePreviewTimer.Stop();
+            RebuildCrossfadeWavePreview();
+        };
 
         _mouseGuideBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MouseGuideBrush"));
         _mouseGuideOnSelectionBrush = WpfControlHelpers.FrozenBrush(Theme.Get("MouseGuideOnSelectionBrush"));
@@ -1010,8 +1031,28 @@ internal sealed class WaveformView : Grid
             _document.CursorFrame = next;
         }
 
+        // Alt ヌッジ等でもドラフト S/E とプリ／ポスト旗をサンプルループに追従させる
+        SyncCrossfadeDraftFromSampleLoop();
         InvalidateStaticLayer();
         InvalidatePlayheadLayer();
+        MarkersChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
+    /// <summary>フェード調整中の Alt ヌッジ用。サンプルループの両端を選択する。</summary>
+    public bool TrySelectSampleLoopPair()
+    {
+        if (_document is null || _document.SampleLoop.IsEmpty)
+        {
+            return false;
+        }
+
+        _selectedMarkerFrames.Clear();
+        _selectedRegionEdges.Clear();
+        _loopStartSelected = true;
+        _loopEndSelected = true;
+        _markerSelectAnchor = _document.SampleLoop.StartFrame;
+        InvalidateStaticLayer();
         MarkersChanged?.Invoke(this, EventArgs.Empty);
         return true;
     }
@@ -1021,6 +1062,27 @@ internal sealed class WaveformView : Grid
     public double AmpZoom => _ampZoom;
 
     public double ViewStart => _viewStart;
+
+    /// <summary>クロスフェード編集モードのドラフト。非 null のとき S/E/X/ポストを重ね描画。</summary>
+    public CrossfadeEditState? CrossfadeDraft
+    {
+        get => _crossfadeDraft;
+        set
+        {
+            _crossfadeDraft = value;
+            // Pre/Post 旗用レーン行数が変わるので行高を取り直す。
+            _appliedMarkerLaneHeight = -1;
+            // クリアは即。変更はデバウンス（ドラッグ／スライダー連打用）。
+            ScheduleCrossfadeWavePreview(immediate: value is null);
+            if (value is { IsActive: true })
+            {
+                InvalidateWaveform();
+            }
+        }
+    }
+
+    /// <summary>本体波形でドラフトマーカーをドラッグしたとき。</summary>
+    public event EventHandler? CrossfadeDraftChanged;
 
     public double ViewSpanFrames
     {
@@ -2525,14 +2587,27 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        if (!SeekAndSelectOnly && TryHitRegionFlag(start, out var regionHit, out var hitFrame))
+        // Pre/Post 旗は最前面なので、マーカー／リージョンより先に掴む。
+        if (!SeekAndSelectOnly && TryHitCrossfadeFlag(start, out var xfFlag))
+        {
+            BeginCrossfadeDraftDrag(xfFlag, start);
+            e.Handled = true;
+            return;
+        }
+
+        // フェード調整中は Pre/Post／サンプルループ以外の旗編集を受け付けない。
+        var fadeToolLocksOtherEdits = _crossfadeDraft is { IsActive: true };
+
+        if (!SeekAndSelectOnly && !fadeToolLocksOtherEdits && TryHitRegionFlag(start, out var regionHit, out var hitFrame))
         {
             BeginRegionFlagInteraction(regionHit, hitFrame, start);
             e.Handled = true;
             return;
         }
 
-        if ((!SeekAndSelectOnly || UsesPlayerScratch) && TryHitMarkerFlag(start, out var hit))
+        if (!fadeToolLocksOtherEdits
+            && (!SeekAndSelectOnly || UsesPlayerScratch)
+            && TryHitMarkerFlag(start, out var hit))
         {
             BeginMarkerFlagInteraction(hit, start);
             e.Handled = true;
@@ -2542,6 +2617,13 @@ internal sealed class WaveformView : Grid
         if (!SeekAndSelectOnly && TryHitSampleLoopBar(start))
         {
             BeginLoopBarInteraction(start);
+            e.Handled = true;
+            return;
+        }
+
+        if (!SeekAndSelectOnly && TryHitCrossfadeDraft(start, out var xfPart))
+        {
+            BeginCrossfadeDraftDrag(xfPart, start);
             e.Handled = true;
             return;
         }
@@ -2630,6 +2712,22 @@ internal sealed class WaveformView : Grid
             return;
         }
 
+        if (_crossfadeDrag != CrossfadeDragPart.None && _document is not null)
+        {
+            Cursor = Cursors.SizeWE;
+            if (!_crossfadeDragMoved && Math.Abs(pos.X - _dragStart.X) >= DragThresholdPx)
+            {
+                _crossfadeDragMoved = true;
+            }
+
+            if (_crossfadeDragMoved)
+            {
+                ApplyCrossfadeDraftDrag(ResolveCrossfadeDragFrame(pos.X));
+            }
+
+            return;
+        }
+
         if (!_dragging)
         {
             UpdateHoverCursor(pos);
@@ -2671,6 +2769,13 @@ internal sealed class WaveformView : Grid
         if (_markerDragging)
         {
             FinishMarkerDrag(commit: true);
+            e.Handled = true;
+            return;
+        }
+
+        if (_crossfadeDrag != CrossfadeDragPart.None)
+        {
+            FinishCrossfadeDraftDrag();
             e.Handled = true;
             return;
         }
@@ -2720,6 +2825,11 @@ internal sealed class WaveformView : Grid
         if (_markerDragging)
         {
             FinishMarkerDrag(commit: true);
+        }
+
+        if (_crossfadeDrag != CrossfadeDragPart.None)
+        {
+            FinishCrossfadeDraftDrag();
         }
 
         if (_dragging && _scrubbing)
@@ -2944,6 +3054,12 @@ internal sealed class WaveformView : Grid
                 MarkerRolePaint.DrawRegion(dc, _document, wave, start, span, "RegionWaveFillBrush");
                 MarkerRolePaint.DrawSampleLoop(dc, _document, wave, start, span, "SampleLoopWaveFillBrush");
                 MarkerRolePaint.DrawBackgrounds(dc, _document, wave, start, span);
+                DrawCrossfadeBarBackgrounds(dc, wave, start, span);
+            }
+            else if (!overlay && !loudness)
+            {
+                // キュー無し表示でもクロスフェード編集中は旗側を波形の下に塗る。
+                DrawCrossfadeBarBackgrounds(dc, wave, start, span);
             }
 
             EnsureWaveformBitmap(wave);
@@ -3035,7 +3151,10 @@ internal sealed class WaveformView : Grid
             RefreshFlagStacks(bounds, start, span);
             DrawRegionFlags(dc, bounds, start, span);
             DrawMarkers(dc, bounds, start, span, _document.Markers);
+            DrawCrossfadeDraft(dc, bounds, start, span);
             DrawPenInk(dc, bounds, start, span);
+            // Pre/Post 旗は他フラッグの上に絶対表示。
+            DrawCrossfadeFlags(dc, bounds, start, span);
             return;
         }
 
@@ -3060,7 +3179,708 @@ internal sealed class WaveformView : Grid
             DrawPlayerAbCues(dc, bounds, start, span);
         }
 
+        DrawCrossfadeDraft(dc, bounds, start, span);
         DrawPenInk(dc, bounds, start, span);
+        DrawCrossfadeFlags(dc, bounds, start, span);
+    }
+
+    // プリ／ポストの原色（旗・バー・重ね波形）。
+    private static Color CrossfadePrePrimary => Theme.Get("CrossfadePreBrush");
+    private static Color CrossfadePostPrimary => Theme.Get("CrossfadePostBrush");
+
+    /// <summary>旗側の長さバーを波形ビットマップの下（静的層）に塗る。</summary>
+    private void DrawCrossfadeBarBackgrounds(DrawingContext dc, Rect wave, double viewStart, double viewSpan)
+    {
+        var draft = CrossfadeDraft;
+        if (draft is not { IsActive: true } || draft.LoopLength <= 0 || viewSpan <= 0)
+        {
+            return;
+        }
+
+        if (draft.PreCrossfadeFrames > 0)
+        {
+            DrawCrossfadeBackgroundWash(
+                dc, wave, viewStart, viewSpan, draft.PreBarRange, CrossfadePrePrimary);
+        }
+
+        if (draft.PostCrossfadeFrames > 0)
+        {
+            DrawCrossfadeBackgroundWash(
+                dc, wave, viewStart, viewSpan, draft.PostBarRange, CrossfadePostPrimary);
+        }
+    }
+
+    private static void DrawCrossfadeBackgroundWash(
+        DrawingContext dc,
+        Rect wave,
+        double viewStart,
+        double viewSpan,
+        WaveSelection range,
+        Color primary)
+    {
+        if (!MarkerRolePaint.TryGetVisibleRangeRect(range, wave, viewStart, viewSpan, out var bar))
+        {
+            return;
+        }
+
+        // 原色のまま、半透明で波形の下に置く（暗く潰さない）。
+        var wash = Color.FromArgb(0x55, primary.R, primary.G, primary.B);
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(wash), null, bar);
+    }
+
+    private void DrawCrossfadeDraft(DrawingContext dc, Rect bounds, double start, double span)
+    {
+        var draft = CrossfadeDraft;
+        if (draft is not { IsActive: true } || _document is null || draft.LoopLength <= 0)
+        {
+            return;
+        }
+
+        var wave = WaveformBounds(bounds);
+
+        // 範囲塗りは静的層のみ。重ね色はゾーン一色（赤緑の同時描画はしない）。
+        // 元波形ピークは局所フェード（プリ=out→0 / ポスト=in←0）。重ねは相手側のみ。
+        // プリ区間＝S 手前×in（緑）、ポスト区間＝E 以降×out（赤）。
+        if (draft.PreCrossfadeFrames > 0)
+        {
+            DrawCrossfadeOverlapWaves(
+                dc,
+                wave,
+                start,
+                span,
+                draft.PreDrawStartFrame,
+                draft.PreCrossfadeFrames,
+                sourceStart: draft.PreFlagFrame,
+                color: CrossfadePrePrimary,
+                outShape: draft.PreOutShape,
+                inShape: draft.PreInShape,
+                fadeIn: true);
+        }
+
+        if (draft.PostCrossfadeFrames > 0)
+        {
+            DrawCrossfadeOverlapWaves(
+                dc,
+                wave,
+                start,
+                span,
+                draft.PostDrawStartFrame,
+                draft.PostCrossfadeFrames,
+                sourceStart: draft.EndFrame,
+                color: CrossfadePostPrimary,
+                outShape: draft.PostOutShape,
+                inShape: draft.PostInShape,
+                fadeIn: false);
+        }
+
+        var sePen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush")), 1.0);
+        sePen.Freeze();
+
+        void StemOnly(long frame)
+        {
+            var x = FrameToViewX(frame, start, span, bounds);
+            if (x < wave.Left - 2 || x > wave.Right + 2)
+            {
+                return;
+            }
+
+            dc.DrawLine(sePen, new Point(x, wave.Top), new Point(x, wave.Bottom));
+        }
+
+        // Pre/Post 旗は DrawCrossfadeFlags で最前面に描く。
+        StemOnly(draft.StartFrame);
+        StemOnly(draft.EndFrame);
+    }
+
+    /// <summary>Pre/Post 旗を最前面に描き、マーカーと同じ旗矩形で当たり判定用に覚える。</summary>
+    private void DrawCrossfadeFlags(DrawingContext dc, Rect bounds, double start, double span)
+    {
+        _crossfadeFlags.Clear();
+        var draft = CrossfadeDraft;
+        if (draft is not { IsActive: true } || _document is null || draft.LoopLength <= 0)
+        {
+            return;
+        }
+
+        var dip = UiDpi.Get(this).PixelsPerDip;
+        var typeface = new Typeface("Segoe UI");
+        var lane = MarkerLaneBounds(bounds);
+        var flagLaneH = Math.Max(lane.Height, DesignMetrics.MarkerLaneRowHeight * ChromeScale);
+        var whiteText = WpfControlHelpers.FrozenBrush(Colors.White);
+
+        void Flag(long frame, string label, bool growLeft, Color flagColor, CrossfadeDragPart part)
+        {
+            var x = FrameToViewX(frame, start, span, bounds);
+            if (x < ScaleLeft(bounds) - 24 || x > bounds.Width + 24)
+            {
+                return;
+            }
+
+            var boxW = MeasureFlagWidth(label, dip);
+            var left = growLeft ? x - boxW : x;
+            var box = LaneFlagRect(left, boxW, flagLaneH, split: false, top: true);
+            var xs = WpfControlHelpers.SnapDeviceCenter(x, dip);
+            var inset = WpfControlHelpers.DeviceHairline(dip) * 0.5;
+            box = AlignFlagToStem(box, xs, growLeft, inset);
+            _crossfadeFlags.Add((part, box));
+            var geo = WpfControlHelpers.FlagGeometry(box, FlagCornerRadius, stemOnLeft: !growLeft);
+            var fill = WpfControlHelpers.FrozenBrush(flagColor);
+            var stem = WpfControlHelpers.FrozenHairline(flagColor, dip);
+            dc.DrawGeometry(fill, null, geo);
+            var idText = new FormattedText(
+                label,
+                System.Globalization.CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                typeface,
+                ChromeFontSize,
+                whiteText,
+                dip);
+            dc.PushClip(geo);
+            dc.DrawText(
+                idText,
+                new Point(box.X + FlagPadX, box.Y + Math.Max(0, (box.Height - idText.Height) * 0.5)));
+            dc.Pop();
+            dc.DrawLine(stem, new Point(xs, box.Bottom), new Point(xs, bounds.Height));
+        }
+
+        Flag(draft.PreFlagFrame, UiStrings.CrossfadeMarkerPre, growLeft: true, CrossfadePrePrimary, CrossfadeDragPart.PreCrossfade);
+        Flag(draft.PostFlagFrame, UiStrings.CrossfadeMarkerPost, growLeft: false, CrossfadePostPrimary, CrossfadeDragPart.PostCrossfade);
+    }
+
+    /// <summary>
+    /// クロス区間に相手側材料を、ゾーン色一色＋フェード曲線ゲインで色付けする。
+    /// </summary>
+    private void DrawCrossfadeOverlapWaves(
+        DrawingContext dc,
+        Rect wave,
+        double viewStart,
+        double viewSpan,
+        long viewStartFrame,
+        long length,
+        long sourceStart,
+        Color color,
+        FadeShape outShape,
+        FadeShape inShape,
+        bool fadeIn)
+    {
+        if (_document is null || length <= 0 || viewSpan <= 0 || wave.Height < 4)
+        {
+            return;
+        }
+
+        var samples = _document.Interleaved;
+        var channels = Math.Max(1, _document.Channels);
+        var frameCount = _document.FrameCount;
+        var bounds = new Rect(RenderSize);
+        var x0 = FrameToViewX(viewStartFrame, viewStart, viewSpan, bounds);
+        var x1 = FrameToViewX(viewStartFrame + length, viewStart, viewSpan, bounds);
+        if (x1 < wave.Left || x0 > wave.Right)
+        {
+            return;
+        }
+
+        x0 = Math.Max(wave.Left, x0);
+        x1 = Math.Min(wave.Right, x1);
+        var pixelW = Math.Max(1, (int)Math.Ceiling(x1 - x0));
+        if (pixelW > 2400)
+        {
+            pixelW = 2400;
+        }
+
+        var drawChannels = SeekAndSelectOnly ? 1 : channels;
+        var laneGap = drawChannels > 1 ? 4d : 0d;
+        ResolveWaveLane(
+            overlay: false,
+            wave.Height,
+            drawChannels,
+            laneGap,
+            _ampZoom,
+            out var laneHeight,
+            out var laneOrigin,
+            out var ampHeight);
+        if (laneHeight < 2)
+        {
+            return;
+        }
+
+        var pen = new Pen(
+            WpfControlHelpers.FrozenBrush(Color.FromArgb(230, color.R, color.G, color.B)),
+            1.0);
+        pen.Freeze();
+        var fill = WpfControlHelpers.FrozenBrush(Color.FromArgb(150, color.R, color.G, color.B));
+
+        float SampleAt(long frame, int channel)
+        {
+            if (frame < 0 || frame >= frameCount)
+            {
+                return 0f;
+            }
+
+            var off = (int)frame * channels;
+            if (drawChannels == 1 && channels > 1)
+            {
+                double sum = 0;
+                for (var ch = 0; ch < channels; ch++)
+                {
+                    sum += samples[off + ch];
+                }
+
+                return (float)(sum / channels);
+            }
+
+            return samples[off + Math.Clamp(channel, 0, channels - 1)];
+        }
+
+        void PeakLane(int channel, double mid, double amp, double top, double bottom)
+        {
+            if (pixelW < 1)
+            {
+                return;
+            }
+
+            var geo = new StreamGeometry();
+            using (var ctx = geo.Open())
+            {
+                var started = false;
+                for (var i = 0; i < pixelW; i++)
+                {
+                    var o0 = i * length / pixelW;
+                    var o1 = (i + 1) * length / pixelW;
+                    if (o1 <= o0)
+                    {
+                        o1 = o0 + 1;
+                    }
+
+                    float min = 1f;
+                    float max = -1f;
+                    var any = false;
+                    for (var offset = o0; offset < o1; offset++)
+                    {
+                        FadeCurves.CrossfadeGainsAtFrame(
+                            outShape, inShape, offset, 0, length, out var outGain, out var inGain);
+                        var gain = fadeIn ? inGain : outGain;
+                        var sample = SampleAt(sourceStart + offset, channel) * gain;
+                        if (!any)
+                        {
+                            min = max = sample;
+                            any = true;
+                        }
+                        else
+                        {
+                            if (sample < min)
+                            {
+                                min = sample;
+                            }
+
+                            if (sample > max)
+                            {
+                                max = sample;
+                            }
+                        }
+                    }
+
+                    if (!any)
+                    {
+                        continue;
+                    }
+
+                    var x = x0 + (i + 0.5) * (x1 - x0) / pixelW;
+                    var yMax = Math.Clamp(mid - max * amp, top + 1, bottom - 1);
+                    if (!started)
+                    {
+                        ctx.BeginFigure(new Point(x, yMax), isFilled: true, isClosed: true);
+                        started = true;
+                    }
+                    else
+                    {
+                        ctx.LineTo(new Point(x, yMax), isStroked: true, isSmoothJoin: true);
+                    }
+                }
+
+                if (!started)
+                {
+                    return;
+                }
+
+                for (var i = pixelW - 1; i >= 0; i--)
+                {
+                    var o0 = i * length / pixelW;
+                    var o1 = (i + 1) * length / pixelW;
+                    if (o1 <= o0)
+                    {
+                        o1 = o0 + 1;
+                    }
+
+                    float min = 1f;
+                    var any = false;
+                    for (var offset = o0; offset < o1; offset++)
+                    {
+                        FadeCurves.CrossfadeGainsAtFrame(
+                            outShape, inShape, offset, 0, length, out var outGain, out var inGain);
+                        var gain = fadeIn ? inGain : outGain;
+                        var sample = SampleAt(sourceStart + offset, channel) * gain;
+                        if (!any)
+                        {
+                            min = sample;
+                            any = true;
+                        }
+                        else if (sample < min)
+                        {
+                            min = sample;
+                        }
+                    }
+
+                    if (!any)
+                    {
+                        continue;
+                    }
+
+                    var x = x0 + (i + 0.5) * (x1 - x0) / pixelW;
+                    var yMin = Math.Clamp(mid - min * amp, top + 1, bottom - 1);
+                    ctx.LineTo(new Point(x, yMin), isStroked: true, isSmoothJoin: true);
+                }
+            }
+
+            geo.Freeze();
+            dc.DrawGeometry(fill, pen, geo);
+        }
+
+        var amp = ampHeight * 0.45 * _ampZoom;
+        for (var ch = 0; ch < drawChannels; ch++)
+        {
+            var top = wave.Top + laneOrigin + ch * (laneHeight + laneGap);
+            var mid = top + laneHeight * 0.5;
+            var bottom = top + laneHeight;
+            PeakLane(ch, mid, amp, top, bottom);
+        }
+    }
+
+    private enum CrossfadeDragPart
+    {
+        None,
+        Start,
+        End,
+        PreCrossfade,
+        PostCrossfade,
+    }
+
+    /// <summary>マーカー旗と同じく、旗矩形 Contains で Pre/Post を掴む。</summary>
+    private bool TryHitCrossfadeFlag(Point point, out CrossfadeDragPart part)
+    {
+        for (var i = _crossfadeFlags.Count - 1; i >= 0; i--)
+        {
+            var hit = _crossfadeFlags[i];
+            if (hit.Flag.Contains(point))
+            {
+                part = hit.Part;
+                return true;
+            }
+        }
+
+        part = CrossfadeDragPart.None;
+        return false;
+    }
+
+    private bool TryHitCrossfadeDraft(Point pos, out CrossfadeDragPart part)
+    {
+        part = CrossfadeDragPart.None;
+        var draft = CrossfadeDraft;
+        if (draft is not { IsActive: true } || _document is null || draft.LoopLength <= 0)
+        {
+            return false;
+        }
+
+        // 旗は TryHitCrossfadeFlag。ここでは S/E 茎と長さバー本体。
+        var bounds = new Rect(RenderSize);
+        var start = _viewStart;
+        var span = ViewSpanFrames;
+        if (span <= 0)
+        {
+            return false;
+        }
+
+        var hitPx = Math.Max(6d, MarkerSnapPx);
+        var bestDist = hitPx;
+        var hit = CrossfadeDragPart.None;
+        void ConsiderStem(long frame, CrossfadeDragPart candidate)
+        {
+            var x = FrameToViewX(frame, start, span, bounds);
+            var dist = Math.Abs(pos.X - x);
+            if (dist <= bestDist)
+            {
+                bestDist = dist;
+                hit = candidate;
+            }
+        }
+
+        ConsiderStem(draft.StartFrame, CrossfadeDragPart.Start);
+        ConsiderStem(draft.EndFrame, CrossfadeDragPart.End);
+
+        // 長さバー上クリックでも旗と同じパーツを掴む。
+        if (draft.PreCrossfadeFrames > 0
+            && IsPointInCrossfadeBar(pos, draft.PreBarRange, start, span, bounds))
+        {
+            part = CrossfadeDragPart.PreCrossfade;
+            return true;
+        }
+
+        if (draft.PostCrossfadeFrames > 0
+            && IsPointInCrossfadeBar(pos, draft.PostBarRange, start, span, bounds))
+        {
+            part = CrossfadeDragPart.PostCrossfade;
+            return true;
+        }
+
+        part = hit;
+        return hit != CrossfadeDragPart.None;
+    }
+
+    private bool IsPointInCrossfadeBar(
+        Point pos,
+        WaveSelection range,
+        double viewStart,
+        double viewSpan,
+        Rect bounds)
+    {
+        var wave = WaveformBounds(bounds);
+        if (!wave.Contains(pos)
+            || !MarkerRolePaint.TryGetVisibleRangeRect(range, wave, viewStart, viewSpan, out var bar))
+        {
+            return false;
+        }
+
+        return bar.Contains(pos);
+    }
+
+    private void BeginCrossfadeDraftDrag(CrossfadeDragPart part, Point start)
+    {
+        _crossfadeDrag = part;
+        _crossfadeDragMoved = false;
+        _crossfadeDragSnapHold = null;
+        _dragStart = start;
+        CaptureMouse();
+        Cursor = Cursors.SizeWE;
+        Focus();
+    }
+
+    private long ResolveCrossfadeDragFrame(double mouseX)
+    {
+        var draft = CrossfadeDraft;
+        if (draft is null || _document is null)
+        {
+            return RawFrameAt(mouseX);
+        }
+
+        // ドラッグ中、近いバー／旗／S/E に吸着（マーカーと同じ距離感）。
+        var targets = new List<long>(4);
+        switch (_crossfadeDrag)
+        {
+            case CrossfadeDragPart.Start:
+            case CrossfadeDragPart.End:
+                if (draft.PreCrossfadeFrames > 0)
+                {
+                    targets.Add(draft.PreFlagFrame);
+                }
+
+                if (draft.PostCrossfadeFrames > 0)
+                {
+                    targets.Add(draft.PostFlagFrame);
+                }
+
+                break;
+            case CrossfadeDragPart.PreCrossfade:
+                targets.Add(draft.StartFrame);
+                targets.Add(draft.EndFrame);
+                if (draft.PostCrossfadeFrames > 0)
+                {
+                    targets.Add(draft.PostFlagFrame);
+                }
+
+                break;
+            case CrossfadeDragPart.PostCrossfade:
+                targets.Add(draft.StartFrame);
+                targets.Add(draft.EndFrame);
+                if (draft.PreCrossfadeFrames > 0)
+                {
+                    targets.Add(draft.PreFlagFrame);
+                }
+
+                break;
+        }
+
+        if (targets.Count > 0
+            && TryPickNearestSnap(
+                targets,
+                mouseX,
+                MarkerSnapPx,
+                _viewStart,
+                _viewStart + ViewSpanFrames,
+                frame => FrameToViewX(frame, _viewStart, ViewSpanFrames, new Rect(0, 0, ActualWidth, ActualHeight)),
+                out _,
+                out var snapped))
+        {
+            _crossfadeDragSnapHold = snapped;
+            return snapped;
+        }
+
+        if (_crossfadeDragSnapHold is long held
+            && TryGetSnapHoldDistance(mouseX, held, out var holdDist)
+            && holdDist <= MarkerSnapPx * 1.5)
+        {
+            return held;
+        }
+
+        _crossfadeDragSnapHold = null;
+        return RawFrameAt(mouseX);
+    }
+
+    private void ApplyCrossfadeDraftDrag(long frame)
+    {
+        var draft = CrossfadeDraft;
+        if (draft is null || _document is null)
+        {
+            return;
+        }
+
+        var frames = _document.FrameCount;
+        // 上限はファイル余白とループ長。相手フェードの自動削減／100%連動は SetPre/SetPost 側。
+        if (_crossfadeDrag == CrossfadeDragPart.PostCrossfade)
+        {
+            var maxPost = Math.Min(Math.Max(0, frames - draft.EndFrame), draft.LoopLength);
+            frame = Math.Clamp(frame, draft.EndFrame, draft.EndFrame + maxPost);
+        }
+        else if (_crossfadeDrag == CrossfadeDragPart.PreCrossfade)
+        {
+            var maxPre = Math.Min(Math.Max(0, draft.StartFrame), draft.LoopLength);
+            frame = Math.Clamp(frame, draft.StartFrame - maxPre, draft.StartFrame);
+        }
+        else
+        {
+            frame = Math.Clamp(frame, 0, frames);
+            if (draft.AlignLoopEndsToTwentyEight
+                && _crossfadeDrag is CrossfadeDragPart.Start or CrossfadeDragPart.End)
+            {
+                frame = CrossfadeEditState.RoundToAlignStep(frame);
+            }
+        }
+
+        switch (_crossfadeDrag)
+        {
+            case CrossfadeDragPart.Start:
+                draft.SetStart(frame, frames);
+                break;
+            case CrossfadeDragPart.End:
+                draft.SetEnd(frame, frames);
+                break;
+            case CrossfadeDragPart.PreCrossfade:
+                // 緑旗は S 手前 → 長さ = S − 旗
+                draft.SetPreCrossfade(Math.Max(0, draft.StartFrame - frame), frames);
+                break;
+            case CrossfadeDragPart.PostCrossfade:
+                // 赤旗は E 後ろ → 長さ = 旗 − E
+                draft.SetPostCrossfade(Math.Max(0, frame - draft.EndFrame), frames);
+                break;
+            default:
+                return;
+        }
+
+        InvalidatePlayheadLayer();
+        // 背景塗り＋フェード済みピークをドラッグ中も追従させる。
+        InvalidateWaveform();
+        ScheduleCrossfadeWavePreview();
+        CrossfadeDraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void FinishCrossfadeDraftDrag()
+    {
+        if (_crossfadeDrag == CrossfadeDragPart.None)
+        {
+            return;
+        }
+
+        _crossfadeDrag = CrossfadeDragPart.None;
+        _crossfadeDragMoved = false;
+        _crossfadeDragSnapHold = null;
+        if (IsMouseCaptured)
+        {
+            ReleaseMouseCapture();
+        }
+
+        RestoreIdleCursor();
+        ScheduleCrossfadeWavePreview(immediate: true);
+        CrossfadeDraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ScheduleCrossfadeWavePreview(bool immediate = false)
+    {
+        _crossfadeWavePreviewTimer.Stop();
+        if (immediate || _crossfadeDraft is not { IsActive: true })
+        {
+            RebuildCrossfadeWavePreview();
+            return;
+        }
+
+        _crossfadeWavePreviewTimer.Start();
+    }
+
+    private void RebuildCrossfadeWavePreview()
+    {
+        // ミックスは描画時に LoopFadePreview で都度計算。ここでは再描画だけ起こす。
+        InvalidateWaveform();
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// ピーク用: 元波形だけにフェード（プリ＝out→0、ポスト＝in←0）。重ね側は描画レイヤ任せ。
+    /// </summary>
+    private bool TryGetCrossfadeBaseDisplaySample(long frame, int channel, out float sample)
+    {
+        sample = 0;
+        if (_document is null
+            || _crossfadeDraft is not { IsActive: true } draft
+            || channel < 0
+            || channel >= _document.Channels
+            || frame < 0
+            || frame >= _document.FrameCount)
+        {
+            return false;
+        }
+
+        var preview = LoopFadePreview.From(draft);
+        if (!preview.TryCrossfadeMix(frame, out _, out _, out var outGain, out var inGain))
+        {
+            return false;
+        }
+
+        var local = _document.Interleaved[(int)frame * _document.Channels + channel];
+        if (draft.PostCrossfadeFrames > 0
+            && frame >= draft.StartFrame
+            && frame < draft.StartFrame + draft.PostCrossfadeFrames)
+        {
+            sample = local * inGain;
+            return true;
+        }
+
+        sample = local * outGain;
+        return true;
+    }
+
+    private bool TryMixCrossfadeBaseDisplayFrame(long frame, int channels, out float mixed)
+    {
+        mixed = 0;
+        double sum = 0;
+        for (var ch = 0; ch < channels; ch++)
+        {
+            if (!TryGetCrossfadeBaseDisplaySample(frame, ch, out var sample))
+            {
+                return false;
+            }
+
+            sum += sample;
+        }
+
+        mixed = (float)(sum / Math.Max(1, channels));
+        return true;
     }
 
     internal void PaintPlayhead(DrawingContext dc)
@@ -3867,7 +4687,13 @@ internal sealed class WaveformView : Grid
         float AbsAt(int index)
         {
             var frame = first + index;
-            SpectrogramEngine.MixFrame(samples, channels, frame, document.FrameCount, out var mixed);
+            float mixed;
+            if (TryMixCrossfadeBaseDisplayFrame(frame, channels, out mixed))
+            {
+                return Math.Abs(mixed * PreviewGain(frame));
+            }
+
+            SpectrogramEngine.MixFrame(samples, channels, frame, document.FrameCount, out mixed);
             return Math.Abs(mixed * PreviewGain(frame));
         }
 
@@ -4149,12 +4975,120 @@ internal sealed class WaveformView : Grid
         var count = useRawColumns
             ? FillRawColumnPeaks(document, startFrame, endFrame, width, channels)
             : document.Peaks.ReadRangePacked(startFrame, endFrame, width, _columnMins, _columnMaxs);
-        if (count > 0 && !useRawColumns && _previewGainAtFrame is not null)
+        if (count <= 0)
+        {
+            return count;
+        }
+
+        if (!useRawColumns && _previewGainAtFrame is not null)
         {
             ApplyPreviewGainToColumns(startFrame, endFrame, count, channels);
         }
 
+        // ピーク／生カラムどちらでも、クロス区間はフェード曲線付きミックスで上書きする。
+        if (_crossfadeDraft is { IsActive: true })
+        {
+            PatchColumnsWithCrossfadeWavePreview(document, startFrame, endFrame, count, channels);
+        }
+
         return count;
+    }
+
+    /// <summary>
+    /// ピーク圧縮カラムのうちプリ／ポストクロス区間と重なるものだけ、ミックス PCM で min/max を作り直す。
+    /// </summary>
+    private void PatchColumnsWithCrossfadeWavePreview(
+        AudioDocument document,
+        long startFrame,
+        long endFrame,
+        int count,
+        int channels)
+    {
+        var draft = _crossfadeDraft;
+        if (draft is not { IsActive: true } || count <= 0 || channels < 1)
+        {
+            return;
+        }
+
+        var rangeFrames = endFrame - startFrame;
+        if (rangeFrames <= 0)
+        {
+            return;
+        }
+
+        bool Overlaps(long a0, long a1, long b0, long b1) => a1 > b0 && a0 < b1;
+
+        var pre0 = draft.PreDrawStartFrame;
+        var pre1 = draft.EndFrame;
+        var post0 = draft.PostDrawRange.StartFrame;
+        var post1 = draft.PostDrawRange.EndFrame;
+        var hasPre = draft.PreCrossfadeFrames > 0;
+        var hasPost = draft.PostCrossfadeFrames > 0;
+        if ((!hasPre || !Overlaps(startFrame, endFrame, pre0, pre1))
+            && (!hasPost || !Overlaps(startFrame, endFrame, post0, post1)))
+        {
+            return;
+        }
+
+        var samples = document.Interleaved;
+        var frameCount = document.FrameCount;
+        for (var i = 0; i < count; i++)
+        {
+            var f0 = startFrame + i * rangeFrames / count;
+            var f1 = startFrame + (i + 1) * rangeFrames / count;
+            if (f1 <= f0)
+            {
+                f1 = f0 + 1;
+            }
+
+            var hit = (hasPre && Overlaps(f0, f1, pre0, pre1))
+                || (hasPost && Overlaps(f0, f1, post0, post1));
+            if (!hit)
+            {
+                continue;
+            }
+
+            f0 = Math.Clamp(f0, 0, frameCount);
+            f1 = Math.Clamp(f1, f0, frameCount);
+            var dest = i * channels;
+            for (var ch = 0; ch < channels; ch++)
+            {
+                _columnMins[dest + ch] = float.MaxValue;
+                _columnMaxs[dest + ch] = float.MinValue;
+            }
+
+            for (var frame = f0; frame < f1; frame++)
+            {
+                var src = (int)frame * channels;
+                var gain = PreviewGain(frame);
+                for (var ch = 0; ch < channels; ch++)
+                {
+                    // 元波形のみフェード（ゼロまで）。色付き重ねが相手側。
+                    var sample = TryGetCrossfadeBaseDisplaySample(frame, ch, out var preview)
+                        ? preview
+                        : samples[src + ch];
+                    sample *= IsLaneMuted(ch) ? 1f : gain;
+                    if (sample < _columnMins[dest + ch])
+                    {
+                        _columnMins[dest + ch] = sample;
+                    }
+
+                    if (sample > _columnMaxs[dest + ch])
+                    {
+                        _columnMaxs[dest + ch] = sample;
+                    }
+                }
+            }
+
+            for (var ch = 0; ch < channels; ch++)
+            {
+                if (_columnMins[dest + ch] > _columnMaxs[dest + ch])
+                {
+                    _columnMins[dest + ch] = 0;
+                    _columnMaxs[dest + ch] = 0;
+                }
+            }
+        }
     }
 
     private int FillLiveColumnPeaks(
@@ -4257,7 +5191,10 @@ internal sealed class WaveformView : Grid
                 var gain = PreviewGain(frame);
                 for (var ch = 0; ch < channels; ch++)
                 {
-                    var sample = samples[src + ch] * (IsLaneMuted(ch) ? 1f : gain);
+                    var sample = TryGetCrossfadeBaseDisplaySample(frame, ch, out var preview)
+                        ? preview
+                        : samples[src + ch];
+                    sample *= IsLaneMuted(ch) ? 1f : gain;
                     if (sample < _columnMins[dest + ch])
                     {
                         _columnMins[dest + ch] = sample;
@@ -4363,8 +5300,18 @@ internal sealed class WaveformView : Grid
             var gain = channel >= 0 && IsLaneMuted(channel) ? 1f : PreviewGain(frame);
             if (channel < 0)
             {
+                if (TryMixCrossfadeBaseDisplayFrame(frame, channels, out var previewMixed))
+                {
+                    return previewMixed * gain;
+                }
+
                 SpectrogramEngine.MixFrame(samples, channels, frame, drawable, out var mixed);
                 return mixed * gain;
+            }
+
+            if (TryGetCrossfadeBaseDisplaySample(frame, channel, out var preview))
+            {
+                return preview * gain;
             }
 
             return samples[(int)frame * channels + channel] * gain;
@@ -5043,12 +5990,19 @@ internal sealed class WaveformView : Grid
         Loudness,
     }
 
-    private enum LoopBarPart
+    internal enum LoopBarPart
     {
         None,
         Start,
         End,
         Body,
+    }
+
+    /// <summary>中央＝両端、始点／終点ハンドル＝その端だけ。</summary>
+    internal static void LoopBarSelectionForPart(LoopBarPart part, out bool selectStart, out bool selectEnd)
+    {
+        selectStart = part is LoopBarPart.Body or LoopBarPart.Start;
+        selectEnd = part is LoopBarPart.Body or LoopBarPart.End;
     }
 
     private bool TryHitSampleLoopBar(Point pos) =>
@@ -6454,14 +7408,16 @@ internal sealed class WaveformView : Grid
             return;
         }
 
-        var already = isBody
-            ? _loopStartSelected && _loopEndSelected
-            : isStart ? _loopStartSelected : _loopEndSelected;
-        if (!already)
+        // 中央＝両端、端ハンドル＝その端だけ。両方選択中に端を掴んだら片側に切り替える。
+        LoopBarSelectionForPart(part, out var wantStart, out var wantEnd);
+        if (_loopStartSelected != wantStart
+            || _loopEndSelected != wantEnd
+            || _selectedMarkerFrames.Count > 0
+            || _selectedRegionEdges.Count > 0)
         {
             ClearTimelineSelection(refresh: false);
-            _loopStartSelected = isBody || isStart;
-            _loopEndSelected = isBody || !isStart;
+            _loopStartSelected = wantStart;
+            _loopEndSelected = wantEnd;
             InvalidateStaticLayer();
             MarkersChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -6637,9 +7593,44 @@ internal sealed class WaveformView : Grid
             _document.CursorFrame = next;
         }
 
+        SyncCrossfadeDraftFromSampleLoop();
         InvalidateStaticLayer();
         InvalidatePlayheadLayer();
         MarkersChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// サンプルループ（中央ドラッグ含む）が動いたとき、フェード調整の S/E を合わせる。
+    /// プリ／ポスト長は維持するので旗位置がループと一緒に移動する。
+    /// </summary>
+    private void SyncCrossfadeDraftFromSampleLoop()
+    {
+        if (_document is null || CrossfadeDraft is not { IsActive: true } draft)
+        {
+            return;
+        }
+
+        var loop = _document.SampleLoop;
+        if (loop.IsEmpty)
+        {
+            return;
+        }
+
+        var beforeStart = draft.StartFrame;
+        var beforeEnd = draft.EndFrame;
+        draft.SyncLoopFromSampleLoop(loop, _document.FrameCount);
+        // 28 倍数モードでは Clamp で S/E が変わり、SampleLoop 側も揃える必要がある
+        if (draft.StartFrame == beforeStart
+            && draft.EndFrame == beforeEnd
+            && draft.StartFrame == loop.StartFrame
+            && draft.EndFrame == loop.EndFrame)
+        {
+            return;
+        }
+
+        InvalidateWaveform();
+        InvalidatePlayheadLayer();
+        CrossfadeDraftChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private long ApplyTimelineDelta(
@@ -6673,6 +7664,14 @@ internal sealed class WaveformView : Grid
             moves.Add(new RangeEdgeMove(loopOrigin, loopStart, loopEnd));
         }
 
+        // フェード調整で 28 倍数モード中は、ループ端の移動先を格子にスナップした delta にする
+        if ((loopStart || loopEnd)
+            && !loopOrigin.IsEmpty
+            && CrossfadeDraft is { IsActive: true, AlignLoopEndsToTwentyEight: true })
+        {
+            desiredDelta = SnapLoopDeltaToAlignGrid(loopOrigin, loopStart, loopEnd, desiredDelta);
+        }
+
         var sorted = markerOrigins as long[] ?? [.. markerOrigins.OrderBy(frame => frame)];
         var occupied = new HashSet<long>();
         foreach (var marker in _document.Markers)
@@ -6703,9 +7702,66 @@ internal sealed class WaveformView : Grid
         if (loopStart || loopEnd)
         {
             _document.TryMoveSampleLoopEdges(loopStart, loopEnd, applied, out _, markDirty: false);
+            if (CrossfadeDraft is { IsActive: true, AlignLoopEndsToTwentyEight: true }
+                && !_document.SampleLoop.IsEmpty)
+            {
+                QuantizeDocumentSampleLoopToAlignGrid();
+            }
         }
 
         return applied;
+    }
+
+    private static long SnapLoopDeltaToAlignGrid(
+        WaveSelection loopOrigin,
+        bool loopStart,
+        bool loopEnd,
+        long desiredDelta)
+    {
+        const long step = CrossfadeEditState.LoopEndAlignStep;
+        if (loopStart && loopEnd)
+        {
+            var newStart = CrossfadeEditState.RoundToAlignStep(loopOrigin.StartFrame + desiredDelta, step);
+            return newStart - loopOrigin.StartFrame;
+        }
+
+        if (loopStart)
+        {
+            var newStart = CrossfadeEditState.RoundToAlignStep(loopOrigin.StartFrame + desiredDelta, step);
+            return newStart - loopOrigin.StartFrame;
+        }
+
+        if (loopEnd)
+        {
+            var newEnd = CrossfadeEditState.RoundToAlignStep(loopOrigin.EndFrame + desiredDelta, step);
+            return newEnd - loopOrigin.EndFrame;
+        }
+
+        return desiredDelta;
+    }
+
+    private void QuantizeDocumentSampleLoopToAlignGrid()
+    {
+        if (_document is null || _document.SampleLoop.IsEmpty)
+        {
+            return;
+        }
+
+        var loop = _document.SampleLoop;
+        var start = CrossfadeEditState.RoundToAlignStep(loop.StartFrame);
+        var end = CrossfadeEditState.RoundToAlignStep(loop.EndFrame);
+        start = Math.Clamp(start, 0, _document.FrameCount);
+        end = Math.Clamp(end, 0, _document.FrameCount);
+        if (end <= start)
+        {
+            end = Math.Min(_document.FrameCount, start + CrossfadeEditState.LoopEndAlignStep);
+        }
+
+        var quantized = new WaveSelection(start, end);
+        if (quantized != loop)
+        {
+            _document.SetSampleLoop(quantized, markDirty: false);
+        }
     }
 
     private static List<RangeEdgeMove> ToRegionMoves(IReadOnlyList<RegionEdge> edges)
@@ -7454,7 +8510,10 @@ internal sealed class WaveformView : Grid
         && _document is not null
         && (UsesPlayerScratch
             ? ScratchCues.HasMarkers || ScratchCues.HasAbPoint
-            : _document.Markers.Count > 0 || !_document.SampleLoop.IsEmpty || _document.Regions.Count > 0);
+            : _document.Markers.Count > 0
+                || !_document.SampleLoop.IsEmpty
+                || _document.Regions.Count > 0
+                || _crossfadeDraft is { IsActive: true });
 
     private void SetMouseGuideFromX(double x) => _pointerX = x;
 
@@ -7692,6 +8751,22 @@ internal sealed class WaveformView : Grid
                 Add(region.EndFrame);
             }
         }
+
+        // クロスフェード編集中は Pre/Post 旗と長さバー端（＝旗位置）へも吸着。
+        if (_crossfadeDraft is { IsActive: true } draft)
+        {
+            Add(draft.StartFrame);
+            Add(draft.EndFrame);
+            if (draft.PreCrossfadeFrames > 0)
+            {
+                Add(draft.PreFlagFrame);
+            }
+
+            if (draft.PostCrossfadeFrames > 0)
+            {
+                Add(draft.PostFlagFrame);
+            }
+        }
     }
 
     internal static bool TryPickNearestSnap(
@@ -7914,6 +8989,7 @@ internal sealed class WaveformView : Grid
 
             DrawSeekPlaybackTrail(dc, bounds, playX, start, span, _trailSamples, Theme.Get("PlayheadBrush"));
             DrawSeekPlaybackTrailReverse(dc, bounds, playX, start, span, _reverseTrailSamples, Theme.Get("PlayheadBrush"));
+            DrawCrossfadeFadePlaybackProgress(dc, bounds, start, span);
             EnsurePlayheadPens();
             var y0 = wave.Y;
             var y1 = wave.Y + wave.Height;
@@ -7947,6 +9023,12 @@ internal sealed class WaveformView : Grid
 
     private static bool IsPlayheadXVisible(double x, Rect wave) =>
         x >= wave.X - 1 && x <= wave.X + wave.Width + 1;
+
+    /// <summary>再生済み強調。塗りは静的層の背景だけなので前面には塗らない。</summary>
+    private void DrawCrossfadeFadePlaybackProgress(DrawingContext dc, Rect bounds, double start, double span)
+    {
+        // 旗側バーの塗りは DrawCrossfadeBarBackgrounds（波形の下）に任せ、前面には重ねない。
+    }
 
     private void EnsureExitPlayheadPens()
     {
@@ -8310,6 +9392,11 @@ internal sealed class WaveformView : Grid
         else if (TryHitChannelLabel(pos, out _))
         {
             next = Cursors.Hand;
+        }
+        else if (TryHitCrossfadeFlag(pos, out _) || TryHitCrossfadeDraft(pos, out _))
+        {
+            // Pre/Post はマーカーより前面。掴める感触は SizeWE。
+            next = Cursors.SizeWE;
         }
         else if (pos.X < ContentLeft
             || TryHitMarkerFlag(pos, out _)

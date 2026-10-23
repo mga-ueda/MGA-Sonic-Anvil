@@ -264,6 +264,7 @@ public partial class MainWindow : Window
         AlwaysOnTopCheck.IsChecked = AppStorage.Settings.AlwaysOnTop;
         Topmost = AppStorage.Settings.AlwaysOnTop;
         SilentSkipCheck.IsChecked = AppStorage.Settings.SilentSkip;
+        AutoLoopCheck.IsChecked = AppStorage.Settings.LibraryAutoLoop;
         Mp3Gapless.Enabled = AppStorage.Settings.GaplessPlayback;
         ApplySilentSkipFromSettings();
 
@@ -296,6 +297,7 @@ public partial class MainWindow : Window
         StatusTimes.CopySelectionTimeRequested += (_, pathKind) => CopySelectionTimes(pathKind);
         UiStrings.LanguageChanged += (_, _) => Dispatcher.BeginInvoke(RefreshLocalizedText);
         HookWaveformEvents(PrimaryWaveform);
+        HookCrossfadePanel();
         Transport.SetAnalysisView(Waveform.AnalysisView);
         Overview.ViewStartChanged += (_, start) =>
         {
@@ -690,6 +692,11 @@ public partial class MainWindow : Window
         try
         {
             var sessionChanged = !ReferenceEquals(_activeSession, session);
+            if (sessionChanged)
+            {
+                CancelCrossfadeEditMode();
+            }
+
             ResetWorkspaceInteraction();
             _activeSession = session;
             if (IsLibraryMaximized && sessionChanged)
@@ -832,6 +839,7 @@ public partial class MainWindow : Window
         TimeScrollStrip.ApplyLocalizedText();
         Transport.ApplyLocalizedText();
         Transport.SetMaximizeMode(_waveformMaximizeMode);
+        RefreshCrossfadeLocalizedText();
         SpeakerMenuLabel.Text = UiStrings.LabelStatusSpeaker;
         RefreshSpeakerMenu();
         if (_waapiToggle is not null)
@@ -1152,6 +1160,9 @@ public partial class MainWindow : Window
         {
             PersistCurrentWindowPlacement();
         }
+
+        // Hide の前に子ツール窓を閉じる（本体だけ先に消えると調整窓が残る）。
+        CloseToolWindowsForExit();
         HideFromTaskAndFocus();
         StopMeterRendering();
         VectorScope.StopTicks();
@@ -1164,6 +1175,66 @@ public partial class MainWindow : Window
         StopSeekNudge();
         StopVideoFrameStep();
         _ = FinishExitAfterFlushAsync();
+    }
+
+    /// <summary>
+    /// 本体終了時に開いているツール窓をまとめて閉じる。
+    /// クロスフェード／無音・ヒット検出／色設定／設定 など Owner 付き子。
+    /// </summary>
+    private void CloseToolWindowsForExit()
+    {
+        try
+        {
+            CancelCrossfadeEditMode();
+            if (_crossfadeWindow is not null)
+            {
+                _crossfadeWindow.ForceCloseFromHost();
+                _crossfadeWindow = null;
+            }
+        }
+        catch
+        {
+            // 終了処理は止めない。
+        }
+
+        try
+        {
+            if (_colorDevPanel is not null)
+            {
+                _colorDevPanel.Close();
+                _colorDevPanel = null;
+            }
+        }
+        catch
+        {
+        }
+
+        // OwnedWindows: 無音検出・ヒット検出・AudioSettings などのモーダル／子。
+        Window[] owned;
+        try
+        {
+            owned = OwnedWindows.OfType<Window>().ToArray();
+        }
+        catch
+        {
+            return;
+        }
+
+        foreach (var child in owned)
+        {
+            try
+            {
+                if (ReferenceEquals(child, this))
+                {
+                    continue;
+                }
+
+                child.Close();
+            }
+            catch
+            {
+            }
+        }
     }
 
     private void HideFromTaskAndFocus()
@@ -1579,6 +1650,20 @@ public partial class MainWindow : Window
 
         AppStorage.Settings.SilentSkip = SilentSkipCheck.IsChecked == true;
         AppStorage.Save();
+    }
+
+    private void AutoLoopCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        var enabled = AutoLoopCheck.IsChecked == true;
+        if (LibraryBrowser.AutoLoopEnabled != enabled)
+        {
+            LibraryBrowser.AutoLoopEnabled = enabled;
+        }
     }
 
     private void ApplySilentSkipFromSettings()

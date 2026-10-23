@@ -14,6 +14,11 @@ public partial class MainWindow
 {
     private void PromptFade(bool fadeIn, FrameworkElement? placementTarget = null)
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         var batch = HasBatchEditTargets;
         var document = _document ?? ResolveBatchEditTargets().FirstOrDefault()?.Document;
         if (document is null)
@@ -88,6 +93,11 @@ public partial class MainWindow
 
     private void PromptVolume()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         // プレイヤー：プレイリスト選択の Wave / AIFF をターゲットへ揃える（確認のみ）。
         if (IsLibraryMaximized)
         {
@@ -493,7 +503,7 @@ public partial class MainWindow
 
     private void PromptPitch()
     {
-        if (IsUiBusy)
+        if (RejectOutsideFadeToolAction() || IsUiBusy)
         {
             return;
         }
@@ -805,7 +815,7 @@ public partial class MainWindow
 
     private void PromptTimeStretch()
     {
-        if (IsUiBusy)
+        if (RejectOutsideFadeToolAction() || IsUiBusy)
         {
             return;
         }
@@ -890,7 +900,7 @@ public partial class MainWindow
 
     private void PromptInsertSilenceAt(long frame)
     {
-        if (IsUiBusy)
+        if (RejectOutsideFadeToolAction() || IsUiBusy)
         {
             return;
         }
@@ -943,7 +953,7 @@ public partial class MainWindow
 
     private void ApplyInsertSilence(double seconds)
     {
-        if (IsUiBusy)
+        if (RejectOutsideFadeToolAction() || IsUiBusy)
         {
             return;
         }
@@ -1641,6 +1651,11 @@ public partial class MainWindow
 
     private void ApplyFade(bool fadeIn, FadeShape shape)
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         _fadePreview.Previewing = false;
         ClearFadeCurveVisualPreview();
         CloseFadeCurvePicker();
@@ -1686,7 +1701,7 @@ public partial class MainWindow
 
     private void ApplyFadeAroundPlayhead()
     {
-        if (_document is null)
+        if (RejectOutsideFadeToolAction() || _document is null)
         {
             return;
         }
@@ -1705,6 +1720,11 @@ public partial class MainWindow
 
     private void ApplyNormalize()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         // タブ／プレイリスト選択中はファイル全体を一括ノーマライズする（選択範囲は見ない）。
         if (TryRunBatchEdit(
                 UiStrings.OverlayApplySelected,
@@ -1737,6 +1757,11 @@ public partial class MainWindow
 
     private void ApplyReverse()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         // タブ／プレイリスト選択中はファイル全体を一括リバースする。
         if (TryRunBatchEdit(
                 UiStrings.OverlayApplySelected,
@@ -1775,6 +1800,11 @@ public partial class MainWindow
 
     private void ApplyNormalizePerRegion()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         // タブ／プレイリスト選択中は一括適用。リージョンの無いファイルはスキップする。
         var fadeMs = AppStorage.Settings.ResolvedClickGuardFadeMs();
         if (TryRunBatchEdit(
@@ -1823,7 +1853,7 @@ public partial class MainWindow
 
     private void ApplyVolume(double gainDb)
     {
-        if (_document is null)
+        if (RejectOutsideFadeToolAction() || _document is null)
         {
             return;
         }
@@ -1926,7 +1956,9 @@ public partial class MainWindow
 
     private bool TryAddMarkerAtPlayhead()
     {
-        if (_document is null || LibraryPlayerMode.BlocksEditorMarkerPlacement(IsLibraryMaximized))
+        if (RejectOutsideFadeToolAction()
+            || _document is null
+            || LibraryPlayerMode.BlocksEditorMarkerPlacement(IsLibraryMaximized))
         {
             return false;
         }
@@ -1986,7 +2018,7 @@ public partial class MainWindow
 
     private void ApplyCopy()
     {
-        if (_document is null)
+        if (RejectOutsideFadeToolAction() || _document is null)
         {
             return;
         }
@@ -2014,6 +2046,11 @@ public partial class MainWindow
 
     private void ApplyCut()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         var focus = Keyboard.FocusedElement as UIElement;
         try
         {
@@ -2060,6 +2097,11 @@ public partial class MainWindow
 
     private void ApplyPaste()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         var focus = Keyboard.FocusedElement as UIElement;
         try
         {
@@ -2111,7 +2153,7 @@ public partial class MainWindow
 
     private void ApplyDelete()
     {
-        if (_document is null)
+        if (RejectOutsideFadeToolAction() || _document is null)
         {
             return;
         }
@@ -2196,7 +2238,7 @@ public partial class MainWindow
 
     private void ApplySilenceSelection()
     {
-        if (_document is null || IsUiBusy)
+        if (RejectOutsideFadeToolAction() || _document is null || IsUiBusy)
         {
             return;
         }
@@ -2224,6 +2266,11 @@ public partial class MainWindow
 
     private void ApplyDetectSilence()
     {
+        if (RejectOutsideFadeToolAction())
+        {
+            return;
+        }
+
         var savedAction = ClampSilenceDetectAction(AppStorage.Settings.SilenceDetectAction);
         var savedOptions = AppStorage.Settings.ResolvedSilenceDetectOptions(
             AppStorage.Settings.SilenceDetectEdgesOnly);
@@ -3068,12 +3115,24 @@ public partial class MainWindow
             return false;
         }
 
-        if (!Waveform.TrySelectTimelineAtPlayhead(includePrevious))
+        // フェード調整中はサンプルループ両端をまとめて動かし、プリ／ポスト旗も追従させる
+        if (IsCrossfadeEditMode)
+        {
+            if (!Waveform.TrySelectSampleLoopPair())
+            {
+                return false;
+            }
+        }
+        else if (!Waveform.TrySelectTimelineAtPlayhead(includePrevious))
         {
             return false;
         }
 
-        var delta = Waveform.NudgeStepFrames * (fast ? 3 : 1) * direction;
+        var units = fast ? 3 : 1;
+        var delta = IsCrossfadeEditMode
+            && _crossfadeEdit is { AlignLoopEndsToTwentyEight: true }
+            ? CrossfadeEditState.LoopEndAlignStep * units * direction
+            : Waveform.NudgeStepFrames * units * direction;
         BeginTimelineNudgeSession();
         if (!Waveform.TryNudgeSelectedTimeline(delta, out _))
         {
@@ -3267,6 +3326,12 @@ public partial class MainWindow
 
     private void UndoEdit()
     {
+        // フェード調整中はドラフトと履歴が食い違うので Undo しない（閉じたあと再開可）。
+        if (IsCrossfadeEditMode)
+        {
+            return;
+        }
+
         if (TryRevertOpenPenStroke())
         {
             return;
@@ -3308,6 +3373,12 @@ public partial class MainWindow
 
     private void RedoEdit()
     {
+        // Undo と同様、フェード調整中は履歴操作しない。
+        if (IsCrossfadeEditMode)
+        {
+            return;
+        }
+
         CommitTimelineNudgeSession();
         StopPlaceRepeat();
 
@@ -3343,6 +3414,11 @@ public partial class MainWindow
 
     private bool ResolveMenuCanUndo(bool canScratch)
     {
+        if (IsCrossfadeEditMode)
+        {
+            return false;
+        }
+
         if (HasBatchEditTargets && AnySessionCanUndo(ResolveBatchEditTargets()))
         {
             return true;
@@ -3355,6 +3431,11 @@ public partial class MainWindow
 
     private bool ResolveMenuCanRedo(bool canScratch)
     {
+        if (IsCrossfadeEditMode)
+        {
+            return false;
+        }
+
         if (HasBatchEditTargets && AnySessionCanRedo(ResolveBatchEditTargets()))
         {
             return true;

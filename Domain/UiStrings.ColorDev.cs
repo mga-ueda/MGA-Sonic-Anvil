@@ -31,18 +31,21 @@ internal static partial class UiStrings
     public static string ColorDevNoMatches => Get("一致する色がありません。", "No matching colors.");
 
     public static string ColorDevGroupShared => Get("共通", "Shared");
+    public static string ColorDevGroupAmbientWash => Get("環境ウォッシュ", "Ambient wash");
     public static string ColorDevGroupOverview => Get("全体波形", "Overview");
     public static string ColorDevGroupWaveform => Get("波形", "Waveform");
     public static string ColorDevGroupLoudness => Get("ラウドネス", "Loudness");
     public static string ColorDevGroupGuides => Get("ガイド", "Guides");
     public static string ColorDevGroupSelection => Get("選択", "Selection");
     public static string ColorDevGroupSampleLoop => Get("サンプルループ", "Sample loop");
+    public static string ColorDevGroupCrossfade => Get("フェード調整", "Crossfade");
     public static string ColorDevGroupRegion => Get("リージョン", "Region");
     public static string ColorDevGroupMarker => Get("マーカー", "Marker");
-    public static string ColorDevGroupMeter => Get("レベルメーター", "Level meter");
-    public static string ColorDevGroupSpectrum => Get("スペアナ", "Spectrum");
+    public static string ColorDevGroupMeter => Get(
+        "レベル（メーター／スペアナ）",
+        "Level (meter · spectrum)");
     public static string ColorDevGroupVectorScope => Get("ベクタースコープ", "Vector scope");
-    public static string ColorDevGroupPlayer => Get("プレイヤー", "Player");
+    public static string ColorDevGroupPlayer => Get("プレイヤー UI", "Player UI");
     public static string ColorDevGroupTransport => Get("トランスポート", "Transport");
     public static string ColorDevGroupStatus => Get("ステータスバー", "Status bar");
     public static string ColorDevGroupDialog => Get("ダイアログ", "Dialog");
@@ -53,7 +56,7 @@ internal static partial class UiStrings
         var token = key.EndsWith("Brush", StringComparison.Ordinal) ? key[..^5] : key;
         return token switch
         {
-            "SurfaceBack" => Get("基本背景", "Base background"),
+            "SurfaceBack" => Get("アプリ基本背景", "App base background"),
             "ChromeBack" => Get("クローム背景", "Chrome background"),
             "ChromeBorder" => Get("クローム境界", "Chrome border"),
             "ChromeMid" => Get("中間グレー", "Mid gray"),
@@ -61,7 +64,7 @@ internal static partial class UiStrings
             "PrimaryFore" => Get("標準文字", "Standard text"),
             "MutedFore" => Get("弱い文字", "Muted text"),
             "AccentCyan" => Get("シアンアクセント", "Cyan accent"),
-            "DirtyAccent" => Get("未保存アクセント", "Dirty accent"),
+            "DirtyAccent" => Get("未保存アクセント", "Unsaved accent"),
             "ScrollThumbBack" => Get("スクロールつまみ", "Scroll thumb"),
             "ScrollThumbHoverBack" => Get("スクロールつまみ・ホバー", "Scroll thumb · hover"),
             "ScrollThumbPressedBack" => Get("スクロールつまみ・ドラッグ", "Scroll thumb · drag"),
@@ -71,11 +74,11 @@ internal static partial class UiStrings
             "MenuSeparator" => Get("メニュー区切り", "Menu separator"),
             "MenuHighlightBack" => Get("メニューハイライト", "Menu highlight"),
             "MenuDisabledFore" => Get("メニュー無効文字", "Menu disabled text"),
-            "ProjectBarBack" => Get("背景", "Background"),
-            "OverviewOutsideFill" => Get("範囲外", "Outside view"),
-            "WaveformBack" => Get("エリア背景（固定）", "Area background (solid)"),
+            "ProjectBarBack" => Get("控えめクロームのボタン枠", "Quiet-chrome button well"),
+            "OverviewOutsideFill" => Get("表示範囲外", "Outside the view"),
+            "WaveformBack" => Get("エリア背景", "Area background"),
             "WaveformRecordBack" => Get("録音中の背景", "Recording background"),
-            "WaveFill" => Get("波形", "Waveform"),
+            "WaveFill" => Get("波形塗り", "Waveform fill"),
             "WaveFillOverlay" => Get("スペクトログラム重ね", "Spectrogram overlay"),
             "WaveZeroLine" => Get("0 dB 線", "0 dB line"),
             "TimelineWellBack" => Get("マーカー編集欄", "Marker edit field"),
@@ -112,6 +115,8 @@ internal static partial class UiStrings
             "SampleLoopWaveFill" => Get("波形塗り", "Wave fill"),
             "SampleLoopTimeLabelFore" => Get("時刻文字", "Time text"),
             "SampleLoopGrip" => Get("ハンドル", "Handle"),
+            "CrossfadePre" => Get("プリ（緑）", "Pre (green)"),
+            "CrossfadePost" => Get("ポスト（赤）", "Post (red)"),
             "RegionTimeline" => Get("タイムライン", "Timeline"),
             "RegionWaveFill" => Get("波形塗り", "Wave fill"),
             "RegionTimeLabelFore" => Get("時刻文字", "Time text"),
@@ -127,10 +132,10 @@ internal static partial class UiStrings
             "LevelMeterTrackBorder" => Get("トラック枠", "Track border"),
             "LevelMeterHoldBorder" => Get("ホールド枠", "Hold border"),
             "LevelMeterTick" => Get("目盛", "Ticks"),
-            "PlayerFallbackWashNavy" => Get("ジャケットなし背面・ネイビー", "No-jacket wash · navy"),
-            "PlayerFallbackWashBlue" => Get("ジャケットなし背面・ブルー", "No-jacket wash · blue"),
-            "PlayerFallbackWashCyan" => Get("ジャケットなし背面・シアン", "No-jacket wash · cyan"),
-            "PlayerGlowVeil" => Get("ウォッシュのベール", "Wash veil"),
+            "PlayerFallbackWashNavy" => Get("ネイビー（ジャケットなし）", "Navy (no jacket)"),
+            "PlayerFallbackWashBlue" => Get("ブルー（ジャケットなし）", "Blue (no jacket)"),
+            "PlayerFallbackWashCyan" => Get("シアン（ジャケットなし）", "Cyan (no jacket)"),
+            "PlayerGlowVeil" => Get("ベール（暗幕）", "Veil"),
             "PlayerPaneFocusLine" => Get("ペインフォーカス", "Pane focus"),
             "PlayerSelectionFill" => Get("選択", "Selection"),
             "PlayerHoverFill" => Get("ホバー", "Hover"),
@@ -154,17 +159,17 @@ internal static partial class UiStrings
             "PlayerWaapiToggleOffHoverBack" => Get("WAAPI オフ・ホバー", "WAAPI off · hover"),
             "PlayerWaapiToggleOnBack" => Get("WAAPI オン・背景", "WAAPI on · background"),
             "PlayerWaapiToggleOnHoverBack" => Get("WAAPI オン・ホバー", "WAAPI on · hover"),
-            "PlayerJacketReflection" => Get("ジャケットの映り込み", "Jacket reflection"),
+            "PlayerJacketReflection" => Get("ジャケット下の映り込み", "Under-jacket reflection"),
             "LevelMeterClipOff" => Get("クリップ消灯", "Clip off"),
             "LevelMeterClipOffBorder" => Get("クリップ消灯枠", "Clip off border"),
             "LevelMeterClipOn" => Get("クリップ点灯", "Clip on"),
             "LevelMeterClipOnOverlay" => Get("クリップ点灯の重ね", "Clip on · overlay"),
             "SurroundHullStroke" => Get("サラウンド RMS 枠", "Surround RMS hull"),
-            "LevelGradFloor" => Get("グラデ・暗い端", "Gradient · dark end"),
-            "LevelGradLow" => Get("グラデ・暗い中間", "Gradient · dark mid"),
-            "LevelGradMid" => Get("グラデ・中間", "Gradient · mid"),
-            "LevelGradHigh" => Get("グラデ・明るい中間", "Gradient · bright mid"),
-            "LevelGradCeil" => Get("グラデ・明るい端", "Gradient · bright end"),
+            "LevelGradFloor" => Get("バー色・暗い端", "Bar · dark end"),
+            "LevelGradLow" => Get("バー色・暗い中間", "Bar · dark mid"),
+            "LevelGradMid" => Get("バー色・中間", "Bar · mid"),
+            "LevelGradHigh" => Get("バー色・明るい中間", "Bar · bright mid"),
+            "LevelGradCeil" => Get("バー色・明るい端", "Bar · bright end"),
             "VectorScopeBack" => Get("背景", "Background"),
             "VectorScopeTrace" => Get("軌跡", "Trace"),
             "VectorScopeGrid" => Get("十字", "Cross"),
@@ -207,8 +212,8 @@ internal static partial class UiStrings
             "StatusExportButtonHoverBack" => Get("EXPORT・ホバー枠", "EXPORT · hover border"),
             "StatusExportButtonPressedBack" => Get("EXPORT・押下枠", "EXPORT · pressed border"),
             "StatusExportButtonFore" => Get("EXPORT・文字", "EXPORT · text"),
-            "WindowBack" => Get("ウィンドウ背景", "Window background"),
-            "ColorPanelBack" => Get("色パネル背景", "Color panel background"),
+            "WindowBack" => Get("窓の背景", "Window background"),
+            "ColorPanelBack" => Get("パネル面（見出しなど）", "Panel surface (headers)"),
             "ExportButtonFill" => Get("OK・塗り", "OK · fill"),
             "ExportButtonFocusFill" => Get("OK・フォーカス塗り", "OK · focus fill"),
             "ExportButtonHoverFill" => Get("OK・ホバー塗り", "OK · hover fill"),

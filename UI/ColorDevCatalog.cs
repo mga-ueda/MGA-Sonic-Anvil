@@ -2,20 +2,23 @@ using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>色パネルのグループ。大枠の共通色のあと、メイン画面の並び（上→下、左→右）に合わせる。</summary>
+/// <summary>
+/// 色パネルのグループ。重要度・色面積の大きい順（共通土台 → 環境ウォッシュ → 編集面 → 細部）。
+/// </summary>
 internal enum ColorDevGroup
 {
     Shared,
-    Overview,
+    AmbientWash,
     Waveform,
+    Overview,
     Guides,
     Selection,
     SampleLoop,
+    Crossfade,
     Region,
     Marker,
     Loudness,
     Meter,
-    Spectrum,
     VectorScope,
     Player,
     Transport,
@@ -48,23 +51,24 @@ internal static class ColorDevCatalog
             ("ScrollThumbPressedBackBrush", ColorDevGroup.Shared),
             ("ScrollThumbGripBrush", ColorDevGroup.Shared),
             ("ControlHoverBorderBrush", ColorDevGroup.Shared),
-            ("DialogInputBackBrush", ColorDevGroup.Shared),
             ("MenuSeparatorBrush", ColorDevGroup.Shared),
             ("MenuHighlightBackBrush", ColorDevGroup.Shared),
             ("MenuDisabledForeBrush", ColorDevGroup.Shared),
 
-            ("ProjectBarBackBrush", ColorDevGroup.Overview),
-            ("OverviewOutsideFillBrush", ColorDevGroup.Overview),
+            ("PlayerFallbackWashNavyBrush", ColorDevGroup.AmbientWash),
+            ("PlayerFallbackWashBlueBrush", ColorDevGroup.AmbientWash),
+            ("PlayerFallbackWashCyanBrush", ColorDevGroup.AmbientWash),
+            ("PlayerGlowVeilBrush", ColorDevGroup.AmbientWash),
 
             ("WaveformBackBrush", ColorDevGroup.Waveform),
             ("WaveformRecordBackBrush", ColorDevGroup.Waveform),
+            ("WaveFillBrush", ColorDevGroup.Waveform),
+            ("WaveFillOverlayBrush", ColorDevGroup.Waveform),
+            ("WaveZeroLineBrush", ColorDevGroup.Waveform),
             ("WaveformTileActiveHeaderBrush", ColorDevGroup.Waveform),
             ("WaveformTileDividerBrush", ColorDevGroup.Waveform),
             ("TileSearchVeilBrush", ColorDevGroup.Waveform),
             ("TimelineWellBackBrush", ColorDevGroup.Waveform),
-            ("WaveFillBrush", ColorDevGroup.Waveform),
-            ("WaveFillOverlayBrush", ColorDevGroup.Waveform),
-            ("WaveZeroLineBrush", ColorDevGroup.Waveform),
             ("ChannelLabelOnTintForeBrush", ColorDevGroup.Waveform),
             ("DbScaleForeBrush", ColorDevGroup.Waveform),
             ("SpectrogramGridBrush", ColorDevGroup.Waveform),
@@ -79,6 +83,8 @@ internal static class ColorDevCatalog
             ("SpectrogramBoostThumbHoverFillBrush", ColorDevGroup.Waveform),
             ("SpectrogramBoostThumbHoverStrokeBrush", ColorDevGroup.Waveform),
 
+            ("OverviewOutsideFillBrush", ColorDevGroup.Overview),
+
             ("PlayheadBrush", ColorDevGroup.Guides),
             ("SeekExitBrush", ColorDevGroup.Guides),
             ("MouseGuideBrush", ColorDevGroup.Guides),
@@ -91,6 +97,9 @@ internal static class ColorDevCatalog
             ("SampleLoopGripBrush", ColorDevGroup.SampleLoop),
             ("SampleLoopWaveFillBrush", ColorDevGroup.SampleLoop),
             ("SampleLoopTimeLabelForeBrush", ColorDevGroup.SampleLoop),
+
+            ("CrossfadePreBrush", ColorDevGroup.Crossfade),
+            ("CrossfadePostBrush", ColorDevGroup.Crossfade),
 
             ("RegionTimelineBrush", ColorDevGroup.Region),
             ("RegionWaveFillBrush", ColorDevGroup.Region),
@@ -113,6 +122,11 @@ internal static class ColorDevCatalog
             ("LoudnessDangerBrush", ColorDevGroup.Loudness),
             ("LoudnessChipForeBrush", ColorDevGroup.Loudness),
 
+            ("LevelGradFloorBrush", ColorDevGroup.Meter),
+            ("LevelGradLowBrush", ColorDevGroup.Meter),
+            ("LevelGradMidBrush", ColorDevGroup.Meter),
+            ("LevelGradHighBrush", ColorDevGroup.Meter),
+            ("LevelGradCeilBrush", ColorDevGroup.Meter),
             ("LevelMeterTrackBackBrush", ColorDevGroup.Meter),
             ("LevelMeterTrackBorderBrush", ColorDevGroup.Meter),
             ("LevelMeterHoldBorderBrush", ColorDevGroup.Meter),
@@ -123,22 +137,12 @@ internal static class ColorDevCatalog
             ("LevelMeterClipOnOverlayBrush", ColorDevGroup.Meter),
             ("SurroundHullStrokeBrush", ColorDevGroup.Meter),
 
-            ("LevelGradFloorBrush", ColorDevGroup.Spectrum),
-            ("LevelGradLowBrush", ColorDevGroup.Spectrum),
-            ("LevelGradMidBrush", ColorDevGroup.Spectrum),
-            ("LevelGradHighBrush", ColorDevGroup.Spectrum),
-            ("LevelGradCeilBrush", ColorDevGroup.Spectrum),
-
             ("VectorScopeBackBrush", ColorDevGroup.VectorScope),
             ("VectorScopeTraceBrush", ColorDevGroup.VectorScope),
             ("VectorScopeGridBrush", ColorDevGroup.VectorScope),
             ("VectorScopeCorrelationBrush", ColorDevGroup.VectorScope),
 
             ("PlayerJacketReflectionBrush", ColorDevGroup.Player),
-            ("PlayerFallbackWashNavyBrush", ColorDevGroup.Player),
-            ("PlayerFallbackWashBlueBrush", ColorDevGroup.Player),
-            ("PlayerFallbackWashCyanBrush", ColorDevGroup.Player),
-            ("PlayerGlowVeilBrush", ColorDevGroup.Player),
             ("PlayerPaneFocusLineBrush", ColorDevGroup.Player),
             ("PlayerSelectionFillBrush", ColorDevGroup.Player),
             ("PlayerHoverFillBrush", ColorDevGroup.Player),
@@ -162,6 +166,7 @@ internal static class ColorDevCatalog
             ("PlayerWaapiToggleOnHoverBackBrush", ColorDevGroup.Player),
 
             ("TransportBackBrush", ColorDevGroup.Transport),
+            ("ProjectBarBackBrush", ColorDevGroup.Transport),
             ("TransportForeBrush", ColorDevGroup.Transport),
             ("TransportDisabledForeBrush", ColorDevGroup.Transport),
             ("TransportHoverBackBrush", ColorDevGroup.Transport),
@@ -203,6 +208,7 @@ internal static class ColorDevCatalog
 
             ("WindowBackBrush", ColorDevGroup.Dialog),
             ("ColorPanelBackBrush", ColorDevGroup.Dialog),
+            ("DialogInputBackBrush", ColorDevGroup.Dialog),
             ("ExportButtonFillBrush", ColorDevGroup.Dialog),
             ("ExportButtonFocusFillBrush", ColorDevGroup.Dialog),
             ("ExportButtonHoverFillBrush", ColorDevGroup.Dialog),
@@ -231,8 +237,11 @@ internal static class ColorDevCatalog
     public static ColorDevGroup GroupOf(string key) =>
         Groups.TryGetValue(key, out var group) ? group : ColorDevGroup.Other;
 
-    /// <summary>プレイヤー色はライト／ダークで分けず、ダークの色を両方で使う。</summary>
-    public static bool IsPlayerShared(string key) => GroupOf(key) == ColorDevGroup.Player;
+    /// <summary>
+    /// プレイヤー UI／環境ウォッシュはライト／ダークで分けず、ダークの色を両方で使う。
+    /// </summary>
+    public static bool IsPlayerShared(string key) =>
+        GroupOf(key) is ColorDevGroup.Player or ColorDevGroup.AmbientWash;
 
     public static int Rank(string key) =>
         Ranks.TryGetValue(key, out var rank) ? rank : int.MaxValue;
@@ -240,16 +249,17 @@ internal static class ColorDevCatalog
     public static string GroupTitle(ColorDevGroup group) => group switch
     {
         ColorDevGroup.Shared => UiStrings.ColorDevGroupShared,
-        ColorDevGroup.Overview => UiStrings.ColorDevGroupOverview,
+        ColorDevGroup.AmbientWash => UiStrings.ColorDevGroupAmbientWash,
         ColorDevGroup.Waveform => UiStrings.ColorDevGroupWaveform,
+        ColorDevGroup.Overview => UiStrings.ColorDevGroupOverview,
         ColorDevGroup.Loudness => UiStrings.ColorDevGroupLoudness,
         ColorDevGroup.Guides => UiStrings.ColorDevGroupGuides,
         ColorDevGroup.Selection => UiStrings.ColorDevGroupSelection,
         ColorDevGroup.SampleLoop => UiStrings.ColorDevGroupSampleLoop,
+        ColorDevGroup.Crossfade => UiStrings.ColorDevGroupCrossfade,
         ColorDevGroup.Region => UiStrings.ColorDevGroupRegion,
         ColorDevGroup.Marker => UiStrings.ColorDevGroupMarker,
         ColorDevGroup.Meter => UiStrings.ColorDevGroupMeter,
-        ColorDevGroup.Spectrum => UiStrings.ColorDevGroupSpectrum,
         ColorDevGroup.VectorScope => UiStrings.ColorDevGroupVectorScope,
         ColorDevGroup.Player => UiStrings.ColorDevGroupPlayer,
         ColorDevGroup.Transport => UiStrings.ColorDevGroupTransport,
