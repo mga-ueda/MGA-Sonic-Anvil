@@ -915,6 +915,10 @@ internal static partial class UiStrings
     public static string LabelLibraryAutoPlayNext => "Auto Next";
     /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（マニュアル側）。Alt+L。</summary>
     public static string LabelLibraryAutoLoop => "Auto Loop";
+    /// <summary>Auto Loop の動作説明（サンプルループあり＝頭通し後に S–E 無限、無し＝曲末→先頭）。</summary>
+    public static string TipLibraryAutoLoop => Get(
+        "オン時: サンプルループがあれば頭（または再生位置）から通し、ループ終端で始点へ無限ループ。無ければ曲末で先頭へ戻す。選択や A-B があるときはそちらを優先。",
+        "On: with a sample loop, play from the head (or playhead) through the intro, then loop S–E forever. Without a sample loop, restart from the start at the end. Selection / A-B take priority.");
     public static string LibraryExplorerDesktop => Get("デスクトップ", "Desktop");
     public static string LibraryExplorerDocuments => Get("ドキュメント", "Documents");
     public static string LibraryExplorerMusic => Get("ミュージック", "Music");
@@ -1161,6 +1165,7 @@ internal static partial class UiStrings
         "Move Marker" => Get("マーカー移動", "Move Marker"),
         "Move Markers" => Get("マーカー移動", "Move Markers"),
         "Set Sample Loop" => Get("サンプルループ", "Set Sample Loop"),
+        "Loop Mix" => Get("ループミックス", "Loop Mix"),
         "Set Region" => Get("リージョン", "Set Region"),
         "Move Timeline" => Get("移動", "Move Timeline"),
         "Convert Sample Rate" => Get("サンプリングレート", "Convert Sample Rate"),

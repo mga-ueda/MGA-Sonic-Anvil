@@ -129,6 +129,7 @@ internal static class HistoryRecipes
     public const string ConvertRate = "ConvertRate";
     public const string ConvertBits = "ConvertBits";
     public const string ConvertChannels = "ConvertChannels";
+    public const string LoopMix = "LoopMix";
 
     private static readonly HashSet<string> KnownKinds = new(StringComparer.Ordinal)
     {
@@ -164,6 +165,7 @@ internal static class HistoryRecipes
         ConvertRate,
         ConvertBits,
         ConvertChannels,
+        LoopMix,
     };
 
     private static readonly HashSet<string> SampleKinds = new(StringComparer.Ordinal)
@@ -187,6 +189,7 @@ internal static class HistoryRecipes
         ConvertRate,
         ConvertBits,
         ConvertChannels,
+        LoopMix,
     };
 
     public static bool IsKnownKind(string? kind) =>
@@ -410,6 +413,7 @@ internal static class HistoryRecipes
             Paste => TryPaste(document, recipe),
             Record => TryRecord(document, recipe),
             SetSampleLoop => TrySetSampleLoop(document, recipe),
+            LoopMix => TryLoopMix(document, recipe),
             SetRegion => TrySetRegion(document, recipe),
             RemoveRegions => ProcessEdits.RemoveRegions(document, RangesOf(recipe)),
             ClearAllRegions => ProcessEdits.ClearAllRegions(document),
@@ -474,6 +478,29 @@ internal static class HistoryRecipes
             ? WaveSelection.Empty
             : new WaveSelection(recipe.Start, recipe.End).Clamp(document.FrameCount);
         return ProcessEdits.ApplySampleLoop(document, after);
+    }
+
+    private static IEditCommand? TryLoopMix(AudioDocument document, HistoryRecipe recipe)
+    {
+        var state = new CrossfadeEditState
+        {
+            IsActive = true,
+            StartFrame = recipe.Start,
+            EndFrame = recipe.End,
+            PreCrossfadeFrames = recipe.Frame,
+            PostCrossfadeFrames = recipe.Playhead,
+            PreOutShape = FadeCurves.ParseStored(((FadeShape)recipe.Value).ToString()),
+            PostOutShape = FadeCurves.ParseStored(((FadeShape)recipe.Channel).ToString()),
+            TruncateOutside = recipe.Flag,
+        };
+        state.PreInShape = recipe.Timing0 > 0
+            ? FadeCurves.ParseStored(((FadeShape)(recipe.Timing0 - 1)).ToString())
+            : state.PreOutShape;
+        state.PostInShape = recipe.Timing1 > 0
+            ? FadeCurves.ParseStored(((FadeShape)(recipe.Timing1 - 1)).ToString())
+            : state.PostOutShape;
+        state.Clamp(document.FrameCount);
+        return ProcessEdits.ApplyLoopMix(document, state);
     }
 
     private static IEditCommand? TrySetRegion(AudioDocument document, HistoryRecipe recipe)

@@ -73,6 +73,7 @@ internal static partial class UiStrings
     public static string WaveMenuFadeOut => Get("フェードアウト(_O)", "Fade _Out");
     public static string WaveMenuFadeOutSelected => Get("選択ファイルをフェードアウト(_O)", "Fade _Out Selected Files");
     public static string WaveMenuFadeAround => Get("シークバー前後をフェード(_X)", "Fade Around See_k Bar");
+    public static string WaveMenuCrossfadeEdit => Get("フェード調整ツール(_X)", "Fade Adjust _Tool");
     public static string WaveMenuNormalize => Get("ノーマライズ(_N)", "_Normalize");
     public static string WaveMenuNormalizeSelected => Get("選択ファイルをノーマライズ(_N)", "_Normalize Selected Files");
     public static string WaveMenuNormalizePerRegion => Get("リージョン毎に波形をノーマライズ(_G)", "Normalize Waveform per Re_gion");

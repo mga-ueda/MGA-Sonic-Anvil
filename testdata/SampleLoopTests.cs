@@ -212,6 +212,25 @@ public sealed class SampleLoopTests
             out _));
     }
 
+    [Fact]
+    public void LoopBarSelection_StartAndEndAreIndependent_BodySelectsBoth()
+    {
+        WaveformView.LoopBarSelectionForPart(
+            WaveformView.LoopBarPart.Start, out var startOnlyS, out var startOnlyE);
+        Assert.True(startOnlyS);
+        Assert.False(startOnlyE);
+
+        WaveformView.LoopBarSelectionForPart(
+            WaveformView.LoopBarPart.End, out var endOnlyS, out var endOnlyE);
+        Assert.False(endOnlyS);
+        Assert.True(endOnlyE);
+
+        WaveformView.LoopBarSelectionForPart(
+            WaveformView.LoopBarPart.Body, out var bodyS, out var bodyE);
+        Assert.True(bodyS);
+        Assert.True(bodyE);
+    }
+
     private static AudioDocument MakeDocument(int frames)
     {
         return new AudioDocument(new float[frames * 2], 48000, 2, 24, AudioFileKind.Wave, null);

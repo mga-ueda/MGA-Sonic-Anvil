@@ -97,6 +97,25 @@ internal static class FadeCurves
         return fadeIn ? rising : 1f - rising;
     }
 
+    /// <summary>
+    /// クロスフェード用。イン＝rising(in,t)、アウト＝1−rising(out,t)。
+    /// アイコン／通常フェードと同じ上下（Exp3 アウト＝山なり、Log3 アウト＝谷なり）。
+    /// </summary>
+    public static void CrossfadeGains(FadeShape shape, double t, out float outGain, out float inGain) =>
+        CrossfadeGains(shape, shape, t, out outGain, out inGain);
+
+    public static void CrossfadeGains(
+        FadeShape outShape,
+        FadeShape inShape,
+        double t,
+        out float outGain,
+        out float inGain)
+    {
+        t = Math.Clamp(t, 0d, 1d);
+        inGain = Gain(inShape, fadeIn: true, t);
+        outGain = Gain(outShape, fadeIn: false, t);
+    }
+
     public static float GainAtFrame(FadeShape shape, bool fadeIn, long frame, long startFrame, long length)
     {
         if (length <= 1)
@@ -107,6 +126,36 @@ internal static class FadeCurves
 
         var t = (frame - startFrame) / (double)(length - 1);
         return Gain(shape, fadeIn, t);
+    }
+
+    /// <summary>クロスフェード区間のフレームゲイン（時間反転）。</summary>
+    public static void CrossfadeGainsAtFrame(
+        FadeShape shape,
+        long frame,
+        long startFrame,
+        long length,
+        out float outGain,
+        out float inGain) =>
+        CrossfadeGainsAtFrame(shape, shape, frame, startFrame, length, out outGain, out inGain);
+
+    public static void CrossfadeGainsAtFrame(
+        FadeShape outShape,
+        FadeShape inShape,
+        long frame,
+        long startFrame,
+        long length,
+        out float outGain,
+        out float inGain)
+    {
+        if (length <= 1)
+        {
+            outGain = 0f;
+            inGain = 0f;
+            return;
+        }
+
+        var t = (frame - startFrame) / (double)(length - 1);
+        CrossfadeGains(outShape, inShape, t, out outGain, out inGain);
     }
 
     /// <summary>
