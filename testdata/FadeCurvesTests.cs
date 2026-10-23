@@ -91,4 +91,36 @@ public sealed class FadeCurvesTests
         Assert.Equal(0.875f, FadeCurves.Apply01(FadeShape.Log3, 0.5d), 5);
         Assert.True(FadeCurves.Apply01(FadeShape.Log3, 0.5d) > FadeCurves.Apply01(FadeShape.Linear, 0.5d));
     }
+
+    [Fact]
+    public void CrossfadeGains_MatchFadeInAndFadeOutGains()
+    {
+        FadeCurves.CrossfadeGains(FadeShape.Exp3, 0.25d, out var outGain, out var inGain);
+        Assert.Equal(FadeCurves.Gain(FadeShape.Exp3, fadeIn: true, 0.25d), inGain, 5);
+        Assert.Equal(FadeCurves.Gain(FadeShape.Exp3, fadeIn: false, 0.25d), outGain, 5);
+    }
+
+    [Fact]
+    public void CrossfadeGains_Exp3Out_StaysHighAtMidpoint()
+    {
+        // 指数3アウトは山なり（中点でもまだ大きい）。時間反転だと谷になりアイコンと食い違う。
+        FadeCurves.CrossfadeGains(FadeShape.Exp3, FadeShape.Linear, 0.5d, out var outGain, out _);
+        Assert.Equal(0.875f, outGain, 5);
+        Assert.True(outGain > 0.5f);
+    }
+
+    [Fact]
+    public void CrossfadeGains_Log3Out_DropsEarlyAtMidpoint()
+    {
+        FadeCurves.CrossfadeGains(FadeShape.Log3, FadeShape.Linear, 0.5d, out var outGain, out _);
+        Assert.Equal(0.125f, outGain, 5);
+        Assert.True(outGain < 0.5f);
+    }
+
+    [Fact]
+    public void CrossfadeGains_LinearStillSumsToOne()
+    {
+        FadeCurves.CrossfadeGains(FadeShape.Linear, 0.3d, out var outGain, out var inGain);
+        Assert.Equal(1f, outGain + inGain, 5);
+    }
 }
