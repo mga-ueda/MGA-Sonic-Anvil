@@ -84,7 +84,17 @@ internal static class Mp3Gapless
         return new WaveSelection(start, end);
     }
 
-    public static long ClampStart(long startFrame, WaveSelection? window, long frameCount)
+    /// <summary>
+    /// 再生開始フレームを窓に合わせる。
+    /// <paramref name="allowBeforeWindowStart"/> が true のとき（Auto Loop＋サンプルループ／フェード調整）は
+    /// 窓の始点より前をイントロとして残し、終端以降だけ始点へ戻す。
+    /// false（既定）はギャップレス遅延や選択ループどおり、始点より前を始点へ吸い寄せる。
+    /// </summary>
+    public static long ClampStart(
+        long startFrame,
+        WaveSelection? window,
+        long frameCount,
+        bool allowBeforeWindowStart = false)
     {
         var begin = 0L;
         var end = Math.Max(0, frameCount);
@@ -101,9 +111,17 @@ internal static class Mp3Gapless
 
         if (startFrame < begin)
         {
-            return begin;
+            return allowBeforeWindowStart
+                ? Math.Clamp(startFrame, 0, Math.Max(0, frameCount))
+                : begin;
         }
 
-        return startFrame >= end ? Math.Max(begin, end - 1) : startFrame;
+        if (startFrame >= end)
+        {
+            // イントロ許容のループ再生では終端以降→窓の始点。それ以外は終端直前。
+            return allowBeforeWindowStart ? begin : Math.Max(begin, end - 1);
+        }
+
+        return startFrame;
     }
 }

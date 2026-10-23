@@ -250,6 +250,48 @@ public sealed class Mp3GaplessTests
         }
     }
 
+    [Fact]
+    public void ClampStart_AllowBeforeWindowStart_KeepsIntro()
+    {
+        var loop = new WaveSelection(100, 400);
+        Assert.Equal(0, Mp3Gapless.ClampStart(0, loop, 1000, allowBeforeWindowStart: true));
+        Assert.Equal(50, Mp3Gapless.ClampStart(50, loop, 1000, allowBeforeWindowStart: true));
+        Assert.Equal(100, Mp3Gapless.ClampStart(0, loop, 1000, allowBeforeWindowStart: false));
+        Assert.Equal(100, Mp3Gapless.ClampStart(400, loop, 1000, allowBeforeWindowStart: true));
+    }
+
+    [Fact]
+    public void Bind_AllowBeforePlayWindowStart_KeepsIntroThenLoops()
+    {
+        // Auto Loop＋サンプルループ: 頭から Bind しても S へ吸い寄せない。
+        const int loopStart = 100;
+        const int loopEnd = 300;
+        var samples = new float[400 * 2];
+        for (var i = 0; i < 400; i++)
+        {
+            var v = i < loopStart ? 0.1f : 0.5f;
+            samples[i * 2] = v;
+            samples[i * 2 + 1] = v;
+        }
+
+        var document = new AudioDocument(samples, 48000, 2, 16, AudioFileKind.Wave, null, buildPeaks: false);
+        var provider = new PlaybackSampleProvider();
+        provider.SetDeviceSampleRate(48000);
+        provider.SetSilentSkip(false, -60);
+        provider.Bind(
+            document,
+            startFrame: 0,
+            playRange: new WaveSelection(loopStart, loopEnd),
+            loop: true,
+            allowBeforePlayWindowStart: true);
+        Assert.Equal(0, provider.CursorFrame);
+
+        var intro = new float[50 * 2];
+        Assert.Equal(intro.Length, provider.Read(intro, 0, intro.Length));
+        Assert.All(intro, v => Assert.Equal(0.1f, v, 2));
+        Assert.InRange(provider.CursorFrame, 40, 60);
+    }
+
     private static AudioDocument ToneDocument(
         int frames,
         int delay,

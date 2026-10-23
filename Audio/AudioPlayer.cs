@@ -295,7 +295,8 @@ internal sealed class AudioPlayer : IDisposable
         WaveSelection? playRange,
         bool loop,
         Func<long, float>? frameGain = null,
-        bool preferStream = false)
+        bool preferStream = false,
+        bool allowBeforePlayWindowStart = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_scrubbing)
@@ -303,7 +304,14 @@ internal sealed class AudioPlayer : IDisposable
             EndScrub();
         }
 
-        BindPlaybackSource(document, startFrame, playRange, loop, frameGain, preferStream);
+        BindPlaybackSource(
+            document,
+            startFrame,
+            playRange,
+            loop,
+            frameGain,
+            preferStream,
+            allowBeforePlayWindowStart);
         ApplyPlaybackRouting();
         EnsureDeviceMatchesProvider();
     }
@@ -347,7 +355,8 @@ internal sealed class AudioPlayer : IDisposable
         WaveSelection? playRange,
         bool loop,
         Func<long, float>? frameGain = null,
-        bool preferStream = false)
+        bool preferStream = false,
+        bool allowBeforePlayWindowStart = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_playing)
@@ -355,7 +364,14 @@ internal sealed class AudioPlayer : IDisposable
             Pause();
         }
 
-        BindPlaybackSource(document, startFrame, playRange, loop, frameGain, preferStream);
+        BindPlaybackSource(
+            document,
+            startFrame,
+            playRange,
+            loop,
+            frameGain,
+            preferStream,
+            allowBeforePlayWindowStart);
     }
 
     /// <summary>
@@ -415,11 +431,18 @@ internal sealed class AudioPlayer : IDisposable
         WaveSelection? playRange,
         bool loop,
         Func<long, float>? frameGain,
-        bool preferStream)
+        bool preferStream,
+        bool allowBeforePlayWindowStart = false)
     {
         if (!ShouldBindPlaybackStream(document, preferStream))
         {
-            _provider.Bind(document, startFrame, playRange, loop, frameGain);
+            _provider.Bind(
+                document,
+                startFrame,
+                playRange,
+                loop,
+                frameGain,
+                allowBeforePlayWindowStart);
             return;
         }
 
@@ -435,13 +458,26 @@ internal sealed class AudioPlayer : IDisposable
                 throw;
             }
 
-            _provider.Bind(document, startFrame, playRange, loop, frameGain);
+            _provider.Bind(
+                document,
+                startFrame,
+                playRange,
+                loop,
+                frameGain,
+                allowBeforePlayWindowStart);
             return;
         }
 
         try
         {
-            _provider.BindStream(stream, document, startFrame, playRange, loop, frameGain);
+            _provider.BindStream(
+                stream,
+                document,
+                startFrame,
+                playRange,
+                loop,
+                frameGain,
+                allowBeforePlayWindowStart);
             if (document.IsStreamPlayback || document.IsDeferredLoad)
             {
                 // UI の尺は document、再生は stream。低レートなどでずれたら stream に揃える。
@@ -521,6 +557,13 @@ internal sealed class AudioPlayer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _provider.SetExitSpan(span);
+    }
+
+    /// <summary>フェード調整の非破壊プレビュー。null で解除。</summary>
+    public void SetLoopFadePreview(Editing.LoopFadePreview? preview)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _provider.SetLoopFadePreview(preview);
     }
 
     /// <summary>Exit レイヤー再生中の現在フレーム。停止中は -1。</summary>
