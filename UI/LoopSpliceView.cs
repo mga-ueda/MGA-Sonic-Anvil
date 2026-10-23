@@ -29,9 +29,12 @@ internal sealed class LoopSpliceView : FrameworkElement
     private long _dragStartLoopFrame;
     private double _dragStartAmpZoom = 1;
     private const int BaseHalfFrames = 256;
+    /// <summary>片側の最小表示サンプル数。1 まで落とさないと拡大が途中で止まる。</summary>
+    private const int MinVisibleHalfFrames = 1;
     private const double DefaultTimeZoom = 0.25;
     private const double TimeZoomMin = 0.125;
-    private const double TimeZoomMax = 64;
+    /// <summary>片側 1 サンプルまで拡大（BaseHalfFrames / MinVisibleHalfFrames）。</summary>
+    private const double TimeZoomMax = BaseHalfFrames / (double)MinVisibleHalfFrames;
     private const double DragLockThresholdPx = 4;
     /// <summary>このピクセル上下で TimeZoomStep 1 段分の振幅ズーム。</summary>
     private const double AmpDragPixelsPerStep = 48;
@@ -334,7 +337,8 @@ internal sealed class LoopSpliceView : FrameworkElement
         Cursor = Cursors.Arrow;
     }
 
-    private int VisibleHalfFrames() => Math.Max(8, (int)(BaseHalfFrames / _timeZoom));
+    private int VisibleHalfFrames() =>
+        Math.Max(MinVisibleHalfFrames, (int)(BaseHalfFrames / Math.Max(_timeZoom, 1e-9)));
 
     private static void ClampPan(ref long pan, int half)
     {
@@ -405,15 +409,18 @@ internal sealed class LoopSpliceView : FrameworkElement
             out var leftByCh,
             out var rightByCh);
 
-        // エディタのサラウンド波形と同じ ChannelColors 登場順（L=0, R=1, …）。
+        // 3ch 以上だけチャンネル色。モノ／ステレオは WaveFill 一色（本体波形と同じ）。
         // レーン間ギャップなし・各レーン高さフルで振幅を描く（上下余白なし）。
+        var tintLanes = ChannelColors.UsesLaneTint(channels);
+        var monoBrush = WpfControlHelpers.FrozenBrush(Theme.Get("WaveFillBrush"));
         var laneHeight = bounds.Height / channels;
         for (var ch = 0; ch < channels; ch++)
         {
             var laneTop = bounds.Top + ch * laneHeight;
             var laneMidY = laneTop + laneHeight * 0.5;
             DrawZeroLine(dc, bounds.Left, bounds.Right, laneMidY);
-            var pen = new Pen(ChannelSwatch.Brush(ch), 1.2);
+            var brush = tintLanes ? ChannelSwatch.Brush(ch) : monoBrush;
+            var pen = new Pen(brush, 1.2);
             pen.Freeze();
             DrawHalf(dc, leftByCh[ch], bounds.Left, midX, laneMidY, laneHeight, pen);
             DrawHalf(dc, rightByCh[ch], midX, bounds.Right, laneMidY, laneHeight, pen);
@@ -455,23 +462,37 @@ internal sealed class LoopSpliceView : FrameworkElement
         double height,
         Pen pen)
     {
-        if (samples.Length < 2 || x1 <= x0)
+        if (samples.Length < 1 || x1 <= x0)
         {
+            return;
+        }
+
+        var halfH = height * 0.5;
+        double SampleY(float sample)
+        {
+            var y = midY - sample * halfH * _ampZoom;
+            return Math.Clamp(y, midY - halfH, midY + halfH);
+        }
+
+        // 1 サンプル時は中央に縦線（点だけだと見えない）。
+        if (samples.Length == 1)
+        {
+            var x = (x0 + x1) * 0.5;
+            var y = SampleY(samples[0]);
+            dc.DrawLine(pen, new Point(x, midY), new Point(x, y));
             return;
         }
 
         var geo = new StreamGeometry();
         using (var ctx = geo.Open())
         {
-            var halfH = height * 0.5;
             var first = true;
             for (var i = 0; i < samples.Length; i++)
             {
                 var t = i / (double)(samples.Length - 1);
                 var x = x0 + (x1 - x0) * t;
                 // ±1.0 でレーン上下端まで使い切る（余白係数なし）。
-                var y = midY - samples[i] * halfH * _ampZoom;
-                y = Math.Clamp(y, midY - halfH, midY + halfH);
+                var y = SampleY(samples[i]);
                 if (first)
                 {
                     ctx.BeginFigure(new Point(x, y), false, false);
