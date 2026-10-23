@@ -34,6 +34,7 @@ internal sealed class CrossfadeEditWindow : Window
     private readonly TextBox _postBox = CreateValueBox();
     private readonly TextBox _fadeInBox = CreateValueBox();
     private readonly CheckBox _truncateCheck = new() { FontSize = 12 };
+    private readonly CheckBox _deleteAfterLoopCheck = new() { FontSize = 12 };
     private readonly CheckBox _align28Check = new() { FontSize = 12 };
     private readonly CheckBox _xfadeCheck = new() { FontSize = 12 };
     private readonly TextBlock _hintText = new()
@@ -60,6 +61,11 @@ internal sealed class CrossfadeEditWindow : Window
     private bool _valueNudgeRepeatStarted;
     private const int ValueNudgeRepeatDelayMs = 400;
     private const int ValueNudgeRepeatIntervalMs = 50;
+    /// <summary>?????????????????? 0.5 ??????</summary>
+    private readonly DispatcherTimer _valueCommitTimer;
+    private TextBox? _valueCommitBox;
+    private CrossfadeEditState.FocusField _valueCommitFocus;
+    private const int ValueCommitDebounceMs = 500;
 
     /// <summary>??? true ??????????????? 0.5 ???????????</summary>
     public event Action<bool>? DraftChanged;
@@ -106,11 +112,13 @@ internal sealed class CrossfadeEditWindow : Window
         {
             _xfadeCheck.Style = checkStyle;
             _truncateCheck.Style = checkStyle;
+            _deleteAfterLoopCheck.Style = checkStyle;
             _align28Check.Style = checkStyle;
         }
 
         _xfadeCheck.Foreground = BrushOf("PrimaryForeBrush");
         _truncateCheck.Foreground = BrushOf("PrimaryForeBrush");
+        _deleteAfterLoopCheck.Foreground = BrushOf("PrimaryForeBrush");
         _align28Check.Foreground = BrushOf("PrimaryForeBrush");
 
         WireToggles();
@@ -122,6 +130,8 @@ internal sealed class CrossfadeEditWindow : Window
 
         _valueNudgeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ValueNudgeRepeatDelayMs) };
         _valueNudgeTimer.Tick += (_, _) => OnValueNudgeTick();
+        _valueCommitTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ValueCommitDebounceMs) };
+        _valueCommitTimer.Tick += (_, _) => OnValueCommitTimerTick();
 
         Content = new Border
         {
@@ -198,6 +208,7 @@ internal sealed class CrossfadeEditWindow : Window
     public void HideFromHost()
     {
         StopValueNudge();
+        CancelPendingValueCommit();
         _hidingFromHost = true;
         try
         {
@@ -216,6 +227,8 @@ internal sealed class CrossfadeEditWindow : Window
     /// <summary>アプリ終了時など、本当に閉じる（通常の X は Hide のみ）。</summary>
     public void ForceCloseFromHost()
     {
+        StopValueNudge();
+        CancelPendingValueCommit();
         _forceCloseFromHost = true;
         _hidingFromHost = true;
         try
@@ -251,6 +264,8 @@ internal sealed class CrossfadeEditWindow : Window
         _hintText.Text = UiStrings.CrossfadeWindowHint;
         _truncateCheck.Content = UiStrings.CrossfadeLabelTruncate;
         _truncateCheck.ToolTip = UiStrings.CrossfadeTipTruncate;
+        _deleteAfterLoopCheck.Content = UiStrings.CrossfadeLabelDeleteAfterLoop;
+        _deleteAfterLoopCheck.ToolTip = UiStrings.CrossfadeTipDeleteAfterLoop;
         _align28Check.Content = UiStrings.CrossfadeLabelAlignTwentyEight;
         _align28Check.ToolTip = UiStrings.CrossfadeTipAlignTwentyEight;
         _xfadeCheck.Content = UiStrings.CrossfadeLabelXfade;
@@ -316,6 +331,8 @@ internal sealed class CrossfadeEditWindow : Window
         _xfadeCheck.Unchecked += (_, _) => SetXfadePreview(false);
         _truncateCheck.Checked += (_, _) => SetTruncate(true);
         _truncateCheck.Unchecked += (_, _) => SetTruncate(false);
+        _deleteAfterLoopCheck.Checked += (_, _) => SetDeleteAfterLoop(true);
+        _deleteAfterLoopCheck.Unchecked += (_, _) => SetDeleteAfterLoop(false);
         _align28Check.Checked += (_, _) => SetAlignTwentyEight(true);
         _align28Check.Unchecked += (_, _) => SetAlignTwentyEight(false);
     }
@@ -510,11 +527,13 @@ internal sealed class CrossfadeEditWindow : Window
         box.LostKeyboardFocus -= OnLoopBoxLostFocus;
         box.PreviewKeyDown -= OnLoopBoxPreviewKeyDown;
         box.PreviewMouseWheel -= OnLoopBoxPreviewMouseWheel;
+        box.TextChanged -= OnLoopBoxTextChanged;
         box.Tag = focus;
         box.GotKeyboardFocus += OnLoopBoxGotFocus;
         box.LostKeyboardFocus += OnLoopBoxLostFocus;
         box.PreviewKeyDown += OnLoopBoxPreviewKeyDown;
         box.PreviewMouseWheel += OnLoopBoxPreviewMouseWheel;
+        box.TextChanged += OnLoopBoxTextChanged;
     }
 
     private void OnLoopBoxGotFocus(object sender, KeyboardFocusChangedEventArgs e)
@@ -530,8 +549,49 @@ internal sealed class CrossfadeEditWindow : Window
         if (sender is TextBox { Tag: CrossfadeEditState.FocusField focus } box)
         {
             StopValueNudge();
-            CommitBox(box, focus);
+            CancelPendingValueCommit();
+            CommitBox(box, focus, revertOnInvalid: true);
         }
+    }
+
+    private void OnLoopBoxTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_syncing || sender is not TextBox { Tag: CrossfadeEditState.FocusField focus } box)
+        {
+            return;
+        }
+
+        // ?????????????? 0.5 ???????????
+        ScheduleValueCommit(box, focus);
+    }
+
+    private void ScheduleValueCommit(TextBox box, CrossfadeEditState.FocusField focus)
+    {
+        _valueCommitBox = box;
+        _valueCommitFocus = focus;
+        _valueCommitTimer.Stop();
+        _valueCommitTimer.Interval = TimeSpan.FromMilliseconds(ValueCommitDebounceMs);
+        _valueCommitTimer.Start();
+    }
+
+    private void CancelPendingValueCommit()
+    {
+        _valueCommitTimer.Stop();
+        _valueCommitBox = null;
+    }
+
+    private void OnValueCommitTimerTick()
+    {
+        _valueCommitTimer.Stop();
+        if (_valueCommitBox is not { } box)
+        {
+            return;
+        }
+
+        var focus = _valueCommitFocus;
+        _valueCommitBox = null;
+        // ????????????????????????????Enter ????
+        CommitBox(box, focus, revertOnInvalid: false);
     }
 
     private void OnLoopBoxPreviewKeyDown(object sender, KeyEventArgs e)
@@ -544,7 +604,8 @@ internal sealed class CrossfadeEditWindow : Window
         if (e.Key == Key.Enter)
         {
             StopValueNudge();
-            CommitBox(box, focus);
+            CancelPendingValueCommit();
+            CommitBox(box, focus, revertOnInvalid: true);
             e.Handled = true;
             return;
         }
@@ -893,9 +954,12 @@ internal sealed class CrossfadeEditWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
         };
         DockPanel.SetDock(right, Dock.Right);
-        _truncateCheck.Margin = new Thickness(0, 0, 12, 0);
+        _truncateCheck.Margin = new Thickness(0, 0, 8, 0);
         _truncateCheck.VerticalAlignment = VerticalAlignment.Center;
         right.Children.Add(_truncateCheck);
+        _deleteAfterLoopCheck.Margin = new Thickness(0, 0, 12, 0);
+        _deleteAfterLoopCheck.VerticalAlignment = VerticalAlignment.Center;
+        right.Children.Add(_deleteAfterLoopCheck);
         right.Children.Add(MakeDialogActionButton(
             UiStrings.ButtonOk,
             UiStrings.CrossfadeTipLoopMix,
@@ -1064,6 +1128,22 @@ internal sealed class CrossfadeEditWindow : Window
         DraftChanged?.Invoke(false);
     }
 
+    private void SetDeleteAfterLoop(bool value)
+    {
+        if (_syncing || _state is null)
+        {
+            return;
+        }
+
+        _state.DeleteAfterLoop = value;
+        if (_splice.Document is not null)
+        {
+            _state.Clamp(_splice.Document.FrameCount);
+        }
+
+        DraftChanged?.Invoke(false);
+    }
+
     private void SetAlignTwentyEight(bool value)
     {
         if (_syncing || _state is null)
@@ -1095,7 +1175,7 @@ internal sealed class CrossfadeEditWindow : Window
         DraftChanged?.Invoke(false);
     }
 
-    private void CommitBox(TextBox box, CrossfadeEditState.FocusField focus)
+    private void CommitBox(TextBox box, CrossfadeEditState.FocusField focus, bool revertOnInvalid = true)
     {
         if (_syncing || _state is null || _splice.Document is null)
         {
@@ -1113,7 +1193,11 @@ internal sealed class CrossfadeEditWindow : Window
         raw = raw.Trim().TrimEnd('%');
         if (!long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
         {
-            SyncFromState();
+            if (revertOnInvalid)
+            {
+                SyncFromState();
+            }
+
             return;
         }
 
@@ -1137,7 +1221,14 @@ internal sealed class CrossfadeEditWindow : Window
                 break;
         }
 
+        var caret = box.IsKeyboardFocusWithin ? box.CaretIndex : -1;
         SyncFromState();
+        if (caret >= 0 && box.IsKeyboardFocusWithin)
+        {
+            box.CaretIndex = Math.Clamp(caret, 0, box.Text.Length);
+        }
+
+        // Enter ????????????????????? 0.5 ????????
         DraftChanged?.Invoke(false);
     }
 
@@ -1156,6 +1247,7 @@ internal sealed class CrossfadeEditWindow : Window
             _fadeInBox.Text = _state.PreCrossfadeFrames.ToString(CultureInfo.InvariantCulture);
             _postBox.Text = _state.PostCrossfadeFrames.ToString(CultureInfo.InvariantCulture);
             _truncateCheck.IsChecked = _state.TruncateOutside;
+            _deleteAfterLoopCheck.IsChecked = _state.DeleteAfterLoop;
             _align28Check.IsChecked = _state.AlignLoopEndsToTwentyEight;
             _xfadeCheck.IsChecked = _state.ShowXfadePreview;
             RefreshCurveIcons();

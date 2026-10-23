@@ -12,7 +12,10 @@ internal static partial class UiStrings
     public static string CrossfadeLabelPostFade => Get("ポストクロスフェード", "Post-crossfade");
     public static string CrossfadeLabelFadeIn => Get("プリクロスフェード", "Pre-crossfade");
     public static string CrossfadeMarkerPre => "Pre";
-    public static string CrossfadeLabelTruncate => Get("範囲外を切り落とし (C)", "Truncate outside (C)");
+    /// <summary>アクセスキー無し（ショートカットは付けない）。</summary>
+    public static string CrossfadeLabelTruncate => Get("ループ前後を削除", "Delete before/after loop");
+    /// <summary>アクセスキー無し（ショートカットは付けない）。</summary>
+    public static string CrossfadeLabelDeleteAfterLoop => Get("ループ後を削除", "Delete after loop");
     public static string CrossfadeLabelCurve => Get("フェード曲線", "Fade curve");
     public static string CrossfadeLabelCurveIn => Get("イン", "In");
     public static string CrossfadeLabelCurveOut => Get("ポスト", "Post");
@@ -42,6 +45,9 @@ internal static partial class UiStrings
     public static string CrossfadeTipTruncate => Get(
         "オンにすると、ループミックス時に始点より前と終点以降を削除します（エンド区間は材料として焼いたあと切り落します）。",
         "When on, Loop Mix deletes audio before Start and after End (End-side is used as material, then trimmed).");
+    public static string CrossfadeTipDeleteAfterLoop => Get(
+        "オンにすると、ループミックス時に終点より後ろの音声だけを削除します（始点より前は残します）。",
+        "When on, Loop Mix deletes only audio after End (keeps audio before Start).");
     public static string CrossfadeTipCurve => Get(
         "上段＝イン（プリ）、下段＝ポスト。各行は左＝アウト脚、右＝イン脚です。",
         "Top=In (Pre), Bottom=Post. In each row: left=out leg, right=in leg.");
@@ -54,7 +60,7 @@ internal static partial class UiStrings
     public static string CrossfadeTipSnapZero => Get(
         "この値を近いゼロクロスへ寄せます。",
         "Snap this value to a nearby zero-crossing.");
-    public static string CrossfadeLabelAlignTwentyEight => Get("28の倍数", "Multiples of 28");
+    public static string CrossfadeLabelAlignTwentyEight => Get("28の倍数でループを取る", "Take loop on multiples of 28");
     public static string CrossfadeTipAlignTwentyEight => Get(
         "オンのとき、ループの始点と終点は 28 サンプルの倍数にしか動きません。",
         "When on, loop Start and End move only on multiples of 28 samples.");

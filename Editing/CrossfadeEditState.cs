@@ -29,6 +29,9 @@ internal sealed class CrossfadeEditState
     /// <summary>Loop Mix 時に [0,S) と [E, end) を切り落す。</summary>
     public bool TruncateOutside { get; set; }
 
+    /// <summary>Loop Mix 時に [E, end) のみ切り落す（始点より前は残す）。アクセスキー無し。</summary>
+    public bool DeleteAfterLoop { get; set; }
+
     /// <summary>オンのとき始点／終点を 28 サンプル格子に揃える。</summary>
     public bool AlignLoopEndsToTwentyEight { get; set; }
 
@@ -343,6 +346,7 @@ internal sealed class CrossfadeEditState
         PreCrossfadeFrames = PreCrossfadeFrames,
         PostCrossfadeFrames = PostCrossfadeFrames,
         TruncateOutside = TruncateOutside,
+        DeleteAfterLoop = DeleteAfterLoop,
         AlignLoopEndsToTwentyEight = AlignLoopEndsToTwentyEight,
         ShowXfadePreview = ShowXfadePreview,
         LoopPlayback = LoopPlayback,

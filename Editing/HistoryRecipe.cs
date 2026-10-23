@@ -492,6 +492,7 @@ internal static class HistoryRecipes
             PreOutShape = FadeCurves.ParseStored(((FadeShape)recipe.Value).ToString()),
             PostOutShape = FadeCurves.ParseStored(((FadeShape)recipe.Channel).ToString()),
             TruncateOutside = recipe.Flag,
+            DeleteAfterLoop = recipe.Flag2,
         };
         state.PreInShape = recipe.Timing0 > 0
             ? FadeCurves.ParseStored(((FadeShape)(recipe.Timing0 - 1)).ToString())
