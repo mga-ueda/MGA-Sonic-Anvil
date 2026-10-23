@@ -405,7 +405,7 @@ internal sealed class SilenceDetectDialog : Window
 
     private static bool IsInsideTextBox(DependencyObject source)
     {
-        for (DependencyObject? node = source; node is not null; node = VisualTreeHelper.GetParent(node))
+        for (DependencyObject? node = source; node is not null; node = NextAncestor(node))
         {
             if (node is TextBox)
             {
@@ -414,6 +414,19 @@ internal sealed class SilenceDetectDialog : Window
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Run など Visual ではない要素は VisualTreeHelper が例外を投げる。論理親へ渡してからビジュアルを辿る。
+    /// </summary>
+    private static DependencyObject? NextAncestor(DependencyObject current)
+    {
+        if (current is Visual or System.Windows.Media.Media3D.Visual3D)
+        {
+            return VisualTreeHelper.GetParent(current);
+        }
+
+        return LogicalTreeHelper.GetParent(current);
     }
 
     private void OnPreviewThresholdChanged(double db, bool openLine)
