@@ -130,6 +130,9 @@ internal sealed class CrossfadeEditWindow : Window
         };
 
         RefreshUiStrings();
+        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        UiThemeService.Changed += OnUiThemeChanged;
+        Closed += (_, _) => UiThemeService.Changed -= OnUiThemeChanged;
         AppDialogKeys.Attach(this, RequestExit);
         Closing += OnClosing;
         LocationChanged += (_, _) => PersistPlacement();
@@ -137,6 +140,9 @@ internal sealed class CrossfadeEditWindow : Window
         PreviewKeyDown += OnPreviewKeyDown;
         PreviewKeyUp += OnPreviewKeyUp;
     }
+
+    private void OnUiThemeChanged(object? sender, EventArgs e) =>
+        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
 
     private void OnPreviewKeyUp(object sender, KeyEventArgs e)
     {
