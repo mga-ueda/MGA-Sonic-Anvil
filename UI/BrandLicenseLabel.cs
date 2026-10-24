@@ -8,7 +8,7 @@ using MgaSonicAnvil.Domain;
 namespace MgaSonicAnvil.UI;
 
 /// <summary>
-/// フッタ権利表記。本文はミュート色、GitHub / MIT License / LAME だけリンク。
+/// フッタ権利表記。本文はミュート色、GitHub / MIT / LAME / FFmpeg / EffeTune をリンク。
 /// </summary>
 internal sealed class BrandLicenseLabel : TextBlock
 {
@@ -198,6 +198,7 @@ internal sealed class BrandLicenseLabel : TextBlock
         Consider(remaining, UiStrings.CopyrightMitLink, "mit", ref at, ref id, ref length);
         Consider(remaining, UiStrings.CopyrightLameLink, "lame", ref at, ref id, ref length);
         Consider(remaining, UiStrings.CopyrightFfmpegLink, "ffmpeg", ref at, ref id, ref length);
+        Consider(remaining, UiStrings.CopyrightEffetuneLink, "effetune", ref at, ref id, ref length);
         return at >= 0;
     }
 

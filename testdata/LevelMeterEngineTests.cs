@@ -211,6 +211,167 @@ public sealed class LevelMeterEngineTests
     }
 
     [Fact]
+    public void PlaybackProvider_MonitorMono_SumsLeftAndRightOnOutput()
+    {
+        var frames = 4;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 2] = 0.5f;
+            samples[i * 2 + 1] = -0.1f;
+        }
+
+        var document = new AudioDocument(samples, 48000, 2, 24, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(2, null);
+        provider.Bind(document, 0, null, loop: false);
+        provider.SetMonitorMono(true);
+        var buffer = new float[samples.Length];
+        Assert.Equal(samples.Length, provider.Read(buffer, 0, buffer.Length));
+        for (var i = 0; i < frames; i++)
+        {
+            Assert.Equal(0.2f, buffer[i * 2], 5);
+            Assert.Equal(0.2f, buffer[i * 2 + 1], 5);
+        }
+    }
+
+    [Fact]
+    public void PlaybackProvider_MonitorDim_AttenuatesOutputByDefaultDb()
+    {
+        var frames = 4;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 2] = 0.5f;
+            samples[i * 2 + 1] = 0.5f;
+        }
+
+        var document = new AudioDocument(samples, 48000, 2, 24, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(2, null);
+        provider.Bind(document, 0, null, loop: false);
+        Assert.Equal(PlaybackSampleProvider.DefaultMonitorDimDb, provider.MonitorDimDbAmount);
+        provider.SetMonitorDim(true);
+        var buffer = new float[samples.Length];
+        Assert.Equal(samples.Length, provider.Read(buffer, 0, buffer.Length));
+        var expected = 0.5f * PlaybackSampleProvider.DefaultMonitorDimLinear;
+        for (var i = 0; i < frames; i++)
+        {
+            Assert.Equal(expected, buffer[i * 2], 5);
+            Assert.Equal(expected, buffer[i * 2 + 1], 5);
+        }
+    }
+
+    [Fact]
+    public void PlaybackProvider_MonitorDim_UsesConfiguredDb()
+    {
+        var frames = 4;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 2] = 0.5f;
+            samples[i * 2 + 1] = 0.5f;
+        }
+
+        var document = new AudioDocument(samples, 48000, 2, 24, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(2, null);
+        provider.Bind(document, 0, null, loop: false);
+        provider.SetMonitorDimDb(-20);
+        provider.SetMonitorDim(true);
+        var buffer = new float[samples.Length];
+        Assert.Equal(samples.Length, provider.Read(buffer, 0, buffer.Length));
+        var expected = 0.5f * (float)Math.Pow(10, -20 / 20.0);
+        for (var i = 0; i < frames; i++)
+        {
+            Assert.Equal(expected, buffer[i * 2], 5);
+            Assert.Equal(expected, buffer[i * 2 + 1], 5);
+        }
+    }
+
+    [Fact]
+    public void PlaybackProvider_MonitorLowCut_DefaultsToOneHundredTwentyHzShelf()
+    {
+        var provider = new PlaybackSampleProvider();
+        Assert.Equal(PlaybackSampleProvider.DefaultMonitorLowCutHz, provider.MonitorLowCutCutoffHz);
+        Assert.Equal(120, PlaybackSampleProvider.DefaultMonitorLowCutHz);
+        Assert.Equal(-20, PlaybackSampleProvider.FixedMonitorLowCutGainDb);
+        Assert.Equal(20, PlaybackSampleProvider.MinMonitorLowCutHz);
+        Assert.Equal(500, PlaybackSampleProvider.MaxMonitorLowCutHz);
+        Assert.Equal(-15, PlaybackSampleProvider.DefaultMonitorDimDb);
+    }
+
+    [Fact]
+    public void PlaybackProvider_MonitorLowCut_ShelvesNearDcToMinusTwentyDb()
+    {
+        // シェルフなので DC は消えず、約 −20 dB（0.5 → 0.05）へ落ち着く。
+        var frames = 48000;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 2] = 0.5f;
+            samples[i * 2 + 1] = 0.5f;
+        }
+
+        var document = new AudioDocument(samples, 48000, 2, 24, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(2, null);
+        provider.Bind(document, 0, null, loop: false);
+        provider.SetMonitorLowCut(true);
+        var buffer = new float[samples.Length];
+        Assert.Equal(samples.Length, provider.Read(buffer, 0, buffer.Length));
+        Assert.InRange(buffer[^2], 0.04f, 0.06f);
+        Assert.InRange(buffer[^1], 0.04f, 0.06f);
+    }
+
+    [Fact]
+    public void PlaybackProvider_MonitorLowCut_LowShelfMinusTwentyDb()
+    {
+        // 低域は約 −20 dB に頭打ち、通過帯（1 kHz）はほぼ 0 dB。
+        const int sampleRate = 48000;
+        const int frames = sampleRate * 2;
+        var lowDb = MeasureMonitorLowCutToneDb(sampleRate, frames, toneHz: 30);
+        var passbandDb = MeasureMonitorLowCutToneDb(sampleRate, frames, toneHz: 1000);
+        Assert.InRange(passbandDb, -1.5, 1.0);
+        Assert.InRange(lowDb, -22.0, -18.0);
+        Assert.True(double.IsFinite(lowDb) && double.IsFinite(passbandDb));
+    }
+
+    private static double MeasureMonitorLowCutToneDb(int sampleRate, int frames, double toneHz)
+    {
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            var s = (float)(0.5 * Math.Sin(2.0 * Math.PI * toneHz * i / sampleRate));
+            samples[i * 2] = s;
+            samples[i * 2 + 1] = s;
+        }
+
+        var document = new AudioDocument(samples, sampleRate, 2, 24, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(2, null);
+        provider.Bind(document, 0, null, loop: false);
+        provider.SetMonitorLowCut(true);
+        var buffer = new float[samples.Length];
+        Assert.Equal(samples.Length, provider.Read(buffer, 0, buffer.Length));
+
+        // 先頭の過渡を捨て、末尾 0.5 秒の RMS。
+        var start = Math.Max(0, frames - sampleRate / 2);
+        double sumSq = 0;
+        var n = 0;
+        for (var i = start; i < frames; i++)
+        {
+            var v = buffer[i * 2];
+            sumSq += v * v;
+            n++;
+        }
+
+        var rms = Math.Sqrt(sumSq / Math.Max(1, n));
+        var inputRms = 0.5 / Math.Sqrt(2.0);
+        return 20.0 * Math.Log10(Math.Max(1e-12, rms / inputRms));
+    }
+
+    [Fact]
     public void Update_RmsHoldLineRisesSlowerThanHeldValue()
     {
         var engine = new LevelMeterEngine();

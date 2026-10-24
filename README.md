@@ -28,9 +28,12 @@
 - 起動: 二重起動しません。2 回目は既存ウィンドウを前面にし、渡したファイルを開きます
 - 起動時に GitHub Releases を見て、新しい版があれば知らせます（自動ダウンロードはしません）
 - ライセンス: [MIT](LICENSE)
+- 第三者通知（EffeTune / Signalsmith の MIT 全文・学習データ帰属など）: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 Wwise®／Audiokinetic® は各権利者の商標です。本ツールは非公式です。
 
 LAME は LAME project の名称で、ライセンスは LGPL です。同梱・改変・リンク・再配布せず、ユーザーが用意した `lame.exe` をプロセスとして呼び出すだけです。入手とライセンス遵守は利用者側です。LAME プロジェクトの非公式です。
 
-Signalsmith Stretch（Signalsmith Audio、MIT）をピッチシフトに同梱しています。
+Signalsmith Stretch（Signalsmith Audio、MIT）をピッチシフトに同梱しています。全文は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) を参照してください。
+
+EffeTune（Yoshiyuki Kobayashi、MIT）の Rhythm Analyzer DSP を BPM／ビート解析に利用します（クリック音は本アプリの波形）。MIT 全文と学習データ由来の帰属は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) にあります。アプリ左下の **EffeTune** リンクからも同じ通知を開けます。

@@ -90,6 +90,12 @@ internal sealed class AppSettings
     /// <summary>ラウドネスメーターのターゲット（LKFS）。既定 -24。</summary>
     public double LoudnessTargetLufs { get; set; } = LoudnessMeterEngine.DefaultTargetLufs;
 
+    /// <summary>モニター DIM の減衰（dB）。既定 -15。</summary>
+    public double MonitorDimDb { get; set; } = PlaybackSampleProvider.DefaultMonitorDimDb;
+
+    /// <summary>モニターローカット（ローシェルフ −20 dB 固定）のカットオフ（Hz）。既定 120。範囲 20〜500。</summary>
+    public double MonitorLowCutHz { get; set; } = PlaybackSampleProvider.DefaultMonitorLowCutHz;
+
     /// <summary>壁紙画像のフルパス。空は壁紙なし。</summary>
     public string WallpaperPath { get; set; } = string.Empty;
 
@@ -500,6 +506,12 @@ internal sealed class AppSettings
 
     public double ResolvedLoudnessTargetLufs() =>
         LoudnessMeterEngine.ClampTargetLufs(LoudnessTargetLufs);
+
+    public double ResolvedMonitorDimDb() =>
+        PlaybackSampleProvider.ClampMonitorDimDb(MonitorDimDb);
+
+    public double ResolvedMonitorLowCutHz() =>
+        PlaybackSampleProvider.ClampMonitorLowCutHz(MonitorLowCutHz);
 
     public double ResolvedSilentSkipThresholdDb() =>
         global::MgaSonicAnvil.Audio.SilentSkip.ClampThresholdDb(SilentSkipThresholdDb);

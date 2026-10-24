@@ -270,6 +270,8 @@
           <li><strong>録音／再生ポートと Ch</strong> …… スピーカー名は配置から、ポート名は機器から来ます。チャンネル番号は録音と再生で共通。「なし」はそのスピーカーを使いません。録音はレベルメーターで確認します。</li>
           <li><strong>確認音</strong> …… 再生ポートごとに、Sine -20 dB（ふつう 1 kHz、LFE は 80 Hz）と英語の Voice（LFE には無し）。</li>
           <li>左右 2 本だけで再生していて、ポートを決めていないときは、スピーカーの音を左右にまとめます。</li>
+          <li><strong>DIM 減衰</strong> …… モニター列の <span class="ui">DIM</span> をオンにしたときの減衰量。既定 −15 dB（−60〜0）。セッション中のオン／オフは覚えません。</li>
+          <li><strong>ローカット周波数</strong> …… モニター列の <span class="ui">LC</span> 用ローシェルフの基準周波数。既定 120 Hz（範囲 20〜500 Hz。RME TotalMix の Lo Cut 周波数レンジと同じ）。ゲインは −20 dB 固定（設定では変更不可）。フィルターは RBJ ローシェルフ（バイキューアド 1 段、Q≈0.707≈1/√2）。低域は約 −20 dB に漸近して頭打ちし、ハイパスのように −∞ dB までは落ちません。オン／オフはセッションのみ。</li>
         </ul>
 
         <h4>プレイヤー</h4>
@@ -355,7 +357,7 @@
           </li>
           <li><kbd>F9</kbd> でプレイリストと波形だけを出します（デスクトップの占有面積を節約したいとき。どのモードからでも）。
             <ul>
-              <li>ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出しません。Alt+S（Silent Skip）と Alt+A（Always on Top）は効きます。</li>
+              <li>ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出しません。Alt+S（Silent Skip）と Alt+T（Always on Top）は効きます。</li>
               <li>もう一度 <kbd>F9</kbd> で通常のエディタへ戻します（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除）。</li>
               <li><kbd>F10</kbd> で通常のプレイヤー表示に戻し、再生は続けます。</li>
             </ul>
@@ -669,7 +671,7 @@
         <ul>
           <li>上段は再生・ズーム。下段はフェード／ノーマライズ／削除／新規／保存／MP3 出力、マニュアル <span class="ui">?</span>。トランスポートのボタンには短いツールチップ（ショートカット付き）が出ます。操作の詳細はこのマニュアルを参照してください。</li>
           <li><span class="ui">マーカークリック</span>（<kbd>Q</kbd>）…… マーカー／リージョン端の位置でクリックを鳴らします。選択があればその範囲、なければファイル全体。ボタンまたは <kbd>Q</kbd> でオン／オフ（既定オフ。自動ではオンになりません）。波形の右クリック → 再生からも切り替えできます。プレイヤーの動画本再生／フレーム一時停止／PDF 明るい表示では <kbd>Escape</kbd> と同じく暗いプレビューへ戻します（F8／引数起動ミニではプレイリストへ戻る（動画の In／Out がある Escape は解除して留まる）。マーカークリックはプレイヤーでは効きません）。</li>
-          <li>会社ロゴとライセンスはボタン列の下です（ロゴの右が表記）。ロゴは会社サイト。GitHub はリポジトリ、MIT License は全文、LAME は公式サイト。Wwise®／Audiokinetic® の商標行があります。</li>
+          <li>会社ロゴとライセンスはボタン列の下です（ロゴの右が表記）。ロゴは会社サイト。GitHub はリポジトリ、MIT License は本アプリの全文、LAME／FFmpeg は各公式サイト、EffeTune は同梱の第三者通知（MIT 全文・学習データ帰属。画面左下のリンクからも開けます）。Wwise®／Audiokinetic® の商標行があります。くわしくは <a href="#trademarks">商標とライセンス</a>。</li>
         </ul>
       </article>
 
@@ -703,12 +705,21 @@
       <article class="part" id="layout-top">
         <h3>Always on Top</h3>
         <p class="where">Silent Skip の右、<span class="ui">SPEAKER</span> の左</p>
-        <p>ウィンドウを最前面に固定します。<kbd>Alt</kbd>+<kbd>A</kbd> で切り替えます。</p>
+        <p>ウィンドウを最前面に固定します。<kbd>Alt</kbd>+<kbd>T</kbd> で切り替えます。</p>
       </article>
 
       <article class="part" id="layout-meters">
         <h3>スペクトラム／ラウドネス／レベルメーター／ベクタースコープ</h3>
         <p>再生出力の表示です。</p>
+
+        <h4>モニター列（BPM／MONO／DIM／LC）</h4>
+        <p class="where">ラウドネスとスペクトラムのあいだ。エディタ／プレイヤー共通。</p>
+        <ul>
+          <li><span class="ui">BPM</span>（<kbd>Alt</kbd>+<kbd>B</kbd>）…… オフ／オンの 2 段階です（既定オフ。セッションのみ。ラベルは常に BPM）。オン時は解析・表示と拍クリックを同時に有効にします。ボタン上にテンポ数値が出ます。表示 BPM は EffeTune が返す半／倍テンポ値ではなく、検出拍の間隔（ミリ秒）から <code>60000 ÷ 間隔</code> で再計算します。クリックも同じ拍タイミングです。</li>
+          <li><span class="ui">MONO</span>（<kbd>Alt</kbd>+<kbd>M</kbd>）…… L+R を合算してモニターします。既定オフ。セッションのみ。</li>
+          <li><span class="ui">DIM</span>（<kbd>Alt</kbd>+<kbd>D</kbd>）…… モニターを減衰します。量は設定のオーディオタブ（既定 −15 dB）。オン／オフはセッションのみ。</li>
+          <li><span class="ui">LC</span>（<kbd>Alt</kbd>+<kbd>C</kbd>）…… モニターにローシェルフをかけます。周波数は設定のオーディオタブ（既定 120 Hz、20〜500）。ゲイン −20 dB 固定。RBJ ローシェルフ（Q≈0.707）。低域は約 −20 dB で頭打ち。オン／オフはセッションのみ。詳細は設定のオーディオタブ説明を参照。</li>
+        </ul>
 
         <h4>ラウドネス</h4>
         <p>スペクトラムの左に出ます。Short Term / Integrated / Momentary Max、Loudness Range、True Peak。ターゲット LKFS は設定です。青＝ターゲットまで、橙＝そこから +3 LU、赤＝それより上。</p>
@@ -755,7 +766,7 @@
         <ul>
           <li><strong>ファイル位置</strong> …… 2 ファイル以上開いているときは、冒頭に <code>1 / 10 Files</code> のように何番目／全数を表示します。</li>
           <li><strong>ファイル情報</strong> …… サンプリングレートなど（名前はタブ側）。レート／ビット深度／チャンネルを変換すると、該当項目が保存まで赤になります。MP3／M4A はビットレートも表示します。容量は MB（MiB / B）。変換や範囲削除で変わると推測サイズが赤になります。</li>
-          <li><strong>Silent Skip と Always on Top</strong> …… NOW POS の左。Silent Skip は <kbd>Alt</kbd>+<kbd>S</kbd>。Always on Top は <kbd>Alt</kbd>+<kbd>A</kbd>。無音を飛ばして再生し、録音ではしきい値超だけ書きます。しきい値は設定です。</li>
+          <li><strong>Silent Skip と Always on Top</strong> …… NOW POS の左。Silent Skip は <kbd>Alt</kbd>+<kbd>S</kbd>。Always on Top は <kbd>Alt</kbd>+<kbd>T</kbd>。無音を飛ばして再生し、録音ではしきい値超だけ書きます。しきい値は設定です。</li>
           <li><strong><span class="ui">SPEAKER</span></strong> …… その右でスピーカー配置を切り替えます。一覧は表示項目タブと同じです。今使っている定義は外しても、切り替えるまで残ります。自動スピーカー選択がオンなら、ファイルの本数に合う定義へ切り替えます。既定オフ。</li>
           <li><strong>時間</strong> …… 現在時間／選択開始／選択範囲／選択終了／トータル。トータル以外は入力・ホイール／↑↓で調整します。時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分、サンプルは 1／Shift 10／Ctrl 100／Ctrl+Shift 1000。右クリックで時間とサンプル数を切り替えます。</li>
         </ul>
@@ -1157,6 +1168,10 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>波形フォーカス時だけ 3 秒前から再生（プリロール。プレイリストでは使わない）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>再生開始位置からやり直し（タイル検索ボックスにフォーカスがあるときはヒット以外を閉じる）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>S</kbd></td><td>Silent Skip（無音を飛ばして再生。録音ではしきい値超だけ書く）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>B</kbd></td><td>モニター <span class="ui">BPM</span>（オフ／オン。オン時は表示＋クリック。表示は拍間隔から算出）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>M</kbd></td><td>モニター <span class="ui">MONO</span>（L+R 合算）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>D</kbd></td><td>モニター <span class="ui">DIM</span>（減衰。量は設定のオーディオタブ）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>C</kbd></td><td>モニター <span class="ui">LC</span>（ローシェルフ −20 dB 固定。周波数は設定のオーディオタブ）</td></tr>
           <tr><td><kbd>L</kbd></td><td>選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Auto Loop</span>（サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B 優先。素の <kbd>L</kbd> とは別）</td></tr>
           <tr><td><kbd>J</kbd>／<kbd>K</kbd></td><td>5 秒戻し／送り（0.75 秒クロスフェード。押しっぱなしは少し待ってから繰り返す）</td></tr>
@@ -1194,7 +1209,7 @@
           <tr><td><kbd>Shift</kbd>+<kbd>V</kbd></td><td>通常の波形表示へ（今の表示にかかわらず）</td></tr>
           <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>チャンネルをソロ（次／前。最後の次で解除。左端の名前をクリックでも可。Ctrl＋クリックで追加。Shift＋クリックでミュート／解除。時間選択は変えない。編集はそのレーンだけ。ミュートはグレー）</td></tr>
           <tr><td><kbd>G</kbd></td><td>ステータスバーの NOW POS を入力</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>A</kbd></td><td>Always on Top（ウィンドウを最前面に固定／解除。どのモードでも。F8／F9 中も効く）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>T</kbd></td><td>Always on Top（ウィンドウを最前面に固定／解除。どのモードでも。F8／F9 中も効く）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></td><td>色設定（ダーク固定）</td></tr>
         </tbody>
       </table>
@@ -1423,7 +1438,7 @@
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
           <tr><td><kbd>F8</kbd></td><td>動画／PDF ミニプレイヤー（トグル。プレイリスト等は無し。ウィンドウのクライアント領域が映像／PDF ページの縦横比になるよう原寸配置／位置は動かした時点で中心を覚え、次の動画本再生でも中心を合わせて使う。<kbd>+</kbd>／<kbd>-</kbd>（キーボード・テンキー）だけ常に 25% 刻み（枠ドラッグで中途半端な大きさでも、次のキーは近い 25% へ着地。原寸で一旦停止。25〜300%。縦横比は維持。倍率は F8 を抜けるまで覚え、抜けると忘れる）。窓枠のドラッグは連続拡縮（25% 刻みではない。縦横比固定。ホイールは使わない）。<kbd>A</kbd>／<kbd>T</kbd> の表示は引数起動と共通に覚え、既定はどちらもオン（変えた状態は本再生とミニで共通に覚え、以後ずっと使う）。背面に動画または PDF があるとき（本再生または暗いバックグラウンドプレビュー）かつプレイリストに再生対象があるときだけ入れる。拡張子連動／引数で動画を開いたときは自動で入る。もう一度 <kbd>F8</kbd> で通常のプレイヤーへ（再生は続ける）。<kbd>Escape</kbd>／<kbd>Q</kbd> でプレイリストへ戻る（動画ミニで In／Out があるとき <kbd>Escape</kbd> は解除して留まる）。<kbd>F9</kbd>／<kbd>F10</kbd> でプレイリストへ戻る（本再生は止める）。<kbd>F11</kbd>／<kbd>F12</kbd> へ移るとき動画／PDF はファイルごと持ち込まない（音声だけ残すこともない）</td></tr>
-          <tr><td><kbd>F9</kbd></td><td>プレイリストと波形だけを出す（トグル。既定オフ。デスクトップの占有面積を節約したいとき）。どのモードからでも入れる。ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出さない。Alt+S（Silent Skip）と Alt+A（Always on Top）は効く。もう一度 <kbd>F9</kbd> で通常のエディタへ戻す（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除する）。<kbd>F10</kbd> で通常のプレイヤー（F10）表示に戻す（再生は続ける）。ウィンドウ位置・サイズはモード別に覚える</td></tr>
+          <tr><td><kbd>F9</kbd></td><td>プレイリストと波形だけを出す（トグル。既定オフ。デスクトップの占有面積を節約したいとき）。どのモードからでも入れる。ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出さない。Alt+S（Silent Skip）と Alt+T（Always on Top）は効く。もう一度 <kbd>F9</kbd> で通常のエディタへ戻す（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除する）。<kbd>F10</kbd> で通常のプレイヤー（F10）表示に戻す（再生は続ける）。ウィンドウ位置・サイズはモード別に覚える</td></tr>
           <tr><td><kbd>F1</kbd>／<kbd>F3</kbd></td><td>割り当てなし（ツリー／お気に入り／プレイリストへの移動には使わない）</td></tr>
           <tr><td><kbd>F2</kbd></td><td>名前の変更。ツリーは選択フォルダ、お気に入りは選択フォルダ（ディスク上の実体）、プレイリストは選択ファイル。索引のフルパスも書き換え、<kbd>Ctrl</kbd>+<kbd>F5</kbd> は不要。エディタのファイル名変更とは別</td></tr>
           <tr><td><kbd>F7</kbd></td><td>ツリーだけ。選択フォルダの直下に、指定した名前で新しいフォルダを作る。お気に入りとプレイリストでは何もしない</td></tr>
@@ -1534,7 +1549,8 @@
         <li>本アプリは <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/LICENSE">MIT License</a> で公開しています。</li>
         <li><strong>LAME</strong> は LAME project の名称です。このアプリには入っていません。設定で指定した <code>lame.exe</code> を呼び出すだけです。入手とライセンスの確認は利用者側です。</li>
         <li><strong>FFmpeg</strong> は FFmpeg プロジェクトの名称です。このアプリには入っていません。設定で指定した <code>ffmpeg.exe</code> を呼び出すだけです。空欄や無効なら動画プロキシは作りません。入手とライセンスの確認は利用者側です。</li>
-        <li><strong>Signalsmith Stretch</strong> はピッチ変更に使っているライブラリです。</li>
+        <li><strong>Signalsmith Stretch</strong>（Signalsmith Audio、MIT）はピッチ変更に同梱しています。MIT 全文は <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> にあります。</li>
+        <li><strong>EffeTune</strong>（Copyright © 2025–2026 Yoshiyuki Kobayashi、MIT）の Rhythm Analyzer DSP を、BPM／ビート解析に利用します（モニター列の BPM がオンのとき）。画面上のテンポ数値は、EffeTune が返す半／倍テンポの候補値ではなく、検出した拍の間隔（ミリ秒）から <code>60000 ÷ 間隔</code> で再計算した値です。オン時のクリックも同じ拍タイミングに合わせます。コードと学習済み重みは MIT のもとで同梱し、学習用の音声データそのものは同梱しません。MIT 全文と学習データ由来の帰属（Slakh2100-redux／Groove MIDI など CC BY 4.0、および T48M 学習セット名）は同梱の <code>THIRD_PARTY_NOTICES.md</code>（画面左下の <span class="ui">EffeTune</span> リンク、またはリポジトリの <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>）にあります。上流プロジェクトは <a href="https://github.com/Frieve-A/effetune">Frieve-A/effetune</a> です。</li>
       </ul>
       <footer>© MIYABI GAME AUDIO INC. — MGA Sonic Anvil User Manual (ja)</footer>
     </main>

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Threading;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
@@ -76,6 +77,28 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private float[] _soloScratch = [];
     private int _monoLeftPort;
     private int _monoRightPort = 1;
+    /// <summary>オンなら出力を L+R 合算のモノラル監視にする（メーターは元のまま）。</summary>
+    private bool _monitorMono;
+    /// <summary>オンなら出力だけ DIM（メーターは元のまま）。</summary>
+    private bool _monitorDim;
+    private double _monitorDimDb = DefaultMonitorDimDb;
+    private float _monitorDimLinear = DefaultMonitorDimLinear;
+    /// <summary>オンなら出力にローカット（メーターは元のまま）。</summary>
+    private bool _monitorLowCut;
+    private double _monitorLowCutHz = DefaultMonitorLowCutHz;
+    private BpmMonitorMode _bpmMonitorMode;
+    private EffeTuneBpmEstimator? _bpmMonitor;
+    /// <summary>モニター LC: RBJ ローシェルフ（ゲイン固定 −20 dB、Q≈0.707）。</summary>
+    private bool _lowCutCoeffReady;
+    private float _lowCutB0;
+    private float _lowCutB1;
+    private float _lowCutB2;
+    private float _lowCutA1;
+    private float _lowCutA2;
+    private float _lowCutS1L;
+    private float _lowCutS2L;
+    private float _lowCutS1R;
+    private float _lowCutS2R;
     private bool _directRoute;
     private int _deviceRate = 48000;
     private int _sourceRate = 48000;
@@ -206,6 +229,20 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     /// <summary>1／3（および ←→ 早送り）の推移中に下げる音量。</summary>
     internal const double ShuttleGainDb = -4;
     internal static readonly float ShuttleGainLinear = (float)Math.Pow(10, ShuttleGainDb / 20.0);
+    /// <summary>モニター DIM の規定減衰（dB）。</summary>
+    internal const double DefaultMonitorDimDb = -15;
+    internal const double MinMonitorDimDb = -60;
+    internal const double MaxMonitorDimDb = 0;
+    internal static readonly float DefaultMonitorDimLinear =
+        (float)Math.Pow(10, DefaultMonitorDimDb / 20.0);
+    /// <summary>互換用。規定 DIM の線形ゲイン。</summary>
+    internal static readonly float MonitorDimLinear = DefaultMonitorDimLinear;
+    /// <summary>モニターローカット（ローシェルフ）の規定カットオフ（Hz）。RME Lo Cut と同様 20〜500。</summary>
+    internal const double DefaultMonitorLowCutHz = 120;
+    internal const double MinMonitorLowCutHz = 20;
+    internal const double MaxMonitorLowCutHz = 500;
+    /// <summary>ローシェルフゲイン（dB）。設定には出さず内部固定。RME の −20 dB シェルフ相当。</summary>
+    internal const double FixedMonitorLowCutGainDb = -20;
     private const double ShuttleGrainSeconds = 0.03;
     private const double ShuttleTaperSeconds = 0.004;
     /// <summary>圧縮ストリーム早戻しの窓。Seek 回数を抑えつつ継ぎ目を滑らかにする。</summary>
@@ -315,6 +352,232 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
     }
 
+    public bool MonitorMono
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _monitorMono;
+            }
+        }
+    }
+
+    public void SetMonitorMono(bool enabled)
+    {
+        lock (_gate)
+        {
+            _monitorMono = enabled;
+        }
+    }
+
+    public bool MonitorDim
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _monitorDim;
+            }
+        }
+    }
+
+    public void SetMonitorDim(bool enabled)
+    {
+        lock (_gate)
+        {
+            _monitorDim = enabled;
+        }
+    }
+
+    public double MonitorDimDbAmount
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _monitorDimDb;
+            }
+        }
+    }
+
+    public void SetMonitorDimDb(double db)
+    {
+        lock (_gate)
+        {
+            var next = ClampMonitorDimDb(db);
+            if (Math.Abs(_monitorDimDb - next) < 1e-9)
+            {
+                return;
+            }
+
+            _monitorDimDb = next;
+            _monitorDimLinear = DbToLinear(next);
+        }
+    }
+
+    public bool MonitorLowCut
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _monitorLowCut;
+            }
+        }
+    }
+
+    public void SetMonitorLowCut(bool enabled)
+    {
+        lock (_gate)
+        {
+            if (_monitorLowCut == enabled)
+            {
+                return;
+            }
+
+            _monitorLowCut = enabled;
+            ResetLowCutStateNoLock();
+        }
+    }
+
+    public BpmMonitorMode BpmMonitorMode
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _bpmMonitorMode;
+            }
+        }
+    }
+
+    public void SetBpmMonitorMode(BpmMonitorMode mode)
+    {
+        lock (_gate)
+        {
+            if (_bpmMonitorMode == mode)
+            {
+                return;
+            }
+
+            _bpmMonitorMode = mode;
+            if (mode == BpmMonitorMode.Off)
+            {
+                _bpmMonitor?.Reset();
+                _bpmMonitor?.SetClickEnabled(false);
+                return;
+            }
+
+            _bpmMonitor ??= new EffeTuneBpmEstimator();
+            // オン時は解析＋クリックを常時有効。
+            _bpmMonitor.SetClickEnabled(true);
+        }
+    }
+
+    public bool TryGetBpmMonitorBpm(out float bpm)
+    {
+        lock (_gate)
+        {
+            if (_bpmMonitorMode == BpmMonitorMode.Off
+                || _bpmMonitor?.Bpm is not { } value)
+            {
+                bpm = 0;
+                return false;
+            }
+
+            bpm = value;
+            return true;
+        }
+    }
+
+    public void ResetBpmMonitor()
+    {
+        lock (_gate)
+        {
+            if (_bpmMonitor is null)
+            {
+                return;
+            }
+
+            _bpmMonitor.Reset();
+            _bpmMonitor.SetClickEnabled(_bpmMonitorMode == BpmMonitorMode.On);
+        }
+    }
+
+    public double MonitorLowCutCutoffHz
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _monitorLowCutHz;
+            }
+        }
+    }
+
+    public void SetMonitorLowCutHz(double hz)
+    {
+        lock (_gate)
+        {
+            var next = ClampMonitorLowCutHz(hz);
+            if (Math.Abs(_monitorLowCutHz - next) < 1e-9)
+            {
+                return;
+            }
+
+            _monitorLowCutHz = next;
+            ResetLowCutStateNoLock();
+        }
+    }
+
+    internal static double ClampMonitorDimDb(double db) =>
+        Math.Clamp(db, MinMonitorDimDb, MaxMonitorDimDb);
+
+    internal static bool TryParseMonitorDimDb(string? text, out double db)
+    {
+        text = text?.Trim() ?? string.Empty;
+        if (text.Length == 0
+            || (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+                && !double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out parsed))
+            || parsed < MinMonitorDimDb
+            || parsed > MaxMonitorDimDb
+            || double.IsNaN(parsed)
+            || double.IsInfinity(parsed))
+        {
+            db = DefaultMonitorDimDb;
+            return false;
+        }
+
+        db = parsed;
+        return true;
+    }
+
+    internal static double ClampMonitorLowCutHz(double hz) =>
+        Math.Clamp(hz, MinMonitorLowCutHz, MaxMonitorLowCutHz);
+
+    internal static bool TryParseMonitorLowCutHz(string? text, out double hz)
+    {
+        text = text?.Trim() ?? string.Empty;
+        if (text.Length == 0
+            || (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+                && !double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out parsed))
+            || parsed < MinMonitorLowCutHz
+            || parsed > MaxMonitorLowCutHz
+            || double.IsNaN(parsed)
+            || double.IsInfinity(parsed))
+        {
+            hz = DefaultMonitorLowCutHz;
+            return false;
+        }
+
+        hz = parsed;
+        return true;
+    }
+
+    private static float DbToLinear(double db) =>
+        (float)Math.Pow(10, db / 20.0);
+
     public void ConfigureOutput(int deviceChannels, int[]? map, int[]? fileChannelMap = null, int speakerChannels = 0)
     {
         lock (_gate)
@@ -349,6 +612,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         _routeMap = ChannelRouter.Normalize(_outputMap, logical, _outputChannels);
         (_monoLeftPort, _monoRightPort) = ChannelRouter.MonoPorts(_outputChannels, _outputMap);
         WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(_deviceRate, Math.Max(1, _outputChannels));
+        ResetLowCutStateNoLock();
     }
 
     public bool IsBoundTo(AudioDocument document)
@@ -1618,6 +1882,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             }
 
             ApplyPlaybackPitch(buffer, offset, written);
+            ApplyBpmMonitorNoLock(buffer, offset, written);
             pushedSource = _sourceMeterThisRead > 0;
         }
 
@@ -3620,42 +3885,154 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         gain *= _shuttleOutputGain;
         source = ApplySolo(source);
         PushSourceFrame(source, gain);
+        var playGain = _monitorDim ? gain * _monitorDimLinear : gain;
         if (_directRoute)
         {
             var dest = buffer.AsSpan(offset + writtenFrames * outCh, outCh);
             if (ChannelRouter.ShouldMirrorMono(source.Length, outCh))
             {
                 dest.Clear();
-                var sample = source[0] * gain;
+                var sample = source[0] * playGain;
                 dest[_monoLeftPort] = sample;
                 dest[_monoRightPort] = sample;
                 MixRangeClick(buffer, offset, writtenFrames, outCh, clickSourceFrame, mixClicks);
+                ApplyMonitorLowCut(dest);
                 return;
             }
 
             var logical = ToSpeakerFrame(source);
             ChannelRouter.Scatter(logical, dest, _routeMap);
-            if (gain != 1f)
+            if (playGain != 1f)
             {
                 for (var i = 0; i < dest.Length; i++)
                 {
-                    dest[i] *= gain;
+                    dest[i] *= playGain;
                 }
             }
 
+            if (_monitorMono)
+            {
+                CollapseOutputToMono(dest);
+            }
+
             MixRangeClick(buffer, offset, writtenFrames, outCh, clickSourceFrame, mixClicks);
+            ApplyMonitorLowCut(dest);
             return;
         }
 
         ChannelMix.Downmix(ToSpeakerFrame(source), out var left, out var right);
-        if (gain != 1f)
+        if (playGain != 1f)
         {
-            left *= gain;
-            right *= gain;
+            left *= playGain;
+            right *= playGain;
+        }
+
+        if (_monitorMono)
+        {
+            var mid = 0.5f * (left + right);
+            left = mid;
+            right = mid;
         }
 
         WriteFrame(buffer, offset, writtenFrames, outCh, left, right);
         MixRangeClick(buffer, offset, writtenFrames, outCh, clickSourceFrame, mixClicks);
+        ApplyMonitorLowCut(buffer.AsSpan(offset + writtenFrames * outCh, outCh));
+    }
+
+    private void ApplyBpmMonitorNoLock(float[] buffer, int offset, int writtenSamples)
+    {
+        if (_bpmMonitorMode == BpmMonitorMode.Off || _bpmMonitor is null || writtenSamples <= 0)
+        {
+            return;
+        }
+
+        var channels = Math.Max(1, WaveFormat.Channels);
+        _bpmMonitor.SetClickEnabled(_bpmMonitorMode == BpmMonitorMode.On);
+        _bpmMonitor.ProcessInterleaved(buffer, offset, writtenSamples, channels, _deviceRate);
+    }
+
+    /// <summary>
+    /// RBJ Audio EQ Cookbook のローシェルフ。
+    /// 低域は固定 −20 dB へ漸近、高域は 0 dB。Q≈0.707。周波数のみ設定可（20〜500 Hz）。
+    /// </summary>
+    private void EnsureLowCutCoeffNoLock()
+    {
+        var fs = Math.Max(8000.0, _deviceRate);
+        var fc = ClampMonitorLowCutHz(_monitorLowCutHz);
+        fc = Math.Min(fc, fs * 0.45);
+        const double gainDb = FixedMonitorLowCutGainDb;
+        var a = Math.Pow(10.0, gainDb / 40.0);
+        var w0 = 2.0 * Math.PI * fc / fs;
+        var cosw0 = Math.Cos(w0);
+        var sinw0 = Math.Sin(w0);
+        const double q = 0.7071067811865476; // 1/√2 — RME 系の緩いシェルフ
+        var alpha = sinw0 / (2.0 * q);
+        var twoSqrtAAlpha = 2.0 * Math.Sqrt(a) * alpha;
+        var b0 = a * ((a + 1.0) - (a - 1.0) * cosw0 + twoSqrtAAlpha);
+        var b1 = 2.0 * a * ((a - 1.0) - (a + 1.0) * cosw0);
+        var b2 = a * ((a + 1.0) - (a - 1.0) * cosw0 - twoSqrtAAlpha);
+        var a0 = (a + 1.0) + (a - 1.0) * cosw0 + twoSqrtAAlpha;
+        var a1 = -2.0 * ((a - 1.0) + (a + 1.0) * cosw0);
+        var a2 = (a + 1.0) + (a - 1.0) * cosw0 - twoSqrtAAlpha;
+        _lowCutB0 = (float)(b0 / a0);
+        _lowCutB1 = (float)(b1 / a0);
+        _lowCutB2 = (float)(b2 / a0);
+        _lowCutA1 = (float)(a1 / a0);
+        _lowCutA2 = (float)(a2 / a0);
+        _lowCutCoeffReady = true;
+    }
+
+    private void ResetLowCutStateNoLock()
+    {
+        EnsureLowCutCoeffNoLock();
+        _lowCutS1L = 0;
+        _lowCutS2L = 0;
+        _lowCutS1R = 0;
+        _lowCutS2R = 0;
+    }
+
+    private void ApplyMonitorLowCut(Span<float> dest)
+    {
+        if (!_monitorLowCut || dest.IsEmpty)
+        {
+            return;
+        }
+
+        if (!_lowCutCoeffReady)
+        {
+            EnsureLowCutCoeffNoLock();
+        }
+
+        var leftPort = Math.Clamp(_monoLeftPort, 0, dest.Length - 1);
+        var rightPort = Math.Clamp(_monoRightPort, 0, dest.Length - 1);
+        dest[leftPort] = StepLowCut(dest[leftPort], ref _lowCutS1L, ref _lowCutS2L);
+        if (rightPort != leftPort)
+        {
+            dest[rightPort] = StepLowCut(dest[rightPort], ref _lowCutS1R, ref _lowCutS2R);
+        }
+    }
+
+    private float StepLowCut(float x, ref float s1, ref float s2)
+    {
+        var y = _lowCutB0 * x + s1;
+        s1 = _lowCutB1 * x - _lowCutA1 * y + s2;
+        s2 = _lowCutB2 * x - _lowCutA2 * y;
+        return y;
+    }
+
+    private void CollapseOutputToMono(Span<float> dest)
+    {
+        if (dest.Length <= 1)
+        {
+            return;
+        }
+
+        var leftPort = Math.Clamp(_monoLeftPort, 0, dest.Length - 1);
+        var rightPort = Math.Clamp(_monoRightPort, 0, dest.Length - 1);
+        var mid = 0.5f * (dest[leftPort] + dest[rightPort]);
+        dest.Clear();
+        dest[leftPort] = mid;
+        dest[rightPort] = mid;
     }
 
     private void MixRangeClick(
@@ -3675,6 +4052,11 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         if (sample == 0f || outCh <= 0)
         {
             return;
+        }
+
+        if (_monitorDim)
+        {
+            sample *= _monitorDimLinear;
         }
 
         var dest = offset + writtenFrames * outCh;
@@ -3768,11 +4150,22 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
         }
 
         _scrub.Read(_scrubScratch, 0, sourceFrames, 1f);
+        var dim = _monitorDim ? _monitorDimLinear : 1f;
         if (_sourceRate == _deviceRate)
         {
             for (var i = 0; i < framesWanted; i++)
             {
-                WriteFrame(buffer, offset, i, outCh, _scrubScratch[i * 2], _scrubScratch[i * 2 + 1]);
+                var left = _scrubScratch[i * 2] * dim;
+                var right = _scrubScratch[i * 2 + 1] * dim;
+                if (_monitorMono)
+                {
+                    var mid = 0.5f * (left + right);
+                    left = mid;
+                    right = mid;
+                }
+
+                WriteFrame(buffer, offset, i, outCh, left, right);
+                ApplyMonitorLowCut(buffer.AsSpan(offset + i * outCh, outCh));
             }
         }
         else
@@ -3789,7 +4182,17 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
                     _deviceRate,
                     out var left,
                     out var right);
+                left *= dim;
+                right *= dim;
+                if (_monitorMono)
+                {
+                    var mid = 0.5f * (left + right);
+                    left = mid;
+                    right = mid;
+                }
+
                 WriteFrame(buffer, offset, i, outCh, left, right);
+                ApplyMonitorLowCut(buffer.AsSpan(offset + i * outCh, outCh));
             }
         }
 

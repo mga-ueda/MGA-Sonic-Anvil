@@ -265,6 +265,7 @@
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
@@ -354,10 +355,18 @@
                               Background="Transparent"
                               Opacity="0"
                               IsHitTestVisible="False" />
-        <ui:ProjectSpectrumView x:Name="Spectrum"
+        <ui:MonitorToggleColumn x:Name="MonitorToggles"
                                 Grid.Row="0"
                                 Grid.RowSpan="2"
                                 Grid.Column="3"
+                                Margin="0,0,6,0"
+                                VerticalAlignment="Center"
+                                Opacity="0"
+                                IsHitTestVisible="False" />
+        <ui:ProjectSpectrumView x:Name="Spectrum"
+                                Grid.Row="0"
+                                Grid.RowSpan="2"
+                                Grid.Column="4"
                                 Height="{x:Static ui:DesignMetrics.SpectrumHeight}"
                                 Margin="0,0,1,0"
                                 Opacity="0"

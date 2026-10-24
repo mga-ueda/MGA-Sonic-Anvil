@@ -356,7 +356,7 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.AllowsKey(Key.O, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.S, ModifierKeys.Alt));
-        Assert.True(LibraryPlayerMode.AllowsKey(Key.A, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.T, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.R, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.R, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.IsShuffleToggle(Key.R, ModifierKeys.Alt));
@@ -380,10 +380,24 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.BypassesSearchFocus(Key.P, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.BypassesSearchFocus(
             Key.P, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsMonitorMonoToggle(Key.M, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.IsMonitorDimToggle(Key.D, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.IsMonitorLowCutToggle(Key.C, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.IsMonitorBpmCycle(Key.B, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.M, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.D, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.B, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.BypassesSearchFocus(Key.M, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.BypassesSearchFocus(Key.D, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.BypassesSearchFocus(Key.C, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.BypassesSearchFocus(Key.B, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.BypassesSearchFocus(Key.N, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BypassesSearchFocus(Key.L, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BypassesSearchFocus(Key.R, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BypassesSearchFocus(Key.A, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsMonitorMonoToggle(Key.M, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsMonitorBpmCycle(Key.B, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsPlaylistFolderAddKey(Key.Enter, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsPlaylistFolderAddKey(Key.Enter, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsPlaylistFolderAddKey(Key.Enter, ModifierKeys.Shift));
