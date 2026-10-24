@@ -2,7 +2,7 @@ using System.IO;
 
 namespace MgaSonicAnvil.Domain;
 
-/// <summary>F10 お気に入り。パス登録のみ。ディスク上のファイルは消さない。</summary>
+/// <summary>F10 お気に入り。フォルダのパス登録のみ。ディスク上の実体は消さない。</summary>
 internal static class LibraryFavoritePaths
 {
     public static string[] Resolve(string[]? saved)
@@ -24,6 +24,12 @@ internal static class LibraryFavoritePaths
             try
             {
                 var full = Path.GetFullPath(raw.Trim());
+                // 存在するファイル単体は登録しない（フォルダのみ）。
+                if (File.Exists(full) && !Directory.Exists(full))
+                {
+                    continue;
+                }
+
                 // 無いパスも登録として残す（UI で赤字表示）。
                 if (!seen.Add(full))
                 {
@@ -47,7 +53,7 @@ internal static class LibraryFavoritePaths
 
     public static string DisplayName(string path) => LibraryExplorerPaths.DisplayName(path);
 
-    /// <summary>登録パスがファイル／フォルダとして無いか。</summary>
+    /// <summary>登録フォルダが無いか。</summary>
     public static bool IsMissing(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -58,7 +64,7 @@ internal static class LibraryFavoritePaths
         try
         {
             var full = Path.GetFullPath(path.Trim());
-            return !File.Exists(full) && !Directory.Exists(full);
+            return !Directory.Exists(full);
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {

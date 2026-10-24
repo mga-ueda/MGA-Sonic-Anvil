@@ -455,7 +455,7 @@ internal sealed class AppSettings
     /// <summary>F10 ツリーのルート。空はマイミュージックのみ。</summary>
     public string[] LibraryExplorerRoots { get; set; } = [];
 
-    /// <summary>F10 お気に入り（ファイル／フォルダのパス）。存在しないものは起動時に落とす。</summary>
+    /// <summary>F10 お気に入り（フォルダのパスのみ。ファイル単体は含めない）。存在しないものは起動時に落とす。</summary>
     public string[] LibraryFavorites { get; set; } = [];
 
     /// <summary>F10 左のフォルダツリー幅。0 以下は既定。</summary>

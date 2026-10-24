@@ -145,24 +145,27 @@ public sealed class LibraryExplorerPathsTests
     }
 
     [Fact]
-    public void FavoritePaths_Resolve_KeepsMissing_MarksIsMissing_NameOnlyDisplay()
+    public void FavoritePaths_Resolve_KeepsFoldersAndMissing_DropsFiles()
     {
-        var file = Path.Combine(Path.GetTempPath(), "mga-fav-" + Guid.NewGuid().ToString("N") + ".mp3");
-        var missing = Path.Combine(Path.GetTempPath(), "missing-fav-" + Guid.NewGuid().ToString("N") + ".mp3");
+        var folder = Path.Combine(Path.GetTempPath(), "mga-fav-" + Guid.NewGuid().ToString("N"));
+        var file = Path.Combine(folder, "track.mp3");
+        var missing = Path.Combine(Path.GetTempPath(), "missing-fav-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
         File.WriteAllBytes(file, [0]);
         try
         {
-            var resolved = LibraryFavoritePaths.Resolve([file, file, missing]);
-            Assert.Equal([Path.GetFullPath(file), Path.GetFullPath(missing)], resolved);
-            Assert.False(LibraryFavoritePaths.IsMissing(file));
+            var resolved = LibraryFavoritePaths.Resolve([folder, folder, file, missing]);
+            Assert.Equal([Path.GetFullPath(folder), Path.GetFullPath(missing)], resolved);
+            Assert.False(LibraryFavoritePaths.IsMissing(folder));
+            Assert.True(LibraryFavoritePaths.IsMissing(file));
             Assert.True(LibraryFavoritePaths.IsMissing(missing));
-            Assert.Equal(Path.GetFileName(file), LibraryFavoritePaths.DisplayName(file));
-            Assert.DoesNotContain('\\', LibraryFavoritePaths.DisplayName(file));
+            Assert.Equal(Path.GetFileName(folder), LibraryFavoritePaths.DisplayName(folder));
+            Assert.DoesNotContain('\\', LibraryFavoritePaths.DisplayName(folder));
             Assert.Equal(Path.GetFileName(missing), LibraryFavoritePaths.DisplayName(missing));
         }
         finally
         {
-            File.Delete(file);
+            Directory.Delete(folder, recursive: true);
         }
     }
 
