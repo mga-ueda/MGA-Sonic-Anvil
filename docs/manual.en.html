@@ -115,6 +115,7 @@
         <li><a href="#spectrogram">Spectrogram / loudness</a></li>
         <li><a href="#shortcuts">Shortcuts</a>
           <ol>
+            <li><a href="#shortcuts-accesskeys">Alt keys with no on-screen underline</a></li>
             <li><a href="#shortcuts-file">File / tabs</a></li>
             <li><a href="#shortcuts-play">Playback</a></li>
             <li><a href="#shortcuts-view">View / zoom</a></li>
@@ -410,7 +411,7 @@
         </ul>
         <h4>List and focus</h4>
         <ul>
-          <li><kbd>↑</kbd><kbd>↓</kbd> select files (before the first wraps to the last; after the last wraps to the first; key-repeat pauses at the ends; wrap again only after release and repress). <kbd>Home</kbd> / <kbd>End</kbd> jump to the first / last track. <kbd>PageUp</kbd> / <kbd>PageDown</kbd> page the list (multi-select allowed; while playing, releasing switches to that track; while stopped, selection only; key-repeat pauses at the ends). <kbd>Shift</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd> extends a range. Playlist multi-select uses <kbd>Shift</kbd>+<kbd>Space</kbd> to toggle check mode (off by default; while on, checkboxes appear at the start of each playlist row only — not on the tree). While on, <kbd>Space</kbd> checks or unchecks the caret row; with a <kbd>Shift</kbd>+↑↓ range, <kbd>Space</kbd> checks every row in that range (if every row in the range is already checked, it unchecks them all). Right-click and similar actions target checked rows while mode is on, and the selection when mode is off. Turning mode off hides the checkbox column, forgets checks, and keeps the formerly checked rows as the selection; turning it back on starts with no checks. Plain ↑↓ moves as a single selection. With the tree focused, <kbd>Space</kbd> / <kbd>Shift</kbd>+<kbd>Space</kbd> still expand / collapse (playlist check-mode toggle is playlist-side only). <kbd>Ctrl</kbd>+<kbd>Space</kbd> is preroll only when the waveform has focus (not used on the playlist).</li>
+          <li><kbd>↑</kbd><kbd>↓</kbd> select files (before the first wraps to the last; after the last wraps to the first; key-repeat pauses at the ends; wrap again only after release and repress). <kbd>Home</kbd> / <kbd>End</kbd> jump to the first / last track. <kbd>PageUp</kbd> / <kbd>PageDown</kbd> page the list (multi-select allowed; while playing, releasing switches to that track; while stopped, selection only; key-repeat pauses at the ends). <kbd>Shift</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd> extends a range. Playlist multi-select uses <kbd>Shift</kbd>+<kbd>Space</kbd> to toggle check mode (off by default; while on, checkboxes appear at the start of each playlist row only — not on the tree). While on, <kbd>Space</kbd> checks or unchecks the caret row; with a <kbd>Shift</kbd>+↑↓ range, <kbd>Space</kbd> checks every row in that range (if every row in the range is already checked, it unchecks them all). Right-click and similar actions target checked rows while mode is on, and the selection when mode is off. Turning mode off hides the checkbox column, forgets checks, and keeps the formerly checked rows as the selection; turning it back on starts with no checks. Plain ↑↓ moves as a single selection. In the player, with the playlist focused, <kbd>Alt</kbd>+↑ / ↓ scrolls the list by one row without moving the selection (the same keys on the tree reorder roots). With the tree focused, <kbd>Space</kbd> / <kbd>Shift</kbd>+<kbd>Space</kbd> still expand / collapse (playlist check-mode toggle is playlist-side only). <kbd>Ctrl</kbd>+<kbd>Space</kbd> is preroll only when the waveform has focus (not used on the playlist).</li>
           <li><kbd>Ctrl</kbd>+← / <kbd>Ctrl</kbd>+↑ focuses the tree, <kbd>Ctrl</kbd>+↓ Favorites, <kbd>Ctrl</kbd>+→ the playlist. <kbd>F1</kbd> and <kbd>F3</kbd> no longer move focus.</li>
           <li><kbd>F2</kbd> renames. On the tree it renames the selected folder, in Favorites the selected folder on disk, and on the playlist the selected file. The library catalog stores full paths, so those paths are rewritten in place. You do not need <kbd>Ctrl</kbd>+<kbd>F5</kbd> afterward.</li>
           <li><kbd>F7</kbd> works only on the tree. It creates a new folder directly under the selection, using the name you type. In Favorites and on the playlist it does nothing.</li>
@@ -434,7 +435,7 @@
           <li>Opened files are listed without loading every waveform at once. Names, times, and similar info are read when files are added. Playlist columns are chosen separately for WAVE, MP3, and video in Settings → Shown, and the header order is remembered. A header click’s sort (column and direction) is remembered in the same settings; with nothing saved, the list sorts by album name, ascending. Empty columns hide automatically; waveform width is on the same Shown tab.</li>
           <li>The tree on the left starts at Music and remembers the last folder, which folders were expanded, and the split with Favorites. Missing tree roots and missing Favorites entries show in red. Drop folders from Explorer onto the tree to register roots; drop folders onto Favorites to register them (individual files are not registered). Reorder roots with <kbd>Alt</kbd>+↑ / ↓, the tree’s right-click <strong>Move Root Up / Down</strong>, or by dragging a root within the tree.</li>
           <li>Splitters and scrollbars appear when the pointer nears them, then fade out after about 3 s of no movement. Selecting a folder does not add it to the list.</li>
-          <li><kbd>*</kbd> (<kbd>Shift</kbd>+<kbd>8</kbd>) expands all under the selection. <kbd>/</kbd> collapses it. The tree’s right-click <strong>Expand All Subfolders</strong> and <strong>Collapse Subfolders</strong> do the same.</li>
+          <li><kbd>*</kbd> (<kbd>Shift</kbd>+<kbd>8</kbd>) expands all under the selection. <kbd>/</kbd> collapses it. <kbd>Shift</kbd>+<kbd>/</kbd> collapses every tree root and everything under each (independent of the selection). The tree’s right-click <strong>Expand All Subfolders</strong> and <strong>Collapse Subfolders</strong> act on the selection, same as <kbd>*</kbd> / <kbd>/</kbd>.</li>
           <li>With the tree focused: <kbd>Space</kbd> expands one level (same as →; or moves down if already expanded / a leaf); <kbd>Shift</kbd>+<kbd>Space</kbd> collapses one level (or moves up). Check mode is playlist-only and never shows checkboxes on the tree (tree <kbd>Space</kbd> / <kbd>Shift</kbd>+<kbd>Space</kbd> always expand / collapse). These clear typeahead highlight. Transport <kbd>Space</kbd> applies when focus is not on the tree.</li>
           <li>With the tree focused, letter keys jump to folders by name (see <a href="#layout-typeahead">Folder-name jump</a>). This does not add to the playlist. It is separate from <kbd>Ctrl</kbd>+<kbd>F</kbd> filter search.</li>
           <li>
@@ -576,7 +577,7 @@
           <li>Channel export writes Wave from the current speaker layout and Ch map (not file channel order or names; unassigned speakers are skipped). Names use the layout labels such as <code>_L</code> / <code>_C</code> / <code>_LFE</code>. It asks for a folder.</li>
           <li>Batch names use the source file name (or the tab title if unsaved). A clash gets <code> 2</code> and up. The last export folder is remembered (separate from Open).</li>
           <li>While it runs, a dim overlay blocks the UI and shows an overall bar plus a bar for every song encoding in parallel (more columns when they would not fit).</li>
-          <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> saves every tab as MP3 (waveform right-click → Tabs; keeps the current tabs; there is no key for batch Wave).</li>
+          <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> saves every tab as MP3 when every tab is selected first (waveform right-click → Tabs; keeps the current tabs; there is no key for batch Wave).</li>
         </ul>
         <h4>Multi-select</h4>
         <ul>
@@ -943,10 +944,10 @@
         <li><strong>Open</strong> — <kbd>Shift</kbd>+<kbd>X</kbd>, or waveform right-click → Audio → Fade Adjust Tool. Not available while the player is maximized.</li>
         <li><strong>Defaults</strong> — uses the selection when present, otherwise the existing sample loop for Start / End. Pre-crossfade starts at 0; Post remembers the last value from the tool.</li>
         <li><strong>Preview</strong> — use the main transport (sample loop as the play window, including playback from before Start). The left seam preview is left=End side / right=Start side. “Show crossfade” below toggles the baked blend in that view (off by default).</li>
-        <li><strong>Values</strong> — Start (S) / End (E) / Pre / Post. ↑↓ / wheel nudge by 1 sample (Shift 10 / Ctrl+Shift 100). Each field’s button snaps to a nearby zero-crossing.</li>
+        <li><strong>Values</strong> — Start (S) / End (E) / Pre (<kbd>X</kbd> or <kbd>F</kbd>) / Post (<kbd>P</kbd>). ↑↓ / wheel nudge by 1 sample (Shift 10 / Ctrl+Shift 100). Each field’s button snaps to a nearby zero-crossing.</li>
         <li><strong>Auto-search</strong> — Find Start, Find End, Shift Start and End. Keeps searching toward a better-matching seam.</li>
         <li><strong>Multiples of 28</strong> — when on, Start and End move only on 28-sample steps.</li>
-        <li><strong>Truncate outside (C)</strong> — on OK, deletes audio before Start and after End (End-side is used as material, then trimmed).</li>
+        <li><strong>Truncate outside</strong> — on OK, deletes audio before Start and after End (End-side is used as material, then trimmed).</li>
         <li><strong>OK / Cancel</strong> — OK (Enter) bakes, commits the sample loop, and closes (undo with <kbd>Ctrl</kbd>+<kbd>Z</kbd>). Cancel (Esc) discards changes and clears overlays. Destructive edits outside are blocked while the tool is open.</li>
         <li>Position and size are remembered. The default size is also the minimum.</li>
       </ul>
@@ -1059,6 +1060,25 @@
       <h2 id="shortcuts">12. Shortcuts</h2>
       <p>This section lists the keyboard shortcuts, including ones already described earlier. Keys in the later tables apply only while that screen is open. See the earlier sections of this manual for full details.</p>
 
+      <h3 id="shortcuts-accesskeys">Alt keys with no on-screen underline</h3>
+      <p>Context-menu items use <code>(_X)</code> markers, so the access key is underlined when the menu is open. Status-bar, monitor-column, and playlist-toolbar toggles have no underscore in their labels and do not show an underline on screen. The keys below are handled only by Alt key handlers in code (separate from menu AccessKeys). Many still work while F8 / F9 hide the chrome.</p>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Alt</kbd>+<kbd>S</kbd></td><td>Silent Skip (status bar; no underline on the label)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>T</kbd></td><td>Always on Top (status bar; no underline on the label)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Auto Loop</span> (playlist toolbar / status; no underline on the label)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>R</kbd></td><td><span class="ui">Random</span> shuffle (no underline on the label)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td><span class="ui">Auto Next</span> (no underline on the label)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td><span class="ui">Auto Play</span> (play on clear-and-add; no underline on the label)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>B</kbd> / <kbd>M</kbd> / <kbd>D</kbd> / <kbd>C</kbd></td><td>Monitor BPM / MONO / DIM / LC (no underline on the button text; tooltips include the Alt shortcut)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>W</kbd></td><td>Show / hide the WAAPI bar</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>E</kbd></td><td>Play -E (when WAAPI is on)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from the playback start (while tile search has focus, closes non-matching tiles instead)</td></tr>
+        </tbody>
+      </table>
+      <p>Letter keys inside an open context menu (for example tab menu <kbd>S</kbd> / <kbd>O</kbd> / …) are menu AccessKeys. They are marked with <code>(_X)</code> and underlines in the menu. See the mouse / pointer section for the tab access-key list.</p>
+
       <h3 id="shortcuts-file">File / tabs</h3>
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
@@ -1072,7 +1092,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td><td>Duplicate the file (opens in the next tab)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce two or more selected tabs — choose where to save first, then the mixed Wave opens to the right of the selection (default name <code>Bounce.wav</code>; length is the longest tab; only when formats match; if the sum exceeds ±1, cancel or lower the mix before writing)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Save as MP3 (keeps the current tab)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd></td><td>Save all tabs as MP3 (waveform right-click → Tabs; the same gesture appears on the tab menu when every tab is selected)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Save all tabs as MP3 when every tab is selected (waveform right-click → Tabs; the same gesture appears on the tab menu when every tab is selected)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>Quit (tabs left open and unsaved working copies come back on the next launch)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close tab (asks to save if unsaved; several unsaved tabs can be finished together)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Reopen a closed tab (newest first; tabs closed in this launch; more than one)</td></tr>
@@ -1121,9 +1141,9 @@
           <tr><td>↑ / ↓</td><td>Time zoom (around the playhead)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+↑</td><td>Time zoom 32× / max</td></tr>
           <tr><td><kbd>Ctrl</kbd>+↓</td><td>Fit all</td></tr>
-          <tr><td><kbd>Shift</kbd>+↑ / ↓</td><td>Amplitude zoom</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↑</td><td>Amplitude zoom max</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↓</td><td>Reset amplitude zoom</td></tr>
+          <tr><td><kbd>Shift</kbd>+↑ / ↓</td><td>Amplitude zoom (same shortcuts as the scroll-strip amplitude ± button tooltips)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↑</td><td>Amplitude zoom max (same gesture as waveform right-click → View)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↓</td><td>Reset amplitude zoom (same gesture as waveform right-click → View)</td></tr>
           <tr><td>Wheel</td><td>Time zoom (around the playhead; same on the overview)</td></tr>
           <tr><td><kbd>Shift</kbd>+wheel</td><td>Pan (on the waveform)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+wheel</td><td>Amplitude zoom (on the waveform)</td></tr>
@@ -1182,7 +1202,7 @@
           <tr><td><kbd>N</kbd></td><td>Normalize (peak −0.1 dB)</td></tr>
           <tr><td><kbd>R</kbd></td><td>Reverse (selection, or the whole file; audio only; markers / regions / loops stay put)</td></tr>
           <tr><td>Right-click → Audio → Normalize Waveform per Region</td><td>Fit each region's peak to −0.1 dB; short fades from Settings (default 20 ms) at the edges</td></tr>
-          <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Ripple-delete the selection. Selected markers / regions go with it (does nothing in the player. Removing rows from the list is <kbd>Delete</kbd> only; files are never deleted. <kbd>Ctrl</kbd>+<kbd>W</kbd> does not close)</td></tr>
+          <tr><td><kbd>Delete</kbd></td><td>Ripple-delete the selection. Selected markers / regions go with it (does nothing in the player. Removing rows from the list is <kbd>Delete</kbd> only; files are never deleted. <kbd>Ctrl</kbd>+<kbd>W</kbd> does not close)</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>Delete</kbd></td><td>Silence the selection. The dialog chooses the default edge fade (on by default; Enter applies, Esc cancels. Length and markers stay. Also on right-click → Edit. Does nothing in the player)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd> / right-click → Edit → Silence &amp; Hit Detection</td><td>Delete silence / add regions / add markers / hit points (selection, or the whole file). Dialog for thresholds, gate timing, and cut fades; hit mode also has rise ratio 5–100% (default 20%). Settings are remembered. Independent of Silent Skip and the click-prevention fade. Default threshold −5 dB. With several tabs selected, confirmation only</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Ins</kbd> / right-click → Edit → Insert Silence</td><td>Insert the given seconds at the playhead (right-click uses the click; ↑↓ / wheel: 0.1 s, Shift 1 s, Ctrl 10 s, Ctrl+Shift 60 s; Enter inserts; 0.001–600 s). Default fade on both sides is on and uses the Settings click-prevention fade. Other selected tabs use each playhead</td></tr>
@@ -1290,8 +1310,7 @@
         <tbody>
           <tr><td><kbd>Enter</kbd></td><td>OK (bake and close)</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Cancel (discard and close)</td></tr>
-          <tr><td><kbd>S</kbd> / <kbd>E</kbd> / <kbd>X</kbd> / <kbd>P</kbd></td><td>Focus Start / End / Pre / Post and jump the view there</td></tr>
-          <tr><td><kbd>C</kbd></td><td>Toggle Truncate outside</td></tr>
+          <tr><td><kbd>S</kbd> / <kbd>E</kbd> / <kbd>X</kbd> / <kbd>F</kbd> / <kbd>P</kbd></td><td>Focus Start / End / Pre (<kbd>X</kbd> and <kbd>F</kbd> are the same) / Post and jump the view there</td></tr>
           <tr><td>← / →</td><td>Nudge the focused value by 1 sample</td></tr>
           <tr><td><kbd>Space</kbd></td><td>Main transport play / stop (sample-loop infinite playback)</td></tr>
         </tbody>
@@ -1414,7 +1433,9 @@
           <tr><td>← / →</td><td>During real video playback (or frame pause), pause and step one frame back / forward (hold repeats after an initial wait; <kbd>F10</kbd> during real playback or frame pause drops to the dim background preview, restores the front UI = playlist, and stays in the player). On the tree, expand / collapse folders. Otherwise do not shuttle</td></tr>
           <tr><td>Tree <kbd>*</kbd></td><td>Expand all folders under the selection (same as Explorer; numpad <kbd>*</kbd> or Shift+8; expansion is remembered)</td></tr>
           <tr><td>Tree <kbd>/</kbd></td><td>Collapse the selection and everything under it (numpad <kbd>/</kbd> or the <kbd>/</kbd> key)</td></tr>
+          <tr><td>Tree <kbd>Shift</kbd>+<kbd>/</kbd></td><td>Collapse every root and everything under each (independent of the selection; numpad <kbd>/</kbd> or the <kbd>/</kbd> key)</td></tr>
           <tr><td>Tree <kbd>Alt</kbd>+↑ / ↓</td><td>Move the selected root up / down one step (same as Settings → Player Up / Down; no-op when the selection is not a root)</td></tr>
+          <tr><td>Playlist <kbd>Alt</kbd>+↑ / ↓</td><td>Scroll the list by one row without moving the selection (player; with the tree focused, root reorder takes priority)</td></tr>
           <tr><td>Type on the tree</td><td>Folder-name jump (incremental search). Moves selection by partial match on the display name. Details under <a href="#layout-typeahead">Layout → Folder-name jump</a>. Separate from <kbd>Ctrl</kbd>+<kbd>F</kbd> filter search. Does not add to the playlist</td></tr>
           <tr><td><kbd>Space</kbd> / <kbd>Enter</kbd> (from any pane)</td><td><kbd>Space</kbd> — play / stop (stop returns to the start; during real video playback, seeks to the start and stops without resuming; playlist chrome stays hidden; Escape / Q returns to the dim preview; with the tree focused, Space expands / moves instead of play), <kbd>Enter</kbd> — pause in place (while stopped, video / PDF go to real playback / bright view; during real video playback, chrome stays hidden)</td></tr>
           <tr><td><kbd>R</kbd></td><td>Restart the current track from the beginning</td></tr>

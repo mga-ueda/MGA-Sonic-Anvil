@@ -94,6 +94,36 @@ internal static class FileAssociations
         return label;
     }
 
+    /// <summary>設定の関連付けチェック用。見出しなしの <see cref="FormatLabel"/> にアクセスキーを付与。</summary>
+    public static string FormatCheckLabel(string extension)
+    {
+        var ext = NormalizeExtension(extension);
+        var key = AccessKeyForExtension(ext);
+        var label = FormatLabel(ext);
+        const string sep = " — ";
+        var at = label.IndexOf(sep, StringComparison.Ordinal);
+        var marker = $" (_{key})";
+        return at >= 0 ? label.Insert(at, marker) : label + marker;
+    }
+
+    private static char AccessKeyForExtension(string ext) => ext switch
+    {
+        ".wav" => 'W',
+        ".wave" => 'E',
+        ".aif" => 'I',
+        ".aiff" => 'F',
+        ".mp3" => '3',
+        ".m4a" => 'A',
+        ".mp4" => '4',
+        ".mov" => 'O',
+        ".avi" => 'V',
+        ".mkv" => 'K',
+        ".webm" => 'B',
+        ".mpg" => 'G',
+        ".mpeg" => '1',
+        _ => 'X',
+    };
+
     public static string BuildOpenCommand(string exePath) =>
         $"\"{exePath}\" \"%1\"";
 

@@ -13,9 +13,9 @@ internal static partial class UiStrings
     public static string CrossfadeLabelFadeIn => Get("プリクロスフェード", "Pre-crossfade");
     public static string CrossfadeMarkerPre => "Pre";
     /// <summary>アクセスキー無し（ショートカットは付けない）。</summary>
-    public static string CrossfadeLabelTruncate => Get("ループ前後を削除", "Delete before/after loop");
+    public static string CrossfadeLabelTruncate => Get("ループ前後を削除(_T)", "Delete before/after loop (_T)");
     /// <summary>アクセスキー無し（ショートカットは付けない）。</summary>
-    public static string CrossfadeLabelDeleteAfterLoop => Get("ループ後を削除", "Delete after loop");
+    public static string CrossfadeLabelDeleteAfterLoop => Get("ループ後を削除(_A)", "Delete _after loop");
     public static string CrossfadeLabelCurve => Get("フェード曲線", "Fade curve");
     public static string CrossfadeLabelCurveIn => Get("イン", "In");
     public static string CrossfadeLabelCurveOut => Get("ポスト", "Post");
@@ -60,7 +60,7 @@ internal static partial class UiStrings
     public static string CrossfadeTipSnapZero => Get(
         "この値を近いゼロクロスへ寄せます。",
         "Snap this value to a nearby zero-crossing.");
-    public static string CrossfadeLabelAlignTwentyEight => Get("28の倍数でループを取る", "Take loop on multiples of 28");
+    public static string CrossfadeLabelAlignTwentyEight => Get("28の倍数でループを取る(_M)", "Take loop on _multiples of 28");
     public static string CrossfadeTipAlignTwentyEight => Get(
         "オンのとき、ループの始点と終点は 28 サンプルの倍数にしか動きません。",
         "When on, loop Start and End move only on multiples of 28 samples.");
@@ -76,7 +76,7 @@ internal static partial class UiStrings
     public static string CrossfadeTipAdjustEnd => Get(
         "始点固定で終点だけ動かして最適位置を探します。窓の端まで進み続けます。",
         "Keep Start fixed; move End to find a better seam. Continues to the usable edge.");
-    public static string CrossfadeLabelXfade => Get("クロスフェード表示", "Show crossfade");
+    public static string CrossfadeLabelXfade => Get("クロスフェード表示(_X)", "Show crossfade (_X)");
     public static string CrossfadeTipXfade => Get(
         "継ぎ目プレビューでクロスフェード合成を表示します。",
         "Show baked crossfade in the seam preview.");

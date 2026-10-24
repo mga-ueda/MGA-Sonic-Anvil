@@ -551,11 +551,7 @@ internal partial class AudioSettingsWindow : Window
         {
             var box = new CheckBox
             {
-                Content = new TextBlock
-                {
-                    Text = UiStrings.LibraryColumnLabel(column),
-                    TextWrapping = TextWrapping.Wrap,
-                },
+                Content = CreateCheckAccessContent(UiStrings.LibraryColumnCheckLabel(column)),
                 IsChecked = visible.Contains(column),
                 Margin = new Thickness(0, 0, 0, 6),
                 Tag = column,
@@ -1067,11 +1063,7 @@ internal partial class AudioSettingsWindow : Window
             var last = i == extensions.Count - 1;
             var box = new CheckBox
             {
-                Content = new TextBlock
-                {
-                    Text = FileAssociations.FormatLabel(ext),
-                    TextWrapping = TextWrapping.Wrap,
-                },
+                Content = CreateCheckAccessContent(FileAssociations.FormatCheckLabel(ext)),
                 IsChecked = FileAssociations.IsAssociated(ext),
                 Margin = new Thickness(0, 0, 0, last ? 0 : 6),
                 Tag = ext,
@@ -2506,11 +2498,13 @@ internal partial class AudioSettingsWindow : Window
         _syncingVisibility = true;
         try
         {
+            var usedAccessKeys = new HashSet<char>();
             foreach (var preset in _presets)
             {
                 var box = new CheckBox
                 {
-                    Content = new TextBlock { Text = preset.DisplayName() },
+                    Content = CreateCheckAccessContent(
+                        WithUniqueAccessKey(preset.DisplayName(), usedAccessKeys)),
                     IsChecked = _visibleIds.Contains(preset.Id),
                     Margin = new Thickness(0, 0, 0, 6),
                     Tag = preset.Id,
@@ -2895,6 +2889,47 @@ internal partial class AudioSettingsWindow : Window
         combo.SelectedItem is LibraryPlaylistWaveformSizeItem sizeItem
             ? sizeItem.Size
             : fallback;
+
+    /// <summary>CheckBox の Content。文字列の _ を AccessText として効かせ、折り返しも可。</summary>
+    private static AccessText CreateCheckAccessContent(string text) =>
+        new()
+        {
+            Text = text,
+            TextWrapping = TextWrapping.Wrap,
+        };
+
+    /// <summary>一覧内で一意なアクセスキーをラベルへ付与（スピーカー表示チェック用）。</summary>
+    private static string WithUniqueAccessKey(string label, HashSet<char> used)
+    {
+        for (var i = 0; i < label.Length; i++)
+        {
+            var c = label[i];
+            if (!char.IsAsciiLetterOrDigit(c))
+            {
+                continue;
+            }
+
+            var key = char.ToUpperInvariant(c);
+            if (!used.Add(key))
+            {
+                continue;
+            }
+
+            return label.Insert(i, "_");
+        }
+
+        for (var d = '0'; d <= '9'; d++)
+        {
+            if (!used.Add(d))
+            {
+                continue;
+            }
+
+            return $"{label} (_{d})";
+        }
+
+        return label;
+    }
 
     private sealed record LaunchModeItem(AppLaunchMode Mode, string Label)
     {

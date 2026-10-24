@@ -20,7 +20,7 @@ public sealed class SilentSkipTests
             UiStrings.SetLanguage(UiLanguage.Japanese);
             Assert.Contains("録音を開始", UiStrings.ConfirmRecord);
             Assert.Contains("設定", UiStrings.ConfirmRecordSilentSkip(-60, 500));
-            Assert.Contains("Silent Skip をオンにする", UiStrings.LabelConfirmRecordSilentSkip);
+            Assert.Contains("_Silent Skip をオンにする", UiStrings.LabelConfirmRecordSilentSkip);
             Assert.Contains("リージョン", UiStrings.LabelSilentSkipRecordAddRegion);
             Assert.Contains("録音部分", UiStrings.LabelSilentSkipRecordAddRegion);
             Assert.DoesNotContain("無音部分", UiStrings.LabelSilentSkipRecordAddRegion);
@@ -33,7 +33,7 @@ public sealed class SilentSkipTests
             UiStrings.SetLanguage(UiLanguage.English);
             Assert.Contains("recording", UiStrings.ConfirmRecord, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Settings", UiStrings.ConfirmRecordSilentSkip(-60, 500));
-            Assert.Contains("Turn on Silent Skip", UiStrings.LabelConfirmRecordSilentSkip);
+            Assert.Contains("Turn on _Silent Skip", UiStrings.LabelConfirmRecordSilentSkip);
             Assert.Contains("region", UiStrings.LabelSilentSkipRecordAddRegion, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("recorded", UiStrings.LabelSilentSkipRecordAddRegion, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("silent", UiStrings.LabelSilentSkipRecordAddRegion, StringComparison.OrdinalIgnoreCase);
