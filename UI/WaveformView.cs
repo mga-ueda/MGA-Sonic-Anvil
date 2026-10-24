@@ -1997,6 +1997,19 @@ internal sealed class WaveformView : Grid
         CursorCommitted?.Invoke(this, frame);
     }
 
+    /// <summary>
+    /// Shift＋テンキー選択の起点。シーク／シャトルでヘッドが動く前に呼ぶ。
+    /// </summary>
+    public void SetKeyboardSelectAnchor(long frame)
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        _keyboardSelectAnchor = ClampFrame(frame);
+    }
+
     private long ResolveKeyboardSelectAnchor()
     {
         if (_document is null)

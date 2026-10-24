@@ -249,6 +249,9 @@ public partial class MainWindow
     private bool IsPlaybackShuttleKey(Key key, ModifierKeys modifiers) =>
         LibraryPlayerMode.IsPlayerShuttleKey(key, modifiers)
         || (modifiers == ModifierKeys.None && key is Key.NumPad1 or Key.NumPad3)
+        || (AllowsWaveformSelectionTransport()
+            && LibraryPlayerMode.IsNumpadSelectionTransport(key, modifiers)
+            && key is Key.NumPad1 or Key.NumPad3)
         || (!IsLibraryMaximized
             && modifiers == ModifierKeys.None
             && key is Key.Left or Key.Right);
@@ -353,6 +356,7 @@ public partial class MainWindow
     {
         if (_playbackShuttleDirection == 0 && !_shuttleStartedWhileStopped)
         {
+            ClearTransportSelectionExtendIfShuttle();
             return;
         }
 
@@ -364,6 +368,8 @@ public partial class MainWindow
         }
 
         _player.SetPlaybackSpeed(1);
+
+        ClearTransportSelectionExtendIfShuttle();
 
         if (!_shuttleStartedWhileStopped)
         {
@@ -378,6 +384,18 @@ public partial class MainWindow
         {
             PausePlaybackHere(immersiveVideoHold: immersive);
         }
+    }
+
+    private void ClearTransportSelectionExtendIfShuttle()
+    {
+        if (!_transportSelectionExtend || _transportSelectionDigit is not (1 or 3))
+        {
+            return;
+        }
+
+        _transportSelectionDigit = -1;
+        _transportSelectionExtend = false;
+        SyncPlayWindowFromDocument();
     }
 
     /// <summary>映像クロックの位置へ音声ヘッドを合わせる（動画シャトル開始時）。</summary>
@@ -886,6 +904,12 @@ public partial class MainWindow
             return _document.SampleLoop.Clamp(_document.FrameCount);
         }
 
+        // Shift＋テンキーで選択を伸ばしているあいだは選択ループを止める。
+        if (_transportSelectionExtend)
+        {
+            return null;
+        }
+
         if (IsLibraryMaximized && Waveform.TryGetPlayerAbLoop(out var ab))
         {
             return ab;
@@ -1031,6 +1055,14 @@ public partial class MainWindow
             return;
         }
 
+        // Shift＋7／9 等の選択伸長中は、半開区間の End にヘッドがあっても始点へ飛ばさない。
+        if (_transportSelectionExtend)
+        {
+            SyncPlayWindowFromDocument();
+            _ = Waveform.TakePendingSelectionPrerollJump();
+            return;
+        }
+
         if (Waveform.TakePendingSelectionPrerollJump())
         {
             JumpPlaybackToSelectionPreroll(selection);
@@ -1038,7 +1070,8 @@ public partial class MainWindow
         }
 
         var cursor = _player.IsPlaying ? _player.CursorFrame : Waveform.PlayheadFrame;
-        var inside = cursor >= selection.StartFrame && cursor < selection.EndFrame;
+        // End は半開なので本来は範囲外だが、伸長の移動端として End 上も範囲内扱い。
+        var inside = cursor >= selection.StartFrame && cursor <= selection.EndFrame;
         if (inside)
         {
             SyncPlayWindowFromDocument();
@@ -1185,6 +1218,11 @@ public partial class MainWindow
             Waveform.PlayheadFrame = frame;
             Waveform.ExitPlayheadFrame = exitFrame;
             Waveform.FollowPlayhead();
+            if (_transportSelectionExtend && _playbackShuttleDirection != 0)
+            {
+                Waveform.ExtendSelectionTo(frame);
+            }
+
             if (OverviewHost.Visibility == Visibility.Visible)
             {
                 SyncOverviewPlayhead();

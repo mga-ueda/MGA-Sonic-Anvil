@@ -1435,6 +1435,25 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad7, ModifierKeys.Control));
         Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.D5, ModifierKeys.None));
 
+        Assert.True(LibraryPlayerMode.IsNumpadSelectionTransport(Key.NumPad7, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsNumpadSelectionTransport(Key.NumPad1, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsNumpadSelectionTransport(Key.J, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsNumpadSelectionTransport(Key.K, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsNumpadSelectionTransport(Key.NumPad7, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsNumpadSelectionTransport(Key.J, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsNumpadSelectionTransport(Key.NumPad5, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsNumpadSelectionTransport(Key.D7, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.TrySelectionTransportDigit(Key.J, out var jDigit));
+        Assert.Equal(7, jDigit);
+        Assert.True(LibraryPlayerMode.TrySelectionTransportDigit(Key.K, out var kDigit));
+        Assert.Equal(9, kDigit);
+        Assert.Equal(LibraryNumpadCommand.SeekBack, LibraryPlayerMode.NumpadSelectionTransportCommand(7));
+        Assert.Equal(LibraryNumpadCommand.SeekForward, LibraryPlayerMode.NumpadSelectionTransportCommand(9));
+        Assert.Equal(LibraryNumpadCommand.Rewind, LibraryPlayerMode.NumpadSelectionTransportCommand(1));
+        Assert.Equal(LibraryNumpadCommand.FastForward, LibraryPlayerMode.NumpadSelectionTransportCommand(3));
+        Assert.True(LibraryPlayerMode.TryNumpadScanDigit(0x47, out var scan7));
+        Assert.Equal(7, scan7);
+
         Assert.True(LibraryPlayerMode.IsTopRowDigitKey(Key.D5));
         Assert.False(LibraryPlayerMode.IsTopRowDigitKey(Key.NumPad5));
         Assert.True(LibraryPlayerMode.IsPercentDigitJump(Key.D5, ModifierKeys.None));
@@ -1460,6 +1479,17 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.IsAltNumpadPercentVirtualKey(0x61, altDown: false, shiftDown: false, ctrlDown: false));
         Assert.False(LibraryPlayerMode.IsAltNumpadPercentVirtualKey(0x61, altDown: true, shiftDown: true, ctrlDown: false));
         Assert.False(LibraryPlayerMode.IsAltNumpadPercentVirtualKey(0x31, altDown: true, shiftDown: false, ctrlDown: false));
+        // Win＋Alt＋テンキーは他アプリのホットキーへ通す（こちらでは割合にしない）。
+        Assert.False(LibraryPlayerMode.IsAltNumpadPercentVirtualKey(
+            0x61, altDown: true, shiftDown: false, ctrlDown: false, winDown: true));
+        Assert.False(LibraryPlayerMode.IsTranslatedNumpadAltPercent(
+            altDown: true, shiftDown: false, ctrlDown: false, winDown: true));
+        Assert.False(LibraryPlayerMode.IsTranslatedNumpadShiftJump(
+            altDown: false, ctrlDown: false, winDown: true));
+        Assert.False(LibraryPlayerMode.IsStaleSysNumpad(
+            0x61, systemKey: true, altModifierActive: false, shiftDown: false, ctrlDown: false, winDown: true));
+        Assert.False(LibraryPlayerMode.TryShiftedNumpadDigit(
+            Scan(0x4F), shiftDown: true, ctrlDown: false, altDown: false, out _, winDown: true));
         Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad1, ModifierKeys.Alt));
 
         // Alt を離した直後（物理状態が残っていても）は修飾なし。テンキー 1 は巻き戻し。
@@ -1545,6 +1575,17 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.TryTranslatedNumpadDigit(0x24, 0x47, extended: true, numLockOn: true, out _));
         Assert.False(LibraryPlayerMode.TryTranslatedNumpadDigit(0x67, 0x47, extended: false, numLockOn: true, out _));
         Assert.False(LibraryPlayerMode.TryTranslatedNumpadDigit(0x24, 0x47, extended: false, numLockOn: false, out _));
+        // Alt＋テンキーが Home 等に化けても Shift 番号ジャンプにせず、割合へ。
+        Assert.True(LibraryPlayerMode.IsTranslatedNumpadAltPercent(altDown: true, shiftDown: false, ctrlDown: false));
+        Assert.False(LibraryPlayerMode.IsTranslatedNumpadShiftJump(altDown: true, ctrlDown: false));
+        Assert.False(LibraryPlayerMode.IsTranslatedNumpadAltPercent(altDown: true, shiftDown: true, ctrlDown: false));
+        Assert.False(LibraryPlayerMode.IsTranslatedNumpadAltPercent(altDown: false, shiftDown: false, ctrlDown: false));
+        Assert.True(LibraryPlayerMode.IsTranslatedNumpadShiftJump(altDown: false, ctrlDown: false));
+        Assert.False(LibraryPlayerMode.IsTranslatedNumpadShiftJump(altDown: false, ctrlDown: true));
+        Assert.True(LibraryPlayerMode.TryTranslatedNumpadDigit(0x24, 0x47, extended: false, numLockOn: true, out var altSeven));
+        Assert.Equal(7, altSeven);
+        Assert.True(LibraryPlayerMode.IsTranslatedNumpadAltPercent(altDown: true, shiftDown: false, ctrlDown: false));
+        Assert.False(LibraryPlayerMode.IsTranslatedNumpadShiftJump(altDown: true, ctrlDown: false));
         Assert.True(LibraryPlayerMode.IsKeyRepeat(Scan(0x47, repeat: true)));
         Assert.False(LibraryPlayerMode.IsKeyRepeat(Scan(0x47)));
         Assert.Equal(5, LibraryPlayerMode.SeekNudgeSeconds);

@@ -431,7 +431,7 @@
               <li>テンキー …… <kbd>0</kbd> 一時停止・再開、<kbd>1</kbd>／<kbd>3</kbd> ±3 倍早戻し／早送り、<kbd>4</kbd>／<kbd>6</kbd> 前／次、<kbd>5</kbd> 最初から、<kbd>7</kbd>／<kbd>9</kbd> ±5 秒（<kbd>2</kbd>／<kbd>8</kbd>は未使用）</li>
             </ul>
           </li>
-          <li>テンキーは再生操作（<kbd>0</kbd>＝一時停止・再開、<kbd>1</kbd>／<kbd>3</kbd>＝±3 倍早戻し／早送り、<kbd>4</kbd>／<kbd>6</kbd>＝前／次、<kbd>5</kbd>＝最初から、<kbd>7</kbd>／<kbd>9</kbd>＝±5 秒。<kbd>2</kbd>／<kbd>8</kbd>は未使用。エディタでも同じで、エディタの <kbd>4</kbd>／<kbd>6</kbd> は前後のタブ。<kbd>J</kbd>／<kbd>K</kbd>／<kbd>,</kbd>／<kbd>.</kbd> もエディタで同じ）。上段の <kbd>0</kbd>–<kbd>9</kbd> と <kbd>Alt</kbd>＋テンキー数字は表示範囲の割合ジャンプ（0＝先頭、9＝90%）。<kbd>Shift</kbd>＋上段数字と <kbd>Shift</kbd>＋テンキー数字は、一時マーカーがあるときマーカー番号へ（音声波形／動画本再生／F8／フレーム一時停止。二桁可。暗いプレビューは一時マーカーを出さないので飛ばない。NumLock オンでもテンキーの Shift は Home／End にせずマーカー番号）。<kbd>Ctrl</kbd>＋上段数字と <kbd>Ctrl</kbd>＋テンキー数字は、ファイルにリージョンがあるときその番号の先頭へ（1 から。二桁可。エディタでも同じ）。無修飾のテンキーは再生のまま。ツリーの <kbd>Shift</kbd>+<kbd>8</kbd>（上段）は配下展開のまま。</li>
+          <li>テンキーは再生操作（<kbd>0</kbd>＝一時停止・再開、<kbd>1</kbd>／<kbd>3</kbd>＝±3 倍早戻し／早送り、<kbd>4</kbd>／<kbd>6</kbd>＝前／次、<kbd>5</kbd>＝最初から、<kbd>7</kbd>／<kbd>9</kbd>＝±5 秒。<kbd>2</kbd>／<kbd>8</kbd>は未使用。エディタでも同じで、エディタの <kbd>4</kbd>／<kbd>6</kbd> は前後のタブ。<kbd>J</kbd>／<kbd>K</kbd>／<kbd>,</kbd>／<kbd>.</kbd> もエディタで同じ）。上段の <kbd>0</kbd>–<kbd>9</kbd> と <kbd>Alt</kbd>＋テンキー数字は表示範囲の割合ジャンプ（0＝先頭、9＝90%）。<kbd>Shift</kbd>＋上段数字と <kbd>Shift</kbd>＋テンキー数字は、一時マーカーがあるときマーカー番号へ（音声波形／動画本再生／F8／フレーム一時停止。二桁可。暗いプレビューは一時マーカーを出さないので飛ばない。NumLock オンでもテンキーの Shift は Home／End にせずマーカー番号。エディタとプレイヤーのシーク＆選択波形ではテンキーの <kbd>Shift</kbd>＋<kbd>1</kbd>／<kbd>3</kbd>／<kbd>7</kbd>／<kbd>9</kbd> と <kbd>Shift</kbd>＋<kbd>J</kbd>／<kbd>K</kbd> が選択付きシーク／シャトルを優先）。<kbd>Ctrl</kbd>＋上段数字と <kbd>Ctrl</kbd>＋テンキー数字は、ファイルにリージョンがあるときその番号の先頭へ（1 から。二桁可。エディタでも同じ）。無修飾のテンキーは再生のまま。ツリーの <kbd>Shift</kbd>+<kbd>8</kbd>（上段）は配下展開のまま。</li>
         </ul>
 
         <h4>リストとフォーカス</h4>
@@ -1214,7 +1214,9 @@
           <tr><td><kbd>Shift</kbd>+<kbd>PageUp</kbd>／<kbd>PageDown</kbd></td><td>表示幅の 5% だけ選択を伸長</td></tr>
           <tr><td>上段 <kbd>0</kbd>–<kbd>9</kbd></td><td>表示範囲の 0%〜90% へジャンプ</td></tr>
           <tr><td>テンキー</td><td><kbd>0</kbd> 一時停止・再開、<kbd>1</kbd>／<kbd>3</kbd> ±3 倍早戻し／早送り、<kbd>4</kbd>／<kbd>6</kbd> 前／次のタブ、<kbd>5</kbd> 頭から再生し直し、<kbd>7</kbd>／<kbd>9</kbd> ±5 秒（<kbd>2</kbd>／<kbd>8</kbd>は未使用）</td></tr>
-          <tr><td><kbd>Shift</kbd>+上段／テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>マーカー番号へ（連続入力可。無修飾のテンキーは再生のまま）</td></tr>
+          <tr><td><kbd>Shift</kbd>＋テンキー <kbd>7</kbd>／<kbd>9</kbd>、<kbd>Shift</kbd>＋<kbd>J</kbd>／<kbd>K</kbd></td><td>±5 秒シークしながら選択を伸長（押し始めた位置が起点。押し中は選択ループを止める。エディタと、プレイヤーのシーク＆選択ができる波形＝音声プレイリスト波形／動画本再生／F8／フレーム一時停止。暗いプレビューでは不可。このときテンキーのマーカージャンプより優先）</td></tr>
+          <tr><td><kbd>Shift</kbd>＋テンキー <kbd>1</kbd>／<kbd>3</kbd></td><td>±3 倍早戻し／早送りしながら選択を伸長（再生中・停止中どちらでも可。押し中は選択ループを止める。適用範囲は上と同じ）</td></tr>
+          <tr><td><kbd>Shift</kbd>+上段／テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>マーカー番号へ（連続入力可。選択付きシーク／シャトルが有効なときはテンキー 1／3／7／9 はそちら優先。上段の Shift＋数字は常にマーカー。無修飾のテンキーは再生のまま）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+上段／テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>リージョン番号の先頭へ（1 から。マーカー番号とは別。二桁可）</td></tr>
           <tr><td><kbd>Alt</kbd>＋テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>表示範囲の割合へ（上段の無修飾と同じ。0＝先頭、9＝90%。無修飾のテンキーは再生のまま）</td></tr>
         </tbody>

@@ -1115,7 +1115,9 @@
           <tr><td><kbd>Shift</kbd>+<kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Extend the selection by 5% of the view</td></tr>
           <tr><td>Top-row <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to 0%–90% of the view</td></tr>
           <tr><td>Numpad</td><td><kbd>0</kbd> pause/resume, <kbd>1</kbd>/<kbd>3</kbd> ±3× rewind/FF, <kbd>4</kbd>/<kbd>6</kbd> previous/next tab, <kbd>5</kbd> restart from the beginning, <kbd>7</kbd>/<kbd>9</kbd> ±5 s (<kbd>2</kbd>/<kbd>8</kbd> unused)</td></tr>
-          <tr><td><kbd>Shift</kbd>+top-row / numpad <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to a marker number (digits can be chained; unmodified numpad stays transport)</td></tr>
+          <tr><td><kbd>Shift</kbd>+numpad <kbd>7</kbd>/<kbd>9</kbd>, <kbd>Shift</kbd>+<kbd>J</kbd>/<kbd>K</kbd></td><td>Extend the selection while seeking ±5 s (anchor is where you started; selection loop is off while held. Editor, and player seek-and-select waveforms: playlist audio / real video / F8 / frame pause — not the dim preview. Prefers this over numpad marker jump there)</td></tr>
+          <tr><td><kbd>Shift</kbd>+numpad <kbd>1</kbd>/<kbd>3</kbd></td><td>Extend the selection while ±3× rewind/FF (works while playing or stopped; selection loop is off while held; same scope as above)</td></tr>
+          <tr><td><kbd>Shift</kbd>+top-row / numpad <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to a marker number (digits can be chained; when selection transport is active, numpad 1/3/7/9 prefer that; top-row Shift+digits stay markers; unmodified numpad stays transport)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+top-row / numpad <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to the start of a region number (from 1, separate from marker numbers; two digits OK)</td></tr>
           <tr><td><kbd>Alt</kbd>+numpad <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump by view percent (same as unmodified top-row digits; 0 = start, 9 = 90%; unmodified numpad stays transport)</td></tr>
         </tbody>
