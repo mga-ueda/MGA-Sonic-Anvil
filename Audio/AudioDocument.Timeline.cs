@@ -796,8 +796,6 @@ internal sealed partial class AudioDocument
         return true;
     }
 
-    public long[] SnapshotMarkerFrames() => _markerFrames.ToArray();
-
     public MarkerSnapshot[] SnapshotMarkers()
     {
         var snapshot = new MarkerSnapshot[_markerFrames.Count];

@@ -3867,7 +3867,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return gainAt(sourceFrame);
         }
 
-        return _loopFadePreview is { } preview ? preview.GainAt(sourceFrame) : 1f;
+        return 1f;
     }
 
     private void EnsureFadeMixScratch(int channels)

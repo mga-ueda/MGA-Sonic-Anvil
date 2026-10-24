@@ -70,15 +70,6 @@ internal sealed class AudioRecorder : IDisposable
         }
     }
 
-    public void MarkTakeHasAudio()
-    {
-        lock (_gate)
-        {
-            _recordGate.Reset(hasWritten: true);
-            ConfigureRecordGate();
-        }
-    }
-
     public void Start(
         AudioOutputSettings output,
         string? recordDeviceId,
@@ -140,14 +131,6 @@ internal sealed class AudioRecorder : IDisposable
         lock (_gate)
         {
             return CopyUsedNoLock(0);
-        }
-    }
-
-    public float[] SnapshotFrom(int startSample)
-    {
-        lock (_gate)
-        {
-            return CopyUsedNoLock(startSample);
         }
     }
 

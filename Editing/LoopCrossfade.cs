@@ -26,8 +26,6 @@ internal readonly struct LoopFadePreview
         PostInShape = state.PostInShape,
     };
 
-    public float GainAt(long frame) => 1f;
-
     /// <summary>
     /// プリ＝[E−Pre, E): 元波形（エンド）×out→0 ＋ S 手前×in。
     /// ポスト＝[S, S＋Post): E 以降×out ＋ 元波形（スタート）×in←0。

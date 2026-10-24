@@ -1228,24 +1228,6 @@ internal sealed class LibraryVisualStage : Grid
         return true;
     }
 
-    public bool TryGoPdfPageEdge(int edge)
-    {
-        if (!IsPdf || _path is null)
-        {
-            return false;
-        }
-
-        var page = edge < 0 ? 0 : Math.Max(0, _pdfPages - 1);
-        if (page == _pdfPage)
-        {
-            return true;
-        }
-
-        _pdfPage = page;
-        _ = LoadPdfPageAsync(_path, page);
-        return true;
-    }
-
     /// <summary>1 始まりのページ番号へ移動。範囲外や PDF 以外は false。</summary>
     public bool TryGoPdfPageNumber(int pageNumber1Based)
     {

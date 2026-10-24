@@ -806,23 +806,6 @@ internal sealed class AppSettings
         LibraryListColumns = [];
     }
 
-    public void ApplyLibraryListColumnsVideo(IEnumerable<LibraryFileColumn> columns)
-    {
-        MigrateLegacyLibraryListColumns();
-        LibraryListColumnsVideo = LibraryColumnFilter.Serialize(columns, LibraryColumnFilter.VideoDefaults);
-        LibraryListColumnsMixed = [];
-        LibraryListColumns = [];
-    }
-
-    public void ApplyLibraryListColumnsMixed(IEnumerable<LibraryFileColumn> columns)
-    {
-        MigrateLegacyLibraryListColumns();
-        LibraryListColumnsMixed = LibraryColumnFilter.Serialize(
-            columns,
-            LibraryColumnFilter.MixedDefaults);
-        LibraryListColumns = [];
-    }
-
     /// <summary>Wave / MP3 / Video を更新し、混在のユーザー記憶を捨てて和集合へ戻す。</summary>
     public void ApplyLibraryListColumnPresets(
         IEnumerable<LibraryFileColumn> waveColumns,

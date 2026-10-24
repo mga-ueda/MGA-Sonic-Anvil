@@ -22,9 +22,6 @@ internal static class SurroundScopeEngine
 
     public static bool IsSurround(int channels) => channels > 2;
 
-    public static ChannelLayout LayoutOf(int fileChannels, ChannelLayout speaker, int[]? fileChannelMap = null) =>
-        ChannelLayout.ForFile(fileChannels, speaker, fileChannelMap);
-
     public static bool IsLfeLabel(string label) =>
         label.Equals("LFE", StringComparison.OrdinalIgnoreCase);
 
