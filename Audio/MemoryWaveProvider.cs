@@ -88,6 +88,9 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
     private double _monitorLowCutHz = DefaultMonitorLowCutHz;
     private BpmMonitorMode _bpmMonitorMode;
     private EffeTuneBpmEstimator? _bpmMonitor;
+    private readonly BpmMonitorClickMixer _bpmClicks = new();
+    private float[] _bpmScratch = [];
+    private readonly List<int> _bpmOnsets = [];
     /// <summary>モニター LC: RBJ ローシェルフ（ゲイン固定 −20 dB、Q≈0.707）。</summary>
     private bool _lowCutCoeffReady;
     private float _lowCutB0;
@@ -274,6 +277,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             _deviceRate = Math.Clamp(sampleRate, 1000, 384000);
             WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(_deviceRate, Math.Max(1, _outputChannels));
             _rangeClicks.SetDeviceRate(_deviceRate);
+            _bpmClicks.SetDeviceRate(_deviceRate);
         }
     }
 
@@ -465,13 +469,14 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             if (mode == BpmMonitorMode.Off)
             {
                 _bpmMonitor?.Reset();
-                _bpmMonitor?.SetClickEnabled(false);
+                _bpmClicks.Reset();
                 return;
             }
 
             _bpmMonitor ??= new EffeTuneBpmEstimator();
-            // オン時は解析＋クリックを常時有効。
-            _bpmMonitor.SetClickEnabled(true);
+            _bpmClicks.Reset();
+            _bpmClicks.EnsureSample();
+            _bpmClicks.SetDeviceRate(_deviceRate);
         }
     }
 
@@ -501,7 +506,7 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             }
 
             _bpmMonitor.Reset();
-            _bpmMonitor.SetClickEnabled(_bpmMonitorMode == BpmMonitorMode.On);
+            _bpmClicks.Reset();
         }
     }
 
@@ -1525,6 +1530,10 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             }
 
             _paused = paused;
+            if (paused)
+            {
+                _bpmClicks.Reset();
+            }
         }
     }
 
@@ -3946,9 +3955,40 @@ internal sealed class PlaybackSampleProvider : ISampleProvider
             return;
         }
 
+        // 停止／ポーズ／無音のみのときは解析もクリックも止める（止まってもカチカチ鳴らない）。
+        if (_paused || _silenceOnly || Ended)
+        {
+            _bpmClicks.Reset();
+            return;
+        }
+
         var channels = Math.Max(1, WaveFormat.Channels);
-        _bpmMonitor.SetClickEnabled(_bpmMonitorMode == BpmMonitorMode.On);
-        _bpmMonitor.ProcessInterleaved(buffer, offset, writtenSamples, channels, _deviceRate);
+        var frames = writtenSamples / channels;
+        if (frames <= 0)
+        {
+            return;
+        }
+
+        if (_bpmScratch.Length < writtenSamples)
+        {
+            _bpmScratch = new float[writtenSamples];
+        }
+
+        Buffer.BlockCopy(buffer, offset * sizeof(float), _bpmScratch, 0, writtenSamples * sizeof(float));
+        // scratch 上だけ合成クリックを混ぜ、拍頭を差分で取る。出力バッファには合成音を残さない。
+        _bpmMonitor.ProcessInterleaved(_bpmScratch, 0, writtenSamples, channels, _deviceRate, mixSynthClick: true);
+        BpmMonitorClickMixer.CollectOnsetsFromSynthDiff(
+            buffer,
+            offset,
+            _bpmScratch,
+            frames,
+            channels,
+            _bpmOnsets);
+
+        _bpmClicks.EnsureSample();
+        _bpmClicks.SetDeviceRate(_deviceRate);
+        var dim = _monitorDim ? _monitorDimLinear : 1f;
+        _bpmClicks.MixBuffer(buffer, offset, channels, frames, _bpmOnsets, dim);
     }
 
     /// <summary>

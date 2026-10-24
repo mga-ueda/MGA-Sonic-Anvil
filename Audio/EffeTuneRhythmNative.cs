@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace MgaSonicAnvil.Audio;
 
 /// <summary>
-/// EffeTune Rhythm Analyzer DSP（MIT）の薄い P/Invoke。BPM 解析と拍間隔／クリック。
+/// EffeTune Rhythm Analyzer DSP（MIT）の薄い P/Invoke。BPM／拍間隔解析（合成クリックは拍検出用のみ）。
 /// </summary>
 internal static class EffeTuneRhythmNative
 {
@@ -42,6 +42,7 @@ internal static class EffeTuneRhythmNative
 
 /// <summary>
 /// EffeTune Rhythm Analyzer。再生スレッドから interleaved を渡し、UI は拍間隔 BPM を読む。
+/// 出力クリックは <see cref="BpmMonitorClickMixer"/>。合成音は拍位置検出用 scratch にだけ足す。
 /// </summary>
 internal sealed class EffeTuneBpmEstimator : IDisposable
 {
@@ -52,7 +53,6 @@ internal sealed class EffeTuneBpmEstimator : IDisposable
     private IntPtr _handle;
     private int _sampleRate;
     private bool _ready;
-    private bool _clickEnabled;
     private float? _bpm;
     private float? _analysisBpm;
     private float _confidence;
@@ -111,28 +111,23 @@ internal sealed class EffeTuneBpmEstimator : IDisposable
             if (_handle != IntPtr.Zero && _ready)
             {
                 EffeTuneRhythmNative.Reset(_handle);
-                EffeTuneRhythmNative.SetClick(_handle, _clickEnabled ? 1 : 0);
-            }
-        }
-    }
-
-    public void SetClickEnabled(bool enabled)
-    {
-        lock (_gate)
-        {
-            _clickEnabled = enabled;
-            if (_handle != IntPtr.Zero && _ready)
-            {
-                EffeTuneRhythmNative.SetClick(_handle, enabled ? 1 : 0);
+                EffeTuneRhythmNative.SetClick(_handle, 0);
             }
         }
     }
 
     /// <summary>
-    /// 再生バッファを解析し、クリック有効時は ch0/1 にクリックを加算する。
-    /// 表示 BPM は拍間隔から更新する（EffeTune の半テンポ値は使わない）。
+    /// 再生バッファを解析する。
+    /// <paramref name="mixSynthClick"/> が true のときだけ合成クリックをバッファへ足す（拍位置検出用の scratch 向け）。
+    /// 表示 BPM は拍間隔から更新する。出力へ出す音は本アプリ側で WAV に差し替える。
     /// </summary>
-    public void ProcessInterleaved(float[] buffer, int offset, int sampleCount, int channels, int sampleRate)
+    public void ProcessInterleaved(
+        float[] buffer,
+        int offset,
+        int sampleCount,
+        int channels,
+        int sampleRate,
+        bool mixSynthClick = false)
     {
         if (_handle == IntPtr.Zero || buffer is null || sampleCount <= 0 || channels < 1)
         {
@@ -156,6 +151,7 @@ internal sealed class EffeTuneBpmEstimator : IDisposable
                 return;
             }
 
+            EffeTuneRhythmNative.SetClick(_handle, mixSynthClick ? 1 : 0);
             if (offset == 0 && sampleCount == buffer.Length)
             {
                 EffeTuneRhythmNative.ProcessInterleaved(_handle, buffer, frames, channels);
@@ -165,9 +161,13 @@ internal sealed class EffeTuneBpmEstimator : IDisposable
                 var scratch = new float[sampleCount];
                 Buffer.BlockCopy(buffer, offset * sizeof(float), scratch, 0, sampleCount * sizeof(float));
                 EffeTuneRhythmNative.ProcessInterleaved(_handle, scratch, frames, channels);
-                Buffer.BlockCopy(scratch, 0, buffer, offset * sizeof(float), sampleCount * sizeof(float));
+                if (mixSynthClick)
+                {
+                    Buffer.BlockCopy(scratch, 0, buffer, offset * sizeof(float), sampleCount * sizeof(float));
+                }
             }
 
+            EffeTuneRhythmNative.SetClick(_handle, 0);
             RefreshBpmNoLock();
         }
     }
@@ -230,7 +230,7 @@ internal sealed class EffeTuneBpmEstimator : IDisposable
         if (_ready)
         {
             EffeTuneRhythmNative.SetRange(_handle, MinBpm, MaxBpm);
-            EffeTuneRhythmNative.SetClick(_handle, _clickEnabled ? 1 : 0);
+            EffeTuneRhythmNative.SetClick(_handle, 0);
         }
 
         _bpm = null;
