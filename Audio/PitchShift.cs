@@ -8,15 +8,12 @@ internal static class PitchShift
 {
     public const int MinSemitones = -24;
     public const int MaxSemitones = 24;
-    public const int OctaveSemitones = 12;
 
     public static int Snap(int semitones) => Math.Clamp(semitones, MinSemitones, MaxSemitones);
 
     public static bool IsNoOp(int semitones) => Snap(semitones) == 0;
 
     public static double Ratio(int semitones) => Math.Pow(2, Snap(semitones) / 12d);
-
-    public static int NudgeStep(bool octave) => octave ? OctaveSemitones : 1;
 
     public static int DestFrameCount(int sourceFrames, int semitones, bool timeStretch)
     {
