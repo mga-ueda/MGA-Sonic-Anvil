@@ -501,7 +501,12 @@ internal static class HistoryRecipes
             ? FadeCurves.ParseStored(((FadeShape)(recipe.Timing1 - 1)).ToString())
             : state.PostOutShape;
         state.Clamp(document.FrameCount);
-        return ProcessEdits.ApplyLoopMix(document, state);
+        // Amount > 0: 適用時に波形全体をフルスケールへ下げた（旧レシピは 0）。
+        return ProcessEdits.ApplyLoopMix(
+            document,
+            state,
+            lowerClippedCrossfade: recipe.Amount > 0,
+            out _);
     }
 
     private static IEditCommand? TrySetRegion(AudioDocument document, HistoryRecipe recipe)

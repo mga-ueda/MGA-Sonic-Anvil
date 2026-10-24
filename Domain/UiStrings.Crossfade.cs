@@ -83,6 +83,10 @@ internal static partial class UiStrings
     public static string CrossfadeTipLoopMix => Get(
         "フェードを波形に焼き込み、サンプルループを確定してツールを終了します。取り消しは Ctrl+Z。",
         "Bake fades, commit the sample loop, and close the tool. Undo with Ctrl+Z.");
+    public static string ConfirmCrossfadeClip(string overDb) => Format(
+        "クロスフェードの合成結果が 0 dBFS を {0} dB 超えています。このままでは歪む可能性があります。\n\nYes: 波形全体を下げて 0 dBFS 以内に収める\nNo: 下げずにこのまま適用する",
+        "The crossfade mix is {0} dB over 0 dBFS and may distort.\n\nYes: lower the entire waveform to stay within 0 dBFS\nNo: apply as-is without lowering",
+        overDb);
     public static string CrossfadeTipExit => Get(
         "変更を捨てて終了します。波形の補助表示も消えます。",
         "Discard changes and close. Waveform overlays are cleared.");

@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
@@ -281,10 +282,37 @@ public partial class MainWindow
         }
 
         _crossfadeEdit.Clamp(_document.FrameCount);
-        var command = ProcessEdits.ApplyLoopMix(_document, _crossfadeEdit);
+        var command = ProcessEdits.ApplyLoopMix(
+            _document,
+            _crossfadeEdit,
+            lowerClippedCrossfade: false,
+            out var clip);
         if (command is null)
         {
             return;
+        }
+
+        if (clip.ExceedsFullScale)
+        {
+            var answer = OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ConfirmCrossfadeClip(TabMerge.FormatOverDb(clip.OverDb)),
+                UiStrings.AppName,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.Yes);
+            if (answer == MessageBoxResult.Yes)
+            {
+                command = ProcessEdits.ApplyLoopMix(
+                    _document,
+                    _crossfadeEdit,
+                    lowerClippedCrossfade: true,
+                    out _);
+                if (command is null)
+                {
+                    return;
+                }
+            }
         }
 
         StopPlaybackForEdit();

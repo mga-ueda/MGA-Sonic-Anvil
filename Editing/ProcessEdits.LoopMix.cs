@@ -5,8 +5,19 @@ namespace MgaSonicAnvil.Editing;
 
 internal static partial class ProcessEdits
 {
-    public static IEditCommand? ApplyLoopMix(AudioDocument document, CrossfadeEditState draft)
+    public static IEditCommand? ApplyLoopMix(AudioDocument document, CrossfadeEditState draft) =>
+        ApplyLoopMix(document, draft, lowerClippedCrossfade: false, out _);
+
+    /// <param name="lowerClippedCrossfade">
+    /// true なら、焼き込み区間のピークが 0 dBFS を超えるとき波形全体をフルスケールへ下げる。
+    /// </param>
+    public static IEditCommand? ApplyLoopMix(
+        AudioDocument document,
+        CrossfadeEditState draft,
+        bool lowerClippedCrossfade,
+        out TabMerge.BounceClipInfo clip)
     {
+        clip = default;
         if (document.FrameCount <= 0 || document.Channels < 1 || draft.LoopLength <= 0)
         {
             return null;
@@ -51,6 +62,13 @@ internal static partial class ProcessEdits
                 state.PostCrossfadeFrames,
                 state.PostOutShape,
                 state.PostInShape);
+        }
+
+        clip = MeasureCrossfadeBakeClip(work, channels, state);
+        if (lowerClippedCrossfade && clip.ExceedsFullScale)
+        {
+            LowerEntireWaveform(work, clip.Peak);
+            clip = MeasureCrossfadeBakeClip(work, channels, state);
         }
 
         float[] after;
@@ -130,7 +148,12 @@ internal static partial class ProcessEdits
 
         var source = state.Clone();
         var sourceRate = document.SampleRate;
-        command.Replay = target => ApplyLoopMix(target, RemapState(source, sourceRate, target));
+        var lower = lowerClippedCrossfade;
+        command.Replay = target => ApplyLoopMix(
+            target,
+            RemapState(source, sourceRate, target),
+            lower,
+            out _);
         command.Persist = new HistoryRecipe
         {
             Kind = HistoryRecipes.LoopMix,
@@ -146,8 +169,95 @@ internal static partial class ProcessEdits
             Timing1 = (int)source.PostInShape + 1,
             Flag = source.TruncateOutside,
             Flag2 = source.DeleteAfterLoop,
+            // 1 = 波形全体をフルスケールへ下げた。旧レシピは 0（下げない）。
+            Amount = lower ? 1 : 0,
         };
         return command;
+    }
+
+    private static TabMerge.BounceClipInfo MeasureCrossfadeBakeClip(
+        float[] samples,
+        int channels,
+        CrossfadeEditState state)
+    {
+        var peak = 0f;
+        AccumulatePeak(samples, channels, state.EndFrame - state.PreCrossfadeFrames, state.PreCrossfadeFrames, ref peak);
+        AccumulatePeak(samples, channels, state.StartFrame, state.PostCrossfadeFrames, ref peak);
+        if (!float.IsFinite(peak))
+        {
+            return new TabMerge.BounceClipInfo { Peak = float.PositiveInfinity, OverDb = double.PositiveInfinity };
+        }
+
+        if (!(peak > 1f))
+        {
+            return new TabMerge.BounceClipInfo { Peak = peak, OverDb = 0 };
+        }
+
+        return new TabMerge.BounceClipInfo { Peak = peak, OverDb = LevelMeterEngine.ToDb(peak) };
+    }
+
+    private static void LowerEntireWaveform(float[] samples, float peak)
+    {
+        LowerSampleRange(samples, 0, samples.Length, peak);
+    }
+
+    private static void AccumulatePeak(
+        float[] samples,
+        int channels,
+        long startFrame,
+        long frameCount,
+        ref float peak)
+    {
+        if (frameCount <= 0 || channels < 1)
+        {
+            return;
+        }
+
+        var start = checked((int)startFrame * channels);
+        var end = checked(start + (int)frameCount * channels);
+        start = Math.Clamp(start, 0, samples.Length);
+        end = Math.Clamp(end, 0, samples.Length);
+        for (var i = start; i < end; i++)
+        {
+            if (!float.IsFinite(samples[i]))
+            {
+                peak = float.PositiveInfinity;
+                return;
+            }
+
+            var magnitude = Math.Abs(samples[i]);
+            if (magnitude > peak)
+            {
+                peak = magnitude;
+            }
+        }
+    }
+
+    private static void LowerSampleRange(float[] samples, int offset, int count, float peak)
+    {
+        if (count <= 0 || offset < 0 || offset >= samples.Length || !(peak > 1f))
+        {
+            return;
+        }
+
+        count = Math.Min(count, samples.Length - offset);
+        for (var pass = 0; pass < 3 && peak > 1f; pass++)
+        {
+            var scale = 1d / peak;
+            var next = 0f;
+            for (var i = 0; i < count; i++)
+            {
+                var scaled = (float)(samples[offset + i] * scale);
+                samples[offset + i] = scaled;
+                var magnitude = Math.Abs(scaled);
+                if (magnitude > next)
+                {
+                    next = magnitude;
+                }
+            }
+
+            peak = next;
+        }
     }
 
     private static CrossfadeEditState RemapState(
