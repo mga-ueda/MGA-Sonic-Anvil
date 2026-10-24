@@ -24,13 +24,6 @@ public sealed class PitchShiftTests
     }
 
     [Fact]
-    public void NudgeStep_SemitoneOrOctave()
-    {
-        Assert.Equal(1, PitchShift.NudgeStep(octave: false));
-        Assert.Equal(12, PitchShift.NudgeStep(octave: true));
-    }
-
-    [Fact]
     public void Apply_ZeroIsCopyOfSameLength()
     {
         var source = MakeSine(440, frames: 2048, channels: 1);

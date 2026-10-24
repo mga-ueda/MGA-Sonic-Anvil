@@ -40,8 +40,6 @@ internal sealed class CrossfadeEditState
     /// <summary>継ぎ目のクロスフェード合成プレビュー。記憶せず、起動時は常にオフ。</summary>
     public bool ShowXfadePreview { get; set; }
 
-    public bool LoopPlayback { get; set; } = true;
-
     /// <summary>プリ側アウト脚（減衰側）。既定はアウトメニュー先頭。</summary>
     public FadeShape PreOutShape { get; set; } = FadeCurves.MenuOrderFadeOut[0];
 
@@ -349,7 +347,6 @@ internal sealed class CrossfadeEditState
         DeleteAfterLoop = DeleteAfterLoop,
         AlignLoopEndsToTwentyEight = AlignLoopEndsToTwentyEight,
         ShowXfadePreview = ShowXfadePreview,
-        LoopPlayback = LoopPlayback,
         PreOutShape = PreOutShape,
         PreInShape = PreInShape,
         PostOutShape = PostOutShape,

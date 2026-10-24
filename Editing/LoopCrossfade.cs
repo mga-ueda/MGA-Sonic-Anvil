@@ -176,63 +176,6 @@ internal static class LoopCrossfade
         && startFrame < endFrame
         && crossfadeFrames <= endFrame - startFrame;
 
-    public static bool TryBuildSeamWavePreview(
-        float[] interleaved,
-        int channels,
-        long frameCount,
-        long startFrame,
-        long endFrame,
-        long crossfadeFrames,
-        FadeShape shape,
-        bool writeAtStart,
-        float[] dest)
-    {
-        if (dest.Length < crossfadeFrames * channels)
-        {
-            return false;
-        }
-
-        if (writeAtStart)
-        {
-            if (!CanBakePost(channels, frameCount, startFrame, endFrame, crossfadeFrames))
-            {
-                return false;
-            }
-        }
-        else if (!CanBakePre(channels, frameCount, startFrame, endFrame, crossfadeFrames))
-        {
-            return false;
-        }
-
-        var x = (int)crossfadeFrames;
-        var denom = Math.Max(1, x - 1);
-        for (var i = 0; i < x; i++)
-        {
-            FadeCurves.CrossfadeGains(shape, i / (double)denom, out var outGain, out var inGain);
-            int srcOut;
-            int srcIn;
-            if (writeAtStart)
-            {
-                srcOut = (int)(endFrame + i) * channels;
-                srcIn = (int)(startFrame + i) * channels;
-            }
-            else
-            {
-                srcOut = (int)(endFrame - crossfadeFrames + i) * channels;
-                srcIn = (int)(startFrame - crossfadeFrames + i) * channels;
-            }
-
-            var destOff = i * channels;
-            for (var ch = 0; ch < channels; ch++)
-            {
-                dest[destOff + ch] =
-                    interleaved[srcOut + ch] * outGain + interleaved[srcIn + ch] * inGain;
-            }
-        }
-
-        return true;
-    }
-
     public static void BuildSplicePreview(
         float[] interleaved,
         int channels,
