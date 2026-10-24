@@ -38,7 +38,6 @@ public partial class MainWindow
 
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
-        ClosePitchShiftPicker();
         CloseTimeStretchPicker();
         CloseInsertSilencePicker();
         if (_fadeMenu is { IsOpen: true })
@@ -137,7 +136,6 @@ public partial class MainWindow
 
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
-        ClosePitchShiftPicker();
         CloseTimeStretchPicker();
         CloseInsertSilencePicker();
         if (_player.IsPlaying)
@@ -515,21 +513,6 @@ public partial class MainWindow
             return;
         }
 
-        if (!batch)
-        {
-            var range = ActiveRange();
-            if (range.IsEmpty)
-            {
-                OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-        }
-
-        if (_pitchMenu is { IsOpen: true })
-        {
-            return;
-        }
-
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
@@ -540,96 +523,69 @@ public partial class MainWindow
             PausePlaybackSoft();
         }
 
-        var document = _document ?? ResolveBatchEditTargets().FirstOrDefault()?.Document;
-        if (document is null)
+        if (batch)
+        {
+            if (!PitchConstantBatchDialog.TryPrompt(this, out var semitones))
+            {
+                return;
+            }
+
+            _ = ApplyPitchBatchAsync(semitones);
+            return;
+        }
+
+        if (_document is null)
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoDocument, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        _pitchPreview.ResumeFrame = document.CursorFrame;
-        var menu = PitchShiftPicker.Show(
-            this,
-            ApplyPitch,
-            batch ? static (_, _) => { } : PreviewPitch,
-            batch ? static (_, _) => { } : OnPitchChanged);
-        _pitchMenu = menu;
-        menu.Closed += (_, _) =>
-        {
-            StopPitchPreview(restoreCursor: true);
-            if (ReferenceEquals(_pitchMenu, menu))
-            {
-                _pitchMenu = null;
-            }
-        };
-    }
-
-    private bool ClosePitchShiftPicker()
-    {
-        if (_pitchMenu is not { IsOpen: true })
-        {
-            return false;
-        }
-
-        _pitchMenu.IsOpen = false;
-        return true;
-    }
-
-    private void OnPitchChanged(int semitones, bool timeStretch)
-    {
-        if (!_pitchPreview.Previewing || _document is null || _pitchPreview.Toggling)
-        {
-            return;
-        }
-
+        var selectionScoped = !_document.Selection.IsEmpty;
         var range = ActiveRange();
         if (range.IsEmpty)
         {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        StartPitchPreviewPlayback(range, semitones, timeStretch);
+        _pitchPreview.ResumeFrame = _document.CursorFrame;
+        var playback = new PitchCurvePreviewPlayback
+        {
+            Play = StartPitchCurvePreviewPlayback,
+            Stop = () => StopPitchCurvePreview(restoreCursor: true),
+            IsPlaying = () => _pitchPreview.Previewing && _player.IsPlaying,
+            CursorFrame = () => _player.SmoothCursorFrame,
+        };
+        var result = PitchCurveEditorDialog.Show(
+            this,
+            _document,
+            range,
+            EditMask(),
+            selectionScoped,
+            playback);
+        StopPitchCurvePreview(restoreCursor: true);
+        if (!result.Accepted)
+        {
+            return;
+        }
+
+        _ = ApplyPitchCurveAsync(
+            result.Curve,
+            result.Range,
+            result.DocumentGainScale,
+            result.EdgeFadeMs,
+            result.TimeStretch,
+            result.PrecomputedAfterRange);
     }
 
-    private void PreviewPitch(int semitones, bool timeStretch)
-    {
-        // 複数ファイル編集ではお試し視聴しない（単体のみ）。
-        if (HasBatchEditTargets || _document is null || _pitchPreview.Toggling)
-        {
-            return;
-        }
-
-        var now = Environment.TickCount64;
-        if (now - _pitchPreview.SpaceTick < 120)
-        {
-            return;
-        }
-
-        _pitchPreview.SpaceTick = now;
-        _pitchPreview.Toggling = true;
-        try
-        {
-            if (_pitchPreview.Previewing && _player.IsPlaying)
-            {
-                StopPitchPreview(restoreCursor: true);
-                return;
-            }
-
-            var range = ActiveRange();
-            if (range.IsEmpty)
-            {
-                return;
-            }
-
-            StartPitchPreviewPlayback(range, semitones, timeStretch);
-        }
-        finally
-        {
-            _pitchPreview.Toggling = false;
-        }
-    }
-
-    private void StartPitchPreviewPlayback(WaveSelection range, int semitones, bool timeStretch)
+    /// <summary>
+    /// ピッチカーブダイアログのプレビュー。本体と同じ <see cref="_player"/> を Rebind するだけなので音は一系統。
+    /// モーダル中は本体の再生ヘッド／トランスポートを動かさず、二重再生に見えないようにする。
+    /// </summary>
+    private void StartPitchCurvePreviewPlayback(
+        AudioDocument preview,
+        WaveSelection previewRange,
+        long originFrame)
     {
         if (_document is null)
         {
@@ -643,26 +599,11 @@ public partial class MainWindow
                 _player.Pause();
             }
 
-            _playTimer.Stop();
+            // 本体側の再生 UI を止めたまま、音声だけ差し替える（二重に聞こえない／見えない）。
+            Waveform.SetTrailRecording(false);
+            Transport.SetPlaying(false);
             _meter.Reset();
             LoudnessMeter.Reset();
-            var source = _document.CopyRange(range.StartFrame, range.Length);
-            var pitched = Audio.PitchShift.IsNoOp(semitones)
-                ? source
-                : Audio.PitchShift.Apply(
-                    source,
-                    _document.Channels,
-                    _document.SampleRate,
-                    semitones,
-                    timeStretch);
-            var preview = new AudioDocument(
-                pitched,
-                _document.SampleRate,
-                _document.Channels,
-                _document.BitsPerSample,
-                _document.SourceKind,
-                null);
-            var previewRange = new WaveSelection(0, preview.FrameCount);
             if (_player.HasOutputDevice)
             {
                 _player.Rebind(preview, 0, previewRange, loop: false);
@@ -672,27 +613,28 @@ public partial class MainWindow
                 _player.Prepare(preview, 0, previewRange, loop: false);
             }
 
-            _pitchPreview.Origin = range.StartFrame;
+            _pitchPreview.Origin = originFrame;
             _pitchPreview.Previewing = true;
+            _pitchPreview.HideHostTransport = true;
             _pitchPreview.StartedAt = Environment.TickCount64;
             _player.Play();
             _playbackGeneration = _player.Generation;
-            _playTimer.Start();
-            StartMeterRendering();
-            Waveform.SetTrailRecording(true);
-            Transport.SetPlaying(true);
-            Waveform.UnlockCenter();
-            Waveform.SetPlayheadFromPlayback(range.StartFrame);
+            // ASIO の終端検知用。SyncPreviewPlayhead は HideHostTransport で抑止する。
+            if (!_playTimer.IsEnabled)
+            {
+                _playTimer.Start();
+            }
         }
         catch (Exception ex)
         {
             _pitchPreview.Previewing = false;
+            _pitchPreview.HideHostTransport = false;
             PausePlaybackSoft();
             OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
-    private void StopPitchPreview(bool restoreCursor)
+    private void StopPitchCurvePreview(bool restoreCursor)
     {
         if (!_pitchPreview.Previewing)
         {
@@ -701,6 +643,7 @@ public partial class MainWindow
 
         var resume = _pitchPreview.ResumeFrame;
         _pitchPreview.Previewing = false;
+        _pitchPreview.HideHostTransport = false;
         PausePlaybackSoft();
         if (restoreCursor && _document is not null)
         {
@@ -708,73 +651,76 @@ public partial class MainWindow
         }
     }
 
-    private void ApplyPitch(int semitones, bool timeStretch) =>
-        _ = ApplyPitchAsync(semitones, timeStretch);
-
-    private async Task ApplyPitchAsync(int semitones, bool timeStretch)
+    private async Task ApplyPitchBatchAsync(int semitones)
     {
-        if (IsUiBusy)
+        if (IsUiBusy || Audio.PitchShift.IsNoOp(semitones))
         {
             return;
         }
 
-        // タブ／プレイリスト選択中はファイル全体へ同じピッチシフトを一括適用する。
-        if (HasBatchEditTargets)
-        {
-            _pitchPreview.Previewing = false;
-            ClosePitchShiftPicker();
-            if (Audio.PitchShift.IsNoOp(semitones))
-            {
-                return;
-            }
+        var targets = ResolveBatchEditTargets();
+        await RunBatchEditAsync(
+            targets,
+            UiStrings.OverlayPitchShift,
+            (session, progress) => session.Document.FrameCount == 0
+                ? null
+                : ProcessEdits.PitchShift(
+                    session.Document,
+                    TabBatchRange(session.Document),
+                    semitones,
+                    timeStretch: true,
+                    progress,
+                    channelMask: TabBatchEditMask(session)),
+            saveAfter: IsLibraryMaximized,
+            ensurePcm: IsLibraryMaximized).ConfigureAwait(true);
+    }
 
-            var targets = ResolveBatchEditTargets();
-            await RunBatchEditAsync(
-                targets,
-                UiStrings.OverlayPitchShift,
-                (session, progress) => session.Document.FrameCount == 0
-                    ? null
-                    : ProcessEdits.PitchShift(
-                        session.Document,
-                        TabBatchRange(session.Document),
-                        semitones,
-                        timeStretch,
-                        progress,
-                        channelMask: TabBatchEditMask(session)),
-                saveAfter: IsLibraryMaximized,
-                ensurePcm: IsLibraryMaximized).ConfigureAwait(true);
-            return;
-        }
-
-        if (_document is null)
+    private async Task ApplyPitchCurveAsync(
+        Audio.PitchCurve curve,
+        WaveSelection range,
+        float documentGainScale,
+        int edgeFadeMs,
+        bool timeStretch = true,
+        float[]? precomputedAfterRange = null)
+    {
+        if (IsUiBusy || _document is null || curve.IsNoOp())
         {
             return;
         }
 
-        var range = ActiveRange();
+        range = range.Clamp(_document.FrameCount);
         if (range.IsEmpty)
         {
             OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        _pitchPreview.Previewing = false;
-        ClosePitchShiftPicker();
-        if (Audio.PitchShift.IsNoOp(semitones))
-        {
-            return;
-        }
-
         PausePlaybackSoft();
         var document = _document;
+        var mask = EditMask();
         _pitchShiftBusy = true;
         Exception? error = null;
         IEditCommand? command = null;
         try
         {
+            // プレビュー計算済みなら ApplyCurve はスキップ（ゲイン／履歴組み立てのみ）。進捗は即完了に見える。
             ShowPitchShiftBusyGlass();
-            var progress = new Progress<double>(p => _busyGlass.SetProgress(p));
-            command = await Task.Run(() => ProcessEdits.PitchShift(document, range, semitones, timeStretch, progress, channelMask: EditMask()))
+            IProgress<double> progress = new Progress<double>(p => _busyGlass.SetProgress(p));
+            if (precomputedAfterRange is not null)
+            {
+                progress.Report(1);
+            }
+
+            command = await Task.Run(() => ProcessEdits.PitchCurve(
+                    document,
+                    range,
+                    curve,
+                    edgeFadeMs,
+                    documentGainScale,
+                    progress,
+                    channelMask: mask,
+                    timeStretch: timeStretch,
+                    precomputedAfterRange: precomputedAfterRange))
                 .ConfigureAwait(true);
             if (!IsLoaded || !ReferenceEquals(_document, document) || command is null)
             {
@@ -859,7 +805,6 @@ public partial class MainWindow
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
-        ClosePitchShiftPicker();
         if (_player.IsPlaying)
         {
             PausePlaybackSoft();
@@ -920,7 +865,6 @@ public partial class MainWindow
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
-        ClosePitchShiftPicker();
         CloseTimeStretchPicker();
         CloseSilenceSelectionPicker();
         if (_player.IsPlaying)
@@ -2205,7 +2149,6 @@ public partial class MainWindow
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
-        ClosePitchShiftPicker();
         CloseTimeStretchPicker();
         CloseInsertSilencePicker();
         if (_player.IsPlaying)

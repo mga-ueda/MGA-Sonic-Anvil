@@ -235,6 +235,29 @@ internal sealed class AppSettings
 
     public int SilenceDetectHeight { get; set; }
 
+    /// <summary>ピッチカーブ編集ウィンドウの位置。未保存なら false。</summary>
+    public bool PitchCurveHasPlacement { get; set; }
+
+    public int PitchCurveX { get; set; }
+
+    public int PitchCurveY { get; set; }
+
+    public int PitchCurveWidth { get; set; }
+
+    public int PitchCurveHeight { get; set; }
+
+    /// <summary>ピッチカーブ既定の補間形状。</summary>
+    public string PitchCurveDefaultShape { get; set; } = "SCurve";
+
+    /// <summary>ピッチカーブで音階スナップ（鍵盤表示）を使う。</summary>
+    public bool PitchCurveSnapToScale { get; set; }
+
+    /// <summary>ピッチカーブでタイムストレッチしない（長さが変わる）。規定は false。</summary>
+    public bool PitchCurveNoTimeStretch { get; set; }
+
+    /// <summary>ピッチカーブプレビューを軽量演算にする。規定は false。OK 本適用には使わない。</summary>
+    public bool PitchCurveLightweightMode { get; set; }
+
     public global::MgaSonicAnvil.Audio.SilenceDetectOptions ResolvedSilenceDetectOptions(bool edgesOnly) =>
         new global::MgaSonicAnvil.Audio.SilenceDetectOptions(
             SilenceDetectOpenThresholdDb,

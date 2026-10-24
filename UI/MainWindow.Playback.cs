@@ -689,9 +689,13 @@ public partial class MainWindow
         }
 
         _fadePreview.Previewing = false;
+        _fadePreview.HideHostTransport = false;
         _volumePreview.Previewing = false;
+        _volumePreview.HideHostTransport = false;
         _pitchPreview.Previewing = false;
+        _pitchPreview.HideHostTransport = false;
         _timeStretchPreview.Previewing = false;
+        _timeStretchPreview.HideHostTransport = false;
         // テンキー 0 はフレーム一時停止＋クローム維持。Enter はその場停止でクロームを戻す。
         // 動画はどちらも静止（暗い 1/3 速へは落とさない。バックグラウンドへ戻すのは Escape）。
         if (immersiveVideoHold)
@@ -1119,7 +1123,12 @@ public partial class MainWindow
 
         if (AnyEffectPreviewing)
         {
-            SyncPreviewPlayhead();
+            // ピッチカーブダイアログ中は本体ヘッドを動かさない（音は一系統のまま）。
+            if (!ActivePreviewHidesHostTransport)
+            {
+                SyncPreviewPlayhead();
+            }
+
             if (_player.ProviderEnded && Environment.TickCount64 - ActivePreviewStartedAt >= 250)
             {
                 OnPlaybackEnded(_playbackGeneration);
@@ -1412,7 +1421,11 @@ public partial class MainWindow
 
         if (AnyEffectPreviewing)
         {
-            SyncPreviewPlayhead();
+            if (!ActivePreviewHidesHostTransport)
+            {
+                SyncPreviewPlayhead();
+            }
+
             QueueAnalyzerTick();
             return;
         }
@@ -1628,11 +1641,13 @@ public partial class MainWindow
         if (_pitchPreview.Previewing)
         {
             _pitchPreview.Previewing = false;
+            _pitchPreview.HideHostTransport = false;
         }
 
         if (_timeStretchPreview.Previewing)
         {
             _timeStretchPreview.Previewing = false;
+            _timeStretchPreview.HideHostTransport = false;
         }
 
         if (_formatPreview.Previewing)
@@ -1821,6 +1836,13 @@ public partial class MainWindow
         || _pitchPreview.Previewing
         || _timeStretchPreview.Previewing;
 
+    private bool ActivePreviewHidesHostTransport =>
+        (_pitchPreview.Previewing && _pitchPreview.HideHostTransport)
+        || (_fadePreview.Previewing && _fadePreview.HideHostTransport)
+        || (_formatPreview.Previewing && _formatPreview.HideHostTransport)
+        || (_volumePreview.Previewing && _volumePreview.HideHostTransport)
+        || (_timeStretchPreview.Previewing && _timeStretchPreview.HideHostTransport);
+
     private long ActivePreviewStartedAt =>
         _fadePreview.Previewing
             ? _fadePreview.StartedAt
@@ -1851,6 +1873,7 @@ public partial class MainWindow
     private void StopPreviewToResume(EffectPreviewState preview)
     {
         preview.Previewing = false;
+        preview.HideHostTransport = false;
         PausePlaybackSoft();
         if (_document is not null)
         {

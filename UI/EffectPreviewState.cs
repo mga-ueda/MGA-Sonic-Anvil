@@ -9,6 +9,8 @@ internal sealed class EffectPreviewState
     public long StartedAt;
     public long SpaceTick;
     public long Origin;
+    /// <summary>true のとき本体波形／トランスポートの再生表示を動かさない（モーダル試聴用）。</summary>
+    public bool HideHostTransport;
 
     public bool IsTooSoon =>
         Previewing && Environment.TickCount64 - StartedAt < 250;

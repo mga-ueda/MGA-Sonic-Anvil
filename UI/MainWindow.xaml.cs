@@ -99,7 +99,6 @@ public partial class MainWindow : Window
     private System.Windows.Controls.ContextMenu? _fadeMenu;
     private System.Windows.Controls.ContextMenu? _formatMenu;
     private System.Windows.Controls.ContextMenu? _volumeMenu;
-    private System.Windows.Controls.ContextMenu? _pitchMenu;
     private System.Windows.Controls.ContextMenu? _timeStretchMenu;
     private System.Windows.Controls.ContextMenu? _silenceMenu;
     private System.Windows.Controls.ContextMenu? _silenceSelectionMenu;
@@ -810,7 +809,6 @@ public partial class MainWindow : Window
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
-        ClosePitchShiftPicker();
         CloseTimeStretchPicker();
         CloseInsertSilencePicker();
         CloseEditHistory(commit: true);

@@ -26,6 +26,18 @@ SS_API int ss_pitch_exact_interleaved(
     ss_progress_fn progress,
     void *user);
 
+/// Time-preserving pitch with a per-frame semitone curve (length == frames).
+/// Updates transpose frequently so automation is continuous, not stepped.
+SS_API int ss_pitch_curve_interleaved(
+    const float *input,
+    float *output,
+    int frames,
+    int channels,
+    int sample_rate,
+    const float *semitones_per_frame,
+    ss_progress_fn progress,
+    void *user);
+
 /// Streaming, time-preserving pitch. One instance per playback voice.
 SS_API void *ss_rt_create(void);
 SS_API void ss_rt_destroy(void *handle);

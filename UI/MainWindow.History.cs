@@ -41,7 +41,6 @@ public partial class MainWindow
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
         CloseVolumeGainPicker();
-        ClosePitchShiftPicker();
         CloseTimeStretchPicker();
         CloseInsertSilencePicker();
         CommitTimelineNudgeSession();
@@ -95,7 +94,6 @@ public partial class MainWindow
             && (CloseFadeCurvePicker()
                 || CloseFormatConvertPicker()
                 || CloseVolumeGainPicker()
-                || ClosePitchShiftPicker()
                 || CloseTimeStretchPicker()
                 || CloseInsertSilencePicker()))
         {
@@ -111,7 +109,6 @@ public partial class MainWindow
         if (CloseFadeCurvePicker()
             || CloseFormatConvertPicker()
             || CloseVolumeGainPicker()
-            || ClosePitchShiftPicker()
             || CloseTimeStretchPicker()
             || CloseInsertSilencePicker())
         {

@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using MgaSonicAnvil.Domain;
@@ -13,6 +14,10 @@ internal static class FadeCurveIcons
 {
     public const int IconSize = 18;
     public const int CanvasPad = 1;
+    /// <summary>クロスフェード／ピッチなど、形状を並べるボタン枠の一辺。</summary>
+    public const int ChoiceButtonSide = 28;
+    /// <summary>並べボタン内アイコンの描画サイズ（Create の pixelSize）。</summary>
+    public const int ChoiceIconPixelSize = 16;
 
     public static int WidthFor(int pixelSize) => Math.Max(8, pixelSize);
 
@@ -187,5 +192,102 @@ internal static class FadeCurveIcons
         PickerChrome.FitListMenu(menu);
         menu.IsOpen = true;
         return menu;
+    }
+
+    /// <summary>
+    /// ピッチ／クロスフェード共通の形状選択ボタン。
+    /// アイコン本体は <see cref="Create"/> と同じ経路。
+    /// </summary>
+    public static Border CreateChoiceButton(FadeShape shape, bool isFadeIn, string? toolTip = null)
+    {
+        var border = new Border
+        {
+            Tag = shape,
+            Width = ChoiceButtonSide,
+            Height = ChoiceButtonSide,
+            Margin = new Thickness(0, 0, 3, 0),
+            CornerRadius = DesignMetrics.ControlCorner,
+            BorderThickness = new Thickness(1),
+            BorderBrush = WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush")),
+            Background = WpfControlHelpers.FrozenBrush(Theme.Get("DialogInputBackBrush")),
+            Cursor = Cursors.Hand,
+            ToolTip = toolTip ?? UiStrings.LabelFadeCurve((int)shape),
+            Child = new Image
+            {
+                Source = Create(shape, isFadeIn, ChoiceIconPixelSize),
+                Stretch = Stretch.None,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                SnapsToDevicePixels = true,
+            },
+        };
+        ApplyChoiceButtonChrome(border, selected: false);
+        return border;
+    }
+
+    /// <summary>メイン数字キー／テンキー 1–9 → MenuOrder の 0 始まりインデックス。</summary>
+    public static bool TryDigitMenuIndex(Key key, out int index)
+    {
+        index = key switch
+        {
+            Key.D1 or Key.NumPad1 => 0,
+            Key.D2 or Key.NumPad2 => 1,
+            Key.D3 or Key.NumPad3 => 2,
+            Key.D4 or Key.NumPad4 => 3,
+            Key.D5 or Key.NumPad5 => 4,
+            Key.D6 or Key.NumPad6 => 5,
+            Key.D7 or Key.NumPad7 => 6,
+            Key.D8 or Key.NumPad8 => 7,
+            Key.D9 or Key.NumPad9 => 8,
+            _ => -1,
+        };
+        return index >= 0;
+    }
+
+    public static bool TryShapeFromDigitKey(Key key, bool isFadeIn, out FadeShape shape)
+    {
+        shape = FadeCurves.Default;
+        if (!TryDigitMenuIndex(key, out var index))
+        {
+            return false;
+        }
+
+        var order = FadeCurves.MenuOrder(isFadeIn);
+        if ((uint)index >= (uint)order.Count)
+        {
+            return false;
+        }
+
+        shape = order[index];
+        return true;
+    }
+
+    public static void ApplyChoiceButtonChrome(Border border, bool selected)
+    {
+        border.BorderBrush = WpfControlHelpers.FrozenBrush(
+            Theme.Get(selected ? "AccentCyanBrush" : "ChromeBorderBrush"));
+        border.BorderThickness = new Thickness(selected ? 2 : 1);
+        border.Background = WpfControlHelpers.FrozenBrush(
+            Theme.Get(selected ? "MenuHighlightBackBrush" : "DialogInputBackBrush"));
+    }
+
+    public static void WireChoiceButtonHover(
+        Border border,
+        Func<bool> isSelected,
+        Func<bool>? isEnabled = null)
+    {
+        border.MouseEnter += (_, _) =>
+        {
+            if (isEnabled is not null && !isEnabled())
+            {
+                return;
+            }
+
+            if (!isSelected())
+            {
+                border.Background = WpfControlHelpers.FrozenBrush(Theme.Get("TransportHoverBackBrush"));
+            }
+        };
+        border.MouseLeave += (_, _) => ApplyChoiceButtonChrome(border, isSelected());
     }
 }

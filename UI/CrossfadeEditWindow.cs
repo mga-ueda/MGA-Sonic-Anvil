@@ -827,25 +827,13 @@ internal sealed class CrossfadeEditWindow : Window
         foreach (var shape in order)
         {
             var capture = shape;
-            var frame = new Border
-            {
-                Width = 28,
-                Height = 28,
-                Margin = new Thickness(0, 0, 3, 0),
-                CornerRadius = DesignMetrics.ControlCorner,
-                BorderThickness = new Thickness(1),
-                BorderBrush = BrushOf("ChromeBorderBrush"),
-                Background = BrushOf("DialogInputBackBrush"),
-                Cursor = Cursors.Hand,
-                ToolTip = $"{legLabel}: {UiStrings.LabelFadeCurveShort((int)shape)}",
-                Child = new Image
-                {
-                    Source = FadeCurveIcons.Create(shape, isFadeIn, pixelSize: 16),
-                    Stretch = Stretch.None,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                },
-            };
+            var frame = FadeCurveIcons.CreateChoiceButton(
+                shape,
+                isFadeIn,
+                toolTip: $"{legLabel}: {UiStrings.LabelFadeCurveShort((int)shape)}");
+            FadeCurveIcons.WireChoiceButtonHover(
+                frame,
+                isSelected: () => row.Selected == capture);
             frame.MouseLeftButtonUp += (_, _) =>
             {
                 row.Selected = capture;
@@ -889,10 +877,7 @@ internal sealed class CrossfadeEditWindow : Window
         for (var i = 0; i < row.Buttons.Count; i++)
         {
             var match = i < row.Order.Count && row.Order[i] == row.Selected;
-            var frame = row.Buttons[i];
-            frame.BorderBrush = BrushOf(match ? "AccentCyanBrush" : "ChromeBorderBrush");
-            frame.BorderThickness = new Thickness(match ? 2 : 1);
-            frame.Background = BrushOf(match ? "MenuHighlightBackBrush" : "DialogInputBackBrush");
+            FadeCurveIcons.ApplyChoiceButtonChrome(row.Buttons[i], match);
         }
     }
 

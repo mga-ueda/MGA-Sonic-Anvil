@@ -55,7 +55,6 @@ public partial class MainWindow
 
         CloseFadeCurvePicker();
         CloseVolumeGainPicker();
-        ClosePitchShiftPicker();
         CloseTimeStretchPicker();
         CloseInsertSilencePicker();
         if (_formatMenu is { IsOpen: true })
