@@ -498,6 +498,99 @@ public sealed class CrossfadeEditTests
     }
 
     [Fact]
+    public void LoopMix_ReportsClipWhenEqualPowerStyleSumExceedsFullScale()
+    {
+        var frames = 200;
+        var samples = new float[frames];
+        Array.Fill(samples, 1f);
+        var document = new AudioDocument(samples, 48000, 1, 24, AudioFileKind.Wave, null);
+        var state = new CrossfadeEditState
+        {
+            StartFrame = 40,
+            EndFrame = 140,
+            PreCrossfadeFrames = 20,
+            PreOutShape = FadeShape.Exp3,
+            PreInShape = FadeShape.Linear,
+        };
+
+        var command = ProcessEdits.ApplyLoopMix(document, state, lowerClippedCrossfade: false, out var clip);
+        Assert.NotNull(command);
+        Assert.True(clip.ExceedsFullScale);
+        Assert.True(clip.Peak > 1f);
+
+        command!.Apply(document);
+        var bakedPeak = 0f;
+        for (var i = (int)(140 - 20); i < 140; i++)
+        {
+            bakedPeak = Math.Max(bakedPeak, Math.Abs(document.Interleaved[i]));
+        }
+
+        Assert.True(bakedPeak > 1f);
+    }
+
+    [Fact]
+    public void LoopMix_LowerClippedCrossfade_LowersEntireWaveformWithinFullScale()
+    {
+        var frames = 200;
+        var samples = new float[frames];
+        Array.Fill(samples, 1f);
+        var document = new AudioDocument(samples, 48000, 1, 24, AudioFileKind.Wave, null);
+        var state = new CrossfadeEditState
+        {
+            StartFrame = 40,
+            EndFrame = 140,
+            PreCrossfadeFrames = 20,
+            PostCrossfadeFrames = 20,
+            PreOutShape = FadeShape.Exp3,
+            PreInShape = FadeShape.Linear,
+            PostOutShape = FadeShape.Exp3,
+            PostInShape = FadeShape.Linear,
+        };
+
+        var command = ProcessEdits.ApplyLoopMix(document, state, lowerClippedCrossfade: true, out var clip);
+        Assert.NotNull(command);
+        Assert.False(clip.ExceedsFullScale);
+        Assert.True(command!.Persist!.Amount > 0);
+
+        command.Apply(document);
+        for (var i = 0; i < frames; i++)
+        {
+            Assert.InRange(Math.Abs(document.Interleaved[i]), 0f, 1f);
+        }
+
+        // クロスフェード外も同じ倍率で下がる（境界での段差を作らない）。
+        Assert.True(Math.Abs(document.Interleaved[0]) < 1f);
+        Assert.True(Math.Abs(document.Interleaved[100]) < 1f);
+        Assert.True(Math.Abs(document.Interleaved[199]) < 1f);
+    }
+
+    [Fact]
+    public void ConfirmCrossfadeClip_UsesYesNoWords()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            var japanese = UiStrings.ConfirmCrossfadeClip("1.5");
+            Assert.Contains("0 dBFS を 1.5 dB 超えています", japanese);
+            Assert.Contains("波形全体を下げて", japanese);
+            Assert.Contains("\n\nYes:", japanese);
+            Assert.Contains("\nNo:", japanese);
+
+            UiStrings.SetLanguage(UiLanguage.English);
+            var english = UiStrings.ConfirmCrossfadeClip("1.5");
+            Assert.Contains("1.5 dB over 0 dBFS", english);
+            Assert.Contains("lower the entire waveform", english);
+            Assert.Contains("\n\nYes:", english);
+            Assert.Contains("\nNo:", english);
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
     public void SnapToZeroCrossing_FindsSignChange()
     {
         var frames = 100;
