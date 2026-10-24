@@ -119,8 +119,8 @@ internal static partial class UiStrings
 
     public static string UntitledDocument => Get("untitled", "untitled");
 
-    public static string LabelAlwaysOnTop => Get("Always on Top", "Always on Top");
-    public static string LabelSilentSkip => Get("Silent Skip", "Silent Skip");
+    public static string LabelAlwaysOnTop => Get("Always on _Top", "Always on _Top");
+    public static string LabelSilentSkip => Get("_Silent Skip", "_Silent Skip");
     public static string LabelSilentSkipThreshold => Get(
         "無音しきい値（Silent Skip）",
         "Silence threshold (Silent Skip)");
@@ -131,11 +131,11 @@ internal static partial class UiStrings
         "スキップ時の無音挿入時間",
         "Silence insert duration on skip");
     public static string LabelConfirmRecordSilentSkip => Get(
-        "Silent Skip をオンにする",
-        "Turn on Silent Skip");
+        "_Silent Skip をオンにする",
+        "Turn on _Silent Skip");
     public static string LabelSilentSkipRecordAddRegion => Get(
-        "録音部分にリージョンを付加",
-        "Add regions to recorded parts");
+        "録音部分にリージョンを付加(_R)",
+        "Add _regions to recorded parts");
     public static string LabelMs => Get("ms", "ms");
     public static string ErrorSilentSkipRecordPadRange => Get(
         "スキップ時の無音挿入時間は 0 から 10000 の ms で入力してください。",
@@ -173,17 +173,17 @@ internal static partial class UiStrings
     public static string LabelLibraryPlaylistWaveformSizeS => Get("S（短）", "S (short)");
     public static string LabelLibraryPlaylistWaveformSizeM => Get("M（中）", "M (medium)");
     public static string LabelLibraryPlaylistWaveformSizeL => Get("L（長）", "L (long)");
-    public static string LabelGaplessPlayback => Get("ギャップレス再生", "Gapless playback");
+    public static string LabelGaplessPlayback => Get("ギャップレス再生(_G)", "_Gapless playback");
     public static string LabelLibraryPlaylistDocuments => Get(
         "プレイリストに載せる書類・動画",
         "Documents and video in the playlist");
-    public static string LabelLibraryShowPlaylistPdf => Get("PDF", "PDF");
-    public static string LabelLibraryShowPlaylistMov => Get("MOV", "MOV");
-    public static string LabelLibraryShowPlaylistMp4 => Get("MP4", "MP4");
-    public static string LabelLibraryShowPlaylistAvi => Get("AVI", "AVI");
-    public static string LabelLibraryShowPlaylistMkv => Get("MKV", "MKV");
-    public static string LabelLibraryShowPlaylistWebm => Get("WebM", "WebM");
-    public static string LabelLibraryShowPlaylistMpg => Get("MPG", "MPG");
+    public static string LabelLibraryShowPlaylistPdf => Get("PDF (_P)", "PDF (_P)");
+    public static string LabelLibraryShowPlaylistMov => Get("MOV (_O)", "MOV (_O)");
+    public static string LabelLibraryShowPlaylistMp4 => Get("MP4 (_4)", "MP4 (_4)");
+    public static string LabelLibraryShowPlaylistAvi => Get("AVI (_V)", "AVI (_V)");
+    public static string LabelLibraryShowPlaylistMkv => Get("MKV (_K)", "MKV (_K)");
+    public static string LabelLibraryShowPlaylistWebm => Get("WebM (_W)", "WebM (_W)");
+    public static string LabelLibraryShowPlaylistMpg => Get("MPG (_1)", "MPG (_1)");
     public static string LabelVideoProxyRetention => Get(
         "未使用プロキシの保存日数",
         "Unused proxy retention");
@@ -196,8 +196,8 @@ internal static partial class UiStrings
         "FFmpeg|ffmpeg.exe|実行ファイル|*.exe|すべて|*.*",
         "FFmpeg|ffmpeg.exe|Executable|*.exe|All|*.*");
     public static string LabelVideoProxyDisableAutoEncode => Get(
-        "プロキシを自動生成しない",
-        "Do not auto-build proxies");
+        "プロキシを自動生成しない(_D)",
+        "_Do not auto-build proxies");
     public static string LabelVideoProxyUsage(long bytes) =>
         Format("現在の容量: {0}", "Current size: {0}", FormatFileBytesCompact(bytes));
     public static string ButtonVideoProxyClearAll => Get("すべて削除", "Delete all");
@@ -227,7 +227,7 @@ internal static partial class UiStrings
     public static string LabelSpeaker => Get("スピーカー", "Speakers");
     public static string LabelSpeakerIo => Get("スピーカーと入出力", "Speakers and I/O");
     public static string LabelSpeakerVisibility => Get("有効にするスピーカー定義", "Speaker definitions to enable");
-    public static string LabelAutoSpeakerSelect => Get("自動スピーカー選択", "Auto speaker selection");
+    public static string LabelAutoSpeakerSelect => Get("自動スピーカー選択(_S)", "Auto _speaker selection");
     public static string ButtonSineMinusTwenty => Get("Sine -20 dB", "Sine -20 dB");
     public static string ButtonChannelVoice => Get("Voice", "Voice");
     public static string LabelPortOff => Get("なし", "Off");
@@ -478,7 +478,7 @@ internal static partial class UiStrings
     public static string LabelInsertSilence => Get("無音を挿入", "Insert silence");
     public static string LabelSilenceSelection => Get("選択範囲を無音化", "Mute selection");
     public static string LabelSilenceSeconds => Get("秒数", "Seconds");
-    public static string LabelInsertSilenceEdgeFade => Get("前後に既定のフェード", "Default fade on both sides");
+    public static string LabelInsertSilenceEdgeFade => Get("前後に既定のフェード(_F)", "Default _fade on both sides");
     public static string LabelSecondsUnit => Get("秒", "s");
     public static string LabelTimeStretch => Get("タイムストレッチ", "Time stretch");
     public static string LabelTimeStretchSource => Get("元の時間", "Original");
@@ -587,7 +587,7 @@ internal static partial class UiStrings
     public static string LabelPitchCurveShape => Get("カーブ形状", "Curve Shape");
 
     /// <summary>ピッチカーブエディタの数値欄ラベル。Alt+N でフォーカス。</summary>
-    public static string LabelPitchCurvePitchValue => Get("ピッチ(_N)", "_Pitch");
+    public static string LabelPitchCurvePitchValue => Get("ピッチ(_N)", "Pitch (_N)");
 
     public static string LabelPitchCurveSnapToScale => Get(
         "音階にスナップする(_S)",
@@ -1013,7 +1013,40 @@ internal static partial class UiStrings
         _ => LibraryColumnName,
     };
 
-    /// <summary>プレイリスト見出し用。長い名前は改行して列幅を抑える。設定チェックは <see cref="LibraryColumnLabel"/>。</summary>
+    /// <summary>設定の列チェック用。見出し <see cref="LibraryColumnLabel"/> とは別（アクセスキー付き）。</summary>
+    public static string LibraryColumnCheckLabel(LibraryFileColumn column) => column switch
+    {
+        LibraryFileColumn.Title => Get("タイトル(_T)", "_Title"),
+        LibraryFileColumn.Artist => Get("アーティスト(_A)", "_Artist"),
+        LibraryFileColumn.AlbumArtist => Get("アルバムアーティスト(_B)", "Album artist (_B)"),
+        LibraryFileColumn.Album => Get("アルバム(_M)", "Albu_m"),
+        LibraryFileColumn.Track => Get("トラック(_K)", "Trac_k"),
+        LibraryFileColumn.Disc => Get("ディスク(_I)", "D_isc"),
+        LibraryFileColumn.Year => Get("年(_Y)", "_Year"),
+        LibraryFileColumn.Genre => Get("ジャンル(_G)", "_Genre"),
+        LibraryFileColumn.Composer => Get("作曲(_O)", "C_omposer"),
+        LibraryFileColumn.Comment => Get("コメント(_C)", "_Comment"),
+        LibraryFileColumn.Kind => Get("種類(_D)", "Kin_d"),
+        LibraryFileColumn.Duration => Get("時間(_E)", "Tim_e"),
+        LibraryFileColumn.SampleRate => Get("レート(_R)", "_Rate"),
+        LibraryFileColumn.BitDepth => Get("ビット(_H)", "Bits (_H)"),
+        LibraryFileColumn.Channels => Get("Ch (_P)", "Ch (_P)"),
+        LibraryFileColumn.BitRate => Get("ビットレート(_Z)", "Bit rate (_Z)"),
+        LibraryFileColumn.Size => Get("サイズ(_S)", "_Size"),
+        LibraryFileColumn.Date => Get("日付(_Q)", "Date (_Q)"),
+        LibraryFileColumn.Folder => Get("フォルダ(_F)", "_Folder"),
+        LibraryFileColumn.ParentFolder => Get("親フォルダ(_U)", "Parent folder (_U)"),
+        LibraryFileColumn.Waveform => Get("波形表示(_W)", "_Waveform"),
+        LibraryFileColumn.Jacket => Get("ジャケット(_J)", "_Jacket"),
+        LibraryFileColumn.VideoSize => Get("解像度(_X)", "Resol_ution"),
+        LibraryFileColumn.FrameRate => Get("フレームレート(_2)", "Frame rate (_2)"),
+        LibraryFileColumn.VideoCodec => Get("映像コーデック(_V)", "_Video codec"),
+        LibraryFileColumn.AudioCodec => Get("音声コーデック(_3)", "Audio codec (_3)"),
+        LibraryFileColumn.Loudness => Get("ラウドネス(_L)", "_Loudness"),
+        _ => Get("ファイル(_N)", "_File"),
+    };
+
+    /// <summary>プレイリスト見出し用。長い名前は改行して列幅を抑える。設定チェックは <see cref="LibraryColumnCheckLabel"/>。</summary>
     public static string LibraryColumnHeader(LibraryFileColumn column) => column switch
     {
         LibraryFileColumn.BitRate => Get("ビット\nレート", "Bit\nrate"),
@@ -1028,14 +1061,14 @@ internal static partial class UiStrings
     public static string LibraryExplorerLabel => Get("ライブラリ", "Library");
     public static string LibraryPlaylistLabel => Get("プレイリスト", "Playlist");
     public static string LibrarySearchHint => Get("検索", "Find");
-    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（マニュアル側）。Alt+R 連想のため Random。</summary>
-    public static string LabelLibraryShuffle => "Random";
-    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（マニュアル側）。</summary>
-    public static string LabelLibraryAutoPlay => "Auto Play";
-    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（マニュアル側）。</summary>
-    public static string LabelLibraryAutoPlayNext => "Auto Next";
-    /// <summary>ステータスバーの Auto Loop。UI 言語に関わらず英語。ショートカットはマニュアル側（Alt+L）。</summary>
-    public static string LabelLibraryAutoLoop => "Auto Loop";
+    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。Alt+R。</summary>
+    public static string LabelLibraryShuffle => "_Random";
+    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。Alt+P。</summary>
+    public static string LabelLibraryAutoPlay => "Auto _Play";
+    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。Alt+N。</summary>
+    public static string LabelLibraryAutoPlayNext => "Auto _Next";
+    /// <summary>ステータスバーの Auto Loop。UI 言語に関わらず英語。Alt+L。</summary>
+    public static string LabelLibraryAutoLoop => "Auto _Loop";
     /// <summary>Auto Loop の動作説明（サンプルループあり＝頭通し後に S–E 無限、無し＝曲末→先頭）。</summary>
     public static string TipLibraryAutoLoop => Get(
         "オン時: サンプルループがあれば頭（または再生位置）から通し、ループ終端で始点へ無限ループ。無ければ曲末で先頭へ戻す。選択や A-B があるときはそちらを優先。",
