@@ -2127,6 +2127,8 @@ public partial class MainWindow
             settings.ResolvedFadeOutCurve(),
             UiStrings.ParseLanguageChoice(settings.UiLanguage),
             settings.ResolvedLoudnessTargetLufs(),
+            settings.ResolvedMonitorDimDb(),
+            settings.ResolvedMonitorLowCutHz(),
             settings.ResolvedSilentSkipThresholdDb(),
             settings.ResolvedSilentSkipRecordPadMs(),
             settings.ResolvedClickGuardFadeMs(),
@@ -2238,6 +2240,8 @@ public partial class MainWindow
         UiScaleService.ApplyFromSettings();
         settings.ApplyDefaultFades(dialog.FadeInCurve, dialog.FadeOutCurve);
         settings.LoudnessTargetLufs = dialog.SelectedLoudnessTargetLufs;
+        settings.MonitorDimDb = dialog.SelectedMonitorDimDb;
+        settings.MonitorLowCutHz = dialog.SelectedMonitorLowCutHz;
         settings.SilentSkipThresholdDb = dialog.SelectedSilentSkipThresholdDb;
         settings.SilentSkipRecordPadMs = dialog.SelectedSilentSkipRecordPadMs;
         settings.ClickGuardFadeMs = dialog.SelectedClickGuardFadeMs;
@@ -2263,6 +2267,7 @@ public partial class MainWindow
         LoudnessMeter.ApplyTargetFromSettings();
         LibraryBrowser.ApplyLoudnessTarget(settings.ResolvedLoudnessTargetLufs());
         ForEachWaveform(view => view.LoudnessTargetLufs = settings.ResolvedLoudnessTargetLufs());
+        ApplyMonitorMixFromSettings();
         ApplySilentSkipFromSettings();
         RefreshSpeakerMenu();
         SyncMonitorLayout();

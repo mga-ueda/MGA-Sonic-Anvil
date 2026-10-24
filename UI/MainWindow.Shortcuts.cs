@@ -982,16 +982,48 @@ public partial class MainWindow
             return true;
         }
 
-        // プレイヤーでも Silent Skip / Always on Top はステータスバー非表示の F8／F9 中も効かせる。
+        // ステータスバー系は F8／F9 でバーが隠れても、エディタ／プレイヤー共通で効かせる。
         if (key == Key.S && modifiers == ModifierKeys.Alt)
         {
             SilentSkipCheck.IsChecked = SilentSkipCheck.IsChecked != true;
             return true;
         }
 
-        if (key == Key.A && modifiers == ModifierKeys.Alt)
+        if (key == Key.T && modifiers == ModifierKeys.Alt)
         {
             AlwaysOnTopCheck.IsChecked = AlwaysOnTopCheck.IsChecked != true;
+            return true;
+        }
+
+        // Auto Loop はステータスバー（Silent Skip の右）。プレイヤー限定にするとエディタで効かない。
+        if (LibraryPlayerMode.IsAutoLoopToggle(key, modifiers))
+        {
+            LibraryBrowser.ToggleAutoLoop();
+            return true;
+        }
+
+        // モニター列（MONO／DIM／LC／BPM）。エディタ／プレイヤー共通。ボタン操作と同じ。
+        if (LibraryPlayerMode.IsMonitorMonoToggle(key, modifiers))
+        {
+            MonitorToggles.ToggleMono();
+            return true;
+        }
+
+        if (LibraryPlayerMode.IsMonitorDimToggle(key, modifiers))
+        {
+            MonitorToggles.ToggleDim();
+            return true;
+        }
+
+        if (LibraryPlayerMode.IsMonitorLowCutToggle(key, modifiers))
+        {
+            MonitorToggles.ToggleLowCut();
+            return true;
+        }
+
+        if (LibraryPlayerMode.IsMonitorBpmCycle(key, modifiers))
+        {
+            MonitorToggles.CycleBpmMode();
             return true;
         }
 
@@ -1127,15 +1159,7 @@ public partial class MainWindow
             return true;
         }
 
-        // Alt+L は曲末ループ。素の L（ループ再生）より先、タイプアヘッド／検索入力より先。
-        if (IsLibraryMaximized
-            && !IsLibraryGroupComboFocused
-            && !ImeComposition.IsComposing
-            && LibraryPlayerMode.IsAutoLoopToggle(key, modifiers))
-        {
-            LibraryBrowser.ToggleAutoLoop();
-            return true;
-        }
+        // Alt+L（Auto Loop）は先頭のステータスバー系で処理済み。
 
         // Alt+P は Enter 追加時の自動再生。素の P（前の曲）より先、タイプアヘッド／検索入力より先。
         if (IsLibraryMaximized

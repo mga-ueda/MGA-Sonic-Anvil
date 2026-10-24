@@ -546,6 +546,61 @@
                         VerticalAlignment="Center"
                         VerticalContentAlignment="Center" />
 
+              <TextBlock x:Name="MonitorHeader"
+                         Text="{x:Static domain:UiStrings.LabelMonitor}"
+                         FontWeight="Bold"
+                         FontSize="11.333"
+                         Margin="0,0,0,6" />
+              <Grid HorizontalAlignment="Left" Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="MonitorDimLabel"
+                           Text="{x:Static domain:UiStrings.LabelMonitorDimAmount}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <TextBox x:Name="MonitorDimBox"
+                         Grid.Column="1"
+                         Width="{x:Static ui:DesignMetrics.SettingsLoudnessBoxWidth}"
+                         Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                         Style="{StaticResource DarkTextBoxStyle}"
+                         Padding="6,1"
+                         FontSize="11.333"
+                         TextAlignment="Center"
+                         VerticalContentAlignment="Center"
+                         InputMethod.IsInputMethodEnabled="False" />
+                <TextBlock x:Name="MonitorDimUnit"
+                           Grid.Column="2"
+                           Text="{x:Static domain:UiStrings.LabelDb}"
+                           VerticalAlignment="Center"
+                           Margin="8,0,16,0" />
+                <TextBlock x:Name="MonitorLowCutLabel"
+                           Grid.Column="3"
+                           Text="{x:Static domain:UiStrings.LabelMonitorLowCutCutoff}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <TextBox x:Name="MonitorLowCutBox"
+                         Grid.Column="4"
+                         Width="{x:Static ui:DesignMetrics.SettingsLoudnessBoxWidth}"
+                         Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                         Style="{StaticResource DarkTextBoxStyle}"
+                         Padding="6,1"
+                         FontSize="11.333"
+                         TextAlignment="Center"
+                         VerticalContentAlignment="Center"
+                         InputMethod.IsInputMethodEnabled="False" />
+                <TextBlock x:Name="MonitorLowCutUnit"
+                           Grid.Column="5"
+                           Text="{x:Static domain:UiStrings.LabelHertz}"
+                           VerticalAlignment="Center"
+                           Margin="8,0,0,0" />
+              </Grid>
+
               <TextBlock x:Name="SpeakerIoHeader"
                          Text="{x:Static domain:UiStrings.LabelSpeakerIo}"
                          FontWeight="Bold"

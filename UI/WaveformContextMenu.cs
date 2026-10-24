@@ -870,7 +870,7 @@ internal static class WaveformContextMenuBuilder
         Check(UiStrings.WaveMenuMaximizeLibrary, WaveMenuCommand.MaximizeLibrary, "F10", m.LibraryMaximized, enabled: true),
         Check(UiStrings.WaveMenuMinimalChrome, WaveMenuCommand.MinimalChrome, "F9", m.MinimalChrome, !m.IsBusy),
         Check(UiStrings.WaveMenuVideoMini, WaveMenuCommand.VideoMini, "F8", m.VideoMini, m.CanToggleVideoMini && !m.IsBusy),
-        Check(UiStrings.WaveMenuAlwaysOnTop, WaveMenuCommand.AlwaysOnTop, "Alt+A", m.AlwaysOnTop, enabled: true),
+        Check(UiStrings.WaveMenuAlwaysOnTop, WaveMenuCommand.AlwaysOnTop, "Alt+T", m.AlwaysOnTop, enabled: true),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> VideoChromeItems(WaveformContextMenuModel m) =>

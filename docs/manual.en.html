@@ -247,6 +247,8 @@
           <li><strong>Record / playback ports and Ch</strong> — speaker names come from the layout, port names from the device. Ch is shared by record and playback. Off leaves the speaker unused. Record has level meters.</li>
           <li><strong>Test tone</strong> — per-playback-port Sine -20 dB (1 kHz, or 80 Hz on LFE) plus an English spoken channel-name Voice (not on LFE).</li>
           <li>Stereo playback with no ports chosen still mixes the speakers to left and right.</li>
+          <li><strong>DIM attenuation</strong> — how much the monitor <span class="ui">DIM</span> button lowers the level. Default −15 dB (−60 to 0). On/off is session-only.</li>
+          <li><strong>Low-cut frequency</strong> — reference frequency for the monitor <span class="ui">LC</span> low shelf. Default 120 Hz (range 20–500 Hz; same span as RME TotalMix Lo Cut frequency). Gain is fixed at −20 dB (not adjustable in Settings). The filter is an RBJ low shelf (one biquad, Q≈0.707≈1/√2). The lows asymptote near −20 dB and do not roll off toward −∞ dB the way a high-pass does. On/off is session-only.</li>
         </ul>
         <h4>Player</h4>
         <p><strong>Gapless playback</strong> is first (on by default; see <a href="#layout-gapless">Gapless playback</a>). Then the left tree roots. Default is Music. Add, remove, and reorder top to bottom. Missing registrations show in red. You can also add a root from the tree’s right-click / menu key <strong>Register as Tree Root</strong>, or by dropping folders from Explorer onto the tree (<strong>Remove Tree Root</strong> when it is already a root). Reorder with Settings Up / Down, <kbd>Alt</kbd>+↑ / ↓ on a selected root, the tree’s right-click <strong>Move Root Up / Down</strong>, or by dragging a root within the tree.</p>
@@ -325,7 +327,7 @@
           </li>
           <li><kbd>F9</kbd> shows only the playlist and waveform (to save desktop space; from any mode).
             <ul>
-              <li>Library, Favorites, meters, analyzers, transport, and status bar stay hidden. Alt+S Silent Skip and Alt+A Always on Top still work.</li>
+              <li>Library, Favorites, meters, analyzers, transport, and status bar stay hidden. Alt+S Silent Skip and Alt+T Always on Top still work.</li>
               <li>F9 again returns to the editor (stops playback, then keeps only the selected files and clears tab multi-selection).</li>
               <li>F10 returns to the normal player and keeps playback going.</li>
             </ul>
@@ -622,7 +624,7 @@
         <ul>
           <li>Top row is playback and zoom. Second row is fade / normalize / delete / new / save / MP3 output, and manual <span class="ui">?</span>. Transport buttons show a short tooltip (with the shortcut). For full details, see this manual.</li>
           <li><span class="ui">Marker click</span> (<kbd>Q</kbd>) — plays clicks at marker / region edges. Uses the selection when present, otherwise the whole file. Toggle with the button or <kbd>Q</kbd> (off by default; never auto-on). Also available from waveform right-click → Playback. In the player during real video playback / frame pause / bright PDF view, same as <kbd>Escape</kbd> — returns to the dim preview (in the F8 / argument-launch mini, Escape / Q return to the playlist (Escape clears In/Out and stays when In/Out is set); marker click does not run in the player).</li>
-          <li>The company logo and license sit under the buttons (license to the right of the logo). The logo opens the company site. GitHub opens the repository, MIT License the full text, LAME the project site. The Wwise® / Audiokinetic® trademark line is included.</li>
+          <li>The company logo and license sit under the buttons (license to the right of the logo). The logo opens the company site. GitHub opens the repository, MIT License this app’s full text, LAME / FFmpeg each project site, and EffeTune the bundled third-party notices (MIT full text and training-data attribution; also from the lower-left link). The Wwise® / Audiokinetic® trademark line is included. See <a href="#trademarks">Trademarks and license</a>.</li>
         </ul>
       </article>
 
@@ -656,12 +658,21 @@
       <article class="part" id="layout-top">
         <h3>Always on Top</h3>
         <p class="where">Right of Silent Skip, left of <span class="ui">SPEAKER</span></p>
-        <p>Keeps the window in front. Toggle with <kbd>Alt</kbd>+<kbd>A</kbd>.</p>
+        <p>Keeps the window in front. Toggle with <kbd>Alt</kbd>+<kbd>T</kbd>.</p>
       </article>
 
       <article class="part" id="layout-meters">
         <h3>Spectrum / loudness / meters / vector scope</h3>
         <p>A view of the playback output.</p>
+        <h4>Monitor column (BPM / MONO / DIM / LC)</h4>
+        <p class="where">Between loudness and the spectrum. Same in the editor and the player.</p>
+        <ul>
+          <li><span class="ui">BPM</span> (<kbd>Alt</kbd>+<kbd>B</kbd>) — off / on (off by default; session-only; the label stays BPM). When on, analysis, the tempo readout, and the beat click are all enabled. The tempo number sits above the button. The displayed BPM is not EffeTune’s half/double-tempo reading; it is recomputed from detected beat intervals as <code>60000 ÷ interval_ms</code>. The click uses the same beat timing.</li>
+          <li><span class="ui">MONO</span> (<kbd>Alt</kbd>+<kbd>M</kbd>) — sum L+R for the monitor. Off by default. Session-only.</li>
+          <li><span class="ui">DIM</span> (<kbd>Alt</kbd>+<kbd>D</kbd>) — attenuate the monitor. Amount is on the Audio tab in Settings (default −15 dB). On/off is session-only.</li>
+          <li><span class="ui">LC</span> (<kbd>Alt</kbd>+<kbd>C</kbd>) — low shelf on the monitor. Frequency is on the Audio tab in Settings (default 120 Hz, 20–500). Gain fixed at −20 dB. RBJ low shelf (Q≈0.707); lows plateau near −20 dB. On/off is session-only. See the Audio tab notes for full filter details.</li>
+        </ul>
+
         <h4>Loudness</h4>
         <p>Sits left of the spectrum. Short Term / Integrated / Momentary Max, Loudness Range, True Peak. Target LKFS is in Settings. Blue = at or below the target, orange = up to +3 LU above it, red = above that.</p>
         <ul>
@@ -703,7 +714,7 @@
         <ul>
           <li><strong>File position</strong> — with two or more files open, the front shows the position and count, e.g. <code>1 / 10 Files</code>.</li>
           <li><strong>Format</strong> — name is on the tab. Sample rate / bit depth / channels turn red after conversion until you save. MP3 / M4A also show bit rate. Size is MB (MiB / B), and turns red as an estimate after conversion or a range delete that changes length.</li>
-          <li><strong>Silent Skip and Always on Top</strong> — left of <span class="ui">SPEAKER</span>. Silent Skip is <kbd>Alt</kbd>+<kbd>S</kbd>. Always on Top is <kbd>Alt</kbd>+<kbd>A</kbd>. Skips silence on playback, and records only above the threshold. Threshold is in Settings.</li>
+          <li><strong>Silent Skip and Always on Top</strong> — left of <span class="ui">SPEAKER</span>. Silent Skip is <kbd>Alt</kbd>+<kbd>S</kbd>. Always on Top is <kbd>Alt</kbd>+<kbd>T</kbd>. Skips silence on playback, and records only above the threshold. Threshold is in Settings.</li>
           <li><strong><span class="ui">SPEAKER</span></strong> — switches the speaker layout. Same list as Shown. The definition in use stays listed until you switch away. Auto speaker selection, off by default, switches to a matching enabled definition.</li>
           <li><strong>Times</strong> — current / selection start / selection length / selection end / total. All but total are editable. Wheel / ↑↓ nudge: time by 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min, samples by 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000. Right-click switches time and samples.</li>
         </ul>
@@ -1058,6 +1069,10 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>With waveform focus only: play from 3 seconds earlier (preroll; not used on the playlist)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from the playback start (while the tile search box has focus, closes tiles that did not match instead)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>S</kbd></td><td>Silent Skip (skip silent stretches on playback; record only above the threshold)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>B</kbd></td><td>Monitor <span class="ui">BPM</span> (off / on; when on, display + click; display from beat intervals)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>M</kbd></td><td>Monitor <span class="ui">MONO</span> (sum L+R)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>D</kbd></td><td>Monitor <span class="ui">DIM</span> (attenuation; amount on Settings → Audio)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>C</kbd></td><td>Monitor <span class="ui">LC</span> (low-shelf −20 dB fixed; frequency on Settings → Audio)</td></tr>
           <tr><td><kbd>L</kbd></td><td>Loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Auto Loop</span> (with a sample loop: intro passthrough then S–E forever; without: restart at end; selection / A-B take priority; separate from plain <kbd>L</kbd>)</td></tr>
           <tr><td><kbd>J</kbd> / <kbd>K</kbd></td><td>Skip 5 s back / forward (0.75 s crossfade; hold repeats after a short wait)</td></tr>
@@ -1095,7 +1110,7 @@
           <tr><td><kbd>Shift</kbd>+<kbd>V</kbd></td><td>Return to the waveform (from any view)</td></tr>
           <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Solo a channel (next / previous; past the last clears it; or click a name on the left; Ctrl+click adds; Shift+click mutes / unmutes; the time selection does not change; edits stay on those lanes; muted lanes go gray)</td></tr>
           <tr><td><kbd>G</kbd></td><td>Edit NOW POS in the status bar</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>A</kbd></td><td>Always on Top (pin / unpin the window; works in every mode, including F8 / F9)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>T</kbd></td><td>Always on Top (pin / unpin the window; works in every mode, including F8 / F9)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></td><td>Color settings (dark UI)</td></tr>
         </tbody>
       </table>
@@ -1314,7 +1329,7 @@
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td><kbd>F8</kbd></td><td>Video / PDF mini player (toggle; no playlist / transport; window client area matches the video / PDF page aspect at native size; the window center is remembered as you move it and reused (center-aligned) for the next real video play; <kbd>+</kbd> / <kbd>-</kbd> (keyboard and numpad only) always land on 25% steps (after a free border drag, the next key snaps to the nearest 25%; keys pause at native size; 25–300%; aspect locked; scale remembered until you leave F8); drag the window border for continuous resize (not 25% steps; aspect locked; no mouse-wheel resize). <kbd>A</kbd> / <kbd>T</kbd> visibility is shared with argument launch (both on by default; a change is remembered for real playback and the mini and used from then on). Enter when a video or PDF is on the back stage (real playback or the dim background preview) and the playlist has something to play; opening video via association or arguments enters it automatically. <kbd>F8</kbd> again returns to the normal player and keeps playback going. <kbd>Escape</kbd> / <kbd>Q</kbd> quits the app. <kbd>F9</kbd> / <kbd>F10</kbd> return to the playlist (stop real playback). <kbd>F11</kbd> / <kbd>F12</kbd> do not take video / PDF at all, including as audio-only</td></tr>
-          <tr><td><kbd>F9</kbd></td><td>Shows only the playlist and waveform (toggle; off by default; for when you want to save desktop space). Available from any mode. The library, Favorites, level meters, analyzers, transport, and status bar stay hidden. Alt+S (Silent Skip) and Alt+A (Always on Top) still work. <kbd>F9</kbd> again returns to the editor (stops playback, then keeps only the selected files and clears tab multi-selection). <kbd>F10</kbd> returns to the normal F10 player and keeps playback going. Each mode remembers its own window position and size</td></tr>
+          <tr><td><kbd>F9</kbd></td><td>Shows only the playlist and waveform (toggle; off by default; for when you want to save desktop space). Available from any mode. The library, Favorites, level meters, analyzers, transport, and status bar stay hidden. Alt+S (Silent Skip) and Alt+T (Always on Top) still work. <kbd>F9</kbd> again returns to the editor (stops playback, then keeps only the selected files and clears tab multi-selection). <kbd>F10</kbd> returns to the normal F10 player and keeps playback going. Each mode remembers its own window position and size</td></tr>
           <tr><td><kbd>F1</kbd> / <kbd>F3</kbd></td><td>Unassigned (they no longer focus the tree, Favorites, or the playlist)</td></tr>
           <tr><td><kbd>F2</kbd></td><td>Rename. Tree: the selected folder. Favorites: the selected folder on disk. Playlist: the selected file. Full paths in the catalog are rewritten; <kbd>Ctrl</kbd>+<kbd>F5</kbd> is not required. Separate from Rename File in the editor</td></tr>
           <tr><td><kbd>F7</kbd></td><td>Tree only. Create a new folder directly under the selection, with the name you type. No-op in Favorites and on the playlist</td></tr>
@@ -1425,7 +1440,8 @@
         <li>This app is released under the <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/LICENSE">MIT License</a>.</li>
         <li><strong>LAME</strong> is the name of the LAME project. It is not included. The app only runs the <code>lame.exe</code> you set in Settings. Getting LAME and following its license is up to you.</li>
         <li><strong>FFmpeg</strong> is the name of the FFmpeg project. It is not included. The app only runs the <code>ffmpeg.exe</code> you set in Settings. Empty or invalid skips the video proxy. Getting FFmpeg and following its license is up to you.</li>
-        <li><strong>Signalsmith Stretch</strong> is the library used for pitch change.</li>
+        <li><strong>Signalsmith Stretch</strong> (Signalsmith Audio, MIT) is bundled for pitch change. The full MIT text is in <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>.</li>
+        <li><strong>EffeTune</strong> (Copyright © 2025–2026 Yoshiyuki Kobayashi, MIT) Rhythm Analyzer DSP is used for BPM / beat analysis when the monitor BPM control is on. The on-screen tempo is not EffeTune’s half/double-tempo reading; it is recomputed from detected beat intervals as <code>60000 ÷ interval_ms</code>. The click while BPM is on follows the same beat timing. The code and frozen weights are redistributed under MIT; original training audio is not included. The full MIT text and training-data attribution (Slakh2100-redux / Groove MIDI and other CC BY 4.0 credits, plus T48M training-set names) are in the bundled <code>THIRD_PARTY_NOTICES.md</code> (lower-left <span class="ui">EffeTune</span> link, or the repository <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>). Upstream: <a href="https://github.com/Frieve-A/effetune">Frieve-A/effetune</a>.</li>
       </ul>
       <footer>© MIYABI GAME AUDIO INC. — MGA Sonic Anvil User Manual (en)</footer>
     </main>

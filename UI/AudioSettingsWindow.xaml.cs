@@ -38,6 +38,12 @@ internal partial class AudioSettingsWindow : Window
 
     public double SelectedLoudnessTargetLufs { get; private set; }
 
+    public double SelectedMonitorDimDb { get; private set; } =
+        PlaybackSampleProvider.DefaultMonitorDimDb;
+
+    public double SelectedMonitorLowCutHz { get; private set; } =
+        PlaybackSampleProvider.DefaultMonitorLowCutHz;
+
     public double SelectedSilentSkipThresholdDb { get; private set; }
 
     public int SelectedSilentSkipRecordPadMs { get; private set; }
@@ -154,6 +160,8 @@ internal partial class AudioSettingsWindow : Window
         FadeShape fadeOut,
         UiLanguageChoice language,
         double loudnessTargetLufs,
+        double monitorDimDb,
+        double monitorLowCutHz,
         double silentSkipThresholdDb,
         int silentSkipRecordPadMs,
         int clickGuardFadeMs,
@@ -200,6 +208,8 @@ internal partial class AudioSettingsWindow : Window
         SelectedUiScalePercent = UiScale.ClampPercent(uiScalePercent);
         _uiScaleOpenedAt = SelectedUiScalePercent;
         SelectedLoudnessTargetLufs = LoudnessMeterEngine.ClampTargetLufs(loudnessTargetLufs);
+        SelectedMonitorDimDb = PlaybackSampleProvider.ClampMonitorDimDb(monitorDimDb);
+        SelectedMonitorLowCutHz = PlaybackSampleProvider.ClampMonitorLowCutHz(monitorLowCutHz);
         SelectedSilentSkipThresholdDb = SilentSkip.ClampThresholdDb(silentSkipThresholdDb);
         SelectedSilentSkipRecordPadMs = SilentSkip.ClampRecordPadMs(silentSkipRecordPadMs);
         SelectedClickGuardFadeMs = ClickGuard.ClampFadeMs(clickGuardFadeMs);
@@ -354,6 +364,8 @@ internal partial class AudioSettingsWindow : Window
         LoadSpeakerEditors(FindPreset(SelectedActiveSpeakerId) ?? _presets[0], releaseDevice: false);
         RebuildRouting();
         LoudnessTargetBox.Text = SelectedLoudnessTargetLufs.ToString("0.#", CultureInfo.InvariantCulture);
+        MonitorDimBox.Text = SelectedMonitorDimDb.ToString("0.#", CultureInfo.InvariantCulture);
+        MonitorLowCutBox.Text = SelectedMonitorLowCutHz.ToString("0.#", CultureInfo.InvariantCulture);
         SilentSkipThresholdBox.Text = SelectedSilentSkipThresholdDb.ToString("0.#", CultureInfo.InvariantCulture);
         SilentSkipRecordPadBox.Text = SelectedSilentSkipRecordPadMs.ToString(CultureInfo.InvariantCulture);
         ClickGuardFadeBox.Text = SelectedClickGuardFadeMs.ToString(CultureInfo.InvariantCulture);
@@ -1234,6 +1246,34 @@ internal partial class AudioSettingsWindow : Window
         }
 
         SelectedLoudnessTargetLufs = target;
+        if (!PlaybackSampleProvider.TryParseMonitorDimDb(MonitorDimBox.Text, out var dimDb))
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorMonitorDimDbRange,
+                UiStrings.DialogSettingsTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            MonitorDimBox.Focus();
+            MonitorDimBox.SelectAll();
+            return;
+        }
+
+        SelectedMonitorDimDb = dimDb;
+        if (!PlaybackSampleProvider.TryParseMonitorLowCutHz(MonitorLowCutBox.Text, out var lowCutHz))
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorMonitorLowCutHzRange,
+                UiStrings.DialogSettingsTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            MonitorLowCutBox.Focus();
+            MonitorLowCutBox.SelectAll();
+            return;
+        }
+
+        SelectedMonitorLowCutHz = lowCutHz;
         if (!SilentSkip.TryParseThresholdDb(SilentSkipThresholdBox.Text, out var silenceDb))
         {
             OwnerCenteredMessageBox.Show(

@@ -100,6 +100,7 @@ internal static partial class UiStrings
     public static string CopyrightText =>
         "© 2026 " + AppVersion.CompanyName + "  " + CopyrightGitHub
         + " / " + CopyrightMitLink + " / " + CopyrightLameLink + " / " + CopyrightFfmpegLink
+        + " / " + CopyrightEffetuneLink
         + "\n" + CopyrightWwiseLine;
 
     public const string CopyrightGitHub = "GitHub";
@@ -112,6 +113,9 @@ internal static partial class UiStrings
     public const string CopyrightLameLink = "LAME";
 
     public const string CopyrightFfmpegLink = "FFmpeg";
+
+    /// <summary>第三者通知（EffeTune MIT 全文・学習データ帰属など）へのフッタリンク。</summary>
+    public const string CopyrightEffetuneLink = "EffeTune";
 
     public static string UntitledDocument => Get("untitled", "untitled");
 
@@ -418,6 +422,49 @@ internal static partial class UiStrings
         string.IsNullOrWhiteSpace(errors) ? string.Empty : Environment.NewLine + errors);
 
     public static string LabelMono => Get("Mono", "Mono");
+
+    public static string LabelMonitorMono => Get("MONO", "MONO");
+
+    public static string TooltipMonitorMono => Get(
+        "MONO：L+R を合算して聴く（クリック／Alt+M）",
+        "MONO: listen to L+R summed (click / Alt+M)");
+
+    public static string LabelMonitorDim => Get("DIM", "DIM");
+
+    public static string TooltipMonitorDim(double db) => Format(
+        "DIM：モニターを {0}（クリック／Alt+D）",
+        "DIM: monitor {0} (click / Alt+D)",
+        FormatSignedDb(db));
+
+    public static string LabelMonitorLowCut => Get("LC", "LC");
+
+    public static string TooltipMonitorLowCut(double hz) => Format(
+        "LC：モニターに {0} Hz ローシェルフ −20 dB（クリック／Alt+C）",
+        "LC: {0} Hz low-shelf −20 dB on monitor (click / Alt+C)",
+        hz.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture));
+
+    public static string TooltipMonitorBpm => Get(
+        "BPM：解析・表示・クリック（クリック／Alt+B）。既定オフ。表示は拍間隔から算出",
+        "BPM: analysis, display, and click (click / Alt+B). Default off. Display from beat intervals");
+
+    public static string LabelMonitor => Get("モニター", "Monitor");
+
+    public static string LabelMonitorDimAmount => Get(
+        "DIM 減衰",
+        "DIM attenuation");
+
+    public static string ErrorMonitorDimDbRange => Get(
+        "DIM 減衰は -60 から 0 の dB で入力してください。",
+        "Enter a DIM attenuation between -60 and 0 dB.");
+
+    public static string LabelMonitorLowCutCutoff => Get(
+        "ローカット周波数",
+        "Low-cut frequency");
+
+    public static string ErrorMonitorLowCutHzRange => Get(
+        "ローカット周波数は 20 から 500 の Hz で入力してください。",
+        "Enter a low-cut frequency between 20 and 500 Hz.");
+
     public static string LabelStereo => Get("Stereo", "Stereo");
     public static string LabelHertz => Get("Hz", "Hz");
     public static string LabelPeak => Get("Peak", "Peak");
@@ -913,7 +960,7 @@ internal static partial class UiStrings
     public static string LabelLibraryAutoPlay => "Auto Play";
     /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（マニュアル側）。</summary>
     public static string LabelLibraryAutoPlayNext => "Auto Next";
-    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。ショートカットは出さない（マニュアル側）。Alt+L。</summary>
+    /// <summary>ステータスバーの Auto Loop。UI 言語に関わらず英語。ショートカットはマニュアル側（Alt+L）。</summary>
     public static string LabelLibraryAutoLoop => "Auto Loop";
     /// <summary>Auto Loop の動作説明（サンプルループあり＝頭通し後に S–E 無限、無し＝曲末→先頭）。</summary>
     public static string TipLibraryAutoLoop => Get(

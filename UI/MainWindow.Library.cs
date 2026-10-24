@@ -982,7 +982,8 @@ public partial class MainWindow
         || ReferenceEquals(target, LevelMeter)
         || ReferenceEquals(target, VectorScope)
         || ReferenceEquals(target, Spectrum)
-        || ReferenceEquals(target, LoudnessMeter);
+        || ReferenceEquals(target, LoudnessMeter)
+        || ReferenceEquals(target, MonitorToggles);
 
     private bool TryTogglePlaylistVideoFullscreen()
     {
@@ -1961,7 +1962,7 @@ public partial class MainWindow
 
     /// <summary>A トグルで出す／消す HUD。波形・アナライザに加え WAAPI 表記（MeterTopSlot）も含む。</summary>
     private UIElement[] PlaylistVideoHudTargets() =>
-        [WaveformHostBorder, MeterTopSlot, LevelMeter, VectorScope, Spectrum, LoudnessMeter];
+        [WaveformHostBorder, MeterTopSlot, LevelMeter, VectorScope, Spectrum, LoudnessMeter, MonitorToggles];
 
     private void SyncPlaylistVideoUiShadows(bool chromeVisible, bool hideHud)
     {
@@ -2011,6 +2012,7 @@ public partial class MainWindow
         VectorScope.VideoOverlayLabels = on;
         Spectrum.VideoOverlayLabels = on;
         LoudnessMeter.VideoOverlayLabels = on;
+        MonitorToggles.VideoOverlayLabels = on;
         ForEachWaveform(view => view.VideoOverlayLabels = on);
         SyncVideoHudFrost(on);
     }
@@ -2019,7 +2021,7 @@ public partial class MainWindow
 
     /// <summary>
     /// 動画本再生／ミニの波形・ピーク・ゴニオ・スペアナ・ラウドネス・ファイル名の背後だけ、
-    /// 少し暗くする。縁は映像へ溶かす。
+    /// 少し暗くする。ラウドネスとスペアナのあいだ（モニター列）は一枚で埋める。縁は映像へ溶かす。
     /// </summary>
     private void SyncVideoHudFrost(bool on)
     {
@@ -2074,7 +2076,7 @@ public partial class MainWindow
             return null;
         }
 
-        var group = new GeometryGroup();
+        var group = new GeometryGroup { FillRule = FillRule.Nonzero };
         foreach (var element in VideoHudFrostElements)
         {
             if (!IsVideoHudFrostElementShown(element))
@@ -2098,7 +2100,74 @@ public partial class MainWindow
             }
         }
 
+        // ラウドネス〜モニター列〜スペアナは外接一枚。列マージンやボタン周りの隙間を残さない。
+        TryAddLoudnessMonitorSpectrumFrost(group, stage);
+
         return group.Children.Count == 0 ? null : group;
+    }
+
+    /// <summary>
+    /// ラウドネス・モニター列・スペアナをまとめた外接矩形を一枚だけ追加する。
+    /// 個別 Rect だと列マージンと MonitorToggles 上下の空きが抜ける。
+    /// </summary>
+    private void TryAddLoudnessMonitorSpectrumFrost(GeometryGroup group, Visual stage)
+    {
+        FrameworkElement[] band = [LoudnessMeter, MonitorToggles, Spectrum];
+        var has = false;
+        var left = 0d;
+        var top = 0d;
+        var right = 0d;
+        var bottom = 0d;
+        foreach (var element in band)
+        {
+            if (!IsVideoHudFrostElementShown(element))
+            {
+                continue;
+            }
+
+            try
+            {
+                var rect = element.TransformToVisual(stage)
+                    .TransformBounds(new Rect(0, 0, element.ActualWidth, element.ActualHeight));
+                if (rect.Width < 1 || rect.Height < 1)
+                {
+                    continue;
+                }
+
+                if (!has)
+                {
+                    left = rect.Left;
+                    top = rect.Top;
+                    right = rect.Right;
+                    bottom = rect.Bottom;
+                    has = true;
+                }
+                else
+                {
+                    left = Math.Min(left, rect.Left);
+                    top = Math.Min(top, rect.Top);
+                    right = Math.Max(right, rect.Right);
+                    bottom = Math.Max(bottom, rect.Bottom);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        if (!has)
+        {
+            return;
+        }
+
+        var width = right - left;
+        var height = bottom - top;
+        if (width < 1 || height < 1)
+        {
+            return;
+        }
+
+        group.Children.Add(new RectangleGeometry(new Rect(left, top, width, height)));
     }
 
     private static bool IsVideoHudFrostElementShown(FrameworkElement element)
@@ -2126,9 +2195,13 @@ public partial class MainWindow
 
     private FrameworkElement[]? _videoHudFrostElements;
 
+    /// <summary>
+    /// ラウドネス／モニター／スペアナは <see cref="TryAddLoudnessMonitorSpectrumFrost"/> で一枚。
+    /// 個別に入れると列マージンが抜けて隙間になる。
+    /// </summary>
     private FrameworkElement[] VideoHudFrostElements =>
         _videoHudFrostElements ??=
-            [WaveformTileHost, LevelMeter, VectorScope, Spectrum, LoudnessMeter, PlaylistVideoFileName];
+            [WaveformTileHost, LevelMeter, VectorScope, PlaylistVideoFileName];
 
     private void ApplyPlayerMeterFade(bool visible, bool instant)
     {
@@ -2174,8 +2247,8 @@ public partial class MainWindow
 
     private UIElement[] PlayerMeterFadeTargets() =>
         _playlistVideoChromeVisible
-            ? [MeterTopSlot, LevelMeter, VectorScope, Spectrum, LoudnessMeter, TimeScrollStrip]
-            : [MeterTopSlot, LevelMeter, VectorScope, Spectrum, LoudnessMeter];
+            ? [MeterTopSlot, LevelMeter, VectorScope, Spectrum, LoudnessMeter, MonitorToggles, TimeScrollStrip]
+            : [MeterTopSlot, LevelMeter, VectorScope, Spectrum, LoudnessMeter, MonitorToggles];
 
     /// <summary>
     /// プレイヤー中はクロムの塗りを外し、ウィンドウ全体のジャケットウォッシュを透かす。
@@ -2221,6 +2294,8 @@ public partial class MainWindow
             _waapiToggle.WashThrough = show;
             _waapiToggle.InvalidateVisual();
         }
+
+        MonitorToggles.WashThrough = show;
 
         LevelMeter.InvalidateVisual();
         VectorScope.InvalidateVisual();

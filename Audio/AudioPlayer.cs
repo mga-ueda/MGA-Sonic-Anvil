@@ -210,6 +210,34 @@ internal sealed class AudioPlayer : IDisposable
 
     public void SetSoloMask(int mask) => _provider.SetSoloMask(mask);
 
+    public bool MonitorMono => _provider.MonitorMono;
+
+    public void SetMonitorMono(bool enabled) => _provider.SetMonitorMono(enabled);
+
+    public bool MonitorDim => _provider.MonitorDim;
+
+    public void SetMonitorDim(bool enabled) => _provider.SetMonitorDim(enabled);
+
+    public double MonitorDimDb => _provider.MonitorDimDbAmount;
+
+    public void SetMonitorDimDb(double db) => _provider.SetMonitorDimDb(db);
+
+    public bool MonitorLowCut => _provider.MonitorLowCut;
+
+    public void SetMonitorLowCut(bool enabled) => _provider.SetMonitorLowCut(enabled);
+
+    public double MonitorLowCutHz => _provider.MonitorLowCutCutoffHz;
+
+    public void SetMonitorLowCutHz(double hz) => _provider.SetMonitorLowCutHz(hz);
+
+    public BpmMonitorMode BpmMonitorMode => _provider.BpmMonitorMode;
+
+    public void SetBpmMonitorMode(BpmMonitorMode mode) => _provider.SetBpmMonitorMode(mode);
+
+    public bool TryGetBpmMonitorBpm(out float bpm) => _provider.TryGetBpmMonitorBpm(out bpm);
+
+    public void ResetBpmMonitor() => _provider.ResetBpmMonitor();
+
     public void SetSilentSkip(bool enabled, double thresholdDb) =>
         _provider.SetSilentSkip(enabled, thresholdDb);
 

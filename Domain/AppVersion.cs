@@ -14,6 +14,9 @@ internal static partial class AppVersion
     public const string GitHubRepo = "MGA-Sonic-Anvil";
     public const string RepositoryUrl = "https://github.com/" + GitHubOwner + "/" + GitHubRepo;
     public const string LicenseUrl = RepositoryUrl + "/blob/main/LICENSE";
+    public const string ThirdPartyNoticesUrl = RepositoryUrl + "/blob/main/THIRD_PARTY_NOTICES.md";
+    public const string EffetuneProjectUrl = "https://github.com/Frieve-A/effetune";
+    public const string EffetuneLicenseUrl = EffetuneProjectUrl + "/blob/main/LICENSE";
     public const string LameProjectUrl = "https://lame.sourceforge.io/";
     public const string FfmpegProjectUrl = "https://ffmpeg.org/";
     public const string CompanyName = "MIYABI GAME AUDIO INC.";

@@ -2707,6 +2707,7 @@ public partial class MainWindow
         LoudnessMeter.LayoutTransform = meterTransform;
         VectorScope.LayoutTransform = meterTransform;
         Spectrum.LayoutTransform = meterTransform;
+        MonitorToggles.LayoutTransform = meterTransform;
         // WAAPI トグルも同じ窓比例／F12 倍率。スロット高は変換後の見た目に合わせる。
         if (_waapiToggle is not null)
         {
@@ -2801,6 +2802,7 @@ public partial class MainWindow
         // ゴニオ（右列下端）と同じ高さ帯にスペアナ／ラウドネスを揃える。
         Spectrum.VerticalAlignment = VerticalAlignment.Bottom;
         LoudnessMeter.VerticalAlignment = VerticalAlignment.Bottom;
+        MonitorToggles.VerticalAlignment = VerticalAlignment.Bottom;
         ApplyMeterColumnWidth(_meterColumnPreferred);
         ApplyLevelMeterHeightCap(scale);
         ScheduleLibraryWaveformPaint();
@@ -2893,7 +2895,7 @@ public partial class MainWindow
     /// <summary>
     /// F9／F8。プレイヤー中だけサイド列・ステータス・トランスポートを畳む。
     /// F8 動画ミニはピーク／ゴニオ／スペアナ／ラウドネスを残す。F9 はメーター列も畳む。
-    /// 波形は残す。再生と Alt+S（Silent Skip）／Alt+A（Always on Top）は続ける。
+    /// 波形は残す。再生と Alt+S（Silent Skip）／Alt+T（Always on Top）は続ける。
     /// ApplyWaveformMaximizeChrome のあとに呼ぶ。
     /// </summary>
     private void ApplyLibraryMinimalChrome()
@@ -2979,6 +2981,7 @@ public partial class MainWindow
         WorkGrid.ClearValue(UIElement.ClipToBoundsProperty);
         Spectrum.VerticalAlignment = VerticalAlignment.Top;
         LoudnessMeter.VerticalAlignment = VerticalAlignment.Stretch;
+        MonitorToggles.VerticalAlignment = VerticalAlignment.Center;
         ClearLevelMeterHeightCap();
     }
 

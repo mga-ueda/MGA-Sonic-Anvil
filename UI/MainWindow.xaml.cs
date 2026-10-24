@@ -270,6 +270,7 @@ public partial class MainWindow : Window
         SilentSkipCheck.IsChecked = AppStorage.Settings.SilentSkip;
         AutoLoopCheck.IsChecked = AppStorage.Settings.LibraryAutoLoop;
         Mp3Gapless.Enabled = AppStorage.Settings.GaplessPlayback;
+        ApplyMonitorMixFromSettings();
         ApplySilentSkipFromSettings();
 
         Transport.CommandInvoked += (_, command) => ExecuteTransport(command);
@@ -355,6 +356,7 @@ public partial class MainWindow : Window
         _player.ApplyOutputSettings(_outputSettings);
         Spectrum.Player = _player;
         LoudnessMeter.Player = _player;
+        MonitorToggles.Player = _player;
         Waveform.LoudnessTargetLufs = AppStorage.Settings.ResolvedLoudnessTargetLufs();
         Overview.SeekTrailSource = Waveform;
         VectorScope.Player = _player;
@@ -867,6 +869,7 @@ public partial class MainWindow : Window
         RefreshStatus();
         LevelMeter.InvalidateVisual();
         LoudnessMeter.ApplyLocalizedText();
+        MonitorToggles.ApplyLocalizedText();
         _colorDevPanel?.ApplyLocalizedText();
         _tabTimeTable?.ApplyLocalizedText();
         LibraryBrowser.ApplyLocalizedText();
@@ -1171,6 +1174,7 @@ public partial class MainWindow : Window
         StopMeterRendering();
         VectorScope.StopTicks();
         Spectrum.StopTicks();
+        MonitorToggles.StopTicks();
         _playTimer.Stop();
         _visualPlayheadTimer.Stop();
         StopMarkerNudge();
@@ -1670,6 +1674,14 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ApplyMonitorMixFromSettings()
+    {
+        var settings = AppStorage.Settings;
+        _player.SetMonitorDimDb(settings.ResolvedMonitorDimDb());
+        _player.SetMonitorLowCutHz(settings.ResolvedMonitorLowCutHz());
+        MonitorToggles.ApplyLocalizedText();
+    }
+
     private void ApplySilentSkipFromSettings()
     {
         var enabled = SilentSkipCheck.IsChecked == true
@@ -1691,10 +1703,21 @@ public partial class MainWindow : Window
             "mit" => AppVersion.LicenseUrl,
             "lame" => AppVersion.LameProjectUrl,
             "ffmpeg" => AppVersion.FfmpegProjectUrl,
+            // GitHub 上の blob は未 push だと 404 になるため、同梱の通知を優先する。
+            "effetune" => ResolveEffetuneNoticesTarget(),
             _ => AppVersion.RepositoryUrl,
         };
         TryOpenUrl(url);
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// 出力横の <c>THIRD_PARTY_NOTICES.md</c>。無いときだけ上流 EffeTune の MIT 全文へ。
+    /// </summary>
+    internal static string ResolveEffetuneNoticesTarget()
+    {
+        var local = Path.Combine(AppContext.BaseDirectory, "THIRD_PARTY_NOTICES.md");
+        return File.Exists(local) ? local : AppVersion.EffetuneLicenseUrl;
     }
 
     private void BrandLogo_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)

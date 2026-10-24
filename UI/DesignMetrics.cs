@@ -198,12 +198,25 @@ internal static class DesignMetrics
 
     public static double TransportHostMinHeight => TransportBarHeight + BrandRowHeight;
 
-    /// <summary>トランスポート右の履歴・ラウドネス・スペアナと、右端メーター列。</summary>
+    /// <summary>トランスポート右の履歴・ラウドネス・モニター列・スペアナと、右端メーター列。</summary>
     public static double TransportSideChromeWidth =>
         HistoryStripWidth + From96(6)
         + LoudnessMeterWidth + From96(6)
+        + MonitorToggleWidth + From96(6)
         + SpectrumWidth + From96(1)
         + LevelMeterWidth;
+
+    /// <summary>モニター列ボタンの高さ（一回り大きめ）。</summary>
+    public static double MonitorButtonHeight => Dip(26);
+
+    /// <summary>モニター列ボタンのラベル字サイズ。</summary>
+    public static double MonitorButtonFontSize => From96(9);
+
+    /// <summary>BPM テンポ数値（ボタン上）の字サイズ。</summary>
+    public static double MonitorBpmValueFontSize => From96(12);
+
+    /// <summary>モニター列の既定幅。実幅はラベル計測で上書きする。</summary>
+    public static double MonitorToggleWidth => From96(44);
 
     /// <summary>ウィンドウ枠（リサイズ辺）。</summary>
     public static double WindowFramePad => From96(24);

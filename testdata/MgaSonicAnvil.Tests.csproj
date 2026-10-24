@@ -25,6 +25,15 @@
     <None Include="..\native\SignalsmithStretch\win-x64\SignalsmithStretch.dll" Condition="Exists('..\native\SignalsmithStretch\win-x64\SignalsmithStretch.dll')" Link="SignalsmithStretch.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="..\native\effetune-rhythm\win-x64\EffeTuneRhythm.dll" Condition="Exists('..\native\effetune-rhythm\win-x64\EffeTuneRhythm.dll')" Link="EffeTuneRhythm.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\THIRD_PARTY_NOTICES.md" Link="THIRD_PARTY_NOTICES.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\native\effetune-rhythm\LICENSE-EffeTune.txt" Condition="Exists('..\native\effetune-rhythm\LICENSE-EffeTune.txt')" Link="LICENSE-EffeTune.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
