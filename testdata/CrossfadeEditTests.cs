@@ -21,8 +21,8 @@ public sealed class CrossfadeEditTests
         var fromLoop = CrossfadeEditState.CreateInitial(document);
         Assert.Equal(50, fromLoop.StartFrame);
         Assert.Equal(250, fromLoop.EndFrame);
-        // Default is Pre=1s / Post=0. Start headroom is 50, so Pre clamps to 50.
-        Assert.Equal(50, fromLoop.PreCrossfadeFrames);
+        // Default is Pre=0 / Post=0.
+        Assert.Equal(0, fromLoop.PreCrossfadeFrames);
         Assert.Equal(0, fromLoop.PostCrossfadeFrames);
         Assert.Equal(fromLoop.StartFrame - fromLoop.PreCrossfadeFrames, fromLoop.PreFlagFrame);
         Assert.Equal(fromLoop.EndFrame - fromLoop.PreCrossfadeFrames, fromLoop.PreDrawStartFrame);
