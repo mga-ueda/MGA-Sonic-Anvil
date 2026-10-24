@@ -633,8 +633,8 @@ internal sealed class LibraryVisualStage : Grid
 
             // プレビュー開始直後は格子がフェードイン中。HasAnimatedProperties だけでは
             // 昇格側のフェードアウトと区別できず、引数起動だと格子だけ本再生に残る。
-            // 本再生へ入るときは、進行中でも必ず消す（プレビューからは現状の濃さからフェードアウト）。
-            SyncPreviewFx(active: false, instant: !fromPreview);
+            // 本再生へ入るときは格子だけ即時消す（暗転は fromPreview 時に現状からフェード）。
+            SyncPreviewFx(active: false, instant: true);
             if (resume)
             {
                 var pos = CurrentVisualPosition();
@@ -787,15 +787,10 @@ internal sealed class LibraryVisualStage : Grid
             return;
         }
 
-        LibraryPlayerMode.FadeElementOpacity(
-            _mesh,
-            0,
-            instant,
-            seconds: LibraryPlayerMode.ChromeFadeSeconds);
-        if (instant)
-        {
-            _mesh.Visibility = Visibility.Collapsed;
-        }
+        // 消すときは常に即時。フェードアウト中に Visibility が残ると、引数起動の
+        // プレビュー→本再生レースで格子だけ本再生に見える／残ることがある。
+        LibraryPlayerMode.FadeElementOpacity(_mesh, 0, instant: true);
+        _mesh.Visibility = Visibility.Collapsed;
     }
 
     /// <summary>指定位置から暗いプレビューへ（停止位置の再シーク後など）。</summary>
@@ -933,7 +928,7 @@ internal sealed class LibraryVisualStage : Grid
 
         var pos = CurrentVisualPosition();
         FadeDimOpacity(0, instant: false, LibraryPlayerMode.ChromeFadeSeconds);
-        SyncPreviewFx(active: false, instant: false);
+        SyncPreviewFx(active: false, instant: true);
         PlayRealtime(pos, restartClock: true);
         _media.BeginAnimation(OpacityProperty, null);
         _media.Opacity = 1;
