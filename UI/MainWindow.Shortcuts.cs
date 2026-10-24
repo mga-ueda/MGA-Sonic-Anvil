@@ -127,13 +127,15 @@ public partial class MainWindow
                 NoteAltTransition((int)info.vkCode, up);
                 var systemKey = message is WmSysKeyDown or WmSysKeyUp
                     || (info.flags & LlkhfAltDown) != 0;
-                if (ConsumeTranslatedNumpad(
+                // Alt＋VK_NUMPAD を先に割合へ。移動キーに化けた Alt＋テンキーは
+                // ConsumeTranslatedNumpad 側で割合へ振り分け、Shift 番号ジャンプにしない。
+                if (ConsumeAltNumpadPercent((int)info.vkCode, up)
+                    || ConsumeTranslatedNumpad(
                         (int)info.vkCode,
                         (int)info.scanCode,
                         extended: (info.flags & LlkhfExtended) != 0,
                         up,
                         repeat: false)
-                    || ConsumeAltNumpadPercent((int)info.vkCode, up)
                     || ConsumeStaleSysNumpad((int)info.vkCode, systemKey, up, repeat: false))
                 {
                     return (IntPtr)1;
@@ -184,14 +186,14 @@ public partial class MainWindow
         var virtualKey = unchecked((int)(msg.wParam.ToInt64() & 0xFFFF));
         var native = msg.lParam.ToInt64();
         NoteAltTransition(virtualKey, up);
-        if (ConsumeTranslatedNumpad(
+        if (ConsumeAltNumpadPercent(
+                virtualKey,
+                up,
+                repeat: LibraryPlayerMode.IsKeyRepeat(native))
+            || ConsumeTranslatedNumpad(
                 virtualKey,
                 scanCode: (int)(native >> 16) & 0xFF,
                 extended: (native & 0x01000000) != 0,
-                up,
-                repeat: LibraryPlayerMode.IsKeyRepeat(native))
-            || ConsumeAltNumpadPercent(
-                virtualKey,
                 up,
                 repeat: LibraryPlayerMode.IsKeyRepeat(native))
             || ConsumeStaleSysNumpad(
@@ -205,14 +207,29 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// 変換済みテンキーなら true。キーダウンの初回だけ番号ジャンプを予約する。
+    /// 変換済みテンキーなら true。キーダウンの初回だけジャンプを予約する。
+    /// NumLock オンの Shift＋テンキーは Home／End 等に化ける（Shift が報告されないこともある）。
+    /// Alt＋テンキーも同じ形に化けることがあり、そのときは割合ジャンプ（Shift 番号ではない）。
     /// </summary>
     private bool ConsumeTranslatedNumpad(int virtualKey, int scanCode, bool extended, bool up, bool repeat)
     {
         var scan = scanCode & 0xFF;
         if (up)
         {
-            return _numpadShiftScansDown.Remove(scan);
+            if (!_numpadShiftScansDown.Remove(scan))
+            {
+                return false;
+            }
+
+            // NumLock オンの Shift＋テンキーは Home 等に化けるので、離しをここで拾う。
+            if (LibraryPlayerMode.TryTranslatedNumpadDigit(
+                    virtualKey, scan, extended, IsNumLockToggled(), out var releasedDigit)
+                && LibraryPlayerMode.IsNumpadSelectionTransportDigit(releasedDigit))
+            {
+                Dispatcher.BeginInvoke(() => StopEditorNumpadSelectionTransport(releasedDigit));
+            }
+
+            return true;
         }
 
         if (NumpadShiftPassesToText())
@@ -221,6 +238,26 @@ public partial class MainWindow
         }
 
         if (!LibraryPlayerMode.TryTranslatedNumpadDigit(virtualKey, scan, extended, IsNumLockToggled(), out var digit))
+        {
+            return false;
+        }
+
+        var altDown = IsAltModifierActive();
+        var shiftDown = IsVkDown(0x10) || IsVkDown(0xA0) || IsVkDown(0xA1);
+        var ctrlDown = IsVkDown(0x11) || IsVkDown(0xA2) || IsVkDown(0xA3);
+        var winDown = IsPhysicalWinDown();
+        if (LibraryPlayerMode.IsTranslatedNumpadAltPercent(altDown, shiftDown, ctrlDown, winDown))
+        {
+            var firstAlt = _numpadShiftScansDown.Add(scan);
+            if (firstAlt && !repeat)
+            {
+                PostNumpadPercentJump(digit);
+            }
+
+            return true;
+        }
+
+        if (!LibraryPlayerMode.IsTranslatedNumpadShiftJump(altDown, ctrlDown, winDown))
         {
             return false;
         }
@@ -235,6 +272,9 @@ public partial class MainWindow
     }
 
     private bool IsPhysicalAltDown() => IsVkDown(0x12) || IsVkDown(0xA4) || IsVkDown(0xA5);
+
+    /// <summary>VK_LWIN / VK_RWIN。他アプリの Win＋Alt＋テンキー等を飲み込まないため。</summary>
+    private bool IsPhysicalWinDown() => IsVkDown(0x5B) || IsVkDown(0x5C);
 
     /// <summary>
     /// キー処理の先頭で呼ぶ。猶予中と、Alt が物理的に上がっているときは修飾なし。
@@ -329,7 +369,13 @@ public partial class MainWindow
 
         var shiftDown = IsVkDown(0x10) || IsVkDown(0xA0) || IsVkDown(0xA1);
         var ctrlDown = IsVkDown(0x11) || IsVkDown(0xA2) || IsVkDown(0xA3);
-        if (!LibraryPlayerMode.IsAltNumpadPercentVirtualKey(virtualKey, altDown: true, shiftDown, ctrlDown))
+        var winDown = IsPhysicalWinDown();
+        if (!LibraryPlayerMode.IsAltNumpadPercentVirtualKey(
+                virtualKey,
+                altDown: true,
+                shiftDown,
+                ctrlDown,
+                winDown))
         {
             return false;
         }
@@ -356,12 +402,14 @@ public partial class MainWindow
     {
         var shiftDown = IsVkDown(0x10) || IsVkDown(0xA0) || IsVkDown(0xA1);
         var ctrlDown = IsVkDown(0x11) || IsVkDown(0xA2) || IsVkDown(0xA3);
+        var winDown = IsPhysicalWinDown();
         if (!LibraryPlayerMode.IsStaleSysNumpad(
                 virtualKey,
                 systemKey,
                 IsAltModifierActive(),
                 shiftDown,
-                ctrlDown))
+                ctrlDown,
+                winDown))
         {
             return false;
         }
@@ -448,6 +496,11 @@ public partial class MainWindow
     {
         if (key is Key.NumPad7 or Key.NumPad9)
         {
+            if (TryDigitKey(key, out var seekDigit))
+            {
+                StopEditorNumpadSelectionTransport(seekDigit);
+            }
+
             if (_seekNudgeDirection != 0
                 && ((key == Key.NumPad7 && _seekNudgeDirection < 0)
                     || (key == Key.NumPad9 && _seekNudgeDirection > 0)))
@@ -460,6 +513,11 @@ public partial class MainWindow
 
         if (key is Key.NumPad1 or Key.NumPad3)
         {
+            if (TryDigitKey(key, out var shuttleDigit))
+            {
+                StopEditorNumpadSelectionTransport(shuttleDigit);
+            }
+
             if (_playbackShuttleDirection != 0
                 && ((key == Key.NumPad1 && _playbackShuttleDirection < 0)
                     || (key == Key.NumPad3 && _playbackShuttleDirection > 0)))
@@ -500,6 +558,14 @@ public partial class MainWindow
 
         _numpadShiftJumpDigit = digit;
         _numpadShiftJumpMs = now;
+        // 選択可能な波形コンテキストでは 1／3／7／9 を選択付きシーク／シャトルへ（マーカージャンプより優先）。
+        if (AllowsWaveformSelectionTransport()
+            && LibraryPlayerMode.IsNumpadSelectionTransportDigit(digit))
+        {
+            Dispatcher.BeginInvoke(() => BeginEditorNumpadSelectionTransport(digit));
+            return;
+        }
+
         Dispatcher.BeginInvoke(() =>
             TryHandleNumpadCueDigitJump((Key)((int)Key.NumPad0 + digit), ModifierKeys.Shift));
     }
@@ -573,12 +639,26 @@ public partial class MainWindow
     {
         if (KeyScanCodeField?.GetValue(e) is int scan && _numpadShiftScansDown.Remove(scan & 0xFF))
         {
+            if (LibraryPlayerMode.TryNumpadScanDigit(scan & 0xFF, out var releasedDigit)
+                && LibraryPlayerMode.IsNumpadSelectionTransportDigit(releasedDigit))
+            {
+                StopEditorNumpadSelectionTransport(releasedDigit);
+            }
+
             e.Handled = true;
             return;
         }
 
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         key = LibraryPlayerMode.ResolveDigitKey(key, e.ImeProcessedKey);
+        if (key is Key.LeftShift or Key.RightShift)
+        {
+            if (_transportSelectionExtend && _transportSelectionDigit >= 0)
+            {
+                StopEditorNumpadSelectionTransport(_transportSelectionDigit);
+            }
+        }
+
         if (key is Key.Apps or Key.F10)
         {
             if (_pendingContextMenuKey)
@@ -593,6 +673,11 @@ public partial class MainWindow
 
         if (key is Key.NumPad7 or Key.NumPad9 or Key.J or Key.K)
         {
+            if (LibraryPlayerMode.TrySelectionTransportDigit(key, out var seekDigit))
+            {
+                StopEditorNumpadSelectionTransport(seekDigit);
+            }
+
             if (_seekNudgeDirection != 0
                 && ((key is Key.NumPad7 or Key.J) && _seekNudgeDirection < 0
                     || (key is Key.NumPad9 or Key.K) && _seekNudgeDirection > 0))
@@ -3057,6 +3142,105 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// Shift＋テンキー 7／9 と Shift＋J／K＝±5 秒シーク＋選択伸長、
+    /// Shift＋テンキー 1／3＝±3 倍シャトル＋選択伸長。
+    /// エディタと、プレイヤーのシーク＆選択コンテキスト（<see cref="AllowsWaveformSelectionTransport"/>）。
+    /// </summary>
+    private void BeginEditorNumpadSelectionTransport(int digit)
+    {
+        if (!AllowsWaveformSelectionTransport()
+            || !LibraryPlayerMode.IsNumpadSelectionTransportDigit(digit))
+        {
+            return;
+        }
+
+        var command = LibraryPlayerMode.NumpadSelectionTransportCommand(digit);
+        if (command == LibraryNumpadCommand.None)
+        {
+            return;
+        }
+
+        var starting = _transportSelectionDigit != digit;
+        if (starting)
+        {
+            // 空のときだけ起点をヘッドに。既存選択があるのに再設定すると
+            // Shift 押しっぱなしで 1／3 を離→再押した瞬間に選択が潰れる。
+            if (_document is null || _document.Selection.IsEmpty)
+            {
+                Waveform.SetKeyboardSelectAnchor(Waveform.PlayheadFrame);
+            }
+
+            _transportSelectionDigit = digit;
+            _transportSelectionExtend = true;
+            // 選択が伸びても再生ループに吸い込まれないようにする。
+            SyncPlayWindowFromDocument();
+        }
+
+        switch (command)
+        {
+            case LibraryNumpadCommand.SeekBack:
+                BeginOrContinueSeekNudge(-1);
+                ApplyTransportSelectionExtend();
+                break;
+            case LibraryNumpadCommand.SeekForward:
+                BeginOrContinueSeekNudge(1);
+                ApplyTransportSelectionExtend();
+                break;
+            case LibraryNumpadCommand.Rewind:
+                if (CanPlaybackShuttle(allowWhileStopped: true))
+                {
+                    BeginOrContinuePlaybackShuttle(-1);
+                    ApplyTransportSelectionExtend();
+                }
+
+                break;
+            case LibraryNumpadCommand.FastForward:
+                if (CanPlaybackShuttle(allowWhileStopped: true))
+                {
+                    BeginOrContinuePlaybackShuttle(1);
+                    ApplyTransportSelectionExtend();
+                }
+
+                break;
+        }
+    }
+
+    private void StopEditorNumpadSelectionTransport(int digit)
+    {
+        if (!_transportSelectionExtend || _transportSelectionDigit != digit)
+        {
+            return;
+        }
+
+        var command = LibraryPlayerMode.NumpadSelectionTransportCommand(digit);
+        // フラグは StopSeekNudge／StopPlaybackShuttle 側でも落とす。先に digit を渡すために残す。
+        if (command is LibraryNumpadCommand.SeekBack or LibraryNumpadCommand.SeekForward)
+        {
+            StopSeekNudge();
+        }
+        else if (command is LibraryNumpadCommand.Rewind or LibraryNumpadCommand.FastForward)
+        {
+            StopPlaybackShuttle();
+        }
+        else
+        {
+            _transportSelectionDigit = -1;
+            _transportSelectionExtend = false;
+            SyncPlayWindowFromDocument();
+        }
+    }
+
+    private void ApplyTransportSelectionExtend()
+    {
+        if (!_transportSelectionExtend || _document is null)
+        {
+            return;
+        }
+
+        Waveform.ExtendSelectionTo(Waveform.PlayheadFrame);
+    }
+
+    /// <summary>
     /// Shift／Ctrl＋テンキーの番号ジャンプ。Alt＋テンキーは表示範囲の割合（上段の無修飾と同じ）。
     /// エディタはドキュメントのマーカー／リージョン。
     /// プレイヤーの Shift は一時マーカー（音声波形／動画本再生／F8／フレーム一時停止）。
@@ -3075,6 +3259,19 @@ public partial class MainWindow
                 JumpByVisiblePercent(percentDigit / 10d, extendSelection: false);
             }
 
+            return true;
+        }
+
+        // NumLock オフ等で Shift＋NumPad が数字のまま届くとき、および Shift＋J／K。
+        // 選択可能な波形コンテキストのみ（J／K は 7／9 と同じ ±5 秒）。
+        // ツリーフォーカス中の J／K はフォルダ名ジャンプへ譲る。
+        if (AllowsWaveformSelectionTransport()
+            && LibraryPlayerMode.IsNumpadSelectionTransport(key, modifiers)
+            && LibraryPlayerMode.TrySelectionTransportDigit(key, out var selectionDigit)
+            && (key is not (Key.J or Key.K)
+                || LibraryPlayerMode.AllowsPlayerLetterTransport(IsLibraryExplorerFocused)))
+        {
+            BeginEditorNumpadSelectionTransport(selectionDigit);
             return true;
         }
 

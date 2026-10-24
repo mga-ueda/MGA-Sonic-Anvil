@@ -2117,6 +2117,41 @@ internal static class LibraryPlayerMode
     public static bool IsNumpadMarkerDigitJump(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.Shift && IsNumpadDigitKey(key);
 
+    /// <summary>
+    /// Shift＋テンキー 1／3／7／9 と Shift＋J／K。
+    /// 選択を伸ばしながらのシャトル／±5 秒シーク（エディタ／プレイヤーのシーク＆選択コンテキスト）。
+    /// </summary>
+    public static bool IsNumpadSelectionTransportDigit(int digit) =>
+        digit is 1 or 3 or 7 or 9;
+
+    public static bool IsNumpadSelectionTransport(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.Shift
+        && key is Key.NumPad1 or Key.NumPad3 or Key.NumPad7 or Key.NumPad9 or Key.J or Key.K;
+
+    /// <summary>J→7、K→9。テンキーはそのまま。</summary>
+    public static bool TrySelectionTransportDigit(Key key, out int digit)
+    {
+        digit = key switch
+        {
+            Key.NumPad1 => 1,
+            Key.NumPad3 => 3,
+            Key.NumPad7 or Key.J => 7,
+            Key.NumPad9 or Key.K => 9,
+            _ => -1,
+        };
+        return digit >= 0;
+    }
+
+    public static LibraryNumpadCommand NumpadSelectionTransportCommand(int digit) =>
+        digit switch
+        {
+            1 => LibraryNumpadCommand.Rewind,
+            3 => LibraryNumpadCommand.FastForward,
+            7 => LibraryNumpadCommand.SeekBack,
+            9 => LibraryNumpadCommand.SeekForward,
+            _ => LibraryNumpadCommand.None,
+        };
+
     /// <summary>Ctrl＋テンキー数字。リージョンがあるとき番号の先頭へ。</summary>
     public static bool IsNumpadRegionDigitJump(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.Control && IsNumpadDigitKey(key);
@@ -2125,9 +2160,14 @@ internal static class LibraryPlayerMode
     public static bool IsNumpadPercentDigitJump(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.Alt && IsNumpadDigitKey(key);
 
-    /// <summary>Alt＋テンキーの仮想キー（VK_NUMPAD0＝0x60）。Shift／Ctrl 付きは対象外。</summary>
-    public static bool IsAltNumpadPercentVirtualKey(int virtualKey, bool altDown, bool shiftDown, bool ctrlDown) =>
-        altDown && !shiftDown && !ctrlDown && virtualKey is >= 0x60 and <= 0x69;
+    /// <summary>Alt＋テンキーの仮想キー（VK_NUMPAD0＝0x60）。Shift／Ctrl／Win 付きは対象外。</summary>
+    public static bool IsAltNumpadPercentVirtualKey(
+        int virtualKey,
+        bool altDown,
+        bool shiftDown,
+        bool ctrlDown,
+        bool winDown = false) =>
+        altDown && !shiftDown && !ctrlDown && !winDown && virtualKey is >= 0x60 and <= 0x69;
 
     /// <summary>
     /// Alt 解放後の猶予中、または物理的に Alt が上がっているときは修飾が残留している。
@@ -2140,12 +2180,20 @@ internal static class LibraryPlayerMode
     /// <summary>
     /// Alt 解放後に残ったシステムキーのテンキー。割合ではなく無修飾の再生操作にし、
     /// DefWindowProc へ渡すとメニュー不一致のシステム音になる。
+    /// Win 付き（他アプリのホットキー等）は対象外。
     /// </summary>
-    public static bool IsStaleSysNumpad(int virtualKey, bool systemKey, bool altModifierActive, bool shiftDown, bool ctrlDown) =>
+    public static bool IsStaleSysNumpad(
+        int virtualKey,
+        bool systemKey,
+        bool altModifierActive,
+        bool shiftDown,
+        bool ctrlDown,
+        bool winDown = false) =>
         systemKey
         && !altModifierActive
         && !shiftDown
         && !ctrlDown
+        && !winDown
         && virtualKey is >= 0x60 and <= 0x69;
 
     /// <summary>
@@ -2333,7 +2381,28 @@ internal static class LibraryPlayerMode
     /// そのとき Shift 自体は下りとして報告されないことがある。
     /// 拡張ビットが無く、仮想キーが対応する移動キーであるスキャンだけ数字に戻す。
     /// 専用の Home／End は拡張ビットが立つ。NumLock オフのテンキーと、無修飾のテンキー数字は対象外。
+    /// Alt＋テンキーも同じ移動キーに化けることがあり、そのときは
+    /// <see cref="IsTranslatedNumpadAltPercent"/> で割合へ振り分ける（Shift 番号ジャンプにしない）。
     /// </summary>
+    public static bool TryNumpadScanDigit(int scanCode, out int digit)
+    {
+        digit = (scanCode & 0xFF) switch
+        {
+            0x52 => 0,
+            0x4F => 1,
+            0x50 => 2,
+            0x51 => 3,
+            0x4B => 4,
+            0x4C => 5,
+            0x4D => 6,
+            0x47 => 7,
+            0x48 => 8,
+            0x49 => 9,
+            _ => -1,
+        };
+        return digit >= 0;
+    }
+
     public static bool TryTranslatedNumpadDigit(int virtualKey, int scanCode, bool extended, bool numLockOn, out int digit)
     {
         digit = -1;
@@ -2342,21 +2411,26 @@ internal static class LibraryPlayerMode
             return false;
         }
 
-        var (expectedDigit, navigationKey) = (scanCode & 0xFF) switch
+        if (!TryNumpadScanDigit(scanCode, out var expectedDigit))
         {
-            0x52 => (0, 0x2D),
-            0x4F => (1, 0x23),
-            0x50 => (2, 0x28),
-            0x51 => (3, 0x22),
-            0x4B => (4, 0x25),
-            0x4C => (5, 0x0C),
-            0x4D => (6, 0x27),
-            0x47 => (7, 0x24),
-            0x48 => (8, 0x26),
-            0x49 => (9, 0x21),
-            _ => (-1, 0),
+            return false;
+        }
+
+        var navigationKey = expectedDigit switch
+        {
+            0 => 0x2D,
+            1 => 0x23,
+            2 => 0x28,
+            3 => 0x22,
+            4 => 0x25,
+            5 => 0x0C,
+            6 => 0x27,
+            7 => 0x24,
+            8 => 0x26,
+            9 => 0x21,
+            _ => 0,
         };
-        if (expectedDigit < 0 || virtualKey != navigationKey)
+        if (virtualKey != navigationKey)
         {
             return false;
         }
@@ -2366,19 +2440,38 @@ internal static class LibraryPlayerMode
     }
 
     /// <summary>
+    /// 移動キーに化けたテンキーを Alt＋割合として扱うか。
+    /// Shift／Ctrl／Win が付いているときは Alt 単独の割合ではない。
+    /// </summary>
+    public static bool IsTranslatedNumpadAltPercent(
+        bool altDown,
+        bool shiftDown,
+        bool ctrlDown,
+        bool winDown = false) =>
+        altDown && !shiftDown && !ctrlDown && !winDown;
+
+    /// <summary>
+    /// 移動キーに化けたテンキーを Shift＋番号ジャンプとして扱うか。
+    /// Alt／Ctrl／Win 付きは対象外（Alt は割合、Ctrl はリージョン側、Win は他アプリへ残す）。
+    /// </summary>
+    public static bool IsTranslatedNumpadShiftJump(bool altDown, bool ctrlDown, bool winDown = false) =>
+        !altDown && !ctrlDown && !winDown;
+
+    /// <summary>
     /// NumLock オンの Shift＋テンキーは、WM_KEYDOWN の時点で Home／End／矢印になる。
     /// 拡張ビットの無いテンキーのスキャンコードだけ数字へ戻す。専用キーは拡張ビットが立つ。
-    /// Ctrl／Alt が付いているときは触らない。
+    /// Ctrl／Alt／Win が付いているときは触らない。
     /// </summary>
     public static bool TryShiftedNumpadDigit(
         long lParam,
         bool shiftDown,
         bool ctrlDown,
         bool altDown,
-        out int digit)
+        out int digit,
+        bool winDown = false)
     {
         digit = -1;
-        if (!shiftDown || ctrlDown || altDown)
+        if (!shiftDown || ctrlDown || altDown || winDown)
         {
             return false;
         }

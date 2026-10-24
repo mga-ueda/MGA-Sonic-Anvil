@@ -271,6 +271,14 @@ public partial class MainWindow
                 && _document is not null
                 && !LibraryPlaylistDocuments.IsVisual(_document));
 
+    /// <summary>
+    /// Shift＋テンキー 1／3／7／9・J／K で選択を伸ばせるか。
+    /// エディタ全般、およびプレイヤーでシーク＆選択できる波形（捨てキューと同じコンテキスト。暗いプレビューは不可）。
+    /// </summary>
+    private bool AllowsWaveformSelectionTransport() =>
+        _document is not null
+        && (!IsLibraryMaximized || IsPlayerScratchContext());
+
     private void SyncPlayerScratchEnabled()
     {
         var enabled = IsPlayerScratchContext();
@@ -3562,7 +3570,12 @@ public partial class MainWindow
             {
                 QueuePendingLibraryWash(first);
                 LibraryBrowser.RequestListFocus();
-                PreviewLibrarySession(first);
+                // 動画ミニ（拡張子／引数）は直後に本再生するので、暗いプレビュー＋格子を挟まない。
+                if (!_videoLaunchPlacement)
+                {
+                    PreviewLibrarySession(first);
+                }
+
                 _ = PlayLibrarySessionAsync(first, keepAmbientGlow: true);
             }
 
@@ -3574,7 +3587,10 @@ public partial class MainWindow
         {
             _libraryHoldJacketWash = false;
             LibraryBrowser.RequestListFocus();
-            PreviewLibrarySession(first);
+            if (!_videoLaunchPlacement)
+            {
+                PreviewLibrarySession(first);
+            }
         }
 
         _ = PlayLibrarySessionAsync(first);
@@ -4116,6 +4132,10 @@ public partial class MainWindow
         SeekFrame(
             current + frames,
             IsPlaybackActive() ? LibraryPlayerMode.SeekNudgeFadeMilliseconds : 0);
+        if (_transportSelectionExtend)
+        {
+            Waveform.ExtendSelectionTo(Waveform.PlayheadFrame);
+        }
     }
 
     private bool BeginOrContinueSeekNudge(int direction)
@@ -4169,21 +4189,41 @@ public partial class MainWindow
         _seekNudgeTimer.Start();
     }
 
-    private static bool IsSeekNudgeHeld(int direction)
+    private bool IsSeekNudgeHeld(int direction)
     {
-        var keyDown = direction < 0
+        if (_transportSelectionExtend)
+        {
+            var expected = direction < 0 ? 7 : 9;
+            var keyDown = _transportSelectionDigit == expected
+                || (direction < 0
+                    ? Keyboard.IsKeyDown(Key.NumPad7) || Keyboard.IsKeyDown(Key.J)
+                    : Keyboard.IsKeyDown(Key.NumPad9) || Keyboard.IsKeyDown(Key.K));
+            return keyDown
+                && (Keyboard.Modifiers & ModifierKeys.Shift) != 0
+                && (Keyboard.Modifiers & ~(ModifierKeys.Shift)) == 0;
+        }
+
+        var plainKeyDown = direction < 0
             ? Keyboard.IsKeyDown(Key.NumPad7) || Keyboard.IsKeyDown(Key.J)
             : Keyboard.IsKeyDown(Key.NumPad9) || Keyboard.IsKeyDown(Key.K);
-        return keyDown && Keyboard.Modifiers == ModifierKeys.None;
+        return plainKeyDown && Keyboard.Modifiers == ModifierKeys.None;
     }
 
     private void StopSeekNudge()
     {
+        var wasExtend = _transportSelectionExtend
+            && _transportSelectionDigit is 7 or 9;
         _seekNudgeDirection = 0;
         _seekNudgeRepeatStarted = false;
         _seekNudgeTimer.Stop();
         _seekNudgeTimer.Interval = TimeSpan.FromMilliseconds(
             LibraryPlayerMode.SeekNudgeTimerIntervalMs(repeatStarted: false));
+        if (wasExtend)
+        {
+            _transportSelectionDigit = -1;
+            _transportSelectionExtend = false;
+            SyncPlayWindowFromDocument();
+        }
     }
 
     private bool TryHandlePlaylistVideoFrameStep(Key key, ModifierKeys modifiers, bool isRepeat)
