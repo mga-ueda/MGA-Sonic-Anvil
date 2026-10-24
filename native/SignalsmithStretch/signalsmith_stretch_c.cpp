@@ -162,6 +162,121 @@ int ss_pitch_exact_interleaved(
     return 1;
 }
 
+int ss_pitch_curve_interleaved(
+    const float *input,
+    float *output,
+    int frames,
+    int channels,
+    int sample_rate,
+    const float *semitones_per_frame,
+    ss_progress_fn progress,
+    void *user)
+{
+    if (input == nullptr || output == nullptr || semitones_per_frame == nullptr
+        || frames < 1 || channels < 1 || sample_rate < 1)
+    {
+        return 0;
+    }
+
+    int lastPercent = -1;
+    ReportProgress(progress, user, 0.f, lastPercent);
+
+    Stretch stretch(1);
+    stretch.presetDefault(channels, static_cast<float>(sample_rate));
+    const float tonality = 8000.f / static_cast<float>(sample_rate);
+    stretch.setTransposeSemitones(semitones_per_frame[0], tonality);
+
+    // 1:1 time. Seek like exact path so the stream starts aligned.
+    constexpr float playbackRate = 1.f;
+    const int seekLength = stretch.outputSeekLength(playbackRate);
+    const int padded = std::max(frames, seekLength);
+
+    std::vector<std::vector<float>> in_ch(static_cast<size_t>(channels));
+    std::vector<std::vector<float>> out_ch(static_cast<size_t>(channels));
+    std::vector<float *> in_ptr(static_cast<size_t>(channels));
+    std::vector<float *> out_ptr(static_cast<size_t>(channels));
+    for (int c = 0; c < channels; c++)
+    {
+        in_ch[static_cast<size_t>(c)].assign(static_cast<size_t>(padded), 0.f);
+        out_ch[static_cast<size_t>(c)].assign(static_cast<size_t>(padded), 0.f);
+        for (int i = 0; i < frames; i++)
+        {
+            in_ch[static_cast<size_t>(c)][static_cast<size_t>(i)] = input[i * channels + c];
+        }
+
+        in_ptr[static_cast<size_t>(c)] = in_ch[static_cast<size_t>(c)].data();
+        out_ptr[static_cast<size_t>(c)] = out_ch[static_cast<size_t>(c)].data();
+    }
+
+    float **inputs = in_ptr.data();
+    float **outputs = out_ptr.data();
+    stretch.outputSeek(inputs, seekLength);
+    ReportProgress(progress, user, 0.06f, lastPercent);
+
+    const int outputIndex = padded - seekLength;
+    const int inputRemain = padded - seekLength;
+    // ~2ms hops keep transpose continuous (STFT still overlaps internally).
+    const int hop = std::max(32, sample_rate / 500);
+    int inDone = 0;
+    int outDone = 0;
+    float lastSemi = semitones_per_frame[0];
+    while (outDone < outputIndex)
+    {
+        const int outLeft = outputIndex - outDone;
+        const int outChunk = std::min(hop, outLeft);
+        const int inLeft = inputRemain - inDone;
+        const int inChunk = outChunk == outLeft
+            ? inLeft
+            : std::clamp(
+                static_cast<int>(std::lround(
+                    static_cast<double>(outDone + outChunk) * inputRemain / std::max(1, outputIndex))) - inDone,
+                0,
+                inLeft);
+
+        // Map output position back into the original (unpadded) curve.
+        const int curveFrame = std::clamp(outDone, 0, frames - 1);
+        float semi = semitones_per_frame[curveFrame];
+        if (semi > 24.f)
+        {
+            semi = 24.f;
+        }
+        else if (semi < -24.f)
+        {
+            semi = -24.f;
+        }
+
+        if (std::abs(semi - lastSemi) > 1e-6f)
+        {
+            stretch.setTransposeSemitones(semi, tonality);
+            lastSemi = semi;
+        }
+
+        OffsetChannels inOff{inputs, seekLength + inDone};
+        OffsetChannels outOff{outputs, outDone};
+        // Always process — skipping near-zero pitch desyncs the STFT and clicks.
+        stretch.process(inOff, inChunk, outOff, outChunk);
+        inDone += inChunk;
+        outDone += outChunk;
+        const float processT = outputIndex <= 0 ? 1.f : static_cast<float>(outDone) / static_cast<float>(outputIndex);
+        ReportProgress(progress, user, 0.06f + 0.88f * processT, lastPercent);
+    }
+
+    OffsetChannels flushOut{outputs, outputIndex};
+    stretch.flush(flushOut, padded - outputIndex, playbackRate);
+    ReportProgress(progress, user, 0.96f, lastPercent);
+
+    for (int i = 0; i < frames; i++)
+    {
+        for (int c = 0; c < channels; c++)
+        {
+            output[i * channels + c] = out_ch[static_cast<size_t>(c)][static_cast<size_t>(i)];
+        }
+    }
+
+    ReportProgress(progress, user, 1.f, lastPercent);
+    return 1;
+}
+
 struct SsRealtime
 {
     Stretch stretch{1};
@@ -245,11 +360,8 @@ int ss_rt_process(
         SsRealtimeConfigure(state);
     }
 
-    if (state->semitones == 0.f)
-    {
-        return 1;
-    }
-
+    // Always run the stretcher so state stays continuous when pitch crosses 0.
+    // Callers that want a true bypass should skip invoking this function.
     state->in.resize(static_cast<size_t>(channels));
     state->out.resize(static_cast<size_t>(channels));
     state->inPtr.resize(static_cast<size_t>(channels));

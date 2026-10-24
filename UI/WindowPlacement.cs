@@ -329,6 +329,60 @@ internal static class WindowPlacement
         return true;
     }
 
+    public static void CapturePitchCurve(Window window, AppSettings settings)
+    {
+        var bounds = window.WindowState == WindowState.Normal
+            ? new Rect(window.Left, window.Top, window.Width, window.Height)
+            : window.RestoreBounds;
+        settings.PitchCurveX = (int)Math.Round(bounds.X);
+        settings.PitchCurveY = (int)Math.Round(bounds.Y);
+        settings.PitchCurveWidth = (int)Math.Round(bounds.Width);
+        settings.PitchCurveHeight = (int)Math.Round(bounds.Height);
+        settings.PitchCurveHasPlacement = true;
+    }
+
+    public static bool TryApplyPitchCurve(Window window, AppSettings settings)
+    {
+        if (!TryReadPitchCurve(settings, out var bounds, out var hasSize))
+        {
+            return false;
+        }
+
+        var width = hasSize ? Math.Max(bounds.Width, window.MinWidth) : window.Width;
+        var height = hasSize ? Math.Max(bounds.Height, window.MinHeight) : window.Height;
+        var placed = new Rect(bounds.X, bounds.Y, width, height);
+        if (!IsVisibleOnAnyScreen(placed))
+        {
+            return false;
+        }
+
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = placed.X;
+        window.Top = placed.Y;
+        if (hasSize)
+        {
+            window.Width = placed.Width;
+            window.Height = placed.Height;
+        }
+
+        return true;
+    }
+
+    public static bool TryReadPitchCurve(AppSettings settings, out Rect bounds, out bool hasSize)
+    {
+        bounds = default;
+        hasSize = settings.PitchCurveWidth > 0 && settings.PitchCurveHeight > 0;
+        if (!settings.PitchCurveHasPlacement)
+        {
+            return false;
+        }
+
+        var width = hasSize ? settings.PitchCurveWidth : 1;
+        var height = hasSize ? settings.PitchCurveHeight : 1;
+        bounds = new Rect(settings.PitchCurveX, settings.PitchCurveY, width, height);
+        return true;
+    }
+
     public static void CenterOnOwner(Window window, Window owner)
     {
         var width = window.ActualWidth > 1 ? window.ActualWidth : window.Width;

@@ -104,6 +104,7 @@ internal static class HistoryRecipes
     public const string Gain = "Gain";
     public const string PenGain = "PenGain";
     public const string PitchShift = "PitchShift";
+    public const string PitchCurve = "PitchCurve";
     public const string TimeStretch = "TimeStretch";
     public const string Reverse = "Reverse";
     public const string NormalizePerRegion = "NormalizePerRegion";
@@ -140,6 +141,7 @@ internal static class HistoryRecipes
         Gain,
         PenGain,
         PitchShift,
+        PitchCurve,
         TimeStretch,
         Reverse,
         NormalizePerRegion,
@@ -177,6 +179,7 @@ internal static class HistoryRecipes
         Gain,
         PenGain,
         PitchShift,
+        PitchCurve,
         TimeStretch,
         Reverse,
         NormalizePerRegion,
@@ -258,6 +261,34 @@ internal static class HistoryRecipes
                 End = range.EndFrame,
                 Value = Audio.PitchShift.Snap(semitones),
                 Flag = !timeStretch,
+            },
+            channel,
+            channelMask);
+
+    public static HistoryRecipe FromPitchCurve(
+        int sourceRate,
+        WaveSelection range,
+        Audio.PitchCurve curve,
+        int edgeFadeMs = ClickGuard.DefaultFadeMilliseconds,
+        float documentGainScale = 1f,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0,
+        bool timeStretch = true) =>
+        WithChannel(
+            new HistoryRecipe
+            {
+                Kind = PitchCurve,
+                SourceRate = sourceRate,
+                Start = range.StartFrame,
+                End = range.EndFrame,
+                Value = (int)curve.DefaultShape,
+                Timing0 = ClickGuard.ClampFadeMs(edgeFadeMs),
+                Amount = documentGainScale,
+                Flag = !timeStretch,
+                ClipSamples = curve.ToPackedSamples(),
+                Frames = curve.ToShapeIds(),
+                ClipChannels = 1,
+                ClipRate = sourceRate,
             },
             channel,
             channelMask);
@@ -381,6 +412,17 @@ internal static class HistoryRecipes
                 recipe.Value,
                 timeStretch: !recipe.Flag,
                 channelMask: MaskOf(recipe)),
+            PitchCurve => ProcessEdits.PitchCurve(
+                document,
+                RangeOf(recipe),
+                Audio.PitchCurve.FromPackedSamples(
+                    recipe.ClipSamples,
+                    recipe.Frames,
+                    FadeCurves.ParseStored(((FadeShape)recipe.Value).ToString())),
+                edgeFadeMs: recipe.Timing0 > 0 ? recipe.Timing0 : ClickGuard.DefaultFadeMilliseconds,
+                documentGainScale: recipe.Amount > 0 && recipe.Amount <= 1 ? (float)recipe.Amount : 1f,
+                channelMask: MaskOf(recipe),
+                timeStretch: !recipe.Flag),
             TimeStretch => ProcessEdits.TimeStretch(
                 document,
                 RangeOf(recipe),

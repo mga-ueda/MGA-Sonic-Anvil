@@ -86,7 +86,11 @@
         <li><a href="#quickstart">クイックスタート</a></li>
         <li><a href="#layout">画面の見方</a></li>
         <li><a href="#playback">再生</a></li>
-        <li><a href="#edit">選択と編集</a></li>
+        <li><a href="#edit">選択と編集</a>
+          <ol>
+            <li><a href="#pitch-curve">ピッチカーブ</a></li>
+          </ol>
+        </li>
         <li><a href="#silence-hit">無音・ヒット検出</a></li>
         <li><a href="#markers">マーカー／リージョン／ループ</a>
           <ol>
@@ -819,7 +823,7 @@
         <li><kbd>X</kbd> …… シークバー前後をフェード。シークを境に、今見えている前だけアウト／後ろだけイン（リニア）。サンプルループの継ぎ目向けの調整は <kbd>Shift</kbd>+<kbd>X</kbd>（<a href="#fade-adjust">フェード調整ツール</a>）。</li>
         <li><kbd>V</kbd> …… 単一タブではラウドネス曲線を表示して音量。dB を直接入力、または ↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。Space で試聴、Enter で実行。メニューに波形全体の Integrated LKFS／RMS／Peak の変化を先に出します。Short Term 曲線と停止中メーターも同じ dB で追従します。<kbd>Esc</kbd> または <kbd>Shift</kbd>+<kbd>V</kbd> で曲線を閉じます。</li>
         <li><strong>ラウドネスを揃える</strong>（プレイヤーのプレイリスト右クリック、またはエディタでタブを複数選択して <kbd>V</kbd>）…… 選択中の Wave／AIFF を指定 LKFS（既定は設定のラウドネスターゲット）へファイル全体のゲインで揃える簡易調整です。曲線ベースの音量（単一ファイルの <kbd>V</kbd>）とは別です。プレイヤーでは揃え後に既存パスへ保存し、この編集は元に戻せません。<kbd>V</kbd> ショートカットはプレイヤーでは無効です。MP3 など非対応はスキップ／対象なしなら案内します。</li>
-        <li><kbd>P</kbd> …… ピッチ。↑↓／ホイールで半音（Shift または Ctrl で 1 オクターブ）。Space で試聴、Enter で実行。±2 オクターブ。長さを保つのは既定オン（<kbd>Tab</kbd> でチェックへ）。オフは再生速度と同じく長さも変わります。実行中は半透明の画面で進捗を出します。</li>
+        <li><kbd>P</kbd> …… ピッチ。単一タブでは<a href="#pitch-curve">ピッチカーブ</a>ウィンドウを開きます（選択があればその範囲、無ければ全体）。タブを複数選んでいるときは一括用の半音指定ダイアログです。実行中は半透明の画面で進捗を出します。</li>
         <li><kbd>T</kbd> …… タイムストレッチ（ピッチ据え置き）。選択があればその時間、無ければ全体。伸ばした時間と割合（％）が連動。↑↓／ホイール（時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分。割合は 0.1／Shift 1／Ctrl 10／Ctrl+Shift 25％）。<kbd>Tab</kbd> で時間と割合。Space で試聴、Enter で実行。10–1000％。実行中は半透明の画面。</li>
         <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> …… ピークを -0.1 dB に合わせる。</li>
         <li><kbd>R</kbd> …… リバース。選択があればその範囲、無ければ全体の波形だけを時間方向に反転。マーカー／リージョン／ループは動かさない。</li>
@@ -884,6 +888,30 @@
           </ul>
         </li>
         <li><kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Ctrl</kbd>+<kbd>Y</kbd>（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> でもやり直し）…… 編集を元に戻す／やり直す。プレイヤーでは捨て A-B と一時マーカーだけです。</li>
+      </ul>
+
+      <h3 id="pitch-curve">ピッチカーブ</h3>
+      <p>時間に沿って半音を変える赤いカーブを描き、プレビューしてから波形へ焼き込むウィンドウです。一括の半音シフト（タブ複数選択時の <kbd>P</kbd>）とは別です。</p>
+      <ul>
+        <li><strong>開き方</strong> …… エディタで <kbd>P</kbd>、または波形の右クリック → オーディオ → ピッチ。選択があればその範囲、無ければ全体。タイトルに（選択範囲）／（全体）が付きます。プレイヤーでは <kbd>P</kbd> は曲送り用で、このウィンドウは開きません（プレイリスト右クリックのピッチは一括の半音指定）。</li>
+        <li><strong>画面</strong> …… 上は波形とピッチカーブ（縦軸は半音。0 / ±12 / ±24）。下は操作 UI を一塊にして中央寄せします。画面最下段の「0 半音」などのステータス文字は出しません。</li>
+        <li><strong>下部 UI の並び</strong>
+          <ul>
+            <li>上段（一塊の左から）…… ピッチ数値欄 → ポイント／ブラシ → 音階スナップ／タイムストレッチをしない／軽量演算 → カーブ形状（1–9）。数値欄の数字は中央揃えです。</li>
+            <li>下段…… 一塊の左に「ポイントを追加」「リセット」、その右に「再生」「ピッチカーブを無視して再生」。一塊の右端に OK／Cancel（窓端ではなく、中央寄せした塊の中での右寄せ）。</li>
+          </ul>
+        </li>
+        <li><strong>ウィンドウサイズ</strong> …… 高さの最小は従来の約半分まで縮められます。幅の最小は、下部 UI が見切れない実測幅です。位置とサイズは覚えます。</li>
+        <li><strong>ポイント</strong>（既定）…… 制御点をドラッグ。選択点は ↑↓ で ±1 半音（<kbd>Shift</kbd>+↑↓ で ±12）。←→ で時間移動（<kbd>Shift</kbd> で速く）。<kbd>Alt</kbd>+←→ で前後の点へ。<kbd>Delete</kbd> で選択点を削除。<kbd>Alt</kbd>+<kbd>A</kbd> または「ポイントを追加」で隣に追加。</li>
+        <li><strong>ブラシ</strong> …… ドラッグでカーブを描きます。このあいだ「ポイントを追加」とカーブ形状は使えません。</li>
+        <li><strong>ピッチ数値欄</strong>（<kbd>Alt</kbd>+<kbd>N</kbd>）…… 定数カーブの半音。↑↓ で ±1（<kbd>Shift</kbd>+↑↓ で ±12）。ホイールでも可。Enter で適用して閉じます（手描きカーブは潰しません）。</li>
+        <li><strong>音階にスナップ</strong>（<kbd>Alt</kbd>+<kbd>S</kbd>）…… 鍵盤表示に合わせ、半音を音階へ吸着。状態は覚えます。</li>
+        <li><strong>タイムストレッチをしない</strong>（<kbd>Alt</kbd>+<kbd>T</kbd>）…… オンだと長さが変わります（再生速度を変えるのと同じ考え方）。オフ（既定）は長さを保ちます。状態は覚えます。</li>
+        <li><strong>軽量演算モード</strong>（<kbd>Alt</kbd>+<kbd>L</kbd>）…… プレビューだけ速い（粗い）演算。OK の本適用はいつも通常品質。状態は覚えます。</li>
+        <li><strong>カーブ形状</strong>…… フェードと同じ 1–9。選択中の区間に効きます。数字キーでも選べます。</li>
+        <li><strong>再生</strong>（<kbd>Alt</kbd>+<kbd>P</kbd>／<kbd>Space</kbd>）…… カーブ付きで試聴／停止。「ピッチカーブを無視して再生」は元波形のまま聴き比べます。プレビュー中は半透明の画面で進捗を出すことがあります。</li>
+        <li><strong>リセット</strong> …… カーブを 0 半音の定数に戻します。</li>
+        <li><strong>OK／Cancel</strong> …… OK（Enter）で焼き込みして閉じる（取り消しは本体の <kbd>Ctrl</kbd>+<kbd>Z</kbd>）。Cancel（Esc）は破棄。クリップしそうなときは音量を下げてから適用するか確認します。ウィンドウ内の点編集は <kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Ctrl</kbd>+<kbd>Y</kbd>（または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>）で元に戻す／やり直しできます。</li>
       </ul>
 
       <h2 id="silence-hit">6. 無音・ヒット検出</h2>
@@ -1248,7 +1276,7 @@
           <tr><td><kbd>X</kbd></td><td>シークバー前後をフェード。シークを境に、今見えている前だけアウト／後ろだけイン（リニア）。一括適用の対象外</td></tr>
           <tr><td><kbd>V</kbd></td><td>単一タブ: ラウドネス曲線を表示して音量（dB を直接入力。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS／RMS／Peak を先に表示。入力を閉じても曲線は残る。<kbd>Shift</kbd>+<kbd>V</kbd> で曲線を閉じる）。複数タブ選択時: ラウドネスを揃える（簡易）。プレイヤーではキー無効（プレイリスト右クリックから）</td></tr>
           <tr><td><kbd>E</kbd></td><td>ラウドネス曲線が出ているときペンにする（もう一度で戻す。右上のボタン、曲線上の右クリックでも同じ。ドラッグは範囲選択せず、元の曲線は残る。離すと音量を反映。両端はフェード。<kbd>Ctrl</kbd>+<kbd>Z</kbd> で一筆を戻す。<kbd>Esc</kbd> はペンを先に戻す）</td></tr>
-          <tr><td><kbd>P</kbd></td><td>ピッチ（半音。↑↓／ホイール、Shift で 1 オクターブ。Space 試聴、Enter 実行。±2 オクターブ。長さを保つ既定オン。実行中は半透明の画面）</td></tr>
+          <tr><td><kbd>P</kbd></td><td>ピッチ。単一タブは<a href="#pitch-curve">ピッチカーブ</a>ウィンドウ（選択または全体）。複数タブ選択時は一括の半音指定。実行中は半透明の画面</td></tr>
           <tr><td><kbd>T</kbd></td><td>タイムストレッチ（時間と割合を連動。Space 試聴、Enter 実行。実行中は半透明の画面）</td></tr>
           <tr><td><kbd>N</kbd></td><td>ノーマライズ（ピーク -0.1 dB）</td></tr>
           <tr><td><kbd>R</kbd></td><td>リバース（選択、無ければ全体。波形のみ。マーカー等は動かさない）</td></tr>
@@ -1387,13 +1415,29 @@
           <tr><td><kbd>Esc</kbd></td><td>閉じる</td></tr>
         </tbody>
       </table>
-      <p>ピッチメニューが開いているとき</p>
+      <p>ピッチカーブが開いているとき（くわしくは <a href="#pitch-curve">ピッチカーブ</a>）</p>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Enter</kbd></td><td>OK（焼き込みして閉じる。数値欄フォーカス中で定数カーブなら先に数値を反映）</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Cancel（破棄して閉じる）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>P</kbd>／<kbd>Space</kbd></td><td>プレビュー再生／停止</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>A</kbd></td><td>ポイントを追加（ポイントモード時）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td>ピッチ数値欄へフォーカス</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>S</kbd>／<kbd>T</kbd>／<kbd>L</kbd></td><td>音階スナップ／タイムストレッチをしない／軽量演算のオン／オフ</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>I</kbd>／<kbd>B</kbd></td><td>ポイント／ブラシ</td></tr>
+          <tr><td>↑／↓（選択点または数値欄）</td><td>±1 半音（<kbd>Shift</kbd>+↑↓ で ±12）</td></tr>
+          <tr><td>←／→（選択点）</td><td>時間移動（<kbd>Shift</kbd> で速く）。<kbd>Alt</kbd>+←→ で前後の点へ</td></tr>
+          <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>選択点のカーブ形状</td></tr>
+          <tr><td><kbd>Delete</kbd></td><td>選択点を削除</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Y</kbd></td><td>ウィンドウ内の点編集を元に戻す／やり直し（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> もやり直し）</td></tr>
+        </tbody>
+      </table>
+      <p>ピッチの一括ダイアログ（タブ複数選択時の <kbd>P</kbd>）が開いているとき</p>
       <table>
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
           <tr><td>↑／↓／ホイール</td><td>半音（<kbd>Shift</kbd> または <kbd>Ctrl</kbd> で 1 オクターブ）</td></tr>
-          <tr><td><kbd>Tab</kbd></td><td>半音と「長さを保つ」を行き来（このあいだはチャンネルソロに使わない）</td></tr>
-          <tr><td><kbd>Space</kbd></td><td>試聴。チェックにフォーカスがあるときはオン／オフ</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>実行</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>閉じる</td></tr>
         </tbody>

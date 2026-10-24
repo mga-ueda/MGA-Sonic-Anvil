@@ -476,7 +476,6 @@ public partial class MainWindow
 
     private bool IsMenuTakingNumpadKeys() =>
         _volumeMenu is { IsOpen: true }
-        || _pitchMenu is { IsOpen: true }
         || _timeStretchMenu is { IsOpen: true }
         || _fadeMenu is { IsOpen: true }
         || _formatMenu is { IsOpen: true };
@@ -801,13 +800,6 @@ public partial class MainWindow
         if (_volumeMenu is { IsOpen: true })
         {
             VolumeGainPicker.TryNudge(_volumeMenu, Math.Sign(e.Delta));
-            e.Handled = true;
-            return;
-        }
-
-        if (_pitchMenu is { IsOpen: true })
-        {
-            PitchShiftPicker.TryNudge(_pitchMenu, Math.Sign(e.Delta));
             e.Handled = true;
             return;
         }
@@ -1294,7 +1286,6 @@ public partial class MainWindow
             && !IsEditingFileName
             && !Waveform.IsEditingMarkerComment
             && _volumeMenu is not { IsOpen: true }
-            && _pitchMenu is not { IsOpen: true }
             && _timeStretchMenu is not { IsOpen: true }
             && _fadeMenu is not { IsOpen: true }
             && _formatMenu is not { IsOpen: true }
@@ -1366,7 +1357,6 @@ public partial class MainWindow
             && !StatusTimes.IsTimeFocused
             && !IsEditingFileName
             && _volumeMenu is not { IsOpen: true }
-            && _pitchMenu is not { IsOpen: true }
             && _timeStretchMenu is not { IsOpen: true }
             && _fadeMenu is not { IsOpen: true }
             && _formatMenu is not { IsOpen: true }
@@ -1723,11 +1713,6 @@ public partial class MainWindow
         if (_volumeMenu is { IsOpen: true })
         {
             return false;
-        }
-
-        if (TryHandlePitchMenuShortcut(key, modifiers))
-        {
-            return true;
         }
 
         if (TryHandleTimeStretchMenuShortcut(key, modifiers))
@@ -2388,7 +2373,7 @@ public partial class MainWindow
             return true;
         }
 
-        if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker() || ClosePitchShiftPicker() || CloseTimeStretchPicker() || CloseInsertSilencePicker() || CloseSilenceSelectionPicker())
+        if (CloseFadeCurvePicker() || CloseFormatConvertPicker() || CloseVolumeGainPicker() || CloseTimeStretchPicker() || CloseInsertSilencePicker() || CloseSilenceSelectionPicker())
         {
             return true;
         }
@@ -2712,53 +2697,6 @@ public partial class MainWindow
         }
 
         if (key == Key.V && modifiers == ModifierKeys.None)
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    private bool TryHandlePitchMenuShortcut(Key key, ModifierKeys modifiers)
-    {
-        if (_pitchMenu is not { IsOpen: true })
-        {
-            return false;
-        }
-
-        if (key is Key.Up or Key.Down)
-        {
-            PitchShiftPicker.TryNudge(_pitchMenu, key == Key.Up ? 1 : -1);
-            return true;
-        }
-
-        if (key == Key.Tab)
-        {
-            PitchShiftPicker.TryMoveFocus(
-                _pitchMenu,
-                reverse: (modifiers & ModifierKeys.Shift) == ModifierKeys.Shift);
-            return true;
-        }
-
-        if (key == Key.Space && modifiers == ModifierKeys.None)
-        {
-            if (PitchShiftPicker.IsTimeStretchFocused(_pitchMenu))
-            {
-                PitchShiftPicker.TryToggleTimeStretch(_pitchMenu);
-                return true;
-            }
-
-            PreviewPitch(PitchShiftPicker.ReadSemitones(_pitchMenu), PitchShiftPicker.ReadTimeStretch(_pitchMenu));
-            return true;
-        }
-
-        if (key == Key.Enter && modifiers == ModifierKeys.None)
-        {
-            ApplyPitch(PitchShiftPicker.ReadSemitones(_pitchMenu), PitchShiftPicker.ReadTimeStretch(_pitchMenu));
-            return true;
-        }
-
-        if (key == Key.P && modifiers == ModifierKeys.None)
         {
             return true;
         }

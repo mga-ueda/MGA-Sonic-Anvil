@@ -472,7 +472,6 @@ internal static partial class UiStrings
     public static string LabelVolume => Get("音量", "Volume");
     public static string LabelPitch => Get("ピッチ", "Pitch");
     public static string LabelSemitone => Get("半音", "st");
-    public static string LabelPitchTimeStretch => Get("長さを保つ", "Keep length");
     public static string ErrorPitchShiftFailed => Get(
         "ピッチシフトに失敗しました。",
         "Pitch shift failed.");
@@ -542,6 +541,81 @@ internal static partial class UiStrings
             ? pitch
             : pitch + Get("（ストレッチなし）", " (no stretch)");
     }
+
+    public static string FormatPitchCurveExtra(Audio.PitchCurve curve, float documentGainScale, bool timeStretch = true)
+    {
+        string text;
+        if (curve.IsConstant(out var semi))
+        {
+            text = FormatSignedSemitones((int)Math.Round(semi));
+        }
+        else
+        {
+            text = Get($"カーブ {curve.Points.Count} 点", $"curve {curve.Points.Count} pts");
+        }
+
+        if (!timeStretch)
+        {
+            text += Get("（ストレッチなし）", " (no stretch)");
+        }
+
+        return documentGainScale < 0.9999f
+            ? text + Get("（全体音量調整）", " (level reduced)")
+            : text;
+    }
+
+    public static string DialogPitchCurveTitle => Get("ピッチカーブ", "Pitch Curve");
+
+    public static string DialogPitchCurveSelectionSuffix => Get("（選択範囲）", " (selection)");
+
+    public static string DialogPitchCurveEntireSuffix => Get("（全体）", " (entire)");
+
+    public static string LabelPitchCurveBrush => Get("ブラシ(_B)", "_Brush");
+
+    public static string LabelPitchCurvePoints => Get("ポイント(_I)", "Po_ints");
+
+    public static string LabelPitchCurveAddPoint => Get("ポイントを追加 (Alt+A)", "Add Point (Alt+A)");
+
+    public static string LabelPitchCurvePlay => Get("再生 (Alt+P)", "Play (Alt+P)");
+
+    public static string LabelPitchCurveStop => Get("停止 (Alt+P)", "Stop (Alt+P)");
+
+    public static string TipPitchCurvePlay => Get(
+        "Alt+Pで再生",
+        "Play with Alt+P");
+
+    public static string LabelPitchCurveShape => Get("カーブ形状", "Curve Shape");
+
+    /// <summary>ピッチカーブエディタの数値欄ラベル。Alt+N でフォーカス。</summary>
+    public static string LabelPitchCurvePitchValue => Get("ピッチ(_N)", "_Pitch");
+
+    public static string LabelPitchCurveSnapToScale => Get(
+        "音階にスナップする(_S)",
+        "Snap to _scale");
+
+    public static string LabelPitchCurveNoTimeStretch => Get(
+        "タイムストレッチをしない(_T)",
+        "Don't _time stretch");
+
+    public static string LabelPitchCurveLightweightMode => Get(
+        "軽量演算モード(_L)（視聴時のみ有効）",
+        "_Lightweight mode (preview only)");
+
+    public static string TipPitchCurveLightweightMode => Get(
+        "プレビューを速くします（音質は下がります）。OK で適用するときは通常の演算を使います。",
+        "Faster preview (lower quality). OK always uses full-quality processing.");
+
+    public static string LabelPitchCurveReset => Get("リセット", "Reset");
+
+    public static string LabelPitchCurvePlayBypass => Get(
+        "ピッチカーブを無視して再生",
+        "Play Ignoring Pitch Curve");
+
+    public static string MessagePitchCurveClipAsk => Get(
+        "処理後にクリップが発生します。波形全体の音量を下げてから適用しますか？",
+        "The result will clip. Lower the volume of the entire waveform before applying?");
+
+    public static string DialogPitchConstantTitle => Get("ピッチシフト（一括）", "Pitch Shift (Batch)");
 
     public static string MenuOpen => Get("開く", "Open");
     public static string MenuSaveAs => Get("名前を付けて保存", "Save As");
