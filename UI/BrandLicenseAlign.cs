@@ -190,9 +190,6 @@ internal static class BrandLicenseAlign
         return (formatted.Height, formatted.Baseline);
     }
 
-    public static double TextBaseline(TextBlock block, double pixelsPerDip) =>
-        MeasureLine(block, block.Text ?? string.Empty, pixelsPerDip).Baseline;
-
     internal static bool IsLogoInk(byte blue, byte green, byte red, byte alpha) =>
         alpha >= 16;
 }

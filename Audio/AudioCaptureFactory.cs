@@ -85,23 +85,6 @@ internal static class AudioCaptureFactory
             : name.Trim();
     }
 
-    public static int QueryInputChannelCount(AudioOutputApi api, string? deviceId)
-    {
-        try
-        {
-            return api switch
-            {
-                AudioOutputApi.Wasapi => QueryWasapiCaptureChannels(deviceId),
-                AudioOutputApi.Asio => 0,
-                _ => QueryWaveInChannels(deviceId),
-            };
-        }
-        catch
-        {
-            return 0;
-        }
-    }
-
     public static int QueryOutputChannelCount(AudioOutputSettings settings)
     {
         try
@@ -118,9 +101,6 @@ internal static class AudioCaptureFactory
             return 2;
         }
     }
-
-    public static string[] PortNames(int count, bool input) =>
-        DevicePortNames.Numbered(count, input);
 
     public static string[] QueryPortNames(AudioOutputApi api, string? deviceId, bool input)
     {
@@ -216,15 +196,6 @@ internal static class AudioCaptureFactory
         }
 
         return index < WaveOut.DeviceCount ? WaveOut.GetCapabilities(index).Channels : 2;
-    }
-
-    private static int QueryWasapiCaptureChannels(string? deviceId)
-    {
-        using var enumerator = new MMDeviceEnumerator();
-        using var device = string.IsNullOrWhiteSpace(deviceId)
-            ? enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia)
-            : enumerator.GetDevice(deviceId);
-        return Math.Max(0, device.AudioClient.MixFormat.Channels);
     }
 
     private static int QueryWasapiRenderChannels(string? deviceId)

@@ -1111,8 +1111,6 @@ internal sealed class LibraryBrowserView : UserControl
 
     public bool TryStepPlaylistPdfPage(int delta) => _visualStage.TryStepPdfPage(delta);
 
-    public bool TryGoPlaylistPdfPageEdge(int edge) => _visualStage.TryGoPdfPageEdge(edge);
-
     public bool TryGoPlaylistPdfPageNumber(int pageNumber1Based) =>
         _visualStage.TryGoPdfPageNumber(pageNumber1Based);
 
@@ -2434,10 +2432,6 @@ internal sealed class LibraryBrowserView : UserControl
         CopyPaths(SelectedCopyPaths());
     }
 
-    /// <summary>選択中の場所をエクスプローラーで開く。</summary>
-    public void ShowSelectedInExplorer() =>
-        LibraryShellFiles.TryOpenInExplorer(SelectedRevealPaths());
-
     internal string[] SelectedCopyPaths() => CopyPathsFor(ActivePane);
 
     internal string[] SelectedRevealPaths() => RevealPathsFor(ActivePane);
@@ -2935,84 +2929,6 @@ internal sealed class LibraryBrowserView : UserControl
         EnsureRowVisible(row);
     }
 
-    /// <summary>
-    /// 選択を変えずにキャレットだけ上下する（Ctrl+Shift+↑↓）。
-    /// 続けて Shift+Space で Ctrl+クリックと同じ飛び飛び選択ができる。
-    /// </summary>
-    public void MovePlaylistCaret(int delta, bool wrap = true)
-    {
-        if (delta == 0)
-        {
-            return;
-        }
-
-        var count = CountPlaylistFiles();
-        if (count <= 0)
-        {
-            return;
-        }
-
-        var index = PlaylistFileIndexOfCaret();
-        if (index < 0)
-        {
-            index = delta > 0 ? 0 : count - 1;
-        }
-        else
-        {
-            index = LibraryPlayerMode.StepLoopIndex(count, index, delta, wrap);
-        }
-
-        if (index < 0)
-        {
-            return;
-        }
-
-        var row = PlaylistFileAt(index);
-        if (row is null)
-        {
-            return;
-        }
-
-        _playlistCaretRow = row;
-        _syncing = true;
-        try
-        {
-            if (!ReferenceEquals(_grid.CurrentItem, row))
-            {
-                _grid.CurrentItem = row;
-            }
-        }
-        finally
-        {
-            _syncing = false;
-        }
-
-        EnsureListFocused();
-        EnsureRowVisible(row);
-    }
-
-    /// <summary>キャレット行を Ctrl+クリックと同じく選択へ足す／外す（Shift+Space）。</summary>
-    public void ToggleCurrentPlaylistRow()
-    {
-        var row = ResolvePlaylistCaretRow();
-        if (row is null || row.Tag is not DocumentSession)
-        {
-            return;
-        }
-
-        var gridIndex = _grid.Items.IndexOf(row);
-        if (gridIndex < 0)
-        {
-            return;
-        }
-
-        _playlistCaretRow = row;
-        ApplyPlaylistModifierClick(gridIndex, shift: false, control: true);
-        // EnsureListFocused→PinSelectionCurrent は呼ばない。
-        // 未選択キャレットへ CollectionView.MoveCurrentTo するとシアンが1行目へ飛ぶ。
-        EnsureRowVisible(row);
-    }
-
     private LibraryFileRow? ResolvePlaylistCaretRow()
     {
         if (_playlistCaretRow is not null
@@ -3028,33 +2944,6 @@ internal sealed class LibraryBrowserView : UserControl
         }
 
         return _grid.SelectedItem as LibraryFileRow;
-    }
-
-    private int PlaylistFileIndexOfCaret()
-    {
-        var caret = ResolvePlaylistCaretRow();
-        if (caret is null)
-        {
-            return PlaylistFileIndexOfSelected();
-        }
-
-        var index = 0;
-        foreach (var row in PlaylistRows())
-        {
-            if (row.Tag is not DocumentSession)
-            {
-                continue;
-            }
-
-            if (ReferenceEquals(row, caret))
-            {
-                return index;
-            }
-
-            index++;
-        }
-
-        return PlaylistFileIndexOfSelected();
     }
 
     private void SelectPlaylistFileRange(int from, int to)
@@ -4084,7 +3973,7 @@ internal sealed class LibraryBrowserView : UserControl
     /// DataGrid の CurrentItem はキャレット（なければ選択行）へ揃える。
     /// CollectionView の currency は<strong>選択行だけ</strong>に載せる。
     /// 未選択キャレットへ MoveCurrentTo すると WPF が IsSelected を先頭へ寄せ、
-    /// シアンが1行目へ飛ぶ（Ctrl+Shift+↑↓ → Shift+Space の飛び飛び選択で再現していた）。
+    /// シアンが1行目へ飛ぶ。
     /// </summary>
     private void PinSelectionCurrent()
     {
@@ -6848,68 +6737,6 @@ internal sealed class LibraryBrowserView : UserControl
         ApplyTreeMultiSelectChrome();
     }
 
-    /// <summary>今の行を Ctrl+クリックと同じく選択へ足す／外す（Ctrl+Shift+Space）。</summary>
-    internal void ToggleCurrentExplorerRow()
-    {
-        var item = _explorerCaret ?? CurrentExplorerItem();
-        if (item is null)
-        {
-            return;
-        }
-
-        _explorerCaret = item;
-        ToggleTreeMultiSelect(item);
-        if (_treeMultiSelected.Contains(item))
-        {
-            item.IsSelected = true;
-            _treeSelectionAnchor = item;
-        }
-        else if (_treeMultiSelected.Count > 0)
-        {
-            foreach (var marked in _treeMultiSelected)
-            {
-                if (marked.Tag is string)
-                {
-                    marked.IsSelected = true;
-                    break;
-                }
-            }
-        }
-
-        item.BringIntoView();
-        item.Focus();
-    }
-
-    /// <summary>選択を変えずにキャレットだけ上下する（Ctrl+Shift+↑↓）。</summary>
-    internal void MoveExplorerCaret(int delta)
-    {
-        if (delta == 0)
-        {
-            return;
-        }
-
-        var items = VisibleExplorerItems();
-        if (items.Count == 0)
-        {
-            return;
-        }
-
-        var caret = _explorerCaret ?? CurrentExplorerItem();
-        var index = caret is null ? -1 : items.IndexOf(caret);
-        if (index < 0)
-        {
-            index = delta > 0 ? 0 : items.Count - 1;
-        }
-        else
-        {
-            index = Math.Clamp(index + delta, 0, items.Count - 1);
-        }
-
-        _explorerCaret = items[index];
-        _explorerCaret.BringIntoView();
-        _explorerCaret.Focus();
-    }
-
     private void ClearTreeMultiSelect()
     {
         if (_treeMultiSelected.Count == 0)
@@ -9384,7 +9211,7 @@ internal sealed class LibraryBrowserView : UserControl
     private void Grid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // マウスや通常キーの選択にキャレットを追従。
-        // Ctrl+Shift+↑↓／Shift+Space 中は _syncing なので上書きしない。
+        // プログラム側の選択変更中（_syncing）は上書きしない。
         if (!_syncing && _grid.SelectedItem is LibraryFileRow selected)
         {
             _playlistCaretRow = selected;
