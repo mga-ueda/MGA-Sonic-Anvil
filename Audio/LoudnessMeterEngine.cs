@@ -165,7 +165,8 @@ internal sealed class LoudnessMeterEngine
         int channels,
         int sampleRate,
         double targetLufs = DefaultTargetLufs,
-        int sampleCount = -1)
+        int sampleCount = -1,
+        IProgress<double>? progress = null)
     {
         channels = Math.Max(1, channels);
         sampleRate = Math.Max(1000, sampleRate);
@@ -176,6 +177,7 @@ internal sealed class LoudnessMeterEngine
         var frames = used / channels;
         if (frames <= 0)
         {
+            progress?.Report(1);
             return LoudnessSnapshot.Idle with { TargetLufs = engine.TargetLufs };
         }
 
@@ -183,6 +185,9 @@ internal sealed class LoudnessMeterEngine
         var left = new float[chunk];
         var right = new float[chunk];
         var offset = 0;
+        var reportEvery = Math.Max(chunk, frames / 100);
+        var nextReport = reportEvery;
+        progress?.Report(0);
         while (offset < frames)
         {
             var n = Math.Min(chunk, frames - offset);
@@ -195,6 +200,11 @@ internal sealed class LoudnessMeterEngine
 
             engine.Process(left.AsSpan(0, n), right.AsSpan(0, n), n, sampleRate);
             offset += n;
+            if (progress is not null && (offset >= nextReport || offset >= frames))
+            {
+                progress.Report(offset / (double)frames);
+                nextReport = offset + reportEvery;
+            }
         }
 
         var snap = engine.Snapshot;
@@ -208,7 +218,8 @@ internal sealed class LoudnessMeterEngine
     public static bool TryMeasureIntegratedLufs(
         AudioDocument document,
         out float integratedLufs,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<double>? progress = null)
     {
         integratedLufs = float.NaN;
         if (!AudioCodec.IsUncompressedPcm(document.SourceKind))
@@ -216,7 +227,7 @@ internal sealed class LoudnessMeterEngine
             return false;
         }
 
-        if (!TryMeasureFileLoudness(document, out var loudness, cancellationToken))
+        if (!TryMeasureFileLoudness(document, out var loudness, cancellationToken, progress))
         {
             return false;
         }
@@ -229,7 +240,8 @@ internal sealed class LoudnessMeterEngine
     public static bool TryMeasureFileLoudness(
         AudioDocument document,
         out FileLoudness loudness,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<double>? progress = null)
     {
         loudness = default;
         if (!AudioCodec.IsUncompressedPcm(document.SourceKind))
@@ -242,7 +254,8 @@ internal sealed class LoudnessMeterEngine
             && document.SampleRate > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            loudness = FileLoudness.FromSnapshot(MeasureFile(pcm, document.Channels, document.SampleRate));
+            loudness = FileLoudness.FromSnapshot(
+                MeasureFile(pcm, document.Channels, document.SampleRate, progress: progress));
             return true;
         }
 
@@ -251,17 +264,18 @@ internal sealed class LoudnessMeterEngine
             return false;
         }
 
-        return TryMeasureFileLoudnessFromPath(path, out loudness, cancellationToken);
+        return TryMeasureFileLoudnessFromPath(path, out loudness, cancellationToken, progress);
     }
 
     /// <summary>パスから PCM を流し Integrated LUFS を測る（全サンプル。重い）。</summary>
     public static bool TryMeasureIntegratedFromPath(
         string path,
         out float integratedLufs,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<double>? progress = null)
     {
         integratedLufs = float.NaN;
-        if (!TryMeasureFileLoudnessFromPath(path, out var loudness, cancellationToken))
+        if (!TryMeasureFileLoudnessFromPath(path, out var loudness, cancellationToken, progress))
         {
             return false;
         }
@@ -273,7 +287,8 @@ internal sealed class LoudnessMeterEngine
     private static bool TryMeasureFileLoudnessFromPath(
         string path,
         out FileLoudness loudness,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<double>? progress = null)
     {
         loudness = default;
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -288,6 +303,7 @@ internal sealed class LoudnessMeterEngine
             var frames = AudioCodec.EstimateStreamFrameCount(stream);
             if (frames <= 0)
             {
+                progress?.Report(1);
                 loudness = FileLoudness.FromSnapshot(LoudnessSnapshot.Idle);
                 return true;
             }
@@ -300,6 +316,9 @@ internal sealed class LoudnessMeterEngine
             var provider = AudioCodec.AsSampleProvider(stream);
             long frame = 0;
             var emptyReads = 0;
+            var reportEvery = Math.Max(chunkFrames, frames / 100);
+            var nextReport = reportEvery;
+            progress?.Report(0);
             while (frame < frames)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -334,8 +353,14 @@ internal sealed class LoudnessMeterEngine
 
                 engine.Process(left.AsSpan(0, n), right.AsSpan(0, n), n, sampleRate);
                 frame += n;
+                if (progress is not null && (frame >= nextReport || frame >= frames))
+                {
+                    progress.Report(Math.Min(1d, frame / (double)frames));
+                    nextReport = frame + reportEvery;
+                }
             }
 
+            progress?.Report(1);
             loudness = FileLoudness.FromSnapshot(
                 engine.Snapshot with { ShortTermLufs = engine.MaxShortTermLufs });
             return true;
@@ -708,11 +733,12 @@ internal sealed class LoudnessMeterEngine
         double targetLufs,
         out double gainDb,
         out float integratedLufs,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<double>? progress = null)
     {
         gainDb = 0;
         integratedLufs = float.NaN;
-        if (!TryMeasureIntegratedLufs(document, out integratedLufs, cancellationToken))
+        if (!TryMeasureIntegratedLufs(document, out integratedLufs, cancellationToken, progress))
         {
             return false;
         }

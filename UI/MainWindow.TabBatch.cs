@@ -45,6 +45,23 @@ public partial class MainWindow
             ? ResolvePlaylistLoudnessMatchTargets().Length > 0
             : HasTabSelection;
 
+    /// <summary>既存 IProgress の区間へ 0..1 を写す。背景スレッドでも SyncContext を汚さない。</summary>
+    private static IProgress<double>? ScaleBusyProgress(
+        IProgress<double>? inner,
+        double start,
+        double end) =>
+        inner is null ? null : new BusyProgressScale(inner, start, end);
+
+    private sealed class BusyProgressScale(IProgress<double> inner, double start, double end)
+        : IProgress<double>
+    {
+        public void Report(double value)
+        {
+            var t = Math.Clamp(value, 0, 1);
+            inner.Report(start + (end - start) * t);
+        }
+    }
+
     /// <summary>
     /// タブ選択があれば、編集コマンドを選択タブ全部に対して実行する。実行に入ったら true。
     /// 履歴レシピ貼り付けと同じすりガラス（タブ別進捗）を重ねて操作を抑制する。
@@ -191,23 +208,18 @@ public partial class MainWindow
                 var parallelism = AudioExport.WorkerCount(
                     buildIndices.Count,
                     AppStorage.Settings.ExportParallelism);
-                var progressLock = new object();
-                // Dispatcher / IsLoaded は UI スレッド専用。並列本体では触らない。
-                var dispatcher = Dispatcher;
+                // System.Progress の SyncContext 経由だと UI Post → 再 BeginInvoke になり、
+                // 計測ループ中の％更新が一度しか見えないことがある。ワーカー直書き＋スナップショット送る。
+                var busyProgress = new BatchEditBusyProgress(
+                    names,
+                    progress,
+                    weights,
+                    Dispatcher,
+                    ApplyHistoryPasteBusySnapshot);
                 var perTabProgress = new IProgress<double>?[sessions.Length];
                 foreach (var i in buildIndices)
                 {
-                    var index = i;
-                    perTabProgress[index] = new Progress<double>(p =>
-                    {
-                        lock (progressLock)
-                        {
-                            progress[index] = Math.Clamp(Math.Max(0.02, p), 0d, 0.99d);
-                        }
-
-                        dispatcher.BeginInvoke(() =>
-                            ReportHistoryPasteBusy(names, progress, weights));
-                    });
+                    perTabProgress[i] = busyProgress.ForTab(i);
                 }
 
                 await Task.Run(() =>

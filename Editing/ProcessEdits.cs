@@ -22,4 +22,16 @@ internal static partial class ProcessEdits
         };
     }
 
+    /// <summary>既存 IProgress の区間へ 0..1 を写す。背景スレッドでも SyncContext を汚さない。</summary>
+    private sealed class ScaledProgress(IProgress<double> inner, double start, double end) : IProgress<double>
+    {
+        public void Report(double value)
+        {
+            var t = Math.Clamp(value, 0, 1);
+            inner.Report(start + (end - start) * t);
+        }
+
+        public static IProgress<double>? Create(IProgress<double>? inner, double start, double end) =>
+            inner is null ? null : new ScaledProgress(inner, start, end);
+    }
 }
