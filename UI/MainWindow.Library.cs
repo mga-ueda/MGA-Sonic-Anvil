@@ -1009,6 +1009,25 @@ public partial class MainWindow
         return true;
     }
 
+    /// <summary>映像／PDF 上のダブルクリックは F キーと同じ全画面トグル。操作系 UI 上は無視。</summary>
+    private void MainWindow_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left || e.Handled)
+        {
+            return;
+        }
+
+        if (LibraryPlayerMode.BlocksVideoFullscreenDoubleClick(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
+        if (TryTogglePlaylistVideoFullscreen())
+        {
+            e.Handled = true;
+        }
+    }
+
     private bool TryTogglePlaylistVideoHud()
     {
         if (!IsPlaylistVisualHudContext())
