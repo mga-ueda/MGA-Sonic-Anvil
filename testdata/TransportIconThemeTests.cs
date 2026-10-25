@@ -11,9 +11,8 @@ namespace MgaSonicAnvil.Tests;
 public sealed class TransportIconThemeTests
 {
     [Fact]
-    public void Outline_BothThemes()
+    public void Outline_IsTrue()
     {
-        Assert.True(TransportIconTheme.Outline(UiTheme.Light));
         Assert.True(TransportIconTheme.Outline(UiTheme.Dark));
     }
 
@@ -22,7 +21,7 @@ public sealed class TransportIconThemeTests
     {
         RunSta(() =>
         {
-            foreach (var theme in new[] { UiTheme.Light, UiTheme.Dark })
+            foreach (var theme in new[] { UiTheme.Dark })
             {
                 var pixels = Render(TransportIcon.Folder, theme, 34, 36);
                 Assert.False(IsInk(pixels, 34, 17, 20), $"{theme} folder body should be hollow");
@@ -58,7 +57,7 @@ public sealed class TransportIconThemeTests
     {
         RunSta(() =>
         {
-            foreach (var theme in new[] { UiTheme.Light, UiTheme.Dark })
+            foreach (var theme in new[] { UiTheme.Dark })
             {
                 AssertIconCentered(TransportIcon.Folder, theme, 22, 22);
                 AssertIconCentered(TransportIcon.Folder, theme, 34, 36);
@@ -71,7 +70,7 @@ public sealed class TransportIconThemeTests
     {
         RunSta(() =>
         {
-            foreach (var theme in new[] { UiTheme.Light, UiTheme.Dark })
+            foreach (var theme in new[] { UiTheme.Dark })
             {
                 var pixels = Render(TransportIcon.PlayPause, theme, 34, 36);
                 Assert.False(IsInk(pixels, 34, 16, 18), $"{theme} play should be hollow");
@@ -84,7 +83,7 @@ public sealed class TransportIconThemeTests
     {
         RunSta(() =>
         {
-            foreach (var theme in new[] { UiTheme.Light, UiTheme.Dark })
+            foreach (var theme in new[] { UiTheme.Dark })
             {
                 foreach (var icon in new[]
                 {
@@ -108,7 +107,7 @@ public sealed class TransportIconThemeTests
     {
         RunSta(() =>
         {
-            foreach (var theme in new[] { UiTheme.Light, UiTheme.Dark })
+            foreach (var theme in new[] { UiTheme.Dark })
             {
                 var pixels = Render(TransportIcon.ColorPalette, theme, 34, 36);
                 Assert.True(CountInk(pixels, 34, 36) >= 40, $"{theme} RGB circles should draw");
@@ -123,7 +122,7 @@ public sealed class TransportIconThemeTests
     {
         RunSta(() =>
         {
-            foreach (var theme in new[] { UiTheme.Light, UiTheme.Dark })
+            foreach (var theme in new[] { UiTheme.Dark })
             {
                 foreach (var icon in new[] { TransportIcon.Lock, TransportIcon.Unlock })
                 {

@@ -225,9 +225,7 @@ public sealed class ColorDevCatalogTests
     [Fact]
     public void Title_UsesPlainColorSettingsLabel()
     {
-        var dark = UiStrings.ColorDevTitleFor(UiTheme.Dark);
-        var light = UiStrings.ColorDevTitleFor(UiTheme.Light);
-        Assert.Equal(dark, light);
+        var dark = UiStrings.ColorDevTitleFor();
         Assert.DoesNotContain("開発者", dark);
         Assert.DoesNotContain("developer", dark, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("モード", dark);

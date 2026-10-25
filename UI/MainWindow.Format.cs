@@ -367,8 +367,7 @@ public partial class MainWindow
             LoudnessMeter.Reset();
             _player.Prepare(preview, startFrame, range, loop: false);
 
-            _formatPreview.Previewing = true;
-            _formatPreview.StartedAt = Environment.TickCount64;
+            EffectPreviewSession.MarkStarted(_formatPreview);
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
@@ -377,10 +376,12 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _formatPreview.Previewing = false;
-            PausePlaybackSoft();
-            RebindOriginalDocument();
-            OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
+            EffectPreviewSession.Fail(
+                this,
+                _formatPreview,
+                ex,
+                () => PausePlaybackSoft(),
+                extraCleanup: RebindOriginalDocument);
         }
     }
 

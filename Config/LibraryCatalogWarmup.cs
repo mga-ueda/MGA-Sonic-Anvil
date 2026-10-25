@@ -47,18 +47,8 @@ internal static class LibraryCatalogWarmup
                 continue;
             }
 
-            string full;
-            try
-            {
-                full = Path.GetFullPath(root.Trim())
-                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            }
-            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-            {
-                continue;
-            }
-
-            if (!Directory.Exists(full))
+            if (!PathUtil.TryGetFullPathTrimmedSeparators(root, out var full)
+                || !Directory.Exists(full))
             {
                 continue;
             }

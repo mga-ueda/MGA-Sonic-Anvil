@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.Config;
 
@@ -505,19 +506,8 @@ internal static class LibraryMediaCache
         return files;
     }
 
-    private static bool TryFull(string path, out string full)
-    {
-        full = string.Empty;
-        try
-        {
-            full = Path.GetFullPath(path.Trim());
-            return full.Length > 0;
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-        {
-            return false;
-        }
-    }
+    private static bool TryFull(string path, out string full) =>
+        PathUtil.TryGetFullPathTrimmed(path, out full);
 
     private static void TryDelete(string file)
     {

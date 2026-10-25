@@ -21,7 +21,6 @@ internal sealed class UiColorScheme
         {
             Format = FormatId,
             Version = CurrentVersion,
-            Light = scheme.Light ?? [],
             Dark = scheme.Dark ?? [],
         };
         return JsonSerializer.Serialize(dto, UiColorSchemeJsonContext.Default.UiColorSchemeDto);
@@ -161,8 +160,6 @@ internal sealed class UiColorSchemeDto
     public string Format { get; set; } = UiColorScheme.FormatId;
 
     public int Version { get; set; } = UiColorScheme.CurrentVersion;
-
-    public Dictionary<string, string> Light { get; set; } = [];
 
     public Dictionary<string, string> Dark { get; set; } = [];
 }

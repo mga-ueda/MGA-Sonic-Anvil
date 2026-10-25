@@ -10,10 +10,6 @@ public sealed class UiColorSchemeTests
     {
         var json = UiColorScheme.Write(new UiColorScheme
         {
-            Light = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["WaveFillBrush"] = "#405273",
-            },
             Dark = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["WaveFillBrush"] = "#7CA7FF",
@@ -22,7 +18,6 @@ public sealed class UiColorSchemeTests
 
         Assert.Contains(UiColorScheme.FormatId, json);
         Assert.True(UiColorScheme.TryRead(json, out var scheme));
-        Assert.Equal("#405273", scheme.Light!["WaveFillBrush"]);
         Assert.Equal("#7CA7FF", scheme.Dark!["WaveFillBrush"]);
     }
 

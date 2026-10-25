@@ -2,6 +2,7 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
@@ -40,21 +41,14 @@ internal static class LibraryShellFiles
                 continue;
             }
 
-            try
+            if (!PathUtil.TryGetFullPathTrimmed(raw, out var full) || !seen.Add(full))
             {
-                var full = Path.GetFullPath(raw.Trim());
-                if (!seen.Add(full))
-                {
-                    continue;
-                }
-
-                if (File.Exists(full) || Directory.Exists(full))
-                {
-                    result.Add(full);
-                }
+                continue;
             }
-            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+
+            if (File.Exists(full) || Directory.Exists(full))
             {
+                result.Add(full);
             }
         }
 

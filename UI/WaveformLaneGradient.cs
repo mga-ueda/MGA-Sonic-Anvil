@@ -1,34 +1,25 @@
-using MgaSonicAnvil.Domain;
-
 namespace MgaSonicAnvil.UI;
 
 /// <summary>
 /// 波形レーン。中心が明るく、上下端へやや暗くなる。
-/// ライトでは描画色を白へ寄せて薄くする。
 /// </summary>
 internal static class WaveformLaneGradient
 {
     /// <summary>端での輝度倍率。1 がそのまま、小さいほど暗い。</summary>
     public const double EdgeBrightness = 0.55;
 
-    /// <summary>
-    /// ライトのプレイヤーでは、色設定の PlayerWaveFill を使う。
-    /// </summary>
-    public static int PlayerFill(int bgra, UiTheme theme)
+    /// <summary>色設定の PlayerWaveFill を使う。</summary>
+    public static int PlayerFill(int bgra)
     {
-        var fill = PlayerChrome.Get("PlayerWaveFillBrush", theme);
+        var fill = PlayerChrome.Get("PlayerWaveFillBrush");
         var a = (bgra >> 24) & 0xFF;
         return (a << 24) | (fill.R << 16) | (fill.G << 8) | fill.B;
     }
 
     /// <summary>
     /// mid を中心に、|y-mid| / halfHeight で端へ暗い色へ寄せる。
-    /// ライトは端を白へ寄せて、ピークがインクのように沈まないようにする。
     /// </summary>
-    public static int Shade(int bgra, double y, double mid, double halfHeight) =>
-        Shade(bgra, y, mid, halfHeight, UiTheme.Dark);
-
-    public static int Shade(int bgra, double y, double mid, double halfHeight, UiTheme theme)
+    public static int Shade(int bgra, double y, double mid, double halfHeight)
     {
         if (halfHeight <= 1e-6)
         {
@@ -36,17 +27,26 @@ internal static class WaveformLaneGradient
         }
 
         var t = Math.Clamp(Math.Abs(y - mid) / halfHeight, 0, 1);
-        if (theme == UiTheme.Light)
-        {
-            return MixTowardWhite(bgra, t * (1d - EdgeBrightness));
-        }
-
         var scale = 1d + (EdgeBrightness - 1d) * t;
         var a = (bgra >> 24) & 0xFF;
         var r = ScaleChannel((bgra >> 16) & 0xFF, scale);
         var g = ScaleChannel((bgra >> 8) & 0xFF, scale);
         var b = ScaleChannel(bgra & 0xFF, scale);
         return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    /// <summary>互換。テーマ引数は無視。</summary>
+    public static int Shade(int bgra, double y, double mid, double halfHeight, Domain.UiTheme theme)
+    {
+        _ = theme;
+        return Shade(bgra, y, mid, halfHeight);
+    }
+
+    /// <summary>互換。テーマ引数は無視。</summary>
+    public static int PlayerFill(int bgra, Domain.UiTheme theme)
+    {
+        _ = theme;
+        return PlayerFill(bgra);
     }
 
     internal static int MixTowardWhite(int bgra, double amount)

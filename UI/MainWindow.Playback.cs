@@ -656,8 +656,65 @@ public partial class MainWindow
         }
     }
 
+    // -------------------------------------------------------------------------
+    // 停止 API（意図明示の少数面）
+    // - PausePlaybackSoft … エンジン／UI の停止中核。カーソル位置は動かない。
+    // - PausePlaybackHere … その場一時停止＋現在フレームへシーク。
+    // - HaltPlaybackToStart … 停止して再生開始位置へ戻す（StopPlayback は同義）。
+    // - StopPlaybackForEdit / StopPlaybackForExport … 編集・書き出し直前の薄い入口。
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// 再生停止の中核。エンジンとトランスポート UI を止め、カーソルは動かない。
+    /// </summary>
+    /// <param name="keepPlaylistVisual">
+    /// true なら映像／PDF の本再生表示はそのまま（暗いプレビューへ落とさない）。
+    /// 上下キーで次の本再生へつなぐとき用。
+    /// </param>
+    /// <param name="freezePlaylistVisual">
+    /// true なら映像を現在フレームで一時停止する（暗い 1/3 速プレビューへ落とさない）。
+    /// テンキー 0 の一時停止用。
+    /// </param>
+    private void PausePlaybackSoft(bool keepPlaylistVisual = false, bool freezePlaylistVisual = false)
+    {
+        StopPlaybackShuttle();
+        ReleaseStuckScrub();
+        _player.Pause();
+        if (IsLibraryMaximized)
+        {
+            if (freezePlaylistVisual)
+            {
+                LibraryBrowser.PausePlaylistVisualFrame();
+            }
+            else if (!keepPlaylistVisual)
+            {
+                LibraryBrowser.SetPlaylistVisualPlaying(false);
+                EnsurePlaylistVideoWindowRestored();
+            }
+        }
+        else
+        {
+            LibraryBrowser.HidePlaylistVisual();
+        }
+
+        _playTimer.Stop();
+        StopMeterRendering();
+        Waveform.ExitPlayheadFrame = -1;
+        Waveform.SetTrailRecording(false);
+        Transport.SetPlaying(false);
+        BeginMeterRelease();
+        // 再生中 Tick は止まっているので、停止時に波形全体のオフライン計測へ戻す。
+        LoudnessMeter.RefreshOffline();
+        Waveform.UnlockCenter();
+    }
+
+    /// <summary>停止して再生開始位置へ戻す。<see cref="HaltPlaybackToStart"/> の別名。</summary>
     private void StopPlayback() => HaltPlaybackToStart();
 
+    /// <summary>編集適用の直前。位置は動かず再生だけ止める。</summary>
+    private void StopPlaybackForEdit() => PausePlaybackSoft();
+
+    /// <summary>書き出しの直前。再生中だけソフト停止する。</summary>
     private void StopPlaybackForExport()
     {
         if (!IsPlaybackActive())
@@ -668,6 +725,7 @@ public partial class MainWindow
         PausePlaybackSoft();
     }
 
+    /// <summary>その場で一時停止し、カーソルを現在フレームへ合わせる。</summary>
     private bool PausePlaybackHere(bool immersiveVideoHold = false)
     {
         if (_document is null || !IsPlaybackActive())
@@ -718,6 +776,7 @@ public partial class MainWindow
         return true;
     }
 
+    /// <summary>停止して再生開始位置へ戻す。</summary>
     private void HaltPlaybackToStart(bool keepVideoChromeHidden = false)
     {
         _editorPlayAfterPcmTicket++;

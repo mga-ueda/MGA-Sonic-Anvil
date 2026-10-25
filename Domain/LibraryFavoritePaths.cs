@@ -16,31 +16,24 @@ internal static class LibraryFavoritePaths
 
         foreach (var raw in saved)
         {
-            if (string.IsNullOrWhiteSpace(raw))
+            if (!PathUtil.TryGetFullPathTrimmed(raw, out var full))
             {
                 continue;
             }
 
-            try
+            // 存在するファイル単体は登録しない（フォルダのみ）。
+            if (File.Exists(full) && !Directory.Exists(full))
             {
-                var full = Path.GetFullPath(raw.Trim());
-                // 存在するファイル単体は登録しない（フォルダのみ）。
-                if (File.Exists(full) && !Directory.Exists(full))
-                {
-                    continue;
-                }
-
-                // 無いパスも登録として残す（UI で赤字表示）。
-                if (!seen.Add(full))
-                {
-                    continue;
-                }
-
-                result.Add(full);
+                continue;
             }
-            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+
+            // 無いパスも登録として残す（UI で赤字表示）。
+            if (!seen.Add(full))
             {
+                continue;
             }
+
+            result.Add(full);
         }
 
         return [.. result];
@@ -56,19 +49,11 @@ internal static class LibraryFavoritePaths
     /// <summary>登録フォルダが無いか。</summary>
     public static bool IsMissing(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path))
+        if (!PathUtil.TryGetFullPathTrimmed(path, out var full))
         {
             return true;
         }
 
-        try
-        {
-            var full = Path.GetFullPath(path.Trim());
-            return !Directory.Exists(full);
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-        {
-            return true;
-        }
+        return !Directory.Exists(full);
     }
 }

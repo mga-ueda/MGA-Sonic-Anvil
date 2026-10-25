@@ -922,100 +922,8 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.F11 && modifiers == ModifierKeys.None)
+        if (TryProcessChromeShortcut(key, modifiers))
         {
-            if (!BlocksOutsideFadeToolActions)
-            {
-                ToggleWaveformMaximize();
-            }
-
-            return true;
-        }
-
-        if (key == Key.F12 && modifiers == ModifierKeys.None)
-        {
-            if (!BlocksOutsideFadeToolActions)
-            {
-                ToggleAnalyzerMaximize();
-            }
-
-            return true;
-        }
-
-        if (key == Key.F8 && modifiers == ModifierKeys.None)
-        {
-            if (!BlocksOutsideFadeToolActions)
-            {
-                ToggleVideoMiniPlayer();
-            }
-
-            return true;
-        }
-
-        if (key == Key.F9 && modifiers == ModifierKeys.None)
-        {
-            if (!BlocksOutsideFadeToolActions)
-            {
-                ToggleLibraryMinimalChrome();
-            }
-
-            return true;
-        }
-
-        if (key == Key.F10 && modifiers == ModifierKeys.None)
-        {
-            if (!BlocksOutsideFadeToolActions)
-            {
-                StopSeekNudge();
-                StopVideoFrameStep();
-                ToggleLibraryMaximize();
-            }
-
-            return true;
-        }
-
-        // ステータスバー系は F8／F9 でバーが隠れても、エディタ／プレイヤー共通で効かせる。
-        if (key == Key.S && modifiers == ModifierKeys.Alt)
-        {
-            SilentSkipCheck.IsChecked = SilentSkipCheck.IsChecked != true;
-            return true;
-        }
-
-        if (key == Key.T && modifiers == ModifierKeys.Alt)
-        {
-            AlwaysOnTopCheck.IsChecked = AlwaysOnTopCheck.IsChecked != true;
-            return true;
-        }
-
-        // Auto Loop はステータスバー（Silent Skip の右）。プレイヤー限定にするとエディタで効かない。
-        if (LibraryPlayerMode.IsAutoLoopToggle(key, modifiers))
-        {
-            LibraryBrowser.ToggleAutoLoop();
-            return true;
-        }
-
-        // モニター列（MONO／DIM／LC／BPM）。エディタ／プレイヤー共通。ボタン操作と同じ。
-        if (LibraryPlayerMode.IsMonitorMonoToggle(key, modifiers))
-        {
-            MonitorToggles.ToggleMono();
-            return true;
-        }
-
-        if (LibraryPlayerMode.IsMonitorDimToggle(key, modifiers))
-        {
-            MonitorToggles.ToggleDim();
-            return true;
-        }
-
-        if (LibraryPlayerMode.IsMonitorLowCutToggle(key, modifiers))
-        {
-            MonitorToggles.ToggleLowCut();
-            return true;
-        }
-
-        if (LibraryPlayerMode.IsMonitorBpmCycle(key, modifiers))
-        {
-            MonitorToggles.CycleBpmMode();
             return true;
         }
 
@@ -1027,473 +935,16 @@ public partial class MainWindow
             return true;
         }
 
-        // タイル検索。Ctrl+F で開き、ボックス内では Enter / Alt+Enter / Esc を拾う。
-        // プレイヤーではライブラリ／プレイリスト検索が Ctrl+F を使う。
-        if (IsLibraryMaximized && TryProcessLibrarySearchKey(key, modifiers))
+        var searchHandled = TryProcessSearchFocusShortcut(key, modifiers);
+        if (searchHandled is not null)
         {
-            return true;
+            return searchHandled.Value;
         }
 
-        if (TryProcessTileSearchKey(key, modifiers))
+        var librarySession = TryProcessLibrarySessionShortcut(key, modifiers, isRepeat);
+        if (librarySession is not null)
         {
-            return true;
-        }
-
-        if (IsTileSearchFocused)
-        {
-            // 検索ボックスへの文字入力はそのまま通す（1 文字ごとに判定される）。
-            return false;
-        }
-
-        // ライブラリ／プレイリスト検索フォーカス中は文字入力を優先。
-        // Alt+R／N／P（と Ctrl+Shift+P）だけは下のトグルへ通す（Alt は検索に文字を入れない）。
-        if (IsLibraryMaximized
-            && LibraryBrowser.IsSearchFocused
-            && !LibraryPlayerMode.BypassesSearchFocus(key, modifiers))
-        {
-            return false;
-        }
-
-        if (!IsNumpadTextInputFocused()
-            && !IsMenuTakingNumpadKeys()
-            && TryNudgePlaybackPitch(key, modifiers))
-        {
-            return true;
-        }
-
-        // 動画ミニ: In／Out がある Escape は解除だけ。無ければ Q と同じくプレイリストへ戻る。
-        if (IsVideoMiniPlayerActive()
-            && !isRepeat
-            && LibraryPlayerMode.LeavesVideoMiniToPlaylist(key, modifiers))
-        {
-            if (LibraryPlayerMode.ClearsVideoMiniInOutInsteadOfLeaving(
-                    key,
-                    modifiers,
-                    LibraryBrowser.PlaylistVisualIsVideo,
-                    Waveform.ScratchCues.HasAbPoint))
-            {
-                Waveform.ClearPlayerAbRepeat();
-                SyncPlayWindowFromDocument();
-                return true;
-            }
-
-            LeaveVideoMiniToPlaylist(minimalChrome: false);
-            return true;
-        }
-
-        // F8／引数起動の動画・PDF ミニ: +／- で窓サイズを拡縮（テンキー可）。
-        // PDF 内容ズームより先に窓拡縮へ回す。
-        if (IsVideoMiniPlayerActive()
-            && !_playlistVideoFullscreen
-            && TryHandleVideoLaunchScaleKey(key, modifiers, isRepeat))
-        {
-            return true;
-        }
-
-        // PDF 表示中はページ／内容拡縮を優先し、プレイリスト操作キーは奪う。
-        if (IsLibraryMaximized
-            && LibraryBrowser.PlaylistVisualIsPdf
-            && TryHandlePlaylistPdfKey(key, modifiers, isRepeat))
-        {
-            return true;
-        }
-
-        // プレイヤーのコピー／貼り付け／移動／削除／名前変更。F1／F3 はペイン移動に使わない。
-        if (IsLibraryMaximized
-            && !isRepeat
-            && !IsLibraryGroupComboFocused
-            && !ImeComposition.IsComposing
-            && TryHandleLibraryFileShortcut(key, modifiers))
-        {
-            return true;
-        }
-
-        // プレイヤー専用: Tab でツリー→お気に入り→プレイリスト。
-        if (IsLibraryMaximized && IsLibraryPaneCycleShortcut(key, modifiers))
-        {
-            if (key == Key.Tab)
-            {
-                LibraryBrowser.CyclePaneFocus(reverse: modifiers == ModifierKeys.Shift);
-            }
-            return true;
-        }
-
-        // F5 はツリー再読込だけ。Ctrl+F5 は索引の再構築（すりガラスでロック）。
-        if (IsLibraryMaximized && LibraryPlayerMode.IsExplorerRefresh(key, modifiers))
-        {
-            RefreshLibraryTree();
-            return true;
-        }
-
-        if (IsLibraryMaximized && LibraryPlayerMode.IsLibraryCatalogRebuild(key, modifiers))
-        {
-            RebuildLibraryCatalog();
-            return true;
-        }
-
-        // 空リスト／ツリー／検索フォーカスでも Alt+R はランダム切替。タイプアヘッドより先に拾う。
-        if (IsLibraryMaximized
-            && !IsLibraryGroupComboFocused
-            && !ImeComposition.IsComposing
-            && LibraryPlayerMode.IsShuffleToggle(key, modifiers))
-        {
-            LibraryBrowser.ToggleShuffle();
-            return true;
-        }
-
-        // Alt+N は次の曲を自動再生。素の N（次の曲）より先、タイプアヘッド／検索入力より先。
-        if (IsLibraryMaximized
-            && !IsLibraryGroupComboFocused
-            && !ImeComposition.IsComposing
-            && LibraryPlayerMode.IsAutoPlayNextToggle(key, modifiers))
-        {
-            LibraryBrowser.ToggleAutoPlayNext();
-            return true;
-        }
-
-        // Alt+L（Auto Loop）は先頭のステータスバー系で処理済み。
-
-        // Alt+P は Enter 追加時の自動再生。素の P（前の曲）より先、タイプアヘッド／検索入力より先。
-        if (IsLibraryMaximized
-            && !IsLibraryGroupComboFocused
-            && !ImeComposition.IsComposing
-            && LibraryPlayerMode.IsAutoPlayToggle(key, modifiers))
-        {
-            LibraryBrowser.ToggleAutoPlay();
-            return true;
-        }
-
-        // Ctrl+Shift+P は動画プロキシの強制生成（設定の自動生成オフ／F8 抑止を無視）。
-        if (IsLibraryMaximized
-            && !IsLibraryGroupComboFocused
-            && !ImeComposition.IsComposing
-            && !isRepeat
-            && LibraryPlayerMode.IsForceVideoProxyEncode(key, modifiers))
-        {
-            RequestForceVideoProxyEncode();
-            return true;
-        }
-
-        // P／N は前後曲（テンキー 4／6）。ツリー／検索フォーカス中はタイプアヘッド（検索入力）を優先。
-        if (IsLibraryMaximized
-            && LibraryPlayerMode.AllowsPlayerLetterTransport(IsLibraryExplorerFocused)
-            && !IsLibraryGroupComboFocused
-            && !ImeComposition.IsComposing
-            && !isRepeat
-            && LibraryPlayerMode.IsPlayerTrackStepKey(key, modifiers))
-        {
-            TryStepLibraryPlaylist(key == Key.P ? -1 : 1);
-            return true;
-        }
-
-        // R は再生し直し（テンキー 5）。Alt+R のランダムより後。ツリー／検索中はタイプアヘッド優先。
-        if (IsLibraryMaximized
-            && LibraryPlayerMode.AllowsPlayerLetterTransport(IsLibraryExplorerFocused)
-            && !IsLibraryGroupComboFocused
-            && !ImeComposition.IsComposing
-            && !isRepeat
-            && LibraryPlayerMode.IsPlayerRestartKey(key, modifiers))
-        {
-            RestartLibraryTrack();
-            return true;
-        }
-
-        // 一時マーカーがあるとき Ctrl+←／→ をマーカージャンプに。
-        if (IsLibraryMaximized
-            && LibraryPlayerMode.PrefersMarkerArrowJump(
-                IsPlayerScratchContext(),
-                Waveform.HasPlayerScratchMarkers)
-            && key is Key.Left or Key.Right
-            && modifiers == ModifierKeys.Control)
-        {
-            Waveform.SeekToMarker(key == Key.Left ? -1 : 1);
-            return true;
-        }
-
-        if (IsLibraryMaximized
-            && LibraryPlayerMode.PrefersMarkerArrowJump(
-                IsPlayerScratchContext(),
-                Waveform.HasPlayerScratchMarkers)
-            && key is Key.Left or Key.Right
-            && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
-        {
-            Waveform.ExtendSelectionToMarker(key == Key.Left ? -1 : 1);
-            return true;
-        }
-
-        // Ctrl+Delete／選択中 Delete は捨てマーカー削除。
-        if (IsLibraryMaximized
-            && IsPlayerScratchContext()
-            && key == Key.Delete
-            && modifiers == ModifierKeys.Control)
-        {
-            ApplyPlayerScratchMarkerDelete();
-            return true;
-        }
-
-        if (IsLibraryMaximized
-            && IsPlayerScratchContext()
-            && key == Key.Delete
-            && modifiers == ModifierKeys.None
-            && LibraryPlayerMode.PrefersScratchMarkerDelete(
-                playerMode: true,
-                Waveform.HasSelectedMarkers))
-        {
-            ApplyPlayerScratchMarkerDelete();
-            return true;
-        }
-
-        // I／O／M／Ins。ツリーフォーカス中は I／O／M をタイプアヘッドへ譲る（Ins はマーカーのまま）。
-        if (IsLibraryMaximized
-            && !IsLibraryGroupComboFocused
-            && !ImeComposition.IsComposing
-            && LibraryPlayerMode.AllowsPlayerScratchCueKey(
-                key,
-                modifiers,
-                LibraryBrowser.IsExplorerTreeFocused)
-            && TryHandlePlayerScratchCueKey(key, modifiers))
-        {
-            return true;
-        }
-
-        // Ctrl+←／↑ ライブラリ、Ctrl+→ プレイリスト、Ctrl+↓ お気に入り。
-        // プレイヤー中の Ctrl+←／→（マーカー）は上で回したのでここには来ない。暗いプレビューではペインへ。
-        if (IsLibraryMaximized
-            && !IsLibraryGroupComboFocused
-            && LibraryPlayerMode.IsPaneFocusArrow(key, modifiers))
-        {
-            switch (key)
-            {
-                case Key.Left:
-                case Key.Up:
-                    LibraryBrowser.FocusExplorer();
-                    break;
-                case Key.Right:
-                    LibraryBrowser.FocusList();
-                    break;
-                default:
-                    LibraryBrowser.FocusFavorites();
-                    break;
-            }
-
-            return true;
-        }
-
-        // テンキー再生操作（プレイヤー／エディタ共通）。上段数字の割合／マーカーは別経路。
-        // ツリーのインクリメントサーチ中はテンキー数字を検索へ譲る。
-        if (!IsLibraryGroupComboFocused
-            && !StatusTimes.IsTimeFocused
-            && !IsEditingFileName
-            && !Waveform.IsEditingMarkerComment
-            && _volumeMenu is not { IsOpen: true }
-            && _timeStretchMenu is not { IsOpen: true }
-            && _fadeMenu is not { IsOpen: true }
-            && _formatMenu is not { IsOpen: true }
-            && !(IsLibraryExplorerFocused
-                && !LibraryBrowser.IsExplorerSearchFocused
-                && LibraryPlayerMode.IsPlayerNumpadKey(key, modifiers))
-            && TryHandleTransportNumpad(key, modifiers, isRepeat))
-        {
-            return true;
-        }
-
-        if (IsLibraryMaximized && TryHandlePlaylistVideoFrameStep(key, modifiers, isRepeat))
-        {
-            return true;
-        }
-
-        if (IsLibraryMaximized
-            && LibraryPlayerMode.IsVideoFullscreenToggle(key, modifiers)
-            && TryTogglePlaylistVideoFullscreen())
-        {
-            return true;
-        }
-
-        if (IsLibraryMaximized
-            && LibraryPlayerMode.IsVideoHudToggle(key, modifiers)
-            && TryTogglePlaylistVideoHud())
-        {
-            return true;
-        }
-
-        if (IsLibraryMaximized
-            && LibraryPlayerMode.IsVideoTimecodeToggle(key, modifiers)
-            && TryTogglePlaylistVideoTimecode())
-        {
-            return true;
-        }
-
-        if (IsLibraryMaximized
-            && !isRepeat
-            && LibraryPlayerMode.IsPdfBackgroundPinToggle(key, modifiers)
-            && TryTogglePdfBackgroundPin())
-        {
-            return true;
-        }
-
-        // F10: 本再生／イマーシブ一時停止／PDF 明るい表示から暗いプレビューへ（Escape と同じ。動画ミニの Q は上でプレイリストへ戻済み）。
-        if (IsLibraryMaximized
-            && key == Key.Q
-            && modifiers == ModifierKeys.None
-            && !isRepeat
-            && TryExitPlaylistRealPlayback())
-        {
-            return true;
-        }
-
-        // Shift／Ctrl＋テンキーは番号ジャンプ。Alt＋テンキーは割合。無修飾は再生のまま。
-        // ツリーの Shift+8（上段）は配下展開のまま。文字入力中はテンキーを渡す。
-        if (!NumpadShiftPassesToText()
-            && TryHandleNumpadCueDigitJump(key, modifiers))
-        {
-            return true;
-        }
-
-        // 上段 0–9: 無修飾＝割合。Shift＋上段＝マーカー番号（二桁可。無修飾テンキーは上で再生操作済み）。
-        // ツリーフォーカス中は使わない（Shift+8＝配下展開を優先。割合／マーカーは他ペインから）。
-        if (IsLibraryMaximized
-            && LibraryPlayerMode.AllowsPlayerDigitJump(IsLibraryExplorerFocused)
-            && !IsLibraryGroupComboFocused
-            && !StatusTimes.IsTimeFocused
-            && !IsEditingFileName
-            && _volumeMenu is not { IsOpen: true }
-            && _timeStretchMenu is not { IsOpen: true }
-            && _fadeMenu is not { IsOpen: true }
-            && _formatMenu is not { IsOpen: true }
-            && TryHandleLibraryDigitJump(key, modifiers))
-        {
-            return true;
-        }
-
-        if (IsLibraryMaximized
-            && key is Key.Left or Key.Right
-            && modifiers == ModifierKeys.None)
-        {
-            StopPlaybackShuttle();
-            if (IsLibraryExplorerFocused)
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        if (IsLibraryGroupComboFocused)
-        {
-            return false;
-        }
-
-        if (IsLibraryExplorerFocused)
-        {
-            if (!LibraryBrowser.IsExplorerSearchFocused)
-            {
-                if (LibraryBrowser.TryExplorerTypeahead(key, modifiers))
-                {
-                    return true;
-                }
-            }
-
-            if (LibraryPlayerMode.IsPlaylistFolderAddKey(key, modifiers))
-            {
-                // Enter＝クリア直下／Ctrl+Enter＝クリア再帰／Shift＋＝追加（Ctrl で再帰）。
-                LibraryBrowser.ClearExplorerTypeahead();
-                var clear = LibraryPlayerMode.ClearsPlaylistOnFolderAdd(modifiers);
-                var recursive = LibraryPlayerMode.RecursesPlaylistFolderAdd(modifiers);
-                if (clear)
-                {
-                    LibraryBrowser.ReplacePlaylistFromSelection(recursive);
-                }
-                else
-                {
-                    LibraryBrowser.OpenSelectedFolder(recursive);
-                }
-
-                return true;
-            }
-
-            if (LibraryPlayerMode.IsExplorerExpandAll(key, modifiers))
-            {
-                LibraryBrowser.ClearExplorerTypeahead();
-                LibraryBrowser.ExpandSelectedExplorerSubtree();
-                return true;
-            }
-
-            if (LibraryPlayerMode.IsExplorerCollapseSubtree(key, modifiers))
-            {
-                LibraryBrowser.ClearExplorerTypeahead();
-                LibraryBrowser.CollapseSelectedExplorerSubtree();
-                return true;
-            }
-
-            if (LibraryPlayerMode.IsExplorerCollapseAllRoots(key, modifiers))
-            {
-                LibraryBrowser.ClearExplorerTypeahead();
-                LibraryBrowser.CollapseAllExplorerRoots();
-                return true;
-            }
-
-            // 設定のルート「上へ／下へ」と同じ並び替え。
-            if (LibraryPlayerMode.IsExplorerRootReorder(key, modifiers))
-            {
-                LibraryBrowser.ClearExplorerTypeahead();
-                LibraryBrowser.TryMoveSelectedExplorerRoots(key == Key.Up ? -1 : 1);
-                return true;
-            }
-
-            if (key == Key.Space && modifiers == ModifierKeys.None)
-            {
-                LibraryBrowser.TryExplorerSpaceExpandOrMoveDown();
-                return true;
-            }
-
-            if (key == Key.Space && modifiers == ModifierKeys.Shift)
-            {
-                LibraryBrowser.TryExplorerShiftSpaceCollapseOrMoveUp();
-                return true;
-            }
-
-            if (LibraryPlayerMode.ExplorerOwnsHorizontal(key, modifiers))
-            {
-                LibraryBrowser.ClearExplorerTypeahead();
-                StopPlaybackShuttle();
-                return false;
-            }
-
-            if (LibraryPlayerMode.BlocksExplorerKey(key, modifiers))
-            {
-                return true;
-            }
-
-            // Ctrl+Q などアプリ共通ショートカットは続行。タイプアヘッドはツリーへ渡す。
-            if (!LibraryPlayerMode.AllowsKey(key, modifiers))
-            {
-                return false;
-            }
-        }
-
-        if (IsLibraryFavoritesFocused)
-        {
-            // Enter 系追加／Delete はお気に入りリスト側で処理。
-            // ここで握るとプレイリストの Enter（再生）に吸われ、追加されない。
-            if (LibraryPlayerMode.IsPlaylistFolderAddKey(key, modifiers))
-            {
-                return false;
-            }
-
-            if (key == Key.Delete && modifiers == ModifierKeys.None)
-            {
-                return false;
-            }
-
-            if (LibraryPlayerMode.BlocksExplorerKey(key, modifiers))
-            {
-                return true;
-            }
-
-            if (!LibraryPlayerMode.AllowsKey(key, modifiers))
-            {
-                return false;
-            }
+            return librarySession.Value;
         }
 
         if (StatusTimes.IsTimeFocused)
@@ -1517,149 +968,9 @@ public partial class MainWindow
             StopPlaceRepeat();
         }
 
-        if (IsLibraryMaximized)
+        if (TryProcessLibraryPlaylistShortcut(key, modifiers, isRepeat))
         {
-            // 選択は据え置きで表示だけ1行動かす。ツリーフォーカス時はルート並び替えが先。
-            if (LibraryPlayerMode.IsPlaylistScroll(key, modifiers)
-                && !IsLibraryExplorerFocused)
-            {
-                LibraryBrowser.ScrollPlaylistByRows(key == Key.Up ? -1 : 1);
-                return true;
-            }
-
-            // Shift+Space: プレイリストのチェックモード（ツリーは上で折りたたみ処理済み）。
-            if (LibraryPlayerMode.IsCheckSelectModeToggle(key, modifiers)
-                && !IsLibraryExplorerFocused
-                && !IsLibraryFavoritesFocused)
-            {
-                if (!isRepeat)
-                {
-                    LibraryBrowser.ToggleCheckSelectMode();
-                }
-
-                return true;
-            }
-
-            if ((key is Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown)
-                && modifiers is ModifierKeys.None or ModifierKeys.Shift)
-            {
-                // 動画本再生・ミニ・PDF 本表示では Home／End／Page をエディタと同じタイムライン操作へ。
-                if ((key is Key.Home or Key.End or Key.PageUp or Key.PageDown)
-                    && LibraryPlayerMode.UsesEditorTimelineNavKeys(_playlistVideoChromeVisible))
-                {
-                    _libraryPlayOnArrowRelease = false;
-                    return TryHandleWaveformTimelineNavKey(key, modifiers);
-                }
-
-                var extend = modifiers == ModifierKeys.Shift;
-                // 単発は端から反対側へ回る。長押し連続は端で一旦止まる（Ctrl+Tab と同じ）。
-                var wrap = !isRepeat;
-                if (key is Key.Home or Key.End)
-                {
-                    LibraryBrowser.MoveSelectionToEdge(key == Key.Home ? -1 : 1, extend);
-                }
-                else if (key is Key.PageUp or Key.PageDown)
-                {
-                    LibraryBrowser.MoveSelectionPage(key == Key.PageUp ? -1 : 1, extend, wrap);
-                }
-                else
-                {
-                    LibraryBrowser.MoveSelection(key == Key.Up ? -1 : 1, extend, wrap);
-                }
-
-                _libraryPlayOnArrowRelease = !extend;
-                return true;
-            }
-
-            if (key == Key.A && modifiers is ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift))
-            {
-                // 動画本再生など前面 UI 隠れ中は全選択しない（続けて Delete で空にする事故を防ぐ）。
-                if (LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(
-                        _playlistVideoChromeVisible))
-                {
-                    return true;
-                }
-
-                LibraryBrowser.SelectAllRows();
-                return true;
-            }
-
-            if (key == Key.C && modifiers == ModifierKeys.Control)
-            {
-                LibraryBrowser.CopySelected();
-                return true;
-            }
-
-            // Enter はグローバル側（本再生中＝その場停止、停止中の動画／PDF＝Space と同じ）。
-
-            // リストから外すだけ（ディスクは消さない）。選択中マーカーの Delete は上で処理済み。
-            if (key == Key.Delete && modifiers == ModifierKeys.None)
-            {
-                if (LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(
-                        _playlistVideoChromeVisible))
-                {
-                    return true;
-                }
-
-                RemoveLibrarySelectedFromList();
-                return true;
-            }
-
-            // 捨てキュー操作は上の TryHandlePlayerScratchCueKey 済み。
-            // 非コンテキスト時も I／O／M／Ins はここで消費し、エディタのフェード／AddMarker へ落とさない。
-            if (modifiers == ModifierKeys.None
-                && key is Key.I or Key.O or Key.M or Key.Insert)
-            {
-                return true;
-            }
-
-            if (IsPlayerScratchContext()
-                && key is Key.Left or Key.Right
-                && (modifiers & ModifierKeys.Alt) != 0
-                && (modifiers & ~(ModifierKeys.Alt | ModifierKeys.Shift | ModifierKeys.Control)) == 0)
-            {
-                return BeginOrContinueMarkerNudge(key == Key.Left ? -1 : 1);
-            }
-
-            // 捨てキューの Undo／Redo。戻せない Ctrl+Z は何もしない（エディタの履歴へ落とさない）。
-            if (key == Key.Z && modifiers == (ModifierKeys.Control | ModifierKeys.Shift)
-                || key == Key.Y && modifiers == ModifierKeys.Control)
-            {
-                if (IsPlayerScratchContext())
-                {
-                    UndoOrRedoPlayerScratch(redo: true);
-                }
-
-                return true;
-            }
-
-            if (key == Key.Z && modifiers == ModifierKeys.Control)
-            {
-                if (IsPlayerScratchContext() && Waveform.CanUndoPlayerScratch)
-                {
-                    UndoOrRedoPlayerScratch(redo: false);
-                }
-
-                return true;
-            }
-
-            // タブを閉じない。リストから外すのも Delete のみ。
-            if (key == Key.W
-                && modifiers is ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift))
-            {
-                return true;
-            }
-
-            if (!LibraryPlayerMode.AllowsKey(key, modifiers))
-            {
-                return true;
-            }
-
-            // 破壊編集は右クリックメニューのみ。ショートカットは握りつぶす（誤操作防止）。
-            if (LibraryPlayerMode.IsDestructiveEditShortcut(key, modifiers))
-            {
-                return true;
-            }
+            return true;
         }
 
         if (TryProcessHistoryShortcut(key, modifiers))
@@ -2273,6 +1584,742 @@ public partial class MainWindow
 
         return false;
     }
+
+    /// <summary>F8–F12、ステータス／モニター列など、モード横断のトグル。</summary>
+    private bool TryProcessChromeShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (key == Key.F11 && modifiers == ModifierKeys.None)
+        {
+            if (!BlocksOutsideFadeToolActions)
+            {
+                ToggleWaveformMaximize();
+            }
+
+            return true;
+        }
+
+        if (key == Key.F12 && modifiers == ModifierKeys.None)
+        {
+            if (!BlocksOutsideFadeToolActions)
+            {
+                ToggleAnalyzerMaximize();
+            }
+
+            return true;
+        }
+
+        if (key == Key.F8 && modifiers == ModifierKeys.None)
+        {
+            if (!BlocksOutsideFadeToolActions)
+            {
+                ToggleVideoMiniPlayer();
+            }
+
+            return true;
+        }
+
+        if (key == Key.F9 && modifiers == ModifierKeys.None)
+        {
+            if (!BlocksOutsideFadeToolActions)
+            {
+                ToggleLibraryMinimalChrome();
+            }
+
+            return true;
+        }
+
+        if (key == Key.F10 && modifiers == ModifierKeys.None)
+        {
+            if (!BlocksOutsideFadeToolActions)
+            {
+                StopSeekNudge();
+                StopVideoFrameStep();
+                ToggleLibraryMaximize();
+            }
+
+            return true;
+        }
+
+        // ステータスバー系は F8／F9 でバーが隠れても、エディタ／プレイヤー共通で効かせる。
+        if (key == Key.S && modifiers == ModifierKeys.Alt)
+        {
+            SilentSkipCheck.IsChecked = SilentSkipCheck.IsChecked != true;
+            return true;
+        }
+
+        if (key == Key.T && modifiers == ModifierKeys.Alt)
+        {
+            AlwaysOnTopCheck.IsChecked = AlwaysOnTopCheck.IsChecked != true;
+            return true;
+        }
+
+        // Auto Loop はステータスバー（Silent Skip の右）。プレイヤー限定にするとエディタで効かない。
+        if (LibraryPlayerMode.IsAutoLoopToggle(key, modifiers))
+        {
+            LibraryBrowser.ToggleAutoLoop();
+            return true;
+        }
+
+        // モニター列（MONO／DIM／LC／BPM）。エディタ／プレイヤー共通。ボタン操作と同じ。
+        if (LibraryPlayerMode.IsMonitorMonoToggle(key, modifiers))
+        {
+            MonitorToggles.ToggleMono();
+            return true;
+        }
+
+        if (LibraryPlayerMode.IsMonitorDimToggle(key, modifiers))
+        {
+            MonitorToggles.ToggleDim();
+            return true;
+        }
+
+        if (LibraryPlayerMode.IsMonitorLowCutToggle(key, modifiers))
+        {
+            MonitorToggles.ToggleLowCut();
+            return true;
+        }
+
+        if (LibraryPlayerMode.IsMonitorBpmCycle(key, modifiers))
+        {
+            MonitorToggles.CycleBpmMode();
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>ライブラリ／タイル検索。処理したら true/false、未該当は null。</summary>
+    private bool? TryProcessSearchFocusShortcut(Key key, ModifierKeys modifiers)
+    {
+        // タイル検索。Ctrl+F で開き、ボックス内では Enter / Alt+Enter / Esc を拾う。
+        // プレイヤーではライブラリ／プレイリスト検索が Ctrl+F を使う。
+        if (IsLibraryMaximized && TryProcessLibrarySearchKey(key, modifiers))
+        {
+            return true;
+        }
+
+        if (TryProcessTileSearchKey(key, modifiers))
+        {
+            return true;
+        }
+
+        if (IsTileSearchFocused)
+        {
+            // 検索ボックスへの文字入力はそのまま通す（1 文字ごとに判定される）。
+            return false;
+        }
+
+        // ライブラリ／プレイリスト検索フォーカス中は文字入力を優先。
+        // Alt+R／N／P（と Ctrl+Shift+P）だけは下のトグルへ通す（Alt は検索に文字を入れない）。
+        if (IsLibraryMaximized
+            && LibraryBrowser.IsSearchFocused
+            && !LibraryPlayerMode.BypassesSearchFocus(key, modifiers))
+        {
+            return false;
+        }
+
+        return null;
+    }
+
+    /// <summary>プレイヤーセッション（ミニ／PDF／ファイル操作／ツリー等）。未該当は null。</summary>
+    private bool? TryProcessLibrarySessionShortcut(Key key, ModifierKeys modifiers, bool isRepeat)
+    {
+        if (!IsNumpadTextInputFocused()
+            && !IsMenuTakingNumpadKeys()
+            && TryNudgePlaybackPitch(key, modifiers))
+        {
+            return true;
+        }
+
+        // 動画ミニ: In／Out がある Escape は解除だけ。無ければ Q と同じくプレイリストへ戻る。
+        if (IsVideoMiniPlayerActive()
+            && !isRepeat
+            && LibraryPlayerMode.LeavesVideoMiniToPlaylist(key, modifiers))
+        {
+            if (LibraryPlayerMode.ClearsVideoMiniInOutInsteadOfLeaving(
+                    key,
+                    modifiers,
+                    LibraryBrowser.PlaylistVisualIsVideo,
+                    Waveform.ScratchCues.HasAbPoint))
+            {
+                Waveform.ClearPlayerAbRepeat();
+                SyncPlayWindowFromDocument();
+                return true;
+            }
+
+            LeaveVideoMiniToPlaylist(minimalChrome: false);
+            return true;
+        }
+
+        // F8／引数起動の動画・PDF ミニ: +／- で窓サイズを拡縮（テンキー可）。
+        // PDF 内容ズームより先に窓拡縮へ回す。
+        if (IsVideoMiniPlayerActive()
+            && !_playlistVideoFullscreen
+            && TryHandleVideoLaunchScaleKey(key, modifiers, isRepeat))
+        {
+            return true;
+        }
+
+        // PDF 表示中はページ／内容拡縮を優先し、プレイリスト操作キーは奪う。
+        if (IsLibraryMaximized
+            && LibraryBrowser.PlaylistVisualIsPdf
+            && TryHandlePlaylistPdfKey(key, modifiers, isRepeat))
+        {
+            return true;
+        }
+
+        // プレイヤーのコピー／貼り付け／移動／削除／名前変更。F1／F3 はペイン移動に使わない。
+        if (IsLibraryMaximized
+            && !isRepeat
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && TryHandleLibraryFileShortcut(key, modifiers))
+        {
+            return true;
+        }
+
+        // プレイヤー専用: Tab でツリー→お気に入り→プレイリスト。
+        if (IsLibraryMaximized && IsLibraryPaneCycleShortcut(key, modifiers))
+        {
+            if (key == Key.Tab)
+            {
+                LibraryBrowser.CyclePaneFocus(reverse: modifiers == ModifierKeys.Shift);
+            }
+            return true;
+        }
+
+        // F5 はツリー再読込だけ。Ctrl+F5 は索引の再構築（すりガラスでロック）。
+        if (IsLibraryMaximized && LibraryPlayerMode.IsExplorerRefresh(key, modifiers))
+        {
+            RefreshLibraryTree();
+            return true;
+        }
+
+        if (IsLibraryMaximized && LibraryPlayerMode.IsLibraryCatalogRebuild(key, modifiers))
+        {
+            RebuildLibraryCatalog();
+            return true;
+        }
+
+        // 空リスト／ツリー／検索フォーカスでも Alt+R はランダム切替。タイプアヘッドより先に拾う。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && LibraryPlayerMode.IsShuffleToggle(key, modifiers))
+        {
+            LibraryBrowser.ToggleShuffle();
+            return true;
+        }
+
+        // Alt+N は次の曲を自動再生。素の N（次の曲）より先、タイプアヘッド／検索入力より先。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && LibraryPlayerMode.IsAutoPlayNextToggle(key, modifiers))
+        {
+            LibraryBrowser.ToggleAutoPlayNext();
+            return true;
+        }
+
+        // Alt+L（Auto Loop）は先頭のステータスバー系で処理済み。
+
+        // Alt+P は Enter 追加時の自動再生。素の P（前の曲）より先、タイプアヘッド／検索入力より先。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && LibraryPlayerMode.IsAutoPlayToggle(key, modifiers))
+        {
+            LibraryBrowser.ToggleAutoPlay();
+            return true;
+        }
+
+        // Ctrl+Shift+P は動画プロキシの強制生成（設定の自動生成オフ／F8 抑止を無視）。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && !isRepeat
+            && LibraryPlayerMode.IsForceVideoProxyEncode(key, modifiers))
+        {
+            RequestForceVideoProxyEncode();
+            return true;
+        }
+
+        // P／N は前後曲（テンキー 4／6）。ツリー／検索フォーカス中はタイプアヘッド（検索入力）を優先。
+        if (IsLibraryMaximized
+            && LibraryPlayerMode.AllowsPlayerLetterTransport(IsLibraryExplorerFocused)
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && !isRepeat
+            && LibraryPlayerMode.IsPlayerTrackStepKey(key, modifiers))
+        {
+            TryStepLibraryPlaylist(key == Key.P ? -1 : 1);
+            return true;
+        }
+
+        // R は再生し直し（テンキー 5）。Alt+R のランダムより後。ツリー／検索中はタイプアヘッド優先。
+        if (IsLibraryMaximized
+            && LibraryPlayerMode.AllowsPlayerLetterTransport(IsLibraryExplorerFocused)
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && !isRepeat
+            && LibraryPlayerMode.IsPlayerRestartKey(key, modifiers))
+        {
+            RestartLibraryTrack();
+            return true;
+        }
+
+        // 一時マーカーがあるとき Ctrl+←／→ をマーカージャンプに。
+        if (IsLibraryMaximized
+            && LibraryPlayerMode.PrefersMarkerArrowJump(
+                IsPlayerScratchContext(),
+                Waveform.HasPlayerScratchMarkers)
+            && key is Key.Left or Key.Right
+            && modifiers == ModifierKeys.Control)
+        {
+            Waveform.SeekToMarker(key == Key.Left ? -1 : 1);
+            return true;
+        }
+
+        if (IsLibraryMaximized
+            && LibraryPlayerMode.PrefersMarkerArrowJump(
+                IsPlayerScratchContext(),
+                Waveform.HasPlayerScratchMarkers)
+            && key is Key.Left or Key.Right
+            && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            Waveform.ExtendSelectionToMarker(key == Key.Left ? -1 : 1);
+            return true;
+        }
+
+        // Ctrl+Delete／選択中 Delete は捨てマーカー削除。
+        if (IsLibraryMaximized
+            && IsPlayerScratchContext()
+            && key == Key.Delete
+            && modifiers == ModifierKeys.Control)
+        {
+            ApplyPlayerScratchMarkerDelete();
+            return true;
+        }
+
+        if (IsLibraryMaximized
+            && IsPlayerScratchContext()
+            && key == Key.Delete
+            && modifiers == ModifierKeys.None
+            && LibraryPlayerMode.PrefersScratchMarkerDelete(
+                playerMode: true,
+                Waveform.HasSelectedMarkers))
+        {
+            ApplyPlayerScratchMarkerDelete();
+            return true;
+        }
+
+        // I／O／M／Ins。ツリーフォーカス中は I／O／M をタイプアヘッドへ譲る（Ins はマーカーのまま）。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && LibraryPlayerMode.AllowsPlayerScratchCueKey(
+                key,
+                modifiers,
+                LibraryBrowser.IsExplorerTreeFocused)
+            && TryHandlePlayerScratchCueKey(key, modifiers))
+        {
+            return true;
+        }
+
+        // Ctrl+←／↑ ライブラリ、Ctrl+→ プレイリスト、Ctrl+↓ お気に入り。
+        // プレイヤー中の Ctrl+←／→（マーカー）は上で回したのでここには来ない。暗いプレビューではペインへ。
+        if (IsLibraryMaximized
+            && !IsLibraryGroupComboFocused
+            && LibraryPlayerMode.IsPaneFocusArrow(key, modifiers))
+        {
+            switch (key)
+            {
+                case Key.Left:
+                case Key.Up:
+                    LibraryBrowser.FocusExplorer();
+                    break;
+                case Key.Right:
+                    LibraryBrowser.FocusList();
+                    break;
+                default:
+                    LibraryBrowser.FocusFavorites();
+                    break;
+            }
+
+            return true;
+        }
+
+        // テンキー再生操作（プレイヤー／エディタ共通）。上段数字の割合／マーカーは別経路。
+        // ツリーのインクリメントサーチ中はテンキー数字を検索へ譲る。
+        if (!IsLibraryGroupComboFocused
+            && !StatusTimes.IsTimeFocused
+            && !IsEditingFileName
+            && !Waveform.IsEditingMarkerComment
+            && _volumeMenu is not { IsOpen: true }
+            && _timeStretchMenu is not { IsOpen: true }
+            && _fadeMenu is not { IsOpen: true }
+            && _formatMenu is not { IsOpen: true }
+            && !(IsLibraryExplorerFocused
+                && !LibraryBrowser.IsExplorerSearchFocused
+                && LibraryPlayerMode.IsPlayerNumpadKey(key, modifiers))
+            && TryHandleTransportNumpad(key, modifiers, isRepeat))
+        {
+            return true;
+        }
+
+        if (IsLibraryMaximized && TryHandlePlaylistVideoFrameStep(key, modifiers, isRepeat))
+        {
+            return true;
+        }
+
+        if (IsLibraryMaximized
+            && LibraryPlayerMode.IsVideoFullscreenToggle(key, modifiers)
+            && TryTogglePlaylistVideoFullscreen())
+        {
+            return true;
+        }
+
+        if (IsLibraryMaximized
+            && LibraryPlayerMode.IsVideoHudToggle(key, modifiers)
+            && TryTogglePlaylistVideoHud())
+        {
+            return true;
+        }
+
+        if (IsLibraryMaximized
+            && LibraryPlayerMode.IsVideoTimecodeToggle(key, modifiers)
+            && TryTogglePlaylistVideoTimecode())
+        {
+            return true;
+        }
+
+        if (IsLibraryMaximized
+            && !isRepeat
+            && LibraryPlayerMode.IsPdfBackgroundPinToggle(key, modifiers)
+            && TryTogglePdfBackgroundPin())
+        {
+            return true;
+        }
+
+        // F10: 本再生／イマーシブ一時停止／PDF 明るい表示から暗いプレビューへ（Escape と同じ。動画ミニの Q は上でプレイリストへ戻済み）。
+        if (IsLibraryMaximized
+            && key == Key.Q
+            && modifiers == ModifierKeys.None
+            && !isRepeat
+            && TryExitPlaylistRealPlayback())
+        {
+            return true;
+        }
+
+        // Shift／Ctrl＋テンキーは番号ジャンプ。Alt＋テンキーは割合。無修飾は再生のまま。
+        // ツリーの Shift+8（上段）は配下展開のまま。文字入力中はテンキーを渡す。
+        if (!NumpadShiftPassesToText()
+            && TryHandleNumpadCueDigitJump(key, modifiers))
+        {
+            return true;
+        }
+
+        // 上段 0–9: 無修飾＝割合。Shift＋上段＝マーカー番号（二桁可。無修飾テンキーは上で再生操作済み）。
+        // ツリーフォーカス中は使わない（Shift+8＝配下展開を優先。割合／マーカーは他ペインから）。
+        if (IsLibraryMaximized
+            && LibraryPlayerMode.AllowsPlayerDigitJump(IsLibraryExplorerFocused)
+            && !IsLibraryGroupComboFocused
+            && !StatusTimes.IsTimeFocused
+            && !IsEditingFileName
+            && _volumeMenu is not { IsOpen: true }
+            && _timeStretchMenu is not { IsOpen: true }
+            && _fadeMenu is not { IsOpen: true }
+            && _formatMenu is not { IsOpen: true }
+            && TryHandleLibraryDigitJump(key, modifiers))
+        {
+            return true;
+        }
+
+        if (IsLibraryMaximized
+            && key is Key.Left or Key.Right
+            && modifiers == ModifierKeys.None)
+        {
+            StopPlaybackShuttle();
+            if (IsLibraryExplorerFocused)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        if (IsLibraryGroupComboFocused)
+        {
+            return false;
+        }
+
+        if (IsLibraryExplorerFocused)
+        {
+            if (!LibraryBrowser.IsExplorerSearchFocused)
+            {
+                if (LibraryBrowser.TryExplorerTypeahead(key, modifiers))
+                {
+                    return true;
+                }
+            }
+
+            if (LibraryPlayerMode.IsPlaylistFolderAddKey(key, modifiers))
+            {
+                // Enter＝クリア直下／Ctrl+Enter＝クリア再帰／Shift＋＝追加（Ctrl で再帰）。
+                LibraryBrowser.ClearExplorerTypeahead();
+                var clear = LibraryPlayerMode.ClearsPlaylistOnFolderAdd(modifiers);
+                var recursive = LibraryPlayerMode.RecursesPlaylistFolderAdd(modifiers);
+                if (clear)
+                {
+                    LibraryBrowser.ReplacePlaylistFromSelection(recursive);
+                }
+                else
+                {
+                    LibraryBrowser.OpenSelectedFolder(recursive);
+                }
+
+                return true;
+            }
+
+            if (LibraryPlayerMode.IsExplorerExpandAll(key, modifiers))
+            {
+                LibraryBrowser.ClearExplorerTypeahead();
+                LibraryBrowser.ExpandSelectedExplorerSubtree();
+                return true;
+            }
+
+            if (LibraryPlayerMode.IsExplorerCollapseSubtree(key, modifiers))
+            {
+                LibraryBrowser.ClearExplorerTypeahead();
+                LibraryBrowser.CollapseSelectedExplorerSubtree();
+                return true;
+            }
+
+            if (LibraryPlayerMode.IsExplorerCollapseAllRoots(key, modifiers))
+            {
+                LibraryBrowser.ClearExplorerTypeahead();
+                LibraryBrowser.CollapseAllExplorerRoots();
+                return true;
+            }
+
+            // 設定のルート「上へ／下へ」と同じ並び替え。
+            if (LibraryPlayerMode.IsExplorerRootReorder(key, modifiers))
+            {
+                LibraryBrowser.ClearExplorerTypeahead();
+                LibraryBrowser.TryMoveSelectedExplorerRoots(key == Key.Up ? -1 : 1);
+                return true;
+            }
+
+            if (key == Key.Space && modifiers == ModifierKeys.None)
+            {
+                LibraryBrowser.TryExplorerSpaceExpandOrMoveDown();
+                return true;
+            }
+
+            if (key == Key.Space && modifiers == ModifierKeys.Shift)
+            {
+                LibraryBrowser.TryExplorerShiftSpaceCollapseOrMoveUp();
+                return true;
+            }
+
+            if (LibraryPlayerMode.ExplorerOwnsHorizontal(key, modifiers))
+            {
+                LibraryBrowser.ClearExplorerTypeahead();
+                StopPlaybackShuttle();
+                return false;
+            }
+
+            if (LibraryPlayerMode.BlocksExplorerKey(key, modifiers))
+            {
+                return true;
+            }
+
+            // Ctrl+Q などアプリ共通ショートカットは続行。タイプアヘッドはツリーへ渡す。
+            if (!LibraryPlayerMode.AllowsKey(key, modifiers))
+            {
+                return false;
+            }
+        }
+
+        if (IsLibraryFavoritesFocused)
+        {
+            // Enter 系追加／Delete はお気に入りリスト側で処理。
+            // ここで握るとプレイリストの Enter（再生）に吸われ、追加されない。
+            if (LibraryPlayerMode.IsPlaylistFolderAddKey(key, modifiers))
+            {
+                return false;
+            }
+
+            if (key == Key.Delete && modifiers == ModifierKeys.None)
+            {
+                return false;
+            }
+
+            if (LibraryPlayerMode.BlocksExplorerKey(key, modifiers))
+            {
+                return true;
+            }
+
+            if (!LibraryPlayerMode.AllowsKey(key, modifiers))
+            {
+                return false;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>プレイリスト上の移動／選択／捨てキュー Undo など。</summary>
+    private bool TryProcessLibraryPlaylistShortcut(Key key, ModifierKeys modifiers, bool isRepeat)
+    {
+        if (IsLibraryMaximized)
+        {
+            // 選択は据え置きで表示だけ1行動かす。ツリーフォーカス時はルート並び替えが先。
+            if (LibraryPlayerMode.IsPlaylistScroll(key, modifiers)
+                && !IsLibraryExplorerFocused)
+            {
+                LibraryBrowser.ScrollPlaylistByRows(key == Key.Up ? -1 : 1);
+                return true;
+            }
+
+            // Shift+Space: プレイリストのチェックモード（ツリーは上で折りたたみ処理済み）。
+            if (LibraryPlayerMode.IsCheckSelectModeToggle(key, modifiers)
+                && !IsLibraryExplorerFocused
+                && !IsLibraryFavoritesFocused)
+            {
+                if (!isRepeat)
+                {
+                    LibraryBrowser.ToggleCheckSelectMode();
+                }
+
+                return true;
+            }
+
+            if ((key is Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown)
+                && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+            {
+                // 動画本再生・ミニ・PDF 本表示では Home／End／Page をエディタと同じタイムライン操作へ。
+                if ((key is Key.Home or Key.End or Key.PageUp or Key.PageDown)
+                    && LibraryPlayerMode.UsesEditorTimelineNavKeys(_playlistVideoChromeVisible))
+                {
+                    _libraryPlayOnArrowRelease = false;
+                    return TryHandleWaveformTimelineNavKey(key, modifiers);
+                }
+
+                var extend = modifiers == ModifierKeys.Shift;
+                // 単発は端から反対側へ回る。長押し連続は端で一旦止まる（Ctrl+Tab と同じ）。
+                var wrap = !isRepeat;
+                if (key is Key.Home or Key.End)
+                {
+                    LibraryBrowser.MoveSelectionToEdge(key == Key.Home ? -1 : 1, extend);
+                }
+                else if (key is Key.PageUp or Key.PageDown)
+                {
+                    LibraryBrowser.MoveSelectionPage(key == Key.PageUp ? -1 : 1, extend, wrap);
+                }
+                else
+                {
+                    LibraryBrowser.MoveSelection(key == Key.Up ? -1 : 1, extend, wrap);
+                }
+
+                _libraryPlayOnArrowRelease = !extend;
+                return true;
+            }
+
+            if (key == Key.A && modifiers is ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift))
+            {
+                // 動画本再生など前面 UI 隠れ中は全選択しない（続けて Delete で空にする事故を防ぐ）。
+                if (LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(
+                        _playlistVideoChromeVisible))
+                {
+                    return true;
+                }
+
+                LibraryBrowser.SelectAllRows();
+                return true;
+            }
+
+            if (key == Key.C && modifiers == ModifierKeys.Control)
+            {
+                LibraryBrowser.CopySelected();
+                return true;
+            }
+
+            // Enter はグローバル側（本再生中＝その場停止、停止中の動画／PDF＝Space と同じ）。
+
+            // リストから外すだけ（ディスクは消さない）。選択中マーカーの Delete は上で処理済み。
+            if (key == Key.Delete && modifiers == ModifierKeys.None)
+            {
+                if (LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(
+                        _playlistVideoChromeVisible))
+                {
+                    return true;
+                }
+
+                RemoveLibrarySelectedFromList();
+                return true;
+            }
+
+            // 捨てキュー操作は上の TryHandlePlayerScratchCueKey 済み。
+            // 非コンテキスト時も I／O／M／Ins はここで消費し、エディタのフェード／AddMarker へ落とさない。
+            if (modifiers == ModifierKeys.None
+                && key is Key.I or Key.O or Key.M or Key.Insert)
+            {
+                return true;
+            }
+
+            if (IsPlayerScratchContext()
+                && key is Key.Left or Key.Right
+                && (modifiers & ModifierKeys.Alt) != 0
+                && (modifiers & ~(ModifierKeys.Alt | ModifierKeys.Shift | ModifierKeys.Control)) == 0)
+            {
+                return BeginOrContinueMarkerNudge(key == Key.Left ? -1 : 1);
+            }
+
+            // 捨てキューの Undo／Redo。戻せない Ctrl+Z は何もしない（エディタの履歴へ落とさない）。
+            if (key == Key.Z && modifiers == (ModifierKeys.Control | ModifierKeys.Shift)
+                || key == Key.Y && modifiers == ModifierKeys.Control)
+            {
+                if (IsPlayerScratchContext())
+                {
+                    UndoOrRedoPlayerScratch(redo: true);
+                }
+
+                return true;
+            }
+
+            if (key == Key.Z && modifiers == ModifierKeys.Control)
+            {
+                if (IsPlayerScratchContext() && Waveform.CanUndoPlayerScratch)
+                {
+                    UndoOrRedoPlayerScratch(redo: false);
+                }
+
+                return true;
+            }
+
+            // タブを閉じない。リストから外すのも Delete のみ。
+            if (key == Key.W
+                && modifiers is ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift))
+            {
+                return true;
+            }
+
+            if (!LibraryPlayerMode.AllowsKey(key, modifiers))
+            {
+                return true;
+            }
+
+            // 破壊編集は右クリックメニューのみ。ショートカットは握りつぶす（誤操作防止）。
+            if (LibraryPlayerMode.IsDestructiveEditShortcut(key, modifiers))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 
     private bool TryConsumeRecordingShortcut(Key key, ModifierKeys modifiers)
     {

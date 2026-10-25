@@ -71,19 +71,6 @@ public sealed class PlayerMeterChromeTests
         Assert.Equal(
             PlayerMeterChrome.Grid(Color.FromRgb(0x5A, 0x5A, 0x5F), player: true),
             Color.FromRgb(0x88, 0x88, 0x8C));
-
-        Assert.Equal(
-            UiThemePalette.ColorFor(UiTheme.Dark, PlayerMeterChrome.TrackBorderKey),
-            UiThemePalette.ColorFor(UiTheme.Light, PlayerMeterChrome.TrackBorderKey));
-        Assert.Equal(
-            UiThemePalette.ColorFor(UiTheme.Dark, PlayerMeterChrome.TickKey),
-            UiThemePalette.ColorFor(UiTheme.Light, PlayerMeterChrome.TickKey));
-        Assert.Equal(
-            UiThemePalette.ColorFor(UiTheme.Dark, PlayerMeterChrome.ScopeGridKey),
-            UiThemePalette.ColorFor(UiTheme.Light, PlayerMeterChrome.ScopeGridKey));
-        Assert.Equal(
-            UiThemePalette.ColorFor(UiTheme.Dark, PlayerMeterChrome.HullKey),
-            UiThemePalette.ColorFor(UiTheme.Light, PlayerMeterChrome.HullKey));
     }
 
     private static double Luma(Color color) =>

@@ -246,13 +246,9 @@ internal sealed class LevelMeterView : FrameworkElement
         }
     }
 
-    /// <summary>ライトのピークホールドだけスペアナと同じ <see cref="LevelColorTheme.PeakHold"/>。</summary>
     internal static ColorRgb HoldFillColor(double holdDb, bool isPeakHold, UiTheme theme)
     {
-        if (isPeakHold && theme == UiTheme.Light)
-        {
-            return LevelColorTheme.PeakHold(holdDb, theme);
-        }
+        _ = theme;
 
         return LevelColorTheme.Sample(LevelMeterEngine.DbToNorm(holdDb));
     }

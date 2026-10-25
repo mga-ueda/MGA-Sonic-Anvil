@@ -420,26 +420,19 @@ public sealed class LoudnessMeterEngineTests
     }
 
     [Fact]
-    public void ChipText_IsWhiteOnDarkAndDarkOnLight()
+    public void ChipText_IsWhiteOnDark()
     {
         Assert.Equal(
             UiThemePalette.ColorFor(UiTheme.Dark, "LoudnessChipForeBrush"),
             LoudnessMeterView.ChipTextColor(UiTheme.Dark));
-        Assert.Equal(
-            UiThemePalette.ColorFor(UiTheme.Light, "LoudnessChipForeBrush"),
-            LoudnessMeterView.ChipTextColor(UiTheme.Light));
         Assert.True(Luma(LoudnessMeterView.ChipTextColor(UiTheme.Dark)) > 0.8);
-        Assert.True(Luma(LoudnessMeterView.ChipTextColor(UiTheme.Light)) < 0.2);
         var cyan = Color.FromRgb(0x3A, 0xB8, 0xE8);
         var darkChip = LoudnessMeterView.ShadeChipFill(cyan, UiTheme.Dark);
-        var lightChip = LoudnessMeterView.ShadeChipFill(cyan, UiTheme.Light);
         Assert.True(Luma(darkChip) < Luma(cyan));
-        Assert.True(Luma(lightChip) > Luma(cyan));
         // 0.55 混ぜのほうが 0.22 より暗い。
         var milder = MixTowardBlack(cyan, 0.22);
         Assert.True(Luma(darkChip) < Luma(milder));
         Assert.Equal(0xFF, darkChip.A);
-        Assert.Equal(0xFF, lightChip.A);
 
         // 注意（琥珀）と超過（赤）は黒へ混ぜても緑成分で判別できる。
         var caution = LoudnessMeterView.ShadeChipFill(

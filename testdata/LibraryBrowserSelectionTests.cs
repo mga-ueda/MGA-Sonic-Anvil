@@ -217,15 +217,7 @@ public sealed class LibraryBrowserSelectionTests
             Assert.True(hover.Color.A < 255);
             Assert.True(hover.Color.A > LibraryBrowserView.LibrarySelectionFillAlpha);
             Assert.True(hover.Color.A > 0x70);
-            Assert.Equal(
-                LibraryBrowserView.LibrarySelectionFillAlpha,
-                LibraryBrowserView.LibrarySelectionFillAlphaLight);
-            Assert.True(
-                LibraryBrowserView.LibrarySelectionFillAlphaLight
-                < LibraryBrowserView.LibraryHoverFillAlpha);
             var navy = Color.FromRgb(0x1A, 0x90, 0xA8);
-            var lightRgb = LibraryBrowserView.LibrarySelectionRgb(navy, UiTheme.Light);
-            Assert.Equal(UiThemePalette.ColorFor(UiTheme.Light, "PlayerSelectionFillBrush"), lightRgb);
             Assert.Equal(
                 UiThemePalette.ColorFor(UiTheme.Dark, "PlayerSelectionFillBrush"),
                 LibraryBrowserView.LibrarySelectionRgb(navy, UiTheme.Dark));
@@ -1876,12 +1868,13 @@ public sealed class LibraryBrowserSelectionTests
             EnsureTheme();
             var root = Path.Combine(Path.GetTempPath(), "mga-fav-shift-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
-            var first = Path.Combine(root, "a.txt");
-            var second = Path.Combine(root, "b.txt");
-            var third = Path.Combine(root, "c.txt");
-            File.WriteAllText(first, "");
-            File.WriteAllText(second, "");
-            File.WriteAllText(third, "");
+            // お気に入りはフォルダのみ登録（ファイル単体は Resolve で落ちる）。
+            var first = Path.Combine(root, "a");
+            var second = Path.Combine(root, "b");
+            var third = Path.Combine(root, "c");
+            Directory.CreateDirectory(first);
+            Directory.CreateDirectory(second);
+            Directory.CreateDirectory(third);
             Window? window = null;
             try
             {

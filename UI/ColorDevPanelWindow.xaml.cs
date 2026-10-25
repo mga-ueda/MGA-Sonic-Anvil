@@ -116,7 +116,7 @@ internal partial class ColorDevPanelWindow : Window
     }
 
     private void ApplyWindowTitle() =>
-        Title = UiStrings.ColorDevTitleFor(UiThemeService.Painted);
+        Title = UiStrings.ColorDevTitleFor();
 
     public void RefreshRows()
     {

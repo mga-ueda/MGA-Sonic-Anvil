@@ -34,29 +34,19 @@ public sealed class WaveformLaneGradientTests
     }
 
     [Fact]
-    public void PlayerFill_Light_IsPalerThanSource()
+    public void PlayerFill_ReplacesSourceWithPaleFill()
     {
         var navy = unchecked((int)0xFF405273);
-        var pale = WaveformLaneGradient.PlayerFill(navy, UiTheme.Light);
+        var pale = WaveformLaneGradient.PlayerFill(navy);
         Assert.True(((pale >> 16) & 0xFF) > ((navy >> 16) & 0xFF));
         Assert.True(((pale >> 8) & 0xFF) > ((navy >> 8) & 0xFF));
         Assert.True((pale & 0xFF) > (navy & 0xFF));
-        var dark = WaveformLaneGradient.PlayerFill(navy, UiTheme.Dark);
-        Assert.True(((dark >> 16) & 0xFF) > ((navy >> 16) & 0xFF));
+        Assert.Equal(pale, WaveformLaneGradient.PlayerFill(navy, UiTheme.Dark));
     }
 
     [Fact]
-    public void Shade_Light_EdgeIsPaler()
+    public void PlayerWaveOpacity_IsInExpectedRange()
     {
-        var navy = unchecked((int)0xFF405273);
-        var edge = WaveformLaneGradient.Shade(navy, y: 10, mid: 50, halfHeight: 40, UiTheme.Light);
-        Assert.True(((edge >> 16) & 0xFF) > ((navy >> 16) & 0xFF));
-    }
-
-    [Fact]
-    public void PlayerWaveOpacity_IsSharedWithDark()
-    {
-        Assert.Equal(WaveformView.PlayerWaveOpacityFor(UiTheme.Dark), WaveformView.PlayerWaveOpacityFor(UiTheme.Light));
         Assert.InRange(WaveformView.PlayerWaveOpacityFor(UiTheme.Dark), 0.55, 0.62);
     }
 }

@@ -322,10 +322,9 @@ internal sealed class LoudnessMeterView : Grid
 
     internal static Color ShadeChipFill(Color color, UiTheme theme)
     {
-        var toward = theme == UiTheme.Light ? Colors.White : Colors.Black;
-        // ダークはネオンを落とすが、琥珀と赤の差は緑成分で残す。
-        var amount = theme == UiTheme.Light ? 0.22 : 0.55;
-        var shaded = Mix(color, toward, amount);
+        _ = theme;
+        // ネオンを落とすが、琥珀と赤の差は緑成分で残す。
+        var shaded = Mix(color, Colors.Black, 0.55);
         return Color.FromArgb(0xFF, shaded.R, shaded.G, shaded.B);
     }
 

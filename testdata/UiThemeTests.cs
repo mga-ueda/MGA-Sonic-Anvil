@@ -6,54 +6,15 @@ namespace MgaSonicAnvil.Tests;
 
 public sealed class UiThemeTests
 {
-    [Theory]
-    [InlineData(null, "Auto")]
-    [InlineData("", "Auto")]
-    [InlineData("auto", "Auto")]
-    [InlineData("dark", "Dark")]
-    [InlineData("Dark", "Dark")]
-    [InlineData("light", "Light")]
-    [InlineData("Light", "Light")]
-    [InlineData("unknown", "Auto")]
-    public void ParseChoice_ReadsStoredValues(string? stored, string expected)
-    {
-        Assert.Equal(expected, UiThemes.ParseChoice(stored).ToString());
-    }
-
     [Fact]
-    public void Resolve_Auto_UsesOsTheme()
+    public void ColorFor_ReturnsDarkPaletteValues()
     {
-        Assert.Equal(UiTheme.Light, UiThemes.Resolve(UiThemeChoice.Auto, osLight: true));
-        Assert.Equal(UiTheme.Dark, UiThemes.Resolve(UiThemeChoice.Auto, osLight: false));
-    }
-
-    [Fact]
-    public void Resolve_Explicit_IgnoresOs()
-    {
-        Assert.Equal(UiTheme.Dark, UiThemes.Resolve(UiThemeChoice.Dark, osLight: true));
-        Assert.Equal(UiTheme.Light, UiThemes.Resolve(UiThemeChoice.Light, osLight: false));
-    }
-
-    [Fact]
-    public void ToStoredValue_RoundTripsChoices()
-    {
-        Assert.Equal("auto", UiThemes.ToStoredValue(UiThemeChoice.Auto));
-        Assert.Equal("dark", UiThemes.ToStoredValue(UiThemeChoice.Dark));
-        Assert.Equal("light", UiThemes.ToStoredValue(UiThemeChoice.Light));
-    }
-
-    [Fact]
-    public void DefaultFor_LightUsesPaletteNotDarkXaml()
-    {
-        var lightWave = UiColors.DefaultFor(UiTheme.Light, "WaveformBackBrush");
-        var lightFill = UiColors.DefaultFor(UiTheme.Light, "WaveFillBrush");
-        Assert.Equal(System.Windows.Media.Color.FromRgb(0xFA, 0xFA, 0xFA), lightWave);
-        Assert.Equal(System.Windows.Media.Color.FromRgb(0x40, 0x52, 0x73), lightFill);
-        Assert.NotEqual(System.Windows.Media.Color.FromRgb(0x26, 0x26, 0x26), lightWave);
-        Assert.NotEqual(System.Windows.Media.Color.FromRgb(0xC6, 0xD9, 0xFF), lightFill);
         Assert.Equal(
-            UiThemePalette.ColorFor(UiTheme.Light, "MouseGuideBrush").A,
-            UiColors.DefaultFor(UiTheme.Light, "MouseGuideBrush").A);
+            System.Windows.Media.Color.FromRgb(0xEB, 0xEB, 0xEB),
+            UiThemePalette.ColorFor(UiTheme.Dark, "PrimaryForeBrush"));
+        Assert.Equal(
+            System.Windows.Media.Color.FromRgb(0x96, 0x96, 0x96),
+            UiThemePalette.ColorFor(UiTheme.Dark, "MutedForeBrush"));
     }
 
     [Fact]
@@ -79,185 +40,19 @@ public sealed class UiThemeTests
         Assert.True(UiThemePalette.IsThemeable("MarkerLabelForeBrush"));
         Assert.True(UiThemePalette.IsThemeable("MenuHighlightBackBrush"));
         Assert.True(UiThemePalette.IsThemeable("MenuDisabledForeBrush"));
-
-        foreach (var key in UiThemePalette.ThemeableKeys)
-        {
-            var light = UiThemePalette.ColorFor(UiTheme.Light, key);
-            Assert.True(light.A > 0 || key == "WaveformTileDividerBrush", key);
-        }
     }
 
     [Fact]
-    public void LightPalette_UsesWhiteRegionMarkerLoopLabels()
+    public void PlayerComboFill_KeepsSearchTextReadable()
     {
-        var white = System.Windows.Media.Color.FromRgb(0xFF, 0xFF, 0xFF);
-        Assert.Equal(white, UiThemePalette.ColorFor(UiTheme.Light, "SampleLoopTimeLabelForeBrush"));
-        Assert.Equal(white, UiThemePalette.ColorFor(UiTheme.Light, "RegionTimeLabelForeBrush"));
-        Assert.Equal(white, UiThemePalette.ColorFor(UiTheme.Light, "MarkerLabelForeBrush"));
-    }
-
-    [Fact]
-    public void LightPalette_KeepsTextDarkerThanSurface()
-    {
-        var back = UiThemePalette.ColorFor(UiTheme.Light, "SurfaceBackBrush");
-        var fore = UiThemePalette.ColorFor(UiTheme.Light, "PrimaryForeBrush");
-        Assert.True(RelativeLuma(fore) < RelativeLuma(back));
-    }
-
-    [Fact]
-    public void LightPalette_MeetsContrastFloors()
-    {
-        var surface = UiThemePalette.ColorFor(UiTheme.Light, "SurfaceBackBrush");
-        var chrome = UiThemePalette.ColorFor(UiTheme.Light, "TransportBackBrush");
-        var wave = UiThemePalette.ColorFor(UiTheme.Light, "WaveformBackBrush");
-        var track = UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterTrackBackBrush");
-        Assert.True(Contrast(UiThemePalette.ColorFor(UiTheme.Light, "AccentCyanBrush"), surface) >= 3);
-        Assert.Equal(
-            UiThemePalette.ColorFor(UiTheme.Light, "AccentCyanBrush"),
-            UiThemePalette.ColorFor(UiTheme.Light, "ActionLinkForeBrush"));
-        Assert.NotEqual(
-            UiThemePalette.ColorFor(UiTheme.Light, "ActionLinkForeBrush"),
-            UiThemePalette.ColorFor(UiTheme.Light, "ActionLinkHoverForeBrush"));
-        Assert.True(Contrast(UiThemePalette.ColorFor(UiTheme.Light, "PrimaryForeBrush"), surface) >= 7);
-        Assert.True(Contrast(UiThemePalette.ColorFor(UiTheme.Light, "MutedForeBrush"), surface) >= 7);
-        Assert.True(Contrast(UiThemePalette.ColorFor(UiTheme.Light, "StatusBarDetailForeBrush"), chrome) >= 7);
-        Assert.True(Contrast(UiThemePalette.ColorFor(UiTheme.Light, "TransportForeBrush"), chrome) >= 4.5);
-        Assert.True(Contrast(UiThemePalette.ColorFor(UiTheme.Light, "ExportButtonForeBrush"), UiThemePalette.ColorFor(UiTheme.Light, "ExportButtonFillBrush")) >= 4.5);
-        var lockFore = UiThemePalette.ColorFor(UiTheme.Light, "KeepTargetLockForeBrush");
-        var lockHover = UiThemePalette.ColorFor(UiTheme.Light, "KeepTargetLockHoverForeBrush");
-        Assert.True(lockFore.G < lockFore.R);
-        Assert.True(lockFore.B < 0x40);
-        Assert.True(Contrast(lockFore, chrome) >= 2.5);
-        Assert.True(RelativeLuma(lockHover) > RelativeLuma(lockFore));
-        Assert.True(Contrast(Composite(UiThemePalette.ColorFor(UiTheme.Light, "WaveZeroLineBrush"), wave), wave) >= 3);
-        Assert.True(UiThemePalette.ColorFor(UiTheme.Light, "LoopRangeFillBrush").A < 0x1A);
-        Assert.True(
-            Contrast(Composite(UiThemePalette.ColorFor(UiTheme.Light, "LoopRangeFillBrush"), wave), wave) < 1.15);
-        Assert.True(
-            RelativeLuma(Composite(UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterTickBrush"), track))
-            >= RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "VectorScopeGridBrush")) - 0.02);
-        Assert.Equal(
-            UiThemePalette.ColorFor(UiTheme.Light, "MutedForeBrush"),
-            UiThemePalette.ColorFor(UiTheme.Light, "DbScaleForeBrush"));
-        Assert.True(
-            RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "SpectrogramScaleForeBrush"))
-            > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "MutedForeBrush")));
-        Assert.True(
-            RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "SurroundHullStrokeBrush"))
-            > RelativeLuma(System.Windows.Media.Color.FromRgb(0x5A, 0x5A, 0x5F)));
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void PlayerComboFill_KeepsSearchTextReadable(bool light)
-    {
-        var theme = light ? UiTheme.Light : UiTheme.Dark;
-        var surface = theme == UiTheme.Light
-            ? UiThemePalette.ColorFor(theme, "SurfaceBackBrush")
-            : System.Windows.Media.Color.FromRgb(0x1E, 0x1E, 0x1E);
-        var fill = Composite(UiThemePalette.ColorFor(theme, "PlayerComboFillBrush"), surface);
-        var hover = Composite(UiThemePalette.ColorFor(theme, "PlayerComboHoverFillBrush"), surface);
-        var fore = UiThemePalette.ColorFor(theme, "PrimaryForeBrush");
-        var muted = UiThemePalette.ColorFor(theme, "MutedForeBrush");
-        Assert.True(Contrast(fore, fill) >= 4.5, $"{theme} typed on fill");
-        Assert.True(Contrast(fore, hover) >= 4.5, $"{theme} typed on hover");
-        Assert.True(Contrast(muted, fill) >= 3, $"{theme} hint on fill");
-    }
-
-    [Fact]
-    public void LightPalette_KeepsBrighterAsEnabled()
-    {
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "TransportForeBrush"))
-            > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "TransportDisabledForeBrush")));
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "TransportHoverBackBrush"))
-            > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "TransportBackBrush")));
-        var surface = UiThemePalette.ColorFor(UiTheme.Light, "SurfaceBackBrush");
-        var menuHighlight = UiThemePalette.ColorFor(UiTheme.Light, "MenuHighlightBackBrush");
-        Assert.True(RelativeLuma(surface) - RelativeLuma(menuHighlight) >= 0.08);
-        Assert.True(Contrast(UiThemePalette.ColorFor(UiTheme.Light, "PrimaryForeBrush"), menuHighlight) >= 7);
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "TransportPressedBackBrush"))
-            >= RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "TransportHoverBackBrush")));
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "HistoryStripHoverBackBrush"))
-            > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "HistoryStripBackBrush")));
-        var stripBack = UiThemePalette.ColorFor(UiTheme.Light, "HistoryStripBackBrush");
-        var chrome = UiThemePalette.ColorFor(UiTheme.Light, "TransportBackBrush");
-        Assert.True(RelativeLuma(stripBack) < RelativeLuma(chrome));
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "WaapiToggleOffHoverBackBrush"))
-            > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "WaapiToggleOffBackBrush")));
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ChromeDimBrush"))
-            > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ChromeMidBrush")));
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ExportButtonHoverFillBrush"))
-            > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ExportButtonFillBrush")));
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ExportButtonHoverBackBrush"))
-            > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ExportButtonBackBrush")));
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ClearButtonHoverBackBrush"))
-            > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ClearButtonBackBrush")));
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "WaapiToggleOnHoverBackBrush"))
-            > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "WaapiToggleOnBackBrush")));
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ScrollThumbHoverBackBrush"))
-            > RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ScrollThumbBackBrush")));
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ScrollThumbPressedBackBrush"))
-            >= RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ScrollThumbHoverBackBrush")));
-    }
-
-    [Fact]
-    public void LightPalette_AvoidsPureBlack()
-    {
-        foreach (var key in UiThemePalette.ThemeableKeys)
-        {
-            var color = UiThemePalette.ColorFor(UiTheme.Light, key);
-            if (color.A == 0)
-            {
-                continue;
-            }
-
-            Assert.False(color.R == 0 && color.G == 0 && color.B == 0, key);
-        }
-
-        var wave = UiThemePalette.ColorFor(UiTheme.Light, "WaveformBackBrush");
-        var guide = Composite(UiThemePalette.ColorFor(UiTheme.Light, "MouseGuideBrush"), wave);
-        Assert.True(RelativeLuma(guide) > 0.28);
-    }
-
-    [Fact]
-    public void LightPalette_LiftsMeterWellsAndButtonFills()
-    {
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ScrollThumbBackBrush")) > 0.5);
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ScrollThumbGripBrush")) > 0.25);
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterTrackBackBrush")) > 0.8);
-        var waveBack = UiThemePalette.ColorFor(UiTheme.Light, "WaveformBackBrush");
-        Assert.True(
-            RelativeLuma(Composite(UiThemePalette.ColorFor(UiTheme.Light, "OverviewOutsideFillBrush"), waveBack))
-            > RelativeLuma(Composite(System.Windows.Media.Color.FromArgb(150, 0, 0, 0), waveBack)));
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "HistoryStripBackBrush")) > 0.6);
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterTrackBorderBrush")) > 0.5);
-        Assert.Equal(
-            UiThemePalette.ColorFor(UiTheme.Dark, "PlayerLevelMeterTickBrush"),
-            UiThemePalette.ColorFor(UiTheme.Light, "PlayerLevelMeterTickBrush"));
-        Assert.Equal(
-            System.Windows.Media.Color.FromRgb(0xC8, 0xC8, 0xC8),
-            UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterHoldBorderBrush"));
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "LevelMeterClipOffBrush")) > 0.8);
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ExportButtonFillBrush")) > 0.7);
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ClearButtonFillBrush")) > 0.7);
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "StatusExportButtonFillBrush")) > 0.7);
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ExportButtonBackBrush")) > 0.25);
-        Assert.True(RelativeLuma(UiThemePalette.ColorFor(UiTheme.Light, "ClearButtonBackBrush")) > 0.2);
-        Assert.True(UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillLoopBrush").B
-            > UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillLoopBrush").R);
-        Assert.True(UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillExitBrush").R
-            > UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillExitBrush").B);
-        var anacrusis = UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillAnacrusisBrush");
-        Assert.True(anacrusis.G > anacrusis.R);
-        Assert.True(anacrusis.G > anacrusis.B);
-        Assert.Equal(0xFF, anacrusis.A);
-        Assert.Equal(0xFF, UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillLoopBrush").A);
-        Assert.Equal(0xFF, UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillExitBrush").A);
-        var excluded = UiThemePalette.ColorFor(UiTheme.Light, "RegionWaveFillExcludedBrush");
-        Assert.Equal(0xFF, excluded.A);
-        Assert.True(Math.Abs(excluded.R - excluded.G) <= 8);
-        Assert.True(Math.Abs(excluded.G - excluded.B) <= 8);
+        var surface = System.Windows.Media.Color.FromRgb(0x1E, 0x1E, 0x1E);
+        var fill = Composite(UiThemePalette.ColorFor(UiTheme.Dark, "PlayerComboFillBrush"), surface);
+        var hover = Composite(UiThemePalette.ColorFor(UiTheme.Dark, "PlayerComboHoverFillBrush"), surface);
+        var fore = UiThemePalette.ColorFor(UiTheme.Dark, "PrimaryForeBrush");
+        var muted = UiThemePalette.ColorFor(UiTheme.Dark, "MutedForeBrush");
+        Assert.True(Contrast(fore, fill) >= 4.5, "typed on fill");
+        Assert.True(Contrast(fore, hover) >= 4.5, "typed on hover");
+        Assert.True(Contrast(muted, fill) >= 3, "hint on fill");
     }
 
     private static double Contrast(System.Windows.Media.Color a, System.Windows.Media.Color b)

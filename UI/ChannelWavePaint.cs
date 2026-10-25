@@ -1,6 +1,5 @@
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
-using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
@@ -13,7 +12,7 @@ internal static class ChannelWavePaint
         var color = ChannelColors.UsesLaneTint(channels)
             ? Tint(baseColor, ToBgra(ChannelSwatch.Of(channel)))
             : baseColor;
-        return muted ? Dim(color, MuteTheme()) : color;
+        return muted ? Dim(color, IsLightWaveformBack()) : color;
     }
 
     public static int Tint(int baseColor, int tint)
@@ -26,15 +25,19 @@ internal static class ChannelWavePaint
         return b | (g << 8) | (r << 16) | (baseColor & unchecked((int)0xFF000000));
     }
 
-    public static int Dim(int bgra) => Dim(bgra, MuteTheme());
+    public static int Dim(int bgra) => Dim(bgra, IsLightWaveformBack());
 
-    public static int Dim(int bgra, UiTheme theme)
+    /// <summary>
+    /// <paramref name="bright"/> が真なら明るいグレーへ寄せ、偽なら黒へ寄せる。
+    /// 波形背景が明るいときに黒くつぶれないよう、輝度で判定する。
+    /// </summary>
+    public static int Dim(int bgra, bool bright)
     {
         var a = (bgra >> 24) & 0xFF;
         var r = (bgra >> 16) & 0xFF;
         var g = (bgra >> 8) & 0xFF;
         var b = bgra & 0xFF;
-        if (theme == UiTheme.Light)
+        if (bright)
         {
             r = MixTowardLightGray(r);
             g = MixTowardLightGray(g);
@@ -51,20 +54,10 @@ internal static class ChannelWavePaint
     }
 
     /// <summary>
-    /// リソース上の波形背景が明るいときはライト扱い。
+    /// リソース上の波形背景が明るいときは明るいグレーへ寄せる。
     /// Current だけだと、配色適用後に Dark のまま残ってミュートが黒くなる。
     /// </summary>
-    private static UiTheme MuteTheme()
-    {
-        if (UiThemeService.Painted == UiTheme.Light || IsLightWaveformBack())
-        {
-            return UiTheme.Light;
-        }
-
-        return UiTheme.Dark;
-    }
-
-    private static bool IsLightWaveformBack()
+    internal static bool IsLightWaveformBack()
     {
         try
         {
