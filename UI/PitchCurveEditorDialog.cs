@@ -1978,7 +1978,7 @@ internal static class PitchConstantBatchDialog
     }
 }
 
-/// <summary>モノ相当波形＋赤いピッチカーブ。</summary>
+/// <summary>モノ相当波形＋赤いピッチカーブ。波形はエディタ本体と同じ PeakPyramid／輪郭接続／LOD／折れ線切替。</summary>
 internal sealed class PitchCurveWavePreview : FrameworkElement
 {
     internal enum EditTool
@@ -3282,8 +3282,8 @@ internal sealed class PitchCurveWavePreview : FrameworkElement
         start = Math.Clamp(start, _range.StartFrame, lastFrame);
         end = Math.Clamp(end, start + 1, _range.EndFrame);
         var sampleFrames = end - start;
-        // 本体／無音検出と同じ: 表示フレームが画素幅以下ならサンプル折れ線＋ドット。
-        var traceSamples = sampleFrames > 0 && sampleFrames <= pxW;
+        // 本体／無音検出と同じ: Polyline 上限以下ならサンプル折れ線＋ドット。
+        var traceSamples = WaveformView.IsPolylineZoom(sampleFrames, pxW);
         var count = traceSamples ? 0 : FillVisibleColumns(pxW, start, end);
         var bitmap = new WriteableBitmap(pxW, pxH, dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32, null);
         var wave = ToPbgra(Theme.Get("WaveFillBrush"));
@@ -3306,40 +3306,7 @@ internal sealed class PitchCurveWavePreview : FrameworkElement
             }
             else
             {
-                for (var i = 0; i < count; i++)
-                {
-                    var y0 = mid - _columnMaxs[i] * amp;
-                    var y1 = mid - _columnMins[i] * amp;
-                    if (y1 < y0)
-                    {
-                        (y0, y1) = (y1, y0);
-                    }
-
-                    var top = (int)Math.Floor(y0);
-                    var bottom = (int)Math.Ceiling(y1);
-                    if (bottom <= top)
-                    {
-                        bottom = top + 1;
-                    }
-
-                    top = Math.Clamp(top, 0, pxH - 1);
-                    bottom = Math.Clamp(bottom, top + 1, pxH);
-                    var x0 = i * pxW / count;
-                    var x1 = (i + 1) * pxW / count;
-                    if (x1 <= x0)
-                    {
-                        x1 = Math.Min(pxW, x0 + 1);
-                    }
-
-                    for (var x = x0; x < x1; x++)
-                    {
-                        var column = buffer + x;
-                        for (var y = top; y < bottom; y++)
-                        {
-                            column[y * stride] = wave;
-                        }
-                    }
-                }
+                PaintEnvelopeColumns(buffer, stride, pxW, pxH, count, mid, amp, wave, sampleFrames);
             }
         }
 
@@ -3355,7 +3322,75 @@ internal sealed class PitchCurveWavePreview : FrameworkElement
         _waveDirty = false;
     }
 
-    /// <summary>表示フレームが画素幅以下のとき、エディタ本体と同じくサンプルを結ぶ線と点を描く。</summary>
+    /// <summary>エディタの RasterPeakEnvelope と同じく、列 min/max を塗り、必要なら隣列と輪郭をつなぐ。</summary>
+    private unsafe void PaintEnvelopeColumns(
+        uint* buffer,
+        int stride,
+        int pxW,
+        int pxH,
+        int count,
+        double mid,
+        double amp,
+        uint wave,
+        long rangeFrames)
+    {
+        if (count <= 0)
+        {
+            return;
+        }
+
+        var connect = WaveformView.ShouldConnectEnvelopeNeighbors(rangeFrames, pxW);
+        var tops = new int[count];
+        var bottoms = new int[count];
+        for (var i = 0; i < count; i++)
+        {
+            var y0 = mid - _columnMaxs[i] * amp;
+            var y1 = mid - _columnMins[i] * amp;
+            if (y1 < y0)
+            {
+                (y0, y1) = (y1, y0);
+            }
+
+            var top = (int)Math.Floor(y0);
+            var bottom = (int)Math.Ceiling(y1);
+            if (bottom <= top)
+            {
+                bottom = top + 1;
+            }
+
+            tops[i] = Math.Clamp(top, 0, pxH - 1);
+            bottoms[i] = Math.Clamp(bottom, tops[i] + 1, pxH);
+        }
+
+        for (var i = 0; i < count; i++)
+        {
+            var top = tops[i];
+            var bottom = bottoms[i];
+            if (connect && i + 1 < count)
+            {
+                top = Math.Min(top, tops[i + 1]);
+                bottom = Math.Max(bottom, bottoms[i + 1]);
+            }
+
+            var x0 = i * pxW / count;
+            var x1 = (i + 1) * pxW / count;
+            if (x1 <= x0)
+            {
+                x1 = Math.Min(pxW, x0 + 1);
+            }
+
+            for (var x = x0; x < x1; x++)
+            {
+                var column = buffer + x;
+                for (var y = top; y < bottom; y++)
+                {
+                    column[y * stride] = wave;
+                }
+            }
+        }
+    }
+
+    /// <summary>表示フレームが画素幅×Polyline 上限以下のとき、エディタ本体と同じくサンプルを結ぶ線と点を描く。</summary>
     private unsafe void PaintSampleTrace(
         uint* buffer,
         int stride,
@@ -3543,30 +3578,99 @@ internal sealed class PitchCurveWavePreview : FrameworkElement
     private int FillVisibleColumns(int width, long start, long end)
     {
         width = Math.Max(1, width);
-        if (_columnMins.Length < width)
-        {
-            _columnMins = new float[width];
-            _columnMaxs = new float[width];
-        }
-
-        Array.Clear(_columnMins, 0, width);
-        Array.Clear(_columnMaxs, 0, width);
         if (_document is null || end <= start)
         {
             return 0;
         }
 
         var frames = end - start;
-        var budget = Math.Min(RawColumnMaxFrames, (long)width * RawColumnMaxSamplesPerPixel);
-        if (frames <= budget)
+        var peaks = _document.Peaks;
+        var peaksUsable = !peaks.IsEmpty;
+        var useRaw = WaveformView.ShouldUseRawWaveColumns(
+            seekAndSelectOnly: false,
+            hasPcm: true,
+            polylineZoom: false,
+            peaksUsableForEnvelope: peaksUsable,
+            rangeFrames: frames,
+            width: width);
+        if (!useRaw && peaksUsable)
         {
-            FillRawColumns(width, start, end);
-            return width;
+            var peakChannels = Math.Max(1, peaks.Channels);
+            EnsureColumns(width * peakChannels);
+            var count = peaks.ReadRangePacked(
+                start,
+                end,
+                width,
+                _columnMins,
+                _columnMaxs,
+                WaveformView.EditorEnvelopeLodBias(
+                    editorMode: true,
+                    frames,
+                    width,
+                    CurrentTimeZoom));
+            if (count > 0)
+            {
+                FoldSolo(_columnMins, _columnMaxs, count, peakChannels, _channelMask);
+                return count;
+            }
         }
 
-        // 長い範囲は粗く間引きサンプリング（ピーク畳み込みはマスク処理を省略）。
+        EnsureColumns(width);
         FillRawColumns(width, start, end);
         return width;
+    }
+
+    private void EnsureColumns(int count)
+    {
+        if (_columnMins.Length >= count)
+        {
+            return;
+        }
+
+        _columnMins = new float[count];
+        _columnMaxs = new float[count];
+    }
+
+    private static void FoldSolo(float[] mins, float[] maxs, int count, int channels, int mask)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            var src = i * channels;
+            float min = 0;
+            float max = 0;
+            var first = true;
+            for (var ch = 0; ch < channels; ch++)
+            {
+                if (!ChannelSolo.Contains(mask, ch))
+                {
+                    continue;
+                }
+
+                var lo = mins[src + ch];
+                var hi = maxs[src + ch];
+                if (first)
+                {
+                    min = lo;
+                    max = hi;
+                    first = false;
+                }
+                else
+                {
+                    if (lo < min)
+                    {
+                        min = lo;
+                    }
+
+                    if (hi > max)
+                    {
+                        max = hi;
+                    }
+                }
+            }
+
+            mins[i] = min;
+            maxs[i] = max;
+        }
     }
 
     private void FillRawColumns(int width, long start, long end)

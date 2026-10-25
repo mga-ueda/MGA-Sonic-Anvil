@@ -1050,7 +1050,7 @@ internal sealed class SilenceDetectDialog : Window
 
 /// <summary>
 /// 選択範囲の波形と ±しきい値線。残す区間とヒットは適用時と同じ検出。
-/// 波形はピークピラミッド（深く寄ると生サンプル）からビットマップにする。ホイールはカーソル位置を基準に時間方向へ拡縮する。
+/// 波形はエディタ本体と同じ PeakPyramid／輪郭接続／LOD／折れ線切替。ホイールはカーソル位置を基準に時間方向へ拡縮する。
 /// </summary>
 internal sealed class SilenceDetectWavePreview : FrameworkElement
 {
@@ -2202,11 +2202,11 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         var lastFrame = Math.Max(_range.StartFrame, _range.EndFrame - 1);
         start = Math.Clamp(start, _range.StartFrame, lastFrame);
         end = Math.Clamp(end, start + 1, _range.EndFrame);
-        var count = FillVisibleColumns(pxW, start, end);
+        var sampleFrames = end - start;
+        var traceSamples = WaveformView.IsPolylineZoom(sampleFrames, pxW);
+        var count = traceSamples ? 0 : FillVisibleColumns(pxW, start, end);
         var bitmap = new WriteableBitmap(pxW, pxH, dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32, null);
         var wave = ToPbgra(Theme.Get("WaveFillBrush"));
-        var sampleFrames = end - start;
-        var traceSamples = sampleFrames > 0 && sampleFrames <= pxW;
         bitmap.Lock();
         unsafe
         {
@@ -2224,41 +2224,9 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             {
                 PaintSampleTrace(buffer, stride, pxW, pxH, start, end, mid, amp, wave, dpi.DpiScaleX, width);
             }
-
-            if (!traceSamples)
-            for (var i = 0; i < count; i++)
+            else
             {
-                var y0 = mid - _columnMaxs[i] * amp;
-                var y1 = mid - _columnMins[i] * amp;
-                if (y1 < y0)
-                {
-                    (y0, y1) = (y1, y0);
-                }
-
-                var top = (int)Math.Floor(y0);
-                var bottom = (int)Math.Ceiling(y1);
-                if (bottom <= top)
-                {
-                    bottom = top + 1;
-                }
-
-                top = Math.Clamp(top, 0, pxH - 1);
-                bottom = Math.Clamp(bottom, top + 1, pxH);
-                var x0 = i * pxW / count;
-                var x1 = (i + 1) * pxW / count;
-                if (x1 <= x0)
-                {
-                    x1 = Math.Min(pxW, x0 + 1);
-                }
-
-                for (var x = x0; x < x1; x++)
-                {
-                    var column = buffer + x;
-                    for (var y = top; y < bottom; y++)
-                    {
-                        column[y * stride] = wave;
-                    }
-                }
+                PaintEnvelopeColumns(buffer, stride, pxW, pxH, count, mid, amp, wave, sampleFrames);
             }
         }
 
@@ -2274,7 +2242,75 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         _waveDirty = false;
     }
 
-    /// <summary>表示フレームが画素幅以下のとき、エディタと同じくサンプルを結ぶ線と点を描く。</summary>
+    /// <summary>エディタの RasterPeakEnvelope と同じく、列 min/max を塗り、必要なら隣列と輪郭をつなぐ。</summary>
+    private unsafe void PaintEnvelopeColumns(
+        uint* buffer,
+        int stride,
+        int pxW,
+        int pxH,
+        int count,
+        double mid,
+        double amp,
+        uint wave,
+        long rangeFrames)
+    {
+        if (count <= 0)
+        {
+            return;
+        }
+
+        var connect = WaveformView.ShouldConnectEnvelopeNeighbors(rangeFrames, pxW);
+        var tops = new int[count];
+        var bottoms = new int[count];
+        for (var i = 0; i < count; i++)
+        {
+            var y0 = mid - _columnMaxs[i] * amp;
+            var y1 = mid - _columnMins[i] * amp;
+            if (y1 < y0)
+            {
+                (y0, y1) = (y1, y0);
+            }
+
+            var top = (int)Math.Floor(y0);
+            var bottom = (int)Math.Ceiling(y1);
+            if (bottom <= top)
+            {
+                bottom = top + 1;
+            }
+
+            tops[i] = Math.Clamp(top, 0, pxH - 1);
+            bottoms[i] = Math.Clamp(bottom, tops[i] + 1, pxH);
+        }
+
+        for (var i = 0; i < count; i++)
+        {
+            var top = tops[i];
+            var bottom = bottoms[i];
+            if (connect && i + 1 < count)
+            {
+                top = Math.Min(top, tops[i + 1]);
+                bottom = Math.Max(bottom, bottoms[i + 1]);
+            }
+
+            var x0 = i * pxW / count;
+            var x1 = (i + 1) * pxW / count;
+            if (x1 <= x0)
+            {
+                x1 = Math.Min(pxW, x0 + 1);
+            }
+
+            for (var x = x0; x < x1; x++)
+            {
+                var column = buffer + x;
+                for (var y = top; y < bottom; y++)
+                {
+                    column[y * stride] = wave;
+                }
+            }
+        }
+    }
+
+    /// <summary>表示フレームが画素幅×Polyline 上限以下のとき、エディタと同じくサンプルを結ぶ線と点を描く。</summary>
     private unsafe void PaintSampleTrace(
         uint* buffer,
         int stride,
@@ -2467,19 +2503,34 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         }
 
         var frames = end - start;
-        var useRaw = frames <= RawColumnBudget(columns);
-        if (!useRaw)
+        var peaks = _document.Peaks;
+        var peaksUsable = !peaks.IsEmpty;
+        var useRaw = WaveformView.ShouldUseRawWaveColumns(
+            seekAndSelectOnly: false,
+            hasPcm: true,
+            polylineZoom: false,
+            peaksUsableForEnvelope: peaksUsable,
+            rangeFrames: frames,
+            width: columns);
+        if (!useRaw && peaksUsable)
         {
-            if (_document.Peaks is { IsEmpty: false } peaks)
+            var peakChannels = Math.Max(1, peaks.Channels);
+            EnsureColumns(columns * peakChannels);
+            var count = peaks.ReadRangePacked(
+                start,
+                end,
+                columns,
+                _columnMins,
+                _columnMaxs,
+                WaveformView.EditorEnvelopeLodBias(
+                    editorMode: true,
+                    frames,
+                    columns,
+                    CurrentTimeZoom));
+            if (count > 0)
             {
-                var peakChannels = Math.Max(1, peaks.Channels);
-                EnsureColumns(columns * peakChannels);
-                var count = peaks.ReadRangePacked(start, end, columns, _columnMins, _columnMaxs);
-                if (count > 0)
-                {
-                    FoldSolo(_columnMins, _columnMaxs, count, peakChannels, _channelMask);
-                    return count;
-                }
+                FoldSolo(_columnMins, _columnMaxs, count, peakChannels, _channelMask);
+                return count;
             }
         }
 
