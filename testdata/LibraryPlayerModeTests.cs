@@ -969,6 +969,16 @@ public sealed class LibraryPlayerModeTests
             isPdf: false, chromeHidden: true));
         Assert.True(LibraryPlayerMode.IsVideoFullscreenToggle(Key.F, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsVideoFullscreenToggle(Key.F, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.PrefersVisualFullMiniToggleOnDoubleClick(
+            visualRealPlayback: true, visualMiniPlayer: false));
+        Assert.True(LibraryPlayerMode.PrefersVisualFullMiniToggleOnDoubleClick(
+            visualRealPlayback: false, visualMiniPlayer: true));
+        Assert.True(LibraryPlayerMode.PrefersVisualFullMiniToggleOnDoubleClick(
+            visualRealPlayback: true, visualMiniPlayer: true));
+        Assert.False(LibraryPlayerMode.PrefersVisualFullMiniToggleOnDoubleClick(
+            visualRealPlayback: false, visualMiniPlayer: false));
+        Assert.True(LibraryPlayerMode.PrefersEnterMiniOnVisualFullMiniDoubleClick(fullscreen: true));
+        Assert.False(LibraryPlayerMode.PrefersEnterMiniOnVisualFullMiniDoubleClick(fullscreen: false));
         Assert.False(LibraryPlayerMode.BlocksVideoFullscreenDoubleClick(null));
         Assert.True(LibraryPlayerMode.DefersVideoLaunchPlacementWhileFullscreen(fullscreen: true));
         Assert.False(LibraryPlayerMode.DefersVideoLaunchPlacementWhileFullscreen(fullscreen: false));

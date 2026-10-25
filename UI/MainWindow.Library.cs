@@ -255,6 +255,13 @@ public partial class MainWindow
         && LibraryBrowser.PlaylistVisualIsVideo
         && LibraryBrowser.PlaylistVisualPlaying;
 
+    /// <summary>PDF の明るい表示中（暗いプレビューは含まない）。</summary>
+    private bool IsPdfBrightDisplay() =>
+        IsLibraryMaximized
+        && LibraryBrowser.PlaylistVisualShown
+        && LibraryBrowser.PlaylistVisualIsPdf
+        && LibraryBrowser.PlaylistVisualPlaying;
+
     /// <summary>
     /// 捨てマーカー／InOut／番号ジャンプを使うか。
     /// 音声のプレイリスト波形、動画本再生・F8・イマーシブ一時停止（暗いプレビューは不可）。
@@ -1009,7 +1016,11 @@ public partial class MainWindow
         return true;
     }
 
-    /// <summary>映像／PDF 上のダブルクリックは F キーと同じ全画面トグル。操作系 UI 上は無視。</summary>
+    /// <summary>
+    /// 動画／PDF の本再生（明るい表示）／ミニ中のダブルクリックは
+    /// フル（タイトルバー無しの F 全画面）⇔ミニ（F8）切替。
+    /// 暗いプレビュー上は F キーと同じ全画面オン／オフ。操作系 UI 上は無視。
+    /// </summary>
     private void MainWindow_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left || e.Handled)
@@ -1022,10 +1033,61 @@ public partial class MainWindow
             return;
         }
 
+        if (LibraryPlayerMode.PrefersVisualFullMiniToggleOnDoubleClick(
+                IsVideoRealPlayback() || IsPdfBrightDisplay(),
+                IsVideoMiniPlayerActive()))
+        {
+            if (TryTogglePlaylistVisualFullAndMini())
+            {
+                e.Handled = true;
+            }
+
+            return;
+        }
+
         if (TryTogglePlaylistVideoFullscreen())
         {
             e.Handled = true;
         }
+    }
+
+    /// <summary>
+    /// フル（タイトルバー無し）⇔ミニ。全画面中はミニへ、それ以外はフルへ。
+    /// </summary>
+    private bool TryTogglePlaylistVisualFullAndMini()
+    {
+        if (LibraryPlayerMode.PrefersEnterMiniOnVisualFullMiniDoubleClick(_playlistVideoFullscreen))
+        {
+            if (IsVideoMiniPlayerActive())
+            {
+                // ミニ＋全画面 → 全画面だけ外してミニ窓へ。
+                SetPlaylistVideoFullscreen(false);
+                return true;
+            }
+
+            if (!LibraryPlayerMode.CanToggleVideoMiniPlayer(
+                    alreadyActive: false,
+                    IsVideoMiniEnterEligible(),
+                    hasPlayableSession: _sessions.Count > 0))
+            {
+                return false;
+            }
+
+            // 全画面の本再生 → ミニ（Enter 側で全画面を先に抜ける）。
+            ToggleVideoMiniPlayer();
+            return true;
+        }
+
+        // ミニまたは窓付き本再生 → フル（タイトルバー無し）。
+        if (!IsLibraryMaximized
+            || !(LibraryBrowser.PlaylistVisualShown
+                && (LibraryBrowser.PlaylistVisualIsVideo || LibraryBrowser.PlaylistVisualIsPdf)))
+        {
+            return false;
+        }
+
+        SetPlaylistVideoFullscreen(true);
+        return true;
     }
 
     private bool TryTogglePlaylistVideoHud()

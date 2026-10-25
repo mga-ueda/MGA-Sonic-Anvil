@@ -1285,8 +1285,25 @@ internal static class LibraryPlayerMode
         key == Key.F && modifiers == ModifierKeys.None;
 
     /// <summary>
-    /// ダブルクリック全画面を抑止する操作系 UI 上か。
-    /// F キーと同じトグルを、ボタン／メーター／波形などの上では走らせない。
+    /// 動画／PDF の本再生（明るい表示）／ミニ中のダブルクリックは
+    /// フル（タイトルバー無しの F 全画面）⇔ミニ（F8）切替。
+    /// 暗いプレビューでは従来どおり F 全画面のオン／オフ。
+    /// </summary>
+    public static bool PrefersVisualFullMiniToggleOnDoubleClick(
+        bool visualRealPlayback,
+        bool visualMiniPlayer) =>
+        visualRealPlayback || visualMiniPlayer;
+
+    /// <summary>
+    /// ダブルクリックのフル⇔ミニ先。フル＝タイトルバー無しの全画面。
+    /// 全画面中ならミニへ、それ以外（ミニ／窓付き本再生）ならフルへ。
+    /// </summary>
+    public static bool PrefersEnterMiniOnVisualFullMiniDoubleClick(bool fullscreen) =>
+        fullscreen;
+
+    /// <summary>
+    /// ダブルクリック（全画面／ミニ切替）を抑止する操作系 UI 上か。
+    /// ボタン／メーター／波形などの上では走らせない。
     /// </summary>
     public static bool BlocksVideoFullscreenDoubleClick(DependencyObject? source)
     {
