@@ -312,7 +312,7 @@
 
       <article class="part" id="layout-player">
         <h3>Player mode</h3>
-        <p class="where"><kbd>F10</kbd> on the waveform. Not fullscreen. <kbd>F10</kbd> again restores.</p>
+        <p class="where"><kbd>F10</kbd> on the waveform. Not fullscreen. <kbd>F10</kbd> again restores. When entering from the editor, unsaved files show a dialog and you cannot switch to the player until they are resolved (see below).</p>
         <h4>Screen</h4>
         <ul>
           <li>Tabs are hidden. File list on top (folder tree left, list center) and a short fixed-height waveform below. The overview is hidden.</li>
@@ -521,7 +521,9 @@
         <ul>
           <li>If you start the app with an MP3 or M4A, it opens in player mode with those files listed. Player mode does not show the multi-file dim overlay.</li>
           <li>WAAPI is off. If it was on, leaving player turns it back on. Files from other modes are listed.</li>
-          <li>Leaving player mode stops playback first, then keeps only the selected files as editor tabs and clears tab multi-selection. The playlist itself is not cleared. Returning to the player restores the tracks from before you left and also keeps files open in the editor (a tab you closed in the editor stays out; a file you opened in the editor is appended). If any open file has unsaved edits, you are asked to save, discard, or cancel before the switch (discard reloads the file from disk; a tab with nowhere to save is dropped; cancel stays in the editor). During video / PDF real playback or video frame pause, <kbd>F10</kbd> stays in the player, drops to the dim background preview, and restores front chrome (the playlist). Quitting while still in player mode does not remember the loaded files.</li>
+          <li><strong>Entering the player from the editor (<kbd>F10</kbd>)</strong> — You cannot switch to the player while any open file is unsaved. An unsaved-changes dialog appears (Save / Don’t Save / Cancel); save or discard first. This keeps the undo history from growing more than needed. Cancel stays in the editor. Discard reloads the file from disk; a tab with nowhere to save is dropped.</li>
+          <li>Leaving player mode stops playback first, then keeps only the selected files as editor tabs and clears tab multi-selection. The playlist itself is not cleared. Returning to the editor restores the tracks from before you left and also keeps files open in the editor (a tab you closed in the editor stays out; a file you opened in the editor is appended).</li>
+          <li>During video / PDF real playback or video frame pause, <kbd>F10</kbd> stays in the player, drops to the dim background preview, and restores front chrome (the playlist). Quitting while still in player mode does not remember the loaded files.</li>
         </ul>
       </article>
 
@@ -1160,7 +1162,7 @@
           <tr><td>Wheel</td><td>Time zoom (around the playhead; same on the overview)</td></tr>
           <tr><td><kbd>Shift</kbd>+wheel</td><td>Pan (on the waveform)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+wheel</td><td>Amplitude zoom (on the waveform)</td></tr>
-          <tr><td><kbd>F10</kbd></td><td>Player mode / exit. Not fullscreen. <kbd>F10</kbd> again restores (during video / PDF real playback or video frame pause, stays in the player, drops to the dim background preview, and restores front chrome = the playlist). Screen, playback, library, and jacket are under <a href="#layout-player">Layout</a>.</td></tr>
+          <tr><td><kbd>F10</kbd></td><td>Player mode / exit. Not fullscreen. <kbd>F10</kbd> again restores. Entering from the editor with unsaved files shows a dialog; you cannot switch until nothing remains unsaved (Save / Don’t Save / Cancel; see <a href="#layout-player">Player mode</a>). During video / PDF real playback or video frame pause, stays in the player, drops to the dim background preview, and restores front chrome = the playlist. Screen, playback, library, and jacket are under the same section.</td></tr>
           <tr><td><kbd>F11</kbd></td><td>Fullscreen / restore the waveform area (hides the taskbar, like a browser; also hides channel names and the dB scale; keeps the overview and status bar; works while tiled; <kbd>F11</kbd> again restores)</td></tr>
           <tr><td><kbd>F12</kbd></td><td>Fullscreen / restore with only the title bar hidden (tabs, transport, meters, WAAPI, channel names, and the dB scale stay; spectrum, loudness, level meter, and vector scope are 1.5× on top of Windows display scaling and UI scale; works while tiled; <kbd>F12</kbd> again restores)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Cycle the tile arrangement (side by side → stacked → grid → off; identical-looking or too-cramped arrangements are skipped; if side-by-side or stacked would not fit, grid is tried; if grid would not fit either, it does nothing; two or more tabs)</td></tr>
