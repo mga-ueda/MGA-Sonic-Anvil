@@ -130,6 +130,7 @@
         </li>
         <li><a href="#disclaimer">対応範囲と位置づけ</a></li>
         <li><a href="#trademarks">商標とライセンス</a></li>
+        <li><a href="#planned-improvements">長時間利用向けの改善</a></li>
       </ol>
     </nav>
     <main>
@@ -1631,6 +1632,27 @@
         <li><strong>Signalsmith Stretch</strong>（Signalsmith Audio、MIT）はピッチ変更に同梱しています。MIT 全文は <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> にあります。</li>
         <li><strong>EffeTune</strong>（Copyright © 2025–2026 Yoshiyuki Kobayashi、MIT）の Rhythm Analyzer DSP を、BPM／ビート解析に利用します（モニター列の BPM がオンのとき）。画面上のテンポ数値は、EffeTune が返す半／倍テンポの候補値ではなく、検出した拍の間隔（ミリ秒）から <code>60000 ÷ 間隔</code> で再計算した値です。オン時のクリックも同じ拍タイミングに合わせます。コードと学習済み重みは MIT のもとで同梱し、学習用の音声データそのものは同梱しません。MIT 全文と学習データ由来の帰属（Slakh2100-redux／Groove MIDI など CC BY 4.0、および T48M 学習セット名）は同梱の <code>THIRD_PARTY_NOTICES.md</code>（画面左下の <span class="ui">EffeTune</span> リンク、またはリポジトリの <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>）にあります。上流プロジェクトは <a href="https://github.com/Frieve-A/effetune">Frieve-A/effetune</a> です。</li>
       </ul>
+
+      <h2 id="planned-improvements">15. 長時間利用向けの改善</h2>
+      <p>長時間の再生や編集で画面が重くなりにくくするための仕組みです。数値や見た目の意味は変えません。</p>
+
+      <h3>ラウドネス履歴</h3>
+      <ul>
+        <li>Integrated／Loudness Range の再計算は、0.1 秒ごとに履歴が増えたときだけ行います（毎フレームの全件 Sort はしません）。Momentary／Short Term の追従や、表示の意味は従来どおりです。</li>
+        <li>ループ再生で頭に戻ったら履歴を捨てます。無限ループでも、だいたい 1 周分までに抑えます。</li>
+      </ul>
+
+      <h3>スペクトラムの描画キャッシュ</h3>
+      <ul>
+        <li><code>CreateBands</code>／バー矩形／LED セル／周波数・dB ラベルは、プロットの大きさや DPI・色が同じあいだキャッシュします。毎描画の作り直しを減らし、表示そのものは変えません。</li>
+      </ul>
+
+      <h3>波形のマーカー系ラベルキャッシュ</h3>
+      <ul>
+        <li>タイム目盛りのラベルキャッシュと同じく、件数 512 を上限にしています。</li>
+        <li>対象はマーカー名／コメント／AB 旗のラベルです。ユニークな文字列の <code>FormattedText</code> が無制限に溜まらないよう、追加の直前に件数が 512 以上なら辞書を丸ごと捨て、表示中の分は次の描画で作り直します。</li>
+      </ul>
+
       <footer>© MIYABI GAME AUDIO INC. — MGA Sonic Anvil User Manual (ja)</footer>
     </main>
   </div>
