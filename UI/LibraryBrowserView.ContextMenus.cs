@@ -258,7 +258,8 @@ internal sealed partial class LibraryBrowserView
         var loudness = new MenuItem
         {
             Header = UiStrings.LibraryMenuMatchLoudness,
-            InputGestureText = "V",
+            // プレイヤーでは V は破壊編集キーとして握りつぶすため表記しない。
+            InputGestureText = string.Empty,
         };
         ArmMenuItemClick(loudness, () => MatchLoudnessRequested?.Invoke(this, EventArgs.Empty));
         var previous = new MenuItem
@@ -529,7 +530,11 @@ internal sealed partial class LibraryBrowserView
             {
                 Tag = cmd,
                 Header = PlaylistWaveMenuHeader(cmd, many: false),
-                InputGestureText = gesture ?? string.Empty,
+                // プレイヤー専用メニュー。破壊編集ショートカットはキー無効のため表記しない。
+                InputGestureText = LibraryPlayerMode.MenuGesture(
+                    playerMode: true,
+                    cmd,
+                    gesture) ?? string.Empty,
             };
             ArmMenuItemClick(item, () => PlaylistWaveMenuRequested?.Invoke(this, cmd));
             items.Add(item);

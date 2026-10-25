@@ -401,7 +401,38 @@ internal static class WaveformContextMenuBuilder
         items.Add(Sub(UiStrings.WaveMenuCatFormat, FormatItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatWwise, WwiseItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatOther, OtherItems(m)));
-        return items;
+        return m.LibraryMaximized
+            ? StripDestructiveGestures(items)
+            : items;
+    }
+
+    /// <summary>プレイヤーでは破壊編集のショートカット表記だけ消す（項目は有効のまま）。</summary>
+    private static IReadOnlyList<WaveMenuEntry> StripDestructiveGestures(IReadOnlyList<WaveMenuEntry> entries)
+    {
+        var list = new List<WaveMenuEntry>(entries.Count);
+        foreach (var entry in entries)
+        {
+            if (entry is WaveMenuSeparatorEntry)
+            {
+                list.Add(entry);
+                continue;
+            }
+
+            if (entry is not WaveMenuItemEntry item)
+            {
+                continue;
+            }
+
+            var children = item.Children is { Count: > 0 }
+                ? StripDestructiveGestures(item.Children)
+                : item.Children;
+            var gesture = item.Command is { } command
+                ? LibraryPlayerMode.MenuGesture(playerMode: true, command, item.Gesture)
+                : item.Gesture;
+            list.Add(item with { Gesture = gesture, Children = children });
+        }
+
+        return list;
     }
 
     public static IEnumerable<IReadOnlyList<string>> AccessKeyGroups(IReadOnlyList<WaveMenuEntry> entries)
