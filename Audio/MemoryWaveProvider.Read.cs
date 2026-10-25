@@ -2120,7 +2120,8 @@ internal sealed partial class PlaybackSampleProvider
             _bpmScratch,
             frames,
             channels,
-            _bpmOnsets);
+            _bpmOnsets,
+            _deviceRate);
 
         _bpmClicks.EnsureSample();
         _bpmClicks.SetDeviceRate(_deviceRate);

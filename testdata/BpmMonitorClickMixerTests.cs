@@ -43,6 +43,39 @@ public sealed class BpmMonitorClickMixerTests
     }
 
     [Fact]
+    public void CollectOnsetsFromSynthDiff_DampedSineClick_OneOnsetOnly()
+    {
+        // EffeTune MixClickSample 相当（2 kHz 減衰サイン）。ゼロクロスで再アームしないこと。
+        const int sampleRate = 48000;
+        const int frames = 4800;
+        var original = new float[frames];
+        var scratch = new float[frames];
+        var omega = 2.0 * Math.PI * 2000.0 / sampleRate;
+        var r = Math.Exp(-1.0 / (0.006 * sampleRate));
+        var amplitude = 0.31622776601683794 * Math.Exp(0.0005 / 0.006);
+        var a = 2.0 * r * Math.Cos(omega);
+        var b = r * r;
+        var y1 = 0.0;
+        var y2 = -amplitude * Math.Sin(omega) / r;
+        var attack = (int)Math.Ceiling(0.0005 * sampleRate);
+        var length = (int)Math.Ceiling(0.06 * sampleRate);
+        for (var age = 0; age < length && age < frames; age++)
+        {
+            var y = a * y1 - b * y2;
+            y2 = y1;
+            y1 = y;
+            var gain = age < attack ? age / (double)attack : 1.0;
+            scratch[age] = (float)(gain * y);
+        }
+
+        var into = new List<int>();
+        BpmMonitorClickMixer.CollectOnsetsFromSynthDiff(
+            original, 0, scratch, frames, channels: 1, into, sampleRate);
+        Assert.Single(into);
+        Assert.InRange(into[0], 1, attack + 8);
+    }
+
+    [Fact]
     public void Reset_StopsCarryOverVoice()
     {
         var click = new BpmMonitorClickMixer();
