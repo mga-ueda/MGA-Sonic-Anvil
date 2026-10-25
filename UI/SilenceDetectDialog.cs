@@ -1809,7 +1809,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         var back = WpfControlHelpers.FrozenBrush(Theme.Get("WaveformBackBrush"));
         var zero = WpfControlHelpers.FrozenBrush(Theme.Get("WaveZeroLineBrush"));
-        var keep = WpfControlHelpers.FrozenBrush(Theme.Get("WaveSelectionFillBrush"));
+        var silenceDim = WpfControlHelpers.FrozenBrush(Theme.Get("OverviewOutsideFillBrush"));
         var thresholdBrush = WpfControlHelpers.FrozenBrush(Theme.Get("LevelMeterClipOnBrush"));
         dc.DrawRectangle(back, null, new Rect(0, 0, width, height));
 
@@ -1824,17 +1824,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             var viewSpan = Math.Max(1.0, _viewSpan);
             if (!_hitPointMode)
             {
-                foreach (var span in _keeps)
-                {
-                    var x0 = (span.StartFrame - viewStart) / viewSpan * width;
-                    var x1 = (span.EndFrame - viewStart) / viewSpan * width;
-                    if (x1 <= x0)
-                    {
-                        continue;
-                    }
-
-                    dc.DrawRectangle(keep, null, new Rect(x0, 0, x1 - x0, height));
-                }
+                // 残す区間は地色のまま。無音側だけ概要バーと同様に薄く暗くする。
+                DrawSilenceDim(dc, silenceDim, width, height, viewStart, viewSpan);
             }
 
             if (_bitmap is not null)
@@ -1869,6 +1860,67 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         DrawHoverBar(dc, width, height);
         DrawSeekBar(dc, width, height);
+    }
+
+    /// <summary>
+    /// 表示範囲内の無音（keep の外側）を薄く暗くする。keep 区間は WaveformBack のまま残す。
+    /// </summary>
+    private void DrawSilenceDim(
+        DrawingContext dc,
+        Brush dim,
+        double width,
+        double height,
+        double viewStart,
+        double viewSpan)
+    {
+        var viewEnd = viewStart + viewSpan;
+        var cursor = viewStart;
+        foreach (var span in _keeps)
+        {
+            if (span.IsEmpty)
+            {
+                continue;
+            }
+
+            var keepStart = Math.Max(span.StartFrame, viewStart);
+            var keepEnd = Math.Min(span.EndFrame, viewEnd);
+            if (keepEnd <= cursor)
+            {
+                continue;
+            }
+
+            if (keepStart > cursor)
+            {
+                DrawDimBand(dc, dim, cursor, keepStart, viewStart, viewSpan, width, height);
+            }
+
+            cursor = Math.Max(cursor, keepEnd);
+        }
+
+        if (cursor < viewEnd)
+        {
+            DrawDimBand(dc, dim, cursor, viewEnd, viewStart, viewSpan, width, height);
+        }
+    }
+
+    private static void DrawDimBand(
+        DrawingContext dc,
+        Brush dim,
+        double frame0,
+        double frame1,
+        double viewStart,
+        double viewSpan,
+        double width,
+        double height)
+    {
+        var x0 = (frame0 - viewStart) / viewSpan * width;
+        var x1 = (frame1 - viewStart) / viewSpan * width;
+        if (x1 <= x0 + 0.5)
+        {
+            return;
+        }
+
+        dc.DrawRectangle(dim, null, new Rect(x0, 0, x1 - x0, height));
     }
 
     private void UpdateHoverBar(double x)
