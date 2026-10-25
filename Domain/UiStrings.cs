@@ -866,7 +866,7 @@ internal static partial class UiStrings
     public static string TooltipFadeAround => Get(
         "シークバー前後をフェード (X)  見えている前だけアウト／後ろだけイン",
         "Fade around seek bar (X)  fade out visible before / fade in visible after");
-    public static string TooltipVolume => Get("音量 (V)", "Volume (V)");
+    public static string TooltipVolume => Get("音量 (V / Ctrl+Shift+V)", "Volume (V / Ctrl+Shift+V)");
     public static string TooltipPitch => Get("ピッチ (P)", "Pitch (P)");
     public static string TooltipTimeStretch => Get("タイムストレッチ (T)", "Time stretch (T)");
     public static string TooltipReverse => Get("リバース (R)", "Reverse (R)");

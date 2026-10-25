@@ -344,15 +344,25 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.F, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.V, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.V, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.V, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsDestructiveEditShortcut(Key.V, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsDestructiveEditShortcut(
+            Key.V, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsDestructiveEditShortcut(Key.N, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsDestructiveEditShortcut(Key.D, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.IsDestructiveEditShortcut(Key.N, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.HidesDestructiveMenuGesture(WaveMenuCommand.Normalize));
+        Assert.False(LibraryPlayerMode.HidesDestructiveMenuGesture(WaveMenuCommand.Volume));
         Assert.False(LibraryPlayerMode.HidesDestructiveMenuGesture(WaveMenuCommand.MergeTabs));
         Assert.False(LibraryPlayerMode.HidesDestructiveMenuGesture(WaveMenuCommand.ExportMp3));
         Assert.Null(LibraryPlayerMode.MenuGesture(playerMode: true, WaveMenuCommand.Normalize, "N"));
         Assert.Equal("N", LibraryPlayerMode.MenuGesture(playerMode: false, WaveMenuCommand.Normalize, "N"));
+        Assert.Equal(
+            MenuGestures.VolumePlayer,
+            LibraryPlayerMode.MenuGesture(playerMode: true, WaveMenuCommand.Volume, MenuGestures.Volume));
+        Assert.Equal(
+            MenuGestures.Volume,
+            LibraryPlayerMode.MenuGesture(playerMode: false, WaveMenuCommand.Volume, MenuGestures.Volume));
         Assert.Equal(
             "Ctrl+Shift+B",
             LibraryPlayerMode.MenuGesture(playerMode: true, WaveMenuCommand.MergeTabs, "Ctrl+Shift+B"));
@@ -535,6 +545,7 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.C, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.X, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.V, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.V, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.BlocksExplorerKey(Key.D, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Up, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Up, ModifierKeys.Shift));

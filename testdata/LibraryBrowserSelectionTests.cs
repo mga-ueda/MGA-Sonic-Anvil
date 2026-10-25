@@ -1044,14 +1044,15 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Equal("Ctrl+C", ((MenuItem)listEdit.Items[0]).InputGestureText);
             Assert.Equal(UiStrings.LibraryMenuClearFromPlaylist, (string)((MenuItem)listEdit.Items[6]).Header);
             Assert.Equal(MenuGestures.Delete, ((MenuItem)listEdit.Items[6]).InputGestureText);
-            // 破壊編集ショートカット（N／I／O／S／B／C／V 等）はキー無効のため表記なし。バウンスは表記あり。
+            // 破壊編集ショートカット（N／I／O／S／B／C／V 等）はキー無効のため表記なし。
+            // ラウドネス揃えは Ctrl+Shift+V、バウンスは Ctrl+Shift+B を表記。
             Assert.True(string.IsNullOrEmpty(((MenuItem)listAudio.Items[3]).InputGestureText));
             Assert.True(string.IsNullOrEmpty(((MenuItem)listAudio.Items[4]).InputGestureText));
             Assert.True(string.IsNullOrEmpty(((MenuItem)listAudio.Items[6]).InputGestureText));
             Assert.True(string.IsNullOrEmpty(((MenuItem)listFormat.Items[0]).InputGestureText));
             Assert.True(string.IsNullOrEmpty(((MenuItem)listFormat.Items[1]).InputGestureText));
             Assert.True(string.IsNullOrEmpty(((MenuItem)listFormat.Items[2]).InputGestureText));
-            Assert.True(string.IsNullOrEmpty(((MenuItem)listExport.Items[0]).InputGestureText));
+            Assert.Equal(MenuGestures.VolumePlayer, ((MenuItem)listExport.Items[0]).InputGestureText);
             Assert.Equal("Ctrl+Shift+M", ((MenuItem)listExport.Items[3]).InputGestureText);
             Assert.Equal("Ctrl+Shift+B", ((MenuItem)listExport.Items[4]).InputGestureText);
             Assert.Equal(UiStrings.LibraryMenuCopyFileName, (string)((MenuItem)listOther.Items[0]).Header);

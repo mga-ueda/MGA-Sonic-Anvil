@@ -258,8 +258,8 @@ internal sealed partial class LibraryBrowserView
         var loudness = new MenuItem
         {
             Header = UiStrings.LibraryMenuMatchLoudness,
-            // プレイヤーでは V は破壊編集キーとして握りつぶすため表記しない。
-            InputGestureText = string.Empty,
+            // 素の V は無効。Ctrl+Shift+V だけ通す（エディタの V / Ctrl+Shift+V と揃える）。
+            InputGestureText = MenuGestures.VolumePlayer,
         };
         ArmMenuItemClick(loudness, () => MatchLoudnessRequested?.Invoke(this, EventArgs.Empty));
         var previous = new MenuItem

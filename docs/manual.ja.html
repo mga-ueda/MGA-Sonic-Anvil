@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
@@ -547,7 +547,7 @@
         <h4>プレイリストの破壊編集</h4>
         <p>プレイヤーは再生が主です。それでもプレイリストの右クリックから、選択中の複数ファイルへノーマライズ／フェード／ピッチ／タイムストレッチ／リバース／サンプルレート・ビット深度・チャンネル変換／無音の挿入／無音・ヒット検出／ラウドネス揃えなどの破壊編集や書き出しができます（ファイル全体が対象。適用後はディスクへ保存し、アンドゥはできません）。</p>
         <div class="note">
-          <p>誤操作で破壊編集が走ると戻せないため、<strong>ノーマライズ／フェード／ピッチ／タイムストレッチ／リバース／フォーマット変換／無音挿入／無音検出／ラウドネス揃えなどのショートカット・キーでは実行しません</strong>（メニューにもそれらのジェスチャーは出しません）。必ず右クリック（またはメニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd>）から選んでください。<kbd>N</kbd>／<kbd>P</kbd>／<kbd>R</kbd> は前後曲・頭出しのままです。例外として、<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>（選択ファイルをバウンス）はキーでもメニュー表記でも使えます。</p>
+          <p>誤操作で破壊編集が走ると戻せないため、<strong>ノーマライズ／フェード／ピッチ／タイムストレッチ／リバース／フォーマット変換／無音挿入／無音検出などのショートカット・キーでは実行しません</strong>（メニューにもそれらのジェスチャーは出しません）。必ず右クリック（またはメニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd>）から選んでください。<kbd>N</kbd>／<kbd>P</kbd>／<kbd>R</kbd> は前後曲・頭出しのままです。例外として、<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>（選択ファイルをバウンス）と <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>（音量／ラウドネス揃え）はキーでもメニュー表記でも使えます（素の <kbd>V</kbd> はプレイヤーでは無効）。</p>
         </div>
 
         <h4>ジャケットと背景</h4>
@@ -838,8 +838,8 @@
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd>／<span class="ui">FADE OUT</span> <kbd>O</kbd> …… カーブを選び Space で試聴、Enter で実行。1–9 でカーブ。</li>
         <li><kbd>X</kbd> …… シークバー前後をフェード。シークを境に、今見えている前だけアウト／後ろだけイン（リニア）。サンプルループの継ぎ目向けの調整は <kbd>Shift</kbd>+<kbd>X</kbd>（<a href="#fade-adjust">フェード調整ツール</a>）。</li>
-        <li><kbd>V</kbd> …… 単一タブではラウドネス曲線を表示して音量。dB を直接入力、または ↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。Space で試聴、Enter で実行。メニューに波形全体の Integrated LKFS／RMS／Peak の変化を先に出します。Short Term 曲線と停止中メーターも同じ dB で追従します。<kbd>Esc</kbd> または <kbd>Shift</kbd>+<kbd>V</kbd> で曲線を閉じます。</li>
-        <li><strong>ラウドネスを揃える</strong>（プレイヤーのプレイリスト右クリック、またはエディタでタブを複数選択して <kbd>V</kbd>）…… 選択中の Wave／AIFF を指定 LKFS（既定は設定のラウドネスターゲット）へファイル全体のゲインで揃える簡易調整です。曲線ベースの音量（単一ファイルの <kbd>V</kbd>）とは別です。プレイヤーでは揃え後に既存パスへ保存し、この編集は元に戻せません。<kbd>V</kbd> ショートカットはプレイヤーでは無効です。MP3 など非対応はスキップ／対象なしなら案内します。</li>
+        <li><kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> …… 単一タブではラウドネス曲線を表示して音量。dB を直接入力、または ↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。Space で試聴、Enter で実行。メニューに波形全体の Integrated LKFS／RMS／Peak の変化を先に出します。Short Term 曲線と停止中メーターも同じ dB で追従します。<kbd>Esc</kbd> または <kbd>Shift</kbd>+<kbd>V</kbd> で曲線を閉じます。エディタでは両方、プレイヤーでは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ有効です。</li>
+        <li><strong>ラウドネスを揃える</strong>（プレイヤーのプレイリスト右クリック／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>、またはエディタでタブを複数選択して <kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>）…… 選択中の Wave／AIFF を指定 LKFS（既定は設定のラウドネスターゲット）へファイル全体のゲインで揃える簡易調整です。曲線ベースの音量（単一ファイルの <kbd>V</kbd>）とは別です。プレイヤーでは揃え後に既存パスへ保存し、この編集は元に戻せません。素の <kbd>V</kbd> はプレイヤーでは無効です。MP3 など非対応はスキップ／対象なしなら案内します。</li>
         <li><kbd>P</kbd> …… ピッチ。単一タブでは<a href="#pitch-curve">ピッチカーブ</a>ウィンドウを開きます（選択があればその範囲、無ければ全体）。タブを複数選んでいるときは一括用の半音指定ダイアログです。実行中は半透明の画面で進捗を出します。</li>
         <li><kbd>T</kbd> …… タイムストレッチ（ピッチ据え置き）。選択があればその時間、無ければ全体。伸ばした時間と割合（％）が連動。↑↓／ホイール（時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分。割合は 0.1／Shift 1／Ctrl 10／Ctrl+Shift 25％）。<kbd>Tab</kbd> で時間と割合。Space で試聴、Enter で実行。10–1000％。実行中は半透明の画面。</li>
         <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> …… ピークを -0.1 dB に合わせる。</li>
@@ -1269,7 +1269,7 @@
           <tr><td><kbd>A</kbd></td><td>スペクトログラム／重ね表示</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>A</kbd></td><td>通常の波形表示へ（今の表示にかかわらず）</td></tr>
           <tr><td><kbd>Alt</kbd>+↑／↓</td><td>スペクトログラムの暗部持ち上げ（押しっぱなしで連続）</td></tr>
-          <tr><td><kbd>V</kbd></td><td>ラウドネス解析を表示して音量入力</td></tr>
+          <tr><td><kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>ラウドネス解析を表示して音量入力（エディタは両方、プレイヤーは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ）</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>V</kbd></td><td>通常の波形表示へ（今の表示にかかわらず）</td></tr>
           <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>チャンネルをソロ（次／前。最後の次で解除。左端の名前をクリックでも可。Ctrl＋クリックで追加。Shift＋クリックでミュート／解除。時間選択は変えない。編集はそのレーンだけ。ミュートはグレー）</td></tr>
           <tr><td><kbd>G</kbd></td><td>ステータスバーの NOW POS を入力</td></tr>
@@ -1303,14 +1303,14 @@
 
       <h3 id="shortcuts-edit">編集</h3>
       <p>タブを複数選択していると、フェード／ノーマライズ（リージョン毎含む）／音量／ピッチ／タイムストレッチ／リバース／無音を挿入／無音・ヒット検出／サンプルレート・ビット深度・チャンネル変換は選択したファイル全部へ一括適用します。保存（<kbd>Ctrl</kbd>+<kbd>S</kbd>）と名前を付けて保存（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>）も同じです（メニュー名は「選択ファイルを〜」に変化。無音・ヒット検出は確認のみで現在設定を適用。無音の挿入はクリック位置、<kbd>Ctrl</kbd>+<kbd>Ins</kbd> のときは再生位置。ほかの選択ファイルは再生位置。適用できないファイルはスキップ。実行中は半透明の画面で進捗を表示し操作を抑制）。</p>
-      <p>プレイヤー（<kbd>F10</kbd>）では、プレイリストの右クリックから同じ系統の破壊編集を複数ファイルへ行えますが、再生が主であり誤操作で破壊編集するとアンドゥできないため、<strong>それらのショートカット・キーでは実行しません</strong>（メニューにもジェスチャーを出しません。例外のバウンス <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> はキーでも表記でも使えます。詳しくは <a href="#layout-player">プレイヤーモード → プレイリストの破壊編集</a>）。</p>
+      <p>プレイヤー（<kbd>F10</kbd>）では、プレイリストの右クリックから同じ系統の破壊編集を複数ファイルへ行えますが、再生が主であり誤操作で破壊編集するとアンドゥできないため、<strong>それらのショートカット・キーでは実行しません</strong>（メニューにもジェスチャーを出しません。例外のバウンス <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> と音量 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> はキーでも表記でも使えます。素の <kbd>V</kbd> はプレイヤーでは無効。詳しくは <a href="#layout-player">プレイヤーモード → プレイリストの破壊編集</a>）。</p>
       <table>
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
           <tr><td><kbd>I</kbd></td><td>フェードイン</td></tr>
           <tr><td><kbd>O</kbd></td><td>フェードアウト</td></tr>
           <tr><td><kbd>X</kbd></td><td>シークバー前後をフェード。シークを境に、今見えている前だけアウト／後ろだけイン（リニア）。一括適用の対象外</td></tr>
-          <tr><td><kbd>V</kbd></td><td>単一タブ: ラウドネス曲線を表示して音量（dB を直接入力。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS／RMS／Peak を先に表示。入力を閉じても曲線は残る。<kbd>Shift</kbd>+<kbd>V</kbd> で曲線を閉じる）。複数タブ選択時: ラウドネスを揃える（簡易）。プレイヤーではキー無効（プレイリスト右クリックから）</td></tr>
+          <tr><td><kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>単一タブ: ラウドネス曲線を表示して音量（dB を直接入力。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS／RMS／Peak を先に表示。入力を閉じても曲線は残る。<kbd>Shift</kbd>+<kbd>V</kbd> で曲線を閉じる）。複数タブ選択時: ラウドネスを揃える（簡易）。エディタは両方有効。プレイヤーは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ（素の <kbd>V</kbd> は無効。プレイリスト右クリックからも可）</td></tr>
           <tr><td><kbd>E</kbd></td><td>ラウドネス曲線が出ているときペンにする（もう一度で戻す。右上のボタン、曲線上の右クリックでも同じ。ドラッグは範囲選択せず、元の曲線は残る。離すと音量を反映。両端はフェード。<kbd>Ctrl</kbd>+<kbd>Z</kbd> で一筆を戻す。<kbd>Esc</kbd> はペンを先に戻す）</td></tr>
           <tr><td><kbd>P</kbd></td><td>ピッチ。単一タブは<a href="#pitch-curve">ピッチカーブ</a>ウィンドウ（選択または全体）。複数タブ選択時は一括の半音指定。実行中は半透明の画面</td></tr>
           <tr><td><kbd>T</kbd></td><td>タイムストレッチ（時間と割合を連動。Space 試聴、Enter 実行。実行中は半透明の画面）</td></tr>
@@ -1321,7 +1321,7 @@
           <tr><td><kbd>Shift</kbd>+<kbd>Delete</kbd></td><td>選択範囲を無音化。前後の既定フェードはダイアログで選択（既定オン。Enter 実行、Esc 取消。長さとマーカーはそのまま。右クリック → 編集にもある。プレイヤーでは効かない）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd>／右クリック → 編集 → 無音・ヒット検出</td><td>無音削除／リージョン付加／マーカー付与／ヒットポイント（選択、なければ全体。ダイアログでしきい値・ゲート・カットフェード。ヒット時は立ち上がり比率 5〜100％・既定 20％も。設定は記憶。Silent Skip／プチノイズ防止とは独立。既定しきい値 −5 dB。タブ複数選択時は確認のみ）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Ins</kbd>／右クリック → 編集 → 無音を挿入</td><td>再生位置（右クリックはクリック位置）へ指定秒の無音（↑↓／ホイールは 0.1 秒、Shift 1 秒、Ctrl 10 秒、Ctrl+Shift 60 秒。Enter で挿入。0.001〜600 秒。前後に既定のフェードは既定オンで、設定のプチノイズ防止。複数タブは同じ秒数を、ほかのファイルは再生位置へ）</td></tr>
-          <tr><td>メニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd></td><td>右クリックと同じメニュー（プレイヤーではプレイリスト側から破壊編集可。破壊編集キーは無効。バウンス <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> は例外）</td></tr>
+          <tr><td>メニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd></td><td>右クリックと同じメニュー（プレイヤーではプレイリスト側から破壊編集可。破壊編集キーは無効。バウンス <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> と音量 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> は例外）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd>／<kbd>C</kbd>／<kbd>V</kbd></td><td>カット／コピー／ペースト（範囲内マーカー含む。選択がリージョンと一致すればリージョンも）。タブ選択中の <kbd>Ctrl</kbd>+<kbd>V</kbd> はコピーした編集履歴を選択タブへ適用（時間がかかるときは半透明の画面と進捗）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>編集を元に戻す（プレイヤーでは捨て A-B／一時マーカーだけ。<kbd>Ctrl</kbd>+<kbd>Y</kbd> はやり直し）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Y</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>編集をやり直す（プレイヤーでは捨て A-B／一時マーカーだけ）</td></tr>
@@ -1386,7 +1386,7 @@
           <tr><td>右クリック（フラッグ／ループバー）</td><td>削除</td></tr>
           <tr><td>右クリック（波形）→ 編集 → 無音・ヒット検出</td><td><kbd>Ctrl</kbd>+<kbd>D</kbd> と同じ（無音削除／リージョン／マーカー／ヒットポイント。ヒット時は立ち上がり比率あり。Silent Skip とは独立）</td></tr>
           <tr><td>右クリック（波形）→ 編集 → 無音を挿入</td><td><kbd>Ctrl</kbd>+<kbd>Ins</kbd> と同じ（キーは再生位置、右クリックはクリック位置。↑↓／ホイールで秒数、Enter で挿入）</td></tr>
-          <tr><td>メニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd></td><td>右クリックと同じメニュー（ポインタが波形上ならその位置、なければ再生位置。プレイヤーではプレイリスト側から破壊編集可。破壊編集キーは無効。バウンス <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> は例外）</td></tr>
+          <tr><td>メニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd></td><td>右クリックと同じメニュー（ポインタが波形上ならその位置、なければ再生位置。プレイヤーではプレイリスト側から破壊編集可。破壊編集キーは無効。バウンス <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> と音量 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> は例外）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+クリック（タブ／タイルの帯）</td><td>タブを個別追加／解除</td></tr>
           <tr><td><kbd>Shift</kbd>+クリック（タブ／タイルの帯）</td><td>タブを範囲選択</td></tr>
           <tr><td>右クリック（タブ）</td><td>
@@ -1577,7 +1577,7 @@
           <tr><td><kbd>Shift</kbd>＋上段／テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>マーカー番号へ（一時マーカーがあるとき。音声波形／動画本再生／F8／フレーム一時停止。二桁可。暗いプレビューは飛ばない。NumLock オンでもテンキーの Shift は Home／End にせずマーカー番号。ツリーの <kbd>Shift</kbd>+<kbd>8</kbd> は上段だけ配下展開）</td></tr>
           <tr><td><kbd>Ctrl</kbd>＋上段／テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>リージョン番号の先頭へ（ファイルにリージョンがあるとき。1 から。マーカー番号とは別。二桁可。エディタでも同じ）</td></tr>
           <tr><td><kbd>Alt</kbd>＋テンキー <kbd>0</kbd>–<kbd>9</kbd></td><td>表示範囲の割合へ（上段の無修飾と同じ。0＝先頭、9＝90%。無修飾のテンキーは再生のまま）</td></tr>
-          <tr><td>メニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd></td><td>ツリー／お気に入り／プレイリストでは右クリックと同じ。プレイリストから破壊編集可（破壊編集キーは無効。バウンス <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> は例外）</td></tr>
+          <tr><td>メニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd></td><td>ツリー／お気に入り／プレイリストでは右クリックと同じ。プレイリストから破壊編集可（破壊編集キーは無効。バウンス <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> と音量 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> は例外）</td></tr>
           <tr><td><kbd>Delete</kbd></td><td>選択行をリストから外す（ファイルは消さない。リストにフォーカスがあるとき。<kbd>Ctrl</kbd>+<kbd>W</kbd> では閉じない。動画本再生／PDF 明るい表示など前面 UI 隠れ中は無効）。お気に入りにフォーカスがあるときは登録を外すだけ</td></tr>
           <tr><td>ツリー <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td><td>ルート以外のフォルダを同じ階層へ複製（ルートは不可。<kbd>Ctrl</kbd>+<kbd>D</kbd> は使わない）。名前は末尾に半角スペースと番号（例: 名前 2）</td></tr>
           <tr><td>プレイリスト <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td><td>選択ファイルを複製（1つでも複数でも全部。<kbd>Ctrl</kbd>+<kbd>D</kbd> は使わない）。名前の末尾はフォルダ複製と同じ印</td></tr>

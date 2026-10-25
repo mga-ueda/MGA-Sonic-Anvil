@@ -24,7 +24,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("Ctrl+Shift+M", UiStrings.TooltipSaveMp3);
         Assert.Contains("Ctrl+R", UiStrings.TooltipRecord);
         Assert.Contains("(X)", UiStrings.TooltipFadeAround);
-        Assert.Contains("(V)", UiStrings.TooltipVolume);
+        Assert.Contains("(V / Ctrl+Shift+V)", UiStrings.TooltipVolume);
         Assert.Contains("(E)", UiStrings.TooltipLoudnessPen);
         var language = UiStrings.Language;
         try

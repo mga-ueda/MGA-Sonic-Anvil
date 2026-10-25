@@ -2557,6 +2557,17 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.V && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            // 音量／ラウドネス揃え。エディタ・プレイヤー共通。素の V はエディタのみ。
+            if (!BlocksOutsideFadeToolActions)
+            {
+                PromptVolume();
+            }
+
+            return true;
+        }
+
         if (key == Key.Q && modifiers == ModifierKeys.Control)
         {
             Close();
@@ -2743,7 +2754,8 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.V && modifiers == ModifierKeys.None)
+        if (key == Key.V
+            && modifiers is ModifierKeys.None or (ModifierKeys.Control | ModifierKeys.Shift))
         {
             return true;
         }
