@@ -221,12 +221,18 @@ public partial class MainWindow
                 return;
             }
 
-            if (!TryBuildPreviewDocument(kind, value, out var preview, out var start, out var range))
+            if (!TryBuildPreviewDocument(
+                    kind,
+                    value,
+                    out var preview,
+                    out var hostStart,
+                    out var start,
+                    out var range))
             {
                 return;
             }
 
-            StartFormatPreviewPlayback(preview, start, range);
+            StartFormatPreviewPlayback(preview, hostStart, start, range);
         }
         finally
         {
@@ -238,10 +244,12 @@ public partial class MainWindow
         FormatConvertKind kind,
         int value,
         out AudioDocument preview,
+        out long hostStartFrame,
         out long startFrame,
         out WaveSelection playRange)
     {
         preview = null!;
+        hostStartFrame = 0;
         startFrame = 0;
         playRange = WaveSelection.Empty;
         if (_document is null)
@@ -256,6 +264,7 @@ public partial class MainWindow
         var sourceRange = source.Selection.IsEmpty
             ? PreviewWindow(source)
             : source.Selection;
+        hostStartFrame = sourceRange.StartFrame;
         var originRate = Math.Max(1, source.FormatOriginSampleRate);
         var originChannels = Math.Max(1, source.FormatOriginChannels);
         var originFrames = source.FormatOriginFrameCount;
@@ -358,7 +367,11 @@ public partial class MainWindow
         return new WaveSelection(start, start + length);
     }
 
-    private void StartFormatPreviewPlayback(AudioDocument preview, long startFrame, WaveSelection range)
+    private void StartFormatPreviewPlayback(
+        AudioDocument preview,
+        long hostStartFrame,
+        long startFrame,
+        WaveSelection range)
     {
         try
         {
@@ -367,15 +380,27 @@ public partial class MainWindow
             LoudnessMeter.Reset();
             _player.Prepare(preview, startFrame, range, loop: false);
 
+            _formatPreview.Origin = hostStartFrame;
+            _formatPreview.PreviewStartFrame = startFrame;
+            _formatPreview.PreviewSampleRate = preview.SampleRate;
             EffectPreviewSession.MarkStarted(_formatPreview);
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
             StartMeterRendering();
             Transport.SetPlaying(true);
+            Waveform.UnlockCenter();
+            Waveform.SetPlayheadFromPlayback(hostStartFrame);
+            if (_document is not null)
+            {
+                _document.CursorFrame = hostStartFrame;
+            }
+
+            SyncTransportPosition(hostStartFrame);
         }
         catch (Exception ex)
         {
+            ClearFormatPreviewMapping();
             EffectPreviewSession.Fail(
                 this,
                 _formatPreview,
@@ -389,17 +414,26 @@ public partial class MainWindow
     {
         if (!_formatPreview.Previewing)
         {
+            ClearFormatPreviewMapping();
             RebindOriginalDocument();
             return;
         }
 
         _formatPreview.Previewing = false;
+        ClearFormatPreviewMapping();
         PausePlaybackSoft();
         RebindOriginalDocument();
         if (_document is not null)
         {
             SeekFrame(_formatPreview.ResumeFrame);
         }
+    }
+
+    private void ClearFormatPreviewMapping()
+    {
+        _formatPreview.Origin = 0;
+        _formatPreview.PreviewStartFrame = 0;
+        _formatPreview.PreviewSampleRate = 0;
     }
 
     private void RebindOriginalDocument()

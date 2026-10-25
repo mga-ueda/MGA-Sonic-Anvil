@@ -310,6 +310,27 @@ internal static class FormatConvert
         return Math.Clamp(scaled, 0, Math.Max(0, destFrameCount));
     }
 
+    /// <summary>
+    /// フォーマット試聴用。プレビュードキュメント上のカーソルを本体タイムラインへ写す。
+    /// プレビューは切り出し＋リサンプル済みなので、両アンカーからの経過をレート換算する。
+    /// </summary>
+    public static long MapPreviewPlayheadToHost(
+        long previewCursorFrame,
+        long previewAnchorFrame,
+        int previewSampleRate,
+        long hostAnchorFrame,
+        int hostSampleRate,
+        long hostFrameCount)
+    {
+        var previewRate = Math.Max(1, previewSampleRate);
+        var hostRate = Math.Max(1, hostSampleRate);
+        var delta = Math.Max(0L, previewCursorFrame - previewAnchorFrame);
+        var hostDelta = previewRate == hostRate
+            ? delta
+            : (long)Math.Round(delta * (double)hostRate / previewRate);
+        return Math.Clamp(hostAnchorFrame + hostDelta, 0, Math.Max(0, hostFrameCount));
+    }
+
     public static WaveSelection ScaleSelection(
         WaveSelection range,
         int sourceRate,

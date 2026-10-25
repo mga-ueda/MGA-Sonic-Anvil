@@ -67,6 +67,47 @@ public sealed class FormatConvertTests
     }
 
     [Fact]
+    public void MapPreviewPlayheadToHost_SameRate_AddsAnchorDelta()
+    {
+        // ビット深度試聴など、レート据え置きで切り出し先頭がずれている場合。
+        var host = FormatConvert.MapPreviewPlayheadToHost(
+            previewCursorFrame: 150,
+            previewAnchorFrame: 50,
+            previewSampleRate: 48000,
+            hostAnchorFrame: 10_000,
+            hostSampleRate: 48000,
+            hostFrameCount: 100_000);
+        Assert.Equal(10_100, host);
+    }
+
+    [Fact]
+    public void MapPreviewPlayheadToHost_RateConvert_KeepsWallClock()
+    {
+        // 48 kHz 本体・8 kHz プレビュー。0.5 秒進むと本体は 24000 フレーム。
+        var host = FormatConvert.MapPreviewPlayheadToHost(
+            previewCursorFrame: 100 + 4000,
+            previewAnchorFrame: 100,
+            previewSampleRate: 8000,
+            hostAnchorFrame: 48_000,
+            hostSampleRate: 48000,
+            hostFrameCount: 480_000);
+        Assert.Equal(48_000 + 24_000, host);
+    }
+
+    [Fact]
+    public void MapPreviewPlayheadToHost_ClampsToHostLength()
+    {
+        var host = FormatConvert.MapPreviewPlayheadToHost(
+            previewCursorFrame: 50_000,
+            previewAnchorFrame: 0,
+            previewSampleRate: 48000,
+            hostAnchorFrame: 90_000,
+            hostSampleRate: 48000,
+            hostFrameCount: 100_000);
+        Assert.Equal(100_000, host);
+    }
+
+    [Fact]
     public void ConvertSampleRate_RemapsMarkersAndMarksDirty()
     {
         var document = MakeDocument(frames: 480, sampleRate: 48000);
