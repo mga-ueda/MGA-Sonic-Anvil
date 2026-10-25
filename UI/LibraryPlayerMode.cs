@@ -403,7 +403,7 @@ internal static class LibraryPlayerMode
         key == Key.N && modifiers == ModifierKeys.Alt;
 
     /// <summary>
-    /// Auto Loop の切替（Alt+L）。ステータスバーのチェックと対。エディタ／プレイヤー共通。
+    /// Single Loop の切替（Alt+L）。ステータスバーのチェックと対。エディタ／プレイヤー共通。
     /// 素の L はループ再生のまま。検索フォーカス中も通す（<see cref="BypassesSearchFocus"/>）。
     /// 仕様は <see cref="AutoLoopPlayback"/>（サンプルループあり＝頭→S 通し後に S–E 無限、無し＝曲末→先頭）。
     /// </summary>

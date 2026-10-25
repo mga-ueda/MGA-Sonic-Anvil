@@ -387,7 +387,7 @@
           <li><kbd>Alt</kbd>+<kbd>R</kbd> でランダム再生（プレイリスト上段の <span class="ui">Random</span>）。一巡まで同じ曲を繰り返しません。空でも切替可。既定オフ。エディタとプレイヤーを行き来しても、次回起動でも最後の状態を設定に覚えます。<kbd>R</kbd> は今の曲を先頭から再生し直しです。</li>
           <li><kbd>Alt</kbd>+<kbd>P</kbd> で <span class="ui">Auto Play</span>。オンのとき、プレイリストをクリアして追加（Enter／ドロップ）すると先頭から再生します。オフのときは追加だけ（再生も停止もしない）。Shift 付きの追加では再生しません。既定オン。最後の状態を設定に覚えます。</li>
           <li><kbd>Alt</kbd>+<kbd>N</kbd> で次の曲を自動再生（プレイリスト上段の <span class="ui">Auto Next</span>）。オンのとき曲末で次へ進み、ギャップレス先読みもします。オフのときはその曲で止まります。空でも切替可。既定オフ。エディタとプレイヤーを行き来しても、次回起動でも最後の状態を設定に覚えます。<kbd>N</kbd> は次の曲への手動送りのままです。</li>
-          <li><kbd>Alt</kbd>+<kbd>L</kbd> で <span class="ui">Auto Loop</span>（プレイリスト上段）。オンのとき、サンプルループがあれば頭（または再生位置）からイントロを通し、ループ終端で始点へ無限ループします。サンプルループが無ければ曲末で先頭へ戻します。選択やプレイヤーの A-B があるときはそちらが再生窓になり、この頭通しは使いません。空でも切替可。最後の状態を設定に覚えます。素の <kbd>L</kbd> は末尾 3 秒前からのループ再生のままです。</li>
+          <li><kbd>Alt</kbd>+<kbd>L</kbd> で <span class="ui">Single Loop</span>（プレイリスト上段）。オンのとき、サンプルループがあれば頭（または再生位置）からイントロを通し、ループ終端で始点へ無限ループします。サンプルループが無ければ曲末で先頭へ戻します。選択やプレイヤーの A-B があるときはそちらが再生窓になり、この頭通しは使いません。空でも切替可。最後の状態を設定に覚えます。素の <kbd>L</kbd> は末尾 3 秒前からのループ再生のままです。</li>
           <li>再生は音が出せるようになった時点で始めます。波形が全部描き終わるのは待ちません。</li>
           <li>次の曲を自動再生がオンのとき、次の曲を先に用意し、終わったら隙間なくつなぎます。MP3／M4A の頭と尻のごく短い無音は <a href="#layout-gapless">ギャップレス再生</a>（設定のプレイヤー。最初はオン）で減らします。オンでもわずかな隙間は残ることがあります。</li>
           <li>
@@ -530,7 +530,7 @@
           </li>
         </ol>
         <div class="note">
-          <p>ツリーにフォーカスがあるとき、<kbd>N</kbd>／<kbd>P</kbd>／<kbd>R</kbd>／<kbd>J</kbd>／<kbd>K</kbd>／<kbd>M</kbd>／<kbd>I</kbd>／<kbd>O</kbd> は前後曲・再生・一時マーカー／A-B ではなく、このフォルダ名ジャンプに使います（テンキーの再生操作はそのまま）。ランダム再生は <kbd>Alt</kbd>+<kbd>R</kbd>、次の曲の自動再生は <kbd>Alt</kbd>+<kbd>N</kbd>、Auto Play は <kbd>Alt</kbd>+<kbd>P</kbd>、Auto Loop は <kbd>Alt</kbd>+<kbd>L</kbd> です。</p>
+          <p>ツリーにフォーカスがあるとき、<kbd>N</kbd>／<kbd>P</kbd>／<kbd>R</kbd>／<kbd>J</kbd>／<kbd>K</kbd>／<kbd>M</kbd>／<kbd>I</kbd>／<kbd>O</kbd> は前後曲・再生・一時マーカー／A-B ではなく、このフォルダ名ジャンプに使います（テンキーの再生操作はそのまま）。ランダム再生は <kbd>Alt</kbd>+<kbd>R</kbd>、次の曲の自動再生は <kbd>Alt</kbd>+<kbd>N</kbd>、Auto Play は <kbd>Alt</kbd>+<kbd>P</kbd>、Single Loop は <kbd>Alt</kbd>+<kbd>L</kbd> です。</p>
         </div>
 
         <h4>波形</h4>
@@ -796,7 +796,7 @@
         <li><kbd>G</kbd> …… ステータスバーの NOW POS を入力。Enter で移動。コピー／貼り付け可。右クリックで時間／サンプル数。</li>
         <li><kbd>Z</kbd> またはテンキーの <kbd>.</kbd>…… 中央寄せ。再生中はセンターロックの切替、停止で解除（キーボードの <kbd>.</kbd> は早送り）。</li>
         <li><kbd>L</kbd> …… 選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生。</li>
-        <li><kbd>Alt</kbd>+<kbd>L</kbd> …… <span class="ui">Auto Loop</span> のオン／オフ（プレイリスト上段と同じ。サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B があるときはそちら優先。くわしくは <a href="#layout-player">プレイヤーモード → 再生</a>）。</li>
+        <li><kbd>Alt</kbd>+<kbd>L</kbd> …… <span class="ui">Single Loop</span> のオン／オフ（プレイリスト上段と同じ。サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B があるときはそちら優先。くわしくは <a href="#layout-player">プレイヤーモード → 再生</a>）。</li>
         <li><kbd>J</kbd> …… 5 秒戻し、<kbd>K</kbd> …… 5 秒送り（0.75 秒クロスフェード。押しっぱなしは少し待ってから繰り返す）</li>
         <li><kbd>Ctrl</kbd>+<kbd>+</kbd>／<kbd>Ctrl</kbd>+<kbd>-</kbd> …… 再生中のピッチを半音上げる／下げる（キーボードとテンキー。キーボードの <kbd>+</kbd> は Shift 付きでも可）。<kbd>Ctrl</kbd>+<kbd>0</kbd>（キーボードとテンキー）で 0 に戻す。中央に半音のトーストを出す。エディタとプレイヤーで同じ。長さと再生位置はそのまま。範囲は ±2 オクターブ。別の曲を再生し始めると忘れる。</li>
         <li><kbd>,</kbd> …… 早戻し、<kbd>.</kbd> …… 早送り（±3 倍・ピッチ据え置き。推移中は -4 dB。停止中でも可。離すとその位置で停止のまま）</li>
@@ -1166,7 +1166,7 @@
         <tbody>
           <tr><td><kbd>Alt</kbd>+<kbd>S</kbd></td><td>Silent Skip（ステータスバー。ラベルに下線なし）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>T</kbd></td><td>Always on Top（ステータスバー。ラベルに下線なし）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Auto Loop</span>（プレイリスト上段／ステータス。ラベルに下線なし）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span>（プレイリスト上段／ステータス。ラベルに下線なし）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>R</kbd></td><td><span class="ui">Random</span>（シャッフル。ラベルに下線なし）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td><span class="ui">Auto Next</span>（次の曲を自動再生。ラベルに下線なし）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td><span class="ui">Auto Play</span>（追加時の自動再生。ラベルに下線なし）</td></tr>
@@ -1221,7 +1221,7 @@
           <tr><td><kbd>Alt</kbd>+<kbd>D</kbd></td><td>モニター <span class="ui">DIM</span>（減衰。量は設定のオーディオタブ）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>C</kbd></td><td>モニター <span class="ui">LC</span>（ローシェルフ −20 dB 固定。周波数は設定のオーディオタブ）</td></tr>
           <tr><td><kbd>L</kbd></td><td>選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Auto Loop</span>（サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B 優先。素の <kbd>L</kbd> とは別）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span>（サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B 優先。素の <kbd>L</kbd> とは別）</td></tr>
           <tr><td><kbd>J</kbd>／<kbd>K</kbd></td><td>5 秒戻し／送り（0.75 秒クロスフェード。押しっぱなしは少し待ってから繰り返す）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>+</kbd>／<kbd>Ctrl</kbd>+<kbd>-</kbd>／<kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>再生ピッチを半音上げ／下げ、または 0 に戻す（<kbd>Ctrl</kbd>+<kbd>0</kbd> はキーボードとテンキー）。中央に半音のトースト。±2 オクターブ。長さは据え置き。再生中の音にすぐ掛かる。別の曲を再生し始めると忘れる</td></tr>
           <tr><td><kbd>,</kbd>／<kbd>.</kbd></td><td>早戻し／早送り（±3 倍・ピッチ据え置き。推移中は -4 dB。停止中でも可。離すとその位置で停止のまま）</td></tr>
@@ -1538,7 +1538,7 @@
           <tr><td><kbd>Alt</kbd>+<kbd>R</kbd></td><td>ランダム再生（<span class="ui">Random</span>）のオン／オフ（プレイリストが空でも可。既定オフ。一巡するまで同じ曲を繰り返さない。モード切替と次回起動でも設定に覚える）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td><span class="ui">Auto Play</span> のオン／オフ（既定オン。クリアして追加したとき先頭から再生するか。最後の状態を設定に覚える。素の <kbd>P</kbd> は前の曲）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td>次の曲を自動再生（<span class="ui">Auto Next</span>）のオン／オフ（プレイリストが空でも可。既定オフ。オンのとき曲末で次へ進みギャップレス先読みもする。モード切替と次回起動でも設定に覚える。素の <kbd>N</kbd> は次の曲への手動送り）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Auto Loop</span> のオン／オフ（プレイリストが空でも可。サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B 優先。素の <kbd>L</kbd> は末尾 3 秒前からのループ再生）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span> のオン／オフ（プレイリストが空でも可。サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B 優先。素の <kbd>L</kbd> は末尾 3 秒前からのループ再生）</td></tr>
           <tr><td>←／→</td><td>動画の本再生中（またはフレーム一時停止中）は一時停止して 1 フレーム戻し／送り（押しっぱなしは最初だけ待ってから繰り返す。本再生中／一時停止中の <kbd>F10</kbd> はエディタへ落とさず、暗いバックグラウンド再生へ落として前面 UI＝プレイリストを出す）。ツリーではフォルダの展開／折りたたみ。それ以外では早送り／巻き戻しには使わない</td></tr>
           <tr><td>ツリー <kbd>*</kbd></td><td>選択フォルダ以下をすべて展開する（エクスプローラーと同じ。テンキーの <kbd>*</kbd> と Shift+8。展開状況は覚える）</td></tr>
           <tr><td>ツリー <kbd>/</kbd></td><td>選択フォルダ以下を閉じる（テンキーの <kbd>/</kbd> と <kbd>/</kbd> キー）</td></tr>
@@ -1582,7 +1582,7 @@
           <tr><td>プレイリスト検索</td><td>表示の有無に関係なくすべての列が対象。空白で分けた語は列をまたいで全部含む必要がある（例: アーティスト名と曲名）。ヒットした行だけ残す。次／前の曲も表示中の行だけを巡る</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>入力した条件で検索し、ライブラリならツリー、プレイリストならリストへフォーカスを返す。空欄ならフィルター解除</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>未確定の入力を捨ててフォーカスを返す（今の検索条件は変えない）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>R</kbd>／<kbd>N</kbd>／<kbd>P</kbd>／<kbd>L</kbd></td><td>検索欄フォーカス中でもランダム／Auto Next／Auto Play／Auto Loop をトグル（文字は入らない）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>R</kbd>／<kbd>N</kbd>／<kbd>P</kbd>／<kbd>L</kbd></td><td>検索欄フォーカス中でもランダム／Auto Next／Auto Play／Single Loop をトグル（文字は入らない）</td></tr>
         </tbody>
       </table>
       <p>ステータスバーの時刻を編集しているとき</p>

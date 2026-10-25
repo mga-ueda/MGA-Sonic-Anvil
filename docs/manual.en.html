@@ -356,7 +356,7 @@
           <li><kbd>Alt</kbd>+<kbd>R</kbd> toggles shuffle (playlist <span class="ui">Random</span>). No repeats until the playlist has played once. Works on an empty list. Off by default. The last state is saved and kept when switching between the editor and the player. <kbd>R</kbd> restarts the current track from the beginning.</li>
           <li><kbd>Alt</kbd>+<kbd>P</kbd> toggles <span class="ui">Auto Play</span>. When on, clearing and adding (Enter / drop) plays the first track. When off, it only adds (does not start or stop playback). Shift-add never plays. On by default. Remembers the last state in settings.</li>
           <li><kbd>Alt</kbd>+<kbd>N</kbd> toggles auto next (playlist <span class="ui">Auto Next</span>). When on, advances to the next track at the end and gapless-prefetches. When off, stops on that track. Works on an empty list. Off by default. The last state is saved and kept when switching between the editor and the player. Plain <kbd>N</kbd> still steps to the next track manually.</li>
-          <li><kbd>Alt</kbd>+<kbd>L</kbd> toggles <span class="ui">Auto Loop</span> (playlist toolbar). When on, with a sample loop it plays from the head (or playhead) through the intro, then loops S–E forever. Without a sample loop, it restarts from the start at the end. A selection or player A-B becomes the play window instead (no intro passthrough). Works on an empty list. Remembers the last state in settings. Plain <kbd>L</kbd> still loops from 3 seconds before the end of the selection / sample loop.</li>
+          <li><kbd>Alt</kbd>+<kbd>L</kbd> toggles <span class="ui">Single Loop</span> (playlist toolbar). When on, with a sample loop it plays from the head (or playhead) through the intro, then loops S–E forever. Without a sample loop, it restarts from the start at the end. A selection or player A-B becomes the play window instead (no intro passthrough). Works on an empty list. Remembers the last state in settings. Plain <kbd>L</kbd> still loops from 3 seconds before the end of the selection / sample loop.</li>
           <li>Playback starts as soon as sound can play. It does not wait for the waveform to finish drawing.</li>
           <li>With auto next on, continuous playback prepares the next track and joins without stopping. Tiny extra silence at the start and end of MP3 / M4A is reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
           <li>
@@ -495,7 +495,7 @@
           </li>
         </ol>
         <div class="note">
-          <p>While the tree has focus, <kbd>N</kbd> / <kbd>P</kbd> / <kbd>R</kbd> / <kbd>J</kbd> / <kbd>K</kbd> / <kbd>M</kbd> / <kbd>I</kbd> / <kbd>O</kbd> feed folder-name jump (not previous/next track, transport letters, or temp markers / A-B; the numpad still controls playback). Shuffle is <kbd>Alt</kbd>+<kbd>R</kbd>; auto next is <kbd>Alt</kbd>+<kbd>N</kbd>; Auto Play is <kbd>Alt</kbd>+<kbd>P</kbd>; Auto Loop is <kbd>Alt</kbd>+<kbd>L</kbd>.</p>
+          <p>While the tree has focus, <kbd>N</kbd> / <kbd>P</kbd> / <kbd>R</kbd> / <kbd>J</kbd> / <kbd>K</kbd> / <kbd>M</kbd> / <kbd>I</kbd> / <kbd>O</kbd> feed folder-name jump (not previous/next track, transport letters, or temp markers / A-B; the numpad still controls playback). Shuffle is <kbd>Alt</kbd>+<kbd>R</kbd>; auto next is <kbd>Alt</kbd>+<kbd>N</kbd>; Auto Play is <kbd>Alt</kbd>+<kbd>P</kbd>; Single Loop is <kbd>Alt</kbd>+<kbd>L</kbd>.</p>
         </div>
         <h4>Waveform</h4>
         <ul>
@@ -747,7 +747,7 @@
         <li><kbd>,</kbd> — rewind, <kbd>.</kbd> — fast-forward (±3× at original pitch; −4 dB while held; works while stopped and leaves you stopped at the new position)</li>
         <li><kbd>Z</kbd> or numpad <kbd>.</kbd> — center. Toggles center-lock while playing; clears it when stopped (the <kbd>.</kbd> key is fast-forward).</li>
         <li><kbd>L</kbd> — loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</li>
-        <li><kbd>Alt</kbd>+<kbd>L</kbd> — toggle <span class="ui">Auto Loop</span> (same as the playlist toolbar; with a sample loop: play through the intro then S–E forever; without: restart at end; selection / A-B take priority; see <a href="#layout-player">Player mode → Playback</a>).</li>
+        <li><kbd>Alt</kbd>+<kbd>L</kbd> — toggle <span class="ui">Single Loop</span> (same as the playlist toolbar; with a sample loop: play through the intro then S–E forever; without: restart at end; selection / A-B take priority; see <a href="#layout-player">Player mode → Playback</a>).</li>
         <li><kbd>Q</kbd> — in the editor, marker click. Plays clicks at marker / region edges (selection when present, otherwise the whole file). Toggle with the button or <kbd>Q</kbd> (off by default; never auto-on). Also available from waveform right-click → Playback. In the player during real video playback / frame pause / bright PDF view, same as <kbd>Escape</kbd> — returns to the dim preview (in the F8 / argument-launch mini, Escape / Q return to the playlist (Escape clears In/Out and stays when In/Out is set); marker click does not run in the player).</li>
         <li><kbd>Tab</kbd> — solo a channel. Other lanes go gray and stay muted. Again moves to the next channel; <kbd>Shift</kbd>+<kbd>Tab</kbd> goes backward. Past the last clears solo. Click a channel name on the left to solo (click the same name again to clear; <kbd>Ctrl</kbd>+click adds; <kbd>Shift</kbd>+click mutes / unmutes). The time selection does not change. Waveform edits apply only to that channel. Works while playing or stopped.</li>
         <li><kbd>Ctrl</kbd>+<kbd>N</kbd> — new file. Opens an empty tab. Choose the format each time (the last choice is remembered). Channels are the speakers enabled on Shown, plus Mono (always available).</li>
@@ -1067,7 +1067,7 @@
         <tbody>
           <tr><td><kbd>Alt</kbd>+<kbd>S</kbd></td><td>Silent Skip (status bar; no underline on the label)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>T</kbd></td><td>Always on Top (status bar; no underline on the label)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Auto Loop</span> (playlist toolbar / status; no underline on the label)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span> (playlist toolbar / status; no underline on the label)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>R</kbd></td><td><span class="ui">Random</span> shuffle (no underline on the label)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td><span class="ui">Auto Next</span> (no underline on the label)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td><span class="ui">Auto Play</span> (play on clear-and-add; no underline on the label)</td></tr>
@@ -1122,7 +1122,7 @@
           <tr><td><kbd>Alt</kbd>+<kbd>D</kbd></td><td>Monitor <span class="ui">DIM</span> (attenuation; amount on Settings → Audio)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>C</kbd></td><td>Monitor <span class="ui">LC</span> (low-shelf −20 dB fixed; frequency on Settings → Audio)</td></tr>
           <tr><td><kbd>L</kbd></td><td>Loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Auto Loop</span> (with a sample loop: intro passthrough then S–E forever; without: restart at end; selection / A-B take priority; separate from plain <kbd>L</kbd>)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span> (with a sample loop: intro passthrough then S–E forever; without: restart at end; selection / A-B take priority; separate from plain <kbd>L</kbd>)</td></tr>
           <tr><td><kbd>J</kbd> / <kbd>K</kbd></td><td>Skip 5 s back / forward (0.75 s crossfade; hold repeats after a short wait)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>Playback pitch up / down by one semitone, or back to zero (<kbd>Ctrl</kbd>+<kbd>0</kbd> on the main keyboard or numpad). A center toast shows the semitones. ±2 octaves; length stays; heard immediately; forgotten when another track starts</td></tr>
           <tr><td><kbd>,</kbd> / <kbd>.</kbd></td><td>Rewind / fast-forward (±3× at original pitch; −4 dB while held; works while stopped and leaves you stopped at the new position)</td></tr>
@@ -1429,7 +1429,7 @@
           <tr><td><kbd>Alt</kbd>+<kbd>R</kbd></td><td>Toggle shuffle (<span class="ui">Random</span>; works on an empty playlist; off by default; does not repeat a track until the playlist has played once; the last state is saved across mode switches and the next launch)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td>Toggle <span class="ui">Auto Play</span> (on by default; whether clear-and-add plays the first track; remembers the last state in settings; plain <kbd>P</kbd> is previous track)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td>Toggle auto next (<span class="ui">Auto Next</span>; works on an empty playlist; off by default; when on, advances at the end and gapless-prefetches; the last state is saved across mode switches and the next launch; plain <kbd>N</kbd> still steps to the next track)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td>Toggle <span class="ui">Auto Loop</span> (works on an empty playlist; with a sample loop: intro passthrough then S–E forever; without: restart at end; selection / A-B take priority; plain <kbd>L</kbd> still loops from 3 seconds before the end)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td>Toggle <span class="ui">Single Loop</span> (works on an empty playlist; with a sample loop: intro passthrough then S–E forever; without: restart at end; selection / A-B take priority; plain <kbd>L</kbd> still loops from 3 seconds before the end)</td></tr>
           <tr><td>← / →</td><td>During real video playback (or frame pause), pause and step one frame back / forward (hold repeats after an initial wait; <kbd>F10</kbd> during real playback or frame pause drops to the dim background preview, restores the front UI = playlist, and stays in the player). On the tree, expand / collapse folders. Otherwise do not shuttle</td></tr>
           <tr><td>Tree <kbd>*</kbd></td><td>Expand all folders under the selection (same as Explorer; numpad <kbd>*</kbd> or Shift+8; expansion is remembered)</td></tr>
           <tr><td>Tree <kbd>/</kbd></td><td>Collapse the selection and everything under it (numpad <kbd>/</kbd> or the <kbd>/</kbd> key)</td></tr>
@@ -1473,7 +1473,7 @@
           <tr><td>Playlist search</td><td>Every column is searched, visible or not. Words separated by spaces may hit different columns (e.g. artist + title) and all must match. Only matching rows stay. Next / previous track also walk only the visible rows</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>Apply the typed condition and return focus to the tree (library) or the list (playlist). An empty box removes the filter</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Discard the typed text and return focus (the current filter stays)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>R</kbd> / <kbd>N</kbd> / <kbd>P</kbd> / <kbd>L</kbd></td><td>With search focused, still toggle shuffle / Auto Next / Auto Play / Auto Loop (they do not type into the box)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>R</kbd> / <kbd>N</kbd> / <kbd>P</kbd> / <kbd>L</kbd></td><td>With search focused, still toggle shuffle / Auto Next / Auto Play / Single Loop (they do not type into the box)</td></tr>
         </tbody>
       </table>
       <p>While editing a status-bar time field</p>

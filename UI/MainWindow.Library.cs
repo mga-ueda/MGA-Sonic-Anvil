@@ -5550,7 +5550,7 @@ public partial class MainWindow
             AutoLoopCheck.IsChecked = LibraryBrowser.AutoLoopEnabled;
         }
 
-        // エディタでもサンプルループ再生ウィンドウを Autoloop に追従させる。
+        // エディタでもサンプルループ再生ウィンドウを Single Loop に追従させる。
         SyncPlayWindowFromDocument();
         if (!IsLibraryMaximized || !IsPlaybackActive())
         {

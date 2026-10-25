@@ -518,7 +518,7 @@ public partial class MainWindow
         }
 
         WaveSelection? playRange = ResolvePlayLoopRange();
-        // フェード調整／Auto Loop＋サンプルループ: イントロ（S より前）は通し、E 以降だけ S へ。
+        // フェード調整／Single Loop＋サンプルループ: イントロ（S より前）は通し、E 以降だけ S へ。
         // Bind/Mp3Gapless 側にも同じフラグを渡し、再生窓始点への再吸い寄せを防ぐ。
         var allowBeforePlayWindowStart =
             IsCrossfadeEditMode || IsAutoLoopSampleLoopWindow();
@@ -951,8 +951,8 @@ public partial class MainWindow
     /// <summary>
     /// 再生のループ窓（半開区間）。null ならループなし（一通）。
     /// 優先順位: フェード調整のサンプルループ → プレイヤー A-B → 選択 →
-    /// Auto Loop のサンプルループ →（プレイヤーのみ）Auto Loop 全長。
-    /// Auto Loop＋サンプルループ時の開始位置は <see cref="AutoLoopPlayback"/> を参照
+    /// Single Loop のサンプルループ →（プレイヤーのみ）Single Loop 全長。
+    /// Single Loop＋サンプルループ時の開始位置は <see cref="AutoLoopPlayback"/> を参照
     /// （頭〜S は通し、E で S へ無限ループ）。
     /// </summary>
     private WaveSelection? ResolvePlayLoopRange()
@@ -999,7 +999,7 @@ public partial class MainWindow
         return null;
     }
 
-    /// <summary>Auto Loop がサンプルループを再生窓にしているか（選択／A-B より下位）。</summary>
+    /// <summary>Single Loop がサンプルループを再生窓にしているか（選択／A-B より下位）。</summary>
     private bool IsAutoLoopSampleLoopWindow() =>
         _document is not null
         && AutoLoopPlayback.UsesSampleLoopWindow(

@@ -3,7 +3,7 @@ using MgaSonicAnvil.Domain;
 namespace MgaSonicAnvil.UI;
 
 /// <summary>
-/// Auto Loop の再生仕様（エディタ／プレイヤー共通の判定）。
+/// Single Loop の再生仕様（エディタ／プレイヤー共通の判定）。
 /// <list type="bullet">
 /// <item>
 /// <description>
@@ -29,7 +29,7 @@ namespace MgaSonicAnvil.UI;
 internal static class AutoLoopPlayback
 {
     /// <summary>
-    /// Auto Loop がサンプルループを再生窓にしているか（選択／A-B より下位のときだけ）。
+    /// Single Loop がサンプルループを再生窓にしているか（選択／A-B より下位のときだけ）。
     /// </summary>
     public static bool UsesSampleLoopWindow(
         bool autoLoopEnabled,
@@ -43,7 +43,7 @@ internal static class AutoLoopPlayback
 
     /// <summary>
     /// 再生開始フレームを再生窓に合わせる。
-    /// <paramref name="allowBeforeStart"/> が true のとき（Auto Loop＋サンプルループ／フェード調整）は
+    /// <paramref name="allowBeforeStart"/> が true のとき（Single Loop＋サンプルループ／フェード調整）は
     /// 窓の始点より前をそのまま許し、終端以降だけ始点へ戻す。
     /// </summary>
     public static long ClampStartFrame(long startFrame, WaveSelection range, bool allowBeforeStart)

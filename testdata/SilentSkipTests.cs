@@ -702,7 +702,7 @@ public sealed class SilentSkipTests
     [Fact]
     public void Provider_AllSilentLoop_PlaysWithoutRescanningWhenSilentSkipOn()
     {
-        // Auto Loop + Silent Skip + 全域無音で、1 サンプルごとに全文走査して固まらないこと。
+        // Single Loop + Silent Skip + 全域無音で、1 サンプルごとに全文走査して固まらないこと。
         const int rate = 48_000;
         var frames = rate; // 1 秒の無音（走査コストが効く長さ）
         var document = new AudioDocument(new float[frames * 2], rate, 2, 16, AudioFileKind.Wave, null);
