@@ -417,34 +417,31 @@ internal sealed class SpectrumAnalyzer
 
     private void EnsureBands(double nyquist)
     {
-        var next = CreateBands(nyquist);
-        if (_bands.Centers is { Length: > 0 } && _bands.Count == next.Count)
+        // ナイキストが同じなら帯域表は不変。毎 Process の CreateBands 割り当てを避ける。
+        if (_bands.Centers is { Length: > 0 } && Math.Abs(_nyquist - nyquist) <= 1)
         {
-            var nyquistChanged = Math.Abs(_nyquist - nyquist) > 1;
-            _nyquist = nyquist;
-            _bands = next;
-            if (nyquistChanged || _bandCapture.Length != next.Count)
-            {
-                BuildCaptureFractions(nyquist * 2d);
-            }
-
             return;
         }
 
+        var next = CreateBands(nyquist);
         _nyquist = nyquist;
         _bands = next;
         var n = next.Count;
-        _bandLin = new double[n];
-        _displayDb = new double[n];
-        _rawDb = new double[n];
-        _envelopeDb = new float[n];
-        _peakHoldDb = new float[n];
-        _peakHoldUntil = new double[n];
-        _peakSustainSec = new double[n];
-        _peakFlat = new bool[n];
-        Array.Fill(_envelopeDb, FloorDb);
-        Array.Fill(_peakHoldDb, FloorDb);
-        Array.Fill(_peakHoldUntil, -1e9);
+        if (_bandLin.Length != n)
+        {
+            _bandLin = new double[n];
+            _displayDb = new double[n];
+            _rawDb = new double[n];
+            _envelopeDb = new float[n];
+            _peakHoldDb = new float[n];
+            _peakHoldUntil = new double[n];
+            _peakSustainSec = new double[n];
+            _peakFlat = new bool[n];
+            Array.Fill(_envelopeDb, FloorDb);
+            Array.Fill(_peakHoldDb, FloorDb);
+            Array.Fill(_peakHoldUntil, -1e9);
+        }
+
         BuildCaptureFractions(nyquist * 2d);
     }
 
