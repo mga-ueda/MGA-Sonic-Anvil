@@ -1051,13 +1051,17 @@ internal sealed class PitchCurveEditorDialog : Window
         }
     }
 
-    /// <summary>音階スナップ解除時: 階段補間をやめ、保存済みの連続形状へ戻す。</summary>
+    /// <summary>
+    /// 音階スナップ解除時: 階段補間をやめる。
+    /// 設定ファイルの古い SCurve は使わず、解除前の UI 選択（無ければリニア）へ戻す。
+    /// </summary>
     private void RestoreContinuousShapes()
     {
-        var restored = FadeCurves.ParseStored(AppStorage.Settings.PitchCurveDefaultShape);
-        if (restored == FadeShape.Constant)
+        var restored = _selectedShape;
+        if (restored == FadeShape.Constant
+            || !FadeCurves.MenuOrderFadeIn.Contains(restored))
         {
-            restored = FadeCurves.Default;
+            restored = FadeShape.Linear;
         }
 
         _curve.DefaultShape = restored;
