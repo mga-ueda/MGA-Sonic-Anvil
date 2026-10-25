@@ -21,6 +21,21 @@ internal sealed class ProjectSpectrumView : FrameworkElement
     private bool _idle = true;
     private long _lastTickAt;
 
+    // サイズ／DPI／帯域数／ラベル色が同じあいだ再利用（毎 OnRender の割り当てを避ける）。
+    private int _cacheWPx = -1;
+    private int _cacheHPx = -1;
+    private double _cacheDpi;
+    private int _cacheBandCount = -1;
+    private Color _cacheLabelColor;
+    private PlotGeometry _cachePlot;
+    private SpectrumAnalyzer.BarRect[] _cacheRects = [];
+    private SpectrumAnalyzer.LedCells _cacheCells;
+    private FormattedText[] _cacheDbLabels = [];
+    private int[] _cacheDbValues = [];
+    private FormattedText[] _cacheHzTop = [];
+    private FormattedText[] _cacheHzBot = [];
+    private FormattedText? _cacheZeroHeight;
+
     public static readonly DependencyProperty BackgroundProperty =
         System.Windows.Controls.Control.BackgroundProperty.AddOwner(
             typeof(ProjectSpectrumView),
@@ -47,6 +62,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
             }
 
             _videoOverlayLabels = value;
+            InvalidateLayoutCache();
             InvalidateVisual();
         }
     }
@@ -70,8 +86,11 @@ internal sealed class ProjectSpectrumView : FrameworkElement
     public void RefreshAppearance()
     {
         _barGradient = null;
+        InvalidateLayoutCache();
         InvalidateVisual();
     }
+
+    private void InvalidateLayoutCache() => _cacheWPx = -1;
 
     protected override Size MeasureOverride(Size availableSize)
     {
@@ -84,6 +103,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
     {
         base.OnDpiChanged(oldDpi, newDpi);
+        InvalidateLayoutCache();
         InvalidateMeasure();
     }
 
@@ -113,8 +133,12 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         var dpi = PixelsPerDip;
         var wPx = Math.Max(1, (int)Math.Floor(bounds.Width * dpi));
         var hPx = Math.Max(1, (int)Math.Floor(bounds.Height * dpi));
-        var g = ComputePlot(wPx, hPx);
+        var bands = _analyzer.CurrentBands;
+        EnsureLayoutCache(wPx, hPx, dpi, bands);
+        var g = _cachePlot;
         var px = 1d / dpi;
+        var rects = _cacheRects;
+        var cells = _cacheCells;
 
         if (!WashThrough)
         {
@@ -133,14 +157,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         DrawDbGrid(dc, g, px, WashThrough);
         EnsureGradient();
 
-        var bands = _analyzer.CurrentBands;
         var n = bands.Count;
-        var rects = SpectrumAnalyzer.CreateBarRects(
-            g.PlotX,
-            g.PlotW,
-            n,
-            SpectrumAnalyzer.BarGutterDevicePx);
-        var cells = SpectrumAnalyzer.CreateLedCells(g.PlotY, g.PlotH, SpectrumAnalyzer.FloorDb);
         var env = _analyzer.EnvelopeDb;
         var hold = _analyzer.PeakHoldDb;
 
@@ -194,6 +211,66 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         }
 
         DrawChromeLabels(dc, g, bands, rects, px);
+    }
+
+    private void EnsureLayoutCache(int wPx, int hPx, double dpi, SpectrumAnalyzer.Bands bands)
+    {
+        var labelColor = LabelColor();
+        if (_cacheWPx == wPx
+            && _cacheHPx == hPx
+            && Math.Abs(_cacheDpi - dpi) <= 0.001
+            && _cacheBandCount == bands.Count
+            && _cacheLabelColor == labelColor
+            && _cacheRects.Length == bands.Count)
+        {
+            return;
+        }
+
+        _cacheWPx = wPx;
+        _cacheHPx = hPx;
+        _cacheDpi = dpi;
+        _cacheBandCount = bands.Count;
+        _cacheLabelColor = labelColor;
+        _cachePlot = ComputePlot(wPx, hPx);
+        _cacheRects = SpectrumAnalyzer.CreateBarRects(
+            _cachePlot.PlotX,
+            _cachePlot.PlotW,
+            bands.Count,
+            SpectrumAnalyzer.BarGutterDevicePx);
+        _cacheCells = SpectrumAnalyzer.CreateLedCells(
+            _cachePlot.PlotY,
+            _cachePlot.PlotH,
+            SpectrumAnalyzer.FloorDb);
+
+        var brush = WpfControlHelpers.FrozenBrush(labelColor);
+        var labels = new SortedSet<int> { (int)SpectrumAnalyzer.FloorDb };
+        for (var db = -10; db >= (int)SpectrumAnalyzer.FloorDb; db -= 10)
+        {
+            labels.Add(db);
+        }
+
+        _cacheDbValues = [.. labels];
+        _cacheDbLabels = new FormattedText[_cacheDbValues.Length];
+        for (var i = 0; i < _cacheDbValues.Length; i++)
+        {
+            _cacheDbLabels[i] = ChromeText(
+                _cacheDbValues[i].ToString(CultureInfo.InvariantCulture),
+                ChromeFontSize,
+                brush);
+        }
+
+        _cacheZeroHeight = ChromeText("0", ChromeFontSize, brush);
+        _cacheHzTop = new FormattedText[SpectrumAnalyzer.LabelTopRow.Length];
+        for (var i = 0; i < SpectrumAnalyzer.LabelTopRow.Length; i++)
+        {
+            _cacheHzTop[i] = ChromeText(SpectrumAnalyzer.LabelTopRow[i].Text, ChromeFontSize, brush);
+        }
+
+        _cacheHzBot = new FormattedText[SpectrumAnalyzer.LabelBotRow.Length];
+        for (var i = 0; i < SpectrumAnalyzer.LabelBotRow.Length; i++)
+        {
+            _cacheHzBot[i] = ChromeText(SpectrumAnalyzer.LabelBotRow[i].Text, ChromeFontSize, brush);
+        }
     }
 
     private void UpdateLevels(double dtMs)
@@ -280,51 +357,44 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         SpectrumAnalyzer.BarRect[] rects,
         double px)
     {
-        var brush = WpfControlHelpers.FrozenBrush(LabelColor());
-        var font = ChromeFontSize;
         if (g.ShowDb)
         {
-            var labels = new SortedSet<int> { (int)SpectrumAnalyzer.FloorDb };
-            for (var db = -10; db >= (int)SpectrumAnalyzer.FloorDb; db -= 10)
+            for (var i = 0; i < _cacheDbLabels.Length && i < _cacheDbValues.Length; i++)
             {
-                labels.Add(db);
-            }
-
-            foreach (var db in labels)
-            {
+                var db = _cacheDbValues[i];
+                var ft = _cacheDbLabels[i];
                 var t = SpectrumAnalyzer.DbNorm(db);
                 var y = (g.PlotY + g.PlotH * (1 - t)) * px;
-                var ft = ChromeText(db.ToString(CultureInfo.InvariantCulture), font, brush);
                 dc.DrawText(ft, new Point(g.PlotX * px - 3 - ft.Width, y - ft.Height * 0.5));
             }
         }
 
-        if (!g.ShowHz)
+        if (!g.ShowHz || _cacheZeroHeight is null)
         {
             return;
         }
 
         var maxF = bands.Count == 0 ? 0 : bands.Centers[^1] * 1.001;
         var row1y = (g.PlotY + g.PlotH + 1) * px;
-        var row2y = row1y + ChromeText("0", font, brush).Height + 2;
-        DrawFreqRow(dc, SpectrumAnalyzer.LabelTopRow, bands, rects, maxF, row1y, font, brush, px, g);
-        DrawFreqRow(dc, SpectrumAnalyzer.LabelBotRow, bands, rects, maxF, row2y, font, brush, px, g);
+        var row2y = row1y + _cacheZeroHeight.Height + 2;
+        DrawFreqRow(dc, SpectrumAnalyzer.LabelTopRow, _cacheHzTop, bands, rects, maxF, row1y, px, g);
+        DrawFreqRow(dc, SpectrumAnalyzer.LabelBotRow, _cacheHzBot, bands, rects, maxF, row2y, px, g);
     }
 
-    private void DrawFreqRow(
+    private static void DrawFreqRow(
         DrawingContext dc,
         (double Hz, string Text)[] row,
+        FormattedText[] texts,
         SpectrumAnalyzer.Bands bands,
         SpectrumAnalyzer.BarRect[] rects,
         double maxF,
         double y,
-        double font,
-        Brush brush,
         double px,
         PlotGeometry g)
     {
-        foreach (var (hz, text) in row)
+        for (var i = 0; i < row.Length && i < texts.Length; i++)
         {
+            var (hz, _) = row[i];
             if (hz > maxF)
             {
                 continue;
@@ -336,7 +406,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
                 continue;
             }
 
-            var ft = ChromeText(text, font, brush);
+            var ft = texts[i];
             var x = cx.Value * px - ft.Width * 0.5;
             var maxX = Math.Max(0, g.WidthPx * px - ft.Width);
             dc.DrawText(ft, new Point(Math.Clamp(x, 0, maxX), y));
