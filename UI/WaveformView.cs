@@ -3903,11 +3903,16 @@ internal sealed partial class WaveformView : Grid
         var usePolyline = !SeekAndSelectOnly && hasPcm && IsPolylineZoom(rangeFrames, width);
         // クロス編集中は raw 全走査を避け、ピーク＋局所パッチのみ（ピーク無し時は raw にフォールバック）。
         var crossfadePreferPeaks = _crossfadeDraft is { IsActive: true } && !document.Peaks.IsEmpty;
-        var useRawColumns = !SeekAndSelectOnly
-            && hasPcm
-            && !usePolyline
-            && !crossfadePreferPeaks
-            && rangeFrames <= RawColumnBudget(width);
+        // 短尺でもピークが使えるなら長尺と同じ PeakPyramid エンベロープに寄せる。
+        // 生 PCM 列はピーク無し／チャンネル不一致時のフォールバックのみ。
+        var peaksUsableForEnvelope = (!document.Peaks.IsEmpty && peaksMatchLanes) || crossfadePreferPeaks;
+        var useRawColumns = ShouldUseRawWaveColumns(
+            SeekAndSelectOnly,
+            hasPcm,
+            usePolyline,
+            peaksUsableForEnvelope,
+            rangeFrames,
+            width);
         var canSplitLanes = peaksMatchLanes || usePolyline || useRawColumns;
         var drawChannels = monoWave ? 1 : (canSplitLanes ? sourceChannels : peakChannels);
         if (!monoWave && (usePolyline || useRawColumns))
@@ -4275,6 +4280,25 @@ internal sealed partial class WaveformView : Grid
 
     private static long RawColumnBudget(int width) =>
         Math.Min(RawColumnMaxFrames, (long)Math.Max(1, width) * RawColumnMaxSamplesPerPixel);
+
+    /// <summary>
+    /// ピークが使えるときは Raw 列走査せず PeakPyramid に寄せる（長尺と同じ描画系統）。
+    /// </summary>
+    internal static bool ShouldUseRawWaveColumns(
+        bool seekAndSelectOnly,
+        bool hasPcm,
+        bool polylineZoom,
+        bool peaksUsableForEnvelope,
+        long rangeFrames,
+        int width)
+    {
+        if (seekAndSelectOnly || !hasPcm || polylineZoom || peaksUsableForEnvelope)
+        {
+            return false;
+        }
+
+        return rangeFrames > 0 && width > 0 && rangeFrames <= RawColumnBudget(width);
+    }
 
     private unsafe void DrawLaneGuides(
         int* buffer,
