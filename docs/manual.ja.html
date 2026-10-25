@@ -195,6 +195,7 @@
         <a href="#layout-transport">トランスポート</a>
         <a href="#layout-silent">Silent Skip</a>
         <a href="#layout-gapless">ギャップレス再生</a>
+        <a href="#layout-single-loop">Single Loop</a>
         <a href="#layout-top">最前面</a>
         <a href="#layout-meters">メーター</a>
         <a href="#layout-waapi">WAAPI</a>
@@ -362,7 +363,7 @@
           </li>
           <li><kbd>F9</kbd> でプレイリストと波形だけを出します（デスクトップの占有面積を節約したいとき。どのモードからでも）。
             <ul>
-              <li>ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出しません。Alt+S（Silent Skip）と Alt+T（Always on Top）は効きます。</li>
+              <li>ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出しません。Alt+S（Silent Skip）、Alt+L（Single Loop）、Alt+T（Always on Top）は効きます。</li>
               <li>もう一度 <kbd>F9</kbd> で通常のエディタへ戻します（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除）。</li>
               <li><kbd>F10</kbd> で通常のプレイヤー表示に戻し、再生は続けます。</li>
             </ul>
@@ -387,7 +388,7 @@
           <li><kbd>Alt</kbd>+<kbd>R</kbd> でランダム再生（プレイリスト上段の <span class="ui">Random</span>）。一巡まで同じ曲を繰り返しません。空でも切替可。既定オフ。エディタとプレイヤーを行き来しても、次回起動でも最後の状態を設定に覚えます。<kbd>R</kbd> は今の曲を先頭から再生し直しです。</li>
           <li><kbd>Alt</kbd>+<kbd>P</kbd> で <span class="ui">Auto Play</span>。オンのとき、プレイリストをクリアして追加（Enter／ドロップ）すると先頭から再生します。オフのときは追加だけ（再生も停止もしない）。Shift 付きの追加では再生しません。既定オン。最後の状態を設定に覚えます。</li>
           <li><kbd>Alt</kbd>+<kbd>N</kbd> で次の曲を自動再生（プレイリスト上段の <span class="ui">Auto Next</span>）。オンのとき曲末で次へ進み、ギャップレス先読みもします。オフのときはその曲で止まります。空でも切替可。既定オフ。エディタとプレイヤーを行き来しても、次回起動でも最後の状態を設定に覚えます。<kbd>N</kbd> は次の曲への手動送りのままです。</li>
-          <li><kbd>Alt</kbd>+<kbd>L</kbd> で <span class="ui">Single Loop</span>（プレイリスト上段）。オンのとき、サンプルループがあれば頭（または再生位置）からイントロを通し、ループ終端で始点へ無限ループします。サンプルループが無ければ曲末で先頭へ戻します。選択やプレイヤーの A-B があるときはそちらが再生窓になり、この頭通しは使いません。空でも切替可。最後の状態を設定に覚えます。素の <kbd>L</kbd> は末尾 3 秒前からのループ再生のままです。</li>
+          <li><kbd>Alt</kbd>+<kbd>L</kbd> で <span class="ui">Single Loop</span>（ステータスバー。エディタでも同じ）。オンのとき、サンプルループがあれば頭（または再生位置）からイントロを通し、ループ終端で始点へ無限ループします。サンプルループが無ければ曲末で先頭へ戻します。選択やプレイヤーの A-B があるときはそちらが再生窓になり、この頭通しは使いません。空でも切替可。最後の状態を設定に覚えます。素の <kbd>L</kbd> は末尾 3 秒前からのループ再生のままです。</li>
           <li>再生は音が出せるようになった時点で始めます。波形が全部描き終わるのは待ちません。</li>
           <li>次の曲を自動再生がオンのとき、次の曲を先に用意し、終わったら隙間なくつなぎます。MP3／M4A の頭と尻のごく短い無音は <a href="#layout-gapless">ギャップレス再生</a>（設定のプレイヤー。最初はオン）で減らします。オンでもわずかな隙間は残ることがあります。</li>
           <li>
@@ -707,9 +708,21 @@
         </ul>
       </article>
 
+      <article class="part" id="layout-single-loop">
+        <h3>Single Loop</h3>
+        <p class="where">ステータスバー。Silent Skip の右、Always on Top の左。<kbd>Alt</kbd>+<kbd>L</kbd>。エディタ／プレイヤー共通。</p>
+        <ul>
+          <li>オンのとき、サンプルループがあれば頭（または再生位置）からイントロを通し、ループ終端で始点へ無限ループします。</li>
+          <li>サンプルループが無ければ曲末で先頭へ戻します。</li>
+          <li>選択やプレイヤーの A-B があるときはそちらが再生窓になり、この頭通しは使いません。</li>
+          <li>プレイリストが空でも切り替えられます。最後の状態を設定に覚えます。</li>
+          <li>素の <kbd>L</kbd> は末尾 3 秒前からのループ再生のままです（別操作）。</li>
+        </ul>
+      </article>
+
       <article class="part" id="layout-top">
         <h3>Always on Top</h3>
-        <p class="where">Silent Skip の右、<span class="ui">SPEAKER</span> の左</p>
+        <p class="where"><span class="ui">Single Loop</span> の右、<span class="ui">SPEAKER</span> の左</p>
         <p>ウィンドウを最前面に固定します。<kbd>Alt</kbd>+<kbd>T</kbd> で切り替えます。</p>
       </article>
 
@@ -771,7 +784,7 @@
         <ul>
           <li><strong>ファイル位置</strong> …… 2 ファイル以上開いているときは、冒頭に <code>1 / 10 Files</code> のように何番目／全数を表示します。</li>
           <li><strong>ファイル情報</strong> …… サンプリングレートなど（名前はタブ側）。レート／ビット深度／チャンネルを変換すると、該当項目が保存まで赤になります。MP3／M4A はビットレートも表示します。容量は MB（MiB / B）。変換や範囲削除で変わると推測サイズが赤になります。</li>
-          <li><strong>Silent Skip と Always on Top</strong> …… NOW POS の左。Silent Skip は <kbd>Alt</kbd>+<kbd>S</kbd>。Always on Top は <kbd>Alt</kbd>+<kbd>T</kbd>。無音を飛ばして再生し、録音ではしきい値超だけ書きます。しきい値は設定です。</li>
+          <li><strong>Silent Skip／Single Loop／Always on Top</strong> …… NOW POS の左からこの順。<span class="ui">SPEAKER</span> の手前。Silent Skip は <kbd>Alt</kbd>+<kbd>S</kbd>、<span class="ui">Single Loop</span> は <kbd>Alt</kbd>+<kbd>L</kbd>、Always on Top は <kbd>Alt</kbd>+<kbd>T</kbd>。Silent Skip は無音を飛ばして再生し、録音ではしきい値超だけ書きます（しきい値は設定）。Single Loop の動作は <a href="#layout-single-loop">Single Loop</a>。</li>
           <li><strong><span class="ui">SPEAKER</span></strong> …… その右でスピーカー配置を切り替えます。一覧は表示項目タブと同じです。今使っている定義は外しても、切り替えるまで残ります。自動スピーカー選択がオンなら、ファイルの本数に合う定義へ切り替えます。既定オフ。</li>
           <li><strong>時間</strong> …… 現在時間／選択開始／選択範囲／選択終了／トータル。トータル以外は入力・ホイール／↑↓で調整します。時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分、サンプルは 1／Shift 10／Ctrl 100／Ctrl+Shift 1000。右クリックで時間とサンプル数を切り替えます。</li>
         </ul>
@@ -796,7 +809,7 @@
         <li><kbd>G</kbd> …… ステータスバーの NOW POS を入力。Enter で移動。コピー／貼り付け可。右クリックで時間／サンプル数。</li>
         <li><kbd>Z</kbd> またはテンキーの <kbd>.</kbd>…… 中央寄せ。再生中はセンターロックの切替、停止で解除（キーボードの <kbd>.</kbd> は早送り）。</li>
         <li><kbd>L</kbd> …… 選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生。</li>
-        <li><kbd>Alt</kbd>+<kbd>L</kbd> …… <span class="ui">Single Loop</span> のオン／オフ（プレイリスト上段と同じ。サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B があるときはそちら優先。くわしくは <a href="#layout-player">プレイヤーモード → 再生</a>）。</li>
+        <li><kbd>Alt</kbd>+<kbd>L</kbd> …… <span class="ui">Single Loop</span> のオン／オフ（ステータスバー。エディタでも同じ。サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B があるときはそちら優先。くわしくは <a href="#layout-single-loop">Single Loop</a>）。</li>
         <li><kbd>J</kbd> …… 5 秒戻し、<kbd>K</kbd> …… 5 秒送り（0.75 秒クロスフェード。押しっぱなしは少し待ってから繰り返す）</li>
         <li><kbd>Ctrl</kbd>+<kbd>+</kbd>／<kbd>Ctrl</kbd>+<kbd>-</kbd> …… 再生中のピッチを半音上げる／下げる（キーボードとテンキー。キーボードの <kbd>+</kbd> は Shift 付きでも可）。<kbd>Ctrl</kbd>+<kbd>0</kbd>（キーボードとテンキー）で 0 に戻す。中央に半音のトーストを出す。エディタとプレイヤーで同じ。長さと再生位置はそのまま。範囲は ±2 オクターブ。別の曲を再生し始めると忘れる。</li>
         <li><kbd>,</kbd> …… 早戻し、<kbd>.</kbd> …… 早送り（±3 倍・ピッチ据え置き。推移中は -4 dB。停止中でも可。離すとその位置で停止のまま）</li>
@@ -818,7 +831,7 @@
       </ul>
 
       <h2 id="edit">5. 選択と編集</h2>
-      <p>ドラッグで選択。ダブルクリックは区間（マーカー間）、トリプルクリックは必ず全選択。<kbd>Esc</kbd> または Shift なし移動で解除。未選択のフェード／音量／ピッチ／ノーマライズ／リバース／タイムストレッチは時間方向は全体です。チャンネルソロ中は聞こえているレーンだけが対象です。ステータスバーの選択開始／範囲／終了に値を入れることでも選択できます。選択範囲への処理（フェード／ノーマライズ／削除など）のあと、再生位置は選択の先頭へ戻ります。</p>
+      <p>ドラッグで選択。ダブルクリックは区間（マーカー間）、トリプルクリックは必ず全選択。<kbd>Esc</kbd> または Shift なし移動で解除。未選択のフェード／音量／ピッチ／ノーマライズ／リバース／タイムストレッチは時間方向は全体です。チャンネルソロ中は聞こえているレーンだけが対象です。ステータスバーの選択開始／範囲／終了に値を入れることでも選択できます。選択範囲への処理（フェード／ノーマライズ／削除など）のあと、再生位置は選択の先頭へ戻ります。選択端がサンプルループ／リージョン／マーカーの境界と一致しているとき、その境界を動かすと選択端も同じ量だけ追従します。</p>
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd>／<span class="ui">FADE OUT</span> <kbd>O</kbd> …… カーブを選び Space で試聴、Enter で実行。1–9 でカーブ。</li>
         <li><kbd>X</kbd> …… シークバー前後をフェード。シークを境に、今見えている前だけアウト／後ろだけイン（リニア）。サンプルループの継ぎ目向けの調整は <kbd>Shift</kbd>+<kbd>X</kbd>（<a href="#fade-adjust">フェード調整ツール</a>）。</li>
@@ -1166,7 +1179,7 @@
         <tbody>
           <tr><td><kbd>Alt</kbd>+<kbd>S</kbd></td><td>Silent Skip（ステータスバー。ラベルに下線なし）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>T</kbd></td><td>Always on Top（ステータスバー。ラベルに下線なし）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span>（プレイリスト上段／ステータス。ラベルに下線なし）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span>（ステータスバー。ラベルに下線なし）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>R</kbd></td><td><span class="ui">Random</span>（シャッフル。ラベルに下線なし）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td><span class="ui">Auto Next</span>（次の曲を自動再生。ラベルに下線なし）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td><span class="ui">Auto Play</span>（追加時の自動再生。ラベルに下線なし）</td></tr>
@@ -1266,8 +1279,8 @@
       <table>
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
-          <tr><td>←／→</td><td>シーク。再生中は押しっぱなしで 3 倍の早送り／巻き戻し（その間 Silent Skip は止める）。選択中のマーカー／リージョン端／ループ端は移動（点表示時は 1 サンプル）。プレイヤーでは左右キーの早送り／巻き戻しはしない（動画の本再生中またはフレーム一時停止中は 1 フレーム戻し／送り）</td></tr>
-          <tr><td><kbd>Shift</kbd>+←／→</td><td>選択を伸長。選択中の端は 3 倍で移動（点表示時は 1 サンプル）</td></tr>
+          <tr><td>←／→</td><td>シーク。再生中は押しっぱなしで 3 倍の早送り／巻き戻し（その間 Silent Skip は止める）。選択中のマーカー／リージョン端／ループ端は移動（点表示時は 1 サンプル。選択端がその境界と一致していれば選択も同じ量だけ追従）。プレイヤーでは左右キーの早送り／巻き戻しはしない（動画の本再生中またはフレーム一時停止中は 1 フレーム戻し／送り）</td></tr>
+          <tr><td><kbd>Shift</kbd>+←／→</td><td>選択を伸長。選択中の端は 3 倍で移動（点表示時は 1 サンプル。境界と一致する選択端も同じ量だけ追従）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+←／→</td><td>前後のマーカー／リージョン端／サンプルループ端へ</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+←／→</td><td>前後のマーカー／端まで選択を伸長</td></tr>
           <tr><td><kbd>Home</kbd>／<kbd>End</kbd></td><td>画面端へ</td></tr>
@@ -1501,7 +1514,7 @@
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
           <tr><td><kbd>F8</kbd></td><td>動画／PDF ミニプレイヤー（トグル。プレイリスト等は無し。ウィンドウのクライアント領域が映像／PDF ページの縦横比になるよう原寸配置／位置は動かした時点で中心を覚え、次の動画本再生でも中心を合わせて使う。<kbd>+</kbd>／<kbd>-</kbd>（キーボード・テンキー）だけ常に 25% 刻み（枠ドラッグで中途半端な大きさでも、次のキーは近い 25% へ着地。原寸で一旦停止。25〜300%。縦横比は維持。倍率は F8 を抜けるまで覚え、抜けると忘れる）。窓枠のドラッグは連続拡縮（25% 刻みではない。縦横比固定。ホイールは使わない）。<kbd>A</kbd>／<kbd>T</kbd> の表示は引数起動と共通に覚え、既定はどちらもオン（変えた状態は本再生とミニで共通に覚え、以後ずっと使う）。背面に動画または PDF があるとき（本再生または暗いバックグラウンドプレビュー）かつプレイリストに再生対象があるときだけ入れる。拡張子連動／引数で動画を開いたときは自動で入る。もう一度 <kbd>F8</kbd> で通常のプレイヤーへ（再生は続ける）。<kbd>Escape</kbd>／<kbd>Q</kbd> でプレイリストへ戻る（動画ミニで In／Out があるとき <kbd>Escape</kbd> は解除して留まる）。<kbd>F9</kbd>／<kbd>F10</kbd> でプレイリストへ戻る（本再生は止める）。<kbd>F11</kbd>／<kbd>F12</kbd> へ移るとき動画／PDF はファイルごと持ち込まない（音声だけ残すこともない）</td></tr>
-          <tr><td><kbd>F9</kbd></td><td>プレイリストと波形だけを出す（トグル。既定オフ。デスクトップの占有面積を節約したいとき）。どのモードからでも入れる。ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出さない。Alt+S（Silent Skip）と Alt+T（Always on Top）は効く。もう一度 <kbd>F9</kbd> で通常のエディタへ戻す（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除する）。<kbd>F10</kbd> で通常のプレイヤー（F10）表示に戻す（再生は続ける）。ウィンドウ位置・サイズはモード別に覚える</td></tr>
+          <tr><td><kbd>F9</kbd></td><td>プレイリストと波形だけを出す（トグル。既定オフ。デスクトップの占有面積を節約したいとき）。どのモードからでも入れる。ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出さない。Alt+S（Silent Skip）、Alt+L（Single Loop）、Alt+T（Always on Top）は効く。もう一度 <kbd>F9</kbd> で通常のエディタへ戻す（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除する）。<kbd>F10</kbd> で通常のプレイヤー（F10）表示に戻す（再生は続ける）。ウィンドウ位置・サイズはモード別に覚える</td></tr>
           <tr><td><kbd>F1</kbd>／<kbd>F3</kbd></td><td>割り当てなし（ツリー／お気に入り／プレイリストへの移動には使わない）</td></tr>
           <tr><td><kbd>F2</kbd></td><td>名前の変更。ツリーは選択フォルダ、お気に入りは選択フォルダ（ディスク上の実体）、プレイリストは選択ファイル。索引のフルパスも書き換え、<kbd>Ctrl</kbd>+<kbd>F5</kbd> は不要。エディタのファイル名変更とは別</td></tr>
           <tr><td><kbd>F7</kbd></td><td>ツリーだけ。選択フォルダの直下に、指定した名前で新しいフォルダを作る。お気に入りとプレイリストでは何もしない</td></tr>
