@@ -175,6 +175,7 @@
         <a href="#layout-transport">Transport</a>
         <a href="#layout-silent">Silent Skip</a>
         <a href="#layout-gapless">Gapless</a>
+        <a href="#layout-single-loop">Single Loop</a>
         <a href="#layout-top">On top</a>
         <a href="#layout-meters">Meters</a>
         <a href="#layout-waapi">WAAPI</a>
@@ -332,7 +333,7 @@
           </li>
           <li><kbd>F9</kbd> shows only the playlist and waveform (to save desktop space; from any mode).
             <ul>
-              <li>Library, Favorites, meters, analyzers, transport, and status bar stay hidden. Alt+S Silent Skip and Alt+T Always on Top still work.</li>
+              <li>Library, Favorites, meters, analyzers, transport, and status bar stay hidden. Alt+S Silent Skip, Alt+L Single Loop, and Alt+T Always on Top still work.</li>
               <li>F9 again returns to the editor (stops playback, then keeps only the selected files and clears tab multi-selection).</li>
               <li>F10 returns to the normal player and keeps playback going.</li>
             </ul>
@@ -356,7 +357,7 @@
           <li><kbd>Alt</kbd>+<kbd>R</kbd> toggles shuffle (playlist <span class="ui">Random</span>). No repeats until the playlist has played once. Works on an empty list. Off by default. The last state is saved and kept when switching between the editor and the player. <kbd>R</kbd> restarts the current track from the beginning.</li>
           <li><kbd>Alt</kbd>+<kbd>P</kbd> toggles <span class="ui">Auto Play</span>. When on, clearing and adding (Enter / drop) plays the first track. When off, it only adds (does not start or stop playback). Shift-add never plays. On by default. Remembers the last state in settings.</li>
           <li><kbd>Alt</kbd>+<kbd>N</kbd> toggles auto next (playlist <span class="ui">Auto Next</span>). When on, advances to the next track at the end and gapless-prefetches. When off, stops on that track. Works on an empty list. Off by default. The last state is saved and kept when switching between the editor and the player. Plain <kbd>N</kbd> still steps to the next track manually.</li>
-          <li><kbd>Alt</kbd>+<kbd>L</kbd> toggles <span class="ui">Single Loop</span> (playlist toolbar). When on, with a sample loop it plays from the head (or playhead) through the intro, then loops S–E forever. Without a sample loop, it restarts from the start at the end. A selection or player A-B becomes the play window instead (no intro passthrough). Works on an empty list. Remembers the last state in settings. Plain <kbd>L</kbd> still loops from 3 seconds before the end of the selection / sample loop.</li>
+          <li><kbd>Alt</kbd>+<kbd>L</kbd> toggles <span class="ui">Single Loop</span> (status bar; same in the editor). When on, with a sample loop it plays from the head (or playhead) through the intro, then loops S–E forever. Without a sample loop, it restarts from the start at the end. A selection or player A-B becomes the play window instead (no intro passthrough). Works on an empty list. Remembers the last state in settings. Plain <kbd>L</kbd> still loops from 3 seconds before the end of the selection / sample loop.</li>
           <li>Playback starts as soon as sound can play. It does not wait for the waveform to finish drawing.</li>
           <li>With auto next on, continuous playback prepares the next track and joins without stopping. Tiny extra silence at the start and end of MP3 / M4A is reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
           <li>
@@ -660,9 +661,21 @@
         </ul>
       </article>
 
+      <article class="part" id="layout-single-loop">
+        <h3>Single Loop</h3>
+        <p class="where">Status bar, right of Silent Skip and left of Always on Top. <kbd>Alt</kbd>+<kbd>L</kbd>. Same in the editor and the player.</p>
+        <ul>
+          <li>When on, with a sample loop it plays from the head (or playhead) through the intro, then loops S–E forever.</li>
+          <li>Without a sample loop, it restarts from the start at the end.</li>
+          <li>A selection or player A-B becomes the play window instead (no intro passthrough).</li>
+          <li>Works on an empty playlist. Remembers the last state in settings.</li>
+          <li>Plain <kbd>L</kbd> still loops from 3 seconds before the end (a separate command).</li>
+        </ul>
+      </article>
+
       <article class="part" id="layout-top">
         <h3>Always on Top</h3>
-        <p class="where">Right of Silent Skip, left of <span class="ui">SPEAKER</span></p>
+        <p class="where">Right of <span class="ui">Single Loop</span>, left of <span class="ui">SPEAKER</span></p>
         <p>Keeps the window in front. Toggle with <kbd>Alt</kbd>+<kbd>T</kbd>.</p>
       </article>
 
@@ -719,7 +732,7 @@
         <ul>
           <li><strong>File position</strong> — with two or more files open, the front shows the position and count, e.g. <code>1 / 10 Files</code>.</li>
           <li><strong>Format</strong> — name is on the tab. Sample rate / bit depth / channels turn red after conversion until you save. MP3 / M4A also show bit rate. Size is MB (MiB / B), and turns red as an estimate after conversion or a range delete that changes length.</li>
-          <li><strong>Silent Skip and Always on Top</strong> — left of <span class="ui">SPEAKER</span>. Silent Skip is <kbd>Alt</kbd>+<kbd>S</kbd>. Always on Top is <kbd>Alt</kbd>+<kbd>T</kbd>. Skips silence on playback, and records only above the threshold. Threshold is in Settings.</li>
+          <li><strong>Silent Skip / Single Loop / Always on Top</strong> — left of <span class="ui">SPEAKER</span>, in that order. Silent Skip is <kbd>Alt</kbd>+<kbd>S</kbd>, <span class="ui">Single Loop</span> is <kbd>Alt</kbd>+<kbd>L</kbd>, Always on Top is <kbd>Alt</kbd>+<kbd>T</kbd>. Silent Skip skips silence on playback and records only above the threshold (threshold in Settings). See <a href="#layout-single-loop">Single Loop</a> for that toggle.</li>
           <li><strong><span class="ui">SPEAKER</span></strong> — switches the speaker layout. Same list as Shown. The definition in use stays listed until you switch away. Auto speaker selection, off by default, switches to a matching enabled definition.</li>
           <li><strong>Times</strong> — current / selection start / selection length / selection end / total. All but total are editable. Wheel / ↑↓ nudge: time by 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min, samples by 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000. Right-click switches time and samples.</li>
         </ul>
@@ -747,7 +760,7 @@
         <li><kbd>,</kbd> — rewind, <kbd>.</kbd> — fast-forward (±3× at original pitch; −4 dB while held; works while stopped and leaves you stopped at the new position)</li>
         <li><kbd>Z</kbd> or numpad <kbd>.</kbd> — center. Toggles center-lock while playing; clears it when stopped (the <kbd>.</kbd> key is fast-forward).</li>
         <li><kbd>L</kbd> — loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</li>
-        <li><kbd>Alt</kbd>+<kbd>L</kbd> — toggle <span class="ui">Single Loop</span> (same as the playlist toolbar; with a sample loop: play through the intro then S–E forever; without: restart at end; selection / A-B take priority; see <a href="#layout-player">Player mode → Playback</a>).</li>
+        <li><kbd>Alt</kbd>+<kbd>L</kbd> — toggle <span class="ui">Single Loop</span> (status bar; same in the editor; with a sample loop: play through the intro then S–E forever; without: restart at end; selection / A-B take priority; see <a href="#layout-single-loop">Single Loop</a>).</li>
         <li><kbd>Q</kbd> — in the editor, marker click. Plays clicks at marker / region edges (selection when present, otherwise the whole file). Toggle with the button or <kbd>Q</kbd> (off by default; never auto-on). Also available from waveform right-click → Playback. In the player during real video playback / frame pause / bright PDF view, same as <kbd>Escape</kbd> — returns to the dim preview (in the F8 / argument-launch mini, Escape / Q return to the playlist (Escape clears In/Out and stays when In/Out is set); marker click does not run in the player).</li>
         <li><kbd>Tab</kbd> — solo a channel. Other lanes go gray and stay muted. Again moves to the next channel; <kbd>Shift</kbd>+<kbd>Tab</kbd> goes backward. Past the last clears solo. Click a channel name on the left to solo (click the same name again to clear; <kbd>Ctrl</kbd>+click adds; <kbd>Shift</kbd>+click mutes / unmutes). The time selection does not change. Waveform edits apply only to that channel. Works while playing or stopped.</li>
         <li><kbd>Ctrl</kbd>+<kbd>N</kbd> — new file. Opens an empty tab. Choose the format each time (the last choice is remembered). Channels are the speakers enabled on Shown, plus Mono (always available).</li>
@@ -756,7 +769,7 @@
       </ul>
 
       <h2 id="edit">5. Selection and editing</h2>
-      <p>Drag to select. Double-click selects a span (between markers). Triple-click always selects all. <kbd>Esc</kbd> or a move without Shift clears it. Fade / volume / pitch / normalize / reverse / time stretch with nothing selected uses the whole file in time. While a channel is soloed, those edits apply only to the audible lanes. You can also type the selection start / length / end in the status bar. After a selection edit (fade, normalize, delete, and so on), the playhead returns to the start of the selection.</p>
+      <p>Drag to select. Double-click selects a span (between markers). Triple-click always selects all. <kbd>Esc</kbd> or a move without Shift clears it. Fade / volume / pitch / normalize / reverse / time stretch with nothing selected uses the whole file in time. While a channel is soloed, those edits apply only to the audible lanes. You can also type the selection start / length / end in the status bar. After a selection edit (fade, normalize, delete, and so on), the playhead returns to the start of the selection. When a selection edge coincides with a sample-loop / region / marker boundary, moving that boundary moves the matching selection edge by the same amount.</p>
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd> / <span class="ui">FADE OUT</span> <kbd>O</kbd> — pick a curve, Space to preview, Enter to apply. 1–9 select a curve.</li>
         <li><kbd>X</kbd> — fade around seek bar: from the playhead, fade out only the visible part before / fade in only the visible part after (linear). For sample-loop seam fades, use <kbd>Shift</kbd>+<kbd>X</kbd> (<a href="#fade-adjust">Fade Adjust Tool</a>).</li>
@@ -1067,7 +1080,7 @@
         <tbody>
           <tr><td><kbd>Alt</kbd>+<kbd>S</kbd></td><td>Silent Skip (status bar; no underline on the label)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>T</kbd></td><td>Always on Top (status bar; no underline on the label)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span> (playlist toolbar / status; no underline on the label)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span> (status bar; no underline on the label)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>R</kbd></td><td><span class="ui">Random</span> shuffle (no underline on the label)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td><span class="ui">Auto Next</span> (no underline on the label)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td><span class="ui">Auto Play</span> (play on clear-and-add; no underline on the label)</td></tr>
@@ -1167,8 +1180,8 @@
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td>← / →</td><td>Seek. Hold during playback for 3× shuttle (Silent Skip pauses). Moves a selected marker / region edge / loop edge (1 sample when dots are shown). Player mode does not shuttle with the arrows (during real video playback or frame pause, steps one frame)</td></tr>
-          <tr><td><kbd>Shift</kbd>+← / →</td><td>Extend the selection. Moves a selected edge ×3 (1 sample when dots are shown)</td></tr>
+          <tr><td>← / →</td><td>Seek. Hold during playback for 3× shuttle (Silent Skip pauses). Moves a selected marker / region edge / loop edge (1 sample when dots are shown; a selection edge that coincides with that boundary follows by the same amount). Player mode does not shuttle with the arrows (during real video playback or frame pause, steps one frame)</td></tr>
+          <tr><td><kbd>Shift</kbd>+← / →</td><td>Extend the selection. Moves a selected edge ×3 (1 sample when dots are shown; a coinciding selection edge follows by the same amount)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+← / →</td><td>Previous / next marker / region edge / sample-loop edge</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+← / →</td><td>Extend the selection to the previous / next marker or edge</td></tr>
           <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>View edge</td></tr>
@@ -1392,7 +1405,7 @@
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td><kbd>F8</kbd></td><td>Video / PDF mini player (toggle; no playlist / transport; window client area matches the video / PDF page aspect at native size; the window center is remembered as you move it and reused (center-aligned) for the next real video play; <kbd>+</kbd> / <kbd>-</kbd> (keyboard and numpad only) always land on 25% steps (after a free border drag, the next key snaps to the nearest 25%; keys pause at native size; 25–300%; aspect locked; scale remembered until you leave F8); drag the window border for continuous resize (not 25% steps; aspect locked; no mouse-wheel resize). <kbd>A</kbd> / <kbd>T</kbd> visibility is shared with argument launch (both on by default; a change is remembered for real playback and the mini and used from then on). Enter when a video or PDF is on the back stage (real playback or the dim background preview) and the playlist has something to play; opening video via association or arguments enters it automatically. <kbd>F8</kbd> again returns to the normal player and keeps playback going. <kbd>Escape</kbd> / <kbd>Q</kbd> quits the app. <kbd>F9</kbd> / <kbd>F10</kbd> return to the playlist (stop real playback). <kbd>F11</kbd> / <kbd>F12</kbd> do not take video / PDF at all, including as audio-only</td></tr>
-          <tr><td><kbd>F9</kbd></td><td>Shows only the playlist and waveform (toggle; off by default; for when you want to save desktop space). Available from any mode. The library, Favorites, level meters, analyzers, transport, and status bar stay hidden. Alt+S (Silent Skip) and Alt+T (Always on Top) still work. <kbd>F9</kbd> again returns to the editor (stops playback, then keeps only the selected files and clears tab multi-selection). <kbd>F10</kbd> returns to the normal F10 player and keeps playback going. Each mode remembers its own window position and size</td></tr>
+          <tr><td><kbd>F9</kbd></td><td>Shows only the playlist and waveform (toggle; off by default; for when you want to save desktop space). Available from any mode. The library, Favorites, level meters, analyzers, transport, and status bar stay hidden. Alt+S (Silent Skip), Alt+L (Single Loop), and Alt+T (Always on Top) still work. <kbd>F9</kbd> again returns to the editor (stops playback, then keeps only the selected files and clears tab multi-selection). <kbd>F10</kbd> returns to the normal F10 player and keeps playback going. Each mode remembers its own window position and size</td></tr>
           <tr><td><kbd>F1</kbd> / <kbd>F3</kbd></td><td>Unassigned (they no longer focus the tree, Favorites, or the playlist)</td></tr>
           <tr><td><kbd>F2</kbd></td><td>Rename. Tree: the selected folder. Favorites: the selected folder on disk. Playlist: the selected file. Full paths in the catalog are rewritten; <kbd>Ctrl</kbd>+<kbd>F5</kbd> is not required. Separate from Rename File in the editor</td></tr>
           <tr><td><kbd>F7</kbd></td><td>Tree only. Create a new folder directly under the selection, with the name you type. No-op in Favorites and on the playlist</td></tr>
