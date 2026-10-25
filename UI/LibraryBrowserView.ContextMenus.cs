@@ -390,6 +390,9 @@ internal sealed partial class LibraryBrowserView
             var selected = SelectedSessions;
             var hasSelection = selected.Length > 0;
             var many = selected.Length >= 2;
+            loudness.Header = many
+                ? UiStrings.LibraryMenuMatchLoudnessSelected
+                : UiStrings.LibraryMenuMatchLoudness;
             loudness.IsEnabled = hasSelection;
             var hasRows = _rows.Count > 0;
             previous.IsEnabled = hasRows;

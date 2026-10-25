@@ -1108,6 +1108,9 @@ internal static partial class UiStrings
     public static string LibraryMenuCatTree => Get("ツリー(_T)", "_Tree");
     public static string LibraryMenuCatOther => Get("その他(_O)", "_Other");
     public static string LibraryMenuMatchLoudness => Get("ラウドネスを揃える", "Match Loudness");
+    public static string LibraryMenuMatchLoudnessSelected => Get(
+        "選択したファイルのラウドネスを揃える",
+        "Match Loudness of Selected Files");
     public static string LibraryMenuSaveMp3 => Get("MP3 として保存", "Save as MP3");
     public static string LibraryMenuCopy => Get("コピー", "Copy");
     public static string LibraryMenuCut => Get("切り取り", "Cut");

@@ -214,15 +214,15 @@ internal static partial class UiStrings
     public static string WaveMenuQuit => Get("終了(_Q)", "_Quit");
 
     public static string WaveMenuExportWave => Get("Wave で書き出す(_W)", "Export _Wave");
-    public static string WaveMenuExportWaveSelected => Get("選択したタブを Wave で書き出す(_W)", "Export Selected Tabs as _Wave");
+    public static string WaveMenuExportWaveSelected => Get("選択したファイルを Wave で書き出す(_W)", "Export Selected Files as _Wave");
     public static string WaveMenuExportMp3 => Get("MP3 で書き出す(_M)", "Export _MP3");
-    public static string WaveMenuExportMp3Selected => Get("選択したタブを MP3 で書き出す(_M)", "Export Selected Tabs as _MP3");
+    public static string WaveMenuExportMp3Selected => Get("選択したファイルを MP3 で書き出す(_M)", "Export Selected Files as _MP3");
     public static string WaveMenuExportByMarkers => Get("マーカーでセパレート(_K)", "Separate by Mar_kers");
-    public static string WaveMenuExportByMarkersSelected => Get("選択したタブをマーカーでセパレート(_K)", "Separate Selected Tabs by Mar_kers");
+    public static string WaveMenuExportByMarkersSelected => Get("選択したファイルをマーカーでセパレート(_K)", "Separate Selected Files by Mar_kers");
     public static string WaveMenuExportByRegions => Get("リージョンでセパレート(_G)", "Separate by Re_gions");
-    public static string WaveMenuExportByRegionsSelected => Get("選択したタブをリージョンでセパレート(_G)", "Separate Selected Tabs by Re_gions");
+    public static string WaveMenuExportByRegionsSelected => Get("選択したファイルをリージョンでセパレート(_G)", "Separate Selected Files by Re_gions");
     public static string WaveMenuExportByChannels => Get("チャンネルごとに書き出す(_C)", "Export by _Channel");
-    public static string WaveMenuExportByChannelsSelected => Get("選択したタブをチャンネルごとに書き出す(_C)", "Export Selected Tabs by _Channel");
+    public static string WaveMenuExportByChannelsSelected => Get("選択したファイルをチャンネルごとに書き出す(_C)", "Export Selected Files by _Channel");
 
     public static string WaveMenuManual => Get("マニュアル(_M)", "_Manual");
     public static string WaveMenuGitHub => Get("GitHub(_G)", "_GitHub");
