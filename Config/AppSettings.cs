@@ -247,7 +247,7 @@ internal sealed class AppSettings
     public int PitchCurveHeight { get; set; }
 
     /// <summary>ピッチカーブ既定の補間形状。</summary>
-    public string PitchCurveDefaultShape { get; set; } = "SCurve";
+    public string PitchCurveDefaultShape { get; set; } = "Linear";
 
     /// <summary>ピッチカーブで音階スナップ（鍵盤表示）を使う。</summary>
     public bool PitchCurveSnapToScale { get; set; }

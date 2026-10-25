@@ -18,14 +18,15 @@ internal sealed class PitchCurve
 
     public PitchCurve() => SetConstant(0);
 
-    public PitchCurve(IEnumerable<PitchCurvePoint> points, IEnumerable<FadeShape>? shapes = null, FadeShape defaultShape = FadeCurves.Default)
+    public PitchCurve(IEnumerable<PitchCurvePoint> points, IEnumerable<FadeShape>? shapes = null, FadeShape defaultShape = FadeShape.Linear)
     {
         // Clone 経路では Constant（音階スナップ）もそのまま残す。勝手に連続形状へ戻さない。
         DefaultShape = defaultShape;
         ReplacePoints(points, shapes);
     }
 
-    public FadeShape DefaultShape { get; set; } = FadeCurves.Default;
+    /// <summary>ユーザーが形状を選ぶまではリニア。フェード既定の SCurve は使わない。</summary>
+    public FadeShape DefaultShape { get; set; } = FadeShape.Linear;
 
     public IReadOnlyList<PitchCurvePoint> Points => _points;
 
@@ -429,10 +430,10 @@ internal sealed class PitchCurve
         return packed;
     }
 
-    public static PitchCurve FromPackedSamples(float[]? packed, IReadOnlyList<long>? shapeIds, FadeShape defaultShape = FadeCurves.Default)
+    public static PitchCurve FromPackedSamples(float[]? packed, IReadOnlyList<long>? shapeIds, FadeShape defaultShape = FadeShape.Linear)
     {
         var curve = new PitchCurve();
-        curve.DefaultShape = defaultShape == FadeShape.Constant ? FadeCurves.Default : defaultShape;
+        curve.DefaultShape = defaultShape == FadeShape.Constant ? FadeShape.Linear : defaultShape;
         if (packed is null || packed.Length < 2)
         {
             curve.SetConstant(0);
