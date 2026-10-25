@@ -100,6 +100,8 @@ internal sealed class BpmMonitorClickMixer
 
     /// <summary>
     /// 合成クリック付き scratch と元バッファの差分から、拍開始フレームを拾う。
+    /// EffeTune 合成音は 2 kHz 減衰サインのため、|差分| は半周期ごとに 0 付近へ戻る。
+    /// 無音再アームだけだと 1 拍で何十回も発火するので、発火後は不感帯を置く。
     /// </summary>
     public static void CollectOnsetsFromSynthDiff(
         float[] original,
@@ -107,7 +109,8 @@ internal sealed class BpmMonitorClickMixer
         float[] scratchWithSynth,
         int frames,
         int channels,
-        List<int> into)
+        List<int> into,
+        int sampleRate = 48000)
     {
         into.Clear();
         if (frames <= 0 || channels < 1)
@@ -118,17 +121,21 @@ internal sealed class BpmMonitorClickMixer
         // 合成クリック振幅は約 0.3。アタック立ち上がりを拍頭とする。
         const float onset = 0.02f;
         const float quiet = 0.004f;
+        // クリック長 ~60 ms・減衰時定数 6 ms。240 BPM の最小拍間隔は 250 ms。
+        var refractory = Math.Max(1, (int)(Math.Clamp(sampleRate, 1000, 384000) * 0.04));
         var prev = 0f;
         var armed = true;
+        var nextAllowed = 0;
         for (var frame = 0; frame < frames; frame++)
         {
             var a = original[originalOffset + frame * channels];
             var b = scratchWithSynth[frame * channels];
             var d = Math.Abs(b - a);
-            if (armed && d > onset && prev < quiet)
+            if (armed && frame >= nextAllowed && d > onset && prev < quiet)
             {
                 into.Add(frame);
                 armed = false;
+                nextAllowed = frame + refractory;
             }
 
             if (d < quiet)
