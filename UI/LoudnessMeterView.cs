@@ -287,7 +287,13 @@ internal sealed class LoudnessMeterView : Grid
     {
         if (IsLivePlayback())
         {
-            var frames = Player!.TakeLoudnessFrames(_left, _right);
+            // 無限ループ対策: 頭に戻ったら Integrated／LRA 履歴を捨てて 1 周分から測り直す。
+            if (Player!.ConsumeLoopWrap())
+            {
+                ResetLive();
+            }
+
+            var frames = Player.TakeLoudnessFrames(_left, _right);
             if (frames > 0)
             {
                 ApplySnapshot(_engine.Process(_left, _right, frames, Player.OutputSampleRate), offline: false);

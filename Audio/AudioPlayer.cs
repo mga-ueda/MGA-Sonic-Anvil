@@ -317,6 +317,9 @@ internal sealed class AudioPlayer : IDisposable
     public int TakeLoudnessFrames(float[] left, float[] right) =>
         _provider.TakeLoudnessFrames(left, right);
 
+    /// <summary>ループ再生で頭に戻ったとき true（一度取る）。</summary>
+    public bool ConsumeLoopWrap() => _provider.ConsumeLoopWrap();
+
     public void Prepare(
         AudioDocument document,
         long startFrame,
