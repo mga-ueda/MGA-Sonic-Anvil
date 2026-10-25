@@ -1043,7 +1043,7 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Equal(MenuGestures.PitchReset, ((MenuItem)listPitch.Items[7]).InputGestureText);
             Assert.Equal("Ctrl+C", ((MenuItem)listEdit.Items[0]).InputGestureText);
             Assert.Equal(UiStrings.LibraryMenuClearFromPlaylist, (string)((MenuItem)listEdit.Items[6]).Header);
-            Assert.True(string.IsNullOrEmpty(((MenuItem)listEdit.Items[6]).InputGestureText));
+            Assert.Equal(MenuGestures.Delete, ((MenuItem)listEdit.Items[6]).InputGestureText);
             // 破壊編集ショートカット（N／I／O／S／B／C／V 等）はキー無効のため表記なし。バウンスは表記あり。
             Assert.True(string.IsNullOrEmpty(((MenuItem)listAudio.Items[3]).InputGestureText));
             Assert.True(string.IsNullOrEmpty(((MenuItem)listAudio.Items[4]).InputGestureText));

@@ -287,7 +287,11 @@ internal sealed partial class LibraryBrowserView
             IsCheckable = true,
         };
         ArmMenuItemClick(autoPlay, () => AutoPlayEnabled = autoPlay.IsChecked == true);
-        var clear = new MenuItem { Header = UiStrings.LibraryMenuClearFromPlaylist };
+        var clear = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuClearFromPlaylist,
+            InputGestureText = MenuGestures.Delete,
+        };
         ArmMenuItemClick(clear, () => ClearPlaylistRequested?.Invoke(this, EventArgs.Empty));
         AddCopyAndExplorerMenuItems(
             LibraryPane.List,
