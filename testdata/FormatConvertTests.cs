@@ -544,7 +544,7 @@ public sealed class FormatConvertTests
         }
 
         Assert.NotEqual(left, right);
-        Assert.True(left.Any(sample => sample != 0f));
+        Assert.Contains(left, sample => sample != 0f);
         Assert.True(MeanAdjacentProduct(left) < 0d, "ディザがナイキストに寄っていない");
 
         var levels = 32767d;
