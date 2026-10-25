@@ -207,17 +207,11 @@ internal sealed class LoudnessOverlayRenderer
     private static Brush BandBrush(LoudnessTraffic traffic)
     {
         var color = Theme.Get(TrafficKey(traffic));
-        var shade = IsLight ? 0.55 : 0.28;
-        return IsLight
-            ? WpfControlHelpers.FrozenBrush(Color.FromArgb(
-                0xA0,
-                (byte)Math.Round(color.R * shade),
-                (byte)Math.Round(color.G * shade),
-                (byte)Math.Round(color.B * shade)))
-            : WpfControlHelpers.FrozenBrush(Color.FromRgb(
-                (byte)Math.Round(color.R * shade),
-                (byte)Math.Round(color.G * shade),
-                (byte)Math.Round(color.B * shade)));
+        const double shade = 0.28;
+        return WpfControlHelpers.FrozenBrush(Color.FromRgb(
+            (byte)Math.Round(color.R * shade),
+            (byte)Math.Round(color.G * shade),
+            (byte)Math.Round(color.B * shade)));
     }
 
     private static void DrawGrid(DrawingContext dc, Rect wave, double target)
@@ -384,8 +378,6 @@ internal sealed class LoudnessOverlayRenderer
         pen.Freeze();
         return pen;
     }
-
-    private static bool IsLight => UiThemeService.Painted == UiTheme.Light;
 
     private static void DrawScaleLabels(
         DrawingContext dc,

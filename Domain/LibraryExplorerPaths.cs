@@ -26,19 +26,9 @@ internal static class LibraryExplorerPaths
 
     public static string Resolve(string? saved)
     {
-        if (!string.IsNullOrWhiteSpace(saved))
+        if (PathUtil.TryGetFullPathTrimmed(saved, out var full) && Directory.Exists(full))
         {
-            try
-            {
-                var full = Path.GetFullPath(saved.Trim());
-                if (Directory.Exists(full))
-                {
-                    return full;
-                }
-            }
-            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-            {
-            }
+            return full;
         }
 
         return DefaultRootFolder();
@@ -52,26 +42,13 @@ internal static class LibraryExplorerPaths
         {
             foreach (var raw in saved)
             {
-                if (string.IsNullOrWhiteSpace(raw))
+                // 無いフォルダも登録として残す（UI で赤字表示）。空の登録だけ既定ルートへ。
+                if (!PathUtil.TryGetFullPathTrimmedSeparators(raw, out var full) || !seen.Add(full))
                 {
                     continue;
                 }
 
-                try
-                {
-                    var full = Path.GetFullPath(raw.Trim())
-                        .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                    // 無いフォルダも登録として残す（UI で赤字表示）。空の登録だけ既定ルートへ。
-                    if (!seen.Add(full))
-                    {
-                        continue;
-                    }
-
-                    result.Add(full);
-                }
-                catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-                {
-                }
+                result.Add(full);
             }
         }
 
@@ -80,7 +57,7 @@ internal static class LibraryExplorerPaths
             var fallback = DefaultRootFolder();
             if (!string.IsNullOrEmpty(fallback))
             {
-                result.Add(fallback.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                result.Add(PathUtil.TrimDirectorySeparators(fallback));
             }
         }
 
@@ -90,21 +67,12 @@ internal static class LibraryExplorerPaths
     /// <summary>登録パスがディスク上に無いか。</summary>
     public static bool IsMissing(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path))
+        if (!PathUtil.TryGetFullPathTrimmedSeparators(path, out var full))
         {
             return true;
         }
 
-        try
-        {
-            var full = Path.GetFullPath(path.Trim())
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            return !Directory.Exists(full);
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-        {
-            return true;
-        }
+        return !Directory.Exists(full);
     }
 
     public static string[] SerializeRoots(IEnumerable<string> roots) => ResolveRoots(roots.ToArray());
@@ -121,25 +89,14 @@ internal static class LibraryExplorerPaths
 
         foreach (var raw in paths)
         {
-            if (string.IsNullOrWhiteSpace(raw))
+            if (!PathUtil.TryGetFullPathTrimmedSeparators(raw, out var full)
+                || !Directory.Exists(full)
+                || !seen.Add(full))
             {
                 continue;
             }
 
-            try
-            {
-                var full = Path.GetFullPath(raw.Trim())
-                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                if (!Directory.Exists(full) || !seen.Add(full))
-                {
-                    continue;
-                }
-
-                result.Add(full);
-            }
-            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-            {
-            }
+            result.Add(full);
         }
 
         return [.. result];
@@ -157,25 +114,14 @@ internal static class LibraryExplorerPaths
 
         foreach (var raw in saved)
         {
-            if (string.IsNullOrWhiteSpace(raw))
+            if (!PathUtil.TryGetFullPathTrimmedSeparators(raw, out var full)
+                || !Directory.Exists(full)
+                || !seen.Add(full))
             {
                 continue;
             }
 
-            try
-            {
-                var full = Path.GetFullPath(raw.Trim())
-                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                if (!Directory.Exists(full) || !seen.Add(full))
-                {
-                    continue;
-                }
-
-                result.Add(full);
-            }
-            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-            {
-            }
+            result.Add(full);
         }
 
         return [.. result];
@@ -266,21 +212,12 @@ internal static class LibraryExplorerPaths
 
     public static string DisplayName(string path)
     {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return string.Empty;
-        }
-
-        try
-        {
-            var full = Path.GetFullPath(path.Trim())
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var name = Path.GetFileName(full);
-            return string.IsNullOrEmpty(name) ? full : name;
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        if (!PathUtil.TryGetFullPathTrimmedSeparators(path, out var full))
         {
             return path;
         }
+
+        var name = Path.GetFileName(full);
+        return string.IsNullOrEmpty(name) ? full : name;
     }
 }

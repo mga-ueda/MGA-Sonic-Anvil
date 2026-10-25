@@ -116,12 +116,9 @@ internal static class SystemClipboard
                     continue;
                 }
 
-                try
+                if (PathUtil.TryGetFullPathTrimmed(file, out var full))
                 {
-                    list.Add(Path.GetFullPath(file.Trim()));
-                }
-                catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-                {
+                    list.Add(full);
                 }
             }
 

@@ -109,13 +109,13 @@ public sealed class UiColorsTests
 
         UiColors.MigrateLegacyColors(settings);
         Assert.Null(settings.Colors);
-        Assert.False(settings.ColorsLight!.ContainsKey("WaveFillBrush"));
-        Assert.Equal("#FF0000", settings.ColorsLight["PlayheadBrush"]);
-        Assert.Equal("#FF0000", settings.ColorsDark!["PlayheadBrush"]);
+        Assert.Null(settings.ColorsLight);
+        Assert.False(settings.ColorsDark!.ContainsKey("WaveFillBrush"));
+        Assert.Equal("#FF0000", settings.ColorsDark["PlayheadBrush"]);
     }
 
     [Fact]
-    public void MigrateLegacyColors_ThemeableOnly_WritesEmptyBags()
+    public void MigrateLegacyColors_ThemeableOnly_WritesEmptyDarkBag()
     {
         var settings = new AppSettings
         {
@@ -124,90 +124,44 @@ public sealed class UiColorsTests
 
         UiColors.MigrateLegacyColors(settings);
         Assert.Null(settings.Colors);
-        Assert.Empty(settings.ColorsLight!);
+        Assert.Null(settings.ColorsLight);
         Assert.Empty(settings.ColorsDark!);
     }
 
     [Fact]
-    public void MirrorPlayerOverrides_CopiesPlayerKeysOnly()
+    public void MigrateLightColors_FoldsLightIntoEmptyDark()
     {
         var settings = new AppSettings
         {
             ColorsLight = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["PlayerWaveFillBrush"] = "#112233",
                 ["WaveFillBrush"] = "#AABBCC",
-            },
-            ColorsDark = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["PlayerWaveFillBrush"] = "#445566",
-                ["WaveFillBrush"] = "#778899",
             },
         };
 
-        UiColors.MirrorPlayerOverrides(settings, UiTheme.Light);
-        Assert.Equal("#112233", settings.ColorsDark!["PlayerWaveFillBrush"]);
-        Assert.Equal("#778899", settings.ColorsDark["WaveFillBrush"]);
-        Assert.Equal("#AABBCC", settings.ColorsLight!["WaveFillBrush"]);
+        UiColors.MigrateLightColors(settings);
+        Assert.Null(settings.ColorsLight);
+        Assert.Equal("#AABBCC", settings.ColorsDark!["WaveFillBrush"]);
     }
 
     [Fact]
-    public void UnifyPlayerOverridesFromDark_DropsLightOnlyPlayerColors()
+    public void MigrateLightColors_KeepsDarkAndClearsLight()
     {
         var settings = new AppSettings
         {
             ColorsLight = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["PlayerSelectionFillBrush"] = "#112233",
                 ["WaveFillBrush"] = "#AABBCC",
             },
             ColorsDark = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["PlayerWaveFillBrush"] = "#445566",
+                ["WaveFillBrush"] = "#112233",
             },
         };
 
-        UiColors.UnifyPlayerOverridesFromDark(settings);
-        Assert.False(settings.ColorsLight!.ContainsKey("PlayerSelectionFillBrush"));
-        Assert.Equal("#445566", settings.ColorsLight["PlayerWaveFillBrush"]);
-        Assert.Equal("#AABBCC", settings.ColorsLight["WaveFillBrush"]);
-    }
-
-    [Fact]
-    public void UnifyPlayerOverridesFromDark_CreatesLightBagFromDarkPlayerKeys()
-    {
-        var settings = new AppSettings
-        {
-            ColorsDark = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["PlayerWaveFillBrush"] = "#445566",
-                ["WaveFillBrush"] = "#778899",
-            },
-        };
-
-        UiColors.UnifyPlayerOverridesFromDark(settings);
-        Assert.Equal("#445566", settings.ColorsLight!["PlayerWaveFillBrush"]);
-        Assert.False(settings.ColorsLight.ContainsKey("WaveFillBrush"));
-    }
-
-    [Fact]
-    public void PlayerPalette_LightMatchesDark()
-    {
-        foreach (var key in ColorDevCatalog.Keys)
-        {
-            if (!ColorDevCatalog.IsPlayerShared(key))
-            {
-                continue;
-            }
-
-            Assert.Equal(
-                UiThemePalette.ColorFor(UiTheme.Dark, key),
-                UiThemePalette.ColorFor(UiTheme.Light, key));
-        }
-
-        Assert.NotEqual(
-            UiThemePalette.ColorFor(UiTheme.Light, "PrimaryForeBrush"),
-            UiThemePalette.ColorFor(UiTheme.Dark, "PrimaryForeBrush"));
+        UiColors.MigrateLightColors(settings);
+        Assert.Null(settings.ColorsLight);
+        Assert.Equal("#112233", settings.ColorsDark!["WaveFillBrush"]);
     }
 
     [Fact]

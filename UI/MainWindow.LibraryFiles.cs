@@ -1024,12 +1024,9 @@ public partial class MainWindow
         var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var path in LibraryBrowser.ExplorerRootPaths)
         {
-            try
+            if (PathUtil.TryNormalizePrefix(path, out var full))
             {
-                roots.Add(LibraryFileTransfer.NormalizePrefix(path));
-            }
-            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-            {
+                roots.Add(full);
             }
         }
 

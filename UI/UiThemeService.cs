@@ -11,10 +11,11 @@ internal static class UiThemeService
 
     public static event EventHandler? Changed;
 
-    public static UiTheme Current { get; private set; } = UiTheme.Dark;
-
-    /// <summary>画面に塗っている配色。実行時はダーク固定。</summary>
+    /// <summary>画面に塗っている配色。ダーク固定。</summary>
     public static UiTheme Painted { get; private set; } = UiTheme.Dark;
+
+    /// <summary>互換用。常に <see cref="Painted"/> と同じ。</summary>
+    public static UiTheme Current => Painted;
 
     public static void Start()
     {
@@ -24,7 +25,7 @@ internal static class UiThemeService
         }
 
         _started = true;
-        ApplyFromSettings(force: true);
+        Paint(force: true);
         if (Application.Current is { } app)
         {
             app.Exit += (_, _) => Stop();
@@ -36,25 +37,22 @@ internal static class UiThemeService
         _started = false;
     }
 
-    public static void ApplyFromSettings(bool force = false)
-    {
-        Apply(UiTheme.Dark, force);
-    }
+    public static void ApplyFromSettings(bool force = false) => Paint(force);
 
-    public static void Apply(UiTheme theme, bool force = false)
+    /// <summary>ダーク配色を再適用する。</summary>
+    public static void Apply(bool force = false) => Paint(force);
+
+    /// <summary>互換用。テーマ引数は無視してダークを塗る。</summary>
+    public static void Apply(UiTheme theme, bool force = false) => Paint(force);
+
+    private static void Paint(bool force = false)
     {
-        if (!force && _applied && theme == Current && theme == Painted)
+        if (!force && _applied && Painted == UiTheme.Dark)
         {
             return;
         }
 
-        Current = theme;
-        Paint();
-    }
-
-    private static void Paint()
-    {
-        Painted = Current;
+        Painted = UiTheme.Dark;
         _applied = true;
         UiThemePalette.Apply(Painted);
         UiColors.ApplySaved(Painted);

@@ -53,21 +53,7 @@ public sealed class AppVersionTests
 
     [Fact]
     public void OpenLogo_FindsEmbeddedDarkPng() =>
-        AssertPng(AppEmbeddedResources.OpenLogo(UiTheme.Dark));
-
-    [Fact]
-    public void OpenLogo_FindsEmbeddedLightPng() =>
-        AssertPng(AppEmbeddedResources.OpenLogo(UiTheme.Light));
-
-    [Fact]
-    public void OpenLogo_LightAndDark_AreDifferentImages()
-    {
-        using var dark = AppEmbeddedResources.OpenLogo(UiTheme.Dark);
-        using var light = AppEmbeddedResources.OpenLogo(UiTheme.Light);
-        Assert.NotNull(dark);
-        Assert.NotNull(light);
-        Assert.NotEqual(dark!.Length, light!.Length);
-    }
+        AssertPng(AppEmbeddedResources.OpenLogo());
 
     private static void AssertPng(Stream? stream)
     {

@@ -488,11 +488,7 @@ internal static class FileNameColorAssignments
             return false;
         }
 
-        try
-        {
-            key = Path.GetFullPath(path);
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        if (!PathUtil.TryGetFullPath(path, out key))
         {
             key = path.Trim();
         }

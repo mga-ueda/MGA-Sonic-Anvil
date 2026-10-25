@@ -5741,12 +5741,9 @@ public partial class MainWindow
         var roots = new List<(string Path, bool AncestorHit)>(folders.Count);
         for (var i = 0; i < folders.Count; i++)
         {
-            try
+            if (PathUtil.TryGetFullPath(folders[i], out var full))
             {
-                roots.Add((Path.GetFullPath(folders[i]), false));
-            }
-            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-            {
+                roots.Add((full, false));
             }
         }
 

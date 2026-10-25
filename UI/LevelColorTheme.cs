@@ -1,14 +1,12 @@
 using System.Windows;
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
-using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
 /// <summary>スペアナとレベルメーター共通のレベル色。停止点は色設定の LevelGrad*。</summary>
 internal static class LevelColorTheme
 {
-    public const double LightPeakHoldShade = 0.28;
     public const float GradientStepDb = 1f;
 
     public static readonly (double P, byte R, byte G, byte B)[] DefaultStops =
@@ -42,18 +40,7 @@ internal static class LevelColorTheme
         return Math.Clamp((db - SpectrumAnalyzer.FloorDb) / span, 0, 1);
     }
 
-    public static ColorRgb PeakHold(double db) => PeakHold(db, UiThemeService.Painted);
-
-    public static ColorRgb PeakHold(double db, UiTheme theme)
-    {
-        var color = Of(db);
-        if (theme != UiTheme.Light)
-        {
-            return color;
-        }
-
-        return Blend(color, StopColor(0), LightPeakHoldShade);
-    }
+    public static ColorRgb PeakHold(double db) => Of(db);
 
     /// <summary>メーターバーと同じ 5 停止の線形補間。</summary>
     public static ColorRgb Sample(double t)
@@ -121,13 +108,4 @@ internal static class LevelColorTheme
 
     private static byte Channel(double value) =>
         (byte)Math.Clamp(Math.Round(value), 0, 255);
-
-    private static ColorRgb Blend(ColorRgb a, ColorRgb b, double t)
-    {
-        t = Math.Clamp(t, 0, 1);
-        return new ColorRgb(
-            (byte)Math.Round(a.R + (b.R - a.R) * t),
-            (byte)Math.Round(a.G + (b.G - a.G) * t),
-            (byte)Math.Round(a.B + (b.B - a.B) * t));
-    }
 }

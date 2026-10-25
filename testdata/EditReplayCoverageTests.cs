@@ -186,6 +186,13 @@ public sealed class EditReplayCoverageTests
             });
         }
 
+        if (kind == HistoryRecipes.PitchCurve)
+        {
+            var longDoc = MakeConstant(2048, 1f);
+            var curve = Audio.PitchCurve.Flat(2f);
+            return (longDoc, HistoryRecipes.FromPitchCurve(48000, new WaveSelection(0, 2048), curve));
+        }
+
         var document = Stocked();
         var recipe = kind switch
         {
@@ -333,6 +340,16 @@ public sealed class EditReplayCoverageTests
             HistoryRecipes.ConvertRate => new HistoryRecipe { Kind = kind, Value = 24000 },
             HistoryRecipes.ConvertBits => new HistoryRecipe { Kind = kind, Value = 16 },
             HistoryRecipes.ConvertChannels => new HistoryRecipe { Kind = kind, Value = 1 },
+            HistoryRecipes.LoopMix => new HistoryRecipe
+            {
+                Kind = kind,
+                SourceRate = 48000,
+                Start = 20,
+                End = 70,
+                Frame = 10,
+                Value = (int)FadeShape.Linear,
+                Channel = (int)FadeShape.Linear,
+            },
             _ => throw new InvalidOperationException($"fixture missing: {kind}"),
         };
         return (document, recipe);

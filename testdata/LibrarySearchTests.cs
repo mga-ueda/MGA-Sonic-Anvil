@@ -246,14 +246,12 @@ public sealed class LibrarySearchTests
         });
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void SearchEditors_MatchPlayerComboChrome(bool light)
+    [Fact]
+    public void SearchEditors_MatchPlayerComboChrome()
     {
         RunSta(() =>
         {
-            var theme = light ? UiTheme.Light : UiTheme.Dark;
+            var theme = UiTheme.Dark;
             EnsurePlayerChrome();
             UiThemePalette.Apply(theme);
             var view = new LibraryBrowserView();

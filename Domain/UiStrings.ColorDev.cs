@@ -2,8 +2,8 @@ namespace MgaSonicAnvil.Domain;
 
 internal static partial class UiStrings
 {
-    /// <summary>実行時の配色はダーク固定。テーマ引数は呼び出し互換のため残す。</summary>
-    public static string ColorDevTitleFor(UiTheme _) =>
+    /// <summary>実行時の配色はダーク固定。</summary>
+    public static string ColorDevTitleFor() =>
         Get("色設定", "Color settings");
     public static string ColorDevClose => Get("Close", "Close");
     public static string ColorDevResetToDefaults => Get("既定に戻す", "Reset to defaults");

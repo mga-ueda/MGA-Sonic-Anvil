@@ -740,50 +740,7 @@ public partial class MainWindow
             }
         }
 
-        StopPlaybackForExport();
-        var options = AppStorage.Settings.ToMp3EncodeOptions();
-        var mix = AppStorage.Settings.ToMp3SpeakerMix();
-        var outcomes = new ExportOutcome[jobs.Count];
-        var anyMp3 = jobs.Any(job => AudioCodec.DetectKind(job.Path) == AudioFileKind.Mp3);
-        var parallelism = anyMp3 && !Mp3Encode.UsesLame(options.LameExePath)
-            ? 1
-            : AudioExport.WorkerCount(jobs.Count, AppStorage.Settings.ExportParallelism);
-        var tracker = new ExportProgressTracker(
-            jobs.Select(job => job.Name).ToArray(),
-            jobs.Select(job => job.ExportFrameCount).ToArray(),
-            new Progress<ExportProgressSnapshot>(ApplyExportProgress));
-
-        _tabExportBusy = true;
-        try
-        {
-            ShowSaveBusyGlass();
-            ApplyExportProgress(tracker.Capture());
-            await Task.Run(() =>
-            {
-                Parallel.For(0, jobs.Count, new ParallelOptions { MaxDegreeOfParallelism = parallelism }, i =>
-                {
-                    var job = jobs[i];
-                    tracker.Report(i, 0, ExportJobState.Running);
-                    try
-                    {
-                        outcomes[i] = new ExportOutcome(
-                            AudioCodec.Save(job.Document, job.Path, options, mix),
-                            null);
-                        tracker.Report(i, 1, ExportJobState.Done);
-                    }
-                    catch (Exception ex)
-                    {
-                        tracker.Report(i, 1, ExportJobState.Failed);
-                        outcomes[i] = new ExportOutcome(null, ex);
-                    }
-                });
-            }).ConfigureAwait(true);
-        }
-        finally
-        {
-            _tabExportBusy = false;
-            _busyGlass.HideOverlay();
-        }
+        var outcomes = await RunExportJobsAsync(jobs).ConfigureAwait(true);
 
         var failed = 0;
         var errors = new StringBuilder();
@@ -885,50 +842,7 @@ public partial class MainWindow
             return;
         }
 
-        StopPlaybackForExport();
-        var options = AppStorage.Settings.ToMp3EncodeOptions();
-        var mix = AppStorage.Settings.ToMp3SpeakerMix();
-        var outcomes = new ExportOutcome[jobs.Count];
-        var anyMp3 = jobs.Any(job => AudioCodec.DetectKind(job.Path) == AudioFileKind.Mp3);
-        var parallelism = anyMp3 && !Mp3Encode.UsesLame(options.LameExePath)
-            ? 1
-            : AudioExport.WorkerCount(jobs.Count, AppStorage.Settings.ExportParallelism);
-        var tracker = new ExportProgressTracker(
-            jobs.Select(job => job.Name).ToArray(),
-            jobs.Select(job => job.ExportFrameCount).ToArray(),
-            new Progress<ExportProgressSnapshot>(ApplyExportProgress));
-
-        _tabExportBusy = true;
-        try
-        {
-            ShowSaveBusyGlass();
-            ApplyExportProgress(tracker.Capture());
-            await Task.Run(() =>
-            {
-                Parallel.For(0, jobs.Count, new ParallelOptions { MaxDegreeOfParallelism = parallelism }, i =>
-                {
-                    var job = jobs[i];
-                    tracker.Report(i, 0, ExportJobState.Running);
-                    try
-                    {
-                        outcomes[i] = new ExportOutcome(
-                            AudioCodec.Save(job.Document, job.Path, options, mix),
-                            null);
-                        tracker.Report(i, 1, ExportJobState.Done);
-                    }
-                    catch (Exception ex)
-                    {
-                        tracker.Report(i, 1, ExportJobState.Failed);
-                        outcomes[i] = new ExportOutcome(null, ex);
-                    }
-                });
-            }).ConfigureAwait(true);
-        }
-        finally
-        {
-            _tabExportBusy = false;
-            _busyGlass.HideOverlay();
-        }
+        var outcomes = await RunExportJobsAsync(jobs).ConfigureAwait(true);
 
         var failed = 0;
         var errors = new StringBuilder();
@@ -1002,6 +916,57 @@ public partial class MainWindow
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
+    }
+
+    /// <summary>保存ジョブを並列実行。進捗ガラスと再生停止を共通化。</summary>
+    private async Task<ExportOutcome[]> RunExportJobsAsync(IReadOnlyList<ExportJob> jobs)
+    {
+        StopPlaybackForExport();
+        var options = AppStorage.Settings.ToMp3EncodeOptions();
+        var mix = AppStorage.Settings.ToMp3SpeakerMix();
+        var outcomes = new ExportOutcome[jobs.Count];
+        var anyMp3 = jobs.Any(job => AudioCodec.DetectKind(job.Path) == AudioFileKind.Mp3);
+        var parallelism = anyMp3 && !Mp3Encode.UsesLame(options.LameExePath)
+            ? 1
+            : AudioExport.WorkerCount(jobs.Count, AppStorage.Settings.ExportParallelism);
+        var tracker = new ExportProgressTracker(
+            jobs.Select(job => job.Name).ToArray(),
+            jobs.Select(job => job.ExportFrameCount).ToArray(),
+            new Progress<ExportProgressSnapshot>(ApplyExportProgress));
+
+        _tabExportBusy = true;
+        try
+        {
+            ShowSaveBusyGlass();
+            ApplyExportProgress(tracker.Capture());
+            await Task.Run(() =>
+            {
+                Parallel.For(0, jobs.Count, new ParallelOptions { MaxDegreeOfParallelism = parallelism }, i =>
+                {
+                    var job = jobs[i];
+                    tracker.Report(i, 0, ExportJobState.Running);
+                    try
+                    {
+                        outcomes[i] = new ExportOutcome(
+                            AudioCodec.Save(job.Document, job.Path, options, mix),
+                            null);
+                        tracker.Report(i, 1, ExportJobState.Done);
+                    }
+                    catch (Exception ex)
+                    {
+                        tracker.Report(i, 1, ExportJobState.Failed);
+                        outcomes[i] = new ExportOutcome(null, ex);
+                    }
+                });
+            }).ConfigureAwait(true);
+        }
+        finally
+        {
+            _tabExportBusy = false;
+            _busyGlass.HideOverlay();
+        }
+
+        return outcomes;
     }
 
     private bool TryPlanSaveJobs(IReadOnlyList<DocumentSession> sessions, bool saveAs, out List<ExportJob> jobs)
@@ -2197,7 +2162,7 @@ public partial class MainWindow
 
         settings.UiLanguage = UiStrings.ToStoredValue(dialog.SelectedLanguage);
         UiStrings.SetLanguage(UiStrings.ResolveLanguage(dialog.SelectedLanguage));
-        settings.UiTheme = UiThemes.ToStoredValue(UiThemeChoice.Dark);
+        settings.UiTheme = "dark";
         settings.MultiFileArrange = WaveformTileLayout.Format(dialog.SelectedMultiFileArrange);
         settings.LaunchMode = AppLaunchModes.Format(dialog.SelectedLaunchMode);
         settings.ApplyLibraryExplorerRoots(dialog.SelectedLibraryExplorerRoots);

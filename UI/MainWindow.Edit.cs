@@ -614,9 +614,7 @@ public partial class MainWindow
             }
 
             _pitchPreview.Origin = originFrame;
-            _pitchPreview.Previewing = true;
-            _pitchPreview.HideHostTransport = true;
-            _pitchPreview.StartedAt = Environment.TickCount64;
+            EffectPreviewSession.MarkStarted(_pitchPreview, hideHostTransport: true);
             _player.Play();
             _playbackGeneration = _player.Generation;
             // ASIO の終端検知用。SyncPreviewPlayhead は HideHostTransport で抑止する。
@@ -627,10 +625,12 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _pitchPreview.Previewing = false;
-            _pitchPreview.HideHostTransport = false;
-            PausePlaybackSoft();
-            OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
+            EffectPreviewSession.Fail(
+                this,
+                _pitchPreview,
+                ex,
+                () => PausePlaybackSoft(),
+                clearHideHostTransport: true);
         }
     }
 
@@ -1033,8 +1033,7 @@ public partial class MainWindow
             }
 
             _timeStretchPreview.Origin = range.StartFrame;
-            _timeStretchPreview.Previewing = true;
-            _timeStretchPreview.StartedAt = Environment.TickCount64;
+            EffectPreviewSession.MarkStarted(_timeStretchPreview);
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
@@ -1046,9 +1045,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _timeStretchPreview.Previewing = false;
-            PausePlaybackSoft();
-            OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
+            EffectPreviewSession.Fail(this, _timeStretchPreview, ex, () => PausePlaybackSoft());
         }
     }
 
@@ -1343,8 +1340,7 @@ public partial class MainWindow
             }
 
             ApplyVolumeVisualPreview(gainDb);
-            _volumePreview.Previewing = true;
-            _volumePreview.StartedAt = Environment.TickCount64;
+            EffectPreviewSession.MarkStarted(_volumePreview);
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
@@ -1356,10 +1352,12 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _volumePreview.Previewing = false;
-            ClearVolumeVisualPreview();
-            PausePlaybackSoft();
-            OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
+            EffectPreviewSession.Fail(
+                this,
+                _volumePreview,
+                ex,
+                () => PausePlaybackSoft(),
+                extraCleanup: ClearVolumeVisualPreview);
         }
     }
 
@@ -1500,8 +1498,7 @@ public partial class MainWindow
             }
 
             ApplyFadeCurveVisualPreview(fadeIn, shape);
-            _fadePreview.Previewing = true;
-            _fadePreview.StartedAt = Environment.TickCount64;
+            EffectPreviewSession.MarkStarted(_fadePreview);
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
@@ -1513,10 +1510,12 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _fadePreview.Previewing = false;
-            ClearFadeCurveVisualPreview();
-            PausePlaybackSoft();
-            OwnerCenteredMessageBox.Show(this, ex.Message, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Warning);
+            EffectPreviewSession.Fail(
+                this,
+                _fadePreview,
+                ex,
+                () => PausePlaybackSoft(),
+                extraCleanup: ClearFadeCurveVisualPreview);
         }
     }
 
@@ -1550,47 +1549,6 @@ public partial class MainWindow
         }
 
         _resumeAfterScrub = false;
-    }
-
-    /// <param name="keepPlaylistVisual">
-    /// true なら映像／PDF の本再生表示はそのまま（暗いプレビューへ落とさない）。
-    /// 上下キーで次の本再生へつなぐとき用。
-    /// </param>
-    /// <param name="freezePlaylistVisual">
-    /// true なら映像を現在フレームで一時停止する（暗い 1/3 速プレビューへ落とさない）。
-    /// テンキー 0 の一時停止用。
-    /// </param>
-    private void PausePlaybackSoft(bool keepPlaylistVisual = false, bool freezePlaylistVisual = false)
-    {
-        StopPlaybackShuttle();
-        ReleaseStuckScrub();
-        _player.Pause();
-        if (IsLibraryMaximized)
-        {
-            if (freezePlaylistVisual)
-            {
-                LibraryBrowser.PausePlaylistVisualFrame();
-            }
-            else if (!keepPlaylistVisual)
-            {
-                LibraryBrowser.SetPlaylistVisualPlaying(false);
-                EnsurePlaylistVideoWindowRestored();
-            }
-        }
-        else
-        {
-            LibraryBrowser.HidePlaylistVisual();
-        }
-
-        _playTimer.Stop();
-        StopMeterRendering();
-        Waveform.ExitPlayheadFrame = -1;
-        Waveform.SetTrailRecording(false);
-        Transport.SetPlaying(false);
-        BeginMeterRelease();
-        // 再生中 Tick は止まっているので、停止時に波形全体のオフライン計測へ戻す。
-        LoudnessMeter.RefreshOffline();
-        Waveform.UnlockCenter();
     }
 
     private void ApplyFade(bool fadeIn, FadeShape shape)
@@ -3462,11 +3420,6 @@ public partial class MainWindow
         }
 
         RefreshViewsAfterHistoryPaste(sessions, applied);
-    }
-
-    private void StopPlaybackForEdit()
-    {
-        PausePlaybackSoft();
     }
 
     /// <summary>編集コマンドの直前。再生ピッチはどの編集でも 0 に戻し、変わったときだけリセットのトーストを出す。</summary>

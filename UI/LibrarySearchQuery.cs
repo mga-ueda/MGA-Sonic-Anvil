@@ -242,19 +242,14 @@ internal static class LibrarySearchQuery
 
     public static string NormalizeFolder(string path)
     {
-        if (string.IsNullOrWhiteSpace(path))
+        if (PathUtil.TryGetFullPathTrimmedSeparators(path, out var full))
         {
-            return string.Empty;
+            return full;
         }
 
-        try
-        {
-            return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-        {
-            return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        }
+        return string.IsNullOrWhiteSpace(path)
+            ? string.Empty
+            : PathUtil.TrimDirectorySeparators(path);
     }
 
     private static bool IsRoot(string folder, IReadOnlyList<string> roots)
@@ -298,12 +293,9 @@ internal static class LibrarySearchQuery
         var remaining = new Stack<(string Path, bool AncestorHit)>();
         for (var i = folders.Count - 1; i >= 0; i--)
         {
-            try
+            if (PathUtil.TryGetFullPath(folders[i], out var full))
             {
-                remaining.Push((Path.GetFullPath(folders[i]), false));
-            }
-            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-            {
+                remaining.Push((full, false));
             }
         }
 

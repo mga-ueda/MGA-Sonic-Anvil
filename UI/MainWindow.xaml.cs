@@ -143,7 +143,6 @@ public partial class MainWindow : Window
     private string? _playlistTrackIndexToastKey;
     private int _autoSpeakerSeenChannels = int.MinValue;
     private ImageSource? _brandLogoDark;
-    private ImageSource? _brandLogoLight;
     private int _brandLogoDecodeWidth;
     private double _brandLogoInkBottomFrac = 1;
     private TimeScrollBar TimeScroll => TimeScrollStrip.Bar;
@@ -230,7 +229,6 @@ public partial class MainWindow : Window
         DpiChanged += (_, _) =>
         {
             _brandLogoDark = null;
-            _brandLogoLight = null;
             LoadBrandLogo();
         };
         LoadBrandLogo();
@@ -1732,15 +1730,13 @@ public partial class MainWindow : Window
             if (decodeWidth != _brandLogoDecodeWidth)
             {
                 _brandLogoDark = null;
-                _brandLogoLight = null;
                 _brandLogoDecodeWidth = decodeWidth;
             }
 
-            var theme = UiThemeService.Painted;
-            var cached = theme == UiTheme.Light ? _brandLogoLight : _brandLogoDark;
+            var cached = _brandLogoDark;
             if (cached is null)
             {
-                using var logoStream = AppEmbeddedResources.OpenLogo(theme);
+                using var logoStream = AppEmbeddedResources.OpenLogo();
                 if (logoStream is null)
                 {
                     BrandLogo.Visibility = Visibility.Collapsed;
@@ -1756,14 +1752,7 @@ public partial class MainWindow : Window
                 bitmap.EndInit();
                 bitmap.Freeze();
                 cached = bitmap;
-                if (theme == UiTheme.Light)
-                {
-                    _brandLogoLight = cached;
-                }
-                else
-                {
-                    _brandLogoDark = cached;
-                }
+                _brandLogoDark = cached;
             }
 
             RenderOptions.SetBitmapScalingMode(BrandLogo, BitmapScalingMode.HighQuality);

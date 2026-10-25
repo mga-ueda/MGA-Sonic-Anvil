@@ -129,7 +129,6 @@ public sealed class LibraryArtworkGlowTests
             WithDefaultPlayerChrome(() =>
             {
                 var darkAlpha = UiThemePalette.ColorFor(UiTheme.Dark, "PlayerPaneFocusLineBrush").A;
-                var lightAlpha = UiThemePalette.ColorFor(UiTheme.Light, "PlayerPaneFocusLineBrush").A;
 
                 var brush = Assert.IsType<LinearGradientBrush>(LibraryBrowserView.CreatePaneFocusLineBrush(UiTheme.Dark));
                 Assert.True(brush.IsFrozen);
@@ -143,13 +142,6 @@ public sealed class LibraryArtworkGlowTests
                 Assert.Equal(255, brush.GradientStops[0].Color.R);
                 Assert.Equal(0, brush.GradientStops[^1].Color.A);
                 Assert.Equal(36, LibraryBrowserView.PaneFocusLineHeight);
-
-                var light = Assert.IsType<LinearGradientBrush>(LibraryBrowserView.CreatePaneFocusLineBrush(UiTheme.Light));
-                Assert.Equal(lightAlpha, light.GradientStops[0].Color.A);
-                Assert.Equal(darkAlpha, lightAlpha);
-                Assert.Equal(lightAlpha, LibraryBrowserView.PaneFocusLineAlphaLight);
-                Assert.Equal(brush.GradientStops[0].Color, light.GradientStops[0].Color);
-                Assert.Equal(0, light.GradientStops[^1].Color.A);
             });
         });
     }
@@ -245,17 +237,14 @@ public sealed class LibraryArtworkGlowTests
         color.R == expected.R && color.G == expected.G && color.B == expected.B;
 
     [Fact]
-    public void GlowVeilOpacity_IsSharedWithDark()
+    public void GlowVeilOpacity_MatchesPalette()
     {
         RunSta(() =>
         {
             WithDefaultPlayerChrome(() =>
             {
                 var dark = UiThemePalette.ColorFor(UiTheme.Dark, "PlayerGlowVeilBrush").A / 255d;
-                var light = UiThemePalette.ColorFor(UiTheme.Light, "PlayerGlowVeilBrush").A / 255d;
-                Assert.Equal(dark, light);
                 Assert.Equal(dark, LibraryBrowserView.GlowVeilOpacityFor(UiTheme.Dark), 3);
-                Assert.Equal(light, LibraryBrowserView.GlowVeilOpacityFor(UiTheme.Light), 3);
             });
         });
     }
@@ -525,18 +514,16 @@ public sealed class LibraryArtworkGlowTests
     /// </summary>
     private static void WithDefaultPlayerChrome(Action action)
     {
+        // UiThemeService はダーク固定になり Current/Painted に setter が無いので、
+        // リフレクションでの切り替えはせずリソースだけ既定のダーク値へ揃える。
         EnsureTheme();
         var app = Application.Current!;
-        var currentProp = typeof(UiThemeService).GetProperty(nameof(UiThemeService.Current))
-            ?? throw new InvalidOperationException("UiThemeService.Current が見つかりません。");
-        var previousTheme = UiThemeService.Current;
         var hadVeil = app.Resources.Contains("PlayerGlowVeilBrush");
         var hadFocus = app.Resources.Contains("PlayerPaneFocusLineBrush");
         var savedVeil = hadVeil ? app.Resources["PlayerGlowVeilBrush"] : null;
         var savedFocus = hadFocus ? app.Resources["PlayerPaneFocusLineBrush"] : null;
         try
         {
-            currentProp.SetValue(null, UiTheme.Dark);
             app.Resources["PlayerGlowVeilBrush"] = new SolidColorBrush(
                 UiThemePalette.ColorFor(UiTheme.Dark, "PlayerGlowVeilBrush"));
             app.Resources["PlayerPaneFocusLineBrush"] = new SolidColorBrush(
@@ -545,7 +532,6 @@ public sealed class LibraryArtworkGlowTests
         }
         finally
         {
-            currentProp.SetValue(null, previousTheme);
             RestoreResource(app, "PlayerGlowVeilBrush", hadVeil, savedVeil);
             RestoreResource(app, "PlayerPaneFocusLineBrush", hadFocus, savedFocus);
         }

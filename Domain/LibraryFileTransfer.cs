@@ -27,42 +27,31 @@ internal static class LibraryFileTransfer
 
     public static bool SameFullPath(string left, string right)
     {
-        try
-        {
-            return string.Equals(NormalizePrefix(left), NormalizePrefix(right), StringComparison.OrdinalIgnoreCase);
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        if (!PathUtil.TryNormalizePrefix(left, out var a)
+            || !PathUtil.TryNormalizePrefix(right, out var b))
         {
             return false;
         }
+
+        return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
     }
 
     public static bool IsCaseOnlyChange(string left, string right)
     {
-        try
-        {
-            var a = Path.GetFullPath(left);
-            var b = Path.GetFullPath(right);
-            return string.Equals(a, b, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(a, b, StringComparison.Ordinal);
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        if (!PathUtil.TryGetFullPath(left, out var a) || !PathUtil.TryGetFullPath(right, out var b))
         {
             return false;
         }
+
+        return string.Equals(a, b, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(a, b, StringComparison.Ordinal);
     }
 
     /// <summary>path が folder そのもの、またはその配下か。</summary>
     public static bool IsSameOrUnder(string path, string folder)
     {
-        string full;
-        string root;
-        try
-        {
-            full = NormalizePrefix(path);
-            root = NormalizePrefix(folder);
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        if (!PathUtil.TryNormalizePrefix(path, out var full)
+            || !PathUtil.TryNormalizePrefix(folder, out var root))
         {
             return false;
         }
@@ -81,16 +70,9 @@ internal static class LibraryFileTransfer
     public static bool TryMapPath(string path, string oldPrefix, string newPrefix, out string mapped)
     {
         mapped = path;
-        string full;
-        string oldRoot;
-        string newRoot;
-        try
-        {
-            full = Path.GetFullPath(path);
-            oldRoot = NormalizePrefix(oldPrefix);
-            newRoot = NormalizePrefix(newPrefix);
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        if (!PathUtil.TryGetFullPath(path, out var full)
+            || !PathUtil.TryNormalizePrefix(oldPrefix, out var oldRoot)
+            || !PathUtil.TryNormalizePrefix(newPrefix, out var newRoot))
         {
             return false;
         }
