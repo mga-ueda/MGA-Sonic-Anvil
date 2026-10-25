@@ -423,8 +423,9 @@ public partial class MainWindow
                     frames);
                 break;
             case CrossfadeEditState.FocusField.End:
+                // 継ぎ目に出るのは E−1。そこをゼロクロスへ寄せてから半開の E を決める。
                 _crossfadeEdit.SetEnd(
-                    LoopCrossfade.SnapToZeroCrossing(
+                    LoopCrossfade.SnapEndToZeroCrossing(
                         interleaved,
                         channels,
                         frames,

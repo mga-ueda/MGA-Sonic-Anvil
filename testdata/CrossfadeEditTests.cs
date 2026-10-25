@@ -636,6 +636,46 @@ public sealed class CrossfadeEditTests
     }
 
     [Fact]
+    public void SnapEndToZeroCrossing_TargetsSeamSampleNotEndFrame()
+    {
+        var frames = 100;
+        var samples = new float[frames];
+        for (var i = 0; i < frames; i++)
+        {
+            // フレーム 50 で符号変化 → 継ぎ目 seam=50、半開の E は 51
+            samples[i] = i < 50 ? -0.5f : 0.5f;
+        }
+
+        var snapped = LoopCrossfade.SnapEndToZeroCrossing(samples, 1, frames, 60, searchRadius: 20);
+        Assert.Equal(51, snapped);
+        // 始点用の吸着とは 1 サンプルずれる
+        Assert.Equal(50, LoopCrossfade.SnapToZeroCrossing(samples, 1, frames, 60, searchRadius: 20));
+    }
+
+    [Fact]
+    public void SnapEndToZeroCrossing_AlignTwentyEight_ScoresSeamNotEnd()
+    {
+        var frames = 400;
+        var samples = new float[frames];
+        for (var i = 0; i < frames; i++)
+        {
+            // 継ぎ目 139 で符号変化 → E=140（28 格子）。
+            // E 自体が 0 の 168 は旧ロジック向けの罠。
+            samples[i] = i < 139 ? -0.6f : 0.6f;
+        }
+
+        samples[168] = 0f;
+
+        var snapped = LoopCrossfade.SnapEndToZeroCrossing(
+            samples, 1, frames, 150, searchRadius: 40, alignToTwentyEight: true);
+        Assert.Equal(140, snapped);
+        Assert.Equal(0, snapped % 28);
+        // 終点フレーム自体を見ると 168 の方が「ゼロ」に見える
+        Assert.Equal(168, LoopCrossfade.SnapToZeroCrossing(
+            samples, 1, frames, 150, searchRadius: 40, alignToTwentyEight: true));
+    }
+
+    [Fact]
     public void BuildSplicePreview_FillsLeftAndRight()
     {
         var document = MakeDocument(200);

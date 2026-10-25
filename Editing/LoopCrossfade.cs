@@ -473,6 +473,81 @@ internal static class LoopCrossfade
         return found ? best : best;
     }
 
+    /// <summary>
+    /// 半開区間の終点 E をゼロクロスへ寄せる。
+    /// 継ぎ目に描画・再生されるのは E−1 なので、そちらを吸着対象にし E = seam+1 を返す。
+    /// 28 倍数モードでは E を格子上に保ちつつ、E−1 の振幅／符号変化で採点する。
+    /// </summary>
+    public static long SnapEndToZeroCrossing(
+        float[] interleaved,
+        int channels,
+        long frameCount,
+        long endFrame,
+        int searchRadius = 512,
+        bool alignToTwentyEight = false)
+    {
+        if (channels < 1 || frameCount <= 2)
+        {
+            return Math.Clamp(endFrame, 0, Math.Max(0, frameCount));
+        }
+
+        endFrame = Math.Clamp(endFrame, 0, frameCount);
+        if (!alignToTwentyEight)
+        {
+            var seamHint = Math.Max(0, endFrame - 1);
+            var seam = SnapToZeroCrossing(
+                interleaved,
+                channels,
+                frameCount,
+                seamHint,
+                searchRadius,
+                alignToTwentyEight: false);
+            return Math.Clamp(seam + 1, 1, frameCount);
+        }
+
+        var step = CrossfadeEditState.LoopEndAlignStep;
+        searchRadius = Math.Max(1, searchRadius);
+        searchRadius = Math.Max(searchRadius, (int)(step * 24));
+
+        var from = Math.Max(step, endFrame - searchRadius);
+        var to = Math.Min(frameCount, endFrame + searchRadius);
+        from = ((from + step - 1) / step) * step;
+
+        long best = Math.Clamp(
+            CrossfadeEditState.RoundToAlignStep(endFrame, step),
+            0,
+            frameCount);
+        var bestScore = double.MaxValue;
+        var found = false;
+        for (var e = from; e <= to; e += step)
+        {
+            if (e < 1 || e > frameCount)
+            {
+                continue;
+            }
+
+            var seam = e - 1;
+            var crossing = IsZeroCrossingAt(interleaved, channels, frameCount, seam)
+                || IsExactZeroAt(interleaved, channels, frameCount, seam);
+            var sample = Math.Abs(SampleFrameMixed(interleaved, channels, frameCount, seam));
+            var dist = Math.Abs(e - endFrame);
+            var score = sample * 1_000_000d + dist;
+            if (!crossing)
+            {
+                score += 1_000d;
+            }
+
+            if (score < bestScore)
+            {
+                bestScore = score;
+                best = e;
+                found = true;
+            }
+        }
+
+        return found ? best : best;
+    }
+
     private static bool IsExactZeroAt(
         float[] interleaved,
         int channels,
