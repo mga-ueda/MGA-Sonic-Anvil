@@ -192,10 +192,12 @@ internal sealed class PitchCurve
     }
 
     /// <summary>ブラシ／ポイント編集。近い t があれば更新、なければ挿入。対象インデックスを返す。</summary>
-    public int Upsert(double t, float semitones, double mergeEpsilon = 0.004)
+    /// <param name="segmentShape">新規区間に使う形状。省略時は DefaultShape。</param>
+    public int Upsert(double t, float semitones, double mergeEpsilon = 0.004, FadeShape? segmentShape = null)
     {
         t = Math.Clamp(t, 0d, 1d);
         semitones = Snap(semitones);
+        var shape = segmentShape ?? DefaultShape;
         for (var i = 0; i < _points.Count; i++)
         {
             if (Math.Abs(_points[i].T - t) <= mergeEpsilon)
@@ -218,19 +220,25 @@ internal sealed class PitchCurve
         _points.Insert(insertAt, new PitchCurvePoint(t, semitones));
         if (_shapes.Count == 0)
         {
-            _shapes.Add(DefaultShape);
+            _shapes.Add(shape);
         }
         else if (insertAt == 0)
         {
-            _shapes.Insert(0, DefaultShape);
+            _shapes.Insert(0, shape);
         }
         else if (insertAt >= _points.Count - 1)
         {
-            _shapes.Add(DefaultShape);
+            _shapes.Add(shape);
         }
         else
         {
-            _shapes.Insert(insertAt, DefaultShape);
+            // 分割した左区間も指定形状に（ブラシのリニア接続用）。
+            if (segmentShape.HasValue)
+            {
+                _shapes[insertAt - 1] = shape;
+            }
+
+            _shapes.Insert(insertAt, shape);
         }
 
         EnsureShapeCount();
@@ -373,7 +381,8 @@ internal sealed class PitchCurve
     }
 
     /// <summary>ブラシ後にほぼ共線の中間点を間引く。</summary>
-    public void Simplify(float semiTolerance = 0.15f)
+    /// <param name="segmentShape">残した点の区間形状。省略時は DefaultShape。</param>
+    public void Simplify(float semiTolerance = 0.15f, FadeShape? segmentShape = null)
     {
         if (_points.Count <= 2)
         {
@@ -393,7 +402,8 @@ internal sealed class PitchCurve
             }
         }
 
-        ReplacePoints(nextPoints, Enumerable.Repeat(DefaultShape, Math.Max(0, nextPoints.Count - 1)));
+        var shape = segmentShape ?? DefaultShape;
+        ReplacePoints(nextPoints, Enumerable.Repeat(shape, Math.Max(0, nextPoints.Count - 1)));
     }
 
     public PitchCurve Clone() => new(_points, _shapes, DefaultShape);

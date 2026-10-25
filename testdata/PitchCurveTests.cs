@@ -159,6 +159,32 @@ public sealed class PitchCurveTests
         Assert.Equal(12f, curve.SampleAt(1), 3);
     }
 
+    /// <summary>ブラシ相当: 既存が SCurve でも挿入・間引き後は全区間リニア。</summary>
+    [Fact]
+    public void BrushUpsertAndSimplify_ForcesLinearSegments()
+    {
+        var curve = new PitchCurve(
+            [
+                new PitchCurvePoint(0, 0),
+                new PitchCurvePoint(1, 12),
+            ],
+            [FadeShape.SCurve],
+            FadeShape.SCurve);
+
+        curve.Upsert(0.25, 3f, segmentShape: FadeShape.Linear);
+        curve.Upsert(0.5, 6f, segmentShape: FadeShape.Linear);
+        curve.Upsert(0.75, 9f, segmentShape: FadeShape.Linear);
+        Assert.All(curve.SegmentShapes, s => Assert.Equal(FadeShape.Linear, s));
+        Assert.Equal(6f, curve.SampleAt(0.5), 3);
+
+        curve.Simplify(semiTolerance: 0.08f, segmentShape: FadeShape.Linear);
+        curve.SetAllSegmentShapes(FadeShape.Linear);
+        Assert.Equal(FadeShape.Linear, curve.DefaultShape);
+        Assert.All(curve.SegmentShapes, s => Assert.Equal(FadeShape.Linear, s));
+        Assert.True(curve.Points.Count <= 3);
+        Assert.Equal(6f, curve.SampleAt(0.5), 3);
+    }
+
     [Fact]
     public void BuildSemitoneTable_LengthMatches()
     {
