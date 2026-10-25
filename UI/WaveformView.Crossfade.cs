@@ -701,7 +701,13 @@ internal sealed partial class WaveformView
         var count = 0;
         if (!peaks.IsEmpty && peaks.Channels == channels)
         {
-            count = peaks.ReadRangePacked(f0, f1, columns, _columnMins, _columnMaxs);
+            count = peaks.ReadRangePacked(
+                f0,
+                f1,
+                columns,
+                _columnMins,
+                _columnMaxs,
+                EditorEnvelopeLodBias(editorMode: true, visibleLen, columns, _timeZoom));
         }
 
         if (count < columns)
