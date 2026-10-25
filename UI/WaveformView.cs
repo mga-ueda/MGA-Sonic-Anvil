@@ -1232,7 +1232,29 @@ internal sealed partial class WaveformView : Grid
         }
     }
 
-    public void Refresh() => InvalidateWaveform();
+    public void Refresh()
+    {
+        // 削除などで尺が短くなったあと、表示窓がドキュメント外に残ると波形が見切れる。
+        ClampViewStartToDocument();
+        InvalidateWaveform();
+    }
+
+    /// <summary>
+    /// 現在の <see cref="ViewStart"/> をドキュメント長と表示幅で再クランプする。
+    /// </summary>
+    public void ClampViewStartToDocument()
+    {
+        if (_document is null)
+        {
+            return;
+        }
+
+        SetViewStart(_viewStart);
+    }
+
+    /// <summary>編集後などに ViewStart が新 FrameCount を超えないよう揃える式。</summary>
+    internal static double ClampViewStart(double viewStart, long frameCount, double viewSpanFrames) =>
+        Math.Clamp(viewStart, 0d, Math.Max(0d, frameCount - viewSpanFrames));
 
     /// <summary>
     /// ピークの途中描画。静的層は Render 優先で入力より先に走るので、
@@ -7504,8 +7526,7 @@ internal sealed partial class WaveformView : Grid
             return;
         }
 
-        var max = Math.Max(0d, _document.FrameCount - ViewSpanFrames);
-        var next = Math.Clamp(start, 0d, max);
+        var next = ClampViewStart(start, _document.FrameCount, ViewSpanFrames);
         if (Math.Abs(next - _viewStart) < 0.0001)
         {
             return;
