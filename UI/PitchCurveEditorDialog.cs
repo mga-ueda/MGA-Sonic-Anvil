@@ -2898,13 +2898,38 @@ internal sealed class PitchCurveWavePreview : FrameworkElement
 
     private void UpsertDrawn(double t, float semi)
     {
-        // 音階スナップONのときだけ階段。OFF時は DefaultShape（連続）のまま。
-        if (_snapToScale && _curve.DefaultShape != FadeShape.Constant)
+        // 音階スナップON: 階段。OFF: 全区間をリニアで繋ぐ（他カーブは形状ボタン選択時のみ）。
+        if (_snapToScale)
         {
-            _curve.DefaultShape = FadeShape.Constant;
+            if (_curve.DefaultShape != FadeShape.Constant)
+            {
+                _curve.DefaultShape = FadeShape.Constant;
+            }
+
+            _curve.Upsert(t, semi);
+            return;
         }
 
-        _curve.Upsert(t, semi);
+        _curve.Upsert(t, semi, segmentShape: FadeShape.Linear);
+        EnsureBrushLinearSegments();
+    }
+
+    /// <summary>ブラシ中は既存区間も含め必ずリニア。DefaultShape もリニアに揃える。</summary>
+    private void EnsureBrushLinearSegments()
+    {
+        for (var i = 0; i < _curve.SegmentShapes.Count; i++)
+        {
+            if (_curve.SegmentShapes[i] != FadeShape.Linear)
+            {
+                _curve.SetAllSegmentShapes(FadeShape.Linear);
+                return;
+            }
+        }
+
+        if (_curve.DefaultShape != FadeShape.Linear)
+        {
+            _curve.DefaultShape = FadeShape.Linear;
+        }
     }
 
     private double ContentWidth => Math.Max(1, ActualWidth - LeftChrome);
@@ -2922,7 +2947,17 @@ internal sealed class PitchCurveWavePreview : FrameworkElement
         ReleaseMouseCapture();
         if (_tool == EditTool.Brush)
         {
-            _curve.Simplify(semiTolerance: 0.08f);
+            if (_snapToScale)
+            {
+                _curve.Simplify(semiTolerance: 0.08f);
+            }
+            else
+            {
+                // 間引き後も全区間リニア（点が2つ以下で Simplify が何もしない場合も含む）。
+                _curve.Simplify(semiTolerance: 0.08f, segmentShape: FadeShape.Linear);
+                _curve.SetAllSegmentShapes(FadeShape.Linear);
+            }
+
             CurveChanged?.Invoke();
             InvalidateVisual();
         }
