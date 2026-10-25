@@ -70,6 +70,42 @@ public sealed class WaveformEnvelopePathTests
     }
 
     [Fact]
+    public void ZoomedIn_StillConnectsEnvelopeNeighbors_AvoidsDashedLook()
+    {
+        // 拡大しても spp 帯にあればつなぐ。切ると短尺が破線に見える。
+        // 約0.5秒表示でも spp≈16 で接続帯に入る。
+        Assert.True(
+            WaveformView.ShouldConnectEnvelopeNeighbors(48_000 / 2, DefaultWaveWidth));
+    }
+
+    [Fact]
+    public void ModerateZoom_ShortClip_UsesPolylineNotDashedEnvelopeTicks()
+    {
+        // 約0.16秒 @48kHz・幅1500px（spp≈5）。旧 polyline 上限1だとエンベロープの点列になる。
+        const long visibleFrames = 48_000 * 16 / 100;
+        Assert.True(visibleFrames > DefaultWaveWidth);
+        Assert.True(WaveformView.IsPolylineZoom(visibleFrames, DefaultWaveWidth));
+        Assert.False(visibleFrames <= DefaultWaveWidth); // 旧 PolylineMaxSamplesPerPixel=1 では false
+    }
+
+    [Fact]
+    public void EditorEnvelopeLodBias_IsZero_KeepsDefaultViewLinesThin()
+    {
+        // 一段粗い LOD は標準倍率の線を太く見せるため常に 0（エディタ／無音検出／ピッチ共通）。
+        const long oneMinuteFrames = 48_000L * 60;
+        Assert.Equal(0, WaveformView.EditorEnvelopeLodBias(true, ShortClipFrames, DefaultWaveWidth));
+        Assert.Equal(0, WaveformView.EditorEnvelopeLodBias(true, oneMinuteFrames, DefaultWaveWidth));
+        Assert.Equal(0, WaveformView.EditorEnvelopeLodBias(false, ShortClipFrames, DefaultWaveWidth));
+        Assert.Equal(
+            0,
+            WaveformView.EditorEnvelopeLodBias(
+                true,
+                ShortClipFrames,
+                DefaultWaveWidth,
+                timeZoom: WaveformView.TimeZoomStep));
+    }
+
+    [Fact]
     public void ShortClip_PeakPyramid_ReadRangePacked_FillsWidth_AndKeepsSpike()
     {
         var samples = new float[ShortClipFrames];
@@ -94,6 +130,48 @@ public sealed class WaveformEnvelopePathTests
         Assert.True(mins[column] <= -0.93f + 1e-5f);
         Assert.DoesNotContain(float.MaxValue, mins);
         Assert.DoesNotContain(float.MinValue, maxs);
+    }
+
+    [Fact]
+    public void ReadRangePacked_LodBias_WidensSpikeAcrossNeighbors()
+    {
+        var samples = new float[ShortClipFrames];
+        const int spikeAt = ShortClipFrames / 3;
+        samples[spikeAt] = 0.97f;
+
+        var peaks = PeakPyramid.Build(samples, channels: 1);
+        var fineMins = new float[DefaultWaveWidth];
+        var fineMaxs = new float[DefaultWaveWidth];
+        var coarseMins = new float[DefaultWaveWidth];
+        var coarseMaxs = new float[DefaultWaveWidth];
+        Assert.Equal(
+            DefaultWaveWidth,
+            peaks.ReadRangePacked(0, ShortClipFrames, DefaultWaveWidth, fineMins, fineMaxs));
+        Assert.Equal(
+            DefaultWaveWidth,
+            peaks.ReadRangePacked(0, ShortClipFrames, DefaultWaveWidth, coarseMins, coarseMaxs, lodBias: 1));
+
+        var column = (int)(spikeAt * (long)DefaultWaveWidth / ShortClipFrames);
+        Assert.True(fineMaxs[column] >= 0.97f - 1e-5f);
+        Assert.True(coarseMaxs[column] >= 0.97f - 1e-5f);
+
+        // 粗い LOD ではスパイクが隣列にも現れやすく、輪郭が穏やかになる。
+        var fineNeighbors = 0;
+        var coarseNeighbors = 0;
+        for (var i = Math.Max(0, column - 2); i <= Math.Min(DefaultWaveWidth - 1, column + 2); i++)
+        {
+            if (fineMaxs[i] >= 0.9f)
+            {
+                fineNeighbors++;
+            }
+
+            if (coarseMaxs[i] >= 0.9f)
+            {
+                coarseNeighbors++;
+            }
+        }
+
+        Assert.True(coarseNeighbors >= fineNeighbors);
     }
 
     [Fact]

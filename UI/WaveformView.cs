@@ -23,17 +23,24 @@ internal sealed partial class WaveformView : Grid
     public const double AmpZoomMax = 128d;
     // 旧 2^(1/4) の 5 段階分 = 2^(5/4)。ホイール時間ズーム。
     public const double WheelTimeStep = 2.378414230005442;
-    private const int PolylineMaxSamplesPerPixel = 1;
+    /// <summary>
+    /// これ以下の samples/px ではサンプル折れ線。1 だと拡大途中の短尺が
+    /// 1px 縦棒の羅列（破線）に見えやすいので、つながった折れ線へ早めに切り替える。
+    /// </summary>
+    internal const int PolylineMaxSamplesPerPixel = 8;
     private const double OverlayWaveHeightFraction = 0.5;
     private const int RawColumnMaxSamplesPerPixel = 96;
     private const int RawColumnMaxFrames = 1 << 18;
     /// <summary>
     /// 列エンベロープの隣接接続を効かせる上限（samples/px）。
-    /// 旧 width×8（spp≤8）だと約2秒の全体表示（spp≈数十）でオフになり、
-    /// 生 PCM 列と同じ帯で輪郭がギザギザに見えた。Raw 予算と同じ 96 に揃え、
-    /// PeakPyramid 経路の短尺標準表示でも長尺寄りの輪郭にする。
+    /// 旧 width×8 だと約2秒の全体表示でオフになりギザついた。Raw 予算と同じ 96。
     /// </summary>
     internal const int EnvelopeConnectMaxSamplesPerPixel = RawColumnMaxSamplesPerPixel;
+    /// <summary>
+    /// エディタで一段粗い PeakPyramid LOD を選ぶ下限（samples/px）。
+    /// 現状はバイアス無し（0）。標準倍率でも線を細く保つ。再導入するときの閾値用に定数は残す。
+    /// </summary>
+    internal const int EditorEnvelopeCoarseMinSamplesPerPixel = 8;
     internal const int SamplePointMaxVisibleFrames = 500;
     /// <summary>タイム／マーカー系ラベルキャッシュの件数上限。満杯なら丸ごと捨てる。</summary>
     private const int TimeLabelCacheMax = 512;
@@ -4308,11 +4315,28 @@ internal sealed partial class WaveformView : Grid
         return rangeFrames > 0 && width > 0 && rangeFrames <= RawColumnBudget(width);
     }
 
-    /// <summary>列エンベロープの輪郭をつなぐか。短尺の標準表示（spp≈数十）も含める。</summary>
+    /// <summary>
+    /// 列エンベロープの輪郭をつなぐか。短尺の標準〜中拡大（spp≈数十）で破線に見えないようにする。
+    /// 線の太さ対策は LOD バイアス側（標準倍率のみ）で行う。
+    /// </summary>
     internal static bool ShouldConnectEnvelopeNeighbors(long rangeFrames, int width) =>
         rangeFrames > 0
         && width > 0
         && rangeFrames <= (long)width * EnvelopeConnectMaxSamplesPerPixel;
+
+    /// <summary>
+    /// エディタのエンベロープ用 LOD バイアス。プレイヤーもエディタも 0。
+    /// 一段粗いミップは標準倍率の線を太く見せるため使わない（輪郭接続と PeakPyramid で滑らかさは確保）。
+    /// </summary>
+    internal static int EditorEnvelopeLodBias(
+        bool editorMode,
+        long rangeFrames,
+        int width,
+        double timeZoom = 1d)
+    {
+        _ = (editorMode, rangeFrames, width, timeZoom, EditorEnvelopeCoarseMinSamplesPerPixel);
+        return 0;
+    }
 
     private unsafe void DrawLaneGuides(
         int* buffer,
@@ -4449,7 +4473,17 @@ internal sealed partial class WaveformView : Grid
 
         var count = useRawColumns
             ? FillRawColumnPeaks(document, startFrame, endFrame, width, channels)
-            : document.Peaks.ReadRangePacked(startFrame, endFrame, width, _columnMins, _columnMaxs);
+            : document.Peaks.ReadRangePacked(
+                startFrame,
+                endFrame,
+                width,
+                _columnMins,
+                _columnMaxs,
+                EditorEnvelopeLodBias(
+                    !SeekAndSelectOnly,
+                    endFrame - startFrame,
+                    width,
+                    SeekAndSelectOnly ? 1d : _timeZoom));
         if (count <= 0)
         {
             return count;
@@ -4708,7 +4742,7 @@ internal sealed partial class WaveformView : Grid
         count > 0
         && count <= Math.Min(SamplePointMaxVisibleFrames, width);
 
-    private static bool IsPolylineZoom(long rangeFrames, int width) =>
+    internal static bool IsPolylineZoom(long rangeFrames, int width) =>
         rangeFrames > 0 && width > 0 && rangeFrames <= (long)width * PolylineMaxSamplesPerPixel;
 
     private void EnsureColumnBuffers(int width)

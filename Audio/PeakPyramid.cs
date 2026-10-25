@@ -806,8 +806,15 @@ internal sealed class PeakPyramid
 
     /// <summary>
     /// 全チャンネルを 1 走査で集計する。mins/maxs は [column * Channels + ch]。
+    /// <paramref name="lodBias"/> は選んだミップをさらに何段粗くするか（エディタの見た目用）。
     /// </summary>
-    public int ReadRangePacked(long startFrame, long endFrame, int peakCount, float[] mins, float[] maxs)
+    public int ReadRangePacked(
+        long startFrame,
+        long endFrame,
+        int peakCount,
+        float[] mins,
+        float[] maxs,
+        int lodBias = 0)
     {
         var needed = peakCount * Math.Max(1, Channels);
         if (mins.Length < needed || maxs.Length < needed)
@@ -815,7 +822,15 @@ internal sealed class PeakPyramid
             return 0;
         }
 
-        return ReadRangeCore(startFrame, endFrame, peakCount, mins, maxs, packed: true, channel: 0);
+        return ReadRangeCore(
+            startFrame,
+            endFrame,
+            peakCount,
+            mins,
+            maxs,
+            packed: true,
+            channel: 0,
+            lodBias);
     }
 
     private int ReadRangeCore(
@@ -825,7 +840,8 @@ internal sealed class PeakPyramid
         float[] mins,
         float[] maxs,
         bool packed,
-        int channel)
+        int channel,
+        int lodBias = 0)
     {
         if (IsEmpty || peakCount <= 0)
         {
@@ -850,6 +866,11 @@ internal sealed class PeakPyramid
             && ((long)BaseBucketFrames << (level + 1)) <= framesPerBucket)
         {
             level++;
+        }
+
+        if (lodBias > 0)
+        {
+            level = Math.Min(_minLevels.Length - 1, level + lodBias);
         }
 
         var levelBucketFrames = (long)BaseBucketFrames << level;
