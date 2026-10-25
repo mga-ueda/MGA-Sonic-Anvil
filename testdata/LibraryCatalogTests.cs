@@ -179,7 +179,7 @@ public sealed class LibraryCatalogTests : IDisposable
     }
 
     [Fact]
-    public void LoadProbedTagTexts_IncludesPlaylistColumns()
+    public void LoadProbedTagTexts_IncludesOnlySearchTagFields()
     {
         var root = Path.Combine(_dir, "columns");
         Directory.CreateDirectory(root);
@@ -190,7 +190,15 @@ public sealed class LibraryCatalogTests : IDisposable
             new AudioFileTags
             {
                 Probed = true,
+                Title = "Yesterday",
+                Artist = "The Beatles",
+                AlbumArtist = "The Beatles",
+                Album = "Help!",
+                Genre = "Rock",
+                Composer = "Lennon/McCartney",
                 Comment = "take two",
+                Year = "1965",
+                Track = "1",
                 SampleRate = 44100,
                 BitRateKbps = 192,
                 Channels = 2,
@@ -199,11 +207,17 @@ public sealed class LibraryCatalogTests : IDisposable
 
         var texts = LibraryCatalog.LoadProbedTagTexts([root]);
         Assert.True(texts.TryGetValue(path, out var row));
+        Assert.Contains("Yesterday", row);
+        Assert.Contains("The Beatles", row);
+        Assert.Contains("Help!", row);
+        Assert.Contains("Rock", row);
+        Assert.Contains("Lennon/McCartney", row);
         Assert.Contains("take two", row);
-        Assert.Contains("44.1kHz", row);
-        Assert.Contains("192 kbps", row);
-        Assert.Contains("2ch", row);
-        Assert.Contains("01:05.500", row);
+        Assert.DoesNotContain("1965", row);
+        Assert.DoesNotContain("44.1kHz", row);
+        Assert.DoesNotContain("192 kbps", row);
+        Assert.DoesNotContain("2ch", row);
+        Assert.DoesNotContain("01:05.500", row);
     }
 
     [Fact]

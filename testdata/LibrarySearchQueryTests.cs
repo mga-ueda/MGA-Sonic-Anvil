@@ -26,7 +26,27 @@ public sealed class LibrarySearchQueryTests
     }
 
     [Fact]
-    public void MatchesRow_AllColumns()
+    public void MatchesFileName_Wildcards()
+    {
+        Assert.True(LibrarySearchQuery.MatchesFileName(
+            @"C:\Music\bgm_loop_01.wav",
+            LibrarySearchQuery.Parse("*.wav")));
+        Assert.True(LibrarySearchQuery.MatchesFileName(
+            @"C:\Music\bgm_loop_01.wav",
+            LibrarySearchQuery.Parse("bgm*01.*")));
+        Assert.True(LibrarySearchQuery.MatchesFileName(
+            "se_hit.wav",
+            LibrarySearchQuery.Parse("se_???.wav")));
+        Assert.False(LibrarySearchQuery.MatchesFileName(
+            @"C:\Music\bgm_loop_01.wav",
+            LibrarySearchQuery.Parse("*.mp3")));
+        Assert.False(LibrarySearchQuery.MatchesFileName(
+            "se_hit.wav",
+            LibrarySearchQuery.Parse("se_??.wav")));
+    }
+
+    [Fact]
+    public void MatchesRow_Wildcards_AcrossColumns()
     {
         var row = new LibraryFileRow
         {
@@ -34,17 +54,50 @@ public sealed class LibrarySearchQueryTests
             Title = "Yesterday",
             Artist = "The Beatles",
             Album = "Help!",
+        };
+        Assert.True(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("*.wav")));
+        Assert.True(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("Yesterda?")));
+        Assert.True(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("The*les")));
+        Assert.False(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("*.mp3")));
+        Assert.False(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("Yesterda??")));
+    }
+
+    [Fact]
+    public void MatchesRow_SelectedFields()
+    {
+        var row = new LibraryFileRow
+        {
+            Name = "track01.wav",
+            Title = "Yesterday",
+            Artist = "The Beatles",
+            AlbumArtist = "The Beatles",
+            Album = "Help!",
             Genre = "Rock",
+            Composer = "Lennon/McCartney",
+            Comment = "mono mix",
+            ParentFolder = "Beatles",
             Folder = @"C:\Music\Beatles",
+            Year = "1965",
+            Track = "1",
+            Kind = "WAVE",
             DateText = "2026/09/20 23:12",
+            SampleRateText = "48 kHz",
+            LoudnessText = "-14.0 LUFS",
         };
         Assert.True(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("beatles yesterday")));
         Assert.True(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("Help")));
         Assert.True(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("track01")));
-        Assert.True(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("2026")));
+        Assert.True(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("Lennon")));
+        Assert.True(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("mono")));
+        Assert.True(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("Rock")));
         Assert.True(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("beatles|radiohead")));
         Assert.False(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("radiohead")));
         Assert.False(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("beatles abbey")));
+        Assert.False(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("2026")));
+        Assert.False(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("1965")));
+        Assert.False(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("48 kHz")));
+        Assert.False(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("LUFS")));
+        Assert.False(LibrarySearchQuery.MatchesRow(row, LibrarySearchQuery.Parse("WAVE")));
     }
 
     [Fact]

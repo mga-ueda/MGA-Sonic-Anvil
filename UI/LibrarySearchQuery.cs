@@ -6,8 +6,10 @@ namespace MgaSonicAnvil.UI;
 
 /// <summary>
 /// プレイヤーのライブラリ／プレイリスト検索。空白は AND、<c>|</c> は OR。
-/// ライブラリはファイル名、祖先フォルダ名、索引済みタグ。プレイリストはすべての列。
-/// タグが未構築のファイルは、タグではヒットしない。
+/// <c>"..."</c> は中の空白を分けず、その文字列の連続一致。
+/// <c>*</c> は任意の文字列、<c>?</c> は任意の一文字（語に含むとき全体マッチ）。
+/// 対象はファイル名、フォルダ名、コメント／タイトル／アルバム／アーティスト／
+/// 作曲／ジャンル／アルバムアーティスト。タグが未構築のファイルはタグではヒットしない。
 /// </summary>
 internal static class LibrarySearchQuery
 {
@@ -30,37 +32,19 @@ internal static class LibrarySearchQuery
     private static IEnumerable<string> RowTexts(LibraryFileRow row)
     {
         yield return row.Name;
+        yield return row.ParentFolder;
         yield return row.Title;
         yield return row.Artist;
         yield return row.AlbumArtist;
         yield return row.Album;
-        yield return row.Track;
-        yield return row.Disc;
-        yield return row.Year;
         yield return row.Genre;
         yield return row.Composer;
         yield return row.Comment;
-        yield return row.Kind;
-        yield return row.DurationText;
-        yield return row.SampleRateText;
-        yield return row.BitDepthText;
-        yield return row.ChannelsText;
-        yield return row.BitRateText;
-        yield return row.VideoSizeText;
-        yield return row.FrameRateText;
-        yield return row.VideoCodec;
-        yield return row.AudioCodec;
-        yield return row.SizeText;
-        yield return row.DateText;
-        yield return row.Folder;
-        yield return row.ParentFolder;
-        yield return row.JacketText;
-        yield return row.LoudnessText;
     }
 
     /// <summary>
     /// ヒットしたファイルの親、名前がヒットしたフォルダ、ルートまでの祖先だけ。ヒットの無い枝は含めない。
-    /// ファイルはファイル名、祖先フォルダ名、索引済みタグを横断して AND／OR する。
+    /// ファイルはファイル名、祖先フォルダ名、索引済みの対象タグを横断して AND／OR する。
     /// </summary>
     public static HashSet<string> VisibleFolders(
         IReadOnlyList<string> roots,

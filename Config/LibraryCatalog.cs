@@ -173,7 +173,6 @@ internal static class LibraryCatalog
             }
         }
 
-        AppendCachedLoudness(result);
         return result;
     }
 
@@ -1157,8 +1156,8 @@ internal static class LibraryCatalog
     private static string[] ReadSearchTagTexts(SqliteDataReader reader)
     {
         var i = 1;
-        var size = reader.GetInt64(i++);
-        var mtime = reader.GetInt64(i++);
+        _ = reader.GetInt64(i++);
+        _ = reader.GetInt64(i++);
         var tags = new AudioFileTags
         {
             Probed = true,
@@ -1184,36 +1183,7 @@ internal static class LibraryCatalog
             AudioCodec = reader.GetString(i++),
             HasArtwork = reader.GetInt64(i) != 0,
         };
-        return LibraryPlaylistSearchTexts.Build(reader.GetString(0), size, mtime, tags);
-    }
-
-    private static void AppendCachedLoudness(Dictionary<string, string[]> texts)
-    {
-        if (texts.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var path in texts.Keys.ToArray())
-        {
-            if (!AudioCodec.IsUncompressedPcm(path)
-                || !LibraryMediaCache.TryGetLoudness(path, out var lufs))
-            {
-                continue;
-            }
-
-            var loudness = UiStrings.FormatIntegratedLufs(lufs);
-            if (loudness.Length == 0)
-            {
-                continue;
-            }
-
-            var row = texts[path];
-            var next = new string[row.Length + 1];
-            row.CopyTo(next, 0);
-            next[^1] = loudness;
-            texts[path] = next;
-        }
+        return LibraryPlaylistSearchTexts.Build(tags);
     }
 
     private static long FileLength(string path)
