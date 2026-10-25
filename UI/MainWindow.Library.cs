@@ -2785,6 +2785,13 @@ public partial class MainWindow
             return;
         }
 
+        // 退避中に破棄閉じされた参照が dirty のまま残っていると、復帰後にまた未保存確認が出る。
+        parked = SanitizeParkedPlaylistSessions(parked);
+        if (parked.Length == 0 && _sessions.Count == 0)
+        {
+            return;
+        }
+
         var merged = LibraryPlayerMode.MergeParkedPlaylist(parked, _sessions);
         if (merged.Count == _sessions.Count)
         {
@@ -2820,6 +2827,47 @@ public partial class MainWindow
         {
             RebuildTabBar();
         }
+    }
+
+    /// <summary>
+    /// エディタで開いていない dirty 退避をディスク版へ戻す。戻せない無題は落とす。
+    /// </summary>
+    private DocumentSession[] SanitizeParkedPlaylistSessions(DocumentSession[] parked)
+    {
+        List<DocumentSession>? kept = null;
+        for (var i = 0; i < parked.Length; i++)
+        {
+            var session = parked[i];
+            var drop = false;
+            if (session.Document.IsDirty && !_sessions.Contains(session)
+                && !TryReloadSessionDocument(session))
+            {
+                // 無題・欠落パスは会員から外す。再読込失敗（権限など）は dirty のまま残し、後で再確認。
+                var path = session.Document.SourcePath;
+                drop = string.IsNullOrWhiteSpace(path) || !File.Exists(path);
+            }
+
+            if (drop)
+            {
+                kept ??= CopyParkedPrefix(parked, i);
+                continue;
+            }
+
+            kept?.Add(session);
+        }
+
+        return kept?.ToArray() ?? parked;
+    }
+
+    private static List<DocumentSession> CopyParkedPrefix(DocumentSession[] parked, int count)
+    {
+        var list = new List<DocumentSession>(parked.Length);
+        for (var i = 0; i < count; i++)
+        {
+            list.Add(parked[i]);
+        }
+
+        return list;
     }
 
     private int DisplayedPlaylistIndex(DocumentSession? session)
