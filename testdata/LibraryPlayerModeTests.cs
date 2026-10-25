@@ -348,6 +348,20 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsDestructiveEditShortcut(Key.N, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsDestructiveEditShortcut(Key.D, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.IsDestructiveEditShortcut(Key.N, ModifierKeys.Alt));
+        Assert.True(LibraryPlayerMode.HidesDestructiveMenuGesture(WaveMenuCommand.Normalize));
+        Assert.False(LibraryPlayerMode.HidesDestructiveMenuGesture(WaveMenuCommand.MergeTabs));
+        Assert.False(LibraryPlayerMode.HidesDestructiveMenuGesture(WaveMenuCommand.ExportMp3));
+        Assert.Null(LibraryPlayerMode.MenuGesture(playerMode: true, WaveMenuCommand.Normalize, "N"));
+        Assert.Equal("N", LibraryPlayerMode.MenuGesture(playerMode: false, WaveMenuCommand.Normalize, "N"));
+        Assert.Equal(
+            "Ctrl+Shift+B",
+            LibraryPlayerMode.MenuGesture(playerMode: true, WaveMenuCommand.MergeTabs, "Ctrl+Shift+B"));
+        Assert.Equal(
+            "Ctrl+Shift+M",
+            LibraryPlayerMode.MenuGesture(playerMode: true, WaveMenuCommand.ExportMp3, "Ctrl+Shift+M"));
+        Assert.False(LibraryPlayerMode.IsDestructiveEditShortcut(
+            Key.B, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.B, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.LeftShift, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.F4, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Space, ModifierKeys.Alt));
@@ -472,7 +486,7 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.S, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.B, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.AllowsKey(Key.B, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.B, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Z, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.W, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.W, ModifierKeys.Control | ModifierKeys.Shift));

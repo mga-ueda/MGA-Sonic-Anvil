@@ -1044,12 +1044,16 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Equal("Ctrl+C", ((MenuItem)listEdit.Items[0]).InputGestureText);
             Assert.Equal(UiStrings.LibraryMenuClearFromPlaylist, (string)((MenuItem)listEdit.Items[6]).Header);
             Assert.True(string.IsNullOrEmpty(((MenuItem)listEdit.Items[6]).InputGestureText));
-            Assert.Equal("N", ((MenuItem)listAudio.Items[6]).InputGestureText);
-            Assert.Equal("S", ((MenuItem)listFormat.Items[0]).InputGestureText);
-            Assert.Equal("B", ((MenuItem)listFormat.Items[1]).InputGestureText);
-            Assert.Equal("C", ((MenuItem)listFormat.Items[2]).InputGestureText);
-            Assert.Equal("V", ((MenuItem)listExport.Items[0]).InputGestureText);
+            // 破壊編集ショートカット（N／I／O／S／B／C／V 等）はキー無効のため表記なし。バウンスは表記あり。
+            Assert.True(string.IsNullOrEmpty(((MenuItem)listAudio.Items[3]).InputGestureText));
+            Assert.True(string.IsNullOrEmpty(((MenuItem)listAudio.Items[4]).InputGestureText));
+            Assert.True(string.IsNullOrEmpty(((MenuItem)listAudio.Items[6]).InputGestureText));
+            Assert.True(string.IsNullOrEmpty(((MenuItem)listFormat.Items[0]).InputGestureText));
+            Assert.True(string.IsNullOrEmpty(((MenuItem)listFormat.Items[1]).InputGestureText));
+            Assert.True(string.IsNullOrEmpty(((MenuItem)listFormat.Items[2]).InputGestureText));
+            Assert.True(string.IsNullOrEmpty(((MenuItem)listExport.Items[0]).InputGestureText));
             Assert.Equal("Ctrl+Shift+M", ((MenuItem)listExport.Items[3]).InputGestureText);
+            Assert.Equal("Ctrl+Shift+B", ((MenuItem)listExport.Items[4]).InputGestureText);
             Assert.Equal(UiStrings.LibraryMenuCopyFileName, (string)((MenuItem)listOther.Items[0]).Header);
             WaveMenuCommand? waveCommand = null;
             view.PlaylistWaveMenuRequested += (_, command) => waveCommand = command;

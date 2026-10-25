@@ -473,6 +473,20 @@ public sealed class WaveformContextMenuTests
         Assert.True(Find(tree, WaveMenuCommand.ClearLoopItem)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.ExportMp3)?.Enabled);
         Assert.Equal("Ctrl+Shift+M", Find(tree, WaveMenuCommand.ExportMp3)?.Gesture);
+        // 破壊編集はメニューから実行可だが、ショートカット表記は出さない。
+        Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.FadeIn)?.Gesture));
+        Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.FadeOut)?.Gesture));
+        Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.Volume)?.Gesture));
+        Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.Normalize)?.Gesture));
+        Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.Pitch)?.Gesture));
+        Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.TimeStretch)?.Gesture));
+        Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.Reverse)?.Gesture));
+        Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.SampleRate)?.Gesture));
+        Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.BitDepth)?.Gesture));
+        Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.Channels)?.Gesture));
+        Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.InsertSilence)?.Gesture));
+        Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.DetectSilence)?.Gesture));
+        Assert.Equal("Ctrl+Shift+B", Find(tree, WaveMenuCommand.MergeTabs)?.Gesture);
         var mp3Only = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
         {
             HasDocument = true,
