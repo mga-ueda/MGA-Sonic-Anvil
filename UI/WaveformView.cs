@@ -35,6 +35,7 @@ internal sealed partial class WaveformView : Grid
     /// </summary>
     internal const int EnvelopeConnectMaxSamplesPerPixel = RawColumnMaxSamplesPerPixel;
     internal const int SamplePointMaxVisibleFrames = 500;
+    /// <summary>タイム／マーカー系ラベルキャッシュの件数上限。満杯なら丸ごと捨てる。</summary>
     private const int TimeLabelCacheMax = 512;
     internal const double SamplePointRadius = 8d / 3d;
     private static readonly double[] DbRequiredMarks = [-3, -6, -12];
@@ -5725,6 +5726,11 @@ internal sealed partial class WaveformView : Grid
             ChromeFontSize,
             WpfControlHelpers.FrozenBrush(fore),
             pixelsPerDip);
+        if (_abFlagLabelCache.Count >= TimeLabelCacheMax)
+        {
+            _abFlagLabelCache.Clear();
+        }
+
         _abFlagLabelCache[key] = formatted;
         return formatted;
     }
@@ -7245,6 +7251,11 @@ internal sealed partial class WaveformView : Grid
             ChromeFontSize,
             WpfControlHelpers.FrozenBrush(Theme.Get("MarkerLabelForeBrush")),
             pixelsPerDip);
+        if (_markerLabelCache.Count >= TimeLabelCacheMax)
+        {
+            _markerLabelCache.Clear();
+        }
+
         _markerLabelCache[text] = formatted;
         return formatted;
     }
@@ -7265,6 +7276,11 @@ internal sealed partial class WaveformView : Grid
             ChromeFontSize,
             WpfControlHelpers.FrozenBrush(Theme.Get(selected ? "AccentCyanBrush" : "PrimaryForeBrush")),
             pixelsPerDip);
+        if (_markerCommentLabelCache.Count >= TimeLabelCacheMax)
+        {
+            _markerCommentLabelCache.Clear();
+        }
+
         _markerCommentLabelCache[key] = formatted;
         return formatted;
     }
