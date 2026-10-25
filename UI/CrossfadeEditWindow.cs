@@ -48,6 +48,8 @@ internal sealed class CrossfadeEditWindow : Window
     private CurveIconRow? _preInCurve;
     private CurveIconRow? _postOutCurve;
     private CurveIconRow? _postInCurve;
+    private StackPanel? _preCurveSide;
+    private StackPanel? _postCurveSide;
     private CrossfadeEditState? _state;
     private bool _syncing;
     private bool _hidingFromHost;
@@ -377,6 +379,9 @@ internal sealed class CrossfadeEditWindow : Window
             HorizontalAlignment = HorizontalAlignment.Left,
         };
         var body = new StackPanel();
+        body.Children.Add(SectionLabel(UiStrings.CrossfadeAutoSearch, UiStrings.CrossfadeTipAutoSearch));
+        body.Children.Add(AutoSearchRow());
+
         body.Children.Add(SectionHeaderWithNudgeHint(UiStrings.CrossfadeSectionParams));
         // 左＝始点／終点、右＝プリ／ポスト（目標スクショの二列）
         body.Children.Add(LoopParamsGrid());
@@ -384,8 +389,6 @@ internal sealed class CrossfadeEditWindow : Window
         body.Children.Add(_align28Check);
 
         body.Children.Add(CurveSection());
-        body.Children.Add(SectionLabel(UiStrings.CrossfadeAutoSearch, UiStrings.CrossfadeTipAutoSearch));
-        body.Children.Add(AutoSearchRow());
 
         scroll.Content = body;
         Grid.SetColumn(scroll, 1);
@@ -748,19 +751,22 @@ internal sealed class CrossfadeEditWindow : Window
                 DraftChanged?.Invoke(false);
             });
 
-        rows.Children.Add(CurveSideRow(
+        _preCurveSide = CurveSideRow(
             UiStrings.CrossfadeLabelCurveIn,
             UiStrings.CrossfadeTipCurveIn,
             _preOutCurve,
             _preInCurve,
-            bottomMargin: 8));
-        rows.Children.Add(CurveSideRow(
+            bottomMargin: 8);
+        _postCurveSide = CurveSideRow(
             UiStrings.CrossfadeLabelCurveOut,
             UiStrings.CrossfadeTipCurveOut,
             _postOutCurve,
             _postInCurve,
-            bottomMargin: 0));
+            bottomMargin: 0);
+        rows.Children.Add(_preCurveSide);
+        rows.Children.Add(_postCurveSide);
         panel.Children.Add(rows);
+        RefreshCurveEnabled();
         return panel;
     }
 
@@ -852,6 +858,7 @@ internal sealed class CrossfadeEditWindow : Window
     {
         if (_state is null)
         {
+            RefreshCurveEnabled();
             return;
         }
 
@@ -859,6 +866,25 @@ internal sealed class CrossfadeEditWindow : Window
         SetCurveIconRow(_preInCurve, _state.PreInShape);
         SetCurveIconRow(_postOutCurve, _state.PostOutShape);
         SetCurveIconRow(_postInCurve, _state.PostInShape);
+        RefreshCurveEnabled();
+    }
+
+    /// <summary>プリ／ポスト各クロスフェード長が 0 より大きいときだけ、対応する曲線行を有効にする。</summary>
+    private void RefreshCurveEnabled()
+    {
+        var preOn = _state is { PreCrossfadeFrames: > 0 };
+        var postOn = _state is { PostCrossfadeFrames: > 0 };
+        if (_preCurveSide is not null)
+        {
+            _preCurveSide.IsEnabled = preOn;
+            _preCurveSide.Opacity = preOn ? 1.0 : 0.45;
+        }
+
+        if (_postCurveSide is not null)
+        {
+            _postCurveSide.IsEnabled = postOn;
+            _postCurveSide.Opacity = postOn ? 1.0 : 0.45;
+        }
     }
 
     private static void SetCurveIconRow(CurveIconRow? row, FadeShape shape)
@@ -1258,7 +1284,7 @@ internal sealed class CrossfadeEditWindow : Window
     /// <summary>ループ行の入力欄と 0 ボタンの共通高さ（縦位置揃え）。</summary>
     private const double ValueRowControlHeight = 28;
 
-    /// <summary>右操作ペイン（ループ／曲線／自動探索）。ウィンドウ拡縮でも幅固定。</summary>
+    /// <summary>右操作ペイン（自動探索／ループ／曲線）。ウィンドウ拡縮でも幅固定。</summary>
     private const double ControlsPaneWidth = 600;
 
     /// <summary>左波形ペインの最小幅。</summary>
