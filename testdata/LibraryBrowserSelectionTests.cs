@@ -2454,11 +2454,11 @@ public sealed class LibraryBrowserSelectionTests
         try
         {
             UiStrings.SetLanguage(UiLanguage.Japanese);
-            Assert.Equal("Auto _Loop", UiStrings.LabelLibraryAutoLoop);
+            Assert.Equal("Single _Loop", UiStrings.LabelLibraryAutoLoop);
             Assert.Equal('L', MenuAccessKeys.Read(UiStrings.LabelLibraryAutoLoop));
             Assert.DoesNotContain("Alt+", UiStrings.LabelLibraryAutoLoop, StringComparison.OrdinalIgnoreCase);
             UiStrings.SetLanguage(UiLanguage.English);
-            Assert.Equal("Auto _Loop", UiStrings.LabelLibraryAutoLoop);
+            Assert.Equal("Single _Loop", UiStrings.LabelLibraryAutoLoop);
             Assert.Equal('L', MenuAccessKeys.Read(UiStrings.LabelLibraryAutoLoop));
         }
         finally

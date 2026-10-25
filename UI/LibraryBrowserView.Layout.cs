@@ -196,7 +196,7 @@ internal sealed partial class LibraryBrowserView
         bar.Children.Add(_shuffleCheck);
 
         // Dock.Right は先に足したものが右。Shuffle → AutoNext → AutoPlay で
-        // 見た目は Auto Play | Auto Next | Random。Auto Loop はステータスバーへ。
+        // 見た目は Auto Play | Auto Next | Random。Single Loop はステータスバーへ。
         _autoPlayNextCheck.Style = TryFindResource("DarkCheckBoxStyle") as Style;
         _autoPlayNextCheck.Content = UiStrings.LabelLibraryAutoPlayNext;
         _autoPlayNextCheck.IsChecked = false;

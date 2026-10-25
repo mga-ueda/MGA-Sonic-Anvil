@@ -263,7 +263,7 @@ public sealed class Mp3GaplessTests
     [Fact]
     public void Bind_AllowBeforePlayWindowStart_KeepsIntroThenLoops()
     {
-        // Auto Loop＋サンプルループ: 頭から Bind しても S へ吸い寄せない。
+        // Single Loop＋サンプルループ: 頭から Bind しても S へ吸い寄せない。
         const int loopStart = 100;
         const int loopEnd = 300;
         var samples = new float[400 * 2];

@@ -120,7 +120,7 @@ internal sealed class AppSettings
     /// <summary>プレイリストの Auto Next。既定オフ。モードを行き来しても設定に残す。</summary>
     public bool LibraryAutoPlayNext { get; set; }
 
-    /// <summary>プレイリストの Auto Loop。既定オフ。モードを行き来しても設定に残す。Auto Next より優先。</summary>
+    /// <summary>プレイリストの Single Loop。既定オフ。モードを行き来しても設定に残す。Auto Next より優先。</summary>
     public bool LibraryAutoLoop { get; set; }
 
     /// <summary>プレイリストに PDF を載せる。既定オン。プレイヤー専用。</summary>

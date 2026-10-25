@@ -1067,9 +1067,9 @@ internal static partial class UiStrings
     public static string LabelLibraryAutoPlay => "Auto _Play";
     /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。Alt+N。</summary>
     public static string LabelLibraryAutoPlayNext => "Auto _Next";
-    /// <summary>ステータスバーの Auto Loop。UI 言語に関わらず英語。Alt+L。</summary>
-    public static string LabelLibraryAutoLoop => "Auto _Loop";
-    /// <summary>Auto Loop の動作説明（サンプルループあり＝頭通し後に S–E 無限、無し＝曲末→先頭）。</summary>
+    /// <summary>ステータスバーの Single Loop。UI 言語に関わらず英語。Alt+L。</summary>
+    public static string LabelLibraryAutoLoop => "Single _Loop";
+    /// <summary>Single Loop の動作説明（サンプルループあり＝頭通し後に S–E 無限、無し＝曲末→先頭）。</summary>
     public static string TipLibraryAutoLoop => Get(
         "オン時: サンプルループがあれば頭（または再生位置）から通し、ループ終端で始点へ無限ループ。無ければ曲末で先頭へ戻す。選択や A-B があるときはそちらを優先。",
         "On: with a sample loop, play from the head (or playhead) through the intro, then loop S–E forever. Without a sample loop, restart from the start at the end. Selection / A-B take priority.");

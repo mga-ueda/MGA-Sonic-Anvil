@@ -1653,7 +1653,7 @@ public partial class MainWindow
             return true;
         }
 
-        // Auto Loop はステータスバー（Silent Skip の右）。プレイヤー限定にするとエディタで効かない。
+        // Single Loop はステータスバー（Silent Skip の右）。プレイヤー限定にするとエディタで効かない。
         if (LibraryPlayerMode.IsAutoLoopToggle(key, modifiers))
         {
             LibraryBrowser.ToggleAutoLoop();
@@ -1821,7 +1821,7 @@ public partial class MainWindow
             return true;
         }
 
-        // Alt+L（Auto Loop）は先頭のステータスバー系で処理済み。
+        // Alt+L（Single Loop）は先頭のステータスバー系で処理済み。
 
         // Alt+P は Enter 追加時の自動再生。素の P（前の曲）より先、タイプアヘッド／検索入力より先。
         if (IsLibraryMaximized
