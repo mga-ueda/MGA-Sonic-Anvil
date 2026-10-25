@@ -32,7 +32,7 @@ public partial class MainWindow
             case TransportCommand.TogglePlayback:
                 if (IsLibraryMaximized)
                 {
-                    // エディタの Space と同じ（単独再生／停止で開始位置へ）。曲末の次送りは自動再生チェック。
+                    // プレイヤーの Space と同じ（動画本再生中は一時停止／再開。ほかは停止で開始位置へ）。
                     PlayLibrarySelectionOnceOrToggle();
                 }
                 else
@@ -797,8 +797,8 @@ public partial class MainWindow
     private void HaltPlaybackToStart(bool keepVideoChromeHidden = false)
     {
         _editorPlayAfterPcmTicket++;
-        // Space の停止は開始位置へ戻す（即再開しない）。動画／PDF 本再生中はプレイリストを出さない。
-        // 暗いプレビューへ落とすのは Escape。
+        // 開始位置へ戻す停止。動画／PDF 本再生中にクロームを隠したままにするときは keepVideoChromeHidden。
+        // 動画本再生の Space 一時停止は PausePlaybackHere 側。暗いプレビューへ落とすのは Escape。
         var videoShown = IsLibraryMaximized
             && LibraryBrowser.PlaylistVisualShown
             && LibraryBrowser.PlaylistVisualIsVideo;
@@ -815,7 +815,7 @@ public partial class MainWindow
             ClearPlaylistVideoImmersivePause(sync: false);
         }
 
-        // 動画本再生の Space／Enter 停止は常に静止（暗いプレビューへ落とさない）。
+        // 動画本再生の開始位置停止は常に静止（暗いプレビューへ落とさない）。
         PausePlaybackSoft(freezePlaylistVisual: videoShown);
 
         if (_document is null)

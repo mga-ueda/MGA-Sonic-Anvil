@@ -576,6 +576,8 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.HaltsLibraryPlaybackOnSpace(playbackActive: false, immersiveVideoPause: true));
         Assert.True(LibraryPlayerMode.HaltsLibraryPlaybackOnSpace(playbackActive: true, immersiveVideoPause: false));
         Assert.False(LibraryPlayerMode.HaltsLibraryPlaybackOnSpace(playbackActive: false, immersiveVideoPause: false));
+        Assert.True(LibraryPlayerMode.PausesVideoRealPlaybackInPlaceOnSpace(videoRealPlaybackPlaying: true));
+        Assert.False(LibraryPlayerMode.PausesVideoRealPlaybackInPlaceOnSpace(videoRealPlaybackPlaying: false));
         // 前面 UI 隠れ中はプレイリストの全選択・行除外を受け付けない。
         Assert.True(LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(chromeVisible: false));
         Assert.False(LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(chromeVisible: true));

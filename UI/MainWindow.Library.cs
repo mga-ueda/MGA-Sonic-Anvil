@@ -4682,7 +4682,8 @@ public partial class MainWindow
 
     /// <summary>
     /// Space／トランスポート再生。エディタの TogglePlayback 相当。
-    /// 再生中は HaltPlaybackToStart。停止中はシーク位置（CursorFrame）から単独再生／再開（曲末で次へ進まない）。
+    /// 再生中は HaltPlaybackToStart（動画本再生中だけその場一時停止）。
+    /// 停止中はシーク位置（CursorFrame）から単独再生／再開（曲末で次へ進まない）。
     /// 別曲へ切り替えるときだけ PlayLibrarySessionAsync（その曲は先頭から）。
     /// </summary>
     /// <param name="fromStart">
@@ -4696,12 +4697,19 @@ public partial class MainWindow
             return;
         }
 
-        // エディタと同じ：本再生中だけ止めて開始位置へ戻す（即再開しない）。
-        // 動画本再生中はプレイリストを出さず、開始位置で静止する。
+        // 再生中：動画本再生は一時停止／再開用にその場停止。それ以外は開始位置へ戻す。
         if (IsPlaybackActive())
         {
             StopVideoFrameStep();
-            HaltPlaybackToStart(keepVideoChromeHidden: IsPlaylistVideoPlaying());
+            if (LibraryPlayerMode.PausesVideoRealPlaybackInPlaceOnSpace(IsPlaylistVideoPlaying()))
+            {
+                PausePlaybackHere(immersiveVideoHold: true);
+            }
+            else
+            {
+                HaltPlaybackToStart(keepVideoChromeHidden: false);
+            }
+
             _libraryStopAfterTrack = false;
             return;
         }

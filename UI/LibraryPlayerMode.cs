@@ -349,10 +349,16 @@ internal static class LibraryPlayerMode
 
     /// <summary>
     /// Escape で本再生／フレーム一時停止から暗いバックグラウンドへ戻す状態。
-    /// Space 自体は開始位置へ静止（暗いプレビューへは落とさない）。
+    /// 動画本再生中の Space は一時停止／再開（開始位置へは戻さない。暗いプレビューへも落とさない）。
     /// </summary>
     public static bool HaltsLibraryPlaybackOnSpace(bool playbackActive, bool immersiveVideoPause) =>
         playbackActive || immersiveVideoPause;
+
+    /// <summary>
+    /// 動画本再生中の Space／トランスポート再生は、開始位置へ戻さずその場一時停止する。
+    /// </summary>
+    public static bool PausesVideoRealPlaybackInPlaceOnSpace(bool videoRealPlaybackPlaying) =>
+        videoRealPlaybackPlaying;
 
     /// <summary>
     /// 動画本再生／PDF 明るい表示／イマーシブ一時停止など前面 UI が隠れているとき、
