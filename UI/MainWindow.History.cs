@@ -605,14 +605,14 @@ public partial class MainWindow
         }
     }
 
-    private void ReportHistoryPasteBusy(string[] names, double[] progress, long[] weights)
-    {
-        var snapshot = HistoryPasteBusyProgress.Capture(names, progress, weights);
+    private void ReportHistoryPasteBusy(string[] names, double[] progress, long[] weights) =>
+        ApplyHistoryPasteBusySnapshot(HistoryPasteBusyProgress.Capture(names, progress, weights));
+
+    private void ApplyHistoryPasteBusySnapshot(HistoryPasteBusySnapshot snapshot) =>
         _busyGlass.SetExportView(
             snapshot.Overall,
             UiStrings.OverlayExportCount(snapshot.Finished, snapshot.Jobs.Count),
             snapshot.Jobs);
-    }
 
     private void PrepareSessionForHistoryPaste(DocumentSession session)
     {

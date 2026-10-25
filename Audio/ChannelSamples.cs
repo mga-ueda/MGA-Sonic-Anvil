@@ -52,8 +52,13 @@ internal static class ChannelSamples
         return peak;
     }
 
-    public static void ApplyGain(float[] interleaved, int channels, int mask, float gain) =>
-        ApplyGain(interleaved, channels, mask, gain, bufferStartFrame: 0, range: null);
+    public static void ApplyGain(
+        float[] interleaved,
+        int channels,
+        int mask,
+        float gain,
+        IProgress<double>? progress = null) =>
+        ApplyGain(interleaved, channels, mask, gain, bufferStartFrame: 0, range: null, progress);
 
     public static void ApplyGain(
         float[] interleaved,
@@ -61,14 +66,20 @@ internal static class ChannelSamples
         int mask,
         float gain,
         long bufferStartFrame,
-        WaveSelection? range)
+        WaveSelection? range,
+        IProgress<double>? progress = null)
     {
         if (channels < 1)
         {
+            progress?.Report(1);
             return;
         }
 
         var (start, end) = FrameSpan(interleaved.Length, channels, bufferStartFrame, range);
+        var span = Math.Max(1, end - start);
+        var reportEvery = Math.Max(1, span / 100);
+        var nextReport = start + reportEvery;
+        progress?.Report(0);
         for (var frame = start; frame < end; frame++)
         {
             var index = frame * channels;
@@ -79,6 +90,12 @@ internal static class ChannelSamples
                 {
                     interleaved[index + ch] *= gain;
                 }
+            }
+
+            if (progress is not null && (frame + 1 >= nextReport || frame + 1 >= end))
+            {
+                progress.Report((frame + 1 - start) / (double)span);
+                nextReport = frame + 1 + reportEvery;
             }
         }
     }

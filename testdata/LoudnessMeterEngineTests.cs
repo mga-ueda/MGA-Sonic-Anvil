@@ -255,6 +255,39 @@ public sealed class LoudnessMeterEngineTests
     }
 
     [Fact]
+    public void MeasureFile_ReportsProgressFromZeroToOne()
+    {
+        const int rate = 48000;
+        var frames = rate; // 1 秒
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            var s = 0.25f * MathF.Sin(2f * MathF.PI * 440f * i / rate);
+            samples[i * 2] = s;
+            samples[i * 2 + 1] = s;
+        }
+
+        var reports = new List<double>();
+        _ = LoudnessMeterEngine.MeasureFile(
+            samples,
+            channels: 2,
+            sampleRate: rate,
+            progress: new CollectProgress(reports));
+        Assert.Contains(0d, reports);
+        Assert.Contains(1d, reports);
+        Assert.True(reports.Count >= 3);
+        for (var i = 1; i < reports.Count; i++)
+        {
+            Assert.True(reports[i] >= reports[i - 1]);
+        }
+    }
+
+    private sealed class CollectProgress(List<double> values) : IProgress<double>
+    {
+        public void Report(double value) => values.Add(value);
+    }
+
+    [Fact]
     public void TryGainDbToMatchTarget_Document_MeasuresAndReturnsGain()
     {
         // 短いトーンでも Integrated が有限ならゲインが求まる。

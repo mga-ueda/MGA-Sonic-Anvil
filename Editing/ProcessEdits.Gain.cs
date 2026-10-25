@@ -48,20 +48,26 @@ internal static partial class ProcessEdits
         WaveSelection range,
         double gainDb,
         int channel = ChannelSolo.Off,
-        int channelMask = 0)
+        int channelMask = 0,
+        IProgress<double>? progress = null)
     {
         range = range.Clamp(document.FrameCount);
         var mask = EditMask(document, channel, channelMask);
         gainDb = WaveformGainAnalyzer.SnapGainDb(gainDb);
         if (range.IsEmpty || WaveformGainAnalyzer.IsNoOp(gainDb))
         {
+            progress?.Report(1);
             return null;
         }
 
+        progress?.Report(0);
         var linear = (float)WaveformGainAnalyzer.LinearFromDb(gainDb);
         var before = document.CopyRange(range.StartFrame, range.Length);
+        progress?.Report(0.35);
         var after = (float[])before.Clone();
-        ChannelSamples.ApplyGain(after, document.Channels, mask, linear);
+        progress?.Report(0.5);
+        ChannelSamples.ApplyGain(after, document.Channels, mask, linear, progress: ScaledProgress.Create(progress, 0.5, 1));
+        progress?.Report(1);
 
         var extra = UiStrings.FormatSignedDb(gainDb);
         var command = new ReplaceRangeCommand(

@@ -311,6 +311,20 @@ public partial class MainWindow
                 var parallelism = AudioExport.WorkerCount(
                     buildIndices.Count,
                     AppStorage.Settings.ExportParallelism);
+                // System.Progress の SyncContext 経由だと UI Post → 再 BeginInvoke になり、
+                // 計測ループ中の％更新が一度しか見えないことがある。ワーカー直書き＋スナップショット送る。
+                var busyProgress = new BatchEditBusyProgress(
+                    names,
+                    progress,
+                    weights,
+                    Dispatcher,
+                    ApplyHistoryPasteBusySnapshot);
+                var perTabProgress = new IProgress<double>?[sessions.Length];
+                foreach (var i in buildIndices)
+                {
+                    perTabProgress[i] = busyProgress.ForTab(i);
+                }
+
                 await Task.Run(() =>
                 {
                     Parallel.For(
@@ -325,12 +339,16 @@ public partial class MainWindow
                             {
                                 var document = session.Document;
                                 var mask = TabBatchEditMask(session);
+                                var tabProgress = perTabProgress[i];
+                                // 計測が本体。ゲイン適用は後半の短い区間。
                                 if (!LoudnessMeterEngine.TryGainDbToMatchTarget(
                                         document,
                                         targetLufs,
                                         out var db,
-                                        out var integrated))
+                                        out var integrated,
+                                        progress: ScaleBusyProgress(tabProgress, 0, 0.8)))
                                 {
+                                    tabProgress?.Report(1);
                                     return;
                                 }
 
@@ -338,9 +356,11 @@ public partial class MainWindow
                                     document,
                                     TabBatchRange(document),
                                     db,
-                                    channelMask: mask);
+                                    channelMask: mask,
+                                    progress: ScaleBusyProgress(tabProgress, 0.8, 0.99));
                                 integratedBefore[i] = integrated;
                                 gainDb[i] = db;
+                                tabProgress?.Report(0.99);
                             }
                             catch (Exception ex)
                             {
