@@ -1,4 +1,7 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -1239,6 +1242,53 @@ internal static class LibraryPlayerMode
     /// <summary>ブラウザの F11 と同じ、モニタ一面の全画面（動画／PDF）。解除もユーザー操作のみ。</summary>
     public static bool IsVideoFullscreenToggle(Key key, ModifierKeys modifiers) =>
         key == Key.F && modifiers == ModifierKeys.None;
+
+    /// <summary>
+    /// ダブルクリック全画面を抑止する操作系 UI 上か。
+    /// F キーと同じトグルを、ボタン／メーター／波形などの上では走らせない。
+    /// </summary>
+    public static bool BlocksVideoFullscreenDoubleClick(DependencyObject? source)
+    {
+        for (var current = source; current is not null; current = ParentOrNull(current))
+        {
+            if (current is ButtonBase
+                or TextBoxBase
+                or RangeBase
+                or Selector
+                or Thumb
+                or ScrollBar
+                or MenuBase
+                or MenuItem
+                or TabItem
+                or TreeViewItem
+                or ListBoxItem
+                or DataGridCell
+                or Hyperlink
+                or WaveformView
+                or LevelMeterView
+                or VectorScopeView
+                or ProjectSpectrumView
+                or LoudnessMeterView
+                or MonitorToggleColumn
+                or PlaylistVideoSeekBar
+                or LibraryBrowserView)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static DependencyObject? ParentOrNull(DependencyObject current)
+    {
+        if (current is Visual or System.Windows.Media.Media3D.Visual3D)
+        {
+            return VisualTreeHelper.GetParent(current);
+        }
+
+        return LogicalTreeHelper.GetParent(current);
+    }
 
     /// <summary>F 全画面中は動画ミニの原寸配置を当てない（解除後に反映）。</summary>
     public static bool DefersVideoLaunchPlacementWhileFullscreen(bool fullscreen) =>

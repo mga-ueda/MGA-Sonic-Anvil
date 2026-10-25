@@ -414,6 +414,7 @@ public partial class MainWindow : Window
         AddHandler(KeyUpEvent, new KeyEventHandler(MainWindow_AltMenuKeyUp), handledEventsToo: true);
         AttachNumpadShiftHook();
         PreviewMouseDown += MainWindow_PreviewMouseDown;
+        PreviewMouseDoubleClick += MainWindow_PreviewMouseDoubleClick;
         PreviewMouseWheel += MainWindow_PreviewMouseWheel;
         PreviewDrop += MainWindow_Drop;
         PreviewDragOver += MainWindow_DragOver;

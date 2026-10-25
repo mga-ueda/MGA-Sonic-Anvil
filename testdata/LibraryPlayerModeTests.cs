@@ -944,6 +944,7 @@ public sealed class LibraryPlayerModeTests
             isPdf: false, chromeHidden: true));
         Assert.True(LibraryPlayerMode.IsVideoFullscreenToggle(Key.F, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsVideoFullscreenToggle(Key.F, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.BlocksVideoFullscreenDoubleClick(null));
         Assert.True(LibraryPlayerMode.DefersVideoLaunchPlacementWhileFullscreen(fullscreen: true));
         Assert.False(LibraryPlayerMode.DefersVideoLaunchPlacementWhileFullscreen(fullscreen: false));
         Assert.True(LibraryPlayerMode.ExitsVideoFullscreenBeforeEnterMini(
@@ -1695,6 +1696,21 @@ public sealed class LibraryPlayerModeTests
         }
 
         return value;
+    }
+
+    [Fact]
+    public void BlocksVideoFullscreenDoubleClick_IgnoresButtonsAndAllowsEmptyChrome()
+    {
+        RunSta(() =>
+        {
+            Assert.False(LibraryPlayerMode.BlocksVideoFullscreenDoubleClick(new Border()));
+            Assert.True(LibraryPlayerMode.BlocksVideoFullscreenDoubleClick(new Button()));
+            Assert.True(LibraryPlayerMode.BlocksVideoFullscreenDoubleClick(new CheckBox()));
+            var panel = new Grid();
+            var nested = new Button();
+            panel.Children.Add(nested);
+            Assert.True(LibraryPlayerMode.BlocksVideoFullscreenDoubleClick(nested));
+        });
     }
 
     private static void RunSta(Action action)
