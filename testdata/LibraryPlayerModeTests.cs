@@ -727,6 +727,18 @@ public sealed class LibraryPlayerModeTests
     }
 
     [Fact]
+    public void MergeParkedPlaylist_ReusesSameSessionReference_DirtyWouldSurviveUnlessCleared()
+    {
+        // CloseSession で破棄しても参照が parked に残るため、IsDirty を消さないと
+        // プレイヤー復帰後のプレイリストクリアで未保存ダイアログが再出する。
+        var parked = Session("edited.wav");
+        parked.Document.SetDirty(true);
+        var merged = LibraryPlayerMode.MergeParkedPlaylist([parked], []);
+        Assert.Same(parked, merged[0]);
+        Assert.True(merged[0].Document.IsDirty);
+    }
+
+    [Fact]
     public void NeedsEditorPcmUpgrade_IsStreamOrDeferred()
     {
         var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid() + ".mp3");

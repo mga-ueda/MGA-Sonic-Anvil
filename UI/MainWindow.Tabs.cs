@@ -152,6 +152,14 @@ public partial class MainWindow
             return false;
         }
 
+        // プレイヤー退避中は同一参照が _playlistParked に残る。
+        // 「保存しない」だけでは IsDirty が残るため、復帰後のクリア等でまた未保存ダイアログが出る。
+        if (session.Document.IsDirty && _playlistParked is not null
+            && !ReconcileDirtySessionForParkedPlaylist(session))
+        {
+            return false;
+        }
+
         var index = _sessions.IndexOf(session);
         if (index < 0)
         {

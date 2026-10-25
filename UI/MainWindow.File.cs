@@ -1937,29 +1937,73 @@ public partial class MainWindow
         RefreshHistoryStrip();
     }
 
+    /// <summary>
+    /// プレイリスト退避中に破棄閉じしたセッションを、会員として残せる状態へ戻す。
+    /// ディスク版へ戻せれば true。無題は parked から外して true。再読込失敗のみ false。
+    /// </summary>
+    private bool ReconcileDirtySessionForParkedPlaylist(DocumentSession session)
+    {
+        if (TryReloadSessionDocument(session))
+        {
+            return true;
+        }
+
+        var path = session.Document.SourcePath;
+        if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+        {
+            return false;
+        }
+
+        RemoveFromParkedPlaylist(session);
+        return true;
+    }
+
+    private void RemoveFromParkedPlaylist(DocumentSession session)
+    {
+        if (_playlistParked is null)
+        {
+            return;
+        }
+
+        var next = Array.FindAll(_playlistParked, item => !ReferenceEquals(item, session));
+        _playlistParked = next.Length == 0 ? null : next;
+    }
+
+    /// <summary>ソースパスから文書を読み直して dirty を消す。パスが無い／読めないときは false。</summary>
+    private bool TryReloadSessionDocument(DocumentSession session)
+    {
+        var path = session.Document.SourcePath;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            var loaded = Task.Run(() => AudioCodec.Load(path)).GetAwaiter().GetResult();
+            session.ReplaceDocument(loaded);
+            ApplyLoadedLibrarySession(session, bind: ReferenceEquals(session, _activeSession));
+            RefreshTabHeaders();
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or NotSupportedException)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorOpenFailed,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return false;
+        }
+    }
+
     private bool TryDiscardSessionEdits(DocumentSession session)
     {
         var path = session.Document.SourcePath;
         if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
         {
-            try
-            {
-                var loaded = Task.Run(() => AudioCodec.Load(path)).GetAwaiter().GetResult();
-                session.ReplaceDocument(loaded);
-                ApplyLoadedLibrarySession(session, bind: ReferenceEquals(session, _activeSession));
-                RefreshTabHeaders();
-                return true;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or NotSupportedException)
-            {
-                OwnerCenteredMessageBox.Show(
-                    this,
-                    UiStrings.ErrorOpenFailed,
-                    UiStrings.AppName,
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-                return false;
-            }
+            return TryReloadSessionDocument(session);
         }
 
         var restore = _dirtyClosePolicy;
