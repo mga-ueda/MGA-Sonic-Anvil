@@ -1880,6 +1880,7 @@ public partial class MainWindow
     /// <summary>
     /// エディタからプレイヤーへ移る前。未保存があれば保存／破棄／キャンセルを聞く。
     /// 破棄はディスクの内容へ戻す。保存先が無いタブはプレイリストに残さない。
+    /// 未保存がゼロになってからだけ true（キャンセルなら false）。
     /// </summary>
     private bool ConfirmDirtySessionsBeforePlayer()
     {
@@ -1921,6 +1922,19 @@ public partial class MainWindow
             }
         });
         return proceed;
+    }
+
+    /// <summary>
+    /// プレイヤー突入時だけ編集 Undo を捨てる。保存操作そのものでは呼ばない。
+    /// </summary>
+    private void ClearEditHistoriesForPlayerEnter()
+    {
+        foreach (var session in _sessions)
+        {
+            session.History.Clear();
+        }
+
+        RefreshHistoryStrip();
     }
 
     private bool TryDiscardSessionEdits(DocumentSession session)

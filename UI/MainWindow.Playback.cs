@@ -2268,6 +2268,12 @@ public partial class MainWindow
                 return;
             }
 
+            // 未保存ゼロで遷移が確定したあとだけ。保存だけでは消さない。
+            if (_waveformMaximizeMode != WaveformMaximizeMode.Library)
+            {
+                ClearEditHistoriesForPlayerEnter();
+            }
+
             _libraryPlayFirstPending = playFirstOnLibrary ?? true;
             SyncRangeClicks();
         }
