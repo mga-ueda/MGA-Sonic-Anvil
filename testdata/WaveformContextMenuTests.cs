@@ -221,7 +221,7 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.Volume, commands);
             var volume = Find(tree, WaveMenuCommand.Volume);
             var loudness = Find(tree, WaveMenuCommand.ViewLoudness);
-            Assert.Equal("V", volume?.Gesture);
+            Assert.Equal(MenuGestures.Volume, volume?.Gesture);
             Assert.Equal("V", loudness?.Gesture);
             Assert.Contains(WaveMenuCommand.ExportWave, commands);
             Assert.Contains(WaveMenuCommand.ExportByChannels, CommandsIn(tree, UiStrings.WaveMenuCatExport));
@@ -473,10 +473,10 @@ public sealed class WaveformContextMenuTests
         Assert.True(Find(tree, WaveMenuCommand.ClearLoopItem)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.ExportMp3)?.Enabled);
         Assert.Equal("Ctrl+Shift+M", Find(tree, WaveMenuCommand.ExportMp3)?.Gesture);
-        // 破壊編集はメニューから実行可だが、ショートカット表記は出さない。
+        // 破壊編集はメニューから実行可だが、ショートカット表記は出さない（音量は Ctrl+Shift+V のみ残す）。
         Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.FadeIn)?.Gesture));
         Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.FadeOut)?.Gesture));
-        Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.Volume)?.Gesture));
+        Assert.Equal(MenuGestures.VolumePlayer, Find(tree, WaveMenuCommand.Volume)?.Gesture);
         Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.Normalize)?.Gesture));
         Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.Pitch)?.Gesture));
         Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.TimeStretch)?.Gesture));

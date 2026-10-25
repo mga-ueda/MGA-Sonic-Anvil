@@ -276,6 +276,8 @@ internal static class LibraryPlayerMode
             (Key.M, ModifierKeys.Control | ModifierKeys.Shift) => true,
             // バウンス（選択ファイルを重ねて合成）。
             (Key.B, ModifierKeys.Control | ModifierKeys.Shift) => true,
+            // 音量／ラウドネス揃え（素の V は不可。Ctrl+Shift+V のみ）。
+            (Key.V, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Tab, ModifierKeys.Control) => true,
             (Key.Tab, ModifierKeys.Control | ModifierKeys.Shift) => true,
             _ => false,
@@ -285,7 +287,8 @@ internal static class LibraryPlayerMode
     /// <summary>
     /// プレイヤーでキーから起こすとまずい破壊編集ショートカット。
     /// 右クリックメニューからは <see cref="BlocksWaveMenu"/> 経由で実行する。
-    /// <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>（バウンス）は除外。
+    /// <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>（バウンス）と
+    /// <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>（音量）は除外。
     /// </summary>
     public static bool IsDestructiveEditShortcut(Key key, ModifierKeys modifiers) =>
         (key, modifiers) switch
@@ -300,12 +303,11 @@ internal static class LibraryPlayerMode
     /// <summary>
     /// プレイヤー右クリックでショートカット表記を出さない破壊編集コマンド。
     /// キー制限は <see cref="IsDestructiveEditShortcut"/> のまま。
-    /// バウンス（<see cref="WaveMenuCommand.MergeTabs"/>）は表記を残す。
+    /// バウンス（<see cref="WaveMenuCommand.MergeTabs"/>）と音量（<see cref="WaveMenuCommand.Volume"/>）は表記を残す。
     /// </summary>
     public static bool HidesDestructiveMenuGesture(WaveMenuCommand command) => command switch
     {
-        WaveMenuCommand.Volume
-            or WaveMenuCommand.FadeIn
+        WaveMenuCommand.FadeIn
             or WaveMenuCommand.FadeOut
             or WaveMenuCommand.Normalize
             or WaveMenuCommand.Pitch
@@ -320,9 +322,19 @@ internal static class LibraryPlayerMode
         _ => false,
     };
 
-    /// <summary>プレイヤーでは破壊編集の InputGestureText を消す。</summary>
-    public static string? MenuGesture(bool playerMode, WaveMenuCommand command, string? gesture) =>
-        playerMode && HidesDestructiveMenuGesture(command) ? null : gesture;
+    /// <summary>
+    /// プレイヤーでは破壊編集の InputGestureText を消す。
+    /// 音量は <see cref="MenuGestures.VolumePlayer"/>（Ctrl+Shift+V）だけ残す。
+    /// </summary>
+    public static string? MenuGesture(bool playerMode, WaveMenuCommand command, string? gesture)
+    {
+        if (playerMode && command == WaveMenuCommand.Volume)
+        {
+            return MenuGestures.VolumePlayer;
+        }
+
+        return playerMode && HidesDestructiveMenuGesture(command) ? null : gesture;
+    }
 
     /// <summary>プレイヤーで選択中の捨てマーカーを Delete で消すとき。リスト除外より優先。</summary>
     public static bool PrefersScratchMarkerDelete(bool playerMode, bool hasSelectedScratchMarkers) =>
@@ -718,7 +730,7 @@ internal static class LibraryPlayerMode
 
         if ((modifiers & ModifierKeys.Control) != 0
             && (modifiers & ModifierKeys.Shift) != 0
-            && key is Key.D or Key.N or Key.C or Key.V)
+            && key is Key.D or Key.N or Key.C)
         {
             return true;
         }

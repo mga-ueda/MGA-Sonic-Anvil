@@ -661,7 +661,7 @@ internal static class WaveformContextMenuBuilder
                     : UiStrings.LibraryMenuMatchLoudness)
                 : (m.HasSelectedTabs ? UiStrings.WaveMenuVolumeSelected : UiStrings.WaveMenuVolume),
             WaveMenuCommand.Volume,
-            "V",
+            MenuGestures.Volume,
             m.CanEdit || m.LibraryMaximized),
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuNormalizeSelected : UiStrings.WaveMenuNormalize,
