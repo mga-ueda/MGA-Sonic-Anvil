@@ -656,7 +656,9 @@ internal static class WaveformContextMenuBuilder
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             m.LibraryMaximized
-                ? UiStrings.LibraryMenuMatchLoudness
+                ? (m.HasMultipleSelectedTabs
+                    ? UiStrings.LibraryMenuMatchLoudnessSelected
+                    : UiStrings.LibraryMenuMatchLoudness)
                 : (m.HasSelectedTabs ? UiStrings.WaveMenuVolumeSelected : UiStrings.WaveMenuVolume),
             WaveMenuCommand.Volume,
             "V",
