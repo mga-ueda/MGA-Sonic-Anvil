@@ -128,7 +128,11 @@ internal sealed class PitchCurveEditorDialog : Window
         _channelMask = channelMask;
         _playback = playback;
         _curve = PitchCurve.Flat(0);
-        _curve.DefaultShape = FadeCurves.ParseStored(AppStorage.Settings.PitchCurveDefaultShape);
+        // ピッチはリニア既定。他カーブはユーザーが形状ボタンで選んだときだけ。
+        _curve.DefaultShape = FadeCurves.ParseStored(
+            AppStorage.Settings.PitchCurveDefaultShape,
+            FadeShape.Linear);
+        _curve.SetAllSegmentShapes(_curve.DefaultShape);
 
         Title = UiStrings.DialogPitchCurveTitle
             + (selectionScoped
@@ -1179,7 +1183,7 @@ internal sealed class PitchCurveEditorDialog : Window
 
         if (shape == FadeShape.Constant)
         {
-            shape = FadeCurves.Default;
+            shape = FadeShape.Linear;
         }
 
         // 選択中ポイントの出セグメントだけ変更。未選択時は新規点の既定形状。
@@ -1218,7 +1222,7 @@ internal sealed class PitchCurveEditorDialog : Window
     {
         if (shape == FadeShape.Constant)
         {
-            shape = FadeCurves.Default;
+            shape = FadeShape.Linear;
         }
 
         _updatingShapeButtons = true;

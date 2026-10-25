@@ -186,6 +186,14 @@ public sealed class PitchCurveTests
     }
 
     [Fact]
+    public void PitchCurve_DefaultsToLinear_NotFadeSCurve()
+    {
+        var curve = new PitchCurve();
+        Assert.Equal(FadeShape.Linear, curve.DefaultShape);
+        Assert.All(curve.SegmentShapes, s => Assert.Equal(FadeShape.Linear, s));
+    }
+
+    [Fact]
     public void BuildSemitoneTable_LengthMatches()
     {
         var curve = PitchCurve.Flat(-3);
