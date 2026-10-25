@@ -545,7 +545,7 @@ internal sealed partial class WaveformView
                     laneHeight,
                     ampHeight,
                     mid,
-                    connectNeighbors: visibleLen <= (long)columns * 8,
+                    connectNeighbors: ShouldConnectEnvelopeNeighbors(visibleLen, columns),
                     colorOverride: fillBgra);
             }
         }

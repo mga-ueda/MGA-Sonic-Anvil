@@ -27,6 +27,13 @@ internal sealed partial class WaveformView : Grid
     private const double OverlayWaveHeightFraction = 0.5;
     private const int RawColumnMaxSamplesPerPixel = 96;
     private const int RawColumnMaxFrames = 1 << 18;
+    /// <summary>
+    /// 列エンベロープの隣接接続を効かせる上限（samples/px）。
+    /// 旧 width×8（spp≤8）だと約2秒の全体表示（spp≈数十）でオフになり、
+    /// 生 PCM 列と同じ帯で輪郭がギザギザに見えた。Raw 予算と同じ 96 に揃え、
+    /// PeakPyramid 経路の短尺標準表示でも長尺寄りの輪郭にする。
+    /// </summary>
+    internal const int EnvelopeConnectMaxSamplesPerPixel = RawColumnMaxSamplesPerPixel;
     internal const int SamplePointMaxVisibleFrames = 500;
     private const int TimeLabelCacheMax = 512;
     internal const double SamplePointRadius = 8d / 3d;
@@ -4009,7 +4016,7 @@ internal sealed partial class WaveformView : Grid
                     laneHeight,
                     ampHeight,
                     mid,
-                    connectNeighbors: rangeFrames <= (long)width * 8);
+                    connectNeighbors: ShouldConnectEnvelopeNeighbors(rangeFrames, width));
             }
 
             return;
@@ -4299,6 +4306,12 @@ internal sealed partial class WaveformView : Grid
 
         return rangeFrames > 0 && width > 0 && rangeFrames <= RawColumnBudget(width);
     }
+
+    /// <summary>列エンベロープの輪郭をつなぐか。短尺の標準表示（spp≈数十）も含める。</summary>
+    internal static bool ShouldConnectEnvelopeNeighbors(long rangeFrames, int width) =>
+        rangeFrames > 0
+        && width > 0
+        && rangeFrames <= (long)width * EnvelopeConnectMaxSamplesPerPixel;
 
     private unsafe void DrawLaneGuides(
         int* buffer,
