@@ -1882,6 +1882,7 @@ internal sealed partial class PlaybackSampleProvider
     /// </summary>
     private void BeginExitOnLoopWrapNoLock()
     {
+        _loopWrapPending = true;
         if (!_playExitLayer || _exitSpanStartFrame < 0 || _exitSpanEndFrame <= _exitSpanStartFrame)
         {
             return;
@@ -1889,6 +1890,21 @@ internal sealed partial class PlaybackSampleProvider
 
         _exitFrame = _exitSpanStartFrame;
         _exitPlaying = true;
+    }
+
+    /// <summary>ループ頭へ戻ったことを UI 側で一度だけ取る。取ったら false に戻す。</summary>
+    public bool ConsumeLoopWrap()
+    {
+        lock (_gate)
+        {
+            if (!_loopWrapPending)
+            {
+                return false;
+            }
+
+            _loopWrapPending = false;
+            return true;
+        }
     }
 
     /// <summary>

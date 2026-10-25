@@ -115,6 +115,8 @@ internal sealed partial class PlaybackSampleProvider : ISampleProvider
     private float[] _fadeMixScratch = [];
     /// <summary>Play -E：ループ折り返しで -E 区間を二重再生するか。</summary>
     private bool _playExitLayer;
+    /// <summary>ループ末端→頭の折り返し。UI が ConsumeLoopWrap で取る。</summary>
+    private bool _loopWrapPending;
     /// <summary>再生ウィンドウ終端に続く -E 区間（ソースフレーム）。負値で未設定。</summary>
     private long _exitSpanStartFrame = -1;
     private long _exitSpanEndFrame = -1;

@@ -44,6 +44,13 @@ internal sealed class LoudnessMeterEngine
     private float _prevR;
     private float _prev2L;
     private float _prev2R;
+    /// <summary>
+    /// Integrated／LRA は 0.1 秒ホップで履歴が増えたときだけ再計算する。
+    /// 毎 Process（描画 Tick）で全件 Sort しない。
+    /// </summary>
+    private bool _programStatsDirty = true;
+    private float _cachedIntegrated = float.NegativeInfinity;
+    private float _cachedLoudnessRange = float.NaN;
 
     public double TargetLufs { get; set; } = DefaultTargetLufs;
 
@@ -106,6 +113,9 @@ internal sealed class LoudnessMeterEngine
         _prev2L = 0;
         _prev2R = 0;
         _hopLeft = _hopLen;
+        _programStatsDirty = true;
+        _cachedIntegrated = float.NegativeInfinity;
+        _cachedLoudnessRange = float.NaN;
         Snapshot = LoudnessSnapshot.Idle;
     }
 
@@ -420,12 +430,14 @@ internal sealed class LoudnessMeterEngine
             _integratedBlocks.Add(block);
             _blockSum = 0;
             _blockCount = 0;
+            _programStatsDirty = true;
         }
 
         if (_shortCount >= _shortLen)
         {
             var shortMs = _shortSum / _shortCount;
             _shortTermHistory.Add(shortMs);
+            _programStatsDirty = true;
             var shortLufs = MeanSquareToLufs(shortMs);
             if (float.IsFinite(shortLufs) && shortLufs > _shortTermMax)
             {
@@ -492,7 +504,29 @@ internal sealed class LoudnessMeterEngine
     private float ShortTermLufs() =>
         MeanSquareToLufs(_shortCount == 0 ? 0 : _shortSum / _shortCount);
 
-    private float IntegratedLufs() => IntegratedFromMeanSquares(_integratedBlocks);
+    private float IntegratedLufs()
+    {
+        EnsureProgramStats();
+        return _cachedIntegrated;
+    }
+
+    private float LoudnessRange()
+    {
+        EnsureProgramStats();
+        return _cachedLoudnessRange;
+    }
+
+    private void EnsureProgramStats()
+    {
+        if (!_programStatsDirty)
+        {
+            return;
+        }
+
+        _cachedIntegrated = IntegratedFromMeanSquares(_integratedBlocks);
+        _cachedLoudnessRange = ComputeLoudnessRange(_cachedIntegrated);
+        _programStatsDirty = false;
+    }
 
     /// <summary>0.1 秒ブロックの mean-square から Integrated LKFS（絶対／相対ゲート）。</summary>
     internal static float IntegratedFromMeanSquares(IReadOnlyList<double> blocks)
@@ -539,7 +573,7 @@ internal sealed class LoudnessMeterEngine
         return passed == 0 ? float.NegativeInfinity : MeanSquareToLufs(sum / passed);
     }
 
-    private float LoudnessRange()
+    private float ComputeLoudnessRange(float integrated)
     {
         if (_shortTermHistory.Count < 2)
         {
@@ -561,7 +595,6 @@ internal sealed class LoudnessMeterEngine
             return float.NaN;
         }
 
-        var integrated = IntegratedLufs();
         if (float.IsInfinity(integrated))
         {
             return float.NaN;
