@@ -746,6 +746,17 @@ public partial class MainWindow
             frame += _timeStretchPreview.Origin;
         }
 
+        if (_formatPreview.Previewing && _formatPreview.PreviewSampleRate > 0)
+        {
+            frame = FormatConvert.MapPreviewPlayheadToHost(
+                frame,
+                _formatPreview.PreviewStartFrame,
+                _formatPreview.PreviewSampleRate,
+                _formatPreview.Origin,
+                _document.SampleRate,
+                _document.FrameCount);
+        }
+
         _fadePreview.Previewing = false;
         _fadePreview.HideHostTransport = false;
         _volumePreview.Previewing = false;
@@ -754,6 +765,12 @@ public partial class MainWindow
         _pitchPreview.HideHostTransport = false;
         _timeStretchPreview.Previewing = false;
         _timeStretchPreview.HideHostTransport = false;
+        if (_formatPreview.Previewing)
+        {
+            _formatPreview.Previewing = false;
+            ClearFormatPreviewMapping();
+            RebindOriginalDocument();
+        }
         // テンキー 0 はフレーム一時停止＋クローム維持。Enter はその場停止でクロームを戻す。
         // 動画はどちらも静止（暗い 1/3 速へは落とさない。バックグラウンドへ戻すのは Escape）。
         if (immersiveVideoHold)
@@ -1559,6 +1576,17 @@ public partial class MainWindow
         if (_timeStretchPreview.Previewing)
         {
             frame += _timeStretchPreview.Origin;
+        }
+
+        if (_formatPreview.Previewing && _formatPreview.PreviewSampleRate > 0)
+        {
+            frame = FormatConvert.MapPreviewPlayheadToHost(
+                frame,
+                _formatPreview.PreviewStartFrame,
+                _formatPreview.PreviewSampleRate,
+                _formatPreview.Origin,
+                _document.SampleRate,
+                _document.FrameCount);
         }
 
         _document.CursorFrame = frame;

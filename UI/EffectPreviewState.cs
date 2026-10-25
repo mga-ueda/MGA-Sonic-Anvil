@@ -8,7 +8,12 @@ internal sealed class EffectPreviewState
     public long ResumeFrame;
     public long StartedAt;
     public long SpaceTick;
+    /// <summary>本体タイムライン上の試聴開始フレーム（ピッチ／TS／フォーマット）。</summary>
     public long Origin;
+    /// <summary>フォーマット試聴: プレビュードキュメント上の再生開始フレーム。</summary>
+    public long PreviewStartFrame;
+    /// <summary>フォーマット試聴: プレビュードキュメントのサンプルレート。0 なら未使用。</summary>
+    public int PreviewSampleRate;
     /// <summary>true のとき本体波形／トランスポートの再生表示を動かさない（モーダル試聴用）。</summary>
     public bool HideHostTransport;
 
