@@ -1612,6 +1612,22 @@ internal static class LibraryPlayerMode
     public const double PlaylistVideoSimpleSeekFadeOutSeconds = 1;
 
     /// <summary>
+    /// 動画／PDF 本再生（前面クローム非表示）中、マウスを動かしたあとカーソルを出しておく秒数。
+    /// その後また消す。
+    /// </summary>
+    public const double PlaylistVisualCursorHideIdleSeconds = 3;
+
+    /// <summary>
+    /// 動画／PDF の本再生（前面クローム非表示）中はマウスカーソルを消せる。
+    /// 暗いプレビューや音声のみでは消さない。
+    /// </summary>
+    public static bool HidesMouseCursorForPlaylistVisual(
+        bool chromeHidden,
+        bool isVideo,
+        bool isPdf) =>
+        chromeHidden && (isVideo || isPdf);
+
+    /// <summary>
     /// 前面クロームが消えている動画本再生で、A がアナライザを隠しているとき簡易シークバーを使える。
     /// T は無関係。A で隠した瞬間に出し、その後はマウスが動いたときとキーボードの時間移動のときに出す。
     /// 波形は描かない。A がオンのときは波形側がシークを受け持つ。

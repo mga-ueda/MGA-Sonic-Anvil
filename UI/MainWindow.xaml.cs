@@ -461,6 +461,8 @@ public partial class MainWindow : Window
             StopSeekNudge();
             StopVideoFrameStep();
             ResetMarkerDigitEntry();
+            // 本再生中に閉じると OverrideCursor が残るのを防ぐ。
+            Mouse.OverrideCursor = null;
             // Closing で既に破棄済みでも安全（冪等）。
             DisposeAllWaveforms();
             _player.Dispose();
