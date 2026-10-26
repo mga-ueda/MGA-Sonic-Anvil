@@ -201,7 +201,18 @@ internal sealed class PitchCurveEditorDialog : Window
             e.Handled = true;
             NudgeFlat(Math.Sign(e.Delta));
         };
-        _flatBox.LostKeyboardFocus += (_, _) => CommitFlatBox();
+        // 定数カーブ中はフォーカス離脱で数値→カーブへ反映。手入力のまま Play してもピッチが 0 のまま残らないようにする。
+        _flatBox.LostKeyboardFocus += (_, _) =>
+        {
+            if (_curve.IsConstant(out _))
+            {
+                ApplyFlatFromBox();
+            }
+            else
+            {
+                CommitFlatBox();
+            }
+        };
         // ↑↓: ±1 半音。Shift+↑↓: ±12（1 オクターブ）。Enter: 適用して閉じる。
         _flatBox.PreviewKeyDown += (_, e) =>
         {
@@ -1462,15 +1473,10 @@ internal sealed class PitchCurveEditorDialog : Window
                 return;
             }
 
-            // 数値欄にフォーカスがあるときだけ欄→カーブ。それ以外はカーブ→欄（古い 0 で点を潰さない）。
-            if (_flatBox.IsKeyboardFocusWithin && _curve.IsConstant(out _))
-            {
-                ApplyFlatFromBox();
-            }
-            else
-            {
-                SyncFlatBoxFromCurveIfConstant();
-            }
+            // 定数カーブなら数値欄を先に反映（非定数では ApplyFlatFromBox が no-op）。
+            // フォーカスが外れたあとに Sync だけすると、手入力中の半音がカーブへ載らず無変化再生になる。
+            ApplyFlatFromBox();
+            SyncFlatBoxFromCurveIfConstant();
 
             _ignorePitchCurve = ignoreCurve;
             RefreshIgnoreCurveButton();

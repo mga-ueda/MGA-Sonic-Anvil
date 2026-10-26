@@ -186,10 +186,14 @@ int ss_pitch_curve_interleaved(
     const float tonality = 8000.f / static_cast<float>(sample_rate);
     stretch.setTransposeSemitones(semitones_per_frame[0], tonality);
 
-    // 1:1 time. Seek like exact path so the stream starts aligned.
+    // 1:1 time. Seek for latency, then produce exactly `frames` outputs while
+    // updating transpose for EVERY output sample (old code froze pitch for the
+    // final seekLength samples via flush → sounded like only the first pitch).
     constexpr float playbackRate = 1.f;
     const int seekLength = stretch.outputSeekLength(playbackRate);
-    const int padded = std::max(frames, seekLength);
+    // Extra input tail so process can finish the last blocks after the real audio.
+    const int paddedIn = frames + seekLength;
+    const int paddedOut = frames + seekLength;
 
     std::vector<std::vector<float>> in_ch(static_cast<size_t>(channels));
     std::vector<std::vector<float>> out_ch(static_cast<size_t>(channels));
@@ -197,8 +201,8 @@ int ss_pitch_curve_interleaved(
     std::vector<float *> out_ptr(static_cast<size_t>(channels));
     for (int c = 0; c < channels; c++)
     {
-        in_ch[static_cast<size_t>(c)].assign(static_cast<size_t>(padded), 0.f);
-        out_ch[static_cast<size_t>(c)].assign(static_cast<size_t>(padded), 0.f);
+        in_ch[static_cast<size_t>(c)].assign(static_cast<size_t>(paddedIn), 0.f);
+        out_ch[static_cast<size_t>(c)].assign(static_cast<size_t>(paddedOut), 0.f);
         for (int i = 0; i < frames; i++)
         {
             in_ch[static_cast<size_t>(c)][static_cast<size_t>(i)] = input[i * channels + c];
@@ -213,27 +217,26 @@ int ss_pitch_curve_interleaved(
     stretch.outputSeek(inputs, seekLength);
     ReportProgress(progress, user, 0.06f, lastPercent);
 
-    const int outputIndex = padded - seekLength;
-    const int inputRemain = padded - seekLength;
     // ~2ms hops keep transpose continuous (STFT still overlaps internally).
     const int hop = std::max(32, sample_rate / 500);
     int inDone = 0;
     int outDone = 0;
     float lastSemi = semitones_per_frame[0];
-    while (outDone < outputIndex)
+    const int inputRemain = paddedIn - seekLength;
+    while (outDone < frames)
     {
-        const int outLeft = outputIndex - outDone;
+        const int outLeft = frames - outDone;
         const int outChunk = std::min(hop, outLeft);
         const int inLeft = inputRemain - inDone;
         const int inChunk = outChunk == outLeft
             ? inLeft
             : std::clamp(
                 static_cast<int>(std::lround(
-                    static_cast<double>(outDone + outChunk) * inputRemain / std::max(1, outputIndex))) - inDone,
+                    static_cast<double>(outDone + outChunk) * inputRemain / std::max(1, frames))) - inDone,
                 0,
                 inLeft);
 
-        // Map output position back into the original (unpadded) curve.
+        // Full-timeline curve: every output frame gets its own semitone.
         const int curveFrame = std::clamp(outDone, 0, frames - 1);
         float semi = semitones_per_frame[curveFrame];
         if (semi > 24.f)
@@ -257,12 +260,17 @@ int ss_pitch_curve_interleaved(
         stretch.process(inOff, inChunk, outOff, outChunk);
         inDone += inChunk;
         outDone += outChunk;
-        const float processT = outputIndex <= 0 ? 1.f : static_cast<float>(outDone) / static_cast<float>(outputIndex);
+        const float processT = frames <= 0 ? 1.f : static_cast<float>(outDone) / static_cast<float>(frames);
         ReportProgress(progress, user, 0.06f + 0.88f * processT, lastPercent);
     }
 
-    OffsetChannels flushOut{outputs, outputIndex};
-    stretch.flush(flushOut, padded - outputIndex, playbackRate);
+    // Drain latency into the padded tail (not copied to the caller).
+    if (paddedOut > frames)
+    {
+        OffsetChannels flushOut{outputs, frames};
+        stretch.flush(flushOut, paddedOut - frames, playbackRate);
+    }
+
     ReportProgress(progress, user, 0.96f, lastPercent);
 
     for (int i = 0; i < frames; i++)

@@ -165,11 +165,9 @@ internal static class PitchShift
 
         if (lightweight)
         {
-            // プレビュー用。無変化なら通常品質へフォールバック（相殺・平滑潰れの保険）。
+            // プレビュー用。ピッチが乗っていない／相殺されているなら通常品質へ（音質だけ劣化の退行を防ぐ）。
             var light = ApplyCurveLightweight(interleaved, channels, sampleRate, table, timeStretch, progress);
-            if (maxAbs >= 0.5f
-                && light.Length == interleaved.Length
-                && IsNearlyIdentical(interleaved, light))
+            if (maxAbs >= 0.5f && IsIneffectivePitchResult(interleaved, light, maxAbs))
             {
                 return ApplyCurveCore(
                     interleaved,
@@ -318,10 +316,12 @@ internal static class PitchShift
         var down = ResampleLinearToFrameCount(interleaved, channels, shortFrames, downProgress);
         var shortTable = new float[shortFrames];
         var last = Math.Max(1, shortFrames - 1);
+        var srcLast = Math.Max(0, frames - 1);
         for (var i = 0; i < shortFrames; i++)
         {
-            var srcIndex = (int)Math.Round(i * (frames - 1) / (double)last);
-            shortTable[i] = semitonesPerFrame[Math.Clamp(srcIndex, 0, frames - 1)];
+            // double 先にしないと i*(frames-1) が int オーバーフローし、末尾が先頭ピッチに張り付く。
+            var srcIndex = (int)Math.Round(i * (double)srcLast / last);
+            shortTable[i] = semitonesPerFrame[Math.Clamp(srcIndex, 0, srcLast)];
         }
 
         // 間引き後は平滑化しない（短いテーブルでカーブが潰れるのを防ぐ）。
@@ -743,6 +743,40 @@ internal static class PitchShift
         }
     }
 
+    /// <summary>
+    /// 軽量結果がピッチ未適用／相殺相当か。長さが変わった速度式は「効いている」とみなす。
+    /// 間引きだけしてピッチが乗らないと相関は落ちつつ音高は元のまま、になりやすいので閾値を広めに取る。
+    /// </summary>
+    private static bool IsIneffectivePitchResult(
+        ReadOnlySpan<float> original,
+        ReadOnlySpan<float> processed,
+        float maxAbsSemitones)
+    {
+        if (processed.Length == 0)
+        {
+            return true;
+        }
+
+        // 速度式で長さが変わっていればピッチは乗っている。
+        if (processed.Length != original.Length)
+        {
+            return false;
+        }
+
+        if (IsNearlyIdentical(original, processed))
+        {
+            return true;
+        }
+
+        // |半音| が大きいのに入力と酷似 → 間引き劣化のみ／相殺。
+        if (maxAbsSemitones >= 0.5f && SampledCorrelation(original, processed) > 0.85)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     /// <summary>ピッチ未適用の検出用。全体の相関が高く振幅差も小さければ「ほぼ同一」。</summary>
     private static bool IsNearlyIdentical(ReadOnlySpan<float> a, ReadOnlySpan<float> b)
     {
@@ -751,7 +785,27 @@ internal static class PitchShift
             return false;
         }
 
-        var n = a.Length;
+        var corr = SampledCorrelation(a, b, out var rmsDiff);
+        if (double.IsNaN(corr))
+        {
+            return rmsDiff < 1e-8;
+        }
+
+        return corr > 0.97 && rmsDiff < 0.02;
+    }
+
+    private static double SampledCorrelation(ReadOnlySpan<float> a, ReadOnlySpan<float> b) =>
+        SampledCorrelation(a, b, out _);
+
+    private static double SampledCorrelation(ReadOnlySpan<float> a, ReadOnlySpan<float> b, out double rmsDiff)
+    {
+        rmsDiff = 0;
+        if (a.Length == 0 || b.Length == 0)
+        {
+            return double.NaN;
+        }
+
+        var n = Math.Min(a.Length, b.Length);
         var step = Math.Max(1, n / 8000);
         double sumA = 0, sumB = 0, sumAA = 0, sumBB = 0, sumAB = 0, sumDiff2 = 0;
         var count = 0;
@@ -771,9 +825,10 @@ internal static class PitchShift
 
         if (count < 8)
         {
-            return false;
+            return double.NaN;
         }
 
+        rmsDiff = Math.Sqrt(sumDiff2 / count);
         var meanA = sumA / count;
         var meanB = sumB / count;
         var cov = sumAB / count - meanA * meanB;
@@ -781,12 +836,10 @@ internal static class PitchShift
         var varB = sumBB / count - meanB * meanB;
         if (varA <= 1e-12 || varB <= 1e-12)
         {
-            return sumDiff2 / count < 1e-8;
+            return double.NaN;
         }
 
-        var corr = cov / Math.Sqrt(varA * varB);
-        var rmsDiff = Math.Sqrt(sumDiff2 / count);
-        return corr > 0.97 && rmsDiff < 0.02;
+        return cov / Math.Sqrt(varA * varB);
     }
 
     private static float SnapFloat(float semitones) =>
