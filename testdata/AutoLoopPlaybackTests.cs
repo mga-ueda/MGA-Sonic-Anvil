@@ -34,6 +34,13 @@ public sealed class AutoLoopPlaybackTests
             sampleLoopEmpty: false,
             hasSelection: false,
             hasPlayerAbLoop: true));
+        // プレイヤーではサンプルループを無視（割合ジャンプが S–E に吸われない）。
+        Assert.False(AutoLoopPlayback.UsesSampleLoopWindow(
+            autoLoopEnabled: true,
+            sampleLoopEmpty: false,
+            hasSelection: false,
+            hasPlayerAbLoop: false,
+            playerMode: true));
     }
 
     [Fact]

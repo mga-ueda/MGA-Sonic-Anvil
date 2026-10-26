@@ -455,7 +455,7 @@ internal static class LibraryPlayerMode
     /// <summary>
     /// Single Loop の切替（Alt+L）。ステータスバーのチェックと対。エディタ／プレイヤー共通。
     /// 素の L はループ再生のまま。検索フォーカス中も通す（<see cref="BypassesSearchFocus"/>）。
-    /// 仕様は <see cref="AutoLoopPlayback"/>（サンプルループあり＝頭→S 通し後に S–E 無限、無し＝曲末→先頭）。
+    /// 仕様は <see cref="AutoLoopPlayback"/>（エディタ＋サンプルループ＝頭→S 通し後に S–E 無限、プレイヤー＝曲末→先頭でサンプルループ無視）。
     /// </summary>
     public static bool IsAutoLoopToggle(Key key, ModifierKeys modifiers) =>
         key == Key.L && modifiers == ModifierKeys.Alt;
@@ -2245,6 +2245,12 @@ internal static class LibraryPlayerMode
     public static bool CanPlayerMarkerDigitJump(bool playerMarkerContext, bool hasScratchMarkers) =>
         playerMarkerContext && hasScratchMarkers;
 
+    /// <summary>
+    /// ドキュメントのリージョン番号ジャンプ（Ctrl＋上段／テンキー）を許すか。
+    /// プレイヤーではリージョンを波形に出さないため常に false。
+    /// </summary>
+    public static bool AllowsDocumentRegionDigitJump(bool playerMode) => !playerMode;
+
     /// <summary>テンキー再生操作を使う（プレイヤー／エディタ共通。上段は割合ジャンプのまま）。</summary>
     public static bool UsesTransportNumpad() => true;
 
@@ -2252,7 +2258,10 @@ internal static class LibraryPlayerMode
     public static bool IsTopRowDigitKey(Key key) =>
         key is >= Key.D0 and <= Key.D9;
 
-    /// <summary>無修飾＝割合、Shift＝マーカー、Ctrl＝リージョン（いずれも上段のみ）。テンキー再生は別。</summary>
+    /// <summary>
+    /// 無修飾＝割合、Shift＝マーカー、Ctrl＝リージョン（いずれも上段のみ）。テンキー再生は別。
+    /// プレイヤーでのリージョンは <see cref="AllowsDocumentRegionDigitJump"/> で拒否する。
+    /// </summary>
     public static bool IsDigitJumpChord(Key key, ModifierKeys modifiers) =>
         IsPercentDigitJump(key, modifiers)
         || IsMarkerDigitJump(key, modifiers)
