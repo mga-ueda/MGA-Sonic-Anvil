@@ -17,10 +17,10 @@ internal static partial class UiStrings
     /// <summary>アクセスキー無し（ショートカットは付けない）。</summary>
     public static string CrossfadeLabelDeleteAfterLoop => Get("ループ後を削除(_A)", "Delete _after loop");
     public static string CrossfadeLabelCurve => Get("フェード曲線", "Fade curve");
-    public static string CrossfadeLabelCurveIn => Get("イン", "In");
-    public static string CrossfadeLabelCurveOut => Get("ポスト", "Post");
-    public static string CrossfadeLabelCurveLegOut => Get("アウト脚", "Out leg");
-    public static string CrossfadeLabelCurveLegIn => Get("イン脚", "In leg");
+    public static string CrossfadeLabelCurveIn => Get("プリクロスフェード", "Pre-crossfade");
+    public static string CrossfadeLabelCurveOut => Get("ポストクロスフェード", "Post-crossfade");
+    public static string CrossfadeLabelCurveLegOut => Get("元波形", "Original");
+    public static string CrossfadeLabelCurveLegIn => Get("クロス波形", "Cross");
     public static string CrossfadeAutoSearch => Get("自動探索", "Auto-search");
     public static string CrossfadeAdjustSE => Get("始点と終点をずらす", "Shift Start and End");
     public static string CrossfadeAdjustStart => Get("始点を探す", "Find Start");
@@ -37,26 +37,26 @@ internal static partial class UiStrings
         "ループの終了サンプル位置（この位置の手前までがループ）。",
         "Loop end sample frame (exclusive).");
     public static string CrossfadeTipPostFade => Get(
-        "ポストクロスフェード長（赤旗・バーは終点の後ろへ）。波形の重ねと焼き込みはループスタート側だけです。",
-        "Post-crossfade (red flag/bar after End). Waveform overlay and bake are only at loop Start.");
+        "ポストクロスフェード長（赤旗・バーはループスタート側）。描画は終点後ろへスタート波形を重ねます。旗と描画位置は別です。",
+        "Post-crossfade (red flag/bar at loop Start). Drawing overlays Start onto after-End — flag and draw are separate.");
     public static string CrossfadeTipFadeIn => Get(
-        "プリクロスフェード長（緑旗は始点の手前）。描画は終点手前へスタート波形を重ねます。旗と描画位置は別です。",
-        "Pre-crossfade (green flag before Start). Drawing overlays Start onto before-End — flag and draw are separate.");
+        "プリクロスフェード長（緑旗は始点の手前）。描画は終点手前へスタート手前波形を重ねます。旗と描画位置は別です。",
+        "Pre-crossfade (green flag before Start). Drawing overlays before-Start onto before-End — flag and draw are separate.");
     public static string CrossfadeTipTruncate => Get(
-        "オンにすると、ループミックス時に始点より前と終点以降を削除します（エンド区間は材料として焼いたあと切り落します）。",
-        "When on, Loop Mix deletes audio before Start and after End (End-side is used as material, then trimmed).");
+        "オンにすると、ループミックス時に始点より前と終点以降を削除します。",
+        "When on, Loop Mix deletes audio before Start and after End.");
     public static string CrossfadeTipDeleteAfterLoop => Get(
         "オンにすると、ループミックス時に終点より後ろの音声だけを削除します（始点より前は残します）。",
         "When on, Loop Mix deletes only audio after End (keeps audio before Start).");
     public static string CrossfadeTipCurve => Get(
-        "上段＝イン（プリ）、下段＝ポスト。各行は左＝アウト脚、右＝イン脚です。",
-        "Top=In (Pre), Bottom=Post. In each row: left=out leg, right=in leg.");
+        "上段＝プリ、下段＝ポスト。各行は左＝元波形、右＝クロス波形です。",
+        "Top=Pre, Bottom=Post. In each row: left=original, right=cross.");
     public static string CrossfadeTipCurveIn => Get(
-        "プリクロスフェード用。左が減衰側（アウト脚）、右が立ち上がり側（イン脚）です。",
-        "Pre-crossfade: left=out leg (decay), right=in leg (rise).");
+        "プリクロスフェード用。左＝元波形（減衰）、右＝クロス波形（立ち上がり）です。",
+        "Pre-crossfade: left=original (decay), right=cross (rise).");
     public static string CrossfadeTipCurveOut => Get(
-        "ポストクロスフェード用。左が減衰側（アウト脚）、右が立ち上がり側（イン脚）です。",
-        "Post-crossfade: left=out leg (decay), right=in leg (rise).");
+        "ポストクロスフェード用。左＝クロス波形（ループスタートのフェードアウト）、右＝元波形（終点後ろのフェードイン）です。",
+        "Post-crossfade: left=cross (loop Start fade-out), right=original (after-End fade-in).");
     public static string CrossfadeTipSnapZero => Get(
         "この値を近いゼロクロスへ寄せます。",
         "Snap this value to a nearby zero-crossing.");
@@ -80,6 +80,12 @@ internal static partial class UiStrings
     public static string CrossfadeTipXfade => Get(
         "継ぎ目プレビューでクロスフェード合成を表示します。",
         "Show baked crossfade in the seam preview.");
+    public static string CrossfadeLabelSingleLoop => Get(
+        "サンプルループでループする",
+        "Loop with sample loop");
+    public static string CrossfadeTipSingleLoop => Get(
+        "オンでサンプルループ終端から始点へ無限ループ。オフにすると終点を越えて再生し、ポストクロスフェードを確認できます。ステータスバーの Single Loop と連動します。",
+        "On: loop forever from End back to Start. Off: play past End so you can hear the post-crossfade. Synced with the status-bar Single Loop.");
     public static string CrossfadeTipLoopMix => Get(
         "フェードを波形に焼き込み、サンプルループを確定してツールを終了します。取り消しは Ctrl+Z。",
         "Bake fades, commit the sample loop, and close the tool. Undo with Ctrl+Z.");

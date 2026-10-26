@@ -165,8 +165,14 @@ internal sealed partial class WaveformView : Grid
                 return _forcedFlagLaneRows;
             }
 
-            // Pre/Post 旗はタイムレーン（サンプルループ側）に描くので、マーカー行は増やさない。
-            return CountFlagLaneRows(_document.Markers.Count > 0, _document.Regions.Count > 0);
+            var rows = CountFlagLaneRows(_document.Markers.Count > 0, _document.Regions.Count > 0);
+            // Pre/Post 旗はマーカートラックに置くので、編集中は最低 1 行を確保する。
+            if (_crossfadeDraft is { IsActive: true })
+            {
+                rows = Math.Max(1, rows);
+            }
+
+            return rows;
         }
     }
 
@@ -1148,8 +1154,11 @@ internal sealed partial class WaveformView : Grid
         set
         {
             _crossfadeDraft = value;
-            // マーカー行高は Pre/Post と無関係だが、ドラフト出入でクロームを取り直す。
+            // Pre/Post でマーカー行を確保／解放するのでクローム高を取り直す。
             _appliedMarkerLaneHeight = -1;
+            _waveDirty = true;
+            _staticHost.InvalidateVisual();
+            _overlayHost.InvalidateVisual();
             if (value is null)
             {
                 HoldCrossfadeWaveRedraw(false);
@@ -3323,7 +3332,7 @@ internal sealed partial class WaveformView : Grid
             // 本体ピークのフェード反映だけ Hold／0.5 秒デバウンス側。
             DrawCrossfadeDraft(dc, bounds, start, span);
             DrawPenInk(dc, bounds, start, span);
-            // Pre/Post 旗は他フラッグの上に絶対表示。
+            // Pre/Post 旗はマーカートラック最前面（他フラッグ・ペンより後）。
             DrawCrossfadeFlags(dc, bounds, start, span);
             return;
         }
@@ -3351,6 +3360,7 @@ internal sealed partial class WaveformView : Grid
 
         DrawCrossfadeDraft(dc, bounds, start, span);
         DrawPenInk(dc, bounds, start, span);
+        // Pre/Post 旗はマーカートラック最前面。
         DrawCrossfadeFlags(dc, bounds, start, span);
     }
 

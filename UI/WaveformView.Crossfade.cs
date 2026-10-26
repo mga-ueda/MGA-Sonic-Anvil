@@ -71,8 +71,8 @@ internal sealed partial class WaveformView
         var wave = WaveformBounds(bounds);
 
         // 範囲塗りは静的層のみ。重ね色はゾーン一色（赤緑の同時描画はしない）。
-        // 元波形ピークは局所フェード（プリ=out→0 / ポスト=in←0）。重ねは相手側のみ。
-        // プリ区間＝S 手前×in（緑）、ポスト区間＝E 以降×out（赤）。
+        // プリ: 元波形 out→0、重ね＝S 手前×in（緑）。
+        // ポスト: 元波形 in←0、重ね＝ループスタート×out→0（赤）。
         if (draft.PreCrossfadeFrames > 0)
         {
             DrawCrossfadeOverlapWaves(
@@ -84,9 +84,8 @@ internal sealed partial class WaveformView
                 draft.PreCrossfadeFrames,
                 sourceStart: draft.PreFlagFrame,
                 color: CrossfadePrePrimary,
-                outShape: draft.PreOutShape,
-                inShape: draft.PreInShape,
-                fadeIn: true);
+                overlayShape: draft.PreInShape,
+                isPre: true);
         }
 
         if (draft.PostCrossfadeFrames > 0)
@@ -98,11 +97,10 @@ internal sealed partial class WaveformView
                 span,
                 draft.PostDrawStartFrame,
                 draft.PostCrossfadeFrames,
-                sourceStart: draft.EndFrame,
+                sourceStart: draft.StartFrame,
                 color: CrossfadePostPrimary,
-                outShape: draft.PostOutShape,
-                inShape: draft.PostInShape,
-                fadeIn: false);
+                overlayShape: draft.PostOutShape,
+                isPre: false);
         }
 
         var sePen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush")), 1.0);
@@ -124,7 +122,7 @@ internal sealed partial class WaveformView
         StemOnly(draft.EndFrame);
     }
 
-    /// <summary>Pre/Post 旗をタイムレーン（サンプルループ／タイムコード側）に描き、当たり判定用に覚える。</summary>
+    /// <summary>Pre/Post 旗をマーカートラックに描き、当たり判定用に覚える（最前面）。</summary>
     private void DrawCrossfadeFlags(DrawingContext dc, Rect bounds, double start, double span)
     {
         _crossfadeFlags.Clear();
@@ -136,8 +134,7 @@ internal sealed partial class WaveformView
 
         var dip = UiDpi.Get(this).PixelsPerDip;
         var typeface = new Typeface("Segoe UI");
-        // マーカー／リージョンレーンではなく、サンプルループがあるタイムレーンに置く。
-        var lane = TimeLaneBounds(bounds);
+        var lane = MarkerLaneBounds(bounds);
         if (lane.Height <= 1)
         {
             return;
@@ -155,12 +152,8 @@ internal sealed partial class WaveformView
 
             var boxW = MeasureFlagWidth(label, dip);
             var left = growLeft ? x - boxW : x;
-            // FullFlagRect は Y=1 固定（マーカーレーン用）なので、タイムレーン上端に合わせて置く。
-            var box = new Rect(
-                left,
-                lane.Y + 1,
-                boxW,
-                Math.Max(2, lane.Height - 2));
+            // マーカー／リージョン半分割より目立つよう、レーン全高を使う。
+            var box = FullFlagRect(left, boxW, lane.Height);
             var xs = WpfControlHelpers.SnapDeviceCenter(x, dip);
             var inset = WpfControlHelpers.DeviceHairline(dip) * 0.5;
             box = AlignFlagToStem(box, xs, growLeft, inset);
@@ -185,14 +178,17 @@ internal sealed partial class WaveformView
             dc.DrawLine(stem, new Point(xs, box.Bottom), new Point(xs, bounds.Height));
         }
 
-        Flag(draft.PreFlagFrame, UiStrings.CrossfadeMarkerPre, growLeft: true, CrossfadePrePrimary, CrossfadeDragPart.PreCrossfade);
+        // Post を先・Pre を後に描き、重なり時は Pre が手前。どちらも他マーカーより後で描く。
         Flag(draft.PostFlagFrame, UiStrings.CrossfadeMarkerPost, growLeft: false, CrossfadePostPrimary, CrossfadeDragPart.PostCrossfade);
+        Flag(draft.PreFlagFrame, UiStrings.CrossfadeMarkerPre, growLeft: true, CrossfadePrePrimary, CrossfadeDragPart.PreCrossfade);
     }
 
     /// <summary>
     /// クロス区間に相手側材料を、ゾーン色一色＋フェード曲線ゲインで色付けする。
     /// 本体と同じピーク経路で列を取り gain を乗算し、WriteableBitmap へ一度描いて転送する。
     /// </summary>
+    /// <param name="overlayShape">プリ＝イン脚、ポスト＝アウト脚。</param>
+    /// <param name="isPre">キャッシュ枠。true ならフェードイン、false ならフェードアウト。</param>
     private void DrawCrossfadeOverlapWaves(
         DrawingContext dc,
         Rect wave,
@@ -202,9 +198,8 @@ internal sealed partial class WaveformView
         long length,
         long sourceStart,
         Color color,
-        FadeShape outShape,
-        FadeShape inShape,
-        bool fadeIn)
+        FadeShape overlayShape,
+        bool isPre)
     {
         if (_document is null || length <= 0 || viewSpan <= 0 || wave.Height < 4)
         {
@@ -287,14 +282,13 @@ internal sealed partial class WaveformView
                     BitConverter.DoubleToInt64Bits(wave.Height),
                     pixelH),
                 HashCode.Combine(
-                    (int)outShape,
-                    (int)inShape,
+                    (int)overlayShape,
                     usePolyline ? 1 : 0,
                     light ? 0 : 1)));
 
-        var cacheKey = fadeIn ? _crossfadePreCacheKey : _crossfadePostCacheKey;
-        var hasBitmap = fadeIn ? _crossfadePreHasBitmap : _crossfadePostHasBitmap;
-        var bitmap = fadeIn ? _crossfadePreBitmap : _crossfadePostBitmap;
+        var cacheKey = isPre ? _crossfadePreCacheKey : _crossfadePostCacheKey;
+        var hasBitmap = isPre ? _crossfadePreHasBitmap : _crossfadePostHasBitmap;
+        var bitmap = isPre ? _crossfadePreBitmap : _crossfadePostBitmap;
 
         // スロットル待ち中はキーが古くても既存ビットマップを転送（常時表示を維持）。
         var rebuild = cacheKey != key
@@ -309,9 +303,9 @@ internal sealed partial class WaveformView
 
         if (rebuild)
         {
-            EnsureCrossfadeOverlapFill(fadeIn, color);
-            var fillBgra = fadeIn ? _crossfadePreFillBgra : _crossfadePostFillBgra;
-            var pixels = fadeIn ? _crossfadePrePixels : _crossfadePostPixels;
+            EnsureCrossfadeOverlapFill(isPre, color);
+            var fillBgra = isPre ? _crossfadePreFillBgra : _crossfadePostFillBgra;
+            var pixels = isPre ? _crossfadePrePixels : _crossfadePostPixels;
             if (pixels.Length < pixelW * pixelH)
             {
                 pixels = new int[pixelW * pixelH];
@@ -336,16 +330,15 @@ internal sealed partial class WaveformView
                 laneGapPx,
                 ampHeightPx,
                 fillBgra,
-                outShape,
-                inShape,
-                fadeIn,
+                overlayShape,
+                fadeIn: isPre,
                 usePolyline,
                 scaleX);
 
-            bitmap = EnsureCrossfadeOverlapBitmap(fadeIn, pixelW, pixelH, dpi);
+            bitmap = EnsureCrossfadeOverlapBitmap(isPre, pixelW, pixelH, dpi);
             bitmap.WritePixels(new Int32Rect(0, 0, pixelW, pixelH), pixels, pixelW * 4, 0);
             var dest = new Rect(x0, wave.Top, destW, destH);
-            if (fadeIn)
+            if (isPre)
             {
                 _crossfadePreCacheKey = key;
                 _crossfadePrePixels = pixels;
@@ -370,7 +363,7 @@ internal sealed partial class WaveformView
             return;
         }
 
-        bitmap = fadeIn ? _crossfadePreBitmap : _crossfadePostBitmap;
+        bitmap = isPre ? _crossfadePreBitmap : _crossfadePostBitmap;
         if (bitmap is null)
         {
             return;
@@ -379,7 +372,7 @@ internal sealed partial class WaveformView
         // 再構築時は最新 dest、スロットル保留中は前回 dest のまま転送。
         var blitDest = rebuild
             ? new Rect(x0, wave.Top, destW, destH)
-            : (fadeIn ? _crossfadePreDest : _crossfadePostDest);
+            : (isPre ? _crossfadePreDest : _crossfadePostDest);
         if (blitDest.Width <= 0 || blitDest.Height <= 0)
         {
             return;
@@ -393,11 +386,11 @@ internal sealed partial class WaveformView
         dc.DrawDrawing(group);
     }
 
-    private void EnsureCrossfadeOverlapFill(bool fadeIn, Color color)
+    private void EnsureCrossfadeOverlapFill(bool isPre, Color color)
     {
         // 本体 WaveFill と同様に不透明寄り（半透明の縁取り感を避ける）。
         var fill = ToBgra(Color.FromArgb(220, color.R, color.G, color.B));
-        if (fadeIn)
+        if (isPre)
         {
             _crossfadePreFillBgra = fill;
         }
@@ -407,9 +400,9 @@ internal sealed partial class WaveformView
         }
     }
 
-    private WriteableBitmap EnsureCrossfadeOverlapBitmap(bool fadeIn, int width, int height, DpiScale dpi)
+    private WriteableBitmap EnsureCrossfadeOverlapBitmap(bool isPre, int width, int height, DpiScale dpi)
     {
-        var existing = fadeIn ? _crossfadePreBitmap : _crossfadePostBitmap;
+        var existing = isPre ? _crossfadePreBitmap : _crossfadePostBitmap;
         if (existing is not null
             && existing.PixelWidth == width
             && existing.PixelHeight == height)
@@ -424,7 +417,7 @@ internal sealed partial class WaveformView
             dpi.PixelsPerInchY,
             PixelFormats.Bgra32,
             null);
-        if (fadeIn)
+        if (isPre)
         {
             _crossfadePreBitmap = bmp;
         }
@@ -454,8 +447,7 @@ internal sealed partial class WaveformView
         double laneGap,
         double ampHeight,
         int fillBgra,
-        FadeShape outShape,
-        FadeShape inShape,
+        FadeShape overlayShape,
         bool fadeIn,
         bool usePolyline,
         double scaleX)
@@ -489,8 +481,7 @@ internal sealed partial class WaveformView
                         ampHeight,
                         mid,
                         fillBgra,
-                        outShape,
-                        inShape,
+                        overlayShape,
                         fadeIn,
                         scaleX);
                 }
@@ -504,9 +495,7 @@ internal sealed partial class WaveformView
             {
                 var midOffset = offset0 + (2 * i + 1) * visibleLen / (2 * columns);
                 midOffset = Math.Clamp(midOffset, 0L, Math.Max(0L, length - 1));
-                FadeCurves.CrossfadeGainsAtFrame(
-                    outShape, inShape, midOffset, 0, length, out var outGain, out var inGain);
-                gains[i] = fadeIn ? inGain : outGain;
+                gains[i] = FadeCurves.GainAtFrame(overlayShape, fadeIn, midOffset, 0, length);
             }
 
             if (!TryFillCrossfadeOverlapPeaks(
@@ -568,8 +557,7 @@ internal sealed partial class WaveformView
         double ampHeight,
         double mid,
         int color,
-        FadeShape outShape,
-        FadeShape inShape,
+        FadeShape overlayShape,
         bool fadeIn,
         double scaleX)
     {
@@ -593,9 +581,7 @@ internal sealed partial class WaveformView
 
         float SampleAt(long offset)
         {
-            FadeCurves.CrossfadeGainsAtFrame(
-                outShape, inShape, offset, 0, length, out var outGain, out var inGain);
-            var gain = fadeIn ? inGain : outGain;
+            var gain = FadeCurves.GainAtFrame(overlayShape, fadeIn, offset, 0, length);
             var frame = sourceStart + offset;
             if (frame < 0 || frame >= frameCount)
             {
@@ -1000,11 +986,11 @@ internal sealed partial class WaveformView
         }
 
         var frames = _document.FrameCount;
-        // 上限はファイル余白とループ長。相手フェードの自動削減／100%連動は SetPre/SetPost 側。
+        // 上限はファイル余白とループ長。相手フェードの超過削減は SetPre/SetPost 側。
         if (_crossfadeDrag == CrossfadeDragPart.PostCrossfade)
         {
             var maxPost = Math.Min(Math.Max(0, frames - draft.EndFrame), draft.LoopLength);
-            frame = Math.Clamp(frame, draft.EndFrame, draft.EndFrame + maxPost);
+            frame = Math.Clamp(frame, draft.StartFrame, draft.StartFrame + maxPost);
         }
         else if (_crossfadeDrag == CrossfadeDragPart.PreCrossfade)
         {
@@ -1034,8 +1020,8 @@ internal sealed partial class WaveformView
                 draft.SetPreCrossfade(Math.Max(0, draft.StartFrame - frame), frames);
                 break;
             case CrossfadeDragPart.PostCrossfade:
-                // 赤旗は E 後ろ → 長さ = 旗 − E
-                draft.SetPostCrossfade(Math.Max(0, frame - draft.EndFrame), frames);
+                // 赤旗は S 後ろ → 長さ = 旗 − S（材料側）。混ぜ先は E 後ろ。
+                draft.SetPostCrossfade(Math.Max(0, frame - draft.StartFrame), frames);
                 break;
             default:
                 return;
@@ -1336,7 +1322,7 @@ internal sealed partial class WaveformView
     }
 
     /// <summary>
-    /// ピーク用: 元波形だけにフェード（プリ＝out→0、ポスト＝in←0）。重ね側は描画レイヤ任せ。
+    /// ピーク用: プリ＝元波形 out→0、ポスト＝元波形 in←0。重ね側は描画レイヤ任せ。
     /// </summary>
     private bool TryGetCrossfadeBaseDisplaySample(long frame, int channel, out float sample)
     {
@@ -1346,14 +1332,13 @@ internal sealed partial class WaveformView
             return false;
         }
 
-        return TryGetCrossfadeBaseDisplaySample(frame, channel, LoopFadePreview.From(draft), draft, out sample);
+        return TryGetCrossfadeBaseDisplaySample(frame, channel, LoopFadePreview.From(draft), out sample);
     }
 
     private bool TryGetCrossfadeBaseDisplaySample(
         long frame,
         int channel,
         in LoopFadePreview preview,
-        CrossfadeEditState draft,
         out float sample)
     {
         sample = 0;
@@ -1366,21 +1351,14 @@ internal sealed partial class WaveformView
             return false;
         }
 
-        if (!preview.TryCrossfadeMix(frame, out _, out _, out var outGain, out var inGain))
+        if (!preview.TryCrossfadeMix(frame, out _, out var inSide, out var outGain, out var inGain))
         {
             return false;
         }
 
         var local = _document.Interleaved[(int)frame * _document.Channels + channel];
-        if (draft.PostCrossfadeFrames > 0
-            && frame >= draft.StartFrame
-            && frame < draft.StartFrame + draft.PostCrossfadeFrames)
-        {
-            sample = local * inGain;
-            return true;
-        }
-
-        sample = local * outGain;
+        // ポスト帯の元波形は inSide＝frame（フェードイン）。プリ帯は outSide＝frame（フェードアウト）。
+        sample = local * (inSide == frame ? inGain : outGain);
         return true;
     }
 
@@ -1403,7 +1381,7 @@ internal sealed partial class WaveformView
         double sum = 0;
         for (var ch = 0; ch < channels; ch++)
         {
-            if (!TryGetCrossfadeBaseDisplaySample(frame, ch, fade, draft, out var sample))
+            if (!TryGetCrossfadeBaseDisplaySample(frame, ch, fade, out var sample))
             {
                 return false;
             }

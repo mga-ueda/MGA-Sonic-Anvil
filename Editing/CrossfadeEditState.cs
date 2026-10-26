@@ -5,10 +5,9 @@ namespace MgaSonicAnvil.Editing;
 
 /// <summary>
 /// フェード調整ツールの非破壊ドラフト。
-/// 旗・長さバーの位置と、聴こえる重ね／焼き込み位置は分離する。
-/// 範囲塗りは旗側のみ。重ね側は波形の色付けだけで塗らない。
-/// プリ: 旗・塗り＝S 手前 / 波形重ね・焼き込み＝E 手前。
-/// ポスト: 旗・塗り＝E 後ろ / 波形重ね・焼き込み＝S 先頭。
+/// 旗・長さバーは材料側、重ね／焼き込みは混ぜ先。範囲塗りは旗側のみ。
+/// プリ: 旗・塗り＝S 手前 / 波形重ね・焼き込み＝E 手前（材料＝S 手前）。
+/// ポスト: 旗・塗り＝S 先頭 / 波形重ね・焼き込み＝E 後ろ（材料＝ループスタート）。
 /// </summary>
 internal sealed class CrossfadeEditState
 {
@@ -70,11 +69,11 @@ internal sealed class CrossfadeEditState
     /// <summary>プリの重ね描画・焼き込み開始（E − Pre）。</summary>
     public long PreDrawStartFrame => EndFrame - PreCrossfadeFrames;
 
-    /// <summary>赤旗の位置（E ＋ Post）。長さ指定はエンド後ろへ伸ばす。</summary>
-    public long PostFlagFrame => EndFrame + PostCrossfadeFrames;
+    /// <summary>赤旗の位置（S ＋ Post）。長さ指定はループスタートから伸ばす。</summary>
+    public long PostFlagFrame => StartFrame + PostCrossfadeFrames;
 
-    /// <summary>ポストの焼き込み・再生ミックス開始（＝S）。旗とは別。</summary>
-    public long PostDrawStartFrame => StartFrame;
+    /// <summary>ポストの焼き込み・再生ミックス開始（＝E）。旗とは別。</summary>
+    public long PostDrawStartFrame => EndFrame;
 
     public WaveSelection LoopRange => new(StartFrame, EndFrame);
 
@@ -84,11 +83,11 @@ internal sealed class CrossfadeEditState
     /// <summary>プリ波形重ね・焼き込み区間 [E−Pre, E)。塗らない。</summary>
     public WaveSelection PreDrawRange => new(PreDrawStartFrame, EndFrame);
 
-    /// <summary>ポスト長さバー／塗り [E, E＋Post)。旗と同じ側。</summary>
-    public WaveSelection PostBarRange => new(EndFrame, PostFlagFrame);
+    /// <summary>ポスト長さバー／塗り [S, S＋Post)。旗と同じ側。</summary>
+    public WaveSelection PostBarRange => new(StartFrame, PostFlagFrame);
 
-    /// <summary>ポスト波形重ね・焼き込み区間 [S, S＋Post)。塗らない。</summary>
-    public WaveSelection PostDrawRange => new(StartFrame, StartFrame + PostCrossfadeFrames);
+    /// <summary>ポスト波形重ね・焼き込み区間 [E, E＋Post)。塗らない。</summary>
+    public WaveSelection PostDrawRange => new(EndFrame, EndFrame + PostCrossfadeFrames);
 
     public static CrossfadeEditState CreateInitial(AudioDocument document)
     {
@@ -135,30 +134,7 @@ internal sealed class CrossfadeEditState
         return state;
     }
 
-    /// <summary>プリ＋ポストがループ長いっぱい（合計100%）か。</summary>
-    public bool IsFadeSumFull
-    {
-        get
-        {
-            var loop = LoopLength;
-            return loop > 0 && PreCrossfadeFrames + PostCrossfadeFrames >= loop;
-        }
-    }
-
-    /// <summary>
-    /// 合計100%連動を掛けるか。片方が 0 のときはオフ（0 側を自動で増やさない）。
-    /// 0 側を再度増やして両方とも正になり合計が満杯なら、次の操作から連動が戻る。
-    /// </summary>
-    public bool ShouldMaintainFadeComplement =>
-        IsFadeSumFull && PreCrossfadeFrames > 0 && PostCrossfadeFrames > 0;
-
-    public void Clamp(long frameCount) => Clamp(frameCount, maintainFull: false);
-
-    /// <param name="maintainFull">
-    /// true のとき（変更前が合計100%かつ双方が正）、フォーカス側に合わせて相手を増減し合計を維持する。
-    /// false のときは超過分だけ相手を減らす（相手は増やさない）。
-    /// </param>
-    public void Clamp(long frameCount, bool maintainFull)
+    public void Clamp(long frameCount)
     {
         if (frameCount <= 0)
         {
@@ -199,54 +175,35 @@ internal sealed class CrossfadeEditState
         }
 
         var loop = Math.Max(0, LoopLength);
-        // ファイル余白に加え、プリ＋ポスト≦ループ長。フォーカス側を優先。
+        // ファイル余白に加え、プリ＋ポスト≦ループ長。フォーカス側を優先。超過分だけ相手を減らす。
         var maxPre = Math.Min(Math.Max(0, StartFrame), loop);
         var maxPost = Math.Min(Math.Max(0, frameCount - EndFrame), loop);
         if (Focus == FocusField.PostCrossfade)
         {
             PostCrossfadeFrames = Math.Clamp(PostCrossfadeFrames, 0, maxPost);
-            if (maintainFull)
-            {
-                PreCrossfadeFrames = Math.Clamp(loop - PostCrossfadeFrames, 0, maxPre);
-                // ファイル余白でプリが足りないときはポストを合わせて合計を最大化
-                PostCrossfadeFrames = Math.Clamp(loop - PreCrossfadeFrames, 0, maxPost);
-            }
-            else
-            {
-                PreCrossfadeFrames = Math.Clamp(
-                    PreCrossfadeFrames, 0, Math.Min(maxPre, Math.Max(0, loop - PostCrossfadeFrames)));
-            }
+            PreCrossfadeFrames = Math.Clamp(
+                PreCrossfadeFrames, 0, Math.Min(maxPre, Math.Max(0, loop - PostCrossfadeFrames)));
         }
         else
         {
             PreCrossfadeFrames = Math.Clamp(PreCrossfadeFrames, 0, maxPre);
-            if (maintainFull && Focus == FocusField.PreCrossfade)
-            {
-                PostCrossfadeFrames = Math.Clamp(loop - PreCrossfadeFrames, 0, maxPost);
-                PreCrossfadeFrames = Math.Clamp(loop - PostCrossfadeFrames, 0, maxPre);
-            }
-            else
-            {
-                PostCrossfadeFrames = Math.Clamp(
-                    PostCrossfadeFrames, 0, Math.Min(maxPost, Math.Max(0, loop - PreCrossfadeFrames)));
-            }
+            PostCrossfadeFrames = Math.Clamp(
+                PostCrossfadeFrames, 0, Math.Min(maxPost, Math.Max(0, loop - PreCrossfadeFrames)));
         }
     }
 
     public void SetPreCrossfade(long frames, long frameCount)
     {
-        var maintain = ShouldMaintainFadeComplement;
         Focus = FocusField.PreCrossfade;
         PreCrossfadeFrames = frames;
-        Clamp(frameCount, maintainFull: maintain);
+        Clamp(frameCount);
     }
 
     public void SetPostCrossfade(long frames, long frameCount)
     {
-        var maintain = ShouldMaintainFadeComplement;
         Focus = FocusField.PostCrossfade;
         PostCrossfadeFrames = frames;
-        Clamp(frameCount, maintainFull: maintain);
+        Clamp(frameCount);
     }
 
     public void Nudge(FocusField field, long delta, long frameCount)

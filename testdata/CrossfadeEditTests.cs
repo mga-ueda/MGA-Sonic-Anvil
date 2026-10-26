@@ -26,11 +26,11 @@ public sealed class CrossfadeEditTests
         Assert.Equal(0, fromLoop.PostCrossfadeFrames);
         Assert.Equal(fromLoop.StartFrame - fromLoop.PreCrossfadeFrames, fromLoop.PreFlagFrame);
         Assert.Equal(fromLoop.EndFrame - fromLoop.PreCrossfadeFrames, fromLoop.PreDrawStartFrame);
-        Assert.Equal(fromLoop.EndFrame + fromLoop.PostCrossfadeFrames, fromLoop.PostFlagFrame);
-        Assert.Equal(fromLoop.StartFrame, fromLoop.PostDrawStartFrame);
+        Assert.Equal(fromLoop.StartFrame + fromLoop.PostCrossfadeFrames, fromLoop.PostFlagFrame);
+        Assert.Equal(fromLoop.EndFrame, fromLoop.PostDrawStartFrame);
         Assert.Equal(fromLoop.PreFlagFrame, fromLoop.PreBarRange.StartFrame);
         Assert.Equal(fromLoop.StartFrame, fromLoop.PreBarRange.EndFrame);
-        Assert.Equal(fromLoop.EndFrame, fromLoop.PostBarRange.StartFrame);
+        Assert.Equal(fromLoop.StartFrame, fromLoop.PostBarRange.StartFrame);
     }
 
     [Fact]
@@ -72,11 +72,14 @@ public sealed class CrossfadeEditTests
         Assert.Equal(80, state.PreFlagFrame);
         Assert.Equal(280, state.PreDrawStartFrame);
         Assert.NotEqual(state.PreFlagFrame, state.PreDrawStartFrame);
-        Assert.Equal(315, state.PostFlagFrame);
-        Assert.Equal(100, state.PostDrawStartFrame);
-        Assert.Equal(300, state.PostBarRange.StartFrame);
-        Assert.Equal(315, state.PostBarRange.EndFrame);
+        Assert.Equal(115, state.PostFlagFrame);
+        Assert.Equal(300, state.PostDrawStartFrame);
+        Assert.Equal(100, state.PostBarRange.StartFrame);
+        Assert.Equal(115, state.PostBarRange.EndFrame);
+        Assert.Equal(300, state.PostDrawRange.StartFrame);
+        Assert.Equal(315, state.PostDrawRange.EndFrame);
         Assert.NotEqual(state.PostFlagFrame, state.PostDrawStartFrame);
+        Assert.NotEqual(state.PostBarRange.StartFrame, state.PostDrawRange.StartFrame);
     }
 
     [Fact]
@@ -101,7 +104,7 @@ public sealed class CrossfadeEditTests
     }
 
     [Fact]
-    public void BakePost_WritesIntoLoopStart()
+    public void BakePost_WritesAfterLoopEnd_BaseFadeIn_OverlayFadeOut()
     {
         var frames = 50;
         var samples = new float[frames * 2];
@@ -117,14 +120,22 @@ public sealed class CrossfadeEditTests
         var baked = (float[])samples.Clone();
         LoopCrossfade.BakePostCrossfade(
             samples, baked, 2, frames, start, end, x, FadeShape.Linear, FadeShape.Linear);
-        var mid = baked[(int)(start + x / 2) * 2];
-        Assert.True(Math.Abs(mid) < 0.2f);
+        var midI = (int)(x / 2);
+        FadeCurves.CrossfadeGainsAtFrame(
+            FadeShape.Linear, FadeShape.Linear, midI, 0, x, out var outGain, out var inGain);
+        // base(-1)*in + overlay(1)*out
+        var expectedMid = (-1f * inGain) + (1f * outGain);
+        Assert.Equal(expectedMid, baked[(int)(end + midI) * 2], 3);
+        // first frame: base*(-1)*0 + overlay(1)*1 = 1
+        Assert.Equal(1f, baked[(int)end * 2], 3);
+        // Sample at loop start is untouched
+        Assert.Equal(1f, baked[(int)start * 2]);
         // Sample just before End is untouched
         Assert.Equal(-1f, baked[(int)(end - 1) * 2]);
     }
 
     [Fact]
-    public void LoopFadePreview_PreAtEnd_PostAtStart_UsesOutside()
+    public void LoopFadePreview_PreAtEnd_PostAfterEnd_BaseFadeIn_OverlayFadeOut()
     {
         var preview = new LoopFadePreview
         {
@@ -138,13 +149,18 @@ public sealed class CrossfadeEditTests
             PostInShape = FadeShape.Linear,
         };
 
-        Assert.True(preview.TryCrossfadeMix(105, out var outSide, out var inSide, out _, out _));
-        Assert.Equal(105, inSide); // start side
-        Assert.Equal(305, outSide); // End+5 after E
+        Assert.True(preview.TryCrossfadeMix(305, out var outSide, out var inSide, out var outGain, out var inGain));
+        Assert.Equal(105, outSide); // overlay = Start+5
+        Assert.Equal(305, inSide); // base after E
+        Assert.True(outGain > 0f && outGain < 1f); // 上乗せフェードアウト途中
+        Assert.True(inGain > 0f && inGain < 1f); // 元波形フェードイン途中
+        Assert.Equal(1f, outGain + inGain, 3);
 
         Assert.True(preview.TryCrossfadeMix(285, out outSide, out inSide, out _, out _));
         Assert.Equal(285, outSide); // end side
         Assert.Equal(85, inSide); // Start-20+5 before S
+
+        Assert.False(preview.TryCrossfadeMix(105, out _, out _, out _, out _));
     }
 
     [Fact]
@@ -161,6 +177,25 @@ public sealed class CrossfadeEditTests
         Assert.Equal(40, state.PreCrossfadeFrames);
         Assert.Equal(20, state.PostCrossfadeFrames); // min(file after E, loop-Pre)
         Assert.True(state.PreCrossfadeFrames + state.PostCrossfadeFrames <= state.LoopLength);
+    }
+
+    [Fact]
+    public void PostZeroSnapLength_IsMeasuredFromStartNotEnd()
+    {
+        // 赤旗は S＋Post。長さは旗−S。旗−E だと負になり 0 に潰れる（旧バグ）。
+        var state = new CrossfadeEditState
+        {
+            StartFrame = 100,
+            EndFrame = 300,
+            PostCrossfadeFrames = 50,
+        };
+        Assert.Equal(150, state.PostFlagFrame);
+
+        // 旗−E だと負になり 0 に潰れる。長さは旗−S。
+        const long snappedFlag = 160;
+        state.SetPostCrossfade(Math.Max(0, snappedFlag - state.StartFrame), frameCount: 1000);
+        Assert.Equal(60, state.PostCrossfadeFrames);
+        Assert.Equal(160, state.PostFlagFrame);
     }
 
     [Fact]
@@ -219,7 +254,7 @@ public sealed class CrossfadeEditTests
     }
 
     [Fact]
-    public void SetPost_WhenSumFull_DecreasingPostGrowsPre()
+    public void SetPost_DecreasingDoesNotGrowPre()
     {
         var state = new CrossfadeEditState
         {
@@ -228,15 +263,13 @@ public sealed class CrossfadeEditTests
             PreCrossfadeFrames = 50,
             PostCrossfadeFrames = 50,
         };
-        Assert.True(state.IsFadeSumFull);
         state.SetPostCrossfade(40, frameCount: 1000);
         Assert.Equal(40, state.PostCrossfadeFrames);
-        Assert.Equal(60, state.PreCrossfadeFrames);
-        Assert.True(state.IsFadeSumFull);
+        Assert.Equal(50, state.PreCrossfadeFrames);
     }
 
     [Fact]
-    public void SetPre_WhenSumFull_DecreasingPreGrowsPost()
+    public void SetPre_DecreasingDoesNotGrowPost()
     {
         var state = new CrossfadeEditState
         {
@@ -247,12 +280,11 @@ public sealed class CrossfadeEditTests
         };
         state.SetPreCrossfade(30, frameCount: 1000);
         Assert.Equal(30, state.PreCrossfadeFrames);
-        Assert.Equal(70, state.PostCrossfadeFrames);
-        Assert.True(state.IsFadeSumFull);
+        Assert.Equal(50, state.PostCrossfadeFrames);
     }
 
     [Fact]
-    public void NudgePost_WhenSumFull_KeepsSumAtLoopLength()
+    public void NudgePost_IncreasingShrinksPre_DecreasingLeavesPre()
     {
         var state = new CrossfadeEditState
         {
@@ -266,24 +298,7 @@ public sealed class CrossfadeEditTests
         Assert.Equal(40, state.PreCrossfadeFrames);
         state.Nudge(CrossfadeEditState.FocusField.PostCrossfade, -15, frameCount: 1000);
         Assert.Equal(45, state.PostCrossfadeFrames);
-        Assert.Equal(55, state.PreCrossfadeFrames);
-        Assert.Equal(100, state.PreCrossfadeFrames + state.PostCrossfadeFrames);
-    }
-
-    [Fact]
-    public void SetPost_WhenNotFull_DecreasingDoesNotGrowPre()
-    {
-        var state = new CrossfadeEditState
-        {
-            StartFrame = 100,
-            EndFrame = 200,
-            PreCrossfadeFrames = 20,
-            PostCrossfadeFrames = 30,
-        };
-        state.SetPostCrossfade(10, frameCount: 1000);
-        Assert.Equal(10, state.PostCrossfadeFrames);
-        Assert.Equal(20, state.PreCrossfadeFrames);
-        Assert.False(state.IsFadeSumFull);
+        Assert.Equal(40, state.PreCrossfadeFrames);
     }
 
     [Fact]
@@ -296,8 +311,6 @@ public sealed class CrossfadeEditTests
             PreCrossfadeFrames = 0,
             PostCrossfadeFrames = 100,
         };
-        Assert.True(state.IsFadeSumFull);
-        Assert.False(state.ShouldMaintainFadeComplement);
         state.SetPostCrossfade(80, frameCount: 1000);
         Assert.Equal(80, state.PostCrossfadeFrames);
         Assert.Equal(0, state.PreCrossfadeFrames);
@@ -313,7 +326,6 @@ public sealed class CrossfadeEditTests
             PreCrossfadeFrames = 100,
             PostCrossfadeFrames = 0,
         };
-        Assert.False(state.ShouldMaintainFadeComplement);
         state.SetPreCrossfade(70, frameCount: 1000);
         Assert.Equal(70, state.PreCrossfadeFrames);
         Assert.Equal(0, state.PostCrossfadeFrames);
@@ -349,7 +361,7 @@ public sealed class CrossfadeEditTests
     }
 
     [Fact]
-    public void SetPre_FromZero_WhilePostFillsLoop_ShrinksPostAndRestoresComplement()
+    public void SetPre_FromZero_WhilePostFillsLoop_ShrinksPostOnly()
     {
         var state = new CrossfadeEditState
         {
@@ -358,15 +370,13 @@ public sealed class CrossfadeEditTests
             PreCrossfadeFrames = 0,
             PostCrossfadeFrames = 100,
         };
-        // 0 側を増やす → 超過削減でポストが減り、双方が正になって連動条件が戻る
+        // 0 側を増やす → 超過分だけポストを減らす。減った側を相手が増やして埋め直すことはしない。
         state.SetPreCrossfade(20, frameCount: 1000);
         Assert.Equal(20, state.PreCrossfadeFrames);
         Assert.Equal(80, state.PostCrossfadeFrames);
-        Assert.True(state.ShouldMaintainFadeComplement);
         state.SetPostCrossfade(60, frameCount: 1000);
         Assert.Equal(60, state.PostCrossfadeFrames);
-        Assert.Equal(40, state.PreCrossfadeFrames);
-        Assert.True(state.IsFadeSumFull);
+        Assert.Equal(20, state.PreCrossfadeFrames);
     }
 
     [Fact]
@@ -441,7 +451,7 @@ public sealed class CrossfadeEditTests
             StartFrame = 100,
             EndFrame = 300,
             PreCrossfadeFrames = 0,
-            PostCrossfadeFrames = 20,
+            PostCrossfadeFrames = 0,
             TruncateOutside = true,
         };
 
@@ -462,7 +472,7 @@ public sealed class CrossfadeEditTests
             StartFrame = 100,
             EndFrame = 300,
             PreCrossfadeFrames = 0,
-            PostCrossfadeFrames = 20,
+            PostCrossfadeFrames = 0,
             DeleteAfterLoop = true,
         };
 
@@ -744,10 +754,9 @@ public sealed class CrossfadeEditTests
     }
 
     [Fact]
-    public void BuildSplicePreview_PreMixesOnLeft_PostMixesOnRight()
+    public void BuildSplicePreview_PreMixesOnLeft_PostDoesNotAffectSeam()
     {
-        // 左=エンド側に定数 0.2、S 手前=1.0、右=スタート側に 0.2、E 以降=-1.0。
-        // 線形クロスの中点は左右とも約 0.6 / -0.4 になる（ドライの 0.2 とは違う）。
+        // ポストは [E, E＋Post) へ焼くため、E|S 継ぎ目プレビューには出ない。
         const int start = 40;
         const int end = 160;
         const int pre = 10;
@@ -801,11 +810,10 @@ public sealed class CrossfadeEditTests
             out var outGain,
             out var inGain);
         var expectedPre = 0.2f * outGain + 1f * inGain;
-        var expectedPost = -1f * outGain + 0.2f * inGain;
         // 左 half の末尾寄り＝プリ（destIndex = 32-10+5 = 27）
         Assert.Equal(expectedPre, leftByCh[0][32 - pre + mid], 3);
-        // 右 half の先頭寄り＝ポスト（destIndex = 5）
-        Assert.Equal(expectedPost, rightByCh[0][mid], 3);
+        // 右 half はドライのスタート側のまま
+        Assert.Equal(0.2f, rightByCh[0][mid], 3);
     }
 
     [Fact]
@@ -824,7 +832,7 @@ public sealed class CrossfadeEditTests
         Assert.Equal(20, state.PreCrossfadeFrames);
         Assert.Equal(15, state.PostCrossfadeFrames);
         Assert.Equal(120, state.PreFlagFrame);
-        Assert.Equal(355, state.PostFlagFrame);
+        Assert.Equal(155, state.PostFlagFrame);
     }
 
     private static AudioDocument MakeDocument(int frames) =>
