@@ -30,19 +30,6 @@ public sealed class AppVersionTests
     }
 
     [Fact]
-    public void WithDebuggerPrefix_MarksOnlyAttachedDebugLaunch()
-    {
-        var plain = AppVersion.FormTitle;
-        Assert.Equal(plain, AppVersion.WithDebuggerPrefix(plain, debuggerAttached: false));
-        var marked = AppVersion.WithDebuggerPrefix(plain, debuggerAttached: true);
-#if DEBUG
-        Assert.Equal("[DEBUG] " + plain, marked);
-#else
-        Assert.Equal(plain, marked);
-#endif
-    }
-
-    [Fact]
     public void FormTitleWithFile_WrapsFullPathInBrackets()
     {
         var path = @"D:\Audio\take.wav";

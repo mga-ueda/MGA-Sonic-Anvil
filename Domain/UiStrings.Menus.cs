@@ -163,11 +163,11 @@ internal static partial class UiStrings
     public static string WaveMenuSettings => Get("設定(_O)", "Settings (_O)");
     /// <summary>その他。GitHub(G) と重ならない R。</summary>
     public static string WaveMenuColorPanel => Get("色設定(_R)", "Colo_r Settings");
-    public static string WaveMenuMaximizeWaveform => Get("フルスクリーン(_F)", "_Fullscreen");
-    public static string WaveMenuMaximizeAnalyzers => Get("フルスクリーン（アナライザー）(_A)", "Fullscreen with _Analyzers");
-    public static string WaveMenuMaximizeLibrary => Get("プレイヤー(_B)", "Player (_B)");
+    public static string WaveMenuMaximizeWaveform => Get("レイアウト F11(_F)", "Layout F1_1");
+    public static string WaveMenuMaximizeAnalyzers => Get("レイアウト F12(_A)", "Layout F1_2");
+    public static string WaveMenuMaximizeLibrary => Get("レイアウト F10(_B)", "Layout F1_0");
     public static string WaveMenuVideoMini => Get("動画ミニ(_M)", "Video _Mini");
-    public static string WaveMenuMinimalChrome => Get("波形だけ(_D)", "Playlist and Waveform (_D)");
+    public static string WaveMenuMinimalChrome => Get("レイアウト F9(_D)", "Layout _F9");
     public static string WaveMenuVideoFullscreen => Get("映像を全画面(_Q)", "Full Screen Video (_Q)");
     public static string WaveMenuVideoMiniZoomIn => Get("ミニ窓を拡大(_U)", "Enlarge Mini Window (_U)");
     public static string WaveMenuVideoMiniZoomOut => Get("ミニ窓を縮小(_Z)", "Shrink Mini Window (_Z)");

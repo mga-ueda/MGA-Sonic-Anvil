@@ -140,6 +140,18 @@ public sealed class WaveformContextMenuTests
     }
 
     [Fact]
+    public void Build_MenuBarOmitsHereCategory()
+    {
+        var tree = WaveformContextMenuBuilder.Build(
+            WaveformContextMenuModel.AllEnabledForTests(),
+            includeHere: false);
+        Assert.DoesNotContain(
+            UiStrings.WaveMenuCatHere,
+            tree.OfType<WaveMenuItemEntry>().Select(item => item.Header));
+        Assert.DoesNotContain(WaveMenuCommand.PlayFromHere, WaveformContextMenuBuilder.Commands(tree));
+    }
+
+    [Fact]
     public void Build_IncludesCategoriesAndCoreCommands()
     {
         var previous = UiStrings.Language;
@@ -598,6 +610,22 @@ public sealed class WaveformContextMenuTests
                 .SelectMany(item => item.Items.OfType<MenuItem>())
                 .First(item => !item.HasItems);
             Assert.False(leaf.StaysOpenOnClick);
+        });
+    }
+
+    [Fact]
+    public void Populate_FillsMenuFromSameBuildAsContextMenu()
+    {
+        RunSta(() =>
+        {
+            var tree = WaveformContextMenuBuilder.Build(WaveformContextMenuModel.AllEnabledForTests());
+            var context = WaveformContextMenuBuilder.Create(tree, _ => { }, new Border());
+            var bar = new Menu();
+            WaveformContextMenuBuilder.Populate(bar.Items, tree, _ => { });
+            Assert.Equal(context.Items.Count, bar.Items.Count);
+            var contextHeaders = context.Items.OfType<MenuItem>().Select(item => item.Header).ToArray();
+            var barHeaders = bar.Items.OfType<MenuItem>().Select(item => item.Header).ToArray();
+            Assert.Equal(contextHeaders, barHeaders);
         });
     }
 

@@ -15,6 +15,7 @@ public partial class MainWindow
     private bool _tileMode => _tileArrange != WaveformTileArrange.Off;
     private bool _tileLayoutBusy;
     private bool _tileNeedsInitialBind;
+    private bool _tileTooSmallDialogQueued;
     private int _tileBuildGeneration;
     private Grid? _tileGrid;
     private WaveformView? _tileActiveView;
@@ -102,6 +103,13 @@ public partial class MainWindow
         var next = WaveformTileLayout.Next(_tileArrange, _sessions.Count, width, height);
         if (next == _tileArrange)
         {
+            // 解除中に切り替えても上下・左右・格子がすべて不可なら通知。
+            if (_tileArrange == WaveformTileArrange.Off
+                && WaveformTileLayout.NoneFit(_sessions.Count, width, height))
+            {
+                NotifyTileArrangeTooSmall();
+            }
+
             return;
         }
 
@@ -116,7 +124,7 @@ public partial class MainWindow
         Keyboard.Focus(Waveform);
     }
 
-    /// <summary>メニューから配置を直接指定する。Off で解除、同じ配置なら何もしない。左右・上下が収まらなければ格子へ、それも無理なら動かない。</summary>
+    /// <summary>メニューから配置を直接指定する。Off で解除、同じ配置なら何もしない。左右・上下が収まらなければ格子へ、それも無理なら通知。</summary>
     private void SetWaveformTileArrange(WaveformTileArrange arrange)
     {
         if (arrange == WaveformTileArrange.Off)
@@ -145,6 +153,8 @@ public partial class MainWindow
         var usable = ResolveUsableTileArrange(arrange);
         if (usable == WaveformTileArrange.Off)
         {
+            NotifyTileArrangeTooSmall();
+            Keyboard.Focus(Waveform);
             return;
         }
 
@@ -161,7 +171,7 @@ public partial class MainWindow
     private void WaveformTileHost_SizeChanged(object sender, SizeChangedEventArgs e) =>
         EnsureUsableTileArrange();
 
-    /// <summary>今のタイル配置が収まらなくなったら格子を試し、それも無理なら解除する。</summary>
+    /// <summary>今のタイル配置が収まらなくなったら格子を試し、それも無理なら解除して通知する。</summary>
     private void EnsureUsableTileArrange()
     {
         // プレイヤー帯は単一波形だけ。ここで張り直すと F10 下部にタイルが残る。
@@ -179,10 +189,34 @@ public partial class MainWindow
         if (usable == WaveformTileArrange.Off)
         {
             ExitWaveformTileMode();
+            NotifyTileArrangeTooSmall();
             return;
         }
 
         ApplyTileArrange(usable);
+    }
+
+    /// <summary>上下・左右・格子いずれも不可のとき。リサイズ連打では ApplicationIdle で一度だけ。</summary>
+    private void NotifyTileArrangeTooSmall()
+    {
+        if (_tileTooSmallDialogQueued)
+        {
+            return;
+        }
+
+        _tileTooSmallDialogQueued = true;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                _tileTooSmallDialogQueued = false;
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    UiStrings.WarnTileArrangeTooSmall,
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            },
+            DispatcherPriority.ApplicationIdle);
     }
 
     private bool CanOfferTileArrange(WaveformTileArrange arrange) =>
@@ -658,6 +692,7 @@ public partial class MainWindow
             if (usable == WaveformTileArrange.Off)
             {
                 ExitWaveformTileMode();
+                NotifyTileArrangeTooSmall();
                 return;
             }
 

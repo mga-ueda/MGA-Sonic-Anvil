@@ -59,9 +59,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("(Z)", UiStrings.TooltipCenterPlayhead);
         Assert.Contains("(U)", UiStrings.TooltipHistory);
         Assert.Contains("F10", UiStrings.TooltipLibraryMaximize);
-        Assert.Contains("F10", UiStrings.TooltipLibraryMaximizeOff);
         Assert.Contains("F12", UiStrings.TooltipAnalyzerMaximize);
-        Assert.Contains("F12", UiStrings.TooltipAnalyzerMaximizeOff);
         Assert.Contains("Ctrl+Shift+C", UiStrings.TooltipColorPanel);
         Assert.Contains("Esc", UiStrings.OverlayOpening);
     }

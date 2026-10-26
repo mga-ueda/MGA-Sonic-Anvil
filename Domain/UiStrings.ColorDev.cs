@@ -74,6 +74,7 @@ internal static partial class UiStrings
             "MenuSeparator" => Get("メニュー区切り", "Menu separator"),
             "MenuHighlightBack" => Get("メニューハイライト", "Menu highlight"),
             "MenuDisabledFore" => Get("メニュー無効文字", "Menu disabled text"),
+            "MainMenuBarBack" => Get("メニューバー背景", "Menu bar background"),
             "ProjectBarBack" => Get("控えめクロームのボタン枠", "Quiet-chrome button well"),
             "OverviewOutsideFill" => Get("表示範囲外", "Outside the view"),
             "WaveformBack" => Get("エリア背景", "Area background"),

@@ -164,9 +164,7 @@ internal partial class TransportBar : UserControl
             var player = mode == WaveformMaximizeMode.Library;
             library.Icon = player ? TransportIcon.EditorMode : TransportIcon.PlayerMode;
             library.IsLatched = player;
-            TransportToolTip.Attach(
-                library,
-                player ? UiStrings.TooltipLibraryMaximizeOff : UiStrings.TooltipLibraryMaximize);
+            TransportToolTip.Attach(library, UiStrings.TooltipLibraryMaximize);
         }
 
         if (_buttons.TryGetValue(TransportCommand.ToggleAnalyzerMaximize, out var analyzers))
@@ -174,9 +172,7 @@ internal partial class TransportBar : UserControl
             var on = mode == WaveformMaximizeMode.Analyzers;
             analyzers.Icon = on ? TransportIcon.AnalyzerRestore : TransportIcon.AnalyzerMaximize;
             analyzers.IsLatched = on;
-            TransportToolTip.Attach(
-                analyzers,
-                on ? UiStrings.TooltipAnalyzerMaximizeOff : UiStrings.TooltipAnalyzerMaximize);
+            TransportToolTip.Attach(analyzers, UiStrings.TooltipAnalyzerMaximize);
         }
     }
 

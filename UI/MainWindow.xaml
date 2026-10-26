@@ -23,6 +23,9 @@
           IsHitTestVisible="False"
           ClipToBounds="True" />
   <DockPanel x:Name="RootDock" LastChildFill="True">
+    <Menu x:Name="MainMenuBar"
+          DockPanel.Dock="Top"
+          Style="{StaticResource DarkMenuStyle}" />
     <Border x:Name="StatusBarHost"
             DockPanel.Dock="Bottom"
             Height="{x:Static ui:DesignMetrics.StatusBarHeight}"
@@ -118,7 +121,50 @@
         <RowDefinition Height="{x:Static ui:DesignMetrics.TransportChromeHeightGrid}" />
       </Grid.RowDefinitions>
 
-      <DockPanel Grid.Row="0" Grid.Column="0">
+      <DockPanel x:Name="WaveformWorkHost" Grid.Row="0" Grid.Column="0">
+        <!-- タブは全体表示（Overview）の上。左は波形開始（dB 目盛り列）に揃える。 -->
+        <Border x:Name="DocumentTabHost"
+                DockPanel.Dock="Top"
+                Height="{x:Static ui:DesignMetrics.DocumentTabBarHeight}"
+                Background="Transparent"
+                SizeChanged="DocumentTabHost_SizeChanged">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition x:Name="DocumentTabScaleColumn"
+                                Width="{x:Static ui:DesignMetrics.DbScaleWidthGrid}" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <!-- ＜ は左スペーサ列。全画面で矢印が出るときは列を広げてタブを右へ。 -->
+            <ui:TabScrollButton x:Name="TabScrollLeft"
+                                Grid.Column="0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                PointLeft="True"
+                                Visibility="Collapsed"
+                                Click="TabScrollLeft_Click" />
+            <DockPanel Grid.Column="1">
+              <ui:TabScrollButton x:Name="TabScrollRight"
+                                  DockPanel.Dock="Right"
+                                  Visibility="Collapsed"
+                                  Click="TabScrollRight_Click" />
+              <ScrollViewer x:Name="DocumentTabScroll"
+                            Background="Transparent"
+                            HorizontalScrollBarVisibility="Hidden"
+                            VerticalScrollBarVisibility="Disabled"
+                            Focusable="False"
+                            PanningMode="HorizontalOnly"
+                            ScrollChanged="DocumentTabScroll_ScrollChanged"
+                            PreviewMouseWheel="DocumentTabScroll_PreviewMouseWheel">
+                <Grid>
+                  <StackPanel x:Name="DocumentTabs"
+                              Orientation="Horizontal" />
+                  <Canvas x:Name="DocumentTabAccentHost"
+                          IsHitTestVisible="False" />
+                </Grid>
+              </ScrollViewer>
+            </DockPanel>
+          </Grid>
+        </Border>
         <Grid x:Name="OverviewHost"
               DockPanel.Dock="Top"
               Height="{x:Static ui:DesignMetrics.ProjectBarHeight}">
@@ -232,29 +278,25 @@
       <Grid x:Name="MeterColumn"
             Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
             Background="Transparent">
-        <Grid.RowDefinitions>
-          <RowDefinition Height="*" />
-          <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <!-- WAAPI + ピークをひとまとめ（動画ミニで高さ制限時もピーク直上に WAAPI が付く）。 -->
-        <DockPanel x:Name="MeterPeakHost"
-                   Grid.Row="0"
-                   LastChildFill="True">
-          <Border x:Name="MeterTopSlot"
-                  DockPanel.Dock="Top"
-                  Height="{x:Static ui:DesignMetrics.ProjectBarHeight}"
-                  Background="Transparent" />
-          <ui:LevelMeterView x:Name="LevelMeter"
-                             VerticalAlignment="Stretch"
-                             Opacity="0"
-                             IsHitTestVisible="False" />
+        <!-- ゴニオはアナライザ扱い（表示は ShowAnalyzerArea）。上下ドックでピークの上／下へ。 -->
+        <DockPanel x:Name="MeterColumnStack" LastChildFill="True">
+          <ui:VectorScopeView x:Name="VectorScope"
+                              DockPanel.Dock="Bottom"
+                              HorizontalAlignment="Center"
+                              Opacity="0"
+                              IsHitTestVisible="False" />
+          <DockPanel x:Name="MeterPeakHost"
+                     LastChildFill="True">
+            <Border x:Name="MeterTopSlot"
+                    DockPanel.Dock="Top"
+                    Height="{x:Static ui:DesignMetrics.ProjectBarHeight}"
+                    Background="Transparent" />
+            <ui:LevelMeterView x:Name="LevelMeter"
+                               VerticalAlignment="Stretch"
+                               Opacity="0"
+                               IsHitTestVisible="False" />
+          </DockPanel>
         </DockPanel>
-        <ui:VectorScopeView x:Name="VectorScope"
-                            Grid.Row="1"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Bottom"
-                            Opacity="0"
-                            IsHitTestVisible="False" />
       </Grid>
 
       <Grid x:Name="TransportChromeHost"
@@ -267,88 +309,49 @@
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-        <Border x:Name="DocumentTabHost"
-                Grid.Row="0"
-                Grid.Column="0"
-                Height="{x:Static ui:DesignMetrics.DocumentTabBarHeight}"
-                Background="Transparent"
-                SizeChanged="DocumentTabHost_SizeChanged">
-          <DockPanel>
-            <ui:TabScrollButton x:Name="TabScrollLeft"
-                                DockPanel.Dock="Left"
-                                PointLeft="True"
-                                Visibility="Collapsed"
-                                Click="TabScrollLeft_Click" />
-            <ui:TabScrollButton x:Name="TabScrollRight"
-                                DockPanel.Dock="Right"
-                                Visibility="Collapsed"
-                                Click="TabScrollRight_Click" />
-            <ScrollViewer x:Name="DocumentTabScroll"
-                          Background="Transparent"
-                          HorizontalScrollBarVisibility="Hidden"
-                          VerticalScrollBarVisibility="Disabled"
-                          Focusable="False"
-                          PanningMode="HorizontalOnly"
-                          ScrollChanged="DocumentTabScroll_ScrollChanged"
-                          PreviewMouseWheel="DocumentTabScroll_PreviewMouseWheel">
-              <Grid>
-                <StackPanel x:Name="DocumentTabs"
-                            Orientation="Horizontal" />
-                <Canvas x:Name="DocumentTabAccentHost"
-                        IsHitTestVisible="False" />
-              </Grid>
-            </ScrollViewer>
-          </DockPanel>
-        </Border>
         <DockPanel x:Name="TransportBarHost"
-                   Grid.Row="1"
                    Grid.Column="0"
                    MinHeight="{x:Static ui:DesignMetrics.TransportHostMinHeight}"
                    Background="Transparent">
-          <StackPanel DockPanel.Dock="Bottom"
-                      Orientation="Horizontal"
-                      HorizontalAlignment="Left"
-                      VerticalAlignment="Bottom"
-                      Margin="12,0,0,4">
-            <Image x:Name="BrandLogo"
-                   Width="{x:Static ui:DesignMetrics.BrandLogoWidth}"
-                   Height="{x:Static ui:DesignMetrics.BrandLogoHeight}"
-                   Margin="0,0,8,0"
-                   VerticalAlignment="Top"
-                   Stretch="Uniform"
-                   SnapsToDevicePixels="True"
-                   UseLayoutRounding="True"
-                   RenderOptions.BitmapScalingMode="HighQuality"
-                   RenderOptions.EdgeMode="Unspecified"
-                   Cursor="Hand"
-                   SizeChanged="BrandLogo_SizeChanged"
-                   MouseLeftButtonUp="BrandLogo_MouseLeftButtonUp" />
-            <ui:BrandLicenseLabel x:Name="BrandLicenseHost"
-                                  VerticalAlignment="Top"
-                                  FontSize="{x:Static ui:DesignMetrics.BrandLicenseFontSize}"
-                                  Foreground="{DynamicResource ActionCopyrightForeBrush}"
-                                  LinkText="{x:Static domain:UiStrings.CopyrightText}"
-                                  SizeChanged="BrandLicenseHost_SizeChanged"
-                                  LinkClick="BrandLicenseHost_LinkClick" />
+          <!-- アイコン＋ロゴを一塊にし帯の垂直中央へ（最大化で帯が伸びても隙間で分解しない）。 -->
+          <StackPanel x:Name="TransportBrandStack"
+                      VerticalAlignment="Center"
+                      HorizontalAlignment="Left">
+            <ui:TransportBar x:Name="Transport"
+                             HorizontalAlignment="Left" />
+            <StackPanel x:Name="BrandRowHost"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        Margin="12,0,0,0">
+              <Image x:Name="BrandLogo"
+                     Width="{x:Static ui:DesignMetrics.BrandLogoWidth}"
+                     Height="{x:Static ui:DesignMetrics.BrandLogoHeight}"
+                     Margin="0,0,8,0"
+                     VerticalAlignment="Top"
+                     Stretch="Uniform"
+                     SnapsToDevicePixels="True"
+                     UseLayoutRounding="True"
+                     RenderOptions.BitmapScalingMode="HighQuality"
+                     RenderOptions.EdgeMode="Unspecified"
+                     Cursor="Hand"
+                     SizeChanged="BrandLogo_SizeChanged"
+                     MouseLeftButtonUp="BrandLogo_MouseLeftButtonUp" />
+              <ui:BrandLicenseLabel x:Name="BrandLicenseHost"
+                                    VerticalAlignment="Top"
+                                    FontSize="{x:Static ui:DesignMetrics.BrandLicenseFontSize}"
+                                    Foreground="{DynamicResource ActionCopyrightForeBrush}"
+                                    LinkText="{x:Static domain:UiStrings.CopyrightText}"
+                                    SizeChanged="BrandLicenseHost_SizeChanged"
+                                    LinkClick="BrandLicenseHost_LinkClick" />
+            </StackPanel>
           </StackPanel>
-          <ui:TransportBar x:Name="Transport"
-                           HorizontalAlignment="Left"
-                           VerticalAlignment="Center" />
         </DockPanel>
         <ui:HistoryStripView x:Name="HistoryStrip"
-                             Grid.Row="0"
-                             Grid.RowSpan="2"
                              Grid.Column="1"
                              Margin="0,0,6,0"
                              VerticalAlignment="Stretch"
                              OpenRequested="HistoryStrip_OpenRequested" />
         <ui:LoudnessMeterView x:Name="LoudnessMeter"
-                              Grid.Row="0"
-                              Grid.RowSpan="2"
                               Grid.Column="2"
                               Margin="0,0,6,0"
                               VerticalAlignment="Stretch"
@@ -356,16 +359,12 @@
                               Opacity="0"
                               IsHitTestVisible="False" />
         <ui:MonitorToggleColumn x:Name="MonitorToggles"
-                                Grid.Row="0"
-                                Grid.RowSpan="2"
                                 Grid.Column="3"
                                 Margin="0,0,6,0"
                                 VerticalAlignment="Center"
                                 Opacity="0"
                                 IsHitTestVisible="False" />
         <ui:ProjectSpectrumView x:Name="Spectrum"
-                                Grid.Row="0"
-                                Grid.RowSpan="2"
                                 Grid.Column="4"
                                 Height="{x:Static ui:DesignMetrics.SpectrumHeight}"
                                 Margin="0,0,1,0"

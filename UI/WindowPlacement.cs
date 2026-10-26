@@ -57,6 +57,20 @@ internal static class WindowPlacement
                 settings.MinimalPlayerWindowHeight = height;
                 settings.MinimalPlayerWindowState = state;
                 return;
+            case MainWindowPlacementKind.Waveform:
+                settings.WaveformWindowX = x;
+                settings.WaveformWindowY = y;
+                settings.WaveformWindowWidth = width;
+                settings.WaveformWindowHeight = height;
+                settings.WaveformWindowState = state;
+                return;
+            case MainWindowPlacementKind.Analyzer:
+                settings.AnalyzerWindowX = x;
+                settings.AnalyzerWindowY = y;
+                settings.AnalyzerWindowWidth = width;
+                settings.AnalyzerWindowHeight = height;
+                settings.AnalyzerWindowState = state;
+                return;
             case MainWindowPlacementKind.WaveformFullscreen:
                 settings.WaveformFullscreenX = x;
                 settings.WaveformFullscreenY = y;
@@ -819,6 +833,8 @@ internal static class WindowPlacement
         {
             MainWindowPlacementKind.Player => settings.PlayerWindowState,
             MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowState,
+            MainWindowPlacementKind.Waveform => settings.WaveformWindowState,
+            MainWindowPlacementKind.Analyzer => settings.AnalyzerWindowState,
             MainWindowPlacementKind.WaveformFullscreen or MainWindowPlacementKind.AnalyzerFullscreen => nameof(WindowState.Normal),
             _ => settings.WindowState,
         };
@@ -830,6 +846,8 @@ internal static class WindowPlacement
         {
             MainWindowPlacementKind.Player => settings.PlayerWindowWidth,
             MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowWidth,
+            MainWindowPlacementKind.Waveform => settings.WaveformWindowWidth,
+            MainWindowPlacementKind.Analyzer => settings.AnalyzerWindowWidth,
             MainWindowPlacementKind.WaveformFullscreen => settings.WaveformFullscreenWidth,
             MainWindowPlacementKind.AnalyzerFullscreen => settings.AnalyzerFullscreenWidth,
             _ => settings.WindowWidth,
@@ -838,6 +856,8 @@ internal static class WindowPlacement
         {
             MainWindowPlacementKind.Player => settings.PlayerWindowHeight,
             MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowHeight,
+            MainWindowPlacementKind.Waveform => settings.WaveformWindowHeight,
+            MainWindowPlacementKind.Analyzer => settings.AnalyzerWindowHeight,
             MainWindowPlacementKind.WaveformFullscreen => settings.WaveformFullscreenHeight,
             MainWindowPlacementKind.AnalyzerFullscreen => settings.AnalyzerFullscreenHeight,
             _ => settings.WindowHeight,
@@ -857,6 +877,8 @@ internal static class WindowPlacement
         {
             MainWindowPlacementKind.Player => settings.PlayerWindowX,
             MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowX,
+            MainWindowPlacementKind.Waveform => settings.WaveformWindowX,
+            MainWindowPlacementKind.Analyzer => settings.AnalyzerWindowX,
             MainWindowPlacementKind.WaveformFullscreen => settings.WaveformFullscreenX,
             MainWindowPlacementKind.AnalyzerFullscreen => settings.AnalyzerFullscreenX,
             _ => settings.WindowX,
@@ -865,6 +887,8 @@ internal static class WindowPlacement
         {
             MainWindowPlacementKind.Player => settings.PlayerWindowY,
             MainWindowPlacementKind.MinimalPlayer => settings.MinimalPlayerWindowY,
+            MainWindowPlacementKind.Waveform => settings.WaveformWindowY,
+            MainWindowPlacementKind.Analyzer => settings.AnalyzerWindowY,
             MainWindowPlacementKind.WaveformFullscreen => settings.WaveformFullscreenY,
             MainWindowPlacementKind.AnalyzerFullscreen => settings.AnalyzerFullscreenY,
             _ => settings.WindowY,
@@ -1253,6 +1277,10 @@ internal enum MainWindowPlacementKind
     Editor,
     Player,
     MinimalPlayer,
+    /// <summary>F11 など波形レイアウトのウィンドウ（非全画面）。</summary>
+    Waveform,
+    /// <summary>F12 などアナライザレイアウトのウィンドウ（非全画面）。</summary>
+    Analyzer,
     WaveformFullscreen,
     AnalyzerFullscreen,
 }

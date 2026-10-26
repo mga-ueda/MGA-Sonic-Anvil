@@ -381,24 +381,32 @@ internal static class MenuAccessKeys
 /// <summary>波形右クリック。カテゴリはサブメニュー、各項目にアクセスキー。</summary>
 internal static class WaveformContextMenuBuilder
 {
-    public static IReadOnlyList<WaveMenuEntry> Build(WaveformContextMenuModel m)
+    /// <param name="includeHere">
+    /// クリック位置依存の「この位置」。波形右クリックのみ true。
+    /// メニューバーとプレイリスト行右クリックは位置が無い／メニューバー例外のため false。
+    /// </param>
+    public static IReadOnlyList<WaveMenuEntry> Build(WaveformContextMenuModel m, bool includeHere = true)
     {
         var items = new List<WaveMenuEntry>();
-        var here = HereItems(m);
-        if (here.Count > 0)
+        if (includeHere)
         {
-            items.Add(Sub(UiStrings.WaveMenuCatHere, here));
+            var here = HereItems(m);
+            if (here.Count > 0)
+            {
+                // クリック位置依存のため先頭。定位置カテゴリは下の順。
+                items.Add(Sub(UiStrings.WaveMenuCatHere, here));
+            }
         }
 
-        items.Add(Sub(UiStrings.WaveMenuCatPlayback, PlaybackItems(m)));
-        items.Add(Sub(UiStrings.WaveMenuCatView, ViewItems(m)));
+        items.Add(Sub(UiStrings.WaveMenuCatFile, FileItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatEdit, EditItems(m)));
-        items.Add(Sub(UiStrings.WaveMenuCatAudio, AudioItems(m)));
+        items.Add(Sub(UiStrings.WaveMenuCatFormat, FormatItems(m)));
+        items.Add(Sub(UiStrings.WaveMenuCatExport, ExportItems(m)));
+        items.Add(Sub(UiStrings.WaveMenuCatView, ViewItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatTimeline, TimelineItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatTabs, TabItems(m)));
-        items.Add(Sub(UiStrings.WaveMenuCatFile, FileItems(m)));
-        items.Add(Sub(UiStrings.WaveMenuCatExport, ExportItems(m)));
-        items.Add(Sub(UiStrings.WaveMenuCatFormat, FormatItems(m)));
+        items.Add(Sub(UiStrings.WaveMenuCatPlayback, PlaybackItems(m)));
+        items.Add(Sub(UiStrings.WaveMenuCatAudio, AudioItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatWwise, WwiseItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatOther, OtherItems(m)));
         return m.LibraryMaximized
@@ -484,9 +492,29 @@ internal static class WaveformContextMenuBuilder
             PlacementTarget = placementTarget,
             Placement = PlacementMode.MousePoint,
         };
-        AddItems(menu.Items, entries, onCommand);
+        Populate(menu.Items, entries, onCommand);
         return menu;
     }
+
+    /// <summary>
+    /// メニューバー／コンテキストメニュー共通の中身入れ替え。
+    /// <see cref="Build"/> の結果をそのまま渡す（右クリックと上部メニューを同一ツリーに保つ）。
+    /// </summary>
+    public static void Populate(
+        ItemCollection items,
+        IReadOnlyList<WaveMenuEntry> entries,
+        Action<WaveMenuCommand> onCommand)
+    {
+        items.Clear();
+        Append(items, entries, onCommand);
+    }
+
+    /// <summary>既存項目の後ろへ <see cref="Build"/> ツリーを足す（プレイリストのカラー等の先頭固定用）。</summary>
+    public static void Append(
+        ItemCollection items,
+        IReadOnlyList<WaveMenuEntry> entries,
+        Action<WaveMenuCommand> onCommand) =>
+        AddItems(items, entries, onCommand);
 
     /// <summary>ファイルが開いているとき、またはマーカー／リージョン／ループの上のときだけ出す。</summary>
     private static List<WaveMenuEntry> HereItems(WaveformContextMenuModel m)
@@ -814,12 +842,6 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuRestart, WaveMenuCommand.Restart, "Alt+Enter", SingleFileOnly(m) && m.CanNavigate),
         Check(UiStrings.WaveMenuSilentSkip, WaveMenuCommand.SilentSkip, "Alt+S", m.SilentSkip, enabled: true),
         Check(UiStrings.WaveMenuRangeClick, WaveMenuCommand.RangeClick, "Q", m.RangeClick, SingleFileOnly(m) && m.CanEdit),
-        Check(
-            UiStrings.WaveMenuRecord,
-            WaveMenuCommand.Record,
-            "Ctrl+R",
-            m.IsRecording,
-            SingleFileOnly(m) && m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> PlaylistPlaybackItems(WaveformContextMenuModel m) =>
@@ -933,6 +955,12 @@ internal static class WaveformContextMenuBuilder
     [
         Cmd(UiStrings.WaveMenuNew, WaveMenuCommand.NewDocument, "Ctrl+N", !m.IsBusy && !m.LibraryMaximized),
         Cmd(UiStrings.WaveMenuOpen, WaveMenuCommand.Open, "Ctrl+O", !m.IsBusy),
+        Check(
+            UiStrings.WaveMenuRecord,
+            WaveMenuCommand.Record,
+            "Ctrl+R",
+            m.IsRecording,
+            SingleFileOnly(m) && m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
         Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuSaveSelected : UiStrings.WaveMenuSave, WaveMenuCommand.Save, "Ctrl+S", m.HasDocument && !m.IsBusy && !m.IsRecording),
         Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuSaveAsSelected : UiStrings.WaveMenuSaveAs, WaveMenuCommand.SaveAs, "Ctrl+Shift+S", m.HasDocument && !m.IsBusy && !m.IsRecording),
         WaveMenuSeparatorEntry.Instance,

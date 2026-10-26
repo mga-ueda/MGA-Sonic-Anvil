@@ -149,6 +149,7 @@ internal static partial class UiStrings
     public static string LabelAudioApi => Get("Audio API", "Audio API");
     public static string LabelAudioDevice => Get("オーディオデバイス", "Audio device");
     public static string LabelSettingsTabGeneral => Get("一般", "General");
+    public static string LabelSettingsTabLayout => Get("レイアウト", "Layout");
     public static string LabelSettingsTabAudio => Get("オーディオ", "Audio");
     public static string LabelSettingsTabLayouts => Get("表示項目", "Shown");
     public static string LabelSettingsTabColor => Get("カラー", "Color");
@@ -174,6 +175,39 @@ internal static partial class UiStrings
     public static string LabelLibraryPlaylistWaveformSizeM => Get("M（中）", "M (medium)");
     public static string LabelLibraryPlaylistWaveformSizeL => Get("L（長）", "L (long)");
     public static string LabelGaplessPlayback => Get("ギャップレス再生(_G)", "_Gapless playback");
+    /// <summary>設定・一般。ウィンドウ上部メニューバーの表示。</summary>
+    public static string LabelShowMainMenuBar => Get(
+        "メニューバーを表示(_M)",
+        "Show _menu bar");
+    public static string LabelLayoutPresetF9 => Get(
+        "F09：プレイヤーモード１",
+        "F09: Player mode 1");
+    public static string LabelLayoutPresetF10 => Get(
+        "F10：プレイヤーモード２",
+        "F10: Player mode 2");
+    public static string LabelLayoutPresetF11 => Get(
+        "F11：エディタモード１",
+        "F11: Editor mode 1");
+    public static string LabelLayoutPresetF12 => Get(
+        "F12：エディタモード２",
+        "F12: Editor mode 2");
+    public static string LabelLayoutFullscreen => Get("全画面", "Fullscreen");
+    public static string LabelLayoutFullscreenOff => Get("オフ", "Off");
+    public static string LabelLayoutFullscreenOn => Get("オン", "On");
+    public static string LabelLayoutFullscreenToggle => Get("トグル", "Toggle");
+    public static string LabelLayoutFullscreenToggleStart => Get("初回全画面", "Initial fullscreen");
+    /// <summary>表示名は「ライブラリ」。内部的にお気に入り列も含む。</summary>
+    public static string LabelLayoutLibraryAndFavorites => Get("ライブラリ", "Library");
+    public static string LabelLayoutShowWaveform => Get("波形表示", "Waveform");
+    public static string LabelLayoutAnalyzerArea => Get("アナライザーエリア", "Analyzer area");
+    public static string LabelLayoutAnalyzerDock => Get("位置", "Position");
+    public static string LabelLayoutAnalyzerDockBottom => Get("下", "Bottom");
+    public static string LabelLayoutAnalyzerDockTop => Get("上", "Top");
+    public static string LabelLayoutLevelMeter => Get("レベルメーター", "Level meter");
+    public static string LabelLayoutStatusBar => Get("ステータスバー", "Status bar");
+    public static string LabelLayoutPresetReset => Get("既定に戻す", "Reset to defaults");
+    public static string LabelLayoutOn => Get("オン", "On");
+    public static string LabelLayoutOff => Get("オフ", "Off");
     public static string LabelLibraryPlaylistDocuments => Get(
         "プレイリストに載せる書類・動画",
         "Documents and video in the playlist");
@@ -257,19 +291,13 @@ internal static partial class UiStrings
     public static string LabelMultiFileArrangeHorizontal => Get("左右", "Side by side");
     public static string LabelMultiFileArrangeVertical => Get("上下", "Stacked");
     public static string LabelMultiFileArrangeGrid => Get("上下左右", "Grid");
+    public static string WarnTileArrangeTooSmall => Get(
+        "ウィンドウが狭いため、タイル表示（上下・左右・格子）を配置できません。ウィンドウを広げてから再度お試しください。",
+        "The window is too small for tile layout (stacked, side by side, or grid). Enlarge the window and try again.");
     public static string LabelAppLaunchMode => Get("起動モード", "Startup mode");
-    public static string LabelAppLaunchModeEditor => Get("エディタ（通常）", "Editor (normal)");
-    public static string LabelAppLaunchModeAnalyzers => Get(
-        "エディタ（フルスクリーン：アナライザー有り）",
-        "Editor (fullscreen: with analyzers)");
-    public static string LabelAppLaunchModeWaveform => Get(
-        "エディタ（フルスクリーン：アナライザー無し）",
-        "Editor (fullscreen: without analyzers)");
-    public static string LabelAppLaunchModePlayer => Get("プレイヤー（通常）", "Player (normal)");
-    public static string LabelAppLaunchModePlayerCompact => Get("プレイヤー（コンパクト）", "Player (compact)");
     public static string LabelAppLaunchModeHint => Get(
-        "ファイルを渡さず、前回の編集も復元しない時だけ有効",
-        "Only effective when no file is passed and nothing is restored");
+        "ファイルを渡さず、前回の編集も復元しない時だけ有効。",
+        "Only when no file is passed and nothing is restored.");
     public static string LabelDefaultAudioFormat => Get("既定 Wave フォーマット", "Default Wave format");
     public static string LabelDefaultSampleRate => Get("サンプルレート", "Sample rate");
     public static string LabelDefaultBitDepth => Get("ビット深度", "Bit depth");
@@ -884,10 +912,8 @@ internal static partial class UiStrings
         "Draw with the pen (E)  volume changes when you release. The curve stays while you draw. Undo with Ctrl+Z. Also right-click the curve");
     public static string TooltipCenterPlayhead => Get("中央寄せ / センターロック (Z)", "Center / center-lock (Z)");
     public static string TooltipHistory => Get("編集履歴 (U)", "Edit history (U)");
-    public static string TooltipLibraryMaximize => Get("プレイヤー (F10)", "Player (F10)");
-    public static string TooltipLibraryMaximizeOff => Get("エディタ (F10)", "Editor (F10)");
-    public static string TooltipAnalyzerMaximize => Get("フルスクリーン（アナライザー） (F12)", "Fullscreen with analyzers (F12)");
-    public static string TooltipAnalyzerMaximizeOff => Get("アナライザー最大化を解除 (F12)", "Leave analyzer fullscreen (F12)");
+    public static string TooltipLibraryMaximize => Get("レイアウト F10", "Layout F10");
+    public static string TooltipAnalyzerMaximize => Get("レイアウト F12", "Layout F12");
     public static string TooltipColorPanel => Get("色設定 (Ctrl+Shift+C)", "Color settings (Ctrl+Shift+C)");
 
 
@@ -1097,15 +1123,16 @@ internal static partial class UiStrings
     public static string LibraryMenuAutoPlay => Get("追加時に自動再生", "Auto Play on Add");
     public static string LibraryMenuRemoveFromFavorites => Get("お気に入りから削除", "Remove from Favorites");
     public static string LibraryMenuClearFromPlaylist => Get("プレイリストからクリア", "Clear from Playlist");
-    // トップカテゴリのアクセスキーは波形メニュー（WaveMenuCat*）と揃える。子項目は InputGestureText。
-    public static string LibraryMenuCatPlaylist => Get("プレイリスト(_Y)", "Playlist (_Y)");
-    public static string LibraryMenuCatEdit => Get("編集(_E)", "_Edit");
-    public static string LibraryMenuCatAudio => Get("オーディオ(_A)", "_Audio");
-    public static string LibraryMenuCatFormat => Get("変換(_N)", "Co_nvert");
-    public static string LibraryMenuCatExport => Get("書き出し(_X)", "E_xport");
-    public static string LibraryMenuCatPitch => Get("再生・ピッチ(_P)", "_Playback & Pitch");
+    // ウィンドウ／波形メニューとトップカテゴリ名を共有（WaveMenuCat*）。子項目は InputGestureText。
+    public static string LibraryMenuCatPlaylist => WaveMenuCatPlaylist;
+    public static string LibraryMenuCatEdit => WaveMenuCatEdit;
+    public static string LibraryMenuCatAudio => WaveMenuCatAudio;
+    public static string LibraryMenuCatFormat => WaveMenuCatFormat;
+    public static string LibraryMenuCatExport => WaveMenuCatExport;
+    /// <summary>旧「再生・ピッチ」。ウィンドウメニューの「再生」に揃える。</summary>
+    public static string LibraryMenuCatPitch => WaveMenuCatPlayback;
     public static string LibraryMenuCatTree => Get("ツリー(_T)", "_Tree");
-    public static string LibraryMenuCatOther => Get("その他(_O)", "_Other");
+    public static string LibraryMenuCatOther => WaveMenuCatOther;
     public static string LibraryMenuMatchLoudness => Get("ラウドネスを揃える", "Match Loudness");
     public static string LibraryMenuMatchLoudnessSelected => Get(
         "選択したファイルのラウドネスを揃える",

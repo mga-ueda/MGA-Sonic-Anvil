@@ -64,7 +64,7 @@ internal sealed class AppSettings
 
     public string DefaultFadeOutCurve { get; set; } = nameof(FadeShape.SCurve);
 
-    /// <summary>レベルメーター／ゴニオ列の幅。0 以下は既定（最小幅）。</summary>
+    /// <summary>レベルメーター列の幅。0 以下は既定（最小幅）。</summary>
     public double MeterColumnWidth { get; set; }
 
     public int Mp3BitRate { get; set; } = Mp3Encode.DefaultWindowsBitRateKbps;
@@ -105,6 +105,21 @@ internal sealed class AppSettings
     public double WallpaperOpacity { get; set; } = WallpaperOpacityDefault;
 
     public bool AlwaysOnTop { get; set; }
+
+    /// <summary>ウィンドウ上部のメニューバーを出す。既定オン。波形右クリックと同じ内容。</summary>
+    public bool ShowMainMenuBar { get; set; } = true;
+
+    /// <summary>F9 レイアウトプリセット。欠落時は <see cref="WindowLayoutPreset.CreateDefault"/>。</summary>
+    public WindowLayoutPreset? LayoutPresetF9 { get; set; }
+
+    /// <summary>F10 レイアウトプリセット。</summary>
+    public WindowLayoutPreset? LayoutPresetF10 { get; set; }
+
+    /// <summary>F11 レイアウトプリセット。</summary>
+    public WindowLayoutPreset? LayoutPresetF11 { get; set; }
+
+    /// <summary>F12 レイアウトプリセット。</summary>
+    public WindowLayoutPreset? LayoutPresetF12 { get; set; }
 
     /// <summary>再生で MP3／M4A の encoder delay／padding を飛ばす。既定オン。</summary>
     public bool GaplessPlayback { get; set; } = true;
@@ -320,6 +335,30 @@ internal sealed class AppSettings
     /// <summary>Normal / Maximized。空または不明なら通常表示。</summary>
     public string PlayerWindowState { get; set; } = string.Empty;
 
+    /// <summary>F11 レイアウトの非全画面ウィンドウ。未保存なら幅 0。</summary>
+    public int WaveformWindowX { get; set; }
+
+    public int WaveformWindowY { get; set; }
+
+    public int WaveformWindowWidth { get; set; }
+
+    public int WaveformWindowHeight { get; set; }
+
+    /// <summary>Normal / Maximized。空または不明なら通常表示。</summary>
+    public string WaveformWindowState { get; set; } = string.Empty;
+
+    /// <summary>F12 レイアウトの非全画面ウィンドウ（トグル全画面オフ時）。未保存なら幅 0。</summary>
+    public int AnalyzerWindowX { get; set; }
+
+    public int AnalyzerWindowY { get; set; }
+
+    public int AnalyzerWindowWidth { get; set; }
+
+    public int AnalyzerWindowHeight { get; set; }
+
+    /// <summary>Normal / Maximized。空または不明なら通常表示。</summary>
+    public string AnalyzerWindowState { get; set; } = string.Empty;
+
     /// <summary>F11 全画面にしたモニター枠。未保存なら幅 0。</summary>
     public int WaveformFullscreenX { get; set; }
 
@@ -473,7 +512,10 @@ internal sealed class AppSettings
     /// </summary>
     public string MultiFileArrange { get; set; } = string.Empty;
 
-    /// <summary>ファイル無しで起動したときの画面。空／editor はエディタ。player／compact／waveform／analyzers。引数起動には使わない。</summary>
+    /// <summary>
+    /// ファイル無しで起動したときのレイアウト。f9–f12（既定 F12）。
+    /// 旧値 editor／player／compact／waveform／analyzers も読む。引数起動には使わない。
+    /// </summary>
     public string LaunchMode { get; set; } = string.Empty;
 
     public bool WaapiKeepTarget { get; set; }
@@ -624,6 +666,7 @@ internal sealed class AppSettings
     {
         var settings = new AppSettings { SettingsGeneration = CurrentGeneration };
         settings.EnsureSpeakerPresets();
+        settings.EnsureLayoutPresets();
         return settings;
     }
 
@@ -693,7 +736,71 @@ internal sealed class AppSettings
         LastNewChannelLayout = format.Layout.Id;
     }
 
-    public AppLaunchMode ResolvedLaunchMode() => AppLaunchModes.Parse(LaunchMode);
+    public WindowLayoutSlot ResolvedLaunchMode() => AppLaunchModes.Parse(LaunchMode);
+
+    public WindowLayoutPreset ResolvedLayoutPreset(WindowLayoutSlot slot)
+    {
+        var stored = slot switch
+        {
+            WindowLayoutSlot.F9 => LayoutPresetF9,
+            WindowLayoutSlot.F10 => LayoutPresetF10,
+            WindowLayoutSlot.F11 => LayoutPresetF11,
+            _ => LayoutPresetF12,
+        };
+        if (stored is null)
+        {
+            return WindowLayoutPreset.CreateDefault(slot);
+        }
+
+        // 旧ファイルで欠落した文字列／新規項目は既定に寄せる（Clone して破壊しない）。
+        var copy = stored.Clone();
+        var defaults = WindowLayoutPreset.CreateDefault(slot);
+        if (string.IsNullOrWhiteSpace(copy.FullscreenMode))
+        {
+            copy.FullscreenMode = defaults.FullscreenMode;
+        }
+
+        if (string.IsNullOrWhiteSpace(copy.AnalyzerDock))
+        {
+            copy.AnalyzerDock = "Bottom";
+        }
+
+        copy.ShowStatusBar ??= defaults.ShowStatusBar;
+        // ライブラリ列は設定に出さないため、常にスロット既定へ寄せる。
+        copy.ShowLibraryAndFavorites = defaults.ShowLibraryAndFavorites;
+
+        return copy;
+    }
+
+    public void ApplyLayoutPreset(WindowLayoutSlot slot, WindowLayoutPreset preset)
+    {
+        var copy = preset.Clone();
+        copy.ShowLibraryAndFavorites = WindowLayoutPreset.CreateDefault(slot).ShowLibraryAndFavorites;
+
+        switch (slot)
+        {
+            case WindowLayoutSlot.F9:
+                LayoutPresetF9 = copy;
+                break;
+            case WindowLayoutSlot.F10:
+                LayoutPresetF10 = copy;
+                break;
+            case WindowLayoutSlot.F11:
+                LayoutPresetF11 = copy;
+                break;
+            default:
+                LayoutPresetF12 = copy;
+                break;
+        }
+    }
+
+    public void EnsureLayoutPresets()
+    {
+        LayoutPresetF9 ??= WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F9);
+        LayoutPresetF10 ??= WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F10);
+        LayoutPresetF11 ??= WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F11);
+        LayoutPresetF12 ??= WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F12);
+    }
 
     public string ResolvedWallpaperPath() =>
         string.IsNullOrWhiteSpace(WallpaperPath) ? string.Empty : WallpaperPath.Trim();
@@ -947,6 +1054,7 @@ internal sealed class AppSettings
 }
 
 [JsonSerializable(typeof(AppSettings))]
+[JsonSerializable(typeof(WindowLayoutPreset))]
 [JsonSerializable(typeof(SpeakerPreset))]
 [JsonSerializable(typeof(SpeakerPreset[]))]
 [JsonSerializable(typeof(FileNameColorRule))]

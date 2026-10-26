@@ -1158,6 +1158,31 @@
         </Setter>
     </Style>
 
+    <!-- ウィンドウ上部メニューバー。項目は DarkMenuItemStyle（TopLevelHeader で下開き）。 -->
+    <Style x:Key="DarkMenuStyle" TargetType="Menu">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="Background" Value="{DynamicResource MainMenuBarBackBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="4,0" />
+        <Setter Property="Height" Value="{x:Static ui:DesignMetrics.MainMenuBarHeight}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Menu">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"
+                                        SnapsToDevicePixels="True"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="DarkMenuItemStyle" TargetType="MenuItem">
         <Setter Property="OverridesDefaultStyle" Value="True" />
         <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
@@ -1286,6 +1311,18 @@
                         </Trigger>
                         <Trigger Property="Role" Value="SubmenuHeader">
                             <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="Role" Value="TopLevelHeader">
+                            <Setter Property="Padding" Value="10,2"/>
+                            <Setter Property="MinHeight" Value="0"/>
+                            <Setter TargetName="PART_Popup" Property="Placement" Value="Bottom"/>
+                            <Setter TargetName="PART_Popup" Property="HorizontalOffset" Value="0"/>
+                            <Setter TargetName="PART_Popup" Property="VerticalOffset" Value="0"/>
+                            <Setter TargetName="Arrow" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                        <Trigger Property="Role" Value="TopLevelItem">
+                            <Setter Property="Padding" Value="10,2"/>
+                            <Setter Property="MinHeight" Value="0"/>
                         </Trigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>

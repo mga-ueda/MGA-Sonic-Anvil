@@ -45,6 +45,7 @@ internal static class AppSettingsFile
             }
 
             settings.EnsureSpeakerPresets();
+            settings.EnsureLayoutPresets();
             return settings;
         }
         catch

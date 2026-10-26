@@ -39,6 +39,7 @@
       <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkScrollBarStyle}"/>
       <Style TargetType="ToolTip" BasedOn="{StaticResource DarkToolTipStyle}"/>
       <Style TargetType="ContextMenu" BasedOn="{StaticResource DarkContextMenuStyle}"/>
+      <Style TargetType="Menu" BasedOn="{StaticResource DarkMenuStyle}"/>
       <Style TargetType="MenuItem" BasedOn="{StaticResource DarkMenuItemStyle}"/>
     </ResourceDictionary>
   </Application.Resources>

@@ -143,6 +143,12 @@ internal static class WaveformTileLayout
         return hostWidth / cols >= MinTileWidth && hostHeight / rows >= MinTileHeight;
     }
 
+    /// <summary>上下・左右・格子のいずれも下限を満たさない。</summary>
+    public static bool NoneFit(int count, double hostWidth, double hostHeight) =>
+        !Fits(WaveformTileArrange.Horizontal, count, hostWidth, hostHeight)
+        && !Fits(WaveformTileArrange.Vertical, count, hostWidth, hostHeight)
+        && !Fits(WaveformTileArrange.Grid, count, hostWidth, hostHeight);
+
     private static bool ShouldSkip(
         WaveformTileArrange current,
         WaveformTileArrange candidate,

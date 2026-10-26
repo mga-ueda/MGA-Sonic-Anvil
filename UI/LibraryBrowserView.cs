@@ -404,16 +404,14 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     public event EventHandler? ClearPlaylistRequested;
 
-    public event EventHandler? MatchLoudnessRequested;
-
     /// <summary>プレイリスト右クリックから波形メニュー相当の編集・書き出しを依頼する。</summary>
     public event EventHandler<WaveMenuCommand>? PlaylistWaveMenuRequested;
 
-    public event EventHandler? PlaylistPreviousRequested;
-
-    public event EventHandler? PlaylistNextRequested;
-
-    public event EventHandler? PlaylistRestartRequested;
+    /// <summary>
+    /// プレイリスト右クリックの有効状態用モデル。未設定時はプレイヤー相当のローカル推定。
+    /// ウィンドウメニューと同じ <see cref="WaveformContextMenuBuilder.Build"/> ツリーに揃える。
+    /// </summary>
+    internal Func<WaveformContextMenuModel>? ResolvePlaylistWaveMenuModel { get; set; }
 
     /// <summary>Ctrl+F5 と同じ索引の再構築。</summary>
     public event EventHandler? LibraryCatalogRebuildRequested;

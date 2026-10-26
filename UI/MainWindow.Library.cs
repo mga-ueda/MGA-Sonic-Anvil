@@ -108,6 +108,31 @@ public partial class MainWindow
     {
         PrimaryWaveform.ShowScaleLane = ShowWaveformScaleLane;
         ForEachWaveform(view => view.ShowScaleLane = ShowWaveformScaleLane);
+        ApplyDocumentTabScaleColumn();
+        ApplyTransportBrandLeftInset();
+    }
+
+    /// <summary>
+    /// タブ左を波形描画開始に揃える。送り ＜ 表示中はボタン幅を確保し、
+    /// 全画面では目盛り＋＜ 分だけ右へずらして潰れを防ぐ。
+    /// </summary>
+    private void ApplyDocumentTabScaleColumn(bool? scrollArrows = null)
+    {
+        var arrows = scrollArrows
+            ?? (TabScrollLeft.Visibility == Visibility.Visible);
+        var left = ShowWaveformScaleLane ? DesignMetrics.DbScaleWidth : 0;
+        if (arrows)
+        {
+            left = IsWaveformMaximized
+                ? left + DesignMetrics.DocumentTabScrollButtonWidth
+                : Math.Max(left, DesignMetrics.DocumentTabScrollButtonWidth);
+        }
+
+        var width = left > 0 ? new GridLength(left) : new GridLength(0);
+        if (DocumentTabScaleColumn.Width != width)
+        {
+            DocumentTabScaleColumn.Width = width;
+        }
     }
 
     internal bool IsLibraryGroupComboFocused =>
@@ -133,11 +158,6 @@ public partial class MainWindow
 
     private void ToggleLibraryMaximize()
     {
-        if (RejectOutsideFadeToolAction())
-        {
-            return;
-        }
-
         // メニュー表示中、および外側クリック dismiss がプレイヤー切替ボタンへ貫通したときの解除は捨てる。
         // （右クリックメニューを閉じるクリックが下のトランスポートボタンに当たると、
         //   ここが走って選択以外のトラックが消えてしまう。ガードは左ボタン解放まで残る。）
@@ -149,44 +169,7 @@ public partial class MainWindow
             return;
         }
 
-        // 動画ミニ（F8）中の F10 はプレイリストが見える通常プレイヤーへ戻す。
-        if (IsVideoMiniPlayerActive())
-        {
-            LeaveVideoMiniToPlaylist(minimalChrome: false);
-            return;
-        }
-
-        // F9 ミニマム中の F10 はエディタへ落とさず、通常の F10 プレイヤーへ戻す。
-        if (IsLibraryMaximized && _libraryMinimalChrome)
-        {
-            LeaveLibraryMinimalChrome();
-            return;
-        }
-
-        // 動画／PDF の本再生中、または ←→／テンキー 0 のフレーム一時停止中は前面 UI が消えている。
-        // エディタへ落とさず、暗いバックグラウンド再生へ落としてクローム（プレイリスト）を出す。
-        if (LibraryPlayerMode.ReturnsToPlaylistChromeOnF10(
-                IsLibraryMaximized,
-                videoMini: false,
-                LibraryBrowser.PlaylistVisualShown,
-                LibraryBrowser.PlaylistVisualPlaying,
-                LibraryBrowser.PlaylistVisualIsPdf,
-                LibraryBrowser.PlaylistVisualIsVideo,
-                _playlistVisualChromeBridge,
-                _playlistVideoImmersivePause))
-        {
-            StopVideoFrameStep();
-            DropPlaylistVideoToDimPreview();
-            return;
-        }
-
-        // エディタ↔プレイヤーの往復では先頭曲への寄せ直し・自動再生をしない。
-        // （既定の playFirst だと SetSessions(rebuild) と PCM ロードが毎回乗り、戻りが重い。）
-        SetWaveformMaximizeMode(
-            _waveformMaximizeMode == WaveformMaximizeMode.Library
-                ? WaveformMaximizeMode.Off
-                : WaveformMaximizeMode.Library,
-            playFirstOnLibrary: false);
+        ApplyLayoutPreset(WindowLayoutSlot.F10, fromUserShortcut: true);
     }
 
     private void LibraryBrowser_ListContextMenuOpened(object? sender, EventArgs e)
@@ -333,32 +316,9 @@ public partial class MainWindow
         StartLibraryVisualPlayback(session, stopAfterTrack: false);
     }
 
-    /// <summary>
-    /// F9 ミニマムプレイヤー。どのモードからでも入れる。
-    /// ミニマム中の F9 は通常のエディタへ戻す。F10 は通常の F10 プレイヤーへ戻す（Esc や F1 では戻さない）。
-    /// 切替時にウィンドウ位置・サイズをスロットへ記憶／復元する。F10 へ戻るときは再生を続ける。
-    /// </summary>
-    private void ToggleLibraryMinimalChrome()
-    {
-        if (RejectOutsideFadeToolAction())
-        {
-            return;
-        }
-
-        if (IsVideoMiniPlayerActive())
-        {
-            LeaveVideoMiniToPlaylist(minimalChrome: true);
-            return;
-        }
-
-        if (IsLibraryMaximized && _libraryMinimalChrome)
-        {
-            LeaveMinimalToEditor();
-            return;
-        }
-
-        EnterLibraryMinimalChrome();
-    }
+    /// <summary>F9 レイアウトプリセットを適用する。</summary>
+    private void ToggleLibraryMinimalChrome() =>
+        ApplyLayoutPreset(WindowLayoutSlot.F9, fromUserShortcut: true);
 
     /// <summary>ミニマム中の F9。通常のエディタへ戻す。F9 のウィンドウ位置は残す。</summary>
     private void LeaveMinimalToEditor()
@@ -834,6 +794,12 @@ public partial class MainWindow
             return;
         }
 
+        // レイアウト全画面（F11／F12 等）のままプレイヤーへ移るときはタイトルバーを出さない。
+        if (IsWaveformMaximized)
+        {
+            return;
+        }
+
         if (!IsLibraryMaximized)
         {
             return;
@@ -942,10 +908,21 @@ public partial class MainWindow
             }
         }
 
-        if (StatusBarHost.Visibility != Visibility.Visible && !_libraryMinimalChrome)
+        var wantStatusBar = _activeLayoutSlot is { } statusSlot
+            ? AppStorage.Settings.ResolvedLayoutPreset(statusSlot).ResolvedShowStatusBar(statusSlot)
+            : true;
+        if (wantStatusBar
+            && StatusBarHost.Visibility != Visibility.Visible
+            && !_libraryMinimalChrome)
         {
             StatusBarHost.Visibility = Visibility.Visible;
         }
+        else if (!wantStatusBar)
+        {
+            StatusBarHost.Visibility = Visibility.Collapsed;
+        }
+
+        ApplyMainMenuBarVisibility();
     }
 
     private void EnsurePlaylistVideoHudOpaque()

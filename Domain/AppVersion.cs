@@ -64,23 +64,6 @@ internal static partial class AppVersion
     }
 
     /// <summary>
-    /// F5（デバッガー接続）のときだけタイトル先頭に [DEBUG] を付ける。
-    /// リリースビルドでは付けない。
-    /// </summary>
-    public static string WithDebuggerPrefix(string title, bool debuggerAttached)
-    {
-#if DEBUG
-        if (debuggerAttached)
-        {
-            return "[DEBUG] " + title;
-        }
-#else
-        _ = debuggerAttached;
-#endif
-        return title;
-    }
-
-    /// <summary>
     /// <paramref name="remoteSemVer"/> がローカルより新しいとき true。
     /// パース不能なときは比較せず false。
     /// </summary>

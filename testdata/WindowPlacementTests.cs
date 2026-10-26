@@ -508,6 +508,44 @@ public sealed class WindowPlacementTests
     }
 
     [Fact]
+    public void CaptureWindowedWaveformAndAnalyzer_SeparateFromFullscreen()
+    {
+        var settings = new AppSettings();
+        WindowPlacement.Capture(
+            new Rect(40, 50, 1280, 720),
+            maximized: false,
+            settings,
+            MainWindowPlacementKind.Waveform);
+        WindowPlacement.Capture(
+            new Rect(60, 70, 1400, 800),
+            maximized: true,
+            settings,
+            MainWindowPlacementKind.Analyzer);
+        WindowPlacement.Capture(
+            new Rect(0, 0, 1920, 1080),
+            maximized: false,
+            settings,
+            MainWindowPlacementKind.WaveformFullscreen);
+        WindowPlacement.Capture(
+            new Rect(1920, 0, 2560, 1440),
+            maximized: false,
+            settings,
+            MainWindowPlacementKind.AnalyzerFullscreen);
+
+        Assert.Equal(40, settings.WaveformWindowX);
+        Assert.Equal(WindowPlacement.ToStoredExtent(1280), settings.WaveformWindowWidth);
+        Assert.Equal(nameof(WindowState.Normal), settings.WaveformWindowState);
+        Assert.Equal(60, settings.AnalyzerWindowX);
+        Assert.Equal(WindowPlacement.ToStoredExtent(1400), settings.AnalyzerWindowWidth);
+        Assert.Equal(nameof(WindowState.Maximized), settings.AnalyzerWindowState);
+        Assert.Equal(WindowPlacement.ToStoredExtent(1920), settings.WaveformFullscreenWidth);
+        Assert.Equal(WindowPlacement.ToStoredExtent(2560), settings.AnalyzerFullscreenWidth);
+        // 全画面枠を書いて非全画面が消えないこと。
+        Assert.Equal(50, settings.WaveformWindowY);
+        Assert.Equal(70, settings.AnalyzerWindowY);
+    }
+
+    [Fact]
     public void TryReadMinimalPlayer_AcceptsSavedBounds()
     {
         var width = DesignMetrics.MinimalPlayerWindowMinWidth + 40;
