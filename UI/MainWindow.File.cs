@@ -1526,6 +1526,24 @@ public partial class MainWindow
 
         ActivateSession(session);
         ApplyPreferredMultiFileArrange(1);
+        // プレイヤー中は BindWorkspace が RebuildTabBar を通らないため、
+        // バウンス等で _sessions に足した直後に一覧へ載せないと、後の SetSessions まで見えない。
+        SyncPlaylistBrowserAfterSessionInsert(session);
+    }
+
+    /// <summary>
+    /// プレイヤー表示中にセッションを足したあと、プレイリスト行を正本へ合わせる。
+    /// </summary>
+    private void SyncPlaylistBrowserAfterSessionInsert(DocumentSession session)
+    {
+        if (!IsLibraryMaximized)
+        {
+            return;
+        }
+
+        LibraryBrowser.SetSessions(_sessions, session, [session]);
+        ShowLibraryArtworkOrClear(session);
+        ScheduleLibraryWaveformPaint();
     }
 
     private void MergeSelectedTabs() => _ = MergeSelectedTabsAsync();
