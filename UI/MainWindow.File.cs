@@ -1281,8 +1281,8 @@ public partial class MainWindow
             this,
             text,
             UiStrings.AppName,
-            MessageBoxButton.YesNo,
-            defaultResult) == MessageBoxResult.Yes;
+            MessageBoxButton.OKCancel,
+            defaultResult) == MessageBoxResult.OK;
     }
 
     private void DuplicateSession(DocumentSession session)
@@ -1300,7 +1300,7 @@ public partial class MainWindow
             confirm = UiStrings.ConfirmDuplicateFileAs(session.DisplayName, Path.GetFileName(destPath));
         }
 
-        if (!ConfirmFileAction(confirm, MessageBoxImage.Question, MessageBoxResult.Yes))
+        if (!ConfirmFileAction(confirm, MessageBoxImage.Question, MessageBoxResult.OK))
         {
             return;
         }
@@ -1362,7 +1362,7 @@ public partial class MainWindow
         if (!ConfirmFileAction(
             UiStrings.ConfirmDuplicateSelectedFiles(sessions.Count),
             MessageBoxImage.Question,
-            MessageBoxResult.Yes))
+            MessageBoxResult.OK))
         {
             return;
         }
@@ -1773,7 +1773,7 @@ public partial class MainWindow
         var confirm = fromDisk
             ? UiStrings.ConfirmDeleteFile(session.DisplayName)
             : UiStrings.ConfirmDeleteUntitled(session.DisplayName);
-        if (!ConfirmFileAction(confirm, MessageBoxImage.Warning, MessageBoxResult.No))
+        if (!ConfirmFileAction(confirm, MessageBoxImage.Warning, MessageBoxResult.Cancel))
         {
             return;
         }
@@ -1833,7 +1833,7 @@ public partial class MainWindow
         if (!ConfirmFileAction(
             UiStrings.ConfirmDeleteSelectedFiles(sessions.Count),
             MessageBoxImage.Warning,
-            MessageBoxResult.No))
+            MessageBoxResult.Cancel))
         {
             return;
         }

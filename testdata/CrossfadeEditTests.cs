@@ -565,7 +565,7 @@ public sealed class CrossfadeEditTests
     }
 
     [Fact]
-    public void ConfirmCrossfadeClip_UsesYesNoWords()
+    public void ConfirmCrossfadeClip_UsesOkCancelWords()
     {
         var previous = UiStrings.Language;
         try
@@ -574,15 +574,19 @@ public sealed class CrossfadeEditTests
             var japanese = UiStrings.ConfirmCrossfadeClip("1.5");
             Assert.Contains("0 dBFS を 1.5 dB 超えています", japanese);
             Assert.Contains("波形全体を下げて", japanese);
-            Assert.Contains("\n\nYes:", japanese);
-            Assert.Contains("\nNo:", japanese);
+            Assert.Contains("\n\nOK:", japanese);
+            Assert.Contains("\nCancel:", japanese);
+            Assert.DoesNotContain("\nYes:", japanese);
+            Assert.DoesNotContain("\nNo:", japanese);
 
             UiStrings.SetLanguage(UiLanguage.English);
             var english = UiStrings.ConfirmCrossfadeClip("1.5");
             Assert.Contains("1.5 dB over 0 dBFS", english);
             Assert.Contains("lower the entire waveform", english);
-            Assert.Contains("\n\nYes:", english);
-            Assert.Contains("\nNo:", english);
+            Assert.Contains("\n\nOK:", english);
+            Assert.Contains("\nCancel:", english);
+            Assert.DoesNotContain("\nYes:", english);
+            Assert.DoesNotContain("\nNo:", english);
         }
         finally
         {

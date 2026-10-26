@@ -14,7 +14,7 @@ internal enum ConfirmSaveChoice
     DiscardAll,
 }
 
-/// <summary>未保存が複数あるときの保存確認。はい／いいえに加え、残りをまとめて閉じられる。</summary>
+/// <summary>未保存が複数あるときの保存確認。OK／No／Cancel に加え、残りをまとめて閉じられる。</summary>
 internal sealed class ConfirmSaveWindow : Window
 {
     public ConfirmSaveChoice Choice { get; private set; } = ConfirmSaveChoice.Cancel;
@@ -51,7 +51,7 @@ internal sealed class ConfirmSaveWindow : Window
             Margin = new Thickness(0, 0, 0, 16),
         };
 
-        var yes = CreateButton(UiStrings.ButtonYes, ConfirmSaveChoice.Save, accent: true, isDefault: true);
+        var yes = CreateButton(UiStrings.ButtonOk, ConfirmSaveChoice.Save, accent: true, isDefault: true);
         var no = CreateButton(UiStrings.ButtonNo, ConfirmSaveChoice.Discard);
         var saveAll = CreateButton(
             closing ? UiStrings.ButtonSaveAllAndClose : UiStrings.ButtonSaveAll,

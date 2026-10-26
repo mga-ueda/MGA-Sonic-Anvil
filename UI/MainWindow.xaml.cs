@@ -1858,11 +1858,11 @@ public partial class MainWindow : Window
                     remoteSemVer,
                     update.Value.IsPrerelease),
                 UiStrings.DialogUpdateAvailableTitle,
-                MessageBoxButton.YesNo,
+                MessageBoxButton.OKCancel,
                 MessageBoxImage.Information,
-                MessageBoxResult.Yes);
+                MessageBoxResult.OK);
 
-            if (answer == MessageBoxResult.Yes)
+            if (answer == MessageBoxResult.OK)
             {
                 try
                 {

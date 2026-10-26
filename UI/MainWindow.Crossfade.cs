@@ -298,10 +298,10 @@ public partial class MainWindow
                 this,
                 UiStrings.ConfirmCrossfadeClip(TabMerge.FormatOverDb(clip.OverDb)),
                 UiStrings.AppName,
-                MessageBoxButton.YesNo,
+                MessageBoxButton.OKCancel,
                 MessageBoxImage.Warning,
-                MessageBoxResult.Yes);
-            if (answer == MessageBoxResult.Yes)
+                MessageBoxResult.OK);
+            if (answer == MessageBoxResult.OK)
             {
                 command = ProcessEdits.ApplyLoopMix(
                     _document,

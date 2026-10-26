@@ -1038,7 +1038,7 @@ public partial class MainWindow
         var text = paths.Count == 1
             ? UiStrings.ConfirmDeleteFile(Path.GetFileName(LibraryFileTransfer.NormalizePrefix(paths[0])))
             : UiStrings.ConfirmDeleteSelectedItems(paths.Count);
-        return ConfirmFileAction(text, MessageBoxImage.Warning, MessageBoxResult.No);
+        return ConfirmFileAction(text, MessageBoxImage.Warning, MessageBoxResult.Cancel);
     }
 
     private void ReleaseLibraryPaths(IReadOnlyList<string> paths)
