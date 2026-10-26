@@ -35,7 +35,7 @@ internal static partial class ProcessEdits
         var before = document.CopyRange(0, frameCount);
         var work = (float[])before.Clone();
 
-        // プリ＝S 手前をエンドへ、ポスト＝E 以降をスタートへ。折り返しは常に S。
+        // プリ＝S 手前をエンド手前へ、ポスト＝ループスタートを E 以降へ。
         if (state.PreCrossfadeFrames > 0)
         {
             LoopCrossfade.BakePreCrossfade(
@@ -80,7 +80,7 @@ internal static partial class ProcessEdits
 
         if (state.TruncateOutside)
         {
-            // 焼き込みは [S,E) 内。前後を切り落す。
+            // ポストは [E, E＋Post) へ焼くが、前後削除では終点以降ごと切り落す。
             var keepStart = state.StartFrame;
             var keepEnd = Math.Min(frameCount, state.EndFrame);
             if (keepEnd <= keepStart)
@@ -182,7 +182,7 @@ internal static partial class ProcessEdits
     {
         var peak = 0f;
         AccumulatePeak(samples, channels, state.EndFrame - state.PreCrossfadeFrames, state.PreCrossfadeFrames, ref peak);
-        AccumulatePeak(samples, channels, state.StartFrame, state.PostCrossfadeFrames, ref peak);
+        AccumulatePeak(samples, channels, state.EndFrame, state.PostCrossfadeFrames, ref peak);
         if (!float.IsFinite(peak))
         {
             return new TabMerge.BounceClipInfo { Peak = float.PositiveInfinity, OverDb = double.PositiveInfinity };

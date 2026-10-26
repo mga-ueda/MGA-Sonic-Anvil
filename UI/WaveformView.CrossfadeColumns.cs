@@ -135,7 +135,7 @@ internal sealed partial class WaveformView
 
             // 列中央で fade／preview gain を 1 回だけ先計算。
             var mid = f0 + (f1 - f0) / 2;
-            var fadeGain = CrossfadeBaseFadeGainAt(mid, fade, draft);
+            var fadeGain = CrossfadeBaseFadeGainAt(mid, fade);
             var previewGain = PreviewGain(mid);
             var dest = i * channels;
 
@@ -242,25 +242,15 @@ internal sealed partial class WaveformView
         return clipped1 > clipped0;
     }
 
-    /// <summary>本体表示用フェードゲイン（列中央 LUT）。ポスト帯は in、プリ帯は out。</summary>
-    private static float CrossfadeBaseFadeGainAt(
-        long frame,
-        in LoopFadePreview fade,
-        CrossfadeEditState draft)
+    /// <summary>本体表示用フェードゲイン。元波形側（プリ＝out、ポスト＝in）。</summary>
+    private static float CrossfadeBaseFadeGainAt(long frame, in LoopFadePreview fade)
     {
-        if (!fade.TryCrossfadeMix(frame, out _, out _, out var outGain, out var inGain))
+        if (!fade.TryCrossfadeMix(frame, out _, out var inSide, out var outGain, out var inGain))
         {
             return 1f;
         }
 
-        if (draft.PostCrossfadeFrames > 0
-            && frame >= draft.StartFrame
-            && frame < draft.StartFrame + draft.PostCrossfadeFrames)
-        {
-            return inGain;
-        }
-
-        return outGain;
+        return inSide == frame ? inGain : outGain;
     }
 
     private int FillLiveColumnPeaks(
@@ -367,7 +357,7 @@ internal sealed partial class WaveformView
                 {
                     float sample;
                     if (draft is not null
-                        && TryGetCrossfadeBaseDisplaySample(frame, ch, fade, draft, out var preview))
+                        && TryGetCrossfadeBaseDisplaySample(frame, ch, fade, out var preview))
                     {
                         sample = preview;
                     }
@@ -495,7 +485,7 @@ internal sealed partial class WaveformView
             }
 
             if (draft is not null
-                && TryGetCrossfadeBaseDisplaySample(frame, channel, fade, draft, out var preview))
+                && TryGetCrossfadeBaseDisplaySample(frame, channel, fade, out var preview))
             {
                 return preview * gain;
             }

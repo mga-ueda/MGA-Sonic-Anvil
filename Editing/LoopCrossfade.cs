@@ -28,8 +28,7 @@ internal readonly struct LoopFadePreview
 
     /// <summary>
     /// プリ＝[E−Pre, E): 元波形（エンド）×out→0 ＋ S 手前×in。
-    /// ポスト＝[S, S＋Post): E 以降×out ＋ 元波形（スタート）×in←0。
-    /// 折り返しは常に S。
+    /// ポスト＝[E, E＋Post): 元波形（E 以降）×in←0 ＋ ループスタート×out→0。
     /// </summary>
     public bool TryCrossfadeMix(
         long frame,
@@ -48,14 +47,14 @@ internal readonly struct LoopFadePreview
         }
 
         if (PostCrossfadeFrames > 0
-            && frame >= StartFrame
-            && frame < StartFrame + PostCrossfadeFrames)
+            && frame >= EndFrame
+            && frame < EndFrame + PostCrossfadeFrames)
         {
             var x = PostCrossfadeFrames;
-            var i = frame - StartFrame;
-            // スタート側を in、ループ直後（E 以降）を out
+            var i = frame - EndFrame;
+            // 元波形＝フェードイン、ループスタート上乗せ＝フェードアウト
+            outSideFrame = StartFrame + i;
             inSideFrame = frame;
-            outSideFrame = EndFrame + i;
             FadeCurves.CrossfadeGainsAtFrame(PostOutShape, PostInShape, i, 0, x, out outGain, out inGain);
             return true;
         }
@@ -114,7 +113,7 @@ internal static class LoopCrossfade
         }
     }
 
-    /// <summary>ポスト: E 以降 × out + スタート先頭 × in を [S, S＋X) へ焼く。</summary>
+    /// <summary>ポスト: E 以降 × in ＋ ループスタート × out を [E, E＋X) へ焼く。</summary>
     public static void BakePostCrossfade(
         float[] source,
         float[] dest,
@@ -136,14 +135,14 @@ internal static class LoopCrossfade
         for (var i = 0; i < x; i++)
         {
             FadeCurves.CrossfadeGains(outShape, inShape, i / (double)denom, out var outGain, out var inGain);
-            var destFrame = startFrame + i;
+            var destFrame = endFrame + i;
             var destOff = (int)destFrame * channels;
-            var srcOut = (int)(endFrame + i) * channels;
-            var srcIn = (int)destFrame * channels;
+            var srcBase = destOff;
+            var srcOverlay = (int)(startFrame + i) * channels;
             for (var ch = 0; ch < channels; ch++)
             {
                 dest[destOff + ch] =
-                    source[srcOut + ch] * outGain + source[srcIn + ch] * inGain;
+                    source[srcBase + ch] * inGain + source[srcOverlay + ch] * outGain;
             }
         }
     }
@@ -277,34 +276,7 @@ internal static class LoopCrossfade
             }
         }
 
-        // 右＝スタート側にポスト（[S, S＋Post) ＝ E 以降 out ＋ スタート in）
-        var post = (int)Math.Min(state.PostCrossfadeFrames, halfFrames);
-        if (post > 0 && state.EndFrame + post <= frameCount)
-        {
-            var denom = Math.Max(1, post - 1);
-            for (var i = 0; i < post; i++)
-            {
-                var frame = state.StartFrame + i;
-                var destIndex = (int)(frame - (state.StartFrame + panRightFrames));
-                if (destIndex < 0 || destIndex >= halfFrames)
-                {
-                    continue;
-                }
-
-                FadeCurves.CrossfadeGains(
-                    state.PostOutShape,
-                    state.PostInShape,
-                    i / (double)denom,
-                    out var outGain,
-                    out var inGain);
-                ReadFrameChannels(interleaved, channels, frameCount, state.EndFrame + i, endBuf);
-                ReadFrameChannels(interleaved, channels, frameCount, frame, startBuf);
-                for (var ch = 0; ch < channels; ch++)
-                {
-                    rightByChannel[ch][destIndex] = endBuf[ch] * outGain + startBuf[ch] * inGain;
-                }
-            }
-        }
+        // ポストは [E, E＋Post) へ焼くため E|S 継ぎ目プレビュー（左＝E 手前／右＝S 直後）には出さない。
     }
 
     private static float[][] AllocChannelBuffers(int channels, int halfFrames)
