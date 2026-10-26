@@ -24,6 +24,8 @@ internal sealed class ConfirmChoiceWindow : Window
             text, caption, buttons, defaultResult, yesText, noText, cancelText);
         if (owner is not null)
         {
+            // 起動クローク中の本体を Owner にすると、ダイアログも見えず操作不能になる。
+            WindowPaintReveal.EnsureRevealedForDialog(owner);
             dialog.Owner = owner;
             dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
         }

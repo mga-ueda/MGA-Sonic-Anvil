@@ -24,6 +24,8 @@ internal sealed class ConfirmSaveWindow : Window
 
     public static ConfirmSaveChoice Show(Window owner, string displayName, int remainingDirty, bool closing)
     {
+        // 起動クローク中の本体を Owner にすると、ダイアログも見えず操作不能になる。
+        WindowPaintReveal.EnsureRevealedForDialog(owner);
         var dialog = new ConfirmSaveWindow(displayName, remainingDirty, closing) { Owner = owner };
         WindowPaintReveal.ShowDialogWhenPainted(dialog);
         return dialog.Choice;

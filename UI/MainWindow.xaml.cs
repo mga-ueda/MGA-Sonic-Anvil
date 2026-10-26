@@ -620,7 +620,23 @@ public partial class MainWindow : Window
         else
         {
             // 引数なし: クローク中に起動モードを載せてから出す（別モードが一瞬見えないように）。
-            EnterStartupMode();
+            // 未保存タブがあるとき F9/F10 へ入れると保存確認が必要。クローク中の
+            // ShowDialog は操作不能になるので、プレイヤー起動モードは後回しにする。
+            var launchSlot = AppStorage.Settings.ResolvedLaunchMode();
+            var dirtyRestored = false;
+            foreach (var session in _sessions)
+            {
+                if (session.Document.IsDirty)
+                {
+                    dirtyRestored = true;
+                    break;
+                }
+            }
+
+            if (!(WindowLayoutPreset.IsPlayerLayoutSlot(launchSlot) && dirtyRestored))
+            {
+                EnterStartupMode();
+            }
         }
 
         NotifySettingsRecreatedIfNeeded();
