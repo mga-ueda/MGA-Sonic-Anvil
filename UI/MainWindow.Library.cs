@@ -823,6 +823,7 @@ public partial class MainWindow
         SyncPlaylistVideoUiShadows(
             !hide,
             hideAtOverlays && LibraryBrowser.PlaylistVisualIsVideo);
+        SyncPlaylistVisualCursorHide();
     }
 
     private void EnsurePlaylistVideoWindowRestored()
@@ -1303,6 +1304,111 @@ public partial class MainWindow
     private void OnPlaylistVideoSimpleSeekPointerMove(object sender, MouseEventArgs e)
     {
         NotePlaylistVideoSimpleSeekKeyboard();
+        NotePlaylistVisualCursorActivity();
+    }
+
+    private bool _playlistVisualCursorHideArmed;
+    private bool _playlistVisualCursorHidden;
+    private long _playlistVisualCursorIdleUntil;
+    private DispatcherTimer? _playlistVisualCursorHideTimer;
+
+    private bool IsPlaylistVisualCursorHideArmed() =>
+        LibraryPlayerMode.HidesMouseCursorForPlaylistVisual(
+            !_playlistVideoChromeVisible,
+            LibraryBrowser.PlaylistVisualIsVideo,
+            LibraryBrowser.PlaylistVisualIsPdf);
+
+    /// <summary>
+    /// 動画／PDF 本再生中はカーソルを消し、マウス移動で一時表示してからまた消す。
+    /// </summary>
+    private void SyncPlaylistVisualCursorHide()
+    {
+        if (!IsPlaylistVisualCursorHideArmed())
+        {
+            _playlistVisualCursorHideArmed = false;
+            _playlistVisualCursorIdleUntil = 0;
+            _playlistVisualCursorHideTimer?.Stop();
+            SetPlaylistVisualCursorHidden(false);
+            return;
+        }
+
+        var justArmed = !_playlistVisualCursorHideArmed;
+        _playlistVisualCursorHideArmed = true;
+        if (justArmed)
+        {
+            // 本再生突入時はすぐ消す（マウスを待たない）。
+            SetPlaylistVisualCursorHidden(true);
+            return;
+        }
+
+        RefreshPlaylistVisualCursorHide();
+    }
+
+    private void NotePlaylistVisualCursorActivity()
+    {
+        if (!IsPlaylistVisualCursorHideArmed())
+        {
+            return;
+        }
+
+        _playlistVisualCursorIdleUntil = Environment.TickCount64
+            + (long)(LibraryPlayerMode.PlaylistVisualCursorHideIdleSeconds * 1000);
+        _playlistVisualCursorHideTimer ??= new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(LibraryPlayerMode.PlaylistVisualCursorHideIdleSeconds),
+        };
+        _playlistVisualCursorHideTimer.Stop();
+        _playlistVisualCursorHideTimer.Tick -= OnPlaylistVisualCursorHideTick;
+        _playlistVisualCursorHideTimer.Tick += OnPlaylistVisualCursorHideTick;
+        _playlistVisualCursorHideTimer.Start();
+        SetPlaylistVisualCursorHidden(false);
+    }
+
+    private void OnPlaylistVisualCursorHideTick(object? sender, EventArgs e)
+    {
+        _playlistVisualCursorHideTimer?.Stop();
+        var remain = _playlistVisualCursorIdleUntil - Environment.TickCount64;
+        if (remain > 0 && _playlistVisualCursorHideTimer is not null)
+        {
+            _playlistVisualCursorHideTimer.Interval = TimeSpan.FromMilliseconds(remain);
+            _playlistVisualCursorHideTimer.Start();
+            return;
+        }
+
+        RefreshPlaylistVisualCursorHide();
+    }
+
+    private void RefreshPlaylistVisualCursorHide()
+    {
+        if (!IsPlaylistVisualCursorHideArmed())
+        {
+            SyncPlaylistVisualCursorHide();
+            return;
+        }
+
+        var keepVisible = Environment.TickCount64 < _playlistVisualCursorIdleUntil
+            || PlaylistVideoSimpleSeek.IsDragging;
+        SetPlaylistVisualCursorHidden(!keepVisible);
+    }
+
+    private void SetPlaylistVisualCursorHidden(bool hidden)
+    {
+        if (_playlistVisualCursorHidden == hidden)
+        {
+            if (hidden && Mouse.OverrideCursor != Cursors.None)
+            {
+                Mouse.OverrideCursor = Cursors.None;
+            }
+            else if (!hidden && ReferenceEquals(Mouse.OverrideCursor, Cursors.None))
+            {
+                Mouse.OverrideCursor = null;
+            }
+
+            return;
+        }
+
+        _playlistVisualCursorHidden = hidden;
+        Mouse.OverrideCursor = hidden ? Cursors.None : null;
     }
 
     private void SyncPlaylistVideoSimpleSeekRatio()
@@ -1421,6 +1527,8 @@ public partial class MainWindow
         }
 
         RefreshPlaylistVideoSimpleSeekPresence();
+        // ドラッグ中はカーソルを残していたので、離したらアイドル判定へ戻す。
+        NotePlaylistVisualCursorActivity();
     }
 
     /// <summary>

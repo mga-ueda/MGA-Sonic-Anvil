@@ -1183,6 +1183,15 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(0, LibraryPlayerMode.SeekRatioAtFrame(10, 0));
         Assert.Equal(3, LibraryPlayerMode.PlaylistVideoSimpleSeekKeyboardHoldSeconds);
         Assert.Equal(1, LibraryPlayerMode.PlaylistVideoSimpleSeekFadeOutSeconds);
+        Assert.Equal(3, LibraryPlayerMode.PlaylistVisualCursorHideIdleSeconds);
+        Assert.True(LibraryPlayerMode.HidesMouseCursorForPlaylistVisual(
+            chromeHidden: true, isVideo: true, isPdf: false));
+        Assert.True(LibraryPlayerMode.HidesMouseCursorForPlaylistVisual(
+            chromeHidden: true, isVideo: false, isPdf: true));
+        Assert.False(LibraryPlayerMode.HidesMouseCursorForPlaylistVisual(
+            chromeHidden: false, isVideo: true, isPdf: false));
+        Assert.False(LibraryPlayerMode.HidesMouseCursorForPlaylistVisual(
+            chromeHidden: true, isVideo: false, isPdf: false));
         Assert.Equal("clip.mov", LibraryPlayerMode.FormatPlaylistVideoFileName("clip.mov", usingProxy: false));
         Assert.Equal(
             "clip.mov" + LibraryPlayerMode.PlaylistVideoProxySuffix,
