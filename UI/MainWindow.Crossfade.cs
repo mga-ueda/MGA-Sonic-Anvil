@@ -73,8 +73,20 @@ public partial class MainWindow
         window.ExitRequested += () => ExitCrossfadeEditMode(apply: false);
         window.AutoSearchRequested += RunCrossfadeAutoSearch;
         window.SnapZeroRequested += SnapCrossfadeZero;
+        window.SingleLoopChanged += OnCrossfadeSingleLoopChanged;
+        window.SetSingleLoopChecked(LibraryBrowser.AutoLoopEnabled);
         _crossfadeWindow = window;
         return window;
+    }
+
+    private void OnCrossfadeSingleLoopChanged(bool enabled)
+    {
+        if (LibraryBrowser.AutoLoopEnabled == enabled)
+        {
+            return;
+        }
+
+        LibraryBrowser.AutoLoopEnabled = enabled;
     }
 
     private bool TryEnterCrossfadeEditMode()
@@ -114,12 +126,14 @@ public partial class MainWindow
         var window = EnsureCrossfadeWindow();
         window.SetDocument(_document);
         window.State = _crossfadeEdit;
+        window.SetSingleLoopChecked(LibraryBrowser.AutoLoopEnabled);
         window.RefreshUiStrings();
         // 前ファイルの重ね／プレビューキャッシュを捨ててからドラフトを載せる。
         Waveform.ClearCrossfadeCaches();
         Waveform.CrossfadeDraft = _crossfadeEdit;
         Waveform.SetPreviewGain(null);
         Waveform.InvalidateVisual();
+        SyncPlayWindowFromDocument();
         window.Present();
         return true;
     }
@@ -443,11 +457,12 @@ public partial class MainWindow
                 }
             case CrossfadeEditState.FocusField.PostCrossfade:
                 {
+                    // 赤旗は S＋Post（材料側）。プリと同様、旗をゼロクロスへ寄せて長さ＝旗−S。
                     var target = Math.Clamp(_crossfadeEdit.PostFlagFrame, 0, Math.Max(0, frames - 1));
                     var flag = LoopCrossfade.SnapToZeroCrossing(
                         interleaved, channels, frames, target);
                     _crossfadeEdit.SetPostCrossfade(
-                        Math.Max(0, flag - _crossfadeEdit.EndFrame), frames);
+                        Math.Max(0, flag - _crossfadeEdit.StartFrame), frames);
                     break;
                 }
         }

@@ -5772,6 +5772,8 @@ public partial class MainWindow
             AutoLoopCheck.IsChecked = LibraryBrowser.AutoLoopEnabled;
         }
 
+        _crossfadeWindow?.SetSingleLoopChecked(LibraryBrowser.AutoLoopEnabled);
+
         // エディタでもサンプルループ再生ウィンドウを Single Loop に追従させる。
         SyncPlayWindowFromDocument();
         if (!IsLibraryMaximized || !IsPlaybackActive())

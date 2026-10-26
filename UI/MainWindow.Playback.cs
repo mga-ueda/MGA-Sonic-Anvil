@@ -519,10 +519,10 @@ public partial class MainWindow
         }
 
         WaveSelection? playRange = ResolvePlayLoopRange();
-        // フェード調整／Single Loop＋サンプルループ: イントロ（S より前）は通し、E 以降だけ S へ。
+        // Single Loop＋サンプルループ（フェード調整中も含む）: イントロ（S より前）は通し、E 以降だけ S へ。
         // Bind/Mp3Gapless 側にも同じフラグを渡し、再生窓始点への再吸い寄せを防ぐ。
-        var allowBeforePlayWindowStart =
-            IsCrossfadeEditMode || IsAutoLoopSampleLoopWindow();
+        // フェード調整中でも Single Loop オフならループせず、ポストクロスを通しで確認できる。
+        var allowBeforePlayWindowStart = AllowsIntroThroughSampleLoopStart();
         if (playRange is { } range)
         {
             // 選択／A-B ループは窓外開始を始点へスナップする。
@@ -958,7 +958,8 @@ public partial class MainWindow
         if (playRange is null)
         {
             _player.SetPlayWindow(null, loop: false);
-            _player.SetExitSpan(null);
+            // フェード調整中はループ無しでもプレビュー合成を維持する。
+            ApplyFadeToolPlaybackLayers(null);
             return;
         }
 
@@ -968,8 +969,9 @@ public partial class MainWindow
 
     /// <summary>
     /// 再生のループ窓（半開区間）。null ならループなし（一通）。
-    /// 優先順位: フェード調整のサンプルループ → プレイヤー A-B → 選択 →
+    /// 優先順位: フェード調整＋Single Loop のサンプルループ → プレイヤー A-B → 選択 →
     /// （エディタ）Single Loop のサンプルループ →（プレイヤー）Single Loop 全長。
+    /// フェード調整中でも Single Loop オフならループしない（ポストクロス確認用）。
     /// プレイヤーではサンプルループを無視する。エディタの Single Loop＋サンプルループ時の
     /// 開始位置は <see cref="AutoLoopPlayback"/> を参照（頭〜S は通し、E で S へ無限ループ）。
     /// </summary>
@@ -980,7 +982,7 @@ public partial class MainWindow
             return null;
         }
 
-        if (IsCrossfadeEditMode && !_document.SampleLoop.IsEmpty)
+        if (IsCrossfadeAutoLoopSampleLoopWindow())
         {
             return _document.SampleLoop.Clamp(_document.FrameCount);
         }
@@ -1030,6 +1032,16 @@ public partial class MainWindow
             hasPlayerAbLoop: IsLibraryMaximized && Waveform.TryGetPlayerAbLoop(out _),
             playerMode: IsLibraryMaximized);
 
+    /// <summary>フェード調整＋Single Loop＋サンプルループ（選択があっても優先）。</summary>
+    private bool IsCrossfadeAutoLoopSampleLoopWindow() =>
+        IsCrossfadeEditMode
+        && LibraryBrowser.AutoLoopEnabled
+        && _document is { SampleLoop.IsEmpty: false };
+
+    /// <summary>イントロ（S より前）を通して再生してよいか。</summary>
+    private bool AllowsIntroThroughSampleLoopStart() =>
+        IsAutoLoopSampleLoopWindow() || IsCrossfadeAutoLoopSampleLoopWindow();
+
     /// <summary>
     /// 再生ウィンドウ終端に接する -E（Exit）区間。Play -E のループ折り返し二重再生対象。
     /// 連続する Exit リージョンは 1 区間へつなげる。該当がなければ null。
@@ -1039,7 +1051,7 @@ public partial class MainWindow
         if (IsCrossfadeEditMode && _crossfadeEdit is not null && _document is not null)
         {
             _crossfadeEdit.Clamp(_document.FrameCount);
-            // プリ／ポストクロスはループ内ミックス。Exit 二重再生は使わない。
+            // プリ／ポストクロスは LoopFadePreview で合成。Exit 二重再生は使わない。
             _player.SetLoopFadePreview(LoopFadePreview.From(_crossfadeEdit));
             _player.SetExitSpan(null);
             _player.PlayExitLayer = false;
