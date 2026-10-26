@@ -160,6 +160,22 @@ internal static class WindowPaintReveal
         InvokePainted(state);
     }
 
+    /// <summary>
+    /// Owner 付きモーダルの直前。クローク／透明のまま ShowDialog すると操作不能になる。
+    /// </summary>
+    public static void EnsureRevealedForDialog(Window? owner)
+    {
+        if (owner is null)
+        {
+            return;
+        }
+
+        if (owner.Opacity < 1 || IsPending(owner))
+        {
+            Reveal(owner);
+        }
+    }
+
     private static void NotifyPainted(Window window)
     {
         if (!States.TryGetValue(window, out var state) || state.PaintNotified)
