@@ -1593,6 +1593,8 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: true, hasScratchMarkers: true));
         Assert.False(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: true, hasScratchMarkers: false));
         Assert.False(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: false, hasScratchMarkers: true));
+        Assert.True(LibraryPlayerMode.AllowsDocumentRegionDigitJump(playerMode: false));
+        Assert.False(LibraryPlayerMode.AllowsDocumentRegionDigitJump(playerMode: true));
 
         // 上段の二桁: 1→2 で 12、1→0 で 10。
         Assert.True(LibraryPlayerMode.TryResolveMarkerDigitJump(0, 1, 12, out var p1, out var s1, out var pct1));

@@ -7,7 +7,7 @@ namespace MgaSonicAnvil.UI;
 /// <list type="bullet">
 /// <item>
 /// <description>
-/// サンプルループあり: 再生窓は [S, E)。S より前（イントロ）からの開始を許可し、
+/// エディタ＋サンプルループあり: 再生窓は [S, E)。S より前（イントロ）からの開始を許可し、
 /// 一度通したあと E 到達で S へ折り返して無限ループする。E 以降の開始だけ S へスナップする。
 /// StartPlayback の吸い寄せ解除に加え、Bind／Mp3Gapless.ClampStart にも
 /// allowBeforePlayWindowStart を渡さないと再生直後に S へ再ジャンプする。
@@ -15,7 +15,8 @@ namespace MgaSonicAnvil.UI;
 /// </item>
 /// <item>
 /// <description>
-/// サンプルループなし（プレイヤー）: 再生窓は全長 [0, N)。曲末で先頭へ戻す。
+/// プレイヤー: サンプルループは無視し、再生窓は全長 [0, N)。曲末で先頭へ戻す
+/// （割合ジャンプが S–E 窓に吸われないようにする）。
 /// </description>
 /// </item>
 /// <item>
@@ -29,14 +30,17 @@ namespace MgaSonicAnvil.UI;
 internal static class AutoLoopPlayback
 {
     /// <summary>
-    /// Single Loop がサンプルループを再生窓にしているか（選択／A-B より下位のときだけ）。
+    /// Single Loop がサンプルループを再生窓にしているか（エディタのみ。選択／A-B より下位）。
+    /// プレイヤーモードでは常に false（サンプルループ無視）。
     /// </summary>
     public static bool UsesSampleLoopWindow(
         bool autoLoopEnabled,
         bool sampleLoopEmpty,
         bool hasSelection,
-        bool hasPlayerAbLoop) =>
-        autoLoopEnabled
+        bool hasPlayerAbLoop,
+        bool playerMode = false) =>
+        !playerMode
+        && autoLoopEnabled
         && !sampleLoopEmpty
         && !hasSelection
         && !hasPlayerAbLoop;

@@ -1068,10 +1068,10 @@ internal static partial class UiStrings
     public static string LabelLibraryAutoPlayNext => "Auto _Next";
     /// <summary>ステータスバーの Single Loop。UI 言語に関わらず英語。Alt+L。</summary>
     public static string LabelLibraryAutoLoop => "Single _Loop";
-    /// <summary>Single Loop の動作説明（サンプルループあり＝頭通し後に S–E 無限、無し＝曲末→先頭）。</summary>
+    /// <summary>Single Loop の動作説明（エディタ＝サンプルループ／プレイヤー＝全長、選択・A-B 優先）。</summary>
     public static string TipLibraryAutoLoop => Get(
-        "オン時: サンプルループがあれば頭（または再生位置）から通し、ループ終端で始点へ無限ループ。無ければ曲末で先頭へ戻す。選択や A-B があるときはそちらを優先。",
-        "On: with a sample loop, play from the head (or playhead) through the intro, then loop S–E forever. Without a sample loop, restart from the start at the end. Selection / A-B take priority.");
+        "オン時: エディタではサンプルループがあれば頭（または再生位置）から通し、ループ終端で始点へ無限ループ。プレイヤーではサンプルループを無視し曲末で先頭へ戻す。選択や A-B があるときはそちらを優先。",
+        "On: in the editor, with a sample loop, play from the head (or playhead) through the intro, then loop S–E forever. In player mode, sample loops are ignored and playback restarts from the start at the end. Selection / A-B take priority.");
     public static string LibraryExplorerDesktop => Get("デスクトップ", "Desktop");
     public static string LibraryExplorerDocuments => Get("ドキュメント", "Documents");
     public static string LibraryExplorerMusic => Get("ミュージック", "Music");

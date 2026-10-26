@@ -3265,8 +3265,7 @@ public partial class MainWindow
     /// Shift／Ctrl＋テンキーの番号ジャンプ。Alt＋テンキーは表示範囲の割合（上段の無修飾と同じ）。
     /// エディタはドキュメントのマーカー／リージョン。
     /// プレイヤーの Shift は一時マーカー（音声波形／動画本再生／F8／フレーム一時停止）。
-    /// プレイヤーの Ctrl はファイルにリージョンがあるときその先頭へ。
-    /// 上段の Ctrl もプレイヤーでは同じ（ツリーの Shift+8 とは別キー）。
+    /// プレイヤーではドキュメントのリージョン番号ジャンプはしない（Ctrl は消費のみ）。
     /// </summary>
     private bool TryHandleNumpadCueDigitJump(Key key, ModifierKeys modifiers)
     {
@@ -3298,6 +3297,7 @@ public partial class MainWindow
 
         var numpadMarker = LibraryPlayerMode.IsNumpadMarkerDigitJump(key, modifiers);
         var numpadRegion = LibraryPlayerMode.IsNumpadRegionDigitJump(key, modifiers);
+        // プレイヤーの Ctrl＋上段もここで受け、リージョンジャンプせず消費する。
         var playerTopRegion = IsLibraryMaximized && LibraryPlayerMode.IsRegionDigitJump(key, modifiers);
         if (!numpadMarker && !numpadRegion && !playerTopRegion)
         {
@@ -3336,6 +3336,12 @@ public partial class MainWindow
                 digit,
                 _document.Markers.Count,
                 allowPercentFallback: false);
+        }
+
+        // プレイヤーではドキュメントのリージョンを使わない（サンプルループと同様に無視）。
+        if (!LibraryPlayerMode.AllowsDocumentRegionDigitJump(IsLibraryMaximized))
+        {
+            return true;
         }
 
         var regionCount = _document?.Regions.Count ?? 0;

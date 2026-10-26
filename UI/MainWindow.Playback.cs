@@ -968,9 +968,9 @@ public partial class MainWindow
     /// <summary>
     /// 再生のループ窓（半開区間）。null ならループなし（一通）。
     /// 優先順位: フェード調整のサンプルループ → プレイヤー A-B → 選択 →
-    /// Single Loop のサンプルループ →（プレイヤーのみ）Single Loop 全長。
-    /// Single Loop＋サンプルループ時の開始位置は <see cref="AutoLoopPlayback"/> を参照
-    /// （頭〜S は通し、E で S へ無限ループ）。
+    /// （エディタ）Single Loop のサンプルループ →（プレイヤー）Single Loop 全長。
+    /// プレイヤーではサンプルループを無視する。エディタの Single Loop＋サンプルループ時の
+    /// 開始位置は <see cref="AutoLoopPlayback"/> を参照（頭〜S は通し、E で S へ無限ループ）。
     /// </summary>
     private WaveSelection? ResolvePlayLoopRange()
     {
@@ -1009,21 +1009,25 @@ public partial class MainWindow
             && LibraryBrowser.AutoLoopEnabled
             && _document.FrameCount > 0)
         {
-            // サンプルループ無し: 曲末→先頭の無限ループ。
+            // プレイヤー: サンプルループ有無に関わらず曲末→先頭の無限ループ。
             return new WaveSelection(0, _document.FrameCount);
         }
 
         return null;
     }
 
-    /// <summary>Single Loop がサンプルループを再生窓にしているか（選択／A-B より下位）。</summary>
+    /// <summary>
+    /// エディタで Single Loop がサンプルループを再生窓にしているか（選択／A-B より下位）。
+    /// プレイヤーモードでは常に false。
+    /// </summary>
     private bool IsAutoLoopSampleLoopWindow() =>
         _document is not null
         && AutoLoopPlayback.UsesSampleLoopWindow(
             LibraryBrowser.AutoLoopEnabled,
             _document.SampleLoop.IsEmpty,
             hasSelection: !_document.Selection.IsEmpty,
-            hasPlayerAbLoop: IsLibraryMaximized && Waveform.TryGetPlayerAbLoop(out _));
+            hasPlayerAbLoop: IsLibraryMaximized && Waveform.TryGetPlayerAbLoop(out _),
+            playerMode: IsLibraryMaximized);
 
     /// <summary>
     /// 再生ウィンドウ終端に接する -E（Exit）区間。Play -E のループ折り返し二重再生対象。
