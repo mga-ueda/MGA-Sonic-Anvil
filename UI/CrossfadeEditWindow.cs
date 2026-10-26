@@ -36,6 +36,7 @@ internal sealed class CrossfadeEditWindow : Window
     private readonly CheckBox _truncateCheck = new() { FontSize = 12 };
     private readonly CheckBox _deleteAfterLoopCheck = new() { FontSize = 12 };
     private readonly CheckBox _align28Check = new() { FontSize = 12 };
+    private readonly CheckBox _singleLoopCheck = new() { FontSize = 12 };
     private readonly CheckBox _xfadeCheck = new() { FontSize = 12 };
     private readonly TextBlock _hintText = new()
     {
@@ -75,6 +76,8 @@ internal sealed class CrossfadeEditWindow : Window
     public event Action? ExitRequested;
     public event Action<CrossfadeAutoSearchKind>? AutoSearchRequested;
     public event Action<CrossfadeEditState.FocusField>? SnapZeroRequested;
+    /// <summary>Single Loop チェック変更（ホストの LibraryBrowser.AutoLoop と連動）。</summary>
+    public event Action<bool>? SingleLoopChanged;
 
     public LoopSpliceView Splice => _splice;
 
@@ -113,12 +116,14 @@ internal sealed class CrossfadeEditWindow : Window
         if (TryFindResource("DarkCheckBoxStyle") is Style checkStyle)
         {
             _xfadeCheck.Style = checkStyle;
+            _singleLoopCheck.Style = checkStyle;
             _truncateCheck.Style = checkStyle;
             _deleteAfterLoopCheck.Style = checkStyle;
             _align28Check.Style = checkStyle;
         }
 
         _xfadeCheck.Foreground = BrushOf("PrimaryForeBrush");
+        _singleLoopCheck.Foreground = BrushOf("PrimaryForeBrush");
         _truncateCheck.Foreground = BrushOf("PrimaryForeBrush");
         _deleteAfterLoopCheck.Foreground = BrushOf("PrimaryForeBrush");
         _align28Check.Foreground = BrushOf("PrimaryForeBrush");
@@ -271,6 +276,8 @@ internal sealed class CrossfadeEditWindow : Window
         _deleteAfterLoopCheck.ToolTip = UiStrings.CrossfadeTipDeleteAfterLoop;
         _align28Check.Content = UiStrings.CrossfadeLabelAlignTwentyEight;
         _align28Check.ToolTip = UiStrings.CrossfadeTipAlignTwentyEight;
+        _singleLoopCheck.Content = UiStrings.CrossfadeLabelSingleLoop;
+        _singleLoopCheck.ToolTip = UiStrings.CrossfadeTipSingleLoop;
         _xfadeCheck.Content = UiStrings.CrossfadeLabelXfade;
         _xfadeCheck.ToolTip = UiStrings.CrossfadeTipXfade;
         SyncFromState();
@@ -279,6 +286,25 @@ internal sealed class CrossfadeEditWindow : Window
     public void NotifyDocumentChanged() => _splice.InvalidateVisual();
 
     public void SyncFromHost(bool updateSplice = true) => SyncFromState(updateSplice);
+
+    /// <summary>ステータスバー／Alt+L 側の Single Loop 状態を反映する。</summary>
+    public void SetSingleLoopChecked(bool enabled)
+    {
+        if (_singleLoopCheck.IsChecked == enabled)
+        {
+            return;
+        }
+
+        _syncing = true;
+        try
+        {
+            _singleLoopCheck.IsChecked = enabled;
+        }
+        finally
+        {
+            _syncing = false;
+        }
+    }
 
     public void SetDocument(AudioDocument? document)
     {
@@ -332,6 +358,8 @@ internal sealed class CrossfadeEditWindow : Window
     {
         _xfadeCheck.Checked += (_, _) => SetXfadePreview(true);
         _xfadeCheck.Unchecked += (_, _) => SetXfadePreview(false);
+        _singleLoopCheck.Checked += (_, _) => SetSingleLoop(true);
+        _singleLoopCheck.Unchecked += (_, _) => SetSingleLoop(false);
         _truncateCheck.Checked += (_, _) => SetTruncate(true);
         _truncateCheck.Unchecked += (_, _) => SetTruncate(false);
         _deleteAfterLoopCheck.Checked += (_, _) => SetDeleteAfterLoop(true);
@@ -380,6 +408,9 @@ internal sealed class CrossfadeEditWindow : Window
             HorizontalAlignment = HorizontalAlignment.Left,
         };
         var body = new StackPanel();
+        _singleLoopCheck.Margin = new Thickness(0, 0, 0, 8);
+        body.Children.Add(_singleLoopCheck);
+
         body.Children.Add(SectionLabel(UiStrings.CrossfadeAutoSearch, UiStrings.CrossfadeTipAutoSearch));
         body.Children.Add(AutoSearchRow());
 
@@ -692,7 +723,7 @@ internal sealed class CrossfadeEditWindow : Window
         var panel = new StackPanel { Margin = new Thickness(0, 6, 0, 2) };
         panel.Children.Add(SectionLabel(UiStrings.CrossfadeLabelCurve, UiStrings.CrossfadeTipCurve));
 
-        // 上段＝イン（プリ）、下段＝ポスト。各行内は左＝アウト脚、右＝イン脚。
+        // 上段＝プリ、下段＝ポスト。各行内は左＝元波形、右＝クロス波形。
         var rows = new StackPanel { Margin = new Thickness(0, 2, 0, 0) };
 
         _preOutCurve = CreateCurveIconRow(
@@ -771,7 +802,7 @@ internal sealed class CrossfadeEditWindow : Window
         return panel;
     }
 
-    /// <summary>1行分。タイトルの下に、左＝アウト脚・右＝イン脚を横並び。</summary>
+    /// <summary>1行分。タイトルの下に、左＝元波形・右＝クロス波形を横並び。</summary>
     private static StackPanel CurveSideRow(
         string title,
         string tip,
@@ -1185,6 +1216,16 @@ internal sealed class CrossfadeEditWindow : Window
         _state.ShowXfadePreview = value;
         _splice.InvalidateVisual();
         DraftChanged?.Invoke(false);
+    }
+
+    private void SetSingleLoop(bool value)
+    {
+        if (_syncing)
+        {
+            return;
+        }
+
+        SingleLoopChanged?.Invoke(value);
     }
 
     private void CommitBox(TextBox box, CrossfadeEditState.FocusField focus, bool revertOnInvalid = true)
