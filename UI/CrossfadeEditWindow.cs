@@ -144,6 +144,7 @@ internal sealed class CrossfadeEditWindow : Window
 
         RefreshUiStrings();
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        WindowPaintReveal.Attach(this, activateOnReveal: true);
         UiThemeService.Changed += OnUiThemeChanged;
         Closed += (_, _) => UiThemeService.Changed -= OnUiThemeChanged;
         AppDialogKeys.Attach(this, RequestExit);
@@ -202,8 +203,8 @@ internal sealed class CrossfadeEditWindow : Window
             _placementApplied = true;
         }
 
-        Show();
-        Activate();
+        // 描画完了まで DWM クロークし、白い未描画フレームを出さない。
+        WindowPaintReveal.ShowWhenPainted(this);
     }
 
     /// <summary>ホスト側から隠す（Close しないので再表示可能）。</summary>

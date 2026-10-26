@@ -1,5 +1,6 @@
 using System.Runtime.ExceptionServices;
 using System.Windows;
+using System.Windows.Media;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 using Xunit;
@@ -57,6 +58,50 @@ public sealed class WindowPaintRevealTests
             Assert.False(WindowPaintReveal.IsPending(window));
             Assert.Equal(1, painted);
         });
+    }
+
+    [Fact]
+    public void PrepareBeforeShow_ResetsPendingAfterReveal()
+    {
+        RunSta(() =>
+        {
+            EnsureThemeResources();
+            var window = new Window { Opacity = 0, Width = 120, Height = 80 };
+            var painted = 0;
+            WindowPaintReveal.Attach(window, () => painted++);
+            WindowPaintReveal.Reveal(window);
+            Assert.False(WindowPaintReveal.IsPending(window));
+            Assert.Equal(1, painted);
+
+            WindowPaintReveal.PrepareBeforeShow(window);
+            Assert.True(WindowPaintReveal.IsPending(window));
+            WindowPaintReveal.Reveal(window);
+            Assert.False(WindowPaintReveal.IsPending(window));
+            Assert.Equal(2, painted);
+        });
+    }
+
+    private static void EnsureThemeResources()
+    {
+        if (Application.Current is null)
+        {
+            _ = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        }
+
+        var resources = Application.Current!.Resources;
+        void Ensure(string key, byte r, byte g, byte b)
+        {
+            if (resources.Contains(key))
+            {
+                return;
+            }
+
+            resources[key] = new SolidColorBrush(Color.FromRgb(r, g, b));
+        }
+
+        Ensure("SurfaceBackBrush", 0x1A, 0x1B, 0x26);
+        Ensure("ChromeBorderBrush", 0x3A, 0x3A, 0x3E);
+        Ensure("PrimaryForeBrush", 0xEB, 0xEB, 0xEB);
     }
 
     [Fact]

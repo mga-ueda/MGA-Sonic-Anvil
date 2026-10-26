@@ -123,7 +123,7 @@
     <SolidColorBrush x:Key="VectorScopeGridBrush" Color="#FF3A3A3E" />
     <SolidColorBrush x:Key="VectorScopeCorrelationBrush" Color="#FF3AB8E8" />
     <SolidColorBrush x:Key="ProjectBarBackBrush" Color="#FF1A1B26" />
-    <SolidColorBrush x:Key="OverviewOutsideFillBrush" Color="#7F001431" />
+    <SolidColorBrush x:Key="OverviewOutsideFillBrush" Color="#98000000" />
     <SolidColorBrush x:Key="TransportBackBrush" Color="#FF1A1B26" />
     <SolidColorBrush x:Key="TransportForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="RecordLatchForeBrush" Color="#FFE24B4A" />

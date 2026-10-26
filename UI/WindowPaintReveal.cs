@@ -64,6 +64,7 @@ internal static class WindowPaintReveal
     public static void PrepareBeforeShow(Window window)
     {
         Attach(window);
+        ResetPending(window);
         _ = new WindowInteropHelper(window).EnsureHandle();
         Prepare(window);
     }
@@ -77,8 +78,15 @@ internal static class WindowPaintReveal
             return;
         }
 
+        // Hide→再 Show では Loaded が再発火しないので、描画待ちを組み直す。
+        var alreadyLoaded = window.IsLoaded;
         PrepareBeforeShow(window);
+        RearmContentRendered(window);
         window.Show();
+        if (alreadyLoaded)
+        {
+            SchedulePaintNotify(window);
+        }
     }
 
     public static bool? ShowDialogWhenPainted(Window window)
@@ -86,6 +94,34 @@ internal static class WindowPaintReveal
         ArgumentNullException.ThrowIfNull(window);
         PrepareBeforeShow(window);
         return window.ShowDialog();
+    }
+
+    private static void ResetPending(Window window)
+    {
+        if (!States.TryGetValue(window, out var state))
+        {
+            return;
+        }
+
+        state.Pending = true;
+        state.PaintNotified = false;
+        state.PaintCallbackInvoked = false;
+    }
+
+    private static void RearmContentRendered(Window window)
+    {
+        window.ContentRendered -= OnContentRendered;
+        window.ContentRendered += OnContentRendered;
+    }
+
+    private static void SchedulePaintNotify(Window window)
+    {
+        window.UpdateLayout();
+        window.Dispatcher.BeginInvoke(
+            () => window.Dispatcher.BeginInvoke(
+                () => NotifyPainted(window),
+                DispatcherPriority.ContextIdle),
+            DispatcherPriority.Render);
     }
 
     public static void Prepare(Window window)
