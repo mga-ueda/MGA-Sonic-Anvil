@@ -79,12 +79,12 @@ public sealed class ConfirmChoiceWindowTests
             UiStrings.SetLanguage(UiLanguage.Japanese);
             Assert.Equal("OK", UiStrings.ButtonOk);
             Assert.Equal("Cancel", UiStrings.ButtonCancel);
-            Assert.Equal("Yes", UiStrings.ButtonYes);
             Assert.Equal("No", UiStrings.ButtonNo);
             Assert.Equal("Cancel", UiStrings.ButtonYesNoCancel);
             Assert.Equal("Close", UiStrings.ButtonClose);
             UiStrings.SetLanguage(UiLanguage.English);
-            Assert.Equal("Yes", UiStrings.ButtonYes);
+            Assert.Equal("OK", UiStrings.ButtonOk);
+            Assert.Equal("Cancel", UiStrings.ButtonCancel);
             Assert.Equal("No", UiStrings.ButtonNo);
             Assert.Equal("Cancel", UiStrings.ButtonYesNoCancel);
         }

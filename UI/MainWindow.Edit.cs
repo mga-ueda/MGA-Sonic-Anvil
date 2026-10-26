@@ -2209,10 +2209,10 @@ public partial class MainWindow
                 this,
                 UiStrings.ConfirmSilenceDetectSelectedFiles(targets.Length),
                 UiStrings.DialogSilenceDetectTitle,
-                MessageBoxButton.YesNo,
+                MessageBoxButton.OKCancel,
                 MessageBoxImage.Question,
-                MessageBoxResult.Yes);
-            if (answer != MessageBoxResult.Yes)
+                MessageBoxResult.OK);
+            if (answer != MessageBoxResult.OK)
             {
                 return;
             }
@@ -3170,9 +3170,9 @@ public partial class MainWindow
                 this,
                 UiStrings.ConfirmPenClip,
                 UiStrings.AppName,
-                MessageBoxButton.YesNo,
+                MessageBoxButton.OKCancel,
                 MessageBoxImage.Warning);
-            if (answer != MessageBoxResult.Yes)
+            if (answer != MessageBoxResult.OK)
             {
                 return;
             }

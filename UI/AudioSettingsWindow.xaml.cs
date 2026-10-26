@@ -1539,10 +1539,10 @@ internal partial class AudioSettingsWindow : Window
             this,
             UiStrings.ConfirmLibraryCatalogClear,
             UiStrings.DialogSettingsTitle,
-            MessageBoxButton.YesNo,
+            MessageBoxButton.OKCancel,
             MessageBoxImage.Warning,
-            MessageBoxResult.No);
-        if (answer != MessageBoxResult.Yes)
+            MessageBoxResult.Cancel);
+        if (answer != MessageBoxResult.OK)
         {
             return;
         }
@@ -1563,10 +1563,10 @@ internal partial class AudioSettingsWindow : Window
             this,
             UiStrings.ConfirmVideoProxyClearAll,
             UiStrings.DialogSettingsTitle,
-            MessageBoxButton.YesNo,
+            MessageBoxButton.OKCancel,
             MessageBoxImage.Warning,
-            MessageBoxResult.No);
-        if (answer != MessageBoxResult.Yes)
+            MessageBoxResult.Cancel);
+        if (answer != MessageBoxResult.OK)
         {
             return;
         }

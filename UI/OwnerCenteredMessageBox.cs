@@ -6,7 +6,7 @@ namespace MgaSonicAnvil.UI;
 
 /// <summary>
 /// オーナー中央のメッセージボックス（WPF）。
-/// OK／Cancel と Yes／No は自前ウィンドウ。ボタン表記は言語に関係なく英語。
+/// OK／Cancel と OK／No／Cancel は自前ウィンドウ。ボタン表記は言語に関係なく英語。
 /// WPF の <see cref="MessageBox.Show"/> はシステムサウンドを鳴らさないことがあるため、
 /// 表示前に OS のシステムイベント音を明示再生する。
 /// </summary>

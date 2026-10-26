@@ -237,7 +237,6 @@ internal static partial class UiStrings
     public static string ButtonOk => Get("OK", "OK");
     public static string ButtonCancel => Get("Cancel", "Cancel");
     public static string ButtonClose => Get("Close", "Close");
-    public static string ButtonYes => Get("Yes", "Yes");
     public static string ButtonNo => Get("No", "No");
     public static string ButtonYesNoCancel => Get("Cancel", "Cancel");
     public static string ButtonSaveAllAndClose => Get("すべて保存して閉じる", "Save all and close");
@@ -384,8 +383,8 @@ internal static partial class UiStrings
     public static string ExportFolderTitle => Get("書き出し先フォルダ", "Export folder");
     public static string SaveFolderTitle => Get("保存先フォルダ", "Save folder");
     public static string ConfirmOverwriteFiles(int count, string list) => Format(
-        "既にあるファイルが {0} 件あります。上書きしますか？{1}{1}{2}{1}{1}Yes = 上書き、No = それらをスキップ、Cancel = 中止",
-        "{0} existing file(s). Overwrite them?{1}{1}{2}{1}{1}Yes = overwrite, No = skip them, Cancel = stop",
+        "既にあるファイルが {0} 件あります。上書きしますか？{1}{1}{2}{1}{1}OK = 上書き、No = それらをスキップ、Cancel = 中止",
+        "{0} existing file(s). Overwrite them?{1}{1}{2}{1}{1}OK = overwrite, No = skip them, Cancel = stop",
         count,
         Environment.NewLine,
         list);
@@ -696,8 +695,8 @@ internal static partial class UiStrings
         channels,
         bits);
     public static string ConfirmPenClip => Get(
-        "描いた音量が 0 dBFS を超えています。このままでは歪む可能性があります。\n\nYes: 描いた範囲全体を下げて 0 dBFS 以内に収める\nNo: この一筆を取り消して描き直す",
-        "The stroke goes above 0 dBFS and may distort.\n\nYes: lower the whole stroke to stay within 0 dBFS\nNo: discard this stroke and draw it again");
+        "描いた音量が 0 dBFS を超えています。このままでは歪む可能性があります。\n\nOK: 描いた範囲全体を下げて 0 dBFS 以内に収める\nCancel: この一筆を取り消して描き直す",
+        "The stroke goes above 0 dBFS and may distort.\n\nOK: lower the whole stroke to stay within 0 dBFS\nCancel: discard this stroke and draw it again");
 
     public static string WarnMergeClip(string overDb) => Format(
         "加算結果が 0 dBFS を {0} dB 超えています。このまま 16bit / 24bit で書くと、超えた分は切り詰められます。\n\nOK: ミックス全体を {0} dB 下げてバウンスする\nCancel: バウンスを中止する",
