@@ -386,27 +386,8 @@ internal static class LoopCrossfade
         }
     }
 
-    /// <summary>継ぎ目プレビュー用。常に全チャンネルの平均。</summary>
-    private static float SampleFrameMixed(
-        float[] interleaved,
-        int channels,
-        long frameCount,
-        long frame)
-    {
-        if (frame < 0 || frame >= frameCount)
-        {
-            return 0f;
-        }
-
-        var offset = (int)frame * channels;
-        double sum = 0;
-        for (var ch = 0; ch < channels; ch++)
-        {
-            sum += interleaved[offset + ch];
-        }
-
-        return (float)(sum / channels);
-    }
+    /// <summary>ゼロクロス探索の既定半径。低域でも 1 周期内に届くよう長め。</summary>
+    public const int DefaultZeroSnapRadius = 8192;
 
     /// <param name="alignToTwentyEight">true なら 28 の倍数の位置だけを候補にする。</param>
     public static long SnapToZeroCrossing(
@@ -414,7 +395,7 @@ internal static class LoopCrossfade
         int channels,
         long frameCount,
         long frame,
-        int searchRadius = 512,
+        int searchRadius = DefaultZeroSnapRadius,
         bool alignToTwentyEight = false)
     {
         if (channels < 1 || frameCount <= 2)
@@ -448,14 +429,10 @@ internal static class LoopCrossfade
         {
             var crossing = IsZeroCrossingAt(interleaved, channels, frameCount, f)
                 || IsExactZeroAt(interleaved, channels, frameCount, f);
-            if (!crossing && !alignToTwentyEight)
-            {
-                continue;
-            }
-
-            var sample = Math.Abs(SampleFrameMixed(interleaved, channels, frameCount, f));
+            // 符号変化が無い位置も振幅で候補にする（逆相ステレオの平均0誤判定を避けるため）。
+            var sample = SampleFramePeakAbs(interleaved, channels, frameCount, f);
             var dist = Math.Abs(f - frame);
-            // ゼロに近いほど優先。同点なら現在位置に近い方。
+            // 全chのピークがゼロに近いほど優先。同点なら現在位置に近い方。
             var score = sample * 1_000_000d + dist;
             if (!crossing)
             {
@@ -483,7 +460,7 @@ internal static class LoopCrossfade
         int channels,
         long frameCount,
         long endFrame,
-        int searchRadius = 512,
+        int searchRadius = DefaultZeroSnapRadius,
         bool alignToTwentyEight = false)
     {
         if (channels < 1 || frameCount <= 2)
@@ -529,7 +506,7 @@ internal static class LoopCrossfade
             var seam = e - 1;
             var crossing = IsZeroCrossingAt(interleaved, channels, frameCount, seam)
                 || IsExactZeroAt(interleaved, channels, frameCount, seam);
-            var sample = Math.Abs(SampleFrameMixed(interleaved, channels, frameCount, seam));
+            var sample = SampleFramePeakAbs(interleaved, channels, frameCount, seam);
             var dist = Math.Abs(e - endFrame);
             var score = sample * 1_000_000d + dist;
             if (!crossing)
@@ -548,38 +525,90 @@ internal static class LoopCrossfade
         return found ? best : best;
     }
 
+    /// <summary>描画と同じく、全チャンネルのうち一番大きい |振幅|。</summary>
+    private static float SampleFramePeakAbs(
+        float[] interleaved,
+        int channels,
+        long frameCount,
+        long frame)
+    {
+        if (frame < 0 || frame >= frameCount || channels < 1)
+        {
+            return 0f;
+        }
+
+        var offset = (int)frame * channels;
+        var peak = 0f;
+        for (var ch = 0; ch < channels; ch++)
+        {
+            var a = Math.Abs(interleaved[offset + ch]);
+            if (a > peak)
+            {
+                peak = a;
+            }
+        }
+
+        return peak;
+    }
+
+    /// <summary>全チャンネルが厳密に 0。平均では逆相をゼロと誤る。</summary>
     private static bool IsExactZeroAt(
         float[] interleaved,
         int channels,
         long frameCount,
-        long frame) =>
-        frame >= 0
-        && frame < frameCount
-        && SampleFrameMixed(interleaved, channels, frameCount, frame) == 0f;
+        long frame)
+    {
+        if (frame < 0 || frame >= frameCount || channels < 1)
+        {
+            return false;
+        }
 
+        var offset = (int)frame * channels;
+        for (var ch = 0; ch < channels; ch++)
+        {
+            if (interleaved[offset + ch] != 0f)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>いずれかのチャンネルで符号変化（またはその ch が 0）。</summary>
     private static bool IsZeroCrossingAt(
         float[] interleaved,
         int channels,
         long frameCount,
         long frame)
     {
-        if (frame <= 0 || frame >= frameCount)
+        if (frame <= 0 || frame >= frameCount || channels < 1)
         {
             return false;
         }
 
-        var prev = SampleFrameMixed(interleaved, channels, frameCount, frame - 1);
-        var cur = SampleFrameMixed(interleaved, channels, frameCount, frame);
-        if (cur == 0f)
+        var curOff = (int)frame * channels;
+        var prevOff = curOff - channels;
+        for (var ch = 0; ch < channels; ch++)
         {
-            return true;
+            var cur = interleaved[curOff + ch];
+            if (cur == 0f)
+            {
+                return true;
+            }
+
+            var prev = interleaved[prevOff + ch];
+            if (prev == 0f)
+            {
+                continue;
+            }
+
+            if (Math.Sign(prev) != Math.Sign(cur))
+            {
+                return true;
+            }
         }
 
-        if (prev == 0f)
-        {
-            return false;
-        }
-
-        return Math.Sign(prev) != Math.Sign(cur);
+        return false;
     }
 }

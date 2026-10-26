@@ -680,6 +680,46 @@ public sealed class CrossfadeEditTests
     }
 
     [Fact]
+    public void SnapEndToZeroCrossing_StereoOutOfPhase_UsesPeakNotAverage()
+    {
+        // L=+0.5 / R=-0.5 だと平均は常に 0。旧実装はどこでも「ゼロ」と誤認して動かなかった。
+        var frames = 200;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 2] = 0.5f;
+            samples[i * 2 + 1] = -0.5f;
+        }
+
+        // フレーム 80 だけ両 ch を 0 に（真の継ぎ目）
+        samples[80 * 2] = 0f;
+        samples[80 * 2 + 1] = 0f;
+
+        var snapped = LoopCrossfade.SnapEndToZeroCrossing(
+            samples, 2, frames, 100, searchRadius: 40);
+        Assert.Equal(81, snapped);
+    }
+
+    [Fact]
+    public void SnapToZeroCrossing_StereoOutOfPhase_FindsSharedZero()
+    {
+        var frames = 200;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 2] = 0.5f;
+            samples[i * 2 + 1] = -0.5f;
+        }
+
+        samples[80 * 2] = 0f;
+        samples[80 * 2 + 1] = 0f;
+
+        var snapped = LoopCrossfade.SnapToZeroCrossing(
+            samples, 2, frames, 100, searchRadius: 40);
+        Assert.Equal(80, snapped);
+    }
+
+    [Fact]
     public void BuildSplicePreview_FillsLeftAndRight()
     {
         var document = MakeDocument(200);
