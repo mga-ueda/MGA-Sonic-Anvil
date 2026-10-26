@@ -342,6 +342,72 @@ public sealed class PitchCurveTests
     }
 
     /// <summary>
+    /// 間引き→線形戻しだけ（ピッチ無し）は入力と高相関。軽量 ApplyCurve はそれと違いピッチが乗ること。
+    /// 「音質だけ落ちて音高は同じ」退行の検出用。
+    /// </summary>
+    [Fact]
+    public void ApplyCurve_Lightweight_MustDifferFromDecimateOnly()
+    {
+        const int channels = 1;
+        const int rate = 48000;
+        const int frames = rate * 2;
+        var sine = MakeTone(440f, frames, rate);
+        var table = PitchCurve.Flat(-12).BuildSemitoneTable(frames);
+
+        var shortFrames = Math.Max(64, (int)Math.Round(frames * (rate / 3.0) / rate));
+        var downOnly = PitchShift.ResampleLinearToFrameCountPublic(sine, channels, shortFrames);
+        var upOnly = PitchShift.ResampleLinearToFrameCountPublic(downOnly, channels, frames);
+        Assert.True(Correlation(sine, upOnly) > 0.95, "decimate-only should stay near input");
+
+        var light = PitchShift.ApplyCurve(sine, channels, rate, table, timeStretch: true, lightweight: true);
+        Assert.Equal(frames, light.Length);
+        Assert.True(
+            Correlation(sine, light) < 0.5,
+            $"lightweight must not resemble decimate-only, corr={Correlation(sine, light):F3}");
+        var lightHz = EstimateHzByZeroCrossings(light, rate);
+        Assert.InRange(lightHz, 220 * 0.8, 220 * 1.2);
+    }
+
+    /// <summary>
+    /// 始端→終端で大きく動くカーブが、軽量でも先頭ピッチのまま張り付かないこと。
+    /// （旧 native は flush 区間で transpose を止め、末尾が最初の半音に戻って聞こえた）
+    /// </summary>
+    [Fact]
+    public void ApplyCurve_Lightweight_RampCurve_TracksStartMidEnd()
+    {
+        const int channels = 1;
+        const int rate = 48000;
+        const int frames = rate * 2;
+        const float hz = 440f;
+        var sine = MakeTone(hz, frames, rate);
+        var curve = new PitchCurve(
+            [
+                new PitchCurvePoint(0, 12),
+                new PitchCurvePoint(0.5, 0),
+                new PitchCurvePoint(1, -12),
+            ],
+            [FadeShape.Linear, FadeShape.Linear]);
+        var table = curve.BuildSemitoneTable(frames);
+        var light = PitchShift.ApplyCurve(sine, channels, rate, table, timeStretch: true, lightweight: true);
+        var flatFirst = PitchShift.ApplyCurve(
+            sine, channels, rate, PitchCurve.Flat(12).BuildSemitoneTable(frames), timeStretch: true, lightweight: false);
+
+        var win = frames / 5;
+        var startHz = EstimateHzByZeroCrossings(light.AsSpan(frames / 10, win).ToArray(), rate);
+        var midHz = EstimateHzByZeroCrossings(light.AsSpan(frames * 2 / 5, win).ToArray(), rate);
+        var endHz = EstimateHzByZeroCrossings(light.AsSpan(frames * 7 / 10, win).ToArray(), rate);
+        var flatHz = EstimateHzByZeroCrossings(flatFirst.AsSpan(frames * 2 / 5, win).ToArray(), rate);
+        var dump = Path.Combine(Path.GetTempPath(), "pitch-lightweight-ramp.txt");
+        File.WriteAllText(dump, $"start={startHz:F1} mid={midHz:F1} end={endHz:F1} flat12mid={flatHz:F1}");
+
+        // 末尾が先頭ピッチ(+12≈880)に張り付いていないこと。
+        Assert.True(endHz < flatHz * 0.7, $"end stuck near first pitch: {File.ReadAllText(dump)}");
+        // 始端は高め、終端は低め（連続可変）。
+        Assert.True(startHz > midHz && midHz > endHz * 0.85, $"ramp not descending: {File.ReadAllText(dump)}");
+        Assert.True(Correlation(light, flatFirst) < 0.5, $"lightweight too like flat-first: {File.ReadAllText(dump)}");
+    }
+
+    /// <summary>
     /// ポイント／ブラシ相当の時間変化カーブでも軽量経路がピッチを動かすこと。
     /// 定数テーブルだけ通って変化カーブで無変化、という退行を防ぐ。
     /// </summary>
