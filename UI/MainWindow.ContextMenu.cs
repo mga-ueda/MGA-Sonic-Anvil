@@ -1,3 +1,5 @@
+using System.Windows;
+using System.Windows.Controls;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
@@ -9,6 +11,89 @@ public partial class MainWindow
 {
     private WaveformContextHit _waveMenuHit = new();
     private bool _pendingContextMenuKey;
+    private bool _mainMenuBarHooked;
+
+    /// <summary>
+    /// 上部メニューバー。中身は <see cref="WaveformContextMenuBuilder.Build"/> と同じツリー。
+    /// 右クリックと共有し、開く直前に再構築する。
+    /// </summary>
+    /// <summary>上部メニューの表示反映。設定プレビューからも呼ぶ。</summary>
+    internal void EnsureMainMenuBar()
+    {
+        if (!_mainMenuBarHooked)
+        {
+            _mainMenuBarHooked = true;
+            MainMenuBar.AddHandler(
+                System.Windows.Controls.MenuItem.SubmenuOpenedEvent,
+                new RoutedEventHandler(MainMenuBar_SubmenuOpened));
+        }
+
+        ApplyMainMenuBarVisibility();
+    }
+
+    private void ApplyMainMenuBarVisibility()
+    {
+        var show = AppStorage.Settings.ShowMainMenuBar
+            && !(_libraryMinimalChrome && IsLibraryMaximized);
+        MainMenuBar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (show)
+        {
+            RebuildMainMenuBar();
+        }
+    }
+
+    private void RebuildMainMenuBar()
+    {
+        if (MainMenuBar.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        // 開いているサブメニューがあるときはルートを壊さない（子は SubmenuOpened で更新）。
+        if (MainMenuBar.Items.OfType<System.Windows.Controls.MenuItem>().Any(item => item.IsSubmenuOpen))
+        {
+            return;
+        }
+
+        var hit = CaptureMenuBarHit();
+        WaveformContextMenuBuilder.Populate(
+            MainMenuBar.Items,
+            WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(hit), includeHere: false),
+            ExecuteWaveMenu);
+    }
+
+    private void MainMenuBar_SubmenuOpened(object sender, RoutedEventArgs e)
+    {
+        if (e.OriginalSource is not System.Windows.Controls.MenuItem top
+            || !ReferenceEquals(top.Parent, MainMenuBar))
+        {
+            return;
+        }
+
+        var hit = CaptureMenuBarHit();
+        _waveMenuHit = hit;
+        var entries = WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(hit), includeHere: false);
+        var header = top.Header as string ?? string.Empty;
+        foreach (var entry in entries.OfType<WaveMenuItemEntry>())
+        {
+            if (!string.Equals(entry.Header, header, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            top.IsEnabled = entry.Enabled;
+            if (entry.Children is { Count: > 0 })
+            {
+                WaveformContextMenuBuilder.Populate(top.Items, entry.Children, ExecuteWaveMenu);
+            }
+
+            return;
+        }
+    }
+
+    /// <summary>メニューバーはクリック位置が無いので再生ヘッド基準（キーボード右クリックと同趣旨）。</summary>
+    private WaveformContextHit CaptureMenuBarHit() =>
+        new() { Frame = Waveform.PlayheadFrame };
 
     private void OpenWaveformContextMenu(WaveformContextHit hit)
     {
@@ -209,7 +294,7 @@ public partial class MainWindow
             CanStepPlaylist = _sessions.Count > 0,
             CanRestartTrack = _sessions.Count > 0,
             VideoMini = IsVideoMiniPlayerActive(),
-            MinimalChrome = IsLibraryMaximized && _libraryMinimalChrome && !IsVideoMiniPlayerActive(),
+            MinimalChrome = _activeLayoutSlot == WindowLayoutSlot.F9,
             CanToggleVideoMini = LibraryPlayerMode.CanToggleVideoMiniPlayer(
                 IsVideoMiniPlayerActive(),
                 IsVideoMiniEnterEligible(),
@@ -258,9 +343,9 @@ public partial class MainWindow
             CanTileHorizontal = CanOfferTileArrange(WaveformTileArrange.Horizontal),
             CanTileVertical = CanOfferTileArrange(WaveformTileArrange.Vertical),
             CanTileGrid = CanOfferTileArrange(WaveformTileArrange.Grid),
-            WaveformMaximized = _waveformMaximizeMode == WaveformMaximizeMode.Waveform,
-            AnalyzersMaximized = _waveformMaximizeMode == WaveformMaximizeMode.Analyzers,
-            LibraryMaximized = _waveformMaximizeMode == WaveformMaximizeMode.Library,
+            WaveformMaximized = _activeLayoutSlot == WindowLayoutSlot.F11,
+            AnalyzersMaximized = _activeLayoutSlot == WindowLayoutSlot.F12,
+            LibraryMaximized = _activeLayoutSlot == WindowLayoutSlot.F10,
             CanExportMp3 = !IsLibraryMaximized
                 || LibraryPlayerMode.HasMp3ExportCandidate(ResolvePlaylistLoudnessMatchTargets()),
             CanLoopPlay = canNavigate

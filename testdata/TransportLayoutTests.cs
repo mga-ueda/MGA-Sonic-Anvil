@@ -20,7 +20,7 @@ public sealed class TransportLayoutTests
         Assert.Equal(214 * 2 / 3.0, DesignMetrics.BrandLogoWidth);
         Assert.Equal(32 * 2 / 3.0, DesignMetrics.BrandLogoHeight);
         Assert.True(DesignMetrics.TransportChromeHeight
-            >= DesignMetrics.DocumentTabBarHeight + DesignMetrics.TransportHostMinHeight);
+            >= DesignMetrics.TransportHostMinHeight);
         Assert.True(DesignMetrics.TransportChromeHeight >= DesignMetrics.VectorScopeHeight);
         Assert.True(DesignMetrics.MinimalPlayerWindowMinWidth < DesignMetrics.WindowMinWidth);
         Assert.True(DesignMetrics.MinimalPlayerWindowMinWidth >= DesignMetrics.From96(280));

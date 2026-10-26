@@ -49,6 +49,9 @@ internal static class DesignMetrics
 
     public static double StatusBarHeight => From96(28);
 
+    /// <summary>ウィンドウ上部メニューバー（Menu）の高さ。</summary>
+    public static double MainMenuBarHeight => From96(24);
+
     public static double WaapiBarHeight => From96(32);
 
     public static double StatusExportButtonWidth => From96(80);
@@ -454,9 +457,11 @@ internal static class DesignMetrics
 
     public static GridLength VectorScopeHeightGrid => new(VectorScopeHeight);
 
-    /// <summary>タブ＋ボタン2行＋ロゴ行。ゴニオより高いときはこちらに合わせる。</summary>
+    /// <summary>
+    /// アナライザ帯の高さ。タブは波形側（マーカーレーン上）へ出したので含めない。
+    /// </summary>
     public static double TransportChromeHeight =>
-        Math.Max(VectorScopeHeight, DocumentTabBarHeight + TransportHostMinHeight);
+        Math.Max(VectorScopeHeight, TransportHostMinHeight);
 
     public static GridLength TransportChromeHeightGrid => new(TransportChromeHeight);
 

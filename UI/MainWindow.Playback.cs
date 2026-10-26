@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -2157,37 +2158,263 @@ public partial class MainWindow
         Waveform.CenterViewOnPlayhead();
     }
 
-    private void ToggleAnalyzerMaximize()
+    private void ToggleAnalyzerMaximize() =>
+        ApplyLayoutPreset(WindowLayoutSlot.F12, fromUserShortcut: true);
+
+    private void ToggleWaveformMaximize() =>
+        ApplyLayoutPreset(WindowLayoutSlot.F11, fromUserShortcut: true);
+
+    /// <summary>設定ダイアログからのレイアウト即時プレビュー。アクティブスロットだけ再適用。</summary>
+    internal void PreviewLayoutPresetFromSettings(WindowLayoutSlot slot)
     {
-        if (RejectOutsideFadeToolAction())
+        if (_activeLayoutSlot != slot)
         {
             return;
         }
 
-        SetWaveformMaximizeMode(
-            _waveformMaximizeMode == WaveformMaximizeMode.Analyzers
-                ? WaveformMaximizeMode.Off
-                : WaveformMaximizeMode.Analyzers);
+        ApplyLayoutPreset(slot, forceReapply: true, fromSettingsPreview: true);
     }
 
-    private void ToggleWaveformMaximize()
+    /// <summary>F9–F12 レイアウトプリセットを適用する。</summary>
+    private void ApplyLayoutPreset(
+        WindowLayoutSlot slot,
+        bool forceReapply = false,
+        bool fromUserShortcut = false,
+        bool fromSettingsPreview = false)
     {
-        if (RejectOutsideFadeToolAction())
+        // 設定プレビューはフェードツール中でもクローム（位置上下など）を即反映する。
+        if (!fromSettingsPreview && RejectOutsideFadeToolAction())
         {
             return;
         }
 
-        SetWaveformMaximizeMode(
-            _waveformMaximizeMode == WaveformMaximizeMode.Waveform
-                ? WaveformMaximizeMode.Off
-                : WaveformMaximizeMode.Waveform);
+        if (IsVideoMiniPlayerActive()
+            && slot is WindowLayoutSlot.F9 or WindowLayoutSlot.F10)
+        {
+            LeaveVideoMiniToPlaylist(minimalChrome: false);
+            _libraryMinimalChrome = false;
+            if (slot == WindowLayoutSlot.F10)
+            {
+                _activeLayoutSlot = WindowLayoutSlot.F10;
+                _layoutFullscreenOn = false;
+                return;
+            }
+
+            ApplyLayoutPreset(WindowLayoutSlot.F9, forceReapply: true, fromUserShortcut: fromUserShortcut);
+            return;
+        }
+
+        if (slot == WindowLayoutSlot.F10
+            && LibraryPlayerMode.ReturnsToPlaylistChromeOnF10(
+                IsLibraryMaximized,
+                videoMini: false,
+                LibraryBrowser.PlaylistVisualShown,
+                LibraryBrowser.PlaylistVisualPlaying,
+                LibraryBrowser.PlaylistVisualIsPdf,
+                LibraryBrowser.PlaylistVisualIsVideo,
+                _playlistVisualChromeBridge,
+                _playlistVideoImmersivePause))
+        {
+            StopVideoFrameStep();
+            DropPlaylistVideoToDimPreview();
+            return;
+        }
+
+        var preset = AppStorage.Settings.ResolvedLayoutPreset(slot);
+        var sameSlot = _activeLayoutSlot == slot;
+        if (sameSlot
+            && !forceReapply
+            && preset.ResolvedFullscreenMode() != LayoutFullscreenMode.Toggle)
+        {
+            // 固定 On/Off の再押下は見た目を変えず再適用のみ。
+            ApplyWaveformMaximizeChrome();
+            return;
+        }
+
+        // 離脱スロットのトグル状態を残してから、次スロットを解決する。
+        RememberLayoutToggleFullscreen(_activeLayoutSlot, _layoutFullscreenOn);
+
+        bool nextFullscreen;
+        if (forceReapply && sameSlot)
+        {
+            // 設定の即時反映: 固定 On/Off はその値へ。Toggle は反転させず現状維持。
+            nextFullscreen = preset.ResolvedFullscreenMode() switch
+            {
+                LayoutFullscreenMode.On => true,
+                LayoutFullscreenMode.Off => false,
+                _ => _layoutFullscreenOn,
+            };
+        }
+        else
+        {
+            bool? remembered = null;
+            if (!sameSlot
+                && preset.ResolvedFullscreenMode() == LayoutFullscreenMode.Toggle
+                && _layoutToggleFullscreenBySlot.TryGetValue(slot, out var rem))
+            {
+                remembered = rem;
+            }
+
+            nextFullscreen = WindowLayoutPresetLogic.ResolveFullscreenOn(
+                preset,
+                sameSlot,
+                _layoutFullscreenOn,
+                remembered,
+                userShortcut: fromUserShortcut);
+        }
+
+        var wasFullscreen = IsWaveformMaximized;
+        // 全画面オン同士は枠を一度も外さず、中身だけ差し替える。
+        var stayFullscreen = wasFullscreen && nextFullscreen;
+        PersistCurrentWindowPlacement();
+        _suppressLayoutPlacementPersist = true;
+        try
+        {
+            _activeLayoutSlot = slot;
+            _layoutFullscreenOn = nextFullscreen;
+            RememberLayoutToggleFullscreen(slot, nextFullscreen);
+            // F9 はもうミニマムクロームではない。F8 動画ミニ以外では下ろす。
+            if (!IsVideoMiniPlayerActive())
+            {
+                _libraryMinimalChrome = false;
+            }
+
+            var derived = DeriveWaveformMaximizeMode(preset, slot, nextFullscreen);
+            if (_waveformMaximizeMode != derived)
+            {
+                // 直前で離脱スロットを Persist 済み。ここで再 Persist すると新スロットへ
+                // まだ切替前の寸法を書いて F10 等の記憶を潰す。
+                SetWaveformMaximizeMode(
+                    derived,
+                    playFirstOnLibrary: false,
+                    persistPlacement: false,
+                    retainFullscreenFrame: stayFullscreen);
+            }
+            else
+            {
+                ApplyWaveformMaximizeChrome();
+            }
+
+            // 全画面枠の付け外しと、スロットごとの位置・サイズ復元。
+            // トグルオフ時は非全画面スロット（Analyzer / Waveform 等）へ戻す。
+            SyncLayoutFullscreenFrame(wasFullscreen);
+            if (stayFullscreen)
+            {
+                // TryApply（Maximized）はタイトルバーが一瞬出るので使わない。
+                // ApplyWaveformFullscreenFrame が保存済み全画面寸法＋モニター被覆だけ行う。
+                ApplyWaveformFullscreenFrame();
+            }
+            else if (!_layoutFullscreenOn
+                && (!sameSlot || wasFullscreen || forceReapply))
+            {
+                if (!TryApplyCurrentModePlacement() && wasFullscreen)
+                {
+                    ApplyRememberedWindowFrameBounds();
+                }
+            }
+            else if (_layoutFullscreenOn && !wasFullscreen)
+            {
+                // SetWaveformMaximizeMode が枠を付けたあと、保存済み全画面スロットを載せる。
+                TryApplyCurrentModePlacement();
+                ApplyWaveformFullscreenFrame();
+            }
+
+            AppStorage.Save();
+            if (WindowLayoutPreset.IsPlayerLayoutSlot(_activeLayoutSlot ?? slot))
+            {
+                FocusLibraryPaneForPlaylist();
+            }
+            else
+            {
+                Waveform.Focus();
+            }
+        }
+        finally
+        {
+            _suppressLayoutPlacementPersist = false;
+        }
+    }
+
+    /// <summary>
+    /// Toggle スロットの全画面オン／オフをセッション内に残す。トグル開始は初回だけ。
+    /// </summary>
+    private void RememberLayoutToggleFullscreen(WindowLayoutSlot? slot, bool fullscreenOn)
+    {
+        if (slot is not { } s)
+        {
+            return;
+        }
+
+        if (AppStorage.Settings.ResolvedLayoutPreset(s).ResolvedFullscreenMode()
+            != LayoutFullscreenMode.Toggle)
+        {
+            return;
+        }
+
+        _layoutToggleFullscreenBySlot[s] = fullscreenOn;
+    }
+
+    private static WaveformMaximizeMode DeriveWaveformMaximizeMode(
+        WindowLayoutPreset preset,
+        WindowLayoutSlot slot,
+        bool fullscreenOn)
+    {
+        // F9／F10 はプレイリスト付きプレイヤー。ライブラリ列のオン／オフとは別。
+        if (WindowLayoutPreset.IsPlayerLayoutSlot(slot))
+        {
+            return WaveformMaximizeMode.Library;
+        }
+
+        if (!fullscreenOn)
+        {
+            return WaveformMaximizeMode.Off;
+        }
+
+        return preset.ShowAnalyzerArea
+            ? WaveformMaximizeMode.Analyzers
+            : WaveformMaximizeMode.Waveform;
+    }
+
+    private void SyncLayoutFullscreenFrame(bool wasFullscreen)
+    {
+        var want = _layoutFullscreenOn;
+        if (want && wasFullscreen)
+        {
+            // 全画面オン同士: 枠を外さず維持（タイトルバーを出さない）。
+            ApplyWaveformFullscreenFrame();
+            SyncShellFullscreen();
+            return;
+        }
+
+        if (want && !wasFullscreen)
+        {
+            RememberWindowFrameBeforeFullscreen(fromLibrary: IsLibraryMaximized);
+            ApplyWaveformFullscreenFrame();
+            SyncShellFullscreen();
+            return;
+        }
+
+        if (!want && wasFullscreen)
+        {
+            RestoreWaveformWindowChrome();
+            // 位置は ApplyLayoutPreset 側で非全画面スロットから戻す。
+        }
+
+        SyncShellFullscreen();
     }
 
     internal bool IsWaveformMaximized =>
-        IsFullscreenMaximizeMode(_waveformMaximizeMode);
+        _activeLayoutSlot is not null
+            ? _layoutFullscreenOn
+            : IsFullscreenMaximizeMode(_waveformMaximizeMode);
 
     private static bool IsFullscreenMaximizeMode(WaveformMaximizeMode mode) =>
         mode is WaveformMaximizeMode.Waveform or WaveformMaximizeMode.Analyzers;
+
+    private WindowLayoutPreset? ActiveLayoutPresetOrNull() =>
+        _activeLayoutSlot is { } slot
+            ? AppStorage.Settings.ResolvedLayoutPreset(slot)
+            : null;
 
     internal void RefreshWaveformFullscreenFrame()
     {
@@ -2200,7 +2427,9 @@ public partial class MainWindow
     private void SetWaveformMaximizeMode(
         WaveformMaximizeMode mode,
         bool? playFirstOnLibrary = null,
-        bool retainMinimalChrome = false)
+        bool retainMinimalChrome = false,
+        bool persistPlacement = true,
+        bool retainFullscreenFrame = false)
     {
         if (_waveformMaximizeMode == mode)
         {
@@ -2286,11 +2515,20 @@ public partial class MainWindow
         var wantLibrary = mode == WaveformMaximizeMode.Library;
         var wasFullscreen = IsFullscreenMaximizeMode(_waveformMaximizeMode);
         var wantFullscreen = IsFullscreenMaximizeMode(mode);
-        PersistCurrentWindowPlacement();
+        if (persistPlacement)
+        {
+            PersistCurrentWindowPlacement();
+        }
 
         if (wantFullscreen && !wasFullscreen)
         {
-            RememberWindowFrameBeforeFullscreen(fromLibrary: wasLibrary);
+            // レイアウト全画面のまま Library→波形／アナライザへ移るときは、
+            // いまの全画面枠を「直前の窓」として覚え直さない。
+            if (!retainFullscreenFrame)
+            {
+                RememberWindowFrameBeforeFullscreen(fromLibrary: wasLibrary);
+            }
+
             _waveformMaximizeMode = mode;
             ApplyWaveformMaximizeChrome();
             ApplyWaveformFullscreenFrame();
@@ -2303,26 +2541,35 @@ public partial class MainWindow
                 _libraryMinimalChrome = _minimalBeforeWaveformMax;
             }
 
-            RestoreWaveformWindowChrome();
-            if (wantLibrary)
+            if (retainFullscreenFrame)
             {
-                if (!TryApplyCurrentModePlacement())
-                {
-                    ApplyRememberedWindowFrameBounds();
-                }
+                // 全画面オン同士（例: F12↔F11、F12↔全画面プレイヤー）は枠を外さない。
+                ApplyWaveformMaximizeChrome();
+                ApplyWaveformFullscreenFrame();
             }
             else
             {
-                ApplyRememberedWindowFrameBounds();
-            }
+                RestoreWaveformWindowChrome();
+                if (wantLibrary)
+                {
+                    if (!TryApplyCurrentModePlacement())
+                    {
+                        ApplyRememberedWindowFrameBounds();
+                    }
+                }
+                else
+                {
+                    ApplyRememberedWindowFrameBounds();
+                }
 
-            ApplyWaveformMaximizeChrome();
+                ApplyWaveformMaximizeChrome();
+            }
         }
         else
         {
             _waveformMaximizeMode = mode;
             ApplyWaveformMaximizeChrome();
-            if (wantFullscreen)
+            if (wantFullscreen || retainFullscreenFrame)
             {
                 ApplyWaveformFullscreenFrame();
             }
@@ -2363,14 +2610,14 @@ public partial class MainWindow
 
     private void ApplyWaveformFullscreenFrame()
     {
-        // 最大化のまま枠だけ消すと作業領域で止まり、タスクバーが残る。
+        // 先に枠を消してから Normal にする。Maximized→Normal を枠付きでやるとタイトルバーが一瞬出る。
+        WindowStyle = WindowStyle.None;
+        ResizeMode = ResizeMode.NoResize;
         if (WindowState != WindowState.Normal)
         {
             WindowState = WindowState.Normal;
         }
 
-        WindowStyle = WindowStyle.None;
-        ResizeMode = ResizeMode.NoResize;
         if (TryGetSavedFullscreenBounds(out var saved))
         {
             Left = saved.X;
@@ -2430,14 +2677,19 @@ public partial class MainWindow
 
     private void PersistCurrentWindowPlacement()
     {
+        if (_suppressLayoutPlacementPersist)
+        {
+            return;
+        }
+
         if (_playlistVideoFullscreen)
         {
             return;
         }
 
-        if (IsFullscreenMaximizeMode(_waveformMaximizeMode))
+        if (IsWaveformMaximized)
         {
-            // 最大化解除の途中寸法を F11／F12 として残すと、次回は作業領域のままタスクバーが出る。
+            // 最大化解除の途中寸法を全画面スロットへ残すと、次回は作業領域のままタスクバーが出る。
             if (WindowPlacement.TryGetContainingMonitorDip(this, out var monitor)
                 && (Width < monitor.Width - 4 || Height < monitor.Height - 4))
             {
@@ -2721,6 +2973,11 @@ public partial class MainWindow
 
     private MainWindowPlacementKind CurrentPlacementKind()
     {
+        if (_activeLayoutSlot is { } slot)
+        {
+            return PlacementKindForLayoutSlot(slot, _layoutFullscreenOn);
+        }
+
         if (_waveformMaximizeMode == WaveformMaximizeMode.Waveform)
         {
             return MainWindowPlacementKind.WaveformFullscreen;
@@ -2744,10 +3001,32 @@ public partial class MainWindow
         return MainWindowPlacementKind.Editor;
     }
 
+    /// <summary>
+    /// スロットごとの位置記憶。全画面オンは Fullscreen 枠、オフ（トグル含む）はウィンドウ枠。
+    /// </summary>
+    private static MainWindowPlacementKind PlacementKindForLayoutSlot(
+        WindowLayoutSlot slot,
+        bool fullscreenOn) =>
+        WindowLayoutPresetLogic.PlacementKindName(slot, fullscreenOn) switch
+        {
+            "MinimalPlayer" => MainWindowPlacementKind.MinimalPlayer,
+            "Player" => MainWindowPlacementKind.Player,
+            "Waveform" => MainWindowPlacementKind.Waveform,
+            "Analyzer" => MainWindowPlacementKind.Analyzer,
+            "WaveformFullscreen" => MainWindowPlacementKind.WaveformFullscreen,
+            "AnalyzerFullscreen" => MainWindowPlacementKind.AnalyzerFullscreen,
+            _ => MainWindowPlacementKind.Editor,
+        };
+
     private void RememberWindowFrameBeforeFullscreen(bool fromLibrary)
     {
-        _windowStyleBeforeWaveformMax = WindowStyle;
-        _resizeModeBeforeWaveformMax = ResizeMode;
+        // 既に全画面枠のあとで再度呼ぶと、解除用に None を覚えてタイトルバーが戻らない。
+        if (WindowStyle != WindowStyle.None)
+        {
+            _windowStyleBeforeWaveformMax = WindowStyle;
+            _resizeModeBeforeWaveformMax = ResizeMode;
+        }
+
         _minimalBeforeWaveformMax = fromLibrary && _libraryMinimalChrome;
         if (fromLibrary
             && WindowPlacement.TryGetDipBounds(
@@ -2763,6 +3042,12 @@ public partial class MainWindow
             return;
         }
 
+        // 全画面中の再記憶では枠寸法も上書きしない。
+        if (WindowStyle == WindowStyle.None)
+        {
+            return;
+        }
+
         _windowStateBeforeWaveformMax = WindowState;
         _boundsBeforeWaveformMax = WindowState == WindowState.Normal
             ? new Rect(Left, Top, Width, Height)
@@ -2771,8 +3056,12 @@ public partial class MainWindow
 
     private void RestoreWaveformWindowChrome()
     {
-        WindowStyle = _windowStyleBeforeWaveformMax;
-        ResizeMode = _resizeModeBeforeWaveformMax;
+        WindowStyle = _windowStyleBeforeWaveformMax == WindowStyle.None
+            ? WindowStyle.SingleBorderWindow
+            : _windowStyleBeforeWaveformMax;
+        ResizeMode = _resizeModeBeforeWaveformMax == ResizeMode.NoResize
+            ? ResizeMode.CanResize
+            : _resizeModeBeforeWaveformMax;
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
         SyncShellFullscreen();
     }
@@ -2790,11 +3079,24 @@ public partial class MainWindow
         }
     }
 
-    /// <summary>F12 アナライザ最大化の倍率。F10 通常／F 全画面は 1（ウィンドウ比例なし）。</summary>
-    private double AnalyzerMaximizeLayoutScale =>
-        _waveformMaximizeMode == WaveformMaximizeMode.Analyzers
-            ? DesignMetrics.AnalyzerMaximizeScale
-            : 1d;
+    /// <summary>アナライザ帯オンかつ全画面のとき拡大。旧 F12 相当。</summary>
+    private double AnalyzerMaximizeLayoutScale
+    {
+        get
+        {
+            var preset = ActiveLayoutPresetOrNull();
+            if (preset is not null)
+            {
+                return preset.ShowAnalyzerArea && _layoutFullscreenOn
+                    ? DesignMetrics.AnalyzerMaximizeScale
+                    : 1d;
+            }
+
+            return _waveformMaximizeMode == WaveformMaximizeMode.Analyzers
+                ? DesignMetrics.AnalyzerMaximizeScale
+                : 1d;
+        }
+    }
 
     /// <summary>動画ミニ専用の窓比例倍率。F10 では常に 1。基準は作業領域（最大化相当＝1）。</summary>
     private double VideoMiniOverlayLayoutScale
@@ -2919,7 +3221,7 @@ public partial class MainWindow
 
         WorkGrid.RowDefinitions[1].Height = new GridLength(
             LibraryPlayerMode.VideoMiniTransportRowHeight(scale));
-        // ゴニオ（右列下端）と同じ高さ帯にスペアナ／ラウドネスを揃える。
+        // 下段スペアナ／ラウドネスを揃える（ゴニオは右列・ピーク下）。
         Spectrum.VerticalAlignment = VerticalAlignment.Bottom;
         LoudnessMeter.VerticalAlignment = VerticalAlignment.Bottom;
         MonitorToggles.VerticalAlignment = VerticalAlignment.Bottom;
@@ -2929,9 +3231,9 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// 動画ミニ専用：レベルメーターの縦伸び上限（列実高・16:9・ゴニオ／上段を考慮）。
+    /// 動画ミニ専用：レベルメーターの縦伸び上限（列実高・16:9・上段／下段アナライザ帯を考慮）。
     /// F10 など通常プレイヤーは Stretch のまま。
-    /// 縦長ミニでは MeterPeakHost（WAAPI＋ピーク）を Bottom 揃えし、WAAPI がピーク直上に付く。
+    /// 縦長ミニでは MeterPeakHost（WAAPI＋ピーク）を Bottom 揃えし、下段帯の直上に載せる。
     /// </summary>
     private void ApplyLevelMeterHeightCap(double layoutScale)
     {
@@ -2961,7 +3263,7 @@ public partial class MainWindow
         LevelMeter.MaxHeight = cap;
         LevelMeter.Height = cap;
         LevelMeter.VerticalAlignment = VerticalAlignment.Stretch;
-        // WAAPI とピークを一塊にしてゴニオ直上へ。
+        // WAAPI とピークを一塊にして下段アナライザ帯の直上へ。
         MeterPeakHost.VerticalAlignment = VerticalAlignment.Bottom;
     }
 
@@ -2975,47 +3277,196 @@ public partial class MainWindow
 
     private void ApplyWaveformMaximizeChrome()
     {
-        var show = _waveformMaximizeMode != WaveformMaximizeMode.Waveform;
-        var visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        var showOverview = _waveformMaximizeMode != WaveformMaximizeMode.Library;
-        StatusBarHost.Visibility = Visibility.Visible;
+        var preset = ActiveLayoutPresetOrNull();
+        var showAnalyzer = preset?.ShowAnalyzerArea
+            ?? (_waveformMaximizeMode != WaveformMaximizeMode.Waveform);
+        var showMeter = preset?.ShowLevelMeter
+            ?? (_waveformMaximizeMode != WaveformMaximizeMode.Waveform);
+        var showStatusBar = preset is not null
+            ? preset.ResolvedShowStatusBar(_activeLayoutSlot ?? WindowLayoutSlot.F10)
+            : true;
+        var showOverview = preset is not null && _activeLayoutSlot is { } overviewSlot
+            ? !WindowLayoutPreset.IsPlayerLayoutSlot(overviewSlot)
+            : _waveformMaximizeMode != WaveformMaximizeMode.Library;
+        // 旧 F11（Waveform）互換: プリセット無しでモードだけ Waveform のときは帯もメーターも畳む。
+        if (preset is null && _waveformMaximizeMode == WaveformMaximizeMode.Waveform)
+        {
+            showAnalyzer = false;
+            showMeter = false;
+        }
+
+        StatusBarHost.Visibility = showStatusBar ? Visibility.Visible : Visibility.Collapsed;
+        ApplyMainMenuBarVisibility();
         OverviewHost.Visibility = showOverview ? Visibility.Visible : Visibility.Collapsed;
         if (!showOverview)
         {
             Overview.CancelDrag();
         }
-        TransportChromeHost.Visibility = visibility;
-        MeterColumn.Visibility = visibility;
-        MeterColumnSplitter.Visibility = visibility;
+
+        TransportChromeHost.Visibility = showAnalyzer ? Visibility.Visible : Visibility.Collapsed;
+        // 右列：ピークは ShowLevelMeter。ゴニオはアナライザ扱いだがピークの上／下に置く。
+        // メーターもゴニオもオフなら列を畳み、プレイヤーはプレイリスト／エディタは波形を広げる。
+        var showGonio = showAnalyzer;
+        var showMeterColumn = showMeter || showGonio;
+        MeterColumn.Visibility = showMeterColumn ? Visibility.Visible : Visibility.Collapsed;
+        MeterColumnSplitter.Visibility = showMeterColumn ? Visibility.Visible : Visibility.Collapsed;
+        MeterPeakHost.Visibility = showMeter ? Visibility.Visible : Visibility.Collapsed;
+        VectorScope.Visibility = showGonio ? Visibility.Visible : Visibility.Collapsed;
+        ApplyAnalyzerDock(preset);
         ApplyAnalyzerMaximizeScale();
         ApplyWaapiPanelVisible();
         ApplyLibraryChrome();
+        ApplyLayoutWaveformVisibility(preset);
         Transport.SetMaximizeMode(_waveformMaximizeMode);
         ApplyWaveformScaleLanes();
         RefreshTileDividers();
-        OverviewScaleColumn.Width = show
+        // 全体表示は波形の dB 目盛り列に揃える。タブ左は ＜ 有無も見て ApplyDocumentTabScaleColumn。
+        OverviewScaleColumn.Width = ShowWaveformScaleLane
             ? DesignMetrics.DbScaleWidthGrid
             : new GridLength(0);
-        if (!show)
+        ApplyDocumentTabScaleColumn();
+
+        var analyzerRow = AnalyzerChromeRowIndex(preset);
+        var waveformRow = analyzerRow == 0 ? 1 : 0;
+        WorkGrid.RowDefinitions[waveformRow].Height = new GridLength(1, GridUnitType.Star);
+        if (!showAnalyzer)
         {
-            WorkGrid.RowDefinitions[1].Height = new GridLength(0);
-            MeterColumnDef.MinWidth = 0;
-            MeterColumnDef.MaxWidth = 0;
-            MeterColumnDef.Width = new GridLength(0);
-            return;
+            WorkGrid.RowDefinitions[analyzerRow].Height = new GridLength(0);
+        }
+        else
+        {
+            WorkGrid.RowDefinitions[analyzerRow].Height = new GridLength(Math.Max(
+                DesignMetrics.TransportChromeHeight,
+                DesignMetrics.SpectrumHeight * AnalyzerMaximizeLayoutScale));
         }
 
-        WorkGrid.RowDefinitions[1].Height = new GridLength(Math.Max(
-            DesignMetrics.TransportChromeHeight,
-            DesignMetrics.SpectrumHeight * AnalyzerMaximizeLayoutScale));
-        ApplyMeterColumnWidth(_meterColumnPreferred);
+        if (!showMeterColumn)
+        {
+            CollapseMeterColumnWidth();
+        }
+        else
+        {
+            ApplyMeterColumnWidth(_meterColumnPreferred);
+        }
+
         ApplyLibraryMinimalChrome();
     }
 
+    private void CollapseMeterColumnWidth()
+    {
+        MeterColumnDef.MinWidth = 0;
+        MeterColumnDef.MaxWidth = 0;
+        MeterColumnDef.Width = new GridLength(0);
+    }
+
+    /// <summary>いまのレイアウト／モードでメーター列を出すべきか（幅の復元ガード用）。</summary>
+    private bool IsMeterColumnEnabledByLayout()
+    {
+        if (_videoLaunchPlacement && IsLibraryMaximized)
+        {
+            return true;
+        }
+
+        var preset = ActiveLayoutPresetOrNull();
+        if (preset is null && _waveformMaximizeMode == WaveformMaximizeMode.Waveform)
+        {
+            return false;
+        }
+
+        // ピークまたはゴニオ（アナライザ）のどちらかが出ていれば列が要る。
+        if (preset is not null)
+        {
+            return preset.ShowLevelMeter || preset.ShowAnalyzerArea;
+        }
+
+        return _waveformMaximizeMode != WaveformMaximizeMode.Waveform;
+    }
+
+    private static int AnalyzerChromeRowIndex(WindowLayoutPreset? preset) =>
+        preset is { ShowAnalyzerArea: true }
+        && preset.ResolvedAnalyzerDock() == LayoutAnalyzerDock.Top
+            ? 0
+            : 1;
+
+    private void ApplyAnalyzerDock(WindowLayoutPreset? preset)
+    {
+        // アナライザ非表示中も上下の希望は覚え、行だけは下配置に畳む。
+        var show = preset?.ShowAnalyzerArea == true;
+        var dockTop = show && preset!.ResolvedAnalyzerDock() == LayoutAnalyzerDock.Top;
+        var waveformRow = dockTop ? 1 : 0;
+        var analyzerRow = dockTop ? 0 : 1;
+        Grid.SetRow(WaveformWorkHost, waveformRow);
+        Grid.SetRow(TransportChromeHost, analyzerRow);
+        WorkGrid.RowDefinitions[waveformRow].Height = new GridLength(1, GridUnitType.Star);
+        WorkGrid.RowDefinitions[waveformRow].MinHeight = 0;
+        // ゴニオ：アナライザ下→ピーク下、上→ピーク上（表示自体は ShowAnalyzerArea）。
+        var gonioDock = preset?.ResolvedAnalyzerDock() == LayoutAnalyzerDock.Top
+            ? Dock.Top
+            : Dock.Bottom;
+        if (DockPanel.GetDock(VectorScope) != gonioDock)
+        {
+            DockPanel.SetDock(VectorScope, gonioDock);
+        }
+
+        // 上下ドックともアイコン＋ロゴを一塊のまま帯の垂直中央へ（F12 拡大時も分解しない）。
+        TransportBrandStack.VerticalAlignment = VerticalAlignment.Center;
+        BrandRowHost.Margin = new Thickness(12, 0, 0, 0);
+        ApplyTransportBrandLeftInset();
+        // アナライザ行の高さは ApplyWaveformMaximizeChrome 側で設定。
+    }
+
+    /// <summary>トランスポート／ロゴ左を波形描画開始（dB 目盛り列）に揃える。</summary>
+    private void ApplyTransportBrandLeftInset()
+    {
+        var left = ShowWaveformScaleLane ? DesignMetrics.DbScaleWidth : 0;
+        var margin = TransportBrandStack.Margin;
+        if (Math.Abs(margin.Left - left) > 0.5)
+        {
+            TransportBrandStack.Margin = new Thickness(left, margin.Top, margin.Right, margin.Bottom);
+        }
+    }
+
+    private void ApplyLayoutWaveformVisibility(WindowLayoutPreset? preset)
+    {
+        if (preset is null)
+        {
+            WaveformHostBorder.Visibility = Visibility.Visible;
+            return;
+        }
+
+        var showWave = preset.ResolvedShowWaveform(
+            _activeLayoutSlot ?? WindowLayoutSlot.F12);
+        WaveformHostBorder.Visibility = showWave || IsLibraryMaximized
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        if (IsLibraryMaximized)
+        {
+            if (showWave)
+            {
+                LibraryWaveformRowDef.MinHeight = DesignMetrics.LibraryWaveformHeight;
+                LibraryWaveformRowDef.MaxHeight = DesignMetrics.LibraryWaveformHeight;
+                LibraryWaveformRowDef.Height = new GridLength(DesignMetrics.LibraryWaveformHeight);
+            }
+            else
+            {
+                LibraryWaveformRowDef.MinHeight = 0;
+                LibraryWaveformRowDef.MaxHeight = 0;
+                LibraryWaveformRowDef.Height = new GridLength(0);
+            }
+
+            return;
+        }
+
+        // エディタ相当: 波形オフならホストを畳む（ライブラリ帯もオフのとき空になる）。
+        if (!showWave)
+        {
+            OverviewHost.Visibility = Visibility.Collapsed;
+        }
+    }
+
     /// <summary>
-    /// F9／F8。プレイヤー中だけサイド列・ステータス・トランスポートを畳む。
-    /// F8 動画ミニはピーク／ゴニオ／スペアナ／ラウドネスを残す。F9 はメーター列も畳む。
-    /// 波形は残す。再生と Alt+S（Silent Skip）／Alt+T（Always on Top）は続ける。
+    /// プレイヤー中のサイド列と、F8 動画ミニの縮小クローム。
+    /// F9／F10 のメーター／アナライザ／ステータスはプリセット側で制御する。
     /// ApplyWaveformMaximizeChrome のあとに呼ぶ。
     /// </summary>
     private void ApplyLibraryMinimalChrome()
@@ -3028,45 +3479,53 @@ public partial class MainWindow
             return;
         }
 
-        LibraryBrowser.SetSidePanesVisible(!_libraryMinimalChrome);
-        if (!_libraryMinimalChrome || _waveformMaximizeMode == WaveformMaximizeMode.Waveform)
+        LibraryBrowser.SetSidePanesVisible(ResolveLibrarySidePanesVisible());
+        // F8 動画ミニ以外はプリセット表示を尊重（旧 F9 ミニマムの一括畳みは使わない）。
+        if (!_videoLaunchPlacement)
         {
             RestoreMinimalChromeMeterHosts();
-            SyncWindowMinSizeForMode(minimal: false);
+            // F9 は以前のミニマムプレイヤーと同じ下限（通常 WindowMinWidth より狭い）。
+            SyncWindowMinSizeForMode(minimal: _activeLayoutSlot == WindowLayoutSlot.F9);
             return;
         }
 
+        // 動画ミニ: アナライザ類＋WAAPI トグルを残す（リスト／トランスポート／タブは隠す）。
         StatusBarHost.Visibility = Visibility.Collapsed;
+        MainMenuBar.Visibility = Visibility.Collapsed;
+        TransportChromeHost.Visibility = Visibility.Visible;
+        MeterColumn.Visibility = Visibility.Visible;
+        MeterColumnSplitter.Visibility = Visibility.Collapsed;
+        DocumentTabHost.Visibility = Visibility.Collapsed;
+        HistoryStrip.Visibility = Visibility.Collapsed;
+        TransportBarHost.Visibility = Visibility.Collapsed;
+        MeterColumn.ClipToBounds = false;
+        TransportChromeHost.ClipToBounds = false;
+        WorkGrid.ClipToBounds = false;
+        MeterTopSlot.Height = double.NaN;
+        MeterTopSlot.Visibility = Visibility.Visible;
+        ApplyAnalyzerMaximizeScale();
+        ApplyVideoMiniOverlayLayout(VideoMiniOverlayLayoutScale);
+        SyncWindowMinSizeForMode(videoMini: true);
+    }
+
+    /// <summary>
+    /// プレイヤーのツリー／お気に入り列。F9 既定オフ・F10 既定オン。F8 動画ミニは隠す。
+    /// </summary>
+    private bool ResolveLibrarySidePanesVisible()
+    {
         if (_videoLaunchPlacement)
         {
-            // 動画ミニ: アナライザ類＋WAAPI トグルを残す（リスト／トランスポート／タブは隠す）。
-            // MeterTopSlot は F10 本再生と同じく出し、WAAPI ボタンだけ消えないようにする。
-            TransportChromeHost.Visibility = Visibility.Visible;
-            MeterColumn.Visibility = Visibility.Visible;
-            MeterColumnSplitter.Visibility = Visibility.Collapsed;
-            DocumentTabHost.Visibility = Visibility.Collapsed;
-            HistoryStrip.Visibility = Visibility.Collapsed;
-            TransportBarHost.Visibility = Visibility.Collapsed;
-            MeterColumn.ClipToBounds = false;
-            TransportChromeHost.ClipToBounds = false;
-            WorkGrid.ClipToBounds = false;
-            MeterTopSlot.Height = double.NaN;
-            MeterTopSlot.Visibility = Visibility.Visible;
-            // 行高・LayoutTransform は ApplyAnalyzerMaximizeScale（AnalyzerLayoutScale）に任せる。
-            ApplyAnalyzerMaximizeScale();
-            ApplyVideoMiniOverlayLayout(VideoMiniOverlayLayoutScale);
-            SyncWindowMinSizeForMode(videoMini: true);
-            return;
+            return false;
         }
 
-        TransportChromeHost.Visibility = Visibility.Collapsed;
-        MeterColumn.Visibility = Visibility.Collapsed;
-        MeterColumnSplitter.Visibility = Visibility.Collapsed;
-        WorkGrid.RowDefinitions[1].Height = new GridLength(0);
-        MeterColumnDef.MinWidth = 0;
-        MeterColumnDef.MaxWidth = 0;
-        MeterColumnDef.Width = new GridLength(0);
-        SyncWindowMinSizeForMode(minimal: true);
+        if (_activeLayoutSlot is { } slot && WindowLayoutPreset.IsPlayerLayoutSlot(slot))
+        {
+            return AppStorage.Settings
+                .ResolvedLayoutPreset(slot)
+                .ResolvedShowLibraryAndFavorites(slot);
+        }
+
+        return !_libraryMinimalChrome;
     }
 
     private void RestoreMinimalChromeMeterHosts()

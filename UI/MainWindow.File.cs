@@ -122,16 +122,15 @@ public partial class MainWindow
             return;
         }
 
+        _activeLayoutSlot = WindowLayoutSlot.F10;
+        _layoutFullscreenOn = false;
         SetWaveformMaximizeMode(WaveformMaximizeMode.Library);
     }
 
     /// <summary>
-    /// ファイル無し・復元無しで、エディタ以外の起動モードのとき。出すまでクロークする。
+    /// 引数無し起動は、起動モード適用までクロークする（タブ復元ありでもエディタが一瞬見えないように）。
     /// </summary>
-    private bool HoldsRevealForStartupMode() =>
-        !LaunchFiles.HasStartup
-        && !HasRestorableOpenDocuments()
-        && AppLaunchModes.HoldsReveal(AppStorage.Settings.ResolvedLaunchMode());
+    private bool HoldsRevealForStartupMode() => !LaunchFiles.HasStartup;
 
     /// <summary>前回エディタで開いていたファイルを次起動で戻せるか。</summary>
     private bool HasRestorableOpenDocuments() =>
@@ -140,7 +139,8 @@ public partial class MainWindow
             AppStorage.Settings);
 
     /// <summary>
-    /// ファイルを渡さず、復元するドキュメントも無い起動だけ、設定の起動モードを適用する。
+    /// 引数ファイルが無い起動で、設定の起動モード（F9–F12）を適用する。
+    /// 前回タブの復元後にも呼び、アナライザ上下などが起動モードどおりになるようにする。
     /// </summary>
     private void EnterStartupMode()
     {
@@ -149,32 +149,15 @@ public partial class MainWindow
             return;
         }
 
-        switch (AppStorage.Settings.ResolvedLaunchMode())
-        {
-            case AppLaunchMode.Player when !IsLibraryMaximized:
-                SetWaveformMaximizeMode(
-                    WaveformMaximizeMode.Library,
-                    playFirstOnLibrary: false);
-                break;
-            case AppLaunchMode.PlayerCompact when !IsLibraryMaximized:
-                _libraryMinimalChrome = true;
-                SetWaveformMaximizeMode(
-                    WaveformMaximizeMode.Library,
-                    playFirstOnLibrary: false,
-                    retainMinimalChrome: true);
-                break;
-            case AppLaunchMode.Waveform when _waveformMaximizeMode != WaveformMaximizeMode.Waveform:
-                SetWaveformMaximizeMode(WaveformMaximizeMode.Waveform);
-                break;
-            case AppLaunchMode.Analyzers when _waveformMaximizeMode != WaveformMaximizeMode.Analyzers:
-                SetWaveformMaximizeMode(WaveformMaximizeMode.Analyzers);
-                break;
-        }
+        ApplyLayoutPreset(AppStorage.Settings.ResolvedLaunchMode(), forceReapply: true);
     }
 
     private void RevealStartupMode()
     {
-        if (!HoldsRevealForStartupMode() || !WindowPaintReveal.IsPending(this))
+        // タブ復元ありの Reveal は RestoreLastDocumentAfterReveal 側。ここでは無し起動のみ。
+        if (HasRestorableOpenDocuments()
+            || !HoldsRevealForStartupMode()
+            || !WindowPaintReveal.IsPending(this))
         {
             return;
         }
@@ -2195,6 +2178,7 @@ public partial class MainWindow
             settings.ResolvedLibraryPlaylistWaveformSizeWave(),
             settings.ResolvedLibraryPlaylistWaveformSizeMp3(),
             settings.GaplessPlayback,
+            settings.ShowMainMenuBar,
             settings.LibraryShowPlaylistPdf,
             settings.LibraryShowPlaylistMov,
             settings.LibraryShowPlaylistMp4,
@@ -2207,7 +2191,11 @@ public partial class MainWindow
             settings.VideoProxyDisableAutoEncode,
             settings.ResolvedLaunchMode(),
             settings.ResolvedWallpaperPath(),
-            settings.ResolvedWallpaperOpacity())
+            settings.ResolvedWallpaperOpacity(),
+            settings.ResolvedLayoutPreset(WindowLayoutSlot.F9),
+            settings.ResolvedLayoutPreset(WindowLayoutSlot.F10),
+            settings.ResolvedLayoutPreset(WindowLayoutSlot.F11),
+            settings.ResolvedLayoutPreset(WindowLayoutSlot.F12))
         {
             Owner = this,
             OpenColorSettings = ShowColorDevPanel,
@@ -2260,6 +2248,16 @@ public partial class MainWindow
         LibraryBrowser.ApplyWallpaper(settings.ResolvedWallpaperPath(), settings.ResolvedWallpaperOpacity());
         settings.GaplessPlayback = dialog.SelectedGaplessPlayback;
         Mp3Gapless.Enabled = settings.GaplessPlayback;
+        settings.ShowMainMenuBar = dialog.SelectedShowMainMenuBar;
+        settings.ApplyLayoutPreset(WindowLayoutSlot.F9, dialog.SelectedLayoutPresetF9);
+        settings.ApplyLayoutPreset(WindowLayoutSlot.F10, dialog.SelectedLayoutPresetF10);
+        settings.ApplyLayoutPreset(WindowLayoutSlot.F11, dialog.SelectedLayoutPresetF11);
+        settings.ApplyLayoutPreset(WindowLayoutSlot.F12, dialog.SelectedLayoutPresetF12);
+        EnsureMainMenuBar();
+        if (_activeLayoutSlot is { } activeSlot)
+        {
+            ApplyLayoutPreset(activeSlot, forceReapply: true);
+        }
         settings.LibraryShowPlaylistPdf = dialog.SelectedLibraryShowPlaylistPdf;
         settings.LibraryShowPlaylistMov = dialog.SelectedLibraryShowPlaylistMov;
         settings.LibraryShowPlaylistMp4 = dialog.SelectedLibraryShowPlaylistMp4;

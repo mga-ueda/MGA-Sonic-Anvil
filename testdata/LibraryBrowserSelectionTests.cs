@@ -1017,52 +1017,54 @@ public sealed class LibraryBrowserSelectionTests
             Flush();
             Assert.True(view.IsListOrigin(view.FileGrid));
             Assert.True(view.TryOpenKeyboardContextMenu());
+            // ウィンドウメニューと同じカテゴリ（先頭カラーのみプレイリスト固有）。実行不可もグレーアウトで残す。
             Assert.Equal(
             [
                 UiStrings.LibraryMenuColor,
-                UiStrings.LibraryMenuCatPitch,
-                UiStrings.LibraryMenuCatEdit,
-                UiStrings.LibraryMenuCatAudio,
-                UiStrings.LibraryMenuCatFormat,
-                UiStrings.LibraryMenuCatExport,
-                UiStrings.LibraryMenuCatOther,
+                UiStrings.WaveMenuCatFile,
+                UiStrings.WaveMenuCatEdit,
+                UiStrings.WaveMenuCatFormat,
+                UiStrings.WaveMenuCatExport,
+                UiStrings.WaveMenuCatView,
+                UiStrings.WaveMenuCatTimeline,
+                UiStrings.WaveMenuCatTabs,
+                UiStrings.WaveMenuCatPlayback,
+                UiStrings.WaveMenuCatAudio,
+                UiStrings.WaveMenuCatWwise,
+                UiStrings.WaveMenuCatOther,
             ],
             view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());
-            var listPitch = view.OpenContextMenuItems[1];
+            Assert.Equal(UiStrings.WaveMenuCatPlayback, UiStrings.LibraryMenuCatPitch);
             var listEdit = view.OpenContextMenuItems[2];
-            var listAudio = view.OpenContextMenuItems[3];
-            var listFormat = view.OpenContextMenuItems[4];
-            var listExport = view.OpenContextMenuItems[5];
-            var listOther = view.OpenContextMenuItems[6];
-            Assert.Equal(MenuGestures.PreviousTrack, ((MenuItem)listPitch.Items[0]).InputGestureText);
-            Assert.Equal(MenuGestures.NextTrack, ((MenuItem)listPitch.Items[1]).InputGestureText);
-            Assert.Equal(MenuGestures.RestartTrack, ((MenuItem)listPitch.Items[2]).InputGestureText);
-            Assert.Equal("Alt+P", ((MenuItem)listPitch.Items[3]).InputGestureText);
-            Assert.Equal(MenuGestures.PitchUp, ((MenuItem)listPitch.Items[5]).InputGestureText);
-            Assert.Equal(MenuGestures.PitchDown, ((MenuItem)listPitch.Items[6]).InputGestureText);
-            Assert.Equal(MenuGestures.PitchReset, ((MenuItem)listPitch.Items[7]).InputGestureText);
-            Assert.Equal("Ctrl+C", ((MenuItem)listEdit.Items[0]).InputGestureText);
-            Assert.Equal(UiStrings.LibraryMenuClearFromPlaylist, (string)((MenuItem)listEdit.Items[6]).Header);
-            Assert.Equal(MenuGestures.Delete, ((MenuItem)listEdit.Items[6]).InputGestureText);
-            // 破壊編集ショートカット（N／I／O／S／B／C／V 等）はキー無効のため表記なし。
-            // ラウドネス揃えは Ctrl+Shift+V、バウンスは Ctrl+Shift+B を表記。
-            Assert.True(string.IsNullOrEmpty(((MenuItem)listAudio.Items[3]).InputGestureText));
-            Assert.True(string.IsNullOrEmpty(((MenuItem)listAudio.Items[4]).InputGestureText));
-            Assert.True(string.IsNullOrEmpty(((MenuItem)listAudio.Items[6]).InputGestureText));
+            var listFormat = view.OpenContextMenuItems[3];
+            var listExport = view.OpenContextMenuItems[4];
+            var listPlayback = view.OpenContextMenuItems[8];
+            var listOther = view.OpenContextMenuItems[11];
+            var listPlaylist = listPlayback.Items.OfType<MenuItem>()
+                .First(item => (string)item.Header == UiStrings.WaveMenuCatPlaylist);
+            Assert.Equal(MenuGestures.PreviousTrack, ((MenuItem)listPlaylist.Items[0]).InputGestureText);
+            Assert.Equal(MenuGestures.NextTrack, ((MenuItem)listPlaylist.Items[1]).InputGestureText);
+            Assert.Equal(MenuGestures.RestartTrack, ((MenuItem)listPlaylist.Items[2]).InputGestureText);
+            Assert.Equal("Alt+P", ((MenuItem)listPlaylist.Items[4]).InputGestureText);
+            Assert.Equal(MenuGestures.PitchUp, listPlayback.Items.OfType<MenuItem>()
+                .First(item => item.InputGestureText == MenuGestures.PitchUp).InputGestureText);
+            // 編集末尾はシェル操作＋プレイリストからクリア。
+            Assert.Equal(UiStrings.LibraryMenuClearFromPlaylist, (string)((MenuItem)listEdit.Items[^1]).Header);
+            Assert.Equal(MenuGestures.Delete, ((MenuItem)listEdit.Items[^1]).InputGestureText);
+            Assert.Equal("Ctrl+C", ((MenuItem)listEdit.Items[^7]).InputGestureText);
+            // 破壊編集ショートカット（S／B／C 等）はプレイヤーでは表記なし。
             Assert.True(string.IsNullOrEmpty(((MenuItem)listFormat.Items[0]).InputGestureText));
             Assert.True(string.IsNullOrEmpty(((MenuItem)listFormat.Items[1]).InputGestureText));
             Assert.True(string.IsNullOrEmpty(((MenuItem)listFormat.Items[2]).InputGestureText));
-            Assert.Equal(MenuGestures.VolumePlayer, ((MenuItem)listExport.Items[0]).InputGestureText);
-            Assert.Equal("Ctrl+Shift+M", ((MenuItem)listExport.Items[3]).InputGestureText);
-            Assert.Equal("Ctrl+Shift+B", ((MenuItem)listExport.Items[4]).InputGestureText);
-            Assert.Equal(UiStrings.LibraryMenuCopyFileName, (string)((MenuItem)listOther.Items[0]).Header);
+            Assert.Equal("Ctrl+Shift+M", ((MenuItem)listExport.Items[1]).InputGestureText);
+            Assert.Equal("Ctrl+Shift+B", ((MenuItem)listExport.Items[2]).InputGestureText);
+            Assert.Equal(UiStrings.LibraryMenuOpenInExplorer, (string)((MenuItem)listOther.Items[^1]).Header);
+            // Wwise はプレイヤーでは実行不可でもカテゴリ自体は残してグレーアウト。
+            Assert.False(view.OpenContextMenuItems[10].IsEnabled);
+            Assert.Equal(UiStrings.WaveMenuCatWwise, (string)view.OpenContextMenuItems[10].Header);
             WaveMenuCommand? waveCommand = null;
             view.PlaylistWaveMenuRequested += (_, command) => waveCommand = command;
             var sampleRateItem = (MenuItem)listFormat.Items[0];
-            sampleRateItem.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
-            {
-                RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent,
-            });
             sampleRateItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             Assert.Equal(WaveMenuCommand.SampleRate, waveCommand);
             Assert.True(view.HasOpenContextMenu);

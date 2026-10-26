@@ -895,12 +895,6 @@ public partial class MainWindow
             return;
         }
 
-        var hostWidth = DocumentTabHost.ActualWidth;
-        if (hostWidth <= 1)
-        {
-            return;
-        }
-
         var tabs = DocumentTabs.Children.OfType<Border>().ToArray();
         if (tabs.Length == 0)
         {
@@ -924,7 +918,30 @@ public partial class MainWindow
             slots[i] = new DocumentTabSlot(preferred, min, keepWide);
         }
 
-        var showArrows = !DocumentTabLayout.FitsWithoutArrows(slots, hostWidth);
+        // 仮の左余白で矢印要否を見積もり、確定余白を引いて配分する。
+        var probeLeft = DocumentTabLeftReserve(scrollArrows: false);
+        var probeWidth = Math.Max(0, DocumentTabHost.ActualWidth - probeLeft);
+        if (probeWidth <= 1)
+        {
+            return;
+        }
+
+        var showArrows = !DocumentTabLayout.FitsWithoutArrows(slots, probeWidth);
+        var leftReserve = DocumentTabLeftReserve(showArrows);
+        var hostWidth = Math.Max(0, DocumentTabHost.ActualWidth - leftReserve);
+        if (hostWidth <= 1)
+        {
+            return;
+        }
+
+        // 左余白を広げた結果、さらに矢印が要る場合がある。
+        if (!showArrows && !DocumentTabLayout.FitsWithoutArrows(slots, hostWidth))
+        {
+            showArrows = true;
+            leftReserve = DocumentTabLeftReserve(scrollArrows: true);
+            hostWidth = Math.Max(0, DocumentTabHost.ActualWidth - leftReserve);
+        }
+
         var widths = new double[tabs.Length];
         DocumentTabLayout.Allocate(slots, hostWidth, widths);
 
@@ -958,6 +975,20 @@ public partial class MainWindow
         }
     }
 
+    private double DocumentTabLeftReserve(bool scrollArrows)
+    {
+        var left = ShowWaveformScaleLane ? DesignMetrics.DbScaleWidth : 0;
+        if (!scrollArrows)
+        {
+            return left;
+        }
+
+        // 全画面は ＜ を目盛り列に押し込めず、タブを右へずらして横幅を確保する。
+        return IsWaveformMaximized
+            ? left + DesignMetrics.DocumentTabScrollButtonWidth
+            : Math.Max(left, DesignMetrics.DocumentTabScrollButtonWidth);
+    }
+
     private void SetTabScrollButtons(bool show)
     {
         var visibility = show ? Visibility.Visible : Visibility.Collapsed;
@@ -966,6 +997,11 @@ public partial class MainWindow
             TabScrollLeft.Visibility = visibility;
             TabScrollRight.Visibility = visibility;
         }
+
+        ApplyDocumentTabScaleColumn(show);
+        // ＜ は常に左スペーサ列。タブ列へ重ねない（全画面で潰れない）。
+        Grid.SetColumn(TabScrollLeft, 0);
+        TabScrollLeft.HorizontalAlignment = HorizontalAlignment.Right;
     }
 
     private void RefreshTabScrollEnabled()
@@ -1034,7 +1070,7 @@ public partial class MainWindow
             DispatcherPriority.Loaded);
     }
 
-    /// <summary>進行中の下線スライドを見た目の位置で止め、古い Completed を無効化する。</summary>
+    /// <summary>進行中の上線スライドを見た目の位置で止め、古い Completed を無効化する。</summary>
     private void CancelDocumentTabAccentAnimation()
     {
         _documentTabAccentAnimatePending = false;
@@ -1131,8 +1167,8 @@ public partial class MainWindow
 
         var left = origin.X;
         var width = item.ActualWidth;
-        var top = bottom.Y - accent.Height;
-        Canvas.SetTop(accent, top);
+        // アクティブ線はタブ上辺。
+        Canvas.SetTop(accent, origin.Y);
 
         // 4／6 連打ではスライドを重ねずスナップ（古い Completed がバーを戻すのも防ぐ）。
         var now = Environment.TickCount64;

@@ -86,6 +86,23 @@ public partial class MainWindow : Window
     private bool _syncingChrome;
     private bool _syncingSpeakers;
     private WaveformMaximizeMode _waveformMaximizeMode;
+
+    /// <summary>F9–F12 で選んだレイアウト枠。未選択はエディタ既定。</summary>
+    private WindowLayoutSlot? _activeLayoutSlot;
+
+    /// <summary>アクティブスロットの全画面がいまオンか（Toggle の反転先）。</summary>
+    private bool _layoutFullscreenOn;
+
+    /// <summary>
+    /// Toggle スロットごとの全画面状態（起動後セッション内）。未登録＝トグル開始を使う初回。
+    /// </summary>
+    private readonly Dictionary<WindowLayoutSlot, bool> _layoutToggleFullscreenBySlot = new();
+
+    /// <summary>
+    /// レイアウト切替中は SizeChanged 等からの Persist を止め、離脱スロットの寸法を
+    /// 次スロットへ書き込まない（F9↔F10 の位置共有を防ぐ）。
+    /// </summary>
+    private bool _suppressLayoutPlacementPersist;
     private WindowState _windowStateBeforeWaveformMax;
     private WindowStyle _windowStyleBeforeWaveformMax;
     private ResizeMode _resizeModeBeforeWaveformMax;
@@ -189,11 +206,8 @@ public partial class MainWindow : Window
         LibraryBrowser.AutoLoopChanged += LibraryBrowser_AutoLoopChanged;
         LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
         LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;
-        LibraryBrowser.MatchLoudnessRequested += (_, _) => PromptVolume();
         LibraryBrowser.PlaylistWaveMenuRequested += (_, command) => ExecuteWaveMenu(command);
-        LibraryBrowser.PlaylistPreviousRequested += (_, _) => TryStepLibraryPlaylist(-1);
-        LibraryBrowser.PlaylistNextRequested += (_, _) => TryStepLibraryPlaylist(1);
-        LibraryBrowser.PlaylistRestartRequested += (_, _) => RestartLibraryTrack();
+        LibraryBrowser.ResolvePlaylistWaveMenuModel = () => CaptureWaveMenuModel(CaptureMenuBarHit());
         LibraryBrowser.LibraryCatalogRebuildRequested += (_, _) => RebuildLibraryCatalog();
         LibraryBrowser.LibraryPasteRequested += (_, pane) => PasteLibraryFromMenu(pane);
         LibraryBrowser.LibraryRenameRequested += (_, pane) => RenameLibraryFromMenu(pane);
@@ -374,6 +388,8 @@ public partial class MainWindow : Window
             Interval = TimeSpan.FromMilliseconds(16),
         };
         _playTimer.Tick += (_, _) => OnPlayTick();
+        // CaptureWaveMenuModel → IsPlaybackActive が _playTimer を参照するため、タイマー生成後に組み立てる。
+        EnsureMainMenuBar();
         _visualPlayheadTimer = new DispatcherTimer(DispatcherPriority.Input)
         {
             Interval = TimeSpan.FromMilliseconds(16),
@@ -429,7 +445,8 @@ public partial class MainWindow : Window
             SyncVideoLaunchScaleAfterUserResize();
             SyncWindowProportionalOverlayScale();
             SchedulePlaylistVideoFileNamePlacement();
-            if (IsFullscreenMaximizeMode(_waveformMaximizeMode))
+            // 全画面に加え、F9／F10 等のレイアウト枠も移動・リサイズで覚える。
+            if (_activeLayoutSlot is not null || IsFullscreenMaximizeMode(_waveformMaximizeMode))
             {
                 PersistCurrentWindowPlacement();
             }
@@ -437,7 +454,7 @@ public partial class MainWindow : Window
         LocationChanged += (_, _) =>
         {
             RememberVideoLaunchPlacementIfNeeded();
-            if (IsFullscreenMaximizeMode(_waveformMaximizeMode))
+            if (_activeLayoutSlot is not null || IsFullscreenMaximizeMode(_waveformMaximizeMode))
             {
                 PersistCurrentWindowPlacement();
             }
@@ -474,7 +491,7 @@ public partial class MainWindow : Window
         InitializeWaapi();
         RefreshLocalizedText();
         // 表示前にフルスクリーンへ入れる。出したあとに最大化を外すと作業領域のままタスクバーが残る。
-        // 前回ドキュメントを復元するときはエディタのままにし、起動モードは復元後の空のときだけ。
+        // タブ復元があるときは復元後に EnterStartupMode（クローク中）。無いときだけここで入れる。
         if (!LaunchFiles.StartupHasVideo() && !HasRestorableOpenDocuments())
         {
             EnterStartupMode();
@@ -533,18 +550,17 @@ public partial class MainWindow : Window
                 UpdateLayout();
             }
         }
-        else if (HoldsRevealForStartupMode())
+        else if (HoldsRevealForStartupMode() && !HasRestorableOpenDocuments())
         {
-            // クローク中に選んだ画面へ入れてから出す。表示後に切り替えるとエディタが一瞬見える。
+            // タブ無し: クローク中に起動モードへ入れてから出す。
             EnterStartupMode();
             UpdateLayout();
-            // 配置をクローク中に描いてから出す。
             Dispatcher.BeginInvoke(
                 () => Dispatcher.BeginInvoke(RevealStartupMode, DispatcherPriority.ContextIdle),
                 DispatcherPriority.Render);
         }
 
-        // 表示を先に出し、前回ドキュメントの読み込みは次のアイドルへ回す。
+        // タブ復元ありはクロークのまま Restore → 起動モード → Reveal。
         // 動画起動は映像が開くまでクロークを維持する。
         Dispatcher.BeginInvoke(RestoreLastDocumentAfterReveal, DispatcherPriority.ApplicationIdle);
         Dispatcher.BeginInvoke(() => _ = StartWaapiAsync(), DispatcherPriority.ApplicationIdle);
@@ -601,9 +617,9 @@ public partial class MainWindow : Window
         {
             await OpenLaunchPathsAsync(launch).ConfigureAwait(true);
         }
-        else if (_sessions.Count == 0)
+        else
         {
-            // 起動モードは「何も読み込まないとき」だけ。復元できたタブがあるときはエディタのまま。
+            // 引数なし: クローク中に起動モードを載せてから出す（別モードが一瞬見えないように）。
             EnterStartupMode();
         }
 
@@ -613,7 +629,14 @@ public partial class MainWindow : Window
         Overview.InvalidateVisual();
         if (WindowPaintReveal.IsPending(this))
         {
+            if (IsWaveformMaximized)
+            {
+                RefreshWaveformFullscreenFrame();
+            }
+
             WindowPaintReveal.Reveal(this);
+            ForegroundActivation.BringToFront(this);
+            SyncShellFullscreen();
         }
     }
 
@@ -872,13 +895,12 @@ public partial class MainWindow : Window
         _colorDevPanel?.ApplyLocalizedText();
         _tabTimeTable?.ApplyLocalizedText();
         LibraryBrowser.ApplyLocalizedText();
+        RebuildMainMenuBar();
     }
 
     private void RefreshTitle()
     {
-        Title = AppVersion.WithDebuggerPrefix(
-            AppVersion.FormTitleWithFile(_document?.SourcePath),
-            Debugger.IsAttached);
+        Title = AppVersion.FormTitleWithFile(_document?.SourcePath);
         RefreshTabHeaders();
     }
 
@@ -1578,14 +1600,19 @@ public partial class MainWindow : Window
         // F9 だけメーター列を畳む。F8 動画ミニはアナライザを出す。
         if (_libraryMinimalChrome && !_videoLaunchPlacement)
         {
-            MeterColumnDef.MinWidth = 0;
-            MeterColumnDef.MaxWidth = 0;
-            MeterColumnDef.Width = new GridLength(0);
+            CollapseMeterColumnWidth();
             return;
         }
 
         if (_waveformMaximizeMode == WaveformMaximizeMode.Waveform)
         {
+            return;
+        }
+
+        // レイアウトで列オフのときは幅を戻さない（SyncMonitorLayout がプレイリスト幅を潰すのを防ぐ）。
+        if (!IsMeterColumnEnabledByLayout())
+        {
+            CollapseMeterColumnWidth();
             return;
         }
 

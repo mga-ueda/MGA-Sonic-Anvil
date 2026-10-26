@@ -231,6 +231,22 @@
           </StackPanel>
         </TabItem>
 
+        <TabItem x:Name="LayoutTab" Header="{x:Static domain:UiStrings.LabelSettingsTabLayout}">
+          <ScrollViewer VerticalScrollBarVisibility="Auto"
+                        HorizontalScrollBarVisibility="Disabled"
+                        Style="{StaticResource SettingsColumnScrollViewerStyle}">
+            <!-- プリセット1行（波形〜既定に戻す）が SettingsPanelWidth より広いので MaxWidth は付けない。 -->
+            <StackPanel HorizontalAlignment="Left">
+              <CheckBox x:Name="ShowMainMenuBarBox"
+                        Style="{StaticResource DarkCheckBoxStyle}"
+                        Content="{x:Static domain:UiStrings.LabelShowMainMenuBar}"
+                        HorizontalAlignment="Left"
+                        Margin="0,0,0,12" />
+              <StackPanel x:Name="LayoutPresetsHost" />
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
         <TabItem x:Name="LayoutsTab" Header="{x:Static domain:UiStrings.LabelSettingsTabLayouts}">
           <Grid x:Name="LayoutsTabBody">
             <Grid.ColumnDefinitions>

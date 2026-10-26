@@ -12,6 +12,7 @@ public sealed class ColorDevCatalogTests
     [InlineData("SurfaceBackBrush", "Shared")]
     [InlineData("MenuHighlightBackBrush", "Shared")]
     [InlineData("MenuDisabledForeBrush", "Shared")]
+    [InlineData("MainMenuBarBackBrush", "Shared")]
     [InlineData("PlayerFallbackWashNavyBrush", "AmbientWash")]
     [InlineData("PlayerGlowVeilBrush", "AmbientWash")]
     [InlineData("OverviewOutsideFillBrush", "Overview")]

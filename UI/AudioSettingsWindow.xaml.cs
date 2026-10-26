@@ -32,7 +32,7 @@ internal partial class AudioSettingsWindow : Window
 
     public WaveformTileArrange SelectedMultiFileArrange { get; private set; }
 
-    public AppLaunchMode SelectedLaunchMode { get; private set; } = AppLaunchMode.Editor;
+    public WindowLayoutSlot SelectedLaunchMode { get; private set; } = AppLaunchModes.DefaultSlot;
 
     public int SelectedUiScalePercent { get; private set; } = UiScale.DefaultPercent;
 
@@ -91,6 +91,27 @@ internal partial class AudioSettingsWindow : Window
 
     public bool SelectedGaplessPlayback { get; private set; } = true;
 
+    public bool SelectedShowMainMenuBar { get; private set; } = true;
+
+    public WindowLayoutPreset SelectedLayoutPresetF9 { get; private set; } =
+        WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F9);
+
+    public WindowLayoutPreset SelectedLayoutPresetF10 { get; private set; } =
+        WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F10);
+
+    public WindowLayoutPreset SelectedLayoutPresetF11 { get; private set; } =
+        WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F11);
+
+    public WindowLayoutPreset SelectedLayoutPresetF12 { get; private set; } =
+        WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F12);
+
+    private readonly List<LayoutPresetEditor> _layoutPresetEditors = [];
+    private readonly WindowLayoutPreset _layoutPresetF9OpenedAt;
+    private readonly WindowLayoutPreset _layoutPresetF10OpenedAt;
+    private readonly WindowLayoutPreset _layoutPresetF11OpenedAt;
+    private readonly WindowLayoutPreset _layoutPresetF12OpenedAt;
+    private bool _layoutPreviewReady;
+
     public bool SelectedLibraryShowPlaylistPdf { get; private set; } = true;
 
     public bool SelectedLibraryShowPlaylistMov { get; private set; }
@@ -148,6 +169,7 @@ internal partial class AudioSettingsWindow : Window
     private string[] _outputPortNames = [];
     private float[] _meterPeaks = [];
     private readonly int _uiScaleOpenedAt;
+    private readonly bool _showMainMenuBarOpenedAt;
     private readonly string _wallpaperPathOpenedAt;
     private readonly double _wallpaperOpacityOpenedAt;
     private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecksWave = [];
@@ -187,6 +209,7 @@ internal partial class AudioSettingsWindow : Window
         LibraryPlaylistWaveformSize libraryPlaylistWaveformSizeWave = LibraryPlaylistWaveformSize.L,
         LibraryPlaylistWaveformSize libraryPlaylistWaveformSizeMp3 = LibraryPlaylistWaveformSize.L,
         bool gaplessPlayback = true,
+        bool showMainMenuBar = true,
         bool libraryShowPlaylistPdf = true,
         bool libraryShowPlaylistMov = false,
         bool libraryShowPlaylistMp4 = false,
@@ -197,9 +220,13 @@ internal partial class AudioSettingsWindow : Window
         int videoProxyRetentionDays = VideoProxy.DefaultRetentionDays,
         string? ffmpegExePath = null,
         bool videoProxyDisableAutoEncode = false,
-        AppLaunchMode launchMode = AppLaunchMode.Editor,
+        WindowLayoutSlot launchMode = WindowLayoutSlot.F12,
         string? wallpaperPath = null,
-        double wallpaperOpacity = AppSettings.WallpaperOpacityDefault)
+        double wallpaperOpacity = AppSettings.WallpaperOpacityDefault,
+        WindowLayoutPreset? layoutPresetF9 = null,
+        WindowLayoutPreset? layoutPresetF10 = null,
+        WindowLayoutPreset? layoutPresetF11 = null,
+        WindowLayoutPreset? layoutPresetF12 = null)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
@@ -241,6 +268,16 @@ internal partial class AudioSettingsWindow : Window
         SelectedLibraryPlaylistWaveformSizeMp3 =
             LibraryPlaylistWaveformSizes.Clamp(libraryPlaylistWaveformSizeMp3);
         SelectedGaplessPlayback = gaplessPlayback;
+        SelectedShowMainMenuBar = showMainMenuBar;
+        _showMainMenuBarOpenedAt = SelectedShowMainMenuBar;
+        SelectedLayoutPresetF9 = (layoutPresetF9 ?? WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F9)).Clone();
+        SelectedLayoutPresetF10 = (layoutPresetF10 ?? WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F10)).Clone();
+        SelectedLayoutPresetF11 = (layoutPresetF11 ?? WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F11)).Clone();
+        SelectedLayoutPresetF12 = (layoutPresetF12 ?? WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F12)).Clone();
+        _layoutPresetF9OpenedAt = SelectedLayoutPresetF9.Clone();
+        _layoutPresetF10OpenedAt = SelectedLayoutPresetF10.Clone();
+        _layoutPresetF11OpenedAt = SelectedLayoutPresetF11.Clone();
+        _layoutPresetF12OpenedAt = SelectedLayoutPresetF12.Clone();
         SelectedLibraryShowPlaylistPdf = libraryShowPlaylistPdf;
         SelectedLibraryShowPlaylistMov = libraryShowPlaylistMov;
         SelectedLibraryShowPlaylistMp4 = libraryShowPlaylistMp4;
@@ -504,7 +541,93 @@ internal partial class AudioSettingsWindow : Window
         }
 
         GaplessPlaybackBox.IsChecked = SelectedGaplessPlayback;
+        ShowMainMenuBarBox.IsChecked = SelectedShowMainMenuBar;
+        ShowMainMenuBarBox.Checked += (_, _) => PreviewShowMainMenuBar(true);
+        ShowMainMenuBarBox.Unchecked += (_, _) => PreviewShowMainMenuBar(false);
+        FillLayoutPresets();
+        _layoutPreviewReady = true;
         RefreshLibraryExplorerRootButtons();
+    }
+
+    private void FillLayoutPresets()
+    {
+        LayoutPresetsHost.Children.Clear();
+        _layoutPresetEditors.Clear();
+        AddLayoutPresetEditor(WindowLayoutSlot.F9, UiStrings.LabelLayoutPresetF9, SelectedLayoutPresetF9);
+        AddLayoutPresetEditor(WindowLayoutSlot.F10, UiStrings.LabelLayoutPresetF10, SelectedLayoutPresetF10);
+        AddLayoutPresetEditor(WindowLayoutSlot.F11, UiStrings.LabelLayoutPresetF11, SelectedLayoutPresetF11);
+        AddLayoutPresetEditor(WindowLayoutSlot.F12, UiStrings.LabelLayoutPresetF12, SelectedLayoutPresetF12);
+    }
+
+    private void AddLayoutPresetEditor(WindowLayoutSlot slot, string title, WindowLayoutPreset preset)
+    {
+        var editor = LayoutPresetEditor.Create(slot, title, preset, PreviewLayoutPresetChanged);
+        _layoutPresetEditors.Add(editor);
+        LayoutPresetsHost.Children.Add(editor.Root);
+    }
+
+    private void PreviewLayoutPresetChanged(WindowLayoutSlot slot)
+    {
+        if (!_layoutPreviewReady)
+        {
+            return;
+        }
+
+        ReadLayoutPresets();
+        var preset = slot switch
+        {
+            WindowLayoutSlot.F9 => SelectedLayoutPresetF9,
+            WindowLayoutSlot.F10 => SelectedLayoutPresetF10,
+            WindowLayoutSlot.F11 => SelectedLayoutPresetF11,
+            _ => SelectedLayoutPresetF12,
+        };
+        AppStorage.Settings.ApplyLayoutPreset(slot, preset);
+        if (Owner is MainWindow window)
+        {
+            window.PreviewLayoutPresetFromSettings(slot);
+        }
+    }
+
+    private void RevertLayoutPresetPreviews()
+    {
+        SelectedLayoutPresetF9 = _layoutPresetF9OpenedAt.Clone();
+        SelectedLayoutPresetF10 = _layoutPresetF10OpenedAt.Clone();
+        SelectedLayoutPresetF11 = _layoutPresetF11OpenedAt.Clone();
+        SelectedLayoutPresetF12 = _layoutPresetF12OpenedAt.Clone();
+        AppStorage.Settings.ApplyLayoutPreset(WindowLayoutSlot.F9, SelectedLayoutPresetF9);
+        AppStorage.Settings.ApplyLayoutPreset(WindowLayoutSlot.F10, SelectedLayoutPresetF10);
+        AppStorage.Settings.ApplyLayoutPreset(WindowLayoutSlot.F11, SelectedLayoutPresetF11);
+        AppStorage.Settings.ApplyLayoutPreset(WindowLayoutSlot.F12, SelectedLayoutPresetF12);
+        if (Owner is MainWindow window)
+        {
+            window.PreviewLayoutPresetFromSettings(WindowLayoutSlot.F9);
+            window.PreviewLayoutPresetFromSettings(WindowLayoutSlot.F10);
+            window.PreviewLayoutPresetFromSettings(WindowLayoutSlot.F11);
+            window.PreviewLayoutPresetFromSettings(WindowLayoutSlot.F12);
+        }
+    }
+
+    private void ReadLayoutPresets()
+    {
+        foreach (var editor in _layoutPresetEditors)
+        {
+            var preset = editor.Read();
+            switch (editor.Slot)
+            {
+                case WindowLayoutSlot.F9:
+                    SelectedLayoutPresetF9 = preset;
+                    break;
+                case WindowLayoutSlot.F10:
+                    SelectedLayoutPresetF10 = preset;
+                    break;
+                case WindowLayoutSlot.F11:
+                    SelectedLayoutPresetF11 = preset;
+                    break;
+                default:
+                    SelectedLayoutPresetF12 = preset;
+                    break;
+            }
+        }
     }
 
     private void FillLibraryColumns()
@@ -1204,8 +1327,8 @@ internal partial class AudioSettingsWindow : Window
             ? arrangeItem.Arrange
             : WaveformTileArrange.Off;
         SelectedLaunchMode = LaunchModeCombo.SelectedItem is LaunchModeItem launchItem
-            ? launchItem.Mode
-            : AppLaunchMode.Editor;
+            ? launchItem.Slot
+            : AppLaunchModes.DefaultSlot;
         if (!AppSettings.TryParseWallpaperOpacityPercent(WallpaperOpacityBox.Text, out var wallpaperOpacity))
         {
             OwnerCenteredMessageBox.Show(
@@ -1370,6 +1493,8 @@ internal partial class AudioSettingsWindow : Window
             LibraryPlaylistWaveformSizeMp3Combo,
             LibraryPlaylistWaveformSize.L);
         SelectedGaplessPlayback = GaplessPlaybackBox.IsChecked != false;
+        SelectedShowMainMenuBar = ShowMainMenuBarBox.IsChecked != false;
+        ReadLayoutPresets();
         SelectedLibraryShowPlaylistPdf = LibraryShowPlaylistPdfBox.IsChecked != false;
         SelectedLibraryShowPlaylistMov = LibraryShowPlaylistMovBox.IsChecked != false;
         SelectedLibraryShowPlaylistMp4 = LibraryShowPlaylistMp4Box.IsChecked != false;
@@ -2151,23 +2276,22 @@ internal partial class AudioSettingsWindow : Window
         MultiFileArrangeCombo.SelectedIndex = 0;
     }
 
-    private void FillLaunchMode(AppLaunchMode mode)
+    private void FillLaunchMode(WindowLayoutSlot slot)
     {
-        LaunchModeCombo.Items.Add(new LaunchModeItem(AppLaunchMode.Editor, UiStrings.LabelAppLaunchModeEditor));
-        LaunchModeCombo.Items.Add(new LaunchModeItem(AppLaunchMode.Analyzers, UiStrings.LabelAppLaunchModeAnalyzers));
-        LaunchModeCombo.Items.Add(new LaunchModeItem(AppLaunchMode.Waveform, UiStrings.LabelAppLaunchModeWaveform));
-        LaunchModeCombo.Items.Add(new LaunchModeItem(AppLaunchMode.Player, UiStrings.LabelAppLaunchModePlayer));
-        LaunchModeCombo.Items.Add(new LaunchModeItem(AppLaunchMode.PlayerCompact, UiStrings.LabelAppLaunchModePlayerCompact));
+        LaunchModeCombo.Items.Add(new LaunchModeItem(WindowLayoutSlot.F9, UiStrings.LabelLayoutPresetF9));
+        LaunchModeCombo.Items.Add(new LaunchModeItem(WindowLayoutSlot.F10, UiStrings.LabelLayoutPresetF10));
+        LaunchModeCombo.Items.Add(new LaunchModeItem(WindowLayoutSlot.F11, UiStrings.LabelLayoutPresetF11));
+        LaunchModeCombo.Items.Add(new LaunchModeItem(WindowLayoutSlot.F12, UiStrings.LabelLayoutPresetF12));
         foreach (LaunchModeItem item in LaunchModeCombo.Items)
         {
-            if (item.Mode == mode)
+            if (item.Slot == slot)
             {
                 LaunchModeCombo.SelectedItem = item;
                 return;
             }
         }
 
-        LaunchModeCombo.SelectedIndex = 0;
+        LaunchModeCombo.SelectedIndex = LaunchModeCombo.Items.Count - 1;
     }
 
     private void FillUiScale(int percent)
@@ -2229,6 +2353,36 @@ internal partial class AudioSettingsWindow : Window
         AppStorage.Settings.UiScalePercent = _uiScaleOpenedAt;
         SelectedUiScalePercent = _uiScaleOpenedAt;
         UiScaleService.ApplyFromSettings();
+    }
+
+    private void PreviewShowMainMenuBar(bool show)
+    {
+        SelectedShowMainMenuBar = show;
+        if (AppStorage.Settings.ShowMainMenuBar == show)
+        {
+            return;
+        }
+
+        AppStorage.Settings.ShowMainMenuBar = show;
+        if (Owner is MainWindow window)
+        {
+            window.EnsureMainMenuBar();
+        }
+    }
+
+    private void RevertShowMainMenuBarPreview()
+    {
+        if (AppStorage.Settings.ShowMainMenuBar == _showMainMenuBarOpenedAt)
+        {
+            return;
+        }
+
+        AppStorage.Settings.ShowMainMenuBar = _showMainMenuBarOpenedAt;
+        SelectedShowMainMenuBar = _showMainMenuBarOpenedAt;
+        if (Owner is MainWindow window)
+        {
+            window.EnsureMainMenuBar();
+        }
     }
 
     private void SelectApi(AudioOutputApi api)
@@ -2302,6 +2456,7 @@ internal partial class AudioSettingsWindow : Window
         var content = Max(
             AudioTabContentWidth(),
             SettingsTabBarWidth(),
+            LayoutTabContentWidth(),
             LayoutsTabContentWidth(),
             PlayerTabContentWidth());
         var inner = content + pad + DesignMetrics.SettingsWindowContentMargin;
@@ -2426,11 +2581,40 @@ internal partial class AudioSettingsWindow : Window
         return ComboBoxFit.MeasureText(this, text, 11.333) + 28;
     }
 
+    private double LayoutTabContentWidth()
+    {
+        var gutter = DesignMetrics.SettingsScrollBarGap + DesignMetrics.SettingsScrollBarWidth;
+        // 全画面行。
+        var fullscreenRow = ComboBoxFit.MeasureText(this, UiStrings.LabelLayoutFullscreen, 11.333)
+            + 8 + 120 + 8
+            + ComboBoxFit.MeasureText(this, UiStrings.LabelLayoutFullscreenToggleStart, 11.333)
+            + 8 + 100;
+        // チェック行：波形・レベル・ステータス・アナライザー・位置・既定に戻す。
+        double CheckWidth(string label) => ComboBoxFit.MeasureText(this, label, 11.333) + 28;
+        var checksRow = CheckWidth(UiStrings.LabelLayoutShowWaveform)
+            + 12
+            + CheckWidth(UiStrings.LabelLayoutLevelMeter)
+            + 12
+            + CheckWidth(UiStrings.LabelLayoutStatusBar)
+            + 12
+            + CheckWidth(UiStrings.LabelLayoutAnalyzerArea)
+            + 12
+            + ComboBoxFit.MeasureText(this, UiStrings.LabelLayoutAnalyzerDock, 11.333)
+            + 8 + 100 + 12
+            + ComboBoxFit.MeasureText(this, UiStrings.LabelLayoutPresetReset, 11.333)
+            + 24;
+        return Max(
+            MeasureCheckBoxContentWidth(ShowMainMenuBarBox),
+            fullscreenRow,
+            checksRow) + gutter;
+    }
+
     private double SettingsTabBarWidth()
     {
         var headers = new[]
         {
             UiStrings.LabelSettingsTabGeneral,
+            UiStrings.LabelSettingsTabLayout,
             UiStrings.LabelSettingsTabLayouts,
             UiStrings.LabelSettingsTabColor,
             UiStrings.LabelSettingsTabAudio,
@@ -2846,6 +3030,8 @@ internal partial class AudioSettingsWindow : Window
         {
             RevertUiScalePreview();
             RevertWallpaperPreview();
+            RevertShowMainMenuBarPreview();
+            RevertLayoutPresetPreviews();
         }
 
         WindowPlacement.CaptureSettings(this, AppStorage.Settings);
@@ -2931,7 +3117,7 @@ internal partial class AudioSettingsWindow : Window
         return label;
     }
 
-    private sealed record LaunchModeItem(AppLaunchMode Mode, string Label)
+    private sealed record LaunchModeItem(WindowLayoutSlot Slot, string Label)
     {
         public override string ToString() => Label;
     }
@@ -2979,5 +3165,333 @@ internal partial class AudioSettingsWindow : Window
     private sealed record ParallelismItem(int Value, string Label)
     {
         public override string ToString() => Label;
+    }
+
+    private sealed class LayoutPresetEditor
+    {
+        private readonly ComboBox _fullscreen;
+        private readonly ComboBox _toggleStart;
+        private readonly CheckBox? _waveform;
+        private readonly CheckBox _analyzer;
+        private readonly ComboBox _analyzerDock;
+        private readonly CheckBox _levelMeter;
+        private readonly CheckBox _statusBar;
+        private readonly Action<WindowLayoutSlot>? _onChanged;
+        private bool _suppressNotify;
+
+        private LayoutPresetEditor(
+            WindowLayoutSlot slot,
+            ComboBox fullscreen,
+            ComboBox toggleStart,
+            CheckBox? waveform,
+            CheckBox analyzer,
+            ComboBox analyzerDock,
+            CheckBox levelMeter,
+            CheckBox statusBar,
+            Action<WindowLayoutSlot>? onChanged)
+        {
+            Slot = slot;
+            _fullscreen = fullscreen;
+            _toggleStart = toggleStart;
+            _waveform = waveform;
+            _analyzer = analyzer;
+            _analyzerDock = analyzerDock;
+            _levelMeter = levelMeter;
+            _statusBar = statusBar;
+            _onChanged = onChanged;
+        }
+
+        public WindowLayoutSlot Slot { get; }
+
+        public FrameworkElement Root { get; private set; } = null!;
+
+        public static LayoutPresetEditor Create(
+            WindowLayoutSlot slot,
+            string title,
+            WindowLayoutPreset preset,
+            Action<WindowLayoutSlot>? onChanged = null)
+        {
+            var fullscreen = CreateLayoutCombo(new Thickness(0, 0, 8, 0));
+            fullscreen.Items.Add(new NamedModeItem(LayoutFullscreenMode.Off, UiStrings.LabelLayoutFullscreenOff));
+            fullscreen.Items.Add(new NamedModeItem(LayoutFullscreenMode.On, UiStrings.LabelLayoutFullscreenOn));
+            fullscreen.Items.Add(new NamedModeItem(LayoutFullscreenMode.Toggle, UiStrings.LabelLayoutFullscreenToggle));
+            SelectFullscreen(fullscreen, preset.ResolvedFullscreenMode());
+            ComboBoxFit.Apply(fullscreen);
+
+            var toggleStart = CreateLayoutCombo(new Thickness(0, 0, 0, 0));
+            toggleStart.Items.Add(new NamedBoolItem(false, UiStrings.LabelLayoutOff));
+            toggleStart.Items.Add(new NamedBoolItem(true, UiStrings.LabelLayoutOn));
+            toggleStart.SelectedIndex = preset.FullscreenToggleStartsOn ? 1 : 0;
+            ComboBoxFit.Apply(toggleStart);
+
+            // 波形表示はプレイヤー（F9／F10）のみ。エディタは常に波形あり。
+            CheckBox? waveform = null;
+            if (WindowLayoutPreset.IsPlayerLayoutSlot(slot))
+            {
+                waveform = new CheckBox
+                {
+                    Style = (Style)Application.Current.FindResource("DarkCheckBoxStyle"),
+                    Content = UiStrings.LabelLayoutShowWaveform,
+                    IsChecked = preset.ShowWaveform,
+                    Margin = new Thickness(0, 2, 12, 2),
+                    VerticalAlignment = VerticalAlignment.Center,
+                };
+            }
+
+            var levelMeter = new CheckBox
+            {
+                Style = (Style)Application.Current.FindResource("DarkCheckBoxStyle"),
+                Content = UiStrings.LabelLayoutLevelMeter,
+                IsChecked = preset.ShowLevelMeter,
+                Margin = new Thickness(0, 2, 12, 2),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            var statusBar = new CheckBox
+            {
+                Style = (Style)Application.Current.FindResource("DarkCheckBoxStyle"),
+                Content = UiStrings.LabelLayoutStatusBar,
+                IsChecked = preset.ResolvedShowStatusBar(slot),
+                Margin = new Thickness(0, 2, 0, 2),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            var analyzer = new CheckBox
+            {
+                Style = (Style)Application.Current.FindResource("DarkCheckBoxStyle"),
+                Content = UiStrings.LabelLayoutAnalyzerArea,
+                IsChecked = preset.ShowAnalyzerArea,
+                Margin = new Thickness(12, 2, 0, 2),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            var analyzerDock = CreateLayoutCombo(new Thickness(8, 0, 0, 0));
+            analyzerDock.Items.Add(new NamedDockItem(LayoutAnalyzerDock.Bottom, UiStrings.LabelLayoutAnalyzerDockBottom));
+            analyzerDock.Items.Add(new NamedDockItem(LayoutAnalyzerDock.Top, UiStrings.LabelLayoutAnalyzerDockTop));
+            analyzerDock.SelectedIndex = preset.ResolvedAnalyzerDock() == LayoutAnalyzerDock.Top ? 1 : 0;
+            ComboBoxFit.Apply(analyzerDock);
+
+            var editor = new LayoutPresetEditor(
+                slot,
+                fullscreen,
+                toggleStart,
+                waveform,
+                analyzer,
+                analyzerDock,
+                levelMeter,
+                statusBar,
+                onChanged);
+
+            void SyncDependent() => editor.SyncDependent();
+            void Notify() => editor.NotifyChanged();
+
+            fullscreen.SelectionChanged += (_, _) =>
+            {
+                SyncDependent();
+                Notify();
+            };
+            toggleStart.SelectionChanged += (_, _) => Notify();
+            analyzer.Checked += (_, _) =>
+            {
+                SyncDependent();
+                Notify();
+            };
+            analyzer.Unchecked += (_, _) =>
+            {
+                SyncDependent();
+                Notify();
+            };
+            // DropDownClosed も拾う（位置上下の即時反映漏れ防止）。
+            analyzerDock.SelectionChanged += (_, _) => Notify();
+            analyzerDock.DropDownClosed += (_, _) => Notify();
+            levelMeter.Checked += (_, _) => Notify();
+            levelMeter.Unchecked += (_, _) => Notify();
+            statusBar.Checked += (_, _) => Notify();
+            statusBar.Unchecked += (_, _) => Notify();
+            if (waveform is not null)
+            {
+                waveform.Checked += (_, _) => Notify();
+                waveform.Unchecked += (_, _) => Notify();
+            }
+
+            SyncDependent();
+
+            var resetButton = new RoundedButton
+            {
+                Content = UiStrings.LabelLayoutPresetReset,
+                Margin = new Thickness(12, 0, 0, 0),
+                Padding = new Thickness(10, 2, 10, 2),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            ActionButtonLooks.ApplyClear(resetButton);
+            AppDialogKeys.PrepareActionButton(resetButton);
+            resetButton.Click += (_, _) => editor.ResetToDefaults();
+
+            var root = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+            root.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontWeight = FontWeights.Bold,
+                FontSize = 11.333,
+                Margin = new Thickness(0, 0, 0, 6),
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+            var fullscreenRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
+            fullscreenRow.Children.Add(new TextBlock
+            {
+                Text = UiStrings.LabelLayoutFullscreen,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                MinWidth = 72,
+            });
+            fullscreenRow.Children.Add(fullscreen);
+            fullscreenRow.Children.Add(new TextBlock
+            {
+                Text = UiStrings.LabelLayoutFullscreenToggleStart,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+            });
+            fullscreenRow.Children.Add(toggleStart);
+            root.Children.Add(fullscreenRow);
+
+            var checksRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 0, 2),
+            };
+            if (waveform is not null)
+            {
+                checksRow.Children.Add(waveform);
+            }
+
+            checksRow.Children.Add(levelMeter);
+            checksRow.Children.Add(statusBar);
+            checksRow.Children.Add(analyzer);
+            checksRow.Children.Add(new TextBlock
+            {
+                Text = UiStrings.LabelLayoutAnalyzerDock,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 0, 0),
+            });
+            checksRow.Children.Add(analyzerDock);
+            checksRow.Children.Add(resetButton);
+            root.Children.Add(checksRow);
+            editor.Root = root;
+            return editor;
+        }
+
+        public WindowLayoutPreset Read()
+        {
+            var preset = new WindowLayoutPreset
+            {
+                ShowLibraryAndFavorites = WindowLayoutPreset.CreateDefault(Slot).ShowLibraryAndFavorites,
+                // エディタは常に波形オン（UI 無し）。プレイヤーのみチェック反映。
+                ShowWaveform = WindowLayoutPreset.IsPlayerLayoutSlot(Slot)
+                    ? _waveform?.IsChecked != false
+                    : true,
+                ShowAnalyzerArea = _analyzer.IsChecked == true,
+                ShowLevelMeter = _levelMeter.IsChecked == true,
+                ShowStatusBar = _statusBar.IsChecked == true,
+                FullscreenToggleStartsOn = _toggleStart.SelectedItem is NamedBoolItem { Value: true },
+            };
+            preset.ApplyFullscreenMode(
+                _fullscreen.SelectedItem is NamedModeItem mode
+                    ? mode.Mode
+                    : LayoutFullscreenMode.Off);
+            preset.ApplyAnalyzerDock(
+                _analyzerDock.SelectedItem is NamedDockItem dock
+                    ? dock.Dock
+                    : LayoutAnalyzerDock.Bottom);
+            return preset;
+        }
+
+        public void ResetToDefaults()
+        {
+            var defaults = WindowLayoutPreset.CreateDefault(Slot);
+            ApplyPreset(defaults);
+        }
+
+        private void NotifyChanged()
+        {
+            if (_suppressNotify)
+            {
+                return;
+            }
+
+            _onChanged?.Invoke(Slot);
+        }
+
+        private void ApplyPreset(WindowLayoutPreset preset)
+        {
+            _suppressNotify = true;
+            try
+            {
+                SelectFullscreen(_fullscreen, preset.ResolvedFullscreenMode());
+                _toggleStart.SelectedIndex = preset.FullscreenToggleStartsOn ? 1 : 0;
+                if (_waveform is not null)
+                {
+                    _waveform.IsChecked = preset.ShowWaveform;
+                }
+
+                _analyzer.IsChecked = preset.ShowAnalyzerArea;
+                _analyzerDock.SelectedIndex =
+                    preset.ResolvedAnalyzerDock() == LayoutAnalyzerDock.Top ? 1 : 0;
+                _levelMeter.IsChecked = preset.ShowLevelMeter;
+                _statusBar.IsChecked = preset.ResolvedShowStatusBar(Slot);
+                SyncDependent();
+            }
+            finally
+            {
+                _suppressNotify = false;
+            }
+
+            NotifyChanged();
+        }
+
+        private void SyncDependent()
+        {
+            var isToggle = _fullscreen.SelectedItem is NamedModeItem { Mode: LayoutFullscreenMode.Toggle };
+            _toggleStart.IsEnabled = isToggle;
+            // 位置はアナライザオフ中も選べる（オンにした瞬間の上下を即反映するため）。
+            _analyzerDock.IsEnabled = true;
+        }
+
+        private static void SelectFullscreen(ComboBox combo, LayoutFullscreenMode mode)
+        {
+            for (var i = 0; i < combo.Items.Count; i++)
+            {
+                if (combo.Items[i] is NamedModeItem item && item.Mode == mode)
+                {
+                    combo.SelectedIndex = i;
+                    return;
+                }
+            }
+
+            combo.SelectedIndex = 0;
+        }
+
+        /// <summary>全画面／トグル開始／位置の高さを他設定コンボと同じにする。</summary>
+        private static ComboBox CreateLayoutCombo(Thickness margin) =>
+            new()
+            {
+                Margin = margin,
+                Height = DesignMetrics.AudioInputHeight,
+                Padding = new Thickness(6, 1, 6, 1),
+                FontSize = 11.333,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+
+        private sealed record NamedModeItem(LayoutFullscreenMode Mode, string Label)
+        {
+            public override string ToString() => Label;
+        }
+
+        private sealed record NamedBoolItem(bool Value, string Label)
+        {
+            public override string ToString() => Label;
+        }
+
+        private sealed record NamedDockItem(LayoutAnalyzerDock Dock, string Label)
+        {
+            public override string ToString() => Label;
+        }
     }
 }

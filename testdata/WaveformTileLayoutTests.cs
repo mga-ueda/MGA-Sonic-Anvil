@@ -90,6 +90,17 @@ public sealed class WaveformTileLayoutTests
     }
 
     [Fact]
+    public void NoneFit_WhenHostTooSmallForAnyArrange()
+    {
+        var minW = WaveformTileLayout.MinTileWidth;
+        var minH = WaveformTileLayout.MinTileHeight;
+        Assert.True(WaveformTileLayout.NoneFit(2, minW - 1, minH * 8));
+        Assert.True(WaveformTileLayout.NoneFit(2, minW * 8, minH - 1));
+        Assert.False(WaveformTileLayout.NoneFit(2, minW, minH * 2));
+        Assert.False(WaveformTileLayout.NoneFit(2, minW * 2, minH));
+    }
+
+    [Fact]
     public void Fits_UnknownHostSize_DoesNotBlock()
     {
         Assert.True(WaveformTileLayout.Fits(WaveformTileArrange.Grid, 8, 0, 0));

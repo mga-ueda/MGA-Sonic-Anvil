@@ -1434,7 +1434,7 @@ internal static class LibraryPlayerMode
     /// <summary>
     /// 動画ミニ用：レベルメーターの LayoutTransform 前の高さ上限。
     /// メーター列の実高を基準に、同じ幅の 16:9 相当までで打ち切り、
-    /// 上段（WAAPI）と下段ゴニオの見た目高を差し引く。低い窓は列高そのもので縮む。
+    /// 上段（WAAPI）と下段アナライザ帯（スペアナ／ゴニオ）の見た目高を差し引く。低い窓は列高そのもので縮む。
     /// </summary>
     /// <param name="meterColumnHeight">MeterColumn の実高。</param>
     /// <param name="windowWidth">窓幅（16:9 上限用）。</param>
