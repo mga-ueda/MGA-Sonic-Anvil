@@ -45,7 +45,7 @@
           <ScrollViewer x:Name="Scroll"
                         VerticalScrollBarVisibility="Auto"
                         HorizontalScrollBarVisibility="Disabled"
-                        Background="{DynamicResource SurfaceBackBrush}"
+                        Background="Transparent"
                         PreviewKeyDown="Scroll_PreviewKeyDown">
             <StackPanel x:Name="ListPanel" Margin="4" />
           </ScrollViewer>
@@ -61,12 +61,12 @@
       <GridSplitter Grid.Column="1"
                     Width="10"
                     HorizontalAlignment="Stretch"
-                    Background="{DynamicResource ColorPanelBackBrush}"
+                    Background="Transparent"
                     Focusable="False" />
 
       <Border Grid.Column="2"
               Padding="12"
-              Background="{DynamicResource SurfaceBackBrush}"
+              Background="Transparent"
               BorderBrush="{DynamicResource ChromeBorderBrush}"
               BorderThickness="1">
         <DockPanel>
