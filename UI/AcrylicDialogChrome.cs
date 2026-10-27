@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Shell;
 
 namespace MgaSonicAnvil.UI;
 
@@ -13,28 +14,37 @@ internal static class AcrylicDialogChrome
 {
     private const double CaptionHeight = 32;
 
-    public static void Prepare(Window window)
+    public static void Prepare(
+        Window window,
+        ResizeMode resizeMode = ResizeMode.NoResize,
+        SizeToContent sizeToContent = SizeToContent.WidthAndHeight,
+        bool showInTaskbar = false,
+        Action? onPainted = null,
+        bool activateOnReveal = false)
     {
         ArgumentNullException.ThrowIfNull(window);
 
         window.WindowStyle = WindowStyle.None;
         window.AllowsTransparency = false;
-        window.ResizeMode = ResizeMode.NoResize;
-        window.ShowInTaskbar = false;
-        window.SizeToContent = SizeToContent.WidthAndHeight;
+        window.ResizeMode = resizeMode;
+        window.ShowInTaskbar = showInTaskbar;
+        window.SizeToContent = sizeToContent;
         window.Background = Brushes.Transparent;
+        AcrylicBackdrop.Track(window);
         window.Activated += (_, _) => AcrylicBackdrop.Apply(window);
 
-        WindowPaintReveal.Attach(
-            window,
-            () =>
+        if (resizeMode is ResizeMode.CanResize or ResizeMode.CanResizeWithGrip)
+        {
+            WindowChrome.SetWindowChrome(window, new WindowChrome
             {
-                window.Background = Brushes.Transparent;
-                AcrylicBackdrop.Apply(window);
-                WindowPaintReveal.Reveal(window);
-                AcrylicBackdrop.Apply(window);
-            },
-            autoReveal: false);
+                CaptionHeight = CaptionHeight,
+                ResizeBorderThickness = new Thickness(6),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false,
+            });
+        }
+
+        ArmReveal(window, onPainted, activateOnReveal);
     }
 
     /// <summary>
@@ -61,7 +71,6 @@ internal static class AcrylicDialogChrome
             Background = Brushes.Transparent,
             Child = title,
         };
-        // 本体（スクロールバー／ボタン）のクリックを DragMove が奪わないよう、帯だけ。
         caption.MouseLeftButtonDown += (_, e) =>
         {
             if (e.ChangedButton != MouseButton.Left)
@@ -90,15 +99,42 @@ internal static class AcrylicDialogChrome
         window.Content = root;
     }
 
-    /// <summary>
-    /// <see cref="WindowPaintReveal.ShowDialogWhenPainted"/> は autoReveal を上書きするため使わない。
-    /// Acrylic 適用後にクローク解除する。
-    /// </summary>
+    /// <summary>XAML／既存 Content をキャプション付きすりガラス本体へ包む。</summary>
+    public static void AdoptContent(Window window, Thickness bodyPadding = default)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        if (window.Content is not UIElement body)
+        {
+            return;
+        }
+
+        window.Content = null;
+        SetBody(window, body, bodyPadding);
+    }
+
     public static bool? ShowDialog(Window window)
     {
         ArgumentNullException.ThrowIfNull(window);
+        CloakForAcrylic(window);
+        return window.ShowDialog();
+    }
 
-        // Prepare 済みでも Show 直前に autoReveal=false を再設定する。
+    public static void Show(Window window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        if (window.IsVisible)
+        {
+            window.Show();
+            AcrylicBackdrop.Apply(window);
+            return;
+        }
+
+        CloakForAcrylic(window);
+        window.Show();
+    }
+
+    private static void ArmReveal(Window window, Action? onPainted = null, bool activateOnReveal = false)
+    {
         WindowPaintReveal.Attach(
             window,
             () =>
@@ -107,14 +143,18 @@ internal static class AcrylicDialogChrome
                 AcrylicBackdrop.Apply(window);
                 WindowPaintReveal.Reveal(window);
                 AcrylicBackdrop.Apply(window);
+                onPainted?.Invoke();
             },
+            activateOnReveal,
             autoReveal: false);
+    }
 
+    private static void CloakForAcrylic(Window window)
+    {
         _ = new WindowInteropHelper(window).EnsureHandle();
         DarkWindowChrome.DisableShowTransitions(window);
         DarkWindowChrome.SuppressEraseBackground(window);
         DarkWindowChrome.TrySetCloaked(window, true);
         AcrylicBackdrop.Apply(window);
-        return window.ShowDialog();
     }
 }

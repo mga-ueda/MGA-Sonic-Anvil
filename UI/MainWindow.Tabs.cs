@@ -620,7 +620,7 @@ public partial class MainWindow
         }
 
         _tabTimeTable.SetRows(rows);
-        WindowPaintReveal.ShowWhenPainted(_tabTimeTable);
+        AcrylicDialogChrome.Show(_tabTimeTable);
         _tabTimeTable.Activate();
     }
 

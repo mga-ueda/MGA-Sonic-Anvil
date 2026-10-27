@@ -31,20 +31,17 @@ internal sealed class MatchLoudnessTargetWindow : Window
         {
             Owner = owner,
         };
-        WindowPaintReveal.ShowDialogWhenPainted(dialog);
+        WindowPaintReveal.EnsureRevealedForDialog(owner);
+        AcrylicDialogChrome.ShowDialog(dialog);
         return new MatchLoudnessTargetResult(dialog._accepted, dialog.TargetLufs);
     }
 
     private MatchLoudnessTargetWindow(int fileCount, double initialTargetLufs, bool saveAfter)
     {
         Title = UiStrings.LabelLoudnessTarget;
-        WindowStyle = WindowStyle.SingleBorderWindow;
-        ResizeMode = ResizeMode.NoResize;
-        ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        SizeToContent = SizeToContent.WidthAndHeight;
-        Background = (Brush)FindResource("WindowBackBrush");
         Foreground = (Brush)FindResource("PrimaryForeBrush");
+        AcrylicDialogChrome.Prepare(this);
         TargetLufs = SnapTargetLufs(initialTargetLufs);
 
         var message = new TextBlock
@@ -114,9 +111,8 @@ internal sealed class MatchLoudnessTargetWindow : Window
         root.Children.Add(row);
         root.Children.Add(buttons);
 
-        Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
+        AcrylicDialogChrome.SetBody(this, root, DesignMetrics.AudioPad);
         PickerChrome.ReleaseInputOnBlankClick(this);
-        WindowPaintReveal.Attach(this);
         AppDialogKeys.Attach(this, CancelAndClose);
         PreviewKeyDown += OnWindowPreviewKeyDown;
         Loaded += (_, _) =>

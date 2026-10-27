@@ -163,6 +163,8 @@
     <SolidColorBrush x:Key="StatusExportButtonPressedBackBrush" Color="#FF962828" />
     <SolidColorBrush x:Key="StatusExportButtonForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="ColorPanelBackBrush" Color="#FF28282A" />
+    <!-- すりガラスダイアログの DWM ティント（#AARRGGBB。A が低いほど透ける）。 -->
+    <SolidColorBrush x:Key="AcrylicDialogTintBrush" Color="#C0000000" />
 
     <SolidColorBrush x:Key="ExportButtonFillBrush" Color="#FF0F1B2D" />
     <SolidColorBrush x:Key="ExportButtonFocusFillBrush" Color="#FF1A3F77" />

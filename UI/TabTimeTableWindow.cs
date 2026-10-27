@@ -26,32 +26,32 @@ internal sealed class TabTimeTableWindow : Window
 
     public TabTimeTableWindow()
     {
-        WindowStyle = WindowStyle.SingleBorderWindow;
-        ResizeMode = ResizeMode.CanResizeWithGrip;
-        ShowInTaskbar = true;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Width = DesignMetrics.From96(640);
         Height = DesignMetrics.From96(440);
         MinWidth = DesignMetrics.From96(520);
         MinHeight = DesignMetrics.From96(320);
-        SetResourceReference(BackgroundProperty, "WindowBackBrush");
         SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
         SnapsToDevicePixels = true;
         UseLayoutRounding = true;
+        AcrylicDialogChrome.Prepare(
+            this,
+            ResizeMode.CanResizeWithGrip,
+            SizeToContent.Manual,
+            showInTaskbar: true);
 
         ConfigureGrid();
         ConfigureButtons();
-        Content = BuildRoot();
+        ApplyLocalizedText();
+        AcrylicDialogChrome.SetBody(this, BuildRoot(), new Thickness(0));
 
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, OnCopy, CanCopy));
         PreviewKeyDown += OnPreviewCopy;
-        WindowPaintReveal.Attach(this, activateOnReveal: true);
         AppDialogKeys.PrepareActionButton(_copyButton, isDefault: true);
         AppDialogKeys.PrepareActionButton(_csvButton);
         AppDialogKeys.PrepareActionButton(_pdfButton);
         AppDialogKeys.PrepareActionButton(_closeButton, isCancel: true);
         AppDialogKeys.Attach(this, Close);
-        ApplyLocalizedText();
         ApplyButtonLooks();
         ApplyGridStyles();
     }
@@ -77,7 +77,7 @@ internal sealed class TabTimeTableWindow : Window
 
     public void RefreshAppearance()
     {
-        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        AcrylicBackdrop.Apply(this);
         ApplyButtonLooks();
         ApplyGridStyles();
     }

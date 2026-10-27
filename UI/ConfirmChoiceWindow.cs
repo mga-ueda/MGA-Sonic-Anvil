@@ -34,7 +34,7 @@ internal sealed class ConfirmChoiceWindow : Window
             dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
 
-        WindowPaintReveal.ShowDialogWhenPainted(dialog);
+        AcrylicDialogChrome.ShowDialog(dialog);
         return dialog.Result;
     }
 
@@ -77,12 +77,8 @@ internal sealed class ConfirmChoiceWindow : Window
     {
         Result = DismissResult(buttons);
         Title = caption;
-        WindowStyle = WindowStyle.SingleBorderWindow;
-        ResizeMode = ResizeMode.NoResize;
-        ShowInTaskbar = false;
-        SizeToContent = SizeToContent.WidthAndHeight;
-        Background = (Brush)FindResource("WindowBackBrush");
         Foreground = (Brush)FindResource("PrimaryForeBrush");
+        AcrylicDialogChrome.Prepare(this);
         var message = new TextBlock
         {
             Text = text,
@@ -150,9 +146,7 @@ internal sealed class ConfirmChoiceWindow : Window
         var root = new StackPanel();
         root.Children.Add(message);
         root.Children.Add(row);
-        Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
-
-        WindowPaintReveal.Attach(this);
+        AcrylicDialogChrome.SetBody(this, root, DesignMetrics.AudioPad);
         AppDialogKeys.Attach(this, () =>
         {
             Result = DismissResult(buttons);

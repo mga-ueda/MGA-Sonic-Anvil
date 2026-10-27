@@ -215,6 +215,9 @@ internal static partial class UiStrings
             "StatusExportButtonFore" => Get("EXPORT・文字", "EXPORT · text"),
             "WindowBack" => Get("窓の背景", "Window background"),
             "ColorPanelBack" => Get("パネル面（見出しなど）", "Panel surface (headers)"),
+            "AcrylicDialogTint" => Get(
+                "すりガラスのティント（ダイアログ／メニュー・明暗・濃さ）",
+                "Frosted-glass tint (dialogs · menus · brightness · strength)"),
             "ExportButtonFill" => Get("OK・塗り", "OK · fill"),
             "ExportButtonFocusFill" => Get("OK・フォーカス塗り", "OK · focus fill"),
             "ExportButtonHoverFill" => Get("OK・ホバー塗り", "OK · hover fill"),

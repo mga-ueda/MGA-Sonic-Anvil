@@ -30,7 +30,13 @@ internal partial class ColorDevPanelWindow : Window
     {
         InitializeComponent();
         ApplyWindowTitle();
-        WindowPaintReveal.Attach(this, FocusSearchBox, activateOnReveal: true);
+        AcrylicDialogChrome.Prepare(
+            this,
+            ResizeMode.CanResizeWithGrip,
+            SizeToContent.Manual,
+            onPainted: FocusSearchBox,
+            activateOnReveal: true);
+        AcrylicDialogChrome.AdoptContent(this);
         Closed += (_, _) =>
         {
             FlushSave();
@@ -65,7 +71,8 @@ internal partial class ColorDevPanelWindow : Window
             return;
         }
 
-        WindowPaintReveal.ShowWhenPainted(this);
+        AcrylicDialogChrome.Show(this);
+        FocusSearchBox();
     }
 
     private void FocusSearchBox()

@@ -9,16 +9,13 @@ public partial class App : Application
 {
     protected override void OnStartup(StartupEventArgs e)
     {
-        EventManager.RegisterClassHandler(
-            typeof(ContextMenu),
-            FrameworkElement.LoadedEvent,
-            new RoutedEventHandler(RevealContextMenuWash));
         // 設定ウィンドウと同じタイトルバー色を、アプリ内の全 Window に適用する。
         EventManager.RegisterClassHandler(
             typeof(Window),
             FrameworkElement.LoadedEvent,
             new RoutedEventHandler(ApplyDarkTitleBarOnWindowLoaded));
         EditorContextMenuTheme.Apply(Resources);
+        AcrylicPopup.Install();
         SlidingTabAccent.Install();
         ImeComposition.Install(this);
         UiColors.Load();
@@ -39,25 +36,5 @@ public partial class App : Application
     {
         ActivationClassBeacon.Stop();
         base.OnExit(e);
-    }
-
-    /// <summary>
-    /// 右クリックメニューをプレイヤーのプルダウンと同じ透かしにする。
-    /// ポップアップが不透明だと背面合成が黒になり、暗い半透明塗りが濁る。
-    /// </summary>
-    private static void RevealContextMenuWash(object sender, RoutedEventArgs e)
-    {
-        if (sender is not ContextMenu menu || menu.Parent is not Popup popup)
-        {
-            return;
-        }
-
-        try
-        {
-            popup.AllowsTransparency = true;
-        }
-        catch (InvalidOperationException)
-        {
-        }
     }
 }

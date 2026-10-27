@@ -1,10 +1,8 @@
 using System.Globalization;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using System.Windows.Media.Imaging;
@@ -92,7 +90,8 @@ internal sealed class SilenceDetectDialog : Window
         {
             Owner = owner,
         };
-        WindowPaintReveal.ShowDialogWhenPainted(dialog);
+        WindowPaintReveal.EnsureRevealedForDialog(owner);
+        AcrylicDialogChrome.ShowDialog(dialog);
         return dialog.Result;
     }
 
@@ -116,16 +115,14 @@ internal sealed class SilenceDetectDialog : Window
         }
 
         Title = UiStrings.DialogSilenceDetectTitle;
-        WindowStyle = WindowStyle.SingleBorderWindow;
-        ResizeMode = ResizeMode.CanResizeWithGrip;
-        ShowInTaskbar = false;
-        SourceInitialized += (_, _) => DisableMinimizeBox(this);
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Width = DesignMetrics.From96(1080);
         MinWidth = DesignMetrics.From96(560);
-        SizeToContent = SizeToContent.Height;
-        Background = (Brush)FindResource("WindowBackBrush");
         Foreground = (Brush)FindResource("PrimaryForeBrush");
+        AcrylicDialogChrome.Prepare(
+            this,
+            ResizeMode.CanResizeWithGrip,
+            SizeToContent.Height);
 
         _preview = new SilenceDetectWavePreview
         {
@@ -339,9 +336,8 @@ internal sealed class SilenceDetectDialog : Window
         root.Children.Add(bottom);
         root.Children.Add(_preview);
 
-        Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
+        AcrylicDialogChrome.SetBody(this, root, DesignMetrics.AudioPad);
         PreviewMouseLeftButtonDown += OnBlankClickReleaseFieldFocus;
-        WindowPaintReveal.Attach(this);
         AppDialogKeys.Attach(this, () => Close());
         Closing += (_, _) =>
         {
@@ -987,51 +983,6 @@ internal sealed class SilenceDetectDialog : Window
         ms = SilenceDetectOptions.ClampTimingMs(parsed);
         return true;
     }
-
-    private const int GwlStyle = -16;
-    private const int WsMinimizeBox = 0x00020000;
-    private const int SwpFrameChanged = 0x0020;
-    private const int SwpNoMove = 0x0002;
-    private const int SwpNoSize = 0x0001;
-    private const int SwpNoZOrder = 0x0004;
-    private const int SwpNoActivate = 0x0010;
-
-    /// <summary>最小化ボタンだけ外す。最大化とリサイズは残す。</summary>
-    private static void DisableMinimizeBox(Window window)
-    {
-        var hwnd = new WindowInteropHelper(window).Handle;
-        if (hwnd == IntPtr.Zero)
-        {
-            return;
-        }
-
-        var style = GetWindowLongPtr(hwnd, GwlStyle).ToInt64();
-        _ = SetWindowLongPtr(hwnd, GwlStyle, new IntPtr(style & ~WsMinimizeBox));
-        _ = SetWindowPos(
-            hwnd,
-            IntPtr.Zero,
-            0,
-            0,
-            0,
-            0,
-            SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
-    }
-
-    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", CharSet = CharSet.Auto)]
-    private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
-
-    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", CharSet = CharSet.Auto)]
-    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
-
-    [DllImport("user32.dll")]
-    private static extern bool SetWindowPos(
-        IntPtr hWnd,
-        IntPtr hWndInsertAfter,
-        int x,
-        int y,
-        int cx,
-        int cy,
-        int uFlags);
 
     private static bool TryParseFadeMs(string? text, out int ms)
     {

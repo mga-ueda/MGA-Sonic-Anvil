@@ -91,6 +91,7 @@ public partial class MainWindow
 
         _tabTimeTable?.RefreshAppearance();
         LibraryBrowser.RefreshAppearance();
+        AcrylicBackdrop.RefreshTracked();
     }
 
     private void ApplyStatusFieldChrome()
